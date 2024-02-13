@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <link href="./styles/index.css" rel="stylesheet" />
+    <script type="importmap">
+        {
+          "imports": {
+            "three": "https://unpkg.com/three@0.160.1/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.1/examples/jsm/",
+            "gui": "/dat.gui/build/dat.gui.module.js"
+          }
+        }
+    </script>
+</head>
+<body>
+    <div class="page">
+        <div class="container">
+            <canvas id="canvas"></canvas>
+        </div>
+    </div>
+    <script type="module" src="daydream.js" defer></script>
+</body>
+</html>

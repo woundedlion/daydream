@@ -1,0 +1,35 @@
+/* Global variables */
+:root {
+  --black: #000000;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  background: var(--black);
+}
+
+#canvas {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+div.labelLayer {
+    pointer-events: none;
+    position:absolute;
+    top: 0px;
+}
+
+div.label {
+    pointer-events: none;
+    background-color: transparent;
+    color: white;
+    font-family: Arial;
+}
