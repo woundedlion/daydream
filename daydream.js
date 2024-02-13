@@ -712,26 +712,51 @@ const distanceGradient = (v, normal) => {
   }
 }
 
+const distanceGreen = (v, normal) => {
+  let d = 1 - 2 * Math.pow(Math.abs(v.dot(normal)),2);
+  let c1 = new THREE.Color(0x000000);
+  let c2 = new THREE.Color(0x00ff00);
+  return c1.clone().lerp(c2, d);
+}
+
+const lissajousCurve = (m1, m2, a, t) => {
+  return new THREE.Vector3(
+    Math.sin(m2 * t) * Math.cos(m1 * t - a * Math.PI),
+    Math.sin(m2 * t) * Math.sin(m1 * t - a * Math.PI),
+    Math.cos(m2 * t)
+  );
+}
+
 class PolyRot {
   constructor() {
     this.pixels = new Map();
     this.labels = [];
-    this.frame = 0;
+
     this.spinDuration = 96;
     this.axisMoveDuration = 16;
-    this.axis = new THREE.Vector3();
-    this.axisMoving = false;
+    this.genPolyDuration = 160;
+
     this.t = 0;
     this.axis = new THREE.Vector3(0, -1, 0).normalize();
+    this.rotation = new THREE.Quaternion(0, 0, 0, 1);
     this.resetPoly();
+    this.resetAxis();
+
+    this.states = {
+      "genPoly": { draw: this.drawGenPoly, animate: this.animateGenPoly },
+      "spinAxis": { draw: this.drawPolyRing, animate: this.animateSpinAxis },
+      "spinSplitPoly": { draw: this.drawPolyRing, animate: this.animateSplitPoly },
+    };
+    this.state = "genPoly";
+
     this.gui = new gui.GUI();
     this.gui.add(this, 'spinDuration').min(2).max(256).step(1);
     this.gui.add(this, 'axisMoveDuration').min(8).max(32).step(1);
+    this.gui.add(this, 'genPolyDuration').min(8).max(320).step(1);
   }
 
   resetPoly() {
     this.poly = new Dodecahedron();
-    this.rotation = new THREE.Quaternion(0, 0, 0, 1);
     this.angle = 0;
     this.lastAngle = 0;
     bisect(this.poly, this.axis);
@@ -742,34 +767,65 @@ class PolyRot {
     this.axisPath = new Path().appendLineCartesian(this.axis.toArray(), nextAxis, true);
   }
 
-  animate() {
-    if (this.axisMoving) {
-      if (this.t == this.axisMoveDuration + 1) {
-        this.resetPoly();
-        this.axisMoving = false;
-        this.t = 0;
-      } else {
-        let a = easeInOutSin(this.t / this.axisMoveDuration);
-        this.axis.setFromSpherical(this.axisPath.getPoint(a));
-        this.resetPoly();
-      }
+  animateGenPoly() {
+    if (this.t == this.genPolyDuration + 1) {
+      this.resetAxis();
+      this.state = "spinAxis";
+      this.t = 0;
     } else {
-      if (this.t == this.spinDuration + 1) {
-        this.resetAxis();
-        this.axisMoving = true;
-        this.t = 0;
-      } else {
-        this.lastAngle = this.angle;
-        this.angle = easeInOutSin(this.t / this.spinDuration) * 4 * Math.PI;
-        let r = new THREE.Quaternion()
-          .setFromAxisAngle(this.axis, this.angle - this.lastAngle);
-        this.rotation.multiply(r)
-      }
+      let tNorm = easeInOutSin(this.t / this.genPolyDuration) * 2 * Math.PI;
+      this.axis = lissajousCurve(6.55, 2.8, 0, tNorm);
     }
     this.t++;
   }
 
-  drawFrame() {
+  animateSpinAxis() {
+    if (this.t == this.axisMoveDuration + 1) {
+      this.resetPoly();
+      this.state = "spinSplitPoly";
+      this.t = 0;
+    } else {
+      let a = easeInOutSin(this.t / this.axisMoveDuration);
+      this.axis.setFromSpherical(this.axisPath.getPoint(a));
+      this.resetPoly();
+    }
+    this.t++;
+  }
+
+  animateSplitPoly() {
+    if (this.t == this.spinDuration + 1) {
+      this.resetAxis();
+      this.state = "spinAxis";
+      this.t = 0;
+    } else {
+      this.lastAngle = this.angle;
+      this.angle = easeInOutSin(this.t / this.spinDuration) * 4 * Math.PI;
+      let r = new THREE.Quaternion()
+        .setFromAxisAngle(this.axis, this.angle - this.lastAngle);
+      this.rotation.multiply(r)
+    }
+    this.t++;
+  }
+
+  drawGenPoly() {
+    this.pixels.clear();
+    let vertices = this.poly.vertices.map((a) => {
+      if (isOver(a, this.axis)) {
+        return rotateCoords(a, this.rotation);
+      } else {
+        return rotateCoords(a, this.rotation.clone().invert());
+      }
+    });
+
+    plotAA(this.pixels, drawPolyhedron(vertices, this.poly.eulerPath,
+      (v) => distanceGreen(v, this.axis)));
+    let s = new THREE.Spherical().setFromVector3(this.axis);
+    plotAA(this.pixels, drawRing(s.theta, s.phi, 1, (v) => 0xaaaaaa), blendOverMax);
+
+    return { pixels: this.pixels, labels: this.labels };
+  }
+
+  drawPolyRing() {
     this.pixels.clear();
 
     let vertices = this.poly.vertices.map((a) => {
@@ -784,8 +840,14 @@ class PolyRot {
       (v) => distanceGradient(v, this.axis)));
     let s = new THREE.Spherical().setFromVector3(this.axis);
     plotAA(this.pixels, drawRing(s.theta, s.phi, 1, (v) => 0xaaaaaa), blendOverMax);
-    this.animate();
+
     return { pixels: this.pixels, labels: this.labels };
+  }
+
+  drawFrame() {
+    let out = this.states[this.state].draw.call(this);
+    this.states[this.state].animate.call(this);
+    return out;
   }
 }
 
