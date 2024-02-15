@@ -1,5 +1,4 @@
 /* TODO
-- Easing function for poly spin
 - Sprite encapsulation
 - Motion encapsulation
 - Cartesian interfaces
@@ -841,8 +840,10 @@ class PolyRot {
     } else {
       let tNorm = easeInOutSin(this.t / (this.spinDuration * 2));
       this.spinAxis = lissajousCurve(12.8, 2 * Math.PI, this.spinStart, tNorm);
+      this.lastAngle = this.angle;
+      this.angle = easeInOutSin(this.t / (this.spinDuration * 2)) * 4 * Math.PI;
       let r = new THREE.Quaternion()
-        .setFromAxisAngle(this.spinAxis, 2 * Math.PI / 48);
+        .setFromAxisAngle(this.spinAxis, this.angle - this.lastAngle);
       this.topRotation.premultiply(r)
       this.bottomRotation = this.topRotation.clone();
     }
