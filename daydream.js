@@ -614,7 +614,7 @@ class Path {
   }
 
   getPoint(t) {
-    let i = Math.round(t * (this.points.length - 1));
+    let i = Math.round(t * (this.points.length));
     return this.points[i];
   }
 
@@ -636,7 +636,7 @@ class Motion {
   }
 
   done() {
-    return this.t >= this.duration + 1;
+    return this.t >= this.duration;
   }
 
   move(v) {
@@ -656,7 +656,7 @@ class Rotation {
   }
 
   done() {
-    return this.t >= this.duration + 1;
+    return this.t >= this.duration;
   }
 
   applyTo(q) {
@@ -864,7 +864,7 @@ class PolyRot {
 
   drawGenPoly() {
     this.pixels.clear();
-    let vertices = this.poly.vertices;
+    let vertices = this.poly.vertices.map((a) => rotateCoords(a, this.topRotation));
     plotAA(this.pixels, drawPolyhedron(vertices, this.poly.eulerPath,
       (v) => distanceGreen(v, this.axis)));
     let s = new THREE.Spherical().setFromVector3(this.axis);
