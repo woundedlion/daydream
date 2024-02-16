@@ -1,9 +1,7 @@
 /* TODO
 - Sprite encapsulation
-- Motion encapsulation
 - Cartesian interfaces
 - Decaying trail, mask
-- State transition logic
 - Lissajous interference
 - Smooth matrix
 - Color generation
@@ -15,8 +13,8 @@ import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer
 import { gui } from "gui"
 
 class Dot {
-  constructor(spherical_coords, color) {
-    this.position = spherical_coords;
+  constructor(sphericalCoords, color) {
+    this.position = sphericalCoords;
     this.color = color;
   }
 }
@@ -590,27 +588,33 @@ class Path {
   }
 
   length() {
-    return this.points.length();
+    return this.points.length;
   }
 
-  appendLineCartesian(c1, c2, longWay = false) {
+  appendLine(c1, c2, longWay = false) {
     let s1 = new THREE.Spherical().setFromCartesianCoords(c1[0], c1[1], c1[2]);
     let s2 = new THREE.Spherical().setFromCartesianCoords(c2[0], c2[1], c2[2]);
-    return this.appendLine(s1.theta, s1.phi, s2.theta, s2.phi, longWay);
-  }
-
-  appendLine(theta1, phi1, theta2, phi2, longWay = false) {
     if (this.points.length > 0) {
       this.points.pop();
     }
     this.points = this.points.concat(
-      drawLine(theta1, phi1, theta2, phi2, (v) => 0x000000, longWay)
+      drawLine(s1.theta, s1.phi, s2.theta, s2.phi, (v) => 0x000000, longWay)
         .map((d) => d.position));
     return this;
   }
 
-  getPoint(pos) {
-    let i = Math.round(pos * (this.points.length - 1));
+  appendSegment(plotFn, domain, samples) {
+    if (this.points.length > 0) {
+      this.points.pop();
+    }
+    for (let t = 0; t < samples; t++) {
+      this.points.push(plotFn(easeInOutSin(t / samples) * domain));
+    }
+    return this;
+  }
+
+  getPoint(t) {
+    let i = Math.round(t * (this.points.length - 1));
     return this.points[i];
   }
 
@@ -621,6 +625,47 @@ class Path {
       return this.points.slice(i1, i2 + 1);
     }
     return this.points.slice(i1).concat(this.points.slice(0, i2));
+  }
+}
+
+class Motion {
+  constructor(path, duration) {
+    this.path = path;
+    this.duration = duration;
+    this.t = 0;
+  }
+
+  done() {
+    return this.t >= this.duration + 1;
+  }
+
+  move(v) {
+    v.setFromSpherical(this.path.getPoint(this.t / this.duration));
+    this.t++
+  }
+}
+
+class Rotation {
+  constructor(axis, angle, duration) {
+    this.axis = axis;
+    this.angle = 0;
+    this.lastAngle = 0;
+    this.totalAngle = angle;
+    this.duration = duration;
+    this.t = 0;
+  }
+
+  done() {
+    return this.t >= this.duration + 1;
+  }
+
+  applyTo(q) {
+    this.lastAngle = this.angle;
+    this.angle = easeInOutSin(this.t / this.duration) * this.totalAngle;
+    let r = new THREE.Quaternion()
+      .setFromAxisAngle(this.axis, this.angle - this.lastAngle);
+    q.premultiply(r);
+    this.t++;
   }
 }
 
@@ -641,7 +686,6 @@ const intersectsPlane = (c1, c2, normal) => {
 }
 
 const angleBetween = (v1, v2) => Math.acos(Math.min(1, v1.dot(v2)));
-
 
 const intersection = (c1, c2, normal) => {
   let u = new THREE.Vector3().fromArray(c1).normalize();
@@ -737,7 +781,7 @@ const distanceGreen = (v, normal) => {
   return c1.clone().lerp(c2, d);
 }
 
-const lissajousCurve = (m1, m2, a, t) => {
+const lissajous = (m1, m2, a, t) => {
   return new THREE.Vector3(
     Math.sin(m2 * t) * Math.cos(m1 * t - a * Math.PI),
     Math.cos(m2 * t),
@@ -750,104 +794,72 @@ class PolyRot {
     this.pixels = new Map();
     this.labels = [];
 
-    this.spinDuration = 96;
+    this.splitPolyDuration = 96;
     this.axisMoveDuration = 16;
     this.genPolyDuration = 160;
+    this.spinPolyDuration = 192;
 
-    this.t = 0;
     this.axis = new THREE.Vector3(0, 1, 0).normalize();
+
     this.spinAxis = new THREE.Vector3(0, 1, 0);
     this.spinStart = Math.random() * Math.PI;
+
     this.topRotation = new THREE.Quaternion(0, 0, 0, 1);
     this.bottomRotation = new THREE.Quaternion(0, 0, 0, 1);
-    this.resetPoly();
-    this.resetAxis();
+
 
     this.states = {
-      "genPoly": { draw: this.drawGenPoly, animate: this.animateGenPoly },
-      "spinAxis": { draw: this.drawPolyRing, animate: this.animateSpinAxis },
-      "spinSplitPoly": { draw: this.drawPolyRing, animate: this.animateSplitPoly },
-      "spinPoly": { draw: this.drawSpinPoly, animate: this.animateSpinPoly },
+      "genPoly": {
+        enter: this.enterGenPoly,
+        draw: this.drawGenPoly,
+        animate: this.animateGenPoly,
+        exit: () => { },
+      },
+      "spinAxis": {
+        enter: this.enterSpinAxis,
+        draw: this.drawSpinPoly,
+        animate: this.animateSpinAxis,
+        exit: () => { },
+      },
+      "splitPoly": {
+        enter: this.enterSplitPoly,
+        draw: this.drawSplitPoly,
+        animate: this.animateSplitPoly,
+        exit: () => { },
+      },
+      "spinPoly": {
+        enter: this.enterSpinPoly,
+        draw: this.drawSpinPoly,
+        animate: this.animateSpinPoly,
+        exit: () => { },
+      },
     };
-    this.state = "spinPoly";
+    this.transitionTo("genPoly");
 
     this.gui = new gui.GUI();
-    this.gui.add(this, 'spinDuration').min(2).max(256).step(1);
-    this.gui.add(this, 'axisMoveDuration').min(8).max(32).step(1);
     this.gui.add(this, 'genPolyDuration').min(8).max(320).step(1);
+    this.gui.add(this, 'splitPolyDuration').min(8).max(256).step(1);
+    this.gui.add(this, 'axisMoveDuration').min(8).max(32).step(1);
+    this.gui.add(this, 'spinPolyDuration').min(8).max(256).step(1);
   }
 
-  resetPoly() {
+  transitionTo(state) {
+    if (this.state != undefined) {
+      this.states[this.state].exit.call(this);
+    }
+    this.t = 0;
+    this.state = state;
+    this.states[this.state].enter.call(this);
+  }
+
+  enterGenPoly() {
     this.poly = new Dodecahedron();
-    this.angle = 0;
-    this.lastAngle = 0;
-  }
-
-  resetAxis() {
-    let nextAxis = this.poly.vertices[Math.floor(Math.random() * this.poly.vertices.length)];
-    this.axisPath = new Path().appendLineCartesian(this.axis.toArray(), nextAxis, true);
-  }
-
-  animateGenPoly() {
-    if (this.t == this.genPolyDuration + 1) {
-      this.resetAxis();
-      this.state = "spinAxis";
-      this.t = 0;
-    } else {
-      let tNorm = easeInOutSin(this.t / this.genPolyDuration) * 2 * Math.PI;
-      this.axis = lissajousCurve(6.55, 2.8, 0, tNorm);
-    }
-    this.t++;
-  }
-
-  animateSpinAxis() {
-    if (this.t == this.axisMoveDuration + 1) {
-      this.resetPoly();
-      bisect(this.poly, this.topRotation, this.axis);
-      this.state = "spinSplitPoly";
-      this.t = 0;
-    } else {
-      let a = easeInOutSin(this.t / this.axisMoveDuration);
-      this.axis.setFromSpherical(this.axisPath.getPoint(a));
-      this.resetPoly();
-    }
-    this.t++;
-  }
-
-  animateSplitPoly() {
-    if (this.t == this.spinDuration + 1) {
-      this.resetPoly();
-      this.spinStart = Math.random() * Math.PI;
-      this.state = "spinPoly";
-      this.t = 0;
-    } else {
-      this.lastAngle = this.angle;
-      this.angle = easeInOutSin(this.t / this.spinDuration) * 4 * Math.PI;
-      let r = new THREE.Quaternion()
-        .setFromAxisAngle(this.axis, this.angle - this.lastAngle);
-      this.topRotation.premultiply(r)
-      this.bottomRotation.premultiply(r.invert());
-    }
-    this.t++;
-  }
-
-  animateSpinPoly() {
-    if (this.t == this.spinDuration * 2 + 1) {
-      this.resetAxis();
-      this.resetPoly();
-      this.state = "spinAxis";
-      this.t = 0;
-    } else {
-      let tNorm = easeInOutSin(this.t / (this.spinDuration * 2));
-      this.spinAxis = lissajousCurve(12.8, 2 * Math.PI, this.spinStart, tNorm);
-      this.lastAngle = this.angle;
-      this.angle = easeInOutSin(this.t / (this.spinDuration * 2)) * 4 * Math.PI;
-      let r = new THREE.Quaternion()
-        .setFromAxisAngle(this.spinAxis, this.angle - this.lastAngle);
-      this.topRotation.premultiply(r)
-      this.bottomRotation = this.topRotation.clone();
-    }
-    this.t++;
+    this.genPolyPath = new Path().appendSegment(
+      (t) => new THREE.Spherical().setFromVector3(
+        lissajous(6.55, 2.8, 0, t)),
+      Math.PI,
+      this.genPolyDuration);
+    this.genPolyMotion = new Motion(this.genPolyPath, this.genPolyDuration);
   }
 
   drawGenPoly() {
@@ -857,11 +869,45 @@ class PolyRot {
       (v) => distanceGreen(v, this.axis)));
     let s = new THREE.Spherical().setFromVector3(this.axis);
     plotAA(this.pixels, drawRing(s.theta, s.phi, 1, (v) => 0xaaaaaa), blendOverMax);
-
     return { pixels: this.pixels, labels: this.labels };
   }
 
-  drawPolyRing() {
+  animateGenPoly() {
+    if (this.genPolyMotion.done()) {
+      this.transitionTo("spinAxis");
+    } else {
+      this.genPolyMotion.move(this.axis);
+    }
+    this.t++;
+  }
+
+  enterSpinAxis() {
+    this.poly = new Dodecahedron();
+    let toAxis = this.poly.vertices[Math.floor(Math.random() * this.poly.vertices.length)];
+    this.axisPath = new Path().appendLine(this.axis.toArray(), toAxis, true);
+    this.axisMotion = new Motion(this.axisPath, this.axisMoveDuration);
+  }
+
+  animateSpinAxis() {
+    if (this.axisMotion.done()) {
+      this.transitionTo("splitPoly");
+    } else {
+      this.axisMotion.move(this.axis);
+      this.poly = new Dodecahedron();
+    }
+  }
+
+  enterSplitPoly() {
+    this.poly = new Dodecahedron();
+    bisect(this.poly, this.topRotation, this.axis);
+    this.bottomRotation = this.topRotation.clone();
+    this.polyRotationFwd = new Rotation(
+      this.axis, 4 * Math.PI, this.splitPolyDuration);
+    this.polyRotationRev = new Rotation(
+      this.axis.clone().negate(), 4 * Math.PI, this.splitPolyDuration);
+  }
+
+  drawSplitPoly() {
     this.pixels.clear();
     this.labels = [];
 
@@ -880,16 +926,47 @@ class PolyRot {
     return { pixels: this.pixels, labels: this.labels };
   }
 
+  animateSplitPoly() {
+    if (this.polyRotationFwd.done()) {
+      this.transitionTo("spinPoly");
+    } else {
+      this.polyRotationFwd.applyTo(this.topRotation);
+      this.polyRotationRev.applyTo(this.bottomRotation);
+    }
+    this.t++;
+  }
+
+  enterSpinPoly() {
+    this.poly = new Dodecahedron();
+    this.spinPolyRotation = new Rotation(this.spinAxis, 4 * Math.PI,
+      this.spinPolyDuration);
+    this.spinAxisPath = new Path().appendSegment(
+      (t) => new THREE.Spherical().setFromVector3(
+        lissajous(12.8, 2 * Math.PI, this.spinStart, t)),
+      1,
+      this.spinPolyDuration
+    );
+    this.spinAxisMotion = new Motion(this.spinAxisPath, this.spinPolyDuration);
+  }
+
   drawSpinPoly() {
     this.pixels.clear();
     this.labels = [];
-
     let vertices = this.poly.vertices.map((a) => rotateCoords(a, this.topRotation));
     plotAA(this.pixels, drawPolyhedron(vertices, this.poly.eulerPath,
       (v) => distanceGradient(v, this.axis)));
     let s = new THREE.Spherical().setFromVector3(this.axis);
     plotAA(this.pixels, drawRing(s.theta, s.phi, 1, (v) => 0xaaaaaa), blendOverMax);
     return { pixels: this.pixels, labels: this.labels };
+  }
+
+  animateSpinPoly() {
+    if (this.spinPolyRotation.done()) {
+      this.transitionTo("genPoly");
+    } else {
+      this.spinAxisMotion.move(this.spinAxis);
+      this.spinPolyRotation.applyTo(this.topRotation);
+    }
   }
 
   drawFrame() {
