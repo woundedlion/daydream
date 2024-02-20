@@ -896,7 +896,7 @@ class PolyRot {
       },
       "spinRing": {
         enter: this.enterSpinRing,
-        draw: this.drawSpinPoly,
+        draw: this.drawPolyRing,
         animate: this.animateSpinRing,
         exit: () => { },
       },
@@ -908,7 +908,7 @@ class PolyRot {
       },
       "spinPoly": {
         enter: this.enterSpinPoly,
-        draw: this.drawSpinPoly,
+        draw: this.drawPolyRing,
         animate: this.animateSpinPoly,
         exit: () => { },
       },
@@ -945,14 +945,17 @@ class PolyRot {
   drawGenPoly() {
     this.pixels.clear();
     let vertices = this.topOrientation.orientPoly(this.poly.vertices);
+    for (let i = 0; i < this.ringOrientation.length(); i++) {
+     plotAA(this.pixels, drawPolyhedron(
+        vertices,
+        this.poly.eulerPath,
+        (v) => applyMask(this.polyMask, v)));
+      let normal = this.ringOrientation.orient(this.ring, i);
+      plotAA(this.pixels, drawRing(normal, 1, (v) => 0xaaaaaa), blendOverMax);
+      plotAA(this.pixels, drawVector(normal, (v) => 0xff0000), blendOverMax);
+    }
     this.ringOrientation.collapse();
-    plotAA(this.pixels, drawPolyhedron(
-      vertices,
-      this.poly.eulerPath,
-      (v) => applyMask(this.polyMask, v)));
-    let normal = this.ringOrientation.orient(this.ring);
-    plotAA(this.pixels, drawRing(normal, 1, (v) => 0xaaaaaa), blendOverMax);
-    plotAA(this.pixels, drawVector(normal, (v) => 0xff0000), blendOverMax);
+
     return { pixels: this.pixels, labels: this.labels };
   }
 
@@ -996,7 +999,6 @@ class PolyRot {
     this.pixels.clear();
     this.labels = [];
     let normal = this.ringOrientation.orient(this.ring);
-
     let vertices = this.poly.vertices.map((c) => {
       let v = this.topOrientation.orient(new THREE.Vector3().fromArray(c));
       if (isOver(v, normal)) {
@@ -1005,7 +1007,6 @@ class PolyRot {
         return this.bottomOrientation.orient(new THREE.Vector3().fromArray(c)).toArray();
       }
     });
-
     plotAA(this.pixels, drawPolyhedron(vertices, this.poly.eulerPath,
       (v) => distanceGradient(v, normal)));
     plotAA(this.pixels, drawRing(normal, 1, (v) => 0xaaaaaa), blendOverMax);
@@ -1036,7 +1037,7 @@ class PolyRot {
     this.spinAxisMotion = new Motion(this.spinAxisPath, this.spinPolyDuration);
   }
 
-  drawSpinPoly() {
+  drawPolyRing() {
     this.pixels.clear();
     this.labels = [];
     let normal = this.ringOrientation.orient(this.ring);
