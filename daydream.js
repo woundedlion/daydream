@@ -11,6 +11,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { gui } from "gui"
+import { MaxEquation } from "three";
 
 class Dot {
   constructor(sphericalCoords, color) {
@@ -467,6 +468,14 @@ const drawVector = (v, colorFn) => {
   return [new Dot(new THREE.Spherical().setFromVector3(v.normalize()), colorFn(v))];
 }
 
+const drawPath = (path, colorFn) => {
+  let r = [];
+  for (let t = 0; t < path.length(); t++) {
+    r.push(new Dot(path.getPoint(t/path.length()), colorFn(t)));
+  }
+  return r;
+}
+
 const drawLine = (theta1, phi1, theta2, phi2, colorFn, longWay = false) => {
   let dots = []
   let u = new THREE.Vector3().setFromSphericalCoords(1, phi1, theta1);
@@ -581,6 +590,50 @@ const drawFibSpiral = (n, eps, colorFn) => {
   return dots;
 };
 
+class Orientation {
+  constructor() {
+    this.orientations = [new THREE.Quaternion(0, 0, 0, 1)];
+  }
+
+  length() {
+    return this.orientations.length;
+  }
+
+  orient(v, i = this.length() - 1) {
+    return v.clone().normalize().applyQuaternion(this.orientations[i]);
+  }
+
+  unorient(v, i = this.length() - 1) {
+    return v.clone().normalize().applyQuaternion(this.orientations[i].clone().invert());
+  }
+
+  orientPoly(vertices, i = this.length() - 1) {
+    return vertices.map((c) => {
+      return this.orient(new THREE.Vector3().fromArray(c)).toArray();
+    });
+  }
+
+  clear() {
+    this.orientations = [];
+  }
+
+  get(i = this.length() - 1) {
+    return this.orientations[i];
+  }
+
+  set(quaternion) {
+    this.orientations = [quaternion];
+  }
+
+  push(quaternion) {
+    this.orientations.push(quaternion);
+  }
+
+  collapse() {
+    while (this.orientations.length > 1) { this.orientations.shift(); }
+  }
+}
+
 class Path {
   constructor() {
     this.points = [];
@@ -619,6 +672,8 @@ class Path {
 }
 
 class Motion {
+  static MAX_ANGLE = 2 * Math.PI / Daydream.W;
+
   constructor(path, duration) {
     this.path = path;
     this.duration = duration;
@@ -630,21 +685,29 @@ class Motion {
     return this.t >= this.duration;
   }
 
-  move(q) {
+  move(orientation) {
     this.from = this.to;
     this.to = new THREE.Vector3().setFromSpherical(
       this.path.getPoint(this.t / this.duration));
     if (!this.from.equals(this.to)) {
       let axis = new THREE.Vector3().crossVectors(this.from, this.to).normalize();
       let angle = angleBetween(this.from, this.to);
+      let origin = orientation.get();
+      orientation.clear();
+      for (let a = Motion.MAX_ANGLE; angle - a > 0.0001; a += Motion.MAX_ANGLE) {
+        let r = new THREE.Quaternion().setFromAxisAngle(axis, a);
+        orientation.push(origin.clone().premultiply(r));
+      }
       let r = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-      q.premultiply(r);
+      orientation.push(origin.clone().premultiply(r));
     }
     this.t++
   }
 }
 
 class Rotation {
+  static MAX_ANGLE = 2 * Math.PI / Daydream.W;
+
   constructor(axis, angle, duration) {
     this.axis = axis;
     this.angle = 0;
@@ -658,12 +721,20 @@ class Rotation {
     return this.t >= this.duration;
   }
 
-  rotate(q) {
-    this.lastAngle = this.angle;
-    this.angle = easeInOutSin(this.t / this.duration) * this.totalAngle;
-    let r = new THREE.Quaternion()
-      .setFromAxisAngle(this.axis, this.angle - this.lastAngle);
-    q.premultiply(r);
+  rotate(orientation) {
+    this.from = this.to;
+    this.to = easeInOutSin(this.t / this.duration) * this.totalAngle;
+    if (Math.abs(this.to - this.from) > 0.0001) {
+      let angle = this.to - this.from;
+      let origin = orientation.get();
+      orientation.clear();
+      for (let a = Rotation.MAX_ANGLE; angle - a > 0.0001; a += Rotation.MAX_ANGLE) {
+        let r = new THREE.Quaternion().setFromAxisAngle(this.axis, a);
+        orientation.push(origin.clone().premultiply(r));
+      }
+      let r = new THREE.Quaternion().setFromAxisAngle(this.axis,angle);
+      orientation.push(origin.clone().premultiply(r));
+    }
     this.t++;
   }
 }
@@ -675,20 +746,18 @@ return new THREE.Vector3()
     .toArray();
 }
 
-const isOver = (c, normal) => {
-  return normal.dot(new THREE.Vector3().fromArray(c)) >= 0;
+const isOver = (v, normal) => {
+  return normal.dot(v) >= 0;
 }
 
-const intersectsPlane = (c1, c2, normal) => {
-  return (isOver(c1, normal) && !isOver(c2, normal))
-    || (!isOver(c1, normal) && isOver(c2, normal));
+const intersectsPlane = (v1, v2, normal) => {
+  return (isOver(v1, normal) && !isOver(v2, normal))
+    || (!isOver(v1, normal) && isOver(v2, normal));
 }
 
 const angleBetween = (v1, v2) => Math.acos(Math.min(1, v1.dot(v2)));
 
-const intersection = (c1, c2, normal) => {
-  let u = new THREE.Vector3().fromArray(c1).normalize();
-  let v = new THREE.Vector3().fromArray(c2).normalize();
+const intersection = (u, v, normal) => {
   let w = new THREE.Vector3().crossVectors(v, u).normalize();
   let i1 = new THREE.Vector3().crossVectors(w, normal).normalize();
   let i2 = new THREE.Vector3().crossVectors(normal, w).normalize();
@@ -715,27 +784,25 @@ const splitPoint = (c, normal) => {
   return [
     new THREE.Vector3().copy(c)
       .addScaledVector(normal, shift)
-      .normalize()
-      .toArray(),
+      .normalize(),
     new THREE.Vector3().copy(c)
       .addScaledVector(new THREE.Vector3().copy(normal).negate(), shift)
       .normalize()
-      .toArray(),
+      ,
   ];
 }
 
-const bisect = (poly, rotation, normal) => {
+const bisect = (poly, orientation, normal) => {
   let v = poly.vertices;
   let e = poly.eulerPath;
   e.map((neighbors, ai) => {
     e[ai] = neighbors.reduce((result, bi) => {
-      let a = rotateCoords(v[ai], rotation);
-      let b = rotateCoords(v[bi], rotation);
+      let a = orientation.orient(new THREE.Vector3().fromArray(v[ai]));
+      let b = orientation.orient(new THREE.Vector3().fromArray(v[bi]));
       if (intersectsPlane(a, b, normal)) {
         let points = splitPoint(intersection(a, b, normal), normal);
-        let unrotation = rotation.clone().invert();
-        v.push(rotateCoords(points[0], unrotation));
-        v.push(rotateCoords(points[1], unrotation));
+        v.push(orientation.unorient(points[0]).toArray());
+        v.push(orientation.unorient(points[1]).toArray());
         if (isOver(a, normal)) {
           e.push([ai]);
           e.push([bi]);
@@ -812,13 +879,13 @@ class PolyRot {
     this.spinPolyDuration = 192;
 
     this.ring = new THREE.Vector3(0, 1, 0).normalize();
-    this.ringPosition = new THREE.Quaternion(0, 0, 0, 1);
+    this.ringOrientation = new Orientation();
 
     this.spinAxis = new THREE.Vector3(0, 1, 0);
-    this.spinAxisPosition = new THREE.Quaternion(0, 0, 0, 1);
+    this.spinAxisOrientation = new Orientation();
 
-    this.topPosition = new THREE.Quaternion(0, 0, 0, 1);
-    this.bottomPosition = new THREE.Quaternion(0, 0, 0, 1);
+    this.topOrientation = new Orientation();
+    this.bottomOrientation = new Orientation;
 
     this.states = {
       "genPoly": {
@@ -877,10 +944,13 @@ class PolyRot {
 
   drawGenPoly() {
     this.pixels.clear();
-    let vertices = this.poly.vertices.map((a) => rotateCoords(a, this.topPosition));
-    plotAA(this.pixels, drawPolyhedron(vertices, this.poly.eulerPath,
+    let vertices = this.topOrientation.orientPoly(this.poly.vertices);
+    this.ringOrientation.collapse();
+    plotAA(this.pixels, drawPolyhedron(
+      vertices,
+      this.poly.eulerPath,
       (v) => applyMask(this.polyMask, v)));
-    let normal = this.ring.clone().applyQuaternion(this.ringPosition);
+    let normal = this.ringOrientation.orient(this.ring);
     plotAA(this.pixels, drawRing(normal, 1, (v) => 0xaaaaaa), blendOverMax);
     plotAA(this.pixels, drawVector(normal, (v) => 0xff0000), blendOverMax);
     return { pixels: this.pixels, labels: this.labels };
@@ -890,14 +960,13 @@ class PolyRot {
     if (this.genPolyMotion.done()) {
       this.transitionTo("spinRing");
     } else {
-      this.genPolyMotion.move(this.ringPosition);
+      this.genPolyMotion.move(this.ringOrientation);
     }
-    this.t++;
   }
 
   enterSpinRing() {
     this.poly = new Dodecahedron();
-    let from = this.ring.clone().applyQuaternion(this.ringPosition);
+    let from = this.ringOrientation.orient(this.ring).clone();
     let toNormal = this.poly.vertices[Math.floor(Math.random() * this.poly.vertices.length)];
     this.ringPath = new Path().appendLine(from.toArray(), toNormal, true);
     this.ringMotion = new Motion(this.ringPath, this.spinRingDuration);
@@ -907,16 +976,16 @@ class PolyRot {
     if (this.ringMotion.done()) {
       this.transitionTo("splitPoly");
     } else {
-      this.ringMotion.move(this.ringPosition);
+      this.ringMotion.move(this.ringOrientation);
       this.poly = new Dodecahedron();
     }
   }
 
   enterSplitPoly() {
     this.poly = new Dodecahedron();
-    let normal = this.ring.clone().applyQuaternion(this.ringPosition);
-    bisect(this.poly, this.topPosition, normal);
-    this.bottomPosition = this.topPosition.clone();
+    let normal = this.ringOrientation.orient(this.ring);
+    bisect(this.poly, this.topOrientation, normal);
+    this.bottomOrientation.set(this.topOrientation.get());
     this.polyRotationFwd = new Rotation(
      normal, 4 * Math.PI, this.splitPolyDuration);
     this.polyRotationRev = new Rotation(
@@ -926,13 +995,14 @@ class PolyRot {
   drawSplitPoly() {
     this.pixels.clear();
     this.labels = [];
-    let normal = this.ring.clone().applyQuaternion(this.ringPosition);
+    let normal = this.ringOrientation.orient(this.ring);
 
-    let vertices = this.poly.vertices.map((a) => {
-      if (isOver(rotateCoords(a, this.topPosition), normal)) {
-        return rotateCoords(a, this.topPosition);
+    let vertices = this.poly.vertices.map((c) => {
+      let v = this.topOrientation.orient(new THREE.Vector3().fromArray(c));
+      if (isOver(v, normal)) {
+        return v.toArray();
       } else {
-        return rotateCoords(a, this.bottomPosition);
+        return this.bottomOrientation.orient(new THREE.Vector3().fromArray(c)).toArray();
       }
     });
 
@@ -946,15 +1016,15 @@ class PolyRot {
     if (this.polyRotationFwd.done()) {
       this.transitionTo("spinPoly");
     } else {
-      this.polyRotationFwd.rotate(this.topPosition);
-      this.polyRotationRev.rotate(this.bottomPosition);
+      this.polyRotationFwd.rotate(this.topOrientation);
+      this.polyRotationRev.rotate(this.bottomOrientation);
     }
     this.t++;
   }
 
   enterSpinPoly() {
     this.poly = new Dodecahedron();
-    let axis = this.spinAxis.clone().applyQuaternion(this.spinAxisPosition);
+    let axis = this.spinAxisOrientation.orient(this.spinAxis);
     this.spinPolyRotation = new Rotation(axis, 4 * Math.PI,
       this.spinPolyDuration);
     this.spinAxisPath = new Path().appendSegment(
@@ -969,13 +1039,11 @@ class PolyRot {
   drawSpinPoly() {
     this.pixels.clear();
     this.labels = [];
-    let normal = this.ring.clone().applyQuaternion(this.ringPosition);
-    let vertices = this.poly.vertices.map((a) => rotateCoords(a, this.topPosition));
+    let normal = this.ringOrientation.orient(this.ring);
+    let vertices = this.topOrientation.orientPoly(this.poly.vertices);
     plotAA(this.pixels, drawPolyhedron(vertices, this.poly.eulerPath,
       (v) => distanceGradient(v, normal)));
     plotAA(this.pixels, drawRing(normal, 1, (v) => 0xaaaaaa), blendOverMax);
-//    let axis = this.spinAxis.clone().applyQuaternion(this.spinAxisPosition);
-//    plotAA(this.pixels, drawVector(axis, (v) => 0x00ff00), blendOverMax);
     return { pixels: this.pixels, labels: this.labels };
   }
 
@@ -983,10 +1051,10 @@ class PolyRot {
     if (this.spinPolyRotation.done()) {
       this.transitionTo("genPoly");
     } else {
-      this.spinAxisMotion.move(this.spinAxisPosition);
+      this.spinAxisMotion.move(this.spinAxisOrientation);
       this.spinPolyRotation.axis =
-        this.spinAxis.clone().applyQuaternion(this.spinAxisPosition);
-      this.spinPolyRotation.rotate(this.topPosition);
+      this.spinAxisOrientation.orient(this.spinAxis);
+      this.spinPolyRotation.rotate(this.topOrientation);
     }
   }
 
