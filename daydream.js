@@ -204,6 +204,10 @@ const blendOver = (c1, c2) => {
   return c2;
 }
 
+const blendUnder = (c1, c2) => {
+  return c1;
+}
+
 const blendOverMax = (c1, c2) => {
   const m1 = Math.sqrt(Math.pow(c1.r, 2) + Math.pow(c1.g, 2) + Math.pow(c1.b, 2));
   const m2 = Math.sqrt(Math.pow(c2.r, 2) + Math.pow(c2.g, 2) + Math.pow(c2.b, 2));
@@ -226,8 +230,7 @@ const blendMean = (c1, c2) => {
   );
 }
 
-const plotPixel = (pixels, px, py, color, maskFn, age = 0, blendMode = blendOverMax) => {
-  const key = new String(px) + "," + py;
+const plotPixel = (pixels, key, color, blendMode, maskFn, age) => {
   let p = { color: color, age: age };
   if (pixels.has(key)) {
     let old = pixels.get(key);
@@ -243,29 +246,36 @@ const falloff = (c) => {
   return c;
 }
 
-const plotAA = (pixels, dots, maskFn = (key) => 1, age = 0, blendMode = blendOverMax) => {
+const pixelKey = (x, y) => new String(x) + "," + y;
+const nullMask = (key) => 1;
+
+const plotAA = (pixels, dots, maskFn = nullMask, age = 0, blendMode = blendOver) => {
+  let buf = new Map();
   for (const dot of dots) {
     let p = sphericalToPixel(dot.position);
     let xi = Math.floor(p.x);
     let xm = p.x - xi;
     let yi = Math.floor(p.y);
     let ym = p.y - yi;
-
     let c = falloff((1 - xm) * (1 - ym));
     let color = new THREE.Color(dot.color);
-    plotPixel(pixels, xi, yi,
-      color.clone().multiplyScalar(c), maskFn, age, blendMode);
+
+    plotPixel(buf, pixelKey(xi, yi),
+      color.clone().multiplyScalar(c), blendOverMax, maskFn, age);
     c = falloff(xm * (1 - ym));
-    plotPixel(pixels, (xi + 1) % Daydream.W, yi,
-      color.clone().multiplyScalar(c), maskFn, age, blendMode);
+    plotPixel(buf, pixelKey((xi + 1) % Daydream.W, yi),
+      color.clone().multiplyScalar(c), blendOverMax, maskFn, age);
     if (yi < Daydream.H - 1) {
       c = falloff((1 - xm) * ym);
-      plotPixel(pixels, xi, yi + 1,
-        color.clone().multiplyScalar(c), maskFn, age, blendMode);
+      plotPixel(buf, pixelKey(xi, yi + 1),
+        color.clone().multiplyScalar(c), blendOverMax, maskFn, age);
       c = falloff(xm * ym);
-      plotPixel(pixels, (xi + 1) % Daydream.W, yi + 1,
-        color.clone().multiplyScalar(c), maskFn, age, blendMode);
+      plotPixel(buf, pixelKey((xi + 1) % Daydream.W, yi + 1),
+        color.clone().multiplyScalar(c), blendOverMax, maskFn, age);
     }
+  }
+  for (const [key, pixel] of buf.entries()) {
+    plotPixel(pixels, key, pixel.color.clone(), blendMode, nullMask, pixel.age);
   }
 };
 
@@ -711,6 +721,25 @@ class Motion {
   }
 }
 
+class FadeIn {
+  constructor(duration) {
+    this.duration = duration;
+    this.t = 0;
+  }
+
+  done() {
+    return this.t >= this.duration;
+  }
+
+  fade(pixels) {
+    this.pixels.forEach((pixel, key) => {
+      console.log(key);
+    });
+    this.t++;
+  }
+
+}
+
 class Rotation {
   static MAX_ANGLE = 2 * Math.PI / Daydream.W;
 
@@ -731,7 +760,7 @@ class Rotation {
     this.from = this.to;
     this.to = easingFn(this.t / this.duration) * this.totalAngle;
     if (Math.abs(this.to - this.from) > 0.0001) {
-      let angle = this.to - this.from;
+      let angle = Math.abs(this.to - this.from);
       let origin = orientation.get();
       orientation.clear();
       for (let a = Rotation.MAX_ANGLE; angle - a > 0.0001; a += Rotation.MAX_ANGLE) {
@@ -847,9 +876,9 @@ const easeMid = (t) => {
 const distanceGradient = (v, normal) => {
   let d = v.dot(normal);
   if (d > 0) {
-    return g3.get(d);
+    return g1.get(d);
   } else {
-    return g3.get(-d);
+    return g2.get(-d);
   }
 }
 
@@ -870,6 +899,10 @@ class DecayTrails {
     this.label = false;
   }
 
+  clear() {
+    this.mask = new Map();
+  }
+
   has(key) {
     return this.mask.has(key);  
   }
@@ -884,12 +917,10 @@ class DecayTrails {
       value.color = this.gradient.get(1 - ((this.ttl - value.age) / this.ttl));
     }
     this.pixels.set(key, value);
-
-
   }
 
   decay() {
-    this.mask.forEach((ttl, key, map) => {
+    this.mask.forEach((ttl, key) => {
       ttl -= 1;
       if (ttl < 0.0001) {
         this.mask.delete(key);
@@ -905,11 +936,19 @@ class DecayTrails {
             `${ttl.toFixed(1)}`);
         }
       }
+
+      if (this.label) {
+        let xy = key.split(',');
+        let s = pixelToSpherical(xy[0], xy[1]);
+        s.radius = Daydream.SPHERE_RADIUS;
+        daydream.makeLabel(new THREE.Vector3().setFromSpherical(s),
+          `${ttl}`);
+      }
+
     });
 
   }
 }
-
 
 class DecayMask {
   constructor(ttl) {
@@ -928,29 +967,29 @@ class DecayMask {
 
   getMask(key) {
     if (this.mask.has(key)) {
-      return Math.pow(this.mask.get(key) / this.ttl, 2);
+      return Math.pow(this.mask.get(key) / this.ttl, 1);
     }
     return 0;
   }
 
   set(key, value) {
-    this.mask.set(key, this.ttl);
+    this.mask.set(key, this.ttl - value.age);
   }
 
   decay() {
     this.mask.forEach((ttl, key, map) => {
-      if (--ttl < 1) {
+      ttl -= 1;
+      if (ttl < 0.0001) {
         this.mask.delete(key);
       } else {
         this.mask.set(key, ttl);
-      }
-
-      if (this.label) {
-        let xy = key.split(',');
-        let s = pixelToSpherical(xy[0], xy[1]);
-        s.radius = Daydream.SPHERE_RADIUS;
-        daydream.makeLabel(new THREE.Vector3().setFromSpherical(s),
-          `${ttl}`);
+        if (this.label) {
+          let xy = key.split(',');
+          let s = pixelToSpherical(xy[0], xy[1]);
+          s.radius = Daydream.SPHERE_RADIUS;
+          daydream.makeLabel(new THREE.Vector3().setFromSpherical(s),
+            `${ttl.toFixed(2)}`);
+        }
       }
     });
   }
@@ -998,7 +1037,7 @@ class PolyRot {
   constructor() {
     this.pixels = new Map();
     this.labels = [];
-    this.polyMask = new DecayMask(5, this.pixels);
+    this.polyMask = new DecayMask(4, this.pixels);
     this.ringTrail = new DecayTrails(3, this.pixels, g3);
 
     this.ring = new THREE.Vector3(0, 1, 0).normalize();
@@ -1011,9 +1050,10 @@ class PolyRot {
     this.topOrientation = new Orientation();
     this.bottomOrientation = new Orientation;
 
+    this.genPolyDuration = 160;
+    this.trailRingDuration = 160;
     this.splitPolyDuration = 96;
     this.spinRingDuration = 16;
-    this.genPolyDuration = 160;
     this.spinPolyDuration = 192;
 
     this.states = {
@@ -1023,7 +1063,7 @@ class PolyRot {
         animate: this.animateGenPoly,
         exit: () => { },
       },
-      "TrailRing": {
+      "trailRing": {
         enter: this.enterTrailRing,
         draw: this.drawTrailRing,
         animate: this.animateTrailRing,
@@ -1049,24 +1089,27 @@ class PolyRot {
       },
     };
 
-    this.stateIndex = 0;
+    this.stateIndex = -1;
     this.sequence = [
-      "TrailRing",
+//      "trailRing",
+      "spinRing",
       "genPoly",
       "spinRing",
+      "spinPoly",
+      "spinRing",
       "splitPoly",
-      "spinPoly"
     ];
 
-    this.transitionTo("TrailRing");
+    this.transition();
 
     this.gui = new gui.GUI();
     this.gui.add(this, 'genPolyDuration').min(8).max(320).step(1);
+    this.gui.add(this, 'trailRingDuration').min(8).max(320).step(1);
     this.gui.add(this, 'splitPolyDuration').min(8).max(256).step(1);
     this.gui.add(this, 'spinRingDuration').min(8).max(32).step(1);
     this.gui.add(this, 'spinPolyDuration').min(8).max(256).step(1);
     this.gui.add(this.polyMask, 'ttl').min(1).max(20).step(1);
-    this.gui.add(this.ringTrail, 'label');
+    this.gui.add(this.polyMask, 'label');
   }
 
   transition() {
@@ -1080,6 +1123,7 @@ class PolyRot {
     }
     this.t = 0;
     this.state = state;
+    console.log(this.state);
     this.states[this.state].enter.call(this);
   }
 
@@ -1090,7 +1134,7 @@ class PolyRot {
         this.ringOrientation.orient(lissajous(10, 0.5, 0, t))),
       2 * Math.PI,
       this.genPolyDuration,
-      easeInSin
+      easeInOutSin
     );
     this.genPolyMotion = new Motion(this.genPolyPath, this.genPolyDuration);
   }
@@ -1101,9 +1145,13 @@ class PolyRot {
     this.polyMask.decay();
     let vertices = this.topOrientation.orientPoly(this.poly.vertices);
 
-    for (let i = 0; i < this.ringOrientation.length(); i++) {
+    let n = this.ringOrientation.length();
+    for (let i = 0; i < n; i++) {
       let normal = this.ringOrientation.orient(this.ring, i);
-      plotAA(this.polyMask, drawRing(normal, 1, (v) => 0x000000));
+      plotAA(this.polyMask, drawRing(normal, 1, (v) => 0x000000),
+        (k) => 1,
+        n == 1 ? 0 : (n - 1 - i) * (1 / (n - 1))
+      );
     }
 
     plotAA(this.pixels, drawPolyhedron(
@@ -1125,22 +1173,23 @@ class PolyRot {
   animateGenPoly() {
     if (this.genPolyMotion.done()) {
       this.transition();
-    } else {
+//      this.transitionTo("genPoly");
+     } else {
       this.genPolyMotion.move(this.ringOrientation);
     }
   }
 
   enterTrailRing() {
-//    this.pixels.clear();  
     this.poly = new Dodecahedron();
-    this.genPolyPath = new Path().appendSegment(
+    this.ringTrail.clear();
+    this.trailRingPath = new Path().appendSegment(
       (t) => new THREE.Spherical().setFromVector3(
-          this.ringOrientation.orient(lissajous(10, 0.5, 0, t))),
+        this.ringOrientation.orient(lissajous(10, 0.5, 0, t))),
       2 * Math.PI,
       this.genPolyDuration,
-      easeInSin
-    );
-    this.genPolyMotion = new Motion(this.genPolyPath, this.genPolyDuration);
+      easeInOutSin
+      )
+      this.trailRingMotion = new Motion(this.trailRingPath, this.trailRingDuration);
   }
 
   drawTrailRing() {
@@ -1150,20 +1199,23 @@ class PolyRot {
     let n = this.ringOrientation.length();
     for (let i = 0; i < n; i++) {
       let normal = this.ringOrientation.orient(this.ring, i);
-      plotAA(this.ringTrail, drawRing(normal, 1, (v) => 0xaaaaaa), (k) => 1,
-        n == 1 ? 0 : (n - 1 - i) * (1 / (n - 1)));
+      plotAA(this.ringTrail, drawRing(normal, 1, (v) => 0xffffff), (k) => 1,
+        n == 1 ? 0 : (n - 1 - i) * (1 / (n - 1)), blendOver);
     }
     this.ringOrientation.collapse();
     let normal = this.ringOrientation.orient(this.ring);
+
+//    plotAA(this.ringTrail, drawVector(normal, (p) => 0xff0000));
 
     return { pixels: this.pixels, labels: this.labels };
   }
 
   animateTrailRing() {
-    if (this.genPolyMotion.done()) {
-      this.transitionTo("TrailRing");
+    if (this.trailRingMotion.done()) {
+      this.transition();
+//      this.transitionTo("trailRing");
     } else {
-      this.genPolyMotion.move(this.ringOrientation);
+      this.trailRingMotion.move(this.ringOrientation);
     }
   }
 
