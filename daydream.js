@@ -21,6 +21,10 @@ class Dot {
   }
 }
 
+const wrap = (x, m) => {
+  return x >= 0 ? x % m : ((x % m) + m) % m;
+}
+
 class Daydream {
   static SCENE_ANTIALIAS = true;
   static SCENE_ALPHA = true;
@@ -158,7 +162,7 @@ class Daydream {
           dummy.updateMatrix();
           dotMesh.setMatrixAt(i, dummy.matrix);
           dotMesh.instanceMatrix.needsUpdate = true;
-          dotMesh.setColorAt(i, pixel.color);
+          dotMesh.setColorAt(i, pixel);
           dotMesh.instanceColor.needsUpdate = true;
           ++i;
         }
@@ -167,7 +171,7 @@ class Daydream {
           this.makeLabel(label.position, label.content);
         }
       }
-    }
+    } 
 
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
@@ -745,8 +749,6 @@ class Rotation {
 
   constructor(axis, angle, duration) {
     this.axis = axis;
-    this.angle = 0;
-    this.lastAngle = 0;
     this.totalAngle = angle;
     this.duration = duration;
     this.t = 0;
@@ -890,6 +892,106 @@ const lissajous = (m1, m2, a, t) => {
   );
 }
 
+const plotDots = (filter, dots, age = 0) => {
+  let pixels = new Map();
+  for (const dot of dots) {
+    let p = sphericalToPixel(dot.position);
+    filter.plot(pixels, p.x, p.y, dot.color, age, blendOverMax);
+  }
+  return pixels;
+}
+class Filter {
+  chain(nextFilter) {
+    this.next = nextFilter;
+    return nextFilter;
+  }
+
+  pass(pixels, x, y, color, age, blendFn) {
+    if (this.next === undefined) {
+      let old = pixels[pixelKey(x, y)];
+      pixels.set(pixelKey(x, y), old === undefined ? color : blendFn(old, color));
+    } else {
+      this.next.plot(pixels, x, y, color, age, blendFn);
+    }
+  }
+}
+
+class FilterRaw extends Filter {
+  plot(pixels, x, y, color, age, blendFn) {
+    this.pass(pixels, x, y, color, age, blendFn);
+  }
+}
+
+class FilterAntiAlias extends Filter {
+  plot(pixels, x, y, color, age, blendFn) {
+    let xi = Math.trunc(x);
+    let xm = x - xi;
+    let yi = Math.trunc(y);
+    let ym = y - yi;
+
+    let c = falloff((1 - xm) * (1 - ym));
+    this.pass(pixels, xi, yi,
+      color.clone().multiplyScalar(c), age, blendFn);
+    if (xm > 0.0001) {
+      c = falloff(xm * (1 - ym));
+      this.pass(pixels, (xi + 1) % Daydream.W, yi,
+        color.clone().multiplyScalar(c), age, blendFn);
+    }
+    if (yi < Daydream.H - 1) {
+      if (ym > 0.0001) {
+        c = falloff((1 - xm) * ym);
+        this.pass(pixels, xi, yi + 1,
+          color.clone().multiplyScalar(c), age, blendFn);
+        if (xm > 0.0001) {
+          c = falloff(xm * ym);
+          this.pass(pixels, (xi + 1) % Daydream.W, yi + 1,
+            color.clone().multiplyScalar(c), age, blendFn);
+        }
+      }
+    }
+  }
+}
+
+class FilterDecayMask extends Filter {
+
+}
+
+class FilterDecayTrails extends Filter {
+  constructor(lifespan, gradient) {
+    super();
+    this.lifespan = lifespan;
+    this.gradient = gradient;
+    this.ttls = new Map();
+    this.trailPixels = new Map();
+  }
+
+  plot(pixels, x, y, color, age, blendFn) {
+    let key = pixelKey(x, y);
+    this.ttls.set(key, Math.max(0, this.lifespan - age));
+    if (age > 0) {
+      color = this.gradient.get(1 - (this.lifespan - age) / this.lifespan);
+    }
+    this.trailPixels.set(key, color);
+    for (const [key, color] of this.trailPixels) {
+      pixels.set(key, color);
+    }
+    this.pass(pixels, x, y, color, age, blendFn);
+  }
+
+  decay() {
+    this.ttls.forEach((ttl, key) => {
+      ttl -= 1;
+      if (ttl < 0.00001) {
+        this.ttls.delete(key);
+        this.trailPixels.delete(key);
+      } else {
+        this.ttls.set(key, ttl);
+        this.trailPixels.set(key, this.gradient.get(1 - ttl / this.lifespan));
+      }
+    });
+  }
+}
+
 class DecayTrails {
   constructor(ttl, pixels, gradient) {
     this.ttl = ttl;
@@ -1015,6 +1117,89 @@ class Gradient {
   }
 };
 
+let rainbow = new Gradient(256, [
+  [0, 0xFF0000],
+  [1/16, 0xD52A00],
+  [2/16, 0xAB5500],
+  [3/16, 0xAB7F00],
+  [4/16, 0xABAB00],
+  [5/16, 0x56D500],
+  [6/16, 0x00FF00],
+  [7/16, 0x00D52A],
+  [8/16, 0x00AB55],
+  [9/16, 0x0056AA],
+  [10/16, 0x0000FF],
+  [11/16, 0x2A00D5],
+  [12/16, 0x5500AB],
+  [13/16, 0x7F0081],
+  [14/16, 0xAB0055],
+  [15/16, 0xD5002B],
+  [16 / 16, 0xD5002B]
+]);
+
+let rainbowStripes = new Gradient(256, [
+  [0, 0xFF0000],
+  [1 / 16, 0x000000],
+  [2 / 16, 0xAB5500],
+  [3 / 16, 0x000000],
+  [4 / 16, 0xABAB00],
+  [5 / 16, 0x000000],
+  [6 / 16, 0x00FF00],
+  [7 / 16, 0x000000],
+  [8 / 16, 0x00AB55],
+  [9 / 16, 0x000000],
+  [10 / 16, 0x0000FF],
+  [11 / 16, 0x000000],
+  [12 / 16, 0x5500AB],
+  [13 / 16, 0x000000],
+  [14 / 16, 0xAB0055],
+  [15 / 16, 0x000000],
+  [16 / 16, 0xFF0000]
+]);
+
+let rainbowThinStripes = new Gradient(256, [
+  [0, 0xFF0000], //
+  [1 / 32, 0x000000],
+  [3 / 32, 0x000000],
+  [4 / 32, 0xAB5500], //
+  [5 / 32, 0x000000],
+  [7 / 32, 0x000000],
+  [8 / 32, 0xABAB00], //
+  [9 / 32, 0x000000],
+  [11 / 32, 0x000000],
+  [12 / 32, 0x00FF00], //
+  [13 / 32, 0x000000],
+  [15 / 32, 0x000000],
+  [16 / 32, 0x00AB55], //
+  [17 / 32, 0x000000],
+  [19 / 32, 0x000000],
+  [20 / 32, 0x0000FF], //
+  [21 / 32, 0x000000],
+  [23 / 32, 0x000000],
+  [24 / 32, 0x5500AB], //
+  [25 / 32, 0x000000],
+  [27 / 32, 0x000000],
+  [28 / 32, 0xAB0055], //
+  [29 / 32, 0x000000], 
+  [32 / 32, 0x000000] //
+]);
+
+
+let amber = new Gradient(256, [
+  [0, 0xff0000],
+  [1, 0xff0000]
+]);
+
+let grayToBlack = new Gradient(256, [
+  [0, 0x444444],
+  [1, 0x000000]
+]);
+
+let blueToBlack = new Gradient(256, [
+  [0, 0xee00ee],
+  [1, 0x000000]
+]);
+
 let g1 = new Gradient(256, [
   [0, 0xffaa00],
   [1, 0xff0000],
@@ -1033,6 +1218,12 @@ let g3 = new Gradient(256, [
   [1, 0x000000]
 ]);
 
+let g4 = new Gradient(256, [
+  //  [0, 0xaaaaaa],
+  [0, 0x0000ff],
+  [1, 0x000000]
+]);
+
 class PolyRot {
   constructor() {
     this.pixels = new Map();
@@ -1041,7 +1232,6 @@ class PolyRot {
     this.ringTrail = new DecayTrails(3, this.pixels, g3);
 
     this.ring = new THREE.Vector3(0, 1, 0).normalize();
-    this.ringSpinAxis = new THREE.Vector3(1, 0, 0);
     this.ringOrientation = new Orientation();
 
     this.spinAxis = new THREE.Vector3(0, 1, 0);
@@ -1091,13 +1281,12 @@ class PolyRot {
 
     this.stateIndex = -1;
     this.sequence = [
-//      "trailRing",
-      "spinRing",
       "genPoly",
-      "spinRing",
+       "spinRing",
       "spinPoly",
       "spinRing",
       "splitPoly",
+      "spinRing",
     ];
 
     this.transition();
@@ -1165,15 +1354,12 @@ class PolyRot {
     let normal = this.ringOrientation.orient(this.ring);
     plotAA(this.pixels, drawRing(normal, 1, (v) => 0xaaaaaa));
 
-//    plotAA(this.pixels, drawVector(this.ringOrientation.orient(this.ring), (v) => 0xff0000));
-
     return { pixels: this.pixels, labels: this.labels };
   }
 
   animateGenPoly() {
     if (this.genPolyMotion.done()) {
       this.transition();
-//      this.transitionTo("genPoly");
      } else {
       this.genPolyMotion.move(this.ringOrientation);
     }
@@ -1195,7 +1381,6 @@ class PolyRot {
   drawTrailRing() {
     this.labels = [];
     this.ringTrail.decay();
-    let vertices = this.topOrientation.orientPoly(this.poly.vertices);
     let n = this.ringOrientation.length();
     for (let i = 0; i < n; i++) {
       let normal = this.ringOrientation.orient(this.ring, i);
@@ -1223,7 +1408,7 @@ class PolyRot {
   enterSpinRing() {
     this.poly = new Dodecahedron();
     let from = this.ringOrientation.orient(this.ring).clone();
-    let toNormal = this.poly.vertices[Math.floor(Math.random() * this.poly.vertices.length)];
+    let toNormal = this.poly.vertices[3/*Math.floor(Math.random() * this.poly.vertices.length)*/];
     this.ringPath = new Path().appendLine(from.toArray(), toNormal, true);
     this.ringMotion = new Motion(this.ringPath, this.spinRingDuration);
   }
@@ -1233,7 +1418,7 @@ class PolyRot {
       this.transition();
     } else {
       this.ringMotion.move(this.ringOrientation);
-      this.poly = new Dodecahedron();
+//      this.poly = new Dodecahedron();
     }
   }
 
@@ -1273,7 +1458,6 @@ class PolyRot {
       this.polyRotationFwd.rotate(this.topOrientation);
       this.polyRotationRev.rotate(this.bottomOrientation);
     }
-    this.t++;
   }
 
   enterSpinPoly() {
@@ -1292,7 +1476,6 @@ class PolyRot {
 
   drawPolyRing() {
     this.pixels.clear();
-    this.labels = [];
     let normal = this.ringOrientation.orient(this.ring);
     let vertices = this.topOrientation.orientPoly(this.poly.vertices);
     plotAA(this.pixels, drawPolyhedron(vertices, this.poly.eulerPath,
@@ -1307,7 +1490,7 @@ class PolyRot {
     } else {
       this.spinAxisMotion.move(this.spinAxisOrientation);
       this.spinPolyRotation.axis =
-      this.spinAxisOrientation.orient(this.spinAxis);
+        this.spinAxisOrientation.orient(this.spinAxis);
       this.spinPolyRotation.rotate(this.topOrientation);
     }
   }
@@ -1330,19 +1513,208 @@ class TestEffect {
     return { pixels: this.pixels, labels: [] };
   }
 }
+
+
+class Ring {
+  constructor(y) {
+    this.x = 0;
+    this.y = y;
+    this.v = 0;
+  }
+}
+class LicentiousZensius {
+  constructor() {
+    Daydream.W = 95;
+    this.pixels = new Map();
+    this.labels = [];
+    this.rings = [];
+    for (let i = 0; i < Daydream.H; ++i) {
+      this.rings.push(new Ring(i));
+    }
+    this.palette = amber;
+    this.speed = 2;
+    this.gap = 3;
+    this.wipe = 0;
+    this.sparseness = 96 / 6;
+    this.filters = new FilterDecayTrails(5, grayToBlack);
+//    this.filters = new FilterRaw();
+
+    // Random interavals
+    (function randomTimer(min, max) {
+      setTimeout(
+        () => {
+//         this.changeGap();
+          this.changeSpeed();
+          this.reverse();
+          randomTimer.bind(this)(min, max);
+        },
+        Math.round(Math.random() * (max - min) + min )
+      );
+    }.bind(this)(250, 16 * 125));
+  }
+
+  changeSpeed() {
+    this.speed = this.dir(this.speed) * Math.round(Math.random() * 1 + 1);
+  }
+
+  reverse() {
+    this.speed *= -1;
+  }
+
+  changeGap() {
+    this.gap = Math.round(Math.random() * 1 + 1);
+  }
+
+  distance(a, b) {
+    let fwd = wrap((b - a), Daydream.W);
+    let rev = wrap((a - b), Daydream.W);
+    if (fwd <= rev) {
+      return fwd;
+    }
+    return -rev;
+  }
+
+  dir(v) { return v < 0 ? -1 : 1; }
+
+  drawFrame() {
+    this.filters.decay();
+    this.pixels.clear();
+//    this.wipe = wrap(this.wipe + 1, Daydream.W);
+    this.pull(0, this.speed);
+    this.drawRings();
+    return { pixels: this.pixels, labels: this.labels };
+  }
+
+  drawRing(ring, age) {
+    for (let x = 0; x < Daydream.W; x++) {
+      let p = wrap(x + this.wipe, Daydream.W);
+      let color = this.palette.get(p / Daydream.W);
+      if (p % this.sparseness == 0) {
+        this.filters.plot(this.pixels,
+          wrap(x + ring.x, Daydream.W),
+          ring.y,
+          color,
+          age,
+          blendOverMax);
+      }
+    }
+  }
+
+  drawRings() {
+    for (let ring of this.rings) {
+      this.drawRing(ring, 0);
+    }
+  }
+  
+  pull(y, speed) {
+    this.rings[y].v = speed;
+    this.move(this.rings[y]);
+    for (let i = y - 1; i >= 0; --i) {
+      this.drag(this.rings[i + 1], this.rings[i]);
+    }
+    for (let i = y + 1; i < Daydream.H; ++i) {
+      this.drag(this.rings[i - 1], this.rings[i]);
+    }
+  }
+
+  drag(leader, follower) {
+/*    if (leader.v * follower.v < 0) {
+      // reverse direction
+      follower.v = leader.v;
+    }
+    this.move(follower);
+    */
+    let dest = wrap(follower.x + follower.v, Daydream.W);
+    if (Math.abs(this.distance(dest, leader.x, Daydream.W)) > this.gap) {
+      // Move to furthest extent based on leader's prior path
+      dest = wrap(leader.x - this.dir(leader.v) * (Math.abs(leader.v) - 1 + this.gap), Daydream.W);
+      follower.v = this.distance(follower.x, dest, Daydream.W);
+      this.move(follower);
+      // Move to gap's length behind leader
+      dest = wrap((leader.x - this.dir(leader.v) * this.gap), Daydream.W);
+      follower.v = this.distance(follower.x, dest, Daydream.W);
+      this.move(follower);
+      // Adjust speed to match leader
+      follower.v = leader.v;
+    } else {
+      this.move(follower);
+    }
+  }
+
+  move(ring) {
+    let dest = wrap(ring.x + ring.v, Daydream.W);
+    let i = ring.x;
+    while (i != dest) {
+      this.drawRing(ring, 1);
+      i = wrap(i + this.dir(ring.v), Daydream.W);
+      ring.x = i;
+    }
+    ring.x = dest;
+  }
+}
+
+class Drop {
+  constructor() {
+    this.v = new THREE.Vector3(0, 1, 0);
+    this.orientation = new Orientation();
+    let axis = new THREE.Vector3().setFromSphericalCoords(1, Math.PI / 2, Math.floor(Daydream.W * Math.random()) * 2 * Math.PI / Daydream.W);
+    
+    let minDur = 8;
+    let maxDur = 64;
+    let duration = Math.floor(Math.random() * (maxDur - minDur) + minDur);
+    this.rotation = new Rotation(axis, Math.PI, duration);
+  }
+};
+
 class TheMatrix {
   constructor() {
+    this.pixels = new Map();
+    this.labels = [];
     this.drops = [];
-    this.pixels = [];
+    this.filters = new FilterAntiAlias();
+    this.trails = new FilterDecayTrails(5, blueToBlack);
+    this.filters.chain(this.trails);
+    Daydream.W = 40;
   }
+
   drawFrame() {
-    return { pixels: this.pixels, labels: labels };
+    this.pixels.clear();
+    this.trails.decay();
+    this.spawnDrops();
+    this.paintDrops();
+    this.moveDrops();
+    return { pixels: this.pixels, labels: this.labels };
   }
+
+  spawnDrops() {
+    let p = 1 / 16;
+    if (Math.random() * 1 < p) { 
+      this.drops.push(new Drop());
+    }
+  }
+
+  moveDrops() {
+    this.drops = this.drops.filter((d) => {
+      d.rotation.rotate(d.orientation, easeInSin);
+      return !d.rotation.done();
+    });
+  }
+
+  paintDrops() {  
+    let dots = [];
+    this.drops.forEach((d) => {
+      dots.push(...drawVector(d.orientation.orient(d.v),
+        (v) => { return new THREE.Color(0x0000ff) }));
+    });
+    this.pixels = plotDots(this.filters, dots);
+  }
+
 }
 
 const daydream = new Daydream();
 window.addEventListener("resize", () => daydream.setCanvasSize());
 window.addEventListener("keydown", (e) => daydream.keydown(e));
-var effect = new PolyRot();
-//var effect = new TestEffect();
+// var effect = new PolyRot();
+// var effect = new TheMatrix();
+var effect = new LicentiousZensius();
 daydream.renderer.setAnimationLoop(() => daydream.render(effect));
