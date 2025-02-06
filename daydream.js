@@ -1685,9 +1685,7 @@ class RainbowWiggles {
   }
 
   distance(a, b) {
-    let fwd = this.difference(a, b, 1);
-    let rev = this.difference(a, b, -1);
-    return Math.min(Math.abs(rev), Math.abs(fwd));
+    return Math.abs(this.shortest_move(a, b));
   }
 
   shortest_move(a, b) {
