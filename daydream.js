@@ -1136,6 +1136,8 @@ class DecayMask {
   }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 class Gradient {
   constructor(size, points) {
     let lastPoint = [0, 0x000000];
@@ -1156,7 +1158,7 @@ class Gradient {
   }
 };
 
-class ProceduralGradient {
+class ProceduralPalette {
   constructor(size, a, b, c, d) {
     this.colors = Array(size);
     for (let i = 0; i < size; ++i) {
@@ -1272,12 +1274,6 @@ let rainbowThinStripes = new Gradient(256, [
   [32 / 32, 0x000000] //
 ]);
 
-
-let amber = new Gradient(256, [
-  [0, 0xff0000],
-  [1, 0xff0000]
-]);
-
 let grayToBlack = new Gradient(256, [
   [0, 0x444444],
   [1, 0x000000]
@@ -1312,13 +1308,7 @@ let g4 = new Gradient(256, [
   [1, 0x000000]
 ]);
 
-let pRainbow = new ProceduralGradient(256,
-  [.6, .4, .4],
-  [0.5, 0.5, 0.5],
-  [.4,.4,.4],
-  [.1, .2, .3]
-);
-
+///////////////////////////////////////////////////////////////////////////////
 
 class PolyRot {
   constructor() {
@@ -1378,7 +1368,7 @@ class PolyRot {
     this.stateIndex = -1;
     this.sequence = [
       "genPoly",
-       "spinRing",
+      "spinRing",
       "spinPoly",
       "spinRing",
       "splitPoly",
@@ -1598,17 +1588,8 @@ class PolyRot {
   }
 }
 
-class TestEffect {
-  constructor() {
-    this.pixels = new Map();
-  }
-  drawFrame() {
-    this.pixels.clear();
-    plotAA(this.pixels,
-      drawLine(-Math.PI / 4, 3 * Math.PI / 4, Math.PI / 4, Math.PI / 4, (v) => 0xff0000));
-    return { pixels: this.pixels, labels: [] };
-  }
-}
+
+///////////////////////////////////////////////////////////////////////////////
 
 
 class Ring {
@@ -1642,20 +1623,16 @@ class RainbowWiggles {
 ;
     this.speed = 2;
     this.gap = 3;
-    this.wipe = 0;
     this.t = 0;
     this.sparseness = 96 / 4;
     this.filters = new FilterReplicate(4);
     this.trails = new FilterDecayTrails(10, this.palette);
     this.filters.chain(this.trails);
-//    this.filters.chain(new FilterSparkle(.005, .1));
-//    this.filters = new FilterRaw();
 
     // Random interavals
     (function randomTimer(min, max) {
       setTimeout(
         () => {
-//         this.changeGap();
           this.changeSpeed();
           this.reverse();
           randomTimer.bind(this)(min, max);
@@ -1671,10 +1648,6 @@ class RainbowWiggles {
 
   reverse() {
     this.speed *= -1;
-  }
-
-  changeGap() {
-    this.gap = Math.round(Math.random() * 1 + 1);
   }
 
   difference(a, b, dir) {
@@ -1701,7 +1674,6 @@ class RainbowWiggles {
 
   drawFrame() {
     this.pixels.clear();
-    //    this.wipe = wrap(this.wipe + 1, Daydream.W);
     this.t++;
     this.palette.mutate(Math.sin(0.001 * this.t++));
     this.pull(0, this.speed);
@@ -1712,7 +1684,7 @@ class RainbowWiggles {
   }
 
   drawRing(ring, age) {
-    let p = wrap(ring.x + this.wipe, Daydream.W);
+    let p = wrap(ring.x, Daydream.W);
     let color = this.palette.get(p / Daydream.W);
     this.filters.plot(this.pixels,
       wrap(ring.x, Daydream.W),
@@ -1740,16 +1712,17 @@ class RainbowWiggles {
   }
 
   drag(leader, follower) {
-    this.move(follower);
-    if (this.distance(follower.x, leader.x) > this.gap) {
+    let dest = wrap(follower.x + follower.v, Daydream.W);
+    if (this.distance(dest, leader.x) > this.gap) {
       // Move to gap's length from leader
       let shift = this.shortest_move(follower.x, leader.x);
-      var dest = wrap(follower.x + shift - this.dir(shift) * this.gap, Daydream.W);
+      dest = wrap(follower.x + shift - this.dir(shift) * this.gap, Daydream.W);
       follower.v = this.shortest_move(follower.x, dest);
       this.move(follower);
-      // Adjust speed to match leader
       follower.v = leader.v;
-    } 
+    } else {
+      this.move(follower);
+    }
   }
 
   move(ring) {
@@ -1766,11 +1739,16 @@ class RainbowWiggles {
   }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 class Drop {
   constructor() {
     this.v = new THREE.Vector3(0, 1, 0);
     this.orientation = new Orientation();
-    let axis = new THREE.Vector3().setFromSphericalCoords(1, Math.PI / 2, Math.floor(Daydream.W * Math.random()) * 2 * Math.PI / Daydream.W);
+    let axis = new THREE.Vector3().setFromSphericalCoords(
+      1,
+      Math.PI / 2,
+      Math.floor(Daydream.W * Math.random()) * 2 * Math.PI / Daydream.W);
     
     let minDur = 8;
     let maxDur = 64;
