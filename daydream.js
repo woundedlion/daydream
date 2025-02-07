@@ -87,10 +87,10 @@ class Daydream {
     );
 
     this.dotMaterial = new THREE.MeshBasicMaterial({
-        side: THREE.FrontSide,
-        blending: THREE.CustomBlending,
-        blendEquation: THREE.MaxEquation,
-        depthWrite: false
+      side: THREE.FrontSide,
+      blending: THREE.CustomBlending,
+      blendEquation: THREE.MaxEquation,
+      depthWrite: false
     });
 
     this.setCanvasSize();
@@ -1159,21 +1159,19 @@ class Gradient {
 };
 
 class ProceduralPalette {
-  constructor(size, a, b, c, d) {
-    this.colors = Array(size);
-    for (let i = 0; i < size; ++i) {
-      let t = i / size;
-      // a + b * cos(2 * PI * (c * t + d));
-      this.colors[i] = new THREE.Color(
-        a[0] + b[0] * Math.cos(2 * Math.PI * (c[0] * t + d[0])),
-        a[1] + b[1] * Math.cos(2 * Math.PI * (c[1] * t + d[1])),
-        a[2] + b[2] * Math.cos(2 * Math.PI * (c[2] * t + d[2]))
-      );
-    }
+  constructor(a, b, c, d) {
+    this.a = a;
+    this.b = b;
+    this.c = c;
+    this.d = d;
   }
 
-  get(a) {
-    return this.colors[Math.floor(a * this.colors.length)];
+  get(t) {
+    return new THREE.Color(
+      this.a[0] + this.b[0] * Math.cos(2 * Math.PI * (this.c[0] * t + this.d[0])),
+      this.a[1] + this.b[1] * Math.cos(2 * Math.PI * (this.c[1] * t + this.d[1])),
+      this.a[2] + this.b[2] * Math.cos(2 * Math.PI * (this.c[2] * t + this.d[2]))
+    ).convertSRGBToLinear();
   }
 };
 
@@ -1203,7 +1201,7 @@ class MutatingPalette {
       this.a.x + this.b.x * Math.cos(2 * Math.PI * (this.c.x * p + this.d.x)),
       this.a.y + this.b.y * Math.cos(2 * Math.PI * (this.c.y * p + this.d.y)),
       this.a.z + this.b.z * Math.cos(2 * Math.PI * (this.c.z * p + this.d.z))
-    );
+    ).convertSRGBToLinear();
   }
 }
 
@@ -1610,21 +1608,27 @@ class RainbowWiggles {
     }
 
     this.palette = new MutatingPalette(
-      [.6, .4, .4],
       [0.5, 0.5, 0.5],
-      [.4, .4, .4],
-      [.1, .2, .3],
+      [0.5, 0.5, 0.5],
+      [0.65, 0.39, 0.91],
+      [0.88, 1.21, 1.55],
 
       [0.5, 0.5, 0.5],
       [0.5, 0.5, 0.5],
       [.4, .4, .4],
       [.5, .3, .2]
     );
-;
+
+    this.palette2 = new ProceduralPalette(
+      [0.5, 0.5, 0.5],
+      [0.5, 0.5, 0.5],
+      [0.65, 0.39, 0.91],
+      [0.88, 1.21, 1.55]
+    );
+
     this.speed = 2;
     this.gap = 3;
     this.t = 0;
-    this.sparseness = 96 / 4;
     this.filters = new FilterReplicate(4);
     this.trails = new FilterDecayTrails(10, this.palette);
     this.filters.chain(this.trails);
@@ -1674,30 +1678,30 @@ class RainbowWiggles {
 
   drawFrame() {
     this.pixels.clear();
+    this.trails.decay();
     this.t++;
     this.palette.mutate(Math.sin(0.001 * this.t++));
     this.pull(0, this.speed);
+    this.trails.trail(this.pixels, blendOver);
     this.drawRings();
-    this.trails.decay();
-    this.trails.trail(this.pixels, blendOverMax);
     return { pixels: this.pixels, labels: this.labels };
-  }
-
-  drawRing(ring, age) {
-    let p = wrap(ring.x, Daydream.W);
-    let color = this.palette.get(p / Daydream.W);
-    this.filters.plot(this.pixels,
-      wrap(ring.x, Daydream.W),
-      ring.y,
-      color,
-      age,
-      blendOverMax);
   }
 
   drawRings() {
     for (let ring of this.rings) {
       this.drawRing(ring, 0);
     }
+  }
+
+  drawRing(ring, age) {
+    let p = wrap(ring.x, Daydream.W);
+    let color = this.palette.get(0);
+    this.filters.plot(this.pixels,
+      wrap(ring.x, Daydream.W),
+      ring.y,
+      color,
+      age,
+      blendOver);
   }
   
   pull(y, speed) {
@@ -1729,7 +1733,7 @@ class RainbowWiggles {
     let dest = wrap(ring.x + ring.v, Daydream.W);
     let i = ring.x;
     while (i != dest) {
-      this.drawRing(ring, 1);
+      this.drawRing(ring, 0);
       i = wrap(i + this.dir(ring.v), Daydream.W);
       ring.x = i;
     }
