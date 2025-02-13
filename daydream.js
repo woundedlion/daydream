@@ -183,7 +183,7 @@ const g = (1 + Math.sqrt(5)) / 2;
 
 const sphericalToPixel = (s) => {
   return {
-    x: (s.theta * Daydream.W) / (2 * Math.PI),
+    x: wrap((s.theta * Daydream.W) / (2 * Math.PI), Daydream.W),
     y: (s.phi * Daydream.H) / Math.PI,
   };
 };
@@ -226,6 +226,20 @@ const blendOverMax = (c1, c2) => {
   );
 }
 
+const blendOverMin = (c1, c2) => {
+  const m1 = Math.sqrt(Math.pow(c1.r, 2) + Math.pow(c1.g, 2) + Math.pow(c1.b, 2));
+  const m2 = Math.sqrt(Math.pow(c2.r, 2) + Math.pow(c2.g, 2) + Math.pow(c2.b, 2));
+  let s = 0;
+  if (m2 > 0) {
+    s = Math.min(m1, m2) / m2;
+  }
+  return new THREE.Color(
+    c2.r * s,
+    c2.g * s,
+    c2.b * s
+  );
+}
+
 const blendMean = (c1, c2) => {
   return new THREE.Color(
     (c1.r + c2.r) / 2,
@@ -257,7 +271,7 @@ const nullMask = (key) => 1;
 const plotAA = (pixels, dots, maskFn = nullMask, age = 0, blendMode = blendOver) => {
   let buf = new Map();
   for (const dot of dots) {
-    let p = sphericalToPixel(dot.position);
+    let p = sphericalToPixel(new THREE.Spherical().setFromVector3(dot.position));
     let xi = Math.floor(p.x);
     let xm = p.x - xi;
     let yi = Math.floor(p.y);
@@ -486,42 +500,40 @@ class Dodecahedron {
 }
 
 const drawVector = (v, colorFn) => {
-  return [new Dot(new THREE.Spherical().setFromVector3(v.normalize()), colorFn(v))];
+  return [new Dot(new THREE.Vector3(...v.toArray()).normalize(), colorFn(v))];
 }
 
 const drawPath = (path, colorFn) => {
   let r = [];
   for (let t = 0; t < path.length(); t++) {
-    r.push(new Dot(path.getPoint(t/path.length()), colorFn(t)));
+    r.push(new Dot(path.getPoint(t / path.length()), colorFn(t)));
   }
   return r;
 }
 
-const drawLine = (theta1, phi1, theta2, phi2, colorFn, longWay = false) => {
+const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false) => {
   let dots = []
-  let u = new THREE.Vector3().setFromSphericalCoords(1, phi1, theta1);
-  let v = new THREE.Vector3().setFromSphericalCoords(1, phi2, theta2);
+  let u = v1.clone();
+  let v = v2.clone();
   let a = angleBetween(u, v);
   let w = new THREE.Vector3().crossVectors(v, u);
   if (longWay) {
     a = 2 * Math.PI - a;
     w.negate();
   }
+  a *= (end - start);
   w.normalize();
   v.crossVectors(u, w);
   v.normalize();
 
   const step = Daydream.DOT_SIZE / Daydream.SPHERE_RADIUS;
-  for (let t = 0; t < a; t += step) {
+  for (let t = start; t < a; t += step) {
     let vi = new THREE.Vector3(
       u.x * Math.cos(t) + v.x * Math.sin(t),
       u.y * Math.cos(t) + v.y * Math.sin(t),
       u.z * Math.cos(t) + v.z * Math.sin(t)
     );
-    dots.push(new Dot(
-      new THREE.Spherical().setFromVector3(vi),
-      colorFn(vi)
-    ));
+    dots.push(new Dot(vi, colorFn(vi)));
   }
   return dots;
 }
@@ -531,12 +543,7 @@ const drawVertices = (vertices, colorFn) => {
   let v = new THREE.Vector3();
   for (const vertex of vertices) {
     v.set(vertex[0], vertex[1], vertex[2]);
-    dots.push(
-      new Dot(
-        new THREE.Spherical().setFromVector3(v.normalize()),
-        colorFn(v)
-      )
-     );
+    dots.push(new Dot(v.normalize(), colorFn(v)));
   }
   return dots;
 }
@@ -544,13 +551,12 @@ const drawVertices = (vertices, colorFn) => {
 const drawPolyhedron = (vertices, edges, colorFn) => {
   let dots = [];
   edges.map((adj, i) => {
-    let a = new THREE.Spherical().setFromCartesianCoords(
-      vertices[i][0], vertices[i][1], vertices[i][2]);
     adj.map((j) => {
-      let b = new THREE.Spherical().setFromCartesianCoords(
-        vertices[j][0], vertices[j][1], vertices[j][2]);
       dots = dots.concat(
-        drawLine(a.theta, a.phi, b.theta, b.phi, colorFn)
+        drawLine(
+          new THREE.Vector3(...vertices[i]).normalize(),
+          new THREE.Vector3(...vertices[j]).normalize(),
+          colorFn)
       );
     })
   });
@@ -577,22 +583,43 @@ const drawRing = (normal, radius, colorFn) => {
   w.crossVectors(v, u);
   let d = Math.sqrt(Math.pow(1 - radius, 2));
 
-  let step = Daydream.DOT_SIZE / Daydream.SPHERE_RADIUS;
+  let step = 2 * Math.PI / Daydream.W;
   for (let t = 0; t < 2 * Math.PI; t += step) {
     let vi = new THREE.Vector3(
       d * v.x + radius * u.x * Math.cos(t) + radius * w.x * Math.sin(t),
       d * v.y + radius * u.y * Math.cos(t) + radius * w.y * Math.sin(t),
       d * v.z + radius * u.z * Math.cos(t) + radius * w.z * Math.sin(t)
     );
-    dots.push(
-      new Dot(
-        new THREE.Spherical().setFromVector3(vi),
-        colorFn(vi)
-      )
-    );
+    dots.push(new Dot(vi, colorFn(vi)));
   }
 
   return dots;
+};
+
+const ringPoint = (normal, radius, angle) => {
+  let dots = [];
+  let u = new THREE.Vector3();
+  let v = normal.clone();
+  let w = new THREE.Vector3();
+  let x_axis = new THREE.Vector3(1, 0, 0);
+  let z_axis = new THREE.Vector3(0, 0, 1);
+  if (radius > 1) {
+    v.negate();
+    radius = 2 - radius;
+  }
+  if (v.x == 0 && v.y == 0) {
+    u.crossVectors(v, x_axis);
+  } else {
+    u.crossVectors(v, z_axis);
+  }
+  u.normalize();
+  w.crossVectors(v, u);
+  let d = Math.sqrt(Math.pow(1 - radius, 2));
+  return new THREE.Vector3(
+    d * v.x + radius * u.x * Math.cos(angle) + radius * w.x * Math.sin(angle),
+    d * v.y + radius * u.y * Math.cos(angle) + radius * w.y * Math.sin(angle),
+    d * v.z + radius * u.z * Math.cos(angle) + radius * w.z * Math.sin(angle)
+  );
 };
 
 const drawFibSpiral = (n, eps, colorFn) => {
@@ -665,13 +692,11 @@ class Path {
   }
 
   appendLine(c1, c2, longWay = false, easingFn = (t) => t) {
-    let s1 = new THREE.Spherical().setFromCartesianCoords(c1[0], c1[1], c1[2]);
-    let s2 = new THREE.Spherical().setFromCartesianCoords(c2[0], c2[1], c2[2]);
     if (this.points.length > 0) {
       this.points.pop();
     }
     this.points = this.points.concat(
-      drawLine(s1.theta, s1.phi, s2.theta, s2.phi, (v) => 0x000000, longWay)
+      drawLine(c1, c2, (v) => 0x000000, 1, longWay)
         .map((d) => d.position));
     return this;
   }
@@ -688,28 +713,56 @@ class Path {
 
   getPoint(t) {
     let i = Math.floor(t * (this.points.length));
-    return this.points[i];
+    return this.points[i].clone();
   }
 }
 
-class Motion {
-  static MAX_ANGLE = 2 * Math.PI / Daydream.W;
-
-  constructor(path, duration) {
-    this.path = path;
-    this.duration = duration;
-    this.t = 0;
-    this.to = new THREE.Vector3().setFromSpherical(this.path.getPoint(0));
+class ProceduralPath {
+  constructor(pathFn) {
+    this.f = pathFn;
   }
 
-  done() {
-    return this.t >= this.duration;
+  getPoint(t) {
+    return this.f(t);
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class Animation {
+  constructor(duration, repeat) {
+    this.duration = duration;
+    this.repeat = repeat;
+    this.t = 0;
+  }
+
+  done() { return this.t >= this.duration }
+
+  step() {
+    this.t++;
+    if (this.done()) {
+      if (this.repeat) {
+        this.t = 0;
+      }
+    }
+  }
+}
+
+class Motion extends Animation {
+  static MAX_ANGLE = 2 * Math.PI / Daydream.W;
+
+  constructor(path, duration, repeat = false) {
+    super(duration, repeat);
+    this.path = path;
+    this.to = this.path.getPoint(0);
   }
 
   move(orientation) {
+    if (this.done()) {
+      return;
+    }
     this.from = this.to;
-    this.to = new THREE.Vector3().setFromSpherical(
-      this.path.getPoint(this.t / this.duration));
+    this.to = this.path.getPoint(this.t / this.duration);
     if (!this.from.equals(this.to)) {
       let axis = new THREE.Vector3().crossVectors(this.from, this.to).normalize();
       let angle = angleBetween(this.from, this.to);
@@ -722,50 +775,56 @@ class Motion {
       let r = new THREE.Quaternion().setFromAxisAngle(axis, angle);
       orientation.push(origin.clone().premultiply(r));
     }
-    this.t++
+    this.step();
   }
 }
 
-class FadeIn {
-  constructor(duration) {
-    this.duration = duration;
-    this.t = 0;
+class FadeInOut extends Animation {
+  constructor(inDuration, onDuration, outDuration, repeat = false)
+  {
+    super(inDuration + onDuration + outDuration, repeat);
+    this.inDuration = inDuration;
+    this.onDuration = onDuration;
+    this.outDuration = outDuration;
   }
 
-  done() {
-    return this.t >= this.duration;
+  fade(dots, easeIn = easeMid, easeOut = easeMid) {
+    if (this.t < this.inDuration) {
+      var m = easeIn(this.t / this.inDuration);
+    } else if (this.t < this.inDuration + this.onDuration) {
+      var m = 1;
+    } else if (!this.done()) {
+      var m = 1 - easeOut((this.t - (this.inDuration + this.onDuration)) / this.outDuration);
+    } else {
+      var m = 0;
+    }
+    for (let dot of dots) {
+      dot.color.multiplyScalar(m);
+    }
+    this.step();
   }
-
-  fade(pixels) {
-    this.pixels.forEach((pixel, key) => {
-      console.log(key);
-    });
-    this.t++;
-  }
-
 }
 
-class Rotation {
+class Rotation extends Animation {
   static MAX_ANGLE = 2 * Math.PI / Daydream.W;
 
-  constructor(axis, angle, duration) {
+  constructor(axis, angle, duration, repeat = false) {
+    super(duration, repeat);
     this.axis = axis;
     this.totalAngle = angle;
-    this.duration = duration;
-    this.t = 0;
-  }
-
-  done() {
-    return this.t >= this.duration;
+    this.from = 0;
+    this.to = 0;
   }
 
   rotate(orientation, easingFn = easeInOutSin) {
+    if (this.done()) {
+      return;
+    }
     this.from = this.to;
-    this.to = easingFn(this.t / this.duration) * this.totalAngle;
+    this.to = easingFn((this.t + 1) / this.duration) * this.totalAngle;
     if (Math.abs(this.to - this.from) > 0.0001) {
       let angle = Math.abs(this.to - this.from);
       let origin = orientation.get();
-      orientation.clear();
       for (let a = Rotation.MAX_ANGLE; angle - a > 0.0001; a += Rotation.MAX_ANGLE) {
         let r = new THREE.Quaternion().setFromAxisAngle(this.axis, a);
         orientation.push(origin.clone().premultiply(r));
@@ -773,9 +832,11 @@ class Rotation {
       let r = new THREE.Quaternion().setFromAxisAngle(this.axis,angle);
       orientation.push(origin.clone().premultiply(r));
     }
-    this.t++;
+    this.step();
   }
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 const isOver = (v, normal) => {
   return normal.dot(v) >= 0;
@@ -862,6 +923,14 @@ const easeInSin = (t) => {
   return 1 - Math.cos((t * Math.PI) / 2);
 }
 
+function easeOutExpo(t) {
+  return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+}
+function easeOutCirc(t) {
+  return Math.sqrt(1 - Math.pow(t - 1, 2));
+}
+
+
 const easeInCubic = (t) => {
   return Math.pow(t, 3);
 }
@@ -874,14 +943,18 @@ const easeMid = (t) => {
   return t;
 }
 
+const easeOutCubic = (t) => {
+  return 1 - Math.pow(1 - t, 3);
+}
+
 
 
 const distanceGradient = (v, normal) => {
   let d = v.dot(normal);
   if (d > 0) {
-    return g1.get(d);
+    return g1.get(d).clone();
   } else {
-    return g2.get(-d);
+    return g2.get(-d).clone();
   }
 }
 
@@ -893,14 +966,14 @@ const lissajous = (m1, m2, a, t) => {
   );
 }
 
-const plotDots = (filter, dots, age = 0) => {
-  let pixels = new Map();
+const plotDots = (pixels, labels, filter, dots, age = 0, blendFn = blendOverMax) => {
   for (const dot of dots) {
-    let p = sphericalToPixel(dot.position);
-    filter.plot(pixels, p.x, p.y, dot.color, age, blendOverMax);
+    let p = sphericalToPixel(new THREE.Spherical().setFromVector3(dot.position));
+    filter.plot(pixels, p.x, p.y, dot.color, age, blendFn);
+//    labels.push({ position: dot.position.multiplyScalar(Daydream.SPHERE_RADIUS), content: `${Math.trunc(p.x)}, ${Math.trunc(p.y)}` });
   }
-  return pixels;
 }
+
 class Filter {
   chain(nextFilter) {
     this.next = nextFilter;
@@ -909,8 +982,15 @@ class Filter {
 
   pass(pixels, x, y, color, age, blendFn) {
     if (this.next === undefined) {
-      let old = pixels[pixelKey(x, y)];
-      pixels.set(pixelKey(x, y), old === undefined ? color : blendFn(old, color));
+      x = Math.round(x);
+      y = Math.round(y);
+      let key = pixelKey(x, y);
+      if (pixels.has(key)) {
+        let old = pixels.get(key);
+        pixels.set(pixelKey(x, y), blendFn(old, color));
+      } else {
+        pixels.set(pixelKey(x, y), color);
+      }
     } else {
       this.next.plot(pixels, x, y, color, age, blendFn);
     }
@@ -936,32 +1016,37 @@ class FilterReplicate extends Filter {
   }
 }
 
-class FilterAntiAlias extends Filter {
+class FilterMirror extends Filter {
+  constructor() {
+    super();
+  }
+
   plot(pixels, x, y, color, age, blendFn) {
+    this.pass(pixels, x, y, color, age, blendFn);
+    this.pass(pixels, Daydream.W - x - 1, Daydream.H - y - 1, color, age, blendFn);
+  }
+}
+
+
+class FilterAntiAlias extends Filter {
+  plot(pixels, x, y, color, age, blendFn = blendOverMax) {
     let xi = Math.trunc(x);
     let xm = x - xi;
     let yi = Math.trunc(y);
     let ym = y - yi;
 
     let c = falloff((1 - xm) * (1 - ym));
-    this.pass(pixels, xi, yi,
-      color.clone().multiplyScalar(c), age, blendFn);
-    if (xm > 0.0001) {
-      c = falloff(xm * (1 - ym));
-      this.pass(pixels, (xi + 1) % Daydream.W, yi,
-        color.clone().multiplyScalar(c), age, blendFn);
-    }
+    this.pass(pixels, xi, yi, color.clone().multiplyScalar(c), age, blendFn);
+
+    c = falloff(xm * (1 - ym));
+    this.pass(pixels, wrap((xi + 1), Daydream.W), yi, color.clone().multiplyScalar(c), age, blendFn);
+
     if (yi < Daydream.H - 1) {
-      if (ym > 0.0001) {
-        c = falloff((1 - xm) * ym);
-        this.pass(pixels, xi, yi + 1,
-          color.clone().multiplyScalar(c), age, blendFn);
-        if (xm > 0.0001) {
-          c = falloff(xm * ym);
-          this.pass(pixels, (xi + 1) % Daydream.W, yi + 1,
-            color.clone().multiplyScalar(c), age, blendFn);
-        }
-      }
+      c = falloff((1 - xm) * ym);
+      this.pass(pixels, xi, yi + 1,color.clone().multiplyScalar(c), age, blendFn);
+
+      c = falloff(xm * ym);
+      this.pass(pixels, wrap((xi + 1), Daydream.W), yi + 1, color.clone().multiplyScalar(c), age, blendFn);
     }
   }
 }
@@ -996,37 +1081,37 @@ class FilterDecayTrails extends Filter {
     super();
     this.lifespan = lifespan;
     this.gradient = gradient;
-    this.ttls = new Map();
-    this.trailPixels = new Map();
+    this.trails = new Map();
   }
 
   plot(pixels, x, y, color, age, blendFn) {
-    let key = pixelKey(x, y);
-    this.ttls.set(key, Math.max(0, this.lifespan - age));
-    if (age > 0) {
-      color = this.gradient.get(1 - (this.lifespan - age) / this.lifespan);
+    if (age >= 0) {
+      let key = pixelKey(x, y);
+      this.trails.set(key, Math.max(0, this.lifespan - age));
     }
-    this.trailPixels.set(key, color);
-    this.pass(pixels, x, y, color, age, blendFn);
+    if (age <= 0) {
+      this.pass(pixels, x, y, color, age, blendFn);
+    } 
   }
 
   decay() {
-    this.ttls.forEach((ttl, key) => {
+    this.trails.forEach((ttl, key) => {
       ttl -= 1;
-      if (ttl < 0.00001) {
-        this.ttls.delete(key);
-        this.trailPixels.delete(key);
+      if (ttl <= 0) {
+        this.trails.delete(key);
       } else {
-        this.ttls.set(key, ttl);
-        this.trailPixels.set(key, this.gradient.get(1 - ttl / this.lifespan));
+        this.trails.set(key, ttl);
       }
     });
   }
-    
-  trail(pixels, blendFn) {
-    for (const [key, color] of this.trailPixels) {
-      let p = keyPixel(key);
-      this.pass(pixels, p[0], p[1], color, 0, blendFn);
+
+  trail(pixels, blendFn = blendUnder) {
+    for (const [key, ttl] of this.trails) {
+      if (ttl > 0) {
+        let p = keyPixel(key);
+        let color = this.gradient.get(1 - (ttl / this.lifespan));
+        this.pass(pixels, p[0], p[1], color, 0, blendFn);
+      }
     }
   }
 }
@@ -1154,7 +1239,7 @@ class Gradient {
   }
 
   get(a) {
-    return this.colors[Math.floor(a * this.colors.length)];
+    return this.colors[Math.floor(a * this.colors.length)].clone();
   }
 };
 
@@ -1330,6 +1415,8 @@ class PolyRot {
     this.spinRingDuration = 16;
     this.spinPolyDuration = 192;
 
+    this.filters = new FilterAntiAlias();
+
     this.states = {
       "genPoly": {
         enter: this.enterGenPoly,
@@ -1403,8 +1490,7 @@ class PolyRot {
   enterGenPoly() {
     this.poly = new Dodecahedron();
     this.genPolyPath = new Path().appendSegment(
-      (t) => new THREE.Spherical().setFromVector3(
-        this.ringOrientation.orient(lissajous(10, 0.5, 0, t))),
+      (t) => this.ringOrientation.orient(lissajous(10, 0.5, 0, t)),
       2 * Math.PI,
       this.genPolyDuration,
       easeInOutSin
@@ -1453,8 +1539,7 @@ class PolyRot {
     this.poly = new Dodecahedron();
     this.ringTrail.clear();
     this.trailRingPath = new Path().appendSegment(
-      (t) => new THREE.Spherical().setFromVector3(
-        this.ringOrientation.orient(lissajous(10, 0.5, 0, t))),
+      (t) => this.ringOrientation.orient(lissajous(10, 0.5, 0, t)),
       2 * Math.PI,
       this.genPolyDuration,
       easeInOutSin
@@ -1492,8 +1577,8 @@ class PolyRot {
   enterSpinRing() {
     this.poly = new Dodecahedron();
     let from = this.ringOrientation.orient(this.ring).clone();
-    let toNormal = this.poly.vertices[3/*Math.floor(Math.random() * this.poly.vertices.length)*/];
-    this.ringPath = new Path().appendLine(from.toArray(), toNormal, true);
+    let toNormal = new THREE.Vector3(...this.poly.vertices[3]).normalize();
+    this.ringPath = new Path().appendLine(from, toNormal, true);
     this.ringMotion = new Motion(this.ringPath, this.spinRingDuration);
   }
 
@@ -1550,8 +1635,7 @@ class PolyRot {
     this.spinPolyRotation = new Rotation(axis, 4 * Math.PI,
       this.spinPolyDuration);
     this.spinAxisPath = new Path().appendSegment(
-      (t) => new THREE.Spherical().setFromVector3(
-        lissajous(12.8, 2 * Math.PI, 0, t)),
+      (t) => lissajous(12.8, 2 * Math.PI, 0, t),
       1,
       this.spinPolyDuration
     );
@@ -1589,6 +1673,47 @@ class PolyRot {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class RandomTimer {
+  constructor(t, min, max, f) {
+    this.min = min;
+    this.max = max;
+    this.f = f;
+    this.reset(t);
+  }
+
+  reset(t) {
+    this.t = t + Math.round(Math.random() * (this.max - this.min) + this.min);
+  }
+
+  poll(t) {
+    if (t >= this.t) {
+      this.f();
+      this.reset(t);
+    }
+  }
+}
+
+class PeriodicTimer {
+  constructor(t, period, f) {
+    this.period = period;
+    this.f = f;
+    this.reset(t);
+  }
+
+  reset(t) {
+    this.t = t + this.period;
+  }
+
+  poll(t) {
+    if (t >= this.t) {
+      this.f();
+      this.reset(t);
+    }
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 
 class Ring {
   constructor(y) {
@@ -1617,13 +1742,6 @@ class RainbowWiggles {
       [0.5, 0.5, 0.5],
       [.4, .4, .4],
       [.5, .3, .2]
-    );
-
-    this.palette2 = new ProceduralPalette(
-      [0.5, 0.5, 0.5],
-      [0.5, 0.5, 0.5],
-      [0.65, 0.39, 0.91],
-      [0.88, 1.21, 1.55]
     );
 
     this.speed = 2;
@@ -1682,7 +1800,7 @@ class RainbowWiggles {
     this.t++;
     this.palette.mutate(Math.sin(0.001 * this.t++));
     this.pull(0, this.speed);
-    this.trails.trail(this.pixels, blendOver);
+    this.trails.trail(this.pixels);
     this.drawRings();
     return { pixels: this.pixels, labels: this.labels };
   }
@@ -1743,6 +1861,165 @@ class RainbowWiggles {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+const rotateBetween = (from, to) => {
+  let diff = from.get().clone().conjugate().premultiply(to.get());
+  let angle = 2 * Math.acos(diff.w);
+  if (angle == 0) {
+    return
+  } else {
+    var axis = new THREE.Vector3(diff.x, diff.y, diff.z).normalize();
+  }
+  new Rotation(axis, angle, 1).rotate(from, easeOutCirc);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class Thruster {
+  constructor(thrustPoint, thrustVector, thrustAxis) {
+    this.thrustPoint = thrustPoint;
+    this.exhaustVector = thrustVector.clone().negate();
+    this.rotation = new Rotation(thrustAxis,  Math.PI, 8 * 16);
+    this.exhaustAnimation = new FadeInOut(0, 4, 12);
+  }
+
+  done() {
+    return this.rotation.done() && this.exhaustAnimation.done();
+  }
+}
+
+class Thrusters {
+  constructor() {
+    Daydream.W = 96
+    this.pixels = new Map();
+    this.labels = [];
+/*
+    this.palette = new ProceduralPalette(
+      [0.5, 0.5, 0.5],
+      [0.5, 0.5, 0.5],
+      [0.65, 0.39, 0.91],
+      [0.88, 1.21, 1.55]
+    );
+ */
+
+    this.palette = new MutatingPalette(
+      [0.5, 0.5, 0.5],
+      [0.5, 0.5, 0.5],
+      [1, 1, .5],
+      [0.8, 0.9, 0.3],
+
+      [0.5, 0.5, 0.5],
+      [0.5, 0.5, 0.5],
+      [.2, .1, 0],
+      [.2, .5, .25]
+    );
+ 
+    let params = [Math.PI, 2 * Math.PI, 0];
+    (this.filters = new FilterReplicate(1))
+      .chain(new FilterAntiAlias)
+      ;
+    this.t = 0;
+    this.ring = new THREE.Vector3(0, 1, 0);
+    this.orientation = new Orientation();
+    this.poly = new Dodecahedron();
+    this.thrusters = [];
+
+    
+    this.thrustTimer = new RandomTimer(this.t, 8, 40,
+      () => this.onThrust(Math.random() * (Daydream.W - 1)));
+      
+
+/*    this.x = 0;
+    this.thrustTimer = new PeriodicTimer(this.t, 8,
+      () => {
+        this.onThrust(this.x);
+        this.x = wrap(this.x + Daydream.W / 4, Daydream.W)
+      });
+      */
+  }
+
+  onThrust(x) {
+    let thrustPoint = ringPoint(this.ring, 1, x / (Daydream.W - 1) * (2 * Math.PI));
+    let dir = Math.random() < 0.5 ? -1 : -1;
+    this.fireThruster(thrustPoint, dir)
+    if (Math.random() < 1) {
+      let xp = wrap(x + Daydream.W / 2, Daydream.W);
+      let thrustPoint = ringPoint(this.ring, 1, xp / (Daydream.W - 1) * (2 * Math.PI));
+      this.fireThruster(thrustPoint.clone(), -dir);
+    }
+  }
+
+  fireThruster(thrustPoint, thrustDir) {
+    let thrustVector = this.ring.clone().multiplyScalar(thrustDir);
+    let thrustAxis = new THREE.Vector3().crossVectors(
+      this.orientation.orient(thrustPoint),
+      this.orientation.orient(thrustVector))
+      .normalize();
+    this.thrusters.push(new Thruster(thrustPoint, thrustVector, thrustAxis));
+  }
+
+  drawThruster(thruster) {
+    let lines = [
+      thruster.thrustPoint.clone().applyQuaternion(
+        new THREE.Quaternion().setFromAxisAngle(this.ring, Math.PI / Daydream.H / 2.2)),
+      thruster.thrustPoint.clone().applyQuaternion(
+        new THREE.Quaternion().setFromAxisAngle(this.ring, -Math.PI / Daydream.H / 2.2))
+    ];
+    
+    let dots = [];
+    lines.forEach((line) => {
+      dots.push(...drawLine(
+        this.orientation.orient(line),
+        this.orientation.orient(thruster.exhaustVector),
+        (v) => this.palette.get(1 - Math.abs(v.dot(this.orientation.orient(this.ring)))),
+        Daydream.DOT_SIZE * 3 / Daydream.SPHERE_RADIUS,
+        1
+      ));
+    });
+
+    thruster.exhaustAnimation.fade(dots, easeMid, easeOutCubic);
+    if (!thruster.exhaustAnimation.done()) {
+      plotDots(this.pixels, this.labels, this.filters, dots, -1);
+    }
+  }
+
+  drawFrame() {
+    this.pixels.clear();
+    this.labels = [];
+
+    // Apply thrusters
+    this.thrustTimer.poll(this.t);
+    let to = new Orientation();
+    to.set(this.orientation.get());
+    let i = this.thrusters.length;
+    while(i--) {
+      let thruster = this.thrusters[i];
+      if (thruster.done()) {
+        this.thrusters.splice(i, 1);
+      } else {
+        thruster.rotation.rotate(to, easeOutExpo);
+      }
+    }
+    to.collapse();
+    rotateBetween(this.orientation, to);
+
+    // Draw ring
+    this.orientation.collapse();
+    for (let i = 0; i < this.orientation.length(); ++i) {
+      let dots = drawRing(this.orientation.orient(this.ring, i), 1, (v) => new THREE.Color(0xaaaaaa));
+      plotDots(this.pixels, this.labels, this.filters, dots, (this.orientation.length() - 1 - i) / this.orientation.length(), blendOverMax);
+    }
+
+    // Draw thrusters
+    this.thrusters.forEach((t) => this.drawThruster(t));
+
+    this.t++;
+    this.palette.mutate(Math.sin(0.001 * this.t));
+     return { pixels: this.pixels, labels: this.labels };
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 class Drop {
   constructor() {
     this.v = new THREE.Vector3(0, 1, 0);
@@ -1759,55 +2036,13 @@ class Drop {
   }
 };
 
-class TheMatrix {
-  constructor() {
-    this.pixels = new Map();
-    this.labels = [];
-    this.drops = [];
-    this.filters = new FilterAntiAlias();
-    this.trails = new FilterDecayTrails(5, blueToBlack);
-    this.filters.chain(this.trails);
-    Daydream.W = 40;
-  }
 
-  drawFrame() {
-    this.pixels.clear();
-    this.trails.decay();
-    this.spawnDrops();
-    this.paintDrops();
-    this.moveDrops();
-    return { pixels: this.pixels, labels: this.labels };
-  }
-
-  spawnDrops() {
-    let p = 1 / 16;
-    if (Math.random() * 1 < p) { 
-      this.drops.push(new Drop());
-    }
-  }
-
-  moveDrops() {
-    this.drops = this.drops.filter((d) => {
-      d.rotation.rotate(d.orientation, easeInSin);
-      return !d.rotation.done();
-    });
-  }
-
-  paintDrops() {  
-    let dots = [];
-    this.drops.forEach((d) => {
-      dots.push(...drawVector(d.orientation.orient(d.v),
-        (v) => { return new THREE.Color(0x0000ff) }));
-    });
-    this.pixels = plotDots(this.filters, dots);
-  }
-
-}
+///////////////////////////////////////////////////////////////////////////////
 
 const daydream = new Daydream();
 window.addEventListener("resize", () => daydream.setCanvasSize());
 window.addEventListener("keydown", (e) => daydream.keydown(e));
 // var effect = new PolyRot();
-// var effect = new TheMatrix();
-var effect = new RainbowWiggles();
+// var effect = new RainbowWiggles();
+var effect = new Thrusters();
 daydream.renderer.setAnimationLoop(() => daydream.render(effect));
