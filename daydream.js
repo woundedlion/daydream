@@ -176,125 +176,6 @@ class Daydream {
   }
 }
 
-const g = (1 + Math.sqrt(5)) / 2;
-
-const sphericalToPixel = (s) => {
-  return {
-    x: wrap((s.theta * Daydream.W) / (2 * Math.PI), Daydream.W),
-    y: (s.phi * Daydream.H) / Math.PI,
-  };
-};
-
-const pixelToSpherical = (x, y) => {
-  return new THREE.Spherical(
-    1,
-    (y * Math.PI) / Daydream.H,
-    (x * 2 * Math.PI) / Daydream.W
-  );
-};
-
-const blendMax = (c1, c2) => {
-  return new THREE.Color(
-    Math.max(c1.r, c2.r),
-    Math.max(c1.g, c2.g),
-    Math.max(c1.b, c2.b)
-  );
-}
-
-const blendOver = (c1, c2) => {
-  return c2;
-}
-
-const blendUnder = (c1, c2) => {
-  return c1;
-}
-
-const blendOverMax = (c1, c2) => {
-  const m1 = Math.sqrt(Math.pow(c1.r, 2) + Math.pow(c1.g, 2) + Math.pow(c1.b, 2));
-  const m2 = Math.sqrt(Math.pow(c2.r, 2) + Math.pow(c2.g, 2) + Math.pow(c2.b, 2));
-  let s = 0;
-  if (m2 > 0) {
-    s = Math.max(m1, m2) / m2;
-  } 
-  return new THREE.Color(
-    c2.r * s,
-    c2.g * s,
-    c2.b * s
-  );
-}
-
-const blendOverMin = (c1, c2) => {
-  const m1 = Math.sqrt(Math.pow(c1.r, 2) + Math.pow(c1.g, 2) + Math.pow(c1.b, 2));
-  const m2 = Math.sqrt(Math.pow(c2.r, 2) + Math.pow(c2.g, 2) + Math.pow(c2.b, 2));
-  let s = 0;
-  if (m2 > 0) {
-    s = Math.min(m1, m2) / m2;
-  }
-  return new THREE.Color(
-    c2.r * s,
-    c2.g * s,
-    c2.b * s
-  );
-}
-
-const blendMean = (c1, c2) => {
-  return new THREE.Color(
-    (c1.r + c2.r) / 2,
-    (c1.g + c2.g) / 2,
-    (c1.b + c2.b) / 2
-  );
-}
-
-const plotPixel = (pixels, key, color, blendMode, maskFn, age) => {
-  let p = { color: color, age: age };
-  if (pixels.has(key)) {
-    let old = pixels.get(key);
-    p.color = blendMode(old.color, p.color);
-  } else {
-    p.color = color;
-  }
-  p.color.multiplyScalar(maskFn(key));
-  pixels.set(key, p);
-};
-
-const falloff = (c) => {
-  return c;
-}
-
-const pixelKey = (x, y) => `${x},${y}`;
-const keyPixel = (k) => k.split(',');
-const nullMask = (key) => 1;
-
-const plotAA = (pixels, dots, maskFn = nullMask, age = 0, blendMode = blendOver) => {
-  let buf = new Map();
-  for (const dot of dots) {
-    let p = sphericalToPixel(new THREE.Spherical().setFromVector3(dot.position));
-    let xi = Math.floor(p.x);
-    let xm = p.x - xi;
-    let yi = Math.floor(p.y);
-    let ym = p.y - yi;
-    let c = falloff((1 - xm) * (1 - ym));
-    let color = new THREE.Color(dot.color);
-
-    plotPixel(buf, pixelKey(xi, yi),
-      color.clone().multiplyScalar(c), blendOverMax, maskFn, age);
-    c = falloff(xm * (1 - ym));
-    plotPixel(buf, pixelKey((xi + 1) % Daydream.W, yi),
-      color.clone().multiplyScalar(c), blendOverMax, maskFn, age);
-    if (yi < Daydream.H - 1) {
-      c = falloff((1 - xm) * ym);
-      plotPixel(buf, pixelKey(xi, yi + 1),
-        color.clone().multiplyScalar(c), blendOverMax, maskFn, age);
-      c = falloff(xm * ym);
-      plotPixel(buf, pixelKey((xi + 1) % Daydream.W, yi + 1),
-        color.clone().multiplyScalar(c), blendOverMax, maskFn, age);
-    }
-  }
-  for (const [key, pixel] of buf.entries()) {
-    plotPixel(pixels, key, pixel.color.clone(), blendMode, nullMask, pixel.age);
-  }
-};
-
 const prettify = (r) => {
   let precision = 3;
 
@@ -366,7 +247,8 @@ const coordsLabel = (c) => {
   let s = new THREE.Spherical().setFromCartesianCoords(c[0], c[1], c[2]);
   let n = new THREE.Vector3(c[0], c[1], c[2]).normalize();
   return {
-    position: new THREE.Vector3().setFromSphericalCoords(Daydream.SPHERE_RADIUS, s.phi, s.theta),
+    position: new THREE.Vector3()
+      .setFromSphericalCoords(Daydream.SPHERE_RADIUS, s.phi, s.theta),
     content:
       `\u03B8, \u03A6 :
         ${prettify(s.theta)},
@@ -386,6 +268,84 @@ const coordsLabel = (c) => {
        `
   };
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+const g = (1 + Math.sqrt(5)) / 2;
+
+const sphericalToPixel = (s) => {
+  return {
+    x: wrap((s.theta * Daydream.W) / (2 * Math.PI), Daydream.W),
+    y: (s.phi * Daydream.H) / Math.PI,
+  };
+};
+
+const pixelToSpherical = (x, y) => {
+  return new THREE.Spherical(
+    1,
+    (y * Math.PI) / Daydream.H,
+    (x * 2 * Math.PI) / Daydream.W
+  );
+};
+
+const blendMax = (c1, c2) => {
+  return new THREE.Color(
+    Math.max(c1.r, c2.r),
+    Math.max(c1.g, c2.g),
+    Math.max(c1.b, c2.b)
+  );
+}
+
+const blendOver = (c1, c2) => {
+  return c2;
+}
+
+const blendUnder = (c1, c2) => {
+  return c1;
+}
+
+const blendOverMax = (c1, c2) => {
+  const m1 =
+    Math.sqrt(Math.pow(c1.r, 2) + Math.pow(c1.g, 2) + Math.pow(c1.b, 2));
+  const m2 =
+    Math.sqrt(Math.pow(c2.r, 2) + Math.pow(c2.g, 2) + Math.pow(c2.b, 2));
+  let s = 0;
+  if (m2 > 0) {
+    s = Math.max(m1, m2) / m2;
+  } 
+  return new THREE.Color(
+    c2.r * s,
+    c2.g * s,
+    c2.b * s
+  );
+}
+
+const blendOverMin = (c1, c2) => {
+  const m1 =
+    Math.sqrt(Math.pow(c1.r, 2) + Math.pow(c1.g, 2) + Math.pow(c1.b, 2));
+  const m2 =
+    Math.sqrt(Math.pow(c2.r, 2) + Math.pow(c2.g, 2) + Math.pow(c2.b, 2));
+  let s = 0;
+  if (m2 > 0) {
+    s = Math.min(m1, m2) / m2;
+  }
+  return new THREE.Color(
+    c2.r * s,
+    c2.g * s,
+    c2.b * s
+  );
+}
+
+const blendMean = (c1, c2) => {
+  return new THREE.Color(
+    (c1.r + c2.r) / 2,
+    (c1.g + c2.g) / 2,
+    (c1.b + c2.b) / 2
+  );
+}
+
+const pixelKey = (x, y) => `${x},${y}`;
+const keyPixel = (k) => k.split(',');
 
 class TestPoly {
   vertices = [
@@ -693,7 +653,7 @@ class Path {
       this.points.pop();
     }
     this.points = this.points.concat(
-      drawLine(c1, c2, (v) => 0x000000, 1, longWay)
+      drawLine(c1, c2, (v) => undefined, 0, 1, longWay)
         .map((d) => d.position));
     return this;
   }
@@ -969,7 +929,6 @@ const plotDots = (pixels, labels, filter, dots, age = 0, blendFn = blendOverMax)
   for (const dot of dots) {
     let p = sphericalToPixel(new THREE.Spherical().setFromVector3(dot.position));
     filter.plot(pixels, p.x, p.y, dot.color, age, blendFn);
-//    labels.push({ position: dot.position.multiplyScalar(Daydream.SPHERE_RADIUS), content: `${Math.trunc(p.x)}, ${Math.trunc(p.y)}` });
   }
 }
 
@@ -1026,6 +985,10 @@ class FilterMirror extends Filter {
   }
 }
 
+
+const falloff = (c) => {
+  return c;
+}
 
 class FilterAntiAlias extends Filter {
   plot(pixels, x, y, color, age, blendFn = blendOverMax) {
@@ -1118,9 +1081,7 @@ class FilterTwinkle extends Filter {
   }
 }
 
-class FilterDecayMask extends Filter {
 
-}
 
 class FilterDecayTrails extends Filter {
   constructor(lifespan, gradient, maskFn) {
@@ -1163,108 +1124,39 @@ class FilterDecayTrails extends Filter {
   }
 }
 
-class DecayTrails {
-  constructor(ttl, pixels, gradient) {
-    this.ttl = ttl;
-    this.pixels = pixels;
-    this.gradient = gradient;
-    this.mask = new Map();
-    this.label = false;
+class FilterDecayMask extends Filter {
+  constructor(lifespan) {
+    super();
+    this.lifespan = lifespan;
+    this.trails = new Map();
   }
 
-  clear() {
-    this.mask = new Map();
-  }
-
-  has(key) {
-    return this.mask.has(key);  
-  }
-
-  get(key) {
-    return this.pixels.get(key);
-  }
-
-  set(key, value) {
-    this.mask.set(key, this.ttl - value.age);
-    if (value.age > 0) {
-      value.color = this.gradient.get(1 - ((this.ttl - value.age) / this.ttl));
+  plot(pixels, x, y, color, age, blendFn) {
+    if (age >= 0) {
+      let key = pixelKey(x, y);
+      this.trails.set(key, Math.max(0, this.lifespan - age));
     }
-    this.pixels.set(key, value);
+    if (age <= 0) {
+      this.pass(pixels, x, y, color, age, blendFn);
+    }
   }
 
   decay() {
-    this.mask.forEach((ttl, key) => {
+    this.trails.forEach((ttl, key) => {
       ttl -= 1;
-      if (ttl < 0.0001) {
-        this.mask.delete(key);
-        this.pixels.delete(key);
+      if (ttl <= 0) {
+        this.trails.delete(key);
       } else {
-        this.mask.set(key, ttl);
-        this.pixels.get(key).color = this.gradient.get((this.ttl - ttl) / this.ttl);
-        if (this.label) {
-          let xy = keyPixel(key);
-          let s = pixelToSpherical(xy[0], xy[1]);
-          s.radius = Daydream.SPHERE_RADIUS;
-          daydream.makeLabel(new THREE.Vector3().setFromSpherical(s),
-            `${ttl.toFixed(1)}`);
-        }
+        this.trails.set(key, ttl);
       }
-
-      if (this.label) {
-        let xy = keyPixel(key);
-        let s = pixelToSpherical(xy[0], xy[1]);
-        s.radius = Daydream.SPHERE_RADIUS;
-        daydream.makeLabel(new THREE.Vector3().setFromSpherical(s),
-          `${ttl}`);
-      }
-
     });
-
-  }
-}
-
-class DecayMask {
-  constructor(ttl) {
-    this.ttl = ttl;
-    this.mask = new Map();
-    this.label = false;
   }
 
-  has(key) {
-    return this.mask.has(key);
-  }
-
-  get(key) {
-    return { color: 0x000000 };
-  }
-
-  getMask(key) {
-    if (this.mask.has(key)) {
-      return Math.pow(this.mask.get(key) / this.ttl, 1);
+  mask(key) {
+    if (this.trails.has(key)) {
+      return this.trails.get(key) / this.lifespan;
     }
     return 0;
-  }
-
-  set(key, value) {
-    this.mask.set(key, this.ttl - value.age);
-  }
-
-  decay() {
-    this.mask.forEach((ttl, key, map) => {
-      ttl -= 1;
-      if (ttl < 0.0001) {
-        this.mask.delete(key);
-      } else {
-        this.mask.set(key, ttl);
-        if (this.label) {
-          let xy = keyPixel(key);
-          let s = pixelToSpherical(xy[0], xy[1]);
-          s.radius = Daydream.SPHERE_RADIUS;
-          daydream.makeLabel(new THREE.Vector3().setFromSpherical(s),
-            `${ttl.toFixed(2)}`);
-        }
-      }
-    });
   }
 }
 
@@ -1444,8 +1336,6 @@ class PolyRot {
   constructor() {
     this.pixels = new Map();
     this.labels = [];
-    this.polyMask = new DecayMask(4, this.pixels);
-    this.ringTrail = new DecayTrails(3, this.pixels, g3);
 
     this.ring = new THREE.Vector3(0, 1, 0).normalize();
     this.ringOrientation = new Orientation();
@@ -1457,24 +1347,21 @@ class PolyRot {
     this.bottomOrientation = new Orientation;
 
     this.genPolyDuration = 160;
-    this.trailRingDuration = 160;
     this.splitPolyDuration = 96;
     this.spinRingDuration = 16;
     this.spinPolyDuration = 192;
 
-    this.filters = new FilterAntiAlias();
+    // Output Filters
+    this.out = new FilterAntiAlias();
+    this.polyMaskMask = new FilterDecayMask(4);
+    (this.polyMask = new FilterAntiAlias())
+      .chain(this.polyMaskMask);
 
     this.states = {
       "genPoly": {
         enter: this.enterGenPoly,
         draw: this.drawGenPoly,
         animate: this.animateGenPoly,
-        exit: () => { },
-      },
-      "trailRing": {
-        enter: this.enterTrailRing,
-        draw: this.drawTrailRing,
-        animate: this.animateTrailRing,
         exit: () => { },
       },
       "spinRing": {
@@ -1511,12 +1398,10 @@ class PolyRot {
 
     this.gui = new gui.GUI();
     this.gui.add(this, 'genPolyDuration').min(8).max(320).step(1);
-    this.gui.add(this, 'trailRingDuration').min(8).max(320).step(1);
     this.gui.add(this, 'splitPolyDuration').min(8).max(256).step(1);
     this.gui.add(this, 'spinRingDuration').min(8).max(32).step(1);
     this.gui.add(this, 'spinPolyDuration').min(8).max(256).step(1);
-    this.gui.add(this.polyMask, 'ttl').min(1).max(20).step(1);
-    this.gui.add(this.polyMask, 'label');
+    this.gui.add(this.polyMaskMask, 'lifespan').min(1).max(20).step(1);
   }
 
   transition() {
@@ -1548,28 +1433,34 @@ class PolyRot {
   drawGenPoly() {
     this.labels = [];
     this.pixels.clear();
-    this.polyMask.decay();
+    this.polyMaskMask.decay();
     let vertices = this.topOrientation.orientPoly(this.poly.vertices);
 
+    // Draw ring into polygon mask
     let n = this.ringOrientation.length();
     for (let i = 0; i < n; i++) {
       let normal = this.ringOrientation.orient(this.ring, i);
-      plotAA(this.polyMask, drawRing(normal, 1, (v, t) => 0x000000),
-        (k) => 1,
-        n == 1 ? 0 : (n - 1 - i) * (1 / (n - 1))
-      );
+      let dots = drawRing(normal, 1, (v, t) => new THREE.Color(0x000000));
+      plotDots(new Map(), this.labels, this.polyMask, dots,
+        (n - 1 - i) / n, blendOverMax);
     }
+    this.ringOrientation.collapse();
 
-    plotAA(this.pixels, drawPolyhedron(
+    // Draw polyhedron
+    let dots = drawPolyhedron(
       vertices,
       this.poly.eulerPath,
-      (v) => distanceGradient(v, this.ringOrientation.orient(this.ring))),
-      (key) => this.polyMask.getMask(key)
-    );
-    
-    this.ringOrientation.collapse();
-    let normal = this.ringOrientation.orient(this.ring);
-    plotAA(this.pixels, drawRing(normal, 1, (v, t) => 0xaaaaaa));
+      (v) => distanceGradient(v, this.ringOrientation.orient(this.ring)));
+    plotDots(this.pixels, this.labels, this.out, dots, 0, blendOverMax);
+    this.pixels.forEach((p, key) => {
+      p.multiplyScalar(this.polyMaskMask.mask(key));
+    });
+
+    // Draw ring
+    plotDots(this.pixels, this.labels, this.out,
+      drawRing(this.ringOrientation.orient(this.ring), 1,
+        (v, t) => new THREE.Color(0xaaaaaa)),
+      0, blendOverMax);
 
     return { pixels: this.pixels, labels: this.labels };
   }
@@ -1581,45 +1472,6 @@ class PolyRot {
       this.genPolyMotion.move(this.ringOrientation);
     }
   }
-
-  enterTrailRing() {
-    this.poly = new Dodecahedron();
-    this.ringTrail.clear();
-    this.trailRingPath = new Path().appendSegment(
-      (t) => this.ringOrientation.orient(lissajous(10, 0.5, 0, t)),
-      2 * Math.PI,
-      this.genPolyDuration,
-      easeInOutSin
-      )
-      this.trailRingMotion = new Motion(this.trailRingPath, this.trailRingDuration);
-  }
-
-  drawTrailRing() {
-    this.labels = [];
-    this.ringTrail.decay();
-    let n = this.ringOrientation.length();
-    for (let i = 0; i < n; i++) {
-      let normal = this.ringOrientation.orient(this.ring, i);
-      plotAA(this.ringTrail, drawRing(normal, 1, (v, t) => 0xffffff), (k) => 1,
-        n == 1 ? 0 : (n - 1 - i) * (1 / (n - 1)), blendOver);
-    }
-    this.ringOrientation.collapse();
-    let normal = this.ringOrientation.orient(this.ring);
-
-//    plotAA(this.ringTrail, drawVector(normal, (p) => 0xff0000));
-
-    return { pixels: this.pixels, labels: this.labels };
-  }
-
-  animateTrailRing() {
-    if (this.trailRingMotion.done()) {
-      this.transition();
-//      this.transitionTo("trailRing");
-    } else {
-      this.trailRingMotion.move(this.ringOrientation);
-    }
-  }
-
 
   enterSpinRing() {
     this.poly = new Dodecahedron();
@@ -1634,7 +1486,6 @@ class PolyRot {
       this.transition();
     } else {
       this.ringMotion.move(this.ringOrientation);
-//      this.poly = new Dodecahedron();
     }
   }
 
@@ -1661,9 +1512,12 @@ class PolyRot {
         return this.bottomOrientation.orient(new THREE.Vector3().fromArray(c)).toArray();
       }
     });
-    plotAA(this.pixels, drawPolyhedron(vertices, this.poly.eulerPath,
+
+    plotDots(this.pixels, this.labels, this.out,
+      drawPolyhedron(vertices, this.poly.eulerPath,
       (v) => distanceGradient(v, normal)));
-    plotAA(this.pixels, drawRing(normal, 1, (v, t) => 0xaaaaaa));
+    plotDots(this.pixels, this.labels, this.out,
+      drawRing(normal, 1, (v, t) => new THREE.Color(0xaaaaaa)));
     return { pixels: this.pixels, labels: this.labels };
   }
 
@@ -1691,11 +1545,14 @@ class PolyRot {
 
   drawPolyRing() {
     this.pixels.clear();
+    this.labels = [];
     let normal = this.ringOrientation.orient(this.ring);
     let vertices = this.topOrientation.orientPoly(this.poly.vertices);
-    plotAA(this.pixels, drawPolyhedron(vertices, this.poly.eulerPath,
-      (v) => distanceGradient(v, normal)));
-    plotAA(this.pixels, drawRing(normal, 1, (v, t) => 0xaaaaaa));
+    plotDots(this.pixels, this.labels, this.out,
+      drawPolyhedron(vertices, this.poly.eulerPath,
+        (v) => distanceGradient(v, normal)));
+    plotDots(this.pixels, this.labels, this.out,
+      drawRing(normal, 1, (v, t) => new THREE.Color(0xaaaaaa)));
     return { pixels: this.pixels, labels: this.labels };
   }
 
@@ -1795,7 +1652,7 @@ class RainbowWiggles {
     this.gap = 3;
     this.t = 0;
     this.filters = new FilterReplicate(4);
-    this.trails = new FilterDecayTrails(10, this.palette, (x, y) => Math.random() < 0.5);
+    this.trails = new FilterDecayTrails(10, this.palette, (x, y) => true);
     this.filters.chain(this.trails);
 
     // Random interavals
@@ -2097,7 +1954,7 @@ class Thrusters {
 const daydream = new Daydream();
 window.addEventListener("resize", () => daydream.setCanvasSize());
 window.addEventListener("keydown", (e) => daydream.keydown(e));
- var effect = new PolyRot();
+// var effect = new PolyRot();
 // var effect = new RainbowWiggles();
-//var effect = new Thrusters();
+var effect = new Thrusters();
 daydream.renderer.setAnimationLoop(() => daydream.render(effect));
