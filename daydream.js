@@ -2,7 +2,7 @@
 - Lissajous interference
 - wiggly color separation
 - wiggly dots
-- Procedural Gradients
+- Accordion rings
 */
 
 import * as THREE from "three";
@@ -40,6 +40,10 @@ class Daydream {
 
   static DOT_SIZE = 2;
   static DOT_COLOR = 0x0000ff;
+
+  static X_AXIS = new THREE.Vector3(1, 0, 0);
+  static Y_AXIS = new THREE.Vector3(0, 1, 0);
+  static Z_AXIS = new THREE.Vector3(0, 0, 1);
 
   constructor() {
     console.log("INIT");
@@ -520,6 +524,44 @@ const drawPolyhedron = (vertices, edges, colorFn) => {
   return dots;
 }
 
+const drawFn = (normal, orientation, radius, shiftFn, colorFn) => {
+  let dots = [];
+  let u = new THREE.Vector3();
+  let v = normal.clone();
+  let w = new THREE.Vector3();
+  if (radius > 1) {
+    v.negate();
+    radius = 2 - radius;
+  }
+  if (v.x == 0 && v.y == 0) {
+    u.crossVectors(v, orientation.orient(Daydream.X_AXIS)).normalize();
+  } else {
+    u.crossVectors(v, orientation.orient(Daydream.Z_AXIS)).normalize();
+  }
+  w.crossVectors(v, u);
+  let d = Math.sqrt(Math.pow(1 - radius, 2));
+
+  let start = undefined;
+  let from = undefined;
+  let step = 2 * Math.PI / Daydream.W;
+  for (let t = 0; t < 2 * Math.PI; t += step) {
+    let vi = calcRingPoint(t, d, radius, u, v, w);
+    let axis = new THREE.Vector3().crossVectors(normal, vi).normalize();
+    let up = new THREE.Quaternion().setFromAxisAngle(axis, shiftFn(t));
+    let to = vi.clone().applyQuaternion(up);
+    if (start === undefined) {
+      dots.push(new Dot(to, colorFn(vi, t)));
+      start = to;
+    } else {
+      dots.push(...drawLine(from, to, colorFn));
+    }
+    from = to;
+  }
+  dots.push(...drawLine(from, start, colorFn));
+
+  return dots;
+};
+
 const calcRingPoint = (a, d, radius, u, v, w) => {
   return new THREE.Vector3(
     d * v.x + radius * u.x * Math.cos(a) + radius * w.x * Math.sin(a),
@@ -533,18 +575,15 @@ const drawRing = (normal, radius, colorFn) => {
   let u = new THREE.Vector3();
   let v = normal.clone();
   let w = new THREE.Vector3();
-  let x_axis = new THREE.Vector3(1, 0, 0);
-  let z_axis = new THREE.Vector3(0, 0, 1);
   if (radius > 1) {
     v.negate();
     radius = 2 - radius;
   }
   if (v.x == 0 && v.y == 0) {
-    u.crossVectors(v, x_axis);
+    u.crossVectors(v, Daydream.X_AXIS).normalize();
   } else {
-    u.crossVectors(v, z_axis);
+    u.crossVectors(v, Daydream.Z_AXIS).normalize();
   }
-  u.normalize();
   w.crossVectors(v, u);
   let d = Math.sqrt(Math.pow(1 - radius, 2));
 
@@ -562,18 +601,15 @@ const ringPoint = (normal, radius, angle) => {
   let u = new THREE.Vector3();
   let v = normal.clone();
   let w = new THREE.Vector3();
-  let x_axis = new THREE.Vector3(1, 0, 0);
-  let z_axis = new THREE.Vector3(0, 0, 1);
   if (radius > 1) {
     v.negate();
     radius = 2 - radius;
   }
   if (v.x == 0 && v.y == 0) {
-    u.crossVectors(v, x_axis);
+    u.crossVectors(v, Daydream.X_AXIS).normalize();
   } else {
-    u.crossVectors(v, z_axis);
+    u.crossVectors(v, Daydream.Z_AXIS).normalize();
   }
-  u.normalize();
   w.crossVectors(v, u);
   let d = Math.sqrt(Math.pow(1 - radius, 2));
   return calcRingPoint(angle, d, radius, u, v, w);
@@ -1084,16 +1120,14 @@ class FilterTwinkle extends Filter {
 
 
 class FilterDecayTrails extends Filter {
-  constructor(lifespan, gradient, maskFn) {
+  constructor(lifespan) {
     super();
     this.lifespan = lifespan;
-    this.gradient = gradient;
     this.trails = new Map();
-    this.maskFn = maskFn;
   }
 
   plot(pixels, x, y, color, age, blendFn) {
-    if (age >= 0 && this.maskFn(x, y)) {
+    if (age >= 0) {
       let key = pixelKey(x, y);
       this.trails.set(key, Math.max(0, this.lifespan - age));
     }
@@ -1113,11 +1147,11 @@ class FilterDecayTrails extends Filter {
     });
   }
 
-  trail(pixels, filters, blendFn = blendUnder) {
+  trail(pixels, filters, trailFn, blendFn = blendUnder) {
     for (const [key, ttl] of this.trails) {
       if (ttl > 0) {
         let p = keyPixel(key);
-        let color = this.gradient.get(1 - (ttl / this.lifespan));
+        let color = trailFn(p[0], p[1], 1 - (ttl / this.lifespan));
         filters.plot(pixels, p[0], p[1], color, this.lifespan - ttl, blendFn);
       }
     }
@@ -1337,10 +1371,10 @@ class PolyRot {
     this.pixels = new Map();
     this.labels = [];
 
-    this.ring = new THREE.Vector3(0, 1, 0).normalize();
+    this.ring = Daydream.Y_AXIS.clone();
     this.ringOrientation = new Orientation();
 
-    this.spinAxis = new THREE.Vector3(0, 1, 0);
+    this.spinAxis = new Daydream.Y_AXIS.clone();
     this.spinAxisOrientation = new Orientation();
 
     this.topOrientation = new Orientation();
@@ -1652,7 +1686,7 @@ class RainbowWiggles {
     this.gap = 3;
     this.t = 0;
     this.filters = new FilterReplicate(4);
-    this.trails = new FilterDecayTrails(10, this.palette, (x, y) => true);
+    this.trails = new FilterDecayTrails(10);
     this.filters.chain(this.trails);
 
     // Random interavals
@@ -1704,7 +1738,7 @@ class RainbowWiggles {
     this.t++;
     this.palette.mutate(Math.sin(0.001 * this.t++));
     this.pull(0, this.speed);
-    this.trails.trail(this.pixels, new FilterRaw());
+    this.trails.trail(this.pixels, new FilterRaw(), (x, y, t) => this.palette.get(t));
     this.drawRings();
     return { pixels: this.pixels, labels: this.labels };
   }
@@ -1826,7 +1860,7 @@ class Thrusters {
     );
 
     // Output Filters
-    this.trails = new FilterDecayTrails(3, grayToBlack, (x, y) => true);
+    this.trails = new FilterDecayTrails(5);
     this.wiggle = new FilterSinDisplace(
       0,
       (t) => 4,
@@ -1834,15 +1868,18 @@ class Thrusters {
       (t) => 0.2
     );
     this.chromaShift = new FilterChromaticShift(1);
-    (this.ringOutput = this.chromaShift)
+    (this.ringOutput = new FilterRaw())
+      //    .chain(this.chromaShift)
       .chain(new FilterAntiAlias())
-      .chain(this.wiggle)
-  //    .chain(this.trails)
+      //      .chain(this.wiggle)
+    //        .chain(this.trails)
+      .chain(new FilterReplicate(1))
+//      .chain(new FilterMirror(1))
     ;
 
     // State
     this.t = 0;
-    this.ring = new THREE.Vector3(0, 1, 0);
+    this.ring = new THREE.Vector3(0.5, 0.5, 0.5).normalize(); //Daydream.Y_AXIS.clone();
     this.orientation = new Orientation();
     this.poly = new Dodecahedron();
     this.thrusters = [];
@@ -1887,7 +1924,7 @@ class Thrusters {
         emitter,
         this.orientation.orient(thruster.exhaustVector),
         (v, t) => {
-          let z = this.orientation.orient(new THREE.Vector3(1, 0, 0));
+          let z = this.orientation.orient(Daydream.X_AXIS);
           return this.palette.get(angleBetween(z, emitter) / Math.PI);
         },
         Daydream.DOT_SIZE * 3 / Daydream.SPHERE_RADIUS,
@@ -1906,7 +1943,13 @@ class Thrusters {
     this.labels = [];
 
     this.trails.decay();
-    this.trails.trail(this.pixels, new FilterRaw());
+    this.trails.trail(this.pixels, new FilterRaw(),
+      (x, y, t) => {
+        let v = new THREE.Vector3().setFromSpherical(pixelToSpherical(x, y));
+        let z = this.orientation.orient(Daydream.X_AXIS);
+        let s = angleBetween(z, v) / Math.PI;
+        return this.palette.get((s + t) % 1);
+      });
     this.wiggle.shift();
 
     // Apply thrusters
@@ -1926,13 +1969,20 @@ class Thrusters {
     // Draw ring
     to.collapse();
     for (let i = 0; i < to.length(); ++i) {
-      let dots = drawRing(to.orient(this.ring, i), 1,
-        (v, t) => new THREE.Color(0x888888)
-//        (v, t) => {
-//          let z = this.orientation.orient(new THREE.Vector3(1, 0, 0));
-//          return this.palette.get(angleBetween(z, v) / Math.PI);
-        //        }
+      // let dots = drawRing(to.orient(this.ring, i), 1,
+      //  (v, t) => {
+      //    let z = this.orientation.orient(Daydream.X_AXIS);
+      //      return this.palette.get(angleBetween(z, v) / Math.PI);
+      //    }
+      //);
+      let dots = drawFn(to.orient(this.ring, i), to, 1,
+        (t) => Math.sin(2 * t ) * Math.sin(((this.t % 16) / 16 * Math.PI * 2)) * 0.5,
+        (v, t) => {
+          let z = this.orientation.orient(Daydream.X_AXIS);
+          return this.palette.get(angleBetween(z, v) / Math.PI);
+        }
       );
+
       plotDots(this.pixels, this.labels, this.ringOutput, dots,
         (to.length() - 1 - i) / to.length(), blendOverMax);
         
@@ -1941,7 +1991,7 @@ class Thrusters {
     this.orientation.collapse();
 
     // Draw thrusters
-    this.thrusters.forEach((t) => this.drawThruster(t));
+//    this.thrusters.forEach((t) => this.drawThruster(t));
 
     this.t++;
 //    this.palette.mutate(Math.sin(0.001 * this.t));
