@@ -548,14 +548,14 @@ const drawFn = (normal, orientation, radius, shiftFn, colorFn) => {
 
   let start = undefined;
   let from = undefined;
-  let step = 2 * Math.PI / Daydream.W;
-  for (let t = 0; t < 2 * Math.PI; t += step) {
-    let vi = calcRingPoint(t, d, radius, u, v, w);
+  let step = 1 / Daydream.W;
+  for (let t = 0; t < 1; t += step) {
+    let vi = calcRingPoint(t * 2 * Math.PI, d, radius, u, v, w);
     let axis = new THREE.Vector3().crossVectors(normal, vi).normalize();
-    let up = new THREE.Quaternion().setFromAxisAngle(axis, shiftFn(t));
-    let to = vi.clone().applyQuaternion(up);
+    let shift = new THREE.Quaternion().setFromAxisAngle(axis, shiftFn(t));
+    let to = vi.clone().applyQuaternion(shift);
     if (start === undefined) {
-      dots.push(new Dot(to, colorFn(vi, t)));
+      dots.push(new Dot(to, colorFn(vi)));
       start = to;
     } else {
       dots.push(...drawLine(from, to, colorFn));
@@ -907,7 +907,6 @@ class Transition extends Animation {
     }
     let t = (this.t / this.duration);
     this.mutable.set(this.easingFn(t) * (this.to - this.from) + this.from);
-    console.log(this.mutable.get())
   }
 }
 
@@ -945,6 +944,13 @@ class Rotation extends Animation {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+function sinWave(from, to, freq, phase) {
+  return (t) => {
+    let w = Math.sin(freq * t * 2 * Math.PI + phase);
+    return (w + 1) * (to - from) / 2 + from;
+  };
+}
 
 const distanceGradient = (v, normal) => {
   let d = v.dot(normal);
@@ -2068,14 +2074,16 @@ class Thrusters {
     this.orientation.collapse();
     this.to.collapse();
     let dots = drawFn(this.orientation.orient(this.ring), this.orientation, 1,
-        (t) => Math.sin(2 * t ) * Math.sin(((this.t % 16) / 16 * 2 * Math.PI)) * this.amplitude.get(),
-//      (t) => Math.sin(((this.t % 16) / 16 * 2 * Math.PI)) * 0.5,
-//      (t) => Math.sin(2 * t),
-        (v, t) => {
-          let z = this.orientation.orient(Daydream.X_AXIS);
-          return this.palette.get(angleBetween(z, v) / Math.PI);
-        }
-      );
+      (t) => {
+        return sinWave(-1, 1, 2, 0)(t)
+        * sinWave(-1, 1, 1, 0)((this.t % 16) / 16)
+        * this.amplitude.get()
+      },
+      (v) => {
+        let z = this.orientation.orient(Daydream.X_AXIS);
+        return this.palette.get(angleBetween(z, v) / Math.PI);
+      }
+    );
     plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
         
     // Draw thrusters
