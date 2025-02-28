@@ -37,6 +37,7 @@ class Daydream {
   static SPHERE_RADIUS = 30;
   static H = 20;
   static W = 96;
+  static FPS = 16;
 
   static DOT_SIZE = 2;
   static DOT_COLOR = 0x0000ff;
@@ -351,6 +352,8 @@ const blendMean = (c1, c2) => {
 const pixelKey = (x, y) => `${x},${y}`;
 const keyPixel = (k) => k.split(',');
 
+///////////////////////////////////////////////////////////////////////////////
+
 class TestPoly {
   vertices = [
     [1, 1, 1], // 0
@@ -459,6 +462,8 @@ class Dodecahedron {
     [18],   // 19
   ];
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 const drawVector = (v, colorFn) => {
   return [new Dot(new THREE.Vector3(...v.toArray()).normalize(), colorFn(v))];
@@ -625,11 +630,13 @@ const drawFibSpiral = (n, eps, colorFn) => {
     );
     let vi = new THREE.Vector3().setFromSpherical(s);
     dots.push(
-      new Dot(s, colorFn(vi))
+      new Dot(vi, colorFn(vi))
     );
   }
   return dots;
 };
+
+///////////////////////////////////////////////////////////////////////////////
 
 class Orientation {
   constructor() {
@@ -722,6 +729,78 @@ class ProceduralPath {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class RandomTimer {
+  constructor(t, min, max, f) {
+    this.min = min;
+    this.max = max;
+    this.f = f;
+    this.reset(t);
+  }
+
+  reset(t) {
+    this.t = t + Math.round(Math.random() * (this.max - this.min) + this.min);
+  }
+
+  poll(t) {
+    if (t >= this.t) {
+      this.f();
+      this.reset(t);
+    }
+  }
+}
+
+class PeriodicTimer {
+  constructor(t, period, f) {
+    this.period = period;
+    this.f = f;
+    this.reset(t);
+  }
+
+  reset(t) {
+    this.t = t + this.period;
+  }
+
+  poll(t) {
+    if (t >= this.t) {
+      this.f();
+      this.reset(t);
+    }
+  }
+}
+
+class Timeline {
+  constructor() {
+    this.t = 0;
+    this.animations = [];
+  }
+
+  animate(animation, inSecs) {
+    let start = this.t + (inSecs * Daydream.FPS);
+    for (let i = 0; i < this.animations.length; ++i) {
+      if (this.animations[i].start > start) {
+        this.animations.splice(i, 0, { start: start, animation: animation });
+        return this;
+      }
+    }
+    this.animations.push({ start: start, animation: animation });
+    return this;
+  }
+
+  step() {
+    ++this.t;
+    let i = this.animations.length;
+    while (i--) {
+      if (this.t > this.animations[i].start) {
+        this.animations[i].animation.step();
+        if (this.animations[i].animation.done()) {
+          this.animations.splice(i, 1);
+          continue;
+        }
+      }
+    }
+  }
+}
+
 class Animation {
   constructor(duration, repeat) {
     this.duration = duration;
@@ -729,6 +808,7 @@ class Animation {
     this.t = 0;
   }
 
+  cancel() { this.t = this.duration; }
   done() { return this.t >= this.duration }
 
   step() {
@@ -744,13 +824,15 @@ class Animation {
 class Motion extends Animation {
   static MAX_ANGLE = 2 * Math.PI / Daydream.W;
 
-  constructor(path, duration, repeat = false) {
+  constructor(orientation, path, duration, repeat = false) {
     super(duration, repeat);
+    this.orientation = orientation;
     this.path = path;
     this.to = this.path.getPoint(0);
   }
 
-  move(orientation) {
+  step() {
+    super.step();
     if (this.done()) {
       return;
     }
@@ -759,77 +841,145 @@ class Motion extends Animation {
     if (!this.from.equals(this.to)) {
       let axis = new THREE.Vector3().crossVectors(this.from, this.to).normalize();
       let angle = angleBetween(this.from, this.to);
-      let origin = orientation.get();
-      orientation.clear();
+      let origin = this.orientation.get();
+      this.orientation.clear();
       for (let a = Motion.MAX_ANGLE; angle - a > 0.0001; a += Motion.MAX_ANGLE) {
         let r = new THREE.Quaternion().setFromAxisAngle(axis, a);
-        orientation.push(origin.clone().premultiply(r));
+        this.orientation.push(origin.clone().premultiply(r));
       }
       let r = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-      orientation.push(origin.clone().premultiply(r));
+      this.orientation.push(origin.clone().premultiply(r));
     }
-    this.step();
   }
 }
 
+class MutableNumber {
+  constructor(n) {
+    this.n = n;
+  }
+  get() { return this.n; }
+  set(n) { this.n = n; }
+}
+
 class FadeInOut extends Animation {
-  constructor(inDuration, onDuration, outDuration, repeat = false)
+  constructor(fader, inDuration, onDuration, outDuration,
+    easeIn = easeMid, easeOut = easeMid, repeat = false)
   {
     super(inDuration + onDuration + outDuration, repeat);
+    this.fader = fader;
     this.inDuration = inDuration;
     this.onDuration = onDuration;
     this.outDuration = outDuration;
+    this.easeOut = easeOut;
   }
 
-  fade(dots, easeIn = easeMid, easeOut = easeMid) {
+  step() {
+    super.step();
     if (this.t < this.inDuration) {
-      var m = easeIn(this.t / this.inDuration);
+      var m = this.easeIn(this.t / this.inDuration);
     } else if (this.t < this.inDuration + this.onDuration) {
       var m = 1;
     } else if (!this.done()) {
-      var m = 1 - easeOut((this.t - (this.inDuration + this.onDuration)) / this.outDuration);
+      var m = 1 - this.easeOut((this.t - (this.inDuration + this.onDuration)) / this.outDuration);
     } else {
       var m = 0;
     }
-    for (let dot of dots) {
-      dot.color.multiplyScalar(m);
+    this.fader.set(m);
+  }
+}
+
+class Transition extends Animation {
+  constructor(mutable, to, duration, easingFn, repeat = false) {
+    super(duration, repeat);
+    this.mutable = mutable;
+    this.to = to;
+    this.duration = duration;
+    this.easingFn = easingFn;
+  }
+
+  step() {
+    if (this.t == 0) {
+      this.from = this.mutable.get();
     }
-    this.step();
+    super.step();
+    if (this.done()) {
+      return;
+    }
+    let t = (this.t / this.duration);
+    this.mutable.set(this.easingFn(t) * (this.to - this.from) + this.from);
+    console.log(this.mutable.get())
   }
 }
 
 class Rotation extends Animation {
   static MAX_ANGLE = 2 * Math.PI / Daydream.W;
 
-  constructor(axis, angle, duration, repeat = false) {
+  constructor(orientation, axis, angle, duration, easingFn, repeat = false) {
     super(duration, repeat);
+    this.orientation = orientation;
     this.axis = axis;
     this.totalAngle = angle;
+    this.easingFn = easingFn;
     this.from = 0;
     this.to = 0;
   }
 
-  rotate(orientation, easingFn = easeInOutSin) {
+  step() {
+    super.step();
     if (this.done()) {
       return;
     }
     this.from = this.to;
-    this.to = easingFn((this.t + 1) / this.duration) * this.totalAngle;
+    this.to = this.easingFn((this.t) / this.duration) * this.totalAngle;
     if (Math.abs(this.to - this.from) > 0.0001) {
       let angle = Math.abs(this.to - this.from);
-      let origin = orientation.get();
+      let origin = this.orientation.get();
       for (let a = Rotation.MAX_ANGLE; angle - a > 0.0001; a += Rotation.MAX_ANGLE) {
         let r = new THREE.Quaternion().setFromAxisAngle(this.axis, a);
-        orientation.push(origin.clone().premultiply(r));
+        this.orientation.push(origin.clone().premultiply(r));
       }
       let r = new THREE.Quaternion().setFromAxisAngle(this.axis,angle);
-      orientation.push(origin.clone().premultiply(r));
+      this.orientation.push(origin.clone().premultiply(r));
     }
-    this.step();
   }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+const distanceGradient = (v, normal) => {
+  let d = v.dot(normal);
+  if (d > 0) {
+    return g1.get(d).clone();
+  } else {
+    return g2.get(-d).clone();
+  }
+}
+
+const lissajous = (m1, m2, a, t) => {
+  return new THREE.Vector3(
+    Math.sin(m2 * t) * Math.cos(m1 * t - a * Math.PI),
+    Math.cos(m2 * t),
+    Math.sin(m2 * t) * Math.sin(m1 * t - a * Math.PI),
+  );
+}
+
+const rotateBetween = (from, to) => {
+  let diff = from.get().clone().conjugate().premultiply(to.get());
+  let angle = 2 * Math.acos(diff.w);
+  if (angle == 0) {
+    return
+  } else {
+    var axis = new THREE.Vector3(diff.x, diff.y, diff.z).normalize();
+  }
+  new Rotation(from, axis, angle, 1, easeOutCirc).step();
+}
+
+const plotDots = (pixels, labels, filter, dots, age = 0, blendFn = blendOverMax) => {
+  for (const dot of dots) {
+    let p = sphericalToPixel(new THREE.Spherical().setFromVector3(dot.position));
+    filter.plot(pixels, p.x, p.y, dot.color, age, blendFn);
+  }
+}
 
 const isOver = (v, normal) => {
   return normal.dot(v) >= 0;
@@ -906,6 +1056,15 @@ const bisect = (poly, orientation, normal) => {
   return poly;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+const easeOutElastic = (x) => {
+  const c4 = (2 * Math.PI) / 3;
+  return x === 0 ?
+    0 : x === 1 ?
+      1 : Math.pow(2, -10 * x) * Math.sin((x * 10 - 0.75) * c4) + 1;
+}
+
 const easeInOutBicubic = (t) => {
   return t < 0.5 ? 4 * Math.pow(t, 3) : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
@@ -918,13 +1077,16 @@ const easeInSin = (t) => {
   return 1 - Math.cos((t * Math.PI) / 2);
 }
 
+const easeOutSin = (t) => {
+  return Math.sin((t * Math.PI) / 2);
+}
+
 function easeOutExpo(t) {
   return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
 }
 function easeOutCirc(t) {
   return Math.sqrt(1 - Math.pow(t - 1, 2));
 }
-
 
 const easeInCubic = (t) => {
   return Math.pow(t, 3);
@@ -943,30 +1105,7 @@ const easeOutCubic = (t) => {
 }
 
 
-
-const distanceGradient = (v, normal) => {
-  let d = v.dot(normal);
-  if (d > 0) {
-    return g1.get(d).clone();
-  } else {
-    return g2.get(-d).clone();
-  }
-}
-
-const lissajous = (m1, m2, a, t) => {
-  return new THREE.Vector3(
-    Math.sin(m2 * t) * Math.cos(m1 * t - a * Math.PI),
-    Math.cos(m2 * t),
-    Math.sin(m2 * t) * Math.sin(m1 * t - a * Math.PI),
-  );
-}
-
-const plotDots = (pixels, labels, filter, dots, age = 0, blendFn = blendOverMax) => {
-  for (const dot of dots) {
-    let p = sphericalToPixel(new THREE.Spherical().setFromVector3(dot.position));
-    filter.plot(pixels, p.x, p.y, dot.color, age, blendFn);
-  }
-}
+///////////////////////////////////////////////////////////////////////////////
 
 class Filter {
   chain(nextFilter) {
@@ -1608,48 +1747,6 @@ class PolyRot {
   }
 }
 
-
-///////////////////////////////////////////////////////////////////////////////
-
-class RandomTimer {
-  constructor(t, min, max, f) {
-    this.min = min;
-    this.max = max;
-    this.f = f;
-    this.reset(t);
-  }
-
-  reset(t) {
-    this.t = t + Math.round(Math.random() * (this.max - this.min) + this.min);
-  }
-
-  poll(t) {
-    if (t >= this.t) {
-      this.f();
-      this.reset(t);
-    }
-  }
-}
-
-class PeriodicTimer {
-  constructor(t, period, f) {
-    this.period = period;
-    this.f = f;
-    this.reset(t);
-  }
-
-  reset(t) {
-    this.t = t + this.period;
-  }
-
-  poll(t) {
-    if (t >= this.t) {
-      this.f();
-      this.reset(t);
-    }
-  }
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 
 
@@ -1799,29 +1896,24 @@ class RainbowWiggles {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-const rotateBetween = (from, to) => {
-  let diff = from.get().clone().conjugate().premultiply(to.get());
-  let angle = 2 * Math.acos(diff.w);
-  if (angle == 0) {
-    return
-  } else {
-    var axis = new THREE.Vector3(diff.x, diff.y, diff.z).normalize();
-  }
-  new Rotation(axis, angle, 1).rotate(from, easeOutCirc);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 class Thruster {
-  constructor(thrustPoint, thrustVector, thrustAxis) {
+  constructor(orientation, thrustPoint, thrustVector, thrustAxis) {
+    this.orientation = orientation;
     this.thrustPoint = thrustPoint;
     this.exhaustVector = thrustVector.clone().negate();
-    this.rotation = new Rotation(thrustAxis,  Math.PI, 8 * 16);
-    this.exhaustAnimation = new FadeInOut(0, 4, 12);
+    this.thrustRotation = new Rotation(orientation, thrustAxis, Math.PI, 8 * 16, easeOutExpo);
+    this.exhaustFader = new MutableNumber(1);
+    this.exhaustFade = new FadeInOut(
+      this.exhaustFader, 0, 4, 12, easeMid, easeOutCubic);
   }
 
   done() {
-    return this.rotation.done() && this.exhaustAnimation.done();
+    return this.thrustRotation.done() && this.exhaustFade.done();
+  }
+
+  step() {
+    this.thrustRotation.step();
+    this.exhaustFade.step();
   }
 }
 
@@ -1877,19 +1969,28 @@ class Thrusters {
 //      .chain(new FilterMirror(1))
     ;
 
+    // Animations
+    this.timeline = new Timeline();
+
     // State
     this.t = 0;
     this.ring = new THREE.Vector3(0.5, 0.5, 0.5).normalize(); //Daydream.Y_AXIS.clone();
     this.orientation = new Orientation();
-    this.poly = new Dodecahedron();
+    this.to = new Orientation();
     this.thrusters = [];
+    this.amplitude = new MutableNumber(0);
 
     // Timers
     this.thrustTimer = new RandomTimer(this.t, 16, 64,
-      () => this.onThrust(Math.random() * (Daydream.W - 1)));
+      () => this.onThrustTimer(Math.random() * (Daydream.W - 1)));
+    this.warpTimer = new PeriodicTimer(this.t, 48, () => this.onWarpTimer());
   }
 
-  onThrust(x) {
+  onWarpTimer() {
+//    this.timeline.animate(new Transition(this.amplitude, Math.random() * 9, 16, easeInOutBicubic), 0);
+  }
+
+  onThrustTimer(x) {
     let thrustPoint = ringPoint(this.ring, 1, x / (Daydream.W - 1) * (2 * Math.PI));
     let dir = Math.random() < 0.5 ? -1 : -1;
     this.fireThruster(thrustPoint, dir)
@@ -1906,7 +2007,18 @@ class Thrusters {
       this.orientation.orient(thrustPoint),
       this.orientation.orient(thrustVector))
       .normalize();
-    this.thrusters.push(new Thruster(thrustPoint, thrustVector, thrustAxis));
+    this.amplitude.set(0.5);
+    this.timeline
+      .animate(new Thruster(this.orientation, thrustPoint, thrustVector, thrustAxis), 0);
+    if (!(this.warpOut === undefined || this.warpOut.done())) {
+      this.warpIn.cancel();
+      this.warpOut.cancel();
+    }
+    this.warpIn = new Transition(this.amplitude, 0.5, 8, easeInSin);
+    this.warpOut = new Transition(this.amplitude, 0, 32, easeOutSin);
+    this.timeline
+      .animate(this.warpIn, 0)
+      .animate(this.warpOut, 1);
   }
 
   drawThruster(thruster) {
@@ -1931,16 +2043,15 @@ class Thrusters {
         1
       ));
     });
-
-    thruster.exhaustAnimation.fade(dots, easeMid, easeOutCubic);
-    if (!thruster.exhaustAnimation.done()) {
-      plotDots(this.pixels, this.labels, this.ringOutput, dots, -1);
-    }
+    plotDots(this.pixels, this.labels, this.ringOutput, dots, -1);
   }
 
   drawFrame() {
     this.pixels.clear();
     this.labels = [];
+    this.thrustTimer.poll(this.t);
+    this.warpTimer.poll(this.t);
+    this.timeline.step();
 
     this.trails.decay();
     this.trails.trail(this.pixels, new FilterRaw(),
@@ -1952,46 +2063,23 @@ class Thrusters {
       });
     this.wiggle.shift();
 
-    // Apply thrusters
-    this.thrustTimer.poll(this.t);
-    let to = new Orientation();
-    to.set(this.orientation.get());
-    let i = this.thrusters.length;
-    while(i--) {
-      let thruster = this.thrusters[i];
-      if (thruster.done()) {
-        this.thrusters.splice(i, 1);
-      } else {
-        thruster.rotation.rotate(to, easeOutExpo);
-      }
-    }
-
     // Draw ring
-    to.collapse();
-    for (let i = 0; i < to.length(); ++i) {
-      // let dots = drawRing(to.orient(this.ring, i), 1,
-      //  (v, t) => {
-      //    let z = this.orientation.orient(Daydream.X_AXIS);
-      //      return this.palette.get(angleBetween(z, v) / Math.PI);
-      //    }
-      //);
-      let dots = drawFn(to.orient(this.ring, i), to, 1,
-        (t) => Math.sin(2 * t ) * Math.sin(((this.t % 16) / 16 * Math.PI * 2)) * 0.5,
+    rotateBetween(this.orientation, this.to);
+    this.orientation.collapse();
+    this.to.collapse();
+    let dots = drawFn(this.orientation.orient(this.ring), this.orientation, 1,
+        (t) => Math.sin(2 * t ) * Math.sin(((this.t % 16) / 16 * 2 * Math.PI)) * this.amplitude.get(),
+//      (t) => Math.sin(((this.t % 16) / 16 * 2 * Math.PI)) * 0.5,
+//      (t) => Math.sin(2 * t),
         (v, t) => {
           let z = this.orientation.orient(Daydream.X_AXIS);
           return this.palette.get(angleBetween(z, v) / Math.PI);
         }
       );
-
-      plotDots(this.pixels, this.labels, this.ringOutput, dots,
-        (to.length() - 1 - i) / to.length(), blendOverMax);
+    plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
         
-    }
-    rotateBetween(this.orientation, to);
-    this.orientation.collapse();
-
     // Draw thrusters
-//    this.thrusters.forEach((t) => this.drawThruster(t));
+    //this.thrusters.forEach((t) => this.drawThruster(t));
 
     this.t++;
 //    this.palette.mutate(Math.sin(0.001 * this.t));
