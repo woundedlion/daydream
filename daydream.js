@@ -482,17 +482,15 @@ const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false) => {
   let u = v1.clone();
   let v = v2.clone();
   let a = angleBetween(u, v);
-  let w = new THREE.Vector3().crossVectors(v, u);
+  let w = new THREE.Vector3().crossVectors(v, u).normalize();
   if (longWay) {
     a = 2 * Math.PI - a;
     w.negate();
   }
-  a *= (end - start);
-  w.normalize();
-  v.crossVectors(u, w);
-  v.normalize();
+  a *= Math.abs((end - start));
+  v.crossVectors(u, w).normalize();
 
-  const step = Daydream.DOT_SIZE / Daydream.SPHERE_RADIUS;
+  const step = 1 / Daydream.W;
   for (let t = start; t < a; t += step) {
     let vi = new THREE.Vector3(
       u.x * Math.cos(t) + v.x * Math.sin(t),
@@ -551,11 +549,12 @@ const drawFn = (normal, orientation, radius, shiftFn, colorFn) => {
   let step = 1 / Daydream.W;
   for (let t = 0; t < 1; t += step) {
     let vi = calcRingPoint(t * 2 * Math.PI, d, radius, u, v, w);
-    let axis = new THREE.Vector3().crossVectors(normal, vi).normalize();
+    let vp = calcRingPoint(t * 2 * Math.PI, 0, 1, u, v, w);
+    let axis = new THREE.Vector3().crossVectors(normal, vp).normalize();
     let shift = new THREE.Quaternion().setFromAxisAngle(axis, shiftFn(t));
     let to = vi.clone().applyQuaternion(shift);
     if (start === undefined) {
-      dots.push(new Dot(to, colorFn(vi)));
+      dots.push(new Dot(to, colorFn(to)));
       start = to;
     } else {
       dots.push(...drawLine(from, to, colorFn));
@@ -572,7 +571,7 @@ const calcRingPoint = (a, d, radius, u, v, w) => {
     d * v.x + radius * u.x * Math.cos(a) + radius * w.x * Math.sin(a),
     d * v.y + radius * u.y * Math.cos(a) + radius * w.y * Math.sin(a),
     d * v.z + radius * u.z * Math.cos(a) + radius * w.z * Math.sin(a)
-  );
+  ).normalize();
 }
 
 const drawRing = (normal, radius, colorFn) => {
@@ -593,9 +592,9 @@ const drawRing = (normal, radius, colorFn) => {
   let d = Math.sqrt(Math.pow(1 - radius, 2));
 
   let step = 2 * Math.PI / Daydream.W;
-  for (let t = 0; t < 2 * Math.PI; t += step) {
-    let vi = calcRingPoint(t, d, radius, u, v, w);
-    dots.push(new Dot(vi, colorFn(vi, t)));
+  for (let a = 0; a < 2 * Math.PI; a += step) {
+    let vi = calcRingPoint(a, d, radius, u, v, w);
+    dots.push(new Dot(vi, colorFn(vi)));
   }
 
   return dots;
@@ -729,52 +728,13 @@ class ProceduralPath {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-class RandomTimer {
-  constructor(t, min, max, f) {
-    this.min = min;
-    this.max = max;
-    this.f = f;
-    this.reset(t);
-  }
-
-  reset(t) {
-    this.t = t + Math.round(Math.random() * (this.max - this.min) + this.min);
-  }
-
-  poll(t) {
-    if (t >= this.t) {
-      this.f();
-      this.reset(t);
-    }
-  }
-}
-
-class PeriodicTimer {
-  constructor(t, period, f) {
-    this.period = period;
-    this.f = f;
-    this.reset(t);
-  }
-
-  reset(t) {
-    this.t = t + this.period;
-  }
-
-  poll(t) {
-    if (t >= this.t) {
-      this.f();
-      this.reset(t);
-    }
-  }
-}
-
 class Timeline {
   constructor() {
     this.t = 0;
     this.animations = [];
   }
 
-  animate(animation, inSecs) {
+  add(animation, inSecs) {
     let start = this.t + (inSecs * Daydream.FPS);
     for (let i = 0; i < this.animations.length; ++i) {
       if (this.animations[i].start > start) {
@@ -791,11 +751,11 @@ class Timeline {
     let i = this.animations.length;
     while (i--) {
       if (this.t > this.animations[i].start) {
-        this.animations[i].animation.step();
         if (this.animations[i].animation.done()) {
           this.animations.splice(i, 1);
           continue;
         }
+        this.animations[i].animation.step();
       }
     }
   }
@@ -806,10 +766,11 @@ class Animation {
     this.duration = duration;
     this.repeat = repeat;
     this.t = 0;
+    this.canceled = false;
   }
 
-  cancel() { this.t = this.duration; }
-  done() { return this.t >= this.duration }
+  cancel() { this.canceled = true; }
+  done() { return this.canceled || (this.duration >= 0 && this.t >= this.duration); }
 
   step() {
     this.t++;
@@ -818,6 +779,83 @@ class Animation {
         this.t = 0;
       }
     }
+  }
+}
+
+class RandomTimer extends Animation {
+  constructor(min, max, f, repeat = true) {
+    super(-1, repeat);
+    this.min = min;
+    this.max = max;
+    this.f = f;
+    this.next = 0;
+    this.reset();
+  }
+
+  reset(t) {
+    this.next = this.t + Math.round(Math.random() * (this.max - this.min) + this.min);
+  }
+
+  step() {
+    if (this.t >= this.next) {
+      this.f();
+      if (this.repeat) {
+        this.reset();
+      } else {
+        this.canceled = true;
+      }
+    }
+    super.step();
+  }
+}
+
+class PeriodicTimer extends Animation {
+  constructor(period, f, duration, repeat = true) {
+    super(-1, repeat);
+    this.period = period;
+    this.f = f;
+    this.reset();
+  }
+
+  reset() {
+    this.next = this.t + this.period;
+  }
+
+  step() {
+    if (this.t >= this.next) {
+      this.f();
+      if (this.repeat) {
+        this.reset(t);
+      } else {
+        this.cancel();
+      }
+    }
+    super.step();
+  }
+}
+
+class Sprite extends Animation {
+  constructor(drawFn, duration,
+    fadeInDuration = 0, fadeInEasingFn = easeMid,
+    fadeOutDuration = 0, fadeOutEasingFn = easeMid)
+  {
+    super(duration, false);
+    this.drawFn = drawFn;
+    this.fader = new MutableNumber(0);
+    this.fadeInDuration = fadeInDuration;
+    this.fadeOutDuration = fadeOutDuration;
+    this.fadeIn = new Transition(this.fader, 1, fadeInDuration, fadeInEasingFn);
+    this.fadeOut = new Transition(this.fader, 0, fadeOutDuration, fadeOutEasingFn);
+  }
+
+  step() {
+    if (!this.fadeIn.done()) {
+      this.fadeIn.step();
+    } else if (this.duration >= 0 && this.t >= (this.duration - this.fadeOutDuration)) {
+      this.fadeOut.step();
+    }
+    this.drawFn(this.fader.get());
+    super.step();
   }
 }
 
@@ -832,10 +870,6 @@ class Motion extends Animation {
   }
 
   step() {
-    super.step();
-    if (this.done()) {
-      return;
-    }
     this.from = this.to;
     this.to = this.path.getPoint(this.t / this.duration);
     if (!this.from.equals(this.to)) {
@@ -850,6 +884,7 @@ class Motion extends Animation {
       let r = new THREE.Quaternion().setFromAxisAngle(axis, angle);
       this.orientation.push(origin.clone().premultiply(r));
     }
+    super.step();
   }
 }
 
@@ -861,36 +896,9 @@ class MutableNumber {
   set(n) { this.n = n; }
 }
 
-class FadeInOut extends Animation {
-  constructor(fader, inDuration, onDuration, outDuration,
-    easeIn = easeMid, easeOut = easeMid, repeat = false)
-  {
-    super(inDuration + onDuration + outDuration, repeat);
-    this.fader = fader;
-    this.inDuration = inDuration;
-    this.onDuration = onDuration;
-    this.outDuration = outDuration;
-    this.easeOut = easeOut;
-  }
-
-  step() {
-    super.step();
-    if (this.t < this.inDuration) {
-      var m = this.easeIn(this.t / this.inDuration);
-    } else if (this.t < this.inDuration + this.onDuration) {
-      var m = 1;
-    } else if (!this.done()) {
-      var m = 1 - this.easeOut((this.t - (this.inDuration + this.onDuration)) / this.outDuration);
-    } else {
-      var m = 0;
-    }
-    this.fader.set(m);
-  }
-}
-
 class Transition extends Animation {
-  constructor(mutable, to, duration, easingFn, repeat = false) {
-    super(duration, repeat);
+  constructor(mutable, to, duration, easingFn) {
+    super(duration, false);
     this.mutable = mutable;
     this.to = to;
     this.duration = duration;
@@ -901,12 +909,25 @@ class Transition extends Animation {
     if (this.t == 0) {
       this.from = this.mutable.get();
     }
-    super.step();
-    if (this.done()) {
-      return;
-    }
-    let t = (this.t / this.duration);
+    let t = Math.min(1, this.t / this.duration);
     this.mutable.set(this.easingFn(t) * (this.to - this.from) + this.from);
+    super.step();
+  }
+}
+
+class MutateFn extends Animation {
+  constructor(mutable, fn, duration, easingFn, repeat = false) {
+    super(duration, repeat);
+    this.mutable = mutable;
+    this.fn = fn;
+    this.duration = duration;
+    this.easingFn = easingFn;
+  }
+
+  step() {
+    let t = (this.t / this.duration);
+    this.mutable.set(this.fn(this.easingFn(t)));
+    super.step();
   }
 }
 
@@ -924,10 +945,6 @@ class Rotation extends Animation {
   }
 
   step() {
-    super.step();
-    if (this.done()) {
-      return;
-    }
     this.from = this.to;
     this.to = this.easingFn((this.t) / this.duration) * this.totalAngle;
     if (Math.abs(this.to - this.from) > 0.0001) {
@@ -940,6 +957,7 @@ class Rotation extends Animation {
       let r = new THREE.Quaternion().setFromAxisAngle(this.axis,angle);
       this.orientation.push(origin.clone().premultiply(r));
     }
+    super.step();
   }
 }
 
@@ -997,7 +1015,7 @@ const intersectsPlane = (v1, v2, normal) => {
 }
 
 const angleBetween = (v1, v2) => {
-  return Math.acos(Math.min(1, v1.dot(v2)));
+  return Math.acos(Math.max(-1, Math.min(1, v1.dot(v2))));
 }
 
 const intersection = (u, v, normal) => {
@@ -1370,11 +1388,11 @@ class ProceduralPalette {
   }
 
   get(t) {
-    return new THREE.Color(
+  return new THREE.Color(
       this.a[0] + this.b[0] * Math.cos(2 * Math.PI * (this.c[0] * t + this.d[0])),
       this.a[1] + this.b[1] * Math.cos(2 * Math.PI * (this.c[1] * t + this.d[1])),
       this.a[2] + this.b[2] * Math.cos(2 * Math.PI * (this.c[2] * t + this.d[2]))
-    ).convertSRGBToLinear();
+      ).convertSRGBToLinear();
   }
 };
 
@@ -1908,18 +1926,14 @@ class Thruster {
     this.thrustPoint = thrustPoint;
     this.exhaustVector = thrustVector.clone().negate();
     this.thrustRotation = new Rotation(orientation, thrustAxis, Math.PI, 8 * 16, easeOutExpo);
-    this.exhaustFader = new MutableNumber(1);
-    this.exhaustFade = new FadeInOut(
-      this.exhaustFader, 0, 4, 12, easeMid, easeOutCubic);
   }
 
   done() {
-    return this.thrustRotation.done() && this.exhaustFade.done();
+    return this.thrustRotation.done();
   }
 
   step() {
     this.thrustRotation.step();
-    this.exhaustFade.step();
   }
 }
 
@@ -1930,70 +1944,34 @@ class Thrusters {
     this.labels = [];
 
     // Palettes
-    this.thrusterPalette = new ProceduralPalette(
-      [0.5, 0.5, 0.5],
-      [0.5, 0.5, 0.5],
-      [0.45, 0.45, 0.45],
-      [1.0, 0.9, 1.3]
-    );
-    /*
     this.palette = new ProceduralPalette(
       [0.5, 0.5, 0.5],
       [0.5, 0.5, 0.5],
       [0.3, 0.3, 0.3],
       [0.0, 0.2, 0.6]
     );
-    */
-
-    this.palette = new MutatingPalette(
-      [0.5, 0.5, 0.5],
-      [0.5, 0.5, 0.5],
-      [0.3, 0.3, 0.3],
-      [0.0, 0.2, 0.6],
-
-      [0.5, 0.5, 0.5],
-      [0.5, 0.5, 0.5],
-      [0.45, 0.45, 0.45],
-      [1.0, 0.9, 1.3]
-    );
 
     // Output Filters
-    this.trails = new FilterDecayTrails(5);
-    this.wiggle = new FilterSinDisplace(
-      0,
-      (t) => 4,
-      (t) => 2,
-      (t) => 0.2
-    );
-    this.chromaShift = new FilterChromaticShift(1);
     (this.ringOutput = new FilterRaw())
-      //    .chain(this.chromaShift)
       .chain(new FilterAntiAlias())
-      //      .chain(this.wiggle)
-    //        .chain(this.trails)
-      .chain(new FilterReplicate(1))
-//      .chain(new FilterMirror(1))
     ;
-
-    // Animations
-    this.timeline = new Timeline();
 
     // State
     this.t = 0;
-    this.ring = new THREE.Vector3(0.5, 0.5, 0.5).normalize(); //Daydream.Y_AXIS.clone();
+    this.ring = new THREE.Vector3(0.5, 0.5, 0.5).normalize();
     this.orientation = new Orientation();
     this.to = new Orientation();
     this.thrusters = [];
     this.amplitude = new MutableNumber(0);
+    this.radius = new MutableNumber(1);
 
-    // Timers
-    this.thrustTimer = new RandomTimer(this.t, 16, 64,
-      () => this.onThrustTimer(Math.random() * (Daydream.W - 1)));
-    this.warpTimer = new PeriodicTimer(this.t, 48, () => this.onWarpTimer());
-  }
-
-  onWarpTimer() {
-//    this.timeline.animate(new Transition(this.amplitude, Math.random() * 9, 16, easeInOutBicubic), 0);
+    // Animations
+    this.timeline = new Timeline();
+    this.timeline.add(new Sprite(this.drawRing.bind(this), -1,
+      16, easeInSin,
+      16, easeOutSin), 0);
+    this.timeline.add(new RandomTimer(8, 48,
+      () => this.onThrustTimer(Math.random() * (Daydream.W - 1))), 0);
   }
 
   onThrustTimer(x) {
@@ -2014,83 +1992,39 @@ class Thrusters {
       this.orientation.orient(thrustVector))
       .normalize();
     this.amplitude.set(0.5);
-    this.timeline
-      .animate(new Thruster(this.orientation, thrustPoint, thrustVector, thrustAxis), 0);
-    if (!(this.warpOut === undefined || this.warpOut.done())) {
-      this.warpIn.cancel();
-      this.warpOut.cancel();
+    if (!(this.warp === undefined || this.warp.done())) {
+      this.warp.cancel();
     }
-    this.warpIn = new Transition(this.amplitude, 0.5, 8, easeInSin);
-    this.warpOut = new Transition(this.amplitude, 0, 32, easeOutSin);
+    this.warp = new Transition(this.amplitude, 0, 32, easeOutSin);
     this.timeline
-      .animate(this.warpIn, 0)
-      .animate(this.warpOut, 1);
+      .add(new Thruster(this.orientation, thrustPoint, thrustVector, thrustAxis), 0);
+    this.timeline
+      .add(this.warp, 1);
   }
 
-  drawThruster(thruster) {
-    let lines = [
-      thruster.thrustPoint.clone().applyQuaternion(
-        new THREE.Quaternion().setFromAxisAngle(this.ring, Math.PI / Daydream.H / 2.2)),
-      thruster.thrustPoint.clone().applyQuaternion(
-        new THREE.Quaternion().setFromAxisAngle(this.ring, -Math.PI / Daydream.H / 2.2))
-    ];
-    
-    let dots = [];
-    lines.forEach((line) => {
-      let emitter = this.orientation.orient(line);
-      dots.push(...drawLine(
-        emitter,
-        this.orientation.orient(thruster.exhaustVector),
-        (v, t) => {
-          let z = this.orientation.orient(Daydream.X_AXIS);
-          return this.palette.get(angleBetween(z, emitter) / Math.PI);
-        },
-        Daydream.DOT_SIZE * 3 / Daydream.SPHERE_RADIUS,
-        1
-      ));
-    });
-    plotDots(this.pixels, this.labels, this.ringOutput, dots, -1);
+  drawRing(opacity) {
+    rotateBetween(this.orientation, this.to);
+    this.orientation.collapse();
+    this.to.collapse();
+    let dots = drawFn(this.orientation.orient(this.ring), this.orientation, this.radius.get(),
+      (t) => {
+        return sinWave(-1, 1, 2, 0)(t)
+          * sinWave(-1, 1, 1, 0)((this.t % 16) / 16)
+          * this.amplitude.get()
+      },
+      (v) => {
+        let z = this.orientation.orient(Daydream.X_AXIS);
+        return this.palette.get(angleBetween(z, v) / Math.PI).multiplyScalar(opacity);
+      }
+    );
+    plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
   }
 
   drawFrame() {
     this.pixels.clear();
     this.labels = [];
-    this.thrustTimer.poll(this.t);
-    this.warpTimer.poll(this.t);
-    this.timeline.step();
-
-    this.trails.decay();
-    this.trails.trail(this.pixels, new FilterRaw(),
-      (x, y, t) => {
-        let v = new THREE.Vector3().setFromSpherical(pixelToSpherical(x, y));
-        let z = this.orientation.orient(Daydream.X_AXIS);
-        let s = angleBetween(z, v) / Math.PI;
-        return this.palette.get((s + t) % 1);
-      });
-    this.wiggle.shift();
-
-    // Draw ring
-    rotateBetween(this.orientation, this.to);
-    this.orientation.collapse();
-    this.to.collapse();
-    let dots = drawFn(this.orientation.orient(this.ring), this.orientation, 1,
-      (t) => {
-        return sinWave(-1, 1, 2, 0)(t)
-        * sinWave(-1, 1, 1, 0)((this.t % 16) / 16)
-        * this.amplitude.get()
-      },
-      (v) => {
-        let z = this.orientation.orient(Daydream.X_AXIS);
-        return this.palette.get(angleBetween(z, v) / Math.PI);
-      }
-    );
-    plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
-        
-    // Draw thrusters
-    //this.thrusters.forEach((t) => this.drawThruster(t));
-
+    this.timeline.step();        
     this.t++;
-//    this.palette.mutate(Math.sin(0.001 * this.t));
      return { pixels: this.pixels, labels: this.labels };
   }
 }
