@@ -788,7 +788,7 @@ class Timeline {
     this.animations = [];
   }
 
-  add(animation, inSecs) {
+  add(inSecs, animation) {
     let start = this.t + (inSecs * Daydream.FPS);
     for (let i = 0; i < this.animations.length; ++i) {
       if (this.animations[i].start > start) {
@@ -804,7 +804,7 @@ class Timeline {
     ++this.t;
     let i = this.animations.length;
     while (i--) {
-      if (this.t > this.animations[i].start) {
+      if (this.t >= this.animations[i].start) {
         if (this.animations[i].animation.done()) {
           this.animations.splice(i, 1);
           continue;
@@ -1032,9 +1032,13 @@ function distance(a, b, m) {
 
 function sinWave(from, to, freq, phase) {
   return (t) => {
-    let w = Math.sin(freq * t * 2 * Math.PI + phase);
-    return (w + 1) * (to - from) / 2 + from;
+    let w = (Math.sin(freq * t * 2 * Math.PI - Math.PI / 2 + phase) + 1) / 2;
+    return w * (to - from) + from;
   };
+}
+
+function lerp(from, to, t) {
+  return (to - from) * t + from;
 }
 
 function triWave(from, to, freq, phase) {
@@ -2066,11 +2070,14 @@ class Thrusters {
 
     // Animations
     this.timeline = new Timeline();
-    this.timeline.add(new Sprite(this.drawRing.bind(this), -1,
-      16, easeInSin,
-      16, easeOutSin), 0);
-    this.timeline.add(new RandomTimer(8, 48,
-      () => this.onThrustTimer(Math.random() * (Daydream.W - 1))), 0);
+    this.timeline.add(0,
+      new Sprite(this.drawRing.bind(this), -1,
+        16, easeInSin,
+        16, easeOutSin)
+    );
+    this.timeline.add(0, new RandomTimer(8, 48,
+      () => this.onThrustTimer(Math.random() * (Daydream.W - 1)))
+    );
   }
 
   onThrustTimer(x) {
@@ -2086,23 +2093,24 @@ class Thrusters {
 
   fireThruster(thrustPoint, thrustDir) {
     // warp ring
-
     this.amplitude.set(0.5);
     if (!(this.warp === undefined || this.warp.done())) {
       this.warp.cancel();
     }
     this.warp = new Transition(this.amplitude, 0, 32, easeOutSin);
-    this.timeline
-      .add(this.warp, 1);
+    this.timeline.add(1,
+      this.warp
+    );
 
     // show thruster
     let thrustVector = this.ring.clone().multiplyScalar(thrustDir);
-  
-    this.timeline.add(new Thruster(
+    this.timeline.add(0,
+      new Thruster(
       this.drawThruster.bind(this),
       this.orientation,
       thrustPoint,
-      thrustVector), 0);
+        thrustVector)
+    );
   }
 
   ringFn(t) {
@@ -2152,45 +2160,85 @@ class RingCircus {
 
     // Output Filters
     (this.ringOutput = new FilterRaw())
-//      .chain(new FilterChromaticShift())
+      //      .chain(new FilterChromaticShift())
       .chain(new FilterAntiAlias())
       ;
 
     // State
+    this.normal = Daydream.X_AXIS.clone();
     this.orientation = new Orientation();
+    this.numRings = new MutableNumber(7);
+    this.spreadFactor = new MutableNumber(0);
+    this.homeRadius = new MutableNumber(0);
 
     // Animations
     this.timeline = new Timeline();
-    let normal = Daydream.X_AXIS.clone();
-    this.numRings = 7;
-    this.radii = new Array(this.numRings);
-    for (let i = 0; i < this.numRings; ++i) {
-      let r = Math.sqrt(Math.pow(1 - (i / (this.numRings - 1) * 2 - 1), 2));
-      this.radii[i] = new MutableNumber(0);
-      this.timeline.add(new Sprite(
-        this.drawRing.bind(this, i, normal, this.radii[i]),
-        -1,
-        8, easeMid,
-        0, easeMid), i * 0.3);
-      this.timeline.add(new Transition(this.radii[i], r,
-        16, easeMid), i * 0.3);
-      this.timeline.add(new MutateFn(this.radii[i],
-        sinWave(r, r + 1 * (1 - r), 1, 0),
-        48, easeMid, true), 3);
-    }
 
-    this.axis = Daydream.Y_AXIS.clone();
-    this.timeline.add(new RandomTimer(4, 64, () => {
-      this.timeline.add(new Rotation(
-        this.orientation, makeRandomVector(), 2 * Math.PI,
-        48, easeInOutSin, false), 0);
-    }), 4);
+    // T0: Draw collapsed and sweep to center
+    this.timeline.add(0,
+      new Sprite(
+      this.drawRings.bind(this),
+      -1, 8, easeMid, 0, easeMid)
+    );
+    this.timeline.add(0,
+      new Transition(this.homeRadius, 1, 16, easeMid)
+    );
+
+    // T1: Spread rings
+    this.onSpreadRings();
+
+    // T2: Spin everything
+    this.timeline.add(1,
+      new Rotation(this.orientation, makeRandomVector(), 4 * Math.PI,
+        96, easeInOutSin, false)
+    );
+    this.timeline.add(1,
+      new RandomTimer(64, 96, () => {
+        this.timeline.add(0,
+          new Rotation(this.orientation,
+            ringPoint(this.normal, 1, Math.random() * 2 * Math.PI),
+            4 * Math.PI,
+            96, easeInOutSin, false)
+        );
+      })
+    );
   }
 
-  drawRing(i, normal, radius, opacity) {
-    let dots = drawRing(this.orientation.orient(normal), radius.get(),
-      (v) => this.palette.get(i / (this.numRings - 1)).multiplyScalar(opacity));
-    plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
+  onCollapseRings() {
+    //collapse
+    this.timeline.add(0,
+      new Transition(this.spreadFactor, 0, 16, easeMid)
+    );
+    // re-spread after random time
+    this.timeline.add(1,
+      new RandomTimer(16, 48, this.onSpreadRings.bind(this), false));
+  }
+
+  onSpreadRings() {
+    // spread
+    this.timeline.add(0,
+      new Transition(this.spreadFactor, 1, 16, easeMid)
+    );
+    // re-collapse after random time
+    this.timeline.add(0,
+      new RandomTimer(48, 160, this.onCollapseRings.bind(this), false));
+  }
+
+  calcRingSpread() {
+    this.radii = new Array(this.numRings.get());
+    for (let i = 0; i < this.numRings.get(); ++i) {
+      let r = Math.sqrt(Math.pow(1 - (i / (this.numRings.get() - 1) * 2 - 1), 2));
+      this.radii[i] = new MutableNumber(lerp(this.homeRadius.get(), r, this.spreadFactor.get()));
+    }
+  }
+
+  drawRings(opacity) {
+    this.calcRingSpread();
+    for (let i = 0; i < this.radii.length; ++i) {
+      let dots = drawRing(this.orientation.orient(this.normal), this.radii[i].get(),
+        (v) => this.palette.get(1 - (i / (this.numRings.get() - 1))).multiplyScalar(opacity));
+      plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
+    }
   }
 
   drawFrame() {
