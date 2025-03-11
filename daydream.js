@@ -310,14 +310,14 @@ const g = (1 + Math.sqrt(5)) / 2;
 const sphericalToPixel = (s) => {
   return {
     x: wrap((s.theta * Daydream.W) / (2 * Math.PI), Daydream.W),
-    y: (s.phi * Daydream.H) / Math.PI,
+    y: (s.phi * (Daydream.H - 1)) / Math.PI,
   };
 };
 
 const pixelToSpherical = (x, y) => {
   return new THREE.Spherical(
     1,
-    (y * Math.PI) / Daydream.H,
+    (y * Math.PI) / (Daydream.H - 1),
     (x * 2 * Math.PI) / Daydream.W
   );
 };
@@ -565,35 +565,36 @@ const fnPoint = (f, normal, radius, angle) => {
     v.negate();
     radius = 2 - radius;
   }
-  if (v.x == 0 && v.y == 0) {
-    u.crossVectors(v, Daydream.X_AXIS).normalize();
-  } else {
+  u.crossVectors(v, Daydream.X_AXIS).normalize();
+  if (u.length() == 0) {
     u.crossVectors(v, Daydream.Z_AXIS).normalize();
   }
   w.crossVectors(v, u);
   let d = Math.sqrt(Math.pow(1 - radius, 2));
-  let vi = calcRingPoint(angle, d, radius, u, v, w);
-  let vp = calcRingPoint(angle, 0, 1, u, v, w);
+  let vi = calcRingPoint(angle, radius, u, v, w);
+  let vp = calcRingPoint(angle, 1, u, v, w);
   let axis = new THREE.Vector3().crossVectors(normal, vp).normalize();
   let shift = new THREE.Quaternion().setFromAxisAngle(axis, f(angle * Math.PI / 2));
   return vi.clone().applyQuaternion(shift);
 };
 
-const drawFn = (normal, orientation, radius, shiftFn, colorFn) => {
+const drawFn = (orientation, normal, radius, shiftFn, colorFn) => {
   let dots = [];
   let u = new THREE.Vector3();
-  let v = normal.clone();
+  let v = orientation.orient(normal);
   let w = new THREE.Vector3();
   if (radius > 1) {
     v.negate();
-    radius = 2 - radius;
   }
-  if (v.x == 0 && v.y == 0) {
-    u.crossVectors(v, orientation.orient(Daydream.X_AXIS)).normalize();
-  } else {
+  u.crossVectors(v, orientation.orient(Daydream.X_AXIS)).normalize();
+  if (u.length() == 0) {
     u.crossVectors(v, orientation.orient(Daydream.Z_AXIS)).normalize();
   }
   w.crossVectors(v, u);
+  if (radius > 1) {
+    w.negate();
+    radius = 2 - radius;
+  }
   let d = Math.sqrt(Math.pow(1 - radius, 2));
 
   let start = undefined;
@@ -618,7 +619,8 @@ const drawFn = (normal, orientation, radius, shiftFn, colorFn) => {
   return dots;
 };
 
-const calcRingPoint = (a, d, radius, u, v, w) => {
+const calcRingPoint = (a, radius, u, v, w) => {
+  let d = Math.sqrt(Math.pow(1 - radius, 2));
   return new THREE.Vector3(
     d * v.x + radius * u.x * Math.cos(a) + radius * w.x * Math.sin(a),
     d * v.y + radius * u.y * Math.cos(a) + radius * w.y * Math.sin(a),
@@ -626,27 +628,28 @@ const calcRingPoint = (a, d, radius, u, v, w) => {
   ).normalize();
 }
 
-const drawRing = (normal, radius, colorFn) => {
+const drawRing = (orientation, normal, radius, colorFn) => {
   let dots = [];
   let u = new THREE.Vector3();
-  let v = normal.clone();
+  let v = orientation.orient(normal);
   let w = new THREE.Vector3();
   if (radius > 1) {
     v.negate();
-    radius = 2 - radius;
   }
-  if (v.x == 0 && v.y == 0) {
-    u.crossVectors(v, Daydream.X_AXIS).normalize();
-  } else {
-    u.crossVectors(v, Daydream.Z_AXIS).normalize();
+  u.crossVectors(v, orientation.orient(Daydream.X_AXIS)).normalize();
+  if (u.length() == 0) {
+    u.crossVectors(v, orientation.orient(Daydream.Z_AXIS)).normalize();
   }
   w.crossVectors(v, u);
-  let d = Math.sqrt(Math.pow(1 - radius, 2));
+  if (radius > 1) {
+    w.negate();
+    radius = 2 - radius;
+  }
 
   let step = 2 * Math.PI / Daydream.W;
   for (let a = 0; a < 2 * Math.PI; a += step) {
-    let vi = calcRingPoint(a, d, radius, u, v, w);
-    dots.push(new Dot(vi, colorFn(vi)));
+    let vi = calcRingPoint(a, radius, u, v, w);
+    dots.push(new Dot(vi, colorFn(vi, a / (2 * Math.PI))));
   }
 
   return dots;
@@ -659,16 +662,17 @@ const ringPoint = (normal, radius, angle) => {
   let w = new THREE.Vector3();
   if (radius > 1) {
     v.negate();
-    radius = 2 - radius;
   }
-  if (v.x == 0 && v.y == 0) {
-    u.crossVectors(v, Daydream.X_AXIS).normalize();
-  } else {
+  u.crossVectors(v, Daydream.X_AXIS).normalize();
+  if (u.length() == 0) {
     u.crossVectors(v, Daydream.Z_AXIS).normalize();
   }
   w.crossVectors(v, u);
-  let d = Math.sqrt(Math.pow(1 - radius, 2));
-  return calcRingPoint(angle, d, radius, u, v, w);
+  if (radius > 1) {
+    w.negate();
+    radius = 2 - radius;
+  }
+  return calcRingPoint(angle, radius, u, v, w);
 };
 
 
@@ -837,7 +841,7 @@ class Animation {
 }
 
 class RandomTimer extends Animation {
-  constructor(min, max, f, repeat = true) {
+  constructor(min, max, f, repeat = false) {
     super(-1, repeat);
     this.min = min;
     this.max = max;
@@ -951,12 +955,13 @@ class MutableNumber {
 }
 
 class Transition extends Animation {
-  constructor(mutable, to, duration, easingFn) {
+  constructor(mutable, to, duration, easingFn, quantized = false) {
     super(duration, false);
     this.mutable = mutable;
     this.to = to;
     this.duration = duration;
     this.easingFn = easingFn;
+    this.quantized = quantized;
   }
 
   step() {
@@ -964,7 +969,11 @@ class Transition extends Animation {
       this.from = this.mutable.get();
     }
     let t = Math.min(1, this.t / (this.duration - 1));
-    this.mutable.set(this.easingFn(t) * (this.to - this.from) + this.from);
+    let n = this.easingFn(t) * (this.to - this.from) + this.from;
+    if (this.quantized) {
+      n = Math.floor(n);
+    }
+    this.mutable.set(n);
     super.step();
   }
 }
@@ -1049,6 +1058,15 @@ function triWave(from, to, freq, phase) {
       w = 2 - 2 * t;
     }
     return w * (to - from) + from;
+  };
+}
+
+function squareWave(from, to, freq, dutyCycle, phase) {
+  return (t) => {
+    if ((t * freq + phase) % 1 < dutyCycle) {
+      return to;
+    }
+    return from;
   };
 }
 
@@ -1448,6 +1466,11 @@ class FilterDecayMask extends Filter {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+function dottedBrush(color, freq, dutyCycle, phase, t) {
+  let r = squareWave(0, 1, freq, dutyCycle, phase)(t);
+  return color.multiplyScalar(r);
+}
 
 class Gradient {
   constructor(size, points) {
@@ -2076,7 +2099,7 @@ class Thrusters {
         16, easeOutSin)
     );
     this.timeline.add(0, new RandomTimer(8, 48,
-      () => this.onThrustTimer(Math.random() * (Daydream.W - 1)))
+      () => this.onThrustTimer(Math.random() * (Daydream.W - 1)), true)
     );
   }
 
@@ -2106,9 +2129,9 @@ class Thrusters {
     let thrustVector = this.ring.clone().multiplyScalar(thrustDir);
     this.timeline.add(0,
       new Thruster(
-      this.drawThruster.bind(this),
-      this.orientation,
-      thrustPoint,
+        this.drawThruster.bind(this),
+        this.orientation,
+        thrustPoint,
         thrustVector)
     );
   }
@@ -2123,7 +2146,7 @@ class Thrusters {
     rotateBetween(this.orientation, this.to);
     this.orientation.collapse();
     this.to.collapse();
-    let dots = drawFn(this.orientation.orient(this.ring), this.orientation, this.radius.get(),
+    let dots = drawFn(this.orientation, this.ring, this.radius.get(),
       this.ringFn.bind(this),
       (v) => {
         let z = this.orientation.orient(Daydream.X_AXIS);
@@ -2165,19 +2188,23 @@ class RingCircus {
       ;
 
     // State
-    this.normal = Daydream.X_AXIS.clone();
+    this.normal = Daydream.Z_AXIS.clone();
     this.orientation = new Orientation();
-    this.numRings = new MutableNumber(7);
+    this.numRings = new MutableNumber(5);
     this.spreadFactor = new MutableNumber(0);
     this.homeRadius = new MutableNumber(0);
+    this.dutyCycle = new MutableNumber(1);
+    this.freq = new MutableNumber(0);
 
     // Animations
     this.timeline = new Timeline();
 
     // T0: Draw collapsed and sweep to center
     this.timeline.add(0,
-      new Sprite(
-      this.drawRings.bind(this),
+      new Sprite((opacity) => {
+        this.orientation.collapse();
+        this.drawRings(opacity);
+      },
       -1, 8, easeMid, 0, easeMid)
     );
     this.timeline.add(0,
@@ -2188,21 +2215,71 @@ class RingCircus {
     this.onSpreadRings();
 
     // T2: Spin everything
-    this.timeline.add(1,
-      new Rotation(this.orientation, makeRandomVector(), 4 * Math.PI,
+    this.onSpinRings(1);
+
+    // T3: Oscillate  Duty Cycle
+//    this.onSplitRings(3);
+
+    // T4: Oscillate Num Rings
+ //   this.onChangeNumRings(4);
+
+  }
+
+  onSpinRings(inSecs = 0) {
+    this.orientation.collapse();
+    this.timeline.add(inSecs,
+      new Rotation(this.orientation,
+        ringPoint(this.normal, 1, Math.random() * 2 * Math.PI),
+        4 * Math.PI,
         96, easeInOutSin, false)
     );
-    this.timeline.add(1,
-      new RandomTimer(64, 96, () => {
-        this.timeline.add(0,
-          new Rotation(this.orientation,
-            ringPoint(this.normal, 1, Math.random() * 2 * Math.PI),
-            4 * Math.PI,
-            96, easeInOutSin, false)
-        );
+    this.timeline.add(inSecs,
+      new RandomTimer(48, 80, () => {
+        this.onSpinRings();
       })
     );
   }
+
+
+  onChangeNumRings(inSecs = 0) {
+    if (this.numRings.get() == Daydream.W) {
+      let n = Math.random() * 8 + 1;
+      this.timeline.add(0,
+        new Transition(this.numRings, n,
+          32, easeMid, true)
+      );
+    } else {
+      this.timeline.add(0,
+        new Transition(this.numRings, Daydream.W,
+          64, easeMid, true)
+      );
+    }
+    this.timeline.add(inSecs,
+      new RandomTimer(64, 160, () => {
+        this.onChangeNumRings();
+      })
+    );
+  }
+
+  onSplitRings(inSecs = 0) {
+    if (this.dutyCycle.get() == 1) {
+      this.timeline.add(0,
+        new Transition(this.dutyCycle, 2 / Daydream.W,
+          8, easeMid)
+      );
+    } else {
+      this.timeline.add(0,
+        new Transition(this.dutyCycle, 1,
+          8, easeMid)
+      );
+    }
+    this.timeline.add(inSecs,
+      new RandomTimer(48, 160, () => {
+        this.onSplitRings();
+      })
+    );
+  }
+
 
   onCollapseRings() {
     //collapse
@@ -2211,7 +2288,7 @@ class RingCircus {
     );
     // re-spread after random time
     this.timeline.add(1,
-      new RandomTimer(16, 48, this.onSpreadRings.bind(this), false));
+      new RandomTimer(16, 48, this.onSpreadRings.bind(this)));
   }
 
   onSpreadRings() {
@@ -2221,13 +2298,14 @@ class RingCircus {
     );
     // re-collapse after random time
     this.timeline.add(0,
-      new RandomTimer(48, 160, this.onCollapseRings.bind(this), false));
+      new RandomTimer(48, 160, this.onCollapseRings.bind(this)));
   }
 
   calcRingSpread() {
     this.radii = new Array(this.numRings.get());
     for (let i = 0; i < this.numRings.get(); ++i) {
-      let r = Math.sqrt(Math.pow(1 - (i / (this.numRings.get() - 1) * 2 - 1), 2));
+      let x = ((i + 1) / (this.numRings.get() + 1)) * 2 - 1;
+      let r = Math.sqrt(Math.pow(1 - x, 2));
       this.radii[i] = new MutableNumber(lerp(this.homeRadius.get(), r, this.spreadFactor.get()));
     }
   }
@@ -2235,8 +2313,13 @@ class RingCircus {
   drawRings(opacity) {
     this.calcRingSpread();
     for (let i = 0; i < this.radii.length; ++i) {
-      let dots = drawRing(this.orientation.orient(this.normal), this.radii[i].get(),
-        (v) => this.palette.get(1 - (i / (this.numRings.get() - 1))).multiplyScalar(opacity));
+      let dots = drawRing(this.orientation, this.normal, this.radii[i].get(),
+        (v, t) => {
+          let idx = this.numRings.get() == 1 ? 0 : (1 - (i / (this.numRings.get() - 1)));
+          let color = this.palette.get(idx);
+          return dottedBrush(color.multiplyScalar(opacity), this.freq.get(),
+            this.dutyCycle.get(), this.dutyCycle.get() / 2, t);
+        });
       plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
     }
   }
