@@ -2107,22 +2107,24 @@ class Thrusters {
   }
 
   drawThruster(thrustPoint, radius, opacity) {
-    let dots = drawRing(this.orientation, thrustPoint, radius.get(), (v) => new THREE.Color(0xffffff).multiplyScalar(opacity));
+    let dots = drawRing(this.orientation, thrustPoint, radius.get(),
+      (v) => new THREE.Color(0xffffff).multiplyScalar(opacity));
     plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
   }
 
   onFireThruster() {
     let thrustDir = Math.random() < 0.5 ? -1 : -1;
-    let thrustPoint = fnPoint(this.ringFn.bind(this), this.ring, 1, Math.random() * 2 * Math.PI);
+    let thrustPoint = fnPoint(
+      this.ringFn.bind(this), this.ring, 1, Math.random() * 2 * Math.PI);
     let thrustOrientation = new Orientation().set(this.orientation.get());
 
 
     // warp ring
-    this.amplitude.set(0.5);
     if (!(this.warp === undefined || this.warp.done())) {
       this.warp.cancel();
     }
-    this.warp = new Transition(this.amplitude, 0, 32, easeOutSin);
+    this.warp = new MutateFn(
+      this.amplitude, (t) => 0.7 * Math.exp(-2 * t), 32, easeMid);
     this.timeline.add(0,
       this.warp
     );
@@ -2147,7 +2149,7 @@ class Thrusters {
 
   ringFn(t) {
     return sinWave(-1, 1, 2, 0)(t)
-      * sinWave(-1, 1, 1, 0)((this.t % 16) / 16)
+      * sinWave(-1, 1, 3, 0)((this.t % 32) / 32)
       * this.amplitude.get();
   }
 
