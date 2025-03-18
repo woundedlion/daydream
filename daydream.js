@@ -629,7 +629,7 @@ const calcRingPoint = (a, radius, u, v, w) => {
   ).normalize();
 }
 
-const drawRing = (orientation, normal, radius, colorFn) => {
+const drawRing = (orientation, normal, radius, colorFn, phase = 0) => {
   let dots = [];
   let u = new THREE.Vector3();
   let v = orientation.orient(normal);
@@ -649,14 +649,14 @@ const drawRing = (orientation, normal, radius, colorFn) => {
 
   let step = 2 * Math.PI / Daydream.W;
   for (let a = 0; a < 2 * Math.PI; a += step) {
-    let vi = calcRingPoint(a, radius, u, v, w);
+    let vi = calcRingPoint((a + phase) % (2 * Math.PI), radius, u, v, w);
     dots.push(new Dot(vi, colorFn(vi, a / (2 * Math.PI))));
   }
 
   return dots;
 };
 
-const ringPoint = (normal, radius, angle) => {
+const ringPoint = (normal, radius, angle, phase = 0) => {
   let dots = [];
   let u = new THREE.Vector3();
   let v = normal.clone();
@@ -673,7 +673,7 @@ const ringPoint = (normal, radius, angle) => {
     w.negate();
     radius = 2 - radius;
   }
-  return calcRingPoint(angle, radius, u, v, w);
+  return calcRingPoint(angle + phase, radius, u, v, w);
 };
 
 
@@ -1054,7 +1054,7 @@ function distance(a, b, m) {
 
 function sinWave(from, to, freq, phase) {
   return (t) => {
-    let w = (Math.sin(freq * t * 2 * Math.PI - Math.PI / 2 + phase) + 1) / 2;
+    let w = (Math.sin(freq * t * 2 * Math.PI - Math.PI / 2 + Math.PI - 2 * phase) + 1) / 2;
     return w * (to - from) + from;
   };
 }
@@ -2092,6 +2092,7 @@ class Thrusters {
     this.to = new Orientation();
     this.thrusters = [];
     this.amplitude = new MutableNumber(0);
+    this.warpPhase = 0;
     this.radius = new MutableNumber(1);
 
     // Animations
@@ -2114,18 +2115,19 @@ class Thrusters {
 
   onFireThruster() {
     let thrustDir = Math.random() < 0.5 ? -1 : -1;
+    this.warpPhase = Math.random() * 2 * Math.PI;
     let thrustPoint = fnPoint(
-      this.ringFn.bind(this), this.ring, 1, Math.random() * 2 * Math.PI);
+      this.ringFn.bind(this), this.ring, 1, this.warpPhase);
     let thrustOrientation = new Orientation().set(this.orientation.get());
-
-
+    let thrustOpp = fnPoint(
+      this.ringFn.bind(this), this.ring, 1, (this.warpPhase + Math.PI));
     // warp ring
     if (!(this.warp === undefined || this.warp.done())) {
       this.warp.cancel();
     }
     this.warp = new MutateFn(
       this.amplitude, (t) => 0.7 * Math.exp(-2 * t), 32, easeMid);
-    this.timeline.add(0,
+    this.timeline.add(1/16,
       this.warp
     );
     
@@ -2145,12 +2147,18 @@ class Thrusters {
         thrustOrientation,
         thrustPoint)
     );
+    this.timeline.add(0,
+      new Thruster(
+        this.drawThruster.bind(this),
+        thrustOrientation,
+        thrustOpp)
+    );
   }
 
   ringFn(t) {
-    return sinWave(-1, 1, 2, 0)(t)
-      * sinWave(-1, 1, 3, 0)((this.t % 32) / 32)
-      * this.amplitude.get();
+    return sinWave(-1, 1, 2, this.warpPhase)(t) // ring
+      * sinWave(-1, 1, 3, 0)((this.t % 32) / 32) // oscillation
+      * this.amplitude.get(); 
   }
 
   drawRing(opacity) {
@@ -2206,6 +2214,7 @@ class RingCircus {
     this.homeRadius = new MutableNumber(0);
     this.dutyCycle = new MutableNumber(1);
     this.freq = new MutableNumber(6);
+    this.twist = new MutableNumber(0);
 
     // Animations
     this.timeline = new Timeline();
@@ -2226,9 +2235,15 @@ class RingCircus {
     // T1: Spin everything
     this.onSpinRings(1);
 
-    // T2: Spread rings
-    this.onSpreadRings(5);
-
+    // T5: start circus
+    this.timeline.add(2,
+      new RandomTimer(16, 48, this.onMultiplyRings.bind(this)));
+    this.timeline.add(5,
+      new RandomTimer(16, 48, this.onSplitRings.bind(this)));
+    this.timeline.add(5,
+      new RandomTimer(16, 48, this.onSpreadRings.bind(this)));
+    this.timeline.add(5,
+      new RandomTimer(16, 48, this.onTwistRings.bind(this)));
   }
 
   onSpinRings(inSecs = 0) {
@@ -2249,20 +2264,38 @@ class RingCircus {
   onSpreadRings(inSecs = 0) {
     // spread
     this.timeline.add(inSecs,
-      new Transition(this.spreadFactor, 1, 16, easeMid)
+      new Transition(this.spreadFactor, 1, 32, easeInOutSin)
     );
-    // split rings
+    // collapse rings
     this.timeline.add(inSecs + 1,
-      new RandomTimer(16, 48, this.onSplitRings.bind(this)));
+      new RandomTimer(16, 48, this.onCollapseRings.bind(this)));
+  }
+
+  onCollapseRings(inSecs = 0) {
+    this.timeline.add(inSecs,
+      new Transition(this.spreadFactor, 0, 32, easeInOutSin)
+    );
+   //spread rings
+   this.timeline.add(inSecs + 1,
+     new RandomTimer(16, 48, this.onSpreadRings.bind(this)));
   }
 
   onSplitRings(inSecs = 0) {
     this.timeline.add(0,
-      new Transition(this.dutyCycle, 2 / Daydream.W, 16, easeMid)
+      new Transition(this.dutyCycle, 2 * Math.PI / Daydream.W, 32, easeInOutSin)
     );
-    // multiply rings
+    // merge rings
     this.timeline.add(inSecs + 1,
-      new RandomTimer(16, 48, this.onMultiplyRings.bind(this)));
+      new RandomTimer(16, 48, this.onMergeRings.bind(this)));
+  }
+
+  onMergeRings(inSecs = 0) {
+    this.timeline.add(0,
+      new Transition(this.dutyCycle, 1, 32, easeInOutSin)
+    );
+    // split rings
+    this.timeline.add(inSecs + 1,
+      new RandomTimer(16, 48, this.onSplitRings.bind(this)));
   }
 
   onMultiplyRings(inSecs = 0) {
@@ -2270,17 +2303,8 @@ class RingCircus {
       new Transition(this.numRings, Daydream.W,
         160, easeOutCubic, true)
     );
-    // merge rings
-    this.timeline.add(inSecs + 10,
-      new RandomTimer(16, 48, this.onMergeRings.bind(this)));
-  }
-
-  onMergeRings(inSecs = 0) {
-    this.timeline.add(0,
-      new Transition(this.dutyCycle, 1, 16, easeMid)
-    );
     // reduce rings
-    this.timeline.add(inSecs + 1,
+    this.timeline.add(inSecs + 10,
       new RandomTimer(16, 48, this.onReduceRings.bind(this)));
   }
 
@@ -2289,21 +2313,30 @@ class RingCircus {
       new Transition(this.numRings, 5,
         160, easeInCubic, true)
     );
-    // collapse rings
+    // multiply rings
     this.timeline.add(inSecs + 10,
-      new RandomTimer(16, 48, this.onCollapseRings.bind(this)));
+      new RandomTimer(16, 48, this.onMultiplyRings.bind(this)));
   }
 
-  onCollapseRings(inSecs = 0) {
-    this.timeline.add(inSecs,
-      new Transition(this.spreadFactor, 0, 16, easeMid)
+  onTwistRings(inSecs = 0) {
+    this.timeline.add(0,
+      new Transition(this.twist, Math.PI / Daydream.W,
+        80, easeMid)
     );
-    // spread rings
-    this.timeline.add(inSecs + 1,
-      new RandomTimer(16, 48, this.onSpreadRings.bind(this)));
+    // align rings
+    this.timeline.add(inSecs + 5,
+      new RandomTimer(16, 48, this.onAlignRings.bind(this)));
   }
 
-
+  onAlignRings(inSecs = 0) {
+    this.timeline.add(0,
+      new Transition(this.twist, 0,
+        80, easeMid)
+    );
+    // twist rings
+    this.timeline.add(inSecs + 5,
+      new RandomTimer(16, 48, this.onTwistRings.bind(this)));
+  }
 
   calcRingSpread() {
     this.radii = new Array(this.numRings.get());
@@ -2321,9 +2354,17 @@ class RingCircus {
         (v, t) => {
           let idx = this.numRings.get() == 1 ? 0 : (1 - (i / (this.numRings.get() - 1)));
           let color = this.palette.get(idx);
-          return dottedBrush(color.multiplyScalar(opacity), this.freq.get(),
-            this.dutyCycle.get(), this.dutyCycle.get() / 2, t);
-        });
+          let r =  dottedBrush(color.multiplyScalar(opacity), this.freq.get(),
+            this.dutyCycle.get(), this.twist.get(), t);
+          return r;
+        }, this.twist.get() * i);
+      let count = 0;
+      for (let i = 0; i < dots.length; ++i) {
+        if (dots[i].color.r != 0 || dots[i].color.g != 0 || dots[i].color.b != 0) {
+          ++count;
+        }
+      }
+      console.log(`${i}:${count}`);
       plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
     }
   }
@@ -2343,6 +2384,6 @@ window.addEventListener("resize", () => daydream.setCanvasSize());
 window.addEventListener("keydown", (e) => daydream.keydown(e));
 // var effect = new PolyRot();
 // var effect = new RainbowWiggles();
- var effect = new Thrusters();
-//var effect = new RingCircus();
+//var effect = new Thrusters();
+var effect = new RingCircus();
 daydream.renderer.setAnimationLoop(() => daydream.render(effect));
