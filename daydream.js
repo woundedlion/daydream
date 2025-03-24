@@ -6,7 +6,7 @@
 */
 
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { gui } from "gui";
 
@@ -968,8 +968,8 @@ class MutableNumber {
 }
 
 class Transition extends Animation {
-  constructor(mutable, to, duration, easingFn, quantized = false) {
-    super(duration, false);
+  constructor(mutable, to, duration, easingFn, quantized = false, repeat = false) {
+    super(duration, repeat);
     this.mutable = mutable;
     this.to = to;
     this.duration = duration;
@@ -981,13 +981,13 @@ class Transition extends Animation {
     if (this.t == 0) {
       this.from = this.mutable.get();
     }
-    let t = Math.min(1, this.t / (this.duration - 1));
+    super.step();
+    let t = Math.min(1, this.t / (this.duration));
     let n = this.easingFn(t) * (this.to - this.from) + this.from;
     if (this.quantized) {
       n = Math.floor(n);
     }
     this.mutable.set(n);
-    super.step();
   }
 }
 
@@ -1280,6 +1280,18 @@ class FilterRaw extends Filter {
     this.pass(pixels, x, y, color, age, blendFn);
   }
 }
+
+class FilterFn extends Filter {
+  constructor(fn) {
+    super();
+    thi.fn = fn();
+  }
+
+  plot(pixels, x, y, color, age, blendFn) {
+    this.pass(pixels, x, y, color, age, blendFn);
+  }
+}
+
 
 class FilterReplicate extends Filter {
   constructor(count) {
@@ -2046,11 +2058,11 @@ class RainbowWiggles {
 ///////////////////////////////////////////////////////////////////////////////
 
 class Thruster {
-  constructor(drawFn, ringOrientation, thrustPoint) {
+  constructor(drawFn, orientation, thrustPoint) {
     this.exhaustRadius = new MutableNumber(0);
-    this.exhaustMotion = new Transition(this.exhaustRadius, 2, 16, easeMid);
+    this.exhaustMotion = new Transition(this.exhaustRadius, 0.3, 8, easeMid);
     this.exhaustSprite = new Sprite(
-      drawFn.bind(null, ringOrientation.orient(thrustPoint), this.exhaustRadius),
+      drawFn.bind(null, orientation, thrustPoint, this.exhaustRadius),
       16, 0, easeMid, 16, easeOutExpo);
   }
 
@@ -2107,8 +2119,8 @@ class Thrusters {
     );
   }
 
-  drawThruster(thrustPoint, radius, opacity) {
-    let dots = drawRing(this.orientation, thrustPoint, radius.get(),
+  drawThruster(orientation, thrustPoint, radius, opacity) {
+    let dots = drawRing(orientation, thrustPoint, radius.get(),
       (v) => new THREE.Color(0xffffff).multiplyScalar(opacity));
     plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
   }
@@ -2193,11 +2205,16 @@ class RingCircus {
     this.labels = [];
 
     // Palettes
-    this.palette = new ProceduralPalette(
+    this.palette = new MutatingPalette(
       [0.5, 0.5, 0.5],
       [0.5, 0.5, 0.5],
       [0.5, 0.25, 0.25],
-      [0.91, 0.205, 0.505]
+      [0.91, 0.205, 0.505],
+
+      [0.5, 0.5, 0.5],
+      [1.0, 0.2, 0.5],
+      [0.5, 0.5, 0.5],
+      [0.3, 0.5, 0.0]
     );
 
     // Output Filters
@@ -2215,6 +2232,7 @@ class RingCircus {
     this.dutyCycle = new MutableNumber(1);
     this.freq = new MutableNumber(6);
     this.twist = new MutableNumber(0);
+    this.t = 0;
 
     // Animations
     this.timeline = new Timeline();
@@ -2264,19 +2282,19 @@ class RingCircus {
   onSpreadRings(inSecs = 0) {
     // spread
     this.timeline.add(inSecs,
-      new Transition(this.spreadFactor, 1, 32, easeInOutSin)
+      new Transition(this.spreadFactor, 1, 80, easeInOutSin)
     );
     // collapse rings
-    this.timeline.add(inSecs + 1,
-      new RandomTimer(16, 48, this.onCollapseRings.bind(this)));
+    this.timeline.add(inSecs + 5,
+      new RandomTimer(80, 160, this.onCollapseRings.bind(this)));
   }
 
   onCollapseRings(inSecs = 0) {
     this.timeline.add(inSecs,
-      new Transition(this.spreadFactor, 0, 32, easeInOutSin)
+      new Transition(this.spreadFactor, 0, 80, easeInOutSin)
     );
    //spread rings
-   this.timeline.add(inSecs + 1,
+   this.timeline.add(inSecs + 5,
      new RandomTimer(16, 48, this.onSpreadRings.bind(this)));
   }
 
@@ -2285,8 +2303,8 @@ class RingCircus {
       new Transition(this.dutyCycle, 2 * Math.PI / Daydream.W, 32, easeInOutSin)
     );
     // merge rings
-    this.timeline.add(inSecs + 1,
-      new RandomTimer(16, 48, this.onMergeRings.bind(this)));
+    this.timeline.add(inSecs + 2,
+      new RandomTimer(80, 160, this.onMergeRings.bind(this)));
   }
 
   onMergeRings(inSecs = 0) {
@@ -2294,28 +2312,28 @@ class RingCircus {
       new Transition(this.dutyCycle, 1, 32, easeInOutSin)
     );
     // split rings
-    this.timeline.add(inSecs + 1,
+    this.timeline.add(inSecs + 2,
       new RandomTimer(16, 48, this.onSplitRings.bind(this)));
   }
 
   onMultiplyRings(inSecs = 0) {
-    this.timeline.add(0,
+    this.timeline.add(inSecs,
       new Transition(this.numRings, Daydream.W,
-        160, easeOutCubic, true)
+        48, easeMid, true)
     );
     // reduce rings
-    this.timeline.add(inSecs + 10,
+    this.timeline.add(inSecs + 3,
       new RandomTimer(16, 48, this.onReduceRings.bind(this)));
   }
 
   onReduceRings(inSecs = 0) {
-    this.timeline.add(0,
+    this.timeline.add(inSecs,
       new Transition(this.numRings, 5,
-        160, easeInCubic, true)
+        48, easeMid, true)
     );
     // multiply rings
-    this.timeline.add(inSecs + 10,
-      new RandomTimer(16, 48, this.onMultiplyRings.bind(this)));
+    this.timeline.add(inSecs + 3,
+      new RandomTimer(80, 160, this.onMultiplyRings.bind(this)));
   }
 
   onTwistRings(inSecs = 0) {
@@ -2325,7 +2343,7 @@ class RingCircus {
     );
     // align rings
     this.timeline.add(inSecs + 5,
-      new RandomTimer(16, 48, this.onAlignRings.bind(this)));
+      new RandomTimer(48, 80, this.onAlignRings.bind(this)));
   }
 
   onAlignRings(inSecs = 0) {
@@ -2357,19 +2375,134 @@ class RingCircus {
           let r =  dottedBrush(color.multiplyScalar(opacity), this.freq.get(),
             this.dutyCycle.get(), this.twist.get(), t);
           return r;
-        }, this.twist.get() * i);
-      let count = 0;
-      for (let i = 0; i < dots.length; ++i) {
-        if (dots[i].color.r != 0 || dots[i].color.g != 0 || dots[i].color.b != 0) {
-          ++count;
-        }
-      }
-      console.log(`${i}:${count}`);
+        }, (0.1 +  this.twist.get()) * i);
       plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
     }
   }
 
   drawFrame() {
+    this.palette.mutate(Math.sin(0.01 * this.t++));
+    this.pixels.clear();
+    this.labels = [];
+    this.timeline.step();
+    return { pixels: this.pixels, labels: this.labels };
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class Wormhole {
+  constructor() {
+    Daydream.W = 96
+    this.pixels = new Map();
+    this.labels = [];
+
+    // Palettes
+    this.palette = new ProceduralPalette(
+      [0.5, 0.5, 0.5],
+      [1.0, 0.2, 0.5],
+      [0.5, 0.5, 0.5],
+      [0.3, 0.5, 0.0]
+    );
+
+    // Output Filters
+    (this.ringOutput = new FilterRaw())
+      .chain(new FilterAntiAlias())
+      ;
+
+    // State
+    this.normal = Daydream.Z_AXIS.clone();
+    this.numRings = new MutableNumber(Daydream.W);
+    this.orientation = new Orientation();
+    this.spreadFactor = new MutableNumber(1);
+    this.homeRadius = new MutableNumber(1);
+    this.dutyCycle = new MutableNumber((2 * Math.PI) / Daydream.W);
+    this.freq = new MutableNumber(2);
+    this.twist = new MutableNumber(7 / Daydream.W);
+    this.phase = new MutableNumber(0);
+    this.t = 0;
+
+    // Animations
+    this.timeline = new Timeline();
+
+    this.timeline.add(0,
+      new Sprite((opacity) => {
+        this.drawRings(opacity);
+      },
+        -1, 8, easeMid, 0, easeMid)
+    );
+
+    // T1: Spin everything
+    this.onThrustRings(1);
+    this.onSpinRings(1);
+    this.onMutateDutyCyle(1);
+    this.onMutateTwist(1);
+
+  }
+
+  onMutateDutyCyle(inSecs = 0) {
+    this.timeline.add(inSecs,
+      new MutateFn(this.dutyCycle, sinWave((2 * Math.PI) / Daydream.W, (8 * 2 * Math.PI) / Daydream.W, 1, Math.PI / 2),
+        160, easeMid, true)
+    );
+  }
+
+  onMutateTwist(inSecs = 0) {
+    this.timeline.add(inSecs,
+      new MutateFn(this.twist, sinWave(3 / Daydream.W, 10 / Daydream.W, 1, Math.PI / 2),
+        64, easeMid, true)
+    );
+  }
+
+  onThrustRings(inSecs = 0) {
+    this.timeline.add(inSecs,
+      new Rotation(this.orientation,
+        ringPoint(this.normal, 1, Math.random() * 2 * Math.PI),
+        4 * Math.PI,
+        96, easeInOutSin, false)
+    );
+
+    this.timeline.add(inSecs,
+      new RandomTimer(48, 70, () => {
+        this.onThrustRings();
+      })
+    );
+  }
+
+  onSpinRings(inSecs = 0) {
+    this.timeline.add(inSecs,
+      new Transition(this.phase, 2 * Math.PI, 16, easeMid, false, true)
+    );
+  }
+
+  calcRingSpread() {
+    this.radii = new Array(this.numRings.get());
+    for (let i = 0; i < this.numRings.get(); ++i) {
+      let x = ((i + 1) / (this.numRings.get() + 1)) * 2 - 1;
+      let r = Math.sqrt(Math.pow(1 - x, 2));
+      this.radii[i] = new MutableNumber(lerp(this.homeRadius.get(), r, this.spreadFactor.get()));
+    }
+  }
+
+  drawRings(opacity) {
+    this.calcRingSpread();
+    this.orientation.collapse();
+    for (let i = 0; i < this.radii.length; ++i) {
+      let dots = drawRing(this.orientation, this.normal, this.radii[i].get(),
+        (v, t) => {
+          let idx = this.numRings.get() == 1 ? 0 : (1 - (i / (this.numRings.get() - 1)));
+          let darken = Math.pow(1 - Math.abs(this.radii[i].get() - 1), 3);
+          let color = this.palette.get(idx).multiplyScalar(darken);
+          let r = dottedBrush(color.multiplyScalar(opacity), this.freq.get(),
+            this.dutyCycle.get(), this.twist.get(), t);
+          return r;
+        }, (this.twist.get()) * i + this.phase.get());
+      plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
+    }
+  }
+
+  drawFrame() {
+//    this.palette.mutate(Math.sin(0.01 * this.t++));
     this.pixels.clear();
     this.labels = [];
     this.timeline.step();
@@ -2384,6 +2517,7 @@ window.addEventListener("resize", () => daydream.setCanvasSize());
 window.addEventListener("keydown", (e) => daydream.keydown(e));
 // var effect = new PolyRot();
 // var effect = new RainbowWiggles();
-//var effect = new Thrusters();
-var effect = new RingCircus();
+var effect = new Thrusters();
+//var effect = new RingCircus();
+//var effect = new Wormhole();
 daydream.renderer.setAnimationLoop(() => daydream.render(effect));
