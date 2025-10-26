@@ -1316,12 +1316,13 @@ class Filter {
       x = Math.round(x);
       y = Math.round(y);
       let key = pixelKey(x, y);
+      let old = 0;
       if (pixels.has(key)) {
-        let old = pixels.get(key);
-        pixels.set(pixelKey(x, y), blendFn(old, color));
+        old = pixels.get(key);
       } else {
-        pixels.set(pixelKey(x, y), color);
+        old = new THREE.Color(0, 0, 0);
       }
+      pixels.set(pixelKey(x, y), blendFn(old, color));
     } else {
       this.next.plot(pixels, x, y, color, age, blendFn);
     }
@@ -2211,19 +2212,18 @@ class RainbowWiggles {
     this.timeline.step();
     for (let i = Math.abs(this.speed) - 1; i >= 0; --i) {
       this.pull(0);
-      this.drawRings(i * 1 / Math.abs(this.speed));
+      this.drawNodes(i * 1 / Math.abs(this.speed));
     }
-    console.log(this.trails.trails.size);
     this.trails.trail(this.pixels,
       (x, y, t) => this.color(pixelToVector(x, y), t), blendOver);
     return { pixels: this.pixels, labels: this.labels };
   }
 
-  nodeY(ring) {
-    return (ring.y / (this.nodes.length - 1)) * (Daydream.H - 1);
+  nodeY(node) {
+    return (node.y / (this.nodes.length - 1)) * (Daydream.H - 1);
   }
 
-  drawRings(age) {
+  drawNodes(age) {
     let dots = [];
     for (let i = 0; i < this.nodes.length; ++i) {
       if (i == 0) {
@@ -2235,7 +2235,6 @@ class RainbowWiggles {
         dots.push(...drawLine(from, to, (v) => this.color(v, 0)));
       }
     }
-    console.log(dots.length);
     plotDots(this.pixels, this.labels, this.filters, dots, age, blendOverMax);
   }
 
