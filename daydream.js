@@ -1621,9 +1621,10 @@ class GenerativePalette {
 
   reset() {
     let sat = randomBetween(0.4, 0.6);
+    let dir = Math.random() < 0.5 ? 1 : -1;
     let hueA = Math.random();
-    let hueB = (hueA + randomBetween(0.1, 0.3)) % 1;
-    let hueC = (hueB + randomBetween(0.1, 0.3)) % 1;
+    let hueB = (hueA + dir * randomBetween(0.1, 0.166)) % 1;
+    let hueC = (hueB + dir * randomBetween(0.1, 0.166)) % 1;
     this.a = new THREE.Color().setHSL(hueA, sat, 0.1);
     this.b = new THREE.Color().setHSL(hueB, sat, 0.3);
     this.c = new THREE.Color().setHSL(hueC, sat, 0.5);
@@ -2103,6 +2104,7 @@ class RainbowWiggles {
     this.paletteIndexNext = 1;
     this.paletteNormal = Daydream.Y_AXIS.clone();
     this.paletteBoundary = new MutableNumber(0);
+    this.wiping = false;
 
     this.nodes = [];
     for (let i = 0; i < Daydream.H; ++i) {
@@ -2131,20 +2133,17 @@ class RainbowWiggles {
     this.timeline = new Timeline();
 
     this.timeline.add(0,
-      new RandomTimer(4, 48, () => {
+      new RandomTimer(4, 40, () => {
         this.reverse();
+        if (!this.wiping) {
+          this.colorWipe();
+        }
       }, true)
     );
 
     this.timeline.add(0,
       new RandomTimer(64, 88, () => {
         this.rotate();
-      }, true)
-    );
-
-    this.timeline.add(0,
-      new RandomTimer(64, 64, () => {
-        this.colorWipe();
       }, true)
     );
   }
@@ -2167,13 +2166,15 @@ class RainbowWiggles {
   }
 
   colorWipe() {
+    this.wiping = true;
     this.timeline.add(0,
-      new Transition(this.paletteBoundary, Math.PI, 48, easeMid)
+      new Transition(this.paletteBoundary, Math.PI, 40, easeMid)
         .then(() => {
           this.paletteIndex = this.paletteIndexNext;
           this.paletteIndexNext = (this.paletteIndexNext + 1) % 2;
           this.palettes[this.paletteIndexNext].reset();
           this.paletteBoundary.set(0);
+          this.wiping = false;
         }
       )
     );
