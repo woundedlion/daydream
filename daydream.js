@@ -354,6 +354,24 @@ const blendUnder = (c1, c2) => {
   return c1;
 }
 
+const blendAdd = (c1, c2) => {
+  return new THREE.Color(
+    Math.min(1, c1.r + c2.r),
+    Math.min(1, c1.g + c2.g),
+    Math.min(1, c1.b + c2.b)
+  );
+}
+
+const blendAlpha = (a) => {
+  return (c1, c2) => {
+    return new THREE.Color(
+      c1.r * a + c2.r * (1 - a),
+      c1.g * a + c2.g * (1 - a),
+      c1.b * a + c2.b * (1 - a)
+    );
+  }
+}
+
 const blendOverMax = (c1, c2) => {
   const m1 =
     Math.sqrt(Math.pow(c1.r, 2) + Math.pow(c1.g, 2) + Math.pow(c1.b, 2));
@@ -542,7 +560,7 @@ const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false) => {
   a *= Math.abs((end - start));
   v.crossVectors(u, w).normalize();
 
-  const step = 1 / Daydream.W;
+  const step = 2 * Math.PI / Daydream.W;
   for (let t = start; t < a; t += step) {
     let vi = new THREE.Vector3(
       u.x * Math.cos(t) + v.x * Math.sin(t),
@@ -1380,18 +1398,18 @@ class FilterAntiAlias extends Filter {
     let yi = Math.trunc(y);
     let ym = y - yi;
 
-    let c = falloff((1 - xm) * (1 - ym));
-    this.pass(pixels, xi, yi, color.clone().multiplyScalar(c), age, blendOverMax);
+    let a = falloff((1 - xm) * (1 - ym));
+    this.pass(pixels, xi, yi, color, age, blendAlpha(a));
 
-    c = falloff(xm * (1 - ym));
-    this.pass(pixels, wrap((xi + 1), Daydream.W), yi, color.clone().multiplyScalar(c), age, blendOverMax);
+    a = falloff(xm * (1 - ym));
+    this.pass(pixels, wrap((xi + 1), Daydream.W), yi, color, age, blendAlpha(a));
 
     if (yi < Daydream.H - 1) {
-      c = falloff((1 - xm) * ym);
-      this.pass(pixels, xi, yi + 1, color.clone().multiplyScalar(c), age, blendOverMax);
+      a = falloff((1 - xm) * ym);
+      this.pass(pixels, xi, yi + 1, color, age, blendAlpha(a));
 
-      c = falloff(xm * ym);
-      this.pass(pixels, wrap((xi + 1), Daydream.W), yi + 1, color.clone().multiplyScalar(c), age, blendOverMax);
+      a = falloff(xm * ym);
+      this.pass(pixels, wrap((xi + 1), Daydream.W), yi + 1, color, age, blendAlpha(a));
     }
   }
 }
@@ -1536,12 +1554,12 @@ class FilterDecayTrails extends Filter {
     });
   }
 
-  trail(pixels, filters, trailFn, blendFn = blendUnder) {
+  trail(pixels, trailFn, blendFn = blendUnder) {
     for (const [key, ttl] of this.trails) {
       if (ttl > 0) {
         let p = keyPixel(key);
         let color = trailFn(p[0], p[1], 1 - (ttl / this.lifespan));
-        filters.plot(pixels, p[0], p[1], color, this.lifespan - ttl, blendFn);
+        this.pass(pixels, p[0], p[1], color, this.lifespan - ttl, blendFn);
       }
     }
   }
@@ -1627,7 +1645,7 @@ class GenerativePalette {
     let hueC = (hueB + dir * randomBetween(0.1, 0.166)) % 1;
     this.a = new THREE.Color().setHSL(hueA, sat, 0.1);
     this.b = new THREE.Color().setHSL(hueB, sat, 0.3);
-    this.c = new THREE.Color().setHSL(hueC, sat, 0.5);
+    this.c = new THREE.Color().setHSL(hueC, sat, 0.6);
   }
 
   get(t) {
@@ -2118,7 +2136,6 @@ class RainbowWiggles {
     this.aa = new FilterAntiAlias();
     this.replicate = new FilterReplicate(4);
     this.orient = new FilterOrient(this.orientation);
-    this.orientDirect = new FilterOrient(this.orientation);
 
     // Filters
     this.filters = new FilterRaw();
@@ -2197,7 +2214,7 @@ class RainbowWiggles {
       this.drawRings(i * 1 / Math.abs(this.speed));
     }
     console.log(this.trails.trails.size);
-    this.trails.trail(this.pixels, this.orientDirect,
+    this.trails.trail(this.pixels,
       (x, y, t) => this.color(pixelToVector(x, y), t), blendOver);
     return { pixels: this.pixels, labels: this.labels };
   }
@@ -2218,6 +2235,7 @@ class RainbowWiggles {
         dots.push(...drawLine(from, to, (v) => this.color(v, 0)));
       }
     }
+    console.log(dots.length);
     plotDots(this.pixels, this.labels, this.filters, dots, age, blendOverMax);
   }
 
