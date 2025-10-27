@@ -1659,7 +1659,7 @@ class GenerativePalette {
         this.a, this.b, (t - 0.1) * 2.5).convertSRGBToLinear();
     } else if (t < 0.9) {
       return new THREE.Color().lerpColors(
-        this.b, this.c, (t - 0.6) * 2.5).convertSRGBToLinear();
+        this.b, this.c, (t - 0.5) * 2.5).convertSRGBToLinear();
     } else {
       return new THREE.Color().lerpColors(
         this.c, end, (t - 0.9) * 10).convertSRGBToLinear();
