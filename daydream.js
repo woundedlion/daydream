@@ -157,9 +157,9 @@ class Daydream {
     this.mainViewport.height = height;
 
     // --- PiP Viewport Calculation ---
-    const pipWidth = Math.floor(width * 0.25);  // 1/4 size
-    const pipHeight = Math.floor(height * 0.25); // 1/4 size
-    const pipMargin = 10; // Small margin from the edges
+    const pipWidth = Math.floor(width * 0.3);  // 1/4 size
+    const pipHeight = Math.floor(height * 0.3); // 1/4 size
+    const pipMargin = 0; // Small margin from the edges
 
     this.pipViewport.x = pipMargin; // Lower-left corner X
     this.pipViewport.y = pipMargin; // Lower-left corner Y
@@ -1712,8 +1712,8 @@ class GenerativePalette {
     let sat = randomBetween(0.4, 0.8);
     let dir = Math.random() < 0.5 ? 1 : -1;
     let hueA = Math.random();
-    let hueB = (hueA + dir * randomBetween(0.1,  0.166)) % 1;
-    let hueC = (hueB + dir * randomBetween(0.1, 0.166)) % 1;
+    let hueB = (hueA + dir * randomBetween(1/12,  1/6)) % 1;
+    let hueC = (hueB + dir * randomBetween(1/12, 1/6)) % 1;
     this.a = new THREE.Color().setHSL(hueA, sat, 0.1);
     this.b = new THREE.Color().setHSL(hueB, sat, 0.3);
     this.c = new THREE.Color().setHSL(hueC, sat, 0.6);
@@ -2184,16 +2184,9 @@ class RainbowWiggles {
     this.pixels = new Map();
     this.labels = [];
 
-    this.palettes = [
-      new GenerativePalette(),
-      new GenerativePalette()
-    ];
-
-    this.paletteIndex = 0;
-    this.paletteIndexNext = 1;
+    this.palettes = [new GenerativePalette()];
+    this.paletteBoundaries = [];
     this.paletteNormal = Daydream.Y_AXIS.clone();
-    this.paletteBoundary = new MutableNumber(0);
-    this.wiping = false;
 
     this.nodes = [];
     for (let i = 0; i < Daydream.H; ++i) {
@@ -2223,14 +2216,12 @@ class RainbowWiggles {
     this.timeline.add(0,
       new RandomTimer(4, 40, () => {
         this.reverse();
-        if (!this.wiping) {
-          this.colorWipe();
-        }
+        this.colorWipe();
       }, true)
     );
 
     this.timeline.add(0,
-      new RandomTimer(64, 88, () => {
+      new RandomTimer(80, 160, () => {
         this.rotate();
       }, true)
     );
@@ -2254,39 +2245,51 @@ class RainbowWiggles {
   }
 
   colorWipe() {
-    this.wiping = true;
+    this.palettes.unshift(new GenerativePalette());
+    this.paletteBoundaries.unshift(new MutableNumber(0));
     this.timeline.add(0,
-      new Transition(this.paletteBoundary, Math.PI, 20, easeMid)
+      new Transition(this.paletteBoundaries[0], Math.PI, 40, easeMid)
         .then(() => {
-          this.paletteIndex = this.paletteIndexNext;
-          this.paletteIndexNext = (this.paletteIndexNext + 1) % 2;
-          this.palettes[this.paletteIndexNext].reset();
-          this.paletteBoundary.set(0);
-          this.wiping = false;
+          this.paletteBoundaries.pop();
+          this.palettes.pop();
         }
       )
     );
   }
 
   color(v, t) {
-    const blendWidth = Math.PI / 8;
-    const boundaryAngle = this.paletteBoundary.get();
-    const a = angleBetween(this.paletteNormal, v);
-    const d = a - boundaryAngle;
+    const blendWidth = Math.PI / 16;
+    const numBoundaries = this.paletteBoundaries.length;
+    const numPalettes = this.palettes.length;
+    const a = angleBetween(v, this.paletteNormal);
 
-    let finalColor;
-    if (a < boundaryAngle - blendWidth) {
-      finalColor = this.palettes[this.paletteIndexNext].get(t);
-    } else if (a > boundaryAngle + blendWidth) {
-      finalColor = this.palettes[this.paletteIndex].get(t);
-    } else {
-      const blendFactor = (d + blendWidth) / (2 * blendWidth);
-      const clampedBlendFactor = Math.max(0, Math.min(blendFactor, 1));
-      const color1 = this.palettes[this.paletteIndexNext].get(t);
-      const color2 = this.palettes[this.paletteIndex].get(t);
-      finalColor = color1.clone().lerp(color2, clampedBlendFactor);
+    for (let i = 0; i < numBoundaries; ++i) {
+      const boundary = this.paletteBoundaries[i].get();
+      const lowerBlendEdge = boundary - blendWidth;
+      const upperBlendEdge = boundary + blendWidth;
+
+      if (a < lowerBlendEdge) {
+        return this.palettes[i].get(t);
+      }
+
+      if (a >= lowerBlendEdge && a <= upperBlendEdge) {
+        const blendFactor = (a - lowerBlendEdge) / (2 * blendWidth);
+        const clampedBlendFactor = Math.max(0, Math.min(blendFactor, 1));
+        const color1 = this.palettes[i].get(t);
+        const color2 = this.palettes[i + 1].get(t);
+        return color1.clone().lerp(color2, clampedBlendFactor);
+      }
+
+      const nextBoundaryLowerBlendEdge = (i + 1 < numBoundaries)
+        ? this.paletteBoundaries[i + 1].get() - blendWidth
+        : Infinity;
+
+      if (a > upperBlendEdge && a < nextBoundaryLowerBlendEdge) {
+        return this.palettes[i + 1].get(t);
+      }
     }
-    return finalColor;
+
+    return this.palettes[0].get(t);
   }
 
   drawFrame() {
