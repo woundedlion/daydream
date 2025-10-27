@@ -1639,10 +1639,10 @@ class GenerativePalette {
   }
 
   reset() {
-    let sat = randomBetween(0.4, 0.6);
+    let sat = randomBetween(0.4, 0.8);
     let dir = Math.random() < 0.5 ? 1 : -1;
     let hueA = Math.random();
-    let hueB = (hueA + dir * randomBetween(0.1, 0.166)) % 1;
+    let hueB = (hueA + dir * randomBetween(0.1,  0.166)) % 1;
     let hueC = (hueB + dir * randomBetween(0.1, 0.166)) % 1;
     this.a = new THREE.Color().setHSL(hueA, sat, 0.1);
     this.b = new THREE.Color().setHSL(hueB, sat, 0.3);
@@ -2186,7 +2186,7 @@ class RainbowWiggles {
   colorWipe() {
     this.wiping = true;
     this.timeline.add(0,
-      new Transition(this.paletteBoundary, Math.PI, 40, easeMid)
+      new Transition(this.paletteBoundary, Math.PI, 20, easeMid)
         .then(() => {
           this.paletteIndex = this.paletteIndexNext;
           this.paletteIndexNext = (this.paletteIndexNext + 1) % 2;
@@ -2199,12 +2199,45 @@ class RainbowWiggles {
   }
 
   color(v, t) {
+    const blendWidth = Math.PI / 8;
+    const boundaryAngle = this.paletteBoundary.get();
+    const a = angleBetween(this.paletteNormal, v);
+    const d = a - boundaryAngle;
+
+    let finalColor;
+    if (a < boundaryAngle - blendWidth) {
+      finalColor = this.palettes[this.paletteIndexNext].get(t);
+    } else if (a > boundaryAngle + blendWidth) {
+      finalColor = this.palettes[this.paletteIndex].get(t);
+    } else {
+      const blendFactor = (d + blendWidth) / (2 * blendWidth);
+      const clampedBlendFactor = Math.max(0, Math.min(blendFactor, 1));
+      const color1 = this.palettes[this.paletteIndexNext].get(t);
+      const color2 = this.palettes[this.paletteIndex].get(t);
+      finalColor = color1.clone().lerp(color2, clampedBlendFactor);
+    }
+    return finalColor;
+  }
+
+  /*
+
+  color(v, t) {
     let i = this.paletteIndex;
-    if (angleBetween(this.paletteNormal, v) < this.paletteBoundary.get()) {
+    let a = angleBetween(this.paletteNormal, v);
+    let d = a - this.paletteBoundary.get();
+    if (Math.abs(d) < Math.PI / 16) {
+      if (d < 0) {
+        return this.palettes[this.paletteIndex].get(t);
+      } else if (d > 0) {
+
+      }
+    }
+    else if (a < this.paletteBoundary.get()) {
       i = this.paletteIndexNext;
     }
     return this.palettes[i].get(t);
   }
+  */
 
   drawFrame() {
     this.pixels.clear();
