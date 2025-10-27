@@ -114,6 +114,10 @@ class Daydream {
     ]);
     this.zAxis = new THREE.Line(zAxisGeometry, this.axisMaterial);
 
+    // --- Add properties for viewports ---
+    this.mainViewport = { x: 0, y: 0, width: 1, height: 1 }; // Proportions initially
+    this.pipViewport = { x: 0, y: 0, width: 0.25, height: 0.25 }; // Picture-in-Picture
+
     this.setCanvasSize();
 
     this.showAxes = false;
@@ -142,10 +146,32 @@ class Daydream {
   }
 
   setCanvasSize() {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    // --- Main Viewport Calculation ---
+    // Make main view slightly offset if you want space around PiP, otherwise use full width/height
+    this.mainViewport.x = 0;
+    this.mainViewport.y = 0;
+    this.mainViewport.width = width;
+    this.mainViewport.height = height;
+
+    // --- PiP Viewport Calculation ---
+    const pipWidth = Math.floor(width * 0.25);  // 1/4 size
+    const pipHeight = Math.floor(height * 0.25); // 1/4 size
+    const pipMargin = 10; // Small margin from the edges
+
+    this.pipViewport.x = pipMargin; // Lower-left corner X
+    this.pipViewport.y = pipMargin; // Lower-left corner Y
+    this.pipViewport.width = pipWidth;
+    this.pipViewport.height = pipHeight;
+
+    // --- Update Camera and Renderers ---
+    this.camera.aspect = width / height; // Main camera aspect remains full window
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.labelRenderer.setSize(window.innerWidth, window.innerHeight);
+
+    this.renderer.setSize(width, height);
+    this.labelRenderer.setSize(width, height); // CSS renderer still covers full area
   }
 
   render(effect) {
@@ -204,8 +230,52 @@ class Daydream {
     } 
 
     this.controls.update();
+
+    // Enable Scissor Test for multiple viewports
+    this.renderer.setScissorTest(true);
+
+    // ** Render Main View **
+    this.renderer.setViewport(
+      this.mainViewport.x,
+      this.mainViewport.y,
+      this.mainViewport.width,
+      this.mainViewport.height
+    );
+    this.renderer.setScissor(
+      this.mainViewport.x,
+      this.mainViewport.y,
+      this.mainViewport.width,
+      this.mainViewport.height
+    );
+    // Ensure background covers the whole main viewport (important if PiP overlaps)
+    this.renderer.setClearColor(this.scene.background, Daydream.SCENE_ALPHA ? 0 : 1);
+    this.renderer.clear(); // Clear color, depth, stencil buffers
     this.renderer.render(this.scene, this.camera);
+    // Render labels associated with the main view
     this.labelRenderer.render(this.scene, this.camera);
+
+
+    // ** Render Picture-in-Picture (PiP) View **
+    this.renderer.setViewport(
+      this.pipViewport.x,
+      this.pipViewport.y,
+      this.pipViewport.width,
+      this.pipViewport.height
+    );
+    this.renderer.setScissor(
+      this.pipViewport.x,
+      this.pipViewport.y,
+      this.pipViewport.width,
+      this.pipViewport.height
+    );
+    // Optional: Clear PiP area with a different background or don't clear to overlay
+    // this.renderer.setClearColor(0x111111, 1); // Darker background for PiP?
+    // this.renderer.clear(); // Clear only the PiP area
+    this.renderer.render(this.scene, this.camera); // Render scene again in the small viewport
+
+    // Disable Scissor Test after rendering all viewports
+    this.renderer.setScissorTest(false);
+
   }
 }
 
@@ -2218,26 +2288,6 @@ class RainbowWiggles {
     }
     return finalColor;
   }
-
-  /*
-
-  color(v, t) {
-    let i = this.paletteIndex;
-    let a = angleBetween(this.paletteNormal, v);
-    let d = a - this.paletteBoundary.get();
-    if (Math.abs(d) < Math.PI / 16) {
-      if (d < 0) {
-        return this.palettes[this.paletteIndex].get(t);
-      } else if (d > 0) {
-
-      }
-    }
-    else if (a < this.paletteBoundary.get()) {
-      i = this.paletteIndexNext;
-    }
-    return this.palettes[i].get(t);
-  }
-  */
 
   drawFrame() {
     this.pixels.clear();
