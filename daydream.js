@@ -10,7 +10,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { gui } from "gui";
 
-import { BufferGeometry, MaxEquation } from "three";
+import { BufferGeometry, AddEquation, MaxEquation } from "three";
 
 class Dot {
   constructor(position, color) {
@@ -371,10 +371,106 @@ const coordsLabel = (c) => {
        `
   };
 }
+///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Efficient PerlinNoise1D Class
+ * Generates 1D Perlin Noise optimized for speed.
+ * The core concept remains: smooth interpolation between random gradients.
+ */
+class PerlinNoise1D {
+  constructor() {
+    // --- Initialization ---
+
+    // The permutation table (0-255). This defines the "random" hash lookup.
+    // It's duplicated (0-511) to avoid explicit modulo operations in the noise function.
+    this.p = new Array(512);
+    this.perm = new Array(256);
+
+    // 1. Fill the permutation array with unique random values (0 to 255)
+    for (let i = 0; i < 256; i++) {
+      this.perm[i] = i;
+    }
+
+    // 2. Shuffle the array using the Fisher-Yates algorithm for true randomness
+    for (let i = 255; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.perm[i], this.perm[j]] = [this.perm[j], this.perm[i]];
+    }
+
+    // 3. Duplicate the array for faster lookups (index & 255 is avoided)
+    for (let i = 0; i < 256; i++) {
+      this.p[i] = this.perm[i];
+      this.p[i + 256] = this.perm[i];
+    }
+
+    // 1D gradients are simply -1 or 1, encoded here as array indices
+    this.gradients = [1, -1];
+  }
+
+  /**
+   * The Perlin smootherstep function: 6t^5 - 15t^4 + 10t^3.
+   * Guarantees zero derivative at t=0 and t=1 for smooth transitions.
+   * @param {number} t - The fractional part of the coordinate [0, 1].
+   */
+  fade(t) {
+    return t * t * t * (t * (t * 6 - 15) + 10);
+  }
+
+  /**
+   * Standard Linear Interpolation.
+   */
+  lerp(a, b, t) {
+    return a + t * (b - a);
+  }
+
+  /**
+   * Calculates the dot product of the distance vector and the gradient vector.
+   * In 1D, this is just grad * distance.
+   * @param {number} hash - The hash value from the permutation table.
+   * @param {number} x - The distance from the grid point (e.g., x or x-1).
+   */
+  grad(hash, x) {
+    // Using hash & 1 is a fast way to get hash % 2
+    // If hash is even, index 0 (+1); if odd, index 1 (-1).
+    const grad = this.gradients[hash & 1];
+    return grad * x;
+  }
+
+  /**
+   * The main 1D Perlin Noise calculation.
+   * @param {number} x - The input coordinate (position or time).
+   * @returns {number} The noise value in the range [-1, 1].
+   */
+  noise(x) {
+    // 1. Find the integer unit grid cell (X) and the fractional part (x_frac)
+    let X = Math.floor(x);
+    const x_frac = x - X;
+
+    // Use bitwise AND to wrap X around 255, minimizing lookups
+    X = X & 255;
+
+    // 2. Compute the fade curve for the fractional part
+    const u = this.fade(x_frac);
+
+    // 3. Calculate hash values (A and B) for the two endpoints (X and X+1)
+    // Since P is 512 long, we can use X+1 directly without a boundary check.
+    const A = this.p[X];
+    const B = this.p[X + 1];
+
+    // 4. Calculate the influence (dot product) from the two endpoint gradients
+    const res0 = this.grad(A, x_frac);     // Influence from the left grid point (distance x_frac)
+    const res1 = this.grad(B, x_frac - 1); // Influence from the right grid point (distance x_frac - 1)
+
+    // 5. Interpolate the results
+    return this.lerp(res0, res1, u);
+  }
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
-const g = (1 + Math.sqrt(5)) / 2;
+const PHI = (1 + Math.sqrt(5)) / 2;
+const G = 1 / PHI;
 
 const sphericalToPixel = (s) => {
   return {
@@ -435,9 +531,21 @@ const blendAdd = (c1, c2) => {
 const blendAlpha = (a) => {
   return (c1, c2) => {
     return new THREE.Color(
-      c1.r * a + c2.r * (1 - a),
-      c1.g * a + c2.g * (1 - a),
-      c1.b * a + c2.b * (1 - a)
+      c1.r * (1 - a) + c2.r * (a),
+      c1.g * (1 - a) + c2.g * (a),
+      c1.b * (1 - a) + c2.b * (a)
+    );
+  }
+}
+
+const blendAccumulate = (a) => {
+  return (c1, c2) => {
+    // c1: existing pixel color, c2: incoming fragment color
+    // Formula: C_result = C_existing + C_fragment * coverage (a)
+    return new THREE.Color(
+      Math.min(1, c1.r + c2.r * a),
+      Math.min(1, c1.g + c2.g * a),
+      Math.min(1, c1.b + c2.b * a)
     );
   }
 }
@@ -533,20 +641,20 @@ class Dodecahedron {
     [-1, -1, 1],     // 6
     [-1, -1, -1],    // 7
 
-    [0, 1 / g, g],   //8
-    [0, 1 / g, -g],  // 9
-    [0, -1 / g, g],  // 10
-    [0, -1 / g, -g], // 11
+    [0, 1 / PHI, PHI],   //8
+    [0, 1 / PHI, -PHI],  // 9
+    [0, -1 / PHI, PHI],  // 10
+    [0, -1 / PHI, -PHI], // 11
 
-    [1 / g, g, 0],   // 12
-    [1 / g, -g, 0],  // 13
-    [-1 / g, g, 0],  // 14
-    [-1 / g, -g, 0], // 15
+    [1 / PHI, PHI, 0],   // 12
+    [1 / PHI, -PHI, 0],  // 13
+    [-1 / PHI, PHI, 0],  // 14
+    [-1 / PHI, -PHI, 0], // 15
 
-    [g, 0, 1 / g],   // 16
-    [g, 0, -1 / g],  // 17
-    [-g, 0, 1 / g],  // 18
-    [-g, 0, -1 / g], // 19
+    [PHI, 0, 1 / PHI],   // 16
+    [PHI, 0, -1 / PHI],  // 17
+    [-PHI, 0, 1 / PHI],  // 18
+    [-PHI, 0, -1 / PHI], // 19
   ];
 
   edges = [
@@ -741,17 +849,18 @@ const calcRingPoint = (a, radius, u, v, w) => {
   ).normalize();
 }
 
-const drawRing = (orientation, normal, radius, colorFn, phase = 0) => {
+const drawRing = (normal, radius, colorFn, phase = 0) => {
   let dots = [];
   let u = new THREE.Vector3();
-  let v = orientation.orient(normal);
+  let v = normal.clone();
   let w = new THREE.Vector3();
   if (radius > 1) {
     v.negate();
+    phase = (phase + Math.PI) % (2 * Math.PI)
   }
-  u.crossVectors(v, orientation.orient(Daydream.X_AXIS)).normalize();
+  u.crossVectors(v, Daydream.X_AXIS).normalize();
   if (u.length() == 0) {
-    u.crossVectors(v, orientation.orient(Daydream.Z_AXIS)).normalize();
+    u.crossVectors(v, Daydream.Z_AXIS).normalize();
   }
   w.crossVectors(v, u);
   if (radius > 1) {
@@ -759,12 +868,11 @@ const drawRing = (orientation, normal, radius, colorFn, phase = 0) => {
     radius = 2 - radius;
   }
 
-  let step = 2 * Math.PI / Daydream.W;
+  let step = 2 * Math.PI / 96;
   for (let a = 0; a < 2 * Math.PI; a += step) {
     let vi = calcRingPoint((a + phase) % (2 * Math.PI), radius, u, v, w);
     dots.push(new Dot(vi, colorFn(vi, a / (2 * Math.PI))));
   }
-
   return dots;
 };
 
@@ -1008,7 +1116,7 @@ class PeriodicTimer extends Animation {
     if (this.t >= this.next) {
       this.f();
       if (this.repeat) {
-        this.reset(t);
+        this.reset();
       } else {
         this.cancel();
       }
@@ -1125,6 +1233,12 @@ class MutateFn extends Animation {
 class Rotation extends Animation {
   static MAX_ANGLE = 2 * Math.PI / Daydream.W;
 
+  static animate(orientation, axis, angle, easingFn) {
+    let r = new Rotation(orientation, axis, angle, 2, easingFn, false);
+    r.step();
+    r.step();
+  }
+
   constructor(orientation, axis, angle, duration, easingFn, repeat = false) {
     super(duration, repeat);
     this.orientation = orientation;
@@ -1234,10 +1348,10 @@ function rotateBetween(from, to) {
   new Rotation(from, axis, angle, 1, easeOutCirc).step();
 }
 
-function plotDots(pixels, labels, filter, dots, age = 0, blendFn = blendOverMax) {
+function plotDots(pixels, labels, filter, dots, age, alpha) {
   for (const dot of dots) {
     let p = sphericalToPixel(new THREE.Spherical().setFromVector3(dot.position));
-    filter.plot(pixels, p.x, p.y, dot.color, age, blendFn);
+    filter.plot(pixels, p.x, p.y, dot.color, age, alpha);
   }
 }
 
@@ -1381,7 +1495,7 @@ class Filter {
     return nextFilter;
   }
 
-  pass(pixels, x, y, color, age, blendFn) {
+  pass(pixels, x, y, color, age, alpha) {
     if (this.next === undefined) {
       x = Math.round(x);
       y = Math.round(y);
@@ -1392,9 +1506,9 @@ class Filter {
       } else {
         old = new THREE.Color(0, 0, 0);
       }
-      pixels.set(pixelKey(x, y), blendFn(old, color));
+      pixels.set(pixelKey(x, y), blendAlpha(alpha)(old, color));
     } else {
-      this.next.plot(pixels, x, y, color, age, blendFn);
+      this.next.plot(pixels, x, y, color, age, alpha);
     }
   }
 }
@@ -1405,19 +1519,19 @@ class FilterOrient extends Filter {
     this.orientation = orientation;
   }
 
-  plot(pixels, x, y, color, age, blendFn) {
+  plot(pixels, x, y, color, age, alpha) {
     let v = new THREE.Vector3()
       .setFromSpherical(pixelToSpherical(x, y));
     let r = sphericalToPixel(new THREE.Spherical()
       .setFromVector3(this.orientation.orient(v)));
     this.orientation.collapse();
-    this.pass(pixels, r.x, r.y, color, age, blendFn);
+    this.pass(pixels, r.x, r.y, color, age, alpha);
   }
 }
 
 class FilterRaw extends Filter {
-  plot(pixels, x, y, color, age, blendFn) {
-    this.pass(pixels, x, y, color, age, blendFn);
+  plot(pixels, x, y, color, age, alpha) {
+    this.pass(pixels, x, y, color, age, alpha);
   }
 }
 
@@ -1427,8 +1541,8 @@ class FilterFn extends Filter {
     thi.fn = fn();
   }
 
-  plot(pixels, x, y, color, age, blendFn) {
-    this.pass(pixels, x, y, color, age, blendFn);
+  plot(pixels, x, y, color, age, alpha) {
+    this.pass(pixels, x, y, color, age, alpha);
   }
 }
 
@@ -1439,9 +1553,9 @@ class FilterReplicate extends Filter {
     this.count = count;
   }
 
-  plot(pixels, x, y, color, age, blendFn) {
+  plot(pixels, x, y, color, age, alpha) {
     for (let i = 0; i < Daydream.W; i +=  Daydream.W / this.count) {
-      this.pass(pixels, wrap(x + Math.floor(i), Daydream.W), y, color, age, blendFn);
+      this.pass(pixels, wrap(x + Math.floor(i), Daydream.W), y, color, age, alpha);
     }
   }
 }
@@ -1451,9 +1565,9 @@ class FilterMirror extends Filter {
     super();
   }
 
-  plot(pixels, x, y, color, age, blendFn) {
-    this.pass(pixels, x, y, color, age, blendFn);
-    this.pass(pixels, Daydream.W - x - 1, Daydream.H - y - 1, color, age, blendFn);
+  plot(pixels, x, y, color, age, alpha) {
+    this.pass(pixels, x, y, color, age, alpha);
+    this.pass(pixels, Daydream.W - x - 1, Daydream.H - y - 1, color, age, alpha);
   }
 }
 
@@ -1463,24 +1577,31 @@ const falloff = (c) => {
 }
 
 class FilterAntiAlias extends Filter {
-  plot(pixels, x, y, color, age, blendFn = blendOverMax) {
+  plot(pixels, x, y, color, age, alpha) {
     let xi = Math.trunc(x);
     let xm = x - xi;
     let yi = Math.trunc(y);
     let ym = y - yi;
 
-    let a = falloff((1 - xm) * (1 - ym));
-    this.pass(pixels, xi, yi, color, age, blendAlpha(a));
-
-    a = falloff(xm * (1 - ym));
-    this.pass(pixels, wrap((xi + 1), Daydream.W), yi, color, age, blendAlpha(a));
+    let cov = falloff((1 - xm) * (1 - ym));
+    if (cov > 0.00001) {
+      this.pass(pixels, xi, yi, color, age, cov * alpha);
+    }
+    cov = falloff(xm * (1 - ym));
+    if (cov > 0.00001) {
+      this.pass(pixels, wrap((xi + 1), Daydream.W), yi, color, age, cov * alpha);
+    }
 
     if (yi < Daydream.H - 1) {
-      a = falloff((1 - xm) * ym);
-      this.pass(pixels, xi, yi + 1, color, age, blendAlpha(a));
+      cov = falloff((1 - xm) * ym);
+      if (cov > 0.00001) {
+        this.pass(pixels, xi, yi + 1, color, age, cov * alpha);
+      }
 
-      a = falloff(xm * ym);
-      this.pass(pixels, wrap((xi + 1), Daydream.W), yi + 1, color, age, blendAlpha(a));
+      cov = falloff(xm * ym);
+      if (cov > 0.00001) {
+        this.pass(pixels, wrap((xi + 1), Daydream.W), yi + 1, color, age, cov * alpha);
+      }
     }
   }
 }
@@ -1500,12 +1621,12 @@ class FilterSinDisplace extends Filter {
     this.phase += this.phaseSpeedFn(this.t);
   }
 
-  plot(pixels, x, y, color, age, blendFn) {
+  plot(pixels, x, y, color, age, alpha) {
     let dx = wrap(
       x + this.amplitudeFn(this.t) * Math.sin(
         this.freqFn(this.t) * (((y / (Daydream.H - 1)) * 2 * Math.PI) + this.phase)
       ), Daydream.W);
-    this.pass(pixels, dx, y, color, age, blendFn);
+    this.pass(pixels, dx, y, color, age, alpha);
   }
 }
 
@@ -1516,14 +1637,14 @@ class FilterChromaticShift extends Filter {
     this.t = 0;
   }
 
-  plot(pixels, x, y, color, age, blendFn) {
+  plot(pixels, x, y, color, age, alpha) {
     let r = new THREE.Color(color.r, 0, 0);
     let g = new THREE.Color(0, color.g, 0);
     let b = new THREE.Color(0, 0, color.b);
-    this.pass(pixels, x, y, color, age, blendFn);
-    this.pass(pixels, wrap(x + 1, Daydream.W), y, r, age, blendFn);
-    this.pass(pixels, wrap(x + 2, Daydream.W), y, g, age, blendFn);
-    this.pass(pixels, wrap(x + 3, Daydream.W), y, b, age, blendFn);
+    this.pass(pixels, x, y, color, age, alpha);
+    this.pass(pixels, wrap(x + 1, Daydream.W), y, r, age, alpha);
+    this.pass(pixels, wrap(x + 2, Daydream.W), y, g, age, alpha);
+    this.pass(pixels, wrap(x + 3, Daydream.W), y, b, age, alpha);
 
   }
 }
@@ -1535,8 +1656,8 @@ class FilterColorShift extends Filter {
     this.t = 0;
   }
 
-  plot(pixels, x, y, color, age, blendFn) {
-    this.pass(pixels, x, y, this.colorShiftFn(x, y, color), age, blendFn);
+  plot(pixels, x, y, color, age, alpha) {
+    this.pass(pixels, x, y, this.colorShiftFn(x, y, color), age, alpha);
   }
 }
 
@@ -1586,13 +1707,13 @@ class FilterTwinkle extends Filter {
     return normalizedValue * 2 * Math.PI;
   }
 
-  plot(pixels, x, y, color, age, blendFn) {
+  plot(pixels, x, y, color, age, alpha) {
     let m = this.amplitude * Math.sin(
      this.randomPhase(x, y) + Math.sin((this.freq * this.t))
     ) + this.amplitude;
     let c = color;
     c.multiplyScalar(m);
-    this.pass(pixels, x, y, c, age, blendFn);
+    this.pass(pixels, x, y, c, age, alpha);
   }
 }
 
@@ -1604,13 +1725,13 @@ class FilterDecayTrails extends Filter {
     this.trails = new Map();
   }
 
-  plot(pixels, x, y, color, age, blendFn) {
+  plot(pixels, x, y, color, age, alpha) {
     if (age >= 0) {
       let key = pixelKey(x, y);
       this.trails.set(key, Math.max(0, this.lifespan - age));
     }
     if (age <= 0) {
-      this.pass(pixels, x, y, color, age, blendFn);
+      this.pass(pixels, x, y, color, age, alpha);
     } 
   }
 
@@ -1625,12 +1746,12 @@ class FilterDecayTrails extends Filter {
     });
   }
 
-  trail(pixels, trailFn, blendFn = blendUnder) {
+  trail(pixels, trailFn, alpha) {
     for (const [key, ttl] of this.trails) {
       if (ttl > 0) {
         let p = keyPixel(key);
         let color = trailFn(p[0], p[1], 1 - (ttl / this.lifespan));
-        this.pass(pixels, p[0], p[1], color, this.lifespan - ttl, blendFn);
+        this.pass(pixels, p[0], p[1], color, this.lifespan - ttl, alpha);
       }
     }
   }
@@ -1643,13 +1764,13 @@ class FilterDecayMask extends Filter {
     this.trails = new Map();
   }
 
-  plot(pixels, x, y, color, age, blendFn) {
+  plot(pixels, x, y, color, age, alpha) {
     if (age >= 0) {
       let key = pixelKey(x, y);
       this.trails.set(key, Math.max(0, this.lifespan - age));
     }
     if (age <= 0) {
-      this.pass(pixels, x, y, color, age, blendFn);
+      this.pass(pixels, x, y, color, age, alpha);
     }
   }
 
@@ -1704,36 +1825,115 @@ function randomBetween(a, b) {
 }
 
 class GenerativePalette {
-  constructor() {
-    this.reset();
-  }
+  static seed = Math.random();
 
-  reset() {
-    let sat = randomBetween(0.4, 0.8);
-    let dir = Math.random() < 0.5 ? 1 : -1;
-    let hueA = Math.random();
-    let hueB = (hueA + dir * randomBetween(1/12,  1/6)) % 1;
-    let hueC = (hueB + dir * randomBetween(1/12, 1/6)) % 1;
-    this.a = new THREE.Color().setHSL(hueA, sat, 0.1);
-    this.b = new THREE.Color().setHSL(hueB, sat, 0.3);
-    this.c = new THREE.Color().setHSL(hueC, sat, 0.6);
-  }
+  static calcHues(baseHue, type) {
+    let hA = baseHue;
+    let hB, hC;
+    const normalize = (h) => (h % 1 + 1) % 1;
 
-  get(t) {
-    let end = new THREE.Color(0, 0, 0);
-    if (t < 0.1) {
-      return new THREE.Color().lerpColors(
-        end, this.a, t * 10).convertSRGBToLinear();
-    } else if (t < 0.5) {
-      return new THREE.Color().lerpColors(
-        this.a, this.b, (t - 0.1) * 2.5).convertSRGBToLinear();
-    } else if (t < 0.9) {
-      return new THREE.Color().lerpColors(
-        this.b, this.c, (t - 0.5) * 2.5).convertSRGBToLinear();
-    } else {
-      return new THREE.Color().lerpColors(
-        this.c, end, (t - 0.9) * 10).convertSRGBToLinear();
+    switch (type) {
+      case 'triadic':
+        // Three equidistant hues (120 degrees apart, or 1/3 of the wheel)
+        hB = normalize(hA + 1 / 3);
+        hC = normalize(hA + 2 / 3);
+        break;
+
+      case 'split-complementary':
+        // HueA, and two hues adjacent to its complement
+        const complement = normalize(hA + 0.5);
+        // Offset by 1/12 (30 degrees)
+        hB = normalize(complement - 1 / 12);
+        hC = normalize(complement + 1 / 12);
+        break;
+
+      case 'complementary':
+        // HueA and its direct opposite (hA, complement, a slight variant of hA)
+        hB = normalize(hA + 0.5);
+        // Introduce a subtle third hue for the blend, slightly offset from hA
+        hC = normalize(hA + randomBetween(-1 / 36, 1 / 36));
+        break;
+
+      case 'analogous': 
+      default:
+        // Analogous (Current behavior: closely spaced hues)
+        let dir = Math.random() < 0.5 ? 1 : -1;
+        hB = normalize(hA + dir * randomBetween(1 / 12, 1 / 6)); 
+        hC = normalize(hB + dir * randomBetween(1 / 12, 1 / 6));
+        break;
     }
+
+    return [hA, hB, hC];
+  }
+
+  /**
+   * @param {string | null} shape - Optional. 'straight', 'circular', 'vignette'
+   * @param {string | null} harmonyType - Optional. 'analogous', 'triadic', 'split-complementary', or 'complementary'.
+   */
+  constructor(shape = 'straight', harmonyType = 'analagous') {
+    this.shapeSpec = shape;
+    this.harmonyType = harmonyType;
+
+    let hueA = GenerativePalette.seed;
+    GenerativePalette.seed = (GenerativePalette.seed + G) % 1;
+    const [hA, hB, hC] = GenerativePalette.calcHues(hueA, harmonyType);
+
+    let sat1 = randomBetween(0.4, 0.8);
+    let sat2 = randomBetween(0.4, 0.8);
+    let sat3 = randomBetween(0.4, 0.8);
+
+    const l1 = randomBetween(0.1, 0.1);
+    const l2 = randomBetween(0.3, 0.3);
+    const l3 = randomBetween(0.6, 0.6);
+
+    this.a = new THREE.Color().setHSL(hA, sat1, l1); // Darkest point (Start)
+    this.b = new THREE.Color().setHSL(hB, sat2, l2); // Mid point
+    this.c = new THREE.Color().setHSL(hC, sat3, l3); // Lightest point (End)
+  }
+
+  /**
+   * Generalized gradient function that uses a shape array to define color stops.
+   * Assumes 'this.a', 'this.b', 'this.c' and 'this.vignette' are available on 'this'.
+   * Requires THREE.Color (from three.js) to be defined.
+   * * @param {number} t - The interpolation value (usually a distance/time) from 0.0 to 1.0.
+   * @returns {THREE.Color} The color at time t, already converted to Linear space.
+   */
+  get(t) {
+    let colors;
+    let shape;
+    const vignetteColor = new THREE.Color(0, 0, 0);
+    switch (this.shapeSpec) {
+      case 'vignette':
+        shape = [0, 0.1, 0.5, 0.9, 1];
+        colors = [vignetteColor, this.a, this.b, this.c, vignetteColor];
+        break;
+      case 'straight':
+        shape = [0, 0.5, 1];
+        colors = [this.a, this.b, this.c];
+        break;
+      case 'circular':
+        shape = [0, 0.33, 0.66, 1];
+        colors = [this.a, this.b, this.c, this.a];
+        break;
+    }
+
+    let segIndex = -1;
+    for (let i = 0; i < shape.length - 1; i++) {
+      if (t >= shape[i] && t < shape[i + 1]) {
+        segIndex = i;
+        break;
+      }
+    }
+    if (segIndex < 0) {
+      segIndex = shape[shape.length - 1];
+    }
+
+    const start = shape[segIndex];
+    const end = shape[segIndex + 1];
+    const c1 = colors[segIndex];
+    const c2 = colors[segIndex + 1];
+
+    return new THREE.Color().lerpColors(c1, c2, (t - start) / (end - start)).convertSRGBToLinear();
   }
 }
 
@@ -1853,7 +2053,7 @@ let rainbowThinStripes = new Gradient(256, [
 ]);
 
 let grayToBlack = new Gradient(16384, [
-  [0, 0x002200],
+  [0, 0x888888],
   [1, 0x000000]
 ]);
 
@@ -1886,12 +2086,21 @@ let g4 = new Gradient(256, [
   [1, 0x000000]
 ]);
 
+///////////////////////////////////////////////////////////////////////////////
+
 let vintageSunset = new Gradient(16384, [
   [0.0, 0xe005e], // Dark Blue
   [0.4, 0xb00202], // Dark Red
   [0.8, 0xcf8100], // Golderod
   [1, 0x000000]  // Black
 ]);
+
+let mysticalSunset = new ProceduralPalette(
+  [0.500, 0.500, 0.500], // A
+  [0.500, 0.500, 0.500], // B
+  [0.241, 0.424, 0.241], // C
+  [0.541, 0.283, 0.247]  // D
+);
 
 let emeraldForest = new Gradient(16384, [
   [0.0, 0x004E64],
@@ -1901,25 +2110,6 @@ let emeraldForest = new Gradient(16384, [
   [0.8, 0x138086],
 //  [0.8, 0xEB9C35],
   [1, 0x000000]  
-]);
-
-let southwest = new Gradient(16384, [
-  [0.0, 0x000000],
-  [0.1, 0x534666],
-  [0.3, 0x138086],
-  [0.5, 0xcd7672],
-  [0.7, 0xdc866B],
-  [0.9, 0xeeb462],
-  [1, 0x000000]
-]);
-
-let winterBlues = new Gradient(16384, [
-  [0, 0x1F2F98],
-  [0.2, 0x787ff6],
-  [0.4, 0x1ca7ec],
-  [0.6, 0x7bd5f5],
-  [0.8, 0x4adede],
-  [1, 0x000000]
 ]);
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2165,197 +2355,6 @@ class PolyRot {
   }
 }
 
-///////////////////////////////////////////////////////////////////////////////
-
-
-class Ring {
-  constructor(y) {
-    this.x = 0;
-    this.y = y;
-    this.v = 0;
-  }
-}
-
-class RainbowWiggles {
-  constructor() {
-    Daydream.W = 96;
-
-    // State
-    this.pixels = new Map();
-    this.labels = [];
-
-    this.palettes = [new GenerativePalette()];
-    this.paletteBoundaries = [];
-    this.paletteNormal = Daydream.Y_AXIS.clone();
-
-    this.nodes = [];
-    for (let i = 0; i < Daydream.H; ++i) {
-      this.nodes.push(new Ring(i));
-    }
-    this.speed = 2;
-    this.gap = 4;
-    this.trailLength = 10;
-    this.orientation = new Orientation();
-    this.trails = new FilterDecayTrails(this.trailLength);
-    this.aa = new FilterAntiAlias();
-    this.replicate = new FilterReplicate(4);
-    this.orient = new FilterOrient(this.orientation);
-
-    // Filters
-    this.filters = new FilterRaw();
-    this.filters
-      .chain(this.replicate)
-      .chain(this.trails)
-      .chain(this.orient)
-      .chain(this.aa)
-     ;
-
-    // Scene
-    this.timeline = new Timeline();
-
-    this.timeline.add(0,
-      new RandomTimer(4, 40, () => {
-        this.reverse();
-        this.colorWipe();
-      }, true)
-    );
-
-    this.timeline.add(0,
-      new RandomTimer(80, 160, () => {
-        this.rotate();
-      }, true)
-    );
-  }
-
-  reverse() {
-    this.speed *= -1;
-  }
-
-  rotate() {
-    this.timeline.add(0,
-      new Rotation(
-        this.orientation,
-        randomVector(),
-        Math.PI,
-        40,
-        easeInOutSin,
-        false
-      )
-    );
-  }
-
-  colorWipe() {
-    this.palettes.unshift(new GenerativePalette());
-    this.paletteBoundaries.unshift(new MutableNumber(0));
-    this.timeline.add(0,
-      new Transition(this.paletteBoundaries[0], Math.PI, 40, easeMid)
-        .then(() => {
-          this.paletteBoundaries.pop();
-          this.palettes.pop();
-        }
-      )
-    );
-  }
-
-  color(v, t) {
-    const blendWidth = Math.PI / 16;
-    const numBoundaries = this.paletteBoundaries.length;
-    const numPalettes = this.palettes.length;
-    const a = angleBetween(v, this.paletteNormal);
-
-    for (let i = 0; i < numBoundaries; ++i) {
-      const boundary = this.paletteBoundaries[i].get();
-      const lowerBlendEdge = boundary - blendWidth;
-      const upperBlendEdge = boundary + blendWidth;
-
-      if (a < lowerBlendEdge) {
-        return this.palettes[i].get(t);
-      }
-
-      if (a >= lowerBlendEdge && a <= upperBlendEdge) {
-        const blendFactor = (a - lowerBlendEdge) / (2 * blendWidth);
-        const clampedBlendFactor = Math.max(0, Math.min(blendFactor, 1));
-        const color1 = this.palettes[i].get(t);
-        const color2 = this.palettes[i + 1].get(t);
-        return color1.clone().lerp(color2, clampedBlendFactor);
-      }
-
-      const nextBoundaryLowerBlendEdge = (i + 1 < numBoundaries)
-        ? this.paletteBoundaries[i + 1].get() - blendWidth
-        : Infinity;
-
-      if (a > upperBlendEdge && a < nextBoundaryLowerBlendEdge) {
-        return this.palettes[i + 1].get(t);
-      }
-    }
-
-    return this.palettes[0].get(t);
-  }
-
-  drawFrame() {
-    this.pixels.clear();
-    this.trails.decay();
-    this.timeline.step();
-    for (let i = Math.abs(this.speed) - 1; i >= 0; --i) {
-      this.pull(0);
-      this.drawNodes(i * 1 / Math.abs(this.speed));
-    }
-    this.trails.trail(this.pixels,
-      (x, y, t) => this.color(pixelToVector(x, y), t), blendOver);
-    return { pixels: this.pixels, labels: this.labels };
-  }
-
-  nodeY(node) {
-    return (node.y / (this.nodes.length - 1)) * (Daydream.H - 1);
-  }
-
-  drawNodes(age) {
-    let dots = [];
-    for (let i = 0; i < this.nodes.length; ++i) {
-      if (i == 0) {
-        let from = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
-        dots.push(...drawVector(from, (v) => this.color(v, 0)));
-      } else {
-        let from = pixelToVector(this.nodes[i - 1].x, this.nodeY(this.nodes[i - 1]));
-        let to = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
-        dots.push(...drawLine(from, to, (v) => this.color(v, 0)));
-      }
-    }
-    plotDots(this.pixels, this.labels, this.filters, dots, age, blendOverMax);
-  }
-
-  pull(y) {
-    this.nodes[y].v = dir(this.speed);
-    this.move(this.nodes[y]);
-    for (let i = y - 1; i >= 0; --i) {
-      this.drag(this.nodes[i + 1], this.nodes[i]);
-    }
-    for (let i = y + 1; i < this.nodes.length; ++i) {
-      this.drag(this.nodes[i - 1], this.nodes[i]);
-    }
-  }
-
-  drag(leader, follower) {
-    let dest = wrap(follower.x + follower.v, Daydream.W);
-    if (distanceWrap(dest, leader.x, Daydream.W) > this.gap) {
-      follower.v = leader.v;
-      while (distanceWrap(follower.x, leader.x, Daydream.W) > this.gap) {
-        this.move(follower);
-      }
-    } else {
-      this.move(follower);
-    }
-  }
-
-  move(ring) {
-    let dest = wrap(ring.x + ring.v, Daydream.W);
-    let x = ring.x;
-    while (x != dest) {
-      x = wrap(x + dir(ring.v), Daydream.W);
-    }
-    ring.x = dest;
-  }
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -2948,7 +2947,7 @@ class Fib {
       let tail = ringPoint(this.heads[i], 0.4, this.tails[i].get(), 2 * Math.PI / i);
       dots.push(...drawLine(head, tail, () => new THREE.Color(0x888888)));
     }
-    this.trails.trail(this.pixels, new FilterRaw(), (x, y, t) => blueToBlack.get(t));
+    this.trails.trail(this.pixels, new FilterRaw(), (x, y, t) => blueToBlack.get(t), 0.1);
     plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
   }
 
@@ -3127,72 +3126,365 @@ class Grid {
 */
 ///////////////////////////////////////////////////////////////////////////////
 
-class Test {
+class Node {
+  constructor(y) {
+    this.x = 0;
+    this.y = y;
+    this.v = 0;
+  }
+}
+
+class Dynamo {
   constructor() {
     Daydream.W = 96;
+
+    // State
     this.pixels = new Map();
     this.labels = [];
 
-    // Palettes
-    this.palette = new ProceduralPalette(
-      [0.5, 0.5, 0.5],
-      [1.0, 0.2, 0.5],
-      [0.5, 0.5, 0.5],
-      [0.3, 0.5, 0.0]
-    );
+    this.palettes = [new GenerativePalette('vignette')];
+    this.paletteBoundaries = [];
+    this.paletteNormal = Daydream.Y_AXIS.clone();
+    this.seedHue = Math.random();
 
-    // Output Filters
-    this.trails = new FilterDecayTrails(32);
-    (this.filters = new FilterRaw())
-      .chain(this.trails)
-      .chain(new FilterAntiAlias())
-    ;
-
-    // State
+    this.nodes = [];
+    for (let i = 0; i < Daydream.H; ++i) {
+      this.nodes.push(new Node(i));
+    }
+    this.speed = 2;
+    this.gap = 4;
+    this.trailLength = 10;
     this.orientation = new Orientation();
-    this.ring = new THREE.Vector3(1,0, 0).normalize();
-    this.w = new MutableNumber(0);
+    this.trails = new FilterDecayTrails(this.trailLength);
+    this.aa = new FilterAntiAlias();
+    this.replicate = new FilterReplicate(4);
+    this.orient = new FilterOrient(this.orientation);
+
+    // Filters
+    this.filters = new FilterRaw();
+    this.filters
+      .chain(this.replicate)
+      .chain(this.trails)
+      .chain(this.orient)
+      .chain(this.aa)
+      ;
 
     // Scene
     this.timeline = new Timeline();
 
     this.timeline.add(0,
-      new Sprite(
-        (opacity) => this.drawRing(opacity),
-        -1, 8, easeMid, 0, easeMid)
+      new RandomTimer(4, 64, () => {
+        this.reverse();
+      }, true)
+    );
+    this.timeline.add(0,
+      new RandomTimer(20, 64, () => {
+        this.colorWipe();
+      }, true)
     );
 
     this.timeline.add(0,
-      new Transition(
-        this.w,
-        2 * Math.PI,
-        320,
-        easeMid,
-        false,
+      new RandomTimer(80, 160, () => {
+        this.rotate();
+      }, true)
+    );
+  }
+
+  reverse() {
+    this.speed *= -1;
+  }
+
+  rotate() {
+    this.timeline.add(0,
+      new Rotation(
+        this.orientation,
+        randomVector(),
+        Math.PI,
+        40,
+        easeInOutSin,
+        false
+      )
+    );
+  }
+
+  colorWipe() {
+    this.palettes.unshift(new GenerativePalette('vignette'));
+    this.paletteBoundaries.unshift(new MutableNumber(0));
+    this.timeline.add(0,
+      new Transition(this.paletteBoundaries[0], Math.PI, 20, easeMid)
+        .then(() => {
+          this.paletteBoundaries.pop();
+          this.palettes.pop();
+        }
+        )
+    );
+  }
+
+  color(v, t) {
+    const blendWidth = Math.PI / 8;
+    const numBoundaries = this.paletteBoundaries.length;
+    const numPalettes = this.palettes.length;
+    const a = angleBetween(v, this.paletteNormal);
+
+    for (let i = 0; i < numBoundaries; ++i) {
+      const boundary = this.paletteBoundaries[i].get();
+      const lowerBlendEdge = boundary - blendWidth;
+      const upperBlendEdge = boundary + blendWidth;
+
+      if (a < lowerBlendEdge) {
+        return this.palettes[i].get(t);
+      }
+
+      if (a >= lowerBlendEdge && a <= upperBlendEdge) {
+        const blendFactor = (a - lowerBlendEdge) / (2 * blendWidth);
+        const clampedBlendFactor = Math.max(0, Math.min(blendFactor, 1));
+        const color1 = this.palettes[i].get(t);
+        const color2 = this.palettes[i + 1].get(t);
+        return color1.clone().lerp(color2, clampedBlendFactor);
+      }
+
+      const nextBoundaryLowerBlendEdge = (i + 1 < numBoundaries)
+        ? this.paletteBoundaries[i + 1].get() - blendWidth
+        : Infinity;
+
+      if (a > upperBlendEdge && a < nextBoundaryLowerBlendEdge) {
+        return this.palettes[i + 1].get(t);
+      }
+    }
+
+    return this.palettes[0].get(t);
+  }
+
+  drawFrame() {
+    this.pixels.clear();
+    this.trails.decay();
+    this.timeline.step();
+    for (let i = Math.abs(this.speed) - 1; i >= 0; --i) {
+      this.pull(0);
+      this.drawNodes(i * 1 / Math.abs(this.speed));
+    }
+    this.trails.trail(this.pixels,
+      (x, y, t) => this.color(pixelToVector(x, y), t), 0.5);
+    return { pixels: this.pixels, labels: this.labels };
+  }
+
+  nodeY(node) {
+    return (node.y / (this.nodes.length - 1)) * (Daydream.H - 1);
+  }
+
+  drawNodes(age) {
+    let dots = [];
+    for (let i = 0; i < this.nodes.length; ++i) {
+      if (i == 0) {
+        let from = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
+        dots.push(...drawVector(from, (v) => this.color(v, 0)));
+      } else {
+        let from = pixelToVector(this.nodes[i - 1].x, this.nodeY(this.nodes[i - 1]));
+        let to = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
+        dots.push(...drawLine(from, to, (v) => this.color(v, 0)));
+      }
+    }
+    plotDots(this.pixels, this.labels, this.filters, dots, age, 0.5);
+  }
+
+  pull(y) {
+    this.nodes[y].v = dir(this.speed);
+    this.move(this.nodes[y]);
+    for (let i = y - 1; i >= 0; --i) {
+      this.drag(this.nodes[i + 1], this.nodes[i]);
+    }
+    for (let i = y + 1; i < this.nodes.length; ++i) {
+      this.drag(this.nodes[i - 1], this.nodes[i]);
+    }
+  }
+
+  drag(leader, follower) {
+    let dest = wrap(follower.x + follower.v, Daydream.W);
+    if (distanceWrap(dest, leader.x, Daydream.W) > this.gap) {
+      follower.v = leader.v;
+      while (distanceWrap(follower.x, leader.x, Daydream.W) > this.gap) {
+        this.move(follower);
+      }
+    } else {
+      this.move(follower);
+    }
+  }
+
+  move(ring) {
+    let dest = wrap(ring.x + ring.v, Daydream.W);
+    let x = ring.x;
+    while (x != dest) {
+      x = wrap(x + dir(ring.v), Daydream.W);
+    }
+    ring.x = dest;
+  }
+}
+
+class RingShower {
+
+  static Ring = class {
+    constructor(filters) {
+      this.normal = randomVector();
+      this.duration = 8 + Math.random() * 72;
+      this.radius = new MutableNumber(0);
+      this.lastRadius = this.radius.get();
+      this.palette = new GenerativePalette('circular');
+    }
+  }
+
+  constructor() {
+    Daydream.W = 96;
+    this.pixels = new Map();
+    this.labels = [];
+    this.rings = [];
+
+    this.palette = new GenerativePalette();
+    this.orientation = new Orientation();
+    this.filters = new FilterAntiAlias();
+
+    this.timeline = new Timeline();
+    this.timeline.add(0,
+      new RandomTimer(1, 24,
+        () => this.spawnRing(),
         true
       )
     );
   }
 
-  drawRing(opacity) {
-    plotDots(this.pixels, this.labels, this.filters,
-      drawFn(this.orientation, this.ring, 1,
-        (t) => Math.abs(1 - t) * Math.sin(29 *t - this.w.get()),
-        () => new THREE.Color(1, 1, 1))
+  spawnRing() {
+    let ring = new RingShower.Ring(this.filters);
+    this.rings.unshift(ring);
+
+    this.timeline.add(0,
+      new Sprite(() => this.drawRing(ring),
+      ring.duration,
+      4, easeMid,
+      0, easeMid
+    ).then(() => {
+      this.rings.pop();
+    }));
+
+    this.timeline.add(0,
+      new Transition(ring.radius, 2, ring.duration, easeMid)
     );
-    this.orientation.collapse();
+  }
+
+  drawRing(ring) {
+    let step = 1 / Daydream.W;
+    let dots = drawRing(this.orientation.orient(ring.normal), ring.radius.get(),
+      (v, t) => ring.palette.get(t));
+    plotDots(this.pixels, this.labels, this.filters, dots, 0, 0.5);
+    ring.lastRadius = ring.radius.get();
+    
   }
 
   drawFrame() {
     this.pixels.clear();
     this.labels = [];
-
-    this.trails.trail(this.pixels, new FilterRaw(),
-      (x, y, t) => rainbow.get(1 - t)
-    );
-    this.trails.decay();
     this.timeline.step();
+    return { pixels: this.pixels, labels: this.labels };
+  }
+}
 
+class RandomWalk extends Animation {
+  constructor(orientation, v_start) {
+    super(-1, false);
+    this.orientation = orientation;
+    this.v = v_start.clone();
+    this.perlin = new PerlinNoise1D();
+    let u = (Math.abs(this.v.x) > 0.9)
+      ? new THREE.Vector3(0, 1, 0)
+      : new THREE.Vector3(1, 0, 0);
+    this.direction = new THREE.Vector3().crossVectors(this.v, u).normalize();
+    this.WALK_SPEED = 0.2; // Constant angular speed (radians per step)
+    this.PIVOT_STRENGTH = 0.1; // Max pivot angle (radians per step)
+    this.NOISE_SCALE = 0.05; // How fast the Perlin noise changes
+
+  }
+
+  step() {
+    super.step();
+    //pivot
+    const pivotAngle = this.perlin.noise(this.t * this.NOISE_SCALE) * this.PIVOT_STRENGTH;
+    this.direction.applyAxisAngle(this.v, pivotAngle).normalize();
+
+    //walk forward
+    const walkAxis = new THREE.Vector3().crossVectors(this.v, this.direction);
+    const walkAngle = this.WALK_SPEED;
+    this.v.applyAxisAngle(walkAxis, walkAngle).normalize();
+    this.direction.applyAxisAngle(walkAxis, walkAngle).normalize();
+    Rotation.animate(this.orientation, walkAxis, walkAngle, easeMid);
+  }
+}
+
+class RingSpin {
+
+  static Ring = class {
+    constructor(normal, filters, palette) {
+      this.normal = normal;
+      this.orientation = new Orientation();
+      this.walk = new RandomWalk(this.orientation, this.normal);
+      this.palette = palette;
+      this.trails = new FilterDecayTrails(5);
+      this.trails.chain(filters);
+    }
+  }
+
+  constructor() {
+    Daydream.W = 96;
+    this.pixels = new Map();
+    this.labels = [];
+    this.rings = [];
+    this.alpha = 0.2;
+    this.trailLength = 5;
+    this.filters = new FilterAntiAlias();
+    this.timeline = new Timeline();
+
+    this.spawnRing(Daydream.X_AXIS, new GenerativePalette('straight'));
+    this.spawnRing(Daydream.Y_AXIS, new GenerativePalette('straight'));
+    this.spawnRing(Daydream.Z_AXIS, new GenerativePalette('straight'));
+    this.spawnRing(Daydream.X_AXIS, new GenerativePalette('straight'));
+    this.spawnRing(Daydream.Y_AXIS, new GenerativePalette('straight'));
+
+    this.gui = new gui.GUI();
+    this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
+
+  }
+
+  spawnRing(normal, palette) {
+    let ring = new RingSpin.Ring(normal, this.filters, palette);
+    this.rings.unshift(ring);
+
+    this.timeline.add(0,
+      new Sprite(() => this.drawRing(ring),
+        -1,
+        4, easeMid,
+        0, easeMid
+      ));
+    this.timeline.add(0, ring.walk);
+  }
+
+  drawRing(ring) {
+    // Draw trails from last motion up to current position
+    for (let i = 0; i < ring.orientation.length() - 1; ++i) {
+      let dots = drawRing(ring.orientation.orient(ring.normal, i), 1,
+        (v, t) => ring.palette.get(0));
+      plotDots(this.pixels, this.labels, ring.trails, dots, 1 - (i / ring.orientation.length() - 1));
+    }
+    ring.trails.trail(this.pixels, (x, y, t) => ring.palette.get(1 - t), this.alpha);
+    ring.trails.decay();
+    ring.orientation.collapse();
+
+    // Draw current position
+    let dots = drawRing(ring.orientation.orient(ring.normal), 1,
+      (v, t) => new THREE.Color(0.5, 0.5, 0.5));
+    plotDots(this.pixels, this.labels, ring.trails, dots, 0, this.alpha);
+  }
+
+  drawFrame() {
+    this.pixels.clear();
+    this.labels = [];
+    this.timeline.step();
     return { pixels: this.pixels, labels: this.labels };
   }
 }
@@ -3202,13 +3494,16 @@ class Test {
 const daydream = new Daydream();
 window.addEventListener("resize", () => daydream.setCanvasSize());
 window.addEventListener("keydown", (e) => daydream.keydown(e));
+
+// var effect = new Dynamo();
+// var effect = new RingShower();
+ var effect = new RingSpin();
+
 // var effect = new PolyRot();
- var effect = new RainbowWiggles();
 // var effect = new Thrusters();
 // var effect = new RingCircus();
 // var effect = new Wormhole();
 //var effect = new Pulses();
 //var effect = new Fib();
 //var effect = new Angles();
-//var effect = new Test();
 daydream.renderer.setAnimationLoop(() => daydream.render(effect));
