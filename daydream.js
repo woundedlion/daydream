@@ -2095,19 +2095,7 @@ let g4 = new Gradient(256, [
 
 ///////////////////////////////////////////////////////////////////////////////
 
-let vintageSunset = new Gradient(16384, [
-  [0.0, 0xe005e], // Dark Blue
-  [0.4, 0xb00202], // Dark Red
-  [0.8, 0xcf8100], // Golderod
-  [1, 0x000000]  // Black
-]);
 
-let mysticalSunset = new ProceduralPalette(
-  [0.500, 0.500, 0.500], // A
-  [0.500, 0.500, 0.500], // B
-  [0.241, 0.424, 0.241], // C
-  [0.541, 0.283, 0.247]  // D
-);
 
 let emeraldForest = new Gradient(16384, [
   [0.0, 0x004E64],
@@ -2118,6 +2106,57 @@ let emeraldForest = new Gradient(16384, [
 //  [0.8, 0xEB9C35],
   [1, 0x000000]  
 ]);
+
+let vintageSunset = new ProceduralPalette(
+  [0.256, 0.256, 0.256], // A
+  [0.500, 0.080, 0.500], // B
+  [0.277, 0.277, 0.277], // C
+  [0.000, 0.330, 0.670]  // D
+);
+
+let richSunset = new ProceduralPalette(
+  [0.309, 0.500, 0.500], // A
+  [1.000, 1.000, 0.500], // B
+  [0.149, 0.148, 0.149], // C
+  [0.132, 0.222, 0.521]  // D
+);
+
+let underSea = new ProceduralPalette(
+  [0.000, 0.000, 0.000], // A
+  [0.500, 0.276, 0.423], // B
+  [0.296, 0.296, 0.296], // C
+  [0.374, 0.941, 0.000]  // D);
+);
+
+let lateSunset = new ProceduralPalette(
+  [0.337, 0.500, 0.096], // A
+  [0.500, 1.000, 0.176], // B
+  [0.261, 0.261, 0.261], // C
+  [0.153, 0.483, 0.773]  // D
+);
+
+let mangoPeel = new ProceduralPalette(
+  [0.500, 0.500, 0.500], // A
+  [0.500, 0.080, 0.500], // B
+  [0.431, 0.431, 0.431], // C
+  [0.566, 0.896, 0.236]  // D
+);
+
+let lemonLime = new ProceduralPalette(
+  [0.455, 0.455, 0.455], // A
+  [0.571, 0.151, 0.571], // B
+  [0.320, 0.320, 0.320], // C
+  [0.087, 0.979, 0.319]  // D
+);
+
+let algae = new ProceduralPalette(
+  [0.337, 0.500, 0.096], // A
+  [0.500, 1.000, 0.176], // B
+  [0.134, 0.134, 0.134], // C
+  [0.328, 0.658, 0.948]  // D
+);
+
+
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -3432,7 +3471,7 @@ class RingSpin {
       this.orientation = new Orientation();
       this.walk = new RandomWalk(this.orientation, this.normal);
       this.palette = palette;
-      this.trails = new FilterDecayTrails(5);
+      this.trails = new FilterDecayTrails(8);
       this.trails.chain(filters);
     }
   }
@@ -3446,12 +3485,14 @@ class RingSpin {
     this.trailLength = 5;
     this.filters = new FilterAntiAlias();
     this.timeline = new Timeline();
+    this.palettes = [richSunset, underSea, mangoPeel, lemonLime, algae, lateSunset];
 
-    this.spawnRing(Daydream.X_AXIS, new GenerativePalette('straight'));
-    this.spawnRing(Daydream.Y_AXIS, new GenerativePalette('straight'));
-    this.spawnRing(Daydream.Z_AXIS, new GenerativePalette('straight'));
-    this.spawnRing(Daydream.X_AXIS, new GenerativePalette('straight'));
-    this.spawnRing(Daydream.Y_AXIS, new GenerativePalette('straight'));
+    this.spawnRing(Daydream.X_AXIS, this.palettes[0]);
+    this.spawnRing(Daydream.Y_AXIS, this.palettes[1]);
+    this.spawnRing(Daydream.Z_AXIS, this.palettes[2]);
+    this.spawnRing(Daydream.X_AXIS, this.palettes[3]);
+    this.spawnRing(Daydream.Y_AXIS, this.palettes[4]);
+    this.spawnRing(Daydream.Y_AXIS, this.palettes[5]);
 
     this.gui = new gui.GUI();
     this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
@@ -3484,7 +3525,7 @@ class RingSpin {
 
     // Draw current position
     let dots = drawRing(ring.orientation.orient(ring.normal), 1,
-      (v, t) => new THREE.Color(0.5, 0.5, 0.5));
+      (v, t) => new THREE.Color(0,0,0));
     plotDots(this.pixels, this.labels, ring.trails, dots, 0, this.alpha);
   }
 
