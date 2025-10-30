@@ -711,6 +711,13 @@ const randomVector = () => {
     Math.random() * 2 - 1).normalize();
 }
 
+const randomChoice = (choices) => {
+  if (choices.length == 0) {
+    return undefined;
+  }
+  return choices[Math.floor(Math.random() * choices.length)];
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 const drawVector = (v, colorFn) => {
