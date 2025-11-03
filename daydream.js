@@ -1754,6 +1754,7 @@ class FilterDecayTrails extends Filter {
   }
 
   trail(pixels, trailFn, alpha) {
+    console.log(this.trails.size);
     for (const [key, ttl] of this.trails) {
       if (ttl > 0) {
         let p = keyPixel(key);
@@ -1761,42 +1762,6 @@ class FilterDecayTrails extends Filter {
         this.pass(pixels, p[0], p[1], color, this.lifespan - ttl, alpha);
       }
     }
-  }
-}
-
-class FilterDecayMask extends Filter {
-  constructor(lifespan) {
-    super();
-    this.lifespan = lifespan;
-    this.trails = new Map();
-  }
-
-  plot(pixels, x, y, color, age, alpha) {
-    if (age >= 0) {
-      let key = pixelKey(x, y);
-      this.trails.set(key, Math.max(0, this.lifespan - age));
-    }
-    if (age <= 0) {
-      this.pass(pixels, x, y, color, age, alpha);
-    }
-  }
-
-  decay() {
-    this.trails.forEach((ttl, key) => {
-      ttl -= 1;
-      if (ttl <= 0) {
-        this.trails.delete(key);
-      } else {
-        this.trails.set(key, ttl);
-      }
-    });
-  }
-
-  mask(key) {
-    if (this.trails.has(key)) {
-      return this.trails.get(key) / this.lifespan;
-    }
-    return 0;
   }
 }
 
@@ -1829,6 +1794,20 @@ class Gradient {
 
 function randomBetween(a, b) {
   return Math.random() * (b - a) + a;
+}
+
+
+/**
+ * Converts HSV [0, 1] to HSL [0, 1].
+ * @param {number} h - Hue (0-1)
+ * @param {number} s - HSV Saturation (0-1)
+ * @param {number} v - Value (0-1)
+ * @returns {Array<number>} Iterable HSL array: [h, s, l]
+ */
+const hsvToHsl = (h, s, v) => {
+  const l = v * (1 - s / 2);
+  const s_hsl = (l === 0 || l === 1) ? 0 : (v - l) / Math.min(l, 1 - l);
+  return [h, s_hsl, l];
 }
 
 class GenerativePalette {
@@ -1865,8 +1844,8 @@ class GenerativePalette {
       default:
         // Analogous (Current behavior: closely spaced hues)
         let dir = Math.random() < 0.5 ? 1 : -1;
-        hB = normalize(hA + dir * randomBetween(1 / 12, 1 / 6)); 
-        hC = normalize(hB + dir * randomBetween(1 / 12, 1 / 6));
+        hB = normalize(hA + dir * randomBetween(1 / 6, 3 / 12)); 
+        hC = normalize(hB + dir * randomBetween(1 / 6, 3 / 12));
         break;
     }
 
@@ -1874,7 +1853,7 @@ class GenerativePalette {
   }
 
   /**
-   * @param {string | null} shape - Optional. 'straight', 'circular', 'vignette'
+   * @param {string | null} shape - Optional. 'straight', 'circular', 'vignette', 'falloff;
    * @param {string | null} harmonyType - Optional. 'analogous', 'triadic', 'split-complementary', or 'complementary'.
    */
   constructor(shape = 'straight', harmonyType = 'analagous') {
@@ -1889,13 +1868,13 @@ class GenerativePalette {
     let sat2 = randomBetween(0.4, 0.8);
     let sat3 = randomBetween(0.4, 0.8);
 
-    const l1 = randomBetween(0.1, 0.1);
-    const l2 = randomBetween(0.3, 0.3);
-    const l3 = randomBetween(0.6, 0.6);
+    const v1 = randomBetween(0.1, 0.1);
+    const v2 = randomBetween(0.2, 0.5);
+    const v3 = randomBetween(0.6, 0.8);
 
-    this.a = new THREE.Color().setHSL(hA, sat1, l1); // Darkest point (Start)
-    this.b = new THREE.Color().setHSL(hB, sat2, l2); // Mid point
-    this.c = new THREE.Color().setHSL(hC, sat3, l3); // Lightest point (End)
+    this.a = new THREE.Color().setHSL(...hsvToHsl(hA, sat1, v1)); // Darkest point (Start)
+    this.b = new THREE.Color().setHSL(...hsvToHsl(hB, sat2, v2)); // Mid point
+    this.c = new THREE.Color().setHSL(...hsvToHsl(hC, sat3, v3)); // Lightest point (End)
   }
 
   /**
@@ -1921,6 +1900,10 @@ class GenerativePalette {
       case 'circular':
         shape = [0, 0.33, 0.66, 1];
         colors = [this.a, this.b, this.c, this.a];
+        break;
+      case 'faloff':
+        shape = [0, 0.33, 0.66, 0.9, 1];
+        colors = [this.a, this.b, this.c, vignetteColor];
         break;
     }
 
@@ -2095,9 +2078,20 @@ let g4 = new Gradient(256, [
 
 ///////////////////////////////////////////////////////////////////////////////
 
+function vignette(palette) {
+  let vignetteColor = new THREE.Color(0, 0, 0);
+  return (t) => {
+    if (t < 0.2) {
+      return new THREE.Color().lerpColors(vignetteColor, palette.get(0), t / 0.2);
+    } else if (t >= 0.8) {
+      return new THREE.Color().lerpColors(palette.get(1), vignetteColor, (t - 0.8) / 0.2);
+    } else {
+      return palette.get((t - 0.2) / 0.6);
+    }
+  };
+}
 
-
-let emeraldForest = new Gradient(16384, [
+const emeraldForest = new Gradient(16384, [
   [0.0, 0x004E64],
   [0.2, 0x0B6E4F],
   [0.4, 0x08A045],
@@ -2107,56 +2101,62 @@ let emeraldForest = new Gradient(16384, [
   [1, 0x000000]  
 ]);
 
-let vintageSunset = new ProceduralPalette(
+const vintageSunset = new ProceduralPalette(
   [0.256, 0.256, 0.256], // A
   [0.500, 0.080, 0.500], // B
   [0.277, 0.277, 0.277], // C
   [0.000, 0.330, 0.670]  // D
 );
 
-let richSunset = new ProceduralPalette(
+const richSunset = new ProceduralPalette(
   [0.309, 0.500, 0.500], // A
   [1.000, 1.000, 0.500], // B
   [0.149, 0.148, 0.149], // C
   [0.132, 0.222, 0.521]  // D
 );
 
-let underSea = new ProceduralPalette(
+const underSea = new ProceduralPalette(
   [0.000, 0.000, 0.000], // A
   [0.500, 0.276, 0.423], // B
   [0.296, 0.296, 0.296], // C
   [0.374, 0.941, 0.000]  // D);
 );
 
-let lateSunset = new ProceduralPalette(
+const lateSunset = new ProceduralPalette(
   [0.337, 0.500, 0.096], // A
   [0.500, 1.000, 0.176], // B
   [0.261, 0.261, 0.261], // C
   [0.153, 0.483, 0.773]  // D
 );
 
-let mangoPeel = new ProceduralPalette(
+const mangoPeel = new ProceduralPalette(
   [0.500, 0.500, 0.500], // A
   [0.500, 0.080, 0.500], // B
   [0.431, 0.431, 0.431], // C
   [0.566, 0.896, 0.236]  // D
 );
 
-let lemonLime = new ProceduralPalette(
+const lemonLime = new ProceduralPalette(
   [0.455, 0.455, 0.455], // A
   [0.571, 0.151, 0.571], // B
   [0.320, 0.320, 0.320], // C
   [0.087, 0.979, 0.319]  // D
 );
 
-let algae = new ProceduralPalette(
+const algae = new ProceduralPalette(
   [0.337, 0.500, 0.096], // A
   [0.500, 1.000, 0.176], // B
   [0.134, 0.134, 0.134], // C
   [0.328, 0.658, 0.948]  // D
 );
 
-
+const paletteFalloff = function (color, size, t) {
+  if (t >= (1 - size)) {
+    t = (t - (1 - size)) / size;
+    return color.clone().lerpColors(color, new THREE.Color(0, 0, 0), t);
+  }
+  return color;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -3191,7 +3191,6 @@ class Dynamo {
     this.palettes = [new GenerativePalette('vignette')];
     this.paletteBoundaries = [];
     this.paletteNormal = Daydream.Y_AXIS.clone();
-    this.seedHue = Math.random();
 
     this.nodes = [];
     for (let i = 0; i < Daydream.H; ++i) {
@@ -3466,12 +3465,12 @@ class RandomWalk extends Animation {
 class RingSpin {
 
   static Ring = class {
-    constructor(normal, filters, palette) {
+    constructor(normal, filters, palette, trailLength) {
       this.normal = normal;
       this.orientation = new Orientation();
       this.walk = new RandomWalk(this.orientation, this.normal);
       this.palette = palette;
-      this.trails = new FilterDecayTrails(8);
+      this.trails = new FilterDecayTrails(trailLength);
       this.trails.chain(filters);
     }
   }
@@ -3482,10 +3481,14 @@ class RingSpin {
     this.labels = [];
     this.rings = [];
     this.alpha = 0.2;
-    this.trailLength = 5;
+    this.trailLength = new MutableNumber(15);
     this.filters = new FilterAntiAlias();
-    this.timeline = new Timeline();
     this.palettes = [richSunset, underSea, mangoPeel, lemonLime, algae, lateSunset];
+
+    this.timeline = new Timeline();
+    this.timeline.add(new MutateFn(this.trailLength,
+      sinWave(0, 20, 1, 0),
+      10, true));
 
     this.spawnRing(Daydream.X_AXIS, this.palettes[0]);
     this.spawnRing(Daydream.Y_AXIS, this.palettes[1]);
@@ -3500,7 +3503,7 @@ class RingSpin {
   }
 
   spawnRing(normal, palette) {
-    let ring = new RingSpin.Ring(normal, this.filters, palette);
+    let ring = new RingSpin.Ring(normal, this.filters, palette, this.trailLength.get());
     this.rings.unshift(ring);
 
     this.timeline.add(0,
@@ -3513,19 +3516,105 @@ class RingSpin {
   }
 
   drawRing(ring) {
+    let s = ring.orientation.length();
+    for (let i = 0; i < s; ++i) {
+      let dots = drawRing(ring.orientation.orient(ring.normal, i), 1,
+        (v, t) => vignette(ring.palette)(0));
+      plotDots(this.pixels, this.labels, ring.trails, dots,
+        (s - 1 - i) / s,
+        this.alpha);
+    }
+    ring.trails.trail(this.pixels, (x, y, t) => paletteFalloff(vignette(ring.palette)((1 - t)), 0.1, 1 - t), this.alpha);
+    ring.trails.decay();
+    ring.orientation.collapse();
+  }
+
+  drawFrame() {
+    this.pixels.clear();
+    this.labels = [];
+    this.timeline.step();
+    return { pixels: this.pixels, labels: this.labels };
+  }
+}
+
+
+class RingMachine {
+
+  static Ring = class {
+    constructor(filters, timeline, normal, axis, speed, delay, palette, trailLength) {
+      this.normal = normal;
+      this.axis = axis;
+      this.speed = speed;
+      this.delay = delay;
+      this.orientation = new Orientation();
+      this.palette = palette;
+      this.trails = new FilterDecayTrails(trailLength);
+      this.trails.chain(filters);
+
+      this.rotation = new Rotation(this.orientation, this.axis, 2 * Math.PI, this.speed, easeMid, true);
+      timeline.add(delay / 16, this.rotation);
+    }
+  }
+
+  constructor() {
+    Daydream.W = 96;
+    this.pixels = new Map();
+    this.labels = [];
+    this.rings = [];
+    this.alpha = 0.5;
+    this.trailLength = 10;
+    this.speed = 80;
+    this.numRings = 96;
+    this.offsetAngle = 2 * Math.PI / this.numRings;
+    this.filters = new FilterAntiAlias();
+    this.timeline = new Timeline();
+
+    
+    for (let i = 0; i < this.numRings; ++i) {
+      let axis = Daydream.Y_AXIS.clone().applyAxisAngle(Daydream.Z_AXIS, i * this.offsetAngle)
+      this.spawnRing(Daydream.Z_AXIS, axis, this.speed, i * 16, lateSunset, this.trailLength);
+    }
+    
+    
+    for (let i = 0; i < this.numRings; ++i) {
+      let axis = Daydream.Z_AXIS.clone().applyAxisAngle(Daydream.X_AXIS, i * this.offsetAngle)
+      this.spawnRing(Daydream.X_AXIS, axis, this.speed, i * 16 , lemonLime, this.trailLength);
+    }
+    
+    this.gui = new gui.GUI();
+    this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
+
+  }
+
+  spawnRing(normal, axis, speed, delay, palette, trailLength) {
+    let ring = new RingMachine.Ring(this.filters, this.timeline, normal, axis, speed, delay, palette, trailLength);
+    this.rings.unshift(ring);
+
+    this.timeline.add(0,
+      new Sprite(() => this.drawRing(ring),
+        -1,
+        4, easeMid,
+        0, easeMid
+      ));
+  }
+
+  drawRing(ring) {
     // Draw trails from last motion up to current position
     for (let i = 0; i < ring.orientation.length() - 1; ++i) {
-      let dots = drawRing(ring.orientation.orient(ring.normal, i), 1,
-        (v, t) => ring.palette.get(0));
-      plotDots(this.pixels, this.labels, ring.trails, dots, 1 - (i / ring.orientation.length() - 1));
+      let dots = drawVector(
+        ring.orientation.orient(ring.normal, i),
+        (v, t) => new THREE.Color(1, 1, 1));
+      plotDots(this.pixels, this.labels, ring.trails, dots, 1 - (i / ring.orientation.length() - 1), this.alpha);
     }
+    
     ring.trails.trail(this.pixels, (x, y, t) => ring.palette.get(1 - t), this.alpha);
     ring.trails.decay();
     ring.orientation.collapse();
 
     // Draw current position
-    let dots = drawRing(ring.orientation.orient(ring.normal), 1,
-      (v, t) => new THREE.Color(0,0,0));
+    let dots = drawVector(
+      ring.orientation.orient(ring.normal),
+      (v, t) => ring.palette.get(ring.palette.length - 1));
     plotDots(this.pixels, this.labels, ring.trails, dots, 0, this.alpha);
   }
 
@@ -3546,6 +3635,8 @@ window.addEventListener("keydown", (e) => daydream.keydown(e));
 // var effect = new Dynamo();
 // var effect = new RingShower();
  var effect = new RingSpin();
+
+//var effect = new RingMachine();
 
 // var effect = new PolyRot();
 // var effect = new Thrusters();
