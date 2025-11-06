@@ -114,15 +114,35 @@ class Daydream {
     ]);
     this.zAxis = new THREE.Line(zAxisGeometry, this.axisMaterial);
 
+    /*
+    this.showAxes = false;
+    this.gui = new gui.GUI();
+    this.gui.add(this, 'showAxes');
+
+    // draw axes
+    if (this.showAxes) {
+      this.scene.add(this.xAxis);
+      this.scene.add(this.yAxis);
+      this.scene.add(this.zAxis);
+    }
+
+    */
+
+    // draw pixels
+    this.dotMesh = new THREE.InstancedMesh(
+      this.dotGeometry,
+      this.dotMaterial,
+      Daydream.W * Daydream.H
+    );
+    this.dotMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.scene.add(this.dotMesh);
+
     // --- Add properties for viewports ---
     this.mainViewport = { x: 0, y: 0, width: 1, height: 1 }; // Proportions initially
     this.pipViewport = { x: 0, y: 0, width: 0.25, height: 0.25 }; // Picture-in-Picture
 
     this.setCanvasSize();
 
-    this.showAxes = false;
-    this.gui = new gui.GUI();
-    this.gui.add(this, 'showAxes');
 
   }
 
@@ -186,26 +206,11 @@ class Daydream {
         for (const label of labels) {
           label.remove();
         }
-        this.scene.clear();
 
-        // draw axes
-        if (this.showAxes) {
-          this.scene.add(this.xAxis);
-          this.scene.add(this.yAxis);
-          this.scene.add(this.zAxis);
-        }
-        // draw pixels
         let out = effect.drawFrame();
-        const dotMesh = new THREE.InstancedMesh(
-          this.dotGeometry,
-          this.dotMaterial,
-          out.pixels.size
-        );
-        dotMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-        this.scene.add(dotMesh);
+        this.dotMesh.count = out.pixels.size;        
 
         const vector = new THREE.Vector3();
-        const dummy = new THREE.Object3D();
 
         let i = 0;
         for (const [key, pixel] of out.pixels) {
@@ -216,12 +221,13 @@ class Daydream {
           dummy.lookAt(vector);
           dummy.position.copy(vector);
           dummy.updateMatrix();
-          dotMesh.setMatrixAt(i, dummy.matrix);
-          dotMesh.instanceMatrix.needsUpdate = true;
-          dotMesh.setColorAt(i, pixel);
-          dotMesh.instanceColor.needsUpdate = true;
+          this.dotMesh.setMatrixAt(i, dummy.matrix);
+          this.dotMesh.setColorAt(i, pixel);
           ++i;
         }
+        this.dotMesh.instanceColor.needsUpdate = true;
+        this.dotMesh.instanceMatrix.needsUpdate = true;
+
         for (const label of out.labels) {
           this.makeLabel(label.position, label.content);
         }
@@ -1754,7 +1760,6 @@ class FilterDecayTrails extends Filter {
   }
 
   trail(pixels, trailFn, alpha) {
-    console.log(this.trails.size);
     for (const [key, ttl] of this.trails) {
       if (ttl > 0) {
         let p = keyPixel(key);
@@ -3484,18 +3489,16 @@ class RingSpin {
     this.trailLength = new MutableNumber(15);
     this.filters = new FilterAntiAlias();
     this.palettes = [richSunset, underSea, mangoPeel, lemonLime, algae, lateSunset];
+    this.numRings = 6;
 
     this.timeline = new Timeline();
     this.timeline.add(new MutateFn(this.trailLength,
       sinWave(0, 20, 1, 0),
-      10, true));
-
-    this.spawnRing(Daydream.X_AXIS, this.palettes[0]);
-    this.spawnRing(Daydream.Y_AXIS, this.palettes[1]);
-    this.spawnRing(Daydream.Z_AXIS, this.palettes[2]);
-    this.spawnRing(Daydream.X_AXIS, this.palettes[3]);
-    this.spawnRing(Daydream.Y_AXIS, this.palettes[4]);
-    this.spawnRing(Daydream.Y_AXIS, this.palettes[5]);
+      10, true)
+    );
+    for (let i = 0; i < this.numRings; ++i) {
+      this.spawnRing(Daydream.X_AXIS, this.palettes[i]);
+    }
 
     this.gui = new gui.GUI();
     this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
@@ -3524,7 +3527,7 @@ class RingSpin {
         (s - 1 - i) / s,
         this.alpha);
     }
-    ring.trails.trail(this.pixels, (x, y, t) => paletteFalloff(vignette(ring.palette)((1 - t)), 0.1, 1 - t), this.alpha);
+    ring.trails.trail(this.pixels, (x, y, t) => vignette(ring.palette)(1 - t), this.alpha);
     ring.trails.decay();
     ring.orientation.collapse();
   }
