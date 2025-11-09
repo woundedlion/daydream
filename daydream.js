@@ -12,6 +12,8 @@ import { gui } from "gui";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
 
+var labels = [];
+
 class Dot {
   constructor(position, color) {
     this.position = position;
@@ -137,9 +139,8 @@ class Daydream {
     this.dotMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.scene.add(this.dotMesh);
 
-    // --- Add properties for viewports ---
-    this.mainViewport = { x: 0, y: 0, width: 1, height: 1 }; // Proportions initially
-    this.pipViewport = { x: 0, y: 0, width: 0.25, height: 0.25 }; // Picture-in-Picture
+    this.mainViewport = { x: 0, y: 0, width: 1, height: 1 }; 
+    this.pipViewport = { x: 0, y: 0, width: 0.25, height: 0.25 }; 
 
     this.setCanvasSize();
 
@@ -169,29 +170,25 @@ class Daydream {
     const width = window.innerWidth;
     const height = window.innerHeight;
 
-    // --- Main Viewport Calculation ---
-    // Make main view slightly offset if you want space around PiP, otherwise use full width/height
     this.mainViewport.x = 0;
     this.mainViewport.y = 0;
     this.mainViewport.width = width;
     this.mainViewport.height = height;
 
-    // --- PiP Viewport Calculation ---
-    const pipWidth = Math.floor(width * 0.3);  // 1/4 size
-    const pipHeight = Math.floor(height * 0.3); // 1/4 size
-    const pipMargin = 0; // Small margin from the edges
+    const pipWidth = Math.floor(width * 0.3);  
+    const pipHeight = Math.floor(height * 0.3); 
+    const pipMargin = 0; 
 
-    this.pipViewport.x = pipMargin; // Lower-left corner X
-    this.pipViewport.y = pipMargin; // Lower-left corner Y
+    this.pipViewport.x = pipMargin; 
+    this.pipViewport.y = pipMargin; 
     this.pipViewport.width = pipWidth;
     this.pipViewport.height = pipHeight;
 
-    // --- Update Camera and Renderers ---
-    this.camera.aspect = width / height; // Main camera aspect remains full window
+    this.camera.aspect = width / height; 
     this.camera.updateProjectionMatrix();
 
     this.renderer.setSize(width, height);
-    this.labelRenderer.setSize(width, height); // CSS renderer still covers full area
+    this.labelRenderer.setSize(width, height); 
   }
 
   render(effect) {
@@ -202,18 +199,22 @@ class Daydream {
           this.stepFrames--;
         }
 
-        const labels = document.querySelectorAll(".label");
-        for (const label of labels) {
-          label.remove();
+        // Clean up old labels
+        for (let i = this.scene.children.length - 1; i >= 0; i--) {
+          const obj = this.scene.children[i];
+          if (obj.isCSS2DObject) {
+            this.scene.remove(obj);
+          }
         }
+        labels = [];
 
-        let out = effect.drawFrame();
-        this.dotMesh.count = out.pixels.size;        
+        let pixels = effect.drawFrame();
+        this.dotMesh.count = pixels.size;        
 
         const vector = new THREE.Vector3();
 
         let i = 0;
-        for (const [key, pixel] of out.pixels) {
+        for (const [key, pixel] of pixels) {
           let p = keyPixel(key);
           vector.setFromSpherical(pixelToSpherical(p[0], p[1]));
           vector.multiplyScalar(Daydream.SPHERE_RADIUS);
@@ -223,24 +224,21 @@ class Daydream {
           dummy.updateMatrix();
           this.dotMesh.setMatrixAt(i, dummy.matrix);
           this.dotMesh.setColorAt(i, pixel);
+          this.dotMesh.instanceColor.needsUpdate = true;
+          this.dotMesh.instanceMatrix.needsUpdate = true;
           ++i;
         }
-        this.dotMesh.instanceColor.needsUpdate = true;
-        this.dotMesh.instanceMatrix.needsUpdate = true;
 
-        for (const label of out.labels) {
+        for (const label of labels) {
           this.makeLabel(label.position, label.content);
+          console.log(labels.size)
         }
-        
       }
     } 
 
     this.controls.update();
 
-    // Enable Scissor Test for multiple viewports
     this.renderer.setScissorTest(true);
-
-    // ** Render Main View **
     this.renderer.setViewport(
       this.mainViewport.x,
       this.mainViewport.y,
@@ -253,15 +251,12 @@ class Daydream {
       this.mainViewport.width,
       this.mainViewport.height
     );
-    // Ensure background covers the whole main viewport (important if PiP overlaps)
+
     this.renderer.setClearColor(this.scene.background, Daydream.SCENE_ALPHA ? 0 : 1);
-    this.renderer.clear(); // Clear color, depth, stencil buffers
+    this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
-    // Render labels associated with the main view
     this.labelRenderer.render(this.scene, this.camera);
 
-
-    // ** Render Picture-in-Picture (PiP) View **
     this.renderer.setViewport(
       this.pipViewport.x,
       this.pipViewport.y,
@@ -274,12 +269,7 @@ class Daydream {
       this.pipViewport.width,
       this.pipViewport.height
     );
-    // Optional: Clear PiP area with a different background or don't clear to overlay
-    // this.renderer.setClearColor(0x111111, 1); // Darker background for PiP?
-    // this.renderer.clear(); // Clear only the PiP area
-    this.renderer.render(this.scene, this.camera); // Render scene again in the small viewport
-
-    // Disable Scissor Test after rendering all viewports
+    this.renderer.render(this.scene, this.camera);
     this.renderer.setScissorTest(false);
 
   }
@@ -473,6 +463,282 @@ class PerlinNoise1D {
   }
 }
 
+/**
+ * Efficient PerlinNoise3D Class
+ * Generates 3D Perlin Noise, following the same efficient hashing
+ * structure as the provided PerllinNoise1D class.
+ */
+class PerlinNoise3D {
+  constructor() {
+    // --- Initialization ---
+
+    // The permutation table (0-255).
+    // This is identical to your PerlinNoise1D setup.
+    this.p = new Array(512);
+    this.perm = new Array(256);
+
+    // 1. Fill the permutation array with unique random values (0 to 255)
+    for (let i = 0; i < 256; i++) {
+      this.perm[i] = i;
+    }
+
+    // 2. Shuffle the array using the Fisher-Yates algorithm
+    for (let i = 255; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.perm[i], this.perm[j]] = [this.perm[j], this.perm[i]];
+    }
+
+    // 3. Duplicate the array to avoid modulo operations
+    for (let i = 0; i < 256; i++) {
+      this.p[i] = this.perm[i];
+      this.p[i + 256] = this.perm[i];
+    }
+  }
+
+  /**
+   * The Perlin smootherstep function: 6t^5 - 15t^4 + 10t^3.
+   * Copied directly from your PerlinNoise1D.
+   */
+  fade(t) {
+    return t * t * t * (t * (t * 6 - 15) + 10);
+  }
+
+  /**
+   * Standard Linear Interpolation.
+   * Copied directly from your PerlinNoise1D.
+   */
+  lerp(a, b, t) {
+    return a + t * (b - a);
+  }
+
+  /**
+   * Calculates the 3D gradient dot product.
+   * This is the 3D equivalent of your 1D grad function.
+   * It's a fast, bitwise implementation from Ken Perlin's "Improved Noise".
+   *
+   * @param {number} hash - The hash value (0-255).
+   * @param {number} x - The fractional distance from the grid point in X.
+   * @param {number} y - The fractional distance from the grid point in Y.
+   * @param {number} z - The fractional distance from the grid point in Z.
+   */
+  grad(hash, x, y, z) {
+    const h = hash & 15; // Get the 4 low-order bits
+
+    // Use the 4 bits to select one of 12 gradient directions
+    // without a lookup table.
+    const u = h < 8 ? x : y;
+    const v = h < 4 ? y : (h === 12 || h === 14 ? x : z);
+    const w = h < 2 ? z : (h === 10 || h === 12 ? y : x);
+
+    // Use the bits to determine +/- signs
+    return ((h & 1) === 0 ? u : -u) +
+      ((h & 2) === 0 ? v : -v) +
+      ((h & 4) === 0 ? w : -w);
+  }
+
+  /**
+   * The main 3D Perlin Noise calculation.
+   *
+   * @param {number} x - The input coordinate (position or time).
+   * @param {number} y - The input coordinate.
+   * @param {number} z - The input coordinate.
+   * @returns {number} The noise value in the range [-1, 1].
+   */
+  noise(x, y, z) {
+    // 1. Find the integer unit grid cell (X,Y,Z)
+    let X = Math.floor(x);
+    let Y = Math.floor(y);
+    let Z = Math.floor(z);
+
+    // Find the fractional part (x_frac, y_frac, z_frac)
+    const x_frac = x - X;
+    const y_frac = y - Y;
+    const z_frac = z - Z;
+
+    // 2. Use bitwise AND to wrap X,Y,Z (just like in 1D)
+    X = X & 255;
+    Y = Y & 255;
+    Z = Z & 255;
+
+    // 3. Compute the fade curves for each fractional part
+    const u = this.fade(x_frac);
+    const v = this.fade(y_frac);
+    const w = this.fade(z_frac);
+
+    // 4. Calculate hash values for the 8 corners of the cube.
+    // This is the 3D equivalent of getting A and B in your 1D code.
+    // We chain the hashes to get a unique hash for each 3D corner.
+    const A = this.p[X] + Y;
+    const AA = this.p[A] + Z;
+    const AB = this.p[A + 1] + Z;
+    const B = this.p[X + 1] + Y;
+    const BA = this.p[B] + Z;
+    const BB = this.p[B + 1] + Z;
+
+    // 5. Calculate the influence (dot product) from the 8 corner gradients
+    // and trilinearly interpolate them.
+
+    // First, lerp along X axis
+    const res0 = this.lerp(
+      this.grad(this.p[AA], x_frac, y_frac, z_frac),
+      this.grad(this.p[BA], x_frac - 1, y_frac, z_frac),
+      u
+    );
+    const res1 = this.lerp(
+      this.grad(this.p[AB], x_frac, y_frac - 1, z_frac),
+      this.grad(this.p[BB], x_frac - 1, y_frac - 1, z_frac),
+      u
+    );
+    const res2 = this.lerp(
+      this.grad(this.p[AA + 1], x_frac, y_frac, z_frac - 1),
+      this.grad(this.p[BA + 1], x_frac - 1, y_frac, z_frac - 1),
+      u
+    );
+    const res3 = this.lerp(
+      this.grad(this.p[AB + 1], x_frac, y_frac - 1, z_frac - 1),
+      this.grad(this.p[BB + 1], x_frac - 1, y_frac - 1, z_frac - 1),
+      u
+    );
+
+    // Next, lerp the results along Y axis
+    const res4 = this.lerp(res0, res1, v);
+    const res5 = this.lerp(res2, res3, v);
+
+    // Finally, lerp those results along Z axis
+    const result = this.lerp(res4, res5, w);
+
+    return result;
+  }
+}
+
+/**
+ * Efficient PerlinNoise4D Class
+ * Generates 4D Perlin Noise, following the same efficient hashing
+ * structure as your PerlinNoise1D class.
+ */
+class PerlinNoise4D {
+  constructor() {
+    // --- Initialization (Identical to 1D) ---
+    this.p = new Array(512);
+    this.perm = new Array(256);
+    for (let i = 0; i < 256; i++) {
+      this.perm[i] = i;
+    }
+    for (let i = 255; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.perm[i], this.perm[j]] = [this.perm[j], this.perm[i]];
+    }
+    for (let i = 0; i < 256; i++) {
+      this.p[i] = this.perm[i];
+      this.p[i + 256] = this.perm[i];
+    }
+  }
+
+  /**
+   * The Perlin smootherstep function: 6t^5 - 15t^4 + 10t^3.
+   *
+   */
+  fade(t) {
+    return t * t * t * (t * (t * 6 - 15) + 10);
+  }
+
+  /**
+   * Standard Linear Interpolation.
+   *
+   */
+  lerp(a, b, t) {
+    return a + t * (b - a);
+  }
+
+  /**
+   * Calculates the 4D gradient dot product.
+   * Uses the 32 gradient vectors that point from the center
+   * of a 4D hypercube to the centers of its 3D "faces".
+   */
+  grad(hash, x, y, z, w) {
+    const h = hash & 31; // Use 5 bits to select one of 32 directions
+    const u = h < 24 ? x : y;
+    const v = h < 16 ? y : z;
+    const t = h < 8 ? z : w;
+
+    // Use the 5 bits to determine +/- signs
+    return ((h & 1) === 0 ? u : -u) +
+      ((h & 2) === 0 ? v : -v) +
+      ((h & 4) === 0 ? t : -t);
+  }
+
+  /**
+   * The main 4D Perlin Noise calculation.
+   */
+  noise(x, y, z, w) {
+    // 1. Find the integer unit grid cell (X,Y,Z,W)
+    let X = Math.floor(x);
+    let Y = Math.floor(y);
+    let Z = Math.floor(z);
+    let W = Math.floor(w);
+
+    // Find the fractional part
+    const x_frac = x - X;
+    const y_frac = y - Y;
+    const z_frac = z - Z;
+    const w_frac = w - W;
+
+    // 2. Use bitwise AND to wrap
+    X = X & 255;
+    Y = Y & 255;
+    Z = Z & 255;
+    W = W & 255;
+
+    // 3. Compute the fade curves
+    const u = this.fade(x_frac);
+    const v = this.fade(y_frac);
+    const s = this.fade(z_frac);
+    const t = this.fade(w_frac);
+
+    // 4. Calculate hash values for the 16 corners of the hypercube.
+    // (This is the corrected version that passes the hash, not p[hash])
+    const A = this.p[X] + Y;
+    const AA = this.p[A] + Z;
+    const AB = this.p[A + 1] + Z;
+    const B = this.p[X + 1] + Y;
+    const BA = this.p[B] + Z;
+    const BB = this.p[B + 1] + Z;
+
+    const AAA = this.p[AA] + W;
+    const AAB = this.p[AA + 1] + W;
+    const ABA = this.p[AB] + W;
+    const ABB = this.p[AB + 1] + W;
+    const BAA = this.p[BA] + W;
+    const BAB = this.p[BA + 1] + W;
+    const BBA = this.p[BB] + W;
+    const BBB = this.p[BB + 1] + W;
+
+    // 5. "Quad"-linearly interpolate the 16 corner gradients
+
+    // Lerp along W (time)
+    const res0 = this.lerp(this.grad(AAA, x_frac, y_frac, z_frac, w_frac), this.grad(AAA + 1, x_frac, y_frac, z_frac, w_frac - 1), t);
+    const res1 = this.lerp(this.grad(BAA, x_frac - 1, y_frac, z_frac, w_frac), this.grad(BAA + 1, x_frac - 1, y_frac, z_frac, w_frac - 1), t);
+    const res2 = this.lerp(this.grad(ABA, x_frac, y_frac - 1, z_frac, w_frac), this.grad(ABA + 1, x_frac, y_frac - 1, z_frac, w_frac - 1), t);
+    const res3 = this.lerp(this.grad(BBA, x_frac - 1, y_frac - 1, z_frac, w_frac), this.grad(BBA + 1, x_frac - 1, y_frac - 1, z_frac, w_frac - 1), t);
+    const res4 = this.lerp(this.grad(AAB, x_frac, y_frac, z_frac - 1, w_frac), this.grad(AAB + 1, x_frac, y_frac, z_frac - 1, w_frac - 1), t);
+    const res5 = this.lerp(this.grad(BAB, x_frac - 1, y_frac, z_frac - 1, w_frac), this.grad(BAB + 1, x_frac - 1, y_frac, z_frac - 1, w_frac - 1), t);
+    const res6 = this.lerp(this.grad(ABB, x_frac, y_frac - 1, z_frac - 1, w_frac), this.grad(ABB + 1, x_frac, y_frac - 1, z_frac - 1, w_frac - 1), t);
+    const res7 = this.lerp(this.grad(BBB, x_frac - 1, y_frac - 1, z_frac - 1, w_frac), this.grad(BBB + 1, x_frac - 1, y_frac - 1, z_frac - 1, w_frac - 1), t);
+
+    // Lerp along Z
+    const res8 = this.lerp(res0, res4, s);
+    const res9 = this.lerp(res1, res5, s);
+    const res10 = this.lerp(res2, res6, s);
+    const res11 = this.lerp(res3, res7, s);
+
+    // Lerp along Y
+    const res12 = this.lerp(res8, res10, v);
+    const res13 = this.lerp(res9, res11, v);
+
+    // Finally, lerp along X
+    return this.lerp(res12, res13, u);
+  }
+}
 ///////////////////////////////////////////////////////////////////////////////
 
 const PHI = (1 + Math.sqrt(5)) / 2;
@@ -968,6 +1234,10 @@ class Orientation {
     this.orientations.push(quaternion);
   }
 
+  pop() {
+    return this.orientations.pop();
+  }
+
   collapse() {
     while (this.orientations.length > 1) { this.orientations.shift(); }
   }
@@ -1044,6 +1314,7 @@ class Timeline {
     while (i--) {
       if (this.t >= this.animations[i].start) {
         if (this.animations[i].animation.done()) {
+          console.log("DONE");
           this.animations[i].animation.post();
           this.animations.splice(i, 1);
           continue;
@@ -1085,6 +1356,39 @@ class Animation {
     this.post();
   }
 }
+class ParticleSystem extends Animation {
+  static Particle = class {
+    constructor(p) {
+      this.p = p;
+      this.v = new THREE.Vector3();
+    }
+  }
+
+  constructor() {
+    super(-1, false);
+    this.particles = [];
+    this.perlin = new PerlinNoise4D();
+    this.NOISE_SCALE = 10;
+    this.TIME_SCALE = 0.01;
+    this.FORCE_SCALE = 10;
+  }
+
+    spawn(p) {
+      this.particles.push(new ParticleSystem.Particle(p));
+  }
+
+  step() {
+    for (let p of this.particles) {
+      p.v.set(
+        this.perlin.noise(p.p.x * this.NOISE_SCALE, p.p.y * this.NOISE_SCALE, p.p.z * this.NOISE_SCALE, this.t * this.TIME_SCALE),
+        this.perlin.noise(p.p.x * this.NOISE_SCALE, p.p.y * this.NOISE_SCALE, p.p.z * this.NOISE_SCALE, this.t * this.TIME_SCALE + 100),
+        this.perlin.noise(p.p.x * this.NOISE_SCALE, p.p.y * this.NOISE_SCALE, p.p.z * this.NOISE_SCALE, this.t * this.TIME_SCALE + 200)
+      ).multiplyScalar(this.FORCE_SCALE);
+    }
+    super.step();
+  }
+}
+
 
 class RandomTimer extends Animation {
   constructor(min, max, f, repeat = false) {
@@ -1247,8 +1551,7 @@ class Rotation extends Animation {
   static MAX_ANGLE = 2 * Math.PI / Daydream.W;
 
   static animate(orientation, axis, angle, easingFn) {
-    let r = new Rotation(orientation, axis, angle, 2, easingFn, false);
-    r.step();
+    let r = new Rotation(orientation, axis, angle, 1, easingFn, false);
     r.step();
   }
 
@@ -1263,19 +1566,21 @@ class Rotation extends Animation {
   }
 
   step() {
+    super.step();
     this.from = this.to;
     this.to = this.easingFn((this.t) / this.duration) * this.totalAngle;
     let angle = distance(this.from, this.to, this.totalAngle);
-    if (angle > 0.0001) {
-      let origin = this.orientation.get();
+    if (angle > 0.00001) {
+      let origin = this.orientation.pop();
       for (let a = Rotation.MAX_ANGLE; angle - a > 0.0001; a += Rotation.MAX_ANGLE) {
         let r = new THREE.Quaternion().setFromAxisAngle(this.axis, a);
         this.orientation.push(origin.clone().premultiply(r));
       }
+      /*
       let r = new THREE.Quaternion().setFromAxisAngle(this.axis, angle);
       this.orientation.push(origin.clone().premultiply(r));
+      */
     }
-    super.step();
   }
 }
 
@@ -1361,7 +1666,7 @@ function rotateBetween(from, to) {
   new Rotation(from, axis, angle, 1, easeOutCirc).step();
 }
 
-function plotDots(pixels, labels, filter, dots, age, alpha) {
+function plotDots(pixels, filter, dots, age, alpha) {
   for (const dot of dots) {
     let p = sphericalToPixel(new THREE.Spherical().setFromVector3(dot.position));
     filter.plot(pixels, p.x, p.y, dot.color, age, alpha);
@@ -1764,6 +2069,7 @@ class FilterDecayTrails extends Filter {
       if (ttl > 0) {
         let p = keyPixel(key);
         let color = trailFn(p[0], p[1], 1 - (ttl / this.lifespan));
+//        labels.push({ position: pixelToVector(p[0], p[1]), content: ttl });
         this.pass(pixels, p[0], p[1], color, this.lifespan - ttl, alpha);
       }
     }
@@ -2096,6 +2402,14 @@ function vignette(palette) {
   };
 }
 
+
+const darkRainbow = new ProceduralPalette(
+  [0.367, 0.367, 0.367], // A
+  [0.500, 0.500, 0.500], // B
+  [1.000, 1.000, 1.000], // C
+  [0.000, 0.330, 0.670]  // D
+);
+
 const emeraldForest = new Gradient(16384, [
   [0.0, 0x004E64],
   [0.2, 0x0B6E4F],
@@ -2168,7 +2482,6 @@ const paletteFalloff = function (color, size, t) {
 class PolyRot {
   constructor() {
     this.pixels = new Map();
-    this.labels = [];
 
     this.ring = Daydream.Y_AXIS.clone();
     this.ringOrientation = new Orientation();
@@ -2263,7 +2576,6 @@ class PolyRot {
   }
 
   drawGenPoly() {
-    this.labels = [];
     this.pixels.clear();
     this.polyMaskMask.decay();
     let vertices = this.topOrientation.orientPoly(this.poly.vertices);
@@ -2273,7 +2585,7 @@ class PolyRot {
     for (let i = 0; i < n; i++) {
       let normal = this.ringOrientation.orient(this.ring, i);
       let dots = drawRing(normal, 1, (v, t) => new THREE.Color(0x000000));
-      plotDots(new Map(), this.labels, this.polyMask, dots,
+      plotDots(new Map(), this.polyMask, dots,
         (n - 1 - i) / n, blendOverMax);
     }
     this.ringOrientation.collapse();
@@ -2283,18 +2595,18 @@ class PolyRot {
       vertices,
       this.poly.eulerPath,
       (v) => distanceGradient(v, this.ringOrientation.orient(this.ring)));
-    plotDots(this.pixels, this.labels, this.out, dots, 0, blendOverMax);
+    plotDots(this.pixels, this.out, dots, 0, blendOverMax);
     this.pixels.forEach((p, key) => {
       p.multiplyScalar(this.polyMaskMask.mask(key));
     });
 
     // Draw ring
-    plotDots(this.pixels, this.labels, this.out,
+    plotDots(this.pixels, this.out,
       drawRing(this.ringOrientation.orient(this.ring), 1,
         (v, t) => new THREE.Color(0xaaaaaa)),
       0, blendOverMax);
 
-    return { pixels: this.pixels, labels: this.labels };
+    return this.pixels;
   }
 
   animateGenPoly() {
@@ -2334,7 +2646,6 @@ class PolyRot {
 
   drawSplitPoly() {
     this.pixels.clear();
-    this.labels = [];
     let normal = this.ringOrientation.orient(this.ring);
     let vertices = this.poly.vertices.map((c) => {
       let v = this.topOrientation.orient(new THREE.Vector3().fromArray(c));
@@ -2345,12 +2656,12 @@ class PolyRot {
       }
     });
 
-    plotDots(this.pixels, this.labels, this.out,
+    plotDots(this.pixels, this.out,
       drawPolyhedron(vertices, this.poly.eulerPath,
       (v) => distanceGradient(v, normal)));
-    plotDots(this.pixels, this.labels, this.out,
+    plotDots(this.pixels, this.out,
       drawRing(normal, 1, (v, t) => new THREE.Color(0xaaaaaa)));
-    return { pixels: this.pixels, labels: this.labels };
+    return this.pixels;
   }
 
   animateSplitPoly() {
@@ -2377,15 +2688,14 @@ class PolyRot {
 
   drawPolyRing() {
     this.pixels.clear();
-    this.labels = [];
     let normal = this.ringOrientation.orient(this.ring);
     let vertices = this.topOrientation.orientPoly(this.poly.vertices);
-    plotDots(this.pixels, this.labels, this.out,
+    plotDots(this.pixels, this.out,
       drawPolyhedron(vertices, this.poly.eulerPath,
         (v) => distanceGradient(v, normal)));
-    plotDots(this.pixels, this.labels, this.out,
+    plotDots(this.pixels, this.out,
       drawRing(normal, 1, (v, t) => new THREE.Color(0xaaaaaa)));
-    return { pixels: this.pixels, labels: this.labels };
+    return this.pixels;
   }
 
   animateSpinPoly() {
@@ -2434,7 +2744,6 @@ class Thrusters {
   constructor() {
     Daydream.W = 96
     this.pixels = new Map();
-    this.labels = [];
 
     // Palettes
     this.palette = new ProceduralPalette(
@@ -2474,7 +2783,7 @@ class Thrusters {
   drawThruster(orientation, thrustPoint, radius, opacity) {
     let dots = drawRing(orientation, thrustPoint, radius.get(),
       (v) => new THREE.Color(0xffffff).multiplyScalar(opacity));
-    plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
+    plotDots(this.pixels, this.ringOutput, dots, 0, blendOverMax);
   }
 
   onFireThruster() {
@@ -2536,15 +2845,14 @@ class Thrusters {
         return this.palette.get(angleBetween(z, v) / Math.PI).multiplyScalar(opacity);
       }
     );
-    plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
+    plotDots(this.pixels, this.ringOutput, dots, 0, blendOverMax);
   }
 
   drawFrame() {
     this.pixels.clear();
-    this.labels = [];
     this.timeline.step();        
     this.t++;
-     return { pixels: this.pixels, labels: this.labels };
+    return this.pixels;
   }
 }
 
@@ -2554,7 +2862,6 @@ class RingCircus {
   constructor() {
     Daydream.W = 96
     this.pixels = new Map();
-    this.labels = [];
 
     // Palettes
     this.palette = new MutatingPalette(
@@ -2728,16 +3035,15 @@ class RingCircus {
             this.dutyCycle.get(), this.twist.get(), t);
           return r;
         }, (0.1 +  this.twist.get()) * i);
-      plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
+      plotDots(this.pixels, this.ringOutput, dots, 0, blendOverMax);
     }
   }
 
   drawFrame() {
     this.palette.mutate(Math.sin(0.01 * this.t++));
     this.pixels.clear();
-    this.labels = [];
     this.timeline.step();
-    return { pixels: this.pixels, labels: this.labels };
+    return this.pixels;
   }
 }
 
@@ -2747,7 +3053,6 @@ class Wormhole {
   constructor() {
     Daydream.W = 96
     this.pixels = new Map();
-    this.labels = [];
 
     // Palettes
     this.palette = new ProceduralPalette(
@@ -2849,16 +3154,15 @@ class Wormhole {
             this.dutyCycle.get(), this.twist.get(), t);
           return r;
         }, (this.twist.get()) * i + this.phase.get());
-      plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
+      plotDots(this.pixels, this.ringOutput, dots, 0, blendOverMax);
     }
   }
 
   drawFrame() {
 //    this.palette.mutate(Math.sin(0.01 * this.t++));
     this.pixels.clear();
-    this.labels = [];
     this.timeline.step();
-    return { pixels: this.pixels, labels: this.labels };
+    return this.pixels;
   }
 }
 
@@ -2868,7 +3172,6 @@ class Pulses {
   constructor() {
     Daydream.W = 96
     this.pixels = new Map();
-    this.labels = [];
 
     // Palettes
     this.palette = new ProceduralPalette(
@@ -2926,15 +3229,14 @@ class Pulses {
         },
         0
       );
-      plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
+      plotDots(this.pixels, this.ringOutput, dots, 0, blendOverMax);
     }
   }
 
   drawFrame() {
     this.pixels.clear();
-    this.labels = [];
     this.timeline.step();
-    return { pixels: this.pixels, labels: this.labels };
+    return this.pixels;
   }
 }
 
@@ -2944,7 +3246,6 @@ class Fib {
   constructor() {
     Daydream.W = 96
     this.pixels = new Map();
-    this.labels = [];
 
     // Palettes
     this.palette = new ProceduralPalette(
@@ -2999,14 +3300,13 @@ class Fib {
       dots.push(...drawLine(head, tail, () => new THREE.Color(0x888888)));
     }
     this.trails.trail(this.pixels, new FilterRaw(), (x, y, t) => blueToBlack.get(t), 0.1);
-    plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
+    plotDots(this.pixels, this.ringOutput, dots, 0, blendOverMax);
   }
 
   drawFrame() {
     this.pixels.clear();
-    this.labels = [];
     this.timeline.step();
-    return { pixels: this.pixels, labels: this.labels };
+    return this.pixels;
   }
 }
 
@@ -3016,7 +3316,6 @@ class Angles {
   constructor() {
     Daydream.W = 96;
     this.pixels = new Map();
-    this.labels = [];
 
     // Palettes
     this.palette = new ProceduralPalette(
@@ -3077,7 +3376,7 @@ class Angles {
     this.trails.decay();
     for (let i = 0; i < this.n; ++i) {
       for (let j = 1; j < this.orientations[i].length(); ++j) {
-        plotDots(this.pixels, this.labels, this.ringOutput,
+        plotDots(this.pixels, this.ringOutput,
           drawVector(this.orientations[i].orient(this.dots[i], j),
             () => new THREE.Color(1, 0, 0))
         );
@@ -3085,7 +3384,7 @@ class Angles {
       this.orientations[i].collapse();
       
 /*
- plotDots(this.pixels, this.labels, this.ringOutput,
+ plotDots(this.pixels, this.ringOutput,
         drawVector(this.axes[i],
           () => new THREE.Color(0, 1, 0))
       );
@@ -3096,9 +3395,8 @@ class Angles {
 
   drawFrame() {
     this.pixels.clear();
-    this.labels = [];
     this.timeline.step();
-    return { pixels: this.pixels, labels: this.labels };
+    return this.pixels;
   }
 }
 
@@ -3109,7 +3407,6 @@ class Grid {
   constructor() {
     Daydream.W = 96
     this.pixels = new Map();
-    this.labels = [];
 
     // Palettes
     this.palette = new ProceduralPalette(
@@ -3164,14 +3461,13 @@ class Grid {
       dots.push(...drawLine(head, tail, () => new THREE.Color(0x888888)));
     }
     this.trails this.pixels, new FilterRaw(), (x, y, t) => blueToBlack.get(t));
-    plotDots(this.pixels, this.labels, this.ringOutput, dots, 0, blendOverMax);
+    plotDots(this.pixels, this.ringOutput, dots, 0, blendOverMax);
   }
 
   drawFrame() {
     this.pixels.clear();
-    this.labels = [];
     this.timeline.step();
-    return { pixels: this.pixels, labels: this.labels };
+    return this.pixels;
   }
 }
 */
@@ -3191,7 +3487,6 @@ class Dynamo {
 
     // State
     this.pixels = new Map();
-    this.labels = [];
 
     this.palettes = [new GenerativePalette('vignette')];
     this.paletteBoundaries = [];
@@ -3315,7 +3610,7 @@ class Dynamo {
     }
     this.trails.trail(this.pixels,
       (x, y, t) => this.color(pixelToVector(x, y), t), 0.5);
-    return { pixels: this.pixels, labels: this.labels };
+    return this.pixels;
   }
 
   nodeY(node) {
@@ -3334,7 +3629,7 @@ class Dynamo {
         dots.push(...drawLine(from, to, (v) => this.color(v, 0)));
       }
     }
-    plotDots(this.pixels, this.labels, this.filters, dots, age, 0.5);
+    plotDots(this.pixels, this.filters, dots, age, 0.5);
   }
 
   pull(y) {
@@ -3385,7 +3680,6 @@ class RingShower {
   constructor() {
     Daydream.W = 96;
     this.pixels = new Map();
-    this.labels = [];
     this.rings = [];
 
     this.palette = new GenerativePalette();
@@ -3423,16 +3717,15 @@ class RingShower {
     let step = 1 / Daydream.W;
     let dots = drawRing(this.orientation.orient(ring.normal), ring.radius.get(),
       (v, t) => ring.palette.get(t));
-    plotDots(this.pixels, this.labels, this.filters, dots, 0, 0.5);
+    plotDots(this.pixels, this.filters, dots, 0, 0.5);
     ring.lastRadius = ring.radius.get();
     
   }
 
   drawFrame() {
     this.pixels.clear();
-    this.labels = [];
     this.timeline.step();
-    return { pixels: this.pixels, labels: this.labels };
+    return this.pixels;
   }
 }
 
@@ -3446,8 +3739,8 @@ class RandomWalk extends Animation {
       ? new THREE.Vector3(0, 1, 0)
       : new THREE.Vector3(1, 0, 0);
     this.direction = new THREE.Vector3().crossVectors(this.v, u).normalize();
-    this.WALK_SPEED = 0.2; // Constant angular speed (radians per step)
-    this.PIVOT_STRENGTH = 0.1; // Max pivot angle (radians per step)
+    this.WALK_SPEED = 0.12; // Constant angular speed (radians per step)
+    this.PIVOT_STRENGTH = 0.2; // Max pivot angle (radians per step)
     this.NOISE_SCALE = 0.05; // How fast the Perlin noise changes
 
   }
@@ -3468,7 +3761,6 @@ class RandomWalk extends Animation {
 }
 
 class RingSpin {
-
   static Ring = class {
     constructor(normal, filters, palette, trailLength) {
       this.normal = normal;
@@ -3483,10 +3775,9 @@ class RingSpin {
   constructor() {
     Daydream.W = 96;
     this.pixels = new Map();
-    this.labels = [];
     this.rings = [];
     this.alpha = 0.2;
-    this.trailLength = new MutableNumber(15);
+    this.trailLength = new MutableNumber(20);
     this.filters = new FilterAntiAlias();
     this.palettes = [richSunset, underSea, mangoPeel, lemonLime, algae, lateSunset];
     this.numRings = 6;
@@ -3523,7 +3814,7 @@ class RingSpin {
     for (let i = 0; i < s; ++i) {
       let dots = drawRing(ring.orientation.orient(ring.normal, i), 1,
         (v, t) => vignette(ring.palette)(0));
-      plotDots(this.pixels, this.labels, ring.trails, dots,
+      plotDots(this.pixels, ring.trails, dots,
         (s - 1 - i) / s,
         this.alpha);
     }
@@ -3534,9 +3825,8 @@ class RingSpin {
 
   drawFrame() {
     this.pixels.clear();
-    this.labels = [];
     this.timeline.step();
-    return { pixels: this.pixels, labels: this.labels };
+    return this.pixels;
   }
 }
 
@@ -3562,7 +3852,6 @@ class RingMachine {
   constructor() {
     Daydream.W = 96;
     this.pixels = new Map();
-    this.labels = [];
     this.rings = [];
     this.alpha = 0.5;
     this.trailLength = 10;
@@ -3607,7 +3896,7 @@ class RingMachine {
       let dots = drawVector(
         ring.orientation.orient(ring.normal, i),
         (v, t) => new THREE.Color(1, 1, 1));
-      plotDots(this.pixels, this.labels, ring.trails, dots, 1 - (i / ring.orientation.length() - 1), this.alpha);
+      plotDots(this.pixels, ring.trails, dots, 1 - (i / ring.orientation.length() - 1), this.alpha);
     }
     
     ring.trails.trail(this.pixels, (x, y, t) => ring.palette.get(1 - t), this.alpha);
@@ -3618,19 +3907,179 @@ class RingMachine {
     let dots = drawVector(
       ring.orientation.orient(ring.normal),
       (v, t) => ring.palette.get(ring.palette.length - 1));
-    plotDots(this.pixels, this.labels, ring.trails, dots, 0, this.alpha);
+    plotDots(this.pixels, ring.trails, dots, 0, this.alpha);
   }
 
   drawFrame() {
     this.pixels.clear();
-    this.labels = [];
     this.timeline.step();
-    return { pixels: this.pixels, labels: this.labels };
+    return this.pixels;
   }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class NoiseParticles {
+
+  constructor() {
+    Daydream.W = 96;
+    this.pixels = new Map();
+    this.alpha = 0.5;
+    this.filters = new FilterAntiAlias();
+    this.timeline = new Timeline();
+    this.particles = new ParticleSystem();
+    this.timeline.add(0, this.particles);
+ 
+    for (let x = 0; x < Daydream.W; ++x) {
+      for (let y = 0; y < Daydream.H; ++y) {
+        if (x % 4 == 0 && y % 2 == 0) {
+          this.particles.spawn(pixelToVector(x, y));
+        }
+      }
+    }
+
+    this.gui = new gui.GUI();
+    this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
+  }
+
+  drawFrame() {
+    this.pixels.clear();
+    this.timeline.step();
+    let dots = [];
+    for (let p of this.particles.particles) {
+      dots.push(...drawVector(p.p.clone().add(p.v).normalize(), () => new THREE.Color(1, 0, 0)));
+    }
+    plotDots(this.pixels , this.filters, dots, 0, this.alpha);
+    return this.pixels;
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class NoiseFieldEffect {
+  constructor() {
+    this.pixels = new Map();
+
+    this.perlin1 = new PerlinNoise1D();
+    this.perlin4 = new PerlinNoise4D();
+    this.palette = darkRainbow; 
+    this.t = 0;
+    this.noiseScale = 2 ;
+    this.timeScale = 0.1  ;
+  }
+
+  drawFrame() {
+    this.pixels.clear();
+    this.t++;
+    for (let x = 0; x < Daydream.W; x++) {
+      for (let y = 0; y < Daydream.H; y++) {
+        const v = pixelToVector(x, y); 
+        let t = this.t * this.timeScale + Math.sin(this.t * 2 * Math.PI) * 0.01
+        const noiseValue = this.perlin4.noise(
+          v.x * this.noiseScale,
+          v.y * this.noiseScale,
+          v.z * this.noiseScale,
+          this.t * this.timeScale
+        );
+
+        const palette_t = (noiseValue + 1) / 2;
+        const color = this.palette.get(palette_t); 
+        this.pixels.set(pixelKey(x, y), color); 
+      }
+    }
+
+    return this.pixels;
+  }
+}
+
+
+/**
+ * Metaballs Effect (V5: Smooth Orbital Physics)
+ * * Uses a central gravity force for smooth, "soft" containment
+ * * instead of a jerky "hard" bounce.
+ */
+class MetaballEffect {
+  constructor() {
+    this.pixels = new Map();
+    this.palette = darkRainbow; //
+    this.t = 0;
+
+    // --- Tunable Knobs ---
+    this.maxInfluence = 5.0;
+    this.gravity = 0.0005; // New knob: How strong is the pull to the center?
+
+    // --- Define our 16 Metaballs ---
+    this.balls = [];
+    const NUM_BALLS = 8;
+
+    for (let i = 0; i < NUM_BALLS; i++) {
+      const rand = (min, max) => Math.random() * (max - min) + min;
+
+      this.balls.push({
+        p: new THREE.Vector3(
+          rand(-0.5, 0.5), // Random start position
+          rand(-0.5, 0.5),
+          rand(-0.5, 0.5)
+        ),
+        r: rand(0.5, 0.8), // Bigger radius
+        v: new THREE.Vector3(
+          rand(-0.02, 0.08), // Slightly faster velocity
+          rand(-0.02, 0.08),
+          rand(-0.02, 0.08)
+        )
+      });
+    }
+  }
+
+  drawFrame() {
+    this.pixels.clear();
+    this.t++;
+
+    // 1. Animate the balls
+    for (const ball of this.balls) {
+
+      // --- THIS IS THE NEW LOGIC ---
+      // 1. Apply a "gravity" force pulling the ball toward the center (0,0,0)
+      //    We do this by adding a tiny, inverted copy of its position to its velocity.
+      ball.v.add(ball.p.clone().multiplyScalar(-this.gravity));
+
+      // 2. Apply the (now gravity-affected) velocity to the position
+      ball.p.add(ball.v); //
+
+    }
+
+    // 2. Iterate *every single pixel* on the sphere's surface
+    for (let x = 0; x < Daydream.W; x++) {
+      for (let y = 0; y < Daydream.H; y++) {
+
+        // Get the 3D position of this pixel
+        const v = pixelToVector(x, y); //
+
+        let sum = 0.0;
+
+        // 3. Sum the influence from all 16 balls
+        for (const ball of this.balls) {
+          // Get squared distance (faster, no sqrt) from pixel to ball
+          const distSq = v.distanceToSquared(ball.p);
+
+          // The metaball function: r^2 / d^2
+          sum += (ball.r * ball.r) / distSq;
+        }
+
+        // 4. Map the total influence to a palette coordinate
+        const palette_t = Math.min(1.0, sum / this.maxInfluence);
+
+        // 5. Get the color and plot the dot
+        const color = this.palette.get(palette_t); //
+        this.pixels.set(pixelKey(x, y), color); //
+      }
+    }
+
+    return this.pixels;
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 const daydream = new Daydream();
 window.addEventListener("resize", () => daydream.setCanvasSize());
 window.addEventListener("keydown", (e) => daydream.keydown(e));
@@ -3638,14 +4087,8 @@ window.addEventListener("keydown", (e) => daydream.keydown(e));
 // var effect = new Dynamo();
 // var effect = new RingShower();
  var effect = new RingSpin();
+//var effect = new MetaballEffect();
+// var effect = new NoiseParticles();
 
 //var effect = new RingMachine();
-
-// var effect = new PolyRot();
-// var effect = new Thrusters();
-// var effect = new RingCircus();
-// var effect = new Wormhole();
-//var effect = new Pulses();
-//var effect = new Fib();
-//var effect = new Angles();
 daydream.renderer.setAnimationLoop(() => daydream.render(effect));
