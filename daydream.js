@@ -1438,31 +1438,6 @@ class PeriodicTimer extends Animation {
   }
 }
 
-class Sprite extends Animation {
-  constructor(drawFn, duration,
-    fadeInDuration = 0, fadeInEasingFn = easeMid,
-    fadeOutDuration = 0, fadeOutEasingFn = easeMid)
-  {
-    super(duration, false);
-    this.drawFn = drawFn;
-    this.fader = new MutableNumber(fadeInDuration > 0 ? 0 : 1);
-    this.fadeInDuration = fadeInDuration;
-    this.fadeOutDuration = fadeOutDuration;
-    this.fadeIn = new Transition(this.fader, 1, fadeInDuration, fadeInEasingFn);
-    this.fadeOut = new Transition(this.fader, 0, fadeOutDuration, fadeOutEasingFn);
-  }
-
-  step() {
-    if (!this.fadeIn.done()) {
-      this.fadeIn.step();
-    } else if (this.duration >= 0 && this.t >= (this.duration - this.fadeOutDuration)) {
-      this.fadeOut.step();
-    }
-    this.drawFn(this.fader.get());
-    super.step();
-  }
-}
-
 class MutableNumber {
   constructor(n) {
     this.n = n;
@@ -1495,7 +1470,7 @@ class Transition extends Animation {
   }
 }
 
-class MutateFn extends Animation {
+class Mutation extends Animation {
   constructor(mutable, fn, duration, easingFn, repeat = false) {
     super(duration, repeat);
     this.mutable = mutable;
@@ -1508,12 +1483,35 @@ class MutateFn extends Animation {
     if (this.t == 0) {
       this.from = this.mutable.get();
     }
-    let t = Math.min(1, this.t / (this.duration - 1));
-    this.mutable.set(this.fn(this.easingFn(t), this.mutable.get()));
     super.step();
+    let t = Math.min(1, this.t / this.duration);
+    this.mutable.set(this.fn(this.easingFn(t), this.mutable.get()));
   }
 }
 
+class Sprite extends Animation {
+  constructor(drawFn, duration,
+    fadeInDuration = 0, fadeInEasingFn = easeMid,
+    fadeOutDuration = 0, fadeOutEasingFn = easeMid) {
+    super(duration, false);
+    this.drawFn = drawFn;
+    this.fader = new MutableNumber(fadeInDuration > 0 ? 0 : 1);
+    this.fadeInDuration = fadeInDuration;
+    this.fadeOutDuration = fadeOutDuration;
+    this.fadeIn = new Transition(this.fader, 1, fadeInDuration, fadeInEasingFn);
+    this.fadeOut = new Transition(this.fader, 0, fadeOutDuration, fadeOutEasingFn);
+  }
+
+  step() {
+    if (!this.fadeIn.done()) {
+      this.fadeIn.step();
+    } else if (this.duration >= 0 && this.t >= (this.duration - this.fadeOutDuration)) {
+      this.fadeOut.step();
+    }
+    this.drawFn(this.fader.get());
+    super.step();
+  }
+}
 class Motion extends Animation {
   static MAX_ANGLE = 2 * Math.PI / Daydream.W;
 
