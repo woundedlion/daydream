@@ -1331,7 +1331,7 @@ class Animation {
   }
 
   cancel() { this.canceled = true; }
-  done() { return this.canceled || (this.duration >= 0 && this.t > this.duration); }
+  done() { return this.canceled || (this.duration >= 0 && this.t >= this.duration); }
 
   step() {
     this.t++;
