@@ -127,7 +127,6 @@ class Daydream {
       this.scene.add(this.yAxis);
       this.scene.add(this.zAxis);
     }
-
     */
 
     // draw pixels
@@ -137,6 +136,7 @@ class Daydream {
       Daydream.W * Daydream.H
     );
     this.dotMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.dotMesh.count = 0;
     this.scene.add(this.dotMesh);
 
     this.mainViewport = { x: 0, y: 0, width: 1, height: 1 }; 
