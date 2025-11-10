@@ -1338,7 +1338,7 @@ class Animation {
     if (this.done()) {
       if (this.repeat) {
         this.post();
-        this.t = 1;
+        this.t = 0;
       }
     }
   }
