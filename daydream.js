@@ -1147,7 +1147,7 @@ const drawRing = (normal, radius, colorFn, phase = 0) => {
     radius = 2 - radius;
   }
 
-  let step = 2 * Math.PI / 96;
+  let step = 2 * Math.PI / Daydream.W;
   for (let a = 0; a < 2 * Math.PI; a += step) {
     let vi = calcRingPoint((a + phase) % (2 * Math.PI), radius, u, v, w);
     dots.push(new Dot(vi, colorFn(vi, a / (2 * Math.PI))));
@@ -1234,10 +1234,6 @@ class Orientation {
     this.orientations.push(quaternion);
   }
 
-  pop() {
-    return this.orientations.pop();
-  }
-
   collapse() {
     while (this.orientations.length > 1) { this.orientations.shift(); }
   }
@@ -1273,7 +1269,7 @@ class Path {
   }
 
   getPoint(t) {
-    let i = Math.floor(t * (this.points.length));
+    let i = Math.floor(t * (this.points.length - 1));
     return this.points[i].clone();
   }
 }
@@ -1467,35 +1463,6 @@ class Sprite extends Animation {
   }
 }
 
-class Motion extends Animation {
-  static MAX_ANGLE = 2 * Math.PI / Daydream.W;
-
-  constructor(orientation, path, duration, repeat = false) {
-    super(duration, repeat);
-    this.orientation = orientation;
-    this.path = path;
-    this.to = this.path.getPoint(0);
-  }
-
-  step() {
-    this.from = this.to;
-    this.to = this.path.getPoint(this.t / this.duration);
-    if (!this.from.equals(this.to)) {
-      let axis = new THREE.Vector3().crossVectors(this.from, this.to).normalize();
-      let angle = angleBetween(this.from, this.to);
-      let origin = this.orientation.get();
-      this.orientation.clear();
-      for (let a = Motion.MAX_ANGLE; angle - a > 0.0001; a += Motion.MAX_ANGLE) {
-        let r = new THREE.Quaternion().setFromAxisAngle(axis, a);
-        this.orientation.push(origin.clone().premultiply(r));
-      }
-      let r = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-      this.orientation.push(origin.clone().premultiply(r));
-    }
-    super.step();
-  }
-}
-
 class MutableNumber {
   constructor(n) {
     this.n = n;
@@ -1547,6 +1514,35 @@ class MutateFn extends Animation {
   }
 }
 
+class Motion extends Animation {
+  static MAX_ANGLE = 2 * Math.PI / Daydream.W;
+
+  constructor(orientation, path, duration, repeat = false) {
+    super(duration, repeat);
+    this.orientation = orientation;
+    this.path = path;
+    this.to = this.path.getPoint(0);
+  }
+
+  step() {
+    super.step();
+    this.orientation.collapse();
+    this.from = this.to;
+    this.to = this.path.getPoint(this.t / this.duration);
+    if (!this.from.equals(this.to)) {
+      let axis = new THREE.Vector3().crossVectors(this.from, this.to).normalize();
+      let angle = angleBetween(this.from, this.to);
+      let step_angle = angle / Math.ceil(angle / Motion.MAX_ANGLE);
+      let origin = this.orientation.get();
+      for (let a = step_angle; angle - a > 0.0001; a += step_angle) {
+        let r = new THREE.Quaternion().setFromAxisAngle(axis, a);
+        this.orientation.push(origin.clone().premultiply(r));
+      }
+      let r = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+      this.orientation.push(origin.clone().premultiply(r));
+    }
+  }
+}
 class Rotation extends Animation {
   static MAX_ANGLE = 2 * Math.PI / Daydream.W;
 
@@ -1567,19 +1563,19 @@ class Rotation extends Animation {
 
   step() {
     super.step();
+    this.orientation.collapse();
     this.from = this.to;
     this.to = this.easingFn((this.t) / this.duration) * this.totalAngle;
     let angle = distance(this.from, this.to, this.totalAngle);
     if (angle > 0.00001) {
-      let origin = this.orientation.pop();
-      for (let a = Rotation.MAX_ANGLE; angle - a > 0.0001; a += Rotation.MAX_ANGLE) {
+      let step_angle = angle / Math.ceil(angle / Rotation.MAX_ANGLE);
+      let origin = this.orientation.get()
+      for (let a = step_angle; angle - a > 0.0001; a += step_angle) {
         let r = new THREE.Quaternion().setFromAxisAngle(this.axis, a);
         this.orientation.push(origin.clone().premultiply(r));
       }
-      /*
       let r = new THREE.Quaternion().setFromAxisAngle(this.axis, angle);
       this.orientation.push(origin.clone().premultiply(r));
-      */
     }
   }
 }
@@ -1592,21 +1588,18 @@ function wrap(x, m) {
   return x >= 0 ? x % m : ((x % m) + m) % m;
 }
 
-function distanceWrap(x1, x2, m) {
+function shortest_distance(x1, x2, m) {
   let d = Math.abs(x1 - x2) % m;
   return Math.min(d, m - d);
 }
 
-function distance(a, b, m) {
-  const a_norm = ((a % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
-  const b_norm = ((a % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
+function fwd_distance(a, b, m) {
   let diff = b - a;
   if (diff < 0) {
     diff += m;
   }
   return diff;
 }
-
 function sinWave(from, to, freq, phase) {
   return (t) => {
     let w = (Math.sin(freq * t * 2 * Math.PI - Math.PI / 2 + Math.PI - 2 * phase) + 1) / 2;
@@ -2069,7 +2062,7 @@ class FilterDecayTrails extends Filter {
       if (ttl > 0) {
         let p = keyPixel(key);
         let color = trailFn(p[0], p[1], 1 - (ttl / this.lifespan));
-//        labels.push({ position: pixelToVector(p[0], p[1]), content: ttl });
+//        labels.push({ position: pixelToVector(p[0], p[1]), content: ttl.toFixed(1) });
         this.pass(pixels, p[0], p[1], color, this.lifespan - ttl, alpha);
       }
     }
@@ -2151,11 +2144,11 @@ class GenerativePalette {
         hC = normalize(hA + randomBetween(-1 / 36, 1 / 36));
         break;
 
-      case 'analogous': 
+      case 'analogous':
       default:
         // Analogous (Current behavior: closely spaced hues)
         let dir = Math.random() < 0.5 ? 1 : -1;
-        hB = normalize(hA + dir * randomBetween(1 / 6, 3 / 12)); 
+        hB = normalize(hA + dir * randomBetween(1 / 6, 3 / 12));
         hC = normalize(hB + dir * randomBetween(1 / 6, 3 / 12));
         break;
     }
@@ -2237,7 +2230,6 @@ class GenerativePalette {
     return new THREE.Color().lerpColors(c1, c2, (t - start) / (end - start)).convertSRGBToLinear();
   }
 }
-
 
 class ProceduralPalette {
   constructor(a, b, c, d) {
@@ -3780,7 +3772,7 @@ class RingSpin {
     this.trailLength = new MutableNumber(20);
     this.filters = new FilterAntiAlias();
     this.palettes = [richSunset, underSea, mangoPeel, lemonLime, algae, lateSunset];
-    this.numRings = 6;
+    this.numRings = 1;
 
     this.timeline = new Timeline();
     this.timeline.add(new MutateFn(this.trailLength,
@@ -3793,14 +3785,13 @@ class RingSpin {
 
     this.gui = new gui.GUI();
     this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
-
   }
 
   spawnRing(normal, palette) {
     let ring = new RingSpin.Ring(normal, this.filters, palette, this.trailLength.get());
     this.rings.unshift(ring);
 
-    this.timeline.add(0,
+    this.timeline.add(0,  
       new Sprite(() => this.drawRing(ring),
         -1,
         4, easeMid,
@@ -3810,12 +3801,13 @@ class RingSpin {
   }
 
   drawRing(ring) {
-    let s = ring.orientation.length();
-    for (let i = 0; i < s; ++i) {
+    let end = ring.orientation.length();
+    let start = end == 1 ? 0 : 1;
+    for (let i = start; i < end; ++i) {
       let dots = drawRing(ring.orientation.orient(ring.normal, i), 1,
         (v, t) => vignette(ring.palette)(0));
       plotDots(this.pixels, ring.trails, dots,
-        (s - 1 - i) / s,
+        (end - 1 - i) / end,
         this.alpha);
     }
     ring.trails.trail(this.pixels, (x, y, t) => vignette(ring.palette)(1 - t), this.alpha);
@@ -4079,6 +4071,39 @@ class MetaballEffect {
   }
 }
 
+class MotionPathTest {
+  constructor() {
+    this.pixels = new Map();
+    this.filters = new FilterAntiAlias();
+    this.orientation = new Orientation();
+    this.v = Daydream.X_AXIS.clone();
+    this.path = new Path();
+    let v1 = randomVector();
+    let v2 = randomVector();
+    let v3 = randomVector();
+    this.path.appendLine(v1, v2, true);
+    this.path.appendLine(v2, v3, true);
+    this.path.appendLine(v3, v1, true);
+
+    this.timeline = new Timeline();
+    this.timeline.add(0,
+      new Motion(this.orientation, this.path, 16, true)
+    );
+  }
+
+  drawFrame() {
+    this.pixels.clear();
+    let dots = [];
+    for (let i = 0; i < this.orientation.length(); ++i) {
+      dots.push(...drawVector(this.orientation.orient(this.v, i), (v, t) => new THREE.Color(1, 0, 0)));
+    }
+    this.orientation.collapse();
+    plotDots(this.pixels, this.filters, dots, 0, 1.0);
+    this.timeline.step();
+    return this.pixels;
+  }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 const daydream = new Daydream();
 window.addEventListener("resize", () => daydream.setCanvasSize());
@@ -4086,9 +4111,10 @@ window.addEventListener("keydown", (e) => daydream.keydown(e));
 
 // var effect = new Dynamo();
 // var effect = new RingShower();
- var effect = new RingSpin();
+// var effect = new RingSpin();
 //var effect = new MetaballEffect();
 // var effect = new NoiseParticles();
-
 //var effect = new RingMachine();
+var effect = new MotionPathTest();
+
 daydream.renderer.setAnimationLoop(() => daydream.render(effect));
