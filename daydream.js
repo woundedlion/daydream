@@ -993,7 +993,7 @@ const randomChoice = (choices) => {
 ///////////////////////////////////////////////////////////////////////////////
 
 const drawVector = (v, colorFn) => {
-  return [new Dot(new THREE.Vector3(...v.toArray()).normalize(), colorFn(v))];
+  return [new Dot(new THREE.Vector3(...v.toArray()).normalize(), colorFn(v, 0))];
 }
 
 const drawPath = (path, colorFn) => {
@@ -1240,8 +1240,12 @@ class Orientation {
 }
 
 class Path {
-  constructor() {
-    this.points = [];
+  constructor(initialPos) {
+    this.points = [initialPos];
+  }
+
+  collapse() {
+    this.points = [this.points[this.points.length - 1]];
   }
 
   length() {
@@ -1292,8 +1296,8 @@ class Timeline {
     this.animations = [];
   }
 
-  add(inSecs, animation) {
-    let start = this.t + (inSecs * Daydream.FPS);
+  add(inFrames, animation) {
+    let start = this.t + inFrames;
     for (let i = 0; i < this.animations.length; ++i) {
       if (this.animations[i].start > start) {
         this.animations.splice(i, 0, { start: start, animation: animation });
@@ -1514,6 +1518,11 @@ class Sprite extends Animation {
 }
 class Motion extends Animation {
   static MAX_ANGLE = 2 * Math.PI / Daydream.W;
+
+  static animate(orientation, path) {
+    let m = new Motion(orientation, path, 1, false);
+    m.step();
+  }
 
   constructor(orientation, path, duration, repeat = false) {
     super(duration, repeat);
@@ -3463,15 +3472,16 @@ class Grid {
 */
 ///////////////////////////////////////////////////////////////////////////////
 
-class Node {
-  constructor(y) {
-    this.x = 0;
-    this.y = y;
-    this.v = 0;
-  }
-}
 
 class Dynamo {
+  static Node = class { 
+    constructor(y) {
+      this.x = 0;
+      this.y = y;
+      this.v = 0;
+    }
+  }
+
   constructor() {
     Daydream.W = 96;
 
@@ -4070,33 +4080,61 @@ class MetaballEffect {
 }
 
 class MotionPathTest {
+  static Node = class {
+    constructor() {
+      this.orientation = new Orientation();
+      this.v = randomVector();
+      this.palette = new GenerativePalette();
+      this.path = new Path();
+      this.updatePath();
+    }
+
+    updatePath() {
+      this.path.collapse();
+      this.path.appendLine(this.orientation.orient(this.v), randomVector(), true, easeMid);
+    }
+  }
   constructor() {
     this.pixels = new Map();
     this.filters = new FilterAntiAlias();
-    this.orientation = new Orientation();
-    this.v = Daydream.X_AXIS.clone();
-    this.path = new Path();
-    let v1 = randomVector();
-    let v2 = randomVector();
-    let v3 = randomVector();
-    this.path.appendLine(v1, v2, true);
-    this.path.appendLine(v2, v3, true);
-    this.path.appendLine(v3, v1, true);
-
+    this.numNodes = 16;
+    this.nodes = [];
     this.timeline = new Timeline();
+
+    for (let i = 0; i < this.numNodes; ++i) {
+      this.spawnNode();
+    }
+  }
+
+  spawnNode() {
+    let i = this.nodes.length;
+    this.nodes.push(new MotionPathTest.Node());
     this.timeline.add(0,
-      new Motion(this.orientation, this.path, 16, true)
+      new Sprite((opacity) => this.drawNode(opacity, i), -1, 32, easeMid, 0, easeMid)
     );
+    this.timeline.add(0,
+      new Motion(this.nodes[i].orientation, this.nodes[i].path, 16, true)
+        .then(() => {
+          this.nodes[i].updatePath();
+        })
+    );
+
+  }
+
+  drawNode(opacity, i) {
+    let dots = [];
+    let node = this.nodes[i];
+    let s = node.orientation.length();
+    for (let i = 0; i < s; ++i) {
+      dots.push(...drawVector(node.orientation.orient(node.v, i),
+        (v, t) => node.palette.get(1 - ((s - 1 - i) / s))));
+    }
+    plotDots(this.pixels, this.filters, dots, 0, opacity);
+    node.orientation.collapse();
   }
 
   drawFrame() {
     this.pixels.clear();
-    let dots = [];
-    for (let i = 0; i < this.orientation.length(); ++i) {
-      dots.push(...drawVector(this.orientation.orient(this.v, i), (v, t) => new THREE.Color(1, 0, 0)));
-    }
-    this.orientation.collapse();
-    plotDots(this.pixels, this.filters, dots, 0, 1.0);
     this.timeline.step();
     return this.pixels;
   }
