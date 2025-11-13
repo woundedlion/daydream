@@ -1564,25 +1564,29 @@ class Rotation extends Animation {
     this.axis = axis;
     this.totalAngle = angle;
     this.easingFn = easingFn;
-    this.from = 0;
-    this.to = 0;
+    this.origin = orientation.get().clone();
+    this.last_angle = 0.0;
   }
 
   step() {
     super.step();
+    if (this.t == 0) {
+      this.last_angle = 0;
+      this.origin = this.orientation.get().clone();
+      this.t++;
+    }
     this.orientation.collapse();
-    this.from = this.to;
-    this.to = this.easingFn((this.t) / this.duration) * this.totalAngle;
-    let angle = distance(this.from, this.to, this.totalAngle);
-    if (angle > 0.00001) {
-      let step_angle = angle / Math.ceil(angle / Rotation.MAX_ANGLE);
-      let origin = this.orientation.get()
-      for (let a = step_angle; angle - a > 0.0001; a += step_angle) {
+    let angle = this.easingFn(this.t / this.duration) * this.totalAngle;
+    let delta = angle - this.last_angle;
+    if (Math.abs(delta) > 0.00001) {
+      const step = Math.abs(delta) / Math.ceil(Math.abs(delta) / Rotation.MAX_ANGLE);
+      for (let a = this.last_angle + step; Math.abs(angle - a) > 0.0001; a += step) {
         let r = new THREE.Quaternion().setFromAxisAngle(this.axis, a);
-        this.orientation.push(origin.clone().premultiply(r));
+        this.orientation.push(this.origin.clone().premultiply(r));
       }
       let r = new THREE.Quaternion().setFromAxisAngle(this.axis, angle);
-      this.orientation.push(origin.clone().premultiply(r));
+      this.orientation.push(this.origin.clone().premultiply(r));
+      this.last_angle = angle;
     }
   }
 }
@@ -2797,7 +2801,7 @@ class Thrusters {
     if (!(this.warp === undefined || this.warp.done())) {
       this.warp.cancel();
     }
-    this.warp = new MutateFn(
+    this.warp = new Mutation(
       this.amplitude, (t) => 0.7 * Math.exp(-2 * t), 32, easeMid);
     this.timeline.add(1/16,
       this.warp
@@ -3098,14 +3102,14 @@ class Wormhole {
 
   onMutateDutyCyle(inSecs = 0) {
     this.timeline.add(inSecs,
-      new MutateFn(this.dutyCycle, sinWave((2 * Math.PI) / Daydream.W, (8 * 2 * Math.PI) / Daydream.W, 1, Math.PI / 2),
+      new Mutation(this.dutyCycle, sinWave((2 * Math.PI) / Daydream.W, (8 * 2 * Math.PI) / Daydream.W, 1, Math.PI / 2),
         160, easeMid, true)
     );
   }
 
   onMutateTwist(inSecs = 0) {
     this.timeline.add(inSecs,
-      new MutateFn(this.twist, sinWave(3 / Daydream.W, 10 / Daydream.W, 1, Math.PI / 2),
+      new Mutation(this.twist, sinWave(3 / Daydream.W, 10 / Daydream.W, 1, Math.PI / 2),
         64, easeMid, true)
     );
   }
@@ -3783,7 +3787,7 @@ class RingSpin {
     this.numRings = 1;
 
     this.timeline = new Timeline();
-    this.timeline.add(new MutateFn(this.trailLength,
+    this.timeline.add(new Mutation(this.trailLength,
       sinWave(0, 20, 1, 0),
       10, true)
     );
@@ -4147,10 +4151,10 @@ window.addEventListener("keydown", (e) => daydream.keydown(e));
 
 // var effect = new Dynamo();
 // var effect = new RingShower();
-// var effect = new RingSpin();
+ var effect = new RingSpin();
 //var effect = new MetaballEffect();
 // var effect = new NoiseParticles();
 //var effect = new RingMachine();
-var effect = new MotionPathTest();
+//var effect = new MotionPathTest();
 
 daydream.renderer.setAnimationLoop(() => daydream.render(effect));
