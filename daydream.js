@@ -1583,7 +1583,7 @@ class Rotation extends Animation {
     let angle = this.easingFn(this.t / this.duration) * this.totalAngle;
     let delta = angle - this.last_angle;
     if (Math.abs(delta) > 0.00001) {
-      const step = Math.abs(delta) / Math.ceil(Math.abs(delta) / Rotation.MAX_ANGLE);
+      const step = delta / Math.ceil(Math.abs(delta) / Rotation.MAX_ANGLE);
       for (let a = this.last_angle + step; Math.abs(angle - a) > 0.0001; a += step) {
         let r = new THREE.Quaternion().setFromAxisAngle(this.axis, a);
         this.orientation.push(this.origin.clone().premultiply(r));
