@@ -1063,9 +1063,10 @@ const fnPoint = (f, normal, radius, angle) => {
     v.negate();
     radius = 2 - radius;
   }
-  u.crossVectors(v, Daydream.X_AXIS).normalize();
-  if (u.length() == 0) {
-    u.crossVectors(v, Daydream.Z_AXIS).normalize();
+  if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.99995) {
+    u.crossVectors(v, Daydream.Y_AXIS).normalize();
+  } else {
+    u.crossVectors(v, Daydream.X_AXIS).normalize();
   }
   w.crossVectors(v, u);
   let d = Math.sqrt(Math.pow(1 - radius, 2));
@@ -1085,9 +1086,10 @@ const drawFn = (orientation, normal, radius, shiftFn, colorFn) => {
   if (radius > 1) {
     v.negate();
   }
-  u.crossVectors(v, orientation.orient(Daydream.X_AXIS)).normalize();
-  if (u.length() == 0) {
-    u.crossVectors(v, orientation.orient(Daydream.Z_AXIS)).normalize();
+  if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.99995) {
+    u.crossVectors(v, Daydream.Y_AXIS).normalize();
+  } else {
+    u.crossVectors(v, Daydream.X_AXIS).normalize();
   }
   w.crossVectors(v, u);
   if (radius > 1) {
@@ -1109,12 +1111,11 @@ const drawFn = (orientation, normal, radius, shiftFn, colorFn) => {
       dots.push(new Dot(to, colorFn(to)));
       start = to;
     } else {
-      dots.push(new Dot(to, colorFn(to)));
-//      dots.push(...drawLine(from, to, colorFn));
+      dots.push(...drawLine(from, to, colorFn));
     }
     from = to;
   }
-  //dots.push(...drawLine(from, start, colorFn));
+  dots.push(...drawLine(from, start, colorFn));
 
   return dots;
 };
@@ -1137,9 +1138,11 @@ const drawRing = (normal, radius, colorFn, phase = 0) => {
     v.negate();
     phase = (phase + Math.PI) % (2 * Math.PI)
   }
-  u.crossVectors(v, Daydream.X_AXIS).normalize();
-  if (u.length() == 0) {
-    u.crossVectors(v, Daydream.Z_AXIS).normalize();
+
+  if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.99995) {
+    u.crossVectors(v, Daydream.Y_AXIS).normalize();
+  } else {
+    u.crossVectors(v, Daydream.X_AXIS).normalize();
   }
   w.crossVectors(v, u);
   if (radius > 1) {
@@ -1163,9 +1166,10 @@ const ringPoint = (normal, radius, angle, phase = 0) => {
   if (radius > 1) {
     v.negate();
   }
-  u.crossVectors(v, Daydream.X_AXIS).normalize();
-  if (u.length() == 0) {
-    u.crossVectors(v, Daydream.Z_AXIS).normalize();
+  if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.99995) {
+    u.crossVectors(v, Daydream.Y_AXIS).normalize();
+  } else {
+    u.crossVectors(v, Daydream.X_AXIS).normalize();
   }
   w.crossVectors(v, u);
   if (radius > 1) {
@@ -1694,7 +1698,9 @@ function intersectsPlane(v1, v2, normal) {
 }
 
 function angleBetween(v1, v2) {
-  return Math.acos(Math.max(-1, Math.min(1, v1.dot(v2))));
+  let len_product = v1.length() * v2.length();
+  let d = v1.dot(v2) / len_product;
+  return Math.acos(Math.max(-1, Math.min(1, d)));
 }
 
 function intersection(u, v, normal) {
@@ -3756,7 +3762,7 @@ class RandomWalk extends Animation {
     this.direction.applyAxisAngle(this.v, pivotAngle).normalize();
 
     //walk forward
-    const walkAxis = new THREE.Vector3().crossVectors(this.v, this.direction);
+    const walkAxis = new THREE.Vector3().crossVectors(this.v, this.direction).normalize();
     const walkAngle = this.WALK_SPEED;
     this.v.applyAxisAngle(walkAxis, walkAngle).normalize();
     this.direction.applyAxisAngle(walkAxis, walkAngle).normalize();
