@@ -2079,7 +2079,7 @@ class FilterDecayTrails extends Filter {
       if (ttl > 0) {
         let p = keyPixel(key);
         let color = trailFn(p[0], p[1], 1 - (ttl / this.lifespan));
-//        labels.push({ position: pixelToVector(p[0], p[1]), content: ttl.toFixed(1) });
+ //       labels.push({ position: pixelToVector(p[0], p[1]), content: `${parseFloat(p[0]).toFixed(1)}, ${parseFloat(p[1]).toFixed(1)}` });
         this.pass(pixels, p[0], p[1], color, this.lifespan - ttl, alpha);
       }
     }
@@ -2117,14 +2117,6 @@ function randomBetween(a, b) {
   return Math.random() * (b - a) + a;
 }
 
-
-/**
- * Converts HSV [0, 1] to HSL [0, 1].
- * @param {number} h - Hue (0-1)
- * @param {number} s - HSV Saturation (0-1)
- * @param {number} v - Value (0-1)
- * @returns {Array<number>} Iterable HSL array: [h, s, l]
- */
 const hsvToHsl = (h, s, v) => {
   const l = v * (1 - s / 2);
   const s_hsl = (l === 0 || l === 1) ? 0 : (v - l) / Math.min(l, 1 - l);
@@ -2173,11 +2165,7 @@ class GenerativePalette {
     return [hA, hB, hC];
   }
 
-  /**
-   * @param {string | null} shape - Optional. 'straight', 'circular', 'vignette', 'falloff;
-   * @param {string | null} harmonyType - Optional. 'analogous', 'triadic', 'split-complementary', or 'complementary'.
-   */
-  constructor(shape = 'straight', harmonyType = 'analagous') {
+  constructor(shape = 'straight', harmonyType = 'analagous', brightnessProfile = 'ascending') {
     this.shapeSpec = shape;
     this.harmonyType = harmonyType;
 
@@ -2189,22 +2177,35 @@ class GenerativePalette {
     let sat2 = randomBetween(0.4, 0.8);
     let sat3 = randomBetween(0.4, 0.8);
 
-    const v1 = randomBetween(0.1, 0.1);
-    const v2 = randomBetween(0.2, 0.5);
-    const v3 = randomBetween(0.6, 0.8);
+    let v1, v2, v3;
+    switch (brightnessProfile) {
+      case 'ascending':
+        v1 = randomBetween(0.1, 0.3);
+        v2 = randomBetween(0.5, 0.7);
+        v3 = randomBetween(0.8, 1.0);
+        break;
+      case 'descending':
+        v1 = randomBetween(0.8, 1.0);
+        v2 = randomBetween(0.5, 0.7);
+        v3 = randomBetween(0.1, 0.3);
+        break;
+      case 'flat':
+        v1 = 1.0;
+        v2 = 1.0;
+        v3 = 1.0;
+        break;
+      case 'bell':
+        v1 = randomBetween(0.2, 0.5);
+        v2 = randomBetween(0.7, 1.0);
+        v3 = v1;
+        break;
+    }
 
-    this.a = new THREE.Color().setHSL(...hsvToHsl(hA, sat1, v1)); // Darkest point (Start)
-    this.b = new THREE.Color().setHSL(...hsvToHsl(hB, sat2, v2)); // Mid point
-    this.c = new THREE.Color().setHSL(...hsvToHsl(hC, sat3, v3)); // Lightest point (End)
+    this.a = new THREE.Color().setHSL(...hsvToHsl(hA, sat1, v1));
+    this.b = new THREE.Color().setHSL(...hsvToHsl(hB, sat2, v2));
+    this.c = new THREE.Color().setHSL(...hsvToHsl(hC, sat3, v3));
   }
 
-  /**
-   * Generalized gradient function that uses a shape array to define color stops.
-   * Assumes 'this.a', 'this.b', 'this.c' and 'this.vignette' are available on 'this'.
-   * Requires THREE.Color (from three.js) to be defined.
-   * * @param {number} t - The interpolation value (usually a distance/time) from 0.0 to 1.0.
-   * @returns {THREE.Color} The color at time t, already converted to Linear space.
-   */
   get(t) {
     let colors;
     let shape;
@@ -3683,7 +3684,7 @@ class RingShower {
       this.duration = 8 + Math.random() * 72;
       this.radius = new MutableNumber(0);
       this.lastRadius = this.radius.get();
-      this.palette = new GenerativePalette('circular');
+      this.palette = new GenerativePalette('circular', 'analogous', 'flat');
     }
   }
 
@@ -3787,7 +3788,7 @@ class RingSpin {
     this.pixels = new Map();
     this.rings = [];
     this.alpha = 0.2;
-    this.trailLength = new MutableNumber(20);
+    this.trailLength = new MutableNumber(10);
     this.filters = new FilterAntiAlias();
     this.palettes = [richSunset, underSea, mangoPeel, lemonLime, algae, lateSunset];
     this.numRings = 1;
@@ -4156,8 +4157,8 @@ window.addEventListener("resize", () => daydream.setCanvasSize());
 window.addEventListener("keydown", (e) => daydream.keydown(e));
 
 // var effect = new Dynamo();
-// var effect = new RingShower();
- var effect = new RingSpin();
+ var effect = new RingShower();
+// var effect = new RingSpin();
 //var effect = new MetaballEffect();
 // var effect = new NoiseParticles();
 //var effect = new RingMachine();
