@@ -4195,6 +4195,177 @@ class Comets {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+
+
+
+/**
+ * FlowField Effect
+ * * This effect simulates a particle system where each particle is pushed
+ * across the sphere's surface by an evolving 4D Perlin noise field.
+ * A gentle gravity-like force, similar to the one in your MetaballEffect,
+ * keeps the particles from flying off, ensuring smooth, orbital motion.
+ */
+class FlowField {
+
+  // A simple class to hold particle state
+  static Particle = class {
+    constructor() {
+      // Start at a random point on the sphere's surface
+      this.pos = new THREE.Vector3(
+        Math.random() * 2 - 1,
+        Math.random() * 2 - 1,
+        Math.random() * 2 - 1
+      ).normalize();
+
+      // Start with no velocity
+      this.vel = new THREE.Vector3(0, 0, 0);
+    }
+  }
+
+  // 1. REPLACE the old constructor with this new one
+  constructor() {
+    this.pixels = new Map();
+    this.timeline = new Timeline();
+
+    // --- Configuration ---
+    // MODIFIED: Reduced default particle count
+    this.NUM_PARTICLES = 250;      // Total number of particles (Was 1000)
+    this.NOISE_SCALE = 1.5;
+    this.TIME_SCALE = 0.01;
+    this.FORCE_SCALE = 0.002;
+    this.GRAVITY = 0.001;
+    this.MAX_SPEED = 0.01;
+    // MODIFIED: Reduced default trail length
+    this.TRAIL_LENGTH = 8;         // Trail filter lifespan in frames (Was 15)
+    this.ALPHA = 0.7;
+
+    // --- Setup ---
+    this.particles = [];
+    // (Particles will be created in resetParticles)
+
+    this.noise = new PerlinNoise4D();
+    this.palette = iceMelt;
+
+    // --- Filters ---
+    // MODIFIED: Pass 'this.TRAIL_LENGTH' so it's not a static value
+    this.trails = new FilterDecayTrails(this.TRAIL_LENGTH);
+    this.aa = new FilterAntiAlias();
+    this.filters = new FilterRaw();
+
+    this.filters.chain(this.trails).chain(this.aa);
+
+    // --- GUI Controls ---
+    this.gui = new gui.GUI();
+
+    // NEW: Add GUI for particle count
+    this.gui.add(this, 'NUM_PARTICLES').min(50).max(2000).step(10).name('Particle Count').onChange(() => this.resetParticles());
+
+    // NEW: Add GUI for trail length
+    this.gui.add(this, 'TRAIL_LENGTH').min(1).max(30).step(1).name('Trail Length').onChange((value) => {
+      this.trails.lifespan = value; // Update the filter's lifespan directly
+    });
+
+    this.gui.add(this, 'NOISE_SCALE').min(0.1).max(5).step(0.1).name('Noise Scale');
+    this.gui.add(this, 'FORCE_SCALE').min(0.0001).max(0.01).step(0.0001).name('Force');
+    this.gui.add(this, 'GRAVITY').min(0).max(0.01).step(0.0001).name('Gravity');
+    this.gui.add(this, 'MAX_SPEED').min(0.001).max(0.1).step(0.001).name('Max Speed');
+    this.gui.add(this, 'ALPHA').min(0).max(1).step(0.01).name('Opacity');
+
+    // --- Initial Population ---
+    // NEW: Call the new method
+    this.resetParticles();
+  }
+
+  // 2. ADD this new method right after the constructor
+  /**
+   * Clears and repopulates the particle array based on this.NUM_PARTICLES.
+   * Called by the constructor and the "Particle Count" GUI slider.
+   */
+  resetParticles() {
+    this.particles = []; // Clear old particles
+    for (let i = 0; i < this.NUM_PARTICLES; i++) {
+      this.particles.push(new FlowField.Particle());
+    }
+  }
+
+  // (The 'Particle' subclass, 'drawFrame', and 'getNoiseForce' methods
+  // can all remain exactly as they were.)
+
+  /**
+   * Main render loop, called by the daydream renderer.
+   */
+  drawFrame() {
+    this.pixels.clear();
+    this.timeline.step(); // This increments this.timeline.t
+    this.trails.decay();  // Age all existing trails by one frame
+
+    let dots = []; // A buffer for all particle "heads" this frame
+
+    for (const p of this.particles) {
+      // 1. Get acceleration from the 4D noise field
+      let accel = this.getNoiseForce(p.pos, this.timeline.t);
+
+      // 2. Apply a gravity force pulling the particle to the center
+      // This is the same technique from your MetaballEffect
+      let gravityForce = p.pos.clone().multiplyScalar(-this.GRAVITY);
+      accel.add(gravityForce);
+
+      // 3. Update velocity
+      p.vel.add(accel);
+      p.vel.clampLength(0, this.MAX_SPEED); // Apply terminal velocity
+
+      // 4. Update position
+      p.pos.add(p.vel);
+      p.pos.normalize(); // Snap the particle back to the sphere's surface
+
+      // 5. Get color based on speed
+      // We map the particle's speed [0, MAX_SPEED] to the palette's t [0, 1]
+      let speedRatio = p.vel.length() / this.MAX_SPEED;
+      let color = this.palette.get(speedRatio);
+
+      // 6. Add the particle's head to the dot buffer
+      dots.push(new Dot(p.pos, color));
+    }
+
+    // Plot all particle heads to the trail filter (with age 0)
+    plotDots(this.pixels, this.filters, dots, 0, this.ALPHA);
+
+    // Now, render the actual trails left behind from previous frames
+    this.trails.trail(this.pixels,
+      (x, y, t) => {
+        // 't' is the trail's age (0.0 at head, 1.0 at end)
+        // We'll fade the color and brightness based on its age.
+        return this.palette.get(1.0 - t).multiplyScalar(1.0 - t);
+      },
+      this.ALPHA
+    );
+
+    return this.pixels;
+  }
+
+  /**
+   * Helper to get a 3D force vector from 4D noise.
+   * We sample the noise field 3 times with different 'w' (time) offsets
+   * to create a complex, "swirly" vector field.
+   */
+  getNoiseForce(pos, t) {
+    let t_scaled = t * this.TIME_SCALE;
+    let n_pos = pos.clone().multiplyScalar(this.NOISE_SCALE);
+
+    let x_force = this.noise.noise(n_pos.x, n_pos.y, n_pos.z, t_scaled);
+    let y_force = this.noise.noise(n_pos.x, n_pos.y, n_pos.z, t_scaled + 100);
+    let z_force = this.noise.noise(n_pos.x, n_pos.y, n_pos.z, t_scaled + 200);
+
+    return new THREE.Vector3(x_force, y_force, z_force).multiplyScalar(this.FORCE_SCALE);
+  }
+}
+
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////
 const daydream = new Daydream();
 window.addEventListener("resize", () => daydream.setCanvasSize());
 window.addEventListener("keydown", (e) => daydream.keydown(e));
@@ -4205,6 +4376,7 @@ window.addEventListener("keydown", (e) => daydream.keydown(e));
 //var effect = new MetaballEffect();
 // var effect = new NoiseParticles();
 //var effect = new RingMachine();
-var effect = new Comets();
+//var effect = new Comets();
+var effect = new FlowField();
 
 daydream.renderer.setAnimationLoop(() => daydream.render(effect));
