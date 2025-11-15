@@ -715,15 +715,19 @@ class PerlinNoise4D {
 
     // 5. "Quad"-linearly interpolate the 16 corner gradients
 
+    // *** --- FIX WAS APPLIED HERE --- ***
+    // All calls to this.grad() are now wrapped in this.p[... & 255]
+    // to correctly look up the gradient from the permutation table.
+
     // Lerp along W (time)
-    const res0 = this.lerp(this.grad(AAA, x_frac, y_frac, z_frac, w_frac), this.grad(AAA + 1, x_frac, y_frac, z_frac, w_frac - 1), t);
-    const res1 = this.lerp(this.grad(BAA, x_frac - 1, y_frac, z_frac, w_frac), this.grad(BAA + 1, x_frac - 1, y_frac, z_frac, w_frac - 1), t);
-    const res2 = this.lerp(this.grad(ABA, x_frac, y_frac - 1, z_frac, w_frac), this.grad(ABA + 1, x_frac, y_frac - 1, z_frac, w_frac - 1), t);
-    const res3 = this.lerp(this.grad(BBA, x_frac - 1, y_frac - 1, z_frac, w_frac), this.grad(BBA + 1, x_frac - 1, y_frac - 1, z_frac, w_frac - 1), t);
-    const res4 = this.lerp(this.grad(AAB, x_frac, y_frac, z_frac - 1, w_frac), this.grad(AAB + 1, x_frac, y_frac, z_frac - 1, w_frac - 1), t);
-    const res5 = this.lerp(this.grad(BAB, x_frac - 1, y_frac, z_frac - 1, w_frac), this.grad(BAB + 1, x_frac - 1, y_frac, z_frac - 1, w_frac - 1), t);
-    const res6 = this.lerp(this.grad(ABB, x_frac, y_frac - 1, z_frac - 1, w_frac), this.grad(ABB + 1, x_frac, y_frac - 1, z_frac - 1, w_frac - 1), t);
-    const res7 = this.lerp(this.grad(BBB, x_frac - 1, y_frac - 1, z_frac - 1, w_frac), this.grad(BBB + 1, x_frac - 1, y_frac - 1, z_frac - 1, w_frac - 1), t);
+    const res0 = this.lerp(this.grad(this.p[AAA & 255], x_frac, y_frac, z_frac, w_frac), this.grad(this.p[AAA + 1 & 255], x_frac, y_frac, z_frac, w_frac - 1), t);
+    const res1 = this.lerp(this.grad(this.p[BAA & 255], x_frac - 1, y_frac, z_frac, w_frac), this.grad(this.p[BAA + 1 & 255], x_frac - 1, y_frac, z_frac, w_frac - 1), t);
+    const res2 = this.lerp(this.grad(this.p[ABA & 255], x_frac, y_frac - 1, z_frac, w_frac), this.grad(this.p[ABA + 1 & 255], x_frac, y_frac - 1, z_frac, w_frac - 1), t);
+    const res3 = this.lerp(this.grad(this.p[BBA & 255], x_frac - 1, y_frac - 1, z_frac, w_frac), this.grad(this.p[BBA + 1 & 255], x_frac - 1, y_frac - 1, z_frac, w_frac - 1), t);
+    const res4 = this.lerp(this.grad(this.p[AAB & 255], x_frac, y_frac, z_frac - 1, w_frac), this.grad(this.p[AAB + 1 & 255], x_frac, y_frac, z_frac - 1, w_frac - 1), t);
+    const res5 = this.lerp(this.grad(this.p[BAB & 255], x_frac - 1, y_frac, z_frac - 1, w_frac), this.grad(this.p[BAB + 1 & 255], x_frac - 1, y_frac, z_frac - 1, w_frac - 1), t);
+    const res6 = this.lerp(this.grad(this.p[ABB & 255], x_frac, y_frac - 1, z_frac - 1, w_frac), this.grad(this.p[ABB + 1 & 255], x_frac, y_frac - 1, z_frac - 1, w_frac - 1), t);
+    const res7 = this.lerp(this.grad(this.p[BBB & 255], x_frac - 1, y_frac - 1, z_frac - 1, w_frac), this.grad(this.p[BBB + 1 & 255], x_frac - 1, y_frac - 1, z_frac - 1, w_frac - 1), t);
 
     // Lerp along Z
     const res8 = this.lerp(res0, res4, s);
@@ -2123,6 +2127,16 @@ const hsvToHsl = (h, s, v) => {
   return [h, s_hsl, l];
 }
 
+class reversePalette {
+  constructor(palette) {
+    this.palette = palette;
+  }
+
+  get(t) {
+    return this.palette.get(1 - t);
+  }
+}
+
 class GenerativePalette {
   static seed = Math.random();
 
@@ -2430,6 +2444,13 @@ const emeraldForest = new Gradient(16384, [
   [1, 0x000000]  
 ]);
 
+const bloodStream = new ProceduralPalette(
+  [0.169, 0.169, 0.169], // A
+  [0.313, 0.313, 0.313], // B
+  [0.231, 0.231, 0.231], // C
+  [0.036, 0.366, 0.706]  // D
+);
+
 const vintageSunset = new ProceduralPalette(
   [0.256, 0.256, 0.256], // A
   [0.500, 0.080, 0.500], // B
@@ -2465,6 +2486,13 @@ const mangoPeel = new ProceduralPalette(
   [0.566, 0.896, 0.236]  // D
 );
 
+const iceMelt = new ProceduralPalette(
+  [0.500, 0.500, 0.500], // A
+  [0.500, 0.500, 0.500], // B
+  [0.083, 0.147, 0.082], // C
+  [0.579, 0.353, 0.244]  // D
+);
+
 const lemonLime = new ProceduralPalette(
   [0.455, 0.455, 0.455], // A
   [0.571, 0.151, 0.571], // B
@@ -2473,12 +2501,18 @@ const lemonLime = new ProceduralPalette(
 );
 
 const algae = new ProceduralPalette(
-  [0.337, 0.500, 0.096], // A
-  [0.500, 1.000, 0.176], // B
-  [0.134, 0.134, 0.134], // C
-  [0.328, 0.658, 0.948]  // D
+  [0.210, 0.210, 0.210], // A
+  [0.500, 1.000, 0.021], // B
+  [0.086, 0.086, 0.075], // C
+  [0.419, 0.213, 0.436]  // D
 );
 
+const embers = new ProceduralPalette(
+  [0.500, 0.500, 0.500], // A
+  [0.500, 0.500, 0.500], // B
+  [0.265, 0.285, 0.198], // C
+  [0.577, 0.440, 0.358]  // D
+);
 const paletteFalloff = function (color, size, t) {
   if (t >= (1 - size)) {
     t = (t - (1 - size)) / size;
@@ -3788,10 +3822,10 @@ class RingSpin {
     this.pixels = new Map();
     this.rings = [];
     this.alpha = 0.2;
-    this.trailLength = new MutableNumber(10);
+    this.trailLength = new MutableNumber(6);
     this.filters = new FilterAntiAlias();
-    this.palettes = [richSunset, underSea, mangoPeel, lemonLime, algae, lateSunset];
-    this.numRings = 1;
+    this.palettes = [richSunset, iceMelt, algae, bloodStream];
+    this.numRings = 2;
 
     this.timeline = new Timeline();
     this.timeline.add(new Mutation(this.trailLength,
@@ -3799,7 +3833,7 @@ class RingSpin {
       10, true)
     );
     for (let i = 0; i < this.numRings; ++i) {
-      this.spawnRing(Daydream.X_AXIS, this.palettes[i]);
+      this.spawnRing(randomVector(), this.palettes[i]);
     }
 
     this.gui = new gui.GUI();
@@ -3829,7 +3863,7 @@ class RingSpin {
         (end - 1 - i) / end,
         this.alpha);
     }
-    ring.trails.trail(this.pixels, (x, y, t) => vignette(ring.palette)(1 - t), this.alpha);
+    ring.trails.trail(this.pixels, (x, y, t) => vignette(ring.palette)(t), this.alpha);
     ring.trails.decay();
     ring.orientation.collapse();
   }
@@ -4012,16 +4046,16 @@ class NoiseFieldEffect {
 class MetaballEffect {
   constructor() {
     this.pixels = new Map();
-    this.palette = darkRainbow; //
+    this.palette = richSunset;
     this.t = 0;
 
     // --- Tunable Knobs ---
-    this.maxInfluence = 5.0;
-    this.gravity = 0.0005; // New knob: How strong is the pull to the center?
+    this.maxInfluence = 10.0;
+    this.gravity = 0.005; // New knob: How strong is the pull to the center?
 
     // --- Define our 16 Metaballs ---
     this.balls = [];
-    const NUM_BALLS = 8;
+    const NUM_BALLS = 16;
 
     for (let i = 0; i < NUM_BALLS; i++) {
       const rand = (min, max) => Math.random() * (max - min) + min;
@@ -4090,12 +4124,11 @@ class MetaballEffect {
   }
 }
 
-class MotionPathTest {
+class Comets {
   static Node = class {
     constructor() {
       this.orientation = new Orientation();
       this.v = randomVector();
-      this.palette = new GenerativePalette();
       this.path = new Path();
       this.updatePath();
     }
@@ -4107,23 +4140,31 @@ class MotionPathTest {
   }
   constructor() {
     this.pixels = new Map();
-    this.filters = new FilterAntiAlias();
-    this.numNodes = 16;
+    this.alpha = 0.5;
+    this.orientation = new Orientation();
+    this.palette = embers;
+    this.filters = new FilterDecayTrails(20);
+    this.filters
+      .chain(new FilterOrient(this.orientation))
+      .chain(new FilterAntiAlias());
+    this.numNodes = 6;
     this.nodes = [];
     this.timeline = new Timeline();
 
     for (let i = 0; i < this.numNodes; ++i) {
       this.spawnNode();
     }
+
+    this.timeline.add(0, new RandomWalk(this.orientation, randomVector()));
   }
 
   spawnNode() {
     let i = this.nodes.length;
     this.nodes.push(new MotionPathTest.Node());
-    this.timeline.add(0,
-      new Sprite((opacity) => this.drawNode(opacity, i), -1, 32, easeMid, 0, easeMid)
+    this.timeline.add(randomBetween(0, 48),
+      new Sprite((opacity) => this.drawNode(opacity, i), -1, 16, easeMid, 0, easeMid)
     );
-    this.timeline.add(0,
+    this.timeline.add(randomBetween(0, 16),
       new Motion(this.nodes[i].orientation, this.nodes[i].path, 16, true)
         .then(() => {
           this.nodes[i].updatePath();
@@ -4138,7 +4179,7 @@ class MotionPathTest {
     let s = node.orientation.length();
     for (let i = 0; i < s; ++i) {
       dots.push(...drawVector(node.orientation.orient(node.v, i),
-        (v, t) => node.palette.get(1 - ((s - 1 - i) / s))));
+        (v, t) => this.palette.get(1 - ((s - 1 - i) / s))));
     }
     plotDots(this.pixels, this.filters, dots, 0, opacity);
     node.orientation.collapse();
@@ -4147,6 +4188,8 @@ class MotionPathTest {
   drawFrame() {
     this.pixels.clear();
     this.timeline.step();
+    this.filters.trail(this.pixels, (x, y, t) => this.palette.get(1 - t), this.alpha);
+    this.filters.decay();
     return this.pixels;
   }
 }
@@ -4156,12 +4199,12 @@ const daydream = new Daydream();
 window.addEventListener("resize", () => daydream.setCanvasSize());
 window.addEventListener("keydown", (e) => daydream.keydown(e));
 
-// var effect = new Dynamo();
- var effect = new RingShower();
+// var effect = new Dynamo();//
+// var effect = new RingShower();
 // var effect = new RingSpin();
 //var effect = new MetaballEffect();
 // var effect = new NoiseParticles();
 //var effect = new RingMachine();
-//var effect = new MotionPathTest();
+var effect = new Comets();
 
 daydream.renderer.setAnimationLoop(() => daydream.render(effect));
