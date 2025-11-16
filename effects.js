@@ -18,7 +18,8 @@ import {
   blendOverMax, ProceduralPalette, MutatingPalette, blueToBlack,
   rainbow, vignette, darkRainbow, richSunset, bloodStream,
   lateSunset, GenerativePalette, g1, g2, grayToBlack,
-  emeraldForest, vintageSunset, underSea, mangoPeel 
+  emeraldForest, vintageSunset, underSea, mangoPeel, iceMelt, lemonLime,
+  algae, embers
 } from "./color.js";
 
 import {
@@ -1413,11 +1414,10 @@ export class RingMachine {
       this.spawnRing(Daydream.Z_AXIS, axis, this.speed, i * 16, lateSunset, this.trailLength);
     }
 
-    // !! ERROR: lemonLime is not defined in color.js
-    // for (let i = 0; i < this.numRings; ++i) {
-    //   let axis = Daydream.Z_AXIS.clone().applyAxisAngle(Daydream.X_AXIS, i * this.offsetAngle)
-    //   this.spawnRing(Daydream.X_AXIS, axis, this.speed, i * 16, lemonLime, this.trailLength);
-    // }
+    for (let i = 0; i < this.numRings; ++i) {
+      let axis = Daydream.Z_AXIS.clone().applyAxisAngle(Daydream.X_AXIS, i * this.offsetAngle)
+      this.spawnRing(Daydream.X_AXIS, axis, this.speed, i * 16, lemonLime, this.trailLength);
+    }
 
     this.gui = new gui.GUI();
     this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
@@ -1452,7 +1452,7 @@ export class RingMachine {
     // Draw current position
     let dots = drawVector(
       ring.orientation.orient(ring.normal),
-      (v, t) => ring.palette.get(ring.palette.length - 1)); // This might be an error, palettes don't have .length
+      (v, t) => ring.palette.get(1.0));
     plotDots(this.pixels, ring.trails, dots, 0, this.alpha);
   }
 

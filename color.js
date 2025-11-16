@@ -478,3 +478,38 @@ export const mangoPeel = new ProceduralPalette(
   [0.431, 0.431, 0.431], // C
   [0.566, 0.896, 0.236]  // D
 );
+
+export const iceMelt = new ProceduralPalette(
+  [0.500, 0.500, 0.500], // A
+  [0.500, 0.500, 0.500], // B
+  [0.083, 0.147, 0.082], // C
+  [0.579, 0.353, 0.244]  // D
+);
+
+export const lemonLime = new ProceduralPalette(
+  [0.455, 0.455, 0.455], // A
+  [0.571, 0.151, 0.571], // B
+  [0.320, 0.320, 0.320], // C
+  [0.087, 0.979, 0.319]  // D
+);
+
+export const algae = new ProceduralPalette(
+  [0.210, 0.210, 0.210], // A
+  [0.500, 1.000, 0.021], // B
+  [0.086, 0.086, 0.075], // C
+  [0.419, 0.213, 0.436]  // D
+);
+
+export const embers = new ProceduralPalette(
+  [0.500, 0.500, 0.500], // A
+  [0.500, 0.500, 0.500], // B
+  [0.265, 0.285, 0.198], // C
+  [0.577, 0.440, 0.358]  // D
+);
+export const paletteFalloff = function (color, size, t) {
+  if (t >= (1 - size)) {
+    t = (t - (1 - size)) / size;
+    return color.clone().lerpColors(color, new THREE.Color(0, 0, 0), t);
+  }
+  return color;
+}
