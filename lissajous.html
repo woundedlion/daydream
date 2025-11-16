@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spherical Lissajous Visualizer</title>
+    <!-- Tailwind CSS for modern styling and responsiveness -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js",
+                "three/addons/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/controls/OrbitControls.js"
+            }
+        }
+    </script>
+    <style>
+        /* Custom styles inspired by palettes.html */
+        :root {
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-700: #334155;
+            --blue-500: #3b82f6;
+            --indigo-400: #818cf8;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--slate-900);
+            color: #E2E8F0;
+            overflow: hidden; /* Prevent scrolling */
+        }
+
+        /* REMOVED .container flex layout */
+
+        #canvasContainer {
+            position: fixed; /* CHANGED */
+            top: 0;
+            left: 0;
+            width: 100vw;     /* CHANGED */
+            height: 100vh;    /* CHANGED */
+            z-index: 10;      /* ADDED */
+        }
+
+        #controls {
+            position: fixed; /* CHANGED */
+            top: 0;
+            right: 0;
+            height: 100vh;    /* CHANGED */
+            z-index: 20;      /* ADDED */
+            width: 420px;
+            max-width: 100vw;
+            padding: 1.5rem;
+            background-color: rgba(30, 41, 59, 0.9); /* ADDED opacity */
+            backdrop-filter: blur(8px);              /* ADDED blur */
+            -webkit-backdrop-filter: blur(8px);    /* ADDED blur */
+            overflow-y: auto;
+            box-shadow: -4px 0 10px rgba(0, 0, 0, 0.4);
+            border-left: 1px solid var(--slate-700); /* ADDED border */
+        }
+
+        /* Styling for the parameter groups */
+        .param-group {
+            background-color: var(--slate-700);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Custom slider styles (copied from palettes.html spirit) */
+        input[type=range] {
+            height: 6px;
+            -webkit-appearance: none;
+            width: 100%;
+            background: #475569;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--blue-500);
+            cursor: pointer;
+            margin-top: -2px; /* Shifted down from -3px */
+        }
+        .slider-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            color: var(--indigo-400);
+        }
+    </style>
+</head>
+<body>
+    <!-- 3D Canvas Container -->
+    <div id="canvasContainer">
+        <canvas id="threeCanvas" class="w-full h-full"></canvas>
+    </div>
+
+    <!-- Control Panel (now an overlay) -->
+    <div id="controls" class="space-y-6">
+        <h1 class="text-3xl font-bold text-white text-center">Lissajous Visualizer</h1>
+        <p class="text-sm text-gray-400 text-center">
+            Spherical Lissajous: F(t) = (sin(C₁t)cos(C₂t), sin(C₂t)sin(C₁t), cos(C₂t))
+        </p>
+
+        <div id="sliders">
+            <!-- Parameter m1: Frequency 1 -->
+            <div class="param-group">
+                <h3 class="text-xl font-semibold text-indigo-400">Frequency C₁ (Axial)</h3>
+                <div id="C1_container" class="flex items-center space-x-3 mt-2"></div>
+            </div>
+
+            <!-- Parameter m2: Frequency 2 -->
+            <div class="param-group">
+                <h3 class="text-xl font-semibold text-indigo-400">Frequency C₂ (Orbital)</h3>
+                <div id="C2_container" class="flex items-center space-x-3 mt-2"></div>
+            </div>
+
+            <!-- Parameter a: Phase Shift -->
+        <div class="param-group">
+            <h3 class="text-xl font-semibold text-indigo-400">Phase Shift A (radians)</h3>
+            <div id="A_container" class="flex items-center space-x-3 mt-2"></div>
+        </div>
+
+        <!-- Visualization Parameters -->
+            <div class="param-group">
+                <h3 class="text-xl font-semibold text-indigo-400">Rendering</h3>
+                <!-- Duration -->
+                <div id="Duration_container" class="flex items-center space-x-3 mt-2"></div>
+                <!-- Sample Count -->
+                <div id="Samples_container" class="flex items-center space-x-3 mt-2"></div>
+            </div>
+        </div>
+        
+        <p class="text-xs text-gray-400 mt-4 text-center">Use mouse/trackpad to orbit the camera.</p>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // Utility to get CSS variable color and convert to numeric hex
+        const getCssColor = (name) => {
+            const hex = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+            // Convert '#0f172a' to 0x0f172a
+            return parseInt(hex.startsWith('#') ? hex.substring(1) : hex, 16);
+        };
+        
+        const SLATE_900 = getCssColor('--slate-900');
+
+
+        // --- Configuration and State ---
+        const config = {
+            C1: { min: 1, max: 20, step: 0.001, default: 12, scale: 1000, label: "C₁" },
+            C2: { min: 1, max: 20, step: 0.001, default: 5, scale: 1000, label: "C₂" },
+            A: { min: 0, max: (2 * Math.PI), step: (2 * Math.PI) / 1000, default: 0, scale: 1000 / (2 * Math.PI), label: "A (rad)" }, // Range 0 to 2*PI, 1000 steps
+            Duration: { min: 0, max: (2 * Math.PI), step: (2 * Math.PI) / 1000, default: 2 * Math.PI, scale: 1000 / (2 * Math.PI), label: "Duration" }, // Domain for t: [0, Duration]
+            Samples: { min: 200, max: 10000, step: 1, default: 4000, label: "Samples" }
+        };
+
+        const state = {
+            C1: config.C1.default,
+            C2: config.C2.default,
+            A: config.A.default, // Stored as raw float (default is 0)
+            Duration: config.Duration.default, // Stored as raw float (default is 2*PI)
+            Samples: config.Samples.default
+        };
+
+        let scene, camera, renderer, controls, line;
+
+        // --- Lissajous Function ---
+
+        /**
+         * Calculates a point on the spherical Lissajous curve.
+         * The function is a variation that maintains unit length (on the sphere).
+         *
+         * @param {number} t - Time parameter.
+         * @param {number} m1 - Frequency 1 (Axial/Latitudinal).
+         * @param {number} m2 - Frequency 2 (Orbital/Longitudinal).
+         * @param {number} a - Phase shift (in radians).
+         * @returns {THREE.Vector3} The 3D point on the unit sphere.
+         */
+        const lissajous = (t, m1, m2, a) => {
+            const phase = a; // 'a' is now directly in radians
+
+            // This variant projects a 2D Lissajous onto the Z-axis for a spherical mapping
+            const x = Math.sin(m2 * t) * Math.cos(m1 * t - phase);
+            const y = Math.cos(m2 * t);
+            const z = Math.sin(m2 * t) * Math.sin(m1 * t - phase);
+
+            // Normalize to ensure it's on the unit sphere (standard for POV)
+            return new THREE.Vector3(x, y, z).normalize();
+        };
+
+        // --- THREE.js Setup ---
+
+        const initThree = () => {
+            const container = document.getElementById('canvasContainer');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            scene = new THREE.Scene();
+            // FIX: Use the resolved numeric hex color
+            scene.background = new THREE.Color(SLATE_900);
+
+            camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            camera.position.set(0, 0, 4);
+
+            renderer = new THREE.WebGLRenderer({
+                canvas: document.getElementById('threeCanvas'),
+                antialias: true
+            });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(window.devicePixelRatio);
+
+            // Orbit Controls for camera manipulation
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.minDistance = 2;
+            controls.maxDistance = 10;
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Add a unit sphere for reference
+            const geometry = new THREE.SphereGeometry(1, 64, 32);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0x334155, // Slate 700
+                wireframe: true,
+                transparent: true,
+                opacity: 0.2
+            });
+            const sphere = new THREE.Mesh(geometry, material);
+            scene.add(sphere);
+
+            regenerateCurve();
+            animate();
+        };
+
+        const regenerateCurve = () => {
+            if (line) {
+                scene.remove(line);
+                line.geometry.dispose();
+                line.material.dispose();
+            }
+
+            const points = [];
+            const segments = parseInt(state.Samples);
+            const domain = state.Duration; // Domain is now 0 to 2*PI
+
+            for (let i = 0; i <= segments; i++) {
+                const t = (i / segments) * domain;
+                const point = lissajous(t, state.C1, state.C2, state.A);
+                points.push(point);
+            }
+
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({
+                color: 0x818cf8, // Indigo 400
+                linewidth: 2 // Note: linewidth is generally not respected across all platforms
+            });
+            line = new THREE.Line(geometry, material);
+            scene.add(line);
+        };
+
+        const animate = () => {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        };
+
+        // --- UI Setup ---
+
+        const createSlider = (id, params) => {
+            const container = document.getElementById(`${id}_container`);
+            if (!container) return;
+
+            const sliderId = `${id}_slider`;
+            const valueSpanId = `${id}_value`;
+            const isFloat = params.step < 1;
+            const scale = params.scale || 1;
+            
+            // Determine the number of decimal places from the step
+            let decimals = 0;
+            if (id === 'A' || id === 'Duration') {
+                decimals = 3; // Show 3 decimal places for radians
+            } else if (isFloat) {
+                const stepStr = params.step.toString();
+                decimals = (stepStr.includes('.')) ? stepStr.split('.')[1].length : 0;
+            }
+
+            // Determine if parameter is float and needs scaling
+            const initialValue = params.default * scale;
+
+            container.innerHTML = `
+                <span class="w-20 text-center font-bold text-white text-lg">${params.label}:</span>
+                <input type="range" id="${sliderId}" 
+                    min="${Math.round(params.min * scale)}" 
+                    max="${Math.round(params.max * scale)}" 
+                    step="${Math.round(params.step * scale)}" 
+                    value="${Math.round(initialValue)}" 
+                    class="flex-grow">
+                <span id="${valueSpanId}" class="slider-label w-24 text-right"> <!-- WIDENED from w-16 -->
+                    ${(params.default).toFixed(decimals)}
+                </span>
+            `;
+
+            const slider = document.getElementById(sliderId);
+            const valueSpan = document.getElementById(valueSpanId);
+
+            slider.addEventListener('input', () => {
+                const rawValue = parseFloat(slider.value);
+                let newValue = rawValue / scale;
+                let displayValue = newValue;
+                
+                // Determine the number of decimal places from the step
+                let decimals = 0;
+                if (id === 'A' || id === 'Duration') {
+                    decimals = 3; // Show 3 decimal places for radians
+                } else if (isFloat) {
+                    const stepStr = params.step.toString();
+                    decimals = (stepStr.includes('.')) ? stepStr.split('.')[1].length : 0;
+                }
+
+                if (id === 'Samples') { // ONLY handle Samples here
+                    displayValue = Math.round(newValue);
+                    valueSpan.textContent = displayValue.toFixed(0);
+                    state[id] = displayValue;
+                } else { // C1, C2, A, and Duration will fall here
+                    displayValue = newValue.toFixed(decimals); // Use dynamic precision
+                    valueSpan.textContent = displayValue;
+                    state[id] = newValue;
+                }
+                
+                // Regenerate the curve on every slider input
+                regenerateCurve();
+            });
+            
+        };
+
+        // Create the sliders
+        Object.keys(config).forEach(id => {
+            createSlider(id, config[id]);
+        });
+
+        // --- Window Event Handlers ---
+
+        const onWindowResize = () => {
+            const container = document.getElementById('canvasContainer');
+            if (!container) return;
+            
+            // CHANGED: Use window.innerWidth/Height for the full-screen canvas
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        };
+
+        // Attach event listeners
+        window.addEventListener('resize', onWindowResize);
+
+        // --- Initialization ---
+        window.onload = () => {
+            // Set initial state from default config values
+            state.C1 = config.C1.default;
+            state.C2 = config.C2.default;
+            state.A = config.A.default;
+            state.Duration = config.Duration.default;
+            state.Samples = config.Samples.default;
+
+            initThree();
+        };
+
+    </script>
+</body>
+</html>
