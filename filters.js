@@ -54,7 +54,7 @@ export class FilterRaw extends Filter {
 export class FilterFn extends Filter {
   constructor(fn) {
     super();
-    thi.fn = fn();
+    this.fn = fn();
   }
 
   plot(pixels, x, y, color, age, alpha) {

@@ -37,7 +37,7 @@ import {
 } from "./filters.js";
 
 import { PerlinNoise1D, PerlinNoise4D } from "./noise.js";
-import { dir, wrap, shortest_distance, randomChoice } from "./util.js";
+import { dir, wrap, shortest_distance, randomChoice, randomBetween } from "./util.js";
 
 
 class PolyRot {
@@ -1644,9 +1644,7 @@ export class Comets {
     this.alpha = 0.5;
     this.orientation = new Orientation();
 
-    // !! ERROR: 'embers' palette is not defined in color.js
-    // this.palette = embers; 
-    this.palette = richSunset; // Using 'richSunset' as a fallback
+    this.palette = embers;
 
     this.filters = new FilterDecayTrails(20);
     this.filters
@@ -1666,10 +1664,10 @@ export class Comets {
   spawnNode() {
     let i = this.nodes.length;
     this.nodes.push(new Comets.Node());
-    this.timeline.add(randomChoice([0, 48]), // randomBetween not defined, using randomChoice
+    this.timeline.add(randomBetween(0, 48),
       new Sprite((opacity) => this.drawNode(opacity, i), -1, 16, easeMid, 0, easeMid)
     );
-    this.timeline.add(randomChoice([0, 16]), // randomBetween not defined, using randomChoice
+    this.timeline.add(randomBetween(0, 16),
       new Motion(this.nodes[i].orientation, this.nodes[i].path, 16, true)
         .then(() => {
           this.nodes[i].updatePath();

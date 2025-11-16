@@ -41,3 +41,6 @@ export const randomChoice = (choices) => {
   }
   return choices[Math.floor(Math.random() * choices.length)];
 }
+export function randomBetween(a, b) {
+  return Math.random() * (b - a) + a;
+}

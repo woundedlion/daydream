@@ -110,10 +110,6 @@ export class Gradient {
   }
 };
 
-export function randomBetween(a, b) {
-  return Math.random() * (b - a) + a;
-}
-
 export const hsvToHsl = (h, s, v) => {
   const l = v * (1 - s / 2);
   const s_hsl = (l === 0 || l === 1) ? 0 : (v - l) / Math.min(l, 1 - l);
