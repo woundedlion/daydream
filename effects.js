@@ -11,7 +11,7 @@ import {
 
 import {
   Path, drawLine, drawRing, plotDots, drawPolyhedron,
-  drawFn, ringPoint, fnPoint, drawVector
+  drawFn, ringPoint, fnPoint, drawVector, ProceduralPath
 } from "./draw.js";
 
 import {
@@ -1328,12 +1328,8 @@ export class RingSpin {
 
     this.palettes = [richSunset, iceMelt];
     this.numRings = 2;
-
     this.timeline = new Timeline();
-    this.timeline.add(0, new Mutation(this.trailLength,
-      sinWave(0, 20, 1, 0),
-      10, true)
-    );
+
     for (let i = 0; i < this.numRings; ++i) {
       this.spawnRing(randomVector(), this.palettes[i]);
     }
@@ -1625,53 +1621,50 @@ export class MetaballEffect {
   }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 export class Comets {
   static Node = class {
-    constructor() {
+    constructor(path) {
       this.orientation = new Orientation();
-      this.v = randomVector();
-      this.path = new Path();
-      this.updatePath();
-    }
-
-    updatePath() {
-      this.path.collapse();
-      this.path.appendLine(this.orientation.orient(this.v), randomVector(), true, easeMid);
+      this.v = Daydream.Y_AXIS;
+      this.path = path;
     }
   }
   constructor() {
     this.pixels = new Map();
+    this.numNodes = 6;
+    this.trailLength = 12;
+    this.spacing = 24;
     this.alpha = 0.5;
     this.orientation = new Orientation();
+    this.path = new Path(Daydream.Y_AXIS);
+    this.path.appendSegment((t) => lissajous(12, 5, 0, t), 2 * Math.PI, 1024, easeMid);
 
     this.palette = embers;
 
-    this.filters = new FilterDecayTrails(20);
+    this.filters = new FilterDecayTrails(this.trailLength);
     this.filters
       .chain(new FilterOrient(this.orientation))
       .chain(new FilterAntiAlias());
-    this.numNodes = 6;
     this.nodes = [];
     this.timeline = new Timeline();
 
     for (let i = 0; i < this.numNodes; ++i) {
-      this.spawnNode();
+      this.spawnNode(this.path);
     }
 
     this.timeline.add(0, new RandomWalk(this.orientation, randomVector()));
   }
 
-  spawnNode() {
+  spawnNode(path) {
     let i = this.nodes.length;
-    this.nodes.push(new Comets.Node());
-    this.timeline.add(randomBetween(0, 48),
+    this.nodes.push(new Comets.Node(path));
+    this.timeline.add(0,
       new Sprite((opacity) => this.drawNode(opacity, i), -1, 16, easeMid, 0, easeMid)
     );
-    this.timeline.add(randomBetween(0, 16),
-      new Motion(this.nodes[i].orientation, this.nodes[i].path, 16, true)
-        .then(() => {
-          this.nodes[i].updatePath();
-        })
+    this.timeline.add(i * this.spacing,
+      new Motion(this.nodes[i].orientation, this.nodes[i].path, 320, true)
     );
 
   }

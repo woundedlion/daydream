@@ -17,7 +17,7 @@ window.addEventListener("keydown", (e) => daydream.keydown(e));
 //var effect = new MetaballEffect();
 // var effect = new NoiseParticles();
 // var effect = new RingMachine();
-var effect = new Comets();
+ var effect = new Comets();
 // var effect = new FlowField();
 // var effect = new VerticalMarch();
 
