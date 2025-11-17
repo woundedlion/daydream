@@ -259,3 +259,10 @@ export function plotDots(pixels, filter, dots, age, alpha) {
     filter.plot(pixels, p.x, p.y, dot.color, age, alpha);
   }
 }
+
+export const tween = (orientation, drawFn) => {
+  let s = orientation.length();
+  for (let i = 0; i < s; ++i) {
+    drawFn((v) => orientation.orient(v, i), (s - 1 - i) / s);
+  }
+}

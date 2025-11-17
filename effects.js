@@ -11,7 +11,7 @@ import {
 
 import {
   Path, drawLine, drawRing, plotDots, drawPolyhedron,
-  drawFn, ringPoint, fnPoint, drawVector, ProceduralPath
+  drawFn, ringPoint, fnPoint, drawVector, ProceduralPath, tween
 } from "./draw.js";
 
 import {
@@ -1420,11 +1420,10 @@ export class Comets {
   drawNode(opacity, i) {
     let dots = [];
     let node = this.nodes[i];
-    let s = node.orientation.length();
-    for (let i = 0; i < s; ++i) {
-      dots.push(...drawVector(node.orientation.orient(node.v, i),
-        (v, t) => this.palette.get(1 - ((s - 1 - i) / s))));
-    }
+    tween(node.orientation, (orientFn, t) => {
+      dots.push(...drawVector(orientFn(node.v),
+        (v, t) => this.palette.get(1 - t)));
+    });
     plotDots(this.pixels, this.filters, dots, 0, opacity);
     node.orientation.collapse();
   }
