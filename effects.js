@@ -1,7 +1,7 @@
-// effects.js
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream, pixelKey } from "./driver.js";
+import FastNoiseLite from "./FastNoiseLite.js";
 
 import {
   Orientation, Dodecahedron, angleBetween, pixelToVector,
@@ -36,260 +36,7 @@ import {
   FilterSinDisplace, FilterColorShift, FilterTwinkle
 } from "./filters.js";
 
-import { PerlinNoise1D, PerlinNoise4D } from "./noise.js";
 import { dir, wrap, shortest_distance, randomChoice, randomBetween } from "./util.js";
-
-
-class PolyRot {
-  constructor() {
-    this.pixels = new Map();
-
-    this.ring = Daydream.Y_AXIS.clone();
-    this.ringOrientation = new Orientation();
-
-    this.spinAxis = Daydream.Y_AXIS.clone();
-    this.spinAxisOrientation = new Orientation();
-
-    this.topOrientation = new Orientation();
-    this.bottomOrientation = new Orientation;
-
-    this.genPolyDuration = 160;
-    this.splitPolyDuration = 96;
-    this.spinRingDuration = 16;
-    this.spinPolyDuration = 192;
-
-    // Output Filters
-    this.out = new FilterAntiAlias();
-
-    // -----------------------------------------------------------------
-    // !! ERROR: FilterDecayMask is not defined in any provided file.
-    // This line will cause a crash.
-    // this.polyMaskMask = new FilterDecayMask(4); 
-    // -----------------------------------------------------------------
-
-    (this.polyMask = new FilterAntiAlias())
-    // .chain(this.polyMaskMask); // Cannot chain an undefined filter
-
-    this.states = {
-      "genPoly": {
-        enter: this.enterGenPoly,
-        draw: this.drawGenPoly,
-        animate: this.animateGenPoly,
-        exit: () => { },
-      },
-      "spinRing": {
-        enter: this.enterSpinRing,
-        draw: this.drawPolyRing,
-        animate: this.animateSpinRing,
-        exit: () => { },
-      },
-      "splitPoly": {
-        enter: this.enterSplitPoly,
-        draw: this.drawSplitPoly,
-        animate: this.animateSplitPoly,
-        exit: () => { },
-      },
-      "spinPoly": {
-        enter: this.enterSpinPoly,
-        draw: this.drawPolyRing,
-        animate: this.animateSpinPoly,
-        exit: () => { },
-      },
-    };
-
-    this.stateIndex = -1;
-    this.sequence = [
-      "genPoly",
-      "spinRing",
-      "spinPoly",
-      "spinRing",
-      "splitPoly",
-      "spinRing",
-    ];
-
-    this.transition();
-
-    this.gui = new gui.GUI();
-    this.gui.add(this, 'genPolyDuration').min(8).max(320).step(1);
-    this.gui.add(this, 'splitPolyDuration').min(8).max(256).step(1);
-    this.gui.add(this, 'spinRingDuration').min(8).max(32).step(1);
-    this.gui.add(this, 'spinPolyDuration').min(8).max(256).step(1);
-
-    // This line will also fail if polyMaskMask is not created
-    // this.gui.add(this.polyMaskMask, 'lifespan').min(1).max(20).step(1);
-  }
-
-  transition() {
-    this.stateIndex = (this.stateIndex + 1) % this.sequence.length;
-    this.transitionTo(this.sequence[this.stateIndex]);
-  }
-
-  transitionTo(state) {
-    if (this.state != undefined) {
-      this.states[this.state].exit.call(this);
-    }
-    this.t = 0;
-    this.state = state;
-    this.states[this.state].enter.call(this);
-  }
-
-  enterGenPoly() {
-    this.poly = new Dodecahedron();
-    this.genPolyPath = new Path().appendSegment(
-      (t) => this.ringOrientation.orient(lissajous(10, 0.5, 0, t)),
-      2 * Math.PI,
-      this.genPolyDuration,
-      easeInOutSin
-    );
-    this.genPolyMotion = new Motion(this.genPolyPath, this.genPolyDuration);
-  }
-
-  drawGenPoly() {
-    this.pixels.clear();
-
-    // This will fail:
-    // this.polyMaskMask.decay(); 
-
-    let vertices = this.topOrientation.orientPoly(this.poly.vertices);
-
-    // Draw ring into polygon mask
-    let n = this.ringOrientation.length();
-    for (let i = 0; i < n; i++) {
-      let normal = this.ringOrientation.orient(this.ring, i);
-      let dots = drawRing(normal, 1, (v, t) => new THREE.Color(0x000000));
-      plotDots(new Map(), this.polyMask, dots,
-        (n - 1 - i) / n, blendOverMax);
-    }
-    this.ringOrientation.collapse();
-
-    // Draw polyhedron
-    let dots = drawPolyhedron(
-      vertices,
-      this.poly.eulerPath,
-      (v) => distanceGradient(v, this.ringOrientation.orient(this.ring)));
-    plotDots(this.pixels, this.out, dots, 0, blendOverMax);
-
-    // This will also fail:
-    // this.pixels.forEach((p, key) => {
-    //   p.multiplyScalar(this.polyMaskMask.mask(key));
-    // });
-
-    // Draw ring
-    plotDots(this.pixels, this.out,
-      drawRing(this.ringOrientation.orient(this.ring), 1,
-        (v, t) => new THREE.Color(0xaaaaaa)),
-      0, blendOverMax);
-
-    return this.pixels;
-  }
-
-  animateGenPoly() {
-    if (this.genPolyMotion.done()) {
-      this.transition();
-    } else {
-      this.genPolyMotion.move(this.ringOrientation);
-    }
-  }
-
-  enterSpinRing() {
-    this.poly = new Dodecahedron();
-    let from = this.ringOrientation.orient(this.ring).clone();
-    let toNormal = new THREE.Vector3(...this.poly.vertices[3]).normalize();
-    this.ringPath = new Path().appendLine(from, toNormal, true);
-    this.ringMotion = new Motion(this.ringPath, this.spinRingDuration);
-  }
-
-  animateSpinRing() {
-    if (this.ringMotion.done()) {
-      this.transition();
-    } else {
-      this.ringMotion.move(this.ringOrientation);
-    }
-  }
-
-  enterSplitPoly() {
-    this.poly = new Dodecahedron();
-    let normal = this.ringOrientation.orient(this.ring);
-    bisect(this.poly, this.topOrientation, normal);
-    this.bottomOrientation.set(this.topOrientation.get());
-    this.polyRotationFwd = new Rotation(
-      normal, 4 * Math.PI, this.splitPolyDuration);
-    this.polyRotationRev = new Rotation(
-      normal.clone().negate(), 4 * Math.PI, this.splitPolyDuration);
-  }
-
-  drawSplitPoly() {
-    this.pixels.clear();
-    let normal = this.ringOrientation.orient(this.ring);
-    let vertices = this.poly.vertices.map((c) => {
-      let v = this.topOrientation.orient(new THREE.Vector3().fromArray(c));
-      if (isOver(v, normal)) {
-        return v.toArray();
-      } else {
-        return this.bottomOrientation.orient(new THREE.Vector3().fromArray(c)).toArray();
-      }
-    });
-
-    plotDots(this.pixels, this.out,
-      drawPolyhedron(vertices, this.poly.eulerPath,
-        (v) => distanceGradient(v, normal)));
-    plotDots(this.pixels, this.out,
-      drawRing(normal, 1, (v, t) => new THREE.Color(0xaaaaaa)));
-    return this.pixels;
-  }
-
-  animateSplitPoly() {
-    if (this.polyRotationFwd.done()) {
-      this.transition();
-    } else {
-      this.polyRotationFwd.rotate(this.topOrientation);
-      this.polyRotationRev.rotate(this.bottomOrientation);
-    }
-  }
-
-  enterSpinPoly() {
-    this.poly = new Dodecahedron();
-    let axis = this.spinAxisOrientation.orient(this.spinAxis);
-    this.spinPolyRotation = new Rotation(axis, 4 * Math.PI,
-      this.spinPolyDuration);
-    this.spinAxisPath = new Path().appendSegment(
-      (t) => lissajous(12.8, 2 * Math.PI, 0, t),
-      1,
-      this.spinPolyDuration
-    );
-    this.spinAxisMotion = new Motion(this.spinAxisPath, this.spinPolyDuration);
-  }
-
-  drawPolyRing() {
-    this.pixels.clear();
-    let normal = this.ringOrientation.orient(this.ring);
-    let vertices = this.topOrientation.orientPoly(this.poly.vertices);
-    plotDots(this.pixels, this.out,
-      drawPolyhedron(vertices, this.poly.eulerPath,
-        (v) => distanceGradient(v, normal)));
-    plotDots(this.pixels, this.out,
-      drawRing(normal, 1, (v, t) => new THREE.Color(0xaaaaaa)));
-    return this.pixels;
-  }
-
-  animateSpinPoly() {
-    if (this.spinPolyRotation.done()) {
-      this.transition();
-    } else {
-      this.spinAxisMotion.move(this.spinAxisOrientation);
-      this.spinPolyRotation.axis =
-        this.spinAxisOrientation.orient(this.spinAxis);
-      this.spinPolyRotation.rotate(this.topOrientation);
-    }
-  }
-
-  drawFrame() {
-    let out = this.states[this.state].draw.call(this);
-    this.states[this.state].animate.call(this);
-    return out;
-  }
-}
-
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -888,7 +635,7 @@ export class Fib {
 
 export class Angles {
   constructor() {
-    Daydream.W = 96;
+    Daydream.W = 96
     this.pixels = new Map();
 
     // Palettes
@@ -1502,8 +1249,8 @@ export class NoiseFieldEffect {
   constructor() {
     this.pixels = new Map();
 
-    this.perlin1 = new PerlinNoise1D();
-    this.perlin4 = new PerlinNoise4D();
+    this.noise = new FastNoiseLite();
+    this.noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
     this.palette = darkRainbow;
     this.t = 0;
     this.noiseScale = 2;
@@ -1517,11 +1264,12 @@ export class NoiseFieldEffect {
       for (let y = 0; y < Daydream.H; y++) {
         const v = pixelToVector(x, y);
         let t = this.t * this.timeScale + Math.sin(this.t * 2 * Math.PI) * 0.01
-        const noiseValue = this.perlin4.noise(
+        
+        // Using 3D noise slicing for animation (approximating 4D effect)
+        const noiseValue = this.noise.GetNoise(
           v.x * this.noiseScale,
           v.y * this.noiseScale,
-          v.z * this.noiseScale,
-          this.t * this.timeScale
+          v.z * this.noiseScale + this.t * this.timeScale // Offset Z by time
         );
 
         const palette_t = (noiseValue + 1) / 2;
@@ -1740,7 +1488,9 @@ export class FlowField {
     this.particles = [];
     // (Particles will be created in resetParticles)
 
-    this.noise = new PerlinNoise4D();
+    this.noise = new FastNoiseLite();
+    this.noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
+    this.noise.SetSeed(Math.floor(Math.random() * 65535));
 
     this.palette = iceMelt;
 
@@ -1850,13 +1600,15 @@ export class FlowField {
     let t_scaled = t * this.TIME_SCALE;
     let n_pos = pos.clone().multiplyScalar(this.NOISE_SCALE);
 
-    let x_force = this.noise.noise(n_pos.x, n_pos.y, n_pos.z, t_scaled);
-    let y_force = this.noise.noise(n_pos.x, n_pos.y, n_pos.z, t_scaled + 100);
-    let z_force = this.noise.noise(n_pos.x, n_pos.y, n_pos.z, t_scaled + 200);
+    // C++ Style 3D noise slice for force field
+    // Using 3D noise by mapping (x, y, t), (y, z, t), (z, x, t)
+    // to approximate 4D noise derivatives
+    let x_force = this.noise.GetNoise(n_pos.x, n_pos.y, t_scaled);
+    let y_force = this.noise.GetNoise(n_pos.y, n_pos.z, t_scaled + 100);
+    let z_force = this.noise.GetNoise(n_pos.z, n_pos.x, t_scaled + 200);
 
     return new THREE.Vector3(x_force, y_force, z_force).multiplyScalar(this.FORCE_SCALE);
   }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-

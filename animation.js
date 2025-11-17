@@ -1,8 +1,7 @@
-// animation.js
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
 import { angleBetween } from "./geometry.js";
-import { PerlinNoise1D, PerlinNoise4D } from "./noise.js";
+import FastNoiseLite from "./FastNoiseLite.js";
 
 export const easeOutElastic = (x) => {
   const c4 = (2 * Math.PI) / 3;
@@ -128,7 +127,10 @@ export class ParticleSystem extends Animation {
   constructor() {
     super(-1, false);
     this.particles = [];
-    this.perlin = new PerlinNoise4D();
+    this.noise = new FastNoiseLite();
+    this.noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
+    this.noise.SetSeed(Math.floor(Math.random() * 65535));
+    
     this.NOISE_SCALE = 10;
     this.TIME_SCALE = 0.01;
     this.FORCE_SCALE = 10;
@@ -139,12 +141,19 @@ export class ParticleSystem extends Animation {
   }
 
   step() {
+    let t_scaled = this.t * this.TIME_SCALE;
+    
     for (let p of this.particles) {
-      p.v.set(
-        this.perlin.noise(p.p.x * this.NOISE_SCALE, p.p.y * this.NOISE_SCALE, p.p.z * this.NOISE_SCALE, this.t * this.TIME_SCALE),
-        this.perlin.noise(p.p.x * this.NOISE_SCALE, p.p.y * this.NOISE_SCALE, p.p.z * this.NOISE_SCALE, this.t * this.TIME_SCALE + 100),
-        this.perlin.noise(p.p.x * this.NOISE_SCALE, p.p.y * this.NOISE_SCALE, p.p.z * this.NOISE_SCALE, this.t * this.TIME_SCALE + 200)
-      ).multiplyScalar(this.FORCE_SCALE);
+      let nx = p.p.x * this.NOISE_SCALE;
+      let ny = p.p.y * this.NOISE_SCALE;
+      let nz = p.p.z * this.NOISE_SCALE;
+
+      // Using 3D slice technique to approximate 4D noise (matching C++ FlowField logic)
+      let vx = this.noise.GetNoise(nx, ny, t_scaled);
+      let vy = this.noise.GetNoise(ny, nz, t_scaled + 100);
+      let vz = this.noise.GetNoise(nz, nx, t_scaled + 200);
+
+      p.v.set(vx, vy, vz).multiplyScalar(this.FORCE_SCALE);
     }
     super.step();
   }
@@ -358,21 +367,28 @@ export class RandomWalk extends Animation {
     super(-1, false);
     this.orientation = orientation;
     this.v = v_start.clone();
-    this.perlin = new PerlinNoise1D();
+    
+    this.noise = new FastNoiseLite();
+    this.noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
+    this.noise.SetSeed(Math.floor(Math.random() * 65535));
+    
+    this.WALK_SPEED = 0.12; // Constant angular speed (radians per step)
+    this.PIVOT_STRENGTH = 0.2; // Max pivot angle (radians per step)
+    this.NOISE_SCALE = 0.05; // How fast the Perlin noise changes
+
+    this.noise.SetFrequency(this.NOISE_SCALE);
+    
     let u = (Math.abs(this.v.x) > 0.9)
       ? new THREE.Vector3(0, 1, 0)
       : new THREE.Vector3(1, 0, 0);
     this.direction = new THREE.Vector3().crossVectors(this.v, u).normalize();
-    this.WALK_SPEED = 0.12; // Constant angular speed (radians per step)
-    this.PIVOT_STRENGTH = 0.2; // Max pivot angle (radians per step)
-    this.NOISE_SCALE = 0.05; // How fast the Perlin noise changes
 
   }
 
   step() {
     super.step();
     //pivot
-    const pivotAngle = this.perlin.noise(this.t * this.NOISE_SCALE) * this.PIVOT_STRENGTH;
+    const pivotAngle = this.noise.GetNoise(this.t * this.NOISE_SCALE, 0.0) * this.PIVOT_STRENGTH;
     this.direction.applyAxisAngle(this.v, pivotAngle).normalize();
 
     //walk forward
@@ -382,4 +398,6 @@ export class RandomWalk extends Animation {
     this.direction.applyAxisAngle(walkAxis, walkAngle).normalize();
     Rotation.animate(this.orientation, walkAxis, walkAngle, easeMid);
   }
+}
+`
 }
