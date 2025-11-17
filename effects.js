@@ -27,7 +27,7 @@ import {
   Rotation, RandomTimer, easeOutExpo, easeInSin, easeOutSin,
   Mutation, MutableNumber, ParticleSystem, RandomWalk,
   easeOutElastic, easeInOutBicubic, easeInCubic, easeOutCubic,
-  easeInCirc, easeOutCirc
+  easeInCirc, easeOutCirc, PeriodicTimer
 } from "./animation.js";
 
 import {
@@ -1381,13 +1381,26 @@ export class Comets {
   }
   constructor() {
     this.pixels = new Map();
-    this.numNodes = 6;
-    this.trailLength = 12;
-    this.spacing = 24;
+    this.numNodes = 1;
+    this.spacing = 48;
+    this.cycleDuration = 80;
+    this.trailLength = this.cycleDuration;
     this.alpha = 0.5;
     this.orientation = new Orientation();
     this.path = new Path(Daydream.Y_AXIS);
-    this.path.appendSegment((t) => lissajous(12, 5, 0, t), 2 * Math.PI, 1024, easeMid);
+    this.functions = [
+      [(t) => lissajous(1.06, 1.06, 0, t), 5.909],
+      [(t) => lissajous(6.06, 1, 0, t), 2 * Math.PI],
+      [(t) => lissajous(19.44, 9.72, 0, t), 0.646],
+      [(t) => lissajous(8.51, 17.01, 0, t), 0.739],
+      [(t) => lissajous(7.66, 6.38, 0, t), 4.924],
+      [(t) => lissajous(8.75, 5, 0, t), 5.027],
+      [(t) => lissajous(11.67, 14.58, 0, t), 2.154],
+      [(t) => lissajous(11.67, 8.75, 0, t), 2.154],
+      [(t) => lissajous(10.94, 8.75, 0, t), 2.872]
+    ]
+    this.curFunction = 0;
+    this.updatePath();
 
     this.palette = embers;
 
@@ -1402,7 +1415,20 @@ export class Comets {
       this.spawnNode(this.path);
     }
 
+    this.timeline.add(0,
+      new PeriodicTimer(2 * this.cycleDuration, () => {
+        this.curFunction = Math.floor(randomBetween(0, this.functions.length));
+        this.updatePath();
+      }, true)
+    );
     this.timeline.add(0, new RandomWalk(this.orientation, randomVector()));
+  }
+
+  updatePath() {
+    let f = this.functions[this.curFunction][0];
+    let domain = this.functions[this.curFunction][1];
+    this.path.collapse();
+    this.path.appendSegment(f, domain, 1024, easeMid);
   }
 
   spawnNode(path) {
@@ -1412,7 +1438,7 @@ export class Comets {
       new Sprite((opacity) => this.drawNode(opacity, i), -1, 16, easeMid, 0, easeMid)
     );
     this.timeline.add(i * this.spacing,
-      new Motion(this.nodes[i].orientation, this.nodes[i].path, 320, true)
+      new Motion(this.nodes[i].orientation, this.nodes[i].path, this.cycleDuration, true)
     );
 
   }

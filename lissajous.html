@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spherical Lissajous Visualizer</title>
-    <!-- Tailwind CSS for modern styling and responsiveness -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="importmap">
         {
@@ -31,32 +30,31 @@
             overflow: hidden; /* Prevent scrolling */
         }
 
-        /* REMOVED .container flex layout */
-
         #canvasContainer {
-            position: fixed; /* CHANGED */
+            position: fixed;
             top: 0;
             left: 0;
-            width: 100vw;     /* CHANGED */
-            height: 100vh;    /* CHANGED */
-            z-index: 10;      /* ADDED */
+            /* FIX: Dynamically calculate the width to exclude the fixed controls panel */
+            width: calc(100vw - 420px);
+            height: 100vh;
+            z-index: 10;
         }
 
         #controls {
-            position: fixed; /* CHANGED */
+            position: fixed;
             top: 0;
             right: 0;
-            height: 100vh;    /* CHANGED */
-            z-index: 20;      /* ADDED */
+            height: 100vh;
+            z-index: 20;
             width: 420px;
             max-width: 100vw;
             padding: 1.5rem;
-            background-color: rgba(30, 41, 59, 0.9); /* ADDED opacity */
-            backdrop-filter: blur(8px);              /* ADDED blur */
-            -webkit-backdrop-filter: blur(8px);    /* ADDED blur */
+            background-color: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             overflow-y: auto;
             box-shadow: -4px 0 10px rgba(0, 0, 0, 0.4);
-            border-left: 1px solid var(--slate-700); /* ADDED border */
+            border-left: 1px solid var(--slate-700);
         }
 
         /* Styling for the parameter groups */
@@ -68,7 +66,7 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
-        /* Custom slider styles (copied from palettes.html spirit) */
+        /* Custom slider styles */
         input[type=range] {
             height: 6px;
             -webkit-appearance: none;
@@ -77,64 +75,111 @@
             border-radius: 3px;
             cursor: pointer;
         }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 16px;
-            width: 16px;
-            border-radius: 50%;
-            background: var(--blue-500);
-            cursor: pointer;
-            margin-top: -2px; /* Shifted down from -3px */
-        }
+
+            input[type=range]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                height: 16px;
+                width: 16px;
+                border-radius: 50%;
+                background: var(--blue-500);
+                cursor: pointer;
+                margin-top: 3px; /* ADJUSTED: Moved down by 8px from -5px */
+            }
+            /* Style for disabled slider thumb */
+            input[type=range]:disabled::-webkit-slider-thumb {
+                background: var(--slate-800);
+                cursor: default;
+            }
+
+            input[type=range]:disabled {
+                background: #47556950;
+            }
+
         .slider-label {
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.875rem;
             color: var(--indigo-400);
         }
+
+        /* Media query for smaller screens */
+        @media (max-width: 640px) {
+            #controls {
+                width: 100vw;
+                height: 50vh;
+                top: auto;
+                bottom: 0;
+                border-top: 1px solid var(--slate-700);
+                border-left: none;
+                box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.4);
+            }
+
+            #canvasContainer {
+                height: 50vh;
+                width: 100vw; /* On mobile, use full width */
+            }
+
+            body {
+                overflow-y: scroll; /* Allow scrolling on mobile controls */
+            }
+        }
     </style>
 </head>
 <body>
-    <!-- 3D Canvas Container -->
     <div id="canvasContainer">
         <canvas id="threeCanvas" class="w-full h-full"></canvas>
     </div>
 
-    <!-- Control Panel (now an overlay) -->
     <div id="controls" class="space-y-6">
         <h1 class="text-3xl font-bold text-white text-center">Lissajous Visualizer</h1>
         <p class="text-sm text-gray-400 text-center">
-            Spherical Lissajous: F(t) = (sin(C₁t)cos(C₂t), sin(C₂t)sin(C₁t), cos(C₂t))
+            Spherical Lissajous Curve (on unit sphere): F(t) = (R sin(C₂t) cos(C₁t - A), R cos(C₂t), R sin(C₂t) sin(C₁t - A))
         </p>
 
         <div id="sliders">
-            <!-- Parameter m1: Frequency 1 -->
             <div class="param-group">
                 <h3 class="text-xl font-semibold text-indigo-400">Frequency C₁ (Axial)</h3>
                 <div id="C1_container" class="flex items-center space-x-3 mt-2"></div>
             </div>
 
-            <!-- Parameter m2: Frequency 2 -->
             <div class="param-group">
                 <h3 class="text-xl font-semibold text-indigo-400">Frequency C₂ (Orbital)</h3>
                 <div id="C2_container" class="flex items-center space-x-3 mt-2"></div>
             </div>
 
-            <!-- Parameter a: Phase Shift -->
-        <div class="param-group">
-            <h3 class="text-xl font-semibold text-indigo-400">Phase Shift A (radians)</h3>
-            <div id="A_container" class="flex items-center space-x-3 mt-2"></div>
-        </div>
+            <div class="param-group">
+                <h3 class="text-xl font-semibold text-indigo-400">Phase Shift A (radians)</h3>
+                <div id="A_container" class="flex items-center space-x-3 mt-2"></div>
+            </div>
 
-        <!-- Visualization Parameters -->
             <div class="param-group">
                 <h3 class="text-xl font-semibold text-indigo-400">Rendering</h3>
-                <!-- Duration -->
+
+                <!-- CHECKBOX FOR RATIONAL CONSTRAINT -->
+                <div class="flex items-center space-x-3 mt-2 mb-4">
+                    <input type="checkbox" id="rational_lock" class="h-5 w-5 rounded text-blue-500 border-gray-600 focus:ring-blue-500 bg-slate-800">
+                    <label for="rational_lock" class="text-white text-base font-medium select-none">Closed Curve Constraint (Rational C₁/C₂)</label>
+                </div>
+                <!-- END CHECKBOX -->
+
                 <div id="Duration_container" class="flex items-center space-x-3 mt-2"></div>
-                <!-- Sample Count -->
                 <div id="Samples_container" class="flex items-center space-x-3 mt-2"></div>
             </div>
+
+            <div class="param-group">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-xl font-semibold text-white">Export Code</h3>
+                    <button id="copy_code_button" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-sm font-medium transition-all shadow-lg text-white">
+                        Copy Snippet
+                    </button>
+                </div>
+                <p class="text-sm text-gray-400 mb-2">
+                    Geometry function ready for <span class="font-mono text-indigo-300">three.js</span>:
+                    <span id="copy_code_prompt" class="ml-2 text-sm text-gray-500 transition-colors duration-300"></span>
+                </p>
+                <pre class="bg-slate-900 p-4 rounded-lg border border-slate-700 overflow-x-auto cursor-pointer" id="code_pre_block"><code id="lissajous_code_output" class="font-mono text-sm text-slate-300 whitespace-pre"></code></pre>
+            </div>
         </div>
-        
+
         <p class="text-xs text-gray-400 mt-4 text-center">Use mouse/trackpad to orbit the camera.</p>
     </div>
 
@@ -145,69 +190,66 @@
         // Utility to get CSS variable color and convert to numeric hex
         const getCssColor = (name) => {
             const hex = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-            // Convert '#0f172a' to 0x0f172a
             return parseInt(hex.startsWith('#') ? hex.substring(1) : hex, 16);
         };
-        
-        const SLATE_900 = getCssColor('--slate-900');
 
+        const SLATE_900 = getCssColor('--slate-900');
 
         // --- Configuration and State ---
         const config = {
-            C1: { min: 1, max: 20, step: 0.001, default: 12, scale: 1000, label: "C₁" },
-            C2: { min: 1, max: 20, step: 0.001, default: 5, scale: 1000, label: "C₂" },
-            A: { min: 0, max: (2 * Math.PI), step: (2 * Math.PI) / 1000, default: 0, scale: 1000 / (2 * Math.PI), label: "A (rad)" }, // Range 0 to 2*PI, 1000 steps
-            Duration: { min: 0, max: (2 * Math.PI), step: (2 * Math.PI) / 1000, default: 2 * Math.PI, scale: 1000 / (2 * Math.PI), label: "Duration" }, // Domain for t: [0, Duration]
-            Samples: { min: 200, max: 10000, step: 1, default: 4000, label: "Samples" }
+            C1: { min: 1, max: 20, step: 0.01, default: 12, scale: 100, label: "C₁" },
+            C2: { min: 1, max: 20, step: 0.01, default: 5, scale: 100, label: "C₂" },
+            A: { min: 0, max: (2 * Math.PI), step: (2 * Math.PI) / 1000, default: 0, scale: 1000 / (2 * Math.PI), label: "A (rad)" },
+            Duration: { min: 0, max: (8 * Math.PI), step: (2 * Math.PI) / 500, default: 2 * Math.PI, scale: 1000 / (2 * Math.PI), label: "Domain" },
+            // FIX: Added scale: 1 to Samples to prevent NaN in slider initialization
+            Samples: { min: 200, max: 10000, step: 1, default: 4000, scale: 1, label: "Samples" }
         };
 
         const state = {
             C1: config.C1.default,
             C2: config.C2.default,
-            A: config.A.default, // Stored as raw float (default is 0)
-            Duration: config.Duration.default, // Stored as raw float (default is 2*PI)
-            Samples: config.Samples.default
+            A: config.A.default,
+            Duration: config.Duration.default,
+            Samples: config.Samples.default,
+            isRationalLocked: false // NEW: State for the constraint lock
         };
 
         let scene, camera, renderer, controls, line;
 
         // --- Lissajous Function ---
-
-        /**
-         * Calculates a point on the spherical Lissajous curve.
-         * The function is a variation that maintains unit length (on the sphere).
-         *
-         * @param {number} t - Time parameter.
-         * @param {number} m1 - Frequency 1 (Axial/Latitudinal).
-         * @param {number} m2 - Frequency 2 (Orbital/Longitudinal).
-         * @param {number} a - Phase shift (in radians).
-         * @returns {THREE.Vector3} The 3D point on the unit sphere.
-         */
         const lissajous = (t, m1, m2, a) => {
-            const phase = a; // 'a' is now directly in radians
-
-            // This variant projects a 2D Lissajous onto the Z-axis for a spherical mapping
+            const phase = a;
             const x = Math.sin(m2 * t) * Math.cos(m1 * t - phase);
             const y = Math.cos(m2 * t);
             const z = Math.sin(m2 * t) * Math.sin(m1 * t - phase);
+            return new THREE.Vector3(x, y, z);
+        };
 
-            // Normalize to ensure it's on the unit sphere (standard for POV)
-            return new THREE.Vector3(x, y, z).normalize();
+        // --- Window Resize Handler ---
+        const onWindowResize = () => {
+            if (!renderer) return;
+
+            const container = document.getElementById('canvasContainer');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
         };
 
         // --- THREE.js Setup ---
-
         const initThree = () => {
             const container = document.getElementById('canvasContainer');
             const width = container.clientWidth;
             const height = container.clientHeight;
 
             scene = new THREE.Scene();
-            // FIX: Use the resolved numeric hex color
             scene.background = new THREE.Color(SLATE_900);
 
             camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-            camera.position.set(0, 0, 4);
+            // ADJUSTMENT: Move the camera closer to make the visualization fill the space
+            camera.position.set(1.5, 1.5, 3);
 
             renderer = new THREE.WebGLRenderer({
                 canvas: document.getElementById('threeCanvas'),
@@ -216,22 +258,22 @@
             renderer.setSize(width, height);
             renderer.setPixelRatio(window.devicePixelRatio);
 
-            // Orbit Controls for camera manipulation
             controls = new OrbitControls(camera, renderer.domElement);
             controls.minDistance = 2;
             controls.maxDistance = 10;
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
 
-            // Add a unit sphere for reference
-            const geometry = new THREE.SphereGeometry(1, 64, 32);
+            // Reference Sphere (Unit Sphere)
+            const geometry = new THREE.SphereGeometry(1.0, 64, 32);
             const material = new THREE.MeshBasicMaterial({
-                color: 0x334155, // Slate 700
+                color: 0x334155,
                 wireframe: true,
                 transparent: true,
                 opacity: 0.2
             });
             const sphere = new THREE.Mesh(geometry, material);
+            sphere.renderOrder = 0;
             scene.add(sphere);
 
             regenerateCurve();
@@ -247,7 +289,7 @@
 
             const points = [];
             const segments = parseInt(state.Samples);
-            const domain = state.Duration; // Domain is now 0 to 2*PI
+            const domain = state.Duration;
 
             for (let i = 0; i <= segments; i++) {
                 const t = (i / segments) * domain;
@@ -257,10 +299,15 @@
 
             const geometry = new THREE.BufferGeometry().setFromPoints(points);
             const material = new THREE.LineBasicMaterial({
-                color: 0x818cf8, // Indigo 400
-                linewidth: 2 // Note: linewidth is generally not respected across all platforms
+                color: 0x818cf8,
+                linewidth: 2,
+                transparent: true,
+                opacity: 0.9,
+                depthWrite: false,
+                depthTest: false // Always on top effect
             });
             line = new THREE.Line(geometry, material);
+            line.renderOrder = 1;
             scene.add(line);
         };
 
@@ -268,6 +315,199 @@
             requestAnimationFrame(animate);
             controls.update();
             renderer.render(scene, camera);
+        };
+
+        // --- RATIONAL CONSTRAINT LOGIC ---
+
+        /**
+         * Finds the simplest rational approximation (M/N) for a given value (ratio).
+         * @param {number} value The ratio to approximate (e.g., C1/C2).
+         * @param {number} maxDenominator Maximum value for the numerator/denominator.
+         * @returns {{ M: number, N: number }} The best simple rational ratio.
+         */
+        const findBestRationalRatio = (value, maxDenominator = 8) => {
+            if (value === 0) return { M: 1, N: 1 };
+
+            let bestM = 1;
+            let bestN = 1;
+            let minDiff = Infinity;
+
+            // Check ratios M/N where M and N are between 1 and maxDenominator
+            for (let N = 1; N <= maxDenominator; N++) {
+                for (let M = 1; M <= maxDenominator; M++) {
+                    const ratio = M / N;
+                    const diff = Math.abs(value - ratio);
+
+                    // Prefer closer approximation, but also prefer smaller ratios
+                    if (diff < minDiff || (diff === minDiff && (M + N) < (bestM + bestN))) {
+                        minDiff = diff;
+                        bestM = M;
+                        bestN = N;
+                    }
+                }
+            }
+            return { M: bestM, N: bestN };
+        };
+
+        /**
+         * Snaps the active frequency (C1 or C2) to maintain a simple rational ratio with the passive frequency.
+         * @param {string} activeId 'C1' or 'C2'.
+         * @param {number} rawNewValue The raw slider value from the input event.
+         */
+        const snapFrequencies = (activeId, rawNewValue) => {
+            if (!state.isRationalLocked) return;
+
+            const passiveId = activeId === 'C1' ? 'C2' : 'C1';
+            const passiveC = state[passiveId];
+
+            // 1. Convert the raw value from the slider input event back to the real float value
+            const activeConfig = config[activeId];
+            const newActiveC_Raw = rawNewValue / activeConfig.scale;
+
+            // 2. Find the closest rational ratio to the *intended* new value
+            // We find M/N such that M/N ≈ activeC / passiveC (e.g., C₁/C₂)
+            const targetRatio = newActiveC_Raw / passiveC;
+            const { M, N } = findBestRationalRatio(targetRatio);
+
+            // 3. Calculate the snapped value: New Active C = Passive C * (M / N)
+            const newActiveC_Snapped = passiveC * (M / N);
+
+            // 4. Update the actual state
+            state[activeId] = newActiveC_Snapped;
+
+            // 5. Update the slider UI (force the thumb to jump to the snapped position)
+            const slider = document.getElementById(`${activeId}_slider`);
+            const valueSpan = document.getElementById(`${activeId}_value`);
+
+            if (slider && valueSpan) {
+                // Round the snapped value for setting the slider UI element
+                const roundedValue = Math.round(newActiveC_Snapped * activeConfig.scale);
+                slider.value = roundedValue;
+
+                // Determine decimals for display (2 for C1/C2)
+                valueSpan.textContent = newActiveC_Snapped.toFixed(2);
+            }
+
+            // --- FIX: CALCULATE AND SET THE CORRECT DOMAIN ---
+            // The domain T required to close the loop is T = (2π * N) / C₂ or T = (2π * M) / C₁
+            // Here, passiveC = C₂ and N is the denominator for the ratio C₁/C₂
+            // If the active slider was C₂, then passiveC = C₁ and we'd use (2π * M) / C₁
+            let newDomain;
+            if (activeId === 'C1') {
+                // Ratio was C₁/C₂ ≈ M/N. T = (2π * N) / C₂
+                newDomain = (2 * Math.PI * N) / passiveC; // passiveC = C₂
+            } else {
+                // Active was C₂. Ratio was C₂/C₁ ≈ M/N. T = (2π * N) / C₁
+                newDomain = (2 * Math.PI * N) / passiveC; // passiveC = C₁
+                // Note: findBestRationalRatio always gives M/N for (active/passive).
+                // If active=C₂, targetRatio=C₂/C₁. We get M/N ≈ C₂/C₁.
+                // T = (2π * M) / C₂ or T = (2π * N) / C₁.
+                // newDomain = (2 * Math.PI * N) / passiveC; (This is correct)
+            }
+
+            state.Duration = newDomain;
+
+            // Update the Domain slider UI to reflect the new calculated domain
+            const durationSlider = document.getElementById('Duration_slider');
+            const durationValueSpan = document.getElementById('Duration_value');
+            const durationConfig = config.Duration;
+
+            if (durationSlider && durationValueSpan) {
+                const scaledDomain = Math.round(newDomain * durationConfig.scale);
+                // Clamp value to slider min/max in case of extreme ratios
+                const clampedScaledDomain = Math.max(
+                    Math.round(durationConfig.min * durationConfig.scale),
+                    Math.min(Math.round(durationConfig.max * durationConfig.scale), scaledDomain)
+                );
+
+                durationSlider.value = clampedScaledDomain;
+
+                // Also update state.Duration if we clamped
+                if (scaledDomain !== clampedScaledDomain) {
+                     state.Duration = clampedScaledDomain / durationConfig.scale;
+                     durationValueSpan.textContent = state.Duration.toFixed(3);
+                } else {
+                     durationValueSpan.textContent = newDomain.toFixed(3);
+                }
+            }
+            // --- END FIX ---
+
+            // 6. Re-render the curve and update the code snippet
+            regenerateCurve();
+            updateCodeSnippet();
+        };
+
+        // --- End RATIONAL CONSTRAINT LOGIC ---
+
+        // --- Copy to Clipboard Helper ---
+        function copyToClipboard(text, feedbackElement, originalMessage = "") {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = 0;
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+
+            let success = false;
+            try {
+                success = document.execCommand('copy');
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+            }
+
+            document.body.removeChild(textarea);
+
+            if (success && feedbackElement) {
+                feedbackElement.textContent = "Copied!";
+                feedbackElement.classList.remove('text-gray-500');
+                feedbackElement.classList.add('text-green-400');
+
+                setTimeout(() => {
+                    feedbackElement.textContent = originalMessage;
+                    feedbackElement.classList.remove('text-green-400');
+                    if (originalMessage) {
+                        feedbackElement.classList.add('text-gray-500');
+                    }
+                }, 1500);
+            }
+        }
+
+        // --- Code Snippet Updater ---
+        const updateCodeSnippet = () => {
+            const codeOutput = document.getElementById('lissajous_code_output');
+            if (!codeOutput) return;
+
+            // Helper to format floats to a clean string representation (e.g., 3.000 -> 3)
+            const f = (n, fixed = 3) => {
+                const s = n.toFixed(fixed);
+                // Remove trailing zeros and decimal point if they exist
+                return s.replace(/\.?0+$/, "");
+            };
+
+            // Format to match the requested simple lambda: (t) => lissajous(C1, C2, A, t)
+            const c1Str = f(state.C1, 2);
+            const c2Str = f(state.C2, 2);
+            const aStr = f(state.A, 3);
+
+            // --- NEW: Format the domain string ---
+            const domain = state.Duration;
+            let domainStr = "";
+            const twoPi = 2 * Math.PI;
+            // Check for multiples of 2*PI within a small tolerance
+            const multiple = domain / twoPi;
+
+            if (Math.abs(multiple - Math.round(multiple)) < 0.001 && Math.round(multiple) > 0) {
+                const N = Math.round(multiple);
+                domainStr = (N === 1) ? "2 * Math.PI" : `${N} * 2 * Math.PI`;
+            } else {
+                domainStr = f(domain, 3); // Use the formatted float value
+            }
+            // --- END NEW ---
+
+            // WRAP in square brackets as requested
+            const snippet = `[(t) => lissajous(${c1Str}, ${c2Str}, ${aStr}, t), ${domainStr}]`;
+            codeOutput.textContent = snippet;
         };
 
         // --- UI Setup ---
@@ -278,31 +518,30 @@
 
             const sliderId = `${id}_slider`;
             const valueSpanId = `${id}_value`;
-            const isFloat = params.step < 1;
-            const scale = params.scale || 1;
-            
-            // Determine the number of decimal places from the step
+
+            // Determine number of decimal places for display
             let decimals = 0;
             if (id === 'A' || id === 'Duration') {
-                decimals = 3; // Show 3 decimal places for radians
-            } else if (isFloat) {
-                const stepStr = params.step.toString();
-                decimals = (stepStr.includes('.')) ? stepStr.split('.')[1].length : 0;
+                decimals = 3;
+            } else {
+                decimals = 2; // C1 and C2 always use 2 decimals for display
             }
 
-            // Determine if parameter is float and needs scaling
+            const scale = params.scale || 1; // Robustly define scale here (though fixed in config now)
+
             const initialValue = params.default * scale;
+            const displayInitialValue = params.default;
 
             container.innerHTML = `
                 <span class="w-20 text-center font-bold text-white text-lg">${params.label}:</span>
-                <input type="range" id="${sliderId}" 
-                    min="${Math.round(params.min * scale)}" 
-                    max="${Math.round(params.max * scale)}" 
-                    step="${Math.round(params.step * scale)}" 
-                    value="${Math.round(initialValue)}" 
+                <input type="range" id="${sliderId}"
+                    min="${Math.round(params.min * scale)}"
+                    max="${Math.round(params.max * scale)}"
+                    step="${Math.round(params.step * scale)}"
+                    value="${Math.round(initialValue)}"
                     class="flex-grow">
-                <span id="${valueSpanId}" class="slider-label w-24 text-right"> <!-- WIDENED from w-16 -->
-                    ${(params.default).toFixed(decimals)}
+                <span id="${valueSpanId}" class="slider-label w-24 text-right">
+                    ${(displayInitialValue).toFixed(decimals)}
                 </span>
             `;
 
@@ -312,67 +551,87 @@
             slider.addEventListener('input', () => {
                 const rawValue = parseFloat(slider.value);
                 let newValue = rawValue / scale;
-                let displayValue = newValue;
-                
-                // Determine the number of decimal places from the step
-                let decimals = 0;
-                if (id === 'A' || id === 'Duration') {
-                    decimals = 3; // Show 3 decimal places for radians
-                } else if (isFloat) {
-                    const stepStr = params.step.toString();
-                    decimals = (stepStr.includes('.')) ? stepStr.split('.')[1].length : 0;
-                }
 
-                if (id === 'Samples') { // ONLY handle Samples here
-                    displayValue = Math.round(newValue);
-                    valueSpan.textContent = displayValue.toFixed(0);
-                    state[id] = displayValue;
-                } else { // C1, C2, A, and Duration will fall here
-                    displayValue = newValue.toFixed(decimals); // Use dynamic precision
-                    valueSpan.textContent = displayValue;
-                    state[id] = newValue;
+                // 1. Update state based on input value first
+                state[id] = id === 'Samples' ? Math.round(newValue) : newValue;
+
+                if ((id === 'C1' || id === 'C2') && state.isRationalLocked) {
+                    // 2. Call snapping logic, which will recalculate state[id], update UI (slider/span), and re-render
+                    snapFrequencies(id, rawValue);
+                } else {
+                    // 3. For unlocked controls, update UI and re-render normally
+                    // FIX: Ensure Samples is always displayed as a whole number
+                    valueSpan.textContent = id === 'Samples' ? Math.round(state[id]).toFixed(0) : state[id].toFixed(decimals);
+                    regenerateCurve();
+                    updateCodeSnippet();
                 }
-                
-                // Regenerate the curve on every slider input
-                regenerateCurve();
             });
-            
         };
-
-        // Create the sliders
-        Object.keys(config).forEach(id => {
-            createSlider(id, config[id]);
-        });
-
-        // --- Window Event Handlers ---
-
-        const onWindowResize = () => {
-            const container = document.getElementById('canvasContainer');
-            if (!container) return;
-            
-            // CHANGED: Use window.innerWidth/Height for the full-screen canvas
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-
-            camera.aspect = width / height;
-            camera.updateProjectionMatrix();
-            renderer.setSize(width, height);
-        };
-
-        // Attach event listeners
-        window.addEventListener('resize', onWindowResize);
 
         // --- Initialization ---
-        window.onload = () => {
-            // Set initial state from default config values
-            state.C1 = config.C1.default;
-            state.C2 = config.C2.default;
-            state.A = config.A.default;
-            state.Duration = config.Duration.default;
-            state.Samples = config.Samples.default;
+        const init = () => {
+            // Setup sliders first
+            Object.keys(config).forEach(id => {
+                createSlider(id, config[id]);
+            });
 
+            // Set up the Rational Lock Checkbox
+            const rationalLockCheckbox = document.getElementById('rational_lock');
+            if (rationalLockCheckbox) {
+                rationalLockCheckbox.addEventListener('change', (e) => {
+                    state.isRationalLocked = e.target.checked;
+
+                    const durationSlider = document.getElementById('Duration_slider');
+                    const durationContainer = document.getElementById('Duration_container');
+
+                    if (state.isRationalLocked) {
+
+                        // --- 1. Disable Domain Slider ---
+                        // The domain will be *calculated* by snapFrequencies, not just set to 2π
+                        durationSlider.disabled = true;
+                        durationContainer.classList.add('opacity-50');
+
+                        // --- 2. Snap Frequencies (which will also set the correct domain) ---
+                        // Use C1's current value as the starting point for snapping
+                        snapFrequencies('C1', parseFloat(document.getElementById('C1_slider').value));
+
+                    } else {
+                        // Re-enable the slider and remove visual dimming
+                        durationSlider.disabled = false;
+                        durationContainer.classList.remove('opacity-50');
+
+                        // Re-render, just in case
+                        regenerateCurve();
+                        updateCodeSnippet();
+                    }
+                });
+            }
+
+
+            // Initialize Copy Button logic
+            const copyButton = document.getElementById('copy_code_button');
+            const codeOutput = document.getElementById('lissajous_code_output');
+            const prompt = document.getElementById('copy_code_prompt');
+            const preBlock = document.getElementById('code_pre_block');
+
+            if (copyButton && codeOutput) {
+                const handleCopy = () => {
+                    copyToClipboard(codeOutput.textContent, prompt, "");
+                };
+
+                copyButton.addEventListener('click', handleCopy);
+                preBlock.addEventListener('click', handleCopy);
+            }
+
+            updateCodeSnippet();
             initThree();
         };
+
+        // Attach resize listener
+        window.addEventListener('resize', onWindowResize);
+
+        // Start everything when the window is fully loaded
+        window.onload = init;
 
     </script>
 </body>

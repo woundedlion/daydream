@@ -372,9 +372,9 @@ export class RandomWalk extends Animation {
     this.noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
     this.noise.SetSeed(Math.floor(Math.random() * 65535));
     
-    this.WALK_SPEED = 0.12; // Constant angular speed (radians per step)
-    this.PIVOT_STRENGTH = 0.2; // Max pivot angle (radians per step)
-    this.NOISE_SCALE = 0.05; // How fast the Perlin noise changes
+    this.WALK_SPEED = 0.05; // Constant angular speed (radians per step)
+    this.PIVOT_STRENGTH = 0.01; // Max pivot angle (radians per step)
+    this.NOISE_SCALE = 0.001; // How fast the Perlin noise changes
 
     this.noise.SetFrequency(this.NOISE_SCALE);
     
