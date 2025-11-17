@@ -27,6 +27,18 @@ export class Filter {
       this.next.plot(pixels, x, y, color, age, alpha);
     }
   }
+
+  decay() {
+    if (this.next !== undefined) {
+      this.next.decay();
+    }
+  }
+
+  trail(pixels, trailFn, alpha) {
+    if (this.next !== undefined) {
+      this.next.trail(pixels, trailFn, alpha);
+    }
+  }
 }
 
 export class FilterOrient extends Filter {
@@ -234,7 +246,7 @@ export class FilterTwinkle extends Filter {
 }
 
 
-export class FilterDecayTrails extends Filter {
+export class FilterDecay extends Filter {
   constructor(lifespan) {
     super();
     this.lifespan = lifespan;
@@ -260,6 +272,7 @@ export class FilterDecayTrails extends Filter {
         this.trails.set(key, ttl);
       }
     });
+    super.decay();
   }
 
   trail(pixels, trailFn, alpha) {
@@ -271,5 +284,6 @@ export class FilterDecayTrails extends Filter {
         this.pass(pixels, p[0], p[1], color, this.lifespan - ttl, alpha);
       }
     }
+    super.trail(pixels, trailFn, alpha);
   }
 }
