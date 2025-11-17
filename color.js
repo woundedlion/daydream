@@ -1,6 +1,7 @@
 // color.js
 import * as THREE from "three";
 import { G } from "./geometry.js";
+import { randomBetween } from "./util.js"
 
 export const blendMax = (c1, c2) => {
   return new THREE.Color(

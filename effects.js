@@ -27,7 +27,7 @@ import {
   Rotation, RandomTimer, easeOutExpo, easeInSin, easeOutSin,
   Mutation, MutableNumber, ParticleSystem, RandomWalk,
   easeOutElastic, easeInOutBicubic, easeInCubic, easeOutCubic,
-  easeInCirc, easeOutCirc, PeriodicTimer
+  easeInCirc, easeOutCirc, PeriodicTimer, ColorWipe
 } from "./animation.js";
 
 import {
@@ -1381,6 +1381,7 @@ export class Comets {
   }
   constructor() {
     this.pixels = new Map();
+    this.timeline = new Timeline();
     this.numNodes = 1;
     this.spacing = 48;
     this.cycleDuration = 80;
@@ -1401,15 +1402,13 @@ export class Comets {
     ]
     this.curFunction = 0;
     this.updatePath();
-
-    this.palette = embers;
-
+    this.palette = new GenerativePalette("straight", "analogous", "ascending");
+  
     this.filters = new FilterDecay(this.trailLength);
     this.filters
       .chain(new FilterOrient(this.orientation))
       .chain(new FilterAntiAlias());
     this.nodes = [];
-    this.timeline = new Timeline();
 
     for (let i = 0; i < this.numNodes; ++i) {
       this.spawnNode(this.path);
@@ -1419,6 +1418,7 @@ export class Comets {
       new PeriodicTimer(2 * this.cycleDuration, () => {
         this.curFunction = Math.floor(randomBetween(0, this.functions.length));
         this.updatePath();
+        this.updatePalette();
       }, true)
     );
     this.timeline.add(0, new RandomWalk(this.orientation, randomVector()));
@@ -1429,6 +1429,13 @@ export class Comets {
     let domain = this.functions[this.curFunction][1];
     this.path.collapse();
     this.path.appendSegment(f, domain, 1024, easeMid);
+  }
+
+  updatePalette() {
+    this.nextPalette = new GenerativePalette("straight", "analogous", "ascending");
+    this.timeline.add(0,
+      new ColorWipe(this.palette, this.nextPalette, 48, easeMid)
+    );
   }
 
   spawnNode(path) {

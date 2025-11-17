@@ -399,3 +399,22 @@ export class RandomWalk extends Animation {
     Rotation.animate(this.orientation, walkAxis, walkAngle, easeMid);
   }
 }
+
+export class ColorWipe extends Animation {
+  constructor(g1, g2, duration, easingFn) {
+    super(duration, false);
+    this.a0 = g1.a;
+    this.b0 = g1.b;
+    this.c0 = g1.c;
+    this.g1 = g1;
+    this.g2 = g2;
+    this.easingFn = easingFn;
+  }
+
+  step() {
+    super.step();
+    this.g1.a.lerpColors(this.a0, this.g2.a, this.t / this.duration);
+    this.g1.b.lerpColors(this.b0, this.g2.b, this.t / this.duration);
+    this.g1.c.lerpColors(this.c0, this.g2.c, this.t / this.duration);
+  }
+}
