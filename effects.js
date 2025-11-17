@@ -40,6 +40,247 @@ import { dir, wrap, shortest_distance, randomChoice, randomBetween } from "./uti
 
 ///////////////////////////////////////////////////////////////////////////////
 
+export class RingShower {
+
+  static Ring = class {
+    constructor(filters) {
+      this.normal = randomVector();
+      this.duration = 8 + Math.random() * 72;
+      this.radius = new MutableNumber(0);
+      this.lastRadius = this.radius.get();
+      this.palette = new GenerativePalette('circular', 'analogous', 'flat');
+    }
+  }
+
+  constructor() {
+    Daydream.W = 96;
+    this.pixels = new Map();
+    this.rings = [];
+
+    this.palette = new GenerativePalette();
+    this.orientation = new Orientation();
+    this.filters = new FilterAntiAlias();
+
+    this.timeline = new Timeline();
+    this.timeline.add(0,
+      new RandomTimer(1, 24,
+        () => this.spawnRing(),
+        true
+      )
+    );
+  }
+
+  spawnRing() {
+    let ring = new RingShower.Ring(this.filters);
+    this.rings.unshift(ring);
+
+    this.timeline.add(0,
+      new Sprite(() => this.drawRing(ring),
+        ring.duration,
+        4, easeMid,
+        0, easeMid
+      ).then(() => {
+        this.rings.pop();
+      }));
+
+    this.timeline.add(0,
+      new Transition(ring.radius, 2, ring.duration, easeMid)
+    );
+  }
+
+  drawRing(ring) {
+    let step = 1 / Daydream.W;
+    let dots = drawRing(this.orientation.orient(ring.normal), ring.radius.get(),
+      (v, t) => ring.palette.get(t));
+    plotDots(this.pixels, this.filters, dots, 0, 0.5);
+    ring.lastRadius = ring.radius.get();
+
+  }
+
+  drawFrame() {
+    this.pixels.clear();
+    this.timeline.step();
+    return this.pixels;
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+export class RingSpin {
+  static Ring = class {
+    constructor(normal, filters, palette, trailLength) {
+      this.normal = normal;
+      this.orientation = new Orientation();
+      this.walk = new RandomWalk(this.orientation, this.normal);
+      this.palette = palette;
+      this.trails = new FilterDecay(trailLength);
+      this.trails.chain(filters);
+    }
+  }
+
+  constructor() {
+    Daydream.W = 96;
+    this.pixels = new Map();
+    this.rings = [];
+    this.alpha = 0.2;
+    this.trailLength = new MutableNumber(6);
+    this.filters = new FilterAntiAlias();
+
+    this.palettes = [richSunset, iceMelt];
+    this.numRings = 2;
+    this.timeline = new Timeline();
+
+    for (let i = 0; i < this.numRings; ++i) {
+      this.spawnRing(randomVector(), this.palettes[i]);
+    }
+
+    this.gui = new gui.GUI();
+    this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
+  }
+
+  spawnRing(normal, palette) {
+    let ring = new RingSpin.Ring(normal, this.filters, palette, this.trailLength.get());
+    this.rings.unshift(ring);
+
+    this.timeline.add(0,
+      new Sprite(() => this.drawRing(ring),
+        -1,
+        4, easeMid,
+        0, easeMid
+      ));
+    this.timeline.add(0, ring.walk);
+  }
+
+  drawRing(ring) {
+    let end = ring.orientation.length();
+    let start = end == 1 ? 0 : 1;
+    for (let i = start; i < end; ++i) {
+      let dots = drawRing(ring.orientation.orient(ring.normal, i), 1,
+        (v, t) => vignette(ring.palette)(0));
+      plotDots(this.pixels, ring.trails, dots,
+        (end - 1 - i) / end,
+        this.alpha);
+    }
+    ring.trails.trail(this.pixels, (x, y, t) => vignette(ring.palette)(t), this.alpha);
+    ring.trails.decay();
+    ring.orientation.collapse();
+  }
+
+  drawFrame() {
+    this.pixels.clear();
+    this.timeline.step();
+    return this.pixels;
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+export class Comets {
+  static Node = class {
+    constructor(path) {
+      this.orientation = new Orientation();
+      this.v = Daydream.Y_AXIS;
+      this.path = path;
+    }
+  }
+  constructor() {
+    this.pixels = new Map();
+    this.timeline = new Timeline();
+    this.numNodes = 1;
+    this.spacing = 48;
+    this.cycleDuration = 80;
+    this.trailLength = this.cycleDuration;
+    this.alpha = 0.5;
+    this.orientation = new Orientation();
+    this.path = new Path(Daydream.Y_AXIS);
+    this.functions = [
+      [(t) => lissajous(1.06, 1.06, 0, t), 5.909],
+      [(t) => lissajous(6.06, 1, 0, t), 2 * Math.PI],
+      [(t) => lissajous(6.02, 4.01, 0, t), 3.132],
+      [(t) => lissajous(46.62, 62.16, 0, t), 0.404],
+      [(t) => lissajous(46.26, 69.39, 0, t), 0.272],
+      [(t) => lissajous(19.44, 9.72, 0, t), 0.646],
+      [(t) => lissajous(8.51, 17.01, 0, t), 0.739],
+      [(t) => lissajous(7.66, 6.38, 0, t), 4.924],
+      [(t) => lissajous(8.75, 5, 0, t), 5.027],
+      [(t) => lissajous(11.67, 14.58, 0, t), 2.154],
+      [(t) => lissajous(11.67, 8.75, 0, t), 2.154],
+      [(t) => lissajous(10.94, 8.75, 0, t), 2.872]
+    ]
+    this.curFunction = 0;
+    this.updatePath();
+    this.palette = new GenerativePalette("straight", "analogous", "ascending");
+
+    this.filters = new FilterDecay(this.trailLength);
+    this.filters
+      .chain(new FilterOrient(this.orientation))
+      .chain(new FilterAntiAlias());
+    this.nodes = [];
+
+    for (let i = 0; i < this.numNodes; ++i) {
+      this.spawnNode(this.path);
+    }
+
+    this.timeline.add(0,
+      new PeriodicTimer(2 * this.cycleDuration, () => {
+        this.curFunction = Math.floor(randomBetween(0, this.functions.length));
+        this.updatePath();
+        this.updatePalette();
+      }, true)
+    );
+    this.timeline.add(0, new RandomWalk(this.orientation, randomVector()));
+  }
+
+  updatePath() {
+    let f = this.functions[this.curFunction][0];
+    let domain = this.functions[this.curFunction][1];
+    this.path.collapse();
+    this.path.appendSegment(f, domain, 1024, easeMid);
+  }
+
+  updatePalette() {
+    this.nextPalette = new GenerativePalette("straight", "analogous", "ascending");
+    this.timeline.add(0,
+      new ColorWipe(this.palette, this.nextPalette, 48, easeMid)
+    );
+  }
+
+  spawnNode(path) {
+    let i = this.nodes.length;
+    this.nodes.push(new Comets.Node(path));
+    this.timeline.add(0,
+      new Sprite((opacity) => this.drawNode(opacity, i), -1, 16, easeMid, 0, easeMid)
+    );
+    this.timeline.add(i * this.spacing,
+      new Motion(this.nodes[i].orientation, this.nodes[i].path, this.cycleDuration, true)
+    );
+
+  }
+
+  drawNode(opacity, i) {
+    let dots = [];
+    let node = this.nodes[i];
+    tween(node.orientation, (orientFn, t) => {
+      dots.push(...drawVector(orientFn(node.v),
+        (v, t) => this.palette.get(1 - t)));
+    });
+    plotDots(this.pixels, this.filters, dots, 0, opacity);
+    node.orientation.collapse();
+  }
+
+  drawFrame() {
+    this.pixels.clear();
+    this.timeline.step();
+    this.filters.trail(this.pixels, (x, y, t) => this.palette.get(1 - t), this.alpha);
+    this.filters.decay();
+    return this.pixels;
+  }
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Experimental Effects Below!
+///////////////////////////////////////////////////////////////////////////////
 class Thruster {
   constructor(drawFn, orientation, thrustPoint) {
     this.exhaustRadius = new MutableNumber(0);
@@ -633,169 +874,6 @@ export class Fib {
 
 /////////////////////////////////////////////////////////////////////////////////
 
-export class Angles {
-  constructor() {
-    Daydream.W = 96
-    this.pixels = new Map();
-
-    // Palettes
-    this.palette = new ProceduralPalette(
-      [0.5, 0.5, 0.5],
-      [1.0, 0.2, 0.5],
-      [0.5, 0.5, 0.5],
-      [0.3, 0.5, 0.0]
-    );
-
-    // Output Filters
-    this.trails = new FilterDecay(10);
-    (this.ringOutput = new FilterRaw())
-      .chain(new FilterAntiAlias())
-      //      .chain(new FilterAntiAlias())
-      //            .chain(new FilterChromaticShift())
-      //      .chain(new FilterReplicate(2))
-      //          .chain(new FilterMirror())
-      // .chain(this.trails)
-      ;
-
-    // State
-    this.orientation = new Orientation();
-    this.ring = new THREE.Vector3(1, 0, 0).normalize();
-    this.n = Daydream.W;
-    this.dots = new Array(this.n);
-    for (let i = 0; i < this.n; ++i) {
-      this.dots[i] = ((v) => {
-        return v;
-      })(ringPoint(this.ring, 1, 2 * Math.PI * i / this.n, 0));
-    }
-    this.axisRing = new THREE.Vector3(0, 1, 0).normalize();
-    this.axes = new Array(this.n);
-    for (let i = 0; i < this.n; ++i) {
-      this.axes[i] = ringPoint(this.axisRing, 0.2, 2 * Math.PI * i / this.n, 0);
-    }
-    this.orientations = new Array(this.n);
-    for (let i = 0; i < this.n; ++i) {
-      this.orientations[i] = new Orientation();
-    }
-
-    // Scene
-    this.timeline = new Timeline();
-    this.timeline.add(0,
-      new Sprite(
-        (opacity) => this.draw(opacity),
-        -1, 8, easeMid, 0, easeMid)
-    );
-    for (let i = 0; i < this.n; ++i) {
-      let a = 2 * Math.PI / Daydream.W;
-      this.timeline.add(0,
-        new Rotation(this.orientations[i], this.axes[i], a * 16, 16, easeMid, true)
-      );
-    }
-  }
-
-
-  draw(opacity) {
-    this.trails.decay();
-    for (let i = 0; i < this.n; ++i) {
-      for (let j = 1; j < this.orientations[i].length(); ++j) {
-        plotDots(this.pixels, this.ringOutput,
-          drawVector(this.orientations[i].orient(this.dots[i], j),
-            () => new THREE.Color(1, 0, 0)),
-          0, // Added age
-          opacity // Added alpha
-        );
-      }
-      this.orientations[i].collapse();
-
-      /*
-       plotDots(this.pixels, this.ringOutput,
-              drawVector(this.axes[i],
-                () => new THREE.Color(0, 1, 0))
-            );
-       */
-    }
-    this.trails.trail(this.pixels, (x, y, t) => rainbow.get(t), opacity);
-  }
-
-  drawFrame() {
-    this.pixels.clear();
-    this.timeline.step();
-    return this.pixels;
-  }
-}
-
-
-///////////////////////////////////////////////////////////////////////////////
-/*
-class Grid {
-  constructor() {
-    Daydream.W = 96
-    this.pixels = new Map();
-
-    // Palettes
-    this.palette = new ProceduralPalette(
-      [0.5, 0.5, 0.5],
-      [1.0, 0.2, 0.5],
-      [0.5, 0.5, 0.5],
-      [0.3, 0.5, 0.0]
-    );
-
-    // Output Filters
-    this.trails = new FilterDecay(4);
-    (this.ringOutput = new FilterRaw())
-      .chain(new FilterAntiAlias())
-      //      .chain(new FilterChromaticShift())
-      ;
-
-    // State
-    this.orientation = new Orientation();
-    this.n = 20;
-    this.heads =
-    for (let i = 0; i < this.n; ++i) {
-      this.heads.push(fibSpiral(this.n, 0, i));
-    }
-    this.tails = Array.from({ length: this.heads.length }, (v, i) => new MutableNumber(0));
-
-    // Scene
-    this.timeline = new Timeline();
-    this.timeline.add(0,
-      new Sprite(
-        (opacity) => this.draw(opacity),
-        -1, 8, easeMid, 0, easeMid)
-    );
-
-    // T1: Start tails spinning
-    this.onSpinTails(0);
-  }
-
-  onSpinTails(inSecs = 0) {
-    for (let i = 0; i < this.heads.length; ++i) {
-      this.timeline.add(inSecs,
-        new Transition(this.tails[i], 2 * Math.PI, 16, easeMid, false, true)
-      );
-    }
-  }
-
-  draw(opacity) {
-    this.trails.decay();
-    let dots = [];
-    for (let i = 0; i < this.heads.length; ++i) {
-      let head = ringPoint(this.heads[i], 0.4, (this.tails[i].get() + Math.PI) % (2 * Math.PI), 2 * Math.PI / i)
-      let tail = ringPoint(this.heads[i], 0.4, this.tails[i].get(), 2 * Math.PI / i);
-      dots.push(...drawLine(head, tail, () => new THREE.Color(0x888888)));
-    }
-    this.trails this.pixels, new FilterRaw(), (x, y, t) => blueToBlack.get(t));
-    plotDots(this.pixels, this.ringOutput, dots, 0, blendOverMax);
-  }
-
-  drawFrame() {
-    this.pixels.clear();
-    this.timeline.step();
-    return this.pixels;
-  }
-}
-*/
-///////////////////////////////////////////////////////////////////////////////
-
 
 export class Dynamo {
   static Node = class {
@@ -989,137 +1067,7 @@ export class Dynamo {
   }
 }
 
-export class RingShower {
-
-  static Ring = class {
-    constructor(filters) {
-      this.normal = randomVector();
-      this.duration = 8 + Math.random() * 72;
-      this.radius = new MutableNumber(0);
-      this.lastRadius = this.radius.get();
-      this.palette = new GenerativePalette('circular', 'analogous', 'flat');
-    }
-  }
-
-  constructor() {
-    Daydream.W = 96;
-    this.pixels = new Map();
-    this.rings = [];
-
-    this.palette = new GenerativePalette();
-    this.orientation = new Orientation();
-    this.filters = new FilterAntiAlias();
-
-    this.timeline = new Timeline();
-    this.timeline.add(0,
-      new RandomTimer(1, 24,
-        () => this.spawnRing(),
-        true
-      )
-    );
-  }
-
-  spawnRing() {
-    let ring = new RingShower.Ring(this.filters);
-    this.rings.unshift(ring);
-
-    this.timeline.add(0,
-      new Sprite(() => this.drawRing(ring),
-        ring.duration,
-        4, easeMid,
-        0, easeMid
-      ).then(() => {
-        this.rings.pop();
-      }));
-
-    this.timeline.add(0,
-      new Transition(ring.radius, 2, ring.duration, easeMid)
-    );
-  }
-
-  drawRing(ring) {
-    let step = 1 / Daydream.W;
-    let dots = drawRing(this.orientation.orient(ring.normal), ring.radius.get(),
-      (v, t) => ring.palette.get(t));
-    plotDots(this.pixels, this.filters, dots, 0, 0.5);
-    ring.lastRadius = ring.radius.get();
-
-  }
-
-  drawFrame() {
-    this.pixels.clear();
-    this.timeline.step();
-    return this.pixels;
-  }
-}
-
-export class RingSpin {
-  static Ring = class {
-    constructor(normal, filters, palette, trailLength) {
-      this.normal = normal;
-      this.orientation = new Orientation();
-      this.walk = new RandomWalk(this.orientation, this.normal);
-      this.palette = palette;
-      this.trails = new FilterDecay(trailLength);
-      this.trails.chain(filters);
-    }
-  }
-
-  constructor() {
-    Daydream.W = 96;
-    this.pixels = new Map();
-    this.rings = [];
-    this.alpha = 0.2;
-    this.trailLength = new MutableNumber(6);
-    this.filters = new FilterAntiAlias();
-
-    this.palettes = [richSunset, iceMelt];
-    this.numRings = 2;
-    this.timeline = new Timeline();
-
-    for (let i = 0; i < this.numRings; ++i) {
-      this.spawnRing(randomVector(), this.palettes[i]);
-    }
-
-    this.gui = new gui.GUI();
-    this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
-  }
-
-  spawnRing(normal, palette) {
-    let ring = new RingSpin.Ring(normal, this.filters, palette, this.trailLength.get());
-    this.rings.unshift(ring);
-
-    this.timeline.add(0,
-      new Sprite(() => this.drawRing(ring),
-        -1,
-        4, easeMid,
-        0, easeMid
-      ));
-    this.timeline.add(0, ring.walk);
-  }
-
-  drawRing(ring) {
-    let end = ring.orientation.length();
-    let start = end == 1 ? 0 : 1;
-    for (let i = start; i < end; ++i) {
-      let dots = drawRing(ring.orientation.orient(ring.normal, i), 1,
-        (v, t) => vignette(ring.palette)(0));
-      plotDots(this.pixels, ring.trails, dots,
-        (end - 1 - i) / end,
-        this.alpha);
-    }
-    ring.trails.trail(this.pixels, (x, y, t) => vignette(ring.palette)(t), this.alpha);
-    ring.trails.decay();
-    ring.orientation.collapse();
-  }
-
-  drawFrame() {
-    this.pixels.clear();
-    this.timeline.step();
-    return this.pixels;
-  }
-}
-
+///////////////////////////////////////////////////////////////////////////////
 
 export class RingMachine {
 
@@ -1282,6 +1230,7 @@ export class NoiseFieldEffect {
   }
 }
 
+///////////////////////////////////////////////////////////////////////////////
 
 /**
  * Metaballs Effect (V5: Smooth Orbital Physics)
@@ -1370,110 +1319,6 @@ export class MetaballEffect {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
-export class Comets {
-  static Node = class {
-    constructor(path) {
-      this.orientation = new Orientation();
-      this.v = Daydream.Y_AXIS;
-      this.path = path;
-    }
-  }
-  constructor() {
-    this.pixels = new Map();
-    this.timeline = new Timeline();
-    this.numNodes = 1;
-    this.spacing = 48;
-    this.cycleDuration = 80;
-    this.trailLength = this.cycleDuration;
-    this.alpha = 0.5;
-    this.orientation = new Orientation();
-    this.path = new Path(Daydream.Y_AXIS);
-    this.functions = [
-      [(t) => lissajous(1.06, 1.06, 0, t), 5.909],
-      [(t) => lissajous(6.06, 1, 0, t), 2 * Math.PI],
-      [(t) => lissajous(19.44, 9.72, 0, t), 0.646],
-      [(t) => lissajous(8.51, 17.01, 0, t), 0.739],
-      [(t) => lissajous(7.66, 6.38, 0, t), 4.924],
-      [(t) => lissajous(8.75, 5, 0, t), 5.027],
-      [(t) => lissajous(11.67, 14.58, 0, t), 2.154],
-      [(t) => lissajous(11.67, 8.75, 0, t), 2.154],
-      [(t) => lissajous(10.94, 8.75, 0, t), 2.872]
-    ]
-    this.curFunction = 0;
-    this.updatePath();
-    this.palette = new GenerativePalette("straight", "analogous", "ascending");
-  
-    this.filters = new FilterDecay(this.trailLength);
-    this.filters
-      .chain(new FilterOrient(this.orientation))
-      .chain(new FilterAntiAlias());
-    this.nodes = [];
-
-    for (let i = 0; i < this.numNodes; ++i) {
-      this.spawnNode(this.path);
-    }
-
-    this.timeline.add(0,
-      new PeriodicTimer(2 * this.cycleDuration, () => {
-        this.curFunction = Math.floor(randomBetween(0, this.functions.length));
-        this.updatePath();
-        this.updatePalette();
-      }, true)
-    );
-    this.timeline.add(0, new RandomWalk(this.orientation, randomVector()));
-  }
-
-  updatePath() {
-    let f = this.functions[this.curFunction][0];
-    let domain = this.functions[this.curFunction][1];
-    this.path.collapse();
-    this.path.appendSegment(f, domain, 1024, easeMid);
-  }
-
-  updatePalette() {
-    this.nextPalette = new GenerativePalette("straight", "analogous", "ascending");
-    this.timeline.add(0,
-      new ColorWipe(this.palette, this.nextPalette, 48, easeMid)
-    );
-  }
-
-  spawnNode(path) {
-    let i = this.nodes.length;
-    this.nodes.push(new Comets.Node(path));
-    this.timeline.add(0,
-      new Sprite((opacity) => this.drawNode(opacity, i), -1, 16, easeMid, 0, easeMid)
-    );
-    this.timeline.add(i * this.spacing,
-      new Motion(this.nodes[i].orientation, this.nodes[i].path, this.cycleDuration, true)
-    );
-
-  }
-
-  drawNode(opacity, i) {
-    let dots = [];
-    let node = this.nodes[i];
-    tween(node.orientation, (orientFn, t) => {
-      dots.push(...drawVector(orientFn(node.v),
-        (v, t) => this.palette.get(1 - t)));
-    });
-    plotDots(this.pixels, this.filters, dots, 0, opacity);
-    node.orientation.collapse();
-  }
-
-  drawFrame() {
-    this.pixels.clear();
-    this.timeline.step();
-    this.filters.trail(this.pixels, (x, y, t) => this.palette.get(1 - t), this.alpha);
-    this.filters.decay();
-    return this.pixels;
-  }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-
-
 
 /**
  * FlowField Effect

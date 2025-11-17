@@ -197,8 +197,8 @@
 
         // --- Configuration and State ---
         const config = {
-            C1: { min: 1, max: 20, step: 0.01, default: 12, scale: 100, label: "C₁" },
-            C2: { min: 1, max: 20, step: 0.01, default: 5, scale: 100, label: "C₂" },
+            C1: { min: 1, max: 100, step: 0.01, default: 12, scale: 100, label: "C₁" },
+            C2: { min: 1, max: 100, step: 0.01, default: 5, scale: 100, label: "C₂" },
             A: { min: 0, max: (2 * Math.PI), step: (2 * Math.PI) / 1000, default: 0, scale: 1000 / (2 * Math.PI), label: "A (rad)" },
             Duration: { min: 0, max: (8 * Math.PI), step: (2 * Math.PI) / 500, default: 2 * Math.PI, scale: 1000 / (2 * Math.PI), label: "Domain" },
             // FIX: Added scale: 1 to Samples to prevent NaN in slider initialization
