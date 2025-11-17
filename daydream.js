@@ -1,7 +1,7 @@
 // daydream.js
 
 import { Daydream } from "./driver.js";
-import { Dynamo, RingShower, RingSpin, MetaballEffect, NoiseParticles, RingMachine, Comets, FlowField, VerticalMarch } from "./effects.js";
+import { Dynamo, RingShower, RingSpin, MetaballEffect, NoiseParticles, RingMachine, Comets, FlowField } from "./effects.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
 
