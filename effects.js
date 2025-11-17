@@ -31,7 +31,7 @@ import {
 } from "./animation.js";
 
 import {
-  FilterAntiAlias, FilterDecayTrails, FilterRaw, FilterReplicate,
+  FilterAntiAlias, FilterDecay, FilterRaw, FilterReplicate,
   FilterOrient, FilterChromaticShift, FilterMirror, FilterFn,
   FilterSinDisplace, FilterColorShift, FilterTwinkle
 } from "./filters.js";
@@ -577,7 +577,7 @@ export class Fib {
     );
 
     // Output Filters
-    this.trails = new FilterDecayTrails(4);
+    this.trails = new FilterDecay(4);
     (this.ringOutput = new FilterRaw())
       .chain(new FilterAntiAlias())
       //      .chain(new FilterChromaticShift())
@@ -647,7 +647,7 @@ export class Angles {
     );
 
     // Output Filters
-    this.trails = new FilterDecayTrails(10);
+    this.trails = new FilterDecay(10);
     (this.ringOutput = new FilterRaw())
       .chain(new FilterAntiAlias())
       //      .chain(new FilterAntiAlias())
@@ -740,7 +740,7 @@ class Grid {
     );
 
     // Output Filters
-    this.trails = new FilterDecayTrails(4);
+    this.trails = new FilterDecay(4);
     (this.ringOutput = new FilterRaw())
       .chain(new FilterAntiAlias())
       //      .chain(new FilterChromaticShift())
@@ -824,7 +824,7 @@ export class Dynamo {
     this.gap = 4;
     this.trailLength = 10;
     this.orientation = new Orientation();
-    this.trails = new FilterDecayTrails(this.trailLength);
+    this.trails = new FilterDecay(this.trailLength);
     this.aa = new FilterAntiAlias();
     this.replicate = new FilterReplicate(4);
     this.orient = new FilterOrient(this.orientation);
@@ -1060,7 +1060,7 @@ export class RingSpin {
       this.orientation = new Orientation();
       this.walk = new RandomWalk(this.orientation, this.normal);
       this.palette = palette;
-      this.trails = new FilterDecayTrails(trailLength);
+      this.trails = new FilterDecay(trailLength);
       this.trails.chain(filters);
     }
   }
@@ -1131,7 +1131,7 @@ export class RingMachine {
       this.delay = delay;
       this.orientation = new Orientation();
       this.palette = palette;
-      this.trails = new FilterDecayTrails(trailLength);
+      this.trails = new FilterDecay(trailLength);
       this.trails.chain(filters);
 
       this.rotation = new Rotation(this.orientation, this.axis, 2 * Math.PI, this.speed, easeMid, true);
@@ -1391,7 +1391,7 @@ export class Comets {
 
     this.palette = embers;
 
-    this.filters = new FilterDecayTrails(this.trailLength);
+    this.filters = new FilterDecay(this.trailLength);
     this.filters
       .chain(new FilterOrient(this.orientation))
       .chain(new FilterAntiAlias());
@@ -1496,7 +1496,7 @@ export class FlowField {
 
     // --- Filters ---
     // MODIFIED: Pass 'this.TRAIL_LENGTH' so it's not a static value
-    this.trails = new FilterDecayTrails(this.TRAIL_LENGTH);
+    this.trails = new FilterDecay(this.TRAIL_LENGTH);
     this.aa = new FilterAntiAlias();
     this.filters = new FilterRaw();
 

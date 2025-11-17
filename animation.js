@@ -399,5 +399,3 @@ export class RandomWalk extends Animation {
     Rotation.animate(this.orientation, walkAxis, walkAngle, easeMid);
   }
 }
-`
-}
