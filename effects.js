@@ -111,7 +111,6 @@ export class RingSpin {
     constructor(normal, filters, palette, trailLength) {
       this.normal = normal;
       this.orientation = new Orientation();
-      this.walk = new RandomWalk(this.orientation, this.normal);
       this.palette = palette;
       this.trails = new FilterDecay(trailLength);
       this.trails.chain(filters);
@@ -123,15 +122,15 @@ export class RingSpin {
     this.pixels = new Map();
     this.rings = [];
     this.alpha = 0.2;
-    this.trailLength = new MutableNumber(6);
+    this.trailLength = new MutableNumber(20);
     this.filters = new FilterAntiAlias();
 
-    this.palettes = [richSunset, iceMelt];
-    this.numRings = 2;
+    this.palettes = [richSunset, mangoPeel, underSea, iceMelt ];
+    this.numRings = 4;
     this.timeline = new Timeline();
 
     for (let i = 0; i < this.numRings; ++i) {
-      this.spawnRing(randomVector(), this.palettes[i]);
+      this.spawnRing(Daydream.X_AXIS, this.palettes[i]);
     }
 
     this.gui = new gui.GUI();
@@ -143,24 +142,22 @@ export class RingSpin {
     this.rings.unshift(ring);
 
     this.timeline.add(0,
-      new Sprite(() => this.drawRing(ring),
+      new Sprite((opacity) => this.drawRing(opacity, ring),
         -1,
         4, easeMid,
         0, easeMid
       ));
-    this.timeline.add(0, ring.walk);
+    this.timeline.add(0,
+      new RandomWalk(ring.orientation, ring.normal));
   }
 
-  drawRing(ring) {
+  drawRing(opacity, ring) {
     let end = ring.orientation.length();
-    let start = end == 1 ? 0 : 1;
-    for (let i = start; i < end; ++i) {
-      let dots = drawRing(ring.orientation.orient(ring.normal, i), 1,
+    tween(ring.orientation, (orientFn, t) => {
+      let dots = drawRing(orientFn(ring.normal), 1,
         (v, t) => vignette(ring.palette)(0));
-      plotDots(this.pixels, ring.trails, dots,
-        (end - 1 - i) / end,
-        this.alpha);
-    }
+      plotDots(this.pixels, ring.trails, dots, t, this.alpha);
+    });
     ring.trails.trail(this.pixels, (x, y, t) => vignette(ring.palette)(t), this.alpha);
     ring.trails.decay();
     ring.orientation.collapse();
@@ -258,13 +255,13 @@ export class Comets {
   }
 
   drawNode(opacity, i) {
-    let dots = [];
     let node = this.nodes[i];
     tween(node.orientation, (orientFn, t) => {
+      let dots = [];
       dots.push(...drawVector(orientFn(node.v),
         (v, t) => this.palette.get(1 - t)));
+      plotDots(this.pixels, this.filters, dots, t, opacity);
     });
-    plotDots(this.pixels, this.filters, dots, 0, opacity);
     node.orientation.collapse();
   }
 
