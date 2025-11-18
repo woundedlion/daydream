@@ -49,6 +49,7 @@ export class RingShower {
       this.radius = new MutableNumber(0);
       this.lastRadius = this.radius.get();
       this.palette = new GenerativePalette('circular', 'analogous', 'flat');
+      this.phase = new MutableNumber(0);
     }
   }
 
@@ -56,6 +57,7 @@ export class RingShower {
     Daydream.W = 96;
     this.pixels = new Map();
     this.rings = [];
+    this.alpha = 0.2;
 
     this.palette = new GenerativePalette();
     this.orientation = new Orientation();
@@ -63,11 +65,14 @@ export class RingShower {
 
     this.timeline = new Timeline();
     this.timeline.add(0,
-      new RandomTimer(1, 24,
+      new RandomTimer(4, 48,
         () => this.spawnRing(),
         true
       )
     );
+
+    this.gui = new gui.GUI();
+    this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
   }
 
   spawnRing() {
@@ -75,7 +80,7 @@ export class RingShower {
     this.rings.unshift(ring);
 
     this.timeline.add(0,
-      new Sprite(() => this.drawRing(ring),
+      new Sprite((opacity) => this.drawRing(opacity, ring),
         ring.duration,
         4, easeMid,
         0, easeMid
@@ -86,13 +91,17 @@ export class RingShower {
     this.timeline.add(0,
       new Transition(ring.radius, 2, ring.duration, easeMid)
     );
+
+    this.timeline.add(0,
+      new Transition(ring.phase, 3 * Math.PI, ring.duration, easeMid)
+    );
   }
 
-  drawRing(ring) {
+  drawRing(opacity, ring) {
     let step = 1 / Daydream.W;
     let dots = drawRing(this.orientation.orient(ring.normal), ring.radius.get(),
-      (v, t) => ring.palette.get(t));
-    plotDots(this.pixels, this.filters, dots, 0, 0.5);
+      (v, t) => ring.palette.get(t), ring.phase.get());
+    plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
     ring.lastRadius = ring.radius.get();
 
   }
@@ -271,6 +280,199 @@ export class Comets {
     this.filters.trail(this.pixels, (x, y, t) => this.palette.get(1 - t), this.alpha);
     this.filters.decay();
     return this.pixels;
+  }
+}
+
+
+export class Dynamo {
+  static Node = class {
+    constructor(y) {
+      this.x = 0;
+      this.y = y;
+      this.v = 0;
+    }
+  }
+
+  constructor() {
+    Daydream.W = 96;
+
+    // State
+    this.pixels = new Map();
+
+    this.palettes = [new GenerativePalette('vignette')];
+    this.paletteBoundaries = [];
+    this.paletteNormal = Daydream.Y_AXIS.clone();
+
+    this.nodes = [];
+    for (let i = 0; i < Daydream.H; ++i) {
+      this.nodes.push(new Dynamo.Node(i));
+    }
+    this.speed = 2;
+    this.gap = 4;
+    this.trailLength = 10;
+    this.orientation = new Orientation();
+    this.trails = new FilterDecay(this.trailLength);
+    this.aa = new FilterAntiAlias();
+    this.replicate = new FilterReplicate(4);
+    this.orient = new FilterOrient(this.orientation);
+
+    // Filters
+    this.filters = new FilterRaw();
+    this.filters
+      .chain(this.replicate)
+      .chain(this.trails)
+      .chain(this.orient)
+      .chain(this.aa)
+      ;
+
+    // Scene
+    this.timeline = new Timeline();
+
+    this.timeline.add(0,
+      new RandomTimer(4, 64, () => {
+        this.reverse();
+      }, true)
+    );
+    this.timeline.add(0,
+      new RandomTimer(20, 64, () => {
+        this.colorWipe();
+      }, true)
+    );
+
+    this.timeline.add(0,
+      new RandomTimer(80, 160, () => {
+        this.rotate();
+      }, true)
+    );
+  }
+
+  reverse() {
+    this.speed *= -1;
+  }
+
+  rotate() {
+    this.timeline.add(0,
+      new Rotation(
+        this.orientation,
+        randomVector(),
+        Math.PI,
+        40,
+        easeInOutSin,
+        false
+      )
+    );
+  }
+
+  colorWipe() {
+    this.palettes.unshift(new GenerativePalette('vignette'));
+    this.paletteBoundaries.unshift(new MutableNumber(0));
+    this.timeline.add(0,
+      new Transition(this.paletteBoundaries[0], Math.PI, 20, easeMid)
+        .then(() => {
+          this.paletteBoundaries.pop();
+          this.palettes.pop();
+        }
+        )
+    );
+  }
+
+  color(v, t) {
+    const blendWidth = Math.PI / 8;
+    const numBoundaries = this.paletteBoundaries.length;
+    const numPalettes = this.palettes.length;
+    const a = angleBetween(v, this.paletteNormal);
+
+    for (let i = 0; i < numBoundaries; ++i) {
+      const boundary = this.paletteBoundaries[i].get();
+      const lowerBlendEdge = boundary - blendWidth;
+      const upperBlendEdge = boundary + blendWidth;
+
+      if (a < lowerBlendEdge) {
+        return this.palettes[i].get(t);
+      }
+
+      if (a >= lowerBlendEdge && a <= upperBlendEdge) {
+        const blendFactor = (a - lowerBlendEdge) / (2 * blendWidth);
+        const clampedBlendFactor = Math.max(0, Math.min(blendFactor, 1));
+        const color1 = this.palettes[i].get(t);
+        const color2 = this.palettes[i + 1].get(t);
+        return color1.clone().lerp(color2, clampedBlendFactor);
+      }
+
+      const nextBoundaryLowerBlendEdge = (i + 1 < numBoundaries)
+        ? this.paletteBoundaries[i + 1].get() - blendWidth
+        : Infinity;
+
+      if (a > upperBlendEdge && a < nextBoundaryLowerBlendEdge) {
+        return this.palettes[i + 1].get(t);
+      }
+    }
+
+    return this.palettes[0].get(t);
+  }
+
+  drawFrame() {
+    this.pixels.clear();
+    this.trails.decay();
+    this.timeline.step();
+    for (let i = Math.abs(this.speed) - 1; i >= 0; --i) {
+      this.pull(0);
+      this.drawNodes(i * 1 / Math.abs(this.speed));
+    }
+    this.trails.trail(this.pixels,
+      (x, y, t) => this.color(pixelToVector(x, y), t), 0.5);
+    return this.pixels;
+  }
+
+  nodeY(node) {
+    return (node.y / (this.nodes.length - 1)) * (Daydream.H - 1);
+  }
+
+  drawNodes(age) {
+    let dots = [];
+    for (let i = 0; i < this.nodes.length; ++i) {
+      if (i == 0) {
+        let from = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
+        dots.push(...drawVector(from, (v) => this.color(v, 0)));
+      } else {
+        let from = pixelToVector(this.nodes[i - 1].x, this.nodeY(this.nodes[i - 1]));
+        let to = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
+        dots.push(...drawLine(from, to, (v) => this.color(v, 0)));
+      }
+    }
+    plotDots(this.pixels, this.filters, dots, age, 0.5);
+  }
+
+  pull(y) {
+    this.nodes[y].v = dir(this.speed);
+    this.move(this.nodes[y]);
+    for (let i = y - 1; i >= 0; --i) {
+      this.drag(this.nodes[i + 1], this.nodes[i]);
+    }
+    for (let i = y + 1; i < this.nodes.length; ++i) {
+      this.drag(this.nodes[i - 1], this.nodes[i]);
+    }
+  }
+
+  drag(leader, follower) {
+    let dest = wrap(follower.x + follower.v, Daydream.W);
+    if (shortest_distance(dest, leader.x, Daydream.W) > this.gap) {
+      follower.v = leader.v;
+      while (shortest_distance(follower.x, leader.x, Daydream.W) > this.gap) {
+        this.move(follower);
+      }
+    } else {
+      this.move(follower);
+    }
+  }
+
+  move(ring) {
+    let dest = wrap(ring.x + ring.v, Daydream.W);
+    let x = ring.x;
+    while (x != dest) {
+      x = wrap(x + dir(ring.v), Daydream.W);
+    }
+    ring.x = dest;
   }
 }
 
@@ -608,125 +810,6 @@ export class RingCircus {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-export class Wormhole {
-  constructor() {
-    Daydream.W = 96
-    this.pixels = new Map();
-
-    // Palettes
-    this.palette = new ProceduralPalette(
-      [0.5, 0.5, 0.5],
-      [1.0, 0.2, 0.5],
-      [0.5, 0.5, 0.5],
-      [0.3, 0.5, 0.0]
-    );
-
-    // Output Filters
-    (this.ringOutput = new FilterRaw())
-      .chain(new FilterAntiAlias())
-      ;
-
-    // State
-    this.normal = Daydream.Z_AXIS.clone();
-    this.numRings = new MutableNumber(Daydream.W);
-    this.orientation = new Orientation();
-    this.spreadFactor = new MutableNumber(1);
-    this.homeRadius = new MutableNumber(1);
-    this.dutyCycle = new MutableNumber((2 * Math.PI) / Daydream.W);
-    this.freq = new MutableNumber(2);
-    this.twist = new MutableNumber(7 / Daydream.W);
-    this.phase = new MutableNumber(0);
-    this.t = 0;
-
-    // Animations
-    this.timeline = new Timeline();
-
-    this.timeline.add(0,
-      new Sprite((opacity) => {
-        this.drawRings(opacity);
-      },
-        -1, 8, easeMid, 0, easeMid)
-    );
-
-    // T1: Spin everything
-    this.onThrustRings(1);
-    this.onSpinRings(1);
-    this.onMutateDutyCyle(1);
-    this.onMutateTwist(1);
-
-  }
-
-  onMutateDutyCyle(inSecs = 0) {
-    this.timeline.add(inSecs,
-      new Mutation(this.dutyCycle, sinWave((2 * Math.PI) / Daydream.W, (8 * 2 * Math.PI) / Daydream.W, 1, Math.PI / 2),
-        160, easeMid, true)
-    );
-  }
-
-  onMutateTwist(inSecs = 0) {
-    this.timeline.add(inSecs,
-      new Mutation(this.twist, sinWave(3 / Daydream.W, 10 / Daydream.W, 1, Math.PI / 2),
-        64, easeMid, true)
-    );
-  }
-
-  onThrustRings(inSecs = 0) {
-    this.timeline.add(inSecs,
-      new Rotation(this.orientation,
-        ringPoint(this.normal, 1, Math.random() * 2 * Math.PI),
-        2 * Math.PI,
-        96, easeInOutSin, false)
-    );
-
-    this.timeline.add(inSecs,
-      new RandomTimer(48, 70, () => {
-        this.onThrustRings();
-      })
-    );
-  }
-
-  onSpinRings(inSecs = 0) {
-    this.timeline.add(inSecs,
-      new Transition(this.phase, 2 * Math.PI, 32, easeMid, false, true)
-    );
-  }
-
-  calcRingSpread() {
-    this.radii = new Array(this.numRings.get());
-    for (let i = 0; i < this.numRings.get(); ++i) {
-      let x = ((i + 1) / (this.numRings.get() + 1)) * 2 - 1;
-      let r = Math.sqrt(Math.pow(1 - x, 2));
-      this.radii[i] = new MutableNumber(lerp(this.homeRadius.get(), r, this.spreadFactor.get()));
-    }
-  }
-
-  drawRings(opacity) {
-    this.calcRingSpread();
-    this.orientation.collapse();
-    for (let i = 0; i < this.radii.length; ++i) {
-      let dots = drawRing(this.orientation.orient(this.normal), this.radii[i].get(),
-        (v, t) => {
-          let idx = this.numRings.get() == 1 ? 0 : (1 - (i / (this.numRings.get() - 1)));
-          let darken = Math.pow(1 - Math.abs(this.radii[i].get() - 1), 3);
-          let color = this.palette.get(idx).multiplyScalar(darken);
-          let r = dottedBrush(color.multiplyScalar(opacity), this.freq.get(),
-            this.dutyCycle.get(), this.twist.get(), t);
-          return r;
-        }, (this.twist.get()) * i + this.phase.get());
-      plotDots(this.pixels, this.ringOutput, dots, 0, blendOverMax);
-    }
-  }
-
-  drawFrame() {
-    //    this.palette.mutate(Math.sin(0.01 * this.t++));
-    this.pixels.clear();
-    this.timeline.step();
-    return this.pixels;
-  }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 export class Pulses {
   constructor() {
     Daydream.W = 96
@@ -871,200 +954,6 @@ export class Fib {
 
 /////////////////////////////////////////////////////////////////////////////////
 
-
-export class Dynamo {
-  static Node = class {
-    constructor(y) {
-      this.x = 0;
-      this.y = y;
-      this.v = 0;
-    }
-  }
-
-  constructor() {
-    Daydream.W = 96;
-
-    // State
-    this.pixels = new Map();
-
-    this.palettes = [new GenerativePalette('vignette')];
-    this.paletteBoundaries = [];
-    this.paletteNormal = Daydream.Y_AXIS.clone();
-
-    this.nodes = [];
-    for (let i = 0; i < Daydream.H; ++i) {
-      this.nodes.push(new Dynamo.Node(i));
-    }
-    this.speed = 2;
-    this.gap = 4;
-    this.trailLength = 10;
-    this.orientation = new Orientation();
-    this.trails = new FilterDecay(this.trailLength);
-    this.aa = new FilterAntiAlias();
-    this.replicate = new FilterReplicate(4);
-    this.orient = new FilterOrient(this.orientation);
-
-    // Filters
-    this.filters = new FilterRaw();
-    this.filters
-      .chain(this.replicate)
-      .chain(this.trails)
-      .chain(this.orient)
-      .chain(this.aa)
-      ;
-
-    // Scene
-    this.timeline = new Timeline();
-
-    this.timeline.add(0,
-      new RandomTimer(4, 64, () => {
-        this.reverse();
-      }, true)
-    );
-    this.timeline.add(0,
-      new RandomTimer(20, 64, () => {
-        this.colorWipe();
-      }, true)
-    );
-
-    this.timeline.add(0,
-      new RandomTimer(80, 160, () => {
-        this.rotate();
-      }, true)
-    );
-  }
-
-  reverse() {
-    this.speed *= -1;
-  }
-
-  rotate() {
-    this.timeline.add(0,
-      new Rotation(
-        this.orientation,
-        randomVector(),
-        Math.PI,
-        40,
-        easeInOutSin,
-        false
-      )
-    );
-  }
-
-  colorWipe() {
-    this.palettes.unshift(new GenerativePalette('vignette'));
-    this.paletteBoundaries.unshift(new MutableNumber(0));
-    this.timeline.add(0,
-      new Transition(this.paletteBoundaries[0], Math.PI, 20, easeMid)
-        .then(() => {
-          this.paletteBoundaries.pop();
-          this.palettes.pop();
-        }
-        )
-    );
-  }
-
-  color(v, t) {
-    const blendWidth = Math.PI / 8;
-    const numBoundaries = this.paletteBoundaries.length;
-    const numPalettes = this.palettes.length;
-    const a = angleBetween(v, this.paletteNormal);
-
-    for (let i = 0; i < numBoundaries; ++i) {
-      const boundary = this.paletteBoundaries[i].get();
-      const lowerBlendEdge = boundary - blendWidth;
-      const upperBlendEdge = boundary + blendWidth;
-
-      if (a < lowerBlendEdge) {
-        return this.palettes[i].get(t);
-      }
-
-      if (a >= lowerBlendEdge && a <= upperBlendEdge) {
-        const blendFactor = (a - lowerBlendEdge) / (2 * blendWidth);
-        const clampedBlendFactor = Math.max(0, Math.min(blendFactor, 1));
-        const color1 = this.palettes[i].get(t);
-        const color2 = this.palettes[i + 1].get(t);
-        return color1.clone().lerp(color2, clampedBlendFactor);
-      }
-
-      const nextBoundaryLowerBlendEdge = (i + 1 < numBoundaries)
-        ? this.paletteBoundaries[i + 1].get() - blendWidth
-        : Infinity;
-
-      if (a > upperBlendEdge && a < nextBoundaryLowerBlendEdge) {
-        return this.palettes[i + 1].get(t);
-      }
-    }
-
-    return this.palettes[0].get(t);
-  }
-
-  drawFrame() {
-    this.pixels.clear();
-    this.trails.decay();
-    this.timeline.step();
-    for (let i = Math.abs(this.speed) - 1; i >= 0; --i) {
-      this.pull(0);
-      this.drawNodes(i * 1 / Math.abs(this.speed));
-    }
-    this.trails.trail(this.pixels,
-      (x, y, t) => this.color(pixelToVector(x, y), t), 0.5);
-    return this.pixels;
-  }
-
-  nodeY(node) {
-    return (node.y / (this.nodes.length - 1)) * (Daydream.H - 1);
-  }
-
-  drawNodes(age) {
-    let dots = [];
-    for (let i = 0; i < this.nodes.length; ++i) {
-      if (i == 0) {
-        let from = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
-        dots.push(...drawVector(from, (v) => this.color(v, 0)));
-      } else {
-        let from = pixelToVector(this.nodes[i - 1].x, this.nodeY(this.nodes[i - 1]));
-        let to = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
-        dots.push(...drawLine(from, to, (v) => this.color(v, 0)));
-      }
-    }
-    plotDots(this.pixels, this.filters, dots, age, 0.5);
-  }
-
-  pull(y) {
-    this.nodes[y].v = dir(this.speed);
-    this.move(this.nodes[y]);
-    for (let i = y - 1; i >= 0; --i) {
-      this.drag(this.nodes[i + 1], this.nodes[i]);
-    }
-    for (let i = y + 1; i < this.nodes.length; ++i) {
-      this.drag(this.nodes[i - 1], this.nodes[i]);
-    }
-  }
-
-  drag(leader, follower) {
-    let dest = wrap(follower.x + follower.v, Daydream.W);
-    if (shortest_distance(dest, leader.x, Daydream.W) > this.gap) {
-      follower.v = leader.v;
-      while (shortest_distance(follower.x, leader.x, Daydream.W) > this.gap) {
-        this.move(follower);
-      }
-    } else {
-      this.move(follower);
-    }
-  }
-
-  move(ring) {
-    let dest = wrap(ring.x + ring.v, Daydream.W);
-    let x = ring.x;
-    while (x != dest) {
-      x = wrap(x + dir(ring.v), Daydream.W);
-    }
-    ring.x = dest;
-  }
-}
-
-///////////////////////////////////////////////////////////////////////////////
 
 export class RingMachine {
 
