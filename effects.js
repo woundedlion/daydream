@@ -308,12 +308,12 @@ export class Dynamo {
       this.nodes.push(new Dynamo.Node(i));
     }
     this.speed = 2;
-    this.gap = 4;
-    this.trailLength = 10;
+    this.gap = 5;
+    this.trailLength = 8;
     this.orientation = new Orientation();
     this.trails = new FilterDecay(this.trailLength);
     this.aa = new FilterAntiAlias();
-    this.replicate = new FilterReplicate(4);
+    this.replicate = new FilterReplicate(3);
     this.orient = new FilterOrient(this.orientation);
 
     // Filters
@@ -340,9 +340,7 @@ export class Dynamo {
     );
 
     this.timeline.add(0,
-      new RandomTimer(80, 160, () => {
-        this.rotate();
-      }, true)
+      new RandomWalk(this.orientation, Daydream.X_AXIS)
     );
   }
 
@@ -377,7 +375,7 @@ export class Dynamo {
   }
 
   color(v, t) {
-    const blendWidth = Math.PI / 8;
+    const blendWidth = Math.PI / 4;
     const numBoundaries = this.paletteBoundaries.length;
     const numPalettes = this.palettes.length;
     const a = angleBetween(v, this.paletteNormal);
