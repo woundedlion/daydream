@@ -185,7 +185,6 @@ export class RandomTimer extends Animation {
         this.canceled = true;
       }
     }
-    super.step();
   }
 }
 
