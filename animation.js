@@ -72,14 +72,18 @@ export class Timeline {
     ++this.t;
     let i = this.animations.length;
     while (i--) {
+      let animation = this.animations[i].animation;
       if (this.t >= this.animations[i].start) {
-        if (this.animations[i].animation.done()) {
-          console.log("DONE");
-          this.animations[i].animation.post();
+        animation.step();
+        if (animation.done()) {
+          if (animation.repeat) {
+            animation.rewind();
+            animation.post();
+            continue;
+          }
           this.animations.splice(i, 1);
-          continue;
+          animation.post();
         }
-        this.animations[i].animation.step();
       }
     }
   }
@@ -87,7 +91,7 @@ export class Timeline {
 
 export class Animation {
   constructor(duration, repeat) {
-    this.duration = duration;
+    this.duration = duration == 0 ? 1 : duration;
     this.repeat = repeat;
     this.t = 0;
     this.canceled = false;
@@ -99,12 +103,10 @@ export class Animation {
 
   step() {
     this.t++;
-    if (this.done()) {
-      if (this.repeat) {
-        this.post();
-        this.t = 0;
-      }
-    }
+  }
+
+  rewind() {
+    this.t = 0;
   }
 
   then(post) {
@@ -141,8 +143,8 @@ export class ParticleSystem extends Animation {
   }
 
   step() {
-    let t_scaled = this.t * this.TIME_SCALE;
-    
+    super.step();
+    let t_scaled = this.t * this.TIME_SCALE;    
     for (let p of this.particles) {
       let nx = p.p.x * this.NOISE_SCALE;
       let ny = p.p.y * this.NOISE_SCALE;
@@ -155,7 +157,6 @@ export class ParticleSystem extends Animation {
 
       p.v.set(vx, vy, vz).multiplyScalar(this.FORCE_SCALE);
     }
-    super.step();
   }
 }
 
@@ -175,6 +176,7 @@ export class RandomTimer extends Animation {
   }
 
   step() {
+    super.step();
     if (this.t >= this.next) {
       this.f();
       if (this.repeat) {
@@ -200,6 +202,7 @@ export class PeriodicTimer extends Animation {
   }
 
   step() {
+    super.step();
     if (this.t >= this.next) {
       this.f();
       if (this.repeat) {
@@ -208,7 +211,6 @@ export class PeriodicTimer extends Animation {
         this.cancel();
       }
     }
-    super.step();
   }
 }
 
@@ -266,7 +268,8 @@ export class Mutation extends Animation {
 export class Sprite extends Animation {
   constructor(drawFn, duration,
     fadeInDuration = 0, fadeInEasingFn = easeMid,
-    fadeOutDuration = 0, fadeOutEasingFn = easeMid) {
+    fadeOutDuration = 0, fadeOutEasingFn = easeMid)
+  {
     super(duration, false);
     this.drawFn = drawFn;
     this.fader = new MutableNumber(fadeInDuration > 0 ? 0 : 1);
@@ -277,13 +280,17 @@ export class Sprite extends Animation {
   }
 
   step() {
+    if (this.t == 0) {
+      this.fadeIn.rewind();
+      this.fadeOut.rewind();
+    }
+    super.step();
     if (!this.fadeIn.done()) {
       this.fadeIn.step();
     } else if (this.duration >= 0 && this.t >= (this.duration - this.fadeOutDuration)) {
       this.fadeOut.step();
     }
     this.drawFn(this.fader.get());
-    super.step();
   }
 }
 export class Motion extends Animation {
@@ -298,10 +305,12 @@ export class Motion extends Animation {
     super(duration, repeat);
     this.orientation = orientation;
     this.path = path;
-    this.to = this.path.getPoint(0);
   }
 
   step() {
+    if (this.t == 0) {
+      this.to = this.path.getPoint(0);
+    }
     super.step();
     this.orientation.collapse();
     this.from = this.to;
@@ -340,12 +349,11 @@ export class Rotation extends Animation {
   }
 
   step() {
-    super.step();
     if (this.t == 0) {
       this.last_angle = 0;
       this.origin = this.orientation.get().clone();
-      this.t++;
     }
+    super.step();
     this.orientation.collapse();
     let angle = this.easingFn(this.t / this.duration) * this.totalAngle;
     let delta = angle - this.last_angle;
@@ -401,20 +409,22 @@ export class RandomWalk extends Animation {
 }
 
 export class ColorWipe extends Animation {
-  constructor(g1, g2, duration, easingFn) {
+  constructor(fromPalette, toPalette, duration, easingFn) {
     super(duration, false);
-    this.a0 = g1.a;
-    this.b0 = g1.b;
-    this.c0 = g1.c;
-    this.g1 = g1;
-    this.g2 = g2;
+    this.curPalette = fromPalette;
+    this.toPalette = toPalette;
     this.easingFn = easingFn;
   }
 
   step() {
+    if (this.t == 0) {
+      this.a0 = this.curPalette.a.clone();
+      this.b0 = this.curPalette.b.clone();
+      this.c0 = this.curPalette.c.clone();
+    }
     super.step();
-    this.g1.a.lerpColors(this.a0, this.g2.a, this.t / this.duration);
-    this.g1.b.lerpColors(this.b0, this.g2.b, this.t / this.duration);
-    this.g1.c.lerpColors(this.c0, this.g2.c, this.t / this.duration);
+    this.curPalette.a.lerpColors(this.a0, this.toPalette.a, easingFn(this.t / this.duration));
+    this.curPalette.b.lerpColors(this.b0, this.toPalette.b, easingFn(this.t / this.duration));
+    this.curPalette.c.lerpColors(this.c0, this.toPalette.c, easingFn(this.t / this.duration));
   }
 }
