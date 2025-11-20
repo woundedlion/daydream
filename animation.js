@@ -422,8 +422,8 @@ export class ColorWipe extends Animation {
       this.c0 = this.curPalette.c.clone();
     }
     super.step();
-    this.curPalette.a.lerpColors(this.a0, this.toPalette.a, easingFn(this.t / this.duration));
-    this.curPalette.b.lerpColors(this.b0, this.toPalette.b, easingFn(this.t / this.duration));
-    this.curPalette.c.lerpColors(this.c0, this.toPalette.c, easingFn(this.t / this.duration));
+    this.curPalette.a.lerpColors(this.a0, this.toPalette.a, this.easingFn(this.t / this.duration));
+    this.curPalette.b.lerpColors(this.b0, this.toPalette.b, this.easingFn(this.t / this.duration));
+    this.curPalette.c.lerpColors(this.c0, this.toPalette.c, this.easingFn(this.t / this.duration));
   }
 }
