@@ -5,68 +5,115 @@ import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer
 import { pixelToSpherical } from "./geometry.js";
 import { G as g } from "./geometry.js";
 
+/** @type {Array<{position: THREE.Vector3, content: string}>} Global array to store labels to be rendered. */
 export var labels = [];
 
+/**
+ * Generates a unique key string for a pixel coordinate.
+ * @param {number} x - The x-coordinate.
+ * @param {number} y - The y-coordinate.
+ * @returns {string} The pixel key in the format "x,y".
+ */
 export const pixelKey = (x, y) => `${x},${y}`;
+
+/**
+ * Parses a pixel key string back into an array of [x, y] strings.
+ * @param {string} k - The pixel key string.
+ * @returns {string[]} An array containing [x, y] as strings.
+ */
 export const keyPixel = (k) => k.split(',');
 
+/**
+ * The main driver class for the Daydream visualization environment.
+ * It sets up the THREE.js scene, camera, renderer, and handles the animation loop.
+ */
 export class Daydream {
+  // --- Static Configuration Constants ---
+  /** @type {boolean} Enables scene antialiasing. */
   static SCENE_ANTIALIAS = true;
+  /** @type {boolean} Enables scene transparency. */
   static SCENE_ALPHA = true;
+  /** @type {number} The scene's background color (hex). */
   static SCENE_BACKGROUND_COLOR = 0x000000;
 
+  /** @type {number} Camera field of view. */
   static CAMERA_FOV = 20;
+  /** @type {number} Camera near clipping plane. */
   static CAMERA_NEAR = 100;
+  /** @type {number} Camera far clipping plane. */
   static CAMERA_FAR = 500;
+  /** @type {number} Camera initial x-position. */
   static CAMERA_X = 0;
+  /** @type {number} Camera initial y-position. */
   static CAMERA_Y = 0;
+  /** @type {number} Camera initial z-position. */
   static CAMERA_Z = 220;
 
+  /** @type {number} The radius of the conceptual sphere the particles live on. */
   static SPHERE_RADIUS = 30;
+  /** @type {number} The height (y-resolution) of the pixel grid. */
   static H = 20;
+  /** @type {number} The width (x-resolution) of the pixel grid. */
   static W = 96;
+  /** @type {number} Target frames per second (currently unused in clock logic). */
   static FPS = 16;
 
+  /** @type {number} The visual size/radius of the rendered dot mesh. */
   static DOT_SIZE = 2;
+  /** @type {number} Default dot color (hex, though overwritten by instance color). */
   static DOT_COLOR = 0x0000ff;
 
+  /** @type {THREE.Vector3} Static representation of the X-axis. */
   static X_AXIS = new THREE.Vector3(1, 0, 0);
+  /** @type {THREE.Vector3} Static representation of the Y-axis. */
   static Y_AXIS = new THREE.Vector3(0, 1, 0);
+  /** @type {THREE.Vector3} Static representation of the Z-axis. */
   static Z_AXIS = new THREE.Vector3(0, 0, 1);
 
   constructor() {
     THREE.ColorManagement.enabled = true;
+    /** @type {HTMLCanvasElement} */
     this.canvas = document.querySelector("#canvas");
 
+    /** @type {THREE.WebGLRenderer} */
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       antialias: Daydream.SCENE_ANTIALIAS,
       alpha: Daydream.SCENE_ALPHA,
     });
 
+    /** @type {CSS2DRenderer} */
     this.labelRenderer = new CSS2DRenderer();
     this.labelRenderer.className = "labelLayer";
     this.canvas.parentElement.appendChild(this.labelRenderer.domElement);
 
+    /** @type {THREE.PerspectiveCamera} */
     this.camera = new THREE.PerspectiveCamera(
       Daydream.CAMERA_FOV,
-      canvas.width / canvas.height,
+      this.canvas.width / this.canvas.height,
       Daydream.CAMERA_NEAR,
       Daydream.CAMERA_FAR
     );
+    /** @type {OrbitControls} */
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.camera.position.set(
       Daydream.CAMERA_X,
       Daydream.CAMERA_Y,
       Daydream.CAMERA_Z
     );
+    /** @type {THREE.Scene} */
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(Daydream.SCENE_BACKGROUND_COLOR);
+    this.scene.background = new  THREE.Color(Daydream.SCENE_BACKGROUND_COLOR);
+    /** @type {boolean} */
     this.paused = false;
+    /** @type {number} */
     this.stepFrames = 0;
+    /** @type {THREE.Clock} */
     this.clock = new THREE.Clock(true);
+    /** @type {Array<any>} */
     this.resources = [];
 
+    /** @type {THREE.SphereGeometry} */
     this.dotGeometry = new THREE.SphereGeometry(
       Daydream.DOT_SIZE,
       32,
@@ -75,6 +122,7 @@ export class Daydream {
       Math.PI
     );
 
+    /** @type {THREE.MeshBasicMaterial} */
     this.dotMaterial = new THREE.MeshBasicMaterial({
       side: THREE.FrontSide,
       blending: THREE.CustomBlending,
@@ -82,43 +130,36 @@ export class Daydream {
       depthWrite: false
     });
 
+    /** @type {THREE.LineBasicMaterial} */
     this.axisMaterial = new THREE.LineBasicMaterial({
       color: 0xffffff,
       linewidth: 5
     });
 
+    // --- Axis Geometries and Meshes ---
     let xAxisGeometry = new THREE.BufferGeometry().setFromPoints([
       Daydream.X_AXIS.clone().negate().multiplyScalar(Daydream.SPHERE_RADIUS),
       Daydream.X_AXIS.clone().multiplyScalar(Daydream.SPHERE_RADIUS)
     ]);
+    /** @type {THREE.Line} */
     this.xAxis = new THREE.Line(xAxisGeometry, this.axisMaterial);
 
     let yAxisGeometry = new THREE.BufferGeometry().setFromPoints([
       Daydream.Y_AXIS.clone().negate().multiplyScalar(Daydream.SPHERE_RADIUS),
       Daydream.Y_AXIS.clone().multiplyScalar(Daydream.SPHERE_RADIUS)
     ]);
+    /** @type {THREE.Line} */
     this.yAxis = new THREE.Line(yAxisGeometry, this.axisMaterial);
 
     let zAxisGeometry = new THREE.BufferGeometry().setFromPoints([
       Daydream.Z_AXIS.clone().negate().multiplyScalar(Daydream.SPHERE_RADIUS),
       Daydream.Z_AXIS.clone().multiplyScalar(Daydream.SPHERE_RADIUS)
     ]);
+    /** @type {THREE.Line} */
     this.zAxis = new THREE.Line(zAxisGeometry, this.axisMaterial);
 
-    /*
-    this.showAxes = false;
-    this.gui = new gui.GUI();
-    this.gui.add(this, 'showAxes');
-
-    // draw axes
-    if (this.showAxes) {
-      this.scene.add(this.xAxis);
-      this.scene.add(this.yAxis);
-      this.scene.add(this.zAxis);
-    }
-    */
-
-    // draw pixels
+    // --- Dot Mesh (InstancedMesh for performance) ---
+    /** @type {THREE.InstancedMesh} */
     this.dotMesh = new THREE.InstancedMesh(
       this.dotGeometry,
       this.dotMaterial,
@@ -128,14 +169,18 @@ export class Daydream {
     this.dotMesh.count = 0;
     this.scene.add(this.dotMesh);
 
+    /** @type {{x: number, y: number, width: number, height: number}} */
     this.mainViewport = { x: 0, y: 0, width: 1, height: 1 };
+    /** @type {{x: number, y: number, width: number, height: number}} */
     this.pipViewport = { x: 0, y: 0, width: 0.25, height: 0.25 };
 
     this.setCanvasSize();
-
-
   }
 
+  /**
+   * Handles keyboard input for pausing/stepping.
+   * @param {KeyboardEvent} e - The keyboard event.
+   */
   keydown(e) {
     if (e.key == ' ') {
       this.paused = !this.paused;
@@ -144,6 +189,11 @@ export class Daydream {
     }
   }
 
+  /**
+   * Creates and positions a 2D HTML label in the scene.
+   * @param {THREE.Vector3} position - The world position for the label.
+   * @param {string} content - The HTML content of the label.
+   */
   makeLabel(position, content) {
     const div = document.createElement("div");
     div.className = "label";
@@ -155,6 +205,9 @@ export class Daydream {
     this.scene.add(label)
   }
 
+  /**
+   * Sets the canvas size and updates the camera aspect ratio and viewports.
+   */
   setCanvasSize() {
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -180,6 +233,10 @@ export class Daydream {
     this.labelRenderer.setSize(width, height);
   }
 
+  /**
+   * The main render loop function.
+   * @param {Object} effect - The effect object containing the drawFrame() method.
+   */
   render(effect) {
     if (this.clock.getElapsedTime() * 1000 > 62.5) {
       this.clock.start();
@@ -227,6 +284,7 @@ export class Daydream {
 
     this.controls.update();
 
+    // --- Render Main Viewport ---
     this.renderer.setScissorTest(true);
     this.renderer.setViewport(
       this.mainViewport.x,
@@ -246,6 +304,7 @@ export class Daydream {
     this.renderer.render(this.scene, this.camera);
     this.labelRenderer.render(this.scene, this.camera);
 
+    // --- Render PiP Viewport ---
     this.renderer.setViewport(
       this.pipViewport.x,
       this.pipViewport.y,
@@ -264,6 +323,12 @@ export class Daydream {
   }
 }
 
+/**
+ * Converts a floating-point number to a user-friendly string representation,
+ * substituting common constants like PI and the Golden Ratio (G).
+ * @param {number} r - The number to prettify.
+ * @returns {string} The prettified string (e.g., "&pi;", "1", "-&phi;\u207b\u00b9").
+ */
 export const prettify = (r) => {
   let precision = 3;
 
@@ -330,6 +395,11 @@ export const prettify = (r) => {
   return r.toFixed(precision);
 }
 
+/**
+ * Formats coordinate data for display as an HTML label.
+ * @param {number[]} c - The Cartesian coordinates [x, y, z].
+ * @returns {{position: THREE.Vector3, content: string}} An object containing the label position and HTML content.
+ */
 export const coordsLabel = (c) => {
   const p = 3;
   let s = new THREE.Spherical().setFromCartesianCoords(c[0], c[1], c[2]);
