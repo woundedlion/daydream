@@ -61,7 +61,7 @@ const controls = {
   }
 };
 
-const effectNames = Object.keys(EFFECTS);
+const effectNames = Object.keys(effects);
 const guiInstance = new gui.GUI();
 guiInstance.add(controls, 'effectName', effectNames)
   .name('Active Effect')

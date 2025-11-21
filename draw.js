@@ -151,22 +151,34 @@ export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false) =
   let u = v1.clone();
   let v = v2.clone();
   let a = angleBetween(u, v);
-  let w = new THREE.Vector3().crossVectors(v, u).normalize();
+  let w = new THREE.Vector3();
+  if (Math.abs(a) < 0.0001) {
+    return [new Dot(u, colorFn(u, 1))];
+  } else if (Math.abs(Math.PI - a) < 0.0001) {
+    if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.9999) {
+      w.crossVectors(u, Daydream.Y_AXIS).normalize();
+    } else {
+      w.crossVectors(u, Daydream.X_AXIS).normalize();
+    }
+  } else {
+    w.crossVectors(u, v).normalize();
+  }
+
   if (longWay) {
     a = 2 * Math.PI - a;
     w.negate();
   }
-  a *= Math.abs((end - start));
-  v.crossVectors(u, w).normalize();
 
-  const step = 2 * Math.PI / Daydream.W;
-  for (let t = start; t < a; t += step) {
-    let vi = new THREE.Vector3(
-      u.x * Math.cos(t) + v.x * Math.sin(t),
-      u.y * Math.cos(t) + v.y * Math.sin(t),
-      u.z * Math.cos(t) + v.z * Math.sin(t)
-    );
-    dots.push(new Dot(vi, colorFn(vi)));
+  if (start != 0) {
+    let q = new THREE.Quaternion().setFromAxisAngle(w, start * a);
+    u.applyQuaternion(q).normalize();
+  }
+  a *= Math.abs(end - start);
+  let numSteps = Math.max(1, Math.ceil((a / (2 * Math.PI)) * Daydream.W));
+  let q = new THREE.Quaternion().setFromAxisAngle(w, a / numSteps);
+  for (let i = 0; i <= numSteps; ++i) {
+    dots.push(new Dot(u.clone(), colorFn(u, i / numSteps)));
+    u.applyQuaternion(q).normalize();
   }
   return dots;
 }
@@ -323,10 +335,10 @@ export const drawRing = (normal, radius, colorFn, phase = 0) => {
   let dots = [];
   let u = new THREE.Vector3();
   let v = normal.clone();
-  let w = new THREE.Vector3();
+  let vDir = normal.clone();
   if (radius > 1) {
-    v.negate();
-    phase = (phase + Math.PI) % (2 * Math.PI)
+    vDir.negate();
+    radius = 2 - radius;
   }
 
   if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.99995) {
@@ -334,16 +346,24 @@ export const drawRing = (normal, radius, colorFn, phase = 0) => {
   } else {
     u.crossVectors(v, Daydream.X_AXIS).normalize();
   }
-  w.crossVectors(v, u);
-  if (radius > 1) {
-    w.negate();
-    radius = 2 - radius;
-  }
 
-  let step = 2 * Math.PI / Daydream.W;
-  for (let a = 0; a < 2 * Math.PI; a += step) {
-    let vi = calcRingPoint((a + phase) % (2 * Math.PI), radius, u, v, w);
-    dots.push(new Dot(vi, colorFn(vi, a / (2 * Math.PI))));
+  if (phase !== 0) {
+    const q = new THREE.Quaternion().setFromAxisAngle(v, phase);
+    u.applyQuaternion(q).normalize();
+  }
+  
+  let numSteps = Daydream.W;
+  let q = new THREE.Quaternion().setFromAxisAngle(v, 2 * Math.PI / numSteps);
+  const d = Math.sqrt(Math.pow(1 - radius, 2));
+  for (let i = 0; i < numSteps; i++) {
+    u.applyQuaternion(q).normalize();
+    const vi = new THREE.Vector3(
+      d * vDir.x + radius * u.x,
+      d * vDir.y + radius * u.y,
+      d * vDir.z + radius * u.z
+    ).normalize();
+
+    dots.push(new Dot(vi, colorFn(vi, i / (numSteps - 1))));
   }
   return dots;
 };
@@ -374,7 +394,12 @@ export const ringPoint = (normal, radius, angle, phase = 0) => {
     w.negate();
     radius = 2 - radius;
   }
-  return calcRingPoint(angle + phase, radius, u, v, w);
+  let d = Math.sqrt(Math.pow(1 - radius, 2));
+  return new THREE.Vector3(
+    d * v.x + radius * u.x * Math.cos(angle + phase) + radius * w.x * Math.sin(angle + phase),
+    d * v.y + radius * u.y * Math.cos(angle + phase) + radius * w.y * Math.sin(angle + phase),
+    d * v.z + radius * u.z * Math.cos(angle + phase) + radius * w.z * Math.sin(angle + phase)
+  ).normalize();
 };
 
 /**

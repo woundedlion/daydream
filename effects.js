@@ -91,10 +91,6 @@ export class RingShower {
     this.timeline.add(0,
       new Transition(ring.radius, 2, ring.duration, easeMid)
     );
-
-    this.timeline.add(0,
-      new Transition(ring.phase, 3 * Math.PI, ring.duration, easeMid)
-    );
   }
 
   drawRing(opacity, ring) {
@@ -103,7 +99,6 @@ export class RingShower {
       (v, t) => ring.palette.get(t), ring.phase.get());
     plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
     ring.lastRadius = ring.radius.get();
-
   }
 
   drawFrame() {
@@ -340,7 +335,9 @@ export class Dynamo {
     );
 
     this.timeline.add(0,
-      new RandomWalk(this.orientation, Daydream.X_AXIS)
+      new RandomTimer(48, 160, () => {
+        this.rotate();
+      }, true)
     );
   }
 
