@@ -40,6 +40,42 @@ import { dir, wrap, shortest_distance, randomChoice, randomBetween } from "./uti
 
 ///////////////////////////////////////////////////////////////////////////////
 
+export class Test {
+  constructor() {
+    Daydream.W = 96;
+    this.pixels = new Map();
+    this.alpha = 1.0;
+    this.filters = new FilterAntiAlias();
+    this.palette = mangoPeel;
+    this.normal = Daydream.X_AXIS.clone();
+    this.orientation = new Orientation();
+    this.timeline = new Timeline();
+
+    this.timeline.add(0,
+      new Sprite((opacity) => this.draw(opacity), -1, 48, easeMid, 0, easeMid)
+    );
+  
+    this.gui = new gui.GUI();
+    this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
+  }
+
+  draw(opacity) {
+    let dots = [];
+    dots.push(...drawFn(this.orientation, this.normal, 1,
+      (t) => sinWave(-0.8, 0.8, 4, 0)(t),
+      (v, t) => this.palette.get(t)
+    ));
+    plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
+  }
+
+
+  drawFrame() {
+    this.pixels.clear();
+    this.timeline.step();
+    return this.pixels;
+  }
+}
+
 export class RingShower {
 
   static Ring = class {

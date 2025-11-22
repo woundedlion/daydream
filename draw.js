@@ -174,6 +174,7 @@ export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false) =
     u.applyQuaternion(q).normalize();
   }
   a *= Math.abs(end - start);
+
   let numSteps = Math.max(1, Math.ceil((a / (2 * Math.PI)) * Daydream.W));
   let q = new THREE.Quaternion().setFromAxisAngle(w, a / numSteps);
   for (let i = 0; i <= numSteps; ++i) {
@@ -255,7 +256,7 @@ export const fnPoint = (f, normal, radius, angle) => {
 
 /**
  * Draws a ring that is distorted by a shift function.
- * @param {Orientation} orientation - The orientation applied to the ring's normal.
+ * @param {Orientation} orientation - The orientation of the ring's normal.
  * @param {THREE.Vector3} normal - The base normal vector defining the ring plane.
  * @param {number} radius - The base radius of the ring.
  * @param {Function} shiftFn - Function to calculate the angular shift (takes normalized ring angle [0, 1]).
@@ -263,46 +264,54 @@ export const fnPoint = (f, normal, radius, angle) => {
  * @returns {Dot[]} An array of Dots forming the distorted ring.
  */
 export const drawFn = (orientation, normal, radius, shiftFn, colorFn) => {
-  let dots = [];
-  let u = new THREE.Vector3();
+  let refAxis = Daydream.X_AXIS;
+  if (Math.abs(normal.dot(refAxis)) > 0.9999) {
+    refAxis = Daydream.Y_AXIS;
+  }
   let v = orientation.orient(normal);
-  let w = new THREE.Vector3();
+  let ref = orientation.orient(refAxis);
+  let u = new THREE.Vector3().crossVectors(v, ref).normalize();
+
+  let vDir = v.clone();
   if (radius > 1) {
-    v.negate();
-  }
-  if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.99995) {
-    u.crossVectors(v, Daydream.Y_AXIS).normalize();
-  } else {
-    u.crossVectors(v, Daydream.X_AXIS).normalize();
-  }
-  w.crossVectors(v, u);
-  if (radius > 1) {
-    w.negate();
+    vDir.negate();
     radius = 2 - radius;
   }
-  let d = Math.sqrt(Math.pow(1 - radius, 2));
+  const d = Math.sqrt(Math.pow(1 - radius, 2));
 
-  let start = undefined;
-  let from = undefined;
-  let step = 1 / Daydream.W;
-  for (let t = 0; t < 1; t += step) {
-    let vi = calcRingPoint(t * 2 * Math.PI, radius, u, v, w);
-    let vp = calcRingPoint(t * 2 * Math.PI, 1, u, v, w);
-    let axis = new THREE.Vector3().crossVectors(v, vp).normalize();
-    let shift = new THREE.Quaternion().setFromAxisAngle(axis, shiftFn(t));
-    let to = vi.clone().applyQuaternion(shift);
-    if (start === undefined) {
-      dots.push(new Dot(to, colorFn(to)));
-      start = to;
-    } else {
-      dots.push(...drawLine(from, to, colorFn));
+  let dots = [];
+  let numSteps = Daydream.W;
+  let qFwd = new THREE.Quaternion().setFromAxisAngle(v, 2 * Math.PI / numSteps);
+  let qShift = new THREE.Quaternion();
+  let start = new THREE.Vector3();
+  let w = new THREE.Vector3();
+  let from = new THREE.Vector3();
+  let to = new THREE.Vector3();
+  for (let i = 0; i < numSteps; i++) {
+    if (i > 0) {
+      u.applyQuaternion(qFwd);
     }
-    from = to;
+    w.crossVectors(v, u).normalize();
+    qShift.setFromAxisAngle(w, shiftFn(i / numSteps));
+    to.copy(u).applyQuaternion(qShift).normalize();
+    to.set(
+      d * vDir.x + radius * to.x,
+      d * vDir.y + radius * to.y,
+      d * vDir.z + radius * to.z
+    ).normalize();
+    if (i == 0) {
+      start = to.clone();
+    } else {
+      dots.push(...drawLine(from, to, (v, t) => colorFn(from, (i - 1) / numSteps)));
+      dots.pop();
+    }
+    from = to.clone();
   }
-  dots.push(...drawLine(from, start, colorFn));
+  dots.push(...drawLine(from, start, (v, t) => colorFn(from, 1)));
+  dots.pop();
 
   return dots;
-};
+}
 
 /**
  * Calculates a point on a circle that lies on the surface of the unit sphere.

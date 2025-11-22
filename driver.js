@@ -4,6 +4,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { pixelToSpherical } from "./geometry.js";
 import { G as g } from "./geometry.js";
+import { gui } from "gui"
 
 /** @type {Array<{position: THREE.Vector3, content: string}>} Global array to store labels to be rendered. */
 export var labels = [];
@@ -175,6 +176,10 @@ export class Daydream {
     this.pipViewport = { x: 0, y: 0, width: 0.25, height: 0.25 };
 
     this.setCanvasSize();
+
+    this.labelAxes = false;
+    this.gui = new gui.GUI();
+    this.gui.add(this, 'labelAxes');
   }
 
   /**
@@ -273,6 +278,13 @@ export class Daydream {
           this.dotMesh.instanceColor.needsUpdate = true;
           this.dotMesh.instanceMatrix.needsUpdate = true;
           ++i;
+        }
+
+        // draw axes
+        if (this.labelAxes) {
+          labels.push({ "position": Daydream.X_AXIS, "content": "X"});
+          labels.push({ "position": Daydream.Y_AXIS, "content": "Y" });
+          labels.push({ "position": Daydream.Z_AXIS, "content": "Z" });
         }
 
         for (const label of labels) {

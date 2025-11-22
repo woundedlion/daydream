@@ -16,7 +16,8 @@ import {
   RingCircus,
   Pulses,
   Fib,
-  NoiseFieldEffect
+  NoiseFieldEffect,
+  Test
 } from "./effects.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
@@ -37,16 +38,15 @@ const effects = {
   NoiseParticles,
   NoiseFieldEffect,
   MetaballEffect,
-  FlowField
+  FlowField,
+  Test
 };
 
-const daydream = new Daydream();
-window.addEventListener("resize", () => daydream.setCanvasSize());
-window.addEventListener("keydown", (e) => daydream.keydown(e));
+
 
 let activeEffect;
 const controls = {
-  effectName: 'RingShower',
+  effectName: 'Test',
   changeEffect: function () {
     if (activeEffect && activeEffect.gui) {
       activeEffect.gui.destroy();
@@ -66,6 +66,11 @@ const guiInstance = new gui.GUI();
 guiInstance.add(controls, 'effectName', effectNames)
   .name('Active Effect')
   .onChange(() => controls.changeEffect());
+
+const daydream = new Daydream();
+window.addEventListener("resize", () => daydream.setCanvasSize());
+window.addEventListener("keydown", (e) => daydream.keydown(e));
+
 controls.changeEffect();
 
 daydream.renderer.setAnimationLoop(() => {
