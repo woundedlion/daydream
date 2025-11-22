@@ -67,7 +67,7 @@ export class Test {
 
   draw(opacity) {
     let dots = [];
-    dots.push(...drawFn(this.orientation, this.normal, 1,
+    dots.push(...drawFn(this.orientation.get(), this.normal, 1,
       (t) => sinWave(-0.3 * this.amplitude.get(), 0.3 * this.amplitude.get(), 4, 0)(t),
       (v, t) => this.palette.get(t)
     ));
@@ -137,7 +137,7 @@ export class RingShower {
 
   drawRing(opacity, ring) {
     let step = 1 / Daydream.W;
-    let dots = drawRing(this.orientation.orient(ring.normal), ring.radius.get(),
+    let dots = drawRing(this.orientation.get(), ring.normal, ring.radius.get(),
       (v, t) => ring.palette.get(t), ring.phase.get());
     plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
     ring.lastRadius = ring.radius.get();
@@ -199,8 +199,8 @@ export class RingSpin {
 
   drawRing(opacity, ring) {
     let end = ring.orientation.length();
-    tween(ring.orientation, (orientFn, t) => {
-      let dots = drawRing(orientFn(ring.normal), 1,
+    tween(ring.orientation, (q, t) => {
+      let dots = drawRing(q, ring.normal, 1,
         (v, t) => vignette(ring.palette)(0));
       plotDots(this.pixels, ring.trails, dots, t, this.alpha);
     });
@@ -302,9 +302,10 @@ export class Comets {
 
   drawNode(opacity, i) {
     let node = this.nodes[i];
-    tween(node.orientation, (orientFn, t) => {
+    tween(node.orientation, (q, t) => {
       let dots = [];
-      dots.push(...drawVector(orientFn(node.v),
+      let v = node.v.clone().applyQuaternion(q).normalize();
+      dots.push(...drawVector(v,
         (v, t) => this.palette.get(1 - t)));
       plotDots(this.pixels, this.filters, dots, t, opacity);
     });

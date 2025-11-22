@@ -256,20 +256,20 @@ export const fnPoint = (f, normal, radius, angle) => {
 
 /**
  * Draws a ring that is distorted by a shift function.
- * @param {Orientation} orientation - The orientation of the ring's normal.
+ * @param {Orientation} orientationQuaternion - The quaternion representing the orientation of the ring's normal.
  * @param {THREE.Vector3} normal - The base normal vector defining the ring plane.
  * @param {number} radius - The base radius of the ring.
  * @param {Function} shiftFn - Function to calculate the angular shift (takes normalized ring angle [0, 1]).
  * @param {Function} colorFn - Function to determine the color (takes vector and normalized ring angle).
  * @returns {Dot[]} An array of Dots forming the distorted ring.
  */
-export const drawFn = (orientation, normal, radius, shiftFn, colorFn) => {
+export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn) => {
   let refAxis = Daydream.X_AXIS;
   if (Math.abs(normal.dot(refAxis)) > 0.9999) {
     refAxis = Daydream.Y_AXIS;
   }
-  let v = orientation.orient(normal);
-  let ref = orientation.orient(refAxis);
+  let v = normal.clone().applyQuaternion(orientationQuaternion).normalize();
+  let ref = refAxis.clone().applyQuaternion(orientationQuaternion).normalize();
   let u = new THREE.Vector3().crossVectors(v, ref).normalize();
 
   let vDir = v.clone();
@@ -334,33 +334,36 @@ export const calcRingPoint = (a, radius, u, v, w) => {
 
 /**
  * Draws a circular ring on the sphere surface.
+ * @param {Orientation} orientationQuaternion - The quaternion representing the orientation of the ring's normal.
  * @param {THREE.Vector3} normal - The normal vector defining the ring plane.
  * @param {number} radius - The radius of the ring. Can be > 1 for a ring that orbits the center.
  * @param {Function} colorFn - Function to determine the color (takes vector and normalized ring angle).
  * @param {number} [phase=0] - The starting angle phase shift of the ring.
  * @returns {Dot[]} An array of Dots forming the ring.
  */
-export const drawRing = (normal, radius, colorFn, phase = 0) => {
+export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase = 0) => {
   let dots = [];
-  let u = new THREE.Vector3();
-  let v = normal.clone();
-  let vDir = normal.clone();
+  let refAxis = Daydream.X_AXIS;
+  if (Math.abs(normal.dot(refAxis)) > 0.9999) {
+    refAxis = Daydream.Y_AXIS;
+  }
+
+  let v = normal.clone().applyQuaternion(orientationQuaternion).normalize();
+  let ref = refAxis.clone().applyQuaternion(orientationQuaternion).normalize();
+  let u = new THREE.Vector3().crossVectors(v, ref).normalize();
+
+  let vDir = v.clone();
   if (radius > 1) {
     vDir.negate();
     radius = 2 - radius;
   }
 
-  if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.99995) {
-    u.crossVectors(v, Daydream.Y_AXIS).normalize();
-  } else {
-    u.crossVectors(v, Daydream.X_AXIS).normalize();
-  }
-
-  if (phase !== 0) {
+  // 5. Apply phase shift to the starting vector 'u'.
+  if (Math.abs(phase) > 0.0001) {
     const q = new THREE.Quaternion().setFromAxisAngle(v, phase);
     u.applyQuaternion(q).normalize();
   }
-  
+
   let numSteps = Daydream.W;
   let q = new THREE.Quaternion().setFromAxisAngle(v, 2 * Math.PI / numSteps);
   const d = Math.sqrt(Math.pow(1 - radius, 2));
@@ -445,11 +448,11 @@ export function plotDots(pixels, filter, dots, age, alpha) {
 /**
  * Draws a motion trail by tweening between orientations in the queue.
  * @param {Orientation} orientation - The orientation object containing the motion history.
- * @param {Function} drawFn - Function to draw a segment (takes orientation function and normalized age/opacity).
+ * @param {Function} drawFn - Function to draw a segment (takes orientation quaternion and normalized age/opacity).
  */
 export const tween = (orientation, drawFn) => {
   let s = orientation.length();
   for (let i = 0; i < s; ++i) {
-    drawFn((v) => orientation.orient(v, i), (s - 1 - i) / s);
+    drawFn(orientation.get(i), (s - 1 - i) / s);
   }
 }
