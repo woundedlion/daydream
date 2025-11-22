@@ -226,27 +226,37 @@ export class FilterAntiAlias extends Filter {
     let yi = Math.trunc(y);
     let ym = y - yi;
 
-    let cov = falloff((1 - xm) * (1 - ym));
-    if (cov > 0.00001) {
-      this.pass(pixels, xi, yi, color, age, cov * alpha);
+    // 1. Calculate the smoothed fractional factors
+    let xs = this.kernel(xm);
+    let ys = this.kernel(ym);
+
+    // 2. Calculate the four weights using the smoothed factors
+    let v00 = (1 - xs) * (1 - ys);  // Top-Left weight
+    let v10 = xs * (1 - ys);        // Top-Right weight
+    let v01 = (1 - xs) * ys;        // Bottom-Left weight
+    let v11 = xs * ys;              // Bottom-Right weight
+
+    if (v00 > 0.0001) {
+      this.pass(pixels, xi, yi, color, age, v00 * alpha);
     }
-    cov = falloff(xm * (1 - ym));
-    if (cov > 0.00001) {
-      this.pass(pixels, wrap((xi + 1), Daydream.W), yi, color, age, cov * alpha);
+    if (v10 > 0.0001) {
+      this.pass(pixels, wrap((xi + 1), Daydream.W), yi, color, age, v10 * alpha);
     }
 
     if (yi < Daydream.H - 1) {
-      cov = falloff((1 - xm) * ym);
-      if (cov > 0.00001) {
-        this.pass(pixels, xi, yi + 1, color, age, cov * alpha);
+      if (v01 > 0.0001) {
+        this.pass(pixels, xi, yi + 1, color, age, v01 * alpha);
       }
-
-      cov = falloff(xm * ym);
-      if (cov > 0.00001) {
-        this.pass(pixels, wrap((xi + 1), Daydream.W), yi + 1, color, age, cov * alpha);
+      if (v11 > 0.0001) {
+        this.pass(pixels, wrap((xi + 1), Daydream.W), yi + 1, color, age, v11 * alpha);
       }
     }
   }
+
+  kernel(t) {
+    return 6 * Math.pow(t, 5) - 15 * Math.pow(t, 4) + 10 * Math.pow(t, 3);
+  }
+
 }
 
 /**

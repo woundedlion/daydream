@@ -50,9 +50,15 @@ export class Test {
     this.normal = Daydream.X_AXIS.clone();
     this.orientation = new Orientation();
     this.timeline = new Timeline();
+    this.amplitude = new MutableNumber(0);
 
     this.timeline.add(0,
       new Sprite((opacity) => this.draw(opacity), -1, 48, easeMid, 0, easeMid)
+    );
+
+    this.timeline.add(0,
+      new Transition(this.amplitude, 1, 48, easeInOutSin, false, true)
+        .then(() => { this.amplitude.set(0); })
     );
   
     this.gui = new gui.GUI();
@@ -62,7 +68,7 @@ export class Test {
   draw(opacity) {
     let dots = [];
     dots.push(...drawFn(this.orientation, this.normal, 1,
-      (t) => sinWave(-0.8, 0.8, 4, 0)(t),
+      (t) => sinWave(-0.3 * this.amplitude.get(), 0.3 * this.amplitude.get(), 4, 0)(t),
       (v, t) => this.palette.get(t)
     ));
     plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
