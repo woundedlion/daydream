@@ -366,7 +366,7 @@ export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase =
 
   let numSteps = Daydream.W;
   let q = new THREE.Quaternion().setFromAxisAngle(v, 2 * Math.PI / numSteps);
-  const d = Math.sqrt(Math.pow(1 - radius, 2));
+  const d = Math.sqrt((1 - radius) * (1 - radius));
   for (let i = 0; i < numSteps; i++) {
     u.applyQuaternion(q).normalize();
     const vi = new THREE.Vector3(

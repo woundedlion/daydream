@@ -45,32 +45,55 @@ export class Test {
     Daydream.W = 96;
     this.pixels = new Map();
     this.alpha = 1.0;
-    this.filters = new FilterAntiAlias();
-    this.palette = mangoPeel;
+    this.ringPalette = mangoPeel;
+    this.polyPalette = new GenerativePalette("circular", "analagous", "cup");
     this.normal = Daydream.X_AXIS.clone();
     this.orientation = new Orientation();
     this.timeline = new Timeline();
+    this.filters = new FilterOrient(this.orientation);
+    this.filters.chain(new FilterAntiAlias())
+
     this.amplitude = new MutableNumber(0);
+    this.poly = new Dodecahedron();
+    this.numRings = 4;
+    this.timeline.add(0,
+      new Sprite((opacity) => this.drawFn(opacity), -1, 48, easeMid, 0, easeMid)
+    );
+
+  //    this.timeline.add(0,
+ //     new Sprite((opacity) => this.drawPoly(opacity), -1, 48, easeMid, 0, easeMid)
+ //   );
 
     this.timeline.add(0,
-      new Sprite((opacity) => this.draw(opacity), -1, 48, easeMid, 0, easeMid)
+      new RandomWalk(this.orientation, this.normal)
     );
 
     this.timeline.add(0,
-      new Transition(this.amplitude, 1, 48, easeInOutSin, false, true)
-        .then(() => { this.amplitude.set(0); })
+      new Mutation(this.amplitude, sinWave(-Math.PI / 2, Math.PI / 2, 2, 0), 64, easeMid, true)
     );
   
     this.gui = new gui.GUI();
     this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
   }
 
-  draw(opacity) {
+  drawPoly(opacity) {
     let dots = [];
-    dots.push(...drawFn(this.orientation.get(), this.normal, 1,
-      (t) => sinWave(-0.3 * this.amplitude.get(), 0.3 * this.amplitude.get(), 4, 0)(t),
-      (v, t) => this.palette.get(t)
+    dots.push(...drawPolyhedron(this.poly.vertices, this.poly.eulerPath,
+      (v, t) => this.polyPalette.get(t)
     ));
+    plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
+  }
+
+  drawFn(opacity) {
+    let dots = [];
+    for (let i = 0; i < this.numRings; ++i) {
+      let phase = 2 * Math.PI / i;
+      dots.push(...drawFn(this.orientation.get(), this.normal,
+        2 / (this.numRings + 1) * (i + 1),
+        (t) => sinWave(-0.3 * this.amplitude.get(), 0.3 * this.amplitude.get(), 4, 0)(t),
+        (v, t) => this.ringPalette.get(t)
+      ));
+    }
     plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
   }
 
@@ -1115,44 +1138,6 @@ export class NoiseParticles {
   }
 }
 
-///////////////////////////////////////////////////////////////////////////////
-
-export class NoiseFieldEffect {
-  constructor() {
-    this.pixels = new Map();
-
-    this.noise = new FastNoiseLite();
-    this.noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
-    this.palette = darkRainbow;
-    this.t = 0;
-    this.noiseScale = 2;
-    this.timeScale = 0.1;
-  }
-
-  drawFrame() {
-    this.pixels.clear();
-    this.t++;
-    for (let x = 0; x < Daydream.W; x++) {
-      for (let y = 0; y < Daydream.H; y++) {
-        const v = pixelToVector(x, y);
-        let t = this.t * this.timeScale + Math.sin(this.t * 2 * Math.PI) * 0.01
-        
-        // Using 3D noise slicing for animation (approximating 4D effect)
-        const noiseValue = this.noise.GetNoise(
-          v.x * this.noiseScale,
-          v.y * this.noiseScale,
-          v.z * this.noiseScale + this.t * this.timeScale // Offset Z by time
-        );
-
-        const palette_t = (noiseValue + 1) / 2;
-        const color = this.palette.get(palette_t);
-        this.pixels.set(pixelKey(x, y), color);
-      }
-    }
-
-    return this.pixels;
-  }
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 

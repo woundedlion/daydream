@@ -16,7 +16,6 @@ import {
   RingCircus,
   Pulses,
   Fib,
-  NoiseFieldEffect,
   Test
 } from "./effects.js";
 
@@ -36,7 +35,6 @@ const effects = {
   Fib,
   RingMachine,
   NoiseParticles,
-  NoiseFieldEffect,
   MetaballEffect,
   FlowField,
   Test

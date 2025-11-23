@@ -265,9 +265,9 @@ export class GenerativePalette {
   }
 
   /**
-   * @param {('straight'|'circular'|'vignette'|'faloff')} [shape='straight'] - The palette shape/sampling method.
+   * @param {('straight'|'circular'|'vignette'|'falloff')} [shape='straight'] - The palette shape/sampling method.
    * @param {('analagous'|'triadic'|'split-complementary'|'complementary')} [harmonyType='analagous'] - The color harmony rule.
-   * @param {('ascending'|'descending'|'flat'|'bell')} [brightnessProfile='ascending'] - The distribution of value/brightness.
+   * @param {('ascending'|'descending'|'flat'|'bell'|'cup')} [brightnessProfile='ascending'] - The distribution of value/brightness.
    */
   constructor(shape = 'straight', harmonyType = 'analagous', brightnessProfile = 'ascending') {
     this.shapeSpec = shape;
@@ -277,9 +277,9 @@ export class GenerativePalette {
     GenerativePalette.seed = (GenerativePalette.seed + G) % 1;
     const [hA, hB, hC] = GenerativePalette.calcHues(hueA, harmonyType);
 
-    let sat1 = randomBetween(0.4, 0.8);
-    let sat2 = randomBetween(0.4, 0.8);
-    let sat3 = randomBetween(0.4, 0.8);
+    let sat1 = randomBetween(0.6, 0.8);
+    let sat2 = randomBetween(0.6, 0.8);
+    let sat3 = randomBetween(0.6, 0.8);
 
     let v1, v2, v3;
     switch (brightnessProfile) {
@@ -301,6 +301,11 @@ export class GenerativePalette {
       case 'bell':
         v1 = randomBetween(0.2, 0.5);
         v2 = randomBetween(0.7, 1.0);
+        v3 = v1;
+        break;
+      case 'cup':
+        v1 = randomBetween(0.7, 1.0);
+        v2 = randomBetween(0.2, 1.5);
         v3 = v1;
         break;
     }
@@ -332,7 +337,7 @@ export class GenerativePalette {
         shape = [0, 0.33, 0.66, 1];
         colors = [this.a, this.b, this.c, this.a];
         break;
-      case 'faloff':
+      case 'falloff':
         shape = [0, 0.33, 0.66, 0.9, 1];
         colors = [this.a, this.b, this.c, vignetteColor];
         break;
