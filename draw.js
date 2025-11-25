@@ -56,8 +56,8 @@ export class Path {
     if (this.points.length > 0) {
       this.points.pop();
     }
-    this.points = this.points.concat(
-      drawLine(c1, c2, (v) => undefined, 0, 1, longWay)
+    this.points.push(
+      ...drawLine(c1, c2, (v, t) => undefined, 0, 1, longWay)
         .map((d) => d.position));
     return this;
   }
@@ -74,7 +74,7 @@ export class Path {
     if (this.points.length > 0) {
       this.points.pop();
     }
-    for (let t = 0; t < samples; t++) {
+    for (let t = 0; t <= samples; t++) {
       this.points.push(plotFn(easingFn(t / samples) * domain));
     }
     return this;
