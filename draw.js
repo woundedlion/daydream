@@ -256,14 +256,16 @@ export const fnPoint = (f, normal, radius, angle) => {
 
 /**
  * Draws a ring that is distorted by a shift function.
- * @param {Orientation} orientationQuaternion - The quaternion representing the orientation of the ring's normal.
+ * @param {Quaternion} orientationQuaternion - The quaternion representing the global orientation.
  * @param {THREE.Vector3} normal - The base normal vector defining the ring plane.
- * @param {number} radius - The base radius of the ring.
- * @param {Function} shiftFn - Function to calculate the angular shift (takes normalized ring angle [0, 1]).
- * @param {Function} colorFn - Function to determine the color (takes vector and normalized ring angle).
+ * @param {number} radius - The input radius (0-1) used for Equidistant spacing.
+ * @param {Function} shiftFn - Function to calculate the angular shift (wave distortion).
+ * @param {Function} colorFn - Function to determine the color.
+ * @param {number} [phase=0] - The starting angle phase shift (unused in this specific implementation).
  * @returns {Dot[]} An array of Dots forming the distorted ring.
  */
-export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn) => {
+export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, phase = 0) => {
+  // Basis
   let refAxis = Daydream.X_AXIS;
   if (Math.abs(normal.dot(refAxis)) > 0.9999) {
     refAxis = Daydream.Y_AXIS;
@@ -271,43 +273,52 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn) 
   let v = normal.clone().applyQuaternion(orientationQuaternion).normalize();
   let ref = refAxis.clone().applyQuaternion(orientationQuaternion).normalize();
   let u = new THREE.Vector3().crossVectors(v, ref).normalize();
+  let w = new THREE.Vector3().crossVectors(v, u).normalize();
 
-  let vDir = v.clone();
+  // Backside rings
+  let vSign = 1.0;
   if (radius > 1) {
-    vDir.negate();
+    vSign = -1.0;
     radius = 2 - radius;
   }
-  const d = Math.sqrt(Math.pow(1 - radius, 2));
 
+  // Equidistant Projection
+  const theta = radius * (Math.PI / 2);
+  const r = Math.sin(theta); 
+  const d = Math.cos(theta);
   let dots = [];
+
   let numSteps = Daydream.W;
-  let qFwd = new THREE.Quaternion().setFromAxisAngle(v, 2 * Math.PI / numSteps);
-  let qShift = new THREE.Quaternion();
-  let start = new THREE.Vector3();
-  let w = new THREE.Vector3();
   let from = new THREE.Vector3();
   let to = new THREE.Vector3();
+  let start = new THREE.Vector3();
+  let uCurrent = new THREE.Vector3();
   for (let i = 0; i < numSteps; i++) {
-    if (i > 0) {
-      u.applyQuaternion(qFwd);
-    }
-    w.crossVectors(v, u).normalize();
-    qShift.setFromAxisAngle(w, shiftFn(i / numSteps));
-    to.copy(u).applyQuaternion(qShift).normalize();
-    to.set(
-      d * vDir.x + radius * to.x,
-      d * vDir.y + radius * to.y,
-      d * vDir.z + radius * to.z
-    ).normalize();
+    let t = i / numSteps;
+    // Ring step
+    let theta = t * 2 * Math.PI + phase;
+    let cosRing = Math.cos(theta);
+    let sinRing = Math.sin(theta);
+    uCurrent.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
+
+    // Rodrigues Rotation for shift
+    let shift = shiftFn(t);
+    let cosShift = Math.cos(shift);
+    let sinShift = Math.sin(shift);
+    let vScale = (vSign * d) * cosShift - r * sinShift;
+    let uScale = r * cosShift + (vSign * d) * sinShift;
+    to.copy(v).multiplyScalar(vScale).addScaledVector(uCurrent, uScale).normalize();
+
     if (i == 0) {
-      start = to.clone();
+      start.copy(to);
     } else {
-      dots.push(...drawLine(from, to, (v, t) => colorFn(from, (i - 1) / numSteps)));
+      dots.push(...drawLine(from, to, (vec, time) => colorFn(from, (i - 1) / numSteps)));
       dots.pop();
     }
-    from = to.clone();
+    from.copy(to);
   }
-  dots.push(...drawLine(from, start, (v, t) => colorFn(from, 1)));
+
+  dots.push(...drawLine(from, start, (vec, time) => colorFn(from, 1)));
   dots.pop();
 
   return dots;

@@ -91,7 +91,8 @@ export class Test {
       dots.push(...drawFn(this.orientation.get(), this.normal,
         2 / (this.numRings + 1) * (i + 1),
         (t) => sinWave(-0.3 * this.amplitude.get(), 0.3 * this.amplitude.get(), 4, 0)(t),
-        (v, t) => this.ringPalette.get(t)
+        (v, t) => this.ringPalette.get(t),
+        i * Math.PI / 16
       ));
     }
     plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
