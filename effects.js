@@ -56,22 +56,24 @@ export class Test {
     this.amplitude = new MutableNumber(0);
     this.poly = new Dodecahedron();
     this.numRings = 4;
-    /*
+    
     this.timeline.add(0,
       new Sprite((opacity) => this.drawFn(opacity), -1, 48, easeMid, 0, easeMid)
     );
-    */
+    
 
+   /*
     this.timeline.add(0,
       new Sprite((opacity) => this.drawPoly(opacity), -1, 48, easeMid, 0, easeMid)
     );
+    */
 
     this.timeline.add(0,
       new RandomWalk(this.orientation, this.normal)
     );
 
     this.timeline.add(0,
-      new Mutation(this.amplitude, sinWave(-Math.PI / 2, Math.PI / 2, 2, 0), 64, easeMid, true)
+      new Mutation(this.amplitude, sinWave(-Math.PI / 16, Math.PI / 16, 2, 0), 64, easeMid, true)
     );
   
     this.gui = new gui.GUI();
@@ -92,9 +94,9 @@ export class Test {
       let phase = 2 * Math.PI / i;
       dots.push(...drawFn(this.orientation.get(), this.normal,
         2 / (this.numRings + 1) * (i + 1),
-        (t) => sinWave(-0.3 * this.amplitude.get(), 0.3 * this.amplitude.get(), 4, 0)(t),
+        (t) => sinWave(this.amplitude.get(), -this.amplitude.get(), 4, 0)(t),
         (v, t) => this.ringPalette.get(t),
-        i * Math.PI / 16
+        i * Math.PI / 4
       ));
     }
     plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
