@@ -147,11 +147,11 @@ export const drawPath = (path, colorFn) => {
  * @returns {Dot[]} An array of Dots forming the line.
  */
 export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false) => {
-  let dots = []
   let u = v1.clone();
   let v = v2.clone();
   let a = angleBetween(u, v);
   let w = new THREE.Vector3();
+
   if (Math.abs(a) < 0.0001) {
     return [new Dot(u, colorFn(u, 1))];
   } else if (Math.abs(Math.PI - a) < 0.0001) {
@@ -175,6 +175,7 @@ export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false) =
   }
   a *= Math.abs(end - start);
 
+  let dots = []
   let numSteps = Math.max(1, Math.ceil((a / (2 * Math.PI)) * Daydream.W));
   let q = new THREE.Quaternion().setFromAxisAngle(w, a / numSteps);
   for (let i = 0; i <= numSteps; ++i) {
@@ -211,8 +212,8 @@ export const drawPolyhedron = (vertices, edges, colorFn) => {
   let dots = [];
   edges.map((adj, i) => {
     adj.map((j) => {
-      dots = dots.concat(
-        drawLine(
+      dots.push(
+        ...drawLine(
           new THREE.Vector3(...vertices[i]).normalize(),
           new THREE.Vector3(...vertices[j]).normalize(),
           colorFn)
@@ -377,9 +378,7 @@ export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase =
 
   let dots = [];
   let numSteps = Daydream.W;
-  let from = new THREE.Vector3();
   let to = new THREE.Vector3();
-  let start = new THREE.Vector3();
   let uCurrent = new THREE.Vector3();
 
   for (let i = 0; i < numSteps; i++) {
@@ -389,19 +388,8 @@ export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase =
     let sinRing = Math.sin(theta);
     uCurrent.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
     to.copy(vDir).multiplyScalar(d).addScaledVector(uCurrent, r).normalize();
-
-    if (i == 0) {
-      start.copy(to);
-    } else {
-      // Draw segment between previous point and current point
-      dots.push(...drawLine(from, to, (vec, time) => colorFn(from, (i - 1) / numSteps)));
-      dots.pop();
-    }
-    from.copy(to);
+    dots.push(new Dot(to.clone(), colorFn(to, t)));
   }
-  dots.push(...drawLine(from, start, (vec, time) => colorFn(from, 1)));
-  dots.pop();
-
   return dots;
 }
 

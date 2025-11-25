@@ -56,13 +56,15 @@ export class Test {
     this.amplitude = new MutableNumber(0);
     this.poly = new Dodecahedron();
     this.numRings = 4;
+    /*
     this.timeline.add(0,
       new Sprite((opacity) => this.drawFn(opacity), -1, 48, easeMid, 0, easeMid)
     );
+    */
 
-  //    this.timeline.add(0,
- //     new Sprite((opacity) => this.drawPoly(opacity), -1, 48, easeMid, 0, easeMid)
- //   );
+    this.timeline.add(0,
+      new Sprite((opacity) => this.drawPoly(opacity), -1, 48, easeMid, 0, easeMid)
+    );
 
     this.timeline.add(0,
       new RandomWalk(this.orientation, this.normal)
@@ -97,7 +99,6 @@ export class Test {
     }
     plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
   }
-
 
   drawFrame() {
     this.pixels.clear();
