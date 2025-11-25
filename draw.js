@@ -283,9 +283,9 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
   }
 
   // Equidistant Projection
-  const theta = radius * (Math.PI / 2);
-  const r = Math.sin(theta); 
-  const d = Math.cos(theta);
+  const thetaEq = radius * (Math.PI / 2);
+  const r = Math.sin(thetaEq); 
+  const d = Math.cos(thetaEq);
   let dots = [];
 
   let numSteps = Daydream.W;
@@ -344,52 +344,66 @@ export const calcRingPoint = (a, radius, u, v, w) => {
 }
 
 /**
- * Draws a circular ring on the sphere surface.
- * @param {Orientation} orientationQuaternion - The quaternion representing the orientation of the ring's normal.
+ * Draws a circular ring on the sphere surface
+ * @param {Quaternion} orientationQuaternion - The quaternion representing the orientation of the ring's normal.
  * @param {THREE.Vector3} normal - The normal vector defining the ring plane.
- * @param {number} radius - The radius of the ring. Can be > 1 for a ring that orbits the center.
+ * @param {number} radius - The radius of the ring. Can be > 1 for a ring on the far side.
  * @param {Function} colorFn - Function to determine the color (takes vector and normalized ring angle).
  * @param {number} [phase=0] - The starting angle phase shift of the ring.
  * @returns {Dot[]} An array of Dots forming the ring.
  */
 export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase = 0) => {
-  let dots = [];
+  // Basis
   let refAxis = Daydream.X_AXIS;
   if (Math.abs(normal.dot(refAxis)) > 0.9999) {
     refAxis = Daydream.Y_AXIS;
   }
-
   let v = normal.clone().applyQuaternion(orientationQuaternion).normalize();
   let ref = refAxis.clone().applyQuaternion(orientationQuaternion).normalize();
   let u = new THREE.Vector3().crossVectors(v, ref).normalize();
+  let w = new THREE.Vector3().crossVectors(v, u).normalize();
 
+  // Backside rings
   let vDir = v.clone();
   if (radius > 1) {
     vDir.negate();
     radius = 2 - radius;
   }
 
-  // 5. Apply phase shift to the starting vector 'u'.
-  if (Math.abs(phase) > 0.0001) {
-    const q = new THREE.Quaternion().setFromAxisAngle(v, phase);
-    u.applyQuaternion(q).normalize();
-  }
+  // Equidistant projection
+  const thetaEq = radius * (Math.PI / 2); 
+  const r = Math.sin(thetaEq); 
+  const d = Math.cos(thetaEq);
 
+  let dots = [];
   let numSteps = Daydream.W;
-  let q = new THREE.Quaternion().setFromAxisAngle(v, 2 * Math.PI / numSteps);
-  const d = Math.sqrt((1 - radius) * (1 - radius));
-  for (let i = 0; i < numSteps; i++) {
-    u.applyQuaternion(q).normalize();
-    const vi = new THREE.Vector3(
-      d * vDir.x + radius * u.x,
-      d * vDir.y + radius * u.y,
-      d * vDir.z + radius * u.z
-    ).normalize();
+  let from = new THREE.Vector3();
+  let to = new THREE.Vector3();
+  let start = new THREE.Vector3();
+  let uCurrent = new THREE.Vector3();
 
-    dots.push(new Dot(vi, colorFn(vi, i / (numSteps - 1))));
+  for (let i = 0; i < numSteps; i++) {
+    let t = i / numSteps;
+    let theta = t * 2 * Math.PI + phase;
+    let cosRing = Math.cos(theta);
+    let sinRing = Math.sin(theta);
+    uCurrent.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
+    to.copy(vDir).multiplyScalar(d).addScaledVector(uCurrent, r).normalize();
+
+    if (i == 0) {
+      start.copy(to);
+    } else {
+      // Draw segment between previous point and current point
+      dots.push(...drawLine(from, to, (vec, time) => colorFn(from, (i - 1) / numSteps)));
+      dots.pop();
+    }
+    from.copy(to);
   }
+  dots.push(...drawLine(from, start, (vec, time) => colorFn(from, 1)));
+  dots.pop();
+
   return dots;
-};
+}
 
 /**
  * Calculates a single point on a circular ring on the sphere surface.
