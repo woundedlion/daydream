@@ -240,7 +240,7 @@ export class FilterDecay2D {
    * @param {Function} pass - The callback.
    */
   plot(x, y, color, alpha, pass) {
-    this.pass = pass;
+    this.pass = pass; // saved for trail splice into the pipeline
     pass(x, y, color, alpha);
     const key = pixelKey(x, y);
     const ttl = this.trails.get(key) || 0;
@@ -256,7 +256,7 @@ export class FilterDecay2D {
    */
   trail(trailFn, alpha) {
     for (const [key, ttl] of this.trails) {
-      if (ttl > 0) {
+      if (ttl > 0 && ttl < this.lifespan) {
         let p = keyPixel(key);
         let color = trailFn(p[0], p[1], 1 - (ttl / this.lifespan));
         //       labels.push({ position: pixelToVector(p[0], p[1]), content: `${parseFloat(p[0]).toFixed(1)}, ${parseFloat(p[1]).toFixed(1)}` });
