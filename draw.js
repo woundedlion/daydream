@@ -2,21 +2,48 @@
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
 import { Dot, angleBetween, sphericalToPixel } from "./geometry.js";
-import { G as g } from "./geometry.js";
 
 /**
- * Creates a brush effect using a square wave for dotted drawing.
- * @param {THREE.Color} color - The base color of the brush.
- * @param {number} freq - The frequency of the square wave pattern.
- * @param {number} dutyCycle - The duty cycle (on time) of the square wave [0, 1].
- * @param {number} phase - The phase shift of the square wave.
- * @param {number} t - The position along the path (time parameter).
- * @returns {THREE.Color} The resultant color multiplied by the square wave value.
+ * Implements pixel history and decay for persistent effects.
  */
-export function dottedBrush(color, freq, dutyCycle, phase, t) {
-  let r = squareWave(0, 1, freq, dutyCycle, phase)(t);
-  return color.multiplyScalar(r);
+export class DecayBuffer {
+  /**
+   * @param {number} lifespan - The number of frames a pixel lasts.
+   */
+  constructor(lifespan) {
+    this.lifespan = lifespan;
+    this.history = [];
+  }
+
+  recordDots(dots, alpha, age) {
+    for (const dot of dots) {
+      this.record(dot.position, dot.color, alpha, age);
+    }
+  }
+
+  record(v, color, alpha, age) {
+    this.history.push({v: v, color: color, alpha: alpha, ttl: this.lifespan - age})
+  }
+
+  render(pixels, pipeline, colorFn) {
+    for (let i = 0; i < this.history.length; ++i) {
+      // plot
+      let e = this.history[i];
+      if (e.ttl === this.lifespan) {
+        pipeline.plot(pixels, e.v, e.color, e.alpha);
+      } else if (e.ttl > 0) {
+        pipeline.plot(pixels, e.v, colorFn(e.v, (this.lifespan - e.ttl) / this.lifespan), e.alpha);
+      }
+
+      // decay and cleanup
+      if (--e.ttl <= 0) {
+        this.history.splice(i, 1);
+        i--;
+      }
+    }
+  }
 }
+
 
 /**
  * Represents a path composed of connected points on the sphere.
@@ -443,18 +470,9 @@ export const drawFibSpiral = (n, eps, colorFn) => {
   return dots;
 };
 
-/**
- * Plots an array of Dots onto the pixel grid using a filter.
- * @param {Map<string, THREE.Color>} pixels - The map of pixel keys to colors.
- * @param {Filter} filter - The filter chain to apply (e.g., anti-aliasing, decay).
- * @param {Dot[]} dots - The array of Dot objects to plot.
- * @param {number} age - The age parameter for filters like FilterDecay.
- * @param {number} alpha - The alpha/opacity multiplier.
- */
-export function plotDots(pixels, filter, dots, age, alpha) {
+export function plotDots(pixels, filters, dots, alpha) {
   for (const dot of dots) {
-    let p = sphericalToPixel(new THREE.Spherical().setFromVector3(dot.position));
-    filter.plot(pixels, p.x, p.y, dot.color, age, alpha);
+    filters.plot(pixels, dot.position, dot.color, alpha);
   }
 }
 
