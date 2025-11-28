@@ -326,7 +326,7 @@ export const fibSpiral = (n, eps, i) => {
  * Returns a function that generates a sine wave value.
  * @param {number} from - The minimum output value.
  * @param {number} to - The maximum output value.
- * @param {number} freq - The frequency of the wave.
+ * @param {number} freq - The frequency multiplier of the wave.
  * @param {number} phase - The phase shift of the wave.
  * @returns {function(number): number} A function that takes time t and returns the wave value.
  */
@@ -352,8 +352,8 @@ export function lerp(from, to, t) {
  * Returns a function that generates a triangle wave value.
  * @param {number} from - The minimum output value.
  * @param {number} to - The maximum output value.
- * @param {number} freq - The frequency of the wave (unused, kept for signature).
- * @param {number} phase - The phase shift of the wave (unused, kept for signature).
+ * @param {number} freq - The frequency multiplier (unused in current implementation, kept for signature).
+ * @param {number} phase - The phase shift (unused in current implementation, kept for signature).
  * @returns {function(number): number} A function that takes time t and returns the wave value.
  */
 export function triWave(from, to, freq, phase) {
@@ -371,7 +371,7 @@ export function triWave(from, to, freq, phase) {
  * Returns a function that generates a square wave value.
  * @param {number} from - The 'off' value.
  * @param {number} to - The 'on' value.
- * @param {number} freq - The frequency.
+ * @param {number} freq - The frequency multiplier.
  * @param {number} dutyCycle - The duty cycle (proportion of 'on' time) [0, 1].
  * @param {number} phase - The phase shift.
  * @returns {function(number): number} A function that takes time t and returns the square wave value.
@@ -418,7 +418,7 @@ export function lissajous(m1, m2, a, t) {
 }
 
 /**
- * Animates a rotation between two orientations.
+ * Animates a rotation between two orientations using an easing function.
  * @param {Orientation} from - The starting orientation (mutable).
  * @param {Orientation} to - The target orientation.
  */

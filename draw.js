@@ -15,16 +15,35 @@ export class DecayBuffer {
     this.history = [];
   }
 
+  /**
+   * Records a list of dots into the history buffer.
+   * @param {Dot[]} dots - The list of dots to record.
+   * @param {number} alpha - The opacity of the dots.
+   * @param {number} age - The initial age of the dots (usually 0).
+   */
   recordDots(dots, alpha, age) {
     for (const dot of dots) {
       this.record(dot.position, dot.color, alpha, age);
     }
   }
 
+  /**
+   * Records a single dot into the history buffer.
+   * @param {THREE.Vector3} v - The position vector.
+   * @param {THREE.Color} color - The color of the dot.
+   * @param {number} alpha - The opacity of the dot.
+   * @param {number} age - The initial age of the dot.
+   */
   record(v, color, alpha, age) {
-    this.history.push({v: v, color: color, alpha: alpha, ttl: this.lifespan - age})
+    this.history.push({ v: v, color: color, alpha: alpha, ttl: this.lifespan - age })
   }
 
+  /**
+   * Renders the buffered dots to the pixel map, applying decay.
+   * @param {Map} pixels - The pixel map to write to.
+   * @param {Object} pipeline - The render pipeline or filter object.
+   * @param {Function} colorFn - Function to determine color based on decay (takes vector and normalized decay progress 0-1).
+   */
   render(pixels, pipeline, colorFn) {
     for (let i = 0; i < this.history.length; ++i) {
       // plot
@@ -167,8 +186,8 @@ export const drawPath = (path, colorFn) => {
  * Draws a geodesic line (arc) between two vectors on the sphere.
  * @param {THREE.Vector3} v1 - The start vector.
  * @param {THREE.Vector3} v2 - The end vector.
- * @param {Function} colorFn - Function to determine the color (takes vector).
- * @param {number} [start=0] - Starting angle for drawing the line arc.
+ * @param {Function} colorFn - Function to determine the color (takes vector and normalized progress t).
+ * @param {number} [start=0] - Starting angle multiplier for drawing the line arc.
  * @param {number} [end=1] - Ending multiplier for the total arc angle.
  * @param {boolean} [longWay=false] - If true, draws the longer arc.
  * @returns {Dot[]} An array of Dots forming the line.
@@ -232,7 +251,7 @@ export const drawVertices = (vertices, colorFn) => {
  * Draws the edges of a polyhedron by drawing lines between connected vertices.
  * @param {number[][]} vertices - An array of [x, y, z] vertex arrays.
  * @param {number[][]} edges - An adjacency list of vertex indices.
- * @param {Function} colorFn - Function to determine the color (takes vector).
+ * @param {Function} colorFn - Function to determine the color (takes vector and normalized progress t).
  * @returns {Dot[]} An array of Dots forming the edges.
  */
 export const drawPolyhedron = (vertices, edges, colorFn) => {
@@ -284,12 +303,12 @@ export const fnPoint = (f, normal, radius, angle) => {
 
 /**
  * Draws a ring that is distorted by a shift function.
- * @param {Quaternion} orientationQuaternion - The quaternion representing the global orientation.
+ * @param {THREE.Quaternion} orientationQuaternion - The quaternion representing the global orientation.
  * @param {THREE.Vector3} normal - The base normal vector defining the ring plane.
  * @param {number} radius - The input radius (0-1) used for Equidistant spacing.
  * @param {Function} shiftFn - Function to calculate the angular shift (wave distortion).
- * @param {Function} colorFn - Function to determine the color.
- * @param {number} [phase=0] - The starting angle phase shift (unused in this specific implementation).
+ * @param {Function} colorFn - Function to determine the color (takes vector and normalized ring angle).
+ * @param {number} [phase=0] - The starting angle phase shift.
  * @returns {Dot[]} An array of Dots forming the distorted ring.
  */
 export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, phase = 0) => {
@@ -312,7 +331,7 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
 
   // Equidistant Projection
   const thetaEq = radius * (Math.PI / 2);
-  const r = Math.sin(thetaEq); 
+  const r = Math.sin(thetaEq);
   const d = Math.cos(thetaEq);
   let dots = [];
 
@@ -373,7 +392,7 @@ export const calcRingPoint = (a, radius, u, v, w) => {
 
 /**
  * Draws a circular ring on the sphere surface
- * @param {Quaternion} orientationQuaternion - The quaternion representing the orientation of the ring's normal.
+ * @param {THREE.Quaternion} orientationQuaternion - The quaternion representing the orientation of the ring's normal.
  * @param {THREE.Vector3} normal - The normal vector defining the ring plane.
  * @param {number} radius - The radius of the ring. Can be > 1 for a ring on the far side.
  * @param {Function} colorFn - Function to determine the color (takes vector and normalized ring angle).
@@ -399,8 +418,8 @@ export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase =
   }
 
   // Equidistant projection
-  const thetaEq = radius * (Math.PI / 2); 
-  const r = Math.sin(thetaEq); 
+  const thetaEq = radius * (Math.PI / 2);
+  const r = Math.sin(thetaEq);
   const d = Math.cos(thetaEq);
 
   let dots = [];
@@ -470,6 +489,13 @@ export const drawFibSpiral = (n, eps, colorFn) => {
   return dots;
 };
 
+/**
+ * Plots a list of dots onto the pixel map using the provided filters.
+ * @param {Map} pixels - The pixel map.
+ * @param {Object} filters - The render pipeline or filter object.
+ * @param {Dot[]} dots - The array of dots to plot.
+ * @param {number} alpha - The global opacity for these dots.
+ */
 export function plotDots(pixels, filters, dots, alpha) {
   for (const dot of dots) {
     filters.plot(pixels, dot.position, dot.color, alpha);

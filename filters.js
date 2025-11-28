@@ -7,6 +7,11 @@ import { vectorToPixel } from "./geometry.js";
 
 const BLACK = new THREE.Color(0, 0, 0);
 
+/**
+ * Creates a render pipeline by chaining multiple filters together.
+ * @param {...Object} filters - A variable number of filter objects (e.g., FilterAntiAlias, FilterOrient).
+ * @returns {Object} An object with a `plot` method that initiates the pipeline.
+ */
 export function createRenderPipeline(...filters) {
   // Canvas sink
   let head = (pixels, x, y, color, alpha) => {
@@ -80,10 +85,23 @@ export class FilterAntiAlias {
     this.is2D = true;
   }
 
+  /**
+   * Calculates the smoothing kernel value.
+   * @param {number} t - The distance from the pixel center [0, 1].
+   * @returns {number} The smoothing factor.
+   */
   kernel(t) {
     return 6 * Math.pow(t, 5) - 15 * Math.pow(t, 4) + 10 * Math.pow(t, 3);
   }
 
+  /**
+   * Plots a pixel with anti-aliasing.
+   * @param {number} x - The x coordinate.
+   * @param {number} y - The y coordinate.
+   * @param {THREE.Color} color - The color to plot.
+   * @param {number} alpha - The opacity.
+   * @param {Function} pass - The callback to pass the pixel to the next stage.
+   */
   plot(x, y, color, alpha, pass) {
     let xi = Math.trunc(x);
     let xm = x - xi;
@@ -121,7 +139,7 @@ export class FilterAntiAlias {
 /**
  * Orients the pixel coordinates based on a given Orientation object.
  */
-export class FilterOrient{
+export class FilterOrient {
   /**
    * @param {Orientation} orientation - The orientation quaternion object.
    */
@@ -130,6 +148,13 @@ export class FilterOrient{
     this.orientation = orientation;
   }
 
+  /**
+   * Plots a 3D vector, applying the orientation.
+   * @param {THREE.Vector3} v - The vector to plot.
+   * @param {THREE.Color} color - The color.
+   * @param {number} alpha - The opacity.
+   * @param {Function} pass - The callback.
+   */
   plot(v, color, alpha, pass) {
     this.orientation.collapse();
     pass(this.orientation.orient(v), color, alpha);
@@ -150,6 +175,13 @@ export class FilterReplicate {
     this.step = 2 * Math.PI / count;
   }
 
+  /**
+   * Plots a 3D vector and its replicates.
+   * @param {THREE.Vector3} v - The vector to plot.
+   * @param {THREE.Color} color - The color.
+   * @param {number} alpha - The opacity.
+   * @param {Function} pass - The callback.
+   */
   plot(v, color, alpha, pass) {
     pass(v, color, alpha);
     for (let i = 1; i < this.count; i++) {
@@ -167,6 +199,13 @@ export class FilterChromaticShift {
     this.is2D = true;
   }
 
+  /**
+   * Plots a pixel, shifting RGB components to adjacent pixels.
+   * @param {number} x - The x coordinate.
+   * @param {number} y - The y coordinate.
+   * @param {THREE.Color} color - The color.
+   * @param {number} alpha - The opacity.
+   */
   plot(x, y, color, alpha) {
     let r = new THREE.Color(color.r, 0, 0);
     let g = new THREE.Color(0, color.g, 0);
@@ -179,6 +218,9 @@ export class FilterChromaticShift {
 }
 
 
+/**
+ * A filter that maintains a history of pixels to create fading trails.
+ */
 export class FilterDecay2D {
   /**
    * @param {number} lifespan - How many frames a trail pixel persists.
@@ -189,16 +231,29 @@ export class FilterDecay2D {
     this.trails = new Map();
   }
 
+  /**
+   * Records a plotted pixel and sets its TTL.
+   * @param {number} x - The x coordinate.
+   * @param {number} y - The y coordinate.
+   * @param {THREE.Color} color - The color.
+   * @param {number} alpha - The opacity.
+   * @param {Function} pass - The callback.
+   */
   plot(x, y, color, alpha, pass) {
     this.pass = pass;
     pass(x, y, color, alpha);
     const key = pixelKey(x, y);
     const ttl = this.trails.get(key) || 0;
     if (this.lifespan > ttl) {
-      this.trails.set(key, this.lifespan); 
+      this.trails.set(key, this.lifespan);
     }
   }
 
+  /**
+   * Renders the trails based on the recorded history.
+   * @param {Function} trailFn - Function to determine trail color based on coordinate and life.
+   * @param {number} alpha - The opacity.
+   */
   trail(trailFn, alpha) {
     for (const [key, ttl] of this.trails) {
       if (ttl > 0) {
@@ -211,6 +266,9 @@ export class FilterDecay2D {
     this.decay();
   }
 
+  /**
+   * Decrements the TTL of recorded pixels and removes expired ones.
+   */
   decay() {
     this.trails.forEach((ttl, key) => {
       ttl -= 1;
