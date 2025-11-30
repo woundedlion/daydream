@@ -300,15 +300,16 @@ export const fnPoint = (f, normal, radius, angle) => {
   return vi.clone().applyQuaternion(shift);
 };
 
+// draw.js
+
 /**
- * Draws a ring that is distorted by a shift function.
- * @param {THREE.Quaternion} orientationQuaternion - The quaternion representing the global orientation.
- * @param {THREE.Vector3} normal - The base normal vector defining the ring plane.
- * @param {number} radius - The input radius (0-1) used for Equidistant spacing.
- * @param {Function} shiftFn - Function to calculate the angular shift (wave distortion).
- * @param {Function} colorFn - Function to determine the color (takes vector and normalized ring angle).
- * @param {number} [phase=0] - The starting angle phase shift.
- * @returns {Dot[]} An array of Dots forming the distorted ring.
+ * Draws a function-distorted ring with adaptive sampling.
+ * @param {THREE.Quaternion} orientationQuaternion - Orientation of the base ring.
+ * @param {THREE.Vector3} normal - Normal of the base ring.
+ * @param {number} radius - Base radius (0-1).
+ * @param {Function} shiftFn - Function(t) returning angle offset.
+ * @param {Function} colorFn - Function(v, t) returning color.
+ * @param {number} [phase=0] - Starting phase offset.
  */
 export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, phase = 0) => {
   // Basis
@@ -321,7 +322,7 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
   let u = new THREE.Vector3().crossVectors(v, ref).normalize();
   let w = new THREE.Vector3().crossVectors(v, u).normalize();
 
-  // Backside rings
+  // Backside ring
   let vSign = 1.0;
   if (radius > 1) {
     vSign = -1.0;
@@ -332,40 +333,35 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
   const thetaEq = radius * (Math.PI / 2);
   const r = Math.sin(thetaEq);
   const d = Math.cos(thetaEq);
-  let dots = [];
 
-  let numSteps = Daydream.W;
-  let from = new THREE.Vector3();
-  let to = new THREE.Vector3();
-  let start = new THREE.Vector3();
+  let dots = [];
+  const baseStep = (2 * Math.PI) / Daydream.W;
+  let theta = 0;
   let uCurrent = new THREE.Vector3();
-  for (let i = 0; i < numSteps; i++) {
-    let t = i / numSteps;
+  let point = new THREE.Vector3();
+  while (theta < 2 * Math.PI) {
+    let t = theta / (2 * Math.PI);
     // Ring step
-    let theta = t * 2 * Math.PI + phase;
-    let cosRing = Math.cos(theta);
-    let sinRing = Math.sin(theta);
+    let ringAngle = theta + phase;
+    let cosRing = Math.cos(ringAngle);
+    let sinRing = Math.sin(ringAngle);
     uCurrent.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
 
-    // Rodrigues Rotation for shift
+    // Shift
     let shift = shiftFn(t);
     let cosShift = Math.cos(shift);
     let sinShift = Math.sin(shift);
     let vScale = (vSign * d) * cosShift - r * sinShift;
     let uScale = r * cosShift + (vSign * d) * sinShift;
-    to.copy(v).multiplyScalar(vScale).addScaledVector(uCurrent, uScale).normalize();
+    point.copy(v).multiplyScalar(vScale).addScaledVector(uCurrent, uScale).normalize();
 
-    if (i == 0) {
-      start.copy(to);
-    } else {
-      dots.push(...drawLine(from, to, (vec, time) => colorFn(from, (i - 1) / numSteps)));
-      dots.pop();
-    }
-    from.copy(to);
+    dots.push(new Dot(point.clone(), colorFn(point, t)));
+
+    // Adaptive sampling
+    let latitudeRadius = Math.sqrt(1 - point.y * point.y);
+    let scaleFactor = Math.max(0.05, latitudeRadius);
+    theta += baseStep * scaleFactor;
   }
-
-  dots.push(...drawLine(from, start, (vec, time) => colorFn(from, 1)));
-  dots.pop();
 
   return dots;
 }
@@ -390,13 +386,14 @@ export const calcRingPoint = (a, radius, u, v, w) => {
 }
 
 /**
- * Draws a circular ring on the sphere surface
- * @param {THREE.Quaternion} orientationQuaternion - The quaternion representing the orientation of the ring's normal.
+ * Draws a circular ring on the sphere surface with adaptive sampling
+ * to prevent artifacts near the poles.
+ * @param {THREE.Quaternion} orientationQuaternion - The orientation of the ring.
  * @param {THREE.Vector3} normal - The normal vector defining the ring plane.
- * @param {number} radius - The radius of the ring. Can be > 1 for a ring on the far side.
- * @param {Function} colorFn - Function to determine the color (takes vector and normalized ring angle).
- * @param {number} [phase=0] - The starting angle phase shift of the ring.
- * @returns {Dot[]} An array of Dots forming the ring.
+ * @param {number} radius - The radius of the ring.
+ * @param {Function} colorFn - Function to determine color.
+ * @param {number} [phase=0] - Starting phase.
+ * @returns {Dot[]} An array of Dots.
  */
 export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase = 0) => {
   // Basis
@@ -416,25 +413,31 @@ export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase =
     radius = 2 - radius;
   }
 
-  // Equidistant projection
+  // Equidistant projection 
   const thetaEq = radius * (Math.PI / 2);
   const r = Math.sin(thetaEq);
   const d = Math.cos(thetaEq);
 
   let dots = [];
-  let numSteps = Daydream.W;
-  let to = new THREE.Vector3();
+  const baseStep = (2 * Math.PI) / Daydream.W;
+  let theta = 0;
   let uCurrent = new THREE.Vector3();
-
-  for (let i = 0; i < numSteps; i++) {
-    let t = i / numSteps;
-    let theta = t * 2 * Math.PI + phase;
-    let cosRing = Math.cos(theta);
-    let sinRing = Math.sin(theta);
+  let point = new THREE.Vector3();
+  while (theta <= 2 * Math.PI) {
+    // Ring step
+    let cosRing = Math.cos(theta + phase);
+    let sinRing = Math.sin(theta + phase);
     uCurrent.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
-    to.copy(vDir).multiplyScalar(d).addScaledVector(uCurrent, r).normalize();
-    dots.push(new Dot(to.clone(), colorFn(to, t)));
+    point.copy(vDir).multiplyScalar(d).addScaledVector(uCurrent, r).normalize();
+
+    dots.push(new Dot(point.clone(), colorFn(point, theta / (2 * Math.PI))));
+
+    // Adaptive sampling
+    let latitudeRadius = Math.sqrt(1 - point.y * point.y);
+    let scaleFactor = Math.max(0.05, latitudeRadius);
+    theta += baseStep * scaleFactor;
   }
+
   return dots;
 }
 
