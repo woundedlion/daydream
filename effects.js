@@ -234,7 +234,7 @@ export class RingSpin {
   drawRing(opacity, ring) {
     tween(ring.orientation, (q, t) => {
       let dots = drawRing(q, ring.normal, 1,
-        (v, t) => vignette(ring.palette)(0));
+        (v, t) => vignette(ring.palette)(t));
       plotDots(this.pixels, ring.filters, dots, t, this.alpha);
     });
     ring.orientation.collapse();
