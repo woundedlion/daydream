@@ -18,12 +18,12 @@ export class DecayBuffer {
   /**
    * Records a list of dots into the history buffer.
    * @param {Dot[]} dots - The list of dots to record.
+   * @param {number} age - The initial age of the dots
    * @param {number} alpha - The opacity of the dots.
-   * @param {number} age - The initial age of the dots (usually 0).
    */
-  recordDots(dots, alpha, age) {
+  recordDots(dots, age, alpha) {
     for (const dot of dots) {
-      this.record(dot.position, dot.color, alpha, age);
+      this.record(dot.position, dot.color, age, alpha);
     }
   }
 
@@ -31,10 +31,10 @@ export class DecayBuffer {
    * Records a single dot into the history buffer.
    * @param {THREE.Vector3} v - The position vector.
    * @param {THREE.Color} color - The color of the dot.
-   * @param {number} alpha - The opacity of the dot.
    * @param {number} age - The initial age of the dot.
+   * @param {number} alpha - The opacity of the dot.
    */
-  record(v, color, alpha, age) {
+  record(v, color, age, alpha) {
     this.history.push({ v: v, color: color, alpha: alpha, ttl: this.lifespan - age })
   }
 
@@ -49,9 +49,9 @@ export class DecayBuffer {
       // plot
       let e = this.history[i];
       if (e.ttl === this.lifespan) {
-        pipeline.plot(pixels, e.v, e.color, e.alpha);
+        pipeline.plot(pixels, e.v, e.color, 0, e.alpha);
       } else if (e.ttl > 0) {
-        pipeline.plot(pixels, e.v, colorFn(e.v, (this.lifespan - e.ttl) / this.lifespan), e.alpha);
+        pipeline.plot(pixels, e.v, colorFn(e.v, (this.lifespan - e.ttl) / this.lifespan), 0, e.alpha);
       }
 
       // decay and cleanup
@@ -62,7 +62,6 @@ export class DecayBuffer {
     }
   }
 }
-
 
 /**
  * Represents a path composed of connected points on the sphere.
@@ -494,11 +493,12 @@ export const drawFibSpiral = (n, eps, colorFn) => {
  * @param {Map} pixels - The pixel map.
  * @param {Object} filters - The render pipeline or filter object.
  * @param {Dot[]} dots - The array of dots to plot.
+ * @param {number} age - The initial age of the dot.
  * @param {number} alpha - The global opacity for these dots.
  */
-export function plotDots(pixels, filters, dots, alpha) {
+export function plotDots(pixels, filters, dots, age, alpha) {
   for (const dot of dots) {
-    filters.plot(pixels, dot.position, dot.color, alpha);
+    filters.plot(pixels, dot.position, dot.color, age, alpha);
   }
 }
 

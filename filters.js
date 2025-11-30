@@ -14,7 +14,7 @@ const BLACK = new THREE.Color(0, 0, 0);
  */
 export function createRenderPipeline(...filters) {
   // Canvas sink
-  let head = (pixels, x, y, color, alpha) => {
+  let head = (pixels, x, y, color, age, alpha) => {
     let xi = Math.round(x);
     let yi = Math.round(y);
     let key = pixelKey(xi, yi);
@@ -34,29 +34,29 @@ export function createRenderPipeline(...filters) {
     const next = head;
     if (filter.is2D) {
       // 2D -> 2D
-      head = (pixels, x, y, c, alpha) => {
-        const pass = (x, y, c, alpha) => {
-          next(pixels, x, y, c, alpha);
+      head = (pixels, x, y, c, age, alpha) => {
+        const pass = (x, y, c, age, alpha) => {
+          next(pixels, x, y, c, age, alpha);
         }
-        filter.plot(x, y, c, alpha, pass);
+        filter.plot(x, y, c, age, alpha, pass);
       };
     } else {
       if (nextIs2D) {
         // 3D -> 2D Rasterize
-        head = (pixels, v, c, alpha) => {
-          const pass = (v, c, alpha) => {
+        head = (pixels, v, c, age, alpha) => {
+          const pass = (v, c, age, alpha) => {
             const p = vectorToPixel(v);
-            next(pixels, p.x, p.y, c, alpha);
+            next(pixels, p.x, p.y, c, age, alpha);
           }
-          filter.plot(v, c, alpha, pass);
+          filter.plot(v, c, age, alpha, pass);
         };
       } else {
         // 3D -> 3D
-        head = (pixels, v, c, alpha) => {
-          const pass = (v, c, alpha) => {
-            next(pixels, v, c, alpha);
+        head = (pixels, v, c, age, alpha) => {
+          const pass = (v, c, age, alpha) => {
+            next(pixels, v, c, age, alpha);
           }
-          filter.plot(v, c, alpha, pass);
+          filter.plot(v, c, age, alpha, pass);
         };
       }
       nextIs2D = false;
@@ -66,9 +66,9 @@ export function createRenderPipeline(...filters) {
   if (nextIs2D) {
     // Head is 2D filter, rasterize first
     return {
-      plot: (pixels, v, c, alpha) => {
+      plot: (pixels, v, c, age, alpha) => {
         const p = vectorToPixel(v);
-        head(pixels, p.x, p.y, c, alpha);
+        head(pixels, p.x, p.y, c, age, alpha);
       }
     };
   } else {
@@ -99,10 +99,11 @@ export class FilterAntiAlias {
    * @param {number} x - The x coordinate.
    * @param {number} y - The y coordinate.
    * @param {THREE.Color} color - The color to plot.
+   * @param {number} age - The initial age of the dots
    * @param {number} alpha - The opacity.
    * @param {Function} pass - The callback to pass the pixel to the next stage.
    */
-  plot(x, y, color, alpha, pass) {
+  plot(x, y, color, age, alpha, pass) {
     let xi = Math.trunc(x);
     let xm = x - xi;
     let yi = Math.trunc(y);
@@ -119,18 +120,18 @@ export class FilterAntiAlias {
     let v11 = xs * ys;              // Bottom-Right weight
 
     if (v00 > 0.0001) {
-      pass(xi, yi, color, v00 * alpha);
+      pass(xi, yi, color, age, v00 * alpha);
     }
     if (v10 > 0.0001) {
-      pass(wrap((xi + 1), Daydream.W), yi, color, v10 * alpha);
+      pass(wrap((xi + 1), Daydream.W), yi, color, age, v10 * alpha);
     }
 
     if (yi < Daydream.H - 1) {
       if (v01 > 0.0001) {
-        pass(xi, yi + 1, color, v01 * alpha);
+        pass(xi, yi + 1, color, age, v01 * alpha);
       }
       if (v11 > 0.0001) {
-        pass(wrap((xi + 1), Daydream.W), yi + 1, color, v11 * alpha);
+        pass(wrap((xi + 1), Daydream.W), yi + 1, color, age, v11 * alpha);
       }
     }
   }
@@ -152,12 +153,13 @@ export class FilterOrient {
    * Plots a 3D vector, applying the orientation.
    * @param {THREE.Vector3} v - The vector to plot.
    * @param {THREE.Color} color - The color.
+   * @param {number} age - The initial age of the dots
    * @param {number} alpha - The opacity.
    * @param {Function} pass - The callback.
    */
-  plot(v, color, alpha, pass) {
+  plot(v, color, age, alpha, pass) {
     this.orientation.collapse();
-    pass(this.orientation.orient(v), color, alpha);
+    pass(this.orientation.orient(v), color, age, alpha);
   }
 }
 
@@ -179,14 +181,15 @@ export class FilterReplicate {
    * Plots a 3D vector and its replicates.
    * @param {THREE.Vector3} v - The vector to plot.
    * @param {THREE.Color} color - The color.
+   * @param {number} age - The initial age of the dots
    * @param {number} alpha - The opacity.
    * @param {Function} pass - The callback.
    */
-  plot(v, color, alpha, pass) {
-    pass(v, color, alpha);
+  plot(v, color, age, alpha, pass) {
+    pass(v, color, age, alpha);
     for (let i = 1; i < this.count; i++) {
       const r = v.clone().applyAxisAngle(Daydream.Y_AXIS, this.step * i);
-      pass(r, color, alpha);
+      pass(r, color, age, alpha);
     }
   }
 }
@@ -204,9 +207,11 @@ export class FilterChromaticShift {
    * @param {number} x - The x coordinate.
    * @param {number} y - The y coordinate.
    * @param {THREE.Color} color - The color.
+   * @param {number} age - The initial age of the dots
    * @param {number} alpha - The opacity.
+   * @param {Function} pass - The callback.
    */
-  plot(x, y, color, alpha) {
+  plot(x, y, color, alpha, pass) {
     let r = new THREE.Color(color.r, 0, 0);
     let g = new THREE.Color(0, color.g, 0);
     let b = new THREE.Color(0, 0, color.b);
@@ -236,17 +241,15 @@ export class FilterDecay2D {
    * @param {number} x - The x coordinate.
    * @param {number} y - The y coordinate.
    * @param {THREE.Color} color - The color.
+   * @param {number} age - The initial age of the dots
    * @param {number} alpha - The opacity.
    * @param {Function} pass - The callback.
    */
-  plot(x, y, color, alpha, pass) {
+  plot(x, y, color, age, alpha, pass) {
     this.pass = pass; // saved for trail splice into the pipeline
-    pass(x, y, color, alpha);
+    pass(x, y, color, age, alpha);
     const key = pixelKey(x, y);
-    const ttl = this.trails.get(key) || 0;
-    if (this.lifespan > ttl) {
-      this.trails.set(key, this.lifespan);
-    }
+    this.trails.set(key, this.lifespan - age);
   }
 
   /**
@@ -260,7 +263,7 @@ export class FilterDecay2D {
         let p = keyPixel(key);
         let color = trailFn(p[0], p[1], 1 - (ttl / this.lifespan));
         //       labels.push({ position: pixelToVector(p[0], p[1]), content: `${parseFloat(p[0]).toFixed(1)}, ${parseFloat(p[1]).toFixed(1)}` });
-        this.pass(p[0], p[1], color, alpha);
+        this.pass(p[0], p[1], color, this.lifespan - ttl, alpha);
       }
     }
     this.decay();

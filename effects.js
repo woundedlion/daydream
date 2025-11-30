@@ -100,7 +100,7 @@ export class Test {
         i * 2 * Math.PI / this.numRings
       ));
     }
-    plotDots(this.pixels, this.filters, dots, opacity * this.alpha);
+    plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
   }
 
   drawFrame() {
@@ -109,6 +109,9 @@ export class Test {
     return this.pixels;
   }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
 
 export class RingShower {
 
@@ -169,7 +172,7 @@ export class RingShower {
     let step = 1 / Daydream.W;
     let dots = drawRing(this.orientation.get(), ring.normal, ring.radius.get(),
       (v, t) => ring.palette.get(t), ring.phase.get());
-    plotDots(this.pixels, this.filters, dots, opacity * this.alpha);
+    plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
     ring.lastRadius = ring.radius.get();
   }
 
@@ -232,7 +235,7 @@ export class RingSpin {
     tween(ring.orientation, (q, t) => {
       let dots = drawRing(q, ring.normal, 1,
         (v, t) => vignette(ring.palette)(0));
-      plotDots(this.pixels, ring.filters, dots, this.alpha);
+      plotDots(this.pixels, ring.filters, dots, 1 - t, this.alpha);
     });
     ring.orientation.collapse();
     ring.trails.trail((x, y, t) => vignette(ring.palette)(t), this.alpha);
@@ -337,7 +340,7 @@ export class Comets {
       let v = node.v.clone().applyQuaternion(q).normalize();
       dots.push(...drawVector(v,
         (v, t) => this.palette.get(1 - t)));
-      this.trails.recordDots(dots, opacity, t, opacity * this.alpha);
+      this.trails.recordDots(dots, opacity, 1 - t, opacity * this.alpha);
     });
     node.orientation.collapse();
   }
@@ -501,7 +504,7 @@ export class Dynamo {
         dots.push(...drawLine(from, to, (v) => this.color(v, 0)));
       }
     }
-    this.trails.recordDots(dots, 0.5, age);
+    this.trails.recordDots(dots, age, 0.5);
   }
 
   pull(y) {
