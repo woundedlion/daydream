@@ -235,7 +235,7 @@ export class RingSpin {
     tween(ring.orientation, (q, t) => {
       let dots = drawRing(q, ring.normal, 1,
         (v, t) => vignette(ring.palette)(0));
-      plotDots(this.pixels, ring.filters, dots, 1 - t, this.alpha);
+      plotDots(this.pixels, ring.filters, dots, t, this.alpha);
     });
     ring.orientation.collapse();
     ring.trails.trail((x, y, t) => vignette(ring.palette)(t), this.alpha);
@@ -339,8 +339,8 @@ export class Comets {
       let dots = [];
       let v = node.v.clone().applyQuaternion(q).normalize();
       dots.push(...drawVector(v,
-        (v, t) => this.palette.get(1 - t)));
-      this.trails.recordDots(dots, opacity, 1 - t, opacity * this.alpha);
+        (v, t) => this.palette.get(t)));
+      this.trails.recordDots(dots, t, opacity * this.alpha);
     });
     node.orientation.collapse();
   }
@@ -348,7 +348,7 @@ export class Comets {
   drawFrame() {
     this.pixels.clear();
     this.timeline.step();
-    this.trails.render(this.pixels, this.filters, (v, t) => this.palette.get(1 - t));
+    this.trails.render(this.pixels, this.filters, (v, t) => this.palette.get(1-t));
     return this.pixels;
   }
 }
