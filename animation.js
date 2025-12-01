@@ -553,28 +553,28 @@ export class Rotation extends Animation {
     this.axis = axis;
     this.totalAngle = angle;
     this.easingFn = easingFn;
-    this.origin = orientation.get().clone();
     this.last_angle = 0.0;
   }
 
   step() {
     if (this.t == 0) {
       this.last_angle = 0;
-      this.origin = this.orientation.get().clone();
     }
     super.step();
     this.orientation.collapse();
-    let angle = this.easingFn(this.t / this.duration) * this.totalAngle;
-    let delta = angle - this.last_angle;
+
+    let targetAngle = this.easingFn(this.t / this.duration) * this.totalAngle;
+    let delta = targetAngle - this.last_angle;
     if (Math.abs(delta) > 0.0001) {
-      const step = delta / Math.ceil(Math.abs(delta) / Rotation.MAX_ANGLE);
-      for (let a = this.last_angle + step; Math.abs(angle - a) > 0.0001; a += step) {
-        let r = new THREE.Quaternion().setFromAxisAngle(this.axis, a);
-        this.orientation.push(this.origin.clone().premultiply(r));
+      const numSteps = Math.ceil(Math.abs(delta) / Rotation.MAX_ANGLE);
+      const stepAngle = delta / numSteps;
+      const qStep = new THREE.Quaternion().setFromAxisAngle(this.axis, stepAngle);
+      for (let i = 0; i < numSteps; i++) {
+        let currentQ = this.orientation.get().clone();
+        currentQ.premultiply(qStep).normalize();
+        this.orientation.push(currentQ);
       }
-      let r = new THREE.Quaternion().setFromAxisAngle(this.axis, angle);
-      this.orientation.push(this.origin.clone().premultiply(r));
-      this.last_angle = angle;
+      this.last_angle = targetAngle;
     }
   }
 }

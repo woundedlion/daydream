@@ -9,13 +9,8 @@ import {
   RingSpin,
 
   MetaballEffect,
-  NoiseParticles,
-  RingMachine,
   FlowField,
   Thrusters,
-  RingCircus,
-  Pulses,
-  Fib,
   Test
 } from "./effects.js";
 
@@ -30,11 +25,6 @@ const effects = {
   Dynamo,
 
   Thrusters,
-  RingCircus,
-  Pulses,
-  Fib,
-  RingMachine,
-  NoiseParticles,
   MetaballEffect,
   FlowField,
   Test

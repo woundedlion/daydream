@@ -63,17 +63,28 @@ export function createRenderPipeline(...filters) {
     }
   }
 
+  // Define the trail propagator
+  const trail = (trailFn, alpha) => {
+    for (const filter of filters) {
+      if (typeof filter.trail === 'function') {
+        filter.trail(trailFn, alpha);
+      }
+    }
+  };
+
   if (nextIs2D) {
     // Head is 2D filter, rasterize first
     return {
       plot: (pixels, v, c, age, alpha) => {
         const p = vectorToPixel(v);
         head(pixels, p.x, p.y, c, age, alpha);
-      }
+      },
+      trail: trail
     };
   } else {
     return {
-      plot: head
+      plot: head,
+      trail: trail
     };
   }
 }
@@ -226,7 +237,7 @@ export class FilterChromaticShift {
 /**
  * A filter that maintains a history of pixels to create fading trails.
  */
-export class FilterDecay2D {
+export class FilterDecay {
   /**
    * @param {number} lifespan - How many frames a trail pixel persists.
    */
