@@ -206,7 +206,7 @@ export class RingSpin {
     this.alpha = 0.2;
     this.trailLength = new MutableNumber(20);
     this.palettes = [ richSunset, mangoPeel, underSea, iceMelt ];
-    this.numRings = 1;
+    this.numRings = 4;
     this.timeline = new Timeline();
 
     for (let i = 0; i < this.numRings; ++i) {

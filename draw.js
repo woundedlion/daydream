@@ -423,7 +423,7 @@ export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase =
   let theta = 0;
   let uCurrent = new THREE.Vector3();
   let point = new THREE.Vector3();
-  while (theta <= 2 * Math.PI) {
+  while (theta < 2 * Math.PI) {
     // Ring step
     let cosRing = Math.cos(theta + phase);
     let sinRing = Math.sin(theta + phase);

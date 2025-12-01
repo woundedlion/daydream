@@ -205,15 +205,25 @@ export class Dodecahedron {
 }
 
 /**
- * Generates a random normalized 3D vector.
- * @returns {THREE.Vector3} A random vector on the unit sphere.
+ * Generates a truly random 3D unit vector using Marsaglia's method.
+ * This ensures perfectly uniform distribution on the sphere surface.
+ * @returns {THREE.Vector3} A normalized random vector.
  */
 export const randomVector = () => {
+  let v1, v2, s;
+  do {
+    v1 = 2.0 * Math.random() - 1.0;
+    v2 = 2.0 * Math.random() - 1.0;
+    s = v1 * v1 + v2 * v2;
+  } while (s >= 1.0 || s === 0.0);
+
+  const sqrtS = Math.sqrt(1.0 - s);
   return new THREE.Vector3(
-    Math.random() * 2 - 1,
-    Math.random() * 2 - 1,
-    Math.random() * 2 - 1).normalize();
-}
+    2.0 * v1 * sqrtS,
+    2.0 * v2 * sqrtS,
+    1.0 - 2.0 * s
+  );
+};
 
 /**
  * Manages the rotation and orientation of a 3D object over time.
