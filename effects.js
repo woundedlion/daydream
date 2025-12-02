@@ -193,7 +193,7 @@ export class RingSpin {
       this.normal = normal;
       this.palette = palette;
       this.filters = createRenderPipeline(
-     //   new FilterDecay(trailLength),
+        new FilterDecay(trailLength),
         new FilterAntiAlias()
       );
       this.orientation = new Orientation();
@@ -207,7 +207,7 @@ export class RingSpin {
     this.alpha = 0.2;
     this.trailLength = new MutableNumber(20);
     this.palettes = [ richSunset, mangoPeel, underSea, iceMelt ];
-    this.numRings = 1;
+    this.numRings = 4;
     this.timeline = new Timeline();
 
     for (let i = 0; i < this.numRings; ++i) {
@@ -237,7 +237,7 @@ export class RingSpin {
     tween(ring.orientation, (q, t) => {
       let dots = drawRing(q, ring.normal, 1,
         (v, t) => {
-          return vignette(ring.palette)(0.5)
+          return vignette(ring.palette)(0)
         });
       plotDots(this.pixels, ring.filters, dots, 0, this.alpha);
     });
