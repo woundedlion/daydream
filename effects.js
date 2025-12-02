@@ -56,13 +56,13 @@ export class Test {
     );
 
     this.amplitude = new MutableNumber(0);
-    this.amplitudeRange = 0.2;
+    this.amplitudeRange = 0.3;
     this.poly = new Dodecahedron();
-    this.numRings = 3;
+    this.numRings = 1;
     
-    this.timeline.add(0,
-      new Sprite((opacity) => this.drawPoly(opacity), -1, 48, easeMid, 0, easeMid)
-    );
+//    this.timeline.add(0,
+//      new Sprite((opacity) => this.drawPoly(opacity), -1, 48, easeMid, 0, easeMid)
+//    );
 
     this.timeline.add(0,
       new Sprite((opacity) => this.drawFn(opacity), -1, 48, easeMid, 0, easeMid)

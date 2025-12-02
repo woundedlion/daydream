@@ -221,7 +221,7 @@ export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false) =
   a *= Math.abs(end - start);
 
   let dots = []
-  let numSteps = Math.max(1, Math.ceil((a / (2 * Math.PI)) * Daydream.W));
+  let numSteps = Math.max(1, Math.ceil((a / (2 * Math.PI)) * Daydream.W * 2));
   let q = new THREE.Quaternion().setFromAxisAngle(w, a / numSteps);
   for (let i = 0; i <= numSteps; ++i) {
     dots.push(new Dot(u.clone(), colorFn(u, i / numSteps)));
@@ -333,8 +333,8 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
   const d = Math.cos(thetaEq);
 
   // Calculate Samples
-  const baseStep = 2 * Math.PI / Daydream.W / 2;
-  let dots = [];
+  const baseStep = 2 * Math.PI / Daydream.W;
+  let points = [];
   let thetas = [];
   let theta = 0;
   let uTemp = new THREE.Vector3();
@@ -353,8 +353,8 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
     let uScale = r * cosShift + (vSign * d) * sinShift;
     pTemp.copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
 
-    dots.push(new Dot(pTemp.clone(), colorFn(pTemp, t / (2 * Math.PI))));
-//    labels.push({ position: pTemp.clone(), content: (t / (2 * Math.PI)).toFixed(1)});
+    points.push(pTemp.clone());
+    //    labels.push({ position: pTemp.clone(), content: (t / (2 * Math.PI)).toFixed(1)});
     thetas.push(theta);
 
     // Adaptive Sampling for horizontal pixel distortion at poles
@@ -365,14 +365,14 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
     // Repair last N samples to close the loop
     if (nextTheta >= 2 * Math.PI) {
       const REPAIR_COUNT = 5;
-      if (dots.length > REPAIR_COUNT) {
-//      labels.length - + REPAIR_COUNT;
+      if (points.length > REPAIR_COUNT) {
+        //      labels.length - + REPAIR_COUNT;
         const targetLastTheta = 2 * Math.PI - step;
-        const anchorIdx = dots.length - REPAIR_COUNT - 1;
+        const anchorIdx = points.length - REPAIR_COUNT - 1;
         const anchorTheta = thetas[anchorIdx];
         const currentLastTheta = theta;
         const ratio = (targetLastTheta - anchorTheta) / (currentLastTheta - anchorTheta);
-        for (let i = anchorIdx + 1; i < dots.length; i++) {
+        for (let i = anchorIdx + 1; i < points.length; i++) {
           const dist = thetas[i] - anchorTheta;
           const correctedTheta = anchorTheta + (dist * ratio);
 
@@ -390,16 +390,29 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
           let uScale = r * cosShift + (vSign * d) * sinShift;
           pTemp.copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
 
-          dots[i].position.copy(pTemp);
-//          labels.push({ position: pTemp.clone(), content: (t / (2 * Math.PI)).toFixed(1) });
-          dots[i].color = colorFn(pTemp, t / (2 * Math.PI));
+          points[i].copy(pTemp);
+          //          labels.push({ position: pTemp.clone(), content: (t / (2 * Math.PI)).toFixed(1) });
         }
       }
       break;
     }
     theta = nextTheta;
   }
-  return dots;
+
+  // Draw lines connecting the repaired points
+  let finalDots = [];
+  for (let i = 0; i < points.length; ++i) {
+    let nextI = (i + 1) % points.length;
+    let tStart = thetas[i] / (2 * Math.PI);
+    let segmentDots = drawLine(points[i], points[nextI],
+      (vec, lineT) => {
+        return colorFn(vec, tStart);
+      });
+    segmentDots.pop(); // Avoid drawing over the start vertex
+    finalDots.push(...segmentDots);
+  }
+
+  return finalDots;
 }
 
 /**
