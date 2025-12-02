@@ -1,6 +1,6 @@
 // draw.js
 import * as THREE from "three";
-import { Daydream } from "./driver.js";
+import { Daydream, labels } from "./driver.js";
 import { Dot, angleBetween, sphericalToPixel } from "./geometry.js";
 
 /**
@@ -300,8 +300,6 @@ export const fnPoint = (f, normal, radius, angle) => {
   return vi.clone().applyQuaternion(shift);
 };
 
-// draw.js
-
 /**
  * Draws a function-distorted ring with adaptive sampling.
  * @param {THREE.Quaternion} orientationQuaternion - Orientation of the base ring.
@@ -322,47 +320,85 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
   let u = new THREE.Vector3().crossVectors(v, ref).normalize();
   let w = new THREE.Vector3().crossVectors(v, u).normalize();
 
-  // Backside ring
+  // Backside rings
   let vSign = 1.0;
   if (radius > 1) {
     vSign = -1.0;
     radius = 2 - radius;
   }
 
-  // Equidistant Projection
+  // Equidistant projection
   const thetaEq = radius * (Math.PI / 2);
   const r = Math.sin(thetaEq);
   const d = Math.cos(thetaEq);
 
+  // Calculate Samples
+  const baseStep = 2 * Math.PI / Daydream.W / 2;
   let dots = [];
-  const baseStep = (2 * Math.PI) / Daydream.W;
+  let thetas = [];
   let theta = 0;
-  let uCurrent = new THREE.Vector3();
-  let point = new THREE.Vector3();
-  while (theta < 2 * Math.PI) {
-    let t = theta / (2 * Math.PI);
-    // Ring step
-    let ringAngle = theta + phase;
-    let cosRing = Math.cos(ringAngle);
-    let sinRing = Math.sin(ringAngle);
-    uCurrent.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
+  let uTemp = new THREE.Vector3();
+  let pTemp = new THREE.Vector3();
+  while (true) {
+    let t = theta + phase;
+    let cosRing = Math.cos(t);
+    let sinRing = Math.sin(t);
+    uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
 
-    // Shift
-    let shift = shiftFn(t);
+    // Apply Shift
+    let shift = shiftFn(theta / (2 * Math.PI));
     let cosShift = Math.cos(shift);
     let sinShift = Math.sin(shift);
     let vScale = (vSign * d) * cosShift - r * sinShift;
     let uScale = r * cosShift + (vSign * d) * sinShift;
-    point.copy(v).multiplyScalar(vScale).addScaledVector(uCurrent, uScale).normalize();
+    pTemp.copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
 
-    dots.push(new Dot(point.clone(), colorFn(point, t)));
+    dots.push(new Dot(pTemp.clone(), colorFn(pTemp, t / (2 * Math.PI))));
+//    labels.push({ position: pTemp.clone(), content: (t / (2 * Math.PI)).toFixed(1)});
+    thetas.push(theta);
 
-    // Adaptive sampling
-    let latitudeRadius = Math.sqrt(1 - point.y * point.y);
-    let scaleFactor = Math.max(0.05, latitudeRadius);
-    theta += baseStep * scaleFactor;
+    // Adaptive Sampling for horizontal pixel distortion at poles
+    let scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - pTemp.y * pTemp.y)));
+    let step = baseStep * scaleFactor;
+    let nextTheta = theta + step;
+
+    // Repair last N samples to close the loop
+    if (nextTheta >= 2 * Math.PI) {
+      const REPAIR_COUNT = 5;
+      if (dots.length > REPAIR_COUNT) {
+//      labels.length - + REPAIR_COUNT;
+        const targetLastTheta = 2 * Math.PI - step;
+        const anchorIdx = dots.length - REPAIR_COUNT - 1;
+        const anchorTheta = thetas[anchorIdx];
+        const currentLastTheta = theta;
+        const ratio = (targetLastTheta - anchorTheta) / (currentLastTheta - anchorTheta);
+        for (let i = anchorIdx + 1; i < dots.length; i++) {
+          const dist = thetas[i] - anchorTheta;
+          const correctedTheta = anchorTheta + (dist * ratio);
+
+          // Re-calculate Geometry
+          let t = correctedTheta + phase;
+          let cosRing = Math.cos(t);
+          let sinRing = Math.sin(t);
+          uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
+
+          // Re-apply Shift
+          let shift = shiftFn(correctedTheta / (2 * Math.PI));
+          let cosShift = Math.cos(shift);
+          let sinShift = Math.sin(shift);
+          let vScale = (vSign * d) * cosShift - r * sinShift;
+          let uScale = r * cosShift + (vSign * d) * sinShift;
+          pTemp.copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
+
+          dots[i].position.copy(pTemp);
+//          labels.push({ position: pTemp.clone(), content: (t / (2 * Math.PI)).toFixed(1) });
+          dots[i].color = colorFn(pTemp, t / (2 * Math.PI));
+        }
+      }
+      break;
+    }
+    theta = nextTheta;
   }
-
   return dots;
 }
 
@@ -418,37 +454,57 @@ export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase =
   const r = Math.sin(thetaEq);
   const d = Math.cos(thetaEq);
 
+  // Calculate Samples
+  const baseStep = 2 * Math.PI / Daydream.W;
   let dots = [];
-  const baseStep = (2 * Math.PI) / Daydream.W;
+  let thetas = [];
   let theta = 0;
-  let uCurrent = new THREE.Vector3();
-  let point = new THREE.Vector3();
-  while (theta < 2 * Math.PI) {
-    // Ring step
-    let cosRing = Math.cos(theta + phase);
-    let sinRing = Math.sin(theta + phase);
-    uCurrent.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
-    point.copy(vDir).multiplyScalar(d).addScaledVector(uCurrent, r).normalize();
+  let uTemp = new THREE.Vector3();
+  let pTemp = new THREE.Vector3();
+  while (true) {
+    let t = theta + phase;
+    let cosRing = Math.cos(t);
+    let sinRing = Math.sin(t);
+    uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
+    pTemp.copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
+    dots.push(new Dot(pTemp.clone(), colorFn(pTemp, t / (2 * Math.PI))));
+    thetas.push(theta);
 
-    dots.push(new Dot(point.clone(), colorFn(point, theta / (2 * Math.PI))));
+    // Adaptive Sampling for horizontal pixel distortion at poles
+    let scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - pTemp.y * pTemp.y)));
+    let step = baseStep * scaleFactor;
+    let nextTheta = theta + step;
 
-    // Adaptive sampling
-    let latitudeRadius = Math.sqrt(1 - point.y * point.y);
-    let scaleFactor = Math.max(0.05, latitudeRadius);
-    theta += baseStep * scaleFactor;
+    // Repair last N samples to close the loop
+    if (nextTheta >= 2 * Math.PI) {
+      const REPAIR_COUNT = 5;
+      if (dots.length > REPAIR_COUNT) {
+        const targetLastTheta = 2 * Math.PI - step;
+        const anchorIdx = dots.length - REPAIR_COUNT - 1;
+        const anchorTheta = thetas[anchorIdx];
+        const currentLastTheta = theta;
+        const ratio = (targetLastTheta - anchorTheta) / (currentLastTheta - anchorTheta);
+        for (let i = anchorIdx + 1; i < dots.length; i++) {
+          const dist = thetas[i] - anchorTheta;
+          const correctedTheta = anchorTheta + (dist * ratio);
+
+          // Re-calculate Geometry
+          let t = correctedTheta + phase;
+          let cosRing = Math.cos(t);
+          let sinRing = Math.sin(t);
+          uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
+          pTemp.copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
+          dots[i].position.copy(pTemp);
+          dots[i].color = colorFn(pTemp, t / (2 * Math.PI));
+        }
+      }
+      break;
+    }
+    theta = nextTheta;
   }
-
   return dots;
 }
 
-/**
- * Calculates a single point on a circular ring on the sphere surface.
- * @param {THREE.Vector3} normal - The normal vector defining the ring plane.
- * @param {number} radius - The radius of the ring.
- * @param {number} angle - The angle around the ring's center.
- * @param {number} [phase=0] - The starting angle phase shift.
- * @returns {THREE.Vector3} The point on the sphere's surface.
- */
 export const ringPoint = (normal, radius, angle, phase = 0) => {
   let dots = [];
   let u = new THREE.Vector3();

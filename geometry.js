@@ -79,6 +79,59 @@ export const pixelToVector = (x, y) => {
 };
 
 /**
+ * Converts Log-Polar coordinates (rho, theta) to a vector on the unit sphere.
+ * Maps: Log-Polar -> Complex Plane -> Inverse Stereographic -> Sphere
+ * @param {number} rho - The log-radius (natural logarithm of the radius on the complex plane).
+ * @param {number} theta - The angle in radians.
+ * @returns {THREE.Vector3} Normalized vector on the unit sphere.
+ */
+export const logPolarToVector = (rho, theta) => {
+  // 1. Log-Polar to Plane Radius (R)
+  // rho = ln(R) -> R = e^rho
+  const R = Math.exp(rho);
+
+  // 2. Inverse Stereographic Projection (Plane Radius R -> Sphere Y)
+  // y = (R^2 - 1) / (R^2 + 1)
+  const y = (R * R - 1) / (R * R + 1);
+
+  // 3. Calculate Euclidean radius at this height (r_xz)
+  // x^2 + z^2 = 1 - y^2
+  const r_xz = Math.sqrt(1 - y * y);
+
+  return new THREE.Vector3(
+    r_xz * Math.cos(theta),
+    y,
+    r_xz * Math.sin(theta)
+  );
+};
+
+/**
+ * Converts a vector on the unit sphere to Log-Polar coordinates.
+ * Maps: Sphere -> Stereographic -> Complex Plane -> Log-Polar
+ * @param {THREE.Vector3} v - Normalized vector on the unit sphere.
+ * @returns {{rho: number, theta: number}} Log-Polar coordinates.
+ */
+export const vectorToLogPolar = (v) => {
+  // 1. Stereographic Projection (Sphere -> Plane Radius R)
+  // R^2 = (1 + y) / (1 - y)
+  const denom = 1 - v.y;
+  if (Math.abs(denom) < 0.00001) {
+    return { rho: 10, theta: 0 }; // Handle North Pole singularity
+  }
+
+  // 2. Calculate rho (log radius)
+  // R = sqrt((1+y)/(1-y))
+  // rho = ln(R) = 0.5 * ln((1+y)/(1-y))
+  const rho = 0.5 * Math.log((1 + v.y) / (1 - v.y));
+
+  // 3. Calculate theta (angle)
+  // Standard polar angle in XZ plane
+  const theta = Math.atan2(v.z, v.x);
+
+  return { rho, theta };
+};
+
+/**
  * Placeholder class for defining a small test polyhedron geometry.
  * @property {number[][]} vertices - Array of [x, y, z] coordinates.
  * @property {number[][]} eulerPath - Adjacency list for edges (intended for Euler path).

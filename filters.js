@@ -203,7 +203,92 @@ export class FilterReplicate {
       pass(r, color, age, alpha);
     }
   }
+} 
+
+
+/**
+ * Applies a Mobius Transformation to the 3D vectors.
+ * Projects sphere -> complex plane -> transform -> sphere.
+ */
+export class FilterMobius {
+  constructor() {
+    this.is2D = false;
+    // Transformation parameters: f(z) = (az + b) / (cz + d)
+    // Initialized to Identity: f(z) = z  (a=1, b=0, c=0, d=1)
+    this.a = { re: 1, im: 0 };
+    this.b = { re: 0, im: 0 };
+    this.c = { re: 0, im: 0 };
+    this.d = { re: 1, im: 0 };
+  }
+
+  // Complex Multiply
+  cmul(c1, c2) {
+    return {
+      re: c1.re * c2.re - c1.im * c2.im,
+      im: c1.re * c2.im + c1.im * c2.re
+    };
+  }
+
+  // Complex Add
+  cadd(c1, c2) {
+    return { re: c1.re + c2.re, im: c1.im + c2.im };
+  }
+
+  // Complex Divide
+  cdiv(c1, c2) {
+    const denom = c2.re * c2.re + c2.im * c2.im;
+    if (denom === 0) return { re: 0, im: 0 };
+    return {
+      re: (c1.re * c2.re + c1.im * c2.im) / denom,
+      im: (c1.im * c2.re - c1.re * c2.im) / denom
+    };
+  }
+
+  plot(v, color, age, alpha, pass) {
+    // 1. Stereographic Projection (North Pole -> Plane)
+    // Singularity check: If we are AT the North Pole, z_in is Infinity.
+    // Möbius of Infinity is a/c.
+    const denom = 1 - v.y;
+    let w;
+
+    if (Math.abs(denom) < 0.00001) {
+      // Input is North Pole (Infinity)
+      // Limit of (az+b)/(cz+d) as z->inf is a/c
+      w = this.cdiv(this.a, this.c);
+    } else {
+      const z_in = { re: v.x / denom, im: v.z / denom };
+
+      // w = (az + b) / (cz + d)
+      const num = this.cadd(this.cmul(this.a, z_in), this.b);
+      const den = this.cadd(this.cmul(this.c, z_in), this.d);
+
+      // Check for division by zero (Map to North Pole)
+      const den_mag = den.re * den.re + den.im * den.im;
+      if (den_mag < 0.000001) {
+        // Result is Infinity -> North Pole
+        pass(new THREE.Vector3(0, 1, 0), color, age, alpha);
+        return;
+      }
+
+      w = this.cdiv(num, den);
+    }
+
+    // 3. Inverse Stereographic Projection (Plane -> Sphere)
+    const w_mag_sq = w.re * w.re + w.im * w.im;
+    const inv_denom = 1 / (w_mag_sq + 1);
+
+    const v_out = new THREE.Vector3(
+      2 * w.re * inv_denom,
+      (w_mag_sq - 1) * inv_denom,
+      2 * w.im * inv_denom
+    );
+
+    pass(v_out, color, age, alpha);
+  }
 }
+///////////////////////////////////////////////////////////////////////////////
+// 2D Filters
+///////////////////////////////////////////////////////////////////////////////
 
 /**
  * Splits the color into its R, G, B components and shifts them.
@@ -234,63 +319,63 @@ export class FilterChromaticShift {
 }
 
 
-/**
- * A filter that maintains a history of pixels to create fading trails.
- */
 export class FilterDecay {
-  /**
-   * @param {number} lifespan - How many frames a trail pixel persists.
-   */
-  constructor(lifespan) {
+  constructor(lifespan, maxCapacity = 10000) {
     this.is2D = true;
     this.lifespan = lifespan;
-    this.trails = new Map();
+    this.count = 0;
+
+    // Pre-allocate memory (like StaticCircularBuffer in C++)
+    this.xs = new Float32Array(maxCapacity);
+    this.ys = new Float32Array(maxCapacity);
+    this.ttls = new Float32Array(maxCapacity);
   }
 
-  /**
-   * Records a plotted pixel and sets its TTL.
-   * @param {number} x - The x coordinate.
-   * @param {number} y - The y coordinate.
-   * @param {THREE.Color} color - The color.
-   * @param {number} age - The initial age of the dots
-   * @param {number} alpha - The opacity.
-   * @param {Function} pass - The callback.
-   */
   plot(x, y, color, age, alpha, pass) {
-    this.pass = pass; // saved for trail splice into the pipeline
+    this.pass = pass; // saved for trail injection
     pass(x, y, color, age, alpha);
-    const key = pixelKey(x, y);
-    this.trails.set(key, this.lifespan - age);
+
+    // 2. Record for trail (if buffer isn't full)
+    if (this.count < this.ttls.length) {
+      const i = this.count;
+      this.xs[i] = x;
+      this.ys[i] = y;
+      this.ttls[i] = this.lifespan - age;
+      this.count++;
+    }
   }
 
-  /**
-   * Renders the trails based on the recorded history.
-   * @param {Function} trailFn - Function to determine trail color based on coordinate and life.
-   * @param {number} alpha - The opacity.
-   */
   trail(trailFn, alpha) {
-    for (const [key, ttl] of this.trails) {
-      if (ttl > 0 && ttl < this.lifespan) {
-        let p = keyPixel(key);
-        let color = trailFn(p[0], p[1], 1 - (ttl / this.lifespan));
-        //       labels.push({ position: pixelToVector(p[0], p[1]), content: `${parseFloat(p[0]).toFixed(1)}, ${parseFloat(p[1]).toFixed(1)}` });
-        this.pass(p[0], p[1], color, this.lifespan - ttl, alpha);
+    // 1. Render loop
+    for (let i = 0; i < this.count; i++) {
+      const ttl = this.ttls[i];
+      const x = this.xs[i];
+      const y = this.ys[i];
+
+      let color = trailFn(x, y, 1 - (ttl / this.lifespan));
+
+      this.pass(x, y, color, this.lifespan - ttl, alpha);
+    }
+
+    // 2. Decay & Compact Loop (The C++ "Swap-Remove" Logic)
+    let i = 0;
+    while (i < this.count) {
+      this.ttls[i] -= 1; // Decrement Life
+
+      if (this.ttls[i] <= 0) {
+        // Pixel died. Swap with the *last* active pixel to fill the hole.
+        this.count--; // Shrink size
+
+        if (i < this.count) { // If not already the last one
+          this.xs[i] = this.xs[this.count];
+          this.ys[i] = this.ys[this.count];
+          this.ttls[i] = this.ttls[this.count];
+
+          // Do NOT increment i, because we need to check the swapped-in pixel next!
+        }
+      } else {
+        i++; // Pixel survived, move to next
       }
     }
-    this.decay();
-  }
-
-  /**
-   * Decrements the TTL of recorded pixels and removes expired ones.
-   */
-  decay() {
-    this.trails.forEach((ttl, key) => {
-      ttl -= 1;
-      if (ttl <= 0) {
-        this.trails.delete(key);
-      } else {
-        this.trails.set(key, ttl);
-      }
-    });
   }
 }

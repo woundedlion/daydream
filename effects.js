@@ -1,12 +1,13 @@
 import * as THREE from "three";
 import { gui } from "gui";
-import { Daydream, pixelKey } from "./driver.js";
+import { Daydream, labels, pixelKey } from "./driver.js";
 import FastNoiseLite from "./FastNoiseLite.js";
 
 import {
   Orientation, Dodecahedron, angleBetween, pixelToVector,
   distanceGradient, isOver, bisect, lissajous,
-  fibSpiral, randomVector, Dot, sinWave, lerp, squareWave
+  fibSpiral, randomVector, Dot, sinWave, lerp, squareWave,
+  logPolarToVector, vectorToLogPolar
 } from "./geometry.js";
 
 import {
@@ -32,7 +33,7 @@ import {
 
 import {
   createRenderPipeline, FilterAntiAlias, FilterReplicate,
-  FilterOrient, FilterChromaticShift, FilterDecay
+  FilterOrient, FilterChromaticShift, FilterDecay, FilterMobius
 } from "./filters.js";
 
 import { dir, wrap, shortest_distance, randomChoice, randomBetween } from "./util.js";
@@ -40,41 +41,40 @@ import { dir, wrap, shortest_distance, randomChoice, randomBetween } from "./uti
 ///////////////////////////////////////////////////////////////////////////////
 
 export class Test {
+
   constructor() {
     Daydream.W = 96;
     this.pixels = new Map();
-    this.alpha = 1.0;
+    this.alpha = 0.3;
     this.ringPalette = mangoPeel;
     this.polyPalette = new GenerativePalette("circular", "analagous", "cup");
     this.normal = Daydream.X_AXIS.clone();
     this.orientation = new Orientation();
     this.timeline = new Timeline();
     this.filters = createRenderPipeline(
-      new FilterOrient(this.orientation),
       new FilterAntiAlias()
     );
 
     this.amplitude = new MutableNumber(0);
+    this.amplitudeRange = 0.2;
     this.poly = new Dodecahedron();
-    this.numRings = 8;
+    this.numRings = 3;
     
+    this.timeline.add(0,
+      new Sprite((opacity) => this.drawPoly(opacity), -1, 48, easeMid, 0, easeMid)
+    );
+
     this.timeline.add(0,
       new Sprite((opacity) => this.drawFn(opacity), -1, 48, easeMid, 0, easeMid)
     );
     
-
-   /*
-    this.timeline.add(0,
-      new Sprite((opacity) => this.drawPoly(opacity), -1, 48, easeMid, 0, easeMid)
-    );
-    */
-
     this.timeline.add(0,
       new RandomWalk(this.orientation, this.normal)
     );
 
     this.timeline.add(0,
-      new Mutation(this.amplitude, sinWave(-0.1, 0.1, 2, 0), 64, easeMid, true)
+      new Mutation(this.amplitude,
+        sinWave(-this.amplitudeRange, this.amplitudeRange, 2, 0), 64, easeMid, true)
     );
   
     this.gui = new gui.GUI();
@@ -86,7 +86,7 @@ export class Test {
     dots.push(...drawPolyhedron(this.poly.vertices, this.poly.eulerPath,
       (v, t) => this.polyPalette.get(t)
     ));
-    plotDots(this.pixels, this.filters, dots, opacity * this.alpha);
+    plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
   }
 
   drawFn(opacity) {
@@ -96,7 +96,9 @@ export class Test {
       dots.push(...drawFn(this.orientation.get(), this.normal,
         2 / (this.numRings + 1) * (i + 1),
         (t) => sinWave(this.amplitude.get(), -this.amplitude.get(), 4, 0)(t),
-        (v, t) => this.ringPalette.get(t),
+        (v, t) => {
+          return this.ringPalette.get(t);
+        },
         i * 2 * Math.PI / this.numRings
       ));
     }
@@ -191,7 +193,7 @@ export class RingSpin {
       this.normal = normal;
       this.palette = palette;
       this.filters = createRenderPipeline(
-        new FilterDecay(trailLength),
+     //   new FilterDecay(trailLength),
         new FilterAntiAlias()
       );
       this.orientation = new Orientation();
@@ -205,7 +207,7 @@ export class RingSpin {
     this.alpha = 0.2;
     this.trailLength = new MutableNumber(20);
     this.palettes = [ richSunset, mangoPeel, underSea, iceMelt ];
-    this.numRings = 4;
+    this.numRings = 1;
     this.timeline = new Timeline();
 
     for (let i = 0; i < this.numRings; ++i) {
@@ -234,7 +236,9 @@ export class RingSpin {
     ring.orientation.collapse();
     tween(ring.orientation, (q, t) => {
       let dots = drawRing(q, ring.normal, 1,
-        (v, t) => vignette(ring.palette)(0));
+        (v, t) => {
+          return vignette(ring.palette)(0.5)
+        });
       plotDots(this.pixels, ring.filters, dots, 0, this.alpha);
     });
     ring.filters.trail((x, y, t) => vignette(ring.palette)(t), this.alpha);
@@ -904,3 +908,106 @@ export class FlowField {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+export class MobiusGrid {
+  constructor() {
+    Daydream.W = 96;
+    this.pixels = new Map();
+    this.alpha = 1.0;
+    this.orientation = new Orientation();
+
+    this.mobius = new FilterMobius();
+
+    this.filters = createRenderPipeline(
+      new FilterOrient(this.orientation),
+      this.mobius,
+      new FilterAntiAlias()
+    );
+
+    this.timeline = new Timeline();
+    this.gui = new gui.GUI();
+
+    // Default ring color
+    this.ringColor = new THREE.Color(0xff00ff);
+
+    // Tunnel Parameters
+    this.tunnelSpeed = 0.005;
+    this.ringCount = 12;
+    this.phase = 0;
+
+    this.setupGui();
+  }
+
+  setupGui() {
+    // 1. Tunnel Controls (The "Even Spacing" logic)
+    const f1 = this.gui.addFolder('Tunnel Generator');
+    f1.add(this, 'tunnelSpeed', -0.05, 0.05).name('Travel Speed');
+    f1.add(this, 'ringCount', 2, 30).step(1).name('Ring Count');
+    f1.add(this, 'alpha', 0, 1).name('Opacity');
+    f1.open();
+
+    // 2. Mobius Controls (The Distortion)
+    const f2 = this.gui.addFolder('Mobius Distortion');
+    const update = () => { };
+
+    const addComplex = (folder, obj, name) => {
+      const sub = folder.addFolder(name);
+      sub.add(obj, 're', -2, 2).step(0.01).name('Real').onChange(update);
+      sub.add(obj, 'im', -2, 2).step(0.01).name('Imag').onChange(update);
+      sub.open();
+    };
+
+    addComplex(f2, this.mobius.a, 'a (Scale/Rot)');
+    addComplex(f2, this.mobius.b, 'b (Translate)');
+    addComplex(f2, this.mobius.c, 'c (Warp)');
+    addComplex(f2, this.mobius.d, 'd (Scale/Rot)');
+    f2.open();
+  }
+
+  drawFrame() {
+    this.pixels.clear();
+    this.timeline.step();
+
+    let dots = [];
+
+    // --- The "Conveyor Belt" Tunnel ---
+    // Instead of using Log-Polar (exponential) spacing, we use Linear spacing 
+    // and animate the PHASE to create infinite motion.
+
+    // 1. Calculate spacing based on ring count
+    // Radius range is 0.0 (North) to 2.0 (South)
+    const spacing = 2.0 / this.ringCount;
+
+    // 2. Advance Phase
+    // The phase cycles from 0 to 'spacing'. 
+    // When it hits 'spacing', it wraps to 0, seamlessly starting the next ring.
+    this.phase += this.tunnelSpeed;
+    if (this.phase >= spacing) this.phase -= spacing;
+    if (this.phase < 0) this.phase += spacing;
+
+    // 3. Generate Rings
+    // We iterate from 'phase' up to 2.0. 
+    // As 'phase' increases, all rings move south.
+    for (let r = this.phase; r < 2.0; r += spacing) {
+
+      // drawRing radius: 0.0 (Pole) -> 1.0 (Equator) -> 2.0 (Opposite Pole)
+      // This is strictly linear on the sphere surface (Angle = r * 90deg).
+
+      dots.push(...drawRing(
+        this.orientation.get(),
+        Daydream.Y_AXIS,        // Axis of the tunnel
+        r,
+        (v, t) => this.ringColor
+      ));
+    }
+
+    // 4. Render
+    // The dots are "Evenly Spaced" when generated above.
+    // They are then passed to 'this.filters', which contains the Mobius Transform.
+    // If Mobius is Identity (a=1, d=1, b=c=0), you see a perfect tunnel.
+    // Adjusting Mobius params will warp this perfect tunnel.
+    plotDots(this.pixels, this.filters, dots, 0, this.alpha);
+
+    return this.pixels;
+  }
+}

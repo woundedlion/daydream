@@ -11,7 +11,8 @@ import {
   MetaballEffect,
   FlowField,
   Thrusters,
-  Test
+  Test,
+  MobiusGrid
 } from "./effects.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
@@ -27,7 +28,8 @@ const effects = {
   Thrusters,
   MetaballEffect,
   FlowField,
-  Test
+  Test,
+  MobiusGrid
 };
 
 
