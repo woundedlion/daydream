@@ -299,91 +299,91 @@
         let scene, camera, renderer, controls, sphereMesh;
 
         const vertexShader = `
-            varying vec3 vPosition;
-            void main() {
-                vPosition = position;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            }
-        `;
+                varying vec3 vPosition;
+                void main() {
+                    vPosition = position;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `;
 
         const complexFunctions = `
-            struct CNum { float re; float im; };
-            CNum cmult(CNum p, CNum q) { return CNum(p.re * q.re - p.im * q.im, p.re * q.im + p.im * q.re); }
-            CNum cadd(CNum p, CNum q) { return CNum(p.re + q.re, p.im + q.im); }
-            CNum cdiv(CNum p, CNum q) {
-                float denom = q.re * q.re + q.im * q.im;
-                if (denom < 1e-6) return CNum(0.0, 0.0);
-                return CNum((p.re * q.re + p.im * q.im) / denom, (p.im * q.re - p.re * q.im) / denom);
-            }
-        `;
+                struct CNum { float re; float im; };
+                CNum cmult(CNum p, CNum q) { return CNum(p.re * q.re - p.im * q.im, p.re * q.im + p.im * q.re); }
+                CNum cadd(CNum p, CNum q) { return CNum(p.re + q.re, p.im + q.im); }
+                CNum cdiv(CNum p, CNum q) {
+                    float denom = q.re * q.re + q.im * q.im;
+                    if (denom < 1e-6) return CNum(0.0, 0.0);
+                    return CNum((p.re * q.re + p.im * q.im) / denom, (p.im * q.re - p.re * q.im) / denom);
+                }
+            `;
 
         const fragmentShader = `
-            ${complexFunctions}
-            uniform CNum u_a;
-            uniform CNum u_b;
-            uniform CNum u_c;
-            uniform CNum u_d;
-            varying vec3 vPosition;
+                ${complexFunctions}
+                uniform CNum u_a;
+                uniform CNum u_b;
+                uniform CNum u_c;
+                uniform CNum u_d;
+                varying vec3 vPosition;
 
-            const float GRID_SCALE_R = 1.5;
-            const float GRID_SCALE_THETA = 12.0;
+                const float GRID_SCALE_R = 1.5;
+                const float GRID_SCALE_THETA = 12.0;
 
-            float pattern(float val, float thickness) {
-                float fw = fwidth(val);
-                float dist = abs(fract(val + 0.5) - 0.5);
-                return 1.0 - smoothstep(0.0, fw * thickness, dist);
-            }
-
-            void main() {
-                vec3 p = normalize(vPosition);
-                float denom = 1.0 - p.z;
-                CNum w;
-                bool isInfinity = false;
-
-                if (denom < 1e-4) { isInfinity = true; }
-                else { w.re = p.x / denom; w.im = p.y / denom; }
-
-                CNum w_prime;
-                if (isInfinity) {
-                    float c_mag = length(vec2(u_c.re, u_c.im));
-                    if (c_mag < 1e-6) w_prime = CNum(100.0, 100.0);
-                    else w_prime = cdiv(u_a, u_c);
-                } else {
-                    CNum aw = cmult(u_a, w);
-                    CNum num = cadd(aw, u_b);
-                    CNum cw = cmult(u_c, w);
-                    CNum den = cadd(cw, u_d);
-                    float den_mag = den.re*den.re + den.im*den.im;
-                    if (den_mag < 1e-6) w_prime = CNum(100.0, 100.0);
-                    else w_prime = cdiv(num, den);
+                float pattern(float val, float thickness) {
+                    float fw = fwidth(val);
+                    float dist = abs(fract(val + 0.5) - 0.5);
+                    return 1.0 - smoothstep(0.0, fw * thickness, dist);
                 }
 
-                float r = length(vec2(w_prime.re, w_prime.im));
-                float theta = atan(w_prime.im, w_prime.re);
-                float log_r = log(r + 0.0001);
-                float u = log_r * GRID_SCALE_R;
-                float v = (theta / 3.14159) * GRID_SCALE_THETA;
+                void main() {
+                    vec3 p = normalize(vPosition);
+                    float denom = 1.0 - p.z;
+                    CNum w;
+                    bool isInfinity = false;
 
-                float gridR = pattern(u, 1.5);
-                float gridTheta = pattern(v, 1.5);
-                float grid = max(gridR, gridTheta);
+                    if (denom < 1e-4) { isInfinity = true; }
+                    else { w.re = p.x / denom; w.im = p.y / denom; }
 
-                vec3 colorBg = vec3(0.059, 0.09, 0.165);
-                vec3 colorLine = vec3(0.506, 0.549, 0.973);
-                vec3 baseColor = mix(colorBg, colorBg * 1.5, 0.5 + 0.5*sin(theta));
-                vec3 finalColor = mix(baseColor, colorLine, grid);
+                    CNum w_prime;
+                    if (isInfinity) {
+                        float c_mag = length(vec2(u_c.re, u_c.im));
+                        if (c_mag < 1e-6) w_prime = CNum(100.0, 100.0);
+                        else w_prime = cdiv(u_a, u_c);
+                    } else {
+                        CNum aw = cmult(u_a, w);
+                        CNum num = cadd(aw, u_b);
+                        CNum cw = cmult(u_c, w);
+                        CNum den = cadd(cw, u_d);
+                        float den_mag = den.re*den.re + den.im*den.im;
+                        if (den_mag < 1e-6) w_prime = CNum(100.0, 100.0);
+                        else w_prime = cdiv(num, den);
+                    }
 
-                gl_FragColor = vec4(finalColor, 1.0);
-            }
-        `;
+                    float r = length(vec2(w_prime.re, w_prime.im));
+                    float theta = atan(w_prime.im, w_prime.re);
+                    float log_r = log(r + 0.0001);
+                    float u = log_r * GRID_SCALE_R;
+                    float v = (theta / 3.14159) * GRID_SCALE_THETA;
+
+                    float gridR = pattern(u, 1.5);
+                    float gridTheta = pattern(v, 1.5);
+                    float grid = max(gridR, gridTheta);
+
+                    vec3 colorBg = vec3(0.059, 0.09, 0.165);
+                    vec3 colorLine = vec3(0.506, 0.549, 0.973);
+                    vec3 baseColor = mix(colorBg, colorBg * 1.5, 0.5 + 0.5*sin(theta));
+                    vec3 finalColor = mix(baseColor, colorLine, grid);
+
+                    gl_FragColor = vec4(finalColor, 1.0);
+                }
+            `;
 
         const updateMobiusUniforms = () => {
-             if (!sphereMesh || !sphereMesh.material.uniforms) return;
-             const u = sphereMesh.material.uniforms;
-             u.u_a.value = { re: config.A.re, im: config.A.im };
-             u.u_b.value = { re: config.B.re, im: config.B.im };
-             u.u_c.value = { re: config.C.re, im: config.C.im };
-             u.u_d.value = { re: config.D.re, im: config.D.im };
+            if (!sphereMesh || !sphereMesh.material.uniforms) return;
+            const u = sphereMesh.material.uniforms;
+            u.u_a.value = { re: config.A.re, im: config.A.im };
+            u.u_b.value = { re: config.B.re, im: config.B.im };
+            u.u_c.value = { re: config.C.re, im: config.C.im };
+            u.u_d.value = { re: config.D.re, im: config.D.im };
         };
 
         const applyConfig = (newVals) => {
@@ -401,7 +401,7 @@
                 name: 'Identity',
                 desc: 'Reset to default state. f(z) = z',
                 animate: false,
-                setup: () => ({ A: {re:1,im:0}, B: {re:0,im:0}, C: {re:0,im:0}, D: {re:1,im:0} })
+                setup: () => ({ A: { re: 1, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 }, D: { re: 1, im: 0 } })
             },
             {
                 id: 'elliptic',
@@ -431,7 +431,7 @@
                     const s = Math.sqrt(scale);
                     return {
                         A: { re: s, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 },
-                        D: { re: 1/s, im: 0 }
+                        D: { re: 1 / s, im: 0 }
                     };
                 }
             },
@@ -451,7 +451,7 @@
                     return {
                         A: { re: s * Math.cos(angle), im: s * Math.sin(angle) },
                         B: { re: 0, im: 0 }, C: { re: 0, im: 0 },
-                        D: { re: (1/s) * Math.cos(-angle), im: (1/s) * Math.sin(-angle) }
+                        D: { re: (1 / s) * Math.cos(-angle), im: (1 / s) * Math.sin(-angle) }
                     };
                 }
             },
@@ -523,7 +523,7 @@
                         A: { re: 1, im: 0 },
                         B: { re: 0, im: -p },
                         C: { re: p, im: 0 },
-                        D: { re: 1-p, im: p }
+                        D: { re: 1 - p, im: p }
                     };
                 }
             }
@@ -559,15 +559,15 @@
             const labelId = `${id}_label`;
 
             container.innerHTML = `
-                <div id="${controlId}" class="complex-plane-control">
-                    <div class="complex-plane-inner">
-                        <div class="axis-h"></div>
-                        <div class="axis-v"></div>
-                        <div id="${dotId}" class="complex-plane-dot"></div>
+                    <div id="${controlId}" class="complex-plane-control">
+                        <div class="complex-plane-inner">
+                            <div class="axis-h"></div>
+                            <div class="axis-v"></div>
+                            <div id="${dotId}" class="complex-plane-dot"></div>
+                        </div>
                     </div>
-                </div>
-                <div id="${labelId}" class="complex-plane-label"></div>
-            `;
+                    <div id="${labelId}" class="complex-plane-label"></div>
+                `;
 
             const planeElement = document.getElementById(controlId);
             const dotElement = document.getElementById(dotId);
@@ -630,9 +630,9 @@
                 const touch = e.touches[0];
                 handleInput(touch.clientX, touch.clientY);
                 const onTouchMove = (ev) => {
-                     ev.preventDefault();
-                     const moveTouch = ev.touches[0];
-                     handleInput(moveTouch.clientX, moveTouch.clientY);
+                    ev.preventDefault();
+                    const moveTouch = ev.touches[0];
+                    handleInput(moveTouch.clientX, moveTouch.clientY);
                 };
                 const onTouchEnd = () => {
                     document.removeEventListener('touchmove', onTouchMove);
@@ -727,9 +727,9 @@
                 btn.className = 'preset-btn';
                 btn.dataset.id = preset.id;
                 btn.innerHTML = `
-                    <div class="font-semibold">${preset.name}</div>
-                    <div class="preset-desc">${preset.desc}</div>
-                `;
+                        <div class="font-semibold">${preset.name}</div>
+                        <div class="preset-desc">${preset.desc}</div>
+                    `;
                 btn.onclick = () => startPreset(preset);
                 presetList.appendChild(btn);
             });
@@ -743,7 +743,7 @@
 
             document.getElementById('resetBtn').addEventListener('click', () => {
                 stopAnimation();
-                applyConfig({ A: {re:1,im:0}, B: {re:0,im:0}, C: {re:0,im:0}, D: {re:1,im:0} });
+                applyConfig({ A: { re: 1, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 }, D: { re: 1, im: 0 } });
             });
 
             initThree();

@@ -46,7 +46,7 @@ export class Test {
     Daydream.W = 96;
     this.pixels = new Map();
     this.alpha = 0.3;
-    this.ringPalette = mangoPeel;
+    this.ringPalette = new GenerativePalette("circular", "analagous", "flat");
     this.polyPalette = new GenerativePalette("circular", "analagous", "cup");
     this.normal = Daydream.X_AXIS.clone();
     this.orientation = new Orientation();
@@ -916,6 +916,7 @@ export class MobiusGrid {
     this.alpha = 1.0;
     this.orientation = new Orientation();
 
+    // The Mobius Filter distorts the grid
     this.mobius = new FilterMobius();
 
     this.filters = createRenderPipeline(
@@ -927,28 +928,31 @@ export class MobiusGrid {
     this.timeline = new Timeline();
     this.gui = new gui.GUI();
 
-    // Default ring color
-    this.ringColor = new THREE.Color(0xff00ff);
+    // Appearance
+    this.ringColor = new THREE.Color(0x00ffaa);
+    this.spokeColor = new THREE.Color(0xff00ff);
 
-    // Tunnel Parameters
-    this.tunnelSpeed = 0.005;
-    this.ringCount = 12;
-    this.phase = 0;
+    // Grid Parameters
+    this.speed = 0.005;     // Speed of the infinite zoom
+    this.gridScale = 0.5;   // Density of the rings (Logarithmic scale factor)
+    this.spokeCount = 12;   // Number of radial lines
+    this.phase = 0;         // Animation phase accumulator
 
     this.setupGui();
   }
 
   setupGui() {
-    // 1. Tunnel Controls (The "Even Spacing" logic)
-    const f1 = this.gui.addFolder('Tunnel Generator');
-    f1.add(this, 'tunnelSpeed', -0.05, 0.05).name('Travel Speed');
-    f1.add(this, 'ringCount', 2, 30).step(1).name('Ring Count');
+    // 1. Grid Generator Controls
+    const f1 = this.gui.addFolder('Log-Polar Grid');
+    f1.add(this, 'speed', -0.05, 0.05).name('Zoom Speed');
+    f1.add(this, 'gridScale', 0.1, 1.5).name('Grid Density');
+    f1.add(this, 'spokeCount', 0, 24).step(1).name('Spoke Count');
     f1.add(this, 'alpha', 0, 1).name('Opacity');
     f1.open();
 
     // 2. Mobius Controls (The Distortion)
-    const f2 = this.gui.addFolder('Mobius Distortion');
-    const update = () => { };
+    const f2 = this.gui.addFolder('Mobius Transform');
+    const update = () => { }; // Placeholder if needed
 
     const addComplex = (folder, obj, name) => {
       const sub = folder.addFolder(name);
@@ -970,42 +974,71 @@ export class MobiusGrid {
 
     let dots = [];
 
-    // --- The "Conveyor Belt" Tunnel ---
-    // Instead of using Log-Polar (exponential) spacing, we use Linear spacing 
-    // and animate the PHASE to create infinite motion.
+    // Advance Phase for infinite zoom effect
+    this.phase += this.speed;
+    // Keep phase stable to prevent floating point drift over long runtimes
+    if (Math.abs(this.phase) >= 1.0) this.phase -= Math.sign(this.phase);
 
-    // 1. Calculate spacing based on ring count
-    // Radius range is 0.0 (North) to 2.0 (South)
-    const spacing = 2.0 / this.ringCount;
+    // We iterate enough times to cover the visible sphere (from near 0 to near Infinity on the plane)
+    const range = 8; // Number of rings to render in both directions
 
-    // 2. Advance Phase
-    // The phase cycles from 0 to 'spacing'. 
-    // When it hits 'spacing', it wraps to 0, seamlessly starting the next ring.
-    this.phase += this.tunnelSpeed;
-    if (this.phase >= spacing) this.phase -= spacing;
-    if (this.phase < 0) this.phase += spacing;
 
-    // 3. Generate Rings
-    // We iterate from 'phase' up to 2.0. 
-    // As 'phase' increases, all rings move south.
-    for (let r = this.phase; r < 2.0; r += spacing) {
+    // --- 1. Draw Radial Spokes (Meridians) ---
+    // These are simple longitudinal lines from North to South pole.
+    for (let i = -range; i < range; i++) {
+      // Calculate Planar Radius (distance from South Pole in stereographic projection)
+      let logR = (i + this.phase) * this.gridScale;
+      let R = Math.exp(logR);
 
-      // drawRing radius: 0.0 (Pole) -> 1.0 (Equator) -> 2.0 (Opposite Pole)
-      // This is strictly linear on the sphere surface (Angle = r * 90deg).
+      // Convert Planar Radius (R) to Sphere Draw Parameter (param)
+      // The filter logic uses a projection where South Pole is Origin.
+      // Relationship: R = cot(theta / 2) -> theta = 2 * atan(1 / R)
+      // drawRing expects 'param' where 0=North, 2=South. 
+      // param = theta / (PI / 2)
 
-      dots.push(...drawRing(
-        this.orientation.get(),
-        Daydream.Y_AXIS,        // Axis of the tunnel
-        r,
-        (v, t) => this.ringColor
-      ));
+      let theta = 2 * Math.atan(1 / R);
+      let param = theta / (Math.PI / 2);
+
+      // Only draw if within valid bounds of the sphere drawing function
+      if (param > 0.01 && param < 1.99) {
+        dots.push(...drawRing(
+          this.orientation.get(),
+          Daydream.Y_AXIS,
+          param,
+          (v, t) => this.ringColor
+        ));
+      }
     }
 
-    // 4. Render
-    // The dots are "Evenly Spaced" when generated above.
-    // They are then passed to 'this.filters', which contains the Mobius Transform.
-    // If Mobius is Identity (a=1, d=1, b=c=0), you see a perfect tunnel.
-    // Adjusting Mobius params will warp this perfect tunnel.
+    // --- 2. Draw Log-Periodic Rings ---
+    // We generate rings based on an exponential scale in the stereographic plane.
+    // R = exp( scale * (i + phase) )
+    for (let i = -range; i < range; i++) {
+      // Calculate Planar Radius (distance from South Pole in stereographic projection)
+      let logR = (i + this.phase) * this.gridScale;
+      let R = Math.exp(logR);
+
+      // Convert Planar Radius (R) to Sphere Draw Parameter (param)
+      // The filter logic uses a projection where South Pole is Origin.
+      // Relationship: R = cot(theta / 2) -> theta = 2 * atan(1 / R)
+      // drawRing expects 'param' where 0=North, 2=South. 
+      // param = theta / (PI / 2)
+
+      let theta = 2 * Math.atan(1 / R);
+      let param = theta / (Math.PI / 2);
+
+      // Only draw if within valid bounds of the sphere drawing function
+      if (param > 0.01 && param < 1.99) {
+        dots.push(...drawRing(
+          this.orientation.get(),
+          Daydream.Z_AXIS,
+          param,
+          (v, t) => this.ringColor
+        ));
+      }
+    }
+
+    // Render all dots through the pipeline (Orient -> Mobius -> AntiAlias)
     plotDots(this.pixels, this.filters, dots, 0, this.alpha);
 
     return this.pixels;
