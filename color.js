@@ -193,27 +193,6 @@ export const hsvToHsl = (h, s, v) => {
 }
 
 /**
- * A wrapper class that reverses the sampling direction of an existing palette.
- */
-export class reversePalette {
-  /**
-   * @param {Object} palette - The original palette object with a .get(t) method.
-   */
-  constructor(palette) {
-    this.palette = palette;
-  }
-
-  /**
-   * Gets the color at a reversed position.
-   * @param {number} t - The position parameter [0, 1].
-   * @returns {THREE.Color} The color from the underlying palette at position (1 - t).
-   */
-  get(t) {
-    return this.palette.get(1 - t);
-  }
-}
-
-/**
  * A class for generating palettes using color harmony rules and procedural shape logic.
  */
 export class GenerativePalette {
@@ -448,6 +427,64 @@ export class MutatingPalette {
   }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Palette Wrappers
+///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * A wrapper class that reverses the sampling direction of an existing palette.
+ */
+export class reversePalette {
+  /**
+   * @param {Object} palette - The original palette object with a .get(t) method.
+   */
+  constructor(palette) {
+    this.palette = palette;
+  }
+
+  /**
+   * Gets the color at a reversed position.
+   * @param {number} t - The position parameter [0, 1].
+   * @returns {THREE.Color} The color from the underlying palette at position (1 - t).
+   */
+  get(t) {
+    return this.palette.get(1 - t);
+  }
+}
+
+
+/**
+ * A wrapper class that applies falloff to both ends of an existing palette.
+ */
+export class VignettePalette {
+  /**
+   * @param {Object} palette - The original palette object with a .get(t) method.
+   */
+  constructor(palette) {
+    this.palette = palette;
+  }
+
+  /**
+   * Gets the color at a reversed position.
+   * @param {number} t - The position parameter [0, 1].
+   * @returns {THREE.Color} The color from the underlying palette at position (1 - t).
+   */
+  get(t) {
+    let vignetteColor = new THREE.Color(0, 0, 0);    
+    if (t < 0.2) {
+      return new THREE.Color().lerpColors(vignetteColor, this.palette.get(0), t / 0.2);
+    } else if (t >= 0.8) {
+      return new THREE.Color().lerpColors(this.palette.get(1), vignetteColor, (t - 0.8) / 0.2);
+    } else {
+      return this.palette.get((t - 0.2) / 0.6);
+    }
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Predefined Palettes
+///////////////////////////////////////////////////////////////////////////////
+
 /** @type {Gradient} A pre-defined full spectrum rainbow gradient. */
 export let rainbow = new Gradient(256, [
   [0, 0xFF0000],
@@ -560,24 +597,6 @@ export let g4 = new Gradient(256, [
 
 ///////////////////////////////////////////////////////////////////////////////
 
-/**
- * Wraps an existing palette with a falloff vignette effect.
- * @param {Object} palette - The original palette object with a .get(t) method.
- * @returns {function(number): THREE.Color} A function that returns the vignetted color.
- */
-export function vignette(palette) {
-  let vignetteColor = new THREE.Color(0, 0, 0);
-  return (t) => {
-    if (t < 0.2) {
-      return new THREE.Color().lerpColors(vignetteColor, palette.get(0), t / 0.2);
-    } else if (t >= 0.8) {
-      return new THREE.Color().lerpColors(palette.get(1), vignetteColor, (t - 0.8) / 0.2);
-    } else {
-      return palette.get((t - 0.2) / 0.6);
-    }
-  };
-}
-
 
 /** @type {ProceduralPalette} A dark, saturated rainbow palette. */
 export const darkRainbow = new ProceduralPalette(
@@ -677,18 +696,3 @@ export const embers = new ProceduralPalette(
   [0.265, 0.285, 0.198], // C
   [0.577, 0.440, 0.358]  // D
 );
-
-/**
- * Applies a falloff (fade to black) to a single color based on a position parameter t.
- * @param {THREE.Color} color - The base color.
- * @param {number} size - The size of the falloff zone [0, 1].
- * @param {number} t - The position parameter [0, 1].
- * @returns {THREE.Color} The blended color.
- */
-export const paletteFalloff = function (color, size, t) {
-  if (t >= (1 - size)) {
-    t = (t - (1 - size)) / size;
-    return color.clone().lerpColors(color, new THREE.Color(0, 0, 0), t);
-  }
-  return color;
-}

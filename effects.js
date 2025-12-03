@@ -17,7 +17,7 @@ import {
 
 import {
   blendOverMax, ProceduralPalette, MutatingPalette, blueToBlack,
-  rainbow, vignette, darkRainbow, richSunset, bloodStream,
+  rainbow, VignettePalette, darkRainbow, richSunset, bloodStream,
   lateSunset, GenerativePalette, g1, g2, grayToBlack,
   emeraldForest, vintageSunset, underSea, mangoPeel, iceMelt, lemonLime,
   algae, embers
@@ -191,7 +191,7 @@ export class RingSpin {
   static Ring = class {
     constructor(normal, palette, trailLength) {
       this.normal = normal;
-      this.palette = palette;
+      this.palette = new VignettePalette(palette);
       this.filters = createRenderPipeline(
         new FilterDecay(trailLength),
         new FilterAntiAlias()
@@ -236,12 +236,10 @@ export class RingSpin {
     ring.orientation.collapse();
     tween(ring.orientation, (q, t) => {
       let dots = drawRing(q, ring.normal, 1,
-        (v, t) => {
-          return vignette(ring.palette)(0)
-        });
+        (v, t) => ring.palette.get(0));
       plotDots(this.pixels, ring.filters, dots, 0, this.alpha);
     });
-    ring.filters.trail((x, y, t) => vignette(ring.palette)(t), this.alpha);
+    ring.filters.trail((x, y, t) => ring.palette.get(t), this.alpha);
   }
 
   drawFrame() {
