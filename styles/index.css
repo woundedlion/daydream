@@ -36,91 +36,95 @@ div.label {
 }
 
 /* --- Mobile Styles for dat.gui --- */
-@media only screen and (max-width: 768px) {
-    /* 1. Position the Auto-Container at the bottom */
+@media only screen and (max-width: 900px) {
+    /* 1. Position the Auto-Container */
     .dg.ac {
         top: auto !important;
         bottom: 0 !important;
-        right: 0 !important;
         left: 0 !important;
         width: 100% !important;
         z-index: 1000 !important;
+        pointer-events: none; /* Pass clicks through the empty areas */
     }
 
     /* 2. Main GUI container styling */
     .dg.main {
+        position: fixed !important; /* Force it to stay visible */
+        bottom: 0 !important; /* Anchor exactly to bottom */
+        left: 0 !important;
         width: 100% !important;
         max-width: 100% !important;
-        margin: 0 !important; /* Remove default right margin */
-        max-height: 50vh; /* Limit height so canvas is still visible */
-        overflow-y: auto; /* Enable internal scrolling */
+        margin: 0 !important;
+        max-height: 45vh; /* Leave space for the canvas */
+        overflow-y: auto; /* Scroll internal content */
+        pointer-events: auto; /* Capture clicks on controls */
+        border-top: 1px solid #333;
     }
 
-    /* 3. Increase Row Height (Touch Targets) */
+    /* 3. Increase Row Height */
     .dg li:not(.folder) {
-        height: 48px !important;
-        line-height: 48px !important;
+        height: 50px !important;
+        line-height: 50px !important;
         border-bottom: 1px solid #2c2c2c;
     }
 
     /* 4. Increase Text Size */
     .dg .property-name {
-        width: 35% !important; /* Give text reasonable space */
+        width: 35% !important;
         font-size: 16px !important;
         text-indent: 10px !important;
     }
 
     .dg .c {
-        width: 65% !important; /* Expand control area */
+        width: 65% !important;
         font-size: 16px !important;
     }
 
-        /* 5. Bigger Input Fields (Text/Numbers) */
-        /* 16px font prevents iOS from auto-zooming in on tap */
+        /* 5. Bigger Input Fields */
         .dg .c input[type=text] {
             font-size: 16px !important;
-            height: 32px !important;
+            height: 34px !important;
             margin-top: 8px !important;
-            line-height: 32px !important;
+            line-height: 34px !important;
+            padding: 4px !important;
         }
 
         /* 6. Bigger Sliders */
         .dg .c .slider {
-            margin-top: 10px !important;
-            height: 28px !important; /* Taller slider track */
+            margin-top: 12px !important;
+            height: 26px !important;
         }
 
         .dg .c .slider-fg {
-            height: 28px !important; /* Taller fill */
+            height: 26px !important;
         }
 
         /* 7. Bigger Checkboxes */
         .dg .c input[type=checkbox] {
-            margin-top: 14px !important;
-            transform: scale(1.5); /* Visually larger checkbox */
+            margin-top: 15px !important;
+            transform: scale(1.8);
             margin-left: 0 !important;
         }
 
         /* 8. Bigger Select Dropdowns */
         .dg .c select {
             margin-top: 8px !important;
-            height: 32px !important;
+            height: 34px !important;
             font-size: 16px !important;
         }
 
     /* 9. Folder Headers */
     .dg li.title {
-        height: 48px !important;
-        line-height: 48px !important;
+        height: 50px !important;
+        line-height: 50px !important;
         font-size: 16px !important;
-        /* Adjust the arrow icon position to match new height */
-        background-position: 6px 20px !important;
+        background-position: 6px 22px !important;
     }
 
     /* 10. Close/Open Button */
     .dg .close-button {
-        height: 44px !important;
-        line-height: 44px !important;
+        height: 50px !important;
+        line-height: 50px !important;
         font-size: 16px !important;
         text-align: center;
     }
