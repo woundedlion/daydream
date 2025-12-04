@@ -338,7 +338,6 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
   let thetas = [];
   let theta = 0;
   let uTemp = new THREE.Vector3();
-  let pTemp = new THREE.Vector3();
   while (true) {
     let t = theta + phase;
     let cosRing = Math.cos(t);
@@ -351,14 +350,14 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
     let sinShift = Math.sin(shift);
     let vScale = (vSign * d) * cosShift - r * sinShift;
     let uScale = r * cosShift + (vSign * d) * sinShift;
-    pTemp.copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
+    let p = v.clone().multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
 
-    points.push(pTemp.clone());
-    //    labels.push({ position: pTemp.clone(), content: (t / (2 * Math.PI)).toFixed(1)});
+    points.push(p);
+    //    labels.push({ position: p, content: (t / (2 * Math.PI)).toFixed(1)});
     thetas.push(theta);
 
     // Adaptive Sampling for horizontal pixel distortion at poles
-    let scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - pTemp.y * pTemp.y)));
+    let scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - p.y * p.y)));
     let step = baseStep * scaleFactor;
     let nextTheta = theta + step;
 
@@ -388,10 +387,8 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
           let sinShift = Math.sin(shift);
           let vScale = (vSign * d) * cosShift - r * sinShift;
           let uScale = r * cosShift + (vSign * d) * sinShift;
-          pTemp.copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
-
-          points[i].copy(pTemp);
-          //          labels.push({ position: pTemp.clone(), content: (t / (2 * Math.PI)).toFixed(1) });
+          points[i].copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
+          //          labels.push({ position:points[i], content: (t / (2 * Math.PI)).toFixed(1) });
         }
       }
       break;
@@ -473,18 +470,17 @@ export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase =
   let thetas = [];
   let theta = 0;
   let uTemp = new THREE.Vector3();
-  let pTemp = new THREE.Vector3();
   while (true) {
     let t = theta + phase;
     let cosRing = Math.cos(t);
     let sinRing = Math.sin(t);
     uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
-    pTemp.copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
-    dots.push(new Dot(pTemp.clone(), colorFn(pTemp, t / (2 * Math.PI))));
+    let p = vDir.clone().multiplyScalar(d).addScaledVector(uTemp, r).normalize();
+    dots.push(new Dot(p, colorFn(p, t / (2 * Math.PI))));
     thetas.push(theta);
 
     // Adaptive Sampling for horizontal pixel distortion at poles
-    let scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - pTemp.y * pTemp.y)));
+    let scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - p.y * p.y)));
     let step = baseStep * scaleFactor;
     let nextTheta = theta + step;
 
@@ -506,9 +502,8 @@ export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase =
           let cosRing = Math.cos(t);
           let sinRing = Math.sin(t);
           uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
-          pTemp.copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
-          dots[i].position.copy(pTemp);
-          dots[i].color = colorFn(pTemp, t / (2 * Math.PI));
+          dots[i].position.copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
+          dots[i].color = colorFn(dots[i].position, t / (2 * Math.PI));
         }
       }
       break;
