@@ -1,29 +1,29 @@
 /* Global variables */
 :root {
-  --black: #000000;
+    --black: #000000;
 }
 
 * {
-  box-sizing: border-box;
-  margin: 0;
+    box-sizing: border-box;
+    margin: 0;
 }
 
 .container {
-  width: 100vw;
-  height: 100vh;
-  position: relative;
-  background: var(--black);
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+    background: var(--black);
 }
 
 #canvas {
-  position: absolute;
-  top: 0;
-  right: 0;
+    position: absolute;
+    top: 0;
+    right: 0;
 }
 
 div.labelLayer {
     pointer-events: none;
-    position:absolute;
+    position: absolute;
     top: 0px;
 }
 
@@ -33,4 +33,33 @@ div.label {
     color: white;
     font-family: Arial;
     font-size: 10px;
+}
+
+/* --- Mobile Styles for lil-gui --- */
+@media only screen and (max-width: 600px) {
+    /* Target the root GUI container */
+    .lil-gui.root {
+        /* Reset default positioning */
+        top: auto;
+        bottom: 0;
+        right: 0;
+        left: 0;
+        margin: 0;
+        /* Take full width at the bottom of the screen */
+        width: 100%;
+        max-width: 100%;
+        /* Limit height to half screen and allow scrolling */
+        max-height: 50vh;
+        overflow-y: auto;
+    }
+
+    /* Override lil-gui internal variables for larger touch targets */
+    .lil-gui {
+        --widget-height: 40px; /* Taller rows for fingers */
+        --font-size: 16px; /* Larger text for readability */
+        --input-font-size: 16px; /* Prevent zooming on iOS inputs */
+        --folder-indent: 12px;
+        --name-width: 45%; /* Give more space to labels */
+        --slider-knob-width: 4px;
+    }
 }
