@@ -37,137 +37,115 @@ div.label {
 
 /* --- Mobile Styles for dat.gui --- */
 @media only screen and (max-width: 900px) {
-    /* 1. Reset the Auto-Container */
+
+    /* 1. Container Positioning */
     .dg.ac {
         top: auto !important;
         bottom: 0 !important;
         left: 0 !important;
-        right: 0 !important;
         width: 100% !important;
-        height: auto !important;
         z-index: 1000 !important;
-        pointer-events: none; /* Allow clicking through empty space */
+        pointer-events: none; /* Allow clicks to pass through empty space */
     }
 
-    /* 2. Main GUI Drawer Styling */
+    /* 2. Main Drawer Styling */
     .dg.main {
-        /* Force fixed positioning at the bottom */
-        position: fixed !important;
-        bottom: 0 !important;
-        left: 0 !important;
         width: 100% !important;
         max-width: 100% !important;
         margin: 0 !important;
-        /* Height constraints */
+        /* Fix the squishing: Force a minimum height and allow scrolling */
         height: auto !important;
-        max-height: 45vh !important; /* Takes up to 45% of screen */
-        /* Scrolling & Interaction */
-        overflow-y: scroll !important; /* Force scrollbar if needed */
-        -webkit-overflow-scrolling: touch; /* Smooth scroll on iOS */
-        pointer-events: auto; /* Re-enable clicks */
+        max-height: 40vh !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
         /* Visuals */
-        border-top: 1px solid #444;
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
+        border-top: 2px solid #444;
+        pointer-events: auto; /* Capture clicks */
+        /* Add padding for the home/gesture bar on mobile */
+        padding-bottom: env(safe-area-inset-bottom, 20px) !important;
     }
 
-    /* 3. Force Row Height & Structure */
+    /* 3. Row Sizing (The Touch Target) */
     .dg li:not(.folder) {
-        height: 54px !important; /* Taller rows */
-        line-height: 54px !important;
+        height: 50px !important;
+        line-height: 50px !important;
         border-bottom: 1px solid #2c2c2c !important;
-        display: flex !important; /* Use flexbox to align content */
-        align-items: center !important;
-        padding: 0 10px !important;
-        box-sizing: border-box !important;
-        width: 100% !important;
+        display: block !important; /* Revert to block to fix layout issues */
     }
 
-    /* 4. Text Labels */
+    /* 4. Text Labels (Left Side) */
     .dg .property-name {
         width: 40% !important;
+        height: 50px !important;
+        line-height: 50px !important;
         font-size: 16px !important;
-        height: 54px !important;
-        line-height: 54px !important;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        padding-left: 5px !important;
+        text-indent: 15px !important;
+        float: left !important; /* Keep native float behavior */
     }
 
     /* 5. Control Area (Right Side) */
     .dg .c {
         width: 60% !important;
-        float: none !important; /* Disable float, use flex */
+        height: 50px !important;
+        float: left !important; /* Keep native float behavior */
         position: relative !important;
-        padding: 0 !important;
-        height: 54px !important;
-        display: flex !important;
-        align-items: center !important;
+        padding: 8px 10px !important; /* Add padding to center controls vertically */
     }
 
-        /* 6. Inputs (Text/Number Fields) */
-        .dg .c input[type=text] {
-            font-size: 16px !important;
-            height: 36px !important;
-            line-height: 36px !important;
-            margin: 0 !important;
-            padding: 4px 8px !important;
-            width: 100% !important;
-            border-radius: 4px;
-            background: #303030;
-            color: #eee;
-        }
-
-        /* 7. Sliders */
+        /* 6. Slider Fixes */
         .dg .c .slider {
-            margin: 0 !important;
             height: 24px !important;
-            width: 100% !important;
-            display: flex !important;
-            align-items: center !important;
+            margin-top: 5px !important; /* Vertically center the slider */
         }
 
         .dg .c .slider-fg {
             height: 24px !important;
-            border-radius: 2px;
+        }
+
+        /* 7. Input Fields (Text/Numbers) */
+        .dg .c input[type=text] {
+            font-size: 16px !important;
+            height: 34px !important;
+            line-height: 34px !important;
+            margin-top: 0 !important; /* Reset margin */
+            width: 100% !important;
+            padding: 0 5px !important;
         }
 
         /* 8. Checkboxes */
         .dg .c input[type=checkbox] {
-            margin: 0 !important;
-            height: 24px !important;
-            width: 24px !important;
-            transform: none !important; /* Reset transform, just size it */
+            margin-top: 8px !important;
+            transform: scale(1.8);
+            margin-left: 0 !important;
         }
 
-        /* 9. Dropdowns (Select) */
+        /* 9. Dropdowns */
         .dg .c select {
-            margin: 0 !important;
-            height: 36px !important;
             font-size: 16px !important;
+            height: 34px !important;
+            margin-top: 0 !important;
             width: 100% !important;
-            background: #303030;
-            color: white;
         }
 
-    /* 10. Folder Headers */
+    /* 10. Folder Headers (Categories) */
     .dg li.title {
-        height: 50px !important;
-        line-height: 50px !important;
-        font-size: 16px !important;
-        font-weight: bold;
+        height: 44px !important;
+        line-height: 44px !important;
+        font-size: 14px !important;
+        font-weight: bold !important;
+        background-color: #111 !important;
         background-position: 10px center !important;
-        padding-left: 30px !important;
-        margin: 0 !important;
+        padding-left: 15px !important;
     }
 
     /* 11. Close/Open Button */
     .dg .close-button {
-        height: 50px !important;
-        line-height: 50px !important;
-        font-size: 16px !important;
+        height: 44px !important;
+        line-height: 44px !important;
+        font-size: 14px !important;
         text-align: center;
-        background-color: #222;
         width: 100% !important;
+        background-color: #222;
+        padding-bottom: env(safe-area-inset-bottom, 0px); /* Extend background for safe area */
     }
 }
