@@ -1,7 +1,7 @@
 // daydream.js
 
 import { Daydream } from "./driver.js";
-import { gui } from "gui";
+import { GUI } from "gui"; // Fixed import
 import {
   RingShower,
   Comets,
@@ -32,8 +32,6 @@ const effects = {
   MobiusGrid
 };
 
-
-
 let activeEffect;
 const controls = {
   effectName: 'Test',
@@ -52,7 +50,7 @@ const controls = {
 };
 
 const effectNames = Object.keys(effects);
-const guiInstance = new gui.GUI();
+const guiInstance = new GUI();
 guiInstance.add(controls, 'effectName', effectNames)
   .name('Active Effect')
   .onChange(() => controls.changeEffect());
