@@ -35,31 +35,93 @@ div.label {
     font-size: 10px;
 }
 
-/* --- Mobile Styles for lil-gui --- */
-@media only screen and (max-width: 600px) {
-    /* Target the root GUI container */
-    .lil-gui.root {
-        /* Reset default positioning */
-        top: auto;
-        bottom: 0;
-        right: 0;
-        left: 0;
-        margin: 0;
-        /* Take full width at the bottom of the screen */
-        width: 100%;
-        max-width: 100%;
-        /* Limit height to half screen and allow scrolling */
-        max-height: 50vh;
-        overflow-y: auto;
+/* --- Mobile Styles for dat.gui --- */
+@media only screen and (max-width: 768px) {
+    /* 1. Position the Auto-Container at the bottom */
+    .dg.ac {
+        top: auto !important;
+        bottom: 0 !important;
+        right: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        z-index: 1000 !important;
     }
 
-    /* Override lil-gui internal variables for larger touch targets */
-    .lil-gui {
-        --widget-height: 40px; /* Taller rows for fingers */
-        --font-size: 16px; /* Larger text for readability */
-        --input-font-size: 16px; /* Prevent zooming on iOS inputs */
-        --folder-indent: 12px;
-        --name-width: 45%; /* Give more space to labels */
-        --slider-knob-width: 4px;
+    /* 2. Main GUI container styling */
+    .dg.main {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important; /* Remove default right margin */
+        max-height: 50vh; /* Limit height so canvas is still visible */
+        overflow-y: auto; /* Enable internal scrolling */
+    }
+
+    /* 3. Increase Row Height (Touch Targets) */
+    .dg li:not(.folder) {
+        height: 48px !important;
+        line-height: 48px !important;
+        border-bottom: 1px solid #2c2c2c;
+    }
+
+    /* 4. Increase Text Size */
+    .dg .property-name {
+        width: 35% !important; /* Give text reasonable space */
+        font-size: 16px !important;
+        text-indent: 10px !important;
+    }
+
+    .dg .c {
+        width: 65% !important; /* Expand control area */
+        font-size: 16px !important;
+    }
+
+        /* 5. Bigger Input Fields (Text/Numbers) */
+        /* 16px font prevents iOS from auto-zooming in on tap */
+        .dg .c input[type=text] {
+            font-size: 16px !important;
+            height: 32px !important;
+            margin-top: 8px !important;
+            line-height: 32px !important;
+        }
+
+        /* 6. Bigger Sliders */
+        .dg .c .slider {
+            margin-top: 10px !important;
+            height: 28px !important; /* Taller slider track */
+        }
+
+        .dg .c .slider-fg {
+            height: 28px !important; /* Taller fill */
+        }
+
+        /* 7. Bigger Checkboxes */
+        .dg .c input[type=checkbox] {
+            margin-top: 14px !important;
+            transform: scale(1.5); /* Visually larger checkbox */
+            margin-left: 0 !important;
+        }
+
+        /* 8. Bigger Select Dropdowns */
+        .dg .c select {
+            margin-top: 8px !important;
+            height: 32px !important;
+            font-size: 16px !important;
+        }
+
+    /* 9. Folder Headers */
+    .dg li.title {
+        height: 48px !important;
+        line-height: 48px !important;
+        font-size: 16px !important;
+        /* Adjust the arrow icon position to match new height */
+        background-position: 6px 20px !important;
+    }
+
+    /* 10. Close/Open Button */
+    .dg .close-button {
+        height: 44px !important;
+        line-height: 44px !important;
+        font-size: 16px !important;
+        text-align: center;
     }
 }

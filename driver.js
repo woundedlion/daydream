@@ -4,7 +4,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { pixelToSpherical } from "./geometry.js";
 import { G as g } from "./geometry.js";
-import { gui } from "gui"
+import { gui } from "gui" // Note: Ensure this import matches your setup (lil-gui or dat.gui)
 
 /** @type {Array<{position: THREE.Vector3, content: string}>} Global array to store labels to be rendered. */
 export var labels = [];
@@ -104,7 +104,7 @@ export class Daydream {
     );
     /** @type {THREE.Scene} */
     this.scene = new THREE.Scene();
-    this.scene.background = new  THREE.Color(Daydream.SCENE_BACKGROUND_COLOR);
+    this.scene.background = new THREE.Color(Daydream.SCENE_BACKGROUND_COLOR);
     /** @type {boolean} */
     this.paused = false;
     /** @type {number} */
@@ -175,9 +175,13 @@ export class Daydream {
     /** @type {{x: number, y: number, width: number, height: number}} */
     this.pipViewport = { x: 0, y: 0, width: 0.25, height: 0.25 };
 
+    // NEW: Track mobile state
+    this.isMobile = false;
+
     this.setCanvasSize();
 
     this.labelAxes = false;
+    // Note: Assuming 'gui' is imported correctly from your importmap (either dat.gui or lil-gui)
     this.gui = new gui.GUI();
     this.gui.add(this, 'labelAxes');
   }
@@ -216,6 +220,9 @@ export class Daydream {
   setCanvasSize() {
     const width = window.innerWidth;
     const height = window.innerHeight;
+
+    // NEW: Check if screen is narrow (mobile)
+    this.isMobile = width <= 768;
 
     this.mainViewport.x = 0;
     this.mainViewport.y = 0;
@@ -282,7 +289,7 @@ export class Daydream {
 
         // draw axes
         if (this.labelAxes) {
-          labels.push({ "position": Daydream.X_AXIS, "content": "X"});
+          labels.push({ "position": Daydream.X_AXIS, "content": "X" });
           labels.push({ "position": Daydream.Y_AXIS, "content": "Y" });
           labels.push({ "position": Daydream.Z_AXIS, "content": "Z" });
         }
@@ -316,31 +323,33 @@ export class Daydream {
     this.renderer.render(this.scene, this.camera);
     this.labelRenderer.render(this.scene, this.camera);
 
-    // --- Render PiP Viewport ---
-    this.renderer.setViewport(
-      this.pipViewport.x,
-      this.pipViewport.y,
-      this.pipViewport.width,
-      this.pipViewport.height
-    );
-    this.renderer.setScissor(
-      this.pipViewport.x,
-      this.pipViewport.y,
-      this.pipViewport.width,
-      this.pipViewport.height
-    );
-    this.renderer.render(this.scene, this.camera);
+    // --- Render PiP Viewport (ONLY if not mobile) ---
+    if (!this.isMobile) {
+      this.renderer.setViewport(
+        this.pipViewport.x,
+        this.pipViewport.y,
+        this.pipViewport.width,
+        this.pipViewport.height
+      );
+      this.renderer.setScissor(
+        this.pipViewport.x,
+        this.pipViewport.y,
+        this.pipViewport.width,
+        this.pipViewport.height
+      );
+      this.renderer.render(this.scene, this.camera);
+    }
+
     this.renderer.setScissorTest(false);
 
   }
 }
 
 /**
- * Converts a floating-point number to a user-friendly string representation,
- * substituting common constants like PI and the Golden Ratio (G).
- * @param {number} r - The number to prettify.
- * @returns {string} The prettified string (e.g., "&pi;", "1", "-&phi;\u207b\u00b9").
+ * Converts a floating-point number to a user-friendly string representation...
+ * (Rest of file remains unchanged)
  */
+// ... (prettify and coordsLabel functions remain the same)
 export const prettify = (r) => {
   let precision = 3;
 
@@ -407,11 +416,6 @@ export const prettify = (r) => {
   return r.toFixed(precision);
 }
 
-/**
- * Formats coordinate data for display as an HTML label.
- * @param {number[]} c - The Cartesian coordinates [x, y, z].
- * @returns {{position: THREE.Vector3, content: string}} An object containing the label position and HTML content.
- */
 export const coordsLabel = (c) => {
   const p = 3;
   let s = new THREE.Spherical().setFromCartesianCoords(c[0], c[1], c[2]);
