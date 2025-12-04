@@ -35,117 +35,31 @@ div.label {
     font-size: 10px;
 }
 
-/* --- Mobile Styles for dat.gui --- */
-@media only screen and (max-width: 900px) {
-
-    /* 1. Container Positioning */
-    .dg.ac {
-        top: auto !important;
-        bottom: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        z-index: 1000 !important;
-        pointer-events: none; /* Allow clicks to pass through empty space */
+/* --- Mobile Styles for lil-gui --- */
+@media only screen and (max-width: 600px) {
+    /* Target the root GUI container */
+    .lil-gui.root {
+        /* Reset default positioning */
+        top: auto;
+        bottom: 0;
+        right: 0;
+        left: 0;
+        margin: 0;
+        /* Take full width at the bottom of the screen */
+        width: 100%;
+        max-width: 100%;
+        /* Limit height to half screen and allow scrolling */
+        max-height: 50vh;
+        overflow-y: auto;
     }
 
-    /* 2. Main Drawer Styling */
-    .dg.main {
-        width: 100% !important;
-        max-width: 100% !important;
-        margin: 0 !important;
-        /* Fix the squishing: Force a minimum height and allow scrolling */
-        height: auto !important;
-        max-height: 40vh !important;
-        overflow-y: auto !important;
-        -webkit-overflow-scrolling: touch;
-        /* Visuals */
-        border-top: 2px solid #444;
-        pointer-events: auto; /* Capture clicks */
-        /* Add padding for the home/gesture bar on mobile */
-        padding-bottom: env(safe-area-inset-bottom, 20px) !important;
-    }
-
-    /* 3. Row Sizing (The Touch Target) */
-    .dg li:not(.folder) {
-        height: 50px !important;
-        line-height: 50px !important;
-        border-bottom: 1px solid #2c2c2c !important;
-        display: block !important; /* Revert to block to fix layout issues */
-    }
-
-    /* 4. Text Labels (Left Side) */
-    .dg .property-name {
-        width: 40% !important;
-        height: 50px !important;
-        line-height: 50px !important;
-        font-size: 16px !important;
-        text-indent: 15px !important;
-        float: left !important; /* Keep native float behavior */
-    }
-
-    /* 5. Control Area (Right Side) */
-    .dg .c {
-        width: 60% !important;
-        height: 50px !important;
-        float: left !important; /* Keep native float behavior */
-        position: relative !important;
-        padding: 8px 10px !important; /* Add padding to center controls vertically */
-    }
-
-        /* 6. Slider Fixes */
-        .dg .c .slider {
-            height: 24px !important;
-            margin-top: 5px !important; /* Vertically center the slider */
-        }
-
-        .dg .c .slider-fg {
-            height: 24px !important;
-        }
-
-        /* 7. Input Fields (Text/Numbers) */
-        .dg .c input[type=text] {
-            font-size: 16px !important;
-            height: 34px !important;
-            line-height: 34px !important;
-            margin-top: 0 !important; /* Reset margin */
-            width: 100% !important;
-            padding: 0 5px !important;
-        }
-
-        /* 8. Checkboxes */
-        .dg .c input[type=checkbox] {
-            margin-top: 8px !important;
-            transform: scale(1.8);
-            margin-left: 0 !important;
-        }
-
-        /* 9. Dropdowns */
-        .dg .c select {
-            font-size: 16px !important;
-            height: 34px !important;
-            margin-top: 0 !important;
-            width: 100% !important;
-        }
-
-    /* 10. Folder Headers (Categories) */
-    .dg li.title {
-        height: 44px !important;
-        line-height: 44px !important;
-        font-size: 14px !important;
-        font-weight: bold !important;
-        background-color: #111 !important;
-        background-position: 10px center !important;
-        padding-left: 15px !important;
-    }
-
-    /* 11. Close/Open Button */
-    .dg .close-button {
-        height: 44px !important;
-        line-height: 44px !important;
-        font-size: 14px !important;
-        text-align: center;
-        width: 100% !important;
-        background-color: #222;
-        padding-bottom: env(safe-area-inset-bottom, 0px); /* Extend background for safe area */
+    /* Override lil-gui internal variables for larger touch targets */
+    .lil-gui {
+        --widget-height: 40px; /* Taller rows for fingers */
+        --font-size: 16px; /* Larger text for readability */
+        --input-font-size: 16px; /* Prevent zooming on iOS inputs */
+        --folder-indent: 12px;
+        --name-width: 45%; /* Give more space to labels */
+        --slider-knob-width: 4px;
     }
 }
