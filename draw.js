@@ -202,8 +202,7 @@ export const rasterize = (points, colorFn, closeLoop = false) => {
     };
 
     // Draw segment
-    const segmentDots = drawLine(p1, p2, segmentColorFn);
-    segmentDots.pop();
+    const segmentDots = drawLine(p1, p2, segmentColorFn, 0, 1, false, true);
     dots.push(...segmentDots);
   }
   return dots;
@@ -219,14 +218,14 @@ export const rasterize = (points, colorFn, closeLoop = false) => {
  * @param {boolean} [longWay=false] - If true, draws the longer arc.
  * @returns {Dot[]} An array of Dots forming the line.
  */
-export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false) => {
+export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast = false) => {
   let u = v1.clone();
   let v = v2.clone();
   let a = angleBetween(u, v);
   let w = new THREE.Vector3();
 
   if (Math.abs(a) < 0.0001) {
-    return [new Dot(u, colorFn(u, 0))];
+    return omitLast ? [] : [new Dot(u, colorFn(u, 0))];
   } else if (Math.abs(Math.PI - a) < 0.0001) {
     if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.9999) {
       w.crossVectors(u, Daydream.Y_AXIS).normalize();
@@ -271,10 +270,15 @@ export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false) =
   let scale = a / simAngle;
 
   // Drawing Phase
+  if (omitLast && steps.length === 0) {
+    return [];
+  }
+
   let currentAngle = 0;
   dots.push(new Dot(u.clone(), colorFn(u, 0)));
 
-  for (let i = 0; i < steps.length; i++) {
+  let loopLimit = omitLast ? steps.length - 1 : steps.length;
+  for (let i = 0; i < loopLimit; i++) {
     let step = steps[i] * scale;
 
     // Advance u
