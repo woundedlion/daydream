@@ -101,8 +101,7 @@ export class Path {
     if (this.points.length > 0) {
       this.points.pop();
     }
-    this.points.push(
-      ...sampleLine(c1, c2, start = 0, end = 1, longWay));
+    this.points.push(c2.clone());
     return this;
   }
 
@@ -181,22 +180,53 @@ export const drawPath = (path, colorFn) => {
 }
 
 /**
- * Samples points along a geodesic line (arc) between two vectors.
+ * Rasterizes a list of points into Dot objects by connecting them with geodesic lines.
+ * @param {THREE.Vector3[]} points - The list of points.
+ * @param {Function} colorFn - Function to determine color (takes vector and normalized progress t).
+ * @param {boolean} [closeLoop=false] - If true, connects the last point to the first.
+ * @returns {Dot[]} An array of Dots.
+ */
+export const rasterize = (points, colorFn, closeLoop = false) => {
+  let dots = [];
+  const len = points.length;
+  if (len === 0) return dots;
+
+  const count = closeLoop ? len : len - 1;
+  for (let i = 0; i < count; i++) {
+    const p1 = points[i];
+    const p2 = points[(i + 1) % len];
+
+    const segmentColorFn = (p, subT) => {
+      const globalT = (i + subT) / count;
+      return colorFn(p, globalT);
+    };
+
+    // Draw segment
+    const segmentDots = drawLine(p1, p2, segmentColorFn);
+    segmentDots.pop();
+    dots.push(...segmentDots);
+  }
+  return dots;
+};
+
+/**
+ * Draws a geodesic line (arc) between two vectors on the sphere with adaptive sampling.
  * @param {THREE.Vector3} v1 - The start vector.
  * @param {THREE.Vector3} v2 - The end vector.
- * @param {number} [start=0] - Starting angle multiplier.
- * @param {number} [end=1] - Ending multiplier.
+ * @param {Function} colorFn - Function to determine the color (takes vector and normalized progress t).
+ * @param {number} [start=0] - Starting angle multiplier for drawing the line arc.
+ * @param {number} [end=1] - Ending multiplier for the total arc angle.
  * @param {boolean} [longWay=false] - If true, draws the longer arc.
- * @returns {THREE.Vector3[]} An array of points.
+ * @returns {Dot[]} An array of Dots forming the line.
  */
-export const sampleLine = (v1, v2, start = 0, end = 1, longWay = false) => {
+export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false) => {
   let u = v1.clone();
   let v = v2.clone();
   let a = angleBetween(u, v);
   let w = new THREE.Vector3();
 
   if (Math.abs(a) < 0.0001) {
-    return [u];
+    return [new Dot(u, colorFn(u, 0))];
   } else if (Math.abs(Math.PI - a) < 0.0001) {
     if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.9999) {
       w.crossVectors(u, Daydream.Y_AXIS).normalize();
@@ -218,83 +248,46 @@ export const sampleLine = (v1, v2, start = 0, end = 1, longWay = false) => {
   }
   a *= Math.abs(end - start);
 
-  let points = []
-  let numSteps = Math.max(1, Math.ceil((a / (2 * Math.PI)) * Daydream.W * 2));
-  let q = new THREE.Quaternion().setFromAxisAngle(w, a / numSteps);
-  for (let i = 0; i <= numSteps; ++i) {
-    points.push(u.clone());
-    u.applyQuaternion(q).normalize();
-  }
-  return points;
-}
-
-/**
- * Rasterizes a list of points into Dot objects by connecting them with geodesic lines.
- * @param {THREE.Vector3[]} points - The list of points.
- * @param {Function} colorFn - Function to determine color (takes vector and normalized progress t).
- * @param {boolean} [closeLoop=false] - If true, connects the last point to the first.
- * @returns {Dot[]} An array of Dots.
- */
-export const rasterize = (points, colorFn, closeLoop = false) => {
   let dots = [];
-  const len = points.length;
-  if (len === 0) return dots;
 
-  const count = closeLoop ? len : len - 1;
-  for (let i = 0; i < count; i++) {
-    const p1 = points[i];
-    const p2 = points[(i + 1) % len];
+  // Simulation Phase
+  let simU = u.clone();
+  let simAngle = 0;
+  let steps = [];
+  const baseStep = 2 * Math.PI / Daydream.W;
 
-    // Interpolate color function
-    // Global t at p1 is i / count (approx)
-    // We pass a sub-color function to drawLine that maps sub-segment t to global t
-    const segmentColorFn = (p, subT) => {
-      // Global progress
-      const globalT = (i + subT) / count;
-      return colorFn(p, globalT);
-    };
+  while (simAngle < a) {
+    let scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - simU.y * simU.y)));
+    let step = baseStep * scaleFactor;
+    steps.push(step);
+    simAngle += step;
 
-    // Draw segment
-    const segmentDots = drawLine(p1, p2, segmentColorFn);
-
-    // Avoid duplicating vertices where segments join
-    // drawLine returns [start, ..., end]
-    // We pop the last one unless it's the very last segment of an open loop
-    if (i < count - 1 || closeLoop) {
-      segmentDots.pop();
-    }
-    dots.push(...segmentDots);
+    // Advance simU
+    let q = new THREE.Quaternion().setFromAxisAngle(w, step);
+    simU.applyQuaternion(q).normalize();
   }
+
+  // Calculate Scale Factor
+  let scale = a / simAngle;
+
+  // Drawing Phase
+  let currentAngle = 0;
+  dots.push(new Dot(u.clone(), colorFn(u, 0)));
+
+  for (let i = 0; i < steps.length; i++) {
+    let step = steps[i] * scale;
+
+    // Advance u
+    let q = new THREE.Quaternion().setFromAxisAngle(w, step);
+    u.applyQuaternion(q).normalize();
+    currentAngle += step;
+
+    // Normalized t
+    let t = (a > 0) ? (currentAngle / a) : 1;
+    dots.push(new Dot(u.clone(), colorFn(u, t)));
+  }
+
   return dots;
-};
-
-/**
- * Helper to convert a list of points directly to dots without interpolation.
- * Used by drawLine to avoid recursion.
- */
-const pointsToDots = (points, colorFn) => {
-  return points.map((p, i) => {
-    let t = 0;
-    if (points.length > 1) {
-      t = i / (points.length - 1);
-    }
-    return new Dot(p, colorFn(p, t));
-  });
-}
-
-/**
- * Draws a geodesic line (arc) between two vectors on the sphere.
- * @param {THREE.Vector3} v1 - The start vector.
- * @param {THREE.Vector3} v2 - The end vector.
- * @param {Function} colorFn - Function to determine the color (takes vector and normalized progress t).
- * @param {number} [start=0] - Starting angle multiplier for drawing the line arc.
- * @param {number} [end=1] - Ending multiplier for the total arc angle.
- * @param {boolean} [longWay=false] - If true, draws the longer arc.
- * @returns {Dot[]} An array of Dots forming the line.
- */
-export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false) => {
-  const points = sampleLine(v1, v2, start, end, longWay);
-  return pointsToDots(points, colorFn);
 }
 
 /**
@@ -323,12 +316,9 @@ export const samplePolyhedron = (vertices, edges) => {
   let points = [];
   edges.map((adj, i) => {
     adj.map((j) => {
-      points.push(
-        ...sampleLine(
-          new THREE.Vector3(...vertices[i]).normalize(),
-          new THREE.Vector3(...vertices[j]).normalize()
-        )
-      );
+      // Just push the vertices, let rasterize handle the lines
+      points.push(new THREE.Vector3(...vertices[i]).normalize());
+      points.push(new THREE.Vector3(...vertices[j]).normalize());
     })
   });
   return points;
@@ -423,12 +413,13 @@ export const sampleFn = (orientationQuaternion, normal, radius, shiftFn, phase =
   const d = Math.cos(thetaEq);
 
   // Calculate Samples
-  const baseStep = 2 * Math.PI / Daydream.W;
+  const numSamples = Daydream.W;
+  const step = 2 * Math.PI / numSamples;
   let points = [];
-  let thetas = [];
-  let theta = 0;
   let uTemp = new THREE.Vector3();
-  while (true) {
+
+  for (let i = 0; i < numSamples; i++) {
+    let theta = i * step;
     let t = theta + phase;
     let cosRing = Math.cos(t);
     let sinRing = Math.sin(t);
@@ -443,56 +434,9 @@ export const sampleFn = (orientationQuaternion, normal, radius, shiftFn, phase =
     let p = v.clone().multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
 
     points.push(p);
-    thetas.push(theta);
-
-    // Adaptive Sampling for horizontal pixel distortion at poles
-    let scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - p.y * p.y)));
-    let step = baseStep * scaleFactor;
-    let nextTheta = theta + step;
-
-    // Repair last N samples to close the loop
-    if (nextTheta >= 2 * Math.PI) {
-      const REPAIR_COUNT = 5;
-      if (points.length > REPAIR_COUNT) {
-        const targetLastTheta = 2 * Math.PI - step;
-        const anchorIdx = points.length - REPAIR_COUNT - 1;
-        const anchorTheta = thetas[anchorIdx];
-        const currentLastTheta = theta;
-        const ratio = (targetLastTheta - anchorTheta) / (currentLastTheta - anchorTheta);
-        for (let i = anchorIdx + 1; i < points.length; i++) {
-          const dist = thetas[i] - anchorTheta;
-          const correctedTheta = anchorTheta + (dist * ratio);
-
-          // Re-calculate Geometry
-          let t = correctedTheta + phase;
-          let cosRing = Math.cos(t);
-          let sinRing = Math.sin(t);
-          uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
-
-          // Re-apply Shift
-          let shift = shiftFn(correctedTheta / (2 * Math.PI));
-          let cosShift = Math.cos(shift);
-          let sinShift = Math.sin(shift);
-          let vScale = (vSign * d) * cosShift - r * sinShift;
-          let uScale = r * cosShift + (vSign * d) * sinShift;
-          points[i].copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
-        }
-      }
-      break;
-    }
-    theta = nextTheta;
   }
 
-  // Interpolate between samples
-  let finalPoints = [];
-  for (let i = 0; i < points.length; ++i) {
-    let nextI = (i + 1) % points.length;
-    let segmentPoints = sampleLine(points[i], points[nextI]);
-    segmentPoints.pop(); // Avoid drawing over the start vertex
-    finalPoints.push(...segmentPoints);
-  }
-
-  return finalPoints;
+  return points;
 }
 
 /**
@@ -554,55 +498,24 @@ export const sampleRing = (orientationQuaternion, normal, radius, phase = 0) => 
     radius = 2 - radius;
   }
 
-  // Equidistant projection 
   const thetaEq = radius * (Math.PI / 2);
   const r = Math.sin(thetaEq);
   const d = Math.cos(thetaEq);
 
   // Calculate Samples
-  const baseStep = 2 * Math.PI / Daydream.W;
+  const numSamples = Daydream.W;
+  const step = 2 * Math.PI / numSamples;
   let points = [];
-  let thetas = [];
-  let theta = 0;
   let uTemp = new THREE.Vector3();
-  while (true) {
+
+  for (let i = 0; i < numSamples; i++) {
+    let theta = i * step;
     let t = theta + phase;
     let cosRing = Math.cos(t);
     let sinRing = Math.sin(t);
     uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
     let p = vDir.clone().multiplyScalar(d).addScaledVector(uTemp, r).normalize();
     points.push(p);
-    thetas.push(theta);
-
-    // Adaptive Sampling for horizontal pixel distortion at poles
-    let scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - p.y * p.y)));
-    let step = baseStep * scaleFactor;
-    let nextTheta = theta + step;
-
-    // Repair last N samples to close the loop
-    if (nextTheta >= 2 * Math.PI) {
-      const REPAIR_COUNT = 5;
-      if (points.length > REPAIR_COUNT) {
-        const targetLastTheta = 2 * Math.PI - step;
-        const anchorIdx = points.length - REPAIR_COUNT - 1;
-        const anchorTheta = thetas[anchorIdx];
-        const currentLastTheta = theta;
-        const ratio = (targetLastTheta - anchorTheta) / (currentLastTheta - anchorTheta);
-        for (let i = anchorIdx + 1; i < points.length; i++) {
-          const dist = thetas[i] - anchorTheta;
-          const correctedTheta = anchorTheta + (dist * ratio);
-
-          // Re-calculate Geometry
-          let t = correctedTheta + phase;
-          let cosRing = Math.cos(t);
-          let sinRing = Math.sin(t);
-          uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
-          points[i].copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
-        }
-      }
-      break;
-    }
-    theta = nextTheta;
   }
   return points;
 }

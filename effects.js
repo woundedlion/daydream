@@ -13,7 +13,7 @@ import {
 import {
   Path, drawLine, drawRing, plotDots, drawPolyhedron, DecayBuffer,
   drawFn, ringPoint, fnPoint, drawVector, ProceduralPath, tween, drawFibSpiral,
-  sampleLine, sampleRing, sampleFn, samplePolyhedron, rasterize
+  sampleRing, sampleFn, samplePolyhedron, rasterize
 } from "./draw.js";
 
 import {
