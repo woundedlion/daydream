@@ -1,7 +1,7 @@
 // draw.js
 import * as THREE from "three";
 import { Daydream, labels } from "./driver.js";
-import { Dot, angleBetween, sphericalToPixel } from "./geometry.js";
+import { Dot, angleBetween, fibSpiral } from "./geometry.js";
 
 /**
  * Implements pixel history and decay for persistent effects.

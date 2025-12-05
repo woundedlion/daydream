@@ -12,7 +12,7 @@ import {
 
 import {
   Path, drawLine, drawRing, plotDots, drawPolyhedron, DecayBuffer,
-  drawFn, ringPoint, fnPoint, drawVector, ProceduralPath, tween
+  drawFn, ringPoint, fnPoint, drawVector, ProceduralPath, tween, drawFibSpiral
 } from "./draw.js";
 
 import {
@@ -914,9 +914,7 @@ export class MobiusGrid {
     this.alpha = 1.0;
     this.orientation = new Orientation();
 
-    // The Mobius Filter distorts the grid
     this.mobius = new FilterMobius();
-
     this.filters = createRenderPipeline(
       new FilterOrient(this.orientation),
       this.mobius,
@@ -931,31 +929,17 @@ export class MobiusGrid {
     this.spokeColor = new THREE.Color(0xff00ff);
 
     // Grid Parameters
-    this.speed = 0.005;     // Speed of the infinite zoom
-    this.gridScale = 0.5;   // Density of the rings (Logarithmic scale factor)
-    this.spokeCount = 12;   // Number of radial lines
-    this.phase = 0;         // Animation phase accumulator
 
     this.setupGui();
   }
 
   setupGui() {
-    // 1. Grid Generator Controls
-    const f1 = this.gui.addFolder('Log-Polar Grid');
-    f1.add(this, 'speed', -0.05, 0.05).name('Zoom Speed');
-    f1.add(this, 'gridScale', 0.1, 1.5).name('Grid Density');
-    f1.add(this, 'spokeCount', 0, 24).step(1).name('Spoke Count');
-    f1.add(this, 'alpha', 0, 1).name('Opacity');
-    f1.open();
 
-    // 2. Mobius Controls (The Distortion)
     const f2 = this.gui.addFolder('Mobius Transform');
-    const update = () => { }; // Placeholder if needed
-
     const addComplex = (folder, obj, name) => {
       const sub = folder.addFolder(name);
-      sub.add(obj, 're', -2, 2).step(0.01).name('Real').onChange(update);
-      sub.add(obj, 'im', -2, 2).step(0.01).name('Imag').onChange(update);
+      sub.add(obj, 're', -2, 2).step(0.01).name('Real');
+      sub.add(obj, 'im', -2, 2).step(0.01).name('Imag')   ;
       sub.open();
     };
 
@@ -971,74 +955,19 @@ export class MobiusGrid {
     this.timeline.step();
 
     let dots = [];
-
-    // Advance Phase for infinite zoom effect
-    this.phase += this.speed;
-    // Keep phase stable to prevent floating point drift over long runtimes
-    if (Math.abs(this.phase) >= 1.0) this.phase -= Math.sign(this.phase);
-
-    // We iterate enough times to cover the visible sphere (from near 0 to near Infinity on the plane)
-    const range = 8; // Number of rings to render in both directions
-
-
-    // --- 1. Draw Radial Spokes (Meridians) ---
-    // These are simple longitudinal lines from North to South pole.
+    const range = 4; // Number of rings to render in both directions
     for (let i = -range; i < range; i++) {
+      logPolarToVector()
       // Calculate Planar Radius (distance from South Pole in stereographic projection)
-      let logR = (i + this.phase) * this.gridScale;
-      let R = Math.exp(logR);
-
-      // Convert Planar Radius (R) to Sphere Draw Parameter (param)
-      // The filter logic uses a projection where South Pole is Origin.
-      // Relationship: R = cot(theta / 2) -> theta = 2 * atan(1 / R)
-      // drawRing expects 'param' where 0=North, 2=South. 
-      // param = theta / (PI / 2)
-
+      let R = Math.exp(i * 0.4);
       let theta = 2 * Math.atan(1 / R);
       let param = theta / (Math.PI / 2);
 
-      // Only draw if within valid bounds of the sphere drawing function
-      if (param > 0.01 && param < 1.99) {
-        dots.push(...drawRing(
-          this.orientation.get(),
-          Daydream.Y_AXIS,
-          param,
-          (v, t) => this.ringColor
-        ));
-      }
+
+      dots.push(...drawFibSpiral(32, 0.2, (v, t) => this.ringColor));
     }
 
-    // --- 2. Draw Log-Periodic Rings ---
-    // We generate rings based on an exponential scale in the stereographic plane.
-    // R = exp( scale * (i + phase) )
-    for (let i = -range; i < range; i++) {
-      // Calculate Planar Radius (distance from South Pole in stereographic projection)
-      let logR = (i + this.phase) * this.gridScale;
-      let R = Math.exp(logR);
-
-      // Convert Planar Radius (R) to Sphere Draw Parameter (param)
-      // The filter logic uses a projection where South Pole is Origin.
-      // Relationship: R = cot(theta / 2) -> theta = 2 * atan(1 / R)
-      // drawRing expects 'param' where 0=North, 2=South. 
-      // param = theta / (PI / 2)
-
-      let theta = 2 * Math.atan(1 / R);
-      let param = theta / (Math.PI / 2);
-
-      // Only draw if within valid bounds of the sphere drawing function
-      if (param > 0.01 && param < 1.99) {
-        dots.push(...drawRing(
-          this.orientation.get(),
-          Daydream.Z_AXIS,
-          param,
-          (v, t) => this.ringColor
-        ));
-      }
-    }
-
-    // Render all dots through the pipeline (Orient -> Mobius -> AntiAlias)
     plotDots(this.pixels, this.filters, dots, 0, this.alpha);
-
     return this.pixels;
   }
 }

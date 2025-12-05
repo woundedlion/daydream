@@ -34,7 +34,7 @@ const effects = {
 
 let activeEffect;
 const controls = {
-  effectName: 'Test',
+  effectName: 'MobiusGrid',
   changeEffect: function () {
     if (activeEffect && activeEffect.gui) {
       activeEffect.gui.destroy();
