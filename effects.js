@@ -1,4 +1,4 @@
-import * as THREE from "three";
+﻿import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream, labels, pixelKey } from "./driver.js";
 import FastNoiseLite from "./FastNoiseLite.js";
@@ -12,7 +12,8 @@ import {
 
 import {
   Path, drawLine, drawRing, plotDots, drawPolyhedron, DecayBuffer,
-  drawFn, ringPoint, fnPoint, drawVector, ProceduralPath, tween, drawFibSpiral
+  drawFn, ringPoint, fnPoint, drawVector, ProceduralPath, tween, drawFibSpiral,
+  sampleLine, sampleRing, sampleFn, samplePolyhedron, rasterize
 } from "./draw.js";
 
 import {
@@ -59,15 +60,15 @@ export class Test {
     this.amplitudeRange = 0.3;
     this.poly = new Dodecahedron();
     this.numRings = 1;
-    
-//    this.timeline.add(0,
-//      new Sprite((opacity) => this.drawPoly(opacity), -1, 48, easeMid, 0, easeMid)
-//    );
+
+    //    this.timeline.add(0,
+    //      new Sprite((opacity) => this.drawPoly(opacity), -1, 48, easeMid, 0, easeMid)
+    //    );
 
     this.timeline.add(0,
       new Sprite((opacity) => this.drawFn(opacity), -1, 48, easeMid, 0, easeMid)
     );
-    
+
     this.timeline.add(0,
       new RandomWalk(this.orientation, this.normal)
     );
@@ -76,7 +77,7 @@ export class Test {
       new Mutation(this.amplitude,
         sinWave(-this.amplitudeRange, this.amplitudeRange, 2, 0), 64, easeMid, true)
     );
-  
+
     this.gui = new gui.GUI();
     this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
   }
@@ -206,7 +207,7 @@ export class RingSpin {
     this.rings = [];
     this.alpha = 0.2;
     this.trailLength = new MutableNumber(20);
-    this.palettes = [ richSunset, mangoPeel, underSea, iceMelt ];
+    this.palettes = [richSunset, mangoPeel, underSea, iceMelt];
     this.numRings = 4;
     this.timeline = new Timeline();
 
@@ -349,7 +350,7 @@ export class Comets {
   drawFrame() {
     this.pixels.clear();
     this.timeline.step();
-    this.trails.render(this.pixels, this.filters, (v, t) => this.palette.get(1-t));
+    this.trails.render(this.pixels, this.filters, (v, t) => this.palette.get(1 - t));
     return this.pixels;
   }
 }
@@ -798,110 +799,86 @@ export class FlowField {
     this.TIME_SCALE = 0.01;
     this.FORCE_SCALE = 0.002;
     this.GRAVITY = 0.001;
-    this.MAX_SPEED = 0.01;
-    this.TRAIL_LENGTH = 8;         // Trail filter lifespan in frames (Was 15)
-    this.ALPHA = 0.7;
+    this.MAX_SPEED = 0.05;
+    this.TRAIL_LENGTH = 12; // Length of the trail (Was 8)
 
-    // --- Setup ---
+    // --- Palette ---
+    this.palette = new GenerativePalette("straight", "analogous", "ascending");
+
+    // --- State ---
     this.particles = [];
-
     this.noise = new FastNoiseLite();
-    this.noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
-    this.noise.SetSeed(Math.floor(Math.random() * 65535));
+    this.noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+    this.t = 0;
 
-    this.palette = iceMelt;
-
+    // --- Filters ---
+    this.trails = new DecayBuffer(this.TRAIL_LENGTH);
     this.filters = createRenderPipeline(
-      new FilterDecay(this.TRAIL_LENGTH),
       new FilterAntiAlias()
     );
 
-    this.gui = new gui.GUI();
-    this.gui.add(this, 'NUM_PARTICLES').min(50).max(2000).step(10).name('Particle Count').onChange(() => this.resetParticles());
-    this.gui.add(this, 'TRAIL_LENGTH').min(1).max(30).step(1).name('Trail Length').onChange((value) => {
-      this.trails.lifespan = value; // Update the filter's lifespan directly
-    });
-    this.gui.add(this, 'NOISE_SCALE').min(0.1).max(5).step(0.1).name('Noise Scale');
-    this.gui.add(this, 'FORCE_SCALE').min(0.0001).max(0.01).step(0.0001).name('Force');
-    this.gui.add(this, 'GRAVITY').min(0).max(0.01).step(0.0001).name('Gravity');
-    this.gui.add(this, 'MAX_SPEED').min(0.001).max(0.1).step(0.001).name('Max Speed');
-    this.gui.add(this, 'ALPHA').min(0).max(1).step(0.01).name('Opacity');
-
-    this.resetParticles();
-  }
-
-  /**
-   * Clears and repopulates the particle array based on this.NUM_PARTICLES.
-   * Called by the constructor and the "Particle Count" GUI slider.
-   */
-  resetParticles() {
-    this.particles = []; // Clear old particles
+    // --- Initialize Particles ---
     for (let i = 0; i < this.NUM_PARTICLES; i++) {
       this.particles.push(new FlowField.Particle());
     }
+
+    // --- Animation: Periodically change the palette ---
+    this.timeline.add(0,
+      new PeriodicTimer(200, () => {
+        this.updatePalette();
+      }, true)
+    );
+  }
+
+  updatePalette() {
+    this.nextPalette = new GenerativePalette("straight", "analogous", "ascending");
+    this.timeline.add(0,
+      new ColorWipe(this.palette, this.nextPalette, 48, easeMid)
+    );
   }
 
   drawFrame() {
     this.pixels.clear();
-    this.timeline.step(); 
-    let dots = [];
+    this.timeline.step();
+    this.t += this.TIME_SCALE;
+
+    const dots = [];
 
     for (const p of this.particles) {
-      // 1. Get acceleration from the 4D noise field
-      let accel = this.getNoiseForce(p.pos, this.timeline.t);
+      // 1. Calculate Noise Force (Flow Field)
+      // We sample 4D noise using the particle's 3D position and time.
+      // We need 3 components for the force vector.
+      const fx = this.noise.GetNoise(p.pos.x * this.NOISE_SCALE, p.pos.y * this.NOISE_SCALE, p.pos.z * this.NOISE_SCALE + this.t) * this.FORCE_SCALE;
+      const fy = this.noise.GetNoise(p.pos.x * this.NOISE_SCALE + 100, p.pos.y * this.NOISE_SCALE, p.pos.z * this.NOISE_SCALE + this.t) * this.FORCE_SCALE;
+      const fz = this.noise.GetNoise(p.pos.x * this.NOISE_SCALE + 200, p.pos.y * this.NOISE_SCALE, p.pos.z * this.NOISE_SCALE + this.t) * this.FORCE_SCALE;
+      const force = new THREE.Vector3(fx, fy, fz);
 
-      // 2. Apply a gravity force pulling the particle to the center
-      // This is the same technique from your MetaballEffect
-      let gravityForce = p.pos.clone().multiplyScalar(-this.GRAVITY);
-      accel.add(gravityForce);
+      // 2. Apply Gravity (Keep on Sphere)
+      // Pull towards the center to counteract the noise pushing it off.
+      const gravity = p.pos.clone().multiplyScalar(-this.GRAVITY);
+      force.add(gravity);
 
-      // 3. Update velocity
-      p.vel.add(accel);
-      p.vel.clampLength(0, this.MAX_SPEED); // Apply terminal velocity
+      // 3. Update Velocity
+      p.vel.add(force);
+      p.vel.clampLength(0, this.MAX_SPEED); // Limit speed
 
-      // 4. Update position
+      // 4. Update Position
       p.pos.add(p.vel);
-      p.pos.normalize(); // Snap the particle back to the sphere's surface
+      p.pos.normalize(); // Snap back to sphere surface exactly
 
-      // 5. Get color based on speed
-      // We map the particle's speed [0, MAX_SPEED] to the palette's t [0, 1]
-      let speedRatio = p.vel.length() / this.MAX_SPEED;
-      let color = this.palette.get(speedRatio);
-
-      // 6. Add the particle's head to the dot buffer
-      dots.push(new Dot(p.pos, color));
+      // 5. Create Dot for Rendering
+      // Color based on velocity direction or position? Let's use position for a nice gradient.
+      // We can map the position to a 0-1 value for the palette.
+      // Let's use the Y coordinate (poles) for variation.
+      const paletteT = (p.pos.y + 1) / 2;
+      dots.push(new Dot(p.pos.clone(), this.palette.get(paletteT)));
     }
 
-    // Plot all particle heads to the trail filter (with age 0)
-    plotDots(this.pixels, this.filters, dots, 0, this.ALPHA);
-
-    this.filters.trail(
-      (x, y, t) => {
-        return this.palette.get(1.0 - t).multiplyScalar(1.0 - t);
-      },
-      this.ALPHA
-    );
+    // 6. Render with Trails
+    this.trails.recordDots(dots, 0, 0.8); // 0.8 opacity
+    this.trails.render(this.pixels, this.filters, (v, t) => this.palette.get(t)); // Color decay
 
     return this.pixels;
-  }
-
-  /**
-   * Helper to get a 3D force vector from 4D noise.
-   * We sample the noise field 3 times with different 'w' (time) offsets
-   * to create a complex, "swirly" vector field.
-   */
-  getNoiseForce(pos, t) {
-    let t_scaled = t * this.TIME_SCALE;
-    let n_pos = pos.clone().multiplyScalar(this.NOISE_SCALE);
-
-    // C++ Style 3D noise slice for force field
-    // Using 3D noise by mapping (x, y, t), (y, z, t), (z, x, t)
-    // to approximate 4D noise derivatives
-    let x_force = this.noise.GetNoise(n_pos.x, n_pos.y, t_scaled);
-    let y_force = this.noise.GetNoise(n_pos.y, n_pos.z, t_scaled + 100);
-    let z_force = this.noise.GetNoise(n_pos.z, n_pos.x, t_scaled + 200);
-
-    return new THREE.Vector3(x_force, y_force, z_force).multiplyScalar(this.FORCE_SCALE);
   }
 }
 
@@ -911,63 +888,175 @@ export class MobiusGrid {
   constructor() {
     Daydream.W = 96;
     this.pixels = new Map();
-    this.alpha = 1.0;
+    this.alpha = 0.5;
+    this.palette = new GenerativePalette("circular", "analagous", "flat");
     this.orientation = new Orientation();
-
-    this.mobius = new FilterMobius();
+    this.timeline = new Timeline();
     this.filters = createRenderPipeline(
-      new FilterOrient(this.orientation),
-      this.mobius,
       new FilterAntiAlias()
     );
 
-    this.timeline = new Timeline();
+    this.mobiusParam = new MutableNumber(0);
+    this.rotation = new MutableNumber(0);
+
+    this.timeline.add(0,
+      new Transition(this.mobiusParam, 1.5, 128, easeInOutSin)
+    );
+    this.timeline.add(0,
+      new Transition(this.rotation, 2 * Math.PI, 256, (t) => t)
+    );
+
+    // Mobius Parameters
+    this.params = {
+      aRe: 1, aIm: 0,
+      bRe: 0, bIm: 0,
+      cRe: 0, cIm: 0,
+      dRe: 1, dIm: 0
+    };
+    this.animate = true;
+
     this.gui = new gui.GUI();
+    this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
+    this.gui.add(this, 'animate').name('Animate Flow').listen();
 
-    // Appearance
-    this.ringColor = new THREE.Color(0x00ffaa);
-    this.spokeColor = new THREE.Color(0xff00ff);
+    const folder = this.gui.addFolder('Mobius Params');
+    const stopAnim = () => { this.animate = false; };
 
-    // Grid Parameters
-
-    this.setupGui();
+    folder.add(this.params, 'aRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    folder.add(this.params, 'aIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    folder.add(this.params, 'bRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    folder.add(this.params, 'bIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    folder.add(this.params, 'cRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    folder.add(this.params, 'cIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    folder.add(this.params, 'dRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    folder.add(this.params, 'dIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
   }
 
-  setupGui() {
-
-    const f2 = this.gui.addFolder('Mobius Transform');
-    const addComplex = (folder, obj, name) => {
-      const sub = folder.addFolder(name);
-      sub.add(obj, 're', -2, 2).step(0.01).name('Real');
-      sub.add(obj, 'im', -2, 2).step(0.01).name('Imag')   ;
-      sub.open();
+  // Complex number operations
+  cAdd(a, b) { return { re: a.re + b.re, im: a.im + b.im }; }
+  cMult(a, b) { return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re }; }
+  cDiv(a, b) {
+    const denom = b.re * b.re + b.im * b.im;
+    return {
+      re: (a.re * b.re + a.im * b.im) / denom,
+      im: (a.im * b.re - a.re * b.im) / denom
     };
+  }
 
-    addComplex(f2, this.mobius.a, 'a (Scale/Rot)');
-    addComplex(f2, this.mobius.b, 'b (Translate)');
-    addComplex(f2, this.mobius.c, 'c (Warp)');
-    addComplex(f2, this.mobius.d, 'd (Scale/Rot)');
-    f2.open();
+  // Inverse Stereographic Projection: Complex Plane -> Sphere
+  invStereo(z) {
+    const r2 = z.re * z.re + z.im * z.im;
+    return new THREE.Vector3(
+      2 * z.re / (r2 + 1),
+      2 * z.im / (r2 + 1),
+      (r2 - 1) / (r2 + 1)
+    );
+  }
+
+  // Stereographic Projection: Sphere -> Complex Plane
+  stereo(v) {
+    const denom = 1 - v.z;
+    if (Math.abs(denom) < 0.0001) return { re: 100, im: 100 }; // Infinity
+    return { re: v.x / denom, im: v.y / denom };
+  }
+
+  // Mobius Transformation: f(z) = (az + b) / (cz + d)
+  mobius(z, a, b, c, d) {
+    const num = this.cAdd(this.cMult(a, z), b);
+    const den = this.cAdd(this.cMult(c, z), d);
+    return this.cDiv(num, den);
   }
 
   drawFrame() {
     this.pixels.clear();
     this.timeline.step();
 
-    let dots = [];
-    const range = 4; // Number of rings to render in both directions
-    for (let i = -range; i < range; i++) {
-      logPolarToVector()
-      // Calculate Planar Radius (distance from South Pole in stereographic projection)
-      let R = Math.exp(i * 0.4);
-      let theta = 2 * Math.atan(1 / R);
-      let param = theta / (Math.PI / 2);
+    const rot = this.rotation.get();
+    let a, b, c, d;
 
+    if (this.animate) {
+      const t = this.mobiusParam.get();
+      // Define Mobius parameters (Hyperbolic flow)
+      const scale = Math.exp(t);
+      a = { re: Math.sqrt(scale), im: 0 };
+      b = { re: 0, im: 0 };
+      c = { re: 0, im: 0 };
+      d = { re: 1 / Math.sqrt(scale), im: 0 };
 
-      dots.push(...drawFibSpiral(32, 0.2, (v, t) => this.ringColor));
+      // Update params for GUI display
+      this.params.aRe = a.re; this.params.aIm = a.im;
+      this.params.bRe = b.re; this.params.bIm = b.im;
+      this.params.cRe = c.re; this.params.cIm = c.im;
+      this.params.dRe = d.re; this.params.dIm = d.im;
+    } else {
+      a = { re: this.params.aRe, im: this.params.aIm };
+      b = { re: this.params.bRe, im: this.params.bIm };
+      c = { re: this.params.cRe, im: this.params.cIm };
+      d = { re: this.params.dRe, im: this.params.dIm };
     }
 
-    plotDots(this.pixels, this.filters, dots, 0, this.alpha);
+    // Generate Geometry (Grid of rings)
+    let points = [];
+    const numRings = 8;
+
+    // Longitudinal rings (pass through poles)
+    for (let i = 0; i < numRings; i++) {
+      const angle = (i / numRings) * Math.PI;
+      const normal = new THREE.Vector3(Math.cos(angle), Math.sin(angle), 0);
+      // Sample the ring geometry
+      const ringPoints = sampleRing(this.orientation.get(), normal, 1);
+
+      // Transform points
+      const transformedPoints = ringPoints.map(p => {
+        // 1. Rotate
+        const pRot = p.clone().applyAxisAngle(Daydream.Z_AXIS, rot * 0.1);
+        // 2. Project to Plane
+        const z = this.stereo(pRot);
+        // 3. Apply Mobius
+        const w = this.mobius(z, a, b, c, d);
+        // 4. Project back to Sphere
+        return this.invStereo(w);
+      });
+
+      points.push(...transformedPoints);
+    }
+
+    // Latitudinal rings
+    for (let i = 1; i < numRings; i++) {
+      const radius = Math.sin((i / numRings) * Math.PI);
+      const y = Math.cos((i / numRings) * Math.PI);
+
+      const latPoints = [];
+      const steps = 64;
+      for (let j = 0; j <= steps; j++) {
+        const phi = (j / steps) * 2 * Math.PI;
+        const p = new THREE.Vector3(
+          radius * Math.cos(phi),
+          radius * Math.sin(phi),
+          y
+        ).normalize();
+        latPoints.push(p);
+      }
+
+      const transformedLatPoints = latPoints.map(p => {
+        const pRot = p.clone().applyAxisAngle(Daydream.Z_AXIS, rot * 0.1);
+        const z = this.stereo(pRot);
+        const w = this.mobius(z, a, b, c, d);
+        return this.invStereo(w);
+      });
+      points.push(...transformedLatPoints);
+    }
+
+
+    // Rasterize and Draw
+    // We treat the grid as a collection of points for now, or we could rasterize each ring separately.
+    // Since we pushed all points into one array, we'll rasterize them all.
+    // Note: This loses the "line" connectivity for coloring if we wanted to color by line progress.
+    // But here we color by Y coordinate, so it's fine.
+
+    const dots = rasterize(points, (p) => this.palette.get(0.5 + 0.5 * p.y), false);
+
+    plotDots(this.pixels, this.filters, dots, 0, 1.0);
     return this.pixels;
   }
 }

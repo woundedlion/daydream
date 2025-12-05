@@ -102,8 +102,7 @@ export class Path {
       this.points.pop();
     }
     this.points.push(
-      ...drawLine(c1, c2, (v, t) => undefined, 0, 1, longWay)
-        .map((d) => d.position));
+      ...sampleLine(c1, c2, start = 0, end = 1, longWay));
     return this;
   }
 
@@ -182,23 +181,22 @@ export const drawPath = (path, colorFn) => {
 }
 
 /**
- * Draws a geodesic line (arc) between two vectors on the sphere.
+ * Samples points along a geodesic line (arc) between two vectors.
  * @param {THREE.Vector3} v1 - The start vector.
  * @param {THREE.Vector3} v2 - The end vector.
- * @param {Function} colorFn - Function to determine the color (takes vector and normalized progress t).
- * @param {number} [start=0] - Starting angle multiplier for drawing the line arc.
- * @param {number} [end=1] - Ending multiplier for the total arc angle.
+ * @param {number} [start=0] - Starting angle multiplier.
+ * @param {number} [end=1] - Ending multiplier.
  * @param {boolean} [longWay=false] - If true, draws the longer arc.
- * @returns {Dot[]} An array of Dots forming the line.
+ * @returns {THREE.Vector3[]} An array of points.
  */
-export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false) => {
+export const sampleLine = (v1, v2, start = 0, end = 1, longWay = false) => {
   let u = v1.clone();
   let v = v2.clone();
   let a = angleBetween(u, v);
   let w = new THREE.Vector3();
 
   if (Math.abs(a) < 0.0001) {
-    return [new Dot(u, colorFn(u, 1))];
+    return [u];
   } else if (Math.abs(Math.PI - a) < 0.0001) {
     if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.9999) {
       w.crossVectors(u, Daydream.Y_AXIS).normalize();
@@ -220,14 +218,83 @@ export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false) =
   }
   a *= Math.abs(end - start);
 
-  let dots = []
+  let points = []
   let numSteps = Math.max(1, Math.ceil((a / (2 * Math.PI)) * Daydream.W * 2));
   let q = new THREE.Quaternion().setFromAxisAngle(w, a / numSteps);
   for (let i = 0; i <= numSteps; ++i) {
-    dots.push(new Dot(u.clone(), colorFn(u, i / numSteps)));
+    points.push(u.clone());
     u.applyQuaternion(q).normalize();
   }
+  return points;
+}
+
+/**
+ * Rasterizes a list of points into Dot objects by connecting them with geodesic lines.
+ * @param {THREE.Vector3[]} points - The list of points.
+ * @param {Function} colorFn - Function to determine color (takes vector and normalized progress t).
+ * @param {boolean} [closeLoop=false] - If true, connects the last point to the first.
+ * @returns {Dot[]} An array of Dots.
+ */
+export const rasterize = (points, colorFn, closeLoop = false) => {
+  let dots = [];
+  const len = points.length;
+  if (len === 0) return dots;
+
+  const count = closeLoop ? len : len - 1;
+  for (let i = 0; i < count; i++) {
+    const p1 = points[i];
+    const p2 = points[(i + 1) % len];
+
+    // Interpolate color function
+    // Global t at p1 is i / count (approx)
+    // We pass a sub-color function to drawLine that maps sub-segment t to global t
+    const segmentColorFn = (p, subT) => {
+      // Global progress
+      const globalT = (i + subT) / count;
+      return colorFn(p, globalT);
+    };
+
+    // Draw segment
+    const segmentDots = drawLine(p1, p2, segmentColorFn);
+
+    // Avoid duplicating vertices where segments join
+    // drawLine returns [start, ..., end]
+    // We pop the last one unless it's the very last segment of an open loop
+    if (i < count - 1 || closeLoop) {
+      segmentDots.pop();
+    }
+    dots.push(...segmentDots);
+  }
   return dots;
+};
+
+/**
+ * Helper to convert a list of points directly to dots without interpolation.
+ * Used by drawLine to avoid recursion.
+ */
+const pointsToDots = (points, colorFn) => {
+  return points.map((p, i) => {
+    let t = 0;
+    if (points.length > 1) {
+      t = i / (points.length - 1);
+    }
+    return new Dot(p, colorFn(p, t));
+  });
+}
+
+/**
+ * Draws a geodesic line (arc) between two vectors on the sphere.
+ * @param {THREE.Vector3} v1 - The start vector.
+ * @param {THREE.Vector3} v2 - The end vector.
+ * @param {Function} colorFn - Function to determine the color (takes vector and normalized progress t).
+ * @param {number} [start=0] - Starting angle multiplier for drawing the line arc.
+ * @param {number} [end=1] - Ending multiplier for the total arc angle.
+ * @param {boolean} [longWay=false] - If true, draws the longer arc.
+ * @returns {Dot[]} An array of Dots forming the line.
+ */
+export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false) => {
+  const points = sampleLine(v1, v2, start, end, longWay);
+  return pointsToDots(points, colorFn);
 }
 
 /**
@@ -247,6 +314,27 @@ export const drawVertices = (vertices, colorFn) => {
 }
 
 /**
+ * Samples points for the edges of a polyhedron.
+ * @param {number[][]} vertices - An array of [x, y, z] vertex arrays.
+ * @param {number[][]} edges - An adjacency list of vertex indices.
+ * @returns {THREE.Vector3[]} An array of points forming the edges.
+ */
+export const samplePolyhedron = (vertices, edges) => {
+  let points = [];
+  edges.map((adj, i) => {
+    adj.map((j) => {
+      points.push(
+        ...sampleLine(
+          new THREE.Vector3(...vertices[i]).normalize(),
+          new THREE.Vector3(...vertices[j]).normalize()
+        )
+      );
+    })
+  });
+  return points;
+}
+
+/**
  * Draws the edges of a polyhedron by drawing lines between connected vertices.
  * @param {number[][]} vertices - An array of [x, y, z] vertex arrays.
  * @param {number[][]} edges - An adjacency list of vertex indices.
@@ -257,12 +345,14 @@ export const drawPolyhedron = (vertices, edges, colorFn) => {
   let dots = [];
   edges.map((adj, i) => {
     adj.map((j) => {
-      dots.push(
-        ...drawLine(
-          new THREE.Vector3(...vertices[i]).normalize(),
-          new THREE.Vector3(...vertices[j]).normalize(),
-          colorFn)
-      );
+      if (i < j) {
+        dots.push(
+          ...drawLine(
+            new THREE.Vector3(...vertices[i]).normalize(),
+            new THREE.Vector3(...vertices[j]).normalize(),
+            colorFn)
+        );
+      }
     })
   });
   return dots;
@@ -301,15 +391,15 @@ export const fnPoint = (f, normal, radius, angle) => {
 };
 
 /**
- * Draws a function-distorted ring with adaptive sampling.
+ * Samples points for a function-distorted ring with adaptive sampling.
  * @param {THREE.Quaternion} orientationQuaternion - Orientation of the base ring.
  * @param {THREE.Vector3} normal - Normal of the base ring.
  * @param {number} radius - Base radius (0-1).
  * @param {Function} shiftFn - Function(t) returning angle offset.
- * @param {Function} colorFn - Function(v, t) returning color.
  * @param {number} [phase=0] - Starting phase offset.
+ * @returns {THREE.Vector3[]} An array of points.
  */
-export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, phase = 0) => {
+export const sampleFn = (orientationQuaternion, normal, radius, shiftFn, phase = 0) => {
   // Basis
   let refAxis = Daydream.X_AXIS;
   if (Math.abs(normal.dot(refAxis)) > 0.9999) {
@@ -353,7 +443,6 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
     let p = v.clone().multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
 
     points.push(p);
-    //    labels.push({ position: p, content: (t / (2 * Math.PI)).toFixed(1)});
     thetas.push(theta);
 
     // Adaptive Sampling for horizontal pixel distortion at poles
@@ -365,7 +454,6 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
     if (nextTheta >= 2 * Math.PI) {
       const REPAIR_COUNT = 5;
       if (points.length > REPAIR_COUNT) {
-        //      labels.length - + REPAIR_COUNT;
         const targetLastTheta = 2 * Math.PI - step;
         const anchorIdx = points.length - REPAIR_COUNT - 1;
         const anchorTheta = thetas[anchorIdx];
@@ -388,7 +476,6 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
           let vScale = (vSign * d) * cosShift - r * sinShift;
           let uScale = r * cosShift + (vSign * d) * sinShift;
           points[i].copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
-          //          labels.push({ position:points[i], content: (t / (2 * Math.PI)).toFixed(1) });
         }
       }
       break;
@@ -396,20 +483,30 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
     theta = nextTheta;
   }
 
-  // Draw lines connecting the repaired points
-  let finalDots = [];
+  // Interpolate between samples
+  let finalPoints = [];
   for (let i = 0; i < points.length; ++i) {
     let nextI = (i + 1) % points.length;
-    let tStart = thetas[i] / (2 * Math.PI);
-    let segmentDots = drawLine(points[i], points[nextI],
-      (vec, lineT) => {
-        return colorFn(vec, tStart);
-      });
-    segmentDots.pop(); // Avoid drawing over the start vertex
-    finalDots.push(...segmentDots);
+    let segmentPoints = sampleLine(points[i], points[nextI]);
+    segmentPoints.pop(); // Avoid drawing over the start vertex
+    finalPoints.push(...segmentPoints);
   }
 
-  return finalDots;
+  return finalPoints;
+}
+
+/**
+ * Draws a function-distorted ring with adaptive sampling.
+ * @param {THREE.Quaternion} orientationQuaternion - Orientation of the base ring.
+ * @param {THREE.Vector3} normal - Normal of the base ring.
+ * @param {number} radius - Base radius (0-1).
+ * @param {Function} shiftFn - Function(t) returning angle offset.
+ * @param {Function} colorFn - Function(v, t) returning color.
+ * @param {number} [phase=0] - Starting phase offset.
+ */
+export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, phase = 0) => {
+  const points = sampleFn(orientationQuaternion, normal, radius, shiftFn, phase);
+  return rasterize(points, colorFn, true);
 }
 
 /**
@@ -432,16 +529,14 @@ export const calcRingPoint = (a, radius, u, v, w) => {
 }
 
 /**
- * Draws a circular ring on the sphere surface with adaptive sampling
- * to prevent artifacts near the poles.
+ * Samples points for a circular ring on the sphere surface with adaptive sampling.
  * @param {THREE.Quaternion} orientationQuaternion - The orientation of the ring.
  * @param {THREE.Vector3} normal - The normal vector defining the ring plane.
  * @param {number} radius - The radius of the ring.
- * @param {Function} colorFn - Function to determine color.
  * @param {number} [phase=0] - Starting phase.
- * @returns {Dot[]} An array of Dots.
+ * @returns {THREE.Vector3[]} An array of points.
  */
-export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase = 0) => {
+export const sampleRing = (orientationQuaternion, normal, radius, phase = 0) => {
   // Basis
   let refAxis = Daydream.X_AXIS;
   if (Math.abs(normal.dot(refAxis)) > 0.9999) {
@@ -466,7 +561,7 @@ export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase =
 
   // Calculate Samples
   const baseStep = 2 * Math.PI / Daydream.W;
-  let dots = [];
+  let points = [];
   let thetas = [];
   let theta = 0;
   let uTemp = new THREE.Vector3();
@@ -476,7 +571,7 @@ export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase =
     let sinRing = Math.sin(t);
     uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
     let p = vDir.clone().multiplyScalar(d).addScaledVector(uTemp, r).normalize();
-    dots.push(new Dot(p, colorFn(p, t / (2 * Math.PI))));
+    points.push(p);
     thetas.push(theta);
 
     // Adaptive Sampling for horizontal pixel distortion at poles
@@ -487,13 +582,13 @@ export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase =
     // Repair last N samples to close the loop
     if (nextTheta >= 2 * Math.PI) {
       const REPAIR_COUNT = 5;
-      if (dots.length > REPAIR_COUNT) {
+      if (points.length > REPAIR_COUNT) {
         const targetLastTheta = 2 * Math.PI - step;
-        const anchorIdx = dots.length - REPAIR_COUNT - 1;
+        const anchorIdx = points.length - REPAIR_COUNT - 1;
         const anchorTheta = thetas[anchorIdx];
         const currentLastTheta = theta;
         const ratio = (targetLastTheta - anchorTheta) / (currentLastTheta - anchorTheta);
-        for (let i = anchorIdx + 1; i < dots.length; i++) {
+        for (let i = anchorIdx + 1; i < points.length; i++) {
           const dist = thetas[i] - anchorTheta;
           const correctedTheta = anchorTheta + (dist * ratio);
 
@@ -502,15 +597,29 @@ export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase =
           let cosRing = Math.cos(t);
           let sinRing = Math.sin(t);
           uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
-          dots[i].position.copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
-          dots[i].color = colorFn(dots[i].position, t / (2 * Math.PI));
+          points[i].copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
         }
       }
       break;
     }
     theta = nextTheta;
   }
-  return dots;
+  return points;
+}
+
+/**
+ * Draws a circular ring on the sphere surface with adaptive sampling
+ * to prevent artifacts near the poles.
+ * @param {THREE.Quaternion} orientationQuaternion - The orientation of the ring.
+ * @param {THREE.Vector3} normal - The normal vector defining the ring plane.
+ * @param {number} radius - The radius of the ring.
+ * @param {Function} colorFn - Function to determine color.
+ * @param {number} [phase=0] - Starting phase.
+ * @returns {Dot[]} An array of Dots.
+ */
+export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase = 0) => {
+  const points = sampleRing(orientationQuaternion, normal, radius, phase);
+  return rasterize(points, colorFn, true);
 }
 
 export const ringPoint = (normal, radius, angle, phase = 0) => {
