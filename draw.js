@@ -507,7 +507,7 @@ export const sampleRing = (orientationQuaternion, normal, radius, phase = 0) => 
   const d = Math.cos(thetaEq);
 
   // Calculate Samples
-  const numSamples = Daydream.W;
+  const numSamples = 3;
   const step = 2 * Math.PI / numSamples;
   let points = [];
   let uTemp = new THREE.Vector3();

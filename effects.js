@@ -221,6 +221,7 @@ export class RingSpin {
 
   spawnRing(normal, palette) {
     let ring = new RingSpin.Ring(normal, palette, this.trailLength.get());
+    ring.basePoints = sampleRing(new THREE.Quaternion(), ring.normal, 1);
     this.rings.unshift(ring);
 
     this.timeline.add(0,
@@ -234,12 +235,12 @@ export class RingSpin {
   }
 
   drawRing(opacity, ring) {
-    ring.orientation.collapse();
     tween(ring.orientation, (q, t) => {
-      let dots = drawRing(q, ring.normal, 1,
-        (v, t) => ring.palette.get(0));
+      let points = ring.basePoints.map(p => p.clone().applyQuaternion(q));
+      let dots = rasterize(points, (v, t) => ring.palette.get(0), true);
       plotDots(this.pixels, ring.filters, dots, 0, this.alpha);
     });
+    ring.orientation.collapse();
     ring.filters.trail((x, y, t) => ring.palette.get(t), this.alpha);
   }
 
