@@ -602,7 +602,7 @@ export class Thrusters {
         16, easeInSin,
         16, easeOutSin)
     );
-    this.timeline.add(0, new RandomTimer(8, 48,
+    this.timeline.add(0, new RandomTimer(16, 48,
       () => this.onFireThruster(), true)
     );
   }
@@ -886,26 +886,18 @@ export class FlowField {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+
 export class MobiusGrid {
   constructor() {
     Daydream.W = 96;
     this.pixels = new Map();
     this.alpha = 0.5;
+    this.numRings = 8;
     this.palette = new GenerativePalette("circular", "analagous", "flat");
     this.orientation = new Orientation();
     this.timeline = new Timeline();
     this.filters = createRenderPipeline(
       new FilterAntiAlias()
-    );
-
-    this.mobiusParam = new MutableNumber(0);
-    this.rotation = new MutableNumber(0);
-
-    this.timeline.add(0,
-      new Transition(this.mobiusParam, 1.5, 128, easeInOutSin)
-    );
-    this.timeline.add(0,
-      new Transition(this.rotation, 2 * Math.PI, 256, (t) => t)
     );
 
     // Mobius Parameters
@@ -917,16 +909,6 @@ export class MobiusGrid {
     };
 
     this.setupGui();
-
-    this.timeline.add(0,
-      new Mutation(this.params.bIm, (t) => sinWave(-1, 1, 1, 0)(t), 64, easeMid, true)
-    );
-    this.timeline.add(0,
-      new Mutation(this.params.cRe, (t) => sinWave(-1, 1, 1, 0)(t + 0.1), 64, easeMid, true)
-    );
-    this.timeline.add(0,
-      new Mutation(this.params.aRe, (t) => sinWave(-1, 1, 1, 0)(t + 0.3), 64, easeMid, true)
-    );
   }
 
   setupGui() {
@@ -941,16 +923,23 @@ export class MobiusGrid {
     folder.add(this.params.cIm, 'n').name('cIm').min(-2).max(2).step(0.01).listen();
     folder.add(this.params.dRe, 'n').name('dRe').min(-2).max(2).step(0.01).listen();
     folder.add(this.params.dIm, 'n').name('dIm').min(-2).max(2).step(0.01).listen();
-
   }
-
   drawAxisRings(normal, numRings, mobiusParams, axisComponent) {
     let dots = [];
     const { a, b, c, d } = mobiusParams;
 
-    for (let i = 1; i < numRings; i++) {
-      const t = i / numRings;
-      const radius = t * 2;
+    // Use a fixed log range for calculation
+    const logMin = -2.5;
+    const logMax = 2.5;
+    const range = logMax - logMin;
+
+    for (let i = -3; i <= numRings + 4; i++) {
+      const t = i / (numRings + 1);
+      const logR = logMin + t * range;
+
+      const R = Math.exp(logR); // Stereographic Radius
+      const radius = (4 / Math.PI) * Math.atan(1 / R);
+
       const points = sampleRing(this.orientation.get(), normal, radius);
 
       const transformedPoints = points.map(p => {
@@ -959,7 +948,58 @@ export class MobiusGrid {
         return invStereo(w);
       });
 
-      dots.push(...rasterize(transformedPoints, (p) => this.palette.get(0.5 + 0.5 * p[axisComponent]), true));
+      dots.push(...rasterize(transformedPoints, (p) => {
+        // Fade towards poles (ingress/egress) along Z axis
+        const poleDist = Math.abs(p.z);
+        const fadeStart = 0.7;
+        const fadeEnd = 1.0;
+
+        let alpha = 1.0;
+        if (poleDist > fadeStart) {
+          const t = (poleDist - fadeStart) / (fadeEnd - fadeStart);
+          alpha = 1.0 - Math.max(0, Math.min(1, t));
+          alpha = alpha * alpha;
+        }
+
+        const baseColor = this.palette.get(0.5 + 0.5 * p[axisComponent]);
+        return baseColor.multiplyScalar(alpha);
+      }, true));
+    }
+    return dots;
+  }
+
+  drawLongitudes(numLines, mobiusParams, axisComponent) {
+    let dots = [];
+    const { a, b, c, d } = mobiusParams;
+
+    for (let i = 0; i < numLines; i++) {
+      const theta = (i / numLines) * Math.PI * 2;
+      // Normal in XY plane defines a great circle passing through Z poles
+      const normal = new THREE.Vector3(Math.cos(theta), Math.sin(theta), 0);
+      const radius = 1.0;
+      const points = sampleRing(this.orientation.get(), normal, radius);
+      const transformedPoints = points.map(p => {
+        const z = stereo(p);
+        const w = mobius(z, a, b, c, d);
+        return invStereo(w);
+      });
+
+      dots.push(...rasterize(transformedPoints, (p) => {
+        // Fade towards poles (ingress/egress) along Z axis, matching Rings
+        const poleDist = Math.abs(p.z);
+        const fadeStart = 0.7;
+        const fadeEnd = 1.0;
+
+        let alpha = 1.0;
+        if (poleDist > fadeStart) {
+          const t = (poleDist - fadeStart) / (fadeEnd - fadeStart);
+          alpha = 1.0 - Math.max(0, Math.min(1, t));
+          alpha = alpha * alpha;
+        }
+
+        const baseColor = this.palette.get(0.5 + 0.5 * p[axisComponent]);
+        return baseColor.multiplyScalar(alpha);
+      }, true));
     }
     return dots;
   }
@@ -968,7 +1008,26 @@ export class MobiusGrid {
     this.pixels.clear();
     this.timeline.step();
 
-    const rot = this.rotation.get();
+    if (!this.frameCount) this.frameCount = 0;
+    this.frameCount++;
+    const time = this.frameCount * 0.01;
+
+    const logPeriod = 5.0 / (this.numRings + 1);
+    const speed = 4.0;
+    const flowParam = (time * speed) % logPeriod;
+    const scale = Math.exp(flowParam);
+    const s = Math.sqrt(scale);
+
+    const angle = time * 0.5;
+
+    this.params.aRe.set(s * Math.cos(angle));
+    this.params.aIm.set(s * Math.sin(angle));
+    this.params.dRe.set((1 / s) * Math.cos(-angle));
+    this.params.dIm.set((1 / s) * Math.sin(-angle));
+
+    this.params.bRe.set(0); this.params.bIm.set(0);
+    this.params.cRe.set(0); this.params.cIm.set(0);
+
     let a, b, c, d;
     a = { re: this.params.aRe.get(), im: this.params.aIm.get() };
     b = { re: this.params.bRe.get(), im: this.params.bIm.get() };
@@ -976,18 +1035,9 @@ export class MobiusGrid {
     d = { re: this.params.dRe.get(), im: this.params.dIm.get() };
     const mobiusParams = { a, b, c, d };
 
-    // Generate Geometry (Grid of rings)
-    const numRings = 2;
     let dots = [];
-
-    // Axis Z
-    dots.push(...this.drawAxisRings(Daydream.Z_AXIS.clone(), numRings, mobiusParams, 'z'));
-
-    // Axis Y
-    dots.push(...this.drawAxisRings(Daydream.Y_AXIS.clone(), numRings, mobiusParams, 'y'));
-
-    // Axis X
-    dots.push(...this.drawAxisRings(Daydream.X_AXIS.clone(), numRings, mobiusParams, 'x'));
+    dots.push(...this.drawAxisRings(Daydream.Z_AXIS.clone(), this.numRings, mobiusParams, 'y'));
+    dots.push(...this.drawLongitudes(12, mobiusParams, 'x'));
 
     plotDots(this.pixels, this.filters, dots, 0, 1.0);
     return this.pixels;
