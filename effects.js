@@ -909,12 +909,12 @@ export class MobiusGrid {
 
     // Mobius Parameters
     this.params = {
-      aRe: 1, aIm: 0,
-      bRe: 0, bIm: 0,
-      cRe: 0, cIm: 0,
-      dRe: 1, dIm: 0
+      aRe: new MutableNumber(1), aIm: new MutableNumber(0),
+      bRe: new MutableNumber(0), bIm: new MutableNumber(0),
+      cRe: new MutableNumber(0), cIm: new MutableNumber(0),
+      dRe: new MutableNumber(1), dIm: new MutableNumber(0)
     };
-    this.animate = true;
+    this.animate = false;
 
     this.gui = new gui.GUI();
     this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
@@ -923,14 +923,24 @@ export class MobiusGrid {
     const folder = this.gui.addFolder('Mobius Params');
     const stopAnim = () => { this.animate = false; };
 
-    folder.add(this.params, 'aRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
-    folder.add(this.params, 'aIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
-    folder.add(this.params, 'bRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
-    folder.add(this.params, 'bIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
-    folder.add(this.params, 'cRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
-    folder.add(this.params, 'cIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
-    folder.add(this.params, 'dRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
-    folder.add(this.params, 'dIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    folder.add(this.params.aRe, 'n').name('aRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    folder.add(this.params.aIm, 'n').name('aIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    folder.add(this.params.bRe, 'n').name('bRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    folder.add(this.params.bIm, 'n').name('bIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    folder.add(this.params.cRe, 'n').name('cRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    folder.add(this.params.cIm, 'n').name('cIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    folder.add(this.params.dRe, 'n').name('dRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    folder.add(this.params.dIm, 'n').name('dIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+
+    this.timeline.add(0,
+      new Mutation(this.params.bIm, (t) => sinWave(-1, 1, 1, 0)(t), 64, easeMid, true)
+    );
+    this.timeline.add(0,
+      new Mutation(this.params.cRe, (t) => sinWave(-1, 1, 1, 0)(t + 0.1), 64, easeMid, true)
+    );
+    this.timeline.add(0,
+      new Mutation(this.params.aRe, (t) => sinWave(-1, 1, 1, 0)(t + 0.2), 64, easeMid, true)
+    );
   }
 
   // Complex number operations
@@ -985,77 +995,62 @@ export class MobiusGrid {
       d = { re: 1 / Math.sqrt(scale), im: 0 };
 
       // Update params for GUI display
-      this.params.aRe = a.re; this.params.aIm = a.im;
-      this.params.bRe = b.re; this.params.bIm = b.im;
-      this.params.cRe = c.re; this.params.cIm = c.im;
-      this.params.dRe = d.re; this.params.dIm = d.im;
+      this.params.aRe.set(a.re); this.params.aIm.set(a.im);
+      this.params.bRe.set(b.re); this.params.bIm.set(b.im);
+      this.params.cRe.set(c.re); this.params.cIm.set(c.im);
+      this.params.dRe.set(d.re); this.params.dIm.set(d.im);
     } else {
-      a = { re: this.params.aRe, im: this.params.aIm };
-      b = { re: this.params.bRe, im: this.params.bIm };
-      c = { re: this.params.cRe, im: this.params.cIm };
-      d = { re: this.params.dRe, im: this.params.dIm };
+      a = { re: this.params.aRe.get(), im: this.params.aIm.get() };
+      b = { re: this.params.bRe.get(), im: this.params.bIm.get() };
+      c = { re: this.params.cRe.get(), im: this.params.cIm.get() };
+      d = { re: this.params.dRe.get(), im: this.params.dIm.get() };
     }
 
     // Generate Geometry (Grid of rings)
-    let points = [];
-    const numRings = 8;
+    const numRings = 2; // Number of rings per axis
+    let dots = [];
 
-    // Longitudinal rings (pass through poles)
-    for (let i = 0; i < numRings; i++) {
-      const angle = (i / numRings) * Math.PI;
-      const normal = new THREE.Vector3(Math.cos(angle), Math.sin(angle), 0);
-      // Sample the ring geometry
-      const ringPoints = sampleRing(this.orientation.get(), normal, 1);
-
-      // Transform points
-      const transformedPoints = ringPoints.map(p => {
-        // 1. Rotate
-        const pRot = p.clone().applyAxisAngle(Daydream.Z_AXIS, rot * 0.1);
-        // 2. Project to Plane
-        const z = this.stereo(pRot);
-        // 3. Apply Mobius
-        const w = this.mobius(z, a, b, c, d);
-        // 4. Project back to Sphere
-        return this.invStereo(w);
-      });
-
-      points.push(...transformedPoints);
-    }
-
-    // Latitudinal rings
+    // Axis 1 Rings (Latitudes around Y)
+    // We iterate radius from >0 to <2 to avoid the poles singularities and redundant checks
+    // Using sampleRing which handles 0..2 mapping (0=North, 1=Equator, 2=South)
     for (let i = 1; i < numRings; i++) {
-      const radius = Math.sin((i / numRings) * Math.PI);
-      const y = Math.cos((i / numRings) * Math.PI);
+      const t = i / numRings; // 0..1
+      const radius = t * 2; // 0..2
 
-      const latPoints = [];
-      const steps = 64;
-      for (let j = 0; j <= steps; j++) {
-        const phi = (j / steps) * 2 * Math.PI;
-        const p = new THREE.Vector3(
-          radius * Math.cos(phi),
-          radius * Math.sin(phi),
-          y
-        ).normalize();
-        latPoints.push(p);
-      }
+      // Axis Z
+      const normalZ = Daydream.Z_AXIS.clone();
+      const pointsZ = sampleRing(this.orientation.get(), normalZ, radius);
 
-      const transformedLatPoints = latPoints.map(p => {
-        const pRot = p.clone().applyAxisAngle(Daydream.Z_AXIS, rot * 0.1);
-        const z = this.stereo(pRot);
+      const transformedPointsZ = pointsZ.map(p => {
+        const z = this.stereo(p);
         const w = this.mobius(z, a, b, c, d);
         return this.invStereo(w);
       });
-      points.push(...transformedLatPoints);
+      dots.push(...rasterize(transformedPointsZ, (p) => this.palette.get(0.5 + 0.5 * p.z), true));
+
+
+      // Axis Y
+      const normalY = Daydream.Y_AXIS.clone();
+      const pointsY = sampleRing(this.orientation.get(), normalY, radius);
+
+      const transformedPointsY = pointsY.map(p => {
+        const z = this.stereo(p);
+        const w = this.mobius(z, a, b, c, d);
+        return this.invStereo(w);
+      });
+      dots.push(...rasterize(transformedPointsY, (p) => this.palette.get(0.5 + 0.5 * p.y), true));
+
+      // Axis X ("Longitudes" but parallel circles like latitudes)
+      const normalX = Daydream.X_AXIS.clone();
+      const pointsX = sampleRing(this.orientation.get(), normalX, radius);
+
+      const transformedPointsX = pointsX.map(p => {
+        const z = this.stereo(p);
+        const w = this.mobius(z, a, b, c, d);
+        return this.invStereo(w);
+      });
+      dots.push(...rasterize(transformedPointsX, (p) => this.palette.get(0.5 + 0.5 * p.x), true));
     }
-
-
-    // Rasterize and Draw
-    // We treat the grid as a collection of points for now, or we could rasterize each ring separately.
-    // Since we pushed all points into one array, we'll rasterize them all.
-    // Note: This loses the "line" connectivity for coloring if we wanted to color by line progress.
-    // But here we color by Y coordinate, so it's fine.
-
-    const dots = rasterize(points, (p) => this.palette.get(0.5 + 0.5 * p.y), false);
 
     plotDots(this.pixels, this.filters, dots, 0, 1.0);
     return this.pixels;
