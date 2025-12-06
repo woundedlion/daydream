@@ -2,6 +2,7 @@
 import { gui } from "gui";
 import { Daydream, labels, pixelKey } from "./driver.js";
 import FastNoiseLite from "./FastNoiseLite.js";
+import { stereo, invStereo, mobius } from "./3dmath.js";
 
 import {
   Orientation, Dodecahedron, angleBetween, pixelToVector,
@@ -914,23 +915,8 @@ export class MobiusGrid {
       cRe: new MutableNumber(0), cIm: new MutableNumber(0),
       dRe: new MutableNumber(1), dIm: new MutableNumber(0)
     };
-    this.animate = false;
 
-    this.gui = new gui.GUI();
-    this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
-    this.gui.add(this, 'animate').name('Animate Flow').listen();
-
-    const folder = this.gui.addFolder('Mobius Params');
-    const stopAnim = () => { this.animate = false; };
-
-    folder.add(this.params.aRe, 'n').name('aRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
-    folder.add(this.params.aIm, 'n').name('aIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
-    folder.add(this.params.bRe, 'n').name('bRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
-    folder.add(this.params.bIm, 'n').name('bIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
-    folder.add(this.params.cRe, 'n').name('cRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
-    folder.add(this.params.cIm, 'n').name('cIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
-    folder.add(this.params.dRe, 'n').name('dRe').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
-    folder.add(this.params.dIm, 'n').name('dIm').min(-2).max(2).step(0.01).listen().onChange(stopAnim);
+    this.setupGui();
 
     this.timeline.add(0,
       new Mutation(this.params.bIm, (t) => sinWave(-1, 1, 1, 0)(t), 64, easeMid, true)
@@ -939,43 +925,23 @@ export class MobiusGrid {
       new Mutation(this.params.cRe, (t) => sinWave(-1, 1, 1, 0)(t + 0.1), 64, easeMid, true)
     );
     this.timeline.add(0,
-      new Mutation(this.params.aRe, (t) => sinWave(-1, 1, 1, 0)(t + 0.2), 64, easeMid, true)
+      new Mutation(this.params.aRe, (t) => sinWave(-1, 1, 1, 0)(t + 0.3), 64, easeMid, true)
     );
   }
 
-  // Complex number operations
-  cAdd(a, b) { return { re: a.re + b.re, im: a.im + b.im }; }
-  cMult(a, b) { return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re }; }
-  cDiv(a, b) {
-    const denom = b.re * b.re + b.im * b.im;
-    return {
-      re: (a.re * b.re + a.im * b.im) / denom,
-      im: (a.im * b.re - a.re * b.im) / denom
-    };
-  }
+  setupGui() {
+    this.gui = new gui.GUI();
+    this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
+    const folder = this.gui.addFolder('Mobius Params');
+    folder.add(this.params.aRe, 'n').name('aRe').min(-2).max(2).step(0.01).listen();
+    folder.add(this.params.aIm, 'n').name('aIm').min(-2).max(2).step(0.01).listen();
+    folder.add(this.params.bRe, 'n').name('bRe').min(-2).max(2).step(0.01).listen();
+    folder.add(this.params.bIm, 'n').name('bIm').min(-2).max(2).step(0.01).listen();
+    folder.add(this.params.cRe, 'n').name('cRe').min(-2).max(2).step(0.01).listen();
+    folder.add(this.params.cIm, 'n').name('cIm').min(-2).max(2).step(0.01).listen();
+    folder.add(this.params.dRe, 'n').name('dRe').min(-2).max(2).step(0.01).listen();
+    folder.add(this.params.dIm, 'n').name('dIm').min(-2).max(2).step(0.01).listen();
 
-  // Inverse Stereographic Projection: Complex Plane -> Sphere
-  invStereo(z) {
-    const r2 = z.re * z.re + z.im * z.im;
-    return new THREE.Vector3(
-      2 * z.re / (r2 + 1),
-      2 * z.im / (r2 + 1),
-      (r2 - 1) / (r2 + 1)
-    );
-  }
-
-  // Stereographic Projection: Sphere -> Complex Plane
-  stereo(v) {
-    const denom = 1 - v.z;
-    if (Math.abs(denom) < 0.0001) return { re: 100, im: 100 }; // Infinity
-    return { re: v.x / denom, im: v.y / denom };
-  }
-
-  // Mobius Transformation: f(z) = (az + b) / (cz + d)
-  mobius(z, a, b, c, d) {
-    const num = this.cAdd(this.cMult(a, z), b);
-    const den = this.cAdd(this.cMult(c, z), d);
-    return this.cDiv(num, den);
   }
 
   drawFrame() {
@@ -984,30 +950,13 @@ export class MobiusGrid {
 
     const rot = this.rotation.get();
     let a, b, c, d;
-
-    if (this.animate) {
-      const t = this.mobiusParam.get();
-      // Define Mobius parameters (Hyperbolic flow)
-      const scale = Math.exp(t);
-      a = { re: Math.sqrt(scale), im: 0 };
-      b = { re: 0, im: 0 };
-      c = { re: 0, im: 0 };
-      d = { re: 1 / Math.sqrt(scale), im: 0 };
-
-      // Update params for GUI display
-      this.params.aRe.set(a.re); this.params.aIm.set(a.im);
-      this.params.bRe.set(b.re); this.params.bIm.set(b.im);
-      this.params.cRe.set(c.re); this.params.cIm.set(c.im);
-      this.params.dRe.set(d.re); this.params.dIm.set(d.im);
-    } else {
-      a = { re: this.params.aRe.get(), im: this.params.aIm.get() };
-      b = { re: this.params.bRe.get(), im: this.params.bIm.get() };
-      c = { re: this.params.cRe.get(), im: this.params.cIm.get() };
-      d = { re: this.params.dRe.get(), im: this.params.dIm.get() };
-    }
+    a = { re: this.params.aRe.get(), im: this.params.aIm.get() };
+    b = { re: this.params.bRe.get(), im: this.params.bIm.get() };
+    c = { re: this.params.cRe.get(), im: this.params.cIm.get() };
+    d = { re: this.params.dRe.get(), im: this.params.dIm.get() };
 
     // Generate Geometry (Grid of rings)
-    const numRings = 2; // Number of rings per axis
+    const numRings = 2;
     let dots = [];
 
     // Axis 1 Rings (Latitudes around Y)
@@ -1022,9 +971,9 @@ export class MobiusGrid {
       const pointsZ = sampleRing(this.orientation.get(), normalZ, radius);
 
       const transformedPointsZ = pointsZ.map(p => {
-        const z = this.stereo(p);
-        const w = this.mobius(z, a, b, c, d);
-        return this.invStereo(w);
+        const z = stereo(p);
+        const w = mobius(z, a, b, c, d);
+        return invStereo(w);
       });
       dots.push(...rasterize(transformedPointsZ, (p) => this.palette.get(0.5 + 0.5 * p.z), true));
 
@@ -1034,9 +983,9 @@ export class MobiusGrid {
       const pointsY = sampleRing(this.orientation.get(), normalY, radius);
 
       const transformedPointsY = pointsY.map(p => {
-        const z = this.stereo(p);
-        const w = this.mobius(z, a, b, c, d);
-        return this.invStereo(w);
+        const z = stereo(p);
+        const w = mobius(z, a, b, c, d);
+        return invStereo(w);
       });
       dots.push(...rasterize(transformedPointsY, (p) => this.palette.get(0.5 + 0.5 * p.y), true));
 
@@ -1045,9 +994,9 @@ export class MobiusGrid {
       const pointsX = sampleRing(this.orientation.get(), normalX, radius);
 
       const transformedPointsX = pointsX.map(p => {
-        const z = this.stereo(p);
-        const w = this.mobius(z, a, b, c, d);
-        return this.invStereo(w);
+        const z = stereo(p);
+        const w = mobius(z, a, b, c, d);
+        return invStereo(w);
       });
       dots.push(...rasterize(transformedPointsX, (p) => this.palette.get(0.5 + 0.5 * p.x), true));
     }
