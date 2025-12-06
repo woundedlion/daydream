@@ -944,6 +944,26 @@ export class MobiusGrid {
 
   }
 
+  drawAxisRings(normal, numRings, mobiusParams, axisComponent) {
+    let dots = [];
+    const { a, b, c, d } = mobiusParams;
+
+    for (let i = 1; i < numRings; i++) {
+      const t = i / numRings;
+      const radius = t * 2;
+      const points = sampleRing(this.orientation.get(), normal, radius);
+
+      const transformedPoints = points.map(p => {
+        const z = stereo(p);
+        const w = mobius(z, a, b, c, d);
+        return invStereo(w);
+      });
+
+      dots.push(...rasterize(transformedPoints, (p) => this.palette.get(0.5 + 0.5 * p[axisComponent]), true));
+    }
+    return dots;
+  }
+
   drawFrame() {
     this.pixels.clear();
     this.timeline.step();
@@ -954,52 +974,20 @@ export class MobiusGrid {
     b = { re: this.params.bRe.get(), im: this.params.bIm.get() };
     c = { re: this.params.cRe.get(), im: this.params.cIm.get() };
     d = { re: this.params.dRe.get(), im: this.params.dIm.get() };
+    const mobiusParams = { a, b, c, d };
 
     // Generate Geometry (Grid of rings)
     const numRings = 2;
     let dots = [];
 
-    // Axis 1 Rings (Latitudes around Y)
-    // We iterate radius from >0 to <2 to avoid the poles singularities and redundant checks
-    // Using sampleRing which handles 0..2 mapping (0=North, 1=Equator, 2=South)
-    for (let i = 1; i < numRings; i++) {
-      const t = i / numRings; // 0..1
-      const radius = t * 2; // 0..2
+    // Axis Z
+    dots.push(...this.drawAxisRings(Daydream.Z_AXIS.clone(), numRings, mobiusParams, 'z'));
 
-      // Axis Z
-      const normalZ = Daydream.Z_AXIS.clone();
-      const pointsZ = sampleRing(this.orientation.get(), normalZ, radius);
+    // Axis Y
+    dots.push(...this.drawAxisRings(Daydream.Y_AXIS.clone(), numRings, mobiusParams, 'y'));
 
-      const transformedPointsZ = pointsZ.map(p => {
-        const z = stereo(p);
-        const w = mobius(z, a, b, c, d);
-        return invStereo(w);
-      });
-      dots.push(...rasterize(transformedPointsZ, (p) => this.palette.get(0.5 + 0.5 * p.z), true));
-
-
-      // Axis Y
-      const normalY = Daydream.Y_AXIS.clone();
-      const pointsY = sampleRing(this.orientation.get(), normalY, radius);
-
-      const transformedPointsY = pointsY.map(p => {
-        const z = stereo(p);
-        const w = mobius(z, a, b, c, d);
-        return invStereo(w);
-      });
-      dots.push(...rasterize(transformedPointsY, (p) => this.palette.get(0.5 + 0.5 * p.y), true));
-
-      // Axis X ("Longitudes" but parallel circles like latitudes)
-      const normalX = Daydream.X_AXIS.clone();
-      const pointsX = sampleRing(this.orientation.get(), normalX, radius);
-
-      const transformedPointsX = pointsX.map(p => {
-        const z = stereo(p);
-        const w = mobius(z, a, b, c, d);
-        return invStereo(w);
-      });
-      dots.push(...rasterize(transformedPointsX, (p) => this.palette.get(0.5 + 0.5 * p.x), true));
-    }
+    // Axis X
+    dots.push(...this.drawAxisRings(Daydream.X_AXIS.clone(), numRings, mobiusParams, 'x'));
 
     plotDots(this.pixels, this.filters, dots, 0, 1.0);
     return this.pixels;
