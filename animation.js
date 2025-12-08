@@ -653,3 +653,49 @@ export class ColorWipe extends Animation {
     this.curPalette.c.lerpColors(this.c0, this.toPalette.c, this.easingFn(this.t / this.duration));
   }
 }
+
+/**
+ * Animates the Mobius parameters for a continuous loxodromic flow.
+ */
+export class MobiusFlow extends Animation {
+  constructor(params, numRings, numLines, duration, repeat = true) {
+    super(duration, repeat);
+    this.params = params;
+    this.numRings = numRings;
+    this.numLines = numLines;
+  }
+
+  step() {
+    super.step();
+    const progress = this.t / this.duration;
+    const logPeriod = 5.0 / (this.numRings + 1);
+    const flowParam = progress * logPeriod;
+    const scale = Math.exp(flowParam);
+    const s = Math.sqrt(scale);
+    const angle = progress * (Math.PI * 2 / this.numLines);
+
+    this.params.aRe.set(s * Math.cos(angle));
+    this.params.aIm.set(s * Math.sin(angle));
+    this.params.dRe.set((1 / s) * Math.cos(-angle));
+    this.params.dIm.set((1 / s) * Math.sin(-angle));
+  }
+}
+
+/**
+ * Animates the Mobius parameters for a warping effect pulling the poles together.
+ */
+export class MobiusWarp extends Animation {
+  constructor(params, numRings, duration, repeat = true) {
+    super(duration, repeat);
+    this.params = params;
+    this.numRings = numRings;
+  }
+
+  step() {
+    super.step();
+    const progress = this.t / this.duration;
+    const angle = progress * Math.PI * 2;
+    this.params.bRe.set(Math.cos(angle));
+    this.params.bIm.set(Math.sin(angle));
+  }
+}
