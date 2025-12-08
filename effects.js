@@ -1014,7 +1014,9 @@ export class MobiusGrid {
         return invStereo(w);
       });
 
-      dots.push(...rasterize(transformedPoints, (p) => this.palette.get(0.5 + 0.5 * p[axisComponent]), true));
+      // Color based on unwarped Z of the ring
+      const unwarpedZ = invStereo(stereo(points[0])).z;
+      dots.push(...rasterize(transformedPoints, (p) => this.palette.get(0.5 + 0.5 * unwarpedZ), true));
     }
     return dots;
   }
@@ -1036,7 +1038,17 @@ export class MobiusGrid {
         return invStereo(w);
       });
 
-      dots.push(...rasterize(transformedPoints, (p) => this.palette.get(0.5 + 0.5 * p[axisComponent]), true));
+      dots.push(...rasterize(transformedPoints, (v, t) => {
+        // Interpolate unwarped points to get Z
+        const idx = t * (points.length - 1);
+        const i1 = Math.floor(idx);
+        const i2 = Math.min(i1 + 1, points.length - 1);
+        const f = idx - i1;
+        const z1 = points[i1].z;
+        const z2 = points[i2].z;
+        const z = z1 * (1 - f) + z2 * f;
+        return this.palette.get(0.5 + 0.5 * z);
+      }, true));
     }
     return dots;
   }
