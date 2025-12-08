@@ -943,8 +943,9 @@ export class MobiusGrid {
   constructor() {
     Daydream.W = 96;
     this.pixels = new Map();
-    this.alpha = 0.5;
-    this.numRings = 4;
+    this.alpha = 0.2;
+    this.numRings = 18;
+    this.numLines = 12;
     this.palette = new GenerativePalette("circular", "analagous", "flat");
     this.orientation = new Orientation();
     this.timeline = new Timeline();
@@ -969,7 +970,7 @@ export class MobiusGrid {
     this.timeline.add(0, new MobiusWarp(this.params, this.numRings, 160, true));
 
     // Add Repeating Y-Axis Camera Rotation
-    this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, 2 * Math.PI, 300, easeMid, true));
+    this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, 2 * Math.PI, 400, easeMid, true));
 
     this.setupGui();
   }
@@ -999,7 +1000,7 @@ export class MobiusGrid {
 
     // Iterate through rings
     for (let i = -3; i <= numRings + 4; i++) {
-      const t = i / (numRings + 1);
+      const t = i / numRings;
       const logR = logMin + t * range;
 
       const R = Math.exp(logR); // Stereographic Radius
@@ -1026,7 +1027,7 @@ export class MobiusGrid {
     const { a, b, c, d } = mobiusParams;
 
     for (let i = 0; i < numLines; i++) {
-      const theta = (i / numLines) * Math.PI * 2;
+      const theta = (i / numLines) * Math.PI;
       // Normal in XY plane defines a great circle passing through Z poles
       const normal = new THREE.Vector3(Math.cos(theta), Math.sin(theta), 0);
       const radius = 1.0;
@@ -1066,7 +1067,7 @@ export class MobiusGrid {
 
     let dots = [];
     dots.push(...this.drawAxisRings(Daydream.Z_AXIS.clone(), this.numRings, mobiusParams, 'y'));
-    dots.push(...this.drawLongitudes(12, mobiusParams, 'x'));
+    dots.push(...this.drawLongitudes(this.numLines, mobiusParams, 'x'));
 
     // 1. Calculate where the Poles end up after: Stereo -> Mobius -> InvStereo
     // No orientation applied here (handled by FilterOrient)
@@ -1094,7 +1095,7 @@ export class MobiusGrid {
 
     // Use plotDots to render
     // FilterOrient in pipeline will apply global camera rotation to the stabilized scene.
-    plotDots(this.pixels, this.filters, dots, 0, 1.0);
+    plotDots(this.pixels, this.filters, dots, 0, this.alpha);
     return this.pixels;
   }
 }

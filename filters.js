@@ -405,7 +405,7 @@ export class FilterHole {
       c.r *= t;
       c.g *= t;
       c.b *= t;
-      pass(v, c, age, alpha * t);
+      pass(v, c, age, alpha);
     }
   }
 }
