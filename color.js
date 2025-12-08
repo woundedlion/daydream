@@ -233,10 +233,12 @@ export class GenerativePalette {
 
       case 'analogous':
       default:
-        // Analogous (closely spaced hues)
+        // Analogous (closely spaced hues 15-30 degrees)
         let dir = Math.random() < 0.5 ? 1 : -1;
-        hB = normalize(hA + dir * randomBetween(1 / 6, 3 / 12));
-        hC = normalize(hB + dir * randomBetween(1 / 6, 3 / 12));
+        // Was 60-90 degrees (1/6 to 3/12), which created wide spreads
+        // Now 15-30 degrees (1/24 to 1/12)
+        hB = normalize(hA + dir * randomBetween(1 / 24, 1 / 12));
+        hC = normalize(hB + dir * randomBetween(1 / 24, 1 / 12));
         break;
     }
 
@@ -470,7 +472,7 @@ export class VignettePalette {
    * @returns {THREE.Color} The color from the underlying palette at position (1 - t).
    */
   get(t) {
-    let vignetteColor = new THREE.Color(0, 0, 0);    
+    let vignetteColor = new THREE.Color(0, 0, 0);
     if (t < 0.2) {
       return new THREE.Color().lerpColors(vignetteColor, this.palette.get(0), t / 0.2);
     } else if (t >= 0.8) {

@@ -289,7 +289,7 @@ export class Comets {
     ]
     this.curFunction = 0;
     this.updatePath();
-    this.palette = new GenerativePalette("straight", "analogous", "ascending");
+    this.palette = new GenerativePalette("straight", "triadic", "ascending");
     this.trails = new DecayBuffer(this.trailLength);
 
     this.filters = createRenderPipeline(
@@ -320,7 +320,7 @@ export class Comets {
   }
 
   updatePalette() {
-    this.nextPalette = new GenerativePalette("straight", "analogous", "ascending");
+    this.nextPalette = new GenerativePalette("straight", "triadic", "ascending");
     this.timeline.add(0,
       new ColorWipe(this.palette, this.nextPalette, 48, easeMid)
     );
@@ -894,7 +894,7 @@ export class MobiusGrid {
     this.alpha = 0.2;
     this.numRings = new MutableNumber(0);
     this.numLines = new MutableNumber(0);
-    this.palette = new GenerativePalette("circular", "analagous", "flat");
+    this.palette = new GenerativePalette("circular", "split-complementary", "flat");
     this.orientation = new Orientation();
     this.timeline = new Timeline();
     this.hole1 = new FilterHole(new THREE.Vector3(0, 0, 1), 1.2);
@@ -911,9 +911,9 @@ export class MobiusGrid {
     this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, 2 * Math.PI, 400, easeMid, true));
     this.timeline.add(0, new PeriodicTimer(120, () => this.wipePalette(), true));
     this.timeline.add(0,
-      new Mutation(this.numRings, (t) => sinWave(12, 1, 1, 0)(t), 640, easeMid, true)
+      new Mutation(this.numRings, (t) => sinWave(12, 1, 1, 0)(t), 320, easeMid, true)
     )
-    this.timeline.add(0,
+    this.timeline.add(160,
       new Mutation(this.numLines, (t) => sinWave(12, 1, 1, 0)(t), 320, easeMid, true)
     )
 
@@ -935,7 +935,7 @@ export class MobiusGrid {
   }
 
   wipePalette() {
-    this.nextPalette = new GenerativePalette("circular", "analagous", "flat");
+    this.nextPalette = new GenerativePalette("circular", "split-complementary", "flat");
     this.timeline.add(0, new ColorWipe(this.palette, this.nextPalette, 60, easeMid));
   }
 
