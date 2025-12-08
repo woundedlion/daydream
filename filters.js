@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { Daydream, pixelKey, keyPixel } from "./driver.js";
 import { wrap } from "./util.js"
 import { blendAlpha } from "./color.js";
-import { vectorToPixel } from "./geometry.js";
+import { vectorToPixel, angleBetween } from "./geometry.js";
 
 const BLACK = new THREE.Color(0, 0, 0);
 
@@ -203,7 +203,7 @@ export class FilterReplicate {
       pass(r, color, age, alpha);
     }
   }
-} 
+}
 
 
 /**
@@ -247,7 +247,7 @@ export class FilterMobius {
   plot(v, color, age, alpha, pass) {
     // 1. Stereographic Projection (North Pole -> Plane)
     // Singularity check: If we are AT the North Pole, z_in is Infinity.
-    // Möbius of Infinity is a/c.
+    // MÃ¶bius of Infinity is a/c.
     const denom = 1 - v.y;
     let w;
 
@@ -376,6 +376,36 @@ export class FilterDecay {
       } else {
         i++; // Pixel survived, move to next
       }
+    }
+  }
+}
+
+/**
+ * Applies an alpha falloff based on distance from an origin point on the sphere.
+ * Alpha falls off from 1.0 at `radius` to 0.0 at `0` distance using a quintic kernel.
+ */
+export class FilterHole {
+  /**
+   * @param {THREE.Vector3} origin - The center point of the falloff (normalized).
+   * @param {number} radius - The radius (in radians) at which fading starts.
+   */
+  constructor(origin, radius) {
+    this.origin = origin.clone().normalize();
+    this.radius = radius;
+  }
+
+  plot(v, c, age, alpha, pass) {
+    const d = angleBetween(v, this.origin);
+    if (d > this.radius) {
+      pass(v, c, age, alpha);
+    } else {
+      let t = d / this.radius;
+      // Quintic kernel (smootherstep): 6t^5 - 15t^4 + 10t^3
+      t = t * t * t * (t * (t * 6 - 15) + 10);
+      c.r *= t;
+      c.g *= t;
+      c.b *= t;
+      pass(v, c, age, alpha * t);
     }
   }
 }

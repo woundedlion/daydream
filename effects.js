@@ -35,7 +35,7 @@ import {
 
 import {
   createRenderPipeline, FilterAntiAlias, FilterReplicate,
-  FilterOrient, FilterChromaticShift, FilterDecay, FilterMobius
+  FilterOrient, FilterChromaticShift, FilterDecay, FilterMobius, FilterHole
 } from "./filters.js";
 
 import { dir, wrap, shortest_distance, randomChoice, randomBetween } from "./util.js";
@@ -886,17 +886,74 @@ export class FlowField {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Animates the Mobius parameters for a continuous loxodromic flow.
+ */
+class MobiusFlow extends Animation {
+  constructor(params, numRings, duration, repeat = true) {
+    super(duration, repeat);
+    this.params = params;
+    this.numRings = numRings;
+  }
+
+  step() {
+    super.step();
+    // Calculate progress from 0.0 to 1.0 over the duration
+    const progress = this.t / this.duration;
+
+    // One full cycle corresponds to traversing `logPeriod`.
+    const logPeriod = 5.0 / (this.numRings + 1);
+    const flowParam = progress * logPeriod;
+
+    const scale = Math.exp(flowParam);
+    const s = Math.sqrt(scale);
+
+    // Rotate 1 sector (12 longitudes) per cycle to match zoom velocity and loop seamlessly
+    const angle = progress * (Math.PI * 2 / 12);
+
+    this.params.aRe.set(s * Math.cos(angle));
+    this.params.aIm.set(s * Math.sin(angle));
+    this.params.dRe.set((1 / s) * Math.cos(-angle));
+    this.params.dIm.set((1 / s) * Math.sin(-angle));
+
+  }
+}
+
+class MobiusWarp extends Animation {
+  constructor(params, numRings, duration, repeat = true) {
+    super(duration, repeat);
+    this.params = params;
+    this.numRings = numRings;
+  }
+
+  step() {
+    super.step();
+    // Calculate progress from 0.0 to 1.0 over the duration
+    const progress = this.t / this.duration;
+
+    // Transition bRe and bIm in a circle of radius 1
+    const angle = progress * Math.PI * 2;
+
+    this.params.bRe.set(Math.cos(angle));
+    this.params.bIm.set(Math.sin(angle));
+  }
+}
 
 export class MobiusGrid {
   constructor() {
     Daydream.W = 96;
     this.pixels = new Map();
     this.alpha = 0.5;
-    this.numRings = 8;
+    this.numRings = 4;
     this.palette = new GenerativePalette("circular", "analagous", "flat");
     this.orientation = new Orientation();
     this.timeline = new Timeline();
+    this.hole1 = new FilterHole(new THREE.Vector3(0, 0, 1), 1.2);
+    this.hole2 = new FilterHole(new THREE.Vector3(0, 0, -1), 1.2);
     this.filters = createRenderPipeline(
+      this.hole1,
+      this.hole2,
+      new FilterOrient(this.orientation),
       new FilterAntiAlias()
     );
 
@@ -907,6 +964,12 @@ export class MobiusGrid {
       cRe: new MutableNumber(0), cIm: new MutableNumber(0),
       dRe: new MutableNumber(1), dIm: new MutableNumber(0)
     };
+
+    // Add Mobius Flow Animation (Duration 60 frames = ~1s, Repeat = true)
+    this.timeline.add(0, new MobiusWarp(this.params, this.numRings, 160, true));
+
+    // Add Repeating Y-Axis Camera Rotation
+    this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, 2 * Math.PI, 300, easeMid, true));
 
     this.setupGui();
   }
@@ -924,15 +987,17 @@ export class MobiusGrid {
     folder.add(this.params.dRe, 'n').name('dRe').min(-2).max(2).step(0.01).listen();
     folder.add(this.params.dIm, 'n').name('dIm').min(-2).max(2).step(0.01).listen();
   }
+
   drawAxisRings(normal, numRings, mobiusParams, axisComponent) {
     let dots = [];
     const { a, b, c, d } = mobiusParams;
 
-    // Use a fixed log range for calculation
+    // Use a fixed log range for calculation matching the ring logic
     const logMin = -2.5;
     const logMax = 2.5;
     const range = logMax - logMin;
 
+    // Iterate through rings
     for (let i = -3; i <= numRings + 4; i++) {
       const t = i / (numRings + 1);
       const logR = logMin + t * range;
@@ -940,7 +1005,8 @@ export class MobiusGrid {
       const R = Math.exp(logR); // Stereographic Radius
       const radius = (4 / Math.PI) * Math.atan(1 / R);
 
-      const points = sampleRing(this.orientation.get(), normal, radius);
+      // We use IDENTITY orientation for grid generation (local space)
+      const points = sampleRing(new THREE.Quaternion(), normal, radius);
 
       const transformedPoints = points.map(p => {
         const z = stereo(p);
@@ -948,22 +1014,7 @@ export class MobiusGrid {
         return invStereo(w);
       });
 
-      dots.push(...rasterize(transformedPoints, (p) => {
-        // Fade towards poles (ingress/egress) along Z axis
-        const poleDist = Math.abs(p.z);
-        const fadeStart = 0.7;
-        const fadeEnd = 1.0;
-
-        let alpha = 1.0;
-        if (poleDist > fadeStart) {
-          const t = (poleDist - fadeStart) / (fadeEnd - fadeStart);
-          alpha = 1.0 - Math.max(0, Math.min(1, t));
-          alpha = alpha * alpha;
-        }
-
-        const baseColor = this.palette.get(0.5 + 0.5 * p[axisComponent]);
-        return baseColor.multiplyScalar(alpha);
-      }, true));
+      dots.push(...rasterize(transformedPoints, (p) => this.palette.get(0.5 + 0.5 * p[axisComponent]), true));
     }
     return dots;
   }
@@ -977,29 +1028,15 @@ export class MobiusGrid {
       // Normal in XY plane defines a great circle passing through Z poles
       const normal = new THREE.Vector3(Math.cos(theta), Math.sin(theta), 0);
       const radius = 1.0;
-      const points = sampleRing(this.orientation.get(), normal, radius);
+      // We use IDENTITY orientation for grid generation (local space)
+      const points = sampleRing(new THREE.Quaternion(), normal, radius);
       const transformedPoints = points.map(p => {
         const z = stereo(p);
         const w = mobius(z, a, b, c, d);
         return invStereo(w);
       });
 
-      dots.push(...rasterize(transformedPoints, (p) => {
-        // Fade towards poles (ingress/egress) along Z axis, matching Rings
-        const poleDist = Math.abs(p.z);
-        const fadeStart = 0.7;
-        const fadeEnd = 1.0;
-
-        let alpha = 1.0;
-        if (poleDist > fadeStart) {
-          const t = (poleDist - fadeStart) / (fadeEnd - fadeStart);
-          alpha = 1.0 - Math.max(0, Math.min(1, t));
-          alpha = alpha * alpha;
-        }
-
-        const baseColor = this.palette.get(0.5 + 0.5 * p[axisComponent]);
-        return baseColor.multiplyScalar(alpha);
-      }, true));
+      dots.push(...rasterize(transformedPoints, (p) => this.palette.get(0.5 + 0.5 * p[axisComponent]), true));
     }
     return dots;
   }
@@ -1007,26 +1044,6 @@ export class MobiusGrid {
   drawFrame() {
     this.pixels.clear();
     this.timeline.step();
-
-    if (!this.frameCount) this.frameCount = 0;
-    this.frameCount++;
-    const time = this.frameCount * 0.01;
-
-    const logPeriod = 5.0 / (this.numRings + 1);
-    const speed = 4.0;
-    const flowParam = (time * speed) % logPeriod;
-    const scale = Math.exp(flowParam);
-    const s = Math.sqrt(scale);
-
-    const angle = time * 0.5;
-
-    this.params.aRe.set(s * Math.cos(angle));
-    this.params.aIm.set(s * Math.sin(angle));
-    this.params.dRe.set((1 / s) * Math.cos(-angle));
-    this.params.dIm.set((1 / s) * Math.sin(-angle));
-
-    this.params.bRe.set(0); this.params.bIm.set(0);
-    this.params.cRe.set(0); this.params.cIm.set(0);
 
     let a, b, c, d;
     a = { re: this.params.aRe.get(), im: this.params.aIm.get() };
@@ -1039,6 +1056,32 @@ export class MobiusGrid {
     dots.push(...this.drawAxisRings(Daydream.Z_AXIS.clone(), this.numRings, mobiusParams, 'y'));
     dots.push(...this.drawLongitudes(12, mobiusParams, 'x'));
 
+    // 1. Calculate where the Poles end up after: Stereo -> Mobius -> InvStereo
+    // No orientation applied here (handled by FilterOrient)
+
+    // Grid North Pole Input (0,0,1)
+    const nIn = new THREE.Vector3(0, 0, 1);
+    const nTrans = invStereo(mobius(stereo(nIn), a, b, c, d));
+
+    // Grid South Pole Input (0,0,-1)
+    const sIn = new THREE.Vector3(0, 0, -1);
+    const sTrans = invStereo(mobius(stereo(sIn), a, b, c, d));
+
+    // 2. Calculate Stabilizing Rotation Q to center the two hubs
+    // Midpoint between transformed poles
+    const mid = new THREE.Vector3().addVectors(nTrans, sTrans).normalize();
+    // Rotation to align Midpoint with Z-axis
+    const q = new THREE.Quaternion().setFromUnitVectors(mid, Daydream.Z_AXIS);
+
+    // 3. Apply Rotation to Dots (Stabilization)
+    dots.forEach(d => d.position.applyQuaternion(q));
+
+    // 4. Update Holes to Match Transformed & Stabilized Poles
+    this.hole1.origin.copy(nTrans).applyQuaternion(q);
+    this.hole2.origin.copy(sTrans).applyQuaternion(q);
+
+    // Use plotDots to render
+    // FilterOrient in pipeline will apply global camera rotation to the stabilized scene.
     plotDots(this.pixels, this.filters, dots, 0, 1.0);
     return this.pixels;
   }
