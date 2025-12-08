@@ -2,7 +2,7 @@
 import { gui } from "gui";
 import { Daydream, labels, pixelKey } from "./driver.js";
 import FastNoiseLite from "./FastNoiseLite.js";
-import { stereo, invStereo, mobius } from "./3dmath.js";
+import { stereo, invStereo, mobius, MobiusParams } from "./3dmath.js";
 
 import {
   Orientation, Dodecahedron, angleBetween, pixelToVector,
@@ -907,12 +907,7 @@ export class MobiusGrid {
     );
 
     // Mobius Parameters
-    this.params = {
-      aRe: new MutableNumber(1), aIm: new MutableNumber(0),
-      bRe: new MutableNumber(0), bIm: new MutableNumber(0),
-      cRe: new MutableNumber(0), cIm: new MutableNumber(0),
-      dRe: new MutableNumber(1), dIm: new MutableNumber(0)
-    };
+    this.params = new MobiusParams(1, 0, 0, 0, 0, 0, 1, 0);
 
     this.timeline.add(0, new MobiusWarp(this.params, this.numRings, 160, true));
     this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, 2 * Math.PI, 400, easeMid, true));
@@ -948,7 +943,6 @@ export class MobiusGrid {
 
   drawAxisRings(normal, numRings, mobiusParams, axisComponent, phase = 0) {
     let dots = [];
-    const { a, b, c, d } = mobiusParams;
     const logMin = -2.5;
     const logMax = 2.5;
     const range = logMax - logMin;
@@ -956,12 +950,12 @@ export class MobiusGrid {
     for (let i = 0; i < count; i++) {
       let t = wrap(i / numRings + phase, 1.0);
       const logR = logMin + t * range;
-      const R = Math.exp(logR); // Stereographic Radius
+      const R = Math.exp(logR);
       const radius = (4 / Math.PI) * Math.atan(1 / R);
       const points = sampleRing(new THREE.Quaternion(), normal, radius);
       const transformedPoints = points.map(p => {
         const z = stereo(p);
-        const w = mobius(z, a, b, c, d);
+        const w = mobius(z, mobiusParams);
         return invStereo(w);
       });
 
@@ -973,54 +967,38 @@ export class MobiusGrid {
 
   drawLongitudes(numLines, mobiusParams, axisComponent, phase = 0) {
     let dots = [];
-    const { a, b, c, d } = mobiusParams;
+    const invParams = {
+      a: mobiusParams.d,
+      b: { re: -mobiusParams.b.re, im: -mobiusParams.b.im },
+      c: { re: -mobiusParams.c.re, im: -mobiusParams.c.im },
+      d: mobiusParams.a
+    };
 
-    // Inverse Mobius parameters
-    // Inv( (az+b)/(cz+d) ) = (dz - b) / (-cz + a)
-    const invA = d;
-    const invB = { re: -b.re, im: -b.im };
-    const invC = { re: -c.re, im: -c.im };
-    const invD = a;
-
-    // Support fractional lines for smooth animation
     const count = Math.ceil(numLines);
 
     for (let i = 0; i < count; i++) {
       const theta = (i / numLines) * Math.PI;
-      // Normal in XY plane defines a great circle passing through Z poles
       const normal = new THREE.Vector3(Math.cos(theta), Math.sin(theta), 0);
       const radius = 1.0;
-
       const points = sampleRing(new THREE.Quaternion(), normal, radius);
-
       const transformedPoints = points.map(p => {
         const z = stereo(p);
-        const w = mobius(z, a, b, c, d);
+        const w = mobius(z, mobiusParams);
         return invStereo(w);
       });
 
-      // Fade in/out fractional lines
       const opacity = Math.min(1.0, Math.max(0.0, numLines - i));
-
       dots.push(...rasterize(transformedPoints, (p) => {
-        // 1. Recover unwarped point via Inverse Mobius
         const zWarped = stereo(p);
-        const wUnwarped = mobius(zWarped, invA, invB, invC, invD);
+        const wUnwarped = mobius(zWarped, invParams);
         const pUnwarped = invStereo(wUnwarped);
-        0
-        // 2. Calculate Unwarped Z and logR
-        // R = sqrt((1+z)/(1-z))
         const zVal = Math.max(-0.999, Math.min(0.999, pUnwarped.z));
         const R = Math.sqrt((1 + zVal) / (1 - zVal));
         const logR = Math.log(R);
-
         const logMin = -2.5;
         const logMax = 2.5;
         const range = logMax - logMin;
-
-        // 3. Determine Color
         const t = (logR - logMin) / range;
-
         if (this.numRings > 0) {
           const k = t * this.numRings - phase * this.numRings;
           return this.palette.get(wrap(k, this.numRings) / this.numRings).multiplyScalar(opacity);
@@ -1035,24 +1013,17 @@ export class MobiusGrid {
   drawFrame() {
     this.pixels.clear();
     this.timeline.step();
-
-    let a, b, c, d;
-    a = { re: this.params.aRe.get(), im: this.params.aIm.get() };
-    b = { re: this.params.bRe.get(), im: this.params.bIm.get() };
-    c = { re: this.params.cRe.get(), im: this.params.cIm.get() };
-    d = { re: this.params.dRe.get(), im: this.params.dIm.get() };
-    const mobiusParams = { a, b, c, d };
     const phase = ((this.timeline.t || 0) % 120) / 120;
     let dots = [];
 
-    dots.push(...this.drawAxisRings(Daydream.Z_AXIS.clone(), this.numRings.get(), mobiusParams, 'y', phase));
-    dots.push(...this.drawLongitudes(this.numLines.get(), mobiusParams, 'x', phase));
+    dots.push(...this.drawAxisRings(Daydream.Z_AXIS.clone(), this.numRings.get(), this.params, 'y', phase));
+    dots.push(...this.drawLongitudes(this.numLines.get(), this.params, 'x', phase));
 
     // Calculate stabilizing counter-rotation
     const nIn = Daydream.Z_AXIS.clone();
-    const nTrans = invStereo(mobius(stereo(nIn), a, b, c, d));
+    const nTrans = invStereo(mobius(stereo(nIn), this.params));
     const sIn = Daydream.Z_AXIS.clone().negate();
-    const sTrans = invStereo(mobius(stereo(sIn), a, b, c, d));
+    const sTrans = invStereo(mobius(stereo(sIn), this.params));
     const mid = new THREE.Vector3().addVectors(nTrans, sTrans).normalize();
     const q = new THREE.Quaternion().setFromUnitVectors(mid, Daydream.Z_AXIS);
 

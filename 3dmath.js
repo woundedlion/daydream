@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { MutableNumber } from "./animation.js";
 
 // Complex number operations
 function cAdd(a, b) { return { re: a.re + b.re, im: a.im + b.im }; }
@@ -29,8 +30,29 @@ export function stereo(v) {
 }
 
 // Mobius Transformation: f(z) = (az + b) / (cz + d)
-export function mobius(z, a, b, c, d) {
-  const num = cAdd(cMult(a, z), b);
-  const den = cAdd(cMult(c, z), d);
+export function mobius(z, params) {
+  const num = cAdd(cMult(params.a, z), params.b);
+  const den = cAdd(cMult(params.c, z), params.d);
   return cDiv(num, den);
+}
+
+/**
+ * Class to hold Mobius parameters with mutable components.
+ */
+export class MobiusParams {
+  constructor(aRe = 1, aIm = 0, bRe = 0, bIm = 0, cRe = 0, cIm = 0, dRe = 1, dIm = 0) {
+    this.aRe = new MutableNumber(aRe);
+    this.aIm = new MutableNumber(aIm);
+    this.bRe = new MutableNumber(bRe);
+    this.bIm = new MutableNumber(bIm);
+    this.cRe = new MutableNumber(cRe);
+    this.cIm = new MutableNumber(cIm);
+    this.dRe = new MutableNumber(dRe);
+    this.dIm = new MutableNumber(dIm);
+  }
+
+  get a() { return { re: this.aRe.get(), im: this.aIm.get() }; }
+  get b() { return { re: this.bRe.get(), im: this.bIm.get() }; }
+  get c() { return { re: this.cRe.get(), im: this.cIm.get() }; }
+  get d() { return { re: this.dRe.get(), im: this.dIm.get() }; }
 }
