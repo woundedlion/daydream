@@ -905,8 +905,6 @@ export class MobiusGrid {
       new FilterOrient(this.orientation),
       new FilterAntiAlias()
     );
-
-    // Mobius Parameters
     this.params = new MobiusParams(1, 0, 0, 0, 0, 0, 1, 0);
 
     this.timeline.add(0, new MobiusWarp(this.params, this.numRings, 160, true));
@@ -967,13 +965,6 @@ export class MobiusGrid {
 
   drawLongitudes(numLines, mobiusParams, axisComponent, phase = 0) {
     let dots = [];
-    const invParams = {
-      a: mobiusParams.d,
-      b: { re: -mobiusParams.b.re, im: -mobiusParams.b.im },
-      c: { re: -mobiusParams.c.re, im: -mobiusParams.c.im },
-      d: mobiusParams.a
-    };
-
     const count = Math.ceil(numLines);
 
     for (let i = 0; i < count; i++) {
@@ -981,6 +972,7 @@ export class MobiusGrid {
       const normal = new THREE.Vector3(Math.cos(theta), Math.sin(theta), 0);
       const radius = 1.0;
       const points = sampleRing(new THREE.Quaternion(), normal, radius);
+
       const transformedPoints = points.map(p => {
         const z = stereo(p);
         const w = mobius(z, mobiusParams);
@@ -988,23 +980,21 @@ export class MobiusGrid {
       });
 
       const opacity = Math.min(1.0, Math.max(0.0, numLines - i));
-      dots.push(...rasterize(transformedPoints, (p) => {
-        const zWarped = stereo(p);
-        const wUnwarped = mobius(zWarped, invParams);
-        const pUnwarped = invStereo(wUnwarped);
-        const zVal = Math.max(-0.999, Math.min(0.999, pUnwarped.z));
-        const R = Math.sqrt((1 + zVal) / (1 - zVal));
+      dots.push(...rasterize(transformedPoints, (p, tLine) => {
+        // Interpolate unwarped points to get Z
+        const idx = tLine * points.length;
+        const i1 = Math.floor(idx) % points.length;
+        const i2 = (i1 + 1) % points.length;
+        const f = idx - Math.floor(idx);
+        const z = points[i1].z * (1 - f) + points[i2].z * f;
+        const R = Math.sqrt((1 + z) / (1 - z));
         const logR = Math.log(R);
         const logMin = -2.5;
         const logMax = 2.5;
         const range = logMax - logMin;
         const t = (logR - logMin) / range;
-        if (this.numRings > 0) {
-          const k = t * this.numRings - phase * this.numRings;
-          return this.palette.get(wrap(k, this.numRings) / this.numRings).multiplyScalar(opacity);
-        } else {
-          return this.palette.get(wrap(t - phase, 1.0)).multiplyScalar(opacity);
-        }
+
+        return this.palette.get(wrap(t - phase, 1.0)).multiplyScalar(opacity);
       }, true));
     }
     return dots;
