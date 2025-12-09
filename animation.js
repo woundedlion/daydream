@@ -1,3 +1,5 @@
+// TODO: Split Transition into ContinuousTransition and DiscreteTransition
+
 // animation.js
 import * as THREE from "three";
 import { Daydream } from "./driver.js";

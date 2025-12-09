@@ -415,18 +415,16 @@ export function lerp(from, to, t) {
  * Returns a function that generates a triangle wave value.
  * @param {number} from - The minimum output value.
  * @param {number} to - The maximum output value.
- * @param {number} freq - The frequency multiplier (unused in current implementation, kept for signature).
- * @param {number} phase - The phase shift (unused in current implementation, kept for signature).
+ * @param {number} freq - The frequency multiplier .
+ * @param {number} phase - The phase shift
  * @returns {function(number): number} A function that takes time t and returns the wave value.
  */
 export function triWave(from, to, freq, phase) {
   return (t) => {
-    if (t < 0.5) {
-      var w = 2 * t;
-    } else {
-      w = 2 - 2 * t;
-    }
-    return w * (to - from) + from;
+    let p = (t * freq + phase) % 1;
+    if (p < 0) p += 1;
+    let w = (p < 0.5) ? (2 * p) : (2 - 2 * p);
+    return from + w * (to - from);
   };
 }
 

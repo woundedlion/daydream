@@ -12,7 +12,8 @@ import {
   FlowField,
   Thrusters,
   Test,
-  MobiusGrid
+  MobiusGrid,
+  Moire
 } from "./effects.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
@@ -29,12 +30,13 @@ const effects = {
   MetaballEffect,
   FlowField,
   Test,
-  MobiusGrid
+  MobiusGrid,
+  Moire
 };
 
 let activeEffect;
 const controls = {
-  effectName: 'MobiusGrid',
+  effectName: 'Moire',
   changeEffect: function () {
     if (activeEffect && activeEffect.gui) {
       activeEffect.gui.destroy();

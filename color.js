@@ -436,7 +436,7 @@ export class MutatingPalette {
 /**
  * A wrapper class that reverses the sampling direction of an existing palette.
  */
-export class reversePalette {
+export class ReversePalette {
   /**
    * @param {Object} palette - The original palette object with a .get(t) method.
    */
