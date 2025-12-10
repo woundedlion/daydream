@@ -13,7 +13,8 @@ import {
   Thrusters,
   Test,
   MobiusGrid,
-  Moire
+  Moire,
+  Portholes
 } from "./effects.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
@@ -31,12 +32,13 @@ const effects = {
   FlowField,
   Test,
   MobiusGrid,
-  Moire
+  Moire,
+  Portholes
 };
 
 let activeEffect;
 const controls = {
-  effectName: 'Moire',
+  effectName: 'Portholes',
   changeEffect: function () {
     if (activeEffect && activeEffect.gui) {
       activeEffect.gui.destroy();
