@@ -6,7 +6,7 @@ import { stereo, invStereo, mobius, MobiusParams } from "./3dmath.js";
 
 import {
   Orientation, Dodecahedron, angleBetween, pixelToVector,
-  distanceGradient, isOver, bisect, lissajous,
+  distanceGradient, isOver, lissajous,
   fibSpiral, randomVector, Dot, sinWave, triWave, lerp, squareWave,
   logPolarToVector, vectorToLogPolar
 } from "./geometry.js";
@@ -36,7 +36,8 @@ import {
 
 import {
   createRenderPipeline, FilterAntiAlias, FilterReplicate,
-  FilterOrient, FilterChromaticShift, FilterDecay, FilterMobius, FilterHole
+  FilterOrient, FilterChromaticShift, FilterDecay, FilterMobius, FilterHole,
+  FilterHemisphereRotate
 } from "./filters.js";
 
 import { dir, wrap, shortest_distance, randomChoice, randomBetween } from "./util.js";
@@ -1146,30 +1147,34 @@ export class Portholes {
     this.alpha = 0.3; // Default alpha
 
     this.basePalette = new GenerativePalette("circular", "analogous", "bell");
-    this.interferencePalette = new GenerativePalette("circular", "split-complementary", "cup");
+    this.interferencePalette = new GenerativePalette("circular", "analogous", "cup");
 
     this.orientation = new Orientation();
+    this.hemisphereOrientationA = new Orientation();
+    this.hemisphereOrientationB = new Orientation();
+    this.hemisphereAxis = new THREE.Vector3(0, 1, 0);
     this.timeline = new Timeline();
 
     // Parameters
-    this.numPoints = new MutableNumber(20); // Keep density low
+    this.numPoints = new MutableNumber(20);
     this.circleRadius = new MutableNumber(0.27);
-    this.offsetRadius = new MutableNumber(2 * Math.PI / Daydream.W); // Width of one pixel
-    this.offsetSpeed = new MutableNumber(1.0);
+    this.offsetRadius = new MutableNumber(0.02); // Increased base offset
+    this.offsetSpeed = new MutableNumber(2.0); // Faster speed
     this.t = 0;
 
     this.filters = createRenderPipeline(
+      new FilterHemisphereRotate(this.hemisphereOrientationA, this.hemisphereOrientationB, this.hemisphereAxis),
       new FilterOrient(this.orientation),
       new FilterAntiAlias()
     );
 
     // Animations
-    this.timeline.add(0, new PeriodicTimer(80, () => this.colorWipe()));
+    this.timeline.add(0, new PeriodicTimer(48, () => this.colorWipe()));
     //    this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, 2 * Math.PI, 300, easeMid, true));
-
-    // Breathing animation for offset
+    this.timeline.add(0, new PeriodicTimer(160, () => this.spinHemisphere(), true));
+    // Breathing animation for offset (Increased range for visibility)
     this.timeline.add(0,
-      new Mutation(this.offsetRadius, sinWave(2 * Math.PI / Daydream.W * 0.9, 2 * Math.PI / Daydream.W * 1.1, 0.1, 0), 200, easeMid, true)
+      new Mutation(this.offsetRadius, sinWave(0.02, 0.04, 0.1, 0), 32, easeMid, true)
     );
 
     this.setupGui();
@@ -1210,7 +1215,7 @@ export class Portholes {
         let v = new THREE.Vector3().crossVectors(p, u).normalize();
 
         // Time based offset in tangent plane
-        const phase = i * 0.1; // Phase offset per circle for waviness?
+        const phase = i * 0.1;
         const angle = this.t * this.offsetSpeed.get() * 2 * Math.PI + phase;
         const r = this.offsetRadius.get();
 
@@ -1242,5 +1247,13 @@ export class Portholes {
 
     plotDots(this.pixels, this.filters, dots, 0, this.alpha);
     return this.pixels;
+  }
+
+  spinHemisphere() {
+    let axis = randomVector();
+    this.hemisphereAxis.copy(axis);
+    // Spin opposite directions over 5 seconds (80 frames)
+    this.timeline.add(0, new Rotation(this.hemisphereOrientationA, axis, 2 * Math.PI, 80, easeInOutSin, false));
+    this.timeline.add(0, new Rotation(this.hemisphereOrientationB, axis, -2 * Math.PI, 80, easeInOutSin, false));
   }
 }

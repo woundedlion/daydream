@@ -409,3 +409,30 @@ export class FilterHole {
     }
   }
 }
+
+/**
+ * Applies different orientations to points in each hemisphere defined by axis.
+ */
+export class FilterHemisphereRotate {
+  /**
+   * @param {Orientation} orientationA - Orientation for the positive hemisphere (dot(v, axis) > 0).
+   * @param {Orientation} orientationB - Orientation for the negative hemisphere.
+   * @param {THREE.Vector3} axis - The axis defining the hemisphere.
+   */
+  constructor(orientationA, orientationB, axis) {
+    this.is2D = false;
+    this.orientationA = orientationA;
+    this.orientationB = orientationB;
+    this.axis = axis;
+  }
+
+  plot(v, color, age, alpha, pass) {
+    if (v.dot(this.axis) > 0) {
+      this.orientationA.collapse();
+      pass(this.orientationA.orient(v), color, age, alpha);
+    } else {
+      this.orientationB.collapse();
+      pass(this.orientationB.orient(v), color, age, alpha);
+    }
+  }
+}
