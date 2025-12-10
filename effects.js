@@ -897,11 +897,11 @@ export class MobiusGrid {
     this.palette = new GenerativePalette("circular", "split-complementary", "flat");
     this.orientation = new Orientation();
     this.timeline = new Timeline();
-    this.hole1 = new FilterHole(new THREE.Vector3(0, 0, 1), 1.2);
-    this.hole2 = new FilterHole(new THREE.Vector3(0, 0, -1), 1.2);
+    this.holeN = new FilterHole(new THREE.Vector3(0, 0, 1), 1.2);
+    this.holeS = new FilterHole(new THREE.Vector3(0, 0, -1), 1.2);
     this.filters = createRenderPipeline(
-      this.hole1,
-      this.hole2,
+      this.holeN,
+      this.holeS,
       new FilterOrient(this.orientation),
       new FilterAntiAlias()
     );
@@ -1019,8 +1019,8 @@ export class MobiusGrid {
 
     // Apply counter-rotation to dots and holes
     dots.forEach(d => d.position.applyQuaternion(q));
-    this.hole1.origin.copy(nTrans).applyQuaternion(q);
-    this.hole2.origin.copy(sTrans).applyQuaternion(q);
+    this.holeN.origin.copy(nTrans).applyQuaternion(q);
+    this.holeS.origin.copy(sTrans).applyQuaternion(q);
 
     plotDots(this.pixels, this.filters, dots, 0, this.alpha);
     return this.pixels;
@@ -1033,7 +1033,7 @@ export class Moire {
   constructor() {
     Daydream.W = 96;
     this.pixels = new Map();
-    this.alpha = 0.1;
+    this.alpha = 0.2;
     this.basePalette = new GenerativePalette("circular", "split-complementary", "bell");
     this.interferencePalette = new GenerativePalette("circular", "split-complementary", "cup");
 

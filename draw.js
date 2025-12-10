@@ -2,24 +2,29 @@
 import * as THREE from "three";
 import { Daydream, labels } from "./driver.js";
 import { Dot, angleBetween, fibSpiral } from "./geometry.js";
+import { StaticCircularBuffer } from "./StaticCircularBuffer.js";
 
 /**
  * Implements pixel history and decay for persistent effects.
+ * Manages a buffer of points that fade out over a specific lifespan.
  */
 export class DecayBuffer {
   /**
-   * @param {number} lifespan - The number of frames a pixel lasts.
+   * @param {number} lifespan - The number of frames a pixel lasts before disappearing.
+   * @param {number} [capacity=4096] - The maximum number of trail segments to track.
    */
-  constructor(lifespan) {
+  constructor(lifespan, capacity = 4096) {
+    /** @type {number} */
     this.lifespan = lifespan;
-    this.history = [];
+    /** @type {StaticCircularBuffer} */
+    this.history = new StaticCircularBuffer(capacity);
   }
 
   /**
    * Records a list of dots into the history buffer.
-   * @param {Dot[]} dots - The list of dots to record.
-   * @param {number} age - The initial age of the dots
-   * @param {number} alpha - The opacity of the dots.
+   * * @param {Dot[]} dots - The list of dots (position/color) to record.
+   * @param {number} age - The initial age of the dots (usually 0).
+   * @param {number} alpha - The global opacity for these dots.
    */
   recordDots(dots, age, alpha) {
     for (const dot of dots) {
@@ -29,36 +34,41 @@ export class DecayBuffer {
 
   /**
    * Records a single dot into the history buffer.
-   * @param {THREE.Vector3} v - The position vector.
-   * @param {THREE.Color} color - The color of the dot.
-   * @param {number} age - The initial age of the dot.
-   * @param {number} alpha - The opacity of the dot.
+   * * @param {THREE.Vector3} v - The position vector.
+   * @param {THREE.Color} color - The base color of the dot.
+   * @param {number} age - The initial age of the dot (frame offset).
+   * @param {number} alpha - The initial opacity.
    */
   record(v, color, age, alpha) {
-    this.history.push({ v: v, color: color, alpha: alpha, ttl: this.lifespan - age })
+    // Calculate Time To Live (TTL)
+    let ttl = this.lifespan - age;
+    if (ttl > 0) {
+      // Push to circular buffer (automatically handles overwriting oldest if full)
+      this.history.push({ v: v, color: color, alpha: alpha, ttl: ttl });
+    }
   }
 
   /**
-   * Renders the buffered dots to the pixel map, applying decay.
-   * @param {Map} pixels - The pixel map to write to.
-   * @param {Object} pipeline - The render pipeline or filter object.
-   * @param {Function} colorFn - Function to determine color based on decay (takes vector and normalized decay progress 0-1).
+   * Renders the buffered dots to the pixel map, applying decay and sorting.
+   * * @param {Map} pixels - The pixel map to write to (output).
+   * @param {Object} pipeline - The render pipeline or filter object to process points.
+   * @param {Function} colorFn - Function to determine color based on decay. Signature: (vector, normalized_t) => Color.
    */
   render(pixels, pipeline, colorFn) {
-    for (let i = 0; i < this.history.length; ++i) {
-      // plot
-      let e = this.history[i];
-      if (e.ttl === this.lifespan) {
-        pipeline.plot(pixels, e.v, e.color, 0, e.alpha);
-      } else if (e.ttl > 0) {
-        pipeline.plot(pixels, e.v, colorFn(e.v, (this.lifespan - e.ttl) / this.lifespan), 0, e.alpha);
-      }
+    // sort
+    this.history.sort((a, b) => a.ttl - b.ttl);
 
-      // decay and cleanup
-      if (--e.ttl <= 0) {
-        this.history.splice(i, 1);
-        i--;
-      }
+    // render
+    for (let i = 0; i < this.history.size; ++i) {
+      let e = this.history.get(i);
+      let t = (this.lifespan - e.ttl) / this.lifespan;
+      pipeline.plot(pixels, e.v, colorFn(e.v, t), 0, e.alpha);
+      e.ttl -= 1;
+    }
+
+    // cleanup
+    while (this.history.size > 0 && this.history.front().ttl <= 0) {
+      this.history.pop();
     }
   }
 }
