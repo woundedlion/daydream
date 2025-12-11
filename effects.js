@@ -1293,13 +1293,13 @@ export class ReactionDiffusion {
     // We'll update seed to just pick random nodes.
 
     // Simulation Parameters
-    // Screen-Space Isotropic Grid.
-    // We use standard Gray-Scott constants now since the grid is uniform.
-    // dA=0.2, dB=0.1
-    this.dA = 0.2;
-    this.dB = 0.1;
+    // Fibonacci Hex Graph.
+    // Uniform weights (1.0). K=6.
+    // dA=0.15, dB=0.075
+    this.dA = 0.15;
+    this.dB = 0.075;
 
-    console.log(`RD Initialized with N=${this.N}. Grid Mode: dA=${this.dA}, dB=${this.dB}`);
+    console.log(`RD Initialized with N=${this.N}. Fibonacci Mode: dA=${this.dA}, dB=${this.dB}`);
 
     // Coral Params
     this.feed = 0.0545;
@@ -1323,105 +1323,70 @@ export class ReactionDiffusion {
   }
 
   buildGraph() {
-    // Screen-Space Isotropic HEXAGONAL Grid
-    // 6 Neighbors for maximum isotropy (Brain Coral look).
-    // Staggered rows (Odd-r offset).
+    // Fibonacci Sphere (Uniform Isotropy)
+    // Solves Polar Distortion by distributing nodes evenly (Equal Area).
+    // Solves Pattern quality by using K=6 (Hexagonal) connectivity.
 
-    // Grid Dimensions
-    const cols = 96;
-    const rows = 48;
-    this.N = cols * rows;
+    this.N = 4096; // Adjust for density
 
     this.nodes = [];
     this.neighbors = [];
     this.weights = [];
     this.scales = [];
 
-    const idx = (c, r) => r * cols + c;
+    // 1. Generate Nodes (Fibonacci Spiral)
+    const phi = Math.PI * (3 - Math.sqrt(5)); // Golden Angle
 
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        // 1. Visual Position (Staggered Lat-Long)
-        // v from 0 to 1
-        let v = (r + 0.5) / rows;
-        let u = c / cols;
+    for (let i = 0; i < this.N; i++) {
+      let y = 1 - (i / (this.N - 1)) * 2; // y goes from 1 to -1
+      let radius = Math.sqrt(1 - y * y);
 
-        // Stagger odd rows by 0.5 column
-        if (r % 2 === 1) {
-          u += 0.5 / cols;
-        }
+      let theta = phi * i;
 
-        let phi = v * Math.PI;
-        let theta = u * 2 * Math.PI;
+      let x = Math.cos(theta) * radius;
+      let z = Math.sin(theta) * radius;
 
-        let x_pos = Math.sin(phi) * Math.cos(theta);
-        let z_pos = Math.sin(phi) * Math.sin(theta);
-        let y_pos = Math.cos(phi);
-
-        this.nodes.push(new THREE.Vector3(x_pos, y_pos, z_pos));
-
-        // 2. Build Hex Neighbors
-        // Even Row: L, R, TL(c-1), TR(c), BL(c-1), BR(c)
-        // Odd Row:  L, R, TL(c), TR(c+1), BL(c), BR(c+1)
-        let myNbs = [];
-
-        let isEven = (r % 2 === 0);
-
-        // Offsets for the 6 neighbors [dc, dr]
-        let offsets;
-        if (isEven) {
-          offsets = [
-            [-1, 0], [1, 0],   // L, R
-            [-1, -1], [0, -1], // TL, TR
-            [-1, 1], [0, 1]    // BL, BR
-          ];
-        } else {
-          offsets = [
-            [-1, 0], [1, 0],   // L, R
-            [0, -1], [1, -1],  // TL, TR
-            [0, 1], [1, 1]     // BL, BR
-          ];
-        }
-
-        for (let o of offsets) {
-          let dc = o[0];
-          let dr = o[1];
-
-          let nc = c + dc;
-          let nr = r + dr;
-
-          // Wrap X
-          // Note: % in JS can be negative. (n%m + m)%m handles it.
-          nc = (nc % cols + cols) % cols;
-
-          // Wrap Y (Cross Poles)
-          if (nr < 0) {
-            // Top Edge -> Cross North Pole
-            // Map to Row 0, opposite Longitude
-            // Hex stagger makes exact alignment tricky, but (c + cols/2) is robust enough.
-            nr = 0;
-            nc = (nc + cols / 2) % cols;
-          } else if (nr >= rows) {
-            // Bottom Edge -> Cross South Pole
-            // Map to Row rows-1, opposite Longitude
-            nr = rows - 1;
-            nc = (nc + cols / 2) % cols;
-          }
-
-          myNbs.push(idx(nc, nr));
-        }
-
-        // Uniform weights
-        // 6 neighbors. 
-        let myWs = new Array(6).fill(1.0);
-
-        this.neighbors.push(myNbs);
-        this.weights.push(myWs);
-        this.scales.push(1.0);
-      }
+      this.nodes.push(new THREE.Vector3(x, y, z));
     }
 
-    console.log("Graph built (Hexagonal Isotropic Grid). Nodes:", this.N);
+    // 2. Build K=6 Neighbors (Hexagonal Topology)
+    // Brute force N^2 for 4096 is ~16M ops (fine for init).
+    const K = 6;
+
+    for (let i = 0; i < this.N; i++) {
+      let p1 = this.nodes[i];
+      let bestIndices = [];
+      let bestDists = [];
+
+      for (let j = 0; j < this.N; j++) {
+        if (i === j) continue;
+        let d2 = p1.distanceToSquared(this.nodes[j]);
+
+        // Insertion Sort
+        let len = bestDists.length;
+        if (len < K || d2 < bestDists[len - 1]) {
+          let pos = len;
+          while (pos > 0 && d2 < bestDists[pos - 1]) {
+            pos--;
+          }
+
+          bestDists.splice(pos, 0, d2);
+          bestIndices.splice(pos, 0, j);
+
+          if (bestDists.length > K) {
+            bestDists.pop();
+            bestIndices.pop();
+          }
+        }
+      }
+
+      this.neighbors.push(bestIndices);
+      // Uniform weights (Simulate Grid behavior on the Graph)
+      this.weights.push(new Array(K).fill(1.0));
+      this.scales.push(1.0);
+    }
+
+    console.log("Graph built (Fibonacci Hex Sphere). Nodes:", this.N);
   }
 
   spin() {
