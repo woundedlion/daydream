@@ -37,7 +37,7 @@ import {
 import {
   createRenderPipeline, FilterAntiAlias, FilterReplicate,
   FilterOrient, FilterChromaticShift, FilterDecay, FilterMobius, FilterHole,
-  FilterHemisphereRotate
+  FilterOrientSlice
 } from "./filters.js";
 
 import { dir, wrap, shortest_distance, randomChoice, randomBetween } from "./util.js";
@@ -1154,7 +1154,6 @@ export class Portholes {
     for (let i = 0; i < numSlices; i++) {
       this.orientations.push(new Orientation());
     }
-    this.orientation = new Orientation();
     this.hemisphereAxis = new THREE.Vector3(0, 1, 0);
     this.timeline = new Timeline();
 
@@ -1166,8 +1165,7 @@ export class Portholes {
     this.t = 0;
 
     this.filters = createRenderPipeline(
-      new FilterHemisphereRotate(this.orientations, this.hemisphereAxis),
-      new FilterOrient(this.orientation),
+      new FilterOrientSlice(this.orientations, this.hemisphereAxis),
       new FilterAntiAlias()
     );
 

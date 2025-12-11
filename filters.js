@@ -411,12 +411,9 @@ export class FilterHole {
 }
 
 /**
- * Applies different orientations to points in each hemisphere defined by axis.
- */
-/**
  * Applies different orientations to points in n latitude bands defined by axis.
  */
-export class FilterHemisphereRotate {
+export class FilterOrientSlice {
   /**
    * @param {Orientation[]} orientations - Array of orientations (South to North).
    * @param {THREE.Vector3} axis - The axis defining the poles for slicing.
@@ -428,18 +425,11 @@ export class FilterHemisphereRotate {
   }
 
   plot(v, color, age, alpha, pass) {
-    // Map angle [PI, 0] to [0, 1] (South to North)
-    // dot=-1 => acos=PI => t=0
-    // dot=1 => acos=0 => t=1
     const dot = Math.max(-1, Math.min(1, v.dot(this.axis)));
     const t = 1 - Math.acos(dot) / Math.PI;
-
-    // Map [0, 1] to integer index [0, n-1]
     let idx = Math.floor(t * this.orientations.length);
-    // Clamp for edge cases (e.g. t=1.0)
     if (idx >= this.orientations.length) idx = this.orientations.length - 1;
     if (idx < 0) idx = 0;
-
     const orientation = this.orientations[idx];
     orientation.collapse();
     pass(orientation.orient(v), color, age, alpha);
