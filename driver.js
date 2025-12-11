@@ -240,8 +240,15 @@ export class Daydream {
           labels.push({ "position": Daydream.Z_AXIS, "content": "Z" });
         }
 
+        if (typeof effect.getLabels === 'function') {
+          labels.push(...effect.getLabels());
+        }
+
         for (const label of labels) {
-          this.makeLabel(label.position, label.content);
+          // Cull labels on the back side of the sphere
+          if (label.position.dot(this.camera.position) > Daydream.SPHERE_RADIUS) {
+            this.makeLabel(label.position, label.content);
+          }
         }
       }
     }

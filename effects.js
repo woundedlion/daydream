@@ -1261,191 +1261,71 @@ export class Portholes {
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 
-export class ReactionDiffusion {
-  constructor() {
-    this.pixels = new Map();
-    this.alpha = 1.0;
+export class Reaction extends Sprite {
+  constructor(rd, duration = 192, fadeOut = 32) {
+    // 16 FPS. 10s exist + 2s fade = 12s total (192 frames).
+    super((alpha) => this.render(alpha), duration, 0, easeMid, fadeOut, easeMid);
 
-    this.alpha = 1.0;
+    this.rd = rd;
+    this.N = rd.N;
 
-    // Graph Parameters
-    // Fix Aspect Ratio: 96 cols. For square cells at equator ($2\pi$ vs $\pi$), we need 48 rows.
-    // This fixes horizontal bias.
-    this.N = 96 * 48;
-
-    this.nodes = [];       // Vector3 positions
-    this.neighbors = [];   // Adjacency list
-    this.weights = [];     // Weights for Laplacian
-    this.scales = [];      // Physical Scale factors (1/dx^2) for correct Laplacian
-
-    // Build Graph (Staggered Lat-Long KNN)
-    this.buildGraph();
-
-    // RD State (Allocate after buildGraph to ensure N is final)
+    // RD State
     this.A = new Float32Array(this.N).fill(1.0);
     this.B = new Float32Array(this.N).fill(0.0);
     this.nextA = new Float32Array(this.N);
     this.nextB = new Float32Array(this.N);
 
-    // Initial Seed
-    this.seed(0, 0, 5);
-    // Actually seed function uses x,y grid logic which maps to graph nodes approx?
-    // We'll update seed to just pick random nodes.
-
-    // Simulation Parameters
-    // Fibonacci Hex Graph.
-    // Uniform weights (1.0). K=6.
-    // dA=0.15, dB=0.075
+    // Params (Brain Coral)
+    this.feed = 0.0545;
+    this.k = 0.062;
+    // Fibonacci Mode diffusion
     this.dA = 0.15;
     this.dB = 0.075;
-
-    console.log(`RD Initialized with N=${this.N}. Fibonacci Mode: dA=${this.dA}, dB=${this.dB}`);
-
-    // Coral Params
-    this.feed = 0.0545;
-    this.k = 0.0635;
     this.dt = 1.0;
 
+    // Palette (Instantiate new one)
     this.palette = new GenerativePalette("straight", "analagous", "ascending", "vibrant");
 
-    this.orientation = new Orientation();
-    // We use a simpler pipeline since we are splatting points
-    this.filters = createRenderPipeline(
-      new FilterOrient(this.orientation),
-      new FilterAntiAlias()
-    );
-
-    this.timeline = new Timeline();
-    //    this.timeline.add(0, new PeriodicTimer(160, () => this.spin(), true));
-
-    this.setupGui();
-    this.reset();
+    this.seed();
   }
 
-  buildGraph() {
-    // Fibonacci Sphere (Uniform Isotropy)
-    // Solves Polar Distortion by distributing nodes evenly (Equal Area).
-    // Solves Pattern quality by using K=6 (Hexagonal) connectivity.
-
-    this.N = 4096; // Adjust for density
-
-    this.nodes = [];
-    this.neighbors = [];
-    this.weights = [];
-    this.scales = [];
-
-    // 1. Generate Nodes (Fibonacci Spiral)
-    const phi = Math.PI * (3 - Math.sqrt(5)); // Golden Angle
-
-    for (let i = 0; i < this.N; i++) {
-      let y = 1 - (i / (this.N - 1)) * 2; // y goes from 1 to -1
-      let radius = Math.sqrt(1 - y * y);
-
-      let theta = phi * i;
-
-      let x = Math.cos(theta) * radius;
-      let z = Math.sin(theta) * radius;
-
-      this.nodes.push(new THREE.Vector3(x, y, z));
-    }
-
-    // 2. Build K=6 Neighbors (Hexagonal Topology)
-    // Brute force N^2 for 4096 is ~16M ops (fine for init).
-    const K = 6;
-
-    for (let i = 0; i < this.N; i++) {
-      let p1 = this.nodes[i];
-      let bestIndices = [];
-      let bestDists = [];
-
-      for (let j = 0; j < this.N; j++) {
-        if (i === j) continue;
-        let d2 = p1.distanceToSquared(this.nodes[j]);
-
-        // Insertion Sort
-        let len = bestDists.length;
-        if (len < K || d2 < bestDists[len - 1]) {
-          let pos = len;
-          while (pos > 0 && d2 < bestDists[pos - 1]) {
-            pos--;
-          }
-
-          bestDists.splice(pos, 0, d2);
-          bestIndices.splice(pos, 0, j);
-
-          if (bestDists.length > K) {
-            bestDists.pop();
-            bestIndices.pop();
-          }
-        }
-      }
-
-      this.neighbors.push(bestIndices);
-      // Uniform weights (Simulate Grid behavior on the Graph)
-      this.weights.push(new Array(K).fill(1.0));
-      this.scales.push(1.0);
-    }
-
-    console.log("Graph built (Fibonacci Hex Sphere). Nodes:", this.N);
-  }
-
-  spin() {
-    let axis = randomVector();
-    // Rotate slowly
-    this.timeline.add(0,
-      new Rotation(this.orientation, axis, Math.PI / 2, 200, easeInOutSin, false)
-    );
-  }
-
-  reset() {
-    this.A.fill(1.0);
-    this.B.fill(0.0);
+  seed() {
     // Seed random spots
     for (let i = 0; i < 5; i++) {
       let idx = Math.floor(Math.random() * this.N);
-      this.seed(idx, 8);
-    }
-  }
-
-  seed(cx, cy, r) {
-    // Seed a few random spots with B=1
-    for (let k = 0; k < 20; k++) {
-      let center = Math.floor(Math.random() * this.N);
-      let nbs = this.neighbors[center];
-      this.B[center] = 1.0;
-      for (let j of nbs) {
+      let nbs = this.rd.neighbors[idx];
+      this.B[idx] = 1.0;
+      for (let j of nbs) { // Check if nbs is iterable (it is array of indices)
         this.B[j] = 1.0;
       }
     }
   }
 
-  setupGui() {
-    if (this.gui) this.gui.destroy();
-    this.gui = new gui.GUI();
-    const restart = () => this.reset();
+  render(currentAlpha) {
+    // 1. Simulate (12 steps per frame)
+    for (let k = 0; k < 12; k++) {
+      this.updatePhysics();
+    }
 
-    const sim = this.gui.addFolder('Simulation');
-    // Feed and Kill are now dynamic in update()
-    // sim.add(this, 'feed', 0.01, 0.1).step(0.001).name('Feed (f)').onChange(restart);
-    // sim.add(this, 'k', 0.01, 0.1).step(0.001).name('Kill (k)').onChange(restart);
-    sim.add(this, 'dA', 0.00001, 0.001).step(0.00001).name('Diff A').onChange(restart);
-    sim.add(this, 'dB', 0.00001, 0.001).step(0.00001).name('Diff B').onChange(restart);
-    sim.add(this, 'dt', 0.1, 2.0).step(0.1).name('Time Step').onChange(restart);
-    sim.open();
-    this.gui.add({ restart }, 'restart').name('Restart Pattern');
+    // 2. Draw
+    for (let i = 0; i < this.N; i++) {
+      let b = this.B[i];
+      if (b > 0.1) {
+        let t = Math.max(0, Math.min(1, (b - 0.15) * 4.0));
+        let c = this.palette.get(t);
+        this.rd.filters.plot(this.rd.pixels, this.rd.nodes[i], c, 0, currentAlpha * this.rd.alpha);
+      }
+    }
   }
 
-  update() {
-    // Dynamic Parameter Evolution
-    // Locked to Brain Coral Regime (Phase Eta)
-    // This is the specific "labyrinth" spot in phase space.
-    // No oscillation, no noise, just pure reaction-diffusion.
-    this.feed = 0.0545;
-    this.k = 0.062;
-
+  updatePhysics() {
+    // Brain Coral Regime (Phase Eta)
     // Gray-Scott on Graph
-    // A' = A + (DA * Laplacian(A) - AB^2 + f(1-A)) * dt
-    // B' = B + (DB * Laplacian(B) + AB^2 - (k+f)B) * dt
+
+    let nodes = this.rd.nodes;
+    let neighbors = this.rd.neighbors;
+    let weights = this.rd.weights;
+    let scales = this.rd.scales;
 
     for (let i = 0; i < this.N; i++) {
       let a = this.A[i];
@@ -1453,8 +1333,8 @@ export class ReactionDiffusion {
 
       let lapA = 0;
       let lapB = 0;
-      let nbs = this.neighbors[i];
-      let ws = this.weights[i];
+      let nbs = neighbors[i];
+      let ws = weights[i];
       let degree = nbs.length;
 
       for (let k = 0; k < degree; k++) {
@@ -1464,8 +1344,8 @@ export class ReactionDiffusion {
         lapB += (this.B[j] - b) * w;
       }
 
-      // Apply Physical Scale Correction (1/dx^2)
-      let s = this.scales[i];
+      // Apply Physical Scale Correction
+      let s = scales[i];
       lapA *= s;
       lapB *= s;
 
@@ -1486,27 +1366,107 @@ export class ReactionDiffusion {
     let tempA = this.A; this.A = this.nextA; this.nextA = tempA;
     let tempB = this.B; this.B = this.nextB; this.nextB = tempB;
   }
+}
+
+export class ReactionDiffusion {
+  constructor() {
+    this.pixels = new Map();
+    this.alpha = 0.3;
+
+    // Graph Parameters
+    this.N = 4096;
+    this.nodes = [];
+    this.neighbors = [];
+    this.weights = [];
+    this.scales = [];
+
+    // Build Graph (Fibonacci Hex)
+    this.buildGraph();
+
+    // Visualization
+    this.orientation = new Orientation();
+    this.filters = createRenderPipeline(
+      new FilterOrient(this.orientation),
+      new FilterAntiAlias()
+    );
+
+    this.timeline = new Timeline();
+    this.timeline.add(0,
+      new Rotation(this.orientation, Daydream.Y_AXIS, Math.PI / 2, 200, easeInOutSin, true)
+    );
+    this.spawn();
+    this.timeline.add(0, new PeriodicTimer(96, () => this.spawn(), true));
+
+    this.setupGui();
+  }
+
+  spawn() {
+    // Create new reaction
+    // 10s alive + 2s fade = 12s = 192 frames.
+    // Fadeout 2s = 32 frames.
+    let r = new Reaction(this, 192, 32);
+    this.timeline.add(0, r);
+  }
+
+  setupGui() {
+    if (this.gui) this.gui.destroy();
+    this.gui = new gui.GUI();
+    this.gui.add(this, 'alpha', 0, 1).step(0.01).name('Alpha');
+  }
+
+  // Graph Build Logic
+  buildGraph() {
+    // Fibonacci Sphere (Uniform Isotropy)
+
+    this.N = 4096; // Adjust for density
+
+    this.nodes = [];
+    this.neighbors = [];
+    this.weights = [];
+    this.scales = [];
+
+    // 1. Generate Nodes (Fibonacci Spiral)
+    const phi = Math.PI * (3 - Math.sqrt(5)); // Golden Angle
+
+    for (let i = 0; i < this.N; i++) {
+      let y = 1 - (i / (this.N - 1)) * 2; // y goes from 1 to -1
+      let radius = Math.sqrt(1 - y * y);
+      let theta = phi * i;
+      let x = Math.cos(theta) * radius;
+      let z = Math.sin(theta) * radius;
+      this.nodes.push(new THREE.Vector3(x, y, z));
+    }
+
+    // 2. Build K=6 Neighbors (Hexagonal Topology)
+    const K = 6;
+    for (let i = 0; i < this.N; i++) {
+      let p1 = this.nodes[i];
+      let bestIndices = [];
+      let bestDists = [];
+
+      for (let j = 0; j < this.N; j++) {
+        if (i === j) continue;
+        let d2 = p1.distanceToSquared(this.nodes[j]);
+
+        let len = bestDists.length;
+        if (len < K || d2 < bestDists[len - 1]) {
+          let pos = len;
+          while (pos > 0 && d2 < bestDists[pos - 1]) { pos--; }
+          bestDists.splice(pos, 0, d2);
+          bestIndices.splice(pos, 0, j);
+          if (bestDists.length > K) { bestDists.pop(); bestIndices.pop(); }
+        }
+      }
+      this.neighbors.push(bestIndices);
+      this.weights.push(new Array(K).fill(1.0));
+      this.scales.push(1.0);
+    }
+    console.log("Graph built (Fibonacci Hex Sphere). Nodes:", this.N);
+  }
 
   drawFrame() {
     this.pixels.clear();
     this.timeline.step();
-
-    // Multiple steps per frame
-    for (let i = 0; i < 12; i++) {
-      this.update();
-    }
-
-    // Render Nodes
-    for (let i = 0; i < this.N; i++) {
-      let b = this.B[i];
-      if (b > 0.1) {
-        // Improve contrast: Map 0.1..0.4 range to full color spectrum
-        // High contrast to see channels
-        let t = Math.max(0, Math.min(1, (b - 0.15) * 4.0));
-        let c = this.palette.get(t);
-        this.filters.plot(this.pixels, this.nodes[i], c, 0, this.alpha);
-      }
-    }
     return this.pixels;
   }
 }

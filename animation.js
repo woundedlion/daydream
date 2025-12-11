@@ -140,8 +140,7 @@ export class Timeline {
    */
   step() {
     ++this.t;
-    let i = this.animations.length;
-    while (i--) {
+    for (let i = 0; i < this.animations.length; i++) {
       let animation = this.animations[i].animation;
       if (this.t >= this.animations[i].start) {
         animation.step();
@@ -152,6 +151,7 @@ export class Timeline {
             continue;
           }
           this.animations.splice(i, 1);
+          i--;
           animation.post();
         }
       }
