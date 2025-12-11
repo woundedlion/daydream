@@ -1256,3 +1256,292 @@ export class Portholes {
     }
   }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+const PHI = (1 + Math.sqrt(5)) / 2;
+
+export class ReactionDiffusion {
+  constructor() {
+    this.pixels = new Map();
+    this.alpha = 1.0;
+
+    this.alpha = 1.0;
+
+    // Graph Parameters
+    // Fix Aspect Ratio: 96 cols. For square cells at equator ($2\pi$ vs $\pi$), we need 48 rows.
+    // This fixes horizontal bias.
+    this.N = 96 * 48;
+
+    this.nodes = [];       // Vector3 positions
+    this.neighbors = [];   // Adjacency list
+    this.weights = [];     // Weights for Laplacian
+    this.scales = [];      // Physical Scale factors (1/dx^2) for correct Laplacian
+
+    // Build Graph (Staggered Lat-Long KNN)
+    this.buildGraph();
+
+    // RD State (Allocate after buildGraph to ensure N is final)
+    this.A = new Float32Array(this.N).fill(1.0);
+    this.B = new Float32Array(this.N).fill(0.0);
+    this.nextA = new Float32Array(this.N);
+    this.nextB = new Float32Array(this.N);
+
+    // Initial Seed
+    this.seed(0, 0, 5);
+    // Actually seed function uses x,y grid logic which maps to graph nodes approx?
+    // We'll update seed to just pick random nodes.
+
+    // Simulation Parameters
+    // Screen-Space Isotropic Grid.
+    // We use standard Gray-Scott constants now since the grid is uniform.
+    // dA=0.2, dB=0.1
+    this.dA = 0.2;
+    this.dB = 0.1;
+
+    console.log(`RD Initialized with N=${this.N}. Grid Mode: dA=${this.dA}, dB=${this.dB}`);
+
+    // Coral Params
+    this.feed = 0.0545;
+    this.k = 0.0635;
+    this.dt = 1.0;
+
+    this.palette = new GenerativePalette("straight", "analagous", "ascending", "vibrant");
+
+    this.orientation = new Orientation();
+    // We use a simpler pipeline since we are splatting points
+    this.filters = createRenderPipeline(
+      new FilterOrient(this.orientation),
+      new FilterAntiAlias()
+    );
+
+    this.timeline = new Timeline();
+    //    this.timeline.add(0, new PeriodicTimer(160, () => this.spin(), true));
+
+    this.setupGui();
+    this.reset();
+  }
+
+  buildGraph() {
+    // Screen-Space Isotropic HEXAGONAL Grid
+    // 6 Neighbors for maximum isotropy (Brain Coral look).
+    // Staggered rows (Odd-r offset).
+
+    // Grid Dimensions
+    const cols = 96;
+    const rows = 48;
+    this.N = cols * rows;
+
+    this.nodes = [];
+    this.neighbors = [];
+    this.weights = [];
+    this.scales = [];
+
+    const idx = (c, r) => r * cols + c;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        // 1. Visual Position (Staggered Lat-Long)
+        // v from 0 to 1
+        let v = (r + 0.5) / rows;
+        let u = c / cols;
+
+        // Stagger odd rows by 0.5 column
+        if (r % 2 === 1) {
+          u += 0.5 / cols;
+        }
+
+        let phi = v * Math.PI;
+        let theta = u * 2 * Math.PI;
+
+        let x_pos = Math.sin(phi) * Math.cos(theta);
+        let z_pos = Math.sin(phi) * Math.sin(theta);
+        let y_pos = Math.cos(phi);
+
+        this.nodes.push(new THREE.Vector3(x_pos, y_pos, z_pos));
+
+        // 2. Build Hex Neighbors
+        // Even Row: L, R, TL(c-1), TR(c), BL(c-1), BR(c)
+        // Odd Row:  L, R, TL(c), TR(c+1), BL(c), BR(c+1)
+        let myNbs = [];
+
+        let isEven = (r % 2 === 0);
+
+        // Offsets for the 6 neighbors [dc, dr]
+        let offsets;
+        if (isEven) {
+          offsets = [
+            [-1, 0], [1, 0],   // L, R
+            [-1, -1], [0, -1], // TL, TR
+            [-1, 1], [0, 1]    // BL, BR
+          ];
+        } else {
+          offsets = [
+            [-1, 0], [1, 0],   // L, R
+            [0, -1], [1, -1],  // TL, TR
+            [0, 1], [1, 1]     // BL, BR
+          ];
+        }
+
+        for (let o of offsets) {
+          let dc = o[0];
+          let dr = o[1];
+
+          let nc = c + dc;
+          let nr = r + dr;
+
+          // Wrap X
+          // Note: % in JS can be negative. (n%m + m)%m handles it.
+          nc = (nc % cols + cols) % cols;
+
+          // Wrap Y (Cross Poles)
+          if (nr < 0) {
+            // Top Edge -> Cross North Pole
+            // Map to Row 0, opposite Longitude
+            // Hex stagger makes exact alignment tricky, but (c + cols/2) is robust enough.
+            nr = 0;
+            nc = (nc + cols / 2) % cols;
+          } else if (nr >= rows) {
+            // Bottom Edge -> Cross South Pole
+            // Map to Row rows-1, opposite Longitude
+            nr = rows - 1;
+            nc = (nc + cols / 2) % cols;
+          }
+
+          myNbs.push(idx(nc, nr));
+        }
+
+        // Uniform weights
+        // 6 neighbors. 
+        let myWs = new Array(6).fill(1.0);
+
+        this.neighbors.push(myNbs);
+        this.weights.push(myWs);
+        this.scales.push(1.0);
+      }
+    }
+
+    console.log("Graph built (Hexagonal Isotropic Grid). Nodes:", this.N);
+  }
+
+  spin() {
+    let axis = randomVector();
+    // Rotate slowly
+    this.timeline.add(0,
+      new Rotation(this.orientation, axis, Math.PI / 2, 200, easeInOutSin, false)
+    );
+  }
+
+  reset() {
+    this.A.fill(1.0);
+    this.B.fill(0.0);
+    // Seed random spots
+    for (let i = 0; i < 5; i++) {
+      let idx = Math.floor(Math.random() * this.N);
+      this.seed(idx, 8);
+    }
+  }
+
+  seed(cx, cy, r) {
+    // Seed a few random spots with B=1
+    for (let k = 0; k < 20; k++) {
+      let center = Math.floor(Math.random() * this.N);
+      let nbs = this.neighbors[center];
+      this.B[center] = 1.0;
+      for (let j of nbs) {
+        this.B[j] = 1.0;
+      }
+    }
+  }
+
+  setupGui() {
+    if (this.gui) this.gui.destroy();
+    this.gui = new gui.GUI();
+    const restart = () => this.reset();
+
+    const sim = this.gui.addFolder('Simulation');
+    // Feed and Kill are now dynamic in update()
+    // sim.add(this, 'feed', 0.01, 0.1).step(0.001).name('Feed (f)').onChange(restart);
+    // sim.add(this, 'k', 0.01, 0.1).step(0.001).name('Kill (k)').onChange(restart);
+    sim.add(this, 'dA', 0.00001, 0.001).step(0.00001).name('Diff A').onChange(restart);
+    sim.add(this, 'dB', 0.00001, 0.001).step(0.00001).name('Diff B').onChange(restart);
+    sim.add(this, 'dt', 0.1, 2.0).step(0.1).name('Time Step').onChange(restart);
+    sim.open();
+    this.gui.add({ restart }, 'restart').name('Restart Pattern');
+  }
+
+  update() {
+    // Dynamic Parameter Evolution
+    // Locked to Brain Coral Regime (Phase Eta)
+    // This is the specific "labyrinth" spot in phase space.
+    // No oscillation, no noise, just pure reaction-diffusion.
+    this.feed = 0.0545;
+    this.k = 0.062;
+
+    // Gray-Scott on Graph
+    // A' = A + (DA * Laplacian(A) - AB^2 + f(1-A)) * dt
+    // B' = B + (DB * Laplacian(B) + AB^2 - (k+f)B) * dt
+
+    for (let i = 0; i < this.N; i++) {
+      let a = this.A[i];
+      let b = this.B[i];
+
+      let lapA = 0;
+      let lapB = 0;
+      let nbs = this.neighbors[i];
+      let ws = this.weights[i];
+      let degree = nbs.length;
+
+      for (let k = 0; k < degree; k++) {
+        let j = nbs[k];
+        let w = ws[k];
+        lapA += (this.A[j] - a) * w;
+        lapB += (this.B[j] - b) * w;
+      }
+
+      // Apply Physical Scale Correction (1/dx^2)
+      let s = this.scales[i];
+      lapA *= s;
+      lapB *= s;
+
+      // Reaction
+      let reaction = a * b * b;
+      let feed = this.feed * (1 - a);
+      let kill = (this.k + this.feed) * b;
+
+      this.nextA[i] = a + (this.dA * lapA - reaction + feed) * this.dt;
+      this.nextB[i] = b + (this.dB * lapB + reaction - kill) * this.dt;
+
+      // Clamp
+      this.nextA[i] = Math.max(0, Math.min(1, this.nextA[i]));
+      this.nextB[i] = Math.max(0, Math.min(1, this.nextB[i]));
+    }
+
+    // Swap
+    let tempA = this.A; this.A = this.nextA; this.nextA = tempA;
+    let tempB = this.B; this.B = this.nextB; this.nextB = tempB;
+  }
+
+  drawFrame() {
+    this.pixels.clear();
+    this.timeline.step();
+
+    // Multiple steps per frame
+    for (let i = 0; i < 12; i++) {
+      this.update();
+    }
+
+    // Render Nodes
+    for (let i = 0; i < this.N; i++) {
+      let b = this.B[i];
+      if (b > 0.1) {
+        // Improve contrast: Map 0.1..0.4 range to full color spectrum
+        // High contrast to see channels
+        let t = Math.max(0, Math.min(1, (b - 0.15) * 4.0));
+        let c = this.palette.get(t);
+        this.filters.plot(this.pixels, this.nodes[i], c, 0, this.alpha);
+      }
+    }
+    return this.pixels;
+  }
+}

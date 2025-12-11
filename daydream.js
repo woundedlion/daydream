@@ -1,4 +1,4 @@
-// daydream.js
+// daydream.js - HMR Touch
 
 import { Daydream } from "./driver.js";
 import { GUI } from "gui"; // Fixed import
@@ -14,7 +14,8 @@ import {
   Test,
   MobiusGrid,
   Moire,
-  Portholes
+  Portholes,
+  ReactionDiffusion
 } from "./effects.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
@@ -33,12 +34,13 @@ const effects = {
   Test,
   MobiusGrid,
   Moire,
-  Portholes
+  Portholes,
+  ReactionDiffusion
 };
 
 let activeEffect;
 const controls = {
-  effectName: 'Portholes',
+  effectName: 'ReactionDiffusion',
   changeEffect: function () {
     if (activeEffect && activeEffect.gui) {
       activeEffect.gui.destroy();
