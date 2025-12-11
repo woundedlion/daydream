@@ -249,8 +249,9 @@ export class GenerativePalette {
    * @param {('straight'|'circular'|'vignette'|'falloff')} [shape='straight'] - The palette shape/sampling method.
    * @param {('analagous'|'triadic'|'split-complementary'|'complementary')} [harmonyType='analagous'] - The color harmony rule.
    * @param {('ascending'|'descending'|'flat'|'bell'|'cup')} [brightnessProfile='ascending'] - The distribution of value/brightness.
+   * @param {('pastel'|'mid'|'vibrant')} [saturationProfile='mid'] - The distribution of saturation.
    */
-  constructor(shape = 'straight', harmonyType = 'analagous', brightnessProfile = 'ascending') {
+  constructor(shape = 'straight', harmonyType = 'analagous', brightnessProfile = 'ascending', saturationProfile = 'mid') {
     this.shapeSpec = shape;
     this.harmonyType = harmonyType;
 
@@ -258,9 +259,24 @@ export class GenerativePalette {
     GenerativePalette.seed = (GenerativePalette.seed + G) % 1;
     const [hA, hB, hC] = GenerativePalette.calcHues(hueA, harmonyType);
 
-    let sat1 = randomBetween(0.6, 0.8);
-    let sat2 = randomBetween(0.6, 0.8);
-    let sat3 = randomBetween(0.6, 0.8);
+    let sat1, sat2, sat3;
+    switch (saturationProfile) {
+      case 'pastel':
+        sat1 = 0.4;
+        sat2 = 0.4;
+        sat3 = 0.4;
+        break;
+      case 'mid':
+        sat1 = randomBetween(0.6, 0.8);
+        sat2 = randomBetween(0.6, 0.8);
+        sat3 = randomBetween(0.6, 0.8);
+        break;
+      case 'vibrant':
+        sat1 = 1.0;
+        sat2 = 1.0;
+        sat3 = 1.0;
+        break;
+    }
 
     let v1, v2, v3;
     switch (brightnessProfile) {

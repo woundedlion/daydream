@@ -1038,7 +1038,7 @@ export class Moire {
     this.basePalette = new GenerativePalette("circular", "split-complementary", "bell");
     this.interferencePalette = new GenerativePalette("circular", "split-complementary", "cup");
 
-    this.density = new MutableNumber(11);
+    this.density = new MutableNumber(10);
     this.scale = new MutableNumber(1.0);
     this.rotation = new MutableNumber(0);
     this.amp = new MutableNumber(0);
@@ -1146,36 +1146,34 @@ export class Portholes {
     this.pixels = new Map();
     this.alpha = 0.3; // Default alpha
 
-    this.basePalette = new GenerativePalette("circular", "analogous", "bell");
-    this.interferencePalette = new GenerativePalette("circular", "analogous", "cup");
+    this.basePalette = new GenerativePalette("circular", "analogous", "bell", "vibrant");
+    this.interferencePalette = new GenerativePalette("circular", "analogous", "cup", "vibrant");
 
+    this.orientations = [];
+    const numSlices = 2;
+    for (let i = 0; i < numSlices; i++) {
+      this.orientations.push(new Orientation());
+    }
     this.orientation = new Orientation();
-    this.hemisphereOrientationA = new Orientation();
-    this.hemisphereOrientationB = new Orientation();
     this.hemisphereAxis = new THREE.Vector3(0, 1, 0);
     this.timeline = new Timeline();
 
     // Parameters
     this.numPoints = new MutableNumber(20);
     this.circleRadius = new MutableNumber(0.27);
-    this.offsetRadius = new MutableNumber(0.02); // Increased base offset
-    this.offsetSpeed = new MutableNumber(2.0); // Faster speed
+    this.offsetRadius = new MutableNumber(5 / Daydream.W);
+    this.offsetSpeed = new MutableNumber(2.0);
     this.t = 0;
 
     this.filters = createRenderPipeline(
-      new FilterHemisphereRotate(this.hemisphereOrientationA, this.hemisphereOrientationB, this.hemisphereAxis),
+      new FilterHemisphereRotate(this.orientations, this.hemisphereAxis),
       new FilterOrient(this.orientation),
       new FilterAntiAlias()
     );
 
     // Animations
     this.timeline.add(0, new PeriodicTimer(48, () => this.colorWipe()));
-    //    this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, 2 * Math.PI, 300, easeMid, true));
-    this.timeline.add(0, new PeriodicTimer(160, () => this.spinHemisphere(), true));
-    // Breathing animation for offset (Increased range for visibility)
-    this.timeline.add(0,
-      new Mutation(this.offsetRadius, sinWave(0.02, 0.04, 0.1, 0), 32, easeMid, true)
-    );
+    this.timeline.add(0, new PeriodicTimer(160, () => this.spinSlices(), true));
 
     this.setupGui();
   }
@@ -1226,12 +1224,12 @@ export class Portholes {
         p.add(offset).normalize();
       }
 
-      // Draw outer ring
-      let outerRing = drawRing(new THREE.Quaternion(), p, this.circleRadius.get(), (v, t) => {
+      // Draw ring
+      let ring = drawRing(new THREE.Quaternion(), p, this.circleRadius.get(), (v, t) => {
         const palette = isInterference ? this.interferencePalette : this.basePalette;
         return palette.get(t);
       });
-      dots.push(...outerRing);
+      dots.push(...ring);
     }
     return dots;
   }
@@ -1249,11 +1247,14 @@ export class Portholes {
     return this.pixels;
   }
 
-  spinHemisphere() {
+  spinSlices() {
     let axis = randomVector();
     this.hemisphereAxis.copy(axis);
-    // Spin opposite directions over 5 seconds (80 frames)
-    this.timeline.add(0, new Rotation(this.hemisphereOrientationA, axis, 2 * Math.PI, 80, easeInOutSin, false));
-    this.timeline.add(0, new Rotation(this.hemisphereOrientationB, axis, -2 * Math.PI, 80, easeInOutSin, false));
+
+    // Spin alternating directions over 5 seconds (80 frames)
+    for (let i = 0; i < this.orientations.length; i++) {
+      const direction = (i % 2 === 0) ? 1 : -1;
+      this.timeline.add(0, new Rotation(this.orientations[i], axis, direction * 2 * Math.PI, 80, easeInOutSin, false));
+    }
   }
 }

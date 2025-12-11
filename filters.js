@@ -413,26 +413,35 @@ export class FilterHole {
 /**
  * Applies different orientations to points in each hemisphere defined by axis.
  */
+/**
+ * Applies different orientations to points in n latitude bands defined by axis.
+ */
 export class FilterHemisphereRotate {
   /**
-   * @param {Orientation} orientationA - Orientation for the positive hemisphere (dot(v, axis) > 0).
-   * @param {Orientation} orientationB - Orientation for the negative hemisphere.
-   * @param {THREE.Vector3} axis - The axis defining the hemisphere.
+   * @param {Orientation[]} orientations - Array of orientations (South to North).
+   * @param {THREE.Vector3} axis - The axis defining the poles for slicing.
    */
-  constructor(orientationA, orientationB, axis) {
+  constructor(orientations, axis) {
     this.is2D = false;
-    this.orientationA = orientationA;
-    this.orientationB = orientationB;
+    this.orientations = orientations;
     this.axis = axis;
   }
 
   plot(v, color, age, alpha, pass) {
-    if (v.dot(this.axis) > 0) {
-      this.orientationA.collapse();
-      pass(this.orientationA.orient(v), color, age, alpha);
-    } else {
-      this.orientationB.collapse();
-      pass(this.orientationB.orient(v), color, age, alpha);
-    }
+    // Map angle [PI, 0] to [0, 1] (South to North)
+    // dot=-1 => acos=PI => t=0
+    // dot=1 => acos=0 => t=1
+    const dot = Math.max(-1, Math.min(1, v.dot(this.axis)));
+    const t = 1 - Math.acos(dot) / Math.PI;
+
+    // Map [0, 1] to integer index [0, n-1]
+    let idx = Math.floor(t * this.orientations.length);
+    // Clamp for edge cases (e.g. t=1.0)
+    if (idx >= this.orientations.length) idx = this.orientations.length - 1;
+    if (idx < 0) idx = 0;
+
+    const orientation = this.orientations[idx];
+    orientation.collapse();
+    pass(orientation.orient(v), color, age, alpha);
   }
 }
