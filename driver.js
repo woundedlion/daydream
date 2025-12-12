@@ -128,8 +128,6 @@ export class Daydream {
     this.setCanvasSize();
 
     this.labelAxes = false;
-    this.gui = new GUI(); // Corrected usage
-    this.gui.add(this, 'labelAxes');
   }
 
   keydown(e) {

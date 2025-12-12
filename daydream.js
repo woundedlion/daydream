@@ -64,6 +64,7 @@ guiInstance.add(controls, 'effectName', effectNames)
   .onChange(() => controls.changeEffect());
 
 const daydream = new Daydream();
+guiInstance.add(daydream, 'labelAxes').name('Show Axes');
 window.addEventListener("resize", () => daydream.setCanvasSize());
 window.addEventListener("keydown", (e) => daydream.keydown(e));
 
