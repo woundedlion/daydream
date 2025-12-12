@@ -35,8 +35,52 @@ div.label {
     font-size: 10px;
 }
 
+/* Navigation Tabs */
+.nav-tabs {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1000;
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    /* Center align items vertically */
+}
+
+.nav-label {
+    color: white;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    font-weight: bold;
+    margin-right: 5px;
+    padding: 8px 0;
+    /* Align with tabs */
+}
+
+.tab {
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    text-decoration: none;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: background 0.2s;
+}
+
+.tab:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.tab.active {
+    background: rgba(255, 255, 255, 0.4);
+    font-weight: bold;
+}
+
 /* --- Mobile Styles for lil-gui --- */
 @media only screen and (max-width: 600px) {
+
     /* Target the root GUI container */
     .lil-gui.root {
         /* Reset default positioning */
@@ -55,11 +99,15 @@ div.label {
 
     /* Override lil-gui internal variables for larger touch targets */
     .lil-gui {
-        --widget-height: 40px; /* Taller rows for fingers */
-        --font-size: 16px; /* Larger text for readability */
-        --input-font-size: 16px; /* Prevent zooming on iOS inputs */
+        --widget-height: 40px;
+        /* Taller rows for fingers */
+        --font-size: 16px;
+        /* Larger text for readability */
+        --input-font-size: 16px;
+        /* Prevent zooming on iOS inputs */
         --folder-indent: 12px;
-        --name-width: 45%; /* Give more space to labels */
+        --name-width: 45%;
+        /* Give more space to labels */
         --slider-knob-width: 4px;
     }
 }
