@@ -46,7 +46,17 @@ const controls = {
   effectName: (initialEffect && effects[initialEffect]) ? initialEffect : 'BZReactionDiffusion',
   changeEffect: function () {
     if (activeEffect && activeEffect.gui) {
-      activeEffect.gui.destroy();
+      try {
+        const dom = activeEffect.gui.domElement;
+        // If we moved the dom element, dat.gui might fail to remove it from where it expects
+        if (dom && dom.parentNode) {
+          dom.parentNode.removeChild(dom);
+        }
+        // Force destroy without throwing if DOM is already gone
+        activeEffect.gui.destroy();
+      } catch (e) {
+        console.warn("GUI destroy warning:", e);
+      }
     }
 
     const EffectClass = effects[this.effectName];

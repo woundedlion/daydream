@@ -50,7 +50,7 @@ export class Moire {
     }
 
     setupGui() {
-        this.gui = new gui.GUI();
+        this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
         this.gui.add(this.density, 'n', 5, 50).name('density').listen();
         this.gui.add(this.amp, 'n', -1, 1).name('amplitude').step(0.01).listen();

@@ -54,7 +54,7 @@ export class Portholes {
     }
 
     setupGui() {
-        this.gui = new gui.GUI();
+        this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
         this.gui.add(this.numPoints, 'n', 10, 200).name('Num Points').step(1).listen();
         this.gui.add(this.circleRadius, 'n', 0.005, 0.5).name('Circle Radius').listen();

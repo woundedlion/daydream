@@ -54,7 +54,7 @@ export class Test {
                 sinWave(-this.amplitudeRange, this.amplitudeRange, 1, 0), 32, easeMid, true)
         );
 
-        this.gui = new gui.GUI();
+        this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
     }
 

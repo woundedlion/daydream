@@ -44,7 +44,7 @@ export class RingSpin {
             this.spawnRing(Daydream.X_AXIS, this.palettes[i]);
         }
 
-        this.gui = new gui.GUI();
+        this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
     }
 

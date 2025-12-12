@@ -95,14 +95,23 @@
 /* --- Mobile Styles --- */
 @media only screen and (max-width: 900px) {
 
-    /* Switch Layout to Mobile */
+    /* Switch Layout to Mobile (Page Scroll) */
     .layout-container {
         flex-direction: column;
+        position: absolute;
+        /* Allow page to grow */
+        height: auto;
+        min-height: 100dvh;
+        overflow: visible;
+        /* Let page scroll */
     }
 
     /* GUI Container becomes a flex item at the bottom */
     .gui-container {
         position: static;
+        width: 100%;
+        max-height: none;
+        /* No internal limit */
         width: 100%;
         height: auto;
         min-height: auto;
@@ -111,18 +120,8 @@
         background: rgba(0, 0, 0, 0.8);
         display: flex;
         flex-direction: column;
-    }
-
-    /* Aggressively remove scrollbars/height limits from dat.gui internals */
-    /* REMOVED .dg li from here to preserve button styles */
-    .gui-container .dg.ac,
-    .gui-container .dg.main,
-    .dg.ac,
-    .dg ul,
-    .dg {
-        height: auto !important;
-        max-height: none !important;
-        overflow: visible !important;
+        overflow-y: visible;
+        /* No internal scrollbars */
     }
 
     /* Target dat.gui root inside our container */
@@ -150,13 +149,29 @@
         width: 100% !important;
     }
 
+    /* Restore dat.gui sizing logic */
+    .gui-container .dg {
+        box-sizing: content-box !important;
+    }
+
+    /* Force open folders to actually show content if JS animation fails */
+    .gui-container .dg li:not(.closed)>ul {
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
     /* Restore Button Styles & Polish */
     .dg li {
         height: 34px !important;
         line-height: 34px !important;
         border-bottom: 1px solid #333 !important;
         overflow: hidden !important;
-        /* Prevent internal scrollbars in items */
+    }
+
+    .dg li.folder {
+        height: auto !important;
+        overflow: visible !important;
     }
 
     .dg .property-name {
@@ -177,6 +192,7 @@
     }
 }
 
+/* --- Desktop Styles --- */
 /* --- Desktop Styles --- */
 @media only screen and (min-width: 901px) {
     .gui-container {
@@ -213,6 +229,14 @@
         top: auto !important;
         bottom: auto !important;
         transform: none !important;
+        overflow: visible !important;
+        /* Allow folders to expand */
+        height: auto !important;
+    }
+
+    /* Ensure content inside doesn't get clipped */
+    .gui-container .dg ul {
+        overflow: visible !important;
     }
 
     /* Ensure close button fits within the panel and doesn't bleed out */

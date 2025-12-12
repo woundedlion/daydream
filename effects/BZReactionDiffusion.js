@@ -182,7 +182,7 @@ export class BZReactionDiffusion {
 
     setupGui() {
         if (this.gui) this.gui.destroy();
-        this.gui = new gui.GUI();
+        this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha', 0, 1).step(0.01).name('Alpha');
 
         const folder = this.gui.addFolder('BZ Parameters');

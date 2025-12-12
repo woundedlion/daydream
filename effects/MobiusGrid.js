@@ -53,7 +53,7 @@ export class MobiusGrid {
     }
 
     setupGui() {
-        this.gui = new gui.GUI();
+        this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
         const folder = this.gui.addFolder('Mobius Params');
         folder.add(this.params.aRe, 'n').name('aRe').min(-2).max(2).step(0.01).listen();

@@ -62,7 +62,7 @@ export class Thrusters {
         this.radius = new MutableNumber(1);
 
         // GUI
-        this.gui = new gui.GUI();
+        this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
 
         // Animations
