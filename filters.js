@@ -4,6 +4,7 @@ import { Daydream } from "./driver.js";
 import { wrap } from "./util.js"
 import { blendAlpha } from "./color.js";
 import { vectorToPixel, angleBetween } from "./geometry.js";
+import { tween } from "./draw.js";
 
 const BLACK = new THREE.Color(0, 0, 0);
 
@@ -166,8 +167,9 @@ export class FilterOrient {
    * @param {Function} pass - The callback.
    */
   plot(v, color, age, alpha, pass) {
-    this.orientation.collapse();
-    pass(this.orientation.orient(v), color, age, alpha);
+    tween(this.orientation, (q, t) => {
+      pass(v.clone().applyQuaternion(q), color, age, alpha);
+    });
   }
 }
 

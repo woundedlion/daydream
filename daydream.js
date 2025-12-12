@@ -38,13 +38,9 @@ const effects = {
   BZReactionDiffusion
 };
 
-const urlParams = new URLSearchParams(window.location.search);
-const initialEffect = urlParams.get('effect');
-
 let activeEffect;
-
 const controls = {
-  effectName: (initialEffect && effects[initialEffect]) ? initialEffect : 'BZReactionDiffusion',
+  effectName: 'BZReactionDiffusion',
   changeEffect: function () {
     if (activeEffect && activeEffect.gui) {
       activeEffect.gui.destroy();
@@ -55,12 +51,6 @@ const controls = {
       console.error(`Effect '${this.effectName}' is not a constructor. Check your imports in daydream.js.`);
       return;
     }
-
-    // Update URL
-    const newUrl = new URL(window.location);
-    newUrl.searchParams.set('effect', this.effectName);
-    window.history.pushState({}, '', newUrl);
-
     activeEffect = new EffectClass();
   }
 };
