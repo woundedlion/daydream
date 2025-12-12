@@ -15,7 +15,8 @@ import {
   MobiusGrid,
   Moire,
   Portholes,
-  ReactionDiffusion
+  GSReactionDiffusion,
+  BZReactionDiffusion
 } from "./effects.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
@@ -35,12 +36,13 @@ const effects = {
   MobiusGrid,
   Moire,
   Portholes,
-  ReactionDiffusion
+  GSReactionDiffusion,
+  BZReactionDiffusion
 };
 
 let activeEffect;
 const controls = {
-  effectName: 'ReactionDiffusion',
+  effectName: 'BZReactionDiffusion',
   changeEffect: function () {
     if (activeEffect && activeEffect.gui) {
       activeEffect.gui.destroy();

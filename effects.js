@@ -1262,9 +1262,9 @@ export class Portholes {
 const PHI = (1 + Math.sqrt(5)) / 2;
 
 export class Reaction extends Sprite {
-  constructor(rd, duration = 192, fadeOut = 32) {
+  constructor(rd, duration = 192, fadeOut = 32, fadeIn = 32) {
     // 16 FPS. 10s exist + 2s fade = 12s total (192 frames).
-    super((alpha) => this.render(alpha), duration, 0, easeMid, fadeOut, easeMid);
+    super((alpha) => this.render(alpha), duration, fadeIn, easeMid, fadeOut, easeMid);
 
     this.rd = rd;
     this.N = rd.N;
@@ -1284,9 +1284,7 @@ export class Reaction extends Sprite {
     this.dt = 1.0;
 
     // Palette (Instantiate new one)
-    this.palette = new GenerativePalette("straight", "analagous", "ascending", "vibrant");
-
-    this.seed();
+    this.palette = new GenerativePalette("straight", "split-complementary", "ascending", "vibrant");
   }
 
   seed() {
@@ -1368,7 +1366,7 @@ export class Reaction extends Sprite {
   }
 }
 
-export class ReactionDiffusion {
+export class GSReactionDiffusion {
   constructor() {
     this.pixels = new Map();
     this.alpha = 0.3;
@@ -1405,6 +1403,7 @@ export class ReactionDiffusion {
     // 10s alive + 2s fade = 12s = 192 frames.
     // Fadeout 2s = 32 frames.
     let r = new Reaction(this, 192, 32);
+    r.seed();
     this.timeline.add(0, r);
   }
 
@@ -1468,5 +1467,154 @@ export class ReactionDiffusion {
     this.pixels.clear();
     this.timeline.step();
     return this.pixels;
+  }
+}
+
+export class BZReaction extends Reaction {
+  constructor(rd, duration = 192, fadeOut = 32) {
+    super(rd, duration, fadeOut);
+
+    // 3rd Chemical Species
+    this.C = new Float32Array(this.N).fill(0.0);
+    this.nextC = new Float32Array(this.N);
+
+    // Params for Cyclic Competition
+    // A eats B, B eats C, C eats A
+    this.alpha = 1.2; // Predation rate
+    this.beta = 0.1;  // Decay rate
+    this.D = 0.08;    // Diffusion
+
+    this.seed();
+
+    this.palette = new GenerativePalette('straight', 'triadic', 'descending', 'vibrant');
+  }
+
+  seed() {
+    // Sparse Seeding for Spirals (Droplets)
+    this.A.fill(0.0);
+    this.B.fill(0.0);
+    this.C.fill(0.0);
+
+    // Seed random droplets
+    for (let k = 0; k < 50; k++) {
+      let center = Math.floor(Math.random() * this.N);
+      let r = Math.random();
+      // Set a small neighborhood
+      let nbs = this.rd.neighbors[center];
+
+      let target = (r < 0.33) ? this.A : (r < 0.66) ? this.B : this.C;
+      target[center] = 1.0;
+      for (let j of nbs) target[j] = 1.0;
+    }
+  }
+
+  updatePhysics() {
+    // 3-Species Cyclic Model (Rock-Paper-Scissors)
+
+    let nodes = this.rd.nodes;
+    let neighbors = this.rd.neighbors;
+    let weights = this.rd.weights;
+
+    // Use parameters from BZReactionDiffusion GUI if available
+    let dt = this.rd.bzParams ? this.rd.bzParams.dt : 0.2;
+    let D = this.rd.bzParams ? this.rd.bzParams.D : 0.03;
+    this.alpha = this.rd.bzParams ? this.rd.bzParams.alpha : 1.6;
+
+    for (let i = 0; i < this.N; i++) {
+      let a = this.A[i];
+      let b = this.B[i];
+      let c = this.C[i];
+
+      let lapA = 0, lapB = 0, lapC = 0;
+      let nbs = neighbors[i];
+      let degree = nbs.length;
+
+      for (let k = 0; k < degree; k++) {
+        let j = nbs[k];
+        lapA += (this.A[j] - a);
+        lapB += (this.B[j] - b);
+        lapC += (this.C[j] - c);
+      }
+
+      let da = a * (1 - a - this.alpha * c);
+      let db = b * (1 - b - this.alpha * a);
+      let dc = c * (1 - c - this.alpha * b);
+
+      this.nextA[i] = a + (D * lapA + da) * dt;
+      this.nextB[i] = b + (D * lapB + db) * dt;
+      this.nextC[i] = c + (D * lapC + dc) * dt;
+
+      // Clamp
+      this.nextA[i] = Math.max(0, Math.min(1, this.nextA[i]));
+      this.nextB[i] = Math.max(0, Math.min(1, this.nextB[i]));
+      this.nextC[i] = Math.max(0, Math.min(1, this.nextC[i]));
+    }
+
+    // Swap
+    let temp;
+    temp = this.A; this.A = this.nextA; this.nextA = temp;
+    temp = this.B; this.B = this.nextB; this.nextB = temp;
+    temp = this.C; this.C = this.nextC; this.nextC = temp;
+  }
+
+  render(currentAlpha) {
+    let ca = this.palette.get(0);
+    let cb = this.palette.get(0.5);
+    let cc = this.palette.get(1);
+
+    // 1. Simulate
+    for (let k = 0; k < 2; k++) {
+      this.updatePhysics();
+    }
+
+    // 2. Draw
+    let color = new THREE.Color();
+    let hsl = { h: 0, s: 0, l: 0 };
+
+    for (let i = 0; i < this.N; i++) {
+      let a = this.A[i];
+      let b = this.B[i];
+      let c = this.C[i];
+      let sum = a + b + c;
+      if (sum > 0.01) {
+        // Alpha Blending (Layered: A first, then B, then C)
+        color.setRGB(0, 0, 0);
+        color.lerp(ca, a);
+        color.lerp(cb, b);
+        color.lerp(cc, c);
+        hsl = color.getHSL(hsl);
+        color.setHSL(hsl.h, 1.0, hsl.l);
+
+        this.rd.filters.plot(this.rd.pixels, this.rd.nodes[i], color, 0, currentAlpha * this.rd.alpha);
+      }
+    }
+  }
+}
+
+export class BZReactionDiffusion extends GSReactionDiffusion {
+  constructor() {
+    super();
+    this.bzParams = {
+      alpha: 1.6,
+      D: 0.03,
+      dt: 0.2
+    };
+    this.initBZGui();
+  }
+
+  initBZGui() {
+    // Add folder to the existing GUI created by super()
+    if (this.gui) {
+      const folder = this.gui.addFolder('BZ Parameters');
+      folder.add(this.bzParams, 'alpha', 0.5, 2.0).name('Predation (α)');
+      folder.add(this.bzParams, 'D', 0.001, 0.1).name('Diffusion');
+      folder.add(this.bzParams, 'dt', 0.01, 0.5).name('Time Step');
+      folder.open();
+    }
+  }
+
+  spawn() {
+    let r = new BZReaction(this, 192, 32);
+    this.timeline.add(0, r);
   }
 }
