@@ -64,7 +64,7 @@ export class Reaction extends Sprite {
             if (b > 0.1) {
                 let t = Math.max(0, Math.min(1, (b - 0.15) * 4.0));
                 let c = this.palette.get(t);
-                this.rd.filters.plot(this.rd.pixels, this.rd.nodes[i], c, 0, currentAlpha * this.rd.alpha);
+                this.rd.filters.plot(null, this.rd.nodes[i], c, 0, currentAlpha * this.rd.alpha);
             }
         }
     }
@@ -121,7 +121,6 @@ export class Reaction extends Sprite {
 
 export class GSReactionDiffusion {
     constructor() {
-        this.pixels = new Map();
         this.alpha = 0.3;
 
         // Graph Parameters
@@ -217,9 +216,7 @@ export class GSReactionDiffusion {
     }
 
     drawFrame() {
-        this.pixels.clear();
         this.timeline.step();
-        return this.pixels;
     }
 }
 
@@ -338,7 +335,7 @@ export class BZReaction extends Reaction {
                 hsl = color.getHSL(hsl);
                 color.setHSL(hsl.h, 1.0, hsl.l);
 
-                this.rd.filters.plot(this.rd.pixels, this.rd.nodes[i], color, 0, currentAlpha * this.rd.alpha);
+                this.rd.filters.plot(null, this.rd.nodes[i], color, 0, currentAlpha * this.rd.alpha);
             }
         }
     }

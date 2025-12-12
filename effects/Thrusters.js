@@ -44,7 +44,6 @@ class Thruster extends Animation {
 export class Thrusters {
     constructor() {
         Daydream.W = 96
-        this.pixels = new Map();
 
         // Palettes
         this.palette = new ProceduralPalette(
@@ -85,7 +84,7 @@ export class Thrusters {
     drawThruster(orientation, thrustPoint, radius, opacity) {
         let dots = drawRing(orientation.get(), thrustPoint, radius.get(),
             (v, t) => new THREE.Color(0xffffff).multiplyScalar(opacity));
-        plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
+        plotDots(null, this.filters, dots, 0, opacity * this.alpha);
     }
 
     onFireThruster() {
@@ -144,13 +143,11 @@ export class Thrusters {
                 return this.palette.get(angleBetween(z, v) / Math.PI);
             }
         );
-        plotDots(this.pixels, this.filters, dots, 0, this.alpha * opacity);
+        plotDots(null, this.filters, dots, 0, this.alpha * opacity);
     }
 
     drawFrame() {
-        this.pixels.clear();
         this.timeline.step();
         this.t++;
-        return this.pixels;
     }
 }

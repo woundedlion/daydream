@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, randomVector
+    Orientation, randomVector, angleBetween
 } from "../geometry.js";
 import {
     drawRing, plotDots
@@ -33,8 +33,8 @@ export class RingShower {
 
     constructor() {
         Daydream.W = 96;
-        this.pixels = new Map();
         this.rings = [];
+        this.numRings = 16;
         this.alpha = 0.2;
 
         this.palette = new GenerativePalette();
@@ -76,14 +76,16 @@ export class RingShower {
     drawRing(opacity, ring) {
         let step = 1 / Daydream.W;
         let dots = drawRing(this.orientation.get(), ring.normal, ring.radius.get(),
-            (v, t) => ring.palette.get(t), ring.phase.get());
-        plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
-        ring.lastRadius = ring.radius.get();
+            (v, t) => {
+                let z = this.orientation.orient(Daydream.X_AXIS);
+                return this.palette.get(angleBetween(z, v) / Math.PI);
+            }
+        );
+        plotDots(null, this.filters, dots, 0, this.alpha * opacity);
     }
 
     drawFrame() {
-        this.pixels.clear();
         this.timeline.step();
-        return this.pixels;
+        this.t++;
     }
 }

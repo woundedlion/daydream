@@ -28,7 +28,6 @@ export class Comets {
         }
     }
     constructor() {
-        this.pixels = new Map();
         this.timeline = new Timeline();
         this.numNodes = 1;
         this.spacing = 48;
@@ -115,9 +114,7 @@ export class Comets {
     }
 
     drawFrame() {
-        this.pixels.clear();
         this.timeline.step();
-        this.trails.render(this.pixels, this.filters, (v, t) => this.palette.get(1 - t));
-        return this.pixels;
+        this.trails.render(null, this.filters, (v, t) => this.palette.get(1 - t));
     }
 }

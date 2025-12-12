@@ -1,6 +1,6 @@
 // filters.js
 import * as THREE from "three";
-import { Daydream, pixelKey, keyPixel } from "./driver.js";
+import { Daydream } from "./driver.js";
 import { wrap } from "./util.js"
 import { blendAlpha } from "./color.js";
 import { vectorToPixel, angleBetween } from "./geometry.js";
@@ -17,14 +17,11 @@ export function createRenderPipeline(...filters) {
   let head = (pixels, x, y, color, age, alpha) => {
     let xi = Math.round(x);
     let yi = Math.round(y);
-    let key = pixelKey(xi, yi);
-    let old = 0;
-    if (pixels.has(key)) {
-      old = pixels.get(key);
-    } else {
-      old = BLACK;
-    }
-    pixels.set(pixelKey(x, y), blendAlpha(alpha)(old, color));
+    let index = yi * Daydream.W + xi;
+
+    // Blend (Color objects)
+    let blended = blendAlpha(alpha)(Daydream.pixels[index], color);
+    Daydream.pixels[index].copy(blended);
   };
   let nextIs2D = true;
 

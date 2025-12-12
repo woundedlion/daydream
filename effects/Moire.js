@@ -21,7 +21,6 @@ import {
 export class Moire {
     constructor() {
         Daydream.W = 96;
-        this.pixels = new Map();
         this.alpha = 0.2;
         this.basePalette = new GenerativePalette("circular", "split-complementary", "bell");
         this.interferencePalette = new GenerativePalette("circular", "split-complementary", "cup");
@@ -116,14 +115,12 @@ export class Moire {
     }
 
     drawFrame() {
-        this.pixels.clear();
         this.timeline.step();
 
         let dots = [];
         dots.push(...this.drawLayer((p) => this.invTransform(p), this.basePalette)); // Base layer
         dots.push(...this.drawLayer((p) => this.transform(p), this.interferencePalette));  // Interference layer
 
-        plotDots(this.pixels, this.filters, dots, 0, this.alpha);
-        return this.pixels;
+        plotDots(null, this.filters, dots, 0, this.alpha);
     }
 }

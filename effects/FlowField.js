@@ -36,7 +36,6 @@ export class FlowField {
     }
 
     constructor() {
-        this.pixels = new Map();
         this.timeline = new Timeline();
 
         // --- Configuration ---
@@ -84,7 +83,6 @@ export class FlowField {
     }
 
     drawFrame() {
-        this.pixels.clear();
         this.timeline.step();
         this.t += this.TIME_SCALE;
 
@@ -122,8 +120,6 @@ export class FlowField {
 
         // 6. Render with Trails
         this.trails.recordDots(dots, 0, 0.8); // 0.8 opacity
-        this.trails.render(this.pixels, this.filters, (v, t) => this.palette.get(t)); // Color decay
-
-        return this.pixels;
+        this.trails.render(null, this.filters, (v, t) => this.palette.get(t)); // Color decay
     }
 }

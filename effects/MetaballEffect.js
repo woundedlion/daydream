@@ -15,7 +15,6 @@ import {
  */
 export class MetaballEffect {
     constructor() {
-        this.pixels = new Map();
         this.palette = richSunset;
         this.t = 0;
 
@@ -47,7 +46,6 @@ export class MetaballEffect {
     }
 
     drawFrame() {
-        this.pixels.clear();
         this.t++;
 
         // 1. Animate the balls
@@ -86,10 +84,12 @@ export class MetaballEffect {
 
                 // 5. Get the color and plot the dot
                 const color = this.palette.get(palette_t); //
-                this.pixels.set(pixelKey(x, y), color); //
+
+                // Write directly to global buffer
+                // TODO: Optimization - precalc index
+                let index = y * Daydream.W + x;
+                Daydream.pixels[index].copy(color);
             }
         }
-
-        return this.pixels;
     }
 }

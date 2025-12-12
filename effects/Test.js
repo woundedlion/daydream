@@ -22,7 +22,6 @@ export class Test {
 
     constructor() {
         Daydream.W = 96;
-        this.pixels = new Map();
         this.alpha = 0.3;
         this.ringPalette = new GenerativePalette("circular", "split-complementary", "flat");
         this.polyPalette = new GenerativePalette("circular", "analagous", "cup");
@@ -64,7 +63,7 @@ export class Test {
         dots.push(...drawPolyhedron(this.poly.vertices, this.poly.eulerPath,
             (v, t) => this.polyPalette.get(t)
         ));
-        plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
+        plotDots(null, this.filters, dots, 0, opacity * this.alpha);
     }
 
     drawFn(opacity) {
@@ -80,12 +79,10 @@ export class Test {
                 i * 2 * Math.PI / this.numRings
             ));
         }
-        plotDots(this.pixels, this.filters, dots, 0, opacity * this.alpha);
+        plotDots(null, this.filters, dots, 0, opacity * this.alpha);
     }
 
     drawFrame() {
-        this.pixels.clear();
         this.timeline.step();
-        return this.pixels;
     }
 }

@@ -33,7 +33,6 @@ export class RingSpin {
 
     constructor() {
         Daydream.W = 96;
-        this.pixels = new Map();
         this.rings = [];
         this.alpha = 0.2;
         this.trailLength = new MutableNumber(20);
@@ -68,15 +67,13 @@ export class RingSpin {
         tween(ring.orientation, (q, t) => {
             let points = ring.basePoints.map(p => p.clone().applyQuaternion(q));
             let dots = rasterize(points, (v, t) => ring.palette.get(0), true);
-            plotDots(this.pixels, ring.filters, dots, 0, this.alpha);
+            plotDots(null, ring.filters, dots, 0, this.alpha);
         });
         ring.orientation.collapse();
         ring.filters.trail((x, y, t) => ring.palette.get(t), this.alpha);
     }
 
     drawFrame() {
-        this.pixels.clear();
         this.timeline.step();
-        return this.pixels;
     }
 }

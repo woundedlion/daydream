@@ -127,6 +127,9 @@ export class Daydream {
 
     this.setCanvasSize();
 
+    // Global pixel buffer
+    Daydream.pixels = Array.from({ length: Daydream.W * Daydream.H }, () => new THREE.Color(0, 0, 0));
+
     this.labelAxes = false;
   }
 
@@ -211,26 +214,51 @@ export class Daydream {
         }
         labels = [];
 
-        let pixels = effect.drawFrame();
-        this.dotMesh.count = pixels.size;
+        // Clear buffer
+        for (let i = 0; i < Daydream.pixels.length; i++) {
+          Daydream.pixels[i].setHex(0);
+        }
 
+        // Draw effect to buffer
+        effect.drawFrame();
+
+        // Render buffer to InstanceMesh
+        let instanceCount = 0;
         const vector = new THREE.Vector3();
+        const dummy = new THREE.Object3D();
+        const MAX_INSTANCES = this.dotMesh.count; // Total capacity
 
-        let i = 0;
-        for (const [key, pixel] of pixels) {
-          let p = keyPixel(key);
-          vector.setFromSpherical(pixelToSpherical(p[0], p[1]));
+        for (let i = 0; i < Daydream.pixels.length; i++) {
+          const pixelColor = Daydream.pixels[i];
+
+          // Skip empty (black) pixels
+          if (pixelColor.r === 0 && pixelColor.g === 0 && pixelColor.b === 0) continue;
+
+          // Compute coordinates
+          const x = i % Daydream.W;
+          const y = Math.floor(i / Daydream.W);
+
+          // Get 3D position
+          vector.setFromSpherical(pixelToSpherical(x, y));
           vector.multiplyScalar(Daydream.SPHERE_RADIUS);
-          const dummy = new THREE.Object3D();
+
+          // Reset position for correct rotation relative to origin
+          dummy.position.set(0, 0, 0);
           dummy.lookAt(vector);
           dummy.position.copy(vector);
           dummy.updateMatrix();
-          this.dotMesh.setMatrixAt(i, dummy.matrix);
-          this.dotMesh.setColorAt(i, pixel);
-          this.dotMesh.instanceColor.needsUpdate = true;
-          this.dotMesh.instanceMatrix.needsUpdate = true;
-          ++i;
+
+          this.dotMesh.setMatrixAt(instanceCount, dummy.matrix);
+          this.dotMesh.setColorAt(instanceCount, pixelColor);
+
+          instanceCount++;
         }
+
+        this.dotMesh.count = instanceCount;
+        if (this.dotMesh.instanceColor) {
+          this.dotMesh.instanceColor.needsUpdate = true;
+        }
+        this.dotMesh.instanceMatrix.needsUpdate = true;
 
         if (this.labelAxes) {
           labels.push({ "position": Daydream.X_AXIS, "content": "X" });

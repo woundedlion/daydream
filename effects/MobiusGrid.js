@@ -23,7 +23,6 @@ import { wrap } from "../util.js";
 export class MobiusGrid {
     constructor() {
         Daydream.W = 96;
-        this.pixels = new Map();
         this.alpha = 0.2;
         this.numRings = new MutableNumber(0);
         this.numLines = new MutableNumber(0);
@@ -134,7 +133,6 @@ export class MobiusGrid {
     }
 
     drawFrame() {
-        this.pixels.clear();
         this.timeline.step();
         const phase = ((this.timeline.t || 0) % 120) / 120;
         let dots = [];
@@ -155,7 +153,6 @@ export class MobiusGrid {
         this.holeN.origin.copy(nTrans).applyQuaternion(q);
         this.holeS.origin.copy(sTrans).applyQuaternion(q);
 
-        plotDots(this.pixels, this.filters, dots, 0, this.alpha);
-        return this.pixels;
+        plotDots(null, this.filters, dots, 0, this.alpha);
     }
 }

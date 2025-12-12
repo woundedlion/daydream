@@ -7,7 +7,6 @@ import {
   Comets,
   Dynamo,
   RingSpin,
-
   MetaballEffect,
   FlowField,
   Thrusters,
@@ -28,7 +27,6 @@ const effects = {
   RingSpin,
   Comets,
   Dynamo,
-
   Thrusters,
   MetaballEffect,
   FlowField,

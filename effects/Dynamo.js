@@ -34,8 +34,6 @@ export class Dynamo {
         Daydream.W = 96;
 
         // State
-        this.pixels = new Map();
-
         this.palettes = [new GenerativePalette('vignette')];
         this.paletteBoundaries = [];
         this.paletteNormal = Daydream.Y_AXIS.clone();
@@ -144,15 +142,13 @@ export class Dynamo {
     }
 
     drawFrame() {
-        this.pixels.clear();
         this.timeline.step();
         for (let i = Math.abs(this.speed) - 1; i >= 0; --i) {
             this.pull(0);
             this.drawNodes(i * 1 / Math.abs(this.speed));
         }
-        this.trails.render(this.pixels, this.filters,
+        this.trails.render(null, this.filters,
             (v, t) => this.color(v, t));
-        return this.pixels;
     }
 
     nodeY(node) {

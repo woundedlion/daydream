@@ -21,7 +21,6 @@ import {
 export class Portholes {
     constructor() {
         Daydream.W = 96;
-        this.pixels = new Map();
         this.alpha = 0.3; // Default alpha
 
         this.basePalette = new GenerativePalette("circular", "analogous", "bell", "vibrant");
@@ -111,7 +110,6 @@ export class Portholes {
     }
 
     drawFrame() {
-        this.pixels.clear();
         this.timeline.step();
         this.t += 0.01; // Global time
 
@@ -119,8 +117,7 @@ export class Portholes {
         dots.push(...this.drawLayer(true));  // Interference
         dots.push(...this.drawLayer(false)); // Base
 
-        plotDots(this.pixels, this.filters, dots, 0, this.alpha);
-        return this.pixels;
+        plotDots(null, this.filters, dots, 0, this.alpha);
     }
 
     spinSlices() {
