@@ -17,7 +17,7 @@ import {
   Portholes,
   GSReactionDiffusion,
   BZReactionDiffusion
-} from "./effects.js";
+} from "./effects/index.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
 
