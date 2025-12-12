@@ -1,9 +1,8 @@
-
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, angleBetween
+    Orientation, angleBetween, sinWave
 } from "../geometry.js";
 import {
     drawRing, plotDots, drawFn, fnPoint
@@ -12,32 +11,28 @@ import {
     ProceduralPalette
 } from "../color.js";
 import {
-    Timeline, easeMid, Sprite, Transition, RandomTimer, MutableNumber, Rotation, Animation, easeOutExpo, easeInSin, easeOutSin, Mutation
+    Timeline, easeMid, Sprite, Transition, RandomTimer, MutableNumber, Rotation, easeOutExpo, easeInSin, easeOutSin, Mutation
 } from "../animation.js";
 import {
     createRenderPipeline, FilterAntiAlias
 } from "../filters.js";
-import { sinWave } from "../geometry.js";
+import { StaticCircularBuffer } from "../StaticCircularBuffer.js";
 
-class Thruster extends Animation {
-    constructor(drawFn, orientation, thrustPoint) {
-        super(-1, false);
-        this.exhaustRadius = new MutableNumber(0);
-        this.exhaustMotion = new Transition(this.exhaustRadius, 0.3, 8, easeMid);
-        this.exhaustSprite = new Sprite(
-            drawFn.bind(null, orientation, thrustPoint, this.exhaustRadius),
-            16, 0, easeMid, 16, easeOutExpo);
+class ThrusterContext {
+    constructor() {
+        this.orientation = new Orientation();
+        this.point = new THREE.Vector3();
+        this.radius = new MutableNumber(0);
+        this.motion = new Transition(this.radius, 0.3, 8, easeMid);
     }
 
-    done() {
-        return this.exhaustMotion.done()
-            && this.exhaustSprite.done();
-        ;
-    }
-
-    step() {
-        this.exhaustSprite.step();
-        this.exhaustMotion.step();
+    reset(orientation, point) {
+        // Snapshot the current orientation (deep copy the quaternion)
+        this.orientation.set(orientation.get().clone());
+        this.point.copy(point);
+        this.radius.set(0);
+        // Reset/Recreate the transition
+        this.motion = new Transition(this.radius, 0.3, 8, easeMid);
     }
 }
 
@@ -61,11 +56,12 @@ export class Thrusters {
         this.alpha = 0.2;
         this.ring = new THREE.Vector3(0.5, 0.5, 0.5).normalize();
         this.orientation = new Orientation();
-        this.thrusters = [];
+        this.thrusters = new StaticCircularBuffer(16);
         this.amplitude = new MutableNumber(0);
         this.warpPhase = 0;
         this.radius = new MutableNumber(1);
 
+        // GUI
         this.gui = new gui.GUI();
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
 
@@ -81,20 +77,19 @@ export class Thrusters {
         );
     }
 
-    drawThruster(orientation, thrustPoint, radius, opacity) {
-        let dots = drawRing(orientation.get(), thrustPoint, radius.get(),
+    drawThruster(ctx, opacity) {
+        let dots = drawRing(ctx.orientation.get(), ctx.point, ctx.radius.get(),
             (v, t) => new THREE.Color(0xffffff).multiplyScalar(opacity));
         plotDots(null, this.filters, dots, 0, opacity * this.alpha);
     }
 
     onFireThruster() {
-        let thrustDir = Math.random() < 0.5 ? -1 : -1;
         this.warpPhase = Math.random() * 2 * Math.PI;
         let thrustPoint = fnPoint(
             this.ringFn.bind(this), this.ring, 1, this.warpPhase);
-        let thrustOrientation = new Orientation().set(this.orientation.get());
         let thrustOpp = fnPoint(
             this.ringFn.bind(this), this.ring, 1, (this.warpPhase + Math.PI));
+
         // warp ring
         if (!(this.warp === undefined || this.warp.done())) {
             this.warp.cancel();
@@ -114,18 +109,24 @@ export class Thrusters {
             new Rotation(this.orientation, thrustAxis, 2 * Math.PI, 8 * 16, easeOutExpo)
         );
 
-        // show thruster
+        // show thrusters
+        this.spawnThruster(thrustPoint);
+        this.spawnThruster(thrustOpp);
+    }
+
+    spawnThruster(point) {
+        const ctx = new ThrusterContext();
+        this.thrusters.push(ctx);
+        ctx.reset(this.orientation, point);
+
         this.timeline.add(0,
-            new Thruster(
-                this.drawThruster.bind(this),
-                thrustOrientation,
-                thrustPoint)
-        );
-        this.timeline.add(0,
-            new Thruster(
-                this.drawThruster.bind(this),
-                thrustOrientation,
-                thrustOpp)
+            new Sprite(
+                (opacity) => {
+                    ctx.motion.step();
+                    this.drawThruster(ctx, opacity);
+                },
+                16, 0, easeMid, 16, easeOutExpo
+            )
         );
     }
 
