@@ -127,6 +127,12 @@ export class Daydream {
 
     this.setCanvasSize();
 
+    // ResizeObserver to handle layout changes (e.g. GUI expanding)
+    this.resizeObserver = new ResizeObserver(() => {
+      this.setCanvasSize();
+    });
+    this.resizeObserver.observe(this.canvas.parentElement);
+
     // Global pixel buffer
     Daydream.pixels = Array.from({ length: Daydream.W * Daydream.H }, () => new THREE.Color(0, 0, 0));
 
@@ -153,8 +159,9 @@ export class Daydream {
   }
 
   setCanvasSize() {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
+    const container = this.canvas.parentElement;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
 
     // Mobile detection
     this.isMobile = width <= 900;

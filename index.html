@@ -18,15 +18,18 @@
 </head>
 
 <body>
-    <div class="nav-tabs">
-        <span class="nav-label">Tools:</span>
-        <a href="lissajous.html" target="_blank" class="tab">Lissajous</a>
-        <a href="mobius.html" target="_blank" class="tab">Mobius</a>
-        <a href="palettes.html" target="_blank" class="tab">Palettes</a>
-    </div>
     <div class="page">
-        <div class="container">
-            <canvas id="canvas"></canvas>
+        <div id="layout-container" class="layout-container">
+            <div class="nav-tabs">
+                <span class="nav-label">Tools:</span>
+                <a href="lissajous.html" target="_blank" class="tab">Lissajous</a>
+                <a href="mobius.html" target="_blank" class="tab">Mobius</a>
+                <a href="palettes.html" target="_blank" class="tab">Palettes</a>
+            </div>
+            <div id="canvas-container" class="canvas-container">
+                <canvas id="canvas"></canvas>
+            </div>
+            <div id="gui-container" class="gui-container"></div>
         </div>
     </div>
     <script type="module" src="daydream.js" defer></script>
