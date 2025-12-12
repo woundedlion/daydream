@@ -385,7 +385,6 @@ export const fnPoint = (f, normal, radius, angle) => {
     u.crossVectors(v, Daydream.X_AXIS).normalize();
   }
   w.crossVectors(v, u);
-  let d = Math.sqrt(Math.pow(1 - radius, 2));
 
   let vi = calcRingPoint(angle, radius, u, v, w);
   let vp = calcRingPoint(angle, 1, u, v, w);
