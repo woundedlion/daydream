@@ -10,5 +10,5 @@ export { FlowField } from "./FlowField.js";
 export { MobiusGrid } from "./MobiusGrid.js";
 export { Moire } from "./Moire.js";
 export { Portholes } from "./Portholes.js";
-export { GSReactionDiffusion } from "./ReactionDiffusion.js";
-export { BZReactionDiffusion } from "./ReactionDiffusion.js";
+export { GSReactionDiffusion } from "./GSReactionDiffusion.js";
+export { BZReactionDiffusion } from "./BZReactionDiffusion.js";

@@ -12,9 +12,9 @@ import {
     createRenderPipeline, FilterAntiAlias, FilterOrient
 } from "../filters.js";
 import { GenerativePalette } from "../color.js";
-import { Reaction } from "./ReactionDiffusion.js";
+import { GSReaction } from "./GSReactionDiffusion.js";
 
-export class BZReaction extends Reaction {
+export class BZReaction extends GSReaction {
     constructor(rd, duration = 192, fadeOut = 32) {
         super(rd, duration, fadeOut);
 
