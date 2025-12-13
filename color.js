@@ -172,10 +172,13 @@ export class Gradient {
   /**
    * Gets the color at a specific position along the gradient.
    * @param {number} a - The position parameter [0, 1].
-   * @returns {THREE.Color} The sampled color, converted to linear color space.
+   * @returns {{color: THREE.Color, alpha: number}} The sampled color and alpha.
    */
   get(a) {
-    return this.colors[Math.floor(a * (this.colors.length - 1))].clone().convertSRGBToLinear();
+    return {
+      color: this.colors[Math.floor(a * (this.colors.length - 1))].clone().convertSRGBToLinear(),
+      alpha: 1.0
+    };
   }
 };
 
@@ -315,7 +318,7 @@ export class GenerativePalette {
   /**
    * Gets the color based on the internal shape specification.
    * @param {number} t - The position parameter [0, 1].
-   * @returns {THREE.Color} The sampled color, converted to linear color space.
+   * @returns {{color: THREE.Color, alpha: number}} The sampled color and alpha.
    */
   get(t) {
     let colors;
@@ -356,7 +359,10 @@ export class GenerativePalette {
     const c1 = colors[segIndex];
     const c2 = colors[segIndex + 1];
 
-    return new THREE.Color().lerpColors(c1, c2, (t - start) / (end - start)).convertSRGBToLinear();
+    return {
+      color: new THREE.Color().lerpColors(c1, c2, (t - start) / (end - start)).convertSRGBToLinear(),
+      alpha: 1.0
+    };
   }
 }
 
@@ -381,14 +387,17 @@ export class ProceduralPalette {
   /**
    * Gets the color for a given position on the palette.
    * @param {number} t - The position parameter [0, 1].
-   * @returns {THREE.Color} The resulting color, converted to linear color space.
+   * @returns {{color: THREE.Color, alpha: number}} The sampled color and alpha.
    */
   get(t) {
-    return new THREE.Color(
-      this.a[0] + this.b[0] * Math.cos(2 * Math.PI * (this.c[0] * t + this.d[0])),
-      this.a[1] + this.b[1] * Math.cos(2 * Math.PI * (this.c[1] * t + this.d[1])),
-      this.a[2] + this.b[2] * Math.cos(2 * Math.PI * (this.c[2] * t + this.d[2]))
-    ).convertSRGBToLinear();
+    return {
+      color: new THREE.Color(
+        this.a[0] + this.b[0] * Math.cos(2 * Math.PI * (this.c[0] * t + this.d[0])),
+        this.a[1] + this.b[1] * Math.cos(2 * Math.PI * (this.c[1] * t + this.d[1])),
+        this.a[2] + this.b[2] * Math.cos(2 * Math.PI * (this.c[2] * t + this.d[2]))
+      ).convertSRGBToLinear(),
+      alpha: 1.0
+    };
   }
 };
 
@@ -433,15 +442,18 @@ export class MutatingPalette {
   /**
    * Gets the color for a given position on the palette using the currently mutated vectors.
    * @param {number} p - The position parameter [0, 1].
-   * @returns {THREE.Color} The resulting color, converted to linear color space.
+   * @returns {{color: THREE.Color, alpha: number}} The sampled color and alpha.
    */
   get(p) {
     // a + b * cos(2 * PI * (c * t + d));
-    return new THREE.Color(
-      this.a.x + this.b.x * Math.cos(2 * Math.PI * (this.c.x * p + this.d.x)),
-      this.a.y + this.b.y * Math.cos(2 * Math.PI * (this.c.y * p + this.d.y)),
-      this.a.z + this.b.z * Math.cos(2 * Math.PI * (this.c.z * p + this.d.z))
-    ).convertSRGBToLinear();
+    return {
+      color: new THREE.Color(
+        this.a.x + this.b.x * Math.cos(2 * Math.PI * (this.c.x * p + this.d.x)),
+        this.a.y + this.b.y * Math.cos(2 * Math.PI * (this.c.y * p + this.d.y)),
+        this.a.z + this.b.z * Math.cos(2 * Math.PI * (this.c.z * p + this.d.z))
+      ).convertSRGBToLinear(),
+      alpha: 1.0
+    };
   }
 }
 
@@ -463,7 +475,7 @@ export class ReversePalette {
   /**
    * Gets the color at a reversed position.
    * @param {number} t - The position parameter [0, 1].
-   * @returns {THREE.Color} The color from the underlying palette at position (1 - t).
+   * @returns {{color: THREE.Color, alpha: number}} The color and alpha from the underlying palette at position (1 - t).
    */
   get(t) {
     return this.palette.get(1 - t);
@@ -485,17 +497,35 @@ export class VignettePalette {
   /**
    * Gets the color at a reversed position.
    * @param {number} t - The position parameter [0, 1].
-   * @returns {THREE.Color} The color from the underlying palette at position (1 - t).
+   * @returns {{color: THREE.Color, alpha: number}} The color and alpha from the underlying palette.
    */
   get(t) {
     let vignetteColor = new THREE.Color(0, 0, 0);
+    // TODO: Should this modulate alpha instead of blending to black?
+    // Current implementation preserves blend-to-black matching original behavior
+    // but ensures the object structure is returned.
+
+    // We get the child result first
+    let result;
+    let factor = 1.0;
+
     if (t < 0.2) {
-      return new THREE.Color().lerpColors(vignetteColor, this.palette.get(0), t / 0.2);
+      result = this.palette.get(0);
+      factor = t / 0.2;
     } else if (t >= 0.8) {
-      return new THREE.Color().lerpColors(this.palette.get(1), vignetteColor, (t - 0.8) / 0.2);
+      result = this.palette.get(1);
+      factor = (1 - (t - 0.8) / 0.2); // Fade out
     } else {
       return this.palette.get((t - 0.2) / 0.6);
     }
+
+    // Blend to black logic (original) - preserves color integrity
+    result.color.lerp(vignetteColor, 1 - factor);
+
+    // Optionally we could fade alpha here too:
+    // result.alpha *= factor;
+
+    return result;
   }
 }
 

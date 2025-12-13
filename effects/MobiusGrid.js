@@ -90,7 +90,10 @@ export class MobiusGrid {
             });
 
             const opacity = Math.min(1.0, Math.max(0.0, numRings - i));
-            dots.push(...rasterize(transformedPoints, (p) => this.palette.get(i / numRings).multiplyScalar(opacity), true));
+            dots.push(...rasterize(transformedPoints, (p) => {
+                const res = this.palette.get(i / numRings);
+                return { color: res.color, alpha: res.alpha * opacity };
+            }, true));
         }
         return dots;
     }
@@ -126,7 +129,8 @@ export class MobiusGrid {
                 const range = logMax - logMin;
                 const t = (logR - logMin) / range;
 
-                return this.palette.get(wrap(t - phase, 1.0)).multiplyScalar(opacity);
+                const res = this.palette.get(wrap(t - phase, 1.0));
+                return { color: res.color, alpha: res.alpha * opacity };
             }, true));
         }
         return dots;

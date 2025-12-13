@@ -64,7 +64,7 @@ export class GSReaction extends Sprite {
             if (b > 0.1) {
                 let t = Math.max(0, Math.min(1, (b - 0.15) * 4.0));
                 let c = this.palette.get(t);
-                this.rd.filters.plot(null, this.rd.nodes[i], c, 0, currentAlpha * this.rd.alpha);
+                this.rd.filters.plot(null, this.rd.nodes[i], c.color, 0, currentAlpha * this.rd.alpha * c.alpha);
             }
         }
     }

@@ -102,9 +102,9 @@ export class BZReaction extends GSReaction {
     }
 
     render(currentAlpha) {
-        let ca = this.palette.get(0);
-        let cb = this.palette.get(0.5);
-        let cc = this.palette.get(1);
+        let ca = this.palette.get(0).color;
+        let cb = this.palette.get(0.5).color;
+        let cc = this.palette.get(1).color;
 
         // 1. Simulate
         for (let k = 0; k < 2; k++) {

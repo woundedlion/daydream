@@ -88,7 +88,7 @@ export class MetaballEffect {
                 // Write directly to global buffer
                 // TODO: Optimization - precalc index
                 let index = y * Daydream.W + x;
-                Daydream.pixels[index].copy(color);
+                Daydream.pixels[index].copy(color.color);
             }
         }
     }

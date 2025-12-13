@@ -16,11 +16,18 @@ export const G = 1 / PHI;
 export class Dot {
   /**
    * @param {THREE.Vector3} position - The position of the dot (normalized).
-   * @param {THREE.Color} color - The color of the dot.
+   * @param {THREE.Color|{color: THREE.Color, alpha: number}} colorOrObj - The color of the dot or an object containing color and alpha.
+   * @param {number} [alpha=1.0] - The alpha value (if not provided in colorOrObj).
    */
-  constructor(position, color) {
+  constructor(position, colorOrObj, alpha = 1.0) {
     this.position = position;
-    this.color = color;
+    if (colorOrObj.isColor) {
+      this.color = colorOrObj;
+      this.alpha = alpha;
+    } else {
+      this.color = colorOrObj.color || new THREE.Color(1, 1, 1);
+      this.alpha = (colorOrObj.alpha !== undefined) ? colorOrObj.alpha : alpha;
+    }
   }
 }
 

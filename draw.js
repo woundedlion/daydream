@@ -28,7 +28,7 @@ export class DecayBuffer {
    */
   recordDots(dots, age, alpha) {
     for (const dot of dots) {
-      this.record(dot.position, dot.color, age, alpha);
+      this.record(dot.position, dot.color, age, alpha * (dot.alpha !== undefined ? dot.alpha : 1.0));
     }
   }
 
@@ -62,7 +62,10 @@ export class DecayBuffer {
     for (let i = 0; i < this.history.size; ++i) {
       let e = this.history.get(i);
       let t = (this.lifespan - e.ttl) / this.lifespan;
-      pipeline.plot(pixels, e.v, colorFn(e.v, t), 0, e.alpha);
+      const res = colorFn(e.v, t);
+      const c = res.isColor ? res : (res.color || res);
+      const a = (res.alpha !== undefined ? res.alpha : 1.0) * e.alpha;
+      pipeline.plot(pixels, e.v, c, 0, a);
       e.ttl -= 1;
     }
 
@@ -600,7 +603,7 @@ export const drawFibSpiral = (n, eps, colorFn) => {
  */
 export function plotDots(pixels, filters, dots, age, alpha) {
   for (const dot of dots) {
-    filters.plot(pixels, dot.position, dot.color, age, alpha);
+    filters.plot(pixels, dot.position, dot.color, age, alpha * (dot.alpha !== undefined ? dot.alpha : 1.0));
   }
 }
 
