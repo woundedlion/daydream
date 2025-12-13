@@ -107,10 +107,6 @@ const moveAutoGui = () => {
 };
 setInterval(moveAutoGui, 1000);
 
-// Cleanup garbage comments
-
-
-
 const daydream = new Daydream();
 guiInstance.add(daydream, 'labelAxes').name('Show Axes');
 window.addEventListener("resize", () => daydream.setCanvasSize());
