@@ -190,22 +190,13 @@ export class Daydream {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
 
-    // Adjust Camera Distance for Mobile Portrait Mode ---
-    // If aspect ratio is narrow (portrait), we must pull the camera back 
-    // so the sphere (radius 30) fits within the horizontal FOV.
-    if (this.camera.aspect < 1.0) {
-      // Calculate required distance to fit the sphere width + padding
-      const targetVisibleWidth = Daydream.SPHERE_RADIUS * 2.4; // 2.4 gives some padding
-      // Math: visible_width = 2 * dist * tan(fov/2) * aspect
-      // dist = (visible_width / 2) / (tan(fov/2) * aspect)
-      const fovRad = THREE.MathUtils.degToRad(Daydream.CAMERA_FOV / 2);
-      const dist = (targetVisibleWidth / 2) / (Math.tan(fovRad) * this.camera.aspect);
-
-      this.camera.position.z = dist;
-    } else {
-      // Reset to default for landscape/desktop
-      this.camera.position.z = Daydream.CAMERA_Z;
-    }
+    // Adjust Camera Distance to fill 90% of the smallest viewport dimension
+    const diameter = Daydream.SPHERE_RADIUS * 2;
+    const targetCoverage = 0.90;
+    const fovRad = THREE.MathUtils.degToRad(Daydream.CAMERA_FOV / 2);
+    const distForHeight = diameter / (2 * Math.tan(fovRad) * targetCoverage);
+    const distForWidth = distForHeight / this.camera.aspect;
+    this.camera.position.z = Math.max(distForHeight, distForWidth);
 
     this.renderer.setSize(width, height);
     this.labelRenderer.setSize(width, height);
@@ -233,7 +224,12 @@ export class Daydream {
         }
 
         // Draw effect to buffer
+        const start = performance.now();
         effect.drawFrame();
+        const duration = performance.now() - start;
+
+        const stats = document.getElementById("perf-stats");
+        if (stats) stats.innerText = `${duration.toFixed(3)} ms`;
 
         // Render buffer to InstanceMesh
         let instanceCount = 0;
