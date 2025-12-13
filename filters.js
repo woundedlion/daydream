@@ -15,13 +15,17 @@ const BLACK = new THREE.Color(0, 0, 0);
  */
 export function createRenderPipeline(...filters) {
   // Canvas sink
-  let head = (pixels, x, y, color, age, alpha) => {
+  let head = (pixels, x, y, colorInput, age, alpha) => {
     let xi = Math.round(x);
     let yi = Math.round(y);
     let index = yi * Daydream.W + xi;
 
+    // Unpack color if it's an object {color, alpha}
+    const color = colorInput.isColor ? colorInput : (colorInput.color || colorInput);
+    const alphaMod = (colorInput.alpha !== undefined ? colorInput.alpha : 1.0);
+
     // Blend (Color objects)
-    let blended = blendAlpha(alpha)(Daydream.pixels[index], color);
+    let blended = blendAlpha(alpha * alphaMod)(Daydream.pixels[index], color);
     Daydream.pixels[index].copy(blended);
   };
   let nextIs2D = true;
@@ -351,9 +355,11 @@ export class FilterDecay {
       const x = this.xs[i];
       const y = this.ys[i];
 
-      let color = trailFn(x, y, 1 - (ttl / this.lifespan));
+      let res = trailFn(x, y, 1 - (ttl / this.lifespan));
+      const color = res.isColor ? res : (res.color || res);
+      const outputAlpha = (res.alpha !== undefined ? res.alpha : 1.0) * alpha;
 
-      this.pass(x, y, color, this.lifespan - ttl, alpha);
+      this.pass(x, y, color, this.lifespan - ttl, outputAlpha);
     }
 
     // 2. Decay & Compact Loop (The C++ "Swap-Remove" Logic)

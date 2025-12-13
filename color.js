@@ -529,6 +529,45 @@ export class VignettePalette {
   }
 }
 
+/**
+ * A wrapper class that applies alpha fade-out to both ends of an existing palette.
+ * Instead of darkening to black, it becomes transparent.
+ */
+export class TransparentVignette {
+  /**
+   * @param {Object} palette - The original palette object with a .get(t) method.
+   */
+  constructor(palette) {
+    this.palette = palette;
+  }
+
+  /**
+   * Gets the color with alpha fade applied.
+   * @param {number} t - The position parameter [0, 1].
+   * @returns {{color: THREE.Color, alpha: number}} The color and alpha from the underlying palette.
+   */
+  get(t) {
+    // We get the child result first
+    let result;
+    let factor = 1.0;
+
+    if (t < 0.2) {
+      result = this.palette.get(0);
+      factor = t / 0.2;
+    } else if (t >= 0.8) {
+      result = this.palette.get(1);
+      factor = (1 - (t - 0.8) / 0.2); // Fade out
+    } else {
+      return this.palette.get((t - 0.2) / 0.6);
+    }
+
+    // Apply alpha fade
+    result.alpha = (result.alpha !== undefined ? result.alpha : 1.0) * factor;
+
+    return result;
+  }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Predefined Palettes
 ///////////////////////////////////////////////////////////////////////////////

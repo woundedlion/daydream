@@ -9,7 +9,7 @@ import {
     sampleRing, rasterize, plotDots, tween
 } from "../draw.js";
 import {
-    VignettePalette, richSunset, mangoPeel, underSea, iceMelt
+    VignettePalette, richSunset, mangoPeel, underSea, iceMelt, TransparentVignette
 } from "../color.js";
 import {
     Timeline, easeMid, Sprite, RandomWalk, MutableNumber
@@ -22,7 +22,7 @@ export class RingSpin {
     static Ring = class {
         constructor(normal, palette, trailLength) {
             this.normal = normal;
-            this.palette = new VignettePalette(palette);
+            this.palette = new TransparentVignette(palette);
             this.filters = createRenderPipeline(
                 new FilterDecay(trailLength),
                 new FilterAntiAlias()
