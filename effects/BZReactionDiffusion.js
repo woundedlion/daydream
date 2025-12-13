@@ -239,7 +239,6 @@ export class BZReactionDiffusion {
             this.weights.push(new Array(K).fill(1.0));
             this.scales.push(1.0);
         }
-        console.log("Graph built (BZ Fibonacci Hex). Nodes:", this.N);
     }
 
     drawFrame() {
