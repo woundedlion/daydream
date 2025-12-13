@@ -190,9 +190,9 @@ export class Daydream {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
 
-    // Adjust Camera Distance to fill 90% of the smallest viewport dimension
+    // Adjust Camera Distance to fill 85% of the smallest viewport dimension
     const diameter = Daydream.SPHERE_RADIUS * 2;
-    const targetCoverage = 0.90;
+    const targetCoverage = 0.85;
     const fovRad = THREE.MathUtils.degToRad(Daydream.CAMERA_FOV / 2);
     const distForHeight = diameter / (2 * Math.tan(fovRad) * targetCoverage);
     const distForWidth = distForHeight / this.camera.aspect;
