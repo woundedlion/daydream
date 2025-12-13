@@ -43,7 +43,7 @@ const initialEffect = urlParams.get('effect');
 
 let activeEffect;
 const controls = {
-  effectName: (initialEffect && effects[initialEffect]) ? initialEffect : 'BZReactionDiffusion',
+  effectName: (initialEffect && effects[initialEffect]) ? initialEffect : 'MobiusGrid',
   changeEffect: function () {
     if (activeEffect && activeEffect.gui) {
       try {

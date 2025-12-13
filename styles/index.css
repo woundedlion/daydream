@@ -187,6 +187,15 @@
         margin-top: 5px !important;
     }
 
+    .gui-container .dg li.folder.closed {
+        height: 34px !important;
+        overflow: hidden !important;
+    }
+
+    .gui-container .dg li.folder.closed ul {
+        display: none !important;
+    }
+
     .dg .close-button {
         display: none !important;
     }

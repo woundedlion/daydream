@@ -124,9 +124,19 @@ export class Dynamo {
             if (a >= lowerBlendEdge && a <= upperBlendEdge) {
                 const blendFactor = (a - lowerBlendEdge) / (2 * blendWidth);
                 const clampedBlendFactor = Math.max(0, Math.min(blendFactor, 1));
-                const color1 = this.palettes[i].get(t);
-                const color2 = this.palettes[i + 1].get(t);
-                return color1.clone().lerp(color2, clampedBlendFactor);
+
+                const c1 = this.palettes[i].get(t);
+                const c2 = this.palettes[i + 1].get(t);
+
+                // Blend colors
+                const resultColor = c1.color.clone().lerp(c2.color, clampedBlendFactor);
+
+                // Blend alphas
+                const t1 = (c1.alpha !== undefined ? c1.alpha : 1.0);
+                const t2 = (c2.alpha !== undefined ? c2.alpha : 1.0);
+                const resultAlpha = t1 + (t2 - t1) * clampedBlendFactor;
+
+                return { color: resultColor, alpha: resultAlpha };
             }
 
             const nextBoundaryLowerBlendEdge = (i + 1 < numBoundaries)

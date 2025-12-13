@@ -185,7 +185,8 @@ export class BZReactionDiffusion {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha', 0, 1).step(0.01).name('Alpha');
 
-        const folder = this.gui.addFolder('BZ Parameters');
+        const folder = this.gui.addFolder('Mobius Params');
+        folder.open();
         folder.add(this.bzParams, 'alpha', 0.5, 2.0).name('Predation (α)');
         folder.add(this.bzParams, 'D', 0.001, 0.1).name('Diffusion');
         folder.add(this.bzParams, 'dt', 0.01, 0.5).name('Time Step');
