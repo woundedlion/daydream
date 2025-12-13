@@ -4,6 +4,61 @@ import { G } from "./geometry.js";
 import { randomBetween } from "./util.js"
 
 /**
+ * Represents a color with an alpha channel.
+ * Encapsulates a THREE.Color and an alpha value.
+ */
+export class Color4 {
+  /**
+   * @param {THREE.Color|number} r - THREE.Color, or Red channel (0-1)
+   * @param {number} [g] - Green channel
+   * @param {number} [b] - Blue channel
+   * @param {number} [a=1.0] - Alpha channel
+   */
+  constructor(r, g, b, a = 1.0) {
+    if (r instanceof THREE.Color) {
+      this.color = r;
+      this.alpha = g !== undefined ? g : 1.0;
+    } else if (arguments.length >= 3) {
+      this.color = new THREE.Color(r, g, b);
+      this.alpha = a;
+    } else {
+      this.color = new THREE.Color(0, 0, 0);
+      this.alpha = 1.0;
+    }
+  }
+
+  clone() {
+    return new Color4(this.color.clone(), this.alpha);
+  }
+
+  copy(other) {
+    this.color.copy(other.color);
+    this.alpha = other.alpha;
+    return this;
+  }
+
+  lerp(other, t) {
+    this.color.lerp(other.color, t);
+    this.alpha += (other.alpha - this.alpha) * t;
+    return this;
+  }
+
+  get isColor4() {
+    return true;
+  }
+}
+
+// ... existing code ...
+
+/**
+ * A standard Palette interface.
+ * Returns a Color4.
+ */
+export class Palette {
+  get(t) { return new Color4(new THREE.Color(0xffffff)); }
+}
+
+/**
  * Blends two colors by taking the maximum value for each RGB channel.
  * @param {THREE.Color} c1 - The first color.
  * @param {THREE.Color} c2 - The second color.
@@ -175,10 +230,8 @@ export class Gradient {
    * @returns {{color: THREE.Color, alpha: number}} The sampled color and alpha.
    */
   get(a) {
-    return {
-      color: this.colors[Math.floor(a * (this.colors.length - 1))].clone().convertSRGBToLinear(),
-      alpha: 1.0
-    };
+    const c = this.colors[Math.floor(a * (this.colors.length - 1))].clone().convertSRGBToLinear();
+    return new Color4(c, 1.0);
   }
 };
 
@@ -359,10 +412,7 @@ export class GenerativePalette {
     const c1 = colors[segIndex];
     const c2 = colors[segIndex + 1];
 
-    return {
-      color: new THREE.Color().lerpColors(c1, c2, (t - start) / (end - start)).convertSRGBToLinear(),
-      alpha: 1.0
-    };
+    return new Color4(new THREE.Color().lerpColors(c1, c2, (t - start) / (end - start)).convertSRGBToLinear(), 1.0);
   }
 }
 
@@ -390,14 +440,14 @@ export class ProceduralPalette {
    * @returns {{color: THREE.Color, alpha: number}} The sampled color and alpha.
    */
   get(t) {
-    return {
-      color: new THREE.Color(
+    return new Color4(
+      new THREE.Color(
         this.a[0] + this.b[0] * Math.cos(2 * Math.PI * (this.c[0] * t + this.d[0])),
         this.a[1] + this.b[1] * Math.cos(2 * Math.PI * (this.c[1] * t + this.d[1])),
         this.a[2] + this.b[2] * Math.cos(2 * Math.PI * (this.c[2] * t + this.d[2]))
       ).convertSRGBToLinear(),
-      alpha: 1.0
-    };
+      1.0
+    );
   }
 };
 
@@ -446,14 +496,14 @@ export class MutatingPalette {
    */
   get(p) {
     // a + b * cos(2 * PI * (c * t + d));
-    return {
-      color: new THREE.Color(
+    return new Color4(
+      new THREE.Color(
         this.a.x + this.b.x * Math.cos(2 * Math.PI * (this.c.x * p + this.d.x)),
         this.a.y + this.b.y * Math.cos(2 * Math.PI * (this.c.y * p + this.d.y)),
         this.a.z + this.b.z * Math.cos(2 * Math.PI * (this.c.z * p + this.d.z))
       ).convertSRGBToLinear(),
-      alpha: 1.0
-    };
+      1.0
+    );
   }
 }
 
@@ -506,26 +556,25 @@ export class VignettePalette {
     // but ensures the object structure is returned.
 
     // We get the child result first
-    let result;
+    let resultColor;
     let factor = 1.0;
 
     if (t < 0.2) {
-      result = this.palette.get(0);
+      resultColor = this.palette.get(0).color.clone();
       factor = t / 0.2;
+      resultColor.lerp(vignetteColor, 1 - factor);
     } else if (t >= 0.8) {
-      result = this.palette.get(1);
+      resultColor = this.palette.get(1).color.clone();
       factor = (1 - (t - 0.8) / 0.2); // Fade out
+      resultColor.lerp(vignetteColor, 1 - factor);
     } else {
-      return this.palette.get((t - 0.2) / 0.6);
+      return this.palette.get((t - 0.2) / 0.6); // returns Color4
     }
 
     // Blend to black logic (original) - preserves color integrity
-    result.color.lerp(vignetteColor, 1 - factor);
+    // result.color.lerp(vignetteColor, 1 - factor); // moved inside
 
-    // Optionally we could fade alpha here too:
-    // result.alpha *= factor;
-
-    return result;
+    return new Color4(resultColor, 1.0);
   }
 }
 
@@ -552,17 +601,17 @@ export class TransparentVignette {
     let factor = 1.0;
 
     if (t < 0.2) {
-      result = this.palette.get(0);
+      result = this.palette.get(0).clone();
       factor = t / 0.2;
     } else if (t >= 0.8) {
-      result = this.palette.get(1);
+      result = this.palette.get(1).clone();
       factor = (1 - (t - 0.8) / 0.2); // Fade out
     } else {
       return this.palette.get((t - 0.2) / 0.6);
     }
 
     // Apply alpha fade
-    result.alpha = (result.alpha !== undefined ? result.alpha : 1.0) * factor;
+    result.alpha *= factor;
 
     return result;
   }

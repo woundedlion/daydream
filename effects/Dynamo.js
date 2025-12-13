@@ -128,15 +128,7 @@ export class Dynamo {
                 const c1 = this.palettes[i].get(t);
                 const c2 = this.palettes[i + 1].get(t);
 
-                // Blend colors
-                const resultColor = c1.color.clone().lerp(c2.color, clampedBlendFactor);
-
-                // Blend alphas
-                const t1 = (c1.alpha !== undefined ? c1.alpha : 1.0);
-                const t2 = (c2.alpha !== undefined ? c2.alpha : 1.0);
-                const resultAlpha = t1 + (t2 - t1) * clampedBlendFactor;
-
-                return { color: resultColor, alpha: resultAlpha };
+                return c1.clone().lerp(c2, clampedBlendFactor);
             }
 
             const nextBoundaryLowerBlendEdge = (i + 1 < numBoundaries)

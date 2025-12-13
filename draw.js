@@ -22,7 +22,7 @@ export class DecayBuffer {
 
   /**
    * Records a list of dots into the history buffer.
-   * * @param {Dot[]} dots - The list of dots (position/color) to record.
+   * @param {Dot[]} dots - The list of dots (position/color) to record.
    * @param {number} age - The initial age of the dots (usually 0).
    * @param {number} alpha - The global opacity for these dots.
    */
@@ -34,7 +34,7 @@ export class DecayBuffer {
 
   /**
    * Records a single dot into the history buffer.
-   * * @param {THREE.Vector3} v - The position vector.
+   * @param {THREE.Vector3} v - The position vector.
    * @param {THREE.Color} color - The base color of the dot.
    * @param {number} age - The initial age of the dot (frame offset).
    * @param {number} alpha - The initial opacity.
@@ -50,7 +50,7 @@ export class DecayBuffer {
 
   /**
    * Renders the buffered dots to the pixel map, applying decay and sorting.
-   * * @param {Map} pixels - The pixel map to write to (output).
+   * @param {Map} pixels - The pixel map to write to (output).
    * @param {Object} pipeline - The render pipeline or filter object to process points.
    * @param {Function} colorFn - Function to determine color based on decay. Signature: (vector, normalized_t) => Color.
    */
