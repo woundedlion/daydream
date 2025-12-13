@@ -47,7 +47,7 @@ export class Daydream {
     });
 
     this.labelRenderer = new CSS2DRenderer();
-    this.labelRenderer.className = "labelLayer";
+    this.labelRenderer.domElement.className = "labelLayer";
     this.canvas.parentElement.appendChild(this.labelRenderer.domElement);
 
     this.camera = new THREE.PerspectiveCamera(
@@ -94,22 +94,25 @@ export class Daydream {
 
     // --- Axis Geometries and Meshes ---
     let xAxisGeometry = new THREE.BufferGeometry().setFromPoints([
-      Daydream.X_AXIS.clone().negate().multiplyScalar(Daydream.SPHERE_RADIUS),
-      Daydream.X_AXIS.clone().multiplyScalar(Daydream.SPHERE_RADIUS)
+      Daydream.X_AXIS.clone().negate().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95),
+      Daydream.X_AXIS.clone().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95)
     ]);
     this.xAxis = new THREE.Line(xAxisGeometry, this.axisMaterial);
+    this.xAxis.visible = false;
 
     let yAxisGeometry = new THREE.BufferGeometry().setFromPoints([
-      Daydream.Y_AXIS.clone().negate().multiplyScalar(Daydream.SPHERE_RADIUS),
-      Daydream.Y_AXIS.clone().multiplyScalar(Daydream.SPHERE_RADIUS)
+      Daydream.Y_AXIS.clone().negate().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95),
+      Daydream.Y_AXIS.clone().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95)
     ]);
     this.yAxis = new THREE.Line(yAxisGeometry, this.axisMaterial);
+    this.yAxis.visible = false;
 
     let zAxisGeometry = new THREE.BufferGeometry().setFromPoints([
-      Daydream.Z_AXIS.clone().negate().multiplyScalar(Daydream.SPHERE_RADIUS),
-      Daydream.Z_AXIS.clone().multiplyScalar(Daydream.SPHERE_RADIUS)
+      Daydream.Z_AXIS.clone().negate().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95),
+      Daydream.Z_AXIS.clone().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95)
     ]);
     this.zAxis = new THREE.Line(zAxisGeometry, this.axisMaterial);
+    this.zAxis.visible = false;
 
     this.dotMesh = new THREE.InstancedMesh(
       this.dotGeometry,
@@ -119,6 +122,9 @@ export class Daydream {
     this.dotMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.dotMesh.count = 0;
     this.scene.add(this.dotMesh);
+    this.scene.add(this.xAxis);
+    this.scene.add(this.yAxis);
+    this.scene.add(this.zAxis);
 
     this.mainViewport = { x: 0, y: 0, width: 1, height: 1 };
     this.pipViewport = { x: 0, y: 0, width: 0.25, height: 0.25 };
@@ -184,7 +190,7 @@ export class Daydream {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
 
-    // --- FIX: Adjust Camera Distance for Mobile Portrait Mode ---
+    // Adjust Camera Distance for Mobile Portrait Mode ---
     // If aspect ratio is narrow (portrait), we must pull the camera back 
     // so the sphere (radius 30) fits within the horizontal FOV.
     if (this.camera.aspect < 1.0) {
@@ -267,10 +273,19 @@ export class Daydream {
         }
         this.dotMesh.instanceMatrix.needsUpdate = true;
 
+        this.dotMesh.instanceMatrix.needsUpdate = true;
+
+        this.xAxis.visible = this.labelAxes;
+        this.yAxis.visible = this.labelAxes;
+        this.zAxis.visible = this.labelAxes;
+
         if (this.labelAxes) {
           labels.push({ "position": Daydream.X_AXIS, "content": "X" });
           labels.push({ "position": Daydream.Y_AXIS, "content": "Y" });
           labels.push({ "position": Daydream.Z_AXIS, "content": "Z" });
+          labels.push({ "position": Daydream.X_AXIS.clone().negate(), "content": "-X" });
+          labels.push({ "position": Daydream.Y_AXIS.clone().negate(), "content": "-Y" });
+          labels.push({ "position": Daydream.Z_AXIS.clone().negate(), "content": "-Z" });
         }
 
         if (typeof effect.getLabels === 'function') {
