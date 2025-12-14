@@ -15,7 +15,8 @@ import {
   Moire,
   Portholes,
   GSReactionDiffusion,
-  BZReactionDiffusion
+  BZReactionDiffusion,
+  PetalFlow
 } from "./effects/index.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
@@ -35,7 +36,8 @@ const effects = {
   Moire,
   Portholes,
   GSReactionDiffusion,
-  BZReactionDiffusion
+  BZReactionDiffusion,
+  PetalFlow
 };
 
 const urlParams = new URLSearchParams(window.location.search);

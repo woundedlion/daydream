@@ -12,3 +12,5 @@ export { Moire } from "./Moire.js";
 export { Portholes } from "./Portholes.js";
 export { GSReactionDiffusion } from "./GSReactionDiffusion.js";
 export { BZReactionDiffusion } from "./BZReactionDiffusion.js";
+export { PetalFlow } from "./PetalFlow.js";
+
