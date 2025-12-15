@@ -38,8 +38,6 @@ class ThrusterContext {
 
 export class Thrusters {
     constructor() {
-        Daydream.W = 96
-
         // Palettes
         this.palette = new ProceduralPalette(
             [0.5, 0.5, 0.5],

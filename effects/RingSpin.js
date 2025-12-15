@@ -32,7 +32,6 @@ export class RingSpin {
     }
 
     constructor() {
-        Daydream.W = 96;
         this.rings = [];
         this.alpha = 0.2;
         this.trailLength = new MutableNumber(20);
