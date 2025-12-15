@@ -28,7 +28,6 @@ export class Daydream {
   static H = 20;
   static W = 96;
   static FPS = 16;
-
   static DOT_SIZE = 2;
   static DOT_COLOR = 0x0000ff;
 

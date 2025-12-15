@@ -50,11 +50,9 @@ const controls = {
     if (activeEffect && activeEffect.gui) {
       try {
         const dom = activeEffect.gui.domElement;
-        // If we moved the dom element, dat.gui might fail to remove it from where it expects
         if (dom && dom.parentNode) {
           dom.parentNode.removeChild(dom);
         }
-        // Force destroy without throwing if DOM is already gone
         activeEffect.gui.destroy();
       } catch (e) {
         console.warn("GUI destroy warning:", e);
