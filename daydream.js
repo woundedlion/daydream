@@ -45,7 +45,7 @@ const initialEffect = urlParams.get('effect');
 
 let activeEffect;
 const controls = {
-  effectName: (initialEffect && effects[initialEffect]) ? initialEffect : 'MobiusGrid',
+  effectName: (initialEffect && effects[initialEffect]) ? initialEffect : 'PetalFlow',
   changeEffect: function () {
     if (activeEffect && activeEffect.gui) {
       try {
