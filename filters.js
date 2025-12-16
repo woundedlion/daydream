@@ -19,13 +19,9 @@ export function createRenderPipeline(...filters) {
     let xi = Math.round(x);
     let yi = Math.round(y);
     let index = yi * Daydream.W + xi;
-
-    // Unpack color if it's an object {color, alpha}
     const color = colorInput.isColor ? colorInput : (colorInput.color || colorInput);
     const alphaMod = (colorInput.alpha !== undefined ? colorInput.alpha : 1.0);
-
-    // Blend (Color objects)
-    let blended = blendAlpha(alpha * alphaMod)(Daydream.pixels[index], color);
+    let blended = blendAlpha(Daydream.pixels[index], color, alpha * alphaMod);
     Daydream.pixels[index].copy(blended);
   };
   let nextIs2D = true;

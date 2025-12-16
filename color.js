@@ -2,6 +2,7 @@
 import * as THREE from "three";
 import { G } from "./geometry.js";
 import { randomBetween } from "./util.js"
+import { StaticPool } from "./StaticPool.js";
 
 /**
  * Represents a color with an alpha channel.
@@ -51,6 +52,12 @@ export class Color4 {
   }
 }
 
+/** @type {StaticPool} Global pool for temporary Color objects used in blending. */
+export const colorPool = new StaticPool(THREE.Color, 1000000);
+
+/** @type {StaticPool} Global pool for temporary Color4 objects. */
+export const color4Pool = new StaticPool(Color4, 250000);
+
 /**
  * A standard Palette interface.
  * Returns a Color4.
@@ -65,158 +72,18 @@ export class Palette {
 }
 
 /**
- * Blends two colors by taking the maximum value for each RGB channel.
- * @param {THREE.Color} c1 - The first color.
- * @param {THREE.Color} c2 - The second color.
- * @returns {THREE.Color} The resulting color.
- */
-export const blendMax = (c1, c2) => {
-  const result = colorPool.acquire();
-  result.r = Math.max(c1.r, c2.r);
-  result.g = Math.max(c1.g, c2.g);
-  result.b = Math.max(c1.b, c2.b);
-  return result;
-}
-
-/**
- * Blends the two colors using an opaque "over" operation (returns c2).
- * @param {THREE.Color} c1 - The background color (ignored).
- * @param {THREE.Color} c2 - The foreground color.
- * @returns {THREE.Color} The foreground color.
- */
-export const blendOver = (c1, c2) => {
-  return c2;
-}
-
-/**
- * Blends the two colors using an opaque "under" operation (returns c1).
- * @param {THREE.Color} c1 - The background color.
- * @param {THREE.Color} c2 - The foreground color (ignored).
- * @returns {THREE.Color} The background color.
- */
-export const blendUnder = (c1, c2) => {
-  return c1;
-}
-
-/**
- * Adds the two colors, clamping each channel at 1.0.
- * @param {THREE.Color} c1 - The first color.
- * @param {THREE.Color} c2 - The second color.
- * @returns {THREE.Color} The resulting color.
- */
-export const blendAdd = (c1, c2) => {
-  const result = colorPool.acquire();
-  result.r = Math.min(1, c1.r + c2.r);
-  result.g = Math.min(1, c1.g + c2.g);
-  result.b = Math.min(1, c1.b + c2.b);
-  return result;
-}
-
-/**
  * Returns a function that performs standard alpha blending.
  * C_result = C1 * (1 - a) + C2 * a
+ * @param {THREE.Color} c1 - The first color.
+ * @param {THREE.Color} c2 - The second color.
  * @param {number} a - The alpha value of the second color [0, 1].
  * @returns {function(THREE.Color, THREE.Color): THREE.Color} A blending function.
  */
-import { StaticPool } from "./StaticPool.js";
-
-/** @type {StaticPool} Global pool for temporary Color objects used in blending. */
-export const colorPool = new StaticPool(THREE.Color, 1000000);
-
-/** @type {StaticPool} Global pool for temporary Color4 objects. */
-export const color4Pool = new StaticPool(Color4, 250000);
-
-/**
- * Returns a function that performs standard alpha blending.
- * C_result = C1 * (1 - a) + C2 * a
- * @param {number} a - The alpha value of the second color [0, 1].
- * @returns {function(THREE.Color, THREE.Color): THREE.Color} A blending function.
- */
-export const blendAlpha = (a) => {
-  return (c1, c2) => {
-    const result = colorPool.acquire();
-    result.r = c1.r * (1 - a) + c2.r * (a);
-    result.g = c1.g * (1 - a) + c2.g * (a);
-    result.b = c1.b * (1 - a) + c2.b * (a);
-    return result;
-  }
-}
-
-/**
- * Returns a function that performs an accumulation blend.
- * C_result = C_existing + C_fragment * coverage (a)
- * @param {number} a - The coverage/alpha value of the incoming fragment [0, 1].
- * @returns {function(THREE.Color, THREE.Color): THREE.Color} A blending function.
- */
-export const blendAccumulate = (a) => {
-  return (c1, c2) => {
-    // c1: existing pixel color, c2: incoming fragment color
-    // Formula: C_result = C_existing + C_fragment * coverage (a)
-    const result = colorPool.acquire();
-    result.r = Math.min(1, c1.r + c2.r * a);
-    result.g = Math.min(1, c1.g + c2.g * a);
-    result.b = Math.min(1, c1.b + c2.b * a);
-    return result;
-  }
-}
-
-/**
- * Blends by applying the maximum color magnitude to the second color (c2).
- * Result is c2 scaled by max(magnitude(c1), magnitude(c2)) / magnitude(c2).
- * @param {THREE.Color} c1 - The first color.
- * @param {THREE.Color} c2 - The second color (the color being scaled).
- * @returns {THREE.Color} The resulting scaled color.
- */
-export const blendOverMax = (c1, c2) => {
-  const m1 =
-    Math.sqrt(Math.pow(c1.r, 2) + Math.pow(c1.g, 2) + Math.pow(c1.b, 2));
-  const m2 =
-    Math.sqrt(Math.pow(c2.r, 2) + Math.pow(c2.g, 2) + Math.pow(c2.b, 2));
-  if (m2 == 0) {
-    return c1;
-  }
-  let s = Math.max(m1, m2) / m2;
+export const blendAlpha = (c1, c2, a) => {
   const result = colorPool.acquire();
-  result.r = c2.r * s;
-  result.g = c2.g * s;
-  result.b = c2.b * s;
-  return result;
-}
-
-/**
- * Blends by applying the minimum color magnitude to the second color (c2).
- * Result is c2 scaled by min(magnitude(c1), magnitude(c2)) / magnitude(c2).
- * @param {THREE.Color} c1 - The first color.
- * @param {THREE.Color} c2 - The second color (the color being scaled).
- * @returns {THREE.Color} The resulting scaled color.
- */
-export const blendOverMin = (c1, c2) => {
-  const m1 =
-    Math.sqrt(Math.pow(c1.r, 2) + Math.pow(c1.g, 2) + Math.pow(c1.b, 2));
-  const m2 =
-    Math.sqrt(Math.pow(c2.r, 2) + Math.pow(c2.g, 2) + Math.pow(c2.b, 2));
-  let s = 0;
-  if (m2 > 0) {
-    s = Math.min(m1, m2) / m2;
-  }
-  const result = colorPool.acquire();
-  result.r = c2.r * s;
-  result.g = c2.g * s;
-  result.b = c2.b * s;
-  return result;
-}
-
-/**
- * Calculates the mean (average) of two colors.
- * @param {THREE.Color} c1 - The first color.
- * @param {THREE.Color} c2 - The second color.
- * @returns {THREE.Color} The mean color.
- */
-export const blendMean = (c1, c2) => {
-  const result = colorPool.acquire();
-  result.r = (c1.r + c2.r) / 2;
-  result.g = (c1.g + c2.g) / 2;
-  result.b = (c1.b + c2.b) / 2;
+  result.r = c1.r * (1 - a) + c2.r * (a);
+  result.g = c1.g * (1 - a) + c2.g * (a);
+  result.b = c1.b * (1 - a) + c2.b * (a);
   return result;
 }
 
@@ -564,6 +431,8 @@ export class ReversePalette {
  * A wrapper class that applies falloff to both ends of an existing palette.
  */
 export class VignettePalette {
+  static vignetteColor = new THREE.Color(0, 0, 0);
+
   /**
    * @param {Object} palette - The original palette object with a .get(t) method.
    */
@@ -577,32 +446,20 @@ export class VignettePalette {
    * @returns {{color: THREE.Color, alpha: number}} The color and alpha from the underlying palette.
    */
   get(t) {
-    let vignetteColor = new THREE.Color(0, 0, 0);
-    // TODO: Should this modulate alpha instead of blending to black?
-    // Current implementation preserves blend-to-black matching original behavior
-    // but ensures the object structure is returned.
-
-    // We get the child result first
     let resultColor;
     let factor = 1.0;
 
     if (t < 0.2) {
       resultColor = this.palette.get(0).color;
       factor = t / 0.2;
-      resultColor.lerp(vignetteColor, 1 - factor);
+      resultColor.lerp(VignettePalette.vignetteColor, 1 - factor);
     } else if (t >= 0.8) {
       resultColor = this.palette.get(1).color;
       factor = (1 - (t - 0.8) / 0.2); // Fade out
-      resultColor.lerp(vignetteColor, 1 - factor);
+      resultColor.lerp(VignettePalette.vignetteColor, 1 - factor);
     } else {
       return this.palette.get((t - 0.2) / 0.6); // returns Color4
     }
-
-    // Blend to black logic (original) - preserves color integrity
-    // result.color.lerp(vignetteColor, 1 - factor); // moved inside
-
-    // Blend to black logic (original) - preserves color integrity
-    // result.color.lerp(vignetteColor, 1 - factor); // moved inside
 
     const result = color4Pool.acquire();
     result.color.copy(resultColor);

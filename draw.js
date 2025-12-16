@@ -48,7 +48,8 @@ export class DecayBuffer {
     let ttl = this.lifespan - age;
     if (ttl > 0) {
       // Push to circular buffer (automatically handles overwriting oldest if full)
-      this.history.push({ v: v, color: color, alpha: alpha, ttl: ttl });
+      // Clones are REQUIRED here because the input objects (v, color) might be pooled and reused.
+      this.history.push({ v: v.clone(), color: color.clone(), alpha: alpha, ttl: ttl });
     }
   }
 
@@ -63,7 +64,7 @@ export class DecayBuffer {
     this.history.sort((a, b) => a.ttl - b.ttl);
 
     // render
-    for (let i = 0; i < this.history.size; ++i) {
+    for (let i = 0; i < this.history.length; ++i) {
       let e = this.history.get(i);
       let t = (this.lifespan - e.ttl) / this.lifespan;
       const res = colorFn(e.v, t);
@@ -74,8 +75,8 @@ export class DecayBuffer {
     }
 
     // cleanup
-    while (this.history.size > 0 && this.history.front().ttl <= 0) {
-      this.history.pop();
+    while (this.history.length > 0 && this.history.front().ttl <= 0) {
+      this.history.pop_front();
     }
   }
 }
