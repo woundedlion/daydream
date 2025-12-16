@@ -5,6 +5,8 @@ import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer
 import { pixelToSpherical } from "./geometry.js";
 import { G as g } from "./geometry.js";
 import { GUI } from "gui"; // Fixed import
+import { colorPool, color4Pool } from "./color.js";
+import { dotPool } from "./draw.js";
 
 /** @type {Array<{position: THREE.Vector3, content: string}>} Global array to store labels to be rendered. */
 export var labels = [];
@@ -209,6 +211,9 @@ export class Daydream {
     if (this.clock.getElapsedTime() * 1000 > 62.5) {
       this.clock.start();
       if (!this.paused || this.stepFrames != 0) {
+        colorPool.reset();
+        color4Pool.reset();
+        dotPool.reset();
         if (this.stepFrames != 0) {
           this.stepFrames--;
         }

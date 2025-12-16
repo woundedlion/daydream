@@ -20,13 +20,24 @@ export class Dot {
    * @param {number} [alpha=1.0] - The alpha value (if not provided in colorOrObj).
    */
   constructor(position, colorOrObj, alpha = 1.0) {
+    if (position === undefined) {
+      // Pool initialization case
+      this.position = new THREE.Vector3();
+      this.color = new THREE.Color(1, 1, 1);
+      this.alpha = 1.0;
+      return;
+    }
+
     this.position = position;
-    if (colorOrObj.isColor) {
+    if (colorOrObj && colorOrObj.isColor) {
       this.color = colorOrObj;
       this.alpha = alpha;
-    } else {
+    } else if (colorOrObj) {
       this.color = colorOrObj.color || new THREE.Color(1, 1, 1);
       this.alpha = (colorOrObj.alpha !== undefined) ? colorOrObj.alpha : alpha;
+    } else {
+      this.color = new THREE.Color(1, 1, 1);
+      this.alpha = alpha;
     }
   }
 }
