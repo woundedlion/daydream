@@ -4,6 +4,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { pixelToSpherical } from "./geometry.js";
 import { G as g } from "./geometry.js";
+import { vector3Pool } from "./geometry.js";
 import { GUI } from "gui"; // Fixed import
 import { colorPool, color4Pool } from "./color.js";
 import { dotPool } from "./draw.js";
@@ -214,6 +215,7 @@ export class Daydream {
         colorPool.reset();
         color4Pool.reset();
         dotPool.reset();
+        vector3Pool.reset();
         if (this.stepFrames != 0) {
           this.stepFrames--;
         }

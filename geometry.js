@@ -4,6 +4,10 @@ import { wrap } from "./util.js";
 import { Daydream } from "./driver.js";
 import { Rotation, easeOutCirc } from "./animation.js";
 import { g1, g2 } from "./color.js";
+import { StaticPool } from "./StaticPool.js";
+
+/** @type {StaticPool} Global pool for temporary Vector3 objects. */
+export const vector3Pool = new StaticPool(THREE.Vector3, 500000);
 
 /** @type {number} The golden ratio, (1 + sqrt(5)) / 2. */
 export const PHI = (1 + Math.sqrt(5)) / 2;
@@ -61,6 +65,10 @@ export const sphericalToPixel = (s) => {
  * @returns {THREE.Spherical} The spherical coordinates (radius is 1).
  */
 export const pixelToSpherical = (x, y) => {
+  // Can't pool Spherical easily as it's not a class we commonly pass around, 
+  // but this function creates a NEW Spherical. 
+  // The caller usually uses it immediately. 
+  // Let's leave Spherical as is for now, focus on Vector3.
   return new THREE.Spherical(
     1,
     (y * Math.PI) / (Daydream.H - 1),
@@ -93,7 +101,9 @@ export const pixelToVector = (x, y) => {
     (y * Math.PI) / (Daydream.H - 1),
     (x * 2 * Math.PI) / Daydream.W
   );
-  return new THREE.Vector3().setFromSpherical(s);
+  const v = vector3Pool.acquire();
+  v.setFromSpherical(s);
+  return v;
 };
 
 /**
@@ -116,11 +126,13 @@ export const logPolarToVector = (rho, theta) => {
   // x^2 + z^2 = 1 - y^2
   const r_xz = Math.sqrt(1 - y * y);
 
-  return new THREE.Vector3(
+  const v = vector3Pool.acquire();
+  v.set(
     r_xz * Math.cos(theta),
     y,
     r_xz * Math.sin(theta)
   );
+  return v;
 };
 
 /**
@@ -289,11 +301,13 @@ export const randomVector = () => {
   } while (s >= 1.0 || s === 0.0);
 
   const sqrtS = Math.sqrt(1.0 - s);
-  return new THREE.Vector3(
+  const v = vector3Pool.acquire();
+  v.set(
     2.0 * v1 * sqrtS,
     2.0 * v2 * sqrtS,
     1.0 - 2.0 * s
   );
+  return v;
 };
 
 /**
@@ -396,11 +410,13 @@ export class Orientation {
  * @returns {THREE.Vector3} The point on the unit sphere.
  */
 export const fibSpiral = (n, eps, i) => {
-  return new THREE.Vector3().setFromSpherical(new THREE.Spherical(
+  const v = vector3Pool.acquire();
+  v.setFromSpherical(new THREE.Spherical(
     1,
     Math.acos(1 - (2 * (i + eps)) / n),
     (2 * Math.PI * i * G) % (2 * Math.PI)
   ));
+  return v;
 }
 
 /**
@@ -489,11 +505,13 @@ export function distanceGradient(v, normal) {
  * @returns {THREE.Vector3} The point on the sphere's surface.
  */
 export function lissajous(m1, m2, a, t) {
-  return new THREE.Vector3(
+  const v = vector3Pool.acquire();
+  v.set(
     Math.sin(m2 * t) * Math.cos(m1 * t - a * Math.PI),
     Math.cos(m2 * t),
     Math.sin(m2 * t) * Math.sin(m1 * t - a * Math.PI),
   );
+  return v;
 }
 
 /**
@@ -527,10 +545,12 @@ export function isOver(v, normal) {
  * @returns {THREE.Vector3} A random vector on the unit sphere.
  */
 export function makeRandomVector() {
-  return new THREE.Vector3(
+  const v = vector3Pool.acquire();
+  v.set(
     Math.random() * 2 - 1,
     Math.random() * 2 - 1,
     Math.random() * 2 - 1).normalize();
+  return v;
 }
 
 /**
