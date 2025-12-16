@@ -1,122 +1,204 @@
-/**
- * A fixed-size circular buffer optimized for stability and sorting.
- * Mimics the C++ StaticCircularBuffer logic found in the firmware.
- * * @template T
+/*
+ * StaticCircularBuffer
  */
 export class StaticCircularBuffer {
-    /**
-     * Creates a new circular buffer with the specified capacity.
-     * @param {number} capacity - The maximum number of items the buffer can hold.
-     */
     constructor(capacity) {
-        /** * The internal storage array.
-         * @type {Array<T>} 
-         */
-        this.buffer = new Array(capacity);
-
-        /** * The hard limit of items. 
-         * @type {number} 
-         */
         this.capacity = capacity;
-
-        /** * Index of the oldest element. 
-         * @type {number} 
-         */
-        this.head = 0;
-
-        /** * Index where the next element will be written. 
-         * @type {number} 
-         */
-        this.tail = 0;
-
-        /** * Current number of elements in the buffer. 
-         * @type {number} 
-         */
-        this.count = 0;
+        this.array = new Array(capacity);
+        this.index = 0;
+        this.length = 0;
+        // FIX: Add a persistent array for sorting to prevent GC churn
+        this.tempArray = new Array(capacity);
     }
 
-    /**
-     * Adds an item to the back of the buffer. 
-     * If the buffer is full, it overwrites the oldest item (head) effectively dropping it.
-     * * @param {T} item - The item to add.
-     */
-    push(item) {
-        if (this.count === this.capacity) {
-            // Buffer full: Overwrite head (oldest)
-            this.head = (this.head + 1) % this.capacity;
-        } else {
-            this.count++;
+    is_empty() {
+        return this.length === 0;
+    }
+
+    back() {
+        if (this.length === 0) {
+            return undefined;
         }
-        this.buffer[this.tail] = item;
-        this.tail = (this.tail + 1) % this.capacity;
+        return this.array[(this.index - 1 + this.capacity) % this.capacity];
     }
 
-    /**
-     * Removes and returns the item from the front (oldest) of the buffer.
-     * * @returns {T|undefined} The removed item, or undefined if the buffer is empty.
-     */
-    pop() {
-        if (this.count === 0) return undefined;
+    front() {
+        if (this.length === 0) {
+            return undefined;
+        }
+        return this.array[(this.index - this.length + this.capacity) % this.capacity];
+    }
 
-        const item = this.buffer[this.head];
-        this.buffer[this.head] = undefined; // Help Garbage Collection
-        this.head = (this.head + 1) % this.capacity;
-        this.count--;
+    get(offset) {
+        if (offset >= this.length) {
+            return undefined;
+        }
+        return this.array[(this.index - this.length + offset + this.capacity) % this.capacity];
+    }
+
+    pop_back() {
+        if (this.length === 0) {
+            return undefined;
+        }
+        this.length--;
+        return this.array[(this.index - 1 + this.capacity) % this.capacity];
+    }
+
+    pop_front() {
+        if (this.length === 0) {
+            return undefined;
+        }
+        const item = this.array[(this.index - this.length + this.capacity) % this.capacity];
+        this.length--;
         return item;
     }
 
-    /**
-     * Returns the item at the front (oldest) of the buffer without removing it.
-     * * @returns {T|undefined} The item at the front, or undefined if empty.
-     */
-    front() {
-        if (this.count === 0) return undefined;
-        return this.buffer[this.head];
+    push(item) {
+        this.array[this.index] = item;
+        this.index = (this.index + 1) % this.capacity;
+        if (this.length < this.capacity) {
+            this.length++;
+        }
     }
 
-    /**
-     * Accesses an item by its logical index (0 being oldest, count-1 being newest).
-     * * @param {number} i - The logical index.
-     * @returns {T|undefined} The item at the specified index, or undefined if out of bounds.
-     */
-    get(i) {
-        if (i < 0 || i >= this.count) return undefined;
-        return this.buffer[(this.head + i) % this.capacity];
+    clear() {
+        this.index = 0;
+        this.length = 0;
     }
 
-    /**
-     * The current number of items in the buffer.
-     * @type {number}
+    /*
+     * Sorts the contents of the buffer.
+     * Takes a comparator function.
      */
-    get size() {
-        return this.count;
+    sort(comparator) {
+        if (this.length === 0) {
+            return;
+        }
+
+        // FIX: Reuse the persistent array and set its length
+        const temp = this.tempArray;
+        temp.length = this.length;
+
+        for (let i = 0; i < this.length; i++) {
+            const index = (this.index - this.length + i + this.capacity) % this.capacity;
+            // FIX: Use direct assignment instead of push()
+            temp[i] = this.array[index];
+        }
+
+        temp.sort(comparator);
+
+        // Copy back to the circular buffer.
+        let new_index = this.index - this.length;
+        if (new_index < 0) {
+            new_index += this.capacity;
+        }
+
+        for (let i = 0; i < this.length; i++) {
+            this.array[(new_index + i) % this.capacity] = temp[i];
+        }
+
+        // Reset the index to be contiguous after sort
+        this.index = new_index + this.length;
+        if (this.index > this.capacity) {
+            this.index -= this.capacity;
+        }
     }
 
-    /**
-     * Sorts the buffer in-place.
-     * NOTE: This operation linearizes the circular buffer (unwraps it) starting at index 0.
-     * This allows the use of the native V8/SpiderMonkey array sort which is highly optimized.
-     * * @param {function(T, T): number} compareFn - Specifies a function that defines the sort order.
+    /*
+     * Iterates over the array contents from oldest to newest.
+     * Takes a callback function (item, index, array).
      */
-    sort(compareFn) {
-        if (this.count < 2) return;
+    forEach(callback) {
+        for (let i = 0; i < this.length; i++) {
+            const index = (this.index - this.length + i + this.capacity) % this.capacity;
+            callback(this.array[index], i, this.array);
+        }
+    }
 
-        // 1. Linearize the circular data into a temporary array
+    map(callback) {
+        const result = [];
+        for (let i = 0; i < this.length; i++) {
+            const index = (this.index - this.length + i + this.capacity) % this.capacity;
+            result.push(callback(this.array[index], i, this.array));
+        }
+        return result;
+    }
+
+    filter(callback) {
+        const result = [];
+        for (let i = 0; i < this.length; i++) {
+            const index = (this.index - this.length + i + this.capacity) % this.capacity;
+            const item = this.array[index];
+            if (callback(item, i, this.array)) {
+                result.push(item);
+            }
+        }
+        return result;
+    }
+
+    pop_filter(callback) {
+        let new_length = 0;
+        const temp = this.map((item, i, arr) => {
+            if (callback(item, i, arr)) {
+                return item;
+            } else {
+                new_length++;
+                return undefined;
+            }
+        });
+        const popped = [];
+        // Copy back to the circular buffer, skipping undefined (popped) items
+        let new_index = this.index - this.length;
+        if (new_index < 0) {
+            new_index += this.capacity;
+        }
+
+        let temp_index = 0;
+        for (let i = 0; i < this.length; i++) {
+            if (temp[i] !== undefined) {
+                this.array[(new_index + temp_index) % this.capacity] = temp[i];
+                temp_index++;
+            } else {
+                popped.push(this.array[(new_index + i) % this.capacity]);
+            }
+        }
+
+        this.length = new_length;
+        this.index = new_index + this.length;
+        if (this.index > this.capacity) {
+            this.index -= this.capacity;
+        }
+        return popped;
+    }
+
+    remove_at(offset) {
+        if (offset >= this.length) {
+            return undefined;
+        }
+        const remove_index = (this.index - this.length + offset + this.capacity) % this.capacity;
+        const item = this.array[remove_index];
+
+        // Shift elements down to fill the gap.
+        // If we remove an element, the tail needs to shift up.
+        // We move elements from index `offset + 1` to `length - 1` one step back.
+        for (let i = offset; i < this.length - 1; i++) {
+            const src_index = (this.index - this.length + i + 1 + this.capacity) % this.capacity;
+            const dest_index = (this.index - this.length + i + this.capacity) % this.capacity;
+            this.array[dest_index] = this.array[src_index];
+        }
+
+        this.length--;
+        // The index remains the same since we shifted elements back.
+        // The last element (at the old 'back' index) is now garbage and will be overwritten on the next push.
+        return item;
+    }
+
+    get_array() {
         const temp = [];
-        for (let i = 0; i < this.count; i++) {
-            temp.push(this.buffer[(this.head + i) % this.capacity]);
+        for (let i = 0; i < this.length; i++) {
+            const index = (this.index - this.length + i + this.capacity) % this.capacity;
+            temp.push(this.array[index]);
         }
-
-        // 2. Sort the linear data
-        temp.sort(compareFn);
-
-        // 3. Refill the buffer linearly starting from 0
-        for (let i = 0; i < this.count; i++) {
-            this.buffer[i] = temp[i];
-        }
-
-        // 4. Reset indices to a simple linear state
-        this.head = 0;
-        this.tail = this.count % this.capacity;
+        return temp;
     }
 }
