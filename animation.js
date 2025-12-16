@@ -499,24 +499,26 @@ export class Motion extends Animation {
   }
 
   step() {
-    if (this.t == 0) {
-      this.to = this.path.getPoint(0);
-    }
     super.step();
     this.orientation.collapse();
-    this.from = this.to;
-    this.to = this.path.getPoint(this.t / this.duration);
-    if (!this.from.equals(this.to)) {
-      let axis = new THREE.Vector3().crossVectors(this.from, this.to).normalize();
-      let angle = angleBetween(this.from, this.to);
-      let step_angle = angle / Math.ceil(angle / Motion.MAX_ANGLE);
-      let origin = this.orientation.get();
-      for (let a = step_angle; angle - a > 0.0001; a += step_angle) {
-        let r = new THREE.Quaternion().setFromAxisAngle(axis, a);
-        this.orientation.push(origin.clone().premultiply(r));
+
+    let currentV = this.path.getPoint((this.t - 1) / this.duration);
+    const targetV = this.path.getPoint(this.t / this.duration);
+    const totalAngle = angleBetween(currentV, targetV);
+    const numSteps = Math.ceil(Math.max(1, totalAngle / Motion.MAX_ANGLE));
+    let origin = this.orientation.get();
+    for (let i = 1; i <= numSteps; i++) {
+      const subT = (this.t - 1) + (i / numSteps);
+      const nextV = this.path.getPoint(subT / this.duration);
+      const stepAngle = angleBetween(currentV, nextV);
+      if (stepAngle > 0.000001) {
+        const stepAxis = new THREE.Vector3().crossVectors(currentV, nextV).normalize();
+        const q = new THREE.Quaternion().setFromAxisAngle(stepAxis, stepAngle);
+        origin = origin.clone().premultiply(q);
+        this.orientation.push(origin);
       }
-      let r = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-      this.orientation.push(origin.clone().premultiply(r));
+
+      currentV = nextV;
     }
   }
 }

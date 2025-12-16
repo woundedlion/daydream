@@ -1,7 +1,7 @@
 
 import * as THREE from "three";
 import { gui } from "gui";
-import { Daydream } from "../driver.js";
+import { Daydream, labels } from "../driver.js";
 import {
     Orientation, lissajous, randomVector
 } from "../geometry.js";
@@ -82,15 +82,14 @@ export class Comets {
     }
 
     /*
-    getLabels() {
-        if (!this.path || !this.path.points) return [];
-        return this.path.points.map((p, i) => ({
-            position: this.orientation.orient(p),
-            content: i.toString()
-        }));
-    }
+        getLabels() {
+            if (!this.path || !this.path.points) return [];
+            return this.path.points.map((p, i) => ({
+                position: this.orientation.orient(p),
+                content: i.toString()
+            }));
+        }
     */
-
     updatePath() {
         const config = this.functions[this.curFunction];
         const { m1, m2, a, domain } = config;
@@ -125,6 +124,10 @@ export class Comets {
         tween(node.orientation, (q, t) => {
             let dots = [];
             let v = node.v.clone().applyQuaternion(q).normalize();
+            labels.push({
+                position: this.orientation.orient(v),
+                content: t.toFixed(2)
+            });
             dots.push(...drawVector(v,
                 (v, t) => this.palette.get(t)));
             this.trails.recordDots(dots, t, opacity * this.alpha);

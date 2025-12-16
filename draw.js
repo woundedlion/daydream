@@ -142,8 +142,20 @@ export class Path {
    * @returns {THREE.Vector3} A clone of the point at the given position.
    */
   getPoint(t) {
-    let i = Math.floor(t * (this.points.length - 1));
-    return this.points[i].clone();
+    const rawIndex = t * (this.points.length - 1);
+    const i = Math.floor(rawIndex);
+    const f = rawIndex - i;
+
+    // Handle end of path
+    if (i >= this.points.length - 1) {
+      return this.points[this.points.length - 1].clone();
+    }
+
+    const p1 = this.points[i];
+    const p2 = this.points[i + 1];
+
+    // Lerp (Linear Interpolation)
+    return p1.clone().lerp(p2, f);
   }
 }
 
