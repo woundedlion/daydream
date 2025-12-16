@@ -50,14 +50,8 @@ export class MetaballEffect {
 
         // 1. Animate the balls
         for (const ball of this.balls) {
-
-            // --- THIS IS THE NEW LOGIC ---
-            // 1. Apply a "gravity" force pulling the ball toward the center (0,0,0)
-            //    We do this by adding a tiny, inverted copy of its position to its velocity.
             ball.v.add(ball.p.clone().multiplyScalar(-this.gravity));
-
-            // 2. Apply the (now gravity-affected) velocity to the position
-            ball.p.add(ball.v); //
+            ball.p.add(ball.v);
 
         }
 
@@ -66,7 +60,7 @@ export class MetaballEffect {
             for (let y = 0; y < Daydream.H; y++) {
 
                 // Get the 3D position of this pixel
-                const v = pixelToVector(x, y); //
+                const v = Daydream.pixelPositions[y * Daydream.W + x];
 
                 let sum = 0.0;
 
