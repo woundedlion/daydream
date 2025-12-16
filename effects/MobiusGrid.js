@@ -22,7 +22,6 @@ import { wrap } from "../util.js";
 
 export class MobiusGrid {
     constructor() {
-        Daydream.W = 96;
         this.alpha = 0.2;
         this.numRings = new MutableNumber(0);
         this.numLines = new MutableNumber(0);

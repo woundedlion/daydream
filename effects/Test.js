@@ -21,7 +21,6 @@ import {
 export class Test {
 
     constructor() {
-        Daydream.W = 96;
         this.alpha = 0.3;
         this.ringPalette = new GenerativePalette("circular", "split-complementary", "flat");
         this.polyPalette = new GenerativePalette("circular", "analagous", "cup");

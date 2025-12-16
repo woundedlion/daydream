@@ -24,7 +24,7 @@ export class RingSpin {
             this.normal = normal;
             this.palette = new TransparentVignette(palette);
             this.filters = createRenderPipeline(
-                new FilterDecay(trailLength),
+                new FilterDecay(trailLength, Math.max(10000, Daydream.W * 200)),
                 new FilterAntiAlias()
             );
             this.orientation = new Orientation();

@@ -170,7 +170,7 @@ export class GSReactionDiffusion {
     buildGraph() {
         // Fibonacci Sphere (Uniform Isotropy)
 
-        this.N = 4096; // Adjust for density
+        this.N = Daydream.W * Daydream.H;
 
         this.nodes = [];
         this.neighbors = [];
