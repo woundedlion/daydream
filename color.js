@@ -326,6 +326,21 @@ export class ProceduralPalette {
     this.b = b;
     this.c = c;
     this.d = d;
+
+    // Memoize the palette
+    const TABLE_SIZE = 16384;
+    this.table = new Array(TABLE_SIZE);
+
+    for (let i = 0; i < TABLE_SIZE; i++) {
+      const t = i / (TABLE_SIZE - 1);
+      const color = new THREE.Color();
+      color.setRGB(
+        this.a[0] + this.b[0] * Math.cos(2 * Math.PI * (this.c[0] * t + this.d[0])),
+        this.a[1] + this.b[1] * Math.cos(2 * Math.PI * (this.c[1] * t + this.d[1])),
+        this.a[2] + this.b[2] * Math.cos(2 * Math.PI * (this.c[2] * t + this.d[2]))
+      ).convertSRGBToLinear();
+      this.table[i] = color;
+    }
   }
 
   /**
@@ -334,12 +349,12 @@ export class ProceduralPalette {
    * @returns {{color: THREE.Color, alpha: number}} The sampled color and alpha.
    */
   get(t) {
+    // Clamp t to [0, 1]
+    const tClamped = Math.max(0, Math.min(1, t));
+    const index = Math.floor(tClamped * (this.table.length - 1));
+
     const result = color4Pool.acquire();
-    result.color.setRGB(
-      this.a[0] + this.b[0] * Math.cos(2 * Math.PI * (this.c[0] * t + this.d[0])),
-      this.a[1] + this.b[1] * Math.cos(2 * Math.PI * (this.c[1] * t + this.d[1])),
-      this.a[2] + this.b[2] * Math.cos(2 * Math.PI * (this.c[2] * t + this.d[2]))
-    ).convertSRGBToLinear();
+    result.color.copy(this.table[index]);
     result.alpha = 1.0;
     return result;
   }
