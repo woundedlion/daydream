@@ -9,6 +9,13 @@ import { tween } from "./draw.js";
 const BLACK = new THREE.Color(0, 0, 0);
 
 /**
+ * Quintic kernel (smootherstep): 6t^5 - 15t^4 + 10t^3
+ */
+const quinticKernel = (t) => {
+  return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+/**
  * Creates a render pipeline by chaining multiple filters together.
  * @param {...Object} filters - A variable number of filter objects (e.g., FilterAntiAlias, FilterOrient).
  * @returns {Object} An object with a `plot` method that initiates the pipeline.
@@ -95,15 +102,6 @@ export class FilterAntiAlias {
   }
 
   /**
-   * Calculates the smoothing kernel value.
-   * @param {number} t - The distance from the pixel center [0, 1].
-   * @returns {number} The smoothing factor.
-   */
-  kernel(t) {
-    return 6 * Math.pow(t, 5) - 15 * Math.pow(t, 4) + 10 * Math.pow(t, 3);
-  }
-
-  /**
    * Plots a pixel with anti-aliasing.
    * @param {number} x - The x coordinate.
    * @param {number} y - The y coordinate.
@@ -119,8 +117,8 @@ export class FilterAntiAlias {
     let ym = y - yi;
 
     // 1. Calculate the smoothed fractional factors
-    let xs = this.kernel(xm);
-    let ys = this.kernel(ym);
+    let xs = quinticKernel(xm);
+    let ys = quinticKernel(ym);
 
     // 2. Calculate the four weights using the smoothed factors
     let v00 = (1 - xs) * (1 - ys);  // Top-Left weight
@@ -404,8 +402,7 @@ export class FilterHole {
       pass(v, c, age, alpha);
     } else {
       let t = d / this.radius;
-      // Quintic kernel (smootherstep): 6t^5 - 15t^4 + 10t^3
-      t = t * t * t * (t * (t * 6 - 15) + 10);
+      t = quinticKernel(t);
       c.r *= t;
       c.g *= t;
       c.b *= t;
