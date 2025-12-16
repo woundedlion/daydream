@@ -207,7 +207,7 @@ export class BZReactionDiffusion {
         const phi = Math.PI * (3 - Math.sqrt(5)); // Golden Angle
 
         for (let i = 0; i < this.N; i++) {
-            let y = 1 - (i / (this.N - 1)) * 2;
+            let y = 1 - (i / (this.N - 1)) * 2; // y goes from 1 to -1
             let radius = Math.sqrt(1 - y * y);
             let theta = phi * i;
             let x = Math.cos(theta) * radius;
@@ -215,24 +215,60 @@ export class BZReactionDiffusion {
             this.nodes.push(new THREE.Vector3(x, y, z));
         }
 
-        // 2. Build K=6 Neighbors (Hexagonal Topology)
+        // 2. Build Neighbors using Spatial Hashing (Grid Optimization)
         const K = 6;
+
+        // Grid setup
+        const gridSize = 20; // 20x20x20 grid
+        const cellSize = 2.0 / gridSize; // Domain is [-1, 1], size 2
+        const grid = new Map();
+
+        const getKey = (p) => {
+            const gx = Math.floor((p.x + 1) / cellSize);
+            const gy = Math.floor((p.y + 1) / cellSize);
+            const gz = Math.floor((p.z + 1) / cellSize);
+            return `${gx},${gy},${gz}`;
+        };
+
+        // Bin points
+        for (let i = 0; i < this.N; i++) {
+            const key = getKey(this.nodes[i]);
+            if (!grid.has(key)) grid.set(key, []);
+            grid.get(key).push(i);
+        }
+
+        // Neighbor search
         for (let i = 0; i < this.N; i++) {
             let p1 = this.nodes[i];
             let bestIndices = [];
             let bestDists = [];
 
-            for (let j = 0; j < this.N; j++) {
-                if (i === j) continue;
-                let d2 = p1.distanceToSquared(this.nodes[j]);
+            // Search local and adjacent cells
+            const gx = Math.floor((p1.x + 1) / cellSize);
+            const gy = Math.floor((p1.y + 1) / cellSize);
+            const gz = Math.floor((p1.z + 1) / cellSize);
 
-                let len = bestDists.length;
-                if (len < K || d2 < bestDists[len - 1]) {
-                    let pos = len;
-                    while (pos > 0 && d2 < bestDists[pos - 1]) { pos--; }
-                    bestDists.splice(pos, 0, d2);
-                    bestIndices.splice(pos, 0, j);
-                    if (bestDists.length > K) { bestDists.pop(); bestIndices.pop(); }
+            for (let x = -1; x <= 1; x++) {
+                for (let y = -1; y <= 1; y++) {
+                    for (let z = -1; z <= 1; z++) {
+                        const key = `${gx + x},${gy + y},${gz + z}`;
+                        const cell = grid.get(key);
+                        if (!cell) continue;
+
+                        for (let j of cell) {
+                            if (i === j) continue;
+                            let d2 = p1.distanceToSquared(this.nodes[j]);
+
+                            let len = bestDists.length;
+                            if (len < K || d2 < bestDists[len - 1]) {
+                                let pos = len;
+                                while (pos > 0 && d2 < bestDists[pos - 1]) { pos--; }
+                                bestDists.splice(pos, 0, d2);
+                                bestIndices.splice(pos, 0, j);
+                                if (bestDists.length > K) { bestDists.pop(); bestIndices.pop(); }
+                            }
+                        }
+                    }
                 }
             }
             this.neighbors.push(bestIndices);
