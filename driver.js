@@ -141,6 +141,9 @@ export class Daydream {
     // Global pixel buffer
     Daydream.pixels = Array.from({ length: Daydream.W * Daydream.H }, () => new THREE.Color(0, 0, 0));
 
+    this.pixelMatrices = [];
+    this.precomputeMatrices();
+
     this.labelAxes = false;
   }
 
@@ -232,8 +235,6 @@ export class Daydream {
 
         // Render buffer to InstanceMesh
         let instanceCount = 0;
-        const vector = new THREE.Vector3();
-        const dummy = new THREE.Object3D();
         const MAX_INSTANCES = this.dotMesh.count; // Total capacity
 
         for (let i = 0; i < Daydream.pixels.length; i++) {
@@ -242,21 +243,7 @@ export class Daydream {
           // Skip empty (black) pixels
           if (pixelColor.r === 0 && pixelColor.g === 0 && pixelColor.b === 0) continue;
 
-          // Compute coordinates
-          const x = i % Daydream.W;
-          const y = Math.floor(i / Daydream.W);
-
-          // Get 3D position
-          vector.setFromSpherical(pixelToSpherical(x, y));
-          vector.multiplyScalar(Daydream.SPHERE_RADIUS);
-
-          // Reset position for correct rotation relative to origin
-          dummy.position.set(0, 0, 0);
-          dummy.lookAt(vector);
-          dummy.position.copy(vector);
-          dummy.updateMatrix();
-
-          this.dotMesh.setMatrixAt(instanceCount, dummy.matrix);
+          this.dotMesh.setMatrixAt(instanceCount, this.pixelMatrices[i]);
           this.dotMesh.setColorAt(instanceCount, pixelColor);
 
           instanceCount++;
@@ -266,8 +253,6 @@ export class Daydream {
         if (this.dotMesh.instanceColor) {
           this.dotMesh.instanceColor.needsUpdate = true;
         }
-        this.dotMesh.instanceMatrix.needsUpdate = true;
-
         this.dotMesh.instanceMatrix.needsUpdate = true;
 
         this.xAxis.visible = this.labelAxes;
@@ -335,7 +320,27 @@ export class Daydream {
     }
 
     this.renderer.setScissorTest(false);
-    this.renderer.setScissorTest(false);
+  }
+
+  precomputeMatrices() {
+    this.pixelMatrices = new Array(Daydream.W * Daydream.H);
+    const vector = new THREE.Vector3();
+    const dummy = new THREE.Object3D();
+
+    for (let i = 0; i < Daydream.W * Daydream.H; i++) {
+      const x = i % Daydream.W;
+      const y = Math.floor(i / Daydream.W);
+
+      vector.setFromSpherical(pixelToSpherical(x, y));
+      vector.multiplyScalar(Daydream.SPHERE_RADIUS);
+
+      dummy.position.set(0, 0, 0);
+      dummy.lookAt(vector);
+      dummy.position.copy(vector);
+      dummy.updateMatrix();
+
+      this.pixelMatrices[i] = dummy.matrix.clone();
+    }
   }
 
   updateResolution(h, w, dotSize) {
@@ -347,10 +352,6 @@ export class Daydream {
     // Dispose old resources
     this.scene.remove(this.dotMesh);
     this.dotGeometry.dispose();
-    // Material can be reused usually but let's be safe if it depended on something odd, 
-    // actually it's just a BasicMaterial, we can keep it or recreate. Reusing is fine.
-
-    // Create new geometry
     this.dotGeometry = new THREE.SphereGeometry(
       Daydream.DOT_SIZE,
       32,
@@ -359,7 +360,6 @@ export class Daydream {
       Math.PI
     );
 
-    // Create new InstancedMesh
     this.dotMesh = new THREE.InstancedMesh(
       this.dotGeometry,
       this.dotMaterial,
@@ -369,8 +369,8 @@ export class Daydream {
     this.dotMesh.count = 0;
     this.scene.add(this.dotMesh);
 
-    // Reallocate Pixel Buffer
     Daydream.pixels = Array.from({ length: Daydream.W * Daydream.H }, () => new THREE.Color(0, 0, 0));
+    this.precomputeMatrices();
   }
 }
 
