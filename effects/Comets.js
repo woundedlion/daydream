@@ -124,10 +124,6 @@ export class Comets {
         tween(node.orientation, (q, t) => {
             let dots = [];
             let v = node.v.clone().applyQuaternion(q).normalize();
-            labels.push({
-                position: this.orientation.orient(v),
-                content: t.toFixed(2)
-            });
             dots.push(...drawVector(v,
                 (v, t) => this.palette.get(t)));
             this.trails.recordDots(dots, t, opacity * this.alpha);
