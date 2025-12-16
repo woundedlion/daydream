@@ -28,7 +28,10 @@ export class Color4 {
   }
 
   clone() {
-    return new Color4(this.color.clone(), this.alpha);
+    const c = color4Pool.acquire();
+    c.color.copy(this.color);
+    c.alpha = this.alpha;
+    return c;
   }
 
   copy(other) {
@@ -48,14 +51,17 @@ export class Color4 {
   }
 }
 
-// ... existing code ...
-
 /**
  * A standard Palette interface.
  * Returns a Color4.
  */
 export class Palette {
-  get(t) { return new Color4(new THREE.Color(0xffffff)); }
+  get(t) {
+    const c = color4Pool.acquire();
+    c.color.setHex(0xffffff);
+    c.alpha = 1.0;
+    return c;
+  }
 }
 
 /**
@@ -65,11 +71,11 @@ export class Palette {
  * @returns {THREE.Color} The resulting color.
  */
 export const blendMax = (c1, c2) => {
-  return new THREE.Color(
-    Math.max(c1.r, c2.r),
-    Math.max(c1.g, c2.g),
-    Math.max(c1.b, c2.b)
-  );
+  const result = colorPool.acquire();
+  result.r = Math.max(c1.r, c2.r);
+  result.g = Math.max(c1.g, c2.g);
+  result.b = Math.max(c1.b, c2.b);
+  return result;
 }
 
 /**
@@ -99,12 +105,26 @@ export const blendUnder = (c1, c2) => {
  * @returns {THREE.Color} The resulting color.
  */
 export const blendAdd = (c1, c2) => {
-  return new THREE.Color(
-    Math.min(1, c1.r + c2.r),
-    Math.min(1, c1.g + c2.g),
-    Math.min(1, c1.b + c2.b)
-  );
+  const result = colorPool.acquire();
+  result.r = Math.min(1, c1.r + c2.r);
+  result.g = Math.min(1, c1.g + c2.g);
+  result.b = Math.min(1, c1.b + c2.b);
+  return result;
 }
+
+/**
+ * Returns a function that performs standard alpha blending.
+ * C_result = C1 * (1 - a) + C2 * a
+ * @param {number} a - The alpha value of the second color [0, 1].
+ * @returns {function(THREE.Color, THREE.Color): THREE.Color} A blending function.
+ */
+import { StaticPool } from "./StaticPool.js";
+
+/** @type {StaticPool} Global pool for temporary Color objects used in blending. */
+export const colorPool = new StaticPool(THREE.Color, 1000000);
+
+/** @type {StaticPool} Global pool for temporary Color4 objects. */
+export const color4Pool = new StaticPool(Color4, 250000);
 
 /**
  * Returns a function that performs standard alpha blending.
@@ -114,11 +134,11 @@ export const blendAdd = (c1, c2) => {
  */
 export const blendAlpha = (a) => {
   return (c1, c2) => {
-    return new THREE.Color(
-      c1.r * (1 - a) + c2.r * (a),
-      c1.g * (1 - a) + c2.g * (a),
-      c1.b * (1 - a) + c2.b * (a)
-    );
+    const result = colorPool.acquire();
+    result.r = c1.r * (1 - a) + c2.r * (a);
+    result.g = c1.g * (1 - a) + c2.g * (a);
+    result.b = c1.b * (1 - a) + c2.b * (a);
+    return result;
   }
 }
 
@@ -132,11 +152,11 @@ export const blendAccumulate = (a) => {
   return (c1, c2) => {
     // c1: existing pixel color, c2: incoming fragment color
     // Formula: C_result = C_existing + C_fragment * coverage (a)
-    return new THREE.Color(
-      Math.min(1, c1.r + c2.r * a),
-      Math.min(1, c1.g + c2.g * a),
-      Math.min(1, c1.b + c2.b * a)
-    );
+    const result = colorPool.acquire();
+    result.r = Math.min(1, c1.r + c2.r * a);
+    result.g = Math.min(1, c1.g + c2.g * a);
+    result.b = Math.min(1, c1.b + c2.b * a);
+    return result;
   }
 }
 
@@ -156,11 +176,11 @@ export const blendOverMax = (c1, c2) => {
     return c1;
   }
   let s = Math.max(m1, m2) / m2;
-  return new THREE.Color(
-    c2.r * s,
-    c2.g * s,
-    c2.b * s
-  );
+  const result = colorPool.acquire();
+  result.r = c2.r * s;
+  result.g = c2.g * s;
+  result.b = c2.b * s;
+  return result;
 }
 
 /**
@@ -179,11 +199,11 @@ export const blendOverMin = (c1, c2) => {
   if (m2 > 0) {
     s = Math.min(m1, m2) / m2;
   }
-  return new THREE.Color(
-    c2.r * s,
-    c2.g * s,
-    c2.b * s
-  );
+  const result = colorPool.acquire();
+  result.r = c2.r * s;
+  result.g = c2.g * s;
+  result.b = c2.b * s;
+  return result;
 }
 
 /**
@@ -193,11 +213,11 @@ export const blendOverMin = (c1, c2) => {
  * @returns {THREE.Color} The mean color.
  */
 export const blendMean = (c1, c2) => {
-  return new THREE.Color(
-    (c1.r + c2.r) / 2,
-    (c1.g + c2.g) / 2,
-    (c1.b + c2.b) / 2
-  );
+  const result = colorPool.acquire();
+  result.r = (c1.r + c2.r) / 2;
+  result.g = (c1.g + c2.g) / 2;
+  result.b = (c1.b + c2.b) / 2;
+  return result;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -230,8 +250,12 @@ export class Gradient {
    * @returns {{color: THREE.Color, alpha: number}} The sampled color and alpha.
    */
   get(a) {
-    const c = this.colors[Math.floor(a * (this.colors.length - 1))].clone().convertSRGBToLinear();
-    return new Color4(c, 1.0);
+    const c = this.colors[Math.floor(a * (this.colors.length - 1))];
+    const sourceColor = this.colors[Math.floor(a * (this.colors.length - 1))];
+    const result = color4Pool.acquire();
+    result.color.copy(sourceColor).convertSRGBToLinear();
+    result.alpha = 1.0;
+    return result;
   }
 };
 
@@ -412,7 +436,10 @@ export class GenerativePalette {
     const c1 = colors[segIndex];
     const c2 = colors[segIndex + 1];
 
-    return new Color4(new THREE.Color().lerpColors(c1, c2, (t - start) / (end - start)).convertSRGBToLinear(), 1.0);
+    const result = color4Pool.acquire();
+    result.color.lerpColors(c1, c2, (t - start) / (end - start)).convertSRGBToLinear();
+    result.alpha = 1.0;
+    return result;
   }
 }
 
@@ -440,14 +467,14 @@ export class ProceduralPalette {
    * @returns {{color: THREE.Color, alpha: number}} The sampled color and alpha.
    */
   get(t) {
-    return new Color4(
-      new THREE.Color(
-        this.a[0] + this.b[0] * Math.cos(2 * Math.PI * (this.c[0] * t + this.d[0])),
-        this.a[1] + this.b[1] * Math.cos(2 * Math.PI * (this.c[1] * t + this.d[1])),
-        this.a[2] + this.b[2] * Math.cos(2 * Math.PI * (this.c[2] * t + this.d[2]))
-      ).convertSRGBToLinear(),
-      1.0
-    );
+    const result = color4Pool.acquire();
+    result.color.setRGB(
+      this.a[0] + this.b[0] * Math.cos(2 * Math.PI * (this.c[0] * t + this.d[0])),
+      this.a[1] + this.b[1] * Math.cos(2 * Math.PI * (this.c[1] * t + this.d[1])),
+      this.a[2] + this.b[2] * Math.cos(2 * Math.PI * (this.c[2] * t + this.d[2]))
+    ).convertSRGBToLinear();
+    result.alpha = 1.0;
+    return result;
   }
 };
 
@@ -496,14 +523,14 @@ export class MutatingPalette {
    */
   get(p) {
     // a + b * cos(2 * PI * (c * t + d));
-    return new Color4(
-      new THREE.Color(
-        this.a.x + this.b.x * Math.cos(2 * Math.PI * (this.c.x * p + this.d.x)),
-        this.a.y + this.b.y * Math.cos(2 * Math.PI * (this.c.y * p + this.d.y)),
-        this.a.z + this.b.z * Math.cos(2 * Math.PI * (this.c.z * p + this.d.z))
-      ).convertSRGBToLinear(),
-      1.0
-    );
+    const result = color4Pool.acquire();
+    result.color.setRGB(
+      this.a.x + this.b.x * Math.cos(2 * Math.PI * (this.c.x * p + this.d.x)),
+      this.a.y + this.b.y * Math.cos(2 * Math.PI * (this.c.y * p + this.d.y)),
+      this.a.z + this.b.z * Math.cos(2 * Math.PI * (this.c.z * p + this.d.z))
+    ).convertSRGBToLinear();
+    result.alpha = 1.0;
+    return result;
   }
 }
 
@@ -560,11 +587,11 @@ export class VignettePalette {
     let factor = 1.0;
 
     if (t < 0.2) {
-      resultColor = this.palette.get(0).color.clone();
+      resultColor = this.palette.get(0).color;
       factor = t / 0.2;
       resultColor.lerp(vignetteColor, 1 - factor);
     } else if (t >= 0.8) {
-      resultColor = this.palette.get(1).color.clone();
+      resultColor = this.palette.get(1).color;
       factor = (1 - (t - 0.8) / 0.2); // Fade out
       resultColor.lerp(vignetteColor, 1 - factor);
     } else {
@@ -574,7 +601,13 @@ export class VignettePalette {
     // Blend to black logic (original) - preserves color integrity
     // result.color.lerp(vignetteColor, 1 - factor); // moved inside
 
-    return new Color4(resultColor, 1.0);
+    // Blend to black logic (original) - preserves color integrity
+    // result.color.lerp(vignetteColor, 1 - factor); // moved inside
+
+    const result = color4Pool.acquire();
+    result.color.copy(resultColor);
+    result.alpha = 1.0;
+    return result;
   }
 }
 
@@ -601,10 +634,10 @@ export class TransparentVignette {
     let factor = 1.0;
 
     if (t < 0.2) {
-      result = this.palette.get(0).clone();
+      result = this.palette.get(0);
       factor = t / 0.2;
     } else if (t >= 0.8) {
-      result = this.palette.get(1).clone();
+      result = this.palette.get(1);
       factor = (1 - (t - 0.8) / 0.2); // Fade out
     } else {
       return this.palette.get((t - 0.2) / 0.6);

@@ -3,6 +3,10 @@ import * as THREE from "three";
 import { Daydream, labels } from "./driver.js";
 import { Dot, angleBetween, fibSpiral } from "./geometry.js";
 import { StaticCircularBuffer } from "./StaticCircularBuffer.js";
+import { StaticPool } from "./StaticPool.js";
+
+/** @type {StaticPool} Global pool for Dot objects. */
+export const dotPool = new StaticPool(Dot, 500000);
 
 /**
  * Implements pixel history and decay for persistent effects.
@@ -187,7 +191,17 @@ export class ProceduralPath {
  * @returns {Dot[]} An array containing a single Dot.
  */
 export const drawVector = (v, colorFn) => {
-  return [new Dot(new THREE.Vector3(...v.toArray()).normalize(), colorFn(v, 0))];
+  const dot = dotPool.acquire();
+  dot.position = new THREE.Vector3(...v.toArray()).normalize();
+  const c = colorFn(v, 0);
+  if (c.isColor) {
+    dot.color = c;
+    dot.alpha = 1.0;
+  } else {
+    dot.color = c.color;
+    dot.alpha = c.alpha !== undefined ? c.alpha : 1.0;
+  }
+  return [dot];
 }
 
 /**
@@ -199,7 +213,17 @@ export const drawVector = (v, colorFn) => {
 export const drawPath = (path, colorFn) => {
   let r = [];
   for (let t = 0; t < path.length(); t++) {
-    r.push(new Dot(path.getPoint(t / path.length()), colorFn(t)));
+    const dot = dotPool.acquire();
+    dot.position = path.getPoint(t / path.length());
+    const c = colorFn(t);
+    if (c.isColor) {
+      dot.color = c;
+      dot.alpha = 1.0;
+    } else {
+      dot.color = c.color;
+      dot.alpha = c.alpha !== undefined ? c.alpha : 1.0;
+    }
+    r.push(dot);
   }
   return r;
 }
@@ -250,7 +274,19 @@ export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, o
   let w = new THREE.Vector3();
 
   if (Math.abs(a) < 0.0001) {
-    return omitLast ? [] : [new Dot(u, colorFn(u, 0))];
+    if (omitLast) return [];
+
+    const dot = dotPool.acquire();
+    dot.position = u;
+    const c = colorFn(u, 0);
+    if (c.isColor) {
+      dot.color = c;
+      dot.alpha = 1.0;
+    } else {
+      dot.color = c.color;
+      dot.alpha = c.alpha !== undefined ? c.alpha : 1.0;
+    }
+    return [dot];
   } else if (Math.abs(Math.PI - a) < 0.0001) {
     if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.9999) {
       w.crossVectors(u, Daydream.Y_AXIS).normalize();
@@ -300,7 +336,18 @@ export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, o
   }
 
   let currentAngle = 0;
-  dots.push(new Dot(u.clone(), colorFn(u, 0)));
+
+  const startDot = dotPool.acquire();
+  startDot.position = u.clone();
+  const startC = colorFn(u, 0);
+  if (startC.isColor) {
+    startDot.color = startC;
+    startDot.alpha = 1.0;
+  } else {
+    startDot.color = startC.color;
+    startDot.alpha = startC.alpha !== undefined ? startC.alpha : 1.0;
+  }
+  dots.push(startDot);
 
   let loopLimit = omitLast ? steps.length - 1 : steps.length;
   for (let i = 0; i < loopLimit; i++) {
@@ -313,7 +360,18 @@ export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, o
 
     // Normalized t
     let t = (a > 0) ? (currentAngle / a) : 1;
-    dots.push(new Dot(u.clone(), colorFn(u, t)));
+
+    const dot = dotPool.acquire();
+    dot.position = u.clone();
+    const c = colorFn(u, t);
+    if (c.isColor) {
+      dot.color = c;
+      dot.alpha = 1.0;
+    } else {
+      dot.color = c.color;
+      dot.alpha = c.alpha !== undefined ? c.alpha : 1.0;
+    }
+    dots.push(dot);
   }
 
   return dots;
@@ -330,7 +388,24 @@ export const drawVertices = (vertices, colorFn) => {
   let v = new THREE.Vector3();
   for (const vertex of vertices) {
     v.set(vertex[0], vertex[1], vertex[2]);
-    dots.push(new Dot(v.normalize(), colorFn(v)));
+    const dot = dotPool.acquire();
+    dot.position = v.clone().normalize();
+    const c = colorFn(v); // Note passed v not normalized here? Original code normalized in new Dot call: v.normalize()
+    // Wait, original: new Dot(v.normalize(), colorFn(v))
+    // v.normalize() modifies v in place! So colorFn(v) called with modified v? 
+    // No, JS eval order: arguments evaluated left to right?
+    // actually, v.set(...) modifies v.
+    // v.normalize() modifies v and returns it.
+    // So colorFn(v) receives the normalized vector.
+
+    if (c.isColor) {
+      dot.color = c;
+      dot.alpha = 1.0;
+    } else {
+      dot.color = c.color;
+      dot.alpha = c.alpha !== undefined ? c.alpha : 1.0;
+    }
+    dots.push(dot);
   }
   return dots;
 }
@@ -600,7 +675,17 @@ export const drawFibSpiral = (n, eps, colorFn) => {
   let dots = [];
   for (let i = 0; i < n; ++i) {
     let v = fibSpiral(n, eps, i);
-    dots.push(new Dot(v, colorFn(v)));
+    const dot = dotPool.acquire();
+    dot.position = v;
+    const c = colorFn(v);
+    if (c.isColor) {
+      dot.color = c;
+      dot.alpha = 1.0;
+    } else {
+      dot.color = c.color;
+      dot.alpha = c.alpha !== undefined ? c.alpha : 1.0;
+    }
+    dots.push(dot);
   }
   return dots;
 };

@@ -338,7 +338,7 @@ export class FilterDecay {
     this.pass = pass; // saved for trail injection
     pass(x, y, color, age, alpha);
 
-    // 2. Record for trail (if buffer isn't full)
+    // Record for trail (if buffer isn't full)
     if (this.count < this.ttls.length) {
       const i = this.count;
       this.xs[i] = x;
@@ -349,37 +349,40 @@ export class FilterDecay {
   }
 
   trail(trailFn, alpha) {
-    // 1. Render loop
-    for (let i = 0; i < this.count; i++) {
+    let i = 0;
+    // Single Loop: Render AND Decay/Compact in one pass
+    while (i < this.count) {
+      // 1. Render Current Particle
       const ttl = this.ttls[i];
       const x = this.xs[i];
       const y = this.ys[i];
 
-      let res = trailFn(x, y, 1 - (ttl / this.lifespan));
+      // Calculate palette progress
+      const t = 1.0 - (ttl / this.lifespan);
+
+      let res = trailFn(x, y, t);
       const color = res.isColor ? res : (res.color || res);
       const outputAlpha = (res.alpha !== undefined ? res.alpha : 1.0) * alpha;
 
       this.pass(x, y, color, this.lifespan - ttl, outputAlpha);
-    }
 
-    // 2. Decay & Compact Loop (The C++ "Swap-Remove" Logic)
-    let i = 0;
-    while (i < this.count) {
-      this.ttls[i] -= 1; // Decrement Life
+      // 2. Decay
+      this.ttls[i] -= 1;
 
+      // 3. Remove if Dead (Swap-Remove Logic)
       if (this.ttls[i] <= 0) {
-        // Pixel died. Swap with the *last* active pixel to fill the hole.
         this.count--; // Shrink size
 
-        if (i < this.count) { // If not already the last one
+        if (i < this.count) {
+          // Swap the last element into the current slot
           this.xs[i] = this.xs[this.count];
           this.ys[i] = this.ys[this.count];
           this.ttls[i] = this.ttls[this.count];
-
-          // Do NOT increment i, because we need to check the swapped-in pixel next!
+          // Do NOT increment i; we need to process the swapped-in element
         }
       } else {
-        i++; // Pixel survived, move to next
+        // Pixel survived, move to next
+        i++;
       }
     }
   }
