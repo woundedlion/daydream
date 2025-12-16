@@ -31,24 +31,25 @@ export class Comets {
         this.timeline = new Timeline();
         this.numNodes = 1;
         this.spacing = 48;
+        this.resolution = 32;
         this.cycleDuration = 80;
         this.trailLength = this.cycleDuration;
         this.alpha = 0.5;
         this.orientation = new Orientation();
         this.path = new Path(Daydream.Y_AXIS);
         this.functions = [
-            [(t) => lissajous(1.06, 1.06, 0, t), 5.909],
-            [(t) => lissajous(6.06, 1, 0, t), 2 * Math.PI],
-            [(t) => lissajous(6.02, 4.01, 0, t), 3.132],
-            [(t) => lissajous(46.62, 62.16, 0, t), 0.404],
-            [(t) => lissajous(46.26, 69.39, 0, t), 0.272],
-            [(t) => lissajous(19.44, 9.72, 0, t), 0.646],
-            [(t) => lissajous(8.51, 17.01, 0, t), 0.739],
-            [(t) => lissajous(7.66, 6.38, 0, t), 4.924],
-            [(t) => lissajous(8.75, 5, 0, t), 5.027],
-            [(t) => lissajous(11.67, 14.58, 0, t), 2.154],
-            [(t) => lissajous(11.67, 8.75, 0, t), 2.154],
-            [(t) => lissajous(10.94, 8.75, 0, t), 2.872]
+            { m1: 1.06, m2: 1.06, a: 0, domain: 5.909 },
+            { m1: 6.06, m2: 1, a: 0, domain: 2 * Math.PI },
+            { m1: 6.02, m2: 4.01, a: 0, domain: 3.132 },
+            { m1: 46.62, m2: 62.16, a: 0, domain: 0.404 },
+            { m1: 46.26, m2: 69.39, a: 0, domain: 0.272 },
+            { m1: 19.44, m2: 9.72, a: 0, domain: 0.646 },
+            { m1: 8.51, m2: 17.01, a: 0, domain: 0.739 },
+            { m1: 7.66, m2: 6.38, a: 0, domain: 4.924 },
+            { m1: 8.75, m2: 5, a: 0, domain: 5.027 },
+            { m1: 11.67, m2: 14.58, a: 0, domain: 2.154 },
+            { m1: 11.67, m2: 8.75, a: 0, domain: 2.154 },
+            { m1: 10.94, m2: 8.75, a: 0, domain: 2.872 }
         ]
         this.curFunction = 0;
         this.updatePath();
@@ -73,13 +74,31 @@ export class Comets {
             }, true)
         );
         this.timeline.add(0, new RandomWalk(this.orientation, randomVector()));
+
+        this.gui = new gui.GUI({ autoPlace: false });
+        this.gui.add(this, 'resolution', 10, 200).step(1).onChange(() => {
+            this.updatePath();
+        });
     }
 
+    /*
+    getLabels() {
+        if (!this.path || !this.path.points) return [];
+        return this.path.points.map((p, i) => ({
+            position: this.orientation.orient(p),
+            content: i.toString()
+        }));
+    }
+    */
+
     updatePath() {
-        let f = this.functions[this.curFunction][0];
-        let domain = this.functions[this.curFunction][1];
+        const config = this.functions[this.curFunction];
+        const { m1, m2, a, domain } = config;
+        const maxSpeed = Math.sqrt(m1 * m1 + m2 * m2);
+        const length = domain * maxSpeed;
+        const samples = Math.max(128, Math.ceil(length * this.resolution));
         this.path.collapse();
-        this.path.appendSegment(f, domain, 1024, easeMid);
+        this.path.appendSegment((t) => lissajous(m1, m2, a, t), domain, samples, easeMid);
     }
 
     updatePalette() {
