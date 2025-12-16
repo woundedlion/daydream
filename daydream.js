@@ -111,7 +111,6 @@ const controls = {
 };
 
 const effectNames = Object.keys(effects);
-// Initialize main dropdown gui with autoPlace: false
 const guiInstance = new GUI({ autoPlace: false });
 document.getElementById('gui-container').appendChild(guiInstance.domElement);
 
@@ -123,7 +122,6 @@ guiInstance.add(controls, 'effectName', effectNames)
   .name('Active Effect')
   .onChange(() => controls.changeEffect());
 
-// Apply initial resolution default
 controls.setResolution();
 
 // Helper to catch any late-bound auto-placed GUIs

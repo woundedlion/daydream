@@ -30,6 +30,7 @@ export class Daydream {
   static FPS = 16;
   static DOT_SIZE = 2;
   static DOT_COLOR = 0x0000ff;
+  static pixelPositions = new Array(Daydream.W * Daydream.H);
 
   static X_AXIS = new THREE.Vector3(1, 0, 0);
   static Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -323,6 +324,7 @@ export class Daydream {
   }
 
   precomputeMatrices() {
+    Daydream.pixelPositions = new Array(Daydream.W * Daydream.H);
     this.pixelMatrices = new Array(Daydream.W * Daydream.H);
     const vector = new THREE.Vector3();
     const dummy = new THREE.Object3D();
@@ -339,6 +341,7 @@ export class Daydream {
       dummy.position.copy(vector);
       dummy.updateMatrix();
 
+      Daydream.pixelPositions[i] = vector.clone().normalize();
       this.pixelMatrices[i] = dummy.matrix.clone();
     }
   }
