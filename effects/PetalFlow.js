@@ -11,7 +11,6 @@ import { easeMid, MutableNumber, Mutation, Rotation, Timeline } from "../animati
 
 export class PetalFlow {
     constructor() {
-        Daydream.W = 96;
         this.alpha = 0.2;
         this.spacing = new MutableNumber(0.3);
         this.twistFactor = new MutableNumber(2.15);

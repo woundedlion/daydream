@@ -31,8 +31,6 @@ export class Dynamo {
     }
 
     constructor() {
-        Daydream.W = 96;
-
         // State
         this.palettes = [new GenerativePalette('vignette')];
         this.paletteBoundaries = [];

@@ -196,7 +196,7 @@ export class BZReactionDiffusion {
     // Graph Build Logic (Duplicated from GSReactionDiffusion)
     buildGraph() {
         // Fibonacci Sphere (Uniform Isotropy)
-        this.N = 4096;
+        this.N = Daydream.W * Daydream.H;
 
         this.nodes = [];
         this.neighbors = [];

@@ -335,6 +335,42 @@ export class Daydream {
     }
 
     this.renderer.setScissorTest(false);
+    this.renderer.setScissorTest(false);
+  }
+
+  updateResolution(h, w, dotSize) {
+    // Update static constants
+    Daydream.H = h;
+    Daydream.W = w;
+    Daydream.DOT_SIZE = dotSize;
+
+    // Dispose old resources
+    this.scene.remove(this.dotMesh);
+    this.dotGeometry.dispose();
+    // Material can be reused usually but let's be safe if it depended on something odd, 
+    // actually it's just a BasicMaterial, we can keep it or recreate. Reusing is fine.
+
+    // Create new geometry
+    this.dotGeometry = new THREE.SphereGeometry(
+      Daydream.DOT_SIZE,
+      32,
+      16,
+      0,
+      Math.PI
+    );
+
+    // Create new InstancedMesh
+    this.dotMesh = new THREE.InstancedMesh(
+      this.dotGeometry,
+      this.dotMaterial,
+      Daydream.W * Daydream.H
+    );
+    this.dotMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.dotMesh.count = 0;
+    this.scene.add(this.dotMesh);
+
+    // Reallocate Pixel Buffer
+    Daydream.pixels = Array.from({ length: Daydream.W * Daydream.H }, () => new THREE.Color(0, 0, 0));
   }
 }
 

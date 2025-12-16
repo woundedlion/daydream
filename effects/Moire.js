@@ -20,7 +20,6 @@ import {
 
 export class Moire {
     constructor() {
-        Daydream.W = 96;
         this.alpha = 0.2;
         this.basePalette = new GenerativePalette("circular", "split-complementary", "bell");
         this.interferencePalette = new GenerativePalette("circular", "split-complementary", "cup");

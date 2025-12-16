@@ -20,7 +20,6 @@ import {
 
 export class Portholes {
     constructor() {
-        Daydream.W = 96;
         this.alpha = 0.3; // Default alpha
 
         this.basePalette = new GenerativePalette("circular", "analogous", "bell", "vibrant");
