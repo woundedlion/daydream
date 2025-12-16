@@ -48,14 +48,14 @@ const initialEffect = urlParams.get('effect');
 // Default to Holosphere
 const resolutionPresets = {
   "Holosphere (20x96)": { h: 20, w: 96, size: 2 },
-  "Phantasm (144x288)": { h: 144, w: 288, size: 0.2 }
+  "Phantasm (144x288)": { h: 144, w: 288, size: 0.25 }
 };
 
 const daydream = new Daydream();
 let activeEffect;
 
 const controls = {
-  effectName: (initialEffect && effects[initialEffect]) ? initialEffect : 'LSystem',
+  effectName: (initialEffect && effects[initialEffect]) ? initialEffect : 'PetalFlow',
   resolution: "Holosphere (20x96)",
 
   setResolution: function () {
