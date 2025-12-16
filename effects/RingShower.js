@@ -22,7 +22,7 @@ export class RingShower {
 
     static Ring = class {
         constructor(filters) {
-            this.normal = randomVector();
+            this.normal = randomVector().clone();
             this.duration = 8 + Math.random() * 72;
             this.radius = new MutableNumber(0);
             this.lastRadius = this.radius.get();
@@ -32,7 +32,6 @@ export class RingShower {
     }
 
     constructor() {
-        Daydream.W = 96;
         this.rings = [];
         this.numRings = 16;
         this.alpha = 0.2;
@@ -78,7 +77,7 @@ export class RingShower {
         let dots = drawRing(this.orientation.get(), ring.normal, ring.radius.get(),
             (v, t) => {
                 let z = this.orientation.orient(Daydream.X_AXIS);
-                return this.palette.get(angleBetween(z, v) / Math.PI);
+                return ring.palette.get(angleBetween(z, v) / Math.PI);
             }
         );
         plotDots(null, this.filters, dots, 0, this.alpha * opacity);
