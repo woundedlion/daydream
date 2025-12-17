@@ -77,14 +77,14 @@ export class Palette {
  * @param {THREE.Color} c1 - The first color.
  * @param {THREE.Color} c2 - The second color.
  * @param {number} a - The alpha value of the second color [0, 1].
+ * @param {number} d - The destination color object.
  * @returns {function(THREE.Color, THREE.Color): THREE.Color} A blending function.
  */
-export const blendAlpha = (c1, c2, a) => {
-  const result = colorPool.acquire();
-  result.r = c1.r * (1 - a) + c2.r * (a);
-  result.g = c1.g * (1 - a) + c2.g * (a);
-  result.b = c1.b * (1 - a) + c2.b * (a);
-  return result;
+export const blendAlpha = (c1, c2, a, d) => {
+  d.r = c1.r * (1 - a) + c2.r * (a);
+  d.g = c1.g * (1 - a) + c2.g * (a);
+  d.b = c1.b * (1 - a) + c2.b * (a);
+  return d;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

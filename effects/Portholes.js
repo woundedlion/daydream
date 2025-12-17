@@ -120,7 +120,7 @@ export class Portholes {
     }
 
     spinSlices() {
-        let axis = randomVector();
+        let axis = randomVector().clone();
         this.hemisphereAxis.copy(axis);
 
         // Spin alternating directions over 5 seconds (80 frames)
