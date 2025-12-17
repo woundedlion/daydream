@@ -23,48 +23,48 @@ const quinticKernel = (t) => {
 export function createRenderPipeline(...filters) {
   // Canvas sink
   let head = (pixels, x, y, colorInput, age, alpha) => {
-    let xi = Math.round(x);
-    let yi = Math.round(y);
-    let index = yi * Daydream.W + xi;
+    let xi = (x + 0.5) | 0;
+    let yi = (y + 0.5) | 0;
+    let index = Daydream.rowOffsets[yi] + xi;
     const color = colorInput.isColor ? colorInput : (colorInput.color || colorInput);
     const alphaMod = (colorInput.alpha !== undefined ? colorInput.alpha : 1.0);
     blendAlpha(Daydream.pixels[index], color, alpha * alphaMod, Daydream.pixels[index]);
   };
   let nextIs2D = true;
 
-  // Create Fiter Chain
+  // Create Filter Chain
   for (let i = filters.length - 1; i >= 0; i--) {
     const filter = filters[i];
     const next = head;
     if (filter.is2D) {
       // 2D -> 2D
+      const pass = (x, y, c, age, alpha) => {
+        next(Daydream.pixels, x, y, c, age, alpha);
+      }
       head = (pixels, x, y, c, age, alpha) => {
-        const pass = (x, y, c, age, alpha) => {
-          next(pixels, x, y, c, age, alpha);
-        }
         filter.plot(x, y, c, age, alpha, pass);
       };
     } else {
       if (nextIs2D) {
         // 3D -> 2D Rasterize
+        const pass = (v, c, age, alpha) => {
+          const p = vectorToPixel(v);
+          next(Daydream.pixels, p.x, p.y, c, age, alpha);
+        }
         head = (pixels, v, c, age, alpha) => {
-          const pass = (v, c, age, alpha) => {
-            const p = vectorToPixel(v);
-            next(pixels, p.x, p.y, c, age, alpha);
-          }
           filter.plot(v, c, age, alpha, pass);
         };
       } else {
         // 3D -> 3D
+        const pass = (v, c, age, alpha) => {
+          next(Daydream.pixels, v, c, age, alpha);
+        }
         head = (pixels, v, c, age, alpha) => {
-          const pass = (v, c, age, alpha) => {
-            next(pixels, v, c, age, alpha);
-          }
           filter.plot(v, c, age, alpha, pass);
         };
       }
-      nextIs2D = false;
     }
+    nextIs2D = filter.is2D;
   }
 
   // Define the trail propagator
