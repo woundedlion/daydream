@@ -23,8 +23,8 @@ const quinticKernel = (t) => {
 export function createRenderPipeline(...filters) {
   // Canvas sink
   let head = (pixels, x, y, colorInput, age, alpha) => {
-    let xi = (x + 0.5) | 0;
-    let yi = (y + 0.5) | 0;
+    let xi = ((x + 0.5) | 0) % Daydream.W;
+    let yi = Math.max(0, Math.min(Daydream.H - 1, (y + 0.5) | 0));
     let index = Daydream.rowOffsets[yi] + xi;
     const color = colorInput.isColor ? colorInput : (colorInput.color || colorInput);
     const alphaMod = (colorInput.alpha !== undefined ? colorInput.alpha : 1.0);
