@@ -145,6 +145,7 @@ export const hsvToHsl = (h, s, v) => {
  */
 export class GenerativePalette {
   static seed = Math.random();
+  static VIGNETTE_COLOR = new THREE.Color(0, 0, 0);
 
   /**
    * Calculates companion hues based on a base hue and a harmony type.
@@ -268,11 +269,10 @@ export class GenerativePalette {
   get(t) {
     let colors;
     let shape;
-    const vignetteColor = new THREE.Color(0, 0, 0);
     switch (this.shapeSpec) {
       case 'vignette':
         shape = [0, 0.1, 0.5, 0.9, 1];
-        colors = [vignetteColor, this.a, this.b, this.c, vignetteColor];
+        colors = [GenerativePalette.VIGNETTE_COLOR, this.a, this.b, this.c, GenerativePalette.VIGNETTE_COLOR];
         break;
       case 'straight':
         shape = [0, 0.5, 1];
@@ -284,7 +284,7 @@ export class GenerativePalette {
         break;
       case 'falloff':
         shape = [0, 0.33, 0.66, 0.9, 1];
-        colors = [this.a, this.b, this.c, vignetteColor];
+        colors = [this.a, this.b, this.c, GenerativePalette.VIGNETTE_COLOR];
         break;
     }
 
