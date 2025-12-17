@@ -82,7 +82,7 @@ export class Dynamo {
         this.timeline.add(0,
             new Rotation(
                 this.orientation,
-                randomVector(),
+                randomVector().clone(),
                 Math.PI,
                 40,
                 easeInOutSin,
