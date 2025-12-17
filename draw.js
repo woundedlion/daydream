@@ -1,7 +1,7 @@
 // draw.js
 import * as THREE from "three";
 import { Daydream, labels } from "./driver.js";
-import { Dot, angleBetween, fibSpiral } from "./geometry.js";
+import { Dot, angleBetween, fibSpiral, vectorPool } from "./geometry.js";
 import { StaticCircularBuffer } from "./StaticCircularBuffer.js";
 import { StaticPool } from "./StaticPool.js";
 
@@ -31,7 +31,8 @@ export class DecayBuffer {
    * @param {number} alpha - The global opacity for these dots.
    */
   recordDots(dots, age, alpha) {
-    for (const dot of dots) {
+    for (let i = 0; i < dots.length; ++i) {
+      let dot = dots[i];
       this.record(dot.position, dot.color, age, alpha * (dot.alpha !== undefined ? dot.alpha : 1.0));
     }
   }
@@ -89,7 +90,7 @@ export class Path {
    * @param {THREE.Vector3} initialPos - The starting position of the path.
    */
   constructor(initialPos) {
-    this.points = [initialPos];
+    this.points = [initialPos.clone()];
   }
 
   /**
@@ -136,7 +137,8 @@ export class Path {
       this.points.pop();
     }
     for (let t = 0; t <= samples; t++) {
-      this.points.push(plotFn(easingFn(t / samples) * domain));
+      // Must clone() because plotFn might return a pooled vector
+      this.points.push(plotFn(easingFn(t / samples) * domain).clone());
     }
     return this;
   }
@@ -153,14 +155,14 @@ export class Path {
 
     // Handle end of path
     if (i >= this.points.length - 1) {
-      return this.points[this.points.length - 1].clone();
+      return vectorPool.acquire().copy(this.points[this.points.length - 1]);
     }
 
     const p1 = this.points[i];
     const p2 = this.points[i + 1];
 
     // Lerp (Linear Interpolation)
-    return p1.clone().lerp(p2, f);
+    return vectorPool.acquire().copy(p1).lerp(p2, f);
   }
 }
 
@@ -193,7 +195,7 @@ export class ProceduralPath {
  */
 export const drawVector = (v, colorFn) => {
   const dot = dotPool.acquire();
-  dot.position = new THREE.Vector3(...v.toArray()).normalize();
+  dot.position.copy(v).normalize();
   const c = colorFn(v, 0);
   if (c.isColor) {
     dot.color = c;
@@ -215,7 +217,7 @@ export const drawPath = (path, colorFn) => {
   let r = [];
   for (let t = 0; t < path.length(); t++) {
     const dot = dotPool.acquire();
-    dot.position = path.getPoint(t / path.length());
+    dot.position.copy(path.getPoint(t / path.length()));
     const c = colorFn(t);
     if (c.isColor) {
       dot.color = c;
@@ -269,16 +271,16 @@ export const rasterize = (points, colorFn, closeLoop = false) => {
  * @returns {Dot[]} An array of Dots forming the line.
  */
 export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast = false) => {
-  let u = v1.clone();
-  let v = v2.clone();
+  let u = vectorPool.acquire().copy(v1);
+  let v = vectorPool.acquire().copy(v2);
   let a = angleBetween(u, v);
-  let w = new THREE.Vector3();
+  let w = vectorPool.acquire();
 
   if (Math.abs(a) < 0.0001) {
     if (omitLast) return [];
 
     const dot = dotPool.acquire();
-    dot.position = u;
+    dot.position.copy(u);
     const c = colorFn(u, 0);
     if (c.isColor) {
       dot.color = c;
@@ -312,7 +314,7 @@ export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, o
   let dots = [];
 
   // Simulation Phase
-  let simU = u.clone();
+  let simU = vectorPool.acquire().copy(u);
   let simAngle = 0;
   let steps = [];
   const baseStep = 2 * Math.PI / Daydream.W;
@@ -339,7 +341,7 @@ export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, o
   let currentAngle = 0;
 
   const startDot = dotPool.acquire();
-  startDot.position = u.clone();
+  startDot.position.copy(u);
   const startC = colorFn(u, 0);
   if (startC.isColor) {
     startDot.color = startC;
@@ -363,7 +365,7 @@ export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, o
     let t = (a > 0) ? (currentAngle / a) : 1;
 
     const dot = dotPool.acquire();
-    dot.position = u.clone();
+    dot.position.copy(u);
     const c = colorFn(u, t);
     if (c.isColor) {
       dot.color = c;
@@ -386,11 +388,11 @@ export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, o
  */
 export const drawVertices = (vertices, colorFn) => {
   let dots = [];
-  let v = new THREE.Vector3();
+  let v = vectorPool.acquire();
   for (const vertex of vertices) {
     v.set(vertex[0], vertex[1], vertex[2]);
     const dot = dotPool.acquire();
-    dot.position = v.clone().normalize();
+    dot.position.copy(v).normalize();
     const c = colorFn(v); // Note passed v not normalized here? Original code normalized in new Dot call: v.normalize()
     // Wait, original: new Dot(v.normalize(), colorFn(v))
     // v.normalize() modifies v in place! So colorFn(v) called with modified v? 
@@ -422,8 +424,8 @@ export const samplePolyhedron = (vertices, edges) => {
   edges.map((adj, i) => {
     adj.map((j) => {
       // Just push the vertices, let rasterize handle the lines
-      points.push(new THREE.Vector3(...vertices[i]).normalize());
-      points.push(new THREE.Vector3(...vertices[j]).normalize());
+      points.push(vectorPool.acquire().set(...vertices[i]).normalize());
+      points.push(vectorPool.acquire().set(...vertices[j]).normalize());
     })
   });
   return points;
@@ -443,8 +445,8 @@ export const drawPolyhedron = (vertices, edges, colorFn) => {
       if (i < j) {
         dots.push(
           ...drawLine(
-            new THREE.Vector3(...vertices[i]).normalize(),
-            new THREE.Vector3(...vertices[j]).normalize(),
+            vectorPool.acquire().set(...vertices[i]).normalize(),
+            vectorPool.acquire().set(...vertices[j]).normalize(),
             colorFn)
         );
       }
@@ -463,9 +465,9 @@ export const drawPolyhedron = (vertices, edges, colorFn) => {
  */
 export const fnPoint = (f, normal, radius, angle) => {
   let dots = [];
-  let u = new THREE.Vector3();
-  let v = normal.clone();
-  let w = new THREE.Vector3();
+  let u = vectorPool.acquire();
+  let v = vectorPool.acquire().copy(normal);
+  let w = vectorPool.acquire();
   if (radius > 1) {
     v.negate();
     radius = 2 - radius;
@@ -479,9 +481,9 @@ export const fnPoint = (f, normal, radius, angle) => {
 
   let vi = calcRingPoint(angle, radius, u, v, w);
   let vp = calcRingPoint(angle, 1, u, v, w);
-  let axis = new THREE.Vector3().crossVectors(v, vp).normalize();
+  let axis = vectorPool.acquire().crossVectors(v, vp).normalize();
   let shift = new THREE.Quaternion().setFromAxisAngle(axis, f(angle * Math.PI / 2));
-  return vi.clone().applyQuaternion(shift);
+  return vi.applyQuaternion(shift);
 };
 
 /**
@@ -499,10 +501,10 @@ export const sampleFn = (orientationQuaternion, normal, radius, shiftFn, phase =
   if (Math.abs(normal.dot(refAxis)) > 0.9999) {
     refAxis = Daydream.Y_AXIS;
   }
-  let v = normal.clone().applyQuaternion(orientationQuaternion).normalize();
-  let ref = refAxis.clone().applyQuaternion(orientationQuaternion).normalize();
-  let u = new THREE.Vector3().crossVectors(v, ref).normalize();
-  let w = new THREE.Vector3().crossVectors(v, u).normalize();
+  let v = vectorPool.acquire().copy(normal).applyQuaternion(orientationQuaternion).normalize();
+  let ref = vectorPool.acquire().copy(refAxis).applyQuaternion(orientationQuaternion).normalize();
+  let u = vectorPool.acquire().crossVectors(v, ref).normalize();
+  let w = vectorPool.acquire().crossVectors(v, u).normalize();
 
   // Backside rings
   let vSign = 1.0;
@@ -520,7 +522,7 @@ export const sampleFn = (orientationQuaternion, normal, radius, shiftFn, phase =
   const numSamples = Daydream.W;
   const step = 2 * Math.PI / numSamples;
   let points = [];
-  let uTemp = new THREE.Vector3();
+  let uTemp = vectorPool.acquire();
 
   for (let i = 0; i < numSamples; i++) {
     let theta = i * step;
@@ -535,7 +537,7 @@ export const sampleFn = (orientationQuaternion, normal, radius, shiftFn, phase =
     let sinShift = Math.sin(shift);
     let vScale = (vSign * d) * cosShift - r * sinShift;
     let uScale = r * cosShift + (vSign * d) * sinShift;
-    let p = v.clone().multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
+    let p = vectorPool.acquire().copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
 
     points.push(p);
   }
@@ -569,7 +571,7 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
  */
 export const calcRingPoint = (a, radius, u, v, w) => {
   let d = Math.sqrt(Math.pow(1 - radius, 2));
-  return new THREE.Vector3(
+  return vectorPool.acquire().set(
     d * v.x + radius * u.x * Math.cos(a) + radius * w.x * Math.sin(a),
     d * v.y + radius * u.y * Math.cos(a) + radius * w.y * Math.sin(a),
     d * v.z + radius * u.z * Math.cos(a) + radius * w.z * Math.sin(a)
@@ -590,10 +592,10 @@ export const sampleRing = (orientationQuaternion, normal, radius, phase = 0) => 
   if (Math.abs(normal.dot(refAxis)) > 0.9999) {
     refAxis = Daydream.Y_AXIS;
   }
-  let v = normal.clone().applyQuaternion(orientationQuaternion).normalize();
-  let ref = refAxis.clone().applyQuaternion(orientationQuaternion).normalize();
-  let u = new THREE.Vector3().crossVectors(v, ref).normalize();
-  let w = new THREE.Vector3().crossVectors(v, u).normalize();
+  let v = vectorPool.acquire().copy(normal).applyQuaternion(orientationQuaternion).normalize();
+  let ref = vectorPool.acquire().copy(refAxis).applyQuaternion(orientationQuaternion).normalize();
+  let u = vectorPool.acquire().crossVectors(v, ref).normalize();
+  let w = vectorPool.acquire().crossVectors(v, u).normalize();
 
   // Backside rings
   let vDir = v.clone();
@@ -610,7 +612,7 @@ export const sampleRing = (orientationQuaternion, normal, radius, phase = 0) => 
   const numSamples = Daydream.W / 4;
   const step = 2 * Math.PI / numSamples;
   let points = [];
-  let uTemp = new THREE.Vector3();
+  let uTemp = vectorPool.acquire();
 
   for (let i = 0; i < numSamples; i++) {
     let theta = i * step;
@@ -618,7 +620,7 @@ export const sampleRing = (orientationQuaternion, normal, radius, phase = 0) => 
     let cosRing = Math.cos(t);
     let sinRing = Math.sin(t);
     uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
-    let p = vDir.clone().multiplyScalar(d).addScaledVector(uTemp, r).normalize();
+    let p = vectorPool.acquire().copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
     points.push(p);
   }
   return points;
@@ -641,9 +643,9 @@ export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase =
 
 export const ringPoint = (normal, radius, angle, phase = 0) => {
   let dots = [];
-  let u = new THREE.Vector3();
-  let v = normal.clone();
-  let w = new THREE.Vector3();
+  let u = vectorPool.acquire();
+  let v = vectorPool.acquire().copy(normal);
+  let w = vectorPool.acquire();
   if (radius > 1) {
     v.negate();
   }
@@ -658,7 +660,7 @@ export const ringPoint = (normal, radius, angle, phase = 0) => {
     radius = 2 - radius;
   }
   let d = Math.sqrt(Math.pow(1 - radius, 2));
-  return new THREE.Vector3(
+  return vectorPool.acquire().set(
     d * v.x + radius * u.x * Math.cos(angle + phase) + radius * w.x * Math.sin(angle + phase),
     d * v.y + radius * u.y * Math.cos(angle + phase) + radius * w.y * Math.sin(angle + phase),
     d * v.z + radius * u.z * Math.cos(angle + phase) + radius * w.z * Math.sin(angle + phase)
@@ -677,7 +679,7 @@ export const drawFibSpiral = (n, eps, colorFn) => {
   for (let i = 0; i < n; ++i) {
     let v = fibSpiral(n, eps, i);
     const dot = dotPool.acquire();
-    dot.position = v;
+    dot.position.copy(v);
     const c = colorFn(v);
     if (c.isColor) {
       dot.color = c;
@@ -700,7 +702,8 @@ export const drawFibSpiral = (n, eps, colorFn) => {
  * @param {number} alpha - The global opacity for these dots.
  */
 export function plotDots(pixels, filters, dots, age, alpha) {
-  for (const dot of dots) {
+  for (let i = 0; i < dots.length; ++i) {
+    let dot = dots[i];
     filters.plot(pixels, dot.position, dot.color, age, alpha * (dot.alpha !== undefined ? dot.alpha : 1.0));
   }
 }

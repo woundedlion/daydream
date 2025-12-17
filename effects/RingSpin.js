@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation
+    Orientation, vectorPool
 } from "../geometry.js";
 import {
     sampleRing, rasterize, plotDots, tween
@@ -22,6 +22,12 @@ export class RingSpin {
     static Ring = class {
         constructor(normal, palette, trailLength) {
             this.normal = normal;
+            // map(v => v.clone()) is essential because sampleRing now returns pooled vectors
+            this.basePoints = sampleRing(new THREE.Quaternion(), this.normal, 1).map(v => v.clone());
+            this.scratchPoints = new Array(this.basePoints.length);
+            for (let i = 0; i < this.basePoints.length; ++i) {
+                this.scratchPoints[i] = new THREE.Vector3();
+            }
             this.palette = new TransparentVignette(palette);
             this.filters = createRenderPipeline(
                 new FilterDecay(trailLength, Math.max(10000, Daydream.W * 200)),
@@ -49,7 +55,6 @@ export class RingSpin {
 
     spawnRing(normal, palette) {
         let ring = new RingSpin.Ring(normal, palette, this.trailLength.get());
-        ring.basePoints = sampleRing(new THREE.Quaternion(), ring.normal, 1);
         this.rings.unshift(ring);
 
         this.timeline.add(0,
@@ -64,8 +69,10 @@ export class RingSpin {
 
     drawRing(opacity, ring) {
         tween(ring.orientation, (q, t) => {
-            let points = ring.basePoints.map(p => p.clone().applyQuaternion(q));
-            let dots = rasterize(points, (v, t) => ring.palette.get(0), true);
+            for (let i = 0; i < ring.basePoints.length; ++i) {
+                ring.scratchPoints[i].copy(ring.basePoints[i]).applyQuaternion(q);
+            }
+            let dots = rasterize(ring.scratchPoints, (v, t) => ring.palette.get(0), true);
             plotDots(null, ring.filters, dots, 0, this.alpha);
         });
         ring.orientation.collapse();

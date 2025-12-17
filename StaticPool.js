@@ -12,10 +12,8 @@ export class StaticPool {
     this.store = new Array(capacity);
     this.cursor = 0;
     this.capacity = capacity;
-
-    for (let i = 0; i < capacity; i++) {
-      this.store[i] = new Type();
-    }
+    this.Type = Type;
+    this.initializedCount = 0;
   }
 
   /**
@@ -25,8 +23,14 @@ export class StaticPool {
   acquire() {
     if (this.cursor >= this.capacity) {
       console.warn("Pool exhausted! Increase capacity.");
-      return this.store[this.capacity - 1];
+      return this.store[this.capacity - 1]; // Return last valid object to avoid crash, but shared state risk
     }
+
+    if (this.cursor >= this.initializedCount) {
+      this.store[this.cursor] = new this.Type();
+      this.initializedCount++;
+    }
+
     return this.store[this.cursor++];
   }
 

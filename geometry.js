@@ -7,7 +7,7 @@ import { g1, g2 } from "./color.js";
 import { StaticPool } from "./StaticPool.js";
 
 /** @type {StaticPool} Global pool for temporary Vector3 objects. */
-export const vector3Pool = new StaticPool(THREE.Vector3, 500000);
+export const vectorPool = new StaticPool(THREE.Vector3, 500000);
 
 /** @type {number} The golden ratio, (1 + sqrt(5)) / 2. */
 export const PHI = (1 + Math.sqrt(5)) / 2;
@@ -101,7 +101,7 @@ export const pixelToVector = (x, y) => {
     (y * Math.PI) / (Daydream.H - 1),
     (x * 2 * Math.PI) / Daydream.W
   );
-  const v = vector3Pool.acquire();
+  const v = vectorPool.acquire();
   v.setFromSpherical(s);
   return v;
 };
@@ -126,7 +126,7 @@ export const logPolarToVector = (rho, theta) => {
   // x^2 + z^2 = 1 - y^2
   const r_xz = Math.sqrt(1 - y * y);
 
-  const v = vector3Pool.acquire();
+  const v = vectorPool.acquire();
   v.set(
     r_xz * Math.cos(theta),
     y,
@@ -301,7 +301,7 @@ export const randomVector = () => {
   } while (s >= 1.0 || s === 0.0);
 
   const sqrtS = Math.sqrt(1.0 - s);
-  const v = vector3Pool.acquire();
+  const v = vectorPool.acquire();
   v.set(
     2.0 * v1 * sqrtS,
     2.0 * v2 * sqrtS,
@@ -356,7 +356,7 @@ export class Orientation {
    */
   orientPoly(vertices, i = this.length() - 1) {
     return vertices.map((c) => {
-      return this.orient(new THREE.Vector3().fromArray(c)).toArray();
+      return this.orient(vectorPool.acquire().fromArray(c)).toArray();
     });
   }
 
@@ -410,7 +410,7 @@ export class Orientation {
  * @returns {THREE.Vector3} The point on the unit sphere.
  */
 export const fibSpiral = (n, eps, i) => {
-  const v = vector3Pool.acquire();
+  const v = vectorPool.acquire();
   v.setFromSpherical(new THREE.Spherical(
     1,
     Math.acos(1 - (2 * (i + eps)) / n),
@@ -505,7 +505,7 @@ export function distanceGradient(v, normal) {
  * @returns {THREE.Vector3} The point on the sphere's surface.
  */
 export function lissajous(m1, m2, a, t) {
-  const v = vector3Pool.acquire();
+  const v = vectorPool.acquire();
   v.set(
     Math.sin(m2 * t) * Math.cos(m1 * t - a * Math.PI),
     Math.cos(m2 * t),
@@ -524,8 +524,9 @@ export function rotateBetween(from, to) {
   let angle = 2 * Math.acos(diff.w);
   if (angle == 0) {
     return
+    return
   } else {
-    var axis = new THREE.Vector3(diff.x, diff.y, diff.z).normalize();
+    var axis = vectorPool.acquire().set(diff.x, diff.y, diff.z).normalize();
   }
   new Rotation(from, axis, angle, 1, easeOutCirc).step();
 }
@@ -545,7 +546,7 @@ export function isOver(v, normal) {
  * @returns {THREE.Vector3} A random vector on the unit sphere.
  */
 export function makeRandomVector() {
-  const v = vector3Pool.acquire();
+  const v = vectorPool.acquire();
   v.set(
     Math.random() * 2 - 1,
     Math.random() * 2 - 1,
@@ -585,9 +586,9 @@ export function angleBetween(v1, v2) {
  * @returns {THREE.Vector3|number} The intersection point (normalized) or NaN if intersection is not valid for geodesic.
  */
 export function intersection(u, v, normal) {
-  let w = new THREE.Vector3().crossVectors(v, u).normalize();
-  let i1 = new THREE.Vector3().crossVectors(w, normal).normalize();
-  let i2 = new THREE.Vector3().crossVectors(normal, w).normalize();
+  let w = vectorPool.acquire().crossVectors(v, u).normalize();
+  let i1 = vectorPool.acquire().crossVectors(w, normal).normalize();
+  let i2 = vectorPool.acquire().crossVectors(normal, w).normalize();
 
   let a1 = angleBetween(u, v);
   let a2 = angleBetween(i1, u);
