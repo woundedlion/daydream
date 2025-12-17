@@ -335,7 +335,7 @@ export class Orientation {
    * @returns {THREE.Vector3} The oriented and normalized vector.
    */
   orient(v, i = this.length() - 1) {
-    return v.clone().normalize().applyQuaternion(this.orientations[i]);
+    return vectorPool.acquire().copy(v).normalize().applyQuaternion(this.orientations[i]);
   }
 
   /**
@@ -345,7 +345,7 @@ export class Orientation {
    * @returns {THREE.Vector3} The unoriented and normalized vector.
    */
   unorient(v, i = this.length() - 1) {
-    return v.clone().normalize().applyQuaternion(this.orientations[i].clone().invert());
+    return vectorPool.acquire().copy(v).normalize().applyQuaternion(this.orientations[i].clone().invert());
   }
 
   /**
