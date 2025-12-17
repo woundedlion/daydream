@@ -28,8 +28,7 @@ export function createRenderPipeline(...filters) {
     let index = yi * Daydream.W + xi;
     const color = colorInput.isColor ? colorInput : (colorInput.color || colorInput);
     const alphaMod = (colorInput.alpha !== undefined ? colorInput.alpha : 1.0);
-    let blended = blendAlpha(Daydream.pixels[index], color, alpha * alphaMod);
-    Daydream.pixels[index].copy(blended);
+    blendAlpha(Daydream.pixels[index], color, alpha * alphaMod, Daydream.pixels[index]);
   };
   let nextIs2D = true;
 
