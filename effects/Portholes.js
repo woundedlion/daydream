@@ -3,10 +3,10 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, fibSpiral, randomVector
+    Orientation, Dodecahedron, randomVector
 } from "../geometry.js";
 import {
-    drawRing, plotDots
+    drawLine, plotDots
 } from "../draw.js";
 import {
     GenerativePalette
@@ -30,12 +30,11 @@ export class Portholes {
         for (let i = 0; i < numSlices; i++) {
             this.orientations.push(new Orientation());
         }
+        this.dodecahedron = new Dodecahedron();
         this.hemisphereAxis = new THREE.Vector3(0, 1, 0);
         this.timeline = new Timeline();
 
         // Parameters
-        this.numPoints = new MutableNumber(20);
-        this.circleRadius = new MutableNumber(0.27);
         this.offsetRadius = new MutableNumber(5 / Daydream.W);
         this.offsetSpeed = new MutableNumber(2.0);
         this.t = 0;
@@ -55,8 +54,6 @@ export class Portholes {
     setupGui() {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
-        this.gui.add(this.numPoints, 'n', 10, 200).name('Num Points').step(1).listen();
-        this.gui.add(this.circleRadius, 'n', 0.005, 0.5).name('Circle Radius').listen();
         this.gui.add(this.offsetRadius, 'n', 0.0, 0.2).name('Offset Radius').listen();
         this.gui.add(this.offsetSpeed, 'n', 0.0, 5.0).name('Offset Speed').listen();
     }
@@ -74,13 +71,13 @@ export class Portholes {
 
     drawLayer(isInterference) {
         let dots = [];
-        const n = Math.floor(this.numPoints.get());
 
-        // Generate Fibonacci points
-        for (let i = 0; i < n; i++) {
-            let p = fibSpiral(n, 0.3, i);
+        // Map Dodecahedron vertices to Vector3
+        const vertices = this.dodecahedron.vertices.map(v => new THREE.Vector3(...v).normalize());
 
-            if (isInterference) {
+        // Apply deformation if interference
+        if (isInterference) {
+            vertices.forEach((p, i) => {
                 // Create basis for tangent plane
                 const axis = (Math.abs(p.y) > 0.99) ? Daydream.X_AXIS : Daydream.Y_AXIS;
                 let u = new THREE.Vector3().crossVectors(p, axis).normalize();
@@ -96,15 +93,21 @@ export class Portholes {
 
                 // Apply offset to normal (approximate, spherical surface constraint handled by normalization)
                 p.add(offset).normalize();
-            }
-
-            // Draw ring
-            let ring = drawRing(new THREE.Quaternion(), p, this.circleRadius.get(), (v, t) => {
-                const palette = isInterference ? this.interferencePalette : this.basePalette;
-                return palette.get(t);
             });
-            dots.push(...ring);
         }
+
+        // Draw edges
+        this.dodecahedron.edges.forEach((adj, i) => {
+            adj.forEach(j => {
+                if (i < j) {
+                    dots.push(...drawLine(vertices[i], vertices[j], (v, t) => {
+                        const palette = isInterference ? this.interferencePalette : this.basePalette;
+                        return palette.get(t);
+                    }));
+                }
+            });
+        });
+
         return dots;
     }
 
