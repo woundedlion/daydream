@@ -24,7 +24,7 @@ export class FieldSample {
 
     constructor() {
         this.rings = [];
-        this.alpha = 0.2;
+        this.alpha = 0.5;
         this.trailLength = new MutableNumber(Daydream.W / 5);
         this.thickness = 2 * Math.PI / Daydream.W;
         this.palettes = [iceMelt, underSea, mangoPeel, richSunset];
