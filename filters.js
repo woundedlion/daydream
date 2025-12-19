@@ -11,7 +11,7 @@ const BLACK = new THREE.Color(0, 0, 0);
 /**
  * Quintic kernel (smootherstep): 6t^5 - 15t^4 + 10t^3
  */
-const quinticKernel = (t) => {
+export const quinticKernel = (t) => {
   return t * t * t * (t * (t * 6 - 15) + 10);
 }
 
@@ -431,7 +431,6 @@ export class FilterOrientSlice {
     if (idx >= this.orientations.length) idx = this.orientations.length - 1;
     if (idx < 0) idx = 0;
     const orientation = this.orientations[idx];
-    orientation.collapse();
     pass(orientation.orient(v), color, age, alpha);
   }
 }

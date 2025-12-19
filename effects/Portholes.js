@@ -112,6 +112,10 @@ export class Portholes {
     }
 
     drawFrame() {
+        for (const o of this.orientations) {
+            o.collapse();
+        }
+
         this.timeline.step();
         this.t += 0.01; // Global time
 

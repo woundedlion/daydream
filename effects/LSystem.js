@@ -176,7 +176,9 @@ export class LSystem {
     }
 
     drawFrame() {
+        this.orientation.collapse();
         this.timeline.step();
+
         if (this.dots) {
             plotDots(null, this.filters, this.dots, 0, 1.0);
         }

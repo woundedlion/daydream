@@ -500,7 +500,7 @@ export class Motion extends Animation {
 
   step() {
     super.step();
-    this.orientation.collapse();
+
 
     let currentV = this.path.getPoint((this.t - 1) / this.duration);
     const targetV = this.path.getPoint(this.t / this.duration);
@@ -565,7 +565,7 @@ export class Rotation extends Animation {
       this.last_angle = 0;
     }
     super.step();
-    this.orientation.collapse();
+
 
     let targetAngle = this.easingFn(this.t / this.duration) * this.totalAngle;
     let delta = targetAngle - this.last_angle;
@@ -624,7 +624,18 @@ export class RandomWalk extends Animation {
     const walkAngle = this.WALK_SPEED;
     this.v.applyAxisAngle(walkAxis, walkAngle).normalize();
     this.direction.applyAxisAngle(walkAxis, walkAngle).normalize();
-    Rotation.animate(this.orientation, walkAxis, walkAngle, easeMid);
+
+    // Manually apply rotation with sub-stepping to ensure smoothness in High Res
+    // AND avoid Rotation.animate() which forces history collapse (preserving FieldSample)
+    const numSteps = Math.ceil(walkAngle / Rotation.MAX_ANGLE);
+    const stepAngle = walkAngle / numSteps;
+    const qStep = new THREE.Quaternion().setFromAxisAngle(walkAxis, stepAngle);
+
+    for (let i = 0; i < numSteps; i++) {
+      let currentQ = this.orientation.get().clone();
+      currentQ.premultiply(qStep).normalize();
+      this.orientation.push(currentQ);
+    }
   }
 }
 
