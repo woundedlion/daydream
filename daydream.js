@@ -17,7 +17,8 @@ import {
   GSReactionDiffusion,
   BZReactionDiffusion,
   PetalFlow,
-  LSystem
+  LSystem,
+  FieldSample
 } from "./effects/index.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
@@ -39,11 +40,14 @@ const effects = {
   GSReactionDiffusion,
   BZReactionDiffusion,
   PetalFlow,
-  LSystem
+  LSystem,
+  FieldSample
 };
 
 const urlParams = new URLSearchParams(window.location.search);
 const initialEffect = urlParams.get('effect');
+
+const initialResolution = urlParams.get('resolution');
 
 // Default to Holosphere
 const resolutionPresets = {
@@ -56,11 +60,17 @@ let activeEffect;
 
 const controls = {
   effectName: (initialEffect && effects[initialEffect]) ? initialEffect : 'PetalFlow',
-  resolution: "Holosphere (20x96)",
+  resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Holosphere (20x96)",
 
   setResolution: function () {
     const p = resolutionPresets[this.resolution];
     if (p) {
+      // Update URL
+      const newUrl = new URL(window.location);
+      newUrl.searchParams.set('effect', this.effectName);
+      newUrl.searchParams.set('resolution', this.resolution);
+      window.history.pushState({}, '', newUrl);
+
       daydream.updateResolution(p.h, p.w, p.size);
       // Restart effect to use new resolution
       this.changeEffect();

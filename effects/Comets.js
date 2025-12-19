@@ -132,6 +132,7 @@ export class Comets {
     }
 
     drawFrame() {
+        this.orientation.collapse();
         this.timeline.step();
         this.trails.render(null, this.filters, (v, t) => this.palette.get(1 - t));
     }

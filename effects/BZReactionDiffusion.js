@@ -278,6 +278,7 @@ export class BZReactionDiffusion {
     }
 
     drawFrame() {
+        this.orientation.collapse();
         this.timeline.step();
     }
 }

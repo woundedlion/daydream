@@ -251,6 +251,7 @@ export class GSReactionDiffusion {
     }
 
     drawFrame() {
+        this.orientation.collapse();
         this.timeline.step();
     }
 }

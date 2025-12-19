@@ -397,8 +397,8 @@ export class Orientation {
   /**
    * Removes all but the most recent orientation, collapsing the history.
    */
-  collapse() {
-    while (this.orientations.length > 1) { this.orientations.shift(); }
+  collapse(history = 1) {
+    while (this.orientations.length > history) { this.orientations.shift(); }
   }
 }
 

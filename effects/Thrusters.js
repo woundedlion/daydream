@@ -146,6 +146,7 @@ export class Thrusters {
     }
 
     drawFrame() {
+        this.orientation.collapse();
         this.timeline.step();
         this.t++;
     }

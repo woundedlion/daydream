@@ -114,6 +114,7 @@ export class Moire {
     }
 
     drawFrame() {
+        this.orientation.collapse();
         this.timeline.step();
 
         let dots = [];

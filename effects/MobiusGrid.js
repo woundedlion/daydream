@@ -137,6 +137,7 @@ export class MobiusGrid {
     }
 
     drawFrame() {
+        this.orientation.collapse();
         this.timeline.step();
         const phase = ((this.timeline.t || 0) % 120) / 120;
         let dots = [];

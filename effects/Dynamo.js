@@ -142,6 +142,7 @@ export class Dynamo {
     }
 
     drawFrame() {
+        this.orientation.collapse();
         this.timeline.step();
         for (let i = Math.abs(this.speed) - 1; i >= 0; --i) {
             this.pull(0);
