@@ -27,7 +27,7 @@ export class RingSpinFieldSample {
     constructor() {
         this.rings = [];
         this.alpha = 0.5;
-        this.trailLength = 20;
+        this.trailLength = 60;
         this.trailLengthMutable = new MutableNumber(this.trailLength);
         this.thickness = 2 * Math.PI / Daydream.W;
         this.palettes = [iceMelt, underSea, mangoPeel, richSunset];
