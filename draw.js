@@ -715,8 +715,7 @@ export function plotDots(pixels, filters, dots, age, alpha) {
  */
 export const tween = (orientation, drawFn) => {
   let s = orientation.length();
-  let start = (s > 1) ? 1 : 0;
-  for (let i = start; i < s; ++i) {
+  for (let i = 0; i < s; ++i) {
     drawFn(orientation.get(i), (s - 1 - i) / s);
   }
 }

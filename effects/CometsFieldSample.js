@@ -79,7 +79,7 @@ export class CometsFieldSample {
     setupGUI() {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha', 0, 1).step(0.01).name('Brightness');
-        this.gui.add(this, 'thickness', 0.01, 0.5).step(0.01).name('Comet Size');
+        this.gui.add(this, 'thickness', 0.01, 0.5).step(0.01).name('Brush Size');
         this.gui.add(this.sampler, 'debugBB').name('Show Bounding Boxes');
     }
 
