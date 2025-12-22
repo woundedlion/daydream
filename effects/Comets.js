@@ -82,14 +82,15 @@ export class Comets {
     }
 
     /*
-        getLabels() {
-            if (!this.path || !this.path.points) return [];
-            return this.path.points.map((p, i) => ({
-                position: this.orientation.orient(p),
-                content: i.toString()
-            }));
-        }
+    getLabels() {
+        if (!this.path || !this.path.points) return [];
+        return this.path.points.map((p, i) => ({
+            position: this.orientation.orient(p),
+            content: i.toString()
+        }));
+    }
     */
+
     updatePath() {
         const config = this.functions[this.curFunction];
         const { m1, m2, a, domain } = config;
@@ -128,11 +129,9 @@ export class Comets {
                 (v, t) => this.palette.get(t)));
             this.trails.recordDots(dots, t, opacity * this.alpha);
         });
-        node.orientation.collapse();
     }
 
     drawFrame() {
-        this.orientation.collapse();
         this.timeline.step();
         this.trails.render(null, this.filters, (v, t) => this.palette.get(1 - t));
     }

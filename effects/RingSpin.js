@@ -75,7 +75,6 @@ export class RingSpin {
             let dots = rasterize(ring.scratchPoints, (v, t) => ring.palette.get(0), true);
             plotDots(null, ring.filters, dots, 0, this.alpha);
         });
-        ring.orientation.collapse();
         ring.filters.trail((x, y, t) => ring.palette.get(t), this.alpha);
     }
 
