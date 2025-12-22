@@ -645,7 +645,6 @@ export class RandomWalk extends Animation {
       this.orientation.push(currentQ);
     }
     let h = (this.history && typeof this.history.get === 'function') ? this.history.get() : this.history;
-    if (Math.random() < 0.001) console.log("RW h:", h);
     this.orientation.collapse(h);
   }
 }
