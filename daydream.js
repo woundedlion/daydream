@@ -18,7 +18,8 @@ import {
   BZReactionDiffusion,
   PetalFlow,
   LSystem,
-  FieldSample
+  RingSpinFieldSample,
+  CometsFieldSample
 } from "./effects/index.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
@@ -28,7 +29,9 @@ import { BufferGeometry, AddEquation, MaxEquation } from "three";
 const effects = {
   RingShower,
   RingSpin,
+  RingSpinFieldSample,
   Comets,
+  CometsFieldSample,
   Dynamo,
   Thrusters,
   MetaballEffect,
@@ -41,7 +44,6 @@ const effects = {
   BZReactionDiffusion,
   PetalFlow,
   LSystem,
-  FieldSample
 };
 
 const urlParams = new URLSearchParams(window.location.search);

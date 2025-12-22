@@ -316,8 +316,9 @@ export const randomVector = () => {
  */
 export class Orientation {
   constructor() {
-    /** @type {THREE.Quaternion[]} */
-    this.orientations = [new THREE.Quaternion(0, 0, 0, 1)];
+    /** @type {{q: THREE.Quaternion, t: number}[]} */
+    this.orientations = [{ q: new THREE.Quaternion(0, 0, 0, 1), t: 0 }];
+    this.time = 0;
   }
 
   /**
@@ -335,7 +336,7 @@ export class Orientation {
    * @returns {THREE.Vector3} The oriented and normalized vector.
    */
   orient(v, i = this.length() - 1) {
-    return vectorPool.acquire().copy(v).normalize().applyQuaternion(this.orientations[i]);
+    return vectorPool.acquire().copy(v).normalize().applyQuaternion(this.orientations[i].q);
   }
 
   /**
@@ -345,7 +346,7 @@ export class Orientation {
    * @returns {THREE.Vector3} The unoriented and normalized vector.
    */
   unorient(v, i = this.length() - 1) {
-    return vectorPool.acquire().copy(v).normalize().applyQuaternion(this.orientations[i].clone().invert());
+    return vectorPool.acquire().copy(v).normalize().applyQuaternion(this.orientations[i].q.clone().invert());
   }
 
   /**
@@ -365,6 +366,7 @@ export class Orientation {
    */
   clear() {
     this.orientations = [];
+    this.time = 0;
   }
 
   /**
@@ -373,7 +375,7 @@ export class Orientation {
    * @returns {THREE.Quaternion} The requested quaternion.
    */
   get(i = this.length() - 1) {
-    return this.orientations[i];
+    return this.orientations[i].q;
   }
 
   /**
@@ -382,7 +384,7 @@ export class Orientation {
    * @returns {Orientation} The orientation instance.
    */
   set(quaternion) {
-    this.orientations = [quaternion];
+    this.orientations = [{ q: quaternion, t: this.time }];
     return this;
   }
 
@@ -391,14 +393,19 @@ export class Orientation {
    * @param {THREE.Quaternion} quaternion - The quaternion to push.
    */
   push(quaternion) {
-    this.orientations.push(quaternion);
+    this.orientations.push({ q: quaternion, t: this.time });
   }
 
   /**
-   * Removes all but the most recent orientation, collapsing the history.
+   * Increment time and remove orientations older than history units.
+   * @param {number} [history=1] - The duration of history to keep.
    */
   collapse(history = 1) {
-    while (this.orientations.length > history) { this.orientations.shift(); }
+    this.time += 1;
+    const threshold = this.time - history;
+    while (this.orientations.length > 0 && this.orientations[0].t < threshold) {
+      this.orientations.shift();
+    }
   }
 }
 
