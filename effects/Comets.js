@@ -15,7 +15,7 @@ import {
     Timeline, easeMid, Sprite, Motion, RandomWalk, PeriodicTimer, ColorWipe
 } from "../animation.js";
 import {
-    createRenderPipeline, FilterAntiAlias, FilterOrient
+    createRenderPipeline, FilterAntiAlias, FilterOrient, quinticKernel
 } from "../filters.js";
 import { randomBetween } from "../util.js";
 
@@ -133,6 +133,10 @@ export class Comets {
 
     drawFrame() {
         this.timeline.step();
-        this.trails.render(null, this.filters, (v, t) => this.palette.get(1 - t));
+        this.trails.render(null, this.filters, (v, t) => {
+            let color = this.palette.get(1 - t);
+            color.alpha *= quinticKernel(1 - t);
+            return color;
+        });
     }
 }

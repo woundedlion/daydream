@@ -122,7 +122,7 @@ export class CometsFieldSample {
                 v.applyQuaternion(this.orientation.get());
                 const color4 = this.palette.get(age);
                 let alpha = color4.alpha * this.alpha * quinticKernel(1 - age);
-                if (alpha > 0.01) {
+                if (alpha > 0.001) {
                     points.push({ pos: v, color: color4.color, alpha: alpha });
                 }
             }
