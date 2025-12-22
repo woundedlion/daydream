@@ -482,7 +482,7 @@ export class Motion extends Animation {
    * @param {Path} path - The path to follow.
    */
   static animate(orientation, path) {
-    let m = new Motion(orientation, path, 1, false);
+    let m = new Motion(orientation, path, 1, false, 1);
     m.step();
   }
 
@@ -491,11 +491,13 @@ export class Motion extends Animation {
    * @param {Path} path - The path to follow.
    * @param {number} duration - Duration of the motion.
    * @param {boolean} [repeat=false] - Whether to repeat.
+   * @param {number} [history=1] - History window size.
    */
-  constructor(orientation, path, duration, repeat = false) {
+  constructor(orientation, path, duration, repeat = false, history = 1) {
     super(duration, repeat);
     this.orientation = orientation;
     this.path = path;
+    this.history = history;
   }
 
   step() {
@@ -520,6 +522,8 @@ export class Motion extends Animation {
 
       currentV = nextV;
     }
+    let h = (this.history && typeof this.history.get === 'function') ? this.history.get() : this.history;
+    this.orientation.collapse(h);
   }
 }
 
@@ -539,7 +543,7 @@ export class Rotation extends Animation {
    * @param {Function} easingFn 
    */
   static animate(orientation, axis, angle, easingFn) {
-    let r = new Rotation(orientation, axis, angle, 1, easingFn, false);
+    let r = new Rotation(orientation, axis, angle, 1, easingFn, false, 1);
     r.step();
   }
 
@@ -550,14 +554,16 @@ export class Rotation extends Animation {
    * @param {number} duration - Duration.
    * @param {Function} easingFn - Easing function.
    * @param {boolean} [repeat=false] - Whether to repeat.
+   * @param {number} [history=1] - History window size.
    */
-  constructor(orientation, axis, angle, duration, easingFn, repeat = false) {
+  constructor(orientation, axis, angle, duration, easingFn, repeat = false, history = 1) {
     super(duration, repeat);
     this.orientation = orientation;
     this.axis = axis;
     this.totalAngle = angle;
     this.easingFn = easingFn;
     this.last_angle = 0.0;
+    this.history = history;
   }
 
   step() {
@@ -580,6 +586,8 @@ export class Rotation extends Animation {
       }
       this.last_angle = targetAngle;
     }
+    let h = (this.history && typeof this.history.get === 'function') ? this.history.get() : this.history;
+    this.orientation.collapse(h);
   }
 }
 
@@ -590,11 +598,13 @@ export class RandomWalk extends Animation {
   /**
    * @param {Orientation} orientation - The orientation to animate.
    * @param {THREE.Vector3} v_start - The starting vector.
+   * @param {number} [history=1] - History window size.
    */
-  constructor(orientation, v_start) {
+  constructor(orientation, v_start, history = 1) {
     super(-1, false);
     this.orientation = orientation;
     this.v = v_start.clone();
+    this.history = history;
 
     this.noise = new FastNoiseLite();
     this.noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
@@ -636,6 +646,9 @@ export class RandomWalk extends Animation {
       currentQ.premultiply(qStep).normalize();
       this.orientation.push(currentQ);
     }
+    let h = (this.history && typeof this.history.get === 'function') ? this.history.get() : this.history;
+    if (Math.random() < 0.001) console.log("RW h:", h);
+    this.orientation.collapse(h);
   }
 }
 

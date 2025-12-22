@@ -105,15 +105,11 @@ export class CometsFieldSample {
         let node = new CometsFieldSample.Node(path);
         this.nodes.push(node);
         this.timeline.add(i * this.spacing,
-            new Motion(node.orientation, node.path, this.cycleDuration, true)
+            new Motion(node.orientation, node.path, this.cycleDuration, true, this.trailLength)
         );
     }
 
     drawFrame() {
-        for (const node of this.nodes) {
-            node.orientation.collapse(this.trailLength);
-        }
-        this.orientation.collapse();
         this.timeline.step();
 
         const points = [];
