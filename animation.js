@@ -502,8 +502,6 @@ export class Motion extends Animation {
 
   step() {
     super.step();
-
-
     let currentV = this.path.getPoint((this.t - 1) / this.duration);
     const targetV = this.path.getPoint(this.t / this.duration);
     const totalAngle = angleBetween(currentV, targetV);

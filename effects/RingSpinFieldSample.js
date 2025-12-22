@@ -45,7 +45,7 @@ export class RingSpinFieldSample {
     setupGUI() {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01).name("Brightness");
-        this.gui.add(this, 'thickness').min(0.01).max(0.5).step(0.01).name("Thickness");
+        this.gui.add(this, 'thickness').min(0.01).max(0.5).step(0.01).name("Brush Size");
         this.gui.add(this, 'trailLength').min(1).max(200).step(1).name("Trail Length").onChange(v => this.trailLengthMutable.set(v));
         this.gui.add(this.sampler, 'debugBB').name('Show Bounding Boxes');
     }
@@ -67,7 +67,7 @@ export class RingSpinFieldSample {
                 const q = ring.orientation.get(i);
                 const n = ring.normal.clone().applyQuaternion(q);
                 const c = ring.palette.get(age);
-                const alpha = c.alpha * this.alpha * (1 - age);
+                const alpha = c.alpha * this.alpha;
                 if (alpha > 0.01) {
                     planes.push({ normal: n, color: c.color, alpha: alpha });
                 }
