@@ -18,6 +18,7 @@ import {
     createRenderPipeline, FilterAntiAlias, FilterOrient, quinticKernel
 } from "../filters.js";
 import { randomBetween, wrap } from "../util.js";
+import { FieldSampler } from "../FieldSampler.js";
 
 export class CometsFieldSample {
     static Node = class {
@@ -38,6 +39,7 @@ export class CometsFieldSample {
         this.thickness = 2.1 * 2 * Math.PI / Daydream.W;
         this.orientation = new Orientation();
         this.path = new Path(Daydream.Y_AXIS);
+        this.sampler = new FieldSampler();
         this.functions = [
             { m1: 1.06, m2: 1.06, a: 0, domain: 5.909 },
             { m1: 6.06, m2: 1, a: 0, domain: 2 * Math.PI },
@@ -55,12 +57,6 @@ export class CometsFieldSample {
         this.curFunction = 0;
         this.updatePath();
         this.palette = new GenerativePalette("straight", "triadic", "descending");
-
-        // We do not use DecayBuffer or standard Filters here because we are manually sampling
-        this.filters = createRenderPipeline(
-            new FilterOrient(this.orientation),
-            new FilterAntiAlias()
-        );
         this.nodes = [];
 
         for (let i = 0; i < this.numNodes; ++i) {
@@ -76,15 +72,15 @@ export class CometsFieldSample {
         );
         this.timeline.add(0, new RandomWalk(this.orientation, randomVector()));
 
+        this.setupGUI();
+
+    }
+
+    setupGUI() {
         this.gui = new gui.GUI({ autoPlace: false });
-        this.gui.add(this, 'resolution', 10, 200).step(1).onChange(() => {
-            this.updatePath();
-        });
         this.gui.add(this, 'alpha', 0, 1).step(0.01).name('Brightness');
         this.gui.add(this, 'thickness', 0.01, 0.5).step(0.01).name('Comet Size');
-
-        this.debugBB = false;
-        this.gui.add(this, 'debugBB').name('Show Bounding Boxes');
+        this.gui.add(this.sampler, 'debugBB').name('Show Bounding Boxes');
     }
 
     updatePath() {
@@ -120,121 +116,21 @@ export class CometsFieldSample {
         this.orientation.collapse();
         this.timeline.step();
 
-        // 1. Pre-calculate "Points" in space (Head + Trail)
         const points = [];
         for (const node of this.nodes) {
             const len = node.orientation.length();
             for (let i = 0; i < len; i++) {
-                // age: 0 (newest) -> 1 (oldest)
                 const age = len > 1 ? (len - 1 - i) / (len - 1) : 0;
-
-                // Get orientation from history
                 const q = node.orientation.get(i);
-
-                // Position of the comet point
-                // Note: The global this.orientation (RandomWalk) also affects the entire scene
-                // So we should apply node orientation AND global orientation?
-                // In Comets.js:
-                // node.orientation handles the path following.
-                // FilterOrient(this.orientation) handles the global wobble.
-                // Since FieldSample manually iterates pixels, we must apply FilterOrient logic manually
-                // OR we can bake it into the points.
-
-                // Let's resolve the point:
-                // Node local: Y_AXIS
-                // Node motion: apply(q)
-                // Global wobble: apply(this.orientation.get(0)) (using latest global orient)
-
                 const v = node.v.clone().applyQuaternion(q);
-
-                // Apply global orientation (current frame)
-                // Note: Comets.js draws trails via DecayBuffer, and DecayBuffer uses FilterOrient.
-                // FilterOrient tweens global orientation matching the age of the dot?
-                // Actually DecayBuffer assumes 'age' for filters is current frame time diff.
-                // (or implies the entire path wobbles together).
-                if (this.orientation.length() > 0) {
-                    v.applyQuaternion(this.orientation.get());
-                }
-
-                const c = this.palette.get(age);
-                const color = c.color || c;
-                let alpha = c.alpha * this.alpha * quinticKernel(1 - age);
-
+                v.applyQuaternion(this.orientation.get());
+                const color4 = this.palette.get(age);
+                let alpha = color4.alpha * this.alpha * quinticKernel(1 - age);
                 if (alpha > 0.01) {
-                    points.push({ pos: v, color: color, alpha: alpha });
+                    points.push({ pos: v, color: color4.color, alpha: alpha });
                 }
             }
         }
-
-        // 2. Field Splatting
-        // Optimization: Iterating over points instead of pixels
-        const cosThreshold = Math.cos(this.thickness);
-
-        // Pre-calculate constants for pixel mapping
-        // From geometry.js: y = (phi * (H - 1)) / PI
-        // So dy/dphi = (H-1)/PI. 
-        // rad_y = thickness * (H-1)/PI
-        const radY = this.thickness * (Daydream.H - 1) / Math.PI;
-
-        for (const pt of points) {
-            // Convert point to pixel coordinates (center of influence)
-            const center = vectorToPixel(pt.pos);
-            const cy = center.y;
-            const cx = center.x;
-
-            // Get phi from y (approximation is fine for bounds)
-            // y = phi * (H-1) / PI  -> phi = y * PI / (H-1)
-            const phi = cy * Math.PI / (Daydream.H - 1);
-
-            // Horizontal radius depends on latitude (phi)
-            const sinPhi = Math.sin(phi);
-            let radX;
-            // Handle poles: if too close to pole, check full width
-            if (Math.abs(sinPhi) < 0.05) {
-                radX = Daydream.W; // Full width
-            } else {
-                radX = (this.thickness * Daydream.W) / (2 * Math.PI * sinPhi);
-            }
-
-            const yMin = Math.max(0, Math.ceil(cy - radY));
-            const yMax = Math.min(Daydream.H - 1, Math.floor(cy + radY));
-
-            const xMin = Math.ceil(cx - radX);
-            const xMax = Math.floor(cx + radX);
-
-            for (let y = yMin; y <= yMax; y++) {
-                const rowOffset = Daydream.rowOffsets[y];
-                for (let x = xMin; x <= xMax; x++) {
-                    // Wrap x
-                    const wx = wrap(x, Daydream.W);
-                    const i = rowOffset + wx;
-
-                    // Debug Visualization
-                    if (this.debugBB) {
-                        const outColor = Daydream.pixels[i];
-                        outColor.r += 0.05;
-                        outColor.g += 0.05;
-                        outColor.b += 0.05;
-                    }
-
-                    const p = Daydream.pixelPositions[i];
-                    // Dot product check
-                    const dot = p.dot(pt.pos);
-
-                    if (dot > cosThreshold) {
-                        // Distance on sphere in radians
-                        const dist = Math.acos(Math.min(1, Math.max(-1, dot)));
-
-                        // Falloff
-                        const t = dist / this.thickness;
-                        const alpha = quinticKernel(1 - t) * pt.alpha;
-
-                        // Alpha Blending
-                        const outColor = Daydream.pixels[i];
-                        blendAlpha(outColor, pt.color, alpha, outColor);
-                    }
-                }
-            }
-        }
+        this.sampler.drawPoints(points, this.thickness);
     }
 }
