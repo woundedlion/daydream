@@ -491,17 +491,17 @@ export class Motion extends Animation {
    * @param {Path} path - The path to follow.
    * @param {number} duration - Duration of the motion.
    * @param {boolean} [repeat=false] - Whether to repeat.
-   * @param {number} [history=1] - History window size.
    */
-  constructor(orientation, path, duration, repeat = false, history = 1) {
+  constructor(orientation, path, duration, repeat = false) {
     super(duration, repeat);
     this.orientation = orientation;
     this.path = path;
-    this.history = history;
   }
 
   step() {
+    this.orientation.collapse();
     super.step();
+
     let currentV = this.path.getPoint((this.t - 1) / this.duration);
     const targetV = this.path.getPoint(this.t / this.duration);
     const totalAngle = angleBetween(currentV, targetV);
@@ -520,10 +520,9 @@ export class Motion extends Animation {
 
       currentV = nextV;
     }
-    let h = (this.history && typeof this.history.get === 'function') ? this.history.get() : this.history;
-    this.orientation.collapse(h);
   }
 }
+
 
 /**
  * Animates an orientation by rotating it around an axis.
@@ -541,7 +540,7 @@ export class Rotation extends Animation {
    * @param {Function} easingFn 
    */
   static animate(orientation, axis, angle, easingFn) {
-    let r = new Rotation(orientation, axis, angle, 1, easingFn, false, 1);
+    let r = new Rotation(orientation, axis, angle, 1, easingFn, false);
     r.step();
   }
 
@@ -552,16 +551,14 @@ export class Rotation extends Animation {
    * @param {number} duration - Duration.
    * @param {Function} easingFn - Easing function.
    * @param {boolean} [repeat=false] - Whether to repeat.
-   * @param {number} [history=1] - History window size.
    */
-  constructor(orientation, axis, angle, duration, easingFn, repeat = false, history = 1) {
+  constructor(orientation, axis, angle, duration, easingFn, repeat = false) {
     super(duration, repeat);
     this.orientation = orientation;
     this.axis = axis;
     this.totalAngle = angle;
     this.easingFn = easingFn;
     this.last_angle = 0.0;
-    this.history = history;
   }
 
   step() {
@@ -569,7 +566,7 @@ export class Rotation extends Animation {
       this.last_angle = 0;
     }
     super.step();
-
+    this.orientation.collapse();
 
     let targetAngle = this.easingFn(this.t / this.duration) * this.totalAngle;
     let delta = targetAngle - this.last_angle;
@@ -584,11 +581,8 @@ export class Rotation extends Animation {
       }
       this.last_angle = targetAngle;
     }
-    let h = (this.history && typeof this.history.get === 'function') ? this.history.get() : this.history;
-    this.orientation.collapse(h);
   }
 }
-
 /**
  * Randomly walks an orientation over the sphere surface.
  */
@@ -596,13 +590,11 @@ export class RandomWalk extends Animation {
   /**
    * @param {Orientation} orientation - The orientation to animate.
    * @param {THREE.Vector3} v_start - The starting vector.
-   * @param {number} [history=1] - History window size.
    */
-  constructor(orientation, v_start, history = 1) {
+  constructor(orientation, v_start) {
     super(-1, false);
     this.orientation = orientation;
     this.v = v_start.clone();
-    this.history = history;
 
     this.noise = new FastNoiseLite();
     this.noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
@@ -632,20 +624,7 @@ export class RandomWalk extends Animation {
     const walkAngle = this.WALK_SPEED;
     this.v.applyAxisAngle(walkAxis, walkAngle).normalize();
     this.direction.applyAxisAngle(walkAxis, walkAngle).normalize();
-
-    // Manually apply rotation with sub-stepping to ensure smoothness in High Res
-    // AND avoid Rotation.animate() which forces history collapse (preserving FieldSample)
-    const numSteps = Math.ceil(walkAngle / Rotation.MAX_ANGLE);
-    const stepAngle = walkAngle / numSteps;
-    const qStep = new THREE.Quaternion().setFromAxisAngle(walkAxis, stepAngle);
-
-    for (let i = 0; i < numSteps; i++) {
-      let currentQ = this.orientation.get().clone();
-      currentQ.premultiply(qStep).normalize();
-      this.orientation.push(currentQ);
-    }
-    let h = (this.history && typeof this.history.get === 'function') ? this.history.get() : this.history;
-    this.orientation.collapse(h);
+    Rotation.animate(this.orientation, walkAxis, walkAngle, easeMid);
   }
 }
 
