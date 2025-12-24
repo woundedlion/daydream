@@ -12,7 +12,7 @@ export class FieldSampler {
 
     /**
      * Draws a list of points (comets) onto the sphere using field sampling.
-     * @param {Array<{pos: THREE.Vector3, color: THREE.Color, alpha: number}>} points 
+     * @param {Array<{pos: THREE.Vector3, color: Color4}>} points 
      * @param {number} thickness - Angular thickness of the influence.
      */
     drawPoints(points, thickness) {
@@ -52,9 +52,9 @@ export class FieldSampler {
                     if (dot > cosThreshold) {
                         const dist = Math.acos(Math.min(1, Math.max(-1, dot)));
                         const t = dist / thickness;
-                        const alpha = quinticKernel(1 - t) * pt.alpha;
+                        const alpha = quinticKernel(1 - t) * pt.color.alpha;
                         const outColor = Daydream.pixels[i];
-                        blendAlpha(outColor, pt.color, alpha, outColor);
+                        blendAlpha(outColor, pt.color.color, alpha, outColor);
                     }
                 }
             }
@@ -63,7 +63,7 @@ export class FieldSampler {
 
     /**
      * Draws a list of planes (rings) onto the sphere using field sampling.
-     * @param {Array<{normal: THREE.Vector3, color: THREE.Color, alpha: number}>} planes 
+     * @param {Array<{normal: THREE.Vector3, color: Color4}>} planes 
      * @param {number} thickness - Angular thickness of the ring.
      */
     drawPlanes(planes, thickness) {
@@ -145,9 +145,9 @@ export class FieldSampler {
         const dist = Math.abs(p.dot(plane.normal));
         if (dist < thickness) {
             const t = dist / thickness;
-            const alpha = quinticKernel(1 - t) * plane.alpha;
+            const alpha = quinticKernel(1 - t) * plane.color.alpha;
             const outColor = Daydream.pixels[i];
-            blendAlpha(outColor, plane.color, alpha, outColor);
+            blendAlpha(outColor, plane.color.color, alpha, outColor);
         }
     }
 
