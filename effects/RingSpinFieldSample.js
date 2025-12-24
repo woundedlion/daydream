@@ -22,16 +22,17 @@ export class RingSpinFieldSample {
             this.normal = normal;
             this.palette = new TransparentVignette(palette);
             this.orientation = new Orientation();
+            this.history = [];
         }
     }
 
     constructor() {
         this.rings = [];
         this.alpha = 0.5;
-        this.trailLength = 60;
+        this.trailLength = 19;
         this.trailLengthMutable = new MutableNumber(this.trailLength);
         this.thickness = 2 * Math.PI / Daydream.W;
-        this.palettes = [iceMelt, underSea, mangoPeel, richSunset];
+        this.palettes = [iceMelt, underSea, mangoPeel, richSunset]
         this.numRings = 4;
         this.timeline = new Timeline();
         this.sampler = new FieldSampler();
@@ -53,7 +54,7 @@ export class RingSpinFieldSample {
 
     spawnRing(normal, palette) {
         let ring = new RingSpinFieldSample.Ring(normal, palette);
-        this.rings.unshift(ring);
+        this.rings.push(ring);
         this.timeline.add(0, new RandomWalk(ring.orientation, ring.normal));
     }
 
@@ -61,11 +62,26 @@ export class RingSpinFieldSample {
         this.timeline.step();
         const planes = [];
         for (const ring of this.rings) {
-            tween(ring.orientation, (q, t) => {
-                const n = ring.normal.clone().applyQuaternion(q);
-                const c = ring.palette.get(t / this.trailLength);
-                planes.push({ normal: n, color: c.color, alpha: c.alpha * this.alpha });
-            });
+            // Update history
+            const snapshot = new Orientation();
+            snapshot.orientations = ring.orientation.orientations.map(q => q.clone());
+            ring.history.unshift(snapshot);
+            if (ring.history.length > this.trailLength) {
+                ring.history.pop();
+            }
+
+            // Draw full history
+            for (let i = 0; i < ring.history.length; i++) {
+                tween(ring.history[i], (q, t) => {
+                    const globalT = (i + t) / this.trailLength;
+                    const c = ring.palette.get(globalT);
+                    planes.push({
+                        normal: ring.normal.clone().applyQuaternion(q),
+                        color: c.color,
+                        alpha: c.alpha * this.alpha * (1 - globalT)
+                    });
+                });
+            }
         }
         this.sampler.drawPlanes(planes, this.thickness);
     }
