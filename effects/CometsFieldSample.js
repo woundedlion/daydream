@@ -3,13 +3,13 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, lissajous, randomVector, vectorToPixel
+    Orientation, lissajous, randomVector, vectorToPixel, vectorPool
 } from "../geometry.js";
 import {
     Path, tween
 } from "../draw.js";
 import {
-    GenerativePalette, blendAlpha
+    GenerativePalette, blendAlpha, color4Pool
 } from "../color.js";
 import {
     Timeline, easeMid, Sprite, Motion, RandomWalk, PeriodicTimer, ColorWipe
@@ -60,6 +60,8 @@ export class CometsFieldSample {
         this.updatePath();
         this.palette = new GenerativePalette("straight", "triadic", "descending");
         this.nodes = [];
+        this.renderPoints = [];
+        this.framePoints = []; // Pre-allocated array for renderPoints reuse if needed, or just clear renderPoints
 
         for (let i = 0; i < this.numNodes; ++i) {
             this.spawnNode(this.path);
@@ -113,7 +115,8 @@ export class CometsFieldSample {
 
     drawFrame() {
         this.timeline.step();
-        const points = [];
+        this.renderPoints.length = 0;
+
         for (const node of this.nodes) {
             // Update history
             const snapshot = new Orientation();
@@ -127,15 +130,17 @@ export class CometsFieldSample {
             for (let i = 0; i < node.history.length; i++) {
                 tween(node.history[i], (q, t) => {
                     const tGlobal = (i + t) / this.trailLength;
-                    const color4 = this.palette.get(tGlobal)
-                    points.push({
-                        pos: this.orientation.orient(node.v.clone().applyQuaternion(q)),
-                        color: color4.color,
-                        alpha: color4.alpha * this.alpha * (1 - tGlobal)
+                    const color4 = this.palette.get(tGlobal);
+                    color4.alpha = color4.alpha * this.alpha * (1 - tGlobal);
+                    const v = vectorPool.acquire().copy(node.v).applyQuaternion(q);
+                    const orientedV = this.orientation.orient(v);
+                    this.renderPoints.push({
+                        pos: orientedV,
+                        color: color4
                     });
                 });
             }
         }
-        this.sampler.drawPoints(points, this.thickness);
+        this.sampler.drawPoints(this.renderPoints, this.thickness);
     }
 }

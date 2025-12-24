@@ -2,12 +2,12 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation
+    Orientation, vectorPool
 } from "../geometry.js";
 import { wrap } from "../util.js";
 import {
     VignettePalette, richSunset, mangoPeel, underSea, iceMelt,
-    TransparentVignette, blendAlpha
+    TransparentVignette, blendAlpha, color4Pool
 } from "../color.js";
 import {
     Timeline, Sprite, RandomWalk, MutableNumber
@@ -42,6 +42,7 @@ export class RingSpinFieldSample {
         }
 
         this.setupGUI();
+        this.renderPlanes = [];
     }
 
     setupGUI() {
@@ -60,7 +61,8 @@ export class RingSpinFieldSample {
 
     drawFrame() {
         this.timeline.step();
-        const planes = [];
+        this.renderPlanes.length = 0;
+
         for (const ring of this.rings) {
             // Update history
             const snapshot = new Orientation();
@@ -75,14 +77,15 @@ export class RingSpinFieldSample {
                 tween(ring.history[i], (q, t) => {
                     const globalT = (i + t) / this.trailLength;
                     const c = ring.palette.get(globalT);
-                    planes.push({
-                        normal: ring.normal.clone().applyQuaternion(q),
-                        color: c.color,
-                        alpha: c.alpha * this.alpha * (1 - globalT)
+                    c.alpha = c.alpha * this.alpha * (1 - globalT);
+
+                    this.renderPlanes.push({
+                        normal: vectorPool.acquire().copy(ring.normal).applyQuaternion(q),
+                        color: c
                     });
                 });
             }
         }
-        this.sampler.drawPlanes(planes, this.thickness);
+        this.sampler.drawPlanes(this.renderPlanes, this.thickness);
     }
 }
