@@ -394,12 +394,11 @@ export class Orientation {
   }
 
   /**
-   * Trims the history to a maximum size.
-   * @param {number} [history=1] - The maximum number of orientations to keep.
+   * Collapses the history to just the most recent orientation.
    */
-  collapse(history = 1) {
-    while (this.orientations.length > history) {
-      this.orientations.shift();
+  collapse() {
+    if (this.orientations.length > 0) {
+      this.orientations = [this.orientations[this.orientations.length - 1]];
     }
   }
 }

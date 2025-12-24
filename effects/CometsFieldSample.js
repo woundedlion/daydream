@@ -6,7 +6,7 @@ import {
     Orientation, lissajous, randomVector, vectorToPixel
 } from "../geometry.js";
 import {
-    Path
+    Path, tween
 } from "../draw.js";
 import {
     GenerativePalette, blendAlpha
@@ -28,6 +28,7 @@ export class CometsFieldSample {
             this.path = path;
         }
     }
+
     constructor() {
         this.timeline = new Timeline();
         this.numNodes = 1;
@@ -105,27 +106,22 @@ export class CometsFieldSample {
         let node = new CometsFieldSample.Node(path);
         this.nodes.push(node);
         this.timeline.add(i * this.spacing,
-            new Motion(node.orientation, node.path, this.cycleDuration, true, this.trailLength)
+            new Motion(node.orientation, node.path, this.cycleDuration, true)
         );
     }
 
     drawFrame() {
         this.timeline.step();
-
         const points = [];
         for (const node of this.nodes) {
-            const len = node.orientation.length();
-            for (let i = 0; i < len; i++) {
-                const age = len > 1 ? (len - 1 - i) / (len - 1) : 0;
-                const q = node.orientation.get(i);
-                const v = node.v.clone().applyQuaternion(q);
-                v.applyQuaternion(this.orientation.get());
-                const color4 = this.palette.get(age);
-                let alpha = color4.alpha * this.alpha * quinticKernel(1 - age);
-                if (alpha > 0.001) {
-                    points.push({ pos: v, color: color4.color, alpha: alpha });
-                }
-            }
+            tween(node.orientation, (q, t) => {
+                const color4 = this.palette.get(t / this.cycleDuration);
+                points.push({
+                    pos: node.v.clone().applyQuaternion(q),
+                    color: color4.color,
+                    alpha: color4.alpha * this.alpha
+                });
+            });
         }
         this.sampler.drawPoints(points, this.thickness);
     }

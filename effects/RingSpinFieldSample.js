@@ -14,6 +14,7 @@ import {
 } from "../animation.js";
 import { quinticKernel } from "../filters.js";
 import { FieldSampler } from "../FieldSampler.js";
+import { tween } from "../draw.js";
 
 export class RingSpinFieldSample {
     static Ring = class {
@@ -53,25 +54,18 @@ export class RingSpinFieldSample {
     spawnRing(normal, palette) {
         let ring = new RingSpinFieldSample.Ring(normal, palette);
         this.rings.unshift(ring);
-        this.timeline.add(0, new RandomWalk(ring.orientation, ring.normal, this.trailLengthMutable));
+        this.timeline.add(0, new RandomWalk(ring.orientation, ring.normal));
     }
 
     drawFrame() {
         this.timeline.step();
         const planes = [];
-        for (let r = this.rings.length - 1; r >= 0; r--) {
-            const ring = this.rings[r];
-            const len = ring.orientation.length();
-            for (let i = 0; i < len; i++) {
-                const age = len > 1 ? (len - 1 - i) / (len - 1) : 0;
-                const q = ring.orientation.get(i);
+        for (const ring of this.rings) {
+            tween(ring.orientation, (q, t) => {
                 const n = ring.normal.clone().applyQuaternion(q);
-                const c = ring.palette.get(age);
-                const alpha = c.alpha * this.alpha;
-                if (alpha > 0.01) {
-                    planes.push({ normal: n, color: c.color, alpha: alpha });
-                }
-            }
+                const c = ring.palette.get(t / this.trailLength);
+                planes.push({ normal: n, color: c.color, alpha: c.alpha * this.alpha });
+            });
         }
         this.sampler.drawPlanes(planes, this.thickness);
     }

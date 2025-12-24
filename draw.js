@@ -711,11 +711,12 @@ export function plotDots(pixels, filters, dots, age, alpha) {
 /**
  * Draws a motion trail by tweening between orientations in the queue.
  * @param {Orientation} orientation - The orientation object containing the motion history.
- * @param {Function} drawFn - Function to draw a segment (takes orientation quaternion and normalized age/opacity).
+ * @param {Function} drawFn - Function to draw a segment (takes orientation quaternion and normalized progress).
  */
 export const tween = (orientation, drawFn) => {
   let s = orientation.length();
-  for (let i = 0; i < s; ++i) {
+  let start = (s > 1) ? 1 : 0;
+  for (let i = start; i < s; ++i) {
     drawFn(orientation.get(i), (s - 1 - i) / s);
   }
 }
