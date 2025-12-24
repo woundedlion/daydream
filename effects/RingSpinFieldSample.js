@@ -77,8 +77,7 @@ export class RingSpinFieldSample {
                 tween(ring.history[i], (q, t) => {
                     const globalT = (i + t) / this.trailLength;
                     const c = ring.palette.get(globalT);
-                    c.alpha = c.alpha * this.alpha * (1 - globalT);
-
+                    c.alpha = c.alpha * this.alpha;
                     this.renderPlanes.push({
                         normal: vectorPool.acquire().copy(ring.normal).applyQuaternion(q),
                         color: c

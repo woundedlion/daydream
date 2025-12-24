@@ -131,7 +131,7 @@ export class CometsFieldSample {
                 tween(node.history[i], (q, t) => {
                     const tGlobal = (i + t) / this.trailLength;
                     const color4 = this.palette.get(tGlobal);
-                    color4.alpha = color4.alpha * this.alpha * (1 - tGlobal);
+                    color4.alpha = color4.alpha * this.alpha * quinticKernel(1 - tGlobal);
                     const v = vectorPool.acquire().copy(node.v).applyQuaternion(q);
                     const orientedV = this.orientation.orient(v);
                     this.renderPoints.push({
