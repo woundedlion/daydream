@@ -55,7 +55,7 @@ export class RingSpin {
 
     spawnRing(normal, palette) {
         let ring = new RingSpin.Ring(normal, palette, this.trailLength.get());
-        this.rings.unshift(ring);
+        this.rings.push(ring);
 
         this.timeline.add(0,
             new Sprite((opacity) => this.drawRing(opacity, ring),
