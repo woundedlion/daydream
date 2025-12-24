@@ -24,6 +24,7 @@ export class CometsFieldSample {
     static Node = class {
         constructor(path) {
             this.orientation = new Orientation();
+            this.history = [];
             this.v = Daydream.Y_AXIS.clone();
             this.path = path;
         }
@@ -114,14 +115,26 @@ export class CometsFieldSample {
         this.timeline.step();
         const points = [];
         for (const node of this.nodes) {
-            tween(node.orientation, (q, t) => {
-                const color4 = this.palette.get(t / this.cycleDuration);
-                points.push({
-                    pos: node.v.clone().applyQuaternion(q),
-                    color: color4.color,
-                    alpha: color4.alpha * this.alpha
+            // Update history
+            const snapshot = new Orientation();
+            snapshot.orientations = node.orientation.orientations.map(q => q.clone());
+            node.history.unshift(snapshot);
+            if (node.history.length > this.trailLength) {
+                node.history.pop();
+            }
+
+            // Draw full history
+            for (let i = 0; i < node.history.length; i++) {
+                tween(node.history[i], (q, t) => {
+                    const tGlobal = (i + t) / this.trailLength;
+                    const color4 = this.palette.get(tGlobal)
+                    points.push({
+                        pos: this.orientation.orient(node.v.clone().applyQuaternion(q)),
+                        color: color4.color,
+                        alpha: color4.alpha * this.alpha * (1 - tGlobal)
+                    });
                 });
-            });
+            }
         }
         this.sampler.drawPoints(points, this.thickness);
     }
