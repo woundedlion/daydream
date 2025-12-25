@@ -8,7 +8,6 @@ import { StaticPool } from "./StaticPool.js";
 
 /** @type {StaticPool} Global pool for temporary Vector3 objects. */
 export const vectorPool = new StaticPool(THREE.Vector3, 500000);
-
 /** @type {number} The golden ratio, (1 + sqrt(5)) / 2. */
 export const PHI = (1 + Math.sqrt(5)) / 2;
 /** @type {number} The inverse golden ratio, 1 / PHI. */
