@@ -12,9 +12,9 @@ import {
 import {
     Timeline, Sprite, RandomWalk, MutableNumber
 } from "../animation.js";
-import { quinticKernel } from "../filters.js";
 import { FieldSampler } from "../FieldSampler.js";
 import { tween } from "../draw.js";
+import { StaticCircularBuffer } from "../StaticCircularBuffer.js";
 
 export class RingSpinFieldSample {
     static Ring = class {
@@ -22,7 +22,7 @@ export class RingSpinFieldSample {
             this.normal = normal;
             this.palette = new TransparentVignette(palette);
             this.orientation = new Orientation();
-            this.history = [];
+            this.history = new StaticCircularBuffer(19); // max trail length
         }
     }
 
@@ -30,7 +30,6 @@ export class RingSpinFieldSample {
         this.rings = [];
         this.alpha = 0.5;
         this.trailLength = 19;
-        this.trailLengthMutable = new MutableNumber(this.trailLength);
         this.thickness = 2 * Math.PI / Daydream.W;
         this.palettes = [iceMelt, underSea, mangoPeel, richSunset]
         this.numRings = 4;
@@ -49,7 +48,6 @@ export class RingSpinFieldSample {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01).name("Brightness");
         this.gui.add(this, 'thickness').min(0.01).max(0.5).step(0.01).name("Brush Size");
-        this.gui.add(this, 'trailLength').min(1).max(200).step(1).name("Trail Length").onChange(v => this.trailLengthMutable.set(v));
         this.gui.add(this.sampler, 'debugBB').name('Show Bounding Boxes');
     }
 
@@ -65,19 +63,31 @@ export class RingSpinFieldSample {
 
         for (const ring of this.rings) {
             // Update history
-            const snapshot = new Orientation();
+            let snapshot;
+            if (ring.history.length >= this.trailLength || ring.history.length >= ring.history.capacity) {
+                snapshot = ring.history.pop_front();
+            } else {
+                snapshot = new Orientation();
+            }
+
+            // Re-initialize snapshot if it was popped
             snapshot.orientations = ring.orientation.orientations.map(q => q.clone());
-            ring.history.unshift(snapshot);
-            if (ring.history.length > this.trailLength) {
-                ring.history.pop();
+
+            ring.history.push(snapshot);
+
+            // Trim if dynamic length shrank
+            while (ring.history.length > this.trailLength) {
+                ring.history.pop_front();
             }
 
             // Draw full history
             for (let i = 0; i < ring.history.length; i++) {
-                tween(ring.history[i], (q, t) => {
-                    const globalT = (i + t) / this.trailLength;
+                const orientationSnapshot = ring.history.get(i);
+                tween(orientationSnapshot, (q, t) => {
+                    const globalT = (ring.history.length - i + t) / this.trailLength;
                     const c = ring.palette.get(globalT);
                     c.alpha = c.alpha * this.alpha;
+
                     this.renderPlanes.push({
                         normal: vectorPool.acquire().copy(ring.normal).applyQuaternion(q),
                         color: c

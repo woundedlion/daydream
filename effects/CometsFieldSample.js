@@ -19,12 +19,13 @@ import {
 } from "../filters.js";
 import { randomBetween, wrap } from "../util.js";
 import { FieldSampler } from "../FieldSampler.js";
+import { StaticCircularBuffer } from "../StaticCircularBuffer.js";
 
 export class CometsFieldSample {
     static Node = class {
         constructor(path) {
             this.orientation = new Orientation();
-            this.history = [];
+            this.history = new StaticCircularBuffer(80); // cycleDuration is 80
             this.v = Daydream.Y_AXIS.clone();
             this.path = path;
         }
@@ -119,17 +120,20 @@ export class CometsFieldSample {
 
         for (const node of this.nodes) {
             // Update history
-            const snapshot = new Orientation();
-            snapshot.orientations = node.orientation.orientations.map(q => q.clone());
-            node.history.unshift(snapshot);
-            if (node.history.length > this.trailLength) {
-                node.history.pop();
+            let snapshot;
+            if (node.history.length >= this.trailLength || node.history.length >= node.history.capacity) {
+                snapshot = node.history.pop_front();
+            } else {
+                snapshot = new Orientation();
             }
+            snapshot.orientations = node.orientation.orientations.map(q => q.clone());
+            node.history.push(snapshot);
 
-            // Draw full history
+            // Draw history
             for (let i = 0; i < node.history.length; i++) {
-                tween(node.history[i], (q, t) => {
-                    const tGlobal = (i + t) / this.trailLength;
+                const orientationSnapshot = node.history.get(i);
+                tween(orientationSnapshot, (q, t) => {
+                    const tGlobal = (node.history.length - i + t) / this.trailLength;
                     const color4 = this.palette.get(tGlobal);
                     color4.alpha = color4.alpha * this.alpha * quinticKernel(1 - tGlobal);
                     const v = vectorPool.acquire().copy(node.v).applyQuaternion(q);
