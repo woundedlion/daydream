@@ -30,7 +30,7 @@ export class TestFSRing {
     constructor() {
         this.rings = [];
         this.alpha = 0.5;
-        this.thickness = 2 * Math.PI / Daydream.W;
+        this.thickness = 2 * 2 * Math.PI / Daydream.W;
         this.palettes = [iceMelt, underSea, mangoPeel, richSunset]
         this.numRings = 1;
         this.timeline = new Timeline();
@@ -60,8 +60,8 @@ export class TestFSRing {
     drawFrame() {
         this.timeline.step();
         for (const ring of this.rings) {
-            let color = ring.palette.get(0);
-            this.sampler.drawRing(ring.normal, 1, color, ring.thickness);
+            let color = ring.palette.get(0.5);
+            this.sampler.drawRing(ring.orientation.orient(ring.normal), 1, color, this.thickness);
         }
     }
 }
