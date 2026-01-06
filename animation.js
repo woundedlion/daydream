@@ -1,6 +1,10 @@
+/*
+ * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ * Licensed under the Polyform Noncommercial License 1.0.0
+ */
+
 // TODO: Split Transition into ContinuousTransition and DiscreteTransition
 
-// animation.js
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
 import { angleBetween } from "./geometry.js";

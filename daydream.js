@@ -1,4 +1,8 @@
-// daydream.js - HMR Touch
+/*
+ * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ * Licensed under the Polyform Noncommercial License 1.0.0
+ */
+
 
 import { Daydream } from "./driver.js";
 import { GUI } from "gui"; // Fixed import
@@ -19,7 +23,8 @@ import {
   PetalFlow,
   LSystem,
   RingSpinFieldSample,
-  CometsFieldSample
+  CometsFieldSample,
+  TestFSRing
 } from "./effects/index.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
@@ -44,6 +49,7 @@ const effects = {
   BZReactionDiffusion,
   PetalFlow,
   LSystem,
+  TestFSRing,
 };
 
 const urlParams = new URLSearchParams(window.location.search);
@@ -71,7 +77,7 @@ const controls = {
       const newUrl = new URL(window.location);
       newUrl.searchParams.set('effect', this.effectName);
       newUrl.searchParams.set('resolution', this.resolution);
-      window.history.pushState({}, '', newUrl);
+      window.history.replaceState({}, '', newUrl);
 
       daydream.updateResolution(p.h, p.w, p.size);
       // Restart effect to use new resolution
@@ -101,7 +107,7 @@ const controls = {
     // Update URL
     const newUrl = new URL(window.location);
     newUrl.searchParams.set('effect', this.effectName);
-    window.history.pushState({}, '', newUrl);
+    window.history.replaceState({}, '', newUrl);
 
     activeEffect = new EffectClass();
 
