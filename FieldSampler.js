@@ -72,6 +72,7 @@ export class FieldSampler {
         const ny = normal.y;
         const nz = normal.z;
         const lineRadius = thickness / 2;
+        const plane = { normal: normal, color: color4 };
 
         // Calculate latitude bounds
         const h = Math.sqrt(1 - ny * ny);
@@ -99,7 +100,7 @@ export class FieldSampler {
             // or if we are at the poles (rXZ is small), the analytical solution is unstable.
             // In these cases, the ring covers nearly the entire row, so we fallback 
             // to scanning the whole row (0 to W).
-            if (R < 0.01 || rXZ < 0.01) {
+            if (R < 0.01) {
                 for (let x = 0; x < Daydream.W; x++) {
                     const i = XY(x, y);
                     this.processPlanePixel(i, plane, thickness);
@@ -108,75 +109,47 @@ export class FieldSampler {
                 continue;
             }
 
-            // 3. HORIZONTAL OPTIMIZATION (Finding the Intersection)
-            // We solve the plane equation Ax + By + Cz = 0 for the angle theta (Longitude).
-            // This tells us exactly where the ring crosses this specific row of pixels.
-            // val = cos(gamma), where gamma is the angle relative to the plane's orientation.
-            const val = (-ny * y3d) / (R * rXZ);
+            // 3. HORIZONTAL OPTIMIZATION (Exact Arc Calculation)
+            // We solve for the range of theta where: |cos(theta - alpha) - C| < K
+            const C = (-ny * y3d) / (R * rXZ);
+            const K = (thickness * 1.1) / (R * rXZ);
 
-            // We widen the search window based on thickness.
-            // dVal approximates how much 'val' changes given the brush thickness.
-            const dVal = (thickness * 1.5) / (R * rXZ);
+            // Determine valid cosine range clamped to [-1, 1]
+            const minCos = Math.max(-1, C - K);
+            const maxCos = Math.min(1, C + K);
 
-            // 4. "NEAR MISS" CHECK
-            // If |val| > 1, the plane doesn't intersect this latitude (math error).
-            // However, due to thickness, pixels might still be close enough.
-            // If it's too far away (> 0.9 or > 1.0 boundary), we might need to scan everything 
-            // or nothing. The code cautiously scans the whole row to avoid artifacts 
-            // at the "tips" of the ring where it turns around.
-            if (Math.abs(val) > 0.9 || (Math.abs(val) + dVal >= 1.0)) {
-                for (let x = 0; x < Daydream.W; x++) {
-                    const i = XY(x, y);
-                    this.processPlanePixel(i, plane, thickness);
-                    if (this.debugBB) this.debugPixel(i);
-                }
-                continue;
-            }
+            // If interval is empty (e.g. ring is too far away), skip
+            if (minCos > maxCos) continue;
 
-            // 5. WINDOW CALCULATION
-            // sinGamma helps determine the steepness of the intersection.
-            const sinGamma = Math.sqrt(1 - val * val);
-
-            // If the intersection is very shallow (glancing blow), the "valid" region
-            // is very wide, so we skip optimization and scan the whole row.
-            if (sinGamma < 0.1) {
-                for (let x = 0; x < Daydream.W; x++) {
-                    const i = XY(x, y);
-                    this.processPlanePixel(i, plane, thickness);
-                    if (this.debugBB) this.debugPixel(i);
-                }
-                continue;
-            }
-
-            // 6. CALCULATE SCAN WINDOWS
-            // The ring intersects the row at two points (front and back).
-            // alpha: The rotational phase of the plane normal.
-            // delta: The angular offset from 'alpha' to the intersection points.
-            const thetaWidth = dVal / sinGamma; // Width of the window to scan
-            const delta = Math.acos(val);
+            // Calculate angular extents relative to alpha
+            // acos decreases from 0 to PI as input goes from 1 to -1
+            const angleMin = Math.acos(maxCos);
+            const angleMax = Math.acos(minCos);
             const alpha = Math.atan2(nx, nz);
 
-            // The two center points of intersection
-            const thetas = [alpha - delta, alpha + delta];
+            // Define scan windows
+            const windows = [];
+            if (angleMin <= 0.0001) {
+                // Merged at the front (near alpha) because band covers the peak
+                windows.push([alpha - angleMax, alpha + angleMax]);
+            } else if (angleMax >= Math.PI - 0.0001) {
+                // Merged at the back (opposite to alpha)
+                windows.push([alpha + angleMin, alpha + 2 * Math.PI - angleMin]);
+            } else {
+                // Two separate windows on either side of alpha
+                windows.push([alpha - angleMax, alpha - angleMin]);
+                windows.push([alpha + angleMin, alpha + angleMax]);
+            }
 
-            // Scan only the pixels within the calculated windows around the intersections
-            for (const thetaCenter of thetas) {
-                const t1 = thetaCenter - thetaWidth;
-                const t2 = thetaCenter + thetaWidth;
-
-                // Convert angles to pixel X coordinates
+            // Scan pixels within windows
+            for (const [t1, t2] of windows) {
                 const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
                 const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
 
                 for (let x = x1; x <= x2; x++) {
-                    // Handle wrapping (e.g., if window crosses the seam of the texture)
                     const wx = wrap(x, Daydream.W);
-                    const i = rowOffset + wx;
-
-                    // Finally, perform the exact distance check and draw
+                    const i = XY(wx, y);
                     this.processPlanePixel(i, plane, thickness);
-
-                    // Visualize the optimized bounding box if debugging is on
                     if (this.debugBB) this.debugPixel(i);
                 }
             }
@@ -207,7 +180,7 @@ export class FieldSampler {
                 const nz = plane.normal.z;
                 const R = Math.sqrt(nx * nx + nz * nz);
 
-                if (R < 0.01 || rXZ < 0.01) {
+                if (R < 0.01) {
                     for (let x = 0; x < Daydream.W; x++) {
                         const i = XY(x, y);
                         this.processPlanePixel(i, plane, thickness);
@@ -216,36 +189,40 @@ export class FieldSampler {
                     continue;
                 }
 
-                const val = (-ny * y3d) / (R * rXZ);
-                const dVal = (thickness * 1.5) / (R * rXZ);
+                // 3. HORIZONTAL OPTIMIZATION (Exact Arc Calculation)
+                // We solve for the range of theta where: |cos(theta - alpha) - C| < K
+                const C = (-ny * y3d) / (R * rXZ);
+                const K = (thickness * 1.1) / (R * rXZ);
 
-                if (Math.abs(val) > 0.9 || (Math.abs(val) + dVal >= 1.0)) {
-                    for (let x = 0; x < Daydream.W; x++) {
-                        const i = XY(x, y);
-                        this.processPlanePixel(i, plane, thickness);
-                        if (this.debugBB) this.debugPixel(i);
-                    }
-                    continue;
-                }
+                // Determine valid cosine range clamped to [-1, 1]
+                const minCos = Math.max(-1, C - K);
+                const maxCos = Math.min(1, C + K);
 
-                const sinGamma = Math.sqrt(1 - val * val);
-                if (sinGamma < 0.1) {
-                    for (let x = 0; x < Daydream.W; x++) {
-                        const i = XY(x, y);
-                        this.processPlanePixel(i, plane, thickness);
-                        if (this.debugBB) this.debugPixel(i);
-                    }
-                    continue;
-                }
+                // If interval is empty (e.g. ring is too far away), skip
+                if (minCos > maxCos) continue;
 
-                const thetaWidth = dVal / sinGamma;
-                const delta = Math.acos(val);
+                // Calculate angular extents relative to alpha
+                // acos decreases from 0 to PI as input goes from 1 to -1
+                const angleMin = Math.acos(maxCos);
+                const angleMax = Math.acos(minCos);
                 const alpha = Math.atan2(nx, nz);
-                const thetas = [alpha - delta, alpha + delta];
 
-                for (const thetaCenter of thetas) {
-                    const t1 = thetaCenter - thetaWidth;
-                    const t2 = thetaCenter + thetaWidth;
+                // Define scan windows
+                const windows = [];
+                if (angleMin <= 0.0001) {
+                    // Merged at the front (near alpha) because band covers the peak
+                    windows.push([alpha - angleMax, alpha + angleMax]);
+                } else if (angleMax >= Math.PI - 0.0001) {
+                    // Merged at the back (opposite to alpha)
+                    windows.push([alpha + angleMin, alpha + 2 * Math.PI - angleMin]);
+                } else {
+                    // Two separate windows on either side of alpha
+                    windows.push([alpha - angleMax, alpha - angleMin]);
+                    windows.push([alpha + angleMin, alpha + angleMax]);
+                }
+
+                // Scan pixels within windows
+                for (const [t1, t2] of windows) {
                     const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
                     const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
 
