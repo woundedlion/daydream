@@ -14,7 +14,7 @@ export class PetalFlow {
         this.alpha = 0.2;
         this.spacing = new MutableNumber(0.3);
         this.twistFactor = new MutableNumber(2.15);
-        this.speed = 15.0;
+        this.speed = 8.0;
 
         this.palette = new ProceduralPalette(
             [0.029, 0.029, 0.029],
