@@ -46,6 +46,24 @@ export class Dot {
 }
 
 /**
+ * Converts a pixel y-coordinate to a spherical phi angle.
+ * @param {number} y - The pixel y-coordinate [0, Daydream.H - 1].
+ * @returns {number} The spherical phi angle in radians.
+ */
+export const yToPhi = (y) => {
+  return (y * Math.PI) / (Daydream.H - 1);
+}
+
+/**
+ * Converts a spherical phi angle to a pixel y-coordinate.
+ * @param {number} phi - The spherical phi angle in radians.
+ * @returns {number} The pixel y-coordinate [0, Daydream.H - 1].
+ */
+export const phiToY = (phi) => {
+  return (phi * (Daydream.H - 1)) / Math.PI;
+}
+
+/**
  * Converts spherical coordinates on a unit sphere to 2D pixel coordinates.
  * @param {THREE.Spherical} s - The spherical coordinates (radius assumed to be 1).
  * @returns {{x: number, y: number}} The pixel coordinates (x is wrapped).
@@ -53,7 +71,7 @@ export class Dot {
 export const sphericalToPixel = (s) => {
   return {
     x: wrap((s.theta * Daydream.W) / (2 * Math.PI), Daydream.W),
-    y: (s.phi * (Daydream.H - 1)) / Math.PI,
+    y: phiToY(s.phi),
   };
 };
 
@@ -64,13 +82,9 @@ export const sphericalToPixel = (s) => {
  * @returns {THREE.Spherical} The spherical coordinates (radius is 1).
  */
 export const pixelToSpherical = (x, y) => {
-  // Can't pool Spherical easily as it's not a class we commonly pass around, 
-  // but this function creates a NEW Spherical. 
-  // The caller usually uses it immediately. 
-  // Let's leave Spherical as is for now, focus on Vector3.
   return new THREE.Spherical(
     1,
-    (y * Math.PI) / (Daydream.H - 1),
+    yToPhi(y),
     (x * 2 * Math.PI) / Daydream.W
   );
 };
