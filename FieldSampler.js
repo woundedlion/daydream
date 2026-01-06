@@ -163,77 +163,7 @@ export class FieldSampler {
      */
     drawPlanes(planes, thickness) {
         for (const plane of planes) {
-            const h = Math.sqrt(1 - plane.normal.y * plane.normal.y);
-            const phiMin = Math.acos(Math.min(1, h)) - thickness;
-            const phiMax = Math.acos(Math.max(-1, -h)) + thickness;
-
-            const yMin = Math.max(0, Math.floor((phiMin * (Daydream.H - 1)) / Math.PI));
-            const yMax = Math.min(Daydream.H - 1, Math.ceil((phiMax * (Daydream.H - 1)) / Math.PI));
-
-            for (let y = yMin; y <= yMax; y++) {
-                const phi = (y * Math.PI) / (Daydream.H - 1);
-                const y3d = Math.cos(phi);
-                const rXZ = Math.sin(phi);
-
-                const nx = plane.normal.x;
-                const ny = plane.normal.y;
-                const nz = plane.normal.z;
-                const R = Math.sqrt(nx * nx + nz * nz);
-
-                if (R < 0.01) {
-                    for (let x = 0; x < Daydream.W; x++) {
-                        const i = XY(x, y);
-                        this.processPlanePixel(i, plane, thickness);
-                        if (this.debugBB) this.debugPixel(i);
-                    }
-                    continue;
-                }
-
-                // 3. HORIZONTAL OPTIMIZATION (Exact Arc Calculation)
-                // We solve for the range of theta where: |cos(theta - alpha) - C| < K
-                const C = (-ny * y3d) / (R * rXZ);
-                const K = (thickness * 1.1) / (R * rXZ);
-
-                // Determine valid cosine range clamped to [-1, 1]
-                const minCos = Math.max(-1, C - K);
-                const maxCos = Math.min(1, C + K);
-
-                // If interval is empty (e.g. ring is too far away), skip
-                if (minCos > maxCos) continue;
-
-                // Calculate angular extents relative to alpha
-                // acos decreases from 0 to PI as input goes from 1 to -1
-                const angleMin = Math.acos(maxCos);
-                const angleMax = Math.acos(minCos);
-                const alpha = Math.atan2(nx, nz);
-
-                // Define scan windows
-                const windows = [];
-                if (angleMin <= 0.0001) {
-                    // Merged at the front (near alpha) because band covers the peak
-                    windows.push([alpha - angleMax, alpha + angleMax]);
-                } else if (angleMax >= Math.PI - 0.0001) {
-                    // Merged at the back (opposite to alpha)
-                    windows.push([alpha + angleMin, alpha + 2 * Math.PI - angleMin]);
-                } else {
-                    // Two separate windows on either side of alpha
-                    windows.push([alpha - angleMax, alpha - angleMin]);
-                    windows.push([alpha + angleMin, alpha + angleMax]);
-                }
-
-                // Scan pixels within windows
-                for (const [t1, t2] of windows) {
-                    const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
-                    const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
-
-                    for (let x = x1; x <= x2; x++) {
-                        const wx = wrap(x, Daydream.W);
-                        const i = XY(wx, y);
-                        this.processPlanePixel(i, plane, thickness);
-                        if (this.debugBB) this.debugPixel(i);
-                    }
-                }
-            }
+            this.drawRing(plane.normal, 1.0, plane.color, thickness);
         }
     }
 
