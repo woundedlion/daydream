@@ -1,6 +1,6 @@
 // filters.js
 import * as THREE from "three";
-import { Daydream } from "./driver.js";
+import { Daydream, XY } from "./driver.js";
 import { wrap } from "./util.js"
 import { blendAlpha } from "./color.js";
 import { vectorToPixel, angleBetween } from "./geometry.js";
@@ -25,7 +25,7 @@ export function createRenderPipeline(...filters) {
   let head = (pixels, x, y, colorInput, age, alpha) => {
     let xi = ((x + 0.5) | 0) % Daydream.W;
     let yi = Math.max(0, Math.min(Daydream.H - 1, (y + 0.5) | 0));
-    let index = Daydream.rowOffsets[yi] + xi;
+    let index = XY(xi, yi);
     const color = colorInput.isColor ? colorInput : (colorInput.color || colorInput);
     const alphaMod = (colorInput.alpha !== undefined ? colorInput.alpha : 1.0);
     blendAlpha(Daydream.pixels[index], color, alpha * alphaMod, Daydream.pixels[index]);

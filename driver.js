@@ -14,6 +14,7 @@ export var labels = [];
 
 export const pixelKey = (x, y) => `${x},${y}`;
 export const keyPixel = (k) => k.split(',');
+export const XY = (x, y) => x + y * Daydream.W;
 
 export class Daydream {
   static SCENE_ANTIALIAS = true;
@@ -332,10 +333,6 @@ export class Daydream {
 
   precomputeMatrices() {
     Daydream.pixelPositions = new Array(Daydream.W * Daydream.H);
-    Daydream.rowOffsets = new Array(Daydream.H);
-    for (let y = 0; y < Daydream.H; y++) {
-      Daydream.rowOffsets[y] = y * Daydream.W;
-    }
 
     this.pixelMatrices = new Array(Daydream.W * Daydream.H);
     const vector = new THREE.Vector3();
