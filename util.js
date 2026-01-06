@@ -1,4 +1,8 @@
-// util.js
+/*
+ * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ * Licensed under the Polyform Noncommercial License 1.0.0
+ */
+
 /**
  * Recursively generates all unique pairwise permutations from a list.
  * @param {Array<any>} list - The input array.

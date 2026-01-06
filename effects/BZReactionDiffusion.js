@@ -1,9 +1,13 @@
+/*
+ * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ * Licensed under the Polyform Noncommercial License 1.0.0
+ */
 
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation
+    Orientation, vectorPool
 } from "../geometry.js";
 import {
     Timeline, easeInOutSin, Rotation, PeriodicTimer, Sprite, easeMid
@@ -20,6 +24,12 @@ export class BZReaction extends GSReaction {
 
         // 3rd Chemical Species
         this.C = new Float32Array(this.N).fill(0.0);
+        this.C = new Float32Array(this.N).fill(0.0);
+
+        // Sorting Buffers
+        this.zValues = new Float32Array(this.N);
+        this.drawIndices = new Int32Array(this.N);
+
         this.nextC = new Float32Array(this.N);
 
         // Params for Cyclic Competition
@@ -112,25 +122,49 @@ export class BZReaction extends GSReaction {
         }
 
         // 2. Draw
-        let color = new THREE.Color();
-        let hsl = { h: 0, s: 0, l: 0 };
+        // 2. Draw
+        // Pre-calculate Depth and filter active nodes
+        let count = 0;
+        const q = this.rd.orientation.get();
 
         for (let i = 0; i < this.N; i++) {
             let a = this.A[i];
             let b = this.B[i];
             let c = this.C[i];
-            let sum = a + b + c;
-            if (sum > 0.01) {
-                // Alpha Blending (Layered: A first, then B, then C)
-                color.setRGB(0, 0, 0);
-                color.lerp(ca, a);
-                color.lerp(cb, b);
-                color.lerp(cc, c);
-                hsl = color.getHSL(hsl);
-                color.setHSL(hsl.h, 1.0, hsl.l);
+            let sum = a + b + c; // Or any threshold logic
 
-                this.rd.filters.plot(null, this.rd.nodes[i], color, 0, currentAlpha * this.rd.alpha);
+            if (sum > 0.05) {
+                // Approximate view Z
+                const v = vectorPool.acquire().copy(this.rd.nodes[i]).applyQuaternion(q);
+                this.zValues[i] = v.z;
+                this.drawIndices[count++] = i;
             }
+        }
+
+        // Sort Indices by Z (Ascending: Far to Near)
+        const zRef = this.zValues;
+        const indices = this.drawIndices.subarray(0, count);
+        indices.sort((a, b) => zRef[a] - zRef[b]);
+
+        let color = new THREE.Color();
+        let hsl = { h: 0, s: 0, l: 0 };
+
+        for (let k = 0; k < count; k++) {
+            const i = indices[k];
+            let a = this.A[i];
+            let b = this.B[i];
+            let c = this.C[i];
+
+            // Re-calc sum/color
+            // Alpha Blending (Layered: A first, then B, then C)
+            color.setRGB(0, 0, 0);
+            color.lerp(ca, a);
+            color.lerp(cb, b);
+            color.lerp(cc, c);
+            hsl = color.getHSL(hsl);
+            color.setHSL(hsl.h, 1.0, hsl.l);
+
+            this.rd.filters.plot(null, this.rd.nodes[i], color, 0, currentAlpha * this.rd.alpha);
         }
     }
 }
@@ -196,7 +230,9 @@ export class BZReactionDiffusion {
     // Graph Build Logic (Duplicated from GSReactionDiffusion)
     buildGraph() {
         // Fibonacci Sphere (Uniform Isotropy)
-        this.N = Daydream.W * Daydream.H;
+        // Fibonacci Sphere (Uniform Isotropy)
+        // Double density for gaps coverage
+        this.N = Daydream.W * Daydream.H * 2;
 
         this.nodes = [];
         this.neighbors = [];

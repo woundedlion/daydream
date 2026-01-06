@@ -1,9 +1,13 @@
+/*
+ * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ * Licensed under the Polyform Noncommercial License 1.0.0
+ */
 
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation
+    Orientation, vectorPool
 } from "../geometry.js";
 import {
     Timeline, easeInOutSin, Rotation, PeriodicTimer, Sprite, easeMid
@@ -21,6 +25,10 @@ export class GSReaction extends Sprite {
 
         this.rd = rd;
         this.N = rd.N;
+
+        // Buffers for Sorting
+        this.zValues = new Float32Array(this.N);
+        this.drawIndices = new Int32Array(this.N);
 
         // RD State
         this.A = new Float32Array(this.N).fill(1.0);
@@ -59,13 +67,44 @@ export class GSReaction extends Sprite {
         }
 
         // 2. Draw
+        // Pre-calculate Depth and filter active nodes
+        let count = 0;
+        const q = this.rd.orientation.get();
+
         for (let i = 0; i < this.N; i++) {
-            let b = this.B[i];
-            if (b > 0.1) {
-                let t = Math.max(0, Math.min(1, (b - 0.15) * 4.0));
-                let c = this.palette.get(t);
-                this.rd.filters.plot(null, this.rd.nodes[i], c.color, 0, currentAlpha * this.rd.alpha * c.alpha);
+            if (this.B[i] > 0.05) { // Lower threshold slightly for smoother fade
+                // Calculate View Space Z
+                // We only need Z, so we can inline dot product: v' = v.applyQuaternion(q)
+                // z' = v.x * q.... applyQuaternion is heavy.
+                // Use vectorPool for simplicity and correctness first.
+                const v = vectorPool.acquire().copy(this.rd.nodes[i]).applyQuaternion(q);
+                this.zValues[i] = v.z;
+                this.drawIndices[count++] = i;
             }
+        }
+
+        // Sort Indices by Z (Ascending: Far to Near) -> Standard Painter's
+        // Camera is at +Z. Far is -Z. Near is +Z.
+        // We want to draw Far first. So Lowest Z first. Ascending.
+        const zRef = this.zValues;
+        const indices = this.drawIndices.subarray(0, count);
+        indices.sort((a, b) => zRef[a] - zRef[b]);
+
+        for (let k = 0; k < count; k++) {
+            const i = indices[k];
+            let b = this.B[i];
+
+            // Re-check threshold inside render logic if needed, but we filtered.
+            // Just apply mapping.
+            let t = Math.max(0, Math.min(1, (b - 0.15) * 4.0));
+            // Ensure min opacity for soft edges
+            if (t <= 0) t = 0.01;
+
+            let c = this.palette.get(t);
+            // Alpha scaling
+            let alpha = currentAlpha * this.rd.alpha * c.alpha;
+
+            this.rd.filters.plot(null, this.rd.nodes[i], c.color, 0, alpha);
         }
     }
 
@@ -169,7 +208,7 @@ export class GSReactionDiffusion {
     // Graph Build Logic
     buildGraph() {
         // Fibonacci Sphere (Uniform Isotropy)
-        this.N = Daydream.W * Daydream.H;
+        this.N = Daydream.W * Daydream.H * 2;
 
         this.nodes = [];
         this.neighbors = [];
@@ -256,123 +295,4 @@ export class GSReactionDiffusion {
     }
 }
 
-export class BZReaction extends GSReaction {
-    constructor(rd, duration = 192, fadeOut = 32) {
-        super(rd, duration, fadeOut);
 
-        // 3rd Chemical Species
-        this.C = new Float32Array(this.N).fill(0.0);
-        this.nextC = new Float32Array(this.N);
-
-        // Params for Cyclic Competition
-        // A eats B, B eats C, C eats A
-        this.alpha = 1.2; // Predation rate
-        this.beta = 0.1;  // Decay rate
-        this.D = 0.08;    // Diffusion
-
-        this.seed();
-
-        this.palette = new GenerativePalette('straight', 'triadic', 'descending', 'vibrant');
-    }
-
-    seed() {
-        // Sparse Seeding for Spirals (Droplets)
-        this.A.fill(0.0);
-        this.B.fill(0.0);
-        this.C.fill(0.0);
-
-        // Seed random droplets
-        for (let k = 0; k < 50; k++) {
-            let center = Math.floor(Math.random() * this.N);
-            let r = Math.random();
-            // Set a small neighborhood
-            let nbs = this.rd.neighbors[center];
-
-            let target = (r < 0.33) ? this.A : (r < 0.66) ? this.B : this.C;
-            target[center] = 1.0;
-            for (let j of nbs) target[j] = 1.0;
-        }
-    }
-
-    updatePhysics() {
-        // 3-Species Cyclic Model (Rock-Paper-Scissors)
-
-        let nodes = this.rd.nodes;
-        let neighbors = this.rd.neighbors;
-        let weights = this.rd.weights;
-
-        // Use parameters from BZReactionDiffusion GUI if available
-        let dt = this.rd.bzParams ? this.rd.bzParams.dt : 0.2;
-        let D = this.rd.bzParams ? this.rd.bzParams.D : 0.03;
-        this.alpha = this.rd.bzParams ? this.rd.bzParams.alpha : 1.6;
-
-        for (let i = 0; i < this.N; i++) {
-            let a = this.A[i];
-            let b = this.B[i];
-            let c = this.C[i];
-
-            let lapA = 0, lapB = 0, lapC = 0;
-            let nbs = neighbors[i];
-            let degree = nbs.length;
-
-            for (let k = 0; k < degree; k++) {
-                let j = nbs[k];
-                lapA += (this.A[j] - a);
-                lapB += (this.B[j] - b);
-                lapC += (this.C[j] - c);
-            }
-
-            let da = a * (1 - a - this.alpha * c);
-            let db = b * (1 - b - this.alpha * a);
-            let dc = c * (1 - c - this.alpha * b);
-
-            this.nextA[i] = a + (D * lapA + da) * dt;
-            this.nextB[i] = b + (D * lapB + db) * dt;
-            this.nextC[i] = c + (D * lapC + dc) * dt;
-
-            // Clamp
-            this.nextA[i] = Math.max(0, Math.min(1, this.nextA[i]));
-            this.nextB[i] = Math.max(0, Math.min(1, this.nextB[i]));
-            this.nextC[i] = Math.max(0, Math.min(1, this.nextC[i]));
-        }
-
-        // Swap
-        let temp;
-        temp = this.A; this.A = this.nextA; this.nextA = temp;
-        temp = this.B; this.B = this.nextB; this.nextB = temp;
-        temp = this.C; this.C = this.nextC; this.nextC = temp;
-    }
-
-    render(currentAlpha) {
-        let ca = this.palette.get(0);
-        let cb = this.palette.get(0.5);
-        let cc = this.palette.get(1);
-
-        // 1. Simulate
-        for (let k = 0; k < 2; k++) {
-            this.updatePhysics();
-        }
-
-        // 2. Draw
-        let color = new THREE.Color();
-        let hsl = { h: 0, s: 0, l: 0 };
-
-        for (let i = 0; i < this.N; i++) {
-            let a = this.A[i];
-            let b = this.B[i];
-            let c = this.C[i];
-            let sum = a + b + c;
-            if (sum > 0.01) {
-                // Alpha Blending (Layered: A first, then B, then C)
-                color.setRGB(0, 0, 0);
-                color.lerp(ca, a);
-                color.lerp(cb, b);
-                color.lerp(cc, c);
-                hsl = color.getHSL(hsl);
-                color.setHSL(hsl.h, 1.0, hsl.l);
-
-                this.rd.filters.plot(null, this.rd.nodes[i], color, 0, currentAlpha * this.rd.alpha);
-            }
-        }
-    }
-}

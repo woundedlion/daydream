@@ -1,4 +1,8 @@
-// draw.js
+/*
+ * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ * Licensed under the Polyform Noncommercial License 1.0.0
+ */
+
 import * as THREE from "three";
 import { Daydream, labels } from "./driver.js";
 import { Dot, angleBetween, fibSpiral, vectorPool } from "./geometry.js";
