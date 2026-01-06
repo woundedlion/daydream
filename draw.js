@@ -6,15 +6,19 @@
 import * as THREE from "three";
 import { Daydream, labels } from "./driver.js";
 import { Dot, angleBetween, fibSpiral, vectorPool } from "./geometry.js";
-import { StaticCircularBuffer } from "./StaticCircularBuffer.js";
 import { StaticPool } from "./StaticPool.js";
 
 /** @type {StaticPool} Global pool for Dot objects. */
 export const dotPool = new StaticPool(Dot, 500000);
 
+// Reusable temporary objects to avoid allocation during render loops
+const _tempVec = new THREE.Vector3();
+const _tempCol = new THREE.Color();
+
 /**
  * Implements pixel history and decay for persistent effects.
  * Manages a buffer of points that fade out over a specific lifespan.
+ * Refactored to use Structure of Arrays (SoA) to prevent GC churn.
  */
 export class DecayBuffer {
   /**
@@ -22,10 +26,24 @@ export class DecayBuffer {
    * @param {number} [capacity=4096] - The maximum number of trail segments to track.
    */
   constructor(lifespan, capacity = 4096) {
-    /** @type {number} */
     this.lifespan = lifespan;
-    /** @type {StaticCircularBuffer} */
-    this.history = new StaticCircularBuffer(capacity);
+    this.capacity = capacity;
+    this.count = 0;
+    this.head = 0; // Points to the next write position
+
+    // Structure of Arrays (SoA) - TypedArrays for zero-allocation storage
+    this.x = new Float32Array(capacity);
+    this.y = new Float32Array(capacity);
+    this.z = new Float32Array(capacity);
+
+    this.r = new Float32Array(capacity);
+    this.g = new Float32Array(capacity);
+    this.b = new Float32Array(capacity);
+    this.a = new Float32Array(capacity); // Alpha
+
+    this.ttl = new Float32Array(capacity);
+
+    this.sortIndices = new Uint32Array(capacity);
   }
 
   /**
@@ -49,12 +67,25 @@ export class DecayBuffer {
    * @param {number} alpha - The initial opacity.
    */
   record(v, color, age, alpha) {
-    // Calculate Time To Live (TTL)
     let ttl = this.lifespan - age;
     if (ttl > 0) {
-      // Push to circular buffer (automatically handles overwriting oldest if full)
-      // Clones are REQUIRED here because the input objects (v, color) might be pooled and reused.
-      this.history.push({ v: v.clone(), color: color.clone(), alpha: alpha, ttl: ttl });
+      const i = this.head;
+
+      this.x[i] = v.x;
+      this.y[i] = v.y;
+      this.z[i] = v.z;
+
+      this.r[i] = color.r;
+      this.g[i] = color.g;
+      this.b[i] = color.b;
+      this.a[i] = alpha;
+
+      this.ttl[i] = ttl;
+
+      this.head = (this.head + 1) % this.capacity;
+      if (this.count < this.capacity) {
+        this.count++;
+      }
     }
   }
 
@@ -65,27 +96,38 @@ export class DecayBuffer {
    * @param {Function} colorFn - Function to determine color based on decay. Signature: (vector, normalized_t) => Color.
    */
   render(pixels, pipeline, colorFn) {
-    // sort
-    this.history.sort((a, b) => a.ttl - b.ttl);
+    let tail = (this.head - this.count + this.capacity) % this.capacity;
+    for (let i = 0; i < this.count; i++) {
+      this.sortIndices[i] = (tail + i) % this.capacity;
+    }
+    const activeIndices = this.sortIndices.subarray(0, this.count);
+    activeIndices.sort((a, b) => this.ttl[a] - this.ttl[b]);
 
-    // render
-    for (let i = 0; i < this.history.length; ++i) {
-      let e = this.history.get(i);
-      let t = (this.lifespan - e.ttl) / this.lifespan;
-      const res = colorFn(e.v, t);
-      const c = res.isColor ? res : (res.color || res);
-      const a = (res.alpha !== undefined ? res.alpha : 1.0) * e.alpha;
-      pipeline.plot(pixels, e.v, c, 0, a);
-      e.ttl -= 1;
+    for (let i = 0; i < this.count; ++i) {
+      const idx = activeIndices[i];
+      this.ttl[idx] -= 1;
+      const currentTTL = this.ttl[idx];
+      if (currentTTL > 0) {
+        _tempVec.set(this.x[idx], this.y[idx], this.z[idx]);
+        let t = (this.lifespan - currentTTL) / this.lifespan;
+        const res = colorFn(_tempVec, t);
+        const c = res.isColor ? res : (res.color || res);
+        const a = (res.alpha !== undefined ? res.alpha : 1.0) * this.a[idx];
+        pipeline.plot(pixels, _tempVec, c, 0, a);
+      }
     }
 
-    // cleanup
-    while (this.history.length > 0 && this.history.front().ttl <= 0) {
-      this.history.pop_front();
+    // Cleanup
+    while (this.count > 0) {
+      const tailIdx = (this.head - this.count + this.capacity) % this.capacity;
+      if (this.ttl[tailIdx] <= 0) {
+        this.count--;
+      } else {
+        break;
+      }
     }
   }
 }
-
 /**
  * Represents a path composed of connected points on the sphere.
  */

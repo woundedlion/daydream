@@ -19,7 +19,6 @@ import {
 } from "../animation.js";
 import { FieldSampler } from "../FieldSampler.js";
 import { tween } from "../draw.js";
-import { StaticCircularBuffer } from "../StaticCircularBuffer.js";
 
 export class RingSpinFieldSample {
     static Ring = class {
@@ -27,7 +26,15 @@ export class RingSpinFieldSample {
             this.normal = normal;
             this.palette = new TransparentVignette(palette);
             this.orientation = new Orientation();
-            this.history = new StaticCircularBuffer(19); // max trail length
+
+            // Pre-allocated Ring Buffer
+            this.historyCapacity = 19;
+            this.history = new Array(this.historyCapacity);
+            for (let i = 0; i < this.historyCapacity; i++) {
+                this.history[i] = new Orientation();
+            }
+            this.head = 0;
+            this.count = 0;
         }
     }
 
@@ -67,29 +74,26 @@ export class RingSpinFieldSample {
         this.renderPlanes.length = 0;
 
         for (const ring of this.rings) {
-            // Update history
-            let snapshot;
-            if (ring.history.length >= this.trailLength || ring.history.length >= ring.history.capacity) {
-                snapshot = ring.history.pop_front();
-            } else {
-                snapshot = new Orientation();
+            const snapshot = ring.history[ring.head];
+            const src = ring.orientation.orientations;
+            if (snapshot.orientations.length < src.length) {
+                while (snapshot.orientations.length < src.length) snapshot.orientations.push(new THREE.Quaternion());
+            }
+            for (let k = 0; k < src.length; k++) {
+                snapshot.orientations[k].copy(src[k]);
             }
 
-            // Re-initialize snapshot if it was popped
-            snapshot.orientations = ring.orientation.orientations.map(q => q.clone());
+            ring.head = (ring.head + 1) % ring.historyCapacity;
+            if (ring.count < ring.historyCapacity) ring.count++;
 
-            ring.history.push(snapshot);
+            for (let i = 0; i < ring.count; i++) {
+                const idx = (ring.head - 1 - i + ring.historyCapacity) % ring.historyCapacity;
+                const orientationSnapshot = ring.history[idx];
 
-            // Trim if dynamic length shrank
-            while (ring.history.length > this.trailLength) {
-                ring.history.pop_front();
-            }
-
-            // Draw full history
-            for (let i = 0; i < ring.history.length; i++) {
-                const orientationSnapshot = ring.history.get(i);
                 tween(orientationSnapshot, (q, t) => {
-                    const globalT = (ring.history.length - i + t) / this.trailLength;
+                    const globalT = i / this.trailLength; // 0 to 1
+                    if (globalT > 1.0) return;
+
                     const c = ring.palette.get(globalT);
                     c.alpha = c.alpha * this.alpha;
 

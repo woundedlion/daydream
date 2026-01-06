@@ -3,7 +3,6 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
@@ -24,13 +23,19 @@ import {
 } from "../filters.js";
 import { randomBetween, wrap } from "../util.js";
 import { FieldSampler } from "../FieldSampler.js";
-import { StaticCircularBuffer } from "../StaticCircularBuffer.js";
 
 export class CometsFieldSample {
     static Node = class {
         constructor(path) {
             this.orientation = new Orientation();
-            this.history = new StaticCircularBuffer(80); // cycleDuration is 80
+            this.historyCapacity = 80;
+            this.history = new Array(this.historyCapacity);
+            for (let i = 0; i < this.historyCapacity; i++) {
+                this.history[i] = new Orientation();
+            }
+            this.head = 0;
+            this.count = 0;
+
             this.v = Daydream.Y_AXIS.clone();
             this.path = path;
         }
@@ -67,7 +72,6 @@ export class CometsFieldSample {
         this.palette = new GenerativePalette("straight", "triadic", "descending");
         this.nodes = [];
         this.renderPoints = [];
-        this.framePoints = []; // Pre-allocated array for renderPoints reuse if needed, or just clear renderPoints
 
         for (let i = 0; i < this.numNodes; ++i) {
             this.spawnNode(this.path);
@@ -124,23 +128,31 @@ export class CometsFieldSample {
         this.renderPoints.length = 0;
 
         for (const node of this.nodes) {
-            // Update history
-            let snapshot;
-            if (node.history.length >= this.trailLength || node.history.length >= node.history.capacity) {
-                snapshot = node.history.pop_front();
-            } else {
-                snapshot = new Orientation();
+            const snapshot = node.history[node.head];
+            const sourceOris = node.orientation.orientations;
+            if (snapshot.orientations.length < sourceOris.length) {
+                // Grow if needed (rare allocation)
+                while (snapshot.orientations.length < sourceOris.length) {
+                    snapshot.orientations.push(new THREE.Quaternion());
+                }
             }
-            snapshot.orientations = node.orientation.orientations.map(q => q.clone());
-            node.history.push(snapshot);
+            for (let k = 0; k < sourceOris.length; k++) {
+                snapshot.orientations[k].copy(sourceOris[k]);
+            }
+            node.head = (node.head + 1) % node.historyCapacity;
+            if (node.count < node.historyCapacity) node.count++;
 
-            // Draw history
-            for (let i = 0; i < node.history.length; i++) {
-                const orientationSnapshot = node.history.get(i);
+            for (let i = 0; i < node.count; i++) {
+                const idx = (node.head - 1 - i + node.historyCapacity) % node.historyCapacity;
+                const orientationSnapshot = node.history[idx];
+
                 tween(orientationSnapshot, (q, t) => {
-                    const tGlobal = (node.history.length - i + t) / this.trailLength;
+                    const tGlobal = i / this.trailLength; // 0 = Newest
+                    if (tGlobal > 1.0) return;
+
                     const color4 = this.palette.get(tGlobal);
                     color4.alpha = color4.alpha * this.alpha * quinticKernel(1 - tGlobal);
+
                     const v = vectorPool.acquire().copy(node.v).applyQuaternion(q);
                     const orientedV = this.orientation.orient(v);
                     this.renderPoints.push({

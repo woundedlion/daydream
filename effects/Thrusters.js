@@ -21,7 +21,7 @@ import {
 import {
     createRenderPipeline, FilterAntiAlias
 } from "../filters.js";
-import { StaticCircularBuffer } from "../StaticCircularBuffer.js";
+import { StaticPool } from "../StaticPool.js";
 
 class ThrusterContext {
     constructor() {
@@ -59,7 +59,11 @@ export class Thrusters {
         this.alpha = 0.2;
         this.ring = new THREE.Vector3(0.5, 0.5, 0.5).normalize();
         this.orientation = new Orientation();
-        this.thrusters = new StaticCircularBuffer(16);
+
+        // Object Pool for Thrusters (Zero Allocation)
+        this.poolSize = 16;
+        this.thrusterPool = new StaticPool(ThrusterContext, this.poolSize);
+
         this.amplitude = new MutableNumber(0);
         this.warpPhase = 0;
         this.radius = new MutableNumber(1);
@@ -118,8 +122,12 @@ export class Thrusters {
     }
 
     spawnThruster(point) {
-        const ctx = new ThrusterContext();
-        this.thrusters.push(ctx);
+        // Acquire from pool
+        if (this.thrusterPool.cursor >= this.thrusterPool.capacity) {
+            this.thrusterPool.reset();
+        }
+        const ctx = this.thrusterPool.acquire();
+
         ctx.reset(this.orientation, point);
 
         this.timeline.add(0,
