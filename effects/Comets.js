@@ -36,7 +36,7 @@ export class Comets {
         this.timeline = new Timeline();
         this.numNodes = 1;
         this.spacing = 48;
-        this.resolution = 32;
+        this.pathResolution = 32;
         this.cycleDuration = 80;
         this.trailLength = this.cycleDuration;
         this.alpha = 0.5;
@@ -81,7 +81,7 @@ export class Comets {
         this.timeline.add(0, new RandomWalk(this.orientation, randomVector()));
 
         this.gui = new gui.GUI({ autoPlace: false });
-        this.gui.add(this, 'resolution', 10, 200).step(1).onChange(() => {
+        this.gui.add(this, 'pathResolution', 10, 200).step(1).onChange(() => {
             this.updatePath();
         });
     }
@@ -101,7 +101,7 @@ export class Comets {
         const { m1, m2, a, domain } = config;
         const maxSpeed = Math.sqrt(m1 * m1 + m2 * m2);
         const length = domain * maxSpeed;
-        const samples = Math.max(128, Math.ceil(length * this.resolution));
+        const samples = Math.max(128, Math.ceil(length * this.pathResolution));
         this.path.collapse();
         this.path.appendSegment((t) => lissajous(m1, m2, a, t), domain, samples, easeMid);
     }
