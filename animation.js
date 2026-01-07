@@ -7,7 +7,7 @@
 
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
-import { angleBetween } from "./geometry.js";
+import { angleBetween, Orientation } from "./geometry.js";
 import FastNoiseLite from "./FastNoiseLite.js";
 
 /**
@@ -706,4 +706,59 @@ export class MobiusWarp extends Animation {
     this.params.bRe.set(Math.cos(angle));
     this.params.bIm.set(Math.sin(angle));
   }
+}
+
+export class OrientationTrail {
+  /**
+   * @param {number} capacity - Number of frames to keep in history.
+   */
+  constructor(capacity) {
+    this.capacity = capacity;
+    // Pre-allocate buffer of Orientation objects
+    this.snapshots = [];
+    for (let i = 0; i < capacity; i++) {
+      this.snapshots.push(new Orientation());
+    }
+    this.head = 0;
+    this.count = 0;
+  }
+
+  /**
+   * Records a snapshot of the current orientation state.
+   * @param {Orientation} source - The orientation to copy.
+   */
+  record(source) {
+    const snapshot = this.snapshots[this.head];
+    const srcData = source.orientations;
+    const dstData = snapshot.orientations;
+
+    // 1. Ensure buffer size matches source (grow if needed)
+    while (dstData.length < srcData.length) {
+      dstData.push(new THREE.Quaternion());
+    }
+    // 2. Trim if source shrank (optional, but keeps state clean)
+    dstData.length = srcData.length;
+
+    // 3. Deep copy quaternions
+    for (let i = 0; i < srcData.length; i++) {
+      dstData[i].copy(srcData[i]);
+    }
+
+    this.head = (this.head + 1) % this.capacity;
+    if (this.count < this.capacity) this.count++;
+  }
+
+  length() {
+    return this.count;
+  }
+
+  get(i) {
+    // 0 = Oldest, count-1 = Newest
+    // head points to next empty slot. head-1 is newest.
+    // oldest is head - count.
+    const idx = (this.head - this.count + i + this.capacity) % this.capacity;
+    return this.snapshots[idx];
+  }
+
+
 }

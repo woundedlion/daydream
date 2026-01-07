@@ -10,13 +10,13 @@ import {
     Orientation, lissajous, randomVector, vectorToPixel, vectorPool
 } from "../geometry.js";
 import {
-    Path, tween
+    Path, tween, dotPool
 } from "../draw.js";
 import {
     GenerativePalette, blendAlpha, color4Pool
 } from "../color.js";
 import {
-    Timeline, easeMid, Sprite, Motion, RandomWalk, PeriodicTimer, ColorWipe
+    Timeline, easeMid, Sprite, Motion, RandomWalk, PeriodicTimer, ColorWipe, OrientationTrail
 } from "../animation.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterOrient, quinticKernel
@@ -28,14 +28,7 @@ export class CometsFieldSample {
     static Node = class {
         constructor(path) {
             this.orientation = new Orientation();
-            this.historyCapacity = 80;
-            this.history = new Array(this.historyCapacity);
-            for (let i = 0; i < this.historyCapacity; i++) {
-                this.history[i] = new Orientation();
-            }
-            this.head = 0;
-            this.count = 0;
-
+            this.trail = new OrientationTrail(80);
             this.v = Daydream.Y_AXIS.clone();
             this.path = path;
         }
@@ -128,42 +121,24 @@ export class CometsFieldSample {
         this.renderPoints.length = 0;
 
         for (const node of this.nodes) {
-            const snapshot = node.history[node.head];
-            const sourceOris = node.orientation.orientations;
-            if (snapshot.orientations.length < sourceOris.length) {
-                // Grow if needed (rare allocation)
-                while (snapshot.orientations.length < sourceOris.length) {
-                    snapshot.orientations.push(new THREE.Quaternion());
-                }
-            }
-            for (let k = 0; k < sourceOris.length; k++) {
-                snapshot.orientations[k].copy(sourceOris[k]);
-            }
-            if (snapshot.orientations.length > sourceOris.length) {
-                snapshot.orientations.length = sourceOris.length;
-            }
-            node.head = (node.head + 1) % node.historyCapacity;
-            if (node.count < node.historyCapacity) node.count++;
+            node.trail.record(node.orientation);
 
-            for (let i = 0; i < node.count; i++) {
-                const idx = (node.head - 1 - i + node.historyCapacity) % node.historyCapacity;
-                const orientationSnapshot = node.history[idx];
-
-                tween(orientationSnapshot, (q, t) => {
-                    const tGlobal = i / this.trailLength; // 0 = Newest
-                    if (tGlobal > 1.0) return;
-
-                    const color4 = this.palette.get(tGlobal);
-                    color4.alpha = color4.alpha * this.alpha * quinticKernel(1 - tGlobal);
-
+            tween(node.trail, (snapshot, t) => {
+                tween(snapshot, (q, subT) => {
+                    if (t > 1.0) return;
+                    const color4 = this.palette.get(t);
+                    color4.alpha = color4.alpha * this.alpha * quinticKernel(1 - t);
                     const v = vectorPool.acquire().copy(node.v).applyQuaternion(q);
                     const orientedV = this.orientation.orient(v);
-                    this.renderPoints.push({
-                        pos: orientedV,
-                        color: color4
-                    });
+
+                    const dot = dotPool.acquire();
+                    dot.position.copy(orientedV);
+                    dot.color = color4.color;
+                    dot.alpha = color4.alpha;
+
+                    this.renderPoints.push(dot);
                 });
-            }
+            });
         }
         this.sampler.drawPoints(this.renderPoints, this.thickness);
     }

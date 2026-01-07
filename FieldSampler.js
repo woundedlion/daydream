@@ -227,7 +227,27 @@ export class FieldSampler {
      */
     drawPoints(points, thickness) {
         for (const pt of points) {
-            FSPoint.draw(pt.pos, pt.color, thickness, this.debugBB);
+            // Support both Dot objects and legacy {pos, color} objects
+            const pos = pt.position || pt.pos;
+            // Support Dot objects (which split color/alpha) and Color4
+            let color = pt.color;
+            if (pt.alpha !== undefined && color.isColor) {
+                // If it's a THREE.Color + alpha, we might need to wrap it or 
+                // FSRing expects {color, alpha} or Color4.
+                // Color4 has {color: THREE.Color, alpha: number} structure usually?
+                // Let's assume passed 'color' is compatible or construct a temporary context
+                // FSRing uses ctx.color.alpha and ctx.color.color.
+                // If pt is Dot, pt.color is THREE.Color, pt.alpha is number.
+                // We need to bundle them if FSRing expects a single color object.
+                // FSRing: const alpha = quinticKernel(1 - t) * ctx.color.alpha;
+                //         blendAlpha(outColor, ctx.color.color, ...
+                // So ctx.color should have .color and .alpha.
+                // Dot does NOT have .color and .alpha on the SAME object (it has this.color and this.alpha).
+                // So we might need to wrap it.
+                color = { color: pt.color, alpha: pt.alpha };
+            }
+
+            FSPoint.draw(pos, color, thickness, this.debugBB);
         }
     }
 
@@ -245,11 +265,5 @@ export class FieldSampler {
     drawRing(normal, radius, color4, thickness) {
         // Delegate to FSRing
         FSRing.draw(normal, radius, color4, thickness, this.debugBB);
-    }
-
-    drawPlanes(planes, thickness) {
-        for (const plane of planes) {
-            this.drawRing(plane.normal, 1.0, plane.color, thickness);
-        }
     }
 }
