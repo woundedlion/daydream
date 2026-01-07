@@ -16,35 +16,55 @@ import { angleBetween, vectorToPixel, yToPhi } from "./geometry.js";
  */
 export class FSRing {
     /**
-     * Draws the ring onto the screen.
+     * Draws the ring (or partial arc) onto the screen.
      * @param {THREE.Vector3} normal - Ring orientation.
      * @param {number} radius - Angular radius (0-2).
      * @param {Color4} color - Ring color.
      * @param {number} thickness - Angular thickness.
+     * @param {number} [startAngle=0] - Start of the arc in radians (0 to 2PI).
+     * @param {number} [endAngle=6.28318] - End of the arc in radians.
      * @param {boolean} [debugBB=false] - Debug flag.
-     * @param {Array<THREE.Vector3>} [clipPlanes=null] - Optional normals defining clipping planes.
+     * @param {Array<THREE.Vector3>} [clipPlanes=null] - Optional normals defining clipping planes (Legacy).
+     * @param {Object} [limits=null] - Optional vertical limits { minPhi, maxPhi }.
      */
-    static draw(normal, radius, color, thickness, debugBB = false, clipPlanes = null) {
+    static draw(normal, radius, color, thickness, startAngle = 0, endAngle = 2 * Math.PI, debugBB = false, clipPlanes = null, limits = null) {
         // Pre-calculate properties
         const nx = normal.x;
         const ny = normal.y;
         const nz = normal.z;
+
+        // --- 1. Construct Basis for Azimuth/Angle checks ---
+        // We need a stable basis (u, w) on the ring plane to measure angles.
+        // This logic matches the C++ sample_ring implementation.
+        let ref = new THREE.Vector3(1, 0, 0); // X_AXIS
+        if (Math.abs(normal.dot(ref)) > 0.9999) {
+            ref.set(0, 1, 0); // Y_AXIS
+        }
+
+        // U = Cross(Normal, Ref) -> Perpendicular to Normal
+        const u = new THREE.Vector3().crossVectors(normal, ref).normalize();
+        // W = Cross(Normal, U) -> Completes the orthonormal basis on the ring plane
+        const w = new THREE.Vector3().crossVectors(normal, u).normalize();
 
         const targetAngle = radius * (Math.PI / 2);
         const R = Math.sqrt(nx * nx + nz * nz);
         const alpha = Math.atan2(nx, nz);
         const centerPhi = Math.acos(ny);
 
-        // Context object to pass through the stack (avoids class state)
+        // Check if we need to perform sector checks (is it a partial ring?)
+        // We check if the arc length is essentially 2PI
+        const isFullCircle = Math.abs(endAngle - startAngle) >= 2 * Math.PI - 0.001;
+
+        // Context object to pass through the stack
         const ctx = {
             normal, radius, color, thickness, debugBB, clipPlanes,
-            nx, ny, nz, targetAngle, R, alpha, centerPhi
+            nx, ny, nz, targetAngle, R, alpha, centerPhi,
+            u, w, startAngle, endAngle,
+            checkSector: !isFullCircle
         };
 
-        // 1. CALCULATE VERTICAL BOUNDS
+        // --- 2. CALCULATE VERTICAL BOUNDS (Global Ring) ---
         // The extreme latitudes of the ring occur along the meridian of the normal.
-        // These are simply centerPhi - targetAngle and centerPhi + targetAngle.
-        // We use acos(cos(x)) to correctly wrap these angles into [0, PI], handling pole crossings.
         const a1 = centerPhi - targetAngle;
         const a2 = centerPhi + targetAngle;
         const p1 = Math.acos(Math.cos(a1));
@@ -53,8 +73,17 @@ export class FSRing {
         const minP = Math.min(p1, p2);
         const maxP = Math.max(p1, p2);
 
-        const phiMin = Math.max(0, minP - thickness);
-        const phiMax = Math.min(Math.PI, maxP + thickness);
+        let phiMin = Math.max(0, minP - thickness);
+        let phiMax = Math.min(Math.PI, maxP + thickness);
+
+        // --- 3. APPLY OPTIONAL LIMITS (Intersection) ---
+        // If the caller provided tighter bounds (e.g. for a line segment), use them.
+        if (limits) {
+            phiMin = Math.max(phiMin, limits.minPhi);
+            phiMax = Math.min(phiMax, limits.maxPhi);
+        }
+
+        if (phiMin > phiMax) return;
 
         const yMin = Math.max(0, Math.floor((phiMin * (Daydream.H - 1)) / Math.PI));
         const yMax = Math.min(Daydream.H - 1, Math.ceil((phiMax * (Daydream.H - 1)) / Math.PI));
@@ -76,11 +105,6 @@ export class FSRing {
         }
 
         // Case B: General Intersection
-        // We want the dot product P.N to be within [cos(target+thick), cos(target-thick)].
-        // P.N = cos(theta - alpha) * R * sinPhi + ny * cosPhi
-        // So cos(theta - alpha) = (D - ny * cosPhi) / (R * sinPhi)
-        // We calculate the min/max allowed D (dot product values).
-
         const ang_low = Math.max(0, ctx.targetAngle - ctx.thickness);
         const ang_high = Math.min(Math.PI, ctx.targetAngle + ctx.thickness);
 
@@ -89,8 +113,10 @@ export class FSRing {
         const D_min = Math.cos(ang_high);
 
         const denom = ctx.R * sinPhi;
-        // Check for singularity to avoid Infinity (though clamp usually handles it)
+        // Check for singularity
         if (Math.abs(denom) < 0.000001) {
+            // Optimization: If the ring is "flat" at this latitude, we only scan if we are inside the band.
+            // Since we rely on yMin/yMax bounds calculated in draw(), if we are here, we are likely inside.
             FSRing.scanFullRow(y, ctx);
             return;
         }
@@ -140,16 +166,40 @@ export class FSRing {
 
         const p = Daydream.pixelPositions[i];
 
-        // Apply Clipping Planes
+        // 1. Clipping Planes (Legacy method for Lines)
         if (ctx.clipPlanes) {
             for (const cp of ctx.clipPlanes) {
                 if (p.dot(cp) < 0) return;
             }
         }
 
-        const angle = angleBetween(p, ctx.normal);
-        const dist = Math.abs(angle - ctx.targetAngle);
+        const polarAngle = angleBetween(p, ctx.normal);
+        const dist = Math.abs(polarAngle - ctx.targetAngle);
+
         if (dist < ctx.thickness) {
+            // 2. Sector Check (Start/End Angles)
+            if (ctx.checkSector) {
+                // Project P onto the basis vectors U and W to find the azimuth
+                const dotU = p.dot(ctx.u);
+                const dotW = p.dot(ctx.w);
+                let azimuth = Math.atan2(dotW, dotU);
+
+                // Wrap azimuth to [0, 2PI)
+                if (azimuth < 0) azimuth += 2 * Math.PI;
+
+                // Check containment
+                let inside = false;
+                if (ctx.startAngle <= ctx.endAngle) {
+                    inside = (azimuth >= ctx.startAngle && azimuth <= ctx.endAngle);
+                } else {
+                    // Crossing the 0/360 boundary (e.g. 350 to 10 degrees)
+                    inside = (azimuth >= ctx.startAngle || azimuth <= ctx.endAngle);
+                }
+
+                if (!inside) return;
+            }
+
+            // 3. Render
             const t = dist / ctx.thickness;
             const alpha = quinticKernel(1 - t) * ctx.color.alpha;
             const outColor = Daydream.pixels[i];
@@ -169,7 +219,7 @@ export class FSPoint {
      */
     static draw(pos, color, thickness, debugBB = false) {
         // A point is just a ring with radius 0
-        FSRing.draw(pos, 0, color, thickness, debugBB);
+        FSRing.draw(pos, 0, color, thickness, 0, 2 * Math.PI, debugBB);
     }
 }
 
@@ -190,21 +240,51 @@ export class FSLine {
         // Handle coincident vectors (no line)
         if (normal.lengthSq() < 0.000001) return;
 
-        // 2. Define Clipping Planes
+        // 2. Define Clipping Planes (Fastest way to check segment bounds in pixel shader)
         // Plane 1: Passes through v1, normal = normal x v1
         const c1 = new THREE.Vector3().crossVectors(normal, v1);
         // Plane 2: Passes through v2, normal = v2 x normal
         const c2 = new THREE.Vector3().crossVectors(v2, normal);
 
-        // Note: For points ON the great circle, v1 x v2 = normal * sin(theta).
-        // c1 = (v1 x v2 / |v1xv2|) x v1.
-        // Direction check:
-        // v2 is on positive side of c1? (v2 . c1) > 0 ?
-        // v2 . ( (v1 x v2) x v1 )
-        // Using vector triple product: (A x B) x C = (A.C)B - (B.C)A
-        // (N x v1) . v2 = N . (v1 x v2) = N . N > 0. Yes.
+        // 3. OPTIMIZATION: Calculate Vertical Bounds of the Segment
+        // We find the min/max Y of the segment to limit the scan area.
 
-        FSRing.draw(normal, 1.0, color, thickness, debugBB, [c1, c2]);
+        let maxY = Math.max(v1.y, v2.y);
+        let minY = Math.min(v1.y, v2.y);
+
+        // Calculate the normal of the plane containing the Y-axis and the Ring Normal.
+        // This plane cuts the ring at its highest and lowest points (Apex/Antipex).
+        const apexPlaneNormal = new THREE.Vector3().crossVectors(normal, new THREE.Vector3(0, 1, 0));
+
+        // If normal is parallel to Y (horizontal ring), cross product is 0. 
+        // In that case, Y is constant, so min/max from endpoints is already correct.
+        if (apexPlaneNormal.lengthSq() > 0.0001) {
+            // Check if the segment crosses the Apex/Antipex plane
+            const d1 = v1.dot(apexPlaneNormal);
+            const d2 = v2.dot(apexPlaneNormal);
+
+            if (d1 * d2 <= 0) {
+                // Segment crosses the extremum line.
+                // It contains either the Top (Max Y) or Bottom (Min Y) of the full circle.
+                // Since we assume short segments (< 180 deg), it contains only one.
+                const globalMaxY = Math.sqrt(1 - normal.y * normal.y);
+
+                if (v1.y + v2.y > 0) {
+                    // Northern Hemisphere -> Contains Top
+                    maxY = globalMaxY;
+                } else {
+                    // Southern Hemisphere -> Contains Bottom
+                    minY = -globalMaxY;
+                }
+            }
+        }
+
+        // Convert Y bounds to Phi bounds (with thickness padding)
+        const minPhi = Math.acos(Math.min(1, Math.max(-1, maxY))) - thickness;
+        const maxPhi = Math.acos(Math.min(1, Math.max(-1, minY))) + thickness;
+
+        // We use full circle (0 to 2PI) for angles because we use Clipping Planes for the cut
+        FSRing.draw(normal, 1.0, color, thickness, 0, 2 * Math.PI, debugBB, [c1, c2], { minPhi, maxPhi });
     }
 }
 
@@ -227,26 +307,11 @@ export class FieldSampler {
      */
     drawPoints(points, thickness) {
         for (const pt of points) {
-            // Support both Dot objects and legacy {pos, color} objects
             const pos = pt.position || pt.pos;
-            // Support Dot objects (which split color/alpha) and Color4
             let color = pt.color;
             if (pt.alpha !== undefined && color.isColor) {
-                // If it's a THREE.Color + alpha, we might need to wrap it or 
-                // FSRing expects {color, alpha} or Color4.
-                // Color4 has {color: THREE.Color, alpha: number} structure usually?
-                // Let's assume passed 'color' is compatible or construct a temporary context
-                // FSRing uses ctx.color.alpha and ctx.color.color.
-                // If pt is Dot, pt.color is THREE.Color, pt.alpha is number.
-                // We need to bundle them if FSRing expects a single color object.
-                // FSRing: const alpha = quinticKernel(1 - t) * ctx.color.alpha;
-                //         blendAlpha(outColor, ctx.color.color, ...
-                // So ctx.color should have .color and .alpha.
-                // Dot does NOT have .color and .alpha on the SAME object (it has this.color and this.alpha).
-                // So we might need to wrap it.
                 color = { color: pt.color, alpha: pt.alpha };
             }
-
             FSPoint.draw(pos, color, thickness, this.debugBB);
         }
     }
@@ -262,8 +327,10 @@ export class FieldSampler {
         FSLine.draw(v1, v2, color, thickness, this.debugBB);
     }
 
-    drawRing(normal, radius, color4, thickness) {
-        // Delegate to FSRing
-        FSRing.draw(normal, radius, color4, thickness, this.debugBB);
+    /**
+     * Draws a ring using the new start/end angle support.
+     */
+    drawRing(normal, radius, color4, thickness, startAngle = 0, endAngle = 2 * Math.PI) {
+        FSRing.draw(normal, radius, color4, thickness, startAngle, endAngle, this.debugBB);
     }
 }
