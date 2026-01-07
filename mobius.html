@@ -1,5 +1,10 @@
 ﻿<!DOCTYPE html>
+<!--
+ Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ Licensed under the Polyform Noncommercial License 1.0.0
+-->
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -85,16 +90,16 @@
             transition: all 0.2s ease;
         }
 
-            .preset-btn:hover {
-                background-color: var(--slate-700);
-                border-color: var(--indigo-400);
-            }
+        .preset-btn:hover {
+            background-color: var(--slate-700);
+            border-color: var(--indigo-400);
+        }
 
-            .preset-btn.active {
-                background-color: rgba(59, 130, 246, 0.2);
-                border-color: var(--blue-500);
-                color: white;
-            }
+        .preset-btn.active {
+            background-color: rgba(59, 130, 246, 0.2);
+            border-color: var(--blue-500);
+            color: white;
+        }
 
         .preset-desc {
             font-size: 0.75rem;
@@ -233,6 +238,7 @@
         }
     </style>
 </head>
+
 <body>
     <div id="canvasContainer">
         <canvas id="threeCanvas" class="w-full h-full"></canvas>
@@ -254,7 +260,8 @@
                 <h1 class="text-lg font-bold text-white leading-tight">Mobius Visualizer</h1>
                 <p class="text-xs text-indigo-300 font-mono">f(z) = (az + b) / (cz + d)</p>
             </div>
-            <button id="resetBtn" class="px-3 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs font-medium transition-colors shadow-sm border border-slate-500">
+            <button id="resetBtn"
+                class="px-3 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs font-medium transition-colors shadow-sm border border-slate-500">
                 Stop / Reset
             </button>
         </div>
@@ -754,4 +761,5 @@
 
     </script>
 </body>
+
 </html>

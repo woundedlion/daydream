@@ -1,5 +1,10 @@
 <!DOCTYPE html>
+<!--
+ Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ Licensed under the Polyform Noncommercial License 1.0.0
+-->
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,26 +12,34 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400&display=swap');
+
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #0F172A; /* Slate 900 */
-            color: #E2E8F0; /* Slate 200 */
+            background-color: #0F172A;
+            /* Slate 900 */
+            color: #E2E8F0;
+            /* Slate 200 */
             min-height: 100vh;
         }
+
         .container {
             max-width: 1200px;
             margin: auto;
         }
+
         .param-group {
-            background-color: #1E293B; /* Slate 800 */
+            background-color: #1E293B;
+            /* Slate 800 */
             border-radius: 0.75rem;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
             padding: 1rem;
         }
+
         .slider-label {
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.875rem;
         }
+
         input[type=range] {
             height: 6px;
             -webkit-appearance: none;
@@ -35,53 +48,81 @@
             border-radius: 3px;
             cursor: pointer;
         }
+
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
             height: 16px;
             width: 16px;
             border-radius: 50%;
-            background: #3B82F6; /* Blue 500 */
+            background: #3B82F6;
+            /* Blue 500 */
             cursor: pointer;
             /* The slider line is 6px tall. The thumb is 16px tall.
                (6px - 16px) / 2 = -5px. This is the mathematical center.
                User reported this was "too high", so we are adjusting to
                be less negative, which moves the thumb *down* visually.
             */
-            margin-top: -3px; /* MODIFIED: Was -5px. Nudged 2px down. */
+            margin-top: -3px;
+            /* MODIFIED: Was -5px. Nudged 2px down. */
         }
+
         /* For Firefox: */
         input[type=range]::-moz-range-thumb {
             height: 16px;
             width: 16px;
             border-radius: 50%;
-            background: #3B82F6; /* Blue 500 */
+            background: #3B82F6;
+            /* Blue 500 */
             cursor: pointer;
-            border: none; /* Remove default border */
+            border: none;
+            /* Remove default border */
         }
+
         /* For MS Edge: */
         input[type=range]::-ms-thumb {
             height: 16px;
             width: 16px;
             border-radius: 50%;
-            background: #3B82F6; /* Blue 500 */
+            background: #3B82F6;
+            /* Blue 500 */
             cursor: pointer;
         }
 
 
         /* NEW: Custom checkbox style */
         input[type=checkbox] {
-            background-color: #475569; /* Slate 600 */
-            border-color: #64748B; /* Slate 500 */
+            background-color: #475569;
+            /* Slate 600 */
+            border-color: #64748B;
+            /* Slate 500 */
         }
+
         input[type=checkbox]:checked {
-            background-color: #3B82F6; /* Blue 500 */
+            background-color: #3B82F6;
+            /* Blue 500 */
             border-color: #3B82F6;
         }
 
-        .r-thumb::-webkit-slider-thumb { background: #EF4444; } /* Red */
-        .g-thumb::-webkit-slider-thumb { background: #22C55E; } /* Green */
-        .b-thumb::-webkit-slider-thumb { background: #3B82F6; } /* Blue */
-        .speed-thumb::-webkit-slider-thumb { background: #8B5CF6; } /* Violet */
+        .r-thumb::-webkit-slider-thumb {
+            background: #EF4444;
+        }
+
+        /* Red */
+        .g-thumb::-webkit-slider-thumb {
+            background: #22C55E;
+        }
+
+        /* Green */
+        .b-thumb::-webkit-slider-thumb {
+            background: #3B82F6;
+        }
+
+        /* Blue */
+        .speed-thumb::-webkit-slider-thumb {
+            background: #8B5CF6;
+        }
+
+        /* Violet */
 
         /* Canvas Styles */
         #colorStripCanvas {
@@ -89,33 +130,45 @@
             border-radius: 0.5rem;
             width: 100%;
             height: 100px;
-            cursor: pointer; /* Indicate it's clickable */
+            cursor: pointer;
+            /* Indicate it's clickable */
         }
+
         #waveGraphCanvas {
             border: 1px solid #475569;
             border-radius: 0.5rem;
             width: 100%;
-            height: 150px; /* Compacted height */
+            height: 150px;
+            /* Compacted height */
         }
+
         #colorSwatch {
-            transition: background-color 0.05s linear; /* Smooth visual transition */
-            cursor: pointer; /* Indicate it's clickable for copying */
+            transition: background-color 0.05s linear;
+            /* Smooth visual transition */
+            cursor: pointer;
+            /* Indicate it's clickable for copying */
         }
     </style>
 </head>
+
 <body class="p-4 sm:p-8">
 
     <div class="container space-y-8">
         <h1 class="text-3xl font-bold text-center text-white pt-4">Procedural Color Palette Generator</h1>
 
-        <!-- 1. PALETTE PARAMETERS (CONTROLS) --><h2 class="text-2xl font-semibold text-white">Palette Parameters: C(t) = A + B &middot; cos(2 &pi; (Ct + D))</h2>
+        <!-- 1. PALETTE PARAMETERS (CONTROLS) -->
+        <h2 class="text-2xl font-semibold text-white">Palette Parameters: C(t) = A + B &middot; cos(2 &pi; (Ct + D))
+        </h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            
-            <!-- PARAMETER A: BASE / OFFSET --><div class="param-group space-y-4">
+
+            <!-- PARAMETER A: BASE / OFFSET -->
+            <div class="param-group space-y-4">
                 <h3 class="text-lg font-bold text-blue-400">Vector A (Base Value)</h3>
                 <p class="text-xs text-gray-400">Sets the center value of the color oscillation.</p>
-                <!-- NEW: Lock Checkbox for A --><div class="flex items-center space-x-2 text-sm text-gray-300">
-                    <input type="checkbox" id="lock_A" class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
+                <!-- NEW: Lock Checkbox for A -->
+                <div class="flex items-center space-x-2 text-sm text-gray-300">
+                    <input type="checkbox" id="lock_A"
+                        class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
                     <label for="lock_A">Lock R, G, B</label>
                 </div>
                 <div id="A_R_container"></div>
@@ -123,11 +176,14 @@
                 <div id="A_B_container"></div>
             </div>
 
-            <!-- PARAMETER B: AMPLITUDE --><div class="param-group space-y-4">
+            <!-- PARAMETER B: AMPLITUDE -->
+            <div class="param-group space-y-4">
                 <h3 class="text-lg font-bold text-green-400">Vector B (Amplitude)</h3>
                 <p class="text-xs text-gray-400">Controls the range/intensity of the oscillation.</p>
-                <!-- NEW: Lock Checkbox for B --><div class="flex items-center space-x-2 text-sm text-gray-300">
-                    <input type="checkbox" id="lock_B" class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
+                <!-- NEW: Lock Checkbox for B -->
+                <div class="flex items-center space-x-2 text-sm text-gray-300">
+                    <input type="checkbox" id="lock_B"
+                        class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
                     <label for="lock_B">Lock R, G, B</label>
                 </div>
                 <div id="B_R_container"></div>
@@ -135,11 +191,14 @@
                 <div id="B_B_container"></div>
             </div>
 
-            <!-- PARAMETER C: FREQUENCY --><div class="param-group space-y-4">
+            <!-- PARAMETER C: FREQUENCY -->
+            <div class="param-group space-y-4">
                 <h3 class="text-lg font-bold text-red-400">Vector C (Frequency)</h3>
                 <p class="text-xs text-gray-400">Determines the number of cycles across the palette (0 to 5).</p>
-                <!-- NEW: Lock Checkbox for C --><div class="flex items-center space-x-2 text-sm text-gray-300">
-                    <input type="checkbox" id="lock_C" class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
+                <!-- NEW: Lock Checkbox for C -->
+                <div class="flex items-center space-x-2 text-sm text-gray-300">
+                    <input type="checkbox" id="lock_C"
+                        class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
                     <label for="lock_C">Lock R, G, B</label>
                 </div>
                 <div id="C_R_container"></div>
@@ -147,11 +206,14 @@
                 <div id="C_B_container"></div>
             </div>
 
-            <!-- PARAMETER D: PHASE --><div class="param-group space-y-4">
+            <!-- PARAMETER D: PHASE -->
+            <div class="param-group space-y-4">
                 <h3 class="text-lg font-bold text-yellow-400">Vector D (Phase Shift)</h3>
                 <p class="text-xs text-gray-400">Shifts the starting point of the wave (0 to 1).</p>
-                <!-- NEW: Lock Checkbox for D --><div class="flex items-center space-x-2 text-sm text-gray-300">
-                    <input type="checkbox" id="lock_D" class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
+                <!-- NEW: Lock Checkbox for D -->
+                <div class="flex items-center space-x-2 text-sm text-gray-300">
+                    <input type="checkbox" id="lock_D"
+                        class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
                     <label for="lock_D">Lock R, G, B</label>
                 </div>
                 <div id="D_R_container"></div>
@@ -160,50 +222,71 @@
             </div>
         </div>
 
-        <!-- 2. RGB WAVE FUNCTIONS (GRAPH) --><div class="space-y-4 p-4 param-group">
-            <h2 class="text-xl font-semibold text-white">RGB Wave Functions</h2> <canvas id="waveGraphCanvas" width="1024" height="300"></canvas>
+        <!-- 2. RGB WAVE FUNCTIONS (GRAPH) -->
+        <div class="space-y-4 p-4 param-group">
+            <h2 class="text-xl font-semibold text-white">RGB Wave Functions</h2> <canvas id="waveGraphCanvas"
+                width="1024" height="300"></canvas>
         </div>
-        
-        <!-- 3. RESULTING PALETTE (STATIC STRIP) --><div class="space-y-4 p-4 param-group">
+
+        <!-- 3. RESULTING PALETTE (STATIC STRIP) -->
+        <div class="space-y-4 p-4 param-group">
             <div class="flex justify-between items-center">
-                <h2 class="text-xl font-semibold text-white">Resulting Palette (t &isin; [0, 1])</h2> <button id="resetZoomButton" class="hidden px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-sm font-medium transition-all shadow-lg">Reset Zoom</button>
+                <h2 class="text-xl font-semibold text-white">Resulting Palette (t &isin; [0, 1])</h2> <button
+                    id="resetZoomButton"
+                    class="hidden px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-sm font-medium transition-all shadow-lg">Reset
+                    Zoom</button>
             </div>
-            <p class="text-sm text-gray-400">Click to set phase, or click and drag to zoom.</p> <canvas id="colorStripCanvas" width="1024" height="100"></canvas>
+            <p class="text-sm text-gray-400">Click to set phase, or click and drag to zoom.</p> <canvas
+                id="colorStripCanvas" width="1024" height="100"></canvas>
         </div>
-        
-        <!-- NEW: Wrapper for sections 4 and 5 --><div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-            <!-- 4. ANIMATED PREVIEW (SWATCH & SPEED) --><div class="space-y-4 p-4 param-group">
+        <!-- NEW: Wrapper for sections 4 and 5 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <!-- 4. ANIMATED PREVIEW (SWATCH & SPEED) -->
+            <div class="space-y-4 p-4 param-group">
                 <h2 class="text-2xl font-semibold text-white">Animated Preview</h2>
-                
-                <!-- NEW: This flex container puts swatch and controls side-by-side --><div class="flex flex-col sm:flex-row gap-4">
-                    <!-- Swatch --><div id="colorSwatch" class="w-full sm:w-1/2 h-32 rounded-lg border-4 border-slate-700 shadow-inner" title="Click to copy Hex code">
-                        <!-- Background color is set by JS --></div>
 
-                    <!-- Animation Controls --><div class="w-full sm:w-1/2 space-y-3">
+                <!-- NEW: This flex container puts swatch and controls side-by-side -->
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <!-- Swatch -->
+                    <div id="colorSwatch" class="w-full sm:w-1/2 h-32 rounded-lg border-4 border-slate-700 shadow-inner"
+                        title="Click to copy Hex code">
+                        <!-- Background color is set by JS -->
+                    </div>
+
+                    <!-- Animation Controls -->
+                    <div class="w-full sm:w-1/2 space-y-3">
                         <h3 class="text-lg font-bold text-indigo-400">Global Phase Speed (Cycles/s)</h3>
                         <div class="flex items-center space-x-2">
                             <span class="w-12 text-gray-400">Speed:</span>
-                            <input type="range" id="speed_slider" min="0" max="2000" step="1" value="300" class="w-full speed-thumb">
+                            <input type="range" id="speed_slider" min="0" max="2000" step="1" value="300"
+                                class="w-full speed-thumb">
                             <span id="speed_value" class="slider-label w-16 text-right">0.300</span>
                         </div>
-                        <p class="text-sm text-gray-400">Current Phase (t): <span id="t_value" class="font-mono text-white">0.000</span></p>
-                        <p class="text-sm text-gray-400">Current Color: 
+                        <p class="text-sm text-gray-400">Current Phase (t): <span id="t_value"
+                                class="font-mono text-white">0.000</span></p>
+                        <p class="text-sm text-gray-400">Current Color:
                             <span id="hex_value" class="font-mono text-white">#000000</span>
-                            <span id="copy_prompt" class="ml-2 text-gray-500 transition-colors duration-300">(Click swatch to copy)</span>
+                            <span id="copy_prompt" class="ml-2 text-gray-500 transition-colors duration-300">(Click
+                                swatch to copy)</span>
                         </p>
                     </div>
-                </div> <!-- End of flex container for swatch and controls --></div>
+                </div> <!-- End of flex container for swatch and controls -->
+            </div>
 
-            <!-- 5. CODE EXPORT --><div class="space-y-4 p-4 param-group">
+            <!-- 5. CODE EXPORT -->
+            <div class="space-y-4 p-4 param-group">
                 <div class="flex justify-between items-center">
                     <h2 class="text-2xl font-semibold text-white">Export Palette Code</h2>
-                    <button id="copy_code_button" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-sm font-medium transition-all shadow-lg">
+                    <button id="copy_code_button"
+                        class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-sm font-medium transition-all shadow-lg">
                         Copy Code
                     </button>
                 </div>
                 <p class="text-sm text-gray-400">Copy the parameter vectors for use in other tools or scripts.
-                    <span id="copy_code_prompt" class="ml-2 text-sm text-gray-500 transition-colors duration-300"></span>
+                    <span id="copy_code_prompt"
+                        class="ml-2 text-sm text-gray-500 transition-colors duration-300"></span>
                 </p>
                 <pre class="bg-slate-900 p-4 rounded-lg border border-slate-700 overflow-x-auto">
 <code id="palette_code_output" class="font-mono text-sm text-slate-300 whitespace-pre">
@@ -215,838 +298,840 @@
                 </pre>
             </div>
 
-        </div> <!-- This closes the grid wrapper for Animated Preview and Export Palette Code --></div> <!-- This closes .container --><script>
-    // --- Palette Class and Data Structure ---
-
-    /**
-     * The core procedural palette class.
-     * C(t) = A + B * cos(2 * PI * (C * t + D))
-     */
-    class ProceduralPalette {
-        constructor(a, b, c, d) {
-            this.a = a; // [Ar, Ag, Ab]
-            this.b = b; // [Br, Bg, Bb]
-            this.c = c; // [Cr, Cg, Cb]
-            this.d = d; // [Dr, Dg, Db]
-        }
+        </div> <!-- This closes the grid wrapper for Animated Preview and Export Palette Code -->
+    </div> <!-- This closes .container -->
+    <script>
+        // --- Palette Class and Data Structure ---
 
         /**
-         * Calculates the color vector (R, G, B) for a time parameter t in [0, 1].
-         * @param {number} t Time parameter (0 to 1).
-         * @returns {number[]} Array [R, G, B] of float values in [0, 1].
+         * The core procedural palette class.
+         * C(t) = A + B * cos(2 * PI * (C * t + D))
          */
-        get(t) {
-            const PI2 = 2 * Math.PI;
-            
-            // Calculate R, G, B values
-            const r = this.a[0] + this.b[0] * Math.cos(PI2 * (this.c[0] * t + this.d[0]));
-            const g = this.a[1] + this.b[1] * Math.cos(PI2 * (this.c[1] * t + this.d[1]));
-            const b = this.a[2] + this.b[2] * Math.cos(PI2 * (this.c[2] * t + this.d[2]));
-            
-            // Clamp values to the valid [0, 1] range before returning
-            return [
-                Math.max(0, Math.min(1, r)),
-                Math.max(0, Math.min(1, g)),
-                Math.max(0, Math.min(1, b))
-            ];
+        class ProceduralPalette {
+            constructor(a, b, c, d) {
+                this.a = a; // [Ar, Ag, Ab]
+                this.b = b; // [Br, Bg, Bb]
+                this.c = c; // [Cr, Cg, Cb]
+                this.d = d; // [Dr, Dg, Db]
+            }
+
+            /**
+             * Calculates the color vector (R, G, B) for a time parameter t in [0, 1].
+             * @param {number} t Time parameter (0 to 1).
+             * @returns {number[]} Array [R, G, B] of float values in [0, 1].
+             */
+            get(t) {
+                const PI2 = 2 * Math.PI;
+
+                // Calculate R, G, B values
+                const r = this.a[0] + this.b[0] * Math.cos(PI2 * (this.c[0] * t + this.d[0]));
+                const g = this.a[1] + this.b[1] * Math.cos(PI2 * (this.c[1] * t + this.d[1]));
+                const b = this.a[2] + this.b[2] * Math.cos(PI2 * (this.c[2] * t + this.d[2]));
+
+                // Clamp values to the valid [0, 1] range before returning
+                return [
+                    Math.max(0, Math.min(1, r)),
+                    Math.max(0, Math.min(1, g)),
+                    Math.max(0, Math.min(1, b))
+                ];
+            }
+
+            /**
+             * Calculates a single channel value (R=0, G=1, B=2) for plotting.
+             */
+            getChannelValue(t, channelIndex) {
+                const PI2 = 2 * Math.PI;
+                return this.a[channelIndex] + this.b[channelIndex] * Math.cos(PI2 * (this.c[channelIndex] * t + this.d[channelIndex]));
+            }
         }
 
-        /**
-         * Calculates a single channel value (R=0, G=1, B=2) for plotting.
-         */
-        getChannelValue(t, channelIndex) {
-            const PI2 = 2 * Math.PI;
-            return this.a[channelIndex] + this.b[channelIndex] * Math.cos(PI2 * (this.c[channelIndex] * t + this.d[channelIndex]));
-        }
-    }
+        // --- State and UI Elements ---
 
-    // --- State and UI Elements ---
-
-    const defaultParams = {
-        A_R: 0.500, A_G: 0.500, A_B: 0.500, // Base (0.0 to 1.0)
-        B_R: 0.500, B_G: 0.500, B_B: 0.500, // Amplitude (0.0 to 1.0)
-        C_R: 1.000, C_G: 1.000, C_B: 1.000, // Frequency (0.0 to 5.0)
-        D_R: 0.000, D_G: 0.330, D_B: 0.670  // Phase (0.0 to 1.0)
-    };
-    
-    let parameters = { ...defaultParams };
-    let palette;
-    let previousParams = null; // NEW: For zoom history
-
-    // Animation state
-    let animationSpeed = 0.3; // Cycles per second (Default: 0.3 cycles/s)
-    let animationTime = 0.0;
-    let lastTime = 0;
-    let animationFrameId = null;
-
-    // NEW: Drag-to-zoom state
-    let isDragging = false;
-    let isSelectionActive = false; // NEW: Tracks if drag is active AND within Y-bounds
-    let dragStartTime = 0.0;
-    let dragEndTime = 0.0;
-    const DRAG_THRESHOLD = 0.01; // Minimum drag distance (as %) to be considered a zoom
-    let lockedDragStartValues = {}; // NEW: For locked slider relative movement
-
-    // DOM Elements
-    // FIXED: These are now declared inside init() after window.onload
-    // to ensure elements exist.
-    let colorStripCanvas, colorStripCtx, waveGraphCanvas, waveGraphCtx,
-        colorSwatch, tValueSpan, speedSlider, speedValueSpan,
-        hexValueSpan, copyPromptSpan, resetZoomButton;
-    
-    // MODIFIED: Added 'group' property
-    const sliderDefinitions = [
-        // A (Base): Range [0, 1]
-        { param: 'A_R', container: 'A_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'A' },
-        { param: 'A_G', container: 'A_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'A' },
-        { param: 'A_B', container: 'A_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'A' },
-        // B (Amplitude): Range [0, 1]
-        { param: 'B_R', container: 'B_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'B' },
-        { param: 'B_G', container: 'B_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'B' },
-        { param: 'B_B', container: 'B_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'B' },
-        // C (Frequency): Range [0, 5]
-        { param: 'C_R', container: 'C_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 5000, step: 1, scale: 1000, group: 'C' },
-        { param: 'C_G', container: 'C_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 5000, step: 1, scale: 1000, group: 'C' },
-        { param: 'C_B', container: 'C_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 5000, step: 1, scale: 1000, group: 'C' },
-        // D (Phase): Range [0, 1]
-        { param: 'D_R', container: 'D_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'D' },
-        { param: 'D_G', container: 'D_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'D' },
-        { param: 'D_B', container: 'D_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'D' }
-    ];
-
-    // --- Helper Functions ---
-
-    /**
-     * Converts float RGB [0, 1] to a HEX string.
-     */
-    function rgbToHex(r, g, b) {
-        const toHex = (c) => {
-            const i = Math.round(c * 255);
-            // Clamp value to 0-255, convert to hex, and pad with '0' if needed
-            const hex = Math.max(0, Math.min(255, i)).toString(16);
-            return hex.length === 1 ? "0" + hex : hex;
+        const defaultParams = {
+            A_R: 0.500, A_G: 0.500, A_B: 0.500, // Base (0.0 to 1.0)
+            B_R: 0.500, B_G: 0.500, B_B: 0.500, // Amplitude (0.0 to 1.0)
+            C_R: 1.000, C_G: 1.000, C_B: 1.000, // Frequency (0.0 to 5.0)
+            D_R: 0.000, D_G: 0.330, D_B: 0.670  // Phase (0.0 to 1.0)
         };
-        return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-    }
 
-    /**
-     * MODIFIED: Copies text to the clipboard and shows feedback on a specific element.
-     * @param {string} text - The text to copy.
-     * @param {HTMLElement} feedbackElement - The span to show "Copied!".
-     * @param {string} originalMessage - The message to restore after copying.
-     */
-    function copyToClipboard(text, feedbackElement, originalMessage = "") {
-        // Create a temporary textarea element to hold the text
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        
-        // Make it invisible and add it to the DOM
-        textarea.style.position = 'fixed';
-        textarea.style.top = 0;
-        textarea.style.left = 0;
-        textarea.style.width = '1px';
-        textarea.style.height = '1px';
-        textarea.style.opacity = 0;
-        document.body.appendChild(textarea);
-        
-        // Select the text and attempt to copy it
-        textarea.focus();
-        textarea.select();
-        
-        let success = false;
-        try {
-            success = document.execCommand('copy');
-        } catch (err) {
-            console.error('Failed to copy text: ', err);
+        let parameters = { ...defaultParams };
+        let palette;
+        let previousParams = null; // NEW: For zoom history
+
+        // Animation state
+        let animationSpeed = 0.3; // Cycles per second (Default: 0.3 cycles/s)
+        let animationTime = 0.0;
+        let lastTime = 0;
+        let animationFrameId = null;
+
+        // NEW: Drag-to-zoom state
+        let isDragging = false;
+        let isSelectionActive = false; // NEW: Tracks if drag is active AND within Y-bounds
+        let dragStartTime = 0.0;
+        let dragEndTime = 0.0;
+        const DRAG_THRESHOLD = 0.01; // Minimum drag distance (as %) to be considered a zoom
+        let lockedDragStartValues = {}; // NEW: For locked slider relative movement
+
+        // DOM Elements
+        // FIXED: These are now declared inside init() after window.onload
+        // to ensure elements exist.
+        let colorStripCanvas, colorStripCtx, waveGraphCanvas, waveGraphCtx,
+            colorSwatch, tValueSpan, speedSlider, speedValueSpan,
+            hexValueSpan, copyPromptSpan, resetZoomButton;
+
+        // MODIFIED: Added 'group' property
+        const sliderDefinitions = [
+            // A (Base): Range [0, 1]
+            { param: 'A_R', container: 'A_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'A' },
+            { param: 'A_G', container: 'A_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'A' },
+            { param: 'A_B', container: 'A_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'A' },
+            // B (Amplitude): Range [0, 1]
+            { param: 'B_R', container: 'B_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'B' },
+            { param: 'B_G', container: 'B_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'B' },
+            { param: 'B_B', container: 'B_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'B' },
+            // C (Frequency): Range [0, 5]
+            { param: 'C_R', container: 'C_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 5000, step: 1, scale: 1000, group: 'C' },
+            { param: 'C_G', container: 'C_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 5000, step: 1, scale: 1000, group: 'C' },
+            { param: 'C_B', container: 'C_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 5000, step: 1, scale: 1000, group: 'C' },
+            // D (Phase): Range [0, 1]
+            { param: 'D_R', container: 'D_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'D' },
+            { param: 'D_G', container: 'D_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'D' },
+            { param: 'D_B', container: 'D_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'D' }
+        ];
+
+        // --- Helper Functions ---
+
+        /**
+         * Converts float RGB [0, 1] to a HEX string.
+         */
+        function rgbToHex(r, g, b) {
+            const toHex = (c) => {
+                const i = Math.round(c * 255);
+                // Clamp value to 0-255, convert to hex, and pad with '0' if needed
+                const hex = Math.max(0, Math.min(255, i)).toString(16);
+                return hex.length === 1 ? "0" + hex : hex;
+            };
+            return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
         }
-        
-        // Clean up and remove the temporary element
-        document.body.removeChild(textarea);
-        
-        // Show visual feedback to the user
-        if (success && feedbackElement) {
-            feedbackElement.textContent = "Copied!";
-            feedbackElement.classList.remove('text-gray-500');
-            feedbackElement.classList.add('text-green-400');
-            
-            // Reset the message after 1.5 seconds
-            setTimeout(() => {
-                feedbackElement.textContent = originalMessage;
-                feedbackElement.classList.remove('text-green-400');
-                // Only add back if there was an original message
-                if (originalMessage) {
-                    feedbackElement.classList.add('text-gray-500');
-                }
-            }, 1500);
+
+        /**
+         * MODIFIED: Copies text to the clipboard and shows feedback on a specific element.
+         * @param {string} text - The text to copy.
+         * @param {HTMLElement} feedbackElement - The span to show "Copied!".
+         * @param {string} originalMessage - The message to restore after copying.
+         */
+        function copyToClipboard(text, feedbackElement, originalMessage = "") {
+            // Create a temporary textarea element to hold the text
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+
+            // Make it invisible and add it to the DOM
+            textarea.style.position = 'fixed';
+            textarea.style.top = 0;
+            textarea.style.left = 0;
+            textarea.style.width = '1px';
+            textarea.style.height = '1px';
+            textarea.style.opacity = 0;
+            document.body.appendChild(textarea);
+
+            // Select the text and attempt to copy it
+            textarea.focus();
+            textarea.select();
+
+            let success = false;
+            try {
+                success = document.execCommand('copy');
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+            }
+
+            // Clean up and remove the temporary element
+            document.body.removeChild(textarea);
+
+            // Show visual feedback to the user
+            if (success && feedbackElement) {
+                feedbackElement.textContent = "Copied!";
+                feedbackElement.classList.remove('text-gray-500');
+                feedbackElement.classList.add('text-green-400');
+
+                // Reset the message after 1.5 seconds
+                setTimeout(() => {
+                    feedbackElement.textContent = originalMessage;
+                    feedbackElement.classList.remove('text-green-400');
+                    // Only add back if there was an original message
+                    if (originalMessage) {
+                        feedbackElement.classList.add('text-gray-500');
+                    }
+                }, 1500);
+            }
         }
-    }
 
 
-    // --- UI and Event Functions ---
+        // --- UI and Event Functions ---
 
-    /**
-     * Creates the HTML structure for a single parameter slider.
-     */
-    function createSlider(def) {
-        const container = document.getElementById(def.container);
-        // Safety check if container doesn't exist
-        if (!container) {
-            console.error(`Slider container not found: ${def.container}`);
-            return;
-        }
-        const value = parameters[def.param] * def.scale;
-        
-        container.innerHTML = `
+        /**
+         * Creates the HTML structure for a single parameter slider.
+         */
+        function createSlider(def) {
+            const container = document.getElementById(def.container);
+            // Safety check if container doesn't exist
+            if (!container) {
+                console.error(`Slider container not found: ${def.container}`);
+                return;
+            }
+            const value = parameters[def.param] * def.scale;
+
+            container.innerHTML = `
             <div class="flex items-center space-x-2">
                 <span class="w-4 h-4 text-center font-bold text-${def.color}">${def.label}</span>
                 <input type="range" id="${def.param}_slider" min="${def.min}" max="${def.max}" step="${def.step}" value="${value}" class="${def.thumb}">
                 <span id="${def.param}_value" class="slider-label w-16 text-right">${parameters[def.param].toFixed(3)}</span>
             </div>
         `;
-        
-        const slider = document.getElementById(`${def.param}_slider`);
-        const valueSpan = document.getElementById(`${def.param}_value`);
-        
-        // NEW: mousedown listener to store initial values for locked drag
-        slider.addEventListener('mousedown', () => {
-            const lockCheckbox = document.getElementById(`lock_${def.group}`);
-            const isLocked = lockCheckbox ? lockCheckbox.checked : false;
 
-            if (isLocked) {
-                lockedDragStartValues = {}; // Clear previous drag values
-                sliderDefinitions.forEach(groupDef => {
-                    if (groupDef.group === def.group) {
-                        const groupSlider = document.getElementById(`${groupDef.param}_slider`);
-                        if (groupSlider) { // Safety check
-                            lockedDragStartValues[groupDef.param] = parseFloat(groupSlider.value);
-                        }
-                    }
-                });
-            }
-        });
-
-        // REWRITTEN: input listener for relative locked movement
-        slider.addEventListener('input', () => {
-            const lockCheckbox = document.getElementById(`lock_${def.group}`);
-            const isLocked = lockCheckbox ? lockCheckbox.checked : false;
-
-            if (isLocked && Object.keys(lockedDragStartValues).length > 0) {
-                // --- LOCKED RELATIVE MOVEMENT ---
-
-                // 1. Get delta from the slider being moved
-                const currentRawValue = parseFloat(slider.value);
-                const startRawValue = lockedDragStartValues[def.param];
-                if (startRawValue === undefined) return; // Should not happen if mousedown fired
-
-                let rawDelta = currentRawValue - startRawValue;
-                let cappedRawDelta = rawDelta;
-
-                // 2. Validate and cap delta against all sliders in the group
-                sliderDefinitions.forEach(groupDef => {
-                    if (groupDef.group === def.group) {
-                        const otherStartRawValue = lockedDragStartValues[groupDef.param];
-                        if (otherStartRawValue === undefined) return; // Safety check
-
-                        const groupSlider = document.getElementById(`${groupDef.param}_slider`);
-                        if (!groupSlider) return; // Safety check
-
-                        const proposedRawValue = otherStartRawValue + rawDelta;
-                        
-                        const min = parseFloat(groupSlider.min);
-                        const max = parseFloat(groupSlider.max);
-
-                        if (proposedRawValue < min) {
-                            // Delta is too negative. Find the max negative delta allowed.
-                            cappedRawDelta = Math.max(cappedRawDelta, min - otherStartRawValue);
-                        }
-                        if (proposedRawValue > max) {
-                            // Delta is too positive. Find the max positive delta allowed.
-                            cappedRawDelta = Math.min(cappedRawDelta, max - otherStartRawValue);
-                        }
-                    }
-                });
-
-                // 3. Apply the final capped delta to all sliders in the group
-                sliderDefinitions.forEach(groupDef => {
-                    if (groupDef.group === def.group) {
-                        const groupSlider = document.getElementById(`${groupDef.param}_slider`);
-                        const groupValueSpan = document.getElementById(`${groupDef.param}_value`);
-                        const groupStartRawValue = lockedDragStartValues[groupDef.param];
-
-                        // Ensure start value is valid before calculating final
-                        if (groupStartRawValue !== undefined && groupSlider && groupValueSpan) {
-                            const finalRawValue = groupStartRawValue + cappedRawDelta;
-                            const finalNewValue = finalRawValue / groupDef.scale;
-
-                            // Update parameter state
-                            parameters[groupDef.param] = finalNewValue; 
-                            // Update UI
-                            groupSlider.value = finalRawValue;
-                            groupValueSpan.textContent = finalNewValue.toFixed(3);
-                        }
-                    }
-                });
-
-            } else {
-                // --- UNLOCKED MOVEMENT (Original logic) ---
-                const newValue = parseFloat(slider.value) / def.scale;
-                parameters[def.param] = newValue;
-                valueSpan.textContent = newValue.toFixed(3);
-            }
-            
-            // Any manual slider change invalidates the zoom history
-            if (def.group === 'C' || def.group === 'D') {
-                hideResetZoomButton();
-            }
-            
-            updatePalette();
-        });
-
-        // NEW: Clear locked values on mouseup
-        slider.addEventListener('mouseup', () => {
-            lockedDragStartValues = {};
-        });
-        slider.addEventListener('touchend', () => {
-            lockedDragStartValues = {};
-        });
-    }
-
-    /**
-     * NEW: Updates all slider positions and value spans from the 'parameters' object.
-     * Used after zooming or resetting zoom.
-     */
-    function updateAllSliders() {
-        sliderDefinitions.forEach(def => {
             const slider = document.getElementById(`${def.param}_slider`);
             const valueSpan = document.getElementById(`${def.param}_value`);
-            
-            if (slider && valueSpan) {
-                const newValue = parameters[def.param];
-                const scaledValue = newValue * def.scale;
-                
-                // Clamp value to slider min/max before setting
-                slider.value = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), scaledValue));
-                valueSpan.textContent = newValue.toFixed(3);
-            }
-        });
-    }
 
-    /**
-     * NEW: Helper function to get the normalized (0-1) X coordinate from a mouse event.
-     */
-    function getNormalizedX(event) {
-        if (!colorStripCanvas) return 0; // Safety check
-        const rect = colorStripCanvas.getBoundingClientRect();
-        // Use clientX for consistency across mouse/touch events
-        const x = (event.clientX || (event.touches && event.touches[0].clientX)) - rect.left;
-        return Math.max(0, Math.min(1, x / rect.width));
-    }
-    
-    /**
-     * NEW: Handles the start of a drag or click on the color strip.
-     */
-    function handleDragStart(event) {
-        // Only trigger on left mouse button
-        if (event.button !== 0 || !colorStripCanvas) return;
-        
-        isDragging = true;
-        isSelectionActive = true; // NEW: Selection is active on start
-        dragStartTime = getNormalizedX(event);
-        dragEndTime = dragStartTime;
-        colorStripCanvas.style.cursor = 'crosshair';
-        
-        // Draw the initial state (strip + marker)
-        drawColorStrip(animationTime);
-    }
+            // NEW: mousedown listener to store initial values for locked drag
+            slider.addEventListener('mousedown', () => {
+                const lockCheckbox = document.getElementById(`lock_${def.group}`);
+                const isLocked = lockCheckbox ? lockCheckbox.checked : false;
 
-    /**
-     * NEW: Handles mouse movement during a drag.
-     * MODIFIED: Now cancels drag if mouse moves above or below the canvas.
-     */
-    function handleDragMove(event) {
-        if (!isDragging) return;
+                if (isLocked) {
+                    lockedDragStartValues = {}; // Clear previous drag values
+                    sliderDefinitions.forEach(groupDef => {
+                        if (groupDef.group === def.group) {
+                            const groupSlider = document.getElementById(`${groupDef.param}_slider`);
+                            if (groupSlider) { // Safety check
+                                lockedDragStartValues[groupDef.param] = parseFloat(groupSlider.value);
+                            }
+                        }
+                    });
+                }
+            });
 
-        // Always update the end time, even if off-canvas (for left/right)
-        dragEndTime = getNormalizedX(event);
+            // REWRITTEN: input listener for relative locked movement
+            slider.addEventListener('input', () => {
+                const lockCheckbox = document.getElementById(`lock_${def.group}`);
+                const isLocked = lockCheckbox ? lockCheckbox.checked : false;
 
-        // NEW: Check if mouse is outside the canvas's Y-bounds to deactivate selection
-        if (colorStripCanvas) { // Safety check
+                if (isLocked && Object.keys(lockedDragStartValues).length > 0) {
+                    // --- LOCKED RELATIVE MOVEMENT ---
+
+                    // 1. Get delta from the slider being moved
+                    const currentRawValue = parseFloat(slider.value);
+                    const startRawValue = lockedDragStartValues[def.param];
+                    if (startRawValue === undefined) return; // Should not happen if mousedown fired
+
+                    let rawDelta = currentRawValue - startRawValue;
+                    let cappedRawDelta = rawDelta;
+
+                    // 2. Validate and cap delta against all sliders in the group
+                    sliderDefinitions.forEach(groupDef => {
+                        if (groupDef.group === def.group) {
+                            const otherStartRawValue = lockedDragStartValues[groupDef.param];
+                            if (otherStartRawValue === undefined) return; // Safety check
+
+                            const groupSlider = document.getElementById(`${groupDef.param}_slider`);
+                            if (!groupSlider) return; // Safety check
+
+                            const proposedRawValue = otherStartRawValue + rawDelta;
+
+                            const min = parseFloat(groupSlider.min);
+                            const max = parseFloat(groupSlider.max);
+
+                            if (proposedRawValue < min) {
+                                // Delta is too negative. Find the max negative delta allowed.
+                                cappedRawDelta = Math.max(cappedRawDelta, min - otherStartRawValue);
+                            }
+                            if (proposedRawValue > max) {
+                                // Delta is too positive. Find the max positive delta allowed.
+                                cappedRawDelta = Math.min(cappedRawDelta, max - otherStartRawValue);
+                            }
+                        }
+                    });
+
+                    // 3. Apply the final capped delta to all sliders in the group
+                    sliderDefinitions.forEach(groupDef => {
+                        if (groupDef.group === def.group) {
+                            const groupSlider = document.getElementById(`${groupDef.param}_slider`);
+                            const groupValueSpan = document.getElementById(`${groupDef.param}_value`);
+                            const groupStartRawValue = lockedDragStartValues[groupDef.param];
+
+                            // Ensure start value is valid before calculating final
+                            if (groupStartRawValue !== undefined && groupSlider && groupValueSpan) {
+                                const finalRawValue = groupStartRawValue + cappedRawDelta;
+                                const finalNewValue = finalRawValue / groupDef.scale;
+
+                                // Update parameter state
+                                parameters[groupDef.param] = finalNewValue;
+                                // Update UI
+                                groupSlider.value = finalRawValue;
+                                groupValueSpan.textContent = finalNewValue.toFixed(3);
+                            }
+                        }
+                    });
+
+                } else {
+                    // --- UNLOCKED MOVEMENT (Original logic) ---
+                    const newValue = parseFloat(slider.value) / def.scale;
+                    parameters[def.param] = newValue;
+                    valueSpan.textContent = newValue.toFixed(3);
+                }
+
+                // Any manual slider change invalidates the zoom history
+                if (def.group === 'C' || def.group === 'D') {
+                    hideResetZoomButton();
+                }
+
+                updatePalette();
+            });
+
+            // NEW: Clear locked values on mouseup
+            slider.addEventListener('mouseup', () => {
+                lockedDragStartValues = {};
+            });
+            slider.addEventListener('touchend', () => {
+                lockedDragStartValues = {};
+            });
+        }
+
+        /**
+         * NEW: Updates all slider positions and value spans from the 'parameters' object.
+         * Used after zooming or resetting zoom.
+         */
+        function updateAllSliders() {
+            sliderDefinitions.forEach(def => {
+                const slider = document.getElementById(`${def.param}_slider`);
+                const valueSpan = document.getElementById(`${def.param}_value`);
+
+                if (slider && valueSpan) {
+                    const newValue = parameters[def.param];
+                    const scaledValue = newValue * def.scale;
+
+                    // Clamp value to slider min/max before setting
+                    slider.value = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), scaledValue));
+                    valueSpan.textContent = newValue.toFixed(3);
+                }
+            });
+        }
+
+        /**
+         * NEW: Helper function to get the normalized (0-1) X coordinate from a mouse event.
+         */
+        function getNormalizedX(event) {
+            if (!colorStripCanvas) return 0; // Safety check
             const rect = colorStripCanvas.getBoundingClientRect();
-            const y = event.clientY;
-            
-            if (y < rect.top || y > rect.bottom) {
-                // Mouse is above or below the canvas, deactivate selection
-                isSelectionActive = false;
-            } else {
-                // Mouse is back inside, reactivate selection
-                isSelectionActive = true;
-            }
-        }
-        
-        // REMOVED: Redraw is now handled by the 'animate' loop
-        // drawColorStrip(animationTime, { start: dragStartTime, end: dragEndTime });
-    }
-
-    /**
-     * NEW: Handles the end of a drag (zoom) or a simple click (set phase).
-     */
-    function handleDragEnd(event) {
-        if (!isDragging || !colorStripCanvas) return;
-
-        const wasSelectionActive = isSelectionActive; // Store state before reset
-        
-        isDragging = false;
-        isSelectionActive = false; // NEW: Reset selection state
-        colorStripCanvas.style.cursor = 'pointer';
-
-        // NEW: If mouse was released outside Y-bounds, do nothing.
-        if (!wasSelectionActive) {
-            drawColorStrip(animationTime); // Redraw to be safe
-            return;
+            // Use clientX for consistency across mouse/touch events
+            const x = (event.clientX || (event.touches && event.touches[0].clientX)) - rect.left;
+            return Math.max(0, Math.min(1, x / rect.width));
         }
 
-        // Use the last known drag position if mouseup is outside canvas
-        // (handleDragMove updates dragEndTime)
-        
-        const t_start = Math.min(dragStartTime, dragEndTime);
-        const t_end = Math.max(dragStartTime, dragEndTime);
-        const range = t_end - t_start;
+        /**
+         * NEW: Handles the start of a drag or click on the color strip.
+         */
+        function handleDragStart(event) {
+            // Only trigger on left mouse button
+            if (event.button !== 0 || !colorStripCanvas) return;
 
-        if (range < DRAG_THRESHOLD) {
-            // --- This was a CLICK ---
-            animationTime = t_start; // Use t_start (which equals dragStartTime)
-            
-            // REMOVED: Reset speed to default
-            
-            // Force update of visual elements
-            updateSwatch();
-            drawColorStrip(animationTime); // Redraw without selection
-            
-        } else {
-            // --- This was a ZOOM (drag) ---
-            zoomPalette(t_start, t_end);
-            showResetZoomButton();
-        }
-    }
+            isDragging = true;
+            isSelectionActive = true; // NEW: Selection is active on start
+            dragStartTime = getNormalizedX(event);
+            dragEndTime = dragStartTime;
+            colorStripCanvas.style.cursor = 'crosshair';
 
-    /**
-     * NEW: Cancels drag if mouse leaves the canvas.
-     */
-    function handleDragLeave() {
-        if (isDragging) {
-            isDragging = false;
-            isSelectionActive = false; // NEW: Also reset this
-            if (colorStripCanvas) {
-                colorStripCanvas.style.cursor = 'pointer';
-            }
-            // Redraw to remove selection overlay
+            // Draw the initial state (strip + marker)
             drawColorStrip(animationTime);
         }
-    }
 
-    /**
-     * NEW: Calculates and applies new C (frequency) and D (phase) parameters
-     * to zoom the palette from t_start to t_end.
-     */
-    function zoomPalette(t_start, t_end) {
-        // 1. Store the "before" state
-        if (!previousParams) { // Only store the *first* pre-zoom state
-            previousParams = {
-                C_R: parameters.C_R, C_G: parameters.C_G, C_B: parameters.C_B,
-                D_R: parameters.D_R, D_G: parameters.D_G, D_B: parameters.D_B
-            };
-        }
+        /**
+         * NEW: Handles mouse movement during a drag.
+         * MODIFIED: Now cancels drag if mouse moves above or below the canvas.
+         */
+        function handleDragMove(event) {
+            if (!isDragging) return;
 
-        const range = t_end - t_start;
+            // Always update the end time, even if off-canvas (for left/right)
+            dragEndTime = getNormalizedX(event);
 
-        // 2. Calculate new parameters based on the zoom formula
-        // C_new = C_old * range
-        // D_new = (D_old + C_old * t_start) % 1.0
-        
-        // Re-calculate C_new and D_new based on the *current* state
-        const current_C_R = parameters.C_R;
-        const current_D_R = parameters.D_R;
-        const current_C_G = parameters.C_G;
-        const current_D_G = parameters.D_G;
-        const current_C_B = parameters.C_B;
-        const current_D_B = parameters.D_B;
+            // NEW: Check if mouse is outside the canvas's Y-bounds to deactivate selection
+            if (colorStripCanvas) { // Safety check
+                const rect = colorStripCanvas.getBoundingClientRect();
+                const y = event.clientY;
 
-        const new_C_R = current_C_R * range;
-        const new_D_R = (current_D_R + current_C_R * t_start) % 1.0;
-        
-        const new_C_G = current_C_G * range;
-        const new_D_G = (current_D_G + current_C_G * t_start) % 1.0;
-
-        const new_C_B = current_C_B * range;
-        const new_D_B = (current_D_B + current_C_B * t_start) % 1.0;
-
-        // 3. Set new parameters
-        parameters.C_R = new_C_R;
-        parameters.D_R = new_D_R;
-        parameters.C_G = new_C_G;
-        parameters.D_G = new_D_G;
-        parameters.C_B = new_C_B;
-        parameters.D_B = new_D_B;
-
-        // 4. Update UI
-        updateAllSliders();
-        updatePalette();
-    }
-
-    /**
-     * NEW: Restores the parameters from before the zoom.
-     */
-    function handleResetZoom() {
-        if (!previousParams) return;
-
-        // 1. Restore parameters
-        parameters.C_R = previousParams.C_R;
-        parameters.C_G = previousParams.C_G;
-        parameters.C_B = previousParams.C_B;
-        parameters.D_R = previousParams.D_R;
-        parameters.D_G = previousParams.D_G;
-        parameters.D_B = previousParams.D_B;
-
-        // 2. Clear history and hide button
-        hideResetZoomButton();
-        
-        // 3. Update UI
-        updateAllSliders();
-        updatePalette();
-    }
-    
-    /**
-     * NEW: Hides the reset button and clears the zoom history.
-     */
-    function hideResetZoomButton() {
-        if (resetZoomButton) {
-            resetZoomButton.classList.add('hidden');
-        }
-        previousParams = null; // Invalidate history
-    }
-
-    /**
-     * NEW: Shows the reset button.
-     */
-    function showResetZoomButton() {
-        if (resetZoomButton) {
-            resetZoomButton.classList.remove('hidden');
-        }
-    }
-
-    // --- Drawing and Animation Functions ---
-
-    /**
-     * MODIFIED: Draws the color strip, the time marker, and an optional selection overlay.
-     * @param {number} t The current time parameter (0 to 1) for the marker position.
-     * @param {object | null} selectionRange - e.g., { start: 0.2, end: 0.5 }
-     */
-    function drawColorStrip(t, selectionRange = null) {
-        if (!colorStripCtx) return; // Safety check
-        const width = colorStripCanvas.width;
-        const height = colorStripCanvas.height;
-        
-        // 1. Draw the static color strip (clears the previous marker)
-        const imageData = colorStripCtx.getImageData(0, 0, width, height);
-        const data = imageData.data;
-        
-        for (let x = 0; x < width; x++) {
-            const tx = x / (width - 1);
-            const [r, g, b] = palette.get(tx); // Get color in [0, 1] range
-
-            const rInt = Math.round(r * 255);
-            const gInt = Math.round(g * 255);
-            const bInt = Math.round(b * 255);
-
-            for (let y = 0; y < height; y++) {
-                const index = (y * width + x) * 4;
-                data[index] = rInt;
-                data[index + 1] = gInt;
-                data[index + 2] = bInt;
-                data[index + 3] = 255; // Alpha
-            }
-        }
-        colorStripCtx.putImageData(imageData, 0, 0);
-
-        // 2. Draw the sweeping line marker
-        const markerX = Math.round(t * width);
-
-        colorStripCtx.strokeStyle = '#FFFFFF'; // Bright white marker
-        colorStripCtx.lineWidth = 2;
-        colorStripCtx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-        colorStripCtx.shadowBlur = 5;
-
-        colorStripCtx.beginPath();
-        colorStripCtx.moveTo(markerX, 0);
-        colorStripCtx.lineTo(markerX, height);
-        colorStripCtx.stroke();
-
-        colorStripCtx.shadowBlur = 0; // Reset shadow
-
-        // 3. NEW: Draw the selection overlay if it exists
-        if (selectionRange) {
-            // Ensure startX is the smaller value
-            const startRaw = selectionRange.start * width;
-            const endRaw = selectionRange.end * width;
-            const startX = Math.min(startRaw, endRaw);
-            const endX = Math.max(startRaw, endRaw);
-
-            colorStripCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            colorStripCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-            colorStripCtx.lineWidth = 1;
-
-            colorStripCtx.fillRect(startX, 0, endX - startX, height);
-            colorStripCtx.strokeRect(startX, 0, endX - startX, height);
-        }
-    }
-    
-    /**
-     * Draws the R, G, and B wave functions on the graph canvas.
-     */
-    function drawWaveGraph() {
-        if (!waveGraphCtx) return; // Safety check
-        const width = waveGraphCanvas.width;
-        const height = waveGraphCanvas.height;
-        waveGraphCtx.clearRect(0, 0, width, height);
-
-        // Background grid and center line
-        waveGraphCtx.fillStyle = '#1E293B';
-        waveGraphCtx.fillRect(0, 0, width, height);
-        waveGraphCtx.strokeStyle = '#475569';
-        waveGraphCtx.lineWidth = 1;
-        
-        // Draw 0.0 and 1.0 boundary lines. These lines are positioned at 10% and 90% of the canvas height.
-        waveGraphCtx.beginPath();
-        waveGraphCtx.moveTo(0, height * 0.1);
-        waveGraphCtx.lineTo(width, height * 0.1);
-        waveGraphCtx.moveTo(0, height * 0.9);
-        waveGraphCtx.lineTo(width, height * 0.9);
-        waveGraphCtx.stroke();
-
-        // Draw center line (0.5 reference)
-        waveGraphCtx.strokeStyle = '#475569';
-        waveGraphCtx.setLineDash([5, 5]);
-        waveGraphCtx.beginPath();
-        waveGraphCtx.moveTo(0, height / 2);
-        waveGraphCtx.lineTo(width, height / 2);
-        waveGraphCtx.stroke();
-        waveGraphCtx.setLineDash([]); // Reset dashed line
-
-        // Draw R, G, B waves
-        const colors = ['#EF4444', '#22C55E', '#3B82F6']; // Red, Green, Blue
-        const channels = [0, 1, 2];
-
-        channels.forEach((channelIndex) => {
-            waveGraphCtx.beginPath();
-            waveGraphCtx.strokeStyle = colors[channelIndex];
-            waveGraphCtx.lineWidth = 3;
-
-            for (let x = 0; x < width; x++) {
-                const t = x / (width - 1);
-                const value = palette.getChannelValue(t, channelIndex);
-                
-                // Map the value from conceptual range [-0.5, 1.5] to canvas height [height*0.9, height*0.1]
-                // This expanded range helps visualize when the wave goes out of the [0, 1] color range
-                const mappedY = mapValue(value, -0.5, 1.5, height * 0.9, height * 0.1);
-
-                if (x === 0) {
-                    waveGraphCtx.moveTo(x, mappedY);
+                if (y < rect.top || y > rect.bottom) {
+                    // Mouse is above or below the canvas, deactivate selection
+                    isSelectionActive = false;
                 } else {
-                    waveGraphCtx.lineTo(x, mappedY);
+                    // Mouse is back inside, reactivate selection
+                    isSelectionActive = true;
                 }
             }
+
+            // REMOVED: Redraw is now handled by the 'animate' loop
+            // drawColorStrip(animationTime, { start: dragStartTime, end: dragEndTime });
+        }
+
+        /**
+         * NEW: Handles the end of a drag (zoom) or a simple click (set phase).
+         */
+        function handleDragEnd(event) {
+            if (!isDragging || !colorStripCanvas) return;
+
+            const wasSelectionActive = isSelectionActive; // Store state before reset
+
+            isDragging = false;
+            isSelectionActive = false; // NEW: Reset selection state
+            colorStripCanvas.style.cursor = 'pointer';
+
+            // NEW: If mouse was released outside Y-bounds, do nothing.
+            if (!wasSelectionActive) {
+                drawColorStrip(animationTime); // Redraw to be safe
+                return;
+            }
+
+            // Use the last known drag position if mouseup is outside canvas
+            // (handleDragMove updates dragEndTime)
+
+            const t_start = Math.min(dragStartTime, dragEndTime);
+            const t_end = Math.max(dragStartTime, dragEndTime);
+            const range = t_end - t_start;
+
+            if (range < DRAG_THRESHOLD) {
+                // --- This was a CLICK ---
+                animationTime = t_start; // Use t_start (which equals dragStartTime)
+
+                // REMOVED: Reset speed to default
+
+                // Force update of visual elements
+                updateSwatch();
+                drawColorStrip(animationTime); // Redraw without selection
+
+            } else {
+                // --- This was a ZOOM (drag) ---
+                zoomPalette(t_start, t_end);
+                showResetZoomButton();
+            }
+        }
+
+        /**
+         * NEW: Cancels drag if mouse leaves the canvas.
+         */
+        function handleDragLeave() {
+            if (isDragging) {
+                isDragging = false;
+                isSelectionActive = false; // NEW: Also reset this
+                if (colorStripCanvas) {
+                    colorStripCanvas.style.cursor = 'pointer';
+                }
+                // Redraw to remove selection overlay
+                drawColorStrip(animationTime);
+            }
+        }
+
+        /**
+         * NEW: Calculates and applies new C (frequency) and D (phase) parameters
+         * to zoom the palette from t_start to t_end.
+         */
+        function zoomPalette(t_start, t_end) {
+            // 1. Store the "before" state
+            if (!previousParams) { // Only store the *first* pre-zoom state
+                previousParams = {
+                    C_R: parameters.C_R, C_G: parameters.C_G, C_B: parameters.C_B,
+                    D_R: parameters.D_R, D_G: parameters.D_G, D_B: parameters.D_B
+                };
+            }
+
+            const range = t_end - t_start;
+
+            // 2. Calculate new parameters based on the zoom formula
+            // C_new = C_old * range
+            // D_new = (D_old + C_old * t_start) % 1.0
+
+            // Re-calculate C_new and D_new based on the *current* state
+            const current_C_R = parameters.C_R;
+            const current_D_R = parameters.D_R;
+            const current_C_G = parameters.C_G;
+            const current_D_G = parameters.D_G;
+            const current_C_B = parameters.C_B;
+            const current_D_B = parameters.D_B;
+
+            const new_C_R = current_C_R * range;
+            const new_D_R = (current_D_R + current_C_R * t_start) % 1.0;
+
+            const new_C_G = current_C_G * range;
+            const new_D_G = (current_D_G + current_C_G * t_start) % 1.0;
+
+            const new_C_B = current_C_B * range;
+            const new_D_B = (current_D_B + current_C_B * t_start) % 1.0;
+
+            // 3. Set new parameters
+            parameters.C_R = new_C_R;
+            parameters.D_R = new_D_R;
+            parameters.C_G = new_C_G;
+            parameters.D_G = new_D_G;
+            parameters.C_B = new_C_B;
+            parameters.D_B = new_D_B;
+
+            // 4. Update UI
+            updateAllSliders();
+            updatePalette();
+        }
+
+        /**
+         * NEW: Restores the parameters from before the zoom.
+         */
+        function handleResetZoom() {
+            if (!previousParams) return;
+
+            // 1. Restore parameters
+            parameters.C_R = previousParams.C_R;
+            parameters.C_G = previousParams.C_G;
+            parameters.C_B = previousParams.C_B;
+            parameters.D_R = previousParams.D_R;
+            parameters.D_G = previousParams.D_G;
+            parameters.D_B = previousParams.D_B;
+
+            // 2. Clear history and hide button
+            hideResetZoomButton();
+
+            // 3. Update UI
+            updateAllSliders();
+            updatePalette();
+        }
+
+        /**
+         * NEW: Hides the reset button and clears the zoom history.
+         */
+        function hideResetZoomButton() {
+            if (resetZoomButton) {
+                resetZoomButton.classList.add('hidden');
+            }
+            previousParams = null; // Invalidate history
+        }
+
+        /**
+         * NEW: Shows the reset button.
+         */
+        function showResetZoomButton() {
+            if (resetZoomButton) {
+                resetZoomButton.classList.remove('hidden');
+            }
+        }
+
+        // --- Drawing and Animation Functions ---
+
+        /**
+         * MODIFIED: Draws the color strip, the time marker, and an optional selection overlay.
+         * @param {number} t The current time parameter (0 to 1) for the marker position.
+         * @param {object | null} selectionRange - e.g., { start: 0.2, end: 0.5 }
+         */
+        function drawColorStrip(t, selectionRange = null) {
+            if (!colorStripCtx) return; // Safety check
+            const width = colorStripCanvas.width;
+            const height = colorStripCanvas.height;
+
+            // 1. Draw the static color strip (clears the previous marker)
+            const imageData = colorStripCtx.getImageData(0, 0, width, height);
+            const data = imageData.data;
+
+            for (let x = 0; x < width; x++) {
+                const tx = x / (width - 1);
+                const [r, g, b] = palette.get(tx); // Get color in [0, 1] range
+
+                const rInt = Math.round(r * 255);
+                const gInt = Math.round(g * 255);
+                const bInt = Math.round(b * 255);
+
+                for (let y = 0; y < height; y++) {
+                    const index = (y * width + x) * 4;
+                    data[index] = rInt;
+                    data[index + 1] = gInt;
+                    data[index + 2] = bInt;
+                    data[index + 3] = 255; // Alpha
+                }
+            }
+            colorStripCtx.putImageData(imageData, 0, 0);
+
+            // 2. Draw the sweeping line marker
+            const markerX = Math.round(t * width);
+
+            colorStripCtx.strokeStyle = '#FFFFFF'; // Bright white marker
+            colorStripCtx.lineWidth = 2;
+            colorStripCtx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            colorStripCtx.shadowBlur = 5;
+
+            colorStripCtx.beginPath();
+            colorStripCtx.moveTo(markerX, 0);
+            colorStripCtx.lineTo(markerX, height);
+            colorStripCtx.stroke();
+
+            colorStripCtx.shadowBlur = 0; // Reset shadow
+
+            // 3. NEW: Draw the selection overlay if it exists
+            if (selectionRange) {
+                // Ensure startX is the smaller value
+                const startRaw = selectionRange.start * width;
+                const endRaw = selectionRange.end * width;
+                const startX = Math.min(startRaw, endRaw);
+                const endX = Math.max(startRaw, endRaw);
+
+                colorStripCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                colorStripCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                colorStripCtx.lineWidth = 1;
+
+                colorStripCtx.fillRect(startX, 0, endX - startX, height);
+                colorStripCtx.strokeRect(startX, 0, endX - startX, height);
+            }
+        }
+
+        /**
+         * Draws the R, G, and B wave functions on the graph canvas.
+         */
+        function drawWaveGraph() {
+            if (!waveGraphCtx) return; // Safety check
+            const width = waveGraphCanvas.width;
+            const height = waveGraphCanvas.height;
+            waveGraphCtx.clearRect(0, 0, width, height);
+
+            // Background grid and center line
+            waveGraphCtx.fillStyle = '#1E293B';
+            waveGraphCtx.fillRect(0, 0, width, height);
+            waveGraphCtx.strokeStyle = '#475569';
+            waveGraphCtx.lineWidth = 1;
+
+            // Draw 0.0 and 1.0 boundary lines. These lines are positioned at 10% and 90% of the canvas height.
+            waveGraphCtx.beginPath();
+            waveGraphCtx.moveTo(0, height * 0.1);
+            waveGraphCtx.lineTo(width, height * 0.1);
+            waveGraphCtx.moveTo(0, height * 0.9);
+            waveGraphCtx.lineTo(width, height * 0.9);
             waveGraphCtx.stroke();
-        });
-        
-        // Draw clamped region overlay (optional, but informative)
-        waveGraphCtx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-        // Area below 0
-        waveGraphCtx.fillRect(0, mapValue(0, -0.5, 1.5, height * 0.9, height * 0.1), width, height * 0.9 - mapValue(0, -0.5, 1.5, height * 0.9, height * 0.1));
-        // Area above 1
-        waveGraphCtx.fillRect(0, height * 0.1, width, mapValue(1, -0.5, 1.5, height * 0.9, height * 0.1) - height * 0.1);
-    }
-    
-    /**
-     * Simple linear interpolation map function.
-     */
-    function mapValue(value, fromMin, fromMax, toMin, toMax) {
-        // FIXED: Corrected typo 'fromM-in' to 'fromMin'
-        return (value - fromMin) * (toMax - toMin) / (fromMax - fromMin) + toMin;
-    }
 
-    /**
-     * Updates the color swatch based on the current animation time.
-     */
-    function updateSwatch() {
-        if (!palette || !colorSwatch) return; // Safety check
+            // Draw center line (0.5 reference)
+            waveGraphCtx.strokeStyle = '#475569';
+            waveGraphCtx.setLineDash([5, 5]);
+            waveGraphCtx.beginPath();
+            waveGraphCtx.moveTo(0, height / 2);
+            waveGraphCtx.lineTo(width, height / 2);
+            waveGraphCtx.stroke();
+            waveGraphCtx.setLineDash([]); // Reset dashed line
 
-        const [r, g, b] = palette.get(animationTime);
-        const hex = rgbToHex(r, g, b); // Get the hex code
-        
-        colorSwatch.style.backgroundColor = hex;
-        
-        if (tValueSpan) {
-            tValueSpan.textContent = animationTime.toFixed(3);
+            // Draw R, G, B waves
+            const colors = ['#EF4444', '#22C55E', '#3B82F6']; // Red, Green, Blue
+            const channels = [0, 1, 2];
+
+            channels.forEach((channelIndex) => {
+                waveGraphCtx.beginPath();
+                waveGraphCtx.strokeStyle = colors[channelIndex];
+                waveGraphCtx.lineWidth = 3;
+
+                for (let x = 0; x < width; x++) {
+                    const t = x / (width - 1);
+                    const value = palette.getChannelValue(t, channelIndex);
+
+                    // Map the value from conceptual range [-0.5, 1.5] to canvas height [height*0.9, height*0.1]
+                    // This expanded range helps visualize when the wave goes out of the [0, 1] color range
+                    const mappedY = mapValue(value, -0.5, 1.5, height * 0.9, height * 0.1);
+
+                    if (x === 0) {
+                        waveGraphCtx.moveTo(x, mappedY);
+                    } else {
+                        waveGraphCtx.lineTo(x, mappedY);
+                    }
+                }
+                waveGraphCtx.stroke();
+            });
+
+            // Draw clamped region overlay (optional, but informative)
+            waveGraphCtx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+            // Area below 0
+            waveGraphCtx.fillRect(0, mapValue(0, -0.5, 1.5, height * 0.9, height * 0.1), width, height * 0.9 - mapValue(0, -0.5, 1.5, height * 0.9, height * 0.1));
+            // Area above 1
+            waveGraphCtx.fillRect(0, height * 0.1, width, mapValue(1, -0.5, 1.5, height * 0.9, height * 0.1) - height * 0.1);
         }
-        if (hexValueSpan) {
-            hexValueSpan.textContent = hex; // Update the new span
-        }
-    }
 
-    /**
-     * Main animation loop using requestAnimationFrame.
-     */
-    function animate(currentTime) {
-        animationFrameId = requestAnimationFrame(animate);
-        
-        if (!lastTime) {
+        /**
+         * Simple linear interpolation map function.
+         */
+        function mapValue(value, fromMin, fromMax, toMin, toMax) {
+            // FIXED: Corrected typo 'fromM-in' to 'fromMin'
+            return (value - fromMin) * (toMax - toMin) / (fromMax - fromMin) + toMin;
+        }
+
+        /**
+         * Updates the color swatch based on the current animation time.
+         */
+        function updateSwatch() {
+            if (!palette || !colorSwatch) return; // Safety check
+
+            const [r, g, b] = palette.get(animationTime);
+            const hex = rgbToHex(r, g, b); // Get the hex code
+
+            colorSwatch.style.backgroundColor = hex;
+
+            if (tValueSpan) {
+                tValueSpan.textContent = animationTime.toFixed(3);
+            }
+            if (hexValueSpan) {
+                hexValueSpan.textContent = hex; // Update the new span
+            }
+        }
+
+        /**
+         * Main animation loop using requestAnimationFrame.
+         */
+        function animate(currentTime) {
+            animationFrameId = requestAnimationFrame(animate);
+
+            if (!lastTime) {
+                lastTime = currentTime;
+                return;
+            }
+
+            const deltaTime = (currentTime - lastTime) / 1000; // Time passed in seconds
             lastTime = currentTime;
-            return;
+
+            // Update global time based on speed
+            animationTime += animationSpeed * deltaTime;
+            animationTime %= 1.0; // Keep t between 0 and 1 (wrap around)
+
+            updateSwatch();
+
+            // MODIFIED:
+            // Always draw the color strip.
+            // If dragging AND selection is active, draw with the selection overlay.
+            // Otherwise, just draw with the time marker.
+            if (isDragging && isSelectionActive) {
+                drawColorStrip(animationTime, { start: dragStartTime, end: dragEndTime });
+            } else {
+                drawColorStrip(animationTime);
+            }
         }
 
-        const deltaTime = (currentTime - lastTime) / 1000; // Time passed in seconds
-        lastTime = currentTime;
 
-        // Update global time based on speed
-        animationTime += animationSpeed * deltaTime;
-        animationTime %= 1.0; // Keep t between 0 and 1 (wrap around)
+        /**
+         * NEW: Updates the code output block with the current parameters.
+         */
+        function updatePaletteCodeOutput() {
+            const codeOutput = document.getElementById('palette_code_output');
+            if (!codeOutput) return;
 
-        updateSwatch();
-        
-        // MODIFIED:
-        // Always draw the color strip.
-        // If dragging AND selection is active, draw with the selection overlay.
-        // Otherwise, just draw with the time marker.
-        if (isDragging && isSelectionActive) {
-            drawColorStrip(animationTime, { start: dragStartTime, end: dragEndTime });
-        } else {
-            drawColorStrip(animationTime);
-        }
-    }
+            const f = (n) => n.toFixed(3); // Formatter
 
-
-    /**
-     * NEW: Updates the code output block with the current parameters.
-     */
-    function updatePaletteCodeOutput() {
-        const codeOutput = document.getElementById('palette_code_output');
-        if (!codeOutput) return;
-
-        const f = (n) => n.toFixed(3); // Formatter
-
-        // Use template literal for multi-line string
-        const codeString = 
-`[${f(parameters.A_R)}, ${f(parameters.A_G)}, ${f(parameters.A_B)}], // A
+            // Use template literal for multi-line string
+            const codeString =
+                `[${f(parameters.A_R)}, ${f(parameters.A_G)}, ${f(parameters.A_B)}], // A
 [${f(parameters.B_R)}, ${f(parameters.B_G)}, ${f(parameters.B_B)}], // B
 [${f(parameters.C_R)}, ${f(parameters.C_G)}, ${f(parameters.C_B)}], // C
 [${f(parameters.D_R)}, ${f(parameters.D_G)}, ${f(parameters.D_B)}]  // D`;
 
-        codeOutput.textContent = codeString;
-    }
-
-    /**
-     * Main update function: reads parameters, initializes palette, and redraws visualizations.
-     */
-    function updatePalette() {
-        const A = [parameters.A_R, parameters.A_G, parameters.A_B];
-        const B = [parameters.B_R, parameters.B_G, parameters.B_B];
-        const C = [parameters.C_R, parameters.C_G, parameters.C_B];
-        const D = [parameters.D_R, parameters.D_G, parameters.D_B];
-        
-        palette = new ProceduralPalette(A, B, C, D);
-        
-        // Redraw static graph elements
-        drawWaveGraph();
-        
-        // Update dynamic elements once immediately
-        updateSwatch();
-        drawColorStrip(animationTime);  
-
-        // NEW: Update the code output
-        updatePaletteCodeOutput();
-    }
-
-    /**
-     * Initialize the sliders and the first visualization.
-     */
-    function init() {
-        // FIXED: Assign DOM elements *inside* init, after DOM load.
-        colorStripCanvas = document.getElementById('colorStripCanvas');
-        colorStripCtx = colorStripCanvas ? colorStripCanvas.getContext('2d') : null;
-        waveGraphCanvas = document.getElementById('waveGraphCanvas');
-        waveGraphCtx = waveGraphCanvas ? waveGraphCanvas.getContext('2d') : null;
-        colorSwatch = document.getElementById('colorSwatch');
-        tValueSpan = document.getElementById('t_value');
-        speedSlider = document.getElementById('speed_slider');
-        speedValueSpan = document.getElementById('speed_value');
-        hexValueSpan = document.getElementById('hex_value');
-        copyPromptSpan = document.getElementById('copy_prompt');
-        resetZoomButton = document.getElementById('resetZoomButton');
-
-        // Safety check for critical elements
-        if (!colorStripCanvas || !waveGraphCanvas || !colorStripCtx || !waveGraphCtx) {
-            console.error("Fatal Error: Canvas elements not found. Stopping init.");
-            return;
+            codeOutput.textContent = codeString;
         }
 
-        // 1. Initialize all 12 R/G/B sliders
-        sliderDefinitions.forEach(createSlider);
+        /**
+         * Main update function: reads parameters, initializes palette, and redraws visualizations.
+         */
+        function updatePalette() {
+            const A = [parameters.A_R, parameters.A_G, parameters.A_B];
+            const B = [parameters.B_R, parameters.B_G, parameters.B_B];
+            const C = [parameters.C_R, parameters.C_G, parameters.C_B];
+            const D = [parameters.D_R, parameters.D_G, parameters.D_B];
 
-        // 2. Initialize Speed slider
-        if (speedSlider) {
-            speedSlider.addEventListener('input', () => {
-                animationSpeed = parseFloat(speedSlider.value) / 1000; // Slider range 0-2000 -> Speed 0-2.000
-                if(speedValueSpan) {
-                    speedValueSpan.textContent = animationSpeed.toFixed(3);
-                }
-            });
-        }
-        
-        // 3. MODIFIED: Add new drag-and-drop listeners
-        colorStripCanvas.addEventListener('mousedown', handleDragStart);
-        document.addEventListener('mousemove', handleDragMove); // Listen on document to drag outside
-        document.addEventListener('mouseup', handleDragEnd); // Listen on document to release outside
-        // REMOVED: colorStripCanvas.addEventListener('mouseleave', handleDragLeave);
-        // The document's 'mousemove' listener now handles this logic.
+            palette = new ProceduralPalette(A, B, C, D);
 
-        // 4. NEW: Add click-to-copy to the swatch
-        if (colorSwatch) {
-            colorSwatch.addEventListener('click', () => {
-                if (hexValueSpan) {
-                    const hex = hexValueSpan.textContent;
-                    copyToClipboard(hex, copyPromptSpan, "(Click swatch to copy)");
-                }
-            });
+            // Redraw static graph elements
+            drawWaveGraph();
+
+            // Update dynamic elements once immediately
+            updateSwatch();
+            drawColorStrip(animationTime);
+
+            // NEW: Update the code output
+            updatePaletteCodeOutput();
         }
 
-        // 5. NEW: Add listener for the reset zoom button
-        if (resetZoomButton) {
-            resetZoomButton.addEventListener('click', handleResetZoom);
+        /**
+         * Initialize the sliders and the first visualization.
+         */
+        function init() {
+            // FIXED: Assign DOM elements *inside* init, after DOM load.
+            colorStripCanvas = document.getElementById('colorStripCanvas');
+            colorStripCtx = colorStripCanvas ? colorStripCanvas.getContext('2d') : null;
+            waveGraphCanvas = document.getElementById('waveGraphCanvas');
+            waveGraphCtx = waveGraphCanvas ? waveGraphCanvas.getContext('2d') : null;
+            colorSwatch = document.getElementById('colorSwatch');
+            tValueSpan = document.getElementById('t_value');
+            speedSlider = document.getElementById('speed_slider');
+            speedValueSpan = document.getElementById('speed_value');
+            hexValueSpan = document.getElementById('hex_value');
+            copyPromptSpan = document.getElementById('copy_prompt');
+            resetZoomButton = document.getElementById('resetZoomButton');
+
+            // Safety check for critical elements
+            if (!colorStripCanvas || !waveGraphCanvas || !colorStripCtx || !waveGraphCtx) {
+                console.error("Fatal Error: Canvas elements not found. Stopping init.");
+                return;
+            }
+
+            // 1. Initialize all 12 R/G/B sliders
+            sliderDefinitions.forEach(createSlider);
+
+            // 2. Initialize Speed slider
+            if (speedSlider) {
+                speedSlider.addEventListener('input', () => {
+                    animationSpeed = parseFloat(speedSlider.value) / 1000; // Slider range 0-2000 -> Speed 0-2.000
+                    if (speedValueSpan) {
+                        speedValueSpan.textContent = animationSpeed.toFixed(3);
+                    }
+                });
+            }
+
+            // 3. MODIFIED: Add new drag-and-drop listeners
+            colorStripCanvas.addEventListener('mousedown', handleDragStart);
+            document.addEventListener('mousemove', handleDragMove); // Listen on document to drag outside
+            document.addEventListener('mouseup', handleDragEnd); // Listen on document to release outside
+            // REMOVED: colorStripCanvas.addEventListener('mouseleave', handleDragLeave);
+            // The document's 'mousemove' listener now handles this logic.
+
+            // 4. NEW: Add click-to-copy to the swatch
+            if (colorSwatch) {
+                colorSwatch.addEventListener('click', () => {
+                    if (hexValueSpan) {
+                        const hex = hexValueSpan.textContent;
+                        copyToClipboard(hex, copyPromptSpan, "(Click swatch to copy)");
+                    }
+                });
+            }
+
+            // 5. NEW: Add listener for the reset zoom button
+            if (resetZoomButton) {
+                resetZoomButton.addEventListener('click', handleResetZoom);
+            }
+
+            // 6. NEW: Add listener for the copy code button
+            const copyCodeButton = document.getElementById('copy_code_button');
+            const copyCodePrompt = document.getElementById('copy_code_prompt');
+            const codeOutput = document.getElementById('palette_code_output');
+
+            if (copyCodeButton && codeOutput && copyCodePrompt) {
+                copyCodeButton.addEventListener('click', () => {
+                    // Get the text content, preserving line breaks
+                    copyToClipboard(codeOutput.textContent, copyCodePrompt, "");
+                });
+            }
+
+            // 7. Set up the initial state and start the animation
+            updatePalette(); // This will now also call updatePaletteCodeOutput()
+            if (animationFrameId === null) {
+                animate(0); // Start the animation loop
+            }
         }
 
-        // 6. NEW: Add listener for the copy code button
-        const copyCodeButton = document.getElementById('copy_code_button');
-        const copyCodePrompt = document.getElementById('copy_code_prompt');
-        const codeOutput = document.getElementById('palette_code_output');
-        
-        if (copyCodeButton && codeOutput && copyCodePrompt) {
-            copyCodeButton.addEventListener('click', () => {
-                // Get the text content, preserving line breaks
-                copyToClipboard(codeOutput.textContent, copyCodePrompt, "");
-            });
-        }
+        // Start the application
+        window.onload = init;
 
-        // 7. Set up the initial state and start the animation
-        updatePalette(); // This will now also call updatePaletteCodeOutput()
-        if (animationFrameId === null) {
-            animate(0); // Start the animation loop
-        }
-    }
-    
-    // Start the application
-    window.onload = init;
-
-</script>
+    </script>
 </body>
-</html>
 
+</html>
