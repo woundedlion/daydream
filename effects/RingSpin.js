@@ -11,7 +11,7 @@ import {
     Orientation, vectorPool
 } from "../geometry.js";
 import {
-    sampleRing, rasterize, plotDots, tween
+    samplePolygon, rasterize, plotDots, tween
 } from "../draw.js";
 import {
     VignettePalette, richSunset, mangoPeel, underSea, iceMelt, TransparentVignette
@@ -27,8 +27,8 @@ export class RingSpin {
     static Ring = class {
         constructor(normal, palette, trailLength) {
             this.normal = normal;
-            // map(v => v.clone()) is essential because sampleRing now returns pooled vectors
-            this.basePoints = sampleRing(new THREE.Quaternion(), this.normal, 1).map(v => v.clone());
+            // map(v => v.clone()) is essential because samplePolygon now returns pooled vectors
+            this.basePoints = samplePolygon(new THREE.Quaternion(), this.normal, 1, Daydream.W / 4).map(v => v.clone());
             this.scratchPoints = new Array(this.basePoints.length);
             for (let i = 0; i < this.basePoints.length; ++i) {
                 this.scratchPoints[i] = new THREE.Vector3();

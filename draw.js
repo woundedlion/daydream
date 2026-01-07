@@ -625,14 +625,15 @@ export const calcRingPoint = (a, radius, u, v, w) => {
 }
 
 /**
- * Samples points for a circular ring on the sphere surface with adaptive sampling.
+ * Samples points for a polygon or ring on the sphere surface.
  * @param {THREE.Quaternion} orientationQuaternion - The orientation of the ring.
  * @param {THREE.Vector3} normal - The normal vector defining the ring plane.
  * @param {number} radius - The radius of the ring.
+ * @param {number} numSamples - The number of points to sample.
  * @param {number} [phase=0] - Starting phase.
  * @returns {THREE.Vector3[]} An array of points.
  */
-export const sampleRing = (orientationQuaternion, normal, radius, phase = 0) => {
+export const samplePolygon = (orientationQuaternion, normal, radius, numSamples, phase = 0) => {
   // Basis
   let refAxis = Daydream.X_AXIS;
   if (Math.abs(normal.dot(refAxis)) > 0.9999) {
@@ -655,7 +656,6 @@ export const sampleRing = (orientationQuaternion, normal, radius, phase = 0) => 
   const d = Math.cos(thetaEq);
 
   // Calculate Samples
-  const numSamples = Daydream.W / 4;
   const step = 2 * Math.PI / numSamples;
   let points = [];
   let uTemp = vectorPool.acquire();
@@ -673,8 +673,7 @@ export const sampleRing = (orientationQuaternion, normal, radius, phase = 0) => 
 }
 
 /**
- * Draws a circular ring on the sphere surface with adaptive sampling
- * to prevent artifacts near the poles.
+ * Draws a circular ring on the sphere surface with adaptive sampling.
  * @param {THREE.Quaternion} orientationQuaternion - The orientation of the ring.
  * @param {THREE.Vector3} normal - The normal vector defining the ring plane.
  * @param {number} radius - The radius of the ring.
@@ -683,7 +682,22 @@ export const sampleRing = (orientationQuaternion, normal, radius, phase = 0) => 
  * @returns {Dot[]} An array of Dots.
  */
 export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase = 0) => {
-  const points = sampleRing(orientationQuaternion, normal, radius, phase);
+  const points = samplePolygon(orientationQuaternion, normal, radius, Daydream.W / 4, phase);
+  return rasterize(points, colorFn, true);
+}
+
+/**
+ * Draws a polygon on the sphere surface.
+ * @param {THREE.Quaternion} orientationQuaternion - The orientation of the polygon.
+ * @param {THREE.Vector3} normal - The normal vector.
+ * @param {number} radius - The radius.
+ * @param {number} numSides - Number of sides.
+ * @param {Function} colorFn - Function to determine color.
+ * @param {number} [phase=0] - Starting phase.
+ * @returns {Dot[]} An array of Dots.
+ */
+export const drawPolygon = (orientationQuaternion, normal, radius, numSides, colorFn, phase = 0) => {
+  const points = samplePolygon(orientationQuaternion, normal, radius, numSides, phase);
   return rasterize(points, colorFn, true);
 }
 
