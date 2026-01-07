@@ -142,6 +142,7 @@ guiInstance.add(controls, 'effectName', effectNames)
 
 controls.resetDefaults = () => {
   GUI.reset(['resolution', 'effect', 'effectName']);
+  controls.changeEffect();
 };
 guiInstance.add(controls, 'resetDefaults').name('Reset Defaults');
 
