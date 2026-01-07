@@ -47,7 +47,9 @@ export class Dot {
       this.alpha = alpha;
     }
   }
+  // ... Dot class definition ...
 }
+
 
 /**
  * Converts a pixel y-coordinate to a spherical phi angle.

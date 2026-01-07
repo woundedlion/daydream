@@ -9,16 +9,15 @@ import { Daydream } from "../driver.js";
 import {
     Orientation, vectorPool
 } from "../geometry.js";
-import { wrap } from "../util.js";
 import {
     VignettePalette, richSunset, mangoPeel, underSea, iceMelt,
-    TransparentVignette, blendAlpha, color4Pool
+    TransparentVignette
 } from "../color.js";
 import {
-    Timeline, Sprite, RandomWalk, MutableNumber
+    Timeline, RandomWalk, OrientationTrail // Assuming you added it to animation.js
 } from "../animation.js";
 import { FieldSampler } from "../FieldSampler.js";
-import { tween } from "../draw.js";
+import { tween, dotPool } from "../draw.js";
 
 export class RingSpinFieldSample {
     static Ring = class {
@@ -26,15 +25,7 @@ export class RingSpinFieldSample {
             this.normal = normal;
             this.palette = new TransparentVignette(palette);
             this.orientation = new Orientation();
-
-            // Pre-allocated Ring Buffer
-            this.historyCapacity = 19;
-            this.history = new Array(this.historyCapacity);
-            for (let i = 0; i < this.historyCapacity; i++) {
-                this.history[i] = new Orientation();
-            }
-            this.head = 0;
-            this.count = 0;
+            this.trail = new OrientationTrail(19);
         }
     }
 
@@ -43,7 +34,7 @@ export class RingSpinFieldSample {
         this.alpha = 0.5;
         this.trailLength = 19;
         this.thickness = 2 * Math.PI / Daydream.W;
-        this.palettes = [iceMelt, underSea, mangoPeel, richSunset]
+        this.palettes = [iceMelt, underSea, mangoPeel, richSunset];
         this.numRings = 4;
         this.timeline = new Timeline();
         this.sampler = new FieldSampler();
@@ -74,36 +65,23 @@ export class RingSpinFieldSample {
         this.renderPlanes.length = 0;
 
         for (const ring of this.rings) {
-            const snapshot = ring.history[ring.head];
-            const src = ring.orientation.orientations;
-            if (snapshot.orientations.length < src.length) {
-                while (snapshot.orientations.length < src.length) snapshot.orientations.push(new THREE.Quaternion());
-            }
-            for (let k = 0; k < src.length; k++) {
-                snapshot.orientations[k].copy(src[k]);
-            }
-
-            ring.head = (ring.head + 1) % ring.historyCapacity;
-            if (ring.count < ring.historyCapacity) ring.count++;
-
-            for (let i = 0; i < ring.count; i++) {
-                const idx = (ring.head - 1 - i + ring.historyCapacity) % ring.historyCapacity;
-                const orientationSnapshot = ring.history[idx];
-
-                tween(orientationSnapshot, (q, t) => {
-                    const globalT = i / this.trailLength; // 0 to 1
-                    if (globalT > 1.0) return;
-
-                    const c = ring.palette.get(globalT);
+            ring.trail.record(ring.orientation);
+            tween(ring.trail, (snapshot, t) => {
+                tween(snapshot, (q, subT) => {
+                    if (t > 1.0) return;
+                    const c = ring.palette.get(t);
                     c.alpha = c.alpha * this.alpha;
-
-                    this.renderPlanes.push({
-                        normal: vectorPool.acquire().copy(ring.normal).applyQuaternion(q),
-                        color: c
-                    });
+                    // Provide normal as position to Dot
+                    const dot = dotPool.acquire();
+                    dot.position.copy(ring.normal).applyQuaternion(q);
+                    dot.color = c.color;
+                    dot.alpha = c.alpha;
+                    this.renderPlanes.push(dot);
                 });
-            }
+            });
         }
-        this.sampler.drawPlanes(this.renderPlanes, this.thickness);
+        for (const dot of this.renderPlanes) {
+            this.sampler.drawRing(dot.position, 1.0, dot, this.thickness);
+        }
     }
 }
