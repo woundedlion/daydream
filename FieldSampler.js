@@ -8,49 +8,45 @@ import { Daydream, XY } from "./driver.js";
 import { quinticKernel } from "./filters.js";
 import { blendAlpha } from "./color.js";
 import { wrap } from "./util.js";
-import { vectorToPixel } from "./geometry.js";
+import { angleBetween, vectorToPixel, yToPhi } from "./geometry.js";
 
 /**
  * Encapsulates the logic for rendering a single ring on the spherical display.
+ * Stateless helper class.
  */
 export class FSRing {
     /**
-     * @param {THREE.Vector3} normal - The normal vector defining the ring's orientation.
-     * @param {number} radius - The angular radius (0=Pole, 1=Equator, 2=Opposite Pole).
-     * @param {Color4} color - The color of the ring.
-     */
-    constructor(normal, radius, color) {
-        this.normal = normal;
-        this.radius = radius;
-        this.color = color;
-
-        // Pre-calculate orientation properties
-        this.nx = normal.x;
-        this.ny = normal.y;
-        this.nz = normal.z;
-
-        // Angle from the normal pole
-        this.targetAngle = radius * (Math.PI / 2);
-        // Distance of the plane from origin along normal (for intersection math)
-        this.planeOffset = Math.cos(this.targetAngle);
-
-        this.R = Math.sqrt(this.nx * this.nx + this.nz * this.nz);
-        this.alpha = Math.atan2(this.nx, this.nz);
-        this.centerPhi = Math.acos(this.ny);
-    }
-
-    /**
      * Draws the ring onto the screen.
-     * @param {number} thickness - Angular thickness of the ring.
-     * @param {boolean} [debugBB=false] - Whether to visualize bounding box.
+     * @param {THREE.Vector3} normal - Ring orientation.
+     * @param {number} radius - Angular radius (0-2).
+     * @param {Color4} color - Ring color.
+     * @param {number} thickness - Angular thickness.
+     * @param {boolean} [debugBB=false] - Debug flag.
+     * @param {Array<THREE.Vector3>} [clipPlanes=null] - Optional normals defining clipping planes.
      */
-    draw(thickness, debugBB = false) {
+    static draw(normal, radius, color, thickness, debugBB = false, clipPlanes = null) {
+        // Pre-calculate properties
+        const nx = normal.x;
+        const ny = normal.y;
+        const nz = normal.z;
+
+        const targetAngle = radius * (Math.PI / 2);
+        const R = Math.sqrt(nx * nx + nz * nz);
+        const alpha = Math.atan2(nx, nz);
+        const centerPhi = Math.acos(ny);
+
+        // Context object to pass through the stack (avoids class state)
+        const ctx = {
+            normal, radius, color, thickness, debugBB, clipPlanes,
+            nx, ny, nz, targetAngle, R, alpha, centerPhi
+        };
+
         // 1. CALCULATE VERTICAL BOUNDS
         // The extreme latitudes of the ring occur along the meridian of the normal.
         // These are simply centerPhi - targetAngle and centerPhi + targetAngle.
         // We use acos(cos(x)) to correctly wrap these angles into [0, PI], handling pole crossings.
-        const a1 = this.centerPhi - this.targetAngle;
-        const a2 = this.centerPhi + this.targetAngle;
+        const a1 = centerPhi - targetAngle;
+        const a2 = centerPhi + targetAngle;
         const p1 = Math.acos(Math.cos(a1));
         const p2 = Math.acos(Math.cos(a2));
 
@@ -64,54 +60,46 @@ export class FSRing {
         const yMax = Math.min(Daydream.H - 1, Math.ceil((phiMax * (Daydream.H - 1)) / Math.PI));
 
         for (let y = yMin; y <= yMax; y++) {
-            this.scanRow(y, thickness, debugBB);
+            FSRing.scanRow(y, ctx);
         }
     }
 
-    /**
-     * Scans a single row of the texture.
-     * @param {number} y - Row index.
-     * @param {number} thickness - Ring thickness.
-     * @param {boolean} debugBB - Debug flag.
-     */
-    scanRow(y, thickness, debugBB) {
-        const phi = (y * Math.PI) / (Daydream.H - 1);
-        const y3d = Math.cos(phi);
-        const rXZ = Math.sin(phi);
+    static scanRow(y, ctx) {
+        const phi = yToPhi(y);
+        const cosPhi = Math.cos(phi);
+        const sinPhi = Math.sin(phi);
 
         // Case A: Singularity (Poles or Vertical Normal)
-        if (this.R < 0.01) {
-            this.scanFullRow(y, thickness, debugBB);
+        if (ctx.R < 0.01) {
+            FSRing.scanFullRow(y, ctx);
             return;
         }
 
         // Case B: General Intersection
         // We want the dot product P.N to be within [cos(target+thick), cos(target-thick)].
-        // P.N = cos(theta - alpha) * R * rXZ + ny * y3d
-        // So cos(theta - alpha) = (D - ny * y3d) / (R * rXZ)
+        // P.N = cos(theta - alpha) * R * sinPhi + ny * cosPhi
+        // So cos(theta - alpha) = (D - ny * cosPhi) / (R * sinPhi)
         // We calculate the min/max allowed D (dot product values).
 
-        const ang_low = Math.max(0, this.targetAngle - thickness);
-        const ang_high = Math.min(Math.PI, this.targetAngle + thickness);
+        const ang_low = Math.max(0, ctx.targetAngle - ctx.thickness);
+        const ang_high = Math.min(Math.PI, ctx.targetAngle + ctx.thickness);
 
         // Cosine decreases as angle increases
         const D_max = Math.cos(ang_low);
         const D_min = Math.cos(ang_high);
 
-        const denom = this.R * rXZ;
+        const denom = ctx.R * sinPhi;
         // Check for singularity to avoid Infinity (though clamp usually handles it)
-        if (denom < 0.000001) {
-            this.scanFullRow(y, thickness, debugBB);
+        if (Math.abs(denom) < 0.000001) {
+            FSRing.scanFullRow(y, ctx);
             return;
         }
 
-        const C_min = (D_min - this.ny * y3d) / denom;
-        const C_max = (D_max - this.ny * y3d) / denom;
+        const C_min = (D_min - ctx.ny * cosPhi) / denom;
+        const C_max = (D_max - ctx.ny * cosPhi) / denom;
 
         const minCos = Math.max(-1, C_min);
         const maxCos = Math.min(1, C_max);
-
-        // If no solution (too far), skip row
         if (minCos > maxCos) return;
 
         const angleMin = Math.acos(maxCos);
@@ -119,49 +107,104 @@ export class FSRing {
 
         // Generate scan windows
         if (angleMin <= 0.0001) {
-            this.scanWindow(y, this.alpha - angleMax, this.alpha + angleMax, thickness, debugBB);
+            FSRing.scanWindow(y, ctx.alpha - angleMax, ctx.alpha + angleMax, ctx);
         } else if (angleMax >= Math.PI - 0.0001) {
-            this.scanWindow(y, this.alpha + angleMin, this.alpha + 2 * Math.PI - angleMin, thickness, debugBB);
+            FSRing.scanWindow(y, ctx.alpha + angleMin, ctx.alpha + 2 * Math.PI - angleMin, ctx);
         } else {
-            this.scanWindow(y, this.alpha - angleMax, this.alpha - angleMin, thickness, debugBB);
-            this.scanWindow(y, this.alpha + angleMin, this.alpha + angleMax, thickness, debugBB);
+            FSRing.scanWindow(y, ctx.alpha - angleMax, ctx.alpha - angleMin, ctx);
+            FSRing.scanWindow(y, ctx.alpha + angleMin, ctx.alpha + angleMax, ctx);
         }
     }
 
-    scanFullRow(y, thickness, debugBB) {
+    static scanFullRow(y, ctx) {
         for (let x = 0; x < Daydream.W; x++) {
-            this.processPixel(XY(x, y), thickness, debugBB);
+            FSRing.processPixel(XY(x, y), ctx);
         }
     }
 
-    scanWindow(y, t1, t2, thickness, debugBB) {
+    static scanWindow(y, t1, t2, ctx) {
         const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
         const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
 
         for (let x = x1; x <= x2; x++) {
             const wx = wrap(x, Daydream.W);
-            this.processPixel(XY(wx, y), thickness, debugBB);
+            FSRing.processPixel(XY(wx, y), ctx);
         }
     }
 
-    processPixel(i, thickness, debugBB) {
-        if (debugBB) {
+    static processPixel(i, ctx) {
+        if (ctx.debugBB) {
             const outColor = Daydream.pixels[i];
             outColor.r += 0.02; outColor.g += 0.02; outColor.b += 0.02;
         }
 
         const p = Daydream.pixelPositions[i];
-        const dot = p.dot(this.normal);
-        // Robust acos
-        const angle = Math.acos(Math.min(1, Math.max(-1, dot)));
-        const dist = Math.abs(angle - this.targetAngle);
 
-        if (dist < thickness) {
-            const t = dist / thickness;
-            const alpha = quinticKernel(1 - t) * this.color.alpha;
-            const outColor = Daydream.pixels[i];
-            blendAlpha(outColor, this.color.color, alpha, outColor);
+        // Apply Clipping Planes
+        if (ctx.clipPlanes) {
+            for (const cp of ctx.clipPlanes) {
+                if (p.dot(cp) < 0) return;
+            }
         }
+
+        const angle = angleBetween(p, ctx.normal);
+        const dist = Math.abs(angle - ctx.targetAngle);
+        if (dist < ctx.thickness) {
+            const t = dist / ctx.thickness;
+            const alpha = quinticKernel(1 - t) * ctx.color.alpha;
+            const outColor = Daydream.pixels[i];
+            blendAlpha(outColor, ctx.color.color, alpha, outColor);
+        }
+    }
+}
+
+// Stateless helper for rendering points (comets)
+export class FSPoint {
+    /**
+     * Draws a point (comet) onto the screen.
+     * @param {THREE.Vector3} pos - Position of the point.
+     * @param {Color4} color - Point color.
+     * @param {number} thickness - Angular size of the point.
+     * @param {boolean} [debugBB=false] - Debug flag.
+     */
+    static draw(pos, color, thickness, debugBB = false) {
+        // A point is just a ring with radius 0
+        FSRing.draw(pos, 0, color, thickness, debugBB);
+    }
+}
+
+// Stateless helper for rendering great circle segments
+export class FSLine {
+    /**
+     * Draws a line segment (geodesic) between two points.
+     * @param {THREE.Vector3} v1 - Start position.
+     * @param {THREE.Vector3} v2 - End position.
+     * @param {Color4} color - Line color.
+     * @param {number} thickness - Angular thickness.
+     * @param {boolean} [debugBB=false] - Debug flag.
+     */
+    static draw(v1, v2, color, thickness, debugBB = false) {
+        // 1. Calculate Normal of the Great Circle passing through v1 and v2
+        const normal = new THREE.Vector3().crossVectors(v1, v2).normalize();
+
+        // Handle coincident vectors (no line)
+        if (normal.lengthSq() < 0.000001) return;
+
+        // 2. Define Clipping Planes
+        // Plane 1: Passes through v1, normal = normal x v1
+        const c1 = new THREE.Vector3().crossVectors(normal, v1);
+        // Plane 2: Passes through v2, normal = v2 x normal
+        const c2 = new THREE.Vector3().crossVectors(v2, normal);
+
+        // Note: For points ON the great circle, v1 x v2 = normal * sin(theta).
+        // c1 = (v1 x v2 / |v1xv2|) x v1.
+        // Direction check:
+        // v2 is on positive side of c1? (v2 . c1) > 0 ?
+        // v2 . ( (v1 x v2) x v1 )
+        // Using vector triple product: (A x B) x C = (A.C)B - (B.C)A
+        // (N x v1) . v2 = N . (v1 x v2) = N . N > 0. Yes.
+
+        FSRing.draw(normal, 1.0, color, thickness, debugBB, [c1, c2]);
     }
 }
 
@@ -183,54 +226,25 @@ export class FieldSampler {
      * @param {number} thickness - Angular thickness of the influence.
      */
     drawPoints(points, thickness) {
-        const cosThreshold = Math.cos(thickness);
-        const radY = thickness * (Daydream.H - 1) / Math.PI;
-
         for (const pt of points) {
-            const center = vectorToPixel(pt.pos);
-            const cy = center.y;
-            const cx = center.x;
-
-            const phi = cy * Math.PI / (Daydream.H - 1);
-            const sinPhi = Math.sin(phi);
-            let radX;
-            if (Math.abs(sinPhi) < 0.05) {
-                radX = Daydream.W;
-            } else {
-                radX = (thickness * Daydream.W) / (2 * Math.PI * sinPhi);
-            }
-
-            const yMin = Math.max(0, Math.ceil(cy - radY));
-            const yMax = Math.min(Daydream.H - 1, Math.floor(cy + radY));
-            const xMin = Math.ceil(cx - radX);
-            const xMax = Math.floor(cx + radX);
-
-            for (let y = yMin; y <= yMax; y++) {
-                for (let x = xMin; x <= xMax; x++) {
-                    const wx = wrap(x, Daydream.W);
-                    const i = XY(wx, y);
-
-                    if (this.debugBB) this.debugPixel(i);
-
-                    const p = Daydream.pixelPositions[i];
-                    const dot = p.dot(pt.pos);
-
-                    if (dot > cosThreshold) {
-                        const dist = Math.acos(Math.min(1, Math.max(-1, dot)));
-                        const t = dist / thickness;
-                        const alpha = quinticKernel(1 - t) * pt.color.alpha;
-                        const outColor = Daydream.pixels[i];
-                        blendAlpha(outColor, pt.color.color, alpha, outColor);
-                    }
-                }
-            }
+            FSPoint.draw(pt.pos, pt.color, thickness, this.debugBB);
         }
+    }
+
+    /**
+     * Draws a line segment between two vectors.
+     * @param {THREE.Vector3} v1 
+     * @param {THREE.Vector3} v2 
+     * @param {Color4} color 
+     * @param {number} thickness 
+     */
+    drawLine(v1, v2, color, thickness) {
+        FSLine.draw(v1, v2, color, thickness, this.debugBB);
     }
 
     drawRing(normal, radius, color4, thickness) {
         // Delegate to FSRing
-        const ring = new FSRing(normal, radius, color4);
-        ring.draw(thickness, this.debugBB);
+        FSRing.draw(normal, radius, color4, thickness, this.debugBB);
     }
 
     drawPlanes(planes, thickness) {
