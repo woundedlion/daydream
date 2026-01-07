@@ -139,6 +139,9 @@ export class CometsFieldSample {
             for (let k = 0; k < sourceOris.length; k++) {
                 snapshot.orientations[k].copy(sourceOris[k]);
             }
+            if (snapshot.orientations.length > sourceOris.length) {
+                snapshot.orientations.length = sourceOris.length;
+            }
             node.head = (node.head + 1) % node.historyCapacity;
             if (node.count < node.historyCapacity) node.count++;
 
