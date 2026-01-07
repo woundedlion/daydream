@@ -71,13 +71,31 @@ export class FieldSampler {
         const nx = normal.x;
         const ny = normal.y;
         const nz = normal.z;
-        const lineRadius = thickness / 2;
-        const plane = { normal: normal, color: color4 };
+
+        // Radius 0: Pole
+        // Radius 1: Equator (Great Circle)
+        // Radius 2: Opposite Pole
+        const targetAngle = radius * (Math.PI / 2); // Angle from the normal pole
+        const planeOffset = Math.cos(targetAngle);  // Distance of the plane from origin along normal
+
+        const plane = { normal: normal, color: color4, targetAngle: targetAngle };
 
         // Calculate latitude bounds
-        const h = Math.sqrt(1 - ny * ny);
-        const phiMin = Math.acos(Math.min(1, h)) - lineRadius;
-        const phiMax = Math.acos(Math.max(-1, -h)) + lineRadius;
+        // The ring covers a band of angles [targetAngle - thickness, targetAngle + thickness] from the pole (normal).
+        // Be conservative with bounds.
+        const centerPhi = Math.acos(ny); // Angle of the normal from the North Pole (Y-axis)
+        const halfWidth = targetAngle + thickness; // Max angular deviation from normal
+
+        // Min/Max phi (angle from global Y-axis) reachable by the ring
+        const phiMin = Math.max(0, centerPhi - halfWidth);
+        const phiMax = Math.min(Math.PI, centerPhi + halfWidth);
+
+        // Wait, if the ring is small (radius~0) around a tilted normal, minPhi is beta - alpha.
+        // If ring is large, it might wrap.
+        // The above range [beta-alpha, beta+alpha] is the correct range of latitudes touched by a cone of angle alpha.
+        // However, we need to account for the "inner" edge of the band too if we want Tight bounds.
+        // But conservative [beta - (alpha+thick), beta + (alpha+thick)] is safe and correct.
+
         const yMin = Math.max(0, Math.floor((phiMin * (Daydream.H - 1)) / Math.PI));
         const yMax = Math.min(Daydream.H - 1, Math.ceil((phiMax * (Daydream.H - 1)) / Math.PI));
 
@@ -90,16 +108,9 @@ export class FieldSampler {
             const y3d = Math.cos(phi);
             const rXZ = Math.sin(phi);
 
-
-
             // Magnitude of the normal projected onto the XZ plane.
             const R = Math.sqrt(nx * nx + nz * nz);
 
-            // 2. SINGULARITY CHECK (Horizontal Rings)
-            // If the plane is nearly horizontal (normal points up/down, so R is small),
-            // or if we are at the poles (rXZ is small), the analytical solution is unstable.
-            // In these cases, the ring covers nearly the entire row, so we fallback 
-            // to scanning the whole row (0 to W).
             if (R < 0.01) {
                 for (let x = 0; x < Daydream.W; x++) {
                     const i = XY(x, y);
@@ -111,7 +122,12 @@ export class FieldSampler {
 
             // 3. HORIZONTAL OPTIMIZATION (Exact Arc Calculation)
             // We solve for the range of theta where: |cos(theta - alpha) - C| < K
-            const C = (-ny * y3d) / (R * rXZ);
+            // With offset D = planeOffset: cos(theta - alpha) = (D - ny * y3d) / (R * rXZ)
+            const C = (planeOffset - ny * y3d) / (R * rXZ);
+            // K is derived from angular thickness. Near equator of the ring, dot product sensitivity is sin(theta) ~ 1.
+            // Near poles of the ring, sensitivity is low.
+            // Using linear approximation for thickness here is an optimization trade-off.
+            // Ideally we check if ANY theta satisfies the acos condition.
             const K = (thickness * 1.1) / (R * rXZ);
 
             // Determine valid cosine range clamped to [-1, 1]
@@ -130,7 +146,7 @@ export class FieldSampler {
             // Define scan windows
             const windows = [];
             if (angleMin <= 0.0001) {
-                // Merged at the front (near alpha) because band covers the peak
+                // Merged at the front (near alpha)
                 windows.push([alpha - angleMax, alpha + angleMax]);
             } else if (angleMax >= Math.PI - 0.0001) {
                 // Merged at the back (opposite to alpha)
@@ -169,7 +185,11 @@ export class FieldSampler {
 
     processPlanePixel(i, plane, thickness) {
         const p = Daydream.pixelPositions[i];
-        const dist = Math.abs(p.dot(plane.normal));
+        // Exact angular distance check to support offset rings
+        const dot = p.dot(plane.normal);
+        const angle = Math.acos(Math.min(1, Math.max(-1, dot)));
+        const dist = Math.abs(angle - plane.targetAngle);
+
         if (dist < thickness) {
             const t = dist / thickness;
             const alpha = quinticKernel(1 - t) * plane.color.alpha;

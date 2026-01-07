@@ -35,6 +35,7 @@ export class TestFSRing {
         this.numRings = 1;
         this.timeline = new Timeline();
         this.sampler = new FieldSampler();
+        this.radius = 1.0;
 
         for (let i = 0; i < this.numRings; ++i) {
             this.spawnRing(Daydream.X_AXIS, this.palettes[i]);
@@ -48,6 +49,7 @@ export class TestFSRing {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01).name("Brightness");
         this.gui.add(this, 'thickness').min(0.01).max(0.5).step(0.01).name("Brush Size");
+        this.gui.add(this, 'radius').min(0).max(2).step(0.01).name("Radius");
         this.gui.add(this.sampler, 'debugBB').name('Show Bounding Boxes');
     }
 
@@ -61,7 +63,7 @@ export class TestFSRing {
         this.timeline.step();
         for (const ring of this.rings) {
             let color = ring.palette.get(0.5);
-            this.sampler.drawRing(ring.orientation.orient(ring.normal), 1, color, this.thickness);
+            this.sampler.drawRing(ring.orientation.orient(ring.normal), this.radius, color, this.thickness);
         }
     }
 }
