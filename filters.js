@@ -169,7 +169,7 @@ export class FilterOrient {
    */
   plot(v, color, age, alpha, pass) {
     tween(this.orientation, (q, t) => {
-      pass(v.clone().applyQuaternion(q), color, age, alpha);
+      pass(v.clone().applyQuaternion(q), color, age + 1.0 - t, alpha);
     });
   }
 }
