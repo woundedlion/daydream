@@ -140,6 +140,11 @@ guiInstance.add(controls, 'effectName', effectNames)
   .name('Active Effect')
   .onChange(() => controls.changeEffect());
 
+controls.resetDefaults = () => {
+  GUI.reset(['resolution', 'effect', 'effectName']);
+};
+guiInstance.add(controls, 'resetDefaults').name('Reset Defaults');
+
 controls.setResolution();
 
 // Helper to catch any late-bound auto-placed GUIs
