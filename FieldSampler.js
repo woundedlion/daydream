@@ -10,11 +10,171 @@ import { blendAlpha } from "./color.js";
 import { wrap } from "./util.js";
 import { vectorToPixel } from "./geometry.js";
 
+/**
+ * Encapsulates the logic for rendering a single ring on the spherical display.
+ */
+export class FSRing {
+    /**
+     * @param {THREE.Vector3} normal - The normal vector defining the ring's orientation.
+     * @param {number} radius - The angular radius (0=Pole, 1=Equator, 2=Opposite Pole).
+     * @param {Color4} color - The color of the ring.
+     */
+    constructor(normal, radius, color) {
+        this.normal = normal;
+        this.radius = radius;
+        this.color = color;
 
+        // Pre-calculate orientation properties
+        this.nx = normal.x;
+        this.ny = normal.y;
+        this.nz = normal.z;
+
+        // Angle from the normal pole
+        this.targetAngle = radius * (Math.PI / 2);
+        // Distance of the plane from origin along normal (for intersection math)
+        this.planeOffset = Math.cos(this.targetAngle);
+
+        this.R = Math.sqrt(this.nx * this.nx + this.nz * this.nz);
+        this.alpha = Math.atan2(this.nx, this.nz);
+        this.centerPhi = Math.acos(this.ny);
+    }
+
+    /**
+     * Draws the ring onto the screen.
+     * @param {number} thickness - Angular thickness of the ring.
+     * @param {boolean} [debugBB=false] - Whether to visualize bounding box.
+     */
+    draw(thickness, debugBB = false) {
+        // 1. CALCULATE VERTICAL BOUNDS
+        // The extreme latitudes of the ring occur along the meridian of the normal.
+        // These are simply centerPhi - targetAngle and centerPhi + targetAngle.
+        // We use acos(cos(x)) to correctly wrap these angles into [0, PI], handling pole crossings.
+        const a1 = this.centerPhi - this.targetAngle;
+        const a2 = this.centerPhi + this.targetAngle;
+        const p1 = Math.acos(Math.cos(a1));
+        const p2 = Math.acos(Math.cos(a2));
+
+        const minP = Math.min(p1, p2);
+        const maxP = Math.max(p1, p2);
+
+        const phiMin = Math.max(0, minP - thickness);
+        const phiMax = Math.min(Math.PI, maxP + thickness);
+
+        const yMin = Math.max(0, Math.floor((phiMin * (Daydream.H - 1)) / Math.PI));
+        const yMax = Math.min(Daydream.H - 1, Math.ceil((phiMax * (Daydream.H - 1)) / Math.PI));
+
+        for (let y = yMin; y <= yMax; y++) {
+            this.scanRow(y, thickness, debugBB);
+        }
+    }
+
+    /**
+     * Scans a single row of the texture.
+     * @param {number} y - Row index.
+     * @param {number} thickness - Ring thickness.
+     * @param {boolean} debugBB - Debug flag.
+     */
+    scanRow(y, thickness, debugBB) {
+        const phi = (y * Math.PI) / (Daydream.H - 1);
+        const y3d = Math.cos(phi);
+        const rXZ = Math.sin(phi);
+
+        // Case A: Singularity (Poles or Vertical Normal)
+        if (this.R < 0.01) {
+            this.scanFullRow(y, thickness, debugBB);
+            return;
+        }
+
+        // Case B: General Intersection
+        // We want the dot product P.N to be within [cos(target+thick), cos(target-thick)].
+        // P.N = cos(theta - alpha) * R * rXZ + ny * y3d
+        // So cos(theta - alpha) = (D - ny * y3d) / (R * rXZ)
+        // We calculate the min/max allowed D (dot product values).
+
+        const ang_low = Math.max(0, this.targetAngle - thickness);
+        const ang_high = Math.min(Math.PI, this.targetAngle + thickness);
+
+        // Cosine decreases as angle increases
+        const D_max = Math.cos(ang_low);
+        const D_min = Math.cos(ang_high);
+
+        const denom = this.R * rXZ;
+        // Check for singularity to avoid Infinity (though clamp usually handles it)
+        if (denom < 0.000001) {
+            this.scanFullRow(y, thickness, debugBB);
+            return;
+        }
+
+        const C_min = (D_min - this.ny * y3d) / denom;
+        const C_max = (D_max - this.ny * y3d) / denom;
+
+        const minCos = Math.max(-1, C_min);
+        const maxCos = Math.min(1, C_max);
+
+        // If no solution (too far), skip row
+        if (minCos > maxCos) return;
+
+        const angleMin = Math.acos(maxCos);
+        const angleMax = Math.acos(minCos);
+
+        // Generate scan windows
+        if (angleMin <= 0.0001) {
+            this.scanWindow(y, this.alpha - angleMax, this.alpha + angleMax, thickness, debugBB);
+        } else if (angleMax >= Math.PI - 0.0001) {
+            this.scanWindow(y, this.alpha + angleMin, this.alpha + 2 * Math.PI - angleMin, thickness, debugBB);
+        } else {
+            this.scanWindow(y, this.alpha - angleMax, this.alpha - angleMin, thickness, debugBB);
+            this.scanWindow(y, this.alpha + angleMin, this.alpha + angleMax, thickness, debugBB);
+        }
+    }
+
+    scanFullRow(y, thickness, debugBB) {
+        for (let x = 0; x < Daydream.W; x++) {
+            this.processPixel(XY(x, y), thickness, debugBB);
+        }
+    }
+
+    scanWindow(y, t1, t2, thickness, debugBB) {
+        const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
+        const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
+
+        for (let x = x1; x <= x2; x++) {
+            const wx = wrap(x, Daydream.W);
+            this.processPixel(XY(wx, y), thickness, debugBB);
+        }
+    }
+
+    processPixel(i, thickness, debugBB) {
+        if (debugBB) {
+            const outColor = Daydream.pixels[i];
+            outColor.r += 0.02; outColor.g += 0.02; outColor.b += 0.02;
+        }
+
+        const p = Daydream.pixelPositions[i];
+        const dot = p.dot(this.normal);
+        // Robust acos
+        const angle = Math.acos(Math.min(1, Math.max(-1, dot)));
+        const dist = Math.abs(angle - this.targetAngle);
+
+        if (dist < thickness) {
+            const t = dist / thickness;
+            const alpha = quinticKernel(1 - t) * this.color.alpha;
+            const outColor = Daydream.pixels[i];
+            blendAlpha(outColor, this.color.color, alpha, outColor);
+        }
+    }
+}
 
 export class FieldSampler {
     constructor() {
         this.debugBB = false;
+    }
+
+    debugPixel(i) {
+        const outColor = Daydream.pixels[i];
+        outColor.r += 0.02;
+        outColor.g += 0.02;
+        outColor.b += 0.02;
     }
 
     /**
@@ -68,140 +228,14 @@ export class FieldSampler {
     }
 
     drawRing(normal, radius, color4, thickness) {
-        const nx = normal.x;
-        const ny = normal.y;
-        const nz = normal.z;
-
-        // Radius 0: Pole
-        // Radius 1: Equator (Great Circle)
-        // Radius 2: Opposite Pole
-        const targetAngle = radius * (Math.PI / 2); // Angle from the normal pole
-        const planeOffset = Math.cos(targetAngle);  // Distance of the plane from origin along normal
-
-        const plane = { normal: normal, color: color4, targetAngle: targetAngle };
-
-        // Calculate latitude bounds
-        // The ring covers a band of angles [targetAngle - thickness, targetAngle + thickness] from the pole (normal).
-        // Be conservative with bounds.
-        const centerPhi = Math.acos(ny); // Angle of the normal from the North Pole (Y-axis)
-        const halfWidth = targetAngle + thickness; // Max angular deviation from normal
-
-        // Min/Max phi (angle from global Y-axis) reachable by the ring
-        const phiMin = Math.max(0, centerPhi - halfWidth);
-        const phiMax = Math.min(Math.PI, centerPhi + halfWidth);
-
-        // Wait, if the ring is small (radius~0) around a tilted normal, minPhi is beta - alpha.
-        // If ring is large, it might wrap.
-        // The above range [beta-alpha, beta+alpha] is the correct range of latitudes touched by a cone of angle alpha.
-        // However, we need to account for the "inner" edge of the band too if we want Tight bounds.
-        // But conservative [beta - (alpha+thick), beta + (alpha+thick)] is safe and correct.
-
-        const yMin = Math.max(0, Math.floor((phiMin * (Daydream.H - 1)) / Math.PI));
-        const yMax = Math.min(Daydream.H - 1, Math.ceil((phiMax * (Daydream.H - 1)) / Math.PI));
-
-        for (let y = yMin; y <= yMax; y++) {
-            // Pre-calculate geometric properties for this specific row (latitude).
-            // phi: Angle down from the North Pole (0 to PI).
-            // y3d: The Y coordinate of this row in 3D space (cos(phi)).
-            // rXZ: The radius of the sphere's cross-section at this height (sin(phi)).
-            const phi = (y * Math.PI) / (Daydream.H - 1);
-            const y3d = Math.cos(phi);
-            const rXZ = Math.sin(phi);
-
-            // Magnitude of the normal projected onto the XZ plane.
-            const R = Math.sqrt(nx * nx + nz * nz);
-
-            if (R < 0.01) {
-                for (let x = 0; x < Daydream.W; x++) {
-                    const i = XY(x, y);
-                    this.processPlanePixel(i, plane, thickness);
-                    if (this.debugBB) this.debugPixel(i);
-                }
-                continue;
-            }
-
-            // 3. HORIZONTAL OPTIMIZATION (Exact Arc Calculation)
-            // We solve for the range of theta where: |cos(theta - alpha) - C| < K
-            // With offset D = planeOffset: cos(theta - alpha) = (D - ny * y3d) / (R * rXZ)
-            const C = (planeOffset - ny * y3d) / (R * rXZ);
-            // K is derived from angular thickness. Near equator of the ring, dot product sensitivity is sin(theta) ~ 1.
-            // Near poles of the ring, sensitivity is low.
-            // Using linear approximation for thickness here is an optimization trade-off.
-            // Ideally we check if ANY theta satisfies the acos condition.
-            const K = (thickness * 1.1) / (R * rXZ);
-
-            // Determine valid cosine range clamped to [-1, 1]
-            const minCos = Math.max(-1, C - K);
-            const maxCos = Math.min(1, C + K);
-
-            // If interval is empty (e.g. ring is too far away), skip
-            if (minCos > maxCos) continue;
-
-            // Calculate angular extents relative to alpha
-            // acos decreases from 0 to PI as input goes from 1 to -1
-            const angleMin = Math.acos(maxCos);
-            const angleMax = Math.acos(minCos);
-            const alpha = Math.atan2(nx, nz);
-
-            // Define scan windows
-            const windows = [];
-            if (angleMin <= 0.0001) {
-                // Merged at the front (near alpha)
-                windows.push([alpha - angleMax, alpha + angleMax]);
-            } else if (angleMax >= Math.PI - 0.0001) {
-                // Merged at the back (opposite to alpha)
-                windows.push([alpha + angleMin, alpha + 2 * Math.PI - angleMin]);
-            } else {
-                // Two separate windows on either side of alpha
-                windows.push([alpha - angleMax, alpha - angleMin]);
-                windows.push([alpha + angleMin, alpha + angleMax]);
-            }
-
-            // Scan pixels within windows
-            for (const [t1, t2] of windows) {
-                const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
-                const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
-
-                for (let x = x1; x <= x2; x++) {
-                    const wx = wrap(x, Daydream.W);
-                    const i = XY(wx, y);
-                    this.processPlanePixel(i, plane, thickness);
-                    if (this.debugBB) this.debugPixel(i);
-                }
-            }
-        }
+        // Delegate to FSRing
+        const ring = new FSRing(normal, radius, color4);
+        ring.draw(thickness, this.debugBB);
     }
 
-    /**
-     * Draws a list of planes (rings) onto the sphere using field sampling.
-     * @param {Array<{normal: THREE.Vector3, color: Color4}>} planes 
-     * @param {number} thickness - Angular thickness of the ring.
-     */
     drawPlanes(planes, thickness) {
         for (const plane of planes) {
             this.drawRing(plane.normal, 1.0, plane.color, thickness);
         }
-    }
-
-    processPlanePixel(i, plane, thickness) {
-        const p = Daydream.pixelPositions[i];
-        // Exact angular distance check to support offset rings
-        const dot = p.dot(plane.normal);
-        const angle = Math.acos(Math.min(1, Math.max(-1, dot)));
-        const dist = Math.abs(angle - plane.targetAngle);
-
-        if (dist < thickness) {
-            const t = dist / thickness;
-            const alpha = quinticKernel(1 - t) * plane.color.alpha;
-            const outColor = Daydream.pixels[i];
-            blendAlpha(outColor, plane.color.color, alpha, outColor);
-        }
-    }
-
-    debugPixel(i) {
-        const outColor = Daydream.pixels[i];
-        outColor.r += 0.02;
-        outColor.g += 0.02;
-        outColor.b += 0.02;
     }
 }
