@@ -63,11 +63,9 @@ export class PetalFlow {
         const step = 2 * Math.PI / numSamples;
 
         for (let k = minK; k <= maxK; k++) {
-            // 1. Log-Polar Coordinates
             const logR = k * currentSpacing;
-            const effectiveLogR = logR + loopT; // The "Zoom"
+            const effectiveLogR = logR + loopT;
 
-            // Opacity Check
             const dist = Math.abs(effectiveLogR);
             let opacity = 1.0;
             if (dist > 2.5) opacity = Math.max(0, 1.0 - (dist - 2.5) / 1.0);
@@ -76,7 +74,7 @@ export class PetalFlow {
             const twistAngle = (k + progress) * this.twistFactor.get();
             const points = [];
 
-            // 2. Generate Ring directly in Complex Plane
+            // Generate Ring directly in Complex Plane
             for (let i = 0; i < numSamples; i++) {
                 const t = i / numSamples;
                 const theta = i * step;
@@ -94,7 +92,7 @@ export class PetalFlow {
                 points.push(this.orientation.orient(invStereo(z)));
             }
 
-            // 4. Rasterize & Color
+            // Rasterize & Color
             const colorIndex = (k - loopCount) + 10000;
             const hue = wrap(colorIndex * 0.13, 1.0);
             dots.push(...rasterize(points, (v, t) => {
