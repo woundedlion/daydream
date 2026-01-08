@@ -21,3 +21,5 @@ export { PetalFlow } from "./PetalFlow.js";
 export { LSystem } from "./LSystem.js";
 export { RingSpinFieldSample } from "./RingSpinFieldSample.js";
 export { TestFSRing } from "./TestFSRing.js";
+export { HopfFibration } from "./HopfFibration.js";
+

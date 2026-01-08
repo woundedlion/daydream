@@ -25,7 +25,8 @@ import {
   LSystem,
   RingSpinFieldSample,
   CometsFieldSample,
-  TestFSRing
+  TestFSRing,
+  HopfFibration
 } from "./effects/index.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
@@ -51,6 +52,7 @@ const effects = {
   PetalFlow,
   LSystem,
   TestFSRing,
+  HopfFibration,
 };
 
 const urlParams = new URLSearchParams(window.location.search);
