@@ -4,6 +4,7 @@ import transform from "dat-gui";
 // Helper to manage URL state
 const getUrlParams = () => new URLSearchParams(window.location.search);
 const setUrlParam = (key, value) => {
+    console.log("DeepLinkGUI: Setting param", key, value);
     const params = getUrlParams();
     if (value === null || value === undefined) {
         params.delete(key);
@@ -45,86 +46,90 @@ class DeepLinkGUI {
 
     add(object, prop, ...args) {
         const key = this._getKey(prop);
+        let value = object[prop];
 
-        // 1. Load from URL
+        // 1. Proxy the property to trigger URL updates on set
+        try {
+            Object.defineProperty(object, prop, {
+                get: () => value,
+                set: (v) => {
+                    value = v;
+                    setUrlParam(key, v);
+                },
+                enumerable: true,
+                configurable: true
+            });
+        } catch (e) {
+            console.warn(`DeepLinkGUI: Failed to proxy property '${prop}'. Deep linking updates may not work for this control.`, e);
+            // Fallback: Hook into setter via existing value if possible, or just proceed
+        }
+
+        // 2. Load initial value from URL
         const params = getUrlParams();
         if (params.has(key)) {
             let val = params.get(key);
-            const currentVal = object[prop];
+            const currentVal = value; // Use local var since getter just returns it
+
             if (typeof currentVal === 'number') {
                 val = parseFloat(val);
             } else if (typeof currentVal === 'boolean') {
                 val = (val === 'true');
             }
+
+            // Trigger setter -> updates URL (redundant but safe) -> updates 'value'
             object[prop] = val;
         }
 
+        // 3. Create Controller
         const controller = this.gui.add(object, prop, ...args);
 
-        // Update UI if we changed the value
+        // 4. Update Display
         if (params.has(key)) {
             try { controller.updateDisplay(); } catch (e) { }
         }
-
-        // 2. Wrap controller for syncing
-        const keyRef = key;
-        const userOnChangeRef = { current: null };
-
-        // Define our internal handler that updates URL and calls user cb
-        const myHandler = (value) => {
-            setUrlParam(keyRef, value);
-            if (userOnChangeRef.current) {
-                userOnChangeRef.current(value);
-            }
-        };
-
-        // Register our handler with the real controller logic
-        // We use the prototype method to bypass our own shadowing below
-        // Note: controller.constructor is Controller (or NumberController etc)
-        // Its prototype has onChange.
-        controller.constructor.prototype.onChange.call(controller, myHandler);
-
-        // Shadow onChange to capture user callback
-        controller.onChange = function (f) {
-            userOnChangeRef.current = f;
-            return this;
-        };
 
         return controller;
     }
 
     addColor(object, prop) {
         const key = this._getKey(prop);
+        let value = object[prop];
+
+        // 1. Proxy the property
+        try {
+            Object.defineProperty(object, prop, {
+                get: () => value,
+                set: (v) => {
+                    value = v;
+                    // Handle Color Serialization
+                    let strVal = v;
+                    if (typeof v === 'object' && v.getHexString) {
+                        strVal = '#' + v.getHexString();
+                    } else if (Array.isArray(v)) {
+                        strVal = `rgb(${v[0]},${v[1]},${v[2]})`;
+                    }
+                    setUrlParam(key, strVal);
+                },
+                enumerable: true,
+                configurable: true
+            });
+        } catch (e) {
+            console.warn(`DeepLinkGUI: Failed to proxy color property '${prop}'.`, e);
+        }
+
+        // 2. Load from URL
         const params = getUrlParams();
         if (params.has(key)) {
-            // Color might be hex string in URL
             object[prop] = params.get(key);
         }
+
+        // 3. Create Controller
         const controller = this.gui.addColor(object, prop);
+
+        // 4. Update Display
         if (params.has(key)) {
             try { controller.updateDisplay(); } catch (e) { }
         }
-
-        const keyRef = key;
-        const userOnChangeRef = { current: null };
-
-        const myHandler = (value) => {
-            let strVal = value;
-            if (typeof value === 'object' && value.getHexString) {
-                strVal = '#' + value.getHexString();
-            } else if (Array.isArray(value)) {
-                strVal = `rgb(${value[0]},${value[1]},${value[2]})`;
-            }
-            setUrlParam(keyRef, strVal);
-            if (userOnChangeRef.current) userOnChangeRef.current(value);
-        }
-
-        controller.constructor.prototype.onChange.call(controller, myHandler);
-
-        controller.onChange = function (f) {
-            userOnChangeRef.current = f;
-            return this;
-        };
 
         return controller;
     }
@@ -137,23 +142,27 @@ class DeepLinkGUI {
         return wrapped;
     }
 
+    static reset(excludedKeys = []) {
+        resetGUI(excludedKeys);
+    }
+
     open() { this.gui.open(); }
     close() { this.gui.close(); }
     destroy() { if (this.gui.destroy) this.gui.destroy(); }
     remove(c) { this.gui.remove(c); }
-
-    static reset(excludedKeys = []) {
-        const params = getUrlParams();
-        const keys = Array.from(params.keys());
-        for (const key of keys) {
-            if (!excludedKeys.includes(key)) {
-                params.delete(key);
-            }
-        }
-        const newUrl = `${window.location.pathname}?${params.toString()}`;
-        window.history.replaceState({}, '', newUrl);
-    }
 }
+
+export const resetGUI = (excludedKeys = []) => {
+    const params = getUrlParams();
+    const keys = Array.from(params.keys());
+    for (const key of keys) {
+        if (!excludedKeys.includes(key)) {
+            params.delete(key);
+        }
+    }
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState({}, '', newUrl);
+};
 
 // compatibility with import * as gui from 'gui'
 export const gui = { GUI: DeepLinkGUI };
