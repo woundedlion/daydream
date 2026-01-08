@@ -206,8 +206,6 @@ export class Path {
 
     const p1 = this.points[i];
     const p2 = this.points[i + 1];
-
-    // Lerp (Linear Interpolation)
     return vectorPool.acquire().copy(p1).lerp(p2, f);
   }
 }

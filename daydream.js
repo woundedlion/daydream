@@ -5,9 +5,10 @@
 
 
 import { Daydream } from "./driver.js";
-import { GUI } from "gui"; // Fixed import
+import { GUI, resetGUI } from "gui";
 import {
   RingShower,
+
   Comets,
   Dynamo,
   RingSpin,
@@ -70,7 +71,7 @@ const controls = {
   effectName: (initialEffect && effects[initialEffect]) ? initialEffect : 'PetalFlow',
   resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Holosphere (20x96)",
 
-  setResolution: function () {
+  setResolution: function (preserveParams = false) {
     const p = resolutionPresets[this.resolution];
     if (p) {
       // Update URL
@@ -81,11 +82,11 @@ const controls = {
 
       daydream.updateResolution(p.h, p.w, p.size);
       // Restart effect to use new resolution
-      this.changeEffect();
+      this.changeEffect(preserveParams);
     }
   },
 
-  changeEffect: function () {
+  changeEffect: function (preserveParams = false) {
     if (activeEffect && activeEffect.gui) {
       try {
         const dom = activeEffect.gui.domElement;
@@ -104,10 +105,16 @@ const controls = {
       return;
     }
 
+    // Clear existing params to avoid pollution, unless we are initializing (preserveParams = true)
+    if (!preserveParams) {
+      resetGUI(['resolution', 'effect', 'effectName']);
+    }
+
     // Update URL
     const newUrl = new URL(window.location);
     newUrl.searchParams.set('effect', this.effectName);
     window.history.replaceState({}, '', newUrl);
+
 
     activeEffect = new EffectClass();
 
@@ -140,7 +147,13 @@ guiInstance.add(controls, 'effectName', effectNames)
   .name('Active Effect')
   .onChange(() => controls.changeEffect());
 
-controls.setResolution();
+controls.resetDefaults = () => {
+  resetGUI(['resolution', 'effect', 'effectName']);
+  controls.changeEffect();
+};
+guiInstance.add(controls, 'resetDefaults').name('Reset Defaults');
+
+controls.setResolution(true);
 
 // Helper to catch any late-bound auto-placed GUIs
 const moveAutoGui = () => {
@@ -155,7 +168,7 @@ guiInstance.add(daydream, 'labelAxes').name('Show Axes');
 window.addEventListener("resize", () => daydream.setCanvasSize());
 window.addEventListener("keydown", (e) => daydream.keydown(e));
 
-controls.changeEffect();
+
 
 daydream.renderer.setAnimationLoop(() => {
   if (activeEffect) {
