@@ -40,11 +40,13 @@ export class HopfFibration {
         this.gui.add(this, 'alpha', 0, 1).name('Opacity');
 
         // Add Color Cycle control
-        this.colorRepeat = 3.0;
+        this.colorRepeat = 3.0; // Multiple cycles per ring
         this.gui.add(this, 'colorRepeat', 1, 20).step(0.5).name('Color Cycles');
 
+        // Use a longer lifespan for trails
+        // Increase capacity to handle high fiber counts (200000 points)
         this.pipeline = createRenderPipeline(
-            new FilterDecay(),
+            new FilterDecay(40, 200000),
             new FilterAntiAlias()
         );
 
@@ -86,8 +88,20 @@ export class HopfFibration {
     }
 
     drawFrame(pixels) {
+        // Render Trails first
+        this.pipeline.trail((x, y, t) => {
+            // t goes 0 (new) -> 1 (old) in FilterDecay (based on implementation reading?)
+            // Wait, Implementation: t = 1.0 - (ttl / lifespan)
+            // age=0 -> ttl=lifespan -> t=0.
+            // ttl=0 -> t=1.
+            // Let's fade alpha and shift color
+            const c = richSunset.get(t);
+            c.a *= (1 - t); // Fade out as it gets older
+            return c;
+        }, this.alpha);
+
         // Advance time parameters
-        this.flowOffset += 0.01 * this.flowSpeed;
+        this.flowOffset += 0.02 * this.flowSpeed * 0.2; // Adjusted speed for dots
 
         // Tumble rotation
         this.tumbleAngleX += 0.003 * this.tumbleSpeed;
@@ -113,84 +127,84 @@ export class HopfFibration {
             const theta = Math.acos(base.y);
             let phi = Math.atan2(base.z, base.x);
 
-            // Folding/Breathing: Modulate eta (aperture)
-            // Reduced amplitude to default to "aligned" look
+            // Folding/Breathing
             let eta = theta / 2;
             const folding = Math.sin(phi * 2 + this.tumbleAngleY + foldBase) * 0.1 * this.tumbleSpeed;
-            // Only apply folding if we want it? For now, keep it subtle.
             eta += folding;
 
-            // Apply Twist: Rotate fiber identity (phi) based on latitude
+            // Apply Twist
             phi += eta * this.twist;
 
-            const fiberPhase = i * 0.1;
-            const fiberPoints = [];
+            // DOT GENERATION: Only one point per fiber
+            // beta travels along the fiber loop
+            const phase = i * (Math.PI / this.fibers.length);
+            const beta = this.flowOffset + phase;
 
-            // Normalize flow for coloring
-            const flowT = (this.flowOffset / (2 * Math.PI));
+            // 1. Construct point on S3 (Hopf inverse)
+            // z0 = cos(eta) * e^(i(phi+beta))
+            // z1 = sin(eta) * e^(i(beta))
+            let q0 = Math.cos(eta) * Math.cos(phi + beta);
+            let q1 = Math.cos(eta) * Math.sin(phi + beta);
+            let q2 = Math.sin(eta) * Math.cos(beta);
+            let q3 = Math.sin(eta) * Math.sin(beta);
 
-            const step = (2 * Math.PI) / this.pointsPerFiber;
+            // 2. Apply Tumble (Global 4D Rotation)
+            // R_xw
+            const q0_r = q0 * cx - q3 * sx;
+            const q3_r = q0 * sx + q3 * cx;
+            q0 = q0_r; q3 = q3_r;
 
-            for (let j = 0; j < this.pointsPerFiber; j++) {
-                // beta travels along the fiber loop
-                const phase = i * (Math.PI / this.fibers.length);
-                const beta = j * step + this.flowOffset + phase;
+            // R_yz
+            const q1_r = q1 * cy - q2 * sy;
+            const q2_r = q1 * sy + q2 * cy;
+            q1 = q1_r; q2 = q2_r;
 
-                // 1. Construct point on S3 (Hopf inverse)
-                // z0 = cos(eta) * e^(i(phi+beta))
-                // z1 = sin(eta) * e^(i(beta))
-                let q0 = Math.cos(eta) * Math.cos(phi + beta);
-                let q1 = Math.cos(eta) * Math.sin(phi + beta);
-                let q2 = Math.sin(eta) * Math.cos(beta);
-                let q3 = Math.sin(eta) * Math.sin(beta);
+            // 3. Stereographic Projection S3 -> R3
+            const div = 1.001 - q3;
+            const factor = 1 / div;
+            const x = q0 * factor;
+            const y = q1 * factor;
+            const z = q2 * factor;
 
-                // 2. Apply Tumble (Global 4D Rotation)
-                // R_xw
-                const q0_r = q0 * cx - q3 * sx;
-                const q3_r = q0 * sx + q3 * cx;
-                q0 = q0_r; q3 = q3_r;
+            const v = vectorPool.acquire();
+            v.set(x, y, z).multiplyScalar(this.scale);
 
-                // R_yz
-                const q1_r = q1 * cy - q2 * sy;
-                const q2_r = q1 * sy + q2 * cy;
-                q1 = q1_r; q2 = q2_r;
+            // Set Color for key point
+            const c = richSunset.get(0);
+            c.a = this.alpha;
 
-                // 3. Stereographic Projection S3 -> R3
-                const div = 1.001 - q3;
-                const factor = 1 / div;
-                const x = q0 * factor;
-                const y = q1 * factor;
-                const z = q2 * factor;
+            // DRAW LINE from previous position if available (Continuous Trail)
+            if (this.prevPositions && this.prevPositions[i]) {
+                const prev = this.prevPositions[i];
+                // Check if jump is too large (wrapping)? Usually S3 flows smoothly.
+                // Just draw line.
+                // We utilize rasterize to draw the segment with proper interpolation if needed,
+                // or just straight line dots. 
+                // Using rasterize with 2 points creates a line.
 
-                const v = vectorPool.acquire();
-                v.set(x, y, z).multiplyScalar(this.scale);
-
-                // We do NOT store _t here anymore because rasterize() does not preserve it.
-                fiberPoints.push(v);
+                const segmentPoints = [prev, v];
+                const segmentDots = rasterize(segmentPoints, (p, t) => {
+                    return c;
+                }, false);
+                allPoints.push(...segmentDots);
+            } else {
+                // First frame or reset, just draw dot
+                allPoints.push({
+                    position: v,
+                    color: c,
+                    alpha: 1.0
+                });
             }
 
-            // Rasterize this fiber
-            // colorFn receives (point, t_interp) where t_interp is 0..1 along the fiber path
-            const colorFn = (p, t_interp) => {
-                // t_interp corresponds to the position along the fiber [0, 1]
+            // Store current position for next frame
+            if (!this.prevPositions) this.prevPositions = [];
 
-                // MULTIPLIER: Creates multiple "runs" of the palette per ring
-                // OFFSET: Re-adding flowOffset causes the pattern to slide/drip along the ring
-                // even as the physical ring rotates.
-                const stretch = t_interp + Math.sin(t_interp * Math.PI * 2) * 0.1;
-                // Add flowOffset * 0.2 to create the drift/drip effect
-                const tRaw = stretch * this.colorRepeat + this.flowOffset * 0.2 + i * 0.1;
-
-                let t = tRaw % 1;
-                if (t < 0) t += 1;
-
-                const c = richSunset.get(t);
-                c.a = this.alpha;
-                return c;
-            };
-
-            const dots = rasterize(fiberPoints, colorFn, true);
-            allPoints.push(...dots);
+            // MUST CLONE because v is from vectorPool and will be recycled
+            if (this.prevPositions[i]) {
+                this.prevPositions[i].copy(v);
+            } else {
+                this.prevPositions[i] = v.clone();
+            }
         }
 
         plotDots(pixels, this.pipeline, allPoints, 0, 1);
