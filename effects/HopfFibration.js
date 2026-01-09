@@ -11,14 +11,13 @@ import { fibSpiral } from "../geometry.js";
 
 export class HopfFibration {
     constructor() {
-        this.numFibers = 12; // User requested: 12
-        this.pointsPerFiber = 80;
+        this.numFibers = 200; // User requested: 12
 
         // Speeds
-        this.flowSpeed = 20.0; // User requested: 20
+        this.flowSpeed = 10.0; // User requested: 20
         this.tumbleSpeed = 4;
 
-        this.alpha = 0.6;
+        this.alpha = 0.4;
         this.scale = 1.4;
 
         // 4D Rotation params
@@ -31,8 +30,7 @@ export class HopfFibration {
         this.fibers = [];
 
         this.gui = new gui.GUI({ autoPlace: false });
-        this.gui.add(this, 'numFibers', 1, 200).step(1).name('Fiber Count').onChange(() => this.initFibers());
-        this.gui.add(this, 'pointsPerFiber', 3, 200).step(1).name('Res / Fiber');
+        this.gui.add(this, 'numFibers', 1, 400).step(1).name('Fiber Count').onChange(() => this.initFibers());
         this.gui.add(this, 'flowSpeed', -20, 20).name('Flow Speed');
         this.gui.add(this, 'tumbleSpeed', 0, 5).name('Tumble Speed');
         this.gui.add(this, 'twist', 0, Math.PI * 4).name('Twist');
