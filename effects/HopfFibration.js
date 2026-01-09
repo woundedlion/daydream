@@ -2,12 +2,12 @@
 import * as THREE from "three";
 import { gui } from "../gui.js";
 import { Daydream } from "../driver.js";
-import { vectorPool } from "../geometry.js";
-import { rasterize, plotDots } from "../draw.js";
+import { vectorPool, Orientation } from "../geometry.js";
+import { rasterize, plotDots, DecayBuffer } from "../draw.js";
 import { stereo } from "../3dmath.js";
-import { createRenderPipeline, FilterAntiAlias, FilterDecay } from "../filters.js";
+import { createRenderPipeline, FilterAntiAlias, FilterDecay, FilterOrient } from "../filters.js";
 import { richSunset } from "../color.js";
-import { fibSpiral } from "../geometry.js";
+import { Timeline, Rotation, easeMid } from "../animation.js";
 
 export class HopfFibration {
     constructor() {
@@ -18,13 +18,15 @@ export class HopfFibration {
         this.tumbleSpeed = 4;
 
         this.alpha = 0.4;
-        this.scale = 1.4;
+        this.folding = 0.5;
 
         // 4D Rotation params
         this.flowOffset = 0;
         this.tumbleAngleX = 0;
         this.tumbleAngleY = 0;
         this.twist = 0;
+        this.cameraSpeed = 0.01;
+        this.orientation = new Orientation(); // Global camera
 
         // Initialize reusable arrays
         this.fibers = [];
@@ -34,29 +36,43 @@ export class HopfFibration {
         this.gui.add(this, 'flowSpeed', -20, 20).name('Flow Speed');
         this.gui.add(this, 'tumbleSpeed', 0, 5).name('Tumble Speed');
         this.gui.add(this, 'twist', 0, Math.PI * 4).name('Twist');
-        this.gui.add(this, 'scale', 0.1, 5).name('Scale');
+        this.gui.add(this, 'folding', 0, 2.0).name('Folding');
+        this.gui.add(this, 'cameraSpeed', 0.001, 0.2).name('Camera Speed').onChange(() => this.updateSpeed());
         this.gui.add(this, 'alpha', 0, 1).name('Opacity');
 
-        // Add Color Cycle control
-        this.colorRepeat = 3.0; // Multiple cycles per ring
-        this.gui.add(this, 'colorRepeat', 1, 20).step(0.5).name('Color Cycles');
-
-        // Use a longer lifespan for trails
-        // Increase capacity to handle high fiber counts (200000 points)
         this.pipeline = createRenderPipeline(
-            new FilterDecay(40, 200000),
+            new FilterOrient(this.orientation),
             new FilterAntiAlias()
         );
 
-        // Ensure fibers are initialized immediately
+        this.trails = new DecayBuffer(40, 200000);
+
+        // Timeline with standard Rotation animation
+        this.timeline = new Timeline();
+        const duration = this.cameraSpeed > 0 ? (2 * Math.PI / this.cameraSpeed) : 10000;
+        this.rotationAnim = new Rotation(this.orientation, Daydream.Y_AXIS, 2 * Math.PI, duration, easeMid, true);
+        this.timeline.add(0, this.rotationAnim);
+
         this.initFibers();
+    }
+
+    updateSpeed() {
+        if (!this.rotationAnim) return;
+
+        // Avoid divide by zero
+        const speed = Math.max(0.0001, this.cameraSpeed);
+        const newDur = 2 * Math.PI / speed;
+
+        // Adjust current time 't' to maintain phase and prevent rotation jumps
+        if (this.rotationAnim.duration > 0) {
+            const ratio = newDur / this.rotationAnim.duration;
+            this.rotationAnim.t *= ratio;
+        }
+        this.rotationAnim.duration = newDur;
     }
 
     initFibers() {
         this.fibers = [];
-
-        // Use a grid-based approach instead of fibSpiral to align fibers
-        // We map S2 (base space) using latitude (theta) and longitude (phi)
 
         // Determine grid dimensions based on numFibers approximation
         const side = Math.ceil(Math.sqrt(this.numFibers));
@@ -86,17 +102,7 @@ export class HopfFibration {
     }
 
     drawFrame(pixels) {
-        // Render Trails first
-        this.pipeline.trail((x, y, t) => {
-            // t goes 0 (new) -> 1 (old) in FilterDecay (based on implementation reading?)
-            // Wait, Implementation: t = 1.0 - (ttl / lifespan)
-            // age=0 -> ttl=lifespan -> t=0.
-            // ttl=0 -> t=1.
-            // Let's fade alpha and shift color
-            const c = richSunset.get(t);
-            c.a *= (1 - t); // Fade out as it gets older
-            return c;
-        }, this.alpha);
+        this.timeline.step();
 
         // Advance time parameters
         this.flowOffset += 0.02 * this.flowSpeed * 0.2; // Adjusted speed for dots
@@ -125,9 +131,9 @@ export class HopfFibration {
             const theta = Math.acos(base.y);
             let phi = Math.atan2(base.z, base.x);
 
-            // Folding/Breathing
+            // Folding
             let eta = theta / 2;
-            const folding = Math.sin(phi * 2 + this.tumbleAngleY + foldBase) * 0.1 * this.tumbleSpeed;
+            const folding = Math.sin(phi * 2 + this.tumbleAngleY + foldBase) * 0.1 * this.tumbleSpeed * this.folding;
             eta += folding;
 
             // Apply Twist
@@ -165,7 +171,7 @@ export class HopfFibration {
             const z = q2 * factor;
 
             const v = vectorPool.acquire();
-            v.set(x, y, z).multiplyScalar(this.scale);
+            v.set(x, y, z);
 
             // Set Color for key point
             const c = richSunset.get(0);
@@ -205,6 +211,17 @@ export class HopfFibration {
             }
         }
 
-        plotDots(pixels, this.pipeline, allPoints, 0, 1);
+        // plotDots(pixels, this.pipeline, allPoints, 0, 1); // Avoid double drawing, DecayBuffer handles it
+
+        // Record new points to the 3D DecayBuffer
+        this.trails.recordDots(allPoints, 0, 1.0);
+
+        // Render the entire trail history (3D vectors projected by FilterOrient)
+        this.trails.render(pixels, this.pipeline, (v, t) => {
+            // t is normalized age [0 (new) -> 1 (old)]
+            const c = richSunset.get(t);
+            c.a *= (1 - t);
+            return c;
+        });
     }
 }
