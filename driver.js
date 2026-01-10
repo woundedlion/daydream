@@ -95,14 +95,13 @@ export class Daydream {
       depthWrite: false
     });
 
+    // Suppress black pixels for performance
     this.dotMaterial.onBeforeCompile = (shader) => {
-      // instanceColor is automatically added by Three.js when using InstancedMesh
-
       shader.vertexShader = shader.vertexShader.replace(
         '#include <begin_vertex>',
         `
           #include <begin_vertex>
-          #ifdef USE_INSTANCING
+          #if defined(USE_INSTANCING_COLOR)
              // Check luminance of instance color
              // Use dot product/squared length to avoid sqrt cost
              if (dot(instanceColor, instanceColor) < 0.0001) {
