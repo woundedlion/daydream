@@ -27,8 +27,9 @@ export class StaticPool {
    */
   acquire() {
     if (this.cursor >= this.capacity) {
-      console.warn("Pool exhausted! Increase capacity.");
-      return this.store[this.capacity - 1]; // Return last valid object to avoid crash, but shared state risk
+      const newCap = this.capacity * 2;
+      console.warn(`StaticPool: Expanding capacity for ${this.Type.name} from ${this.capacity} to ${newCap}`);
+      this.capacity = newCap;
     }
 
     if (this.cursor >= this.initializedCount) {
