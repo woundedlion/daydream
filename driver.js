@@ -95,6 +95,24 @@ export class Daydream {
       depthWrite: false
     });
 
+    this.dotMaterial.onBeforeCompile = (shader) => {
+      // instanceColor is automatically added by Three.js when using InstancedMesh
+
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `
+          #include <begin_vertex>
+          #ifdef USE_INSTANCING
+             // Check luminance of instance color
+             // Use dot product/squared length to avoid sqrt cost
+             if (dot(instanceColor, instanceColor) < 0.0001) {
+                 transformed *= 0.0;
+             }
+          #endif
+          `
+      );
+    };
+
     this.axisMaterial = new THREE.LineBasicMaterial({
       color: 0xffffff,
       linewidth: 5
@@ -127,8 +145,9 @@ export class Daydream {
       this.dotMaterial,
       Daydream.W * Daydream.H
     );
-    this.dotMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.dotMesh.count = 0;
+    this.dotMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+    this.dotMesh.count = Daydream.W * Daydream.H;
+    this.dotMesh.frustumCulled = false;
     this.scene.add(this.dotMesh);
     this.scene.add(this.xAxis);
     this.scene.add(this.yAxis);
@@ -247,26 +266,13 @@ export class Daydream {
         if (stats) stats.innerText = `${duration.toFixed(3)} ms`;
 
         // Render buffer to InstanceMesh
-        let instanceCount = 0;
-        const MAX_INSTANCES = this.dotMesh.count; // Total capacity
-
         for (let i = 0; i < Daydream.pixels.length; i++) {
-          const pixelColor = Daydream.pixels[i];
-
-          // Skip empty (black) pixels
-          if (pixelColor.r === 0 && pixelColor.g === 0 && pixelColor.b === 0) continue;
-
-          this.dotMesh.setMatrixAt(instanceCount, this.pixelMatrices[i]);
-          this.dotMesh.setColorAt(instanceCount, pixelColor);
-
-          instanceCount++;
+          this.dotMesh.setColorAt(i, Daydream.pixels[i]);
         }
 
-        this.dotMesh.count = instanceCount;
         if (this.dotMesh.instanceColor) {
           this.dotMesh.instanceColor.needsUpdate = true;
         }
-        this.dotMesh.instanceMatrix.needsUpdate = true;
 
         this.xAxis.visible = this.labelAxes;
         this.yAxis.visible = this.labelAxes;
@@ -356,6 +362,15 @@ export class Daydream {
 
       Daydream.pixelPositions[i] = vector.clone().normalize();
       this.pixelMatrices[i] = dummy.matrix.clone();
+
+      // Ensure matrix is set on the mesh
+      if (this.dotMesh) {
+        this.dotMesh.setMatrixAt(i, this.pixelMatrices[i]);
+      }
+    }
+
+    if (this.dotMesh) {
+      this.dotMesh.instanceMatrix.needsUpdate = true;
     }
   }
 
@@ -381,8 +396,9 @@ export class Daydream {
       this.dotMaterial,
       Daydream.W * Daydream.H
     );
-    this.dotMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.dotMesh.count = 0;
+    this.dotMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+    this.dotMesh.count = Daydream.W * Daydream.H;
+    this.dotMesh.frustumCulled = false;
     this.scene.add(this.dotMesh);
 
     Daydream.pixels = Array.from({ length: Daydream.W * Daydream.H }, () => new THREE.Color(0, 0, 0));
