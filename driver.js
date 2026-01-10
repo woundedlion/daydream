@@ -365,6 +365,7 @@ export class Daydream {
       // Ensure matrix is set on the mesh
       if (this.dotMesh) {
         this.dotMesh.setMatrixAt(i, this.pixelMatrices[i]);
+        this.dotMesh.setColorAt(i, Daydream.pixels[i]); // Initialize to black (from Daydream.pixels)
       }
     }
 

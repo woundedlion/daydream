@@ -23,5 +23,7 @@ export { RingSpinFieldSample } from "./RingSpinFieldSample.js";
 export { TestFSRing } from "./TestFSRing.js";
 export { HopfFibration } from "./HopfFibration.js";
 export { Voronoi } from "./Voronoi.js";
+export { SphericalHarmonics } from "./SphericalHarmonics.js";
+export { MobiusGradient } from "./MobiusGradient.js";
 
 

@@ -16,7 +16,8 @@ import {
 import {
     Timeline, RandomWalk, OrientationTrail // Assuming you added it to animation.js
 } from "../animation.js";
-import { FieldSampler } from "../FieldSampler.js";
+import { Scan } from "../draw.js";
+import { createRenderPipeline, FilterDecay } from "../filters.js";
 import { tween, dotPool } from "../draw.js";
 
 export class RingSpinFieldSample {
@@ -37,7 +38,7 @@ export class RingSpinFieldSample {
         this.palettes = [iceMelt, underSea, mangoPeel, richSunset];
         this.numRings = 4;
         this.timeline = new Timeline();
-        this.sampler = new FieldSampler();
+        this.debugBB = false; // Added back
 
         for (let i = 0; i < this.numRings; ++i) {
             this.spawnRing(Daydream.X_AXIS, this.palettes[i]);
@@ -51,7 +52,7 @@ export class RingSpinFieldSample {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01).name("Brightness");
         this.gui.add(this, 'thickness').min(0.01).max(0.5).step(0.01).name("Brush Size");
-        this.gui.add(this.sampler, 'debugBB').name('Show Bounding Boxes');
+        this.gui.add(this, 'debugBB').name('Show Bounding Boxes'); // Restored
     }
 
     spawnRing(normal, palette) {
@@ -64,6 +65,10 @@ export class RingSpinFieldSample {
         this.timeline.step();
         this.renderPlanes.length = 0;
 
+        // 1. Build Local Pipeline
+        // Add FilterDecay to get free trails on your rings!
+        const pipeline = createRenderPipeline(new FilterDecay(20));
+
         for (const ring of this.rings) {
             ring.trail.record(ring.orientation);
             tween(ring.trail, (snapshot, t) => {
@@ -71,17 +76,24 @@ export class RingSpinFieldSample {
                     if (t > 1.0) return;
                     const c = ring.palette.get(t);
                     c.alpha = c.alpha * this.alpha;
-                    // Provide normal as position to Dot
+
+                    // Store for rendering
                     const dot = dotPool.acquire();
                     dot.position.copy(ring.normal).applyQuaternion(q);
                     dot.color = c.color;
                     dot.alpha = c.alpha;
+                    dot.t = t; // Store t for material function if needed
                     this.renderPlanes.push(dot);
                 });
             });
         }
+
         for (const dot of this.renderPlanes) {
-            this.sampler.drawRing(dot.position, 1.0, dot, this.thickness);
+            const materialFn = (p, tPos, dist) => {
+                return { color: dot.color, alpha: dot.alpha };
+            };
+
+            Scan.Ring.draw(pipeline, Daydream.pixels, dot.position, 1.0, this.thickness, materialFn, 0, 2 * Math.PI, { debugBB: this.debugBB });
         }
     }
 }
