@@ -44,16 +44,42 @@ class DeepLinkGUI {
         return keys.join('.');
     }
 
+    _getDescriptor(object, prop) {
+        let curr = object;
+        while (curr) {
+            const desc = Object.getOwnPropertyDescriptor(curr, prop);
+            if (desc) return desc;
+            curr = Object.getPrototypeOf(curr);
+        }
+        return undefined;
+    }
+
     add(object, prop, ...args) {
         const key = this._getKey(prop);
-        let value = object[prop];
+
+        // Check for existing descriptor to respect getters/setters
+        const descriptor = this._getDescriptor(object, prop);
+        let getter, setter;
+
+        if (descriptor && (descriptor.get || descriptor.set)) {
+            // Wrap existing accessors
+            getter = () => descriptor.get ? descriptor.get.call(object) : undefined;
+            setter = (v) => {
+                if (descriptor.set) descriptor.set.call(object, v);
+            };
+        } else {
+            // Simple property - use closure logic
+            let value = object[prop];
+            getter = () => value;
+            setter = (v) => { value = v; };
+        }
 
         // 1. Proxy the property to trigger URL updates on set
         try {
             Object.defineProperty(object, prop, {
-                get: () => value,
+                get: getter,
                 set: (v) => {
-                    value = v;
+                    setter(v);
                     setUrlParam(key, v);
                 },
                 enumerable: true,
@@ -61,22 +87,19 @@ class DeepLinkGUI {
             });
         } catch (e) {
             console.warn(`DeepLinkGUI: Failed to proxy property '${prop}'. Deep linking updates may not work for this control.`, e);
-            // Fallback: Hook into setter via existing value if possible, or just proceed
         }
+
 
         // 2. Load initial value from URL
         const params = getUrlParams();
         if (params.has(key)) {
             let val = params.get(key);
-            const currentVal = value; // Use local var since getter just returns it
-
+            const currentVal = object[prop];
             if (typeof currentVal === 'number') {
                 val = parseFloat(val);
             } else if (typeof currentVal === 'boolean') {
                 val = (val === 'true');
             }
-
-            // Trigger setter -> updates URL (redundant but safe) -> updates 'value'
             object[prop] = val;
         }
 
