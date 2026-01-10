@@ -4,8 +4,10 @@
  */
 
 import * as THREE from "three";
-import { Daydream, labels } from "./driver.js";
-import { Dot, angleBetween, fibSpiral, vectorPool } from "./geometry.js";
+import { Daydream, labels, XY } from "./driver.js";
+import { Dot, angleBetween, fibSpiral, vectorPool, yToPhi } from "./geometry.js";
+import { quinticKernel } from "./filters.js";
+import { wrap } from "./util.js";
 import { StaticPool } from "./StaticPool.js";
 
 /** @type {StaticPool} Global pool for Dot objects. */
@@ -778,3 +780,241 @@ export const tween = (orientation, drawFn) => {
     drawFn(orientation.get(i), (s - 1 - i) / s);
   }
 }
+
+export const Scan = {
+  Ring: class {
+    /**
+     * Scans a thick ring and feeds pixels into the pipeline.
+     * @param {Object} pipeline - The render pipeline (must support plot2D).
+     * @param {Array} pixels - The pixel buffer (Daydream.pixels).
+     * @param {THREE.Vector3} normal - Ring orientation.
+     * @param {number} radius - Angular radius (0-2).
+     * @param {number} thickness - Angular thickness.
+     * @param {Function} materialFn - (pos, t, dist) => {color, alpha}.
+     * @param {number} [startAngle=0] - Start of the arc in radians.
+     * @param {number} [endAngle=6.28318] - End of the arc in radians.
+     */
+    static draw(pipeline, pixels, normal, radius, thickness, materialFn, startAngle = 0, endAngle = 2 * Math.PI, options = {}) {
+      // Pre-calculate properties
+      const nx = normal.x;
+      const ny = normal.y;
+      const nz = normal.z;
+
+      // --- 1. Construct Basis for Azimuth/Angle checks ---
+      let ref = new THREE.Vector3(1, 0, 0); // X_AXIS
+      if (Math.abs(normal.dot(ref)) > 0.9999) {
+        ref.set(0, 1, 0); // Y_AXIS
+      }
+      const u = new THREE.Vector3().crossVectors(normal, ref).normalize();
+      const w = new THREE.Vector3().crossVectors(normal, u).normalize();
+
+      const targetAngle = radius * (Math.PI / 2);
+      const R = Math.sqrt(nx * nx + nz * nz);
+      const alpha = Math.atan2(nx, nz);
+      const centerPhi = Math.acos(ny);
+      const isFullCircle = Math.abs(endAngle - startAngle) >= 2 * Math.PI - 0.001;
+
+      const ctx = {
+        normal, radius, thickness, materialFn,
+        nx, ny, nz, targetAngle, R, alpha, centerPhi,
+        u, w, startAngle, endAngle,
+        checkSector: !isFullCircle,
+        pipeline, pixels,
+        clipPlanes: options.clipPlanes, // Injected options
+        limits: options.limits, // Injected options
+        debugBB: options.debugBB // Injected options
+      };
+
+      // --- 2. CALCULATE VERTICAL BOUNDS ---
+      const a1 = centerPhi - targetAngle;
+      const a2 = centerPhi + targetAngle;
+      const p1 = Math.acos(Math.cos(a1));
+      const p2 = Math.acos(Math.cos(a2));
+      const minP = Math.min(p1, p2);
+      const maxP = Math.max(p1, p2);
+
+      let phiMin = Math.max(0, minP - thickness);
+      let phiMax = Math.min(Math.PI, maxP + thickness);
+
+      // Optional limits could be passed in ctx if needed, but keeping it simple for now
+      if (ctx.limits) {
+        phiMin = Math.max(phiMin, ctx.limits.minPhi);
+        phiMax = Math.min(phiMax, ctx.limits.maxPhi);
+      }
+
+      if (phiMin > phiMax) return;
+
+      const yMin = Math.max(0, Math.floor((phiMin * (Daydream.H - 1)) / Math.PI));
+      const yMax = Math.min(Daydream.H - 1, Math.ceil((phiMax * (Daydream.H - 1)) / Math.PI));
+
+      for (let y = yMin; y <= yMax; y++) {
+        Scan.Ring.scanRow(y, ctx);
+      }
+    }
+
+    static scanRow(y, ctx) {
+      const phi = yToPhi(y);
+      const cosPhi = Math.cos(phi);
+      const sinPhi = Math.sin(phi);
+
+      if (ctx.R < 0.01) {
+        Scan.Ring.scanFullRow(y, ctx);
+        return;
+      }
+
+      const ang_low = Math.max(0, ctx.targetAngle - ctx.thickness);
+      const ang_high = Math.min(Math.PI, ctx.targetAngle + ctx.thickness);
+      const D_max = Math.cos(ang_low);
+      const D_min = Math.cos(ang_high);
+      const denom = ctx.R * sinPhi;
+
+      if (Math.abs(denom) < 0.000001) {
+        Scan.Ring.scanFullRow(y, ctx);
+        return;
+      }
+
+      const C_min = (D_min - ctx.ny * cosPhi) / denom;
+      const C_max = (D_max - ctx.ny * cosPhi) / denom;
+      const minCos = Math.max(-1, C_min);
+      const maxCos = Math.min(1, C_max);
+
+      if (minCos > maxCos) return;
+
+      const angleMin = Math.acos(maxCos);
+      const angleMax = Math.acos(minCos);
+
+      if (angleMin <= 0.0001) {
+        Scan.Ring.scanWindow(y, ctx.alpha - angleMax, ctx.alpha + angleMax, ctx);
+      } else if (angleMax >= Math.PI - 0.0001) {
+        Scan.Ring.scanWindow(y, ctx.alpha + angleMin, ctx.alpha + 2 * Math.PI - angleMin, ctx);
+      } else {
+        Scan.Ring.scanWindow(y, ctx.alpha - angleMax, ctx.alpha - angleMin, ctx);
+        Scan.Ring.scanWindow(y, ctx.alpha + angleMin, ctx.alpha + angleMax, ctx);
+      }
+    }
+
+    static scanFullRow(y, ctx) {
+      for (let x = 0; x < Daydream.W; x++) {
+        Scan.Ring.processPixel(XY(x, y), x, y, ctx);
+      }
+    }
+
+    static scanWindow(y, t1, t2, ctx) {
+      const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
+      const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
+      for (let x = x1; x <= x2; x++) {
+        const wx = wrap(x, Daydream.W);
+        Scan.Ring.processPixel(XY(wx, y), wx, y, ctx);
+      }
+    }
+
+    static processPixel(i, x, y, ctx) {
+      if (ctx.debugBB) {
+        const outColor = Daydream.pixels[i];
+        outColor.r += 0.02; outColor.g += 0.02; outColor.b += 0.02;
+      }
+
+      const p = Daydream.pixelPositions[i];
+
+      // Clipping Planes Logic from original FSRing (passed via ctx if needed)
+      if (ctx.clipPlanes) {
+        for (const cp of ctx.clipPlanes) {
+          if (p.dot(cp) < 0) return;
+        }
+      }
+
+      const polarAngle = angleBetween(p, ctx.normal);
+      const dist = Math.abs(polarAngle - ctx.targetAngle);
+
+      if (dist < ctx.thickness) {
+        if (ctx.checkSector) {
+          const dotU = p.dot(ctx.u);
+          const dotW = p.dot(ctx.w);
+          let azimuth = Math.atan2(dotW, dotU);
+          if (azimuth < 0) azimuth += 2 * Math.PI;
+
+          let inside = false;
+          if (ctx.startAngle <= ctx.endAngle) {
+            inside = (azimuth >= ctx.startAngle && azimuth <= ctx.endAngle);
+          } else {
+            inside = (azimuth >= ctx.startAngle || azimuth <= ctx.endAngle);
+          }
+          if (!inside) return;
+        }
+
+        const t = dist / ctx.thickness;
+        const aaAlpha = quinticKernel(1.0 - t);
+
+        // Evaluate Material
+        const mat = ctx.materialFn(p, t, dist);
+        const color = mat.isColor ? mat : (mat.color || mat);
+        const baseAlpha = (mat.alpha !== undefined ? mat.alpha : 1.0);
+
+        ctx.pipeline.plot2D(ctx.pixels, x, y, color, 0, baseAlpha * aaAlpha);
+      }
+    }
+  },
+
+  Line: class {
+    static draw(pipeline, pixels, v1, v2, thickness, materialFn, options = {}) {
+      const normal = new THREE.Vector3().crossVectors(v1, v2).normalize();
+      if (normal.lengthSq() < 0.000001) return;
+
+      const c1 = new THREE.Vector3().crossVectors(normal, v1);
+      const c2 = new THREE.Vector3().crossVectors(v2, normal);
+
+      let maxY = Math.max(v1.y, v2.y);
+      let minY = Math.min(v1.y, v2.y);
+      const apexPlaneNormal = new THREE.Vector3().crossVectors(normal, new THREE.Vector3(0, 1, 0));
+      if (apexPlaneNormal.lengthSq() > 0.0001) {
+        const d1 = v1.dot(apexPlaneNormal);
+        const d2 = v2.dot(apexPlaneNormal);
+        if (d1 * d2 <= 0) {
+          const globalMaxY = Math.sqrt(1 - normal.y * normal.y);
+          if (v1.y + v2.y > 0) maxY = globalMaxY;
+          else minY = -globalMaxY;
+        }
+      }
+
+      const minPhi = Math.acos(Math.min(1, Math.max(-1, maxY))) - thickness;
+      const maxPhi = Math.acos(Math.min(1, Math.max(-1, minY))) + thickness;
+
+      Scan.Ring.draw(pipeline, pixels, normal, 1.0, thickness, materialFn, 0, 2 * Math.PI, {
+        ...options,
+        clipPlanes: [c1, c2], // Merge clipPlanes? Scan.Ring currently just takes options.clipPlanes.
+        // If options has clipPlanes, we should probably append or replace. 
+        // But Line relies on these clipPlanes for segment definition.
+        // Assuming options might contain debugBB but not clipPlanes for lines.
+        limits: { minPhi, maxPhi }
+      });
+    }
+  },
+
+  Point: class {
+    static draw(pipeline, pixels, pos, thickness, materialFn, options) {
+      Scan.Ring.draw(pipeline, pixels, pos, 0, thickness, materialFn, 0, 2 * Math.PI, options);
+    }
+  },
+
+  Field: class {
+    static draw(pipeline, pixels, materialFn) {
+      // Iterate all pixels
+      for (let i = 0; i < Daydream.pixelPositions.length; i++) {
+        // We need x, y for plot2D. 
+        // Daydream.pixelPositions is linear 0..W*H.
+        // x = i % W, y = i / W
+        const x = i % Daydream.W;
+        const y = (i / Daydream.W) | 0;
+
+        const p = Daydream.pixelPositions[i];
+        const mat = materialFn(p);
+
+        const color = mat.isColor ? mat : (mat.color || mat);
+        const alpha = (mat.alpha !== undefined ? mat.alpha : 1.0);
+
+        // No AA logic here, just direct field evaluation
+        pipeline.plot2D(pixels, x, y, color, 0, alpha);
+      }
+    }
+  }
+};

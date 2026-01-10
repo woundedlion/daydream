@@ -27,7 +27,9 @@ import {
   CometsFieldSample,
   TestFSRing,
   HopfFibration,
-  Voronoi
+  Voronoi,
+  SphericalHarmonics,
+  MobiusGradient
 } from "./effects/index.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
@@ -54,7 +56,9 @@ const effects = {
   LSystem,
   TestFSRing,
   HopfFibration,
-  Voronoi
+  Voronoi,
+  SphericalHarmonics,
+  MobiusGradient
 };
 
 const urlParams = new URLSearchParams(window.location.search);

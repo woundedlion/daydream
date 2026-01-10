@@ -22,7 +22,7 @@ import {
     createRenderPipeline, FilterAntiAlias, FilterOrient, quinticKernel
 } from "../filters.js";
 import { randomBetween, wrap } from "../util.js";
-import { FieldSampler } from "../FieldSampler.js";
+import { Scan } from "../draw.js";
 
 export class CometsFieldSample {
     static Node = class {
@@ -45,7 +45,8 @@ export class CometsFieldSample {
         this.thickness = 2.1 * 2 * Math.PI / Daydream.W;
         this.orientation = new Orientation();
         this.path = new Path(Daydream.Y_AXIS);
-        this.sampler = new FieldSampler();
+        this.debugBB = false;
+
         this.functions = [
             { m1: 1.06, m2: 1.06, a: 0, domain: 5.909 },
             { m1: 6.06, m2: 1, a: 0, domain: 2 * Math.PI },
@@ -87,7 +88,7 @@ export class CometsFieldSample {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha', 0, 1).step(0.01).name('Brightness');
         this.gui.add(this, 'thickness', 0.01, 0.5).step(0.01).name('Brush Size');
-        this.gui.add(this.sampler, 'debugBB').name('Show Bounding Boxes');
+        this.gui.add(this, 'debugBB').name('Show Bounding Boxes'); // Restored
     }
 
     updatePath() {
@@ -140,6 +141,15 @@ export class CometsFieldSample {
                 });
             });
         }
-        this.sampler.drawPoints(this.renderPoints, this.thickness);
+
+        const pipeline = createRenderPipeline();
+        for (const pt of this.renderPoints) {
+            const pos = pt.position;
+            const matFn = () => {
+                const col = pt.color;
+                return { color: col, alpha: pt.alpha };
+            };
+            Scan.Point.draw(pipeline, Daydream.pixels, pos, this.thickness, matFn, { debugBB: this.debugBB });
+        }
     }
 }

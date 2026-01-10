@@ -16,7 +16,8 @@ import {
 import {
     Timeline, Sprite, RandomWalk, MutableNumber
 } from "../animation.js";
-import { FieldSampler } from "../FieldSampler.js";
+import { Scan } from "../draw.js";
+import { createRenderPipeline } from "../filters.js";
 
 export class TestFSRing {
     static Ring = class {
@@ -34,8 +35,8 @@ export class TestFSRing {
         this.palettes = [iceMelt, underSea, mangoPeel, richSunset]
         this.numRings = 1;
         this.timeline = new Timeline();
-        this.sampler = new FieldSampler();
         this.radius = 1.0;
+        this.debugBB = false; // Added back
 
         for (let i = 0; i < this.numRings; ++i) {
             this.spawnRing(Daydream.X_AXIS, this.palettes[i]);
@@ -50,7 +51,7 @@ export class TestFSRing {
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01).name("Brightness");
         this.gui.add(this, 'thickness').min(0.01).max(0.5).step(0.01).name("Brush Size");
         this.gui.add(this, 'radius').min(0).max(2).step(0.01).name("Radius");
-        this.gui.add(this.sampler, 'debugBB').name('Show Bounding Boxes');
+        this.gui.add(this, 'debugBB').name('Show Bounding Boxes'); // Restored
     }
 
     spawnRing(normal, palette) {
@@ -61,9 +62,16 @@ export class TestFSRing {
 
     drawFrame() {
         this.timeline.step();
+
+        const pipeline = createRenderPipeline();
+
         for (const ring of this.rings) {
-            let color = ring.palette.get(0.5);
-            this.sampler.drawRing(ring.orientation.orient(ring.normal), this.radius, color, this.thickness);
+            // let color = ring.palette.get(0.5);
+            // Scan.Ring need materialFn
+            const materialFn = () => {
+                return ring.palette.get(0.5);
+            }
+            Scan.Ring.draw(pipeline, Daydream.pixels, ring.orientation.orient(ring.normal), this.radius, this.thickness, materialFn, 0, 2 * Math.PI, { debugBB: this.debugBB });
         }
     }
 }

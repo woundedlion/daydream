@@ -81,17 +81,28 @@ export function createRenderPipeline(...filters) {
   };
 
   if (nextIs2D) {
-    // Head is 2D filter, rasterize first
+    // Head is 2D filter
     return {
+      // 3D Entry Point (Standard)
       plot: (pixels, v, c, age, alpha) => {
         const p = vectorToPixel(v);
         head(pixels, p.x, p.y, c, age, alpha);
       },
+      // 2D Entry Point (New - For Scanners)
+      plot2D: (pixels, x, y, c, age, alpha) => {
+        head(pixels, x, y, c, age, alpha);
+      },
       trail: trail
     };
   } else {
+    // Pipeline starts with 3D filter (e.g. FilterOrient)
+    // We cannot scan directly into this without un-projecting x,y -> v
     return {
       plot: head,
+      plot2D: (pixels, x, y, c, age, alpha) => {
+        // Optional: Convert back to vector if needed, or throw error
+        console.warn("Cannot scan 2D into 3D pipeline head");
+      },
       trail: trail
     };
   }
