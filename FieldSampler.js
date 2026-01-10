@@ -333,4 +333,15 @@ export class FieldSampler {
     drawRing(normal, radius, color4, thickness, startAngle = 0, endAngle = 2 * Math.PI) {
         FSRing.draw(normal, radius, color4, thickness, startAngle, endAngle, this.debugBB);
     }
+    /**
+     * Iterates over all pixels and calls colorFn to determine the color.
+     * @param {Function} colorFn - Function taking (position: THREE.Vector3) and returning {color: THREE.Color, alpha: number} or THREE.Color.
+     */
+    draw3DField(colorFn) {
+        for (let i = 0; i < Daydream.pixelPositions.length; i++) {
+            const result = colorFn(Daydream.pixelPositions[i]);
+            const outColor = Daydream.pixels[i];
+            blendAlpha(outColor, result.color, result.alpha, outColor);
+        }
+    }
 }

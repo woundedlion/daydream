@@ -12,6 +12,7 @@ import {
 import {
     richSunset
 } from "../color.js";
+import { gui } from "../gui.js";
 
 /**
  * Metaballs Effect (V5: Smooth Orbital Physics)
@@ -25,26 +26,39 @@ export class MetaballEffect {
 
         // --- Tunable Knobs ---
         this.maxInfluence = 10.0;
-        this.gravity = 0.005; // New knob: How strong is the pull to the center?
+        this.gravity = 0.005;
+        this.numBalls = 16;
+        this.radiusScale = 1.0;
+        this.velocityScale = 1.0;
 
-        // --- Define our 16 Metaballs ---
         this.balls = [];
-        const NUM_BALLS = 16;
 
-        for (let i = 0; i < NUM_BALLS; i++) {
+        this.gui = new gui.GUI({ autoPlace: false });
+        this.gui.add(this, 'maxInfluence', 1.0, 50.0).name('Influence Falloff');
+        this.gui.add(this, 'gravity', 0.0001, 0.05).name('Gravity');
+        this.gui.add(this, 'numBalls', 1, 50).step(1).name('Ball Count').onChange(() => this.initBalls());
+        this.gui.add(this, 'radiusScale', 0.1, 3.0).name('Size Scale').onChange(() => this.initBalls());
+        this.gui.add(this, 'velocityScale', 0.1, 5.0).name('Speed Scale').onChange(() => this.initBalls());
+
+        this.initBalls();
+    }
+
+    initBalls() {
+        this.balls = [];
+        for (let i = 0; i < this.numBalls; i++) {
             const rand = (min, max) => Math.random() * (max - min) + min;
 
             this.balls.push({
                 p: new THREE.Vector3(
-                    rand(-0.5, 0.5), // Random start position
+                    rand(-0.5, 0.5),
                     rand(-0.5, 0.5),
                     rand(-0.5, 0.5)
                 ),
-                r: rand(0.5, 0.8), // Bigger radius
+                r: rand(0.5, 0.8) * this.radiusScale,
                 v: new THREE.Vector3(
-                    rand(-0.02, 0.08), // Slightly faster velocity
-                    rand(-0.02, 0.08),
-                    rand(-0.02, 0.08)
+                    rand(-0.02, 0.08) * this.velocityScale,
+                    rand(-0.02, 0.08) * this.velocityScale,
+                    rand(-0.02, 0.08) * this.velocityScale
                 )
             });
         }
