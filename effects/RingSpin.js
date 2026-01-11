@@ -17,7 +17,7 @@ import {
     Timeline, RandomWalk, OrientationTrail // Assuming you added it to animation.js
 } from "../animation.js";
 import { Scan } from "../draw.js";
-import { createRenderPipeline, FilterDecay } from "../filters.js";
+import { createRenderPipeline } from "../filters.js";
 import { tween, dotPool } from "../draw.js";
 
 export class RingSpin {

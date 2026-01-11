@@ -330,23 +330,20 @@ export class FilterChromaticShift {
 }
 
 
-export class FilterDecay {
+export class FilterScreenTrails {
   constructor(lifespan, maxCapacity = 10000) {
     this.is2D = true;
     this.lifespan = lifespan;
     this.count = 0;
-
-    // Pre-allocate memory (like StaticCircularBuffer in C++)
     this.xs = new Float32Array(maxCapacity);
     this.ys = new Float32Array(maxCapacity);
     this.ttls = new Float32Array(maxCapacity);
   }
 
   plot(x, y, color, age, alpha, pass) {
-    this.pass = pass; // saved for trail injection
+    this.pass = pass;
     pass(x, y, color, age, alpha);
 
-    // Record for trail (if buffer isn't full)
     if (this.count < this.ttls.length) {
       const i = this.count;
       this.xs[i] = x;
@@ -356,42 +353,128 @@ export class FilterDecay {
     }
   }
 
-  trail(trailFn, alpha) {
+  trail(trailFn, alpha = 1.0) {
+    // 1. Age and Compact (remove dead particles)
     let i = 0;
-    // Single Loop: Render AND Decay/Compact in one pass
     while (i < this.count) {
-      // 1. Render Current Particle
-      const ttl = this.ttls[i];
-      const x = this.xs[i];
-      const y = this.ys[i];
+      this.ttls[i] -= 1;
+      if (this.ttls[i] <= 0) {
+        this.count--;
+        if (i < this.count) {
+          // Swap-remove
+          this.xs[i] = this.xs[this.count];
+          this.ys[i] = this.ys[this.count];
+          this.ttls[i] = this.ttls[this.count];
+          // Stay at 'i' to check the swapped element
+        }
+      } else {
+        i++;
+      }
+    }
 
-      // Calculate palette progress
+    // 2. Prepare Indices
+    if (!this.indices || this.indices.length < this.count) {
+      this.indices = new Uint32Array(this.xs.length);
+    }
+    for (let k = 0; k < this.count; k++) {
+      this.indices[k] = k;
+    }
+
+    // 3. Sort by TTL (Ascending: Oldest/Smallest TTL first -> Newest/Largest TTL last)
+    // Using a subarray to sort only active indices
+    const activeIndices = this.indices.subarray(0, this.count);
+    activeIndices.sort((a, b) => this.ttls[a] - this.ttls[b]);
+
+    // 4. Draw
+    for (let k = 0; k < this.count; k++) {
+      const idx = activeIndices[k];
+      const ttl = this.ttls[idx];
+      const x = this.xs[idx];
+      const y = this.ys[idx];
       const t = 1.0 - (ttl / this.lifespan);
 
       let res = trailFn(x, y, t);
       const color = res.isColor ? res : (res.color || res);
       const outputAlpha = (res.alpha !== undefined ? res.alpha : 1.0) * alpha;
-
       this.pass(x, y, color, this.lifespan - ttl, outputAlpha);
+    }
+  }
+}
 
-      // 2. Decay
-      this.ttls[i] -= 1;
+export class FilterWorldTrails {
+  constructor(lifespan, capacity = 4096) {
+    this.is2D = false;
+    this.lifespan = lifespan;
+    this.capacity = capacity;
+    this.count = 0;
 
-      // 3. Remove if Dead (Swap-Remove Logic)
-      if (this.ttls[i] <= 0) {
-        this.count--; // Shrink size
+    // SoA for 3D points
+    this.x = new Float32Array(capacity);
+    this.y = new Float32Array(capacity);
+    this.z = new Float32Array(capacity);
+    this.ttl = new Float32Array(capacity);
+  }
 
+  plot(v, color, age, alpha, pass) {
+    this.pass = pass;
+    pass(v, color, age, alpha);
+
+    if (this.count < this.capacity) {
+      const i = this.count;
+      this.x[i] = v.x;
+      this.y[i] = v.y;
+      this.z[i] = v.z;
+      this.ttl[i] = this.lifespan - age;
+      this.count++;
+    }
+  }
+
+  trail(trailFn, alpha = 1.0) {
+    // 1. Age and Compact
+    let i = 0;
+    while (i < this.count) {
+      this.ttl[i] -= 1;
+      if (this.ttl[i] <= 0) {
+        this.count--;
         if (i < this.count) {
-          // Swap the last element into the current slot
-          this.xs[i] = this.xs[this.count];
-          this.ys[i] = this.ys[this.count];
-          this.ttls[i] = this.ttls[this.count];
-          // Do NOT increment i; we need to process the swapped-in element
+          // Swap-remove
+          this.x[i] = this.x[this.count];
+          this.y[i] = this.y[this.count];
+          this.z[i] = this.z[this.count];
+          this.ttl[i] = this.ttl[this.count];
+          // Do not increment i; check swapped element
         }
       } else {
-        // Pixel survived, move to next
         i++;
       }
+    }
+
+    // 2. Prepare Indices
+    if (!this.indices || this.indices.length < this.count) {
+      this.indices = new Uint32Array(this.capacity);
+    }
+    for (let k = 0; k < this.count; k++) {
+      this.indices[k] = k;
+    }
+
+    // 3. Sort by TTL (Ascending: Oldest first)
+    const activeIndices = this.indices.subarray(0, this.count);
+    activeIndices.sort((a, b) => this.ttl[a] - this.ttl[b]);
+
+    // 4. Draw
+    const v = new THREE.Vector3(); // Reusable
+    for (let k = 0; k < this.count; k++) {
+      const idx = activeIndices[k];
+      const ttl = this.ttl[idx];
+
+      v.set(this.x[idx], this.y[idx], this.z[idx]);
+
+      const t = 1.0 - (ttl / this.lifespan);
+      let res = trailFn(v, t);
+      const color = res.isColor ? res : (res.color || res);
+      const outputAlpha = (res.alpha !== undefined ? res.alpha : 1.0) * alpha;
+
+      this.pass(v, color, this.lifespan - ttl, outputAlpha);
     }
   }
 }

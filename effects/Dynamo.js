@@ -11,7 +11,7 @@ import {
     Orientation, angleBetween, pixelToVector, randomVector
 } from "../geometry.js";
 import {
-    Plot, DecayBuffer
+    Plot
 } from "../draw.js";
 import {
     GenerativePalette
@@ -20,7 +20,7 @@ import {
     Timeline, easeMid, easeInOutSin, Transition, RandomTimer, MutableNumber, Rotation
 } from "../animation.js";
 import {
-    createRenderPipeline, FilterAntiAlias, FilterReplicate, FilterOrient
+    createRenderPipeline, FilterAntiAlias, FilterReplicate, FilterOrient, FilterWorldTrails
 } from "../filters.js";
 import {
     dir, wrap, shortest_distance
@@ -51,8 +51,9 @@ export class Dynamo {
         this.orientation = new Orientation();
 
         // Filters
-        this.trails = new DecayBuffer(this.trailLength);
+        // Decay must be first to capture source points for trails
         this.filters = createRenderPipeline(
+            new FilterWorldTrails(this.trailLength),
             new FilterReplicate(3),
             new FilterOrient(this.orientation),
             new FilterAntiAlias()
@@ -153,8 +154,9 @@ export class Dynamo {
             this.pull(0);
             this.drawNodes(i * 1 / Math.abs(this.speed));
         }
-        this.trails.render(this.filters,
-            (v, t) => this.color(v, t));
+
+        // Render Trails
+        this.filters.trail((v, t) => this.color(v, t));
     }
 
     nodeY(node) {
@@ -165,20 +167,19 @@ export class Dynamo {
         for (let i = 0; i < this.nodes.length; ++i) {
             if (i == 0) {
                 let from = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
-                Plot.Point.draw(this.trails, from, (v) => {
+                Plot.Point.draw(this.filters, from, (v) => {
                     const c = this.color(v, 0);
                     return { color: c.color || c, alpha: (c.alpha || 1) * 0.5 }; // pre-multiply opacity 0.5
                 });
             } else {
                 let from = pixelToVector(this.nodes[i - 1].x, this.nodeY(this.nodes[i - 1]));
                 let to = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
-                Plot.Line.draw(this.trails, from, to, (v) => {
+                Plot.Line.draw(this.filters, from, to, (v) => {
                     const c = this.color(v, 0);
                     return { color: c.color || c, alpha: (c.alpha || 1) * 0.5 };
                 });
             }
         }
-        // trails.recordDots no longer needed, we drew directly to trails
     }
 
     pull(y) {

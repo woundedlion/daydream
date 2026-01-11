@@ -15,132 +15,8 @@ export const dotPool = new StaticPool(Dot, 500000);
 
 // Reusable temporary objects to avoid allocation during render loops
 const _tempVec = new THREE.Vector3();
-const _tempCol = new THREE.Color();
 
-/**
- * Implements pixel history and decay for persistent effects.
- * Manages a buffer of points that fade out over a specific lifespan.
- * Refactored to use Structure of Arrays (SoA) to prevent GC churn.
- */
-export class DecayBuffer {
-  /**
-   * @param {number} lifespan - The number of frames a pixel lasts before disappearing.
-   * @param {number} [capacity=4096] - The maximum number of trail segments to track.
-   */
-  constructor(lifespan, capacity = 4096) {
-    this.lifespan = lifespan;
-    this.capacity = capacity;
-    this.count = 0;
-    this.head = 0; // Points to the next write position
 
-    // Structure of Arrays (SoA) - TypedArrays for zero-allocation storage
-    this.x = new Float32Array(capacity);
-    this.y = new Float32Array(capacity);
-    this.z = new Float32Array(capacity);
-
-    this.r = new Float32Array(capacity);
-    this.g = new Float32Array(capacity);
-    this.b = new Float32Array(capacity);
-    this.a = new Float32Array(capacity); // Alpha
-
-    this.ttl = new Float32Array(capacity);
-
-    this.sortIndices = new Uint32Array(capacity);
-  }
-
-  /**
-   * Records a list of dots into the history buffer.
-   * @param {Dot[]} dots - The list of dots (position/color) to record.
-   * @param {number} age - The initial age of the dots (usually 0).
-   * @param {number} alpha - The global opacity for these dots.
-   */
-  recordDots(dots, age, alpha) {
-    for (let i = 0; i < dots.length; ++i) {
-      let dot = dots[i];
-      this.record(dot.position, dot.color, age, alpha * (dot.alpha !== undefined ? dot.alpha : 1.0));
-    }
-  }
-
-  /**
-   * Records a single dot into the history buffer.
-   * @param {THREE.Vector3} v - The position vector.
-   * @param {THREE.Color} color - The base color of the dot.
-   * @param {number} age - The initial age of the dot (frame offset).
-   * @param {number} alpha - The initial opacity.
-   */
-  record(v, color, age, alpha) {
-    let ttl = this.lifespan - age;
-    if (ttl > 0) {
-      const i = this.head;
-
-      this.x[i] = v.x;
-      this.y[i] = v.y;
-      this.z[i] = v.z;
-
-      this.r[i] = color.r;
-      this.g[i] = color.g;
-      this.b[i] = color.b;
-      this.a[i] = alpha;
-
-      this.ttl[i] = ttl;
-
-      this.head = (this.head + 1) % this.capacity;
-      if (this.count < this.capacity) {
-        this.count++;
-      }
-    }
-  }
-
-  /**
-   * Alias for record to satisfy the pipeline interface.
-   * @param {THREE.Vector3} v - The vector to record.
-   * @param {THREE.Color} color - The color.
-   * @param {number} age - The age (unused/passed through).
-   * @param {number} alpha - The opacity.
-   */
-  plot(v, color, age, alpha) {
-    this.record(v, color, age, alpha);
-  }
-
-  /**
-   * Renders the buffered dots to the pixel map, applying decay and sorting.
-   * @param {Map} pixels - The pixel map to write to (output).
-   * @param {Object} pipeline - The render pipeline or filter object to process points.
-   * @param {Function} colorFn - Function to determine color based on decay. Signature: (vector, normalized_t) => Color.
-   */
-  render(pipeline, colorFn) {
-    let tail = (this.head - this.count + this.capacity) % this.capacity;
-    for (let i = 0; i < this.count; i++) {
-      this.sortIndices[i] = (tail + i) % this.capacity;
-    }
-    const activeIndices = this.sortIndices.subarray(0, this.count);
-    activeIndices.sort((a, b) => this.ttl[a] - this.ttl[b]);
-
-    for (let i = 0; i < this.count; ++i) {
-      const idx = activeIndices[i];
-      this.ttl[idx] -= 1;
-      const currentTTL = this.ttl[idx];
-      if (currentTTL > 0) {
-        _tempVec.set(this.x[idx], this.y[idx], this.z[idx]);
-        let t = (this.lifespan - currentTTL) / this.lifespan;
-        const res = colorFn(_tempVec, t);
-        const c = res.isColor ? res : (res.color || res);
-        const a = (res.alpha !== undefined ? res.alpha : 1.0) * this.a[idx];
-        pipeline.plot(_tempVec, c, 0, a);
-      }
-    }
-
-    // Cleanup
-    while (this.count > 0) {
-      const tailIdx = (this.head - this.count + this.capacity) % this.capacity;
-      if (this.ttl[tailIdx] <= 0) {
-        this.count--;
-      } else {
-        break;
-      }
-    }
-  }
-}
 /**
  * Represents a path composed of connected points on the sphere.
  */
@@ -385,9 +261,7 @@ export const Plot = {
       let scale = a / simAngle;
 
       // Drawing Phase
-      if (omitLast && steps.length === 0) {
-        return;
-      }
+
 
       let currentAngle = 0;
 

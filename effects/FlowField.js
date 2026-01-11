@@ -11,16 +11,13 @@ import {
     randomVector, Dot
 } from "../geometry.js";
 import {
-    DecayBuffer
-} from "../draw.js";
-import {
     GenerativePalette
 } from "../color.js";
 import {
     Timeline, easeMid, PeriodicTimer, ColorWipe
 } from "../animation.js";
 import {
-    createRenderPipeline, FilterAntiAlias
+    createRenderPipeline, FilterAntiAlias, FilterWorldTrails
 } from "../filters.js";
 
 /**
@@ -59,8 +56,8 @@ export class FlowField {
         this.t = 0;
 
         // --- Filters ---
-        this.trails = new DecayBuffer(this.TRAIL_LENGTH);
         this.filters = createRenderPipeline(
+            new FilterWorldTrails(this.TRAIL_LENGTH),
             new FilterAntiAlias()
         );
 
@@ -88,8 +85,6 @@ export class FlowField {
         this.timeline.step();
         this.t += this.TIME_SCALE;
 
-        const dots = [];
-
         for (const p of this.particles) {
             // 1. Calculate Noise Force (Flow Field)
             // 4D noise: x, y, z, t
@@ -116,11 +111,13 @@ export class FlowField {
             // 5. Create Dot
             // Map Y (-1 to 1) to (0 to 1) for palette
             const paletteT = (p.pos.y + 1) / 2;
-            dots.push(new Dot(p.pos.clone(), this.palette.get(paletteT)));
+            const color = this.palette.get(paletteT);
+
+            // 6. Draw directly to pipeline (Head)
+            this.filters.plot(p.pos, color, 0, 0.8);
         }
 
-        // 6. Render with Trails
-        this.trails.recordDots(dots, 0, 0.8); // 0.8 opacity
-        this.trails.render(this.filters, (v, t) => this.palette.get(t));
+        // 7. Draw Trails
+        this.filters.trail((v, t) => this.palette.get(t));
     }
 }
