@@ -92,12 +92,23 @@ export class DecayBuffer {
   }
 
   /**
+   * Alias for record to satisfy the pipeline interface.
+   * @param {THREE.Vector3} v - The vector to record.
+   * @param {THREE.Color} color - The color.
+   * @param {number} age - The age (unused/passed through).
+   * @param {number} alpha - The opacity.
+   */
+  plot(v, color, age, alpha) {
+    this.record(v, color, age, alpha);
+  }
+
+  /**
    * Renders the buffered dots to the pixel map, applying decay and sorting.
    * @param {Map} pixels - The pixel map to write to (output).
    * @param {Object} pipeline - The render pipeline or filter object to process points.
    * @param {Function} colorFn - Function to determine color based on decay. Signature: (vector, normalized_t) => Color.
    */
-  render(pixels, pipeline, colorFn) {
+  render(pipeline, colorFn) {
     let tail = (this.head - this.count + this.capacity) % this.capacity;
     for (let i = 0; i < this.count; i++) {
       this.sortIndices[i] = (tail + i) % this.capacity;
@@ -115,7 +126,7 @@ export class DecayBuffer {
         const res = colorFn(_tempVec, t);
         const c = res.isColor ? res : (res.color || res);
         const a = (res.alpha !== undefined ? res.alpha : 1.0) * this.a[idx];
-        pipeline.plot(pixels, _tempVec, c, 0, a);
+        pipeline.plot(_tempVec, c, 0, a);
       }
     }
 
@@ -239,18 +250,11 @@ export class ProceduralPath {
  * @param {Function} colorFn - Function to determine the color (takes vector and t=0).
  * @returns {Dot[]} An array containing a single Dot.
  */
-const drawVector = (v, colorFn) => {
-  const dot = dotPool.acquire();
-  dot.position.copy(v).normalize();
+const drawVector = (pipeline, v, colorFn) => {
   const c = colorFn(v, 0);
-  if (c.isColor) {
-    dot.color = c;
-    dot.alpha = 1.0;
-  } else {
-    dot.color = c.color;
-    dot.alpha = c.alpha !== undefined ? c.alpha : 1.0;
-  }
-  return [dot];
+  const color = c.isColor ? c : (c.color || c);
+  const alpha = c.alpha !== undefined ? c.alpha : 1.0;
+  pipeline.plot(v, color, 0, alpha);
 }
 
 /**
@@ -259,22 +263,14 @@ const drawVector = (v, colorFn) => {
  * @param {Function} colorFn - Function to determine the color (takes normalized time t).
  * @returns {Dot[]} An array of Dots along the path.
  */
-const drawPath = (path, colorFn) => {
-  let r = [];
+const drawPath = (pipeline, path, colorFn) => {
   for (let t = 0; t < path.length(); t++) {
-    const dot = dotPool.acquire();
-    dot.position.copy(path.getPoint(t / path.length()));
+    const v = path.getPoint(t / path.length());
     const c = colorFn(t);
-    if (c.isColor) {
-      dot.color = c;
-      dot.alpha = 1.0;
-    } else {
-      dot.color = c.color;
-      dot.alpha = c.alpha !== undefined ? c.alpha : 1.0;
-    }
-    r.push(dot);
+    const color = c.isColor ? c : (c.color || c);
+    const alpha = c.alpha !== undefined ? c.alpha : 1.0;
+    pipeline.plot(v, color, 0, alpha);
   }
-  return r;
 }
 
 /**
@@ -284,10 +280,9 @@ const drawPath = (path, colorFn) => {
  * @param {boolean} [closeLoop=false] - If true, connects the last point to the first.
  * @returns {Dot[]} An array of Dots.
  */
-export const rasterize = (points, colorFn, closeLoop = false) => {
-  let dots = [];
+export const rasterize = (pipeline, points, colorFn, closeLoop = false) => {
   const len = points.length;
-  if (len === 0) return dots;
+  if (len === 0) return;
 
   const count = closeLoop ? len : len - 1;
   for (let i = 0; i < count; i++) {
@@ -300,10 +295,8 @@ export const rasterize = (points, colorFn, closeLoop = false) => {
     };
 
     // Draw segment
-    const segmentDots = drawLine(p1, p2, segmentColorFn, 0, 1, false, true);
-    dots.push(...segmentDots);
+    drawLine(pipeline, p1, p2, segmentColorFn, 0, 1, false, true);
   }
-  return dots;
 };
 
 /**
@@ -316,26 +309,20 @@ export const rasterize = (points, colorFn, closeLoop = false) => {
  * @param {boolean} [longWay=false] - If true, draws the longer arc.
  * @returns {Dot[]} An array of Dots forming the line.
  */
-const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast = false) => {
+const drawLine = (pipeline, v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast = false) => {
   let u = vectorPool.acquire().copy(v1);
   let v = vectorPool.acquire().copy(v2);
   let a = angleBetween(u, v);
   let w = vectorPool.acquire();
 
   if (Math.abs(a) < 0.0001) {
-    if (omitLast) return [];
+    if (omitLast) return;
 
-    const dot = dotPool.acquire();
-    dot.position.copy(u);
     const c = colorFn(u, 0);
-    if (c.isColor) {
-      dot.color = c;
-      dot.alpha = 1.0;
-    } else {
-      dot.color = c.color;
-      dot.alpha = c.alpha !== undefined ? c.alpha : 1.0;
-    }
-    return [dot];
+    const color = c.isColor ? c : (c.color || c);
+    const alpha = c.alpha !== undefined ? c.alpha : 1.0;
+    pipeline.plot(u, color, 0, alpha);
+    return;
   } else if (Math.abs(Math.PI - a) < 0.0001) {
     if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.9999) {
       w.crossVectors(u, Daydream.Y_AXIS).normalize();
@@ -356,8 +343,6 @@ const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast
     u.applyQuaternion(q).normalize();
   }
   a *= Math.abs(end - start);
-
-  let dots = [];
 
   // Simulation Phase
   let simU = vectorPool.acquire().copy(u);
@@ -381,22 +366,15 @@ const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast
 
   // Drawing Phase
   if (omitLast && steps.length === 0) {
-    return [];
+    return;
   }
 
   let currentAngle = 0;
 
-  const startDot = dotPool.acquire();
-  startDot.position.copy(u);
   const startC = colorFn(u, 0);
-  if (startC.isColor) {
-    startDot.color = startC;
-    startDot.alpha = 1.0;
-  } else {
-    startDot.color = startC.color;
-    startDot.alpha = startC.alpha !== undefined ? startC.alpha : 1.0;
-  }
-  dots.push(startDot);
+  const startColor = startC.isColor ? startC : (startC.color || startC);
+  const startAlpha = startC.alpha !== undefined ? startC.alpha : 1.0;
+  pipeline.plot(u, startColor, 0, startAlpha);
 
   let loopLimit = omitLast ? steps.length - 1 : steps.length;
   for (let i = 0; i < loopLimit; i++) {
@@ -410,20 +388,11 @@ const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast
     // Normalized t
     let t = (a > 0) ? (currentAngle / a) : 1;
 
-    const dot = dotPool.acquire();
-    dot.position.copy(u);
     const c = colorFn(u, t);
-    if (c.isColor) {
-      dot.color = c;
-      dot.alpha = 1.0;
-    } else {
-      dot.color = c.color;
-      dot.alpha = c.alpha !== undefined ? c.alpha : 1.0;
-    }
-    dots.push(dot);
+    const color = c.isColor ? c : (c.color || c);
+    const alpha = c.alpha !== undefined ? c.alpha : 1.0;
+    pipeline.plot(u, color, 0, alpha);
   }
-
-  return dots;
 }
 
 /**
@@ -432,31 +401,15 @@ const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast
  * @param {Function} colorFn - Function to determine the color (takes vector).
  * @returns {Dot[]} An array of Dots at the vertex positions.
  */
-const drawVertices = (vertices, colorFn) => {
-  let dots = [];
+const drawVertices = (pipeline, vertices, colorFn) => {
   let v = vectorPool.acquire();
   for (const vertex of vertices) {
     v.set(vertex[0], vertex[1], vertex[2]);
-    const dot = dotPool.acquire();
-    dot.position.copy(v).normalize();
-    const c = colorFn(v); // Note passed v not normalized here? Original code normalized in new Dot call: v.normalize()
-    // Wait, original: new Dot(v.normalize(), colorFn(v))
-    // v.normalize() modifies v in place! So colorFn(v) called with modified v? 
-    // No, JS eval order: arguments evaluated left to right?
-    // actually, v.set(...) modifies v.
-    // v.normalize() modifies v and returns it.
-    // So colorFn(v) receives the normalized vector.
-
-    if (c.isColor) {
-      dot.color = c;
-      dot.alpha = 1.0;
-    } else {
-      dot.color = c.color;
-      dot.alpha = c.alpha !== undefined ? c.alpha : 1.0;
-    }
-    dots.push(dot);
+    const c = colorFn(v);
+    const color = c.isColor ? c : (c.color || c);
+    const alpha = c.alpha !== undefined ? c.alpha : 1.0;
+    pipeline.plot(v, color, 0, alpha);
   }
-  return dots;
 }
 
 /**
@@ -484,21 +437,18 @@ const samplePolyhedron = (vertices, edges) => {
  * @param {Function} colorFn - Function to determine the color (takes vector and normalized progress t).
  * @returns {Dot[]} An array of Dots forming the edges.
  */
-const drawPolyhedron = (vertices, edges, colorFn) => {
-  let dots = [];
+const drawPolyhedron = (pipeline, vertices, edges, colorFn) => {
   edges.map((adj, i) => {
     adj.map((j) => {
       if (i < j) {
-        dots.push(
-          ...drawLine(
-            vectorPool.acquire().set(...vertices[i]).normalize(),
-            vectorPool.acquire().set(...vertices[j]).normalize(),
-            colorFn)
-        );
+        drawLine(
+          pipeline,
+          vectorPool.acquire().set(...vertices[i]).normalize(),
+          vectorPool.acquire().set(...vertices[j]).normalize(),
+          colorFn);
       }
     })
   });
-  return dots;
 }
 
 /**
@@ -600,9 +550,9 @@ const sampleFn = (orientationQuaternion, normal, radius, shiftFn, phase = 0) => 
  * @param {Function} colorFn - Function(v, t) returning color.
  * @param {number} [phase=0] - Starting phase offset.
  */
-const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, phase = 0) => {
+const drawFn = (pipeline, orientationQuaternion, normal, radius, shiftFn, colorFn, phase = 0) => {
   const points = sampleFn(orientationQuaternion, normal, radius, shiftFn, phase);
-  return rasterize(points, colorFn, true);
+  rasterize(pipeline, points, colorFn, true);
 }
 
 /**
@@ -681,9 +631,9 @@ const samplePolygon = (orientationQuaternion, normal, radius, numSamples, phase 
  * @param {number} [phase=0] - Starting phase.
  * @returns {Dot[]} An array of Dots.
  */
-const drawRing = (orientationQuaternion, normal, radius, colorFn, phase = 0) => {
+const drawRing = (pipeline, orientationQuaternion, normal, radius, colorFn, phase = 0) => {
   const points = samplePolygon(orientationQuaternion, normal, radius, Daydream.W / 4, phase);
-  return rasterize(points, colorFn, true);
+  rasterize(pipeline, points, colorFn, true);
 }
 
 /**
@@ -696,9 +646,9 @@ const drawRing = (orientationQuaternion, normal, radius, colorFn, phase = 0) => 
  * @param {number} [phase=0] - Starting phase.
  * @returns {Dot[]} An array of Dots.
  */
-const drawPolygon = (orientationQuaternion, normal, radius, numSides, colorFn, phase = 0) => {
+const drawPolygon = (pipeline, orientationQuaternion, normal, radius, numSides, colorFn, phase = 0) => {
   const points = samplePolygon(orientationQuaternion, normal, radius, numSides, phase);
-  return rasterize(points, colorFn, true);
+  rasterize(pipeline, points, colorFn, true);
 }
 
 const ringPoint = (normal, radius, angle, phase = 0) => {
@@ -734,39 +684,17 @@ const ringPoint = (normal, radius, angle, phase = 0) => {
  * @param {Function} colorFn - Function to determine the color (takes vector).
  * @returns {Dot[]} An array of Dots forming the spiral.
  */
-const drawFibSpiral = (n, eps, colorFn) => {
-  let dots = [];
+const drawFibSpiral = (pipeline, n, eps, colorFn) => {
   for (let i = 0; i < n; ++i) {
     let v = fibSpiral(n, eps, i);
-    const dot = dotPool.acquire();
-    dot.position.copy(v);
     const c = colorFn(v);
-    if (c.isColor) {
-      dot.color = c;
-      dot.alpha = 1.0;
-    } else {
-      dot.color = c.color;
-      dot.alpha = c.alpha !== undefined ? c.alpha : 1.0;
-    }
-    dots.push(dot);
+    const color = c.isColor ? c : (c.color || c);
+    const alpha = c.alpha !== undefined ? c.alpha : 1.0;
+    pipeline.plot(v, color, 0, alpha);
   }
-  return dots;
 };
 
-/**
- * Plots a list of dots onto the pixel map using the provided filters.
- * @param {Map} pixels - The pixel map.
- * @param {Object} filters - The render pipeline or filter object.
- * @param {Dot[]} dots - The array of dots to plot.
- * @param {number} age - The initial age of the dot.
- * @param {number} alpha - The global opacity for these dots.
- */
-export function plotDots(pixels, filters, dots, age, alpha) {
-  for (let i = 0; i < dots.length; ++i) {
-    let dot = dots[i];
-    filters.plot(pixels, dot.position, dot.color, age, alpha * (dot.alpha !== undefined ? dot.alpha : 1.0));
-  }
-}
+
 
 /**
  * Draws a motion trail by tweening between orientations in the queue.
@@ -793,7 +721,9 @@ export const Plot = {
   Spiral: { draw: drawFibSpiral },
   tween: tween,
   rasterize: rasterize,
-  plotDots: plotDots
+  Spiral: { draw: drawFibSpiral },
+  tween: tween,
+  rasterize: rasterize
 };
 
 export const Scan = {
@@ -809,7 +739,7 @@ export const Scan = {
      * @param {number} [startAngle=0] - Start of the arc in radians.
      * @param {number} [endAngle=6.28318] - End of the arc in radians.
      */
-    static draw(pipeline, pixels, normal, radius, thickness, materialFn, startAngle = 0, endAngle = 2 * Math.PI, options = {}) {
+    static draw(pipeline, normal, radius, thickness, materialFn, startAngle = 0, endAngle = 2 * Math.PI, options = {}) {
       // Pre-calculate properties
       const nx = normal.x;
       const ny = normal.y;
@@ -834,7 +764,7 @@ export const Scan = {
         nx, ny, nz, targetAngle, R, alpha, centerPhi,
         u, w, startAngle, endAngle,
         checkSector: !isFullCircle,
-        pipeline, pixels,
+        pipeline,
         clipPlanes: options.clipPlanes, // Injected options
         limits: options.limits, // Injected options
         debugBB: options.debugBB // Injected options
@@ -965,7 +895,7 @@ export const Scan = {
         const color = mat.isColor ? mat : (mat.color || mat);
         const baseAlpha = (mat.alpha !== undefined ? mat.alpha : 1.0);
 
-        ctx.pipeline.plot2D(ctx.pixels, x, y, color, 0, baseAlpha * aaAlpha);
+        ctx.pipeline.plot2D(x, y, color, 0, baseAlpha * aaAlpha);
       }
     }
   },
@@ -994,7 +924,7 @@ export const Scan = {
       const minPhi = Math.acos(Math.min(1, Math.max(-1, maxY))) - thickness;
       const maxPhi = Math.acos(Math.min(1, Math.max(-1, minY))) + thickness;
 
-      Scan.Ring.draw(pipeline, pixels, normal, 1.0, thickness, materialFn, 0, 2 * Math.PI, {
+      Scan.Ring.draw(pipeline, normal, 1.0, thickness, materialFn, 0, 2 * Math.PI, {
         ...options,
         clipPlanes: [c1, c2], // Merge clipPlanes? Scan.Ring currently just takes options.clipPlanes.
         // If options has clipPlanes, we should probably append or replace. 
@@ -1006,13 +936,13 @@ export const Scan = {
   },
 
   Point: class {
-    static draw(pipeline, pixels, pos, thickness, materialFn, options) {
-      Scan.Ring.draw(pipeline, pixels, pos, 0, thickness, materialFn, 0, 2 * Math.PI, options);
+    static draw(pipeline, pos, thickness, materialFn, options) {
+      Scan.Ring.draw(pipeline, pos, 0, thickness, materialFn, 0, 2 * Math.PI, options);
     }
   },
 
   Field: class {
-    static draw(pipeline, pixels, materialFn) {
+    static draw(pipeline, materialFn) {
       // Iterate all pixels
       for (let i = 0; i < Daydream.pixelPositions.length; i++) {
         // We need x, y for plot2D. 
@@ -1028,7 +958,11 @@ export const Scan = {
         const alpha = (mat.alpha !== undefined ? mat.alpha : 1.0);
 
         // No AA logic here, just direct field evaluation
-        pipeline.plot2D(pixels, x, y, color, 0, alpha);
+        if (pipeline.plot) { // Fallback if plot2D not present
+          pipeline.plot(p, color, 0, alpha);
+        } else if (pipeline.plot2D) {
+          pipeline.plot2D(null, x, y, color, 0, alpha);
+        }
       }
     }
   }

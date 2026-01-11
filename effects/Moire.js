@@ -11,7 +11,7 @@ import {
     Orientation, sinWave
 } from "../geometry.js";
 import {
-    rasterize, plotDots
+    rasterize
 } from "../draw.js";
 import {
     GenerativePalette
@@ -87,8 +87,7 @@ export class Moire {
         );
     }
 
-    drawLayer(transform, palette) {
-        let dots = [];
+    drawLayer(pipeline, transform, palette) {
         const count = Math.ceil(this.density.get());
         for (let i = 0; i <= count; i++) {
             const t = i / count;
@@ -96,9 +95,8 @@ export class Moire {
             const normal = Daydream.Z_AXIS;
             const points = Plot.DistortedRing.sample(new THREE.Quaternion(), normal, r, sinWave(-this.amp.get(), this.amp.get(), 4, 0));
             const transformedPoints = points.map(p => transform(p));
-            dots.push(...rasterize(transformedPoints, (p) => palette.get(t), true));
+            rasterize(pipeline, transformedPoints, (p) => palette.get(t), true);
         }
-        return dots;
     }
 
     rotate(p, axis) {
@@ -122,10 +120,7 @@ export class Moire {
         this.orientation.collapse();
         this.timeline.step();
 
-        let dots = [];
-        dots.push(...this.drawLayer((p) => this.invTransform(p), this.basePalette)); // Base layer
-        dots.push(...this.drawLayer((p) => this.transform(p), this.interferencePalette));  // Interference layer
-
-        plotDots(null, this.filters, dots, 0, this.alpha);
+        this.drawLayer(this.filters, (p) => this.invTransform(p), this.basePalette); // Base layer
+        this.drawLayer(this.filters, (p) => this.transform(p), this.interferencePalette);  // Interference layer
     }
 }

@@ -91,7 +91,7 @@ export class RingSpinFieldSample {
                 return { color: dot.color, alpha: dot.alpha };
             };
 
-            Scan.Ring.draw(pipeline, Daydream.pixels, dot.position, 1.0, this.thickness, materialFn, 0, 2 * Math.PI, { debugBB: this.debugBB });
+            Scan.Ring.draw(pipeline, dot.position, 1.0, this.thickness, materialFn, 0, 2 * Math.PI, { debugBB: this.debugBB });
         }
     }
 }

@@ -4,7 +4,6 @@ import transform from "dat-gui";
 // Helper to manage URL state
 const getUrlParams = () => new URLSearchParams(window.location.search);
 const setUrlParam = (key, value) => {
-    console.log("DeepLinkGUI: Setting param", key, value);
     const params = getUrlParams();
     if (value === null || value === undefined) {
         params.delete(key);

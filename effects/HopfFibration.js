@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { gui } from "../gui.js";
 import { Daydream } from "../driver.js";
 import { vectorPool, Orientation } from "../geometry.js";
-import { Plot, DecayBuffer, plotDots, rasterize } from "../draw.js";
+import { Plot, DecayBuffer, rasterize } from "../draw.js";
 import { stereo } from "../3dmath.js";
 import { createRenderPipeline, FilterAntiAlias, FilterDecay, FilterOrient } from "../filters.js";
 import { richSunset } from "../color.js";
@@ -111,7 +111,7 @@ export class HopfFibration {
         this.tumbleAngleX += 0.003 * this.tumbleSpeed;
         this.tumbleAngleY += 0.005 * this.tumbleSpeed;
 
-        const allPoints = [];
+
 
         // Precompute tumble rotation terms
         const cx = Math.cos(this.tumbleAngleX);
@@ -187,17 +187,12 @@ export class HopfFibration {
                 // Using rasterize with 2 points creates a line.
 
                 const segmentPoints = [prev, v];
-                const segmentDots = rasterize(segmentPoints, (p, t) => {
+                rasterize(this.trails, segmentPoints, (p, t) => {
                     return c;
                 }, false);
-                allPoints.push(...segmentDots);
             } else {
                 // First frame or reset, just draw dot
-                allPoints.push({
-                    position: v,
-                    color: c,
-                    alpha: 1.0
-                });
+                this.trails.record(v, c, 0, 1.0);
             }
 
             // Store current position for next frame
@@ -211,13 +206,10 @@ export class HopfFibration {
             }
         }
 
-        // plotDots(pixels, this.pipeline, allPoints, 0, 1); // Avoid double drawing, DecayBuffer handles it
 
-        // Record new points to the 3D DecayBuffer
-        this.trails.recordDots(allPoints, 0, 1.0);
 
         // Render the entire trail history (3D vectors projected by FilterOrient)
-        this.trails.render(pixels, this.pipeline, (v, t) => {
+        this.trails.render(this.pipeline, (v, t) => {
             // t is normalized age [0 (new) -> 1 (old)]
             const c = richSunset.get(t);
             c.a *= (1 - t);

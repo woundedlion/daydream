@@ -121,6 +121,6 @@ export class FlowField {
 
         // 6. Render with Trails
         this.trails.recordDots(dots, 0, 0.8); // 0.8 opacity
-        this.trails.render(null, this.filters, (v, t) => this.palette.get(t));
+        this.trails.render(this.filters, (v, t) => this.palette.get(t));
     }
 }

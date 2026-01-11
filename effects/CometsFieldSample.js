@@ -10,7 +10,7 @@ import {
     Orientation, lissajous, randomVector, vectorToPixel, vectorPool
 } from "../geometry.js";
 import {
-    Path, dotPool, Plot, tween, plotDots
+    Path, dotPool, Plot, tween
 } from "../draw.js";
 import {
     GenerativePalette, blendAlpha, color4Pool
@@ -149,7 +149,7 @@ export class CometsFieldSample {
                 const col = pt.color;
                 return { color: col, alpha: pt.alpha };
             };
-            Scan.Point.draw(pipeline, Daydream.pixels, pos, this.thickness, matFn, { debugBB: this.debugBB });
+            Scan.Point.draw(pipeline, pos, this.thickness, matFn, { debugBB: this.debugBB });
         }
     }
 }

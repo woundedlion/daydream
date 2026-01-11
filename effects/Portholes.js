@@ -73,7 +73,7 @@ export class Portholes {
     }
 
     drawLayer(isInterference) {
-        let dots = [];
+        let lines = [];
 
         // Map Dodecahedron vertices to Vector3
         const vertices = this.dodecahedron.vertices.map(v => new THREE.Vector3(...v).normalize());
@@ -103,15 +103,12 @@ export class Portholes {
         this.dodecahedron.edges.forEach((adj, i) => {
             adj.forEach(j => {
                 if (i < j) {
-                    dots.push(...Plot.Line.draw(vertices[i], vertices[j], (v, t) => {
-                        const palette = isInterference ? this.interferencePalette : this.basePalette;
-                        return palette.get(t);
-                    }));
+                    lines.push({ u: vertices[i], v: vertices[j], palette: isInterference ? this.interferencePalette : this.basePalette });
                 }
             });
         });
 
-        return dots;
+        return lines;
     }
 
     drawFrame() {
@@ -122,11 +119,16 @@ export class Portholes {
         this.timeline.step();
         this.t += 0.01; // Global time
 
-        let dots = [];
-        dots.push(...this.drawLayer(true));  // Interference
-        dots.push(...this.drawLayer(false)); // Base
+        let allLines = [];
+        allLines.push(...this.drawLayer(true));  // Interference
+        allLines.push(...this.drawLayer(false)); // Base
 
-        Plot, plotDots.plotDots(null, this.filters, dots, 0, this.alpha);
+        for (const line of allLines) {
+            Plot.Line.draw(this.filters, line.u, line.v, (v, t) => {
+                const c = line.palette.get(t);
+                return { color: c.color, alpha: c.alpha * this.alpha };
+            });
+        }
     }
 
     spinSlices() {

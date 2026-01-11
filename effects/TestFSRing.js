@@ -71,7 +71,7 @@ export class TestFSRing {
             const materialFn = () => {
                 return ring.palette.get(0.5);
             }
-            Scan.Ring.draw(pipeline, Daydream.pixels, ring.orientation.orient(ring.normal), this.radius, this.thickness, materialFn, 0, 2 * Math.PI, { debugBB: this.debugBB });
+            Scan.Ring.draw(pipeline, ring.orientation.orient(ring.normal), this.radius, this.thickness, materialFn, 0, 2 * Math.PI, { debugBB: this.debugBB });
         }
     }
 }
