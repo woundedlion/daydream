@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { gui } from "../gui.js";
 import { Daydream } from "../driver.js";
 import { vectorPool, Orientation } from "../geometry.js";
-import { rasterize, plotDots, DecayBuffer } from "../draw.js";
+import { Plot, DecayBuffer, plotDots, rasterize } from "../draw.js";
 import { stereo } from "../3dmath.js";
 import { createRenderPipeline, FilterAntiAlias, FilterDecay, FilterOrient } from "../filters.js";
 import { richSunset } from "../color.js";

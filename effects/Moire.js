@@ -11,7 +11,7 @@ import {
     Orientation, sinWave
 } from "../geometry.js";
 import {
-    sampleFn, rasterize, plotDots
+    rasterize, plotDots
 } from "../draw.js";
 import {
     GenerativePalette
@@ -94,7 +94,7 @@ export class Moire {
             const t = i / count;
             const r = t * 2.0;
             const normal = Daydream.Z_AXIS;
-            const points = sampleFn(new THREE.Quaternion(), normal, r, sinWave(-this.amp.get(), this.amp.get(), 4, 0));
+            const points = Plot.DistortedRing.sample(new THREE.Quaternion(), normal, r, sinWave(-this.amp.get(), this.amp.get(), 4, 0));
             const transformedPoints = points.map(p => transform(p));
             dots.push(...rasterize(transformedPoints, (p) => palette.get(t), true));
         }

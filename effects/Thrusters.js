@@ -10,7 +10,7 @@ import {
     Orientation, angleBetween, sinWave
 } from "../geometry.js";
 import {
-    drawRing, plotDots, drawFn, fnPoint
+    Plot, plotDots
 } from "../draw.js";
 import {
     ProceduralPalette
@@ -85,16 +85,16 @@ export class Thrusters {
     }
 
     drawThruster(ctx, opacity) {
-        let dots = drawRing(ctx.orientation.get(), ctx.point, ctx.radius.get(),
+        let dots = Plot.Ring.draw(ctx.orientation.get(), ctx.point, ctx.radius.get(),
             (v, t) => new THREE.Color(0xffffff).multiplyScalar(opacity));
         plotDots(null, this.filters, dots, 0, opacity * this.alpha);
     }
 
     onFireThruster() {
         this.warpPhase = Math.random() * 2 * Math.PI;
-        let thrustPoint = fnPoint(
+        let thrustPoint = Plot.DistortedRing.point(
             this.ringFn.bind(this), this.ring, 1, this.warpPhase);
-        let thrustOpp = fnPoint(
+        let thrustOpp = Plot.DistortedRing.point(
             this.ringFn.bind(this), this.ring, 1, (this.warpPhase + Math.PI));
 
         // warp ring
@@ -148,7 +148,7 @@ export class Thrusters {
     }
 
     drawRing(opacity) {
-        let dots = drawFn(this.orientation.get(), this.ring, this.radius.get(),
+        let dots = Plot.DistortedRing.draw(this.orientation.get(), this.ring, this.radius.get(),
             this.ringFn.bind(this),
             (v, t) => {
                 let z = this.orientation.orient(Daydream.X_AXIS);

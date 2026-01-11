@@ -10,7 +10,7 @@ import {
     Orientation, lissajous, randomVector, vectorToPixel, vectorPool
 } from "../geometry.js";
 import {
-    Path, tween, dotPool
+    Path, dotPool, Plot, tween, plotDots
 } from "../draw.js";
 import {
     GenerativePalette, blendAlpha, color4Pool

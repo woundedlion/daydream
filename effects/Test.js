@@ -10,9 +10,7 @@ import { Daydream } from "../driver.js";
 import {
     Orientation, Dodecahedron, sinWave
 } from "../geometry.js";
-import {
-    drawFn, drawPolyhedron, plotDots
-} from "../draw.js";
+import { Plot } from "../draw.js";
 import {
     GenerativePalette
 } from "../color.js";
@@ -64,7 +62,7 @@ export class Test {
 
     drawPoly(opacity) {
         let dots = [];
-        dots.push(...drawPolyhedron(this.poly.vertices, this.poly.eulerPath,
+        dots.push(...Plot.Polyhedron.draw(this.poly.vertices, this.poly.eulerPath,
             (v, t) => this.polyPalette.get(t)
         ));
         plotDots(null, this.filters, dots, 0, opacity * this.alpha);
@@ -74,7 +72,7 @@ export class Test {
         let dots = [];
         for (let i = 0; i < this.numRings; ++i) {
             let phase = 2 * Math.PI / i;
-            dots.push(...drawFn(this.orientation.get(), this.normal,
+            dots.push(...Plot.DistortedRing.draw(this.orientation.get(), this.normal,
                 2 / (this.numRings + 1) * (i + 1),
                 (t) => sinWave(this.amplitude.get(), -this.amplitude.get(), 4, 0)(t),
                 (v, t) => {

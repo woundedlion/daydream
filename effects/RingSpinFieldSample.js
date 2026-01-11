@@ -65,9 +65,7 @@ export class RingSpinFieldSample {
         this.timeline.step();
         this.renderPlanes.length = 0;
 
-        // 1. Build Local Pipeline
-        // Add FilterDecay to get free trails on your rings!
-        const pipeline = createRenderPipeline(new FilterDecay(20));
+        const pipeline = createRenderPipeline();
 
         for (const ring of this.rings) {
             ring.trail.record(ring.orientation);

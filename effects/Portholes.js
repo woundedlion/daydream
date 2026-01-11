@@ -10,9 +10,7 @@ import { Daydream } from "../driver.js";
 import {
     Orientation, Dodecahedron, randomVector
 } from "../geometry.js";
-import {
-    drawLine, plotDots
-} from "../draw.js";
+import { Plot } from "../draw.js";
 import {
     GenerativePalette
 } from "../color.js";
@@ -105,7 +103,7 @@ export class Portholes {
         this.dodecahedron.edges.forEach((adj, i) => {
             adj.forEach(j => {
                 if (i < j) {
-                    dots.push(...drawLine(vertices[i], vertices[j], (v, t) => {
+                    dots.push(...Plot.Line.draw(vertices[i], vertices[j], (v, t) => {
                         const palette = isInterference ? this.interferencePalette : this.basePalette;
                         return palette.get(t);
                     }));
@@ -128,7 +126,7 @@ export class Portholes {
         dots.push(...this.drawLayer(true));  // Interference
         dots.push(...this.drawLayer(false)); // Base
 
-        plotDots(null, this.filters, dots, 0, this.alpha);
+        Plot, plotDots.plotDots(null, this.filters, dots, 0, this.alpha);
     }
 
     spinSlices() {

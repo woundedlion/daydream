@@ -8,7 +8,7 @@ import { Daydream, XY } from "./driver.js";
 import { wrap } from "./util.js"
 import { blendAlpha } from "./color.js";
 import { vectorToPixel, angleBetween } from "./geometry.js";
-import { tween } from "./draw.js";
+import { Plot, tween } from "./draw.js";
 
 const BLACK = new THREE.Color(0, 0, 0);
 

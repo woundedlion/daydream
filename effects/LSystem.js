@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { Orientation } from "../geometry.js";
-import { plotDots, drawLine } from "../draw.js";
+import { Plot, plotDots } from "../draw.js";
 import { createRenderPipeline, FilterOrient, FilterAntiAlias } from "../filters.js";
 import { Timeline, Rotation, easeMid } from "../animation.js";
 import { GenerativePalette } from "../color.js";
@@ -176,7 +176,7 @@ export class LSystem {
         this.dots = [];
         for (let seg of this.segments) {
             // Color based on the Y height (latitudinal gradient)
-            this.dots.push(...drawLine(seg.start, seg.end, (v) => this.palette.get((v.y + 1) / 2)));
+            this.dots.push(...Plot.Line.draw(seg.start, seg.end, (v) => this.palette.get((v.y + 1) / 2)));
         }
     }
 

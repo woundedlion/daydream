@@ -11,7 +11,7 @@ import {
     Orientation, angleBetween, pixelToVector, randomVector
 } from "../geometry.js";
 import {
-    drawLine, drawVector, DecayBuffer
+    Plot, DecayBuffer, plotDots
 } from "../draw.js";
 import {
     GenerativePalette
@@ -166,11 +166,11 @@ export class Dynamo {
         for (let i = 0; i < this.nodes.length; ++i) {
             if (i == 0) {
                 let from = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
-                dots.push(...drawVector(from, (v) => this.color(v, 0)));
+                dots.push(...Plot.Point.draw(from, (v) => this.color(v, 0)));
             } else {
                 let from = pixelToVector(this.nodes[i - 1].x, this.nodeY(this.nodes[i - 1]));
                 let to = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
-                dots.push(...drawLine(from, to, (v) => this.color(v, 0)));
+                dots.push(...Plot.Line.draw(from, to, (v) => this.color(v, 0)));
             }
         }
         this.trails.recordDots(dots, age, 0.5);

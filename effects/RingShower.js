@@ -10,9 +10,7 @@ import { Daydream } from "../driver.js";
 import {
     Orientation, randomVector, angleBetween
 } from "../geometry.js";
-import {
-    drawRing, plotDots
-} from "../draw.js";
+import { Plot } from "../draw.js";
 import {
     GenerativePalette
 } from "../color.js";
@@ -79,13 +77,13 @@ export class RingShower {
 
     drawRing(opacity, ring) {
         let step = 1 / Daydream.W;
-        let dots = drawRing(this.orientation.get(), ring.normal, ring.radius.get(),
+        let dots = Plot.Ring.draw(this.orientation.get(), ring.normal, ring.radius.get(),
             (v, t) => {
                 let z = this.orientation.orient(Daydream.X_AXIS);
                 return ring.palette.get(angleBetween(z, v) / Math.PI);
             }
         );
-        plotDots(null, this.filters, dots, 0, this.alpha * opacity);
+        Plot, plotDots.plotDots(null, this.filters, dots, 0, this.alpha * opacity);
     }
 
     drawFrame() {

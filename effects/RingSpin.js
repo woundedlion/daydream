@@ -10,9 +10,7 @@ import { Daydream } from "../driver.js";
 import {
     Orientation, vectorPool
 } from "../geometry.js";
-import {
-    samplePolygon, rasterize, plotDots, tween
-} from "../draw.js";
+import { Plot, tween, plotDots, rasterize } from "../draw.js";
 import {
     VignettePalette, richSunset, mangoPeel, underSea, iceMelt, TransparentVignette
 } from "../color.js";
@@ -28,7 +26,7 @@ export class RingSpin {
         constructor(normal, palette, trailLength) {
             this.normal = normal;
             // map(v => v.clone()) is essential because samplePolygon now returns pooled vectors
-            this.basePoints = samplePolygon(new THREE.Quaternion(), this.normal, 1, Daydream.W / 4).map(v => v.clone());
+            this.basePoints = Plot.Polygon.sample(new THREE.Quaternion(), this.normal, 1, Daydream.W / 4).map(v => v.clone());
             this.scratchPoints = new Array(this.basePoints.length);
             for (let i = 0; i < this.basePoints.length; ++i) {
                 this.scratchPoints[i] = new THREE.Vector3();
