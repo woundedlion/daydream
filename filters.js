@@ -185,6 +185,137 @@ export class FilterOrient {
   }
 }
 
+/**
+ * Applies different orientations to points in n latitude bands defined by axis.
+ */
+export class FilterOrientSlice {
+  /**
+   * @param {Orientation[]} orientations - Array of orientations (South to North).
+   * @param {THREE.Vector3} axis - The axis defining the poles for slicing.
+   */
+  constructor(orientations, axis) {
+    this.is2D = false;
+    this.orientations = orientations;
+    this.axis = axis;
+  }
+
+  plot(v, color, age, alpha, pass) {
+    const dot = Math.max(-1, Math.min(1, v.dot(this.axis)));
+    const t = 1 - Math.acos(dot) / Math.PI;
+    let idx = Math.floor(t * this.orientations.length);
+    if (idx >= this.orientations.length) idx = this.orientations.length - 1;
+    if (idx < 0) idx = 0;
+    const orientation = this.orientations[idx];
+    pass(orientation.orient(v), color, age, alpha);
+  }
+}
+
+export class FilterWorldTrails {
+  constructor(lifespan, capacity = 4096) {
+    this.is2D = false;
+    this.lifespan = lifespan;
+    this.capacity = capacity;
+    this.count = 0;
+
+    // SoA for 3D points
+    this.x = new Float32Array(capacity);
+    this.y = new Float32Array(capacity);
+    this.z = new Float32Array(capacity);
+    this.ttl = new Float32Array(capacity);
+  }
+
+  plot(v, color, age, alpha, pass) {
+    this.pass = pass;
+    pass(v, color, age, alpha);
+
+    if (this.count < this.capacity) {
+      const i = this.count;
+      this.x[i] = v.x;
+      this.y[i] = v.y;
+      this.z[i] = v.z;
+      this.ttl[i] = this.lifespan - age;
+      this.count++;
+    }
+  }
+
+  trail(trailFn, alpha = 1.0) {
+    // 1. Age and Compact
+    let i = 0;
+    while (i < this.count) {
+      this.ttl[i] -= 1;
+      if (this.ttl[i] <= 0) {
+        this.count--;
+        if (i < this.count) {
+          // Swap-remove
+          this.x[i] = this.x[this.count];
+          this.y[i] = this.y[this.count];
+          this.z[i] = this.z[this.count];
+          this.ttl[i] = this.ttl[this.count];
+          // Do not increment i; check swapped element
+        }
+      } else {
+        i++;
+      }
+    }
+
+    // 2. Prepare Indices
+    if (!this.indices || this.indices.length < this.count) {
+      this.indices = new Uint32Array(this.capacity);
+    }
+    for (let k = 0; k < this.count; k++) {
+      this.indices[k] = k;
+    }
+
+    // 3. Sort by TTL (Ascending: Oldest first)
+    const activeIndices = this.indices.subarray(0, this.count);
+    activeIndices.sort((a, b) => this.ttl[a] - this.ttl[b]);
+
+    // 4. Draw
+    const v = new THREE.Vector3(); // Reusable
+    for (let k = 0; k < this.count; k++) {
+      const idx = activeIndices[k];
+      const ttl = this.ttl[idx];
+
+      v.set(this.x[idx], this.y[idx], this.z[idx]);
+
+      const t = 1.0 - (ttl / this.lifespan);
+      let res = trailFn(v, t);
+      const color = res.isColor ? res : (res.color || res);
+      const outputAlpha = (res.alpha !== undefined ? res.alpha : 1.0) * alpha;
+
+      this.pass(v, color, this.lifespan - ttl, outputAlpha);
+    }
+  }
+}
+
+/**
+ * Applies an alpha falloff based on distance from an origin point on the sphere.
+ * Alpha falls off from 1.0 at `radius` to 0.0 at `0` distance using a quintic kernel.
+ */
+export class FilterHole {
+  /**
+   * @param {THREE.Vector3} origin - The center point of the falloff (normalized).
+   * @param {number} radius - The radius (in radians) at which fading starts.
+   */
+  constructor(origin, radius) {
+    this.origin = origin.clone().normalize();
+    this.radius = radius;
+  }
+
+  plot(v, c, age, alpha, pass) {
+    const d = angleBetween(v, this.origin);
+    if (d > this.radius) {
+      pass(v, c, age, alpha);
+    } else {
+      let t = d / this.radius;
+      t = quinticKernel(t);
+      c.r *= t;
+      c.g *= t;
+      c.b *= t;
+      pass(v, c, age, alpha);
+    }
+  }
+}
 
 /**
  * Replicates the plotted pixel horizontally across the globe.
@@ -401,134 +532,3 @@ export class FilterScreenTrails {
   }
 }
 
-export class FilterWorldTrails {
-  constructor(lifespan, capacity = 4096) {
-    this.is2D = false;
-    this.lifespan = lifespan;
-    this.capacity = capacity;
-    this.count = 0;
-
-    // SoA for 3D points
-    this.x = new Float32Array(capacity);
-    this.y = new Float32Array(capacity);
-    this.z = new Float32Array(capacity);
-    this.ttl = new Float32Array(capacity);
-  }
-
-  plot(v, color, age, alpha, pass) {
-    this.pass = pass;
-    pass(v, color, age, alpha);
-
-    if (this.count < this.capacity) {
-      const i = this.count;
-      this.x[i] = v.x;
-      this.y[i] = v.y;
-      this.z[i] = v.z;
-      this.ttl[i] = this.lifespan - age;
-      this.count++;
-    }
-  }
-
-  trail(trailFn, alpha = 1.0) {
-    // 1. Age and Compact
-    let i = 0;
-    while (i < this.count) {
-      this.ttl[i] -= 1;
-      if (this.ttl[i] <= 0) {
-        this.count--;
-        if (i < this.count) {
-          // Swap-remove
-          this.x[i] = this.x[this.count];
-          this.y[i] = this.y[this.count];
-          this.z[i] = this.z[this.count];
-          this.ttl[i] = this.ttl[this.count];
-          // Do not increment i; check swapped element
-        }
-      } else {
-        i++;
-      }
-    }
-
-    // 2. Prepare Indices
-    if (!this.indices || this.indices.length < this.count) {
-      this.indices = new Uint32Array(this.capacity);
-    }
-    for (let k = 0; k < this.count; k++) {
-      this.indices[k] = k;
-    }
-
-    // 3. Sort by TTL (Ascending: Oldest first)
-    const activeIndices = this.indices.subarray(0, this.count);
-    activeIndices.sort((a, b) => this.ttl[a] - this.ttl[b]);
-
-    // 4. Draw
-    const v = new THREE.Vector3(); // Reusable
-    for (let k = 0; k < this.count; k++) {
-      const idx = activeIndices[k];
-      const ttl = this.ttl[idx];
-
-      v.set(this.x[idx], this.y[idx], this.z[idx]);
-
-      const t = 1.0 - (ttl / this.lifespan);
-      let res = trailFn(v, t);
-      const color = res.isColor ? res : (res.color || res);
-      const outputAlpha = (res.alpha !== undefined ? res.alpha : 1.0) * alpha;
-
-      this.pass(v, color, this.lifespan - ttl, outputAlpha);
-    }
-  }
-}
-
-/**
- * Applies an alpha falloff based on distance from an origin point on the sphere.
- * Alpha falls off from 1.0 at `radius` to 0.0 at `0` distance using a quintic kernel.
- */
-export class FilterHole {
-  /**
-   * @param {THREE.Vector3} origin - The center point of the falloff (normalized).
-   * @param {number} radius - The radius (in radians) at which fading starts.
-   */
-  constructor(origin, radius) {
-    this.origin = origin.clone().normalize();
-    this.radius = radius;
-  }
-
-  plot(v, c, age, alpha, pass) {
-    const d = angleBetween(v, this.origin);
-    if (d > this.radius) {
-      pass(v, c, age, alpha);
-    } else {
-      let t = d / this.radius;
-      t = quinticKernel(t);
-      c.r *= t;
-      c.g *= t;
-      c.b *= t;
-      pass(v, c, age, alpha);
-    }
-  }
-}
-
-/**
- * Applies different orientations to points in n latitude bands defined by axis.
- */
-export class FilterOrientSlice {
-  /**
-   * @param {Orientation[]} orientations - Array of orientations (South to North).
-   * @param {THREE.Vector3} axis - The axis defining the poles for slicing.
-   */
-  constructor(orientations, axis) {
-    this.is2D = false;
-    this.orientations = orientations;
-    this.axis = axis;
-  }
-
-  plot(v, color, age, alpha, pass) {
-    const dot = Math.max(-1, Math.min(1, v.dot(this.axis)));
-    const t = 1 - Math.acos(dot) / Math.PI;
-    let idx = Math.floor(t * this.orientations.length);
-    if (idx >= this.orientations.length) idx = this.orientations.length - 1;
-    if (idx < 0) idx = 0;
-    const orientation = this.orientations[idx];
-    pass(orientation.orient(v), color, age, alpha);
-  }
-}
