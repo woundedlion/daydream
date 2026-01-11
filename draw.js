@@ -239,7 +239,7 @@ export class ProceduralPath {
  * @param {Function} colorFn - Function to determine the color (takes vector and t=0).
  * @returns {Dot[]} An array containing a single Dot.
  */
-export const drawVector = (v, colorFn) => {
+const drawVector = (v, colorFn) => {
   const dot = dotPool.acquire();
   dot.position.copy(v).normalize();
   const c = colorFn(v, 0);
@@ -259,7 +259,7 @@ export const drawVector = (v, colorFn) => {
  * @param {Function} colorFn - Function to determine the color (takes normalized time t).
  * @returns {Dot[]} An array of Dots along the path.
  */
-export const drawPath = (path, colorFn) => {
+const drawPath = (path, colorFn) => {
   let r = [];
   for (let t = 0; t < path.length(); t++) {
     const dot = dotPool.acquire();
@@ -316,7 +316,7 @@ export const rasterize = (points, colorFn, closeLoop = false) => {
  * @param {boolean} [longWay=false] - If true, draws the longer arc.
  * @returns {Dot[]} An array of Dots forming the line.
  */
-export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast = false) => {
+const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast = false) => {
   let u = vectorPool.acquire().copy(v1);
   let v = vectorPool.acquire().copy(v2);
   let a = angleBetween(u, v);
@@ -432,7 +432,7 @@ export const drawLine = (v1, v2, colorFn, start = 0, end = 1, longWay = false, o
  * @param {Function} colorFn - Function to determine the color (takes vector).
  * @returns {Dot[]} An array of Dots at the vertex positions.
  */
-export const drawVertices = (vertices, colorFn) => {
+const drawVertices = (vertices, colorFn) => {
   let dots = [];
   let v = vectorPool.acquire();
   for (const vertex of vertices) {
@@ -465,7 +465,7 @@ export const drawVertices = (vertices, colorFn) => {
  * @param {number[][]} edges - An adjacency list of vertex indices.
  * @returns {THREE.Vector3[]} An array of points forming the edges.
  */
-export const samplePolyhedron = (vertices, edges) => {
+const samplePolyhedron = (vertices, edges) => {
   let points = [];
   edges.map((adj, i) => {
     adj.map((j) => {
@@ -484,7 +484,7 @@ export const samplePolyhedron = (vertices, edges) => {
  * @param {Function} colorFn - Function to determine the color (takes vector and normalized progress t).
  * @returns {Dot[]} An array of Dots forming the edges.
  */
-export const drawPolyhedron = (vertices, edges, colorFn) => {
+const drawPolyhedron = (vertices, edges, colorFn) => {
   let dots = [];
   edges.map((adj, i) => {
     adj.map((j) => {
@@ -509,7 +509,7 @@ export const drawPolyhedron = (vertices, edges, colorFn) => {
  * @param {number} angle - The angle along the ring to calculate the point.
  * @returns {THREE.Vector3} The shifted point on the sphere.
  */
-export const fnPoint = (f, normal, radius, angle) => {
+const fnPoint = (f, normal, radius, angle) => {
   let dots = [];
   let u = vectorPool.acquire();
   let v = vectorPool.acquire().copy(normal);
@@ -541,7 +541,7 @@ export const fnPoint = (f, normal, radius, angle) => {
  * @param {number} [phase=0] - Starting phase offset.
  * @returns {THREE.Vector3[]} An array of points.
  */
-export const sampleFn = (orientationQuaternion, normal, radius, shiftFn, phase = 0) => {
+const sampleFn = (orientationQuaternion, normal, radius, shiftFn, phase = 0) => {
   // Basis
   let refAxis = Daydream.X_AXIS;
   if (Math.abs(normal.dot(refAxis)) > 0.9999) {
@@ -600,7 +600,7 @@ export const sampleFn = (orientationQuaternion, normal, radius, shiftFn, phase =
  * @param {Function} colorFn - Function(v, t) returning color.
  * @param {number} [phase=0] - Starting phase offset.
  */
-export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, phase = 0) => {
+const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, phase = 0) => {
   const points = sampleFn(orientationQuaternion, normal, radius, shiftFn, phase);
   return rasterize(points, colorFn, true);
 }
@@ -615,7 +615,7 @@ export const drawFn = (orientationQuaternion, normal, radius, shiftFn, colorFn, 
  * @param {THREE.Vector3} w - A second vector on the plane (ortho to u and normal).
  * @returns {THREE.Vector3} The normalized point on the sphere's surface.
  */
-export const calcRingPoint = (a, radius, u, v, w) => {
+const calcRingPoint = (a, radius, u, v, w) => {
   let d = Math.sqrt(Math.pow(1 - radius, 2));
   return vectorPool.acquire().set(
     d * v.x + radius * u.x * Math.cos(a) + radius * w.x * Math.sin(a),
@@ -633,7 +633,7 @@ export const calcRingPoint = (a, radius, u, v, w) => {
  * @param {number} [phase=0] - Starting phase.
  * @returns {THREE.Vector3[]} An array of points.
  */
-export const samplePolygon = (orientationQuaternion, normal, radius, numSamples, phase = 0) => {
+const samplePolygon = (orientationQuaternion, normal, radius, numSamples, phase = 0) => {
   // Basis
   let refAxis = Daydream.X_AXIS;
   if (Math.abs(normal.dot(refAxis)) > 0.9999) {
@@ -681,7 +681,7 @@ export const samplePolygon = (orientationQuaternion, normal, radius, numSamples,
  * @param {number} [phase=0] - Starting phase.
  * @returns {Dot[]} An array of Dots.
  */
-export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase = 0) => {
+const drawRing = (orientationQuaternion, normal, radius, colorFn, phase = 0) => {
   const points = samplePolygon(orientationQuaternion, normal, radius, Daydream.W / 4, phase);
   return rasterize(points, colorFn, true);
 }
@@ -696,12 +696,12 @@ export const drawRing = (orientationQuaternion, normal, radius, colorFn, phase =
  * @param {number} [phase=0] - Starting phase.
  * @returns {Dot[]} An array of Dots.
  */
-export const drawPolygon = (orientationQuaternion, normal, radius, numSides, colorFn, phase = 0) => {
+const drawPolygon = (orientationQuaternion, normal, radius, numSides, colorFn, phase = 0) => {
   const points = samplePolygon(orientationQuaternion, normal, radius, numSides, phase);
   return rasterize(points, colorFn, true);
 }
 
-export const ringPoint = (normal, radius, angle, phase = 0) => {
+const ringPoint = (normal, radius, angle, phase = 0) => {
   let dots = [];
   let u = vectorPool.acquire();
   let v = vectorPool.acquire().copy(normal);
@@ -734,7 +734,7 @@ export const ringPoint = (normal, radius, angle, phase = 0) => {
  * @param {Function} colorFn - Function to determine the color (takes vector).
  * @returns {Dot[]} An array of Dots forming the spiral.
  */
-export const drawFibSpiral = (n, eps, colorFn) => {
+const drawFibSpiral = (n, eps, colorFn) => {
   let dots = [];
   for (let i = 0; i < n; ++i) {
     let v = fibSpiral(n, eps, i);
@@ -780,6 +780,21 @@ export const tween = (orientation, drawFn) => {
     drawFn(orientation.get(i), (s - 1 - i) / s);
   }
 }
+
+export const Plot = {
+  Point: { draw: drawVector },
+  Path: { draw: drawPath },
+  Line: { draw: drawLine },
+  Vertices: { draw: drawVertices },
+  Polyhedron: { draw: drawPolyhedron, sample: samplePolyhedron },
+  DistortedRing: { draw: drawFn, sample: sampleFn, point: fnPoint }, // Mirrors "Function" logic
+  Ring: { draw: drawRing, sample: samplePolygon },
+  Polygon: { draw: drawPolygon, sample: samplePolygon },
+  Spiral: { draw: drawFibSpiral },
+  tween: tween,
+  rasterize: rasterize,
+  plotDots: plotDots
+};
 
 export const Scan = {
   Ring: class {

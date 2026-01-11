@@ -12,7 +12,7 @@ import {
     Orientation, sinWave
 } from "../geometry.js";
 import {
-    samplePolygon, rasterize, plotDots
+    rasterize, plotDots
 } from "../draw.js";
 import {
     GenerativePalette
@@ -87,7 +87,7 @@ export class MobiusGrid {
             const logR = logMin + t * range;
             const R = Math.exp(logR);
             const radius = (4 / Math.PI) * Math.atan(1 / R);
-            const points = samplePolygon(new THREE.Quaternion(), normal, radius, Daydream.W / 4);
+            const points = Plot.Polygon.sample(new THREE.Quaternion(), normal, radius, Daydream.W / 4);
             const transformedPoints = points.map(p => {
                 const z = stereo(p);
                 const w = mobius(z, mobiusParams);
@@ -111,7 +111,7 @@ export class MobiusGrid {
             const theta = (i / numLines) * Math.PI;
             const normal = new THREE.Vector3(Math.cos(theta), Math.sin(theta), 0);
             const radius = 1.0;
-            const points = samplePolygon(new THREE.Quaternion(), normal, radius, Daydream.W / 4);
+            const points = Plot.Polygon.sample(new THREE.Quaternion(), normal, radius, Daydream.W / 4);
 
             const transformedPoints = points.map(p => {
                 const z = stereo(p);

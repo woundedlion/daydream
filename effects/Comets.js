@@ -11,7 +11,7 @@ import {
     Orientation, lissajous, randomVector
 } from "../geometry.js";
 import {
-    Path, drawVector, DecayBuffer, tween
+    Path, DecayBuffer, Plot, tween, plotDots
 } from "../draw.js";
 import {
     GenerativePalette
@@ -130,7 +130,7 @@ export class Comets {
         tween(node.orientation, (q, t) => {
             let dots = [];
             let v = node.v.clone().applyQuaternion(q).normalize();
-            dots.push(...drawVector(v,
+            dots.push(...Plot.Point.draw(v,
                 (v, t) => this.palette.get(t)));
             this.trails.recordDots(dots, t, opacity * this.alpha);
         });
