@@ -562,19 +562,6 @@ export function isOver(v, normal) {
 }
 
 /**
- * Generates a random normalized 3D vector.
- * @returns {THREE.Vector3} A random vector on the unit sphere.
- */
-export function makeRandomVector() {
-  const v = vectorPool.acquire();
-  v.set(
-    Math.random() * 2 - 1,
-    Math.random() * 2 - 1,
-    Math.random() * 2 - 1).normalize();
-  return v;
-}
-
-/**
  * Checks if the line segment between two vectors intersects a plane.
  * @param {THREE.Vector3} v1 - Start vector.
  * @param {THREE.Vector3} v2 - End vector.
@@ -593,9 +580,8 @@ export function intersectsPlane(v1, v2, normal) {
  * @returns {number} The angle in radians [0, PI].
  */
 export function angleBetween(v1, v2) {
-  //  let len_product = v1.length() * v2.length();
-  //  let d = v1.dot(v2) / len_product;
-  let d = v1.dot(v2);
+  let len_product = v1.length() * v2.length();
+  let d = v1.dot(v2) / len_product;
   return Math.acos(Math.max(-1, Math.min(1, d)));
 }
 
