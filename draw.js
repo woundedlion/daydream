@@ -245,40 +245,11 @@ export class ProceduralPath {
 }
 
 /**
- * Draws a single dot at a given vector.
- * @param {THREE.Vector3} v - The vector position (normalized).
- * @param {Function} colorFn - Function to determine the color (takes vector and t=0).
- * @returns {Dot[]} An array containing a single Dot.
- */
-const drawVector = (pipeline, v, colorFn) => {
-  const c = colorFn(v, 0);
-  const color = c.isColor ? c : (c.color || c);
-  const alpha = c.alpha !== undefined ? c.alpha : 1.0;
-  pipeline.plot(v, color, 0, alpha);
-}
-
-/**
- * Draws a sequence of points along a Path object.
- * @param {Path|ProceduralPath} path - The path object.
- * @param {Function} colorFn - Function to determine the color (takes normalized time t).
- * @returns {Dot[]} An array of Dots along the path.
- */
-const drawPath = (pipeline, path, colorFn) => {
-  for (let t = 0; t < path.length(); t++) {
-    const v = path.getPoint(t / path.length());
-    const c = colorFn(t);
-    const color = c.isColor ? c : (c.color || c);
-    const alpha = c.alpha !== undefined ? c.alpha : 1.0;
-    pipeline.plot(v, color, 0, alpha);
-  }
-}
-
-/**
  * Rasterizes a list of points into Dot objects by connecting them with geodesic lines.
+ * @param {Object} pipeline - The render pipeline.
  * @param {THREE.Vector3[]} points - The list of points.
  * @param {Function} colorFn - Function to determine color (takes vector and normalized progress t).
  * @param {boolean} [closeLoop=false] - If true, connects the last point to the first.
- * @returns {Dot[]} An array of Dots.
  */
 export const rasterize = (pipeline, points, colorFn, closeLoop = false) => {
   const len = points.length;
@@ -295,406 +266,9 @@ export const rasterize = (pipeline, points, colorFn, closeLoop = false) => {
     };
 
     // Draw segment
-    drawLine(pipeline, p1, p2, segmentColorFn, 0, 1, false, true);
+    Plot.Line.draw(pipeline, p1, p2, segmentColorFn, 0, 1, false, true);
   }
 };
-
-/**
- * Draws a geodesic line (arc) between two vectors on the sphere with adaptive sampling.
- * @param {THREE.Vector3} v1 - The start vector.
- * @param {THREE.Vector3} v2 - The end vector.
- * @param {Function} colorFn - Function to determine the color (takes vector and normalized progress t).
- * @param {number} [start=0] - Starting angle multiplier for drawing the line arc.
- * @param {number} [end=1] - Ending multiplier for the total arc angle.
- * @param {boolean} [longWay=false] - If true, draws the longer arc.
- * @returns {Dot[]} An array of Dots forming the line.
- */
-const drawLine = (pipeline, v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast = false) => {
-  let u = vectorPool.acquire().copy(v1);
-  let v = vectorPool.acquire().copy(v2);
-  let a = angleBetween(u, v);
-  let w = vectorPool.acquire();
-
-  if (Math.abs(a) < 0.0001) {
-    if (omitLast) return;
-
-    const c = colorFn(u, 0);
-    const color = c.isColor ? c : (c.color || c);
-    const alpha = c.alpha !== undefined ? c.alpha : 1.0;
-    pipeline.plot(u, color, 0, alpha);
-    return;
-  } else if (Math.abs(Math.PI - a) < 0.0001) {
-    if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.9999) {
-      w.crossVectors(u, Daydream.Y_AXIS).normalize();
-    } else {
-      w.crossVectors(u, Daydream.X_AXIS).normalize();
-    }
-  } else {
-    w.crossVectors(u, v).normalize();
-  }
-
-  if (longWay) {
-    a = 2 * Math.PI - a;
-    w.negate();
-  }
-
-  if (start != 0) {
-    let q = new THREE.Quaternion().setFromAxisAngle(w, start * a);
-    u.applyQuaternion(q).normalize();
-  }
-  a *= Math.abs(end - start);
-
-  // Simulation Phase
-  let simU = vectorPool.acquire().copy(u);
-  let simAngle = 0;
-  let steps = [];
-  const baseStep = 2 * Math.PI / Daydream.W;
-
-  while (simAngle < a) {
-    let scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - simU.y * simU.y)));
-    let step = baseStep * scaleFactor;
-    steps.push(step);
-    simAngle += step;
-
-    // Advance simU
-    let q = new THREE.Quaternion().setFromAxisAngle(w, step);
-    simU.applyQuaternion(q).normalize();
-  }
-
-  // Calculate Scale Factor
-  let scale = a / simAngle;
-
-  // Drawing Phase
-  if (omitLast && steps.length === 0) {
-    return;
-  }
-
-  let currentAngle = 0;
-
-  const startC = colorFn(u, 0);
-  const startColor = startC.isColor ? startC : (startC.color || startC);
-  const startAlpha = startC.alpha !== undefined ? startC.alpha : 1.0;
-  pipeline.plot(u, startColor, 0, startAlpha);
-
-  let loopLimit = omitLast ? steps.length - 1 : steps.length;
-  for (let i = 0; i < loopLimit; i++) {
-    let step = steps[i] * scale;
-
-    // Advance u
-    let q = new THREE.Quaternion().setFromAxisAngle(w, step);
-    u.applyQuaternion(q).normalize();
-    currentAngle += step;
-
-    // Normalized t
-    let t = (a > 0) ? (currentAngle / a) : 1;
-
-    const c = colorFn(u, t);
-    const color = c.isColor ? c : (c.color || c);
-    const alpha = c.alpha !== undefined ? c.alpha : 1.0;
-    pipeline.plot(u, color, 0, alpha);
-  }
-}
-
-/**
- * Draws a set of vertices as individual dots.
- * @param {number[][]} vertices - An array of [x, y, z] arrays.
- * @param {Function} colorFn - Function to determine the color (takes vector).
- * @returns {Dot[]} An array of Dots at the vertex positions.
- */
-const drawVertices = (pipeline, vertices, colorFn) => {
-  let v = vectorPool.acquire();
-  for (const vertex of vertices) {
-    v.set(vertex[0], vertex[1], vertex[2]);
-    const c = colorFn(v);
-    const color = c.isColor ? c : (c.color || c);
-    const alpha = c.alpha !== undefined ? c.alpha : 1.0;
-    pipeline.plot(v, color, 0, alpha);
-  }
-}
-
-/**
- * Samples points for the edges of a polyhedron.
- * @param {number[][]} vertices - An array of [x, y, z] vertex arrays.
- * @param {number[][]} edges - An adjacency list of vertex indices.
- * @returns {THREE.Vector3[]} An array of points forming the edges.
- */
-const samplePolyhedron = (vertices, edges) => {
-  let points = [];
-  edges.map((adj, i) => {
-    adj.map((j) => {
-      // Just push the vertices, let rasterize handle the lines
-      points.push(vectorPool.acquire().set(...vertices[i]).normalize());
-      points.push(vectorPool.acquire().set(...vertices[j]).normalize());
-    })
-  });
-  return points;
-}
-
-/**
- * Draws the edges of a polyhedron by drawing lines between connected vertices.
- * @param {number[][]} vertices - An array of [x, y, z] vertex arrays.
- * @param {number[][]} edges - An adjacency list of vertex indices.
- * @param {Function} colorFn - Function to determine the color (takes vector and normalized progress t).
- * @returns {Dot[]} An array of Dots forming the edges.
- */
-const drawPolyhedron = (pipeline, vertices, edges, colorFn) => {
-  edges.map((adj, i) => {
-    adj.map((j) => {
-      if (i < j) {
-        drawLine(
-          pipeline,
-          vectorPool.acquire().set(...vertices[i]).normalize(),
-          vectorPool.acquire().set(...vertices[j]).normalize(),
-          colorFn);
-      }
-    })
-  });
-}
-
-/**
- * Calculates a single point on a sphere distorted by a function, often for an oscillating ring.
- * @param {Function} f - The shift function (e.g., sinWave) based on angle.
- * @param {THREE.Vector3} normal - The normal vector defining the ring plane.
- * @param {number} radius - The base radius of the ring.
- * @param {number} angle - The angle along the ring to calculate the point.
- * @returns {THREE.Vector3} The shifted point on the sphere.
- */
-const fnPoint = (f, normal, radius, angle) => {
-  let dots = [];
-  let u = vectorPool.acquire();
-  let v = vectorPool.acquire().copy(normal);
-  let w = vectorPool.acquire();
-  if (radius > 1) {
-    v.negate();
-    radius = 2 - radius;
-  }
-  if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.99995) {
-    u.crossVectors(v, Daydream.Y_AXIS).normalize();
-  } else {
-    u.crossVectors(v, Daydream.X_AXIS).normalize();
-  }
-  w.crossVectors(v, u);
-
-  let vi = calcRingPoint(angle, radius, u, v, w);
-  let vp = calcRingPoint(angle, 1, u, v, w);
-  let axis = vectorPool.acquire().crossVectors(v, vp).normalize();
-  let shift = new THREE.Quaternion().setFromAxisAngle(axis, f(angle * Math.PI / 2));
-  return vi.applyQuaternion(shift);
-};
-
-/**
- * Samples points for a function-distorted ring with adaptive sampling.
- * @param {THREE.Quaternion} orientationQuaternion - Orientation of the base ring.
- * @param {THREE.Vector3} normal - Normal of the base ring.
- * @param {number} radius - Base radius (0-1).
- * @param {Function} shiftFn - Function(t) returning angle offset.
- * @param {number} [phase=0] - Starting phase offset.
- * @returns {THREE.Vector3[]} An array of points.
- */
-const sampleFn = (orientationQuaternion, normal, radius, shiftFn, phase = 0) => {
-  // Basis
-  let refAxis = Daydream.X_AXIS;
-  if (Math.abs(normal.dot(refAxis)) > 0.9999) {
-    refAxis = Daydream.Y_AXIS;
-  }
-  let v = vectorPool.acquire().copy(normal).applyQuaternion(orientationQuaternion).normalize();
-  let ref = vectorPool.acquire().copy(refAxis).applyQuaternion(orientationQuaternion).normalize();
-  let u = vectorPool.acquire().crossVectors(v, ref).normalize();
-  let w = vectorPool.acquire().crossVectors(v, u).normalize();
-
-  // Backside rings
-  let vSign = 1.0;
-  if (radius > 1) {
-    vSign = -1.0;
-    radius = 2 - radius;
-  }
-
-  // Equidistant projection
-  const thetaEq = radius * (Math.PI / 2);
-  const r = Math.sin(thetaEq);
-  const d = Math.cos(thetaEq);
-
-  // Calculate Samples
-  const numSamples = Daydream.W;
-  const step = 2 * Math.PI / numSamples;
-  let points = [];
-  let uTemp = vectorPool.acquire();
-
-  for (let i = 0; i < numSamples; i++) {
-    let theta = i * step;
-    let t = theta + phase;
-    let cosRing = Math.cos(t);
-    let sinRing = Math.sin(t);
-    uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
-
-    // Apply Shift
-    let shift = shiftFn(theta / (2 * Math.PI));
-    let cosShift = Math.cos(shift);
-    let sinShift = Math.sin(shift);
-    let vScale = (vSign * d) * cosShift - r * sinShift;
-    let uScale = r * cosShift + (vSign * d) * sinShift;
-    let p = vectorPool.acquire().copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
-
-    points.push(p);
-  }
-
-  return points;
-}
-
-/**
- * Draws a function-distorted ring with adaptive sampling.
- * @param {THREE.Quaternion} orientationQuaternion - Orientation of the base ring.
- * @param {THREE.Vector3} normal - Normal of the base ring.
- * @param {number} radius - Base radius (0-1).
- * @param {Function} shiftFn - Function(t) returning angle offset.
- * @param {Function} colorFn - Function(v, t) returning color.
- * @param {number} [phase=0] - Starting phase offset.
- */
-const drawFn = (pipeline, orientationQuaternion, normal, radius, shiftFn, colorFn, phase = 0) => {
-  const points = sampleFn(orientationQuaternion, normal, radius, shiftFn, phase);
-  rasterize(pipeline, points, colorFn, true);
-}
-
-/**
- * Calculates a point on a circle that lies on the surface of the unit sphere.
- * Used internally by drawing functions.
- * @param {number} a - The angle in radians around the ring.
- * @param {number} radius - The ring radius in the plane.
- * @param {THREE.Vector3} u - A vector on the plane (ortho to normal).
- * @param {THREE.Vector3} v - The ring's normal (center point).
- * @param {THREE.Vector3} w - A second vector on the plane (ortho to u and normal).
- * @returns {THREE.Vector3} The normalized point on the sphere's surface.
- */
-const calcRingPoint = (a, radius, u, v, w) => {
-  let d = Math.sqrt(Math.pow(1 - radius, 2));
-  return vectorPool.acquire().set(
-    d * v.x + radius * u.x * Math.cos(a) + radius * w.x * Math.sin(a),
-    d * v.y + radius * u.y * Math.cos(a) + radius * w.y * Math.sin(a),
-    d * v.z + radius * u.z * Math.cos(a) + radius * w.z * Math.sin(a)
-  ).normalize();
-}
-
-/**
- * Samples points for a polygon or ring on the sphere surface.
- * @param {THREE.Quaternion} orientationQuaternion - The orientation of the ring.
- * @param {THREE.Vector3} normal - The normal vector defining the ring plane.
- * @param {number} radius - The radius of the ring.
- * @param {number} numSamples - The number of points to sample.
- * @param {number} [phase=0] - Starting phase.
- * @returns {THREE.Vector3[]} An array of points.
- */
-const samplePolygon = (orientationQuaternion, normal, radius, numSamples, phase = 0) => {
-  // Basis
-  let refAxis = Daydream.X_AXIS;
-  if (Math.abs(normal.dot(refAxis)) > 0.9999) {
-    refAxis = Daydream.Y_AXIS;
-  }
-  let v = vectorPool.acquire().copy(normal).applyQuaternion(orientationQuaternion).normalize();
-  let ref = vectorPool.acquire().copy(refAxis).applyQuaternion(orientationQuaternion).normalize();
-  let u = vectorPool.acquire().crossVectors(v, ref).normalize();
-  let w = vectorPool.acquire().crossVectors(v, u).normalize();
-
-  // Backside rings
-  let vDir = v.clone();
-  if (radius > 1) {
-    vDir.negate();
-    radius = 2 - radius;
-  }
-
-  const thetaEq = radius * (Math.PI / 2);
-  const r = Math.sin(thetaEq);
-  const d = Math.cos(thetaEq);
-
-  // Calculate Samples
-  const step = 2 * Math.PI / numSamples;
-  let points = [];
-  let uTemp = vectorPool.acquire();
-
-  for (let i = 0; i < numSamples; i++) {
-    let theta = i * step;
-    let t = theta + phase;
-    let cosRing = Math.cos(t);
-    let sinRing = Math.sin(t);
-    uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
-    let p = vectorPool.acquire().copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
-    points.push(p);
-  }
-  return points;
-}
-
-/**
- * Draws a circular ring on the sphere surface with adaptive sampling.
- * @param {THREE.Quaternion} orientationQuaternion - The orientation of the ring.
- * @param {THREE.Vector3} normal - The normal vector defining the ring plane.
- * @param {number} radius - The radius of the ring.
- * @param {Function} colorFn - Function to determine color.
- * @param {number} [phase=0] - Starting phase.
- * @returns {Dot[]} An array of Dots.
- */
-const drawRing = (pipeline, orientationQuaternion, normal, radius, colorFn, phase = 0) => {
-  const points = samplePolygon(orientationQuaternion, normal, radius, Daydream.W / 4, phase);
-  rasterize(pipeline, points, colorFn, true);
-}
-
-/**
- * Draws a polygon on the sphere surface.
- * @param {THREE.Quaternion} orientationQuaternion - The orientation of the polygon.
- * @param {THREE.Vector3} normal - The normal vector.
- * @param {number} radius - The radius.
- * @param {number} numSides - Number of sides.
- * @param {Function} colorFn - Function to determine color.
- * @param {number} [phase=0] - Starting phase.
- * @returns {Dot[]} An array of Dots.
- */
-const drawPolygon = (pipeline, orientationQuaternion, normal, radius, numSides, colorFn, phase = 0) => {
-  const points = samplePolygon(orientationQuaternion, normal, radius, numSides, phase);
-  rasterize(pipeline, points, colorFn, true);
-}
-
-const ringPoint = (normal, radius, angle, phase = 0) => {
-  let dots = [];
-  let u = vectorPool.acquire();
-  let v = vectorPool.acquire().copy(normal);
-  let w = vectorPool.acquire();
-  if (radius > 1) {
-    v.negate();
-  }
-  if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.99995) {
-    u.crossVectors(v, Daydream.Y_AXIS).normalize();
-  } else {
-    u.crossVectors(v, Daydream.X_AXIS).normalize();
-  }
-  w.crossVectors(v, u);
-  if (radius > 1) {
-    w.negate();
-    radius = 2 - radius;
-  }
-  let d = Math.sqrt(Math.pow(1 - radius, 2));
-  return vectorPool.acquire().set(
-    d * v.x + radius * u.x * Math.cos(angle + phase) + radius * w.x * Math.sin(angle + phase),
-    d * v.y + radius * u.y * Math.cos(angle + phase) + radius * w.y * Math.sin(angle + phase),
-    d * v.z + radius * u.z * Math.cos(angle + phase) + radius * w.z * Math.sin(angle + phase)
-  ).normalize();
-};
-
-/**
- * Draws points forming a Fibonacci spiral pattern.
- * @param {number} n - Total number of points.
- * @param {number} eps - Epsilon value for spiral offset.
- * @param {Function} colorFn - Function to determine the color (takes vector).
- * @returns {Dot[]} An array of Dots forming the spiral.
- */
-const drawFibSpiral = (pipeline, n, eps, colorFn) => {
-  for (let i = 0; i < n; ++i) {
-    let v = fibSpiral(n, eps, i);
-    const c = colorFn(v);
-    const color = c.isColor ? c : (c.color || c);
-    const alpha = c.alpha !== undefined ? c.alpha : 1.0;
-    pipeline.plot(v, color, 0, alpha);
-  }
-};
-
-
 
 /**
  * Draws a motion trail by tweening between orientations in the queue.
@@ -710,18 +284,423 @@ export const tween = (orientation, drawFn) => {
 }
 
 export const Plot = {
-  Point: { draw: drawVector },
-  Path: { draw: drawPath },
-  Line: { draw: drawLine },
-  Vertices: { draw: drawVertices },
-  Polyhedron: { draw: drawPolyhedron, sample: samplePolyhedron },
-  DistortedRing: { draw: drawFn, sample: sampleFn, point: fnPoint }, // Mirrors "Function" logic
-  Ring: { draw: drawRing, sample: samplePolygon },
-  Polygon: { draw: drawPolygon, sample: samplePolygon },
-  Spiral: { draw: drawFibSpiral },
-  tween: tween,
-  rasterize: rasterize,
-  Spiral: { draw: drawFibSpiral },
+  Point: class {
+    /**
+     * Draws a single dot at a given vector.
+     * @param {Object} pipeline - The render pipeline.
+     * @param {THREE.Vector3} v - The vector position (normalized).
+     * @param {Function} colorFn - Function to determine the color (takes vector and t=0).
+     */
+    static draw(pipeline, v, colorFn) {
+      const c = colorFn(v, 0);
+      const color = c.isColor ? c : (c.color || c);
+      const alpha = c.alpha !== undefined ? c.alpha : 1.0;
+      pipeline.plot(v, color, 0, alpha);
+    }
+  },
+
+  Path: class {
+    /**
+     * Draws a sequence of points along a Path object.
+     * @param {Object} pipeline - The render pipeline.
+     * @param {Path|ProceduralPath} path - The path object.
+     * @param {Function} colorFn - Function to determine the color (takes normalized time t).
+     */
+    static draw(pipeline, path, colorFn) {
+      for (let t = 0; t < path.length(); t++) {
+        const v = path.getPoint(t / path.length());
+        const c = colorFn(t);
+        const color = c.isColor ? c : (c.color || c);
+        const alpha = c.alpha !== undefined ? c.alpha : 1.0;
+        pipeline.plot(v, color, 0, alpha);
+      }
+    }
+  },
+
+  Line: class {
+    /**
+     * Draws a geodesic line (arc) between two vectors on the sphere with adaptive sampling.
+     * @param {Object} pipeline - The render pipeline.
+     * @param {THREE.Vector3} v1 - The start vector.
+     * @param {THREE.Vector3} v2 - The end vector.
+     * @param {Function} colorFn - Function to determine the color (takes vector and normalized progress t).
+     * @param {number} [start=0] - Starting angle multiplier for drawing the line arc.
+     * @param {number} [end=1] - Ending multiplier for the total arc angle.
+     * @param {boolean} [longWay=false] - If true, draws the longer arc.
+     * @param {boolean} [omitLast=false] - If true, omits the last point.
+     */
+    static draw(pipeline, v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast = false) {
+      let u = vectorPool.acquire().copy(v1);
+      let v = vectorPool.acquire().copy(v2);
+      let a = angleBetween(u, v);
+      let w = vectorPool.acquire();
+
+      if (Math.abs(a) < 0.0001) {
+        if (omitLast) return;
+
+        const c = colorFn(u, 0);
+        const color = c.isColor ? c : (c.color || c);
+        const alpha = c.alpha !== undefined ? c.alpha : 1.0;
+        pipeline.plot(u, color, 0, alpha);
+        return;
+      } else if (Math.abs(Math.PI - a) < 0.0001) {
+        if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.9999) {
+          w.crossVectors(u, Daydream.Y_AXIS).normalize();
+        } else {
+          w.crossVectors(u, Daydream.X_AXIS).normalize();
+        }
+      } else {
+        w.crossVectors(u, v).normalize();
+      }
+
+      if (longWay) {
+        a = 2 * Math.PI - a;
+        w.negate();
+      }
+
+      if (start != 0) {
+        let q = new THREE.Quaternion().setFromAxisAngle(w, start * a);
+        u.applyQuaternion(q).normalize();
+      }
+      a *= Math.abs(end - start);
+
+      // Simulation Phase
+      let simU = vectorPool.acquire().copy(u);
+      let simAngle = 0;
+      let steps = [];
+      const baseStep = 2 * Math.PI / Daydream.W;
+
+      while (simAngle < a) {
+        let scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - simU.y * simU.y)));
+        let step = baseStep * scaleFactor;
+        steps.push(step);
+        simAngle += step;
+
+        // Advance simU
+        let q = new THREE.Quaternion().setFromAxisAngle(w, step);
+        simU.applyQuaternion(q).normalize();
+      }
+
+      // Calculate Scale Factor
+      let scale = a / simAngle;
+
+      // Drawing Phase
+      if (omitLast && steps.length === 0) {
+        return;
+      }
+
+      let currentAngle = 0;
+
+      const startC = colorFn(u, 0);
+      const startColor = startC.isColor ? startC : (startC.color || startC);
+      const startAlpha = startC.alpha !== undefined ? startC.alpha : 1.0;
+      pipeline.plot(u, startColor, 0, startAlpha);
+
+      let loopLimit = omitLast ? steps.length - 1 : steps.length;
+      for (let i = 0; i < loopLimit; i++) {
+        let step = steps[i] * scale;
+
+        // Advance u
+        let q = new THREE.Quaternion().setFromAxisAngle(w, step);
+        u.applyQuaternion(q).normalize();
+        currentAngle += step;
+
+        // Normalized t
+        let t = (a > 0) ? (currentAngle / a) : 1;
+
+        const c = colorFn(u, t);
+        const color = c.isColor ? c : (c.color || c);
+        const alpha = c.alpha !== undefined ? c.alpha : 1.0;
+        pipeline.plot(u, color, 0, alpha);
+      }
+    }
+  },
+
+  Vertices: class {
+    /**
+     * Draws a set of vertices as individual dots.
+     * @param {Object} pipeline - The render pipeline.
+     * @param {number[][]} vertices - An array of [x, y, z] arrays.
+     * @param {Function} colorFn - Function to determine the color (takes vector).
+     */
+    static draw(pipeline, vertices, colorFn) {
+      let v = vectorPool.acquire();
+      for (const vertex of vertices) {
+        v.set(vertex[0], vertex[1], vertex[2]);
+        const c = colorFn(v);
+        const color = c.isColor ? c : (c.color || c);
+        const alpha = c.alpha !== undefined ? c.alpha : 1.0;
+        pipeline.plot(v, color, 0, alpha);
+      }
+    }
+  },
+
+  Polyhedron: class {
+    /**
+     * Samples points for the edges of a polyhedron.
+     * @param {number[][]} vertices - An array of [x, y, z] vertex arrays.
+     * @param {number[][]} edges - An adjacency list of vertex indices.
+     * @returns {THREE.Vector3[]} An array of points forming the edges.
+     */
+    static sample(vertices, edges) {
+      let points = [];
+      edges.map((adj, i) => {
+        adj.map((j) => {
+          // Just push the vertices, let rasterize handle the lines
+          points.push(vectorPool.acquire().set(...vertices[i]).normalize());
+          points.push(vectorPool.acquire().set(...vertices[j]).normalize());
+        })
+      });
+      return points;
+    }
+
+    /**
+     * Draws the edges of a polyhedron by drawing lines between connected vertices.
+     * @param {Object} pipeline - The render pipeline.
+     * @param {number[][]} vertices - An array of [x, y, z] vertex arrays.
+     * @param {number[][]} edges - An adjacency list of vertex indices.
+     * @param {Function} colorFn - Function to determine the color (takes vector and normalized progress t).
+     */
+    static draw(pipeline, vertices, edges, colorFn) {
+      edges.map((adj, i) => {
+        adj.map((j) => {
+          if (i < j) {
+            Plot.Line.draw(
+              pipeline,
+              vectorPool.acquire().set(...vertices[i]).normalize(),
+              vectorPool.acquire().set(...vertices[j]).normalize(),
+              colorFn);
+          }
+        })
+      });
+    }
+  },
+
+  Ring: class {
+    /**
+     * Calculates a point on a circle that lies on the surface of the unit sphere.
+     * @param {number} a - Angle.
+     * @param {number} radius - Radius.
+     * @param {THREE.Vector3} u - Basis U.
+     * @param {THREE.Vector3} v - Basis V (Normal).
+     * @param {THREE.Vector3} w - Basis W.
+     * @returns {THREE.Vector3} Point.
+     */
+    static calcPoint(a, radius, u, v, w) {
+      let d = Math.sqrt(Math.pow(1 - radius, 2));
+      return vectorPool.acquire().set(
+        d * v.x + radius * u.x * Math.cos(a) + radius * w.x * Math.sin(a),
+        d * v.y + radius * u.y * Math.cos(a) + radius * w.y * Math.sin(a),
+        d * v.z + radius * u.z * Math.cos(a) + radius * w.z * Math.sin(a)
+      ).normalize();
+    }
+
+    /**
+     * Samples points for a polygon or ring on the sphere surface.
+     * @param {THREE.Quaternion} orientationQuaternion - The orientation of the ring.
+     * @param {THREE.Vector3} normal - The normal vector defining the ring plane.
+     * @param {number} radius - The radius of the ring.
+     * @param {number} numSamples - The number of points to sample.
+     * @param {number} [phase=0] - Starting phase.
+     * @returns {THREE.Vector3[]} An array of points.
+     */
+    static sample(orientationQuaternion, normal, radius, numSamples, phase = 0) {
+      // Basis
+      let refAxis = Daydream.X_AXIS;
+      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
+        refAxis = Daydream.Y_AXIS;
+      }
+      let v = vectorPool.acquire().copy(normal).applyQuaternion(orientationQuaternion).normalize();
+      let ref = vectorPool.acquire().copy(refAxis).applyQuaternion(orientationQuaternion).normalize();
+      let u = vectorPool.acquire().crossVectors(v, ref).normalize();
+      let w = vectorPool.acquire().crossVectors(v, u).normalize();
+
+      // Backside rings
+      let vDir = v.clone();
+      if (radius > 1) {
+        vDir.negate();
+        radius = 2 - radius;
+      }
+
+      const thetaEq = radius * (Math.PI / 2);
+      const r = Math.sin(thetaEq);
+      const d = Math.cos(thetaEq);
+
+      // Calculate Samples
+      const step = 2 * Math.PI / numSamples;
+      let points = [];
+      let uTemp = vectorPool.acquire();
+
+      for (let i = 0; i < numSamples; i++) {
+        let theta = i * step;
+        let t = theta + phase;
+        let cosRing = Math.cos(t);
+        let sinRing = Math.sin(t);
+        uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
+        let p = vectorPool.acquire().copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
+        points.push(p);
+      }
+      return points;
+    }
+
+    /**
+     * Draws a circular ring on the sphere surface with adaptive sampling.
+     * @param {Object} pipeline - Render pipeline.
+     * @param {THREE.Quaternion} orientationQuaternion - The orientation of the ring.
+     * @param {THREE.Vector3} normal - The normal vector defining the ring plane.
+     * @param {number} radius - The radius of the ring.
+     * @param {Function} colorFn - Function to determine color.
+     * @param {number} [phase=0] - Starting phase.
+     */
+    static draw(pipeline, orientationQuaternion, normal, radius, colorFn, phase = 0) {
+      const points = Plot.Ring.sample(orientationQuaternion, normal, radius, Daydream.W / 4, phase);
+      rasterize(pipeline, points, colorFn, true);
+    }
+  },
+
+  Polygon: class {
+    /**
+     * Draws a polygon on the sphere surface.
+     * @param {Object} pipeline - Render pipeline.
+     * @param {THREE.Quaternion} orientationQuaternion - The orientation of the polygon.
+     * @param {THREE.Vector3} normal - The normal vector.
+     * @param {number} radius - The radius.
+     * @param {number} numSides - Number of sides.
+     * @param {Function} colorFn - Function to determine color.
+     * @param {number} [phase=0] - Starting phase.
+     */
+    static draw(pipeline, orientationQuaternion, normal, radius, numSides, colorFn, phase = 0) {
+      const points = Plot.Ring.sample(orientationQuaternion, normal, radius, numSides, phase);
+      rasterize(pipeline, points, colorFn, true);
+    }
+    static sample(orientationQuaternion, normal, radius, numSides, phase = 0) {
+      return Plot.Ring.sample(orientationQuaternion, normal, radius, numSides, phase);
+    }
+  },
+
+  DistortedRing: class {
+    /**
+     * Calculates a single point on a sphere distorted by a function.
+     * @param {Function} f - The shift function.
+     * @param {THREE.Vector3} normal - The normal.
+     * @param {number} radius - The base radius.
+     * @param {number} angle - The angle.
+     */
+    static point(f, normal, radius, angle) {
+      let u = vectorPool.acquire();
+      let v = vectorPool.acquire().copy(normal);
+      let w = vectorPool.acquire();
+      if (radius > 1) {
+        v.negate();
+        radius = 2 - radius;
+      }
+      if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.99995) {
+        u.crossVectors(v, Daydream.Y_AXIS).normalize();
+      } else {
+        u.crossVectors(v, Daydream.X_AXIS).normalize();
+      }
+      w.crossVectors(v, u);
+
+      let vi = Plot.Ring.calcPoint(angle, radius, u, v, w);
+      let vp = Plot.Ring.calcPoint(angle, 1, u, v, w);
+      let axis = vectorPool.acquire().crossVectors(v, vp).normalize();
+      let shift = new THREE.Quaternion().setFromAxisAngle(axis, f(angle * Math.PI / 2));
+      return vi.applyQuaternion(shift);
+    }
+
+    /**
+     * Samples points for a function-distorted ring.
+     * @param {THREE.Quaternion} orientationQuaternion - Orientation.
+     * @param {THREE.Vector3} normal - Normal.
+     * @param {number} radius - Radius.
+     * @param {Function} shiftFn - Shift function.
+     * @param {number} [phase=0] - Phase.
+     */
+    static sample(orientationQuaternion, normal, radius, shiftFn, phase = 0) {
+      // Basis
+      let refAxis = Daydream.X_AXIS;
+      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
+        refAxis = Daydream.Y_AXIS;
+      }
+      let v = vectorPool.acquire().copy(normal).applyQuaternion(orientationQuaternion).normalize();
+      let ref = vectorPool.acquire().copy(refAxis).applyQuaternion(orientationQuaternion).normalize();
+      let u = vectorPool.acquire().crossVectors(v, ref).normalize();
+      let w = vectorPool.acquire().crossVectors(v, u).normalize();
+
+      // Backside rings
+      let vSign = 1.0;
+      if (radius > 1) {
+        vSign = -1.0;
+        radius = 2 - radius;
+      }
+
+      // Equidistant projection
+      const thetaEq = radius * (Math.PI / 2);
+      const r = Math.sin(thetaEq);
+      const d = Math.cos(thetaEq);
+
+      // Calculate Samples
+      const numSamples = Daydream.W;
+      const step = 2 * Math.PI / numSamples;
+      let points = [];
+      let uTemp = vectorPool.acquire();
+
+      for (let i = 0; i < numSamples; i++) {
+        let theta = i * step;
+        let t = theta + phase;
+        let cosRing = Math.cos(t);
+        let sinRing = Math.sin(t);
+        uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
+
+        // Apply Shift
+        let shift = shiftFn(theta / (2 * Math.PI));
+        let cosShift = Math.cos(shift);
+        let sinShift = Math.sin(shift);
+        let vScale = (vSign * d) * cosShift - r * sinShift;
+        let uScale = r * cosShift + (vSign * d) * sinShift;
+        let p = vectorPool.acquire().copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
+
+        points.push(p);
+      }
+
+      return points;
+    }
+
+    /**
+     * Draws a function-distorted ring.
+     * @param {Object} pipeline - Render pipeline.
+     * @param {THREE.Quaternion} orientationQuaternion - Orientation.
+     * @param {THREE.Vector3} normal - Normal.
+     * @param {number} radius - Radius.
+     * @param {Function} shiftFn - Shift function.
+     * @param {Function} colorFn - Color function.
+     * @param {number} [phase=0] - Phase.
+     */
+    static draw(pipeline, orientationQuaternion, normal, radius, shiftFn, colorFn, phase = 0) {
+      const points = Plot.DistortedRing.sample(orientationQuaternion, normal, radius, shiftFn, phase);
+      rasterize(pipeline, points, colorFn, true);
+    }
+  },
+
+  Spiral: class {
+    /**
+     * Draws points forming a Fibonacci spiral pattern.
+     * @param {Object} pipeline - Render pipeline.
+     * @param {number} n - Total number of points.
+     * @param {number} eps - Epsilon value for spiral offset.
+     * @param {Function} colorFn - Function to determine the color (takes vector).
+     */
+    static draw(pipeline, n, eps, colorFn) {
+      for (let i = 0; i < n; ++i) {
+        let v = fibSpiral(n, eps, i);
+        const c = colorFn(v);
+        const color = c.isColor ? c : (c.color || c);
+        const alpha = c.alpha !== undefined ? c.alpha : 1.0;
+        pipeline.plot(v, color, 0, alpha);
+      }
+    }
+  },
+
   tween: tween,
   rasterize: rasterize
 };
