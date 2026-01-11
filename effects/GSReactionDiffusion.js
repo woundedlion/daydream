@@ -104,7 +104,7 @@ export class GSReaction extends Sprite {
             // Alpha scaling
             let alpha = currentAlpha * this.rd.alpha * c.alpha;
 
-            this.rd.filters.plot(null, this.rd.nodes[i], c.color, 0, alpha);
+            this.rd.filters.plot(this.rd.nodes[i], c.color, 0, alpha);
         }
     }
 

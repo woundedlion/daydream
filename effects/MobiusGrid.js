@@ -12,7 +12,7 @@ import {
     Orientation, sinWave
 } from "../geometry.js";
 import {
-    rasterize, plotDots
+    Plot, rasterize
 } from "../draw.js";
 import {
     GenerativePalette
@@ -21,7 +21,7 @@ import {
     Timeline, easeMid, Rotation, MutableNumber, PeriodicTimer, ColorWipe, MobiusWarp, Mutation
 } from "../animation.js";
 import {
-    createRenderPipeline, FilterAntiAlias, FilterOrient, FilterHole
+    createRenderPipeline, FilterAntiAlias, FilterOrient, FilterHole, FilterMobius
 } from "../filters.js";
 import { wrap } from "../util.js";
 
@@ -76,8 +76,12 @@ export class MobiusGrid {
         this.timeline.add(0, new ColorWipe(this.palette, this.nextPalette, 60, easeMid));
     }
 
-    drawAxisRings(normal, numRings, mobiusParams, axisComponent, phase = 0) {
-        let dots = [];
+    drawAxisRings(pipeline, normal, numRings, mobiusParams, axisComponent, phase = 0, rotationQ) {
+        const { a, b, c, d } = mobiusParams;
+        // const filter = new FilterMobius(); // Removed
+        // filter.a = a; filter.b = b; filter.c = c; filter.d = d; // Removed
+
+        // let dots = []; // Removed
         const logMin = -2.5;
         const logMax = 2.5;
         const range = logMax - logMin;
@@ -88,39 +92,48 @@ export class MobiusGrid {
             const R = Math.exp(logR);
             const radius = (4 / Math.PI) * Math.atan(1 / R);
             const points = Plot.Polygon.sample(new THREE.Quaternion(), normal, radius, Daydream.W / 4);
+
             const transformedPoints = points.map(p => {
-                const z = stereo(p);
+                // const pRotated = p.clone().applyQuaternion(rotationQ); // Modified
+                const z = stereo(p); // Modified
                 const w = mobius(z, mobiusParams);
-                return invStereo(w);
+                let finalP = invStereo(w); // Modified
+                if (rotationQ) finalP.applyQuaternion(rotationQ); // Modified
+                return finalP; // Modified
             });
 
             const opacity = Math.min(1.0, Math.max(0.0, numRings - i));
-            dots.push(...rasterize(transformedPoints, (p) => {
+            rasterize(pipeline, transformedPoints, (p) => {
                 const res = this.palette.get(i / numRings);
-                return { color: res.color, alpha: res.alpha * opacity };
-            }, true));
+                return { color: res.color, alpha: res.alpha * opacity * this.alpha };
+            }, true);
         }
-        return dots;
+        // rasterize(dots, pipeline, 0, this.alpha); // Removed
     }
 
-    drawLongitudes(numLines, mobiusParams, axisComponent, phase = 0) {
-        let dots = [];
-        const count = Math.ceil(numLines);
+    drawLongitudes(pipeline, numLines, mobiusParams, axisComponent, phase = 0, rotationQ) {
+        const { a, b, c, d } = mobiusParams;
+        // const filter = new FilterMobius(); // Removed
+        // filter.a = a; filter.b = b; filter.c = c; filter.d = d; // Removed
 
-        for (let i = 0; i < count; i++) {
+        // let dots = []; // Removed
+        const count = Math.ceil(numLines); // Added count for numLines
+
+        for (let i = 0; i < count; i++) { // Changed numLines to count
             const theta = (i / numLines) * Math.PI;
             const normal = new THREE.Vector3(Math.cos(theta), Math.sin(theta), 0);
             const radius = 1.0;
             const points = Plot.Polygon.sample(new THREE.Quaternion(), normal, radius, Daydream.W / 4);
 
             const transformedPoints = points.map(p => {
-                const z = stereo(p);
-                const w = mobius(z, mobiusParams);
-                return invStereo(w);
+                let mp = mobius(stereo(p), mobiusParams);
+                let finalP = invStereo(mp); // Modified
+                if (rotationQ) finalP.applyQuaternion(rotationQ); // Modified
+                return finalP; // Modified
             });
 
             const opacity = Math.min(1.0, Math.max(0.0, numLines - i));
-            dots.push(...rasterize(transformedPoints, (p, tLine) => {
+            rasterize(pipeline, transformedPoints, (p, tLine) => {
                 // Interpolate unwarped points to get Z
                 const idx = tLine * points.length;
                 const i1 = Math.floor(idx) % points.length;
@@ -135,34 +148,31 @@ export class MobiusGrid {
                 const t = (logR - logMin) / range;
 
                 const res = this.palette.get(wrap(t - phase, 1.0));
-                return { color: res.color, alpha: res.alpha * opacity };
-            }, true));
+                return { color: res.color, alpha: res.alpha * opacity * this.alpha };
+            }, true);
         }
-        return dots;
+        // rasterize(dots, pipeline, 0, this.alpha); // Removed
     }
 
     drawFrame() {
         this.orientation.collapse();
         this.timeline.step();
         const phase = ((this.timeline.t || 0) % 120) / 120;
-        let dots = [];
-
-        dots.push(...this.drawAxisRings(Daydream.Z_AXIS.clone(), this.numRings.get(), this.params, 'y', phase));
-        dots.push(...this.drawLongitudes(this.numLines.get(), this.params, 'x', phase));
 
         // Calculate stabilizing counter-rotation
         const nIn = Daydream.Z_AXIS.clone();
-        const nTrans = invStereo(mobius(stereo(nIn), this.params));
-        const sIn = Daydream.Z_AXIS.clone().negate();
-        const sTrans = invStereo(mobius(stereo(sIn), this.params));
-        const mid = new THREE.Vector3().addVectors(nTrans, sTrans).normalize();
-        const q = new THREE.Quaternion().setFromUnitVectors(mid, Daydream.Z_AXIS);
+        const nTrans = invStereo(mobius(stereo(nIn), this.params)); // Modified
+        const sIn = Daydream.Z_AXIS.clone().negate(); // Added
+        const sTrans = invStereo(mobius(stereo(sIn), this.params)); // Added
+        const mid = new THREE.Vector3().addVectors(nTrans, sTrans).normalize(); // Added
+        const q = new THREE.Quaternion().setFromUnitVectors(mid, Daydream.Z_AXIS); // Modified
 
-        // Apply counter-rotation to dots and holes
-        dots.forEach(d => d.position.applyQuaternion(q));
-        this.holeN.origin.copy(nTrans).applyQuaternion(q);
-        this.holeS.origin.copy(sTrans).applyQuaternion(q);
+        // Apply counter-rotation to holes
+        this.holeN.origin.copy(nTrans).applyQuaternion(q); // Modified
+        this.holeS.origin.copy(sTrans).applyQuaternion(q); // Modified
 
-        plotDots(null, this.filters, dots, 0, this.alpha);
+        // Draw directly with rotation
+        this.drawAxisRings(this.filters, Daydream.Z_AXIS.clone(), this.numRings.get(), this.params, 'y', phase, q);
+        this.drawLongitudes(this.filters, this.numLines.get(), this.params, 'x', phase, q);
     }
 }

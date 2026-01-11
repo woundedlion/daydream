@@ -11,7 +11,7 @@ import {
     Orientation, angleBetween, pixelToVector, randomVector
 } from "../geometry.js";
 import {
-    Plot, DecayBuffer, plotDots
+    Plot, DecayBuffer
 } from "../draw.js";
 import {
     GenerativePalette
@@ -153,7 +153,7 @@ export class Dynamo {
             this.pull(0);
             this.drawNodes(i * 1 / Math.abs(this.speed));
         }
-        this.trails.render(null, this.filters,
+        this.trails.render(this.filters,
             (v, t) => this.color(v, t));
     }
 
@@ -162,18 +162,23 @@ export class Dynamo {
     }
 
     drawNodes(age) {
-        let dots = [];
         for (let i = 0; i < this.nodes.length; ++i) {
             if (i == 0) {
                 let from = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
-                dots.push(...Plot.Point.draw(from, (v) => this.color(v, 0)));
+                Plot.Point.draw(this.trails, from, (v) => {
+                    const c = this.color(v, 0);
+                    return { color: c.color || c, alpha: (c.alpha || 1) * 0.5 }; // pre-multiply opacity 0.5
+                });
             } else {
                 let from = pixelToVector(this.nodes[i - 1].x, this.nodeY(this.nodes[i - 1]));
                 let to = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
-                dots.push(...Plot.Line.draw(from, to, (v) => this.color(v, 0)));
+                Plot.Line.draw(this.trails, from, to, (v) => {
+                    const c = this.color(v, 0);
+                    return { color: c.color || c, alpha: (c.alpha || 1) * 0.5 };
+                });
             }
         }
-        this.trails.recordDots(dots, age, 0.5);
+        // trails.recordDots no longer needed, we drew directly to trails
     }
 
     pull(y) {

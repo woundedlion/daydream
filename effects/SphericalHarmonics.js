@@ -119,7 +119,7 @@ export class SphericalHarmonics {
 
         const pipeline = createRenderPipeline();
 
-        Scan.Field.draw(pipeline, Daydream.pixels, (p) => {
+        Scan.Field.draw(pipeline, (p) => {
             // 1. Rotate domain
             const v = p.clone().applyQuaternion(invQ);
 

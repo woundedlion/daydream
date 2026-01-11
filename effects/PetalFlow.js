@@ -8,7 +8,7 @@ import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { Orientation, sinWave } from "../geometry.js";
 import { invStereo } from "../3dmath.js";
-import { Plot, plotDots, rasterize } from "../draw.js";
+import { Plot, rasterize } from "../draw.js";
 import { ProceduralPalette } from "../color.js";
 import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
 import { wrap } from "../util.js";
@@ -46,7 +46,6 @@ export class PetalFlow {
     }
 
     drawPetals(loopCount, loopT) {
-        let dots = [];
         const logMin = -3.75;
         const logMax = 3.75;
         const currentSpacing = this.spacing.get();
@@ -72,7 +71,14 @@ export class PetalFlow {
             if (opacity <= 0.01) continue;
 
             const twistAngle = (k + progress) * this.twistFactor.get();
+
+            // Rasterize & Color
+            const colorIndex = (k - loopCount) + 10000;
+            const hue = wrap(colorIndex * 0.13, 1.0);
+            const color = this.palette.get(hue).color;
+
             const points = [];
+            let prevPos = null;
 
             // Generate Ring directly in Complex Plane
             for (let i = 0; i < numSamples; i++) {
@@ -89,19 +95,21 @@ export class PetalFlow {
                     re: R * Math.cos(finalTheta),
                     im: R * Math.sin(finalTheta)
                 };
-                points.push(this.orientation.orient(invStereo(z)));
-            }
+                const pos = this.orientation.orient(invStereo(z));
 
-            // Rasterize & Color
-            const colorIndex = (k - loopCount) + 10000;
-            const hue = wrap(colorIndex * 0.13, 1.0);
-            dots.push(...rasterize(points, (v, t) => {
-                const res = this.palette.get(hue);
-                return { color: res.color, alpha: res.alpha * opacity };
-            }, true));
+                if (i > 0) {
+                    rasterize(this.filters, [prevPos, pos], (p, t) => {
+                        return { color: color, alpha: this.alpha * opacity };
+                    }, false);
+                } else {
+                    // First point, just dot? Plot.Point.draw?
+                    this.filters.plot(pos, color, 0, this.alpha * opacity);
+                }
+                prevPos = pos;
+            }
         }
 
-        return dots;
+
     }
 
     drawFrame() {
@@ -111,7 +119,8 @@ export class PetalFlow {
         const loopCount = Math.floor(time / this.spacing.get());
         const loopT = time % this.spacing.get();
 
-        let dots = this.drawPetals(loopCount, loopT);
-        plotDots(null, this.filters, dots, 0, this.alpha);
+
+
+        this.drawPetals(loopCount, loopT);
     }
 }

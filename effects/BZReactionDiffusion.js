@@ -164,7 +164,7 @@ export class BZReaction extends GSReaction {
             hsl = color.getHSL(hsl);
             color.setHSL(hsl.h, 1.0, hsl.l);
 
-            this.rd.filters.plot(null, this.rd.nodes[i], color, 0, currentAlpha * this.rd.alpha);
+            this.rd.filters.plot(this.rd.nodes[i], color, 0, currentAlpha * this.rd.alpha);
         }
     }
 }

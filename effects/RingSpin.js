@@ -10,7 +10,9 @@ import { Daydream } from "../driver.js";
 import {
     Orientation, vectorPool
 } from "../geometry.js";
-import { Plot, tween, plotDots, rasterize } from "../draw.js";
+import {
+    Plot, tween, rasterize
+} from "../draw.js";
 import {
     VignettePalette, richSunset, mangoPeel, underSea, iceMelt, TransparentVignette
 } from "../color.js";
@@ -75,8 +77,10 @@ export class RingSpin {
             for (let i = 0; i < ring.basePoints.length; ++i) {
                 ring.scratchPoints[i].copy(ring.basePoints[i]).applyQuaternion(q);
             }
-            let dots = rasterize(ring.scratchPoints, (v, t) => ring.palette.get(0), true);
-            plotDots(null, ring.filters, dots, 0, this.alpha);
+            rasterize(ring.filters, ring.scratchPoints, (v, t) => {
+                const c = ring.palette.get(0);
+                return { color: c.color, alpha: c.alpha * this.alpha };
+            }, true);
         });
         ring.filters.trail((x, y, t) => ring.palette.get(t), this.alpha);
     }

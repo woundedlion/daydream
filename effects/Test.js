@@ -61,27 +61,23 @@ export class Test {
     }
 
     drawPoly(opacity) {
-        let dots = [];
-        dots.push(...Plot.Polyhedron.draw(this.poly.vertices, this.poly.eulerPath,
-            (v, t) => this.polyPalette.get(t)
-        ));
-        plotDots(null, this.filters, dots, 0, opacity * this.alpha);
+        Plot.Polyhedron.draw(this.filters, this.poly.vertices, this.poly.eulerPath, (v, t) => {
+            return this.polyPalette.get(t);
+        }, opacity * this.alpha);
     }
 
     drawFn(opacity) {
-        let dots = [];
         for (let i = 0; i < this.numRings; ++i) {
-            let phase = 2 * Math.PI / i;
-            dots.push(...Plot.DistortedRing.draw(this.orientation.get(), this.normal,
+            Plot.DistortedRing.draw(this.filters, this.orientation.get(), this.normal,
                 2 / (this.numRings + 1) * (i + 1),
                 (t) => sinWave(this.amplitude.get(), -this.amplitude.get(), 4, 0)(t),
                 (v, t) => {
-                    return this.ringPalette.get(t);
+                    const c = this.ringPalette.get(t);
+                    return { color: c.color, alpha: c.alpha * opacity * this.alpha };
                 },
                 i * 2 * Math.PI / this.numRings
-            ));
+            );
         }
-        plotDots(null, this.filters, dots, 0, opacity * this.alpha);
     }
 
     drawFrame() {
