@@ -102,7 +102,6 @@ export class PetalFlow {
                         return { color: color, alpha: this.alpha * opacity };
                     }, false);
                 } else {
-                    // First point, just dot? Plot.Point.draw?
                     this.filters.plot(pos, color, 0, this.alpha * opacity);
                 }
                 prevPos = pos;
@@ -118,9 +117,6 @@ export class PetalFlow {
         const time = (performance.now() / 1000.0) * (this.speed * 0.015);
         const loopCount = Math.floor(time / this.spacing.get());
         const loopT = time % this.spacing.get();
-
-
-
         this.drawPetals(loopCount, loopT);
     }
 }

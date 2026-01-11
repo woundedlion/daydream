@@ -36,7 +36,7 @@ export class TestFSRing {
         this.numRings = 1;
         this.timeline = new Timeline();
         this.radius = 1.0;
-        this.debugBB = false; // Added back
+        this.debugBB = false;
 
         for (let i = 0; i < this.numRings; ++i) {
             this.spawnRing(Daydream.X_AXIS, this.palettes[i]);

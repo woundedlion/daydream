@@ -32,11 +32,9 @@ class ThrusterContext {
     }
 
     reset(orientation, point) {
-        // Snapshot the current orientation (deep copy the quaternion)
         this.orientation.set(orientation.get().clone());
         this.point.copy(point);
         this.radius.set(0);
-        // Reset/Recreate the transition
         this.motion = new Transition(this.radius, 0.3, 8, easeMid);
     }
 }
@@ -124,7 +122,6 @@ export class Thrusters {
     }
 
     spawnThruster(point) {
-        // Acquire from pool
         if (this.thrusterPool.cursor >= this.thrusterPool.capacity) {
             this.thrusterPool.reset();
         }
@@ -144,8 +141,8 @@ export class Thrusters {
     }
 
     ringFn(t) {
-        return sinWave(-1, 1, 2, this.warpPhase)(t) // ring
-            * sinWave(-1, 1, 3, 0)((this.t % 32) / 32) // oscillation
+        return sinWave(-1, 1, 2, this.warpPhase)(t)
+            * sinWave(-1, 1, 3, 0)((this.t % 32) / 32)
             * this.amplitude.get();
     }
 

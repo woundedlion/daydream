@@ -44,7 +44,6 @@ export class BZReaction extends GSReaction {
     }
 
     seed() {
-        // Sparse Seeding for Spirals (Droplets)
         this.A.fill(0.0);
         this.B.fill(0.0);
         this.C.fill(0.0);
@@ -53,7 +52,6 @@ export class BZReaction extends GSReaction {
         for (let k = 0; k < 50; k++) {
             let center = Math.floor(Math.random() * this.N);
             let r = Math.random();
-            // Set a small neighborhood
             let nbs = this.rd.neighbors[center];
 
             let target = (r < 0.33) ? this.A : (r < 0.66) ? this.B : this.C;
@@ -63,13 +61,10 @@ export class BZReaction extends GSReaction {
     }
 
     updatePhysics() {
-        // 3-Species Cyclic Model (Rock-Paper-Scissors)
-
         let nodes = this.rd.nodes;
         let neighbors = this.rd.neighbors;
         let weights = this.rd.weights;
 
-        // Use parameters from BZReactionDiffusion GUI if available
         let dt = this.rd.bzParams ? this.rd.bzParams.dt : 0.2;
         let D = this.rd.bzParams ? this.rd.bzParams.D : 0.03;
         this.alpha = this.rd.bzParams ? this.rd.bzParams.alpha : 1.6;
@@ -98,7 +93,6 @@ export class BZReaction extends GSReaction {
             this.nextB[i] = b + (D * lapB + db) * dt;
             this.nextC[i] = c + (D * lapC + dc) * dt;
 
-            // Clamp
             this.nextA[i] = Math.max(0, Math.min(1, this.nextA[i]));
             this.nextB[i] = Math.max(0, Math.min(1, this.nextB[i]));
             this.nextC[i] = Math.max(0, Math.min(1, this.nextC[i]));
@@ -116,14 +110,10 @@ export class BZReaction extends GSReaction {
         let cb = this.palette.get(0.5).color;
         let cc = this.palette.get(1).color;
 
-        // 1. Simulate
         for (let k = 0; k < 2; k++) {
             this.updatePhysics();
         }
 
-        // 2. Draw
-        // 2. Draw
-        // Pre-calculate Depth and filter active nodes
         let count = 0;
         const q = this.rd.orientation.get();
 
@@ -131,17 +121,15 @@ export class BZReaction extends GSReaction {
             let a = this.A[i];
             let b = this.B[i];
             let c = this.C[i];
-            let sum = a + b + c; // Or any threshold logic
+            let sum = a + b + c;
 
             if (sum > 0.05) {
-                // Approximate view Z
                 const v = vectorPool.acquire().copy(this.rd.nodes[i]).applyQuaternion(q);
                 this.zValues[i] = v.z;
                 this.drawIndices[count++] = i;
             }
         }
 
-        // Sort Indices by Z (Ascending: Far to Near)
         const zRef = this.zValues;
         const indices = this.drawIndices.subarray(0, count);
         indices.sort((a, b) => zRef[a] - zRef[b]);
@@ -155,8 +143,6 @@ export class BZReaction extends GSReaction {
             let b = this.B[i];
             let c = this.C[i];
 
-            // Re-calc sum/color
-            // Alpha Blending (Layered: A first, then B, then C)
             color.setRGB(0, 0, 0);
             color.lerp(ca, a);
             color.lerp(cb, b);
@@ -188,10 +174,8 @@ export class BZReactionDiffusion {
         };
         this.quarterSpinDuration = 600;
 
-        // Build Graph (Fibonacci Hex)
         this.buildGraph();
 
-        // Visualization
         this.orientation = new Orientation();
         this.filters = createRenderPipeline(
             new FilterOrient(this.orientation),
@@ -227,11 +211,7 @@ export class BZReactionDiffusion {
         folder.open();
     }
 
-    // Graph Build Logic (Duplicated from GSReactionDiffusion)
     buildGraph() {
-        // Fibonacci Sphere (Uniform Isotropy)
-        // Fibonacci Sphere (Uniform Isotropy)
-        // Double density for gaps coverage
         this.N = Daydream.W * Daydream.H * 2;
 
         this.nodes = [];
@@ -239,11 +219,10 @@ export class BZReactionDiffusion {
         this.weights = [];
         this.scales = [];
 
-        // 1. Generate Nodes (Fibonacci Spiral)
-        const phi = Math.PI * (3 - Math.sqrt(5)); // Golden Angle
+        const phi = Math.PI * (3 - Math.sqrt(5));
 
         for (let i = 0; i < this.N; i++) {
-            let y = 1 - (i / (this.N - 1)) * 2; // y goes from 1 to -1
+            let y = 1 - (i / (this.N - 1)) * 2;
             let radius = Math.sqrt(1 - y * y);
             let theta = phi * i;
             let x = Math.cos(theta) * radius;
@@ -251,12 +230,10 @@ export class BZReactionDiffusion {
             this.nodes.push(new THREE.Vector3(x, y, z));
         }
 
-        // 2. Build Neighbors using Spatial Hashing (Grid Optimization)
         const K = 6;
 
-        // Grid setup
-        const gridSize = 20; // 20x20x20 grid
-        const cellSize = 2.0 / gridSize; // Domain is [-1, 1], size 2
+        const gridSize = 20;
+        const cellSize = 2.0 / gridSize;
         const grid = new Map();
 
         const getKey = (p) => {
@@ -266,7 +243,6 @@ export class BZReactionDiffusion {
             return `${gx},${gy},${gz}`;
         };
 
-        // Bin points
         for (let i = 0; i < this.N; i++) {
             const key = getKey(this.nodes[i]);
             if (!grid.has(key)) grid.set(key, []);
@@ -279,7 +255,6 @@ export class BZReactionDiffusion {
             let bestIndices = [];
             let bestDists = [];
 
-            // Search local and adjacent cells
             const gx = Math.floor((p1.x + 1) / cellSize);
             const gy = Math.floor((p1.y + 1) / cellSize);
             const gz = Math.floor((p1.z + 1) / cellSize);
