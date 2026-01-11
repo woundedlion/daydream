@@ -9,9 +9,59 @@ import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer
 import { pixelToSpherical } from "./geometry.js";
 import { G as g } from "./geometry.js";
 import { vectorPool } from "./geometry.js";
-import { GUI } from "gui"; // Fixed import
+import { GUI } from "gui";
 import { colorPool, color4Pool } from "./color.js";
 import { dotPool } from "./draw.js";
+
+/** * Helper class to reuse CSS2DObjects instead of creating/destroying DOM elements every frame.
+ * This prevents the browser from recalculating layout/styles constantly.
+ */
+class LabelPool {
+  constructor(scene) {
+    this.scene = scene;
+    this.pool = [];
+    this.activeCount = 0;
+  }
+
+  reset() {
+    this.activeCount = 0;
+  }
+
+  acquire(position, content) {
+    let labelObj;
+
+    // Reuse existing object if available
+    if (this.activeCount < this.pool.length) {
+      labelObj = this.pool[this.activeCount];
+      labelObj.visible = true;
+    } else {
+      // Create new object if pool is empty
+      const div = document.createElement("div");
+      div.className = "label";
+      labelObj = new CSS2DObject(div);
+      labelObj.center.set(0, 1);
+      this.scene.add(labelObj);
+      this.pool.push(labelObj);
+    }
+
+    // Update position (multiply by radius here to match original logic)
+    labelObj.position.copy(position).multiplyScalar(Daydream.SPHERE_RADIUS);
+
+    // Only touch the DOM if the text actually changes
+    if (labelObj.element.innerHTML !== content) {
+      labelObj.element.innerHTML = content;
+    }
+
+    this.activeCount++;
+  }
+
+  cleanup() {
+    // Hide any labels that weren't used this frame
+    for (let i = this.activeCount; i < this.pool.length; i++) {
+      this.pool[i].visible = false;
+    }
+  }
+}
 
 /** @type {Array<{position: THREE.Vector3, content: string}>} Global array to store labels to be rendered. */
 export var labels = [];
@@ -27,7 +77,7 @@ export class Daydream {
 
   static CAMERA_FOV = 20;
   static CAMERA_NEAR = 100;
-  static CAMERA_FAR = 1000; // Increased to allow camera to move back further
+  static CAMERA_FAR = 1000;
   static CAMERA_X = 0;
   static CAMERA_Y = 0;
   static CAMERA_Z = 220;
@@ -66,7 +116,6 @@ export class Daydream {
     );
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    // Initial position, will be adjusted in setCanvasSize
     this.camera.position.set(
       Daydream.CAMERA_X,
       Daydream.CAMERA_Y,
@@ -79,6 +128,9 @@ export class Daydream {
     this.stepFrames = 0;
     this.clock = new THREE.Clock(true);
     this.resources = [];
+
+    // Initialize the Object Pool for labels
+    this.labelPool = new LabelPool(this.scene);
 
     this.dotGeometry = new THREE.SphereGeometry(
       Daydream.DOT_SIZE,
@@ -95,7 +147,6 @@ export class Daydream {
       depthWrite: false
     });
 
-    /*
     // Suppress black pixels for performance
     this.dotMaterial.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader.replace(
@@ -103,8 +154,6 @@ export class Daydream {
         `
           #include <begin_vertex>
           #if defined(USE_INSTANCING_COLOR)
-             // Check luminance of instance color
-             // Use dot product/squared length to avoid sqrt cost
              if (dot(instanceColor, instanceColor) < 0.0001) {
                  transformed *= 0.0;
              }
@@ -112,7 +161,6 @@ export class Daydream {
           `
       );
     };
-    */
 
     this.axisMaterial = new THREE.LineBasicMaterial({
       color: 0xffffff,
@@ -149,6 +197,7 @@ export class Daydream {
     this.dotMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     this.dotMesh.count = Daydream.W * Daydream.H;
     this.dotMesh.frustumCulled = false;
+    this.dotMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.dotMesh.count * 3), 3);
     this.scene.add(this.dotMesh);
     this.scene.add(this.xAxis);
     this.scene.add(this.yAxis);
@@ -161,7 +210,6 @@ export class Daydream {
 
     this.setCanvasSize();
 
-    // ResizeObserver to handle layout changes (e.g. GUI expanding)
     this.resizeObserver = new ResizeObserver(() => {
       this.setCanvasSize();
     });
@@ -184,23 +232,11 @@ export class Daydream {
     }
   }
 
-  makeLabel(position, content) {
-    const div = document.createElement("div");
-    div.className = "label";
-    div.innerHTML = content;
-    const label = new CSS2DObject(div);
-    label.position.copy(position);
-    label.position.multiplyScalar(Daydream.SPHERE_RADIUS);
-    label.center.set(0, 1);
-    this.scene.add(label)
-  }
-
   setCanvasSize() {
     const container = this.canvas.parentElement;
     const width = container.clientWidth;
     const height = container.clientHeight;
 
-    // Mobile detection
     this.isMobile = width <= 900;
 
     this.mainViewport.x = 0;
@@ -217,11 +253,9 @@ export class Daydream {
     this.pipViewport.width = pipWidth;
     this.pipViewport.height = pipHeight;
 
-    // Update Camera Aspect Ratio
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
 
-    // Adjust Camera Distance to fill 85% of the smallest viewport dimension
     const diameter = Daydream.SPHERE_RADIUS * 2;
     const targetCoverage = 0.85;
     const fovRad = THREE.MathUtils.degToRad(Daydream.CAMERA_FOV / 2);
@@ -245,13 +279,7 @@ export class Daydream {
           this.stepFrames--;
         }
 
-        for (let i = this.scene.children.length - 1; i >= 0; i--) {
-          const obj = this.scene.children[i];
-          if (obj.isCSS2DObject) {
-            this.scene.remove(obj);
-          }
-        }
-        labels = [];
+        // --- OPTIMIZATION: REMOVED SCENE CHILD DELETION LOOP ---
 
         // Clear buffer
         for (let i = 0; i < Daydream.pixels.length; i++) {
@@ -266,18 +294,24 @@ export class Daydream {
         const stats = document.getElementById("perf-stats");
         if (stats) stats.innerText = `${duration.toFixed(3)} ms`;
 
-        // Render buffer to InstanceMesh
+        // --- OPTIMIZATION: DIRECT BUFFER ACCESS ---
+        const colorArray = this.dotMesh.instanceColor.array;
         for (let i = 0; i < Daydream.pixels.length; i++) {
-          this.dotMesh.setColorAt(i, Daydream.pixels[i]);
+          const pixelColor = Daydream.pixels[i];
+          const stride = i * 3;
+          colorArray[stride] = pixelColor.r;
+          colorArray[stride + 1] = pixelColor.g;
+          colorArray[stride + 2] = pixelColor.b;
         }
-
-        if (this.dotMesh.instanceColor) {
-          this.dotMesh.instanceColor.needsUpdate = true;
-        }
+        this.dotMesh.instanceColor.needsUpdate = true;
 
         this.xAxis.visible = this.labelAxes;
         this.yAxis.visible = this.labelAxes;
         this.zAxis.visible = this.labelAxes;
+
+        // --- OPTIMIZATION: LABEL POOLING ---
+        this.labelPool.reset();
+        labels = []; // Clear the export (if external modules depend on reading it)
 
         if (this.labelAxes) {
           labels.push({ "position": Daydream.X_AXIS, "content": "X" });
@@ -295,9 +329,11 @@ export class Daydream {
         for (const label of labels) {
           // Cull labels on the back side of the sphere
           if (label.position.dot(this.camera.position) > Daydream.SPHERE_RADIUS) {
-            this.makeLabel(label.position, label.content);
+            this.labelPool.acquire(label.position, label.content);
           }
         }
+
+        this.labelPool.cleanup();
       }
     }
 
@@ -322,7 +358,6 @@ export class Daydream {
     this.renderer.render(this.scene, this.camera);
     this.labelRenderer.render(this.scene, this.camera);
 
-    // Only render PIP if NOT on mobile
     if (!this.isMobile) {
       this.renderer.setViewport(
         this.pipViewport.x,
@@ -364,25 +399,25 @@ export class Daydream {
       Daydream.pixelPositions[i] = vector.clone().normalize();
       this.pixelMatrices[i] = dummy.matrix.clone();
 
-      // Ensure matrix is set on the mesh
       if (this.dotMesh) {
         this.dotMesh.setMatrixAt(i, this.pixelMatrices[i]);
-        this.dotMesh.setColorAt(i, Daydream.pixels[i]); // Initialize to black (from Daydream.pixels)
       }
     }
 
+    // Initialize colors to black
     if (this.dotMesh) {
+      const colorArray = this.dotMesh.instanceColor.array;
+      colorArray.fill(0);
       this.dotMesh.instanceMatrix.needsUpdate = true;
+      this.dotMesh.instanceColor.needsUpdate = true;
     }
   }
 
   updateResolution(h, w, dotSize) {
-    // Update static constants
     Daydream.H = h;
     Daydream.W = w;
     Daydream.DOT_SIZE = dotSize;
 
-    // Dispose old resources
     this.scene.remove(this.dotMesh);
     this.dotGeometry.dispose();
     this.dotGeometry = new THREE.SphereGeometry(
@@ -401,6 +436,7 @@ export class Daydream {
     this.dotMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     this.dotMesh.count = Daydream.W * Daydream.H;
     this.dotMesh.frustumCulled = false;
+    this.dotMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.dotMesh.count * 3), 3);
     this.scene.add(this.dotMesh);
 
     Daydream.pixels = Array.from({ length: Daydream.W * Daydream.H }, () => new THREE.Color(0, 0, 0));

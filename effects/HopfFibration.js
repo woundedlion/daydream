@@ -170,7 +170,7 @@ export class HopfFibration {
             const z = q2 * factor;
 
             const v = vectorPool.acquire();
-            v.set(x, y, z);
+            v.set(x, y, z).normalize();
 
             // Set Color for key point
             const c = richSunset.get(0);

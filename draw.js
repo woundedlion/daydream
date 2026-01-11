@@ -142,7 +142,8 @@ export const rasterize = (pipeline, points, colorFn, closeLoop = false) => {
     };
 
     // Draw segment
-    Plot.Line.draw(pipeline, p1, p2, segmentColorFn, 0, 1, false, true);
+    const omitLast = closeLoop || (i < count - 1);
+    Plot.Line.draw(pipeline, p1, p2, segmentColorFn, 0, 1, false, omitLast);
   }
 };
 
