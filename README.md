@@ -1,88 +1,116 @@
 # Daydream Simulator
 
-**Daydream** is a comprehensive WebGL-based simulator for the **[Holosphere](../pov)** firmware. It is designed to act as a 1:1 development environment, allowing you to write, debug, and visualize C++ POV effects using modern JavaScript and Three.js before deploying them to hardware.
+**Daydream** is a comprehensive WebGL-based simulator for the **[Holosphere](../pov)** firmware. It serves as a 1:1 development environment, enabling the writing, debugging, and visualization of C++ POV effects using modern JavaScript and Three.js prior to hardware deployment.
 
-The project structure deliberately mirrors the C++ firmware architecture to make porting code seamless.
+The architecture mirrors the C++ firmware to ensure seamless porting.
 
 ---
 
-## 🌟 Architecture & Component Mapping
+## 🌟 Architecture & Core Components
 
-Daydream is not just a visualizer; it is a port of the Holosphere engine logic to JavaScript.
+Daydream replicates the Holosphere firmware structure in JavaScript.
 
 ### 1. The Virtual Driver (`driver.js`)
-This acts as the "hardware" layer of the simulator.
-* **Virtual Display**: It creates a buffer of `W * H` pixels (`Daydream.pixels`), mimicking the raw LED buffer in the firmware.
-* **Instanced Rendering**: Instead of creating thousands of Sphere meshes, it uses `THREE.InstancedMesh` to render 2,000+ LED dots efficiently in a single draw call.
-* **Spherical Mapping**: It maps the 2D `(x, y)` coordinates of the pixel buffer to 3D `(x, y, z)` coordinates on a sphere, simulating the physical layout of the POV device.
+The `Daydream` class acts as the hardware abstraction layer (HAL):
+*   **Virtual Display**: Manages a pixel buffer (`Daydream.pixels`) corresponding to the spherical LED array.
+*   **Instanced Rendering**: Uses `THREE.InstancedMesh` to efficiently render thousands of LEDs in a single draw call.
+*   **Frame Loop**: Manages the render loop (`render()`), handling clearing, drawing effects, and updating the display.
+*   **Optimization**: Features optimization strategies like object pooling (for `THREE.Vector3`, `THREE.Color`) to minimize garbage collection overhead.
 
-### 2. Engine Core (Ported Modules)
-These files map directly to their C++ counterparts in the `pov` project:
+### 2. Geometry & Math (`geometry.js`, `util.js`)
+Handles the complex spherical mathematics required for the POV display:
+*   **Spherical Conversion**: Utilities like `vectorToPixel`, `pixelToVector`, `phiToY` for mapping 3D space to the 2D LED buffer.
+*   **Orientation**: The `Orientation` class manages quaternion-based rotation history, enabling motion trails and complex rotations.
+*   **Lissajous**: Implementation of projection-based Lissajous curves for generating complex, non-singular paths on the sphere.
+*   **Fibonacci Spirals**: Logic for evenly distributing points on the sphere.
+*   **Math Utils**: Basic helpers in `util.js` for wrapping, permutation, and distance calculations.
 
-| JavaScript File | C++ Counterpart | Function |
-| :--- | :--- | :--- |
-| **`geometry.js`** | `geometry.h` | Implements `Orientation`, `Dot`, and `Vector` logic. Includes the `tween` function for motion blur. |
-| **`3dmath.js`** | `3dmath.h` | Math utilities including complex numbers for Möbius transforms (`mobius`, `stereo`, `invStereo`) and `fibSpiral` generation. |
-| **`filters.js`** | `filter.h` | The render pipeline. Includes `FilterOrient` (world rotation), `FilterAntiAlias` (quintic smoothing), and `FilterDecay` (trails). |
-| **`animation.js`** | `animation.h` | The `Timeline` class, `Transition`, `Sprite`, `Mutation`, and easing functions. |
-| **`color.js`** | `color.h` | `GenerativePalette` and `ProceduralPalette` logic for dynamic color creation. |
-| **`draw.js`** | `draw.h` | Geometry generators like `drawLine`, `drawRing`, and `rasterize`. |
-| **`StaticCircularBuffer.js`** | `static_circular_buffer.h` | A fixed-size ring buffer implementation to mimic the memory constraints and behavior of the C++ firmware. |
+### 3. Drawing System (`draw.js`)
+A set of high-level primitives and drawing pipelines:
+*   **`Plot.Point`, `Plot.Line`**: Basic primitives for drawing dots and geodesic lines (great circles).
+*   **`Plot.Ring`, `Plot.Polygon`**: Tools for drawing circles and n-sided polygons on the sphere surface also supports distortion.
+*   **`Plot.DistortedRing`**: Advanced ring drawing with function-based distortion (e.g., sine waves applied to the radius).
+*   **`Scan.Ring`**: A scanline-based rasterizer for drawing thick, anti-aliased rings directly into the pixel buffer, supporting depth checks and clipping planes.
+*   **`rasterize()`**: Converts vector paths into discrete points for the pixel buffer.
 
-### 3. Hot Module Replacement (HMR)
-The entry point `daydream.js` is set up to support rapid iteration. You can tweak effect parameters, math formulas, or animation timings in the code, and the simulator will update instantly without a full page reload, preserving the current state where possible.
+### 4. Animation Engine (`animation.js`)
+A robust animation framework based on a `Timeline`:
+*   **`Timeline`**: Manages a queue of animations, executing them in sync with the frame clock.
+*   **Animations**: Includes `Motion` (path following), `Rotation` (axis-angle), `RandomWalk` (stochastic movement), `Sprite` (fade in/out), and `ColorWipe` (palette transitions).
+*   **Easing**: A collection of easing functions (e.g., `easeOutElastic`, `easeInOutBicubic`) for natural motion.
+*   **ParticleSystem**: A noise-driven particle system for flow field effects.
+
+### 5. Render Pipeline & Filters (`filters.js`)
+The `createRenderPipeline` function builds a chain of filters to process drawing operations:
+*   **`FilterAntiAlias`**: Applies quintic kernel smoothing to pixel operations for high-quality visuals.
+*   **`FilterOrient`**: Rotates the entire world or specific objects using an `Orientation` quaternion.
+*   **`FilterMobius`**: Applies conformal Möbius transformations (Sphere -> Plane -> Transform -> Sphere) for psychedelic warping effects.
+*   **`FilterTrail` & `FilterWorldTrails`**: Manages fading trails for points, creating a sense of history and motion.
+*   **`FilterReplicate`**: Duplicates drawing operations across the sphere (e.g., symmetry).
+
+### 6. Color Engine (`color.js`)
+Advanced color management:
+*   **`Color4`**: Extends `THREE.Color` with an alpha channel.
+*   **`GenerativePalette`**: Procedurally generates harmonious color palettes (Triadic, Split-Complementary, Analogous) based on color theory.
+*   **`ProceduralPalette`**: Implements cosine-based gradients ($A + B \cdot \cos(2\pi(Cx + D))$).
+*   **Pooling**: `colorPool` and `color4Pool` recycle color objects to reduce allocation.
 
 ---
 
-## 🛠 Included Visual Tools
+## 🎨 Included Effects
 
-Daydream includes standalone HTML tools to assist in generating the math constants used in the effects.
+The `effects/` directory contains the visual sketches. Each class typically manages its own `Timeline`, `Orientation`, and render logic.
+
+*   **`Comets`**: Lissajous-driven particles leaving trails.
+*   **`Voronoi`**: Cellular noise patterns on the sphere.
+*   **`MobiusGrid`**: A grid distorted by Möbius transformations.
+*   **`HopfFibration`**: Visualization of the Hopf Fibration (circles interlaced on the 3-sphere projected to 2-sphere).
+*   **`FlowField`**: Noise-driven particle flow.
+*   **`ReactionDiffusion`**: Gray-Scott and Belousov-Zhabotinsky simulations (`GSReactionDiffusion`, `BZReactionDiffusion`).
+*   **`Portholes`**: Clipping plane effects revealing inner geometries.
+*   **`MetaballEffect`**: 2D Metaballs mapped to the sphere surface.
+*   **`LSystem`**: Fractal plant growth simulations.
+*   ...and many more (`PetalFlow`, `Moire`, `RingSpin`, `Thrusters`, etc.)
+
+---
+
+## 🛠 Visual Tools
+
+Daydream provides HTML-based tools for researching math and designing assets:
 
 ### 🎨 Palette Generator (`palettes.html`)
-An interactive tool for designing `ProceduralPalette`s based on the cosine formula:
-$$color(t) = A + B \cdot \cos(2\pi(C \cdot t + D))$$
-* **Visualizers**: Shows individual R/G/B waveforms and the resulting color gradient.
-* **Real-time Preview**: Displays an animated swatch.
-* **Export**: Generates the exact C++ or JavaScript array code to paste into your effect.
+Interactive design of procedural cosine gradients.
+*   **Visualizers**: RGB waveforms and gradient preview.
+*   **Export**: Generates C++/JS code.
 
 ### 🌀 Möbius Visualizer (`mobius.html`)
-A playground for exploring Conformal Möbius transformations projected onto a sphere.
-* **Interactive Plane**: Drag points on the complex plane to adjust the complex parameters $A, B, C, D$.
-* **Presets**: Visualize standard transformations like Elliptic (rotation), Hyperbolic (zoom), and Loxodromic (spiral).
-* **Grid Visualization**: Renders a longitude/latitude grid to visualize the distortion.
+Playground for Möbius transformations.
+*   **Interactive Plane**: Drag control points to define transformations.
+*   **Presets**: Elliptic, Hyperbolic, Loxodromic, Parabolic transforms.
 
 ### ➿ Lissajous Visualizer (`lissajous.html`)
-A tool to visualize spherical Lissajous curves used in effects like `Comets`.
-* **Rational Locking**: Automatically snaps frequency sliders to simple rational ratios (e.g., 3:2, 5:4) to ensure the generated curves are closed loops.
-* **Code Export**: Generates the lambda function required to render the curve in the engine.
+Tool to tune spherical Lissajous curves.
+*   **Rational Locking**: Snaps frequencies to rational ratios for closed loops.
+*   **Export**: Generates the exact formula parameters.
 
 ---
 
 ## 🚀 Getting Started
 
-1.  **Install Dependencies**:
-    Daydream uses standard ES6 modules but requires a local server to handle imports correctly due to CORS.
+1.  **Install**:
     ```bash
     npm install
     ```
 
-2.  **Run Simulator**:
-    Start a local web server (using Vite, http-server, or Python):
+2.  **Run**:
     ```bash
     npx http-server .
     ```
 
-3.  **Access**:
-    Open `http://localhost:8080` (or the port provided) in your browser.
-    * **Main Simulator**: `index.html`
-    * **Palette Tool**: `palettes.html`
-    * **Mobius Tool**: `mobius.html`
-
-4.  **Controls**:
-    * Use the **GUI dropdown** in the top right to switch between effects.
-    * Expand folders in the GUI to tweak effect-specific parameters (Speed, Alpha, etc.) in real-time.
-    * Press **Space** to pause/resume the animation.
-    * Press **Arrow Right** while paused to step forward one frame.
+3.  **Open**:
+    Navigate to `http://localhost:8080`.
+    *   **Controls**: Use the dat.GUI panel to switch effects and tweak parameters.
+    *   **Keyboard**: SPACE to pause, ARROW RIGHT to step frames.
 
 ---
 *Hardware implementation: [Holosphere Firmware](../pov/README.md)*
