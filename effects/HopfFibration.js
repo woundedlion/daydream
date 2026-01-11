@@ -3,9 +3,9 @@ import * as THREE from "three";
 import { gui } from "../gui.js";
 import { Daydream } from "../driver.js";
 import { vectorPool, Orientation } from "../geometry.js";
-import { Plot, DecayBuffer, rasterize } from "../draw.js";
+import { Plot, rasterize } from "../draw.js";
 import { stereo } from "../3dmath.js";
-import { createRenderPipeline, FilterAntiAlias, FilterDecay, FilterOrient } from "../filters.js";
+import { createRenderPipeline, FilterAntiAlias, FilterWorldTrails, FilterOrient } from "../filters.js";
 import { richSunset } from "../color.js";
 import { Timeline, Rotation, easeMid } from "../animation.js";
 
@@ -41,11 +41,10 @@ export class HopfFibration {
         this.gui.add(this, 'alpha', 0, 1).name('Opacity');
 
         this.pipeline = createRenderPipeline(
+            new FilterWorldTrails(40, 200000),
             new FilterOrient(this.orientation),
             new FilterAntiAlias()
         );
-
-        this.trails = new DecayBuffer(40, 200000);
 
         // Timeline with standard Rotation animation
         this.timeline = new Timeline();
@@ -187,12 +186,12 @@ export class HopfFibration {
                 // Using rasterize with 2 points creates a line.
 
                 const segmentPoints = [prev, v];
-                rasterize(this.trails, segmentPoints, (p, t) => {
+                rasterize(this.pipeline, segmentPoints, (p, t) => {
                     return c;
                 }, false);
             } else {
                 // First frame or reset, just draw dot
-                this.trails.record(v, c, 0, 1.0);
+                this.pipeline.plot(v, c, 0, 1.0);
             }
 
             // Store current position for next frame
@@ -209,7 +208,7 @@ export class HopfFibration {
 
 
         // Render the entire trail history (3D vectors projected by FilterOrient)
-        this.trails.render(this.pipeline, (v, t) => {
+        this.pipeline.trail((v, t) => {
             // t is normalized age [0 (new) -> 1 (old)]
             const c = richSunset.get(t);
             c.a *= (1 - t);

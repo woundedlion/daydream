@@ -10,7 +10,7 @@ import {
     Orientation, angleBetween, sinWave
 } from "../geometry.js";
 import {
-    DecayBuffer, Plot
+    Plot
 } from "../draw.js";
 import {
     ProceduralPalette

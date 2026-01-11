@@ -95,6 +95,7 @@ export class Daydream {
       depthWrite: false
     });
 
+    /*
     // Suppress black pixels for performance
     this.dotMaterial.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader.replace(
@@ -111,6 +112,7 @@ export class Daydream {
           `
       );
     };
+    */
 
     this.axisMaterial = new THREE.LineBasicMaterial({
       color: 0xffffff,

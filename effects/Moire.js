@@ -11,7 +11,7 @@ import {
     Orientation, sinWave
 } from "../geometry.js";
 import {
-    rasterize
+    rasterize, Plot
 } from "../draw.js";
 import {
     GenerativePalette
@@ -29,7 +29,7 @@ export class Moire {
         this.basePalette = new GenerativePalette("circular", "split-complementary", "bell");
         this.interferencePalette = new GenerativePalette("circular", "split-complementary", "cup");
 
-        this.density = new MutableNumber(10);
+        this.density = 10;
         this.scale = new MutableNumber(1.0);
         this.rotation = new MutableNumber(0);
         this.amp = new MutableNumber(0);
@@ -43,7 +43,6 @@ export class Moire {
 
         this.timeline
             .add(0, new PeriodicTimer(80, () => this.colorWipe()))
-            //      .add(0, new RandomTimer(48, 48, () => this.deRes(), false))
             .add(0, new Rotation(this.orientation, Daydream.Y_AXIS, 2 * Math.PI, 300, easeMid, true))
             .add(0,
                 new Transition(this.rotation, 2 * Math.PI, 160, easeMid, false, true)
@@ -56,7 +55,7 @@ export class Moire {
     setupGui() {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
-        this.gui.add(this.density, 'n', 5, 50).name('density').listen();
+        this.gui.add(this, 'density', 5, 50).name('density').listen();
         this.gui.add(this.amp, 'n', -1, 1).name('amplitude').step(0.01).listen();
         this.gui.add(this.scale, 'n', 0.8, 1.2).name('scale');
         this.gui.add(this.rotation, 'n', 0, Math.PI).name('rotation');
@@ -73,22 +72,8 @@ export class Moire {
         );
     }
 
-    deRes() {
-        this.timeline.add(0,
-            new Transition(this.density, 5, 6, easeMid, true, false)
-                .then(() => this.timeline.add(0, new RandomTimer(48, 48, () => this.res(), false)))
-        );
-    }
-
-    res() {
-        this.timeline.add(0,
-            new Transition(this.density, 11, 6, easeMid, true, false)
-                .then(() => this.timeline.add(0, new RandomTimer(48, 48, () => this.deRes(), false)))
-        );
-    }
-
     drawLayer(pipeline, transform, palette) {
-        const count = Math.ceil(this.density.get());
+        const count = Math.ceil(this.density);
         for (let i = 0; i <= count; i++) {
             const t = i / count;
             const r = t * 2.0;
