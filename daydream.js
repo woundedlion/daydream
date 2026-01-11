@@ -23,8 +23,7 @@ import {
   BZReactionDiffusion,
   PetalFlow,
   LSystem,
-  RingSpinFieldSample,
-  CometsFieldSample,
+
   TestFSRing,
   HopfFibration,
   Voronoi,
@@ -39,9 +38,7 @@ import { BufferGeometry, AddEquation, MaxEquation } from "three";
 const effects = {
   RingShower,
   RingSpin,
-  RingSpinFieldSample,
   Comets,
-  CometsFieldSample,
   Dynamo,
   Thrusters,
   MetaballEffect,
