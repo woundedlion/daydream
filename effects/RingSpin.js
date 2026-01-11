@@ -3,7 +3,6 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
@@ -11,81 +10,88 @@ import {
     Orientation, vectorPool
 } from "../geometry.js";
 import {
-    Plot, tween, rasterize
-} from "../draw.js";
-import {
-    VignettePalette, richSunset, mangoPeel, underSea, iceMelt, TransparentVignette
+    VignettePalette, richSunset, mangoPeel, underSea, iceMelt,
+    TransparentVignette
 } from "../color.js";
 import {
-    Timeline, easeMid, Sprite, RandomWalk, MutableNumber
+    Timeline, RandomWalk, OrientationTrail // Assuming you added it to animation.js
 } from "../animation.js";
-import {
-    createRenderPipeline, FilterAntiAlias, FilterDecay
-} from "../filters.js";
+import { Scan } from "../draw.js";
+import { createRenderPipeline, FilterDecay } from "../filters.js";
+import { tween, dotPool } from "../draw.js";
 
 export class RingSpin {
     static Ring = class {
-        constructor(normal, palette, trailLength) {
+        constructor(normal, palette) {
             this.normal = normal;
-            // map(v => v.clone()) is essential because samplePolygon now returns pooled vectors
-            this.basePoints = Plot.Polygon.sample(new THREE.Quaternion(), this.normal, 1, Daydream.W / 4).map(v => v.clone());
-            this.scratchPoints = new Array(this.basePoints.length);
-            for (let i = 0; i < this.basePoints.length; ++i) {
-                this.scratchPoints[i] = new THREE.Vector3();
-            }
             this.palette = new TransparentVignette(palette);
-            this.filters = createRenderPipeline(
-                new FilterDecay(trailLength, Math.max(10000, Daydream.W * 200)),
-                new FilterAntiAlias()
-            );
             this.orientation = new Orientation();
+            this.trail = new OrientationTrail(19);
         }
     }
 
     constructor() {
         this.rings = [];
-        this.alpha = 0.2;
-        this.trailLength = new MutableNumber(20);
+        this.alpha = 0.5;
+        this.trailLength = 19;
+        this.thickness = 2 * Math.PI / Daydream.W;
         this.palettes = [iceMelt, underSea, mangoPeel, richSunset];
         this.numRings = 4;
         this.timeline = new Timeline();
+        this.debugBB = false; // Added back
 
         for (let i = 0; i < this.numRings; ++i) {
             this.spawnRing(Daydream.X_AXIS, this.palettes[i]);
         }
 
+        this.setupGUI();
+        this.renderPlanes = [];
+    }
+
+    setupGUI() {
         this.gui = new gui.GUI({ autoPlace: false });
-        this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
+        this.gui.add(this, 'alpha').min(0).max(1).step(0.01).name("Brightness");
+        this.gui.add(this, 'thickness').min(0.01).max(0.5).step(0.01).name("Brush Size");
+        this.gui.add(this, 'debugBB').name('Show Bounding Boxes'); // Restored
     }
 
     spawnRing(normal, palette) {
-        let ring = new RingSpin.Ring(normal, palette, this.trailLength.get());
+        let ring = new RingSpin.Ring(normal, palette);
         this.rings.push(ring);
-
-        this.timeline.add(0,
-            new Sprite((opacity) => this.drawRing(opacity, ring),
-                -1,
-                4, easeMid,
-                0, easeMid
-            ));
-        this.timeline.add(0,
-            new RandomWalk(ring.orientation, ring.normal));
-    }
-
-    drawRing(opacity, ring) {
-        tween(ring.orientation, (q, t) => {
-            for (let i = 0; i < ring.basePoints.length; ++i) {
-                ring.scratchPoints[i].copy(ring.basePoints[i]).applyQuaternion(q);
-            }
-            rasterize(ring.filters, ring.scratchPoints, (v, t) => {
-                const c = ring.palette.get(0);
-                return { color: c.color, alpha: c.alpha * this.alpha };
-            }, true);
-        });
-        ring.filters.trail((x, y, t) => ring.palette.get(t), this.alpha);
+        this.timeline.add(0, new RandomWalk(ring.orientation, ring.normal));
     }
 
     drawFrame() {
         this.timeline.step();
+        this.renderPlanes.length = 0;
+
+        const pipeline = createRenderPipeline();
+
+        for (const ring of this.rings) {
+            ring.trail.record(ring.orientation);
+            tween(ring.trail, (snapshot, t) => {
+                tween(snapshot, (q, subT) => {
+                    if (t > 1.0) return;
+                    const c = ring.palette.get(t);
+                    c.alpha = c.alpha * this.alpha;
+
+                    // Store for rendering
+                    const dot = dotPool.acquire();
+                    dot.position.copy(ring.normal).applyQuaternion(q);
+                    dot.color = c.color;
+                    dot.alpha = c.alpha;
+                    dot.t = t; // Store t for material function if needed
+                    this.renderPlanes.push(dot);
+                });
+            });
+        }
+
+        for (const dot of this.renderPlanes) {
+            const materialFn = (p, tPos, dist) => {
+                return { color: dot.color, alpha: dot.alpha };
+            };
+
+            Scan.Ring.draw(pipeline, dot.position, 1.0, this.thickness, materialFn, 0, 2 * Math.PI, { debugBB: this.debugBB });
+        }
     }
 }

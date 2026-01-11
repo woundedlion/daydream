@@ -3,45 +3,50 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-
 import * as THREE from "three";
 import { gui } from "gui";
-import { Daydream, labels } from "../driver.js";
+import { Daydream } from "../driver.js";
 import {
-    Orientation, lissajous, randomVector
+    Orientation, lissajous, randomVector, vectorToPixel, vectorPool
 } from "../geometry.js";
 import {
-    Path, DecayBuffer, Plot, tween
+    Path, dotPool, Plot, tween
 } from "../draw.js";
 import {
-    GenerativePalette
+    GenerativePalette, blendAlpha, color4Pool
 } from "../color.js";
 import {
-    Timeline, easeMid, Sprite, Motion, RandomWalk, PeriodicTimer, ColorWipe
+    Timeline, easeMid, Sprite, Motion, RandomWalk, PeriodicTimer, ColorWipe, OrientationTrail
 } from "../animation.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterOrient, quinticKernel
 } from "../filters.js";
-import { randomBetween } from "../util.js";
+import { randomBetween, wrap } from "../util.js";
+import { Scan } from "../draw.js";
 
 export class Comets {
     static Node = class {
         constructor(path) {
             this.orientation = new Orientation();
-            this.v = Daydream.Y_AXIS;
+            this.trail = new OrientationTrail(80);
+            this.v = Daydream.Y_AXIS.clone();
             this.path = path;
         }
     }
+
     constructor() {
         this.timeline = new Timeline();
         this.numNodes = 1;
         this.spacing = 48;
-        this.pathResolution = 32;
+        this.resolution = 32;
         this.cycleDuration = 80;
         this.trailLength = this.cycleDuration;
         this.alpha = 0.5;
+        this.thickness = 2.1 * 2 * Math.PI / Daydream.W;
         this.orientation = new Orientation();
         this.path = new Path(Daydream.Y_AXIS);
+        this.debugBB = false;
+
         this.functions = [
             { m1: 1.06, m2: 1.06, a: 0, domain: 5.909 },
             { m1: 6.06, m2: 1, a: 0, domain: 2 * Math.PI },
@@ -58,14 +63,9 @@ export class Comets {
         ]
         this.curFunction = 0;
         this.updatePath();
-        this.palette = new GenerativePalette("straight", "triadic", "ascending");
-        this.trails = new DecayBuffer(this.trailLength);
-
-        this.filters = createRenderPipeline(
-            new FilterOrient(this.orientation),
-            new FilterAntiAlias()
-        );
+        this.palette = new GenerativePalette("straight", "triadic", "descending");
         this.nodes = [];
+        this.renderPoints = [];
 
         for (let i = 0; i < this.numNodes; ++i) {
             this.spawnNode(this.path);
@@ -80,28 +80,23 @@ export class Comets {
         );
         this.timeline.add(0, new RandomWalk(this.orientation, randomVector()));
 
-        this.gui = new gui.GUI({ autoPlace: false });
-        this.gui.add(this, 'pathResolution', 10, 200).step(1).onChange(() => {
-            this.updatePath();
-        });
+        this.setupGUI();
+
     }
 
-    /*
-    getLabels() {
-        if (!this.path || !this.path.points) return [];
-        return this.path.points.map((p, i) => ({
-            position: this.orientation.orient(p),
-            content: i.toString()
-        }));
+    setupGUI() {
+        this.gui = new gui.GUI({ autoPlace: false });
+        this.gui.add(this, 'alpha', 0, 1).step(0.01).name('Brightness');
+        this.gui.add(this, 'thickness', 0.01, 0.5).step(0.01).name('Brush Size');
+        this.gui.add(this, 'debugBB').name('Show Bounding Boxes'); // Restored
     }
-    */
 
     updatePath() {
         const config = this.functions[this.curFunction];
         const { m1, m2, a, domain } = config;
         const maxSpeed = Math.sqrt(m1 * m1 + m2 * m2);
         const length = domain * maxSpeed;
-        const samples = Math.max(128, Math.ceil(length * this.pathResolution));
+        const samples = Math.max(128, Math.ceil(length * this.resolution));
         this.path.collapse();
         this.path.appendSegment((t) => lissajous(m1, m2, a, t), domain, samples, easeMid);
     }
@@ -115,34 +110,46 @@ export class Comets {
 
     spawnNode(path) {
         let i = this.nodes.length;
-        this.nodes.push(new Comets.Node(path));
-        this.timeline.add(0,
-            new Sprite((opacity) => this.drawNode(opacity, i), -1, 16, easeMid, 0, easeMid)
-        );
+        let node = new Comets.Node(path);
+        this.nodes.push(node);
         this.timeline.add(i * this.spacing,
-            new Motion(this.nodes[i].orientation, this.nodes[i].path, this.cycleDuration, true)
+            new Motion(node.orientation, node.path, this.cycleDuration, true)
         );
-
-    }
-
-    drawNode(opacity, i) {
-        let node = this.nodes[i];
-        tween(node.orientation, (q, t) => {
-            let v = node.v.clone().applyQuaternion(q).normalize();
-            Plot.Point.draw(this.trails, v,
-                (v, t) => {
-                    const c = this.palette.get(t);
-                    return { color: c.color, alpha: c.alpha * opacity * this.alpha };
-                });
-        });
     }
 
     drawFrame() {
         this.timeline.step();
-        this.trails.render(this.filters, (v, t) => {
-            let color = this.palette.get(1 - t);
-            color.alpha *= quinticKernel(1 - t);
-            return color;
-        });
+        this.renderPoints.length = 0;
+
+        for (const node of this.nodes) {
+            node.trail.record(node.orientation);
+
+            tween(node.trail, (snapshot, t) => {
+                tween(snapshot, (q, subT) => {
+                    if (t > 1.0) return;
+                    const color4 = this.palette.get(t);
+                    color4.alpha = color4.alpha * this.alpha * quinticKernel(1 - t);
+                    const v = vectorPool.acquire().copy(node.v).applyQuaternion(q);
+                    const orientedV = this.orientation.orient(v);
+
+                    const dot = dotPool.acquire();
+                    dot.position.copy(orientedV);
+                    dot.color = color4.color;
+                    dot.alpha = color4.alpha;
+
+                    this.renderPoints.push(dot);
+                });
+            });
+        }
+
+        const pipeline = createRenderPipeline();
+        for (const pt of this.renderPoints) {
+            const pos = pt.position;
+            const matFn = () => {
+                const col = pt.color;
+                return { color: col, alpha: pt.alpha };
+            };
+            Scan.Point.draw(pipeline, pos, this.thickness, matFn, { debugBB: this.debugBB });
+        }
     }
 }
