@@ -469,17 +469,11 @@ export const Plot = {
       const w = new THREE.Vector3().crossVectors(v, u).normalize();
 
       const project = (p) => {
-        const d = p.dot(v);
-        const R = Math.acos(Math.min(1, Math.max(-1, d)));
+        const R = angleBetween(p, v);
         if (R < 0.0001) return new THREE.Vector2(0, 0);
-
-        // Direction perpendicular to v
-        const p_perp = p.clone().sub(v.clone().multiplyScalar(d)).normalize();
-
         const x = p.dot(u);
         const y = p.dot(w);
         const theta = Math.atan2(y, x);
-
         return new THREE.Vector2(R * Math.cos(theta), R * Math.sin(theta));
       };
 
