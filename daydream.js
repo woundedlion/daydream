@@ -73,7 +73,7 @@ const daydream = new Daydream();
 let activeEffect;
 
 const controls = {
-  effectName: (initialEffect && effects[initialEffect]) ? initialEffect : 'PetalFlow',
+  effect: (initialEffect && effects[initialEffect]) ? initialEffect : 'PetalFlow',
   resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Holosphere (20x96)",
 
   setResolution: function (preserveParams = false) {
@@ -81,7 +81,7 @@ const controls = {
     if (p) {
       // Update URL
       const newUrl = new URL(window.location);
-      newUrl.searchParams.set('effect', this.effectName);
+      newUrl.searchParams.set('effect', this.effect);
       newUrl.searchParams.set('resolution', this.resolution);
       window.history.replaceState({}, '', newUrl);
 
@@ -104,20 +104,20 @@ const controls = {
       }
     }
 
-    const EffectClass = effects[this.effectName];
+    const EffectClass = effects[this.effect];
     if (typeof EffectClass !== 'function') {
-      console.error(`Effect '${this.effectName}' is not a constructor. Check your imports in daydream.js.`);
+      console.error(`Effect '${this.effect}' is not a constructor. Check your imports in daydream.js.`);
       return;
     }
 
     // Clear existing params to avoid pollution, unless we are initializing (preserveParams = true)
     if (!preserveParams) {
-      resetGUI(['resolution', 'effect', 'effectName']);
+      resetGUI(['resolution', 'effect']);
     }
 
     // Update URL
     const newUrl = new URL(window.location);
-    newUrl.searchParams.set('effect', this.effectName);
+    newUrl.searchParams.set('effect', this.effect);
     window.history.replaceState({}, '', newUrl);
 
 
@@ -148,12 +148,12 @@ guiInstance.add(controls, 'resolution', Object.keys(resolutionPresets))
   .name('Resolution')
   .onChange(() => controls.setResolution());
 
-guiInstance.add(controls, 'effectName', effectNames)
+guiInstance.add(controls, 'effect', effectNames)
   .name('Active Effect')
   .onChange(() => controls.changeEffect());
 
 controls.resetDefaults = () => {
-  resetGUI(['resolution', 'effect', 'effectName']);
+  resetGUI(['resolution', 'effect']);
   controls.changeEffect();
 };
 guiInstance.add(controls, 'resetDefaults').name('Reset Defaults');

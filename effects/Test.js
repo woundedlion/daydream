@@ -10,7 +10,7 @@ import { Daydream } from "../driver.js";
 import {
     Orientation, Dodecahedron, sinWave
 } from "../geometry.js";
-import { Plot } from "../draw.js";
+import { Plot, Scan } from "../draw.js";
 import {
     GenerativePalette
 } from "../color.js";
@@ -38,6 +38,8 @@ export class Test {
         this.amplitudeRange = 0.3;
         this.poly = new Dodecahedron();
         this.numRings = 1;
+        this.debugBB = false;
+        this.thickness = 4 * 2 * Math.PI / Daydream.W;
 
         //    this.timeline.add(0,
         //      new Sprite((opacity) => this.drawPoly(opacity), -1, 48, easeMid, 0, easeMid)
@@ -58,6 +60,8 @@ export class Test {
 
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
+        this.gui.add(this, 'debugBB').name('Show Bounding Boxes');
+        this.gui.add(this, 'thickness').min(0.01).max(0.2).step(0.001);
     }
 
     drawPoly(opacity) {
@@ -68,14 +72,18 @@ export class Test {
 
     drawFn(opacity) {
         for (let i = 0; i < this.numRings; ++i) {
-            Plot.DistortedRing.draw(this.filters, this.orientation.get(), this.normal,
-                2 / (this.numRings + 1) * (i + 1),
-                (t) => sinWave(this.amplitude.get(), -this.amplitude.get(), 4, 0)(t),
-                (v, t) => {
-                    const c = this.ringPalette.get(t);
+            // Verify Scan.DistortedRing
+            const radius = 2 / (this.numRings + 1) * (i + 1);
+            const shiftFn = (t) => sinWave(this.amplitude.get(), -this.amplitude.get(), 4, 0)(t);
+            const amplitude = this.amplitudeRange;
+
+            Scan.DistortedRing.draw(this.filters, this.orientation.get(), this.normal, radius, this.thickness,
+                shiftFn, amplitude,
+                (p, t, dist) => {
+                    const c = this.ringPalette.get(t); // t is normalized azimuth (0..1)
                     return { color: c.color, alpha: c.alpha * opacity * this.alpha };
                 },
-                i * 2 * Math.PI / this.numRings
+                { debugBB: this.debugBB }
             );
         }
     }

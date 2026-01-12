@@ -66,12 +66,10 @@ export class TestFSRing {
         const pipeline = createRenderPipeline();
 
         for (const ring of this.rings) {
-            // let color = ring.palette.get(0.5);
-            // Scan.Ring need materialFn
-            const materialFn = () => {
+            const colorFn = () => {
                 return ring.palette.get(0.5);
             }
-            Scan.Ring.draw(pipeline, ring.orientation.orient(ring.normal), this.radius, this.thickness, materialFn, 0, 2 * Math.PI, { debugBB: this.debugBB });
+            Scan.Ring.draw(pipeline, ring.orientation.orient(ring.normal), this.radius, this.thickness, colorFn, 0, 2 * Math.PI, { debugBB: this.debugBB });
         }
     }
 }
