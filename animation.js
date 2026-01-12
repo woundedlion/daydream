@@ -587,6 +587,88 @@ export class Rotation extends Animation {
     }
   }
 }
+
+export class ComposedRotation extends Animation {
+
+  /**
+   * @param {Orientation} orientation Target orientation.
+   * @param {number} duration Duration in frames.
+   * @param {boolean} repeat Whether to loop the animation.
+   */
+  constructor(orientation, duration, repeat = true) {
+    super(duration, repeat);
+    this.orientation = orientation;
+    this.layers = [];
+
+    // Temps
+    this._qLayer = new THREE.Quaternion();
+    this._qTotal = new THREE.Quaternion();
+    this._qPrev = new THREE.Quaternion();
+  }
+
+  /**
+   * Adds a rotation layer to the hierarchy.
+   * @param {Vector3} axis Axis of rotation.
+   * @param {number} totalAngle Total radians to rotate over the duration (e.g. Math.PI * 2).
+   * @param {function} easingFn Easing function (t => val). Defaults to Linear.
+   */
+  rotate(axis, totalAngle, easingFn = Easing.Linear) {
+    this.layers.push({
+      axis: axis.clone().normalize(),
+      totalAngle: totalAngle,
+      easing: easingFn
+    });
+    return this;
+  }
+
+  step() {
+    super.step();
+
+    // 1. Snapshot previous state (for motion blur calculation)
+    this.orientation.collapse();
+    this._qPrev.copy(this.orientation.get());
+
+    // 2. Calculate Target for current frame
+    // Normalize time to 0.0 -> 1.0 range based on duration
+    const progress = Math.min(1.0, this.t / this.duration);
+    const endQ = this._calculateTotalRotation(progress);
+
+    // 3. Smart Motion Blur (Sub-stepping)
+    const dist = this._qPrev.angleTo(endQ);
+    const pixelRad = (2 * Math.PI) / (Daydream.W || 96);
+    const steps = Math.ceil(dist / pixelRad);
+
+    for (let i = 1; i <= steps; ++i) {
+      const subT = i / steps;
+
+      // Calculate exact sub-frame time (e.g. frame 10.5)
+      // Then normalize it to 0.0 -> 1.0 range
+      const absoluteTime = (this.t - 1) + subT;
+      const subProgress = Math.min(1.0, absoluteTime / this.duration);
+
+      const subQ = this._calculateTotalRotation(subProgress);
+      this.orientation.push(subQ);
+    }
+  }
+
+  _calculateTotalRotation(progress) {
+    this._qTotal.identity();
+
+    for (const layer of this.layers) {
+      // Apply the layer's specific easing to the time
+      const easedT = layer.easing(progress);
+
+      // Determine the angle for this specific moment
+      const angle = layer.totalAngle * easedT;
+
+      this._qLayer.setFromAxisAngle(layer.axis, angle);
+      this._qTotal.multiply(this._qLayer); // FK Composition (Parent * Child)
+    }
+
+    return this._qTotal.clone();
+  }
+}
+
 /**
  * Randomly walks an orientation over the sphere surface.
  */
