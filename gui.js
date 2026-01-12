@@ -56,40 +56,7 @@ class DeepLinkGUI {
     add(object, prop, ...args) {
         const key = this._getKey(prop);
 
-        // Check for existing descriptor to respect getters/setters
-        const descriptor = this._getDescriptor(object, prop);
-        let getter, setter;
-
-        if (descriptor && (descriptor.get || descriptor.set)) {
-            // Wrap existing accessors
-            getter = () => descriptor.get ? descriptor.get.call(object) : undefined;
-            setter = (v) => {
-                if (descriptor.set) descriptor.set.call(object, v);
-            };
-        } else {
-            // Simple property - use closure logic
-            let value = object[prop];
-            getter = () => value;
-            setter = (v) => { value = v; };
-        }
-
-        // 1. Proxy the property to trigger URL updates on set
-        try {
-            Object.defineProperty(object, prop, {
-                get: getter,
-                set: (v) => {
-                    setter(v);
-                    setUrlParam(key, v);
-                },
-                enumerable: true,
-                configurable: true
-            });
-        } catch (e) {
-            console.warn(`DeepLinkGUI: Failed to proxy property '${prop}'. Deep linking updates may not work for this control.`, e);
-        }
-
-
-        // 2. Load initial value from URL
+        // 1. Load initial value from URL
         const params = getUrlParams();
         if (params.has(key)) {
             let val = params.get(key);
@@ -102,8 +69,13 @@ class DeepLinkGUI {
             object[prop] = val;
         }
 
-        // 3. Create Controller
+        // 2. Create Controller
         const controller = this.gui.add(object, prop, ...args);
+
+        // 3. Attach URL/State Listener (Only triggers on UI change)
+        controller.onChange((v) => {
+            setUrlParam(key, v);
+        });
 
         // 4. Update Display
         if (params.has(key)) {
@@ -115,38 +87,26 @@ class DeepLinkGUI {
 
     addColor(object, prop) {
         const key = this._getKey(prop);
-        let value = object[prop];
-
-        // 1. Proxy the property
-        try {
-            Object.defineProperty(object, prop, {
-                get: () => value,
-                set: (v) => {
-                    value = v;
-                    // Handle Color Serialization
-                    let strVal = v;
-                    if (typeof v === 'object' && v.getHexString) {
-                        strVal = '#' + v.getHexString();
-                    } else if (Array.isArray(v)) {
-                        strVal = `rgb(${v[0]},${v[1]},${v[2]})`;
-                    }
-                    setUrlParam(key, strVal);
-                },
-                enumerable: true,
-                configurable: true
-            });
-        } catch (e) {
-            console.warn(`DeepLinkGUI: Failed to proxy color property '${prop}'.`, e);
-        }
-
-        // 2. Load from URL
+        // 1. Load from URL
         const params = getUrlParams();
         if (params.has(key)) {
             object[prop] = params.get(key);
         }
 
-        // 3. Create Controller
+        // 2. Create Controller
         const controller = this.gui.addColor(object, prop);
+
+        // 3. Attach URL/State Listener
+        controller.onChange((v) => {
+            // Handle Color Serialization
+            let strVal = v;
+            if (typeof v === 'object' && v.getHexString) {
+                strVal = '#' + v.getHexString();
+            } else if (Array.isArray(v)) {
+                strVal = `rgb(${v[0]},${v[1]},${v[2]})`;
+            }
+            setUrlParam(key, strVal);
+        });
 
         // 4. Update Display
         if (params.has(key)) {

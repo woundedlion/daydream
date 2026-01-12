@@ -26,10 +26,10 @@ import {
 export class Moire {
     constructor() {
         this.alpha = 0.2;
-        this.basePalette = new GenerativePalette("circular", "split-complementary", "bell");
-        this.interferencePalette = new GenerativePalette("circular", "split-complementary", "cup");
+        this.basePalette = new GenerativePalette("circular", "analagous", "bell");
+        this.interferencePalette = new GenerativePalette("circular", "analagous", "cup");
 
-        this.density = 10;
+        this.density = Daydream.W <= 96 ? 10 : 45;
         this.scale = new MutableNumber(1.0);
         this.rotation = new MutableNumber(0);
         this.amp = new MutableNumber(0);
