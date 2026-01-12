@@ -14,7 +14,7 @@ import {
     TransparentVignette, blendAlpha, color4Pool
 } from "../color.js";
 import {
-    Timeline, Sprite, RandomWalk, MutableNumber
+    Timeline, RandomWalk, Rotation, easeMid, ComposedRotation
 } from "../animation.js";
 import { Plot } from "../draw.js";
 import { createRenderPipeline, FilterAntiAlias } from "../filters.js";
@@ -38,10 +38,10 @@ export class TestPlotPolygon {
         this.radius = 0.4;
         this.sides = 5;
         this.pipeline = createRenderPipeline(new FilterAntiAlias());
-        this.debugBB = false; // Not used in Plot but kept for consistency
 
         for (let i = 0; i < this.numRings; ++i) {
-            this.spawnRing(Daydream.X_AXIS, this.palettes[i]);
+            this.spawnRing(Daydream.Z_AXIS, this.palettes[i], 1);
+            this.spawnRing(Daydream.Z_AXIS, this.palettes[i], -1);
         }
 
         this.setupGUI();
@@ -56,10 +56,13 @@ export class TestPlotPolygon {
         this.gui.add(this, 'sides').min(3).max(12).step(1).name("Sides");
     }
 
-    spawnRing(normal, palette) {
+    spawnRing(normal, palette, direction) {
         let ring = new TestPlotPolygon.Ring(normal, palette);
         this.rings.push(ring);
-        this.timeline.add(0, new RandomWalk(ring.orientation, ring.normal));
+        this.timeline.add(0, new ComposedRotation(ring.orientation, 48, true)
+            .rotate(Daydream.Y_AXIS, 2 * Math.PI, easeMid)
+            .rotate(normal, direction * 2 * Math.PI, easeMid)
+        );
     }
 
     drawFrame() {
@@ -68,7 +71,7 @@ export class TestPlotPolygon {
             const colorFn = (p, t) => {
                 return ring.palette.get(0.5);
             }
-            Plot.Polygon.draw(this.pipeline, ring.orientation.get(), this.normal || ring.normal, this.radius, this.sides, colorFn);
+            Plot.Polygon.draw(this.pipeline, ring.orientation.get(), ring.normal, this.radius, this.sides, colorFn);
         }
     }
 }
