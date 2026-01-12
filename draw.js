@@ -161,18 +161,14 @@ export const tween = (orientation, drawFn) => {
 }
 
 /**
- * Performs a deep tween on an OrientationTrail, handling interpolation between snapshots.
+ * Performs a deep tween on an OrientationTrail, handling interpolation between frames.
  * @param {OrientationTrail} trail - The trail of orientation histories.
- * @param {number} dt - The time delta between snapshots (usually 1/capacity).
  * @param {Function} drawFn - Function to draw a sample (takes quaternion and global time t).
  */
-export const deepTween = (trail, dt, drawFn) => {
-  tween(trail, (snapshot, t) => {
-    tween(snapshot, (q, subT) => {
-      // t is the base time of the snapshot (0..1)
-      // subT is the interpolation factor within the snapshot (0..1)
-      // dt is the size of the window covered by one snapshot step
-      // We add subT * dt because we are moving Forward in time from the snapshot base
+export const deepTween = (trail, drawFn) => {
+  const dt = 1.0 / trail.capacity;
+  tween(trail, (frame, t) => {
+    tween(frame, (q, subT) => {
       const globalT = t + subT * dt;
       drawFn(q, globalT);
     });
