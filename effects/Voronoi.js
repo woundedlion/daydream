@@ -45,11 +45,8 @@ export class Voronoi {
             const z = Math.sin(theta) * radius;
 
             const v = new THREE.Vector3(x, y, z);
-
             const vel = randomVector();
-
             const axis = vel;
-
             const t = i / (this.numSites - 1 || 1);
             const color = this.palette.get(t);
 
