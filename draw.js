@@ -448,6 +448,84 @@ export const Plot = {
     }
   },
 
+  PlanarLine: class {
+    /**
+     * Draws a line that is straight in the Azimuthal Equidistant projection centered at 'center'.
+     * @param {Object} pipeline - Render pipeline.
+     * @param {THREE.Vector3} v1 - Start point (normalized).
+     * @param {THREE.Vector3} v2 - End point (normalized).
+     * @param {THREE.Vector3} center - Center of projection (normalized).
+     * @param {Function} colorFn - (t) => {color, alpha}.
+     */
+    static draw(pipeline, v1, v2, center, colorFn) {
+      // Basis for projection
+      let refAxis = Daydream.X_AXIS;
+      if (Math.abs(center.dot(refAxis)) > 0.9999) {
+        refAxis = Daydream.Y_AXIS;
+      }
+      const v = center.clone(); // The 'pole'
+
+      const project = (p) => {
+        const d = p.dot(v);
+        const R = Math.acos(Math.min(1, Math.max(-1, d)));
+        if (R < 0.0001) return new THREE.Vector2(0, 0);
+
+        // Direction perpendicular to v
+        const p_perp = p.clone().sub(v.clone().multiplyScalar(d)).normalize();
+
+        const ref = Math.abs(v.dot(Daydream.X_AXIS)) > 0.9 ? Daydream.Y_AXIS : Daydream.X_AXIS;
+        const u = new THREE.Vector3().crossVectors(v, ref).normalize();
+        const w = new THREE.Vector3().crossVectors(v, u).normalize();
+
+        const x = p.dot(u);
+        const y = p.dot(w);
+        const theta = Math.atan2(y, x);
+
+        return new THREE.Vector2(R * Math.cos(theta), R * Math.sin(theta));
+      };
+
+      const p1 = project(v1);
+      const p2 = project(v2);
+
+      const dist = p1.distanceTo(p2);
+      const numSteps = Math.max(2, Math.ceil(dist * Daydream.W / (2 * Math.PI)));
+
+      let pTemp = new THREE.Vector3();
+
+      // We need the basis again for unproject
+      const ref = Math.abs(v.dot(Daydream.X_AXIS)) > 0.9 ? Daydream.Y_AXIS : Daydream.X_AXIS;
+      const u = new THREE.Vector3().crossVectors(v, ref).normalize();
+      const w = new THREE.Vector3().crossVectors(v, u).normalize();
+
+      for (let i = 0; i < numSteps; i++) {
+        const t = i / (numSteps - 1);
+        const Px = p1.x + (p2.x - p1.x) * t;
+        const Py = p1.y + (p2.y - p1.y) * t;
+
+        const R = Math.sqrt(Px * Px + Py * Py);
+        const theta = Math.atan2(Py, Px);
+
+        let point = v.clone();
+        if (R > 0.0001) {
+          const sinR = Math.sin(R);
+          const cosR = Math.cos(R);
+          const cosT = Math.cos(theta);
+          const sinT = Math.sin(theta);
+
+          // dir = u*cosT + w*sinT
+          const dir = u.clone().multiplyScalar(cosT).addScaledVector(w, sinT).normalize();
+          // p = v*cosR + dir*sinR
+          point.multiplyScalar(cosR).addScaledVector(dir, sinR).normalize();
+        }
+
+        const c = colorFn(t);
+        const color = c.isColor ? c : (c.color || c);
+        const alpha = c.alpha !== undefined ? c.alpha : 1.0;
+        pipeline.plot(point, color, 0, alpha);
+      }
+    }
+  },
+
   Polygon: class {
     /**
      * Draws a polygon on the sphere surface.
@@ -461,63 +539,18 @@ export const Plot = {
      */
     static draw(pipeline, orientationQuaternion, normal, radius, numSides, colorFn, phase = 0) {
       const points = Plot.Polygon.sample(orientationQuaternion, normal, radius, numSides, phase);
-      rasterize(pipeline, points, colorFn, true);
+      const center = normal.clone().applyQuaternion(orientationQuaternion).normalize();
+      for (let i = 0; i < points.length; i++) {
+        const p1 = points[i];
+        const p2 = points[(i + 1) % points.length];
+        Plot.PlanarLine.draw(pipeline, p1, p2, center, (t) => colorFn(p1, t));
+      }
     }
 
     static sample(orientationQuaternion, normal, radius, numSides, phase = 0) {
-      // Planar Polygon Logic (Azimuthal Equidistant)
-      const thickness = radius * (Math.PI / 2);
-      const angle = Math.PI / numSides;
-      const apothem = thickness * Math.cos(angle);
-
-      // Basis
-      let refAxis = Daydream.X_AXIS;
-      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
-        refAxis = Daydream.Y_AXIS;
-      }
-      const v = normal.clone().applyQuaternion(orientationQuaternion).normalize();
-      const ref = refAxis.clone().applyQuaternion(orientationQuaternion).normalize();
-      const u = new THREE.Vector3().crossVectors(v, ref).normalize();
-      const w = new THREE.Vector3().crossVectors(v, u).normalize();
-
-      // Backside rings handling (mirroring normal if radius > 1)
-      let vSign = 1.0;
-      if (radius > 1) {
-        vSign = -1.0;
-        radius = 2 - radius;
-      }
-
-      // Sample points along the planar polygon boundary
-      const points = [];
-      const numSamples = Math.max(numSides * 32, Daydream.W / 2); // High resolution
-      const step = 2 * Math.PI / numSamples;
-
-      for (let i = 0; i < numSamples; i++) {
-        const theta = i * step + phase;
-
-        // Calculate polar angle (R) for the polygon boundary at azimuth theta
-        const sectorAngle = 2 * Math.PI / numSides;
-        const localAzimuth = wrap(theta + sectorAngle / 2, sectorAngle) - sectorAngle / 2;
-        // Boundary: R * cos(local) = apothem => R = apothem / cos(local)
-        const R_planar = apothem / Math.cos(localAzimuth);
-
-        // Spherical Point Construction
-        // p = normal * cos(R) + dir * sin(R)
-        const sinR = Math.sin(R_planar);
-        const cosR = Math.cos(R_planar);
-
-        const cosTheta = Math.cos(theta);
-        const sinTheta = Math.sin(theta);
-
-        // dir = u*cos + w*sin
-        const dir = u.clone().multiplyScalar(cosTheta).addScaledVector(w, sinTheta).normalize();
-
-        // p = v*cosR + dir*sinR
-        const p = v.clone().multiplyScalar(vSign * cosR).addScaledVector(dir, sinR).normalize();
-
-        points.push(p);
-      }
-      return points;
+      // Offset by half-sector to align with Scan.Polygon edges
+      const offset = Math.PI / numSides;
+      return Plot.Ring.sample(orientationQuaternion, normal, radius, numSides, phase + offset);
     }
   },
 
@@ -1029,7 +1062,7 @@ export const Scan = {
       const ny = normal.y;
       const nz = normal.z;
 
-      // --- 1. Construct Basis for Azimuth/Angle checks ---
+      // Basis
       let ref = new THREE.Vector3(1, 0, 0); // X_AXIS
       if (Math.abs(normal.dot(ref)) > 0.9999) {
         ref.set(0, 1, 0); // Y_AXIS
