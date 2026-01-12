@@ -124,8 +124,7 @@ export class Comets {
         for (const node of this.nodes) {
             node.trail.record(node.orientation);
 
-            const dt = 1.0 / this.cycleDuration;
-            deepTween(node.trail, dt, (q, t) => {
+            deepTween(node.trail, (q, t) => {
                 if (t > 1.0) return;
                 const color4 = this.palette.get(t);
                 color4.alpha = color4.alpha * this.alpha * quinticKernel(1 - t);

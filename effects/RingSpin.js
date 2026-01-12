@@ -66,10 +66,9 @@ export class RingSpin {
         this.renderPlanes.length = 0;
 
         const pipeline = createRenderPipeline();
-        const dt = 1.0 / this.trailLength;
         for (const ring of this.rings) {
             ring.trail.record(ring.orientation);
-            deepTween(ring.trail, dt, (q, t) => {
+            deepTween(ring.trail, (q, t) => {
                 if (t > 1.0) return;
                 const c = ring.palette.get(t);
                 c.alpha = c.alpha * this.alpha;
