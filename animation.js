@@ -588,7 +588,7 @@ export class Rotation extends Animation {
   }
 }
 
-export class ComposedRotation extends Animation {
+export class ComposedAnimation extends Animation {
 
   /**
    * @param {Orientation} orientation Target orientation.
@@ -599,73 +599,65 @@ export class ComposedRotation extends Animation {
     super(duration, repeat);
     this.orientation = orientation;
     this.layers = [];
-
-    // Temps
-    this._qLayer = new THREE.Quaternion();
-    this._qTotal = new THREE.Quaternion();
-    this._qPrev = new THREE.Quaternion();
   }
 
   /**
-   * Adds a rotation layer to the hierarchy.
-   * @param {Vector3} axis Axis of rotation.
-   * @param {number} totalAngle Total radians to rotate over the duration (e.g. Math.PI * 2).
-   * @param {function} easingFn Easing function (t => val). Defaults to Linear.
+   * Adds a sub-animation layer.
+   * @param {Animation} animation The animation to add.
    */
-  rotate(axis, totalAngle, easingFn = Easing.Linear) {
-    this.layers.push({
-      axis: axis.clone().normalize(),
-      totalAngle: totalAngle,
-      easing: easingFn
-    });
+  add(animation) {
+    // Create a proxy orientation for the sub-animation to operate on.
+    // It starts at Identity.
+    const proxy = new Orientation();
+
+    // Inject the proxy into the animation.
+    // Most Animations store their target orientation in 'this.orientation'.
+    if (animation.orientation !== undefined) {
+      animation.orientation = proxy;
+    } else {
+      console.warn("ComposedAnimation: Added animation does not have an 'orientation' property.");
+    }
+
+    this.layers.push({ animation, proxy });
     return this;
+  }
+
+
+  rewind() {
+    super.rewind();
+    for (const layer of this.layers) {
+      layer.animation.rewind();
+      // Reset proxy to Identity
+      layer.proxy.set(new THREE.Quaternion(0, 0, 0, 1));
+    }
   }
 
   step() {
     super.step();
 
-    // 1. Snapshot previous state (for motion blur calculation)
-    this.orientation.collapse();
-    this._qPrev.copy(this.orientation.get());
-
-    // 2. Calculate Target for current frame
-    // Normalize time to 0.0 -> 1.0 range based on duration
-    const progress = Math.min(1.0, this.t / this.duration);
-    const endQ = this._calculateTotalRotation(progress);
-
-    // 3. Smart Motion Blur (Sub-stepping)
-    const dist = this._qPrev.angleTo(endQ);
-    const pixelRad = (2 * Math.PI) / (Daydream.W || 96);
-    const steps = Math.ceil(dist / pixelRad);
-
-    for (let i = 1; i <= steps; ++i) {
-      const subT = i / steps;
-
-      // Calculate exact sub-frame time (e.g. frame 10.5)
-      // Then normalize it to 0.0 -> 1.0 range
-      const absoluteTime = (this.t - 1) + subT;
-      const subProgress = Math.min(1.0, absoluteTime / this.duration);
-
-      const subQ = this._calculateTotalRotation(subProgress);
-      this.orientation.push(subQ);
+    // 1. Step all layers
+    for (const layer of this.layers) {
+      // Ensure proxy history doesn't grow indefinitely, keep it minimal
+      layer.proxy.collapse();
+      layer.animation.step();
     }
-  }
 
-  _calculateTotalRotation(progress) {
-    this._qTotal.identity();
+    // 2. Compose Rotations
+    // We multiply them in order: Layer 0 * Layer 1 * ...
+    // This effectively applies transforms: L0 * (L1 * (...))
+    // So L0 is "Parent", L_last is "Child" (closest to object vertex).
+
+    const totalQ = new THREE.Quaternion(); // Identity
 
     for (const layer of this.layers) {
-      // Apply the layer's specific easing to the time
-      const easedT = layer.easing(progress);
-
-      // Determine the angle for this specific moment
-      const angle = layer.totalAngle * easedT;
-
-      this._qLayer.setFromAxisAngle(layer.axis, angle);
-      this._qTotal.multiply(this._qLayer); // FK Composition (Parent * Child)
+      // Get the latest orientation from this layer (relative to Identity)
+      const q = layer.proxy.get();
+      totalQ.multiply(q);
     }
 
-    return this._qTotal.clone();
+    // 3. Apply to target
+    this.orientation.collapse();
+    this.orientation.push(totalQ);
   }
 }
 
@@ -676,15 +668,16 @@ export class RandomWalk extends Animation {
   /**
    * @param {Orientation} orientation - The orientation to animate.
    * @param {THREE.Vector3} v_start - The starting vector.
+   * @param {number} [seed] - Optional seed for the noise generator.
    */
-  constructor(orientation, v_start) {
+  constructor(orientation, v_start, seed) {
     super(-1, false);
     this.orientation = orientation;
     this.v = v_start.clone();
 
     this.noise = new FastNoiseLite();
     this.noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
-    this.noise.SetSeed(Math.floor(Math.random() * 65535));
+    this.noise.SetSeed(seed !== undefined ? seed : Math.floor(Math.random() * 65535));
 
     this.WALK_SPEED = 0.05; // Constant angular speed (radians per step)
     this.PIVOT_STRENGTH = 0.4; // Max pivot angle (radians per step)
