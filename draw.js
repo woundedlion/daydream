@@ -460,15 +460,70 @@ export const Plot = {
      * @param {number} [phase=0] - Starting phase.
      */
     static draw(pipeline, orientationQuaternion, normal, radius, numSides, colorFn, phase = 0) {
-      const points = Plot.Ring.sample(orientationQuaternion, normal, radius, numSides, phase);
+      const points = Plot.Polygon.sample(orientationQuaternion, normal, radius, numSides, phase);
       rasterize(pipeline, points, colorFn, true);
     }
+
     static sample(orientationQuaternion, normal, radius, numSides, phase = 0) {
-      return Plot.Ring.sample(orientationQuaternion, normal, radius, numSides, phase);
+      // Planar Polygon Logic (Azimuthal Equidistant)
+      const thickness = radius * (Math.PI / 2);
+      const angle = Math.PI / numSides;
+      const apothem = thickness * Math.cos(angle);
+
+      // Basis
+      let refAxis = Daydream.X_AXIS;
+      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
+        refAxis = Daydream.Y_AXIS;
+      }
+      const v = normal.clone().applyQuaternion(orientationQuaternion).normalize();
+      const ref = refAxis.clone().applyQuaternion(orientationQuaternion).normalize();
+      const u = new THREE.Vector3().crossVectors(v, ref).normalize();
+      const w = new THREE.Vector3().crossVectors(v, u).normalize();
+
+      // Backside rings handling (mirroring normal if radius > 1)
+      let vSign = 1.0;
+      if (radius > 1) {
+        vSign = -1.0;
+        radius = 2 - radius;
+      }
+
+      // Sample points along the planar polygon boundary
+      const points = [];
+      const numSamples = Math.max(numSides * 32, Daydream.W / 2); // High resolution
+      const step = 2 * Math.PI / numSamples;
+
+      for (let i = 0; i < numSamples; i++) {
+        const theta = i * step + phase;
+
+        // Calculate polar angle (R) for the polygon boundary at azimuth theta
+        const sectorAngle = 2 * Math.PI / numSides;
+        const localAzimuth = wrap(theta + sectorAngle / 2, sectorAngle) - sectorAngle / 2;
+        // Boundary: R * cos(local) = apothem => R = apothem / cos(local)
+        const R_planar = apothem / Math.cos(localAzimuth);
+
+        // Spherical Point Construction
+        // p = normal * cos(R) + dir * sin(R)
+        const sinR = Math.sin(R_planar);
+        const cosR = Math.cos(R_planar);
+
+        const cosTheta = Math.cos(theta);
+        const sinTheta = Math.sin(theta);
+
+        // dir = u*cos + w*sin
+        const dir = u.clone().multiplyScalar(cosTheta).addScaledVector(w, sinTheta).normalize();
+
+        // p = v*cosR + dir*sinR
+        const p = v.clone().multiplyScalar(vSign * cosR).addScaledVector(dir, sinR).normalize();
+
+        points.push(p);
+      }
+      return points;
     }
   },
 
   DistortedRing: class {
+
+
     /**
      * Calculates a single point on a sphere distorted by a function.
      * @param {Function} f - The shift function.
@@ -589,10 +644,8 @@ export const Plot = {
         pipeline.plot(v, color, 0, alpha);
       }
     }
-  },
+  }
 
-  tween: tween,
-  rasterize: rasterize
 };
 
 export const Scan = {
@@ -732,6 +785,13 @@ export const Scan = {
     static scanWindow(y, t1, t2, ctx) {
       const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
       const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
+
+      // Prevent double scanning if window >= 2pi
+      if (x2 - x1 >= Daydream.W) {
+        Scan.DistortedRing.scanFullRow(y, ctx);
+        return;
+      }
+
       for (let x = x1; x <= x2; x++) {
         const wx = wrap(x, Daydream.W);
         Scan.DistortedRing.processPixel(XY(wx, y), wx, y, ctx);
@@ -773,6 +833,181 @@ export const Scan = {
 
         ctx.pipeline.plot2D(x, y, color, 0, baseAlpha * aaAlpha);
       }
+    }
+  },
+
+  Polygon: class {
+    /**
+     * Scans a regular polygon with soft edges.
+     * @param {Object} pipeline - Render pipeline.
+     * @param {THREE.Quaternion} orientation - Orientation.
+     * @param {THREE.Vector3} normal - Center normal.
+     * @param {number} radius - Circumradius (0-2).
+     * @param {number} sides - Number of sides.
+     * @param {Function} colorFn - (pos, t, dist) => {color, alpha}.
+     * @param {Object} options - Options.
+     */
+    static draw(pipeline, orientation, normal, radius, sides, colorFn, options = {}) {
+      const thickness = radius * (Math.PI / 2); // Map 0-1 radius to 0-PI/2 angle
+      if (thickness <= 0.0001) return;
+
+      // Basis Construction
+      let refAxis = Daydream.X_AXIS;
+      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
+        refAxis = Daydream.Y_AXIS;
+      }
+      const v = normal.clone().applyQuaternion(orientation).normalize();
+      const ref = refAxis.clone().applyQuaternion(orientation).normalize();
+      const u = new THREE.Vector3().crossVectors(v, ref).normalize();
+      const w = new THREE.Vector3().crossVectors(v, u).normalize();
+
+      const nx = v.x;
+      const ny = v.y;
+      const nz = v.z;
+
+      const R = Math.sqrt(nx * nx + nz * nz);
+      const alpha = Math.atan2(nx, nz);
+
+      const angle = Math.PI / sides;
+      const apothem = thickness * Math.cos(angle);
+
+      const pixelWidth = 2 * Math.PI / Daydream.W;
+
+      const ctx = {
+        normal: v, radius, thickness, sides, apothem, colorFn,
+        nx, ny, nz, u, w,
+        R, alpha,
+        pipeline,
+        pixelWidth,
+        debugBB: options.debugBB
+      };
+
+      const targetAngle = 0;
+      const centerPhi = Math.acos(ny);
+      const a1 = centerPhi - targetAngle;
+      const a2 = centerPhi + targetAngle;
+      const phiMin = Math.max(0, centerPhi - thickness - pixelWidth);
+      const phiMax = Math.min(Math.PI, centerPhi + thickness + pixelWidth);
+
+      if (phiMin > phiMax) return;
+
+      const yMin = Math.max(0, Math.floor((phiMin * (Daydream.H - 1)) / Math.PI));
+      const yMax = Math.min(Daydream.H - 1, Math.ceil((phiMax * (Daydream.H - 1)) / Math.PI));
+
+      for (let y = yMin; y <= yMax; y++) {
+        Scan.Polygon.scanRow(y, ctx);
+      }
+    }
+
+    static scanRow(y, ctx) {
+      // Bounding Circle Optimization
+      const phi = yToPhi(y);
+      const cosPhi = Math.cos(phi);
+      const sinPhi = Math.sin(phi);
+
+      // If near pole or singularity, scan full row (conservative)
+      if (ctx.R < 0.01) {
+        Scan.Polygon.scanFullRow(y, ctx);
+        return;
+      }
+
+      const ang_low = 0;
+      const ang_high = ctx.thickness;
+      const D_max = 1.0;
+      const D_min = Math.cos(ang_high);
+
+      const denom = ctx.R * sinPhi;
+      if (Math.abs(denom) < 0.000001) {
+        Scan.Polygon.scanFullRow(y, ctx);
+        return;
+      }
+
+      const C_min = (D_min - ctx.ny * cosPhi) / denom;
+      if (C_min > 1.0) return; // Outside cap
+      if (C_min < -1.0) {
+        Scan.Polygon.scanFullRow(y, ctx);
+        return;
+      }
+
+      const dAlpha = Math.acos(C_min);
+      Scan.Polygon.scanWindow(y, ctx.alpha - dAlpha, ctx.alpha + dAlpha, ctx);
+    }
+
+    static scanFullRow(y, ctx) {
+      for (let x = 0; x < Daydream.W; x++) {
+        Scan.Polygon.processPixel(XY(x, y), x, y, ctx);
+      }
+    }
+
+    static scanWindow(y, t1, t2, ctx) {
+      const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
+      const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
+
+      // Prevent double scanning if window >= 2pi
+      if (x2 - x1 >= Daydream.W) {
+        Scan.Polygon.scanFullRow(y, ctx);
+        return;
+      }
+
+      for (let x = x1; x <= x2; x++) {
+        const wx = wrap(x, Daydream.W);
+        Scan.Polygon.processPixel(XY(wx, y), wx, y, ctx);
+      }
+    }
+
+    static processPixel(i, x, y, ctx) {
+      if (ctx.debugBB) {
+        Daydream.pixels[i].r += 0.2;
+        Daydream.pixels[i].g += 0.2;
+        Daydream.pixels[i].b += 0.2;
+      }
+      const p = Daydream.pixelPositions[i];
+      const polarAngle = angleBetween(p, ctx.normal);
+
+      if (polarAngle > ctx.thickness + ctx.pixelWidth) return;
+
+      const dotU = p.dot(ctx.u);
+      const dotW = p.dot(ctx.w);
+      let azimuth = Math.atan2(dotW, dotU);
+      if (azimuth < 0) azimuth += 2 * Math.PI;
+
+      // SDF Logic
+      const sectorAngle = 2 * Math.PI / ctx.sides;
+      // Rotate azimuth so edge is perp to x-axis
+      const localAzimuth = wrap(azimuth + sectorAngle / 2, sectorAngle) - sectorAngle / 2;
+      const distToEdge = polarAngle * Math.cos(localAzimuth) - ctx.apothem;
+
+      if (distToEdge < ctx.pixelWidth) {
+        // AA
+        let alpha = 1.0;
+        if (distToEdge > -ctx.pixelWidth) {
+          const t = (distToEdge + ctx.pixelWidth) / (2 * ctx.pixelWidth);
+          alpha = quinticKernel(1.0 - t);
+        }
+
+        const t = polarAngle / ctx.thickness; // Normalized distance from center
+        const c = ctx.colorFn(p, t, distToEdge);
+        const color = c.isColor ? c : (c.color || c);
+        const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
+
+        ctx.pipeline.plot2D(x, y, color, 0, baseAlpha * alpha);
+      }
+    }
+  },
+
+  Circle: class {
+    /**
+     * Scans a solid circle (disk) on the sphere.
+     * @param {Object} pipeline - Render pipeline.
+     * @param {THREE.Vector3} normal - Center of the circle.
+     * @param {number} radius - Angular radius (0-2).
+     * @param {Function} colorFn - (pos, t, dist) => {color, alpha}.
+     * @param {Object} options - Options.
+     */
+    static draw(pipeline, normal, radius, colorFn, options = {}) {
+      // A circle is a ring with radius 0 and thickness = radius
+      const thickness = radius * (Math.PI / 2);
+      Scan.Ring.draw(pipeline, normal, 0, thickness, colorFn, 0, 2 * Math.PI, options);
     }
   },
 
@@ -897,6 +1132,13 @@ export const Scan = {
     static scanWindow(y, t1, t2, ctx) {
       const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
       const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
+
+      // Prevent double scanning if window >= 2pi
+      if (x2 - x1 >= Daydream.W) {
+        Scan.Ring.scanFullRow(y, ctx);
+        return;
+      }
+
       for (let x = x1; x <= x2; x++) {
         const wx = wrap(x, Daydream.W);
         Scan.Ring.processPixel(XY(wx, y), wx, y, ctx);
