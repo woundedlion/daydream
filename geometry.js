@@ -47,7 +47,6 @@ export class Dot {
       this.alpha = alpha;
     }
   }
-  // ... Dot class definition ...
 }
 
 

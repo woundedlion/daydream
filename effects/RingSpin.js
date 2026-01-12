@@ -18,7 +18,7 @@ import {
 } from "../animation.js";
 import { Scan } from "../draw.js";
 import { createRenderPipeline } from "../filters.js";
-import { tween, dotPool } from "../draw.js";
+import { tween, deepTween, dotPool } from "../draw.js";
 
 export class RingSpin {
     static Ring = class {
@@ -52,7 +52,7 @@ export class RingSpin {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01).name("Brightness");
         this.gui.add(this, 'thickness').min(0.01).max(0.5).step(0.01).name("Brush Size");
-        this.gui.add(this, 'debugBB').name('Show Bounding Boxes'); // Restored
+        this.gui.add(this, 'debugBB').name('Show Bounding Boxes');
     }
 
     spawnRing(normal, palette) {
@@ -66,23 +66,19 @@ export class RingSpin {
         this.renderPlanes.length = 0;
 
         const pipeline = createRenderPipeline();
-
+        const dt = 1.0 / this.trailLength;
         for (const ring of this.rings) {
             ring.trail.record(ring.orientation);
-            tween(ring.trail, (snapshot, t) => {
-                tween(snapshot, (q, subT) => {
-                    if (t > 1.0) return;
-                    const c = ring.palette.get(t);
-                    c.alpha = c.alpha * this.alpha;
-
-                    // Store for rendering
-                    const dot = dotPool.acquire();
-                    dot.position.copy(ring.normal).applyQuaternion(q);
-                    dot.color = c.color;
-                    dot.alpha = c.alpha;
-                    dot.t = t; // Store t for material function if needed
-                    this.renderPlanes.push(dot);
-                });
+            deepTween(ring.trail, dt, (q, t) => {
+                if (t > 1.0) return;
+                const c = ring.palette.get(t);
+                c.alpha = c.alpha * this.alpha;
+                const dot = dotPool.acquire();
+                dot.position.copy(ring.normal).applyQuaternion(q);
+                dot.color = c.color;
+                dot.alpha = c.alpha;
+                dot.t = t;
+                this.renderPlanes.push(dot);
             });
         }
 

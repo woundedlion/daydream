@@ -74,11 +74,7 @@ export class Portholes {
 
     drawLayer(isInterference) {
         let lines = [];
-
-        // Map Dodecahedron vertices to Vector3
         const vertices = this.dodecahedron.vertices.map(v => new THREE.Vector3(...v).normalize());
-
-        // Apply deformation if interference
         if (isInterference) {
             vertices.forEach((p, i) => {
                 // Create basis for tangent plane
@@ -90,16 +86,11 @@ export class Portholes {
                 const phase = i * 0.1;
                 const angle = this.t * this.offsetSpeed.get() * 2 * Math.PI + phase;
                 const r = this.offsetRadius.get();
-
-                // Calculate offset vector
                 const offset = u.clone().multiplyScalar(Math.cos(angle)).add(v.clone().multiplyScalar(Math.sin(angle))).multiplyScalar(r);
-
-                // Apply offset to normal (approximate, spherical surface constraint handled by normalization)
                 p.add(offset).normalize();
             });
         }
 
-        // Draw edges
         this.dodecahedron.edges.forEach((adj, i) => {
             adj.forEach(j => {
                 if (i < j) {

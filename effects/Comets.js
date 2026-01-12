@@ -10,7 +10,7 @@ import {
     Orientation, lissajous, randomVector, vectorToPixel, vectorPool
 } from "../geometry.js";
 import {
-    Path, dotPool, Plot, tween
+    Path, dotPool, Plot, tween, deepTween
 } from "../draw.js";
 import {
     GenerativePalette, blendAlpha, color4Pool
@@ -124,21 +124,20 @@ export class Comets {
         for (const node of this.nodes) {
             node.trail.record(node.orientation);
 
-            tween(node.trail, (snapshot, t) => {
-                tween(snapshot, (q, subT) => {
-                    if (t > 1.0) return;
-                    const color4 = this.palette.get(t);
-                    color4.alpha = color4.alpha * this.alpha * quinticKernel(1 - t);
-                    const v = vectorPool.acquire().copy(node.v).applyQuaternion(q);
-                    const orientedV = this.orientation.orient(v);
+            const dt = 1.0 / this.cycleDuration;
+            deepTween(node.trail, dt, (q, t) => {
+                if (t > 1.0) return;
+                const color4 = this.palette.get(t);
+                color4.alpha = color4.alpha * this.alpha * quinticKernel(1 - t);
+                const v = vectorPool.acquire().copy(node.v).applyQuaternion(q);
+                const orientedV = this.orientation.orient(v);
 
-                    const dot = dotPool.acquire();
-                    dot.position.copy(orientedV);
-                    dot.color = color4.color;
-                    dot.alpha = color4.alpha;
+                const dot = dotPool.acquire();
+                dot.position.copy(orientedV);
+                dot.color = color4.color;
+                dot.alpha = color4.alpha;
 
-                    this.renderPoints.push(dot);
-                });
+                this.renderPoints.push(dot);
             });
         }
 
