@@ -36,6 +36,7 @@ export class TestFSRing {
         this.numRings = 1;
         this.timeline = new Timeline();
         this.radius = 1.0;
+        this.sides = 6;
         this.debugBB = false;
 
         for (let i = 0; i < this.numRings; ++i) {
@@ -51,7 +52,8 @@ export class TestFSRing {
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01).name("Brightness");
         this.gui.add(this, 'thickness').min(0.01).max(0.5).step(0.01).name("Brush Size");
         this.gui.add(this, 'radius').min(0).max(2).step(0.01).name("Radius");
-        this.gui.add(this, 'debugBB').name('Show Bounding Boxes'); // Restored
+        this.gui.add(this, 'sides').min(3).max(12).step(1).name("Sides"); // Added sides control
+        this.gui.add(this, 'debugBB').name('Show Bounding Boxes');
     }
 
     spawnRing(normal, palette) {
@@ -66,10 +68,11 @@ export class TestFSRing {
         const pipeline = createRenderPipeline();
 
         for (const ring of this.rings) {
-            const colorFn = () => {
-                return ring.palette.get(0.5);
+            const colorFn = (p, t, dist) => {
+                return ring.palette.get(0.5); // Still flat color for now
             }
-            Scan.Ring.draw(pipeline, ring.orientation.orient(ring.normal), this.radius, this.thickness, colorFn, 0, 2 * Math.PI, { debugBB: this.debugBB });
+            // Use Scan.Polygon
+            Scan.Polygon.draw(pipeline, ring.orientation.get(), this.normal || ring.normal, this.radius, this.sides, colorFn, { debugBB: this.debugBB });
         }
     }
 }

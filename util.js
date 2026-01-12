@@ -99,3 +99,15 @@ export const randomChoice = (choices) => {
 export function randomBetween(a, b) {
   return Math.random() * (b - a) + a;
 }
+
+/**
+ * Perform Hermite interpolation between two values.
+ * @param {number} min - Lower bound.
+ * @param {number} max - Upper bound.
+ * @param {number} x - Value to interpolate.
+ * @returns {number} Interpolated value [0, 1].
+ */
+export function smoothstep(min, max, x) {
+  x = Math.max(0, Math.min(1, (x - min) / (max - min)));
+  return x * x * (3 - 2 * x);
+}
