@@ -464,6 +464,9 @@ export const Plot = {
         refAxis = Daydream.Y_AXIS;
       }
       const v = center.clone(); // The 'pole'
+      const ref = Math.abs(v.dot(Daydream.X_AXIS)) > 0.9 ? Daydream.Y_AXIS : Daydream.X_AXIS;
+      const u = new THREE.Vector3().crossVectors(v, ref).normalize();
+      const w = new THREE.Vector3().crossVectors(v, u).normalize();
 
       const project = (p) => {
         const d = p.dot(v);
@@ -472,10 +475,6 @@ export const Plot = {
 
         // Direction perpendicular to v
         const p_perp = p.clone().sub(v.clone().multiplyScalar(d)).normalize();
-
-        const ref = Math.abs(v.dot(Daydream.X_AXIS)) > 0.9 ? Daydream.Y_AXIS : Daydream.X_AXIS;
-        const u = new THREE.Vector3().crossVectors(v, ref).normalize();
-        const w = new THREE.Vector3().crossVectors(v, u).normalize();
 
         const x = p.dot(u);
         const y = p.dot(w);
@@ -491,11 +490,6 @@ export const Plot = {
       const numSteps = Math.max(2, Math.ceil(dist * Daydream.W / (2 * Math.PI)));
 
       let pTemp = new THREE.Vector3();
-
-      // We need the basis again for unproject
-      const ref = Math.abs(v.dot(Daydream.X_AXIS)) > 0.9 ? Daydream.Y_AXIS : Daydream.X_AXIS;
-      const u = new THREE.Vector3().crossVectors(v, ref).normalize();
-      const w = new THREE.Vector3().crossVectors(v, u).normalize();
 
       for (let i = 0; i < numSteps; i++) {
         const t = i / (numSteps - 1);
