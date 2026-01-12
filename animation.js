@@ -495,11 +495,13 @@ export class Motion extends Animation {
    * @param {Path} path - The path to follow.
    * @param {number} duration - Duration of the motion.
    * @param {boolean} [repeat=false] - Whether to repeat.
+   * @param {string} [space="World"] - "World" or "Local".
    */
-  constructor(orientation, path, duration, repeat = false) {
+  constructor(orientation, path, duration, repeat = false, space = "World") {
     super(duration, repeat);
     this.orientation = orientation;
     this.path = path;
+    this.space = space;
   }
 
   step() {
@@ -517,7 +519,10 @@ export class Motion extends Animation {
       const stepAngle = angleBetween(currentV, nextV);
       if (stepAngle > 0.000001) {
         const stepAxis = new THREE.Vector3().crossVectors(currentV, nextV).normalize();
-        const q = new THREE.Quaternion().setFromAxisAngle(stepAxis, stepAngle);
+
+        const rotAxis = (this.space === "Local") ? this.orientation.orient(stepAxis) : stepAxis;
+        const q = new THREE.Quaternion().setFromAxisAngle(rotAxis, stepAngle);
+
         origin = origin.clone().premultiply(q);
         this.orientation.push(origin);
       }
@@ -543,26 +548,35 @@ export class Rotation extends Animation {
    * @param {number} angle 
    * @param {Function} easingFn 
    */
-  static animate(orientation, axis, angle, easingFn) {
-    let r = new Rotation(orientation, axis, angle, 1, easingFn, false);
+  /**
+   * Static helper for a one-shot rotation.
+   * @param {Orientation} orientation 
+   * @param {THREE.Vector3} axis 
+   * @param {number} angle 
+   * @param {Function} easingFn 
+   * @param {string} [space="World"]
+   */
+  static animate(orientation, axis, angle, easingFn, space) {
+    let r = new Rotation(orientation, axis, angle, 1, easingFn, false, space);
     r.step();
   }
 
   /**
-   * @param {Orientation} orientation - The orientation to rotate.
    * @param {THREE.Vector3} axis - Axis of rotation.
    * @param {number} angle - Total angle to rotate.
    * @param {number} duration - Duration.
    * @param {Function} easingFn - Easing function.
    * @param {boolean} [repeat=false] - Whether to repeat.
+   * @param {string} [space="World"] - "World" or "Local".
    */
-  constructor(orientation, axis, angle, duration, easingFn, repeat = false) {
+  constructor(orientation, axis, angle, duration, easingFn, repeat = false, space = "World") {
     super(duration, repeat);
     this.orientation = orientation;
     this.axis = axis;
     this.totalAngle = angle;
     this.easingFn = easingFn;
     this.last_angle = 0.0;
+    this.space = space;
   }
 
   step() {
@@ -577,7 +591,10 @@ export class Rotation extends Animation {
     if (Math.abs(delta) > 0.0001) {
       const numSteps = Math.ceil(Math.abs(delta) / Rotation.MAX_ANGLE);
       const stepAngle = delta / numSteps;
-      const qStep = new THREE.Quaternion().setFromAxisAngle(this.axis, stepAngle);
+
+      const rotAxis = (this.space === "Local") ? this.orientation.orient(this.axis) : this.axis;
+      const qStep = new THREE.Quaternion().setFromAxisAngle(rotAxis, stepAngle);
+
       for (let i = 0; i < numSteps; i++) {
         let currentQ = this.orientation.get().clone();
         currentQ.premultiply(qStep).normalize();
@@ -585,79 +602,6 @@ export class Rotation extends Animation {
       }
       this.last_angle = targetAngle;
     }
-  }
-}
-
-export class ComposedAnimation extends Animation {
-
-  /**
-   * @param {Orientation} orientation Target orientation.
-   * @param {number} duration Duration in frames.
-   * @param {boolean} repeat Whether to loop the animation.
-   */
-  constructor(orientation, duration, repeat = true) {
-    super(duration, repeat);
-    this.orientation = orientation;
-    this.layers = [];
-  }
-
-  /**
-   * Adds a sub-animation layer.
-   * @param {Animation} animation The animation to add.
-   */
-  add(animation) {
-    // Create a proxy orientation for the sub-animation to operate on.
-    // It starts at Identity.
-    const proxy = new Orientation();
-
-    // Inject the proxy into the animation.
-    // Most Animations store their target orientation in 'this.orientation'.
-    if (animation.orientation !== undefined) {
-      animation.orientation = proxy;
-    } else {
-      console.warn("ComposedAnimation: Added animation does not have an 'orientation' property.");
-    }
-
-    this.layers.push({ animation, proxy });
-    return this;
-  }
-
-
-  rewind() {
-    super.rewind();
-    for (const layer of this.layers) {
-      layer.animation.rewind();
-      // Reset proxy to Identity
-      layer.proxy.set(new THREE.Quaternion(0, 0, 0, 1));
-    }
-  }
-
-  step() {
-    super.step();
-
-    // 1. Step all layers
-    for (const layer of this.layers) {
-      // Ensure proxy history doesn't grow indefinitely, keep it minimal
-      layer.proxy.collapse();
-      layer.animation.step();
-    }
-
-    // 2. Compose Rotations
-    // We multiply them in order: Layer 0 * Layer 1 * ...
-    // This effectively applies transforms: L0 * (L1 * (...))
-    // So L0 is "Parent", L_last is "Child" (closest to object vertex).
-
-    const totalQ = new THREE.Quaternion(); // Identity
-
-    for (const layer of this.layers) {
-      // Get the latest orientation from this layer (relative to Identity)
-      const q = layer.proxy.get();
-      totalQ.multiply(q);
-    }
-
-    // 3. Apply to target
-    this.orientation.collapse();
-    this.orientation.push(totalQ);
   }
 }
 
@@ -669,11 +613,13 @@ export class RandomWalk extends Animation {
    * @param {Orientation} orientation - The orientation to animate.
    * @param {THREE.Vector3} v_start - The starting vector.
    * @param {number} [seed] - Optional seed for the noise generator.
+   * @param {string} [space="World"] - "World" or "Local".
    */
-  constructor(orientation, v_start, seed) {
+  constructor(orientation, v_start, seed, space = "World") {
     super(-1, false);
     this.orientation = orientation;
     this.v = v_start.clone();
+    this.space = space;
 
     this.noise = new FastNoiseLite();
     this.noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
@@ -703,7 +649,7 @@ export class RandomWalk extends Animation {
     const walkAngle = this.WALK_SPEED;
     this.v.applyAxisAngle(walkAxis, walkAngle).normalize();
     this.direction.applyAxisAngle(walkAxis, walkAngle).normalize();
-    Rotation.animate(this.orientation, walkAxis, walkAngle, easeMid);
+    Rotation.animate(this.orientation, walkAxis, walkAngle, easeMid, this.space);
   }
 }
 

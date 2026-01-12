@@ -14,7 +14,7 @@ import {
     TransparentVignette, blendAlpha, color4Pool
 } from "../color.js";
 import {
-    Timeline, RandomWalk, Rotation, easeMid, ComposedAnimation
+    Timeline, RandomWalk, Rotation, easeMid
 } from "../animation.js";
 import { Plot } from "../draw.js";
 import { createRenderPipeline, FilterAntiAlias } from "../filters.js";
@@ -60,10 +60,8 @@ export class TestPlotPolygon {
     spawnRing(normal, palette, direction, seed) {
         let ring = new TestPlotPolygon.Ring(normal, palette);
         this.rings.push(ring);
-        this.timeline.add(0, new ComposedAnimation(ring.orientation, -1, false)
-            .add(new RandomWalk(ring.orientation, ring.normal, seed))
-            .add(new Rotation(ring.orientation, normal, direction * 2 * Math.PI, 48, easeMid))
-        );
+        this.timeline.add(0, new RandomWalk(ring.orientation, ring.normal, seed));
+        this.timeline.add(0, new Rotation(ring.orientation, normal, direction * 2 * Math.PI, 48, easeMid, true, "Local"));
     }
 
     drawFrame() {
