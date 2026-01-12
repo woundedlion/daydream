@@ -14,7 +14,7 @@ import {
     TransparentVignette, blendAlpha, color4Pool
 } from "../color.js";
 import {
-    Timeline, RandomWalk, Rotation, easeMid, ComposedRotation
+    Timeline, RandomWalk, Rotation, easeMid, ComposedAnimation
 } from "../animation.js";
 import { Plot } from "../draw.js";
 import { createRenderPipeline, FilterAntiAlias } from "../filters.js";
@@ -39,9 +39,10 @@ export class TestPlotPolygon {
         this.sides = 5;
         this.pipeline = createRenderPipeline(new FilterAntiAlias());
 
+        const seed = Math.floor(Math.random() * 65535);
         for (let i = 0; i < this.numRings; ++i) {
-            this.spawnRing(Daydream.Z_AXIS, this.palettes[i], 1);
-            this.spawnRing(Daydream.Z_AXIS, this.palettes[i], -1);
+            this.spawnRing(Daydream.Z_AXIS, this.palettes[i], 1, seed);
+            this.spawnRing(Daydream.Z_AXIS, this.palettes[i], -1, seed);
         }
 
         this.setupGUI();
@@ -56,12 +57,12 @@ export class TestPlotPolygon {
         this.gui.add(this, 'sides').min(3).max(12).step(1).name("Sides");
     }
 
-    spawnRing(normal, palette, direction) {
+    spawnRing(normal, palette, direction, seed) {
         let ring = new TestPlotPolygon.Ring(normal, palette);
         this.rings.push(ring);
-        this.timeline.add(0, new ComposedRotation(ring.orientation, 48, true)
-            .rotate(Daydream.Y_AXIS, 2 * Math.PI, easeMid)
-            .rotate(normal, direction * 2 * Math.PI, easeMid)
+        this.timeline.add(0, new ComposedAnimation(ring.orientation, -1, false)
+            .add(new RandomWalk(ring.orientation, ring.normal, seed))
+            .add(new Rotation(ring.orientation, normal, direction * 2 * Math.PI, 48, easeMid))
         );
     }
 
