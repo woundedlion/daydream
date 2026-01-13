@@ -99,6 +99,16 @@ export class Palette {
  * @returns {function(THREE.Color, THREE.Color): THREE.Color} A blending function.
  */
 export const blendAlpha = (c1, c2, a, d) => {
+  if (a <= 0.001) {
+    if (d !== c1) {
+      d.r = c1.r; d.g = c1.g; d.b = c1.b;
+    }
+    return d;
+  }
+  if (a >= 0.999) {
+    d.r = c2.r; d.g = c2.g; d.b = c2.b;
+    return d;
+  }
   let invA = 1 - a;
   d.r = c1.r * invA + c2.r * a;
   d.g = c1.g * invA + c2.g * a;

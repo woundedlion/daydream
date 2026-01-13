@@ -617,9 +617,9 @@ export function intersectsPlane(v1, v2, normal) {
  * @returns {number} The angle in radians [0, PI].
  */
 export function angleBetween(v1, v2) {
-  let len_product = v1.length() * v2.length();
-  let d = v1.dot(v2) / len_product;
-  return Math.acos(Math.max(-1, Math.min(1, d)));
+  const d = v1.dot(v2);
+  const l2 = v1.lengthSq() * v2.lengthSq();
+  return Math.acos(Math.max(-1, Math.min(1, d / Math.sqrt(l2))));
 }
 
 /**

@@ -277,9 +277,13 @@ export class Daydream {
     // Safety: prevent spiral of death
     if (this.timeAccumulator > 0.25) this.timeAccumulator = 0.25;
 
+    // EARLY EXIT: Enforce 16 FPS limit
+    // We only render when we have enough accumulated time for at least one simulation step.
+    if (this.timeAccumulator < this.frameInterval) return;
+
     // 2. SIMULATION LOOP (Runs exactly at 16 FPS / 62.5ms chunks)
-    // Using a while loop ensures we catch up if a frame was late, maintaining exact speed.
-    while (this.timeAccumulator >= this.frameInterval) {
+    // Removed while loop to ensure every simulation frame is rendered (no dropping).
+    if (this.timeAccumulator >= this.frameInterval) {
       this.timeAccumulator -= this.frameInterval;
 
       if (!this.paused || this.stepFrames != 0) {

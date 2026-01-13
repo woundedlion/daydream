@@ -82,11 +82,11 @@ export class RingSpin {
         }
 
         for (const dot of this.renderPlanes) {
-            const materialFn = (p, tPos, dist) => {
-                return { color: dot.color, alpha: dot.alpha };
+            const colorFn = (p, tPos, dist) => {
+                return dot;
             };
 
-            Scan.Ring.draw(pipeline, dot.position, 1.0, this.thickness, materialFn, 0, 2 * Math.PI, { debugBB: this.debugBB });
+            Scan.Ring.draw(pipeline, dot.position, 1.0, this.thickness, colorFn, 0, 2 * Math.PI, { debugBB: this.debugBB, computeT: false });
         }
     }
 }
