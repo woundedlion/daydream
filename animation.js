@@ -525,22 +525,31 @@ export class Motion extends Animation {
     const targetV = this.path.getPoint(this.t / this.duration);
     const totalAngle = angleBetween(currentV, targetV);
     const numSteps = Math.ceil(Math.max(1, totalAngle / Motion.MAX_ANGLE));
-    let origin = this.orientation.get();
-    for (let i = 1; i <= numSteps; i++) {
-      const subT = (this.t - 1) + (i / numSteps);
+
+    // Ensure sufficient resolution
+    this.orientation.upsample(numSteps + 1);
+    const len = this.orientation.length();
+
+    let prevV = currentV.clone();
+    const accumulatedQ = new THREE.Quaternion();
+
+    const applyRotation = (this.space === "Local")
+      ? (target, source) => target.multiply(source)
+      : (target, source) => target.premultiply(source);
+
+    for (let i = 1; i < len; i++) {
+      const subT = (this.t - 1) + (i / (len - 1));
       const nextV = this.path.getPoint(subT / this.duration);
-      const stepAngle = angleBetween(currentV, nextV);
-      if (stepAngle > 0.000001) {
-        const stepAxis = new THREE.Vector3().crossVectors(currentV, nextV).normalize();
+      const stepAngle = angleBetween(prevV, nextV);
 
-        const rotAxis = (this.space === "Local") ? this.orientation.orient(stepAxis) : stepAxis;
-        const q = new THREE.Quaternion().setFromAxisAngle(rotAxis, stepAngle);
-
-        origin = origin.clone().premultiply(q);
-        this.orientation.push(origin);
+      if (stepAngle > 0.0001) {
+        const stepAxis = new THREE.Vector3().crossVectors(prevV, nextV).normalize();
+        const qStep = new THREE.Quaternion().setFromAxisAngle(stepAxis, stepAngle);
+        applyRotation(accumulatedQ, qStep);
       }
 
-      currentV = nextV;
+      applyRotation(this.orientation.orientations[i], accumulatedQ).normalize();
+      prevV = nextV;
     }
   }
 }
@@ -606,33 +615,18 @@ export class Rotation extends Animation {
     }
 
     const steps = 1 + Math.ceil(Math.abs(delta) / Rotation.MAX_ANGLE);
-    if (this.orientation.length() > 1) {
-      this.orientation.upsample(steps);
-    }
-
-    const rotAxis = (this.space === "Local")
-      ? this.orientation.orient(this.axis, this.orientation.length() - 1)
-      : this.axis;
-    const qTotal = new THREE.Quaternion().setFromAxisAngle(rotAxis, delta);
-
-    // Apply Rotation
+    this.orientation.upsample(steps + 1);
     const len = this.orientation.length();
-    if (len <= 1) {
-      this.orientation.collapse();
-      const stepAngle = delta / steps;
-      const qStep = new THREE.Quaternion().setFromAxisAngle(rotAxis, stepAngle);
-      for (let i = 0; i < steps; i++) {
-        let currentQ = this.orientation.get().clone();
-        currentQ.premultiply(qStep).normalize();
-        this.orientation.push(currentQ);
-      }
-    } else {
-      const identity = new THREE.Quaternion();
-      for (let i = 1; i < len; i++) {
-        const t = i / (len - 1);
-        const qPartial = identity.clone().slerp(qTotal, t);
-        this.orientation.orientations[i].premultiply(qPartial).normalize();
-      }
+    const accumulatedQ = new THREE.Quaternion();
+    const stepAngle = delta / (len - 1);
+    const applyRotation = (this.space === "Local")
+      ? (target, source) => target.multiply(source)
+      : (target, source) => target.premultiply(source);
+
+    for (let i = 1; i < len; i++) {
+      const angle = stepAngle * i;
+      const q = new THREE.Quaternion().setFromAxisAngle(this.axis, angle);
+      applyRotation(this.orientation.orientations[i], q).normalize();
     }
     this.last_angle = targetAngle;
   }
