@@ -784,7 +784,7 @@ export class OrientationTrail {
 
     // 1. Ensure buffer size matches source (grow if needed)
     while (dstData.length < srcData.length) {
-      dstData.push(new THREE.Quaternion());
+      dstData.push(new THREE.Quaternion()); // These are persistent within the OrientationTrail snapshots
     }
     // 2. Trim if source shrank (optional, but keeps state clean)
     dstData.length = srcData.length;

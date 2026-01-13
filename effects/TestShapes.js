@@ -3,6 +3,9 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+// TODO: Add smoothing slider
+// TODO: Add multiple smaller shapes rotating out of phase
+
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
