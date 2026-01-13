@@ -1378,13 +1378,26 @@ export const Scan = {
       const R = Math.sqrt(nx * nx + nz * nz);
       const alpha = Math.atan2(nx, nz);
       const centerPhi = Math.acos(ny);
+
+      const angMin = Math.max(0, targetAngle - thickness);
+      const angMax = Math.min(Math.PI, targetAngle + thickness);
+      const cosMax = Math.cos(angMin); // Smaller angle = Larger cosine
+      const cosMin = Math.cos(angMax);
+
       const isFullCircle = Math.abs(endAngle - startAngle) >= 2 * Math.PI - 0.001;
+
+      const cosTarget = Math.cos(targetAngle);
+      const sinTarget = Math.sin(targetAngle);
+      const invSinTarget = Math.abs(sinTarget) > 0.001 ? 1.0 / sinTarget : 0;
 
       const ctx = {
         normal, radius, thickness, colorFn,
         nx, ny, nz, targetAngle, R, alpha, centerPhi,
+        cosMin, cosMax, // Optimization
+        cosTarget, invSinTarget, // Optimization (polarAngle)
         u, w, startAngle, endAngle,
         checkSector: !isFullCircle,
+        computeT: options.computeT !== undefined ? options.computeT : true, // Optimization for RingSpin
         pipeline,
         clipPlanes: options.clipPlanes, // Injected options
         limits: options.limits, // Injected options
@@ -1496,38 +1509,57 @@ export const Scan = {
         }
       }
 
-      const polarAngle = angleBetween(p, ctx.normal);
-      const dist = Math.abs(polarAngle - ctx.targetAngle);
+      // Optimization: Fast Rejection via Dot Product
+      const dot = p.dot(ctx.normal);
+      if (ctx.cosMin !== undefined) {
+        if (dot < ctx.cosMin || dot > ctx.cosMax) return;
+      }
+
+      let dist = 0;
+      if (ctx.invSinTarget !== 0) {
+        // Optimization: Linear approximation of acos near targetAngle
+        // dist ~= |dot - cos(target)| / sin(target)
+        dist = Math.abs(dot - ctx.cosTarget) * ctx.invSinTarget;
+      } else {
+        const polarAngle = Math.acos(Math.max(-1, Math.min(1, dot)));
+        dist = Math.abs(polarAngle - ctx.targetAngle);
+      }
 
       if (dist < ctx.thickness) {
-        // Calculate azimuth for t and/or sector check
-        const dotU = p.dot(ctx.u);
-        const dotW = p.dot(ctx.w);
-        let azimuth = Math.atan2(dotW, dotU);
-        if (azimuth < 0) azimuth += 2 * Math.PI;
-
-        if (ctx.checkSector) {
-          let inside = false;
-          if (ctx.startAngle <= ctx.endAngle) {
-            inside = (azimuth >= ctx.startAngle && azimuth <= ctx.endAngle);
-          } else {
-            inside = (azimuth >= ctx.startAngle || azimuth <= ctx.endAngle);
-          }
-          if (!inside) return;
-        }
 
         const distT = dist / ctx.thickness;
         const aaAlpha = quinticKernel(1.0 - distT);
 
-        // Normalize t based on angle range
+        // Calculate azimuth for t and/or sector check
         let t = 0;
-        if (Math.abs(ctx.endAngle - ctx.startAngle) > 0.0001) {
-          let relAz = azimuth - ctx.startAngle;
-          // handle wrap for sector crossing 0
-          if (ctx.startAngle > ctx.endAngle && relAz < 0) relAz += 2 * Math.PI;
-          t = relAz / (ctx.startAngle > ctx.endAngle ? (2 * Math.PI - (ctx.startAngle - ctx.endAngle)) : (ctx.endAngle - ctx.startAngle));
-        } else {
-          t = azimuth / (2 * Math.PI);
+
+        if (ctx.checkSector || ctx.computeT) {
+          const dotU = p.dot(ctx.u);
+          const dotW = p.dot(ctx.w);
+          let azimuth = Math.atan2(dotW, dotU);
+          if (azimuth < 0) azimuth += 2 * Math.PI;
+
+          if (ctx.checkSector) {
+            let inside = false;
+            if (ctx.startAngle <= ctx.endAngle) {
+              inside = (azimuth >= ctx.startAngle && azimuth <= ctx.endAngle);
+            } else {
+              inside = (azimuth >= ctx.startAngle || azimuth <= ctx.endAngle);
+            }
+            if (!inside) return;
+          }
+
+          if (ctx.computeT) {
+            // Normalize t based on angle range
+            if (Math.abs(ctx.endAngle - ctx.startAngle) > 0.0001) {
+              let relAz = azimuth - ctx.startAngle;
+              // handle wrap for sector crossing 0
+              if (ctx.startAngle > ctx.endAngle && relAz < 0) relAz += 2 * Math.PI;
+              t = relAz / (ctx.startAngle > ctx.endAngle ? (2 * Math.PI - (ctx.startAngle - ctx.endAngle)) : (ctx.endAngle - ctx.startAngle));
+            } else {
+              t = azimuth / (2 * Math.PI);
+            }
+          }
         }
 
         // Evaluate Material
