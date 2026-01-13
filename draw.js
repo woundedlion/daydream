@@ -549,25 +549,72 @@ export const Plot = {
     }
   },
 
-  Flower: class {
-    /**
-     * Draws a star/flower shape using projection distortion.
-     * @param {Object} pipeline - Render pipeline.
-     * @param {THREE.Quaternion} orientationQuaternion - The orientation of the polygon.
-     * @param {THREE.Vector3} normal - The normal vector.
-     * @param {number} radius - The radius.
-     * @param {number} numSides - Number of sides.
-     * @param {Function} colorFn - Function to determine color.
-     * @param {number} [phase=0] - Starting phase.
-     */
+  Star: class {
     static draw(pipeline, orientationQuaternion, normal, radius, numSides, colorFn, phase = 0) {
-      const points = Plot.Polygon.sample(orientationQuaternion, normal, radius, numSides, phase);
-      let center = normal.clone().applyQuaternion(orientationQuaternion).normalize();
-
-      // Always project from the "far" side to create the flower/star distortion.
-      if (radius <= 1.0) {
-        center.negate();
+      if (radius > 1.0) {
+        normal = normal.clone().negate();
+        radius = 2.0 - radius;
       }
+
+      const outerRadius = radius * (Math.PI / 2);
+      const innerRadius = outerRadius * 0.382;
+
+      const points = [];
+      const angleStep = Math.PI / numSides;
+
+      // Basis construction
+      let refAxis = Daydream.X_AXIS;
+      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
+        refAxis = Daydream.Y_AXIS;
+      }
+      const v = normal.clone().applyQuaternion(orientationQuaternion).normalize();
+      const ref = refAxis.clone().applyQuaternion(orientationQuaternion).normalize();
+      const u = vectorPool.acquire().crossVectors(v, ref).normalize();
+      const w = vectorPool.acquire().crossVectors(v, u).normalize();
+
+      for (let i = 0; i < numSides * 2; i++) {
+        const theta = phase + i * angleStep;
+        const r = (i % 2 === 0) ? outerRadius : innerRadius;
+
+        const sinR = Math.sin(r);
+        const cosR = Math.cos(r);
+        const cosT = Math.cos(theta);
+        const sinT = Math.sin(theta);
+
+        const p = new THREE.Vector3()
+          .copy(v).multiplyScalar(cosR)
+          .addScaledVector(u, cosT * sinR)
+          .addScaledVector(w, sinT * sinR)
+          .normalize();
+
+        points.push(p);
+      }
+
+      // Projection center (Front)
+      const center = v;
+
+      for (let i = 0; i < points.length; i++) {
+        const p1 = points[i];
+        const p2 = points[(i + 1) % points.length];
+        Plot.PlanarLine.draw(pipeline, p1, p2, center, (t) => colorFn(p1, t));
+      }
+    }
+  },
+
+  Flower: class {
+    static draw(pipeline, orientationQuaternion, normal, radius, numSides, colorFn, phase = 0) {
+      // Original logic: Projection Distortion of Antipodal Polygon
+      const desiredOuterRadius = radius * (Math.PI / 2);
+      const apothem = Math.PI - desiredOuterRadius;
+      const angle = Math.PI / numSides;
+      const polyRadiusRadians = apothem / Math.cos(angle);
+
+      const polyRadiusNorm = polyRadiusRadians / (Math.PI / 2);
+
+      const antiNormal = normal.clone().negate();
+      const points = Plot.Polygon.sample(orientationQuaternion, antiNormal, polyRadiusNorm, numSides, phase);
+
+      let center = normal.clone().applyQuaternion(orientationQuaternion).normalize();
 
       for (let i = 0; i < points.length; i++) {
         const p1 = points[i];
@@ -1047,23 +1094,37 @@ export const Scan = {
     }
   },
 
-  Flower: class {
+  Star: class {
     static draw(pipeline, orientation, normal, radius, sides, colorFn, options = {}) {
-      // Logic:
-      // A "Flower" is the star-shaped hole formed by the projection distortion of a polygon centered at the Antipode.
-      // 1. Shape Definition: Defined relative to Anti-Normal (S).
-      // 2. Scan Window: Defined relative to Normal (N) (where the star is).
-      // 3. SDF: Points are "Inside" the Star if they are "Outside" the backend-polygon.
-
       if (radius > 1.0) {
         normal = normal.clone().negate();
-        radius = 2.0 - radius;
+        radius = 2.0 - radius; // Invert radius
       }
 
-      const innerThickness = radius * (Math.PI / 2); // Scan window size (small)
-      if (innerThickness <= 0.0001) return;
+      // --- Shape Parameters ---
+      const outerRadius = radius * (Math.PI / 2);
+      const innerRadius = outerRadius * 0.382; // Pentagram ratio
 
-      // --- Basis Construction (Relative to NORMAL) ---
+      const angleStep = Math.PI / sides; // Half-sector (Tip to Valley)
+
+      // Precompute Edge Normal for SDF
+      const vT = outerRadius;
+      const vVx = innerRadius * Math.cos(angleStep);
+      const vVy = innerRadius * Math.sin(angleStep);
+      const dx = vVx - vT;
+      const dy = vVy;
+      const len = Math.sqrt(dx * dx + dy * dy);
+
+      const nx = -dy / len;
+      const ny = dx / len;
+      const planeD = -(nx * vT + ny * 0); // Dot(N, Tip) + D = 0 => D = -Dot
+
+      const thickness = outerRadius;
+      if (thickness <= 0.0001) return;
+
+      const pixelWidth = 2 * Math.PI / Daydream.W;
+
+      // Basis Construction
       let refAxis = Daydream.X_AXIS;
       if (Math.abs(normal.dot(refAxis)) > 0.9999) {
         refAxis = Daydream.Y_AXIS;
@@ -1072,32 +1133,131 @@ export const Scan = {
       const ref = refAxis.clone().applyQuaternion(orientation).normalize();
       const u = new THREE.Vector3().crossVectors(scanV, ref).normalize();
       const w = new THREE.Vector3().crossVectors(scanV, u).normalize();
-
       const scanNy = scanV.y;
 
-      // --- Shape Parameters (Relative to ANTIPODE) ---
-      const distFromS = Math.PI - (radius * (Math.PI / 2));
-      const angle = Math.PI / sides;
-      const apothem = distFromS * Math.cos(angle);
-      const maxStarRadius = Math.PI - apothem;
-      const thickness = maxStarRadius;
-      if (thickness <= 0.0001) return;
-
-      const pixelWidth = 2 * Math.PI / Daydream.W;
-
-      // --- Basis Construction (Relative to NORMAL) ---
       const ctx = {
         scanNormal: scanV,
         u, w,
-        thickness, // Scan window radius
-        sides, apothem, colorFn,
-        scanNy,
-        pipeline,
+        thickness,
+        sides,
+        nx, ny, planeD,
+        colorFn,
         pixelWidth,
+        pipeline,
         debugBB: options.debugBB
       };
 
       // Scan Bounding Box (around NORMAL)
+      const centerPhi = Math.acos(scanNy);
+      const phiMin = Math.max(0, centerPhi - thickness - pixelWidth);
+      const phiMax = Math.min(Math.PI, centerPhi + thickness + pixelWidth);
+
+      if (phiMin > phiMax) return;
+
+      const yMin = Math.max(0, Math.floor((phiMin * (Daydream.H - 1)) / Math.PI));
+      const yMax = Math.min(Daydream.H - 1, Math.ceil((phiMax * (Daydream.H - 1)) / Math.PI));
+
+      for (let y = yMin; y <= yMax; y++) {
+        Scan.Star.scanRow(y, ctx);
+      }
+    }
+
+    static scanRow(y, ctx) {
+      Scan.Star.scanFullRow(y, ctx);
+    }
+
+    static scanFullRow(y, ctx) {
+      for (let x = 0; x < Daydream.W; x++) {
+        Scan.Star.processPixel(XY(x, y), x, y, ctx);
+      }
+    }
+
+    static processPixel(i, x, y, ctx) {
+      const p = Daydream.pixelPositions[i];
+
+      const scanDist = angleBetween(p, ctx.scanNormal);
+      if (scanDist > ctx.thickness + ctx.pixelWidth) return;
+
+      if (ctx.debugBB) {
+        Daydream.pixels[i].r += 0.2;
+        Daydream.pixels[i].g += 0.2;
+        Daydream.pixels[i].b += 0.2;
+      }
+
+      const dotU = p.dot(ctx.u);
+      const dotW = p.dot(ctx.w);
+      let azimuth = Math.atan2(dotW, dotU);
+      if (azimuth < 0) azimuth += 2 * Math.PI;
+
+      const sectorAngle = 2 * Math.PI / ctx.sides;
+      let localAzimuth = wrap(azimuth + sectorAngle / 2, sectorAngle) - sectorAngle / 2;
+      localAzimuth = Math.abs(localAzimuth);
+
+      const px = scanDist * Math.cos(localAzimuth);
+      const py = scanDist * Math.sin(localAzimuth);
+
+      const distToEdge = px * ctx.nx + py * ctx.ny + ctx.planeD;
+
+      if (distToEdge > -ctx.pixelWidth) {
+        let alpha = 1.0;
+        if (distToEdge < ctx.pixelWidth) {
+          const t = (distToEdge + ctx.pixelWidth) / (2 * ctx.pixelWidth);
+          alpha = quinticKernel(t);
+        }
+
+        const t = scanDist / ctx.thickness;
+        const c = ctx.colorFn(p, t, distToEdge);
+        const color = c.isColor ? c : (c.color || c);
+        const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
+
+        ctx.pipeline.plot2D(x, y, color, 0, baseAlpha * alpha);
+      }
+    }
+  },
+
+  Flower: class {
+    static draw(pipeline, orientation, normal, radius, sides, colorFn, options = {}) {
+      // Original logic: Antipodal Polygon Distortion
+      if (radius > 1.0) {
+        normal = normal.clone().negate();
+        radius = 2.0 - radius;
+      }
+
+      // distFromS logic (Antipodal Apothem)
+      const desiredOuterRadius = radius * (Math.PI / 2);
+      const apothem = Math.PI - desiredOuterRadius;
+
+      // Calculate max extent of the "Hole" (which is the Flower) on the front
+      // It is bounded by the Flats of the polygon at S, which map to Tips at Front
+      // Max radius = desiredOuterRadius.
+      const thickness = desiredOuterRadius;
+      if (thickness <= 0.0001) return;
+
+      // Basis Construction
+      let refAxis = Daydream.X_AXIS;
+      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
+        refAxis = Daydream.Y_AXIS;
+      }
+      const scanV = normal.clone().applyQuaternion(orientation).normalize();
+      const ref = refAxis.clone().applyQuaternion(orientation).normalize();
+      const u = new THREE.Vector3().crossVectors(scanV, ref).normalize();
+      const w = new THREE.Vector3().crossVectors(scanV, u).normalize();
+      const scanNy = scanV.y;
+
+      const pixelWidth = 2 * Math.PI / Daydream.W;
+
+      const ctx = {
+        scanNormal: scanV,
+        u, w,
+        thickness,
+        sides,
+        apothem, // Antipodal Apothem
+        colorFn,
+        pixelWidth,
+        pipeline,
+        debugBB: options.debugBB
+      };
+
       const centerPhi = Math.acos(scanNy);
       const phiMin = Math.max(0, centerPhi - thickness - pixelWidth);
       const phiMax = Math.min(Math.PI, centerPhi + thickness + pixelWidth);
@@ -1124,8 +1284,6 @@ export const Scan = {
 
     static processPixel(i, x, y, ctx) {
       const p = Daydream.pixelPositions[i];
-
-      // 1. Scan Window Check (Relative to Scan Normal)
       const scanDist = angleBetween(p, ctx.scanNormal);
       if (scanDist > ctx.thickness + ctx.pixelWidth) return;
 
@@ -1135,25 +1293,31 @@ export const Scan = {
         Daydream.pixels[i].b += 0.2;
       }
 
+      // Calc distance from ANTIPODE (PI - scanDist)
       const polarAngle = Math.PI - scanDist;
+
       const dotU = p.dot(ctx.u);
       const dotW = p.dot(ctx.w);
       let azimuth = Math.atan2(dotW, dotU);
       if (azimuth < 0) azimuth += 2 * Math.PI;
       const sectorAngle = 2 * Math.PI / ctx.sides;
       const localAzimuth = wrap(azimuth + sectorAngle / 2, sectorAngle) - sectorAngle / 2;
-      const distToEdge = polarAngle * Math.cos(localAzimuth) - ctx.apothem;
-      const distIntoStar = distToEdge;
 
-      if (distIntoStar > -ctx.pixelWidth) {
+      // SDF vs Antipodal Polygon
+      const distToEdge = polarAngle * Math.cos(localAzimuth) - ctx.apothem;
+
+      // If distToEdge > 0, we are OUTSIDE the polygon at S.
+      // This forms the "Hole" or "Flower" at N.
+
+      if (distToEdge > -ctx.pixelWidth) {
         let alpha = 1.0;
-        if (distIntoStar < ctx.pixelWidth) {
-          const t = (distIntoStar + ctx.pixelWidth) / (2 * ctx.pixelWidth);
+        if (distToEdge < ctx.pixelWidth) {
+          const t = (distToEdge + ctx.pixelWidth) / (2 * ctx.pixelWidth);
           alpha = quinticKernel(t);
         }
 
         const t = scanDist / ctx.thickness;
-        const c = ctx.colorFn(p, t, distIntoStar);
+        const c = ctx.colorFn(p, t, distToEdge);
         const color = c.isColor ? c : (c.color || c);
         const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
 
