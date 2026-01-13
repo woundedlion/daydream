@@ -11,7 +11,8 @@ import {
 } from "../geometry.js";
 import {
     VignettePalette, richSunset, mangoPeel, underSea, iceMelt,
-    TransparentVignette, blendAlpha, color4Pool
+    TransparentVignette, blendAlpha, color4Pool,
+    Color4
 } from "../color.js";
 import {
     Timeline, Sprite, RandomWalk, MutableNumber, Rotation, easeMid
@@ -75,7 +76,7 @@ export class TestShapes {
 
     setupGUI() {
         this.gui = new gui.GUI({ autoPlace: false });
-        this.gui.add(this, 'alpha').min(0).max(1).step(0.01).name("Brightness");
+        this.gui.add(this, 'alpha').min(0).max(1).step(0.01).name("Alpha");
         this.gui.add(this, 'radius').min(0).max(2).step(0.01).name("Radius");
         this.gui.add(this, 'sides').min(3).max(12).step(1).name("Sides");
 
@@ -110,7 +111,7 @@ export class TestShapes {
             }
 
             const colorFn = (p, t, dist) => {
-                return ring.color;
+                return new Color4(ring.color.color, ring.color.alpha * this.alpha);
             }
 
             const pipeline = (ring.mode === "Plot") ? plotPipeline : scanPipeline;
