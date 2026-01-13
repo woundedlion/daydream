@@ -50,9 +50,11 @@ export class TestShapes {
         let colorCount = 0;
 
         for (let i = 0; i < this.numRings; ++i) {
-            const c1 = iceMelt.get(colorCount / totalColors);
+            const c1Pool = iceMelt.get(colorCount / totalColors);
+            const c1 = new Color4(c1Pool.color, c1Pool.alpha);
             colorCount++;
-            const c2 = iceMelt.get(colorCount / totalColors);
+            const c2Pool = iceMelt.get(colorCount / totalColors);
+            const c2 = new Color4(c2Pool.color, c2Pool.alpha);
             colorCount++;
 
             // Front Side (Scan) - MASTERS
@@ -114,7 +116,7 @@ export class TestShapes {
             }
 
             const colorFn = (p, t, dist) => {
-                return new Color4(ring.color.color, ring.color.alpha * this.alpha);
+                return color4Pool.acquire().set(ring.color.color, ring.color.alpha * this.alpha);
             }
 
             const pipeline = (ring.mode === "Plot") ? plotPipeline : scanPipeline;

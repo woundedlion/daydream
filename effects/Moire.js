@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, sinWave
+    Orientation, sinWave, quaternionPool, vectorPool
 } from "../geometry.js";
 import {
     rasterize, Plot
@@ -85,7 +85,7 @@ export class Moire {
     }
 
     rotate(p, axis) {
-        let q = new THREE.Quaternion().setFromAxisAngle(axis, this.rotation.get());
+        let q = quaternionPool.acquire().setFromAxisAngle(axis, this.rotation.get());
         return p.applyQuaternion(q);
     }
 
@@ -96,8 +96,10 @@ export class Moire {
     }
 
     invTransform(p) {
-        p = this.rotate(p, Daydream.X_AXIS.clone().negate());
-        p = this.rotate(p, Daydream.Z_AXIS.clone().negate());
+        const xAxisNeg = vectorPool.acquire().copy(Daydream.X_AXIS).negate();
+        const zAxisNeg = vectorPool.acquire().copy(Daydream.Z_AXIS).negate();
+        p = this.rotate(p, xAxisNeg);
+        p = this.rotate(p, zAxisNeg);
         return p;
     }
 

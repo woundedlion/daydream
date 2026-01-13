@@ -7,7 +7,7 @@
 import * as THREE from "three";
 import { Daydream, pixelKey } from "../driver.js";
 import {
-    pixelToVector
+    pixelToVector, vectorPool
 } from "../geometry.js";
 import {
     richSunset
@@ -68,10 +68,11 @@ export class MetaballEffect {
         this.t++;
 
         // 1. Animate the balls
+        // 1. Animate the balls
         for (const ball of this.balls) {
-            ball.v.add(ball.p.clone().multiplyScalar(-this.gravity));
+            const F = vectorPool.acquire().copy(ball.p).multiplyScalar(-this.gravity);
+            ball.v.add(F);
             ball.p.add(ball.v);
-
         }
 
         // 2. Iterate *every single pixel* on the sphere's surface

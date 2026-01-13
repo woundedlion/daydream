@@ -46,14 +46,15 @@ export class Voronoi {
 
             const v = new THREE.Vector3(x, y, z);
             const vel = randomVector();
-            const axis = vel;
+            const axis = vel.clone(); // Clone for persistence
             const t = i / (this.numSites - 1 || 1);
             const color = this.palette.get(t);
+            const persistentColor = new THREE.Color().copy(color.color);
 
             this.sites.push({
                 pos: v,
                 axis: axis,
-                color: color.color,
+                color: persistentColor,
                 id: i
             });
         }

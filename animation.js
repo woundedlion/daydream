@@ -7,7 +7,7 @@
 
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
-import { angleBetween, Orientation } from "./geometry.js";
+import { angleBetween, Orientation, vectorPool, quaternionPool } from "./geometry.js";
 import FastNoiseLite from "./FastNoiseLite.js";
 
 /**
@@ -530,8 +530,9 @@ export class Motion extends Animation {
     this.orientation.upsample(numSteps + 1);
     const len = this.orientation.length();
 
-    let prevV = currentV.clone();
-    const accumulatedQ = new THREE.Quaternion();
+    let prevV = currentV.clone(); // Path points might be needing clone if path reuses them? Path usually computes fresh.
+    const accumulatedQ = quaternionPool.acquire(); // Identity? No, acquire returns whatever.
+    accumulatedQ.set(0, 0, 0, 1);
 
     const applyRotation = (this.space === "Local")
       ? (target, source) => target.multiply(source)
@@ -543,8 +544,8 @@ export class Motion extends Animation {
       const stepAngle = angleBetween(prevV, nextV);
 
       if (stepAngle > 0.0001) {
-        const stepAxis = new THREE.Vector3().crossVectors(prevV, nextV).normalize();
-        const qStep = new THREE.Quaternion().setFromAxisAngle(stepAxis, stepAngle);
+        const stepAxis = vectorPool.acquire().crossVectors(prevV, nextV).normalize();
+        const qStep = quaternionPool.acquire().setFromAxisAngle(stepAxis, stepAngle);
         applyRotation(accumulatedQ, qStep);
       }
 
@@ -563,13 +564,6 @@ export class Rotation extends Animation {
     return 2 * Math.PI / Daydream.W;
   }
 
-  /**
-   * Static helper for a one-shot rotation.
-   * @param {Orientation} orientation 
-   * @param {THREE.Vector3} axis 
-   * @param {number} angle 
-   * @param {Function} easingFn 
-   */
   /**
    * Static helper for a one-shot rotation.
    * @param {Orientation} orientation 
@@ -617,7 +611,15 @@ export class Rotation extends Animation {
     const steps = 1 + Math.ceil(Math.abs(delta) / Rotation.MAX_ANGLE);
     this.orientation.upsample(steps + 1);
     const len = this.orientation.length();
-    const accumulatedQ = new THREE.Quaternion();
+
+    // accumulatedQ not needed for Rotation logic as logic is per-step? 
+    // Wait, original trace:
+    // const accumulatedQ = new THREE.Quaternion(); -> Was Unused in original code?
+    // Looking at original line 620: const accumulatedQ = new THREE.Quaternion();
+    // It is NOT USED in the loop. Loop uses `q`.
+    // It was dead code! 
+    // I will remove it.
+
     const stepAngle = delta / (len - 1);
     const applyRotation = (this.space === "Local")
       ? (target, source) => target.multiply(source)
@@ -625,7 +627,7 @@ export class Rotation extends Animation {
 
     for (let i = 1; i < len; i++) {
       const angle = stepAngle * i;
-      const q = new THREE.Quaternion().setFromAxisAngle(this.axis, angle);
+      const q = quaternionPool.acquire().setFromAxisAngle(this.axis, angle);
       applyRotation(this.orientation.orientations[i], q).normalize();
     }
     this.last_angle = targetAngle;

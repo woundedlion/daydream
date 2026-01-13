@@ -6,8 +6,8 @@
 import * as THREE from "three";
 import { Daydream, XY } from "./driver.js";
 import { wrap } from "./util.js"
-import { blendAlpha } from "./color.js";
-import { vectorToPixel, angleBetween } from "./geometry.js";
+import { blendAlpha, colorPool } from "./color.js";
+import { vectorToPixel, angleBetween, vectorPool } from "./geometry.js";
 import { Plot, tween } from "./draw.js";
 
 const BLACK = new THREE.Color(0, 0, 0);
@@ -408,7 +408,7 @@ export class FilterMobius {
       const den_mag = den.re * den.re + den.im * den.im;
       if (den_mag < 0.000001) {
         // Result is Infinity -> North Pole
-        pass(new THREE.Vector3(0, 1, 0), color, age, alpha);
+        pass(vectorPool.acquire().set(0, 1, 0), color, age, alpha);
         return;
       }
 
@@ -419,7 +419,7 @@ export class FilterMobius {
     const w_mag_sq = w.re * w.re + w.im * w.im;
     const inv_denom = 1 / (w_mag_sq + 1);
 
-    const v_out = new THREE.Vector3(
+    const v_out = vectorPool.acquire().set(
       2 * w.re * inv_denom,
       (w_mag_sq - 1) * inv_denom,
       2 * w.im * inv_denom
@@ -450,9 +450,9 @@ export class FilterChromaticShift {
    * @param {Function} pass - The callback.
    */
   plot(x, y, color, alpha, pass) {
-    let r = new THREE.Color(color.r, 0, 0);
-    let g = new THREE.Color(0, color.g, 0);
-    let b = new THREE.Color(0, 0, color.b);
+    let r = colorPool.acquire().setRGB(color.r, 0, 0);
+    let g = colorPool.acquire().setRGB(0, color.g, 0);
+    let b = colorPool.acquire().setRGB(0, 0, color.b);
     pass(x, y, color, alpha);
     pass(wrap(x + 1, Daydream.W), y, r, alpha);
     pass(wrap(x + 2, Daydream.W), y, g, alpha);

@@ -7,13 +7,13 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, angleBetween, sinWave
+    Orientation, angleBetween, sinWave, vectorPool
 } from "../geometry.js";
 import {
     Plot
 } from "../draw.js";
 import {
-    ProceduralPalette
+    ProceduralPalette, colorPool, color4Pool
 } from "../color.js";
 import {
     Timeline, easeMid, Sprite, Transition, RandomTimer, MutableNumber, Rotation, easeOutExpo, easeInSin, easeOutSin, Mutation
@@ -83,8 +83,8 @@ export class Thrusters {
     drawThruster(ctx, opacity) {
         Plot.Ring.draw(this.filters, ctx.orientation.get(), ctx.point, ctx.radius.get(),
             (v, t) => {
-                let c = new THREE.Color(0xffffff).multiplyScalar(opacity);
-                return { color: c, alpha: opacity * this.alpha };
+                let c = colorPool.acquire().setHex(0xffffff).multiplyScalar(opacity);
+                return color4Pool.acquire().set(c, opacity * this.alpha);
             });
     }
 
@@ -106,7 +106,7 @@ export class Thrusters {
         );
 
         // Spin ring
-        let thrustAxis = new THREE.Vector3().crossVectors(
+        let thrustAxis = vectorPool.acquire().crossVectors(
             this.orientation.orient(thrustPoint),
             this.orientation.orient(this.ring))
             .normalize();
@@ -150,7 +150,8 @@ export class Thrusters {
             (v, t) => {
                 let z = this.orientation.orient(Daydream.X_AXIS);
                 const c = this.palette.get(angleBetween(z, v) / Math.PI);
-                return { color: c.color, alpha: c.alpha * this.alpha * opacity };
+                c.alpha *= this.alpha * opacity;
+                return c;
             }
         );
     }

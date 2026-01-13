@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { Daydream } from "../driver.js";
 import FastNoiseLite from "../FastNoiseLite.js";
 import {
-    randomVector, Dot
+    randomVector, Dot, vectorPool
 } from "../geometry.js";
 import {
     GenerativePalette
@@ -30,7 +30,7 @@ export class FlowField {
     // A simple class to hold particle state
     static Particle = class {
         constructor() {
-            this.pos = randomVector();
+            this.pos = new THREE.Vector3().copy(randomVector());
             this.vel = new THREE.Vector3(0, 0, 0);
         }
     }
@@ -91,7 +91,7 @@ export class FlowField {
             const fx = this.noise.GetNoise(p.pos.x * this.NOISE_SCALE, p.pos.y * this.NOISE_SCALE, p.pos.z * this.NOISE_SCALE + this.t) * this.FORCE_SCALE;
             const fy = this.noise.GetNoise(p.pos.x * this.NOISE_SCALE + 100, p.pos.y * this.NOISE_SCALE, p.pos.z * this.NOISE_SCALE + this.t) * this.FORCE_SCALE;
             const fz = this.noise.GetNoise(p.pos.x * this.NOISE_SCALE + 200, p.pos.y * this.NOISE_SCALE, p.pos.z * this.NOISE_SCALE + this.t) * this.FORCE_SCALE;
-            const force = new THREE.Vector3(fx, fy, fz);
+            const force = vectorPool.acquire().set(fx, fy, fz);
 
             // 2. Update Velocity with Damping (Friction)
             p.vel.add(force);
@@ -104,7 +104,7 @@ export class FlowField {
 
             // 4. Respawn Logic (Prevent sinks/clumping)
             if (Math.random() < 0.005) {
-                p.pos = randomVector();
+                p.pos.copy(randomVector());
                 p.vel.set(0, 0, 0);
             }
 
