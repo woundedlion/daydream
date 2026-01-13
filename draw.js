@@ -603,6 +603,11 @@ export const Plot = {
 
   Flower: class {
     static draw(pipeline, orientationQuaternion, normal, radius, numSides, colorFn, phase = 0) {
+      if (radius > 1.0) {
+        normal = normal.clone().negate();
+        radius = 2.0 - radius;
+      }
+
       // Original logic: Projection Distortion of Antipodal Polygon
       const desiredOuterRadius = radius * (Math.PI / 2);
       const apothem = Math.PI - desiredOuterRadius;
@@ -614,7 +619,8 @@ export const Plot = {
       const antiNormal = normal.clone().negate();
       const points = Plot.Polygon.sample(orientationQuaternion, antiNormal, polyRadiusNorm, numSides, phase);
 
-      let center = normal.clone().applyQuaternion(orientationQuaternion).normalize();
+      // Center for projection: The Antipode (which makes the straight lines of the polygon curved at the front)
+      let center = antiNormal.clone().applyQuaternion(orientationQuaternion).normalize();
 
       for (let i = 0; i < points.length; i++) {
         const p1 = points[i];
