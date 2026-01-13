@@ -23,7 +23,7 @@ import {
 
 export class Portholes {
     constructor() {
-        this.alpha = 0.3; // Default alpha
+        this.alpha = 0.3;
 
         this.basePalette = new GenerativePalette("circular", "analogous", "bell", "vibrant");
         this.interferencePalette = new GenerativePalette("circular", "analogous", "cup", "vibrant");
@@ -103,10 +103,6 @@ export class Portholes {
     }
 
     drawFrame() {
-        for (const o of this.orientations) {
-            o.collapse();
-        }
-
         this.timeline.step();
         this.t += 0.01; // Global time
 

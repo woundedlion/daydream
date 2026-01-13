@@ -144,6 +144,20 @@ export class Timeline {
    */
   step() {
     ++this.t;
+
+    // Prep Animations
+    const touchedOrientations = new Set();
+    for (const item of this.animations) {
+      if (this.t >= item.start && !item.animation.canceled) {
+        const anim = item.animation;
+        if (anim.orientation && !touchedOrientations.has(anim.orientation)) {
+          anim.orientation.collapse();
+          touchedOrientations.add(anim.orientation);
+        }
+      }
+    }
+
+    // Step animations
     for (let i = 0; i < this.animations.length; i++) {
       let animation = this.animations[i].animation;
       if (this.t >= this.animations[i].start) {
@@ -505,7 +519,6 @@ export class Motion extends Animation {
   }
 
   step() {
-    this.orientation.collapse();
     super.step();
 
     let currentV = this.path.getPoint((this.t - 1) / this.duration);
@@ -584,26 +597,47 @@ export class Rotation extends Animation {
       this.last_angle = 0;
     }
     super.step();
-    this.orientation.collapse();
 
     let targetAngle = this.easingFn(this.t / this.duration) * this.totalAngle;
     let delta = targetAngle - this.last_angle;
-    if (Math.abs(delta) > 0.0001) {
-      const numSteps = Math.ceil(Math.abs(delta) / Rotation.MAX_ANGLE);
-      const stepAngle = delta / numSteps;
+    if (Math.abs(delta) < 0.000001) {
+      this.last_angle = targetAngle;
+      return;
+    }
 
-      const rotAxis = (this.space === "Local") ? this.orientation.orient(this.axis) : this.axis;
+    const steps = 1 + Math.ceil(Math.abs(delta) / Rotation.MAX_ANGLE);
+    if (this.orientation.length() > 1) {
+      this.orientation.upsample(steps);
+    }
+
+    const rotAxis = (this.space === "Local")
+      ? this.orientation.orient(this.axis, this.orientation.length() - 1)
+      : this.axis;
+    const qTotal = new THREE.Quaternion().setFromAxisAngle(rotAxis, delta);
+
+    // Apply Rotation
+    const len = this.orientation.length();
+    if (len <= 1) {
+      this.orientation.collapse();
+      const stepAngle = delta / steps;
       const qStep = new THREE.Quaternion().setFromAxisAngle(rotAxis, stepAngle);
-
-      for (let i = 0; i < numSteps; i++) {
+      for (let i = 0; i < steps; i++) {
         let currentQ = this.orientation.get().clone();
         currentQ.premultiply(qStep).normalize();
         this.orientation.push(currentQ);
       }
-      this.last_angle = targetAngle;
+    } else {
+      const identity = new THREE.Quaternion();
+      for (let i = 1; i < len; i++) {
+        const t = i / (len - 1);
+        const qPartial = identity.clone().slerp(qTotal, t);
+        this.orientation.orientations[i].premultiply(qPartial).normalize();
+      }
     }
+    this.last_angle = targetAngle;
   }
 }
+
 
 /**
  * Randomly walks an orientation over the sphere surface.
@@ -649,6 +683,7 @@ export class RandomWalk extends Animation {
     const walkAngle = this.WALK_SPEED;
     this.v.applyAxisAngle(walkAxis, walkAngle).normalize();
     this.direction.applyAxisAngle(walkAxis, walkAngle).normalize();
+
     Rotation.animate(this.orientation, walkAxis, walkAngle, easeMid, this.space);
   }
 }

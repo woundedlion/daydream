@@ -378,6 +378,38 @@ export class Orientation {
   }
 
   /**
+   * Increases the resolution of the history to 'count' steps, preserving shape via Slerp.
+   * @param {number} count - The target number of steps in the history.
+   * Does nothing if count is less than current length.
+   */
+  upsample(count) {
+    if (this.orientations.length >= count) return;
+
+    const oldHistory = this.orientations;
+    const newHistory = new Array(count);
+
+    // Always keep start and end exact
+    newHistory[0] = oldHistory[0];
+    newHistory[count - 1] = oldHistory[oldHistory.length - 1];
+
+    for (let i = 1; i < count - 1; i++) {
+      // Normalized position in new array (0..1)
+      const t = i / (count - 1);
+
+      // Corresponding float index in old array
+      const oldVal = t * (oldHistory.length - 1);
+      const idxA = Math.floor(oldVal);
+      const idxB = Math.ceil(oldVal);
+      const alpha = oldVal - idxA;
+
+      // Slerp between the two nearest existing points
+      newHistory[i] = oldHistory[idxA].clone().slerp(oldHistory[idxB], alpha);
+    }
+
+    this.orientations = newHistory;
+  }
+
+  /**
    * Clears all recorded orientations.
    */
   clear() {
