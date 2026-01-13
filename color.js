@@ -32,6 +32,20 @@ export class Color4 {
     }
   }
 
+  set(r, g, b, a = 1.0) {
+    if (r instanceof THREE.Color) {
+      this.color.copy(r);
+      this.alpha = g !== undefined ? g : 1.0;
+    } else if (arguments.length >= 3) {
+      this.color.setRGB(r, g, b);
+      this.alpha = a;
+    } else {
+      this.color.setRGB(0, 0, 0);
+      this.alpha = 1.0;
+    }
+    return this;
+  }
+
   clone() {
     const c = color4Pool.acquire();
     c.color.copy(this.color);

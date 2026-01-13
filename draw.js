@@ -465,8 +465,8 @@ export const Plot = {
       }
       const v = center.clone(); // The 'pole'
       const ref = Math.abs(v.dot(Daydream.X_AXIS)) > 0.9 ? Daydream.Y_AXIS : Daydream.X_AXIS;
-      const u = new THREE.Vector3().crossVectors(v, ref).normalize();
-      const w = new THREE.Vector3().crossVectors(v, u).normalize();
+      const u = vectorPool.acquire().crossVectors(v, ref).normalize();
+      const w = vectorPool.acquire().crossVectors(v, u).normalize();
 
       const project = (p) => {
         const R = angleBetween(p, v);
@@ -483,7 +483,7 @@ export const Plot = {
       const dist = p1.distanceTo(p2);
       const numSteps = Math.max(2, Math.ceil(dist * Daydream.W / (2 * Math.PI)));
 
-      let pTemp = new THREE.Vector3();
+      let pTemp = vectorPool.acquire();
 
       for (let i = 0; i < numSteps; i++) {
         const t = i / (numSteps - 1);
@@ -493,7 +493,7 @@ export const Plot = {
         const R = Math.sqrt(Px * Px + Py * Py);
         const theta = Math.atan2(Py, Px);
 
-        let point = v.clone();
+        let point = vectorPool.acquire().copy(v);
         if (R > 0.0001) {
           const sinR = Math.sin(R);
           const cosR = Math.cos(R);
@@ -501,7 +501,7 @@ export const Plot = {
           const sinT = Math.sin(theta);
 
           // dir = u*cosT + w*sinT
-          const dir = u.clone().multiplyScalar(cosT).addScaledVector(w, sinT).normalize();
+          const dir = vectorPool.acquire().copy(u).multiplyScalar(cosT).addScaledVector(w, sinT).normalize();
           // p = v*cosR + dir*sinR
           point.multiplyScalar(cosR).addScaledVector(dir, sinR).normalize();
         }
@@ -581,7 +581,7 @@ export const Plot = {
         const cosT = Math.cos(theta);
         const sinT = Math.sin(theta);
 
-        const p = new THREE.Vector3()
+        const p = vectorPool.acquire()
           .copy(v).multiplyScalar(cosR)
           .addScaledVector(u, cosT * sinR)
           .addScaledVector(w, sinT * sinR)
@@ -781,10 +781,10 @@ export const Scan = {
       }
 
       // Calculate Basis
-      const v = normal.clone().applyQuaternion(orientation).normalize();
-      const ref = refAxis.clone().applyQuaternion(orientation).normalize();
-      const u = new THREE.Vector3().crossVectors(v, ref).normalize();
-      const w = new THREE.Vector3().crossVectors(v, u).normalize();
+      const v = vectorPool.acquire().copy(normal).applyQuaternion(orientation).normalize();
+      const ref = vectorPool.acquire().copy(refAxis).applyQuaternion(orientation).normalize();
+      const u = vectorPool.acquire().crossVectors(v, ref).normalize();
+      const w = vectorPool.acquire().crossVectors(v, u).normalize();
 
       const nx = v.x;
       const ny = v.y;

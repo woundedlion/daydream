@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, Dodecahedron, randomVector
+    Orientation, Dodecahedron, randomVector, vectorPool
 } from "../geometry.js";
 import { Plot } from "../draw.js";
 import {
@@ -74,19 +74,19 @@ export class Portholes {
 
     drawLayer(isInterference) {
         let lines = [];
-        const vertices = this.dodecahedron.vertices.map(v => new THREE.Vector3(...v).normalize());
+        const vertices = this.dodecahedron.vertices.map(v => vectorPool.acquire().set(...v).normalize());
         if (isInterference) {
             vertices.forEach((p, i) => {
                 // Create basis for tangent plane
                 const axis = (Math.abs(p.y) > 0.99) ? Daydream.X_AXIS : Daydream.Y_AXIS;
-                let u = new THREE.Vector3().crossVectors(p, axis).normalize();
-                let v = new THREE.Vector3().crossVectors(p, u).normalize();
+                let u = vectorPool.acquire().crossVectors(p, axis).normalize();
+                let v = vectorPool.acquire().crossVectors(p, u).normalize();
 
                 // Time based offset in tangent plane
                 const phase = i * 0.1;
                 const angle = this.t * this.offsetSpeed.get() * 2 * Math.PI + phase;
                 const r = this.offsetRadius.get();
-                const offset = u.clone().multiplyScalar(Math.cos(angle)).add(v.clone().multiplyScalar(Math.sin(angle))).multiplyScalar(r);
+                const offset = vectorPool.acquire().copy(u).multiplyScalar(Math.cos(angle)).addScaledVector(v, Math.sin(angle)).multiplyScalar(r);
                 p.add(offset).normalize();
             });
         }
@@ -113,7 +113,8 @@ export class Portholes {
         for (const line of allLines) {
             Plot.Line.draw(this.filters, line.u, line.v, (v, t) => {
                 const c = line.palette.get(t);
-                return { color: c.color, alpha: c.alpha * this.alpha };
+                c.alpha *= this.alpha;
+                return c;
             });
         }
     }

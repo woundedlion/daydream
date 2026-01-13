@@ -9,13 +9,13 @@ import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { stereo, invStereo, mobius, MobiusParams } from "../3dmath.js";
 import {
-    Orientation, sinWave
+    Orientation, sinWave, vectorPool, quaternionPool
 } from "../geometry.js";
 import {
     Plot, rasterize
 } from "../draw.js";
 import {
-    GenerativePalette
+    GenerativePalette, color4Pool
 } from "../color.js";
 import {
     Timeline, easeMid, Rotation, MutableNumber, PeriodicTimer, ColorWipe, MobiusWarp, Mutation
@@ -82,17 +82,25 @@ export class MobiusGrid {
         const logMax = 2.5;
         const range = logMax - logMin;
         const count = Math.ceil(numRings);
+        const q = quaternionPool.acquire(); // default identity
         for (let i = 0; i < count; i++) {
             let t = wrap(i / numRings + phase, 1.0);
             const logR = logMin + t * range;
             const R = Math.exp(logR);
             const radius = (4 / Math.PI) * Math.atan(1 / R);
-            const points = Plot.Polygon.sample(new THREE.Quaternion(), normal, radius, Daydream.W / 4);
+            const points = Plot.Polygon.sample(q, normal, radius, Daydream.W / 4);
 
             const transformedPoints = points.map(p => {
                 const z = stereo(p);
                 const w = mobius(z, mobiusParams);
-                let finalP = invStereo(w);
+                // Inline invStereo to usage vectorPool
+                const r2 = w.re * w.re + w.im * w.im;
+                const finalP = vectorPool.acquire().set(
+                    2 * w.re / (r2 + 1),
+                    2 * w.im / (r2 + 1),
+                    (r2 - 1) / (r2 + 1)
+                );
+
                 if (rotationQ) finalP.applyQuaternion(rotationQ);
                 return finalP;
             });
@@ -100,7 +108,8 @@ export class MobiusGrid {
             const opacity = Math.min(1.0, Math.max(0.0, numRings - i));
             rasterize(pipeline, transformedPoints, (p) => {
                 const res = this.palette.get(i / numRings);
-                return { color: res.color, alpha: res.alpha * opacity * this.alpha };
+                res.alpha *= opacity * this.alpha;
+                return res;
             }, true);
         }
     }
@@ -108,15 +117,21 @@ export class MobiusGrid {
     drawLongitudes(pipeline, numLines, mobiusParams, axisComponent, phase = 0, rotationQ) {
         const { a, b, c, d } = mobiusParams;
         const count = Math.ceil(numLines);
+        const q = quaternionPool.acquire();
         for (let i = 0; i < count; i++) {
             const theta = (i / numLines) * Math.PI;
-            const normal = new THREE.Vector3(Math.cos(theta), Math.sin(theta), 0);
+            const normal = vectorPool.acquire().set(Math.cos(theta), Math.sin(theta), 0);
             const radius = 1.0;
-            const points = Plot.Polygon.sample(new THREE.Quaternion(), normal, radius, Daydream.W / 4);
+            const points = Plot.Polygon.sample(q, normal, radius, Daydream.W / 4);
 
             const transformedPoints = points.map(p => {
                 let mp = mobius(stereo(p), mobiusParams);
-                let finalP = invStereo(mp);
+                const r2 = mp.re * mp.re + mp.im * mp.im;
+                const finalP = vectorPool.acquire().set(
+                    2 * mp.re / (r2 + 1),
+                    2 * mp.im / (r2 + 1),
+                    (r2 - 1) / (r2 + 1)
+                );
                 if (rotationQ) finalP.applyQuaternion(rotationQ);
                 return finalP;
             });
@@ -137,7 +152,8 @@ export class MobiusGrid {
                 const t = (logR - logMin) / range;
 
                 const res = this.palette.get(wrap(t - phase, 1.0));
-                return { color: res.color, alpha: res.alpha * opacity * this.alpha };
+                res.alpha *= opacity * this.alpha;
+                return res;
             }, true);
         }
     }
@@ -147,19 +163,38 @@ export class MobiusGrid {
         const phase = ((this.timeline.t || 0) % 120) / 120;
 
         // Calculate stabilizing counter-rotation
-        const nIn = Daydream.Z_AXIS.clone();
-        const nTrans = invStereo(mobius(stereo(nIn), this.params));
-        const sIn = Daydream.Z_AXIS.clone().negate();
-        const sTrans = invStereo(mobius(stereo(sIn), this.params));
-        const mid = new THREE.Vector3().addVectors(nTrans, sTrans).normalize();
-        const q = new THREE.Quaternion().setFromUnitVectors(mid, Daydream.Z_AXIS);
+        const nIn = vectorPool.acquire().copy(Daydream.Z_AXIS);
+        // inline stereo/mobius/invStereo for nTrans to use pool?
+        // For simplicity, just wrapping result of existing functions in pool if possible,
+        // but invStereo returns new Vector3.
+        // It's cleaner to just accept the allocation for these few calculation vectors 
+        // OR rewrite the math locally.
+        // Let's rewrite locally for nTrans/sTrans to be perfect.
+
+        const transform = (v) => {
+            const z = stereo(v);
+            const w = mobius(z, this.params);
+            const r2 = w.re * w.re + w.im * w.im;
+            return vectorPool.acquire().set(
+                2 * w.re / (r2 + 1),
+                2 * w.im / (r2 + 1),
+                (r2 - 1) / (r2 + 1)
+            );
+        };
+
+        const nTrans = transform(nIn);
+        const sIn = vectorPool.acquire().copy(Daydream.Z_AXIS).negate();
+        const sTrans = transform(sIn);
+
+        const mid = vectorPool.acquire().addVectors(nTrans, sTrans).normalize();
+        const q = quaternionPool.acquire().setFromUnitVectors(mid, Daydream.Z_AXIS);
 
         // Apply counter-rotation to holes
         this.holeN.origin.copy(nTrans).applyQuaternion(q);
         this.holeS.origin.copy(sTrans).applyQuaternion(q);
 
         // Draw directly with rotation
-        this.drawAxisRings(this.filters, Daydream.Z_AXIS.clone(), this.numRings.get(), this.params, 'y', phase, q);
+        this.drawAxisRings(this.filters, vectorPool.acquire().copy(Daydream.Z_AXIS), this.numRings.get(), this.params, 'y', phase, q);
         this.drawLongitudes(this.filters, this.numLines.get(), this.params, 'x', phase, q);
     }
 }

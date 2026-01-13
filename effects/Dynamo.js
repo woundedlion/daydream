@@ -169,14 +169,16 @@ export class Dynamo {
                 let from = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
                 Plot.Point.draw(this.filters, from, (v) => {
                     const c = this.color(v, 0);
-                    return { color: c.color || c, alpha: (c.alpha || 1) * 0.5 }; // pre-multiply opacity 0.5
+                    c.alpha = (c.alpha || 1) * 0.5;
+                    return c;
                 });
             } else {
                 let from = pixelToVector(this.nodes[i - 1].x, this.nodeY(this.nodes[i - 1]));
                 let to = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
                 Plot.Line.draw(this.filters, from, to, (v) => {
                     const c = this.color(v, 0);
-                    return { color: c.color || c, alpha: (c.alpha || 1) * 0.5 };
+                    c.alpha = (c.alpha || 1) * 0.5;
+                    return c;
                 });
             }
         }

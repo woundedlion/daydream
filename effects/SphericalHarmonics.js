@@ -102,10 +102,8 @@ export class SphericalHarmonics {
             val = Math.abs(val) * this.params.amplitude;
             const t = Math.tanh(val);
             const colorResult = richSunset.get(t);
-            return {
-                color: colorResult.color,
-                alpha: Math.min(1, val * 2)
-            };
+            colorResult.alpha = Math.min(1, val * 2);
+            return colorResult;
         });
     }
 
