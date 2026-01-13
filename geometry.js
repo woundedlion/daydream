@@ -12,6 +12,8 @@ import { StaticPool } from "./StaticPool.js";
 
 /** @type {StaticPool} Global pool for temporary Vector3 objects. */
 export const vectorPool = new StaticPool(THREE.Vector3, 500000);
+/** @type {StaticPool} Global pool for temporary Quaternion objects. */
+export const quaternionPool = new StaticPool(THREE.Quaternion, 1000000);
 /** @type {number} The golden ratio, (1 + sqrt(5)) / 2. */
 export const PHI = (1 + Math.sqrt(5)) / 2;
 /** @type {number} The inverse golden ratio, 1 / PHI. */
@@ -362,7 +364,8 @@ export class Orientation {
    * @returns {THREE.Vector3} The unoriented and normalized vector.
    */
   unorient(v, i = this.length() - 1) {
-    return vectorPool.acquire().copy(v).normalize().applyQuaternion(this.orientations[i].clone().invert());
+    const q = quaternionPool.acquire().copy(this.orientations[i]).invert();
+    return vectorPool.acquire().copy(v).normalize().applyQuaternion(q);
   }
 
   /**
@@ -388,7 +391,8 @@ export class Orientation {
     const oldHistory = this.orientations;
     const newHistory = new Array(count);
 
-    // Always keep start and end exact
+    // Always keep start and end exact. 
+    // Note: oldHistory[0] and oldHistory[end] are persistent (non-pooled) if they were the result of a collapse() or set().
     newHistory[0] = oldHistory[0];
     newHistory[count - 1] = oldHistory[oldHistory.length - 1];
 
@@ -402,8 +406,8 @@ export class Orientation {
       const idxB = Math.ceil(oldVal);
       const alpha = oldVal - idxA;
 
-      // Slerp between the two nearest existing points
-      newHistory[i] = oldHistory[idxA].clone().slerp(oldHistory[idxB], alpha);
+      // Slerp between the two nearest existing points using pooled objects
+      newHistory[i] = quaternionPool.acquire().copy(oldHistory[idxA]).slerp(oldHistory[idxB], alpha);
     }
 
     this.orientations = newHistory;
@@ -447,8 +451,11 @@ export class Orientation {
    * Collapses the history to just the most recent orientation.
    */
   collapse() {
-    if (this.orientations.length > 0) {
-      this.orientations = [this.orientations[this.orientations.length - 1]];
+    if (this.orientations.length > 1) {
+      // Copy last value into the first slot. 
+      // This ensures this.orientations[0] is always a persistent object (not from a pool that gets reset).
+      this.orientations[0].copy(this.orientations[this.orientations.length - 1]);
+      this.orientations.length = 1;
     }
   }
 }
@@ -571,10 +578,9 @@ export function lissajous(m1, m2, a, t) {
  * @param {Orientation} to - The target orientation.
  */
 export function rotateBetween(from, to) {
-  let diff = from.get().clone().conjugate().premultiply(to.get());
+  let diff = quaternionPool.acquire().copy(from.get()).conjugate().premultiply(to.get());
   let angle = 2 * Math.acos(diff.w);
   if (angle == 0) {
-    return
     return
   } else {
     var axis = vectorPool.acquire().set(diff.x, diff.y, diff.z).normalize();

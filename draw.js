@@ -5,7 +5,7 @@
 
 import * as THREE from "three";
 import { Daydream, labels, XY } from "./driver.js";
-import { Dot, angleBetween, fibSpiral, vectorPool, yToPhi } from "./geometry.js";
+import { Dot, angleBetween, fibSpiral, vectorPool, quaternionPool, yToPhi } from "./geometry.js";
 import { quinticKernel } from "./filters.js";
 import { wrap } from "./util.js";
 import { StaticPool } from "./StaticPool.js";
@@ -251,7 +251,7 @@ export const Plot = {
       }
 
       if (start != 0) {
-        let q = new THREE.Quaternion().setFromAxisAngle(w, start * a);
+        let q = quaternionPool.acquire().setFromAxisAngle(w, start * a);
         u.applyQuaternion(q).normalize();
       }
       a *= Math.abs(end - start);
@@ -269,7 +269,7 @@ export const Plot = {
         simAngle += step;
 
         // Advance simU
-        let q = new THREE.Quaternion().setFromAxisAngle(w, step);
+        let q = quaternionPool.acquire().setFromAxisAngle(w, step);
         simU.applyQuaternion(q).normalize();
       }
 
@@ -291,7 +291,7 @@ export const Plot = {
         let step = steps[i] * scale;
 
         // Advance u
-        let q = new THREE.Quaternion().setFromAxisAngle(w, step);
+        let q = quaternionPool.acquire().setFromAxisAngle(w, step);
         u.applyQuaternion(q).normalize();
         currentAngle += step;
 

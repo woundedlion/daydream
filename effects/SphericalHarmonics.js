@@ -17,10 +17,8 @@ import {
     easeMid,
     easeInOutSin
 } from "../animation.js";
-import { Orientation } from "../geometry.js";
+import { Orientation, quaternionPool, vectorPool } from "../geometry.js";
 import { createRenderPipeline } from "../filters.js";
-
-// --- Math Helpers ---
 
 const factorial = (n) => {
     if (n <= 1) return 1;
@@ -92,12 +90,12 @@ export class SphericalHarmonics {
         const l = Math.floor(Math.sqrt(idx));
         const m = idx - l * l - l;
 
-        const invQ = this.orientation.get().clone().invert();
+        const invQ = quaternionPool.acquire().copy(this.orientation.get()).invert();
 
         const pipeline = createRenderPipeline();
 
         Scan.Field.draw(pipeline, (p) => {
-            const v = p.clone().applyQuaternion(invQ);
+            const v = vectorPool.acquire().copy(p).applyQuaternion(invQ);
             const phi = Math.acos(Math.max(-1, Math.min(1, v.y)));
             const theta = Math.atan2(v.z, v.x);
             let val = sphericalHarmonic(l, m, theta, phi);
