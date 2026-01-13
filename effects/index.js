@@ -20,8 +20,7 @@ export { BZReactionDiffusion } from "./BZReactionDiffusion.js";
 export { PetalFlow } from "./PetalFlow.js";
 export { LSystem } from "./LSystem.js";
 
-export { TestScanPolygon } from "./TestScanPolygon.js";
-export { TestPlotPolygon } from "./TestPlotPolygon.js";
+export { TestShapes } from "./TestShapes.js";
 export { HopfFibration } from "./HopfFibration.js";
 export { Voronoi } from "./Voronoi.js";
 export { SphericalHarmonics } from "./SphericalHarmonics.js";
