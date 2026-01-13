@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, vectorPool
+    Orientation, randomVector
 } from "../geometry.js";
 import {
     VignettePalette, richSunset, mangoPeel, underSea, iceMelt,

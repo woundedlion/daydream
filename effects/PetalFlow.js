@@ -112,7 +112,6 @@ export class PetalFlow {
     }
 
     drawFrame() {
-        this.orientation.collapse();
         this.timeline.step();
         const time = (performance.now() / 1000.0) * (this.speed * 0.015);
         const loopCount = Math.floor(time / this.spacing.get());

@@ -57,8 +57,6 @@ export class Thrusters {
         this.alpha = 0.2;
         this.ring = new THREE.Vector3(0.5, 0.5, 0.5).normalize();
         this.orientation = new Orientation();
-
-        // Object Pool for Thrusters (Zero Allocation)
         this.poolSize = 16;
         this.thrusterPool = new StaticPool(ThrusterContext, this.poolSize);
 
@@ -158,7 +156,6 @@ export class Thrusters {
     }
 
     drawFrame() {
-        this.orientation.collapse();
         this.timeline.step();
         this.t++;
     }
