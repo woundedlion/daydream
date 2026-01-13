@@ -38,7 +38,7 @@ export class TestShapes {
         this.debugBB = false;
         this.numRings = 1;
         this.timeline = new Timeline();
-        this.radius = 0.4;
+        this.radius = 0.6;
         this.sides = 5;
 
         const seed = Math.floor(Math.random() * 65535);
