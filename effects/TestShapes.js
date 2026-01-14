@@ -25,9 +25,9 @@ import { createRenderPipeline, FilterAntiAlias } from "../filters.js";
 
 export class TestShapes {
     static Ring = class {
-        constructor(normal, color, mode) {
-            this.baseNormal = normal.clone(); // Immutable reference for rendering
-            this.simNormal = normal.clone();  // Mutable state for RandomWalk
+        constructor(normal, scale, color, mode) {
+            this.normal = normal;
+            this.scale = scale;
             this.color = color;
             this.mode = mode;
             this.orientation = new Orientation();
@@ -40,33 +40,29 @@ export class TestShapes {
         this.alpha = 0.5;
         this.shape = "Polygon";
         this.debugBB = false;
-        this.numRings = 1;
+        this.numShapes = 5; // Default to 5 pairs
         this.timeline = new Timeline();
         this.radius = 0.6;
         this.sides = 5;
 
-        const seed = Math.floor(Math.random() * 65535);
-        const totalColors = this.numRings * 2;
-        let colorCount = 0;
-
-        for (let i = 0; i < this.numRings; ++i) {
-            const c1Pool = iceMelt.get(colorCount / totalColors);
-            const c1 = new Color4(c1Pool.color, c1Pool.alpha);
-            colorCount++;
-            const c2Pool = iceMelt.get(colorCount / totalColors);
-            const c2 = new Color4(c2Pool.color, c2Pool.alpha);
-            colorCount++;
-
-            // Front Side (Scan) - MASTERS
-            const r1 = this.spawnRing(Daydream.X_AXIS, c1, 1, seed, "Scan", null);
-            const r2 = this.spawnRing(Daydream.X_AXIS, c2, -1, seed, "Scan", null);
-
-            // Back Side (Plot) - SLAVES (Mirror Masters)
-            this.spawnRing(Daydream.X_AXIS.clone().negate(), c1, 1, seed, "Plot", r1);
-            this.spawnRing(Daydream.X_AXIS.clone().negate(), c2, -1, seed, "Plot", r2);
-        }
-
         this.setupGUI();
+        this.rebuild();
+    }
+
+    rebuild() {
+        this.rings = [];
+        this.timeline = new Timeline(); // Reset timeline
+
+        const seed1 = Math.floor(Math.random() * 65535);
+        const seed2 = Math.floor(Math.random() * 65535);
+        const totalShapes = this.numShapes;
+
+        for (let i = 0; i < totalShapes; ++i) {
+            const t = i / (totalShapes > 1 ? totalShapes - 1 : 1);
+            const color = iceMelt.get(t).clone();
+            this.spawnRing(Daydream.X_AXIS, i / (totalShapes - 1), color, seed1, "Scan");
+            this.spawnRing(Daydream.X_AXIS.clone().negate(), i / (totalShapes - 1), color, seed1, "Plot");
+        }
     }
 
     // Radio Button Simulators
@@ -85,22 +81,21 @@ export class TestShapes {
         this.gui.add(this, 'radius').min(0).max(2).step(0.01).name("Radius");
         this.gui.add(this, 'sides').min(3).max(12).step(1).name("Sides");
 
+        this.gui.add(this, 'numShapes').min(1).max(20).step(1).name("Num Shapes").onChange(() => this.rebuild());
+
         this.gui.add(this, 'isPolygon').name("Polygon").listen();
         this.gui.add(this, 'isFlower').name("Flower").listen();
         this.gui.add(this, 'isStar').name("Star").listen();
         this.gui.add(this, 'debugBB').name('Show Bounding Boxes');
     }
 
-    spawnRing(normal, color, direction, seed, mode, master) {
-        let ring = new TestShapes.Ring(normal, color, mode);
-        ring.master = master;
+    spawnRing(normal, scale, color, seed, mode) {
+        let ring = new TestShapes.Ring(normal, scale, color, mode);
         this.rings.push(ring);
-
-        if (!master) {
-            // Only animate Masters
-            this.timeline.add(0, new RandomWalk(ring.orientation, ring.simNormal, seed));
-            this.timeline.add(0, new Rotation(ring.orientation, normal, direction * 2 * Math.PI, 160, easeMid, true, "Local"));
-        }
+        // Keep scan and plot shapes antipodal
+        const simNormal = (normal.x < -0.5) ? normal.clone().negate() : normal;
+        this.timeline.add(0, new RandomWalk(ring.orientation, simNormal, seed));
+        this.timeline.add(0, new Rotation(ring.orientation, ring.normal, 2 * Math.PI, 160, easeMid, true, "Local"));
         return ring;
     }
 
@@ -120,23 +115,22 @@ export class TestShapes {
             }
 
             const pipeline = (ring.mode === "Plot") ? plotPipeline : scanPipeline;
-            const drawNormal = this.normal || ring.baseNormal;
+            const drawNormal = ring.normal;
             if (ring.mode === "Plot") {
                 if (this.shape === "Flower") {
-                    Plot.Flower.draw(pipeline, ring.orientation.get(), drawNormal, this.radius, this.sides, colorFn);
+                    Plot.Flower.draw(pipeline, ring.orientation.get(), drawNormal, this.radius * ring.scale, this.sides, colorFn);
                 } else if (this.shape === "Star") {
-                    Plot.Star.draw(pipeline, ring.orientation.get(), drawNormal, this.radius, this.sides, colorFn);
+                    Plot.Star.draw(pipeline, ring.orientation.get(), drawNormal, this.radius * ring.scale, this.sides, colorFn);
                 } else {
-                    Plot.Polygon.draw(pipeline, ring.orientation.get(), drawNormal, this.radius, this.sides, colorFn);
+                    Plot.Polygon.draw(pipeline, ring.orientation.get(), drawNormal, this.radius * ring.scale, this.sides, colorFn);
                 }
             } else {
-                // Scan Mode
                 if (this.shape === "Flower") {
-                    Scan.Flower.draw(pipeline, ring.orientation.get(), drawNormal, this.radius, this.sides, colorFn, { debugBB: this.debugBB });
+                    Scan.Flower.draw(pipeline, ring.orientation.get(), drawNormal, this.radius * ring.scale, this.sides, colorFn, { debugBB: this.debugBB });
                 } else if (this.shape === "Star") {
-                    Scan.Star.draw(pipeline, ring.orientation.get(), drawNormal, this.radius, this.sides, colorFn, { debugBB: this.debugBB });
+                    Scan.Star.draw(pipeline, ring.orientation.get(), drawNormal, this.radius * ring.scale, this.sides, colorFn, { debugBB: this.debugBB });
                 } else {
-                    Scan.Polygon.draw(pipeline, ring.orientation.get(), drawNormal, this.radius, this.sides, colorFn, { debugBB: this.debugBB });
+                    Scan.Polygon.draw(pipeline, ring.orientation.get(), drawNormal, this.radius * ring.scale, this.sides, colorFn, { debugBB: this.debugBB });
                 }
             }
         }

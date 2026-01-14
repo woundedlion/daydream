@@ -47,10 +47,7 @@ export class Color4 {
   }
 
   clone() {
-    const c = color4Pool.acquire();
-    c.color.copy(this.color);
-    c.alpha = this.alpha;
-    return c;
+    return new Color4(this.color.r, this.color.g, this.color.b, this.alpha);
   }
 
   copy(other) {
