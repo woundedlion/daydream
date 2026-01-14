@@ -18,7 +18,7 @@ import {
     Color4
 } from "../color.js";
 import {
-    Timeline, Sprite, RandomWalk, MutableNumber, Rotation, easeMid
+    Timeline, Sprite, RandomWalk, MutableNumber, Rotation, Mutation, easeMid
 } from "../animation.js";
 import { Scan, Plot } from "../draw.js";
 import { createRenderPipeline, FilterAntiAlias } from "../filters.js";
@@ -36,16 +36,19 @@ export class TestShapes {
         }
     }
 
+    get twist() { return this._twist.get(); }
+    set twist(v) { this._twist.set(v); }
+
     constructor() {
         this.rings = [];
         this.alpha = 0.5;
         this.shape = "Polygon";
         this.debugBB = false;
-        this.numShapes = 10;
+        this.numShapes = 25;
         this.timeline = new Timeline();
         this.radius = 1.0;
         this.sides = 5;
-        this.twist = 0;
+        this._twist = new MutableNumber(0);
 
         this.setupGUI();
         this.rebuild();
@@ -54,14 +57,15 @@ export class TestShapes {
     rebuild() {
         this.rings = [];
         this.timeline = new Timeline(); // Reset timeline
+        this.timeline.add(0, new Mutation(this._twist, (t) => (Math.PI / 4) * Math.sin(t * Math.PI), 480, easeMid, true));
 
         const seed1 = Math.floor(Math.random() * 65535);
         const seed2 = Math.floor(Math.random() * 65535);
         const totalShapes = this.numShapes;
 
-        for (let i = 0; i < totalShapes; ++i) {
+        for (let i = totalShapes - 1; i >= 0; --i) {
             const t = i / (totalShapes > 1 ? totalShapes - 1 : 1);
-            const color = iceMelt.get(t).clone();
+            const color = richSunset.get(t).clone();
             this.spawnRing(Daydream.X_AXIS, i / (totalShapes - 1), color, seed1, "Scan", i);
             this.spawnRing(Daydream.X_AXIS.clone().negate(), i / (totalShapes - 1), color, seed1, "Plot", i);
         }
@@ -82,7 +86,7 @@ export class TestShapes {
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01).name("Alpha");
         this.gui.add(this, 'radius').min(0).max(2).step(0.01).name("Radius");
         this.gui.add(this, 'sides').min(3).max(12).step(1).name("Sides");
-        this.gui.add(this, 'twist').min(-Math.PI / 2).max(Math.PI).step(0.001).name("Twist");
+        this.gui.add(this, 'twist').min(-Math.PI / 2).max(Math.PI).step(0.001).name("Twist").listen();
 
         this.gui.add(this, 'numShapes').min(1).max(50).step(1).name("Num Shapes").onChange(() => this.rebuild());
 
