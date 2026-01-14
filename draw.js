@@ -608,25 +608,68 @@ export const Plot = {
         radius = 2.0 - radius;
       }
 
-      // Original logic: Projection Distortion of Antipodal Polygon
+      // The "flower" is the hole of an antipodal polygon.
+      // We draw the boundary of this polygon relative to the Antipode.
       const desiredOuterRadius = radius * (Math.PI / 2);
       const apothem = Math.PI - desiredOuterRadius;
-      const angle = Math.PI / numSides;
-      const polyRadiusRadians = apothem / Math.cos(angle);
+      const angleStep = Math.PI / numSides;
 
-      const polyRadiusNorm = polyRadiusRadians / (Math.PI / 2);
-
+      // Basis construction for the ANTIPODE
       const antiNormal = normal.clone().negate();
-      const points = Plot.Polygon.sample(orientationQuaternion, antiNormal, polyRadiusNorm, numSides, phase);
-
-      // Center for projection: The Antipode (which makes the straight lines of the polygon curved at the front)
-      let center = antiNormal.clone().applyQuaternion(orientationQuaternion).normalize();
-
-      for (let i = 0; i < points.length; i++) {
-        const p1 = points[i];
-        const p2 = points[(i + 1) % points.length];
-        Plot.PlanarLine.draw(pipeline, p1, p2, center, (t) => colorFn(p1, t));
+      let refAxis = Daydream.X_AXIS;
+      if (Math.abs(antiNormal.dot(refAxis)) > 0.9999) {
+        refAxis = Daydream.Y_AXIS;
       }
+      const v = antiNormal.clone().applyQuaternion(orientationQuaternion).normalize();
+      const ref = refAxis.clone().applyQuaternion(orientationQuaternion).normalize();
+      const u = vectorPool.acquire().crossVectors(v, ref).normalize();
+      const w = vectorPool.acquire().crossVectors(v, u).normalize();
+
+      const points = [];
+      const numSegments = Math.max(2, Math.floor(Daydream.W / numSides)); // Resolution per side
+
+      // Sample the analytical boundary: R(phi) = apothem / cos(phi)
+      for (let i = 0; i < numSides; i++) {
+        const sectorCenter = phase + i * 2 * angleStep;
+
+        for (let j = 0; j < numSegments; j++) {
+          // Sweep from -angleStep to +angleStep within the sector
+          // We intentionally overlap the end of one sector with start of next to ensure closure
+          // or we can just go 0..numSegments and carefully match logic.
+          // Standard polygon side logic: phi goes from -PI/sides to +PI/sides relative to sector center.
+          const t = j / numSegments;
+          const localPhi = -angleStep + t * (2 * angleStep);
+
+          let R = apothem / Math.cos(localPhi);
+
+          // Clamp R to PI to prevent wrapping past the pole (the "ears" artifact)
+          if (R > Math.PI) R = Math.PI;
+
+          const theta = sectorCenter + localPhi;
+
+          // Convert Polar (R, theta) on antipode centered map to 3D Sphere Point
+          // Point = v * cos(R) + (u*cos(theta) + w*sin(theta)) * sin(R)
+          const sinR = Math.sin(R);
+          const cosR = Math.cos(R);
+          const cosT = Math.cos(theta);
+          const sinT = Math.sin(theta);
+
+          const p = vectorPool.acquire()
+            .copy(v).multiplyScalar(cosR)
+            .addScaledVector(u, cosT * sinR)
+            .addScaledVector(w, sinT * sinR)
+            .normalize();
+
+          points.push(p);
+        }
+      }
+
+      // Close the loop
+      if (points.length > 0) {
+        points.push(vectorPool.acquire().copy(points[0]));
+      }
+
+      rasterize(pipeline, points, colorFn, false);
     }
   },
 
