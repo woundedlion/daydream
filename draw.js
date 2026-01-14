@@ -946,7 +946,7 @@ export const Scan = {
      * @param {Function} colorFn - (pos, t, dist) => {color, alpha}.
      * @param {Object} options - Options.
      */
-    static draw(pipeline, orientation, normal, radius, sides, colorFn, options = {}) {
+    static draw(pipeline, orientation, normal, radius, sides, colorFn, phase = 0, options = {}) {
       // Fix: If radius > 1, draw a polygon on the back side by flipping normal
       if (radius > 1.0) {
         normal = normal.clone().negate();
@@ -984,6 +984,7 @@ export const Scan = {
         R, alpha,
         pipeline,
         pixelWidth,
+        phase,
         debugBB: options.debugBB
       };
 
@@ -1075,6 +1076,7 @@ export const Scan = {
       const dotW = p.dot(ctx.w);
       let azimuth = Math.atan2(dotW, dotU);
       if (azimuth < 0) azimuth += 2 * Math.PI;
+      azimuth += ctx.phase;
 
       // SDF Logic
       const sectorAngle = 2 * Math.PI / ctx.sides;
@@ -1101,7 +1103,7 @@ export const Scan = {
   },
 
   Star: class {
-    static draw(pipeline, orientation, normal, radius, sides, colorFn, options = {}) {
+    static draw(pipeline, orientation, normal, radius, sides, colorFn, phase = 0, options = {}) {
       if (radius > 1.0) {
         normal = normal.clone().negate();
         radius = 2.0 - radius; // Invert radius
@@ -1150,6 +1152,7 @@ export const Scan = {
         colorFn,
         pixelWidth,
         pipeline,
+        phase,
         debugBB: options.debugBB
       };
 
@@ -1194,6 +1197,7 @@ export const Scan = {
       const dotW = p.dot(ctx.w);
       let azimuth = Math.atan2(dotW, dotU);
       if (azimuth < 0) azimuth += 2 * Math.PI;
+      azimuth += ctx.phase;
 
       const sectorAngle = 2 * Math.PI / ctx.sides;
       let localAzimuth = wrap(azimuth + sectorAngle / 2, sectorAngle) - sectorAngle / 2;
@@ -1222,7 +1226,7 @@ export const Scan = {
   },
 
   Flower: class {
-    static draw(pipeline, orientation, normal, radius, sides, colorFn, options = {}) {
+    static draw(pipeline, orientation, normal, radius, sides, colorFn, phase = 0, options = {}) {
       // Original logic: Antipodal Polygon Distortion
       if (radius > 1.0) {
         normal = normal.clone().negate();
@@ -1261,6 +1265,7 @@ export const Scan = {
         colorFn,
         pixelWidth,
         pipeline,
+        phase,
         debugBB: options.debugBB
       };
 
@@ -1306,6 +1311,7 @@ export const Scan = {
       const dotW = p.dot(ctx.w);
       let azimuth = Math.atan2(dotW, dotU);
       if (azimuth < 0) azimuth += 2 * Math.PI;
+      azimuth += ctx.phase;
       const sectorAngle = 2 * Math.PI / ctx.sides;
       const localAzimuth = wrap(azimuth + sectorAngle / 2, sectorAngle) - sectorAngle / 2;
 
