@@ -62,7 +62,7 @@ export class TestShapes {
         for (let i = 0; i < totalShapes; ++i) {
             const t = i / (totalShapes > 1 ? totalShapes - 1 : 1);
             const color = iceMelt.get(t).clone();
-            this.spawnRing(Daydream.X_AXIS, i / (totalShapes - 1), color, seed1, "Plot", i);
+            this.spawnRing(Daydream.X_AXIS, i / (totalShapes - 1), color, seed1, "Scan", i);
             this.spawnRing(Daydream.X_AXIS.clone().negate(), i / (totalShapes - 1), color, seed1, "Plot", i);
         }
     }
