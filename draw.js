@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { Daydream, labels, XY } from "./driver.js";
 import { Dot, angleBetween, fibSpiral, vectorPool, quaternionPool, yToPhi } from "./geometry.js";
 import { quinticKernel } from "./filters.js";
-import { wrap } from "./util.js";
+import { wrap, fastAtan2 } from "./util.js";
 import { StaticPool } from "./StaticPool.js";
 
 /** @type {StaticPool} Global pool for Dot objects. */
@@ -959,7 +959,7 @@ export const Scan = {
       // Calc Azimuth for Modulation
       const dotU = p.dot(ctx.u);
       const dotW = p.dot(ctx.w);
-      let azimuth = Math.atan2(dotW, dotU);
+      let azimuth = fastAtan2(dotW, dotU);
       if (azimuth < 0) azimuth += 2 * Math.PI;
 
       // Distorted Target
@@ -1123,7 +1123,7 @@ export const Scan = {
 
       const dotU = p.dot(ctx.u);
       const dotW = p.dot(ctx.w);
-      let azimuth = Math.atan2(dotW, dotU);
+      let azimuth = fastAtan2(dotW, dotU);
       if (azimuth < 0) azimuth += 2 * Math.PI;
       azimuth += ctx.phase;
 
@@ -1183,11 +1183,7 @@ export const Scan = {
 
       const pixelWidth = 2 * Math.PI / Daydream.W;
 
-      // Basis already extracted
-      const scanV = v; // Rename to match internal logic used below
-
-      // ... we used 'scanV' below, but it's just 'v'
-
+      const scanV = v;
       const scanNy = scanV.y;
 
       const ctx = {
@@ -1294,8 +1290,8 @@ export const Scan = {
       const thickness = desiredOuterRadius;
       if (thickness <= 0.0001) return;
 
-      // Basis Construction (Already done or passed in)
-      const scanV = v;
+      // Invert normal so that antipodal polygon appears at 'v'
+      const scanV = vectorPool.acquire().copy(v).negate();
 
       const pixelWidth = 2 * Math.PI / Daydream.W;
       const scanNy = scanV.y;
@@ -1430,8 +1426,9 @@ export const Scan = {
       const cosMin = Math.cos(angMax);
 
       const cosTarget = Math.cos(targetAngle);
-      const sinTarget = Math.sin(targetAngle);
-      const invSinTarget = Math.abs(sinTarget) > 0.001 ? 1.0 / sinTarget : 0;
+      // Optimization only valid if we are not near poles
+      const safeApprox = (targetAngle > 0.05 && targetAngle < Math.PI - 0.05);
+      const invSinTarget = safeApprox ? (1.0 / Math.sin(targetAngle)) : 0;
 
       const ctx = {
         normal: v, radius, thickness, colorFn,
@@ -1576,6 +1573,7 @@ export const Scan = {
         // dist ~= |dot - cos(target)| / sin(target)
         dist = Math.abs(dot - ctx.cosTarget) * ctx.invSinTarget;
       } else {
+        // Fallback to expensive acos for poles/small rings where linear approx fails
         const polarAngle = Math.acos(Math.max(-1, Math.min(1, dot)));
         dist = Math.abs(polarAngle - ctx.targetAngle);
       }
@@ -1588,7 +1586,7 @@ export const Scan = {
         // Calculate azimuth for t and/or sector check
         const dotU = p.dot(ctx.u);
         const dotW = p.dot(ctx.w);
-        let azimuth = Math.atan2(dotW, dotU);
+        let azimuth = fastAtan2(dotW, dotU);
         if (azimuth < 0) azimuth += 2 * Math.PI;
 
         azimuth += ctx.phase; // Apply phase
