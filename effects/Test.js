@@ -10,7 +10,7 @@ import { Daydream } from "../driver.js";
 import {
     Orientation, Dodecahedron, sinWave
 } from "../geometry.js";
-import { Plot, Scan } from "../draw.js";
+import { Plot, Scan, makeBasis } from "../draw.js";
 import {
     GenerativePalette
 } from "../color.js";
@@ -77,13 +77,15 @@ export class Test {
             const shiftFn = (t) => sinWave(this.amplitude.get(), -this.amplitude.get(), 4, 0)(t);
             const amplitude = this.amplitudeRange;
 
-            Scan.DistortedRing.draw(this.filters, this.orientation.get(), this.normal, radius, this.thickness,
+            const basis = makeBasis(this.orientation.get(), this.normal);
+            Scan.DistortedRing.draw(this.filters, basis, radius, this.thickness,
                 shiftFn, amplitude,
                 (p, t, dist) => {
                     const c = this.ringPalette.get(t); // t is normalized azimuth (0..1)
                     return { color: c.color, alpha: c.alpha * opacity * this.alpha };
                 },
-                { debugBB: this.debugBB }
+                0, // phase
+                this.debugBB // debugBB
             );
         }
     }

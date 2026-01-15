@@ -3,7 +3,6 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
@@ -12,7 +11,7 @@ import {
     Orientation, sinWave, vectorPool, quaternionPool
 } from "../geometry.js";
 import {
-    Plot, rasterize
+    Plot, rasterize, makeBasis
 } from "../draw.js";
 import {
     GenerativePalette, color4Pool
@@ -88,7 +87,8 @@ export class MobiusGrid {
             const logR = logMin + t * range;
             const R = Math.exp(logR);
             const radius = (4 / Math.PI) * Math.atan(1 / R);
-            const points = Plot.Polygon.sample(q, normal, radius, Daydream.W / 4);
+            const basis = makeBasis(q, normal);
+            const points = Plot.Polygon.sample(basis, radius, Daydream.W / 4);
 
             const transformedPoints = points.map(p => {
                 const z = stereo(p);
@@ -122,7 +122,8 @@ export class MobiusGrid {
             const theta = (i / numLines) * Math.PI;
             const normal = vectorPool.acquire().set(Math.cos(theta), Math.sin(theta), 0);
             const radius = 1.0;
-            const points = Plot.Polygon.sample(q, normal, radius, Daydream.W / 4);
+            const basis = makeBasis(q, normal);
+            const points = Plot.Polygon.sample(basis, radius, Daydream.W / 4);
 
             const transformedPoints = points.map(p => {
                 let mp = mobius(stereo(p), mobiusParams);
@@ -164,12 +165,6 @@ export class MobiusGrid {
 
         // Calculate stabilizing counter-rotation
         const nIn = vectorPool.acquire().copy(Daydream.Z_AXIS);
-        // inline stereo/mobius/invStereo for nTrans to use pool?
-        // For simplicity, just wrapping result of existing functions in pool if possible,
-        // but invStereo returns new Vector3.
-        // It's cleaner to just accept the allocation for these few calculation vectors 
-        // OR rewrite the math locally.
-        // Let's rewrite locally for nTrans/sTrans to be perfect.
 
         const transform = (v) => {
             const z = stereo(v);

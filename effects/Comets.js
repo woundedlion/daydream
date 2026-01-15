@@ -4,6 +4,7 @@
  */
 
 import * as THREE from "three";
+const _tempVec = new THREE.Vector3();
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
@@ -128,11 +129,15 @@ export class Comets {
                 if (t > 1.0) return;
                 const color4 = this.palette.get(t);
                 color4.alpha = color4.alpha * this.alpha * quinticKernel(1 - t);
-                const v = vectorPool.acquire().copy(node.v).applyQuaternion(q);
-                const orientedV = this.orientation.orient(v);
+
+                // transform node.v by trail quaternion 'q'
+                _tempVec.copy(node.v).applyQuaternion(q);
+
+                // orient the resulting vector by the object's current orientation
+                _tempVec.normalize().applyQuaternion(this.orientation.get());
 
                 const dot = dotPool.acquire();
-                dot.position.copy(orientedV);
+                dot.position.copy(_tempVec);
                 dot.color = color4.color;
                 dot.alpha = color4.alpha;
 

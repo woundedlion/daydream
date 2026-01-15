@@ -19,6 +19,9 @@ export const PHI = (1 + Math.sqrt(5)) / 2;
 /** @type {number} The inverse golden ratio, 1 / PHI. */
 export const G = 1 / PHI;
 
+const _tempSpherical = new THREE.Spherical();
+const _tempVec = new THREE.Vector3();
+
 /**
  * Represents a single point to be rendered, storing its position and color.
  */
@@ -102,10 +105,10 @@ export const pixelToSpherical = (x, y) => {
  * @returns {{x: number, y: number}} The pixel coordinates (x is wrapped).
  */
 export const vectorToPixel = (v) => {
-  let s = new THREE.Spherical().setFromVector3(v);
+  _tempSpherical.setFromVector3(v);
   return {
-    x: wrap((s.theta * Daydream.W) / (2 * Math.PI), Daydream.W),
-    y: (s.phi * (Daydream.H - 1)) / Math.PI,
+    x: wrap((_tempSpherical.theta * Daydream.W) / (2 * Math.PI), Daydream.W),
+    y: (_tempSpherical.phi * (Daydream.H - 1)) / Math.PI,
   };
 };
 
@@ -116,13 +119,13 @@ export const vectorToPixel = (v) => {
  * @returns {THREE.Vector3} The normalized 3D vector.
  */
 export const pixelToVector = (x, y) => {
-  let s = new THREE.Spherical(
+  const v = vectorPool.acquire();
+  _tempSpherical.set(
     1,
     (y * Math.PI) / (Daydream.H - 1),
     (x * 2 * Math.PI) / Daydream.W
   );
-  const v = vectorPool.acquire();
-  v.setFromSpherical(s);
+  v.setFromSpherical(_tempSpherical);
   return v;
 };
 
@@ -563,7 +566,7 @@ export function distanceGradient(v, normal) {
  * @returns {THREE.Vector3} The point on the sphere's surface.
  */
 export function lissajous(m1, m2, a, t) {
-  const v = vectorPool.acquire();
+  const v = _tempVec;
   v.set(
     Math.sin(m2 * t) * Math.cos(m1 * t - a * Math.PI),
     Math.cos(m2 * t),

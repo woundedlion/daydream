@@ -14,7 +14,7 @@ import {
     Plot
 } from "../draw.js";
 import {
-    GenerativePalette
+    GenerativePalette, color4Pool
 } from "../color.js";
 import {
     Timeline, easeMid, easeInOutSin, Transition, RandomTimer, MutableNumber, Rotation
@@ -51,9 +51,8 @@ export class Dynamo {
         this.orientation = new Orientation();
 
         // Filters
-        // Decay must be first to capture source points for trails
         this.filters = createRenderPipeline(
-            new FilterWorldTrails(this.trailLength),
+            new FilterWorldTrails(this.trailLength, Math.max(4096, Daydream.W * Daydream.H)),
             new FilterReplicate(3),
             new FilterOrient(this.orientation),
             new FilterAntiAlias()
@@ -132,7 +131,8 @@ export class Dynamo {
                 const c1 = this.palettes[i].get(t);
                 const c2 = this.palettes[i + 1].get(t);
 
-                return c1.clone().lerp(c2, clampedBlendFactor);
+                const result = color4Pool.acquire().copy(c1).lerp(c2, clampedBlendFactor);
+                return result;
             }
 
             const nextBoundaryLowerBlendEdge = (i + 1 < numBoundaries)

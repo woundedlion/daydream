@@ -11,7 +11,7 @@ import {
     Orientation, sinWave, quaternionPool, vectorPool
 } from "../geometry.js";
 import {
-    rasterize, Plot, Scan
+    rasterize, Plot, Scan, makeBasis
 } from "../draw.js";
 import {
     GenerativePalette
@@ -82,11 +82,11 @@ export class Moire {
 
     drawLayer(pipeline, palette, orientation) {
         const count = Math.ceil(this.density);
+        const basis = makeBasis(orientation.get(), Daydream.Z_AXIS);
         for (let i = 0; i <= count; i++) {
             const t = i / count;
             const r = t * 2.0;
-            const normal = Daydream.Z_AXIS;
-            Plot.DistortedRing.draw(this.filters, orientation.get(), normal, r,
+            Plot.DistortedRing.draw(this.filters, basis, r,
                 sinWave(-this.amp.get(), this.amp.get(), 4, 0), (v, t) => palette.get(t), this.rotation.get());
         }
     }

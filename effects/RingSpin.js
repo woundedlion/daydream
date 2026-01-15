@@ -16,7 +16,7 @@ import {
 import {
     Timeline, RandomWalk, OrientationTrail // Assuming you added it to animation.js
 } from "../animation.js";
-import { Scan } from "../draw.js";
+import { Scan, makeBasis } from "../draw.js";
 import { createRenderPipeline } from "../filters.js";
 import { tween, deepTween, dotPool } from "../draw.js";
 
@@ -87,7 +87,8 @@ export class RingSpin {
                 return dot;
             };
 
-            Scan.Ring.draw(pipeline, dot.q, dot.position, 1.0, this.thickness, colorFn, 0, this.debugBB);
+            const basis = makeBasis(dot.q, dot.position);
+            Scan.Ring.draw(pipeline, basis, 1.0, this.thickness, colorFn, 0, this.debugBB);
         }
     }
 }

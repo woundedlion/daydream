@@ -7,10 +7,10 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, angleBetween, sinWave, vectorPool
+    Orientation, angleBetween, sinWave, vectorPool, quaternionPool
 } from "../geometry.js";
 import {
-    Plot
+    Plot, makeBasis
 } from "../draw.js";
 import {
     ProceduralPalette, colorPool, color4Pool
@@ -81,7 +81,8 @@ export class Thrusters {
     }
 
     drawThruster(ctx, opacity) {
-        Plot.Ring.draw(this.filters, ctx.orientation.get(), ctx.point, ctx.radius.get(),
+        const basis = makeBasis(ctx.orientation.get(), ctx.point);
+        Plot.Ring.draw(this.filters, basis, ctx.radius.get(),
             (v, t) => {
                 let c = colorPool.acquire().setHex(0xffffff).multiplyScalar(opacity);
                 return color4Pool.acquire().set(c, opacity * this.alpha);
@@ -90,10 +91,13 @@ export class Thrusters {
 
     onFireThruster() {
         this.warpPhase = Math.random() * 2 * Math.PI;
+        const identity = quaternionPool.acquire().identity();
+        const basis = makeBasis(identity, this.ring);
+
         let thrustPoint = Plot.DistortedRing.point(
-            this.ringFn.bind(this), this.ring, 1, this.warpPhase);
+            this.ringFn.bind(this), basis, 1, this.warpPhase);
         let thrustOpp = Plot.DistortedRing.point(
-            this.ringFn.bind(this), this.ring, 1, (this.warpPhase + Math.PI));
+            this.ringFn.bind(this), basis, 1, (this.warpPhase + Math.PI));
 
         // warp ring
         if (!(this.warp === undefined || this.warp.done())) {
@@ -145,7 +149,8 @@ export class Thrusters {
     }
 
     drawRing(opacity) {
-        Plot.DistortedRing.draw(this.filters, this.orientation.get(), this.ring, this.radius.get(),
+        const basis = makeBasis(this.orientation.get(), this.ring);
+        Plot.DistortedRing.draw(this.filters, basis, this.radius.get(),
             this.ringFn.bind(this),
             (v, t) => {
                 let z = this.orientation.orient(Daydream.X_AXIS);
