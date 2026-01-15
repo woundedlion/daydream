@@ -111,3 +111,23 @@ export function smoothstep(min, max, x) {
   x = Math.max(0, Math.min(1, (x - min) / (max - min)));
   return x * x * (3 - 2 * x);
 }
+
+/**
+ * Fast approximation of atan2.
+ * Max error ~0.005 radians.
+ * @param {number} y 
+ * @param {number} x 
+ * @returns {number} Angle in radians
+ */
+export function fastAtan2(y, x) {
+  const abs_y = Math.abs(y) + 1e-10; // prevent 0/0
+  let r, angle;
+  if (x >= 0) {
+    r = (x - abs_y) / (x + abs_y);
+    angle = 0.785398 - 0.785398 * r;
+  } else {
+    r = (x + abs_y) / (abs_y - x);
+    angle = 2.356194 - 0.785398 * r;
+  }
+  return y < 0 ? -angle : angle;
+}
