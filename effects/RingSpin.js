@@ -73,9 +73,10 @@ export class RingSpin {
                 const c = ring.palette.get(t);
                 c.alpha = c.alpha * this.alpha;
                 const dot = dotPool.acquire();
-                dot.position.copy(ring.normal).applyQuaternion(q);
+                dot.position.copy(ring.normal);
                 dot.color = c.color;
                 dot.alpha = c.alpha;
+                dot.q = q;
                 dot.t = t;
                 this.renderPlanes.push(dot);
             });
@@ -86,7 +87,7 @@ export class RingSpin {
                 return dot;
             };
 
-            Scan.Ring.draw(pipeline, dot.position, 1.0, this.thickness, colorFn, 0, 2 * Math.PI, { debugBB: this.debugBB, computeT: false });
+            Scan.Ring.draw(pipeline, dot.q, dot.position, 1.0, this.thickness, colorFn, 0, this.debugBB);
         }
     }
 }

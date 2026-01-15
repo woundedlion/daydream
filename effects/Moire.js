@@ -11,7 +11,7 @@ import {
     Orientation, sinWave, quaternionPool, vectorPool
 } from "../geometry.js";
 import {
-    rasterize, Plot
+    rasterize, Plot, Scan
 } from "../draw.js";
 import {
     GenerativePalette
@@ -33,17 +33,25 @@ export class Moire {
         this.scale = new MutableNumber(1.0);
         this.rotation = new MutableNumber(0);
         this.amp = new MutableNumber(0);
-        this.orientation = new Orientation();
+        this.cameraOrientation = new Orientation();
+        this.layer1Orientation = new Orientation();
+        this.layer2Orientation = new Orientation();
+
         this.timeline = new Timeline();
 
         this.filters = createRenderPipeline(
-            new FilterOrient(this.orientation),
+            new FilterOrient(this.cameraOrientation),
             new FilterAntiAlias()
         );
 
+        const rotationAxis1 = new THREE.Vector3(1, 0, 1).normalize();
+        const rotationAxis2 = rotationAxis1.clone().negate();
+
         this.timeline
             .add(0, new PeriodicTimer(80, () => this.colorWipe()))
-            .add(0, new Rotation(this.orientation, Daydream.Y_AXIS, 2 * Math.PI, 300, easeMid, true))
+            .add(0, new Rotation(this.cameraOrientation, Daydream.Y_AXIS, 2 * Math.PI, 300, easeMid, true))
+            .add(0, new Rotation(this.layer1Orientation, rotationAxis1, 2 * Math.PI, 300, easeMid, true))
+            .add(0, new Rotation(this.layer2Orientation, rotationAxis2, 2 * Math.PI, 300, easeMid, true))
             .add(0,
                 new Transition(this.rotation, 2 * Math.PI, 160, easeMid, false, true)
                     .then(() => this.rotation.set(0)))
@@ -72,42 +80,23 @@ export class Moire {
         );
     }
 
-    drawLayer(pipeline, transform, palette) {
+    drawLayer(pipeline, palette, orientation) {
         const count = Math.ceil(this.density);
         for (let i = 0; i <= count; i++) {
             const t = i / count;
             const r = t * 2.0;
             const normal = Daydream.Z_AXIS;
-            const points = Plot.DistortedRing.sample(new THREE.Quaternion(), normal, r, sinWave(-this.amp.get(), this.amp.get(), 4, 0));
-            const transformedPoints = points.map(p => transform(p));
-            rasterize(pipeline, transformedPoints, (p) => palette.get(t), true);
+            Plot.DistortedRing.draw(this.filters, orientation.get(), normal, r,
+                sinWave(-this.amp.get(), this.amp.get(), 4, 0), (v, t) => palette.get(t), this.rotation.get());
         }
     }
 
-    rotate(p, axis) {
-        let q = quaternionPool.acquire().setFromAxisAngle(axis, this.rotation.get());
-        return p.applyQuaternion(q);
-    }
-
-    transform(p) {
-        p = this.rotate(p, Daydream.Z_AXIS);
-        p = this.rotate(p, Daydream.X_AXIS);
-        return p;
-    }
-
-    invTransform(p) {
-        const xAxisNeg = vectorPool.acquire().copy(Daydream.X_AXIS).negate();
-        const zAxisNeg = vectorPool.acquire().copy(Daydream.Z_AXIS).negate();
-        p = this.rotate(p, xAxisNeg);
-        p = this.rotate(p, zAxisNeg);
-        return p;
-    }
 
     drawFrame() {
-        this.orientation.collapse();
+        this.cameraOrientation.collapse();
         this.timeline.step();
 
-        this.drawLayer(this.filters, (p) => this.invTransform(p), this.basePalette); // Base layer
-        this.drawLayer(this.filters, (p) => this.transform(p), this.interferencePalette);  // Interference layer
+        this.drawLayer(this.filters, this.basePalette, this.layer1Orientation); // Base layer
+        this.drawLayer(this.filters, this.interferencePalette, this.layer2Orientation);  // Interference layer
     }
 }

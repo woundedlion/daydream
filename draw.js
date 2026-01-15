@@ -810,12 +810,11 @@ export const Scan = {
      * @param {number} radius - Base angular radius.
      * @param {number} thickness - Angular thickness.
      * @param {Function} shiftFn - (t: 0..1) => shift in radians.
-     * @param {number} amplitude - Max abs(shift) for bucket optimization.
+     * @param {number} maxDistortion - Max abs(shift) for bucket optimization.
      * @param {Function} materialFn - (pos, t, dist) => {color, alpha}.
      */
-    static draw(pipeline, orientation, normal, radius, thickness, shiftFn, amplitude, colorFn, options = {}) {
-      // Conservative bounds
-      const maxThickness = thickness + amplitude;
+    static draw(pipeline, orientation, normal, radius, thickness, shiftFn, maxDistortion, colorFn, phase = 0, debugBB = false) {
+      const maxThickness = thickness + maxDistortion;
 
       // Basis Construction matching Plot.Ring => Stable Twist
       let refAxis = Daydream.X_AXIS;
@@ -824,10 +823,10 @@ export const Scan = {
       }
 
       // Calculate Basis
-      const v = vectorPool.acquire().copy(normal).applyQuaternion(orientation).normalize();
-      const ref = vectorPool.acquire().copy(refAxis).applyQuaternion(orientation).normalize();
-      const u = vectorPool.acquire().crossVectors(v, ref).normalize();
-      const w = vectorPool.acquire().crossVectors(v, u).normalize();
+      const v = normal.clone().applyQuaternion(orientation).normalize();
+      const ref = refAxis.clone().applyQuaternion(orientation).normalize();
+      const u = new THREE.Vector3().crossVectors(v, ref).normalize();
+      const w = new THREE.Vector3().crossVectors(v, u).normalize();
 
       const nx = v.x;
       const ny = v.y;
@@ -842,26 +841,41 @@ export const Scan = {
         normal: v, radius, thickness, shiftFn, colorFn,
         nx, ny, nz, targetAngle, R, alpha, centerPhi,
         u, w,
+        phase,
         pipeline,
-        debugBB: options.debugBB,
+        debugBB,
         maxThickness // For bounding
       };
 
-      // Exact implementation of Ring's vertical bounds check but with maxThickness
       const a1 = centerPhi - targetAngle;
       const a2 = centerPhi + targetAngle;
-      const p1 = Math.acos(Math.cos(a1));
-      const p2 = Math.acos(Math.cos(a2));
-      const minP = Math.min(p1, p2);
-      const maxP = Math.max(p1, p2);
 
-      const phiMin = Math.max(0, minP - maxThickness);
-      const phiMax = Math.min(Math.PI, maxP + maxThickness);
+      let phiMin = 0;
+      let phiMax = Math.PI;
 
-      if (phiMin > phiMax) return;
+      if (a1 <= 0) {
+        phiMin = 0;
+      } else {
+        const p1 = Math.acos(Math.cos(a1));
+        const p2 = Math.acos(Math.cos(a2));
+        phiMin = Math.min(p1, p2);
+      }
 
-      const yMin = Math.max(0, Math.floor((phiMin * (Daydream.H - 1)) / Math.PI));
-      const yMax = Math.min(Daydream.H - 1, Math.ceil((phiMax * (Daydream.H - 1)) / Math.PI));
+      if (a2 >= Math.PI) {
+        phiMax = Math.PI;
+      } else {
+        const p1 = Math.acos(Math.cos(a1));
+        const p2 = Math.acos(Math.cos(a2));
+        phiMax = Math.max(p1, p2);
+      }
+
+      let finalPhiMin = Math.max(0, phiMin - boundThickness);
+      let finalPhiMax = Math.min(Math.PI, phiMax + boundThickness);
+
+      if (finalPhiMin > finalPhiMax) return;
+
+      const yMin = Math.max(0, Math.floor((finalPhiMin * (Daydream.H - 1)) / Math.PI));
+      const yMax = Math.min(Daydream.H - 1, Math.ceil((finalPhiMax * (Daydream.H - 1)) / Math.PI));
 
       for (let y = yMin; y <= yMax; y++) {
         Scan.DistortedRing.scanRow(y, ctx);
@@ -902,8 +916,6 @@ export const Scan = {
       const angleMin = Math.acos(maxCos);
       const angleMax = Math.acos(minCos);
 
-      // Pixel-aware threshold to prevent double-scanning due to floor/ceil overlap
-      // Width of one pixel in radians = 2 * PI / W
       const pixelWidth = 2 * Math.PI / Daydream.W;
       const safeThreshold = pixelWidth;
 
@@ -957,8 +969,13 @@ export const Scan = {
       if (azimuth < 0) azimuth += 2 * Math.PI;
 
       // Distorted Target
+      // Distorted Target
       const normAzimuth = azimuth / (2 * Math.PI);
-      const shift = ctx.shiftFn(normAzimuth);
+
+      const t = azimuth + ctx.phase;
+      const normT = t / (2 * Math.PI);
+
+      const shift = ctx.shiftFn(normT);
       const localTarget = ctx.targetAngle + shift;
 
       // Check Dist
@@ -989,7 +1006,7 @@ export const Scan = {
      * @param {Function} colorFn - (pos, t, dist) => {color, alpha}.
      * @param {Object} options - Options.
      */
-    static draw(pipeline, orientation, normal, radius, sides, colorFn, phase = 0, options = {}) {
+    static draw(pipeline, orientation, normal, radius, sides, colorFn, phase = 0, debugBB = false) {
       // Fix: If radius > 1, draw a polygon on the back side by flipping normal
       if (radius > 1.0) {
         normal = normal.clone().negate();
@@ -1028,7 +1045,7 @@ export const Scan = {
         pipeline,
         pixelWidth,
         phase,
-        debugBB: options.debugBB
+        debugBB
       };
 
       const targetAngle = 0;
@@ -1146,7 +1163,7 @@ export const Scan = {
   },
 
   Star: class {
-    static draw(pipeline, orientation, normal, radius, sides, colorFn, phase = 0, options = {}) {
+    static draw(pipeline, orientation, normal, radius, sides, colorFn, phase = 0, debugBB = false) {
       if (radius > 1.0) {
         normal = normal.clone().negate();
         radius = 2.0 - radius; // Invert radius
@@ -1196,7 +1213,7 @@ export const Scan = {
         pixelWidth,
         pipeline,
         phase,
-        debugBB: options.debugBB
+        debugBB
       };
 
       // Scan Bounding Box (around NORMAL)
@@ -1269,7 +1286,7 @@ export const Scan = {
   },
 
   Flower: class {
-    static draw(pipeline, orientation, normal, radius, sides, colorFn, phase = 0, options = {}) {
+    static draw(pipeline, orientation, normal, radius, sides, colorFn, phase = 0, debugBB = false) {
       // Original logic: Antipodal Polygon Distortion
       if (radius > 1.0) {
         normal = normal.clone().negate();
@@ -1309,7 +1326,7 @@ export const Scan = {
         pixelWidth,
         pipeline,
         phase,
-        debugBB: options.debugBB
+        debugBB
       };
 
       const centerPhi = Math.acos(scanNy);
@@ -1390,10 +1407,10 @@ export const Scan = {
      * @param {Function} colorFn - (pos, t, dist) => {color, alpha}.
      * @param {Object} options - Options.
      */
-    static draw(pipeline, normal, radius, colorFn, options = {}) {
+    static draw(pipeline, orientation, normal, radius, colorFn, phase = 0, debugBB = false) {
       // A circle is a ring with radius 0 and thickness = radius
       const thickness = radius * (Math.PI / 2);
-      Scan.Ring.draw(pipeline, normal, 0, thickness, colorFn, 0, 2 * Math.PI, options);
+      Scan.Ring.draw(pipeline, orientation, normal, 0, thickness, colorFn, phase, debugBB);
     }
   },
 
@@ -1401,27 +1418,28 @@ export const Scan = {
     /**
      * Scans a thick ring and feeds pixels into the pipeline.
      * @param {Object} pipeline - The render pipeline (must support plot2D).
-     * @param {Array} pixels - The pixel buffer (Daydream.pixels).
+     * @param {THREE.Quaternion} orientationQuaternion - Ring orientation.
      * @param {THREE.Vector3} normal - Ring orientation.
      * @param {number} radius - Angular radius (0-2).
      * @param {number} thickness - Angular thickness.
-     * @param {Function} materialFn - (pos, t, dist) => {color, alpha}.
-     * @param {number} [startAngle=0] - Start of the arc in radians.
-     * @param {number} [endAngle=6.28318] - End of the arc in radians.
+     * @param {Function} colorFn - (pos, t, dist) => {color, alpha}.
+     * @param {number} [phase=0] - Phase of the ring.
+     * @param {boolean} [debugBB=false] - Whether to show bounding boxes.
      */
-    static draw(pipeline, normal, radius, thickness, colorFn, startAngle = 0, endAngle = 2 * Math.PI, options = {}) {
-      // Pre-calculate properties
-      const nx = normal.x;
-      const ny = normal.y;
-      const nz = normal.z;
-
+    static draw(pipeline, orientationQuaternion, normal, radius, thickness, colorFn, phase = 0, debugBB = false) {
       // Basis
-      let ref = new THREE.Vector3(1, 0, 0); // X_AXIS
-      if (Math.abs(normal.dot(ref)) > 0.9999) {
-        ref.set(0, 1, 0); // Y_AXIS
+      let refAxis = Daydream.X_AXIS;
+      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
+        refAxis = Daydream.Y_AXIS;
       }
-      const u = new THREE.Vector3().crossVectors(normal, ref).normalize();
-      const w = new THREE.Vector3().crossVectors(normal, u).normalize();
+      let v = vectorPool.acquire().copy(normal).applyQuaternion(orientationQuaternion).normalize();
+      let ref = vectorPool.acquire().copy(refAxis).applyQuaternion(orientationQuaternion).normalize();
+      let u = vectorPool.acquire().crossVectors(v, ref).normalize();
+      let w = vectorPool.acquire().crossVectors(v, u).normalize();
+
+      const nx = v.x;
+      const ny = v.y;
+      const nz = v.z;
 
       const targetAngle = radius * (Math.PI / 2);
       const R = Math.sqrt(nx * nx + nz * nz);
@@ -1433,46 +1451,56 @@ export const Scan = {
       const cosMax = Math.cos(angMin); // Smaller angle = Larger cosine
       const cosMin = Math.cos(angMax);
 
-      const isFullCircle = Math.abs(endAngle - startAngle) >= 2 * Math.PI - 0.001;
-
       const cosTarget = Math.cos(targetAngle);
       const sinTarget = Math.sin(targetAngle);
       const invSinTarget = Math.abs(sinTarget) > 0.001 ? 1.0 / sinTarget : 0;
 
       const ctx = {
-        normal, radius, thickness, colorFn,
+        normal: v, radius, thickness, colorFn,
         nx, ny, nz, targetAngle, R, alpha, centerPhi,
         cosMin, cosMax, // Optimization
         cosTarget, invSinTarget, // Optimization (polarAngle)
-        u, w, startAngle, endAngle,
-        checkSector: !isFullCircle,
-        computeT: options.computeT !== undefined ? options.computeT : true, // Optimization for RingSpin
+        u, w, phase,
         pipeline,
-        clipPlanes: options.clipPlanes, // Injected options
-        limits: options.limits, // Injected options
-        debugBB: options.debugBB // Injected options
+        debugBB
       };
 
       // Vertical bounds
       const a1 = centerPhi - targetAngle;
       const a2 = centerPhi + targetAngle;
-      const p1 = Math.acos(Math.cos(a1));
-      const p2 = Math.acos(Math.cos(a2));
-      const minP = Math.min(p1, p2);
-      const maxP = Math.max(p1, p2);
 
-      let phiMin = Math.max(0, minP - thickness);
-      let phiMax = Math.min(Math.PI, maxP + thickness);
+      let phiMin = 0;
+      let phiMax = Math.PI;
 
-      if (ctx.limits) {
-        phiMin = Math.max(phiMin, ctx.limits.minPhi);
-        phiMax = Math.min(phiMax, ctx.limits.maxPhi);
+      if (a1 <= 0) {
+        phiMin = 0;
+      } else {
+        phiMin = Math.acos(Math.cos(a1)); // This calculates the "highest" point (closest to 0) which is correct if monotonic?
+        const p1 = Math.acos(Math.cos(a1));
+        const p2 = Math.acos(Math.cos(a2));
+        phiMin = Math.min(p1, p2);
       }
 
-      if (phiMin > phiMax) return;
+      if (a2 >= Math.PI) {
+        phiMax = Math.PI;
+      } else {
+        const p1 = Math.acos(Math.cos(a1));
+        const p2 = Math.acos(Math.cos(a2));
+        phiMax = Math.max(p1, p2);
+      }
 
-      const yMin = Math.max(0, Math.floor((phiMin * (Daydream.H - 1)) / Math.PI));
-      const yMax = Math.min(Daydream.H - 1, Math.ceil((phiMax * (Daydream.H - 1)) / Math.PI));
+      let finalPhiMin = Math.max(0, phiMin - thickness);
+      let finalPhiMax = Math.min(Math.PI, phiMax + thickness);
+
+      if (ctx.limits) {
+        finalPhiMin = Math.max(finalPhiMin, ctx.limits.minPhi);
+        finalPhiMax = Math.min(finalPhiMax, ctx.limits.maxPhi);
+      }
+
+      if (finalPhiMin > finalPhiMax) return;
+
+      const yMin = Math.max(0, Math.floor((finalPhiMin * (Daydream.H - 1)) / Math.PI));
+      const yMax = Math.min(Daydream.H - 1, Math.ceil((finalPhiMax * (Daydream.H - 1)) / Math.PI));
 
       for (let y = yMin; y <= yMax; y++) {
         Scan.Ring.scanRow(y, ctx);
@@ -1580,38 +1608,14 @@ export const Scan = {
         const aaAlpha = quinticKernel(1.0 - distT);
 
         // Calculate azimuth for t and/or sector check
-        let t = 0;
+        const dotU = p.dot(ctx.u);
+        const dotW = p.dot(ctx.w);
+        let azimuth = Math.atan2(dotW, dotU);
+        if (azimuth < 0) azimuth += 2 * Math.PI;
 
-        if (ctx.checkSector || ctx.computeT) {
-          const dotU = p.dot(ctx.u);
-          const dotW = p.dot(ctx.w);
-          let azimuth = Math.atan2(dotW, dotU);
-          if (azimuth < 0) azimuth += 2 * Math.PI;
+        azimuth += ctx.phase; // Apply phase
+        const t = azimuth / (2 * Math.PI); // Normalized t
 
-          if (ctx.checkSector) {
-            let inside = false;
-            if (ctx.startAngle <= ctx.endAngle) {
-              inside = (azimuth >= ctx.startAngle && azimuth <= ctx.endAngle);
-            } else {
-              inside = (azimuth >= ctx.startAngle || azimuth <= ctx.endAngle);
-            }
-            if (!inside) return;
-          }
-
-          if (ctx.computeT) {
-            // Normalize t based on angle range
-            if (Math.abs(ctx.endAngle - ctx.startAngle) > 0.0001) {
-              let relAz = azimuth - ctx.startAngle;
-              // handle wrap for sector crossing 0
-              if (ctx.startAngle > ctx.endAngle && relAz < 0) relAz += 2 * Math.PI;
-              t = relAz / (ctx.startAngle > ctx.endAngle ? (2 * Math.PI - (ctx.startAngle - ctx.endAngle)) : (ctx.endAngle - ctx.startAngle));
-            } else {
-              t = azimuth / (2 * Math.PI);
-            }
-          }
-        }
-
-        // Evaluate Material
         const c = ctx.colorFn(p, t, dist);
         const color = c.isColor ? c : (c.color || c);
         const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);

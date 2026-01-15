@@ -136,11 +136,11 @@ export class TestShapes {
                 }
             } else {
                 if (this.shape === "Flower") {
-                    Scan.Flower.draw(pipeline, orientation, drawNormal, this.radius * ring.scale, this.sides, colorFn, phase, { debugBB: this.debugBB });
+                    Scan.Flower.draw(pipeline, orientation, drawNormal, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
                 } else if (this.shape === "Star") {
-                    Scan.Star.draw(pipeline, orientation, drawNormal, this.radius * ring.scale, this.sides, colorFn, phase, { debugBB: this.debugBB });
+                    Scan.Star.draw(pipeline, orientation, drawNormal, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
                 } else {
-                    Scan.Polygon.draw(pipeline, orientation, drawNormal, this.radius * ring.scale, this.sides, colorFn, phase, { debugBB: this.debugBB });
+                    Scan.Polygon.draw(pipeline, orientation, drawNormal, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
                 }
             }
         }
