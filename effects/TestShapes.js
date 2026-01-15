@@ -20,7 +20,7 @@ import {
 import {
     Timeline, Sprite, RandomWalk, MutableNumber, Rotation, Mutation, easeMid
 } from "../animation.js";
-import { Scan, Plot } from "../draw.js";
+import { Scan, Plot, makeBasis } from "../draw.js";
 import { createRenderPipeline, FilterAntiAlias } from "../filters.js";
 
 export class TestShapes {
@@ -126,21 +126,23 @@ export class TestShapes {
 
             const pipeline = (ring.mode === "Plot") ? plotPipeline : scanPipeline;
             const drawNormal = ring.normal;
+            const basis = makeBasis(orientation, drawNormal);
+
             if (ring.mode === "Plot") {
                 if (this.shape === "Flower") {
-                    Plot.Flower.draw(pipeline, orientation, drawNormal, this.radius * ring.scale, this.sides, colorFn, phase);
+                    Plot.Flower.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase);
                 } else if (this.shape === "Star") {
-                    Plot.Star.draw(pipeline, orientation, drawNormal, this.radius * ring.scale, this.sides, colorFn, phase);
+                    Plot.Star.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase);
                 } else {
-                    Plot.Polygon.draw(pipeline, orientation, drawNormal, this.radius * ring.scale, this.sides, colorFn, phase);
+                    Plot.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase);
                 }
             } else {
                 if (this.shape === "Flower") {
-                    Scan.Flower.draw(pipeline, orientation, drawNormal, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
+                    Scan.Flower.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
                 } else if (this.shape === "Star") {
-                    Scan.Star.draw(pipeline, orientation, drawNormal, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
+                    Scan.Star.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
                 } else {
-                    Scan.Polygon.draw(pipeline, orientation, drawNormal, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
+                    Scan.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
                 }
             }
         }

@@ -7,10 +7,12 @@ import * as THREE from "three";
 import { Daydream, XY } from "./driver.js";
 import { wrap } from "./util.js"
 import { blendAlpha, colorPool } from "./color.js";
-import { vectorToPixel, angleBetween, vectorPool } from "./geometry.js";
-import { Plot, tween } from "./draw.js";
+import { vectorToPixel, angleBetween } from "./geometry.js";
+import { vectorPool } from "./geometry.js";
+import { Plot, tween, rasterize } from "./draw.js";
 
 const BLACK = new THREE.Color(0, 0, 0);
+const _tempVec = new THREE.Vector3();
 
 /**
  * Quintic kernel (smootherstep): 6t^5 - 15t^4 + 10t^3
@@ -180,7 +182,8 @@ export class FilterOrient {
    */
   plot(v, color, age, alpha, pass) {
     tween(this.orientation, (q, t) => {
-      pass(v.clone().applyQuaternion(q), color, age + 1.0 - t, alpha);
+      _tempVec.copy(v).applyQuaternion(q);
+      pass(_tempVec, color, age + 1.0 - t, alpha);
     });
   }
 }
@@ -341,8 +344,8 @@ export class FilterReplicate {
   plot(v, color, age, alpha, pass) {
     pass(v, color, age, alpha);
     for (let i = 1; i < this.count; i++) {
-      const r = v.clone().applyAxisAngle(Daydream.Y_AXIS, this.step * i);
-      pass(r, color, age, alpha);
+      _tempVec.copy(v).applyAxisAngle(Daydream.Y_AXIS, this.step * i);
+      pass(_tempVec, color, age, alpha);
     }
   }
 }
@@ -408,7 +411,7 @@ export class FilterMobius {
       const den_mag = den.re * den.re + den.im * den.im;
       if (den_mag < 0.000001) {
         // Result is Infinity -> North Pole
-        pass(vectorPool.acquire().set(0, 1, 0), color, age, alpha);
+        pass(Daydream.UP_AXIS, color, age, alpha);
         return;
       }
 
@@ -419,7 +422,7 @@ export class FilterMobius {
     const w_mag_sq = w.re * w.re + w.im * w.im;
     const inv_denom = 1 / (w_mag_sq + 1);
 
-    const v_out = vectorPool.acquire().set(
+    const v_out = _tempVec.set(
       2 * w.re * inv_denom,
       (w_mag_sq - 1) * inv_denom,
       2 * w.im * inv_denom

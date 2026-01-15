@@ -10,7 +10,7 @@ import { Daydream } from "../driver.js";
 import {
     Orientation, randomVector, angleBetween
 } from "../geometry.js";
-import { Plot } from "../draw.js";
+import { Plot, makeBasis } from "../draw.js";
 import {
     GenerativePalette
 } from "../color.js";
@@ -77,7 +77,8 @@ export class RingShower {
     }
 
     drawRing(opacity, ring) {
-        Plot.Ring.draw(this.filters, this.orientation.get(), ring.normal, ring.radius.get(),
+        const basis = makeBasis(this.orientation.get(), ring.normal);
+        Plot.Ring.draw(this.filters, basis, ring.radius.get(),
             (v, t) => {
                 let z = this.orientation.orient(Daydream.X_AXIS);
                 const c = ring.palette.get(angleBetween(z, v) / Math.PI);

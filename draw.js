@@ -15,6 +15,7 @@ export const dotPool = new StaticPool(Dot, 500000);
 
 // Reusable temporary objects to avoid allocation during render loops
 const _tempVec = new THREE.Vector3();
+const _lineSteps = new Float32Array(16384); // Max steps buffer
 
 
 /**
@@ -175,6 +176,24 @@ export const deepTween = (trail, drawFn) => {
   });
 }
 
+/**
+ * Creates a basis object { u, v, w } from an orientation and normal.
+ * @param {THREE.Quaternion} orientation - The orientation quaternion.
+ * @param {THREE.Vector3} normal - The local normal vector.
+ * @returns {{u: THREE.Vector3, v: THREE.Vector3, w: THREE.Vector3}} The basis vectors.
+ */
+export const makeBasis = (orientation, normal) => {
+  let refAxis = Daydream.X_AXIS;
+  if (Math.abs(normal.dot(refAxis)) > 0.9999) {
+    refAxis = Daydream.Y_AXIS;
+  }
+  let v = vectorPool.acquire().copy(normal).applyQuaternion(orientation).normalize();
+  let ref = _tempVec.copy(refAxis).applyQuaternion(orientation).normalize();
+  let u = vectorPool.acquire().crossVectors(v, ref).normalize();
+  let w = vectorPool.acquire().crossVectors(v, u).normalize();
+  return { u, v, w };
+};
+
 export const Plot = {
   Point: class {
     /**
@@ -259,18 +278,26 @@ export const Plot = {
       // Simulation Phase
       let simU = vectorPool.acquire().copy(u);
       let simAngle = 0;
-      let steps = [];
+      // Reuse static array avoids GC
+      let stepCount = 0;
       const baseStep = 2 * Math.PI / Daydream.W;
+
+      // Reuse quaternion for simulation loop
+      let simQ = quaternionPool.acquire();
 
       while (simAngle < a) {
         let scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - simU.y * simU.y)));
         let step = baseStep * scaleFactor;
-        steps.push(step);
+
+        if (stepCount < _lineSteps.length) {
+          _lineSteps[stepCount++] = step;
+        }
+
         simAngle += step;
 
-        // Advance simU
-        let q = quaternionPool.acquire().setFromAxisAngle(w, step);
-        simU.applyQuaternion(q).normalize();
+        // Advance simU using reused quaternion
+        simQ.setFromAxisAngle(w, step);
+        simU.applyQuaternion(simQ).normalize();
       }
 
       // Calculate Scale Factor
@@ -286,13 +313,17 @@ export const Plot = {
       const startAlpha = startC.alpha !== undefined ? startC.alpha : 1.0;
       pipeline.plot(u, startColor, 0, startAlpha);
 
-      let loopLimit = omitLast ? steps.length - 1 : steps.length;
-      for (let i = 0; i < loopLimit; i++) {
-        let step = steps[i] * scale;
+      let loopLimit = omitLast ? stepCount - 1 : stepCount;
 
-        // Advance u
-        let q = quaternionPool.acquire().setFromAxisAngle(w, step);
-        u.applyQuaternion(q).normalize();
+      // Reuse quaternion for drawing loop
+      let drawQ = quaternionPool.acquire();
+
+      for (let i = 0; i < loopLimit; i++) {
+        let step = _lineSteps[i] * scale;
+
+        // Advance u using reused quaternion
+        drawQ.setFromAxisAngle(w, step);
+        u.applyQuaternion(drawQ).normalize();
         currentAngle += step;
 
         // Normalized t
@@ -394,16 +425,8 @@ export const Plot = {
      * @param {number} [phase=0] - Starting phase.
      * @returns {THREE.Vector3[]} An array of points.
      */
-    static sample(orientationQuaternion, normal, radius, numSamples, phase = 0) {
-      // Basis
-      let refAxis = Daydream.X_AXIS;
-      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
-        refAxis = Daydream.Y_AXIS;
-      }
-      let v = vectorPool.acquire().copy(normal).applyQuaternion(orientationQuaternion).normalize();
-      let ref = vectorPool.acquire().copy(refAxis).applyQuaternion(orientationQuaternion).normalize();
-      let u = vectorPool.acquire().crossVectors(v, ref).normalize();
-      let w = vectorPool.acquire().crossVectors(v, u).normalize();
+    static sample(basis, radius, numSamples, phase = 0) {
+      const { u, v, w } = basis;
 
       // Backside rings
       let vDir = v.clone();
@@ -442,8 +465,8 @@ export const Plot = {
      * @param {Function} colorFn - Function to determine color.
      * @param {number} [phase=0] - Starting phase.
      */
-    static draw(pipeline, orientationQuaternion, normal, radius, colorFn, phase = 0) {
-      const points = Plot.Ring.sample(orientationQuaternion, normal, radius, Daydream.W / 4, phase);
+    static draw(pipeline, basis, radius, colorFn, phase = 0) {
+      const points = Plot.Ring.sample(basis, radius, Daydream.W / 4, phase);
       rasterize(pipeline, points, colorFn, true);
     }
   },
@@ -525,14 +548,16 @@ export const Plot = {
      * @param {Function} colorFn - Function to determine color.
      * @param {number} [phase=0] - Starting phase.
      */
-    static draw(pipeline, orientationQuaternion, normal, radius, numSides, colorFn, phase = 0) {
-      const points = Plot.Polygon.sample(orientationQuaternion, normal, radius, numSides, phase);
-      let center = normal.clone().applyQuaternion(orientationQuaternion).normalize();
+    static draw(pipeline, basis, radius, numSides, colorFn, phase = 0) {
+      const points = Plot.Polygon.sample(basis, radius, numSides, phase);
+
+      let center = basis.v; // Default center
 
       // Fix: If radius > 1, the points are on the backside.
       // To draw a regular convex polygon, we must project relative to the antipode.
       if (radius > 1.0) {
-        center.negate();
+        // Project relative to -v
+        center = vectorPool.acquire().copy(basis.v).negate();
       }
 
       for (let i = 0; i < points.length; i++) {
@@ -542,17 +567,21 @@ export const Plot = {
       }
     }
 
-    static sample(orientationQuaternion, normal, radius, numSides, phase = 0) {
+    static sample(basis, radius, numSides, phase = 0) {
       // Offset by half-sector to align with Scan.Polygon edges
       const offset = Math.PI / numSides;
-      return Plot.Ring.sample(orientationQuaternion, normal, radius, numSides, phase + offset);
+      return Plot.Ring.sample(basis, radius, numSides, phase + offset);
     }
   },
 
   Star: class {
-    static draw(pipeline, orientationQuaternion, normal, radius, numSides, colorFn, phase = 0) {
+    static draw(pipeline, basis, radius, numSides, colorFn, phase = 0) {
+      // Basis construction
+      let { v, u, w } = basis;
+
       if (radius > 1.0) {
-        normal = normal.clone().negate();
+        v = vectorPool.acquire().copy(v).negate();
+        u = vectorPool.acquire().copy(u).negate();
         radius = 2.0 - radius;
       }
 
@@ -561,16 +590,6 @@ export const Plot = {
 
       const points = [];
       const angleStep = Math.PI / numSides;
-
-      // Basis construction
-      let refAxis = Daydream.X_AXIS;
-      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
-        refAxis = Daydream.Y_AXIS;
-      }
-      const v = normal.clone().applyQuaternion(orientationQuaternion).normalize();
-      const ref = refAxis.clone().applyQuaternion(orientationQuaternion).normalize();
-      const u = vectorPool.acquire().crossVectors(v, ref).normalize();
-      const w = vectorPool.acquire().crossVectors(v, u).normalize();
 
       for (let i = 0; i < numSides * 2; i++) {
         const theta = phase + i * angleStep;
@@ -602,9 +621,14 @@ export const Plot = {
   },
 
   Flower: class {
-    static draw(pipeline, orientationQuaternion, normal, radius, numSides, colorFn, phase = 0) {
+    static draw(pipeline, basis, radius, numSides, colorFn, phase = 0) {
+      let { v, u, w } = basis;
+
       if (radius > 1.0) {
-        normal = normal.clone().negate();
+        // Switch to antipode basis
+        v = vectorPool.acquire().copy(v).negate();
+        u = vectorPool.acquire().copy(u).negate();
+
         radius = 2.0 - radius;
       }
 
@@ -614,16 +638,7 @@ export const Plot = {
       const apothem = Math.PI - desiredOuterRadius;
       const angleStep = Math.PI / numSides;
 
-      // Basis construction for the ANTIPODE
-      const antiNormal = normal.clone().negate();
-      let refAxis = Daydream.X_AXIS;
-      if (Math.abs(antiNormal.dot(refAxis)) > 0.9999) {
-        refAxis = Daydream.Y_AXIS;
-      }
-      const v = antiNormal.clone().applyQuaternion(orientationQuaternion).normalize();
-      const ref = refAxis.clone().applyQuaternion(orientationQuaternion).normalize();
-      const u = vectorPool.acquire().crossVectors(v, ref).normalize();
-      const w = vectorPool.acquire().crossVectors(v, u).normalize();
+      // Basis already set above (Antibasis if needed)
 
       const points = [];
       const numSegments = Math.max(2, Math.floor(Daydream.W / numSides)); // Resolution per side
@@ -683,20 +698,15 @@ export const Plot = {
      * @param {number} radius - The base radius.
      * @param {number} angle - The angle.
      */
-    static point(f, normal, radius, angle) {
-      let u = vectorPool.acquire();
-      let v = vectorPool.acquire().copy(normal);
-      let w = vectorPool.acquire();
+    static point(f, basis, radius, angle) { // f, basis, radius, angle
+      let { u, v, w } = basis;
+
       if (radius > 1) {
-        v.negate();
+        // Flip basis logic locally 
+        v = vectorPool.acquire().copy(v).negate();
+        u = vectorPool.acquire().copy(u).negate();
         radius = 2 - radius;
       }
-      if (Math.abs(v.dot(Daydream.X_AXIS)) > 0.99995) {
-        u.crossVectors(v, Daydream.Y_AXIS).normalize();
-      } else {
-        u.crossVectors(v, Daydream.X_AXIS).normalize();
-      }
-      w.crossVectors(v, u);
 
       let vi = Plot.Ring.calcPoint(angle, radius, u, v, w);
       let vp = Plot.Ring.calcPoint(angle, 1, u, v, w);
@@ -713,16 +723,9 @@ export const Plot = {
      * @param {Function} shiftFn - Shift function.
      * @param {number} [phase=0] - Phase.
      */
-    static sample(orientationQuaternion, normal, radius, shiftFn, phase = 0) {
+    static sample(basis, radius, shiftFn, phase = 0) {
       // Basis
-      let refAxis = Daydream.X_AXIS;
-      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
-        refAxis = Daydream.Y_AXIS;
-      }
-      let v = vectorPool.acquire().copy(normal).applyQuaternion(orientationQuaternion).normalize();
-      let ref = vectorPool.acquire().copy(refAxis).applyQuaternion(orientationQuaternion).normalize();
-      let u = vectorPool.acquire().crossVectors(v, ref).normalize();
-      let w = vectorPool.acquire().crossVectors(v, u).normalize();
+      const { v, u, w } = basis;
 
       // Backside rings
       let vSign = 1.0;
@@ -773,8 +776,8 @@ export const Plot = {
      * @param {Function} colorFn - Color function.
      * @param {number} [phase=0] - Phase.
      */
-    static draw(pipeline, orientationQuaternion, normal, radius, shiftFn, colorFn, phase = 0) {
-      const points = Plot.DistortedRing.sample(orientationQuaternion, normal, radius, shiftFn, phase);
+    static draw(pipeline, basis, radius, shiftFn, colorFn, phase = 0) {
+      const points = Plot.DistortedRing.sample(basis, radius, shiftFn, phase);
       rasterize(pipeline, points, colorFn, true);
     }
   },
@@ -813,20 +816,11 @@ export const Scan = {
      * @param {number} maxDistortion - Max abs(shift) for bucket optimization.
      * @param {Function} materialFn - (pos, t, dist) => {color, alpha}.
      */
-    static draw(pipeline, orientation, normal, radius, thickness, shiftFn, maxDistortion, colorFn, phase = 0, debugBB = false) {
+    static draw(pipeline, basis, radius, thickness, shiftFn, maxDistortion, colorFn, phase = 0, debugBB = false) {
       const maxThickness = thickness + maxDistortion;
 
-      // Basis Construction matching Plot.Ring => Stable Twist
-      let refAxis = Daydream.X_AXIS;
-      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
-        refAxis = Daydream.Y_AXIS;
-      }
-
-      // Calculate Basis
-      const v = normal.clone().applyQuaternion(orientation).normalize();
-      const ref = refAxis.clone().applyQuaternion(orientation).normalize();
-      const u = new THREE.Vector3().crossVectors(v, ref).normalize();
-      const w = new THREE.Vector3().crossVectors(v, u).normalize();
+      // Extract Basis
+      const { u, v, w } = basis;
 
       const nx = v.x;
       const ny = v.y;
@@ -869,8 +863,8 @@ export const Scan = {
         phiMax = Math.max(p1, p2);
       }
 
-      let finalPhiMin = Math.max(0, phiMin - boundThickness);
-      let finalPhiMax = Math.min(Math.PI, phiMax + boundThickness);
+      let finalPhiMin = Math.max(0, phiMin - maxThickness);
+      let finalPhiMax = Math.min(Math.PI, phiMax + maxThickness);
 
       if (finalPhiMin > finalPhiMax) return;
 
@@ -1006,25 +1000,20 @@ export const Scan = {
      * @param {Function} colorFn - (pos, t, dist) => {color, alpha}.
      * @param {Object} options - Options.
      */
-    static draw(pipeline, orientation, normal, radius, sides, colorFn, phase = 0, debugBB = false) {
+    static draw(pipeline, basis, radius, sides, colorFn, phase = 0, debugBB = false) {
       // Fix: If radius > 1, draw a polygon on the back side by flipping normal
+      let { v, u, w } = basis;
+
       if (radius > 1.0) {
-        normal = normal.clone().negate();
+        v = vectorPool.acquire().copy(v).negate();
+        u = vectorPool.acquire().copy(u).negate();
         radius = 2.0 - radius;
       }
 
       const thickness = radius * (Math.PI / 2); // Map 0-1 radius to 0-PI/2 angle
       if (thickness <= 0.0001) return;
 
-      // Basis Construction
-      let refAxis = Daydream.X_AXIS;
-      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
-        refAxis = Daydream.Y_AXIS;
-      }
-      const v = normal.clone().applyQuaternion(orientation).normalize();
-      const ref = refAxis.clone().applyQuaternion(orientation).normalize();
-      const u = new THREE.Vector3().crossVectors(v, ref).normalize();
-      const w = new THREE.Vector3().crossVectors(v, u).normalize();
+      // Basis already laid out
 
       const nx = v.x;
       const ny = v.y;
@@ -1163,9 +1152,11 @@ export const Scan = {
   },
 
   Star: class {
-    static draw(pipeline, orientation, normal, radius, sides, colorFn, phase = 0, debugBB = false) {
+    static draw(pipeline, basis, radius, sides, colorFn, phase = 0, debugBB = false) {
+      let { v, u, w } = basis;
       if (radius > 1.0) {
-        normal = normal.clone().negate();
+        v = vectorPool.acquire().copy(v).negate();
+        u = vectorPool.acquire().copy(u).negate();
         radius = 2.0 - radius; // Invert radius
       }
 
@@ -1192,15 +1183,11 @@ export const Scan = {
 
       const pixelWidth = 2 * Math.PI / Daydream.W;
 
-      // Basis Construction
-      let refAxis = Daydream.X_AXIS;
-      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
-        refAxis = Daydream.Y_AXIS;
-      }
-      const scanV = normal.clone().applyQuaternion(orientation).normalize();
-      const ref = refAxis.clone().applyQuaternion(orientation).normalize();
-      const u = new THREE.Vector3().crossVectors(scanV, ref).normalize();
-      const w = new THREE.Vector3().crossVectors(scanV, u).normalize();
+      // Basis already extracted
+      const scanV = v; // Rename to match internal logic used below
+
+      // ... we used 'scanV' below, but it's just 'v'
+
       const scanNy = scanV.y;
 
       const ctx = {
@@ -1286,10 +1273,14 @@ export const Scan = {
   },
 
   Flower: class {
-    static draw(pipeline, orientation, normal, radius, sides, colorFn, phase = 0, debugBB = false) {
+    static draw(pipeline, basis, radius, sides, colorFn, phase = 0, debugBB = false) {
       // Original logic: Antipodal Polygon Distortion
+
+      let { v, u, w } = basis;
+
       if (radius > 1.0) {
-        normal = normal.clone().negate();
+        v = vectorPool.acquire().copy(v).negate();
+        u = vectorPool.acquire().copy(u).negate();
         radius = 2.0 - radius;
       }
 
@@ -1303,18 +1294,12 @@ export const Scan = {
       const thickness = desiredOuterRadius;
       if (thickness <= 0.0001) return;
 
-      // Basis Construction
-      let refAxis = Daydream.X_AXIS;
-      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
-        refAxis = Daydream.Y_AXIS;
-      }
-      const scanV = normal.clone().applyQuaternion(orientation).normalize();
-      const ref = refAxis.clone().applyQuaternion(orientation).normalize();
-      const u = new THREE.Vector3().crossVectors(scanV, ref).normalize();
-      const w = new THREE.Vector3().crossVectors(scanV, u).normalize();
-      const scanNy = scanV.y;
+      // Basis Construction (Already done or passed in)
+      const scanV = v;
 
       const pixelWidth = 2 * Math.PI / Daydream.W;
+      const scanNy = scanV.y;
+
 
       const ctx = {
         scanNormal: scanV,
@@ -1407,10 +1392,10 @@ export const Scan = {
      * @param {Function} colorFn - (pos, t, dist) => {color, alpha}.
      * @param {Object} options - Options.
      */
-    static draw(pipeline, orientation, normal, radius, colorFn, phase = 0, debugBB = false) {
+    static draw(pipeline, basis, radius, colorFn, phase = 0, debugBB = false) {
       // A circle is a ring with radius 0 and thickness = radius
       const thickness = radius * (Math.PI / 2);
-      Scan.Ring.draw(pipeline, orientation, normal, 0, thickness, colorFn, phase, debugBB);
+      Scan.Ring.draw(pipeline, basis, 0, thickness, colorFn, phase, debugBB);
     }
   },
 
@@ -1426,16 +1411,9 @@ export const Scan = {
      * @param {number} [phase=0] - Phase of the ring.
      * @param {boolean} [debugBB=false] - Whether to show bounding boxes.
      */
-    static draw(pipeline, orientationQuaternion, normal, radius, thickness, colorFn, phase = 0, debugBB = false) {
+    static draw(pipeline, basis, radius, thickness, colorFn, phase = 0, debugBB = false) {
       // Basis
-      let refAxis = Daydream.X_AXIS;
-      if (Math.abs(normal.dot(refAxis)) > 0.9999) {
-        refAxis = Daydream.Y_AXIS;
-      }
-      let v = vectorPool.acquire().copy(normal).applyQuaternion(orientationQuaternion).normalize();
-      let ref = vectorPool.acquire().copy(refAxis).applyQuaternion(orientationQuaternion).normalize();
-      let u = vectorPool.acquire().crossVectors(v, ref).normalize();
-      let w = vectorPool.acquire().crossVectors(v, u).normalize();
+      const { v, u, w } = basis;
 
       const nx = v.x;
       const ny = v.y;
@@ -1659,7 +1637,10 @@ export const Scan = {
 
   Point: class {
     static draw(pipeline, pos, thickness, colorFn, options) {
-      Scan.Ring.draw(pipeline, pos, 0, thickness, colorFn, 0, 2 * Math.PI, options);
+      const identity = quaternionPool.acquire().identity();
+      const basis = makeBasis(identity, pos);
+      // Ring with radius 0, thickness specified.
+      Scan.Ring.draw(pipeline, basis, 0, thickness, colorFn, 0, options && options.debugBB);
     }
   },
 
