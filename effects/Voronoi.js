@@ -80,17 +80,29 @@ export class Voronoi {
             const maxDot1 = p.dot(bestSite.pos);
             const maxDot2 = secondBestSite ? p.dot(secondBestSite.pos) : -1.0;
 
-            const outColor = Daydream.pixels[i];
+            const i3 = i * 3;
 
             if (bestSite) {
-                outColor.copy(bestSite.color);
+                // Copy
+                Daydream.pixels[i3] = bestSite.color.r;
+                Daydream.pixels[i3 + 1] = bestSite.color.g;
+                Daydream.pixels[i3 + 2] = bestSite.color.b;
 
                 if (secondBestSite && this.smoothness > 0) {
                     const diff = maxDot1 - maxDot2;
                     let factor = Math.min(1.0, diff * this.smoothness);
                     factor = quinticKernel(factor);
                     const t = 0.5 + 0.5 * factor;
-                    outColor.lerp(secondBestSite.color, 1.0 - t);
+
+                    // Lerp
+                    // Color.lerp(target, alpha) => this + (target - this) * alpha
+                    const invT = 1.0 - t; // logic in original code was 1.0 - t
+                    // Original: outColor.lerp(secondBestSite.color, 1.0 - t);
+                    // Standard Three.js lerp is this + (target - this) * alpha
+
+                    Daydream.pixels[i3] += (secondBestSite.color.r - Daydream.pixels[i3]) * invT;
+                    Daydream.pixels[i3 + 1] += (secondBestSite.color.g - Daydream.pixels[i3 + 1]) * invT;
+                    Daydream.pixels[i3 + 2] += (secondBestSite.color.b - Daydream.pixels[i3 + 2]) * invT;
                 }
             }
 
@@ -98,13 +110,17 @@ export class Voronoi {
                 const dist1 = Math.acos(Math.min(1, maxDot1));
                 const dist2 = Math.acos(Math.min(1, maxDot2));
                 if (dist2 - dist1 < this.borderThickness) {
-                    outColor.setRGB(0, 0, 0);
+                    Daydream.pixels[i3] = 0;
+                    Daydream.pixels[i3 + 1] = 0;
+                    Daydream.pixels[i3 + 2] = 0;
                 }
             }
 
             if (this.showSites) {
                 if (maxDot1 > 0.999 && Math.acos(maxDot1) < 0.015) {
-                    outColor.setRGB(1, 1, 1);
+                    Daydream.pixels[i3] = 1;
+                    Daydream.pixels[i3 + 1] = 1;
+                    Daydream.pixels[i3 + 2] = 1;
                 }
             }
         }
