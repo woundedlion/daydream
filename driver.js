@@ -13,10 +13,10 @@ import { GUI } from "gui";
 import { colorPool, color4Pool } from "./color.js";
 import { dotPool } from "./draw.js";
 
-/** * Optimized LabelPool that removes objects from the Scene entirely.
- * This prevents CSS2DRenderer from traversing hidden objects.
- */
+// ... [LabelPool class remains unchanged] ...
+
 class LabelPool {
+  // ... (Keep existing implementation)
   constructor(scene) {
     this.scene = scene;
     this.pool = [];
@@ -78,6 +78,7 @@ export const keyPixel = (k) => k.split(',');
 export const XY = (x, y) => x + y * Daydream.W;
 
 export class Daydream {
+  // ... [Static configs remain unchanged] ...
   static SCENE_ANTIALIAS = true;
   static SCENE_ALPHA = true;
   static SCENE_BACKGROUND_COLOR = 0x000000;
@@ -95,13 +96,18 @@ export class Daydream {
   static FPS = 16;
   static DOT_SIZE = 2;
   static DOT_COLOR = 0x0000ff;
+
+  // OPTIMIZATION: pixelPositions remains an Array of Vectors (for geometry math)
+  // but pixels is now a Float32Array (flat buffer for colors)
   static pixelPositions = new Array(Daydream.W * Daydream.H);
+  static pixels = new Float32Array(Daydream.W * Daydream.H * 3);
 
   static X_AXIS = new THREE.Vector3(1, 0, 0);
   static Y_AXIS = new THREE.Vector3(0, 1, 0);
   static Z_AXIS = new THREE.Vector3(0, 0, 1);
 
   constructor() {
+    // ... [Constructor setup remains unchanged up to precomputeMatrices] ...
     THREE.ColorManagement.enabled = true;
     this.canvas = document.querySelector("#canvas");
 
@@ -138,13 +144,13 @@ export class Daydream {
 
     // Timing Variables
     this.clock = new THREE.Clock(true);
-    this.frameInterval = 1 / 16; // 62.5ms target
+    this.frameInterval = 1 / 16;
     this.timeAccumulator = 0;
 
     this.resources = [];
     this.labelPool = new LabelPool(this.scene);
 
-    // Optimized Geometry (Low Poly for high FPS rendering)
+    // Optimized Geometry
     this.dotGeometry = new THREE.SphereGeometry(
       Daydream.DOT_SIZE,
       8,
@@ -179,7 +185,7 @@ export class Daydream {
       linewidth: 5
     });
 
-    // --- Axis Geometries ---
+    // Axis Geometries
     let xAxisGeometry = new THREE.BufferGeometry().setFromPoints([
       Daydream.X_AXIS.clone().negate().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95),
       Daydream.X_AXIS.clone().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95)
@@ -224,12 +230,13 @@ export class Daydream {
     });
     this.resizeObserver.observe(this.canvas.parentElement);
 
-    Daydream.pixels = Array.from({ length: Daydream.W * Daydream.H }, () => new THREE.Color(0, 0, 0));
+    // Initialization
     this.pixelMatrices = [];
     this.precomputeMatrices();
     this.labelAxes = false;
   }
 
+  // ... [keydown and setCanvasSize remain unchanged] ...
   keydown(e) {
     if (e.key == ' ') {
       this.paused = !this.paused;
@@ -270,57 +277,36 @@ export class Daydream {
   }
 
   render(effect) {
-    // 1. Accumulate Time
     const delta = this.clock.getDelta();
     this.timeAccumulator += delta;
-
-    // Safety: prevent spiral of death
     if (this.timeAccumulator > 0.25) this.timeAccumulator = 0.25;
-
-    // EARLY EXIT: Enforce 16 FPS limit
-    // We only render when we have enough accumulated time for at least one simulation step.
     if (this.timeAccumulator < this.frameInterval) return;
 
-    // 2. SIMULATION LOOP (Runs exactly at 16 FPS / 62.5ms chunks)
-    // Removed while loop to ensure every simulation frame is rendered (no dropping).
     if (this.timeAccumulator >= this.frameInterval) {
       this.timeAccumulator -= this.frameInterval;
 
       if (!this.paused || this.stepFrames != 0) {
         if (this.stepFrames != 0) this.stepFrames--;
 
-        // Reset Pools
         colorPool.reset();
         color4Pool.reset();
         dotPool.reset();
         vectorPool.reset();
         quaternionPool.reset();
 
-        // Clear Pixels
-        for (let i = 0; i < Daydream.pixels.length; i++) {
-          Daydream.pixels[i].setHex(0);
-        }
+        // OPTIMIZATION: Fast Clear using TypedArray.fill
+        Daydream.pixels.fill(0);
 
-        // Draw Effect
         const start = performance.now();
         effect.drawFrame();
         const duration = performance.now() - start;
         const stats = document.getElementById("perf-stats");
         if (stats) stats.innerText = `${duration.toFixed(3)} ms`;
 
-        // Update GPU Colors (Direct Buffer Access)
-        const colorArray = this.dotMesh.instanceColor.array;
-        for (let i = 0; i < Daydream.pixels.length; i++) {
-          const pixelColor = Daydream.pixels[i];
-          const stride = i * 3;
-          colorArray[stride] = pixelColor.r;
-          colorArray[stride + 1] = pixelColor.g;
-          colorArray[stride + 2] = pixelColor.b;
-        }
-        // Mark for upload to GPU
+        // OPTIMIZATION: Zero-copy update.
+        // Daydream.pixels aliases the instanceColor buffer, so we just flag update.
         this.dotMesh.instanceColor.needsUpdate = true;
 
-        // Update Labels
         this.xAxis.visible = this.labelAxes;
         this.yAxis.visible = this.labelAxes;
         this.zAxis.visible = this.labelAxes;
@@ -350,9 +336,6 @@ export class Daydream {
         this.labelPool.cleanup();
       }
     }
-
-    // 3. RENDER LOOP (Runs at Monitor Refresh Rate / 60 FPS)
-    // This allows the camera to be smooth while the LEDs strobe at 16 FPS.
 
     this.controls.update();
 
@@ -423,15 +406,19 @@ export class Daydream {
       }
     }
 
-    // Allocate color buffer if missing
     if (this.dotMesh) {
       if (!this.dotMesh.instanceColor) {
+        // Create the buffer
         this.dotMesh.instanceColor = new THREE.InstancedBufferAttribute(
           new Float32Array(this.dotMesh.count * 3), 3
         );
       }
-      const colorArray = this.dotMesh.instanceColor.array;
-      colorArray.fill(0);
+
+      // OPTIMIZATION: Alias the global 'pixels' array to the geometry buffer.
+      // This means effects write DIRECTLY to the GPU staging area.
+      Daydream.pixels = this.dotMesh.instanceColor.array;
+      Daydream.pixels.fill(0);
+
       this.dotMesh.instanceMatrix.needsUpdate = true;
       this.dotMesh.instanceColor.needsUpdate = true;
     }
@@ -445,7 +432,6 @@ export class Daydream {
     this.scene.remove(this.dotMesh);
     this.dotGeometry.dispose();
 
-    // Maintain Low-Poly optimization
     this.dotGeometry = new THREE.SphereGeometry(
       Daydream.DOT_SIZE,
       8,
@@ -464,11 +450,11 @@ export class Daydream {
     this.dotMesh.frustumCulled = false;
     this.scene.add(this.dotMesh);
 
-    Daydream.pixels = Array.from({ length: Daydream.W * Daydream.H }, () => new THREE.Color(0, 0, 0));
+    // Re-run setup
     this.precomputeMatrices();
   }
 }
-
+// ... [Utility functions remain unchanged] ...
 export const prettify = (r) => {
   let precision = 3;
   if (Math.abs(r) <= 0.00001) return "0";
@@ -499,7 +485,7 @@ export const coordsLabel = (c) => {
       .setFromSphericalCoords(Daydream.SPHERE_RADIUS, s.phi, s.theta),
     content:
       `\u03B8, \u03A6 : ${prettify(s.theta)}, ${prettify(s.phi)}<br>
-       x, y, z : ${prettify(c[0])}, ${prettify(c[1])}, ${prettify(c[2])}<br>
-       x\u0302, y\u0302, z\u0302 : ${prettify(n.x)}, ${prettify(n.y)}, ${prettify(n.z)}`
+         x, y, z : ${prettify(c[0])}, ${prettify(c[1])}, ${prettify(c[2])}<br>
+         x\u0302, y\u0302, z\u0302 : ${prettify(n.x)}, ${prettify(n.y)}, ${prettify(n.z)}`
   };
 }

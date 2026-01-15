@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { G } from "./geometry.js";
 import { randomBetween } from "./util.js"
 import { StaticPool } from "./StaticPool.js";
+import { Daydream } from "./driver.js";
 
 /**
  * Represents a color with an alpha channel.
@@ -87,30 +88,37 @@ export class Palette {
 }
 
 /**
- * Returns a function that performs standard alpha blending.
- * C_result = C1 * (1 - a) + C2 * a
- * @param {THREE.Color} c1 - The first color.
- * @param {THREE.Color} c2 - The second color.
- * @param {number} a - The alpha value of the second color [0, 1].
- * @param {number} d - The destination color object.
- * @returns {function(THREE.Color, THREE.Color): THREE.Color} A blending function.
+ * Blends a color into the global pixel buffer at a specific index.
+ * Optimized for Float32Array (Flat Buffer) access.
+ * * @param {number} index - The pixel index (0 to W*H-1).
+ * @param {THREE.Color} color - The source color.
+ * @param {number} alpha - The alpha/opacity of the source (0.0 - 1.0).
  */
-export const blendAlpha = (c1, c2, a, d) => {
-  if (a <= 0.001) {
-    if (d !== c1) {
-      d.r = c1.r; d.g = c1.g; d.b = c1.b;
-    }
-    return d;
+export function blendAlpha(index, color, alpha) {
+  // 1. Calculate the memory address (stride)
+  const stride = index * 3;
+
+  // 2. Direct reference to the GPU buffer
+  const pixels = Daydream.pixels;
+
+  // Optimization: Skip invisible updates
+  if (alpha <= 0.001) return;
+
+  // Optimization: Fast Path for Opaque pixels (Replace)
+  if (alpha >= 0.999) {
+    pixels[stride] = color.r;
+    pixels[stride + 1] = color.g;
+    pixels[stride + 2] = color.b;
+    return;
   }
-  if (a >= 0.999) {
-    d.r = c2.r; d.g = c2.g; d.b = c2.b;
-    return d;
-  }
-  let invA = 1 - a;
-  d.r = c1.r * invA + c2.r * a;
-  d.g = c1.g * invA + c2.g * a;
-  d.b = c1.b * invA + c2.b * a;
-  return d;
+
+  // 3. Alpha Blending (Standard 'Over' operator)
+  // Formula: Out = Old * (1 - alpha) + New * alpha
+  const invAlpha = 1.0 - alpha;
+
+  pixels[stride] = pixels[stride] * invAlpha + color.r * alpha;
+  pixels[stride + 1] = pixels[stride + 1] * invAlpha + color.g * alpha;
+  pixels[stride + 2] = pixels[stride + 2] * invAlpha + color.b * alpha;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
