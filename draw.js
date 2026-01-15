@@ -726,7 +726,7 @@ export const Plot = {
       const d = Math.cos(thetaEq);
 
       // Calculate Samples
-      const numSamples = Daydream.W;
+      const numSamples = Daydream.W * 4;
       const step = 2 * Math.PI / numSamples;
       let points = [];
       let uTemp = vectorPool.acquire();

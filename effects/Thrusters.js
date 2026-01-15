@@ -99,6 +99,7 @@ export class Thrusters {
         let thrustOpp = Plot.DistortedRing.point(
             this.ringFn.bind(this), basis, 1, (this.warpPhase + Math.PI));
 
+
         // warp ring
         if (!(this.warp === undefined || this.warp.done())) {
             this.warp.cancel();
@@ -110,12 +111,12 @@ export class Thrusters {
         );
 
         // Spin ring
-        let thrustAxis = vectorPool.acquire().crossVectors(
+        let thrustAxis = new THREE.Vector3().crossVectors(
             this.orientation.orient(thrustPoint),
             this.orientation.orient(this.ring))
             .normalize();
         this.timeline.add(0,
-            new Rotation(this.orientation, thrustAxis, 2 * Math.PI, 8 * 16, easeOutExpo)
+            new Rotation(this.orientation, thrustAxis, 2 * Math.PI, 8 * 16, easeOutExpo, false)
         );
 
         // show thrusters
