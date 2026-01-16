@@ -6,6 +6,7 @@
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
+import { TWO_PI } from "../3dmath.js";
 import {
     Orientation, angleBetween, sinWave, vectorPool, quaternionPool
 } from "../geometry.js";
@@ -90,7 +91,7 @@ export class Thrusters {
     }
 
     onFireThruster() {
-        this.warpPhase = Math.random() * 2 * Math.PI;
+        this.warpPhase = Math.random() * TWO_PI;
         const identity = quaternionPool.acquire().identity();
         const basis = makeBasis(identity, this.ring);
 
@@ -116,7 +117,7 @@ export class Thrusters {
             this.orientation.orient(this.ring))
             .normalize();
         this.timeline.add(0,
-            new Rotation(this.orientation, thrustAxis, 2 * Math.PI, 8 * 16, easeOutExpo, false)
+            new Rotation(this.orientation, thrustAxis, TWO_PI, 8 * 16, easeOutExpo, false)
         );
 
         // show thrusters

@@ -10,6 +10,7 @@ import { Daydream } from "../driver.js";
 import {
     Orientation, Dodecahedron, randomVector, vectorPool
 } from "../geometry.js";
+import { TWO_PI } from "../3dmath.js";
 import { Plot } from "../draw.js";
 import {
     GenerativePalette
@@ -84,7 +85,7 @@ export class Portholes {
 
                 // Time based offset in tangent plane
                 const phase = i * 0.1;
-                const angle = this.t * this.offsetSpeed.get() * 2 * Math.PI + phase;
+                const angle = this.t * this.offsetSpeed.get() * TWO_PI + phase;
                 const r = this.offsetRadius.get();
                 const offset = vectorPool.acquire().copy(u).multiplyScalar(Math.cos(angle)).addScaledVector(v, Math.sin(angle)).multiplyScalar(r);
                 p.add(offset).normalize();
@@ -126,7 +127,7 @@ export class Portholes {
         // Spin alternating directions over 5 seconds (80 frames)
         for (let i = 0; i < this.orientations.length; i++) {
             const direction = (i % 2 === 0) ? 1 : -1;
-            this.timeline.add(0, new Rotation(this.orientations[i], axis, direction * 2 * Math.PI, 80, easeInOutSin, false));
+            this.timeline.add(0, new Rotation(this.orientations[i], axis, direction * TWO_PI, 80, easeInOutSin, false));
         }
     }
 }

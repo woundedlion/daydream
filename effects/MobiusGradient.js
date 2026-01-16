@@ -55,7 +55,7 @@ export class MobiusGradient {
         this.timeline.step();
 
         const offset = this.offset.get();
-        const count = Daydream.pixels.length;
+        const count = Daydream.pixelPositions.length;
 
         for (let i = 0; i < count; i++) {
             const p = Daydream.pixelPositions[i];
@@ -69,7 +69,11 @@ export class MobiusGradient {
 
             // 3. Sample Palette
             const c = this.palette.get(warpedT);
-            Daydream.pixels[i].copy(c.color);
+
+            const stride = i * 3;
+            Daydream.pixels[stride] = c.color.r;
+            Daydream.pixels[stride + 1] = c.color.g;
+            Daydream.pixels[stride + 2] = c.color.b;
         }
     }
 }

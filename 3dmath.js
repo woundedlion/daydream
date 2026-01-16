@@ -6,6 +6,8 @@
 import * as THREE from "three";
 import { MutableNumber } from "./animation.js";
 
+export const TWO_PI = 2 * Math.PI;
+
 // Complex number operations
 function cAdd(a, b) { return { re: a.re + b.re, im: a.im + b.im }; }
 function cMult(a, b) { return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re }; }

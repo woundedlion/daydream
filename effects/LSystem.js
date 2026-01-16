@@ -11,6 +11,7 @@ import { Plot } from "../draw.js";
 import { createRenderPipeline, FilterOrient, FilterAntiAlias } from "../filters.js";
 import { Timeline, Rotation, easeMid } from "../animation.js";
 import { GenerativePalette } from "../color.js";
+import { TWO_PI } from "../3dmath.js";
 
 class SphericalTurtle {
     constructor(pos, heading) {
@@ -116,7 +117,7 @@ export class LSystem {
         this.regenerate();
 
         // Spin the tree
-        this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, 2 * Math.PI, 1200, easeMid, true));
+        this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, TWO_PI, 1200, easeMid, true));
     }
 
     regenerate() {

@@ -232,11 +232,9 @@ export const Plot = {
     static draw(pipeline, v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast = false) {
       let u = vectorPool.acquire().copy(v1);
       let v = vectorPool.acquire().copy(v2);
-      let a = v1.angleTo(v2);
+      let a = angleBetween(u, v);
       let w = vectorPool.acquire();
-
-      // ... (Basis Setup logic remains the same) ...
-      if (Math.abs(a) < 0.0001) { /* ... same ... */ return; }
+      if (Math.abs(a) < 0.0001) { return; }
 
       if (Math.abs(Math.PI - a) < 0.0001) {
         if (Math.abs(u.dot(Daydream.X_AXIS)) > 0.9999) w.crossVectors(u, Daydream.Y_AXIS).normalize();

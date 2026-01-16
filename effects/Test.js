@@ -11,6 +11,7 @@ import {
     Orientation, Dodecahedron, sinWave
 } from "../geometry.js";
 import { Plot, Scan, makeBasis } from "../draw.js";
+import { TWO_PI } from "../3dmath.js";
 import {
     GenerativePalette
 } from "../color.js";
@@ -39,7 +40,7 @@ export class Test {
         this.poly = new Dodecahedron();
         this.numRings = 1;
         this.debugBB = false;
-        this.thickness = 4 * 2 * Math.PI / Daydream.W;
+        this.thickness = 4 * TWO_PI / Daydream.W;
 
         //    this.timeline.add(0,
         //      new Sprite((opacity) => this.drawPoly(opacity), -1, 48, easeMid, 0, easeMid)
