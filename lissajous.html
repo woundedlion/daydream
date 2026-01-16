@@ -211,13 +211,14 @@
         };
 
         const SLATE_900 = getCssColor('--slate-900');
+        const TWO_PI = 2 * Math.PI;
 
         // --- Configuration and State ---
         const config = {
             C1: { min: 1, max: 100, step: 0.01, default: 12, scale: 100, label: "C₁" },
             C2: { min: 1, max: 100, step: 0.01, default: 5, scale: 100, label: "C₂" },
-            A: { min: 0, max: (2 * Math.PI), step: (2 * Math.PI) / 1000, default: 0, scale: 1000 / (2 * Math.PI), label: "A (rad)" },
-            Duration: { min: 0, max: (8 * Math.PI), step: (2 * Math.PI) / 500, default: 2 * Math.PI, scale: 1000 / (2 * Math.PI), label: "Domain" },
+            A: { min: 0, max: TWO_PI, step: TWO_PI / 1000, default: 0, scale: 1000 / TWO_PI, label: "A (rad)" },
+            Duration: { min: 0, max: (4 * TWO_PI), step: TWO_PI / 500, default: TWO_PI, scale: 1000 / TWO_PI, label: "Domain" },
             // FIX: Added scale: 1 to Samples to prevent NaN in slider initialization
             Samples: { min: 200, max: 10000, step: 1, default: 4000, scale: 1, label: "Samples" }
         };
@@ -412,10 +413,10 @@
             let newDomain;
             if (activeId === 'C1') {
                 // Ratio was C₁/C₂ ≈ M/N. T = (2π * N) / C₂
-                newDomain = (2 * Math.PI * N) / passiveC; // passiveC = C₂
+                newDomain = (TWO_PI * N) / passiveC; // passiveC = C₂
             } else {
                 // Active was C₂. Ratio was C₂/C₁ ≈ M/N. T = (2π * N) / C₁
-                newDomain = (2 * Math.PI * N) / passiveC; // passiveC = C₁
+                newDomain = (TWO_PI * N) / passiveC; // passiveC = C₁
                 // Note: findBestRationalRatio always gives M/N for (active/passive).
                 // If active=C₂, targetRatio=C₂/C₁. We get M/N ≈ C₂/C₁.
                 // T = (2π * M) / C₂ or T = (2π * N) / C₁.
@@ -510,13 +511,13 @@
             // --- NEW: Format the domain string ---
             const domain = state.Duration;
             let domainStr = "";
-            const twoPi = 2 * Math.PI;
+            const twoPi = TWO_PI;
             // Check for multiples of 2*PI within a small tolerance
             const multiple = domain / twoPi;
 
             if (Math.abs(multiple - Math.round(multiple)) < 0.001 && Math.round(multiple) > 0) {
                 const N = Math.round(multiple);
-                domainStr = (N === 1) ? "2 * Math.PI" : `${N} * 2 * Math.PI`;
+                domainStr = (N === 1) ? "TWO_PI" : `${N} * TWO_PI`;
             } else {
                 domainStr = f(domain, 3); // Use the formatted float value
             }

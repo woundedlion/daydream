@@ -4,6 +4,7 @@
  */
 
 import * as THREE from "three";
+import { TWO_PI } from "../3dmath.js";
 import { gui } from "../gui.js";
 import { Daydream } from "../driver.js";
 import { Scan } from "../draw.js";
@@ -53,7 +54,7 @@ const associatedLegendre = (l, m, x) => {
 
 const sphericalHarmonic = (l, m, theta, phi) => {
     let absM = Math.abs(m);
-    const N = Math.sqrt(((2 * l + 1) / (4 * Math.PI)) * (factorial(l - absM) / factorial(l + absM)));
+    const N = Math.sqrt(((2 * l + 1) / (2 * TWO_PI)) * (factorial(l - absM) / factorial(l + absM)));
     const P = associatedLegendre(l, absM, Math.cos(phi));
 
     if (m > 0) {
@@ -80,7 +81,7 @@ export class SphericalHarmonics {
         this.orientation = new Orientation();
 
         const axis = new THREE.Vector3(0.5, 1, 0.2).normalize();
-        this.timeline.add(0, new Rotation(this.orientation, axis, Math.PI * 2 * 100, 10000, easeMid, true));
+        this.timeline.add(0, new Rotation(this.orientation, axis, TWO_PI * 100, 10000, easeMid, true));
     }
 
     drawFrame() {

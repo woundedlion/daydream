@@ -10,6 +10,7 @@ import { blendAlpha, colorPool } from "./color.js";
 import { vectorToPixel, angleBetween } from "./geometry.js";
 import { vectorPool } from "./geometry.js";
 import { Plot, tween, rasterize } from "./draw.js";
+import { TWO_PI } from "./3dmath.js";
 
 const BLACK = new THREE.Color(0, 0, 0);
 const _tempVec = new THREE.Vector3();
@@ -330,7 +331,7 @@ export class FilterReplicate {
   constructor(count) {
     this.is2D = false;
     this.count = count;
-    this.step = 2 * Math.PI / count;
+    this.step = TWO_PI / count;
   }
 
   /**

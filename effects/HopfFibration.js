@@ -4,7 +4,7 @@ import { gui } from "../gui.js";
 import { Daydream } from "../driver.js";
 import { vectorPool, Orientation } from "../geometry.js";
 import { Plot, rasterize } from "../draw.js";
-import { stereo } from "../3dmath.js";
+import { stereo, TWO_PI } from "../3dmath.js";
 import { createRenderPipeline, FilterAntiAlias, FilterWorldTrails, FilterOrient } from "../filters.js";
 import { richSunset } from "../color.js";
 import { Timeline, Rotation, easeMid } from "../animation.js";
@@ -48,8 +48,8 @@ export class HopfFibration {
 
         // Timeline with standard Rotation animation
         this.timeline = new Timeline();
-        const duration = this.cameraSpeed > 0 ? (2 * Math.PI / this.cameraSpeed) : 10000;
-        this.rotationAnim = new Rotation(this.orientation, Daydream.Y_AXIS, 2 * Math.PI, duration, easeMid, true);
+        const duration = this.cameraSpeed > 0 ? (TWO_PI / this.cameraSpeed) : 10000;
+        this.rotationAnim = new Rotation(this.orientation, Daydream.Y_AXIS, TWO_PI, duration, easeMid, true);
         this.timeline.add(0, this.rotationAnim);
 
         this.initFibers();
@@ -60,7 +60,7 @@ export class HopfFibration {
 
         // Avoid divide by zero
         const speed = Math.max(0.0001, this.cameraSpeed);
-        const newDur = 2 * Math.PI / speed;
+        const newDur = TWO_PI / speed;
 
         // Adjust current time 't' to maintain phase and prevent rotation jumps
         if (this.rotationAnim.duration > 0) {
@@ -88,7 +88,7 @@ export class HopfFibration {
             const r = Math.sin(theta); // Radius of ring at this latitude
 
             for (let j = 0; j < perRing; j++) {
-                const phi = 2 * Math.PI * j / perRing;
+                const phi = TWO_PI * j / perRing;
 
                 const x = r * Math.cos(phi);
                 const z = r * Math.sin(phi);

@@ -12,6 +12,7 @@ import { Daydream } from "../driver.js";
 import {
     Orientation, vectorPool
 } from "../geometry.js";
+import { TWO_PI } from "../3dmath.js";
 import {
     VignettePalette, richSunset, mangoPeel, underSea, iceMelt,
     TransparentVignette, blendAlpha, color4Pool,
@@ -102,7 +103,7 @@ export class TestShapes {
         // Keep scan and plot shapes antipodal
         const simNormal = (normal.x < -0.5) ? normal.clone().negate() : normal;
         this.timeline.add(0, new RandomWalk(ring.orientation, simNormal, seed));
-        this.timeline.add(0, new Rotation(ring.orientation, ring.normal, 2 * Math.PI, 160, easeMid, true, "Local"));
+        this.timeline.add(0, new Rotation(ring.orientation, ring.normal, TWO_PI, 160, easeMid, true, "Local"));
         return ring;
     }
 

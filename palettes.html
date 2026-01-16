@@ -302,10 +302,11 @@
     </div> <!-- This closes .container -->
     <script>
         // --- Palette Class and Data Structure ---
+        const TWO_PI = 2 * Math.PI;
 
         /**
          * The core procedural palette class.
-         * C(t) = A + B * cos(2 * PI * (C * t + D))
+         * C(t) = A + B * cos(TWO_PI * (C * t + D))
          */
         class ProceduralPalette {
             constructor(a, b, c, d) {
@@ -321,7 +322,7 @@
              * @returns {number[]} Array [R, G, B] of float values in [0, 1].
              */
             get(t) {
-                const PI2 = 2 * Math.PI;
+                const PI2 = TWO_PI;
 
                 // Calculate R, G, B values
                 const r = this.a[0] + this.b[0] * Math.cos(PI2 * (this.c[0] * t + this.d[0]));
@@ -340,7 +341,7 @@
              * Calculates a single channel value (R=0, G=1, B=2) for plotting.
              */
             getChannelValue(t, channelIndex) {
-                const PI2 = 2 * Math.PI;
+                const PI2 = TWO_PI;
                 return this.a[channelIndex] + this.b[channelIndex] * Math.cos(PI2 * (this.c[channelIndex] * t + this.d[channelIndex]));
             }
         }

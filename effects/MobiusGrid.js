@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
-import { stereo, invStereo, mobius, MobiusParams } from "../3dmath.js";
+import { stereo, invStereo, mobius, MobiusParams, TWO_PI } from "../3dmath.js";
 import {
     Orientation, sinWave, vectorPool, quaternionPool
 } from "../geometry.js";
@@ -43,7 +43,7 @@ export class MobiusGrid {
         this.params = new MobiusParams(1, 0, 0, 0, 0, 0, 1, 0);
 
         this.timeline.add(0, new MobiusWarp(this.params, this.numRings, 160, true));
-        this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, 2 * Math.PI, 400, easeMid, true));
+        this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, TWO_PI, 400, easeMid, true));
         this.timeline.add(0, new PeriodicTimer(120, () => this.wipePalette(), true));
         this.timeline.add(0,
             new Mutation(this.numRings, (t) => sinWave(12, 1, 1, 0)(t), 320, easeMid, true)

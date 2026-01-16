@@ -9,6 +9,7 @@ import { Daydream } from "./driver.js";
 import { Rotation, easeOutCirc } from "./animation.js";
 import { g1, g2 } from "./color.js";
 import { StaticPool } from "./StaticPool.js";
+import { TWO_PI } from "./3dmath.js";
 
 /** @type {StaticPool} Global pool for temporary Vector3 objects. */
 export const vectorPool = new StaticPool(THREE.Vector3, 500000);
@@ -80,7 +81,7 @@ export const phiToY = (phi) => {
  */
 export const sphericalToPixel = (s) => {
   return {
-    x: wrap((s.theta * Daydream.W) / (2 * Math.PI), Daydream.W),
+    x: wrap((s.theta * Daydream.W) / TWO_PI, Daydream.W),
     y: phiToY(s.phi),
   };
 };
@@ -95,7 +96,7 @@ export const pixelToSpherical = (x, y) => {
   return new THREE.Spherical(
     1,
     yToPhi(y),
-    (x * 2 * Math.PI) / Daydream.W
+    (x * TWO_PI) / Daydream.W
   );
 };
 
@@ -107,7 +108,7 @@ export const pixelToSpherical = (x, y) => {
 export const vectorToPixel = (v) => {
   _tempSpherical.setFromVector3(v);
   return {
-    x: wrap((_tempSpherical.theta * Daydream.W) / (2 * Math.PI), Daydream.W),
+    x: wrap((_tempSpherical.theta * Daydream.W) / TWO_PI, Daydream.W),
     y: (_tempSpherical.phi * (Daydream.H - 1)) / Math.PI,
   };
 };
@@ -123,7 +124,7 @@ export const pixelToVector = (x, y) => {
   _tempSpherical.set(
     1,
     (y * Math.PI) / (Daydream.H - 1),
-    (x * 2 * Math.PI) / Daydream.W
+    (x * TWO_PI) / Daydream.W
   );
   v.setFromSpherical(_tempSpherical);
   return v;
@@ -475,7 +476,7 @@ export const fibSpiral = (n, eps, i) => {
   v.setFromSpherical(new THREE.Spherical(
     1,
     Math.acos(1 - (2 * (i + eps)) / n),
-    (2 * Math.PI * i * G) % (2 * Math.PI)
+    (TWO_PI * i * G) % TWO_PI
   ));
   return v;
 }
@@ -490,7 +491,7 @@ export const fibSpiral = (n, eps, i) => {
  */
 export function sinWave(from, to, freq, phase) {
   return (t) => {
-    let w = (Math.sin(freq * t * 2 * Math.PI - Math.PI / 2 + Math.PI - 2 * phase) + 1) / 2;
+    let w = (Math.sin(freq * t * TWO_PI - Math.PI / 2 + Math.PI - 2 * phase) + 1) / 2;
     return w * (to - from) + from;
   };
 }

@@ -9,6 +9,7 @@ import * as THREE from "three";
 import { Daydream } from "./driver.js";
 import { angleBetween, Orientation, vectorPool, quaternionPool } from "./geometry.js";
 import FastNoiseLite from "./FastNoiseLite.js";
+import { TWO_PI } from "./3dmath.js";
 
 /**
  * Elastic easing out.
@@ -16,7 +17,7 @@ import FastNoiseLite from "./FastNoiseLite.js";
  * @returns {number} The eased value.
  */
 export const easeOutElastic = (x) => {
-  const c4 = (2 * Math.PI) / 3;
+  const c4 = TWO_PI / 3;
   return x === 0 ?
     0 : x === 1 ?
       1 : Math.pow(2, -10 * x) * Math.sin((x * 10 - 0.75) * c4) + 1;
@@ -492,7 +493,7 @@ export class Sprite extends Animation {
  * Animates an orientation along a path.
  */
 export class Motion extends Animation {
-  static get MAX_ANGLE() { return 2 * Math.PI / Daydream.W; }
+  static get MAX_ANGLE() { return TWO_PI / Daydream.W; }
 
   /**
    * Static helper to perform a one-shot motion animation.
@@ -561,7 +562,7 @@ export class Motion extends Animation {
  */
 export class Rotation extends Animation {
   static get MAX_ANGLE() {
-    return 2 * Math.PI / Daydream.W;
+    return TWO_PI / Daydream.W;
   }
 
   /**
@@ -732,7 +733,7 @@ export class MobiusFlow extends Animation {
     const flowParam = progress * logPeriod;
     const scale = Math.exp(flowParam);
     const s = Math.sqrt(scale);
-    const angle = progress * (Math.PI * 2 / this.numLines);
+    const angle = progress * (TWO_PI / this.numLines);
 
     this.params.aRe.set(s * Math.cos(angle));
     this.params.aIm.set(s * Math.sin(angle));
@@ -754,7 +755,7 @@ export class MobiusWarp extends Animation {
   step() {
     super.step();
     const progress = this.t / this.duration;
-    const angle = progress * Math.PI * 2;
+    const angle = progress * TWO_PI;
     this.params.bRe.set(Math.cos(angle));
     this.params.bIm.set(Math.sin(angle));
   }

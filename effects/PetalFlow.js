@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { Orientation, sinWave } from "../geometry.js";
-import { invStereo } from "../3dmath.js";
+import { invStereo, TWO_PI } from "../3dmath.js";
 import { Plot, rasterize } from "../draw.js";
 import { ProceduralPalette } from "../color.js";
 import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
@@ -59,7 +59,7 @@ export class PetalFlow {
         };
 
         const numSamples = Daydream.W;
-        const step = 2 * Math.PI / numSamples;
+        const step = TWO_PI / numSamples;
 
         for (let k = minK; k <= maxK; k++) {
             const logR = k * currentSpacing;

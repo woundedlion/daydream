@@ -22,6 +22,7 @@ import {
 import {
     createRenderPipeline, FilterAntiAlias, FilterOrient
 } from "../filters.js";
+import { TWO_PI } from "../3dmath.js";
 
 export class Moire {
     constructor() {
@@ -49,11 +50,11 @@ export class Moire {
 
         this.timeline
             .add(0, new PeriodicTimer(80, () => this.colorWipe()))
-            .add(0, new Rotation(this.cameraOrientation, Daydream.Y_AXIS, 2 * Math.PI, 300, easeMid, true))
-            .add(0, new Rotation(this.layer1Orientation, rotationAxis1, 2 * Math.PI, 300, easeMid, true))
-            .add(0, new Rotation(this.layer2Orientation, rotationAxis2, 2 * Math.PI, 300, easeMid, true))
+            .add(0, new Rotation(this.cameraOrientation, Daydream.Y_AXIS, TWO_PI, 300, easeMid, true))
+            .add(0, new Rotation(this.layer1Orientation, rotationAxis1, TWO_PI, 300, easeMid, true))
+            .add(0, new Rotation(this.layer2Orientation, rotationAxis2, TWO_PI, 300, easeMid, true))
             .add(0,
-                new Transition(this.rotation, 2 * Math.PI, 160, easeMid, false, true)
+                new Transition(this.rotation, TWO_PI, 160, easeMid, false, true)
                     .then(() => this.rotation.set(0)))
             .add(0,
                 new Mutation(this.amp, sinWave(0.1, 0.5, 1, 0), 160, easeMid, true));
