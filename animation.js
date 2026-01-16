@@ -641,14 +641,18 @@ export class Rotation extends Animation {
  */
 export class RandomWalk extends Animation {
   /**
+   * @typedef {Object} RandomWalkOptions
+   * @property {number} [speed=0.02] - Speed of the walk (angular speed in radians per step).
+   * @property {number} [pivotStrength=0.1] - Turning sharpness (max pivot angle in radians per step).
+   * @property {number} [noiseScale=0.02] - Frequency of turn direction changes (Perlin noise frequency).
+   * @property {number} [seed] - Seed for the noise generator (default: random).
+   * @property {string} [space="World"] - Coordinate space ("World" or "Local").
+   */
+
+  /**
    * @param {Orientation} orientation - The orientation to animate.
    * @param {THREE.Vector3} v_start - The starting vector.
-   * @param {Object} [options] - Configuration options.
-   * @param {number} [options.speed=0.02] - Speed of the walk.
-   * @param {number} [options.pivotStrength=0.1] - How sharply it turns.
-   * @param {number} [options.noiseScale=0.02] - How fast the turn direction changes.
-   * @param {number} [options.seed] - Seed for the noise generator.
-   * @param {string} [options.space="World"] - "World" or "Local".
+   * @param {RandomWalkOptions} [options] - Configuration options.
    */
   constructor(orientation, v_start, options = {}) {
     super(-1, false);
