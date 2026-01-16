@@ -183,8 +183,8 @@ export class FilterOrient {
    */
   plot(v, color, age, alpha, pass) {
     tween(this.orientation, (q, t) => {
-      _tempVec.copy(v).applyQuaternion(q);
-      pass(_tempVec, color, age + 1.0 - t, alpha);
+      let v_oriented = vectorPool.acquire().copy(v).applyQuaternion(q);
+      pass(v_oriented, color, age + 1.0 - t, alpha);
     });
   }
 }

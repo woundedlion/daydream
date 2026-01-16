@@ -643,22 +643,27 @@ export class RandomWalk extends Animation {
   /**
    * @param {Orientation} orientation - The orientation to animate.
    * @param {THREE.Vector3} v_start - The starting vector.
-   * @param {number} [seed] - Optional seed for the noise generator.
-   * @param {string} [space="World"] - "World" or "Local".
+   * @param {Object} [options] - Configuration options.
+   * @param {number} [options.speed=0.02] - Speed of the walk.
+   * @param {number} [options.pivotStrength=0.1] - How sharply it turns.
+   * @param {number} [options.noiseScale=0.02] - How fast the turn direction changes.
+   * @param {number} [options.seed] - Seed for the noise generator.
+   * @param {string} [options.space="World"] - "World" or "Local".
    */
-  constructor(orientation, v_start, seed, space = "World") {
+  constructor(orientation, v_start, options = {}) {
     super(-1, false);
     this.orientation = orientation;
     this.v = v_start.clone();
-    this.space = space;
+
+    this.space = options.space || "World";
 
     this.noise = new FastNoiseLite();
     this.noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
-    this.noise.SetSeed(seed !== undefined ? seed : Math.floor(Math.random() * 65535));
+    this.noise.SetSeed(options.seed !== undefined ? options.seed : Math.floor(Math.random() * 65535));
 
-    this.WALK_SPEED = 0.05; // Constant angular speed (radians per step)
-    this.PIVOT_STRENGTH = 0.4; // Max pivot angle (radians per step)
-    this.NOISE_SCALE = 0.08; // How fast the Perlin noise changes
+    this.WALK_SPEED = options.speed !== undefined ? options.speed : 0.02; // Constant angular speed (radians per step)
+    this.PIVOT_STRENGTH = options.pivotStrength !== undefined ? options.pivotStrength : 0.1;  // Max pivot angle (radians per step)
+    this.NOISE_SCALE = options.noiseScale !== undefined ? options.noiseScale : 0.02; // How fast the Perlin noise changes
 
     this.noise.SetFrequency(this.NOISE_SCALE);
 
