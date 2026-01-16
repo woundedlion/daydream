@@ -51,7 +51,7 @@ export class Test {
         );
 
         this.timeline.add(0,
-            new RandomWalk(this.orientation, this.normal)
+            new RandomWalk(this.orientation, this.normal, { speed: 0.01, pivotStrength: 0.05 }) // Very smooth for test
         );
 
         this.timeline.add(0,
