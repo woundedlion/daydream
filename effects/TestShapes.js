@@ -102,7 +102,7 @@ export class TestShapes {
         this.rings.push(ring);
         // Keep scan and plot shapes antipodal
         const simNormal = (normal.x < -0.5) ? normal.clone().negate() : normal;
-        this.timeline.add(0, new RandomWalk(ring.orientation, simNormal, seed));
+        this.timeline.add(0, new RandomWalk(ring.orientation, simNormal, { seed: seed }));
         this.timeline.add(0, new Rotation(ring.orientation, ring.normal, TWO_PI, 160, easeMid, true, "Local"));
         return ring;
     }
