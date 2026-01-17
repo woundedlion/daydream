@@ -7,27 +7,26 @@
 import { Daydream } from "./driver.js";
 import { GUI, resetGUI } from "gui";
 import {
-  RingShower,
-
+  BZReactionDiffusion,
   Comets,
   Dynamo,
-  RingSpin,
-  MetaballEffect,
   FlowField,
-  Thrusters,
-  Test,
+  GSReactionDiffusion,
+  HopfFibration,
+  LSystem,
+  MetaballEffect,
+  MobiusGradient,
   MobiusGrid,
   Moire,
-  Portholes,
-  GSReactionDiffusion,
-  BZReactionDiffusion,
   PetalFlow,
-  LSystem,
-  TestShapes,
-  HopfFibration,
-  Voronoi,
+  Portholes,
+  RingShower,
+  RingSpin,
   SphericalHarmonics,
-  MobiusGradient
+  Test,
+  TestShapes,
+  Thrusters,
+  Voronoi
 } from "./effects/index.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
@@ -35,26 +34,26 @@ import { BufferGeometry, AddEquation, MaxEquation } from "three";
 ///////////////////////////////////////////////////////////////////////////////
 
 const effects = {
-  RingShower,
-  RingSpin,
+  BZReactionDiffusion,
   Comets,
   Dynamo,
-  Thrusters,
-  MetaballEffect,
   FlowField,
-  Test,
+  GSReactionDiffusion,
+  HopfFibration,
+  LSystem,
+  MetaballEffect,
+  MobiusGradient,
   MobiusGrid,
   Moire,
-  Portholes,
-  GSReactionDiffusion,
-  BZReactionDiffusion,
   PetalFlow,
-  LSystem,
-  TestShapes,
-  HopfFibration,
-  Voronoi,
+  Portholes,
+  RingShower,
+  RingSpin,
   SphericalHarmonics,
-  MobiusGradient
+  Test,
+  TestShapes,
+  Thrusters,
+  Voronoi
 };
 
 const urlParams = new URLSearchParams(window.location.search);
