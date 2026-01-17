@@ -58,7 +58,7 @@ export class RingSpin {
     spawnRing(normal, palette) {
         let ring = new RingSpin.Ring(normal, palette);
         this.rings.push(ring);
-        this.timeline.add(0, new RandomWalk(ring.orientation, ring.normal));
+        this.timeline.add(0, new RandomWalk(ring.orientation, ring.normal, RandomWalk.Energetic));
     }
 
     drawFrame() {
