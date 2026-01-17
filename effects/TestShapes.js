@@ -3,9 +3,6 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-// TODO: Add smoothing slider
-// TODO: Add multiple smaller shapes rotating out of phase
-
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
@@ -50,6 +47,9 @@ export class TestShapes {
         this.radius = 1.0;
         this.sides = 5;
         this._twist = new MutableNumber(0);
+
+        this.scanPipeline = createRenderPipeline();
+        this.plotPipeline = createRenderPipeline(new FilterAntiAlias());
 
         this.setupGUI();
         this.rebuild();
@@ -100,52 +100,43 @@ export class TestShapes {
     spawnRing(normal, scale, color, seed, mode, layerIndex) {
         let ring = new TestShapes.Ring(normal, scale, color, mode, layerIndex);
         this.rings.push(ring);
-        // Keep scan and plot shapes antipodal
-        const simNormal = (normal.x < -0.5) ? normal.clone().negate() : normal;
-        this.timeline.add(0, new RandomWalk(ring.orientation, simNormal, { seed: seed }));
+        const antipode = (normal.x < -0.5) ? normal.clone().negate() : normal;
+        this.timeline.add(0, new RandomWalk(ring.orientation, antipode, { seed: seed }));
         this.timeline.add(0, new Rotation(ring.orientation, ring.normal, TWO_PI, 160, easeMid, true, "Local"));
-        return ring;
+        this.timeline.add(0, new Sprite((alpha) => this.drawShape(ring, alpha), -1));
+    }
+
+    drawShape(ring, spriteAlpha) {
+        const pipeline = (ring.mode === "Plot")
+            ? this.plotPipeline
+            : this.scanPipeline;
+
+        const colorFn = (p, t, dist) => {
+            return color4Pool.acquire().set(ring.color.color, ring.color.alpha * this.alpha * spriteAlpha);
+        }
+
+        const basis = makeBasis(ring.orientation.get(), ring.normal);
+        const phase = ring.layerIndex * this.twist;
+        if (ring.mode === "Plot") {
+            if (this.shape === "Flower") {
+                Plot.Flower.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase);
+            } else if (this.shape === "Star") {
+                Plot.Star.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase);
+            } else {
+                Plot.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase);
+            }
+        } else {
+            if (this.shape === "Flower") {
+                Scan.Flower.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
+            } else if (this.shape === "Star") {
+                Scan.Star.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
+            } else {
+                Scan.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
+            }
+        }
     }
 
     drawFrame() {
         this.timeline.step();
-
-        const scanPipeline = createRenderPipeline();
-        const plotPipeline = createRenderPipeline(new FilterAntiAlias());
-
-        for (const ring of this.rings) {
-            if (ring.master) {
-                ring.orientation = ring.master.orientation;
-            }
-
-            const orientation = ring.orientation.get();
-            const phase = ring.layerIndex * this.twist;
-
-            const colorFn = (p, t, dist) => {
-                return color4Pool.acquire().set(ring.color.color, ring.color.alpha * this.alpha);
-            }
-
-            const pipeline = (ring.mode === "Plot") ? plotPipeline : scanPipeline;
-            const drawNormal = ring.normal;
-            const basis = makeBasis(orientation, drawNormal);
-
-            if (ring.mode === "Plot") {
-                if (this.shape === "Flower") {
-                    Plot.Flower.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase);
-                } else if (this.shape === "Star") {
-                    Plot.Star.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase);
-                } else {
-                    Plot.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase);
-                }
-            } else {
-                if (this.shape === "Flower") {
-                    Scan.Flower.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
-                } else if (this.shape === "Star") {
-                    Scan.Star.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
-                } else {
-                    Scan.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
-                }
-            }
-        }
     }
 }

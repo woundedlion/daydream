@@ -934,7 +934,7 @@ export const Scan = {
       const p = Daydream.pixelPositions[i];
 
       if (ctx.debugBB) {
-        Daydream.pixels[i].b += 0.2;
+        Daydream.pixels[i * 3 + 2] += 0.2;
       }
 
       // Calc Polar Angle
@@ -1096,9 +1096,9 @@ export const Scan = {
 
     static processPixel(i, x, y, ctx) {
       if (ctx.debugBB) {
-        Daydream.pixels[i].r += 0.2;
-        Daydream.pixels[i].g += 0.2;
-        Daydream.pixels[i].b += 0.2;
+        Daydream.pixels[i * 3] += 0.2;
+        Daydream.pixels[i * 3 + 1] += 0.2;
+        Daydream.pixels[i * 3 + 2] += 0.2;
       }
       const p = Daydream.pixelPositions[i];
       const polarAngle = angleBetween(p, ctx.normal);
@@ -1215,9 +1215,9 @@ export const Scan = {
       if (scanDist > ctx.thickness + ctx.pixelWidth) return;
 
       if (ctx.debugBB) {
-        Daydream.pixels[i].r += 0.2;
-        Daydream.pixels[i].g += 0.2;
-        Daydream.pixels[i].b += 0.2;
+        Daydream.pixels[i * 3] += 0.2;
+        Daydream.pixels[i * 3 + 1] += 0.2;
+        Daydream.pixels[i * 3 + 2] += 0.2;
       }
 
       const dotU = p.dot(ctx.u);
@@ -1324,9 +1324,9 @@ export const Scan = {
       if (scanDist > ctx.thickness + ctx.pixelWidth) return;
 
       if (ctx.debugBB) {
-        Daydream.pixels[i].r += 0.2;
-        Daydream.pixels[i].g += 0.2;
-        Daydream.pixels[i].b += 0.2;
+        Daydream.pixels[i * 3] += 0.2;
+        Daydream.pixels[i * 3 + 1] += 0.2;
+        Daydream.pixels[i * 3 + 2] += 0.2;
       }
 
       // Calc distance from ANTIPODE (PI - scanDist)
@@ -1533,8 +1533,9 @@ export const Scan = {
 
     static processPixel(i, x, y, ctx) {
       if (ctx.debugBB) {
-        const outColor = Daydream.pixels[i];
-        outColor.r += 0.02; outColor.g += 0.02; outColor.b += 0.02;
+        Daydream.pixels[i * 3] += 0.02;
+        Daydream.pixels[i * 3 + 1] += 0.02;
+        Daydream.pixels[i * 3 + 2] += 0.02;
       }
 
       const p = Daydream.pixelPositions[i];
