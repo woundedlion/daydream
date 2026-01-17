@@ -649,6 +649,9 @@ export class RandomWalk extends Animation {
    * @property {string} [space="World"] - Coordinate space ("World" or "Local").
    */
 
+  static Languid = { speed: 0.02, pivotStrength: 0.1, noiseScale: 0.02 };
+  static Energetic = { speed: 0.05, pivotStrength: 0.4, noiseScale: 0.08 };
+
   /**
    * @param {Orientation} orientation - The orientation to animate.
    * @param {THREE.Vector3} v_start - The starting vector.
@@ -665,9 +668,9 @@ export class RandomWalk extends Animation {
     this.noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
     this.noise.SetSeed(options.seed !== undefined ? options.seed : Math.floor(Math.random() * 65535));
 
-    this.WALK_SPEED = options.speed !== undefined ? options.speed : 0.02; // Constant angular speed (radians per step)
-    this.PIVOT_STRENGTH = options.pivotStrength !== undefined ? options.pivotStrength : 0.1;  // Max pivot angle (radians per step)
-    this.NOISE_SCALE = options.noiseScale !== undefined ? options.noiseScale : 0.02; // How fast the Perlin noise changes
+    this.WALK_SPEED = options.speed !== undefined ? options.speed : RandomWalk.Languid.speed;
+    this.PIVOT_STRENGTH = options.pivotStrength !== undefined ? options.pivotStrength : RandomWalk.Languid.pivotStrength;
+    this.NOISE_SCALE = options.noiseScale !== undefined ? options.noiseScale : RandomWalk.Languid.noiseScale;
 
     this.noise.SetFrequency(this.NOISE_SCALE);
 
