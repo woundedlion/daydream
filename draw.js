@@ -943,7 +943,7 @@ export const Scan = {
       // Calc Azimuth for Modulation
       const dotU = p.dot(ctx.u);
       const dotW = p.dot(ctx.w);
-      let azimuth = fastAtan2(dotW, dotU);
+      let azimuth = Math.atan2(dotW, dotU);
       if (azimuth < 0) azimuth += 2 * Math.PI;
 
       // Distorted Target
@@ -1107,7 +1107,7 @@ export const Scan = {
 
       const dotU = p.dot(ctx.u);
       const dotW = p.dot(ctx.w);
-      let azimuth = fastAtan2(dotW, dotU);
+      let azimuth = Math.atan2(dotW, dotU);
       if (azimuth < 0) azimuth += 2 * Math.PI;
       azimuth += ctx.phase;
 
