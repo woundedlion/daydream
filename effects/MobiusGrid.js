@@ -17,7 +17,7 @@ import {
     GenerativePalette, color4Pool
 } from "../color.js";
 import {
-    Timeline, easeMid, Rotation, MutableNumber, PeriodicTimer, ColorWipe, MobiusWarp, Mutation
+    Timeline, easeMid, Rotation, PeriodicTimer, ColorWipe, MobiusWarp, Mutation
 } from "../animation.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterOrient, FilterHole, FilterMobius
@@ -27,8 +27,8 @@ import { wrap } from "../util.js";
 export class MobiusGrid {
     constructor() {
         this.alpha = 0.2;
-        this.numRings = new MutableNumber(0);
-        this.numLines = new MutableNumber(0);
+        this.numRings = 0;
+        this.numLines = 0;
         this.palette = new GenerativePalette("circular", "split-complementary", "flat");
         this.orientation = new Orientation();
         this.timeline = new Timeline();
@@ -46,10 +46,10 @@ export class MobiusGrid {
         this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, TWO_PI, 400, easeMid, true));
         this.timeline.add(0, new PeriodicTimer(120, () => this.wipePalette(), true));
         this.timeline.add(0,
-            new Mutation(this.numRings, (t) => sinWave(12, 1, 1, 0)(t), 320, easeMid, true)
+            new Mutation(this, 'numRings', (t) => sinWave(12, 1, 1, 0)(t), 320, easeMid, true)
         )
         this.timeline.add(160,
-            new Mutation(this.numLines, (t) => sinWave(12, 1, 1, 0)(t), 320, easeMid, true)
+            new Mutation(this, 'numLines', (t) => sinWave(12, 1, 1, 0)(t), 320, easeMid, true)
         )
 
         this.setupGui();
@@ -60,14 +60,14 @@ export class MobiusGrid {
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
         const folder = this.gui.addFolder('Mobius Params');
         folder.open();
-        folder.add(this.params.aRe, 'n').name('aRe').min(-2).max(2).step(0.01).listen();
-        folder.add(this.params.aIm, 'n').name('aIm').min(-2).max(2).step(0.01).listen();
-        folder.add(this.params.bRe, 'n').name('bRe').min(-2).max(2).step(0.01).listen();
-        folder.add(this.params.bIm, 'n').name('bIm').min(-2).max(2).step(0.01).listen();
-        folder.add(this.params.cRe, 'n').name('cRe').min(-2).max(2).step(0.01).listen();
-        folder.add(this.params.cIm, 'n').name('cIm').min(-2).max(2).step(0.01).listen();
-        folder.add(this.params.dRe, 'n').name('dRe').min(-2).max(2).step(0.01).listen();
-        folder.add(this.params.dIm, 'n').name('dIm').min(-2).max(2).step(0.01).listen();
+        folder.add(this.params, 'aRe').name('aRe').min(-2).max(2).step(0.01).listen();
+        folder.add(this.params, 'aIm').name('aIm').min(-2).max(2).step(0.01).listen();
+        folder.add(this.params, 'bRe').name('bRe').min(-2).max(2).step(0.01).listen();
+        folder.add(this.params, 'bIm').name('bIm').min(-2).max(2).step(0.01).listen();
+        folder.add(this.params, 'cRe').name('cRe').min(-2).max(2).step(0.01).listen();
+        folder.add(this.params, 'cIm').name('cIm').min(-2).max(2).step(0.01).listen();
+        folder.add(this.params, 'dRe').name('dRe').min(-2).max(2).step(0.01).listen();
+        folder.add(this.params, 'dIm').name('dIm').min(-2).max(2).step(0.01).listen();
     }
 
     wipePalette() {
@@ -189,7 +189,7 @@ export class MobiusGrid {
         this.holeS.origin.copy(sTrans).applyQuaternion(q);
 
         // Draw directly with rotation
-        this.drawAxisRings(this.filters, vectorPool.acquire().copy(Daydream.Z_AXIS), this.numRings.get(), this.params, 'y', phase, q);
-        this.drawLongitudes(this.filters, this.numLines.get(), this.params, 'x', phase, q);
+        this.drawAxisRings(this.filters, vectorPool.acquire().copy(Daydream.Z_AXIS), this.numRings, this.params, 'y', phase, q);
+        this.drawLongitudes(this.filters, this.numLines, this.params, 'x', phase, q);
     }
 }

@@ -16,7 +16,7 @@ import {
     GenerativePalette
 } from "../color.js";
 import {
-    Timeline, easeMid, Sprite, RandomWalk, Mutation, MutableNumber
+    Timeline, easeMid, Sprite, RandomWalk, Mutation
 } from "../animation.js";
 import {
     createRenderPipeline, FilterAntiAlias
@@ -35,7 +35,7 @@ export class Test {
             new FilterAntiAlias()
         );
 
-        this.amplitude = new MutableNumber(0);
+        this.amplitude = 0;
         this.amplitudeRange = 0.3;
         this.poly = new Dodecahedron();
         this.numRings = 1;
@@ -55,7 +55,7 @@ export class Test {
         );
 
         this.timeline.add(0,
-            new Mutation(this.amplitude,
+            new Mutation(this, 'amplitude',
                 sinWave(-this.amplitudeRange, this.amplitudeRange, 1, 0), 32, easeMid, true)
         );
 
@@ -75,7 +75,7 @@ export class Test {
         for (let i = 0; i < this.numRings; ++i) {
             // Verify Scan.DistortedRing
             const radius = 2 / (this.numRings + 1) * (i + 1);
-            const shiftFn = (t) => sinWave(this.amplitude.get(), -this.amplitude.get(), 4, 0)(t);
+            const shiftFn = (t) => sinWave(this.amplitude, -this.amplitude, 4, 0)(t);
             const amplitude = this.amplitudeRange;
 
             const basis = makeBasis(this.orientation.get(), this.normal);

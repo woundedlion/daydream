@@ -15,7 +15,7 @@ import {
     GenerativePalette
 } from "../color.js";
 import {
-    Timeline, easeMid, Sprite, Transition, RandomTimer, MutableNumber
+    Timeline, easeMid, Sprite, Transition, RandomTimer
 } from "../animation.js";
 import {
     createRenderPipeline, FilterAntiAlias
@@ -27,10 +27,10 @@ export class RingShower {
         constructor(filters) {
             this.normal = randomVector().clone();
             this.duration = 8 + Math.random() * 72;
-            this.radius = new MutableNumber(0);
-            this.lastRadius = this.radius.get();
+            this.radius = 0;
+            this.lastRadius = this.radius;
             this.palette = new GenerativePalette('circular', 'analogous', 'flat');
-            this.phase = new MutableNumber(0);
+            this.phase = 0;
         }
     }
 
@@ -72,13 +72,13 @@ export class RingShower {
             }));
 
         this.timeline.add(0,
-            new Transition(ring.radius, 2, ring.duration, easeMid)
+            new Transition(ring, 'radius', 2, ring.duration, easeMid)
         );
     }
 
     drawRing(opacity, ring) {
         const basis = makeBasis(this.orientation.get(), ring.normal);
-        Plot.Ring.draw(this.filters, basis, ring.radius.get(),
+        Plot.Ring.draw(this.filters, basis, ring.radius,
             (v, t) => {
                 let z = this.orientation.orient(Daydream.X_AXIS);
                 const c = ring.palette.get(angleBetween(z, v) / Math.PI);

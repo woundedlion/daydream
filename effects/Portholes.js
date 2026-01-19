@@ -16,7 +16,7 @@ import {
     GenerativePalette
 } from "../color.js";
 import {
-    Timeline, easeMid, Rotation, MutableNumber, PeriodicTimer, ColorWipe, easeInOutSin
+    Timeline, easeMid, Rotation, PeriodicTimer, ColorWipe, easeInOutSin
 } from "../animation.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterOrientSlice
@@ -39,8 +39,8 @@ export class Portholes {
         this.timeline = new Timeline();
 
         // Parameters
-        this.offsetRadius = new MutableNumber(5 / Daydream.W);
-        this.offsetSpeed = new MutableNumber(2.0);
+        this.offsetRadius = 5 / Daydream.W;
+        this.offsetSpeed = 2.0;
         this.t = 0;
 
         this.filters = createRenderPipeline(
@@ -58,8 +58,8 @@ export class Portholes {
     setupGui() {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
-        this.gui.add(this.offsetRadius, 'n', 0.0, 0.2).name('Offset Radius').listen();
-        this.gui.add(this.offsetSpeed, 'n', 0.0, 5.0).name('Offset Speed').listen();
+        this.gui.add(this, 'offsetRadius', 0.0, 0.2).name('Offset Radius').listen();
+        this.gui.add(this, 'offsetSpeed', 0.0, 5.0).name('Offset Speed').listen();
     }
 
     colorWipe() {
@@ -85,8 +85,8 @@ export class Portholes {
 
                 // Time based offset in tangent plane
                 const phase = i * 0.1;
-                const angle = this.t * this.offsetSpeed.get() * TWO_PI + phase;
-                const r = this.offsetRadius.get();
+                const angle = this.t * this.offsetSpeed * TWO_PI + phase;
+                const r = this.offsetRadius;
                 const offset = vectorPool.acquire().copy(u).multiplyScalar(Math.cos(angle)).addScaledVector(v, Math.sin(angle)).multiplyScalar(r);
                 p.add(offset).normalize();
             });

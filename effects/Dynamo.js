@@ -17,7 +17,7 @@ import {
     GenerativePalette, color4Pool
 } from "../color.js";
 import {
-    Timeline, easeMid, easeInOutSin, Transition, RandomTimer, MutableNumber, Rotation
+    Timeline, easeMid, easeInOutSin, Transition, RandomTimer, Rotation
 } from "../animation.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterReplicate, FilterOrient, FilterWorldTrails
@@ -98,9 +98,9 @@ export class Dynamo {
 
     colorWipe() {
         this.palettes.unshift(new GenerativePalette('vignette'));
-        this.paletteBoundaries.unshift(new MutableNumber(0));
+        this.paletteBoundaries.unshift({ val: 0 });
         this.timeline.add(0,
-            new Transition(this.paletteBoundaries[0], Math.PI, 20, easeMid)
+            new Transition(this.paletteBoundaries[0], 'val', Math.PI, 20, easeMid)
                 .then(() => {
                     this.paletteBoundaries.pop();
                     this.palettes.pop();
@@ -116,7 +116,7 @@ export class Dynamo {
         const a = angleBetween(v, this.paletteNormal);
 
         for (let i = 0; i < numBoundaries; ++i) {
-            const boundary = this.paletteBoundaries[i].get();
+            const boundary = this.paletteBoundaries[i].val;
             const lowerBlendEdge = boundary - blendWidth;
             const upperBlendEdge = boundary + blendWidth;
 
@@ -136,7 +136,7 @@ export class Dynamo {
             }
 
             const nextBoundaryLowerBlendEdge = (i + 1 < numBoundaries)
-                ? this.paletteBoundaries[i + 1].get() - blendWidth
+                ? this.paletteBoundaries[i + 1].val - blendWidth
                 : Infinity;
 
             if (a > upperBlendEdge && a < nextBoundaryLowerBlendEdge) {

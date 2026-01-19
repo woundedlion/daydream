@@ -517,35 +517,24 @@ export class PeriodicTimer extends Animation {
   }
 }
 
-/**
- * Wrapper for a number that can be mutated.
- */
-export class MutableNumber {
-  /**
-   * @param {number} n - The initial value.
-   */
-  constructor(n) {
-    this.n = n;
-  }
-  get() { return this.n; }
-  set(n) { this.n = n; }
-}
 
 /**
- * Transitions a MutableNumber from one value to another over time.
+ * Transitions a property on an object from one value to another over time.
  */
 export class Transition extends Animation {
   /**
-   * @param {MutableNumber} mutable - The value to modify.
+   * @param {Object} target - The object to modify.
+   * @param {string} property - The property name.
    * @param {number} to - The target value.
    * @param {number} duration - Duration of transition.
    * @param {Function} easingFn - Easing function.
    * @param {boolean} [quantized=false] - If true, rounds values to integers.
    * @param {boolean} [repeat=false] - Whether to repeat.
    */
-  constructor(mutable, to, duration, easingFn, quantized = false, repeat = false) {
+  constructor(target, property, to, duration, easingFn, quantized = false, repeat = false) {
     super(duration, repeat);
-    this.mutable = mutable;
+    this.target = target;
+    this.property = property;
     this.to = to;
     this.duration = duration;
     this.easingFn = easingFn;
@@ -554,7 +543,7 @@ export class Transition extends Animation {
 
   step() {
     if (this.t == 0) {
-      this.from = this.mutable.get();
+      this.from = this.target[this.property];
     }
     super.step();
     let t = Math.min(1, this.t / (this.duration));
@@ -562,24 +551,26 @@ export class Transition extends Animation {
     if (this.quantized) {
       n = Math.floor(n);
     }
-    this.mutable.set(n);
+    this.target[this.property] = n;
   }
 }
 
 /**
- * Mutates a value using a provided function over time.
+ * Mutates a property on an object using a provided function over time.
  */
 export class Mutation extends Animation {
   /**
-   * @param {MutableNumber} mutable - The value to mutate.
+   * @param {Object} target - The object to modify.
+   * @param {string} property - The property name.
    * @param {Function} fn - The mutation function (takes eased time and current value).
    * @param {number} duration - Duration.
    * @param {Function} easingFn - Easing function.
    * @param {boolean} [repeat=false] - Whether to repeat.
    */
-  constructor(mutable, fn, duration, easingFn, repeat = false) {
+  constructor(target, property, fn, duration, easingFn, repeat = false) {
     super(duration, repeat);
-    this.mutable = mutable;
+    this.target = target;
+    this.property = property;
     this.fn = fn;
     this.duration = duration;
     this.easingFn = easingFn;
@@ -587,11 +578,11 @@ export class Mutation extends Animation {
 
   step() {
     if (this.t == 0) {
-      this.from = this.mutable.get();
+      this.from = this.target[this.property];
     }
     super.step();
     let t = Math.min(1, this.t / this.duration);
-    this.mutable.set(this.fn(this.easingFn(t), this.mutable.get()));
+    this.target[this.property] = this.fn(this.easingFn(t), this.target[this.property]);
   }
 }
 
@@ -612,11 +603,11 @@ export class Sprite extends Animation {
     fadeOutDuration = 0, fadeOutEasingFn = easeMid) {
     super(duration, false);
     this.drawFn = drawFn;
-    this.fader = new MutableNumber(fadeInDuration > 0 ? 0 : 1);
+    this.opacity = fadeInDuration > 0 ? 0 : 1;
     this.fadeInDuration = fadeInDuration;
     this.fadeOutDuration = fadeOutDuration;
-    this.fadeIn = new Transition(this.fader, 1, fadeInDuration, fadeInEasingFn);
-    this.fadeOut = new Transition(this.fader, 0, fadeOutDuration, fadeOutEasingFn);
+    this.fadeIn = new Transition(this, 'opacity', 1, fadeInDuration, fadeInEasingFn);
+    this.fadeOut = new Transition(this, 'opacity', 0, fadeOutDuration, fadeOutEasingFn);
   }
 
   step() {
@@ -630,7 +621,7 @@ export class Sprite extends Animation {
     } else if (this.duration >= 0 && this.t >= (this.duration - this.fadeOutDuration)) {
       this.fadeOut.step();
     }
-    this.drawFn(this.fader.get());
+    this.drawFn(this.opacity);
   }
 }
 
@@ -893,10 +884,10 @@ export class MobiusFlow extends Animation {
     const s = Math.sqrt(scale);
     const angle = progress * (TWO_PI / this.numLines);
 
-    this.params.aRe.set(s * Math.cos(angle));
-    this.params.aIm.set(s * Math.sin(angle));
-    this.params.dRe.set((1 / s) * Math.cos(-angle));
-    this.params.dIm.set((1 / s) * Math.sin(-angle));
+    this.params.aRe = s * Math.cos(angle);
+    this.params.aIm = s * Math.sin(angle);
+    this.params.dRe = (1 / s) * Math.cos(-angle);
+    this.params.dIm = (1 / s) * Math.sin(-angle);
   }
 }
 
@@ -914,8 +905,8 @@ export class MobiusWarp extends Animation {
     super.step();
     const progress = this.t / this.duration;
     const angle = progress * TWO_PI;
-    this.params.bRe.set(Math.cos(angle));
-    this.params.bIm.set(Math.sin(angle));
+    this.params.bRe = Math.cos(angle);
+    this.params.bIm = Math.sin(angle);
   }
 }
 
