@@ -17,7 +17,7 @@ import {
     GenerativePalette, color4Pool
 } from "../color.js";
 import {
-    Timeline, easeMid, Rotation, MutableNumber, PeriodicTimer, ColorWipe, Transition, Mutation, RandomTimer
+    Timeline, easeMid, Rotation, PeriodicTimer, ColorWipe, Transition, Mutation, RandomTimer
 } from "../animation.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterOrient
@@ -31,8 +31,8 @@ export class Moire {
         this.interferencePalette = new GenerativePalette("circular", "analagous", "cup");
 
         this.density = Daydream.W <= 96 ? 10 : 45;
-        this.rotation = new MutableNumber(0);
-        this.amp = new MutableNumber(0);
+        this.rotation = 0;
+        this.amp = 0;
         this.cameraOrientation = new Orientation();
         this.layer1Orientation = new Orientation();
         this.layer2Orientation = new Orientation();
@@ -53,10 +53,10 @@ export class Moire {
             .add(0, new Rotation(this.layer1Orientation, rotationAxis1, TWO_PI, 300, easeMid, true))
             //            .add(0, new Rotation(this.layer2Orientation, rotationAxis2, TWO_PI, 300, easeMid, true))
             .add(0,
-                new Transition(this.rotation, TWO_PI, 160, easeMid, false, true)
-                    .then(() => this.rotation.set(0)))
+                new Transition(this, 'rotation', TWO_PI, 160, easeMid, false, true)
+                    .then(() => this.rotation = 0))
             .add(0,
-                new Mutation(this.amp, sinWave(0.1, 0.5, 1, 0), 160, easeMid, true));
+                new Mutation(this, 'amp', sinWave(0.1, 0.5, 1, 0), 160, easeMid, true));
         this.setupGui();
     }
 
@@ -64,7 +64,7 @@ export class Moire {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
         this.gui.add(this, 'density', 5, 50).name('density').listen();
-        this.gui.add(this.amp, 'n', -1, 1).name('amplitude').step(0.01).listen();
+        this.gui.add(this, 'amp', -1, 1).name('amplitude').step(0.01).listen();
     }
 
     colorWipe() {
@@ -85,12 +85,12 @@ export class Moire {
             const t = i / count;
             const r = t * 2.0;
             Plot.DistortedRing.draw(this.filters, basis, r,
-                sinWave(-this.amp.get(), this.amp.get(), 4, 0),
+                sinWave(-this.amp, this.amp, 4, 0),
                 (v, t) => {
                     const c = palette.get(t);
                     return color4Pool.acquire().set(c.color, c.alpha * this.alpha);
                 },
-                this.rotation.get());
+                this.rotation);
         }
     }
 

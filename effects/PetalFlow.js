@@ -12,13 +12,13 @@ import { Plot, rasterize } from "../draw.js";
 import { ProceduralPalette } from "../color.js";
 import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
 import { wrap } from "../util.js";
-import { easeMid, MutableNumber, Mutation, Rotation, Timeline } from "../animation.js";
+import { easeMid, Mutation, Rotation, Timeline } from "../animation.js";
 
 export class PetalFlow {
     constructor() {
         this.alpha = 0.2;
-        this.spacing = new MutableNumber(0.3);
-        this.twistFactor = new MutableNumber(2.15);
+        this.spacing = 0.3;
+        this.twistFactor = 2.15;
         this.speed = 8.0;
 
         this.palette = new ProceduralPalette(
@@ -35,7 +35,7 @@ export class PetalFlow {
         );
         this.timeline = new Timeline();
         this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, Math.PI / 4, 160, easeMid, true));
-        this.timeline.add(0, new Mutation(this.twistFactor, sinWave(2.0, 2.5, 1, 0), 160, easeMid, true));
+        this.timeline.add(0, new Mutation(this, 'twistFactor', sinWave(2.0, 2.5, 1, 0), 160, easeMid, true));
         this.setupGui();
     }
 
@@ -48,7 +48,7 @@ export class PetalFlow {
     drawPetals(loopCount, loopT) {
         const logMin = -3.75;
         const logMax = 3.75;
-        const currentSpacing = this.spacing.get();
+        const currentSpacing = this.spacing;
 
         const minK = Math.floor(logMin / currentSpacing) - 1;
         const maxK = Math.ceil(logMax / currentSpacing) + 1;
@@ -70,7 +70,7 @@ export class PetalFlow {
             if (dist > 2.5) opacity = Math.max(0, 1.0 - (dist - 2.5) / 1.0);
             if (opacity <= 0.01) continue;
 
-            const twistAngle = (k + progress) * this.twistFactor.get();
+            const twistAngle = (k + progress) * this.twistFactor;
 
             // Rasterize & Color
             const colorIndex = (k - loopCount) + 10000;
@@ -114,8 +114,8 @@ export class PetalFlow {
     drawFrame() {
         this.timeline.step();
         const time = (performance.now() / 1000.0) * (this.speed * 0.015);
-        const loopCount = Math.floor(time / this.spacing.get());
-        const loopT = time % this.spacing.get();
+        const loopCount = Math.floor(time / this.spacing);
+        const loopT = time % this.spacing;
         this.drawPetals(loopCount, loopT);
     }
 }

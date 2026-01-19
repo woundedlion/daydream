@@ -7,21 +7,20 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { GenerativePalette } from "../color.js";
-import { Timeline, MutableNumber, Mutation, easeMid } from "../animation.js";
+import { Timeline, Mutation, easeMid } from "../animation.js";
 
 export class MobiusGradient {
     constructor() {
         this.palette = new GenerativePalette("straight", "split-complementary", "descending");
         this.timeline = new Timeline();
 
-        // The "offset" represents the position of the sphere relative to the plane
         // as it moves.
-        this.offset = new MutableNumber(0);
+        this.offset = 0;
         this.animationSpeed = 0.01;
 
         // Animate offset continuously
         this.timeline.add(0,
-            new Mutation(this.offset, (t, current) => current + this.animationSpeed, -1, easeMid, true)
+            new Mutation(this, 'offset', (t, current) => current + this.animationSpeed, -1, easeMid, true)
         );
 
         this.setupGui();
@@ -30,7 +29,7 @@ export class MobiusGradient {
     setupGui() {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'animationSpeed', -0.1, 0.1).name('Speed');
-        this.gui.add(this.offset, 'n').name('Warp Offset').step(0.01).listen();
+        this.gui.add(this, 'offset').name('Warp Offset').step(0.01).listen();
     }
 
     // Transform t (0..1) using a stereographic translation logic.
@@ -54,7 +53,7 @@ export class MobiusGradient {
     drawFrame() {
         this.timeline.step();
 
-        const offset = this.offset.get();
+        const offset = this.offset;
         const count = Daydream.pixelPositions.length;
 
         for (let i = 0; i < count; i++) {

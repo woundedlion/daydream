@@ -16,7 +16,7 @@ import {
     Color4
 } from "../color.js";
 import {
-    Timeline, Sprite, RandomWalk, MutableNumber, Rotation, Mutation, easeMid
+    Timeline, Sprite, RandomWalk, Rotation, Mutation, easeMid
 } from "../animation.js";
 import { Scan, Plot, makeBasis } from "../draw.js";
 import { createRenderPipeline, FilterAntiAlias } from "../filters.js";
@@ -34,8 +34,8 @@ export class TestShapes {
         }
     }
 
-    get twist() { return this._twist.get(); }
-    set twist(v) { this._twist.set(v); }
+    get twist() { return this._twist; }
+    set twist(v) { this._twist = v; }
 
     constructor() {
         this.rings = [];
@@ -46,7 +46,7 @@ export class TestShapes {
         this.timeline = new Timeline();
         this.radius = 1.0;
         this.sides = 5;
-        this._twist = new MutableNumber(0);
+        this._twist = 0;
 
         this.scanPipeline = createRenderPipeline();
         this.plotPipeline = createRenderPipeline(new FilterAntiAlias());
@@ -58,7 +58,7 @@ export class TestShapes {
     rebuild() {
         this.rings = [];
         this.timeline = new Timeline(); // Reset timeline
-        this.timeline.add(0, new Mutation(this._twist, (t) => (Math.PI / 4) * Math.sin(t * Math.PI), 480, easeMid, true));
+        this.timeline.add(0, new Mutation(this, '_twist', (t) => (Math.PI / 4) * Math.sin(t * Math.PI), 480, easeMid, true));
 
         const seed1 = Math.floor(Math.random() * 65535);
         const seed2 = Math.floor(Math.random() * 65535);

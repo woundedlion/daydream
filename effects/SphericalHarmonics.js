@@ -13,8 +13,6 @@ import {
     Timeline,
     OrientationTrail,
     Rotation,
-    Transition,
-    MutableNumber,
     easeMid,
     easeInOutSin
 } from "../animation.js";

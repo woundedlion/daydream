@@ -17,7 +17,7 @@ import {
     ProceduralPalette, colorPool, color4Pool
 } from "../color.js";
 import {
-    Timeline, easeMid, Sprite, Transition, RandomTimer, MutableNumber, Rotation, easeOutExpo, easeInSin, easeOutSin, Mutation
+    Timeline, easeMid, Sprite, Transition, RandomTimer, Rotation, easeOutExpo, easeInSin, easeOutSin, Mutation
 } from "../animation.js";
 import {
     createRenderPipeline, FilterAntiAlias
@@ -28,15 +28,15 @@ class ThrusterContext {
     constructor() {
         this.orientation = new Orientation();
         this.point = new THREE.Vector3();
-        this.radius = new MutableNumber(0);
-        this.motion = new Transition(this.radius, 0.3, 8, easeMid);
+        this.radius = 0;
+        this.motion = new Transition(this, 'radius', 0.3, 8, easeMid);
     }
 
     reset(orientation, point) {
         this.orientation.set(orientation.get().clone());
         this.point.copy(point);
-        this.radius.set(0);
-        this.motion = new Transition(this.radius, 0.3, 8, easeMid);
+        this.radius = 0;
+        this.motion = new Transition(this, 'radius', 0.3, 8, easeMid);
     }
 }
 
@@ -61,9 +61,9 @@ export class Thrusters {
         this.poolSize = 16;
         this.thrusterPool = new StaticPool(ThrusterContext, this.poolSize);
 
-        this.amplitude = new MutableNumber(0);
+        this.amplitude = 0;
         this.warpPhase = 0;
-        this.radius = new MutableNumber(1);
+        this.radius = 1;
 
         // GUI
         this.gui = new gui.GUI({ autoPlace: false });
@@ -83,7 +83,7 @@ export class Thrusters {
 
     drawThruster(ctx, opacity) {
         const basis = makeBasis(ctx.orientation.get(), ctx.point);
-        Plot.Ring.draw(this.filters, basis, ctx.radius.get(),
+        Plot.Ring.draw(this.filters, basis, ctx.radius,
             (v, t) => {
                 let c = colorPool.acquire().setHex(0xffffff).multiplyScalar(opacity);
                 return color4Pool.acquire().set(c, opacity * this.alpha);
@@ -106,7 +106,7 @@ export class Thrusters {
             this.warp.cancel();
         }
         this.warp = new Mutation(
-            this.amplitude, (t) => 0.7 * Math.exp(-2 * t), 32, easeMid);
+            this, 'amplitude', (t) => 0.7 * Math.exp(-2 * t), 32, easeMid);
         this.timeline.add(1 / 16,
             this.warp
         );
@@ -147,12 +147,12 @@ export class Thrusters {
     ringFn(t) {
         return sinWave(-1, 1, 2, this.warpPhase)(t)
             * sinWave(-1, 1, 3, 0)((this.t % 32) / 32)
-            * this.amplitude.get();
+            * this.amplitude;
     }
 
     drawRing(opacity) {
         const basis = makeBasis(this.orientation.get(), this.ring);
-        Plot.DistortedRing.draw(this.filters, basis, this.radius.get(),
+        Plot.DistortedRing.draw(this.filters, basis, this.radius,
             this.ringFn.bind(this),
             (v, t) => {
                 let z = this.orientation.orient(Daydream.X_AXIS);

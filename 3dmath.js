@@ -4,7 +4,7 @@
  */
 
 import * as THREE from "three";
-import { MutableNumber } from "./animation.js";
+
 
 export const TWO_PI = 2 * Math.PI;
 
@@ -48,18 +48,18 @@ export function mobius(z, params) {
  */
 export class MobiusParams {
   constructor(aRe = 1, aIm = 0, bRe = 0, bIm = 0, cRe = 0, cIm = 0, dRe = 1, dIm = 0) {
-    this.aRe = new MutableNumber(aRe);
-    this.aIm = new MutableNumber(aIm);
-    this.bRe = new MutableNumber(bRe);
-    this.bIm = new MutableNumber(bIm);
-    this.cRe = new MutableNumber(cRe);
-    this.cIm = new MutableNumber(cIm);
-    this.dRe = new MutableNumber(dRe);
-    this.dIm = new MutableNumber(dIm);
+    this.aRe = aRe;
+    this.aIm = aIm;
+    this.bRe = bRe;
+    this.bIm = bIm;
+    this.cRe = cRe;
+    this.cIm = cIm;
+    this.dRe = dRe;
+    this.dIm = dIm;
   }
 
-  get a() { return { re: this.aRe.get(), im: this.aIm.get() }; }
-  get b() { return { re: this.bRe.get(), im: this.bIm.get() }; }
-  get c() { return { re: this.cRe.get(), im: this.cIm.get() }; }
-  get d() { return { re: this.dRe.get(), im: this.dIm.get() }; }
+  get a() { return { re: this.aRe, im: this.aIm }; }
+  get b() { return { re: this.bRe, im: this.bIm }; }
+  get c() { return { re: this.cRe, im: this.cIm }; }
+  get d() { return { re: this.dRe, im: this.dIm }; }
 }
