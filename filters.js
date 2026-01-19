@@ -536,3 +536,68 @@ export class FilterScreenTrails {
   }
 }
 
+/**
+ * Applies a variable 3x3 Gaussian Blur.
+ * @param {number} factor - Blur intensity [0.0 to 1.0].
+ */
+export class FilterGaussianBlur {
+  constructor(factor = 1.0) {
+    this.is2D = true;
+
+    // Clamp factor to valid range [0, 1]
+    const f = Math.max(0, Math.min(1, factor));
+
+    // Interpolate weights between Identity (Center=1) and Gaussian (Center=0.25)
+    // Gaussian reference: Corner=1/16, Edge=2/16, Center=4/16
+    const c = 1.0 - (0.75 * f); // Center weight: 1.0 -> 0.25
+    const e = 0.125 * f;        // Edge weight:   0.0 -> 0.125
+    const d = 0.0625 * f;       // Diagonal weight: 0.0 -> 0.0625
+
+    // Flattened 3x3 kernel
+    this.kernel = [
+      d, e, d,
+      e, c, e,
+      d, e, d
+    ];
+  }
+
+  update(factor) {
+    // Clamp factor to valid range [0, 1]
+    const f = Math.max(0, Math.min(1, factor));
+
+    // Interpolate weights between Identity (Center=1) and Gaussian (Center=0.25)
+    const c = 1.0 - (0.75 * f);
+    const e = 0.125 * f;
+    const d = 0.0625 * f;
+
+    this.kernel = [
+      d, e, d,
+      e, c, e,
+      d, e, d
+    ];
+  }
+
+  plot(x, y, color, age, alpha, pass) {
+    const cx = Math.round(x);
+    const cy = Math.round(y);
+
+    let k = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      const ny = cy + dy;
+
+      // Strict vertical bounds check
+      if (ny >= 0 && ny < Daydream.H) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const weight = this.kernel[k++];
+
+          // Optimization: Skip zero-weight neighbors if factor is 0
+          if (weight > 0.001) {
+            pass(wrap(cx + dx, Daydream.W), ny, color, age, alpha * weight);
+          }
+        }
+      } else {
+        k += 3; // Skip row
+      }
+    }
+  }
+}

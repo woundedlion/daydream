@@ -151,8 +151,8 @@ export class Gradient {
    * @returns {{color: THREE.Color, alpha: number}} The sampled color and alpha.
    */
   get(a) {
-    const c = this.colors[Math.floor(a * (this.colors.length - 1))];
-    const sourceColor = this.colors[Math.floor(a * (this.colors.length - 1))];
+    const t = Math.max(0, Math.min(1, a));
+    const sourceColor = this.colors[Math.floor(t * (this.colors.length - 1))];
     const result = color4Pool.acquire();
     result.color.copy(sourceColor).convertSRGBToLinear();
     result.alpha = 1.0;

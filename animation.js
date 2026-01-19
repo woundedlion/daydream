@@ -238,53 +238,198 @@ export class Animation {
 }
 
 /**
- * A particle system animation driven by Perlin noise.
+ * efficient neighbor lookup for particles.
  */
+class SpatialHash {
+  constructor(cellSize) {
+    this.cellSize = cellSize;
+    this.buckets = new Map();
+  }
+
+  insert(particle) {
+    const key = this.getKey(particle.p);
+    if (!this.buckets.has(key)) {
+      this.buckets.set(key, []);
+    }
+    this.buckets.get(key).push(particle);
+  }
+
+  getKey(v) {
+    const x = Math.floor(v.x / this.cellSize);
+    const y = Math.floor(v.y / this.cellSize);
+    const z = Math.floor(v.z / this.cellSize);
+    return `${x},${y},${z}`;
+  }
+
+  query(position, radius) {
+    const particles = [];
+    const cx = Math.floor(position.x / this.cellSize);
+    const cy = Math.floor(position.y / this.cellSize);
+    const cz = Math.floor(position.z / this.cellSize);
+    const range = Math.ceil(radius / this.cellSize);
+
+    for (let x = cx - range; x <= cx + range; x++) {
+      for (let y = cy - range; y <= cy + range; y++) {
+        for (let z = cz - range; z <= cz + range; z++) {
+          const key = `${x},${y},${z}`;
+          if (this.buckets.has(key)) {
+            const bucket = this.buckets.get(key);
+            for (const p of bucket) {
+              if (p.p.distanceToSquared(position) <= radius * radius) {
+                particles.push(p);
+              }
+            }
+          }
+        }
+      }
+    }
+    return particles;
+  }
+
+  clear() {
+    this.buckets.clear();
+  }
+}
+
+/**
+ * A physics-based particle system with gravity and spatial hashing.
+ */
+// Base vector for particle orientation (North Pole)
+export const PARTICLE_BASE = new THREE.Vector3(0, 1, 0);
+
 export class ParticleSystem extends Animation {
   static Particle = class {
-    constructor(p) {
-      this.p = p;
-      this.v = new THREE.Vector3();
+    /**
+     * @param {THREE.Vector3} p - Initial position.
+     * @param {THREE.Vector3} v - Initial velocity.
+     * @param {Color4} c - Color.
+     * @param {number} gravity - Gravity mass/strength.
+     */
+    constructor(p, v, c, gravity) {
+      this.p = p.clone(); // Position (cache)
+      this.v = v.clone(); // Velocity (Angular)
+      this.c = c;         // Color (Color4)
+      this.gravity = gravity;
+
+      this.orientation = new Orientation();
+      // Initialize orientation to match position p
+      // assuming PARTICLE_BASE is (0,1,0)
+      const q = quaternionPool.acquire().setFromUnitVectors(PARTICLE_BASE, p.clone().normalize());
+      this.orientation.orientations[0].copy(q);
     }
   }
 
   constructor() {
     super(-1, false);
     this.particles = [];
-    this.noise = new FastNoiseLite();
-    this.noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
-    this.noise.SetSeed(Math.floor(Math.random() * 65535));
+    this.friction = 0.95;
+    this.gravityConstant = 0.01;
+    this.attractors = [];
+    this.spatialHash = new SpatialHash(0.1); // Default cell size, adjustable
+    this.interactionRadius = 0.2;
+  }
 
-    this.NOISE_SCALE = 10;
-    this.TIME_SCALE = 0.01;
-    this.FORCE_SCALE = 10;
+  /**
+   * Adds a gravity well.
+   * @param {THREE.Vector3} position 
+   * @param {number} strength 
+   * @param {number} killRadius 
+   */
+  addAttractor(position, strength, killRadius) {
+    this.attractors.push({ position, strength, killRadius });
   }
 
   /**
    * Spawns a new particle.
-   * @param {THREE.Vector3} p - The initial position of the particle.
+   * @param {THREE.Vector3} p 
+   * @param {THREE.Vector3} v 
+   * @param {Color4} c 
+   * @param {number} gravity 
    */
-  spawn(p) {
-    this.particles.push(new ParticleSystem.Particle(p));
+  spawn(p, v, c, gravity) {
+    this.particles.push(new ParticleSystem.Particle(p, v, c, gravity));
   }
 
   /**
-   * Updates the particles' velocities based on noise.
+   * Updates the particles' physics.
    */
   step() {
     super.step();
-    let t_scaled = this.t * this.TIME_SCALE;
-    for (let p of this.particles) {
-      let nx = p.p.x * this.NOISE_SCALE;
-      let ny = p.p.y * this.NOISE_SCALE;
-      let nz = p.p.z * this.NOISE_SCALE;
 
-      // Using 3D slice technique to approximate 4D noise (matching C++ FlowField logic)
-      let vx = this.noise.GetNoise(nx, ny, t_scaled);
-      let vy = this.noise.GetNoise(ny, nz, t_scaled + 100);
-      let vz = this.noise.GetNoise(nz, nx, t_scaled + 200);
+    // 1. Rebuild Spatial Hash
+    this.spatialHash.clear();
+    for (const p of this.particles) {
+      this.spatialHash.insert(p);
+    }
 
-      p.v.set(vx, vy, vz).multiplyScalar(this.FORCE_SCALE);
+    // 2. Physics Step
+    const G = this.gravityConstant;
+    const radius = this.interactionRadius;
+    const torque = vectorPool.acquire(); // Reuse vector for torque calculation
+    const q = quaternionPool.acquire();  // Reuse quaternion
+
+    for (const p of this.particles) {
+      // Find neighbors
+      const neighbors = this.spatialHash.query(p.p, radius);
+
+      for (const other of neighbors) {
+        if (p === other) continue;
+
+        // Force is attraction between p and other
+        // In rotational physics, we apply a Torque
+        // Vector D = other - p
+        // Torque T = p x D (axis of rotation to move p towards other)
+
+        const distSq = p.p.distanceToSquared(other.p);
+
+        if (distSq > 0.0001 && distSq < radius * radius) {
+          const forceMag = (G * p.gravity * other.gravity) / distSq;
+
+          // Calculate Torque direction (p cross (other - p) = p cross other)
+          torque.crossVectors(p.p, other.p).normalize().multiplyScalar(forceMag);
+          p.v.add(torque);
+        }
+      }
+
+      // Apply Rotational Velocity
+      // v represents axis * speed
+      p.v.multiplyScalar(this.friction);
+
+      const speed = p.v.length();
+      if (speed > 0.00001) {
+        const axis = vectorPool.acquire().copy(p.v).multiplyScalar(1 / speed); // Normalize axis
+
+        // Animate rotation, upsampling history for trails
+        const easeLinear = (t) => t;
+        Rotation.animate(p.orientation, axis, speed, easeLinear, "World");
+      }
+    }
+
+
+    // 3. Attractors & Death
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      let dead = false;
+      for (const attr of this.attractors) {
+        const distSq = p.p.distanceToSquared(attr.position);
+        if (distSq < attr.killRadius * attr.killRadius) {
+          dead = true;
+          break;
+        }
+
+        // Attractor Torque
+        // T = p x attr
+        const dist = Math.sqrt(distSq);
+        if (dist > 0.001) {
+          const forceMag = attr.strength / distSq;
+          torque.crossVectors(p.p, attr.position).normalize().multiplyScalar(forceMag);
+          p.v.add(torque);
+        }
+      }
+
+      if (dead) {
+        this.particles.splice(i, 1);
+      }
     }
   }
 }
@@ -574,6 +719,7 @@ export class Rotation extends Animation {
    * @param {string} [space="World"]
    */
   static animate(orientation, axis, angle, easingFn, space) {
+    orientation.collapse();
     let r = new Rotation(orientation, axis, angle, 1, easingFn, false, space);
     r.step();
   }

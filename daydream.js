@@ -23,7 +23,9 @@ import {
   RingShower,
   RingSpin,
   SphericalHarmonics,
+  SpinShapes,
   Test,
+  TestParticles,
   TestShapes,
   Thrusters,
   Voronoi
@@ -50,7 +52,9 @@ const effects = {
   RingShower,
   RingSpin,
   SphericalHarmonics,
+  SpinShapes,
   Test,
+  TestParticles,
   TestShapes,
   Thrusters,
   Voronoi

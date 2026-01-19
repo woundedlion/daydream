@@ -97,17 +97,15 @@ export class Daydream {
   static DOT_SIZE = 2;
   static DOT_COLOR = 0x0000ff;
 
-  // OPTIMIZATION: pixelPositions remains an Array of Vectors (for geometry math)
-  // but pixels is now a Float32Array (flat buffer for colors)
   static pixelPositions = new Array(Daydream.W * Daydream.H);
   static pixels = new Float32Array(Daydream.W * Daydream.H * 3);
 
   static X_AXIS = new THREE.Vector3(1, 0, 0);
   static Y_AXIS = new THREE.Vector3(0, 1, 0);
   static Z_AXIS = new THREE.Vector3(0, 0, 1);
+  static UP = Daydream.Y_AXIS;
 
   constructor() {
-    // ... [Constructor setup remains unchanged up to precomputeMatrices] ...
     THREE.ColorManagement.enabled = true;
     this.canvas = document.querySelector("#canvas");
 
@@ -153,8 +151,8 @@ export class Daydream {
     // Optimized Geometry
     this.dotGeometry = new THREE.SphereGeometry(
       Daydream.DOT_SIZE,
-      8,
-      8,
+      32,
+      32,
       0,
       Math.PI
     );
@@ -434,8 +432,8 @@ export class Daydream {
 
     this.dotGeometry = new THREE.SphereGeometry(
       Daydream.DOT_SIZE,
-      8,
-      8,
+      32,
+      32,
       0,
       Math.PI
     );
