@@ -21,9 +21,11 @@ export { PetalFlow } from "./PetalFlow.js";
 export { LSystem } from "./LSystem.js";
 
 export { TestShapes } from "./TestShapes.js";
+export { TestParticles } from "./TestParticles.js";
 export { HopfFibration } from "./HopfFibration.js";
 export { Voronoi } from "./Voronoi.js";
 export { SphericalHarmonics } from "./SphericalHarmonics.js";
+export { SpinShapes } from "./SpinShapes.js";
 export { MobiusGradient } from "./MobiusGradient.js";
 
 
