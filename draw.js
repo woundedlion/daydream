@@ -1153,8 +1153,42 @@ export const SDF = {
 
     // Intersection intervals: A intersect B
     getHorizontalBounds(y) {
-      if (this.a.getHorizontalBounds) return this.a.getHorizontalBounds(y);
-      return null;
+      let iA = this.a.getHorizontalBounds ? this.a.getHorizontalBounds(y) : null;
+      let iB = this.b.getHorizontalBounds ? this.b.getHorizontalBounds(y) : null;
+
+      // Null means "Full Row" (technically [-inf, +inf] or [0, W])
+      // Intersection with "Full Row" is just the other set.
+      if (iA === null) return iB;
+      if (iB === null) return iA;
+
+      // If either returns an empty list (no intersection), the result is empty.
+      if (iA.length === 0 || iB.length === 0) return [];
+
+      let result = [];
+      let idxA = 0;
+      let idxB = 0;
+
+      // Assuming sorted intervals from children (standard for Scan)
+      while (idxA < iA.length && idxB < iB.length) {
+        let intA = iA[idxA];
+        let intB = iB[idxB];
+
+        // Find overlap
+        let start = Math.max(intA.start, intB.start);
+        let end = Math.min(intA.end, intB.end);
+
+        if (start < end) {
+          result.push({ start, end });
+        }
+
+        // Advance the one that ends first
+        if (intA.end < intB.end) {
+          idxA++;
+        } else {
+          idxB++;
+        }
+      }
+      return result;
     }
 
     distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
@@ -1446,19 +1480,11 @@ export const Scan = {
       Daydream.pixels[i * 3 + 2] += 0.02;
     }
 
-    // Pass reusable object
     shape.distance(p, sampleResult);
     const d = sampleResult.dist;
-
-    // Unified AA Logic
     const pixelWidth = 2 * Math.PI / Daydream.W;
-    const threshold = pixelWidth; // Always use pixelWidth threshold for solid shapes (implicit)
-
+    const threshold = pixelWidth;
     if (d < threshold) {
-      // Solid AA: Fade across [-pixelWidth, pixelWidth]
-      // Map d from [pixelWidth, -pixelWidth] to [0, 1]
-      // t = 0.5 - d / (2 * pixelWidth)
-      // d=pixelWidth -> t=0. d=-pixelWidth -> t=1.
       const t = 0.5 - d / (2 * pixelWidth);
       const aaAlpha = quinticKernel(Math.max(0, Math.min(1, t)));
 

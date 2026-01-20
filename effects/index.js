@@ -28,4 +28,3 @@ export { SphericalHarmonics } from "./SphericalHarmonics.js";
 export { SpinShapes } from "./SpinShapes.js";
 export { MobiusGradient } from "./MobiusGradient.js";
 
-
