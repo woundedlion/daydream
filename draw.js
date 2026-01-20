@@ -508,7 +508,7 @@ export const Plot = {
   },
 
   Star: class {
-    static draw(pipeline, basis, radius, numSides, colorFn, phase = 0) {
+    static sample(basis, radius, numSides, phase = 0) {
       // Basis construction
       let { v, u, w } = basis;
 
@@ -541,9 +541,22 @@ export const Plot = {
 
         points.push(p);
       }
+      return points;
+    }
+
+    static draw(pipeline, basis, radius, numSides, colorFn, phase = 0) {
+      const points = Plot.Star.sample(basis, radius, numSides, phase);
 
       // Projection center (Front)
-      const center = v;
+      // Recalculate center based on radius logic or just use basis.v/antipode logic handled in sample?
+      // The drawing logic needs the 'center' for PlanarLine.
+      // If sampling flipped the basis, the points are correct, but the "center" for projection
+      // should ideally be the pole they surround.
+
+      let center = basis.v;
+      if (radius > 1.0) {
+        center = vectorPool.acquire().copy(basis.v).negate();
+      }
 
       for (let i = 0; i < points.length; i++) {
         const p1 = points[i];
@@ -554,7 +567,7 @@ export const Plot = {
   },
 
   Flower: class {
-    static draw(pipeline, basis, radius, numSides, colorFn, phase = 0) {
+    static sample(basis, radius, numSides, phase = 0) {
       let { v, u, w } = basis;
 
       if (radius > 1.0) {
@@ -610,6 +623,11 @@ export const Plot = {
         points.push(vectorPool.acquire().copy(points[0]));
       }
 
+      return points;
+    }
+
+    static draw(pipeline, basis, radius, numSides, colorFn, phase = 0) {
+      const points = Plot.Flower.sample(basis, radius, numSides, phase);
       Plot.Rasterize.draw(pipeline, points, colorFn, false);
     }
   },
@@ -709,6 +727,21 @@ export const Plot = {
   },
 
   Spiral: class {
+
+    /**
+     * Samples points forming a Fibonacci spiral pattern.
+     * @param {number} n - Total number of points.
+     * @param {number} eps - Epsilon value for spiral offset.
+     * @returns {THREE.Vector3[]} An array of points.
+     */
+    static sample(n, eps) {
+      const points = [];
+      for (let i = 0; i < n; ++i) {
+        points.push(fibSpiral(n, eps, i));
+      }
+      return points;
+    }
+
     /**
      * Draws points forming a Fibonacci spiral pattern.
      * @param {Object} pipeline - Render pipeline.
@@ -717,8 +750,8 @@ export const Plot = {
      * @param {Function} colorFn - Function to determine the color (takes vector).
      */
     static draw(pipeline, n, eps, colorFn) {
-      for (let i = 0; i < n; ++i) {
-        let v = fibSpiral(n, eps, i);
+      const points = Plot.Spiral.sample(n, eps);
+      for (const v of points) {
         const c = colorFn(v);
         const color = c.isColor ? c : (c.color || c);
         const alpha = c.alpha !== undefined ? c.alpha : 1.0;
