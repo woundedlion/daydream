@@ -812,6 +812,10 @@ export const SDF = {
       this.invSinTarget = safeApprox ? (1.0 / Math.sin(this.targetAngle)) : 0;
     }
 
+    /**
+     * Calculates the vertical range of the ring on the screen.
+     * @returns {{yMin: number, yMax: number}} The vertical bounds [yMin, yMax].
+     */
     getVerticalBounds() {
       // Vertical bounds
       const a1 = this.centerPhi - this.targetAngle;
@@ -850,6 +854,15 @@ export const SDF = {
       return { yMin, yMax };
     }
 
+    /**
+     * Calculates the horizontal intervals for a given scanline y.
+     * @param {number} y - The scanline y-coordinate.
+     * @returns {{start: number, end: number}[]|null} Array of intervals, or null for full row.
+     */
+    /**
+     * @param {number} y 
+     * @returns {{start: number, end: number}[]|null}
+     */
     getHorizontalBounds(y) {
       const phi = yToPhi(y);
       const cosPhi = Math.cos(phi);
@@ -903,7 +916,12 @@ export const SDF = {
       return intervals;
     }
 
-    // Returns { dist, t } where dist is signed distance (negative inside)
+    /**
+     * Calculates the signed distance from a point to the ring surface.
+     * @param {THREE.Vector3} p - The point to check.
+     * @param {{dist: number, t: number, rawDist: number}} [out] - Result object.
+     * @returns {{dist: number, t: number, rawDist: number}} The distance result.
+     */
     distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
       const dot = p.dot(this.normal);
       if (dot < this.cosMin || dot > this.cosMax) {
@@ -960,6 +978,10 @@ export const SDF = {
       this.maxThickness = thickness + maxDistortion;
     }
 
+    /**
+     * Calculates the vertical range.
+     * @returns {{yMin: number, yMax: number}} Vertical bounds.
+     */
     getVerticalBounds() {
       const a1 = this.centerPhi - this.targetAngle;
       const a2 = this.centerPhi + this.targetAngle;
@@ -990,6 +1012,11 @@ export const SDF = {
       return { yMin, yMax };
     }
 
+    /**
+     * Calculates horizontal intervals for a scanline.
+     * @param {number} y - Scanline y.
+     * @returns {{start: number, end: number}[]|null} Intervals.
+     */
     getHorizontalBounds(y) {
       const phi = yToPhi(y);
       const cosPhi = Math.cos(phi);
@@ -1041,6 +1068,12 @@ export const SDF = {
       return intervals;
     }
 
+    /**
+     * Signed distance to the distorted ring.
+     * @param {THREE.Vector3} p - Point.
+     * @param {{dist: number, t: number, rawDist: number}} [out] - Result.
+     * @returns {{dist: number, t: number, rawDist: number}} Result.
+     */
     distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
       const polarAngle = angleBetween(p, this.normal);
 
@@ -1071,6 +1104,10 @@ export const SDF = {
       this.thickness = Math.max(a.thickness || 0, b.thickness || 0);
     }
 
+    /**
+     * Vertical bounds of the union.
+     * @returns {{yMin: number, yMax: number}} Bounds.
+     */
     getVerticalBounds() {
       const b1 = this.a.getVerticalBounds();
       const b2 = this.b.getVerticalBounds();
@@ -1080,6 +1117,12 @@ export const SDF = {
       };
     }
 
+    /**
+     * Distance to union (min of distances).
+     * @param {THREE.Vector3} p - Point.
+     * @param {{dist: number, t: number, rawDist: number}} [out] - Result.
+     * @returns {{dist: number, t: number, rawDist: number}} Result.
+     */
     distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
       const d1 = this.a.distance(p, out);
       const resA = this.a.distance(p);
@@ -1105,16 +1148,31 @@ export const SDF = {
       this.thickness = a.thickness || 0;
     }
 
+    /**
+     * Vertical bounds of the subtraction (conservatively A's bounds).
+     * @returns {{yMin: number, yMax: number}} Bounds.
+     */
     getVerticalBounds() {
       return this.a.getVerticalBounds();
     }
 
+    /**
+     * Horizontal bounds (delegates to A).
+     * @param {number} y - Scanline.
+     * @returns {{start: number, end: number}[]|null} Intervals.
+     */
     // Conservative interval: Subtracting B from A might chop A's intervals, but A's intervals are a safe superset.
     getHorizontalBounds(y) {
       if (this.a.getHorizontalBounds) return this.a.getHorizontalBounds(y);
       return null;
     }
 
+    /**
+     * Distance to subtraction (max of A and -B).
+     * @param {THREE.Vector3} p - Point.
+     * @param {{dist: number, t: number, rawDist: number}} [out] - Result.
+     * @returns {{dist: number, t: number, rawDist: number}} Result.
+     */
     distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
       const resA = this.a.distance(p);
       const resB = this.b.distance(p);
@@ -1142,6 +1200,10 @@ export const SDF = {
       this.thickness = Math.min(a.thickness || 0, b.thickness || 0);
     }
 
+    /**
+     * Vertical bounds of intersection.
+     * @returns {{yMin: number, yMax: number}} Bounds.
+     */
     getVerticalBounds() {
       const b1 = this.a.getVerticalBounds();
       const b2 = this.b.getVerticalBounds();
@@ -1151,6 +1213,11 @@ export const SDF = {
       };
     }
 
+    /**
+     * Horizontal bounds of intersection.
+     * @param {number} y - Scanline.
+     * @returns {{start: number, end: number}[]|null} Intervals.
+     */
     // Intersection intervals: A intersect B
     getHorizontalBounds(y) {
       let iA = this.a.getHorizontalBounds ? this.a.getHorizontalBounds(y) : null;
@@ -1191,6 +1258,12 @@ export const SDF = {
       return result;
     }
 
+    /**
+     * Distance to intersection (max of distances).
+     * @param {THREE.Vector3} p - Point.
+     * @param {{dist: number, t: number, rawDist: number}} [out] - Result.
+     * @returns {{dist: number, t: number, rawDist: number}} Result.
+     */
     distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
       const resA = this.a.distance(p);
       const resB = this.b.distance(p);
@@ -1228,8 +1301,15 @@ export const SDF = {
       this.yMax = Math.ceil((Math.min(Math.PI, centerPhi + margin) / Math.PI) * (Daydream.H - 1));
     }
 
+    /**
+     * @returns {{yMin: number, yMax: number}} Vertical bounds.
+     */
     getVerticalBounds() { return { yMin: this.yMin, yMax: this.yMax }; }
 
+    /**
+     * @param {number} y 
+     * @returns {{start: number, end: number}[]|null}
+     */
     getHorizontalBounds(y) {
       const phi = yToPhi(y);
       const cosPhi = Math.cos(phi);
@@ -1260,6 +1340,11 @@ export const SDF = {
       return [{ start: x1, end: x2 }];
     }
 
+    /**
+     * @param {THREE.Vector3} p 
+     * @param {{dist: number, t: number, rawDist: number}} [out] 
+     * @returns {{dist: number, t: number, rawDist: number}}
+     */
     distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
       const polarAngle = angleBetween(p, this.basis.v);
       const dotU = p.dot(this.basis.u);
@@ -1314,8 +1399,15 @@ export const SDF = {
       this.yMax = Math.ceil((Math.min(Math.PI, centerPhi + margin) / Math.PI) * (Daydream.H - 1));
     }
 
+    /**
+     * @returns {{yMin: number, yMax: number}} Vertical bounds.
+     */
     getVerticalBounds() { return { yMin: this.yMin, yMax: this.yMax }; }
 
+    /**
+     * @param {number} y 
+     * @returns {{start: number, end: number}[]|null}
+     */
     getHorizontalBounds(y) {
       // Same as Polygon Bounding Circle logic
       const phi = yToPhi(y);
@@ -1341,6 +1433,11 @@ export const SDF = {
       return [{ start: x1, end: x2 }];
     }
 
+    /**
+     * @param {THREE.Vector3} p 
+     * @param {{dist: number, t: number, rawDist: number}} [out] 
+     * @returns {{dist: number, t: number, rawDist: number}}
+     */
     distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
       const scanDist = angleBetween(p, this.basis.v);
       const dotU = p.dot(this.basis.u);
@@ -1389,8 +1486,15 @@ export const SDF = {
       this.yMax = Math.ceil((Math.min(Math.PI, centerPhi + margin) / Math.PI) * (Daydream.H - 1));
     }
 
+    /**
+     * @returns {{yMin: number, yMax: number}} Vertical bounds.
+     */
     getVerticalBounds() { return { yMin: this.yMin, yMax: this.yMax }; }
 
+    /**
+     * @param {number} y 
+     * @returns {{start: number, end: number}[]|null}
+     */
     getHorizontalBounds(y) {
       const phi = yToPhi(y);
       const cosPhi = Math.cos(phi);
@@ -1415,6 +1519,11 @@ export const SDF = {
       return [{ start: x1, end: x2 }];
     }
 
+    /**
+     * @param {THREE.Vector3} p 
+     * @param {{dist: number, t: number, rawDist: number}} [out] 
+     * @returns {{dist: number, t: number, rawDist: number}}
+     */
     distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
       const scanDist = angleBetween(p, this.antipode);
       const polarAngle = Math.PI - scanDist;
@@ -1594,6 +1703,16 @@ export const Scan = {
   },
 
   Line: class {
+    /**
+     * Scans a line between two points. (Simplified Scan).
+     * @param {Object} pipeline - Render pipeline.
+     * @param {Object} pixels - Pixel buffer (unused in signature but implied environment).
+     * @param {THREE.Vector3} v1 - Start point.
+     * @param {THREE.Vector3} v2 - End point.
+     * @param {number} thickness - Line thickness.
+     * @param {Function} colorFn - Color function.
+     * @param {Object} options - Options.
+     */
     static draw(pipeline, pixels, v1, v2, thickness, colorFn, options = {}) {
       const normal = new THREE.Vector3().crossVectors(v1, v2).normalize();
       if (normal.lengthSq() < 0.000001) return;
