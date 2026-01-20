@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { gui } from "../gui.js";
 import { Daydream } from "../driver.js";
 import { vectorPool, Orientation } from "../geometry.js";
-import { Plot, rasterize } from "../draw.js";
+import { Plot } from "../draw.js";
 import { stereo, TWO_PI } from "../3dmath.js";
 import { createRenderPipeline, FilterAntiAlias, FilterWorldTrails, FilterOrient } from "../filters.js";
 import { richSunset } from "../color.js";
@@ -186,7 +186,7 @@ export class HopfFibration {
                 // Using rasterize with 2 points creates a line.
 
                 const segmentPoints = [prev, v];
-                rasterize(this.pipeline, segmentPoints, (p, t) => {
+                Plot.Rasterize.draw(this.pipeline, segmentPoints, (p, t) => {
                     return c;
                 }, false);
             } else {

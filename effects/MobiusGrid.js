@@ -11,7 +11,7 @@ import {
     Orientation, sinWave, vectorPool, quaternionPool
 } from "../geometry.js";
 import {
-    Plot, rasterize, makeBasis
+    Plot, makeBasis
 } from "../draw.js";
 import {
     GenerativePalette, color4Pool
@@ -106,7 +106,7 @@ export class MobiusGrid {
             });
 
             const opacity = Math.min(1.0, Math.max(0.0, numRings - i));
-            rasterize(pipeline, transformedPoints, (p) => {
+            Plot.Rasterize.draw(pipeline, transformedPoints, (p) => {
                 const res = this.palette.get(i / numRings);
                 res.alpha *= opacity * this.alpha;
                 return res;
@@ -138,7 +138,7 @@ export class MobiusGrid {
             });
 
             const opacity = Math.min(1.0, Math.max(0.0, numLines - i));
-            rasterize(pipeline, transformedPoints, (p, tLine) => {
+            Plot.Rasterize.draw(pipeline, transformedPoints, (p, tLine) => {
                 // Interpolate unwarped points to get Z
                 const idx = tLine * points.length;
                 const i1 = Math.floor(idx) % points.length;

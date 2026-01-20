@@ -87,8 +87,8 @@ export class LSystem {
                 rules: {
                     "F": "F-F++F-F"
                 },
-                angle: 60,
-                step: 0.1,
+                angle: 79,
+                step: 0.33,
                 iterations: 3
             }
         ];

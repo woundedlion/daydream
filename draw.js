@@ -121,32 +121,7 @@ export class ProceduralPath {
   }
 }
 
-/**
- * Rasterizes a list of points into Dot objects by connecting them with geodesic lines.
- * @param {Object} pipeline - The render pipeline.
- * @param {THREE.Vector3[]} points - The list of points.
- * @param {Function} colorFn - Function to determine color (takes vector and normalized progress t).
- * @param {boolean} [closeLoop=false] - If true, connects the last point to the first.
- */
-export const rasterize = (pipeline, points, colorFn, closeLoop = false) => {
-  const len = points.length;
-  if (len === 0) return;
 
-  const count = closeLoop ? len : len - 1;
-  for (let i = 0; i < count; i++) {
-    const p1 = points[i];
-    const p2 = points[(i + 1) % len];
-
-    const segmentColorFn = (p, subT) => {
-      const globalT = (i + subT) / count;
-      return colorFn(p, globalT);
-    };
-
-    // Draw segment
-    const omitLast = closeLoop || (i < count - 1);
-    Plot.Line.draw(pipeline, p1, p2, segmentColorFn, 0, 1, false, omitLast);
-  }
-};
 
 /**
  * Draws a motion trail by tweening between orientations in the queue.
@@ -430,7 +405,7 @@ export const Plot = {
      */
     static draw(pipeline, basis, radius, colorFn, phase = 0) {
       const points = Plot.Ring.sample(basis, radius, Daydream.W / 4, phase);
-      rasterize(pipeline, points, colorFn, true);
+      Plot.Rasterize.draw(pipeline, points, colorFn, true);
     }
   },
 
@@ -635,7 +610,7 @@ export const Plot = {
         points.push(vectorPool.acquire().copy(points[0]));
       }
 
-      rasterize(pipeline, points, colorFn, false);
+      Plot.Rasterize.draw(pipeline, points, colorFn, false);
     }
   },
 
@@ -729,7 +704,7 @@ export const Plot = {
      */
     static draw(pipeline, basis, radius, shiftFn, colorFn, phase = 0) {
       const points = Plot.DistortedRing.sample(basis, radius, shiftFn, phase);
-      rasterize(pipeline, points, colorFn, true);
+      Plot.Rasterize.draw(pipeline, points, colorFn, true);
     }
   },
 
@@ -748,6 +723,35 @@ export const Plot = {
         const color = c.isColor ? c : (c.color || c);
         const alpha = c.alpha !== undefined ? c.alpha : 1.0;
         pipeline.plot(v, color, 0, alpha);
+      }
+    }
+  },
+
+  Rasterize: class {
+    /**
+     * Rasterizes a list of points into Dot objects by connecting them with geodesic lines.
+     * @param {Object} pipeline - The render pipeline.
+     * @param {THREE.Vector3[]} points - The list of points.
+     * @param {Function} colorFn - Function to determine color (takes vector and normalized progress t).
+     * @param {boolean} [closeLoop=false] - If true, connects the last point to the first.
+     */
+    static draw(pipeline, points, colorFn, closeLoop = false) {
+      const len = points.length;
+      if (len === 0) return;
+
+      const count = closeLoop ? len : len - 1;
+      for (let i = 0; i < count; i++) {
+        const p1 = points[i];
+        const p2 = points[(i + 1) % len];
+
+        const segmentColorFn = (p, subT) => {
+          const globalT = (i + subT) / count;
+          return colorFn(p, globalT);
+        };
+
+        // Draw segment
+        const omitLast = closeLoop || (i < count - 1);
+        Plot.Line.draw(pipeline, p1, p2, segmentColorFn, 0, 1, false, omitLast);
       }
     }
   }
