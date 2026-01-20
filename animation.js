@@ -238,14 +238,21 @@ export class Animation {
 }
 
 /**
- * efficient neighbor lookup for particles.
+ * Hashes 3D points into spatial buckets for fast neighbor lookup.
  */
 class SpatialHash {
+  /**
+   * @param {number} cellSize - The size of each cell in the grid.
+   */
   constructor(cellSize) {
     this.cellSize = cellSize;
     this.buckets = new Map();
   }
 
+  /**
+   * Inserts a particle into the hash.
+   * @param {ParticleSystem.Particle} particle - The particle to insert.
+   */
   insert(particle) {
     const key = this.getKey(particle.p);
     if (!this.buckets.has(key)) {
@@ -261,6 +268,12 @@ class SpatialHash {
     return `${x},${y},${z}`;
   }
 
+  /**
+   * Queries for particles within a radius.
+   * @param {THREE.Vector3} position - Center of query.
+   * @param {number} radius - Radius of query.
+   * @returns {ParticleSystem.Particle[]} Array of neighbors.
+   */
   query(position, radius) {
     const particles = [];
     const cx = Math.floor(position.x / this.cellSize);
@@ -286,6 +299,9 @@ class SpatialHash {
     return particles;
   }
 
+  /**
+   * Clears the hash table.
+   */
   clear() {
     this.buckets.clear();
   }
@@ -860,6 +876,13 @@ export class ColorWipe extends Animation {
  * Animates the Mobius parameters for a continuous loxodromic flow.
  */
 export class MobiusFlow extends Animation {
+  /**
+   * @param {Object} params - The Mobius parameters object.
+   * @param {number} numRings - Number of rings in the flow.
+   * @param {number} numLines - Number of lines.
+   * @param {number} duration - Animation duration.
+   * @param {boolean} [repeat=true] - Whether to repeat.
+   */
   constructor(params, numRings, numLines, duration, repeat = true) {
     super(duration, repeat);
     this.params = params;
@@ -887,6 +910,12 @@ export class MobiusFlow extends Animation {
  * Animates the Mobius parameters for a warping effect pulling the poles together.
  */
 export class MobiusWarp extends Animation {
+  /**
+   * @param {Object} params - The Mobius parameters.
+   * @param {number} numRings - Number of rings.
+   * @param {number} duration - Animation duration.
+   * @param {boolean} [repeat=true] - Whether to repeat.
+   */
   constructor(params, numRings, duration, repeat = true) {
     super(duration, repeat);
     this.params = params;
@@ -946,6 +975,11 @@ export class OrientationTrail {
     return this.count;
   }
 
+  /**
+   * Gets a historical orientation. 0 is oldest, length-1 is newest.
+   * @param {number} i - Index [0..length-1].
+   * @returns {Orientation} The orientation at that index.
+   */
   get(i) {
     // 0 = Oldest, count-1 = Newest
     // head points to next empty slot. head-1 is newest.
