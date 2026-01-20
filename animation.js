@@ -750,14 +750,6 @@ export class Rotation extends Animation {
     this.orientation.upsample(steps + 1);
     const len = this.orientation.length();
 
-    // accumulatedQ not needed for Rotation logic as logic is per-step? 
-    // Wait, original trace:
-    // const accumulatedQ = new THREE.Quaternion(); -> Was Unused in original code?
-    // Looking at original line 620: const accumulatedQ = new THREE.Quaternion();
-    // It is NOT USED in the loop. Loop uses `q`.
-    // It was dead code! 
-    // I will remove it.
-
     const stepAngle = delta / (len - 1);
     const applyRotation = (this.space === "Local")
       ? (target, source) => target.multiply(source)
