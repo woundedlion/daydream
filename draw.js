@@ -787,46 +787,41 @@ export const Plot = {
 
 };
 
-export const Scan = {
-  DistortedRing: class {
-    /**
-     * Scans a distorted thick ring.
-     * @param {Object} pipeline - Render pipeline.
-     * @param {THREE.Quaternion} orientation - Ring orientation quaternion.
-     * @param {THREE.Vector3} normal - Local ring axis.
-     * @param {number} radius - Base angular radius.
-     * @param {number} thickness - Angular thickness.
-     * @param {Function} shiftFn - (t: 0..1) => shift in radians.
-     * @param {number} maxDistortion - Max abs(shift) for bucket optimization.
-     * @param {Function} materialFn - (pos, t, dist) => {color, alpha}.
-     */
-    static draw(pipeline, basis, radius, thickness, shiftFn, maxDistortion, colorFn, phase = 0, debugBB = false) {
-      const maxThickness = thickness + maxDistortion;
+export const SDF = {
+  Ring: class {
+    constructor(basis, radius, thickness, phase = 0) {
+      this.basis = basis;
+      this.radius = radius;
+      this.thickness = thickness;
+      this.phase = phase;
 
-      // Extract Basis
-      const { u, v, w } = basis;
+      const { v, u, w } = basis;
+      this.normal = v;
+      this.u = u;
+      this.w = w;
 
-      const nx = v.x;
-      const ny = v.y;
-      const nz = v.z;
+      this.nx = v.x;
+      this.ny = v.y;
+      this.nz = v.z;
 
-      const targetAngle = radius * (Math.PI / 2);
-      const R = Math.sqrt(nx * nx + nz * nz);
-      const alpha = Math.atan2(nx, nz);
-      const centerPhi = Math.acos(ny);
+      this.targetAngle = radius * (Math.PI / 2);
+      this.centerPhi = Math.acos(this.ny);
 
-      const ctx = {
-        normal: v, radius, thickness, shiftFn, colorFn,
-        nx, ny, nz, targetAngle, R, alpha, centerPhi,
-        u, w,
-        phase,
-        pipeline,
-        debugBB,
-        maxThickness // For bounding
-      };
+      // Pre-calc optimization constants
+      const angMin = Math.max(0, this.targetAngle - thickness);
+      const angMax = Math.min(Math.PI, this.targetAngle + thickness);
+      this.cosMax = Math.cos(angMin);
+      this.cosMin = Math.cos(angMax);
 
-      const a1 = centerPhi - targetAngle;
-      const a2 = centerPhi + targetAngle;
+      this.cosTarget = Math.cos(this.targetAngle);
+      const safeApprox = (this.targetAngle > 0.05 && this.targetAngle < Math.PI - 0.05);
+      this.invSinTarget = safeApprox ? (1.0 / Math.sin(this.targetAngle)) : 0;
+    }
+
+    getVerticalRange() {
+      // Vertical bounds
+      const a1 = this.centerPhi - this.targetAngle;
+      const a2 = this.centerPhi + this.targetAngle;
 
       let phiMin = 0;
       let phiMax = Math.PI;
@@ -847,49 +842,44 @@ export const Scan = {
         phiMax = Math.max(p1, p2);
       }
 
-      let finalPhiMin = Math.max(0, phiMin - maxThickness);
-      let finalPhiMax = Math.min(Math.PI, phiMax + maxThickness);
+      let finalPhiMin = Math.max(0, phiMin - this.thickness);
+      let finalPhiMax = Math.min(Math.PI, phiMax + this.thickness);
 
-      if (finalPhiMin > finalPhiMax) return;
+      if (this.basis.limits) {
+        finalPhiMin = Math.max(finalPhiMin, this.basis.limits.minPhi);
+        finalPhiMax = Math.min(finalPhiMax, this.basis.limits.maxPhi);
+      }
 
       const yMin = Math.max(0, Math.floor((finalPhiMin * (Daydream.H - 1)) / Math.PI));
       const yMax = Math.min(Daydream.H - 1, Math.ceil((finalPhiMax * (Daydream.H - 1)) / Math.PI));
 
-      for (let y = yMin; y <= yMax; y++) {
-        Scan.DistortedRing.scanRow(y, ctx);
-      }
+      return { yMin, yMax };
     }
 
-    static scanRow(y, ctx) {
+    getHorizontalIntervals(y) {
       const phi = yToPhi(y);
       const cosPhi = Math.cos(phi);
       const sinPhi = Math.sin(phi);
 
-      const ang_low = Math.max(0, ctx.targetAngle - ctx.maxThickness);
-      const ang_high = Math.min(Math.PI, ctx.targetAngle + ctx.maxThickness);
-      const D_max = Math.cos(ang_low);
-      const D_min = Math.cos(ang_high);
+      const R = Math.sqrt(this.nx * this.nx + this.nz * this.nz);
+      // Fast rejection for poles or singularity
+      if (R < 0.01) return null; // Logic for "Scan Full Row"
 
-      // Standard Ring Scan Math using maxThickness
-      if (ctx.R < 0.01) {
-        // Near pole, just scan full row if in vertical bounds (checked by y loop)
-        Scan.DistortedRing.scanFullRow(y, ctx);
-        return;
-      }
+      const denom = R * sinPhi;
+      if (Math.abs(denom) < 0.000001) return null;
 
-      const denom = ctx.R * sinPhi;
-      if (Math.abs(denom) < 0.000001) {
-        Scan.DistortedRing.scanFullRow(y, ctx);
-        return;
-      }
+      const alpha = Math.atan2(this.nx, this.nz);
 
-      const C_min = (D_min - ctx.ny * cosPhi) / denom;
-      const C_max = (D_max - ctx.ny * cosPhi) / denom;
-      // Intersection interval for cos(diffAlpha)
+      const D_max = this.cosMax; // cos(ang_low)
+      const D_min = this.cosMin; // cos(ang_high)
+
+      const C_min = (D_min - this.ny * cosPhi) / denom;
+      const C_max = (D_max - this.ny * cosPhi) / denom;
+
       const minCos = Math.max(-1, C_min);
       const maxCos = Math.min(1, C_max);
 
-      if (minCos > maxCos) return;
+      if (minCos > maxCos) return []; // Empty row
 
       const angleMin = Math.acos(maxCos);
       const angleMax = Math.acos(minCos);
@@ -897,79 +887,376 @@ export const Scan = {
       const pixelWidth = 2 * Math.PI / Daydream.W;
       const safeThreshold = pixelWidth;
 
-      // Scan the conservative windows
+      const intervals = [];
+
+      const addWindow = (t1, t2) => {
+        const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
+        const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
+        if (x2 - x1 >= Daydream.W) return null; // Full row
+        intervals.push({ start: x1, end: x2 });
+        return intervals;
+      };
+
       if (angleMin <= safeThreshold) {
-        Scan.DistortedRing.scanWindow(y, ctx.alpha - angleMax, ctx.alpha + angleMax, ctx);
+        if (!addWindow(alpha - angleMax, alpha + angleMax)) return null;
       } else if (angleMax >= Math.PI - safeThreshold) {
-        Scan.DistortedRing.scanWindow(y, ctx.alpha + angleMin, ctx.alpha + 2 * Math.PI - angleMin, ctx);
+        if (!addWindow(alpha + angleMin, alpha + 2 * Math.PI - angleMin)) return null;
       } else {
-        Scan.DistortedRing.scanWindow(y, ctx.alpha - angleMax, ctx.alpha - angleMin, ctx);
-        Scan.DistortedRing.scanWindow(y, ctx.alpha + angleMin, ctx.alpha + angleMax, ctx);
+        addWindow(alpha - angleMax, alpha - angleMin);
+        addWindow(alpha + angleMin, alpha + angleMax);
       }
+
+      return intervals;
     }
 
-    static scanFullRow(y, ctx) {
-      for (let x = 0; x < Daydream.W; x++) {
-        Scan.DistortedRing.processPixel(XY(x, y), x, y, ctx);
+    // Returns { dist, t } where dist is signed distance (negative inside)
+    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+      const dot = p.dot(this.normal);
+      if (dot < this.cosMin || dot > this.cosMax) {
+        out.dist = 100.0;
+        return out;
       }
+
+      let dist = 0;
+      if (this.invSinTarget !== 0) {
+        // Optimization: Linear approximation
+        dist = Math.abs(dot - this.cosTarget) * this.invSinTarget;
+      } else {
+        const polarAngle = Math.acos(Math.max(-1, Math.min(1, dot)));
+        dist = Math.abs(polarAngle - this.targetAngle);
+      }
+
+      // Calculate t (azimuth)
+      const dotU = p.dot(this.u);
+      const dotW = p.dot(this.w);
+      let azimuth = fastAtan2(dotW, dotU);
+      if (azimuth < 0) azimuth += 2 * Math.PI;
+      azimuth += this.phase;
+      const t = azimuth / (2 * Math.PI);
+
+      out.dist = dist - this.thickness;
+      out.t = t;
+      out.rawDist = dist;
+
+      return out;
+    }
+  },
+
+  DistortedRing: class {
+    constructor(basis, radius, thickness, shiftFn, maxDistortion, phase = 0) {
+      this.basis = basis;
+      this.radius = radius; // Base angular radius
+      this.thickness = thickness;
+      this.shiftFn = shiftFn;
+      this.maxDistortion = maxDistortion;
+      this.phase = phase;
+
+      const { v, u, w } = basis;
+      this.normal = v;
+      this.u = u;
+      this.w = w;
+
+      this.nx = v.x;
+      this.ny = v.y;
+      this.nz = v.z;
+
+      this.targetAngle = radius * (Math.PI / 2);
+      this.centerPhi = Math.acos(this.ny);
+      // Max thickness including distortion for bounds
+      this.maxThickness = thickness + maxDistortion;
     }
 
-    static scanWindow(y, t1, t2, ctx) {
-      const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
-      const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
+    getVerticalRange() {
+      const a1 = this.centerPhi - this.targetAngle;
+      const a2 = this.centerPhi + this.targetAngle;
 
-      // Prevent double scanning if window >= 2pi
-      if (x2 - x1 >= Daydream.W) {
-        Scan.DistortedRing.scanFullRow(y, ctx);
-        return;
+      let phiMin = 0;
+      let phiMax = Math.PI;
+
+      if (a1 <= 0) phiMin = 0;
+      else {
+        const p1 = Math.acos(Math.cos(a1));
+        const p2 = Math.acos(Math.cos(a2));
+        phiMin = Math.min(p1, p2);
       }
 
-      for (let x = x1; x <= x2; x++) {
-        const wx = wrap(x, Daydream.W);
-        Scan.DistortedRing.processPixel(XY(wx, y), wx, y, ctx);
+      if (a2 >= Math.PI) phiMax = Math.PI;
+      else {
+        const p1 = Math.acos(Math.cos(a1));
+        const p2 = Math.acos(Math.cos(a2));
+        phiMax = Math.max(p1, p2);
       }
+
+      let finalPhiMin = Math.max(0, phiMin - this.maxThickness);
+      let finalPhiMax = Math.min(Math.PI, phiMax + this.maxThickness);
+
+      const yMin = Math.max(0, Math.floor((finalPhiMin * (Daydream.H - 1)) / Math.PI));
+      const yMax = Math.min(Daydream.H - 1, Math.ceil((finalPhiMax * (Daydream.H - 1)) / Math.PI));
+
+      return { yMin, yMax };
     }
 
-    static processPixel(i, x, y, ctx) {
-      const p = Daydream.pixelPositions[i];
+    getHorizontalIntervals(y) {
+      const phi = yToPhi(y);
+      const cosPhi = Math.cos(phi);
+      const sinPhi = Math.sin(phi);
 
-      if (ctx.debugBB) {
-        Daydream.pixels[i * 3 + 2] += 0.2;
+      const ang_low = Math.max(0, this.targetAngle - this.maxThickness);
+      const ang_high = Math.min(Math.PI, this.targetAngle + this.maxThickness);
+      const D_max = Math.cos(ang_low);
+      const D_min = Math.cos(ang_high);
+
+      const R = Math.sqrt(this.nx * this.nx + this.nz * this.nz);
+      if (R < 0.01) return null;
+
+      const denom = R * sinPhi;
+      if (Math.abs(denom) < 0.000001) return null;
+
+      const C_min = (D_min - this.ny * cosPhi) / denom;
+      const C_max = (D_max - this.ny * cosPhi) / denom;
+
+      const minCos = Math.max(-1, C_min);
+      const maxCos = Math.min(1, C_max);
+
+      if (minCos > maxCos) return [];
+
+      const angleMin = Math.acos(maxCos);
+      const angleMax = Math.acos(minCos);
+
+      const pixelWidth = 2 * Math.PI / Daydream.W;
+      const safeThreshold = pixelWidth;
+      const alpha = Math.atan2(this.nx, this.nz);
+
+      const intervals = [];
+      const addWindow = (t1, t2) => {
+        const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
+        const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
+        if (x2 - x1 >= Daydream.W) return null;
+        intervals.push({ start: x1, end: x2 });
+        return intervals;
+      };
+
+      if (angleMin <= safeThreshold) {
+        if (!addWindow(alpha - angleMax, alpha + angleMax)) return null;
+      } else if (angleMax >= Math.PI - safeThreshold) {
+        if (!addWindow(alpha + angleMin, alpha + 2 * Math.PI - angleMin)) return null;
+      } else {
+        addWindow(alpha - angleMax, alpha - angleMin);
+        addWindow(alpha + angleMin, alpha + angleMax);
       }
+      return intervals;
+    }
 
-      // Calc Polar Angle
-      const polarAngle = angleBetween(p, ctx.normal);
+    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+      // Distorted Ring has no "Fast Cos Rejection" because targetAngle varies.
+      const polarAngle = angleBetween(p, this.normal);
 
-      // Calc Azimuth for Modulation
-      const dotU = p.dot(ctx.u);
-      const dotW = p.dot(ctx.w);
-      let azimuth = Math.atan2(dotW, dotU);
+      const dotU = p.dot(this.u);
+      const dotW = p.dot(this.w);
+      let azimuth = fastAtan2(dotW, dotU);
       if (azimuth < 0) azimuth += 2 * Math.PI;
 
-      // Distorted Target
-      // Distorted Target
-      const normAzimuth = azimuth / (2 * Math.PI);
-
-      const t = azimuth + ctx.phase;
+      const t = azimuth + this.phase;
       const normT = t / (2 * Math.PI);
 
-      const shift = ctx.shiftFn(normT);
-      const localTarget = ctx.targetAngle + shift;
+      const shift = this.shiftFn(normT);
+      const localTarget = this.targetAngle + shift;
 
-      // Check Dist
       const dist = Math.abs(polarAngle - localTarget);
 
-      if (dist < ctx.thickness) {
-        const distT = dist / ctx.thickness;
-        const aaAlpha = quinticKernel(1.0 - distT);
+      out.dist = dist - this.thickness;
+      out.t = (azimuth / (2 * Math.PI));
+      out.rawDist = dist;
+      return out;
+    }
+  },
 
-        // Pass t as normalized azimuth to colorFn, matching Plot.Ring behavior
-        const c = ctx.colorFn(p, normAzimuth, dist);
-        const color = c.isColor ? c : (c.color || c);
-        const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
+  Union: class {
+    constructor(a, b) {
+      this.a = a;
+      this.b = b;
+      this.thickness = Math.max(a.thickness || 0, b.thickness || 0);
+    }
 
-        ctx.pipeline.plot2D(x, y, color, 0, baseAlpha * aaAlpha);
+    getVerticalRange() {
+      const b1 = this.a.getVerticalRange();
+      const b2 = this.b.getVerticalRange();
+      return {
+        yMin: Math.min(b1.yMin, b2.yMin),
+        yMax: Math.max(b1.yMax, b2.yMax)
+      };
+    }
+
+    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+      const d1 = this.a.sample(p, out);
+      const resA = this.a.sample(p);
+      const resB = this.b.sample(p);
+
+      if (resA.dist < resB.dist) {
+        out.dist = resA.dist;
+        out.t = resA.t;
+        out.rawDist = resA.rawDist;
+      } else {
+        out.dist = resB.dist;
+        out.t = resB.t;
+        out.rawDist = resB.rawDist;
       }
+      return out;
+    }
+  },
+
+  Subtract: class {
+    constructor(a, b) {
+      this.a = a;
+      this.b = b;
+      this.thickness = a.thickness || 0;
+    }
+
+    getVerticalRange() {
+      return this.a.getVerticalRange();
+    }
+
+    // Conservative interval: Subtracting B from A might chop A's intervals, but A's intervals are a safe superset.
+    getHorizontalIntervals(y) {
+      if (this.a.getHorizontalIntervals) return this.a.getHorizontalIntervals(y);
+      return null;
+    }
+
+    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+      const resA = this.a.sample(p);
+      const resB = this.b.sample(p);
+
+      const dist = Math.max(resA.dist, -resB.dist);
+
+      if (resA.dist > -resB.dist) {
+        out.dist = dist;
+        out.t = resA.t;
+        out.rawDist = resA.rawDist; // Preserve A's attributes?
+      } else {
+        // If B is the boundary, we are "inside" B (subtracted space).
+        out.dist = dist;
+        out.t = resB.t;
+        out.rawDist = resB.dist;
+      }
+      return out;
+    }
+  },
+
+  Intersection: class {
+    constructor(a, b) {
+      this.a = a;
+      this.b = b;
+      this.thickness = Math.min(a.thickness || 0, b.thickness || 0);
+    }
+
+    getVerticalRange() {
+      const b1 = this.a.getVerticalRange();
+      const b2 = this.b.getVerticalRange();
+      return {
+        yMin: Math.max(b1.yMin, b2.yMin),
+        yMax: Math.min(b1.yMax, b2.yMax)
+      };
+    }
+
+    // Intersection intervals: A intersect B
+    getHorizontalIntervals(y) {
+      if (this.a.getHorizontalIntervals) return this.a.getHorizontalIntervals(y);
+      return null;
+    }
+
+    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+      const resA = this.a.sample(p);
+      const resB = this.b.sample(p);
+
+      if (resA.dist > resB.dist) {
+        out.dist = resA.dist;
+        out.t = resA.t;
+        out.rawDist = resA.rawDist;
+      } else {
+        out.dist = resB.dist;
+        out.t = resB.t;
+        out.rawDist = resB.rawDist;
+      }
+      return out;
+    }
+  }
+};
+
+export const Scan = {
+  render: (pipeline, shape, colorFn, debugBB = false) => {
+    const { yMin, yMax } = shape.getVerticalRange();
+
+    // Reusable result object to avoid GC
+    const sampleResult = { dist: 100, t: 0, rawDist: 100 };
+
+    for (let y = yMin; y <= yMax; y++) {
+      let intervals = null;
+      if (shape.getHorizontalIntervals) {
+        intervals = shape.getHorizontalIntervals(y);
+      }
+
+      if (intervals) {
+        // Intervals (Optimized Scan)
+        for (let k = 0; k < intervals.length; k++) {
+          const iv = intervals[k];
+          for (let x = iv.start; x <= iv.end; x++) {
+            Scan.processPixel(x, y, pipeline, shape, colorFn, debugBB, sampleResult);
+          }
+        }
+      } else {
+        // Full Scan (Fallback)
+        for (let x = 0; x < Daydream.W; x++) {
+          Scan.processPixel(x, y, pipeline, shape, colorFn, debugBB, sampleResult);
+        }
+      }
+    }
+  },
+
+  processPixel: (x, y, pipeline, shape, colorFn, debugBB, sampleResult) => {
+    const wx = wrap(x, Daydream.W);
+    const i = wx + y * Daydream.W;
+    const p = Daydream.pixelPositions[i];
+
+    if (debugBB) {
+      Daydream.pixels[i * 3] += 0.02;
+      Daydream.pixels[i * 3 + 1] += 0.02;
+      Daydream.pixels[i * 3 + 2] += 0.02;
+    }
+
+    // Pass reusable object
+    shape.sample(p, sampleResult);
+    const d = sampleResult.dist;
+
+    if (d < 0) {
+      // AA Logic: Map d from [-thickness, 0] to [1, 0] for alpha
+      let aaAlpha = 1.0;
+      if (shape.thickness > 0) {
+        aaAlpha = quinticKernel(-d / shape.thickness);
+      }
+
+      const c = colorFn(p, sampleResult.t, sampleResult.rawDist);
+      const color = c.isColor ? c : (c.color || c);
+      const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
+
+      pipeline.plot2D(wx, y, color, 0, baseAlpha * aaAlpha);
+    }
+  },
+
+  DistortedRing: class {
+    /**
+     * Scans a distorted thick ring.
+     * @param {Object} pipeline - Render pipeline.
+     * @param {THREE.Quaternion} orientation - Ring orientation quaternion.
+     * @param {THREE.Vector3} normal - Local ring axis.
+     * @param {number} radius - Base angular radius.
+     * @param {number} thickness - Angular thickness.
+     * @param {Function} shiftFn - (t: 0..1) => shift in radians.
+     * @param {number} maxDistortion - Max abs(shift) for bucket optimization.
+     * @param {Function} materialFn - (pos, t, dist) => {color, alpha}.
+     */
+    static draw(pipeline, basis, radius, thickness, shiftFn, maxDistortion, colorFn, phase = 0, debugBB = false) {
+      const shape = new SDF.DistortedRing(basis, radius, thickness, shiftFn, maxDistortion, phase);
+      Scan.render(pipeline, shape, colorFn, debugBB);
     }
   },
 
@@ -1392,197 +1679,8 @@ export const Scan = {
      * @param {boolean} [debugBB=false] - Whether to show bounding boxes.
      */
     static draw(pipeline, basis, radius, thickness, colorFn, phase = 0, debugBB = false) {
-      // Basis
-      const { v, u, w } = basis;
-
-      const nx = v.x;
-      const ny = v.y;
-      const nz = v.z;
-
-      const targetAngle = radius * (Math.PI / 2);
-      const R = Math.sqrt(nx * nx + nz * nz);
-      const alpha = Math.atan2(nx, nz);
-      const centerPhi = Math.acos(ny);
-
-      const angMin = Math.max(0, targetAngle - thickness);
-      const angMax = Math.min(Math.PI, targetAngle + thickness);
-      const cosMax = Math.cos(angMin); // Smaller angle = Larger cosine
-      const cosMin = Math.cos(angMax);
-
-      const cosTarget = Math.cos(targetAngle);
-      // Optimization only valid if we are not near poles
-      const safeApprox = (targetAngle > 0.05 && targetAngle < Math.PI - 0.05);
-      const invSinTarget = safeApprox ? (1.0 / Math.sin(targetAngle)) : 0;
-
-      const ctx = {
-        normal: v, radius, thickness, colorFn,
-        nx, ny, nz, targetAngle, R, alpha, centerPhi,
-        cosMin, cosMax, // Optimization
-        cosTarget, invSinTarget, // Optimization (polarAngle)
-        u, w, phase,
-        pipeline,
-        debugBB
-      };
-
-      // Vertical bounds
-      const a1 = centerPhi - targetAngle;
-      const a2 = centerPhi + targetAngle;
-
-      let phiMin = 0;
-      let phiMax = Math.PI;
-
-      if (a1 <= 0) {
-        phiMin = 0;
-      } else {
-        phiMin = Math.acos(Math.cos(a1)); // This calculates the "highest" point (closest to 0) which is correct if monotonic?
-        const p1 = Math.acos(Math.cos(a1));
-        const p2 = Math.acos(Math.cos(a2));
-        phiMin = Math.min(p1, p2);
-      }
-
-      if (a2 >= Math.PI) {
-        phiMax = Math.PI;
-      } else {
-        const p1 = Math.acos(Math.cos(a1));
-        const p2 = Math.acos(Math.cos(a2));
-        phiMax = Math.max(p1, p2);
-      }
-
-      let finalPhiMin = Math.max(0, phiMin - thickness);
-      let finalPhiMax = Math.min(Math.PI, phiMax + thickness);
-
-      if (ctx.limits) {
-        finalPhiMin = Math.max(finalPhiMin, ctx.limits.minPhi);
-        finalPhiMax = Math.min(finalPhiMax, ctx.limits.maxPhi);
-      }
-
-      if (finalPhiMin > finalPhiMax) return;
-
-      const yMin = Math.max(0, Math.floor((finalPhiMin * (Daydream.H - 1)) / Math.PI));
-      const yMax = Math.min(Daydream.H - 1, Math.ceil((finalPhiMax * (Daydream.H - 1)) / Math.PI));
-
-      for (let y = yMin; y <= yMax; y++) {
-        Scan.Ring.scanRow(y, ctx);
-      }
-    }
-
-    static scanRow(y, ctx) {
-      const phi = yToPhi(y);
-      const cosPhi = Math.cos(phi);
-      const sinPhi = Math.sin(phi);
-
-      if (ctx.R < 0.01) {
-        Scan.Ring.scanFullRow(y, ctx);
-        return;
-      }
-
-      const ang_low = Math.max(0, ctx.targetAngle - ctx.thickness);
-      const ang_high = Math.min(Math.PI, ctx.targetAngle + ctx.thickness);
-      const D_max = Math.cos(ang_low);
-      const D_min = Math.cos(ang_high);
-      const denom = ctx.R * sinPhi;
-
-      if (Math.abs(denom) < 0.000001) {
-        Scan.Ring.scanFullRow(y, ctx);
-        return;
-      }
-
-      const C_min = (D_min - ctx.ny * cosPhi) / denom;
-      const C_max = (D_max - ctx.ny * cosPhi) / denom;
-      const minCos = Math.max(-1, C_min);
-      const maxCos = Math.min(1, C_max);
-
-      if (minCos > maxCos) return;
-
-      const angleMin = Math.acos(maxCos);
-      const angleMax = Math.acos(minCos);
-      const pixelWidth = 2 * Math.PI / Daydream.W;
-      const safeThreshold = pixelWidth;
-
-      if (angleMin <= safeThreshold) {
-        Scan.Ring.scanWindow(y, ctx.alpha - angleMax, ctx.alpha + angleMax, ctx);
-      } else if (angleMax >= Math.PI - safeThreshold) {
-        Scan.Ring.scanWindow(y, ctx.alpha + angleMin, ctx.alpha + 2 * Math.PI - angleMin, ctx);
-      } else {
-        Scan.Ring.scanWindow(y, ctx.alpha - angleMax, ctx.alpha - angleMin, ctx);
-        Scan.Ring.scanWindow(y, ctx.alpha + angleMin, ctx.alpha + angleMax, ctx);
-      }
-    }
-
-    static scanFullRow(y, ctx) {
-      for (let x = 0; x < Daydream.W; x++) {
-        Scan.Ring.processPixel(XY(x, y), x, y, ctx);
-      }
-    }
-
-    static scanWindow(y, t1, t2, ctx) {
-      const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
-      const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
-
-      // Prevent double scanning if window >= 2pi
-      if (x2 - x1 >= Daydream.W) {
-        Scan.Ring.scanFullRow(y, ctx);
-        return;
-      }
-
-      for (let x = x1; x <= x2; x++) {
-        const wx = wrap(x, Daydream.W);
-        Scan.Ring.processPixel(XY(wx, y), wx, y, ctx);
-      }
-    }
-
-    static processPixel(i, x, y, ctx) {
-      if (ctx.debugBB) {
-        Daydream.pixels[i * 3] += 0.02;
-        Daydream.pixels[i * 3 + 1] += 0.02;
-        Daydream.pixels[i * 3 + 2] += 0.02;
-      }
-
-      const p = Daydream.pixelPositions[i];
-
-      if (ctx.clipPlanes) {
-        for (const cp of ctx.clipPlanes) {
-          if (p.dot(cp) < 0) return;
-        }
-      }
-
-      // Optimization: Fast Rejection via Dot Product
-      const dot = p.dot(ctx.normal);
-      if (ctx.cosMin !== undefined) {
-        if (dot < ctx.cosMin || dot > ctx.cosMax) return;
-      }
-
-      let dist = 0;
-      if (ctx.invSinTarget !== 0) {
-        // Optimization: Linear approximation of acos near targetAngle
-        // dist ~= |dot - cos(target)| / sin(target)
-        dist = Math.abs(dot - ctx.cosTarget) * ctx.invSinTarget;
-      } else {
-        // Fallback to expensive acos for poles/small rings where linear approx fails
-        const polarAngle = Math.acos(Math.max(-1, Math.min(1, dot)));
-        dist = Math.abs(polarAngle - ctx.targetAngle);
-      }
-
-      if (dist < ctx.thickness) {
-
-        const distT = dist / ctx.thickness;
-        const aaAlpha = quinticKernel(1.0 - distT);
-
-        // Calculate azimuth for t and/or sector check
-        const dotU = p.dot(ctx.u);
-        const dotW = p.dot(ctx.w);
-        let azimuth = fastAtan2(dotW, dotU);
-        if (azimuth < 0) azimuth += 2 * Math.PI;
-
-        azimuth += ctx.phase; // Apply phase
-        const t = azimuth / (2 * Math.PI); // Normalized t
-
-        const c = ctx.colorFn(p, t, dist);
-        const color = c.isColor ? c : (c.color || c);
-        const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
-
-        ctx.pipeline.plot2D(x, y, color, 0, baseAlpha * aaAlpha);
-      }
+      const shape = new SDF.Ring(basis, radius, thickness, phase);
+      Scan.render(pipeline, shape, colorFn, debugBB);
     }
   },
 
@@ -1622,7 +1720,7 @@ export const Scan = {
     static draw(pipeline, pos, thickness, colorFn, options) {
       const identity = quaternionPool.acquire().identity();
       const basis = makeBasis(identity, pos);
-      // Ring with radius 0, thickness specified.
+      // A point is a Ring with radius 0 and some thickness
       Scan.Ring.draw(pipeline, basis, 0, thickness, colorFn, 0, options && options.debugBB);
     }
   },
