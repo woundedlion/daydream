@@ -256,21 +256,14 @@ export const Plot = {
       }
       a *= Math.abs(end - start);
 
-      // --- FAST SCALAR SIMULATION ---
+      // Scalar simlutation to align seam
       // Goal: Find 'scale' so steps sum exactly to 'a'.
-      // We need to know u.y at every step, but we don't need a Vector3 for that.
       // u(theta).y = uStart.y * cos(theta) + tangent.y * sin(theta)
-
       const uStart_y = u.y;
-      // Calculate tangent.y component: (w x u).y
-      // Cross product y-component formula: z*x - x*z
       const tangent_y = w.z * u.x - w.x * u.z;
-
       let simAngle = 0;
-      const steps = []; // We still need to store steps to reproduce the spacing
+      const steps = [];
       const baseStep = 2 * Math.PI / Daydream.W;
-
-      // This loop uses NO objects and NO quaternions. Pure JS numbers.
       while (simAngle < a) {
         // Analytical Height Calculation
         const cosT = Math.cos(simAngle);
@@ -287,35 +280,21 @@ export const Plot = {
 
       // Calculate Normalization Scale (Ensures perfect seam)
       let scale = a / simAngle;
-
-      // --- DRAWING PHASE ---
       let currentAngle = 0;
-
-      // Draw first point
       const startC = colorFn(u, 0);
       const startColor = startC.isColor ? startC : (startC.color || startC);
       const startAlpha = startC.alpha !== undefined ? startC.alpha : 1.0;
       pipeline.plot(u, startColor, 0, startAlpha);
-
       const loopLimit = omitLast ? steps.length - 1 : steps.length;
-
       for (let i = 0; i < loopLimit; i++) {
-        // Apply the normalized step
         const step = steps[i] * scale;
-
-        // Use Quaternion only for the actual visual rotation
         const q = quaternionPool.acquire().setFromAxisAngle(w, step);
         u.applyQuaternion(q).normalize();
-
         currentAngle += step;
-
-        // Normalized t
         const t = (a > 0) ? (currentAngle / a) : 1;
-
         const c = colorFn(u, t);
         const color = c.isColor ? c : (c.color || c);
         const alpha = c.alpha !== undefined ? c.alpha : 1.0;
-
         pipeline.plot(u, color, 0, alpha);
       }
     }
@@ -534,13 +513,8 @@ export const Plot = {
      */
     static draw(pipeline, basis, radius, numSides, colorFn, phase = 0) {
       const points = Plot.Polygon.sample(basis, radius, numSides, phase);
-
-      let center = basis.v; // Default center
-
-      // Fix: If radius > 1, the points are on the backside.
-      // To draw a regular convex polygon, we must project relative to the antipode.
+      let center = basis.v;
       if (radius > 1.0) {
-        // Project relative to -v
         center = vectorPool.acquire().copy(basis.v).negate();
       }
 
@@ -632,16 +606,9 @@ export const Plot = {
         const sectorCenter = phase + i * 2 * angleStep;
 
         for (let j = 0; j < numSegments; j++) {
-          // Sweep from -angleStep to +angleStep within the sector
-          // We intentionally overlap the end of one sector with start of next to ensure closure
-          // or we can just go 0..numSegments and carefully match logic.
-          // Standard polygon side logic: phi goes from -PI/sides to +PI/sides relative to sector center.
           const t = j / numSegments;
           const localPhi = -angleStep + t * (2 * angleStep);
-
           let R = apothem / Math.cos(localPhi);
-
-          // Clamp R to PI to prevent wrapping past the pole (the "ears" artifact)
           if (R > Math.PI) R = Math.PI;
 
           const theta = sectorCenter + localPhi;
@@ -929,7 +896,7 @@ export const SDF = {
       // Calculate t (azimuth)
       const dotU = p.dot(this.u);
       const dotW = p.dot(this.w);
-      let azimuth = fastAtan2(dotW, dotU);
+      let azimuth = Math.atan2(dotW, dotU);
       if (azimuth < 0) azimuth += 2 * Math.PI;
       azimuth += this.phase;
       const t = azimuth / (2 * Math.PI);
@@ -1053,7 +1020,7 @@ export const SDF = {
 
       const dotU = p.dot(this.u);
       const dotW = p.dot(this.w);
-      let azimuth = fastAtan2(dotW, dotU);
+      let azimuth = Math.atan2(dotW, dotU);
       if (azimuth < 0) azimuth += 2 * Math.PI;
 
       const t = azimuth + this.phase;
@@ -1179,6 +1146,239 @@ export const SDF = {
       }
       return out;
     }
+  },
+
+  Polygon: class {
+    constructor(basis, radius, thickness, sides, phase = 0) {
+      this.basis = basis;
+      this.thickness = thickness;
+      this.sides = sides;
+      this.phase = phase;
+      this.apothem = thickness * Math.cos(Math.PI / sides);
+      this.isSolid = true; // Solid Shape
+
+      this.nx = basis.v.x;
+      this.ny = basis.v.y;
+      this.nz = basis.v.z;
+      this.R = Math.sqrt(this.nx * this.nx + this.nz * this.nz);
+      this.alpha = Math.atan2(this.nx, this.nz);
+
+      const centerPhi = Math.acos(Math.max(-1, Math.min(1, basis.v.y)));
+      const margin = thickness + 0.1;
+      this.yMin = Math.floor((Math.max(0, centerPhi - margin) / Math.PI) * (Daydream.H - 1));
+      this.yMax = Math.ceil((Math.min(Math.PI, centerPhi + margin) / Math.PI) * (Daydream.H - 1));
+    }
+
+    getVerticalRange() { return { yMin: this.yMin, yMax: this.yMax }; }
+
+    getHorizontalIntervals(y) {
+      const phi = yToPhi(y);
+      const cosPhi = Math.cos(phi);
+      const sinPhi = Math.sin(phi);
+
+      if (this.R < 0.01) return null; // Full row (near pole)
+
+      const pixelWidth = 2 * Math.PI / Daydream.W;
+      const ang_high = this.thickness + pixelWidth; // Use slightly expanded bounds for AA
+      const D_min = Math.cos(ang_high);
+
+      const denom = this.R * sinPhi;
+      if (Math.abs(denom) < 0.000001) return null;
+
+      const C_min = (D_min - this.ny * cosPhi) / denom;
+      if (C_min > 1.0) return []; // Outside cap
+      if (C_min < -1.0) return null; // Full row
+
+      const dAlpha = Math.acos(C_min);
+      const t1 = this.alpha - dAlpha;
+      const t2 = this.alpha + dAlpha;
+
+      const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
+      const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
+
+      if (x2 - x1 >= Daydream.W) return null;
+
+      return [{ start: x1, end: x2 }];
+    }
+
+    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+      const polarAngle = angleBetween(p, this.basis.v);
+      const dotU = p.dot(this.basis.u);
+      const dotW = p.dot(this.basis.w);
+      let azimuth = Math.atan2(dotW, dotU);
+      if (azimuth < 0) azimuth += 2 * Math.PI;
+
+      azimuth += this.phase;
+
+      const sectorAngle = 2 * Math.PI / this.sides;
+      const localAzimuth = wrap(azimuth + sectorAngle / 2, sectorAngle) - sectorAngle / 2;
+
+      out.dist = polarAngle * Math.cos(localAzimuth) - this.apothem;
+      out.t = polarAngle / this.thickness; // Normalized distance for color lookup
+      out.rawDist = polarAngle;
+      return out;
+    }
+  },
+
+  Star: class {
+    constructor(basis, radius, sides, phase = 0) {
+      this.basis = basis;
+      this.sides = sides;
+      this.phase = phase;
+      this.isSolid = true;
+
+      const outerRadius = radius * (Math.PI / 2);
+      const innerRadius = outerRadius * 0.382;
+      const angleStep = Math.PI / sides;
+
+      const vT = outerRadius;
+      const vVx = innerRadius * Math.cos(angleStep);
+      const vVy = innerRadius * Math.sin(angleStep);
+
+      const dx = vVx - vT;
+      const dy = vVy;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      this.nx = -dy / len;
+      this.ny = dx / len;
+      this.planeD = -(this.nx * vT);
+      this.thickness = outerRadius;
+
+      // Scan params
+      this.scanNy = basis.v.y;
+      this.scanNx = basis.v.x;
+      this.scanNz = basis.v.z;
+      this.scanR = Math.sqrt(this.scanNx * this.scanNx + this.scanNz * this.scanNz);
+      this.scanAlpha = Math.atan2(this.scanNx, this.scanNz);
+
+      const centerPhi = Math.acos(Math.max(-1, Math.min(1, basis.v.y)));
+      const margin = outerRadius + 0.1;
+      this.yMin = Math.floor((Math.max(0, centerPhi - margin) / Math.PI) * (Daydream.H - 1));
+      this.yMax = Math.ceil((Math.min(Math.PI, centerPhi + margin) / Math.PI) * (Daydream.H - 1));
+    }
+
+    getVerticalRange() { return { yMin: this.yMin, yMax: this.yMax }; }
+
+    getHorizontalIntervals(y) {
+      // Same as Polygon Bounding Circle logic
+      const phi = yToPhi(y);
+      const cosPhi = Math.cos(phi);
+      const sinPhi = Math.sin(phi);
+      if (this.scanR < 0.01) return null;
+
+      const pixelWidth = 2 * Math.PI / Daydream.W;
+      const D_min = Math.cos(this.thickness + pixelWidth);
+      const denom = this.scanR * sinPhi;
+      if (Math.abs(denom) < 0.000001) return null;
+
+      const C_min = (D_min - this.scanNy * cosPhi) / denom;
+      if (C_min > 1.0) return [];
+      if (C_min < -1.0) return null;
+
+      const dAlpha = Math.acos(C_min);
+      const t1 = this.scanAlpha - dAlpha;
+      const t2 = this.scanAlpha + dAlpha;
+      const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
+      const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
+      if (x2 - x1 >= Daydream.W) return null;
+      return [{ start: x1, end: x2 }];
+    }
+
+    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+      const scanDist = angleBetween(p, this.basis.v);
+      const dotU = p.dot(this.basis.u);
+      const dotW = p.dot(this.basis.w);
+      let azimuth = Math.atan2(dotW, dotU);
+      if (azimuth < 0) azimuth += 2 * Math.PI;
+
+      azimuth += this.phase;
+
+      const sectorAngle = 2 * Math.PI / this.sides;
+      let localAzimuth = wrap(azimuth + sectorAngle / 2, sectorAngle) - sectorAngle / 2;
+      localAzimuth = Math.abs(localAzimuth);
+
+      const px = scanDist * Math.cos(localAzimuth);
+      const py = scanDist * Math.sin(localAzimuth);
+
+      const distToEdge = px * this.nx + py * this.ny + this.planeD;
+
+      out.dist = -distToEdge;
+      out.t = scanDist / this.thickness;
+      out.rawDist = scanDist;
+      return out;
+    }
+  },
+
+  Flower: class {
+    constructor(basis, radius, sides, phase = 0) {
+      this.basis = basis;
+      this.sides = sides;
+      this.phase = phase;
+      this.isSolid = true;
+
+      const desiredOuterRadius = radius * (Math.PI / 2);
+      this.apothem = Math.PI - desiredOuterRadius;
+      this.thickness = desiredOuterRadius;
+      this.antipode = basis.v.clone().negate();
+
+      this.scanNy = this.antipode.y;
+      this.scanNx = this.antipode.x;
+      this.scanNz = this.antipode.z;
+      this.scanR = Math.sqrt(this.scanNx * this.scanNx + this.scanNz * this.scanNz);
+      this.scanAlpha = Math.atan2(this.scanNx, this.scanNz);
+
+      const centerPhi = Math.acos(Math.max(-1, Math.min(1, this.antipode.y)));
+      const margin = this.thickness + 0.1;
+      this.yMin = Math.floor((Math.max(0, centerPhi - margin) / Math.PI) * (Daydream.H - 1));
+      this.yMax = Math.ceil((Math.min(Math.PI, centerPhi + margin) / Math.PI) * (Daydream.H - 1));
+    }
+
+    getVerticalRange() { return { yMin: this.yMin, yMax: this.yMax }; }
+
+    getHorizontalIntervals(y) {
+      const phi = yToPhi(y);
+      const cosPhi = Math.cos(phi);
+      const sinPhi = Math.sin(phi);
+      if (this.scanR < 0.01) return null;
+
+      const pixelWidth = 2 * Math.PI / Daydream.W;
+      const D_min = Math.cos(this.thickness + pixelWidth);
+      const denom = this.scanR * sinPhi;
+      if (Math.abs(denom) < 0.000001) return null;
+
+      const C_min = (D_min - this.scanNy * cosPhi) / denom;
+      if (C_min > 1.0) return [];
+      if (C_min < -1.0) return null;
+
+      const dAlpha = Math.acos(C_min);
+      const t1 = this.scanAlpha - dAlpha;
+      const t2 = this.scanAlpha + dAlpha;
+      const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
+      const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
+      if (x2 - x1 >= Daydream.W) return null;
+      return [{ start: x1, end: x2 }];
+    }
+
+    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+      const scanDist = angleBetween(p, this.antipode);
+      const polarAngle = Math.PI - scanDist;
+
+      const dotU = p.dot(this.basis.u);
+      const dotW = p.dot(this.basis.w);
+      let azimuth = Math.atan2(dotW, dotU);
+      if (azimuth < 0) azimuth += 2 * Math.PI;
+
+      azimuth += this.phase;
+
+      const sectorAngle = 2 * Math.PI / this.sides;
+      const localAzimuth = wrap(azimuth + sectorAngle / 2, sectorAngle) - sectorAngle / 2;
+
+      const distToEdge = polarAngle * Math.cos(localAzimuth) - this.apothem;
+
+      out.dist = -distToEdge;
+      out.t = scanDist / this.thickness;
+      out.rawDist = scanDist;
+      return out;
+    }
   }
 };
 
@@ -1227,11 +1427,25 @@ export const Scan = {
     shape.sample(p, sampleResult);
     const d = sampleResult.dist;
 
-    if (d < 0) {
-      // AA Logic: Map d from [-thickness, 0] to [1, 0] for alpha
+    // AA Logic
+    const pixelWidth = 2 * Math.PI / Daydream.W;
+    const threshold = shape.isSolid ? pixelWidth : 0;
+
+    if (d < threshold) {
       let aaAlpha = 1.0;
-      if (shape.thickness > 0) {
-        aaAlpha = quinticKernel(-d / shape.thickness);
+
+      if (shape.isSolid) {
+        // Solid AA: Fade across [-pixelWidth, pixelWidth]
+        // Map d from [pixelWidth, -pixelWidth] to [0, 1]
+        // t = 0.5 - d / (2 * pixelWidth)
+        // d=pixelWidth -> t=0. d=-pixelWidth -> t=1.
+        const t = 0.5 - d / (2 * pixelWidth);
+        aaAlpha = quinticKernel(Math.max(0, Math.min(1, t)));
+      } else {
+        // Soft Ring AA: Fade internal thickness [-thickness, 0]
+        if (shape.thickness > 0) {
+          aaAlpha = quinticKernel(-d / shape.thickness);
+        }
       }
 
       const c = colorFn(p, sampleResult.t, sampleResult.rawDist);
@@ -1260,165 +1474,20 @@ export const Scan = {
     }
   },
 
-  Polygon: class {
-    /**
-     * Scans a regular polygon with soft edges.
-     * @param {Object} pipeline - Render pipeline.
-     * @param {THREE.Quaternion} orientation - Orientation.
-     * @param {THREE.Vector3} normal - Center normal.
-     * @param {number} radius - Circumradius (0-2).
-     * @param {number} sides - Number of sides.
-     * @param {Function} colorFn - (pos, t, dist) => {color, alpha}.
-     * @param {Object} options - Options.
-     */
-    static draw(pipeline, basis, radius, sides, colorFn, phase = 0, debugBB = false) {
-      // Fix: If radius > 1, draw a polygon on the back side by flipping normal
-      let { v, u, w } = basis;
 
+  Polygon: class {
+    static draw(pipeline, basis, radius, sides, colorFn, phase = 0, debugBB = false) {
+      let { v, u, w } = basis;
       if (radius > 1.0) {
         v = vectorPool.acquire().copy(v).negate();
         u = vectorPool.acquire().copy(u).negate();
         radius = 2.0 - radius;
       }
 
-      const thickness = radius * (Math.PI / 2); // Map 0-1 radius to 0-PI/2 angle
-      if (thickness <= 0.0001) return;
-
-      // Basis already laid out
-
-      const nx = v.x;
-      const ny = v.y;
-      const nz = v.z;
-
-      const R = Math.sqrt(nx * nx + nz * nz);
-      const alpha = Math.atan2(nx, nz);
-
-      const angle = Math.PI / sides;
-      const apothem = thickness * Math.cos(angle);
-
-      const pixelWidth = 2 * Math.PI / Daydream.W;
-
-      const ctx = {
-        normal: v, radius, thickness, sides, apothem, colorFn,
-        nx, ny, nz, u, w,
-        R, alpha,
-        pipeline,
-        pixelWidth,
-        phase,
-        debugBB
-      };
-
-      const targetAngle = 0;
-      const centerPhi = Math.acos(ny);
-      const a1 = centerPhi - targetAngle;
-      const a2 = centerPhi + targetAngle;
-      const phiMin = Math.max(0, centerPhi - thickness - pixelWidth);
-      const phiMax = Math.min(Math.PI, centerPhi + thickness + pixelWidth);
-
-      if (phiMin > phiMax) return;
-
-      const yMin = Math.max(0, Math.floor((phiMin * (Daydream.H - 1)) / Math.PI));
-      const yMax = Math.min(Daydream.H - 1, Math.ceil((phiMax * (Daydream.H - 1)) / Math.PI));
-
-      for (let y = yMin; y <= yMax; y++) {
-        Scan.Polygon.scanRow(y, ctx);
-      }
-    }
-
-    static scanRow(y, ctx) {
-      // Bounding Circle Optimization
-      const phi = yToPhi(y);
-      const cosPhi = Math.cos(phi);
-      const sinPhi = Math.sin(phi);
-
-      // If near pole or singularity, scan full row (conservative)
-      if (ctx.R < 0.01) {
-        Scan.Polygon.scanFullRow(y, ctx);
-        return;
-      }
-
-      const ang_low = 0;
-      const ang_high = ctx.thickness;
-      const D_max = 1.0;
-      const D_min = Math.cos(ang_high);
-
-      const denom = ctx.R * sinPhi;
-      if (Math.abs(denom) < 0.000001) {
-        Scan.Polygon.scanFullRow(y, ctx);
-        return;
-      }
-
-      const C_min = (D_min - ctx.ny * cosPhi) / denom;
-      if (C_min > 1.0) return; // Outside cap
-      if (C_min < -1.0) {
-        Scan.Polygon.scanFullRow(y, ctx);
-        return;
-      }
-
-      const dAlpha = Math.acos(C_min);
-      Scan.Polygon.scanWindow(y, ctx.alpha - dAlpha, ctx.alpha + dAlpha, ctx);
-    }
-
-    static scanFullRow(y, ctx) {
-      for (let x = 0; x < Daydream.W; x++) {
-        Scan.Polygon.processPixel(XY(x, y), x, y, ctx);
-      }
-    }
-
-    static scanWindow(y, t1, t2, ctx) {
-      const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
-      const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
-
-      // Prevent double scanning if window >= 2pi
-      if (x2 - x1 >= Daydream.W) {
-        Scan.Polygon.scanFullRow(y, ctx);
-        return;
-      }
-
-      for (let x = x1; x <= x2; x++) {
-        const wx = wrap(x, Daydream.W);
-        Scan.Polygon.processPixel(XY(wx, y), wx, y, ctx);
-      }
-    }
-
-    static processPixel(i, x, y, ctx) {
-      if (ctx.debugBB) {
-        Daydream.pixels[i * 3] += 0.2;
-        Daydream.pixels[i * 3 + 1] += 0.2;
-        Daydream.pixels[i * 3 + 2] += 0.2;
-      }
-      const p = Daydream.pixelPositions[i];
-      const polarAngle = angleBetween(p, ctx.normal);
-
-      if (polarAngle > ctx.thickness + ctx.pixelWidth) return;
-
-      const dotU = p.dot(ctx.u);
-      const dotW = p.dot(ctx.w);
-      let azimuth = Math.atan2(dotW, dotU);
-      if (azimuth < 0) azimuth += 2 * Math.PI;
-      azimuth += ctx.phase;
-
-      // SDF Logic
-      const sectorAngle = 2 * Math.PI / ctx.sides;
-      // Rotate azimuth so edge is perp to x-axis
-      const localAzimuth = wrap(azimuth + sectorAngle / 2, sectorAngle) - sectorAngle / 2;
-      const distToEdge = polarAngle * Math.cos(localAzimuth) - ctx.apothem;
-
-      if (distToEdge < ctx.pixelWidth) {
-        // AA
-        let alpha = 1.0;
-        if (distToEdge > -ctx.pixelWidth) {
-          const t = (distToEdge + ctx.pixelWidth) / (2 * ctx.pixelWidth);
-          alpha = quinticKernel(1.0 - t);
-        }
-
-        const t = polarAngle / ctx.thickness; // Normalized distance from center
-        const c = ctx.colorFn(p, t, distToEdge);
-        const color = c.isColor ? c : (c.color || c);
-        const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
-
-        ctx.pipeline.plot2D(x, y, color, 0, baseAlpha * alpha);
-      }
+      const thickness = radius * (Math.PI / 2);
+      const shape = new SDF.Polygon({ v, u, w }, radius, thickness, sides, phase);
+      const renderColorFn = (p, t, d) => colorFn(p, 0, d);
+      Scan.render(pipeline, shape, renderColorFn, debugBB);
     }
   },
 
@@ -1428,225 +1497,25 @@ export const Scan = {
       if (radius > 1.0) {
         v = vectorPool.acquire().copy(v).negate();
         u = vectorPool.acquire().copy(u).negate();
-        radius = 2.0 - radius; // Invert radius
+        radius = 2.0 - radius;
       }
-
-      // --- Shape Parameters ---
-      const outerRadius = radius * (Math.PI / 2);
-      const innerRadius = outerRadius * 0.382; // Pentagram ratio
-
-      const angleStep = Math.PI / sides; // Half-sector (Tip to Valley)
-
-      // Precompute Edge Normal for SDF
-      const vT = outerRadius;
-      const vVx = innerRadius * Math.cos(angleStep);
-      const vVy = innerRadius * Math.sin(angleStep);
-      const dx = vVx - vT;
-      const dy = vVy;
-      const len = Math.sqrt(dx * dx + dy * dy);
-
-      const nx = -dy / len;
-      const ny = dx / len;
-      const planeD = -(nx * vT + ny * 0); // Dot(N, Tip) + D = 0 => D = -Dot
-
-      const thickness = outerRadius;
-      if (thickness <= 0.0001) return;
-
-      const pixelWidth = 2 * Math.PI / Daydream.W;
-
-      const scanV = v;
-      const scanNy = scanV.y;
-
-      const ctx = {
-        scanNormal: scanV,
-        u, w,
-        thickness,
-        sides,
-        nx, ny, planeD,
-        colorFn,
-        pixelWidth,
-        pipeline,
-        phase,
-        debugBB
-      };
-
-      // Scan Bounding Box (around NORMAL)
-      const centerPhi = Math.acos(scanNy);
-      const phiMin = Math.max(0, centerPhi - thickness - pixelWidth);
-      const phiMax = Math.min(Math.PI, centerPhi + thickness + pixelWidth);
-
-      if (phiMin > phiMax) return;
-
-      const yMin = Math.max(0, Math.floor((phiMin * (Daydream.H - 1)) / Math.PI));
-      const yMax = Math.min(Daydream.H - 1, Math.ceil((phiMax * (Daydream.H - 1)) / Math.PI));
-
-      for (let y = yMin; y <= yMax; y++) {
-        Scan.Star.scanRow(y, ctx);
-      }
-    }
-
-    static scanRow(y, ctx) {
-      Scan.Star.scanFullRow(y, ctx);
-    }
-
-    static scanFullRow(y, ctx) {
-      for (let x = 0; x < Daydream.W; x++) {
-        Scan.Star.processPixel(XY(x, y), x, y, ctx);
-      }
-    }
-
-    static processPixel(i, x, y, ctx) {
-      const p = Daydream.pixelPositions[i];
-
-      const scanDist = angleBetween(p, ctx.scanNormal);
-      if (scanDist > ctx.thickness + ctx.pixelWidth) return;
-
-      if (ctx.debugBB) {
-        Daydream.pixels[i * 3] += 0.2;
-        Daydream.pixels[i * 3 + 1] += 0.2;
-        Daydream.pixels[i * 3 + 2] += 0.2;
-      }
-
-      const dotU = p.dot(ctx.u);
-      const dotW = p.dot(ctx.w);
-      let azimuth = Math.atan2(dotW, dotU);
-      if (azimuth < 0) azimuth += 2 * Math.PI;
-      azimuth += ctx.phase;
-
-      const sectorAngle = 2 * Math.PI / ctx.sides;
-      let localAzimuth = wrap(azimuth + sectorAngle / 2, sectorAngle) - sectorAngle / 2;
-      localAzimuth = Math.abs(localAzimuth);
-
-      const px = scanDist * Math.cos(localAzimuth);
-      const py = scanDist * Math.sin(localAzimuth);
-
-      const distToEdge = px * ctx.nx + py * ctx.ny + ctx.planeD;
-
-      if (distToEdge > -ctx.pixelWidth) {
-        let alpha = 1.0;
-        if (distToEdge < ctx.pixelWidth) {
-          const t = (distToEdge + ctx.pixelWidth) / (2 * ctx.pixelWidth);
-          alpha = quinticKernel(t);
-        }
-
-        const t = scanDist / ctx.thickness;
-        const c = ctx.colorFn(p, t, distToEdge);
-        const color = c.isColor ? c : (c.color || c);
-        const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
-
-        ctx.pipeline.plot2D(x, y, color, 0, baseAlpha * alpha);
-      }
+      const shape = new SDF.Star({ v, u, w }, radius, sides, phase);
+      const renderColorFn = (p, t, d) => colorFn(p, 0, d);
+      Scan.render(pipeline, shape, renderColorFn, debugBB);
     }
   },
 
   Flower: class {
     static draw(pipeline, basis, radius, sides, colorFn, phase = 0, debugBB = false) {
-      // Original logic: Antipodal Polygon Distortion
-
       let { v, u, w } = basis;
-
       if (radius > 1.0) {
         v = vectorPool.acquire().copy(v).negate();
         u = vectorPool.acquire().copy(u).negate();
         radius = 2.0 - radius;
       }
-
-      // distFromS logic (Antipodal Apothem)
-      const desiredOuterRadius = radius * (Math.PI / 2);
-      const apothem = Math.PI - desiredOuterRadius;
-
-      // Calculate max extent of the "Hole" (which is the Flower) on the front
-      // It is bounded by the Flats of the polygon at S, which map to Tips at Front
-      // Max radius = desiredOuterRadius.
-      const thickness = desiredOuterRadius;
-      if (thickness <= 0.0001) return;
-
-      // Invert normal so that antipodal polygon appears at 'v'
-      const scanV = vectorPool.acquire().copy(v).negate();
-
-      const pixelWidth = 2 * Math.PI / Daydream.W;
-      const scanNy = scanV.y;
-
-
-      const ctx = {
-        scanNormal: scanV,
-        u, w,
-        thickness,
-        sides,
-        apothem, // Antipodal Apothem
-        colorFn,
-        pixelWidth,
-        pipeline,
-        phase,
-        debugBB
-      };
-
-      const centerPhi = Math.acos(scanNy);
-      const phiMin = Math.max(0, centerPhi - thickness - pixelWidth);
-      const phiMax = Math.min(Math.PI, centerPhi + thickness + pixelWidth);
-
-      if (phiMin > phiMax) return;
-
-      const yMin = Math.max(0, Math.floor((phiMin * (Daydream.H - 1)) / Math.PI));
-      const yMax = Math.min(Daydream.H - 1, Math.ceil((phiMax * (Daydream.H - 1)) / Math.PI));
-
-      for (let y = yMin; y <= yMax; y++) {
-        Scan.Flower.scanRow(y, ctx);
-      }
-    }
-
-    static scanRow(y, ctx) {
-      Scan.Flower.scanFullRow(y, ctx);
-    }
-
-    static scanFullRow(y, ctx) {
-      for (let x = 0; x < Daydream.W; x++) {
-        Scan.Flower.processPixel(XY(x, y), x, y, ctx);
-      }
-    }
-
-    static processPixel(i, x, y, ctx) {
-      const p = Daydream.pixelPositions[i];
-      const scanDist = angleBetween(p, ctx.scanNormal);
-      if (scanDist > ctx.thickness + ctx.pixelWidth) return;
-
-      if (ctx.debugBB) {
-        Daydream.pixels[i * 3] += 0.2;
-        Daydream.pixels[i * 3 + 1] += 0.2;
-        Daydream.pixels[i * 3 + 2] += 0.2;
-      }
-
-      // Calc distance from ANTIPODE (PI - scanDist)
-      const polarAngle = Math.PI - scanDist;
-
-      const dotU = p.dot(ctx.u);
-      const dotW = p.dot(ctx.w);
-      let azimuth = Math.atan2(dotW, dotU);
-      if (azimuth < 0) azimuth += 2 * Math.PI;
-      azimuth += ctx.phase;
-      const sectorAngle = 2 * Math.PI / ctx.sides;
-      const localAzimuth = wrap(azimuth + sectorAngle / 2, sectorAngle) - sectorAngle / 2;
-
-      // SDF vs Antipodal Polygon
-      const distToEdge = polarAngle * Math.cos(localAzimuth) - ctx.apothem;
-
-      // If distToEdge > 0, we are OUTSIDE the polygon at S.
-      // This forms the "Hole" or "Flower" at N.
-
-      if (distToEdge > -ctx.pixelWidth) {
-        let alpha = 1.0;
-        if (distToEdge < ctx.pixelWidth) {
-          const t = (distToEdge + ctx.pixelWidth) / (2 * ctx.pixelWidth);
-          alpha = quinticKernel(t);
-        }
-
-        const t = scanDist / ctx.thickness;
-        const c = ctx.colorFn(p, t, distToEdge);
-        const color = c.isColor ? c : (c.color || c);
-        const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
-
-        ctx.pipeline.plot2D(x, y, color, 0, baseAlpha * alpha);
-      }
+      const shape = new SDF.Flower({ v, u, w }, radius, sides, phase);
+      const renderColorFn = (p, t, d) => colorFn(p, 0, d);
+      Scan.render(pipeline, shape, renderColorFn, debugBB);
     }
   },
 
