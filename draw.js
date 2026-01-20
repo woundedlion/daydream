@@ -1418,7 +1418,7 @@ export const SDF = {
 };
 
 export const Scan = {
-  render: (pipeline, shape, colorFn, debugBB = false) => {
+  rasterize: (pipeline, shape, colorFn, debugBB = false) => {
     const { yMin, yMax } = shape.getVerticalRange();
 
     // Reusable result object to avoid GC
@@ -1505,7 +1505,7 @@ export const Scan = {
      */
     static draw(pipeline, basis, radius, thickness, shiftFn, maxDistortion, colorFn, phase = 0, debugBB = false) {
       const shape = new SDF.DistortedRing(basis, radius, thickness, shiftFn, maxDistortion, phase);
-      Scan.render(pipeline, shape, colorFn, debugBB);
+      Scan.rasterize(pipeline, shape, colorFn, debugBB);
     }
   },
 
@@ -1522,7 +1522,7 @@ export const Scan = {
       const thickness = radius * (Math.PI / 2);
       const shape = new SDF.Polygon({ v, u, w }, radius, thickness, sides, phase);
       const renderColorFn = (p, t, d) => colorFn(p, 0, d);
-      Scan.render(pipeline, shape, renderColorFn, debugBB);
+      Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
     }
   },
 
@@ -1536,7 +1536,7 @@ export const Scan = {
       }
       const shape = new SDF.Star({ v, u, w }, radius, sides, phase);
       const renderColorFn = (p, t, d) => colorFn(p, 0, d);
-      Scan.render(pipeline, shape, renderColorFn, debugBB);
+      Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
     }
   },
 
@@ -1550,7 +1550,7 @@ export const Scan = {
       }
       const shape = new SDF.Flower({ v, u, w }, radius, sides, phase);
       const renderColorFn = (p, t, d) => colorFn(p, 0, d);
-      Scan.render(pipeline, shape, renderColorFn, debugBB);
+      Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
     }
   },
 
@@ -1584,7 +1584,7 @@ export const Scan = {
      */
     static draw(pipeline, basis, radius, thickness, colorFn, phase = 0, debugBB = false) {
       const shape = new SDF.Ring(basis, radius, thickness, phase);
-      Scan.render(pipeline, shape, colorFn, debugBB);
+      Scan.rasterize(pipeline, shape, colorFn, debugBB);
     }
   },
 
