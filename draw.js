@@ -15,8 +15,6 @@ export const dotPool = new StaticPool(Dot, 500000);
 
 // Reusable temporary objects to avoid allocation during render loops
 const _tempVec = new THREE.Vector3();
-const _lineSteps = new Float32Array(16384); // Max steps buffer
-
 
 /**
  * Represents a path composed of connected points on the sphere.
