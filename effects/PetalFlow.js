@@ -8,7 +8,7 @@ import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { Orientation, sinWave } from "../geometry.js";
 import { invStereo, TWO_PI } from "../3dmath.js";
-import { Plot, rasterize } from "../draw.js";
+import { Plot } from "../draw.js";
 import { ProceduralPalette } from "../color.js";
 import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
 import { wrap } from "../util.js";
@@ -98,7 +98,7 @@ export class PetalFlow {
                 const pos = this.orientation.orient(invStereo(z));
 
                 if (i > 0) {
-                    rasterize(this.filters, [prevPos, pos], (p, t) => {
+                    Plot.Rasterize.draw(this.filters, [prevPos, pos], (p, t) => {
                         return { color: color, alpha: this.alpha * opacity };
                     }, false);
                 } else {
