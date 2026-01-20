@@ -106,7 +106,7 @@ export class MobiusGrid {
             });
 
             const opacity = Math.min(1.0, Math.max(0.0, numRings - i));
-            Plot.Rasterize.draw(pipeline, transformedPoints, (p) => {
+            Plot.rasterize(pipeline, transformedPoints, (p) => {
                 const res = this.palette.get(i / numRings);
                 res.alpha *= opacity * this.alpha;
                 return res;
@@ -138,7 +138,7 @@ export class MobiusGrid {
             });
 
             const opacity = Math.min(1.0, Math.max(0.0, numLines - i));
-            Plot.Rasterize.draw(pipeline, transformedPoints, (p, tLine) => {
+            Plot.rasterize(pipeline, transformedPoints, (p, tLine) => {
                 // Interpolate unwarped points to get Z
                 const idx = tLine * points.length;
                 const i1 = Math.floor(idx) % points.length;

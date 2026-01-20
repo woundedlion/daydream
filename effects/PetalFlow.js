@@ -98,7 +98,7 @@ export class PetalFlow {
                 const pos = this.orientation.orient(invStereo(z));
 
                 if (i > 0) {
-                    Plot.Rasterize.draw(this.filters, [prevPos, pos], (p, t) => {
+                    Plot.rasterize(this.filters, [prevPos, pos], (p, t) => {
                         return { color: color, alpha: this.alpha * opacity };
                     }, false);
                 } else {

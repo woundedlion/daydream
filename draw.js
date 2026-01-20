@@ -403,7 +403,7 @@ export const Plot = {
      */
     static draw(pipeline, basis, radius, colorFn, phase = 0) {
       const points = Plot.Ring.sample(basis, radius, Daydream.W / 4, phase);
-      Plot.Rasterize.draw(pipeline, points, colorFn, true);
+      Plot.rasterize(pipeline, points, colorFn, true);
     }
   },
 
@@ -545,12 +545,6 @@ export const Plot = {
     static draw(pipeline, basis, radius, numSides, colorFn, phase = 0) {
       const points = Plot.Star.sample(basis, radius, numSides, phase);
 
-      // Projection center (Front)
-      // Recalculate center based on radius logic or just use basis.v/antipode logic handled in sample?
-      // The drawing logic needs the 'center' for PlanarLine.
-      // If sampling flipped the basis, the points are correct, but the "center" for projection
-      // should ideally be the pole they surround.
-
       let center = basis.v;
       if (radius > 1.0) {
         center = vectorPool.acquire().copy(basis.v).negate();
@@ -626,7 +620,7 @@ export const Plot = {
 
     static draw(pipeline, basis, radius, numSides, colorFn, phase = 0) {
       const points = Plot.Flower.sample(basis, radius, numSides, phase);
-      Plot.Rasterize.draw(pipeline, points, colorFn, false);
+      Plot.rasterize(pipeline, points, colorFn, false);
     }
   },
 
@@ -720,7 +714,7 @@ export const Plot = {
      */
     static draw(pipeline, basis, radius, shiftFn, colorFn, phase = 0) {
       const points = Plot.DistortedRing.sample(basis, radius, shiftFn, phase);
-      Plot.Rasterize.draw(pipeline, points, colorFn, true);
+      Plot.rasterize(pipeline, points, colorFn, true);
     }
   },
 
@@ -758,32 +752,30 @@ export const Plot = {
     }
   },
 
-  Rasterize: class {
-    /**
-     * Rasterizes a list of points into Dot objects by connecting them with geodesic lines.
-     * @param {Object} pipeline - The render pipeline.
-     * @param {THREE.Vector3[]} points - The list of points.
-     * @param {Function} colorFn - Function to determine color (takes vector and normalized progress t).
-     * @param {boolean} [closeLoop=false] - If true, connects the last point to the first.
-     */
-    static draw(pipeline, points, colorFn, closeLoop = false) {
-      const len = points.length;
-      if (len === 0) return;
+  /**
+   * Rasterizes a list of points into Dot objects by connecting them with geodesic lines.
+   * @param {Object} pipeline - The render pipeline.
+   * @param {THREE.Vector3[]} points - The list of points.
+   * @param {Function} colorFn - Function to determine color (takes vector and normalized progress t).
+   * @param {boolean} [closeLoop=false] - If true, connects the last point to the first.
+   */
+  rasterize: (pipeline, points, colorFn, closeLoop = false) => {
+    const len = points.length;
+    if (len === 0) return;
 
-      const count = closeLoop ? len : len - 1;
-      for (let i = 0; i < count; i++) {
-        const p1 = points[i];
-        const p2 = points[(i + 1) % len];
+    const count = closeLoop ? len : len - 1;
+    for (let i = 0; i < count; i++) {
+      const p1 = points[i];
+      const p2 = points[(i + 1) % len];
 
-        const segmentColorFn = (p, subT) => {
-          const globalT = (i + subT) / count;
-          return colorFn(p, globalT);
-        };
+      const segmentColorFn = (p, subT) => {
+        const globalT = (i + subT) / count;
+        return colorFn(p, globalT);
+      };
 
-        // Draw segment
-        const omitLast = closeLoop || (i < count - 1);
-        Plot.Line.draw(pipeline, p1, p2, segmentColorFn, 0, 1, false, omitLast);
-      }
+      // Draw segment
+      const omitLast = closeLoop || (i < count - 1);
+      Plot.Line.draw(pipeline, p1, p2, segmentColorFn, 0, 1, false, omitLast);
     }
   }
 
@@ -1050,7 +1042,6 @@ export const SDF = {
     }
 
     sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
-      // Distorted Ring has no "Fast Cos Rejection" because targetAngle varies.
       const polarAngle = angleBetween(p, this.normal);
 
       const dotU = p.dot(this.u);

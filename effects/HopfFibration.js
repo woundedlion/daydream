@@ -186,7 +186,7 @@ export class HopfFibration {
                 // Using rasterize with 2 points creates a line.
 
                 const segmentPoints = [prev, v];
-                Plot.Rasterize.draw(this.pipeline, segmentPoints, (p, t) => {
+                Plot.rasterize(this.pipeline, segmentPoints, (p, t) => {
                     return c;
                 }, false);
             } else {
