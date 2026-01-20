@@ -812,7 +812,7 @@ export const SDF = {
       this.invSinTarget = safeApprox ? (1.0 / Math.sin(this.targetAngle)) : 0;
     }
 
-    getVerticalRange() {
+    getVerticalBounds() {
       // Vertical bounds
       const a1 = this.centerPhi - this.targetAngle;
       const a2 = this.centerPhi + this.targetAngle;
@@ -850,7 +850,7 @@ export const SDF = {
       return { yMin, yMax };
     }
 
-    getHorizontalIntervals(y) {
+    getHorizontalBounds(y) {
       const phi = yToPhi(y);
       const cosPhi = Math.cos(phi);
       const sinPhi = Math.sin(phi);
@@ -904,7 +904,7 @@ export const SDF = {
     }
 
     // Returns { dist, t } where dist is signed distance (negative inside)
-    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+    distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
       const dot = p.dot(this.normal);
       if (dot < this.cosMin || dot > this.cosMax) {
         out.dist = 100.0;
@@ -960,7 +960,7 @@ export const SDF = {
       this.maxThickness = thickness + maxDistortion;
     }
 
-    getVerticalRange() {
+    getVerticalBounds() {
       const a1 = this.centerPhi - this.targetAngle;
       const a2 = this.centerPhi + this.targetAngle;
 
@@ -990,7 +990,7 @@ export const SDF = {
       return { yMin, yMax };
     }
 
-    getHorizontalIntervals(y) {
+    getHorizontalBounds(y) {
       const phi = yToPhi(y);
       const cosPhi = Math.cos(phi);
       const sinPhi = Math.sin(phi);
@@ -1041,7 +1041,7 @@ export const SDF = {
       return intervals;
     }
 
-    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+    distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
       const polarAngle = angleBetween(p, this.normal);
 
       const dotU = p.dot(this.u);
@@ -1071,19 +1071,19 @@ export const SDF = {
       this.thickness = Math.max(a.thickness || 0, b.thickness || 0);
     }
 
-    getVerticalRange() {
-      const b1 = this.a.getVerticalRange();
-      const b2 = this.b.getVerticalRange();
+    getVerticalBounds() {
+      const b1 = this.a.getVerticalBounds();
+      const b2 = this.b.getVerticalBounds();
       return {
         yMin: Math.min(b1.yMin, b2.yMin),
         yMax: Math.max(b1.yMax, b2.yMax)
       };
     }
 
-    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
-      const d1 = this.a.sample(p, out);
-      const resA = this.a.sample(p);
-      const resB = this.b.sample(p);
+    distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+      const d1 = this.a.distance(p, out);
+      const resA = this.a.distance(p);
+      const resB = this.b.distance(p);
 
       if (resA.dist < resB.dist) {
         out.dist = resA.dist;
@@ -1105,19 +1105,19 @@ export const SDF = {
       this.thickness = a.thickness || 0;
     }
 
-    getVerticalRange() {
-      return this.a.getVerticalRange();
+    getVerticalBounds() {
+      return this.a.getVerticalBounds();
     }
 
     // Conservative interval: Subtracting B from A might chop A's intervals, but A's intervals are a safe superset.
-    getHorizontalIntervals(y) {
-      if (this.a.getHorizontalIntervals) return this.a.getHorizontalIntervals(y);
+    getHorizontalBounds(y) {
+      if (this.a.getHorizontalBounds) return this.a.getHorizontalBounds(y);
       return null;
     }
 
-    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
-      const resA = this.a.sample(p);
-      const resB = this.b.sample(p);
+    distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+      const resA = this.a.distance(p);
+      const resB = this.b.distance(p);
 
       const dist = Math.max(resA.dist, -resB.dist);
 
@@ -1142,9 +1142,9 @@ export const SDF = {
       this.thickness = Math.min(a.thickness || 0, b.thickness || 0);
     }
 
-    getVerticalRange() {
-      const b1 = this.a.getVerticalRange();
-      const b2 = this.b.getVerticalRange();
+    getVerticalBounds() {
+      const b1 = this.a.getVerticalBounds();
+      const b2 = this.b.getVerticalBounds();
       return {
         yMin: Math.max(b1.yMin, b2.yMin),
         yMax: Math.min(b1.yMax, b2.yMax)
@@ -1152,14 +1152,14 @@ export const SDF = {
     }
 
     // Intersection intervals: A intersect B
-    getHorizontalIntervals(y) {
-      if (this.a.getHorizontalIntervals) return this.a.getHorizontalIntervals(y);
+    getHorizontalBounds(y) {
+      if (this.a.getHorizontalBounds) return this.a.getHorizontalBounds(y);
       return null;
     }
 
-    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
-      const resA = this.a.sample(p);
-      const resB = this.b.sample(p);
+    distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+      const resA = this.a.distance(p);
+      const resB = this.b.distance(p);
 
       if (resA.dist > resB.dist) {
         out.dist = resA.dist;
@@ -1195,9 +1195,9 @@ export const SDF = {
       this.yMax = Math.ceil((Math.min(Math.PI, centerPhi + margin) / Math.PI) * (Daydream.H - 1));
     }
 
-    getVerticalRange() { return { yMin: this.yMin, yMax: this.yMax }; }
+    getVerticalBounds() { return { yMin: this.yMin, yMax: this.yMax }; }
 
-    getHorizontalIntervals(y) {
+    getHorizontalBounds(y) {
       const phi = yToPhi(y);
       const cosPhi = Math.cos(phi);
       const sinPhi = Math.sin(phi);
@@ -1227,7 +1227,7 @@ export const SDF = {
       return [{ start: x1, end: x2 }];
     }
 
-    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+    distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
       const polarAngle = angleBetween(p, this.basis.v);
       const dotU = p.dot(this.basis.u);
       const dotW = p.dot(this.basis.w);
@@ -1282,9 +1282,9 @@ export const SDF = {
       this.yMax = Math.ceil((Math.min(Math.PI, centerPhi + margin) / Math.PI) * (Daydream.H - 1));
     }
 
-    getVerticalRange() { return { yMin: this.yMin, yMax: this.yMax }; }
+    getVerticalBounds() { return { yMin: this.yMin, yMax: this.yMax }; }
 
-    getHorizontalIntervals(y) {
+    getHorizontalBounds(y) {
       // Same as Polygon Bounding Circle logic
       const phi = yToPhi(y);
       const cosPhi = Math.cos(phi);
@@ -1309,7 +1309,7 @@ export const SDF = {
       return [{ start: x1, end: x2 }];
     }
 
-    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+    distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
       const scanDist = angleBetween(p, this.basis.v);
       const dotU = p.dot(this.basis.u);
       const dotW = p.dot(this.basis.w);
@@ -1358,9 +1358,9 @@ export const SDF = {
       this.yMax = Math.ceil((Math.min(Math.PI, centerPhi + margin) / Math.PI) * (Daydream.H - 1));
     }
 
-    getVerticalRange() { return { yMin: this.yMin, yMax: this.yMax }; }
+    getVerticalBounds() { return { yMin: this.yMin, yMax: this.yMax }; }
 
-    getHorizontalIntervals(y) {
+    getHorizontalBounds(y) {
       const phi = yToPhi(y);
       const cosPhi = Math.cos(phi);
       const sinPhi = Math.sin(phi);
@@ -1384,7 +1384,7 @@ export const SDF = {
       return [{ start: x1, end: x2 }];
     }
 
-    sample(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+    distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
       const scanDist = angleBetween(p, this.antipode);
       const polarAngle = Math.PI - scanDist;
 
@@ -1410,15 +1410,15 @@ export const SDF = {
 
 export const Scan = {
   rasterize: (pipeline, shape, colorFn, debugBB = false) => {
-    const { yMin, yMax } = shape.getVerticalRange();
+    const { yMin, yMax } = shape.getVerticalBounds();
 
     // Reusable result object to avoid GC
     const sampleResult = { dist: 100, t: 0, rawDist: 100 };
 
     for (let y = yMin; y <= yMax; y++) {
       let intervals = null;
-      if (shape.getHorizontalIntervals) {
-        intervals = shape.getHorizontalIntervals(y);
+      if (shape.getHorizontalBounds) {
+        intervals = shape.getHorizontalBounds(y);
       }
 
       if (intervals) {
@@ -1450,7 +1450,7 @@ export const Scan = {
     }
 
     // Pass reusable object
-    shape.sample(p, sampleResult);
+    shape.distance(p, sampleResult);
     const d = sampleResult.dist;
 
     // AA Logic
