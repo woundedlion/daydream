@@ -333,6 +333,36 @@ export const Plot = {
     }
   },
 
+  Mesh: class {
+    /**
+     * Draws a wireframe mesh.
+     * @param {Object} pipeline - Render pipeline.
+     * @param {Object} mesh - The mesh object {vertices: Vector3[], faces: number[][]}.
+     * @param {Function} colorFn - Color function.
+     */
+    static draw(pipeline, mesh, colorFn) {
+      const drawn = new Set();
+      for (const face of mesh.faces) {
+        for (let i = 0; i < face.length; i++) {
+          const idx1 = face[i];
+          const idx2 = face[(i + 1) % face.length];
+
+          // Deduplicate edges (draw each undirected edge once)
+          const key = idx1 < idx2 ? `${idx1},${idx2}` : `${idx2},${idx1}`;
+          if (drawn.has(key)) continue;
+          drawn.add(key);
+
+          Plot.Line.draw(
+            pipeline,
+            mesh.vertices[idx1],
+            mesh.vertices[idx2],
+            colorFn
+          );
+        }
+      }
+    }
+  },
+
   Ring: class {
     /**
      * Calculates a point on a circle that lies on the surface of the unit sphere.
@@ -1545,6 +1575,189 @@ export const SDF = {
       out.rawDist = scanDist;
       return out;
     }
+  },
+
+  Face: class {
+    constructor(vertices, thickness = 0) {
+      this.vertices = vertices;
+      this.thickness = thickness;
+      this.planes = [];
+      this.yMin = Daydream.H;
+      this.yMax = 0;
+      this.intervals = null;
+
+      // Compute edge planes and bounding box
+      let minPhi = 100;
+      let maxPhi = -100;
+      const thetas = [];
+
+      for (let i = 0; i < this.vertices.length; i++) {
+        const v1 = this.vertices[i];
+        const v2 = this.vertices[(i + 1) % this.vertices.length];
+
+        // Edge Plane Normal (points OUT for CCW)
+        // v1 x v2 points 'Right' relative to edge.
+        const normal = vectorPool.acquire().crossVectors(v1, v2).normalize();
+        this.planes.push(normal);
+
+        // 1. Vertex contribution
+        const phi1 = Math.acos(Math.max(-1, Math.min(1, v1.y)));
+        if (phi1 < minPhi) minPhi = phi1;
+        if (phi1 > maxPhi) maxPhi = phi1;
+
+        // 1b. Arc Extrema (Max/Min Latitude on Edge)
+        // Check if the Great Circle arc contains P_top (closest to North) or P_bot (closest to South).
+        const ny = normal.y;
+        if (Math.abs(ny) < 0.99999) { // Avoid pole-aligned planes
+          const nx = normal.x;
+          const nz = normal.z;
+          // P_top = Projection of (0,1,0) onto plane N, normalized.
+          // Vector T = ( -nx*ny, 1 - ny*ny, -nz*ny )
+          const tx = -nx * ny;
+          const ty = 1.0 - ny * ny;
+          const tz = -nz * ny;
+          const tLenSq = tx * tx + ty * ty + tz * tz;
+          if (tLenSq > 1e-12) {
+            const invLen = 1.0 / Math.sqrt(tLenSq);
+            const ptx = tx * invLen;
+            const pty = ty * invLen;
+            const ptz = tz * invLen;
+
+            // Check if P_top is strictly between v1 and v2 using scalar triple products
+            // cx1 = (v1 x P_top) . N
+            // cx2 = (P_top x v2) . N
+            const cx1 = (v1.y * ptz - v1.z * pty) * nx + (v1.z * ptx - v1.x * ptz) * ny + (v1.x * pty - v1.y * ptx) * nz;
+            const cx2 = (pty * v2.z - ptz * v2.y) * nx + (ptz * v2.x - ptx * v2.z) * ny + (ptx * v2.y - pty * v2.x) * nz;
+
+            // If P_top is inside, update minPhi (Northmost)
+            if (cx1 > 0 && cx2 > 0) {
+              const phiTop = Math.acos(Math.max(-1, Math.min(1, pty)));
+              if (phiTop < minPhi) minPhi = phiTop;
+            }
+
+            // If P_bot (-P_top) is inside, update maxPhi (Southmost)
+            // Symmetry: (v1 x -P) . N = -cx1. So we check if -cx1 > 0 AND -cx2 > 0.
+            if (cx1 < 0 && cx2 < 0) {
+              const phiBot = Math.acos(Math.max(-1, Math.min(1, -pty)));
+              if (phiBot > maxPhi) maxPhi = phiBot;
+            }
+          }
+        }
+
+        // Collect Thetas
+        let theta = Math.atan2(v1.x, v1.z);
+        if (theta < 0) theta += 2 * Math.PI;
+        thetas.push(theta);
+      }
+
+      // 2. Arc/Pole Logic
+      // CCW Winding: Edge Normals point "Right" (Southish for North Face).
+      // NP Inside -> Face is North of Edge -> Normal points South (y < 0).
+      // So if any Normal points North (y > 0), NP is NOT inside.
+      let npInside = true;
+      let spInside = true;
+      for (const plane of this.planes) {
+        if (plane.y < 0) npInside = false;
+        if (plane.y > 0) spInside = false;
+      }
+      if (npInside) minPhi = 0;
+      if (spInside) maxPhi = Math.PI;
+
+      // Expand bounds slightly
+      const margin = thickness + 0.05;
+      this.yMin = Math.floor((Math.max(0, minPhi - margin) / Math.PI) * (Daydream.H - 1));
+      this.yMax = Math.ceil((Math.min(Math.PI, maxPhi + margin) / Math.PI) * (Daydream.H - 1));
+
+      // 3. Horizontal Bounds (Simplified Enclosing Square)
+      if (npInside || spInside) {
+        // If including pole, full width
+        this.intervals = null;
+      } else {
+        // Find max gap in thetas to handle wrapping
+        thetas.sort((a, b) => a - b);
+        let maxGap = 0;
+        let gapStart = 0;
+
+        for (let i = 0; i < thetas.length; i++) {
+          const next = (i + 1) < thetas.length ? thetas[i + 1] : (thetas[0] + 2 * Math.PI);
+          const gap = next - thetas[i];
+          if (gap > maxGap) {
+            maxGap = gap;
+            gapStart = thetas[i];
+          }
+        }
+
+        // If max gap is big enough (e.g. > PI), the face is in the COMPLEMENT of the gap
+        if (maxGap > Math.PI) {
+          const validStart = (gapStart + maxGap) % (2 * Math.PI); // theta limit 1
+          const validEnd = gapStart; // theta limit 2
+
+          const startPx = Math.floor((validStart / (2 * Math.PI)) * Daydream.W);
+          const endPx = Math.ceil((validEnd / (2 * Math.PI)) * Daydream.W);
+
+          if (startPx <= endPx) {
+            this.intervals = [{ start: startPx, end: Math.min(endPx, Daydream.W - 1) }];
+          } else {
+            // Wrapped
+            this.intervals = [
+              { start: startPx, end: Daydream.W - 1 },
+              { start: 0, end: Math.min(endPx, Daydream.W - 1) }
+            ];
+          }
+        } else {
+          // Conservative fallback: Min/Max of list
+          const minT = thetas[0];
+          const maxT = thetas[thetas.length - 1];
+          if (maxT - minT > Math.PI) {
+            // Spans > 180 without single gap > 180? Full width.
+            this.intervals = null;
+          } else {
+            const startPx = Math.floor((minT / (2 * Math.PI)) * Daydream.W);
+            const endPx = Math.ceil((maxT / (2 * Math.PI)) * Daydream.W);
+            this.intervals = [{ start: startPx, end: Math.min(endPx, Daydream.W - 1) }];
+          }
+        }
+      }
+    }
+
+    getVerticalBounds() {
+      return { yMin: this.yMin, yMax: this.yMax };
+    }
+
+    getHorizontalBounds(y) {
+      return this.intervals;
+    }
+
+    distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+      let maxDist = -Infinity;
+      for (const plane of this.planes) {
+        // Plane definition: p.n - d = 0 (d=0 for origin-centered planes)
+        // With outward pointing normals:
+        // - p.n > 0 means Outside
+        // - p.n < 0 means Inside
+        // We want 'dist' to be negative for Inside points consistent with Signed Distance Fields.
+        // So dist = - ( -p.n ) ?? No.
+        // Standard SDF: dist > 0 Outside, dist < 0 Inside.
+        // p.n > 0 (Outside) -> dist should be pos -> dist = p.n
+        // p.n < 0 (Inside) -> dist should be neg -> dist = p.n
+        //
+        // However, for rendering Logic in Scan.js:
+        // "if (d < threshold) draw"
+        // If d = p.n (neg inside), then deep inside (large neg) is < threshold (pos). It draws.
+        // Earlier debugging suggested d = -p.n was required.
+        // If normals point INWARD (Southward on North face), then:
+        // p.n > 0 (Inside).
+        // Then dist = -p.n (Negative Inside).
+        // Let's stick to the convention that worked: d = -p.dot(plane).
+
+        const d = -p.dot(plane);
+        if (d > maxDist) maxDist = d;
+      }
+      out.dist = maxDist - this.thickness;
+      out.t = 0;
+      out.rawDist = maxDist;
+      return out;
+    }
   }
 };
 
@@ -1741,6 +1954,27 @@ export const Scan = {
         clipPlanes: [c1, c2],
         limits: { minPhi, maxPhi }
       });
+    }
+  },
+
+  Mesh: class {
+    /**
+     * Scans a solid mesh face by face.
+     * @param {Object} pipeline - Render pipeline.
+     * @param {Object} mesh - {vertices: Vector3[], faces: number[][]}.
+     * @param {Function} colorFn - Color function.
+     * @param {boolean} [debugBB=false] - Debug.
+     */
+    static draw(pipeline, mesh, colorFn, debugBB = false) {
+      for (let i = 0; i < mesh.faces.length; i++) {
+        const face = mesh.faces[i];
+        const verts = face.map(idx => mesh.vertices[idx]);
+        // Zero thickness for solid face
+        const shape = new SDF.Face(verts, 0);
+        // Pass face index (i) as 4th argument to colorFn
+        const renderColorFn = (p, t, d) => colorFn(p, t, d, i);
+        Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
+      }
     }
   },
 
