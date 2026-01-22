@@ -27,6 +27,7 @@ import {
   Test,
   TestParticles,
   TestShapes,
+  TestSolids,
   Thrusters,
   Voronoi
 } from "./effects/index.js";
@@ -56,6 +57,7 @@ const effects = {
   Test,
   TestParticles,
   TestShapes,
+  TestSolids,
   Thrusters,
   Voronoi
 };

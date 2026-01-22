@@ -654,3 +654,251 @@ export function intersection(u, v, normal) {
 
   return NaN;
 }
+
+/**
+ * Collection of standard geometric solids.
+ */
+export const Solids = {
+  // Helper for normalization
+  normalize(m) {
+    m.vertices.forEach(v => v.normalize());
+  },
+
+  // 1. TETRAHEDRON (4 Verts, 4 Faces)
+  // Source: Standard construction
+  tetrahedron() {
+    const s = 1.0;
+    const c = 1.0 / Math.sqrt(3.0); // Normalize to sphere
+    return {
+      vertices: [
+        new THREE.Vector3(c, c, c),   // 0: (+,+,+)
+        new THREE.Vector3(c, -c, -c), // 1: (+,-,-)
+        new THREE.Vector3(-c, c, -c), // 2: (-,+,-)
+        new THREE.Vector3(-c, -c, c)  // 3: (-,-,+)
+      ],
+      faces: [
+        // Reversed to CCW
+        [0, 3, 1], [0, 2, 3], [0, 1, 2], [1, 3, 2]
+      ]
+    };
+  },
+
+  // 2. CUBE (8 Verts, 6 Faces)
+  // Source: Geometric Tools (Ref 3.7)
+  // Order: Bottom Ring (0-3), Top Ring (4-7)
+  cube() {
+    const a = 1.0 / Math.sqrt(3.0);
+    return {
+      vertices: [
+        new THREE.Vector3(-a, -a, -a), // 0
+        new THREE.Vector3(a, -a, -a), // 1
+        new THREE.Vector3(a, a, -a), // 2
+        new THREE.Vector3(-a, a, -a), // 3
+        new THREE.Vector3(-a, -a, a), // 4
+        new THREE.Vector3(a, -a, a), // 5
+        new THREE.Vector3(a, a, a), // 6
+        new THREE.Vector3(-a, a, a)  // 7
+      ],
+      faces: [
+        [0, 3, 2, 1], // Bottom
+        [0, 1, 5, 4], // Front
+        [0, 4, 7, 3], // Left
+        [6, 5, 1, 2], // Right
+        [6, 2, 3, 7], // Back
+        [6, 7, 4, 5]  // Top
+      ]
+    };
+  },
+
+  // 3. OCTAHEDRON (6 Verts, 8 Faces)
+  // Source: Geometric Tools
+  // Order: Equator (0-3), Top (4), Bottom (5)
+  octahedron() {
+    return {
+      vertices: [
+        new THREE.Vector3(1, 0, 0), // 0
+        new THREE.Vector3(-1, 0, 0), // 1
+        new THREE.Vector3(0, 1, 0), // 2
+        new THREE.Vector3(0, -1, 0), // 3
+        new THREE.Vector3(0, 0, 1), // 4 (Top)
+        new THREE.Vector3(0, 0, -1)  // 5 (Bottom)
+      ],
+      faces: [
+        [4, 0, 2], [4, 2, 1], [4, 1, 3], [4, 3, 0], // Top Fan
+        [5, 2, 0], [5, 1, 2], [5, 3, 1], [5, 0, 3]  // Bottom Fan
+      ]
+    };
+  },
+
+  // 4. ICOSAHEDRON (12 Verts, 20 Faces)
+  // Source: Schneide Blog (Verified standard strip construction)
+  // Structure:
+  //   0-3: XZ plane rectangle
+  //   4-7: YZ plane rectangle
+  //   8-11: XY plane rectangle
+  icosahedron() {
+    const X = 0.525731112119;
+    const Z = 0.850650808352;
+
+    return {
+      vertices: [
+        new THREE.Vector3(-X, 0.0, Z), new THREE.Vector3(X, 0.0, Z), new THREE.Vector3(-X, 0.0, -Z), new THREE.Vector3(X, 0.0, -Z),    // 0-3
+        new THREE.Vector3(0.0, Z, X), new THREE.Vector3(0.0, Z, -X), new THREE.Vector3(0.0, -Z, X), new THREE.Vector3(0.0, -Z, -X),    // 4-7
+        new THREE.Vector3(Z, X, 0.0), new THREE.Vector3(-Z, X, 0.0), new THREE.Vector3(Z, -X, 0.0), new THREE.Vector3(-Z, -X, 0.0)     // 8-11
+      ],
+      faces: [
+        [0, 1, 4], [0, 4, 9], [9, 4, 5], [4, 8, 5], [4, 1, 8],
+        [8, 1, 10], [8, 10, 3], [5, 8, 3], [5, 3, 2], [2, 3, 7],
+        [7, 3, 10], [7, 10, 6], [7, 6, 11], [11, 6, 0], [0, 6, 1],
+        [6, 10, 1], [9, 11, 0], [9, 2, 11], [9, 5, 2], [7, 11, 2]
+      ]
+    };
+  },
+
+  // 5. DODECAHEDRON (20 Verts, 12 Faces)
+  // Source: Geometric Tools (Ref 3.7)
+  // Order is CRITICAL here. 
+  //   0-7:   Cube vertices (±1, ±1, ±1)
+  //   8-11:  (±1/phi, ±phi, 0)   [XY plane]
+  //   12-15: (±phi, 0, ±1/phi)   [XZ plane]
+  //   16-19: (0, ±1/phi, ±phi)   [YZ plane]
+  dodecahedron() {
+    const a = 1.0 / Math.sqrt(3.0);     // Cube corners
+    const phi = (1.0 + Math.sqrt(5.0)) / 2.0;
+    const b = (1.0 / phi) / Math.sqrt(3.0); // scaled 1/phi
+    const c = phi / Math.sqrt(3.0);          // scaled phi
+
+    // Note: We re-normalize at the end to be perfectly spherical, 
+    // but the constants above ensure correct relative geometry.
+    const m = {
+      vertices: [
+        // Cube Vertices (0-7)
+        new THREE.Vector3(a, a, a), new THREE.Vector3(a, a, -a), new THREE.Vector3(a, -a, a), new THREE.Vector3(a, -a, -a), // 0-3
+        new THREE.Vector3(-a, a, a), new THREE.Vector3(-a, a, -a), new THREE.Vector3(-a, -a, a), new THREE.Vector3(-a, -a, -a), // 4-7
+
+        // XY Plane Points (8-11) -> (±1/phi, ±phi, 0)
+        new THREE.Vector3(b, c, 0.0), new THREE.Vector3(-b, c, 0.0), new THREE.Vector3(b, -c, 0.0), new THREE.Vector3(-b, -c, 0.0),
+
+        // XZ Plane Points (12-15) -> (±phi, 0, ±1/phi)
+        new THREE.Vector3(c, 0.0, b), new THREE.Vector3(c, 0.0, -b), new THREE.Vector3(-c, 0.0, b), new THREE.Vector3(-c, 0.0, -b),
+
+        // YZ Plane Points (16-19) -> (0, ±1/phi, ±phi)
+        new THREE.Vector3(0.0, b, c), new THREE.Vector3(0.0, -b, c), new THREE.Vector3(0.0, b, -c), new THREE.Vector3(0.0, -b, -c)
+      ],
+      faces: [
+        // 12 Pentagonal Faces (Reversed to CCW winding)
+        [0, 8, 9, 4, 16],
+        [0, 12, 13, 1, 8],
+        [0, 16, 17, 2, 12],
+        [8, 1, 18, 5, 9],
+        [12, 2, 10, 3, 13],
+        [16, 4, 14, 6, 17],
+        [9, 5, 15, 14, 4],
+        [6, 11, 10, 2, 17],
+        [3, 19, 18, 1, 13],
+        [7, 15, 5, 18, 19],
+        [7, 11, 6, 14, 15],
+        [7, 19, 3, 10, 11]
+      ]
+    };
+    this.normalize(m); // Ensure exact unit radius
+    return m;
+  }
+};
+
+
+/**
+ * Vertex in a Half-Edge data structure.
+ * Stores position and a reference to one outgoing half-edge.
+ */
+export class HEVertex {
+  constructor(position) {
+    this.position = position;
+    this.halfEdge = null; // Reference to one outgoing HalfEdge
+  }
+}
+
+/**
+ * Face in a Half-Edge data structure.
+ * Stores a reference to one of the half-edges bordering this face.
+ */
+export class HEFace {
+  constructor() {
+    this.halfEdge = null;
+  }
+}
+
+/**
+ * Half-Edge structure.
+ * Directed edge comprising half of a full edge.
+ */
+export class HalfEdge {
+  constructor() {
+    this.vertex = null; // Vertex at the END of this half-edge (destination)
+    this.pair = null;   // Oppositely oriented half-edge
+    this.face = null;   // Face this half-edge borders
+    this.next = null;   // Next half-edge around the face
+    this.prev = null;   // Previous half-edge around the face
+  }
+}
+
+/**
+ * Half-Edge Mesh data structure.
+ * Constructed from a standard PolyMesh (vertices + faces array).
+ */
+export class HalfEdgeMesh {
+  constructor(polyMesh) {
+    this.vertices = [];
+    this.faces = [];
+    this.halfEdges = [];
+
+    // 1. Create Vertices
+    for (const v of polyMesh.vertices) {
+      this.vertices.push(new HEVertex(v));
+    }
+
+    const edgeMap = new Map(); // "start,end" -> HalfEdge
+
+    // 2. Create Faces and HalfEdges
+    for (const faceIndices of polyMesh.faces) {
+      const face = new HEFace();
+      this.faces.push(face);
+
+      const faceEdges = [];
+
+      for (let i = 0; i < faceIndices.length; i++) {
+        const startIdx = faceIndices[i];
+        const endIdx = faceIndices[(i + 1) % faceIndices.length];
+
+        const he = new HalfEdge();
+        this.halfEdges.push(he);
+        faceEdges.push(he);
+
+        he.vertex = this.vertices[endIdx];
+        he.face = face;
+
+        if (!this.vertices[startIdx].halfEdge) {
+          this.vertices[startIdx].halfEdge = he;
+        }
+
+        edgeMap.set(`${startIdx},${endIdx}`, he);
+      }
+
+      // Link Next/Prev
+      for (let i = 0; i < faceEdges.length; i++) {
+        const he = faceEdges[i];
+        he.next = faceEdges[(i + 1) % faceEdges.length];
+        he.prev = faceEdges[(i - 1 + faceEdges.length) % faceEdges.length];
+      }
+
+      face.halfEdge = faceEdges[0];
+    }
+
+    // 3. Link Pairs
+    for (const [key, he] of edgeMap) {
+      const [start, end] = key.split(',').map(Number);
+      const pairHe = edgeMap.get(`${end},${start}`);
+      if (pairHe) he.pair = pairHe;
+    }
+  }
+}
