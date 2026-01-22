@@ -677,6 +677,99 @@ export const Solids = {
     };
     this.normalize(m); // Ensure exact unit radius
     return m;
+  },
+
+  // --- ARCHIMEDEAN SOLIDS ---
+
+  // 1. Truncated Tetrahedron
+  truncatedTetrahedron() {
+    const m = MeshOps.truncate(this.tetrahedron());
+    this.normalize(m);
+    return m;
+  },
+
+  // 2. Cuboctahedron
+  cuboctahedron() {
+    const m = MeshOps.rectify(this.cube());
+    this.normalize(m);
+    return m;
+  },
+
+  // 3. Truncated Cube
+  truncatedCube() {
+    const m = MeshOps.truncate(this.cube());
+    this.normalize(m);
+    return m;
+  },
+
+  // 4. Truncated Octahedron
+  truncatedOctahedron() {
+    const m = MeshOps.truncate(this.octahedron());
+    this.normalize(m);
+    return m;
+  },
+
+  // 5. Rhombicuboctahedron
+  rhombicuboctahedron() {
+    const m = MeshOps.expand(this.cube());
+    this.normalize(m);
+    return m;
+  },
+
+  // 6. Truncated Cuboctahedron (Great Rhombicuboctahedron)
+  truncatedCuboctahedron() {
+    const m = MeshOps.truncate(this.cuboctahedron());
+    this.normalize(m);
+    return m;
+  },
+
+  // 7. Snub Cube
+  snubCube() {
+    const m = MeshOps.snub(this.cube());
+    this.normalize(m);
+    return m;
+  },
+
+  // 8. Icosidodecahedron
+  icosidodecahedron() {
+    const m = MeshOps.rectify(this.dodecahedron());
+    this.normalize(m);
+    return m;
+  },
+
+  // 9. Truncated Dodecahedron
+  truncatedDodecahedron() {
+    const m = MeshOps.truncate(this.dodecahedron());
+    this.normalize(m);
+    return m;
+  },
+
+  // 10. Truncated Icosahedron (Soccer Ball)
+  truncatedIcosahedron() {
+    const m = MeshOps.truncate(this.icosahedron());
+    this.normalize(m);
+    return m;
+  },
+
+  // 11. Rhombicosidodecahedron
+  rhombicosidodecahedron() {
+    const m = MeshOps.expand(this.dodecahedron());
+    this.normalize(m);
+    return m;
+  },
+
+  // 12. Truncated Icosidodecahedron (Great Rhombicosidodecahedron)
+  truncatedIcosidodecahedron() {
+    const m = MeshOps.truncate(this.icosidodecahedron());
+    this.normalize(m);
+    return m;
+  },
+
+  // 13. Snub Dodecahedron
+  snubDodecahedron() {
+    const m = MeshOps.snub(this.dodecahedron());
+    this.normalize(m);
+    return m;
   }
 };
 
@@ -775,4 +868,365 @@ export class HalfEdgeMesh {
       if (pairHe) he.pair = pairHe;
     }
   }
+
+  /**
+   * Converts the Half-Edge mesh back to a standard polygon mesh.
+   * @returns {{vertices: THREE.Vector3[], faces: number[][]}}
+   */
+  toPolyMesh() {
+    const vertices = this.vertices.map(v => v.position.clone());
+    const vIndexMap = new Map(this.vertices.map((v, i) => [v, i]));
+
+    const faces = [];
+    for (const face of this.faces) {
+      const faceIndices = [];
+      let he = face.halfEdge;
+      // Guard against broken meshes
+      if (!he) continue;
+
+      const startHe = he;
+      do {
+        faceIndices.push(vIndexMap.get(he.vertex));
+        he = he.next;
+      } while (he !== startHe && he !== null);
+      faces.push(faceIndices);
+    }
+
+    return { vertices, faces };
+  }
 }
+
+/**
+ * Procedural mesh operations for generating Archimedean solids.
+ */
+export const MeshOps = {
+  /**
+   * Truncates the vertices of a mesh.
+   * @param {Object} mesh - {vertices, faces}
+   * @param {number} [factor=1/3] - Cut depth [0..0.5]. 
+   */
+  truncate(mesh, factor = 1 / 3) {
+    const heMesh = new HalfEdgeMesh(mesh);
+    const newVertices = [];
+    // Map from HalfEdge to new Vertex index
+    // We place a new vertex on every half-edge (near the start vertex).
+    // Actually, "Truncation" places vertices on edges.
+    // For every directed half-edge HE (from A to B), we create a vertex P on AB near A.
+    // P = Lerp(A, B, factor).
+    const heToVertIdx = new Map();
+
+    for (const he of heMesh.halfEdges) {
+      // he.vertex is B (destination).
+      // he.pair.vertex is A (origin).
+      // But he.pair might not exist if open mesh? Archimedean solids are closed.
+      if (!he.pair) continue;
+
+      const A = he.pair.vertex.position;
+      const B = he.vertex.position;
+
+      const P = _tempVec.copy(A).lerp(B, factor).clone();
+      const idx = newVertices.push(P) - 1;
+      heToVertIdx.set(he, idx);
+    }
+
+    const newFaces = [];
+
+    // 1. Faces from original faces (trimmed)
+    for (const face of heMesh.faces) {
+      const faceIndices = [];
+      let he = face.halfEdge;
+      const startHe = he;
+      do {
+        // The vertex for this corner in this face corresponds to the half-edge STARTING at this corner?
+        // No, we defined heToVertIdx[he] as point on edge A->B near A.
+        // So for a face (A->B->C...), we want the sequence of new vertices.
+        // Along edge AB, we have point P_AB (near A) and P_BA (near B)? 
+        // No, standard truncation keeps the center of the face.
+        // The new face is formed by P_AB, P_BC, P_CD...
+        // Wait. P_AB is near A. P_BA is near B.
+        // If we traverse face A->B->C.
+        // Edge AB has two cut points. One near A, one near B.
+        // Truncated face uses the cut points "inner" to the face?
+        // Logic:
+        // Original face is a polygon. We cut the corners.
+        // The remaining polygon connects the cut points on the edges.
+        // For edge AB, we use the cut point near A (start) and near B (end)? 
+        // No! We use the cut point on AB near A, and the cut point on AB near B?
+        // Actually, we use the cut point on AB near A... wait.
+        // Let's trace A -> B.
+        // We leave A, go towards B. We hit cut point P1 (near A).
+        // Then we traverse to B... no, the corner B is cut.
+        // So we go from P_AB (near A) ...?
+        // Actually, distinct vertices are created for each edge end?
+        // If `factor` < 0.5, we have 2 points per edge.
+        // The original face's new vertices are:
+        // [Point on AB near A, Point on AB near B, Point on BC near B, Point on BC near C...] ? 
+        // No.
+        // Truncation replaces Vertex A with a Face.
+        // Face F remains a Face F' (with more vertices? No, same number of vertices, but rotated? No).
+        // Face F (Triangle A-B-C).
+        // New Mesh has Face F' (Hexagon?).
+        // Vertices of F' are:
+        // P on AB near A.
+        // P on AB near B?
+        // If we strictly truncate corners:
+        // The segment near A is cut. The segment near B is cut.
+        // The edge AB is reduced to the middle segment.
+        // So the face F' connects:
+        // (Point on AB near A) -> (Point on AB near B) -> (Point on BC near B) ... ?
+        // Yes, if we consider the edge "surviving".
+        // BUT usually Truncation is defined as: Faces of original + Faces of vertices.
+        // Vertices of F' are simply the "cut points" on the edges surrounding F.
+        // Since each edge has 2 cut points (one per end), does F' use both?
+        // Yes, if indices are 2*N.
+        // Example: Truncated Cube. Square face becomes Octagon.
+        // Yes. 4 edges -> 8 vertices.
+        // So for face A->B->C...
+        // We collect: P(on AB near A), P(on AB near B), P(on BC near B)...
+
+        // My definition of heToVertIdx was: "For he (A->B), create P on AB near A".
+        // So P_AB_near_A = heToVertIdx.get(he).
+        // P_AB_near_B = heToVertIdx.get(he.pair) ? No, he.pair is B->A.
+        // he.pair generates point on BA near B. That is exactly P_AB_near_B.
+        // PERFECT.
+
+        // So for face loop (he):
+        //   Add heToVertIdx.get(he)  (Point on AB near A)
+        //   Add heToVertIdx.get(he.pair) (Point on BA near B? Wait.)
+        //   Sequence for Octagon: P_AB_near_A, P_AB_near_B, P_BC_near_B...
+        //   My loop visits edges A->B, B->C...
+        //   For edge A->B (he), I want P_AB_near_A and P_AB_near_B.
+        //   P_AB_near_B corresponds to the half-edge B->A? Yes.
+        //   So: push(heToVertIdx.get(he)); push(heToVertIdx.get(he.pair));
+
+        faceIndices.push(heToVertIdx.get(he));
+        faceIndices.push(heToVertIdx.get(he.pair));
+
+        he = he.next;
+      } while (he !== startHe);
+      newFaces.push(faceIndices);
+    }
+
+    // 2. Faces from original vertices
+    // Each original vertex has a "fan" of half-edges starting from it.
+    // We need to traverse them in order to form the face.
+    // HalfEdgeMesh doesn't strictly enforce "outgoing around vertex" iteration easily unless we sort or have `prev`/`pair` logic.
+    // However, `he.pair.next` moves us around the vertex A?
+    // Let's see: `he` is A->B. `he.pair` is B->A. `he.pair.next` is A->C (if triangle)?
+    // Yes, `he.pair` points to A. `next` goes to next edge in that adjacent face, which starts at A.
+    // So `current = he.pair.next` pivots around A CCW (or CW depending on winding).
+    // Let's verify winding.
+    // Faces are CCW.
+    // Face 1: A-B-C. Edge A->B (he1).
+    // Face 2: A-C-D. Edge C->A (he1.next?). No, A->C is edge shared?
+    // Pair of A->B is B->A.
+    // Next of B->A is A->C (in Face 2)? No, next of B->A is A->...
+    // In Face 2 (A, C, D), edges are A->C, C->D, D->A.
+    // pair(A->B) is B->A (in Face 1? No, B->A is in neighbor face).
+    // Let's assume manifold.
+    // he (A->B). pair (B->A). next (A->C ?).
+    // Vertex orbit: `h = h.pair.next`.
+    // We need to trace this orbit for every unique vertex.
+    const visitedVerts = new Set();
+
+    for (const heStart of heMesh.halfEdges) {
+      // heStart.pair.vertex is the ORIGIN A.
+      // We want to process A once.
+      // Use prev.vertex which is safer than pair.vertex for open meshes
+      const origin = heStart.prev.vertex;
+      if (visitedVerts.has(origin)) continue;
+      visitedVerts.add(origin);
+
+      const vertFaceIndices = [];
+      // Walk around A
+      let curr = heStart; // Starts at A
+      // We want the vertices generated "near A".
+
+      let safety = 0;
+      const startOrbit = curr;
+      do {
+        vertFaceIndices.push(heToVertIdx.get(curr));
+        // Guard against boundary/unmatched edges
+        if (!curr.pair) break;
+        curr = curr.pair.next;
+        safety++;
+      } while (curr !== startOrbit && curr && safety < 100);
+
+      if (vertFaceIndices.length > 2) {
+        newFaces.push(vertFaceIndices.reverse());
+      }
+    }
+
+    return { vertices: newVertices, faces: newFaces };
+  },
+
+  rectify(mesh) {
+    // Rectify is truncate with factor 0.5.
+    // However, duplicate vertices will be created (P_AB_near_A and P_AB_near_B are same).
+    // We should merge them. 
+    // Or write custom logic.
+    // Custom logic is simpler: One vertex per Edge.
+    const heMesh = new HalfEdgeMesh(mesh);
+    const newVertices = [];
+    const edgeToVertIdx = new Map(); // Key: "min,max" vertex index? or just verify uniqueness.
+
+    // Map each edge (unordered pair) to a new vertex
+    // We can use the half-edge loop.
+    // Map each edge (distinct undirected) to a new vertex
+    for (const he of heMesh.halfEdges) {
+      if (edgeToVertIdx.has(he)) continue;
+
+      // Identify the undirected edge by sorting vertex usage or exploiting pair
+      // If pair exists, we check if pair is processed.
+      if (he.pair && edgeToVertIdx.has(he.pair)) {
+        edgeToVertIdx.set(he, edgeToVertIdx.get(he.pair));
+        continue;
+      }
+
+      const vA = he.prev.vertex;
+      const vB = he.vertex;
+
+      const P = _tempVec.copy(vA.position).add(vB.position).multiplyScalar(0.5).clone();
+      const idx = newVertices.push(P) - 1;
+      edgeToVertIdx.set(he, idx);
+      if (he.pair) edgeToVertIdx.set(he.pair, idx);
+    }
+
+    const newFaces = [];
+
+    // 1. Faces from original faces
+    for (const face of heMesh.faces) {
+      const faceIndices = [];
+      let he = face.halfEdge;
+      const start = he;
+      do {
+        faceIndices.push(edgeToVertIdx.get(he));
+        he = he.next;
+      } while (he !== start);
+      newFaces.push(faceIndices);
+    }
+
+    // 2. Faces from original vertices
+    const visitedVerts = new Set();
+    for (const heStart of heMesh.halfEdges) {
+      const origin = heStart.prev.vertex;
+      if (visitedVerts.has(origin)) continue;
+      visitedVerts.add(origin);
+
+      const vertFaceIndices = [];
+      let curr = heStart;
+      const startOrbit = curr;
+      let safety = 0;
+      do {
+        const idx = edgeToVertIdx.get(curr);
+        if (idx !== undefined) vertFaceIndices.push(idx);
+
+        if (!curr.pair) break;
+        curr = curr.pair.next;
+        safety++;
+      } while (curr !== startOrbit && curr && safety < 100);
+
+      if (vertFaceIndices.length > 2) newFaces.push(vertFaceIndices.reverse());
+    }
+
+    return { vertices: newVertices, faces: newFaces };
+  },
+
+  expand(mesh) {
+    return this.rectify(this.rectify(mesh));
+  },
+
+  snub(mesh) {
+    const heMesh = new HalfEdgeMesh(mesh);
+    const newVertices = [];
+    const heToVertIdx = new Map();
+
+    // 1. Create new vertices (shrunk/twisted faces)
+    // Lerp(Start, Centroid, 0.5)
+
+    // Precompute face centroids
+    const faceCentroids = new Map();
+    for (const face of heMesh.faces) {
+      const c = new THREE.Vector3();
+      let count = 0;
+      let he = face.halfEdge;
+      const start = he;
+      do {
+        c.add(he.vertex.position);
+        count++;
+        he = he.next;
+      } while (he !== start);
+      c.multiplyScalar(1 / count);
+      faceCentroids.set(face, c);
+    }
+
+    for (const face of heMesh.faces) {
+      const centroid = faceCentroids.get(face);
+      let he = face.halfEdge;
+      const start = he;
+      do {
+        if (!he.pair) { he = he.next; continue; }
+        const startPos = he.pair.vertex.position;
+
+        const P = _tempVec.copy(startPos).lerp(centroid, 0.5).clone();
+        const idx = newVertices.push(P) - 1;
+        heToVertIdx.set(he, idx);
+
+        he = he.next;
+      } while (he !== start);
+    }
+
+    const newFaces = [];
+
+    // 2. Original Faces (Shrunk)
+    for (const face of heMesh.faces) {
+      const faceIndices = [];
+      let he = face.halfEdge;
+      const start = he;
+      do {
+        faceIndices.push(heToVertIdx.get(he));
+        he = he.next;
+      } while (he !== start);
+      newFaces.push(faceIndices);
+    }
+
+    // 3. Vertex Faces (Polygons at original vertices)
+    const visitedVerts = new Set();
+    for (const heStart of heMesh.halfEdges) {
+      const origin = heStart.prev.vertex;
+      if (visitedVerts.has(origin)) continue;
+      visitedVerts.add(origin);
+
+      const vertLoop = [];
+      let curr = heStart;
+      const startOrbit = curr;
+      let safety = 0;
+      do {
+        vertLoop.push(heToVertIdx.get(curr));
+        if (!curr.pair) break;
+        curr = curr.pair.next;
+        safety++;
+      } while (curr !== startOrbit && curr && safety < 100);
+      newFaces.push(vertLoop.reverse());
+    }
+
+    // 4. Edge Faces (Triangles)
+    const visitedEdges = new Set();
+    for (const he of heMesh.halfEdges) {
+      if (!he.pair) continue;
+      if (visitedEdges.has(he) || visitedEdges.has(he.pair)) continue;
+      visitedEdges.add(he);
+      visitedEdges.add(he.pair);
+
+      const pAS = heToVertIdx.get(he);
+      const pAE = heToVertIdx.get(he.next);
+      const pBE = heToVertIdx.get(he.pair);
+      const pBS = heToVertIdx.get(he.pair.next);
+
+      newFaces.push([pAS, pBS, pBE]);
+      newFaces.push([pAS, pBE, pAE]);
+    }
+
+    return { vertices: newVertices, faces: newFaces };
+  }
+};
