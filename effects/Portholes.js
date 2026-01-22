@@ -1,14 +1,9 @@
-/*
- * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
- * Licensed under the Polyform Noncommercial License 1.0.0
- */
-
 
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, Dodecahedron, randomVector, vectorPool
+    Orientation, Solids, randomVector, vectorPool
 } from "../geometry.js";
 import { TWO_PI } from "../3dmath.js";
 import { Plot } from "../draw.js";
@@ -34,7 +29,7 @@ export class Portholes {
         for (let i = 0; i < numSlices; i++) {
             this.orientations.push(new Orientation());
         }
-        this.dodecahedron = new Dodecahedron();
+        this.baseMesh = Solids.dodecahedron();
         this.hemisphereAxis = new THREE.Vector3(0, 1, 0);
         this.timeline = new Timeline();
 
@@ -73,51 +68,50 @@ export class Portholes {
         );
     }
 
-    drawLayer(isInterference) {
-        let lines = [];
-        const vertices = this.dodecahedron.vertices.map(v => vectorPool.acquire().set(...v).normalize());
-        if (isInterference) {
-            vertices.forEach((p, i) => {
-                // Create basis for tangent plane
-                const axis = (Math.abs(p.y) > 0.99) ? Daydream.X_AXIS : Daydream.Y_AXIS;
-                let u = vectorPool.acquire().crossVectors(p, axis).normalize();
-                let v = vectorPool.acquire().crossVectors(p, u).normalize();
+    // Helper to apply offset to vertices for the interference layer
+    getInterferenceMesh() {
+        const vertices = this.baseMesh.vertices.map((v, i) => {
+            const p = vectorPool.acquire().copy(v);
 
-                // Time based offset in tangent plane
-                const phase = i * 0.1;
-                const angle = this.t * this.offsetSpeed * TWO_PI + phase;
-                const r = this.offsetRadius;
-                const offset = vectorPool.acquire().copy(u).multiplyScalar(Math.cos(angle)).addScaledVector(v, Math.sin(angle)).multiplyScalar(r);
-                p.add(offset).normalize();
-            });
-        }
+            // Create basis for tangent plane
+            const axis = (Math.abs(p.y) > 0.99) ? Daydream.X_AXIS : Daydream.Y_AXIS;
+            let u = vectorPool.acquire().crossVectors(p, axis).normalize();
+            let vBasis = vectorPool.acquire().crossVectors(p, u).normalize();
 
-        this.dodecahedron.edges.forEach((adj, i) => {
-            adj.forEach(j => {
-                if (i < j) {
-                    lines.push({ u: vertices[i], v: vertices[j], palette: isInterference ? this.interferencePalette : this.basePalette });
-                }
-            });
+            // Time based offset in tangent plane
+            const phase = i * 0.1;
+            const angle = this.t * this.offsetSpeed * TWO_PI + phase;
+            const r = this.offsetRadius;
+            const offset = vectorPool.acquire().copy(u).multiplyScalar(Math.cos(angle)).addScaledVector(vBasis, Math.sin(angle)).multiplyScalar(r);
+            return p.add(offset).normalize();
         });
 
-        return lines;
+        return { vertices, faces: this.baseMesh.faces };
     }
 
     drawFrame() {
         this.timeline.step();
         this.t += 0.01; // Global time
 
-        let allLines = [];
-        allLines.push(...this.drawLayer(true));  // Interference
-        allLines.push(...this.drawLayer(false)); // Base
+        // Color functions
+        const baseColorFn = (v, t) => {
+            const c = this.basePalette.get(t);
+            c.alpha *= this.alpha;
+            return c;
+        };
 
-        for (const line of allLines) {
-            Plot.Line.draw(this.filters, line.u, line.v, (v, t) => {
-                const c = line.palette.get(t);
-                c.alpha *= this.alpha;
-                return c;
-            });
-        }
+        const interferenceColorFn = (v, t) => {
+            const c = this.interferencePalette.get(t);
+            c.alpha *= this.alpha;
+            return c;
+        };
+
+        // Draw Base Mesh
+        Plot.Mesh.draw(this.filters, this.baseMesh, baseColorFn);
+
+        // Draw Interference Mesh
+        const interferenceMesh = this.getInterferenceMesh();
+        Plot.Mesh.draw(this.filters, interferenceMesh, interferenceColorFn);
     }
 
     spinSlices() {
@@ -131,3 +125,4 @@ export class Portholes {
         }
     }
 }
+

@@ -8,7 +8,7 @@ import { gui } from "gui";
 import { Solids, vectorPool, quaternionPool } from "../geometry.js";
 import { Plot, Scan } from "../draw.js";
 import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
-import { color4Pool, rainbow } from "../color.js";
+import { color4Pool, richSunset } from "../color.js";
 import { Timeline, Rotation, easeMid } from "../animation.js";
 import { Daydream } from "../driver.js";
 import { TWO_PI } from "../3dmath.js";
@@ -22,11 +22,12 @@ export class TestSolids {
         this.params = {
             solid: 'dodecahedron',
             plot: true,
-            scan: false,
+            scan: true, // Enabled scan by default to see the effect
             scale: 1.0,
             rotationSpeed: 0.5,
             opacity: 1.0,
-            debugBB: false
+            debugBB: false,
+            faceScale: 3.0 // New parameter for gradient scaling
         };
 
         this.timeline = new Timeline();
@@ -52,6 +53,7 @@ export class TestSolids {
         this.gui.add(this.params, 'scale', 0.1, 2.0).name("Scale");
         this.gui.add(this.params, 'rotationSpeed', 0.0, 5.0).name("Rotation Speed");
         this.gui.add(this.params, 'opacity', 0.1, 1.0).name("Opacity");
+        this.gui.add(this.params, 'faceScale', 0.1, 10.0).name("Face Gradient Scale"); // New Slider
         this.gui.add(this.params, 'debugBB').name("Show Bounding Box");
     }
 
@@ -60,7 +62,6 @@ export class TestSolids {
         const dt = 0.016; // Approx 60fps
         const angle = this.params.rotationSpeed * dt;
         // Rotate around an arbitrary axis for interest (e.g., slowly shifting axis)
-        // For simplicity, just Y axis or a fixed diagonal
         const axis = vectorPool.acquire().set(0.5, 1, 0.2).normalize();
         const qInc = quaternionPool.acquire().setFromAxisAngle(axis, angle);
         this.rotation.multiply(qInc);
@@ -76,17 +77,29 @@ export class TestSolids {
             v.applyQuaternion(this.rotation);
         }
 
-        const colorBlue = (v, t, d, i) => {
-            // Use face index (i) to pick color from rainbow palette
-            // Normalize i by number of faces (mesh.faces.length)
-            const hue = (i % mesh.faces.length) / mesh.faces.length;
-            const c = rainbow.get(hue).color;
-            return color4Pool.acquire().set(c.r, c.g, c.b, this.params.opacity);
+        // Updated Color Function
+        const colorFace = (v, t, d, i) => {
+            // 1. Invert distance (d is negative inside face, 0 at edge)
+            const distFromEdge = -d;
+
+            // 2. Scale and Clamp (0 at edge, 1 at center)
+            const intensity = Math.min(1, Math.max(0, distFromEdge * this.params.faceScale));
+
+            // 3. Pick base color from rainbow palette using face index
+            //            const hue = (i % mesh.faces.length) / mesh.faces.length;
+            const c = richSunset.get(intensity).color;
+
+            // 4. Modulate color brightness by intensity
+            return color4Pool.acquire().set(
+                c,
+                this.params.opacity
+            );
         };
+
         const colorWhite = (v) => color4Pool.acquire().set(1, 1, 1, this.params.opacity);
 
         if (this.params.scan) {
-            Scan.Mesh.draw(this.pipeline, mesh, colorBlue, this.params.debugBB);
+            Scan.Mesh.draw(this.pipeline, mesh, colorFace, this.params.debugBB);
         }
 
         if (this.params.plot) {

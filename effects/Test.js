@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, Dodecahedron, sinWave
+    Orientation, sinWave
 } from "../geometry.js";
 import { Plot, Scan, makeBasis } from "../draw.js";
 import { TWO_PI } from "../3dmath.js";
@@ -42,10 +42,6 @@ export class Test {
         this.debugBB = false;
         this.thickness = 4 * TWO_PI / Daydream.W;
 
-        //    this.timeline.add(0,
-        //      new Sprite((opacity) => this.drawPoly(opacity), -1, 48, easeMid, 0, easeMid)
-        //    );
-
         this.timeline.add(0,
             new Sprite((opacity) => this.drawFn(opacity), -1, 48, easeMid, 0, easeMid)
         );
@@ -63,12 +59,6 @@ export class Test {
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
         this.gui.add(this, 'debugBB').name('Show Bounding Boxes');
         this.gui.add(this, 'thickness').min(0.01).max(0.2).step(0.001);
-    }
-
-    drawPoly(opacity) {
-        Plot.Polyhedron.draw(this.filters, this.poly.vertices, this.poly.eulerPath, (v, t) => {
-            return this.polyPalette.get(t);
-        }, opacity * this.alpha);
     }
 
     drawFn(opacity) {
