@@ -1228,5 +1228,84 @@ export const MeshOps = {
     }
 
     return { vertices: newVertices, faces: newFaces };
+  },
+
+  dual(mesh) {
+    const heMesh = new HalfEdgeMesh(mesh);
+    const newVertices = [];
+    const faceToVertIdx = new Map();
+
+    // 1. New vertices = Centroids of original faces
+    for (const face of heMesh.faces) {
+      const c = new THREE.Vector3();
+      let count = 0;
+      let he = face.halfEdge;
+      const start = he;
+      do {
+        c.add(he.vertex.position);
+        count++;
+        he = he.next;
+      } while (he !== start);
+      c.multiplyScalar(1.0 / count);
+
+      const idx = newVertices.push(c) - 1;
+      faceToVertIdx.set(face, idx);
+    }
+
+    const newFaces = [];
+
+    // 2. New faces = Cycles around original vertices
+    // A vertex V in original mesh becomes a face F in dual mesh.
+    // The vertices of F are the centroids of faces surrounding V.
+    const visitedVerts = new Set();
+
+    for (const heStart of heMesh.halfEdges) {
+      // Use prev for robustness
+      const origin = heStart.prev.vertex;
+      if (visitedVerts.has(origin)) continue;
+      visitedVerts.add(origin);
+
+      const faceIndices = [];
+      let curr = heStart;
+      const startOrbit = curr;
+      let safety = 0;
+      do {
+        // Current HE belongs to a face. We want that face's centroid index.
+        const faceIdx = faceToVertIdx.get(curr.face);
+        faceIndices.push(faceIdx);
+
+        // Move to next face around origin.
+        // curr is outgoing A->B. Face is to left. 
+        // pair is incoming B->A.
+        // pair.next is Outgoing A->C.
+        if (!curr.pair) break;
+        curr = curr.pair.next;
+        safety++;
+      } while (curr !== startOrbit && curr && safety < 100);
+
+      if (faceIndices.length > 2) {
+        // Dual faces generally should be reversed if we want consistent normal direction?
+        // Original: CCW face A-B-C.
+        // Dual: Vertex A -> Face around A.
+        // If we walk CCW around A (A->B, A->C...), the new face vertices are ordered CCW?
+        // Let's trace.
+        // Face 1 (with A-B), Face 2 (with A-C).
+        // Centroid 1, Centroid 2...
+        // If faces are CCW around A, then Centroid 1 -> Centroid 2 is CCW.
+        // `pair.next` moves "CW" around vertex in standard CCW mesh? 
+        // No, let's check.
+        // Face 1: A-B-C (CCW). Edge A->B.
+        // Neighbor Face 2 sharing A-B? Edge B->A is in Face 2?
+        // Face 2: B-A-D (CCW). Edge B->A. Next is A->D.
+        // So `pair` (B->A) -> `next` (A->D).
+        // Rotation: A->B to A->D.
+        // In CCW mesh, faces around vertex are usually traversed CW by `pair.next`.
+        // So this loop produces CW faces.
+        // We should reverse to get CCW dual faces.
+        newFaces.push(faceIndices.reverse());
+      }
+    }
+
+    return { vertices: newVertices, faces: newFaces };
   }
 };

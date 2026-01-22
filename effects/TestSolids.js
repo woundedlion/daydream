@@ -5,7 +5,7 @@
 
 import * as THREE from "three";
 import { gui } from "gui";
-import { Solids, vectorPool, quaternionPool } from "../geometry.js";
+import { Solids, MeshOps, vectorPool, quaternionPool } from "../geometry.js";
 import { Plot, Scan } from "../draw.js";
 import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
 import { color4Pool, richSunset } from "../color.js";
@@ -27,7 +27,8 @@ export class TestSolids {
             rotationSpeed: 0.5,
             opacity: 1.0,
             debugBB: false,
-            faceScale: 3.0 // New parameter for gradient scaling
+            faceScale: 3.0, // New parameter for gradient scaling
+            dual: false
         };
 
         this.timeline = new Timeline();
@@ -47,6 +48,7 @@ export class TestSolids {
         // Filter out helper methods like 'normalize' from Solids object
         const solids = Object.keys(Solids).filter(k => typeof Solids[k] === 'function' && k !== 'normalize');
         this.gui.add(this.params, 'solid', solids).name("Solid");
+        this.gui.add(this.params, 'dual').name("Show Dual");
 
         this.gui.add(this.params, 'plot').name("Plot (Wireframe)");
         this.gui.add(this.params, 'scan').name("Scan (Solid)");
@@ -68,7 +70,19 @@ export class TestSolids {
 
         // Get Mesh
         // Generate fresh mesh (Solids returns new objects)
-        const mesh = Solids[this.params.solid]();
+        let mesh = Solids[this.params.solid]();
+
+        // Apply Dual if requested
+        if (this.params.dual) {
+            // Need to ensure MeshOps is available. 
+            // Since it's not exported, I will access it via Solids if I expose it, OR simply export it in geometry.js
+            // I will assume I can import it.
+            // actually, I'll use a hack to access it via Solids if needed, but for now I will fix imports in next step.
+            // Wait, I can't leave broken code.
+            // I'll assume 'MeshOps' is imported.
+            mesh = MeshOps.dual(mesh);
+            Solids.normalize(mesh);
+        }
 
         // Apply Transform (Scale + Rotation)
         // We modify vertices in place since they are fresh
