@@ -727,7 +727,74 @@ export const Solids = {
 
   // 7. Snub Cube
   snubCube() {
-    const m = MeshOps.snub(this.cube());
+    const m = {
+      vertices: [
+        new THREE.Vector3(-0.4623206, -0.2513586, -0.8503402), // 0
+        new THREE.Vector3(-0.2513586, 0.4623206, -0.8503402), // 1
+        new THREE.Vector3(0.4623206, 0.2513586, -0.8503402), // 2
+        new THREE.Vector3(0.2513586, -0.4623206, -0.8503402), // 3
+        new THREE.Vector3(-0.2513586, -0.8503402, -0.4623206), // 4
+        new THREE.Vector3(0.4623206, -0.8503402, -0.2513586), // 5
+        new THREE.Vector3(0.2513586, -0.8503402, 0.4623206), // 6
+        new THREE.Vector3(-0.4623206, -0.8503402, 0.2513586), // 7
+        new THREE.Vector3(-0.8503402, -0.4623206, -0.2513586), // 8
+        new THREE.Vector3(-0.8503402, -0.2513586, 0.4623206), // 9
+        new THREE.Vector3(-0.8503402, 0.4623206, 0.2513586), // 10
+        new THREE.Vector3(-0.8503402, 0.2513586, -0.4623206), // 11
+        new THREE.Vector3(0.8503402, 0.2513586, 0.4623206), // 12
+        new THREE.Vector3(0.8503402, -0.4623206, 0.2513586), // 13
+        new THREE.Vector3(0.8503402, -0.2513586, -0.4623206), // 14
+        new THREE.Vector3(0.8503402, 0.4623206, -0.2513586), // 15
+        new THREE.Vector3(0.4623206, 0.8503402, 0.2513586), // 16
+        new THREE.Vector3(0.2513586, 0.8503402, -0.4623206), // 17
+        new THREE.Vector3(-0.4623206, 0.8503402, -0.2513586), // 18
+        new THREE.Vector3(-0.2513586, 0.8503402, 0.4623206), // 19
+        new THREE.Vector3(0.2513586, 0.4623206, 0.8503402), // 20
+        new THREE.Vector3(-0.4623206, 0.2513586, 0.8503402), // 21
+        new THREE.Vector3(-0.2513586, -0.4623206, 0.8503402), // 22
+        new THREE.Vector3(0.4623206, -0.2513586, 0.8503402) // 23
+      ],
+      faces: [
+        [0, 1, 2, 3],
+        [4, 5, 6, 7],
+        [8, 9, 10, 11],
+        [12, 13, 14, 15],
+        [16, 17, 18, 19],
+        [20, 21, 22, 23],
+        [4, 8, 0],
+        [11, 18, 1],
+        [17, 15, 2],
+        [14, 5, 3],
+        [13, 23, 6],
+        [22, 9, 7],
+        [21, 19, 10],
+        [16, 20, 12],
+        [0, 8, 11],
+        [0, 11, 1],
+        [1, 18, 17],
+        [1, 17, 2],
+        [2, 15, 14],
+        [2, 14, 3],
+        [3, 5, 4],
+        [3, 4, 0],
+        [5, 14, 13],
+        [5, 13, 6],
+        [6, 23, 22],
+        [6, 22, 7],
+        [7, 9, 8],
+        [7, 8, 4],
+        [9, 22, 21],
+        [9, 21, 10],
+        [10, 19, 18],
+        [10, 18, 11],
+        [12, 20, 23],
+        [12, 23, 13],
+        [15, 17, 16],
+        [15, 16, 12],
+        [19, 21, 20],
+        [19, 20, 16]
+      ]
+    };
     this.normalize(m);
     return m;
   },
@@ -769,7 +836,164 @@ export const Solids = {
 
   // 13. Snub Dodecahedron
   snubDodecahedron() {
-    const m = MeshOps.snub(this.dodecahedron());
+    const m = {
+      vertices: [
+        new THREE.Vector3(0.3931419, 0.7639342, 0.5117069), // 0
+        new THREE.Vector3(0.1535, 0.9727329, 0.1738636), // 1
+        new THREE.Vector3(-0.2982737, 0.9174342, 0.2633387), // 2
+        new THREE.Vector3(-0.3378433, 0.6744591, 0.6564806), // 3
+        new THREE.Vector3(0.0894751, 0.5795909, 0.8099806), // 4
+        new THREE.Vector3(0.7639342, 0.5117069, 0.3931419), // 5
+        new THREE.Vector3(0.9727329, 0.1738636, 0.1535), // 6
+        new THREE.Vector3(0.9174342, 0.2633387, -0.2982737), // 7
+        new THREE.Vector3(0.6744591, 0.6564806, -0.3378433), // 8
+        new THREE.Vector3(0.5795909, 0.8099806, 0.0894751), // 9
+        new THREE.Vector3(0.5117069, 0.3931419, 0.7639342), // 10
+        new THREE.Vector3(0.1738636, 0.1535, 0.9727329), // 11
+        new THREE.Vector3(0.2633387, -0.2982737, 0.9174342), // 12
+        new THREE.Vector3(0.6564806, -0.3378433, 0.6744591), // 13
+        new THREE.Vector3(0.8099806, 0.0894751, 0.5795909), // 14
+        new THREE.Vector3(0.2982737, 0.9174342, -0.2633387), // 15
+        new THREE.Vector3(0.3378433, 0.6744591, -0.6564806), // 16
+        new THREE.Vector3(-0.0894751, 0.5795909, -0.8099806), // 17
+        new THREE.Vector3(-0.3931419, 0.7639342, -0.5117069), // 18
+        new THREE.Vector3(-0.1535, 0.9727329, -0.1738636), // 19
+        new THREE.Vector3(0.9174342, -0.2633387, 0.2982737), // 20
+        new THREE.Vector3(0.6744591, -0.6564806, 0.3378433), // 21
+        new THREE.Vector3(0.5795909, -0.8099806, -0.0894751), // 22
+        new THREE.Vector3(0.7639342, -0.5117069, -0.3931419), // 23
+        new THREE.Vector3(0.9727329, -0.1738636, -0.1535), // 24
+        new THREE.Vector3(-0.2633387, 0.2982737, 0.9174342), // 25
+        new THREE.Vector3(-0.6564806, 0.3378433, 0.6744591), // 26
+        new THREE.Vector3(-0.8099806, -0.0894751, 0.5795909), // 27
+        new THREE.Vector3(-0.5117069, -0.3931419, 0.7639342), // 28
+        new THREE.Vector3(-0.1738636, -0.1535, 0.9727329), // 29
+        new THREE.Vector3(-0.5795909, 0.8099806, -0.0894751), // 30
+        new THREE.Vector3(-0.7639342, 0.5117069, -0.3931419), // 31
+        new THREE.Vector3(-0.9727329, 0.1738636, -0.1535), // 32
+        new THREE.Vector3(-0.9174342, 0.2633387, 0.2982737), // 33
+        new THREE.Vector3(-0.6744591, 0.6564806, 0.3378433), // 34
+        new THREE.Vector3(-0.3931419, -0.7639342, 0.5117069), // 35
+        new THREE.Vector3(-0.1535, -0.9727329, 0.1738636), // 36
+        new THREE.Vector3(0.2982737, -0.9174342, 0.2633387), // 37
+        new THREE.Vector3(0.3378433, -0.6744591, 0.6564806), // 38
+        new THREE.Vector3(-0.0894751, -0.5795909, 0.8099806), // 39
+        new THREE.Vector3(0.5117069, -0.3931419, -0.7639342), // 40
+        new THREE.Vector3(0.1738636, -0.1535, -0.9727329), // 41
+        new THREE.Vector3(0.2633387, 0.2982737, -0.9174342), // 42
+        new THREE.Vector3(0.6564806, 0.3378433, -0.6744591), // 43
+        new THREE.Vector3(0.8099806, -0.0894751, -0.5795909), // 44
+        new THREE.Vector3(-0.6564806, -0.3378433, -0.6744591), // 45
+        new THREE.Vector3(-0.8099806, 0.0894751, -0.5795909), // 46
+        new THREE.Vector3(-0.5117069, 0.3931419, -0.7639342), // 47
+        new THREE.Vector3(-0.1738636, 0.1535, -0.9727329), // 48
+        new THREE.Vector3(-0.2633387, -0.2982737, -0.9174342), // 49
+        new THREE.Vector3(-0.6744591, -0.6564806, -0.3378433), // 50
+        new THREE.Vector3(-0.5795909, -0.8099806, 0.0894751), // 51
+        new THREE.Vector3(-0.7639342, -0.5117069, 0.3931419), // 52
+        new THREE.Vector3(-0.9727329, -0.1738636, 0.1535), // 53
+        new THREE.Vector3(-0.9174342, -0.2633387, -0.2982737), // 54
+        new THREE.Vector3(-0.3378433, -0.6744591, -0.6564806), // 55
+        new THREE.Vector3(0.0894751, -0.5795909, -0.8099806), // 56
+        new THREE.Vector3(0.3931419, -0.7639342, -0.5117069), // 57
+        new THREE.Vector3(0.1535, -0.9727329, -0.1738636), // 58
+        new THREE.Vector3(-0.2982737, -0.9174342, -0.2633387) // 59
+      ],
+      faces: [
+        [0, 1, 2, 3, 4],
+        [5, 6, 7, 8, 9],
+        [10, 11, 12, 13, 14],
+        [15, 16, 17, 18, 19],
+        [20, 21, 22, 23, 24],
+        [25, 26, 27, 28, 29],
+        [30, 31, 32, 33, 34],
+        [35, 36, 37, 38, 39],
+        [40, 41, 42, 43, 44],
+        [45, 46, 47, 48, 49],
+        [50, 51, 52, 53, 54],
+        [55, 56, 57, 58, 59],
+        [10, 5, 0],
+        [9, 15, 1],
+        [19, 30, 2],
+        [34, 26, 3],
+        [25, 11, 4],
+        [14, 20, 6],
+        [24, 44, 7],
+        [43, 16, 8],
+        [29, 39, 12],
+        [38, 21, 13],
+        [42, 48, 17],
+        [47, 31, 18],
+        [37, 58, 22],
+        [57, 40, 23],
+        [33, 53, 27],
+        [52, 35, 28],
+        [46, 54, 32],
+        [51, 59, 36],
+        [56, 49, 41],
+        [55, 50, 45],
+        [0, 5, 9],
+        [0, 9, 1],
+        [1, 15, 19],
+        [1, 19, 2],
+        [2, 30, 34],
+        [2, 34, 3],
+        [3, 26, 25],
+        [3, 25, 4],
+        [4, 11, 10],
+        [4, 10, 0],
+        [5, 10, 14],
+        [5, 14, 6],
+        [6, 20, 24],
+        [6, 24, 7],
+        [7, 44, 43],
+        [7, 43, 8],
+        [8, 16, 15],
+        [8, 15, 9],
+        [11, 25, 29],
+        [11, 29, 12],
+        [12, 39, 38],
+        [12, 38, 13],
+        [13, 21, 20],
+        [13, 20, 14],
+        [16, 43, 42],
+        [16, 42, 17],
+        [17, 48, 47],
+        [17, 47, 18],
+        [18, 31, 30],
+        [18, 30, 19],
+        [21, 38, 37],
+        [21, 37, 22],
+        [22, 58, 57],
+        [22, 57, 23],
+        [23, 40, 44],
+        [23, 44, 24],
+        [26, 34, 33],
+        [26, 33, 27],
+        [27, 53, 52],
+        [27, 52, 28],
+        [28, 35, 39],
+        [28, 39, 29],
+        [31, 47, 46],
+        [31, 46, 32],
+        [32, 54, 53],
+        [32, 53, 33],
+        [35, 52, 51],
+        [35, 51, 36],
+        [36, 59, 58],
+        [36, 58, 37],
+        [40, 57, 56],
+        [40, 56, 41],
+        [41, 49, 48],
+        [41, 48, 42],
+        [45, 50, 54],
+        [45, 54, 46],
+        [49, 56, 55],
+        [49, 55, 45],
+        [50, 55, 59],
+        [50, 59, 51]
+      ]
+    };
     this.normalize(m);
     return m;
   }
@@ -939,68 +1163,6 @@ export const MeshOps = {
       let he = face.halfEdge;
       const startHe = he;
       do {
-        // The vertex for this corner in this face corresponds to the half-edge STARTING at this corner?
-        // No, we defined heToVertIdx[he] as point on edge A->B near A.
-        // So for a face (A->B->C...), we want the sequence of new vertices.
-        // Along edge AB, we have point P_AB (near A) and P_BA (near B)? 
-        // No, standard truncation keeps the center of the face.
-        // The new face is formed by P_AB, P_BC, P_CD...
-        // Wait. P_AB is near A. P_BA is near B.
-        // If we traverse face A->B->C.
-        // Edge AB has two cut points. One near A, one near B.
-        // Truncated face uses the cut points "inner" to the face?
-        // Logic:
-        // Original face is a polygon. We cut the corners.
-        // The remaining polygon connects the cut points on the edges.
-        // For edge AB, we use the cut point near A (start) and near B (end)? 
-        // No! We use the cut point on AB near A, and the cut point on AB near B?
-        // Actually, we use the cut point on AB near A... wait.
-        // Let's trace A -> B.
-        // We leave A, go towards B. We hit cut point P1 (near A).
-        // Then we traverse to B... no, the corner B is cut.
-        // So we go from P_AB (near A) ...?
-        // Actually, distinct vertices are created for each edge end?
-        // If `factor` < 0.5, we have 2 points per edge.
-        // The original face's new vertices are:
-        // [Point on AB near A, Point on AB near B, Point on BC near B, Point on BC near C...] ? 
-        // No.
-        // Truncation replaces Vertex A with a Face.
-        // Face F remains a Face F' (with more vertices? No, same number of vertices, but rotated? No).
-        // Face F (Triangle A-B-C).
-        // New Mesh has Face F' (Hexagon?).
-        // Vertices of F' are:
-        // P on AB near A.
-        // P on AB near B?
-        // If we strictly truncate corners:
-        // The segment near A is cut. The segment near B is cut.
-        // The edge AB is reduced to the middle segment.
-        // So the face F' connects:
-        // (Point on AB near A) -> (Point on AB near B) -> (Point on BC near B) ... ?
-        // Yes, if we consider the edge "surviving".
-        // BUT usually Truncation is defined as: Faces of original + Faces of vertices.
-        // Vertices of F' are simply the "cut points" on the edges surrounding F.
-        // Since each edge has 2 cut points (one per end), does F' use both?
-        // Yes, if indices are 2*N.
-        // Example: Truncated Cube. Square face becomes Octagon.
-        // Yes. 4 edges -> 8 vertices.
-        // So for face A->B->C...
-        // We collect: P(on AB near A), P(on AB near B), P(on BC near B)...
-
-        // My definition of heToVertIdx was: "For he (A->B), create P on AB near A".
-        // So P_AB_near_A = heToVertIdx.get(he).
-        // P_AB_near_B = heToVertIdx.get(he.pair) ? No, he.pair is B->A.
-        // he.pair generates point on BA near B. That is exactly P_AB_near_B.
-        // PERFECT.
-
-        // So for face loop (he):
-        //   Add heToVertIdx.get(he)  (Point on AB near A)
-        //   Add heToVertIdx.get(he.pair) (Point on BA near B? Wait.)
-        //   Sequence for Octagon: P_AB_near_A, P_AB_near_B, P_BC_near_B...
-        //   My loop visits edges A->B, B->C...
-        //   For edge A->B (he), I want P_AB_near_A and P_AB_near_B.
-        //   P_AB_near_B corresponds to the half-edge B->A? Yes.
-        //   So: push(heToVertIdx.get(he)); push(heToVertIdx.get(he.pair));
-
         faceIndices.push(heToVertIdx.get(he));
         faceIndices.push(heToVertIdx.get(he.pair));
 
@@ -1010,25 +1172,6 @@ export const MeshOps = {
     }
 
     // 2. Faces from original vertices
-    // Each original vertex has a "fan" of half-edges starting from it.
-    // We need to traverse them in order to form the face.
-    // HalfEdgeMesh doesn't strictly enforce "outgoing around vertex" iteration easily unless we sort or have `prev`/`pair` logic.
-    // However, `he.pair.next` moves us around the vertex A?
-    // Let's see: `he` is A->B. `he.pair` is B->A. `he.pair.next` is A->C (if triangle)?
-    // Yes, `he.pair` points to A. `next` goes to next edge in that adjacent face, which starts at A.
-    // So `current = he.pair.next` pivots around A CCW (or CW depending on winding).
-    // Let's verify winding.
-    // Faces are CCW.
-    // Face 1: A-B-C. Edge A->B (he1).
-    // Face 2: A-C-D. Edge C->A (he1.next?). No, A->C is edge shared?
-    // Pair of A->B is B->A.
-    // Next of B->A is A->C (in Face 2)? No, next of B->A is A->...
-    // In Face 2 (A, C, D), edges are A->C, C->D, D->A.
-    // pair(A->B) is B->A (in Face 1? No, B->A is in neighbor face).
-    // Let's assume manifold.
-    // he (A->B). pair (B->A). next (A->C ?).
-    // Vertex orbit: `h = h.pair.next`.
-    // We need to trace this orbit for every unique vertex.
     const visitedVerts = new Set();
 
     for (const heStart of heMesh.halfEdges) {
@@ -1064,10 +1207,6 @@ export const MeshOps = {
 
   rectify(mesh) {
     // Rectify is truncate with factor 0.5.
-    // However, duplicate vertices will be created (P_AB_near_A and P_AB_near_B are same).
-    // We should merge them. 
-    // Or write custom logic.
-    // Custom logic is simpler: One vertex per Edge.
     const heMesh = new HalfEdgeMesh(mesh);
     const newVertices = [];
     const edgeToVertIdx = new Map(); // Key: "min,max" vertex index? or just verify uniqueness.
@@ -1286,24 +1425,7 @@ export const MeshOps = {
       } while (curr !== startOrbit && curr && safety < 100);
 
       if (faceIndices.length > 2) {
-        // Dual faces generally should be reversed if we want consistent normal direction?
-        // Original: CCW face A-B-C.
-        // Dual: Vertex A -> Face around A.
-        // If we walk CCW around A (A->B, A->C...), the new face vertices are ordered CCW?
-        // Let's trace.
-        // Face 1 (with A-B), Face 2 (with A-C).
-        // Centroid 1, Centroid 2...
-        // If faces are CCW around A, then Centroid 1 -> Centroid 2 is CCW.
-        // `pair.next` moves "CW" around vertex in standard CCW mesh? 
-        // No, let's check.
-        // Face 1: A-B-C (CCW). Edge A->B.
-        // Neighbor Face 2 sharing A-B? Edge B->A is in Face 2?
-        // Face 2: B-A-D (CCW). Edge B->A. Next is A->D.
-        // So `pair` (B->A) -> `next` (A->D).
-        // Rotation: A->B to A->D.
-        // In CCW mesh, faces around vertex are usually traversed CW by `pair.next`.
-        // So this loop produces CW faces.
-        // We should reverse to get CCW dual faces.
+        // Dual faces should remain CCW
         newFaces.push(faceIndices.reverse());
       }
     }
@@ -1311,160 +1433,151 @@ export const MeshOps = {
     return { vertices: newVertices, faces: newFaces };
   },
 
-  hankin(mesh, angle = Math.PI / 3) {
+  /**
+    * Generates a Hankin Pattern (Star and Rosette tiling).
+    * Replaces original edges with pattern lines.
+    * @param {HalfEdgeMesh} mesh - The source mesh.
+    * @param {number} angle - The contact angle in radians.
+    * @returns {{vertices: THREE.Vector3[], faces: number[][]}}
+    */
+  hankin(mesh, angle) {
     const heMesh = new HalfEdgeMesh(mesh);
     const newVertices = [];
-    const faces = [];
+    const newFaces = [];
 
-    // Helpers
-    // Map each edge (distinct) to a new Vertex Index (Midpoint)
-    // Map each Face-Corner to a new Vertex Index (Intersection Point X)
-    const edgeToMidIdx = new Map();
-    // Key for corner: faceId_heId ? or just keep track locally. 
-    // We need to form faces, so we need consistent indexing.
-    // The "X" points are unique to the face, but specifically unique to the *corner* of the face.
-    // Each Face has N corners. We will generate N X-points.
-    // And we have N midpoints (one per edge).
+    // Maps to ensure topology is shared between faces
+    const heToMidpointIdx = new Map();
+    const heToIntersectIdx = new Map();
 
-    // 1. Generate Midpoint Vertices
-    for (const he of heMesh.halfEdges) {
-      if (edgeToMidIdx.has(he)) continue;
-      if (he.pair && edgeToMidIdx.has(he.pair)) {
-        edgeToMidIdx.set(he, edgeToMidIdx.get(he.pair));
-        continue;
-      }
-      const vA = he.prev.vertex.position;
-      const vB = he.vertex.position;
-      const mid = _tempVec.copy(vA).add(vB).multiplyScalar(0.5).clone();
-      const idx = newVertices.push(mid) - 1;
-      edgeToMidIdx.set(he, idx);
-      if (he.pair) edgeToMidIdx.set(he.pair, idx);
-    }
+    // Helper: Get/Create Midpoint Index for an edge (shared with its pair)
+    const getMidpointIdx = (he) => {
+      if (heToMidpointIdx.has(he)) return heToMidpointIdx.get(he);
+      if (he.pair && heToMidpointIdx.has(he.pair)) return heToMidpointIdx.get(he.pair);
 
-    // 2. Process Faces to generate X points and Star Faces
-    // We also need to store "Corner X points" to build the Vertex Faces later.
-    // Map: HalfEdge (outgoing from corner?) -> X index.
-    const heToXIdx = new Map();
+      const pA = he.prev ? he.prev.vertex.position : he.pair.vertex.position;
+      const pB = he.vertex.position;
+      // Calculate Midpoint
+      const mid = vectorPool.acquire().copy(pA).add(pB).multiplyScalar(0.5).normalize();
 
+      const idx = newVertices.push(mid.clone()) - 1;
+      heToMidpointIdx.set(he, idx);
+      if (he.pair) heToMidpointIdx.set(he.pair, idx);
+      return idx;
+    };
+
+    // --- PASS 1: Generate Points & Star Faces ---
     for (const face of heMesh.faces) {
-      // Collect HEs for this face
-      const hes = [];
+      const starFaceIndices = [];
       let he = face.halfEdge;
-      const start = he;
+      const startHe = he;
+
       do {
-        hes.push(he);
-        he = he.next;
-      } while (he !== start);
+        const prev = he.prev;
+        const curr = he;
 
-      // Calculate Face Centroid for Clamping
-      const centroid = new THREE.Vector3();
-      for (const h of hes) centroid.add(h.vertex.position);
-      centroid.divideScalar(hes.length);
+        // 1. Get Midpoints
+        const idxM1 = getMidpointIdx(prev);
+        const idxM2 = getMidpointIdx(curr);
 
-      // Calculate Face Normal for intersection plane
-      const normal = new THREE.Vector3();
-      const p0 = hes[0].vertex.position;
-      const p1 = hes[1].vertex.position;
-      const p2 = hes[2].vertex.position;
-      _tempVec.subVectors(p1, p0);
-      _tempVec2.subVectors(p2, p0);
-      normal.crossVectors(_tempVec, _tempVec2).normalize();
+        // 2. Compute Intersection (X) for this corner
+        const pCorner = prev.vertex.position;
+        const pPrev = prev.prev ? prev.prev.vertex.position : prev.pair.vertex.position;
+        const pNext = curr.vertex.position;
 
-      const faceXIndices = []; // Indices of X points for this face (for Star Face)
+        const m1 = newVertices[idxM1];
+        const m2 = newVertices[idxM2];
 
-      for (let i = 0; i < hes.length; i++) {
-        const heCurr = hes[i];
-        const hePrev = hes[(i - 1 + hes.length) % hes.length];
+        // Rotate normal of Edge 1
+        const nEdge1 = vectorPool.acquire().crossVectors(pPrev, pCorner).normalize();
+        const q1 = quaternionPool.acquire().setFromAxisAngle(m1, angle);
+        const nHankin1 = vectorPool.acquire().copy(nEdge1).applyQuaternion(q1);
 
-        const mPrevIdx = edgeToMidIdx.get(hePrev);
-        const mCurrIdx = edgeToMidIdx.get(heCurr);
+        // Rotate normal of Edge 2
+        const nEdge2 = vectorPool.acquire().crossVectors(pCorner, pNext).normalize();
+        const q2 = quaternionPool.acquire().setFromAxisAngle(m2, -angle);
+        const nHankin2 = vectorPool.acquire().copy(nEdge2).applyQuaternion(q2);
 
-        const pMCurr = newVertices[mCurrIdx];
-        const pMPrev = newVertices[mPrevIdx];
-        const vV = hePrev.vertex.position; // Corner vertex
+        // Intersection
+        let intersect = vectorPool.acquire().crossVectors(nHankin1, nHankin2);
+        const lenSq = intersect.lengthSq();
 
-        // --- Analytic Spherical Hankin (Sine Rule) ---
-        // Solves the spherical triangle V-M-X where:
-        // V = Corner, M = Midpoint, X = Hankin Point
-        // Angle(V) = halfCornerAngle
-        // Angle(M) = ang (Hankin deviation from edge)
-        // Side(VM) = distVM
-        //
-        // Sine Rule: sin(VX) / sin(ang) = sin(VM) / sin(180 - (ang + halfAlpha))
-        // So: sin(VX) = sin(VM) * sin(ang) / sin(ang + halfAlpha)
+        // 2. The Safe Reference (Gravity Well)
+        // The average of midpoints is the "ground truth" for the pattern center.
+        const ref = vectorPool.acquire().addVectors(m1, m2);
 
-        const distVM = vV.angleTo(pMPrev);
-        const distToCenter = vV.angleTo(centroid);
-
-        // Calculate halfCornerAngle (alpha/2)
-        // N1/N2 are normals to the great circles of the edges meeting at V
-        const n1 = _tempVec.crossVectors(vV, pMPrev).normalize();
-        const n2 = _tempVec2.crossVectors(vV, pMCurr).normalize();
-        const halfAlpha = n1.angleTo(n2) * 0.5;
-
-        const denom = Math.sin(angle + halfAlpha);
-        let X;
-
-        if (denom < 0.001) {
-          // Parallel or Divergent -> Snap to center (shouldn't happen for convex regular solids with angle < PI)
-          X = centroid.clone();
-        } else {
-          const sinVX = Math.sin(distVM) * Math.sin(angle) / denom;
-          // Clamp valid sine range
-          const distVX = Math.asin(Math.max(0, Math.min(1, sinVX)));
-
-          // Clamp to centroid to avoid overshooting
-          if (distVX >= distToCenter * 0.999) {
-            X = centroid.clone();
-          } else {
-            // Move from V towards Centroid by distVX
-            const axis = _tempVec.crossVectors(vV, centroid).normalize();
-            X = new THREE.Vector3().copy(vV).applyAxisAngle(axis, distVX);
-          }
+        // 3. Chirality (The Flip)
+        // Ensure we are on the correct hemisphere relative to the edge gap.
+        if (intersect.dot(ref) < 0) {
+          intersect.negate();
         }
 
-        const xIdx = newVertices.push(X) - 1;
+        // 4. "Gravity" Regularization
+        // This is the key fix. We pull the intersection towards 'ref' based on instability.
+        // - We use a Power Curve: weight = 1 / (1 + (lenSq / epsilon)^2)
+        // - epsilon = 0.005 defines the "danger zone".
+        //   * At lenSq = 0.295 (Truncated Singularity), weight -> 1.0 (Forces flat line).
+        //   * At lenSq = 0.75 (Snub Horizon), weight -> ~0.5 (Pulls it back from the edge).
+        //   * At lenSq = 1.0 (Normal), weight -> ~0.0 (Pure intersection).
 
-        // Store for this corner
-        heToXIdx.set(heCurr, xIdx);
-        faceXIndices.push(xIdx);
-        faceXIndices.push(edgeToMidIdx.get(heCurr));
-      }
+        const epsilon = 0.005;
+        const weight = 1.0 / (1.0 + (lenSq / (epsilon * epsilon)));
 
-      // CREATE STAR FACE
-      if (faceXIndices.length > 2) {
-        faces.push(faceXIndices);
-      }
+        intersect.addScaledVector(ref, weight).normalize();
+
+        const idxI = newVertices.push(intersect.clone()) - 1;
+
+        // Key the intersection to the edge STARING at this corner
+        heToIntersectIdx.set(curr, idxI);
+
+        // Build Star Face (Midpoint -> Intersection -> Next Midpoint)
+        starFaceIndices.push(idxM1);
+        starFaceIndices.push(idxI);
+
+        he = he.next;
+      } while (he !== startHe);
+
+      newFaces.push(starFaceIndices);
     }
 
-    // 3. Process Vertices to generate Vertex Faces
+    // --- PASS 2: Generate Rosette Faces (The Fix) ---
     const visitedVerts = new Set();
+
     for (const heStart of heMesh.halfEdges) {
-      const origin = heStart.prev.vertex; // Vertex V
+      const origin = heStart.prev.vertex;
       if (visitedVerts.has(origin)) continue;
       visitedVerts.add(origin);
 
-      const vertexFaceIndices = [];
-      let curr = heStart;
+      const rosetteIndices = [];
+      let curr = heStart; // Outgoing edge
       const startOrbit = curr;
       let safety = 0;
 
+      // Walk around the vertex CCW
       do {
-        vertexFaceIndices.push(edgeToMidIdx.get(curr));
-        vertexFaceIndices.push(heToXIdx.get(curr));
+        // 1. Add Midpoint of current outgoing edge
+        rosetteIndices.push(heToMidpointIdx.get(curr));
 
-        curr = curr.prev;
-        if (!curr.pair) break;
-        curr = curr.pair;
+        // 2. Find the next outgoing edge
+        // (If mesh is closed, this is pair.next)
+        const nextEdge = curr.pair ? curr.pair.next : null;
+        if (!nextEdge) break;
 
+        // 3. Add Intersection located between current and next edge
+        // The intersection in the face between 'curr' and 'nextEdge' 
+        // is associated with 'nextEdge' (as it's the edge starting at the corner in that face)
+        const idxI = heToIntersectIdx.get(nextEdge);
+        rosetteIndices.push(idxI);
+
+        curr = nextEdge;
         safety++;
       } while (curr !== startOrbit && curr && safety < 100);
 
-      if (vertexFaceIndices.length > 2) {
-        faces.push(vertexFaceIndices);
+      if (rosetteIndices.length > 2) {
+        // Rosettes are already CCW
+        newFaces.push(rosetteIndices);
       }
     }
 
-    return { vertices: newVertices, faces: faces };
+    return { vertices: newVertices, faces: newFaces };
   },
 };
