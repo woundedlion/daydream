@@ -5,11 +5,11 @@
 
 import * as THREE from "three";
 import { gui } from "gui";
-import { Solids, MeshOps, vectorPool, quaternionPool } from "../geometry.js";
+import { Solids, MeshOps, vectorPool, quaternionPool, sinWave } from "../geometry.js";
 import { Plot, Scan } from "../draw.js";
 import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
 import { color4Pool, richSunset, darkRainbow, rainbow, g3 } from "../color.js";
-import { Timeline, Rotation, easeMid } from "../animation.js";
+import { Timeline, Rotation, easeInOutSin, Mutation } from "../animation.js";
 import { Daydream } from "../driver.js";
 import { TWO_PI } from "../3dmath.js";
 
@@ -29,12 +29,13 @@ export class TestSolids {
             debugBB: false,
             faceScale: 5.0, // New parameter for gradient scaling
             dual: false,
-            hankin: false,
+            hankin: true,
             hankinAngle: Math.PI / 4
         };
 
         this.timeline = new Timeline();
-        this.timeline.add(0, new Rotation(this.orientation, Daydream.UP, TWO_PI, 160, easeMid, true, "World"));
+        //        this.timeline.add(0, new Rotation(this.orientation, Daydream.UP, TWO_PI, 160, easeMid, true, "World"));
+        this.timeline.add(0, new Mutation(this.params, 'hankinAngle', sinWave(0, Math.PI / 2, 1, 0), 160, easeInOutSin, true));
 
         // Rotation state
         this.rotation = new THREE.Quaternion();
@@ -64,6 +65,7 @@ export class TestSolids {
     }
 
     drawFrame() {
+        this.timeline.step();
         // Update Rotation
         const dt = 0.016; // Approx 60fps
         const rotStep = this.params.rotationSpeed * dt;
