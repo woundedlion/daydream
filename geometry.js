@@ -18,10 +18,12 @@ export const quaternionPool = new StaticPool(THREE.Quaternion, 1000000);
 /** @type {number} The golden ratio, (1 + sqrt(5)) / 2. */
 export const PHI = (1 + Math.sqrt(5)) / 2;
 /** @type {number} The inverse golden ratio, 1 / PHI. */
-export const G = 1 / PHI;
-
 const _tempSpherical = new THREE.Spherical();
 const _tempVec = new THREE.Vector3();
+const _tempVec2 = new THREE.Vector3();
+export const G = 1 / PHI;
+
+
 
 /**
  * Represents a single point to be rendered, storing its position and color.
@@ -1307,5 +1309,162 @@ export const MeshOps = {
     }
 
     return { vertices: newVertices, faces: newFaces };
-  }
+  },
+
+  hankin(mesh, angle = Math.PI / 3) {
+    const heMesh = new HalfEdgeMesh(mesh);
+    const newVertices = [];
+    const faces = [];
+
+    // Helpers
+    // Map each edge (distinct) to a new Vertex Index (Midpoint)
+    // Map each Face-Corner to a new Vertex Index (Intersection Point X)
+    const edgeToMidIdx = new Map();
+    // Key for corner: faceId_heId ? or just keep track locally. 
+    // We need to form faces, so we need consistent indexing.
+    // The "X" points are unique to the face, but specifically unique to the *corner* of the face.
+    // Each Face has N corners. We will generate N X-points.
+    // And we have N midpoints (one per edge).
+
+    // 1. Generate Midpoint Vertices
+    for (const he of heMesh.halfEdges) {
+      if (edgeToMidIdx.has(he)) continue;
+      if (he.pair && edgeToMidIdx.has(he.pair)) {
+        edgeToMidIdx.set(he, edgeToMidIdx.get(he.pair));
+        continue;
+      }
+      const vA = he.prev.vertex.position;
+      const vB = he.vertex.position;
+      const mid = _tempVec.copy(vA).add(vB).multiplyScalar(0.5).clone();
+      const idx = newVertices.push(mid) - 1;
+      edgeToMidIdx.set(he, idx);
+      if (he.pair) edgeToMidIdx.set(he.pair, idx);
+    }
+
+    // 2. Process Faces to generate X points and Star Faces
+    // We also need to store "Corner X points" to build the Vertex Faces later.
+    // Map: HalfEdge (outgoing from corner?) -> X index.
+    const heToXIdx = new Map();
+
+    for (const face of heMesh.faces) {
+      // Collect HEs for this face
+      const hes = [];
+      let he = face.halfEdge;
+      const start = he;
+      do {
+        hes.push(he);
+        he = he.next;
+      } while (he !== start);
+
+      // Calculate Face Centroid for Clamping
+      const centroid = new THREE.Vector3();
+      for (const h of hes) centroid.add(h.vertex.position);
+      centroid.divideScalar(hes.length);
+
+      // Calculate Face Normal for intersection plane
+      const normal = new THREE.Vector3();
+      const p0 = hes[0].vertex.position;
+      const p1 = hes[1].vertex.position;
+      const p2 = hes[2].vertex.position;
+      _tempVec.subVectors(p1, p0);
+      _tempVec2.subVectors(p2, p0);
+      normal.crossVectors(_tempVec, _tempVec2).normalize();
+
+      const faceXIndices = []; // Indices of X points for this face (for Star Face)
+
+      for (let i = 0; i < hes.length; i++) {
+        const heCurr = hes[i];
+        const hePrev = hes[(i - 1 + hes.length) % hes.length];
+
+        const mPrevIdx = edgeToMidIdx.get(hePrev);
+        const mCurrIdx = edgeToMidIdx.get(heCurr);
+
+        const pMCurr = newVertices[mCurrIdx];
+        const pMPrev = newVertices[mPrevIdx];
+        const vV = hePrev.vertex.position; // Corner vertex
+
+        // --- Analytic Spherical Hankin (Sine Rule) ---
+        // Solves the spherical triangle V-M-X where:
+        // V = Corner, M = Midpoint, X = Hankin Point
+        // Angle(V) = halfCornerAngle
+        // Angle(M) = ang (Hankin deviation from edge)
+        // Side(VM) = distVM
+        //
+        // Sine Rule: sin(VX) / sin(ang) = sin(VM) / sin(180 - (ang + halfAlpha))
+        // So: sin(VX) = sin(VM) * sin(ang) / sin(ang + halfAlpha)
+
+        const distVM = vV.angleTo(pMPrev);
+        const distToCenter = vV.angleTo(centroid);
+
+        // Calculate halfCornerAngle (alpha/2)
+        // N1/N2 are normals to the great circles of the edges meeting at V
+        const n1 = _tempVec.crossVectors(vV, pMPrev).normalize();
+        const n2 = _tempVec2.crossVectors(vV, pMCurr).normalize();
+        const halfAlpha = n1.angleTo(n2) * 0.5;
+
+        const denom = Math.sin(angle + halfAlpha);
+        let X;
+
+        if (denom < 0.001) {
+          // Parallel or Divergent -> Snap to center (shouldn't happen for convex regular solids with angle < PI)
+          X = centroid.clone();
+        } else {
+          const sinVX = Math.sin(distVM) * Math.sin(angle) / denom;
+          // Clamp valid sine range
+          const distVX = Math.asin(Math.max(0, Math.min(1, sinVX)));
+
+          // Clamp to centroid to avoid overshooting
+          if (distVX >= distToCenter * 0.999) {
+            X = centroid.clone();
+          } else {
+            // Move from V towards Centroid by distVX
+            const axis = _tempVec.crossVectors(vV, centroid).normalize();
+            X = new THREE.Vector3().copy(vV).applyAxisAngle(axis, distVX);
+          }
+        }
+
+        const xIdx = newVertices.push(X) - 1;
+
+        // Store for this corner
+        heToXIdx.set(heCurr, xIdx);
+        faceXIndices.push(xIdx);
+        faceXIndices.push(edgeToMidIdx.get(heCurr));
+      }
+
+      // CREATE STAR FACE
+      if (faceXIndices.length > 2) {
+        faces.push(faceXIndices);
+      }
+    }
+
+    // 3. Process Vertices to generate Vertex Faces
+    const visitedVerts = new Set();
+    for (const heStart of heMesh.halfEdges) {
+      const origin = heStart.prev.vertex; // Vertex V
+      if (visitedVerts.has(origin)) continue;
+      visitedVerts.add(origin);
+
+      const vertexFaceIndices = [];
+      let curr = heStart;
+      const startOrbit = curr;
+      let safety = 0;
+
+      do {
+        vertexFaceIndices.push(edgeToMidIdx.get(curr));
+        vertexFaceIndices.push(heToXIdx.get(curr));
+
+        curr = curr.prev;
+        if (!curr.pair) break;
+        curr = curr.pair;
+
+        safety++;
+      } while (curr !== startOrbit && curr && safety < 100);
+
+      if (vertexFaceIndices.length > 2) {
+        faces.push(vertexFaceIndices);
+      }
+    }
+
+    return { vertices: newVertices, faces: faces };
+  },
 };
