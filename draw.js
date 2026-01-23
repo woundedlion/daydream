@@ -15,6 +15,12 @@ export const dotPool = new StaticPool(Dot, 500000);
 
 // Reusable temporary objects to avoid allocation during render loops
 const _tempVec = new THREE.Vector3();
+const _distVec1 = new THREE.Vector3();
+const _distVec2 = new THREE.Vector3();
+const _distVec3 = new THREE.Vector3();
+const _distVec4 = new THREE.Vector3();
+const _distVec5 = new THREE.Vector3();
+const _distVec6 = new THREE.Vector3();
 
 /**
  * Represents a path composed of connected points on the sphere.
@@ -1586,6 +1592,33 @@ export const SDF = {
       this.yMax = 0;
       this.intervals = null;
 
+      // Gnomonic Basis (Centroid & Tangent Frame)
+      this.center = new THREE.Vector3(0, 0, 0);
+      for (const v of this.vertices) this.center.add(v);
+      this.center.normalize();
+
+      this.uAxis = new THREE.Vector3();
+      this.vAxis = new THREE.Vector3();
+
+      // Robust basis construction
+      if (Math.abs(this.center.y) > 0.99) {
+        this.uAxis.set(1, 0, 0).cross(this.center).normalize();
+      } else {
+        this.uAxis.set(0, 1, 0).cross(this.center).normalize();
+      }
+      this.vAxis.crossVectors(this.center, this.uAxis).normalize();
+
+      // Precompute Vertex UVs
+      this.uvs = [];
+      // Use a temp vector for projection math (safe in constructor)
+      const _pVec = new THREE.Vector3();
+      for (const vtx of this.vertices) {
+        const dot = vtx.dot(this.center);
+        const s = 1.0 / dot;
+        _pVec.copy(vtx).multiplyScalar(s).sub(this.center); // Q - C
+        this.uvs.push(new THREE.Vector2(_pVec.dot(this.uAxis), _pVec.dot(this.vAxis)));
+      }
+
       // Compute edge planes and bounding box
       let minPhi = 100;
       let maxPhi = -100;
@@ -1597,7 +1630,8 @@ export const SDF = {
 
         // Edge Plane Normal (points OUT for CCW)
         // v1 x v2 points 'Right' relative to edge.
-        const normal = vectorPool.acquire().crossVectors(v1, v2).normalize();
+        // FIXED: Use new THREE.Vector3() instead of pool to avoid corruption
+        const normal = new THREE.Vector3().crossVectors(v1, v2).normalize();
         this.planes.push(normal);
 
         // 1. Vertex contribution
@@ -1729,35 +1763,88 @@ export const SDF = {
     }
 
     distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
-      let maxDist = -Infinity;
-      for (const plane of this.planes) {
-        // Plane definition: p.n - d = 0 (d=0 for origin-centered planes)
-        // With outward pointing normals:
-        // - p.n > 0 means Outside
-        // - p.n < 0 means Inside
-        // We want 'dist' to be negative for Inside points consistent with Signed Distance Fields.
-        // So dist = - ( -p.n ) ?? No.
-        // Standard SDF: dist > 0 Outside, dist < 0 Inside.
-        // p.n > 0 (Outside) -> dist should be pos -> dist = p.n
-        // p.n < 0 (Inside) -> dist should be neg -> dist = p.n
-        //
-        // However, for rendering Logic in Scan.js:
-        // "if (d < threshold) draw"
-        // If d = p.n (neg inside), then deep inside (large neg) is < threshold (pos). It draws.
-        // Earlier debugging suggested d = -p.n was required.
-        // If normals point INWARD (Southward on North face), then:
-        // p.n > 0 (Inside).
-        // Then dist = -p.n (Negative Inside).
-        // Let's stick to the convention that worked: d = -p.dot(plane).
+      // 1. Gnomonic Projection onto Tangent Plane at Centroid.
+      // Faster and robust for concave shapes.
 
-        const d = -p.dot(plane);
-        if (d > maxDist) maxDist = d;
+      const pDotC = p.dot(this.center);
+      if (pDotC <= 0.001) {
+        out.dist = 100;
+        return out;
       }
-      out.dist = maxDist - this.thickness;
+
+      // Project P -> UV Plane
+      // Q = P / (P . C) maps P to plane tangent at C (distance 1 from origin)
+      // UVs are coords in basis (uAxis, vAxis) on that plane relative to C.
+      // D = Q - C = P/pDotC - C
+      const invDot = 1.0 / pDotC;
+      // Use scratch vector to avoid allocations
+      _distVec1.copy(p).multiplyScalar(invDot).sub(this.center);
+      const u = _distVec1.dot(this.uAxis);
+      const v = _distVec1.dot(this.vAxis);
+
+      let minDistSq = Infinity;
+      let winding = 0;
+      const numVerts = this.uvs.length;
+
+      for (let i = 0, j = numVerts - 1; i < numVerts; j = i++) {
+        const pi = this.uvs[i];
+        const pj = this.uvs[j];
+
+        // 1. Winding Number (Sum of Signed Angles)
+        const x1 = pi.x - u;
+        const y1 = pi.y - v;
+        const x2 = pj.x - u;
+        const y2 = pj.y - v;
+
+        // Angle between vector P->Pi and P->Pj
+        // det = x1*y2 - y1*x2
+        // dot = x1*x2 + y1*y2
+        winding += Math.atan2(x1 * y2 - y1 * x2, x1 * x2 + y1 * y2);
+
+        // 2. Point-Segment Distance Squared
+        // P relative to Pi (origin at Pi) is (-x1, -y1)
+        // Vector E = Pj - Pi = (x2-x1, y2-y1)
+        const eX = x2 - x1;
+        const eY = y2 - y1;
+
+        // Project Vector Pi->P onto E
+        // Pi->P = (-x1, -y1)
+        const wX = -x1;
+        const wY = -y1;
+
+        // Clamp t to segment [0,1]
+        const lenSq = eX * eX + eY * eY;
+        let t = 0;
+        if (lenSq > 0.00000001) {
+          t = Math.max(0, Math.min(1, (wX * eX + wY * eY) / lenSq));
+        }
+
+        // Closest point C on line segment: C = Pi + t*E
+        // Dist P->C = |(Pi->P) - t*E| = |(-x1, -y1) - t*E|
+        const dX = -x1 - t * eX;
+        const dY = -y1 - t * eY;
+        const dSq = dX * dX + dY * dY;
+
+        if (dSq < minDistSq) minDistSq = dSq;
+      }
+
+      // Check Winding for Inside (roughly 2PI or -2PI)
+      const inside = Math.abs(winding) > 3.0;
+
+
+
+      // Convert Tangent Distance back to Geodesic Angle
+      // r_tan = tan(theta) => theta = atan(r_tan)
+      const distRad = Math.atan(Math.sqrt(minDistSq));
+
+      out.dist = (inside ? -distRad : distRad) - this.thickness;
+      out.rawDist = distRad;
       out.t = 0;
-      out.rawDist = maxDist;
       return out;
     }
+
+
+
   }
 };
 
@@ -1810,7 +1897,7 @@ export const Scan = {
       const t = 0.5 - d / (2 * pixelWidth);
       const aaAlpha = quinticKernel(Math.max(0, Math.min(1, t)));
 
-      const c = colorFn(p, sampleResult.t, sampleResult.rawDist);
+      const c = colorFn(p, sampleResult.t, sampleResult.dist);
       const color = c.isColor ? c : (c.color || c);
       const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
 
