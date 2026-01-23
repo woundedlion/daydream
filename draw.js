@@ -1629,33 +1629,74 @@ export const SDF = {
         const v1 = this.vertices[i];
         const v2 = this.vertices[(i + 1) % this.vertices.length];
 
-        // Compute plane for bounds check (same as before)
-        const normal = vectorPool.acquire().crossVectors(v1, v2).normalize();
+        // Edge Plane Normal (points OUT for CCW)
+        // v1 x v2 points 'Right' relative to edge.
+        // FIXED: Use new THREE.Vector3() instead of pool to avoid corruption
+        const normal = new THREE.Vector3().crossVectors(v1, v2).normalize();
         this.planes.push(normal);
 
-        // Update Extrema
+        // 1. Vertex contribution
         const phi1 = Math.acos(Math.max(-1, Math.min(1, v1.y)));
-        minPhi = Math.min(minPhi, phi1);
-        maxPhi = Math.max(maxPhi, phi1);
+        if (phi1 < minPhi) minPhi = phi1;
+        if (phi1 > maxPhi) maxPhi = phi1;
 
-        // Arc Extrema Check (simplified from previous for brevity, but crucial for large faces)
+        // 1b. Arc Extrema (Max/Min Latitude on Edge)
+        // Check if the Great Circle arc contains P_top (closest to North) or P_bot (closest to South).
         const ny = normal.y;
-        if (Math.abs(ny) < 0.99999) {
-          const tx = -normal.x * ny;
+        if (Math.abs(ny) < 0.99999) { // Avoid pole-aligned planes
+          const nx = normal.x;
+          const nz = normal.z;
+          // P_top = Projection of (0,1,0) onto plane N, normalized.
+          // Vector T = ( -nx*ny, 1 - ny*ny, -nz*ny )
+          const tx = -nx * ny;
           const ty = 1.0 - ny * ny;
-          const tz = -normal.z * ny;
-          const tLen = Math.sqrt(tx * tx + ty * ty + tz * tz);
-          if (tLen > 1e-9) {
-            // Project 'Top' point onto plane
-            // Check if it lies within the edge sector... 
-            // (Keeping strict existing bounds logic is recommended, assuming it was correct)
+          const tz = -nz * ny;
+          const tLenSq = tx * tx + ty * ty + tz * tz;
+          if (tLenSq > 1e-12) {
+            const invLen = 1.0 / Math.sqrt(tLenSq);
+            const ptx = tx * invLen;
+            const pty = ty * invLen;
+            const ptz = tz * invLen;
+
+            // Check if P_top is strictly between v1 and v2 using scalar triple products
+            // cx1 = (v1 x P_top) . N
+            // cx2 = (P_top x v2) . N
+            const cx1 = (v1.y * ptz - v1.z * pty) * nx + (v1.z * ptx - v1.x * ptz) * ny + (v1.x * pty - v1.y * ptx) * nz;
+            const cx2 = (pty * v2.z - ptz * v2.y) * nx + (ptz * v2.x - ptx * v2.z) * ny + (ptx * v2.y - pty * v2.x) * nz;
+
+            // If P_top is inside, update minPhi (Northmost)
+            if (cx1 > 0 && cx2 > 0) {
+              const phiTop = Math.acos(Math.max(-1, Math.min(1, pty)));
+              if (phiTop < minPhi) minPhi = phiTop;
+            }
+
+            // If P_bot (-P_top) is inside, update maxPhi (Southmost)
+            // Symmetry: (v1 x -P) . N = -cx1. So we check if -cx1 > 0 AND -cx2 > 0.
+            if (cx1 < 0 && cx2 < 0) {
+              const phiBot = Math.acos(Math.max(-1, Math.min(1, -pty)));
+              if (phiBot > maxPhi) maxPhi = phiBot;
+            }
           }
         }
 
+        // Collect Thetas
         let theta = Math.atan2(v1.x, v1.z);
         if (theta < 0) theta += 2 * Math.PI;
         thetas.push(theta);
       }
+
+      // 2. Arc/Pole Logic
+      // CCW Winding: Edge Normals point "Right" (Southish for North Face).
+      // NP Inside -> Face is North of Edge -> Normal points South (y < 0).
+      // So if any Normal points North (y > 0), NP is NOT inside.
+      let npInside = true;
+      let spInside = true;
+      for (const plane of this.planes) {
+        if (plane.y < 0) npInside = false;
+        if (plane.y > 0) spInside = false;
+      }
+      if (npInside) minPhi = 0;
+      if (spInside) maxPhi = Math.PI;
 
       // (Re-using simpler conservative bounds for now to ensure concave safety)
       // A concave shape is contained by its convex hull vertices, so vertex min/max is safe.

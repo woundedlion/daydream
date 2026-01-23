@@ -37,7 +37,6 @@ export class Test {
 
         this.amplitude = 0;
         this.amplitudeRange = 0.3;
-        this.poly = new Dodecahedron();
         this.numRings = 1;
         this.debugBB = false;
         this.thickness = 4 * TWO_PI / Daydream.W;
