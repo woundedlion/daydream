@@ -5,11 +5,12 @@
 
 import * as THREE from "three";
 import { gui } from "gui";
-import { Solids, MeshOps, vectorPool, quaternionPool, sinWave } from "../geometry.js";
+import { MeshOps, vectorPool, quaternionPool, sinWave } from "../geometry.js";
+import { Solids } from "../solids.js";
 import { Plot, Scan } from "../draw.js";
 import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
 import { color4Pool, richSunset, darkRainbow, rainbow, g3 } from "../color.js";
-import { Timeline, Rotation, easeInOutSin, Mutation } from "../animation.js";
+import { Timeline, Rotation, easeInOutSin, Mutation, easeMid } from "../animation.js";
 import { Daydream } from "../driver.js";
 import { TWO_PI } from "../3dmath.js";
 
@@ -34,8 +35,7 @@ export class TestSolids {
         };
 
         this.timeline = new Timeline();
-        //        this.timeline.add(0, new Rotation(this.orientation, Daydream.UP, TWO_PI, 160, easeMid, true, "World"));
-        this.timeline.add(0, new Mutation(this.params, 'hankinAngle', sinWave(0, Math.PI / 2, 1, 0), 160, easeInOutSin, true));
+        this.timeline.add(0, new Mutation(this.params, 'hankinAngle', sinWave(0, Math.PI / 2, 1, 0), 320, easeMid, true));
 
         // Rotation state
         this.rotation = new THREE.Quaternion();
