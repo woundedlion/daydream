@@ -807,6 +807,89 @@ export const MeshOps = {
     return { vertices: newVertices, faces: newFaces };
   },
 
+  /**
+   * Finds the closest point on the mesh "wireframe" (vertices and edges) to a target point.
+   * Assumes all points are on a unit sphere.
+   * @param {THREE.Vector3} p - Target point (normalized)
+   * @param {Object} mesh - {vertices, faces}
+   * @returns {THREE.Vector3} Closest point on the edges/vertices of the mesh
+   */
+  closestPointOnMeshGraph(p, mesh) {
+    let bestPoint = null;
+    let maxDot = -1.0;
+
+    // 1. Check all Vertices
+    for (const v of mesh.vertices) {
+      const d = p.dot(v);
+      if (d > maxDot) {
+        maxDot = d;
+        bestPoint = v;
+      }
+    }
+    // Optimization: If very close, return early? No, edge might be closer technically? 
+    // Actually on sphere, closest point is either vertex or orthogonal projection onto Great Circle arc.
+
+    // 2. Check all Edges
+    // Using a set to avoid processing shared edges twice would be ideal, but faces loop is simpler.
+    const tempN = new THREE.Vector3();
+    const tempC = new THREE.Vector3();
+
+    // Reuse vectors for performance
+    const vA = new THREE.Vector3();
+    const vB = new THREE.Vector3();
+
+    for (const face of mesh.faces) {
+      for (let i = 0; i < face.length; i++) {
+        const idxA = face[i];
+        const idxB = face[(i + 1) % face.length];
+
+        // To save clone cost, we'll access directly if safe, but mesh.vertices might be shared
+        // Just referencing is fine for read-only
+        const A = mesh.vertices[idxA];
+        const B = mesh.vertices[idxB];
+
+        // Normal of the Great Circle Plane defined by (Origin, A, B)
+        tempN.crossVectors(A, B); // A x B
+        const lenSq = tempN.lengthSq();
+        if (lenSq < 0.000001) continue; // Degenerate edge or antipodal
+        tempN.multiplyScalar(1.0 / Math.sqrt(lenSq)); // Normalize
+
+        // Project P onto this plane: P_proj = P - (P . N) * N
+        const pDotN = p.dot(tempN);
+        tempC.copy(p).addScaledVector(tempN, -pDotN); // P_proj
+
+        // Normalize to get point on sphere surface
+        tempC.normalize();
+
+        // Check if Candidate C lies on the arc AB
+        // It must be "between" A and B.
+        // A reliable check for minor arcs (< 180): 
+        // C must be on the positive side of plane(Origin, A, N_edge_A) and plane(Origin, B, N_edge_B)?
+        // Simpler: Check if C is in the cone.
+        // (A x C) . (C x B) > 0 implies same winding? 
+        // Let's use: C = s*A + t*B (screen space check?)
+
+        // Cross Check:
+        // (A x C) should point in same direction as (A x B) -> (A x C) . (A x B) > 0
+        // (C x B) should point in same direction as (A x B) -> (C x B) . (A x B) > 0
+
+        const crossAC = vA.crossVectors(A, tempC);
+        const crossCB = vB.crossVectors(tempC, B);
+
+        if (crossAC.dot(tempN) > 0 && crossCB.dot(tempN) > 0) {
+          // Valid point on arc
+          const d = p.dot(tempC);
+          if (d > maxDot) {
+            maxDot = d;
+            bestPoint = tempC.clone(); // Must clone because tempC is reused
+          }
+        }
+      }
+    }
+
+    return bestPoint ? bestPoint.clone() : mesh.vertices[0].clone();
+  },
+
   expand(mesh) {
     return this.rectify(this.rectify(mesh));
   },

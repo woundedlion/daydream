@@ -1632,8 +1632,16 @@ export const SDF = {
         // Edge Plane Normal (points OUT for CCW)
         // v1 x v2 points 'Right' relative to edge.
         // FIXED: Use new THREE.Vector3() instead of pool to avoid corruption
-        const normal = new THREE.Vector3().crossVectors(v1, v2).normalize();
-        this.planes.push(normal);
+        const normal = new THREE.Vector3().crossVectors(v1, v2);
+
+        // Guard against degenerate edges (v1 ~= v2)
+        if (normal.lengthSq() < 1e-12) {
+          // Degenerate edge: contributes nothing to bounds.
+          // Skip adding to planes, but continue vertex bounds checks.
+        } else {
+          normal.normalize();
+          this.planes.push(normal);
+        }
 
         // 1. Vertex contribution
         const phi1 = Math.acos(Math.max(-1, Math.min(1, v1.y)));
@@ -1742,46 +1750,66 @@ export const SDF = {
       const px = p.dot(this.basisU) / cosAngle;
       const py = p.dot(this.basisW) / cosAngle;
 
-      // 3. 2D Polygon SDF (Inigo Quilez method)
-      // Calculates closest distance to edge AND determines sign via winding/crossing parity.
+      // 3. 2D Polygon SDF (Inigo Quilez method) & Winding Number
+      // Calculates closest distance to edge AND determines sign via winding.
       const v = this.poly2D;
       const N = v.length;
 
-      let d = (px - v[0].x) ** 2 + (py - v[0].y) ** 2;
-      let s = 1.0;
+      let d = Infinity; // Start with clear max
+      let winding = 0;
 
       for (let i = 0, j = N - 1; i < N; j = i, i++) {
-        const ex = v[j].x - v[i].x;
-        const ey = v[j].y - v[i].y;
+        const Vi = v[i];
+        const Vj = v[j];
 
-        const wx = px - v[i].x;
-        const wy = py - v[i].y;
+        const ex = Vj.x - Vi.x;
+        const ey = Vj.y - Vi.y;
+        const wx = px - Vi.x;
+        const wy = py - Vi.y;
 
-        // Distance to Segment
+        // --- Distance to Edge Segment ---
         // clamp( dot(w,e)/dot(e,e), 0, 1 )
         const dotWE = wx * ex + wy * ey;
         const dotEE = ex * ex + ey * ey;
-        const clampVal = Math.max(0, Math.min(1, dotWE / dotEE));
+
+        let clampVal = 0;
+        if (dotEE > 1e-12) {
+          clampVal = Math.max(0, Math.min(1, dotWE / dotEE));
+        }
 
         const bx = wx - ex * clampVal;
         const by = wy - ey * clampVal;
+        const distSq = bx * bx + by * by;
 
-        d = Math.min(d, bx * bx + by * by);
+        if (distSq < d) d = distSq;
 
-        // Winding / Crossing Number Parity Check
-        const cond1 = py >= v[i].y;
-        const cond2 = py < v[j].y;
-        const cond3 = ex * wy > ey * wx;
+        // --- Winding Number Check (Non-Zero Rule) ---
+        // Ray cast along +X from (px, py).
+        // Check if edge (Vi, Vj) crosses this ray.
+        const isUpward = (Vi.y <= py) && (Vj.y > py);
+        const isDownward = (Vi.y > py) && (Vj.y <= py);
 
-        if ((cond1 && cond2 && cond3) || (!cond1 && !cond2 && !cond3)) {
-          s *= -1.0;
+        if (isUpward || isDownward) {
+          // Calculate intersection X-offset relative to P using cross product
+          // Cross(Vj-Vi, P-Vi). If edge goes up, Positive Cross means P is to Right (Ray intersects)
+          // Wait, Standard 2D cross: (B.x-A.x)*(P.y-A.y) - (B.y-A.y)*(P.x-A.x)
+          // = ex * wy - ey * wx
+          const cross = ex * wy - ey * wx;
+
+          if (isUpward) {
+            // Edge goes Up. Point Left of edge => Ray Intersects.
+            // Left means Cross > 0 (assuming Y-up CCW)
+            if (cross > 0) winding++;
+          } else {
+            // Edge goes Down. Point Left of edge => Ray Intersects.
+            if (cross < 0) winding--;
+          }
         }
       }
 
       // Result is distance in Tangent Plane units.
-      // s = -1 if inside, 1 if outside.
-      // We can convert approx angle: atan(sqrt(d)).
-      // But for coloring gradients, plane distance is smooth and valid.
+      // Non-Zero Rule: Inside if winding != 0
+      const s = (winding !== 0) ? -1.0 : 1.0;
 
       const planeDist = s * Math.sqrt(d);
 
