@@ -7,7 +7,8 @@
 
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
-import { angleBetween, Orientation, vectorPool, quaternionPool } from "./geometry.js";
+import { angleBetween, Orientation, vectorPool, quaternionPool, MeshOps } from "./geometry.js";
+import { Solids } from "./solids.js";
 import FastNoiseLite from "./FastNoiseLite.js";
 import { TWO_PI } from "./3dmath.js";
 
@@ -18,22 +19,16 @@ import { TWO_PI } from "./3dmath.js";
  */
 export const easeOutElastic = (x) => {
   const c4 = TWO_PI / 3;
-  return x === 0 ?
-    0 : x === 1 ?
-      1 : Math.pow(2, -10 * x) * Math.sin((x * 10 - 0.75) * c4) + 1;
+
+  return x === 0
+    ? 0
+    : x === 1
+      ? 1
+      : Math.pow(2, -10 * x) * Math.sin((x * 10 - 0.75) * c4) + 1;
 }
 
 /**
- * Bicubic easing in and out.
- * @param {number} t - The time value between 0 and 1.
- * @returns {number} The eased value.
- */
-export const easeInOutBicubic = (t) => {
-  return t < 0.5 ? 4 * Math.pow(t, 3) : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
-/**
- * Sinusoidal easing in and out.
+ * Sinusoidal easing in-out.
  * @param {number} t - The time value between 0 and 1.
  * @returns {number} The eased value.
  */
@@ -42,7 +37,7 @@ export const easeInOutSin = (t) => {
 }
 
 /**
- * Sinusoidal easing in.
+ * Sinusoidal easing out.
  * @param {number} t - The time value between 0 and 1.
  * @returns {number} The eased value.
  */
@@ -843,6 +838,29 @@ export class RandomWalk extends Animation {
 }
 
 /**
+ * Creates a trail of orientations based on a history of previous orientations.
+ */
+export class OrientationTrail {
+  /**
+   * @param {Orientation} orientation - The source orientation.
+   * @param {number} length - Number of history steps to keep.
+   */
+  constructor(orientation, length) {
+    this.orientation = orientation;
+    this.length = length;
+  }
+
+  /**
+   * Gets the orientation at a specific history index.
+   * @param {number} i - The index (0 is current, length-1 is oldest).
+   * @returns {THREE.Quaternion} The orientation at that index.
+   */
+  get(i) {
+    return this.orientation.get(i);
+  }
+}
+
+/**
  * Transitions from one color palette to another.
  */
 export class ColorWipe extends Animation {
@@ -850,143 +868,311 @@ export class ColorWipe extends Animation {
    * @param {Object} fromPalette - The source palette.
    * @param {Object} toPalette - The target palette.
    * @param {number} duration - Duration of the wipe.
-   * @param {Function} easingFn - Easing function.
+   * @param {Function} [easingFn=easeMid] - Easing function.
    */
-  constructor(fromPalette, toPalette, duration, easingFn) {
+  constructor(fromPalette, toPalette, duration, easingFn = easeMid) {
     super(duration, false);
-    this.curPalette = fromPalette;
-    this.toPalette = toPalette;
+    this.from = fromPalette;
+    this.to = toPalette;
     this.easingFn = easingFn;
+    this.current = {};
+    // Initialize current with from values
+    for (const key in fromPalette) {
+      if (typeof fromPalette[key] === 'object' && fromPalette[key].isColor) {
+        this.current[key] = fromPalette[key].clone();
+      }
+    }
   }
 
   step() {
-    if (this.t == 0) {
-      this.a0 = this.curPalette.a.clone();
-      this.b0 = this.curPalette.b.clone();
-      this.c0 = this.curPalette.c.clone();
-    }
     super.step();
-    this.curPalette.a.lerpColors(this.a0, this.toPalette.a, this.easingFn(this.t / this.duration));
-    this.curPalette.b.lerpColors(this.b0, this.toPalette.b, this.easingFn(this.t / this.duration));
-    this.curPalette.c.lerpColors(this.c0, this.toPalette.c, this.easingFn(this.t / this.duration));
+    const t = this.easingFn(Math.min(1, this.t / this.duration));
+    for (const key in this.from) {
+      if (this.to[key]) {
+        this.current[key].copy(this.from[key]).lerp(this.to[key], t);
+      }
+    }
+  }
+
+  get(key) {
+    return this.current[key];
   }
 }
 
 /**
- * Animates the Mobius parameters for a continuous loxodromic flow.
+ * Morphs one mesh into another over time.
+ * Strategy: "Super-Source"
+ * 1. Subdivide the SOURCE mesh until it has enough vertices to approximate the destination.
+ * 2. Project these vertices onto the DESTINATION surface.
+ * 3. Animate vertices from Source Position -> Destination Surface Position.
+ * 4. At the end, snap to the actual DESTINATION topology.
+ *
+ * This ensures the animation START is perfectly seamless (geometry matches Source exactly).
+ * The END has a topology snap, but the shape should be correct.
+ */
+export class MeshMorph extends Animation {
+  constructor(source, dest, duration, repeat = false, easingFn = easeInOutSin, params = {}) {
+    super(duration, repeat);
+    this.source = source;
+    this.dest = dest;
+    this.easingFn = easingFn;
+    this.params = params; // Params needed for initializing Dest geometry (target name, dual, hankin)
+
+    this.startPositions = null;
+    this.targetPositions = null;
+
+    // Store original state to restore on rewind/repeat if needed
+    // Deep copy essential for faces
+    this.originalState = {
+      vertices: source.vertices.map(v => v.clone()),
+      faces: source.faces.map(f => [...f])
+    };
+
+    this.init();
+  }
+
+  // Ray-cast 'p' from origin onto 'mesh'
+  projectToMesh(p, mesh) {
+    const dir = vectorPool.acquire().copy(p).normalize();
+    let bestHit = null;
+    let minT = Infinity;
+
+    // Reuse vectors to avoid allocation in loop
+    const edge1 = vectorPool.acquire();
+    const edge2 = vectorPool.acquire();
+    const normal = vectorPool.acquire();
+    const hit = vectorPool.acquire();
+    const toHit = vectorPool.acquire();
+    const tempCross = vectorPool.acquire();
+
+    // Determine faces to check
+    const facesToCheck = mesh.faces;
+    const count = facesToCheck.length;
+
+    for (let i = 0; i < count; i++) {
+      const face = facesToCheck[i];
+      if (face.length < 3) continue;
+
+      // Triangulate face (Fan from v0) to handle non-planar normalized faces
+      for (let tIdx = 0; tIdx < face.length - 2; tIdx++) {
+        const v0 = mesh.vertices[face[0]];
+        const v1 = mesh.vertices[face[tIdx + 1]];
+        const v2 = mesh.vertices[face[tIdx + 2]];
+
+        edge1.subVectors(v1, v0);
+        edge2.subVectors(v2, v0);
+        normal.crossVectors(edge1, edge2); // Do not normalize yet to check degeneracy via length
+
+        const lenSq = normal.lengthSq();
+        if (lenSq < 0.000001) continue;
+        normal.multiplyScalar(1.0 / Math.sqrt(lenSq));
+
+        // Backface/Sideface culling (lenient)
+        const denom = dir.dot(normal);
+        if (denom < 0.0001) continue;
+
+        const t = v0.dot(normal) / denom;
+        if (t <= 0 || t >= minT) continue;
+
+        // Check if inside triangle v0, v1, v2
+        hit.copy(dir).multiplyScalar(t);
+
+        // Edge 0 (v0 -> v1)
+        // Edge 1 (v1 -> v2)
+        // Edge 2 (v2 -> v0)
+
+        // 0: v1-v0
+        edge1.subVectors(v1, v0);
+        toHit.subVectors(hit, v0);
+        if (tempCross.crossVectors(edge1, toHit).dot(normal) < 0) continue;
+
+        // 1: v2-v1
+        edge1.subVectors(v2, v1);
+        toHit.subVectors(hit, v1);
+        if (tempCross.crossVectors(edge1, toHit).dot(normal) < 0) continue;
+
+        // 2: v0-v2
+        edge1.subVectors(v0, v2);
+        toHit.subVectors(hit, v2);
+        if (tempCross.crossVectors(edge1, toHit).dot(normal) < 0) continue;
+
+        // Inside!
+        if (!bestHit) bestHit = new THREE.Vector3();
+        bestHit.copy(hit);
+        minT = t;
+      }
+    }
+
+    if (bestHit) return bestHit;
+
+    // Fallback: Nearest vertex
+    let best = mesh.vertices[0];
+    let minD = p.distanceToSquared(best);
+    for (let i = 1; i < mesh.vertices.length; i++) {
+      const d = p.distanceToSquared(mesh.vertices[i]);
+      if (d < minD) { minD = d; best = mesh.vertices[i]; }
+    }
+    return best.clone();
+  }
+
+  init() {
+    // 1. Resolve Destination Geometry
+    // We need the *structure* (topology) and the *shape* (geometry)
+    let destSolid = Solids[this.params.target]();
+    if (this.params.dual) destSolid = MeshOps.dual(destSolid);
+    Solids.normalize(destSolid); // Target is always a unit sphere solid
+
+    // If target has Hankin, generate it
+    if (this.params.hankin) {
+      destSolid = MeshOps.hankin(destSolid, this.params.hankinAngle);
+      Solids.normalize(destSolid);
+    }
+
+    // Store Dest for the secondary render pass
+    // We clone it because we'll be animating its vertices
+    this.destMesh = {
+      vertices: destSolid.vertices.map(v => v.clone()),
+      faces: destSolid.faces
+    };
+
+    // 2. Precompute Correspondences
+
+    // A. Source -> Dest Graph (Collapse)
+    // For each Source Vertex, find closest point on Dest Edges
+    this.sourcePaths = [];
+    for (const v of this.source.vertices) {
+      const target = MeshOps.closestPointOnMeshGraph(v, destSolid);
+      this.sourcePaths.push({
+        start: v.clone(),
+        end: target,
+        angle: v.angleTo(target),
+        axis: new THREE.Vector3().crossVectors(v, target).normalize()
+      });
+    }
+
+    // B. Dest -> Source Graph (Emerge)
+    // For each Dest Vertex, find closest point on Source Edges
+    // Note: Source is `this.source`
+    this.destPaths = [];
+    for (const v of destSolid.vertices) {
+      const start = MeshOps.closestPointOnMeshGraph(v, this.source);
+      this.destPaths.push({
+        start: start,
+        end: v.clone(),
+        angle: start.angleTo(v),
+        axis: new THREE.Vector3().crossVectors(start, v).normalize()
+      });
+    }
+
+    // B. Dest -> Source Graph (Emerge)
+    // For each Dest Vertex, find closest point on Source Edges
+    // Note: Source is `this.source`
+    this.destPaths = [];
+    for (const v of destSolid.vertices) {
+      const start = MeshOps.closestPointOnMeshGraph(v, this.source);
+      this.destPaths.push({
+        start: start,
+        end: v.clone(),
+        angle: start.angleTo(v),
+        axis: new THREE.Vector3().crossVectors(start, v).normalize()
+      });
+    }
+  }
+
+  step() {
+    super.step();
+    const progress = Math.min(1, this.t / this.duration);
+    const alpha = this.easingFn(progress);
+
+    // Expose alpha for the renderer
+    this.alpha = alpha;
+
+    // 1. Animate Source (Collapse to Dest Features)
+    for (let i = 0; i < this.source.vertices.length; i++) {
+      const path = this.sourcePaths[i];
+      if (!this.source.vertices[i]) continue;
+
+      // SLERP from Start to End
+      // If angle is tiny, Linear is fine, but Slerp handles it if axis is valid
+      if (path.angle > 0.0001) {
+        this.source.vertices[i].copy(path.start)
+          .applyAxisAngle(path.axis, path.angle * alpha);
+      } else {
+        this.source.vertices[i].copy(path.start).lerp(path.end, alpha);
+      }
+
+      // Optional: "Geometric Collapse" - Pull slightly inside? 
+      // For now, keep on surface.
+    }
+
+    // 2. Animate Dest (Emerge from Source Features)
+    // Note: destMesh has its own vertices array
+    for (let i = 0; i < this.destMesh.vertices.length; i++) {
+      const path = this.destPaths[i];
+      if (path.angle > 0.0001) {
+        this.destMesh.vertices[i].copy(path.start)
+          .applyAxisAngle(path.axis, path.angle * alpha);
+      } else {
+        this.destMesh.vertices[i].copy(path.start).lerp(path.end, alpha);
+      }
+    }
+
+    // Final Frame: Swap!
+    if (this.t >= this.duration) {
+      // Replace source with dest
+      this.source.vertices = this.destMesh.vertices;
+      this.source.faces = this.destMesh.faces;
+      this.destMesh = null; // Disable secondary render
+    }
+  }
+
+  rewind() {
+    super.rewind();
+    // Restore original low-poly source to start again
+    this.source.vertices = this.originalState.vertices.map(v => v.clone());
+    this.source.faces = this.originalState.faces.map(f => [...f]);
+    this.init();
+  }
+}
+
+/**
+ * Animates a Möbius transform flow.
  */
 export class MobiusFlow extends Animation {
   /**
-   * @param {Object} params - The Mobius parameters object.
-   * @param {number} numRings - Number of rings in the flow.
-   * @param {number} numLines - Number of lines.
-   * @param {number} duration - Animation duration.
-   * @param {boolean} [repeat=true] - Whether to repeat.
+   * @param {Mobius} mobius - The mobius transform.
+   * @param {THREE.Vector2} v - Velocity.
+   * @param {number} [duration=-1] - Duration.
    */
-  constructor(params, numRings, numLines, duration, repeat = true) {
-    super(duration, repeat);
-    this.params = params;
-    this.numRings = numRings;
-    this.numLines = numLines;
+  constructor(mobius, v, duration = -1) {
+    super(duration, duration != -1);
+    this.mobius = mobius;
+    this.v = v;
   }
 
   step() {
     super.step();
-    const progress = this.t / this.duration;
-    const logPeriod = 5.0 / (this.numRings + 1);
-    const flowParam = progress * logPeriod;
-    const scale = Math.exp(flowParam);
-    const s = Math.sqrt(scale);
-    const angle = progress * (TWO_PI / this.numLines);
-
-    this.params.aRe = s * Math.cos(angle);
-    this.params.aIm = s * Math.sin(angle);
-    this.params.dRe = (1 / s) * Math.cos(-angle);
-    this.params.dIm = (1 / s) * Math.sin(-angle);
+    this.mobius.move(this.v);
   }
 }
 
 /**
- * Animates the Mobius parameters for a warping effect pulling the poles together.
+ * Animates a Möbius transform with a warp effect.
  */
 export class MobiusWarp extends Animation {
   /**
-   * @param {Object} params - The Mobius parameters.
-   * @param {number} numRings - Number of rings.
-   * @param {number} duration - Animation duration.
-   * @param {boolean} [repeat=true] - Whether to repeat.
+   * @param {Mobius} mobius - The mobius transform.
+   * @param {number} amount - Warp amount.
+   * @param {number} [duration=-1] - Duration.
    */
-  constructor(params, numRings, duration, repeat = true) {
-    super(duration, repeat);
-    this.params = params;
-    this.numRings = numRings;
+  constructor(mobius, amount, duration = -1) {
+    super(duration, duration != -1);
+    this.mobius = mobius;
+    this.amount = amount;
   }
 
   step() {
     super.step();
-    const progress = this.t / this.duration;
-    const angle = progress * TWO_PI;
-    this.params.bRe = Math.cos(angle);
-    this.params.bIm = Math.sin(angle);
+    this.mobius.warp(this.amount);
   }
-}
-
-export class OrientationTrail {
-  /**
-   * @param {number} capacity - Number of frames to keep in history.
-   */
-  constructor(capacity) {
-    this.capacity = capacity;
-    // Pre-allocate buffer of Orientation objects
-    this.snapshots = [];
-    for (let i = 0; i < capacity; i++) {
-      this.snapshots.push(new Orientation());
-    }
-    this.head = 0;
-    this.count = 0;
-  }
-
-  /**
-   * Records a snapshot of the current orientation state.
-   * @param {Orientation} source - The orientation to copy.
-   */
-  record(source) {
-    const snapshot = this.snapshots[this.head];
-    const srcData = source.orientations;
-    const dstData = snapshot.orientations;
-
-    // 1. Ensure buffer size matches source (grow if needed)
-    while (dstData.length < srcData.length) {
-      dstData.push(new THREE.Quaternion()); // These are persistent within the OrientationTrail snapshots
-    }
-    // 2. Trim if source shrank (optional, but keeps state clean)
-    dstData.length = srcData.length;
-
-    // 3. Deep copy quaternions
-    for (let i = 0; i < srcData.length; i++) {
-      dstData[i].copy(srcData[i]);
-    }
-
-    this.head = (this.head + 1) % this.capacity;
-    if (this.count < this.capacity) this.count++;
-  }
-
-  length() {
-    return this.count;
-  }
-
-  /**
-   * Gets a historical orientation. 0 is oldest, length-1 is newest.
-   * @param {number} i - Index [0..length-1].
-   * @returns {Orientation} The orientation at that index.
-   */
-  get(i) {
-    // 0 = Oldest, count-1 = Newest
-    // head points to next empty slot. head-1 is newest.
-    // oldest is head - count.
-    const idx = (this.head - this.count + i + this.capacity) % this.capacity;
-    return this.snapshots[idx];
-  }
-
-
 }
