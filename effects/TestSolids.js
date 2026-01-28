@@ -60,33 +60,44 @@ export class TestSolids {
         this.scanSolid = Solids[this.params.solid]();
         if (this.params.dual) this.scanSolid = MeshOps.dual(this.scanSolid);
 
+        // Optimization: Compile topology once
+        if (this.params.hankin) {
+            this.compiledHankin = MeshOps.compileHankin(this.scanSolid);
+        } else {
+            this.compiledHankin = null;
+        }
+
         this.timeline.add(0, new Mutation(
             this.params, 'hankinAngle', sinWave(0, Math.PI / 2, 1, 0), 64, easeMid, false)
             .then(() => this.startMorph()));
 
         this.timeline.add(0, new Sprite((opacity) => {
-            let mesh = {
-                vertices: this.scanSolid.vertices.map(v => v.clone()),
-                faces: this.scanSolid.faces
-            };
+            let mesh = this.scanSolid;
 
             if (this.params.hankin) {
-                mesh = MeshOps.hankin(mesh, this.params.hankinAngle);
+                if (!this.compiledHankin) {
+                    this.compiledHankin = MeshOps.compileHankin(this.scanSolid);
+                }
+                mesh = MeshOps.updateHankin(this.compiledHankin, this.params.hankinAngle);
             }
+
             this.drawMesh(mesh, opacity);
         }, 64));
     }
 
     startMorph() {
-        // Source Mesh
+        // Source Mesh - Reuse current state
         let startMesh = this.scanSolid;
         if (this.params.hankin) {
-            startMesh = {
-                vertices: this.scanSolid.vertices.map(v => v.clone()),
-                faces: this.scanSolid.faces
-            };
-            startMesh = MeshOps.hankin(startMesh, this.params.hankinAngle);
+            if (!this.compiledHankin) {
+                this.compiledHankin = MeshOps.compileHankin(this.scanSolid);
+            }
+            startMesh = MeshOps.updateHankin(this.compiledHankin, this.params.hankinAngle);
         }
+
+        // We clone faces since MeshMorph might need to mutate structure (though ideally it shouldn't for pure vertex morph)
+        // But for safety let's ensure we have a stable snapshot. 
+        // Actually MeshMorph usually projects. Let's trust the optimization.
         this.renderMesh = startMesh;
 
         // Destination Mesh
@@ -98,9 +109,12 @@ export class TestSolids {
         this.params.solid = nextName;
         let nextSolid = Solids[nextName]();
         if (this.params.dual) nextSolid = MeshOps.dual(nextSolid);
+
         let nextMesh = nextSolid;
         if (this.params.hankin) {
-            nextMesh = MeshOps.hankin(nextSolid, this.params.hankinAngle);
+            // Compile destination too
+            const nextCompiled = MeshOps.compileHankin(nextSolid);
+            nextMesh = MeshOps.updateHankin(nextCompiled, this.params.hankinAngle);
         }
 
         // Start Morph
