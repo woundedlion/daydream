@@ -9,7 +9,7 @@ import { MeshOps, vectorPool, quaternionPool, sinWave, Orientation } from "../ge
 import { Solids } from "../solids.js";
 import { Plot, Scan } from "../draw.js";
 import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
-import { color4Pool, richSunset, g3 } from "../color.js";
+import { color4Pool, richSunset, embers, underSea, emeraldForest, lateSunset, iceMelt, mangoPeel } from "../color.js";
 import { Timeline, Rotation, easeInOutSin, Mutation, easeMid, MeshMorph, PeriodicTimer, Sprite } from "../animation.js";
 import { Daydream } from "../driver.js";
 import { TWO_PI } from "../3dmath.js";
@@ -162,10 +162,23 @@ export class TestSolids {
             faces: mesh.faces
         };
 
+        const palettes = {
+            3: embers,
+            4: underSea,
+            5: emeraldForest,
+            6: lateSunset,
+            8: iceMelt,
+            10: mangoPeel
+        };
+
         const colorFace = (v, t, d, i) => {
+            const face = mesh.faces[i];
+            const n = face ? face.length : 0;
+            const palette = palettes[n] || richSunset;
+
             const distFromEdge = -d;
             const intensity = Math.min(1, Math.max(0, distFromEdge * this.params.intensity));
-            const c = richSunset.get(intensity).color;
+            const c = palette.get(intensity).color;
             return color4Pool.acquire().set(c, op);
         };
         const colorWhite = (v) => color4Pool.acquire().set(1, 1, 1, op);
