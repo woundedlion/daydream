@@ -49,7 +49,7 @@ export class TestSolids {
 
         // The underlying solid definition (used in HANKIN mode)
         this.scanSolid = Solids[this.params.solid]();
-        Solids.normalize(this.scanSolid);
+
 
         // The mesh currently being rendered/morphed (used in MORPH mode)
         this.renderMesh = null;
@@ -68,7 +68,7 @@ export class TestSolids {
         // Ensure scanSolid is up to date with CURRENT params
         this.scanSolid = Solids[this.params.solid]();
         if (this.params.dual) this.scanSolid = MeshOps.dual(this.scanSolid);
-        Solids.normalize(this.scanSolid);
+
 
         // Animate Angle
         this.timeline.add(0, new Mutation(
@@ -94,7 +94,7 @@ export class TestSolids {
                 faces: this.scanSolid.faces
             };
             startMesh = MeshOps.hankin(startMesh, this.params.hankinAngle);
-            Solids.normalize(startMesh);
+
         }
 
         // Set as current render mesh (Mutated by Morph)
@@ -111,14 +111,14 @@ export class TestSolids {
         // Base geometry
         let nextSolid = Solids[nextName]();
         if (this.params.dual) nextSolid = MeshOps.dual(nextSolid);
-        Solids.normalize(nextSolid);
+
 
         // Actual target mesh (might be Hankin)
         let nextMesh = nextSolid;
         if (this.params.hankin) {
             // Must clone/use fresh for Hankin generation, but nextSolid is fresh
             nextMesh = MeshOps.hankin(nextSolid, this.params.hankinAngle);
-            Solids.normalize(nextMesh);
+
         }
 
         // 3. Start Morph
@@ -169,7 +169,7 @@ export class TestSolids {
 
             if (this.params.hankin) {
                 mesh = MeshOps.hankin(mesh, this.params.hankinAngle);
-                Solids.normalize(mesh);
+
             }
             meshesToDraw.push({ mesh: mesh, opacity: 1.0 });
 

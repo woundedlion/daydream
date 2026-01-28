@@ -16,10 +16,12 @@ export const Solids = {
 
   // 1. TETRAHEDRON (4 Verts, 4 Faces)
   // Source: Standard construction
+  // 1. TETRAHEDRON (4 Verts, 4 Faces)
+  // Source: Standard construction
   tetrahedron() {
     const s = 1.0;
     const c = 1.0 / Math.sqrt(3.0); // Normalize to sphere
-    return {
+    const m = {
       vertices: [
         new THREE.Vector3(c, c, c),   // 0: (+,+,+)
         new THREE.Vector3(c, -c, -c), // 1: (+,-,-)
@@ -31,6 +33,8 @@ export const Solids = {
         [0, 3, 1], [0, 2, 3], [0, 1, 2], [1, 3, 2]
       ]
     };
+    this.normalize(m);
+    return m;
   },
 
   // 2. CUBE (8 Verts, 6 Faces)
@@ -38,7 +42,7 @@ export const Solids = {
   // Order: Bottom Ring (0-3), Top Ring (4-7)
   cube() {
     const a = 1.0 / Math.sqrt(3.0);
-    return {
+    const m = {
       vertices: [
         new THREE.Vector3(-a, -a, -a), // 0
         new THREE.Vector3(a, -a, -a), // 1
@@ -58,13 +62,15 @@ export const Solids = {
         [6, 7, 4, 5]  // Top
       ]
     };
+    this.normalize(m);
+    return m;
   },
 
   // 3. OCTAHEDRON (6 Verts, 8 Faces)
   // Source: Geometric Tools
   // Order: Equator (0-3), Top (4), Bottom (5)
   octahedron() {
-    return {
+    const m = {
       vertices: [
         new THREE.Vector3(1, 0, 0), // 0
         new THREE.Vector3(-1, 0, 0), // 1
@@ -78,6 +84,8 @@ export const Solids = {
         [5, 2, 0], [5, 1, 2], [5, 3, 1], [5, 0, 3]  // Bottom Fan
       ]
     };
+    this.normalize(m);
+    return m;
   },
 
   // 4. ICOSAHEDRON (12 Verts, 20 Faces)
@@ -90,7 +98,7 @@ export const Solids = {
     const X = 0.525731112119;
     const Z = 0.850650808352;
 
-    return {
+    const m = {
       vertices: [
         new THREE.Vector3(-X, 0.0, Z), new THREE.Vector3(X, 0.0, Z), new THREE.Vector3(-X, 0.0, -Z), new THREE.Vector3(X, 0.0, -Z),    // 0-3
         new THREE.Vector3(0.0, Z, X), new THREE.Vector3(0.0, Z, -X), new THREE.Vector3(0.0, -Z, X), new THREE.Vector3(0.0, -Z, -X),    // 4-7
@@ -103,6 +111,8 @@ export const Solids = {
         [6, 10, 1], [9, 11, 0], [9, 2, 11], [9, 5, 2], [7, 11, 2]
       ]
     };
+    this.normalize(m);
+    return m;
   },
 
   // 5. DODECAHEDRON (20 Verts, 12 Faces)
