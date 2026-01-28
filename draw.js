@@ -1614,11 +1614,45 @@ export const SDF = {
       for (const v of vertices) {
         const d = v.dot(this.basisV);
         // u = (v . basisU) / d, w = (v . basisW) / d
-        this.poly2D.push({
-          x: v.dot(this.basisU) / d,
-          y: v.dot(this.basisW) / d
-        });
+        const x = v.dot(this.basisU) / d;
+        const y = v.dot(this.basisW) / d;
+        this.poly2D.push({ x, y });
       }
+
+      // Calculate 'inradius' (distance from centroid 0,0 to nearest edge)
+      // This ensures that the gradient is scaled relative to the "width" of the face.
+      let minEdgeDist = Infinity;
+      const len = this.poly2D.length;
+      if (len < 2) {
+        minEdgeDist = 1.0;
+      } else {
+        for (let i = 0; i < len; i++) {
+          const p1 = this.poly2D[i];
+          const p2 = this.poly2D[(i + 1) % len];
+
+          // Distance from (0,0) to segment p1-p2
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const l2 = dx * dx + dy * dy;
+          if (l2 < 1e-12) {
+            const d = Math.sqrt(p1.x * p1.x + p1.y * p1.y);
+            if (d < minEdgeDist) minEdgeDist = d;
+            continue;
+          }
+
+          // t = dot(p - p1, p2 - p1) / l2 .  Here p is (0,0) -> dot(-p1, p2-p1)
+          let t = - (p1.x * dx + p1.y * dy) / l2;
+          t = Math.max(0, Math.min(1, t));
+
+          const closestX = p1.x + t * dx;
+          const closestY = p1.y + t * dy;
+          const distSq = closestX * closestX + closestY * closestY;
+
+          if (distSq < minEdgeDist) minEdgeDist = distSq;
+        }
+        minEdgeDist = Math.sqrt(minEdgeDist);
+      }
+      this.size = (minEdgeDist > 0.0001) ? minEdgeDist : 1.0;
 
       // --- 3. Compute Bounds (Existing Logic - Preserved for Efficiency) ---
       // The bounding box logic is conservative and works for concave shapes too.
@@ -2034,7 +2068,7 @@ export const Scan = {
         // Zero thickness for solid face
         const shape = new SDF.Face(verts, 0);
         // Pass face index (i) as 4th argument to colorFn
-        const renderColorFn = (p, t, d) => colorFn(p, t, d, i);
+        const renderColorFn = (p, t, d) => colorFn(p, t, d / (shape.size || 1.0), i);
         Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
       }
     }

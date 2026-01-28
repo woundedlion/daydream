@@ -26,7 +26,7 @@ export class TestSolids {
             rotationSpeed: 0.5,
             opacity: 1.0,
             debugBB: false,
-            intensity: 5.0,
+            intensity: 1.2,
             dual: false,
             hankin: true,
             hankinAngle: Math.PI / 4
@@ -60,7 +60,6 @@ export class TestSolids {
         this.scanSolid = Solids[this.params.solid]();
         if (this.params.dual) this.scanSolid = MeshOps.dual(this.scanSolid);
 
-        // Optimization: Compile topology once
         if (this.params.hankin) {
             this.compiledHankin = MeshOps.compileHankin(this.scanSolid);
         } else {
@@ -94,10 +93,6 @@ export class TestSolids {
             }
             startMesh = MeshOps.updateHankin(this.compiledHankin, this.params.hankinAngle);
         }
-
-        // We clone faces since MeshMorph might need to mutate structure (though ideally it shouldn't for pure vertex morph)
-        // But for safety let's ensure we have a stable snapshot. 
-        // Actually MeshMorph usually projects. Let's trust the optimization.
         this.renderMesh = startMesh;
 
         // Destination Mesh
