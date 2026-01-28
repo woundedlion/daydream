@@ -2027,6 +2027,7 @@ export const Scan = {
      */
     static draw(pipeline, mesh, colorFn, debugBB = false) {
       for (let i = 0; i < mesh.faces.length; i++) {
+        //      for (let i = 31; i < 32; i++) {
         const face = mesh.faces[i];
         const verts = face.map(idx => mesh.vertices[idx]);
         // Zero thickness for solid face

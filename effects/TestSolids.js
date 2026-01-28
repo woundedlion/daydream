@@ -24,11 +24,11 @@ export class TestSolids {
             solid: 'dodecahedron',
             plot: true,
             scan: true,
-            scale: 1.0,
             rotationSpeed: 0.5,
             opacity: 1.0,
             debugBB: false,
-            faceScale: 5.0,
+            showLabels: false,
+            intensity: 5.0,
             dual: false,
             hankin: true,
             hankinAngle: Math.PI / 4
@@ -49,7 +49,7 @@ export class TestSolids {
 
         // The underlying solid definition (used in HANKIN mode)
         this.scanSolid = Solids[this.params.solid]();
-        // Solids.normalize(this.scanSolid);
+        Solids.normalize(this.scanSolid);
 
         // The mesh currently being rendered/morphed (used in MORPH mode)
         this.renderMesh = null;
@@ -68,7 +68,7 @@ export class TestSolids {
         // Ensure scanSolid is up to date with CURRENT params
         this.scanSolid = Solids[this.params.solid]();
         if (this.params.dual) this.scanSolid = MeshOps.dual(this.scanSolid);
-        // Solids.normalize(this.scanSolid);
+        Solids.normalize(this.scanSolid);
 
         // Animate Angle
         this.timeline.add(0, new Mutation(
@@ -94,7 +94,7 @@ export class TestSolids {
                 faces: this.scanSolid.faces
             };
             startMesh = MeshOps.hankin(startMesh, this.params.hankinAngle);
-            // Solids.normalize(startMesh);
+            Solids.normalize(startMesh);
         }
 
         // Set as current render mesh (Mutated by Morph)
@@ -111,14 +111,14 @@ export class TestSolids {
         // Base geometry
         let nextSolid = Solids[nextName]();
         if (this.params.dual) nextSolid = MeshOps.dual(nextSolid);
-        // Solids.normalize(nextSolid);
+        Solids.normalize(nextSolid);
 
         // Actual target mesh (might be Hankin)
         let nextMesh = nextSolid;
         if (this.params.hankin) {
             // Must clone/use fresh for Hankin generation, but nextSolid is fresh
             nextMesh = MeshOps.hankin(nextSolid, this.params.hankinAngle);
-            // Solids.normalize(nextMesh);
+            Solids.normalize(nextMesh);
         }
 
         // 3. Start Morph
@@ -139,11 +139,11 @@ export class TestSolids {
         this.gui.add(this.params, 'hankinAngle', 0, Math.PI / 2).name("Hankin Angle");
         this.gui.add(this.params, 'plot').name("Plot");
         this.gui.add(this.params, 'scan').name("Scan");
-        this.gui.add(this.params, 'scale', 0.1, 2.0).name("Scale");
-        this.gui.add(this.params, 'faceScale', 1.0, 50.0).name("Intensity");
+        this.gui.add(this.params, 'intensity', 1.0, 50.0).name("Intensity");
         this.gui.add(this.params, 'rotationSpeed', 0.0, 5.0).name("Rot Speed");
         this.gui.add(this.params, 'opacity', 0.1, 1.0).name("Opacity");
         this.gui.add(this.params, 'debugBB').name("Debug BB");
+        this.gui.add(this.params, 'showLabels').name("Show Labels");
     }
 
 
@@ -215,13 +215,12 @@ export class TestSolids {
 
             // Apply Transforms
             for (const v of m.vertices) {
-                if (this.params.scale !== 1.0) v.multiplyScalar(this.params.scale);
                 v.applyQuaternion(this.rotation);
             }
 
             const colorFace = (v, t, d, i) => {
                 const distFromEdge = -d;
-                const intensity = Math.min(1, Math.max(0, distFromEdge * this.params.faceScale));
+                const intensity = Math.min(1, Math.max(0, distFromEdge * this.params.intensity));
                 const c = richSunset.get(intensity).color;
                 return color4Pool.acquire().set(c, op);
             };
@@ -232,5 +231,37 @@ export class TestSolids {
         }
     }
 
-    getLabels() { return []; }
+    getLabels() {
+        if (!this.params.showLabels) return [];
+        const labels = [];
+        // Determine which mesh to label based on state
+        const mesh = (this.state === 'MORPH' && this.renderMesh) ? this.renderMesh : this.scanSolid;
+
+        if (!mesh || !mesh.faces) return labels;
+
+        for (let i = 0; i < mesh.faces.length; i++) {
+            const face = mesh.faces[i];
+            const centroid = new THREE.Vector3();
+
+            // Calculate centroid
+            for (const idx of face) {
+                centroid.add(mesh.vertices[idx]);
+            }
+            centroid.divideScalar(face.length);
+
+            // Apply rotation to match the visual orientation
+            // Note: We apply rotation even if the draw loop has it commented out, 
+            // assuming the user wants to track the logical orientation.
+            centroid.applyQuaternion(this.rotation);
+
+            // Normalize to project onto the sphere surface (as expected by driver.js)
+            centroid.normalize();
+
+            labels.push({
+                position: centroid,
+                content: i.toString()
+            });
+        }
+        return labels;
+    }
 }
