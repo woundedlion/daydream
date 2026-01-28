@@ -925,7 +925,10 @@ export const MeshOps = {
         safety++;
       } while (curr !== startOrbit && curr && safety < 100);
 
-      if (rosetteIndices.length > 2) faces.push(rosetteIndices);
+      if (rosetteIndices.length > 2) {
+        rosetteIndices.reverse(); // Fix inward normals
+        faces.push(rosetteIndices);
+      }
     }
 
     return {
@@ -971,8 +974,9 @@ export const MeshOps = {
       intersect.crossVectors(nHankin1, nHankin2);
 
       // Chirality
-      ref.addVectors(m1, m2);
-      if (intersect.dot(ref) < 0) intersect.negate();
+      // Use pCorner as the reference. The Hankin vertex starts at pCorner (angle 0)
+      // and moves towards the face center. It should always remain in the same hemisphere as pCorner.
+      if (intersect.dot(instr.pCorner) < 0) intersect.negate();
 
       dynamicVertices[i].copy(intersect).normalize();
     }
