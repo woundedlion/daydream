@@ -14,7 +14,7 @@ import { StaticPool } from "./StaticPool.js";
 /** @type {StaticPool} Global pool for Dot objects. */
 export const dotPool = new StaticPool(Dot, 500000);
 
-// Reusable temporary objects to avoid allocation during render loops
+// Temps
 const _tempVec = new THREE.Vector3();
 const _distVec1 = new THREE.Vector3();
 const _distVec2 = new THREE.Vector3();
@@ -78,7 +78,7 @@ export class Path {
       this.points.pop();
     }
     for (let t = 0; t <= samples; t++) {
-      // Must clone() because plotFn might return a pooled vector
+      // Clone
       this.points.push(plotFn(easingFn(t / samples) * domain).clone());
     }
     return this;
@@ -94,7 +94,7 @@ export class Path {
     const i = Math.floor(rawIndex);
     const f = rawIndex - i;
 
-    // Handle end of path
+    // Check end
     if (i >= this.points.length - 1) {
       return vectorPool.acquire().copy(this.points[this.points.length - 1]);
     }
@@ -228,7 +228,7 @@ export const Plot = {
         w.negate();
       }
 
-      // Handle Start Offset
+      // Start offset
       if (start !== 0) {
         const startAngle = start * a;
         const q = quaternionPool.acquire().setFromAxisAngle(w, startAngle);
@@ -236,8 +236,7 @@ export const Plot = {
       }
       a *= Math.abs(end - start);
 
-      // Scalar simlutation to align seam
-      // Goal: Find 'scale' so steps sum exactly to 'a'.
+      // Simulate seam
       // u(theta).y = uStart.y * cos(theta) + tangent.y * sin(theta)
       const uStart_y = u.y;
       const tangent_y = w.z * u.x - w.x * u.z;
@@ -245,7 +244,7 @@ export const Plot = {
       const steps = [];
       const baseStep = TWO_PI / Daydream.W;
       while (simAngle < a) {
-        // Analytical Height Calculation
+        // Height
         const cosT = Math.cos(simAngle);
         const sinT = Math.sin(simAngle);
         const currentY = uStart_y * cosT + tangent_y * sinT;
@@ -258,7 +257,7 @@ export const Plot = {
         simAngle += step;
       }
 
-      // Calculate Normalization Scale (Ensures perfect seam)
+      // Normalize
       let scale = a / simAngle;
       let currentAngle = 0;
       const startC = colorFn(u, 0);
@@ -310,7 +309,7 @@ export const Plot = {
       let points = [];
       edges.map((adj, i) => {
         adj.map((j) => {
-          // Just push the vertices, let rasterize handle the lines
+          // Push vertices
           points.push(vectorPool.acquire().set(...vertices[i]).normalize());
           points.push(vectorPool.acquire().set(...vertices[j]).normalize());
         })
@@ -354,7 +353,7 @@ export const Plot = {
           const idx1 = face[i];
           const idx2 = face[(i + 1) % face.length];
 
-          // Deduplicate edges (draw each undirected edge once)
+          // Deduplicate
           const key = idx1 < idx2 ? `${idx1},${idx2}` : `${idx2},${idx1}`;
           if (drawn.has(key)) continue;
           drawn.add(key);
@@ -400,8 +399,7 @@ export const Plot = {
      */
     static sample(basis, radius, numSamples, phase = 0) {
       const { u, v, w } = basis;
-
-      // Backside rings
+      // Backside
       let vDir = v.clone();
       if (radius > 1) {
         vDir.negate();
@@ -454,7 +452,7 @@ export const Plot = {
      * @param {Function} colorFn - (t) => {color, alpha}.
      */
     static draw(pipeline, v1, v2, center, colorFn) {
-      // Basis for projection
+      // Basis
       let refAxis = Daydream.X_AXIS;
       if (Math.abs(center.dot(refAxis)) > 0.9999) {
         refAxis = Daydream.Y_AXIS;
@@ -536,7 +534,7 @@ export const Plot = {
     }
 
     static sample(basis, radius, numSides, phase = 0) {
-      // Offset by half-sector to align with Scan.Polygon edges
+      // Offset sectors
       const offset = Math.PI / numSides;
       return Plot.Ring.sample(basis, radius, numSides, phase + offset);
     }
@@ -544,7 +542,7 @@ export const Plot = {
 
   Star: class {
     static sample(basis, radius, numSides, phase = 0) {
-      // Basis construction
+      // Basis
       let { v, u, w } = basis;
 
       if (radius > 1.0) {
@@ -600,25 +598,22 @@ export const Plot = {
       let { v, u, w } = basis;
 
       if (radius > 1.0) {
-        // Switch to antipode basis
+        // Antipode basis
         v = vectorPool.acquire().copy(v).negate();
         u = vectorPool.acquire().copy(u).negate();
 
         radius = 2.0 - radius;
       }
 
-      // The "flower" is the hole of an antipodal polygon.
-      // We draw the boundary of this polygon relative to the Antipode.
+      // Draw boundary relative to antipode
       const desiredOuterRadius = radius * (Math.PI / 2);
       const apothem = Math.PI - desiredOuterRadius;
       const angleStep = Math.PI / numSides;
 
-      // Basis already set above (Antibasis if needed)
-
       const points = [];
       const numSegments = Math.max(2, Math.floor(Daydream.W / numSides)); // Resolution per side
 
-      // Sample the analytical boundary: R(phi) = apothem / cos(phi)
+      // Sample boundary: R(phi) = apothem / cos(phi)
       for (let i = 0; i < numSides; i++) {
         const sectorCenter = phase + i * 2 * angleStep;
 
@@ -628,10 +623,8 @@ export const Plot = {
           let R = apothem / Math.cos(localPhi);
           if (R > Math.PI) R = Math.PI;
 
-          const theta = sectorCenter + localPhi;
 
-          // Convert Polar (R, theta) on antipode centered map to 3D Sphere Point
-          // Point = v * cos(R) + (u*cos(theta) + w*sin(theta)) * sin(R)
+          // Convert Polar (R, theta)
           const sinR = Math.sin(R);
           const cosR = Math.cos(R);
           const cosT = Math.cos(theta);
@@ -647,7 +640,7 @@ export const Plot = {
         }
       }
 
-      // Close the loop
+      // Close loop
       if (points.length > 0) {
         points.push(vectorPool.acquire().copy(points[0]));
       }
@@ -675,7 +668,7 @@ export const Plot = {
       let { u, v, w } = basis;
 
       if (radius > 1) {
-        // Flip basis logic locally 
+        // Flip basis
         v = vectorPool.acquire().copy(v).negate();
         u = vectorPool.acquire().copy(u).negate();
         radius = 2 - radius;
@@ -700,14 +693,14 @@ export const Plot = {
       // Basis
       const { v, u, w } = basis;
 
-      // Backside rings
+      // Backside
       let vSign = 1.0;
       if (radius > 1) {
         vSign = -1.0;
         radius = 2 - radius;
       }
 
-      // Equidistant projection
+      // Projection
       const thetaEq = radius * (Math.PI / 2);
       const r = Math.sin(thetaEq);
       const d = Math.cos(thetaEq);
@@ -725,7 +718,7 @@ export const Plot = {
         let sinRing = Math.sin(t);
         uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
 
-        // Apply Shift
+        // Shift
         let shift = shiftFn(theta / (TWO_PI));
         let cosShift = Math.cos(shift);
         let sinShift = Math.sin(shift);
@@ -820,6 +813,12 @@ export const Plot = {
 
 export const SDF = {
   Ring: class {
+    /**
+     * @param {Object} basis - {u, v, w}.
+     * @param {number} radius - Radius.
+     * @param {number} thickness - Thickness.
+     * @param {number} phase - Phase.
+     */
     constructor(basis, radius, thickness, phase = 0) {
       this.basis = basis;
       this.radius = radius;
@@ -838,7 +837,7 @@ export const SDF = {
       this.targetAngle = radius * (Math.PI / 2);
       this.centerPhi = Math.acos(this.ny);
 
-      // Pre-calc optimization constants
+      // Optimize
       const angMin = Math.max(0, this.targetAngle - thickness);
       const angMax = Math.min(Math.PI, this.targetAngle + thickness);
       this.cosMax = Math.cos(angMin);
@@ -854,7 +853,7 @@ export const SDF = {
      * @returns {{yMin: number, yMax: number}} The vertical bounds [yMin, yMax].
      */
     getVerticalBounds() {
-      // Vertical bounds
+      // Vertical
       const a1 = this.centerPhi - this.targetAngle;
       const a2 = this.centerPhi + this.targetAngle;
 
@@ -892,11 +891,6 @@ export const SDF = {
     }
 
     /**
-     * Calculates the horizontal intervals for a given scanline y.
-     * @param {number} y - The scanline y-coordinate.
-     * @returns {{start: number, end: number}[]|null} Array of intervals, or null for full row.
-     */
-    /**
      * @param {number} y 
      * @returns {{start: number, end: number}[]|null}
      */
@@ -906,8 +900,8 @@ export const SDF = {
       const sinPhi = Math.sin(phi);
 
       const R = Math.sqrt(this.nx * this.nx + this.nz * this.nz);
-      // Fast rejection for poles or singularity
-      if (R < 0.01) return null; // Logic for "Scan Full Row"
+      // Check poles
+      if (R < 0.01) return null;
 
       const denom = R * sinPhi;
       if (Math.abs(denom) < 0.000001) return null;
@@ -968,7 +962,7 @@ export const SDF = {
 
       let dist = 0;
       if (this.invSinTarget !== 0) {
-        // Optimization: Linear approximation
+        // Approx
         dist = Math.abs(dot - this.cosTarget) * this.invSinTarget;
       } else {
         const polarAngle = Math.acos(Math.max(-1, Math.min(1, dot)));
@@ -992,6 +986,14 @@ export const SDF = {
   },
 
   DistortedRing: class {
+    /**
+     * @param {Object} basis - {u, v, w}.
+     * @param {number} radius - Radius.
+     * @param {number} thickness - Thickness.
+     * @param {Function} shiftFn - Shift.
+     * @param {number} maxDistortion - Max shift.
+     * @param {number} phase - Phase.
+     */
     constructor(basis, radius, thickness, shiftFn, maxDistortion, phase = 0) {
       this.basis = basis;
       this.radius = radius; // Base angular radius
@@ -1011,7 +1013,7 @@ export const SDF = {
 
       this.targetAngle = radius * (Math.PI / 2);
       this.centerPhi = Math.acos(this.ny);
-      // Max thickness including distortion for bounds
+      // Max thickness
       this.maxThickness = thickness + maxDistortion;
     }
 
@@ -1135,6 +1137,10 @@ export const SDF = {
   },
 
   Union: class {
+    /**
+     * @param {Object} a - Shape A.
+     * @param {Object} b - Shape B.
+     */
     constructor(a, b) {
       this.a = a;
       this.b = b;
@@ -1179,6 +1185,10 @@ export const SDF = {
   },
 
   Subtract: class {
+    /**
+     * @param {Object} a - Shape A.
+     * @param {Object} b - Shape B.
+     */
     constructor(a, b) {
       this.a = a;
       this.b = b;
@@ -1198,7 +1208,7 @@ export const SDF = {
      * @param {number} y - Scanline.
      * @returns {{start: number, end: number}[]|null} Intervals.
      */
-    // Conservative interval: Subtracting B from A might chop A's intervals, but A's intervals are a safe superset.
+    // Conservative
     getHorizontalBounds(y) {
       if (this.a.getHorizontalBounds) return this.a.getHorizontalBounds(y);
       return null;
@@ -1231,6 +1241,10 @@ export const SDF = {
   },
 
   Intersection: class {
+    /**
+     * @param {Object} a - Shape A.
+     * @param {Object} b - Shape B.
+     */
     constructor(a, b) {
       this.a = a;
       this.b = b;
@@ -1255,13 +1269,12 @@ export const SDF = {
      * @param {number} y - Scanline.
      * @returns {{start: number, end: number}[]|null} Intervals.
      */
-    // Intersection intervals: A intersect B
+    // Intersect
     getHorizontalBounds(y) {
       let iA = this.a.getHorizontalBounds ? this.a.getHorizontalBounds(y) : null;
       let iB = this.b.getHorizontalBounds ? this.b.getHorizontalBounds(y) : null;
 
-      // Null means "Full Row" (technically [-inf, +inf] or [0, W])
-      // Intersection with "Full Row" is just the other set.
+      // Full row
       if (iA === null) return iB;
       if (iB === null) return iA;
 
@@ -1319,6 +1332,13 @@ export const SDF = {
   },
 
   Polygon: class {
+    /**
+     * @param {Object} basis - {u, v, w}.
+     * @param {number} radius - Radius.
+     * @param {number} thickness - Thickness.
+     * @param {number} sides - Sides.
+     * @param {number} phase - Phase.
+     */
     constructor(basis, radius, thickness, sides, phase = 0) {
       this.basis = basis;
       this.thickness = thickness;
@@ -1402,6 +1422,12 @@ export const SDF = {
   },
 
   Star: class {
+    /**
+     * @param {Object} basis - {u, v, w}.
+     * @param {number} radius - Radius.
+     * @param {number} sides - Sides.
+     * @param {number} phase - Phase.
+     */
     constructor(basis, radius, sides, phase = 0) {
       this.basis = basis;
       this.sides = sides;
@@ -1423,7 +1449,7 @@ export const SDF = {
       this.planeD = -(this.nx * vT);
       this.thickness = outerRadius;
 
-      // Scan params
+      // Scan
       this.scanNy = basis.v.y;
       this.scanNx = basis.v.x;
       this.scanNz = basis.v.z;
@@ -1446,7 +1472,7 @@ export const SDF = {
      * @returns {{start: number, end: number}[]|null}
      */
     getHorizontalBounds(y) {
-      // Same as Polygon Bounding Circle logic
+      // Bounding circle
       const phi = yToPhi(y);
       const cosPhi = Math.cos(phi);
       const sinPhi = Math.sin(phi);
@@ -1501,6 +1527,12 @@ export const SDF = {
   },
 
   Flower: class {
+    /**
+     * @param {Object} basis - {u, v, w}.
+     * @param {number} radius - Radius.
+     * @param {number} sides - Sides.
+     * @param {number} phase - Phase.
+     */
     constructor(basis, radius, sides, phase = 0) {
       this.basis = basis;
       this.sides = sides;
@@ -1585,6 +1617,10 @@ export const SDF = {
   },
 
   Face: class {
+    /**
+     * @param {THREE.Vector3[]} vertices - Vertices.
+     * @param {number} thickness - Thickness.
+     */
     constructor(vertices, thickness = 0) {
       this.vertices = vertices;
       this.thickness = thickness;
@@ -1593,8 +1629,7 @@ export const SDF = {
       this.yMax = 0;
       this.intervals = null;
 
-      // --- 1. Calculate Centroid & Basis (for Gnomonic Projection) ---
-      // We need a local 2D coordinate system tangent to the face center.
+      // Centroid & Basis
       const center = new THREE.Vector3();
       for (const v of vertices) center.add(v);
       center.normalize();
@@ -1602,14 +1637,12 @@ export const SDF = {
       this.center = center;
       this.basisV = center; // Normal (V)
 
-      // Create basis U and W perpendicular to V
+      // Basis U W
       let ref = Math.abs(center.dot(Daydream.X_AXIS)) > 0.9 ? Daydream.Y_AXIS : Daydream.X_AXIS;
       this.basisU = new THREE.Vector3().crossVectors(center, ref).normalize();
       this.basisW = new THREE.Vector3().crossVectors(center, this.basisU).normalize();
 
-      // --- 2. Project Vertices to 2D Plane ---
-      // Gnomonic projection: P_plane = P_sphere / (P_sphere . Center)
-      // This maps Great Circles to straight lines in 2D.
+      // Project 2D
       this.poly2D = [];
       for (const v of vertices) {
         const d = v.dot(this.basisV);
@@ -1619,8 +1652,7 @@ export const SDF = {
         this.poly2D.push({ x, y });
       }
 
-      // Calculate 'inradius' (distance from centroid 0,0 to nearest edge)
-      // This ensures that the gradient is scaled relative to the "width" of the face.
+      // Inradius
       let minEdgeDist = Infinity;
       const len = this.poly2D.length;
       if (len < 2) {
@@ -1654,8 +1686,7 @@ export const SDF = {
       }
       this.size = (minEdgeDist > 0.0001) ? minEdgeDist : 1.0;
 
-      // --- 3. Compute Bounds (Existing Logic - Preserved for Efficiency) ---
-      // The bounding box logic is conservative and works for concave shapes too.
+      // Compute Bounds
       let minPhi = 100;
       let maxPhi = -100;
       const thetas = [];
@@ -1664,27 +1695,24 @@ export const SDF = {
         const v1 = this.vertices[i];
         const v2 = this.vertices[(i + 1) % this.vertices.length];
 
-        // Edge Plane Normal (points OUT for CCW)
-        // v1 x v2 points 'Right' relative to edge.
+        // Plane Normal
         // FIXED: Use new THREE.Vector3() instead of pool to avoid corruption
         const normal = new THREE.Vector3().crossVectors(v1, v2);
 
-        // Guard against degenerate edges (v1 ~= v2)
+        // Skip degenerate
         if (normal.lengthSq() < 1e-12) {
-          // Degenerate edge: contributes nothing to bounds.
           // Skip adding to planes, but continue vertex bounds checks.
         } else {
           normal.normalize();
           this.planes.push(normal);
         }
 
-        // 1. Vertex contribution
+        // Vertices
         const phi1 = Math.acos(Math.max(-1, Math.min(1, v1.y)));
         if (phi1 < minPhi) minPhi = phi1;
         if (phi1 > maxPhi) maxPhi = phi1;
 
-        // 1b. Arc Extrema (Max/Min Latitude on Edge)
-        // Check if the Great Circle arc contains P_top (closest to North) or P_bot (closest to South).
+        // Arc Extrema
         const ny = normal.y;
         if (Math.abs(ny) < 0.99999) { // Avoid pole-aligned planes
           const nx = normal.x;
@@ -1701,13 +1729,11 @@ export const SDF = {
             const pty = ty * invLen;
             const ptz = tz * invLen;
 
-            // Check if P_top is strictly between v1 and v2 using scalar triple products
-            // cx1 = (v1 x P_top) . N
-            // cx2 = (P_top x v2) . N
+            // Check P_top
             const cx1 = (v1.y * ptz - v1.z * pty) * nx + (v1.z * ptx - v1.x * ptz) * ny + (v1.x * pty - v1.y * ptx) * nz;
             const cx2 = (pty * v2.z - ptz * v2.y) * nx + (ptz * v2.x - ptx * v2.z) * ny + (ptx * v2.y - pty * v2.x) * nz;
 
-            // If P_top is inside, update minPhi (Northmost)
+            // Update minPhi
             if (cx1 > 0 && cx2 > 0) {
               const phiTop = Math.acos(Math.max(-1, Math.min(1, pty)));
               if (phiTop < minPhi) minPhi = phiTop;
@@ -1728,7 +1754,7 @@ export const SDF = {
         thetas.push(theta);
       }
 
-      // 2. Arc/Pole Logic
+      // Pole Logic
       // CCW Winding: Edge Normals point "Right" (Southish for North Face).
       // NP Inside -> Face is North of Edge -> Normal points South (y < 0).
       // So if any Normal points North (y > 0), NP is NOT inside.
@@ -1741,13 +1767,12 @@ export const SDF = {
       if (npInside) minPhi = 0;
       if (spInside) maxPhi = Math.PI;
 
-      // (Re-using simpler conservative bounds for now to ensure concave safety)
-      // A concave shape is contained by its convex hull vertices, so vertex min/max is safe.
+      // Conservative Bounds
       const margin = thickness + 0.05;
       this.yMin = Math.floor((Math.max(0, minPhi - margin) / Math.PI) * (Daydream.H - 1));
       this.yMax = Math.ceil((Math.min(Math.PI, maxPhi + margin) / Math.PI) * (Daydream.H - 1));
 
-      // Horizontal bounds logic (simplified enclosing square)
+      // Horizontal bounds
       thetas.sort((a, b) => a - b);
       let maxGap = 0;
       let gapStart = 0;
@@ -1769,24 +1794,23 @@ export const SDF = {
     getHorizontalBounds(y) { return this.intervals; }
 
     /**
-     * Calculates Signed Distance to arbitrary polygon (Concave/Convex).
-     * Uses 2D SDF in Gnomonic Tangent Plane.
+     * Signed Distance to arbitrary polygon.
+     * @param {THREE.Vector3} p - Point.
+     * @param {{dist: number, t: number, rawDist: number}} [out] - Result.
+     * @returns {{dist: number, t: number, rawDist: number}} Result.
      */
     distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
-      // 1. Hemisphere Check (Clipping)
-      // If point is 90deg away from center, it can't be part of the face
+      // Hemisphere check
       const cosAngle = p.dot(this.center);
       if (cosAngle <= 0.01) {
         out.dist = 100; return out;
       }
 
-      // 2. Project P to 2D Tangent Plane
-      // p2d = (P . U, P . W) / (P . V)
+      // Project P
       const px = p.dot(this.basisU) / cosAngle;
       const py = p.dot(this.basisW) / cosAngle;
 
-      // 3. 2D Polygon SDF (Inigo Quilez method) & Winding Number
-      // Calculates closest distance to edge AND determines sign via winding.
+      // 2D SDF & Winding
       const v = this.poly2D;
       const N = v.length;
 
@@ -1802,8 +1826,7 @@ export const SDF = {
         const wx = px - Vi.x;
         const wy = py - Vi.y;
 
-        // --- Distance to Edge Segment ---
-        // clamp( dot(w,e)/dot(e,e), 0, 1 )
+        // Edge distance
         const dotWE = wx * ex + wy * ey;
         const dotEE = ex * ex + ey * ey;
 
@@ -1818,9 +1841,7 @@ export const SDF = {
 
         if (distSq < d) d = distSq;
 
-        // --- Winding Number Check (Non-Zero Rule) ---
-        // Ray cast along +X from (px, py).
-        // Check if edge (Vi, Vj) crosses this ray.
+        // Winding
         const isUpward = (Vi.y <= py) && (Vj.y > py);
         const isDownward = (Vi.y > py) && (Vj.y <= py);
 
@@ -1857,6 +1878,13 @@ export const SDF = {
 };
 
 export const Scan = {
+  /**
+   * Rasterizes a shape using scanline conversion.
+   * @param {Object} pipeline - Pipeline.
+   * @param {Object} shape - SDF shape.
+   * @param {Function} colorFn - Color function.
+   * @param {boolean} [debugBB=false] - Debug.
+   */
   rasterize: (pipeline, shape, colorFn, debugBB = false) => {
     const { yMin, yMax } = shape.getVerticalBounds();
 
@@ -1886,6 +1914,16 @@ export const Scan = {
     }
   },
 
+  /**
+   * Processes a single pixel.
+   * @param {number} x - X coord.
+   * @param {number} y - Y coord.
+   * @param {Object} pipeline - Pipeline.
+   * @param {Object} shape - Shape.
+   * @param {Function} colorFn - Color function.
+   * @param {boolean} debugBB - Debug.
+   * @param {Object} sampleResult - Reusable result.
+   */
   processPixel: (x, y, pipeline, shape, colorFn, debugBB, sampleResult) => {
     const wx = wrap(x, Daydream.W);
     const i = wx + y * Daydream.W;
@@ -1933,6 +1971,15 @@ export const Scan = {
 
 
   Polygon: class {
+    /**
+     * @param {Object} pipeline - Pipeline.
+     * @param {Object} basis - Basis.
+     * @param {number} radius - Radius.
+     * @param {number} sides - Sides.
+     * @param {Function} colorFn - Color function.
+     * @param {number} [phase=0] - Phase.
+     * @param {boolean} [debugBB=false] - Debug.
+     */
     static draw(pipeline, basis, radius, sides, colorFn, phase = 0, debugBB = false) {
       let { v, u, w } = basis;
       if (radius > 1.0) {
@@ -1949,6 +1996,15 @@ export const Scan = {
   },
 
   Star: class {
+    /**
+     * @param {Object} pipeline - Pipeline.
+     * @param {Object} basis - Basis.
+     * @param {number} radius - Radius.
+     * @param {number} sides - Sides.
+     * @param {Function} colorFn - Color function.
+     * @param {number} [phase=0] - Phase.
+     * @param {boolean} [debugBB=false] - Debug.
+     */
     static draw(pipeline, basis, radius, sides, colorFn, phase = 0, debugBB = false) {
       let { v, u, w } = basis;
       if (radius > 1.0) {
@@ -1963,6 +2019,15 @@ export const Scan = {
   },
 
   Flower: class {
+    /**
+     * @param {Object} pipeline - Pipeline.
+     * @param {Object} basis - Basis.
+     * @param {number} radius - Radius.
+     * @param {number} sides - Sides.
+     * @param {Function} colorFn - Color function.
+     * @param {number} [phase=0] - Phase.
+     * @param {boolean} [debugBB=false] - Debug.
+     */
     static draw(pipeline, basis, radius, sides, colorFn, phase = 0, debugBB = false) {
       let { v, u, w } = basis;
       if (radius > 1.0) {
@@ -2062,7 +2127,6 @@ export const Scan = {
      */
     static draw(pipeline, mesh, colorFn, debugBB = false) {
       for (let i = 0; i < mesh.faces.length; i++) {
-        //      for (let i = 31; i < 32; i++) {
         const face = mesh.faces[i];
         const verts = face.map(idx => mesh.vertices[idx]);
         // Zero thickness for solid face
@@ -2075,6 +2139,13 @@ export const Scan = {
   },
 
   Point: class {
+    /**
+     * @param {Object} pipeline - Pipeline.
+     * @param {THREE.Vector3} pos - Position.
+     * @param {number} thickness - Thickness.
+     * @param {Function} colorFn - Color function.
+     * @param {Object} options - Options.
+     */
     static draw(pipeline, pos, thickness, colorFn, options) {
       const identity = quaternionPool.acquire().identity();
       const basis = makeBasis(identity, pos);
@@ -2084,6 +2155,10 @@ export const Scan = {
   },
 
   Field: class {
+    /**
+     * @param {Object} pipeline - Pipeline.
+     * @param {Function} colorFn - Color function.
+     */
     static draw(pipeline, colorFn) {
       for (let i = 0; i < Daydream.pixelPositions.length; i++) {
         const x = i % Daydream.W;
