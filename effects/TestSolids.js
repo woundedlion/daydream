@@ -14,9 +14,21 @@ import { Timeline, Rotation, easeInOutSin, Mutation, easeMid, MeshMorph, Periodi
 import { Daydream } from "../driver.js";
 import { TWO_PI } from "../3dmath.js";
 
+
+
+const PALETTES = {
+    3: embers,
+    4: underSea,
+    5: emeraldForest,
+    6: lateSunset,
+    8: iceMelt,
+    10: mangoPeel
+};
+
 export class TestSolids {
     constructor() {
         this.orientation = new THREE.Quaternion();
+        this.transformedVertices = [];
         this.pipeline = createRenderPipeline(new FilterAntiAlias());
 
         this.params = {
@@ -157,24 +169,33 @@ export class TestSolids {
         if (op < 0.01) return;
         if (!mesh || mesh.faces.length === 0) return;
 
-        const drawnMesh = {
-            vertices: mesh.vertices.map(v => v.clone().applyQuaternion(this.orientation.get())),
-            faces: mesh.faces
-        };
+        // OPTIMIZATION: Reuse array and vectors
+        // 1. Ensure cache size
+        while (this.transformedVertices.length < mesh.vertices.length) {
+            this.transformedVertices.push(new THREE.Vector3());
+        }
 
-        const palettes = {
-            3: embers,
-            4: underSea,
-            5: emeraldForest,
-            6: lateSunset,
-            8: iceMelt,
-            10: mangoPeel
+        // 2. Transform into cache without allocation
+        const q = this.orientation.get();
+        const count = mesh.vertices.length;
+
+        // We only create a slice/view, not a deep copy of the array structure
+        const currentVerts = this.transformedVertices.slice(0, count);
+
+        for (let i = 0; i < count; i++) {
+            // Copy source, apply rotation, store in cache
+            currentVerts[i].copy(mesh.vertices[i]).applyQuaternion(q);
+        }
+
+        const drawnMesh = {
+            vertices: currentVerts,
+            faces: mesh.faces
         };
 
         const colorFace = (v, t, d, i) => {
             const face = mesh.faces[i];
             const n = face ? face.length : 0;
-            const palette = palettes[n] || richSunset;
+            const palette = PALETTES[n] || richSunset;
 
             const distFromEdge = -d;
             const intensity = Math.min(1, Math.max(0, distFromEdge * this.params.intensity));
