@@ -736,6 +736,7 @@ export const MeshOps = {
       }
     }
 
+    newVertices.forEach(v => v.normalize());
     return { vertices: newVertices, faces: newFaces };
   },
 
@@ -804,6 +805,7 @@ export const MeshOps = {
       if (vertFaceIndices.length > 2) newFaces.push(vertFaceIndices.reverse());
     }
 
+    newVertices.forEach(v => v.normalize());
     return { vertices: newVertices, faces: newFaces };
   },
 
@@ -985,6 +987,7 @@ export const MeshOps = {
       newFaces.push([pAS, pBE, pAE]);
     }
 
+    newVertices.forEach(v => v.normalize());
     return { vertices: newVertices, faces: newFaces };
   },
 
@@ -1047,6 +1050,7 @@ export const MeshOps = {
       }
     }
 
+    newVertices.forEach(v => v.normalize());
     return { vertices: newVertices, faces: newFaces };
   },
 
@@ -1128,19 +1132,6 @@ export const MeshOps = {
           intersect.negate();
         }
 
-        // 4. "Gravity" Regularization
-        // This is the key fix. We pull the intersection towards 'ref' based on instability.
-        // - We use a Power Curve: weight = 1 / (1 + (lenSq / epsilon)^2)
-        // - epsilon = 0.005 defines the "danger zone".
-        //   * At lenSq = 0.295 (Truncated Singularity), weight -> 1.0 (Forces flat line).
-        //   * At lenSq = 0.75 (Snub Horizon), weight -> ~0.5 (Pulls it back from the edge).
-        //   * At lenSq = 1.0 (Normal), weight -> ~0.0 (Pure intersection).
-
-        //      const epsilon = 0.005;
-        //     const weight = 1.0 / (1.0 + (lenSq / (epsilon * epsilon)));
-
-        //   intersect.addScaledVector(ref, weight).normalize();
-
         const idxI = newVertices.push(intersect.clone()) - 1;
 
         // Key the intersection to the edge STARING at this corner
@@ -1180,8 +1171,7 @@ export const MeshOps = {
         if (!nextEdge) break;
 
         // 3. Add Intersection located between current and next edge
-        // The intersection in the face between 'curr' and 'nextEdge' 
-        // is associated with 'nextEdge' (as it's the edge starting at the corner in that face)
+
         const idxI = heToIntersectIdx.get(nextEdge);
         rosetteIndices.push(idxI);
 
@@ -1195,6 +1185,7 @@ export const MeshOps = {
       }
     }
 
+    newVertices.forEach(v => v.normalize());
     return { vertices: newVertices, faces: newFaces };
   },
 };

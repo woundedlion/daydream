@@ -1020,12 +1020,12 @@ export class MeshMorph extends Animation {
     // We need the *structure* (topology) and the *shape* (geometry)
     let destSolid = Solids[this.params.target]();
     if (this.params.dual) destSolid = MeshOps.dual(destSolid);
-    Solids.normalize(destSolid); // Target is always a unit sphere solid
+
 
     // If target has Hankin, generate it
     if (this.params.hankin) {
       destSolid = MeshOps.hankin(destSolid, this.params.hankinAngle);
-      Solids.normalize(destSolid);
+
     }
 
     // Store Dest for the secondary render pass
