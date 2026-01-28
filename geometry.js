@@ -10,6 +10,7 @@ import { Rotation, easeOutCirc } from "./animation.js";
 import { g1, g2 } from "./color.js";
 import { StaticPool } from "./StaticPool.js";
 import { TWO_PI } from "./3dmath.js";
+import { KDTree } from "./KDTree.js";
 
 /** @type {StaticPool} Global pool for temporary Vector3 objects. */
 export const vectorPool = new StaticPool(THREE.Vector3, 500000);
@@ -810,6 +811,48 @@ export const MeshOps = {
   },
 
   /**
+   * Computes the KDTree and Adjacency Map for a mesh.
+   * Stores the result in mesh.kdTree.
+   * @param {Object} mesh - {vertices, faces}
+   */
+  computeKdTree(mesh) {
+    if (mesh.kdTree) return;
+
+    // 1. Build Adjacency Map (Vertex Index -> Array of Neighbor Vertex Indices)
+    const adjacency = new Array(mesh.vertices.length).fill(null).map(() => []);
+
+    // We need edge connectivity. 
+    // Ideally we want: Vertex -> Connected Edges (Pairs of indices)
+    // Actually, closestPoint check involves checking all edges connected to the closest vertex.
+    // So for each vertex, we need a list of edges (as neighbor vertex indices) that start from it.
+
+    // Iterate faces to find edges
+    for (const face of mesh.faces) {
+      for (let i = 0; i < face.length; i++) {
+        const idxA = face[i];
+        const idxB = face[(i + 1) % face.length];
+
+        // Add B to A's list
+        if (!adjacency[idxA].includes(idxB)) adjacency[idxA].push(idxB);
+        // Add A to B's list
+        if (!adjacency[idxB].includes(idxA)) adjacency[idxB].push(idxA);
+      }
+    }
+
+    // 2. Format points for KDTree
+    // KDTree expects objects with a .pos property (Vector3)
+    const points = mesh.vertices.map((v, i) => ({ pos: v, index: i }));
+
+    // 3. Build Tree
+    const tree = new KDTree(points);
+
+    mesh.kdTree = {
+      tree,
+      adjacency
+    };
+  },
+
+  /**
    * Finds the closest point on the mesh "wireframe" (vertices and edges) to a target point.
    * Assumes all points are on a unit sphere.
    * @param {THREE.Vector3} p - Target point (normalized)
@@ -817,79 +860,72 @@ export const MeshOps = {
    * @returns {THREE.Vector3} Closest point on the edges/vertices of the mesh
    */
   closestPointOnMeshGraph(p, mesh) {
-    let bestPoint = null;
-    let maxDot = -1.0;
-
-    // 1. Check all Vertices
-    for (const v of mesh.vertices) {
-      const d = p.dot(v);
-      if (d > maxDot) {
-        maxDot = d;
-        bestPoint = v;
-      }
+    // Ensure acceleration structure exists
+    if (!mesh.kdTree) {
+      this.computeKdTree(mesh);
     }
-    // Optimization: If very close, return early? No, edge might be closer technically? 
-    // Actually on sphere, closest point is either vertex or orthogonal projection onto Great Circle arc.
 
-    // 2. Check all Edges
-    // Using a set to avoid processing shared edges twice would be ideal, but faces loop is simpler.
+    const { tree, adjacency } = mesh.kdTree;
+
+    // 1. Find Closest Vertex using KDTree
+    // We search for 1 nearest neighbor.
+    // Returns array of { pos: Vector3, index: number } (from our wrapper objects)
+    const nearestNodes = tree.nearest(p, 1);
+    if (!nearestNodes.length) return mesh.vertices[0].clone();
+
+    const closestVertexNode = nearestNodes[0]; // This is the object { pos, index }
+    const closestVertexIndex = closestVertexNode.index;
+    const closestVertexPos = closestVertexNode.pos;
+
+    let bestPoint = closestVertexPos.clone();
+    let maxDot = p.dot(bestPoint);
+
+    // 2. Check Edges connected to this vertex
+    // adjacency[i] contains indices of neighbors.
+    // Each neighbor forms an edge (closestVertexIndex, neighborIndex).
+
+    const neighbors = adjacency[closestVertexIndex];
+    if (!neighbors) return bestPoint; // Should not happen for valid mesh
+
     const tempN = new THREE.Vector3();
     const tempC = new THREE.Vector3();
-
-    // Reuse vectors for performance
     const vA = new THREE.Vector3();
     const vB = new THREE.Vector3();
 
-    for (const face of mesh.faces) {
-      for (let i = 0; i < face.length; i++) {
-        const idxA = face[i];
-        const idxB = face[(i + 1) % face.length];
+    const A = closestVertexPos;
 
-        // To save clone cost, we'll access directly if safe, but mesh.vertices might be shared
-        // Just referencing is fine for read-only
-        const A = mesh.vertices[idxA];
-        const B = mesh.vertices[idxB];
+    for (const neighborIdx of neighbors) {
+      const B = mesh.vertices[neighborIdx];
 
-        // Normal of the Great Circle Plane defined by (Origin, A, B)
-        tempN.crossVectors(A, B); // A x B
-        const lenSq = tempN.lengthSq();
-        if (lenSq < 0.000001) continue; // Degenerate edge or antipodal
-        tempN.multiplyScalar(1.0 / Math.sqrt(lenSq)); // Normalize
+      // Normal of the Great Circle Plane defined by (Origin, A, B)
+      // Note: A and B are unit vectors on sphere.
+      tempN.crossVectors(A, B);
+      const lenSq = tempN.lengthSq();
+      if (lenSq < 0.000001) continue; // Degenerate edge
+      tempN.multiplyScalar(1.0 / Math.sqrt(lenSq)); // Normalize
 
-        // Project P onto this plane: P_proj = P - (P . N) * N
-        const pDotN = p.dot(tempN);
-        tempC.copy(p).addScaledVector(tempN, -pDotN); // P_proj
+      // Project P onto this plane: P_proj = P - (P . N) * N
+      const pDotN = p.dot(tempN);
+      tempC.copy(p).addScaledVector(tempN, -pDotN); // P_proj
 
-        // Normalize to get point on sphere surface
-        tempC.normalize();
+      // Normalize to get point on sphere surface
+      tempC.normalize();
 
-        // Check if Candidate C lies on the arc AB
-        // It must be "between" A and B.
-        // A reliable check for minor arcs (< 180): 
-        // C must be on the positive side of plane(Origin, A, N_edge_A) and plane(Origin, B, N_edge_B)?
-        // Simpler: Check if C is in the cone.
-        // (A x C) . (C x B) > 0 implies same winding? 
-        // Let's use: C = s*A + t*B (screen space check?)
+      // Check if Candidate C lies on the arc AB
+      const crossAC = vA.crossVectors(A, tempC);
+      const crossCB = vB.crossVectors(tempC, B);
 
-        // Cross Check:
-        // (A x C) should point in same direction as (A x B) -> (A x C) . (A x B) > 0
-        // (C x B) should point in same direction as (A x B) -> (C x B) . (A x B) > 0
-
-        const crossAC = vA.crossVectors(A, tempC);
-        const crossCB = vB.crossVectors(tempC, B);
-
-        if (crossAC.dot(tempN) > 0 && crossCB.dot(tempN) > 0) {
-          // Valid point on arc
-          const d = p.dot(tempC);
-          if (d > maxDot) {
-            maxDot = d;
-            bestPoint = tempC.clone(); // Must clone because tempC is reused
-          }
+      if (crossAC.dot(tempN) > 0 && crossCB.dot(tempN) > 0) {
+        // Valid point on arc
+        const d = p.dot(tempC);
+        if (d > maxDot) {
+          maxDot = d;
+          bestPoint.copy(tempC);
         }
       }
     }
 
-    return bestPoint ? bestPoint.clone() : mesh.vertices[0].clone();
+    return bestPoint; // already cloned or copied
   },
 
   expand(mesh) {
