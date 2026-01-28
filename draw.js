@@ -1621,40 +1621,84 @@ export const SDF = {
      * @param {THREE.Vector3[]} vertices - Vertices.
      * @param {number} thickness - Thickness.
      */
-    constructor(vertices, thickness = 0) {
-      this.vertices = vertices;
+    /**
+     * @param {THREE.Vector3[]} vertices - Vertices.
+     * @param {number} thickness - Thickness.
+     */
+    /**
+     * @param {THREE.Vector3[]} vertices - Vertices.
+     * @param {number} thickness - Thickness.
+     * @param {number} [count] - Number of vertices to use from array.
+     */
+    constructor() {
+      // Pre-allocate persistent members
+      this.center = new THREE.Vector3();
+      this.basisU = new THREE.Vector3();
+      this.basisV = new THREE.Vector3(); // Normal (V)
+      this.basisW = new THREE.Vector3();
+
+      this.planes = []; // We will clear and reuse
+      this.poly2D = []; // Reused objects {x,y}
+      this.intervals = null;
+    }
+
+    /**
+     * Initializes the face with new data without allocation.
+     * @param {THREE.Vector3[]} vertices - Array of all vertices.
+     * @param {number[]} indices - Indices for this face.
+     * @param {number} thickness - Thickness.
+     */
+    init(vertices, indices, thickness = 0) {
+      this.vertices = vertices; // Store reference to full array
+      this.indices = indices;   // Store reference to indices
+      this.count = indices ? indices.length : vertices.length;
       this.thickness = thickness;
-      this.planes = [];
+
+      // Reset state
+      this.planes.length = 0;
       this.yMin = Daydream.H;
       this.yMax = 0;
       this.intervals = null;
 
       // Centroid & Basis
-      const center = new THREE.Vector3();
-      for (const v of vertices) center.add(v);
-      center.normalize();
+      // Reuse this.center
+      this.center.set(0, 0, 0);
 
-      this.center = center;
-      this.basisV = center; // Normal (V)
+      if (indices) {
+        for (let i = 0; i < this.count; i++) this.center.add(vertices[indices[i]]);
+      } else {
+        for (let i = 0; i < this.count; i++) this.center.add(vertices[i]);
+      }
+      // center is average, but we just normalize direction for sphere surface projection
+      this.center.normalize();
+
+      // Copy center to basisV (Normal)
+      this.basisV.copy(this.center);
 
       // Basis U W
-      let ref = Math.abs(center.dot(Daydream.X_AXIS)) > 0.9 ? Daydream.Y_AXIS : Daydream.X_AXIS;
-      this.basisU = new THREE.Vector3().crossVectors(center, ref).normalize();
-      this.basisW = new THREE.Vector3().crossVectors(center, this.basisU).normalize();
+      let ref = (Math.abs(this.center.dot(Daydream.X_AXIS)) > 0.9) ? Daydream.Y_AXIS : Daydream.X_AXIS;
+      this.basisU.crossVectors(this.center, ref).normalize();
+      this.basisW.crossVectors(this.center, this.basisU).normalize();
 
       // Project 2D
-      this.poly2D = [];
-      for (const v of vertices) {
+      // Ensure poly2D size
+      while (this.poly2D.length < this.count) {
+        this.poly2D.push({ x: 0, y: 0 });
+      }
+
+      for (let i = 0; i < this.count; i++) {
+        const v = indices ? vertices[indices[i]] : vertices[i];
         const d = v.dot(this.basisV);
         // u = (v . basisU) / d, w = (v . basisW) / d
-        const x = v.dot(this.basisU) / d;
-        const y = v.dot(this.basisW) / d;
-        this.poly2D.push({ x, y });
+        // We reuse objects in this.poly2D
+        const p2d = this.poly2D[i];
+        p2d.x = v.dot(this.basisU) / d;
+        p2d.y = v.dot(this.basisW) / d;
       }
 
       // Inradius
       let minEdgeDist = Infinity;
-      const len = this.poly2D.length;
+      const len = this.count;
       if (len < 2) {
         minEdgeDist = 1.0;
       } else {
@@ -1689,15 +1733,17 @@ export const SDF = {
       // Compute Bounds
       let minPhi = 100;
       let maxPhi = -100;
-      const thetas = [];
+      const thetas = []; // Allocating array here... technically we could pool this too but it's small integers (actually floats)
+      // Note: primitives array allocation is cheap in JS, but could use a scratch array if needed.
+      // For now, let's stick to user request about Face objects and Vectors.
 
-      for (let i = 0; i < this.vertices.length; i++) {
-        const v1 = this.vertices[i];
-        const v2 = this.vertices[(i + 1) % this.vertices.length];
+      for (let i = 0; i < this.count; i++) {
+        const v1 = indices ? vertices[indices[i]] : vertices[i];
+        const v2 = indices ? vertices[indices[(i + 1) % this.count]] : vertices[(i + 1) % this.count];
 
         // Plane Normal
-        // FIXED: Use new THREE.Vector3() instead of pool to avoid corruption
-        const normal = new THREE.Vector3().crossVectors(v1, v2);
+        // OPTIMIZATION: Use vectorPool instead of new THREE.Vector3()
+        const normal = vectorPool.acquire().crossVectors(v1, v2);
 
         // Skip degenerate
         if (normal.lengthSq() < 1e-12) {
@@ -1812,7 +1858,7 @@ export const SDF = {
 
       // 2D SDF & Winding
       const v = this.poly2D;
-      const N = v.length;
+      const N = this.count;
 
       let d = Infinity; // Start with clear max
       let winding = 0;
@@ -1876,6 +1922,9 @@ export const SDF = {
     }
   }
 };
+
+// 1. Create a static pool for SDF.Face
+export const facePool = new StaticPool(SDF.Face, 10000);
 
 export const Scan = {
   /**
@@ -2124,11 +2173,19 @@ export const Scan = {
      * @param {boolean} [debugBB=false] - Debug.
      */
     static draw(pipeline, mesh, colorFn, debugBB = false) {
+      // Lazy init scratch buffer (Not used with facePool approach but kept for safety/reference if needed)
+      // Reset the pool pointer at the start of the draw call
+      facePool.reset();
+
       for (let i = 0; i < mesh.faces.length; i++) {
-        const face = mesh.faces[i];
-        const verts = face.map(idx => mesh.vertices[idx]);
-        // Zero thickness for solid face
-        const shape = new SDF.Face(verts, 0);
+        const faceIndices = mesh.faces[i];
+
+        // Acquire a reused Face object
+        const shape = facePool.acquire();
+
+        // Init with existing mesh vertices and indices
+        shape.init(mesh.vertices, faceIndices, 0);
+
         // Pass face index (i) as 4th argument to colorFn
         const renderColorFn = (p, t, d) => colorFn(p, t, d / (shape.size || 1.0), i);
         Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
