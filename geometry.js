@@ -22,6 +22,10 @@ export const PHI = (1 + Math.sqrt(5)) / 2;
 const _tempSpherical = new THREE.Spherical();
 const _tempVec = new THREE.Vector3();
 const _tempVec2 = new THREE.Vector3();
+const _tempN = new THREE.Vector3();
+const _tempC = new THREE.Vector3();
+const _vA = new THREE.Vector3();
+const _vB = new THREE.Vector3();
 export const G = 1 / PHI;
 
 
@@ -141,16 +145,13 @@ export const pixelToVector = (x, y) => {
  * @returns {THREE.Vector3} Normalized vector on the unit sphere.
  */
 export const logPolarToVector = (rho, theta) => {
-  // 1. Log-Polar to Plane Radius (R)
-  // rho = ln(R) -> R = e^rho
+  // 1. Plane radius
   const R = Math.exp(rho);
 
-  // 2. Inverse Stereographic Projection (Plane Radius R -> Sphere Y)
-  // y = (R^2 - 1) / (R^2 + 1)
+  // 2. Inverse stereographic
   const y = (R * R - 1) / (R * R + 1);
 
-  // 3. Calculate Euclidean radius at this height (r_xz)
-  // x^2 + z^2 = 1 - y^2
+  // 3. Euclidean radius
   const r_xz = Math.sqrt(1 - y * y);
 
   const v = vectorPool.acquire();
@@ -169,20 +170,16 @@ export const logPolarToVector = (rho, theta) => {
  * @returns {{rho: number, theta: number}} Log-Polar coordinates.
  */
 export const vectorToLogPolar = (v) => {
-  // 1. Stereographic Projection (Sphere -> Plane Radius R)
-  // R^2 = (1 + y) / (1 - y)
+  // 1. Stereographic projection
   const denom = 1 - v.y;
   if (Math.abs(denom) < 0.00001) {
-    return { rho: 10, theta: 0 }; // Handle North Pole singularity
+    return { rho: 10, theta: 0 }; // Singular
   }
 
-  // 2. Calculate rho (log radius)
-  // R = sqrt((1+y)/(1-y))
-  // rho = ln(R) = 0.5 * ln((1+y)/(1-y))
+  // 2. Log radius
   const rho = 0.5 * Math.log((1 + v.y) / (1 - v.y));
 
-  // 3. Calculate theta (angle)
-  // Standard polar angle in XZ plane
+  // 3. Angle
   const theta = Math.atan2(v.z, v.x);
 
   return { rho, theta };
@@ -272,22 +269,21 @@ export class Orientation {
     const oldHistory = this.orientations;
     const newHistory = new Array(count);
 
-    // Always keep start and end exact. 
-    // Note: oldHistory[0] and oldHistory[end] are persistent (non-pooled) if they were the result of a collapse() or set().
+    // Preserves endpoints
     newHistory[0] = oldHistory[0];
     newHistory[count - 1] = oldHistory[oldHistory.length - 1];
 
     for (let i = 1; i < count - 1; i++) {
-      // Normalized position in new array (0..1)
+      // Normalized position
       const t = i / (count - 1);
 
-      // Corresponding float index in old array
+      // Float index
       const oldVal = t * (oldHistory.length - 1);
       const idxA = Math.floor(oldVal);
       const idxB = Math.ceil(oldVal);
       const alpha = oldVal - idxA;
 
-      // Slerp between the two nearest existing points using pooled objects
+      // Slerp
       newHistory[i] = quaternionPool.acquire().copy(oldHistory[idxA]).slerp(oldHistory[idxB], alpha);
     }
 
@@ -333,8 +329,7 @@ export class Orientation {
    */
   collapse() {
     if (this.orientations.length > 1) {
-      // Copy last value into the first slot. 
-      // This ensures this.orientations[0] is always a persistent object (not from a pool that gets reset).
+      // Copy last to first
       this.orientations[0].copy(this.orientations[this.orientations.length - 1]);
       this.orientations.length = 1;
     }
@@ -658,7 +653,7 @@ export class HalfEdgeMesh {
 }
 
 /**
- * Procedural mesh operations for generating Archimedean solids.
+ * Procedural mesh operations.
  */
 export const MeshOps = {
   /**
@@ -669,15 +664,10 @@ export const MeshOps = {
   computeKdTree(mesh) {
     if (mesh.kdTree) return;
 
-    // 1. Build Adjacency Map (Vertex Index -> Array of Neighbor Vertex Indices)
+    // Adjacency map
     const adjacency = new Array(mesh.vertices.length).fill(null).map(() => []);
 
-    // We need edge connectivity. 
-    // Ideally we want: Vertex -> Connected Edges (Pairs of indices)
-    // Actually, closestPoint check involves checking all edges connected to the closest vertex.
-    // So for each vertex, we need a list of edges (as neighbor vertex indices) that start from it.
-
-    // Iterate faces to find edges
+    // Find edges
     for (const face of mesh.faces) {
       for (let i = 0; i < face.length; i++) {
         const idxA = face[i];
@@ -690,11 +680,10 @@ export const MeshOps = {
       }
     }
 
-    // 2. Format points for KDTree
-    // KDTree expects objects with a .pos property (Vector3)
+    // Format points
     const points = mesh.vertices.map((v, i) => ({ pos: v, index: i }));
 
-    // 3. Build Tree
+    // Build Tree
     const tree = new KDTree(points);
 
     mesh.kdTree = {
@@ -711,16 +700,14 @@ export const MeshOps = {
    * @returns {THREE.Vector3} Closest point on the edges/vertices of the mesh
    */
   closestPointOnMeshGraph(p, mesh) {
-    // Ensure acceleration structure exists
+    // Ensure KDTree
     if (!mesh.kdTree) {
       this.computeKdTree(mesh);
     }
 
     const { tree, adjacency } = mesh.kdTree;
 
-    // 1. Find Closest Vertex using KDTree
-    // We search for 1 nearest neighbor.
-    // Returns array of { pos: Vector3, index: number } (from our wrapper objects)
+    // Closest vertex
     const nearestNodes = tree.nearest(p, 1);
     if (!nearestNodes.length) return mesh.vertices[0].clone();
 
@@ -731,7 +718,7 @@ export const MeshOps = {
     let bestPoint = closestVertexPos.clone();
     let maxDot = p.dot(bestPoint);
 
-    // 2. Check Edges connected to this vertex
+    // Check connected edges
     // adjacency[i] contains indices of neighbors.
     // Each neighbor forms an edge (closestVertexIndex, neighborIndex).
 
@@ -748,21 +735,20 @@ export const MeshOps = {
     for (const neighborIdx of neighbors) {
       const B = mesh.vertices[neighborIdx];
 
-      // Normal of the Great Circle Plane defined by (Origin, A, B)
-      // Note: A and B are unit vectors on sphere.
+      // Great circle normal
       tempN.crossVectors(A, B);
       const lenSq = tempN.lengthSq();
       if (lenSq < 0.000001) continue; // Degenerate edge
       tempN.multiplyScalar(1.0 / Math.sqrt(lenSq)); // Normalize
 
-      // Project P onto this plane: P_proj = P - (P . N) * N
+      // Project P
       const pDotN = p.dot(tempN);
       tempC.copy(p).addScaledVector(tempN, -pDotN); // P_proj
 
-      // Normalize to get point on sphere surface
+      // Normalize
       tempC.normalize();
 
-      // Check if Candidate C lies on the arc AB
+      // Arc check
       const crossAC = vA.crossVectors(A, tempC);
       const crossCB = vB.crossVectors(tempC, B);
 
@@ -779,111 +765,18 @@ export const MeshOps = {
     return bestPoint; // already cloned or copied
   },
 
-  expand(mesh) {
-    return this.rectify(this.rectify(mesh));
-  },
-
-  snub(mesh) {
-    const heMesh = new HalfEdgeMesh(mesh);
-    const newVertices = [];
-    const heToVertIdx = new Map();
-
-    // 1. Create new vertices (shrunk/twisted faces)
-    // Lerp(Start, Centroid, 0.5)
-
-    // Precompute face centroids
-    const faceCentroids = new Map();
-    for (const face of heMesh.faces) {
-      const c = new THREE.Vector3();
-      let count = 0;
-      let he = face.halfEdge;
-      const start = he;
-      do {
-        c.add(he.vertex.position);
-        count++;
-        he = he.next;
-      } while (he !== start);
-      c.multiplyScalar(1 / count);
-      faceCentroids.set(face, c);
-    }
-
-    for (const face of heMesh.faces) {
-      const centroid = faceCentroids.get(face);
-      let he = face.halfEdge;
-      const start = he;
-      do {
-        if (!he.pair) { he = he.next; continue; }
-        const startPos = he.pair.vertex.position;
-
-        const P = _tempVec.copy(startPos).lerp(centroid, 0.5).clone();
-        const idx = newVertices.push(P) - 1;
-        heToVertIdx.set(he, idx);
-
-        he = he.next;
-      } while (he !== start);
-    }
-
-    const newFaces = [];
-
-    // 2. Original Faces (Shrunk)
-    for (const face of heMesh.faces) {
-      const faceIndices = [];
-      let he = face.halfEdge;
-      const start = he;
-      do {
-        faceIndices.push(heToVertIdx.get(he));
-        he = he.next;
-      } while (he !== start);
-      newFaces.push(faceIndices);
-    }
-
-    // 3. Vertex Faces (Polygons at original vertices)
-    const visitedVerts = new Set();
-    for (const heStart of heMesh.halfEdges) {
-      const origin = heStart.prev.vertex;
-      if (visitedVerts.has(origin)) continue;
-      visitedVerts.add(origin);
-
-      const vertLoop = [];
-      let curr = heStart;
-      const startOrbit = curr;
-      let safety = 0;
-      do {
-        vertLoop.push(heToVertIdx.get(curr));
-        if (!curr.pair) break;
-        curr = curr.pair.next;
-        safety++;
-      } while (curr !== startOrbit && curr && safety < 100);
-      newFaces.push(vertLoop.reverse());
-    }
-
-    // 4. Edge Faces (Triangles)
-    const visitedEdges = new Set();
-    for (const he of heMesh.halfEdges) {
-      if (!he.pair) continue;
-      if (visitedEdges.has(he) || visitedEdges.has(he.pair)) continue;
-      visitedEdges.add(he);
-      visitedEdges.add(he.pair);
-
-      const pAS = heToVertIdx.get(he);
-      const pAE = heToVertIdx.get(he.next);
-      const pBE = heToVertIdx.get(he.pair);
-      const pBS = heToVertIdx.get(he.pair.next);
-
-      newFaces.push([pAS, pBS, pBE]);
-      newFaces.push([pAS, pBE, pAE]);
-    }
-
-    newVertices.forEach(v => v.normalize());
-    return { vertices: newVertices, faces: newFaces };
-  },
-
+  /**
+   * Computes the dual of a mesh.
+   * New vertices are face centroids; new faces are vertex cycles.
+   * @param {Object} mesh - input mesh {vertices, faces}
+   * @return {Object} dual mesh
+   */
   dual(mesh) {
     const heMesh = new HalfEdgeMesh(mesh);
     const newVertices = [];
     const faceToVertIdx = new Map();
 
-    // 1. New vertices = Centroids of original faces
+    // New vertices
     for (const face of heMesh.faces) {
       const c = new THREE.Vector3();
       let count = 0;
@@ -902,9 +795,7 @@ export const MeshOps = {
 
     const newFaces = [];
 
-    // 2. New faces = Cycles around original vertices
-    // A vertex V in original mesh becomes a face F in dual mesh.
-    // The vertices of F are the centroids of faces surrounding V.
+    // New faces
     const visitedVerts = new Set();
 
     for (const heStart of heMesh.halfEdges) {
@@ -918,21 +809,18 @@ export const MeshOps = {
       const startOrbit = curr;
       let safety = 0;
       do {
-        // Current HE belongs to a face. We want that face's centroid index.
+        // Face centroid index
         const faceIdx = faceToVertIdx.get(curr.face);
         faceIndices.push(faceIdx);
 
-        // Move to next face around origin.
-        // curr is outgoing A->B. Face is to left. 
-        // pair is incoming B->A.
-        // pair.next is Outgoing A->C.
+        // Next face
         if (!curr.pair) break;
         curr = curr.pair.next;
         safety++;
       } while (curr !== startOrbit && curr && safety < 100);
 
       if (faceIndices.length > 2) {
-        // Dual faces should remain CCW
+        // Maintain CCW
         newFaces.push(faceIndices.reverse());
       }
     }
@@ -942,38 +830,45 @@ export const MeshOps = {
   },
 
   /**
-    * Generates a Hankin Pattern (Star and Rosette tiling).
-    * Replaces original edges with pattern lines.
-    * @param {HalfEdgeMesh} mesh - The source mesh.
-    * @param {number} angle - The contact angle in radians.
-    * @returns {{vertices: THREE.Vector3[], faces: number[][]}}
-    */
-  hankin(mesh, angle) {
+   * Compiles the topological structure of a Hankin pattern.
+   * Returns a "CompiledHankin" object that can be updated rapidly.
+   */
+  compileHankin(mesh) {
     const heMesh = new HalfEdgeMesh(mesh);
-    const newVertices = [];
-    const newFaces = [];
+    const staticVertices = []; // Midpoints (don't move)
+    const dynamicVertices = []; // Intersections (move with angle)
+    const faces = [];
 
-    // Maps to ensure topology is shared between faces
     const heToMidpointIdx = new Map();
-    const heToIntersectIdx = new Map();
+    const heToDynamicIdx = new Map(); // Maps he -> index in dynamicVertices array
 
-    // Helper: Get/Create Midpoint Index for an edge (shared with its pair)
+    // Static vertices
     const getMidpointIdx = (he) => {
       if (heToMidpointIdx.has(he)) return heToMidpointIdx.get(he);
       if (he.pair && heToMidpointIdx.has(he.pair)) return heToMidpointIdx.get(he.pair);
 
       const pA = he.prev ? he.prev.vertex.position : he.pair.vertex.position;
       const pB = he.vertex.position;
-      // Calculate Midpoint
-      const mid = vectorPool.acquire().copy(pA).add(pB).multiplyScalar(0.5).normalize();
+      const mid = pA.clone().add(pB).multiplyScalar(0.5).normalize();
 
-      const idx = newVertices.push(mid.clone()) - 1;
+      const idx = staticVertices.push(mid) - 1;
       heToMidpointIdx.set(he, idx);
       if (he.pair) heToMidpointIdx.set(he.pair, idx);
       return idx;
     };
 
-    // --- PASS 1: Generate Points & Star Faces ---
+    // Ensure midpoints
+    for (const he of heMesh.halfEdges) {
+      getMidpointIdx(he);
+    }
+
+    // Lock the offset
+    const staticOffset = staticVertices.length;
+
+    // Dynamic instructions
+    const dynamicInstructions = [];
+
+    // Star faces
     for (const face of heMesh.faces) {
       const starFaceIndices = [];
       let he = face.halfEdge;
@@ -983,96 +878,117 @@ export const MeshOps = {
         const prev = he.prev;
         const curr = he;
 
-        // 1. Get Midpoints
+        // Static Indices
         const idxM1 = getMidpointIdx(prev);
         const idxM2 = getMidpointIdx(curr);
 
-        // 2. Compute Intersection (X) for this corner
-        const pCorner = prev.vertex.position;
-        const pPrev = prev.prev ? prev.prev.vertex.position : prev.pair.vertex.position;
-        const pNext = curr.vertex.position;
+        // Define Dynamic Vertex
+        const pCorner = prev.vertex.position.clone();
+        const pPrev = (prev.prev ? prev.prev.vertex.position : prev.pair.vertex.position).clone();
+        const pNext = curr.vertex.position.clone();
 
-        const m1 = newVertices[idxM1];
-        const m2 = newVertices[idxM2];
+        dynamicInstructions.push({
+          pCorner, pPrev, pNext,
+          idxM1, idxM2 // Indices into staticVertices
+        });
 
-        // Rotate normal of Edge 1
-        const nEdge1 = vectorPool.acquire().crossVectors(pPrev, pCorner).normalize();
-        const q1 = quaternionPool.acquire().setFromAxisAngle(m1, angle);
-        const nHankin1 = vectorPool.acquire().copy(nEdge1).applyQuaternion(q1);
+        // This dynamic vertex corresponds to the current edge
+        const dynIdx = dynamicVertices.length; // Will be added
+        heToDynamicIdx.set(curr, dynIdx);
+        dynamicVertices.push(new THREE.Vector3()); // Placeholder
 
-        // Rotate normal of Edge 2
-        const nEdge2 = vectorPool.acquire().crossVectors(pCorner, pNext).normalize();
-        const q2 = quaternionPool.acquire().setFromAxisAngle(m2, -angle);
-        const nHankin2 = vectorPool.acquire().copy(nEdge2).applyQuaternion(q2);
-
-        // Intersection
-        let intersect = vectorPool.acquire().crossVectors(nHankin1, nHankin2);
-        const lenSq = intersect.lengthSq();
-
-        // 2. The Safe Reference (Gravity Well)
-        // The average of midpoints is the "ground truth" for the pattern center.
-        const ref = vectorPool.acquire().addVectors(m1, m2);
-
-        // 3. Chirality (The Flip)
-        // Ensure we are on the correct hemisphere relative to the edge gap.
-        if (intersect.dot(ref) < 0) {
-          intersect.negate();
-        }
-
-        const idxI = newVertices.push(intersect.clone()) - 1;
-
-        // Key the intersection to the edge STARING at this corner
-        heToIntersectIdx.set(curr, idxI);
-
-        // Build Star Face (Midpoint -> Intersection -> Next Midpoint)
         starFaceIndices.push(idxM1);
-        starFaceIndices.push(idxI);
+        starFaceIndices.push(staticOffset + dynIdx);
 
         he = he.next;
       } while (he !== startHe);
-
-      newFaces.push(starFaceIndices);
+      faces.push(starFaceIndices);
     }
 
-    // --- PASS 2: Generate Rosette Faces (The Fix) ---
+    // Rosette faces
     const visitedVerts = new Set();
-
     for (const heStart of heMesh.halfEdges) {
       const origin = heStart.prev.vertex;
       if (visitedVerts.has(origin)) continue;
       visitedVerts.add(origin);
 
       const rosetteIndices = [];
-      let curr = heStart; // Outgoing edge
+      let curr = heStart;
       const startOrbit = curr;
       let safety = 0;
-
-      // Walk around the vertex CCW
       do {
-        // 1. Add Midpoint of current outgoing edge
-        rosetteIndices.push(heToMidpointIdx.get(curr));
-
-        // 2. Find the next outgoing edge
-        // (If mesh is closed, this is pair.next)
+        rosetteIndices.push(heToMidpointIdx.get(curr)); // Static
         const nextEdge = curr.pair ? curr.pair.next : null;
         if (!nextEdge) break;
-
-        // 3. Add Intersection located between current and next edge
-
-        const idxI = heToIntersectIdx.get(nextEdge);
-        rosetteIndices.push(idxI);
-
+        rosetteIndices.push(staticOffset + heToDynamicIdx.get(nextEdge)); // Dynamic
         curr = nextEdge;
         safety++;
       } while (curr !== startOrbit && curr && safety < 100);
 
-      if (rosetteIndices.length > 2) {
-        // Rosettes are already CCW
-        newFaces.push(rosetteIndices);
-      }
+      if (rosetteIndices.length > 2) faces.push(rosetteIndices);
     }
 
-    newVertices.forEach(v => v.normalize());
-    return { vertices: newVertices, faces: newFaces };
+    return {
+      staticVertices,
+      dynamicVertices, // Placeholders
+      dynamicInstructions,
+      faces, // Topology
+      staticOffset // Exported for debugging/completeness
+    };
   },
+
+  /**
+   * Updates a compiled Hankin mesh based on the angle.
+   * Zero allocation.
+   */
+  updateHankin(compiled, angle) {
+    const { staticVertices, dynamicVertices, dynamicInstructions } = compiled;
+
+    const q1 = quaternionPool.acquire();
+    const q2 = quaternionPool.acquire();
+    const nEdge1 = vectorPool.acquire();
+    const nEdge2 = vectorPool.acquire();
+    const nHankin1 = vectorPool.acquire();
+    const nHankin2 = vectorPool.acquire();
+    const intersect = vectorPool.acquire();
+    const ref = vectorPool.acquire();
+
+    for (let i = 0; i < dynamicInstructions.length; i++) {
+      const instr = dynamicInstructions[i];
+      const m1 = staticVertices[instr.idxM1];
+      const m2 = staticVertices[instr.idxM2];
+
+      // Normals
+      nEdge1.crossVectors(instr.pPrev, instr.pCorner).normalize();
+      q1.setFromAxisAngle(m1, angle);
+      nHankin1.copy(nEdge1).applyQuaternion(q1);
+
+      nEdge2.crossVectors(instr.pCorner, instr.pNext).normalize();
+      q2.setFromAxisAngle(m2, -angle);
+      nHankin2.copy(nEdge2).applyQuaternion(q2);
+
+      // Intersection
+      intersect.crossVectors(nHankin1, nHankin2);
+
+      // Chirality
+      ref.addVectors(m1, m2);
+      if (intersect.dot(ref) < 0) intersect.negate();
+
+      dynamicVertices[i].copy(intersect).normalize();
+    }
+
+    // Return mesh
+    return {
+      vertices: [...staticVertices, ...dynamicVertices],
+      faces: compiled.faces
+    };
+  },
+
+  /**
+   * Returns the topological structure of a Hankin pattern.
+   */
+  hankin(mesh, angle) {
+    const compiled = this.compileHankin(mesh);
+    return this.updateHankin(compiled, angle);
+  }
 };
