@@ -116,7 +116,7 @@ export class Daydream {
       alpha: Daydream.SCENE_ALPHA,
     });
 
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
 
     this.labelRenderer = new CSS2DRenderer();
     this.labelRenderer.domElement.className = "labelLayer";
@@ -407,14 +407,11 @@ export class Daydream {
 
     if (this.dotMesh) {
       if (!this.dotMesh.instanceColor) {
-        // Create the buffer
         this.dotMesh.instanceColor = new THREE.InstancedBufferAttribute(
           new Float32Array(this.dotMesh.count * 3), 3
         );
+        this.dotMesh.instanceColor.setUsage(THREE.StreamDrawUsage);
       }
-
-      // OPTIMIZATION: Alias the global 'pixels' array to the geometry buffer.
-      // This means effects write DIRECTLY to the GPU staging area.
       Daydream.pixels = this.dotMesh.instanceColor.array;
       Daydream.pixels.fill(0);
 
