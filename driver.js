@@ -93,6 +93,7 @@ export class Daydream {
   static SPHERE_RADIUS = 30;
   static H = 20;
   static W = 96;
+  static PIXEL_WIDTH = 2 * Math.PI / Daydream.W;
   static FPS = 16;
   static DOT_SIZE = 2;
   static DOT_COLOR = 0x0000ff;
@@ -425,6 +426,7 @@ export class Daydream {
   updateResolution(h, w, dotSize) {
     Daydream.H = h;
     Daydream.W = w;
+    Daydream.PIXEL_WIDTH = 2 * Math.PI / Daydream.W;
     Daydream.DOT_SIZE = dotSize;
 
     this.scene.remove(this.dotMesh);
