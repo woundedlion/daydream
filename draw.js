@@ -8,6 +8,7 @@ import { Daydream, labels, XY } from "./driver.js";
 import { Dot, angleBetween, fibSpiral, vectorPool, quaternionPool, yToPhi } from "./geometry.js";
 import { quinticKernel } from "./filters.js";
 import { wrap, fastAtan2 } from "./util.js";
+import { TWO_PI } from "./3dmath.js";
 import { StaticPool } from "./StaticPool.js";
 
 /** @type {StaticPool} Global pool for Dot objects. */
@@ -223,7 +224,7 @@ export const Plot = {
       }
 
       if (longWay) {
-        a = 2 * Math.PI - a;
+        a = TWO_PI - a;
         w.negate();
       }
 
@@ -242,7 +243,7 @@ export const Plot = {
       const tangent_y = w.z * u.x - w.x * u.z;
       let simAngle = 0;
       const steps = [];
-      const baseStep = 2 * Math.PI / Daydream.W;
+      const baseStep = TWO_PI / Daydream.W;
       while (simAngle < a) {
         // Analytical Height Calculation
         const cosT = Math.cos(simAngle);
@@ -412,7 +413,7 @@ export const Plot = {
       const d = Math.cos(thetaEq);
 
       // Calculate Samples
-      const step = 2 * Math.PI / numSamples;
+      const step = TWO_PI / numSamples;
       let points = [];
       let uTemp = vectorPool.acquire();
 
@@ -476,7 +477,7 @@ export const Plot = {
       const p2 = project(v2);
 
       const dist = p1.distanceTo(p2);
-      const numSteps = Math.max(2, Math.ceil(dist * Daydream.W / (2 * Math.PI)));
+      const numSteps = Math.max(2, Math.ceil(dist * Daydream.W / (TWO_PI)));
 
       let pTemp = vectorPool.acquire();
 
@@ -713,7 +714,7 @@ export const Plot = {
 
       // Calculate Samples
       const numSamples = Daydream.W;
-      const step = 2 * Math.PI / numSamples;
+      const step = TWO_PI / numSamples;
       let points = [];
       let uTemp = vectorPool.acquire();
 
@@ -725,7 +726,7 @@ export const Plot = {
         uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
 
         // Apply Shift
-        let shift = shiftFn(theta / (2 * Math.PI));
+        let shift = shiftFn(theta / (TWO_PI));
         let cosShift = Math.cos(shift);
         let sinShift = Math.sin(shift);
         let vScale = (vSign * d) * cosShift - r * sinShift;
