@@ -3,8 +3,6 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-// TODO: Split Transition into ContinuousTransition and DiscreteTransition
-
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
 import { angleBetween, Orientation, vectorPool, quaternionPool, MeshOps } from "./geometry.js";
@@ -14,102 +12,79 @@ import { TWO_PI } from "./3dmath.js";
 
 /**
  * Elastic easing out.
- * @param {number} x - The time value between 0 and 1.
- * @returns {number} The eased value.
+ * @param {number} x - Time [0, 1].
+ * @returns {number} Eased value.
  */
 export const easeOutElastic = (x) => {
   const c4 = TWO_PI / 3;
-
-  return x === 0
-    ? 0
-    : x === 1
-      ? 1
-      : Math.pow(2, -10 * x) * Math.sin((x * 10 - 0.75) * c4) + 1;
+  return x === 0 ? 0 : x === 1 ? 1 : Math.pow(2, -10 * x) * Math.sin((x * 10 - 0.75) * c4) + 1;
 }
 
 /**
  * Sinusoidal easing in-out.
- * @param {number} t - The time value between 0 and 1.
- * @returns {number} The eased value.
+ * @param {number} t - Time [0, 1].
+ * @returns {number} Eased value.
  */
-export const easeInOutSin = (t) => {
-  return -(Math.cos(Math.PI * t) - 1) / 2;
-}
+export const easeInOutSin = (t) => -(Math.cos(Math.PI * t) - 1) / 2;
 
 /**
  * Sinusoidal easing out.
- * @param {number} t - The time value between 0 and 1.
- * @returns {number} The eased value.
+ * @param {number} t - Time [0, 1].
+ * @returns {number} Eased value.
  */
-export const easeInSin = (t) => {
-  return 1 - Math.cos((t * Math.PI) / 2);
-}
+export const easeInSin = (t) => 1 - Math.cos((t * Math.PI) / 2);
 
 /**
  * Sinusoidal easing out.
- * @param {number} t - The time value between 0 and 1.
- * @returns {number} The eased value.
+ * @param {number} t - Time [0, 1].
+ * @returns {number} Eased value.
  */
-export const easeOutSin = (t) => {
-  return Math.sin((t * Math.PI) / 2);
-}
+export const easeOutSin = (t) => Math.sin((t * Math.PI) / 2);
 
 /**
  * Exponential easing out.
- * @param {number} t - The time value between 0 and 1.
- * @returns {number} The eased value.
+ * @param {number} t - Time [0, 1].
+ * @returns {number} Eased value.
  */
-export const easeOutExpo = (t) => {
-  return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
-}
+export const easeOutExpo = (t) => t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
 
 /**
  * Circular easing out.
- * @param {number} t - The time value between 0 and 1.
- * @returns {number} The eased value.
+ * @param {number} t - Time [0, 1].
+ * @returns {number} Eased value.
  */
-export const easeOutCirc = (t) => {
-  return Math.sqrt(1 - Math.pow(t - 1, 2));
-}
+export const easeOutCirc = (t) => Math.sqrt(1 - Math.pow(t - 1, 2));
 
 /**
  * Cubic easing in.
- * @param {number} t - The time value between 0 and 1.
- * @returns {number} The eased value.
+ * @param {number} t - Time [0, 1].
+ * @returns {number} Eased value.
  */
-export const easeInCubic = (t) => {
-  return Math.pow(t, 3);
-}
+export const easeInCubic = (t) => Math.pow(t, 3);
 
 /**
  * Circular easing in.
- * @param {number} t - The time value between 0 and 1.
- * @returns {number} The eased value.
+ * @param {number} t - Time [0, 1].
+ * @returns {number} Eased value.
  */
-export const easeInCirc = (t) => {
-  return 1 - Math.sqrt(1 - Math.pow(t, 2));
-}
+export const easeInCirc = (t) => 1 - Math.sqrt(1 - Math.pow(t, 2));
 
 /**
- * Linear easing (no easing).
- * @param {number} t - The time value between 0 and 1.
- * @returns {number} The eased value.
+ * Linear easing.
+ * @param {number} t - Time [0, 1].
+ * @returns {number} Value.
  */
-export const easeMid = (t) => {
-  return t;
-}
+export const easeMid = (t) => t;
 
 /**
  * Cubic easing out.
- * @param {number} t - The time value between 0 and 1.
- * @returns {number} The eased value.
+ * @param {number} t - Time [0, 1].
+ * @returns {number} Eased value.
  */
-export const easeOutCubic = (t) => {
-  return 1 - Math.pow(1 - t, 3);
-}
+export const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
 /**
- * Manages a list of animations on a timeline.
+ * Manages animations on a timeline.
  */
 export class Timeline {
   constructor() {
@@ -118,10 +93,10 @@ export class Timeline {
   }
 
   /**
-   * Adds an animation to the timeline.
-   * @param {number} inFrames - The delay in frames before starting the animation.
-   * @param {Animation} animation - The animation object to add.
-   * @returns {Timeline} The timeline instance.
+   * Add animation.
+   * @param {number} inFrames - Delay.
+   * @param {Animation} animation - Animation.
+   * @returns {Timeline} Self.
    */
   add(inFrames, animation) {
     let start = this.t + inFrames;
@@ -136,12 +111,12 @@ export class Timeline {
   }
 
   /**
-   * Advances the timeline by one frame and steps active animations.
+   * Advances the timeline by one frame.
    */
   step() {
     ++this.t;
 
-    // Prep Animations
+    // Prep
     const touchedOrientations = new Set();
     for (const item of this.animations) {
       if (this.t >= item.start && !item.animation.canceled) {
@@ -153,7 +128,7 @@ export class Timeline {
       }
     }
 
-    // Step animations
+    // Step
     for (let i = 0; i < this.animations.length; i++) {
       let animation = this.animations[i].animation;
       if (this.t >= this.animations[i].start) {
@@ -174,12 +149,12 @@ export class Timeline {
 }
 
 /**
- * Base class for animations.
+ * Animation base class.
  */
 export class Animation {
   /**
-   * @param {number} duration - Duration of the animation in frames.
-   * @param {boolean} repeat - Whether the animation should repeat.
+   * @param {number} duration - Frames.
+   * @param {boolean} repeat - Loop.
    */
   constructor(duration, repeat) {
     this.duration = duration == 0 ? 1 : duration;
@@ -196,28 +171,24 @@ export class Animation {
 
   /**
    * Checks if the animation is done.
-   * @returns {boolean} True if done or canceled.
+   * @returns {boolean} True if finished or canceled.
    */
   done() { return this.canceled || (this.duration >= 0 && this.t >= this.duration); }
 
   /**
-   * Advances the animation by one step.
+   * Advances the animation.
    */
-  step() {
-    this.t++;
-  }
+  step() { this.t++; }
 
   /**
-   * Resets the animation time.
+   * Resets the animation.
    */
-  rewind() {
-    this.t = 0;
-  }
+  rewind() { this.t = 0; }
 
   /**
-   * Sets a callback to run after the animation finishes.
-   * @param {Function} post - The callback function.
-   * @returns {Animation} The animation instance.
+   * Sets a callback to run after completion.
+   * @param {Function} post - Callback function.
+   * @returns {Animation} Self.
    */
   then(post) {
     this.post = post;
@@ -227,35 +198,33 @@ export class Animation {
   /**
    * Executes the post-animation callback.
    */
-  post() {
-    this.post();
-  }
+  post() { this.post(); }
 }
 
 /**
- * Hashes 3D points into spatial buckets for fast neighbor lookup.
+ * Spatial hashing for neighbor lookup.
  */
 class SpatialHash {
-  /**
-   * @param {number} cellSize - The size of each cell in the grid.
-   */
   constructor(cellSize) {
     this.cellSize = cellSize;
     this.buckets = new Map();
   }
 
   /**
-   * Inserts a particle into the hash.
-   * @param {ParticleSystem.Particle} particle - The particle to insert.
+   * Inserts a particle.
+   * @param {Object} particle - Particle with .p (position).
    */
   insert(particle) {
     const key = this.getKey(particle.p);
-    if (!this.buckets.has(key)) {
-      this.buckets.set(key, []);
-    }
+    if (!this.buckets.has(key)) this.buckets.set(key, []);
     this.buckets.get(key).push(particle);
   }
 
+  /**
+   * Gets hash key for a vector.
+   * @param {THREE.Vector3} v - Position.
+   * @returns {string} Hash key.
+   */
   getKey(v) {
     const x = Math.floor(v.x / this.cellSize);
     const y = Math.floor(v.y / this.cellSize);
@@ -264,10 +233,10 @@ class SpatialHash {
   }
 
   /**
-   * Queries for particles within a radius.
-   * @param {THREE.Vector3} position - Center of query.
-   * @param {number} radius - Radius of query.
-   * @returns {ParticleSystem.Particle[]} Array of neighbors.
+   * Finds neighbors within radius.
+   * @param {THREE.Vector3} position - Center.
+   * @param {number} radius - Search radius.
+   * @returns {Array} List of neighbors.
    */
   query(position, radius) {
     const particles = [];
@@ -283,9 +252,7 @@ class SpatialHash {
           if (this.buckets.has(key)) {
             const bucket = this.buckets.get(key);
             for (const p of bucket) {
-              if (p.p.distanceToSquared(position) <= radius * radius) {
-                particles.push(p);
-              }
+              if (p.p.distanceToSquared(position) <= radius * radius) particles.push(p);
             }
           }
         }
@@ -295,36 +262,35 @@ class SpatialHash {
   }
 
   /**
-   * Clears the hash table.
+   * Clears the hash.
    */
   clear() {
     this.buckets.clear();
   }
 }
 
-/**
- * A physics-based particle system with gravity and spatial hashing.
- */
-// Base vector for particle orientation (North Pole)
+// North Pole
 export const PARTICLE_BASE = new THREE.Vector3(0, 1, 0);
 
+/**
+ * Physics particle system.
+ */
 export class ParticleSystem extends Animation {
   static Particle = class {
     /**
-     * @param {THREE.Vector3} p - Initial position.
-     * @param {THREE.Vector3} v - Initial velocity.
-     * @param {Color4} c - Color.
-     * @param {number} gravity - Gravity mass/strength.
+     * @param {THREE.Vector3} p - Position.
+     * @param {THREE.Vector3} v - Velocity.
+     * @param {THREE.Color} c - Color.
+     * @param {number} gravity - Gravity scale.
      */
     constructor(p, v, c, gravity) {
-      this.p = p.clone(); // Position (cache)
-      this.v = v.clone(); // Velocity (Angular)
-      this.c = c;         // Color (Color4)
+      this.p = p.clone();
+      this.v = v.clone();
+      this.c = c;
       this.gravity = gravity;
-
       this.orientation = new Orientation();
-      // Initialize orientation to match position p
-      // assuming PARTICLE_BASE is (0,1,0)
+
+      // Orient
       const q = quaternionPool.acquire().setFromUnitVectors(PARTICLE_BASE, p.clone().normalize());
       this.orientation.orientations[0].copy(q);
     }
@@ -336,15 +302,15 @@ export class ParticleSystem extends Animation {
     this.friction = 0.95;
     this.gravityConstant = 0.01;
     this.attractors = [];
-    this.spatialHash = new SpatialHash(0.1); // Default cell size, adjustable
+    this.spatialHash = new SpatialHash(0.1);
     this.interactionRadius = 0.2;
   }
 
   /**
-   * Adds a gravity well.
-   * @param {THREE.Vector3} position 
-   * @param {number} strength 
-   * @param {number} killRadius 
+   * Adds an attractor.
+   * @param {THREE.Vector3} position - Location.
+   * @param {number} strength - Attraction strength.
+   * @param {number} killRadius - Radius to kill particles.
    */
   addAttractor(position, strength, killRadius) {
     this.attractors.push({ position, strength, killRadius });
@@ -352,72 +318,58 @@ export class ParticleSystem extends Animation {
 
   /**
    * Spawns a new particle.
-   * @param {THREE.Vector3} p 
-   * @param {THREE.Vector3} v 
-   * @param {Color4} c 
-   * @param {number} gravity 
+   * @param {THREE.Vector3} p - Position.
+   * @param {THREE.Vector3} v - Velocity.
+   * @param {THREE.Color} c - Color.
+   * @param {number} gravity - Gravity scale.
    */
   spawn(p, v, c, gravity) {
     this.particles.push(new ParticleSystem.Particle(p, v, c, gravity));
   }
 
   /**
-   * Updates the particles' physics.
+   * Simulates the physics step.
    */
   step() {
     super.step();
 
-    // 1. Rebuild Spatial Hash
+    // Rebuild Hash
     this.spatialHash.clear();
-    for (const p of this.particles) {
-      this.spatialHash.insert(p);
-    }
+    for (const p of this.particles) this.spatialHash.insert(p);
 
-    // 2. Physics Step
+    // Physics
     const G = this.gravityConstant;
     const radius = this.interactionRadius;
-    const torque = vectorPool.acquire(); // Reuse vector for torque calculation
-    const q = quaternionPool.acquire();  // Reuse quaternion
+    const torque = vectorPool.acquire();
+    const q = quaternionPool.acquire();
 
     for (const p of this.particles) {
-      // Find neighbors
       const neighbors = this.spatialHash.query(p.p, radius);
-
       for (const other of neighbors) {
         if (p === other) continue;
-
-        // Force is attraction between p and other
-        // In rotational physics, we apply a Torque
-        // Vector D = other - p
-        // Torque T = p x D (axis of rotation to move p towards other)
-
         const distSq = p.p.distanceToSquared(other.p);
 
         if (distSq > 0.0001 && distSq < radius * radius) {
           const forceMag = (G * p.gravity * other.gravity) / distSq;
-
-          // Calculate Torque direction (p cross (other - p) = p cross other)
+          // Torque
           torque.crossVectors(p.p, other.p).normalize().multiplyScalar(forceMag);
           p.v.add(torque);
         }
       }
 
-      // Apply Rotational Velocity
-      // v represents axis * speed
+      // Friction
       p.v.multiplyScalar(this.friction);
 
       const speed = p.v.length();
       if (speed > 0.00001) {
-        const axis = vectorPool.acquire().copy(p.v).multiplyScalar(1 / speed); // Normalize axis
-
-        // Animate rotation, upsampling history for trails
+        const axis = vectorPool.acquire().copy(p.v).multiplyScalar(1 / speed);
+        // Rotate
         const easeLinear = (t) => t;
         Rotation.animate(p.orientation, axis, speed, easeLinear, "World");
       }
     }
 
-
-    // 3. Attractors & Death
+    // Attractors
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       let dead = false;
@@ -427,9 +379,7 @@ export class ParticleSystem extends Animation {
           dead = true;
           break;
         }
-
-        // Attractor Torque
-        // T = p x attr
+        // Torque
         const dist = Math.sqrt(distSq);
         if (dist > 0.001) {
           const forceMag = attr.strength / distSq;
@@ -437,24 +387,20 @@ export class ParticleSystem extends Animation {
           p.v.add(torque);
         }
       }
-
-      if (dead) {
-        this.particles.splice(i, 1);
-      }
+      if (dead) this.particles.splice(i, 1);
     }
   }
 }
 
-
 /**
- * A timer that triggers a function at random intervals.
+ * Randomized timer.
  */
 export class RandomTimer extends Animation {
   /**
-   * @param {number} min - Minimum delay in frames.
-   * @param {number} max - Maximum delay in frames.
-   * @param {Function} f - The function to execute.
-   * @param {boolean} [repeat=false] - Whether to repeat the timer.
+   * @param {number} min - Min delay frames.
+   * @param {number} max - Max delay frames.
+   * @param {Function} f - Callback.
+   * @param {boolean} repeat - Loop.
    */
   constructor(min, max, f, repeat = false) {
     super(-1, repeat);
@@ -466,37 +412,34 @@ export class RandomTimer extends Animation {
   }
 
   /**
-   * Resets the timer with a new random delay.
-   * @param {number} [t] - Optional time parameter (unused).
+   * Resets the timer.
+   * @param {number} t - Unused.
    */
   reset(t) {
     this.next = this.t + Math.round(Math.random() * (this.max - this.min) + this.min);
   }
 
   /**
-   * Checks if the timer should fire.
+   * Checks timer.
    */
   step() {
     super.step();
     if (this.t >= this.next) {
       this.f();
-      if (this.repeat) {
-        this.reset();
-      } else {
-        this.canceled = true;
-      }
+      if (this.repeat) this.reset();
+      else this.canceled = true;
     }
   }
 }
 
 /**
- * A timer that triggers a function at regular intervals.
+ * Regular interval timer.
  */
 export class PeriodicTimer extends Animation {
   /**
-   * @param {number} period - The interval in frames.
-   * @param {Function} f - The function to execute.
-   * @param {boolean} [repeat=false] - Whether to repeat.
+   * @param {number} period - Interval frames.
+   * @param {Function} f - Callback.
+   * @param {boolean} repeat - Loop.
    */
   constructor(period, f, repeat = false) {
     super(-1, repeat);
@@ -506,41 +449,37 @@ export class PeriodicTimer extends Animation {
   }
 
   /**
-   * Resets the timer for the next period.
+   * Resets the timer.
    */
   reset() {
     this.next = this.t + this.period;
   }
 
   /**
-   * Checks if the timer should fire.
+   * Checks timer.
    */
   step() {
     super.step();
     if (this.t >= this.next) {
       this.f();
-      if (this.repeat) {
-        this.reset();
-      } else {
-        this.cancel();
-      }
+      if (this.repeat) this.reset();
+      else this.cancel();
     }
   }
 }
 
-
 /**
- * Transitions a property on an object from one value to another over time.
+ * Property transition.
  */
 export class Transition extends Animation {
   /**
-   * @param {Object} target - The object to modify.
-   * @param {string} property - The property name.
-   * @param {number} to - The target value.
-   * @param {number} duration - Duration of transition.
-   * @param {Function} easingFn - Easing function.
-   * @param {boolean} [quantized=false] - If true, rounds values to integers.
-   * @param {boolean} [repeat=false] - Whether to repeat.
+   * @param {Object} target - Object.
+   * @param {string} property - Property name.
+   * @param {number} to - Target value.
+   * @param {number} duration - Frames.
+   * @param {Function} easingFn - Easing.
+   * @param {boolean} quantized - Int only.
+   * @param {boolean} repeat - Loop.
    */
   constructor(target, property, to, duration, easingFn, quantized = false, repeat = false) {
     super(duration, repeat);
@@ -552,31 +491,30 @@ export class Transition extends Animation {
     this.quantized = quantized;
   }
 
+  /**
+   * Interpolates property.
+   */
   step() {
-    if (this.t == 0) {
-      this.from = this.target[this.property];
-    }
+    if (this.t == 0) this.from = this.target[this.property];
     super.step();
     let t = Math.min(1, this.t / (this.duration));
     let n = this.easingFn(t) * (this.to - this.from) + this.from;
-    if (this.quantized) {
-      n = Math.floor(n);
-    }
+    if (this.quantized) n = Math.floor(n);
     this.target[this.property] = n;
   }
 }
 
 /**
- * Mutates a property on an object using a provided function over time.
+ * Property mutation.
  */
 export class Mutation extends Animation {
   /**
-   * @param {Object} target - The object to modify.
-   * @param {string} property - The property name.
-   * @param {Function} fn - The mutation function (takes eased time and current value).
-   * @param {number} duration - Duration.
-   * @param {Function} easingFn - Easing function.
-   * @param {boolean} [repeat=false] - Whether to repeat.
+   * @param {Object} target - Object.
+   * @param {string} property - Property name.
+   * @param {Function} fn - Mutator(easing, val).
+   * @param {number} duration - Frames.
+   * @param {Function} easingFn - Easing.
+   * @param {boolean} repeat - Loop.
    */
   constructor(target, property, fn, duration, easingFn, repeat = false) {
     super(duration, repeat);
@@ -587,10 +525,11 @@ export class Mutation extends Animation {
     this.easingFn = easingFn;
   }
 
+  /**
+   * Mutates property.
+   */
   step() {
-    if (this.t == 0) {
-      this.from = this.target[this.property];
-    }
+    if (this.t == 0) this.from = this.target[this.property];
     super.step();
     let t = Math.min(1, this.t / this.duration);
     this.target[this.property] = this.fn(this.easingFn(t), this.target[this.property]);
@@ -598,16 +537,16 @@ export class Mutation extends Animation {
 }
 
 /**
- * An animation that draws something with fade-in and fade-out capabilities.
+ * Fade-in/out sprite animation.
  */
 export class Sprite extends Animation {
   /**
-   * @param {Function} drawFn - The function to draw the sprite (takes opacity).
-   * @param {number} duration - Total duration.
-   * @param {number} [fadeInDuration=0] - Fade in duration.
-   * @param {Function} [fadeInEasingFn=easeMid] - Fade in easing.
-   * @param {number} [fadeOutDuration=0] - Fade out duration.
-   * @param {Function} [fadeOutEasingFn=easeMid] - Fade out easing.
+   * @param {Function} drawFn - Draw callback(opacity).
+   * @param {number} duration - Total frames.
+   * @param {number} fadeInDuration - Fade in frames.
+   * @param {Function} fadeInEasingFn - Fade in easing.
+   * @param {number} fadeOutDuration - Fade out frames.
+   * @param {Function} fadeOutEasingFn - Fade out easing.
    */
   constructor(drawFn, duration,
     fadeInDuration = 0, fadeInEasingFn = easeMid,
@@ -621,6 +560,9 @@ export class Sprite extends Animation {
     this.fadeOut = new Transition(this, 'opacity', 0, fadeOutDuration, fadeOutEasingFn);
   }
 
+  /**
+   * Manages fading and drawing.
+   */
   step() {
     if (this.t == 0) {
       this.fadeIn.rewind();
@@ -637,15 +579,15 @@ export class Sprite extends Animation {
 }
 
 /**
- * Animates an orientation along a path.
+ * Orientation path animation.
  */
 export class Motion extends Animation {
   static get MAX_ANGLE() { return TWO_PI / Daydream.W; }
 
   /**
-   * Static helper to perform a one-shot motion animation.
-   * @param {Orientation} orientation - The orientation object.
-   * @param {Path} path - The path to follow.
+   * Static helper to create and run path animation.
+   * @param {Orientation} orientation - Object.
+   * @param {THREE.CurvePath} path - Path.
    */
   static animate(orientation, path) {
     let m = new Motion(orientation, path, 1, false, 1);
@@ -653,11 +595,11 @@ export class Motion extends Animation {
   }
 
   /**
-   * @param {Orientation} orientation - The orientation to update.
-   * @param {Path} path - The path to follow.
-   * @param {number} duration - Duration of the motion.
-   * @param {boolean} [repeat=false] - Whether to repeat.
-   * @param {string} [space="World"] - "World" or "Local".
+   * @param {Orientation} orientation - Object to animate.
+   * @param {THREE.CurvePath} path - 3D path.
+   * @param {number} duration - Frames.
+   * @param {boolean} repeat - Loop.
+   * @param {string} space - "World" or "Local".
    */
   constructor(orientation, path, duration, repeat = false, space = "World") {
     super(duration, repeat);
@@ -666,20 +608,22 @@ export class Motion extends Animation {
     this.space = space;
   }
 
+  /**
+   * Advances motion.
+   */
   step() {
     super.step();
-
     let currentV = this.path.getPoint((this.t - 1) / this.duration);
     const targetV = this.path.getPoint(this.t / this.duration);
     const totalAngle = angleBetween(currentV, targetV);
     const numSteps = Math.ceil(Math.max(1, totalAngle / Motion.MAX_ANGLE));
 
-    // Ensure sufficient resolution
+    // Upsample
     this.orientation.upsample(numSteps + 1);
     const len = this.orientation.length();
 
-    let prevV = currentV.clone(); // Path points might be needing clone if path reuses them? Path usually computes fresh.
-    const accumulatedQ = quaternionPool.acquire(); // Identity? No, acquire returns whatever.
+    let prevV = currentV.clone();
+    const accumulatedQ = quaternionPool.acquire();
     accumulatedQ.set(0, 0, 0, 1);
 
     const applyRotation = (this.space === "Local")
@@ -703,22 +647,19 @@ export class Motion extends Animation {
   }
 }
 
-
 /**
- * Animates an orientation by rotating it around an axis.
+ * Axis rotation.
  */
 export class Rotation extends Animation {
-  static get MAX_ANGLE() {
-    return TWO_PI / Daydream.W;
-  }
+  static get MAX_ANGLE() { return TWO_PI / Daydream.W; }
 
   /**
-   * Static helper for a one-shot rotation.
-   * @param {Orientation} orientation 
-   * @param {THREE.Vector3} axis 
-   * @param {number} angle 
-   * @param {Function} easingFn 
-   * @param {string} [space="World"]
+   * Static helper to animate rotation.
+   * @param {Orientation} orientation - Object.
+   * @param {THREE.Vector3} axis - Axis.
+   * @param {number} angle - Total radians.
+   * @param {Function} easingFn - Easing.
+   * @param {string} space - "World"/"Local".
    */
   static animate(orientation, axis, angle, easingFn, space) {
     orientation.collapse();
@@ -727,12 +668,13 @@ export class Rotation extends Animation {
   }
 
   /**
-   * @param {THREE.Vector3} axis - Axis of rotation.
-   * @param {number} angle - Total angle to rotate.
-   * @param {number} duration - Duration.
-   * @param {Function} easingFn - Easing function.
-   * @param {boolean} [repeat=false] - Whether to repeat.
-   * @param {string} [space="World"] - "World" or "Local".
+   * @param {Orientation} orientation - Object.
+   * @param {THREE.Vector3} axis - Axis.
+   * @param {number} angle - Total radians.
+   * @param {number} duration - Frames.
+   * @param {Function} easingFn - Easing.
+   * @param {boolean} repeat - Loop.
+   * @param {string} space - Space.
    */
   constructor(orientation, axis, angle, duration, easingFn, repeat = false, space = "World") {
     super(duration, repeat);
@@ -744,10 +686,11 @@ export class Rotation extends Animation {
     this.space = space;
   }
 
+  /**
+   * Advances rotation.
+   */
   step() {
-    if (this.t == 0) {
-      this.last_angle = 0;
-    }
+    if (this.t == 0) this.last_angle = 0;
     super.step();
 
     let targetAngle = this.easingFn(this.t / this.duration) * this.totalAngle;
@@ -775,35 +718,23 @@ export class Rotation extends Animation {
   }
 }
 
-
 /**
- * Randomly walks an orientation over the sphere surface.
+ * Random surface walk.
  */
 export class RandomWalk extends Animation {
-  /**
-   * @typedef {Object} RandomWalkOptions
-   * @property {number} [speed=0.02] - Speed of the walk (angular speed in radians per step).
-   * @property {number} [pivotStrength=0.1] - Turning sharpness (max pivot angle in radians per step).
-   * @property {number} [noiseScale=0.02] - Frequency of turn direction changes (Perlin noise frequency).
-   * @property {number} [seed] - Seed for the noise generator (default: random).
-   * @property {string} [space="World"] - Coordinate space ("World" or "Local").
-   */
-
   static Languid = { speed: 0.02, pivotStrength: 0.1, noiseScale: 0.02 };
   static Energetic = { speed: 0.05, pivotStrength: 0.4, noiseScale: 0.08 };
 
   /**
-   * @param {Orientation} orientation - The orientation to animate.
-   * @param {THREE.Vector3} v_start - The starting vector.
-   * @param {RandomWalkOptions} [options] - Configuration options.
+   * @param {Orientation} orientation - Object.
+   * @param {THREE.Vector3} v_start - Initial vector.
+   * @param {Object} options - {speed, pivotStrength, noiseScale, seed, space}.
    */
   constructor(orientation, v_start, options = {}) {
     super(-1, false);
     this.orientation = orientation;
     this.v = v_start.clone();
-
     this.space = options.space || "World";
-
     this.noise = new FastNoiseLite();
     this.noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
     this.noise.SetSeed(options.seed !== undefined ? options.seed : Math.floor(Math.random() * 65535));
@@ -813,21 +744,20 @@ export class RandomWalk extends Animation {
     this.NOISE_SCALE = options.noiseScale !== undefined ? options.noiseScale : RandomWalk.Languid.noiseScale;
 
     this.noise.SetFrequency(this.NOISE_SCALE);
-
-    let u = (Math.abs(this.v.x) > 0.9)
-      ? new THREE.Vector3(0, 1, 0)
-      : new THREE.Vector3(1, 0, 0);
+    let u = (Math.abs(this.v.x) > 0.9) ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
     this.direction = new THREE.Vector3().crossVectors(this.v, u).normalize();
-
   }
 
+  /**
+   * Advances walk.
+   */
   step() {
     super.step();
-    //pivot
+    // Pivot
     const pivotAngle = this.noise.GetNoise(this.t, 0.0) * this.PIVOT_STRENGTH;
     this.direction.applyAxisAngle(this.v, pivotAngle).normalize();
 
-    //walk forward
+    // Walk
     const walkAxis = new THREE.Vector3().crossVectors(this.v, this.direction).normalize();
     const walkAngle = this.WALK_SPEED;
     this.v.applyAxisAngle(walkAxis, walkAngle).normalize();
@@ -838,37 +768,34 @@ export class RandomWalk extends Animation {
 }
 
 /**
- * Creates a trail of orientations based on a history of previous orientations.
+ * Orientation history trail.
  */
 export class OrientationTrail {
   /**
-   * @param {Orientation} orientation - The source orientation.
-   * @param {number} length - Number of history steps to keep.
+   * @param {Orientation} orientation - Tracked object.
+   * @param {number} length - Trail length.
    */
   constructor(orientation, length) {
     this.orientation = orientation;
     this.length = length;
   }
-
   /**
-   * Gets the orientation at a specific history index.
-   * @param {number} i - The index (0 is current, length-1 is oldest).
-   * @returns {THREE.Quaternion} The orientation at that index.
+   * Gets history orientation.
+   * @param {number} i - Index (0=current).
+   * @returns {THREE.Quaternion} Orientation at i.
    */
-  get(i) {
-    return this.orientation.get(i);
-  }
+  get(i) { return this.orientation.get(i); }
 }
 
 /**
- * Transitions from one color palette to another.
+ * Color palette transition.
  */
 export class ColorWipe extends Animation {
   /**
-   * @param {Object} fromPalette - The source palette.
-   * @param {Object} toPalette - The target palette.
-   * @param {number} duration - Duration of the wipe.
-   * @param {Function} [easingFn=easeMid] - Easing function.
+   * @param {Object} fromPalette - Source colors.
+   * @param {Object} toPalette - Target colors.
+   * @param {number} duration - Frames.
+   * @param {Function} easingFn - Easing.
    */
   constructor(fromPalette, toPalette, duration, easingFn = easeMid) {
     super(duration, false);
@@ -876,7 +803,6 @@ export class ColorWipe extends Animation {
     this.to = toPalette;
     this.easingFn = easingFn;
     this.current = {};
-    // Initialize current with from values
     for (const key in fromPalette) {
       if (typeof fromPalette[key] === 'object' && fromPalette[key].isColor) {
         this.current[key] = fromPalette[key].clone();
@@ -884,45 +810,48 @@ export class ColorWipe extends Animation {
     }
   }
 
+  /**
+   * Interpolates colors.
+   */
   step() {
     super.step();
     const t = this.easingFn(Math.min(1, this.t / this.duration));
     for (const key in this.from) {
-      if (this.to[key]) {
-        this.current[key].copy(this.from[key]).lerp(this.to[key], t);
-      }
+      if (this.to[key]) this.current[key].copy(this.from[key]).lerp(this.to[key], t);
     }
   }
-
-  get(key) {
-    return this.current[key];
-  }
+  /**
+   * Gets current color.
+   * @param {string} key - Color key.
+   * @returns {THREE.Color} Current color.
+   */
+  get(key) { return this.current[key]; }
 }
 
 /**
- * Morphs one mesh into another over time.
- * Strategy: "Super-Source"
- * 1. Subdivide the SOURCE mesh until it has enough vertices to approximate the destination.
- * 2. Project these vertices onto the DESTINATION surface.
- * 3. Animate vertices from Source Position -> Destination Surface Position.
- * 4. At the end, snap to the actual DESTINATION topology.
- *
- * This ensures the animation START is perfectly seamless (geometry matches Source exactly).
- * The END has a topology snap, but the shape should be correct.
+ * "Super-Source" mesh morphing.
+ * Projects source vertices onto destination surface, animates, then swaps topology.
  */
 export class MeshMorph extends Animation {
+  /**
+   * @param {Object} source - Source mesh {vertices, faces}.
+   * @param {string} dest - Target solid name.
+   * @param {number} duration - Frames.
+   * @param {boolean} repeat - Loop.
+   * @param {Function} easingFn - Easing.
+   * @param {Object} params - {target, dual, hankin, hankinAngle}.
+   */
   constructor(source, dest, duration, repeat = false, easingFn = easeInOutSin, params = {}) {
     super(duration, repeat);
     this.source = source;
     this.dest = dest;
     this.easingFn = easingFn;
-    this.params = params; // Params needed for initializing Dest geometry (target name, dual, hankin)
+    this.params = params;
 
     this.startPositions = null;
     this.targetPositions = null;
 
-    // Store original state to restore on rewind/repeat if needed
-    // Deep copy essential for faces
+    // Cache original
     this.originalState = {
       vertices: source.vertices.map(v => v.clone()),
       faces: source.faces.map(f => [...f])
@@ -931,13 +860,18 @@ export class MeshMorph extends Animation {
     this.init();
   }
 
-  // Ray-cast 'p' from origin onto 'mesh'
+  /**
+   * Raycasts point onto mesh.
+   * @param {THREE.Vector3} p - Point to project.
+   * @param {Object} mesh - Target mesh.
+   * @returns {THREE.Vector3} Projected point.
+   */
   projectToMesh(p, mesh) {
     const dir = vectorPool.acquire().copy(p).normalize();
     let bestHit = null;
     let minT = Infinity;
 
-    // Reuse vectors to avoid allocation in loop
+    // Cache vectors
     const edge1 = vectorPool.acquire();
     const edge2 = vectorPool.acquire();
     const normal = vectorPool.acquire();
@@ -945,7 +879,7 @@ export class MeshMorph extends Animation {
     const toHit = vectorPool.acquire();
     const tempCross = vectorPool.acquire();
 
-    // Determine faces to check
+    // Check faces
     const facesToCheck = mesh.faces;
     const count = facesToCheck.length;
 
@@ -953,7 +887,7 @@ export class MeshMorph extends Animation {
       const face = facesToCheck[i];
       if (face.length < 3) continue;
 
-      // Triangulate face (Fan from v0) to handle non-planar normalized faces
+      // Triangulate
       for (let tIdx = 0; tIdx < face.length - 2; tIdx++) {
         const v0 = mesh.vertices[face[0]];
         const v1 = mesh.vertices[face[tIdx + 1]];
@@ -961,42 +895,38 @@ export class MeshMorph extends Animation {
 
         edge1.subVectors(v1, v0);
         edge2.subVectors(v2, v0);
-        normal.crossVectors(edge1, edge2); // Do not normalize yet to check degeneracy via length
+        normal.crossVectors(edge1, edge2);
 
         const lenSq = normal.lengthSq();
         if (lenSq < 0.000001) continue;
         normal.multiplyScalar(1.0 / Math.sqrt(lenSq));
 
-        // Backface/Sideface culling (lenient)
+        // Culling
         const denom = dir.dot(normal);
         if (denom < 0.0001) continue;
 
         const t = v0.dot(normal) / denom;
         if (t <= 0 || t >= minT) continue;
 
-        // Check if inside triangle v0, v1, v2
+        // Hit test
         hit.copy(dir).multiplyScalar(t);
 
-        // Edge 0 (v0 -> v1)
-        // Edge 1 (v1 -> v2)
-        // Edge 2 (v2 -> v0)
-
-        // 0: v1-v0
+        // 0
         edge1.subVectors(v1, v0);
         toHit.subVectors(hit, v0);
         if (tempCross.crossVectors(edge1, toHit).dot(normal) < 0) continue;
 
-        // 1: v2-v1
+        // 1
         edge1.subVectors(v2, v1);
         toHit.subVectors(hit, v1);
         if (tempCross.crossVectors(edge1, toHit).dot(normal) < 0) continue;
 
-        // 2: v0-v2
+        // 2
         edge1.subVectors(v0, v2);
         toHit.subVectors(hit, v2);
         if (tempCross.crossVectors(edge1, toHit).dot(normal) < 0) continue;
 
-        // Inside!
+        // Hit
         if (!bestHit) bestHit = new THREE.Vector3();
         bestHit.copy(hit);
         minT = t;
@@ -1005,7 +935,7 @@ export class MeshMorph extends Animation {
 
     if (bestHit) return bestHit;
 
-    // Fallback: Nearest vertex
+    // Fallback
     let best = mesh.vertices[0];
     let minD = p.distanceToSquared(best);
     for (let i = 1; i < mesh.vertices.length; i++) {
@@ -1015,30 +945,26 @@ export class MeshMorph extends Animation {
     return best.clone();
   }
 
+  /**
+   * Initializes morph targets and paths.
+   */
   init() {
-    // 1. Resolve Destination Geometry
-    // We need the *structure* (topology) and the *shape* (geometry)
+    // Resolve Dest
     let destSolid = Solids[this.params.target]();
     if (this.params.dual) destSolid = MeshOps.dual(destSolid);
 
+    // Hankin
+    if (this.params.hankin) destSolid = MeshOps.hankin(destSolid, this.params.hankinAngle);
 
-    // If target has Hankin, generate it
-    if (this.params.hankin) {
-      destSolid = MeshOps.hankin(destSolid, this.params.hankinAngle);
-
-    }
-
-    // Store Dest for the secondary render pass
-    // We clone it because we'll be animating its vertices
+    // Store Dest
     this.destMesh = {
       vertices: destSolid.vertices.map(v => v.clone()),
       faces: destSolid.faces
     };
 
-    // 2. Precompute Correspondences
+    // Correspondences
 
-    // A. Source -> Dest Graph (Collapse)
-    // For each Source Vertex, find closest point on Dest Edges
+    // Source -> Dest
     this.sourcePaths = [];
     for (const v of this.source.vertices) {
       const target = MeshOps.closestPointOnMeshGraph(v, destSolid);
@@ -1050,23 +976,7 @@ export class MeshMorph extends Animation {
       });
     }
 
-    // B. Dest -> Source Graph (Emerge)
-    // For each Dest Vertex, find closest point on Source Edges
-    // Note: Source is `this.source`
-    this.destPaths = [];
-    for (const v of destSolid.vertices) {
-      const start = MeshOps.closestPointOnMeshGraph(v, this.source);
-      this.destPaths.push({
-        start: start,
-        end: v.clone(),
-        angle: start.angleTo(v),
-        axis: new THREE.Vector3().crossVectors(start, v).normalize()
-      });
-    }
-
-    // B. Dest -> Source Graph (Emerge)
-    // For each Dest Vertex, find closest point on Source Edges
-    // Note: Source is `this.source`
+    // Dest -> Source
     this.destPaths = [];
     for (const v of destSolid.vertices) {
       const start = MeshOps.closestPointOnMeshGraph(v, this.source);
@@ -1079,56 +989,53 @@ export class MeshMorph extends Animation {
     }
   }
 
+  /**
+   * Animates morph.
+   */
   step() {
     super.step();
     const progress = Math.min(1, this.t / this.duration);
     const alpha = this.easingFn(progress);
 
-    // Expose alpha for the renderer
+    // Expose alpha
     this.alpha = alpha;
 
-    // 1. Animate Source (Collapse to Dest Features)
+    // Animate Source
     for (let i = 0; i < this.source.vertices.length; i++) {
       const path = this.sourcePaths[i];
       if (!this.source.vertices[i]) continue;
 
-      // SLERP from Start to End
-      // If angle is tiny, Linear is fine, but Slerp handles it if axis is valid
+      // SLERP or LERP
       if (path.angle > 0.0001) {
-        this.source.vertices[i].copy(path.start)
-          .applyAxisAngle(path.axis, path.angle * alpha);
+        this.source.vertices[i].copy(path.start).applyAxisAngle(path.axis, path.angle * alpha);
       } else {
         this.source.vertices[i].copy(path.start).lerp(path.end, alpha);
       }
-
-      // Optional: "Geometric Collapse" - Pull slightly inside? 
-      // For now, keep on surface.
     }
 
-    // 2. Animate Dest (Emerge from Source Features)
-    // Note: destMesh has its own vertices array
+    // Animate Dest
     for (let i = 0; i < this.destMesh.vertices.length; i++) {
       const path = this.destPaths[i];
       if (path.angle > 0.0001) {
-        this.destMesh.vertices[i].copy(path.start)
-          .applyAxisAngle(path.axis, path.angle * alpha);
+        this.destMesh.vertices[i].copy(path.start).applyAxisAngle(path.axis, path.angle * alpha);
       } else {
         this.destMesh.vertices[i].copy(path.start).lerp(path.end, alpha);
       }
     }
 
-    // Final Frame: Swap!
+    // Swap
     if (this.t >= this.duration) {
-      // Replace source with dest
       this.source.vertices = this.destMesh.vertices;
       this.source.faces = this.destMesh.faces;
-      this.destMesh = null; // Disable secondary render
+      this.destMesh = null;
     }
   }
 
+  /**
+   * Resets to original state.
+   */
   rewind() {
     super.rewind();
-    // Restore original low-poly source to start again
     this.source.vertices = this.originalState.vertices.map(v => v.clone());
     this.source.faces = this.originalState.faces.map(f => [...f]);
     this.init();
@@ -1136,20 +1043,22 @@ export class MeshMorph extends Animation {
 }
 
 /**
- * Animates a Möbius transform flow.
+ * Mobius transform flow.
  */
 export class MobiusFlow extends Animation {
   /**
-   * @param {Mobius} mobius - The mobius transform.
-   * @param {THREE.Vector2} v - Velocity.
-   * @param {number} [duration=-1] - Duration.
+   * @param {Mobius} mobius - Transform.
+   * @param {THREE.Vector3} v - Movement vector.
+   * @param {number} duration - Frames.
    */
   constructor(mobius, v, duration = -1) {
     super(duration, duration != -1);
     this.mobius = mobius;
     this.v = v;
   }
-
+  /**
+   * Moves flow.
+   */
   step() {
     super.step();
     this.mobius.move(this.v);
@@ -1157,20 +1066,22 @@ export class MobiusFlow extends Animation {
 }
 
 /**
- * Animates a Möbius transform with a warp effect.
+ * Mobius warp.
  */
 export class MobiusWarp extends Animation {
   /**
-   * @param {Mobius} mobius - The mobius transform.
-   * @param {number} amount - Warp amount.
-   * @param {number} [duration=-1] - Duration.
+   * @param {Mobius} mobius - Transform.
+   * @param {number} amount - Warp factor.
+   * @param {number} duration - Frames.
    */
   constructor(mobius, amount, duration = -1) {
     super(duration, duration != -1);
     this.mobius = mobius;
     this.amount = amount;
   }
-
+  /**
+   * Warps space.
+   */
   step() {
     super.step();
     this.mobius.warp(this.amount);
