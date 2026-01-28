@@ -1937,10 +1937,8 @@ export const Scan = {
 
     shape.distance(p, sampleResult);
     const d = sampleResult.dist;
-    const pixelWidth = 2 * Math.PI / Daydream.W;
-    const threshold = pixelWidth;
-    if (d < threshold) {
-      const t = 0.5 - d / (2 * pixelWidth);
+    if (d < Daydream.PIXEL_WIDTH) {
+      const t = 0.5 - d / (2 * Daydream.PIXEL_WIDTH);
       const aaAlpha = quinticKernel(Math.max(0, Math.min(1, t)));
 
       const c = colorFn(p, sampleResult.t, sampleResult.dist);
