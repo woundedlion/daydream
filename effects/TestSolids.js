@@ -169,26 +169,18 @@ export class TestSolids {
         if (op < 0.01) return;
         if (!mesh || mesh.faces.length === 0) return;
 
-        // OPTIMIZATION: Reuse array and vectors
-        // 1. Ensure cache size
         while (this.transformedVertices.length < mesh.vertices.length) {
             this.transformedVertices.push(new THREE.Vector3());
         }
-
-        // 2. Transform into cache without allocation
         const q = this.orientation.get();
         const count = mesh.vertices.length;
 
-        // We only create a slice/view, not a deep copy of the array structure
-        const currentVerts = this.transformedVertices.slice(0, count);
-
         for (let i = 0; i < count; i++) {
-            // Copy source, apply rotation, store in cache
-            currentVerts[i].copy(mesh.vertices[i]).applyQuaternion(q);
+            this.transformedVertices[i].copy(mesh.vertices[i]).applyQuaternion(q);
         }
 
         const drawnMesh = {
-            vertices: currentVerts,
+            vertices: this.transformedVertices,
             faces: mesh.faces
         };
 
