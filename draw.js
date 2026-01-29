@@ -623,6 +623,7 @@ export const Plot = {
           let R = apothem / Math.cos(localPhi);
           if (R > Math.PI) R = Math.PI;
 
+          const theta = sectorCenter + localPhi;
 
           // Convert Polar (R, theta)
           const sinR = Math.sin(R);
