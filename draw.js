@@ -1874,8 +1874,9 @@ export const SDF = {
       }
 
       // Project P
-      const px = p.dot(this.basisU) / cosAngle;
-      const py = p.dot(this.basisW) / cosAngle;
+      const invCos = 1.0 / cosAngle;
+      const px = p.dot(this.basisU) * invCos;
+      const py = p.dot(this.basisW) * invCos;
 
       // 2D SDF & Winding
       const v = this.poly2D;
