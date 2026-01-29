@@ -15,10 +15,7 @@ import { Plot, dotPool } from "./plot.js";
 
 import { Scan } from "./scan.js"; // scan.js
 
-// ... [LabelPool class remains unchanged] ...
-
 class LabelPool {
-  // ... (Keep existing implementation)
   constructor(scene) {
     this.scene = scene;
     this.pool = [];
@@ -32,11 +29,9 @@ class LabelPool {
   acquire(position, content) {
     let labelObj;
 
-    // Reuse existing object if available
     if (this.activeCount < this.pool.length) {
       labelObj = this.pool[this.activeCount];
     } else {
-      // Create new object if pool is empty
       const div = document.createElement("div");
       div.className = "label";
       labelObj = new CSS2DObject(div);
@@ -44,16 +39,13 @@ class LabelPool {
       this.pool.push(labelObj);
     }
 
-    // Ensure it is in the scene (it might have been removed in cleanup)
     if (labelObj.parent !== this.scene) {
       this.scene.add(labelObj);
     }
 
-    // Update position
     labelObj.position.copy(position).multiplyScalar(Daydream.SPHERE_RADIUS);
     labelObj.visible = true;
 
-    // Only touch the DOM if the text actually changes
     if (labelObj.element.innerHTML !== content) {
       labelObj.element.innerHTML = content;
     }
@@ -62,7 +54,6 @@ class LabelPool {
   }
 
   cleanup() {
-    // Remove unused labels from the scene entirely
     for (let i = this.activeCount; i < this.pool.length; i++) {
       const obj = this.pool[i];
       if (obj.parent === this.scene) {
@@ -80,7 +71,6 @@ export const keyPixel = (k) => k.split(',');
 export const XY = (x, y) => x + y * Daydream.W;
 
 export class Daydream {
-  // ... [Static configs remain unchanged] ...
   static SCENE_ANTIALIAS = true;
   static SCENE_ALPHA = true;
   static SCENE_BACKGROUND_COLOR = 0x000000;
@@ -237,7 +227,6 @@ export class Daydream {
     this.labelAxes = false;
   }
 
-  // ... [keydown and setCanvasSize remain unchanged] ...
   keydown(e) {
     if (e.key == ' ') {
       this.paused = !this.paused;
@@ -295,7 +284,6 @@ export class Daydream {
         vectorPool.reset();
         quaternionPool.reset();
 
-        // OPTIMIZATION: Fast Clear using TypedArray.fill
         Daydream.pixels.fill(0);
 
         const start = performance.now();
@@ -304,8 +292,6 @@ export class Daydream {
         const stats = document.getElementById("perf-stats");
         if (stats) stats.innerText = `${duration.toFixed(3)} ms`;
 
-        // OPTIMIZATION: Zero-copy update.
-        // Daydream.pixels aliases the instanceColor buffer, so we just flag update.
         this.dotMesh.instanceColor.needsUpdate = true;
 
         this.xAxis.visible = this.labelAxes;
@@ -449,11 +435,10 @@ export class Daydream {
     this.dotMesh.frustumCulled = false;
     this.scene.add(this.dotMesh);
 
-    // Re-run setup
     this.precomputeMatrices();
   }
 }
-// ... [Utility functions remain unchanged] ...
+
 export const prettify = (r) => {
   let precision = 3;
   if (Math.abs(r) <= 0.00001) return "0";
