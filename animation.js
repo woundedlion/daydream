@@ -772,19 +772,54 @@ export class RandomWalk extends Animation {
  */
 export class OrientationTrail {
   /**
-   * @param {Orientation} orientation - Tracked object.
-   * @param {number} length - Trail length.
+   * @param {number} capacity - Number of frames to keep in history.
    */
-  constructor(orientation, length) {
-    this.orientation = orientation;
-    this.length = length;
+  constructor(capacity) {
+    this.capacity = capacity;
+    // Pre-allocate buffer of Orientation objects
+    this.snapshots = [];
+    for (let i = 0; i < capacity; i++) {
+      this.snapshots.push(new Orientation());
+    }
+    this.head = 0;
+    this.count = 0;
   }
+
   /**
-   * Gets history orientation.
-   * @param {number} i - Index (0=current).
-   * @returns {THREE.Quaternion} Orientation at i.
+   * Records a snapshot of the current orientation state.
+   * @param {Orientation} source - The orientation to copy.
    */
-  get(i) { return this.orientation.get(i); }
+  record(source) {
+    const snapshot = this.snapshots[this.head];
+    const srcData = source.orientations;
+    const dstData = snapshot.orientations;
+
+    while (dstData.length < srcData.length) {
+      dstData.push(new THREE.Quaternion());
+    }
+    dstData.length = srcData.length;
+
+    for (let i = 0; i < srcData.length; i++) {
+      dstData[i].copy(srcData[i]);
+    }
+
+    this.head = (this.head + 1) % this.capacity;
+    if (this.count < this.capacity) this.count++;
+  }
+
+  length() {
+    return this.count;
+  }
+
+  /**
+   * Gets a historical orientation. 0 is oldest, length-1 is newest.
+   * @param {number} i - Index [0..length-1].
+   * @returns {Orientation} The orientation at that index.
+   */
+  get(i) {
+    const idx = (this.head - this.count + i + this.capacity) % this.capacity;
+    return this.snapshots[idx];
+  }
 }
 
 /**
