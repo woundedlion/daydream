@@ -78,17 +78,17 @@ The `effects/` directory contains the visual sketches. Each class typically mana
 
 Daydream provides HTML-based tools for researching math and designing assets:
 
-### 🎨 Palette Generator (`palettes.html`)
+### 🎨 Palette Generator (`tools/palettes.html`)
 Interactive design of procedural cosine gradients.
 *   **Visualizers**: RGB waveforms and gradient preview.
 *   **Export**: Generates C++/JS code.
 
-### 🌀 Möbius Visualizer (`mobius.html`)
+### 🌀 Möbius Visualizer (`tools/mobius.html`)
 Playground for Möbius transformations.
 *   **Interactive Plane**: Drag control points to define transformations.
 *   **Presets**: Elliptic, Hyperbolic, Loxodromic, Parabolic transforms.
 
-### ➿ Lissajous Visualizer (`lissajous.html`)
+### ➿ Lissajous Visualizer (`tools/lissajous.html`)
 Tool to tune spherical Lissajous curves.
 *   **Rational Locking**: Snaps frequencies to rational ratios for closed loops.
 *   **Export**: Generates the exact formula parameters.
