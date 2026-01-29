@@ -47,8 +47,9 @@ export function dir(v) { return v < 0 ? -1 : 1; }
  * @returns {number} The wrapped value [0, m - 1].
  */
 export function wrap(x, m) {
-  const r = x % m;
-  return r < 0 ? r + m : r;
+  if (x < 0) return x + m;
+  if (x >= m) return x - m;
+  return x;
 }
 
 /**
