@@ -7,7 +7,8 @@ import * as THREE from "three";
 import { TWO_PI } from "../3dmath.js";
 import { gui } from "../gui.js";
 import { Daydream } from "../driver.js";
-import { Scan } from "../draw.js";
+import { Scan } from "../scan.js";
+
 import { richSunset } from "../color.js";
 import {
     Timeline,

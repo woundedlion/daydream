@@ -11,8 +11,12 @@ import {
     Orientation, sinWave, vectorPool, quaternionPool
 } from "../geometry.js";
 import {
-    Plot, makeBasis
-} from "../draw.js";
+    Plot
+} from "../plot.js";
+import {
+    makeBasis
+} from "../geometry.js";
+
 import {
     GenerativePalette, color4Pool
 } from "../color.js";

@@ -7,7 +7,8 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { Orientation } from "../geometry.js";
-import { Plot } from "../draw.js";
+import { Plot } from "../plot.js";
+
 import { createRenderPipeline, FilterOrient, FilterAntiAlias } from "../filters.js";
 import { Timeline, Rotation, easeMid } from "../animation.js";
 import { GenerativePalette } from "../color.js";

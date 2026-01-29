@@ -16,9 +16,13 @@ import {
 import {
     Timeline, RandomWalk, OrientationTrail // Assuming you added it to animation.js
 } from "../animation.js";
-import { Scan, makeBasis } from "../draw.js";
+import { Scan } from "../scan.js";
+import { makeBasis } from "../geometry.js";
+
 import { createRenderPipeline } from "../filters.js";
-import { tween, deepTween, dotPool } from "../draw.js";
+import { tween, deepTween } from "../animation.js";
+import { dotPool } from "../plot.js";
+
 
 export class RingSpin {
     static Ring = class {

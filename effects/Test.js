@@ -10,7 +10,10 @@ import { Daydream } from "../driver.js";
 import {
     Orientation, sinWave
 } from "../geometry.js";
-import { Plot, Scan, makeBasis } from "../draw.js";
+import { Plot } from "../plot.js";
+import { Scan } from "../scan.js";
+import { makeBasis } from "../geometry.js";
+
 import { TWO_PI } from "../3dmath.js";
 import {
     GenerativePalette

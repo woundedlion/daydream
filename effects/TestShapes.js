@@ -18,7 +18,10 @@ import {
 import {
     Timeline, Sprite, RandomWalk, Rotation, Mutation, easeMid
 } from "../animation.js";
-import { Scan, Plot, makeBasis } from "../draw.js";
+import { Scan } from "../scan.js";
+import { Plot } from "../plot.js";
+import { makeBasis } from "../geometry.js";
+
 import { createRenderPipeline, FilterAntiAlias } from "../filters.js";
 
 export class TestShapes {

@@ -11,8 +11,12 @@ import {
     Orientation, lissajous, randomVector, vectorToPixel, vectorPool
 } from "../geometry.js";
 import {
-    Path, dotPool, Plot, tween, deepTween
-} from "../draw.js";
+    dotPool, Plot
+} from "../plot.js";
+import {
+    Path, tween, deepTween
+} from "../animation.js";
+import { Scan } from "../scan.js";
 import {
     GenerativePalette, blendAlpha, color4Pool
 } from "../color.js";
@@ -23,7 +27,8 @@ import {
     createRenderPipeline, FilterAntiAlias, FilterOrient, quinticKernel
 } from "../filters.js";
 import { randomBetween, wrap } from "../util.js";
-import { Scan } from "../draw.js";
+
+
 
 export class Comets {
     static Node = class {
