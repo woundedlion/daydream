@@ -1346,6 +1346,7 @@ export const SDF = {
       this.sides = sides;
       this.phase = phase;
       this.apothem = thickness * Math.cos(Math.PI / sides);
+      this.isSolid = true; // Solid Shape
 
       this.nx = basis.v.x;
       this.ny = basis.v.y;
@@ -1433,6 +1434,7 @@ export const SDF = {
       this.basis = basis;
       this.sides = sides;
       this.phase = phase;
+      this.isSolid = true;
 
       const outerRadius = radius * (Math.PI / 2);
       const innerRadius = outerRadius * 0.382;
@@ -1538,6 +1540,7 @@ export const SDF = {
       this.basis = basis;
       this.sides = sides;
       this.phase = phase;
+      this.isSolid = true;
 
       const desiredOuterRadius = radius * (Math.PI / 2);
       this.apothem = Math.PI - desiredOuterRadius;
@@ -2012,9 +2015,27 @@ export const Scan = {
 
     shape.distance(p, sampleResult);
     const d = sampleResult.dist;
-    if (d < Daydream.PIXEL_WIDTH) {
-      const t = 0.5 - d / (2 * Daydream.PIXEL_WIDTH);
-      const aaAlpha = quinticKernel(Math.max(0, Math.min(1, t)));
+
+    // AA Logic
+    const pixelWidth = 2 * Math.PI / Daydream.W;
+    const threshold = shape.isSolid ? pixelWidth : 0;
+
+    if (d < threshold) {
+      let aaAlpha = 1.0;
+
+      if (shape.isSolid) {
+        // Solid AA: Fade across [-pixelWidth, pixelWidth]
+        // Map d from [pixelWidth, -pixelWidth] to [0, 1]
+        // t = 0.5 - d / (2 * pixelWidth)
+        // d=pixelWidth -> t=0. d=-pixelWidth -> t=1.
+        const t = 0.5 - d / (2 * pixelWidth);
+        aaAlpha = quinticKernel(Math.max(0, Math.min(1, t)));
+      } else {
+        // Soft Ring AA: Fade internal thickness [-thickness, 0]
+        if (shape.thickness > 0) {
+          aaAlpha = quinticKernel(-d / shape.thickness);
+        }
+      }
 
       const c = colorFn(p, sampleResult.t, sampleResult.dist);
       const color = c.isColor ? c : (c.color || c);
