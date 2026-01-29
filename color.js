@@ -771,3 +771,11 @@ export const embers = new ProceduralPalette(
   [0.265, 0.285, 0.198], // C
   [0.577, 0.440, 0.358]  // D
 );
+
+/** @type {ProceduralPalette} A cool, desaturated blue/gray palette. */
+export const lavenderLake = new ProceduralPalette(
+  [0.473, 0.473, 0.473], // A
+  [0.500, 0.500, 0.500], // B
+  [0.364, 0.124, 0.528], // C
+  [0.142, 0.378, 0.876]  // D
+);

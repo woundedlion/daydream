@@ -7,7 +7,8 @@ import {
 } from "../geometry.js";
 import { Solids } from "../solids.js";
 import { TWO_PI } from "../3dmath.js";
-import { Plot } from "../draw.js";
+import { Plot } from "../plot.js";
+
 import {
     GenerativePalette
 } from "../color.js";

@@ -996,3 +996,24 @@ export const MeshOps = {
     return this.updateHankin(compiled, angle);
   }
 };
+
+/**
+ * Creates a basis object { u, v, w } from an orientation and normal.
+ * @param {THREE.Quaternion} orientation - The orientation quaternion.
+ * @param {THREE.Vector3} normal - The local normal vector.
+ * @returns {{u: THREE.Vector3, v: THREE.Vector3, w: THREE.Vector3}} The basis vectors.
+ */
+export const makeBasis = (orientation, normal) => {
+  let refAxis = Daydream.X_AXIS;
+  if (Math.abs(normal.dot(refAxis)) > 0.9999) {
+    refAxis = Daydream.Y_AXIS;
+  }
+  let v = vectorPool.acquire().copy(normal).applyQuaternion(orientation).normalize();
+  let ref = _tempVec.copy(refAxis).applyQuaternion(orientation).normalize();
+  let u = vectorPool.acquire().crossVectors(v, ref).normalize();
+  let w = vectorPool.acquire().crossVectors(v, u).normalize();
+  return { u, v, w };
+};
+
+
+

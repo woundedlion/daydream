@@ -16,7 +16,10 @@ import {
     Timeline, ParticleSystem, Sprite
 } from "../animation.js";
 import { createRenderPipeline, FilterAntiAlias } from "../filters.js";
-import { Scan, makeBasis, tween } from "../draw.js";
+import { Scan } from "../scan.js";
+import { makeBasis } from "../geometry.js";
+import { tween } from "../animation.js";
+
 
 export class TestParticles {
     constructor() {

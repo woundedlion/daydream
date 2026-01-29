@@ -7,9 +7,11 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { MeshOps, vectorPool, quaternionPool, sinWave, Orientation } from "../geometry.js";
 import { Solids } from "../solids.js";
-import { Plot, Scan } from "../draw.js";
+import { Plot } from "../plot.js";
+import { Scan } from "../scan.js";
+
 import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
-import { color4Pool, richSunset, embers, underSea, emeraldForest, lateSunset, iceMelt, mangoPeel } from "../color.js";
+import { color4Pool, richSunset, embers, underSea, emeraldForest, lateSunset, iceMelt, mangoPeel, lavenderLake } from "../color.js";
 import { Timeline, Rotation, easeInOutSin, Mutation, easeMid, MeshMorph, PeriodicTimer, Sprite } from "../animation.js";
 import { Daydream } from "../driver.js";
 import { TWO_PI } from "../3dmath.js";
@@ -17,12 +19,12 @@ import { TWO_PI } from "../3dmath.js";
 
 
 const PALETTES = {
-    3: embers,
-    4: underSea,
-    5: emeraldForest,
-    6: lateSunset,
-    8: iceMelt,
-    10: mangoPeel
+    3: lavenderLake,
+    4: lavenderLake,
+    5: lavenderLake,
+    6: emeraldForest,
+    8: lavenderLake,
+    10: lavenderLake
 };
 
 export class TestSolids {

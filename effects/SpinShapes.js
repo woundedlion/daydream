@@ -16,7 +16,9 @@ import {
 import {
     Timeline, Sprite, Rotation, easeMid
 } from "../animation.js";
-import { Scan, makeBasis } from "../draw.js";
+import { Scan } from "../scan.js";
+import { makeBasis } from "../geometry.js";
+
 import { createRenderPipeline } from "../filters.js";
 
 export class SpinShapes {

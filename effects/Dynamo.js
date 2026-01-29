@@ -12,7 +12,8 @@ import {
 } from "../geometry.js";
 import {
     Plot
-} from "../draw.js";
+} from "../plot.js";
+
 import {
     GenerativePalette, color4Pool
 } from "../color.js";

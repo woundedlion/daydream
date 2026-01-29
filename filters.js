@@ -9,7 +9,9 @@ import { wrap } from "./util.js"
 import { blendAlpha, colorPool } from "./color.js";
 import { vectorToPixel, angleBetween } from "./geometry.js";
 import { vectorPool } from "./geometry.js";
-import { Plot, tween } from "./draw.js";
+import { Plot } from "./plot.js";
+import { tween } from "./animation.js";
+
 import { TWO_PI } from "./3dmath.js";
 
 const BLACK = new THREE.Color(0, 0, 0);

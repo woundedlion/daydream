@@ -11,7 +11,9 @@ import { G as g } from "./geometry.js";
 import { vectorPool, quaternionPool } from "./geometry.js";
 import { GUI } from "gui";
 import { colorPool, color4Pool } from "./color.js";
-import { dotPool } from "./draw.js";
+import { Plot, dotPool } from "./plot.js";
+
+import { Scan } from "./scan.js"; // scan.js
 
 // ... [LabelPool class remains unchanged] ...
 

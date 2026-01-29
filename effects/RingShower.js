@@ -10,7 +10,9 @@ import { Daydream } from "../driver.js";
 import {
     Orientation, randomVector, angleBetween
 } from "../geometry.js";
-import { Plot, makeBasis } from "../draw.js";
+import { Plot } from "../plot.js";
+import { makeBasis } from "../geometry.js";
+
 import {
     GenerativePalette
 } from "../color.js";

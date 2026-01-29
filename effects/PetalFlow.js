@@ -8,7 +8,8 @@ import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { Orientation, sinWave } from "../geometry.js";
 import { invStereo, TWO_PI } from "../3dmath.js";
-import { Plot } from "../draw.js";
+import { Plot } from "../plot.js";
+
 import { ProceduralPalette } from "../color.js";
 import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
 import { wrap } from "../util.js";
