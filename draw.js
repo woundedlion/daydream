@@ -1639,6 +1639,8 @@ export const SDF = {
 
       this.planes = []; // We will clear and reuse
       this.poly2D = []; // Reused objects {x,y}
+      this.edgeVectors = []; // Reused objects {x,y}
+      this.edgeLengthsSq = []; // Reused numbers
       this.intervals = null;
     }
 
@@ -1694,6 +1696,25 @@ export const SDF = {
         const p2d = this.poly2D[i];
         p2d.x = v.dot(this.basisU) / d;
         p2d.y = v.dot(this.basisW) / d;
+      }
+
+      // Pre-compute Edge Vectors & Lengths
+      // Ensure arrays size
+      while (this.edgeVectors.length < this.count) {
+        this.edgeVectors.push({ x: 0, y: 0 });
+        this.edgeLengthsSq.push(0);
+      }
+
+      // Compute edges for distance check (matching distance loop: i, j=i-1)
+      for (let i = 0, j = this.count - 1; i < this.count; j = i, i++) {
+        const Vi = this.poly2D[i];
+        const Vj = this.poly2D[j];
+
+        const edge = this.edgeVectors[i];
+        edge.x = Vj.x - Vi.x;
+        edge.y = Vj.y - Vi.y;
+
+        this.edgeLengthsSq[i] = edge.x * edge.x + edge.y * edge.y;
       }
 
       // Inradius
@@ -1867,14 +1888,17 @@ export const SDF = {
         const Vi = v[i];
         const Vj = v[j];
 
-        const ex = Vj.x - Vi.x;
-        const ey = Vj.y - Vi.y;
+        // Use pre-computed edge
+        const edge = this.edgeVectors[i];
+        const ex = edge.x;
+        const ey = edge.y;
+
         const wx = px - Vi.x;
         const wy = py - Vi.y;
 
         // Edge distance
         const dotWE = wx * ex + wy * ey;
-        const dotEE = ex * ex + ey * ey;
+        const dotEE = this.edgeLengthsSq[i];
 
         let clampVal = 0;
         if (dotEE > 1e-12) {
