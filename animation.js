@@ -768,8 +768,94 @@ export class RandomWalk extends Animation {
 }
 
 /**
- * Orientation history trail.
+ * Transitions from one color palette to another.
  */
+export class ColorWipe extends Animation {
+  /**
+   * @param {Object} fromPalette - The source palette.
+   * @param {Object} toPalette - The target palette.
+   * @param {number} duration - Duration of the wipe.
+   * @param {Function} easingFn - Easing function.
+   */
+  constructor(fromPalette, toPalette, duration, easingFn) {
+    super(duration, false);
+    this.curPalette = fromPalette;
+    this.toPalette = toPalette;
+    this.easingFn = easingFn;
+  }
+
+  step() {
+    if (this.t == 0) {
+      this.a0 = this.curPalette.a.clone();
+      this.b0 = this.curPalette.b.clone();
+      this.c0 = this.curPalette.c.clone();
+    }
+    super.step();
+    this.curPalette.a.lerpColors(this.a0, this.toPalette.a, this.easingFn(this.t / this.duration));
+    this.curPalette.b.lerpColors(this.b0, this.toPalette.b, this.easingFn(this.t / this.duration));
+    this.curPalette.c.lerpColors(this.c0, this.toPalette.c, this.easingFn(this.t / this.duration));
+  }
+}
+
+/**
+ * Animates the Mobius parameters for a continuous loxodromic flow.
+ */
+export class MobiusFlow extends Animation {
+  /**
+   * @param {Object} params - The Mobius parameters object.
+   * @param {number} numRings - Number of rings in the flow.
+   * @param {number} numLines - Number of lines.
+   * @param {number} duration - Animation duration.
+   * @param {boolean} [repeat=true] - Whether to repeat.
+   */
+  constructor(params, numRings, numLines, duration, repeat = true) {
+    super(duration, repeat);
+    this.params = params;
+    this.numRings = numRings;
+    this.numLines = numLines;
+  }
+
+  step() {
+    super.step();
+    const progress = this.t / this.duration;
+    const logPeriod = 5.0 / (this.numRings + 1);
+    const flowParam = progress * logPeriod;
+    const scale = Math.exp(flowParam);
+    const s = Math.sqrt(scale);
+    const angle = progress * (TWO_PI / this.numLines);
+
+    this.params.aRe = s * Math.cos(angle);
+    this.params.aIm = s * Math.sin(angle);
+    this.params.dRe = (1 / s) * Math.cos(-angle);
+    this.params.dIm = (1 / s) * Math.sin(-angle);
+  }
+}
+
+/**
+ * Animates the Mobius parameters for a warping effect pulling the poles together.
+ */
+export class MobiusWarp extends Animation {
+  /**
+   * @param {Object} params - The Mobius parameters.
+   * @param {number} numRings - Number of rings.
+   * @param {number} duration - Animation duration.
+   * @param {boolean} [repeat=true] - Whether to repeat.
+   */
+  constructor(params, numRings, duration, repeat = true) {
+    super(duration, repeat);
+    this.params = params;
+    this.numRings = numRings;
+  }
+
+  step() {
+    super.step();
+    const progress = this.t / this.duration;
+    const angle = progress * TWO_PI;
+    this.params.bRe = Math.cos(angle);
+    this.params.bIm = Math.sin(angle);
+  }
+}
+
 export class OrientationTrail {
   /**
    * @param {number} capacity - Number of frames to keep in history.
@@ -794,11 +880,14 @@ export class OrientationTrail {
     const srcData = source.orientations;
     const dstData = snapshot.orientations;
 
+    // 1. Ensure buffer size matches source (grow if needed)
     while (dstData.length < srcData.length) {
-      dstData.push(new THREE.Quaternion());
+      dstData.push(new THREE.Quaternion()); // These are persistent within the OrientationTrail snapshots
     }
+    // 2. Trim if source shrank (optional, but keeps state clean)
     dstData.length = srcData.length;
 
+    // 3. Deep copy quaternions
     for (let i = 0; i < srcData.length; i++) {
       dstData[i].copy(srcData[i]);
     }
@@ -817,50 +906,14 @@ export class OrientationTrail {
    * @returns {Orientation} The orientation at that index.
    */
   get(i) {
+    // 0 = Oldest, count-1 = Newest
+    // head points to next empty slot. head-1 is newest.
+    // oldest is head - count.
     const idx = (this.head - this.count + i + this.capacity) % this.capacity;
     return this.snapshots[idx];
   }
-}
 
-/**
- * Color palette transition.
- */
-export class ColorWipe extends Animation {
-  /**
-   * @param {Object} fromPalette - Source colors.
-   * @param {Object} toPalette - Target colors.
-   * @param {number} duration - Frames.
-   * @param {Function} easingFn - Easing.
-   */
-  constructor(fromPalette, toPalette, duration, easingFn = easeMid) {
-    super(duration, false);
-    this.from = fromPalette;
-    this.to = toPalette;
-    this.easingFn = easingFn;
-    this.current = {};
-    for (const key in fromPalette) {
-      if (typeof fromPalette[key] === 'object' && fromPalette[key].isColor) {
-        this.current[key] = fromPalette[key].clone();
-      }
-    }
-  }
 
-  /**
-   * Interpolates colors.
-   */
-  step() {
-    super.step();
-    const t = this.easingFn(Math.min(1, this.t / this.duration));
-    for (const key in this.from) {
-      if (this.to[key]) this.current[key].copy(this.from[key]).lerp(this.to[key], t);
-    }
-  }
-  /**
-   * Gets current color.
-   * @param {string} key - Color key.
-   * @returns {THREE.Color} Current color.
-   */
-  get(key) { return this.current[key]; }
 }
 
 /**
@@ -1074,51 +1127,5 @@ export class MeshMorph extends Animation {
     this.source.vertices = this.originalState.vertices.map(v => v.clone());
     this.source.faces = this.originalState.faces.map(f => [...f]);
     this.init();
-  }
-}
-
-/**
- * Mobius transform flow.
- */
-export class MobiusFlow extends Animation {
-  /**
-   * @param {Mobius} mobius - Transform.
-   * @param {THREE.Vector3} v - Movement vector.
-   * @param {number} duration - Frames.
-   */
-  constructor(mobius, v, duration = -1) {
-    super(duration, duration != -1);
-    this.mobius = mobius;
-    this.v = v;
-  }
-  /**
-   * Moves flow.
-   */
-  step() {
-    super.step();
-    this.mobius.move(this.v);
-  }
-}
-
-/**
- * Mobius warp.
- */
-export class MobiusWarp extends Animation {
-  /**
-   * @param {Mobius} mobius - Transform.
-   * @param {number} amount - Warp factor.
-   * @param {number} duration - Frames.
-   */
-  constructor(mobius, amount, duration = -1) {
-    super(duration, duration != -1);
-    this.mobius = mobius;
-    this.amount = amount;
-  }
-  /**
-   * Warps space.
-   */
-  step() {
-    super.step();
-    this.mobius.warp(this.amount);
   }
 }
