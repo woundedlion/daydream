@@ -212,10 +212,10 @@ class SpatialHash {
 
   /**
    * Inserts a particle.
-   * @param {Object} particle - Particle with .p (position).
+   * @param {Object} particle - Particle with .orientedPosition.
    */
   insert(particle) {
-    const key = this.getKey(particle.p);
+    const key = this.getKey(particle.orientedPosition);
     if (!this.buckets.has(key)) this.buckets.set(key, []);
     this.buckets.get(key).push(particle);
   }
@@ -252,7 +252,7 @@ class SpatialHash {
           if (this.buckets.has(key)) {
             const bucket = this.buckets.get(key);
             for (const p of bucket) {
-              if (p.p.distanceToSquared(position) <= radius * radius) particles.push(p);
+              if (p.orientedPosition.distanceToSquared(position) <= radius * radius) particles.push(p);
             }
           }
         }
@@ -278,21 +278,21 @@ export const PARTICLE_BASE = new THREE.Vector3(0, 1, 0);
 export class ParticleSystem extends Animation {
   static Particle = class {
     /**
-     * @param {THREE.Vector3} p - Position.
-     * @param {THREE.Vector3} v - Velocity.
-     * @param {THREE.Color} c - Color.
+     * @param {THREE.Vector3} position - Position.
+     * @param {THREE.Vector3} velocity - Velocity.
+     * @param {THREE.Color} color - Color.
      * @param {number} gravity - Gravity scale.
      */
-    constructor(p, v, c, gravity) {
-      this.p = p.clone();
-      this.v = v.clone();
-      this.c = c;
+    constructor(position, velocity, color, gravity) {
+      this.position = position.clone();
+      this.velocity = velocity.clone();
+      this.color = color;
       this.gravity = gravity;
       this.orientation = new Orientation();
+    }
 
-      // Orient
-      const q = quaternionPool.acquire().setFromUnitVectors(PARTICLE_BASE, p.clone().normalize());
-      this.orientation.orientations[0].copy(q);
+    get orientedPosition() {
+      return this.orientation.orient(this.position);
     }
   }
 
@@ -300,7 +300,7 @@ export class ParticleSystem extends Animation {
     super(-1, false);
     this.particles = [];
     this.friction = 0.95;
-    this.gravityConstant = 0.01;
+    this.gravityConstant = 0.001;
     this.attractors = [];
     this.spatialHash = new SpatialHash(0.1);
     this.interactionRadius = 0.2;
@@ -318,13 +318,13 @@ export class ParticleSystem extends Animation {
 
   /**
    * Spawns a new particle.
-   * @param {THREE.Vector3} p - Position.
-   * @param {THREE.Vector3} v - Velocity.
-   * @param {THREE.Color} c - Color.
+   * @param {THREE.Vector3} position - Position.
+   * @param {THREE.Vector3} velocity - Velocity.
+   * @param {THREE.Color} color - Color.
    * @param {number} gravity - Gravity scale.
    */
-  spawn(p, v, c, gravity) {
-    this.particles.push(new ParticleSystem.Particle(p, v, c, gravity));
+  spawn(position, velocity, color, gravity) {
+    this.particles.push(new ParticleSystem.Particle(position, velocity, color, gravity));
   }
 
   /**
@@ -333,61 +333,57 @@ export class ParticleSystem extends Animation {
   step() {
     super.step();
 
-    // Rebuild Hash
-    this.spatialHash.clear();
-    for (const p of this.particles) this.spatialHash.insert(p);
-
     // Physics
     const G = this.gravityConstant;
-    const radius = this.interactionRadius;
     const torque = vectorPool.acquire();
-    const q = quaternionPool.acquire();
 
-    for (const p of this.particles) {
-      const neighbors = this.spatialHash.query(p.p, radius);
-      for (const other of neighbors) {
-        if (p === other) continue;
-        const distSq = p.p.distanceToSquared(other.p);
-
-        if (distSq > 0.0001 && distSq < radius * radius) {
-          const forceMag = (G * p.gravity * other.gravity) / distSq;
-          // Torque
-          torque.crossVectors(p.p, other.p).normalize().multiplyScalar(forceMag);
-          p.v.add(torque);
-        }
-      }
-
-      // Friction
-      p.v.multiplyScalar(this.friction);
-
-      const speed = p.v.length();
-      if (speed > 0.00001) {
-        const axis = vectorPool.acquire().copy(p.v).multiplyScalar(1 / speed);
-        // Rotate
-        const easeLinear = (t) => t;
-        Rotation.animate(p.orientation, axis, speed, easeLinear, "World");
-      }
-    }
-
-    // Attractors
+    // Attractors (Global Gravity)
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       let dead = false;
+
+      // Apply forces from attractors
       for (const attr of this.attractors) {
-        const distSq = p.p.distanceToSquared(attr.position);
+        // Distance to attractor
+        const distSq = p.orientedPosition.distanceToSquared(attr.position);
+
+        // Kill if too close
         if (distSq < attr.killRadius * attr.killRadius) {
           dead = true;
           break;
         }
-        // Torque
-        const dist = Math.sqrt(distSq);
-        if (dist > 0.001) {
-          const forceMag = attr.strength / distSq;
-          torque.crossVectors(p.p, attr.position).normalize().multiplyScalar(forceMag);
-          p.v.add(torque);
+
+        // Apply Force
+        if (distSq > 0.000001) {
+          // Soften gravity
+          let forceMag = (G * attr.strength) / (distSq + 0.000001);
+
+          // Tangential force towards attractor
+          torque.crossVectors(p.orientedPosition, attr.position).normalize().multiplyScalar(forceMag);
+          const force = torque.cross(p.orientedPosition);
+          p.velocity.add(force);
         }
       }
-      if (dead) this.particles.splice(i, 1);
+
+      if (dead) {
+        this.particles.splice(i, 1);
+        continue;
+      }
+
+      // Friction
+      p.velocity.multiplyScalar(this.friction);
+
+
+
+      // Motion
+      const speed = p.velocity.length();
+      if (speed > 0.00001) {
+        // Interpret velocity as spatial units on the unit sphere:
+        // arc_length = radius * theta. Radius = 1, so theta = arc_length = speed.
+        const angle = speed;
+        const axis = vectorPool.acquire().crossVectors(p.orientedPosition, p.velocity).normalize();
+        Rotation.animate(p.orientation, axis, angle, easeMid, "World");
+      }
     }
   }
 }
