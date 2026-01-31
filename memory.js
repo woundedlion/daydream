@@ -57,10 +57,10 @@ export class StaticPool {
 
 
 /** @type {StaticPool} Global pool for temporary Vector3 objects. */
-export const vectorPool = new StaticPool(THREE.Vector3, 500000);
+export const vectorPool = new StaticPool(THREE.Vector3, 2000000);
 
 /** @type {StaticPool} Global pool for temporary Quaternion objects. */
-export const quaternionPool = new StaticPool(THREE.Quaternion, 1000000);
+export const quaternionPool = new StaticPool(THREE.Quaternion, 4000000);
 
 /** @type {StaticPool} Global pool for temporary Color objects used in blending. */
 export const colorPool = new StaticPool(THREE.Color, 1000000);

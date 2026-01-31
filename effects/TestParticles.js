@@ -35,6 +35,7 @@ export class TestParticles {
         this.initialSpeed = 0.05;
 
         this.maxSpeed = 0;
+        this.batchSize = Daydream.W; // Default batch size
         this.rebuild();
         this.setupGUI();
     }
@@ -44,18 +45,23 @@ export class TestParticles {
         this.gui.add(this.particleSystem, 'friction').min(0.8).max(1.0).step(0.001).name("Friction");
         this.gui.add(this.particleSystem, 'gravityScale').min(0.0001).max(0.01).step(0.0001).name("Gravity Scale");
         this.gui.add(this, 'initialSpeed').min(0.001).max(0.2).step(0.001).name("Initial Speed");
+
+        // Time Scale Slider
+        this.gui.add(this.particleSystem, 'timeScale').min(0.0).max(10.0).step(1).name("Time Scale");
+
         this.gui.add(this, 'wellStrength').min(0).max(10).step(0.1).name("Attractor Strength").onChange((v) => {
             for (const a of this.particleSystem.attractors) {
                 a.strength = v;
             }
         });
-        this.gui.add(this, 'numParticles').min(1).max(10000).step(1).name("# Particles");
+
         this.gui.add(this, 'maxSpeed').name("Max Speed").listen();
         this.gui.add(this, 'rebuild').name("Respawn");
     }
 
     rebuild() {
-        this.numParticles = 1000; // Restore higher count for spiral visibility
+        this.spawnIndex = 0;
+        this.emitCounter = 0;
         this.particleSystem.reset(this.friction, 0.001);
 
         const killRadius = 0.05;
@@ -66,16 +72,26 @@ export class TestParticles {
         this.particleSystem.addAttractor(new THREE.Vector3(-1, 0, 0), this.wellStrength, killRadius);
         this.particleSystem.addAttractor(new THREE.Vector3(0, 0, -1), this.wellStrength, killRadius);
 
-    }
-
-    replenish() {
-        for (let i = 0; i < 10 && this.particleSystem.particles.length < this.numParticles; i++) {
-            const v = (Math.random() < 0.5) ? Daydream.Y_AXIS.clone() : Daydream.Y_AXIS.clone().negate();
-            const vel = randomVector().cross(v).normalize().multiplyScalar(this.initialSpeed);
+        // North Emitter
+        this.particleSystem.addEmitter((sys) => {
+            const axis = Daydream.Y_AXIS.clone(); // North (+1)
+            // Use monotonic counter for spiral
+            const angle = (this.emitCounter++ * 0.1);
+            const vel = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)).multiplyScalar(this.initialSpeed);
             const palette = new GenerativePalette('straight', 'analagous', 'descending', 'mid');
-            const life = 48 + Math.random() * 160;
-            this.particleSystem.spawn(v, vel, palette, life);
-        }
+            const life = 160;
+            return new ParticleSystem.Particle(axis, vel, palette, life);
+        });
+
+        // South Emitter
+        this.particleSystem.addEmitter((sys) => {
+            const axis = Daydream.Y_AXIS.clone().multiplyScalar(-1); // South (-1)
+            const angle = (this.emitCounter++ * 0.1);
+            const vel = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)).multiplyScalar(this.initialSpeed);
+            const palette = new GenerativePalette('straight', 'complementary', 'descending', 'mid');
+            const life = 160;
+            return new ParticleSystem.Particle(axis, vel, palette, life);
+        });
     }
 
     evaluateColor(particle, t) {
@@ -93,9 +109,7 @@ export class TestParticles {
             const sq = p.velocity.lengthSq();
             if (sq > maxSq) maxSq = sq;
         }
-        this.maxSpeed = Math.sqrt(maxSq).toFixed(3);
-
-        this.replenish();
+        this.maxSpeed = Math.sqrt(maxSq);
 
         // Draw Trails
         this.pipeline.trail((x, y, t, particle) => {
@@ -105,16 +119,18 @@ export class TestParticles {
 
     drawParticles(alpha) {
         for (const p of this.particleSystem.particles) {
+            const steps = p.orientation.length();
+
+            // Age in Physics Steps
+            const particleAgeSteps = p.maxLife - p.life;
+
             tween(p.orientation, (q, t) => {
                 let v = vectorPool.acquire().copy(p.position).applyQuaternion(q);
-                const c = this.evaluateColor(p, 0);
-
-                const lifeAlpha = p.life / p.maxLife;
-                c.alpha *= alpha * lifeAlpha;
-
+                const c = this.evaluateColor(p, t);
+                c.alpha *= alpha;
                 Plot.Point.draw(this.pipeline, v, (pos, _t) => {
                     return { color: c.color, alpha: c.alpha, tag: p.tag };
-                });
+                }, t);
             });
             p.orientation.collapse();
         }

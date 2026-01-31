@@ -20,13 +20,14 @@ export const Plot = {
          * @param {Object} pipeline - The render pipeline.
          * @param {THREE.Vector3} v - The vector position (normalized).
          * @param {Function} colorFn - Function to determine the color (takes vector and t=0).
+         * @param {number} [age=0] - The age of the dot (for trails).
          */
-        static draw(pipeline, v, colorFn) {
+        static draw(pipeline, v, colorFn, age = 0) {
             const res = colorFn(v, 0);
             const color = res.isColor ? res : (res.color || res);
             const alpha = res.alpha !== undefined ? res.alpha : 1.0;
             const tag = res.tag;
-            pipeline.plot(v, color, 0, alpha, tag);
+            pipeline.plot(v, color, age, alpha, tag);
         }
     },
 
@@ -36,21 +37,22 @@ export const Plot = {
          * @param {Object} pipeline - The render pipeline.
          * @param {Path|ProceduralPath} path - The path object.
          * @param {Function} colorFn - Function to determine the color (takes normalized time t).
+         * @param {number} [age=0] - The age of the dots.
          */
-        static draw(pipeline, path, colorFn) {
+        static draw(pipeline, path, colorFn, age = 0) {
             for (let t = 0; t < path.length(); t++) {
                 const v = path.getPoint(t / path.length());
                 const res = colorFn(t);
                 const color = res.isColor ? res : (res.color || res);
                 const alpha = res.alpha !== undefined ? res.alpha : 1.0;
                 const tag = res.tag;
-                pipeline.plot(v, color, 0, alpha, tag);
+                pipeline.plot(v, color, age, alpha, tag);
             }
         }
     },
 
     Line: class {
-        static draw(pipeline, v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast = false) {
+        static draw(pipeline, v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast = false, age = 0) {
             let u = vectorPool.acquire().copy(v1);
             let v = vectorPool.acquire().copy(v2);
             let a = angleBetween(u, v);
@@ -105,7 +107,7 @@ export const Plot = {
             const startColor = startRes.isColor ? startRes : (startRes.color || startRes);
             const startAlpha = startRes.alpha !== undefined ? startRes.alpha : 1.0;
             const startTag = startRes.tag;
-            pipeline.plot(u, startColor, 0, startAlpha, startTag);
+            pipeline.plot(u, startColor, age, startAlpha, startTag);
             const loopLimit = omitLast ? steps.length - 1 : steps.length;
             for (let i = 0; i < loopLimit; i++) {
                 const step = steps[i] * scale;
@@ -117,7 +119,7 @@ export const Plot = {
                 const color = res.isColor ? res : (res.color || res);
                 const alpha = res.alpha !== undefined ? res.alpha : 1.0;
                 const tag = res.tag;
-                pipeline.plot(u, color, 0, alpha, tag);
+                pipeline.plot(u, color, age, alpha, tag);
             }
         }
     },
@@ -128,8 +130,9 @@ export const Plot = {
          * @param {Object} pipeline - The render pipeline.
          * @param {number[][]} vertices - An array of [x, y, z] arrays.
          * @param {Function} colorFn - Function to determine the color (takes vector).
+         * @param {number} [age=0] - The age of the dots.
          */
-        static draw(pipeline, vertices, colorFn) {
+        static draw(pipeline, vertices, colorFn, age = 0) {
             let v = vectorPool.acquire();
             for (const vertex of vertices) {
                 v.set(vertex[0], vertex[1], vertex[2]);
@@ -137,7 +140,7 @@ export const Plot = {
                 const color = res.isColor ? res : (res.color || res);
                 const alpha = res.alpha !== undefined ? res.alpha : 1.0;
                 const tag = res.tag;
-                pipeline.plot(v, color, 0, alpha, tag);
+                pipeline.plot(v, color, age, alpha, tag);
             }
         }
     },
@@ -167,8 +170,9 @@ export const Plot = {
          * @param {number[][]} vertices - An array of [x, y, z] vertex arrays.
          * @param {number[][]} edges - An adjacency list of vertex indices.
          * @param {Function} colorFn - Function to determine the color (takes vector and normalized progress t).
+         * @param {number} [age=0] - The age of the dots.
          */
-        static draw(pipeline, vertices, edges, colorFn) {
+        static draw(pipeline, vertices, edges, colorFn, age = 0) {
             edges.map((adj, i) => {
                 adj.map((j) => {
                     if (i < j) {
@@ -176,7 +180,8 @@ export const Plot = {
                             pipeline,
                             vectorPool.acquire().set(...vertices[i]).normalize(),
                             vectorPool.acquire().set(...vertices[j]).normalize(),
-                            colorFn);
+                            colorFn,
+                            0, 1, false, false, age);
                     }
                 })
             });
@@ -190,7 +195,7 @@ export const Plot = {
          * @param {Object} mesh - The mesh object {vertices: Vector3[], faces: number[][]}.
          * @param {Function} colorFn - Color function.
          */
-        static draw(pipeline, mesh, colorFn) {
+        static draw(pipeline, mesh, colorFn, age = 0) {
             const drawn = new Set();
             for (const face of mesh.faces) {
                 for (let i = 0; i < face.length; i++) {
@@ -206,7 +211,8 @@ export const Plot = {
                         pipeline,
                         mesh.vertices[idx1],
                         mesh.vertices[idx2],
-                        colorFn
+                        colorFn,
+                        0, 1, false, false, age
                     );
                 }
             }
@@ -280,9 +286,9 @@ export const Plot = {
          * @param {Function} colorFn - Function to determine color.
          * @param {number} [phase=0] - Starting phase.
          */
-        static draw(pipeline, basis, radius, colorFn, phase = 0) {
+        static draw(pipeline, basis, radius, colorFn, phase = 0, age = 0) {
             const points = Plot.Ring.sample(basis, radius, Daydream.W / 4, phase);
-            Plot.rasterize(pipeline, points, colorFn, true);
+            Plot.rasterize(pipeline, points, colorFn, true, age);
         }
     },
 
@@ -294,8 +300,9 @@ export const Plot = {
          * @param {THREE.Vector3} v2 - End point (normalized).
          * @param {THREE.Vector3} center - Center of projection (normalized).
          * @param {Function} colorFn - (t) => {color, alpha}.
+         * @param {number} [age=0] - The age of the dots.
          */
-        static draw(pipeline, v1, v2, center, colorFn) {
+        static draw(pipeline, v1, v2, center, colorFn, age = 0) {
             // Basis
             let refAxis = Daydream.X_AXIS;
             if (Math.abs(center.dot(refAxis)) > 0.9999) {
@@ -348,7 +355,7 @@ export const Plot = {
                 const color = res.isColor ? res : (res.color || res);
                 const alpha = res.alpha !== undefined ? res.alpha : 1.0;
                 const tag = res.tag;
-                pipeline.plot(point, color, 0, alpha, tag);
+                pipeline.plot(point, color, age, alpha, tag);
             }
         }
     },
@@ -364,7 +371,7 @@ export const Plot = {
          * @param {Function} colorFn - Function to determine color.
          * @param {number} [phase=0] - Starting phase.
          */
-        static draw(pipeline, basis, radius, numSides, colorFn, phase = 0) {
+        static draw(pipeline, basis, radius, numSides, colorFn, phase = 0, age = 0) {
             const points = Plot.Polygon.sample(basis, radius, numSides, phase);
             let center = basis.v;
             if (radius > 1.0) {
@@ -374,7 +381,7 @@ export const Plot = {
             for (let i = 0; i < points.length; i++) {
                 const p1 = points[i];
                 const p2 = points[(i + 1) % points.length];
-                Plot.PlanarLine.draw(pipeline, p1, p2, center, (t) => colorFn(p1, t));
+                Plot.PlanarLine.draw(pipeline, p1, p2, center, (t) => colorFn(p1, t), age);
             }
         }
 
@@ -422,7 +429,7 @@ export const Plot = {
             return points;
         }
 
-        static draw(pipeline, basis, radius, numSides, colorFn, phase = 0) {
+        static draw(pipeline, basis, radius, numSides, colorFn, phase = 0, age = 0) {
             const points = Plot.Star.sample(basis, radius, numSides, phase);
 
             let center = basis.v;
@@ -433,7 +440,7 @@ export const Plot = {
             for (let i = 0; i < points.length; i++) {
                 const p1 = points[i];
                 const p2 = points[(i + 1) % points.length];
-                Plot.PlanarLine.draw(pipeline, p1, p2, center, (t) => colorFn(p1, t));
+                Plot.PlanarLine.draw(pipeline, p1, p2, center, (t) => colorFn(p1, t), age);
             }
         }
     },
@@ -494,9 +501,9 @@ export const Plot = {
             return points;
         }
 
-        static draw(pipeline, basis, radius, numSides, colorFn, phase = 0) {
+        static draw(pipeline, basis, radius, numSides, colorFn, phase = 0, age = 0) {
             const points = Plot.Flower.sample(basis, radius, numSides, phase);
-            Plot.rasterize(pipeline, points, colorFn, false);
+            Plot.rasterize(pipeline, points, colorFn, false, age);
         }
     },
 
@@ -588,9 +595,9 @@ export const Plot = {
          * @param {Function} colorFn - Color function.
          * @param {number} [phase=0] - Phase.
          */
-        static draw(pipeline, basis, radius, shiftFn, colorFn, phase = 0) {
+        static draw(pipeline, basis, radius, shiftFn, colorFn, phase = 0, age = 0) {
             const points = Plot.DistortedRing.sample(basis, radius, shiftFn, phase);
-            Plot.rasterize(pipeline, points, colorFn, true);
+            Plot.rasterize(pipeline, points, colorFn, true, age);
         }
     },
 
@@ -616,15 +623,16 @@ export const Plot = {
          * @param {number} n - Total number of points.
          * @param {number} eps - Epsilon value for spiral offset.
          * @param {Function} colorFn - Function to determine the color (takes vector).
+         * @param {number} [age=0] - The age of the dots.
          */
-        static draw(pipeline, n, eps, colorFn) {
+        static draw(pipeline, n, eps, colorFn, age = 0) {
             const points = Plot.Spiral.sample(n, eps);
             for (const v of points) {
                 const res = colorFn(v);
                 const color = res.isColor ? res : (res.color || res);
                 const alpha = res.alpha !== undefined ? res.alpha : 1.0;
                 const tag = res.tag;
-                pipeline.plot(v, color, 0, alpha, tag);
+                pipeline.plot(v, color, age, alpha, tag);
             }
         }
     },
@@ -635,8 +643,9 @@ export const Plot = {
      * @param {THREE.Vector3[]} points - The list of points.
      * @param {Function} colorFn - Function to determine color (takes vector and normalized progress t).
      * @param {boolean} [closeLoop=false] - If true, connects the last point to the first.
+     * @param {number} [age=0] - The age of the dots.
      */
-    rasterize: (pipeline, points, colorFn, closeLoop = false) => {
+    rasterize: (pipeline, points, colorFn, closeLoop = false, age = 0) => {
         const len = points.length;
         if (len === 0) return;
 
@@ -652,7 +661,7 @@ export const Plot = {
 
             // Draw segment
             const omitLast = closeLoop || (i < count - 1);
-            Plot.Line.draw(pipeline, p1, p2, segmentColorFn, 0, 1, false, omitLast);
+            Plot.Line.draw(pipeline, p1, p2, segmentColorFn, 0, 1, false, omitLast, age);
         }
     }
 
