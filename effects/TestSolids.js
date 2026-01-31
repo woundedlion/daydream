@@ -196,7 +196,7 @@ export class TestSolids {
             const c = palette.get(intensity).color;
             return color4Pool.acquire().set(c, op);
         };
-        const colorWhite = (v) => color4Pool.acquire().set(1, 1, 1, op);
+        const colorWhite = (v) => color4Pool.acquire().set(1, 1, 1, op); //#003c3e
 
         if (this.params.scan) Scan.Mesh.draw(this.pipeline, drawnMesh, colorFace, this.params.debugBB);
         if (this.params.plot) Plot.Mesh.draw(this.pipeline, drawnMesh, colorWhite);

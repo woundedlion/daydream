@@ -9,6 +9,7 @@ import { vectorPool, makeBasis, angleBetween, yToPhi } from "./geometry.js";
 import { quinticKernel } from "./filters.js";
 import { wrap } from "./util.js";
 import { StaticPool } from "./StaticPool.js";
+import { BVH } from "./spatial.js";
 
 export const SDF = {
     Ring: class {
@@ -1014,9 +1015,6 @@ export const SDF = {
             }
 
             // Pole Logic
-            // CCW Winding: Edge Normals point "Right" (Southish for North Face).
-            // NP Inside -> Face is North of Edge -> Normal points South (y < 0).
-            // So if any Normal points North (y > 0), NP is NOT inside.
             let npInside = true;
             let spInside = true;
             for (const plane of this.planes) {
@@ -1137,7 +1135,51 @@ export const SDF = {
             out.rawDist = planeDist;
             return out;
         }
-    }
+    },
+
+    Mesh: class {
+        /**
+         * @param {Object} mesh - {vertices, faces, bvh}.
+         */
+        constructor(mesh) {
+            this.mesh = mesh;
+            this.bvh = mesh.bvh;
+            this.isSolid = true; // Use Solid AA
+
+            // MRU Cache
+            this.lastFaceIndex = -1;
+            this.lastFaceShape = new SDF.Face();
+        }
+
+        getVerticalBounds() {
+            // Conservative: Full screen as mesh rotates/wraps
+            return { yMin: 0, yMax: Daydream.H - 1 };
+        }
+
+        getHorizontalBounds(y) {
+            // Simplified: full width
+            return null;
+        }
+
+        distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+            const hit = this.bvh.intersectRay(vectorPool.acquire().set(0, 0, 0), p);
+
+            if (hit) {
+                // Check Cache
+                if (hit.faceIndex !== this.lastFaceIndex) {
+                    this.lastFaceShape.init(this.mesh.vertices, this.mesh.faces[hit.faceIndex], 0);
+                    this.lastFaceIndex = hit.faceIndex;
+                }
+
+                // Distance
+                this.lastFaceShape.distance(p, out);
+                out.faceIndex = hit.faceIndex;
+            } else {
+                out.dist = 10;
+            }
+            return out;
+        }
+    },
 };
 
 // 1. Create a static pool for SDF.Face
@@ -1225,7 +1267,7 @@ export const Scan = {
                 }
             }
 
-            const c = colorFn(p, sampleResult.t, sampleResult.dist);
+            const c = colorFn(p, sampleResult.t, sampleResult.dist, sampleResult.faceIndex);
             const color = c.isColor ? c : (c.color || c);
             const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
 
