@@ -218,7 +218,6 @@ export const randomVector = () => {
 export class Orientation {
   constructor() {
     this.orientations = [new THREE.Quaternion(0, 0, 0, 1)];
-    this.cursor = 1;
   }
 
   /**
@@ -226,26 +225,26 @@ export class Orientation {
    * @returns {number} The length of the orientation history.
    */
   length() {
-    return this.cursor;
+    return this.orientations.length;
   }
 
   /**
    * Applies an orientation from the history to a given vector.
    * @param {THREE.Vector3} v - The vector to be oriented.
-   * @param {number} [i=this.cursor - 1] - The index in the history to use.
+   * @param {number} [i=this.length() - 1] - The index in the history to use.
    * @returns {THREE.Vector3} The oriented and normalized vector.
    */
-  orient(v, i = this.cursor - 1) {
+  orient(v, i = this.length() - 1) {
     return vectorPool.acquire().copy(v).normalize().applyQuaternion(this.orientations[i]);
   }
 
   /**
    * Applies the inverse orientation from the history to a given vector.
    * @param {THREE.Vector3} v - The vector to be unoriented.
-   * @param {number} [i=this.cursor - 1] - The index in the history to use.
+   * @param {number} [i=this.length() - 1] - The index in the history to use.
    * @returns {THREE.Vector3} The unoriented and normalized vector.
    */
-  unorient(v, i = this.cursor - 1) {
+  unorient(v, i = this.length() - 1) {
     const q = quaternionPool.acquire().copy(this.orientations[i]).invert();
     return vectorPool.acquire().copy(v).normalize().applyQuaternion(q);
   }
@@ -253,12 +252,12 @@ export class Orientation {
   /**
    * Applies the orientation to an array of coordinate arrays.
    * @param {number[][]} vertices - Array of [x, y, z] coordinates.
-   * @param {number} [i=this.cursor - 1] - The index in the history to use.
+   * @param {number} [i=this.length() - 1] - The index in the history to use.
    * @returns {number[][]} Array of oriented [x, y, z] coordinates.
    */
-  orientPoly(vertices, i = this.cursor - 1) {
+  orientPoly(vertices, i = this.length() - 1) {
     return vertices.map((c) => {
-      return this.orient(vectorPool.acquire().fromArray(c), i).toArray();
+      return this.orient(vectorPool.acquire().fromArray(c)).toArray();
     });
   }
 
@@ -268,52 +267,45 @@ export class Orientation {
    * Does nothing if count is less than current length.
    */
   upsample(count) {
-    if (this.cursor >= count) return;
+    if (this.orientations.length >= count) return;
 
-    // Ensure we have enough persistent objects
-    while (this.orientations.length < count) {
-      this.orientations.push(new THREE.Quaternion());
-    }
+    const oldHistory = this.orientations;
+    const newHistory = new Array(count);
 
-    // Temporary storage for slerp results to avoid overwriting source data if we worked in-place
-    // Actually, we can work backwards or use a temp array of references.
-    const oldLength = this.cursor;
-    const temp = new Array(count);
+    // Preserves endpoints
+    newHistory[0] = oldHistory[0];
+    newHistory[count - 1] = oldHistory[oldHistory.length - 1];
 
-    // Copy references to current quaternions for interpolation
-    const snapshot = this.orientations.slice(0, oldLength).map(q => q.clone());
-
-    // Fill the persistent objects
-    for (let i = 0; i < count; i++) {
+    for (let i = 1; i < count - 1; i++) {
+      // Normalized position
       const t = i / (count - 1);
-      const oldVal = t * (oldLength - 1);
+
+      // Float index
+      const oldVal = t * (oldHistory.length - 1);
       const idxA = Math.floor(oldVal);
       const idxB = Math.ceil(oldVal);
       const alpha = oldVal - idxA;
 
-      if (idxA === idxB) {
-        this.orientations[i].copy(snapshot[idxA]);
-      } else {
-        this.orientations[i].copy(snapshot[idxA]).slerp(snapshot[idxB], alpha);
-      }
+      // Slerp
+      newHistory[i] = quaternionPool.acquire().copy(oldHistory[idxA]).slerp(oldHistory[idxB], alpha);
     }
 
-    this.cursor = count;
+    this.orientations = newHistory;
   }
 
   /**
    * Clears all recorded orientations.
    */
   clear() {
-    this.cursor = 0;
+    this.orientations = [];
   }
 
   /**
    * Gets a specific quaternion from the history.
-   * @param {number} [i=this.cursor - 1] - The index in the history to get.
+   * @param {number} [i=this.length() - 1] - The index in the history to get.
    * @returns {THREE.Quaternion} The requested quaternion.
    */
-  get(i = this.cursor - 1) {
+  get(i = this.length() - 1) {
     return this.orientations[i];
   }
 
@@ -323,9 +315,7 @@ export class Orientation {
    * @returns {Orientation} The orientation instance.
    */
   set(quaternion) {
-    if (this.orientations.length === 0) this.orientations.push(new THREE.Quaternion());
-    this.orientations[0].copy(quaternion);
-    this.cursor = 1;
+    this.orientations = [quaternion];
     return this;
   }
 
@@ -334,20 +324,17 @@ export class Orientation {
    * @param {THREE.Quaternion} quaternion - The quaternion to push.
    */
   push(quaternion) {
-    if (this.cursor >= this.orientations.length) {
-      this.orientations.push(new THREE.Quaternion());
-    }
-    this.orientations[this.cursor++].copy(quaternion);
+    this.orientations.push(quaternion);
   }
 
   /**
    * Collapses the history to just the most recent orientation.
    */
   collapse() {
-    if (this.cursor > 1) {
+    if (this.orientations.length > 1) {
       // Copy last to first
-      this.orientations[0].copy(this.orientations[this.cursor - 1]);
-      this.cursor = 1;
+      this.orientations[0].copy(this.orientations[this.orientations.length - 1]);
+      this.orientations.length = 1;
     }
   }
 }

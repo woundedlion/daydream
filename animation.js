@@ -143,13 +143,13 @@ export class ParticleSystem extends Animation {
     /**
      * @param {THREE.Vector3} position - Position.
      * @param {THREE.Vector3} velocity - Velocity.
-     * @param {THREE.Color} color - Color.
+     * @param {THREE.Color|Object} color - Color or Palette object.
      * @param {number} life - Frames to live.
      */
-    constructor(position, velocity, color, life) {
+    constructor(position, velocity, palette, life) {
       this.position = position.clone();
       this.velocity = velocity.clone();
-      this.color = color;
+      this.palette = palette;
       this.life = life;
       this.maxLife = life;
       this.orientation = new Orientation();
@@ -192,7 +192,7 @@ export class ParticleSystem extends Animation {
    * Spawns a new particle.
    * @param {THREE.Vector3} position - Position.
    * @param {THREE.Vector3} velocity - Velocity.
-   * @param {THREE.Color} color - Color.
+   * @param {THREE.Color|Object} color - Color or Palette.
    * @param {number} life - Frames to live.
    */
   spawn(position, velocity, color, life = 600) {
@@ -293,9 +293,7 @@ export class ParticleSystem extends Animation {
           const angle = subSpeed * dt;
           dQ.setFromAxisAngle(axis, angle);
           currentQ.premultiply(dQ); // World rotation
-          p.orientation.push(currentQ);
-
-          // Transport velocity vector to new position (maintain tangency)
+          p.orientation.push(quaternionPool.acquire().copy(currentQ));
           p.velocity.applyQuaternion(dQ);
         }
 
