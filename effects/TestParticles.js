@@ -26,11 +26,13 @@ export class TestParticles {
         this.timeline = new Timeline();
         this.pipeline = createRenderPipeline(new FilterScreenTrails(15, 500000), new FilterAntiAlias());
 
-        this.particleSystem = new ParticleSystem(0.95, 0.001);
+        this.friction = 0.99;
+        this.particleSystem = new ParticleSystem(this.friction, 0.001);
         this.timeline.add(0, this.particleSystem);
         this.timeline.add(0, new Sprite((opacity) => this.drawParticles(opacity), -1));
 
         this.wellStrength = 1.0;
+        this.initialSpeed = 0.05;
 
         this.maxSpeed = 0;
         this.rebuild();
@@ -41,6 +43,7 @@ export class TestParticles {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this.particleSystem, 'friction').min(0.8).max(1.0).step(0.001).name("Friction");
         this.gui.add(this.particleSystem, 'gravityScale').min(0.0001).max(0.01).step(0.0001).name("Gravity Scale");
+        this.gui.add(this, 'initialSpeed').min(0.001).max(0.2).step(0.001).name("Initial Speed");
         this.gui.add(this, 'wellStrength').min(0).max(10).step(0.1).name("Attractor Strength").onChange((v) => {
             for (const a of this.particleSystem.attractors) {
                 a.strength = v;
@@ -53,7 +56,7 @@ export class TestParticles {
 
     rebuild() {
         this.numParticles = 1000; // Restore higher count for spiral visibility
-        this.particleSystem.reset(0.95, 0.001);
+        this.particleSystem.reset(this.friction, 0.001);
 
         const killRadius = 0.05;
 
@@ -62,6 +65,18 @@ export class TestParticles {
         this.particleSystem.addAttractor(new THREE.Vector3(0, 0, 1), this.wellStrength, killRadius);
         this.particleSystem.addAttractor(new THREE.Vector3(-1, 0, 0), this.wellStrength, killRadius);
         this.particleSystem.addAttractor(new THREE.Vector3(0, 0, -1), this.wellStrength, killRadius);
+
+    }
+
+    replenish() {
+        for (let i = 0; i < 10 && this.particleSystem.particles.length < this.numParticles; i++) {
+            const v = Daydream.Y_AXIS.clone();
+            const vel = randomVector().cross(v).normalize().multiplyScalar(this.initialSpeed);
+            const c = color4Pool.acquire().set(0, 0, 0, 1);
+            // Randomize ttl
+            const life = 48 + Math.random() * 160;
+            this.particleSystem.spawn(v, vel, c, life);
+        }
     }
 
     drawFrame() {
@@ -75,14 +90,7 @@ export class TestParticles {
         }
         this.maxSpeed = Math.sqrt(maxSq).toFixed(3);
 
-        // Replenish
-        if (this.particleSystem.particles.length < this.numParticles) {
-            const v = Daydream.Y_AXIS.clone();
-            const vel = randomVector().cross(v).normalize().multiplyScalar(0.05);
-            const c = color4Pool.acquire().set(0, 0, 0, 1);
-            const gravity = 1.0;
-            this.particleSystem.spawn(v, vel, c, gravity);
-        }
+        this.replenish();
 
         // Draw Trails
         this.pipeline.trail((x, y, t) => {
@@ -96,8 +104,13 @@ export class TestParticles {
             tween(p.orientation, (q, t) => {
                 let v = vectorPool.acquire().copy(p.position).applyQuaternion(q);
                 const c = lavenderLake.get(0);
+
+                // Fade out as life ends
+                const lifeAlpha = p.life / p.maxLife;
+                const finalAlpha = c.alpha * alpha * t * lifeAlpha;
+
                 Plot.Point.draw(this.pipeline, v, (pos, _t) => {
-                    return { color: c.color, alpha: c.alpha * alpha * t };
+                    return { color: c.color, alpha: finalAlpha };
                 });
             });
         }
