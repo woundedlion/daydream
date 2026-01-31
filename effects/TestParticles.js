@@ -11,7 +11,7 @@ import {
 } from "../geometry.js";
 import { vectorPool, color4Pool } from "../memory.js";
 import {
-    richSunset, rainbow, lavenderLake
+    richSunset, rainbow, lavenderLake, GenerativePalette
 } from "../color.js";
 import {
     Timeline, ParticleSystem, Sprite, PARTICLE_BASE
@@ -72,11 +72,16 @@ export class TestParticles {
         for (let i = 0; i < 10 && this.particleSystem.particles.length < this.numParticles; i++) {
             const v = Daydream.Y_AXIS.clone();
             const vel = randomVector().cross(v).normalize().multiplyScalar(this.initialSpeed);
-            const c = color4Pool.acquire().set(0, 0, 0, 1);
-            // Randomize ttl
+            const palette = new GenerativePalette('straight', 'analagous', 'descending', 'mid');
             const life = 48 + Math.random() * 160;
-            this.particleSystem.spawn(v, vel, c, life);
+            this.particleSystem.spawn(v, vel, palette, life);
         }
+    }
+
+    evaluateColor(particle, t) {
+        const c = particle.palette.get(t);
+        c.alpha *= (1.0 - t);
+        return c;
     }
 
     drawFrame() {
@@ -93,9 +98,8 @@ export class TestParticles {
         this.replenish();
 
         // Draw Trails
-        this.pipeline.trail((x, y, t) => {
-            if (Number.isNaN(t)) return lavenderLake.get(0);
-            return lavenderLake.get(t);
+        this.pipeline.trail((x, y, t, particle) => {
+            return this.evaluateColor(particle, t);
         }, 0.2);
     }
 
@@ -103,17 +107,16 @@ export class TestParticles {
         for (const p of this.particleSystem.particles) {
             tween(p.orientation, (q, t) => {
                 let v = vectorPool.acquire().copy(p.position).applyQuaternion(q);
-                const c = lavenderLake.get(0);
+                const c = this.evaluateColor(p, 0);
 
-                // Fade out as life ends
                 const lifeAlpha = p.life / p.maxLife;
-                const finalAlpha = c.alpha * alpha * t * lifeAlpha;
+                c.alpha *= alpha * lifeAlpha;
 
                 Plot.Point.draw(this.pipeline, v, (pos, _t) => {
-                    return { color: c.color, alpha: finalAlpha };
+                    return { color: c.color, alpha: c.alpha, tag: { trailData: p } };
                 });
             });
+            p.orientation.collapse();
         }
-
     }
 }

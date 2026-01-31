@@ -32,7 +32,7 @@ export const quinticKernel = (t) => {
  */
 export function createRenderPipeline(...filters) {
   // Canvas sink
-  let head = (x, y, colorInput, age, alpha) => {
+  let head = (x, y, colorInput, age, alpha, tag) => {
     let xi = ((x + 0.5) | 0) % Daydream.W;
     let yi = Math.max(0, Math.min(Daydream.H - 1, (y + 0.5) | 0));
     let index = XY(xi, yi);
@@ -48,29 +48,29 @@ export function createRenderPipeline(...filters) {
     const next = head;
     if (filter.is2D) {
       // 2D -> 2D
-      const pass = (x, y, c, age, alpha) => {
-        next(x, y, c, age, alpha);
+      const pass = (x, y, c, age, alpha, tag) => {
+        next(x, y, c, age, alpha, tag);
       }
-      head = (x, y, c, age, alpha) => {
-        filter.plot(x, y, c, age, alpha, pass);
+      head = (x, y, c, age, alpha, tag) => {
+        filter.plot(x, y, c, age, alpha, tag, pass);
       };
     } else {
       if (nextIs2D) {
         // 3D -> 2D Rasterize
-        const pass = (v, c, age, alpha) => {
+        const pass = (v, c, age, alpha, tag) => {
           const p = vectorToPixel(v);
-          next(p.x, p.y, c, age, alpha);
+          next(p.x, p.y, c, age, alpha, tag);
         }
-        head = (v, c, age, alpha) => {
-          filter.plot(v, c, age, alpha, pass);
+        head = (v, c, age, alpha, tag) => {
+          filter.plot(v, c, age, alpha, tag, pass);
         };
       } else {
         // 3D -> 3D
-        const pass = (v, c, age, alpha) => {
-          next(v, c, age, alpha);
+        const pass = (v, c, age, alpha, tag) => {
+          next(v, c, age, alpha, tag);
         }
-        head = (v, c, age, alpha) => {
-          filter.plot(v, c, age, alpha, pass);
+        head = (v, c, age, alpha, tag) => {
+          filter.plot(v, c, age, alpha, tag, pass);
         };
       }
     }
@@ -90,13 +90,13 @@ export function createRenderPipeline(...filters) {
     // Head is 2D filter
     return {
       // 3D Entry Point (Standard)
-      plot: (v, c, age, alpha) => {
+      plot: (v, c, age, alpha, tag) => {
         const p = vectorToPixel(v);
-        head(p.x, p.y, c, age, alpha);
+        head(p.x, p.y, c, age, alpha, tag);
       },
       // 2D Entry Point (New - For Scanners)
-      plot2D: (x, y, c, age, alpha) => {
-        head(x, y, c, age, alpha);
+      plot2D: (x, y, c, age, alpha, tag) => {
+        head(x, y, c, age, alpha, tag);
       },
       trail: trail
     };
@@ -105,7 +105,7 @@ export function createRenderPipeline(...filters) {
     // We cannot scan directly into this without un-projecting x,y -> v
     return {
       plot: head,
-      plot2D: (x, y, c, age, alpha) => {
+      plot2D: (x, y, c, age, alpha, tag) => {
         // Optional: Convert back to vector if needed, or throw error
         console.warn("Cannot scan 2D into 3D pipeline head");
       },
@@ -130,7 +130,7 @@ export class FilterAntiAlias {
    * @param {number} alpha - The opacity.
    * @param {Function} pass - The callback to pass the pixel to the next stage.
    */
-  plot(x, y, color, age, alpha, pass) {
+  plot(x, y, color, age, alpha, tag, pass) {
     let xi = Math.trunc(x);
     let xm = x - xi;
     let yi = Math.trunc(y);
@@ -147,18 +147,18 @@ export class FilterAntiAlias {
     let v11 = xs * ys;              // Bottom-Right weight
 
     if (v00 > 0.0001) {
-      pass(xi, yi, color, age, v00 * alpha);
+      pass(xi, yi, color, age, v00 * alpha, tag);
     }
     if (v10 > 0.0001) {
-      pass(wrap((xi + 1), Daydream.W), yi, color, age, v10 * alpha);
+      pass(wrap((xi + 1), Daydream.W), yi, color, age, v10 * alpha, tag);
     }
 
     if (yi < Daydream.H - 1) {
       if (v01 > 0.0001) {
-        pass(xi, yi + 1, color, age, v01 * alpha);
+        pass(xi, yi + 1, color, age, v01 * alpha, tag);
       }
       if (v11 > 0.0001) {
-        pass(wrap((xi + 1), Daydream.W), yi + 1, color, age, v11 * alpha);
+        pass(wrap((xi + 1), Daydream.W), yi + 1, color, age, v11 * alpha, tag);
       }
     }
   }
@@ -184,10 +184,10 @@ export class FilterOrient {
    * @param {number} alpha - The opacity.
    * @param {Function} pass - The callback.
    */
-  plot(v, color, age, alpha, pass) {
+  plot(v, color, age, alpha, tag, pass) {
     tween(this.orientation, (q, t) => {
       let v_oriented = vectorPool.acquire().copy(v).applyQuaternion(q);
-      pass(v_oriented, color, age + 1.0 - t, alpha);
+      pass(v_oriented, color, age + 1.0 - t, alpha, tag);
     });
   }
 }
@@ -206,14 +206,14 @@ export class FilterOrientSlice {
     this.axis = axis;
   }
 
-  plot(v, color, age, alpha, pass) {
+  plot(v, color, age, alpha, tag, pass) {
     const dot = Math.max(-1, Math.min(1, v.dot(this.axis)));
     const t = 1 - Math.acos(dot) / Math.PI;
     let idx = Math.floor(t * this.orientations.length);
     if (idx >= this.orientations.length) idx = this.orientations.length - 1;
     if (idx < 0) idx = 0;
     const orientation = this.orientations[idx];
-    pass(orientation.orient(v), color, age, alpha);
+    pass(orientation.orient(v), color, age, alpha, tag);
   }
 }
 
@@ -231,9 +231,9 @@ export class FilterWorldTrails {
     this.ttl = new Float32Array(capacity);
   }
 
-  plot(v, color, age, alpha, pass) {
+  plot(v, color, age, alpha, tag, pass) {
     this.pass = pass;
-    pass(v, color, age, alpha);
+    pass(v, color, age, alpha, tag);
 
     if (this.count < this.capacity) {
       const i = this.count;
@@ -309,17 +309,19 @@ export class FilterHole {
     this.radius = radius;
   }
 
-  plot(v, c, age, alpha, pass) {
+  plot(v, c, age, alpha, tag, pass) {
     const d = angleBetween(v, this.origin);
     if (d > this.radius) {
-      pass(v, c, age, alpha);
+      pass(v, c, age, alpha, tag);
     } else {
       let t = d / this.radius;
       t = quinticKernel(t);
-      c.r *= t;
-      c.g *= t;
-      c.b *= t;
-      pass(v, c, age, alpha);
+
+      const param = c.isColor ? c : (c.color || c);
+      param.r *= t;
+      param.g *= t;
+      param.b *= t;
+      pass(v, c, age, alpha, tag);
     }
   }
 }
@@ -345,11 +347,11 @@ export class FilterReplicate {
    * @param {number} alpha - The opacity.
    * @param {Function} pass - The callback.
    */
-  plot(v, color, age, alpha, pass) {
-    pass(v, color, age, alpha);
+  plot(v, color, age, alpha, tag, pass) {
+    pass(v, color, age, alpha, tag);
     for (let i = 1; i < this.count; i++) {
       _tempVec.copy(v).applyAxisAngle(Daydream.Y_AXIS, this.step * i);
-      pass(_tempVec, color, age, alpha);
+      pass(_tempVec, color, age, alpha, tag);
     }
   }
 }
@@ -393,7 +395,7 @@ export class FilterMobius {
     };
   }
 
-  plot(v, color, age, alpha, pass) {
+  plot(v, color, age, alpha, tag, pass) {
     // 1. Stereographic Projection (North Pole -> Plane)
     // Singularity check: If we are AT the North Pole, z_in is Infinity.
     // Möbius of Infinity is a/c.
@@ -415,7 +417,7 @@ export class FilterMobius {
       const den_mag = den.re * den.re + den.im * den.im;
       if (den_mag < 0.000001) {
         // Result is Infinity -> North Pole
-        pass(Daydream.UP_AXIS, color, age, alpha);
+        pass(Daydream.UP_AXIS, color, age, alpha, tag);
         return;
       }
 
@@ -432,7 +434,7 @@ export class FilterMobius {
       2 * w.im * inv_denom
     );
 
-    pass(v_out, color, age, alpha);
+    pass(v_out, color, age, alpha, tag);
   }
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -456,14 +458,15 @@ export class FilterChromaticShift {
    * @param {number} alpha - The opacity.
    * @param {Function} pass - The callback.
    */
-  plot(x, y, color, alpha, pass) {
+  plot(x, y, colorInput, alpha, tag, pass) {
+    const color = colorInput.isColor ? colorInput : (colorInput.color || colorInput);
     let r = colorPool.acquire().setRGB(color.r, 0, 0);
     let g = colorPool.acquire().setRGB(0, color.g, 0);
     let b = colorPool.acquire().setRGB(0, 0, color.b);
-    pass(x, y, color, alpha);
-    pass(wrap(x + 1, Daydream.W), y, r, alpha);
-    pass(wrap(x + 2, Daydream.W), y, g, alpha);
-    pass(wrap(x + 3, Daydream.W), y, b, alpha);
+    pass(x, y, colorInput, alpha, tag);
+    pass(wrap(x + 1, Daydream.W), y, r, alpha, tag);
+    pass(wrap(x + 2, Daydream.W), y, g, alpha, tag);
+    pass(wrap(x + 3, Daydream.W), y, b, alpha, tag);
   }
 }
 
@@ -476,17 +479,19 @@ export class FilterScreenTrails {
     this.xs = new Float32Array(maxCapacity);
     this.ys = new Float32Array(maxCapacity);
     this.ttls = new Float32Array(maxCapacity);
+    this.data = new Array(maxCapacity);
   }
 
-  plot(x, y, color, age, alpha, pass) {
+  plot(x, y, color, age, alpha, tag, pass) {
     this.pass = pass;
-    pass(x, y, color, age, alpha);
+    pass(x, y, color, age, alpha, tag);
 
     if (this.count < this.ttls.length) {
       const i = this.count;
       this.xs[i] = x;
       this.ys[i] = y;
       this.ttls[i] = this.lifespan - age;
+      this.data[i] = (tag && tag.trailData) ? tag.trailData : null; // Extract trailData from tag
       this.count++;
     }
   }
@@ -503,6 +508,7 @@ export class FilterScreenTrails {
           this.xs[i] = this.xs[this.count];
           this.ys[i] = this.ys[this.count];
           this.ttls[i] = this.ttls[this.count];
+          this.data[i] = this.data[this.count];
           // Stay at 'i' to check the swapped element
         }
       } else {
@@ -529,9 +535,10 @@ export class FilterScreenTrails {
       const ttl = this.ttls[idx];
       const x = this.xs[idx];
       const y = this.ys[idx];
+      const data = this.data[idx];
       const t = 1.0 - (ttl / this.lifespan);
 
-      let res = trailFn(x, y, t);
+      let res = trailFn(x, y, t, data);
       const color = res.isColor ? res : (res.color || res);
       const outputAlpha = (res.alpha !== undefined ? res.alpha : 1.0) * alpha;
       this.pass(x, y, color, this.lifespan - ttl, outputAlpha);
@@ -580,7 +587,7 @@ export class FilterGaussianBlur {
     ];
   }
 
-  plot(x, y, color, age, alpha, pass) {
+  plot(x, y, color, age, alpha, tag, pass) {
     const cx = Math.round(x);
     const cy = Math.round(y);
 
@@ -595,7 +602,7 @@ export class FilterGaussianBlur {
 
           // Optimization: Skip zero-weight neighbors if factor is 0
           if (weight > 0.001) {
-            pass(wrap(cx + dx, Daydream.W), ny, color, age, alpha * weight);
+            pass(wrap(cx + dx, Daydream.W), ny, color, age, alpha * weight, tag);
           }
         }
       } else {

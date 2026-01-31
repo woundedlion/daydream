@@ -22,10 +22,11 @@ export const Plot = {
          * @param {Function} colorFn - Function to determine the color (takes vector and t=0).
          */
         static draw(pipeline, v, colorFn) {
-            const c = colorFn(v, 0);
-            const color = c.isColor ? c : (c.color || c);
-            const alpha = c.alpha !== undefined ? c.alpha : 1.0;
-            pipeline.plot(v, color, 0, alpha);
+            const res = colorFn(v, 0);
+            const color = res.isColor ? res : (res.color || res);
+            const alpha = res.alpha !== undefined ? res.alpha : 1.0;
+            const tag = res.tag;
+            pipeline.plot(v, color, 0, alpha, tag);
         }
     },
 
@@ -39,10 +40,11 @@ export const Plot = {
         static draw(pipeline, path, colorFn) {
             for (let t = 0; t < path.length(); t++) {
                 const v = path.getPoint(t / path.length());
-                const c = colorFn(t);
-                const color = c.isColor ? c : (c.color || c);
-                const alpha = c.alpha !== undefined ? c.alpha : 1.0;
-                pipeline.plot(v, color, 0, alpha);
+                const res = colorFn(t);
+                const color = res.isColor ? res : (res.color || res);
+                const alpha = res.alpha !== undefined ? res.alpha : 1.0;
+                const tag = res.tag;
+                pipeline.plot(v, color, 0, alpha, tag);
             }
         }
     },
@@ -99,10 +101,11 @@ export const Plot = {
             // Normalize
             let scale = a / simAngle;
             let currentAngle = 0;
-            const startC = colorFn(u, 0);
-            const startColor = startC.isColor ? startC : (startC.color || startC);
-            const startAlpha = startC.alpha !== undefined ? startC.alpha : 1.0;
-            pipeline.plot(u, startColor, 0, startAlpha);
+            const startRes = colorFn(u, 0);
+            const startColor = startRes.isColor ? startRes : (startRes.color || startRes);
+            const startAlpha = startRes.alpha !== undefined ? startRes.alpha : 1.0;
+            const startTag = startRes.tag;
+            pipeline.plot(u, startColor, 0, startAlpha, startTag);
             const loopLimit = omitLast ? steps.length - 1 : steps.length;
             for (let i = 0; i < loopLimit; i++) {
                 const step = steps[i] * scale;
@@ -110,10 +113,11 @@ export const Plot = {
                 u.applyQuaternion(q).normalize();
                 currentAngle += step;
                 const t = (a > 0) ? (currentAngle / a) : 1;
-                const c = colorFn(u, t);
-                const color = c.isColor ? c : (c.color || c);
-                const alpha = c.alpha !== undefined ? c.alpha : 1.0;
-                pipeline.plot(u, color, 0, alpha);
+                const res = colorFn(u, t);
+                const color = res.isColor ? res : (res.color || res);
+                const alpha = res.alpha !== undefined ? res.alpha : 1.0;
+                const tag = res.tag;
+                pipeline.plot(u, color, 0, alpha, tag);
             }
         }
     },
@@ -129,10 +133,11 @@ export const Plot = {
             let v = vectorPool.acquire();
             for (const vertex of vertices) {
                 v.set(vertex[0], vertex[1], vertex[2]);
-                const c = colorFn(v);
-                const color = c.isColor ? c : (c.color || c);
-                const alpha = c.alpha !== undefined ? c.alpha : 1.0;
-                pipeline.plot(v, color, 0, alpha);
+                const res = colorFn(v);
+                const color = res.isColor ? res : (res.color || res);
+                const alpha = res.alpha !== undefined ? res.alpha : 1.0;
+                const tag = res.tag;
+                pipeline.plot(v, color, 0, alpha, tag);
             }
         }
     },
@@ -339,10 +344,11 @@ export const Plot = {
                     point.multiplyScalar(cosR).addScaledVector(dir, sinR).normalize();
                 }
 
-                const c = colorFn(t);
-                const color = c.isColor ? c : (c.color || c);
-                const alpha = c.alpha !== undefined ? c.alpha : 1.0;
-                pipeline.plot(point, color, 0, alpha);
+                const res = colorFn(t);
+                const color = res.isColor ? res : (res.color || res);
+                const alpha = res.alpha !== undefined ? res.alpha : 1.0;
+                const tag = res.tag;
+                pipeline.plot(point, color, 0, alpha, tag);
             }
         }
     },
@@ -614,10 +620,11 @@ export const Plot = {
         static draw(pipeline, n, eps, colorFn) {
             const points = Plot.Spiral.sample(n, eps);
             for (const v of points) {
-                const c = colorFn(v);
-                const color = c.isColor ? c : (c.color || c);
-                const alpha = c.alpha !== undefined ? c.alpha : 1.0;
-                pipeline.plot(v, color, 0, alpha);
+                const res = colorFn(v);
+                const color = res.isColor ? res : (res.color || res);
+                const alpha = res.alpha !== undefined ? res.alpha : 1.0;
+                const tag = res.tag;
+                pipeline.plot(v, color, 0, alpha, tag);
             }
         }
     },
