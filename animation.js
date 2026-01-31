@@ -8,7 +8,6 @@ import { Daydream } from "./driver.js";
 import { angleBetween, Orientation, MeshOps } from "./geometry.js";
 import { vectorPool, quaternionPool } from "./memory.js";
 import { Solids } from "./solids.js";
-import { BVH, SpatialHash } from "./spatial.js";
 import FastNoiseLite from "./FastNoiseLite.js";
 import { TWO_PI } from "./3dmath.js";
 import { easeOutElastic, easeInOutSin, easeInSin, easeOutSin, easeOutExpo, easeOutCirc, easeInCubic, easeInCirc, easeMid, easeOutCubic } from "./easing.js";
@@ -145,13 +144,14 @@ export class ParticleSystem extends Animation {
      * @param {THREE.Vector3} position - Position.
      * @param {THREE.Vector3} velocity - Velocity.
      * @param {THREE.Color} color - Color.
-     * @param {number} gravity - Gravity scale.
+     * @param {number} life - Frames to live.
      */
-    constructor(position, velocity, color, gravity) {
+    constructor(position, velocity, color, life) {
       this.position = position.clone();
       this.velocity = velocity.clone();
       this.color = color;
-      this.gravity = gravity;
+      this.life = life;
+      this.maxLife = life;
       this.orientation = new Orientation();
     }
 
@@ -163,7 +163,6 @@ export class ParticleSystem extends Animation {
   constructor(friction = 0.95, gravityScale = 0.001) {
     super(-1, false);
     this.reset(friction, gravityScale);
-    this.spatialHash = new SpatialHash(0.1);
     this.interactionRadius = 0.2;
   }
 
@@ -194,10 +193,10 @@ export class ParticleSystem extends Animation {
    * @param {THREE.Vector3} position - Position.
    * @param {THREE.Vector3} velocity - Velocity.
    * @param {THREE.Color} color - Color.
-   * @param {number} gravity - Gravity scale.
+   * @param {number} life - Frames to live.
    */
-  spawn(position, velocity, color, gravity) {
-    this.particles.push(new ParticleSystem.Particle(position, velocity, color, gravity));
+  spawn(position, velocity, color, life = 600) {
+    this.particles.push(new ParticleSystem.Particle(position, velocity, color, life));
   }
 
   /**
@@ -220,6 +219,13 @@ export class ParticleSystem extends Animation {
       const p = this.particles[i];
       let dead = false;
 
+      // Age
+      p.life--;
+      if (p.life <= 0) {
+        this.particles.splice(i, 1);
+        continue;
+      }
+
       // Adaptive sub-stepping
       const speed = p.velocity.length();
       const pos_y = p.orientedPosition.y;
@@ -231,7 +237,7 @@ export class ParticleSystem extends Animation {
 
       // Reset orientation history for this frame
       p.orientation.collapse();
-      const currentQ = p.orientation.get(0).clone(); // Working quaternion
+      const currentQ = quaternionPool.acquire().copy(p.orientation.get(0)); // Working quaternion from pool
 
       // Sub-step loop
       for (let k = 0; k < substeps; k++) {
@@ -265,8 +271,7 @@ export class ParticleSystem extends Animation {
               forceMag = (G * attr.strength) / distSq;
             }
 
-            // Scale force by dt and latitude
-            forceMag *= dt * Math.max(0.1, latitudeScale);
+            forceMag *= dt;
 
             // Tangential force towards attractor
             torque.crossVectors(pos, attr.position).normalize().multiplyScalar(forceMag);
@@ -288,7 +293,7 @@ export class ParticleSystem extends Animation {
           const angle = subSpeed * dt;
           dQ.setFromAxisAngle(axis, angle);
           currentQ.premultiply(dQ); // World rotation
-          p.orientation.push(currentQ.clone());
+          p.orientation.push(currentQ);
 
           // Transport velocity vector to new position (maintain tangency)
           p.velocity.applyQuaternion(dQ);
