@@ -15,8 +15,9 @@ import {
 } from "../plot.js";
 
 import {
-    GenerativePalette, color4Pool
+    GenerativePalette
 } from "../color.js";
+import { color4Pool } from "../memory.js";
 import {
     Timeline, Transition, RandomTimer, Rotation
 } from "../animation.js";

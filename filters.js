@@ -6,9 +6,10 @@
 import * as THREE from "three";
 import { Daydream, XY } from "./driver.js";
 import { wrap } from "./util.js"
-import { blendAlpha, colorPool } from "./color.js";
+import { blendAlpha } from "./color.js";
+import { colorPool } from "./memory.js";
 import { vectorToPixel, angleBetween } from "./geometry.js";
-import { vectorPool } from "./geometry.js";
+import { vectorPool } from "./memory.js";
 import { Plot } from "./plot.js";
 import { tween } from "./animation.js";
 

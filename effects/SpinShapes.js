@@ -11,8 +11,9 @@ import {
 } from "../geometry.js";
 import { TWO_PI } from "../3dmath.js";
 import {
-    richSunset, color4Pool
+    richSunset
 } from "../color.js";
+import { color4Pool } from "../memory.js";
 import {
     Timeline, Sprite, Rotation
 } from "../animation.js";

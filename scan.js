@@ -5,10 +5,11 @@
 
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
-import { vectorPool, makeBasis, angleBetween, yToPhi } from "./geometry.js";
+import { makeBasis, angleBetween, yToPhi } from "./geometry.js";
+import { vectorPool, StaticPool } from "./memory.js";
 import { quinticKernel } from "./filters.js";
 import { wrap } from "./util.js";
-import { StaticPool } from "./StaticPool.js";
+
 import { BVH } from "./spatial.js";
 
 export const SDF = {

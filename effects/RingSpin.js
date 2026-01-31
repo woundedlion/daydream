@@ -7,8 +7,9 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, vectorPool
+    Orientation
 } from "../geometry.js";
+import { vectorPool } from "../memory.js";
 import {
     VignettePalette, richSunset, mangoPeel, underSea, iceMelt,
     TransparentVignette
@@ -21,7 +22,7 @@ import { makeBasis } from "../geometry.js";
 
 import { createRenderPipeline } from "../filters.js";
 import { tween, deepTween } from "../animation.js";
-import { dotPool } from "../plot.js";
+import { dotPool } from "../memory.js";
 
 
 export class RingSpin {

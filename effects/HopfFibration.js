@@ -2,7 +2,8 @@
 import * as THREE from "three";
 import { gui } from "../gui.js";
 import { Daydream } from "../driver.js";
-import { vectorPool, Orientation } from "../geometry.js";
+import { Orientation } from "../geometry.js";
+import { vectorPool } from "../memory.js";
 import { Plot } from "../plot.js";
 
 import { stereo, TWO_PI } from "../3dmath.js";

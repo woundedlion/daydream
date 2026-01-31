@@ -5,7 +5,8 @@
 
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
-import { angleBetween, Orientation, vectorPool, quaternionPool, MeshOps } from "./geometry.js";
+import { angleBetween, Orientation, MeshOps } from "./geometry.js";
+import { vectorPool, quaternionPool } from "./memory.js";
 import { Solids } from "./solids.js";
 import { BVH, SpatialHash } from "./spatial.js";
 import FastNoiseLite from "./FastNoiseLite.js";
