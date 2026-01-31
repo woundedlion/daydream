@@ -21,8 +21,9 @@ import {
     ProceduralPalette, colorPool, color4Pool
 } from "../color.js";
 import {
-    Timeline, easeMid, Sprite, Transition, RandomTimer, Rotation, easeOutExpo, easeInSin, easeOutSin, Mutation
+    Timeline, Sprite, Transition, RandomTimer, Rotation, Mutation
 } from "../animation.js";
+import { easeMid, easeOutExpo, easeInSin, easeOutSin } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias
 } from "../filters.js";

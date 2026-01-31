@@ -6,7 +6,8 @@
 import * as THREE from "three";
 import { wrap } from "./util.js";
 import { Daydream } from "./driver.js";
-import { Rotation, easeOutCirc } from "./animation.js";
+import { Rotation } from "./animation.js";
+import { easeOutCirc } from "./easing.js";
 import { g1, g2 } from "./color.js";
 import { StaticPool } from "./StaticPool.js";
 import { TWO_PI } from "./3dmath.js";

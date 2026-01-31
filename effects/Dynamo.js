@@ -18,8 +18,9 @@ import {
     GenerativePalette, color4Pool
 } from "../color.js";
 import {
-    Timeline, easeMid, easeInOutSin, Transition, RandomTimer, Rotation
+    Timeline, Transition, RandomTimer, Rotation
 } from "../animation.js";
+import { easeMid, easeInOutSin } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterReplicate, FilterOrient, FilterWorldTrails
 } from "../filters.js";

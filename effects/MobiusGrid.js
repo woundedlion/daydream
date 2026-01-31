@@ -21,8 +21,9 @@ import {
     GenerativePalette, color4Pool
 } from "../color.js";
 import {
-    Timeline, easeMid, Rotation, PeriodicTimer, ColorWipe, MobiusWarp, Mutation
+    Timeline, Rotation, PeriodicTimer, ColorWipe, MobiusWarp, Mutation
 } from "../animation.js";
+import { easeMid } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterOrient, FilterHole, FilterMobius
 } from "../filters.js";

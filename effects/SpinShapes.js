@@ -14,8 +14,9 @@ import {
     richSunset, color4Pool
 } from "../color.js";
 import {
-    Timeline, Sprite, Rotation, easeMid
+    Timeline, Sprite, Rotation
 } from "../animation.js";
+import { easeMid } from "../easing.js";
 import { Scan } from "../scan.js";
 import { makeBasis } from "../geometry.js";
 

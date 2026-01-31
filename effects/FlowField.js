@@ -14,8 +14,9 @@ import {
     GenerativePalette
 } from "../color.js";
 import {
-    Timeline, easeMid, PeriodicTimer, ColorWipe
+    Timeline, PeriodicTimer, ColorWipe
 } from "../animation.js";
+import { easeMid } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterWorldTrails
 } from "../filters.js";

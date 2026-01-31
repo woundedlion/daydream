@@ -16,8 +16,9 @@ import {
     Color4
 } from "../color.js";
 import {
-    Timeline, Sprite, RandomWalk, Rotation, Mutation, easeMid
+    Timeline, Sprite, RandomWalk, Rotation, Mutation
 } from "../animation.js";
+import { easeMid } from "../easing.js";
 import { Scan } from "../scan.js";
 import { Plot } from "../plot.js";
 import { makeBasis } from "../geometry.js";

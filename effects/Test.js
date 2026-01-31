@@ -19,8 +19,9 @@ import {
     GenerativePalette
 } from "../color.js";
 import {
-    Timeline, easeMid, Sprite, RandomWalk, Mutation
+    Timeline, Sprite, RandomWalk, Mutation
 } from "../animation.js";
+import { easeMid } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias
 } from "../filters.js";
