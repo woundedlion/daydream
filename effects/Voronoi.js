@@ -9,7 +9,7 @@ import { Daydream } from "../driver.js";
 import { ReversePalette, richSunset } from "../color.js";
 import { randomVector } from "../geometry.js";
 import { quinticKernel } from "../filters.js";
-import { KDTree } from "../KDTree.js";
+import { KDTree } from "../spatial.js";
 
 export class Voronoi {
     constructor() {

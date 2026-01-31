@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { Daydream } from "./driver.js";
 import { angleBetween, Orientation, vectorPool, quaternionPool, MeshOps } from "./geometry.js";
 import { Solids } from "./solids.js";
+import { BVH, SpatialHash } from "./spatial.js";
 import FastNoiseLite from "./FastNoiseLite.js";
 import { TWO_PI } from "./3dmath.js";
 
@@ -199,74 +200,6 @@ export class Animation {
    * Executes the post-animation callback.
    */
   post() { this.post(); }
-}
-
-/**
- * Spatial hashing for neighbor lookup.
- */
-class SpatialHash {
-  constructor(cellSize) {
-    this.cellSize = cellSize;
-    this.buckets = new Map();
-  }
-
-  /**
-   * Inserts a particle.
-   * @param {Object} particle - Particle with .orientedPosition.
-   */
-  insert(particle) {
-    const key = this.getKey(particle.orientedPosition);
-    if (!this.buckets.has(key)) this.buckets.set(key, []);
-    this.buckets.get(key).push(particle);
-  }
-
-  /**
-   * Gets hash key for a vector.
-   * @param {THREE.Vector3} v - Position.
-   * @returns {string} Hash key.
-   */
-  getKey(v) {
-    const x = Math.floor(v.x / this.cellSize);
-    const y = Math.floor(v.y / this.cellSize);
-    const z = Math.floor(v.z / this.cellSize);
-    return `${x},${y},${z}`;
-  }
-
-  /**
-   * Finds neighbors within radius.
-   * @param {THREE.Vector3} position - Center.
-   * @param {number} radius - Search radius.
-   * @returns {Array} List of neighbors.
-   */
-  query(position, radius) {
-    const particles = [];
-    const cx = Math.floor(position.x / this.cellSize);
-    const cy = Math.floor(position.y / this.cellSize);
-    const cz = Math.floor(position.z / this.cellSize);
-    const range = Math.ceil(radius / this.cellSize);
-
-    for (let x = cx - range; x <= cx + range; x++) {
-      for (let y = cy - range; y <= cy + range; y++) {
-        for (let z = cz - range; z <= cz + range; z++) {
-          const key = `${x},${y},${z}`;
-          if (this.buckets.has(key)) {
-            const bucket = this.buckets.get(key);
-            for (const p of bucket) {
-              if (p.orientedPosition.distanceToSquared(position) <= radius * radius) particles.push(p);
-            }
-          }
-        }
-      }
-    }
-    return particles;
-  }
-
-  /**
-   * Clears the hash.
-   */
-  clear() {
-    this.buckets.clear();
-  }
 }
 
 // North Pole
@@ -951,75 +884,20 @@ export class MeshMorph extends Animation {
    * @returns {THREE.Vector3} Projected point.
    */
   projectToMesh(p, mesh) {
-    const dir = vectorPool.acquire().copy(p).normalize();
-    let bestHit = null;
-    let minT = Infinity;
-
-    // Cache vectors
-    const edge1 = vectorPool.acquire();
-    const edge2 = vectorPool.acquire();
-    const normal = vectorPool.acquire();
-    const hit = vectorPool.acquire();
-    const toHit = vectorPool.acquire();
-    const tempCross = vectorPool.acquire();
-
-    // Check faces
-    const facesToCheck = mesh.faces;
-    const count = facesToCheck.length;
-
-    for (let i = 0; i < count; i++) {
-      const face = facesToCheck[i];
-      if (face.length < 3) continue;
-
-      // Triangulate
-      for (let tIdx = 0; tIdx < face.length - 2; tIdx++) {
-        const v0 = mesh.vertices[face[0]];
-        const v1 = mesh.vertices[face[tIdx + 1]];
-        const v2 = mesh.vertices[face[tIdx + 2]];
-
-        edge1.subVectors(v1, v0);
-        edge2.subVectors(v2, v0);
-        normal.crossVectors(edge1, edge2);
-
-        const lenSq = normal.lengthSq();
-        if (lenSq < 0.000001) continue;
-        normal.multiplyScalar(1.0 / Math.sqrt(lenSq));
-
-        // Culling
-        const denom = dir.dot(normal);
-        if (denom < 0.0001) continue;
-
-        const t = v0.dot(normal) / denom;
-        if (t <= 0 || t >= minT) continue;
-
-        // Hit test
-        hit.copy(dir).multiplyScalar(t);
-
-        // 0
-        edge1.subVectors(v1, v0);
-        toHit.subVectors(hit, v0);
-        if (tempCross.crossVectors(edge1, toHit).dot(normal) < 0) continue;
-
-        // 1
-        edge1.subVectors(v2, v1);
-        toHit.subVectors(hit, v1);
-        if (tempCross.crossVectors(edge1, toHit).dot(normal) < 0) continue;
-
-        // 2
-        edge1.subVectors(v0, v2);
-        toHit.subVectors(hit, v2);
-        if (tempCross.crossVectors(edge1, toHit).dot(normal) < 0) continue;
-
-        // Hit
-        if (!bestHit) bestHit = new THREE.Vector3();
-        bestHit.copy(hit);
-        minT = t;
-      }
+    if (!mesh.bvh) {
+      mesh.bvh = new BVH(mesh);
+      mesh.bvh.build();
     }
 
-    if (bestHit) return bestHit;
+    const dir = vectorPool.acquire().copy(p).normalize();
+    const origin = vectorPool.acquire().set(0, 0, 0);
 
-    // Fallback
+    const hit = mesh.bvh.intersectRay(origin, dir);
+
+    if (hit) {
+      return hit.point;
+    }
+
     let best = mesh.vertices[0];
     let minD = p.distanceToSquared(best);
     for (let i = 1; i < mesh.vertices.length; i++) {

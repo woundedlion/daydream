@@ -10,7 +10,7 @@ import { Rotation, easeOutCirc } from "./animation.js";
 import { g1, g2 } from "./color.js";
 import { StaticPool } from "./StaticPool.js";
 import { TWO_PI } from "./3dmath.js";
-import { KDTree } from "./KDTree.js";
+import { KDTree } from "./spatial.js";
 
 /** @type {StaticPool} Global pool for temporary Vector3 objects. */
 export const vectorPool = new StaticPool(THREE.Vector3, 500000);
