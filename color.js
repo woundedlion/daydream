@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { G } from "./geometry.js";
 import { randomBetween } from "./util.js"
-import { StaticPool } from "./StaticPool.js";
+import { StaticPool, colorPool, color4Pool } from "./memory.js";
 import { Daydream } from "./driver.js";
 
 /**
@@ -68,11 +68,8 @@ export class Color4 {
   }
 }
 
-/** @type {StaticPool} Global pool for temporary Color objects used in blending. */
-export const colorPool = new StaticPool(THREE.Color, 1000000);
-
-/** @type {StaticPool} Global pool for temporary Color4 objects. */
-export const color4Pool = new StaticPool(Color4, 250000);
+// Inject Type into pool to handle circular dependency
+color4Pool.Type = Color4;
 
 /**
  * A standard Palette interface.

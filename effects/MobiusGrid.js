@@ -8,8 +8,9 @@ import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { stereo, invStereo, mobius, MobiusParams, TWO_PI } from "../3dmath.js";
 import {
-    Orientation, sinWave, vectorPool, quaternionPool
+    Orientation, sinWave
 } from "../geometry.js";
+import { vectorPool, quaternionPool } from "../memory.js";
 import {
     Plot
 } from "../plot.js";
@@ -18,8 +19,9 @@ import {
 } from "../geometry.js";
 
 import {
-    GenerativePalette, color4Pool
+    GenerativePalette
 } from "../color.js";
+import { color4Pool } from "../memory.js";
 import {
     Timeline, Rotation, PeriodicTimer, ColorWipe, MobiusWarp, Mutation
 } from "../animation.js";

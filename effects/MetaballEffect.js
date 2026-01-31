@@ -7,8 +7,9 @@
 import * as THREE from "three";
 import { Daydream, pixelKey } from "../driver.js";
 import {
-    pixelToVector, vectorPool
+    pixelToVector
 } from "../geometry.js";
+import { vectorPool } from "../memory.js";
 import {
     richSunset
 } from "../color.js";

@@ -7,10 +7,11 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    vectorPool, randomVector, fibSpiral
+    randomVector, fibSpiral
 } from "../geometry.js";
+import { vectorPool, color4Pool } from "../memory.js";
 import {
-    richSunset, rainbow, color4Pool, lavenderLake
+    richSunset, rainbow, lavenderLake
 } from "../color.js";
 import {
     Timeline, ParticleSystem, Sprite, PARTICLE_BASE

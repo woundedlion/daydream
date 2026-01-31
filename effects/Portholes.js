@@ -3,8 +3,9 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, randomVector, vectorPool
+    Orientation, randomVector
 } from "../geometry.js";
+import { vectorPool } from "../memory.js";
 import { Solids } from "../solids.js";
 import { TWO_PI } from "../3dmath.js";
 import { Plot } from "../plot.js";

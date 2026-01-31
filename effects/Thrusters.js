@@ -8,8 +8,9 @@ import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { TWO_PI } from "../3dmath.js";
 import {
-    Orientation, angleBetween, sinWave, vectorPool, quaternionPool
+    Orientation, angleBetween, sinWave
 } from "../geometry.js";
+import { vectorPool, quaternionPool, colorPool, color4Pool, StaticPool } from "../memory.js";
 import {
     Plot
 } from "../plot.js";
@@ -18,7 +19,7 @@ import {
 } from "../geometry.js";
 
 import {
-    ProceduralPalette, colorPool, color4Pool
+    ProceduralPalette
 } from "../color.js";
 import {
     Timeline, Sprite, Transition, RandomTimer, Rotation, Mutation
@@ -27,7 +28,7 @@ import { easeMid, easeOutExpo, easeInSin, easeOutSin } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias
 } from "../filters.js";
-import { StaticPool } from "../StaticPool.js";
+
 
 class ThrusterContext {
     constructor() {

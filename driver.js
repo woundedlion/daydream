@@ -8,10 +8,10 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { pixelToSpherical } from "./geometry.js";
 import { G as g } from "./geometry.js";
-import { vectorPool, quaternionPool } from "./geometry.js";
+import { vectorPool, quaternionPool, colorPool, color4Pool, dotPool } from "./memory.js";
 import { GUI } from "gui";
-import { colorPool, color4Pool } from "./color.js";
-import { Plot, dotPool } from "./plot.js";
+
+import { Plot } from "./plot.js";
 
 import { Scan } from "./scan.js"; // scan.js
 

@@ -79,6 +79,7 @@ let activeEffect;
 const controls = {
   effect: (initialEffect && effects[initialEffect]) ? initialEffect : 'PetalFlow',
   resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Holosphere (20x96)",
+  testAll: false,
 
   setResolution: function (preserveParams = false) {
     const p = resolutionPresets[this.resolution];
@@ -152,9 +153,25 @@ guiInstance.add(controls, 'resolution', Object.keys(resolutionPresets))
   .name('Resolution')
   .onChange(() => controls.setResolution());
 
-guiInstance.add(controls, 'effect', effectNames)
+const effectController = guiInstance.add(controls, 'effect', effectNames)
   .name('Active Effect')
   .onChange(() => controls.changeEffect());
+
+let testAllInterval = null;
+guiInstance.add(controls, 'testAll').name('Test All').onChange((v) => {
+  if (v) {
+    testAllInterval = setInterval(() => {
+      const currentIndex = effectNames.indexOf(controls.effect);
+      const nextIndex = (currentIndex + 1) % effectNames.length;
+      controls.effect = effectNames[nextIndex];
+      controls.changeEffect();
+      effectController.updateDisplay();
+    }, 1000);
+  } else {
+    clearInterval(testAllInterval);
+    testAllInterval = null;
+  }
+});
 
 controls.resetDefaults = () => {
   resetGUI(['resolution', 'effect']);

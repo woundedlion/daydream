@@ -8,8 +8,9 @@ import * as THREE from "three";
 import { Daydream } from "../driver.js";
 import FastNoiseLite from "../FastNoiseLite.js";
 import {
-    randomVector, Dot, vectorPool
+    randomVector, Dot
 } from "../geometry.js";
+import { vectorPool } from "../memory.js";
 import {
     GenerativePalette
 } from "../color.js";

@@ -8,18 +8,21 @@ const _tempVec = new THREE.Vector3();
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, lissajous, randomVector, vectorToPixel, vectorPool
+    Orientation, lissajous, randomVector, vectorToPixel
 } from "../geometry.js";
+import { vectorPool } from "../memory.js";
 import {
-    dotPool, Plot
+    Plot
 } from "../plot.js";
+import { dotPool } from "../memory.js";
 import {
     Path, tween, deepTween
 } from "../animation.js";
 import { Scan } from "../scan.js";
 import {
-    GenerativePalette, blendAlpha, color4Pool
+    GenerativePalette, blendAlpha
 } from "../color.js";
+import { color4Pool } from "../memory.js";
 import {
     Timeline, Sprite, Motion, RandomWalk, PeriodicTimer, ColorWipe, OrientationTrail
 } from "../animation.js";

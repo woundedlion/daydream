@@ -16,7 +16,8 @@ import {
     Rotation
 } from "../animation.js";
 import { easeMid, easeInOutSin } from "../easing.js";
-import { Orientation, quaternionPool, vectorPool } from "../geometry.js";
+import { Orientation } from "../geometry.js";
+import { quaternionPool, vectorPool } from "../memory.js";
 import { createRenderPipeline } from "../filters.js";
 
 const factorial = (n) => {

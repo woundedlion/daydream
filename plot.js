@@ -5,12 +5,13 @@
 
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
-import { vectorPool, quaternionPool, angleBetween, fibSpiral, Dot, makeBasis } from "./geometry.js";
+import { angleBetween, fibSpiral, makeBasis } from "./geometry.js";
 import { TWO_PI } from "./3dmath.js";
-import { StaticPool } from "./StaticPool.js";
+import { dotPool, vectorPool, quaternionPool } from "./memory.js";
+import { Dot } from "./geometry.js";
 import { Path, ProceduralPath } from "./animation.js";
 
-export const dotPool = new StaticPool(Dot, 10000);
+
 
 export const Plot = {
     Point: class {

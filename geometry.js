@@ -9,15 +9,11 @@ import { Daydream } from "./driver.js";
 import { Rotation } from "./animation.js";
 import { easeOutCirc } from "./easing.js";
 import { g1, g2 } from "./color.js";
-import { StaticPool } from "./StaticPool.js";
+import { vectorPool, quaternionPool, dotPool } from "./memory.js";
 import { TWO_PI } from "./3dmath.js";
 import { KDTree } from "./spatial.js";
 
-/** @type {StaticPool} Global pool for temporary Vector3 objects. */
-export const vectorPool = new StaticPool(THREE.Vector3, 500000);
-/** @type {StaticPool} Global pool for temporary Quaternion objects. */
-export const quaternionPool = new StaticPool(THREE.Quaternion, 1000000);
-/** @type {number} The golden ratio, (1 + sqrt(5)) / 2. */
+/** @type {number} The golden ratio, (1 + Math.sqrt(5)) / 2. */
 export const PHI = (1 + Math.sqrt(5)) / 2;
 /** @type {number} The inverse golden ratio, 1 / PHI. */
 const _tempSpherical = new THREE.Spherical();
@@ -28,6 +24,13 @@ const _tempC = new THREE.Vector3();
 const _vA = new THREE.Vector3();
 const _vB = new THREE.Vector3();
 export const G = 1 / PHI;
+
+
+
+/**
+ * Represents a single point to be rendered, storing its position and color.
+ */
+
 
 
 
@@ -62,7 +65,6 @@ export class Dot {
     }
   }
 }
-
 
 /**
  * Converts a pixel y-coordinate to a spherical phi angle.
@@ -1018,3 +1020,6 @@ export const makeBasis = (orientation, normal) => {
 
 
 
+
+// Inject Type into pool to handle circular dependency
+dotPool.Type = Dot;

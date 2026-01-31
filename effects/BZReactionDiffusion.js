@@ -7,8 +7,9 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, vectorPool
+    Orientation
 } from "../geometry.js";
+import { vectorPool } from "../memory.js";
 import {
     Timeline, Rotation, PeriodicTimer, Sprite
 } from "../animation.js";

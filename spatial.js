@@ -4,7 +4,7 @@
  */
 
 import * as THREE from "three";
-import { vectorPool } from "./geometry.js";
+import { vectorPool } from "./memory.js";
 
 export class KDTree {
     constructor(points) {
