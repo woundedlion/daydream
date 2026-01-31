@@ -160,14 +160,23 @@ export class ParticleSystem extends Animation {
     }
   }
 
-  constructor() {
+  constructor(friction = 0.95, gravityScale = 0.001) {
     super(-1, false);
-    this.particles = [];
-    this.friction = 0.95;
-    this.gravityConstant = 0.001;
-    this.attractors = [];
+    this.reset(friction, gravityScale);
     this.spatialHash = new SpatialHash(0.1);
     this.interactionRadius = 0.2;
+  }
+
+  /**
+   * Resets the particle system state.
+   * @param {number} [friction] - Friction coefficient.
+   * @param {number} [gravityScale] - Gravity scale.
+   */
+  reset(friction, gravityScale) {
+    this.particles = [];
+    this.attractors = [];
+    if (friction !== undefined) this.friction = friction;
+    if (gravityScale !== undefined) this.gravityScale = gravityScale;
   }
 
   /**
@@ -197,56 +206,98 @@ export class ParticleSystem extends Animation {
   step() {
     super.step();
 
+    const maxDelta = TWO_PI / Daydream.W;
+
     // Physics
-    const G = this.gravityConstant;
+    const G = this.gravityScale;
     const torque = vectorPool.acquire();
+    const axis = vectorPool.acquire();
+    const dQ = quaternionPool.acquire();
+    const pos = vectorPool.acquire(); // Acquire once for reuse in sub-step loop
 
     // Attractors (Global Gravity)
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       let dead = false;
 
-      // Apply forces from attractors
-      for (const attr of this.attractors) {
-        // Distance to attractor
-        const distSq = p.orientedPosition.distanceToSquared(attr.position);
+      // Adaptive sub-stepping
+      const speed = p.velocity.length();
+      const pos_y = p.orientedPosition.y;
+      // Latitude scale: pixels have higher angular density near poles
+      const latitudeScale = Math.sqrt(Math.max(0, 1.0 - pos_y * pos_y));
+      const adjustedMaxDelta = maxDelta * Math.max(0.001, latitudeScale);
+      const substeps = Math.max(1, Math.min(256, Math.ceil(speed / adjustedMaxDelta)));
+      const dt = 1.0 / substeps;
 
-        // Kill if too close
-        if (distSq < attr.killRadius * attr.killRadius) {
-          dead = true;
-          break;
+      // Reset orientation history for this frame
+      p.orientation.collapse();
+      const currentQ = p.orientation.get(0).clone(); // Working quaternion
+
+      // Sub-step loop
+      for (let k = 0; k < substeps; k++) {
+        pos.copy(p.position).applyQuaternion(currentQ);
+
+        // Latitude scale for current position
+        const latitudeScale = Math.sqrt(Math.max(0, 1.0 - pos.y * pos.y));
+
+        // Apply forces from attractors
+        for (const attr of this.attractors) {
+          // Distance to attractor
+          const distSq = pos.distanceToSquared(attr.position);
+
+          // Kill if too close
+          if (distSq < attr.killRadius * attr.killRadius) {
+            dead = true;
+            break;
+          }
+
+          // Apply Force
+          if (distSq > 0.000001) {
+            const dist = Math.sqrt(distSq);
+            const coreRadius = 0.2; // Solid sphere radius
+
+            let forceMag = 0;
+            if (dist < coreRadius) {
+              // Inside core: Linear drop-off
+              forceMag = (G * attr.strength * dist) / (coreRadius * coreRadius * coreRadius);
+            } else {
+              // Outside core: Inverse Square Law
+              forceMag = (G * attr.strength) / distSq;
+            }
+
+            // Scale force by dt and latitude
+            forceMag *= dt * Math.max(0.1, latitudeScale);
+
+            // Tangential force towards attractor
+            torque.crossVectors(pos, attr.position).normalize().multiplyScalar(forceMag);
+            const force = torque.cross(pos);
+            p.velocity.add(force);
+          }
         }
 
-        // Apply Force
-        if (distSq > 0.000001) {
-          // Soften gravity
-          let forceMag = (G * attr.strength) / (distSq + 0.000001);
+        if (dead) break;
 
-          // Tangential force towards attractor
-          torque.crossVectors(p.orientedPosition, attr.position).normalize().multiplyScalar(forceMag);
-          const force = torque.cross(p.orientedPosition);
-          p.velocity.add(force);
+        // Apply Friction (Drag)
+        p.velocity.multiplyScalar(Math.pow(this.friction, dt));
+
+        // Move (Rotate)
+        const subSpeed = p.velocity.length();
+        if (subSpeed > 0.000001) {
+          axis.crossVectors(pos, p.velocity).normalize();
+          // Angle is already in radians per frame, so we just scale by dt
+          const angle = subSpeed * dt;
+          dQ.setFromAxisAngle(axis, angle);
+          currentQ.premultiply(dQ); // World rotation
+          p.orientation.push(currentQ.clone());
+
+          // Transport velocity vector to new position (maintain tangency)
+          p.velocity.applyQuaternion(dQ);
         }
-      }
+
+      } // End Substeps
 
       if (dead) {
         this.particles.splice(i, 1);
-        continue;
-      }
-
-      // Friction
-      p.velocity.multiplyScalar(this.friction);
-
-
-
-      // Motion
-      const speed = p.velocity.length();
-      if (speed > 0.00001) {
-        // Interpret velocity as spatial units on the unit sphere:
-        // arc_length = radius * theta. Radius = 1, so theta = arc_length = speed.
-        const angle = speed;
-        const axis = vectorPool.acquire().crossVectors(p.orientedPosition, p.velocity).normalize();
-        Rotation.animate(p.orientation, axis, angle, easeMid, "World");
       }
     }
   }

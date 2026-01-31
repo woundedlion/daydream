@@ -16,21 +16,23 @@ import {
 import {
     Timeline, ParticleSystem, Sprite, PARTICLE_BASE
 } from "../animation.js";
-import { createRenderPipeline, FilterScreenTrails } from "../filters.js";
-import { Scan } from "../scan.js";
+import { createRenderPipeline, FilterScreenTrails, FilterAntiAlias } from "../filters.js";
+import { Plot } from "../plot.js";
 import { tween } from "../animation.js";
 
 
 export class TestParticles {
     constructor() {
         this.timeline = new Timeline();
-        this.pipeline = createRenderPipeline(new FilterScreenTrails(15, 500000));
-        this.brushSize = 3;
+        this.pipeline = createRenderPipeline(new FilterScreenTrails(15, 500000), new FilterAntiAlias());
 
-        this.particleSystem = new ParticleSystem();
+        this.particleSystem = new ParticleSystem(0.95, 0.001);
         this.timeline.add(0, this.particleSystem);
         this.timeline.add(0, new Sprite((opacity) => this.drawParticles(opacity), -1));
 
+        this.wellStrength = 1.0;
+
+        this.maxSpeed = 0;
         this.rebuild();
         this.setupGUI();
     }
@@ -38,33 +40,45 @@ export class TestParticles {
     setupGUI() {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this.particleSystem, 'friction').min(0.8).max(1.0).step(0.001).name("Friction");
-        this.gui.add(this.particleSystem, 'gravityConstant').min(0.0001).max(0.01).step(0.0001).name("Gravity Scale");
+        this.gui.add(this.particleSystem, 'gravityScale').min(0.0001).max(0.01).step(0.0001).name("Gravity Scale");
+        this.gui.add(this, 'wellStrength').min(0).max(10).step(0.1).name("Attractor Strength").onChange((v) => {
+            for (const a of this.particleSystem.attractors) {
+                a.strength = v;
+            }
+        });
         this.gui.add(this, 'numParticles').min(1).max(10000).step(1).name("# Particles");
-        this.gui.add(this, 'brushSize').min(1).max(50).step(1).name("Brush Size");
+        this.gui.add(this, 'maxSpeed').name("Max Speed").listen();
         this.gui.add(this, 'rebuild').name("Respawn");
     }
 
     rebuild() {
         this.numParticles = 1000; // Restore higher count for spiral visibility
-        this.particleSystem.particles = [];
-        this.particleSystem.attractors = [];
-        this.particleSystem.friction = 0.995;
-        this.particleSystem.gravityConstant = 0.0005; // Lower gravity for uncapped velocity
+        this.particleSystem.reset(0.95, 0.001);
 
-        // Single South Pole Attractor (-Y)
-        const wellStrength = 2.0;
         const killRadius = 0.05;
-        this.particleSystem.addAttractor(new THREE.Vector3(0, -1, 0), wellStrength, killRadius);
 
+        // 4 Equatorial Attractors
+        this.particleSystem.addAttractor(new THREE.Vector3(1, 0, 0), this.wellStrength, killRadius);
+        this.particleSystem.addAttractor(new THREE.Vector3(0, 0, 1), this.wellStrength, killRadius);
+        this.particleSystem.addAttractor(new THREE.Vector3(-1, 0, 0), this.wellStrength, killRadius);
+        this.particleSystem.addAttractor(new THREE.Vector3(0, 0, -1), this.wellStrength, killRadius);
     }
 
     drawFrame() {
         this.timeline.step();
 
+        // Monitor Speed
+        let maxSq = 0;
+        for (const p of this.particleSystem.particles) {
+            const sq = p.velocity.lengthSq();
+            if (sq > maxSq) maxSq = sq;
+        }
+        this.maxSpeed = Math.sqrt(maxSq).toFixed(3);
+
         // Replenish
         if (this.particleSystem.particles.length < this.numParticles) {
             const v = Daydream.Y_AXIS.clone();
-            const vel = randomVector().cross(v).normalize().multiplyScalar(0.00005);
+            const vel = randomVector().cross(v).normalize().multiplyScalar(0.05);
             const c = color4Pool.acquire().set(0, 0, 0, 1);
             const gravity = 1.0;
             this.particleSystem.spawn(v, vel, c, gravity);
@@ -78,17 +92,13 @@ export class TestParticles {
     }
 
     drawParticles(alpha) {
-        // Calculate angular thickness from pixel brush size
-        const pixelAngle = (2 * Math.PI) / Daydream.W;
-        const thickness = (this.brushSize / 2) * pixelAngle;
-
         for (const p of this.particleSystem.particles) {
             tween(p.orientation, (q, t) => {
                 let v = vectorPool.acquire().copy(p.position).applyQuaternion(q);
                 const c = lavenderLake.get(0);
-                Scan.Point.draw(this.pipeline, v, thickness, (pos, _t, dist) => {
+                Plot.Point.draw(this.pipeline, v, (pos, _t) => {
                     return { color: c.color, alpha: c.alpha * alpha * t };
-                }, { debugBB: false });
+                });
             });
         }
 
