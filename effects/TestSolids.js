@@ -12,7 +12,8 @@ import { Scan } from "../scan.js";
 
 import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
 import { color4Pool, richSunset, embers, underSea, emeraldForest, lateSunset, iceMelt, mangoPeel, lavenderLake } from "../color.js";
-import { Timeline, Rotation, easeInOutSin, Mutation, easeMid, MeshMorph, PeriodicTimer, Sprite } from "../animation.js";
+import { Timeline, Rotation, Mutation, MeshMorph, PeriodicTimer, Sprite } from "../animation.js";
+import { easeInOutSin, easeMid } from "../easing.js";
 import { Daydream } from "../driver.js";
 import { TWO_PI } from "../3dmath.js";
 

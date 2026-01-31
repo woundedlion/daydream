@@ -8,7 +8,8 @@ import { Plot } from "../plot.js";
 import { stereo, TWO_PI } from "../3dmath.js";
 import { createRenderPipeline, FilterAntiAlias, FilterWorldTrails, FilterOrient } from "../filters.js";
 import { richSunset } from "../color.js";
-import { Timeline, Rotation, easeMid } from "../animation.js";
+import { Timeline, Rotation } from "../animation.js";
+import { easeMid } from "../easing.js";
 
 export class HopfFibration {
     constructor() {

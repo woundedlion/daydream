@@ -13,7 +13,8 @@ import { Plot } from "../plot.js";
 import { ProceduralPalette } from "../color.js";
 import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
 import { wrap } from "../util.js";
-import { easeMid, Mutation, Rotation, Timeline } from "../animation.js";
+import { Mutation, Rotation, Timeline } from "../animation.js";
+import { easeMid } from "../easing.js";
 
 export class PetalFlow {
     constructor() {

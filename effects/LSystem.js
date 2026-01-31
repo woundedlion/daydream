@@ -10,7 +10,8 @@ import { Orientation } from "../geometry.js";
 import { Plot } from "../plot.js";
 
 import { createRenderPipeline, FilterOrient, FilterAntiAlias } from "../filters.js";
-import { Timeline, Rotation, easeMid } from "../animation.js";
+import { Timeline, Rotation } from "../animation.js";
+import { easeMid } from "../easing.js";
 import { GenerativePalette } from "../color.js";
 import { TWO_PI } from "../3dmath.js";
 

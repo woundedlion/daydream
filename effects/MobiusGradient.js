@@ -7,7 +7,8 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { GenerativePalette } from "../color.js";
-import { Timeline, Mutation, easeMid } from "../animation.js";
+import { Timeline, Mutation } from "../animation.js";
+import { easeMid } from "../easing.js";
 
 export class MobiusGradient {
     constructor() {

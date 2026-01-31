@@ -13,8 +13,9 @@ import {
     GenerativePalette
 } from "../color.js";
 import {
-    Timeline, easeMid, Rotation, PeriodicTimer, ColorWipe, easeInOutSin
+    Timeline, Rotation, PeriodicTimer, ColorWipe
 } from "../animation.js";
+import { easeMid, easeInOutSin } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterOrientSlice
 } from "../filters.js";

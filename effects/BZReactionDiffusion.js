@@ -10,8 +10,9 @@ import {
     Orientation, vectorPool
 } from "../geometry.js";
 import {
-    Timeline, easeInOutSin, Rotation, PeriodicTimer, Sprite, easeMid
+    Timeline, Rotation, PeriodicTimer, Sprite
 } from "../animation.js";
+import { easeInOutSin, easeMid } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterOrient
 } from "../filters.js";
