@@ -153,6 +153,7 @@ export class ParticleSystem extends Animation {
       this.life = life;
       this.maxLife = life;
       this.orientation = new Orientation();
+      this.tag = { trailData: this };
     }
 
     get orientedPosition() {

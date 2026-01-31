@@ -70,7 +70,7 @@ export class TestParticles {
 
     replenish() {
         for (let i = 0; i < 10 && this.particleSystem.particles.length < this.numParticles; i++) {
-            const v = Daydream.Y_AXIS.clone();
+            const v = (Math.random() < 0.5) ? Daydream.Y_AXIS.clone() : Daydream.Y_AXIS.clone().negate();
             const vel = randomVector().cross(v).normalize().multiplyScalar(this.initialSpeed);
             const palette = new GenerativePalette('straight', 'analagous', 'descending', 'mid');
             const life = 48 + Math.random() * 160;
@@ -113,7 +113,7 @@ export class TestParticles {
                 c.alpha *= alpha * lifeAlpha;
 
                 Plot.Point.draw(this.pipeline, v, (pos, _t) => {
-                    return { color: c.color, alpha: c.alpha, tag: { trailData: p } };
+                    return { color: c.color, alpha: c.alpha, tag: p.tag };
                 });
             });
             p.orientation.collapse();
