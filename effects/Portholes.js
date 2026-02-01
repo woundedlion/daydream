@@ -7,14 +7,14 @@ import {
 } from "../geometry.js";
 import { vectorPool } from "../memory.js";
 import { Solids } from "../solids.js";
-import { TWO_PI } from "../3dmath.js";
+import { TWO_PI, MobiusParams, mobius, stereo, invStereo } from "../3dmath.js";
 import { Plot } from "../plot.js";
 
 import {
     GenerativePalette
 } from "../color.js";
 import {
-    Timeline, Rotation, PeriodicTimer, ColorWipe
+    Timeline, Rotation, PeriodicTimer, ColorWipe, MobiusWarp
 } from "../animation.js";
 import { easeMid, easeInOutSin } from "../easing.js";
 import {
@@ -24,23 +24,28 @@ import {
 export class Portholes {
     constructor() {
         this.alpha = 0.3;
+        this.numCopies = 3;
 
-        this.basePalette = new GenerativePalette("circular", "analogous", "bell", "vibrant");
-        this.interferencePalette = new GenerativePalette("circular", "analogous", "cup", "vibrant");
+        this.palettes = [];
+        for (let i = 0; i < 10; i++) {
+            this.palettes.push(new GenerativePalette("circular", "triadic", "bell", "vibrant"));
+        }
 
         this.orientations = [];
         const numSlices = 2;
         for (let i = 0; i < numSlices; i++) {
             this.orientations.push(new Orientation());
         }
-        this.baseMesh = Solids.dodecahedron();
+        this.baseMesh = Solids.snubCube();
         this.hemisphereAxis = new THREE.Vector3(0, 1, 0);
         this.timeline = new Timeline();
 
         // Parameters
-        this.offsetRadius = 5 / Daydream.W;
-        this.offsetSpeed = 2.0;
+        this.offsetRadius = 50 / Daydream.W;
+        this.offsetSpeed = 1.0;
         this.t = 0;
+
+        this.mobiusParams = new MobiusParams();
 
         this.filters = createRenderPipeline(
             new FilterOrientSlice(this.orientations, this.hemisphereAxis),
@@ -50,6 +55,7 @@ export class Portholes {
         // Animations
         this.timeline.add(0, new PeriodicTimer(48, () => this.colorWipe()));
         this.timeline.add(0, new PeriodicTimer(160, () => this.spinSlices(), true));
+        this.timeline.add(0, new MobiusWarp(this.mobiusParams, 160, true));
 
         this.setupGui();
     }
@@ -59,21 +65,20 @@ export class Portholes {
         this.gui.add(this, 'alpha').min(0).max(1).step(0.01);
         this.gui.add(this, 'offsetRadius', 0.0, 0.2).name('Offset Radius').listen();
         this.gui.add(this, 'offsetSpeed', 0.0, 5.0).name('Offset Speed').listen();
+        this.gui.add(this, 'numCopies', 1, 10, 1).name('Num Copies').listen();
     }
 
     colorWipe() {
-        this.nextBasePalette = new GenerativePalette("straight", "triadic", "ascending");
-        this.nextInterferencePalette = new GenerativePalette("straight", "triadic", "ascending");
-        this.timeline.add(0,
-            new ColorWipe(this.basePalette, this.nextBasePalette, 80, easeMid)
-        );
-        this.timeline.add(0,
-            new ColorWipe(this.interferencePalette, this.nextInterferencePalette, 80, easeMid)
-        );
+        for (let i = 0; i < this.palettes.length; i++) {
+            const nextPalette = new GenerativePalette("straight", "triadic", "ascending");
+            this.timeline.add(0,
+                new ColorWipe(this.palettes[i], nextPalette, 80, easeMid)
+            );
+        }
     }
 
-    // Helper to apply offset to vertices for the interference layer
-    getInterferenceMesh() {
+    // Helper to apply offset to vertices
+    getDisplacedMesh(angleOffset) {
         const vertices = this.baseMesh.vertices.map((v, i) => {
             const p = vectorPool.acquire().copy(v);
 
@@ -84,7 +89,7 @@ export class Portholes {
 
             // Time based offset in tangent plane
             const phase = i * 0.1;
-            const angle = this.t * this.offsetSpeed * TWO_PI + phase;
+            const angle = this.t * this.offsetSpeed * TWO_PI + phase + angleOffset;
             const r = this.offsetRadius;
             const offset = vectorPool.acquire().copy(u).multiplyScalar(Math.cos(angle)).addScaledVector(vBasis, Math.sin(angle)).multiplyScalar(r);
             return p.add(offset).normalize();
@@ -97,25 +102,29 @@ export class Portholes {
         this.timeline.step();
         this.t += 0.01; // Global time
 
-        // Color functions
-        const baseColorFn = (v, t) => {
-            const c = this.basePalette.get(t);
-            c.alpha *= this.alpha;
-            return c;
+        const transform = (p) => {
+            const z = stereo(p);
+            const w = mobius(z, this.mobiusParams);
+            return invStereo(w, vectorPool.acquire());
         };
 
-        const interferenceColorFn = (v, t) => {
-            const c = this.interferencePalette.get(t);
-            c.alpha *= this.alpha;
-            return c;
-        };
+        for (let i = 0; i < this.numCopies; i++) {
+            const offset = (i / this.numCopies) * TWO_PI;
+            const mesh = this.getDisplacedMesh(offset);
+            const edges = Plot.Mesh.sample(mesh, 10);
 
-        // Draw Base Mesh
-        Plot.Mesh.draw(this.filters, this.baseMesh, baseColorFn);
+            const palette = this.palettes[i % this.palettes.length];
+            const colorFn = (v, t) => {
+                const c = palette.get(t);
+                c.alpha *= this.alpha;
+                return c;
+            };
 
-        // Draw Interference Mesh
-        const interferenceMesh = this.getInterferenceMesh();
-        Plot.Mesh.draw(this.filters, interferenceMesh, interferenceColorFn);
+            for (const edge of edges) {
+                const transformed = edge.map(transform);
+                Plot.rasterize(this.filters, transformed, colorFn);
+            }
+        }
     }
 
     spinSlices() {

@@ -375,6 +375,26 @@ export class FilterMobius {
     this.d = { re: 1, im: 0 };
   }
 
+  get aRe() { return this.a.re; }
+  set aRe(v) { this.a.re = v; }
+  get aIm() { return this.a.im; }
+  set aIm(v) { this.a.im = v; }
+
+  get bRe() { return this.b.re; }
+  set bRe(v) { this.b.re = v; }
+  get bIm() { return this.b.im; }
+  set bIm(v) { this.b.im = v; }
+
+  get cRe() { return this.c.re; }
+  set cRe(v) { this.c.re = v; }
+  get cIm() { return this.c.im; }
+  set cIm(v) { this.c.im = v; }
+
+  get dRe() { return this.d.re; }
+  set dRe(v) { this.d.re = v; }
+  get dIm() { return this.d.im; }
+  set dIm(v) { this.d.im = v; }
+
   // Complex Multiply
   cmul(c1, c2) {
     return {

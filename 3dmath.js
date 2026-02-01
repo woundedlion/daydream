@@ -20,9 +20,10 @@ function cDiv(a, b) {
 }
 
 // Inverse Stereographic Projection: Complex Plane -> Sphere
-export function invStereo(z) {
+export function invStereo(z, target) {
   const r2 = z.re * z.re + z.im * z.im;
-  return new THREE.Vector3(
+  const t = target || new THREE.Vector3();
+  return t.set(
     2 * z.re / (r2 + 1),
     2 * z.im / (r2 + 1),
     (r2 - 1) / (r2 + 1)

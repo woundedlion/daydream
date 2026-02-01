@@ -52,6 +52,25 @@ export const Plot = {
     },
 
     Line: class {
+        static sample(v1, v2, numSamples = 10) {
+            let u = vectorPool.acquire().copy(v1);
+            let v = vectorPool.acquire().copy(v2);
+            let angle = angleBetween(u, v);
+            let axis = vectorPool.acquire().crossVectors(u, v).normalize();
+
+            // Handle collinear/coincident points
+            if (Math.abs(angle) < 0.0001) return [vectorPool.acquire().copy(u)];
+
+            let points = [];
+            for (let i = 0; i <= numSamples; i++) {
+                let t = i / numSamples;
+                let q = quaternionPool.acquire().setFromAxisAngle(axis, angle * t);
+                let p = vectorPool.acquire().copy(u).applyQuaternion(q);
+                points.push(p);
+            }
+            return points;
+        }
+
         static draw(pipeline, v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast = false, age = 0) {
             let u = vectorPool.acquire().copy(v1);
             let v = vectorPool.acquire().copy(v2);
@@ -189,6 +208,31 @@ export const Plot = {
     },
 
     Mesh: class {
+        /**
+         * Samples points along the edges of the mesh.
+         * @param {Object} mesh - The mesh object {vertices: Vector3[], faces: number[][]}.
+         * @param {number} [density=10] - Number of samples per edge.
+         * @returns {THREE.Vector3[][]} Array of edge samples.
+         */
+        static sample(mesh, density = 10) {
+            const edges = [];
+            const drawn = new Set();
+            for (const face of mesh.faces) {
+                for (let i = 0; i < face.length; i++) {
+                    const idx1 = face[i];
+                    const idx2 = face[(i + 1) % face.length];
+
+                    // Deduplicate
+                    const key = idx1 < idx2 ? `${idx1},${idx2}` : `${idx2},${idx1}`;
+                    if (drawn.has(key)) continue;
+                    drawn.add(key);
+
+                    edges.push(Plot.Line.sample(mesh.vertices[idx1], mesh.vertices[idx2], density));
+                }
+            }
+            return edges;
+        }
+
         /**
          * Draws a wireframe mesh.
          * @param {Object} pipeline - Render pipeline.
