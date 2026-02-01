@@ -1,31 +1,33 @@
 /*
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
+ * * Optimized Version 5.0 - ApplyQuaternion & Flattened Arrays
  */
 
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
+import { Orientation, vectorToPixel } from "../geometry.js";
 import {
-    Orientation
-} from "../geometry.js";
-import { vectorPool } from "../memory.js";
-import {
-    Timeline, Rotation, PeriodicTimer, Sprite
+    Timeline, Rotation, PeriodicTimer, Sprite, tween
 } from "../animation.js";
 import { easeInOutSin, easeMid } from "../easing.js";
 import {
-    createRenderPipeline, FilterAntiAlias, FilterOrient
+    createRenderPipeline, FilterAntiAlias
 } from "../filters.js";
 import { GenerativePalette } from "../color.js";
 import { GSReaction } from "./GSReactionDiffusion.js";
+import { TWO_PI } from "../3dmath.js";
+
+// Reusable scratch vectors to avoid Garbage Collection in the render loop
+const _rotVec = new THREE.Vector3();
+const _zAxis = new THREE.Vector3();
 
 export class BZReaction extends GSReaction {
     constructor(rd, duration = 192, fadeOut = 32) {
         super(rd, duration, fadeOut);
 
         // 3rd Chemical Species
-        this.C = new Float32Array(this.N).fill(0.0);
         this.C = new Float32Array(this.N).fill(0.0);
 
         // Sorting Buffers
@@ -35,7 +37,6 @@ export class BZReaction extends GSReaction {
         this.nextC = new Float32Array(this.N);
 
         // Params for Cyclic Competition
-        // A eats B, B eats C, C eats A
         this.alpha = 1.2; // Predation rate
         this.beta = 0.1;  // Decay rate
         this.D = 0.08;    // Diffusion
@@ -50,11 +51,13 @@ export class BZReaction extends GSReaction {
         this.B.fill(0.0);
         this.C.fill(0.0);
 
-        // Seed random droplets
+        // Use optimized neighbor arrays if available
+        const neighbors = this.rd.neighbors;
+
         for (let k = 0; k < 50; k++) {
             let center = Math.floor(Math.random() * this.N);
             let r = Math.random();
-            let nbs = this.rd.neighbors[center];
+            let nbs = neighbors[center];
 
             let target = (r < 0.33) ? this.A : (r < 0.66) ? this.B : this.C;
             target[center] = 1.0;
@@ -63,71 +66,102 @@ export class BZReaction extends GSReaction {
     }
 
     updatePhysics() {
-        let nodes = this.rd.nodes;
-        let neighbors = this.rd.neighbors;
-        let weights = this.rd.weights;
+        // Direct local access vars for speed
+        const N = this.N;
+        const A = this.A;
+        const B = this.B;
+        const C = this.C;
+        const nextA = this.nextA;
+        const nextB = this.nextB;
+        const nextC = this.nextC;
 
-        let dt = this.rd.bzParams ? this.rd.bzParams.dt : 0.2;
-        let D = this.rd.bzParams ? this.rd.bzParams.D : 0.03;
-        this.alpha = this.rd.bzParams ? this.rd.bzParams.alpha : 1.6;
+        // OPTIMIZATION: Use flattened arrays for contiguous memory access (Cache Locality)
+        const flatNeighbors = this.rd.flatNeighbors;
+        const offsets = this.rd.neighborOffsets;
 
-        for (let i = 0; i < this.N; i++) {
-            let a = this.A[i];
-            let b = this.B[i];
-            let c = this.C[i];
+        const bz = this.rd.bzParams;
+        const dt = bz ? bz.dt : 0.2;
+        const D = bz ? bz.D : 0.03;
+        const alpha = bz ? bz.alpha : 1.6;
 
-            let lapA = 0, lapB = 0, lapC = 0;
-            let nbs = neighbors[i];
-            let degree = nbs.length;
+        for (let i = 0; i < N; i++) {
+            const a = A[i];
+            const b = B[i];
+            const c = C[i];
 
-            for (let k = 0; k < degree; k++) {
-                let j = nbs[k];
-                lapA += (this.A[j] - a);
-                lapB += (this.B[j] - b);
-                lapC += (this.C[j] - c);
+            let sumA = 0, sumB = 0, sumC = 0;
+
+            // Loop over flattened neighbor list
+            const start = offsets[i];
+            const end = offsets[i + 1];
+
+            for (let k = start; k < end; k++) {
+                const j = flatNeighbors[k];
+                sumA += A[j];
+                sumB += B[j];
+                sumC += C[j];
             }
 
-            let da = a * (1 - a - this.alpha * c);
-            let db = b * (1 - b - this.alpha * a);
-            let dc = c * (1 - c - this.alpha * b);
+            // Standard Laplacian: sum(neighbors) - degree * self
+            const degree = end - start;
+            const lapA = sumA - degree * a;
+            const lapB = sumB - degree * b;
+            const lapC = sumC - degree * c;
 
-            this.nextA[i] = a + (D * lapA + da) * dt;
-            this.nextB[i] = b + (D * lapB + db) * dt;
-            this.nextC[i] = c + (D * lapC + dc) * dt;
+            // Reaction: Cyclic Competition
+            const da = a * (1 - a - alpha * c);
+            const db = b * (1 - b - alpha * a);
+            const dc = c * (1 - c - alpha * b);
 
-            this.nextA[i] = Math.max(0, Math.min(1, this.nextA[i]));
-            this.nextB[i] = Math.max(0, Math.min(1, this.nextB[i]));
-            this.nextC[i] = Math.max(0, Math.min(1, this.nextC[i]));
+            const valA = a + (D * lapA + da) * dt;
+            const valB = b + (D * lapB + db) * dt;
+            const valC = c + (D * lapC + dc) * dt;
+
+            // Fast clamp
+            nextA[i] = valA < 0 ? 0 : (valA > 1 ? 1 : valA);
+            nextB[i] = valB < 0 ? 0 : (valB > 1 ? 1 : valB);
+            nextC[i] = valC < 0 ? 0 : (valC > 1 ? 1 : valC);
         }
 
-        // Swap
-        let temp;
-        temp = this.A; this.A = this.nextA; this.nextA = temp;
-        temp = this.B; this.B = this.nextB; this.nextB = temp;
-        temp = this.C; this.C = this.nextC; this.nextC = temp;
+        // Pointer swap (Zero allocation)
+        this.A = nextA; this.nextA = A;
+        this.B = nextB; this.nextB = B;
+        this.C = nextC; this.nextC = C;
     }
 
     render(currentAlpha) {
-        let ca = this.palette.get(0).color;
-        let cb = this.palette.get(0.5).color;
-        let cc = this.palette.get(1).color;
+        const ca = this.palette.get(0).color;
+        const cb = this.palette.get(0.5).color;
+        const cc = this.palette.get(1).color;
 
+        // Run physics multiple times per frame for speed
         for (let k = 0; k < 2; k++) {
             this.updatePhysics();
         }
 
+        const nodes = this.rd.nodes;
+        const N = this.N;
+
+        // --- Z-Sorting ---
+        // 1. Get the current global orientation
+        const qCurrent = this.rd.orientation.get();
+
+        // 2. Calculate the World-Space Z-Axis
+        // We take the local vector (0,0,1) and apply the rotation. 
+        // This vector tells us which direction is "forward" for depth sorting.
+        _zAxis.set(0, 0, 1).applyQuaternion(qCurrent);
+
         let count = 0;
-        const q = this.rd.orientation.get();
+        for (let i = 0; i < N; i++) {
+            const a = this.A[i];
+            const b = this.B[i];
+            const c = this.C[i];
+            const sum = a + b + c;
 
-        for (let i = 0; i < this.N; i++) {
-            let a = this.A[i];
-            let b = this.B[i];
-            let c = this.C[i];
-            let sum = a + b + c;
-
+            // Simple culling
             if (sum > 0.05) {
-                const v = vectorPool.acquire().copy(this.rd.nodes[i]).applyQuaternion(q);
-                this.zValues[i] = v.z;
+                // Depth = Dot product of position and camera-facing axis
+                this.zValues[i] = nodes[i].dot(_zAxis);
                 this.drawIndices[count++] = i;
             }
         }
@@ -136,24 +170,39 @@ export class BZReaction extends GSReaction {
         const indices = this.drawIndices.subarray(0, count);
         indices.sort((a, b) => zRef[a] - zRef[b]);
 
-        let color = new THREE.Color();
-        let hsl = { h: 0, s: 0, l: 0 };
+        const color = new THREE.Color();
+        const effectiveAlpha = currentAlpha * this.rd.alpha;
+        const filters = this.rd.filters;
 
-        for (let k = 0; k < count; k++) {
-            const i = indices[k];
-            let a = this.A[i];
-            let b = this.B[i];
-            let c = this.C[i];
+        // --- Outer Loop: Draw Trails (Tween Orientation) ---
+        // We hoist the loop here to avoid creating closures per particle.
+        tween(this.rd.orientation, (q, t) => {
 
-            color.setRGB(0, 0, 0);
-            color.lerp(ca, a);
-            color.lerp(cb, b);
-            color.lerp(cc, c);
-            hsl = color.getHSL(hsl);
-            color.setHSL(hsl.h, 1.0, hsl.l);
+            // --- Inner Loop: Draw Particles ---
+            for (let k = 0; k < count; k++) {
+                const i = indices[k];
+                const a = this.A[i];
+                const b = this.B[i];
+                const c = this.C[i];
 
-            this.rd.filters.plot(this.rd.nodes[i], color, 0, currentAlpha * this.rd.alpha);
-        }
+                color.setRGB(0, 0, 0);
+                color.lerp(ca, a);
+                color.lerp(cb, b);
+                color.lerp(cc, c);
+
+                // 1. Copy & Rotate
+                // We use the scratch vector `_rotVec` to avoid allocations.
+                // We use standard applyQuaternion as requested.
+                _rotVec.copy(nodes[i]).applyQuaternion(q);
+
+                // 2. Project
+                // geometry.js handles the spherical mapping logic
+                const p = vectorToPixel(_rotVec);
+
+                // 3. Draw
+                filters.plot2D(p.x, p.y, color, 1.0 - t, effectiveAlpha);
+            }
+        });
     }
 }
 
@@ -161,14 +210,16 @@ export class BZReactionDiffusion {
     constructor() {
         this.alpha = 0.3;
 
-        // Graph Parameters
         this.N = 4096;
         this.nodes = [];
         this.neighbors = [];
         this.weights = [];
         this.scales = [];
 
-        // BZ Specific Params
+        // Optimized flattened storage
+        this.flatNeighbors = null;
+        this.neighborOffsets = null;
+
         this.bzParams = {
             alpha: 1.6,
             D: 0.03,
@@ -179,8 +230,8 @@ export class BZReactionDiffusion {
         this.buildGraph();
 
         this.orientation = new Orientation();
+
         this.filters = createRenderPipeline(
-            new FilterOrient(this.orientation),
             new FilterAntiAlias()
         );
 
@@ -288,6 +339,26 @@ export class BZReactionDiffusion {
             this.weights.push(new Array(K).fill(1.0));
             this.scales.push(1.0);
         }
+
+        // OPTIMIZATION: Flatten neighbors for contiguous memory access
+        let totalLinks = 0;
+        for (let nbs of this.neighbors) {
+            totalLinks += nbs.length;
+        }
+
+        this.flatNeighbors = new Int32Array(totalLinks);
+        this.neighborOffsets = new Int32Array(this.N + 1);
+
+        let offset = 0;
+        for (let i = 0; i < this.N; i++) {
+            this.neighborOffsets[i] = offset;
+            const nbs = this.neighbors[i];
+            const count = nbs.length;
+            for (let j = 0; j < count; j++) {
+                this.flatNeighbors[offset++] = nbs[j];
+            }
+        }
+        this.neighborOffsets[this.N] = offset;
     }
 
     drawFrame() {

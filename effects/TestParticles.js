@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    randomVector, fibSpiral
+    Orientation
 } from "../geometry.js";
 import { vectorPool, color4Pool } from "../memory.js";
 import {
@@ -16,26 +16,28 @@ import {
 import {
     Timeline, ParticleSystem, Sprite, PARTICLE_BASE
 } from "../animation.js";
-import { createRenderPipeline, FilterScreenTrails, FilterAntiAlias } from "../filters.js";
+import { createRenderPipeline, FilterWorldTrails, FilterOrient, FilterAntiAlias } from "../filters.js";
 import { Plot } from "../plot.js";
-import { tween } from "../animation.js";
+import { RandomWalk, tween } from "../animation.js";
 
 
 export class TestParticles {
     constructor() {
-        this.timeline = new Timeline();
-        this.pipeline = createRenderPipeline(new FilterScreenTrails(15, 500000), new FilterAntiAlias());
+        this.orientation = new Orientation();
+        this.pipeline = createRenderPipeline(new FilterWorldTrails(15, 500000), new FilterOrient(this.orientation), new FilterAntiAlias());
 
-        this.friction = 0.99;
+        this.timeline = new Timeline();
         this.particleSystem = new ParticleSystem(this.friction, 0.001);
         this.timeline.add(0, this.particleSystem);
         this.timeline.add(0, new Sprite((opacity) => this.drawParticles(opacity), -1));
+        this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
 
+        this.friction = 0.99;
         this.wellStrength = 1.0;
         this.initialSpeed = 0.05;
-
         this.maxSpeed = 0;
-        this.batchSize = Daydream.W; // Default batch size
+        this.batchSize = Daydream.W;
+
         this.rebuild();
         this.setupGUI();
     }
@@ -86,7 +88,7 @@ export class TestParticles {
         // South Emitter
         this.particleSystem.addEmitter((sys) => {
             const axis = Daydream.Y_AXIS.clone().multiplyScalar(-1); // South (-1)
-            const angle = (this.emitCounter++ * 0.1);
+            const angle = -(this.emitCounter++ * 0.1);
             const vel = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)).multiplyScalar(this.initialSpeed);
             const palette = new GenerativePalette('straight', 'complementary', 'descending', 'mid');
             const life = 160;
@@ -112,7 +114,7 @@ export class TestParticles {
         this.maxSpeed = Math.sqrt(maxSq);
 
         // Draw Trails
-        this.pipeline.trail((x, y, t, particle) => {
+        this.pipeline.trail((v, t, particle) => {
             return this.evaluateColor(particle, t);
         }, 0.2);
     }
