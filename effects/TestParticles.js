@@ -32,7 +32,7 @@ export class TestParticles {
         this.timeline.add(0, this.particleSystem);
         this.timeline.add(0, new Sprite((opacity) => this.drawParticles(opacity), -1));
         this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
-        this.timeline.add(0, new MobiusWarp(this.mobius, 100, 48, true));
+        this.timeline.add(0, new MobiusWarp(this.mobius, 160, true));
 
         this.friction = 0.85;
         this.wellStrength = 1.0;

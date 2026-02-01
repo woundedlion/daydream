@@ -781,14 +781,12 @@ export class MobiusFlow extends Animation {
 export class MobiusWarp extends Animation {
   /**
    * @param {Object} params - The Mobius parameters.
-   * @param {number} numRings - Number of rings.
    * @param {number} duration - Animation duration.
    * @param {boolean} [repeat=true] - Whether to repeat.
    */
-  constructor(params, numRings, duration, repeat = true) {
+  constructor(params, duration, repeat = true) {
     super(duration, repeat);
     this.params = params;
-    this.numRings = numRings;
   }
 
   step() {
