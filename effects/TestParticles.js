@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation
+    Orientation, MeshOps
 } from "../geometry.js";
 import { vectorPool, color4Pool } from "../memory.js";
 import {
@@ -19,12 +19,12 @@ import {
 import { createRenderPipeline, FilterWorldTrails, FilterOrient, FilterAntiAlias } from "../filters.js";
 import { Plot } from "../plot.js";
 import { RandomWalk, tween } from "../animation.js";
-
+import { Solids } from "../solids.js";
 
 export class TestParticles {
     constructor() {
         this.orientation = new Orientation();
-        this.pipeline = createRenderPipeline(new FilterWorldTrails(15, 500000), new FilterOrient(this.orientation), new FilterAntiAlias());
+        this.pipeline = createRenderPipeline(new FilterWorldTrails(25, 500000), new FilterOrient(this.orientation), new FilterAntiAlias());
 
         this.timeline = new Timeline();
         this.particleSystem = new ParticleSystem(this.friction, 0.001);
@@ -32,9 +32,9 @@ export class TestParticles {
         this.timeline.add(0, new Sprite((opacity) => this.drawParticles(opacity), -1));
         this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
 
-        this.friction = 0.99;
+        this.friction = 0.85;
         this.wellStrength = 1.0;
-        this.initialSpeed = 0.05;
+        this.initialSpeed = 0.025;
         this.maxSpeed = 0;
         this.batchSize = Daydream.W;
 
@@ -63,37 +63,31 @@ export class TestParticles {
 
     rebuild() {
         this.spawnIndex = 0;
-        this.emitCounter = 0;
         this.particleSystem.reset(this.friction, 0.001);
 
         const killRadius = 0.05;
 
-        // 4 Equatorial Attractors
-        this.particleSystem.addAttractor(new THREE.Vector3(1, 0, 0), this.wellStrength, killRadius);
-        this.particleSystem.addAttractor(new THREE.Vector3(0, 0, 1), this.wellStrength, killRadius);
-        this.particleSystem.addAttractor(new THREE.Vector3(-1, 0, 0), this.wellStrength, killRadius);
-        this.particleSystem.addAttractor(new THREE.Vector3(0, 0, -1), this.wellStrength, killRadius);
+        let emitters = Solids.cube();
+        this.emitCounters = [];
+        for (let i = 0; i < emitters.vertices.length; i++) {
+            this.emitCounters.push(0);
+        }
+        let attractors = MeshOps.dual(emitters);
 
-        // North Emitter
-        this.particleSystem.addEmitter((sys) => {
-            const axis = Daydream.Y_AXIS.clone(); // North (+1)
-            // Use monotonic counter for spiral
-            const angle = (this.emitCounter++ * 0.1);
-            const vel = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)).multiplyScalar(this.initialSpeed);
-            const palette = new GenerativePalette('straight', 'analagous', 'descending', 'mid');
-            const life = 160;
-            return new ParticleSystem.Particle(axis, vel, palette, life);
-        });
+        for (const v of attractors.vertices) {
+            this.particleSystem.addAttractor(v, this.wellStrength, killRadius);
+        }
 
-        // South Emitter
-        this.particleSystem.addEmitter((sys) => {
-            const axis = Daydream.Y_AXIS.clone().multiplyScalar(-1); // South (-1)
-            const angle = -(this.emitCounter++ * 0.1);
-            const vel = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)).multiplyScalar(this.initialSpeed);
-            const palette = new GenerativePalette('straight', 'complementary', 'descending', 'mid');
-            const life = 160;
-            return new ParticleSystem.Particle(axis, vel, palette, life);
-        });
+        for (let i = 0; i < emitters.vertices.length; i++) {
+            this.particleSystem.addEmitter(() => {
+                const axis = emitters.vertices[i];
+                const angle = this.emitCounters[i]++ * 0.2;
+                const vel = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)).multiplyScalar(this.initialSpeed);
+                const palette = new GenerativePalette('straight', 'complementary', 'descending', 'mid');
+                const life = 160;
+                return new ParticleSystem.Particle(axis, vel, palette, life);
+            });
+        }
     }
 
     evaluateColor(particle, t) {
