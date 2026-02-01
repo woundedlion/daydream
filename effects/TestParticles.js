@@ -16,25 +16,28 @@ import {
 import {
     Timeline, ParticleSystem, Sprite, PARTICLE_BASE
 } from "../animation.js";
-import { createRenderPipeline, FilterWorldTrails, FilterOrient, FilterAntiAlias } from "../filters.js";
+import { createRenderPipeline, FilterWorldTrails, FilterOrient, FilterAntiAlias, FilterMobius } from "../filters.js";
 import { Plot } from "../plot.js";
-import { RandomWalk, tween } from "../animation.js";
+import { RandomWalk, MobiusWarp, tween } from "../animation.js";
 import { Solids } from "../solids.js";
 
 export class TestParticles {
     constructor() {
         this.orientation = new Orientation();
-        this.pipeline = createRenderPipeline(new FilterWorldTrails(25, 500000), new FilterOrient(this.orientation), new FilterAntiAlias());
+        this.mobius = new FilterMobius();
+        this.pipeline = createRenderPipeline(new FilterWorldTrails(25, 500000), this.mobius, new FilterOrient(this.orientation), new FilterAntiAlias());
 
         this.timeline = new Timeline();
         this.particleSystem = new ParticleSystem(this.friction, 0.001);
         this.timeline.add(0, this.particleSystem);
         this.timeline.add(0, new Sprite((opacity) => this.drawParticles(opacity), -1));
         this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
+        this.timeline.add(0, new MobiusWarp(this.mobius, 100, 48, true));
 
         this.friction = 0.85;
         this.wellStrength = 1.0;
         this.initialSpeed = 0.025;
+        this.angularSpeed = 0.2;
         this.maxSpeed = 0;
         this.batchSize = Daydream.W;
 
@@ -47,6 +50,7 @@ export class TestParticles {
         this.gui.add(this.particleSystem, 'friction').min(0.8).max(1.0).step(0.001).name("Friction");
         this.gui.add(this.particleSystem, 'gravityScale').min(0.0001).max(0.01).step(0.0001).name("Gravity Scale");
         this.gui.add(this, 'initialSpeed').min(0.001).max(0.2).step(0.001).name("Initial Speed");
+        this.gui.add(this, 'angularSpeed').min(0.001).max(1).step(0.001).name("Angular Speed");
 
         // Time Scale Slider
         this.gui.add(this.particleSystem, 'timeScale').min(0.0).max(10.0).step(1).name("Time Scale");
@@ -81,7 +85,7 @@ export class TestParticles {
         for (let i = 0; i < emitters.vertices.length; i++) {
             this.particleSystem.addEmitter(() => {
                 const axis = emitters.vertices[i];
-                const angle = this.emitCounters[i]++ * 0.2;
+                const angle = this.emitCounters[i]++ * this.angularSpeed;
                 const vel = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)).multiplyScalar(this.initialSpeed);
                 const palette = new GenerativePalette('straight', 'complementary', 'descending', 'mid');
                 const life = 160;
