@@ -32,7 +32,9 @@ export class TestParticles {
         this.timeline.add(0, this.particleSystem);
         this.timeline.add(0, new Sprite((opacity) => this.drawParticles(opacity), -1));
         this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
-        this.timeline.add(0, new MobiusWarp(this.mobius, 160, true));
+
+        this.enableWarp = false;
+        if (this.enableWarp) this.startWarp(); // Default false
 
         this.friction = 0.85;
         this.wellStrength = 1.0;
@@ -63,6 +65,23 @@ export class TestParticles {
 
         this.gui.add(this, 'maxSpeed').name("Max Speed").listen();
         this.gui.add(this, 'rebuild').name("Respawn");
+        this.gui.add(this, 'enableWarp').name('Enable Warp').onChange(v => {
+            if (v) this.startWarp(); else this.stopWarp();
+        });
+    }
+
+    startWarp() {
+        if (this.warpAnim) this.warpAnim.cancel();
+        this.warpAnim = new MobiusWarp(this.mobius, 160, true);
+        this.timeline.add(0, this.warpAnim);
+    }
+
+    stopWarp() {
+        if (this.warpAnim) this.warpAnim.cancel();
+        this.mobius.aRe = 1; this.mobius.aIm = 0;
+        this.mobius.bRe = 0; this.mobius.bIm = 0;
+        this.mobius.cRe = 0; this.mobius.cIm = 0;
+        this.mobius.dRe = 1; this.mobius.dIm = 0;
     }
 
     rebuild() {

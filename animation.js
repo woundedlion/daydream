@@ -63,9 +63,11 @@ export class Timeline {
     for (let i = 0; i < this.animations.length; i++) {
       let animation = this.animations[i].animation;
       if (this.t >= this.animations[i].start) {
-        animation.step();
+        if (!animation.canceled) {
+          animation.step();
+        }
         if (animation.done()) {
-          if (animation.repeat) {
+          if (animation.repeat && !animation.canceled) {
             animation.rewind();
             animation.post();
             continue;

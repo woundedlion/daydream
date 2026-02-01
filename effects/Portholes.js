@@ -55,9 +55,25 @@ export class Portholes {
         // Animations
         this.timeline.add(0, new PeriodicTimer(48, () => this.colorWipe()));
         this.timeline.add(0, new PeriodicTimer(160, () => this.spinSlices(), true));
-        this.timeline.add(0, new MobiusWarp(this.mobiusParams, 160, true));
+
+        this.enableWarp = true;
+        this.startWarp();
 
         this.setupGui();
+    }
+
+    startWarp() {
+        if (this.warpAnim) this.warpAnim.cancel();
+        this.warpAnim = new MobiusWarp(this.mobiusParams, 160, true);
+        this.timeline.add(0, this.warpAnim);
+    }
+
+    stopWarp() {
+        if (this.warpAnim) this.warpAnim.cancel();
+        this.mobiusParams.aRe = 1; this.mobiusParams.aIm = 0;
+        this.mobiusParams.bRe = 0; this.mobiusParams.bIm = 0;
+        this.mobiusParams.cRe = 0; this.mobiusParams.cIm = 0;
+        this.mobiusParams.dRe = 1; this.mobiusParams.dIm = 0;
     }
 
     setupGui() {
@@ -66,6 +82,9 @@ export class Portholes {
         this.gui.add(this, 'offsetRadius', 0.0, 0.2).name('Offset Radius').listen();
         this.gui.add(this, 'offsetSpeed', 0.0, 5.0).name('Offset Speed').listen();
         this.gui.add(this, 'numCopies', 1, 10, 1).name('Num Copies').listen();
+        this.gui.add(this, 'enableWarp').name('Enable Warp').onChange(v => {
+            if (v) this.startWarp(); else this.stopWarp();
+        });
     }
 
     colorWipe() {
