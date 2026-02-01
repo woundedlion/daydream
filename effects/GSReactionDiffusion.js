@@ -42,9 +42,19 @@ export class GSReaction extends Sprite {
         this.feed = 0.0545;
         this.k = 0.062;
         // Fibonacci Mode diffusion
-        this.dA = 0.15;
-        this.dB = 0.075;
-        this.dt = 1.0;
+        // Scale params based on Resolution relative to baseline (4096 nodes)
+        // D ~ scale, dt ~ 1/scale, steps ~ scale
+        this.scaleFactor = this.N / 4096.0;
+
+        // Params (Brain Coral)
+        this.feed = 0.0545;
+        this.k = 0.062;
+        // Fibonacci Mode diffusion
+        this.dA = 0.15 * this.scaleFactor;
+        this.dB = 0.075 * this.scaleFactor;
+        this.dt = 1.0 / this.scaleFactor;
+
+        this.stepsPerFrame = Math.ceil(12 * this.scaleFactor);
 
         // Palette (Instantiate new one)
         this.palette = new GenerativePalette("straight", "split-complementary", "ascending", "vibrant");
@@ -63,8 +73,8 @@ export class GSReaction extends Sprite {
     }
 
     render(currentAlpha) {
-        // 1. Simulate (12 steps per frame)
-        for (let k = 0; k < 12; k++) {
+        // 1. Simulate
+        for (let k = 0; k < this.stepsPerFrame; k++) {
             this.updatePhysics();
         }
 
@@ -286,7 +296,25 @@ export class GSReactionDiffusion {
                 }
             }
             this.neighbors.push(bestIndices);
-            this.weights.push(new Array(K).fill(1.0));
+
+            // Calculate Inverse Square Weights
+            let totalWeight = 0;
+            let currentWeights = new Array(bestDists.length);
+            for (let k = 0; k < bestDists.length; k++) {
+                // bestDists stores d^2 already
+                let w = 1.0 / (bestDists[k] + 0.000001);
+                currentWeights[k] = w;
+                totalWeight += w;
+            }
+
+            // Normalize weights to sum to K (approx 6.0)
+            if (totalWeight > 0) {
+                const scale = bestDists.length / totalWeight;
+                for (let k = 0; k < currentWeights.length; k++) {
+                    currentWeights[k] *= scale;
+                }
+            }
+            this.weights.push(currentWeights);
             this.scales.push(1.0);
         }
     }

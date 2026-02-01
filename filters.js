@@ -229,6 +229,7 @@ export class FilterWorldTrails {
     this.y = new Float32Array(capacity);
     this.z = new Float32Array(capacity);
     this.ttl = new Float32Array(capacity);
+    this.data = new Array(capacity);
   }
 
   plot(v, color, age, alpha, tag, pass) {
@@ -241,6 +242,7 @@ export class FilterWorldTrails {
       this.y[i] = v.y;
       this.z[i] = v.z;
       this.ttl[i] = this.lifespan - age;
+      this.data[i] = (tag && tag.trailData) ? tag.trailData : null; // Extract trailData from tag
       this.count++;
     }
   }
@@ -258,7 +260,7 @@ export class FilterWorldTrails {
           this.y[i] = this.y[this.count];
           this.z[i] = this.z[this.count];
           this.ttl[i] = this.ttl[this.count];
-          // Do not increment i; check swapped element
+          this.data[i] = this.data[this.count];
         }
       } else {
         i++;
@@ -282,11 +284,12 @@ export class FilterWorldTrails {
     for (let k = 0; k < this.count; k++) {
       const idx = activeIndices[k];
       const ttl = this.ttl[idx];
+      const data = this.data[idx];
 
       v.set(this.x[idx], this.y[idx], this.z[idx]);
 
       const t = 1.0 - (ttl / this.lifespan);
-      let res = trailFn(v, t);
+      let res = trailFn(v, t, data);
       const color = res.isColor ? res : (res.color || res);
       const outputAlpha = (res.alpha !== undefined ? res.alpha : 1.0) * alpha;
 
