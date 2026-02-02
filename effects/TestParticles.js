@@ -37,8 +37,10 @@ export class TestParticles {
         this.pipeline = createRenderPipeline(new FilterOrient(this.orientation), new FilterAntiAlias());
 
         this.timeline = new Timeline();
-        this.particleSystem = new ParticleSystem(this.friction, 0.001, this.trailLength);
+        this.timeline = new Timeline();
+        this.particleSystem = new ParticleSystem(2000, this.friction, 0.001, this.trailLength);
         this.particleSystem.resolutionScale = 2;
+        this.holeAlphasBuffer = [];
         this.timeline.add(0, this.particleSystem);
         this.timeline.add(0, new Sprite((opacity) => this.drawParticles(opacity), -1));
         this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
@@ -119,7 +121,7 @@ export class TestParticles {
                 const vel = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)).multiplyScalar(this.initialSpeed);
                 const palette = new GenerativePalette('straight', 'complementary', 'descending', 'mid');
                 const life = 160;
-                return new ParticleSystem.Particle(axis, vel, palette, life, system.trailLength);
+                system.spawn(axis, vel, palette, life);
             });
         }
     }
@@ -145,12 +147,13 @@ export class TestParticles {
     }
 
     drawParticles(opacity) {
-        const trails = Plot.ParticleSystem.sample(this.particleSystem);
-        const attractors = this.particleSystem.attractors;
-
-        for (const { points, particle } of trails) {
+        Plot.ParticleSystem.forEachTrail(this.particleSystem, (points, particle) => {
             // 1. Calculate hole alphas in geometry space
-            const holeAlphas = [];
+            // Note: points array is reused, so we must be careful if we needed original points later (we don't here)
+            this.holeAlphasBuffer.length = 0;
+            const holeAlphas = this.holeAlphasBuffer;
+            const attractors = this.particleSystem.attractors; // Hoist this if optimizing further, but it's fine here
+
             for (let i = 0; i < points.length; i++) {
                 let alpha = 1.0;
                 for (const attr of attractors) {
@@ -175,12 +178,15 @@ export class TestParticles {
                 c.alpha *= opacity;
                 return c;
             }, false, 0);
-        }
+        });
     }
 
     monitorSpeed() {
         let maxSq = 0;
-        for (const p of this.particleSystem.particles) {
+        const count = this.particleSystem.activeCount;
+        const pool = this.particleSystem.particles;
+        for (let i = 0; i < count; i++) {
+            const p = pool[i];
             const sq = p.velocity.lengthSq();
             if (sq > maxSq) maxSq = sq;
         }
