@@ -8,19 +8,14 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, angleBetween, pixelToVector, randomVector
-} from "../geometry.js";
-import {
-    Plot
-} from "../plot.js";
-
-import {
-    GenerativePalette
-} from "../color.js";
-import { color4Pool } from "../memory.js";
-import {
-    Timeline, Transition, RandomTimer, Rotation
+    Timeline, Transition, RandomTimer, Rotation, Orientation
 } from "../animation.js";
+import {
+    angleBetween, pixelToVector, randomVector
+} from "../geometry.js";
+import { Plot } from "../plot.js";
+import { GenerativePalette } from "../color.js";
+import { color4Pool } from "../memory.js";
 import { easeMid, easeInOutSin } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterReplicate, FilterOrient, FilterWorldTrails

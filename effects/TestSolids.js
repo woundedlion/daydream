@@ -5,15 +5,14 @@
 
 import * as THREE from "three";
 import { gui } from "gui";
-import { MeshOps, sinWave, Orientation } from "../geometry.js";
+import { Timeline, Rotation, Mutation, MeshMorph, PeriodicTimer, Sprite, Orientation } from "../animation.js";
+import { MeshOps, sinWave } from "../geometry.js";
 import { vectorPool, quaternionPool, color4Pool } from "../memory.js";
 import { Solids } from "../solids.js";
 import { Plot } from "../plot.js";
 import { Scan } from "../scan.js";
-
 import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
 import { richSunset, embers, underSea, emeraldForest, lateSunset, iceMelt, mangoPeel, lavenderLake } from "../color.js";
-import { Timeline, Rotation, Mutation, MeshMorph, PeriodicTimer, Sprite } from "../animation.js";
 import { easeInOutSin, easeMid } from "../easing.js";
 import { Daydream } from "../driver.js";
 import { TWO_PI } from "../3dmath.js";

@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, sinWave
+    sinWave
 } from "../geometry.js";
 import { Plot } from "../plot.js";
 import { Scan } from "../scan.js";
@@ -19,7 +19,7 @@ import {
     GenerativePalette
 } from "../color.js";
 import {
-    Timeline, Sprite, RandomWalk, Mutation
+    Timeline, Sprite, RandomWalk, Mutation, Orientation
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import {

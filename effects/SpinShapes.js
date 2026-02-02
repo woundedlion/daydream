@@ -7,19 +7,14 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, fibSpiral
-} from "../geometry.js";
-import { TWO_PI } from "../3dmath.js";
-import {
-    richSunset
-} from "../color.js";
-import { color4Pool } from "../memory.js";
-import {
-    Timeline, Sprite, Rotation
+    Timeline, Sprite, Rotation, Orientation
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import { Scan } from "../scan.js";
-import { makeBasis } from "../geometry.js";
+import { makeBasis, fibSpiral } from "../geometry.js";
+import { color4Pool } from "../memory.js";
+import { richSunset } from "../color.js";
+import { TWO_PI } from "../3dmath.js";
 
 import { createRenderPipeline } from "../filters.js";
 

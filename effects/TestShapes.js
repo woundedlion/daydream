@@ -7,16 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation
-} from "../geometry.js";
-import { vectorPool, color4Pool } from "../memory.js";
-import { TWO_PI } from "../3dmath.js";
-import {
-    VignettePalette, richSunset, mangoPeel, underSea, iceMelt,
-    TransparentVignette, blendAlpha, Color4
-} from "../color.js";
-import {
-    Timeline, Sprite, RandomWalk, Rotation, Mutation
+    Timeline, Sprite, RandomWalk, Rotation, Mutation, Orientation
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import { Scan } from "../scan.js";

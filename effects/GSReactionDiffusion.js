@@ -7,12 +7,9 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation
-} from "../geometry.js";
-import { vectorPool } from "../memory.js";
-import {
-    Timeline, Rotation, PeriodicTimer, Sprite
+    Timeline, Rotation, PeriodicTimer, Sprite, Orientation
 } from "../animation.js";
+import { vectorPool } from "../memory.js";
 import { easeInOutSin, easeMid } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterOrient
@@ -41,32 +38,35 @@ export class GSReaction extends Sprite {
         // Params (Brain Coral)
         this.feed = 0.0545;
         this.k = 0.062;
-        // Fibonacci Mode diffusion
-        // Scale params based on Resolution relative to baseline (4096 nodes)
-        // D ~ scale, dt ~ 1/scale, steps ~ scale
-        this.scaleFactor = this.N / 4096.0;
 
-        // Params (Brain Coral)
-        this.feed = 0.0545;
-        this.k = 0.062;
-        // Fibonacci Mode diffusion
-        this.dA = 0.15 * this.scaleFactor;
-        this.dB = 0.075 * this.scaleFactor;
-        this.dt = 1.0 / this.scaleFactor;
+        // Fixed parameters independent of resolution. 
+        // This means higher resolution = finer pattern details.
+        // We do NOT scale dA/dt with resolution anymore to prevent "slow motion" and death.
+        this.dA = 0.15;
+        this.dB = 0.075;
+        this.dt = 1.0;
 
-        this.stepsPerFrame = Math.ceil(12 * this.scaleFactor);
+        // Run fixed number of steps. 8 is a good balance of speed vs evolution.
+        this.stepsPerFrame = 8;
 
         // Palette (Instantiate new one)
         this.palette = new GenerativePalette("straight", "split-complementary", "ascending", "vibrant");
     }
 
     seed() {
+        const offsets = this.rd.neighborOffsets;
+        const flatNeighbors = this.rd.flatNeighbors;
+
         // Seed random spots
-        for (let i = 0; i < 5; i++) {
+        for (let k = 0; k < 12; k++) { // Increased seed count
             let idx = Math.floor(Math.random() * this.N);
-            let nbs = this.rd.neighbors[idx];
             this.B[idx] = 1.0;
-            for (let j of nbs) { // Check if nbs is iterable (it is array of indices)
+
+            // Seed neighbors (Nucleation)
+            const start = offsets[idx];
+            const end = offsets[idx + 1];
+            for (let i = start; i < end; i++) {
+                const j = flatNeighbors[i];
                 this.B[j] = 1.0;
             }
         }
@@ -82,22 +82,19 @@ export class GSReaction extends Sprite {
         // Pre-calculate Depth and filter active nodes
         let count = 0;
         const q = this.rd.orientation.get();
+        const nodes = this.rd.nodes;
 
         for (let i = 0; i < this.N; i++) {
             if (this.B[i] > 0.05) { // Lower threshold slightly for smoother fade
                 // Calculate View Space Z
                 // We only need Z, so we can inline dot product: v' = v.applyQuaternion(q)
-                // z' = v.x * q.... applyQuaternion is heavy.
-                // Use vectorPool for simplicity and correctness first.
-                const v = vectorPool.acquire().copy(this.rd.nodes[i]).applyQuaternion(q);
+                const v = vectorPool.acquire().copy(nodes[i]).applyQuaternion(q);
                 this.zValues[i] = v.z;
                 this.drawIndices[count++] = i;
             }
         }
 
         // Sort Indices by Z (Ascending: Far to Near) -> Standard Painter's
-        // Camera is at +Z. Far is -Z. Near is +Z.
-        // We want to draw Far first. So Lowest Z first. Ascending.
         const zRef = this.zValues;
         const indices = this.drawIndices.subarray(0, count);
         indices.sort((a, b) => zRef[a] - zRef[b]);
@@ -106,8 +103,6 @@ export class GSReaction extends Sprite {
             const i = indices[k];
             let b = this.B[i];
 
-            // Re-check threshold inside render logic if needed, but we filtered.
-            // Just apply mapping.
             let t = Math.max(0, Math.min(1, (b - 0.15) * 4.0));
             // Ensure min opacity for soft edges
             if (t <= 0) t = 0.01;
@@ -116,7 +111,7 @@ export class GSReaction extends Sprite {
             // Alpha scaling
             let alpha = currentAlpha * this.rd.alpha * c.alpha;
 
-            this.rd.filters.plot(this.rd.nodes[i], c.color, 0, alpha);
+            this.rd.filters.plot(nodes[i], c.color, 0, alpha);
         }
     }
 
@@ -124,49 +119,52 @@ export class GSReaction extends Sprite {
         // Brain Coral Regime (Phase Eta)
         // Gray-Scott on Graph
 
-        let nodes = this.rd.nodes;
-        let neighbors = this.rd.neighbors;
-        let weights = this.rd.weights;
-        let scales = this.rd.scales;
+        const offsets = this.rd.neighborOffsets;
+        const flatNeighbors = this.rd.flatNeighbors;
+        const flatWeights = this.rd.flatWeights;
 
-        for (let i = 0; i < this.N; i++) {
-            let a = this.A[i];
-            let b = this.B[i];
+        // Local vars for performance
+        const A = this.A;
+        const B = this.B;
+        const nextA = this.nextA;
+        const nextB = this.nextB;
+        const N = this.N;
+
+        for (let i = 0; i < N; i++) {
+            let a = A[i];
+            let b = B[i];
 
             let lapA = 0;
             let lapB = 0;
-            let nbs = neighbors[i];
-            let ws = weights[i];
-            let degree = nbs.length;
 
-            for (let k = 0; k < degree; k++) {
-                let j = nbs[k];
-                let w = ws[k];
-                lapA += (this.A[j] - a) * w;
-                lapB += (this.B[j] - b) * w;
+            const start = offsets[i];
+            const end = offsets[i + 1];
+
+            // Weighted Laplacian
+            for (let k = start; k < end; k++) {
+                let j = flatNeighbors[k];
+                let w = flatWeights[k];
+                lapA += (A[j] - a) * w;
+                lapB += (B[j] - b) * w;
             }
-
-            // Apply Physical Scale Correction
-            let s = scales[i];
-            lapA *= s;
-            lapB *= s;
 
             // Reaction
             let reaction = a * b * b;
             let feed = this.feed * (1 - a);
             let kill = (this.k + this.feed) * b;
 
-            this.nextA[i] = a + (this.dA * lapA - reaction + feed) * this.dt;
-            this.nextB[i] = b + (this.dB * lapB + reaction - kill) * this.dt;
+            // Update
+            nextA[i] = a + (this.dA * lapA - reaction + feed) * this.dt;
+            nextB[i] = b + (this.dB * lapB + reaction - kill) * this.dt;
 
             // Clamp
-            this.nextA[i] = Math.max(0, Math.min(1, this.nextA[i]));
-            this.nextB[i] = Math.max(0, Math.min(1, this.nextB[i]));
+            nextA[i] = Math.max(0, Math.min(1, nextA[i]));
+            nextB[i] = Math.max(0, Math.min(1, nextB[i]));
         }
 
         // Swap
-        let tempA = this.A; this.A = this.nextA; this.nextA = tempA;
-        let tempB = this.B; this.B = this.nextB; this.nextB = tempB;
+        this.A = nextA; this.nextA = A;
+        this.B = nextB; this.nextB = B;
     }
 }
 
@@ -177,9 +175,11 @@ export class GSReactionDiffusion {
         // Graph Parameters
         this.N = 4096;
         this.nodes = [];
-        this.neighbors = [];
-        this.weights = [];
-        this.scales = [];
+        // Flattened Graph
+        this.flatNeighbors = null;
+        this.flatWeights = null;
+        this.neighborOffsets = null;
+
         this.quarterSpinDuration = 64;
 
         // Build Graph (Fibonacci Hex)
@@ -223,9 +223,9 @@ export class GSReactionDiffusion {
         this.N = Daydream.W * Daydream.H * 2;
 
         this.nodes = [];
-        this.neighbors = [];
-        this.weights = [];
-        this.scales = [];
+        // Temporary arrays
+        let tempNeighbors = [];
+        let tempWeights = [];
 
         // 1. Generate Nodes (Fibonacci Spiral)
         const phi = Math.PI * (3 - Math.sqrt(5)); // Golden Angle
@@ -295,7 +295,7 @@ export class GSReactionDiffusion {
                     }
                 }
             }
-            this.neighbors.push(bestIndices);
+            tempNeighbors.push(bestIndices);
 
             // Calculate Inverse Square Weights
             let totalWeight = 0;
@@ -314,9 +314,32 @@ export class GSReactionDiffusion {
                     currentWeights[k] *= scale;
                 }
             }
-            this.weights.push(currentWeights);
-            this.scales.push(1.0);
+            tempWeights.push(currentWeights);
         }
+
+        // 3. Flatten Arrays for Performance
+        let totalLinks = 0;
+        for (let nbs of tempNeighbors) {
+            totalLinks += nbs.length;
+        }
+
+        this.flatNeighbors = new Int32Array(totalLinks);
+        this.flatWeights = new Float32Array(totalLinks);
+        this.neighborOffsets = new Int32Array(this.N + 1);
+
+        let offset = 0;
+        for (let i = 0; i < this.N; i++) {
+            this.neighborOffsets[i] = offset;
+            const nbs = tempNeighbors[i];
+            const ws = tempWeights[i];
+            const count = nbs.length;
+            for (let j = 0; j < count; j++) {
+                this.flatNeighbors[offset] = nbs[j];
+                this.flatWeights[offset] = ws[j];
+                offset++;
+            }
+        }
+        this.neighborOffsets[this.N] = offset; // Sentinel
     }
 
     drawFrame() {

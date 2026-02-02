@@ -2,14 +2,12 @@
 import * as THREE from "three";
 import { gui } from "../gui.js";
 import { Daydream } from "../driver.js";
-import { Orientation } from "../geometry.js";
+import { Timeline, Rotation, Orientation } from "../animation.js";
 import { vectorPool } from "../memory.js";
 import { Plot } from "../plot.js";
-
 import { stereo, TWO_PI } from "../3dmath.js";
 import { createRenderPipeline, FilterAntiAlias, FilterWorldTrails, FilterOrient } from "../filters.js";
 import { richSunset } from "../color.js";
-import { Timeline, Rotation } from "../animation.js";
 import { easeMid } from "../easing.js";
 
 export class HopfFibration {

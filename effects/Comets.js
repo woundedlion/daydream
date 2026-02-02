@@ -8,24 +8,13 @@ const _tempVec = new THREE.Vector3();
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, lissajous, randomVector, vectorToPixel
+    lissajous, randomVector, vectorToPixel
 } from "../geometry.js";
-import { vectorPool } from "../memory.js";
-import {
-    Plot
-} from "../plot.js";
-import { dotPool } from "../memory.js";
-import {
-    Path, tween, deepTween
-} from "../animation.js";
+import { vectorPool, dotPool, color4Pool } from "../memory.js";
+import { Plot } from "../plot.js";
+import { Path, deepTween, Timeline, Sprite, Motion, RandomWalk, PeriodicTimer, ColorWipe, OrientationTrail, Orientation } from "../animation.js";
 import { Scan } from "../scan.js";
-import {
-    GenerativePalette, blendAlpha
-} from "../color.js";
-import { color4Pool } from "../memory.js";
-import {
-    Timeline, Sprite, Motion, RandomWalk, PeriodicTimer, ColorWipe, OrientationTrail
-} from "../animation.js";
+import { GenerativePalette, blendAlpha } from "../color.js";
 import { easeMid } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterOrient, quinticKernel
@@ -138,11 +127,7 @@ export class Comets {
                 if (t > 1.0) return;
                 const color4 = this.palette.get(t);
                 color4.alpha = color4.alpha * this.alpha * quinticKernel(1 - t);
-
-                // transform node.v by trail quaternion 'q'
                 _tempVec.copy(node.v).applyQuaternion(q);
-
-                // orient the resulting vector by the object's current orientation
                 _tempVec.normalize().applyQuaternion(this.orientation.get());
 
                 const dot = dotPool.acquire();

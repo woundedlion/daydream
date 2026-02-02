@@ -6,15 +6,14 @@
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
-import { Orientation, sinWave } from "../geometry.js";
-import { invStereo, TWO_PI } from "../3dmath.js";
-import { Plot } from "../plot.js";
-
-import { ProceduralPalette } from "../color.js";
-import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
-import { wrap } from "../util.js";
-import { Mutation, Rotation, Timeline } from "../animation.js";
+import { sinWave } from "../geometry.js";
+import { Mutation, Rotation, Timeline, Orientation } from "../animation.js";
 import { easeMid } from "../easing.js";
+import { ProceduralPalette } from "../color.js";
+import { createRenderPipeline, FilterOrient, FilterAntiAlias } from "../filters.js";
+import { Plot } from "../plot.js";
+import { invStereo, TWO_PI } from "../3dmath.js";
+import { wrap } from "../util.js";
 
 export class PetalFlow {
     constructor() {

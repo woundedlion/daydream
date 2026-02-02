@@ -8,31 +8,19 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, sinWave
-} from "../geometry.js";
-import { vectorPool, quaternionPool } from "../memory.js";
-import {
-    makeBasis
-} from "../geometry.js";
-import {
-    Plot
-} from "../plot.js";
-import {
-    Scan
-} from "../scan.js";
-
-import {
-    GenerativePalette
-} from "../color.js";
-import {
-    Timeline, Rotation, PeriodicTimer, ColorWipe, Transition, Mutation, RandomTimer
+    Timeline, Rotation, PeriodicTimer, ColorWipe, Transition, Mutation, RandomTimer, Orientation
 } from "../animation.js";
+import { sinWave, makeBasis } from "../geometry.js";
+import { vectorPool, quaternionPool, color4Pool } from "../memory.js";
+import { Plot } from "../plot.js";
+import { Scan } from "../scan.js";
+import { GenerativePalette } from "../color.js";
 import { easeMid } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterOrient
 } from "../filters.js";
 import { TWO_PI } from "../3dmath.js";
-import { color4Pool } from "../memory.js";
+
 
 export class Moire {
     constructor() {
