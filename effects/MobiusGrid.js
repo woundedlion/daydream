@@ -49,7 +49,8 @@ export class MobiusGrid {
         );
         this.params = new MobiusParams(1, 0, 0, 0, 0, 0, 1, 0);
 
-        this.timeline.add(0, new MobiusWarp(this.params, this.numRings, 160, true));
+        this.warpAnim = new MobiusWarp(this.params, 160, 1.0, true);
+        this.timeline.add(0, this.warpAnim);
         this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, TWO_PI, 400, easeMid, true));
         this.timeline.add(0, new PeriodicTimer(120, () => this.wipePalette(), true));
         this.timeline.add(0,

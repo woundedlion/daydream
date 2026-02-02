@@ -29,6 +29,7 @@ export class TestParticles {
 
         this.timeline = new Timeline();
         this.particleSystem = new ParticleSystem(this.friction, 0.001);
+        this.particleSystem.resolutionScale = 2;
         this.timeline.add(0, this.particleSystem);
         this.timeline.add(0, new Sprite((opacity) => this.drawParticles(opacity), -1));
         this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
@@ -42,6 +43,7 @@ export class TestParticles {
         this.angularSpeed = 0.2;
         this.maxSpeed = 0;
         this.batchSize = Daydream.W;
+        this.warpScale = 0.6;
 
         this.rebuild();
         this.setupGUI();
@@ -68,11 +70,14 @@ export class TestParticles {
         this.gui.add(this, 'enableWarp').name('Enable Warp').onChange(v => {
             if (v) this.startWarp(); else this.stopWarp();
         });
+        this.gui.add(this, 'warpScale').min(0).max(5.0).step(0.1).name("Warp Intensity").onChange(v => {
+            if (this.warpAnim) this.warpAnim.scale = v;
+        });
     }
 
     startWarp() {
         if (this.warpAnim) this.warpAnim.cancel();
-        this.warpAnim = new MobiusWarp(this.mobius, 160, true);
+        this.warpAnim = new MobiusWarp(this.mobius, 160, this.warpScale, true);
         this.timeline.add(0, this.warpAnim);
     }
 

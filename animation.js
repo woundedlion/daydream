@@ -167,6 +167,7 @@ export class ParticleSystem extends Animation {
     super(-1, false);
     this.reset(friction, gravityScale);
     this.interactionRadius = 0.2;
+    this.resolutionScale = 1.0;
   }
 
   /**
@@ -229,7 +230,7 @@ export class ParticleSystem extends Animation {
         }
       }
 
-      const maxDelta = TWO_PI / Daydream.W;
+      const maxDelta = TWO_PI / Daydream.W / this.resolutionScale;
       const G = this.gravityScale;
 
       // Scratch variables reused across particles for performance
@@ -784,19 +785,21 @@ export class MobiusWarp extends Animation {
   /**
    * @param {Object} params - The Mobius parameters.
    * @param {number} duration - Animation duration.
+   * @param {number} scale - Magnitude of distortion.
    * @param {boolean} [repeat=true] - Whether to repeat.
    */
-  constructor(params, duration, repeat = true) {
+  constructor(params, duration, scale = 1.0, repeat = true) {
     super(duration, repeat);
     this.params = params;
+    this.scale = scale;
   }
 
   step() {
     super.step();
     const progress = this.t / this.duration;
     const angle = progress * TWO_PI;
-    this.params.bRe = Math.cos(angle);
-    this.params.bIm = Math.sin(angle);
+    this.params.bRe = this.scale * Math.cos(angle);
+    this.params.bIm = this.scale * Math.sin(angle);
   }
 }
 
