@@ -9,9 +9,9 @@ import * as THREE from "three";
 export const TWO_PI = 2 * Math.PI;
 
 // Complex number operations
-function cAdd(a, b) { return { re: a.re + b.re, im: a.im + b.im }; }
-function cMult(a, b) { return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re }; }
-function cDiv(a, b) {
+export function cAdd(a, b) { return { re: a.re + b.re, im: a.im + b.im }; }
+export function cMult(a, b) { return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re }; }
+export function cDiv(a, b) {
   const denom = b.re * b.re + b.im * b.im;
   return {
     re: (a.re * b.re + a.im * b.im) / denom,
@@ -57,6 +57,13 @@ export class MobiusParams {
     this.cIm = cIm;
     this.dRe = dRe;
     this.dIm = dIm;
+  }
+
+  reset() {
+    this.aRe = 1; this.aIm = 0;
+    this.bRe = 0; this.bIm = 0;
+    this.cRe = 0; this.cIm = 0;
+    this.dRe = 1; this.dIm = 0;
   }
 
   get a() { return { re: this.aRe, im: this.aIm }; }

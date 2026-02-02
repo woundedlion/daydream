@@ -10,7 +10,20 @@ import { Rotation } from "./animation.js";
 import { easeOutCirc } from "./easing.js";
 import { g1, g2 } from "./color.js";
 import { vectorPool, quaternionPool, dotPool } from "./memory.js";
-import { TWO_PI } from "./3dmath.js";
+import { TWO_PI, mobius, stereo, invStereo } from "./3dmath.js";
+
+/**
+ * Transforms a 3D vector specific to this Mobius parameter set.
+ * @param {THREE.Vector3} v - Input vector.
+ * @param {MobiusParams} params - The Mobius parameters.
+ * @returns {THREE.Vector3} Transformed vector (from pool).
+ */
+export function mobiusTransform(v, params) {
+  const z = stereo(v);
+  const w = mobius(z, params);
+  return invStereo(w, vectorPool.acquire());
+}
+
 import { KDTree } from "./spatial.js";
 
 /** @type {number} The golden ratio, (1 + Math.sqrt(5)) / 2. */
@@ -24,15 +37,6 @@ const _tempC = new THREE.Vector3();
 const _vA = new THREE.Vector3();
 const _vB = new THREE.Vector3();
 export const G = 1 / PHI;
-
-
-
-/**
- * Represents a single point to be rendered, storing its position and color.
- */
-
-
-
 
 /**
  * Represents a single point to be rendered, storing its position and color.
@@ -756,7 +760,6 @@ export const MeshOps = {
       const crossCB = vB.crossVectors(tempC, B);
 
       if (crossAC.dot(tempN) > 0 && crossCB.dot(tempN) > 0) {
-        // Valid point on arc
         const d = p.dot(tempC);
         if (d > maxDot) {
           maxDot = d;

@@ -11,6 +11,7 @@ import { Solids } from "./solids.js";
 import FastNoiseLite from "./FastNoiseLite.js";
 import { TWO_PI } from "./3dmath.js";
 import { easeOutElastic, easeInOutSin, easeInSin, easeOutSin, easeOutExpo, easeOutCirc, easeInCubic, easeInCirc, easeMid, easeOutCubic } from "./easing.js";
+import { StaticCircularBuffer } from "./StaticCircularBuffer.js";
 
 // Easing functions moved to easing.js
 
@@ -137,6 +138,8 @@ export class Animation {
 // North Pole
 export const PARTICLE_BASE = new THREE.Vector3(0, 1, 0);
 
+
+
 /**
  * Physics particle system.
  */
@@ -148,7 +151,7 @@ export class ParticleSystem extends Animation {
      * @param {THREE.Color|Object} color - Color or Palette object.
      * @param {number} life - Frames to live.
      */
-    constructor(position, velocity, palette, life) {
+    constructor(position, velocity, palette, life, trailLength = 20) {
       this.position = position.clone();
       this.velocity = velocity.clone();
       this.palette = palette;
@@ -156,6 +159,8 @@ export class ParticleSystem extends Animation {
       this.maxLife = life;
       this.orientation = new Orientation();
       this.tag = { trailData: this };
+      this.history = new OrientationTrail(trailLength);
+      this.trailLength = trailLength;
     }
 
     get orientedPosition() {
@@ -163,9 +168,9 @@ export class ParticleSystem extends Animation {
     }
   }
 
-  constructor(friction = 0.95, gravityScale = 0.001) {
+  constructor(friction = 0.95, gravityScale = 0.001, trailLength = 20) {
     super(-1, false);
-    this.reset(friction, gravityScale);
+    this.reset(friction, gravityScale, trailLength);
     this.interactionRadius = 0.2;
     this.resolutionScale = 1.0;
   }
@@ -174,8 +179,9 @@ export class ParticleSystem extends Animation {
    * Resets the particle system state.
    * @param {number} [friction] - Friction coefficient.
    * @param {number} [gravityScale] - Gravity scale.
+   * @param {number} [trailLength] - Trail History Length.
    */
-  reset(friction, gravityScale) {
+  reset(friction, gravityScale, trailLength) {
     this.particles = [];
     this.attractors = [];
     this.emitters = [];
@@ -183,6 +189,7 @@ export class ParticleSystem extends Animation {
 
     if (friction !== undefined) this.friction = friction;
     if (gravityScale !== undefined) this.gravityScale = gravityScale;
+    if (trailLength !== undefined) this.trailLength = trailLength;
   }
 
   /**
@@ -211,7 +218,7 @@ export class ParticleSystem extends Animation {
    * @param {number} life - Frames to live.
    */
   spawn(position, velocity, color, life = 600) {
-    this.particles.push(new ParticleSystem.Particle(position, velocity, color, life));
+    this.particles.push(new ParticleSystem.Particle(position, velocity, color, life, this.trailLength));
   }
 
   /**
@@ -261,81 +268,110 @@ export class ParticleSystem extends Animation {
    * @returns {boolean} True if particle died.
    */
   stepParticle(p, maxDelta, G, scratch) {
-    let dead = false;
     const { torque, axis, dQ, pos } = scratch;
 
-    // Age
+    // 1. Age Check
     p.life--;
-    if (p.life <= 0) return true;
+    let active = p.life > 0;
 
-    // Adaptive sub-stepping
-    const speed = p.velocity.length();
-    const pos_y = p.orientedPosition.y;
-    // Latitude scale: pixels have higher angular density near poles
-    const latitudeScale = Math.sqrt(Math.max(0, 1.0 - pos_y * pos_y));
-    const adjustedMaxDelta = maxDelta * Math.max(0.001, latitudeScale);
-    const substeps = Math.max(1, Math.min(256, Math.ceil(speed / adjustedMaxDelta)));
-    const dt = 1.0 / substeps;
+    // 2. Physics Simulation (Only if active)
+    if (active) {
+      // Adaptive sub-stepping
+      const speed = p.velocity.length();
+      const pos_y = p.orientedPosition.y;
+      const latitudeScale = Math.sqrt(Math.max(0, 1.0 - pos_y * pos_y));
+      const adjustedMaxDelta = maxDelta * Math.max(0.001, latitudeScale);
+      const substeps = Math.max(1, Math.min(256, Math.ceil(speed / adjustedMaxDelta)));
+      const dt = 1.0 / substeps;
 
-    const currentQ = quaternionPool.acquire().copy(p.orientation.get()); // Working quaternion from pool
+      const currentQ = quaternionPool.acquire().copy(p.orientation.get());
 
-    // Sub-step loop
-    for (let k = 0; k < substeps; k++) {
-      pos.copy(p.position).applyQuaternion(currentQ);
+      for (let k = 0; k < substeps; k++) {
+        pos.copy(p.position).applyQuaternion(currentQ);
 
-      // Apply forces from attractors
-      for (const attr of this.attractors) {
-        // Distance to attractor
-        const distSq = pos.distanceToSquared(attr.position);
-
-        // Kill if too close
-        if (distSq < attr.killRadius * attr.killRadius) {
-          dead = true;
-          break;
-        }
-
-        // Apply Force
-        if (distSq > 0.000001) {
-          const dist = Math.sqrt(distSq);
-          const coreRadius = 0.2; // Solid sphere radius
-
-          let forceMag = 0;
-          if (dist < coreRadius) {
-            // Inside core: Linear drop-off
-            forceMag = (G * attr.strength * dist) / (coreRadius * coreRadius * coreRadius);
-          } else {
-            // Outside core: Inverse Square Law
-            forceMag = (G * attr.strength) / distSq;
+        // Attractors
+        for (const attr of this.attractors) {
+          const distSq = pos.distanceToSquared(attr.position);
+          if (distSq < attr.killRadius * attr.killRadius) {
+            p.life = 0;
+            active = false;
+            break;
           }
+          if (distSq > 0.000001) {
+            const dist = Math.sqrt(distSq);
+            const coreRadius = 0.2;
+            let forceMag = (dist < coreRadius)
+              ? (G * attr.strength * dist) / (coreRadius * coreRadius * coreRadius)
+              : (G * attr.strength) / distSq;
+            forceMag *= dt;
+            torque.crossVectors(pos, attr.position).normalize().multiplyScalar(forceMag);
+            p.velocity.add(torque.cross(pos));
+          }
+        }
 
-          forceMag *= dt;
+        if (!active) break;
 
-          // Tangential force towards attractor
-          torque.crossVectors(pos, attr.position).normalize().multiplyScalar(forceMag);
-          const force = torque.cross(pos);
-          p.velocity.add(force);
+        // Physics Update
+        p.velocity.multiplyScalar(Math.pow(this.friction, dt));
+        const subSpeed = p.velocity.length();
+        if (subSpeed > 0.000001) {
+          axis.crossVectors(pos, p.velocity).normalize();
+          const angle = subSpeed * dt;
+          dQ.setFromAxisAngle(axis, angle);
+          currentQ.premultiply(dQ);
+          p.orientation.push(quaternionPool.acquire().copy(currentQ));
+          p.velocity.applyQuaternion(dQ);
         }
       }
+    }
 
-      if (dead) break;
-
-      // Apply Friction (Drag)
-      p.velocity.multiplyScalar(Math.pow(this.friction, dt));
-
-      // Move (Rotate)
-      const subSpeed = p.velocity.length();
-      if (subSpeed > 0.000001) {
-        axis.crossVectors(pos, p.velocity).normalize();
-        // Angle is already in radians per frame, so we just scale by dt
-        const angle = subSpeed * dt;
-        dQ.setFromAxisAngle(axis, angle);
-        currentQ.premultiply(dQ); // World rotation
-        p.orientation.push(quaternionPool.acquire().copy(currentQ));
-        p.velocity.applyQuaternion(dQ);
+    // 3. History Management
+    if (active) {
+      // Record new state
+      p.history.record(p.orientation);
+    } else {
+      // Expire old state (trail dissipation)
+      if (p.history.length() > 0) {
+        p.history.expire();
       }
+    }
 
-    } // End Substeps
-    return dead;
+    // 4. Reset frame orientation accumulator
+    p.orientation.collapse();
+
+    // 5. Removal Check
+    // Remove only if inactive AND history is fully expired
+    if (!active && p.history.length() === 0) {
+      return true;
+    }
+
+    return false;
+  }
+
+  draw(pipeline, drawLine, colorFn, transformFn = null) {
+    for (const p of this.particles) {
+      if (p.history.length() < 2) continue;
+
+      let prevPos = null;
+
+      // Draw entire history using deepTween
+      deepTween(p.history, (q, t) => {
+        // q is interpolated orientation, t is normalized history time (0..1)
+        let v = vectorPool.acquire().copy(p.position).applyQuaternion(q);
+
+        if (transformFn) {
+          v = transformFn(v);
+        }
+
+        if (prevPos) {
+          drawLine(pipeline, prevPos, v, (pos, subT) => {
+            const segmentT = 1; // Not used significantly if we use global T
+            return colorFn(pos, t, p); // Pass age (1.0 at tail, 0.0 at head) ?? 
+          }, 0, 1, false, false, 0);
+        }
+        prevPos = v;
+      });
+    }
   }
 }
 
@@ -860,7 +896,11 @@ export class OrientationTrail {
     return this.snapshots[idx];
   }
 
-
+  expire() {
+    if (this.count > 0) {
+      this.count--;
+    }
+  }
 }
 
 /**

@@ -6,9 +6,9 @@
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
-import { stereo, invStereo, mobius, MobiusParams, TWO_PI } from "../3dmath.js";
+import { MobiusParams, TWO_PI } from "../3dmath.js";
 import {
-    Orientation, sinWave
+    Orientation, sinWave, mobiusTransform
 } from "../geometry.js";
 import { vectorPool, quaternionPool } from "../memory.js";
 import {
@@ -84,14 +84,13 @@ export class MobiusGrid {
     }
 
     drawAxisRings(pipeline, normal, numRings, mobiusParams, axisComponent, phase = 0, rotationQ) {
-        const { a, b, c, d } = mobiusParams;
-        const logMin = -2.5;
-        const logMax = 2.5;
-        const range = logMax - logMin;
         const count = Math.ceil(numRings);
         const q = quaternionPool.acquire(); // default identity
         for (let i = 0; i < count; i++) {
             let t = wrap(i / numRings + phase, 1.0);
+            const logMin = -2.5;
+            const logMax = 2.5;
+            const range = logMax - logMin;
             const logR = logMin + t * range;
             const R = Math.exp(logR);
             const radius = (4 / Math.PI) * Math.atan(1 / R);
@@ -99,16 +98,7 @@ export class MobiusGrid {
             const points = Plot.Polygon.sample(basis, radius, Daydream.W / 4);
 
             const transformedPoints = points.map(p => {
-                const z = stereo(p);
-                const w = mobius(z, mobiusParams);
-                // Inline invStereo to usage vectorPool
-                const r2 = w.re * w.re + w.im * w.im;
-                const finalP = vectorPool.acquire().set(
-                    2 * w.re / (r2 + 1),
-                    2 * w.im / (r2 + 1),
-                    (r2 - 1) / (r2 + 1)
-                );
-
+                const finalP = mobiusTransform(p, mobiusParams);
                 if (rotationQ) finalP.applyQuaternion(rotationQ);
                 return finalP;
             });
@@ -123,7 +113,6 @@ export class MobiusGrid {
     }
 
     drawLongitudes(pipeline, numLines, mobiusParams, axisComponent, phase = 0, rotationQ) {
-        const { a, b, c, d } = mobiusParams;
         const count = Math.ceil(numLines);
         const q = quaternionPool.acquire();
         for (let i = 0; i < count; i++) {
@@ -134,13 +123,7 @@ export class MobiusGrid {
             const points = Plot.Polygon.sample(basis, radius, Daydream.W / 4);
 
             const transformedPoints = points.map(p => {
-                let mp = mobius(stereo(p), mobiusParams);
-                const r2 = mp.re * mp.re + mp.im * mp.im;
-                const finalP = vectorPool.acquire().set(
-                    2 * mp.re / (r2 + 1),
-                    2 * mp.im / (r2 + 1),
-                    (r2 - 1) / (r2 + 1)
-                );
+                const finalP = mobiusTransform(p, mobiusParams);
                 if (rotationQ) finalP.applyQuaternion(rotationQ);
                 return finalP;
             });
@@ -174,16 +157,7 @@ export class MobiusGrid {
         // Calculate stabilizing counter-rotation
         const nIn = vectorPool.acquire().copy(Daydream.Z_AXIS);
 
-        const transform = (v) => {
-            const z = stereo(v);
-            const w = mobius(z, this.params);
-            const r2 = w.re * w.re + w.im * w.im;
-            return vectorPool.acquire().set(
-                2 * w.re / (r2 + 1),
-                2 * w.im / (r2 + 1),
-                (r2 - 1) / (r2 + 1)
-            );
-        };
+        const transform = (v) => mobiusTransform(v, this.params);
 
         const nTrans = transform(nIn);
         const sIn = vectorPool.acquire().copy(Daydream.Z_AXIS).negate();
