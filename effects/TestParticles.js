@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    MeshOps, mobiusTransform
+    MeshOps, mobiusTransform, angleBetween
 } from "../geometry.js";
 import { vectorPool, color4Pool } from "../memory.js";
 import {
@@ -16,7 +16,7 @@ import {
 import {
     Timeline, ParticleSystem, Sprite, RandomWalk, MobiusWarp, Orientation
 } from "../animation.js";
-import { createRenderPipeline, FilterOrient, FilterAntiAlias } from "../filters.js";
+import { createRenderPipeline, FilterOrient, FilterAntiAlias, quinticKernel } from "../filters.js";
 import { Plot } from "../plot.js";
 import { MobiusParams } from "../3dmath.js";
 import { Solids } from "../solids.js";
@@ -113,23 +113,54 @@ export class TestParticles {
         }
     }
 
-    particleColor(p, t) {
+    particleColor(p, t, holeAlphas) {
         const c = p.palette.get(t);
         let age = t * this.particleSystem.trailLength;
         let particleAgeAlpha = (Math.max(0, p.life) + age) / p.maxLife;
         let trailAgeAlpha = 1.0 - t;
-        c.alpha *= trailAgeAlpha * particleAgeAlpha;
+
+        let holeAlpha = 1.0;
+        if (holeAlphas) {
+            const idx = t * (holeAlphas.length - 1);
+            const i = Math.floor(idx);
+            const f = idx - i;
+            const a1 = holeAlphas[Math.min(i, holeAlphas.length - 1)];
+            const a2 = holeAlphas[Math.min(i + 1, holeAlphas.length - 1)];
+            holeAlpha = a1 * (1 - f) + a2 * f;
+        }
+
+        c.alpha *= trailAgeAlpha * particleAgeAlpha * holeAlpha;
         return c;
     }
 
     drawParticles(opacity) {
         const trails = Plot.ParticleSystem.sample(this.particleSystem);
+        const attractors = this.particleSystem.attractors;
+
         for (const { points, particle } of trails) {
+            // 1. Calculate hole alphas in geometry space
+            const holeAlphas = [];
+            for (let i = 0; i < points.length; i++) {
+                let alpha = 1.0;
+                for (const attr of attractors) {
+                    const dist = angleBetween(points[i], attr.position);
+                    if (dist < attr.eventHorizon) {
+                        let t = dist / attr.eventHorizon;
+                        t = quinticKernel(t);
+                        alpha *= t;
+                    }
+                }
+                holeAlphas.push(alpha);
+            }
+
+            // 2. Transform positions
             for (let i = 0; i < points.length; i++) {
                 points[i] = this.orientation.orient(mobiusTransform(points[i], this.mobius));
             }
+
+            // 3. Rasterize with interpolation
             Plot.rasterize(this.pipeline, points, (pos, t) => {
-                const c = this.particleColor(particle, t);
+                const c = this.particleColor(particle, t, holeAlphas);
                 c.alpha *= opacity;
                 return c;
             }, false, 0);
