@@ -152,21 +152,10 @@ export const pixelToVector = (x, y) => {
  * @returns {THREE.Vector3} Normalized vector on the unit sphere.
  */
 export const logPolarToVector = (rho, theta) => {
-  // 1. Plane radius
   const R = Math.exp(rho);
-
-  // 2. Inverse stereographic
-  const y = (R * R - 1) / (R * R + 1);
-
-  // 3. Euclidean radius
-  const r_xz = Math.sqrt(1 - y * y);
-
+  const z = { re: R * Math.cos(theta), im: R * Math.sin(theta) };
   const v = vectorPool.acquire();
-  v.set(
-    r_xz * Math.cos(theta),
-    y,
-    r_xz * Math.sin(theta)
-  );
+  invStereo(z, v);
   return v;
 };
 
@@ -177,18 +166,9 @@ export const logPolarToVector = (rho, theta) => {
  * @returns {{rho: number, theta: number}} Log-Polar coordinates.
  */
 export const vectorToLogPolar = (v) => {
-  // 1. Stereographic projection
-  const denom = 1 - v.y;
-  if (Math.abs(denom) < 0.00001) {
-    return { rho: 10, theta: 0 }; // Singular
-  }
-
-  // 2. Log radius
-  const rho = 0.5 * Math.log((1 + v.y) / (1 - v.y));
-
-  // 3. Angle
-  const theta = Math.atan2(v.z, v.x);
-
+  const z = stereo(v);
+  const rho = 0.5 * Math.log(z.re * z.re + z.im * z.im);
+  const theta = Math.atan2(z.im, z.re);
   return { rho, theta };
 };
 

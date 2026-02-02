@@ -25,16 +25,16 @@ export function invStereo(z, target) {
   const t = target || new THREE.Vector3();
   return t.set(
     2 * z.re / (r2 + 1),
-    2 * z.im / (r2 + 1),
-    (r2 - 1) / (r2 + 1)
+    (r2 - 1) / (r2 + 1),
+    2 * z.im / (r2 + 1)
   );
 }
 
 // Stereographic Projection: Sphere -> Complex Plane
 export function stereo(v) {
-  const denom = 1 - v.z;
-  if (Math.abs(denom) < 0.0001) return { re: 100, im: 100 }; // Infinity
-  return { re: v.x / denom, im: v.y / denom };
+  const denom = 1 - v.y;
+  if (Math.abs(denom) < Number.EPSILON) return { re: 100, im: 100 }; // Infinity
+  return { re: v.x / denom, im: v.z / denom };
 }
 
 // Mobius Transformation: f(z) = (az + b) / (cz + d)

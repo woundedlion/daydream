@@ -333,9 +333,10 @@ export class ParticleSystem extends Animation {
    * @param {THREE.Vector3} position - Location.
    * @param {number} strength - Attraction strength.
    * @param {number} killRadius - Radius to kill particles.
+   * @param {number} eventHorizon - Radius where particles get sucked in.
    */
-  addAttractor(position, strength, killRadius) {
-    this.attractors.push({ position, strength, killRadius });
+  addAttractor(position, strength, killRadius, eventHorizon) {
+    this.attractors.push({ position, strength, killRadius, eventHorizon });
   }
 
   /**
@@ -407,8 +408,10 @@ export class ParticleSystem extends Animation {
       // Adaptive sub-stepping
       const speed = p.velocity.length();
       const pos_y = p.orientedPosition.y;
+
       const latitudeScale = Math.sqrt(Math.max(0, 1.0 - pos_y * pos_y));
       const adjustedMaxDelta = maxDelta * Math.max(0.001, latitudeScale);
+
       const substeps = Math.max(1, Math.min(256, Math.ceil(speed / adjustedMaxDelta)));
       const dt = 1.0 / substeps;
 
@@ -420,26 +423,37 @@ export class ParticleSystem extends Animation {
         // Attractors
         for (const attr of this.attractors) {
           const distSq = pos.distanceToSquared(attr.position);
+
           if (distSq < attr.killRadius * attr.killRadius) {
             active = false;
             break;
           }
-          if (distSq > 0.000001) {
-            const dist = Math.sqrt(distSq);
-            const coreRadius = 0.2;
-            let forceMag = (dist < coreRadius)
-              ? (G * attr.strength * dist) / (coreRadius * coreRadius * coreRadius)
-              : (G * attr.strength) / distSq;
-            forceMag *= dt;
-            torque.crossVectors(pos, attr.position).normalize().multiplyScalar(forceMag);
-            p.velocity.add(torque.cross(pos));
+
+          if (distSq > 0.0000001) {
+            const eventHorizonSq = attr.eventHorizon * attr.eventHorizon;
+
+            if (distSq < eventHorizonSq) {
+              // Steer directly into the center at the current speed
+              torque.subVectors(attr.position, pos).normalize();
+              const currentSpeed = p.velocity.length();
+              p.velocity.copy(torque).multiplyScalar(currentSpeed);
+
+            } else {
+              // Apply gravity
+              const dist = Math.sqrt(distSq);
+              const forceMag = (G * attr.strength) / distSq;
+              torque.crossVectors(pos, attr.position).normalize().multiplyScalar(forceMag * dt);
+              p.velocity.add(torque.cross(pos));
+            }
           }
         }
 
         if (!active) break;
 
-        // Physics Update
+        // Drag
         p.velocity.multiplyScalar(Math.pow(this.friction, dt));
+
+        // Move
         const subSpeed = p.velocity.length();
         if (subSpeed > 0.000001) {
           axis.crossVectors(pos, p.velocity).normalize();
@@ -454,27 +468,21 @@ export class ParticleSystem extends Animation {
 
     // 3. History Management
     if (active) {
-      // Record new state
       p.history.record(p.orientation);
     } else {
-      // Expire old state (trail dissipation)
       if (p.history.length() > 0) {
         p.history.expire();
       }
     }
 
-    // 4. Reset frame orientation accumulator
     p.orientation.collapse();
 
-    // 5. Removal Check
-    // Remove only if inactive AND history is fully expired
     if (!active && p.history.length() === 0) {
       return true;
     }
 
     return false;
   }
-
 
 }
 

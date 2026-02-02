@@ -5,7 +5,7 @@ import { Daydream } from "../driver.js";
 import { Timeline, Rotation, Orientation } from "../animation.js";
 import { vectorPool } from "../memory.js";
 import { Plot } from "../plot.js";
-import { stereo, TWO_PI } from "../3dmath.js";
+import { TWO_PI } from "../3dmath.js";
 import { createRenderPipeline, FilterAntiAlias, FilterWorldTrails, FilterOrient } from "../filters.js";
 import { richSunset } from "../color.js";
 import { easeMid } from "../easing.js";
