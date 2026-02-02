@@ -371,26 +371,6 @@ export class FilterMobius {
     this.params = new MobiusParams();
   }
 
-  get aRe() { return this.params.aRe; }
-  set aRe(v) { this.params.aRe = v; }
-  get aIm() { return this.params.aIm; }
-  set aIm(v) { this.params.aIm = v; }
-
-  get bRe() { return this.params.bRe; }
-  set bRe(v) { this.params.bRe = v; }
-  get bIm() { return this.params.bIm; }
-  set bIm(v) { this.params.bIm = v; }
-
-  get cRe() { return this.params.cRe; }
-  set cRe(v) { this.params.cRe = v; }
-  get cIm() { return this.params.cIm; }
-  set cIm(v) { this.params.cIm = v; }
-
-  get dRe() { return this.params.dRe; }
-  set dRe(v) { this.params.dRe = v; }
-  get dIm() { return this.params.dIm; }
-  set dIm(v) { this.params.dIm = v; }
-
   plot(v, color, age, alpha, tag, pass) {
     const v_out = mobiusTransform(v, this.params);
     pass(v_out, color, age, alpha, tag);

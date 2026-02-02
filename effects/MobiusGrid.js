@@ -27,7 +27,7 @@ import {
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import {
-    createRenderPipeline, FilterAntiAlias, FilterOrient, FilterHole, FilterMobius
+    createRenderPipeline, FilterAntiAlias, FilterOrient, FilterHole
 } from "../filters.js";
 import { wrap } from "../util.js";
 
