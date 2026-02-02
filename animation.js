@@ -421,7 +421,6 @@ export class ParticleSystem extends Animation {
         for (const attr of this.attractors) {
           const distSq = pos.distanceToSquared(attr.position);
           if (distSq < attr.killRadius * attr.killRadius) {
-            p.life = 0;
             active = false;
             break;
           }

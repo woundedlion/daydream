@@ -14,30 +14,15 @@ import {
     richSunset, rainbow, lavenderLake, GenerativePalette
 } from "../color.js";
 import {
-    Timeline, ParticleSystem, Sprite, PARTICLE_BASE, Orientation
+    Timeline, ParticleSystem, Sprite, RandomWalk, MobiusWarp, Orientation
 } from "../animation.js";
 import { createRenderPipeline, FilterOrient, FilterAntiAlias } from "../filters.js";
 import { Plot } from "../plot.js";
 import { MobiusParams } from "../3dmath.js";
-import { RandomWalk, MobiusWarp, tween } from "../animation.js";
 import { Solids } from "../solids.js";
 
 export class TestParticles {
     constructor() {
-        this.orientation = new Orientation();
-        this.mobius = new MobiusParams();
-        this.pipeline = createRenderPipeline(new FilterOrient(this.orientation), new FilterAntiAlias());
-
-        this.timeline = new Timeline();
-        this.particleSystem = new ParticleSystem(this.friction, 0.001, 25);
-        this.particleSystem.resolutionScale = 2;
-        this.timeline.add(0, this.particleSystem);
-        this.timeline.add(0, new Sprite((opacity) => this.drawParticles(opacity), -1));
-        this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
-
-        this.enableWarp = false;
-        if (this.enableWarp) this.startWarp(); // Default false
-
         this.friction = 0.85;
         this.wellStrength = 1.0;
         this.initialSpeed = 0.025;
@@ -45,7 +30,21 @@ export class TestParticles {
         this.maxSpeed = 0;
         this.batchSize = Daydream.W;
         this.warpScale = 0.6;
+        this.trailLength = 25;
 
+        this.orientation = new Orientation();
+        this.mobius = new MobiusParams();
+        this.pipeline = createRenderPipeline(new FilterOrient(this.orientation), new FilterAntiAlias());
+
+        this.timeline = new Timeline();
+        this.particleSystem = new ParticleSystem(this.friction, 0.001, this.trailLength);
+        this.particleSystem.resolutionScale = 2;
+        this.timeline.add(0, this.particleSystem);
+        this.timeline.add(0, new Sprite((opacity) => this.drawParticles(opacity), -1));
+        this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
+
+        this.enableWarp = false;
+        if (this.enableWarp) this.startWarp(); // Default false
         this.rebuild();
         this.setupGUI();
     }
@@ -56,6 +55,7 @@ export class TestParticles {
         this.gui.add(this.particleSystem, 'gravityScale').min(0.0001).max(0.01).step(0.0001).name("Gravity Scale");
         this.gui.add(this, 'initialSpeed').min(0.001).max(0.2).step(0.001).name("Initial Speed");
         this.gui.add(this, 'angularSpeed').min(0.001).max(1).step(0.001).name("Angular Speed");
+        this.gui.add(this, 'trailLength').min(0).max(100).step(1).name("Trail Length");
         this.gui.add(this.particleSystem, 'timeScale').min(0.0).max(10.0).step(1).name("Time Scale");
         this.gui.add(this, 'wellStrength').min(0).max(10).step(0.1).name("Attractor Strength").onChange((v) => {
             for (const a of this.particleSystem.attractors) {
@@ -85,9 +85,9 @@ export class TestParticles {
 
     rebuild() {
         this.spawnIndex = 0;
-        this.particleSystem.reset(this.friction, 0.001, 25);
+        this.particleSystem.reset(this.friction, 0.001, this.trailLength);
 
-        const killRadius = 0.05;
+        const killRadius = 0.004;
 
         let emitters = Solids.cube();
         this.emitCounters = [];
@@ -114,7 +114,9 @@ export class TestParticles {
 
     evaluateColor(particle, t) {
         const c = particle.palette.get(t);
-        c.alpha *= (1.0 - t);
+        let age = t * this.particleSystem.trailLength;
+        let particleAlpha = (Math.max(0, particle.life) + age) / particle.maxLife;
+        c.alpha *= (1.0 - t) * particleAlpha;
         return c;
     }
 
@@ -122,7 +124,7 @@ export class TestParticles {
         const trails = Plot.ParticleSystem.sample(this.particleSystem);
         for (const { points, particle } of trails) {
             for (let i = 0; i < points.length; i++) {
-                points[i] = mobiusTransform(points[i], this.mobius);
+                points[i] = this.orientation.orient(mobiusTransform(points[i], this.mobius));
             }
             Plot.rasterize(this.pipeline, points, (pos, t) => {
                 const c = this.evaluateColor(particle, t);
