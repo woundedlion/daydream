@@ -14,7 +14,7 @@ import {
     richSunset, rainbow, lavenderLake, GenerativePalette
 } from "../color.js";
 import {
-    Timeline, ParticleSystem, Sprite, RandomWalk, MobiusWarp, Orientation
+    Timeline, ParticleSystem, Sprite, RandomWalk, MobiusWarp, Orientation, RandomTimer
 } from "../animation.js";
 import { createRenderPipeline, FilterOrient, FilterAntiAlias, quinticKernel } from "../filters.js";
 import { Plot } from "../plot.js";
@@ -43,8 +43,8 @@ export class TestParticles {
         this.timeline.add(0, new Sprite((opacity) => this.drawParticles(opacity), -1));
         this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
 
-        this.enableWarp = false;
-        if (this.enableWarp) this.startWarp(); // Default false
+        this.enableWarp = true;
+        if (this.enableWarp) this.startWarp();
         this.rebuild();
         this.setupGUI();
     }
@@ -73,13 +73,24 @@ export class TestParticles {
     }
 
     startWarp() {
-        if (this.warpAnim) this.warpAnim.cancel();
-        this.warpAnim = new MobiusWarp(this.mobius, 160, this.warpScale, true);
+        this.stopWarp();
+        this.scheduleWarp();
+    }
+
+    scheduleWarp() {
+        this.warpTimer = new RandomTimer(180, 300, () => this.performWarp());
+        this.timeline.add(0, this.warpTimer);
+    }
+
+    performWarp() {
+        this.warpAnim = new MobiusWarp(this.mobius, 160, this.warpScale, false);
+        this.warpAnim.then(() => this.scheduleWarp());
         this.timeline.add(0, this.warpAnim);
     }
 
     stopWarp() {
         if (this.warpAnim) this.warpAnim.cancel();
+        if (this.warpTimer) this.warpTimer.cancel();
         this.mobius.reset();
     }
 

@@ -8,7 +8,7 @@ import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { MobiusParams, TWO_PI } from "../3dmath.js";
 import {
-    Timeline, Rotation, PeriodicTimer, ColorWipe, MobiusWarp, Mutation, Orientation
+    Timeline, Rotation, PeriodicTimer, ColorWipe, MobiusWarpCircular, Mutation, Orientation
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import {
@@ -38,7 +38,7 @@ export class MobiusGrid {
         );
         this.params = new MobiusParams(1, 0, 0, 0, 0, 0, 1, 0);
 
-        this.warpAnim = new MobiusWarp(this.params, 160, 1.0, true);
+        this.warpAnim = new MobiusWarpCircular(this.params, 160, 1.0, true);
         this.timeline.add(0, this.warpAnim);
         this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, TWO_PI, 400, easeMid, true));
         this.timeline.add(0, new PeriodicTimer(120, () => this.wipePalette(), true));
