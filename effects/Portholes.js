@@ -64,7 +64,7 @@ export class Portholes {
 
     startWarp() {
         if (this.warpAnim) this.warpAnim.cancel();
-        this.warpAnim = new MobiusWarp(this.mobiusParams, 160, true);
+        this.warpAnim = new MobiusWarp(this.mobiusParams, 160, 1.0, true);
         this.timeline.add(0, this.warpAnim);
     }
 
