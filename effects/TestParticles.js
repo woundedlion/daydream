@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    MeshOps, mobiusTransform, angleBetween
+    MeshOps, mobiusTransform, angleBetween, makeBasis, G
 } from "../geometry.js";
 import { vectorPool, color4Pool } from "../memory.js";
 import {
@@ -30,7 +30,9 @@ export class TestParticles {
         this.maxSpeed = 0;
         this.batchSize = Daydream.W;
         this.warpScale = 0.6;
+        this.warpScale = 0.6;
         this.trailLength = 25;
+        this.solidName = 'cube';
 
         this.orientation = new Orientation();
         this.mobius = new MobiusParams();
@@ -38,7 +40,7 @@ export class TestParticles {
 
         this.timeline = new Timeline();
         this.timeline = new Timeline();
-        this.particleSystem = new ParticleSystem(2000, this.friction, 0.001, this.trailLength);
+        this.particleSystem = new ParticleSystem(2048, this.friction, 0.001, this.trailLength);
         this.particleSystem.resolutionScale = 2;
         this.holeAlphasBuffer = [];
         this.timeline.add(0, this.particleSystem);
@@ -65,6 +67,7 @@ export class TestParticles {
             }
         });
         this.gui.add(this, 'maxSpeed').name("Max Speed").listen();
+        this.gui.add(this, 'solidName', Object.keys(Solids)).name("Solid").onChange(() => this.rebuild());
         this.gui.add(this, 'rebuild').name("Respawn");
         this.gui.add(this, 'enableWarp').name('Enable Warp').onChange(v => {
             if (v) this.startWarp(); else this.stopWarp();
@@ -103,7 +106,8 @@ export class TestParticles {
         const killRadius = 0.003;
         const eventHorizon = 0.2;
 
-        let emitters = Solids.cube();
+
+        let emitters = Solids[this.solidName]();
         this.emitCounters = [];
         for (let i = 0; i < emitters.vertices.length; i++) {
             this.emitCounters.push(0);
@@ -114,12 +118,32 @@ export class TestParticles {
             this.particleSystem.addAttractor(v, this.wellStrength, killRadius, eventHorizon);
         }
 
+        const identityQ = new THREE.Quaternion(); // Static orientation for emitters
+
+        this.emitterHues = [];
+        for (let i = 0; i < emitters.vertices.length; i++) {
+            this.emitterHues.push(Math.random());
+        }
+
         for (let i = 0; i < emitters.vertices.length; i++) {
             this.particleSystem.addEmitter((system) => {
                 const axis = emitters.vertices[i];
                 const angle = this.emitCounters[i]++ * this.angularSpeed;
-                const vel = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)).multiplyScalar(this.initialSpeed);
-                const palette = new GenerativePalette('straight', 'complementary', 'descending', 'mid');
+
+                // Get tangent basis [u, v, w] where v is normal (axis)
+                // u and w are tangent vectors
+                const { u, w } = makeBasis(identityQ, axis);
+
+                // Construct swirling velocity in tangent plane
+                const vel = vectorPool.acquire();
+                vel.copy(u).multiplyScalar(Math.cos(angle))
+                    .addScaledVector(w, Math.sin(angle))
+                    .multiplyScalar(this.initialSpeed);
+
+                const currentHue = this.emitterHues[i];
+                this.emitterHues[i] = (this.emitterHues[i] + G * 0.1) % 1; // Slower increment per emitter
+
+                const palette = new GenerativePalette('straight', 'complementary', 'descending', 'mid', currentHue);
                 const life = 160;
                 system.spawn(axis, vel, palette, life);
             });

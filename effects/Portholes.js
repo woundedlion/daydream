@@ -31,7 +31,8 @@ export class Portholes {
         for (let i = 0; i < numSlices; i++) {
             this.orientations.push(new Orientation());
         }
-        this.baseMesh = Solids.snubCube();
+        this.solidName = 'snubCube';
+        this.baseMesh = Solids[this.solidName]();
         this.hemisphereAxis = new THREE.Vector3(0, 1, 0);
         this.timeline = new Timeline();
 
@@ -74,6 +75,9 @@ export class Portholes {
         this.gui.add(this, 'offsetRadius', 0.0, 0.2).name('Offset Radius').listen();
         this.gui.add(this, 'offsetSpeed', 0.0, 5.0).name('Offset Speed').listen();
         this.gui.add(this, 'numCopies', 1, 10, 1).name('Num Copies').listen();
+        this.gui.add(this, 'solidName', Object.keys(Solids)).name("Solid").onChange((v) => {
+            this.baseMesh = Solids[v]();
+        });
         this.gui.add(this, 'enableWarp').name('Enable Warp').onChange(v => {
             if (v) this.startWarp(); else this.stopWarp();
         });
