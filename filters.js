@@ -305,6 +305,7 @@ export class FilterHole {
    * @param {number} radius - The radius (in radians) at which fading starts.
    */
   constructor(origin, radius) {
+    this.is2D = false;
     this.origin = origin.clone().normalize();
     this.radius = radius;
   }
