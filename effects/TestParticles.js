@@ -87,7 +87,8 @@ export class TestParticles {
         this.spawnIndex = 0;
         this.particleSystem.reset(this.friction, 0.001, this.trailLength);
 
-        const killRadius = 0.004;
+        const killRadius = 0.003;
+        const eventHorizon = 0.2;
 
         let emitters = Solids.cube();
         this.emitCounters = [];
@@ -97,7 +98,7 @@ export class TestParticles {
         let attractors = MeshOps.dual(emitters);
 
         for (const v of attractors.vertices) {
-            this.particleSystem.addAttractor(v, this.wellStrength, killRadius);
+            this.particleSystem.addAttractor(v, this.wellStrength, killRadius, eventHorizon);
         }
 
         for (let i = 0; i < emitters.vertices.length; i++) {
