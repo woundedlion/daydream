@@ -934,20 +934,48 @@ export class MobiusWarp extends Animation {
    * @param {number} scale - Magnitude of distortion.
    * @param {boolean} [repeat=true] - Whether to repeat.
    */
-  constructor(params, duration, scale = 1.0, repeat = true) {
+  constructor(params, duration, scale = 1.0, repeat = true, easingFn = easeInOutSin) {
     super(duration, repeat);
     this.params = params;
     this.scale = scale;
+    this.easingFn = easingFn;
   }
 
   step() {
     super.step();
-    const progress = this.t / this.duration;
+    const progress = this.easingFn(this.t / this.duration);
     const angle = progress * TWO_PI;
-    this.params.bRe = this.scale * Math.cos(angle);
+    this.params.bRe = this.scale * (Math.cos(angle) - 1);
     this.params.bIm = this.scale * Math.sin(angle);
   }
 }
+
+/**
+ * Animates the Mobius parameters for a warping effect pulling the poles together in a circular motion.
+ */
+export class MobiusWarpCircular extends Animation {
+  /**
+   * @param {Object} params - The Mobius parameters.
+   * @param {number} duration - Animation duration.
+   * @param {number} scale - Magnitude of distortion.
+   * @param {boolean} [repeat=true] - Whether to repeat.
+   */
+  constructor(params, duration, scale = 1.0, repeat = true, easingFn = easeInOutSin) {
+    super(duration, repeat);
+    this.params = params;
+    this.scale = scale;
+    this.easingFn = easingFn;
+  }
+
+  step() {
+    super.step();
+    const progress = this.easingFn(this.t / this.duration);
+    const angle = progress * TWO_PI;
+    this.params.bRe = this.scale * (Math.cos(angle));
+    this.params.bIm = this.scale * Math.sin(angle);
+  }
+}
+
 
 export class OrientationTrail {
   /**
