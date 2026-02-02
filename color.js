@@ -229,17 +229,32 @@ export class GenerativePalette {
    * @param {('analagous'|'triadic'|'split-complementary'|'complementary')} [harmonyType='analagous'] - The color harmony rule.
    * @param {('ascending'|'descending'|'flat'|'bell'|'cup')} [brightnessProfile='ascending'] - The distribution of value/brightness.
    * @param {('pastel'|'mid'|'vibrant')} [saturationProfile='mid'] - The distribution of saturation.
+   * @param {number} [baseHue] - Optional base hue [0, 1]. If provided, static seed is ignored.
    */
-  constructor(shape = 'straight', harmonyType = 'analagous', brightnessProfile = 'ascending', saturationProfile = 'mid') {
+  constructor(shape = 'straight', harmonyType = 'analagous', brightnessProfile = 'ascending', saturationProfile = 'mid', baseHue = undefined) {
     this.shapeSpec = shape;
     this.harmonyType = harmonyType;
+    this.brightnessProfile = brightnessProfile;
+    this.saturationProfile = saturationProfile;
+    this.init(baseHue);
+  }
 
-    let hueA = GenerativePalette.seed;
-    GenerativePalette.seed = (GenerativePalette.seed + G) % 1;
-    const [hA, hB, hC] = GenerativePalette.calcHues(hueA, harmonyType);
+  /**
+   * Regenerates the palette colors based on the stored configuration.
+   * @param {number} [baseHue] - Optional base hue override.
+   */
+  init(baseHue) {
+    let hueA;
+    if (baseHue !== undefined) {
+      hueA = baseHue;
+    } else {
+      hueA = GenerativePalette.seed;
+      GenerativePalette.seed = (GenerativePalette.seed + G) % 1;
+    }
+    const [hA, hB, hC] = GenerativePalette.calcHues(hueA, this.harmonyType);
 
     let sat1, sat2, sat3;
-    switch (saturationProfile) {
+    switch (this.saturationProfile) {
       case 'pastel':
         sat1 = 0.4;
         sat2 = 0.4;
@@ -258,7 +273,7 @@ export class GenerativePalette {
     }
 
     let v1, v2, v3;
-    switch (brightnessProfile) {
+    switch (this.brightnessProfile) {
       case 'ascending':
         v1 = randomBetween(0.1, 0.3);
         v2 = randomBetween(0.5, 0.7);
