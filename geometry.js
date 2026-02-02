@@ -114,6 +114,8 @@ export const pixelToSpherical = (x, y) => {
   );
 };
 
+const _tempPixel = { x: 0, y: 0 };
+
 /**
  * Converts a 3D vector (normalized) to 2D pixel coordinates.
  * @param {THREE.Vector3} v - The vector (position on unit sphere).
@@ -121,10 +123,9 @@ export const pixelToSpherical = (x, y) => {
  */
 export const vectorToPixel = (v) => {
   _tempSpherical.setFromVector3(v);
-  return {
-    x: wrap((_tempSpherical.theta * Daydream.W) / TWO_PI, Daydream.W),
-    y: (_tempSpherical.phi * (Daydream.H - 1)) / Math.PI,
-  };
+  _tempPixel.x = wrap((_tempSpherical.theta * Daydream.W) / TWO_PI, Daydream.W);
+  _tempPixel.y = (_tempSpherical.phi * (Daydream.H - 1)) / Math.PI;
+  return _tempPixel;
 };
 
 /**

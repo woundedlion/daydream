@@ -682,25 +682,45 @@ export const Plot = {
     },
 
     ParticleSystem: class {
-        static sample(system) {
-            const trails = [];
-            for (const p of system.particles) {
+        /**
+         * Iterates over particle trails without allocating intermediate arrays.
+         * @param {ParticleSystem} system - The particle system.
+         * @param {Function} callback - Callback (points: Vector3[], particle: Particle) => void.
+         *                              Note: 'points' is a valid reference ONLY during the callback.
+         */
+        static forEachTrail(system, callback) {
+            const buffer = Plot.ParticleSystem._sampleBuffer || (Plot.ParticleSystem._sampleBuffer = []);
+            const particles = system.particles;
+            const count = system.activeCount !== undefined ? system.activeCount : particles.length;
+
+            for (let i = 0; i < count; i++) {
+                const p = particles[i];
                 if (p.history.length() < 2) continue;
-                const trail = [];
+
+                buffer.length = 0;
                 deepTween(p.history, (q, t) => {
                     let v = vectorPool.acquire().copy(p.position).applyQuaternion(q);
-                    trail.push(v);
+                    buffer.push(v);
                 });
-                trails.push({ points: trail, particle: p });
+
+                callback(buffer, p);
             }
+        }
+
+        // Deprecated: helper for legacy code, inefficient
+        static sample(system) {
+            console.warn("Plot.ParticleSystem.sample is deprecated. Use forEachTrail.");
+            const trails = [];
+            Plot.ParticleSystem.forEachTrail(system, (points, particle) => {
+                trails.push({ points: [...points], particle }); // Copy points to preserve them
+            });
             return trails;
         }
 
         static draw(pipeline, particleSystem, colorFn) {
-            const trails = Plot.ParticleSystem.sample(particleSystem);
-            for (const { points, particle } of trails) {
+            Plot.ParticleSystem.forEachTrail(particleSystem, (points, particle) => {
                 Plot.rasterize(pipeline, points, (v, t) => colorFn(v, t, particle), false, 0);
-            }
+            });
         }
     },
 

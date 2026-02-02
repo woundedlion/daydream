@@ -22,6 +22,7 @@ import { StaticCircularBuffer } from "./StaticCircularBuffer.js";
 export class Orientation {
   constructor() {
     this.orientations = [new THREE.Quaternion(0, 0, 0, 1)];
+    this.count = 1;
   }
 
   /**
@@ -29,7 +30,7 @@ export class Orientation {
    * @returns {number} The length of the orientation history.
    */
   length() {
-    return this.orientations.length;
+    return this.count;
   }
 
   /**
@@ -70,31 +71,39 @@ export class Orientation {
    * @param {number} count - The target number of steps in the history.
    * Does nothing if count is less than current length.
    */
+  /**
+   * Increases the resolution of the history to 'count' steps, preserving shape via Slerp.
+   * @param {number} count - The target number of steps in the history.
+   * Does nothing if count is less than current length.
+   */
   upsample(count) {
-    if (this.orientations.length >= count) return;
+    if (this.count >= count) return;
 
-    const oldHistory = this.orientations;
-    const newHistory = new Array(count);
+    this.ensureCapacity(count);
 
-    // Preserves endpoints
-    newHistory[0] = oldHistory[0];
-    newHistory[count - 1] = oldHistory[oldHistory.length - 1];
+    const oldLen = this.count;
 
-    for (let i = 1; i < count - 1; i++) {
+    // Use backwards iteration to perform in-place expansion
+    for (let i = count - 1; i >= 0; i--) {
       // Normalized position
       const t = i / (count - 1);
 
       // Float index
-      const oldVal = t * (oldHistory.length - 1);
+      const oldVal = t * (oldLen - 1);
       const idxA = Math.floor(oldVal);
       const idxB = Math.ceil(oldVal);
       const alpha = oldVal - idxA;
 
-      // Slerp
-      newHistory[i] = quaternionPool.acquire().copy(oldHistory[idxA]).slerp(oldHistory[idxB], alpha);
+      // in-place slerp:
+      const qA = this.orientations[idxA];
+      const qB = this.orientations[idxB];
+      const target = this.orientations[i];
+      const safeQB = (target === qB) ? quaternionPool.acquire().copy(qB) : qB;
+
+      target.copy(qA).slerp(safeQB, alpha);
     }
 
-    this.orientations = newHistory;
+    this.count = count;
   }
 
   /**
@@ -102,6 +111,7 @@ export class Orientation {
    */
   clear() {
     this.orientations = [];
+    this.count = 0;
   }
 
   /**
@@ -120,7 +130,23 @@ export class Orientation {
    */
   set(quaternion) {
     this.orientations = [quaternion];
+    this.count = 1;
     return this;
+  }
+
+  ensureCapacity(n) {
+    while (this.orientations.length < n) {
+      this.orientations.push(new THREE.Quaternion());
+    }
+  }
+
+  copyFrom(source) {
+    const len = source.length();
+    this.ensureCapacity(len);
+    for (let i = 0; i < len; i++) {
+      this.orientations[i].copy(source.get(i));
+    }
+    this.count = len;
   }
 
   /**
@@ -128,17 +154,31 @@ export class Orientation {
    * @param {THREE.Quaternion} quaternion - The quaternion to push.
    */
   push(quaternion) {
-    this.orientations.push(quaternion);
+    this.orientations[this.count] = quaternion;
+    this.count++;
+  }
+
+  /**
+   * Appends a quaternion by copying it into the next available slot.
+   * Allocates new storage only if necessary.
+   * @param {THREE.Quaternion} q - The quaternion to copy.
+   */
+  append(q) {
+    if (this.count >= this.orientations.length) {
+      this.orientations.push(new THREE.Quaternion());
+    }
+    this.orientations[this.count].copy(q);
+    this.count++;
   }
 
   /**
    * Collapses the history to just the most recent orientation.
    */
   collapse() {
-    if (this.orientations.length > 1) {
+    if (this.count > 1) {
       // Copy last to first
-      this.orientations[0].copy(this.orientations[this.orientations.length - 1]);
-      this.orientations.length = 1;
+      this.orientations[0].copy(this.orientations[this.count - 1]);
+      this.count = 1;
     }
   }
 }
@@ -279,16 +319,32 @@ export class ParticleSystem extends Animation {
      * @param {THREE.Color|Object} color - Color or Palette object.
      * @param {number} life - Frames to live.
      */
-    constructor(position, velocity, palette, life, trailLength = 20) {
-      this.position = position.clone();
-      this.velocity = velocity.clone();
-      this.palette = palette;
-      this.life = life;
-      this.maxLife = life;
+    constructor(trailLength = 20) {
+      this.position = new THREE.Vector3();
+      this.velocity = new THREE.Vector3();
+      this.palette = null;
+      this.life = 0;
+      this.maxLife = 0;
       this.tag = { trailData: this };
       this.orientation = new Orientation();
       this.history = new OrientationTrail(trailLength);
       this.trailLength = trailLength;
+    }
+
+    /**
+     * Re-initializes the particle state.
+     */
+    init(position, velocity, palette, life) {
+      this.position.copy(position);
+      this.velocity.copy(velocity);
+      this.palette = palette;
+      this.life = life;
+      this.maxLife = life;
+      // Reuse existing array and quaternion to avoid allocation
+      this.orientation.count = 1;
+      this.orientation.orientations[0].set(0, 0, 0, 1);
+      this.history.head = 0;
+      this.history.count = 0;
     }
 
     get orientedPosition() {
@@ -296,11 +352,17 @@ export class ParticleSystem extends Animation {
     }
   }
 
-  constructor(friction = 0.95, gravityScale = 0.001, trailLength = 20) {
+  constructor(capacity = 1000, friction = 0.95, gravityScale = 0.001, trailLength = 20) {
     super(-1, false);
+    this.capacity = capacity;
     this.reset(friction, gravityScale, trailLength);
     this.interactionRadius = 0.2;
     this.resolutionScale = 1.0;
+  }
+
+  // Getter for backwards compatibility (returns full pool, including inactive)
+  get particles() {
+    return this.pool;
   }
 
   /**
@@ -310,14 +372,22 @@ export class ParticleSystem extends Animation {
    * @param {number} [trailLength] - Trail History Length.
    */
   reset(friction, gravityScale, trailLength) {
-    this.particles = [];
+    this.activeCount = 0;
     this.attractors = [];
     this.emitters = [];
     this.timeScale = 1.0;
 
     if (friction !== undefined) this.friction = friction;
     if (gravityScale !== undefined) this.gravityScale = gravityScale;
-    if (trailLength !== undefined) this.trailLength = trailLength;
+
+    // Rebuild pool if trailLength changes or pool is empty
+    if (this.pool === undefined || this.pool.length === 0 || (trailLength !== undefined && trailLength !== this.trailLength)) {
+      if (trailLength !== undefined) this.trailLength = trailLength;
+      this.pool = [];
+      for (let i = 0; i < this.capacity; i++) {
+        this.pool.push(new ParticleSystem.Particle(this.trailLength));
+      }
+    }
   }
 
   /**
@@ -347,7 +417,11 @@ export class ParticleSystem extends Animation {
    * @param {number} life - Frames to live.
    */
   spawn(position, velocity, color, life = 600) {
-    this.particles.push(new ParticleSystem.Particle(position, velocity, color, life, this.trailLength));
+    if (this.activeCount < this.capacity) {
+      const p = this.pool[this.activeCount];
+      p.init(position, velocity, color, life);
+      this.activeCount++;
+    }
   }
 
   /**
@@ -360,10 +434,7 @@ export class ParticleSystem extends Animation {
 
       // Run Emitters
       for (const emit of this.emitters) {
-        const p = emit(this);
-        if (p) {
-          this.particles.push(p);
-        }
+        emit(this);
       }
 
       const maxDelta = TWO_PI / Daydream.W / this.resolutionScale;
@@ -378,11 +449,16 @@ export class ParticleSystem extends Animation {
       };
 
       // Attractors (Global Gravity)
-      for (let i = this.particles.length - 1; i >= 0; i--) {
-        const p = this.particles[i];
+      for (let i = 0; i < this.activeCount; i++) {
+        const p = this.pool[i];
         const dead = this.stepParticle(p, maxDelta, G, scratch);
         if (dead) {
-          this.particles.splice(i, 1);
+          // Swap with last active
+          const last = this.pool[this.activeCount - 1];
+          this.pool[i] = last;
+          this.pool[this.activeCount - 1] = p; // Return to pool (swap)
+          this.activeCount--;
+          i--; // Reprocess the swapped-in particle
         }
       }
     }
@@ -405,61 +481,47 @@ export class ParticleSystem extends Animation {
 
     // Physics
     if (active) {
-      // Adaptive sub-stepping
-      const speed = p.velocity.length();
-      const pos_y = p.orientedPosition.y;
-
-      const latitudeScale = Math.sqrt(Math.max(0, 1.0 - pos_y * pos_y));
-      const adjustedMaxDelta = maxDelta * Math.max(0.001, latitudeScale);
-
-      const substeps = Math.max(1, Math.min(256, Math.ceil(speed / adjustedMaxDelta)));
-      const dt = 1.0 / substeps;
-
       const currentQ = quaternionPool.acquire().copy(p.orientation.get());
+      pos.copy(p.position).applyQuaternion(currentQ);
 
-      for (let k = 0; k < substeps; k++) {
-        pos.copy(p.position).applyQuaternion(currentQ);
+      // Attractors
+      for (const attr of this.attractors) {
+        const distSq = pos.distanceToSquared(attr.position);
 
-        // Attractors
-        for (const attr of this.attractors) {
-          const distSq = pos.distanceToSquared(attr.position);
-
-          if (distSq < attr.killRadius * attr.killRadius) {
-            active = false;
-            break;
-          }
-
-          if (distSq > 0.0000001) {
-            const eventHorizonSq = attr.eventHorizon * attr.eventHorizon;
-
-            if (distSq < eventHorizonSq) {
-              // Steer directly into the center at the current speed
-              torque.subVectors(attr.position, pos).normalize();
-              const currentSpeed = p.velocity.length();
-              p.velocity.copy(torque).multiplyScalar(currentSpeed);
-            } else {
-              // Apply gravity
-              const dist = Math.sqrt(distSq);
-              const forceMag = (G * attr.strength) / distSq;
-              torque.crossVectors(pos, attr.position).normalize().multiplyScalar(forceMag * dt);
-              p.velocity.add(torque.cross(pos));
-            }
-          }
+        if (distSq < attr.killRadius * attr.killRadius) {
+          active = false;
+          break;
         }
 
-        if (!active) break;
+        if (distSq > 0.0000001) {
+          const eventHorizonSq = attr.eventHorizon * attr.eventHorizon;
 
+          if (distSq < eventHorizonSq) {
+            // Steer directly into the center at the current speed
+            torque.subVectors(attr.position, pos).normalize();
+            const currentSpeed = p.velocity.length();
+            p.velocity.copy(torque).multiplyScalar(currentSpeed);
+          } else {
+            // Apply gravity
+            const forceMag = (G * attr.strength) / distSq;
+            torque.crossVectors(pos, attr.position).normalize().multiplyScalar(forceMag);
+            p.velocity.add(torque.cross(pos));
+          }
+        }
+      }
+
+      if (active) {
         // Drag
-        p.velocity.multiplyScalar(Math.pow(this.friction, dt));
+        p.velocity.multiplyScalar(this.friction);
 
         // Move
         const subSpeed = p.velocity.length();
         if (subSpeed > 0.000001) {
           axis.crossVectors(pos, p.velocity).normalize();
-          const angle = subSpeed * dt;
+          const angle = subSpeed;
           dQ.setFromAxisAngle(axis, angle);
           currentQ.premultiply(dQ);
-          p.orientation.push(quaternionPool.acquire().copy(currentQ));
+          p.orientation.append(currentQ);
           p.velocity.applyQuaternion(dQ);
         }
       }
@@ -998,20 +1060,7 @@ export class OrientationTrail {
    */
   record(source) {
     const snapshot = this.snapshots[this.head];
-    const srcData = source.orientations;
-    const dstData = snapshot.orientations;
-
-    // 1. Ensure buffer size matches source (grow if needed)
-    while (dstData.length < srcData.length) {
-      dstData.push(new THREE.Quaternion()); // These are persistent within the OrientationTrail snapshots
-    }
-    // 2. Trim if source shrank (optional, but keeps state clean)
-    dstData.length = srcData.length;
-
-    // 3. Deep copy quaternions
-    for (let i = 0; i < srcData.length; i++) {
-      dstData[i].copy(srcData[i]);
-    }
+    snapshot.copyFrom(source);
 
     this.head = (this.head + 1) % this.capacity;
     if (this.count < this.capacity) this.count++;
