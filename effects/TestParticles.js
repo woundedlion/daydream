@@ -113,11 +113,12 @@ export class TestParticles {
         }
     }
 
-    evaluateColor(particle, t) {
-        const c = particle.palette.get(t);
+    particleColor(p, t) {
+        const c = p.palette.get(t);
         let age = t * this.particleSystem.trailLength;
-        let particleAlpha = (Math.max(0, particle.life) + age) / particle.maxLife;
-        c.alpha *= (1.0 - t) * particleAlpha;
+        let particleAgeAlpha = (Math.max(0, p.life) + age) / p.maxLife;
+        let trailAgeAlpha = 1.0 - t;
+        c.alpha *= trailAgeAlpha * particleAgeAlpha;
         return c;
     }
 
@@ -128,7 +129,7 @@ export class TestParticles {
                 points[i] = this.orientation.orient(mobiusTransform(points[i], this.mobius));
             }
             Plot.rasterize(this.pipeline, points, (pos, t) => {
-                const c = this.evaluateColor(particle, t);
+                const c = this.particleColor(particle, t);
                 c.alpha *= opacity;
                 return c;
             }, false, 0);

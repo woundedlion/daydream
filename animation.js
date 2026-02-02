@@ -399,11 +399,11 @@ export class ParticleSystem extends Animation {
   stepParticle(p, maxDelta, G, scratch) {
     const { torque, axis, dQ, pos } = scratch;
 
-    // 1. Age Check
+    // Age
     p.life--;
     let active = p.life > 0;
 
-    // 2. Physics Simulation (Only if active)
+    // Physics
     if (active) {
       // Adaptive sub-stepping
       const speed = p.velocity.length();
@@ -437,7 +437,6 @@ export class ParticleSystem extends Animation {
               torque.subVectors(attr.position, pos).normalize();
               const currentSpeed = p.velocity.length();
               p.velocity.copy(torque).multiplyScalar(currentSpeed);
-
             } else {
               // Apply gravity
               const dist = Math.sqrt(distSq);
