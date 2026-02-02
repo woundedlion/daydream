@@ -121,6 +121,8 @@ export class Daydream {
       Daydream.CAMERA_FAR
     );
 
+    this.pipCamera = this.camera.clone();
+
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.camera.position.set(
       Daydream.CAMERA_X,
@@ -245,12 +247,16 @@ export class Daydream {
     this.mainViewport.width = width;
     this.mainViewport.height = height;
 
-    const pipWidth = Math.floor(width * 0.3);
-    const pipHeight = Math.floor(height * 0.3);
+    // Make the PIP viewport square to reduce empty space ("black bars") 
+    // around the central spherical content.
+    const pipSize = Math.floor(Math.min(width, height) * 0.3);
     this.pipViewport.x = 0;
     this.pipViewport.y = 0;
-    this.pipViewport.width = pipWidth;
-    this.pipViewport.height = pipHeight;
+    this.pipViewport.width = pipSize;
+    this.pipViewport.height = pipSize;
+
+    this.pipCamera.aspect = 1.0;
+    this.pipCamera.updateProjectionMatrix();
 
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
@@ -361,7 +367,9 @@ export class Daydream {
         this.pipViewport.width,
         this.pipViewport.height
       );
-      this.renderer.render(this.scene, this.camera);
+      this.pipCamera.position.copy(this.camera.position);
+      this.pipCamera.quaternion.copy(this.camera.quaternion);
+      this.renderer.render(this.scene, this.pipCamera);
     }
 
     this.renderer.setScissorTest(false);
