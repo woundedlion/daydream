@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { gui } from "../gui.js";
 import { Daydream } from "../driver.js";
-import { ReversePalette, richSunset } from "../color.js";
+import { richSunset } from "../color.js";
 import { randomVector } from "../geometry.js";
 import { quinticKernel } from "../filters.js";
 import { KDTree } from "../spatial.js";
@@ -95,11 +95,7 @@ export class Voronoi {
                     const t = 0.5 + 0.5 * factor;
 
                     // Lerp
-                    // Color.lerp(target, alpha) => this + (target - this) * alpha
-                    const invT = 1.0 - t; // logic in original code was 1.0 - t
-                    // Original: outColor.lerp(secondBestSite.color, 1.0 - t);
-                    // Standard Three.js lerp is this + (target - this) * alpha
-
+                    const invT = 1.0 - t;
                     Daydream.pixels[i3] += (secondBestSite.color.r - Daydream.pixels[i3]) * invT;
                     Daydream.pixels[i3 + 1] += (secondBestSite.color.g - Daydream.pixels[i3 + 1]) * invT;
                     Daydream.pixels[i3 + 2] += (secondBestSite.color.b - Daydream.pixels[i3 + 2]) * invT;

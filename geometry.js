@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { wrap } from "./util.js";
 import { Daydream } from "./driver.js";
-import { Rotation } from "./animation.js";
+import { Rotation, Orientation } from "./animation.js";
 import { easeOutCirc } from "./easing.js";
 import { g1, g2 } from "./color.js";
 import { vectorPool, quaternionPool, dotPool } from "./memory.js";
@@ -215,133 +215,7 @@ export const randomVector = () => {
   return v;
 };
 
-/**
- * Manages the rotation and orientation of a 3D object over time.
- * Stores a history of quaternions for motion trails.
- */
-export class Orientation {
-  constructor() {
-    this.orientations = [new THREE.Quaternion(0, 0, 0, 1)];
-  }
 
-  /**
-   * Gets the number of recorded orientations (history length).
-   * @returns {number} The length of the orientation history.
-   */
-  length() {
-    return this.orientations.length;
-  }
-
-  /**
-   * Applies an orientation from the history to a given vector.
-   * @param {THREE.Vector3} v - The vector to be oriented.
-   * @param {number} [i=this.length() - 1] - The index in the history to use.
-   * @returns {THREE.Vector3} The oriented and normalized vector.
-   */
-  orient(v, i = this.length() - 1) {
-    return vectorPool.acquire().copy(v).normalize().applyQuaternion(this.orientations[i]);
-  }
-
-  /**
-   * Applies the inverse orientation from the history to a given vector.
-   * @param {THREE.Vector3} v - The vector to be unoriented.
-   * @param {number} [i=this.length() - 1] - The index in the history to use.
-   * @returns {THREE.Vector3} The unoriented and normalized vector.
-   */
-  unorient(v, i = this.length() - 1) {
-    const q = quaternionPool.acquire().copy(this.orientations[i]).invert();
-    return vectorPool.acquire().copy(v).normalize().applyQuaternion(q);
-  }
-
-  /**
-   * Applies the orientation to an array of coordinate arrays.
-   * @param {number[][]} vertices - Array of [x, y, z] coordinates.
-   * @param {number} [i=this.length() - 1] - The index in the history to use.
-   * @returns {number[][]} Array of oriented [x, y, z] coordinates.
-   */
-  orientPoly(vertices, i = this.length() - 1) {
-    return vertices.map((c) => {
-      return this.orient(vectorPool.acquire().fromArray(c)).toArray();
-    });
-  }
-
-  /**
-   * Increases the resolution of the history to 'count' steps, preserving shape via Slerp.
-   * @param {number} count - The target number of steps in the history.
-   * Does nothing if count is less than current length.
-   */
-  upsample(count) {
-    if (this.orientations.length >= count) return;
-
-    const oldHistory = this.orientations;
-    const newHistory = new Array(count);
-
-    // Preserves endpoints
-    newHistory[0] = oldHistory[0];
-    newHistory[count - 1] = oldHistory[oldHistory.length - 1];
-
-    for (let i = 1; i < count - 1; i++) {
-      // Normalized position
-      const t = i / (count - 1);
-
-      // Float index
-      const oldVal = t * (oldHistory.length - 1);
-      const idxA = Math.floor(oldVal);
-      const idxB = Math.ceil(oldVal);
-      const alpha = oldVal - idxA;
-
-      // Slerp
-      newHistory[i] = quaternionPool.acquire().copy(oldHistory[idxA]).slerp(oldHistory[idxB], alpha);
-    }
-
-    this.orientations = newHistory;
-  }
-
-  /**
-   * Clears all recorded orientations.
-   */
-  clear() {
-    this.orientations = [];
-  }
-
-  /**
-   * Gets a specific quaternion from the history.
-   * @param {number} [i=this.length() - 1] - The index in the history to get.
-   * @returns {THREE.Quaternion} The requested quaternion.
-   */
-  get(i = this.length() - 1) {
-    return this.orientations[i];
-  }
-
-  /**
-   * Replaces the entire history with a single quaternion.
-   * @param {THREE.Quaternion} quaternion - The new orientation.
-   * @returns {Orientation} The orientation instance.
-   */
-  set(quaternion) {
-    this.orientations = [quaternion];
-    return this;
-  }
-
-  /**
-   * Adds a new quaternion to the end of the history.
-   * @param {THREE.Quaternion} quaternion - The quaternion to push.
-   */
-  push(quaternion) {
-    this.orientations.push(quaternion);
-  }
-
-  /**
-   * Collapses the history to just the most recent orientation.
-   */
-  collapse() {
-    if (this.orientations.length > 1) {
-      // Copy last to first
-      this.orientations[0].copy(this.orientations[this.orientations.length - 1]);
-      this.orientations.length = 1;
-    }
-  }
-}
 
 /**
  * Calculates a point on the Fibonacci spiral on the unit sphere.

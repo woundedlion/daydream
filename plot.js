@@ -9,7 +9,7 @@ import { angleBetween, fibSpiral, makeBasis } from "./geometry.js";
 import { TWO_PI } from "./3dmath.js";
 import { dotPool, vectorPool, quaternionPool } from "./memory.js";
 import { Dot } from "./geometry.js";
-import { Path, ProceduralPath } from "./animation.js";
+import { Path, ProceduralPath, deepTween } from "./animation.js";
 
 
 
@@ -677,6 +677,29 @@ export const Plot = {
                 const alpha = res.alpha !== undefined ? res.alpha : 1.0;
                 const tag = res.tag;
                 pipeline.plot(v, color, age, alpha, tag);
+            }
+        }
+    },
+
+    ParticleSystem: class {
+        static sample(system) {
+            const trails = [];
+            for (const p of system.particles) {
+                if (p.history.length() < 2) continue;
+                const trail = [];
+                deepTween(p.history, (q, t) => {
+                    let v = vectorPool.acquire().copy(p.position).applyQuaternion(q);
+                    trail.push(v);
+                });
+                trails.push({ points: trail, particle: p });
+            }
+            return trails;
+        }
+
+        static draw(pipeline, system, colorFn) {
+            const trails = Plot.ParticleSystem.sample(system);
+            for (const { points, particle } of trails) {
+                Plot.rasterize(pipeline, points, (pos, t) => colorFn(pos, t, particle), false, 0);
             }
         }
     },

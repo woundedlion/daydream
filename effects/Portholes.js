@@ -3,23 +3,18 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, randomVector, mobiusTransform
-} from "../geometry.js";
-import { vectorPool } from "../memory.js";
-import { Solids } from "../solids.js";
-import { TWO_PI, MobiusParams } from "../3dmath.js";
-import { Plot } from "../plot.js";
-
-import {
-    GenerativePalette
-} from "../color.js";
-import {
-    Timeline, Rotation, PeriodicTimer, ColorWipe, MobiusWarp
+    Timeline, Rotation, PeriodicTimer, ColorWipe, MobiusWarp, Orientation
 } from "../animation.js";
 import { easeMid, easeInOutSin } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterOrientSlice
 } from "../filters.js";
+import { GenerativePalette } from "../color.js";
+import { Solids } from "../solids.js";
+import { MobiusParams, TWO_PI } from "../3dmath.js";
+import { vectorPool } from "../memory.js";
+import { mobiusTransform, randomVector } from "../geometry.js";
+import { Plot } from "../plot.js";
 
 export class Portholes {
     constructor() {

@@ -8,28 +8,17 @@ import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { MobiusParams, TWO_PI } from "../3dmath.js";
 import {
-    Orientation, sinWave, mobiusTransform
-} from "../geometry.js";
-import { vectorPool, quaternionPool } from "../memory.js";
-import {
-    Plot
-} from "../plot.js";
-import {
-    makeBasis
-} from "../geometry.js";
-
-import {
-    GenerativePalette
-} from "../color.js";
-import { color4Pool } from "../memory.js";
-import {
-    Timeline, Rotation, PeriodicTimer, ColorWipe, MobiusWarp, Mutation
+    Timeline, Rotation, PeriodicTimer, ColorWipe, MobiusWarp, Mutation, Orientation
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterOrient, FilterHole
 } from "../filters.js";
 import { wrap } from "../util.js";
+import { GenerativePalette } from "../color.js";
+import { Plot } from "../plot.js";
+import { vectorPool, quaternionPool } from "../memory.js";
+import { makeBasis, mobiusTransform, sinWave } from "../geometry.js";
 
 export class MobiusGrid {
     constructor() {

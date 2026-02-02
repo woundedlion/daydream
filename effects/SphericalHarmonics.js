@@ -13,10 +13,10 @@ import { richSunset } from "../color.js";
 import {
     Timeline,
     OrientationTrail,
-    Rotation
+    Rotation,
+    Orientation
 } from "../animation.js";
 import { easeMid, easeInOutSin } from "../easing.js";
-import { Orientation } from "../geometry.js";
 import { quaternionPool, vectorPool } from "../memory.js";
 import { createRenderPipeline } from "../filters.js";
 

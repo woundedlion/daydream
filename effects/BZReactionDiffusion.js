@@ -7,10 +7,10 @@
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
-import { Orientation, vectorToPixel } from "../geometry.js";
 import {
-    Timeline, Rotation, PeriodicTimer, Sprite, tween
+    Timeline, Rotation, PeriodicTimer, Sprite, tween, Orientation
 } from "../animation.js";
+import { vectorToPixel } from "../geometry.js";
 import { easeInOutSin, easeMid } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias

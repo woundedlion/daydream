@@ -7,21 +7,13 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation
-} from "../geometry.js";
-import { vectorPool } from "../memory.js";
-import {
-    VignettePalette, richSunset, mangoPeel, underSea, iceMelt,
-    TransparentVignette
-} from "../color.js";
-import {
-    Timeline, RandomWalk, OrientationTrail // Assuming you added it to animation.js
+    Timeline, RandomWalk, OrientationTrail, Orientation, tween, deepTween
 } from "../animation.js";
 import { Scan } from "../scan.js";
 import { makeBasis } from "../geometry.js";
+import { iceMelt, underSea, mangoPeel, richSunset, TransparentVignette } from "../color.js";
 
 import { createRenderPipeline } from "../filters.js";
-import { tween, deepTween } from "../animation.js";
 import { dotPool } from "../memory.js";
 
 

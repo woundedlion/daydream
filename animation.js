@@ -5,7 +5,7 @@
 
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
-import { angleBetween, Orientation, MeshOps } from "./geometry.js";
+import { angleBetween, MeshOps } from "./geometry.js";
 import { vectorPool, quaternionPool } from "./memory.js";
 import { Solids } from "./solids.js";
 import FastNoiseLite from "./FastNoiseLite.js";
@@ -14,6 +14,134 @@ import { easeOutElastic, easeInOutSin, easeInSin, easeOutSin, easeOutExpo, easeO
 import { StaticCircularBuffer } from "./StaticCircularBuffer.js";
 
 // Easing functions moved to easing.js
+
+/**
+ * Manages the rotation and orientation of a 3D object over time.
+ * Stores a history of quaternions for motion trails.
+ */
+export class Orientation {
+  constructor() {
+    this.orientations = [new THREE.Quaternion(0, 0, 0, 1)];
+  }
+
+  /**
+   * Gets the number of recorded orientations (history length).
+   * @returns {number} The length of the orientation history.
+   */
+  length() {
+    return this.orientations.length;
+  }
+
+  /**
+   * Applies an orientation from the history to a given vector.
+   * @param {THREE.Vector3} v - The vector to be oriented.
+   * @param {number} [i=this.length() - 1] - The index in the history to use.
+   * @returns {THREE.Vector3} The oriented and normalized vector.
+   */
+  orient(v, i = this.length() - 1) {
+    return vectorPool.acquire().copy(v).normalize().applyQuaternion(this.orientations[i]);
+  }
+
+  /**
+   * Applies the inverse orientation from the history to a given vector.
+   * @param {THREE.Vector3} v - The vector to be unoriented.
+   * @param {number} [i=this.length() - 1] - The index in the history to use.
+   * @returns {THREE.Vector3} The unoriented and normalized vector.
+   */
+  unorient(v, i = this.length() - 1) {
+    const q = quaternionPool.acquire().copy(this.orientations[i]).invert();
+    return vectorPool.acquire().copy(v).normalize().applyQuaternion(q);
+  }
+
+  /**
+   * Applies the orientation to an array of coordinate arrays.
+   * @param {number[][]} vertices - Array of [x, y, z] coordinates.
+   * @param {number} [i=this.length() - 1] - The index in the history to use.
+   * @returns {number[][]} Array of oriented [x, y, z] coordinates.
+   */
+  orientPoly(vertices, i = this.length() - 1) {
+    return vertices.map((c) => {
+      return this.orient(vectorPool.acquire().fromArray(c)).toArray();
+    });
+  }
+
+  /**
+   * Increases the resolution of the history to 'count' steps, preserving shape via Slerp.
+   * @param {number} count - The target number of steps in the history.
+   * Does nothing if count is less than current length.
+   */
+  upsample(count) {
+    if (this.orientations.length >= count) return;
+
+    const oldHistory = this.orientations;
+    const newHistory = new Array(count);
+
+    // Preserves endpoints
+    newHistory[0] = oldHistory[0];
+    newHistory[count - 1] = oldHistory[oldHistory.length - 1];
+
+    for (let i = 1; i < count - 1; i++) {
+      // Normalized position
+      const t = i / (count - 1);
+
+      // Float index
+      const oldVal = t * (oldHistory.length - 1);
+      const idxA = Math.floor(oldVal);
+      const idxB = Math.ceil(oldVal);
+      const alpha = oldVal - idxA;
+
+      // Slerp
+      newHistory[i] = quaternionPool.acquire().copy(oldHistory[idxA]).slerp(oldHistory[idxB], alpha);
+    }
+
+    this.orientations = newHistory;
+  }
+
+  /**
+   * Clears all recorded orientations.
+   */
+  clear() {
+    this.orientations = [];
+  }
+
+  /**
+   * Gets a specific quaternion from the history.
+   * @param {number} [i=this.length() - 1] - The index in the history to get.
+   * @returns {THREE.Quaternion} The requested quaternion.
+   */
+  get(i = this.length() - 1) {
+    return this.orientations[i];
+  }
+
+  /**
+   * Replaces the entire history with a single quaternion.
+   * @param {THREE.Quaternion} quaternion - The new orientation.
+   * @returns {Orientation} The orientation instance.
+   */
+  set(quaternion) {
+    this.orientations = [quaternion];
+    return this;
+  }
+
+  /**
+   * Adds a new quaternion to the end of the history.
+   * @param {THREE.Quaternion} quaternion - The quaternion to push.
+   */
+  push(quaternion) {
+    this.orientations.push(quaternion);
+  }
+
+  /**
+   * Collapses the history to just the most recent orientation.
+   */
+  collapse() {
+    if (this.orientations.length > 1) {
+      // Copy last to first
+      this.orientations[0].copy(this.orientations[this.orientations.length - 1]);
+      this.orientations.length = 1;
+    }
+  }
+}
 
 /**
  * Manages animations on a timeline.
@@ -157,8 +285,8 @@ export class ParticleSystem extends Animation {
       this.palette = palette;
       this.life = life;
       this.maxLife = life;
-      this.orientation = new Orientation();
       this.tag = { trailData: this };
+      this.orientation = new Orientation();
       this.history = new OrientationTrail(trailLength);
       this.trailLength = trailLength;
     }
@@ -348,31 +476,7 @@ export class ParticleSystem extends Animation {
     return false;
   }
 
-  draw(pipeline, drawLine, colorFn, transformFn = null) {
-    for (const p of this.particles) {
-      if (p.history.length() < 2) continue;
 
-      let prevPos = null;
-
-      // Draw entire history using deepTween
-      deepTween(p.history, (q, t) => {
-        // q is interpolated orientation, t is normalized history time (0..1)
-        let v = vectorPool.acquire().copy(p.position).applyQuaternion(q);
-
-        if (transformFn) {
-          v = transformFn(v);
-        }
-
-        if (prevPos) {
-          drawLine(pipeline, prevPos, v, (pos, subT) => {
-            const segmentT = 1; // Not used significantly if we use global T
-            return colorFn(pos, t, p); // Pass age (1.0 at tail, 0.0 at head) ?? 
-          }, 0, 1, false, false, 0);
-        }
-        prevPos = v;
-      });
-    }
-  }
 }
 
 /**
@@ -884,15 +988,13 @@ export class OrientationTrail {
   }
 
   /**
-   * Gets a historical orientation. 0 is oldest, length-1 is newest.
+   * Gets a historical orientation. 0 is newest, length-1 is oldest.
    * @param {number} i - Index [0..length-1].
    * @returns {Orientation} The orientation at that index.
    */
-  get(i) {
-    // 0 = Oldest, count-1 = Newest
-    // head points to next empty slot. head-1 is newest.
-    // oldest is head - count.
-    const idx = (this.head - this.count + i + this.capacity) % this.capacity;
+  get(i = 0) {
+    // 0 = Newest, count-1 = Oldest
+    const idx = (this.head - 1 - i + this.capacity) % this.capacity;
     return this.snapshots[idx];
   }
 
@@ -1186,9 +1288,22 @@ export const tween = (orientation, drawFn) => {
 export const deepTween = (trail, drawFn) => {
   const dt = 1.0 / trail.capacity;
   tween(trail, (frame, t) => {
-    tween(frame, (q, subT) => {
+    // Manually iterate frame in reverse (New->Old) to match trail order
+    const s = frame.length();
+    const end = (s > 1) ? 1 : 0;
+    for (let i = s - 1; i >= end; --i) {
+      // subT: i / s goes from ~1 (New) to ~0 (Old)
+      // globalT = t (FrameBase) + offset
+      // Since t is decreasing (New->Old), and we are going New->Old implies subtraction or just mapping
+      // Let's approximate globalT ~ t for now to ensure continuity
+      // Refined: t is roughly the center or start of the frame.
+      // Let's just use t + subT * dt logic but adapted? 
+      // Actually simpler: just pass t or interpolated t.
+      // But subT from original tween was (s-1-i)/s. 
+      // Here i is index.
+      const subT = (i) / s;
       const globalT = t + subT * dt;
-      drawFn(q, globalT);
-    });
+      drawFn(frame.get(i), globalT);
+    }
   });
 }

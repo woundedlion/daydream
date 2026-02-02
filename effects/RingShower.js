@@ -8,21 +8,15 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, randomVector, angleBetween
-} from "../geometry.js";
-import { Plot } from "../plot.js";
-import { makeBasis } from "../geometry.js";
-
-import {
-    GenerativePalette
-} from "../color.js";
-import {
-    Timeline, Sprite, Transition, RandomTimer
+    Timeline, Sprite, Transition, RandomTimer, Orientation
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias
 } from "../filters.js";
+import { GenerativePalette } from "../color.js";
+import { Plot } from "../plot.js";
+import { makeBasis, angleBetween, randomVector } from "../geometry.js";
 
 export class RingShower {
 
