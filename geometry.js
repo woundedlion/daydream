@@ -195,8 +195,6 @@ export const randomVector = () => {
   return v;
 };
 
-
-
 /**
  * Calculates a point on the Fibonacci spiral on the unit sphere.
  * @param {number} n - The total number of points in the spiral.
