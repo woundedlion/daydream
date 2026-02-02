@@ -27,5 +27,4 @@ export { Voronoi } from "./Voronoi.js";
 export { SphericalHarmonics } from "./SphericalHarmonics.js";
 export { SpinShapes } from "./SpinShapes.js";
 export { TestSolids } from "./TestSolids.js";
-export { MobiusGradient } from "./MobiusGradient.js";
 

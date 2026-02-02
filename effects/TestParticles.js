@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, MeshOps
+    Orientation, MeshOps, mobiusTransform
 } from "../geometry.js";
 import { vectorPool, color4Pool } from "../memory.js";
 import {
@@ -16,22 +16,29 @@ import {
 import {
     Timeline, ParticleSystem, Sprite, PARTICLE_BASE
 } from "../animation.js";
-import { createRenderPipeline, FilterWorldTrails, FilterOrient, FilterAntiAlias, FilterMobius } from "../filters.js";
+import { createRenderPipeline, FilterOrient, FilterAntiAlias } from "../filters.js";
 import { Plot } from "../plot.js";
+import { MobiusParams } from "../3dmath.js";
 import { RandomWalk, MobiusWarp, tween } from "../animation.js";
 import { Solids } from "../solids.js";
 
 export class TestParticles {
     constructor() {
         this.orientation = new Orientation();
-        this.mobius = new FilterMobius();
-        this.pipeline = createRenderPipeline(new FilterWorldTrails(25, 500000), this.mobius, new FilterOrient(this.orientation), new FilterAntiAlias());
+        this.mobius = new MobiusParams();
+        this.pipeline = createRenderPipeline(new FilterOrient(this.orientation), new FilterAntiAlias());
 
         this.timeline = new Timeline();
-        this.particleSystem = new ParticleSystem(this.friction, 0.001);
+        this.particleSystem = new ParticleSystem(this.friction, 0.001, 25);
         this.particleSystem.resolutionScale = 2;
         this.timeline.add(0, this.particleSystem);
-        this.timeline.add(0, new Sprite((opacity) => this.drawParticles(opacity), -1));
+        this.timeline.add(0, new Sprite((opacity) => {
+            this.particleSystem.draw(this.pipeline, Plot.Line.draw, (pos, t, particle) => {
+                const c = this.evaluateColor(particle, t);
+                c.alpha *= opacity;
+                return c;
+            }, (v) => mobiusTransform(v, this.mobius));
+        }, -1));
         this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
 
         this.enableWarp = false;
@@ -83,15 +90,12 @@ export class TestParticles {
 
     stopWarp() {
         if (this.warpAnim) this.warpAnim.cancel();
-        this.mobius.aRe = 1; this.mobius.aIm = 0;
-        this.mobius.bRe = 0; this.mobius.bIm = 0;
-        this.mobius.cRe = 0; this.mobius.cIm = 0;
-        this.mobius.dRe = 1; this.mobius.dIm = 0;
+        this.mobius.reset();
     }
 
     rebuild() {
         this.spawnIndex = 0;
-        this.particleSystem.reset(this.friction, 0.001);
+        this.particleSystem.reset(this.friction, 0.001, 25);
 
         const killRadius = 0.05;
 
@@ -107,13 +111,13 @@ export class TestParticles {
         }
 
         for (let i = 0; i < emitters.vertices.length; i++) {
-            this.particleSystem.addEmitter(() => {
+            this.particleSystem.addEmitter((system) => {
                 const axis = emitters.vertices[i];
                 const angle = this.emitCounters[i]++ * this.angularSpeed;
                 const vel = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)).multiplyScalar(this.initialSpeed);
                 const palette = new GenerativePalette('straight', 'complementary', 'descending', 'mid');
                 const life = 160;
-                return new ParticleSystem.Particle(axis, vel, palette, life);
+                return new ParticleSystem.Particle(axis, vel, palette, life, system.trailLength);
             });
         }
     }
@@ -135,28 +139,5 @@ export class TestParticles {
         }
         this.maxSpeed = Math.sqrt(maxSq);
 
-        // Draw Trails
-        this.pipeline.trail((v, t, particle) => {
-            return this.evaluateColor(particle, t);
-        }, 0.2);
-    }
-
-    drawParticles(alpha) {
-        for (const p of this.particleSystem.particles) {
-            const steps = p.orientation.length();
-
-            // Age in Physics Steps
-            const particleAgeSteps = p.maxLife - p.life;
-
-            tween(p.orientation, (q, t) => {
-                let v = vectorPool.acquire().copy(p.position).applyQuaternion(q);
-                const c = this.evaluateColor(p, t);
-                c.alpha *= alpha;
-                Plot.Point.draw(this.pipeline, v, (pos, _t) => {
-                    return { color: c.color, alpha: c.alpha, tag: p.tag };
-                }, t);
-            });
-            p.orientation.collapse();
-        }
     }
 }

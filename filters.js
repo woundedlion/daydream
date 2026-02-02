@@ -8,12 +8,12 @@ import { Daydream, XY } from "./driver.js";
 import { wrap } from "./util.js"
 import { blendAlpha } from "./color.js";
 import { colorPool } from "./memory.js";
-import { vectorToPixel, angleBetween } from "./geometry.js";
+import { vectorToPixel, angleBetween, mobiusTransform } from "./geometry.js";
 import { vectorPool } from "./memory.js";
 import { Plot } from "./plot.js";
 import { tween } from "./animation.js";
 
-import { TWO_PI } from "./3dmath.js";
+import { TWO_PI, MobiusParams } from "./3dmath.js";
 import { StaticCircularBuffer } from "./StaticCircularBuffer.js";
 
 class Trail3DNode {
@@ -361,102 +361,42 @@ export class FilterReplicate {
  * Applies a Mobius Transformation to the 3D vectors.
  * Projects sphere -> complex plane -> transform -> sphere.
  */
+/**
+ * Applies a Mobius Transformation to the 3D vectors.
+ * Projects sphere -> complex plane -> transform -> sphere.
+ */
 export class FilterMobius {
   constructor() {
     this.is2D = false;
-    // Transformation parameters: f(z) = (az + b) / (cz + d)
-    // Initialized to Identity: f(z) = z  (a=1, b=0, c=0, d=1)
-    this.a = { re: 1, im: 0 };
-    this.b = { re: 0, im: 0 };
-    this.c = { re: 0, im: 0 };
-    this.d = { re: 1, im: 0 };
+    this.params = new MobiusParams();
   }
 
-  get aRe() { return this.a.re; }
-  set aRe(v) { this.a.re = v; }
-  get aIm() { return this.a.im; }
-  set aIm(v) { this.a.im = v; }
+  get aRe() { return this.params.aRe; }
+  set aRe(v) { this.params.aRe = v; }
+  get aIm() { return this.params.aIm; }
+  set aIm(v) { this.params.aIm = v; }
 
-  get bRe() { return this.b.re; }
-  set bRe(v) { this.b.re = v; }
-  get bIm() { return this.b.im; }
-  set bIm(v) { this.b.im = v; }
+  get bRe() { return this.params.bRe; }
+  set bRe(v) { this.params.bRe = v; }
+  get bIm() { return this.params.bIm; }
+  set bIm(v) { this.params.bIm = v; }
 
-  get cRe() { return this.c.re; }
-  set cRe(v) { this.c.re = v; }
-  get cIm() { return this.c.im; }
-  set cIm(v) { this.c.im = v; }
+  get cRe() { return this.params.cRe; }
+  set cRe(v) { this.params.cRe = v; }
+  get cIm() { return this.params.cIm; }
+  set cIm(v) { this.params.cIm = v; }
 
-  get dRe() { return this.d.re; }
-  set dRe(v) { this.d.re = v; }
-  get dIm() { return this.d.im; }
-  set dIm(v) { this.d.im = v; }
-
-  // Complex Multiply
-  cmul(c1, c2) {
-    return {
-      re: c1.re * c2.re - c1.im * c2.im,
-      im: c1.re * c2.im + c1.im * c2.re
-    };
-  }
-
-  // Complex Add
-  cadd(c1, c2) {
-    return { re: c1.re + c2.re, im: c1.im + c2.im };
-  }
-
-  // Complex Divide
-  cdiv(c1, c2) {
-    const denom = c2.re * c2.re + c2.im * c2.im;
-    if (denom === 0) return { re: 0, im: 0 };
-    return {
-      re: (c1.re * c2.re + c1.im * c2.im) / denom,
-      im: (c1.im * c2.re - c1.re * c2.im) / denom
-    };
-  }
+  get dRe() { return this.params.dRe; }
+  set dRe(v) { this.params.dRe = v; }
+  get dIm() { return this.params.dIm; }
+  set dIm(v) { this.params.dIm = v; }
 
   plot(v, color, age, alpha, tag, pass) {
-    // 1. Stereographic Projection (North Pole -> Plane)
-    // Singularity check: If we are AT the North Pole, z_in is Infinity.
-    // Möbius of Infinity is a/c.
-    const denom = 1 - v.y;
-    let w;
-
-    if (Math.abs(denom) < 0.00001) {
-      // Input is North Pole (Infinity)
-      // Limit of (az+b)/(cz+d) as z->inf is a/c
-      w = this.cdiv(this.a, this.c);
-    } else {
-      const z_in = { re: v.x / denom, im: v.z / denom };
-
-      // w = (az + b) / (cz + d)
-      const num = this.cadd(this.cmul(this.a, z_in), this.b);
-      const den = this.cadd(this.cmul(this.c, z_in), this.d);
-
-      // Check for division by zero (Map to North Pole)
-      const den_mag = den.re * den.re + den.im * den.im;
-      if (den_mag < 0.000001) {
-        // Result is Infinity -> North Pole
-        pass(Daydream.UP_AXIS, color, age, alpha, tag);
-        return;
-      }
-
-      w = this.cdiv(num, den);
-    }
-
-    // 3. Inverse Stereographic Projection (Plane -> Sphere)
-    const w_mag_sq = w.re * w.re + w.im * w.im;
-    const inv_denom = 1 / (w_mag_sq + 1);
-
-    const v_out = _tempVec.set(
-      2 * w.re * inv_denom,
-      (w_mag_sq - 1) * inv_denom,
-      2 * w.im * inv_denom
-    );
-
+    const v_out = mobiusTransform(v, this.params);
     pass(v_out, color, age, alpha, tag);
   }
 }
+
 ///////////////////////////////////////////////////////////////////////////////
 // 2D Filters
 ///////////////////////////////////////////////////////////////////////////////

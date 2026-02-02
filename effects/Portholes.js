@@ -3,11 +3,11 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Orientation, randomVector
+    Orientation, randomVector, mobiusTransform
 } from "../geometry.js";
 import { vectorPool } from "../memory.js";
 import { Solids } from "../solids.js";
-import { TWO_PI, MobiusParams, mobius, stereo, invStereo } from "../3dmath.js";
+import { TWO_PI, MobiusParams } from "../3dmath.js";
 import { Plot } from "../plot.js";
 
 import {
@@ -70,10 +70,7 @@ export class Portholes {
 
     stopWarp() {
         if (this.warpAnim) this.warpAnim.cancel();
-        this.mobiusParams.aRe = 1; this.mobiusParams.aIm = 0;
-        this.mobiusParams.bRe = 0; this.mobiusParams.bIm = 0;
-        this.mobiusParams.cRe = 0; this.mobiusParams.cIm = 0;
-        this.mobiusParams.dRe = 1; this.mobiusParams.dIm = 0;
+        this.mobiusParams.reset();
     }
 
     setupGui() {
@@ -121,11 +118,8 @@ export class Portholes {
         this.timeline.step();
         this.t += 0.01; // Global time
 
-        const transform = (p) => {
-            const z = stereo(p);
-            const w = mobius(z, this.mobiusParams);
-            return invStereo(w, vectorPool.acquire());
-        };
+        const transform = (p) => mobiusTransform(p, this.mobiusParams);
+
 
         for (let i = 0; i < this.numCopies; i++) {
             const offset = (i / this.numCopies) * TWO_PI;
