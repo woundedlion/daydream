@@ -699,7 +699,7 @@ export const Plot = {
         static draw(pipeline, particleSystem, colorFn) {
             const trails = Plot.ParticleSystem.sample(particleSystem);
             for (const { points, particle } of trails) {
-                Plot.rasterize(pipeline, points, (pos, t) => colorFn(pos, t, particle), false, 0);
+                Plot.rasterize(pipeline, points, (v, t) => colorFn(v, t, particle), false, 0);
             }
         }
     },

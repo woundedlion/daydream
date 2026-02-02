@@ -5,7 +5,6 @@
 
 import * as THREE from "three";
 
-
 export const TWO_PI = 2 * Math.PI;
 
 // Complex number operations
@@ -13,6 +12,7 @@ export function cAdd(a, b) { return { re: a.re + b.re, im: a.im + b.im }; }
 export function cMult(a, b) { return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re }; }
 export function cDiv(a, b) {
   const denom = b.re * b.re + b.im * b.im;
+  if (denom < Number.EPSILON) return { re: 0, im: 0 };
   return {
     re: (a.re * b.re + a.im * b.im) / denom,
     im: (a.im * b.re - a.re * b.im) / denom
@@ -23,18 +23,25 @@ export function cDiv(a, b) {
 export function invStereo(z, target) {
   const r2 = z.re * z.re + z.im * z.im;
   const t = target || new THREE.Vector3();
+  if (!Number.isFinite(r2)) {
+    return t.set(0, 0, 1);
+  }
+
   return t.set(
     2 * z.re / (r2 + 1),
-    (r2 - 1) / (r2 + 1),
-    2 * z.im / (r2 + 1)
+    2 * z.im / (r2 + 1),
+    (r2 - 1) / (r2 + 1)
   );
 }
 
 // Stereographic Projection: Sphere -> Complex Plane
 export function stereo(v) {
-  const denom = 1 - v.y;
-  if (Math.abs(denom) < Number.EPSILON) return { re: 100, im: 100 }; // Infinity
-  return { re: v.x / denom, im: v.z / denom };
+  const denom = 1 - v.z;
+  if (Math.abs(denom) < Number.EPSILON) {
+    return { re: 1e15, im: 0 };
+  }
+
+  return { re: v.x / denom, im: v.y / denom };
 }
 
 // Mobius Transformation: f(z) = (az + b) / (cz + d)
