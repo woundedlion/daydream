@@ -1483,6 +1483,7 @@ export const Scan = {
             // The user contract is: shaderFn(index) -> VertexData, shaderFn.color(data) -> Color.
 
             const isShader = (typeof shaderFn === 'function' && typeof shaderFn.color === 'function');
+            const interpolated = { v0: 0, v1: 0, v2: 0, v3: 0 }; // Scratch object for zero-alloc
 
             for (let i = 0; i < mesh.faces.length; i++) {
                 const faceIndices = mesh.faces[i];
@@ -1507,24 +1508,38 @@ export const Scan = {
 
                         // 2. Interpolate Data (Barycentric Mix)
                         if (w) {
-                            // Assuming d0, d1, d2 are objects or numbers. 
-                            // If they are objects, we need a lerp. If numbers, simple math.
-                            // For flexibility, let's assume they are objects with numeric properties, OR rely on a lerp helper.
-                            // But for speed, let's just do a shallow linear mix of properties or return raw weights?
-                            // User example: "d0.val * w.a + ..."
-                            // Let's implement a generic shallow mix for now.
+                            // Zero-Allocation Interpolation
+                            // Assumes d0, d1, d2 are Fragment-like objects with v0..v3 properties
+                            // Use the pre-allocated scratch fragment from Plot.js context or create one here? 
+                            // Since we are in Scan, let's make a local static scratch.
+                            // However, we can't export it easily.
+                            // Let's assume we can reuse a simple object.
 
-                            const interpolated = {};
-                            for (let key in d0) {
-                                const v0 = d0[key];
-                                const v1 = d1[key];
-                                const v2 = d2[key];
-                                if (typeof v0 === 'number') {
-                                    interpolated[key] = v0 * w.a + v1 * w.b + v2 * w.c;
-                                } else {
-                                    interpolated[key] = v0; // Fallback
-                                }
-                            }
+                            // Re-use a static object inside the closure (created once per draw call, or global?)
+                            // Better: use a module-level scratch if possible, but for now closure-level is OK if we don't recreate it per pixel.
+                            // Wait, renderColorFn is created once per FACE.
+                            // But we need ONE scratch for the whole render or per pixel?
+                            // We need to return an object to shaderFn.color.
+                            // If shaderFn.color expects {v0..v3}, we pass it.
+
+                            // OPTIMIZATION: Manually interpolate registers
+                            // This object is allocated once per Face loop if we define it outside?
+                            // renderColorFn is called per PIXEL.
+                            // So we shouldn't allocate inside here.
+
+                            // We need a scratch object.
+                            // We'll trust the user provided Fragments with v0..v3.
+
+                            /* 
+                                Note: We are cheating slightly by using a closure variable. 
+                                Ideally `interpolated` should be allocated once per Scan.Mesh.draw call.
+                            */
+
+                            interpolated.v0 = d0.v0 * w.a + d1.v0 * w.b + d2.v0 * w.c;
+                            interpolated.v1 = d0.v1 * w.a + d1.v1 * w.b + d2.v1 * w.c;
+                            interpolated.v2 = d0.v2 * w.a + d1.v2 * w.b + d2.v2 * w.c;
+                            interpolated.v3 = d0.v3 * w.a + d1.v3 * w.b + d2.v3 * w.c;
+
                             return shaderFn.color(interpolated);
                         }
                         // Fallback if no weights (e.g. outside triangle or degraded)?
