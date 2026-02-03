@@ -13,6 +13,7 @@ import { easeMid } from "../easing.js";
 import { Scan } from "../scan.js";
 import { Plot } from "../plot.js";
 import { makeBasis } from "../geometry.js";
+import { Palettes } from "../palettes.js";
 
 import { createRenderPipeline, FilterAntiAlias } from "../filters.js";
 
@@ -61,7 +62,7 @@ export class TestShapes {
 
         for (let i = totalShapes - 1; i >= 0; --i) {
             const t = i / (totalShapes > 1 ? totalShapes - 1 : 1);
-            const color = richSunset.get(t).clone();
+            const color = Palettes.richSunset.get(t).clone();
             this.spawnRing(Daydream.X_AXIS, i / (totalShapes - 1), color, seed1, "Plot", i);
             this.spawnRing(Daydream.X_AXIS.clone().negate(), i / (totalShapes - 1), color, seed1, "Scan", i);
         }

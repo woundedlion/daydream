@@ -13,7 +13,7 @@ import { easeMid } from "../easing.js";
 import { Scan } from "../scan.js";
 import { makeBasis, fibSpiral } from "../geometry.js";
 import { color4Pool } from "../memory.js";
-import { richSunset } from "../color.js";
+import { Palettes } from "../palettes.js";
 import { TWO_PI } from "../3dmath.js";
 
 import { createRenderPipeline } from "../filters.js";
@@ -68,7 +68,7 @@ export class SpinShapes {
 
     drawShape(shape, alpha) {
         const t = (shape.normal.y + 1) / 2;
-        const c = richSunset.get(t);
+        const c = Palettes.richSunset.get(t);
 
         const colorFn = (p, t, dist) => {
             return color4Pool.acquire().set(c.color, 0.6 * alpha);

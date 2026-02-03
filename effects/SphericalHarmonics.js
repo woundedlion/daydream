@@ -9,7 +9,7 @@ import { gui } from "../gui.js";
 import { Daydream } from "../driver.js";
 import { Scan } from "../scan.js";
 
-import { richSunset } from "../color.js";
+import { Palettes } from "../palettes.js";
 import {
     Timeline,
     OrientationTrail,
@@ -101,7 +101,7 @@ export class SphericalHarmonics {
             let val = sphericalHarmonic(l, m, theta, phi);
             val = Math.abs(val) * this.params.amplitude;
             const t = Math.tanh(val);
-            const colorResult = richSunset.get(t);
+            const colorResult = Palettes.richSunset.get(t);
             colorResult.alpha = Math.min(1, val * 2);
             return colorResult;
         });

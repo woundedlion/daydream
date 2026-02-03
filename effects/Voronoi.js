@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { gui } from "../gui.js";
 import { Daydream } from "../driver.js";
-import { richSunset } from "../color.js";
+import { Palettes } from "../palettes.js";
 import { randomVector } from "../geometry.js";
 import { quinticKernel } from "../filters.js";
 import { KDTree } from "../spatial.js";
@@ -21,7 +21,7 @@ export class Voronoi {
         this.smoothness = 50.0;
         this.sites = [];
         this.gui = new gui.GUI({ autoPlace: false });
-        this.palette = richSunset;
+        this.palette = Palettes.richSunset;
 
         this.gui.add(this, 'numSites', 2, 1000).step(1).name('Site Count').onChange(() => this.initSites());
         this.gui.add(this, 'speed', 0, 100.0).name('Speed');

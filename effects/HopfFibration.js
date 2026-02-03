@@ -7,7 +7,7 @@ import { vectorPool } from "../memory.js";
 import { Plot } from "../plot.js";
 import { TWO_PI } from "../3dmath.js";
 import { createRenderPipeline, FilterAntiAlias, FilterWorldTrails, FilterOrient } from "../filters.js";
-import { richSunset } from "../color.js";
+import { Palettes } from "../palettes.js";
 import { easeMid } from "../easing.js";
 
 export class HopfFibration {
@@ -174,7 +174,7 @@ export class HopfFibration {
             v.set(x, y, z).normalize();
 
             // Set Color for key point
-            const c = richSunset.get(0);
+            const c = Palettes.richSunset.get(0);
             c.a = this.alpha;
 
             // DRAW LINE from previous position if available (Continuous Trail)
@@ -211,7 +211,7 @@ export class HopfFibration {
         // Render the entire trail history (3D vectors projected by FilterOrient)
         this.pipeline.trail((v, t) => {
             // t is normalized age [0 (new) -> 1 (old)]
-            const c = richSunset.get(t);
+            const c = Palettes.richSunset.get(t);
             c.a *= (1 - t);
             return c;
         });

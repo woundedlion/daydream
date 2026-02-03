@@ -8,7 +8,7 @@ import { wrap } from "./util.js";
 import { Daydream } from "./driver.js";
 import { Rotation, Orientation } from "./animation.js";
 import { easeOutCirc } from "./easing.js";
-import { g1, g2 } from "./color.js";
+import { Palettes } from "./palettes.js";
 import { vectorPool, quaternionPool, dotPool } from "./memory.js";
 import { TWO_PI, mobius, stereo, invStereo } from "./3dmath.js";
 
@@ -284,9 +284,9 @@ export function squareWave(from, to, freq, dutyCycle, phase) {
 export function distanceGradient(v, normal) {
   let d = v.dot(normal);
   if (d > 0) {
-    return g1.get(d).clone();
+    return Palettes.g1.get(d).clone();
   } else {
-    return g2.get(-d).clone();
+    return Palettes.g2.get(-d).clone();
   }
 }
 
