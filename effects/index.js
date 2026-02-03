@@ -22,7 +22,7 @@ export { SphericalHarmonics } from "./SphericalHarmonics.js";
 export { SpinShapes } from "./SpinShapes.js";
 export { Test } from "./Test.js";
 export { TestShapes } from "./TestShapes.js";
-export { TestSolids } from "./TestSolids.js";
+export { IslamicStars } from "./IslamicStars.js";
 export { Thrusters } from "./Thrusters.js";
 export { Voronoi } from "./Voronoi.js";
 

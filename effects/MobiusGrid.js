@@ -84,58 +84,60 @@ export class MobiusGrid {
             const R = Math.exp(logR);
             const radius = (4 / Math.PI) * Math.atan(1 / R);
             const basis = makeBasis(q, normal);
-            const points = Plot.Polygon.sample(basis, radius, Daydream.W / 4);
 
-            const transformedPoints = points.map(p => {
+            const transformFn = (p) => {
                 const finalP = mobiusTransform(p, mobiusParams);
                 if (rotationQ) finalP.applyQuaternion(rotationQ);
                 return finalP;
-            });
+            };
 
             const opacity = Math.min(1.0, Math.max(0.0, numRings - i));
-            Plot.rasterize(pipeline, transformedPoints, (p) => {
+            Plot.Polygon.draw(pipeline, basis, radius, Daydream.W / 4, (p, tPoly) => {
                 const res = this.palette.get(i / numRings);
                 res.alpha *= opacity * this.alpha;
                 return res;
-            }, true);
+            }, 0, 0, transformFn);
         }
     }
 
     drawLongitudes(pipeline, numLines, mobiusParams, axisComponent, phase = 0, rotationQ) {
         const count = Math.ceil(numLines);
         const q = quaternionPool.acquire();
+
+        // Pre-calculate z info helper if possible, but inside colorFn we need implicit logic
+
         for (let i = 0; i < count; i++) {
             const theta = (i / numLines) * Math.PI;
             const normal = vectorPool.acquire().set(Math.cos(theta), Math.sin(theta), 0);
             const radius = 1.0;
             const basis = makeBasis(q, normal);
-            const points = Plot.Polygon.sample(basis, radius, Daydream.W / 4);
 
-            const transformedPoints = points.map(p => {
+            const transformFn = (p) => {
                 const finalP = mobiusTransform(p, mobiusParams);
                 if (rotationQ) finalP.applyQuaternion(rotationQ);
                 return finalP;
-            });
+            };
 
             const opacity = Math.min(1.0, Math.max(0.0, numLines - i));
-            Plot.rasterize(pipeline, transformedPoints, (p, tLine) => {
-                // Interpolate unwarped points to get Z
-                const idx = tLine * points.length;
-                const i1 = Math.floor(idx) % points.length;
-                const i2 = (i1 + 1) % points.length;
-                const f = idx - Math.floor(idx);
-                const z = points[i1].z * (1 - f) + points[i2].z * f;
+
+            Plot.Polygon.draw(pipeline, basis, radius, Daydream.W / 4, (pTransformed, tLine) => {
+
+                const angle = tLine * TWO_PI;
+                // Since normal is in XY plane, the ring goes through Z axis.
+                // Z varies as sin(angle) or cos(angle).
+                const z = Math.sin(angle); // Approx
+
                 const R = Math.sqrt((1 + z) / (1 - z));
                 const logR = Math.log(R);
                 const logMin = -2.5;
                 const logMax = 2.5;
                 const range = logMax - logMin;
-                const t = (logR - logMin) / range;
+                const tParam = (logR - logMin) / range;
 
-                const res = this.palette.get(wrap(t - phase, 1.0));
+                const res = this.palette.get(wrap(tParam - phase, 1.0));
                 res.alpha *= opacity * this.alpha;
                 return res;
-            }, true);
+            }, 0, 0, transformFn);
         }
     }
 

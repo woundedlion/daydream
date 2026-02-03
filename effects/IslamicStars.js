@@ -28,7 +28,7 @@ const PALETTES = {
     10: Palettes.lavenderLake
 };
 
-export class TestSolids {
+export class IslamicStars {
     constructor() {
         this.orientation = new THREE.Quaternion();
         this.transformedVertices = [];

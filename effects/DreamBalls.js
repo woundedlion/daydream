@@ -116,8 +116,8 @@ export class DreamBalls {
             warpAnim.step();
             this.drawScene(params, opacity, baseMesh, mobiusParams);
         };
-        this.timeline.add(0, new Sprite(drawFn, 160, 32, easeMid, 32, easeMid));
-        this.timeline.add(160 - 32, new PeriodicTimer(0, () => this.nextPreset(), false));
+        this.timeline.add(0, new Sprite(drawFn, 320, 32, easeMid, 32, easeMid));
+        this.timeline.add(320 - 32, new PeriodicTimer(0, () => this.nextPreset(), false));
     }
 
     setupGui() {
@@ -137,13 +137,9 @@ export class DreamBalls {
 
         this.paramFolder = this.gui.addFolder('Manual Params');
         const presetNames = Object.keys(DreamBalls.presets);
-        // Include "Custom" option which isn't in the presets object but is a valid state
         this.paramFolder.add(this, 'currentPreset', [...presetNames, 'Custom']).name('Preset').listen().onChange(v => {
             if (v !== 'Custom') {
-                const p = DreamBalls.presets[v];
-                // Apply preset values to this.params
                 Object.assign(this.params, p);
-                // Trigger updates for side-effects
                 this.baseMesh = Solids[this.params.solidName]();
                 if (this.warpAnim) this.warpAnim.scale = this.params.warpScale;
             }
@@ -176,22 +172,16 @@ export class DreamBalls {
     drawScene(params, opacity, baseMesh, mobiusParams) {
         const transform = (p) => this.globalOrientation.orient(mobiusTransform(p, mobiusParams));
         const palette = params.palette;
+        const colorFn = (v, t) => {
+            const c = palette.get(t);
+            c.alpha *= params.alpha * opacity;
+            return c;
+        };
 
         for (let i = 0; i < params.numCopies; i++) {
             const offset = (i / params.numCopies) * TWO_PI;
             const mesh = this.getDisplacedMesh(baseMesh, params, offset);
-            const edges = Plot.Mesh.sample(mesh, 10);
-
-            const colorFn = (v, t) => {
-                const c = palette.get(t);
-                c.alpha *= params.alpha * opacity;
-                return c;
-            };
-
-            for (const edge of edges) {
-                const transformed = edge.map(transform);
-                Plot.rasterize(this.filters, transformed, colorFn);
-            }
+            Plot.Mesh.draw(this.filters, mesh, colorFn, 0, transform);
         }
     }
 

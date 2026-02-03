@@ -6,59 +6,52 @@
 
 import { Daydream } from "./driver.js";
 import { GUI, resetGUI } from "gui";
-import {
-  BZReactionDiffusion,
-  Comets,
-  DreamBalls,
-  Dynamo,
-  FlowField,
-  GSReactionDiffusion,
-  HopfFibration,
-  LSystem,
-  MetaballEffect,
-  MindSplatter,
-  MobiusGrid,
-  Moire,
-  PetalFlow,
-  RingShower,
-  RingSpin,
-  SphericalHarmonics,
-  SpinShapes,
-  Test,
-  TestShapes,
-  TestSolids,
-  Thrusters,
-  Voronoi
-} from "./effects/index.js";
+import * as allEffects from "./effects/index.js";
 
 import { BufferGeometry, AddEquation, MaxEquation } from "three";
 
 ///////////////////////////////////////////////////////////////////////////////
 
-const effects = {
-  BZReactionDiffusion,
-  Comets,
-  DreamBalls,
-  Dynamo,
-  FlowField,
-  GSReactionDiffusion,
-  HopfFibration,
-  LSystem,
-  MetaballEffect,
-  MindSplatter,
-  MobiusGrid,
-  Moire,
-  PetalFlow,
-  RingShower,
-  RingSpin,
-  SphericalHarmonics,
-  SpinShapes,
-  Test,
-  TestShapes,
-  TestSolids,
-  Thrusters,
-  Voronoi
-};
+const HiResFavorites = [
+  "BZReactionDiffusion",
+  "Comets",
+  "DreamBalls",
+  "FlowField",
+  "GSReactionDiffusion",
+  "HopfFibration",
+  "IslamicStars",
+  "LSystem",
+  "MetaballEffect",
+  "MindSplatter",
+  "MobiusGrid",
+  "Moire",
+  "PetalFlow",
+  "RingSpin",
+  "SphericalHarmonics",
+  "SpinShapes",
+  "Test",
+  "TestShapes",
+  "Voronoi"
+];
+
+const LoResFavorites = [
+  "BZReactionDiffusion",
+  "Comets",
+  "Dynamo",
+  "FlowField",
+  "GSReactionDiffusion",
+  "IslamicStars",
+  "MetaballEffect",
+  "MobiusGrid",
+  "Moire",
+  "PetalFlow",
+  "RingShower",
+  "RingSpin",
+  "Test",
+  "Thrusters",
+  "Voronoi"
+];
+
 
 const urlParams = new URLSearchParams(window.location.search);
 const initialEffect = urlParams.get('effect');
@@ -71,17 +64,37 @@ const resolutionPresets = {
   "Phantasm (144x288)": { h: 144, w: 288, size: 0.25 }
 };
 
+const effectsByResolution = {
+  "Holosphere (20x96)": LoResFavorites,
+  "Phantasm (144x288)": HiResFavorites
+};
+
 const daydream = new Daydream();
 let activeEffect;
 
 const controls = {
-  effect: (initialEffect && effects[initialEffect]) ? initialEffect : 'PetalFlow',
+  effect: (initialEffect && allEffects[initialEffect]) ? initialEffect : 'PetalFlow',
   resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Holosphere (20x96)",
   testAll: false,
 
   setResolution: function (preserveParams = false) {
     const p = resolutionPresets[this.resolution];
     if (p) {
+      // Update available effects based on resolution
+      const availableEffects = effectsByResolution[this.resolution] || Object.keys(allEffects);
+
+      // Update GUI controller
+      // We must remove the old controller and add a new one to update options dynamically in dat.GUI
+      // Or we can modify the prototype if the library supports it, but standard dat.GUI requires this hack:
+      // However, we saved reference 'effectController' so we can try updating its dom options
+      // Actually simpler to just check validity and update options if possible or reconstruct.
+      // Standard dat.GUI doesn't support changing options easily. We will do a reconstruct in a moment.
+
+      // Check if current effect is valid
+      if (!availableEffects.includes(this.effect)) {
+        this.effect = availableEffects[0];
+      }
+
       // Update URL
       const newUrl = new URL(window.location);
       newUrl.searchParams.set('effect', this.effect);
@@ -89,6 +102,10 @@ const controls = {
       window.history.replaceState({}, '', newUrl);
 
       daydream.updateResolution(p.h, p.w, p.size);
+
+      // Update the dropdown options
+      updateEffectDropdown(availableEffects);
+
       // Restart effect to use new resolution
       this.changeEffect(preserveParams);
     }
@@ -107,7 +124,7 @@ const controls = {
       }
     }
 
-    const EffectClass = effects[this.effect];
+    const EffectClass = allEffects[this.effect];
     if (typeof EffectClass !== 'function') {
       console.error(`Effect '${this.effect}' is not a constructor. Check your imports in daydream.js.`);
       return;
@@ -143,7 +160,6 @@ const controls = {
   }
 };
 
-const effectNames = Object.keys(effects);
 const guiInstance = new GUI({ autoPlace: false });
 document.getElementById('gui-container').appendChild(guiInstance.domElement);
 
@@ -151,17 +167,26 @@ guiInstance.add(controls, 'resolution', Object.keys(resolutionPresets))
   .name('Resolution')
   .onChange(() => controls.setResolution());
 
-const effectController = guiInstance.add(controls, 'effect', effectNames)
+let effectController = guiInstance.add(controls, 'effect', Object.keys(allEffects))
   .name('Active Effect')
   .onChange(() => controls.changeEffect());
+
+function updateEffectDropdown(options) {
+  // Remove and recreate
+  guiInstance.remove(effectController);
+  effectController = guiInstance.add(controls, 'effect', options)
+    .name('Active Effect')
+    .onChange(() => controls.changeEffect());
+}
 
 let testAllInterval = null;
 guiInstance.add(controls, 'testAll').name('Test All').onChange((v) => {
   if (v) {
     testAllInterval = setInterval(() => {
-      const currentIndex = effectNames.indexOf(controls.effect);
-      const nextIndex = (currentIndex + 1) % effectNames.length;
-      controls.effect = effectNames[nextIndex];
+      const currentList = effectsByResolution[controls.resolution];
+      const currentIndex = currentList.indexOf(controls.effect);
+      const nextIndex = (currentIndex + 1) % currentList.length;
+      controls.effect = currentList[nextIndex];
       controls.changeEffect();
       effectController.updateDisplay();
     }, 1000);
