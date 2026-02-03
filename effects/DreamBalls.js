@@ -1,4 +1,3 @@
-
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
@@ -30,7 +29,6 @@ export class DreamBalls {
             palette: new AlphaFalloffPalette((t) => 1.0 - t, Palettes.bloodStream),
             alpha: 0.7,
         },
-
         elvenMachinery: {
             solidName: 'truncatedCuboctahedron',
             numCopies: 6,
@@ -40,7 +38,6 @@ export class DreamBalls {
             palette: Palettes.richSunset,
             alpha: 0.3,
         },
-
         globeKnot: {
             solidName: 'icosidodecahedron',
             numCopies: 10,
@@ -52,12 +49,9 @@ export class DreamBalls {
         }
     }
 
-
     constructor() {
         this.presets = Object.values(DreamBalls.presets);
         this.presetIndex = 0;
-
-        // Keep params for potential GUI use or debugging, initialized to first preset
         this.params = { ...this.presets[0] };
 
         this.globalOrientation = new Orientation();
@@ -75,11 +69,10 @@ export class DreamBalls {
 
         // Manual mode state
         this.runPresets = true;
-        this.currentPreset = Object.keys(DreamBalls.presets)[0]; // Default selection
+        this.currentPreset = Object.keys(DreamBalls.presets)[0];
         this.mobiusParams = new MobiusParams();
-        this.baseMesh = Solids[this.params.solidName]();
-        this.startWarp();
 
+        // Filters
         this.sliceFilter = new FilterOrientSlice(this.orientations, this.hemisphereAxis);
         this.sliceFilter.enabled = this.enableSlice;
         this.filters = createRenderPipeline(
@@ -87,11 +80,29 @@ export class DreamBalls {
             new FilterAntiAlias()
         );
 
-        // Animations
         this.timeline.add(9, new RandomWalk(this.globalOrientation, Daydream.UP));
         this.timeline.add(0, new PeriodicTimer(160, () => this.spinSlices(), true));
+        this.startWarp();
         this.nextPreset();
         this.setupGui();
+    }
+
+    loadSolid(name) {
+        this.baseMesh = Solids[name]();
+
+        // Pre-allocate the reusable displaced mesh to avoid GC
+        this.displacedMesh = {
+            faces: this.baseMesh.faces,
+            vertices: this.baseMesh.vertices.map(v => new THREE.Vector3())
+        };
+
+        // Pre-compute tangents (u, vBasis) for every vertex
+        this.tangents = this.baseMesh.vertices.map(p => {
+            const axis = (Math.abs(p.y) > 0.99) ? Daydream.X_AXIS : Daydream.Y_AXIS;
+            const u = new THREE.Vector3().crossVectors(p, axis).normalize();
+            const vBasis = new THREE.Vector3().crossVectors(p, u).normalize();
+            return { u, v: vBasis };
+        });
     }
 
     startWarp() {
@@ -107,14 +118,17 @@ export class DreamBalls {
     }
 
     spawnSprite(params) {
-        const baseMesh = Solids[params.solidName]();
+        this.loadSolid(params.solidName);
+        const baseMesh = this.baseMesh;
+        const tangents = this.tangents;
+        const spriteMesh = this.displacedMesh;
+
         const mobiusParams = new MobiusParams();
         const warpAnim = new MobiusWarp(mobiusParams, 200, params.warpScale, true);
-        const palette = params.palette;
 
         const drawFn = (opacity) => {
             warpAnim.step();
-            this.drawScene(params, opacity, baseMesh, mobiusParams);
+            this.drawScene(params, opacity, baseMesh, spriteMesh, tangents, mobiusParams);
         };
         this.timeline.add(0, new Sprite(drawFn, 320, 32, easeMid, 32, easeMid));
         this.timeline.add(320 - 32, new PeriodicTimer(0, () => this.nextPreset(), false));
@@ -136,40 +150,33 @@ export class DreamBalls {
         });
 
         this.paramFolder = this.gui.addFolder('Manual Params');
-        const presetNames = Object.keys(DreamBalls.presets);
-        this.paramFolder.add(this, 'currentPreset', [...presetNames, 'Custom']).name('Preset').listen().onChange(v => {
+        this.paramFolder.add(this, 'currentPreset', [...Object.keys(DreamBalls.presets), 'Custom']).name('Preset').listen().onChange(v => {
             if (v !== 'Custom') {
-                Object.assign(this.params, p);
-                this.baseMesh = Solids[this.params.solidName]();
+                Object.assign(this.params, DreamBalls.presets[v]);
+                this.loadSolid(this.params.solidName);
                 if (this.warpAnim) this.warpAnim.scale = this.params.warpScale;
             }
         });
 
-        const manualChange = () => {
-            this.currentPreset = 'Custom';
-        };
+        const manualChange = () => { this.currentPreset = 'Custom'; };
 
         this.paramFolder.add(this.params, 'alpha').min(0).max(1).step(0.01).onChange(manualChange);
-        this.paramFolder.add(this.params, 'offsetRadius', 0.0, 0.2).name('Offset Radius').listen().onChange(manualChange);
-        this.paramFolder.add(this.params, 'offsetSpeed', 0.0, 5.0).name('Offset Speed').listen().onChange(manualChange);
-        this.paramFolder.add(this.params, 'numCopies', 1, 10, 1).name('Num Copies').listen().onChange(manualChange);
-        this.paramFolder.add(this.params, 'solidName', Object.keys(Solids)).name("Solid").onChange((v) => {
-            this.baseMesh = Solids[v]();
+        this.paramFolder.add(this.params, 'offsetRadius', 0.0, 0.2).listen().onChange(manualChange);
+        this.paramFolder.add(this.params, 'offsetSpeed', 0.0, 5.0).listen().onChange(manualChange);
+        this.paramFolder.add(this.params, 'numCopies', 1, 10, 1).listen().onChange(manualChange);
+        this.paramFolder.add(this.params, 'solidName', Object.keys(Solids)).onChange((v) => {
+            this.loadSolid(v);
             manualChange();
         });
-        this.paramFolder.add(this.params, 'warpScale', 0.1, 5.0).name('Warp Scale').onChange(v => {
+        this.paramFolder.add(this.params, 'warpScale', 0.1, 5.0).onChange(v => {
             if (this.warpAnim) this.warpAnim.scale = v;
             manualChange();
         });
-
         this.paramFolder.open();
-
-        if (this.runPresets) {
-            this.paramFolder.domElement.style.display = 'none';
-        }
+        if (this.runPresets) this.paramFolder.domElement.style.display = 'none';
     }
 
-    drawScene(params, opacity, baseMesh, mobiusParams) {
+    drawScene(params, opacity, baseMesh, targetMesh, tangents, mobiusParams) {
         const transform = (p) => this.globalOrientation.orient(mobiusTransform(p, mobiusParams));
         const palette = params.palette;
         const colorFn = (v, t) => {
@@ -180,53 +187,53 @@ export class DreamBalls {
 
         for (let i = 0; i < params.numCopies; i++) {
             const offset = (i / params.numCopies) * TWO_PI;
-            const mesh = this.getDisplacedMesh(baseMesh, params, offset);
-            Plot.Mesh.draw(this.filters, mesh, colorFn, 0, transform);
+            this.updateDisplacedMesh(baseMesh, targetMesh, tangents, params, offset);
+            Plot.Mesh.draw(this.filters, targetMesh, colorFn, 0, transform);
         }
     }
 
+    updateDisplacedMesh(base, target, tangents, params, angleOffset) {
+        const count = base.vertices.length;
+        const r = params.offsetRadius;
+        const speed = params.offsetSpeed;
 
+        for (let i = 0; i < count; i++) {
+            const v = base.vertices[i];
+            const t = tangents[i];
 
-    // Helper to apply offset to vertices
-    getDisplacedMesh(baseMesh, params, angleOffset) {
-        const vertices = baseMesh.vertices.map((v, i) => {
-            const p = vectorPool.acquire().copy(v);
-
-            // Create basis for tangent plane
-            const axis = (Math.abs(p.y) > 0.99) ? Daydream.X_AXIS : Daydream.Y_AXIS;
-            let u = vectorPool.acquire().crossVectors(p, axis).normalize();
-            let vBasis = vectorPool.acquire().crossVectors(p, u).normalize();
-
-            // Time based offset in tangent plane
+            // Phase calculation
             const phase = i * 0.1;
-            const angle = this.t * params.offsetSpeed * TWO_PI + phase + angleOffset;
-            const r = params.offsetRadius;
-            const offset = vectorPool.acquire().copy(u).multiplyScalar(Math.cos(angle)).addScaledVector(vBasis, Math.sin(angle)).multiplyScalar(r);
-            return p.add(offset).normalize();
-        });
+            const angle = this.t * speed * TWO_PI + phase + angleOffset;
 
-        return { vertices, faces: baseMesh.faces };
+            // Math: P = v + u*cos + v*sin
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
+
+            // Update target vertex in place
+            const out = target.vertices[i];
+            out.x = v.x + (t.u.x * cosA + t.v.x * sinA) * r;
+            out.y = v.y + (t.u.y * cosA + t.v.y * sinA) * r;
+            out.z = v.z + (t.u.z * cosA + t.v.z * sinA) * r;
+            out.normalize();
+        }
     }
 
     drawFrame() {
         this.timeline.step();
-        this.t += 0.01; // Global time
+        this.t += 0.01;
 
         if (!this.runPresets) {
             this.warpAnim.step();
-            this.drawScene(this.params, 1.0, this.baseMesh, this.mobiusParams);
+            this.drawScene(this.params, 1.0, this.baseMesh, this.displacedMesh, this.tangents, this.mobiusParams);
         }
     }
 
     spinSlices() {
         let axis = randomVector().clone();
         this.hemisphereAxis.copy(axis);
-
-        // Spin alternating directions over 5 seconds (80 frames)
         for (let i = 0; i < this.orientations.length; i++) {
             const direction = (i % 2 === 0) ? 1 : -1;
             this.timeline.add(0, new Rotation(this.orientations[i], axis, direction * TWO_PI, 80, easeInOutSin, false));
         }
     }
 }
-
