@@ -14,6 +14,8 @@ import { Scan } from "../scan.js";
 import { Plot } from "../plot.js";
 import { makeBasis } from "../geometry.js";
 import { Palettes } from "../palettes.js";
+import { TWO_PI } from "../3dmath.js";
+import { color4Pool } from "../memory.js";
 
 import { createRenderPipeline, FilterAntiAlias } from "../filters.js";
 

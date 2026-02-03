@@ -224,9 +224,14 @@ export class FilterOrientSlice {
     this.is2D = false;
     this.orientations = orientations;
     this.axis = axis;
+    this.enabled = true;
   }
 
   plot(v, color, age, alpha, tag, pass) {
+    if (!this.enabled) {
+      pass(v, color, age, alpha, tag);
+      return;
+    }
     const dot = Math.max(-1, Math.min(1, v.dot(this.axis)));
     const t = 1 - Math.acos(dot) / Math.PI;
     let idx = Math.floor(t * this.orientations.length);

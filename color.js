@@ -568,3 +568,94 @@ export class TransparentVignette {
   }
 }
 
+
+/**
+ * A wrapper class that applies a scalar falloff function to an existing palette.
+ * The scalar result is clamped to [0, 1] and used to scale the color's brightness.
+ */
+export class FalloffPalette {
+  /**
+   * @param {function(number): number} falloffFn - A function that takes t [0-1] and returns a brightness scale factor.
+   * @param {Object} palette - The original palette object with a .get(t) method.
+   */
+  constructor(falloffFn, palette) {
+    this.palette = palette;
+    this.falloffFn = falloffFn;
+  }
+
+  /**
+   * Gets the color with brightness scaling applied.
+   * @param {number} t - The position parameter [0, 1].
+   * @returns {{color: THREE.Color, alpha: number}} The scaled color and alpha.
+   */
+  get(t) {
+    const result = this.palette.get(t);
+    let scale = this.falloffFn(t);
+    scale = Math.max(0, Math.min(1, scale)); // Clamp to [0, 1]
+    result.color.multiplyScalar(scale);
+    return result;
+  }
+}
+
+/**
+ * A wrapper class that applies a scalar falloff function to an existing palette's alpha channel.
+ * The scalar result is clamped to [0, 1] and used to scale the alpha.
+ */
+export class AlphaFalloffPalette {
+  /**
+   * @param {function(number): number} falloffFn - A function that takes t [0-1] and returns an alpha scale factor.
+   * @param {Object} palette - The original palette object with a .get(t) method.
+   */
+  constructor(falloffFn, palette) {
+    this.palette = palette;
+    this.falloffFn = falloffFn;
+  }
+
+  /**
+   * Gets the color with alpha scaling applied.
+   * @param {number} t - The position parameter [0, 1].
+   * @returns {{color: THREE.Color, alpha: number}} The scaled color and alpha.
+   */
+  get(t) {
+    const result = this.palette.get(t);
+    let scale = this.falloffFn(t);
+    scale = Math.max(0, Math.min(1, scale)); // Clamp to [0, 1]
+    result.alpha *= scale;
+    return result;
+  }
+}
+
+/**
+ * A wrapper class that cycles the input t by adding an offset.
+ * tPrime = (t + cycle + phase) % 1
+ */
+export class CyclingPalette {
+  /**
+   * @param {number} cycle - The cycle offset [0, 1].
+   * @param {number} [phase=0] - Additional phase offset [0, 1].
+   * @param {Object} palette - The original palette.
+   */
+  constructor(cycle, phase = 0, palette) {
+    // If palette is passed as 2nd arg (phase omitted)
+    if (typeof phase === 'object' && phase.get) {
+      this.palette = phase;
+      this.phase = 0;
+    } else {
+      this.palette = palette;
+      this.phase = phase; // Fix bug: was phase=0 in param default, but if passed explicitly need to use it.
+    }
+    this.cycle = cycle;
+  }
+
+  /**
+   * Gets the color at the cycled position.
+   * @param {number} t - The position parameter [0, 1].
+   * @returns {{color: THREE.Color, alpha: number}} The sampled color and alpha.
+   */
+  get(t) {
+    let tPrime = (t + this.cycle + this.phase) % 1;
+    // Handle negative results from modulo if any inputs are negative
+    if (tPrime < 0) tPrime += 1;
+    return this.palette.get(tPrime);
+  }
+}

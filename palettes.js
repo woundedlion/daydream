@@ -77,45 +77,13 @@ export const Palettes = {
         [32 / 32, 0x000000] //
     ]),
 
-    /** @type {Gradient} A gray-to-black gradient. */
-    grayToBlack: new Gradient(16384, [
-        [0, 0x888888],
-        [1, 0x000000]
-    ]),
-
-    /** @type {Gradient} A blue-to-black gradient. */
-    blueToBlack: new Gradient(256, [
-        [0, 0xee00ee],
-        [1, 0x000000]
-    ]),
-
-    /** @type {Gradient} Generic Gradient 1 (Orange/Red). */
-    g1: new Gradient(256, [
-        [0, 0xffaa00],
-        [1, 0xff0000],
-    ]),
-
-    /** @type {Gradient} Generic Gradient 2 (Blue/Purple). */
-    g2: new Gradient(256, [
-        [0, 0x0000ff],
-        [1, 0x660099],
-    ]),
-
-    /** @type {Gradient} Generic Gradient 3 (Yellow/Orange to Dark Blue/Black). */
-    g3: new Gradient(256, [
-        //  [0, 0xaaaaaa],
-        [0, 0xffff00],
-        [0.3, 0xfc7200],
-        [0.8, 0x06042f],
-        [1, 0x000000]
-    ]),
-
-    /** @type {Gradient} Generic Gradient 4 (Blue to Black). */
-    g4: new Gradient(256, [
-        //  [0, 0xaaaaaa],
-        [0, 0x0000ff],
-        [1, 0x000000]
-    ]),
+    /** @type {ProceduralPalette} pink, yellow, orange, gray. */
+    desertRose: new ProceduralPalette(
+        [0.500, 0.500, 0.500], // A
+        [0.500, 0.270, 0.442], // B
+        [0.303, 1.012, 0.585], // C
+        [0.985, 0.720, 0.212]  // D
+    ),
 
     /** @type {ProceduralPalette} A dark, saturated rainbow palette. */
     darkRainbow: new ProceduralPalette(

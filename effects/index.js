@@ -3,28 +3,26 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-export { Test } from "./Test.js";
-export { RingShower } from "./RingShower.js";
-export { RingSpin } from "./RingSpin.js";
+export { BZReactionDiffusion } from "./BZReactionDiffusion.js";
 export { Comets } from "./Comets.js";
-
+export { DreamBalls } from "./DreamBalls.js";
 export { Dynamo } from "./Dynamo.js";
-export { Thrusters } from "./Thrusters.js";
-export { MetaballEffect } from "./MetaballEffect.js";
 export { FlowField } from "./FlowField.js";
+export { GSReactionDiffusion } from "./GSReactionDiffusion.js";
+export { HopfFibration } from "./HopfFibration.js";
+export { LSystem } from "./LSystem.js";
+export { MetaballEffect } from "./MetaballEffect.js";
+export { MindSplatter } from "./MindSplatter.js";
 export { MobiusGrid } from "./MobiusGrid.js";
 export { Moire } from "./Moire.js";
-export { Portholes } from "./Portholes.js";
-export { GSReactionDiffusion } from "./GSReactionDiffusion.js";
-export { BZReactionDiffusion } from "./BZReactionDiffusion.js";
 export { PetalFlow } from "./PetalFlow.js";
-export { LSystem } from "./LSystem.js";
-
-export { TestShapes } from "./TestShapes.js";
-export { TestParticles } from "./TestParticles.js";
-export { HopfFibration } from "./HopfFibration.js";
-export { Voronoi } from "./Voronoi.js";
+export { RingShower } from "./RingShower.js";
+export { RingSpin } from "./RingSpin.js";
 export { SphericalHarmonics } from "./SphericalHarmonics.js";
 export { SpinShapes } from "./SpinShapes.js";
+export { Test } from "./Test.js";
+export { TestShapes } from "./TestShapes.js";
 export { TestSolids } from "./TestSolids.js";
+export { Thrusters } from "./Thrusters.js";
+export { Voronoi } from "./Voronoi.js";
 
