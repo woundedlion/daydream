@@ -707,12 +707,10 @@ export const Plot = {
             }
         }
 
-        // Deprecated: helper for legacy code, inefficient
         static sample(system) {
-            console.warn("Plot.ParticleSystem.sample is deprecated. Use forEachTrail.");
             const trails = [];
             Plot.ParticleSystem.forEachTrail(system, (points, particle) => {
-                trails.push({ points: [...points], particle }); // Copy points to preserve them
+                trails.push({ points: [...points], particle });
             });
             return trails;
         }
