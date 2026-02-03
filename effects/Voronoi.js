@@ -18,7 +18,7 @@ export class Voronoi {
         this.borderThickness = 0.0;
         this.showBorders = true;
         this.showSites = false;
-        this.smoothness = 50.0;
+        this.smoothness = 100.0;
         this.sites = [];
         this.gui = new gui.GUI({ autoPlace: false });
         this.palette = Palettes.richSunset;
