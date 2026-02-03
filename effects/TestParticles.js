@@ -10,9 +10,8 @@ import {
     MeshOps, mobiusTransform, angleBetween, makeBasis, G
 } from "../geometry.js";
 import { vectorPool, color4Pool } from "../memory.js";
-import {
-    richSunset, rainbow, lavenderLake, GenerativePalette
-} from "../color.js";
+import { GenerativePalette } from "../color.js";
+import { Palettes } from "../palettes.js";
 import {
     Timeline, ParticleSystem, Sprite, RandomWalk, MobiusWarp, Orientation, RandomTimer
 } from "../animation.js";

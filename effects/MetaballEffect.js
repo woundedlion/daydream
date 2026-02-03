@@ -11,8 +11,8 @@ import {
 } from "../geometry.js";
 import { vectorPool } from "../memory.js";
 import {
-    richSunset
-} from "../color.js";
+    Palettes
+} from "../palettes.js";
 import { gui } from "../gui.js";
 
 /**
@@ -22,7 +22,7 @@ import { gui } from "../gui.js";
  */
 export class MetaballEffect {
     constructor() {
-        this.palette = richSunset;
+        this.palette = Palettes.richSunset;
         this.t = 0;
 
         // --- Tunable Knobs ---

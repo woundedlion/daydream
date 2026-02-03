@@ -12,7 +12,7 @@ import { Solids } from "../solids.js";
 import { Plot } from "../plot.js";
 import { Scan } from "../scan.js";
 import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
-import { richSunset, embers, underSea, emeraldForest, lateSunset, iceMelt, mangoPeel, lavenderLake } from "../color.js";
+import { Palettes } from "../palettes.js";
 import { easeInOutSin, easeMid } from "../easing.js";
 import { Daydream } from "../driver.js";
 import { TWO_PI } from "../3dmath.js";
@@ -20,12 +20,12 @@ import { TWO_PI } from "../3dmath.js";
 
 
 const PALETTES = {
-    3: lavenderLake,
-    4: lavenderLake,
-    5: lavenderLake,
-    6: emeraldForest,
-    8: lavenderLake,
-    10: lavenderLake
+    3: Palettes.lavenderLake,
+    4: Palettes.lavenderLake,
+    5: Palettes.lavenderLake,
+    6: Palettes.emeraldForest,
+    8: Palettes.lavenderLake,
+    10: Palettes.lavenderLake
 };
 
 export class TestSolids {
@@ -190,7 +190,7 @@ export class TestSolids {
         const colorFace = (v, t, d, i) => {
             const face = mesh.faces[i];
             const n = face ? face.length : 0;
-            const palette = PALETTES[n] || richSunset;
+            const palette = PALETTES[n] || Palettes.richSunset;
 
             const distFromEdge = -d;
             const intensity = Math.min(1, Math.max(0, distFromEdge * this.params.intensity));

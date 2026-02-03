@@ -11,7 +11,8 @@ import {
 } from "../animation.js";
 import { Scan } from "../scan.js";
 import { makeBasis } from "../geometry.js";
-import { iceMelt, underSea, mangoPeel, richSunset, TransparentVignette } from "../color.js";
+import { TransparentVignette } from "../color.js";
+import { Palettes } from "../palettes.js";
 
 import { createRenderPipeline } from "../filters.js";
 import { dotPool } from "../memory.js";
@@ -32,7 +33,7 @@ export class RingSpin {
         this.alpha = 0.5;
         this.trailLength = 19;
         this.thickness = 2 * Math.PI / Daydream.W;
-        this.palettes = [iceMelt, underSea, mangoPeel, richSunset];
+        this.palettes = [Palettes.iceMelt, Palettes.underSea, Palettes.mangoPeel, Palettes.richSunset];
         this.numRings = 4;
         this.timeline = new Timeline();
         this.debugBB = false; // Added back
