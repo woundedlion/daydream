@@ -14,6 +14,7 @@ import { createRenderPipeline, FilterOrient, FilterAntiAlias } from "../filters.
 import { Plot } from "../plot.js";
 import { invStereo, TWO_PI } from "../3dmath.js";
 import { wrap } from "../util.js";
+import { fragmentPool, color4Pool } from "../memory.js";
 
 export class PetalFlow {
     constructor() {
@@ -97,19 +98,21 @@ export class PetalFlow {
                     im: R * Math.sin(finalTheta)
                 };
                 const pos = this.orientation.orient(invStereo(z));
+                const frag = fragmentPool.acquire();
+                frag.pos.copy(pos);
+                frag.v0 = t;
 
                 if (i > 0) {
-                    Plot.rasterize(this.filters, [prevPos, pos], (p, t) => {
-                        return { color: color, alpha: this.alpha * opacity };
+                    Plot.rasterize(this.filters, [prevPos, frag], (p, f) => {
+                        const alpha = this.alpha * opacity;
+                        return color4Pool.acquire().set(color, alpha);
                     }, false);
                 } else {
                     this.filters.plot(pos, color, 0, this.alpha * opacity);
                 }
-                prevPos = pos;
+                prevPos = frag;
             }
         }
-
-
     }
 
     drawFrame() {

@@ -34,8 +34,7 @@ export const Plot = {
          * @param {Function} colorFn - Function to determine the color (takes vector and t=0).
          * @param {number} [age=0] - The age of the dot (for trails).
          */
-        static draw(pipeline, v, colorFn, age = 0, transformFn = null) {
-            if (transformFn) v = transformFn(v);
+        static draw(pipeline, v, colorFn, age = 0) {
             const res = colorFn(v, 0);
             const color = res.isColor ? res : (res.color || res);
             const alpha = res.alpha !== undefined ? res.alpha : 1.0;
@@ -44,28 +43,14 @@ export const Plot = {
         }
     },
 
-    Path: class {
-        /**
-         * Draws a sequence of points along a Path object.
-         * @param {Object} pipeline - The render pipeline.
-         * @param {Path|ProceduralPath} path - The path object.
-         * @param {Function} colorFn - Function to determine the color (takes normalized time t).
-         * @param {number} [age=0] - The age of the dots.
-         */
-        static draw(pipeline, path, colorFn, age = 0, transformFn = null) {
-            for (let t = 0; t < path.length(); t++) {
-                let v = path.getPoint(t / path.length());
-                if (transformFn) v = transformFn(v);
-                const res = colorFn(t);
-                const color = res.isColor ? res : (res.color || res);
-                const alpha = res.alpha !== undefined ? res.alpha : 1.0;
-                const tag = res.tag;
-                pipeline.plot(v, color, age, alpha, tag);
-            }
-        }
-    },
-
     Line: class {
+        /**
+         * Samples points along a geodesic line between two vectors.
+         * @param {THREE.Vector3} v1 - The start vector.
+         * @param {THREE.Vector3} v2 - The end vector.
+         * @param {number} [numSamples=10] - Number of samples.
+         * @returns {Object[]} Array of fragments {pos, v0}.
+         */
         static sample(v1, v2, numSamples = 10) {
             let u = vectorPool.acquire().copy(v1);
             let v = vectorPool.acquire().copy(v2);
@@ -73,25 +58,56 @@ export const Plot = {
             let axis = vectorPool.acquire().crossVectors(u, v).normalize();
 
             // Handle collinear/coincident points
-            if (Math.abs(angle) < 0.0001) return [vectorPool.acquire().copy(u)];
+            if (Math.abs(angle) < 0.0001) {
+                const f = fragmentPool.acquire();
+                f.pos.copy(u);
+                f.v0 = 0;
+                return [f];
+            }
 
             let points = [];
             for (let i = 0; i <= numSamples; i++) {
                 let t = i / numSamples;
                 let q = quaternionPool.acquire().setFromAxisAngle(axis, angle * t);
-                let p = vectorPool.acquire().copy(u).applyQuaternion(q);
+
+                let p = fragmentPool.acquire();
+                p.pos.copy(u).applyQuaternion(q);
+                p.v0 = t;
+
                 points.push(p);
             }
             return points;
         }
 
+        /**
+         * Draws a geodesic line between two vectors.
+         * @param {Object} pipeline - The render pipeline.
+         * @param {THREE.Vector3} v1 - Start vector.
+         * @param {THREE.Vector3} v2 - End vector.
+         * @param {Function} colorFn - Function to determine color.
+         * @param {number} [start=0] - Start fraction (0-1).
+         * @param {number} [end=1] - End fraction (0-1).
+         * @param {boolean} [longWay=false] - Whether to take the long path around the sphere.
+         * @param {boolean} [omitLast=false] - Whether to omit the last point.
+         * @param {number} [age=0] - Age of the line.
+         * @param {Function} [transformFn=null] - Optional transformation function.
+         */
         static draw(pipeline, v1, v2, colorFn, start = 0, end = 1, longWay = false, omitLast = false, age = 0, transformFn = null) {
+
+            // 1. Calculate Basis for Line (u, v, w) to determine geometry
             let u = vectorPool.acquire().copy(v1);
             let v = vectorPool.acquire().copy(v2);
             let a = angleBetween(u, v);
             let w = vectorPool.acquire();
-            if (Math.abs(a) < 0.0001) { return; }
 
+            // Collinear check
+            if (Math.abs(a) < 0.0001) {
+                // Just draw a dot if we have to? Or nothing?
+                // Minimal fragment creation
+                return;
+            }
+
+            // Normal calculation
             if (Math.abs(Math.PI - a) < 0.0001) {
                 if (Math.abs(u.dot(Daydream.X_AXIS)) > 0.9999) w.crossVectors(u, Daydream.Y_AXIS).normalize();
                 else w.crossVectors(u, Daydream.X_AXIS).normalize();
@@ -99,92 +115,83 @@ export const Plot = {
                 w.crossVectors(u, v).normalize();
             }
 
+            // 2. LongWay Logic
+            // If longWay, we seek the complement arc.
+            // We flip the rotation axis and use 2PI - a
             if (longWay) {
                 a = TWO_PI - a;
                 w.negate();
             }
 
-            // Start offset
+            // 3. Start/End Trimming
+            // Calculate effective start/end angular offsets
+            const angleStart = a * start;
+            const angleEnd = a * end;
+
+            // Adjust u (Start Point)
             if (start !== 0) {
-                const startAngle = start * a;
-                const q = quaternionPool.acquire().setFromAxisAngle(w, startAngle);
+                let q = quaternionPool.acquire().setFromAxisAngle(w, angleStart);
                 u.applyQuaternion(q).normalize();
             }
-            a *= Math.abs(end - start);
+            // Adjust v (End Point)
+            // v is technically u rotated by angleEnd
+            // We need to establish the 'v' position for the p2 fragment
+            // Reuse vector 'v' for p2 pos
+            v.copy(u); // Start with adjusted start position? No, start with original u?
+            // Let's just calculate p2 from original u + rotation
+            let p2Vec = vectorPool.acquire().copy(v1); // Original start
+            // If longWay was processed, w is flipped, so rotating by +angleEnd moves along the path correctly.
+            let qEnd = quaternionPool.acquire().setFromAxisAngle(w, angleEnd);
+            p2Vec.applyQuaternion(qEnd).normalize();
 
-            // Simulate seam
-            // u(theta).y = uStart.y * cos(theta) + tangent.y * sin(theta)
-            const uStart_y = u.y;
-            const tangent_y = w.z * u.x - w.x * u.z;
-            let simAngle = 0;
-            const steps = [];
-            const baseStep = TWO_PI / Daydream.W;
-            while (simAngle < a) {
-                // Height
-                const cosT = Math.cos(simAngle);
-                const sinT = Math.sin(simAngle);
-                const currentY = uStart_y * cosT + tangent_y * sinT;
+            // 4. Create Fragments
+            const p1 = fragmentPool.acquire();
+            const p2 = fragmentPool.acquire();
 
-                // Adaptive Step
-                const scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - currentY * currentY)));
-                const step = baseStep * scaleFactor;
+            p1.pos.copy(u);
+            p1.v0 = start;
 
-                steps.push(step);
-                simAngle += step;
+            p2.pos.copy(p2Vec);
+            p2.v0 = end;
+
+            if (transformFn) {
+                p1.pos.copy(transformFn(p1.pos));
+                p2.pos.copy(transformFn(p2.pos));
             }
 
-            // Normalize
-            let scale = a / simAngle;
-            let currentAngle = 0;
-            const startRes = colorFn(u, 0);
-            const startColor = startRes.isColor ? startRes : (startRes.color || startRes);
-            const startAlpha = startRes.alpha !== undefined ? startRes.alpha : 1.0;
-            const startTag = startRes.tag;
+            // 5. To support LongWay in Rasterize:
+            // Rasterize naturally takes shortest path.
+            // If the segment p1->p2 is > PI, Rasterize will go the "short" way (wrong way).
+            // We must detect if the requested arc is > PI.
+            // Current 'a' is the arc length *after* longWay logic but *before* start/end trim.
+            // The actual arc length drawn is 'a * (end - start)'.
+            const arcLength = Math.abs(angleEnd - angleStart);
 
-            let pStart = u;
-            if (transformFn) pStart = transformFn(pStart);
-            pipeline.plot(pStart, startColor, age, startAlpha, startTag);
+            const points = [p1];
 
-            const loopLimit = omitLast ? steps.length - 1 : steps.length;
-            for (let i = 0; i < loopLimit; i++) {
-                const step = steps[i] * scale;
-                const q = quaternionPool.acquire().setFromAxisAngle(w, step);
-                u.applyQuaternion(q).normalize();
-                currentAngle += step;
-                const t = (a > 0) ? (currentAngle / a) : 1;
-                const res = colorFn(u, t);
-                const color = res.isColor ? res : (res.color || res);
-                const alpha = res.alpha !== undefined ? res.alpha : 1.0;
-                const tag = res.tag;
+            // If arc > PI, split it.
+            if (arcLength > Math.PI) {
+                // Insert Midpoint
+                const midAngle = (angleStart + angleEnd) / 2;
+                const pMid = fragmentPool.acquire();
 
-                let p = u;
-                if (transformFn) p = transformFn(p);
-                pipeline.plot(p, color, age, alpha, tag);
+                // Calculate Pos
+                const tempVec = vectorPool.acquire().copy(v1); // Original start
+                const qMid = quaternionPool.acquire().setFromAxisAngle(w, midAngle);
+                pMid.pos.copy(tempVec.applyQuaternion(qMid).normalize());
+                pMid.v0 = (start + end) / 2;
+
+                if (transformFn) pMid.pos.copy(transformFn(pMid.pos));
+
+                points.push(pMid);
             }
+
+            points.push(p2);
+
+            Plot.rasterize(pipeline, points, colorFn, false, age);
         }
-    },
 
-    Vertices: class {
-        /**
-         * Draws a set of vertices as individual dots.
-         * @param {Object} pipeline - The render pipeline.
-         * @param {number[][]} vertices - An array of [x, y, z] arrays.
-         * @param {Function} colorFn - Function to determine the color (takes vector).
-         * @param {number} [age=0] - The age of the dots.
-         */
-        static draw(pipeline, vertices, colorFn, age = 0, transformFn = null) {
-            let v = vectorPool.acquire();
-            for (const vertex of vertices) {
-                v.set(vertex[0], vertex[1], vertex[2]);
-                let p = v;
-                if (transformFn) p = transformFn(p);
-                const res = colorFn(v);
-                const color = res.isColor ? res : (res.color || res);
-                const alpha = res.alpha !== undefined ? res.alpha : 1.0;
-                const tag = res.tag;
-                pipeline.plot(p, color, age, alpha, tag);
-            }
-        }
+
     },
 
     Polyhedron: class {
@@ -265,14 +272,14 @@ export const Plot = {
         static draw(pipeline, mesh, colorFn, age = 0, transformFn = null) {
             const edges = Plot.Mesh.sample(mesh);
             for (const edge of edges) {
-                let points = edge;
                 if (transformFn) {
-                    points = [];
                     for (let i = 0; i < edge.length; i++) {
-                        points.push(transformFn(edge[i]));
+                        const frag = edge[i];
+                        const transformed = transformFn(frag.pos);
+                        frag.pos.copy(transformed);
                     }
                 }
-                Plot.rasterize(pipeline, points, colorFn, false, age);
+                Plot.rasterize(pipeline, edge, colorFn, false, age);
             }
         }
     },
@@ -393,103 +400,92 @@ export const Plot = {
 
     PlanarLine: class {
         /**
-         * Draws a line that is straight in the Azimuthal Equidistant projection centered at 'center'.
-         * @param {Object} pipeline - Render pipeline.
-         * @param {THREE.Vector3} v1 - Start point (normalized).
-         * @param {THREE.Vector3} v2 - End point (normalized).
-         * @param {THREE.Vector3} center - Center of projection (normalized).
-         * @param {Function} colorFn - (t) => {color, alpha}.
-         * @param {number} [age=0] - The age of the dots.
+         * Samples the endpoints of a planar line.
+         * @param {THREE.Vector3} v1 - Start point.
+         * @param {THREE.Vector3} v2 - End point.
+         * @returns {Object[]} Array of fragments.
          */
-        static draw(pipeline, v1, v2, center, colorFn, age = 0) {
-            // Basis
-            let refAxis = Daydream.X_AXIS;
-            if (Math.abs(center.dot(refAxis)) > 0.9999) {
-                refAxis = Daydream.Y_AXIS;
-            }
-            const v = center.clone(); // The 'pole'
-            const ref = Math.abs(v.dot(Daydream.X_AXIS)) > 0.9 ? Daydream.Y_AXIS : Daydream.X_AXIS;
-            const u = vectorPool.acquire().crossVectors(v, ref).normalize();
-            const w = vectorPool.acquire().crossVectors(v, u).normalize();
+        static sample(v1, v2) {
+            const p1 = fragmentPool.acquire();
+            p1.pos.copy(v1);
+            p1.v0 = 0;
 
-            const project = (p) => {
-                const R = angleBetween(p, v);
-                if (R < 0.0001) return new THREE.Vector2(0, 0);
-                const x = p.dot(u);
-                const y = p.dot(w);
-                const theta = Math.atan2(y, x);
-                return new THREE.Vector2(R * Math.cos(theta), R * Math.sin(theta));
-            };
+            const p2 = fragmentPool.acquire();
+            p2.pos.copy(v2);
+            p2.v0 = 1;
 
-            const p1 = project(v1);
-            const p2 = project(v2);
+            return [p1, p2];
+        }
 
-            const dist = p1.distanceTo(p2);
-            const numSteps = Math.max(2, Math.ceil(dist * Daydream.W / (TWO_PI)));
-
-            let pTemp = vectorPool.acquire();
-
-            for (let i = 0; i < numSteps; i++) {
-                const t = i / (numSteps - 1);
-                const Px = p1.x + (p2.x - p1.x) * t;
-                const Py = p1.y + (p2.y - p1.y) * t;
-
-                const R = Math.sqrt(Px * Px + Py * Py);
-                const theta = Math.atan2(Py, Px);
-
-                let point = vectorPool.acquire().copy(v);
-                if (R > 0.0001) {
-                    const sinR = Math.sin(R);
-                    const cosR = Math.cos(R);
-                    const cosT = Math.cos(theta);
-                    const sinT = Math.sin(theta);
-
-                    // dir = u*cosT + w*sinT
-                    const dir = vectorPool.acquire().copy(u).multiplyScalar(cosT).addScaledVector(w, sinT).normalize();
-                    // p = v*cosR + dir*sinR
-                    point.multiplyScalar(cosR).addScaledVector(dir, sinR).normalize();
+        /**
+         * Draws a line using Azimuthal Equidistant projection.
+         * @param {Object} pipeline - Render pipeline.
+         * @param {THREE.Vector3} v1 - Start point.
+         * @param {THREE.Vector3} v2 - End point.
+         * @param {THREE.Vector3} center - Center of projection.
+         * @param {Function} colorFn - Function to determine color.
+         * @param {number} [age=0] - Age of the line.
+         * @param {Function} [transformFn=null] - Optional transformation function.
+         */
+        static draw(pipeline, v1, v2, center, colorFn, age = 0, transformFn = null) {
+            const points = Plot.PlanarLine.sample(v1, v2);
+            if (transformFn) {
+                for (const p of points) {
+                    const transformed = transformFn(p.pos);
+                    p.pos.copy(transformed);
                 }
-
-                const res = colorFn(t);
-                const color = res.isColor ? res : (res.color || res);
-                const alpha = res.alpha !== undefined ? res.alpha : 1.0;
-                const tag = res.tag;
-                pipeline.plot(point, color, age, alpha, tag);
             }
+            Plot.rasterize(pipeline, points, (v, frag) => colorFn(frag.v0), false, age, center);
         }
     },
 
     Polygon: class {
         /**
-         * Draws a polygon on the sphere surface.
-         * @param {Object} pipeline - Render pipeline.
-         * @param {THREE.Quaternion} orientationQuaternion - The orientation of the polygon.
-         * @param {THREE.Vector3} normal - The normal vector.
+         * Samples points for a regular polygon on the sphere.
+         * @param {Object} basis - The coordinate basis {u, v, w}.
+         * @param {number} radius - The radius of the polygon.
+         * @param {number} numSides - Number of sides.
+         * @param {number} [phase=0] - Starting phase.
+         * @returns {THREE.Vector3[]} Array of points.
+         */
+        static sample(basis, radius, numSides, phase = 0) {
+            const offset = Math.PI / numSides;
+            return Plot.Ring.sample(basis, radius, numSides, phase + offset);
+        }
+
+        /**
+         * Draws a regular polygon on the sphere surface.
+         * @param {Object} pipeline - The render pipeline.
+         * @param {Object} basis - The coordinate basis {u, v, w}.
          * @param {number} radius - The radius.
          * @param {number} numSides - Number of sides.
          * @param {Function} colorFn - Function to determine color.
          * @param {number} [phase=0] - Starting phase.
+         * @param {number} [age=0] - Age of the polygon.
+         * @param {Function} [transformFn=null] - Optional transformation function.
          */
         static draw(pipeline, basis, radius, numSides, colorFn, phase = 0, age = 0, transformFn = null) {
             let points = Plot.Polygon.sample(basis, radius, numSides, phase);
             if (transformFn) {
-                points = points.map(p => {
-                    const newP = transformFn(p);
-                    newP.v0 = p.v0;
-                    return newP;
-                });
+                for (const p of points) {
+                    const transformed = transformFn(p.pos);
+                    p.pos.copy(transformed);
+                }
             }
-            Plot.rasterize(pipeline, points, colorFn, true, age);
+            Plot.rasterize(pipeline, points, colorFn, true, age, basis.v);
         }
 
-        static sample(basis, radius, numSides, phase = 0) {
-            // Offset sectors
-            const offset = Math.PI / numSides;
-            return Plot.Ring.sample(basis, radius, numSides, phase + offset);
-        }
     },
 
     Star: class {
+        /**
+         * Samples points for a star shape on the sphere.
+         * @param {Object} basis - The coordinate basis {u, v, w}.
+         * @param {number} radius - The outer radius.
+         * @param {number} numSides - Number of points on the star.
+         * @param {number} [phase=0] - Starting phase.
+         * @returns {THREE.Vector3[]} Array of points.
+         */
         static sample(basis, radius, numSides, phase = 0) {
             // Basis
             let { v, u, w } = basis;
@@ -528,20 +524,38 @@ export const Plot = {
             return points;
         }
 
+        /**
+         * Draws a star shape on the sphere surface.
+         * @param {Object} pipeline - Render pipeline.
+         * @param {Object} basis - The coordinate basis {u, v, w}.
+         * @param {number} radius - The outer radius.
+         * @param {number} numSides - Number of points.
+         * @param {Function} colorFn - Function to determine color.
+         * @param {number} [phase=0] - Starting phase.
+         * @param {number} [age=0] - Age of the star.
+         * @param {Function} [transformFn=null] - Optional transformation function.
+         */
         static draw(pipeline, basis, radius, numSides, colorFn, phase = 0, age = 0, transformFn = null) {
             let points = Plot.Star.sample(basis, radius, numSides, phase);
             if (transformFn) {
-                points = points.map(p => {
-                    const newP = transformFn(p);
-                    newP.v = p.v;
-                    return newP;
-                });
+                for (const p of points) {
+                    const transformed = transformFn(p.pos);
+                    p.pos.copy(transformed);
+                }
             }
-            Plot.rasterize(pipeline, points, colorFn, true, age);
+            Plot.rasterize(pipeline, points, colorFn, true, age, basis.v);
         }
     },
 
     Flower: class {
+        /**
+         * Samples points for a flower shape on the sphere.
+         * @param {Object} basis - The coordinate basis {u, v, w}.
+         * @param {number} radius - The radius.
+         * @param {number} numSides - Number of petals.
+         * @param {number} [phase=0] - Starting phase.
+         * @returns {Object[]} Array of fragments.
+         */
         static sample(basis, radius, numSides, phase = 0) {
             let { v, u, w } = basis;
 
@@ -603,46 +617,30 @@ export const Plot = {
             return points;
         }
 
+        /**
+         * Draws a flower shape on the sphere surface.
+         * @param {Object} pipeline - Render pipeline.
+         * @param {Object} basis - The coordinate basis {u, v, w}.
+         * @param {number} radius - The radius.
+         * @param {number} numSides - Number of petals.
+         * @param {Function} colorFn - Function to determine color.
+         * @param {number} [phase=0] - Starting phase.
+         * @param {number} [age=0] - Age of the flower.
+         * @param {Function} [transformFn=null] - Optional transformation function.
+         */
         static draw(pipeline, basis, radius, numSides, colorFn, phase = 0, age = 0, transformFn = null) {
             let points = Plot.Flower.sample(basis, radius, numSides, phase);
             if (transformFn) {
-                points = points.map(p => {
-                    const newP = transformFn(p);
-                    newP.v = p.v;
-                    return newP;
-                });
+                for (const p of points) {
+                    const transformed = transformFn(p.pos);
+                    p.pos.copy(transformed);
+                }
             }
-            Plot.rasterize(pipeline, points, colorFn, false, age);
+            Plot.rasterize(pipeline, points, colorFn, false, age, basis.v);
         }
     },
 
     DistortedRing: class {
-
-
-        /**
-         * Calculates a single point on a sphere distorted by a function.
-         * @param {Function} f - The shift function.
-         * @param {THREE.Vector3} normal - The normal.
-         * @param {number} radius - The base radius.
-         * @param {number} angle - The angle.
-         */
-        static point(f, basis, radius, angle) { // f, basis, radius, angle
-            let { u, v, w } = basis;
-
-            if (radius > 1) {
-                // Flip basis
-                v = vectorPool.acquire().copy(v).negate();
-                u = vectorPool.acquire().copy(u).negate();
-                radius = 2 - radius;
-            }
-
-            let vi = Plot.Ring.calcPoint(angle, radius, u, v, w);
-            let vp = Plot.Ring.calcPoint(angle, 1, u, v, w);
-            let axis = vectorPool.acquire().crossVectors(v, vp).normalize();
-            let shift = new THREE.Quaternion().setFromAxisAngle(axis, f(angle * Math.PI / 2));
-            return vi.applyQuaternion(shift);
-        }
-
         /**
          * Samples points for a function-distorted ring.
          * @param {THREE.Quaternion} orientationQuaternion - Orientation.
@@ -710,11 +708,10 @@ export const Plot = {
         static draw(pipeline, basis, radius, shiftFn, colorFn, phase = 0, age = 0, transformFn = null) {
             let points = Plot.DistortedRing.sample(basis, radius, shiftFn, phase);
             if (transformFn) {
-                points = points.map(p => {
-                    const newP = transformFn(p);
-                    newP.v = p.v;
-                    return newP;
-                });
+                for (const p of points) {
+                    const transformed = transformFn(p.pos);
+                    p.pos.copy(transformed);
+                }
             }
             Plot.rasterize(pipeline, points, colorFn, true, age);
         }
@@ -784,6 +781,11 @@ export const Plot = {
             }
         }
 
+        /**
+         * Samples all trails from the particle system.
+         * @param {ParticleSystem} system - The particle system.
+         * @returns {Object[]} Array of {points, particle} objects.
+         */
         static sample(system) {
             const trails = [];
             Plot.ParticleSystem.forEachTrail(system, (points, particle) => {
@@ -792,6 +794,13 @@ export const Plot = {
             return trails;
         }
 
+        /**
+         * Draws the trails of a particle system.
+         * @param {Object} pipeline - Render pipeline.
+         * @param {ParticleSystem} particleSystem - The particle system.
+         * @param {Function} colorFn - Function to determine color.
+         * @param {Function} [transformFn=null] - Optional transformation function.
+         */
         static draw(pipeline, particleSystem, colorFn, transformFn = null) {
             Plot.ParticleSystem.forEachTrail(particleSystem, (points, particle) => {
                 if (transformFn) {
@@ -812,53 +821,195 @@ export const Plot = {
      * @param {boolean} [closeLoop=false] - If true, connects the last point to the first.
      * @param {number} [age=0] - The age of the dots.
      */
-    rasterize: (pipeline, points, colorFn, closeLoop = false, age = 0) => {
+    /**
+     * Rasterizes a list of points into Dot objects by connecting them with geodesic lines.
+     * @param {Object} pipeline - The render pipeline.
+     * @param {THREE.Vector3[]|Object[]} points - The list of points (Vectors or Objects with {pos, v}).
+     * @param {Function} colorFn - Function to determine color.
+     * @param {boolean} [closeLoop=false] - If true, connects the last point to the first.
+     * @param {number} [age=0] - The age of the dots.
+     * @param {THREE.Vector3} [projectionCenter=null] - If provided, uses Planar (Azimuthal Equidistant) interpolation relative to this center.
+     */
+    rasterize: (pipeline, points, colorFn, closeLoop = false, age = 0, projectionCenter = null) => {
         const len = points.length;
         if (len < 2) return;
 
-        // Detect Shader Mode: Do the points have a 'v0' property?
-        const isShader = (points[0].v0 !== undefined);
+        // Planar Basis Setup
+        let uPlanar, wPlanar, vPlanar;
+        if (projectionCenter) {
+            vPlanar = projectionCenter; // Assume normalized
+            const ref = Math.abs(vPlanar.dot(Daydream.X_AXIS)) > 0.9 ? Daydream.Y_AXIS : Daydream.X_AXIS;
+            uPlanar = vectorPool.acquire().crossVectors(vPlanar, ref).normalize();
+            wPlanar = vectorPool.acquire().crossVectors(vPlanar, uPlanar).normalize();
+        }
+
+        const project = (p) => {
+            const R = angleBetween(p, vPlanar);
+            if (R < 0.0001) return { x: 0, y: 0 };
+            const x = p.dot(uPlanar);
+            const y = p.dot(wPlanar);
+            const theta = Math.atan2(y, x);
+            return { x: R * Math.cos(theta), y: R * Math.sin(theta) };
+        };
 
         const count = closeLoop ? len : len - 1;
         for (let i = 0; i < count; i++) {
             const current = points[i];
             const next = points[(i + 1) % len];
 
-            // 1. Get Positions
-            // Support both Wrapper {pos, v} and Augmented Vector check (current.pos undefined if Vector)
-            const p1 = (current.pos) ? current.pos : current;
-            const p2 = (next.pos) ? next.pos : next;
+            const p1 = current.pos || current;
+            const p2 = next.pos || next;
 
-            // 2. Create the "Fragment Shader" Closure
-            let segmentColorFn;
+            // Interpolator
+            const segmentColorFn = (p, subT) => {
+                const cV0 = current.v0 !== undefined ? current.v0 : 0;
+                const nV0 = next.v0 !== undefined ? next.v0 : 1;
 
-            if (isShader) {
-                // --- SHADER MODE ---
-                // The Rasterizer (this loop) handles interpolation
-                segmentColorFn = (p, subT) => {
-                    // subT is 0..1 along the segment
-                    // Optimized Zero-Allocation Interpolation using Registers
-                    _scratchFrag.v0 = current.v0 * (1 - subT) + next.v0 * subT;
+                _scratchFrag.v0 = cV0 * (1 - subT) + nV0 * subT;
+
+                // Copy other props if they exist, else default
+                // Optimization: Only lerp if they exist? 
+                // For now, simple safety:
+                if (current.v1 !== undefined && next.v1 !== undefined) {
                     _scratchFrag.v1 = current.v1 * (1 - subT) + next.v1 * subT;
+                }
+                if (current.v2 !== undefined && next.v2 !== undefined) {
                     _scratchFrag.v2 = current.v2 * (1 - subT) + next.v2 * subT;
+                }
+                if (current.v3 !== undefined && next.v3 !== undefined) {
                     _scratchFrag.v3 = current.v3 * (1 - subT) + next.v3 * subT;
+                }
 
-                    // Pass scratch fragment to color function
-                    // NOTE: The color function must use .v0, .v1 etc immediately
-                    return colorFn(p, _scratchFrag);
-                };
+                return colorFn(p, _scratchFrag);
+            };
+
+            if (projectionCenter) {
+                // Azimuthal projection
+                const proj1 = project(p1);
+                const proj2 = project(p2);
+
+                const dx = proj2.x - proj1.x;
+                const dy = proj2.y - proj1.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const numSteps = Math.max(2, Math.ceil(dist * Daydream.W / TWO_PI));
+
+                let pTemp = vectorPool.acquire();
+
+                const startRes = segmentColorFn(p1, 0);
+                const startAlpha = startRes.alpha !== undefined ? startRes.alpha : 1.0;
+                pipeline.plot(p1, startRes.isColor ? startRes : (startRes.color || startRes), age, startAlpha, startRes.tag);
+
+                const loopLimit = numSteps; // We iterate 1..numSteps
+
+                for (let j = 1; j <= loopLimit; j++) {
+                    const t = j / numSteps;
+
+                    if ((closeLoop || i < count - 1) && j === numSteps) continue;
+
+                    const Px = proj1.x + dx * t;
+                    const Py = proj1.y + dy * t;
+
+                    const R = Math.sqrt(Px * Px + Py * Py);
+                    const theta = Math.atan2(Py, Px);
+
+                    pTemp.copy(vPlanar);
+                    if (R > 0.0001) {
+                        const sinR = Math.sin(R);
+                        const cosR = Math.cos(R);
+                        const cosT = Math.cos(theta);
+                        const sinT = Math.sin(theta);
+
+                        // dir = u*cosT + w*sinT
+                        const dir = vectorPool.acquire().copy(uPlanar).multiplyScalar(cosT).addScaledVector(wPlanar, sinT).normalize();
+                        pTemp.multiplyScalar(cosR).addScaledVector(dir, sinR).normalize();
+                    }
+
+                    const res = segmentColorFn(pTemp, t);
+                    const color = res.isColor ? res : (res.color || res);
+                    const alpha = res.alpha !== undefined ? res.alpha : 1.0;
+                    pipeline.plot(pTemp, color, age, alpha, res.tag);
+                }
+
             } else {
-                // --- LEGACY MODE ---
-                // Just pass global progress
-                segmentColorFn = (p, subT) => {
-                    const globalT = (i + subT) / count;
-                    return colorFn(p, globalT);
-                };
-            }
+                // Geodesic interpolation
+                let u = vectorPool.acquire().copy(p1);
+                const v = p2; // Read-only
+                let a = angleBetween(u, v);
+                let w = vectorPool.acquire();
 
-            const omitLast = closeLoop || (i < count - 1);
-            Plot.Line.draw(pipeline, p1, p2, segmentColorFn, 0, 1, false, omitLast, age);
+                // Handle tiny segments
+                if (Math.abs(a) < 0.0001) {
+                    const c = segmentColorFn(u, 0);
+                    const color = c.isColor ? c : (c.color || c);
+                    const alpha = c.alpha !== undefined ? c.alpha : 1.0;
+                    pipeline.plot(u, color, age, alpha, c.tag);
+                    continue;
+                }
+
+                // Normal calculation
+                if (Math.abs(Math.PI - a) < 0.0001) {
+                    if (Math.abs(u.dot(Daydream.X_AXIS)) > 0.9999) w.crossVectors(u, Daydream.Y_AXIS).normalize();
+                    else w.crossVectors(u, Daydream.X_AXIS).normalize();
+                } else {
+                    w.crossVectors(u, v).normalize();
+                }
+
+                // Adaptive Geodesic Walk
+                const baseStep = TWO_PI / Daydream.W;
+                const uStart_y = u.y;
+                const tangent_y = w.z * u.x - w.x * u.z;
+
+                let simAngle = 0;
+                const steps = [];
+
+                // Generate adaptive steps
+                while (simAngle < a) {
+                    const cosT = Math.cos(simAngle);
+                    const sinT = Math.sin(simAngle);
+                    const currentY = uStart_y * cosT + tangent_y * sinT;
+
+                    // Adaptive Step (based on Polar Distortion / Screen Y)
+                    const scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - currentY * currentY)));
+                    const step = Math.min(baseStep * scaleFactor, a - simAngle);
+
+                    if (step < 0.00001) break;
+
+                    steps.push(step);
+                    simAngle += step;
+                }
+
+                // Normalize steps to exactly match angle 'a'
+                const scale = (simAngle > 0) ? (a / simAngle) : 0;
+
+                // Plot Start
+                const startRes = segmentColorFn(u, 0);
+                const startAlpha = startRes.alpha !== undefined ? startRes.alpha : 1.0;
+                pipeline.plot(u, startRes.isColor ? startRes : (startRes.color || startRes), age, startAlpha, startRes.tag);
+
+                // Walk
+                const omitLast = closeLoop || (i < count - 1);
+                const loopLimit = omitLast ? steps.length - 1 : steps.length;
+
+                let currentAngle = 0;
+
+                for (let j = 0; j < loopLimit; j++) {
+                    const step = steps[j] * scale;
+                    currentAngle += step;
+
+                    let p = vectorPool.acquire().copy(p1);
+                    let q = quaternionPool.acquire().setFromAxisAngle(w, currentAngle);
+                    p.applyQuaternion(q).normalize();
+
+                    const subT = (a > 0.0001) ? (currentAngle / a) : 1;
+                    const res = segmentColorFn(p, subT);
+                    const color = res.isColor ? res : (res.color || res);
+                    const alpha = res.alpha !== undefined ? res.alpha : 1.0;
+
+                    pipeline.plot(p, color, age, alpha, res.tag);
+                }
+            }
         }
     }
 
 };
+

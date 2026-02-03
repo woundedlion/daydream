@@ -187,19 +187,31 @@ export class IslamicStars {
             faces: mesh.faces
         };
 
-        const colorFace = (v, t, d, i) => {
+        const colorFaceShader = (v, vertexIdx, faceIdx) => {
+            // Vertex Shader: v0 used for faceIndex
+            // faceIdx is now passed as the 3rd argument from Scan.Mesh.draw
+            return {
+                v0: faceIdx
+            };
+        };
+
+        colorFaceShader.color = (data, t, dist) => {
+            // Fragment Shader: read v0 for faceIndex
+            const i = Math.round(data.v0);
             const face = mesh.faces[i];
             const n = face ? face.length : 0;
             const palette = PALETTES[n] || Palettes.richSunset;
 
-            const distFromEdge = -d;
+            // Use the 'dist' passed from Scan.Mesh.draw (SDF distance)
+            const distFromEdge = -dist;
             const intensity = Math.min(1, Math.max(0, distFromEdge * this.params.intensity));
             const c = palette.get(intensity).color;
             return color4Pool.acquire().set(c, op);
         };
+
         const colorWhite = (v) => color4Pool.acquire().set(1, 1, 1, op); //#003c3e
 
-        if (this.params.scan) Scan.Mesh.draw(this.pipeline, drawnMesh, colorFace, this.params.debugBB);
+        if (this.params.scan) Scan.Mesh.draw(this.pipeline, drawnMesh, colorFaceShader, this.params.debugBB);
         if (this.params.plot) Plot.Mesh.draw(this.pipeline, drawnMesh, colorWhite);
     }
 }
