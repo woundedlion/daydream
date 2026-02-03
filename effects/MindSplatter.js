@@ -9,7 +9,7 @@ import { Daydream } from "../driver.js";
 import {
     MeshOps, mobiusTransform, angleBetween, makeBasis, G
 } from "../geometry.js";
-import { vectorPool, color4Pool } from "../memory.js";
+import { vectorPool, color4Pool, fragmentPool } from "../memory.js";
 import { GenerativePalette } from "../color.js";
 import { Palettes } from "../palettes.js";
 import {
@@ -41,7 +41,7 @@ export class MindSplatter {
         this.timeline = new Timeline();
         this.particleSystem = new ParticleSystem(2048, this.friction, 0.001, this.trailLength);
         this.particleSystem.resolutionScale = 2;
-        this.holeAlphasBuffer = [];
+
         this.timeline.add(0, this.particleSystem);
         this.timeline.add(0, new Sprite((opacity) => this.drawParticles(opacity), -1));
         this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
@@ -142,58 +142,48 @@ export class MindSplatter {
         }
     }
 
-    particleColor(p, t, holeAlphas) {
-        const c = p.palette.get(t);
-        let age = t * this.particleSystem.trailLength;
-        let particleAgeAlpha = (Math.max(0, p.life) + age) / p.maxLife;
-        let trailAgeAlpha = 1.0 - t;
-
-        let holeAlpha = 1.0;
-        if (holeAlphas) {
-            const idx = t * (holeAlphas.length - 1);
-            const i = Math.floor(idx);
-            const f = idx - i;
-            const a1 = holeAlphas[Math.min(i, holeAlphas.length - 1)];
-            const a2 = holeAlphas[Math.min(i + 1, holeAlphas.length - 1)];
-            holeAlpha = a1 * (1 - f) + a2 * f;
-        }
-
-        c.alpha *= trailAgeAlpha * particleAgeAlpha * holeAlpha;
-        return c;
-    }
-
     drawParticles(opacity) {
-        Plot.ParticleSystem.forEachTrail(this.particleSystem, (points, particle) => {
-            // 1. Calculate hole alphas in geometry space
-            this.holeAlphasBuffer.length = 0;
-            const holeAlphas = this.holeAlphasBuffer;
-            const attractors = this.particleSystem.attractors;
+        // We iterate trails, but delegate the "drawing" logic to our generic shader
+        Plot.ParticleSystem.draw(
+            this.pipeline,
+            this.particleSystem,
+            // --- FRAGMENT SHADER ---
+            (pos, v, particle) => {
+                // v is now the _scratchFrag from rasterize, with v0..v3 populated
+                const lifeAlpha = v.v1;
+                const holeAlpha = v.v0;
 
-            for (let i = 0; i < points.length; i++) {
-                let alpha = 1.0;
-                for (const attr of attractors) {
-                    const dist = angleBetween(points[i], attr.position);
+                const c = particle.palette.get(lifeAlpha);
+                c.alpha *= holeAlpha * opacity;
+                return c;
+            },
+            // --- VERTEX SHADER ---
+            (point, particle, i, total) => {
+                // 1. Calculate Hole Alpha (Physics/Logic)
+                let holeAlpha = 1.0;
+                for (const attr of this.particleSystem.attractors) {
+                    const dist = angleBetween(point, attr.position);
                     if (dist < attr.eventHorizon) {
-                        let t = dist / attr.eventHorizon;
-                        t = quinticKernel(t);
-                        alpha *= t;
+                        holeAlpha *= quinticKernel(dist / attr.eventHorizon);
                     }
                 }
-                holeAlphas.push(alpha);
-            }
 
-            // 2. Transform positions
-            for (let i = 0; i < points.length; i++) {
-                points[i] = this.orientation.orient(mobiusTransform(points[i], this.mobius));
-            }
+                // 2. Output Fragment (Platinum Standard Zero-Alloc)
+                const frag = fragmentPool.acquire();
 
-            // 3. Rasterize with interpolation
-            Plot.rasterize(this.pipeline, points, (pos, t) => {
-                const c = this.particleColor(particle, t, holeAlphas);
-                c.alpha *= opacity;
-                return c;
-            }, false, 0);
-        });
+                // 3. Transform Position (Geometry) - IN PLACE
+                // mobiusTransform writes directly to frag.pos
+                mobiusTransform(point, this.mobius, frag.pos);
+                // orient writes directly to frag.pos (target = frag.pos)
+                this.orientation.orient(frag.pos, undefined, frag.pos);
+
+                // 4. Write Data Registers
+                frag.v0 = holeAlpha;
+                frag.v1 = i / total; // lifeAlpha
+
+                return frag;
+            }
+        );
     }
 
     drawFrame() {

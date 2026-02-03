@@ -7,13 +7,25 @@ import * as THREE from "three";
 import { Daydream } from "./driver.js";
 import { angleBetween, fibSpiral, makeBasis } from "./geometry.js";
 import { TWO_PI } from "./3dmath.js";
-import { dotPool, vectorPool, quaternionPool } from "./memory.js";
+import { dotPool, vectorPool, quaternionPool, fragmentPool } from "./memory.js";
 import { Dot } from "./geometry.js";
 import { Path, ProceduralPath, deepTween } from "./animation.js";
+
+const _scratchFrag = new fragmentPool.Type(); // Reused Fragment for interpolation
+const _scratchVec = new THREE.Vector3();
 
 
 
 export const Plot = {
+    Shader: {
+        lerp: (a, b, t) => {
+            if (typeof a === 'number') return a * (1 - t) + b * t;
+            const res = {};
+            for (const k in a) res[k] = a[k] * (1 - t) + b[k] * t;
+            return res;
+        },
+    },
+
     Point: class {
         /**
          * Draws a single dot at a given vector.
@@ -317,7 +329,13 @@ export const Plot = {
                 let cosRing = Math.cos(t);
                 let sinRing = Math.sin(t);
                 uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
-                let p = vectorPool.acquire().copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
+
+                // Platinum Standard: Acquire Fragment
+                let p = fragmentPool.acquire();
+                p.pos.copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
+
+                // Write data
+                p.v = i / numSamples;
                 points.push(p);
             }
             return points;
@@ -333,10 +351,42 @@ export const Plot = {
          * @param {number} [phase=0] - Starting phase.
          */
         static draw(pipeline, basis, radius, colorFn, phase = 0, age = 0, transformFn = null) {
-            let points = Plot.Ring.sample(basis, radius, Daydream.W / 4, phase);
-            if (transformFn) {
-                points = points.map(transformFn);
+            const { u, v, w } = basis;
+            // Backside
+            let vDir = v.clone();
+            let rVal = radius;
+            if (rVal > 1) {
+                vDir.negate();
+                rVal = 2 - rVal;
             }
+
+            const thetaEq = rVal * (Math.PI / 2);
+            const r = Math.sin(thetaEq);
+            const d = Math.cos(thetaEq);
+
+            const numSamples = Daydream.W / 4;
+            const step = TWO_PI / numSamples;
+            const points = [];
+            let uTemp = vectorPool.acquire();
+
+            for (let i = 0; i < numSamples; i++) {
+                let theta = i * step;
+                let t = theta + phase;
+                let cosRing = Math.cos(t);
+                let sinRing = Math.sin(t);
+                uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
+
+                // Platinum Standard: Acquire Fragment
+                let p = fragmentPool.acquire();
+                p.pos.copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
+
+                if (transformFn) p.pos.copy(transformFn(p.pos));
+
+                // Write data
+                p.v = i / numSamples;
+                points.push(p);
+            }
+
             Plot.rasterize(pipeline, points, colorFn, true, age);
         }
     },
@@ -423,7 +473,11 @@ export const Plot = {
         static draw(pipeline, basis, radius, numSides, colorFn, phase = 0, age = 0, transformFn = null) {
             let points = Plot.Polygon.sample(basis, radius, numSides, phase);
             if (transformFn) {
-                points = points.map(transformFn);
+                points = points.map(p => {
+                    const newP = transformFn(p);
+                    newP.v = p.v;
+                    return newP;
+                });
             }
             Plot.rasterize(pipeline, points, colorFn, true, age);
         }
@@ -461,12 +515,14 @@ export const Plot = {
                 const cosT = Math.cos(theta);
                 const sinT = Math.sin(theta);
 
-                const p = vectorPool.acquire()
-                    .copy(v).multiplyScalar(cosR)
+                // Platinum Standard: Acquire Fragment
+                const p = fragmentPool.acquire();
+                p.pos.copy(v).multiplyScalar(cosR)
                     .addScaledVector(u, cosT * sinR)
                     .addScaledVector(w, sinT * sinR)
                     .normalize();
 
+                p.v = i / (numSides * 2);
                 points.push(p);
             }
             return points;
@@ -475,7 +531,11 @@ export const Plot = {
         static draw(pipeline, basis, radius, numSides, colorFn, phase = 0, age = 0, transformFn = null) {
             let points = Plot.Star.sample(basis, radius, numSides, phase);
             if (transformFn) {
-                points = points.map(transformFn);
+                points = points.map(p => {
+                    const newP = transformFn(p);
+                    newP.v = p.v;
+                    return newP;
+                });
             }
             Plot.rasterize(pipeline, points, colorFn, true, age);
         }
@@ -519,19 +579,25 @@ export const Plot = {
                     const cosT = Math.cos(theta);
                     const sinT = Math.sin(theta);
 
-                    const p = vectorPool.acquire()
-                        .copy(v).multiplyScalar(cosR)
+                    // Platinum Standard: Acquire Fragment
+                    const p = fragmentPool.acquire();
+                    p.pos.copy(v).multiplyScalar(cosR)
                         .addScaledVector(u, cosT * sinR)
                         .addScaledVector(w, sinT * sinR)
                         .normalize();
 
+                    p.v = (i * numSegments + j) / (numSides * numSegments);
                     points.push(p);
                 }
             }
 
             // Close loop
             if (points.length > 0) {
-                points.push(vectorPool.acquire().copy(points[0]));
+                const first = points[0];
+                const last = fragmentPool.acquire();
+                last.pos.copy(first.pos);
+                last.v = 1.0;
+                points.push(last);
             }
 
             return points;
@@ -540,7 +606,11 @@ export const Plot = {
         static draw(pipeline, basis, radius, numSides, colorFn, phase = 0, age = 0, transformFn = null) {
             let points = Plot.Flower.sample(basis, radius, numSides, phase);
             if (transformFn) {
-                points = points.map(transformFn);
+                points = points.map(p => {
+                    const newP = transformFn(p);
+                    newP.v = p.v;
+                    return newP;
+                });
             }
             Plot.rasterize(pipeline, points, colorFn, false, age);
         }
@@ -616,8 +686,11 @@ export const Plot = {
                 let sinShift = Math.sin(shift);
                 let vScale = (vSign * d) * cosShift - r * sinShift;
                 let uScale = r * cosShift + (vSign * d) * sinShift;
-                let p = vectorPool.acquire().copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
+                // Platinum Standard: Acquire Fragment
+                let p = fragmentPool.acquire();
+                p.pos.copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
 
+                p.v = i / numSamples;
                 points.push(p);
             }
 
@@ -637,7 +710,11 @@ export const Plot = {
         static draw(pipeline, basis, radius, shiftFn, colorFn, phase = 0, age = 0, transformFn = null) {
             let points = Plot.DistortedRing.sample(basis, radius, shiftFn, phase);
             if (transformFn) {
-                points = points.map(transformFn);
+                points = points.map(p => {
+                    const newP = transformFn(p);
+                    newP.v = p.v;
+                    return newP;
+                });
             }
             Plot.rasterize(pipeline, points, colorFn, true, age);
         }
@@ -719,7 +796,7 @@ export const Plot = {
             Plot.ParticleSystem.forEachTrail(particleSystem, (points, particle) => {
                 if (transformFn) {
                     for (let i = 0; i < points.length; i++) {
-                        points[i] = transformFn(points[i], particle);
+                        points[i] = transformFn(points[i], particle, i, points.length);
                     }
                 }
                 Plot.rasterize(pipeline, points, (v, t) => colorFn(v, t, particle), false, 0);
@@ -730,26 +807,55 @@ export const Plot = {
     /**
      * Rasterizes a list of points into Dot objects by connecting them with geodesic lines.
      * @param {Object} pipeline - The render pipeline.
-     * @param {THREE.Vector3[]} points - The list of points.
-     * @param {Function} colorFn - Function to determine color (takes vector and normalized progress t).
+     * @param {THREE.Vector3[]|Object[]} points - The list of points (Vectors or Objects with {pos, v}).
+     * @param {Function} colorFn - Function to determine color.
      * @param {boolean} [closeLoop=false] - If true, connects the last point to the first.
      * @param {number} [age=0] - The age of the dots.
      */
     rasterize: (pipeline, points, colorFn, closeLoop = false, age = 0) => {
         const len = points.length;
-        if (len === 0) return;
+        if (len < 2) return;
+
+        // Detect Shader Mode: Do the points have a 'v0' property?
+        const isShader = (points[0].v0 !== undefined);
 
         const count = closeLoop ? len : len - 1;
         for (let i = 0; i < count; i++) {
-            const p1 = points[i];
-            const p2 = points[(i + 1) % len];
+            const current = points[i];
+            const next = points[(i + 1) % len];
 
-            const segmentColorFn = (p, subT) => {
-                const globalT = (i + subT) / count;
-                return colorFn(p, globalT);
-            };
+            // 1. Get Positions
+            // Support both Wrapper {pos, v} and Augmented Vector check (current.pos undefined if Vector)
+            const p1 = (current.pos) ? current.pos : current;
+            const p2 = (next.pos) ? next.pos : next;
 
-            // Draw segment
+            // 2. Create the "Fragment Shader" Closure
+            let segmentColorFn;
+
+            if (isShader) {
+                // --- SHADER MODE ---
+                // The Rasterizer (this loop) handles interpolation
+                segmentColorFn = (p, subT) => {
+                    // subT is 0..1 along the segment
+                    // Optimized Zero-Allocation Interpolation using Registers
+                    _scratchFrag.v0 = current.v0 * (1 - subT) + next.v0 * subT;
+                    _scratchFrag.v1 = current.v1 * (1 - subT) + next.v1 * subT;
+                    _scratchFrag.v2 = current.v2 * (1 - subT) + next.v2 * subT;
+                    _scratchFrag.v3 = current.v3 * (1 - subT) + next.v3 * subT;
+
+                    // Pass scratch fragment to color function
+                    // NOTE: The color function must use .v0, .v1 etc immediately
+                    return colorFn(p, _scratchFrag);
+                };
+            } else {
+                // --- LEGACY MODE ---
+                // Just pass global progress
+                segmentColorFn = (p, subT) => {
+                    const globalT = (i + subT) / count;
+                    return colorFn(p, globalT);
+                };
+            }
+
             const omitLast = closeLoop || (i < count - 1);
             Plot.Line.draw(pipeline, p1, p2, segmentColorFn, 0, 1, false, omitLast, age);
         }

@@ -1108,18 +1108,10 @@ export const SDF = {
                 const isDownward = (Vi.y > py) && (Vj.y <= py);
 
                 if (isUpward || isDownward) {
-                    // Calculate intersection X-offset relative to P using cross product
-                    // Cross(Vj-Vi, P-Vi). If edge goes up, Positive Cross means P is to Right (Ray intersects)
-                    // Wait, Standard 2D cross: (B.x-A.x)*(P.y-A.y) - (B.y-A.y)*(P.x-A.x)
-                    // = ex * wy - ey * wx
                     const cross = ex * wy - ey * wx;
-
                     if (isUpward) {
-                        // Edge goes Up. Point Left of edge => Ray Intersects.
-                        // Left means Cross > 0 (assuming Y-up CCW)
                         if (cross > 0) winding++;
                     } else {
-                        // Edge goes Down. Point Left of edge => Ray Intersects.
                         if (cross < 0) winding--;
                     }
                 }
@@ -1134,6 +1126,29 @@ export const SDF = {
             out.dist = planeDist - this.thickness;
             out.t = 0;
             out.rawDist = planeDist;
+
+            // Barycentric Weights (for triangles only)
+            if (N === 3) {
+                const v0 = v[0];
+                const v1 = v[1];
+                const v2 = v[2];
+
+                const denom = (v1.y - v2.y) * (v0.x - v2.x) + (v2.x - v1.x) * (v0.y - v2.y);
+                // Avoid div 0 for degenerate triangles
+                if (Math.abs(denom) > 1e-12) {
+                    const invDenom = 1.0 / denom;
+                    const weightA = ((v1.y - v2.y) * (px - v2.x) + (v2.x - v1.x) * (py - v2.y)) * invDenom;
+                    const weightB = ((v2.y - v0.y) * (px - v2.x) + (v0.x - v2.x) * (py - v2.y)) * invDenom;
+                    const weightC = 1.0 - weightA - weightB;
+
+                    if (out.weights) {
+                        out.weights.a = weightA;
+                        out.weights.b = weightB;
+                        out.weights.c = weightC;
+                    }
+                }
+            }
+
             return out;
         }
     },
@@ -1197,8 +1212,14 @@ export const Scan = {
     rasterize: (pipeline, shape, colorFn, debugBB = false) => {
         const { yMin, yMax } = shape.getVerticalBounds();
 
-        // Reusable result object to avoid GC
-        const sampleResult = { dist: 100, t: 0, rawDist: 100 };
+        // Reusable result object to avoid GC and Hidden Class changes
+        const sampleResult = {
+            dist: 100,
+            t: 0,
+            rawDist: 100,
+            faceIndex: -1,
+            weights: { a: 0, b: 0, c: 0 }
+        };
 
         for (let y = yMin; y <= yMax; y++) {
             let intervals = null;
@@ -1268,7 +1289,7 @@ export const Scan = {
                 }
             }
 
-            const c = colorFn(p, sampleResult.t, sampleResult.dist, sampleResult.faceIndex);
+            const c = colorFn(p, sampleResult.t, sampleResult.dist, sampleResult.faceIndex, sampleResult);
             const color = c.isColor ? c : (c.color || c);
             const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
 
@@ -1451,10 +1472,17 @@ export const Scan = {
          * @param {Function} colorFn - Color function.
          * @param {boolean} [debugBB=false] - Debug.
          */
-        static draw(pipeline, mesh, colorFn, debugBB = false) {
+        static draw(pipeline, mesh, shaderFn, debugBB = false) {
             // Lazy init scratch buffer (Not used with facePool approach but kept for safety/reference if needed)
             // Reset the pool pointer at the start of the draw call
             facePool.reset();
+
+            // Check if using new Shader pattern (function with .color property or object)
+            // Note: Simplest check is if shaderFn has a property .color or if it returns data.
+            // But we can't easily check return type without running it. 
+            // The user contract is: shaderFn(index) -> VertexData, shaderFn.color(data) -> Color.
+
+            const isShader = (typeof shaderFn === 'function' && typeof shaderFn.color === 'function');
 
             for (let i = 0; i < mesh.faces.length; i++) {
                 const faceIndices = mesh.faces[i];
@@ -1465,8 +1493,49 @@ export const Scan = {
                 // Init with existing mesh vertices and indices
                 shape.init(mesh.vertices, faceIndices, 0);
 
-                // Pass face index (i) as 4th argument to colorFn
-                const renderColorFn = (p, t, d) => colorFn(p, t, d / (shape.size || 1.0), i);
+                let renderColorFn;
+                if (isShader) {
+                    // --- PRE-COMPUTE VERTEX DATA ---
+                    // Get the data for the 3 corners of this face once
+                    const d0 = shaderFn(mesh.vertices[faceIndices[0]], faceIndices[0]);
+                    const d1 = shaderFn(mesh.vertices[faceIndices[1]], faceIndices[1]);
+                    const d2 = shaderFn(mesh.vertices[faceIndices[2]], faceIndices[2]);
+
+                    renderColorFn = (p, t, dist, faceIdx, out) => {
+                        // 1. Retrieve weights calculated by SDF.Face
+                        const w = out.weights;
+
+                        // 2. Interpolate Data (Barycentric Mix)
+                        if (w) {
+                            // Assuming d0, d1, d2 are objects or numbers. 
+                            // If they are objects, we need a lerp. If numbers, simple math.
+                            // For flexibility, let's assume they are objects with numeric properties, OR rely on a lerp helper.
+                            // But for speed, let's just do a shallow linear mix of properties or return raw weights?
+                            // User example: "d0.val * w.a + ..."
+                            // Let's implement a generic shallow mix for now.
+
+                            const interpolated = {};
+                            for (let key in d0) {
+                                const v0 = d0[key];
+                                const v1 = d1[key];
+                                const v2 = d2[key];
+                                if (typeof v0 === 'number') {
+                                    interpolated[key] = v0 * w.a + v1 * w.b + v2 * w.c;
+                                } else {
+                                    interpolated[key] = v0; // Fallback
+                                }
+                            }
+                            return shaderFn.color(interpolated);
+                        }
+                        // Fallback if no weights (e.g. outside triangle or degraded)?
+                        // Should not happen if d < threshold.
+                        return shaderFn.color(d0); // Fallback
+                    };
+                } else {
+                    // Old Pattern: shaderFn is just colorFn(p, t, d, i)
+                    renderColorFn = (p, t, d, faceIdx, out) => shaderFn(p, t, d / (shape.size || 1.0), i, out);
+                }
+
                 Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
             }
         }

@@ -70,3 +70,21 @@ export const color4Pool = new StaticPool(null, 250000);
 
 /** @type {StaticPool} Global pool for temporary Dot objects. */
 export const dotPool = new StaticPool(null, 10000);
+
+/** 
+ * Data Packet for Shader Mode.
+ * Ensures stable Hidden Class for V8 Optimization.
+ */
+class Fragment {
+    constructor() {
+        this.pos = new THREE.Vector3(); // Pre-allocate vector
+        // Data Registers (Scalar slots for varying data)
+        this.v0 = 0;
+        this.v1 = 0;
+        this.v2 = 0;
+        this.v3 = 0;
+    }
+}
+
+/** @type {StaticPool} Global pool for Fragment objects (Pos + Data). */
+export const fragmentPool = new StaticPool(Fragment, 2000000);

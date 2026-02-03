@@ -16,12 +16,13 @@ import { TWO_PI, mobius, stereo, invStereo } from "./3dmath.js";
  * Transforms a 3D vector specific to this Mobius parameter set.
  * @param {THREE.Vector3} v - Input vector.
  * @param {MobiusParams} params - The Mobius parameters.
- * @returns {THREE.Vector3} Transformed vector (from pool).
+ * @param {THREE.Vector3} target - Output vector.
+ * @returns {THREE.Vector3} Transformed vector (target).
  */
-export function mobiusTransform(v, params) {
+export function mobiusTransform(v, params, target) {
   const z = stereo(v);
   const w = mobius(z, params);
-  return invStereo(w, vectorPool.acquire());
+  return invStereo(w, target);
 }
 
 import { KDTree } from "./spatial.js";
