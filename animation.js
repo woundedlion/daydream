@@ -37,10 +37,13 @@ export class Orientation {
    * Applies an orientation from the history to a given vector.
    * @param {THREE.Vector3} v - The vector to be oriented.
    * @param {number} [i=this.length() - 1] - The index in the history to use.
+   * @param {THREE.Vector3} [target=null] - Optional target vector.
    * @returns {THREE.Vector3} The oriented and normalized vector.
    */
-  orient(v, i = this.length() - 1) {
-    return vectorPool.acquire().copy(v).normalize().applyQuaternion(this.orientations[i]);
+  orient(v, i = this.length() - 1, target = null) {
+    const out = target || vectorPool.acquire();
+    // Safety check if v is same as target (implicit in copy)
+    return out.copy(v).normalize().applyQuaternion(this.orientations[i]);
   }
 
   /**
