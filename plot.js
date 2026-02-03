@@ -335,7 +335,7 @@ export const Plot = {
                 p.pos.copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
 
                 // Write data
-                p.v = i / numSamples;
+                p.v0 = i / numSamples;
                 points.push(p);
             }
             return points;
@@ -383,7 +383,7 @@ export const Plot = {
                 if (transformFn) p.pos.copy(transformFn(p.pos));
 
                 // Write data
-                p.v = i / numSamples;
+                p.v0 = i / numSamples;
                 points.push(p);
             }
 
@@ -475,7 +475,7 @@ export const Plot = {
             if (transformFn) {
                 points = points.map(p => {
                     const newP = transformFn(p);
-                    newP.v = p.v;
+                    newP.v0 = p.v0;
                     return newP;
                 });
             }
@@ -522,7 +522,7 @@ export const Plot = {
                     .addScaledVector(w, sinT * sinR)
                     .normalize();
 
-                p.v = i / (numSides * 2);
+                p.v0 = i / (numSides * 2);
                 points.push(p);
             }
             return points;
@@ -586,7 +586,7 @@ export const Plot = {
                         .addScaledVector(w, sinT * sinR)
                         .normalize();
 
-                    p.v = (i * numSegments + j) / (numSides * numSegments);
+                    p.v0 = (i * numSegments + j) / (numSides * numSegments);
                     points.push(p);
                 }
             }
@@ -596,7 +596,7 @@ export const Plot = {
                 const first = points[0];
                 const last = fragmentPool.acquire();
                 last.pos.copy(first.pos);
-                last.v = 1.0;
+                last.v0 = 1.0;
                 points.push(last);
             }
 
@@ -690,7 +690,7 @@ export const Plot = {
                 let p = fragmentPool.acquire();
                 p.pos.copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
 
-                p.v = i / numSamples;
+                p.v0 = i / numSamples;
                 points.push(p);
             }
 
