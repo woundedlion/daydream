@@ -856,6 +856,7 @@ export const SDF = {
             this.yMin = Daydream.H;
             this.yMax = 0;
             this.intervals = null;
+            this.maxR2 = 0; // Squared radius (tangent space)
 
             // Centroid & Basis
             // Reuse this.center
@@ -889,8 +890,14 @@ export const SDF = {
                 // u = (v . basisU) / d, w = (v . basisW) / d
                 // We reuse objects in this.poly2D
                 const p2d = this.poly2D[i];
-                p2d.x = v.dot(this.basisU) / d;
-                p2d.y = v.dot(this.basisW) / d;
+                const px = v.dot(this.basisU) / d;
+                const py = v.dot(this.basisW) / d;
+                p2d.x = px;
+                p2d.y = py;
+
+                // Track Max Radius (in tangent space)
+                const r2 = px * px + py * py;
+                if (r2 > this.maxR2) this.maxR2 = r2;
             }
 
             // Pre-compute Edge Vectors & Lengths
@@ -1066,6 +1073,14 @@ export const SDF = {
             const px = p.dot(this.basisU) * invCos;
             const py = p.dot(this.basisW) * invCos;
 
+            // Bounding Circle Optimization
+            const pR2 = px * px + py * py;
+            const maxDist = Math.sqrt(this.maxR2) + 0.1;
+            if (pR2 > maxDist * maxDist) {
+                out.dist = Math.sqrt(pR2) - Math.sqrt(this.maxR2);
+                return out;
+            }
+
             // 2D SDF & Winding
             const v = this.poly2D;
             const N = this.count;
@@ -1123,6 +1138,7 @@ export const SDF = {
             out.dist = planeDist - this.thickness;
             out.t = 0;
             out.rawDist = planeDist;
+            out.size = this.size;
 
             // Barycentric Weights (N-gon fan)
             if (out.weights) {
@@ -1191,16 +1207,58 @@ export const SDF = {
             // MRU Cache
             this.lastFaceIndex = -1;
             this.lastFaceShape = new SDF.Face();
+
+            // Calculate Bounds
+            let minPhi = Infinity;
+            let maxPhi = -Infinity;
+            // Scan all vertices to find vertical range
+            for (let i = 0; i < mesh.vertices.length; i++) {
+                const v = mesh.vertices[i];
+                // Phi is angle from North Pole (Y axis)
+                // y = cos(phi) -> phi = acos(y)
+                const phi = Math.acos(Math.max(-1, Math.min(1, v.y)));
+                if (phi < minPhi) minPhi = phi;
+                if (phi > maxPhi) maxPhi = phi;
+            }
+
+            const margin = 0.05; // Safety margin
+            this.yMin = Math.floor((Math.max(0, minPhi - margin) / Math.PI) * (Daydream.H - 1));
+            this.yMax = Math.ceil((Math.min(Math.PI, maxPhi + margin) / Math.PI) * (Daydream.H - 1));
+
+            // Horizontal bounds (Theta Gap Logic)
+            const thetas = [];
+            for (let i = 0; i < mesh.vertices.length; i++) {
+                const v = mesh.vertices[i];
+                let theta = Math.atan2(v.x, v.z);
+                if (theta < 0) theta += 2 * Math.PI;
+                thetas.push(theta);
+            }
+            thetas.sort((a, b) => a - b);
+
+            let maxGap = 0;
+            let gapStart = 0;
+            for (let i = 0; i < thetas.length; i++) {
+                const next = (i + 1) < thetas.length ? thetas[i + 1] : (thetas[0] + 2 * Math.PI);
+                const diff = next - thetas[i];
+                if (diff > maxGap) { maxGap = diff; gapStart = thetas[i]; }
+            }
+
+            if (maxGap > Math.PI) {
+                const startPx = Math.floor(((gapStart + maxGap) % (2 * Math.PI) / (2 * Math.PI)) * Daydream.W);
+                const endPx = Math.ceil((gapStart / (2 * Math.PI)) * Daydream.W);
+                if (startPx <= endPx) this.intervals = [{ start: startPx, end: Math.min(endPx, Daydream.W - 1) }];
+                else this.intervals = [{ start: startPx, end: Daydream.W - 1 }, { start: 0, end: Math.min(endPx, Daydream.W - 1) }];
+            } else {
+                this.intervals = null;
+            }
         }
 
         getVerticalBounds() {
-            // Conservative: Full screen as mesh rotates/wraps
-            return { yMin: 0, yMax: Daydream.H - 1 };
+            return { yMin: this.yMin, yMax: this.yMax };
         }
 
         getHorizontalBounds(y) {
-            // Simplified: full width
-            return null;
+            return this.intervals;
         }
 
         distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
@@ -1474,8 +1532,8 @@ export const Scan = {
 
             Scan.Ring.draw(pipeline, { v: normal, u: c1, w: c2 }, 1.0, thickness, shaderFn, 0, 2 * Math.PI, {
                 ...options,
-                clipPlanes: [c1, c2], // SDF.face handles clip planes logic? No, this Line draw logic seems custom or tied to Ring limit logic which moved to Ring getVerticalBounds
-                limits: { minPhi, maxPhi } // Ring supports basis.limits
+                clipPlanes: [c1, c2],
+                limits: { minPhi, maxPhi }
             });
         }
     },
@@ -1490,41 +1548,38 @@ export const Scan = {
          */
         static draw(pipeline, mesh, shaderFn, debugBB = false) {
             facePool.reset();
+
+            // Optimization: Reuse vertexData buffer and closure to avoid GC
+            const vertexData = [];
+
+            const renderColorFn = (p, t, dist, faceIdx, out) => {
+                const w = out.weights;
+
+                // Barycentric Mix
+                if (w) {
+                    const d0 = vertexData[w.i0];
+                    const d1 = vertexData[w.i1];
+                    const d2 = vertexData[w.i2];
+
+                    _scanScratch.v0 = d0.v0 * w.a + d1.v0 * w.b + d2.v0 * w.c;
+                    _scanScratch.v1 = d0.v1 * w.a + d1.v1 * w.b + d2.v1 * w.c;
+                    _scanScratch.v2 = d0.v2 * w.a + d1.v2 * w.b + d2.v2 * w.c;
+                    _scanScratch.v3 = d0.v3 * w.a + d1.v3 * w.b + d2.v3 * w.c;
+
+                    return shaderFn.color(_scanScratch, t, dist, out.size);
+                }
+                return shaderFn.color(vertexData[0], t, dist, out.size);
+            };
+
             for (let i = 0; i < mesh.faces.length; i++) {
                 const faceIndices = mesh.faces[i];
-
-                // Acquire a reused Face object
                 const shape = facePool.acquire();
-
-                // Init with existing mesh vertices and indices
                 shape.init(mesh.vertices, faceIndices, 0);
-
-                let renderColorFn;
-
-                const vertexData = [];
+                vertexData.length = 0;
                 for (let k = 0; k < faceIndices.length; k++) {
                     vertexData.push(shaderFn(mesh.vertices[faceIndices[k]], faceIndices[k], i));
                 }
 
-                renderColorFn = (p, t, dist, faceIdx, out) => {
-                    const w = out.weights;
-
-                    // Barycentric Mix
-                    if (w) {
-                        const d0 = vertexData[w.i0];
-                        const d1 = vertexData[w.i1];
-                        const d2 = vertexData[w.i2];
-
-                        _scanScratch.v0 = d0.v0 * w.a + d1.v0 * w.b + d2.v0 * w.c;
-                        _scanScratch.v1 = d0.v1 * w.a + d1.v1 * w.b + d2.v1 * w.c;
-                        _scanScratch.v2 = d0.v2 * w.a + d1.v2 * w.b + d2.v2 * w.c;
-                        _scanScratch.v3 = d0.v3 * w.a + d1.v3 * w.b + d2.v3 * w.c;
-
-                        return shaderFn.color(_scanScratch, t, dist);
-                    }
-                    // Fallback
-                    return shaderFn.color(vertexData[0], t, dist);
-                };
                 Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
             }
         }
