@@ -64,6 +64,12 @@ export class Color4 {
   set b(v) { this.color.b = v; }
   get a() { return this.alpha; }
   set a(v) { this.alpha = v; }
+
+  lerp(color, alpha) {
+    this.color.lerp(color.color, alpha);
+    this.alpha += (color.alpha - this.alpha) * alpha;
+    return this;
+  }
 }
 
 // Inject Type
