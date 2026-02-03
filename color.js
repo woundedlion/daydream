@@ -9,66 +9,64 @@ import { randomBetween } from "./util.js"
 import { StaticPool, colorPool, color4Pool } from "./memory.js";
 import { Daydream } from "./driver.js";
 
-/**
- * Represents a color with an alpha channel.
- * Encapsulates a THREE.Color and an alpha value.
+
+
+/** 
+ * Color4 class wrapping THREE.Color and alpha.
  */
 export class Color4 {
-  /**
-   * @param {THREE.Color|number} r - THREE.Color, or Red channel (0-1)
-   * @param {number} [g] - Green channel
-   * @param {number} [b] - Blue channel
-   * @param {number} [a=1.0] - Alpha channel
-   */
-  constructor(r, g, b, a = 1.0) {
-    if (r instanceof THREE.Color) {
-      this.color = r;
-      this.alpha = g !== undefined ? g : 1.0;
-    } else if (arguments.length >= 3) {
-      this.color = new THREE.Color(r, g, b);
-      this.alpha = a;
-    } else {
-      this.color = new THREE.Color(0, 0, 0);
-      this.alpha = 1.0;
-    }
-  }
+  constructor(r, g, b, a = 1) {
+    this.color = new THREE.Color();
+    this.alpha = 1.0;
 
-  set(r, g, b, a = 1.0) {
     if (r instanceof THREE.Color) {
       this.color.copy(r);
       this.alpha = g !== undefined ? g : 1.0;
     } else if (arguments.length >= 3) {
       this.color.setRGB(r, g, b);
       this.alpha = a;
-    } else {
-      this.color.setRGB(0, 0, 0);
-      this.alpha = 1.0;
     }
+  }
+
+  set(r, g, b, a = 1) {
+    if (r instanceof Color4) {
+      this.color.copy(r.color);
+      this.alpha = r.alpha;
+      return this;
+    }
+    if (r instanceof THREE.Color) {
+      this.color.copy(r);
+      this.alpha = g !== undefined ? g : 1.0;
+      return this;
+    }
+    this.color.setRGB(r, g, b);
+    this.alpha = a;
+    return this;
+  }
+
+  copy(c) {
+    if (c.color) this.color.copy(c.color);
+    else this.color.setRGB(c.r, c.g, c.b); // Fallback if simple object
+
+    this.alpha = c.alpha !== undefined ? c.alpha : (c.a !== undefined ? c.a : 1.0);
     return this;
   }
 
   clone() {
-    return new Color4(this.color.r, this.color.g, this.color.b, this.alpha);
+    return new Color4(this.color, this.alpha);
   }
 
-  copy(other) {
-    this.color.copy(other.color);
-    this.alpha = other.alpha;
-    return this;
-  }
-
-  lerp(other, t) {
-    this.color.lerp(other.color, t);
-    this.alpha += (other.alpha - this.alpha) * t;
-    return this;
-  }
-
-  get isColor4() {
-    return true;
-  }
+  get r() { return this.color.r; }
+  set r(v) { this.color.r = v; }
+  get g() { return this.color.g; }
+  set g(v) { this.color.g = v; }
+  get b() { return this.color.b; }
+  set b(v) { this.color.b = v; }
+  get a() { return this.alpha; }
+  set a(v) { this.alpha = v; }
 }
 
-// Inject Type into pool to handle circular dependency
+// Inject Type
 color4Pool.Type = Color4;
 
 /**
@@ -511,21 +509,22 @@ export class VignettePalette {
     let factor = 1.0;
 
     if (t < 0.2) {
-      resultColor = this.palette.get(0).color;
+      resultColor = this.palette.get(0);
       factor = t / 0.2;
-      resultColor.lerp(VignettePalette.vignetteColor, 1 - factor);
     } else if (t >= 0.8) {
-      resultColor = this.palette.get(1).color;
+      resultColor = this.palette.get(1);
       factor = (1 - (t - 0.8) / 0.2); // Fade out
-      resultColor.lerp(VignettePalette.vignetteColor, 1 - factor);
     } else {
       return this.palette.get((t - 0.2) / 0.6); // returns Color4
     }
 
-    const result = color4Pool.acquire();
-    result.color.copy(resultColor);
-    result.alpha = 1.0;
-    return result;
+    // Blend to vignette color (Black)
+    // result = resultColor * factor + Black * (1-factor)
+    // Black is 0,0,0 so result = resultColor * factor
+
+    resultColor.color.multiplyScalar(factor);
+
+    return resultColor;
   }
 }
 
@@ -592,7 +591,10 @@ export class FalloffPalette {
     const result = this.palette.get(t);
     let scale = this.falloffFn(t);
     scale = Math.max(0, Math.min(1, scale)); // Clamp to [0, 1]
+
+    // Direct scale
     result.color.multiplyScalar(scale);
+
     return result;
   }
 }

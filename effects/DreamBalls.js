@@ -180,7 +180,8 @@ export class DreamBalls {
         const transform = (p) => this.globalOrientation.orient(mobiusTransform(p, mobiusParams));
         const palette = params.palette;
         const colorFn = (v, t) => {
-            const c = palette.get(t);
+            const val = (t.v0 !== undefined) ? t.v0 : t;
+            const c = palette.get(val);
             c.alpha *= params.alpha * opacity;
             return c;
         };

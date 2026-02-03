@@ -85,7 +85,8 @@ export class Moire {
             Plot.DistortedRing.draw(this.filters, basis, r,
                 sinWave(-this.amp, this.amp, 4, 0),
                 (v, t) => {
-                    const c = palette.get(t);
+                    const val = (t.v0 !== undefined) ? t.v0 : t;
+                    const c = palette.get(val);
                     return color4Pool.acquire().set(c.color, c.alpha * this.alpha);
                 },
                 this.rotation);

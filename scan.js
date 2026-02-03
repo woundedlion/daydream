@@ -12,6 +12,8 @@ import { wrap } from "./util.js";
 
 import { BVH } from "./spatial.js";
 
+const _scanScratch = { v0: 0, v1: 0, v2: 0, v3: 0 }; // Scratch object for zero-alloc
+
 export const SDF = {
     Ring: class {
         /**
@@ -38,7 +40,6 @@ export const SDF = {
             this.targetAngle = radius * (Math.PI / 2);
             this.centerPhi = Math.acos(this.ny);
 
-            // Optimize
             const angMin = Math.max(0, this.targetAngle - thickness);
             const angMax = Math.min(Math.PI, this.targetAngle + thickness);
             this.cosMax = Math.cos(angMin);
@@ -54,7 +55,6 @@ export const SDF = {
          * @returns {{yMin: number, yMax: number}} The vertical bounds [yMin, yMax].
          */
         getVerticalBounds() {
-            // Vertical
             const a1 = this.centerPhi - this.targetAngle;
             const a2 = this.centerPhi + this.targetAngle;
 
@@ -101,7 +101,6 @@ export const SDF = {
             const sinPhi = Math.sin(phi);
 
             const R = Math.sqrt(this.nx * this.nx + this.nz * this.nz);
-            // Check poles
             if (R < 0.01) return null;
 
             const denom = R * sinPhi;
@@ -109,8 +108,8 @@ export const SDF = {
 
             const alpha = Math.atan2(this.nx, this.nz);
 
-            const D_max = this.cosMax; // cos(ang_low)
-            const D_min = this.cosMin; // cos(ang_high)
+            const D_max = this.cosMax;
+            const D_min = this.cosMin;
 
             const C_min = (D_min - this.ny * cosPhi) / denom;
             const C_max = (D_max - this.ny * cosPhi) / denom;
@@ -847,8 +846,8 @@ export const SDF = {
          * @param {number} thickness - Thickness.
          */
         init(vertices, indices, thickness = 0) {
-            this.vertices = vertices; // Store reference to full array
-            this.indices = indices;   // Store reference to indices
+            this.vertices = vertices;
+            this.indices = indices;
             this.count = indices ? indices.length : vertices.length;
             this.thickness = thickness;
 
@@ -874,12 +873,12 @@ export const SDF = {
             this.basisV.copy(this.center);
 
             // Basis U W
-            let ref = (Math.abs(this.center.dot(Daydream.X_AXIS)) > 0.9) ? Daydream.Y_AXIS : Daydream.X_AXIS;
-            this.basisU.crossVectors(this.center, ref).normalize();
-            this.basisW.crossVectors(this.center, this.basisU).normalize();
+            const identity = new THREE.Quaternion();
+            const b = makeBasis(identity, this.center);
+            this.basisU.copy(b.u);
+            this.basisW.copy(b.w);
 
             // Project 2D
-            // Ensure poly2D size
             while (this.poly2D.length < this.count) {
                 this.poly2D.push({ x: 0, y: 0 });
             }
@@ -895,7 +894,6 @@ export const SDF = {
             }
 
             // Pre-compute Edge Vectors & Lengths
-            // Ensure arrays size
             while (this.edgeVectors.length < this.count) {
                 this.edgeVectors.push({ x: 0, y: 0 });
                 this.edgeLengthsSq.push(0);
@@ -957,7 +955,6 @@ export const SDF = {
                 const v2 = indices ? vertices[indices[(i + 1) % this.count]] : vertices[(i + 1) % this.count];
 
                 // Plane Normal
-                // OPTIMIZATION: Use vectorPool instead of new THREE.Vector3()
                 const normal = vectorPool.acquire().crossVectors(v1, v2);
 
                 // Skip degenerate
@@ -1127,24 +1124,53 @@ export const SDF = {
             out.t = 0;
             out.rawDist = planeDist;
 
-            // Barycentric Weights (for triangles only)
-            if (N === 3) {
-                const v0 = v[0];
-                const v1 = v[1];
-                const v2 = v[2];
+            // Barycentric Weights (N-gon fan)
+            if (out.weights) {
+                if (N === 3) {
+                    const v0 = v[0];
+                    const v1 = v[1];
+                    const v2 = v[2];
+                    const denom = (v1.y - v2.y) * (v0.x - v2.x) + (v2.x - v1.x) * (v0.y - v2.y);
+                    if (Math.abs(denom) > 1e-12) {
+                        const invDenom = 1.0 / denom;
+                        out.weights.a = ((v1.y - v2.y) * (px - v2.x) + (v2.x - v1.x) * (py - v2.y)) * invDenom;
+                        out.weights.b = ((v2.y - v0.y) * (px - v2.x) + (v0.x - v2.x) * (py - v2.y)) * invDenom;
+                        out.weights.c = 1.0 - out.weights.a - out.weights.b;
+                        out.weights.i0 = 0;
+                        out.weights.i1 = 1;
+                        out.weights.i2 = 2;
+                    }
+                } else {
+                    // Triangle Fan (0, i, i+1)
+                    // Find which triangle contains P
+                    for (let i = 1; i < N - 1; i++) {
+                        const v0 = v[0];
+                        const v1 = v[i];
+                        const v2 = v[i + 1];
 
-                const denom = (v1.y - v2.y) * (v0.x - v2.x) + (v2.x - v1.x) * (v0.y - v2.y);
-                // Avoid div 0 for degenerate triangles
-                if (Math.abs(denom) > 1e-12) {
-                    const invDenom = 1.0 / denom;
-                    const weightA = ((v1.y - v2.y) * (px - v2.x) + (v2.x - v1.x) * (py - v2.y)) * invDenom;
-                    const weightB = ((v2.y - v0.y) * (px - v2.x) + (v0.x - v2.x) * (py - v2.y)) * invDenom;
-                    const weightC = 1.0 - weightA - weightB;
+                        const denom = (v1.y - v2.y) * (v0.x - v2.x) + (v2.x - v1.x) * (v0.y - v2.y);
+                        if (Math.abs(denom) > 1e-12) {
+                            const invDenom = 1.0 / denom;
+                            const wA = ((v1.y - v2.y) * (px - v2.x) + (v2.x - v1.x) * (py - v2.y)) * invDenom;
+                            const wB = ((v2.y - v0.y) * (px - v2.x) + (v0.x - v2.x) * (py - v2.y)) * invDenom;
+                            const wC = 1.0 - wA - wB;
 
-                    if (out.weights) {
-                        out.weights.a = weightA;
-                        out.weights.b = weightB;
-                        out.weights.c = weightC;
+                            // Check if inside with small epsilon due to float/AA
+                            if (wA >= -0.01 && wB >= -0.01 && wC >= -0.01) {
+                                out.weights.a = wA;
+                                out.weights.b = wB;
+                                out.weights.c = wC;
+                                out.weights.i0 = 0;
+                                out.weights.i1 = i;
+                                out.weights.i2 = i + 1;
+                                break;
+                            }
+                        }
+                    }
+                    // Fallback: If outside all (due to AA boundary), use first triangle?
+                    if (out.weights.i1 === undefined) {
+                        out.weights.a = 1; out.weights.b = 0; out.weights.c = 0;
+                        out.weights.i0 = 0; out.weights.i1 = 1; out.weights.i2 = 2;
                     }
                 }
             }
@@ -1203,22 +1229,75 @@ export const facePool = new StaticPool(SDF.Face, 10000);
 
 export const Scan = {
     /**
-     * Rasterizes a shape using scanline conversion.
-     * @param {Object} pipeline - Pipeline.
-     * @param {Object} shape - SDF shape.
-     * @param {Function} colorFn - Color function.
-     * @param {boolean} [debugBB=false] - Debug.
-     */
+         * Rasterizes a shape using scanline conversion.
+         * @param {Object} pipeline - Pipeline.
+         * @param {Object} shape - SDF shape.
+         * @param {Function} colorFn - Color function.
+         * @param {boolean} [debugBB=false] - Debug.
+         */
     rasterize: (pipeline, shape, colorFn, debugBB = false) => {
         const { yMin, yMax } = shape.getVerticalBounds();
 
-        // Reusable result object to avoid GC and Hidden Class changes
+        // Reusable result object
         const sampleResult = {
             dist: 100,
             t: 0,
             rawDist: 100,
             faceIndex: -1,
             weights: { a: 0, b: 0, c: 0 }
+        };
+
+        const pixelWidth = 2 * Math.PI / Daydream.W;
+        const threshold = shape.isSolid ? pixelWidth : 0;
+        const W = Daydream.W;
+        const pixelPositions = Daydream.pixelPositions;
+
+        // INLINED LOOP LOGIC
+        const runScanline = (xStart, xEnd, y) => {
+            for (let x = xStart; x <= xEnd; x++) {
+                // 1. Calculate Index
+                // Inline wrap() for speed: (x % W + W) % W
+                let wx = x % W;
+                if (wx < 0) wx += W;
+
+                const i = wx + y * W;
+                const p = pixelPositions[i];
+
+                if (debugBB) {
+                    Daydream.pixels[i * 3] += 0.02;
+                    Daydream.pixels[i * 3 + 1] += 0.02;
+                    Daydream.pixels[i * 3 + 2] += 0.02;
+                }
+
+                // 2. Distance Check
+                shape.distance(p, sampleResult);
+                const d = sampleResult.dist;
+
+                // 3. AA & Plot
+                if (d < threshold) {
+                    let aaAlpha = 1.0;
+
+                    if (shape.isSolid) {
+                        const t = 0.5 - d / (2 * pixelWidth);
+                        // Inline clamp(0,1)
+                        const tc = t < 0 ? 0 : (t > 1 ? 1 : t);
+                        // Inline quinticKernel: t * t * t * (t * (t * 6 - 15) + 10)
+                        aaAlpha = tc * tc * tc * (tc * (tc * 6 - 15) + 10);
+                    } else {
+                        if (shape.thickness > 0) {
+                            aaAlpha = quinticKernel(-d / shape.thickness);
+                        }
+                    }
+
+                    const c = colorFn(p, sampleResult.t, sampleResult.dist, sampleResult.faceIndex, sampleResult);
+                    const color = c.isColor ? c : (c.color || c);
+                    const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
+
+                    pipeline.plot2D(wx, y, color, 0, baseAlpha * aaAlpha);
+
+
+                }
+            }
         };
 
         for (let y = yMin; y <= yMax; y++) {
@@ -1228,72 +1307,13 @@ export const Scan = {
             }
 
             if (intervals) {
-                // Intervals (Optimized Scan)
                 for (let k = 0; k < intervals.length; k++) {
                     const iv = intervals[k];
-                    for (let x = iv.start; x <= iv.end; x++) {
-                        Scan.processPixel(x, y, pipeline, shape, colorFn, debugBB, sampleResult);
-                    }
+                    runScanline(iv.start, iv.end, y);
                 }
             } else {
-                // Full Scan (Fallback)
-                for (let x = 0; x < Daydream.W; x++) {
-                    Scan.processPixel(x, y, pipeline, shape, colorFn, debugBB, sampleResult);
-                }
+                runScanline(0, W - 1, y);
             }
-        }
-    },
-
-    /**
-     * Processes a single pixel.
-     * @param {number} x - X coord.
-     * @param {number} y - Y coord.
-     * @param {Object} pipeline - Pipeline.
-     * @param {Object} shape - Shape.
-     * @param {Function} colorFn - Color function.
-     * @param {boolean} debugBB - Debug.
-     * @param {Object} sampleResult - Reusable result.
-     */
-    processPixel: (x, y, pipeline, shape, colorFn, debugBB, sampleResult) => {
-        const wx = wrap(x, Daydream.W);
-        const i = wx + y * Daydream.W;
-        const p = Daydream.pixelPositions[i];
-
-        if (debugBB) {
-            Daydream.pixels[i * 3] += 0.02;
-            Daydream.pixels[i * 3 + 1] += 0.02;
-            Daydream.pixels[i * 3 + 2] += 0.02;
-        }
-
-        shape.distance(p, sampleResult);
-        const d = sampleResult.dist;
-
-        // AA Logic
-        const pixelWidth = 2 * Math.PI / Daydream.W;
-        const threshold = shape.isSolid ? pixelWidth : 0;
-
-        if (d < threshold) {
-            let aaAlpha = 1.0;
-
-            if (shape.isSolid) {
-                // Solid AA: Fade across [-pixelWidth, pixelWidth]
-                // Map d from [pixelWidth, -pixelWidth] to [0, 1]
-                // t = 0.5 - d / (2 * pixelWidth)
-                // d=pixelWidth -> t=0. d=-pixelWidth -> t=1.
-                const t = 0.5 - d / (2 * pixelWidth);
-                aaAlpha = quinticKernel(Math.max(0, Math.min(1, t)));
-            } else {
-                // Soft Ring AA: Fade internal thickness [-thickness, 0]
-                if (shape.thickness > 0) {
-                    aaAlpha = quinticKernel(-d / shape.thickness);
-                }
-            }
-
-            const c = colorFn(p, sampleResult.t, sampleResult.dist, sampleResult.faceIndex, sampleResult);
-            const color = c.isColor ? c : (c.color || c);
-            const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
-
-            pipeline.plot2D(wx, y, color, 0, baseAlpha * aaAlpha);
         }
     },
 
@@ -1460,7 +1480,6 @@ export const Scan = {
                 clipPlanes: [c1, c2], // SDF.face handles clip planes logic? No, this Line draw logic seems custom or tied to Ring limit logic which moved to Ring getVerticalBounds
                 limits: { minPhi, maxPhi } // Ring supports basis.limits
             });
-            // basis needs to be object. Scan.Ring.draw takes basis.
         }
     },
 
@@ -1473,18 +1492,7 @@ export const Scan = {
          * @param {boolean} [debugBB=false] - Debug.
          */
         static draw(pipeline, mesh, shaderFn, debugBB = false) {
-            // Lazy init scratch buffer (Not used with facePool approach but kept for safety/reference if needed)
-            // Reset the pool pointer at the start of the draw call
             facePool.reset();
-
-            // Check if using new Shader pattern (function with .color property or object)
-            // Note: Simplest check is if shaderFn has a property .color or if it returns data.
-            // But we can't easily check return type without running it. 
-            // The user contract is: shaderFn(index) -> VertexData, shaderFn.color(data) -> Color.
-
-            const isShader = (typeof shaderFn === 'function' && typeof shaderFn.color === 'function');
-            const interpolated = { v0: 0, v1: 0, v2: 0, v3: 0 }; // Scratch object for zero-alloc
-
             for (let i = 0; i < mesh.faces.length; i++) {
                 const faceIndices = mesh.faces[i];
 
@@ -1495,62 +1503,31 @@ export const Scan = {
                 shape.init(mesh.vertices, faceIndices, 0);
 
                 let renderColorFn;
-                if (isShader) {
-                    // --- PRE-COMPUTE VERTEX DATA ---
-                    // Get the data for the 3 corners of this face once
-                    const d0 = shaderFn(mesh.vertices[faceIndices[0]], faceIndices[0]);
-                    const d1 = shaderFn(mesh.vertices[faceIndices[1]], faceIndices[1]);
-                    const d2 = shaderFn(mesh.vertices[faceIndices[2]], faceIndices[2]);
 
-                    renderColorFn = (p, t, dist, faceIdx, out) => {
-                        // 1. Retrieve weights calculated by SDF.Face
-                        const w = out.weights;
-
-                        // 2. Interpolate Data (Barycentric Mix)
-                        if (w) {
-                            // Zero-Allocation Interpolation
-                            // Assumes d0, d1, d2 are Fragment-like objects with v0..v3 properties
-                            // Use the pre-allocated scratch fragment from Plot.js context or create one here? 
-                            // Since we are in Scan, let's make a local static scratch.
-                            // However, we can't export it easily.
-                            // Let's assume we can reuse a simple object.
-
-                            // Re-use a static object inside the closure (created once per draw call, or global?)
-                            // Better: use a module-level scratch if possible, but for now closure-level is OK if we don't recreate it per pixel.
-                            // Wait, renderColorFn is created once per FACE.
-                            // But we need ONE scratch for the whole render or per pixel?
-                            // We need to return an object to shaderFn.color.
-                            // If shaderFn.color expects {v0..v3}, we pass it.
-
-                            // OPTIMIZATION: Manually interpolate registers
-                            // This object is allocated once per Face loop if we define it outside?
-                            // renderColorFn is called per PIXEL.
-                            // So we shouldn't allocate inside here.
-
-                            // We need a scratch object.
-                            // We'll trust the user provided Fragments with v0..v3.
-
-                            /* 
-                                Note: We are cheating slightly by using a closure variable. 
-                                Ideally `interpolated` should be allocated once per Scan.Mesh.draw call.
-                            */
-
-                            interpolated.v0 = d0.v0 * w.a + d1.v0 * w.b + d2.v0 * w.c;
-                            interpolated.v1 = d0.v1 * w.a + d1.v1 * w.b + d2.v1 * w.c;
-                            interpolated.v2 = d0.v2 * w.a + d1.v2 * w.b + d2.v2 * w.c;
-                            interpolated.v3 = d0.v3 * w.a + d1.v3 * w.b + d2.v3 * w.c;
-
-                            return shaderFn.color(interpolated);
-                        }
-                        // Fallback if no weights (e.g. outside triangle or degraded)?
-                        // Should not happen if d < threshold.
-                        return shaderFn.color(d0); // Fallback
-                    };
-                } else {
-                    // Old Pattern: shaderFn is just colorFn(p, t, d, i)
-                    renderColorFn = (p, t, d, faceIdx, out) => shaderFn(p, t, d / (shape.size || 1.0), i, out);
+                const vertexData = [];
+                for (let k = 0; k < faceIndices.length; k++) {
+                    vertexData.push(shaderFn(mesh.vertices[faceIndices[k]], faceIndices[k], i));
                 }
 
+                renderColorFn = (p, t, dist, faceIdx, out) => {
+                    const w = out.weights;
+
+                    // Barycentric Mix
+                    if (w) {
+                        const d0 = vertexData[w.i0];
+                        const d1 = vertexData[w.i1];
+                        const d2 = vertexData[w.i2];
+
+                        _scanScratch.v0 = d0.v0 * w.a + d1.v0 * w.b + d2.v0 * w.c;
+                        _scanScratch.v1 = d0.v1 * w.a + d1.v1 * w.b + d2.v1 * w.c;
+                        _scanScratch.v2 = d0.v2 * w.a + d1.v2 * w.b + d2.v2 * w.c;
+                        _scanScratch.v3 = d0.v3 * w.a + d1.v3 * w.b + d2.v3 * w.c;
+
+                        return shaderFn.color(_scanScratch, t, dist);
+                    }
+                    // Fallback
+                    return shaderFn.color(vertexData[0], t, dist);
+                };
                 Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
             }
         }
@@ -1584,7 +1561,6 @@ export const Scan = {
 
                 const p = Daydream.pixelPositions[i];
                 const mat = colorFn(p);
-
                 const color = mat.isColor ? mat : (mat.color || mat);
                 const alpha = (mat.alpha !== undefined ? mat.alpha : 1.0);
 

@@ -11,6 +11,7 @@ import {
     randomVector, Dot
 } from "../geometry.js";
 import { vectorPool } from "../memory.js";
+import { Plot } from "../plot.js";
 import {
     GenerativePalette
 } from "../color.js";
@@ -108,6 +109,7 @@ export class FlowField {
             if (Math.random() < 0.005) {
                 p.pos.copy(randomVector());
                 p.vel.set(0, 0, 0);
+                p.prevPos = null; // Reset trail
             }
 
             // 5. Create Dot
@@ -115,8 +117,29 @@ export class FlowField {
             const paletteT = (p.pos.y + 1) / 2;
             const color = this.palette.get(paletteT);
 
-            // 6. Draw directly to pipeline (Head)
-            this.filters.plot(p.pos, color, 0, 0.8);
+            // 6. Draw Segment (Head) using Zero-Alloc Fragments
+            if (p.prevPos) {
+                Plot.Line.draw(this.filters, p.prevPos, p.pos, (frag, t) => {
+                    // Get color based on Y (interpolated by rasterize -> Line.draw)
+                    // frag.pos is updated by Line.draw
+                    // We can use frag.pos.y or the interpolation t
+                    // Line.draw passes (p, frag) ? No, we need to check Plot.rasterize signature for segmentColorFn
+                    // rasterize: segmentColorFn = (p, subT) => colorFn(p, _scratchFrag)
+                    // So here: (p, scratch) => ...
+
+                    // We use p.y for palette
+                    const val = (frag.y + 1) / 2;
+                    return this.palette.get(val);
+                });
+            } else {
+                this.filters.plot(p.pos, color, 0, 0.8);
+            }
+
+            // Store prevPos (Clone or Copy)
+            // Since p.pos changes in place next frame, we need a copy.
+            // But tracking 'prevPos' as a property:
+            if (!p.prevPos) p.prevPos = new THREE.Vector3();
+            p.prevPos.copy(p.pos);
         }
 
         // 7. Draw Trails

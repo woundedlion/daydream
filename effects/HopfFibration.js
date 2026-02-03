@@ -186,10 +186,7 @@ export class HopfFibration {
                 // or just straight line dots. 
                 // Using rasterize with 2 points creates a line.
 
-                const segmentPoints = [prev, v];
-                Plot.rasterize(this.pipeline, segmentPoints, (p, t) => {
-                    return c;
-                }, false);
+                Plot.Line.draw(this.pipeline, prev, v, (p, frag) => c);
             } else {
                 // First frame or reset, just draw dot
                 this.pipeline.plot(v, c, 0, 1.0);
