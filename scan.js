@@ -1129,12 +1129,9 @@ export const SDF = {
                 }
             }
 
-            // Result is distance in Tangent Plane units.
             // Non-Zero Rule: Inside if winding != 0
             const s = (winding !== 0) ? -1.0 : 1.0;
-
             const planeDist = s * Math.sqrt(d);
-
             out.dist = planeDist - this.thickness;
             out.t = 0;
             out.rawDist = planeDist;

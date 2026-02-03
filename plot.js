@@ -867,9 +867,6 @@ export const Plot = {
 
                 _scratchFrag.v0 = cV0 * (1 - subT) + nV0 * subT;
 
-                // Copy other props if they exist, else default
-                // Optimization: Only lerp if they exist? 
-                // For now, simple safety:
                 if (current.v1 !== undefined && next.v1 !== undefined) {
                     _scratchFrag.v1 = current.v1 * (1 - subT) + next.v1 * subT;
                 }
