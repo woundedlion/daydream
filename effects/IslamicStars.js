@@ -188,8 +188,6 @@ export class IslamicStars {
         };
 
         const colorFaceShader = (v, vertexIdx, faceIdx) => {
-            // Vertex Shader: v0 used for faceIndex
-            // faceIdx is now passed as the 3rd argument from Scan.Mesh.draw
             return {
                 v0: faceIdx
             };
