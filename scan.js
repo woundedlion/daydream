@@ -1224,7 +1224,6 @@ export const SDF = {
     },
 };
 
-// 1. Create a static pool for SDF.Face
 export const facePool = new StaticPool(SDF.Face, 10000);
 
 export const Scan = {
