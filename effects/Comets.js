@@ -126,7 +126,7 @@ export class Comets {
             deepTween(node.trail, (q, t) => {
                 if (t > 1.0) return;
                 const color4 = this.palette.get(t);
-                color4.alpha = color4.alpha * this.alpha * quinticKernel(1 - t);
+                color4.alpha = color4.alpha * this.alpha * quinticKernel(t);
                 _tempVec.copy(node.v).applyQuaternion(q);
                 _tempVec.normalize().applyQuaternion(this.orientation.get());
 
