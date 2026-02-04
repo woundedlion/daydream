@@ -5,7 +5,7 @@
 
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
-import { makeBasis, angleBetween, yToPhi } from "./geometry.js";
+import { makeBasis, angleBetween, yToPhi, getAntipode } from "./geometry.js";
 import { vectorPool, StaticPool } from "./memory.js";
 import { quinticKernel } from "./filters.js";
 import { wrap } from "./util.js";
@@ -1453,12 +1453,9 @@ export const Scan = {
          * @param {boolean} [debugBB=false] - Debug.
          */
         static draw(pipeline, basis, radius, sides, fragmentShaderFn, phase = 0, debugBB = false) {
-            let { v, u, w } = basis;
-            if (radius > 1.0) {
-                v = vectorPool.acquire().copy(v).negate();
-                u = vectorPool.acquire().copy(u).negate();
-                radius = 2.0 - radius;
-            }
+            const res = getAntipode(basis, radius);
+            const { v, u, w } = res.basis;
+            radius = res.radius;
 
             const thickness = radius * (Math.PI / 2);
             const shape = new SDF.Polygon({ v, u, w }, radius, thickness, sides, phase);
@@ -1478,12 +1475,9 @@ export const Scan = {
          * @param {boolean} [debugBB=false] - Debug.
          */
         static draw(pipeline, basis, radius, sides, fragmentShaderFn, phase = 0, debugBB = false) {
-            let { v, u, w } = basis;
-            if (radius > 1.0) {
-                v = vectorPool.acquire().copy(v).negate();
-                u = vectorPool.acquire().copy(u).negate();
-                radius = 2.0 - radius;
-            }
+            const res = getAntipode(basis, radius);
+            const { v, u, w } = res.basis;
+            radius = res.radius;
             const shape = new SDF.Star({ v, u, w }, radius, sides, phase);
             const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
             Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
@@ -1501,12 +1495,9 @@ export const Scan = {
          * @param {boolean} [debugBB=false] - Debug.
          */
         static draw(pipeline, basis, radius, sides, fragmentShaderFn, phase = 0, debugBB = false) {
-            let { v, u, w } = basis;
-            if (radius > 1.0) {
-                v = vectorPool.acquire().copy(v).negate();
-                u = vectorPool.acquire().copy(u).negate();
-                radius = 2.0 - radius;
-            }
+            const res = getAntipode(basis, radius);
+            const { v, u, w } = res.basis;
+            radius = res.radius;
             const shape = new SDF.Flower({ v, u, w }, radius, sides, phase);
             const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
             Scan.rasterize(pipeline, shape, renderColorFn, debugBB);

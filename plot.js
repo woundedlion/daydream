@@ -5,7 +5,7 @@
 
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
-import { angleBetween, fibSpiral, makeBasis } from "./geometry.js";
+import { angleBetween, fibSpiral, makeBasis, getAntipode } from "./geometry.js";
 import { TWO_PI } from "./3dmath.js";
 import { dotPool, vectorPool, quaternionPool, fragmentPool } from "./memory.js";
 import { Dot } from "./geometry.js";
@@ -100,10 +100,7 @@ export const Plot = {
             let a = angleBetween(u, v);
             let w = vectorPool.acquire();
 
-            // Collinear check
             if (Math.abs(a) < 0.0001) {
-                // Just draw a dot if we have to? Or nothing?
-                // Minimal fragment creation
                 return;
             }
 
@@ -115,32 +112,20 @@ export const Plot = {
                 w.crossVectors(u, v).normalize();
             }
 
-            // 2. LongWay Logic
-            // If longWay, we seek the complement arc.
-            // We flip the rotation axis and use 2PI - a
             if (longWay) {
                 a = TWO_PI - a;
                 w.negate();
             }
 
-            // 3. Start/End Trimming
-            // Calculate effective start/end angular offsets
             const angleStart = a * start;
             const angleEnd = a * end;
 
-            // Adjust u (Start Point)
             if (start !== 0) {
                 let q = quaternionPool.acquire().setFromAxisAngle(w, angleStart);
                 u.applyQuaternion(q).normalize();
             }
-            // Adjust v (End Point)
-            // v is technically u rotated by angleEnd
-            // We need to establish the 'v' position for the p2 fragment
-            // Reuse vector 'v' for p2 pos
-            v.copy(u); // Start with adjusted start position? No, start with original u?
-            // Let's just calculate p2 from original u + rotation
-            let p2Vec = vectorPool.acquire().copy(v1); // Original start
-            // If longWay was processed, w is flipped, so rotating by +angleEnd moves along the path correctly.
+            v.copy(u);
+            let p2Vec = vectorPool.acquire().copy(v1);
             let qEnd = quaternionPool.acquire().setFromAxisAngle(w, angleEnd);
             p2Vec.applyQuaternion(qEnd).normalize();
 
@@ -159,24 +144,14 @@ export const Plot = {
                 p2.pos.copy(vertexShaderFn(p2.pos));
             }
 
-            // 5. To support LongWay in Rasterize:
-            // Rasterize naturally takes shortest path.
-            // If the segment p1->p2 is > PI, Rasterize will go the "short" way (wrong way).
-            // We must detect if the requested arc is > PI.
-            // Current 'a' is the arc length *after* longWay logic but *before* start/end trim.
-            // The actual arc length drawn is 'a * (end - start)'.
             const arcLength = Math.abs(angleEnd - angleStart);
-
             const points = [p1];
 
-            // If arc > PI, split it.
             if (arcLength > Math.PI) {
-                // Insert Midpoint
+                // Insert Midpoint to force long way
                 const midAngle = (angleStart + angleEnd) / 2;
                 const pMid = fragmentPool.acquire();
-
-                // Calculate Pos
-                const tempVec = vectorPool.acquire().copy(v1); // Original start
+                const tempVec = vectorPool.acquire().copy(v1);
                 const qMid = quaternionPool.acquire().setFromAxisAngle(w, midAngle);
                 pMid.pos.copy(tempVec.applyQuaternion(qMid).normalize());
                 pMid.v0 = (start + end) / 2;
@@ -251,12 +226,9 @@ export const Plot = {
                 for (let i = 0; i < face.length; i++) {
                     const idx1 = face[i];
                     const idx2 = face[(i + 1) % face.length];
-
-                    // Deduplicate
                     const key = idx1 < idx2 ? `${idx1},${idx2}` : `${idx2},${idx1}`;
                     if (drawn.has(key)) continue;
                     drawn.add(key);
-
                     edges.push(Plot.Line.sample(mesh.vertices[idx1], mesh.vertices[idx2], density));
                 }
             }
@@ -313,13 +285,9 @@ export const Plot = {
          * @returns {THREE.Vector3[]} An array of points.
          */
         static sample(basis, radius, numSamples, phase = 0) {
-            const { u, v, w } = basis;
-            // Backside
-            let vDir = v.clone();
-            if (radius > 1) {
-                vDir.negate();
-                radius = 2 - radius;
-            }
+            const res = getAntipode(basis, radius);
+            const { u, v, w } = res.basis;
+            radius = res.radius;
 
             const thetaEq = radius * (Math.PI / 2);
             const r = Math.sin(thetaEq);
@@ -339,7 +307,7 @@ export const Plot = {
 
                 // Platinum Standard: Acquire Fragment
                 let p = fragmentPool.acquire();
-                p.pos.copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
+                p.pos.copy(v).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
 
                 // Write data
                 p.v0 = i / numSamples;
@@ -358,40 +326,14 @@ export const Plot = {
          * @param {number} [phase=0] - Starting phase.
          */
         static draw(pipeline, basis, radius, fragmentShaderFn, phase = 0, age = 0, vertexShaderFn = null) {
-            const { u, v, w } = basis;
-            // Backside
-            let vDir = v.clone();
-            let rVal = radius;
-            if (rVal > 1) {
-                vDir.negate();
-                rVal = 2 - rVal;
-            }
-
-            const thetaEq = rVal * (Math.PI / 2);
-            const r = Math.sin(thetaEq);
-            const d = Math.cos(thetaEq);
-
             const numSamples = Daydream.W / 4;
-            const step = TWO_PI / numSamples;
-            const points = [];
-            let uTemp = vectorPool.acquire();
+            let points = Plot.Ring.sample(basis, radius, numSamples, phase);
 
-            for (let i = 0; i < numSamples; i++) {
-                let theta = i * step;
-                let t = theta + phase;
-                let cosRing = Math.cos(t);
-                let sinRing = Math.sin(t);
-                uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
-
-                // Platinum Standard: Acquire Fragment
-                let p = fragmentPool.acquire();
-                p.pos.copy(vDir).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
-
-                if (vertexShaderFn) p.pos.copy(vertexShaderFn(p.pos));
-
-                // Write data
-                p.v0 = i / numSamples;
-                points.push(p);
+            if (vertexShaderFn) {
+                for (const p of points) {
+                    const transformed = vertexShaderFn(p.pos);
+                    p.pos.copy(transformed);
+                }
             }
 
             Plot.rasterize(pipeline, points, fragmentShaderFn, true, age);
@@ -487,14 +429,9 @@ export const Plot = {
          * @returns {THREE.Vector3[]} Array of points.
          */
         static sample(basis, radius, numSides, phase = 0) {
-            // Basis
-            let { v, u, w } = basis;
-
-            if (radius > 1.0) {
-                v = vectorPool.acquire().copy(v).negate();
-                u = vectorPool.acquire().copy(u).negate();
-                radius = 2.0 - radius;
-            }
+            const res = getAntipode(basis, radius);
+            const { u, v, w } = res.basis;
+            radius = res.radius;
 
             const outerRadius = radius * (Math.PI / 2);
             const innerRadius = outerRadius * 0.382;
@@ -557,15 +494,9 @@ export const Plot = {
          * @returns {Object[]} Array of fragments.
          */
         static sample(basis, radius, numSides, phase = 0) {
-            let { v, u, w } = basis;
-
-            if (radius > 1.0) {
-                // Antipode basis
-                v = vectorPool.acquire().copy(v).negate();
-                u = vectorPool.acquire().copy(u).negate();
-
-                radius = 2.0 - radius;
-            }
+            const res = getAntipode(basis, radius);
+            const { u, v, w } = res.basis;
+            radius = res.radius;
 
             // Draw boundary relative to antipode
             const desiredOuterRadius = radius * (Math.PI / 2);
@@ -650,15 +581,9 @@ export const Plot = {
          * @param {number} [phase=0] - Phase.
          */
         static sample(basis, radius, shiftFn, phase = 0) {
-            // Basis
-            const { v, u, w } = basis;
-
-            // Backside
-            let vSign = 1.0;
-            if (radius > 1) {
-                vSign = -1.0;
-                radius = 2 - radius;
-            }
+            const res = getAntipode(basis, radius);
+            const { u, v, w } = res.basis;
+            radius = res.radius;
 
             // Projection
             const thetaEq = radius * (Math.PI / 2);
@@ -682,8 +607,8 @@ export const Plot = {
                 let shift = shiftFn(theta / (TWO_PI));
                 let cosShift = Math.cos(shift);
                 let sinShift = Math.sin(shift);
-                let vScale = (vSign * d) * cosShift - r * sinShift;
-                let uScale = r * cosShift + (vSign * d) * sinShift;
+                let vScale = d * cosShift - r * sinShift;
+                let uScale = r * cosShift + d * sinShift;
                 // Platinum Standard: Acquire Fragment
                 let p = fragmentPool.acquire();
                 p.pos.copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
@@ -944,11 +869,18 @@ export const Plot = {
                 }
 
                 // Normal calculation
-                if (Math.abs(Math.PI - a) < 0.0001) {
-                    if (Math.abs(u.dot(Daydream.X_AXIS)) > 0.9999) w.crossVectors(u, Daydream.Y_AXIS).normalize();
-                    else w.crossVectors(u, Daydream.X_AXIS).normalize();
+                if (Math.abs(Math.PI - a) < 0.001) {
+                    const ref = (Math.abs(u.dot(Daydream.X_AXIS)) < 0.9) ? Daydream.X_AXIS : Daydream.Y_AXIS;
+                    w.crossVectors(u, ref).normalize();
+                } else if (a < 0.0001) {
+                    // Handled above, but for safety
+                    w.set(0, 0, 0);
                 } else {
                     w.crossVectors(u, v).normalize();
+                    if (w.lengthSq() < 0.0001) {
+                        const ref = (Math.abs(u.dot(Daydream.X_AXIS)) < 0.9) ? Daydream.X_AXIS : Daydream.Y_AXIS;
+                        w.crossVectors(u, ref).normalize();
+                    }
                 }
 
                 // Adaptive Geodesic Walk
