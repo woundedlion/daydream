@@ -9,10 +9,9 @@ import { easeMid, easeInOutSin } from "../easing.js";
 import {
     createRenderPipeline, FilterAntiAlias, FilterOrientSlice
 } from "../filters.js";
-import { AlphaFalloffPalette } from "../color.js";
+import { AlphaFalloffPalette, FalloffPalette } from "../color.js";
 import { Solids } from "../solids.js";
 import { MobiusParams, TWO_PI } from "../3dmath.js";
-import { vectorPool } from "../memory.js";
 import { mobiusTransform, randomVector } from "../geometry.js";
 import { Plot } from "../plot.js";
 import { Palettes } from "../palettes.js";
@@ -20,7 +19,17 @@ import { Palettes } from "../palettes.js";
 export class DreamBalls {
 
     static presets = {
-        netBall: {
+        bloodStream: {
+            solidName: 'rhombicuboctahedron',
+            numCopies: 18,
+            offsetRadius: 0.3,
+            offsetSpeed: 0.4,
+            warpScale: 0.2,
+            palette: new AlphaFalloffPalette((t) => 1.0 - t, Palettes.bloodStream),
+            alpha: 0.7,
+        },
+
+        redSinew: {
             solidName: 'rhombicosidodecahedron',
             numCopies: 6,
             offsetRadius: 0.05,
@@ -29,6 +38,7 @@ export class DreamBalls {
             palette: new AlphaFalloffPalette((t) => 1.0 - t, Palettes.bloodStream),
             alpha: 0.7,
         },
+
         elvenMachinery: {
             solidName: 'truncatedCuboctahedron',
             numCopies: 6,
@@ -38,7 +48,7 @@ export class DreamBalls {
             palette: Palettes.richSunset,
             alpha: 0.3,
         },
-        globeKnot: {
+        blueEnigma: {
             solidName: 'icosidodecahedron',
             numCopies: 10,
             offsetRadius: 0.16,
@@ -161,14 +171,14 @@ export class DreamBalls {
         const manualChange = () => { this.currentPreset = 'Custom'; };
 
         this.paramFolder.add(this.params, 'alpha').min(0).max(1).step(0.01).onChange(manualChange);
-        this.paramFolder.add(this.params, 'offsetRadius', 0.0, 0.2).listen().onChange(manualChange);
+        this.paramFolder.add(this.params, 'offsetRadius', 0.0, 1.0).listen().onChange(manualChange);
         this.paramFolder.add(this.params, 'offsetSpeed', 0.0, 5.0).listen().onChange(manualChange);
-        this.paramFolder.add(this.params, 'numCopies', 1, 10, 1).listen().onChange(manualChange);
+        this.paramFolder.add(this.params, 'numCopies', 1, 100, 1).listen().onChange(manualChange);
         this.paramFolder.add(this.params, 'solidName', Object.keys(Solids)).onChange((v) => {
             this.loadSolid(v);
             manualChange();
         });
-        this.paramFolder.add(this.params, 'warpScale', 0.1, 5.0).onChange(v => {
+        this.paramFolder.add(this.params, 'warpScale', 0.0, 5.0).onChange(v => {
             if (this.warpAnim) this.warpAnim.scale = v;
             manualChange();
         });
@@ -179,7 +189,7 @@ export class DreamBalls {
     drawScene(params, opacity, baseMesh, targetMesh, tangents, mobiusParams) {
         const transform = (p) => this.globalOrientation.orient(mobiusTransform(p, mobiusParams));
         const palette = params.palette;
-        const colorFn = (v, t) => {
+        const fargmentShader = (v, t) => {
             const val = (t.v0 !== undefined) ? t.v0 : t;
             const c = palette.get(val);
             c.alpha *= params.alpha * opacity;
@@ -189,7 +199,7 @@ export class DreamBalls {
         for (let i = 0; i < params.numCopies; i++) {
             const offset = (i / params.numCopies) * TWO_PI;
             this.updateDisplacedMesh(baseMesh, targetMesh, tangents, params, offset);
-            Plot.Mesh.draw(this.filters, targetMesh, colorFn, 0, transform);
+            Plot.Mesh.draw(this.filters, targetMesh, fargmentShader, 0, transform);
         }
     }
 

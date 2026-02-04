@@ -875,6 +875,26 @@ export const makeBasis = (orientation, normal) => {
   return { u, v, w };
 };
 
+/**
+ * Adjusted basis and radius for drawing on the opposite side of the sphere.
+ * @param {Object} basis - {u, v, w}
+ * @param {number} radius - angular radius (0-2)
+ * @returns {{basis: Object, radius: number}}
+ */
+export function getAntipode(basis, radius) {
+  if (radius <= 1.0) return { basis, radius };
+
+  const { u, v, w } = basis;
+  return {
+    basis: {
+      u: vectorPool.acquire().copy(u).negate(),
+      v: vectorPool.acquire().copy(v).negate(),
+      w: w // W is unchanged to maintain handedness ((-u) x (-v) = u x v)
+    },
+    radius: 2.0 - radius
+  };
+}
+
 
 
 
