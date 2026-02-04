@@ -20,13 +20,18 @@ export const SDF = {
          * @param {Object} basis - {u, v, w}.
          * @param {number} radius - Radius.
          * @param {number} thickness - Thickness.
-         * @param {number} phase - Phase.
+         * @param {Object} [options] - Modifiers.
+         * @param {number} [options.phase=0] - Rotation offset along the ring.
+         * @param {THREE.Vector3[]} [options.clipPlanes] - Array of normal vectors; points where dot(p, n) < 0 are clipped.
+         * @param {Object} [options.limits] - Vertical limits { minPhi, maxPhi }.
          */
-        constructor(basis, radius, thickness, phase = 0) {
+        constructor(basis, radius, thickness, options = {}) {
             this.basis = basis;
             this.radius = radius;
             this.thickness = thickness;
-            this.phase = phase;
+            this.phase = options.phase || 0;
+            this.clipPlanes = options.clipPlanes;
+            this.limits = options.limits || (basis.limits ? basis.limits : null);
 
             const { v, u, w } = basis;
             this.normal = v;
@@ -80,9 +85,9 @@ export const SDF = {
             let finalPhiMin = Math.max(0, phiMin - this.thickness);
             let finalPhiMax = Math.min(Math.PI, phiMax + this.thickness);
 
-            if (this.basis.limits) {
-                finalPhiMin = Math.max(finalPhiMin, this.basis.limits.minPhi);
-                finalPhiMax = Math.min(finalPhiMax, this.basis.limits.maxPhi);
+            if (this.limits) {
+                finalPhiMin = Math.max(finalPhiMin, this.limits.minPhi);
+                finalPhiMax = Math.min(finalPhiMax, this.limits.maxPhi);
             }
 
             const yMin = Math.max(0, Math.floor((finalPhiMin * (Daydream.H - 1)) / Math.PI));
@@ -158,6 +163,17 @@ export const SDF = {
             if (dot < this.cosMin || dot > this.cosMax) {
                 out.dist = 100.0;
                 return out;
+            }
+
+            // Clip Planes Logic
+            if (this.clipPlanes) {
+                for (let i = 0; i < this.clipPlanes.length; i++) {
+                    // If point is "behind" the plane, clip it
+                    if (p.dot(this.clipPlanes[i]) < 0) {
+                        out.dist = 100.0;
+                        return out;
+                    }
+                }
             }
 
             let dist = 0;
@@ -1465,13 +1481,13 @@ export const Scan = {
          * @param {Object} pipeline - Render pipeline.
          * @param {THREE.Vector3} normal - Center of the circle.
          * @param {number} radius - Angular radius (0-2).
-         * @param {Function} fragmentShaderFn - (pos, t, dist) => {color, alpha}.
+         * @param {Function} shaderFn - (pos, t, dist) => {color, alpha}.
          * @param {Object} options - Options.
          */
-        static draw(pipeline, basis, radius, fragmentShaderFn, phase = 0, debugBB = false) {
+        static draw(pipeline, basis, radius, shaderFn, phase = 0, debugBB = false) {
             // A circle is a ring with radius 0 and thickness = radius
             const thickness = radius * (Math.PI / 2);
-            Scan.Ring.draw(pipeline, basis, 0, thickness, fragmentShaderFn, phase, debugBB);
+            Scan.Ring.draw(pipeline, basis, 0, thickness, shaderFn, { phase, debugBB });
         }
     },
 
@@ -1479,17 +1495,15 @@ export const Scan = {
         /**
          * Scans a thick ring and feeds pixels into the pipeline.
          * @param {Object} pipeline - The render pipeline (must support plot2D).
-         * @param {THREE.Quaternion} orientationQuaternion - Ring orientation.
-         * @param {THREE.Vector3} normal - Ring orientation.
+         * @param {Object} basis - Coordinate basis {u, v, w}.
          * @param {number} radius - Angular radius (0-2).
          * @param {number} thickness - Angular thickness.
-         * @param {Function} fragmentShaderFn - (pos, t, dist) => {color, alpha}.
-         * @param {number} [phase=0] - Phase of the ring.
-         * @param {boolean} [debugBB=false] - Whether to show bounding boxes.
+         * @param {Function} shaderFn - (pos, t, dist) => {color, alpha}.
+         * @param {Object} [options] - { phase, clipPlanes, limits, debugBB }.
          */
-        static draw(pipeline, basis, radius, thickness, fragmentShaderFn, phase = 0, debugBB = false) {
-            const shape = new SDF.Ring(basis, radius, thickness, phase);
-            Scan.rasterize(pipeline, shape, fragmentShaderFn, debugBB);
+        static draw(pipeline, basis, radius, thickness, shaderFn, options = {}) {
+            const shape = new SDF.Ring(basis, radius, thickness, options);
+            Scan.rasterize(pipeline, shape, shaderFn, options.debugBB);
         }
     },
 
@@ -1501,10 +1515,10 @@ export const Scan = {
          * @param {THREE.Vector3} v1 - Start point.
          * @param {THREE.Vector3} v2 - End point.
          * @param {number} thickness - Line thickness.
-         * @param {Function} fragmentShaderFn - Color function.
+         * @param {Function} shaderFn - Color function.
          * @param {Object} options - Options.
          */
-        static draw(pipeline, pixels, v1, v2, thickness, fragmentShaderFn, options = {}) {
+        static draw(pipeline, pixels, v1, v2, thickness, shaderFn, options = {}) {
             const normal = vectorPool.acquire().crossVectors(v1, v2).normalize();
             if (normal.lengthSq() < 0.000001) return;
 
@@ -1527,7 +1541,7 @@ export const Scan = {
             const minPhi = Math.acos(Math.min(1, Math.max(-1, maxY))) - thickness;
             const maxPhi = Math.acos(Math.min(1, Math.max(-1, minY))) + thickness;
 
-            Scan.Ring.draw(pipeline, { v: normal, u: c1, w: c2 }, 1.0, thickness, fragmentShaderFn, 0, 2 * Math.PI, {
+            Scan.Ring.draw(pipeline, { v: normal, u: c1, w: c2 }, 1.0, thickness, shaderFn, {
                 ...options,
                 clipPlanes: [c1, c2],
                 limits: { minPhi, maxPhi }
