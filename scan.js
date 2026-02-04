@@ -1293,6 +1293,44 @@ export const SDF = {
             return out;
         }
     },
+
+    HarmonicBlob: class {
+        /**
+         * @param {number} l - Degree.
+         * @param {number} m - Order.
+         * @param {number} amplitude - Displacement gain.
+         * @param {THREE.Quaternion} orientation - The object's world orientation.
+         * @param {Function} harmonicFn - (l, m, theta, phi) => val.
+         */
+        constructor(l, m, amplitude, orientation, harmonicFn) {
+            this.l = l;
+            this.m = m;
+            this.amplitude = amplitude;
+            this.harmonicFn = harmonicFn;
+            this.isSolid = true;
+            this.invQ = orientation.clone().invert();
+        }
+
+        getVerticalBounds() { return { yMin: 0, yMax: Daydream.H - 1 }; }
+
+        distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+            // Transform world pixel position to local harmonic space
+            const v = vectorPool.acquire().copy(p).applyQuaternion(this.invQ);
+            const phi = Math.acos(Math.max(-1, Math.min(1, v.y)));
+            const theta = Math.atan2(v.z, v.x);
+            const harmonicVal = this.harmonicFn(this.l, this.m, theta, phi);
+
+            // Surface radius varies by harmonic magnitude
+            const lobeRadius = 1.0 + Math.abs(harmonicVal) * this.amplitude;
+            const d = 1.0 - lobeRadius;
+
+            out.dist = d;
+            out.t = Math.tanh(Math.abs(harmonicVal) * this.amplitude);
+            out.rawDist = harmonicVal;
+
+            return out;
+        }
+    },
 };
 
 export const facePool = new StaticPool(SDF.Face, 10000);
@@ -1611,30 +1649,6 @@ export const Scan = {
             Scan.Ring.draw(pipeline, basis, 0, thickness, fragmentShaderFn, 0, options && options.debugBB);
         }
     },
-
-    Field: class {
-        /**
-         * @param {Object} pipeline - Pipeline.
-         * @param {Function} fragmentShaderFn - Color function.
-         */
-        static draw(pipeline, fragmentShaderFn) {
-            for (let i = 0; i < Daydream.pixelPositions.length; i++) {
-                const x = i % Daydream.W;
-                const y = (i / Daydream.W) | 0;
-
-                const p = Daydream.pixelPositions[i];
-                const mat = fragmentShaderFn(p);
-                const color = mat.isColor ? mat : (mat.color || mat);
-                const alpha = (mat.alpha !== undefined ? mat.alpha : 1.0);
-
-                if (pipeline.plot) {
-                    pipeline.plot(p, color, 0, alpha);
-                } else if (pipeline.plot2D) {
-                    pipeline.plot2D(x, y, color, 0, alpha);
-                }
-            }
-        }
-    }
 };
 
 
