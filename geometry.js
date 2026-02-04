@@ -881,22 +881,18 @@ export const makeBasis = (orientation, normal) => {
  * @param {number} radius - angular radius (0-2)
  * @returns {{basis: Object, radius: number}}
  */
-export function getAntipode(basis, radius) {
-  if (radius <= 1.0) return { basis, radius };
-
-  const { u, v, w } = basis;
-  return {
-    basis: {
-      u: vectorPool.acquire().copy(u).negate(),
-      v: vectorPool.acquire().copy(v).negate(),
-      w: w // W is unchanged to maintain handedness ((-u) x (-v) = u x v)
-    },
-    radius: 2.0 - radius
-  };
-}
-
-
-
+export const getAntipode = (basis, radius) => {
+  if (radius > 1.0) {
+    const u = vectorPool.acquire().copy(basis.u).negate(); // Flip U to maintain chirality
+    const v = vectorPool.acquire().copy(basis.v).negate(); // Flip V (Antipode)
+    const w = vectorPool.acquire().copy(basis.w);          // W stays (Rotation axis)
+    return {
+      basis: { u, v, w },
+      radius: 2.0 - radius
+    };
+  }
+  return { basis, radius };
+};
 
 // Inject Type into pool to handle circular dependency
 dotPool.Type = Dot;
