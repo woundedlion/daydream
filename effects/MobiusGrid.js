@@ -85,7 +85,7 @@ export class MobiusGrid {
             const radius = (4 / Math.PI) * Math.atan(1 / R);
             const basis = makeBasis(q, normal);
 
-            const transformFn = (p) => {
+            const vertexShaderFn = (p) => {
                 const finalP = mobiusTransform(p, mobiusParams);
                 if (rotationQ) finalP.applyQuaternion(rotationQ);
                 return finalP;
@@ -96,7 +96,7 @@ export class MobiusGrid {
                 const res = this.palette.get(i / numRings);
                 res.alpha *= opacity * this.alpha;
                 return res;
-            }, 0, 0, transformFn);
+            }, 0, 0, vertexShaderFn);
         }
     }
 
@@ -112,13 +112,13 @@ export class MobiusGrid {
             const radius = 1.0;
             const basis = makeBasis(q, normal);
 
-            const transformFn = (p) => {
+            const vertexShaderFn = (p) => {
                 const finalP = mobiusTransform(p, mobiusParams);
                 if (rotationQ) finalP.applyQuaternion(rotationQ);
                 return finalP;
             };
 
-            const opacity = Math.min(1.0, Math.max(0.0, numLines - i));
+            const opacity = Math.min(1.0, Math.max(0.0, numRings - i));
 
             Plot.Polygon.draw(pipeline, basis, radius, Daydream.W / 4, (pTransformed, tLine) => {
 
@@ -137,7 +137,7 @@ export class MobiusGrid {
                 const res = this.palette.get(wrap(tParam - phase, 1.0));
                 res.alpha *= opacity * this.alpha;
                 return res;
-            }, 0, 0, transformFn);
+            }, 0, 0, vertexShaderFn);
         }
     }
 

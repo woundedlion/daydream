@@ -42,7 +42,6 @@ export class Orientation {
    */
   orient(v, i = this.length() - 1, target = null) {
     const out = target || vectorPool.acquire();
-    // Safety check if v is same as target (implicit in copy)
     return out.copy(v).normalize().applyQuaternion(this.orientations[i]);
   }
 
