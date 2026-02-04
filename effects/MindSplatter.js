@@ -143,46 +143,40 @@ export class MindSplatter {
     }
 
     drawParticles(opacity) {
-        // We iterate trails, but delegate the "drawing" logic to our generic shader
+        const fragmentShader = (pos, v, particle) => {
+            const lifeAlpha = v.v1;
+            const holeAlpha = v.v0;
+            const c = particle.palette.get(lifeAlpha);
+            c.alpha *= holeAlpha * opacity;
+            return c;
+        }
+
+        const vertexShader = (point, particle, i, total) => {
+            // Attractor alpha holes
+            let holeAlpha = 1.0;
+            for (const attr of this.particleSystem.attractors) {
+                const dist = angleBetween(point, attr.position);
+                if (dist < attr.eventHorizon) {
+                    holeAlpha *= quinticKernel(dist / attr.eventHorizon);
+                }
+            }
+
+            // Mobius transform and global camera
+            const frag = fragmentPool.acquire();
+            mobiusTransform(point, this.mobius, frag.pos);
+            this.orientation.orient(frag.pos, undefined, frag.pos);
+
+            frag.v0 = holeAlpha;
+            frag.v1 = i / total; // lifeAlpha
+
+            return frag;
+        }
+
         Plot.ParticleSystem.draw(
             this.pipeline,
             this.particleSystem,
-            // --- FRAGMENT SHADER ---
-            (pos, v, particle) => {
-                // v is now the _scratchFrag from rasterize, with v0..v3 populated
-                const lifeAlpha = v.v1;
-                const holeAlpha = v.v0;
-
-                const c = particle.palette.get(lifeAlpha);
-                c.alpha *= holeAlpha * opacity;
-                return c;
-            },
-            // --- VERTEX SHADER ---
-            (point, particle, i, total) => {
-                // 1. Calculate Hole Alpha (Physics/Logic)
-                let holeAlpha = 1.0;
-                for (const attr of this.particleSystem.attractors) {
-                    const dist = angleBetween(point, attr.position);
-                    if (dist < attr.eventHorizon) {
-                        holeAlpha *= quinticKernel(dist / attr.eventHorizon);
-                    }
-                }
-
-                // 2. Output Fragment (Platinum Standard Zero-Alloc)
-                const frag = fragmentPool.acquire();
-
-                // 3. Transform Position (Geometry) - IN PLACE
-                // mobiusTransform writes directly to frag.pos
-                mobiusTransform(point, this.mobius, frag.pos);
-                // orient writes directly to frag.pos (target = frag.pos)
-                this.orientation.orient(frag.pos, undefined, frag.pos);
-
-                // 4. Write Data Registers
-                frag.v0 = holeAlpha;
-                frag.v1 = i / total; // lifeAlpha
-
-                return frag;
-            }
+            fragmentShader,
+            vertexShader
         );
     }
 

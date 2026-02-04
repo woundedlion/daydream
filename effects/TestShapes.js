@@ -109,7 +109,7 @@ export class TestShapes {
             ? this.plotPipeline
             : this.scanPipeline;
 
-        const colorFn = (p, t, dist) => {
+        const fragmentShaderFn = (p, t, dist) => {
             return color4Pool.acquire().set(ring.color.color, ring.color.alpha * this.alpha * spriteAlpha);
         }
 
@@ -117,19 +117,19 @@ export class TestShapes {
         const phase = ring.layerIndex * this.twist;
         if (ring.mode === "Plot") {
             if (this.shape === "Flower") {
-                Plot.Flower.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase);
+                Plot.Flower.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase);
             } else if (this.shape === "Star") {
-                Plot.Star.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase);
+                Plot.Star.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase);
             } else {
-                Plot.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase);
+                Plot.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase);
             }
         } else {
             if (this.shape === "Flower") {
-                Scan.Flower.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
+                Scan.Flower.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase, this.debugBB);
             } else if (this.shape === "Star") {
-                Scan.Star.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
+                Scan.Star.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase, this.debugBB);
             } else {
-                Scan.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, colorFn, phase, this.debugBB);
+                Scan.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase, this.debugBB);
             }
         }
     }

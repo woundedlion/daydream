@@ -1286,10 +1286,10 @@ export const Scan = {
          * Rasterizes a shape using scanline conversion.
          * @param {Object} pipeline - Pipeline.
          * @param {Object} shape - SDF shape.
-         * @param {Function} shaderFn - Color function.
+         * @param {Function} fragmentShaderFn - Color function.
          * @param {boolean} [debugBB=false] - Debug.
          */
-    rasterize: (pipeline, shape, shaderFn, debugBB = false) => {
+    rasterize: (pipeline, shape, fragmentShaderFn, debugBB = false) => {
         const { yMin, yMax } = shape.getVerticalBounds();
 
         // Reusable result object
@@ -1341,7 +1341,7 @@ export const Scan = {
                         }
                     }
 
-                    const c = shaderFn(p, sampleResult.t, sampleResult.dist, sampleResult.faceIndex, sampleResult);
+                    const c = fragmentShaderFn(p, sampleResult.t, sampleResult.dist, sampleResult.faceIndex, sampleResult);
                     const color = c.isColor ? c : (c.color || c);
                     const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
 
@@ -1381,9 +1381,9 @@ export const Scan = {
          * @param {number} maxDistortion - Max abs(shift) for bucket optimization.
          * @param {Function} materialFn - (pos, t, dist) => {color, alpha}.
          */
-        static draw(pipeline, basis, radius, thickness, shiftFn, maxDistortion, shaderFn, phase = 0, debugBB = false) {
+        static draw(pipeline, basis, radius, thickness, shiftFn, maxDistortion, fragmentShaderFn, phase = 0, debugBB = false) {
             const shape = new SDF.DistortedRing(basis, radius, thickness, shiftFn, maxDistortion, phase);
-            Scan.rasterize(pipeline, shape, shaderFn, debugBB);
+            Scan.rasterize(pipeline, shape, fragmentShaderFn, debugBB);
         }
     },
 
@@ -1394,11 +1394,11 @@ export const Scan = {
          * @param {Object} basis - Basis.
          * @param {number} radius - Radius.
          * @param {number} sides - Sides.
-         * @param {Function} shaderFn - Color function.
+         * @param {Function} fragmentShaderFn - Color function.
          * @param {number} [phase=0] - Phase.
          * @param {boolean} [debugBB=false] - Debug.
          */
-        static draw(pipeline, basis, radius, sides, shaderFn, phase = 0, debugBB = false) {
+        static draw(pipeline, basis, radius, sides, fragmentShaderFn, phase = 0, debugBB = false) {
             let { v, u, w } = basis;
             if (radius > 1.0) {
                 v = vectorPool.acquire().copy(v).negate();
@@ -1408,7 +1408,7 @@ export const Scan = {
 
             const thickness = radius * (Math.PI / 2);
             const shape = new SDF.Polygon({ v, u, w }, radius, thickness, sides, phase);
-            const renderColorFn = (p, t, d) => shaderFn(p, 0, d);
+            const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
             Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
         }
     },
@@ -1419,11 +1419,11 @@ export const Scan = {
          * @param {Object} basis - Basis.
          * @param {number} radius - Radius.
          * @param {number} sides - Sides.
-         * @param {Function} shaderFn - Color function.
+         * @param {Function} fragmentShaderFn - Color function.
          * @param {number} [phase=0] - Phase.
          * @param {boolean} [debugBB=false] - Debug.
          */
-        static draw(pipeline, basis, radius, sides, shaderFn, phase = 0, debugBB = false) {
+        static draw(pipeline, basis, radius, sides, fragmentShaderFn, phase = 0, debugBB = false) {
             let { v, u, w } = basis;
             if (radius > 1.0) {
                 v = vectorPool.acquire().copy(v).negate();
@@ -1431,7 +1431,7 @@ export const Scan = {
                 radius = 2.0 - radius;
             }
             const shape = new SDF.Star({ v, u, w }, radius, sides, phase);
-            const renderColorFn = (p, t, d) => shaderFn(p, 0, d);
+            const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
             Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
         }
     },
@@ -1442,11 +1442,11 @@ export const Scan = {
          * @param {Object} basis - Basis.
          * @param {number} radius - Radius.
          * @param {number} sides - Sides.
-         * @param {Function} shaderFn - Color function.
+         * @param {Function} fragmentShaderFn - Color function.
          * @param {number} [phase=0] - Phase.
          * @param {boolean} [debugBB=false] - Debug.
          */
-        static draw(pipeline, basis, radius, sides, shaderFn, phase = 0, debugBB = false) {
+        static draw(pipeline, basis, radius, sides, fragmentShaderFn, phase = 0, debugBB = false) {
             let { v, u, w } = basis;
             if (radius > 1.0) {
                 v = vectorPool.acquire().copy(v).negate();
@@ -1454,7 +1454,7 @@ export const Scan = {
                 radius = 2.0 - radius;
             }
             const shape = new SDF.Flower({ v, u, w }, radius, sides, phase);
-            const renderColorFn = (p, t, d) => shaderFn(p, 0, d);
+            const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
             Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
         }
     },
@@ -1465,13 +1465,13 @@ export const Scan = {
          * @param {Object} pipeline - Render pipeline.
          * @param {THREE.Vector3} normal - Center of the circle.
          * @param {number} radius - Angular radius (0-2).
-         * @param {Function} shaderFn - (pos, t, dist) => {color, alpha}.
+         * @param {Function} fragmentShaderFn - (pos, t, dist) => {color, alpha}.
          * @param {Object} options - Options.
          */
-        static draw(pipeline, basis, radius, shaderFn, phase = 0, debugBB = false) {
+        static draw(pipeline, basis, radius, fragmentShaderFn, phase = 0, debugBB = false) {
             // A circle is a ring with radius 0 and thickness = radius
             const thickness = radius * (Math.PI / 2);
-            Scan.Ring.draw(pipeline, basis, 0, thickness, shaderFn, phase, debugBB);
+            Scan.Ring.draw(pipeline, basis, 0, thickness, fragmentShaderFn, phase, debugBB);
         }
     },
 
@@ -1483,13 +1483,13 @@ export const Scan = {
          * @param {THREE.Vector3} normal - Ring orientation.
          * @param {number} radius - Angular radius (0-2).
          * @param {number} thickness - Angular thickness.
-         * @param {Function} shaderFn - (pos, t, dist) => {color, alpha}.
+         * @param {Function} fragmentShaderFn - (pos, t, dist) => {color, alpha}.
          * @param {number} [phase=0] - Phase of the ring.
          * @param {boolean} [debugBB=false] - Whether to show bounding boxes.
          */
-        static draw(pipeline, basis, radius, thickness, shaderFn, phase = 0, debugBB = false) {
+        static draw(pipeline, basis, radius, thickness, fragmentShaderFn, phase = 0, debugBB = false) {
             const shape = new SDF.Ring(basis, radius, thickness, phase);
-            Scan.rasterize(pipeline, shape, shaderFn, debugBB);
+            Scan.rasterize(pipeline, shape, fragmentShaderFn, debugBB);
         }
     },
 
@@ -1501,10 +1501,10 @@ export const Scan = {
          * @param {THREE.Vector3} v1 - Start point.
          * @param {THREE.Vector3} v2 - End point.
          * @param {number} thickness - Line thickness.
-         * @param {Function} shaderFn - Color function.
+         * @param {Function} fragmentShaderFn - Color function.
          * @param {Object} options - Options.
          */
-        static draw(pipeline, pixels, v1, v2, thickness, shaderFn, options = {}) {
+        static draw(pipeline, pixels, v1, v2, thickness, fragmentShaderFn, options = {}) {
             const normal = vectorPool.acquire().crossVectors(v1, v2).normalize();
             if (normal.lengthSq() < 0.000001) return;
 
@@ -1527,7 +1527,7 @@ export const Scan = {
             const minPhi = Math.acos(Math.min(1, Math.max(-1, maxY))) - thickness;
             const maxPhi = Math.acos(Math.min(1, Math.max(-1, minY))) + thickness;
 
-            Scan.Ring.draw(pipeline, { v: normal, u: c1, w: c2 }, 1.0, thickness, shaderFn, 0, 2 * Math.PI, {
+            Scan.Ring.draw(pipeline, { v: normal, u: c1, w: c2 }, 1.0, thickness, fragmentShaderFn, 0, 2 * Math.PI, {
                 ...options,
                 clipPlanes: [c1, c2],
                 limits: { minPhi, maxPhi }
@@ -1540,10 +1540,10 @@ export const Scan = {
          * Scans a solid mesh face by face.
          * @param {Object} pipeline - Render pipeline.
          * @param {Object} mesh - {vertices: Vector3[], faces: number[][]}.
-         * @param {Function} shaderFn - Color function.
+         * @param {Function} fragmentShaderFn - Color function.
          * @param {boolean} [debugBB=false] - Debug.
          */
-        static draw(pipeline, mesh, shaderFn, debugBB = false) {
+        static draw(pipeline, mesh, fragmentShaderFn, debugBB = false) {
             facePool.reset();
 
             // Optimization: Reuse vertexData buffer and closure to avoid GC
@@ -1563,9 +1563,9 @@ export const Scan = {
                     _scanScratch.v2 = d0.v2 * w.a + d1.v2 * w.b + d2.v2 * w.c;
                     _scanScratch.v3 = d0.v3 * w.a + d1.v3 * w.b + d2.v3 * w.c;
 
-                    return shaderFn.color(_scanScratch, t, dist, out.size);
+                    return fragmentShaderFn.color(_scanScratch, t, dist, out.size);
                 }
-                return shaderFn.color(vertexData[0], t, dist, out.size);
+                return fragmentShaderFn.color(vertexData[0], t, dist, out.size);
             };
 
             for (let i = 0; i < mesh.faces.length; i++) {
@@ -1574,7 +1574,7 @@ export const Scan = {
                 shape.init(mesh.vertices, faceIndices, 0);
                 vertexData.length = 0;
                 for (let k = 0; k < faceIndices.length; k++) {
-                    vertexData.push(shaderFn(mesh.vertices[faceIndices[k]], faceIndices[k], i));
+                    vertexData.push(fragmentShaderFn(mesh.vertices[faceIndices[k]], faceIndices[k], i));
                 }
 
                 Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
@@ -1587,29 +1587,29 @@ export const Scan = {
          * @param {Object} pipeline - Pipeline.
          * @param {THREE.Vector3} pos - Position.
          * @param {number} thickness - Thickness.
-         * @param {Function} shaderFn - Color function.
+         * @param {Function} fragmentShaderFn - Color function.
          * @param {Object} options - Options.
          */
-        static draw(pipeline, pos, thickness, shaderFn, options) {
+        static draw(pipeline, pos, thickness, fragmentShaderFn, options) {
             const identity = new THREE.Quaternion().identity();
             const basis = makeBasis(identity, pos);
             // A point is a Ring with radius 0 and some thickness
-            Scan.Ring.draw(pipeline, basis, 0, thickness, shaderFn, 0, options && options.debugBB);
+            Scan.Ring.draw(pipeline, basis, 0, thickness, fragmentShaderFn, 0, options && options.debugBB);
         }
     },
 
     Field: class {
         /**
          * @param {Object} pipeline - Pipeline.
-         * @param {Function} shaderFn - Color function.
+         * @param {Function} fragmentShaderFn - Color function.
          */
-        static draw(pipeline, shaderFn) {
+        static draw(pipeline, fragmentShaderFn) {
             for (let i = 0; i < Daydream.pixelPositions.length; i++) {
                 const x = i % Daydream.W;
                 const y = (i / Daydream.W) | 0;
 
                 const p = Daydream.pixelPositions[i];
-                const mat = shaderFn(p);
+                const mat = fragmentShaderFn(p);
                 const color = mat.isColor ? mat : (mat.color || mat);
                 const alpha = (mat.alpha !== undefined ? mat.alpha : 1.0);
 
