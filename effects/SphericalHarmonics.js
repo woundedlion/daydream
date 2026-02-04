@@ -7,18 +7,19 @@ import * as THREE from "three";
 import { TWO_PI } from "../3dmath.js";
 import { gui } from "../gui.js";
 import { Daydream } from "../driver.js";
-import { Scan } from "../scan.js";
+import { Scan, SDF } from "../scan.js";
+import { quinticKernel } from "../filters.js";
 
 import { Palettes } from "../palettes.js";
 import {
     Timeline,
-    OrientationTrail,
     Rotation,
     Orientation
 } from "../animation.js";
-import { easeMid, easeInOutSin } from "../easing.js";
-import { quaternionPool, vectorPool } from "../memory.js";
+import { easeMid } from "../easing.js";
+import { quaternionPool } from "../memory.js"; // vectorPool removed (using local scratch)
 import { createRenderPipeline } from "../filters.js";
+import { smoothstep } from "../util.js";
 
 const factorial = (n) => {
     if (n <= 1) return 1;
@@ -71,6 +72,7 @@ export class SphericalHarmonics {
             mode: 6,
             amplitude: 3.2
         };
+        this.pipeline = createRenderPipeline();
 
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this.params, 'amplitude', 0, 5).name('Gain');
@@ -89,22 +91,66 @@ export class SphericalHarmonics {
         const idx = Math.floor(this.params.mode);
         const l = Math.floor(Math.sqrt(idx));
         const m = idx - l * l - l;
+        const absM = Math.abs(m);
 
-        const invQ = quaternionPool.acquire().copy(this.orientation.get()).invert();
+        // 1. Pre-calculate N (Optimization)
+        const N = Math.sqrt(((2 * l + 1) / (2 * TWO_PI)) * (factorial(l - absM) / factorial(l + absM)));
 
-        const pipeline = createRenderPipeline();
+        const fastHarmonic = (l, m, theta, phi) => {
+            const P = associatedLegendre(l, absM, Math.cos(phi));
+            if (m > 0) return Math.sqrt(2) * N * P * Math.cos(m * theta);
+            if (m < 0) return Math.sqrt(2) * N * P * Math.sin(absM * theta);
+            return N * P;
+        };
 
-        Scan.Field.draw(pipeline, (p) => {
-            const v = vectorPool.acquire().copy(p).applyQuaternion(invQ);
-            const phi = Math.acos(Math.max(-1, Math.min(1, v.y)));
-            const theta = Math.atan2(v.z, v.x);
-            let val = sphericalHarmonic(l, m, theta, phi);
-            val = Math.abs(val) * this.params.amplitude;
-            const t = Math.tanh(val);
-            const colorResult = Palettes.richSunset.get(t);
-            colorResult.alpha = Math.min(1, val * 2);
-            return colorResult;
-        });
+        // 2. Create the Blob
+        const blob = new SDF.HarmonicBlob(
+            l,
+            m,
+            this.params.amplitude,
+            this.orientation.get(),
+            fastHarmonic
+        );
+
+        // 3. "Digital Twin" Fragment Shader
+        // out.rawDist contains the signed harmonic value (-Infinity to +Infinity)
+        const fragmentShader = (pos, t, dist, faceIdx, out) => {
+            const val = out.rawDist; // The raw math value
+            const absVal = Math.abs(val);
+
+            // A. Dual-Tone Coloring
+            // Use standard sunset for Positive Lobes, Synthesize "Ice" for Negative
+            let base;
+            if (val >= 0) {
+                base = Palettes.richSunset.get(t); // Gold/Red
+            } else {
+                // Swap channels to create a complementary Ice/Blue palette
+                const p = Palettes.richSunset.get(t);
+                base = {
+                    color: new THREE.Color(p.color.b, p.color.g * 0.8, p.color.r), // Blue-ish
+                    alpha: p.alpha
+                };
+            }
+
+            // B. Ambient Occlusion (The "Pretty Darkening")
+            // Darken the "valleys" where the shape is close to the unit sphere (val ~ 0).
+            // This creates deep shadows between the lobes.
+            const shadow = smoothstep(0.0, 0.4, absVal * this.params.amplitude);
+            const occlusion = 0.15 + 0.85 * shadow;
+
+            // Apply shadow
+            base.color.multiplyScalar(occlusion);
+
+            // C. Highlight Tips
+            // Add a specular pop to the very tips of the lobes
+            if (t > 0.9) {
+                base.color.addScalar(0.15 * (t - 0.9) * 10);
+            }
+
+            return base;
+        };
+
+        Scan.rasterize(this.pipeline, blob, fragmentShader);
     }
 
     getLabels() {
