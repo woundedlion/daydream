@@ -552,25 +552,26 @@ class TemporalNode {
 /**
  * Delays pixel drawing by a TTL determined by a function.
  */
-export class TemporalFilter {
+export class FilterTemporal {
   /**
-   * @param {Function} ttlFn - Function(x, y) => frames (integer)
-   * @param {number} capacity - Initial capacity (not strictly valued since we use array)
+   * @param {Function} ttlFn - Function(x, y) => frames (float)
+   * @param {number} windowSize - How many frames to smear the release over (e.g. 1.5)
    */
-  constructor(ttlFn, capacity = 1000) {
+  constructor(ttlFn, windowSize = 1.5) {
     this.is2D = true;
     this.ttlFn = ttlFn;
-    this.buffer = []; // Swap-and-Pop Array
-    this.nodePool = []; // Simple Object Pool
+    this.windowSize = windowSize;
+    this.buffer = [];
+    this.nodePool = [];
     this.pass = null;
   }
 
   plot(x, y, color, age, alpha, tag, pass) {
     this.pass = pass;
 
-    const ttl = Math.floor(this.ttlFn(x, y));
+    const ttl = this.ttlFn(x, y);
 
-    if (ttl <= 0) {
+    if (ttl <= -this.windowSize) {
       pass(x, y, color, age, alpha, tag);
       return;
     }
@@ -589,32 +590,41 @@ export class TemporalFilter {
     this.buffer.push(node);
   }
 
-  flush(unused, alpha) {
-    // Note: 'unused' arg is because other flush/trail methods usually take a trailFn.
-    // Here we don't generate new trails, we just release dots.
-
-    // Swap-and-Pop iteration
+  flush(unused, globalAlpha) {
+    const window = this.windowSize;
     for (let i = 0; i < this.buffer.length; i++) {
       const node = this.buffer[i];
-      node.ttl--;
+      node.ttl -= 1.0;
 
-      if (node.ttl <= 0) {
-        // RELEASE
-        if (this.pass) {
-          this.pass(node.x, node.y, node.color, node.age, node.alpha, node.tag);
+      const dist = Math.abs(node.ttl);
+      if (dist <= window) {
+        // Linear Triangle Filter: 1.0 at center, 0.0 at edges
+        // We normalize by (1 / window) to ensure total energy sums to ~1.0 over time
+        const weight = (1.0 - (dist / window));
+        const intensity = weight; // You can multiply by (1/window) for strict energy conservation if needed
+
+        if (this.pass && intensity > 0.01) {
+          this.pass(
+            node.x, node.y,
+            node.color,
+            node.age,
+            node.alpha * intensity * globalAlpha,
+            node.tag
+          );
         }
+      }
 
-        // Return to pool
+      // 4. Removal: Only drop when fully past the negative edge of the window
+      if (node.ttl < -window) {
         node.tag = null;
         node.color = null;
         this.nodePool.push(node);
 
-        // Swap-and-Pop
+        // Fast removal (Swap with last)
         const last = this.buffer.pop();
-
         if (i < this.buffer.length) {
           this.buffer[i] = last;
-          i--; // Re-process this index
+          i--; // Re-process this index since we swapped a new node in
         }
       }
     }

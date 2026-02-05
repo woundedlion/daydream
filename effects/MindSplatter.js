@@ -31,7 +31,7 @@ export class MindSplatter {
         this.warpScale = 0.6;
         this.warpScale = 0.6;
         this.trailLength = 25;
-        this.solidName = 'cube';
+        this.solidName = 'dodecahedron';
 
         this.orientation = new Orientation();
         this.mobius = new MobiusParams();

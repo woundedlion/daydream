@@ -10,7 +10,7 @@ import {
     createRenderPipeline,
     FilterAntiAlias,
     FilterOrient,
-    TemporalFilter,
+    FilterTemporal,
     FilterGaussianBlur
 } from "../filters.js";
 
@@ -22,15 +22,13 @@ export class TestTemporal {
         this.timeline.add(0, new RandomWalk(this.orientation, new THREE.Vector3(0, 1, 0)));
 
         // Setup Temporal Parameters
-        this.delayBase = 10;
-        this.delayAmp = 20;
-        this.delayFreq = 0.05;
-        this.delaySpeed = 0.02;
-        this.delayNoise = 2;
+        this.delayBase = 0;
+        this.delayAmp = 3;
+        this.delayFreq = 0.3;
+        this.delaySpeed = 0.01;
+        this.windowSize = 3;
 
         this.temporalEnabled = true;
-
-        this.noiseEnabled = true;
 
         this.blurEnabled = true;
         this.blurStrength = 0.25;
@@ -38,7 +36,7 @@ export class TestTemporal {
         this.t = 0;
 
         // Setup Pipeline
-        this.temporalFilter = new TemporalFilter(this.delayFn.bind(this));
+        this.filterTemporal = new FilterTemporal(this.delayFn.bind(this), this.windowSize, 10);
 
         this.filterOrient = new FilterOrient(this.orientation);
         this.filterAA = new FilterAntiAlias();
@@ -46,13 +44,14 @@ export class TestTemporal {
 
         this.filters = createRenderPipeline(
             this.filterOrient,
-            this.temporalFilter,
-            this.filterBlur,
-            this.filterAA
+            this.filterTemporal,
+            this.filterAA,
+            this.filterBlur
         );
 
         // Load Mesh
-        this.mesh = Solids.rhombicuboctahedron();
+        this.solidName = 'icosahedron';
+        this.mesh = Solids[this.solidName]();
 
         this.setupGui();
     }
@@ -60,8 +59,7 @@ export class TestTemporal {
     delayFn(x, y) {
         if (!this.temporalEnabled) return 0;
         const phase = y * this.delayFreq + this.t * this.delaySpeed;
-        const noise = this.noiseEnabled ? (Math.random() - 0.5) * this.delayNoise : 0;
-        return Math.max(0, this.delayBase + Math.sin(phase) * this.delayAmp + noise);
+        return Math.max(0, this.delayBase + Math.sin(phase) * this.delayAmp);
     }
 
     updateBlur() {
@@ -71,6 +69,10 @@ export class TestTemporal {
     setupGui() {
         this.gui = new gui.GUI({ autoPlace: false });
 
+        this.gui.add(this, 'solidName', Object.keys(Solids)).name('Solid').onChange(v => {
+            this.mesh = Solids[v]();
+        });
+
         const folder = this.gui.addFolder('Temporal Settings');
         folder.add(this, 'temporalEnabled').name('Enable Delay');
         folder.add(this, 'delayBase', 0, 60).name('Base Delay');
@@ -78,11 +80,6 @@ export class TestTemporal {
         folder.add(this, 'delayFreq', 0, 0.5).name('Frequency');
         folder.add(this, 'delaySpeed', 0, 0.2).name('Speed');
         folder.open();
-
-        const noiseFolder = this.gui.addFolder('Noise Settings');
-        noiseFolder.add(this, 'noiseEnabled').name('Enable Noise');
-        noiseFolder.add(this, 'delayNoise', 0, 20).name('Noise Level');
-        noiseFolder.open();
 
         const blurFolder = this.gui.addFolder('Blur Settings');
         blurFolder.add(this, 'blurEnabled').name('Enable Blur').onChange(() => this.updateBlur());
@@ -106,3 +103,4 @@ export class TestTemporal {
         this.filters.flush(null, 1.0);
     }
 }
+
