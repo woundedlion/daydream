@@ -11,7 +11,6 @@ import {
     FilterAntiAlias,
     FilterOrient,
     FilterTemporal,
-    FilterGaussianBlur
 } from "../filters.js";
 
 export class TestTemporal {
@@ -22,16 +21,13 @@ export class TestTemporal {
         this.timeline.add(0, new RandomWalk(this.orientation, new THREE.Vector3(0, 1, 0)));
 
         // Setup Temporal Parameters
-        this.delayBase = 0;
-        this.delayAmp = 3;
+        this.delayBase = 8;
+        this.delayAmp = 4;
         this.delayFreq = 0.3;
         this.delaySpeed = 0.01;
-        this.windowSize = 3;
+        this.windowSize = 2;
 
         this.temporalEnabled = true;
-
-        this.blurEnabled = true;
-        this.blurStrength = 0.25;
 
         this.t = 0;
 
@@ -40,13 +36,11 @@ export class TestTemporal {
 
         this.filterOrient = new FilterOrient(this.orientation);
         this.filterAA = new FilterAntiAlias();
-        this.filterBlur = new FilterGaussianBlur(this.blurEnabled ? this.blurStrength : 0);
 
         this.filters = createRenderPipeline(
             this.filterOrient,
             this.filterTemporal,
-            this.filterAA,
-            this.filterBlur
+            this.filterAA
         );
 
         // Load Mesh
@@ -74,17 +68,16 @@ export class TestTemporal {
         });
 
         const folder = this.gui.addFolder('Temporal Settings');
-        folder.add(this, 'temporalEnabled').name('Enable Delay');
+        folder.add(this, 'temporalEnabled').name('Enable Temporal Displacement');
         folder.add(this, 'delayBase', 0, 60).name('Base Delay');
         folder.add(this, 'delayAmp', 0, 60).name('Amplitude');
         folder.add(this, 'delayFreq', 0, 0.5).name('Frequency');
         folder.add(this, 'delaySpeed', 0, 0.2).name('Speed');
+        folder.add(this, 'windowSize', 1, 8).name('Window Size').onChange(v => {
+            this.filterTemporal.windowSize = v;
+        });
         folder.open();
 
-        const blurFolder = this.gui.addFolder('Blur Settings');
-        blurFolder.add(this, 'blurEnabled').name('Enable Blur').onChange(() => this.updateBlur());
-        blurFolder.add(this, 'blurStrength', 0, 1).name('Blur Strength').onChange(() => this.updateBlur());
-        blurFolder.open();
     }
 
     drawFrame() {
