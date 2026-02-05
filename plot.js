@@ -240,53 +240,6 @@ export const Plot = {
         }
     },
 
-    Polyhedron: class {
-        /**
-         * Samples edges of a polyhedron.
-         * Registers: None (Returns Points)
-         * @param {number[][]} vertices - Array of [x, y, z]
-         * @param {number[][]} edges - Adjacency list
-         * @returns {THREE.Vector3[]} Array of points
-         */
-        static sample(vertices, edges) {
-            let points = [];
-            edges.map((adj, i) => {
-                adj.map((j) => {
-                    points.push(vectorPool.acquire().set(...vertices[i]).normalize());
-                    points.push(vectorPool.acquire().set(...vertices[j]).normalize());
-                })
-            });
-            return points;
-        }
-
-        /**
-         * Draws a polyhedron.
-         * Registers:
-         *  v0: Interpolation factor t (0.0 -> 1.0) per edge
-         *  v1: Arc Length (radians) per edge
-         * @param {Object} pipeline - Render pipeline
-         * @param {number[][]} vertices - Array of [x, y, z]
-         * @param {number[][]} edges - Adjacency list
-         * @param {Function} fragmentShaderFn - Shader function
-         * @param {number} age - Age of operation
-         * @param {Function} vertexShaderFn - Vertex displacement function
-         */
-        static draw(pipeline, vertices, edges, fragmentShaderFn, age = 0, vertexShaderFn = null) {
-            edges.map((adj, i) => {
-                adj.map((j) => {
-                    if (i < j) {
-                        Plot.Line.draw(
-                            pipeline,
-                            vectorPool.acquire().set(...vertices[i]).normalize(),
-                            vectorPool.acquire().set(...vertices[j]).normalize(),
-                            fragmentShaderFn,
-                            0, 1, false, false, age, vertexShaderFn);
-                    }
-                })
-            });
-        }
-    },
-
     Mesh: class {
         /**
          * Samples edges of a mesh.
