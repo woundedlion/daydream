@@ -76,7 +76,7 @@ export class SpinShapes {
 
         const basis = makeBasis(shape.orientation.get(), shape.normal);
         const phase = (shape.layer === 0) ? 0 : Math.PI / this.sides;
-        Scan.Polygon.draw(this.pipeline, basis, this.radius, this.sides, colorFn, phase);
+        Scan.SphericalPolygon.draw(this.pipeline, basis, this.radius, this.sides, colorFn, phase);
     }
 
     drawFrame() {

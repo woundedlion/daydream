@@ -93,16 +93,15 @@ const PlanarStrategy = (basis) => {
 
 
 export const Plot = {
-    Shader: {
-        lerp: (a, b, t) => {
-            if (typeof a === 'number') return a * (1 - t) + b * t;
-            const res = {};
-            for (const k in a) res[k] = a[k] * (1 - t) + b[k] * t;
-            return res;
-        },
-    },
-
     Point: class {
+        /**
+         * Draws a single point.
+         * Registers: None (Points only)
+         * @param {Object} pipeline - Render pipeline
+         * @param {THREE.Vector3} v - Position
+         * @param {Function} fragmentShaderFn - Shader function (v, t)
+         * @param {number} age - Age of operation
+         */
         static draw(pipeline, v, fragmentShaderFn, age = 0) {
             const res = fragmentShaderFn(v, 0);
             const color = res.isColor ? res : (res.color || res);
@@ -117,7 +116,11 @@ export const Plot = {
          * Samples a geodesic line between two points.
          * Registers:
          *  v0: Interpolation factor t (0.0 -> 1.0)
-         *  v1: Cumulative Arc Length (radians) from start
+         *  v1: Arc Length (radians) from v1
+         * @param {THREE.Vector3} v1 - Start point
+         * @param {THREE.Vector3} v2 - End point
+         * @param {number} numSamples - Number of samples
+         * @returns {Object[]} Array of fragments
          */
         static sample(v1, v2, numSamples = 10) {
             let u = vectorPool.acquire().copy(v1);
@@ -151,8 +154,8 @@ export const Plot = {
         /**
          * Draws a geodesic line between two points.
          * Registers:
-         *  v0: Interpolation factor t (start -> end)
-         *  v1: Cumulative Arc Length (radians)
+         *  v0: line progress (0..1)
+         *  v1: Arc Length (0..2PI)
          * @param {Object} pipeline - Render pipeline
          * @param {THREE.Vector3} v1 - Start point
          * @param {THREE.Vector3} v2 - End point
@@ -238,6 +241,13 @@ export const Plot = {
     },
 
     Polyhedron: class {
+        /**
+         * Samples edges of a polyhedron.
+         * Registers: None (Returns Points)
+         * @param {number[][]} vertices - Array of [x, y, z]
+         * @param {number[][]} edges - Adjacency list
+         * @returns {THREE.Vector3[]} Array of points
+         */
         static sample(vertices, edges) {
             let points = [];
             edges.map((adj, i) => {
@@ -249,6 +259,18 @@ export const Plot = {
             return points;
         }
 
+        /**
+         * Draws a polyhedron.
+         * Registers:
+         *  v0: Interpolation factor t (0.0 -> 1.0) per edge
+         *  v1: Arc Length (radians) per edge
+         * @param {Object} pipeline - Render pipeline
+         * @param {number[][]} vertices - Array of [x, y, z]
+         * @param {number[][]} edges - Adjacency list
+         * @param {Function} fragmentShaderFn - Shader function
+         * @param {number} age - Age of operation
+         * @param {Function} vertexShaderFn - Vertex displacement function
+         */
         static draw(pipeline, vertices, edges, fragmentShaderFn, age = 0, vertexShaderFn = null) {
             edges.map((adj, i) => {
                 adj.map((j) => {
@@ -266,6 +288,15 @@ export const Plot = {
     },
 
     Mesh: class {
+        /**
+         * Samples edges of a mesh.
+         * Registers:
+         *  v0: Interpolation factor t (0.0 -> 1.0) per edge
+         *  v1: Cumulative Arc Length (radians) per edge
+         * @param {Object} mesh - Mesh object with {vertices, faces}
+         * @param {number} density - Sampling density
+         * @returns {Object[]} Array of fragments (edges array)
+         */
         static sample(mesh, density = 10) {
             const edges = [];
             const drawn = new Set();
@@ -282,6 +313,17 @@ export const Plot = {
             return edges;
         }
 
+        /**
+         * Draws a mesh.
+         * Registers:
+         *  v0: Edge Progress t (0.0 -> 1.0) per edge
+         *  v1: Cumulative Arc Length (radians) per edge
+         * @param {Object} pipeline - Render pipeline
+         * @param {Object} mesh - Mesh object
+         * @param {Function} fragmentShaderFn - Shader function
+         * @param {number} age - Age of operation
+         * @param {Function} vertexShaderFn - Vertex displacement function
+         */
         static draw(pipeline, mesh, fragmentShaderFn, age = 0, vertexShaderFn = null) {
             const edges = Plot.Mesh.sample(mesh);
             for (const edge of edges) {
@@ -310,8 +352,8 @@ export const Plot = {
         /**
          * Samples a ring/circle on the sphere.
          * Registers:
-         *  v0: Normalized parameter (0.0 -> 1.0) around ring
-         *  v1: Cumulative Integer Index (0, 1, 2...)
+         *  v0: Angular progress (0.0 -> 1.0) around ring
+         *  v1: Arc Length (radians)
          * @param {Object} basis - Coordinate basis {u, v, w}
          * @param {number} radius - Radius in radians
          * @param {number} numSamples - Number of points
@@ -328,6 +370,8 @@ export const Plot = {
             const d = Math.cos(thetaEq);
 
             const step = TWO_PI / numSamples;
+            const arcLengthScale = Math.sin(radius); // Circumference scaling
+
             let points = [];
             let uTemp = vectorPool.acquire();
 
@@ -341,8 +385,21 @@ export const Plot = {
                 let p = fragmentPool.acquire();
                 p.pos.copy(v).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
                 p.v0 = i / numSamples;
-                p.v1 = i;
+                p.v1 = theta * arcLengthScale;
+                p.v2 = i;
                 points.push(p);
+            }
+
+            // Manual Close (Overlap)
+            // Ensures texture flows from 0.999 -> 1.0 continuously
+            if (points.length > 0) {
+                const first = points[0];
+                const last = fragmentPool.acquire();
+                last.pos.copy(first.pos);
+                last.v0 = 1.0;
+                last.v1 = TWO_PI * arcLengthScale;
+                last.v2 = numSamples;
+                points.push(last);
             }
             return points;
         }
@@ -350,8 +407,9 @@ export const Plot = {
         /**
          * Draws a ring/circle on the sphere.
          * Registers:
-         *  v0: Normalized parameter (0.0 -> 1.0)
-         *  v1: Cumulative Integer Index (0, 1, 2...)
+         *  v0: Angular progress (0.0 -> 1.0)
+         *  v1: Arc Length (radians)
+         *  v2: Index
          * @param {Object} pipeline - Render pipeline
          * @param {Object} basis - Coordinate basis {u, v, w}
          * @param {number} radius - Radius in radians
@@ -376,14 +434,40 @@ export const Plot = {
     },
 
     PlanarLine: class {
+        /**
+         * Samples a straight line in the projection.
+         * Registers:
+         *  v0: Line progress t (0.0 -> 1.0)
+         * @param {THREE.Vector3} v1 - Start
+         * @param {THREE.Vector3} v2 - End
+         * @returns {Object[]} Start and End fragments
+         */
         static sample(v1, v2) {
+            const dx = v1.x - v2.x; // Simplified distance for 'Planar' (Euclidean in 3D or projected?) 
+            // PlanarLine is usually used for UI or HUD where Z is ignored or it's flat.
+            // Let's use Euclidean distance between the vectors as "Arc Length" proxy.
+            const dist = v1.distanceTo(v2);
+
             const p1 = fragmentPool.acquire();
-            p1.pos.copy(v1); p1.v0 = 0;
+            p1.pos.copy(v1); p1.v0 = 0; p1.v1 = 0;
             const p2 = fragmentPool.acquire();
-            p2.pos.copy(v2); p2.v0 = 1;
+            p2.pos.copy(v2); p2.v0 = 1; p2.v1 = dist;
             return [p1, p2];
         }
 
+        /**
+         * Draws a straight line in the projection.
+         * Registers:
+         *  v0: Line progress t (0.0 -> 1.0)
+         *  v1: Length (Euclidean distance)
+         * @param {Object} pipeline - Render pipeline
+         * @param {THREE.Vector3} v1 - Start
+         * @param {THREE.Vector3} v2 - End
+         * @param {THREE.Vector3} center - Center of projection
+         * @param {Function} fragmentShaderFn - Shader function (takes v0)
+         * @param {number} age - Age of operation
+         * @param {Function} vertexShaderFn - Vertex displacement function
+         */
         static draw(pipeline, v1, v2, center, fragmentShaderFn, age = 0, vertexShaderFn = null) {
             const points = Plot.PlanarLine.sample(v1, v2);
             if (vertexShaderFn) {
@@ -402,12 +486,13 @@ export const Plot = {
         }
     },
 
-    Polygon: class {
+    SphericalPolygon: class {
         /**
-         * Samples a regular polygon.
+         * Samples a regular polygon (Geodesic edges).
          * Registers:
-         *  v0: Normalized parameter (0.0 -> 1.0)
-         *  v1: Cumulative Integer Index (0, 1, 2...)
+         *  v0: Normalized parameter (0.0 -> 1.0) around perimeter
+         *  v1: Cumulative Arc Length (radians)
+         *  v2: Cumulative Integer Index (0, 1, 2...). Fract(v2) is local edge t.
          * @param {Object} basis - Coordinate basis {u, v, w}
          * @param {number} radius - Radius in radians
          * @param {number} numSides - Number of sides
@@ -415,15 +500,32 @@ export const Plot = {
          * @returns {Object[]} Array of fragments
          */
         static sample(basis, radius, numSides, phase = 0) {
-            const offset = Math.PI / numSides;
-            return Plot.Ring.sample(basis, radius, numSides, phase + offset);
+            const points = Plot.Ring.sample(basis, radius, numSides, phase + Math.PI / numSides);
+
+            // Re-calculate v1 to be true geodesic chord length
+            let cumulativeLength = 0;
+            for (let i = 0; i < points.length; i++) {
+                points[i].v2 = i; // Ensure index is strictly monotonic
+
+                if (i > 0) {
+                    cumulativeLength += angleBetween(points[i - 1].pos, points[i].pos);
+                }
+                points[i].v1 = cumulativeLength;
+            }
+            // Note: Since Ring now duplicates the first point at end (Manual Close),
+            // points.length is numSides + 1. The loop above correctly calculates
+            // the full perimeter length for the last point.
+
+            return points;
         }
 
+
         /**
-         * Draws a regular polygon.
+         * Draws a regular polygon (Geodesic edges).
          * Registers:
-         *  v0: Normalized parameter (0.0 -> 1.0)
-         *  v1: Cumulative Integer Index (0, 1, 2...)
+         *  v0: Perimeter progress (0.0 -> 1.0)
+         *  v1: Arc Length (radians)
+         *  v2: Vertex index (0, 1, 2...)
          * @param {Object} pipeline - Render pipeline
          * @param {Object} basis - Coordinate basis {u, v, w}
          * @param {number} radius - Radius in radians
@@ -432,17 +534,62 @@ export const Plot = {
          * @param {number} phase - Rotation offset
          * @param {number} age - Age of operation
          * @param {Function} vertexShaderFn - Vertex displacement function
-         * @param {boolean} usePlanar - Use planar interpolation
          */
-        static draw(pipeline, basis, radius, numSides, fragmentShaderFn, phase = 0, age = 0, vertexShaderFn = null, usePlanar = false) {
-            let points = Plot.Polygon.sample(basis, radius, numSides, phase);
+        static draw(pipeline, basis, radius, numSides, fragmentShaderFn, phase = 0, age = 0, vertexShaderFn = null) {
+            let points = Plot.SphericalPolygon.sample(basis, radius, numSides, phase);
             if (vertexShaderFn) {
                 for (const p of points) {
                     const transformed = vertexShaderFn(p.pos);
                     p.pos.copy(transformed);
                 }
             }
-            Plot.rasterize(pipeline, points, fragmentShaderFn, true, age, usePlanar ? basis : null);
+            Plot.rasterize(pipeline, points, fragmentShaderFn, true, age, null);
+        }
+    },
+
+    PlanarPolygon: class {
+        /**
+         * Samples a regular polygon (Planar edges).
+         * Registers:
+         *  v0: Normalized parameter (0.0 -> 1.0) around perimeter
+         *  v1: Cumulative Arc Length (radians, approximate along chords)
+         *  v2: Cumulative Integer Index (0, 1, 2...). Fract(v2) is local edge t.
+         * @param {Object} basis - Coordinate basis {u, v, w}
+         * @param {number} radius - Radius in radians
+         * @param {number} numSides - Number of sides
+         * @param {number} phase - Rotation offset
+         * @returns {Object[]} Array of fragments
+         */
+        static sample(basis, radius, numSides, phase = 0) {
+            // Ring.sample now handles v0, v1, v2 and closing
+            const points = Plot.Ring.sample(basis, radius, numSides, phase + Math.PI / numSides);
+            return points;
+        }
+
+        /**
+         * Draws a regular polygon (Planar edges).
+         * Registers:
+         *  v0: Perimeter progress (0.0 -> 1.0)
+         *  v1: Arc Length (radians)
+         *  v2: Vertex index (0, 1, 2...)
+         * @param {Object} pipeline - Render pipeline
+         * @param {Object} basis - Coordinate basis {u, v, w}
+         * @param {number} radius - Radius in radians
+         * @param {number} numSides - Number of sides
+         * @param {Function} fragmentShaderFn - Shader function
+         * @param {number} phase - Rotation offset
+         * @param {number} age - Age of operation
+         * @param {Function} vertexShaderFn - Vertex displacement function
+         */
+        static draw(pipeline, basis, radius, numSides, fragmentShaderFn, phase = 0, age = 0, vertexShaderFn = null) {
+            let points = Plot.PlanarPolygon.sample(basis, radius, numSides, phase);
+            if (vertexShaderFn) {
+                for (const p of points) {
+                    const transformed = vertexShaderFn(p.pos);
+                    p.pos.copy(transformed);
+                }
+            }
+            Plot.rasterize(pipeline, points, fragmentShaderFn, true, age, basis);
         }
     },
 
@@ -451,7 +598,7 @@ export const Plot = {
          * Samples a star shape.
          * Registers:
          *  v0: Normalized parameter (0.0 -> 1.0)
-         *  v1: Cumulative Integer Index (0, 1, 2...)
+         *  v1: Cumulative Integer Index (0, 1, 2...). 0=Tip, 1=Valley, etc.
          * @param {Object} basis - Coordinate basis {u, v, w}
          * @param {number} radius - Radius in radians
          * @param {number} numSides - Number of sides
@@ -469,6 +616,7 @@ export const Plot = {
             const points = [];
             const angleStep = Math.PI / numSides;
 
+            let cumulativeLength = 0;
             for (let i = 0; i < numSides * 2; i++) {
                 const theta = phase + i * angleStep;
                 const r = (i % 2 === 0) ? outerRadius : innerRadius;
@@ -484,18 +632,39 @@ export const Plot = {
                     .addScaledVector(w, sinT * sinR)
                     .normalize();
 
+                if (i > 0) {
+                    cumulativeLength += angleBetween(points[i - 1].pos, p.pos);
+                }
+
                 p.v0 = i / (numSides * 2);
-                p.v1 = i;
+                p.v1 = cumulativeLength;
+                p.v2 = i;
                 points.push(p);
             }
+
+            // Manual Close (Overlap)
+            if (points.length > 0) {
+                const first = points[0];
+                const last = fragmentPool.acquire();
+                last.pos.copy(first.pos);
+                last.v0 = 1.0;
+
+                // Add final chord
+                cumulativeLength += angleBetween(points[points.length - 1].pos, first.pos);
+                last.v1 = cumulativeLength;
+                last.v2 = numSides * 2;
+                points.push(last);
+            }
+
             return points;
         }
 
         /**
          * Draws a star shape.
          * Registers:
-         *  v0: Normalized parameter (0.0 -> 1.0)
-         *  v1: Cumulative Integer Index (0, 1, 2...)
+         *  v0: Perimeter progress (0.0 -> 1.0)
+         *  v1: Arc Length (radians)
+         *  v2: Vertex index (0, 1, 2...)
          * @param {Object} pipeline - Render pipeline
          * @param {Object} basis - Coordinate basis {u, v, w}
          * @param {number} radius - Radius in radians
@@ -542,6 +711,8 @@ export const Plot = {
 
             const points = [];
 
+            let cumulativeLength = 0;
+
             for (let i = 0; i < numSides * 2; i++) {
                 const theta = phase + i * angleStep;
                 const R = safeApothem;
@@ -559,8 +730,13 @@ export const Plot = {
                     .addScaledVector(workBasis.w, sinT * sinR)
                     .normalize();
 
+                if (i > 0) {
+                    cumulativeLength += angleBetween(points[i - 1].pos, p.pos);
+                }
+
                 p.v0 = i / (numSides * 2);
-                p.v1 = i;
+                p.v1 = cumulativeLength;
+                p.v2 = i;
                 points.push(p);
             }
 
@@ -570,7 +746,10 @@ export const Plot = {
                 const last = fragmentPool.acquire();
                 last.pos.copy(first.pos);
                 last.v0 = 1.0;
-                last.v1 = numSides * 2;
+                // Accumulate last segment length
+                cumulativeLength += angleBetween(points[points.length - 1].pos, first.pos);
+                last.v1 = cumulativeLength;
+                last.v2 = numSides * 2;
                 points.push(last);
             }
             return points;
@@ -579,8 +758,9 @@ export const Plot = {
         /**
          * Draws a flower shape.
          * Registers:
-         *  v0: Normalized parameter (0.0 -> 1.0)
-         *  v1: Cumulative Integer Index (0, 1, 2...)
+         *  v0: Perimeter progress (0.0 -> 1.0)
+         *  v1: Arc Length (radians)
+         *  v2: Vertex index (0, 1, 2...)
          * @param {Object} pipeline - Render pipeline
          * @param {Object} basis - Coordinate basis {u, v, w}
          * @param {number} radius - Radius in radians
@@ -610,8 +790,9 @@ export const Plot = {
         /**
          * Samples a distorted ring.
          * Registers:
-         *  v0: Normalized parameter (0.0 -> 1.0)
-         *  v1: Cumulative Integer Index (0, 1, 2...)
+         *  v0: Angular progress (0.0 -> 1.0)
+         *  v1: Arc Length (radians)
+         *  v2: Index (0, 1, 2...)
          * @param {Object} basis - Coordinate basis {u, v, w}
          * @param {number} radius - Radius in radians
          * @param {Function} shiftFn - Distortion function relative to theta
@@ -631,6 +812,7 @@ export const Plot = {
             const step = TWO_PI / numSamples;
             let points = [];
             let uTemp = vectorPool.acquire();
+            let cumulativeLength = 0;
 
             for (let i = 0; i < numSamples; i++) {
                 let theta = i * step;
@@ -648,9 +830,28 @@ export const Plot = {
                 let p = fragmentPool.acquire();
                 p.pos.copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
 
+                if (i > 0) {
+                    cumulativeLength += angleBetween(points[i - 1].pos, p.pos);
+                }
+
                 p.v0 = i / numSamples;
-                p.v1 = i;
+                p.v1 = cumulativeLength;
+                p.v2 = i;
                 points.push(p);
+            }
+
+            // Manual Close (Overlap)
+            if (points.length > 0) {
+                const first = points[0];
+                const last = fragmentPool.acquire();
+                last.pos.copy(first.pos);
+                last.v0 = 1.0;
+
+                // Accumulate last segment
+                cumulativeLength += angleBetween(points[points.length - 1].pos, first.pos);
+                last.v1 = cumulativeLength;
+                last.v2 = numSamples;
+                points.push(last);
             }
 
             return points;
@@ -659,8 +860,9 @@ export const Plot = {
         /**
          * Draws a distorted ring.
          * Registers:
-         *  v0: Normalized parameter (0.0 -> 1.0)
-         *  v1: Cumulative Integer Index (0, 1, 2...)
+         *  v0: Angular progress (0.0 -> 1.0)
+         *  v1: Arc Length (radians)
+         *  v2: Index
          * @param {Object} pipeline - Render pipeline
          * @param {Object} basis - Coordinate basis {u, v, w}
          * @param {number} radius - Radius in radians
@@ -683,6 +885,13 @@ export const Plot = {
     },
 
     Spiral: class {
+        /**
+         * Samples a Fibonacci spiral.
+         * Registers: None (Points only)
+         * @param {number} n - Number of points
+         * @param {number} eps - Epsilon/Parameter
+         * @returns {THREE.Vector3[]} Array of points
+         */
         static sample(n, eps) {
             const points = [];
             for (let i = 0; i < n; ++i) {
@@ -691,6 +900,16 @@ export const Plot = {
             return points;
         }
 
+        /**
+         * Draws a Fibonacci spiral.
+         * Registers: None
+         * @param {Object} pipeline - Render pipeline
+         * @param {number} n - Number of points
+         * @param {number} eps - Epsilon/Parameter
+         * @param {Function} fragmentShaderFn - Shader function
+         * @param {number} age - Age of operation
+         * @param {Function} vertexShaderFn - Vertex displacement function
+         */
         static draw(pipeline, n, eps, fragmentShaderFn, age = 0, vertexShaderFn = null) {
             const points = Plot.Spiral.sample(n, eps);
             for (const p of points) {
@@ -706,6 +925,12 @@ export const Plot = {
     },
 
     ParticleSystem: class {
+        /**
+         * Iterates over particle trails.
+         * Registers: None (Points only)
+         * @param {Object} system - Particle system
+         * @param {Function} callback - (points, particle) => void
+         */
         static forEachTrail(system, callback) {
             const buffer = Plot.ParticleSystem._sampleBuffer || (Plot.ParticleSystem._sampleBuffer = []);
             const particles = system.particles;
@@ -725,6 +950,12 @@ export const Plot = {
             }
         }
 
+        /**
+         * Samples particle trails.
+         * Registers: None (Points only)
+         * @param {Object} system - Particle system
+         * @returns {Object[]} Array of {points, particle}
+         */
         static sample(system) {
             const trails = [];
             Plot.ParticleSystem.forEachTrail(system, (points, particle) => {
@@ -733,6 +964,15 @@ export const Plot = {
             return trails;
         }
 
+        /**
+         * Draws particle trails.
+         * Registers:
+         *  v0: Interpolation factor t (0.0 -> 1.0) along each segment
+         * @param {Object} pipeline - Render pipeline
+         * @param {Object} particleSystem - Particle system
+         * @param {Function} fragmentShaderFn - Shader function
+         * @param {Function} vertexShaderFn - Vertex displacement function
+         */
         static draw(pipeline, particleSystem, fragmentShaderFn, vertexShaderFn = null) {
             Plot.ParticleSystem.forEachTrail(particleSystem, (points, particle) => {
                 if (vertexShaderFn) {
