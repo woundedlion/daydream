@@ -5,17 +5,16 @@
 
 import * as THREE from "three";
 import { gui } from "gui";
-import { Timeline, Rotation, Mutation, MeshMorph, PeriodicTimer, Sprite, Orientation } from "../animation.js";
+import { Timeline, RandomWalk, Mutation, MeshMorph, Sprite, Orientation } from "../animation.js";
 import { MeshOps, sinWave } from "../geometry.js";
-import { vectorPool, quaternionPool, color4Pool } from "../memory.js";
+import { color4Pool } from "../memory.js";
 import { Solids } from "../solids.js";
 import { Plot } from "../plot.js";
 import { Scan } from "../scan.js";
-import { createRenderPipeline, FilterAntiAlias, FilterOrient } from "../filters.js";
+import { createRenderPipeline, FilterAntiAlias } from "../filters.js";
 import { Palettes } from "../palettes.js";
 import { easeInOutSin, easeMid } from "../easing.js";
 import { Daydream } from "../driver.js";
-import { TWO_PI } from "../3dmath.js";
 
 
 
@@ -68,7 +67,7 @@ export class IslamicStars {
     }
 
     startRotation() {
-        this.timeline.add(0, new Rotation(this.orientation, Daydream.UP, TWO_PI, 600, easeMid, true));
+        this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
     }
 
     startHankin() {
