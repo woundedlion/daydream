@@ -547,7 +547,7 @@ export const SDF = {
         }
     },
 
-    Polygon: class {
+    PlanarPolygon: class {
         /**
          * @param {Object} basis - {u, v, w}.
          * @param {number} radius - Radius.
@@ -1444,7 +1444,7 @@ export const Scan = {
     },
 
 
-    Polygon: class {
+    SphericalPolygon: class {
         /**
          * Samples a polygon and returns points with positions.
          * @param {Object} basis - Basis.
@@ -1486,28 +1486,41 @@ export const Scan = {
          * @param {number} [phase=0] - Phase.
          * @param {boolean} [debugBB=false] - Debug.
          */
-        static draw(pipeline, basis, radius, sides, fragmentShaderFn, phase = 0, debugBB = false, usePlanar = false) {
+        static draw(pipeline, basis, radius, sides, fragmentShaderFn, phase = 0, debugBB = false) {
+            // Geodesic: Use SDF.Face
+            const points = Scan.SphericalPolygon.sample(basis, radius, sides, phase);
+            const vertices = points.map(p => p.pos);
+            const indices = Array.from({ length: sides }, (_, i) => i);
+
+            const face = facePool.acquire();
+            face.init(vertices, indices, 0);
+
+            const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
+            // NOTE: We rely on SDF.Face usage here. If SDF.Polygon was used before for *planar*,
+            // SphericalPolygon now correctly enforces geodesic face.
+            Scan.rasterize(pipeline, face, renderColorFn, debugBB);
+        }
+    },
+
+    PlanarPolygon: class {
+        /**
+         * @param {Object} pipeline - Pipeline.
+         * @param {Object} basis - Basis.
+         * @param {number} radius - Radius.
+         * @param {number} sides - Sides.
+         * @param {Function} fragmentShaderFn - Color function.
+         * @param {number} [phase=0] - Phase.
+         * @param {boolean} [debugBB=false] - Debug.
+         */
+        static draw(pipeline, basis, radius, sides, fragmentShaderFn, phase = 0, debugBB = false) {
             const res = getAntipode(basis, radius);
             const { v, u, w } = res.basis;
             radius = res.radius;
 
-            if (usePlanar) {
-                const thickness = radius * (Math.PI / 2);
-                const shape = new SDF.Polygon({ v, u, w }, radius, thickness, sides, phase);
-                const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
-                Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
-            } else {
-                // Geodesic: Use SDF.Face
-                const points = Scan.Polygon.sample({ v, u, w }, radius, sides, phase);
-                const vertices = points.map(p => p.pos);
-                const indices = Array.from({ length: sides }, (_, i) => i);
-
-                const face = facePool.acquire();
-                face.init(vertices, indices, 0);
-
-                const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
-                Scan.rasterize(pipeline, face, renderColorFn, debugBB);
-            }
+            const thickness = radius * (Math.PI / 2);
+            const shape = new SDF.PlanarPolygon({ v, u, w }, radius, thickness, sides, phase);
+            const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
+            Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
         }
     },
 

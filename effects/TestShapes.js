@@ -38,13 +38,13 @@ export class TestShapes {
     constructor() {
         this.rings = [];
         this.alpha = 0.5;
-        this.shape = "Polygon";
+        this.shape = "SphericalPolygon";
         this.debugBB = false;
         this.numShapes = 25;
         this.timeline = new Timeline();
         this.radius = 1.0;
         this.sides = 5;
-        this.usePlanar = true;
+        // this.usePlanar = true; // Removed
         this._twist = 0;
 
         this.scanPipeline = createRenderPipeline();
@@ -72,8 +72,12 @@ export class TestShapes {
     }
 
     // Radio Button Simulators
-    get isPolygon() { return this.shape === "Polygon"; }
-    set isPolygon(v) { if (v) this.shape = "Polygon"; }
+    get isSphericalPolygon() { return this.shape === "SphericalPolygon"; }
+    set isSphericalPolygon(v) { if (v) this.shape = "SphericalPolygon"; }
+
+    get isPlanarPolygon() { return this.shape === "PlanarPolygon"; }
+    set isPlanarPolygon(v) { if (v) this.shape = "PlanarPolygon"; }
+
 
     get isFlower() { return this.shape === "Flower"; }
     set isFlower(v) { if (v) this.shape = "Flower"; }
@@ -90,10 +94,11 @@ export class TestShapes {
 
         this.gui.add(this, 'numShapes').min(1).max(50).step(1).name("Num Shapes").onChange(() => this.rebuild());
 
-        this.gui.add(this, 'isPolygon').name("Polygon").listen();
+        this.gui.add(this, 'isSphericalPolygon').name("Spherical Polygon").listen();
+        this.gui.add(this, 'isPlanarPolygon').name("Planar Polygon").listen();
         this.gui.add(this, 'isFlower').name("Flower").listen();
         this.gui.add(this, 'isStar').name("Star").listen();
-        this.gui.add(this, 'usePlanar').name("Planar Lines");
+        // this.gui.add(this, 'usePlanar').name("Planar Lines"); // Removed
         this.gui.add(this, 'debugBB').name('Show Bounding Boxes');
     }
 
@@ -122,16 +127,20 @@ export class TestShapes {
                 Plot.Flower.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase);
             } else if (this.shape === "Star") {
                 Plot.Star.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase);
+            } else if (this.shape === "PlanarPolygon") {
+                Plot.PlanarPolygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase);
             } else {
-                Plot.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase, 0, null, this.usePlanar);
+                Plot.SphericalPolygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase);
             }
         } else {
             if (this.shape === "Flower") {
                 Scan.Flower.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase, this.debugBB);
             } else if (this.shape === "Star") {
                 Scan.Star.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase, this.debugBB);
+            } else if (this.shape === "PlanarPolygon") {
+                Scan.PlanarPolygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase, this.debugBB);
             } else {
-                Scan.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase, this.debugBB, this.usePlanar);
+                Scan.SphericalPolygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase, this.debugBB);
             }
         }
     }

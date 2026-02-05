@@ -28,7 +28,7 @@ Handles the complex spherical mathematics required for the POV display:
 ### 3. Drawing System (`draw.js`)
 A set of high-level primitives and drawing pipelines:
 *   **`Plot.Point`, `Plot.Line`**: Basic primitives for drawing dots and geodesic lines (great circles).
-*   **`Plot.Ring`, `Plot.Polygon`**: Tools for drawing circles and n-sided polygons on the sphere surface also supports distortion.
+*   **`Plot.Ring`, `Plot.SphericalPolygon`/`PlanarPolygon`**: Tools for drawing circles and n-sided polygons on the sphere surface also supports distortion.
 *   **`Plot.DistortedRing`**: Advanced ring drawing with function-based distortion (e.g., sine waves applied to the radius).
 *   **`Scan.Ring`**: A scanline-based rasterizer for drawing thick, anti-aliased rings directly into the pixel buffer, supporting depth checks and clipping planes.
 *   **`rasterize()`**: Converts vector paths into discrete points for the pixel buffer.

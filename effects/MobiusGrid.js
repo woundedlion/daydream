@@ -99,7 +99,7 @@ export class MobiusGrid {
                 return finalP;
             };
 
-            Plot.Polygon.draw(pipeline, basis, radius, Daydream.W / 4, fragmentShader, 0, 0, vertexShaderFn);
+            Plot.SphericalPolygon.draw(pipeline, basis, radius, Daydream.W / 4, fragmentShader, 0, 0, vertexShaderFn);
         }
     }
 
@@ -110,6 +110,7 @@ export class MobiusGrid {
             const theta = (i / numLines) * Math.PI;
             const normal = vectorPool.acquire().set(Math.cos(theta), Math.sin(theta), 0);
             const radius = 1.0;
+
             // Stable basis for longitude at theta
             const v = normal;
             const w = vectorPool.acquire().set(0, 0, 1);
@@ -138,7 +139,7 @@ export class MobiusGrid {
                 return finalP;
             };
 
-            Plot.Polygon.draw(pipeline, basis, radius, Daydream.W / 4, fragmentShader, 0, 0, vertexShader);
+            Plot.SphericalPolygon.draw(pipeline, basis, radius, Daydream.W / 4, fragmentShader, 0, 0, vertexShader);
         }
     }
 
