@@ -19,7 +19,7 @@ const _scratchVec = new THREE.Vector3();
  * Creates a Geodesic (Great Circle) interpolator.
  * Returns: (p1, p2) => { dist, map(t, out) }
  */
-const _createGeodesicStrategy = () => {
+const GeodesicStrategy = () => {
     const axis = new THREE.Vector3();
 
     return (p1, p2) => {
@@ -48,7 +48,7 @@ const _createGeodesicStrategy = () => {
  * The distortion of this projection is what creates 'Flower' shapes when
  * the points are located near the antipode (R ~ PI).
  */
-const _createPlanarStrategy = (basis) => {
+const PlanarStrategy = (basis) => {
     const { u, v: center, w } = basis;
     const axis = new THREE.Vector3();
 
@@ -113,6 +113,12 @@ export const Plot = {
     },
 
     Line: class {
+        /**
+         * Samples a geodesic line between two points.
+         * Registers:
+         *  v0: Interpolation factor t (0.0 -> 1.0)
+         *  v1: Cumulative Arc Length (radians) from start
+         */
         static sample(v1, v2, numSamples = 10) {
             let u = vectorPool.acquire().copy(v1);
             let v = vectorPool.acquire().copy(v2);
@@ -123,6 +129,7 @@ export const Plot = {
                 const f = fragmentPool.acquire();
                 f.pos.copy(u);
                 f.v0 = 0;
+                f.v1 = 0;
                 return [f];
             }
 
@@ -134,12 +141,29 @@ export const Plot = {
                 let p = fragmentPool.acquire();
                 p.pos.copy(u).applyQuaternion(q);
                 p.v0 = t;
+                p.v1 = angle * t; // Cumulative Arc Length
 
                 points.push(p);
             }
             return points;
         }
 
+        /**
+         * Draws a geodesic line between two points.
+         * Registers:
+         *  v0: Interpolation factor t (start -> end)
+         *  v1: Cumulative Arc Length (radians)
+         * @param {Object} pipeline - Render pipeline
+         * @param {THREE.Vector3} v1 - Start point
+         * @param {THREE.Vector3} v2 - End point
+         * @param {Function} fragmentShaderFn - Shader function
+         * @param {number} start - Start t (0.0-1.0)
+         * @param {number} end - End t (0.0-1.0)
+         * @param {boolean} longWay - Whether to take the long path
+         * @param {boolean} omitLast - Whether to skip the last point
+         * @param {number} age - Age of the operation
+         * @param {Function} vertexShaderFn - Vertex displacement function
+         */
         static draw(pipeline, v1, v2, fragmentShaderFn, start = 0, end = 1, longWay = false, omitLast = false, age = 0, vertexShaderFn = null) {
             let u = vectorPool.acquire().copy(v1);
             let v = vectorPool.acquire().copy(v2);
@@ -179,9 +203,11 @@ export const Plot = {
 
             p1.pos.copy(u);
             p1.v0 = start;
+            p1.v1 = angleStart;
 
             p2.pos.copy(p2Vec);
             p2.v0 = end;
+            p2.v1 = angleEnd;
 
             if (vertexShaderFn) {
                 p1.pos.copy(vertexShaderFn(p1.pos));
@@ -198,6 +224,7 @@ export const Plot = {
                 const qMid = quaternionPool.acquire().setFromAxisAngle(w, midAngle);
                 pMid.pos.copy(tempVec.applyQuaternion(qMid).normalize());
                 pMid.v0 = (start + end) / 2;
+                pMid.v1 = midAngle;
 
                 if (vertexShaderFn) pMid.pos.copy(vertexShaderFn(pMid.pos));
 
@@ -280,6 +307,17 @@ export const Plot = {
             ).normalize();
         }
 
+        /**
+         * Samples a ring/circle on the sphere.
+         * Registers:
+         *  v0: Normalized parameter (0.0 -> 1.0) around ring
+         *  v1: Cumulative Integer Index (0, 1, 2...)
+         * @param {Object} basis - Coordinate basis {u, v, w}
+         * @param {number} radius - Radius in radians
+         * @param {number} numSamples - Number of points
+         * @param {number} phase - Rotation offset
+         * @returns {Object[]} Array of fragments
+         */
         static sample(basis, radius, numSamples, phase = 0) {
             const res = getAntipode(basis, radius);
             const { u, v, w } = res.basis;
@@ -303,11 +341,25 @@ export const Plot = {
                 let p = fragmentPool.acquire();
                 p.pos.copy(v).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
                 p.v0 = i / numSamples;
+                p.v1 = i;
                 points.push(p);
             }
             return points;
         }
 
+        /**
+         * Draws a ring/circle on the sphere.
+         * Registers:
+         *  v0: Normalized parameter (0.0 -> 1.0)
+         *  v1: Cumulative Integer Index (0, 1, 2...)
+         * @param {Object} pipeline - Render pipeline
+         * @param {Object} basis - Coordinate basis {u, v, w}
+         * @param {number} radius - Radius in radians
+         * @param {Function} fragmentShaderFn - Shader function
+         * @param {number} phase - Rotation offset
+         * @param {number} age - Age of the operation
+         * @param {Function} vertexShaderFn - Vertex displacement function
+         */
         static draw(pipeline, basis, radius, fragmentShaderFn, phase = 0, age = 0, vertexShaderFn = null) {
             const numSamples = Daydream.W / 4;
             let points = Plot.Ring.sample(basis, radius, numSamples, phase);
@@ -351,11 +403,37 @@ export const Plot = {
     },
 
     Polygon: class {
+        /**
+         * Samples a regular polygon.
+         * Registers:
+         *  v0: Normalized parameter (0.0 -> 1.0)
+         *  v1: Cumulative Integer Index (0, 1, 2...)
+         * @param {Object} basis - Coordinate basis {u, v, w}
+         * @param {number} radius - Radius in radians
+         * @param {number} numSides - Number of sides
+         * @param {number} phase - Rotation offset
+         * @returns {Object[]} Array of fragments
+         */
         static sample(basis, radius, numSides, phase = 0) {
             const offset = Math.PI / numSides;
             return Plot.Ring.sample(basis, radius, numSides, phase + offset);
         }
 
+        /**
+         * Draws a regular polygon.
+         * Registers:
+         *  v0: Normalized parameter (0.0 -> 1.0)
+         *  v1: Cumulative Integer Index (0, 1, 2...)
+         * @param {Object} pipeline - Render pipeline
+         * @param {Object} basis - Coordinate basis {u, v, w}
+         * @param {number} radius - Radius in radians
+         * @param {number} numSides - Number of sides
+         * @param {Function} fragmentShaderFn - Shader function
+         * @param {number} phase - Rotation offset
+         * @param {number} age - Age of operation
+         * @param {Function} vertexShaderFn - Vertex displacement function
+         * @param {boolean} usePlanar - Use planar interpolation
+         */
         static draw(pipeline, basis, radius, numSides, fragmentShaderFn, phase = 0, age = 0, vertexShaderFn = null, usePlanar = false) {
             let points = Plot.Polygon.sample(basis, radius, numSides, phase);
             if (vertexShaderFn) {
@@ -369,6 +447,17 @@ export const Plot = {
     },
 
     Star: class {
+        /**
+         * Samples a star shape.
+         * Registers:
+         *  v0: Normalized parameter (0.0 -> 1.0)
+         *  v1: Cumulative Integer Index (0, 1, 2...)
+         * @param {Object} basis - Coordinate basis {u, v, w}
+         * @param {number} radius - Radius in radians
+         * @param {number} numSides - Number of sides
+         * @param {number} phase - Rotation offset
+         * @returns {Object[]} Array of fragments
+         */
         static sample(basis, radius, numSides, phase = 0) {
             const res = getAntipode(basis, radius);
             const { u, v, w } = res.basis;
@@ -396,11 +485,26 @@ export const Plot = {
                     .normalize();
 
                 p.v0 = i / (numSides * 2);
+                p.v1 = i;
                 points.push(p);
             }
             return points;
         }
 
+        /**
+         * Draws a star shape.
+         * Registers:
+         *  v0: Normalized parameter (0.0 -> 1.0)
+         *  v1: Cumulative Integer Index (0, 1, 2...)
+         * @param {Object} pipeline - Render pipeline
+         * @param {Object} basis - Coordinate basis {u, v, w}
+         * @param {number} radius - Radius in radians
+         * @param {number} numSides - Number of sides
+         * @param {Function} fragmentShaderFn - Shader function
+         * @param {number} phase - Rotation offset
+         * @param {number} age - Age of operation
+         * @param {Function} vertexShaderFn - Vertex displacement function
+         */
         static draw(pipeline, basis, radius, numSides, fragmentShaderFn, phase = 0, age = 0, vertexShaderFn = null) {
             let points = Plot.Star.sample(basis, radius, numSides, phase);
             if (vertexShaderFn) {
@@ -414,6 +518,17 @@ export const Plot = {
     },
 
     Flower: class {
+        /**
+         * Samples a flower shape.
+         * Registers:
+         *  v0: Normalized parameter (0.0 -> 1.0)
+         *  v1: Cumulative Integer Index (0, 1, 2...)
+         * @param {Object} basis - Coordinate basis {u, v, w}
+         * @param {number} radius - Radius in radians
+         * @param {number} numSides - Number of sides
+         * @param {number} phase - Rotation offset
+         * @returns {Object[]} Array of fragments
+         */
         static sample(basis, radius, numSides, phase = 0) {
             // Check for flip (needed for correct geometry generation)
             const res = getAntipode(basis, radius);
@@ -445,6 +560,7 @@ export const Plot = {
                     .normalize();
 
                 p.v0 = i / (numSides * 2);
+                p.v1 = i;
                 points.push(p);
             }
 
@@ -454,11 +570,26 @@ export const Plot = {
                 const last = fragmentPool.acquire();
                 last.pos.copy(first.pos);
                 last.v0 = 1.0;
+                last.v1 = numSides * 2;
                 points.push(last);
             }
             return points;
         }
 
+        /**
+         * Draws a flower shape.
+         * Registers:
+         *  v0: Normalized parameter (0.0 -> 1.0)
+         *  v1: Cumulative Integer Index (0, 1, 2...)
+         * @param {Object} pipeline - Render pipeline
+         * @param {Object} basis - Coordinate basis {u, v, w}
+         * @param {number} radius - Radius in radians
+         * @param {number} numSides - Number of sides
+         * @param {Function} fragmentShaderFn - Shader function
+         * @param {number} phase - Rotation offset
+         * @param {number} age - Age of operation
+         * @param {Function} vertexShaderFn - Vertex displacement function
+         */
         static draw(pipeline, basis, radius, numSides, fragmentShaderFn, phase = 0, age = 0, vertexShaderFn = null) {
             const res = getAntipode(basis, radius);
             const workBasis = res.basis;
@@ -476,6 +607,17 @@ export const Plot = {
     },
 
     DistortedRing: class {
+        /**
+         * Samples a distorted ring.
+         * Registers:
+         *  v0: Normalized parameter (0.0 -> 1.0)
+         *  v1: Cumulative Integer Index (0, 1, 2...)
+         * @param {Object} basis - Coordinate basis {u, v, w}
+         * @param {number} radius - Radius in radians
+         * @param {Function} shiftFn - Distortion function relative to theta
+         * @param {number} phase - Rotation offset
+         * @returns {Object[]} Array of fragments
+         */
         static sample(basis, radius, shiftFn, phase = 0) {
             const res = getAntipode(basis, radius);
             const { u, v, w } = res.basis;
@@ -507,12 +649,27 @@ export const Plot = {
                 p.pos.copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
 
                 p.v0 = i / numSamples;
+                p.v1 = i;
                 points.push(p);
             }
 
             return points;
         }
 
+        /**
+         * Draws a distorted ring.
+         * Registers:
+         *  v0: Normalized parameter (0.0 -> 1.0)
+         *  v1: Cumulative Integer Index (0, 1, 2...)
+         * @param {Object} pipeline - Render pipeline
+         * @param {Object} basis - Coordinate basis {u, v, w}
+         * @param {number} radius - Radius in radians
+         * @param {Function} shiftFn - Distortion function relative to theta
+         * @param {Function} fragmentShaderFn - Shader function
+         * @param {number} phase - Rotation offset
+         * @param {number} age - Age of operation
+         * @param {Function} vertexShaderFn - Vertex displacement function
+         */
         static draw(pipeline, basis, radius, shiftFn, fragmentShaderFn, phase = 0, age = 0, vertexShaderFn = null) {
             let points = Plot.DistortedRing.sample(basis, radius, shiftFn, phase);
             if (vertexShaderFn) {
@@ -604,8 +761,8 @@ export const Plot = {
 
         // Select Strategy Factory
         const createInterpolator = planarBasis
-            ? _createPlanarStrategy(planarBasis)
-            : _createGeodesicStrategy();
+            ? PlanarStrategy(planarBasis)
+            : GeodesicStrategy();
 
         const count = closeLoop ? len : len - 1;
         const pTemp = vectorPool.acquire();
