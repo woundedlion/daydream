@@ -31,6 +31,7 @@ const HiResFavorites = [
   "SpinShapes",
   "Test",
   "TestShapes",
+  "TestTemporal",
   "Voronoi"
 ];
 
@@ -49,6 +50,7 @@ const LoResFavorites = [
   "RingSpin",
   "Test",
   "TestShapes",
+  "TestTemporal",
   "Thrusters",
   "Voronoi"
 ];

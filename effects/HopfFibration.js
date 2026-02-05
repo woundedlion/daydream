@@ -206,7 +206,7 @@ export class HopfFibration {
 
 
         // Render the entire trail history (3D vectors projected by FilterOrient)
-        this.pipeline.trail((v, t) => {
+        this.pipeline.flush((v, t) => {
             // t is normalized age [0 (new) -> 1 (old)]
             const c = Palettes.richSunset.get(t);
             c.a *= (1 - t);

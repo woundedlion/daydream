@@ -23,6 +23,7 @@ export { SpinShapes } from "./SpinShapes.js";
 export { Test } from "./Test.js";
 export { TestShapes } from "./TestShapes.js";
 export { IslamicStars } from "./IslamicStars.js";
+export { TestTemporal } from "./TestTemporal.js";
 export { Thrusters } from "./Thrusters.js";
 export { Voronoi } from "./Voronoi.js";
 

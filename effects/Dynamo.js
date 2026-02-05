@@ -154,7 +154,7 @@ export class Dynamo {
         }
 
         // Render Trails
-        this.filters.trail((v, t) => this.color(v, t));
+        this.filters.flush((v, t) => this.color(v, t));
     }
 
     nodeY(node) {
