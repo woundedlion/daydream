@@ -1,7 +1,6 @@
 /*
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
- * Licensed under the Polyform Noncommercial License 1.0.0
- * * Optimized Version 5.0 - ApplyQuaternion & Flattened Arrays
+ * LICENSE: ALL RIGHTS RESERVED. No redistribution or use without explicit permission.
  */
 
 import * as THREE from "three";

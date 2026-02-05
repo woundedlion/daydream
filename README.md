@@ -6,6 +6,23 @@ The architecture mirrors the C++ firmware to ensure seamless porting.
 
 ---
 
+## 📜 License
+
+This project operates under a **Dual License** model to protect the creative works (Effects) while keeping the engine open for non-commercial educational use.
+
+### 1. The Core Engine
+The engine core, including all mathematics, rendering pipelines, and driver logic, is licensed under the **[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)**.
+*   **Allowed**: Personal use, education, hobbyist projects.
+*   **Prohibited**: Commercial distribution or selling hardware running this engine.
+*   **Files**: `geometry.js`, `driver.js`, `plot.js`, `scan.js`, `filters.js`, `color.js`, `animation.js`, `index.js`.
+
+### 2. The Effects Library
+The specific visual sketches found in the `effects/` directory are **Proprietary** and **All Rights Reserved**.
+*   **Restricted**: These files may not be copied, modified, or redistributed without explicit written permission from the author.
+*   **Files**: All contents of the `effects/` directory.
+
+---
+
 ## 🌟 Architecture & Core Components
 
 Daydream replicates the Holosphere firmware structure in JavaScript.
@@ -35,10 +52,10 @@ A set of high-level primitives and drawing pipelines:
 
 ### 4. Animation Engine (`animation.js`)
 A robust animation framework based on a `Timeline`:
-*   **`Timeline`**: Manages a queue of animations, executing them in sync with the frame clock.
+*   **`Timeline`**: Manages a queue of animations, executing them in sync with the frame clock including support for 'Unified Animation Stepping'.
 *   **Animations**: Includes `Motion` (path following), `Rotation` (axis-angle), `RandomWalk` (stochastic movement), `Sprite` (fade in/out), and `ColorWipe` (palette transitions).
 *   **Easing**: A collection of easing functions (e.g., `easeOutElastic`, `easeInOutBicubic`) for natural motion.
-*   **ParticleSystem**: A noise-driven particle system for flow field effects.
+*   **ParticleSystem**: A noise-driven particle system for flow field effects, with register-mapping parity (v0: trail progress, v1: ID).
 
 ### 5. Render Pipeline & Filters (`filters.js`)
 The `createRenderPipeline` function builds a chain of filters to process drawing operations:
@@ -46,6 +63,7 @@ The `createRenderPipeline` function builds a chain of filters to process drawing
 *   **`FilterOrient`**: Rotates the entire world or specific objects using an `Orientation` quaternion.
 *   **`FilterMobius`**: Applies conformal Möbius transformations (Sphere -> Plane -> Transform -> Sphere) for psychedelic warping effects.
 *   **`FilterTrail` & `FilterWorldTrails`**: Manages fading trails for points, creating a sense of history and motion.
+*   **`TemporalFilter`**: Smoothly accumulates energy over multiple frames to eliminate mechanical flicker.
 *   **`FilterReplicate`**: Duplicates drawing operations across the sphere (e.g., symmetry).
 
 ### 6. Color Engine (`color.js`)
