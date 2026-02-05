@@ -44,6 +44,7 @@ export class TestShapes {
         this.timeline = new Timeline();
         this.radius = 1.0;
         this.sides = 5;
+        this.usePlanar = true;
         this._twist = 0;
 
         this.scanPipeline = createRenderPipeline();
@@ -92,6 +93,7 @@ export class TestShapes {
         this.gui.add(this, 'isPolygon').name("Polygon").listen();
         this.gui.add(this, 'isFlower').name("Flower").listen();
         this.gui.add(this, 'isStar').name("Star").listen();
+        this.gui.add(this, 'usePlanar').name("Planar Lines");
         this.gui.add(this, 'debugBB').name('Show Bounding Boxes');
     }
 
@@ -121,7 +123,7 @@ export class TestShapes {
             } else if (this.shape === "Star") {
                 Plot.Star.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase);
             } else {
-                Plot.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase);
+                Plot.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase, 0, null, this.usePlanar);
             }
         } else {
             if (this.shape === "Flower") {
@@ -129,7 +131,7 @@ export class TestShapes {
             } else if (this.shape === "Star") {
                 Scan.Star.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase, this.debugBB);
             } else {
-                Scan.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase, this.debugBB);
+                Scan.Polygon.draw(pipeline, basis, this.radius * ring.scale, this.sides, fragmentShaderFn, phase, this.debugBB, this.usePlanar);
             }
         }
     }

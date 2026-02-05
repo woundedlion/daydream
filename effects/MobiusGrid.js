@@ -85,59 +85,60 @@ export class MobiusGrid {
             const radius = (4 / Math.PI) * Math.atan(1 / R);
             const basis = makeBasis(q, normal);
 
+            const opacity = Math.min(1.0, Math.max(0.0, numRings - i));
+
+            const fragmentShader = (pTransformed, tPoly) => {
+                const res = this.palette.get(i / numRings);
+                res.alpha *= opacity * this.alpha;
+                return res;
+            };
+
             const vertexShaderFn = (p) => {
-                const finalP = mobiusTransform(p, mobiusParams);
+                const finalP = mobiusTransform(p, mobiusParams, vectorPool.acquire());
                 if (rotationQ) finalP.applyQuaternion(rotationQ);
                 return finalP;
             };
 
-            const opacity = Math.min(1.0, Math.max(0.0, numRings - i));
-            Plot.Polygon.draw(pipeline, basis, radius, Daydream.W / 4, (p, tPoly) => {
-                const res = this.palette.get(i / numRings);
-                res.alpha *= opacity * this.alpha;
-                return res;
-            }, 0, 0, vertexShaderFn);
+            Plot.Polygon.draw(pipeline, basis, radius, Daydream.W / 4, fragmentShader, 0, 0, vertexShaderFn);
         }
     }
 
     drawLongitudes(pipeline, numLines, mobiusParams, axisComponent, phase = 0, rotationQ) {
         const count = Math.ceil(numLines);
         const q = quaternionPool.acquire();
-
-        // Pre-calculate z info helper if possible, but inside colorFn we need implicit logic
-
         for (let i = 0; i < count; i++) {
             const theta = (i / numLines) * Math.PI;
             const normal = vectorPool.acquire().set(Math.cos(theta), Math.sin(theta), 0);
             const radius = 1.0;
-            const basis = makeBasis(q, normal);
+            // Stable basis for longitude at theta
+            const v = normal;
+            const w = vectorPool.acquire().set(0, 0, 1);
+            const u = vectorPool.acquire().crossVectors(v, w).normalize();
+            const basis = { u, v, w };
 
-            const vertexShaderFn = (p) => {
-                const finalP = mobiusTransform(p, mobiusParams);
-                if (rotationQ) finalP.applyQuaternion(rotationQ);
-                return finalP;
-            };
+            const opacity = Math.min(1.0, Math.max(0.0, numLines - i));
 
-            const opacity = Math.min(1.0, Math.max(0.0, numRings - i));
-
-            Plot.Polygon.draw(pipeline, basis, radius, Daydream.W / 4, (pTransformed, tLine) => {
-
-                const angle = tLine * TWO_PI;
-                // Since normal is in XY plane, the ring goes through Z axis.
-                // Z varies as sin(angle) or cos(angle).
-                const z = Math.sin(angle); // Approx
-
+            const fragmentShader = (pTransformed, tLine) => {
+                const angle = tLine.v0 * TWO_PI;
+                const z = Math.sin(angle);
                 const R = Math.sqrt((1 + z) / (1 - z));
                 const logR = Math.log(R);
                 const logMin = -2.5;
                 const logMax = 2.5;
                 const range = logMax - logMin;
                 const tParam = (logR - logMin) / range;
-
                 const res = this.palette.get(wrap(tParam - phase, 1.0));
                 res.alpha *= opacity * this.alpha;
                 return res;
-            }, 0, 0, vertexShaderFn);
+            };
+
+            const vertexShader = (p) => {
+                const finalP = mobiusTransform(p, mobiusParams, vectorPool.acquire());
+                if (rotationQ) finalP.applyQuaternion(rotationQ);
+                return finalP;
+            };
+
+            Plot.Polygon.draw(pipeline, basis, radius, Daydream.W / 4, fragmentShader, 0, 0, vertexShader);
         }
     }
 
@@ -147,22 +148,25 @@ export class MobiusGrid {
 
         // Calculate stabilizing counter-rotation
         const nIn = vectorPool.acquire().copy(Daydream.Z_AXIS);
+        const nTrans = mobiusTransform(nIn, this.params, vectorPool.acquire());
 
-        const transform = (v) => mobiusTransform(v, this.params);
-
-        const nTrans = transform(nIn);
         const sIn = vectorPool.acquire().copy(Daydream.Z_AXIS).negate();
-        const sTrans = transform(sIn);
+        const sTrans = mobiusTransform(sIn, this.params, vectorPool.acquire());
 
-        const mid = vectorPool.acquire().addVectors(nTrans, sTrans).normalize();
-        const q = quaternionPool.acquire().setFromUnitVectors(mid, Daydream.Z_AXIS);
+        const mid = vectorPool.acquire().addVectors(nTrans, sTrans);
+        const q = quaternionPool.acquire(); // identity
+
+        if (mid.lengthSq() > 0.001) {
+            mid.normalize();
+            q.setFromUnitVectors(mid, Daydream.Z_AXIS);
+        }
 
         // Apply counter-rotation to holes
         this.holeN.origin.copy(nTrans).applyQuaternion(q);
         this.holeS.origin.copy(sTrans).applyQuaternion(q);
 
         // Draw directly with rotation
-        this.drawAxisRings(this.filters, vectorPool.acquire().copy(Daydream.Z_AXIS), this.numRings, this.params, 'y', phase, q);
+        this.drawAxisRings(this.filters, Daydream.Z_AXIS, this.numRings, this.params, 'y', phase, q);
         this.drawLongitudes(this.filters, this.numLines, this.params, 'x', phase, q);
     }
 }

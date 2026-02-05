@@ -72,6 +72,7 @@ export class Test {
             const amplitude = this.amplitudeRange;
 
             const basis = makeBasis(this.orientation.get(), this.normal);
+
             Scan.DistortedRing.draw(this.filters, basis, radius, this.thickness,
                 shiftFn, amplitude,
                 (p, t, dist) => {

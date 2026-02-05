@@ -853,6 +853,7 @@ export const SDF = {
             this.edgeVectors = []; // Reused objects {x,y}
             this.edgeLengthsSq = []; // Reused numbers
             this.intervals = null;
+            this.isSolid = true;
         }
 
         /**
@@ -873,6 +874,7 @@ export const SDF = {
             this.yMax = 0;
             this.intervals = null;
             this.maxR2 = 0; // Squared radius (tangent space)
+            this.isSolid = true;
 
             // Centroid & Basis
             // Reuse this.center
@@ -1444,6 +1446,38 @@ export const Scan = {
 
     Polygon: class {
         /**
+         * Samples a polygon and returns points with positions.
+         * @param {Object} basis - Basis.
+         * @param {number} radius - Radius.
+         * @param {number} sides - Sides.
+         * @param {number} [phase=0] - Phase.
+         * @returns {Object[]} Array of {pos: Vector3}.
+         */
+        static sample(basis, radius, sides, phase = 0) {
+            const res = getAntipode(basis, radius);
+            const { u, v, w } = res.basis;
+            radius = res.radius;
+
+            const offset = Math.PI / sides;
+            const thetaEq = radius * (Math.PI / 2);
+            const r = Math.sin(thetaEq);
+            const d = Math.cos(thetaEq);
+
+            const step = (Math.PI * 2) / sides;
+            let points = [];
+            for (let i = 0; i < sides; i++) {
+                let theta = i * step + phase + offset;
+                const cosT = Math.cos(theta);
+                const sinT = Math.sin(theta);
+
+                const pos = new THREE.Vector3().copy(u).multiplyScalar(cosT).addScaledVector(w, sinT);
+                pos.multiplyScalar(r).addScaledVector(res.basis.v, d).normalize();
+                points.push({ pos });
+            }
+            return points;
+        }
+
+        /**
          * @param {Object} pipeline - Pipeline.
          * @param {Object} basis - Basis.
          * @param {number} radius - Radius.
@@ -1452,15 +1486,28 @@ export const Scan = {
          * @param {number} [phase=0] - Phase.
          * @param {boolean} [debugBB=false] - Debug.
          */
-        static draw(pipeline, basis, radius, sides, fragmentShaderFn, phase = 0, debugBB = false) {
+        static draw(pipeline, basis, radius, sides, fragmentShaderFn, phase = 0, debugBB = false, usePlanar = false) {
             const res = getAntipode(basis, radius);
             const { v, u, w } = res.basis;
             radius = res.radius;
 
-            const thickness = radius * (Math.PI / 2);
-            const shape = new SDF.Polygon({ v, u, w }, radius, thickness, sides, phase);
-            const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
-            Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
+            if (usePlanar) {
+                const thickness = radius * (Math.PI / 2);
+                const shape = new SDF.Polygon({ v, u, w }, radius, thickness, sides, phase);
+                const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
+                Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
+            } else {
+                // Geodesic: Use SDF.Face
+                const points = Scan.Polygon.sample({ v, u, w }, radius, sides, phase);
+                const vertices = points.map(p => p.pos);
+                const indices = Array.from({ length: sides }, (_, i) => i);
+
+                const face = facePool.acquire();
+                face.init(vertices, indices, 0);
+
+                const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
+                Scan.rasterize(pipeline, face, renderColorFn, debugBB);
+            }
         }
     },
 

@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
-import { pixelToSpherical } from "./geometry.js";
+import { pixelToSpherical, vectorToPixel, pixelToVector } from "./geometry.js";
 import { G as g } from "./geometry.js";
 import { vectorPool, quaternionPool, colorPool, color4Pool, dotPool, fragmentPool } from "./memory.js";
 import { GUI } from "gui";
@@ -35,7 +35,7 @@ class LabelPool {
       const div = document.createElement("div");
       div.className = "label";
       labelObj = new CSS2DObject(div);
-      labelObj.center.set(0, 1);
+      labelObj.center.set(0, 0);
       this.pool.push(labelObj);
     }
 
@@ -205,6 +205,7 @@ export class Daydream {
       this.dotMaterial,
       Daydream.W * Daydream.H
     );
+
     this.dotMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     this.dotMesh.count = Daydream.W * Daydream.H;
     this.dotMesh.frustumCulled = false;
@@ -227,6 +228,7 @@ export class Daydream {
     this.pixelMatrices = [];
     this.precomputeMatrices();
     this.labelAxes = false;
+    this.cullBackLabels = true;
   }
 
   keydown(e) {
@@ -322,7 +324,7 @@ export class Daydream {
         }
 
         for (const label of labels) {
-          if (label.position.dot(this.camera.position) > Daydream.SPHERE_RADIUS) {
+          if (!this.cullBackLabels || label.position.dot(this.camera.position) > Daydream.SPHERE_RADIUS) {
             this.labelPool.acquire(label.position, label.content);
           }
         }
@@ -445,6 +447,15 @@ export class Daydream {
     this.scene.add(this.dotMesh);
 
     this.precomputeMatrices();
+  }
+  static snapToGrid(v) {
+    const pixel = vectorToPixel(v);
+    const ix = Math.floor(pixel.x + 0.5);
+    const iy = Math.floor(pixel.y + 0.5);
+    return {
+      position: pixelToVector(ix, iy),
+      index: ix + iy * Daydream.W
+    };
   }
 }
 

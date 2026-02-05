@@ -356,7 +356,7 @@ export const Plot = {
             return Plot.Ring.sample(basis, radius, numSides, phase + offset);
         }
 
-        static draw(pipeline, basis, radius, numSides, fragmentShaderFn, phase = 0, age = 0, vertexShaderFn = null) {
+        static draw(pipeline, basis, radius, numSides, fragmentShaderFn, phase = 0, age = 0, vertexShaderFn = null, usePlanar = false) {
             let points = Plot.Polygon.sample(basis, radius, numSides, phase);
             if (vertexShaderFn) {
                 for (const p of points) {
@@ -364,7 +364,7 @@ export const Plot = {
                     p.pos.copy(transformed);
                 }
             }
-            Plot.rasterize(pipeline, points, fragmentShaderFn, true, age, basis.v);
+            Plot.rasterize(pipeline, points, fragmentShaderFn, true, age, usePlanar ? basis : null);
         }
     },
 
@@ -409,7 +409,7 @@ export const Plot = {
                     p.pos.copy(transformed);
                 }
             }
-            Plot.rasterize(pipeline, points, fragmentShaderFn, true, age, basis.v);
+            Plot.rasterize(pipeline, points, fragmentShaderFn, true, age, basis);
         }
     },
 
@@ -590,70 +590,118 @@ export const Plot = {
 
     /**
      * Rasterizes a list of points connecting them with Geodesic or Planar lines.
-     * @param {Object} planarBasis - {u, v, w} If provided, uses Planar strategy.
+     * Uses a "Simulate & Scale" approach to ensure adaptive steps land precisely on endpoints.
+     * @param {Object} pipeline - Render pipeline.
+     * @param {Object[]} points - List of points.
+     * @param {Function} shaderFn - Color function.
+     * @param {boolean} [closeLoop=false] - Connect last to first.
+     * @param {number} [age=0] - Age.
+     * @param {Object} [planarBasis=null] - {u, v, w} If provided, uses Planar interpolation.
      */
     rasterize: (pipeline, points, shaderFn, closeLoop = false, age = 0, planarBasis = null) => {
         const len = points.length;
         if (len < 2) return;
 
-        // 1. Select Strategy Factory
+        // Select Strategy Factory
         const createInterpolator = planarBasis
             ? _createPlanarStrategy(planarBasis)
             : _createGeodesicStrategy();
 
         const count = closeLoop ? len : len - 1;
         const pTemp = vectorPool.acquire();
+        const steps = []; // Reusable buffer? Better to alloc new to be safe/simple first.
 
-        // 2. Segment Loop
         for (let i = 0; i < count; i++) {
             const curr = points[i];
             const next = points[(i + 1) % len];
             const p1 = curr.pos || curr;
             const p2 = next.pos || next;
 
-            // Initialize Strategy for this segment
-            const { dist, map } = createInterpolator(p1, p2);
+            // 1. Initialize Strategy
+            const { dist: totalDist, map } = createInterpolator(p1, p2);
 
-            // Handle degenerate segments
-            if (dist < 1e-5) {
-                lerpFragments(curr, next, 0, _scratchFrag);
-                const res = shaderFn(p1, _scratchFrag);
-                pipeline.plot(p1, res.color || res, age, res.alpha ?? 1.0, res.tag);
+            // Handle Degenerate Segment
+            if (totalDist < 1e-5) {
+                // If it's a point, draw it only if we aren't omitting the end
+                // (Logic: degenerate line = single point. Treat as start point.)
+                // But generally, we skip degenerate steps to avoid noise, 
+                // UNLESS it's a single dot geometry? 
+                // Following drawLine logic: 
+                // if (omitLast) return []; else draw dot.
+
+                const isLastSegment = (i === count - 1);
+                const shouldOmit = closeLoop || !isLastSegment;
+
+                if (!shouldOmit) {
+                    lerpFragments(curr, next, 0, _scratchFrag);
+                    const res = shaderFn(p1, _scratchFrag);
+                    pipeline.plot(p1, res.color || res, age, res.alpha ?? 1.0, res.tag);
+                }
                 continue;
             }
 
-            // 3. Adaptive Rasterization Loop
-            // Goal: ~1 pixel per step. 
-            const baseStep = TWO_PI / Daydream.W;
-            let currentT = 0;
+            // 2. Simulation Phase
+            // Walk the path to determine adaptive step counts
+            steps.length = 0;
+            let simDist = 0;
+            const baseStep = TWO_PI / Daydream.W; // Base resolution
 
-            // Plot Start Point
+            // Start simulation at t=0
+            map(0, pTemp);
+
+            while (simDist < totalDist) {
+                // Check density at current simulation point
+                // (1.0 - y*y) is squared distance from Y-axis. 
+                // Near poles (y=1), this is 0. Sqrt is 0. scaleFactor is small (0.05).
+                const scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - pTemp.y * pTemp.y)));
+                const step = baseStep * scaleFactor;
+
+                steps.push(step);
+                simDist += step;
+
+                // Advance simulation point for next density check
+                // We use (simDist / totalDist) as 't', clamping strictly for safety
+                // Note: pTemp is updated for the NEXT iteration's density check
+                if (simDist < totalDist) {
+                    map(simDist / totalDist, pTemp);
+                }
+            }
+
+            // 3. Scale Factor
+            // Compress/Expand steps so they sum EXACTLY to totalDist
+            const scale = (simDist > 0) ? (totalDist / simDist) : 0;
+
+            // 4. Drawing Phase
+            // Determine omitLast based on chain logic
+            const isLastSegment = (i === count - 1);
+
+            // If closed loop: ALL segments omit their last point (it's the start of next).
+            // If open chain: All segments omit last, EXCEPT the very last segment.
+            const omitLast = closeLoop || !isLastSegment;
+
+            if (omitLast && steps.length === 0) continue;
+
+            // Draw Start Point
             map(0, pTemp);
             lerpFragments(curr, next, 0, _scratchFrag);
             let res = shaderFn(pTemp, _scratchFrag);
-            pipeline.plot(pTemp, res.color || res, age, res.alpha ?? 1.0, res.tag);
+            pipeline.plot(pTemp, res.color, age, res.alpha, res.tag);
 
-            while (currentT < 1.0) {
-                // Determine step size based on Polar Density (y-height)
-                const densityScale = Math.max(0.05, Math.sqrt(1.0 - pTemp.y * pTemp.y));
-                let dt = (baseStep * densityScale) / dist;
-                if (dt < 1e-4) dt = 1e-4;
+            // Draw Steps
+            const loopLimit = omitLast ? steps.length - 1 : steps.length;
+            let currentDist = 0;
 
-                currentT += dt;
+            for (let j = 0; j < loopLimit; j++) {
+                const step = steps[j] * scale;
+                currentDist += step;
 
-                // Cap at 1.0
-                if (currentT >= 1.0) {
-                    if (!closeLoop && i === count - 1) currentT = 1.0;
-                    else break;
-                }
+                const t = (totalDist > 0) ? (currentDist / totalDist) : 1;
 
-                // Move & Draw
-                map(currentT, pTemp);
-                pTemp.normalize(); // Drift correction
+                map(t, pTemp);
 
-                lerpFragments(curr, next, currentT, _scratchFrag);
+                lerpFragments(curr, next, t, _scratchFrag);
                 res = shaderFn(pTemp, _scratchFrag);
-                pipeline.plot(pTemp, res.color || res, age, res.alpha ?? 1.0, res.tag);
+                pipeline.plot(pTemp, res.color, age, res.alpha, res.tag);
             }
         }
     },
