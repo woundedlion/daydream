@@ -552,81 +552,180 @@ class TemporalNode {
 /**
  * Delays pixel drawing by a TTL determined by a function.
  */
+/**
+ * Optimized Temporal Filter using TypedArray Linked Lists.
+ * - Zero Garbage Collection (Pre-allocated memory)
+ * - O(1) Insertion / Free
+ * - O(Window) Flush
+ */
 export class FilterTemporal {
   /**
-   * @param {Function} ttlFn - Function(x, y) => frames (float)
-   * @param {number} windowSize - How many frames to smear the release over (e.g. 1.5)
+   * @param {Function} ttlFn - Function(x, y) => delay frames (float)
+   * @param {number} windowSize - TAA Window (e.g. 1.5 frames)
+   * @param {number} maxDelay - Maximum supported delay in frames (e.g. 300)
+   * @param {number} capacity - Maximum number of active particles (e.g. 1,000,000)
    */
-  constructor(ttlFn, windowSize = 1.5) {
+  constructor(ttlFn, windowSize = 1.5, maxDelay = 300, capacity = 1000000) {
     this.is2D = true;
     this.ttlFn = ttlFn;
     this.windowSize = windowSize;
-    this.buffer = [];
-    this.nodePool = [];
-    this.pass = null;
+    this.capacity = capacity;
+
+    // Buffer Stats
+    this.bufferSize = maxDelay + Math.ceil(windowSize) * 2 + 10;
+    this.currentFrame = 0;
+
+    // Data Store (Stride = 8)
+    // [x, y, r, g, b, a, age, targetTime]
+    this.STRIDE = 8;
+    this.data = new Float32Array(capacity * this.STRIDE);
+
+    // Linked List Pointers
+    // nextPtrs[i] points to the index of the next node in the chain
+    this.nextPtrs = new Int32Array(capacity).fill(-1);
+
+    // Buckets (Heads of Linked Lists)
+    // buckets[i] points to the index of the first node in the bucket
+    this.buckets = new Int32Array(this.bufferSize).fill(-1);
+
+    // Tag Storage (Parallel Array for Objects)
+    this.tags = new Array(capacity).fill(null);
+
+    // Free List Management
+    this.freeHead = 0;
+    for (let i = 0; i < capacity - 1; i++) {
+      this.nextPtrs[i] = i + 1;
+    }
+    this.nextPtrs[capacity - 1] = -1; // End of free list
+
+    // Reusable scratch object
+    this._tempColor = { r: 0, g: 0, b: 0 };
   }
 
-  plot(x, y, color, age, alpha, tag, pass) {
+  plot(x, y, colorInput, age, alpha, tag, pass) {
     this.pass = pass;
 
-    const ttl = this.ttlFn(x, y);
+    // 1. Calculate absolute target frame
+    const fDelay = this.ttlFn(x, y);
+    const delay = Math.max(0, fDelay); // Safety
+    const targetTime = this.currentFrame + delay;
 
-    if (ttl <= -this.windowSize) {
-      pass(x, y, color, age, alpha, tag);
+    // 2. Determine Bucket Index
+    const bucketIndex = Math.floor(targetTime) % this.bufferSize;
+
+    // 3. Allocate Node
+    const nodeIdx = this.freeHead;
+    if (nodeIdx === -1) {
+      // Out of memory - drop particle
       return;
     }
+    // Pop from free list
+    this.freeHead = this.nextPtrs[nodeIdx];
 
-    let node = this.nodePool.pop();
-    if (!node) node = new TemporalNode();
+    // 4. Write Data
+    const base = nodeIdx * this.STRIDE;
 
-    node.x = x;
-    node.y = y;
-    node.color = color;
-    node.age = age;
-    node.alpha = alpha;
-    node.tag = tag;
-    node.ttl = ttl;
+    // Flatten Color
+    let r, g, b, a;
+    if (colorInput.isColor) {
+      r = colorInput.r; g = colorInput.g; b = colorInput.b; a = alpha;
+    } else if (colorInput.color) {
+      r = colorInput.color.r; g = colorInput.color.g; b = colorInput.color.b;
+      a = (colorInput.alpha !== undefined ? colorInput.alpha : 1.0) * alpha;
+    } else {
+      r = colorInput.r; g = colorInput.g; b = colorInput.b; a = alpha;
+    }
 
-    this.buffer.push(node);
+    this.data[base] = x;
+    this.data[base + 1] = y;
+    this.data[base + 2] = r;
+    this.data[base + 3] = g;
+    this.data[base + 4] = b;
+    this.data[base + 5] = a;
+    this.data[base + 6] = age;
+    this.data[base + 7] = targetTime;
+
+    this.tags[nodeIdx] = tag; // Store tag reference
+
+    // 5. Link to Bucket (Prepend)
+    this.nextPtrs[nodeIdx] = this.buckets[bucketIndex]; // Point to old head
+    this.buckets[bucketIndex] = nodeIdx; // Become new head
   }
 
   flush(unused, globalAlpha) {
-    const window = this.windowSize;
-    for (let i = 0; i < this.buffer.length; i++) {
-      const node = this.buffer[i];
-      node.ttl -= 1.0;
+    if (!this.pass) return;
 
-      const dist = Math.abs(node.ttl);
-      if (dist <= window) {
-        // Linear Triangle Filter: 1.0 at center, 0.0 at edges
-        // We normalize by (1 / window) to ensure total energy sums to ~1.0 over time
-        const weight = (1.0 - (dist / window));
-        const intensity = weight; // You can multiply by (1/window) for strict energy conservation if needed
+    const frame = this.currentFrame;
+    const win = this.windowSize;
 
-        if (this.pass && intensity > 0.01) {
-          this.pass(
-            node.x, node.y,
-            node.color,
-            node.age,
-            node.alpha * intensity * globalAlpha,
-            node.tag
-          );
+    // 1. Iterate Active Window
+    const start = Math.floor(frame - win);
+    const end = Math.ceil(frame + win);
+
+    for (let f = start; f <= end; f++) {
+      let idx = f % this.bufferSize;
+      if (idx < 0) idx += this.bufferSize;
+
+      // Walk Linked List
+      let curr = this.buckets[idx];
+      while (curr !== -1) {
+        const base = curr * this.STRIDE;
+        const targetTime = this.data[base + 7];
+
+        // TAA Weight
+        const dist = Math.abs(targetTime - frame);
+        if (dist <= win) {
+          const intensity = 1.0 - (dist / win);
+
+          if (intensity > 0.01) {
+            // Reconstruct Color
+            this._tempColor.r = this.data[base + 2];
+            this._tempColor.g = this.data[base + 3];
+            this._tempColor.b = this.data[base + 4];
+
+            this.pass(
+              this.data[base],     // x
+              this.data[base + 1], // y
+              this._tempColor,
+              this.data[base + 6], // age
+              this.data[base + 5] * intensity * globalAlpha, // alpha
+              this.tags[curr]      // tag
+            );
+          }
         }
-      }
-
-      // 4. Removal: Only drop when fully past the negative edge of the window
-      if (node.ttl < -window) {
-        node.tag = null;
-        node.color = null;
-        this.nodePool.push(node);
-
-        // Fast removal (Swap with last)
-        const last = this.buffer.pop();
-        if (i < this.buffer.length) {
-          this.buffer[i] = last;
-          i--; // Re-process this index since we swapped a new node in
-        }
+        curr = this.nextPtrs[curr];
       }
     }
+
+    // 2. Clean Up Old Bucket
+    // The bucket at `frame - win - 1` has completely fallen out of scope.
+    const cleanFrame = Math.floor(frame - win - 1);
+    let cleanIdx = cleanFrame % this.bufferSize;
+    if (cleanIdx < 0) cleanIdx += this.bufferSize;
+
+    // Walk the entire chain and return to free list
+    let head = this.buckets[cleanIdx];
+    if (head !== -1) {
+      // Find tail of this chain
+      let tail = head;
+      let count = 0;
+      while (true) {
+        this.tags[tail] = null; // Clear tag reference to avoid leaks
+        const next = this.nextPtrs[tail];
+        if (next === -1) break;
+        tail = next;
+        count++;
+      }
+
+      // Link entire chain to free list
+      this.nextPtrs[tail] = this.freeHead;
+      this.freeHead = head;
+
+      // Empty the bucket
+      this.buckets[cleanIdx] = -1;
+    }
+
+    // 3. Advance Time
+    this.currentFrame++;
   }
 }
