@@ -24,7 +24,7 @@ export class DreamBalls {
             numCopies: 18,
             offsetRadius: 0.3,
             offsetSpeed: 0.4,
-            warpScale: 0.2,
+            warpScale: 0.3,
             palette: new AlphaFalloffPalette((t) => 1.0 - t, Palettes.bloodStream),
             alpha: 0.7,
         },

@@ -48,6 +48,7 @@ const LoResFavorites = [
   "RingShower",
   "RingSpin",
   "Test",
+  "TestShapes",
   "Thrusters",
   "Voronoi"
 ];
@@ -214,6 +215,7 @@ const moveAutoGui = () => {
 setInterval(moveAutoGui, 1000);
 
 guiInstance.add(daydream, 'labelAxes').name('Show Axes');
+guiInstance.add(daydream, 'cullBackLabels').name('Cull Back Labels');
 window.addEventListener("resize", () => daydream.setCanvasSize());
 window.addEventListener("keydown", (e) => daydream.keydown(e));
 
