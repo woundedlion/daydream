@@ -82,6 +82,8 @@ export class DreamBalls {
         this.currentPreset = Object.keys(DreamBalls.presets)[0];
         this.mobiusParams = new MobiusParams();
 
+
+
         // Filters
         this.sliceFilter = new FilterOrientSlice(this.orientations, this.hemisphereAxis);
         this.sliceFilter.enabled = this.enableSlice;
@@ -96,6 +98,8 @@ export class DreamBalls {
         this.nextPreset();
         this.setupGui();
     }
+
+
 
     loadSolid(name) {
         this.baseMesh = Solids[name]();
@@ -158,6 +162,7 @@ export class DreamBalls {
         this.gui.add(this, 'enableSlice').name('Slice').onChange(v => {
             this.sliceFilter.enabled = v;
         });
+
 
         this.paramFolder = this.gui.addFolder('Manual Params');
         this.paramFolder.add(this, 'currentPreset', [...Object.keys(DreamBalls.presets), 'Custom']).name('Preset').listen().onChange(v => {
@@ -237,6 +242,7 @@ export class DreamBalls {
             this.warpAnim.step();
             this.drawScene(this.params, 1.0, this.baseMesh, this.displacedMesh, this.tangents, this.mobiusParams);
         }
+
     }
 
     spinSlices() {

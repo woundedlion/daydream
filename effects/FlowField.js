@@ -143,6 +143,6 @@ export class FlowField {
         }
 
         // 7. Draw Trails
-        this.filters.trail((v, t) => this.palette.get(t));
+        this.filters.flush((v, t) => this.palette.get(t));
     }
 }

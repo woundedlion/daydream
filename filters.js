@@ -98,10 +98,10 @@ export function createRenderPipeline(...filters) {
   }
 
   // Define the trail propagator
-  const trail = (trailFn, alpha) => {
+  const flush = (trailFn, alpha) => {
     for (const filter of filters) {
-      if (typeof filter.trail === 'function') {
-        filter.trail(trailFn, alpha);
+      if (typeof filter.flush === 'function') {
+        filter.flush(trailFn, alpha);
       }
     }
   };
@@ -118,7 +118,7 @@ export function createRenderPipeline(...filters) {
       plot2D: (x, y, c, age, alpha, tag) => {
         head(x, y, c, age, alpha, tag);
       },
-      trail: trail
+      flush: flush
     };
   } else {
     // Pipeline starts with 3D filter (e.g. FilterOrient)
@@ -129,7 +129,7 @@ export function createRenderPipeline(...filters) {
         // Optional: Convert back to vector if needed, or throw error
         console.warn("Cannot scan 2D into 3D pipeline head");
       },
-      trail: trail
+      flush: flush
     };
   }
 }
@@ -267,7 +267,7 @@ export class FilterWorldTrails {
     this.buffer.push_back(node);
   }
 
-  trail(trailFn, alpha = 1.0) {
+  flush(trailFn, alpha = 1.0) {
     // Age
     for (const node of this.buffer) {
       node.ttl -= 1;
@@ -440,7 +440,7 @@ export class FilterScreenTrails {
     this.buffer.push_back(node);
   }
 
-  trail(trailFn, alpha = 1.0) {
+  flush(trailFn, alpha = 1.0) {
     // Age
     for (const node of this.buffer) {
       node.ttl -= 1;
@@ -531,6 +531,91 @@ export class FilterGaussianBlur {
         }
       } else {
         k += 3; // Skip row
+      }
+    }
+  }
+}
+
+
+class TemporalNode {
+  constructor() {
+    this.x = 0;
+    this.y = 0;
+    this.color = null;
+    this.age = 0;
+    this.alpha = 0;
+    this.tag = null;
+    this.ttl = 0;
+  }
+}
+
+/**
+ * Delays pixel drawing by a TTL determined by a function.
+ */
+export class TemporalFilter {
+  /**
+   * @param {Function} ttlFn - Function(x, y) => frames (integer)
+   * @param {number} capacity - Initial capacity (not strictly valued since we use array)
+   */
+  constructor(ttlFn, capacity = 1000) {
+    this.is2D = true;
+    this.ttlFn = ttlFn;
+    this.buffer = []; // Swap-and-Pop Array
+    this.nodePool = []; // Simple Object Pool
+    this.pass = null;
+  }
+
+  plot(x, y, color, age, alpha, tag, pass) {
+    this.pass = pass;
+
+    const ttl = Math.floor(this.ttlFn(x, y));
+
+    if (ttl <= 0) {
+      pass(x, y, color, age, alpha, tag);
+      return;
+    }
+
+    let node = this.nodePool.pop();
+    if (!node) node = new TemporalNode();
+
+    node.x = x;
+    node.y = y;
+    node.color = color;
+    node.age = age;
+    node.alpha = alpha;
+    node.tag = tag;
+    node.ttl = ttl;
+
+    this.buffer.push(node);
+  }
+
+  flush(unused, alpha) {
+    // Note: 'unused' arg is because other flush/trail methods usually take a trailFn.
+    // Here we don't generate new trails, we just release dots.
+
+    // Swap-and-Pop iteration
+    for (let i = 0; i < this.buffer.length; i++) {
+      const node = this.buffer[i];
+      node.ttl--;
+
+      if (node.ttl <= 0) {
+        // RELEASE
+        if (this.pass) {
+          this.pass(node.x, node.y, node.color, node.age, node.alpha, node.tag);
+        }
+
+        // Return to pool
+        node.tag = null;
+        node.color = null;
+        this.nodePool.push(node);
+
+        // Swap-and-Pop
+        const last = this.buffer.pop();
+
+        if (i < this.buffer.length) {
+          this.buffer[i] = last;
+          i--; // Re-process this index
+        }
       }
     }
   }
