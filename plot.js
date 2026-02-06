@@ -91,7 +91,6 @@ const PlanarStrategy = (basis) => {
     };
 };
 
-
 export const Plot = {
     Point: class {
         /**
@@ -271,6 +270,7 @@ export const Plot = {
          * Registers:
          *  v0: Edge Progress t (0.0 -> 1.0) per edge
          *  v1: Cumulative Arc Length (radians) per edge
+         *  v2: Edge Index
          * @param {Object} pipeline - Render pipeline
          * @param {Object} mesh - Mesh object
          * @param {Function} fragmentShaderFn - Shader function
@@ -279,10 +279,12 @@ export const Plot = {
          */
         static draw(pipeline, mesh, fragmentShaderFn, age = 0, vertexShaderFn = null) {
             const edges = Plot.Mesh.sample(mesh);
-            for (const edge of edges) {
+            for (let i = 0; i < edges.length; i++) {
+                const edge = edges[i];
                 if (vertexShaderFn) {
-                    for (let i = 0; i < edge.length; i++) {
-                        const frag = edge[i];
+                    for (let j = 0; j < edge.length; j++) {
+                        const frag = edge[j];
+                        frag.v2 = i;
                         const transformed = vertexShaderFn(frag.pos);
                         frag.pos.copy(transformed);
                     }
@@ -323,8 +325,7 @@ export const Plot = {
             const d = Math.cos(thetaEq);
 
             const step = TWO_PI / numSamples;
-            const arcLengthScale = Math.sin(radius); // Circumference scaling
-
+            const arcLengthScale = Math.sin(radius);
             let points = [];
             let uTemp = vectorPool.acquire();
 
@@ -396,9 +397,8 @@ export const Plot = {
          * @returns {Object[]} Start and End fragments
          */
         static sample(v1, v2) {
-            const dx = v1.x - v2.x; // Simplified distance for 'Planar' (Euclidean in 3D or projected?) 
-            // PlanarLine is usually used for UI or HUD where Z is ignored or it's flat.
-            // Let's use Euclidean distance between the vectors as "Arc Length" proxy.
+            const dx = v1.x - v2.x;
+            // Euclidean distance for Planar Line
             const dist = v1.distanceTo(v2);
 
             const p1 = fragmentPool.acquire();
@@ -952,14 +952,13 @@ export const Plot = {
         const len = points.length;
         if (len < 2) return;
 
-        // Select Strategy Factory
         const createInterpolator = planarBasis
             ? PlanarStrategy(planarBasis)
             : GeodesicStrategy();
 
         const count = closeLoop ? len : len - 1;
         const pTemp = vectorPool.acquire();
-        const steps = []; // Reusable buffer? Better to alloc new to be safe/simple first.
+        const steps = [];
 
         for (let i = 0; i < count; i++) {
             const curr = points[i];
@@ -967,18 +966,10 @@ export const Plot = {
             const p1 = curr.pos || curr;
             const p2 = next.pos || next;
 
-            // 1. Initialize Strategy
             const { dist: totalDist, map } = createInterpolator(p1, p2);
 
             // Handle Degenerate Segment
             if (totalDist < 1e-5) {
-                // If it's a point, draw it only if we aren't omitting the end
-                // (Logic: degenerate line = single point. Treat as start point.)
-                // But generally, we skip degenerate steps to avoid noise, 
-                // UNLESS it's a single dot geometry? 
-                // Following drawLine logic: 
-                // if (omitLast) return []; else draw dot.
-
                 const isLastSegment = (i === count - 1);
                 const shouldOmit = closeLoop || !isLastSegment;
 
@@ -990,45 +981,25 @@ export const Plot = {
                 continue;
             }
 
-            // 2. Simulation Phase
-            // Walk the path to determine adaptive step counts
+            // Simulation Phase
             steps.length = 0;
             let simDist = 0;
-            const baseStep = TWO_PI / Daydream.W; // Base resolution
-
-            // Start simulation at t=0
+            const baseStep = TWO_PI / Daydream.W;
             map(0, pTemp);
-
             while (simDist < totalDist) {
-                // Check density at current simulation point
-                // (1.0 - y*y) is squared distance from Y-axis. 
-                // Near poles (y=1), this is 0. Sqrt is 0. scaleFactor is small (0.05).
                 const scaleFactor = Math.max(0.05, Math.sqrt(Math.max(0, 1.0 - pTemp.y * pTemp.y)));
                 const step = baseStep * scaleFactor;
-
                 steps.push(step);
                 simDist += step;
 
-                // Advance simulation point for next density check
-                // We use (simDist / totalDist) as 't', clamping strictly for safety
-                // Note: pTemp is updated for the NEXT iteration's density check
                 if (simDist < totalDist) {
                     map(simDist / totalDist, pTemp);
                 }
             }
 
-            // 3. Scale Factor
-            // Compress/Expand steps so they sum EXACTLY to totalDist
             const scale = (simDist > 0) ? (totalDist / simDist) : 0;
-
-            // 4. Drawing Phase
-            // Determine omitLast based on chain logic
             const isLastSegment = (i === count - 1);
-
-            // If closed loop: ALL segments omit their last point (it's the start of next).
-            // If open chain: All segments omit last, EXCEPT the very last segment.
             const omitLast = closeLoop || !isLastSegment;
-
             if (omitLast && steps.length === 0) continue;
 
             // Draw Start Point
@@ -1040,7 +1011,6 @@ export const Plot = {
             // Draw Steps
             const loopLimit = omitLast ? steps.length - 1 : steps.length;
             let currentDist = 0;
-
             for (let j = 0; j < loopLimit; j++) {
                 const step = steps[j] * scale;
                 currentDist += step;

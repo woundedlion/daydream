@@ -10,6 +10,7 @@ import { Timeline, Orientation, Rotation, RandomWalk } from "../animation.js";
 import { Plot } from "../plot.js";
 import { Solids } from "../solids.js";
 import { Palettes } from "../palettes.js";
+import { Color4 } from "../color.js";
 import FastNoiseLite from "../FastNoiseLite.js";
 import {
     createRenderPipeline,
@@ -31,12 +32,22 @@ export class TestTemporal {
                 temporalEnabled: true,
                 windowSize: 2,
                 speed: 0.01,
+                lightSpeed: 0.05,
+                lightAlpha: 1.0,
             },
-            'Vertical Wave': { delayBase: 8, delayAmp: 4, frequency: 0.3 },
-            'Diagonal Spiral': { delayBase: 8, delayAmp: 4, xSpirals: 2.0, yFreq: 0.3 },
-            'Liquid Time': { delayBase: 8, delayAmp: 4, noiseFreq: 0.03, timeScale: 2.0 },
-            'Quantum Tunnel': { delayBase: 8, delayAmp: 4, spiralTightness: 10.0, spiralAngle: 5.0 },
-            'Datamosh': { delayBase: 8, delayAmp: 4, flowSpeed: 0.1, glitchScale: 15.0 }
+            'Vertical Wave': { delayBase: 10, delayAmp: 5, frequency: 0.3 },
+            'Diagonal Spiral': { delayBase: 12, delayAmp: 6, xSpirals: 2.0, yFreq: 0.3 },
+            'Liquid Time': { delayBase: 12, delayAmp: 25, noiseFreq: 0.015, timeScale: 1.0, rippleFreq: 0.06 },
+            'Quantum Tunnel': { delayBase: 5, delayAmp: 20, spiralTightness: 10.0, spiralAngle: 5.0 },
+            'Datamosh': { delayBase: 20, delayAmp: 15, flowSpeed: 0.05, glitchScale: 25.0 }
+        };
+
+        this.modeDefaults = {
+            'Vertical Wave': { windowSize: 2.0, speed: 0.01 },
+            'Diagonal Spiral': { windowSize: 3.0, speed: 0.01 },
+            'Liquid Time': { windowSize: 6.0, speed: 0.02 },
+            'Quantum Tunnel': { windowSize: 4.0, speed: 0.03 },
+            'Datamosh': { windowSize: 12.0, speed: 0.0 }
         };
 
         this.t = 0;
@@ -101,10 +112,20 @@ export class TestTemporal {
         if (!p.temporalEnabled) return 0;
         const ep = this.params['Liquid Time'];
 
-        // 3D Noise: X, Y, and Time
+        // 1. Radial Ripples (Water surface)
+        const cx = Daydream.W * 0.5;
+        const cy = Daydream.H * 0.5;
+        const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+
+        const ripple = Math.sin(dist * ep.rippleFreq - this.t * ep.timeScale * 5.0);
+
+        // 2. Noise (Turbulence/Organic feel)
         const noiseVal = this.noise.GetNoise(x, y, this.t * ep.timeScale);
 
-        return ep.delayBase + (noiseVal + 1.0) * 0.5 * ep.delayAmp;
+        // Combine: Strong ripples disrupted by noise
+        const combined = ripple + (noiseVal * 0.5);
+
+        return Math.max(0, ep.delayBase + combined * ep.delayAmp);
     }
 
     delayQuantumTunnel(x, y) {
@@ -165,13 +186,24 @@ export class TestTemporal {
             .onChange(v => {
                 this.filterTemporal.ttlFn = this.delayModes[v];
                 this.refreshEffectParams();
+
+                // Apply Defaults
+                const defs = this.modeDefaults[v];
+                if (defs) {
+                    if (defs.windowSize !== undefined) this.globalCtrls.windowSize.setValue(defs.windowSize);
+                    if (defs.speed !== undefined) this.globalCtrls.speed.setValue(defs.speed);
+                }
             });
 
-        globalFolder.add(this.params.Global, 'windowSize', 1, 8).name('Window Size').onChange(v => {
+        this.globalCtrls = {};
+
+        this.globalCtrls.windowSize = globalFolder.add(this.params.Global, 'windowSize', 1, 8).name('Window Size').onChange(v => {
             this.filterTemporal.windowSize = v;
         });
 
-        globalFolder.add(this.params.Global, 'speed', 0, 0.2).name('Master Speed');
+        this.globalCtrls.speed = globalFolder.add(this.params.Global, 'speed', 0, 0.2).name('Master Speed');
+        this.globalCtrls.lightSpeed = globalFolder.add(this.params.Global, 'lightSpeed', -0.2, 0.2).name('Light Speed');
+        this.globalCtrls.lightAlpha = globalFolder.add(this.params.Global, 'lightAlpha', 0, 1.0).name('Light Alpha');
 
         globalFolder.open();
 
@@ -224,13 +256,24 @@ export class TestTemporal {
         this.timeline.step();
         this.t += 1;
         const colors = Palettes.richSunset;
-        const renderMesh = (v, t) => {
-            return colors.get(t);
-        };
+        const p = this.params.Global;
 
-        Plot.Mesh.draw(this.filters, this.mesh, (v) => {
-            // Use vertex Y for color
-            return colors.get((v.y + 1) * 0.5);
+        Plot.Mesh.draw(this.filters, this.mesh, (v, frag) => {
+            // Base Color
+            const baseColor = colors.get((v.y + 1) * 0.5).clone();
+
+            let phase = (this.t * p.lightSpeed) % 1.0;
+            if (phase < 0) phase += 1.0;
+            let dist = Math.abs(frag.v1 - phase);
+            if (dist > 0.5) dist = 1.0 - dist;
+
+            const width = 0.15;
+            if (dist < width) {
+                const strength = Math.pow(1.0 - (dist / width), 2);
+                baseColor.lerp(new Color4(1, 1, 1, 1), strength * p.lightAlpha);
+            }
+
+            return baseColor;
         });
 
         this.filters.flush(null, 1.0);
