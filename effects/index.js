@@ -1,6 +1,6 @@
 /*
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
- * LICENSE: ALL RIGHTS RESERVED. No redistribution or use without explicit permission.
+ * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
 export { BZReactionDiffusion } from "./BZReactionDiffusion.js";
@@ -26,4 +26,5 @@ export { IslamicStars } from "./IslamicStars.js";
 export { TestTemporal } from "./TestTemporal.js";
 export { Thrusters } from "./Thrusters.js";
 export { Voronoi } from "./Voronoi.js";
+
 

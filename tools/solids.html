@@ -222,12 +222,51 @@
             align-items: center;
             width: 100%;
             box-sizing: border-box;
+            position: relative;
+            transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), border-color 0.2s, opacity 0.2s;
+            user-select: none;
+        }
+
+        .op-item:hover {
+            border-color: var(--indigo-400);
+        }
+
+        .op-item.dragging {
+            opacity: 0.2;
+            transform: scale(0.98);
+            border-style: dashed;
+            z-index: 10;
+        }
+
+        .drag-handle {
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 1rem;
+            height: 1.5rem;
+            margin-right: 0.25rem;
+            color: var(--slate-500);
+            flex-shrink: 0;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+
+        .op-item:hover .drag-handle {
+            opacity: 1;
+        }
+
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+
+        .drag-handle svg {
+            width: 0.8rem;
+            height: 0.8rem;
+            fill: currentColor;
         }
 
         #saveBtn {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
             width: 3rem;
             height: 3rem;
             border-radius: 50%;
@@ -238,8 +277,32 @@
             justify-content: center;
             cursor: pointer;
             transition: all 0.2s;
-            z-index: 40;
             backdrop-filter: blur(5px);
+        }
+
+        #save-actions {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            z-index: 40;
+        }
+
+        #meshStats {
+            background-color: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--slate-700);
+            border-radius: 0.5rem;
+            padding: 0.4rem 0.8rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            color: rgba(165, 180, 252, 0.8);
+            text-transform: uppercase;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+            white-space: nowrap;
         }
 
         #saveBtn:hover {
@@ -345,6 +408,21 @@
             <p class="text-xs text-indigo-300">Conway Mesh Operators</p>
         </div>
 
+        <!-- Base Solid Display -->
+        <div id="baseSolidDisplay" class="space-y-2">
+            <label class="text-xs uppercase font-semibold text-slate-400">Source Solid</label>
+            <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-3 flex items-center space-x-3">
+                <img id="baseThumb" src=""
+                    class="w-12 h-12 object-contain bg-slate-900 rounded-md border border-slate-700 shadow-sm" />
+                <div class="flex flex-col min-w-0">
+                    <div id="baseTitle" class="text-xs font-black text-white uppercase tracking-wider line-clamp-2">
+                    </div>
+                    <span id="baseStats"
+                        class="text-[0.6rem] text-indigo-300/60 font-medium uppercase tracking-tight"></span>
+                </div>
+            </div>
+        </div>
+
         <!-- Operations Queue -->
         <div class="space-y-2 flex-1 overflow-hidden flex flex-col">
             <div class="flex items-center justify-between">
@@ -353,7 +431,7 @@
                     class="text-[0.65rem] text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear
                     All</button>
             </div>
-            <div id="opsList" class="flex-1 overflow-y-auto space-y-2 pr-2">
+            <div id="opsList" class="relative flex-1 overflow-y-auto space-y-2 pr-2">
                 <!-- Operations go here -->
             </div>
 
@@ -407,15 +485,18 @@
 
     <div id="main">
         <div id="canvas-container">
-            <button id="saveBtn" title="Save to Collection">
-                <!-- Star Icon -->
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round"
-                    stroke-linejoin="round">
-                    <polygon
-                        points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
-                    </polygon>
-                </svg>
-            </button>
+            <div id="save-actions">
+                <div id="meshStats"></div>
+                <button id="saveBtn" title="Save to Collection">
+                    <!-- Star Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <polygon
+                            points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+                        </polygon>
+                    </svg>
+                </button>
+            </div>
             <canvas id="canvas" class="w-full h-full block"></canvas>
         </div>
 
@@ -450,6 +531,10 @@
             showVertices: false
         };
 
+        const baseThumbnails = {};
+        // Make draggingIndex global so inline handlers can see it if needed, mainly strictly module scope is fine for listeners but good for debug
+        let draggingIndex = -1;
+
         const OP_DEFS = {
             kis: { label: 'Kis', params: {} },
             ambo: { label: 'Ambo', params: {} },
@@ -457,7 +542,7 @@
             snub: { label: 'Snub', params: {} },
             dual: { label: 'Dual', params: {} },
             truncate: { label: 'Truncate', params: { t: { val: 0.25, min: 0.01, max: 0.5, step: 0.01 } } },
-            hankin: { label: 'Hankin', params: { angle: { val: 0.0, min: -1.5, max: 1.5, step: 0.01 } } }
+            hankin: { label: 'Hankin', params: { angle: { val: 0.0, min: 0.0, max: 0.5, step: 0.01 } } }
         };
 
         let scene, camera, renderer, controls;
@@ -532,6 +617,7 @@
             updateToggles();
             onResize();
             update();
+            renderBaseSolid();
             animate();
         }
 
@@ -632,6 +718,7 @@
                 btn.onclick = () => {
                     state.base = key;
                     update();
+                    renderBaseSolid();
                     // Update active state
                     document.querySelectorAll('.thumb-btn').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
@@ -640,7 +727,9 @@
                 };
 
                 const img = document.createElement('img');
-                img.src = offRenderer.domElement.toDataURL();
+                const dataURL = offRenderer.domElement.toDataURL();
+                img.src = dataURL;
+                baseThumbnails[key] = dataURL;
 
                 const span = document.createElement('span');
                 // Format Name: truncatedIcosahedron -> Truncated Icosahedron -> Truncated\nIcosahedron?
@@ -699,10 +788,16 @@
             const dataURL = renderer.domElement.toDataURL('image/png');
 
             const title = state.base.replace(/([A-Z])/g, ' $1').trim();
+
+            // Get current counts from window.currentMesh
+            const vCount = window.currentMesh.vertices.length;
+            const fCount = window.currentMesh.faces.length;
+            const eCount = window.currentMesh.edgeCount || 0;
+
             // Generate summary
             const opsSummary = state.ops.map(o => {
                 if (o.op === 'truncate') return `Tr(${o.params.t})`;
-                if (o.op === 'hankin') return `Hk(${o.params.angle})`;
+                if (o.op === 'hankin') return `Hk(${o.params.angle.toFixed(2)})`;
                 return o.op.charAt(0).toUpperCase() + o.op.slice(1);
             }).join(', ') || 'Base Solid';
 
@@ -715,7 +810,8 @@
                 vertices: state.showVertices,
                 thumb: dataURL,
                 title: title,
-                desc: opsSummary
+                desc: opsSummary,
+                stats: `${vCount}V ${eCount}E ${fCount}F`
             };
 
             savedSolids.push(item);
@@ -731,7 +827,10 @@
                 el.className = 'saved-item';
                 el.innerHTML = `
                     <img src="${item.thumb}" alt="${item.title}" />
-                    <div class="title capitalize">${item.title}</div>
+                    <div class="flex justify-between items-start">
+                        <div class="title capitalize">${item.title}</div>
+                        <div class="text-[0.55rem] font-mono text-indigo-400 opacity-60">${item.stats}</div>
+                    </div>
                     <div class="details uppercase opacity-70">${item.desc}</div>
                     <div class="saved-actions" onclick="event.stopPropagation()">
                         <button class="action-btn" onclick="copyCode(${index}, 'js')">JS</button>
@@ -822,16 +921,129 @@
             });
 
             update();
+            renderBaseSolid();
+        }
+
+        function renderBaseSolid() {
+            const thumb = baseThumbnails[state.base];
+            const title = state.base.replace(/([A-Z])/g, ' $1').trim();
+            const mesh = Solids[state.base]();
+
+            document.getElementById('baseThumb').src = thumb || '';
+            document.getElementById('baseTitle').innerText = title;
+            document.getElementById('baseStats').innerText = `${mesh.vertices.length} Vertices • ${mesh.faces.length} Faces`;
+        }
+
+        window.enableDrag = (e) => {
+            const item = e.target.closest('.op-item');
+            if (item) item.draggable = true;
+        };
+
+        // Helper: Calculate insertion index based on static layout (ignoring transforms)
+        function getDragTargetIndex(e, list) {
+            const items = [...list.children];
+            // Calculate mouse Y relative to the scrolling list container
+            const listRect = list.getBoundingClientRect();
+            const mouseY = e.clientY - listRect.top + list.scrollTop;
+
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                // mid point of the item in the list's coordinate space
+                // offsetTop is correct because container is relative
+                const mid = item.offsetTop + (item.offsetHeight / 2);
+                if (mouseY < mid) {
+                    return i;
+                }
+            }
+            return items.length;
         }
 
         function renderOps() {
             const list = document.getElementById('opsList');
+            // Clean up overrides if any
             list.innerHTML = '';
+
+            // Container-level Drag Events
+            list.ondragover = (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+
+                if (draggingIndex === -1) return;
+
+                const targetIndex = getDragTargetIndex(e, list);
+                const items = [...list.children];
+                const draggingItem = items[draggingIndex];
+
+                if (!draggingItem) return;
+
+                // Amount to visual shift: height of item + gap (space-y-2 is 0.5rem = 8px)
+                const shiftAmount = draggingItem.offsetHeight + 8;
+
+                items.forEach((item, idx) => {
+                    if (idx === draggingIndex) return;
+
+                    item.style.transform = '';
+
+                    // Transformation Logic
+                    if (draggingIndex < targetIndex) {
+                        // Dragging Down: items between draggingIndex and targetIndex shift UP
+                        if (idx > draggingIndex && idx < targetIndex) {
+                            item.style.transform = `translateY(-${shiftAmount}px)`;
+                        }
+                    } else {
+                        // Dragging Up: items between targetIndex and draggingIndex shift DOWN
+                        if (idx >= targetIndex && idx < draggingIndex) {
+                            item.style.transform = `translateY(${shiftAmount}px)`;
+                        }
+                    }
+                });
+            };
+
+            list.ondrop = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const fromIndex = draggingIndex;
+                if (fromIndex === -1) return;
+
+                const list = document.getElementById('opsList');
+                let toIndex = getDragTargetIndex(e, list);
+
+                // Adjust index: removing the item at fromIndex shifts subsequent indices down by 1
+                if (fromIndex < toIndex) {
+                    toIndex--;
+                }
+
+                if (fromIndex !== toIndex) {
+                    const [movedItem] = state.ops.splice(fromIndex, 1);
+                    state.ops.splice(toIndex, 0, movedItem);
+                    update();
+                }
+                renderOps();
+                draggingIndex = -1;
+            };
 
             state.ops.forEach((o, i) => {
                 const opDef = OP_DEFS[o.op];
                 const el = document.createElement('div');
                 el.className = 'op-item flex-col items-stretch text-sm text-indigo-300';
+                el.draggable = false;
+
+                // Item Drag Start/End
+                el.addEventListener('dragstart', (e) => {
+                    draggingIndex = i;
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', i); // Required for Firefox
+                    setTimeout(() => el.classList.add('dragging'), 0);
+                });
+
+                el.addEventListener('dragend', () => {
+                    el.draggable = false;
+                    el.classList.remove('dragging');
+                    draggingIndex = -1;
+                    if (list) {
+                        [...list.children].forEach(c => c.style.transform = '');
+                    }
+                });
 
                 let controlsHtml = '';
                 if (opDef.params && Object.keys(opDef.params).length > 0) {
@@ -840,14 +1052,20 @@
                         const def = opDef.params[key];
                         const val = o.params[key];
                         controlsHtml += `
-                            <div class="flex items-center text-[0.6rem] space-x-1">
+                            <div class="flex items-center text-[0.6rem] space-x-1" draggable="false">
                                 <span class="w-12 text-slate-400 capitalize truncate">${key}</span>
                                 <input type="range" 
                                     min="${def.min}" max="${def.max}" step="${def.step}" value="${val}"
                                     class="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer min-w-0"
                                     oninput="updateOpParam(${i}, '${key}', this.value)"
+                                    onmousedown="event.stopPropagation()"
                                 />
-                                <span class="w-10 text-right font-mono text-slate-500">${Number(val).toFixed(2)}</span>
+                                <input type="number" step="${def.step}" value="${Number(val).toFixed(2)}"
+                                    class="w-12 bg-transparent text-right font-mono text-slate-500 focus:outline-none focus:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    onchange="updateOpParam(${i}, '${key}', this.value)"
+                                    onmousedown="event.stopPropagation()"
+                                />
+                                <span class="text-[0.5rem] text-slate-600 ml-0.5">${key === 'angle' ? 'rev' : ''}</span>
                             </div>
                          `;
                     });
@@ -855,9 +1073,14 @@
                 }
 
                 el.innerHTML = `
-                <div class="flex justify-between items-center w-full">
-                    <span>${i + 1}. ${o.op.toUpperCase()}</span>
-                    <button onclick="removeOp(${i})" class="text-slate-500 hover:text-white">&times;</button>
+                <div class="flex justify-between items-center w-full" draggable="false">
+                    <div class="flex items-center">
+                        <div class="drag-handle" onmousedown="enableDrag(event)" ontouchstart="enableDrag(event)">
+                            <svg viewBox="0 0 24 24"><path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+                        </div>
+                        <span class="font-bold">${i + 1}. ${o.op.toUpperCase()}</span>
+                    </div>
+                    <button onclick="removeOp(${i})" class="text-slate-500 hover:text-white" draggable="false">&times;</button>
                 </div>
                 ${controlsHtml}
             `;
@@ -866,16 +1089,18 @@
         }
 
         window.updateOpParam = (index, key, value) => {
-            state.ops[index].params[key] = parseFloat(value);
-            // Updating the number display manually is tricky without ID, let's just re-render ops or try to update text sibling
-            // To keep it smooth, ideally we don't re-render entire list.
-            // But re-rendering list is safe.
-            // Actually, for smoothness, just update logic first.
-            // Re-render ops list?
+            const val = parseFloat(value);
+            state.ops[index].params[key] = val;
+
+            // Sync UI elements
             const item = document.getElementById('opsList').children[index];
             if (item) {
-                const valSpan = item.querySelectorAll('.font-mono')[Object.keys(state.ops[index].params).indexOf(key)];
-                if (valSpan) valSpan.innerText = parseFloat(value).toFixed(2);
+                const paramIndex = Object.keys(state.ops[index].params).indexOf(key);
+                const slider = item.querySelectorAll('input[type="range"]')[paramIndex];
+                const input = item.querySelectorAll('input[type="number"]')[paramIndex];
+
+                if (slider) slider.value = val;
+                if (input) input.value = val.toFixed(2);
             }
             update();
         };
@@ -886,12 +1111,34 @@
             update();
         };
 
+        function computeInternalAngle(mesh) {
+            if (!mesh || !mesh.faces || mesh.faces.length === 0) return 0;
+            const face = mesh.faces[0];
+            if (face.length < 3) return 0;
+
+            const v1 = mesh.vertices[face[0]];
+            const v2 = mesh.vertices[face[1]];
+            const v3 = mesh.vertices[face[2]];
+
+            // Spherical internal angle at v2 is the angle between the planes OV2V1 and OV2V3
+            // Vector cross product gives normals to these planes.
+            const n1 = new THREE.Vector3().crossVectors(v2, v1).normalize();
+            const n2 = new THREE.Vector3().crossVectors(v2, v3).normalize();
+
+            // The angle between normals is the internal angle
+            return n1.angleTo(n2);
+        }
+
         window.addOp = (opName) => {
             const def = OP_DEFS[opName];
             const newOp = { op: opName, params: {} };
             if (def && def.params) {
                 Object.keys(def.params).forEach(k => {
-                    newOp.params[k] = def.params[k].val;
+                    let val = def.params[k].val;
+                    if (opName === 'hankin' && k === 'angle') {
+                        val = computeInternalAngle(window.currentMesh) / (2 * Math.PI);
+                    }
+                    newOp.params[k] = val;
                 });
             }
             state.ops.push(newOp);
@@ -924,7 +1171,7 @@
                     if (opName === 'truncate') {
                         mesh = MeshOps.truncate(mesh, o.params.t);
                     } else if (opName === 'hankin') {
-                        mesh = MeshOps.hankin(mesh, o.params.angle);
+                        mesh = MeshOps.hankin(mesh, o.params.angle * 2 * Math.PI);
                     } else if (MeshOps[opName]) {
                         mesh = MeshOps[opName](mesh);
                     }
@@ -1014,6 +1261,10 @@
             const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
             edgeLines = new THREE.LineSegments(lineGeo, lineMat);
             scene.add(edgeLines);
+
+            // Update Live Stats
+            mesh.edgeCount = edgeIndices.size;
+            document.getElementById('meshStats').innerText = `${mesh.vertices.length}V / ${mesh.edgeCount}E / ${mesh.faces.length}F`;
 
             // Store current mesh for generation
             window.currentMesh = mesh;

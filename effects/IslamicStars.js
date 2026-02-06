@@ -1,6 +1,6 @@
 /*
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
- * LICENSE: ALL RIGHTS RESERVED. No redistribution or use without explicit permission.
+ * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
 import * as THREE from "three";
@@ -212,3 +212,4 @@ export class IslamicStars {
         if (this.params.plot) Plot.Mesh.draw(this.pipeline, drawnMesh, colorWhite);
     }
 }
+

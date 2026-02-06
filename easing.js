@@ -2,6 +2,7 @@
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
+// Based on https://easings.net/
 
 import { TWO_PI } from "./3dmath.js";
 

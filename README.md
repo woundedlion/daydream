@@ -8,18 +8,13 @@ The architecture mirrors the C++ firmware to ensure seamless porting.
 
 ## 📜 License
 
-This project operates under a **Dual License** model to protect the creative works (Effects) while keeping the engine open for non-commercial educational use.
+This project is licensed under the **[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)**.
 
-### 1. The Core Engine
-The engine core, including all mathematics, rendering pipelines, and driver logic, is licensed under the **[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)**.
 *   **Allowed**: Personal use, education, hobbyist projects.
-*   **Prohibited**: Commercial distribution or selling hardware running this engine.
-*   **Files**: `geometry.js`, `driver.js`, `plot.js`, `scan.js`, `filters.js`, `color.js`, `animation.js`, `index.js`.
+*   **Prohibited**: Commercial distribution or selling hardware running this engine/effects.
+*   **Copyright**: Copyright 2025 Gabriel Levy. All rights reserved.
 
-### 2. The Effects Library
-The specific visual sketches found in the `effects/` directory are **Proprietary** and **All Rights Reserved**.
-*   **Restricted**: These files may not be copied, modified, or redistributed without explicit written permission from the author.
-*   **Files**: All contents of the `effects/` directory.
+All files in this repository, including the engine core and the `effects/` library, are subject to this license.
 
 ---
 
