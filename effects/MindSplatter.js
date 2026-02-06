@@ -151,9 +151,11 @@ export class MindSplatter {
             return c;
         }
 
-        const vertexShader = (point, particle, i, total) => {
+        const vertexShader = (frag, particle, i, total) => {
             // Attractor alpha holes
             let holeAlpha = 1.0;
+            const point = frag.pos; // Read from frag.pos
+
             for (const attr of this.particleSystem.attractors) {
                 const dist = angleBetween(point, attr.position);
                 if (dist < attr.eventHorizon) {
@@ -161,15 +163,11 @@ export class MindSplatter {
                 }
             }
 
-            // Mobius transform and global camera
-            const frag = fragmentPool.acquire();
-            mobiusTransform(point, this.mobius, frag.pos);
+            mobiusTransform(frag.pos, this.mobius, frag.pos);
             this.orientation.orient(frag.pos, undefined, frag.pos);
 
             frag.v0 = holeAlpha;
             frag.v1 = i / total; // lifeAlpha
-
-            return frag;
         }
 
         Plot.ParticleSystem.draw(

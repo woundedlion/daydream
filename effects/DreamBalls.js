@@ -18,6 +18,7 @@ import { AlphaFalloffPalette, FalloffPalette } from "../color.js";
 import { Solids } from "../solids.js";
 import { MobiusParams, TWO_PI } from "../3dmath.js";
 import { mobiusTransform, randomVector } from "../geometry.js";
+import { vectorPool } from "../memory.js";
 import { Plot } from "../plot.js";
 import { Palettes } from "../palettes.js";
 
@@ -197,7 +198,11 @@ export class DreamBalls {
     }
 
     drawScene(params, opacity, baseMesh, targetMesh, tangents, mobiusParams) {
-        const transform = (p) => this.globalOrientation.orient(mobiusTransform(p, mobiusParams));
+        const scratch = vectorPool.acquire();
+        const transform = (frag) => {
+            mobiusTransform(frag.pos, mobiusParams, scratch);
+            this.globalOrientation.orient(scratch, undefined, frag.pos);
+        };
         const palette = params.palette;
         const fargmentShader = (v, t) => {
             const val = (t.v0 !== undefined) ? t.v0 : t;

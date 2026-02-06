@@ -212,8 +212,8 @@ export const Plot = {
             p2.v1 = angleEnd;
 
             if (vertexShaderFn) {
-                p1.pos.copy(vertexShaderFn(p1.pos));
-                p2.pos.copy(vertexShaderFn(p2.pos));
+                vertexShaderFn(p1);
+                vertexShaderFn(p2);
             }
 
             const arcLength = Math.abs(angleEnd - angleStart);
@@ -228,7 +228,9 @@ export const Plot = {
                 pMid.v0 = (start + end) / 2;
                 pMid.v1 = midAngle;
 
-                if (vertexShaderFn) pMid.pos.copy(vertexShaderFn(pMid.pos));
+                if (vertexShaderFn) {
+                    vertexShaderFn(pMid);
+                }
 
                 points.push(pMid);
             }
@@ -285,8 +287,8 @@ export const Plot = {
                     for (let j = 0; j < edge.length; j++) {
                         const frag = edge[j];
                         frag.v2 = i;
-                        const transformed = vertexShaderFn(frag.pos);
-                        frag.pos.copy(transformed);
+                        // Updated: Zero-Copy
+                        vertexShaderFn(frag);
                     }
                 }
                 Plot.rasterize(pipeline, edge, fragmentShaderFn, false, age);
@@ -378,8 +380,8 @@ export const Plot = {
 
             if (vertexShaderFn) {
                 for (const p of points) {
-                    const transformed = vertexShaderFn(p.pos);
-                    p.pos.copy(transformed);
+                    // Updated: Zero-Copy
+                    vertexShaderFn(p);
                 }
             }
 
@@ -425,8 +427,8 @@ export const Plot = {
             const points = Plot.PlanarLine.sample(v1, v2);
             if (vertexShaderFn) {
                 for (const p of points) {
-                    const transformed = vertexShaderFn(p.pos);
-                    p.pos.copy(transformed);
+                    // Updated: Zero-Copy
+                    vertexShaderFn(p);
                 }
             }
 
@@ -492,8 +494,8 @@ export const Plot = {
             let points = Plot.SphericalPolygon.sample(basis, radius, numSides, phase);
             if (vertexShaderFn) {
                 for (const p of points) {
-                    const transformed = vertexShaderFn(p.pos);
-                    p.pos.copy(transformed);
+                    // Updated: Zero-Copy
+                    vertexShaderFn(p);
                 }
             }
             Plot.rasterize(pipeline, points, fragmentShaderFn, true, age, null);
@@ -538,8 +540,8 @@ export const Plot = {
             let points = Plot.PlanarPolygon.sample(basis, radius, numSides, phase);
             if (vertexShaderFn) {
                 for (const p of points) {
-                    const transformed = vertexShaderFn(p.pos);
-                    p.pos.copy(transformed);
+                    // Updated: Zero-Copy
+                    vertexShaderFn(p);
                 }
             }
             Plot.rasterize(pipeline, points, fragmentShaderFn, true, age, basis);
@@ -631,8 +633,8 @@ export const Plot = {
             let points = Plot.Star.sample(basis, radius, numSides, phase);
             if (vertexShaderFn) {
                 for (const p of points) {
-                    const transformed = vertexShaderFn(p.pos);
-                    p.pos.copy(transformed);
+                    // Updated: Zero-Copy
+                    vertexShaderFn(p);
                 }
             }
             Plot.rasterize(pipeline, points, fragmentShaderFn, true, age, basis);
@@ -731,8 +733,8 @@ export const Plot = {
 
             if (vertexShaderFn) {
                 for (const p of points) {
-                    const transformed = vertexShaderFn(p.pos);
-                    p.pos.copy(transformed);
+                    // Updated: Zero-Copy
+                    vertexShaderFn(p);
                 }
             }
             Plot.rasterize(pipeline, points, fragmentShaderFn, true, age, workBasis);
@@ -829,8 +831,8 @@ export const Plot = {
             let points = Plot.DistortedRing.sample(basis, radius, shiftFn, phase);
             if (vertexShaderFn) {
                 for (const p of points) {
-                    const transformed = vertexShaderFn(p.pos);
-                    p.pos.copy(transformed);
+                    // Updated: Zero-Copy
+                    vertexShaderFn(p);
                 }
             }
             Plot.rasterize(pipeline, points, fragmentShaderFn, true, age);
@@ -866,13 +868,19 @@ export const Plot = {
         static draw(pipeline, n, eps, fragmentShaderFn, age = 0, vertexShaderFn = null) {
             const points = Plot.Spiral.sample(n, eps);
             for (const p of points) {
-                let v = p;
-                if (vertexShaderFn) v = vertexShaderFn(v);
-                const res = fragmentShaderFn(v);
+                // Standardization: Wrap Vector3 in Fragment
+                const frag = fragmentPool.acquire();
+                frag.pos.copy(p);
+                // Default registers?
+
+                if (vertexShaderFn) vertexShaderFn(frag);
+
+                // ShaderFn now receives Fragment (standard)
+                const res = fragmentShaderFn(frag);
                 const color = res.isColor ? res : (res.color || res);
                 const alpha = res.alpha !== undefined ? res.alpha : 1.0;
                 const tag = res.tag;
-                pipeline.plot(v, color, age, alpha, tag);
+                pipeline.plot(frag.pos, color, age, alpha, tag);
             }
         }
     },
@@ -928,12 +936,21 @@ export const Plot = {
          */
         static draw(pipeline, particleSystem, fragmentShaderFn, vertexShaderFn = null) {
             Plot.ParticleSystem.forEachTrail(particleSystem, (points, particle) => {
-                if (vertexShaderFn) {
-                    for (let i = 0; i < points.length; i++) {
-                        points[i] = vertexShaderFn(points[i], particle, i, points.length);
+                const count = points.length;
+                const fragments = [];
+                for (let i = 0; i < count; i++) {
+                    const f = fragmentPool.acquire();
+                    f.pos.copy(points[i]);
+                    // Standard registers for Line/Trail
+                    f.v0 = (count > 1) ? i / (count - 1) : 0;
+                    f.v1 = i;
+                    if (vertexShaderFn) {
+                        vertexShaderFn(f);
                     }
+                    fragments.push(f);
                 }
-                Plot.rasterize(pipeline, points, (v, t) => fragmentShaderFn(v, t, particle), false, 0);
+
+                Plot.rasterize(pipeline, fragments, (v, t) => fragmentShaderFn(v, t, particle), false, 0);
             });
         }
     },

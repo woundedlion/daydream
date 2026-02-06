@@ -93,10 +93,10 @@ export class MobiusGrid {
                 return res;
             };
 
-            const vertexShaderFn = (p) => {
-                const finalP = mobiusTransform(p, mobiusParams, vectorPool.acquire());
+            const vertexShaderFn = (frag) => {
+                const finalP = mobiusTransform(frag.pos, mobiusParams, vectorPool.acquire());
                 if (rotationQ) finalP.applyQuaternion(rotationQ);
-                return finalP;
+                frag.pos.copy(finalP);
             };
 
             Plot.SphericalPolygon.draw(pipeline, basis, radius, Daydream.W / 4, fragmentShader, 0, 0, vertexShaderFn);
@@ -133,10 +133,10 @@ export class MobiusGrid {
                 return res;
             };
 
-            const vertexShader = (p) => {
-                const finalP = mobiusTransform(p, mobiusParams, vectorPool.acquire());
+            const vertexShader = (frag) => {
+                const finalP = mobiusTransform(frag.pos, mobiusParams, vectorPool.acquire());
                 if (rotationQ) finalP.applyQuaternion(rotationQ);
-                return finalP;
+                frag.pos.copy(finalP);
             };
 
             Plot.SphericalPolygon.draw(pipeline, basis, radius, Daydream.W / 4, fragmentShader, 0, 0, vertexShader);
