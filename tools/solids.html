@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<!--
+ Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ Licensed under the Polyform Noncommercial License 1.0.0
+-->
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solids Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+                "dat-gui": "https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.module.js",
+                "gui": "../gui.js",
+                "solids": "../solids.js",
+                "geometry": "../geometry.js"
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-700: #334155;
+            --blue-500: #3b82f6;
+            --indigo-400: #818cf8;
+            --sidebar-width: 320px;
+            --footer-height: 38vh;
+            --right-sidebar-width: 250px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--slate-900);
+            color: #E2E8F0;
+            overflow: hidden;
+            margin: 0;
+            display: flex;
+        }
+
+        #sidebar {
+            width: var(--sidebar-width);
+            flex-shrink: 0;
+            height: 100vh;
+            background-color: rgba(15, 23, 42, 0.95);
+            border-right: 1px solid var(--slate-700);
+            display: flex;
+            flex-direction: column;
+            z-index: 20;
+            overflow-y: auto;
+        }
+
+        #main {
+            flex: 1;
+            min-width: 0;
+            position: relative;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            background: linear-gradient(to bottom, #0f172a, #1e293b);
+            min-height: 0;
+            /* Allow shrinking */
+            overflow: hidden;
+        }
+
+        #footer {
+            height: var(--footer-height);
+            background-color: rgba(15, 23, 42, 0.95);
+            border-top: 1px solid var(--slate-700);
+            display: grid;
+            grid-template-rows: repeat(2, 1fr);
+            grid-auto-flow: column;
+            align-items: center;
+            overflow-x: auto;
+            padding: 1.5vh;
+            gap: 1.5vh;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+        }
+
+        /* Scrollbar styling for footer */
+        #footer::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        #footer::-webkit-scrollbar-track {
+            background: var(--slate-900);
+        }
+
+        #footer::-webkit-scrollbar-thumb {
+            background: var(--slate-700);
+            border-radius: 4px;
+        }
+
+        #footer::-webkit-scrollbar-thumb:hover {
+            background: var(--slate-600);
+        }
+
+        .thumb-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 14vh;
+            height: 100%;
+            background-color: var(--slate-800);
+            border: 2px solid var(--slate-700);
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 0.5vh;
+            position: relative;
+        }
+
+        .thumb-btn:hover {
+            border-color: var(--blue-500);
+            background-color: var(--slate-700);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+
+        .thumb-btn.active {
+            border-color: var(--blue-500);
+            background-color: rgba(59, 130, 246, 0.15);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+        }
+
+        .thumb-btn img {
+            width: 10vh;
+            height: 10vh;
+            object-fit: contain;
+            margin-bottom: 0.5vh;
+            filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+        }
+
+        .thumb-btn span {
+            font-size: 1.25vh;
+            text-align: center;
+            line-height: 1.1;
+            color: #cbd5e1;
+        }
+
+        #code-panel {
+            position: absolute;
+            bottom: var(--footer-height);
+            /* Sit above footer */
+            left: 0;
+            right: 0;
+            height: 200px;
+            background-color: var(--slate-800);
+            border-top: 1px solid var(--slate-700);
+            padding: 1rem;
+            transform: translateY(150%);
+            /* Hide fully */
+            transition: transform 0.3s ease;
+            z-index: 30;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        #code-panel.open {
+            transform: translateY(0);
+        }
+
+        textarea {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: var(--slate-900);
+            color: #a5b4fc;
+            border: 1px solid var(--slate-700);
+            resize: none;
+            font-size: 0.8rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            font-weight: 500;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background-color: var(--blue-500);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+
+        .btn-secondary {
+            background-color: var(--slate-700);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--slate-600);
+        }
+
+        .op-item {
+            background-color: var(--slate-800);
+            border: 1px solid var(--slate-700);
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.25rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #saveBtn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 3rem;
+            height: 3rem;
+            border-radius: 50%;
+            background-color: rgba(15, 23, 42, 0.8);
+            border: 2px solid var(--slate-700);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            z-index: 40;
+            backdrop-filter: blur(5px);
+        }
+
+        #saveBtn:hover {
+            border-color: var(--blue-500);
+            transform: scale(1.1);
+        }
+
+        #saveBtn svg {
+            width: 1.5rem;
+            height: 1.5rem;
+            stroke: #fbbf24;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        #right-sidebar {
+            width: var(--right-sidebar-width);
+            flex-shrink: 0;
+            height: 100vh;
+            background-color: rgba(15, 23, 42, 0.95);
+            border-left: 1px solid var(--slate-700);
+            display: flex;
+            flex-direction: column;
+            z-index: 20;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .saved-item {
+            background-color: var(--slate-800);
+            border: 1px solid var(--slate-700);
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .saved-item:hover {
+            border-color: var(--blue-500);
+            transform: translateY(-2px);
+        }
+
+        .saved-item img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 0.25rem;
+            margin-bottom: 0.5rem;
+            background-color: #000;
+        }
+
+        .saved-item .title {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #cbd5e1;
+            margin-bottom: 0.1rem;
+        }
+
+        .saved-item .details {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            margin-bottom: 0.5rem;
+        }
+
+        .saved-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.4rem;
+            margin-top: 0.4rem;
+        }
+
+        .action-btn {
+            font-size: 0.65rem;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.2rem;
+            background-color: var(--slate-700);
+            color: #cbd5e1;
+            border: 1px solid var(--slate-600);
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+
+        .action-btn:hover {
+            background-color: var(--blue-500);
+            color: white;
+            border-color: var(--blue-400);
+        }
+
+        .del-btn:hover {
+            background-color: #ef4444;
+            border-color: #f87171;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="sidebar" class="p-4 space-y-6">
+        <div>
+            <h1 class="text-xl font-bold text-white mb-1">Solids Generator</h1>
+            <p class="text-xs text-indigo-300">Conway Mesh Operators</p>
+        </div>
+
+        <!-- Operations Queue -->
+        <div class="space-y-2 flex-1 overflow-hidden flex flex-col">
+            <label class="text-xs uppercase font-semibold text-slate-400">Operations</label>
+            <div id="opsList" class="flex-1 overflow-y-auto space-y-2 pr-2">
+                <!-- Operations go here -->
+            </div>
+
+            <label class="text-xs uppercase font-semibold text-slate-400 mt-4">Add Operation</label>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+                <button onclick="addOp('kis')" class="btn btn-secondary text-xs">Kis</button>
+                <button onclick="addOp('ambo')" class="btn btn-secondary text-xs">Ambo</button>
+                <button onclick="addOp('gyro')" class="btn btn-secondary text-xs">Gyro</button>
+                <button onclick="addOp('snub')" class="btn btn-secondary text-xs">Snub</button>
+                <button onclick="addOp('dual')" class="btn btn-secondary text-xs">Dual</button>
+            </div>
+            <button onclick="resetOps()"
+                class="btn btn-secondary w-full text-xs mt-2 text-red-300 hover:text-red-200">Reset Operations</button>
+        </div>
+
+        <!-- Visualization Options -->
+        <div class="space-y-2 border-t border-slate-700 pt-4">
+            <label class="text-xs uppercase font-semibold text-slate-400">Visualization</label>
+            <div class="flex items-center justify-between">
+                <span class="text-sm">Geodesic Edges</span>
+                <button id="toggleGeo"
+                    class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
+                    <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform"></div>
+                </button>
+            </div>
+            <div class="flex items-center justify-between mt-2">
+                <span class="text-sm">Show Vertices</span>
+                <button id="toggleVerts"
+                    class="w-10 h-5 rounded-full bg-blue-500 relative transition-colors focus:outline-none">
+                    <div
+                        class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transform translate-x-5 transition-transform">
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Export Removed -->
+        <div class="pt-2 text-xs text-slate-500 italic text-center">
+            Configure solid then click star to save
+        </div>
+    </div>
+
+    <div id="main">
+        <div id="canvas-container">
+            <button id="saveBtn" title="Save to Collection">
+                <!-- Star Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <polygon
+                        points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+                    </polygon>
+                </svg>
+            </button>
+            <canvas id="canvas" class="w-full h-full block"></canvas>
+        </div>
+
+        <div id="footer">
+            <!-- Dynamic Thumbnails -->
+        </div>
+    </div>
+
+    <div id="right-sidebar">
+        <h2 class="text-lg font-bold text-white mb-4">Saved Solids</h2>
+        <div id="savedList" class="flex-1 overflow-y-auto">
+            <!-- Saved items go here -->
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { Solids } from 'solids';
+        import { MeshOps } from 'geometry';
+
+        // --- STATE ---
+        const state = {
+            base: 'icosahedron',
+            ops: [], // Array of strings like 'kis', 'ambo'
+            showGeodesics: true,
+            showVertices: false
+        };
+
+        let scene, camera, renderer, controls;
+        let mainMesh, edgeLines, vertPoints;
+
+        // --- MAIN ---
+
+        function init() {
+            // Initialize Three.js
+            const canvas = document.getElementById('canvas');
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0f172a); // slate-900
+
+            // New Camera Position: Closer to fill viewport
+            // Unit sphere radius = 1.0. At z=2.0, FOV=45 deg covers approx height = 2 * tan(22.5) * 2 = 1.65.
+            // Sphere diam = 2.0. So 2.0 is slightly cropped? No, tan(22.5) ~ 0.41. 
+            // Visible height at z=2 is 2*2*0.41 = 1.65. Sphere is 2.0. So it crops.
+            // Let's try z=2.8. 2.8 * 0.82 = 2.3. Fits.
+            // Previous was (2,2,4) -> dist 4.9.
+            // Setting position to (0,0,2.8) looks straight on.
+            // Setting position to (1.5, 1.5, 1.5) -> dist ~2.6.
+
+            camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+            camera.position.set(2, 1.5, 2); // Nice angle, closer
+
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.autoRotate = true; // Slowly rotate for effect?
+            controls.autoRotateSpeed = 2.0;
+
+            // Lights
+            const ambLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+            dirLight.position.set(5, 10, 7);
+            scene.add(dirLight);
+
+            // Secondary Light for drama
+            const rimLight = new THREE.SpotLight(0x3b82f6, 5);
+            rimLight.position.set(-5, 0, -5);
+            scene.add(rimLight);
+
+            // Events
+            window.addEventListener('resize', onResize);
+
+            // Toggles
+            document.getElementById('toggleGeo').parentElement.addEventListener('click', () => {
+                state.showGeodesics = !state.showGeodesics;
+                updateToggles();
+                update();
+            });
+            document.getElementById('toggleVerts').parentElement.addEventListener('click', () => {
+                state.showVertices = !state.showVertices;
+                updateToggles();
+                update();
+            });
+
+            document.getElementById('saveBtn').addEventListener('click', saveSolid);
+
+            // Generate Thumbnails
+            generateThumbnails();
+
+            updateToggles();
+            onResize();
+            update();
+            animate();
+        }
+
+        async function generateThumbnails() {
+            const footer = document.getElementById('footer');
+            const thumbKeys = Object.keys(Solids).filter(k => typeof Solids[k] === 'function' && k !== 'normalize');
+
+            // Create offscreen renderer
+            const width = 256; // High-res for larger thumbs
+            const height = 256;
+            const offRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            offRenderer.setSize(width, height);
+            offRenderer.setClearColor(0x000000, 0); // Transparent
+
+            const offScene = new THREE.Scene();
+            const offCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 10);
+            offCamera.position.set(1.5, 1.5, 1.5);
+            offCamera.lookAt(0, 0, 0);
+
+            const light = new THREE.DirectionalLight(0xffffff, 1.5);
+            light.position.set(2, 5, 3);
+            offScene.add(light);
+            offScene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+            // Material for thumbnails
+            const mat = new THREE.MeshPhongMaterial({
+                color: 0x3b82f6,
+                flatShading: true,
+                shininess: 30
+            });
+            const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
+
+            for (const key of thumbKeys) {
+                // Clear scene
+                while (offScene.children.length > 0) {
+                    const obj = offScene.children[0];
+                    if (obj.isLight) { // Keep lighting? adjust
+                        // Actually, better to remove meshes.
+                        if (obj.isMesh || obj.isLineSegments) offScene.remove(obj);
+                        else break; // light is at end? No.
+                    }
+                    if (obj.isLight) {
+                        // Keep light
+                        offScene.children.push(offScene.children.shift()); // Cycle
+                        if (offScene.children[0].isLight && offScene.children.length <= 2) break; // Assuming 2 lights
+                    } else {
+                        offScene.remove(obj);
+                    }
+                }
+
+                // Re-add lights if cleared (simpler to just clear all and re-add)
+                offScene.clear();
+                offScene.add(light);
+                offScene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+                const meshData = Solids[key]();
+                // Triangulate
+                const vertices = [];
+                meshData.faces.forEach(f => {
+                    for (let i = 1; i < f.length - 1; i++) {
+                        vertices.push(...meshData.vertices[f[0]].toArray());
+                        vertices.push(...meshData.vertices[f[i]].toArray());
+                        vertices.push(...meshData.vertices[f[i + 1]].toArray());
+                    }
+                });
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                geo.computeVertexNormals();
+
+                const mesh = new THREE.Mesh(geo, mat);
+                offScene.add(mesh);
+
+                // Edges (optional, but looks nice)
+                const edgeIndices = new Set();
+                meshData.faces.forEach(f => {
+                    for (let i = 0; i < f.length; i++) {
+                        const a = f[i];
+                        const b = f[(i + 1) % f.length];
+                        const k = a < b ? `${a}_${b}` : `${b}_${a}`;
+                        if (!edgeIndices.has(k)) edgeIndices.add(k);
+                    }
+                });
+                const linePoints = [];
+                edgeIndices.forEach(k => {
+                    const [ai, bi] = k.split('_').map(Number);
+                    linePoints.push(meshData.vertices[ai], meshData.vertices[bi]);
+                });
+                const lineGeo = new THREE.BufferGeometry().setFromPoints(linePoints);
+                const lines = new THREE.LineSegments(lineGeo, lineMat);
+                offScene.add(lines);
+
+                // Render
+                offRenderer.render(offScene, offCamera);
+
+                // Create Button
+                const btn = document.createElement('div');
+                btn.className = `thumb-btn ${state.base === key ? 'active' : ''}`;
+                btn.onclick = () => {
+                    state.base = key;
+                    update();
+                    // Update active state
+                    document.querySelectorAll('.thumb-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    // auto reset ops?
+                    // resetOps(); // Maybe nicer to keep ops applied?
+                };
+
+                const img = document.createElement('img');
+                img.src = offRenderer.domElement.toDataURL();
+
+                const span = document.createElement('span');
+                // Format Name: truncatedIcosahedron -> Truncated Icosahedron -> Truncated\nIcosahedron?
+                // Split camel case
+                const title = key.replace(/([A-Z])/g, ' $1').trim();
+                const parts = title.split(' ');
+                span.innerHTML = parts.join('<br>');
+
+                btn.appendChild(img);
+                btn.appendChild(span);
+                footer.appendChild(btn);
+            }
+
+            // Cleanup
+            offRenderer.dispose();
+        }
+
+        function updateToggles() {
+            const tG = document.getElementById('toggleGeo');
+            const tV = document.getElementById('toggleVerts');
+
+            tG.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showGeodesics ? 'bg-blue-500' : 'bg-slate-700'}`;
+            tG.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showGeodesics ? 'translate-x-5' : ''}`;
+
+            tV.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showVertices ? 'bg-blue-500' : 'bg-slate-700'}`;
+            tV.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showVertices ? 'translate-x-5' : ''}`;
+        }
+
+        function onResize() {
+            const sidebar = document.getElementById('sidebar');
+            const rightSidebar = document.getElementById('right-sidebar');
+            const container = document.getElementById('canvas-container');
+
+            // Explicitly calculate available width
+            const sidebarWidth = sidebar.getBoundingClientRect().width;
+            const rightWidth = rightSidebar.getBoundingClientRect().width;
+            const w = window.innerWidth - sidebarWidth - rightWidth;
+            const h = container.clientHeight;
+
+            renderer.setSize(w, h);
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+        }
+
+        // --- SAVED ITEMS ---
+        const savedSolids = [];
+
+        function saveSolid() {
+            // Capture thumbnail
+            renderer.render(scene, camera);
+            const dataURL = renderer.domElement.toDataURL('image/png');
+
+            const title = state.base.replace(/([A-Z])/g, ' $1').trim();
+            const opsSummary = state.ops.length > 0 ? state.ops.join(', ') : 'Base Solid';
+
+            const item = {
+                id: Date.now(),
+                base: state.base,
+                ops: [...state.ops],
+                geodesics: state.showGeodesics,
+                vertices: state.showVertices,
+                thumb: dataURL,
+                title: title,
+                desc: opsSummary
+            };
+
+            savedSolids.push(item);
+            renderSavedList();
+        }
+
+        function renderSavedList() {
+            const list = document.getElementById('savedList');
+            list.innerHTML = '';
+
+            savedSolids.forEach((item, index) => {
+                const el = document.createElement('div');
+                el.className = 'saved-item';
+                el.innerHTML = `
+                    <img src="${item.thumb}" alt="${item.title}" />
+                    <div class="title capitalize">${item.title}</div>
+                    <div class="details uppercase opacity-70">${item.desc}</div>
+                    <div class="saved-actions" onclick="event.stopPropagation()">
+                        <button class="action-btn" onclick="copyCode(${index}, 'js')">JS</button>
+                        <button class="action-btn" onclick="copyCode(${index}, 'cpp')">C++</button>
+                        <button class="action-btn del-btn" onclick="deleteSolid(${index})">&times;</button>
+                    </div>
+                `;
+                el.onclick = () => restoreSolid(item);
+                list.insertBefore(el, list.firstChild); // Newest first
+            });
+        }
+
+        window.deleteSolid = (index) => {
+            savedSolids.splice(index, 1);
+            renderSavedList();
+        };
+
+        window.copyCode = (index, lang) => {
+            const item = savedSolids[index];
+            // Reconstruct mesh to generate code
+            let mesh = Solids[item.base]();
+            mesh = MeshOps.clone(mesh);
+            item.ops.forEach(op => {
+                if (MeshOps[op]) mesh = MeshOps[op](mesh);
+            });
+
+            let code = '';
+            if (lang === 'cpp') {
+                code = generateCPlusPlus(mesh);
+            } else {
+                code = generateJavascript(mesh);
+            }
+
+            navigator.clipboard.writeText(code).then(() => {
+                console.log(`${lang.toUpperCase()} copied!`);
+                // Visual feedback?
+            });
+        };
+
+        function generateCPlusPlus(m) {
+            let s = '// Generated Solid (C++)\n';
+            s += `// V: ${m.vertices.length}, F: ${m.faces.length}\n\n`;
+            s += 'const std::vector<Vector3> vertices = {\n';
+            s += m.vertices.map((v, i) => `    Vector3(${v.x.toFixed(7)}, ${v.y.toFixed(7)}, ${v.z.toFixed(7)})${i < m.vertices.length - 1 ? ',' : ''}`).join('\n');
+            s += '\n};\n\n';
+            s += 'const std::vector<std::vector<int>> faces = {\n';
+            s += m.faces.map((f, i) => `    {${f.join(', ')}}${i < m.faces.length - 1 ? ',' : ''}`).join('\n');
+            s += '\n};\n';
+            return s;
+        }
+
+        function generateJavascript(m) {
+            let s = '// Generated Solid (JS)\n';
+            s += `// V: ${m.vertices.length}, F: ${m.faces.length}\n\n`;
+            s += 'const vertices = [\n';
+            s += m.vertices.map((v, i) => `    new THREE.Vector3(${v.x.toFixed(7)}, ${v.y.toFixed(7)}, ${v.z.toFixed(7)})${i < m.vertices.length - 1 ? ',' : ''}`).join('\n');
+            s += '\n];\n\n';
+            s += 'const faces = [\n';
+            s += m.faces.map((f, i) => `    [${f.join(', ')}]${i < m.faces.length - 1 ? ',' : ''}`).join('\n');
+            s += '\n];\n';
+            return s;
+        }
+
+        function restoreSolid(item) {
+            state.base = item.base;
+            state.ops = [...item.ops];
+            state.showGeodesics = item.geodesics;
+            state.showVertices = item.vertices;
+
+            // Update UI
+            updateToggles();
+            renderOps();
+
+            // Highlight active base in footer
+            document.querySelectorAll('.thumb-btn').forEach(b => {
+                if (b.classList.contains('active')) b.classList.remove('active');
+                if (b.innerText.toLowerCase().replace(/\s/g, '').includes(item.base.toLowerCase())) b.classList.add('active'); // Approximate match logic
+                // Better: Use data-key attribute or just re-match
+            });
+
+            // We need to re-find the active button more reliably. 
+            // In generateThumbnails, we didn't adding data-key. 
+            // Let's assume user just wants the visual. 
+            // Actually, let's fix the button highlighting logic later if needed or rely on base name match.
+            // Re-generation of thumbnails isn't needed, but highlighting is nice.
+            const btns = document.querySelectorAll('.thumb-btn');
+            for (let btn of btns) {
+                if (btn.onclick.toString().includes(item.base)) {
+                    btn.classList.add('active'); // Hard to match without ID.
+                }
+            }
+
+            update();
+        }
+
+        function renderOps() {
+            const list = document.getElementById('opsList');
+            list.innerHTML = '';
+            state.ops.forEach((op, i) => {
+                const el = document.createElement('div');
+                el.className = 'op-item text-sm text-indigo-300';
+                el.innerHTML = `
+                <span>${i + 1}. ${op.toUpperCase()}</span>
+                <button onclick="removeOp(${i})" class="text-slate-500 hover:text-white">&times;</button>
+            `;
+                list.appendChild(el);
+            });
+        }
+
+        window.removeOp = (index) => {
+            state.ops.splice(index, 1);
+            renderOps();
+            update();
+        };
+
+        function update() {
+            // 1. Generate Mesh
+            let mesh = Solids[state.base]();
+
+            // Deep copy to avoid mutating original registry
+            mesh = MeshOps.clone(mesh);
+
+            // Apply Ops
+            try {
+                // Keep the active button check in sync? 
+                // It's handled in click handler.
+
+                state.ops.forEach(op => {
+                    if (MeshOps[op]) {
+                        mesh = MeshOps[op](mesh);
+                    }
+                });
+            } catch (e) {
+                console.error(e);
+            }
+
+            // 2. Render
+            if (mainMesh) scene.remove(mainMesh);
+            if (edgeLines) scene.remove(edgeLines);
+            if (vertPoints) scene.remove(vertPoints);
+
+            // Faces (Translucent)
+            const geometry = new THREE.BufferGeometry();
+            const vertices = [];
+            // Triangulate faces for display
+            mesh.faces.forEach(f => {
+                // Fan triangulation
+                for (let i = 1; i < f.length - 1; i++) {
+                    vertices.push(...mesh.vertices[f[0]].toArray());
+                    vertices.push(...mesh.vertices[f[i]].toArray());
+                    vertices.push(...mesh.vertices[f[i + 1]].toArray());
+                }
+            });
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            geometry.computeVertexNormals();
+
+            const material = new THREE.MeshPhongMaterial({
+                color: 0x3b82f6,
+                transparent: true,
+                opacity: 0.9,
+                side: THREE.DoubleSide,
+                flatShading: true,
+                shininess: 50,
+                polygonOffset: true,
+                polygonOffsetFactor: 1, // Push back
+                polygonOffsetUnits: 1
+            });
+
+            mainMesh = new THREE.Mesh(geometry, material);
+            scene.add(mainMesh);
+
+            // Vertices
+            if (state.showVertices) {
+                const dotGeo = new THREE.BufferGeometry().setFromPoints(mesh.vertices);
+                const dotMat = new THREE.PointsMaterial({ color: 0xa5b4fc, size: 0.05 });
+                vertPoints = new THREE.Points(dotGeo, dotMat);
+                scene.add(vertPoints);
+            }
+
+            // Edges
+            const edgeIndices = new Set();
+            mesh.faces.forEach(f => {
+                for (let i = 0; i < f.length; i++) {
+                    const a = f[i];
+                    const b = f[(i + 1) % f.length];
+                    const key = a < b ? `${a}_${b}` : `${b}_${a}`;
+                    if (!edgeIndices.has(key)) {
+                        edgeIndices.add(key);
+                    }
+                }
+            });
+
+            const lineGeoPoints = [];
+            edgeIndices.forEach(key => {
+                const [ai, bi] = key.split('_').map(Number);
+                const va = mesh.vertices[ai];
+                const vb = mesh.vertices[bi];
+
+                if (state.showGeodesics) {
+                    // Slerp subdivision
+                    const steps = 12;
+                    for (let j = 0; j < steps; j++) {
+                        const t1 = j / steps;
+                        const t2 = (j + 1) / steps;
+                        const p1 = new THREE.Vector3().copy(va).lerp(vb, t1).normalize().multiplyScalar(1.002);
+                        const p2 = new THREE.Vector3().copy(va).lerp(vb, t2).normalize().multiplyScalar(1.002);
+                        lineGeoPoints.push(p1, p2);
+                    }
+                } else {
+                    lineGeoPoints.push(va, vb);
+                }
+            });
+
+            const lineGeo = new THREE.BufferGeometry().setFromPoints(lineGeoPoints);
+            const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
+            edgeLines = new THREE.LineSegments(lineGeo, lineMat);
+            scene.add(edgeLines);
+
+            // Store current mesh for generation
+            window.currentMesh = mesh;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+
+
+        window.onload = init;
+
+    </script>
+</body>
+
+</html>
