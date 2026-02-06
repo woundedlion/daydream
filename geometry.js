@@ -680,7 +680,9 @@ export const MeshOps = {
       } while (curr !== startOrbit && curr && safety < 100);
 
       if (faceIndices.length > 2) {
-        // Maintain CCW
+        // The traversal `curr = curr.pair.next` moves from an incoming half-edge to the next outgoing half-edge
+        // on the same vertex. In a standard CCW face mesh, this circulates Clockwise (CW) around the vertex.
+        // Therefore, we must reverse the indices to produce a Counter-Clockwise (CCW) face for the dual.
         newFaces.push(faceIndices.reverse());
       }
     }
@@ -987,7 +989,10 @@ export const MeshOps = {
       } while (currFaceIdx !== startFaceIdx && safety < 20);
 
       if (neighborMids.length >= 3) {
-        newFaces.push(neighborMids);
+        // Reversing is required because the traversal around the vertex follows the
+        // half-edge "next" pointers, which typically wind Clockwise around the vertex
+        // for a CCW mesh.
+        newFaces.push(neighborMids.reverse());
       }
     });
 
@@ -1081,30 +1086,16 @@ export const MeshOps = {
         return newVertsMap[fi][idx];
       });
 
-      // Snub creates triangular gaps if we just connect them?
-      // No, "Vertex Faces" in a Snub are usually triangles (if original was degree 3).
-      // They are k-gons for degree k.
-      newFaces.push(faceVerts.reverse()); // Reverse to maintain winding? 
-      // Original winding around vertex is CW if viewed from outside?
-      // Adjacent faces CCW: F1, F2, F3.
-      // v_new_1, v_new_2, v_new_3.
-      // If we connect 1-2-3, is it CCW?
-      // Geometric center is "out". 1,2,3 are CCW around it.
-      // So no reverse? Let's check visual.
+      // The traversal above follows the neighbor's "previous" edge, which effectively walks
+      // CCW around the vertex (if faces are viewed from outside).
+      // Thus, faceVerts is already CCW. No reverse needed.
+      newFaces.push(faceVerts);
     });
 
     // 4. Create "Edge Triangles"
     // For each edge (u, v) shared by Face A and Face B
-    // Vertices involved: A_u, A_v, B_u, B_v (where B_u is new vertex in B near u).
+    // Vertices involved: A_u, A_v, B_u, B_v
     // Faces A and B are adjacent.
-    // We already have A_u...A_v connected (Face A).
-    // We have B_v...B_u connected (Face B). (Order in B is v->u)
-    // We have u_B...u_A connected (Vertex u Face).
-    // We have v_A...v_B connected (Vertex v Face).
-    //
-    // So loop is u_A -> v_A -> v_B -> u_B -> u_A. (Quad).
-    // Split with diagonal. u_A -> v_B.
-    // Tris: [u_A, v_A, v_B] and [v_B, u_B, u_A].
 
     // To avoid duplicates, iterate edges via edgeMap/Keys
     const processedEdges = new Set();
@@ -1136,8 +1127,6 @@ export const MeshOps = {
         const B_u = newVertsMap[faceB][idxB_u];
         const B_v = newVertsMap[faceB][idxB_v];
 
-        // Quad: A_u -> A_v -> B_v -> B_u
-        // Diagonal A_u -> B_v ?
         // Tri 1: A_v, A_u, B_v
         newFaces.push([A_v, A_u, B_v]);
 

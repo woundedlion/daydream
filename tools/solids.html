@@ -450,6 +450,7 @@
         <!-- Visualization Options -->
         <div class="space-y-2 border-t border-slate-700 pt-4">
             <label class="text-xs uppercase font-semibold text-slate-400">Visualization</label>
+
             <div class="flex items-center justify-between">
                 <span class="text-sm">Geodesic Edges</span>
                 <button id="toggleGeo"
@@ -457,7 +458,8 @@
                     <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform"></div>
                 </button>
             </div>
-            <div class="flex items-center justify-between mt-2">
+
+            <div class="flex items-center justify-between">
                 <span class="text-sm">Show Faces</span>
                 <button id="toggleFaces"
                     class="w-10 h-5 rounded-full bg-blue-500 relative transition-colors focus:outline-none">
@@ -466,7 +468,8 @@
                     </div>
                 </button>
             </div>
-            <div class="flex items-center justify-between mt-2">
+
+            <div class="flex items-center justify-between">
                 <span class="text-sm">Show Vertices</span>
                 <button id="toggleVerts"
                     class="w-10 h-5 rounded-full bg-blue-500 relative transition-colors focus:outline-none">
@@ -475,16 +478,31 @@
                     </div>
                 </button>
             </div>
-        </div>
 
-        <!-- Export Removed -->
-        <div class="pt-2 text-xs text-slate-500 italic text-center">
-            Configure solid then click star to save
+            <div class="flex items-center justify-between">
+                <span class="text-sm">Show Normals</span>
+                <button id="toggleNormals"
+                    class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
+                    <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform">
+                    </div>
+                </button>
+            </div>
+
+            <div class="flex items-center justify-between">
+                <span class="text-sm">Show Indices</span>
+                <button id="toggleIndices"
+                    class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
+                    <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform">
+                    </div>
+                </button>
+            </div>
         </div>
     </div>
 
     <div id="main">
         <div id="canvas-container">
+            <!-- Index Labels Overlay -->
+            <div id="labels" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
             <div id="save-actions">
                 <div id="meshStats"></div>
                 <button id="saveBtn" title="Save to Collection">
@@ -528,7 +546,9 @@
             ops: [], // Array of objects { op: string, params: object }
             showGeodesics: true,
             showFaces: true,
-            showVertices: false
+            showVertices: false,
+            showNormals: false,
+            showIndices: false
         };
 
         const baseThumbnails = {};
@@ -542,11 +562,12 @@
             snub: { label: 'Snub', params: {} },
             dual: { label: 'Dual', params: {} },
             truncate: { label: 'Truncate', params: { t: { val: 0.25, min: 0.01, max: 0.5, step: 0.01 } } },
-            hankin: { label: 'Hankin', params: { angle: { val: 0.0, min: 0.0, max: 0.5, step: 0.01 } } }
+            hankin: { label: 'Hankin', params: { angle: { val: 0.0, min: 0.0, max: 180, step: 1 } } }
         };
 
         let scene, camera, renderer, controls;
-        let mainMesh, edgeLines, vertPoints;
+        let mainMesh, edgeLines, vertPoints, normalLines;
+        let labelsContainer; // DOM element for labels
 
         // --- MAIN ---
 
@@ -608,6 +629,18 @@
                 updateToggles();
                 update();
             });
+            document.getElementById('toggleNormals').parentElement.addEventListener('click', () => {
+                state.showNormals = !state.showNormals;
+                updateToggles();
+                update();
+            });
+            document.getElementById('toggleIndices').parentElement.addEventListener('click', () => {
+                state.showIndices = !state.showIndices;
+                updateToggles();
+                update();
+            });
+
+            labelsContainer = document.getElementById('labels');
 
             document.getElementById('saveBtn').addEventListener('click', saveSolid);
 
@@ -760,6 +793,14 @@
 
             tV.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showVertices ? 'bg-blue-500' : 'bg-slate-700'}`;
             tV.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showVertices ? 'translate-x-5' : ''}`;
+
+            const tN = document.getElementById('toggleNormals');
+            tN.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showNormals ? 'bg-blue-500' : 'bg-slate-700'}`;
+            tN.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showNormals ? 'translate-x-5' : ''}`;
+
+            const tI = document.getElementById('toggleIndices');
+            tI.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showIndices ? 'bg-blue-500' : 'bg-slate-700'}`;
+            tI.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showIndices ? 'translate-x-5' : ''}`;
         }
 
         function onResize() {
@@ -1065,7 +1106,7 @@
                                     onchange="updateOpParam(${i}, '${key}', this.value)"
                                     onmousedown="event.stopPropagation()"
                                 />
-                                <span class="text-[0.5rem] text-slate-600 ml-0.5">${key === 'angle' ? 'rev' : ''}</span>
+                                <span class="text-[0.5rem] text-slate-600 ml-0.5">${key === 'angle' ? 'deg' : ''}</span>
                             </div>
                          `;
                     });
@@ -1136,7 +1177,7 @@
                 Object.keys(def.params).forEach(k => {
                     let val = def.params[k].val;
                     if (opName === 'hankin' && k === 'angle') {
-                        val = computeInternalAngle(window.currentMesh) / (2 * Math.PI);
+                        val = computeInternalAngle(window.currentMesh) * (180 / Math.PI);
                     }
                     newOp.params[k] = val;
                 });
@@ -1171,7 +1212,7 @@
                     if (opName === 'truncate') {
                         mesh = MeshOps.truncate(mesh, o.params.t);
                     } else if (opName === 'hankin') {
-                        mesh = MeshOps.hankin(mesh, o.params.angle * 2 * Math.PI);
+                        mesh = MeshOps.hankin(mesh, o.params.angle * (Math.PI / 180));
                     } else if (MeshOps[opName]) {
                         mesh = MeshOps[opName](mesh);
                     }
@@ -1184,6 +1225,8 @@
             if (mainMesh) scene.remove(mainMesh);
             if (edgeLines) scene.remove(edgeLines);
             if (vertPoints) scene.remove(vertPoints);
+            if (normalLines) scene.remove(normalLines);
+            labelsContainer.innerHTML = ''; // Clear labels
 
             // Faces (Translucent)
             const geometry = new THREE.BufferGeometry();
@@ -1262,6 +1305,45 @@
             edgeLines = new THREE.LineSegments(lineGeo, lineMat);
             scene.add(edgeLines);
 
+            // Face Normals
+            if (state.showNormals) {
+                const normalPoints = [];
+                const colors = [];
+                mesh.faces.forEach(f => {
+                    const centroid = new THREE.Vector3();
+                    f.forEach(vi => centroid.add(mesh.vertices[vi]));
+                    centroid.divideScalar(f.length);
+                    // Compute normal via cross product of first two edges
+                    const v0 = mesh.vertices[f[0]];
+                    const v1 = mesh.vertices[f[1]];
+                    const v2 = mesh.vertices[f[f.length - 1]]; // Use last to be safe for winding
+                    const n = new THREE.Vector3().crossVectors(new THREE.Vector3().subVectors(v1, v0), new THREE.Vector3().subVectors(v2, v0)).normalize();
+                    const p2 = centroid.clone().add(n.multiplyScalar(0.15));
+                    normalPoints.push(centroid, p2);
+                    colors.push(0, 1, 0, 0, 1, 0); // Bright Green
+                });
+                const normGeo = new THREE.BufferGeometry().setFromPoints(normalPoints);
+                normGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                const normMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.8 });
+                normalLines = new THREE.LineSegments(normGeo, normMat);
+                scene.add(normalLines);
+            }
+
+            // Indices (prepare for animation loop)
+            // We'll update positions in animate() to track camera
+            // Just create elements here if static? No, creates too many if high poly.
+            // Let's just create them for the first N vertices to avoid lag?
+            // Or only if < 500 vertices.
+            if (state.showIndices && mesh.vertices.length < 1000) {
+                mesh.vertices.forEach((v, i) => {
+                    const el = document.createElement('div');
+                    el.textContent = i;
+                    el.className = 'absolute text-[0.75rem] font-mono text-white bg-black/50 px-1 rounded transform -translate-x-1/2 -translate-y-1/2 pointer-events-none';
+                    el.dataset.index = i; // Store index to retrieve pos
+                    labelsContainer.appendChild(el);
+                });
+            }
+
             // Update Live Stats
             mesh.edgeCount = edgeIndices.size;
             document.getElementById('meshStats').innerText = `${mesh.vertices.length}V / ${mesh.edgeCount}E / ${mesh.faces.length}F`;
@@ -1274,6 +1356,45 @@
             requestAnimationFrame(animate);
             controls.update();
             renderer.render(scene, camera);
+
+            // Update Labels
+            if (state.showIndices && window.currentMesh && labelsContainer.children.length > 0) {
+                const rect = renderer.domElement.getBoundingClientRect();
+                const tempV = new THREE.Vector3();
+                const camPos = camera.position;
+
+                Array.from(labelsContainer.children).forEach(el => {
+                    const i = parseInt(el.dataset.index);
+                    const v = window.currentMesh.vertices[i];
+                    if (v) {
+                        // Backface Culling for Labels
+                        // Assumption: Mesh is generally convex and centered at origin, so v approximates normal
+                        // View Vector = camPos - v
+                        // Dot(v, camPos - v) > 0 implies facing camera
+                        // Expanded: v.dot(camPos) - v.dot(v) > 0
+                        const dot = v.dot(camPos) - v.lengthSq();
+
+                        if (dot < 0) {
+                            el.style.display = 'none';
+                            return;
+                        }
+
+                        tempV.copy(v);
+                        tempV.project(camera);
+
+                        // Check if behind camera frustum (NDC z)
+                        if (tempV.z > 1) {
+                            el.style.display = 'none';
+                        } else {
+                            el.style.display = 'block';
+                            const x = (tempV.x * rect.width / 2) + rect.width / 2;
+                            const y = -(tempV.y * rect.height / 2) + rect.height / 2;
+                            el.style.left = `${x}px`;
+                            el.style.top = `${y}px`;
+                        }
+                    }
+                });
+            }
         }
 
 
