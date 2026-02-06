@@ -428,10 +428,12 @@ export class Daydream {
     this.scene.remove(this.dotMesh);
     this.dotGeometry.dispose();
 
+    const detail = (w * h > 10000) ? 6 : 32;
+
     this.dotGeometry = new THREE.SphereGeometry(
       Daydream.DOT_SIZE,
-      32,
-      32,
+      detail,
+      detail,
       0,
       Math.PI
     );
@@ -447,7 +449,10 @@ export class Daydream {
     this.scene.add(this.dotMesh);
 
     this.precomputeMatrices();
+    console.log(this.renderer.info.render.triangles);
+
   }
+
   static snapToGrid(v) {
     const pixel = vectorToPixel(v);
     const ix = Math.floor(pixel.x + 0.5);
