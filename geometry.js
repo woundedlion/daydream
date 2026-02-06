@@ -849,11 +849,315 @@ export const MeshOps = {
   },
 
   /**
+  /**
    * Returns the topological structure of a Hankin pattern.
    */
   hankin(mesh, angle) {
     const compiled = this.compileHankin(mesh);
     return this.updateHankin(compiled, angle);
+  },
+
+  // --- CONWAY OPERATORS ---
+
+  /**
+   * Deep clones a mesh.
+   * @param {Object} mesh - {vertices, faces}
+   * @returns {Object} new mesh
+   */
+  clone(mesh) {
+    return {
+      vertices: mesh.vertices.map(v => v.clone()),
+      faces: mesh.faces.map(f => [...f])
+    };
+  },
+
+  /**
+   * Normalizes all vertices in the mesh to the unit sphere.
+   * @param {Object} mesh - {vertices, faces}
+   */
+  normalize(mesh) {
+    mesh.vertices.forEach(v => v.normalize());
+  },
+
+  /**
+   * Kis operator: Raises a pyramid on each face.
+   * @param {Object} mesh - input mesh
+   * @returns {Object} new mesh
+   */
+  kis(mesh) {
+    const newVerts = [...mesh.vertices];
+    const newFaces = [];
+
+    mesh.faces.forEach(f => {
+      // Add centroid
+      const centroid = new THREE.Vector3();
+      f.forEach(vi => centroid.add(mesh.vertices[vi]));
+      centroid.divideScalar(f.length);
+      newVerts.push(centroid);
+      const centerIdx = newVerts.length - 1;
+
+      // Create triangles
+      for (let i = 0; i < f.length; i++) {
+        const vi = f[i];
+        const vj = f[(i + 1) % f.length];
+        newFaces.push([vi, vj, centerIdx]);
+      }
+    });
+
+    this.normalize({ vertices: newVerts, faces: newFaces });
+    return { vertices: newVerts, faces: newFaces };
+  },
+
+  /**
+   * Ambo operator: Truncates vertices to edge midpoints.
+   * @param {Object} mesh - input mesh
+   * @returns {Object} new mesh
+   */
+  ambo(mesh) {
+    const newVerts = [];
+    const newFaces = [];
+    const edgeMap = new Map();
+
+    // 1. Create vertices at edge midpoints
+    mesh.faces.forEach(f => {
+      for (let i = 0; i < f.length; i++) {
+        const vi = f[i];
+        const vj = f[(i + 1) % f.length];
+        const key = vi < vj ? `${vi}_${vj}` : `${vj}_${vi}`;
+        if (!edgeMap.has(key)) {
+          const v1 = mesh.vertices[vi];
+          const v2 = mesh.vertices[vj];
+          const mid = new THREE.Vector3().addVectors(v1, v2).multiplyScalar(0.5);
+          newVerts.push(mid);
+          edgeMap.set(key, newVerts.length - 1);
+        }
+      }
+    });
+
+    // 2. Create faces
+    // A. Shrink old faces
+    mesh.faces.forEach(f => {
+      const faceVerts = [];
+      for (let i = 0; i < f.length; i++) {
+        const vi = f[i];
+        const vj = f[(i + 1) % f.length];
+        const key = vi < vj ? `${vi}_${vj}` : `${vj}_${vi}`;
+        faceVerts.push(edgeMap.get(key));
+      }
+      newFaces.push(faceVerts);
+    });
+
+    // B. Create new faces at old vertices
+    const edgeToFaces = {};
+    mesh.faces.forEach((f, fi) => {
+      f.forEach((vi, i) => {
+        const vj = f[(i + 1) % f.length];
+        const key = [vi, vj].sort((a, b) => a - b).join('_');
+        if (!edgeToFaces[key]) edgeToFaces[key] = [];
+        edgeToFaces[key].push(fi);
+      });
+    });
+
+    mesh.vertices.forEach((v, vi) => {
+      const neighborMids = [];
+      // Walk around vi
+      const startFaceIdx = mesh.faces.findIndex(f => f.includes(vi));
+      if (startFaceIdx === -1) return;
+
+      let currFaceIdx = startFaceIdx;
+      let safety = 0;
+      do {
+        const face = mesh.faces[currFaceIdx];
+        const idxInFace = face.indexOf(vi);
+        const nextVi = face[(idxInFace + 1) % face.length]; // edge vi -> nextVi
+
+        // Get midpoint index for this edge
+        const key = vi < nextVi ? `${vi}_${nextVi}` : `${nextVi}_${vi}`;
+        neighborMids.push(edgeMap.get(key));
+
+        const prevFaceKey = [vi, nextVi].sort((a, b) => a - b).join('_');
+        const adjFaces = edgeToFaces[prevFaceKey];
+        if (!adjFaces) break;
+
+        const nextFaceIdx = adjFaces.find(id => id !== currFaceIdx);
+        if (nextFaceIdx === undefined) break;
+
+        currFaceIdx = nextFaceIdx;
+        safety++;
+      } while (currFaceIdx !== startFaceIdx && safety < 20);
+
+      if (neighborMids.length >= 3) {
+        newFaces.push(neighborMids);
+      }
+    });
+
+    this.normalize({ vertices: newVerts, faces: newFaces });
+    return { vertices: newVerts, faces: newFaces };
+  },
+
+  /**
+   * Snub operator: Creates a chiral semi-regular polyhedron.
+   * Expands faces, twists them, and inserts triangles.
+   * @param {Object} mesh 
+   * @returns {Object}
+   */
+  snub(mesh) {
+    const newVerts = [];
+    const newFaces = [];
+
+    // 1. Create new vertices (n per face)
+    // Structure: newVertsMap[faceIndex][vertIndexInFace] = globalIndex
+    const newVertsMap = new Array(mesh.faces.length).fill(null).map(() => []);
+    const SHRINK_FACTOR = 0.5; // Adjustable
+
+    mesh.faces.forEach((f, fi) => {
+      // Calculate face centroid
+      const centroid = new THREE.Vector3();
+      f.forEach(vi => centroid.add(mesh.vertices[vi]));
+      centroid.divideScalar(f.length);
+
+      f.forEach((vi, i) => {
+        // Create new vertex towards centroid
+        const v = mesh.vertices[vi];
+        const newV = new THREE.Vector3().copy(v).lerp(centroid, SHRINK_FACTOR);
+        newVerts.push(newV);
+        newVertsMap[fi][i] = newVerts.length - 1;
+      });
+    });
+
+    // 2. Create "Face Faces" (shrunk originals)
+    mesh.faces.forEach((f, fi) => {
+      const faceIndices = newVertsMap[fi];
+      newFaces.push([...faceIndices]); // Copy to ensure new array
+    });
+
+    // Helper: Build edge map to find adjacent faces
+    const edgeToFaces = {};
+    mesh.faces.forEach((f, fi) => {
+      f.forEach((vi, i) => {
+        const vj = f[(i + 1) % f.length];
+        const key = [vi, vj].sort((a, b) => a - b).join('_');
+        if (!edgeToFaces[key]) edgeToFaces[key] = [];
+        edgeToFaces[key].push(fi);
+      });
+    });
+
+    // 3. Create "Vertex Faces" (at original vertices)
+    // For each ORIGINAL vertex, find the cycle of faces around it.
+    // Connect the new vertices corresponding to this original vertex.
+    mesh.vertices.forEach((v, vi) => {
+      // Find ordered faces around vi
+
+      // Start with any face touching vi
+      const startFaceIdx = mesh.faces.findIndex(f => f.includes(vi));
+      if (startFaceIdx === -1) return;
+
+      const orderedFaces = [];
+      let currFaceIdx = startFaceIdx;
+      let safety = 0;
+
+      do {
+        orderedFaces.push(currFaceIdx);
+        // Find "previous" edge in this face entering vi
+        // Face: ... -> prev -> vi -> next -> ...
+        // We want the face sharing (prev, vi).
+        const face = mesh.faces[currFaceIdx];
+        const idxInFace = face.indexOf(vi);
+        const prevVi = face[(idxInFace - 1 + face.length) % face.length];
+
+        const key = [prevVi, vi].sort((a, b) => a - b).join('_');
+        const adjFaces = edgeToFaces[key];
+        const nextFaceIdx = adjFaces.find(id => id !== currFaceIdx);
+        if (nextFaceIdx === undefined) break;
+
+        currFaceIdx = nextFaceIdx;
+        safety++;
+      } while (currFaceIdx !== startFaceIdx && safety < 20);
+
+      // Collect the specific new vertices
+      const faceVerts = orderedFaces.map(fi => {
+        const face = mesh.faces[fi];
+        const idx = face.indexOf(vi);
+        return newVertsMap[fi][idx];
+      });
+
+      // Snub creates triangular gaps if we just connect them?
+      // No, "Vertex Faces" in a Snub are usually triangles (if original was degree 3).
+      // They are k-gons for degree k.
+      newFaces.push(faceVerts.reverse()); // Reverse to maintain winding? 
+      // Original winding around vertex is CW if viewed from outside?
+      // Adjacent faces CCW: F1, F2, F3.
+      // v_new_1, v_new_2, v_new_3.
+      // If we connect 1-2-3, is it CCW?
+      // Geometric center is "out". 1,2,3 are CCW around it.
+      // So no reverse? Let's check visual.
+    });
+
+    // 4. Create "Edge Triangles"
+    // For each edge (u, v) shared by Face A and Face B
+    // Vertices involved: A_u, A_v, B_u, B_v (where B_u is new vertex in B near u).
+    // Faces A and B are adjacent.
+    // We already have A_u...A_v connected (Face A).
+    // We have B_v...B_u connected (Face B). (Order in B is v->u)
+    // We have u_B...u_A connected (Vertex u Face).
+    // We have v_A...v_B connected (Vertex v Face).
+    //
+    // So loop is u_A -> v_A -> v_B -> u_B -> u_A. (Quad).
+    // Split with diagonal. u_A -> v_B.
+    // Tris: [u_A, v_A, v_B] and [v_B, u_B, u_A].
+
+    // To avoid duplicates, iterate edges via edgeMap/Keys
+    const processedEdges = new Set();
+    mesh.faces.forEach((f, fi) => {
+      f.forEach((vi, i) => {
+        const vj = f[(i + 1) % f.length]; // Edge vi -> vj
+        const key = vi < vj ? `${vi}_${vj}` : `${vj}_${vi}`;
+        if (processedEdges.has(key)) return;
+        processedEdges.add(key);
+
+        const adj = edgeToFaces[key];
+        if (!adj || adj.length < 2) return;
+
+        const faceA = fi;
+        const faceB = adj.find(id => id !== fi);
+
+        // Find indices
+        const idxA_u = mesh.faces[faceA].indexOf(vi);
+        const idxA_v = mesh.faces[faceA].indexOf(vj);
+
+        const u = vi;
+        const v = vj;
+
+        const idxB_u = mesh.faces[faceB].indexOf(u);
+        const idxB_v = mesh.faces[faceB].indexOf(v);
+
+        const A_u = newVertsMap[faceA][idxA_u];
+        const A_v = newVertsMap[faceA][idxA_v];
+        const B_u = newVertsMap[faceB][idxB_u];
+        const B_v = newVertsMap[faceB][idxB_v];
+
+        // Quad: A_u -> A_v -> B_v -> B_u
+        // Diagonal A_u -> B_v ?
+        // Tri 1: A_v, A_u, B_v
+        newFaces.push([A_v, A_u, B_v]);
+
+        // Tri 2: B_u, B_v, A_u
+        newFaces.push([B_u, B_v, A_u]);
+      });
+    });
+
+    this.normalize({ vertices: newVerts, faces: newFaces });
+    return { vertices: newVerts, faces: newFaces };
+  },
+
+  /**
+   * Gyro operator: dual(snub(mesh)).
+   * Creates pentagonal faces (for standard inputs).
+   * @param {Object} mesh 
+   * @returns {Object}
+   */
+  gyro(mesh) {
+    return this.dual(this.snub(mesh));
   }
 };
 
