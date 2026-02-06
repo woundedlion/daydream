@@ -29,8 +29,8 @@
             --slate-700: #334155;
             --blue-500: #3b82f6;
             --indigo-400: #818cf8;
-            --sidebar-width: 320px;
-            --footer-height: 38vh;
+            --sidebar-width: 224px;
+            --footer-height: calc((100vw - 474px) * 0.22);
             --right-sidebar-width: 250px;
         }
 
@@ -53,6 +53,7 @@
             flex-direction: column;
             z-index: 20;
             overflow-y: auto;
+            overflow-x: hidden;
         }
 
         #main {
@@ -82,8 +83,8 @@
             grid-auto-flow: column;
             align-items: center;
             overflow-x: auto;
-            padding: 1.5vh;
-            gap: 1.5vh;
+            padding: calc((100vw - 474px) * 0.008);
+            gap: calc((100vw - 474px) * 0.008);
             backdrop-filter: blur(10px);
             box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
             z-index: 10;
@@ -112,14 +113,14 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-width: 14vh;
+            min-width: calc((100vw - 474px) * 0.09);
             height: 100%;
             background-color: var(--slate-800);
             border: 2px solid var(--slate-700);
             border-radius: 0.75rem;
             cursor: pointer;
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            padding: 0.5vh;
+            padding: calc((100vw - 474px) * 0.005);
             position: relative;
         }
 
@@ -137,15 +138,15 @@
         }
 
         .thumb-btn img {
-            width: 10vh;
-            height: 10vh;
+            width: calc((100vw - 474px) * 0.06);
+            height: calc((100vw - 474px) * 0.06);
             object-fit: contain;
-            margin-bottom: 0.5vh;
+            margin-bottom: calc((100vw - 474px) * 0.004);
             filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
         }
 
         .thumb-btn span {
-            font-size: 1.25vh;
+            font-size: calc((100vw - 474px) * 0.008);
             text-align: center;
             line-height: 1.1;
             color: #cbd5e1;
@@ -184,7 +185,7 @@
         }
 
         .btn {
-            padding: 0.5rem 1rem;
+            padding: 0.4rem 0.6rem;
             border-radius: 0.25rem;
             font-weight: 500;
             font-size: 0.875rem;
@@ -213,12 +214,14 @@
         .op-item {
             background-color: var(--slate-800);
             border: 1px solid var(--slate-700);
-            padding: 0.5rem;
-            margin-bottom: 0.5rem;
+            padding: 0.4rem;
+            margin-bottom: 0.4rem;
             border-radius: 0.25rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         #saveBtn {
@@ -344,21 +347,26 @@
 
         <!-- Operations Queue -->
         <div class="space-y-2 flex-1 overflow-hidden flex flex-col">
-            <label class="text-xs uppercase font-semibold text-slate-400">Operations</label>
+            <div class="flex items-center justify-between">
+                <label class="text-xs uppercase font-semibold text-slate-400">Operations</label>
+                <button onclick="resetOps()"
+                    class="text-[0.65rem] text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear
+                    All</button>
+            </div>
             <div id="opsList" class="flex-1 overflow-y-auto space-y-2 pr-2">
                 <!-- Operations go here -->
             </div>
 
             <label class="text-xs uppercase font-semibold text-slate-400 mt-4">Add Operation</label>
             <div class="grid grid-cols-2 gap-2 pt-1">
-                <button onclick="addOp('kis')" class="btn btn-secondary text-xs">Kis</button>
-                <button onclick="addOp('ambo')" class="btn btn-secondary text-xs">Ambo</button>
-                <button onclick="addOp('gyro')" class="btn btn-secondary text-xs">Gyro</button>
-                <button onclick="addOp('snub')" class="btn btn-secondary text-xs">Snub</button>
-                <button onclick="addOp('dual')" class="btn btn-secondary text-xs">Dual</button>
+                <button onclick="addOp('kis')" class="btn btn-secondary text-[0.65rem]">Kis</button>
+                <button onclick="addOp('ambo')" class="btn btn-secondary text-[0.65rem]">Ambo</button>
+                <button onclick="addOp('gyro')" class="btn btn-secondary text-[0.65rem]">Gyro</button>
+                <button onclick="addOp('snub')" class="btn btn-secondary text-[0.65rem]">Snub</button>
+                <button onclick="addOp('dual')" class="btn btn-secondary text-[0.65rem]">Dual</button>
+                <button onclick="addOp('truncate')" class="btn btn-secondary text-[0.65rem]">Truncate</button>
+                <button onclick="addOp('hankin')" class="btn btn-secondary text-[0.65rem]">Hankin</button>
             </div>
-            <button onclick="resetOps()"
-                class="btn btn-secondary w-full text-xs mt-2 text-red-300 hover:text-red-200">Reset Operations</button>
         </div>
 
         <!-- Visualization Options -->
@@ -369,6 +377,15 @@
                 <button id="toggleGeo"
                     class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
                     <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform"></div>
+                </button>
+            </div>
+            <div class="flex items-center justify-between mt-2">
+                <span class="text-sm">Show Faces</span>
+                <button id="toggleFaces"
+                    class="w-10 h-5 rounded-full bg-blue-500 relative transition-colors focus:outline-none">
+                    <div
+                        class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transform translate-x-5 transition-transform">
+                    </div>
                 </button>
             </div>
             <div class="flex items-center justify-between mt-2">
@@ -408,7 +425,11 @@
     </div>
 
     <div id="right-sidebar">
-        <h2 class="text-lg font-bold text-white mb-4">Saved Solids</h2>
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-white">Saved Solids</h2>
+            <button onclick="clearSavedSolids()"
+                class="text-xs text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear All</button>
+        </div>
         <div id="savedList" class="flex-1 overflow-y-auto">
             <!-- Saved items go here -->
         </div>
@@ -423,9 +444,20 @@
         // --- STATE ---
         const state = {
             base: 'icosahedron',
-            ops: [], // Array of strings like 'kis', 'ambo'
+            ops: [], // Array of objects { op: string, params: object }
             showGeodesics: true,
+            showFaces: true,
             showVertices: false
+        };
+
+        const OP_DEFS = {
+            kis: { label: 'Kis', params: {} },
+            ambo: { label: 'Ambo', params: {} },
+            gyro: { label: 'Gyro', params: {} },
+            snub: { label: 'Snub', params: {} },
+            dual: { label: 'Dual', params: {} },
+            truncate: { label: 'Truncate', params: { t: { val: 0.25, min: 0.01, max: 0.5, step: 0.01 } } },
+            hankin: { label: 'Hankin', params: { angle: { val: 0.0, min: -1.5, max: 1.5, step: 0.01 } } }
         };
 
         let scene, camera, renderer, controls;
@@ -478,6 +510,11 @@
             // Toggles
             document.getElementById('toggleGeo').parentElement.addEventListener('click', () => {
                 state.showGeodesics = !state.showGeodesics;
+                updateToggles();
+                update();
+            });
+            document.getElementById('toggleFaces').parentElement.addEventListener('click', () => {
+                state.showFaces = !state.showFaces;
                 updateToggles();
                 update();
             });
@@ -623,10 +660,14 @@
 
         function updateToggles() {
             const tG = document.getElementById('toggleGeo');
+            const tF = document.getElementById('toggleFaces');
             const tV = document.getElementById('toggleVerts');
 
             tG.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showGeodesics ? 'bg-blue-500' : 'bg-slate-700'}`;
             tG.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showGeodesics ? 'translate-x-5' : ''}`;
+
+            tF.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showFaces ? 'bg-blue-500' : 'bg-slate-700'}`;
+            tF.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showFaces ? 'translate-x-5' : ''}`;
 
             tV.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showVertices ? 'bg-blue-500' : 'bg-slate-700'}`;
             tV.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showVertices ? 'translate-x-5' : ''}`;
@@ -646,6 +687,7 @@
             renderer.setSize(w, h);
             camera.aspect = w / h;
             camera.updateProjectionMatrix();
+            camera.updateProjectionMatrix();
         }
 
         // --- SAVED ITEMS ---
@@ -657,13 +699,19 @@
             const dataURL = renderer.domElement.toDataURL('image/png');
 
             const title = state.base.replace(/([A-Z])/g, ' $1').trim();
-            const opsSummary = state.ops.length > 0 ? state.ops.join(', ') : 'Base Solid';
+            // Generate summary
+            const opsSummary = state.ops.map(o => {
+                if (o.op === 'truncate') return `Tr(${o.params.t})`;
+                if (o.op === 'hankin') return `Hk(${o.params.angle})`;
+                return o.op.charAt(0).toUpperCase() + o.op.slice(1);
+            }).join(', ') || 'Base Solid';
 
             const item = {
                 id: Date.now(),
                 base: state.base,
-                ops: [...state.ops],
+                ops: JSON.parse(JSON.stringify(state.ops)), // Deep copy
                 geodesics: state.showGeodesics,
+                faces: state.showFaces,
                 vertices: state.showVertices,
                 thumb: dataURL,
                 title: title,
@@ -706,8 +754,17 @@
             // Reconstruct mesh to generate code
             let mesh = Solids[item.base]();
             mesh = MeshOps.clone(mesh);
-            item.ops.forEach(op => {
-                if (MeshOps[op]) mesh = MeshOps[op](mesh);
+
+            // Re-run pipeline with params
+            item.ops.forEach(o => {
+                const opName = typeof o === 'string' ? o : o.op; // helper for legacy
+                if (opName === 'truncate') {
+                    mesh = MeshOps.truncate(mesh, o.params.t);
+                } else if (opName === 'hankin') {
+                    mesh = MeshOps.hankin(mesh, o.params.angle);
+                } else if (MeshOps[opName]) {
+                    mesh = MeshOps[opName](mesh);
+                }
             });
 
             let code = '';
@@ -749,8 +806,9 @@
 
         function restoreSolid(item) {
             state.base = item.base;
-            state.ops = [...item.ops];
+            state.ops = JSON.parse(JSON.stringify(item.ops));
             state.showGeodesics = item.geodesics;
+            state.showFaces = item.faces !== undefined ? item.faces : true;
             state.showVertices = item.vertices;
 
             // Update UI
@@ -760,21 +818,8 @@
             // Highlight active base in footer
             document.querySelectorAll('.thumb-btn').forEach(b => {
                 if (b.classList.contains('active')) b.classList.remove('active');
-                if (b.innerText.toLowerCase().replace(/\s/g, '').includes(item.base.toLowerCase())) b.classList.add('active'); // Approximate match logic
-                // Better: Use data-key attribute or just re-match
+                if (b.onclick.toString().includes(state.base)) b.classList.add('active');
             });
-
-            // We need to re-find the active button more reliably. 
-            // In generateThumbnails, we didn't adding data-key. 
-            // Let's assume user just wants the visual. 
-            // Actually, let's fix the button highlighting logic later if needed or rely on base name match.
-            // Re-generation of thumbnails isn't needed, but highlighting is nice.
-            const btns = document.querySelectorAll('.thumb-btn');
-            for (let btn of btns) {
-                if (btn.onclick.toString().includes(item.base)) {
-                    btn.classList.add('active'); // Hard to match without ID.
-                }
-            }
 
             update();
         }
@@ -782,21 +827,87 @@
         function renderOps() {
             const list = document.getElementById('opsList');
             list.innerHTML = '';
-            state.ops.forEach((op, i) => {
+
+            state.ops.forEach((o, i) => {
+                const opDef = OP_DEFS[o.op];
                 const el = document.createElement('div');
-                el.className = 'op-item text-sm text-indigo-300';
+                el.className = 'op-item flex-col items-stretch text-sm text-indigo-300';
+
+                let controlsHtml = '';
+                if (opDef.params && Object.keys(opDef.params).length > 0) {
+                    controlsHtml = '<div class="mt-2 space-y-2">';
+                    Object.keys(opDef.params).forEach(key => {
+                        const def = opDef.params[key];
+                        const val = o.params[key];
+                        controlsHtml += `
+                            <div class="flex items-center text-[0.6rem] space-x-1">
+                                <span class="w-12 text-slate-400 capitalize truncate">${key}</span>
+                                <input type="range" 
+                                    min="${def.min}" max="${def.max}" step="${def.step}" value="${val}"
+                                    class="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer min-w-0"
+                                    oninput="updateOpParam(${i}, '${key}', this.value)"
+                                />
+                                <span class="w-10 text-right font-mono text-slate-500">${Number(val).toFixed(2)}</span>
+                            </div>
+                         `;
+                    });
+                    controlsHtml += '</div>';
+                }
+
                 el.innerHTML = `
-                <span>${i + 1}. ${op.toUpperCase()}</span>
-                <button onclick="removeOp(${i})" class="text-slate-500 hover:text-white">&times;</button>
+                <div class="flex justify-between items-center w-full">
+                    <span>${i + 1}. ${o.op.toUpperCase()}</span>
+                    <button onclick="removeOp(${i})" class="text-slate-500 hover:text-white">&times;</button>
+                </div>
+                ${controlsHtml}
             `;
                 list.appendChild(el);
             });
         }
 
+        window.updateOpParam = (index, key, value) => {
+            state.ops[index].params[key] = parseFloat(value);
+            // Updating the number display manually is tricky without ID, let's just re-render ops or try to update text sibling
+            // To keep it smooth, ideally we don't re-render entire list.
+            // But re-rendering list is safe.
+            // Actually, for smoothness, just update logic first.
+            // Re-render ops list?
+            const item = document.getElementById('opsList').children[index];
+            if (item) {
+                const valSpan = item.querySelectorAll('.font-mono')[Object.keys(state.ops[index].params).indexOf(key)];
+                if (valSpan) valSpan.innerText = parseFloat(value).toFixed(2);
+            }
+            update();
+        };
+
         window.removeOp = (index) => {
             state.ops.splice(index, 1);
             renderOps();
             update();
+        };
+
+        window.addOp = (opName) => {
+            const def = OP_DEFS[opName];
+            const newOp = { op: opName, params: {} };
+            if (def && def.params) {
+                Object.keys(def.params).forEach(k => {
+                    newOp.params[k] = def.params[k].val;
+                });
+            }
+            state.ops.push(newOp);
+            renderOps();
+            update();
+        };
+
+        window.resetOps = () => {
+            state.ops = [];
+            renderOps();
+            update();
+        };
+
+        window.clearSavedSolids = () => {
+            savedSolids.length = 0;
+            renderSavedList();
         };
 
         function update() {
@@ -808,12 +919,14 @@
 
             // Apply Ops
             try {
-                // Keep the active button check in sync? 
-                // It's handled in click handler.
-
-                state.ops.forEach(op => {
-                    if (MeshOps[op]) {
-                        mesh = MeshOps[op](mesh);
+                state.ops.forEach(o => {
+                    const opName = typeof o === 'string' ? o : o.op;
+                    if (opName === 'truncate') {
+                        mesh = MeshOps.truncate(mesh, o.params.t);
+                    } else if (opName === 'hankin') {
+                        mesh = MeshOps.hankin(mesh, o.params.angle);
+                    } else if (MeshOps[opName]) {
+                        mesh = MeshOps[opName](mesh);
                     }
                 });
             } catch (e) {
@@ -853,7 +966,7 @@
             });
 
             mainMesh = new THREE.Mesh(geometry, material);
-            scene.add(mainMesh);
+            if (state.showFaces) scene.add(mainMesh);
 
             // Vertices
             if (state.showVertices) {
