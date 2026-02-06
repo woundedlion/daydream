@@ -64,12 +64,12 @@ const initialResolution = urlParams.get('resolution');
 // Default to Holosphere
 const resolutionPresets = {
   "Holosphere (20x96)": { h: 20, w: 96, size: 2 },
-  "Phantasm (144x288)": { h: 144, w: 288, size: 0.25 }
+  "Phantasm (144x288)": { h: 144, w: 288, size: 0.25 },
 };
 
 const effectsByResolution = {
   "Holosphere (20x96)": LoResFavorites,
-  "Phantasm (144x288)": HiResFavorites
+  "Phantasm (144x288)": HiResFavorites,
 };
 
 const daydream = new Daydream();
@@ -85,13 +85,6 @@ const controls = {
     if (p) {
       // Update available effects based on resolution
       const availableEffects = effectsByResolution[this.resolution] || Object.keys(allEffects);
-
-      // Update GUI controller
-      // We must remove the old controller and add a new one to update options dynamically in dat.GUI
-      // Or we can modify the prototype if the library supports it, but standard dat.GUI requires this hack:
-      // However, we saved reference 'effectController' so we can try updating its dom options
-      // Actually simpler to just check validity and update options if possible or reconstruct.
-      // Standard dat.GUI doesn't support changing options easily. We will do a reconstruct in a moment.
 
       // Check if current effect is valid
       if (!availableEffects.includes(this.effect)) {
