@@ -143,35 +143,7 @@ export class Daydream {
     this.resources = [];
     this.labelPool = new LabelPool(this.scene);
 
-    // Optimized Geometry
-    this.dotGeometry = new THREE.SphereGeometry(
-      Daydream.DOT_SIZE,
-      32,
-      32,
-      0,
-      Math.PI
-    );
-
-    this.dotMaterial = new THREE.MeshBasicMaterial({
-      side: THREE.FrontSide,
-      blending: THREE.CustomBlending,
-      blendEquation: THREE.MaxEquation,
-      depthWrite: false
-    });
-
-    this.dotMaterial.onBeforeCompile = (shader) => {
-      shader.vertexShader = shader.vertexShader.replace(
-        '#include <begin_vertex>',
-        `
-          #include <begin_vertex>
-          #if defined(USE_INSTANCING_COLOR)
-             if (dot(instanceColor, instanceColor) < 0.0001) {
-                 transformed *= 0.0;
-             }
-          #endif
-          `
-      );
-    };
+    this.setupDots();
 
     this.axisMaterial = new THREE.LineBasicMaterial({
       color: 0xffffff,
@@ -200,16 +172,7 @@ export class Daydream {
     this.zAxis = new THREE.Line(zAxisGeometry, this.axisMaterial);
     this.zAxis.visible = false;
 
-    this.dotMesh = new THREE.InstancedMesh(
-      this.dotGeometry,
-      this.dotMaterial,
-      Daydream.W * Daydream.H
-    );
 
-    this.dotMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-    this.dotMesh.count = Daydream.W * Daydream.H;
-    this.dotMesh.frustumCulled = false;
-    this.scene.add(this.dotMesh);
     this.scene.add(this.xAxis);
     this.scene.add(this.yAxis);
     this.scene.add(this.zAxis);
@@ -378,6 +341,59 @@ export class Daydream {
     this.renderer.setScissorTest(false);
   }
 
+  setupDots() {
+    if (this.dotMesh) {
+      this.scene.remove(this.dotMesh);
+    }
+    if (this.dotGeometry) {
+      this.dotGeometry.dispose();
+    }
+
+    if (!this.dotMaterial) {
+      this.dotMaterial = new THREE.MeshBasicMaterial({
+        side: THREE.FrontSide,
+        blending: THREE.CustomBlending,
+        blendEquation: THREE.MaxEquation,
+        depthWrite: false
+      });
+
+      this.dotMaterial.onBeforeCompile = (shader) => {
+        shader.vertexShader = shader.vertexShader.replace(
+          '#include <begin_vertex>',
+          `
+          #include <begin_vertex>
+          #if defined(USE_INSTANCING_COLOR)
+             if (dot(instanceColor, instanceColor) < 0.0001) {
+                 transformed *= 0.0;
+             }
+          #endif
+          `
+        );
+      };
+    }
+
+    const detail = Math.floor(-0.0006 * Daydream.W * Daydream.H) + 32;
+
+    this.dotGeometry = new THREE.SphereGeometry(
+      Daydream.DOT_SIZE,
+      detail,
+      detail,
+      0,
+      Math.PI
+    );
+
+    this.dotMesh = new THREE.InstancedMesh(
+      this.dotGeometry,
+      this.dotMaterial,
+      Daydream.W * Daydream.H
+    );
+
+    this.dotMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+    this.dotMesh.count = Daydream.W * Daydream.H;
+    this.dotMesh.frustumCulled = false;
+    this.scene.add(this.dotMesh);
+  }
+
   precomputeMatrices() {
     Daydream.pixelPositions = new Array(Daydream.W * Daydream.H);
     this.pixelMatrices = new Array(Daydream.W * Daydream.H);
@@ -425,28 +441,7 @@ export class Daydream {
     Daydream.PIXEL_WIDTH = 2 * Math.PI / Daydream.W;
     Daydream.DOT_SIZE = dotSize;
 
-    this.scene.remove(this.dotMesh);
-    this.dotGeometry.dispose();
-
-    const detail = (w * h > 10000) ? 6 : 32;
-
-    this.dotGeometry = new THREE.SphereGeometry(
-      Daydream.DOT_SIZE,
-      detail,
-      detail,
-      0,
-      Math.PI
-    );
-
-    this.dotMesh = new THREE.InstancedMesh(
-      this.dotGeometry,
-      this.dotMaterial,
-      Daydream.W * Daydream.H
-    );
-    this.dotMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-    this.dotMesh.count = Daydream.W * Daydream.H;
-    this.dotMesh.frustumCulled = false;
-    this.scene.add(this.dotMesh);
+    this.setupDots();
 
     this.precomputeMatrices();
     console.log(this.renderer.info.render.triangles);

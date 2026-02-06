@@ -65,11 +65,13 @@ const initialResolution = urlParams.get('resolution');
 const resolutionPresets = {
   "Holosphere (20x96)": { h: 20, w: 96, size: 2 },
   "Phantasm (144x288)": { h: 144, w: 288, size: 0.25 },
+  "Pie-in-the-sky (288x576)": { h: 288, w: 576, size: 0.1 },
 };
 
 const effectsByResolution = {
   "Holosphere (20x96)": LoResFavorites,
   "Phantasm (144x288)": HiResFavorites,
+  "Pie-in-the-sky (288x576)": HiResFavorites,
 };
 
 const daydream = new Daydream();
