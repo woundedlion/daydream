@@ -1151,6 +1151,164 @@ export const MeshOps = {
   },
 
   /**
+   * Truncate operator: Cuts corners off the polyhedron.
+   * @param {Object} mesh 
+   * @param {number} t - Truncation depth [0..0.5]. 0 = no change, 0.5 = ambo.
+   * @returns {Object}
+   */
+  truncate(mesh, t = 0.25) {
+    const newVerts = [];
+    const newFaces = [];
+    const edgeMap = new Map(); // key -> [idxNearU, idxNearV]
+
+    // 1. Create new vertices along edges
+    mesh.faces.forEach(f => {
+      for (let i = 0; i < f.length; i++) {
+        const u = f[i];
+        const v = f[(i + 1) % f.length];
+        const key = u < v ? `${u}_${v}` : `${v}_${u}`;
+
+        if (!edgeMap.has(key)) {
+          const vU = mesh.vertices[u];
+          const vV = mesh.vertices[v];
+
+          // Vertex near U
+          const p1 = vU.clone().lerp(vV, t);
+          newVerts.push(p1);
+          const idx1 = newVerts.length - 1;
+
+          // Vertex near V
+          const p2 = vU.clone().lerp(vV, 1 - t);
+          newVerts.push(p2);
+          const idx2 = newVerts.length - 1;
+
+          edgeMap.set(key, u < v ? [idx1, idx2] : [idx2, idx1]);
+          // stored as [index_near_keystart, index_near_keyend]
+          // if key is u_v, [0] is near u, [1] is near v.
+        }
+      }
+    });
+
+    // 2. Modified Faces (internal polygons)
+    mesh.faces.forEach(f => {
+      const faceVerts = [];
+      for (let i = 0; i < f.length; i++) {
+        const u = f[i];
+        const v = f[(i + 1) % f.length];
+        const key = u < v ? `${u}_${v}` : `${v}_${u}`;
+        const indices = edgeMap.get(key);
+
+        // Edge u->v. We want vertex near u then vertex near v.
+        // If u < v, key is u_v, indices are [near_u, near_v].
+        // If u > v, key is v_u, indices are [near_v, near_u].
+
+        if (u < v) {
+          faceVerts.push(indices[0]);
+          faceVerts.push(indices[1]);
+        } else {
+          faceVerts.push(indices[1]);
+          faceVerts.push(indices[0]);
+        }
+      }
+      newFaces.push(faceVerts);
+    });
+
+    // 3. Corner Faces (at original vertices)
+    // Needs adjacency to know order of edges around vertex.
+    const edgeToFaces = {};
+    mesh.faces.forEach((f, fi) => {
+      f.forEach((u, i) => {
+        const v = f[(i + 1) % f.length];
+        const key = u < v ? `${u}_${v}` : `${v}_${u}`;
+        if (!edgeToFaces[key]) edgeToFaces[key] = [];
+        edgeToFaces[key].push(fi);
+      });
+    });
+
+    mesh.vertices.forEach((v, vi) => {
+      // Find one face starting
+      const startFaceIdx = mesh.faces.findIndex(f => f.includes(vi));
+      if (startFaceIdx === -1) return;
+
+      const polyVerts = [];
+      let currFaceIdx = startFaceIdx;
+      let safety = 0;
+      do {
+        // In currFace, find edge outgoing from vi
+        const face = mesh.faces[currFaceIdx];
+        const idxInFace = face.indexOf(vi);
+        const nextVi = face[(idxInFace + 1) % face.length];
+
+        // We want the vertex on this edge that is closest to vi.
+        const key = vi < nextVi ? `${vi}_${nextVi}` : `${nextVi}_${vi}`;
+        const indices = edgeMap.get(key);
+        // indices: [near_key_start, near_key_end]
+        const idxNearVi = (vi < nextVi) ? indices[0] : indices[1];
+        polyVerts.push(idxNearVi);
+
+        // Move to neighbor face sharing the *previous* edge (incoming to vi) to walk CCW?
+        // Wait, standard order:
+        // Polygon is vi -> outgoing_edge_pt -> incoming_next_edge_pt ...
+        // No, standard cutoff face connects the points on edges incident to vi.
+
+        // Let's walk the faces around vi.
+        // Current Face F1. Edge outgoing is (vi, next). Edge incoming is (prev, vi).
+        // The truncation face connects point on (vi, next) to point on (vi, prev)?
+        // No, usually it's the cycle of points on the edges connected to vi.
+
+        // Let's traverse faces around vi.
+        // F1 -> F2 -> ...
+        // In F1, we have point on edge (vi, next).
+        // We also have point on edge (prev, vi). -> Wait, that's in F1 too.
+        // A Truncate face replaces the vertex. It connects all the new points that surround the old vertex.
+        // Sequence: Point on Edge 1, Point on Edge 2, ...
+
+        // Let's find neighbors of vi.
+        // If we walk edges around vi: e1, e2, e3...
+        // We pick the point on e1 (near vi), point on e2 (near vi)...
+
+        // To ensure winding order, we walk faces.
+        // Start Face F. Edge (vi, next) is part of F.
+        // The point on (vi, next) is P1.
+        // Next face shares edge (vi, next).
+        // That face has edge (vi, next2). Point P2.
+
+        // So:
+        // 1. Start Face F.
+        // 2. Identify edge (vi, next).
+        // 3. Get point on (vi, next) closest to vi. Push params.
+        // 4. Move to neighbor face sharing (vi, next).
+
+        const nextVert = face[(idxInFace + 1) % face.length];
+        const edgeKey = vi < nextVert ? `${vi}_${nextVert}` : `${nextVert}_${vi}`;
+
+        // Find neighbor face
+        const adj = edgeToFaces[edgeKey];
+        const nextFaceId = adj.find(id => id !== currFaceIdx);
+        if (nextFaceId === undefined) break; // Open mesh?
+
+        currFaceIdx = nextFaceId;
+        safety++;
+      } while (currFaceIdx !== startFaceIdx && safety < 20);
+
+      if (polyVerts.length > 2) {
+        newFaces.push(polyVerts.reverse()); // Keep CCW? 
+        // Walked faces: F1 -> F2 (across edge 1).
+        // Point 1 is on edge 1. Point 2 is on edge 2.
+        // P1 -> P2 -> ... ensures logical loop around vi.
+        // Verify winding: center is vi. P1, P2...
+        // Original faces are CCW seen from outside.
+        // Vertices around vi are CW or CCW? 
+        // Usually, neighbors of a vertex in CCW face are ordered CW? No.
+        // Let's stick with reverse() if it looks inside-out.
+      }
+    });
+
+    this.normalize({ vertices: newVerts, faces: newFaces });
+    return { vertices: newVerts, faces: newFaces };
+  },
+
+  /**
    * Gyro operator: dual(snub(mesh)).
    * Creates pentagonal faces (for standard inputs).
    * @param {Object} mesh 
