@@ -96,7 +96,7 @@ export class Palette {
  * @param {THREE.Color} color - The source color.
  * @param {number} alpha - The alpha/opacity of the source (0.0 - 1.0).
  */
-export function blendAlpha(index, color, alpha) {
+export function blendAlpha(index, color, alpha, mode = 'over') {
   // 1. Calculate the memory address (stride)
   const stride = index * 3;
 
@@ -106,21 +106,33 @@ export function blendAlpha(index, color, alpha) {
   // Optimization: Skip invisible updates
   if (alpha <= 0.001) return;
 
-  // Optimization: Fast Path for Opaque pixels (Replace)
-  if (alpha >= 0.999) {
-    pixels[stride] = color.r;
-    pixels[stride + 1] = color.g;
-    pixels[stride + 2] = color.b;
-    return;
+  if (mode === 'add') {
+    // Additive: New light adds to existing light
+    pixels[stride] += color.r * alpha;
+    pixels[stride + 1] += color.g * alpha;
+    pixels[stride + 2] += color.b * alpha;
+  } else if (mode === 'max') {
+    // Max: Only keep the brightest value
+    pixels[stride] = Math.max(pixels[stride], color.r * alpha);
+    pixels[stride + 1] = Math.max(pixels[stride + 1], color.g * alpha);
+    pixels[stride + 2] = Math.max(pixels[stride + 2], color.b * alpha);
+  } else {
+    // Optimization: Fast Path for Opaque pixels (Replace)
+    if (alpha >= 0.999) {
+      pixels[stride] = color.r;
+      pixels[stride + 1] = color.g;
+      pixels[stride + 2] = color.b;
+      return;
+    }
+
+    // 3. Alpha Blending (Standard 'Over' operator)
+    // Formula: Out = Old * (1 - alpha) + New * alpha
+    const invAlpha = 1.0 - alpha;
+
+    pixels[stride] = pixels[stride] * invAlpha + color.r * alpha;
+    pixels[stride + 1] = pixels[stride + 1] * invAlpha + color.g * alpha;
+    pixels[stride + 2] = pixels[stride + 2] * invAlpha + color.b * alpha;
   }
-
-  // 3. Alpha Blending (Standard 'Over' operator)
-  // Formula: Out = Old * (1 - alpha) + New * alpha
-  const invAlpha = 1.0 - alpha;
-
-  pixels[stride] = pixels[stride] * invAlpha + color.r * alpha;
-  pixels[stride + 1] = pixels[stride + 1] * invAlpha + color.g * alpha;
-  pixels[stride + 2] = pixels[stride + 2] * invAlpha + color.b * alpha;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
