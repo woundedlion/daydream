@@ -132,7 +132,6 @@ export const Plot = {
                 f.pos.copy(u);
                 f.v0 = 0;
                 f.v1 = 0;
-                f.v2 = 0;
                 return [f];
             }
 
@@ -860,11 +859,24 @@ export const Plot = {
          * @returns {THREE.Vector3[]} Array of points
          */
         static sample(n, eps) {
-            const points = [];
-            for (let i = 0; i < n; ++i) {
-                points.push(fibSpiral(n, eps, i));
+            const fragments = [];
+            let cumulativeLen = 0;
+            let lastPos = null;
+
+            for (let i = 0; i < n; i++) {
+                const pos = fibSpiral(n, eps, i);
+                const frag = fragmentPool.acquire();
+                frag.pos.copy(pos);
+                frag.v0 = n > 1 ? i / (n - 1) : 0.0;
+
+                if (lastPos) {
+                    cumulativeLen += angleBetween(lastPos, frag.pos);
+                }
+                frag.v1 = cumulativeLen;
+                lastPos = frag.pos;
+                fragments.push(frag);
             }
-            return points;
+            return fragments;
         }
 
         /**
@@ -878,22 +890,15 @@ export const Plot = {
          * @param {Function} vertexShaderFn - Vertex displacement function
          */
         static draw(pipeline, n, eps, fragmentShaderFn, age = 0, vertexShaderFn = null) {
-            const points = Plot.Spiral.sample(n, eps);
-            for (const p of points) {
-                // Standardization: Wrap Vector3 in Fragment
-                const frag = fragmentPool.acquire();
-                frag.pos.copy(p);
-                // Default registers?
+            const frags = Plot.Spiral.sample(n, eps);
 
-                if (vertexShaderFn) vertexShaderFn(frag);
-
-                // ShaderFn now receives Fragment (standard)
-                const res = fragmentShaderFn(frag);
-                const color = res.isColor ? res : (res.color || res);
-                const alpha = res.alpha !== undefined ? res.alpha : 1.0;
-                const tag = res.tag;
-                pipeline.plot(frag.pos, color, age, alpha, tag);
+            if (vertexShaderFn) {
+                for (const f of frags) {
+                    vertexShaderFn(f);
+                }
             }
+
+            Plot.rasterize(pipeline, frags, fragmentShaderFn, false, age);
         }
     },
 
