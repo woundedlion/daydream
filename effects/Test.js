@@ -75,7 +75,8 @@ export class Test {
 
             Scan.DistortedRing.draw(this.filters, basis, radius, this.thickness,
                 shiftFn, amplitude,
-                (p, t, dist) => {
+                (p, frag) => {
+                    const t = frag.v0;
                     const c = this.ringPalette.get(t); // t is normalized azimuth (0..1)
                     return { color: c.color, alpha: c.alpha * opacity * this.alpha };
                 },

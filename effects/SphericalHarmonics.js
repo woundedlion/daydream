@@ -114,9 +114,10 @@ export class SphericalHarmonics {
 
         // 3. "Digital Twin" Fragment Shader
         // out.rawDist contains the signed harmonic value (-Infinity to +Infinity)
-        const fragmentShader = (pos, t, dist, faceIdx, out) => {
-            const val = out.rawDist; // The raw math value
+        const fragmentShader = (pos, frag) => {
+            const val = frag.rawDist; // The raw math value
             const absVal = Math.abs(val);
+            const t = frag.v0;
 
             // A. Dual-Tone Coloring
             // Use standard sunset for Positive Lobes, Synthesize "Ice" for Negative

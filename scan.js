@@ -12,7 +12,7 @@ import { wrap } from "./util.js";
 
 import { BVH } from "./spatial.js";
 
-const _scanScratch = { v0: 0, v1: 0, v2: 0, v3: 0 }; // Scratch object for zero-alloc
+const _scanScratch = { pos: new THREE.Vector3(), v0: 0, v1: 0, v2: 0, v3: 0, weights: null }; // Scratch object for zero-alloc
 
 export const SDF = {
     Ring: class {
@@ -629,11 +629,21 @@ export const SDF = {
             azimuth += this.phase;
 
             const sectorAngle = 2 * Math.PI / this.sides;
+            const sectorIdx = Math.floor(azimuth / sectorAngle);
             const localAzimuth = wrap(azimuth + sectorAngle / 2, sectorAngle) - sectorAngle / 2;
 
-            out.dist = polarAngle * Math.cos(localAzimuth) - this.apothem;
-            out.t = polarAngle / this.thickness; // Normalized distance for color lookup
-            out.rawDist = polarAngle;
+            // Distance to edge (apothem - projected radius)
+            const distToEdge = polarAngle * Math.cos(localAzimuth) - this.apothem;
+            out.dist = distToEdge;
+
+            // Progress along perimeter (0..1)
+            // Tangent distance = polarAngle * sin(localAzimuth)
+            const tangentHigh = this.thickness * Math.sin(Math.PI / this.sides); // Half edge length
+            const tangentDist = polarAngle * Math.sin(localAzimuth);
+            const tSegment = (tangentDist / tangentHigh) * 0.5 + 0.5; // 0..1 along edge? 
+            out.t = (azimuth / (2 * Math.PI));
+
+            out.rawDist = distToEdge;
             return out;
         }
     },
@@ -1397,14 +1407,23 @@ export const Scan = {
                         }
                     }
 
-                    const c = fragmentShaderFn(p, sampleResult.t, sampleResult.dist, sampleResult.faceIndex, sampleResult);
-                    const color = c.isColor ? c : (c.color || c);
-                    const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
-                    const tag = c.tag;
+                    if (sampleResult.dist < threshold) {
+                        _scanScratch.pos.copy(p);
+                        _scanScratch.v0 = sampleResult.t;
+                        _scanScratch.v1 = sampleResult.dist; // Signed Distance
+                        _scanScratch.v2 = (sampleResult.faceIndex !== undefined) ? sampleResult.faceIndex : 0;
+                        _scanScratch.v3 = 0.0;
+                        if (sampleResult.weights) _scanScratch.weights = sampleResult.weights;
+                        if (sampleResult.size) _scanScratch.size = sampleResult.size;
+                        if (sampleResult.rawDist !== undefined) _scanScratch.rawDist = sampleResult.rawDist;
 
-                    pipeline.plot2D(wx, y, color, 0, baseAlpha * aaAlpha, tag);
+                        const c = fragmentShaderFn(p, _scanScratch);
+                        const color = c.isColor ? c : (c.color || c);
+                        const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
+                        const tag = c.tag;
 
-
+                        pipeline.plot2D(wx, y, color, 0, baseAlpha * aaAlpha, tag);
+                    }
                 }
             }
         };
@@ -1496,9 +1515,7 @@ export const Scan = {
             const face = facePool.acquire();
             face.init(vertices, indices, 0);
 
-            const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
-            // NOTE: We rely on SDF.Face usage here. If SDF.Polygon was used before for *planar*,
-            // SphericalPolygon now correctly enforces geodesic face.
+            const renderColorFn = (p, frag) => fragmentShaderFn(p, frag);
             Scan.rasterize(pipeline, face, renderColorFn, debugBB);
         }
     },
@@ -1520,7 +1537,7 @@ export const Scan = {
 
             const thickness = radius * (Math.PI / 2);
             const shape = new SDF.PlanarPolygon({ v, u, w }, radius, thickness, sides, phase);
-            const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
+            const renderColorFn = (p, frag) => fragmentShaderFn(p, frag);
             Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
         }
     },
@@ -1540,7 +1557,7 @@ export const Scan = {
             const { v, u, w } = res.basis;
             radius = res.radius;
             const shape = new SDF.Star({ v, u, w }, radius, sides, phase);
-            const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
+            const renderColorFn = (p, frag) => fragmentShaderFn(p, frag);
             Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
         }
     },
@@ -1560,7 +1577,7 @@ export const Scan = {
             const { v, u, w } = res.basis;
             radius = res.radius;
             const shape = new SDF.Flower({ v, u, w }, radius, sides, phase);
-            const renderColorFn = (p, t, d) => fragmentShaderFn(p, 0, d);
+            const renderColorFn = (p, frag) => fragmentShaderFn(p, frag);
             Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
         }
     },
@@ -1633,7 +1650,7 @@ export const Scan = {
 
             Scan.Ring.draw(pipeline, { v: normal, u: c1, w: c2 }, 1.0, thickness, shaderFn, {
                 ...options,
-                clipPlanes: [c1, c2],
+                clipPlanes: [c1, c2], // Pass raw planes, SDF.Ring handles them
                 limits: { minPhi, maxPhi }
             });
         }
@@ -1653,7 +1670,7 @@ export const Scan = {
             // Optimization: Reuse vertexData buffer and closure to avoid GC
             const vertexData = [];
 
-            const renderColorFn = (p, t, dist, faceIdx, out) => {
+            const renderColorFn = (p, out) => {
                 const w = out.weights;
 
                 // Barycentric Mix
@@ -1662,23 +1679,38 @@ export const Scan = {
                     const d1 = vertexData[w.i1];
                     const d2 = vertexData[w.i2];
 
-                    _scanScratch.v0 = d0.v0 * w.a + d1.v0 * w.b + d2.v0 * w.c;
-                    _scanScratch.v1 = d0.v1 * w.a + d1.v1 * w.b + d2.v1 * w.c;
-                    _scanScratch.v2 = d0.v2 * w.a + d1.v2 * w.b + d2.v2 * w.c;
-                    _scanScratch.v3 = d0.v3 * w.a + d1.v3 * w.b + d2.v3 * w.c;
+                    // Interpolate v0 (Texture Coords) and v2 (Face Index)
+                    // Note: v2 is constant per face, so interpolation effectively passes it through.
+                    _scanScratch.v0 = (d0.v0 || 0) * w.a + (d1.v0 || 0) * w.b + (d2.v0 || 0) * w.c;
+                    _scanScratch.v1 = out.v1; // Signed Distance from SDF
+                    _scanScratch.v2 = d0.v2;    // Face Index (Constant)
+                    _scanScratch.v3 = 0.0;
 
-                    return fragmentShaderFn.color(_scanScratch, t, dist, out.size);
+                    if (out.size) _scanScratch.size = out.size;
+
+                    return fragmentShaderFn(p, _scanScratch);
                 }
-                return fragmentShaderFn.color(vertexData[0], t, dist, out.size);
+
+                // Fallback (Should not happen for Mesh)
+                _scanScratch.v0 = 0;
+                _scanScratch.v1 = out.v1;
+                _scanScratch.v2 = vertexData[0].v2;
+                return fragmentShaderFn(p, _scanScratch);
             };
+
+            const vertexScratch = { v0: 0, v1: 0, v2: 0, v3: 0 };
 
             for (let i = 0; i < mesh.faces.length; i++) {
                 const faceIndices = mesh.faces[i];
                 const shape = facePool.acquire();
                 shape.init(mesh.vertices, faceIndices, 0);
+
                 vertexData.length = 0;
+
+                // Pre-populate vertex data with Face Index
                 for (let k = 0; k < faceIndices.length; k++) {
-                    vertexData.push(fragmentShaderFn(mesh.vertices[faceIndices[k]], faceIndices[k], i));
+                    // We just need to store the Face Index for retrieval in renderColorFn
+                    vertexData.push({ v0: 0, v1: 0, v2: i, v3: 0 });
                 }
 
                 Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
