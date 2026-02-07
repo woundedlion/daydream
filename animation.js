@@ -1353,6 +1353,7 @@ export class ProceduralPath {
 
 /**
  * Draws a motion trail by tweening between orientations in the queue.
+ * t = 0 is the oldest frame, t = 1 is the newest frame.
  * @param {Orientation} orientation - The orientation object containing the motion history.
  * @param {Function} drawFn - Function to draw a segment (takes orientation quaternion and normalized progress).
  */
@@ -1366,28 +1367,17 @@ export const tween = (orientation, drawFn) => {
 
 /**
  * Performs a deep tween on an OrientationTrail, handling interpolation between frames.
+ * t = 0 is the oldest frame, t = 1 is the newest frame.
  * @param {OrientationTrail} trail - The trail of orientation histories.
  * @param {Function} drawFn - Function to draw a sample (takes quaternion and global time t).
  */
 export const deepTween = (trail, drawFn) => {
-  const dt = 1.0 / trail.capacity;
+  const dt = 1.0 / trail.length();
   tween(trail, (frame, t) => {
-    // Manually iterate frame in reverse (New->Old) to match trail order
-    const s = frame.length();
-    const end = (s > 1) ? 1 : 0;
-    for (let i = s - 1; i >= end; --i) {
-      // subT: i / s goes from ~1 (New) to ~0 (Old)
-      // globalT = t (FrameBase) + offset
-      // Since t is decreasing (New->Old), and we are going New->Old implies subtraction or just mapping
-      // Let's approximate globalT ~ t for now to ensure continuity
-      // Refined: t is roughly the center or start of the frame.
-      // Let's just use t + subT * dt logic but adapted? 
-      // Actually simpler: just pass t or interpolated t.
-      // But subT from original tween was (s-1-i)/s. 
-      // Here i is index.
-      const subT = (i) / s;
-      const globalT = t + subT * dt;
-      drawFn(frame.get(i), globalT);
-    }
+    const frameStartT = t;
+    tween(frame, (q, subT) => {
+      const globalT = frameStartT - (1.0 - subT) * dt;
+      drawFn(q, globalT);
+    });
   });
 }
