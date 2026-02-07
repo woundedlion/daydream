@@ -1072,13 +1072,13 @@ export class OrientationTrail {
   }
 
   /**
-   * Gets a historical orientation. 0 is newest, length-1 is oldest.
+   * Gets a historical orientation. 0 is oldest, length-1 is newest.
    * @param {number} i - Index [0..length-1].
    * @returns {Orientation} The orientation at that index.
    */
   get(i = 0) {
-    // 0 = Newest, count-1 = Oldest
-    const idx = (this.head - 1 - i + this.capacity) % this.capacity;
+    // 0 = Oldest, count-1 = Newest
+    const idx = (this.head - this.count + i + this.capacity) % this.capacity;
     return this.snapshots[idx];
   }
 
@@ -1354,6 +1354,7 @@ export class ProceduralPath {
 /**
  * Draws a motion trail by tweening between orientations in the queue.
  * t = 0 is the oldest frame, t = 1 is the newest frame.
+ * Calls back with quaternion or Orientation and frame progress
  * @param {Orientation} orientation - The orientation object containing the motion history.
  * @param {Function} drawFn - Function to draw a segment (takes orientation quaternion and normalized progress).
  */
@@ -1361,22 +1362,24 @@ export const tween = (orientation, drawFn) => {
   let s = orientation.length();
   let start = (s > 1) ? 1 : 0;
   for (let i = start; i < s; ++i) {
-    drawFn(orientation.get(i), (s - 1 - i) / s);
+    drawFn(orientation.get(s - 1 - i), s > 1 ? i / (s - 1) : 0);
   }
 }
 
 /**
  * Performs a deep tween on an OrientationTrail, handling interpolation between frames.
+ * Calls back with quaternion and global time t.
  * t = 0 is the oldest frame, t = 1 is the newest frame.
  * @param {OrientationTrail} trail - The trail of orientation histories.
  * @param {Function} drawFn - Function to draw a sample (takes quaternion and global time t).
  */
-export const deepTween = (trail, drawFn) => {
-  const dt = 1.0 / trail.length();
-  tween(trail, (frame, t) => {
-    const frameStartT = t;
+export const deepTween = (orientationTrail, drawFn) => {
+  const dt = 1.0 / orientationTrail.length();
+  tween(orientationTrail, (frame, frameT) => {
     tween(frame, (q, subT) => {
-      const globalT = frameStartT - (1.0 - subT) * dt;
+      let s = orientationTrail.length();
+      let framesOld = Math.floor(frameT * (s - 1));
+      const globalT = s > 0 ? (framesOld + subT) / s : 0;
       drawFn(q, globalT);
     });
   });

@@ -5,6 +5,7 @@
 
 import * as THREE from "three";
 import { G } from "./geometry.js";
+import { quinticKernel } from "./filters.js";
 import { randomBetween } from "./util.js"
 import { StaticPool, colorPool, color4Pool } from "./memory.js";
 import { Daydream } from "./driver.js";
@@ -539,36 +540,26 @@ export class VignettePalette {
  * Instead of darkening to black, it becomes transparent.
  */
 export class TransparentVignette {
-  /**
-   * @param {Object} palette - The original palette object with a .get(t) method.
-   */
   constructor(palette) {
     this.palette = palette;
   }
 
-  /**
-   * Gets the color with alpha fade applied.
-   * @param {number} t - The position parameter [0, 1].
-   * @returns {{color: THREE.Color, alpha: number}} The color and alpha from the underlying palette.
-   */
   get(t) {
-    // We get the child result first
-    let result;
+    const tClamped = Math.max(0, Math.min(1, t));
+    const result = this.palette.get(tClamped);
     let factor = 1.0;
-
-    if (t < 0.2) {
-      result = this.palette.get(0);
-      factor = t / 0.2;
-    } else if (t >= 0.8) {
-      result = this.palette.get(1);
-      factor = (1 - (t - 0.8) / 0.2); // Fade out
-    } else {
-      return this.palette.get((t - 0.2) / 0.6);
+    // Fade In (0.0 -> 0.2)
+    if (tClamped < 0.2) {
+      const t_edge = tClamped / 0.2;
+      factor = quinticKernel(t_edge);
+    }
+    // Fade Out (0.8 -> 1.0)
+    else if (tClamped > 0.8) {
+      const t_edge = (1.0 - tClamped) / 0.2;
+      factor = quinticKernel(t_edge);
     }
 
-    // Apply alpha fade
     result.alpha *= factor;
-
     return result;
   }
 }

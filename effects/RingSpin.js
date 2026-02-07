@@ -67,8 +67,8 @@ export class RingSpin {
         for (const ring of this.rings) {
             ring.trail.record(ring.orientation);
             deepTween(ring.trail, (q, t) => {
-                if (t > 1.0) return;
-                const c = ring.palette.get(t);
+                console.log(t);
+                const c = ring.palette.get(1 - t);
                 c.alpha = c.alpha * this.alpha;
                 const dot = dotPool.acquire();
                 dot.position.copy(ring.normal);
