@@ -1400,8 +1400,9 @@ export const Scan = {
                     const c = fragmentShaderFn(p, sampleResult.t, sampleResult.dist, sampleResult.faceIndex, sampleResult);
                     const color = c.isColor ? c : (c.color || c);
                     const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
+                    const tag = c.tag;
 
-                    pipeline.plot2D(wx, y, color, 0, baseAlpha * aaAlpha);
+                    pipeline.plot2D(wx, y, color, 0, baseAlpha * aaAlpha, tag);
 
 
                 }
