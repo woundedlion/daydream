@@ -637,10 +637,6 @@ export const SDF = {
             out.dist = distToEdge;
 
             // Progress along perimeter (0..1)
-            // Tangent distance = polarAngle * sin(localAzimuth)
-            const tangentHigh = this.thickness * Math.sin(Math.PI / this.sides); // Half edge length
-            const tangentDist = polarAngle * Math.sin(localAzimuth);
-            const tSegment = (tangentDist / tangentHigh) * 0.5 + 0.5; // 0..1 along edge? 
             out.t = (azimuth / (2 * Math.PI));
 
             out.rawDist = distToEdge;
@@ -748,7 +744,7 @@ export const SDF = {
             const distToEdge = px * this.nx + py * this.ny + this.planeD;
 
             out.dist = -distToEdge;
-            out.t = scanDist / this.thickness;
+            out.t = (azimuth / (2 * Math.PI));
             out.rawDist = scanDist;
             return out;
         }
@@ -839,7 +835,7 @@ export const SDF = {
             const distToEdge = polarAngle * Math.cos(localAzimuth) - this.apothem;
 
             out.dist = -distToEdge;
-            out.t = scanDist / this.thickness;
+            out.t = (azimuth / (2 * Math.PI));
             out.rawDist = scanDist;
             return out;
         }
@@ -1347,6 +1343,21 @@ export const SDF = {
 
 export const facePool = new StaticPool(SDF.Face, 10000);
 
+/**
+ * SCAN vs PLOT REGISTER CONVENTION
+ * --------------------------------
+ * There is a fundamental divergence in the meaning of v1 between Scan and Plot:
+ *
+ * SCAN (Volumetric/SDF):
+ * v0: Angular/Perimeter Progress (0..1) - Used for gradients, texture mapping around the shape.
+ * v1: Radial Distance (Signed Distance) - Used for glow, thickness, AA, and volumetric effects.
+ *
+ * PLOT (Vector/Stroke):
+ * v0: Linear Progress (0..1) - Used for gradients along the stroke.
+ * v1: Longitudinal Length (Arc Length) - Used for dashed lines, pattern repetition.
+ *
+ * This divergence is intentional. Shaders should be written with the specific renderer in mind.
+ */
 export const Scan = {
     /**
          * Rasterizes a shape using scanline conversion.
@@ -1372,7 +1383,6 @@ export const Scan = {
         const W = Daydream.W;
         const pixelPositions = Daydream.pixelPositions;
 
-        // INLINED LOOP LOGIC
         const runScanline = (xStart, xEnd, y) => {
             for (let x = xStart; x <= xEnd; x++) {
                 // 1. Calculate Index
@@ -1680,7 +1690,6 @@ export const Scan = {
                     const d2 = vertexData[w.i2];
 
                     // Interpolate v0 (Texture Coords) and v2 (Face Index)
-                    // Note: v2 is constant per face, so interpolation effectively passes it through.
                     _scanScratch.v0 = (d0.v0 || 0) * w.a + (d1.v0 || 0) * w.b + (d2.v0 || 0) * w.c;
                     _scanScratch.v1 = out.v1; // Signed Distance from SDF
                     _scanScratch.v2 = d0.v2;    // Face Index (Constant)
