@@ -105,7 +105,7 @@ export class PetalFlow {
                 if (i > 0) {
                     Plot.rasterize(this.filters, [prevPos, frag], (p, f) => {
                         const alpha = this.alpha * opacity;
-                        return color4Pool.acquire().set(color, alpha);
+                        f.color.set(color, alpha);
                     }, false);
                 } else {
                     this.filters.plot(pos, color, 0, this.alpha * opacity);

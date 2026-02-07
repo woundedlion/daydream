@@ -76,10 +76,10 @@ export class RingShower {
     drawRing(opacity, ring) {
         const basis = makeBasis(this.orientation.get(), ring.normal);
         Plot.Ring.draw(this.filters, basis, ring.radius,
-            (v, t) => {
+            (v, frag) => {
                 let z = this.orientation.orient(Daydream.X_AXIS);
                 const c = ring.palette.get(angleBetween(z, v) / Math.PI);
-                return { color: c.color, alpha: c.alpha * this.alpha * opacity };
+                frag.color.set(c.color, c.alpha * this.alpha * opacity);
             }
         );
     }

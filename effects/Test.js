@@ -78,7 +78,8 @@ export class Test {
                 (p, frag) => {
                     const t = frag.v0;
                     const c = this.ringPalette.get(t); // t is normalized azimuth (0..1)
-                    return { color: c.color, alpha: c.alpha * opacity * this.alpha };
+                    frag.color.copy(c.color);
+                    frag.color.alpha = c.alpha * opacity * this.alpha;
                 },
                 0, // phase
                 this.debugBB // debugBB

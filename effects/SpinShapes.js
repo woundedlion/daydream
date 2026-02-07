@@ -70,8 +70,8 @@ export class SpinShapes {
         const t = (shape.normal.y + 1) / 2;
         const c = Palettes.richSunset.get(t);
 
-        const colorFn = (p, t, dist) => {
-            return color4Pool.acquire().set(c.color, 0.6 * alpha);
+        const colorFn = (p, frag) => {
+            frag.color.set(c.color, 0.6 * alpha);
         }
 
         const basis = makeBasis(shape.orientation.get(), shape.normal);

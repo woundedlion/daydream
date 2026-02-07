@@ -7,12 +7,20 @@ import * as THREE from "three";
 import { Daydream } from "./driver.js";
 import { makeBasis, angleBetween, yToPhi, getAntipode } from "./geometry.js";
 import { vectorPool, StaticPool } from "./memory.js";
+import { Color4 } from "./color.js";
 import { quinticKernel } from "./filters.js";
 import { wrap } from "./util.js";
 
 import { BVH } from "./spatial.js";
 
-const _scanScratch = { pos: new THREE.Vector3(), v0: 0, v1: 0, v2: 0, v3: 0, weights: null }; // Scratch object for zero-alloc
+const _scanScratch = {
+    pos: new THREE.Vector3(),
+    v0: 0, v1: 0, v2: 0, v3: 0,
+    age: 0,
+    weights: null,
+    color: new Color4(0, 0, 0, 0),
+    blend: 0
+}; // Scratch object for zero-alloc
 
 export const SDF = {
     Ring: class {
@@ -1423,16 +1431,19 @@ export const Scan = {
                         _scanScratch.v1 = sampleResult.dist; // Signed Distance
                         _scanScratch.v2 = (sampleResult.faceIndex !== undefined) ? sampleResult.faceIndex : 0;
                         _scanScratch.v3 = 0.0;
+                        _scanScratch.age = 0; // Default age for Scan
+                        // Reset Outputs
+                        _scanScratch.blend = 0;
+                        _scanScratch.color.set(0, 0, 0, 0);
+
                         if (sampleResult.weights) _scanScratch.weights = sampleResult.weights;
                         if (sampleResult.size) _scanScratch.size = sampleResult.size;
                         if (sampleResult.rawDist !== undefined) _scanScratch.rawDist = sampleResult.rawDist;
 
-                        const c = fragmentShaderFn(p, _scanScratch);
-                        const color = c.isColor ? c : (c.color || c);
-                        const baseAlpha = (c.alpha !== undefined ? c.alpha : 1.0);
-                        const tag = c.tag;
+                        // Execute Shader (Void Return, modifies _scanScratch)
+                        fragmentShaderFn(p, _scanScratch);
 
-                        pipeline.plot2D(wx, y, color, 0, baseAlpha * aaAlpha, tag);
+                        pipeline.plot2D(wx, y, _scanScratch.color, _scanScratch.age, _scanScratch.color.alpha * aaAlpha, _scanScratch.blend);
                     }
                 }
             }

@@ -148,7 +148,8 @@ export class SphericalHarmonics {
                 base.color.addScalar(0.15 * (t - 0.9) * 10);
             }
 
-            return base;
+            frag.color.copy(base.color);
+            frag.color.alpha = base.alpha;
         };
 
         Scan.rasterize(this.pipeline, blob, fragmentShader);

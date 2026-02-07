@@ -165,18 +165,18 @@ export class Dynamo {
         for (let i = 0; i < this.nodes.length; ++i) {
             if (i == 0) {
                 let from = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
-                Plot.Point.draw(this.filters, from, (v) => {
+                Plot.Point.draw(this.filters, from, (v, frag) => {
                     const c = this.color(v, 0);
                     c.alpha = (c.alpha || 1) * 0.5;
-                    return c;
+                    frag.color.copy(c);
                 });
             } else {
                 let from = pixelToVector(this.nodes[i - 1].x, this.nodeY(this.nodes[i - 1]));
                 let to = pixelToVector(this.nodes[i].x, this.nodeY(this.nodes[i]));
-                Plot.Line.draw(this.filters, from, to, (v) => {
+                Plot.Line.draw(this.filters, from, to, (v, frag) => {
                     const c = this.color(v, 0);
                     c.alpha = (c.alpha || 1) * 0.5;
-                    return c;
+                    frag.color.copy(c);
                 });
             }
         }

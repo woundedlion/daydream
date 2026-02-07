@@ -197,10 +197,10 @@ export class IslamicStars {
 
             const intensity = Math.min(1, Math.max(0, (distFromEdge / size) * this.params.intensity));
             const c = palette.get(intensity).color;
-            return color4Pool.acquire().set(c, op);
+            frag.color.set(c, op);
         };
 
-        const colorWhite = (v) => color4Pool.acquire().set(1, 1, 1, op); //#003c3e
+        const colorWhite = (v, frag) => frag.color.set(1, 1, 1, op); //#003c3e
 
         if (this.params.scan) Scan.Mesh.draw(this.pipeline, drawnMesh, colorFaceShader, this.params.debugBB);
         if (this.params.plot) Plot.Mesh.draw(this.pipeline, drawnMesh, colorWhite);

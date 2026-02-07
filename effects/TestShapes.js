@@ -117,7 +117,7 @@ export class TestShapes {
             : this.scanPipeline;
 
         const fragmentShaderFn = (v, fragment) => {
-            return color4Pool.acquire().set(ring.color.color, ring.color.alpha * this.alpha * spriteAlpha);
+            fragment.color.set(ring.color.color, ring.color.alpha * this.alpha * spriteAlpha);
         }
 
         const basis = makeBasis(ring.orientation.get(), ring.normal);

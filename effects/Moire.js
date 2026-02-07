@@ -84,10 +84,24 @@ export class Moire {
             const r = t * 2.0;
             Plot.DistortedRing.draw(this.filters, basis, r,
                 sinWave(-this.amp, this.amp, 4, 0),
-                (v, t) => {
-                    const val = (t.v0 !== undefined) ? t.v0 : t;
-                    const c = palette.get(val);
-                    return color4Pool.acquire().set(c.color, c.alpha * this.alpha);
+                (v, frag) => {
+                    const val = (frag.v0 !== undefined) ? frag.v0 : frag; // Adapt to what DistortedRing puts in v0. Wait, distRing puts t in v0?
+                    // DistortedRing passes basis, r, thickness, shader, ...
+                    // Scan.Ring.draw calls shader(p, scratch)
+                    // scratch.v0 is set to sampleResult.t
+                    // varying.v0 IS t.
+                    // So frag.v0 is correct.
+                    // Old code: (v, t) => ... t.v0 ...
+                    // It seems old code expected 't' to be the fragment object?
+                    // Yes, scan.js passed _scanScratch as 2nd arg.
+                    // So old code was (v, frag) actually?
+                    // scan.js old: fragmentShaderFn(p, _scanScratch)
+                    // Moire.js old: (v, t) => { ... t.v0 ... }
+                    // So 't' WAS 'frag'.
+                    // New code: (v, frag) => ...
+
+                    const c = palette.get(frag.v0);
+                    frag.color.set(c.color, c.alpha * this.alpha);
                 },
                 this.rotation);
         }
