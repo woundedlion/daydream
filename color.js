@@ -4,13 +4,15 @@
  */
 
 import * as THREE from "three";
-import { G } from "./geometry.js";
+// Removed import G from geometry.js to break cycle
 import { quinticKernel } from "./filters.js";
 import { randomBetween } from "./util.js"
 import { StaticPool, colorPool, color4Pool } from "./memory.js";
 import { Daydream } from "./driver.js";
 
-
+// Inlined from geometry.js to break cycle
+const PHI = (1 + Math.sqrt(5)) / 2;
+const G = 1 / PHI;
 
 /** 
  * Color4 class wrapping THREE.Color and alpha.
@@ -47,7 +49,7 @@ export class Color4 {
 
   copy(c) {
     if (c.color) this.color.copy(c.color);
-    else this.color.setRGB(c.r, c.g, c.b); // Fallback if simple object
+    else this.color.setRGB(c.r, c.g, c.b);
 
     this.alpha = c.alpha !== undefined ? c.alpha : (c.a !== undefined ? c.a : 1.0);
     return this;
@@ -73,8 +75,8 @@ export class Color4 {
   }
 }
 
-// Inject Type
 color4Pool.Type = Color4;
+
 
 /**
  * A standard Palette interface.

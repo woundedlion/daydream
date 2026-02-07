@@ -27,8 +27,9 @@ export class StaticPool {
      * * @returns {Object} An instance of Type
      */
     acquire() {
+        // Late binding check
         if (!this.Type) {
-            console.error("StaticPool: Type is not defined!", this);
+            console.error("StaticPool: Type is not defined (Late Binding missed)!", this);
             return null;
         }
 
@@ -65,26 +66,11 @@ export const quaternionPool = new StaticPool(THREE.Quaternion, 4000000);
 /** @type {StaticPool} Global pool for temporary Color objects used in blending. */
 export const colorPool = new StaticPool(THREE.Color, 1000000);
 
-/** @type {StaticPool} Global pool for temporary Color4 objects. */
-export const color4Pool = new StaticPool(null, 250000);
-
 /** @type {StaticPool} Global pool for temporary Dot objects. */
 export const dotPool = new StaticPool(null, 10000);
 
-/** 
- * Data Packet for Shader Mode.
- * Ensures stable Hidden Class for V8 Optimization.
- */
-class Fragment {
-    constructor() {
-        this.pos = new THREE.Vector3(); // Pre-allocate vector
-        // Data Registers (Scalar slots for varying data)
-        this.v0 = 0;
-        this.v1 = 0;
-        this.v2 = 0;
-        this.v3 = 0;
-    }
-}
+/** @type {StaticPool} Global pool for temporary Color4 objects. */
+export const color4Pool = new StaticPool(null, 250000);
 
 /** @type {StaticPool} Global pool for Fragment objects (Pos + Data). */
-export const fragmentPool = new StaticPool(Fragment, 2000000);
+export const fragmentPool = new StaticPool(null, 2000000);

@@ -10,8 +10,8 @@ import { TWO_PI } from "./3dmath.js";
 import { vectorPool, quaternionPool, fragmentPool } from "./memory.js";
 import { deepTween } from "./animation.js";
 
-const _scratchFrag = new fragmentPool.Type();
 const _scratchVec = new THREE.Vector3();
+let _scratchFrag = null;
 
 // --- Interpolation Strategies (Factories) ---
 
@@ -102,11 +102,20 @@ export const Plot = {
          * @param {number} age - Age of operation
          */
         static draw(pipeline, v, fragmentShaderFn, age = 0) {
-            const res = fragmentShaderFn(v, 0);
-            const color = res.isColor ? res : (res.color || res);
-            const alpha = res.alpha !== undefined ? res.alpha : 1.0;
-            const tag = res.tag;
-            pipeline.plot(v, color, age, alpha, tag);
+            if (!_scratchFrag) _scratchFrag = new fragmentPool.Type();
+
+            _scratchFrag.pos.copy(v);
+            _scratchFrag.age = age;
+            _scratchFrag.v0 = 0;
+            _scratchFrag.v1 = 0;
+            _scratchFrag.v2 = 0;
+            _scratchFrag.v3 = 0;
+            _scratchFrag.color.set(0, 0, 0, 0);
+            _scratchFrag.blend = 0;
+
+            fragmentShaderFn(v, _scratchFrag);
+
+            pipeline.plot(v, _scratchFrag.color, _scratchFrag.age, _scratchFrag.color.alpha, _scratchFrag.blend);
         }
     },
 
@@ -434,11 +443,10 @@ export const Plot = {
             }
 
             // Construct basis on the fly for PlanarLine
-            const ref = Math.abs(center.dot(Daydream.X_AXIS)) > 0.9 ? Daydream.Y_AXIS : Daydream.X_AXIS;
             const u = vectorPool.acquire().crossVectors(center, ref).normalize();
             const w = vectorPool.acquire().crossVectors(center, u).normalize();
 
-            Plot.rasterize(pipeline, points, (v, frag) => fragmentShaderFn(frag.v0), false, age, { u, v: center, w });
+            Plot.rasterize(pipeline, points, fragmentShaderFn, false, age, { u, v: center, w });
         }
     },
 
@@ -982,6 +990,8 @@ export const Plot = {
      * @param {Object} [planarBasis=null] - {u, v, w} If provided, uses Planar interpolation.
      */
     rasterize: (pipeline, points, shaderFn, closeLoop = false, age = 0, planarBasis = null) => {
+        if (!_scratchFrag) _scratchFrag = new fragmentPool.Type();
+
         const len = points.length;
         if (len < 2) return;
 
@@ -1008,8 +1018,11 @@ export const Plot = {
 
                 if (!shouldOmit) {
                     lerpFragments(curr, next, 0, _scratchFrag);
-                    const res = shaderFn(p1, _scratchFrag);
-                    pipeline.plot(p1, res.color || res, age, res.alpha ?? 1.0, res.tag);
+                    _scratchFrag.pos.copy(p1);
+                    _scratchFrag.age = age;
+
+                    shaderFn(p1, _scratchFrag);
+                    pipeline.plot(p1, _scratchFrag.color, _scratchFrag.age, _scratchFrag.color.alpha, _scratchFrag.blend);
                 }
                 continue;
             }
@@ -1038,8 +1051,10 @@ export const Plot = {
             // Draw Start Point
             map(0, pTemp);
             lerpFragments(curr, next, 0, _scratchFrag);
-            let res = shaderFn(pTemp, _scratchFrag);
-            pipeline.plot(pTemp, res.color, age, res.alpha, res.tag);
+            _scratchFrag.pos.copy(pTemp);
+            _scratchFrag.age = age;
+            shaderFn(pTemp, _scratchFrag);
+            pipeline.plot(pTemp, _scratchFrag.color, _scratchFrag.age, _scratchFrag.color.alpha, _scratchFrag.blend);
 
             // Draw Steps
             const loopLimit = omitLast ? steps.length - 1 : steps.length;
@@ -1053,8 +1068,10 @@ export const Plot = {
                 map(t, pTemp);
 
                 lerpFragments(curr, next, t, _scratchFrag);
-                res = shaderFn(pTemp, _scratchFrag);
-                pipeline.plot(pTemp, res.color, age, res.alpha, res.tag);
+                _scratchFrag.pos.copy(pTemp);
+                _scratchFrag.age = age;
+                shaderFn(pTemp, _scratchFrag);
+                pipeline.plot(pTemp, _scratchFrag.color, _scratchFrag.age, _scratchFrag.color.alpha, _scratchFrag.blend);
             }
         }
     },

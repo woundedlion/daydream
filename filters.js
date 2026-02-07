@@ -6,12 +6,35 @@
 import * as THREE from "three";
 import { Daydream, XY } from "./driver.js";
 import { wrap } from "./util.js"
-import { blendAlpha } from "./color.js";
-import { colorPool } from "./memory.js";
+import { blendAlpha, Color4 } from "./color.js";
+import { colorPool, fragmentPool } from "./memory.js";
 import { vectorToPixel, angleBetween, mobiusTransform } from "./geometry.js";
 import { vectorPool } from "./memory.js";
 import { Plot } from "./plot.js";
 import { tween } from "./animation.js";
+
+/** 
+ * Data Packet for Shader Mode.
+ * Ensures stable Hidden Class for V8 Optimization.
+ */
+export class Fragment {
+  constructor() {
+    this.pos = new THREE.Vector3(); // Pre-allocate vector
+    // Data Registers (Scalar slots for varying data)
+    this.v0 = 0;
+    this.v1 = 0;
+    this.v2 = 0;
+    this.v3 = 0;
+    this.age = 0; // Added based on User Request (Fragment becomes source of truth)
+
+    // Outputs
+    this.color = new Color4(0, 0, 0, 0);
+    this.blend = 0; // Default: 0 (Normal)
+  }
+}
+
+// Inject Type into Pool (Break Cycle)
+fragmentPool.Type = Fragment;
 
 import { TWO_PI, MobiusParams } from "./3dmath.js";
 import { StaticCircularBuffer } from "./StaticCircularBuffer.js";
@@ -51,6 +74,14 @@ export const quinticKernel = (t) => {
  * @returns {Object} An object with a `plot` method that initiates the pipeline.
  */
 export function createRenderPipeline(...filters) {
+  /* 
+   * Blend Mode Registry:
+   * 0: Normal (Over)
+   * 1: Additive (Add)
+   * 2: Max (Lighten)
+   */
+  const BLEND_MODES = ['over', 'add', 'max'];
+
   // Canvas sink
   let head = (x, y, colorInput, age, alpha, tag) => {
     let xi = ((x + 0.5) | 0) % Daydream.W;
@@ -59,7 +90,13 @@ export function createRenderPipeline(...filters) {
     const color = colorInput.isColor ? colorInput : (colorInput.color || colorInput);
     const alphaMod = (colorInput.alpha !== undefined ? colorInput.alpha : 1.0);
 
-    const mode = (tag && tag.blendMode) ? tag.blendMode : 'over';
+    let mode = 'over';
+    if (typeof tag === 'number') {
+      mode = BLEND_MODES[tag] || 'over';
+    } else if (tag && tag.blendMode) {
+      mode = tag.blendMode;
+    }
+
     blendAlpha(index, color, alpha * alphaMod, mode);
   };
   let nextIs2D = true;

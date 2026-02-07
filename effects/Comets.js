@@ -142,7 +142,10 @@ export class Comets {
         const pipeline = createRenderPipeline();
         for (const pt of this.renderPoints) {
             const pos = pt.position;
-            const matFn = () => pt;
+            const matFn = (p, frag) => {
+                frag.color.copy(pt.color);
+                frag.color.alpha = pt.alpha;
+            };
             Scan.Point.draw(pipeline, pos, this.thickness, matFn, { debugBB: this.debugBB });
         }
     }

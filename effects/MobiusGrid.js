@@ -87,10 +87,18 @@ export class MobiusGrid {
 
             const opacity = Math.min(1.0, Math.max(0.0, numRings - i));
 
-            const fragmentShader = (pTransformed, tPoly) => {
+            const fragmentShader = (pTransformed, frag) => {
+                const t = frag.v0; // t matches previous logic (i/numRings + phase) which determines geometry, but color logic depended on i/numRings.
+                // Wait, drawAxisRings iterates i. 
+                // The shader uses 'i' from closure? Yes.
+                // "const res = this.palette.get(i / numRings);"
+                // So 'tPoly' was unused in original code?
+                // Original: (pTransformed, tPoly) => ...
+                // It ignored tPoly.
+
                 const res = this.palette.get(i / numRings);
                 res.alpha *= opacity * this.alpha;
-                return res;
+                frag.color.copy(res);
             };
 
             const vertexShaderFn = (frag) => {
@@ -119,8 +127,8 @@ export class MobiusGrid {
 
             const opacity = Math.min(1.0, Math.max(0.0, numLines - i));
 
-            const fragmentShader = (pTransformed, tLine) => {
-                const angle = tLine.v0 * TWO_PI;
+            const fragmentShader = (pTransformed, frag) => {
+                const angle = frag.v0 * TWO_PI;
                 const z = Math.sin(angle);
                 const R = Math.sqrt((1 + z) / (1 - z));
                 const logR = Math.log(R);
@@ -130,7 +138,7 @@ export class MobiusGrid {
                 const tParam = (logR - logMin) / range;
                 const res = this.palette.get(wrap(tParam - phase, 1.0));
                 res.alpha *= opacity * this.alpha;
-                return res;
+                frag.color.copy(res);
             };
 
             const vertexShader = (frag) => {

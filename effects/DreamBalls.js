@@ -204,11 +204,11 @@ export class DreamBalls {
             this.globalOrientation.orient(scratch, undefined, frag.pos);
         };
         const palette = params.palette;
-        const fargmentShader = (v, t) => {
-            const val = (t.v0 !== undefined) ? t.v0 : t;
+        const fargmentShader = (v, frag) => {
+            const val = (frag.v0 !== undefined) ? frag.v0 : frag;
             const c = palette.get(val);
             c.alpha *= params.alpha * opacity;
-            return c;
+            frag.color.copy(c);
         };
 
         for (let i = 0; i < params.numCopies; i++) {

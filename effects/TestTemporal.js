@@ -273,7 +273,7 @@ export class TestTemporal {
                 baseColor.lerp(new Color4(1, 1, 1, 1), strength * p.lightAlpha);
             }
 
-            return baseColor;
+            frag.color.copy(baseColor);
         });
 
         this.filters.flush(null, 1.0);

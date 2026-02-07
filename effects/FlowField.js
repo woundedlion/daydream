@@ -119,7 +119,7 @@ export class FlowField {
 
             // 6. Draw Segment (Head) using Zero-Alloc Fragments
             if (p.prevPos) {
-                Plot.Line.draw(this.filters, p.prevPos, p.pos, (frag, t) => {
+                Plot.Line.draw(this.filters, p.prevPos, p.pos, (v, frag) => {
                     // Get color based on Y (interpolated by rasterize -> Line.draw)
                     // frag.pos is updated by Line.draw
                     // We can use frag.pos.y or the interpolation t
@@ -128,8 +128,8 @@ export class FlowField {
                     // So here: (p, scratch) => ...
 
                     // We use p.y for palette
-                    const val = (frag.y + 1) / 2;
-                    return this.palette.get(val);
+                    const val = (v.y + 1) / 2;
+                    frag.color.copy(this.palette.get(val));
                 });
             } else {
                 this.filters.plot(p.pos, color, 0, 0.8);
