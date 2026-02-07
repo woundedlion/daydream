@@ -645,7 +645,7 @@ export const SDF = {
             out.dist = distToEdge;
 
             // Progress along perimeter (0..1)
-            out.t = (azimuth / (2 * Math.PI));
+            out.t = wrap(azimuth, 2 * Math.PI) / (2 * Math.PI);
 
             out.rawDist = distToEdge;
             return out;
@@ -752,7 +752,7 @@ export const SDF = {
             const distToEdge = px * this.nx + py * this.ny + this.planeD;
 
             out.dist = -distToEdge;
-            out.t = (azimuth / (2 * Math.PI));
+            out.t = wrap(azimuth, 2 * Math.PI) / (2 * Math.PI);
             out.rawDist = scanDist;
             return out;
         }
@@ -843,7 +843,7 @@ export const SDF = {
             const distToEdge = polarAngle * Math.cos(localAzimuth) - this.apothem;
 
             out.dist = -distToEdge;
-            out.t = (azimuth / (2 * Math.PI));
+            out.t = wrap(azimuth, 2 * Math.PI) / (2 * Math.PI);
             out.rawDist = scanDist;
             return out;
         }
