@@ -319,14 +319,14 @@ export class ParticleSystem extends Animation {
      * @param {THREE.Vector3} position - Position.
      * @param {THREE.Vector3} velocity - Velocity.
      * @param {THREE.Color|Object} color - Color or Palette object.
-     * @param {number} life - Frames to live.
+     * @param {number} ttl - Frames to live.
      */
     constructor(trailLength = 20) {
       this.position = new THREE.Vector3();
       this.velocity = new THREE.Vector3();
       this.palette = null;
-      this.life = 0;
-      this.maxLife = 0;
+      this.ttl = 0;
+      this.maxTtl = 0;
       this.tag = { trailData: this };
       this.orientation = new Orientation();
       this.history = new OrientationTrail(trailLength);
@@ -336,13 +336,12 @@ export class ParticleSystem extends Animation {
     /**
      * Re-initializes the particle state.
      */
-    init(position, velocity, palette, life) {
+    init(position, velocity, palette, ttl) {
       this.position.copy(position);
       this.velocity.copy(velocity);
       this.palette = palette;
-      this.life = life;
-      this.maxLife = life;
-      // Reuse existing array and quaternion to avoid allocation
+      this.ttl = ttl;
+      this.maxTtl = ttl;
       this.orientation.count = 1;
       this.orientation.orientations[0].set(0, 0, 0, 1);
       this.history.head = 0;
@@ -416,12 +415,12 @@ export class ParticleSystem extends Animation {
    * @param {THREE.Vector3} position - Position.
    * @param {THREE.Vector3} velocity - Velocity.
    * @param {THREE.Color|Object} color - Color or Palette.
-   * @param {number} life - Frames to live.
+   * @param {number} ttl - Frames to live.
    */
-  spawn(position, velocity, color, life = 600) {
+  spawn(position, velocity, color, ttl = 600) {
     if (this.activeCount < this.capacity) {
       const p = this.pool[this.activeCount];
-      p.init(position, velocity, color, life);
+      p.init(position, velocity, color, ttl);
       this.activeCount++;
     }
   }
@@ -478,8 +477,8 @@ export class ParticleSystem extends Animation {
     const { torque, axis, dQ, pos } = scratch;
 
     // Age
-    p.life--;
-    let active = p.life > 0;
+    p.ttl--;
+    let active = p.ttl > 0;
 
     // Physics
     if (active) {
