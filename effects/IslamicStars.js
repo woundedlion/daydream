@@ -186,22 +186,16 @@ export class IslamicStars {
             faces: mesh.faces
         };
 
-        const colorFaceShader = (v, vertexIdx, faceIdx) => {
-            return {
-                v0: faceIdx
-            };
-        };
-
-        colorFaceShader.color = (data, t, dist, size) => {
-            // Fragment Shader: read v0 for faceIndex
-            const i = Math.round(data.v0);
+        const colorFaceShader = (p, frag) => {
+            const i = Math.round(frag.v2);
             const face = mesh.faces[i];
             const n = face ? face.length : 0;
             const palette = PALETTES[n] || Palettes.richSunset;
 
-            // Use the 'dist' passed from Scan.Mesh.draw (SDF distance)
-            const distFromEdge = -dist;
-            const intensity = Math.min(1, Math.max(0, (distFromEdge / (size || 1)) * this.params.intensity));
+            const distFromEdge = -frag.v1;
+            const size = frag.size || 1;
+
+            const intensity = Math.min(1, Math.max(0, (distFromEdge / size) * this.params.intensity));
             const c = palette.get(intensity).color;
             return color4Pool.acquire().set(c, op);
         };
