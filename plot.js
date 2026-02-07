@@ -132,6 +132,7 @@ export const Plot = {
                 f.pos.copy(u);
                 f.v0 = 0;
                 f.v1 = 0;
+                f.v2 = 0;
                 return [f];
             }
 
@@ -144,6 +145,7 @@ export const Plot = {
                 p.pos.copy(u).applyQuaternion(q);
                 p.v0 = t;
                 p.v1 = angle * t; // Cumulative Arc Length
+                p.v2 = 0;
 
                 points.push(p);
             }
@@ -517,7 +519,17 @@ export const Plot = {
          */
         static sample(basis, radius, numSides, phase = 0) {
             // Ring.sample now handles v0, v1, v2 and closing
+            // Ring.sample now handles v0, v1, v2 and closing
             const points = Plot.Ring.sample(basis, radius, numSides, phase + Math.PI / numSides);
+
+            // Fix v1: Ring returns Circular Arc Length. We want Polygonal (Planar) Arc Length (Geodesic chords).
+            let cumul = 0;
+            for (let i = 0; i < points.length; i++) {
+                points[i].v1 = cumul;
+                if (i < points.length - 1) {
+                    cumul += angleBetween(points[i].pos, points[i + 1].pos);
+                }
+            }
             return points;
         }
 
@@ -887,71 +899,68 @@ export const Plot = {
 
     ParticleSystem: class {
         /**
-         * Iterates over particle trails.
-         * Registers: None (Points only)
+         * Iterates depth first over particles, generating fragments for each particle
+         * including subframe motion trails based on the particle's history.
+         * Registers:
+         *  v0: Normalized trail progress
+         *  v1: trail arc length
+         *  v2: Particle index
+         *  v3: Normalized particle ttl
          * @param {Object} system - Particle system
-         * @param {Function} callback - (points, particle) => void
+         * @param {Function} callback - (particle, frags) => void
          */
-        static forEachTrail(system, callback) {
-            const buffer = Plot.ParticleSystem._sampleBuffer || (Plot.ParticleSystem._sampleBuffer = []);
-            const particles = system.particles;
-            const count = system.activeCount !== undefined ? system.activeCount : particles.length;
-
+        static sample(particleSystem) {
+            const particles = particleSystem.particles;
+            const count = particleSystem.activeCount !== undefined ?
+                particleSystem.activeCount : particles.length;
+            let trails = [];
             for (let i = 0; i < count; i++) {
                 const p = particles[i];
-                if (p.history.length() < 2) continue;
-
-                buffer.length = 0;
+                let trail = [];
+                let cumulativeLen = 0;
+                let lastPos = null;
                 deepTween(p.history, (q, t) => {
+                    let frag = fragmentPool.acquire();
                     let v = vectorPool.acquire().copy(p.position).applyQuaternion(q);
-                    buffer.push(v);
+                    if (lastPos) {
+                        cumulativeLen += angleBetween(lastPos, v);
+                    }
+                    lastPos = v;
+
+                    frag.pos.copy(v);
+                    frag.v0 = t;
+                    frag.v1 = cumulativeLen;
+                    frag.v2 = i;
+                    frag.v3 = p.ttl / p.maxTtl;
+                    trail.push(frag);
                 });
-
-                callback(buffer, p);
+                if (trail.length > 0) trails.push(trail);
             }
-        }
-
-        /**
-         * Samples particle trails.
-         * Registers: None (Points only)
-         * @param {Object} system - Particle system
-         * @returns {Object[]} Array of {points, particle}
-         */
-        static sample(system) {
-            const trails = [];
-            Plot.ParticleSystem.forEachTrail(system, (points, particle) => {
-                trails.push({ points: [...points], particle });
-            });
             return trails;
         }
 
         /**
          * Draws particle trails.
          * Registers:
-         *  v0: Interpolation factor t (0.0 -> 1.0) along each segment
+         *  v0: Normalized trail progress
+         *  v1: trail arc length
+         *  v2: Particle index
+         *  v3: Normalized particle ttl
          * @param {Object} pipeline - Render pipeline
          * @param {Object} particleSystem - Particle system
          * @param {Function} fragmentShaderFn - Shader function
          * @param {Function} vertexShaderFn - Vertex displacement function
          */
         static draw(pipeline, particleSystem, fragmentShaderFn, vertexShaderFn = null) {
-            Plot.ParticleSystem.forEachTrail(particleSystem, (points, particle) => {
-                const count = points.length;
-                const fragments = [];
-                for (let i = 0; i < count; i++) {
-                    const f = fragmentPool.acquire();
-                    f.pos.copy(points[i]);
-                    // Standard registers for Line/Trail
-                    f.v0 = (count > 1) ? i / (count - 1) : 0;
-                    f.v1 = i;
-                    if (vertexShaderFn) {
+            let trails = Plot.ParticleSystem.sample(particleSystem);
+            for (const trail of trails) {
+                if (vertexShaderFn) {
+                    for (const f of trail) {
                         vertexShaderFn(f);
                     }
-                    fragments.push(f);
                 }
-
-                Plot.rasterize(pipeline, fragments, (v, t) => fragmentShaderFn(v, t, particle), false, 0);
-            });
+                Plot.rasterize(pipeline, trail, fragmentShaderFn, false, 0);
+            }
         }
     },
 

@@ -38,7 +38,7 @@ export class TestShapes {
     constructor() {
         this.rings = [];
         this.alpha = 0.5;
-        this.shape = "SphericalPolygon";
+        this.shape = "PlanarPolygon";
         this.debugBB = false;
         this.numShapes = 25;
         this.timeline = new Timeline();
@@ -94,8 +94,8 @@ export class TestShapes {
 
         this.gui.add(this, 'numShapes').min(1).max(50).step(1).name("Num Shapes").onChange(() => this.rebuild());
 
-        this.gui.add(this, 'isSphericalPolygon').name("Spherical Polygon").listen();
         this.gui.add(this, 'isPlanarPolygon').name("Planar Polygon").listen();
+        this.gui.add(this, 'isSphericalPolygon').name("Spherical Polygon").listen();
         this.gui.add(this, 'isFlower').name("Flower").listen();
         this.gui.add(this, 'isStar').name("Star").listen();
         // this.gui.add(this, 'usePlanar').name("Planar Lines"); // Removed
@@ -116,7 +116,7 @@ export class TestShapes {
             ? this.plotPipeline
             : this.scanPipeline;
 
-        const fragmentShaderFn = (p, t, dist) => {
+        const fragmentShaderFn = (v, fragment) => {
             return color4Pool.acquire().set(ring.color.color, ring.color.alpha * this.alpha * spriteAlpha);
         }
 

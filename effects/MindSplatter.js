@@ -137,25 +137,23 @@ export class MindSplatter {
 
                 const palette = new GenerativePalette('straight', 'complementary', 'descending', 'mid', currentHue);
                 const life = 160;
-                system.spawn(axis, vel, palette, life);
+                this.particleSystem.spawn(axis, vel, palette, life);
             });
         }
     }
 
     drawParticles(opacity) {
-        const fragmentShader = (pos, v, particle) => {
-            const lifeAlpha = v.v1;
-            const holeAlpha = v.v0;
-            const c = particle.palette.get(lifeAlpha);
-            c.alpha *= holeAlpha * opacity;
+        const fragmentShader = (v, frag) => {
+            const alpha = frag.v3;
+            const particle = this.particleSystem.particles[Math.floor(frag.v2)];
+            const c = particle.palette.get(frag.v0);
+            c.alpha *= alpha * opacity;
             return c;
         }
 
-        const vertexShader = (frag, particle, i, total) => {
-            // Attractor alpha holes
+        const vertexShader = (frag) => {
             let holeAlpha = 1.0;
-            const point = frag.pos; // Read from frag.pos
-
+            const point = frag.pos;
             for (const attr of this.particleSystem.attractors) {
                 const dist = angleBetween(point, attr.position);
                 if (dist < attr.eventHorizon) {
@@ -165,9 +163,7 @@ export class MindSplatter {
 
             mobiusTransform(frag.pos, this.mobius, frag.pos);
             this.orientation.orient(frag.pos, undefined, frag.pos);
-
-            frag.v0 = holeAlpha;
-            frag.v1 = i / total; // lifeAlpha
+            frag.v3 *= holeAlpha;
         }
 
         Plot.ParticleSystem.draw(
