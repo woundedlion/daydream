@@ -868,6 +868,8 @@ export const Plot = {
                 const frag = fragmentPool.acquire();
                 frag.pos.copy(pos);
                 frag.v0 = n > 1 ? i / (n - 1) : 0.0;
+                frag.v2 = 0;
+                frag.v3 = 0;
 
                 if (lastPos) {
                     cumulativeLen += angleBetween(lastPos, frag.pos);
