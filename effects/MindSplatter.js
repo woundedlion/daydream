@@ -150,7 +150,6 @@ export class MindSplatter {
             const c = particle.palette.get(frag.v0);
 
             frag.color.set(c.color, c.alpha * alpha * opacity);
-            frag.blend = 0; // 1 = Additive
         }
 
         const vertexShader = (frag) => {
