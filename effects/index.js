@@ -26,6 +26,6 @@ export { IslamicStars } from "./IslamicStars.js";
 export { TestTemporal } from "./TestTemporal.js";
 export { Thrusters } from "./Thrusters.js";
 export { Voronoi } from "./Voronoi.js";
-export { TestPoincare } from "./TestPoincare.js";
+export { GnomonicStars } from "./GnomonicStars.js";
 
 

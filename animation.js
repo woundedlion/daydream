@@ -879,6 +879,7 @@ export class Rotation extends Animation {
  */
 export class RandomWalk extends Animation {
   static Languid = { speed: 0.02, pivotStrength: 0.1, noiseScale: 0.02 };
+  static Brisk = { speed: 0.06, pivotStrength: 0.1, noiseScale: 0.02 };
   static Energetic = { speed: 0.05, pivotStrength: 0.4, noiseScale: 0.08 };
 
   /**
@@ -1387,5 +1388,58 @@ export const deepTween = (orientationTrail, drawFn) => {
       const globalT = (i + subT) / trailLength;
       drawFn(q, globalT);
     }
+  }
+}
+
+/**
+ * Continuously modulates Mobius parameters to create an evolving warp.
+ * Uses multiple frequencies for non-repeating chaos.
+ */
+export class MobiusGenerate extends Animation {
+  /**
+   * @param {MobiusParams} params - The params to animate.
+   * @param {number} scale - Magnitude of modulation.
+   * @param {number} speed - Speed of the animation.
+   */
+  constructor(params, scale = 0.5, speed = 0.01) {
+    super(-1, true);
+    this.params = params;
+    this.scale = scale;
+    this.speed = speed;
+
+    // Capture initial state as base
+    this.base = {
+      aRe: params.aRe, aIm: params.aIm,
+      bRe: params.bRe, bIm: params.bIm,
+      cRe: params.cRe, cIm: params.cIm,
+      dRe: params.dRe, dIm: params.dIm
+    };
+
+    // Random phase offsets for each parameter to ensure they don't sync up
+    this.phases = {
+      aRe: Math.random() * 100, aIm: Math.random() * 100,
+      bRe: Math.random() * 100, bIm: Math.random() * 100,
+      cRe: Math.random() * 100, cIm: Math.random() * 100,
+      dRe: Math.random() * 100, dIm: Math.random() * 100
+    };
+  }
+
+  step() {
+    super.step();
+    const t = this.t * this.speed;
+    const s = this.scale;
+
+    // Use prime-ish number ratios for frequencies to minimize repetition cycle
+    this.params.aRe = this.base.aRe + Math.sin(t * 1.0 + this.phases.aRe) * s;
+    this.params.aIm = this.base.aIm + Math.cos(t * 1.13 + this.phases.aIm) * s;
+
+    this.params.bRe = this.base.bRe + Math.sin(t * 1.27 + this.phases.bRe) * s;
+    this.params.bIm = this.base.bIm + Math.cos(t * 1.39 + this.phases.bIm) * s;
+
+    this.params.cRe = this.base.cRe + Math.sin(t * 0.71 + this.phases.cRe) * s;
+    this.params.cIm = this.base.cIm + Math.cos(t * 0.83 + this.phases.cIm) * s;
+
+    this.params.dRe = this.base.dRe + Math.sin(t * 0.97 + this.phases.dRe) * s;
+    this.params.dIm = this.base.dIm + Math.cos(t * 1.09 + this.phases.dIm) * s;
   }
 }

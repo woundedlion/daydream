@@ -33,7 +33,7 @@ const HiResFavorites = [
   "TestShapes",
   "TestTemporal",
   "Voronoi",
-  "TestPoincare"
+  "GnomonicStars"
 ];
 
 const LoResFavorites = [
@@ -54,7 +54,7 @@ const LoResFavorites = [
   "TestTemporal",
   "Thrusters",
   "Voronoi",
-  "TestPoincare"
+  "GnomonicStars"
 ];
 
 
