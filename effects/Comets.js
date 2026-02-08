@@ -25,9 +25,9 @@ import { randomBetween, wrap } from "../util.js";
 
 export class Comets {
     static Node = class {
-        constructor(path) {
+        constructor(path, trailLength) {
             this.orientation = new Orientation();
-            this.trail = new OrientationTrail(90);
+            this.trail = new OrientationTrail(trailLength);
             this.v = Daydream.Y_AXIS.clone();
             this.path = path;
         }
@@ -39,7 +39,7 @@ export class Comets {
         this.spacing = 48;
         this.resolution = 32;
         this.cycleDuration = 80;
-        this.trailLength = this.cycleDuration;
+        this.trailLength = 115;
         this.alpha = 1.0;
         this.thickness = 2.1 * 2 * Math.PI / Daydream.W;
         this.orientation = new Orientation();
@@ -63,12 +63,16 @@ export class Comets {
         this.curFunction = 0;
         this.updatePath();
         this.palette = new GenerativePalette("straight", "triadic", "ascending");
-        this.nodes = [];
         this.renderPoints = [];
 
-        for (let i = 0; i < this.numNodes; ++i) {
-            this.spawnNode(this.path);
-        }
+        this.initTimeline();
+        this.setupGUI();
+
+    }
+
+    initTimeline() {
+        this.timeline = new Timeline();
+        this.nodes = [];
 
         this.timeline.add(0,
             new PeriodicTimer(2 * this.cycleDuration, () => {
@@ -79,14 +83,18 @@ export class Comets {
         );
         this.timeline.add(0, new RandomWalk(this.orientation, randomVector()));
 
-        this.setupGUI();
-
+        for (let i = 0; i < this.numNodes; ++i) {
+            this.spawnNode(this.path);
+        }
     }
 
     setupGUI() {
         this.gui = new gui.GUI({ autoPlace: false });
         this.gui.add(this, 'alpha', 0, 1).step(0.01).name('Brightness');
         this.gui.add(this, 'thickness', 0.01, 0.5).step(0.01).name('Brush Size');
+        this.gui.add(this, 'trailLength', 1, 200).step(1).name('Trail Length').onChange(() => {
+            this.initTimeline();
+        });
         this.gui.add(this, 'debugBB').name('Show Bounding Boxes'); // Restored
     }
 
@@ -109,7 +117,7 @@ export class Comets {
 
     spawnNode(path) {
         let i = this.nodes.length;
-        let node = new Comets.Node(path);
+        let node = new Comets.Node(path, this.trailLength);
         this.nodes.push(node);
         this.timeline.add(i * this.spacing,
             new Motion(node.orientation, node.path, this.cycleDuration, true)

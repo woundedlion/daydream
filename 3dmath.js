@@ -78,3 +78,26 @@ export class MobiusParams {
   get c() { return { re: this.cRe, im: this.cIm }; }
   get d() { return { re: this.dRe, im: this.dIm }; }
 }
+
+// Gnomonic Projection: Sphere -> Plane (Equator at Infinity)
+// Projects from center (0,0,0) to plane z=1 (tangent at North Pole)
+export function gnomonic(v) {
+  // Handle equator singularity with a large number instead of Infinity
+  const div = (Math.abs(v.z) < 1e-9) ? 1e-9 * (v.z >= 0 ? 1 : -1) : v.z;
+  return { re: v.x / div, im: v.y / div };
+}
+
+// Inverse Gnomonic: Plane -> Sphere
+export function invGnomonic(z, target, originalSign = 1) {
+  const t = target || new THREE.Vector3();
+  // Project (re, im, 1) back onto unit sphere
+  const len = Math.sqrt(z.re * z.re + z.im * z.im + 1);
+  const invLen = 1 / len;
+
+  // Restore hemisphere sign (Upper or Lower)
+  return t.set(
+    z.re * invLen * originalSign,
+    z.im * invLen * originalSign,
+    invLen * originalSign
+  );
+}
