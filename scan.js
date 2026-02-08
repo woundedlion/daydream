@@ -5,7 +5,7 @@
 
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
-import { makeBasis, angleBetween, yToPhi, getAntipode } from "./geometry.js";
+import { makeBasis, angleBetween, yToPhi, getAntipode, fibSpiral } from "./geometry.js";
 import { vectorPool, StaticPool } from "./memory.js";
 import { Color4 } from "./color.js";
 import { quinticKernel } from "./filters.js";
@@ -1753,6 +1753,43 @@ export const Scan = {
             Scan.Ring.draw(pipeline, basis, 0, thickness, fragmentShaderFn, 0, options && options.debugBB);
         }
     },
-};
 
+    Spiral: class {
+        /**
+         * Draws a Fibonacci spiral using segments (Lines).
+         * @param {Object} pipeline - Render pipeline.
+         * @param {number} n - Number of points.
+         * @param {number} thickness - Line thickness.
+         * @param {Function} fragmentShaderFn - Color function.
+         * @param {Function} [vertexShaderFn] - Vertex shader.
+         */
+        static draw(pipeline, n, thickness, fragmentShaderFn, vertexShaderFn) {
+            const prev = vectorPool.acquire();
+            const curr = vectorPool.acquire();
+            let first = true;
+
+            const frag = { pos: new THREE.Vector3() }; // Mock frag for vertex shader
+
+            for (let i = 0; i < n; i++) {
+                const p = fibSpiral(n, 0, i);
+
+                // Apply Vertex Shader
+                if (vertexShaderFn) {
+                    frag.pos.copy(p);
+                    vertexShaderFn(frag);
+                    curr.copy(frag.pos);
+                } else {
+                    curr.copy(p);
+                }
+
+                if (!first) {
+                    Scan.Line.draw(pipeline, null, prev, curr, thickness, fragmentShaderFn);
+                }
+
+                prev.copy(curr);
+                first = false;
+            }
+        }
+    },
+};
 
