@@ -10,7 +10,7 @@ import { Rotation, Orientation } from "./animation.js";
 import { easeOutCirc } from "./easing.js";
 import { Palettes } from "./palettes.js";
 import { vectorPool, quaternionPool, dotPool } from "./memory.js";
-import { TWO_PI, mobius, stereo, invStereo } from "./3dmath.js";
+import { TWO_PI, mobius, stereo, invStereo, gnomonic, invGnomonic } from "./3dmath.js";
 
 /**
  * Transforms a 3D vector specific to this Mobius parameter set.
@@ -23,6 +23,30 @@ export function mobiusTransform(v, params, target) {
   const z = stereo(v);
   const w = mobius(z, params);
   return invStereo(w, target);
+}
+
+/**
+ * Transforms a vector using Gnomonic projection + Mobius.
+ * This effectively treats the equator as the boundary at infinity.
+ * @param {THREE.Vector3} v - Input vector.
+ * @param {MobiusParams} params - The Mobius parameters.
+ * @param {THREE.Vector3} target - Output vector.
+ * @returns {THREE.Vector3} Transformed vector.
+ */
+export function poincareTransform(v, params, target) {
+  // 1. Preserve Hemisphere (Gnomonic is 2:1 mapping without this)
+  const sign = v.z >= 0 ? 1 : -1;
+
+  // 2. Project to Plane (Equator -> Infinity)
+  const z = gnomonic(v);
+
+  // 3. Apply Mobius Transform on the plane
+  // Note: Since the equator is infinity, translations here (params.b)
+  // will shift the "center" of the pattern away from the pole.
+  const w = mobius(z, params);
+
+  // 4. Unproject back to Sphere
+  return invGnomonic(w, target, sign);
 }
 
 import { KDTree } from "./spatial.js";
