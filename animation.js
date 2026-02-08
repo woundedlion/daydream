@@ -1362,7 +1362,7 @@ export const tween = (orientation, drawFn) => {
   let s = orientation.length();
   let start = (s > 1) ? 1 : 0;
   for (let i = start; i < s; ++i) {
-    drawFn(orientation.get(s - 1 - i), s > 1 ? i / (s - 1) : 0);
+    drawFn(orientation.get(i), s > 1 ? i / (s - 1) : 0);
   }
 }
 
@@ -1374,13 +1374,18 @@ export const tween = (orientation, drawFn) => {
  * @param {Function} drawFn - Function to draw a sample (takes quaternion and global time t).
  */
 export const deepTween = (orientationTrail, drawFn) => {
-  const dt = 1.0 / orientationTrail.length();
-  tween(orientationTrail, (frame, frameT) => {
-    tween(frame, (q, subT) => {
-      let s = orientationTrail.length();
-      let framesOld = Math.floor(frameT * (s - 1));
-      const globalT = s > 0 ? (framesOld + subT) / s : 0;
+  const trailLength = orientationTrail.length();
+  if (trailLength === 0) return;
+
+  for (let i = 0; i < trailLength; i++) {
+    const frame = orientationTrail.get(i);
+    const frameSize = frame.length();
+    const startJ = (i === 0) ? 0 : 1;
+    for (let j = startJ; j < frameSize; j++) {
+      const q = frame.get(j);
+      const subT = (frameSize > 1) ? j / (frameSize - 1) : 0;
+      const globalT = (i + subT) / trailLength;
       drawFn(q, globalT);
-    });
-  });
+    }
+  }
 }
