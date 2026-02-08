@@ -9,8 +9,8 @@ import { Daydream } from "../driver.js";
 import {
     MeshOps, mobiusTransform, angleBetween, makeBasis, G
 } from "../geometry.js";
-import { vectorPool, color4Pool, fragmentPool } from "../memory.js";
-import { GenerativePalette } from "../color.js";
+import { vectorPool } from "../memory.js";
+import { GenerativePalette, AlphaFalloffPalette } from "../color.js";
 import { Palettes } from "../palettes.js";
 import {
     Timeline, ParticleSystem, Sprite, RandomWalk, MobiusWarp, Orientation, RandomTimer
@@ -135,7 +135,8 @@ export class MindSplatter {
                 const currentHue = this.emitterHues[i];
                 this.emitterHues[i] = (this.emitterHues[i] + G * 0.1) % 1;
 
-                const palette = new GenerativePalette('straight', 'complementary', 'descending', 'mid', currentHue);
+                const palette = new AlphaFalloffPalette((t) => t,
+                    new GenerativePalette('straight', 'complementary', 'flat', 'mid', currentHue));
                 const life = 160;
                 this.particleSystem.spawn(axis, vel, palette, life);
             });
@@ -149,7 +150,7 @@ export class MindSplatter {
             const c = particle.palette.get(frag.v0);
 
             frag.color.set(c.color, c.alpha * alpha * opacity);
-            frag.blend = 1; // 1 = Additive
+            frag.blend = 0; // 1 = Additive
         }
 
         const vertexShader = (frag) => {

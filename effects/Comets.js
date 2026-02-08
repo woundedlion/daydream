@@ -27,7 +27,7 @@ export class Comets {
     static Node = class {
         constructor(path) {
             this.orientation = new Orientation();
-            this.trail = new OrientationTrail(80);
+            this.trail = new OrientationTrail(90);
             this.v = Daydream.Y_AXIS.clone();
             this.path = path;
         }
@@ -40,7 +40,7 @@ export class Comets {
         this.resolution = 32;
         this.cycleDuration = 80;
         this.trailLength = this.cycleDuration;
-        this.alpha = 0.5;
+        this.alpha = 1.0;
         this.thickness = 2.1 * 2 * Math.PI / Daydream.W;
         this.orientation = new Orientation();
         this.path = new Path(Daydream.Y_AXIS);
@@ -62,7 +62,7 @@ export class Comets {
         ]
         this.curFunction = 0;
         this.updatePath();
-        this.palette = new GenerativePalette("straight", "triadic", "descending");
+        this.palette = new GenerativePalette("straight", "triadic", "ascending");
         this.nodes = [];
         this.renderPoints = [];
 
@@ -124,16 +124,15 @@ export class Comets {
             node.trail.record(node.orientation);
 
             deepTween(node.trail, (q, t) => {
-                if (t > 1.0) return;
-                const color4 = this.palette.get(t);
-                color4.alpha = color4.alpha * this.alpha * quinticKernel(t);
+                const c = this.palette.get(t);
+
                 _tempVec.copy(node.v).applyQuaternion(q);
                 _tempVec.normalize().applyQuaternion(this.orientation.get());
 
                 const dot = dotPool.acquire();
                 dot.position.copy(_tempVec);
-                dot.color = color4.color;
-                dot.alpha = color4.alpha;
+                dot.color = c.color;
+                dot.alpha = quinticKernel(t) * this.alpha * c.alpha;
 
                 this.renderPoints.push(dot);
             });
@@ -142,12 +141,14 @@ export class Comets {
         const pipeline = createRenderPipeline();
         for (const pt of this.renderPoints) {
             const pos = pt.position;
-            const matFn = (p, frag) => {
+            const fragmentShader = (v, frag) => {
                 frag.color.copy(pt.color);
                 frag.color.alpha = pt.alpha;
             };
-            Scan.Point.draw(pipeline, pos, this.thickness, matFn, { debugBB: this.debugBB });
+            Scan.Point.draw(pipeline, pos, this.thickness, fragmentShader, { debugBB: this.debugBB });
         }
     }
 }
+
+
 
