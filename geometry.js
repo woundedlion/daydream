@@ -9,7 +9,7 @@ import { Daydream } from "./driver.js";
 import { Rotation, Orientation } from "./animation.js";
 import { easeOutCirc } from "./easing.js";
 import { Palettes } from "./palettes.js";
-import { vectorPool, quaternionPool, dotPool } from "./memory.js";
+import { vectorPool, quaternionPool, dotPool, basisPool } from "./memory.js";
 import { TWO_PI, mobius, stereo, invStereo, gnomonic, invGnomonic } from "./3dmath.js";
 
 /**
@@ -1259,39 +1259,6 @@ export const MeshOps = {
         const idxNearVi = (vi < nextVi) ? indices[0] : indices[1];
         polyVerts.push(idxNearVi);
 
-        // Move to neighbor face sharing the *previous* edge (incoming to vi) to walk CCW?
-        // Wait, standard order:
-        // Polygon is vi -> outgoing_edge_pt -> incoming_next_edge_pt ...
-        // No, standard cutoff face connects the points on edges incident to vi.
-
-        // Let's walk the faces around vi.
-        // Current Face F1. Edge outgoing is (vi, next). Edge incoming is (prev, vi).
-        // The truncation face connects point on (vi, next) to point on (vi, prev)?
-        // No, usually it's the cycle of points on the edges connected to vi.
-
-        // Let's traverse faces around vi.
-        // F1 -> F2 -> ...
-        // In F1, we have point on edge (vi, next).
-        // We also have point on edge (prev, vi). -> Wait, that's in F1 too.
-        // A Truncate face replaces the vertex. It connects all the new points that surround the old vertex.
-        // Sequence: Point on Edge 1, Point on Edge 2, ...
-
-        // Let's find neighbors of vi.
-        // If we walk edges around vi: e1, e2, e3...
-        // We pick the point on e1 (near vi), point on e2 (near vi)...
-
-        // To ensure winding order, we walk faces.
-        // Start Face F. Edge (vi, next) is part of F.
-        // The point on (vi, next) is P1.
-        // Next face shares edge (vi, next).
-        // That face has edge (vi, next2). Point P2.
-
-        // So:
-        // 1. Start Face F.
-        // 2. Identify edge (vi, next).
-        // 3. Get point on (vi, next) closest to vi. Push params.
-        // 4. Move to neighbor face sharing (vi, next).
-
         const nextVert = face[(idxInFace + 1) % face.length];
         const edgeKey = vi < nextVert ? `${vi}_${nextVert}` : `${nextVert}_${vi}`;
 
@@ -1306,14 +1273,6 @@ export const MeshOps = {
 
       if (polyVerts.length > 2) {
         newFaces.push(polyVerts.reverse()); // Keep CCW? 
-        // Walked faces: F1 -> F2 (across edge 1).
-        // Point 1 is on edge 1. Point 2 is on edge 2.
-        // P1 -> P2 -> ... ensures logical loop around vi.
-        // Verify winding: center is vi. P1, P2...
-        // Original faces are CCW seen from outside.
-        // Vertices around vi are CW or CCW? 
-        // Usually, neighbors of a vertex in CCW face are ordered CW? No.
-        // Let's stick with reverse() if it looks inside-out.
       }
     });
 
@@ -1347,6 +1306,15 @@ export const makeBasis = (orientation, normal) => {
   let ref = _tempVec.copy(refAxis).applyQuaternion(orientation).normalize();
   let u = vectorPool.acquire().crossVectors(v, ref).normalize();
   let w = vectorPool.acquire().crossVectors(v, u).normalize();
+
+  // Zero-Alloc: Use basisPool if available, otherwise fallback (should typically avail)
+  const basis = basisPool.acquire();
+  if (basis) {
+    basis.u.copy(u);
+    basis.v.copy(v);
+    basis.w.copy(w);
+    return basis;
+  }
   return { u, v, w };
 };
 
@@ -1371,3 +1339,12 @@ export const getAntipode = (basis, radius) => {
 
 // Inject Type into pool to handle circular dependency
 dotPool.Type = Dot;
+
+class Basis {
+  constructor() {
+    this.u = new THREE.Vector3();
+    this.v = new THREE.Vector3();
+    this.w = new THREE.Vector3();
+  }
+}
+if (basisPool) basisPool.Type = Basis;

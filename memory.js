@@ -74,3 +74,8 @@ export const color4Pool = new StaticPool(null, 250000);
 
 /** @type {StaticPool} Global pool for Fragment objects (Pos + Data). */
 export const fragmentPool = new StaticPool(null, 2000000);
+
+
+
+/** @type {StaticPool} Global pool for Basis objects {u, v, w}. */
+export const basisPool = new StaticPool(null, 20000);

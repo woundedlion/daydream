@@ -827,6 +827,7 @@ export const Plot = {
             if (points.length > 0) {
                 const first = points[0];
                 const last = fragmentPool.acquire();
+                last.pos = vectorPool.acquire();
                 last.pos.copy(first.pos);
                 last.v0 = 1.0;
 

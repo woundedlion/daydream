@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
 import { makeBasis, angleBetween, yToPhi, getAntipode, fibSpiral } from "./geometry.js";
-import { vectorPool, StaticPool, color4Pool } from "./memory.js";
+import { vectorPool, StaticPool, color4Pool, quaternionPool, basisPool } from "./memory.js";
 import { Color4 } from "./color.js";
 import { quinticKernel } from "./filters.js";
 import { wrap } from "./util.js";
@@ -33,6 +33,13 @@ const _sampleResult = {
     weights: { a: 0, b: 0, c: 0 }
 };
 
+const _intervalCache = Array.from({ length: 32 }, () => ({ start: 0, end: 0 }));
+const _activeIntervals = [];
+
+const _lineClipPlanes = [null, null];
+const _lineLimits = { minPhi: 0, maxPhi: 0 };
+const _lineOptionsScratch = { clipPlanes: _lineClipPlanes, limits: _lineLimits };
+
 export const SDF = {
     Ring: class {
         /**
@@ -45,6 +52,10 @@ export const SDF = {
          * @param {Object} [options.limits] - Vertical limits { minPhi, maxPhi }.
          */
         constructor(basis, radius, thickness, options = {}) {
+            this.init(basis, radius, thickness, options);
+        }
+
+        init(basis, radius, thickness, options = {}) {
             this.basis = basis;
             this.radius = radius;
             this.thickness = thickness;
@@ -154,14 +165,19 @@ export const SDF = {
             const pixelWidth = 2 * Math.PI / Daydream.W;
             const safeThreshold = pixelWidth;
 
-            const intervals = [];
+            _activeIntervals.length = 0;
+            let cacheIdx = 0;
 
             const addWindow = (t1, t2) => {
                 const x1 = Math.floor((t1 * Daydream.W) / (2 * Math.PI));
                 const x2 = Math.ceil((t2 * Daydream.W) / (2 * Math.PI));
                 if (x2 - x1 >= Daydream.W) return null; // Full row
-                intervals.push({ start: x1, end: x2 });
-                return intervals;
+
+                const iv = _intervalCache[cacheIdx++];
+                iv.start = x1;
+                iv.end = x2;
+                _activeIntervals.push(iv);
+                return _activeIntervals;
             };
 
             if (angleMin <= safeThreshold) {
@@ -173,7 +189,7 @@ export const SDF = {
                 addWindow(alpha + angleMin, alpha + angleMax);
             }
 
-            return intervals;
+            return _activeIntervals;
         }
 
         /**
@@ -1447,9 +1463,8 @@ export const Scan = {
                         _scanScratch.v3 = 0.0;
                         _scanScratch.age = 0; // Default age for Scan
                         // Reset Outputs
-                        _scanScratch.blend = 0;
+                        _scanScratch.blend = 0; ``
                         _scanScratch.color = _scanScratchColor; // Reference!
-                        _scanScratch.color.set(0, 0, 0, 0);
 
                         if (sampleResult.weights) _scanScratch.weights = sampleResult.weights;
                         if (sampleResult.size) _scanScratch.size = sampleResult.size;
@@ -1679,11 +1694,27 @@ export const Scan = {
             const minPhi = Math.acos(Math.min(1, Math.max(-1, maxY))) - thickness;
             const maxPhi = Math.acos(Math.min(1, Math.max(-1, minY))) + thickness;
 
-            Scan.Ring.draw(pipeline, { v: normal, u: c1, w: c2 }, 1.0, thickness, shaderFn, {
-                ...options,
-                clipPlanes: [c1, c2], // Pass raw planes, SDF.Ring handles them
-                limits: { minPhi, maxPhi }
-            });
+            let basis = basisPool.acquire();
+            if (!basis) basis = { v: normal, u: c1, w: c2 };
+            else { basis.v = normal; basis.u = c1; basis.w = c2; }
+
+            // Zero-Alloc Options
+            _lineClipPlanes[0] = c1;
+            _lineClipPlanes[1] = c2;
+            _lineLimits.minPhi = minPhi;
+            _lineLimits.maxPhi = maxPhi;
+
+            // Allow options to override default scratch, but usually we just mix them in?
+            // Since options is usually sparse, we can just use properties from options if needed?
+            // But Scan.Ring expects one object.
+            // We use _lineOptionsScratch as the base.
+            _lineOptionsScratch.phase = options.phase;
+            _lineOptionsScratch.debugBB = options.debugBB;
+            _lineOptionsScratch.clipPlanes = _lineClipPlanes;
+            _lineOptionsScratch.limits = _lineLimits;
+            // Scan.Ring options: phase, clipPlanes, limits.
+
+            Scan.Ring.draw(pipeline, basis, 1.0, thickness, shaderFn, _lineOptionsScratch);
         }
     },
 
@@ -1758,7 +1789,7 @@ export const Scan = {
          * @param {Object} options - Options.
          */
         static draw(pipeline, pos, thickness, fragmentShaderFn, options) {
-            const identity = new THREE.Quaternion().identity();
+            const identity = quaternionPool.acquire().identity();
             const basis = makeBasis(identity, pos);
             // A point is a Ring with radius 0 and some thickness
             Scan.Ring.draw(pipeline, basis, 0, thickness, fragmentShaderFn, 0, options && options.debugBB);
