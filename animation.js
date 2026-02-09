@@ -1443,3 +1443,49 @@ export class MobiusGenerate extends Animation {
     this.params.dIm = this.base.dIm + Math.cos(t * 1.09 + this.phases.dIm) * s;
   }
 }
+
+/**
+ * Adapts an arbitrary behavior function to the Animation system.
+ */
+export class PaletteAnimation extends Animation {
+  /**
+   * @param {Function} behaviorFn - Function(t, age) returning transformed t.
+   * @param {number} duration - Duration in frames (-1 for infinite).
+   */
+  constructor(behaviorFn, duration = -1, repeat = true) {
+    super(duration, repeat);
+    this.behaviorFn = behaviorFn;
+  }
+
+  transform(t) {
+    return this.behaviorFn(t, this.t);
+  }
+}
+
+/**
+ * Factory functions for common palette behaviors.
+ */
+export const PaletteBehaviors = {
+  /**
+   * Linearly shifts t over time.
+   * @param {number} speed - Rate of change per frame.
+   */
+  Cycle: (speed = 0.01) => {
+    return (t, age) => (t + age * speed) % 1;
+  },
+
+  /**
+   * Oscillates t sinusodally.
+   * @param {number} freq - Frequency of oscillation.
+   * @param {number} amp - Amplitude of oscillation.
+   */
+  Breathe: (freq = 0.05, amp = 0.1) => {
+    return (t, age) => (t + Math.sin(age * freq) * amp);
+  },
+
+  /**
+   * Arbitrary mutation function.
+   * @param {Function} fn - Custom transform function.
+   */
+  Mutate: (fn) => fn
+};
