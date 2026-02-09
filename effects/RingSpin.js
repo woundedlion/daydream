@@ -87,7 +87,7 @@ export class RingSpin {
             };
 
             const basis = makeBasis(dot.q, dot.position);
-            Scan.Ring.draw(pipeline, basis, 1.0, this.thickness, colorFn, 0, this.debugBB);
+            Scan.Ring.draw(pipeline, basis, 1.0, this.thickness, colorFn, { phase: 0, debugBB: this.debugBB });
         }
     }
 }
