@@ -99,7 +99,7 @@ export class PetalFlow {
                 };
                 const pos = this.orientation.orient(invStereo(z));
                 const frag = fragmentPool.acquire();
-                frag.pos.copy(pos);
+                frag.pos = pos;
                 frag.v0 = t;
 
                 if (i > 0) {

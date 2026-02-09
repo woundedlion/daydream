@@ -17,6 +17,7 @@ const HiResFavorites = [
   "Comets",
   "DreamBalls",
   "FlowField",
+  "GnomonicStars",
   "GSReactionDiffusion",
   "HopfFibration",
   "IslamicStars",
@@ -33,7 +34,6 @@ const HiResFavorites = [
   "TestShapes",
   "TestTemporal",
   "Voronoi",
-  "GnomonicStars"
 ];
 
 const LoResFavorites = [
@@ -41,6 +41,7 @@ const LoResFavorites = [
   "Comets",
   "Dynamo",
   "FlowField",
+  "GnomonicStars",
   "GSReactionDiffusion",
   "IslamicStars",
   "MetaballEffect",
@@ -54,7 +55,6 @@ const LoResFavorites = [
   "TestTemporal",
   "Thrusters",
   "Voronoi",
-  "GnomonicStars"
 ];
 
 
@@ -103,8 +103,8 @@ const controls = {
 
       daydream.updateResolution(p.h, p.w, p.size);
 
-      // Update the dropdown options
-      updateEffectDropdown(availableEffects);
+      // Update the sidebar options
+      populateEffectSidebar(availableEffects);
 
       // Restart effect to use new resolution
       this.changeEffect(preserveParams);
@@ -142,41 +142,83 @@ const controls = {
 
 
     activeEffect = new EffectClass();
+    if (activeEffect && activeEffect.gui && window.innerWidth < 900) {
+      activeEffect.gui.close();
+    }
 
     // Ensure new effect's GUI is attached to our container
     if (activeEffect && activeEffect.gui) {
       const guiContainer = document.getElementById('gui-container');
-      if (guiContainer && activeEffect.gui.domElement.parentElement !== guiContainer) {
-        // Move the auto-placed container if implicit
+
+      // Helper to add class
+      const addEffectClass = (el) => {
+        el.classList.add('effect-gui');
+        el.classList.remove('global-gui'); // Safety
+      };
+
+      if (guiContainer) {
+        // Check if we need to move it (auto-place or just detached)
         const autoContainer = document.querySelector('body > .dg.ac');
         if (autoContainer) {
           guiContainer.appendChild(autoContainer);
+          addEffectClass(autoContainer);
         } else if (activeEffect.gui.domElement.parentElement !== guiContainer) {
-          // Or just the domain element if it's standalone
           guiContainer.appendChild(activeEffect.gui.domElement);
+          addEffectClass(activeEffect.gui.domElement);
+        } else {
+          // Already in container, just ensure class
+          addEffectClass(activeEffect.gui.domElement);
         }
       }
     }
+
+    // Update active state in sidebar
+    updateSidebarActiveState();
   }
 };
 
 const guiInstance = new GUI({ autoPlace: false });
+guiInstance.domElement.classList.add('global-gui');
+if (window.innerWidth < 900) {
+  guiInstance.close();
+}
 document.getElementById('gui-container').appendChild(guiInstance.domElement);
 
 guiInstance.add(controls, 'resolution', Object.keys(resolutionPresets))
   .name('Resolution')
   .onChange(() => controls.setResolution());
 
-let effectController = guiInstance.add(controls, 'effect', Object.keys(allEffects))
-  .name('Active Effect')
-  .onChange(() => controls.changeEffect());
+function populateEffectSidebar(options) {
+  const sidebar = document.getElementById('effect-sidebar');
+  if (!sidebar) return;
 
-function updateEffectDropdown(options) {
-  // Remove and recreate
-  guiInstance.remove(effectController);
-  effectController = guiInstance.add(controls, 'effect', options)
-    .name('Active Effect')
-    .onChange(() => controls.changeEffect());
+  sidebar.innerHTML = '';
+  options.forEach(effectName => {
+    const btn = document.createElement('button');
+    btn.className = 'effect-button';
+    btn.innerText = effectName;
+    btn.dataset.effect = effectName;
+    btn.onclick = () => {
+      controls.effect = effectName;
+      controls.changeEffect();
+    };
+    sidebar.appendChild(btn);
+  });
+  updateSidebarActiveState();
+}
+
+function updateSidebarActiveState() {
+  const sidebar = document.getElementById('effect-sidebar');
+  if (!sidebar) return;
+  const buttons = sidebar.querySelectorAll('.effect-button');
+  buttons.forEach(btn => {
+    if (btn.dataset.effect === controls.effect) {
+      btn.classList.add('active');
+      btn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } else {
+      btn.classList.remove('active');
+    }
+  });
 }
 
 let testAllInterval = null;
@@ -188,7 +230,6 @@ guiInstance.add(controls, 'testAll').name('Test All').onChange((v) => {
       const nextIndex = (currentIndex + 1) % currentList.length;
       controls.effect = currentList[nextIndex];
       controls.changeEffect();
-      effectController.updateDisplay();
     }, 1000);
   } else {
     clearInterval(testAllInterval);
@@ -209,6 +250,7 @@ const moveAutoGui = () => {
   const autoContainer = document.querySelector('body > .dg.ac');
   if (autoContainer) {
     document.getElementById('gui-container').appendChild(autoContainer);
+    autoContainer.classList.add('effect-gui');
   }
 };
 setInterval(moveAutoGui, 1000);
