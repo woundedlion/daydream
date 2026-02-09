@@ -148,8 +148,8 @@ export class MindSplatter {
             const alpha = Math.min(frag.v0, frag.v3);
             const particle = this.particleSystem.particles[Math.floor(frag.v2)];
             const c = particle.palette.get(frag.v0);
-
-            frag.color.set(c.color, c.alpha * alpha * opacity);
+            c.alpha *= alpha * opacity;
+            frag.color = c;
         }
 
         const vertexShader = (frag) => {

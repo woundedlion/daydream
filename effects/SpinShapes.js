@@ -71,7 +71,8 @@ export class SpinShapes {
         const c = Palettes.richSunset.get(t);
 
         const colorFn = (p, frag) => {
-            frag.color.set(c.color, 0.6 * alpha);
+            c.alpha = 0.6 * alpha;
+            frag.color = c;
         }
 
         const basis = makeBasis(shape.orientation.get(), shape.normal);

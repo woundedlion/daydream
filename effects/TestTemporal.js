@@ -266,7 +266,7 @@ export class TestTemporal {
 
         Plot.Mesh.draw(this.filters, this.mesh, (v, frag) => {
             // Base Color
-            const baseColor = colors.get((v.y + 1) * 0.5).clone();
+            const baseColor = colors.get((v.y + 1) * 0.5);
 
             let phase = (this.t * p.lightSpeed) % 1.0;
             if (phase < 0) phase += 1.0;
@@ -279,7 +279,7 @@ export class TestTemporal {
                 baseColor.lerp(new Color4(1, 1, 1, 1), strength * p.lightAlpha);
             }
 
-            frag.color.copy(baseColor);
+            frag.color = baseColor;
         });
 
         this.filters.flush(null, 1.0);

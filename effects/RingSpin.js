@@ -81,9 +81,7 @@ export class RingSpin {
 
         for (const dot of this.renderPlanes) {
             const colorFn = (p, frag) => {
-                frag.color.copy(dot.color);
-                frag.color.alpha = dot.alpha;
-                // dist unused
+                frag.color = dot;
             };
 
             const basis = makeBasis(dot.q, dot.position);

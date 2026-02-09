@@ -79,7 +79,8 @@ export class RingShower {
             (v, frag) => {
                 let z = this.orientation.orient(Daydream.X_AXIS);
                 const c = ring.palette.get(angleBetween(z, v) / Math.PI);
-                frag.color.set(c.color, c.alpha * this.alpha * opacity);
+                c.alpha *= this.alpha * opacity;
+                frag.color = c;
             }
         );
     }

@@ -19,7 +19,7 @@ import { tween } from "./animation.js";
  */
 export class Fragment {
   constructor() {
-    this.pos = new THREE.Vector3(); // Pre-allocate vector
+    this.pos = null; // Reference Only
     // Data Registers (Scalar slots for varying data)
     this.v0 = 0;
     this.v1 = 0;
@@ -28,7 +28,7 @@ export class Fragment {
     this.age = 0; // Added based on User Request (Fragment becomes source of truth)
 
     // Outputs
-    this.color = new Color4(0, 0, 0, 0);
+    this.color = null; // Reference Only
     this.blend = 0; // Default: 0 (Normal)
   }
 }

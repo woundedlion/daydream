@@ -6,19 +6,21 @@
 import * as THREE from "three";
 import { Daydream } from "./driver.js";
 import { makeBasis, angleBetween, yToPhi, getAntipode, fibSpiral } from "./geometry.js";
-import { vectorPool, StaticPool } from "./memory.js";
+import { vectorPool, StaticPool, color4Pool } from "./memory.js";
 import { Color4 } from "./color.js";
 import { quinticKernel } from "./filters.js";
 import { wrap } from "./util.js";
 
 import { BVH } from "./spatial.js";
 
+const _scanScratchColor = new Color4(0, 0, 0, 0);
+
 const _scanScratch = {
-    pos: new THREE.Vector3(),
+    pos: null,
     v0: 0, v1: 0, v2: 0, v3: 0,
     age: 0,
     weights: null,
-    color: new Color4(0, 0, 0, 0),
+    color: null,
     blend: 0
 }; // Scratch object for zero-alloc
 
@@ -1438,7 +1440,7 @@ export const Scan = {
                     }
 
                     if (sampleResult.dist < threshold) {
-                        _scanScratch.pos.copy(p);
+                        _scanScratch.pos = p; // Reference!
                         _scanScratch.v0 = sampleResult.t;
                         _scanScratch.v1 = sampleResult.dist; // Signed Distance
                         _scanScratch.v2 = (sampleResult.faceIndex !== undefined) ? sampleResult.faceIndex : 0;
@@ -1446,6 +1448,7 @@ export const Scan = {
                         _scanScratch.age = 0; // Default age for Scan
                         // Reset Outputs
                         _scanScratch.blend = 0;
+                        _scanScratch.color = _scanScratchColor; // Reference!
                         _scanScratch.color.set(0, 0, 0, 0);
 
                         if (sampleResult.weights) _scanScratch.weights = sampleResult.weights;

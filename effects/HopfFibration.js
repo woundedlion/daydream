@@ -191,7 +191,7 @@ export class HopfFibration {
                 // or just straight line dots. 
                 // Using rasterize with 2 points creates a line.
 
-                Plot.Line.draw(this.pipeline, prev, v, (p, frag) => { frag.color.copy(c); });
+                Plot.Line.draw(this.pipeline, prev, v, (p, frag) => { frag.color = c; });
             } else {
                 // First frame or reset, just draw dot
                 this.pipeline.plot(v, c, 0, 1.0);

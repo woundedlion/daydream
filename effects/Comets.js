@@ -150,8 +150,7 @@ export class Comets {
         for (const pt of this.renderPoints) {
             const pos = pt.position;
             const fragmentShader = (v, frag) => {
-                frag.color.copy(pt.color);
-                frag.color.alpha = pt.alpha;
+                frag.color = pt;
             };
             Scan.Point.draw(pipeline, pos, this.thickness, fragmentShader, { debugBB: this.debugBB });
         }
