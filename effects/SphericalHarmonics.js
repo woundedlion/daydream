@@ -127,10 +127,9 @@ export class SphericalHarmonics {
             } else {
                 // Swap channels to create a complementary Ice/Blue palette
                 const p = Palettes.richSunset.get(t);
-                base = {
-                    color: new THREE.Color(p.color.b, p.color.g * 0.8, p.color.r), // Blue-ish
-                    alpha: p.alpha
-                };
+                base = color4Pool.acquire();
+                base.color.setRGB(p.color.b, p.color.g * 0.8, p.color.r); // Blue-ish
+                base.alpha = p.alpha;
             }
 
             // B. Ambient Occlusion (The "Pretty Darkening")
@@ -148,8 +147,7 @@ export class SphericalHarmonics {
                 base.color.addScalar(0.15 * (t - 0.9) * 10);
             }
 
-            frag.color.copy(base.color);
-            frag.color.alpha = base.alpha;
+            frag.color = base;
         };
 
         Scan.rasterize(this.pipeline, blob, fragmentShader);

@@ -208,7 +208,7 @@ export class DreamBalls {
             const val = (frag.v0 !== undefined) ? frag.v0 : frag;
             const c = palette.get(val);
             c.alpha *= params.alpha * opacity;
-            frag.color.copy(c);
+            frag.color = c;
         };
 
         for (let i = 0; i < params.numCopies; i++) {

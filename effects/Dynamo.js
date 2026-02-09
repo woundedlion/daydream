@@ -168,7 +168,7 @@ export class Dynamo {
                 Plot.Point.draw(this.filters, from, (v, frag) => {
                     const c = this.color(v, 0);
                     c.alpha = (c.alpha || 1) * 0.5;
-                    frag.color.copy(c);
+                    frag.color = c;
                 });
             } else {
                 let from = pixelToVector(this.nodes[i - 1].x, this.nodeY(this.nodes[i - 1]));
@@ -176,7 +176,7 @@ export class Dynamo {
                 Plot.Line.draw(this.filters, from, to, (v, frag) => {
                     const c = this.color(v, 0);
                     c.alpha = (c.alpha || 1) * 0.5;
-                    frag.color.copy(c);
+                    frag.color = c;
                 });
             }
         }

@@ -98,7 +98,7 @@ export class MobiusGrid {
 
                 const res = this.palette.get(i / numRings);
                 res.alpha *= opacity * this.alpha;
-                frag.color.copy(res);
+                frag.color = res;
             };
 
             const vertexShaderFn = (frag) => {
@@ -138,7 +138,7 @@ export class MobiusGrid {
                 const tParam = (logR - logMin) / range;
                 const res = this.palette.get(wrap(tParam - phase, 1.0));
                 res.alpha *= opacity * this.alpha;
-                frag.color.copy(res);
+                frag.color = res;
             };
 
             const vertexShader = (frag) => {

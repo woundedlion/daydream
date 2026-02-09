@@ -83,8 +83,10 @@ export class Thrusters {
         const basis = makeBasis(ctx.orientation.get(), ctx.point);
         Plot.Ring.draw(this.filters, basis, ctx.radius,
             (v, frag) => {
-                let c = colorPool.acquire().setHex(0xffffff).multiplyScalar(opacity);
-                frag.color.set(c, opacity * this.alpha);
+                let c = color4Pool.acquire();
+                c.color.setHex(0xffffff).multiplyScalar(opacity);
+                c.alpha = opacity * this.alpha;
+                frag.color = c;
             });
     }
 
@@ -156,7 +158,7 @@ export class Thrusters {
                 let z = this.orientation.orient(Daydream.X_AXIS);
                 const c = this.palette.get(angleBetween(z, v) / Math.PI);
                 c.alpha *= this.alpha * opacity;
-                frag.color.copy(c);
+                frag.color = c;
             }
         );
     }

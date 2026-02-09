@@ -180,7 +180,7 @@ export class LSystem {
             for (let seg of this.segments) {
                 Plot.Line.draw(this.filters, seg.start, seg.end, (v, frag) => {
                     const c = this.palette.get((v.y + 1) / 2);
-                    frag.color.copy(c);
+                    frag.color = c;
                 });
             }
         }

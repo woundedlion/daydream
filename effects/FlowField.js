@@ -129,7 +129,7 @@ export class FlowField {
 
                     // We use p.y for palette
                     const val = (v.y + 1) / 2;
-                    frag.color.copy(this.palette.get(val));
+                    frag.color = this.palette.get(val);
                 });
             } else {
                 this.filters.plot(p.pos, color, 0, 0.8);

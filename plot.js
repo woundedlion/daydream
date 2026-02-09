@@ -7,11 +7,13 @@ import * as THREE from "three";
 import { Daydream } from "./driver.js";
 import { angleBetween, fibSpiral, makeBasis, getAntipode } from "./geometry.js";
 import { TWO_PI } from "./3dmath.js";
-import { vectorPool, quaternionPool, fragmentPool } from "./memory.js";
+import { Color4 } from "./color.js";
+import { vectorPool, quaternionPool, fragmentPool, color4Pool } from "./memory.js";
 import { deepTween } from "./animation.js";
 
 const _scratchVec = new THREE.Vector3();
 let _scratchFrag = null;
+let _scratchColor = null;
 
 // --- Interpolation Strategies (Factories) ---
 
@@ -102,20 +104,27 @@ export const Plot = {
          * @param {number} age - Age of operation
          */
         static draw(pipeline, v, fragmentShaderFn, age = 0) {
-            if (!_scratchFrag) _scratchFrag = new fragmentPool.Type();
 
-            _scratchFrag.pos.copy(v);
+            if (!_scratchFrag) _scratchFrag = new fragmentPool.Type();
+            if (!_scratchColor) _scratchColor = new Color4(0, 0, 0, 0);
+
+            _scratchFrag.pos = v; // Reference!
             _scratchFrag.age = age;
             _scratchFrag.v0 = 0;
             _scratchFrag.v1 = 0;
             _scratchFrag.v2 = 0;
             _scratchFrag.v3 = 0;
+            _scratchFrag.color = _scratchColor; // Reference!
             _scratchFrag.color.set(0, 0, 0, 0);
             _scratchFrag.blend = 0;
 
             fragmentShaderFn(v, _scratchFrag);
 
             pipeline.plot(v, _scratchFrag.color, _scratchFrag.age, _scratchFrag.color.alpha, _scratchFrag.blend);
+
+            // Clear references to safely release if needed (though scratch is reused)
+            _scratchFrag.pos = null;
+            _scratchFrag.color = null;
         }
     },
 
@@ -138,7 +147,7 @@ export const Plot = {
 
             if (Math.abs(angle) < 0.0001) {
                 const f = fragmentPool.acquire();
-                f.pos.copy(u);
+                f.pos = vectorPool.acquire().copy(u);
                 f.v0 = 0;
                 f.v1 = 0;
                 return [f];
@@ -150,7 +159,7 @@ export const Plot = {
                 let q = quaternionPool.acquire().setFromAxisAngle(axis, angle * t);
 
                 let p = fragmentPool.acquire();
-                p.pos.copy(u).applyQuaternion(q);
+                p.pos = vectorPool.acquire().copy(u).applyQuaternion(q);
                 p.v0 = t;
                 p.v1 = angle * t; // Cumulative Arc Length
                 p.v2 = 0;
@@ -213,11 +222,11 @@ export const Plot = {
             const p1 = fragmentPool.acquire();
             const p2 = fragmentPool.acquire();
 
-            p1.pos.copy(u);
+            p1.pos = vectorPool.acquire().copy(u);
             p1.v0 = start;
             p1.v1 = angleStart;
 
-            p2.pos.copy(p2Vec);
+            p2.pos = vectorPool.acquire().copy(p2Vec);
             p2.v0 = end;
             p2.v1 = angleEnd;
 
@@ -234,7 +243,7 @@ export const Plot = {
                 const pMid = fragmentPool.acquire();
                 const tempVec = vectorPool.acquire().copy(v1);
                 const qMid = quaternionPool.acquire().setFromAxisAngle(w, midAngle);
-                pMid.pos.copy(tempVec.applyQuaternion(qMid).normalize());
+                pMid.pos = vectorPool.acquire().copy(tempVec.applyQuaternion(qMid).normalize());
                 pMid.v0 = (start + end) / 2;
                 pMid.v1 = midAngle;
 
@@ -349,7 +358,7 @@ export const Plot = {
                 uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
 
                 let p = fragmentPool.acquire();
-                p.pos.copy(v).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
+                p.pos = vectorPool.acquire().copy(v).multiplyScalar(d).addScaledVector(uTemp, r).normalize();
                 p.v0 = i / numSamples;
                 p.v1 = theta * arcLengthScale;
                 p.v2 = i;
@@ -361,7 +370,7 @@ export const Plot = {
             if (points.length > 0) {
                 const first = points[0];
                 const last = fragmentPool.acquire();
-                last.pos.copy(first.pos);
+                last.pos = vectorPool.acquire().copy(first.pos);
                 last.v0 = 1.0;
                 last.v1 = TWO_PI * arcLengthScale;
                 last.v2 = numSamples;
@@ -414,9 +423,9 @@ export const Plot = {
             const dist = v1.distanceTo(v2);
 
             const p1 = fragmentPool.acquire();
-            p1.pos.copy(v1); p1.v0 = 0; p1.v1 = 0;
+            p1.pos = vectorPool.acquire().copy(v1); p1.v0 = 0; p1.v1 = 0;
             const p2 = fragmentPool.acquire();
-            p2.pos.copy(v2); p2.v0 = 1; p2.v1 = dist;
+            p2.pos = vectorPool.acquire().copy(v2); p2.v0 = 1; p2.v1 = dist;
             return [p1, p2];
         }
 
@@ -601,7 +610,7 @@ export const Plot = {
                 const sinT = Math.sin(theta);
 
                 const p = fragmentPool.acquire();
-                p.pos.copy(v).multiplyScalar(cosR)
+                p.pos = vectorPool.acquire().copy(v).multiplyScalar(cosR)
                     .addScaledVector(u, cosT * sinR)
                     .addScaledVector(w, sinT * sinR)
                     .normalize();
@@ -620,7 +629,7 @@ export const Plot = {
             if (points.length > 0) {
                 const first = points[0];
                 const last = fragmentPool.acquire();
-                last.pos.copy(first.pos);
+                last.pos = vectorPool.acquire().copy(first.pos);
                 last.v0 = 1.0;
 
                 // Add final chord
@@ -699,7 +708,7 @@ export const Plot = {
                 const cosT = Math.cos(theta);
                 const sinT = Math.sin(theta);
 
-                p.pos.copy(workBasis.v).multiplyScalar(cosR)
+                p.pos = vectorPool.acquire().copy(workBasis.v).multiplyScalar(cosR)
                     .addScaledVector(workBasis.u, cosT * sinR)
                     .addScaledVector(workBasis.w, sinT * sinR)
                     .normalize();
@@ -718,7 +727,7 @@ export const Plot = {
             if (points.length > 0) {
                 const first = points[0];
                 const last = fragmentPool.acquire();
-                last.pos.copy(first.pos);
+                last.pos = vectorPool.acquire().copy(first.pos);
                 last.v0 = 1.0;
                 // Accumulate last segment length
                 cumulativeLength += angleBetween(points[points.length - 1].pos, first.pos);
@@ -802,7 +811,7 @@ export const Plot = {
                 let uScale = r * cosShift + d * sinShift;
 
                 let p = fragmentPool.acquire();
-                p.pos.copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
+                p.pos = vectorPool.acquire().copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
 
                 if (i > 0) {
                     cumulativeLength += angleBetween(points[i - 1].pos, p.pos);
@@ -874,7 +883,7 @@ export const Plot = {
             for (let i = 0; i < n; i++) {
                 const pos = fibSpiral(n, eps, i);
                 const frag = fragmentPool.acquire();
-                frag.pos.copy(pos);
+                frag.pos = vectorPool.acquire().copy(pos);
                 frag.v0 = n > 1 ? i / (n - 1) : 0.0;
                 frag.v2 = 0;
                 frag.v3 = 0;
@@ -942,7 +951,7 @@ export const Plot = {
                     }
                     lastPos = v;
 
-                    frag.pos.copy(v);
+                    frag.pos = v; // Ownership transferred used to be vectorPool
                     frag.v0 = t;
                     frag.v1 = cumulativeLen;
                     frag.v2 = i;
@@ -991,6 +1000,7 @@ export const Plot = {
      */
     rasterize: (pipeline, points, shaderFn, closeLoop = false, age = 0, planarBasis = null) => {
         if (!_scratchFrag) _scratchFrag = new fragmentPool.Type();
+        if (!_scratchColor) _scratchColor = new Color4(0, 0, 0, 0);
 
         const len = points.length;
         if (len < 2) return;
@@ -1018,11 +1028,18 @@ export const Plot = {
 
                 if (!shouldOmit) {
                     lerpFragments(curr, next, 0, _scratchFrag);
-                    _scratchFrag.pos.copy(p1);
+                    _scratchFrag.pos = p1; // Reference
                     _scratchFrag.age = age;
+
+                    _scratchFrag.color = _scratchColor;
+                    _scratchFrag.color.set(0, 0, 0, 0);
+                    _scratchFrag.blend = 0;
 
                     shaderFn(p1, _scratchFrag);
                     pipeline.plot(p1, _scratchFrag.color, _scratchFrag.age, _scratchFrag.color.alpha, _scratchFrag.blend);
+
+                    _scratchFrag.pos = null;
+                    _scratchFrag.color = null;
                 }
                 continue;
             }
@@ -1051,10 +1068,17 @@ export const Plot = {
             // Draw Start Point
             map(0, pTemp);
             lerpFragments(curr, next, 0, _scratchFrag);
-            _scratchFrag.pos.copy(pTemp);
+            _scratchFrag.pos = pTemp; // Reference!
             _scratchFrag.age = age;
+
+            _scratchFrag.color = _scratchColor;
+            _scratchFrag.color.set(0, 0, 0, 0);
+            _scratchFrag.blend = 0;
+
             shaderFn(pTemp, _scratchFrag);
             pipeline.plot(pTemp, _scratchFrag.color, _scratchFrag.age, _scratchFrag.color.alpha, _scratchFrag.blend);
+            _scratchFrag.pos = null;
+            _scratchFrag.color = null;
 
             // Draw Steps
             const loopLimit = omitLast ? steps.length - 1 : steps.length;
@@ -1068,10 +1092,17 @@ export const Plot = {
                 map(t, pTemp);
 
                 lerpFragments(curr, next, t, _scratchFrag);
-                _scratchFrag.pos.copy(pTemp);
+                _scratchFrag.pos = pTemp; // Reference!
                 _scratchFrag.age = age;
+
+                _scratchFrag.color = _scratchColor;
+                _scratchFrag.color.set(0, 0, 0, 0);
+                _scratchFrag.blend = 0;
+
                 shaderFn(pTemp, _scratchFrag);
                 pipeline.plot(pTemp, _scratchFrag.color, _scratchFrag.age, _scratchFrag.color.alpha, _scratchFrag.blend);
+                _scratchFrag.pos = null;
+                _scratchFrag.color = null;
             }
         }
     },

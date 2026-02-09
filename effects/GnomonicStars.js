@@ -67,7 +67,7 @@ export class GnomonicStars {
         const fragmentShader = (p, frag) => {
             const t = (p.y + 1) * 0.5; // Map [-1, 1] to [0, 1]
             const c = Palettes.mangoPeel.get(t);
-            frag.color.copy(c);
+            frag.color = c;
         };
 
         const points = this.spiralParams.points;

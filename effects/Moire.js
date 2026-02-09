@@ -101,7 +101,8 @@ export class Moire {
                     // New code: (v, frag) => ...
 
                     const c = palette.get(frag.v0);
-                    frag.color.set(c.color, c.alpha * this.alpha);
+                    c.alpha *= this.alpha;
+                    frag.color = c;
                 },
                 this.rotation);
         }

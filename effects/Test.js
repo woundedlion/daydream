@@ -66,7 +66,6 @@ export class Test {
 
     drawFn(opacity) {
         for (let i = 0; i < this.numRings; ++i) {
-            // Verify Scan.DistortedRing
             const radius = 2 / (this.numRings + 1) * (i + 1);
             const shiftFn = (t) => sinWave(this.amplitude, -this.amplitude, 4, 0)(t);
             const amplitude = this.amplitudeRange;
@@ -78,8 +77,8 @@ export class Test {
                 (p, frag) => {
                     const t = frag.v0;
                     const c = this.ringPalette.get(t); // t is normalized azimuth (0..1)
-                    frag.color.copy(c.color);
-                    frag.color.alpha = c.alpha * opacity * this.alpha;
+                    c.alpha *= opacity * this.alpha;
+                    frag.color = c;
                 },
                 0, // phase
                 this.debugBB // debugBB
