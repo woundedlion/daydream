@@ -135,7 +135,6 @@ export const SDF = {
          * @returns {{start: number, end: number}[]|null}
          */
         getHorizontalBounds(y) {
-            // Optimization: Use pre-calculated R
             if (this.R < 0.01) return null;
 
             const phi = yToPhi(y);
@@ -145,7 +144,6 @@ export const SDF = {
             const denom = this.R * sinPhi;
             if (Math.abs(denom) < 0.000001) return null;
 
-            // Optimization: Use pre-calculated alpha
             const alpha = this.alpha;
 
             const D_max = this.cosMax;
@@ -199,8 +197,8 @@ export const SDF = {
          * @returns {{dist: number, t: number, rawDist: number}} The distance result.
          */
         distance(p, out = { dist: 100, t: 0, rawDist: 100 }, computeUVs = true) {
-            const dot = p.dot(this.normal);
-
+            // inline dot product for speed
+            const dot = p.x * this.nx + p.y * this.ny + p.z * this.nz;
             if (dot < this.cosMin || dot > this.cosMax) {
                 out.dist = 100.0;
                 return out;
