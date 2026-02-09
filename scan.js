@@ -1185,6 +1185,8 @@ export const SDF = {
 
             // Barycentric Weights (N-gon fan)
             if (out.weights) {
+                out.weights.i1 = -1; // Reset sentinel
+
                 if (N === 3) {
                     const v0 = v[0];
                     const v1 = v[1];
@@ -1227,9 +1229,11 @@ export const SDF = {
                         }
                     }
                     // Fallback: If outside all (due to AA boundary), use first triangle?
-                    if (out.weights.i1 === undefined) {
+                    if (out.weights.i1 === undefined || out.weights.i1 === -1) {
                         out.weights.a = 1; out.weights.b = 0; out.weights.c = 0;
-                        out.weights.i0 = 0; out.weights.i1 = 1; out.weights.i2 = 2;
+                        out.weights.i0 = 0;
+                        out.weights.i1 = (N > 1) ? 1 : 0;
+                        out.weights.i2 = (N > 2) ? 2 : ((N > 1) ? 1 : 0);
                     }
                 }
             }
@@ -1725,6 +1729,7 @@ export const Scan = {
 
             for (let i = 0; i < mesh.faces.length; i++) {
                 const faceIndices = mesh.faces[i];
+                if (faceIndices.length < 3) continue;
                 const shape = facePool.acquire();
                 shape.init(mesh.vertices, faceIndices, 0);
 
