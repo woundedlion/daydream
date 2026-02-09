@@ -33,7 +33,7 @@ export function mobiusTransform(v, params, target) {
  * @param {THREE.Vector3} target - Output vector.
  * @returns {THREE.Vector3} Transformed vector.
  */
-export function poincareTransform(v, params, target) {
+export function gnomonicMobiusTransform(v, params, target) {
   // 1. Preserve Hemisphere (Gnomonic is 2:1 mapping without this)
   const sign = v.z >= 0 ? 1 : -1;
 
