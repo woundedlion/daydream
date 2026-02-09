@@ -5,7 +5,7 @@ import { MobiusParams } from "../3dmath.js";
 import { Timeline, MobiusGenerate, Orientation, RandomWalk } from "../animation.js";
 import { createRenderPipeline } from "../filters.js";
 import { Scan } from "../scan.js";
-import { poincareTransform as gnomonicMobiusTransform, fibSpiral, makeBasis } from "../geometry.js";
+import { gnomonicMobiusTransform, fibSpiral, makeBasis } from "../geometry.js";
 import { Palettes } from "../palettes.js";
 
 export class GnomonicStars {
