@@ -22,6 +22,15 @@ const _scanScratch = {
     blend: 0
 }; // Scratch object for zero-alloc
 
+// Optimized shared result object
+const _sampleResult = {
+    dist: 100,
+    t: 0,
+    rawDist: 100,
+    faceIndex: -1,
+    weights: { a: 0, b: 0, c: 0 }
+};
+
 export const SDF = {
     Ring: class {
         /**
@@ -49,6 +58,10 @@ export const SDF = {
             this.nx = v.x;
             this.ny = v.y;
             this.nz = v.z;
+
+            // Pre-calculate horizontal bounds constants
+            this.R = Math.sqrt(this.nx * this.nx + this.nz * this.nz);
+            this.alpha = Math.atan2(this.nx, this.nz);
 
             this.targetAngle = radius * (Math.PI / 2);
             this.centerPhi = Math.acos(this.ny);
@@ -109,17 +122,18 @@ export const SDF = {
          * @returns {{start: number, end: number}[]|null}
          */
         getHorizontalBounds(y) {
+            // Optimization: Use pre-calculated R
+            if (this.R < 0.01) return null;
+
             const phi = yToPhi(y);
             const cosPhi = Math.cos(phi);
             const sinPhi = Math.sin(phi);
 
-            const R = Math.sqrt(this.nx * this.nx + this.nz * this.nz);
-            if (R < 0.01) return null;
-
-            const denom = R * sinPhi;
+            const denom = this.R * sinPhi;
             if (Math.abs(denom) < 0.000001) return null;
 
-            const alpha = Math.atan2(this.nx, this.nz);
+            // Optimization: Use pre-calculated alpha
+            const alpha = this.alpha;
 
             const D_max = this.cosMax;
             const D_min = this.cosMin;
@@ -1377,14 +1391,8 @@ export const Scan = {
     rasterize: (pipeline, shape, fragmentShaderFn, debugBB = false) => {
         const { yMin, yMax } = shape.getVerticalBounds();
 
-        // Reusable result object
-        const sampleResult = {
-            dist: 100,
-            t: 0,
-            rawDist: 100,
-            faceIndex: -1,
-            weights: { a: 0, b: 0, c: 0 }
-        };
+        // Use shared result object (Zero GC)
+        const sampleResult = _sampleResult;
 
         const pixelWidth = 2 * Math.PI / Daydream.W;
         const threshold = shape.isSolid ? pixelWidth : 0;
@@ -1787,4 +1795,3 @@ export const Scan = {
         }
     },
 };
-
