@@ -198,18 +198,19 @@ export const SDF = {
          * @param {{dist: number, t: number, rawDist: number}} [out] - Result object.
          * @returns {{dist: number, t: number, rawDist: number}} The distance result.
          */
-        distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
+        distance(p, out = { dist: 100, t: 0, rawDist: 100 }, computeUVs = true) {
             const dot = p.dot(this.normal);
+
             if (dot < this.cosMin || dot > this.cosMax) {
                 out.dist = 100.0;
                 return out;
             }
 
-            // Clip Planes Logic
+            // Clip Planes (if any)
             if (this.clipPlanes) {
                 for (let i = 0; i < this.clipPlanes.length; i++) {
-                    // If point is "behind" the plane, clip it
-                    if (p.dot(this.clipPlanes[i]) < 0) {
+                    const plane = this.clipPlanes[i];
+                    if (p.dot(plane) < 0) {
                         out.dist = 100.0;
                         return out;
                     }
@@ -217,25 +218,29 @@ export const SDF = {
             }
 
             let dist = 0;
+            // Linear approximation for small angles (Optimization)
             if (this.invSinTarget !== 0) {
-                // Approx
                 dist = Math.abs(dot - this.cosTarget) * this.invSinTarget;
             } else {
+                // Precise angle for large angles / poles
                 const polarAngle = Math.acos(Math.max(-1, Math.min(1, dot)));
                 dist = Math.abs(polarAngle - this.targetAngle);
             }
 
-            // Calculate t (azimuth)
-            const dotU = p.dot(this.u);
-            const dotW = p.dot(this.w);
-            let azimuth = Math.atan2(dotW, dotU);
-            if (azimuth < 0) azimuth += 2 * Math.PI;
-            azimuth += this.phase;
-            const t = azimuth / (2 * Math.PI);
+            let t = 0;
+            // OPTIMIZATION: Skip Atan2 if UVs are unused
+            if (computeUVs) {
+                const dotU = p.x * this.u.x + p.y * this.u.y + p.z * this.u.z;
+                const dotW = p.x * this.w.x + p.y * this.w.y + p.z * this.w.z;
+                let azimuth = Math.atan2(dotW, dotU);
+                if (azimuth < 0) azimuth += 2 * Math.PI;
+                azimuth += this.phase;
+                t = azimuth / (2 * Math.PI);
+            }
 
             out.dist = dist - this.thickness;
             out.t = t;
-            out.rawDist = dist;
+            // out.rawDist = dist; // Not strictly used by Ring, but good for debug
 
             return out;
         }
@@ -422,10 +427,9 @@ export const SDF = {
          * @param {{dist: number, t: number, rawDist: number}} [out] - Result.
          * @returns {{dist: number, t: number, rawDist: number}} Result.
          */
-        distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
-            const d1 = this.a.distance(p, out);
-            const resA = this.a.distance(p);
-            const resB = this.b.distance(p);
+        distance(p, out = { dist: 100, t: 0, rawDist: 100 }, computeUVs = true) {
+            const resA = this.a.distance(p, undefined, computeUVs);
+            const resB = this.b.distance(p, undefined, computeUVs);
 
             if (resA.dist < resB.dist) {
                 out.dist = resA.dist;
@@ -476,9 +480,9 @@ export const SDF = {
          * @param {{dist: number, t: number, rawDist: number}} [out] - Result.
          * @returns {{dist: number, t: number, rawDist: number}} Result.
          */
-        distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
-            const resA = this.a.distance(p);
-            const resB = this.b.distance(p);
+        distance(p, out = { dist: 100, t: 0, rawDist: 100 }, computeUVs = true) {
+            const resA = this.a.distance(p, undefined, computeUVs);
+            const resB = this.b.distance(p, undefined, computeUVs);
 
             const dist = Math.max(resA.dist, -resB.dist);
 
@@ -570,9 +574,9 @@ export const SDF = {
          * @param {{dist: number, t: number, rawDist: number}} [out] - Result.
          * @returns {{dist: number, t: number, rawDist: number}} Result.
          */
-        distance(p, out = { dist: 100, t: 0, rawDist: 100 }) {
-            const resA = this.a.distance(p);
-            const resB = this.b.distance(p);
+        distance(p, out = { dist: 100, t: 0, rawDist: 100 }, computeUVs = true) {
+            const resA = this.a.distance(p, undefined, computeUVs);
+            const resB = this.b.distance(p, undefined, computeUVs);
 
             if (resA.dist > resB.dist) {
                 out.dist = resA.dist;
@@ -1410,7 +1414,8 @@ export const Scan = {
          * @param {Function} fragmentShaderFn - Color function.
          * @param {boolean} [debugBB=false] - Debug.
          */
-    rasterize: (pipeline, shape, fragmentShaderFn, debugBB = false) => {
+    rasterize: (pipeline, shape, fragmentShaderFn, options = {}) => {
+        const { debugBB = false, computeUVs = true } = options;
         const { yMin, yMax } = shape.getVerticalBounds();
 
         // Use shared result object (Zero GC)
@@ -1421,77 +1426,93 @@ export const Scan = {
         const W = Daydream.W;
         const pixelPositions = Daydream.pixelPositions;
 
-        const runScanline = (xStart, xEnd, y) => {
-            for (let x = xStart; x <= xEnd; x++) {
-                // 1. Calculate Index
-                // Inline wrap() for speed: (x % W + W) % W
-                let wx = x % W;
-                if (wx < 0) wx += W;
-
-                const i = wx + y * W;
-                const p = pixelPositions[i];
-
-                if (debugBB) {
-                    Daydream.pixels[i * 3] += 0.02;
-                    Daydream.pixels[i * 3 + 1] += 0.02;
-                    Daydream.pixels[i * 3 + 2] += 0.02;
-                }
-
-                // 2. Distance Check
-                shape.distance(p, sampleResult);
-                const d = sampleResult.dist;
-
-                // 3. AA & Plot
-                if (d < threshold) {
-                    let aaAlpha = 1.0;
-
-                    if (shape.isSolid) {
-                        const t = 0.5 - d / (2 * pixelWidth);
-                        const tc = t < 0 ? 0 : (t > 1 ? 1 : t);
-                        aaAlpha = quinticKernel(tc);
-                    } else {
-                        if (shape.thickness > 0) {
-                            aaAlpha = quinticKernel(-d / shape.thickness);
-                        }
-                    }
-
-                    if (sampleResult.dist < threshold) {
-                        _scanScratch.pos = p; // Reference!
-                        _scanScratch.v0 = sampleResult.t;
-                        _scanScratch.v1 = sampleResult.dist; // Signed Distance
-                        _scanScratch.v2 = (sampleResult.faceIndex !== undefined) ? sampleResult.faceIndex : 0;
-                        _scanScratch.v3 = 0.0;
-                        _scanScratch.age = 0; // Default age for Scan
-                        // Reset Outputs
-                        _scanScratch.blend = 0; ``
-                        _scanScratch.color = _scanScratchColor; // Reference!
-
-                        if (sampleResult.weights) _scanScratch.weights = sampleResult.weights;
-                        if (sampleResult.size) _scanScratch.size = sampleResult.size;
-                        if (sampleResult.rawDist !== undefined) _scanScratch.rawDist = sampleResult.rawDist;
-
-                        // Execute Shader (Void Return, modifies _scanScratch)
-                        fragmentShaderFn(p, _scanScratch);
-
-                        pipeline.plot2D(wx, y, _scanScratch.color, _scanScratch.age, _scanScratch.color.alpha * aaAlpha, _scanScratch.blend);
-                    }
-                }
-            }
-        };
-
         for (let y = yMin; y <= yMax; y++) {
             let intervals = null;
+            // Optimization: Only call if method exists (it should for all SDFs)
             if (shape.getHorizontalBounds) {
                 intervals = shape.getHorizontalBounds(y);
             }
 
-            if (intervals) {
-                for (let k = 0; k < intervals.length; k++) {
+            // Normalize to a list of intervals [start, end]
+            // If no bounds, scan the whole line (0..W-1)
+            if (!intervals) {
+                // Determine valid range (e.g. Ring fallback)
+                // For now, simpler to just use [0, W-1] list
+                // intervals = [{start: 0, end: W - 1}]; // Cons: Allocation
+                // Zero-Alloc approach: Use a static scratch array for the fallback? 
+                // Or just handle the null case in the loop.
+                // Let's duplicate the loop logic to avoid allocation, or just iterate 0..W-1
+            }
+
+            // To avoid allocation:
+            const count = intervals ? intervals.length : 1;
+
+            for (let k = 0; k < count; k++) {
+                let xStart = 0;
+                let xEnd = W - 1;
+
+                if (intervals) {
                     const iv = intervals[k];
-                    runScanline(iv.start, iv.end, y);
+                    xStart = iv.start;
+                    xEnd = iv.end;
                 }
-            } else {
-                runScanline(0, W - 1, y);
+
+                for (let x = xStart; x <= xEnd; x++) {
+                    // 1. Calculate Index
+                    // Inline wrap() for speed: (x % W + W) % W
+                    let wx = x % W;
+                    if (wx < 0) wx += W;
+
+                    const i = wx + y * W;
+                    const p = pixelPositions[i];
+
+                    if (debugBB) {
+                        Daydream.pixels[i * 3] += 0.02;
+                        Daydream.pixels[i * 3 + 1] += 0.02;
+                        Daydream.pixels[i * 3 + 2] += 0.02;
+                    }
+
+                    // 2. Distance Check
+                    // Pass computeUVs flag to distance
+                    shape.distance(p, sampleResult, computeUVs);
+                    const d = sampleResult.dist;
+
+                    // 3. AA & Plot
+                    if (d < threshold) {
+                        let aaAlpha = 1.0;
+
+                        if (shape.isSolid) {
+                            const t = 0.5 - d / (2 * pixelWidth);
+                            const tc = t < 0 ? 0 : (t > 1 ? 1 : t);
+                            aaAlpha = quinticKernel(tc);
+                        } else {
+                            if (shape.thickness > 0) {
+                                aaAlpha = quinticKernel(-d / shape.thickness);
+                            }
+                        }
+
+                        if (sampleResult.dist < threshold) {
+                            _scanScratch.pos = p; // Reference!
+                            _scanScratch.v0 = sampleResult.t;
+                            _scanScratch.v1 = sampleResult.dist; // Signed Distance
+                            _scanScratch.v2 = (sampleResult.faceIndex !== undefined) ? sampleResult.faceIndex : 0;
+                            _scanScratch.v3 = 0.0;
+                            _scanScratch.age = 0; // Default age for Scan
+                            // Reset Outputs
+                            _scanScratch.blend = 0;
+                            _scanScratch.color = _scanScratchColor; // Reference!
+
+                            if (sampleResult.weights) _scanScratch.weights = sampleResult.weights;
+                            if (sampleResult.size) _scanScratch.size = sampleResult.size;
+                            if (sampleResult.rawDist !== undefined) _scanScratch.rawDist = sampleResult.rawDist;
+
+                            // Execute Shader (Void Return, modifies _scanScratch)
+                            fragmentShaderFn(p, _scanScratch);
+
+                            pipeline.plot2D(wx, y, _scanScratch.color, _scanScratch.age, _scanScratch.color.alpha * aaAlpha, _scanScratch.blend);
+                        }
+                    }
+                }
             }
         }
     },
@@ -1510,7 +1531,7 @@ export const Scan = {
          */
         static draw(pipeline, basis, radius, thickness, shiftFn, maxDistortion, fragmentShaderFn, phase = 0, debugBB = false) {
             const shape = new SDF.DistortedRing(basis, radius, thickness, shiftFn, maxDistortion, phase);
-            Scan.rasterize(pipeline, shape, fragmentShaderFn, debugBB);
+            Scan.rasterize(pipeline, shape, fragmentShaderFn, { debugBB });
         }
     },
 
@@ -1565,7 +1586,7 @@ export const Scan = {
 
             const face = facePool.acquire();
             face.init(vertices, indices, 0);
-            Scan.rasterize(pipeline, face, fragmentShaderFn, debugBB);
+            Scan.rasterize(pipeline, face, fragmentShaderFn, { debugBB });
         }
     },
 
@@ -1586,7 +1607,7 @@ export const Scan = {
 
             const thickness = radius * (Math.PI / 2);
             const shape = new SDF.PlanarPolygon({ v, u, w }, radius, thickness, sides, phase);
-            Scan.rasterize(pipeline, shape, fragmentShaderFn, debugBB);
+            Scan.rasterize(pipeline, shape, fragmentShaderFn, { debugBB });
         }
     },
 
@@ -1605,7 +1626,7 @@ export const Scan = {
             const { v, u, w } = res.basis;
             radius = res.radius;
             const shape = new SDF.Star({ v, u, w }, radius, sides, phase);
-            Scan.rasterize(pipeline, shape, fragmentShaderFn, debugBB);
+            Scan.rasterize(pipeline, shape, fragmentShaderFn, { debugBB });
         }
     },
 
@@ -1624,7 +1645,7 @@ export const Scan = {
             const { v, u, w } = res.basis;
             radius = res.radius;
             const shape = new SDF.Flower({ v, u, w }, radius, sides, phase);
-            Scan.rasterize(pipeline, shape, fragmentShaderFn, debugBB);
+            Scan.rasterize(pipeline, shape, fragmentShaderFn, { debugBB });
         }
     },
 
@@ -1640,7 +1661,7 @@ export const Scan = {
         static draw(pipeline, basis, radius, shaderFn, phase = 0, debugBB = false) {
             // A circle is a ring with radius 0 and thickness = radius
             const thickness = radius * (Math.PI / 2);
-            Scan.Ring.draw(pipeline, basis, 0, thickness, shaderFn, { phase, debugBB });
+
         }
     },
 
@@ -1656,7 +1677,7 @@ export const Scan = {
          */
         static draw(pipeline, basis, radius, thickness, shaderFn, options = {}) {
             const shape = new SDF.Ring(basis, radius, thickness, options);
-            Scan.rasterize(pipeline, shape, shaderFn, options.debugBB);
+            Scan.rasterize(pipeline, shape, shaderFn, options);
         }
     },
 
@@ -1704,12 +1725,9 @@ export const Scan = {
             _lineLimits.minPhi = minPhi;
             _lineLimits.maxPhi = maxPhi;
 
-            // Allow options to override default scratch, but usually we just mix them in?
-            // Since options is usually sparse, we can just use properties from options if needed?
-            // But Scan.Ring expects one object.
-            // We use _lineOptionsScratch as the base.
             _lineOptionsScratch.phase = options.phase;
             _lineOptionsScratch.debugBB = options.debugBB;
+            _lineOptionsScratch.computeUVs = options.computeUVs;
             _lineOptionsScratch.clipPlanes = _lineClipPlanes;
             _lineOptionsScratch.limits = _lineLimits;
             // Scan.Ring options: phase, clipPlanes, limits.
@@ -1775,7 +1793,7 @@ export const Scan = {
                     vertexData.push({ v0: 0, v1: 0, v2: i, v3: 0 });
                 }
 
-                Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
+                Scan.rasterize(pipeline, shape, renderColorFn, { debugBB });
             }
         }
     },
@@ -1792,7 +1810,7 @@ export const Scan = {
             const identity = quaternionPool.acquire().identity();
             const basis = makeBasis(identity, pos);
             // A point is a Ring with radius 0 and some thickness
-            Scan.Ring.draw(pipeline, basis, 0, thickness, fragmentShaderFn, 0, options && options.debugBB);
+            Scan.Ring.draw(pipeline, basis, 0, thickness, fragmentShaderFn, options);
         }
     },
 
