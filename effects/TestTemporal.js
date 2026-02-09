@@ -6,11 +6,11 @@
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
-import { Timeline, Orientation, Rotation, RandomWalk } from "../animation.js";
+import { Timeline, Orientation, Rotation, RandomWalk, PaletteAnimation, PaletteBehaviors } from "../animation.js";
 import { Plot } from "../plot.js";
 import { Solids } from "../solids.js";
 import { Palettes } from "../palettes.js";
-import { Color4 } from "../color.js";
+import { Color4, AnimatedPalette, CircularPalette } from "../color.js";
 import FastNoiseLite from "../FastNoiseLite.js";
 import {
     createRenderPipeline,
@@ -25,6 +25,12 @@ export class TestTemporal {
         this.timeline = new Timeline();
         this.orientation = new Orientation();
         this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
+
+        // Palette Setup
+        this.palette = new AnimatedPalette(new CircularPalette(Palettes.richSunset));
+        this.modifier = new PaletteAnimation(PaletteBehaviors.Cycle(0.02));
+        this.palette.add(this.modifier);
+        this.timeline.add(0, this.modifier);
 
         // Parameter Storage
         this.params = {
@@ -255,7 +261,7 @@ export class TestTemporal {
     drawFrame() {
         this.timeline.step();
         this.t += 1;
-        const colors = Palettes.richSunset;
+        const colors = this.palette;
         const p = this.params.Global;
 
         Plot.Mesh.draw(this.filters, this.mesh, (v, frag) => {

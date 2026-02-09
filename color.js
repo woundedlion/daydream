@@ -506,6 +506,27 @@ export class ReversePalette {
   }
 }
 
+/**
+ * A wrapper class that maps [0,1] to [0,1,0] (Triangle Wave).
+ * Useful for making any palette cycle seamlessly.
+ */
+export class CircularPalette {
+  /**
+   * @param {Object} palette - The original palette object.
+   */
+  constructor(palette) {
+    this.palette = palette;
+  }
+
+  get(t) {
+    // 0 -> 0
+    // 0.5 -> 1
+    // 1.0 -> 0
+    // formula: 1 - abs(2*t - 1)
+    return this.palette.get(1 - Math.abs(2 * t - 1));
+  }
+}
+
 
 /**
  * A wrapper class that applies falloff to both ends of an existing palette.
@@ -639,36 +660,44 @@ export class AlphaFalloffPalette {
 }
 
 /**
- * A wrapper class that cycles the input t by adding an offset.
- * tPrime = (t + cycle + phase) % 1
+ * A wrapper that applies a chain of modifiers to the palette parameter 't'
+ * before sampling the underlying source palette.
  */
-export class CyclingPalette {
+export class AnimatedPalette {
   /**
-   * @param {number} cycle - The cycle offset [0, 1].
-   * @param {number} [phase=0] - Additional phase offset [0, 1].
-   * @param {Object} palette - The original palette.
+   * @param {Object} source - The source Palette (e.g., Palettes.mangoPeel)
    */
-  constructor(cycle, phase = 0, palette) {
-    // If palette is passed as 2nd arg (phase omitted)
-    if (typeof phase === 'object' && phase.get) {
-      this.palette = phase;
-      this.phase = 0;
-    } else {
-      this.palette = palette;
-      this.phase = phase; // Fix bug: was phase=0 in param default, but if passed explicitly need to use it.
-    }
-    this.cycle = cycle;
+  constructor(source) {
+    this.source = source;
+    this.modifiers = []; // List of objects with a transform(t) method
   }
 
   /**
-   * Gets the color at the cycled position.
-   * @param {number} t - The position parameter [0, 1].
-   * @returns {{color: THREE.Color, alpha: number}} The sampled color and alpha.
+   * Explicitly connect a modifier to this palette.
+   * @param {Object} modifier - Object with a transform(t) method.
+   */
+  add(modifier) {
+    this.modifiers.push(modifier);
+    return this;
+  }
+
+  /**
+   * Sets the source palette.
+   * @param {Object} p - The new source palette.
+   */
+  setSource(p) { this.source = p; }
+
+  /**
+   * Palette Interface: Transforms parameter t through all modifiers, then samples source.
+   * @param {number} t - The lookup parameter (0..1)
+   * @returns {THREE.Color}
    */
   get(t) {
-    let tPrime = (t + this.cycle + this.phase) % 1;
-    // Handle negative results from modulo if any inputs are negative
-    if (tPrime < 0) tPrime += 1;
-    return this.palette.get(tPrime);
+    let finalT = t;
+    // Pipe t through the modifier chain: t -> m1 -> m2 ... -> t'
+    for (let i = 0; i < this.modifiers.length; i++) {
+      finalT = this.modifiers[i].transform(finalT);
+    }
+    return this.source.get(finalT);
   }
 }
