@@ -17,7 +17,7 @@ import {
     Orientation
 } from "../animation.js";
 import { easeMid } from "../easing.js";
-import { quaternionPool } from "../memory.js"; // vectorPool removed (using local scratch)
+import { quaternionPool, color4Pool } from "../memory.js"; // vectorPool removed (using local scratch)
 import { createRenderPipeline } from "../filters.js";
 import { smoothstep } from "../util.js";
 

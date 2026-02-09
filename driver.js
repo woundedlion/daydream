@@ -8,7 +8,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { pixelToSpherical, vectorToPixel, pixelToVector } from "./geometry.js";
 import { G as g } from "./geometry.js";
-import { vectorPool, quaternionPool, colorPool, color4Pool, dotPool, fragmentPool } from "./memory.js";
+import { vectorPool, quaternionPool, colorPool, color4Pool, dotPool, fragmentPool, basisPool } from "./memory.js";
 import { GUI } from "gui";
 
 import { Plot } from "./plot.js";
@@ -255,6 +255,7 @@ export class Daydream {
         vectorPool.reset();
         quaternionPool.reset();
         fragmentPool.reset();
+        basisPool.reset();
 
         Daydream.pixels.fill(0);
 
