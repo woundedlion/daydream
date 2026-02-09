@@ -1229,7 +1229,7 @@ export const SDF = {
                         }
                     }
                     // Fallback: If outside all (due to AA boundary), use first triangle?
-                    if (out.weights.i1 === undefined || out.weights.i1 === -1) {
+                    if (out.weights.i1 === -1) {
                         out.weights.a = 1; out.weights.b = 0; out.weights.c = 0;
                         out.weights.i0 = 0;
                         out.weights.i1 = (N > 1) ? 1 : 0;
