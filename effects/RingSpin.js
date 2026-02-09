@@ -18,6 +18,14 @@ import { createRenderPipeline } from "../filters.js";
 import { dotPool } from "../memory.js";
 
 
+// 1. Define a "Bucket" variable at module scope (outside the class)
+let _activeDot = null;
+
+// 2. Define the shader ONCE. V8 will optimize this specific function object.
+const staticColorFn = (p, frag) => {
+    frag.color = _activeDot; // Fast pointer swap
+};
+
 export class RingSpin {
     static Ring = class {
         constructor(normal, palette) {
@@ -80,12 +88,9 @@ export class RingSpin {
         }
 
         for (const dot of this.renderPlanes) {
-            const colorFn = (p, frag) => {
-                frag.color = dot;
-            };
-
             const basis = makeBasis(dot.q, dot.position);
-            Scan.Ring.draw(pipeline, basis, 1.0, this.thickness, colorFn, { phase: 0, debugBB: this.debugBB });
+            _activeDot = dot;
+            Scan.Ring.draw(pipeline, basis, 1.0, this.thickness, staticColorFn, { phase: 0, debugBB: this.debugBB });
         }
     }
 }
