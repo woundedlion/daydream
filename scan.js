@@ -1535,9 +1535,7 @@ export const Scan = {
 
             const face = facePool.acquire();
             face.init(vertices, indices, 0);
-
-            const renderColorFn = (p, frag) => fragmentShaderFn(p, frag);
-            Scan.rasterize(pipeline, face, renderColorFn, debugBB);
+            Scan.rasterize(pipeline, face, fragmentShaderFn, debugBB);
         }
     },
 
@@ -1558,8 +1556,7 @@ export const Scan = {
 
             const thickness = radius * (Math.PI / 2);
             const shape = new SDF.PlanarPolygon({ v, u, w }, radius, thickness, sides, phase);
-            const renderColorFn = (p, frag) => fragmentShaderFn(p, frag);
-            Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
+            Scan.rasterize(pipeline, shape, fragmentShaderFn, debugBB);
         }
     },
 
@@ -1578,8 +1575,7 @@ export const Scan = {
             const { v, u, w } = res.basis;
             radius = res.radius;
             const shape = new SDF.Star({ v, u, w }, radius, sides, phase);
-            const renderColorFn = (p, frag) => fragmentShaderFn(p, frag);
-            Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
+            Scan.rasterize(pipeline, shape, fragmentShaderFn, debugBB);
         }
     },
 
@@ -1598,8 +1594,7 @@ export const Scan = {
             const { v, u, w } = res.basis;
             radius = res.radius;
             const shape = new SDF.Flower({ v, u, w }, radius, sides, phase);
-            const renderColorFn = (p, frag) => fragmentShaderFn(p, frag);
-            Scan.rasterize(pipeline, shape, renderColorFn, debugBB);
+            Scan.rasterize(pipeline, shape, fragmentShaderFn, debugBB);
         }
     },
 
