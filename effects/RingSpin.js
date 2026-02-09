@@ -90,7 +90,7 @@ export class RingSpin {
         for (const dot of this.renderPlanes) {
             const basis = makeBasis(dot.q, dot.position);
             _activeDot = dot;
-            Scan.Ring.draw(pipeline, basis, 1.0, this.thickness, staticColorFn, { phase: 0, debugBB: this.debugBB });
+            Scan.Ring.draw(pipeline, basis, 1.0, this.thickness, staticColorFn, { phase: 0, debugBB: this.debugBB, computeUVs: false });
         }
     }
 }
