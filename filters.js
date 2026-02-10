@@ -768,3 +768,95 @@ export class FilterTemporal {
     this.currentFrame++;
   }
 }
+
+/**
+ * Pipeline-compatible Slew Rate Limiter.
+ */
+export class FilterSlewRate {
+  constructor(riseLimit = 1.0, fallLimit = 0.05) {
+    this.is2D = true;
+    this.hasHistory = true; // Signals pipeline to call flush
+    this.rise = riseLimit;
+    this.fall = fallLimit;
+    this.mode = 'linear'; // 'linear' or 'exponential'
+
+    // Persistent history buffer
+    this.history = new Float32Array(Daydream.W * Daydream.H * 3).fill(0);
+    // Target buffer for the current frame
+    this.target = new Float32Array(Daydream.W * Daydream.H * 3).fill(0);
+  }
+
+  plot(x, y, c, age, alpha, tag, pass) {
+    this.pass = pass;
+
+    // Calculate index from integer coordinates
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+
+    // Bounds check
+    if (ix < 0 || ix >= Daydream.W || iy < 0 || iy >= Daydream.H) return;
+
+    const idx = (ix + iy * Daydream.W) * 3;
+
+    // Write to internal target buffer with MAX blending to handle overlapping primitives/AA
+    this.target[idx] = Math.max(this.target[idx], c.r * alpha);
+    this.target[idx + 1] = Math.max(this.target[idx + 1], c.g * alpha);
+    this.target[idx + 2] = Math.max(this.target[idx + 2], c.b * alpha);
+  }
+
+  // Process entire frame
+  flush(trailFn, alpha) {
+    if (!this.pass) return;
+    const len = this.target.length;
+    // Iterate over R, G, B components linearly
+    for (let i = 0; i < len; i++) {
+      let cur = this.history[i];  // Float 0..1
+      let tgt = this.target[i];   // Float 0..1
+      let out = tgt;
+
+      if (this.mode === 'exponential') {
+        // Exponential Decay (Lerp)
+        // out = cur + (tgt - cur) * rate
+        if (tgt > cur) {
+          out = cur + (tgt - cur) * this.rise;
+        } else {
+          out = cur + (tgt - cur) * this.fall;
+        }
+      } else {
+        // Linear Decay (Constant Speed)
+        if (tgt > cur) {
+          if (tgt - cur > this.rise) {
+            out = cur + this.rise;
+          }
+        } else {
+          if (cur - tgt > this.fall) {
+            out = cur - this.fall;
+          }
+        }
+      }
+
+      // Clamp to 0..1
+      out = Math.max(0.0, Math.min(1.0, out));
+
+      // Update History
+      this.history[i] = out;
+
+      // Clear Target for next frame
+      this.target[i] = 0;
+    }
+
+    // Output the result
+    const pixelCount = Daydream.W * Daydream.H;
+    for (let i = 0; i < pixelCount; i++) {
+      const color = colorPool.acquire();
+      color.set(this.history[i * 3], this.history[i * 3 + 1], this.history[i * 3 + 2]);
+
+      // Optimization: Skip black pixels
+      if (color.r > 1e-6 || color.g > 1e-6 || color.b > 1e-6) {
+        const x = i % Daydream.W;
+        const y = Math.floor(i / Daydream.W);
+        this.pass(x, y, color, 0, 1.0, 0);
+      }
+    }
+  }
+}
