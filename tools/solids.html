@@ -901,7 +901,7 @@
                 if (opName === 'truncate') {
                     mesh = MeshOps.truncate(mesh, o.params.t);
                 } else if (opName === 'hankin') {
-                    mesh = MeshOps.hankin(mesh, o.params.angle);
+                    mesh = MeshOps.hankin(mesh, o.params.angle * (Math.PI / 180));
                 } else if (MeshOps[opName]) {
                     mesh = MeshOps[opName](mesh);
                 }
@@ -909,9 +909,9 @@
 
             let code = '';
             if (lang === 'cpp') {
-                code = generateCPlusPlus(mesh);
+                code = generateCPlusPlus(mesh, item);
             } else {
-                code = generateJavascript(mesh);
+                code = generateJavascript(mesh, item);
             }
 
             navigator.clipboard.writeText(code).then(() => {
@@ -920,27 +920,61 @@
             });
         };
 
-        function generateCPlusPlus(m) {
-            let s = '// Generated Solid (C++)\n';
-            s += `// V: ${m.vertices.length}, F: ${m.faces.length}\n\n`;
-            s += 'const std::vector<Vector3> vertices = {\n';
-            s += m.vertices.map((v, i) => `    Vector3(${v.x.toFixed(7)}, ${v.y.toFixed(7)}, ${v.z.toFixed(7)})${i < m.vertices.length - 1 ? ',' : ''}`).join('\n');
-            s += '\n};\n\n';
-            s += 'const std::vector<std::vector<int>> faces = {\n';
-            s += m.faces.map((f, i) => `    {${f.join(', ')}}${i < m.faces.length - 1 ? ',' : ''}`).join('\n');
-            s += '\n};\n';
+        function generateCPlusPlus(m, item) {
+            const structName = item.title.replace(/\s+/g, '');
+            const totalIndices = m.faces.reduce((acc, f) => acc + f.length, 0);
+
+            let s = `// Base: ${item.base}, Ops: ${item.desc}\n`;
+            s += `struct ${structName} {\n`;
+            s += `  static constexpr int NUM_VERTS = ${m.vertices.length};\n`;
+            s += `  static constexpr std::array<Vector, NUM_VERTS> vertices = {\n`;
+            s += m.vertices.map((v, i) => `    Vector(${v.x}f, ${v.y}f, ${v.z}f)${i < m.vertices.length - 1 ? ',' : ''}`).join('\n');
+            s += '\n  };\n';
+
+            s += `  static constexpr int NUM_FACES = ${m.faces.length};\n`;
+            s += `  static constexpr int TOTAL_FACE_INDICES = ${totalIndices};\n`;
+
+            s += `  static constexpr std::array<uint8_t, NUM_FACES> face_counts = {\n`;
+            s += '    ' + m.faces.map(f => f.length).join(', ') + '\n';
+            s += '  };\n';
+
+            s += `  static constexpr std::array<int, TOTAL_FACE_INDICES> faces = {\n`;
+
+            // Flatten faces
+            const flatFaces = [];
+            m.faces.forEach(f => flatFaces.push(...f));
+
+            // Wrap lines for readability
+            let faceStr = '    ';
+            flatFaces.forEach((idx, i) => {
+                faceStr += `${idx}${i < flatFaces.length - 1 ? ', ' : ''}`;
+                if ((i + 1) % 20 === 0 && i < flatFaces.length - 1) faceStr += '\n    ';
+            });
+            s += faceStr + '\n';
+            s += '  };\n';
+            s += '};\n';
             return s;
         }
 
-        function generateJavascript(m) {
-            let s = '// Generated Solid (JS)\n';
-            s += `// V: ${m.vertices.length}, F: ${m.faces.length}\n\n`;
-            s += 'const vertices = [\n';
-            s += m.vertices.map((v, i) => `    new THREE.Vector3(${v.x.toFixed(7)}, ${v.y.toFixed(7)}, ${v.z.toFixed(7)})${i < m.vertices.length - 1 ? ',' : ''}`).join('\n');
-            s += '\n];\n\n';
-            s += 'const faces = [\n';
-            s += m.faces.map((f, i) => `    [${f.join(', ')}]${i < m.faces.length - 1 ? ',' : ''}`).join('\n');
-            s += '\n];\n';
+        function generateJavascript(m, item) {
+            // camelCase for function name
+            const funcName = item.title.replace(/(?:^\w|[A-Z]|\b\w)/g, (word, index) => {
+                return index === 0 ? word.toLowerCase() : word.toUpperCase();
+            }).replace(/\s+/g, '');
+
+            let s = `  // Base: ${item.base}, Ops: ${item.desc}\n`;
+            s += `  ${funcName}() {\n`;
+            s += '    const m = {\n';
+            s += '      vertices: [\n';
+            s += m.vertices.map((v, i) => `        new THREE.Vector3(${v.x}, ${v.y}, ${v.z})${i < m.vertices.length - 1 ? ',' : ''}`).join('\n');
+            s += '\n      ],\n';
+            s += '      faces: [\n';
+            s += m.faces.map((f, i) => `        [${f.join(', ')}]${i < m.faces.length - 1 ? ',' : ''}`).join('\n');
+            s += '\n      ]\n';
+            s += '    };\n';
+            s += '    this.normalize(m);\n';
+            s += '    return m;\n';
+            s += '  },';
             return s;
         }
 
