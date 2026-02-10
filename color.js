@@ -106,7 +106,7 @@ export function blendAlpha(index, color, alpha, mode = 'over') {
   const pixels = Daydream.pixels;
 
   // Optimization: Skip invisible updates
-  if (alpha <= 0.001) return;
+  if (alpha <= 0.000001) return;
 
   if (mode === 'add') {
     // Additive: New light adds to existing light

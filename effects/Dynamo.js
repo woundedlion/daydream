@@ -18,7 +18,7 @@ import { GenerativePalette } from "../color.js";
 import { color4Pool } from "../memory.js";
 import { easeMid, easeInOutSin } from "../easing.js";
 import {
-    createRenderPipeline, FilterAntiAlias, FilterReplicate, FilterOrient, FilterWorldTrails
+    createRenderPipeline, Filter
 } from "../filters.js";
 import {
     dir, wrap, shortest_distance
@@ -50,10 +50,10 @@ export class Dynamo {
 
         // Filters
         this.filters = createRenderPipeline(
-            new FilterWorldTrails(this.trailLength, Math.max(4096, Daydream.W * Daydream.H)),
-            new FilterReplicate(3),
-            new FilterOrient(this.orientation),
-            new FilterAntiAlias()
+            new Filter.World.Trails(this.trailLength, Math.max(4096, Daydream.W * Daydream.H)),
+            new Filter.World.Replicate(3),
+            new Filter.World.Orient(this.orientation),
+            new Filter.Screen.AntiAlias()
         );
 
         // Scene

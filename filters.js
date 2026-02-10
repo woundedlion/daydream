@@ -6,12 +6,12 @@
 import * as THREE from "three";
 import { Daydream, XY } from "./driver.js";
 import { wrap } from "./util.js"
-import { blendAlpha, Color4 } from "./color.js";
+import { blendAlpha } from "./color.js";
 import { colorPool, fragmentPool } from "./memory.js";
 import { vectorToPixel, angleBetween, mobiusTransform } from "./geometry.js";
 import { vectorPool } from "./memory.js";
-import { Plot } from "./plot.js";
 import { tween } from "./animation.js";
+
 
 /** 
  * Data Packet for Shader Mode.
@@ -175,7 +175,10 @@ export function createRenderPipeline(...filters) {
 /**
  * Implements anti-aliasing by distributing color across a 2x2 pixel grid.
  */
-export class FilterAntiAlias {
+/**
+ * Implements anti-aliasing by distributing color across a 2x2 pixel grid.
+ */
+export class FilterScreenAntiAlias {
   constructor() {
     this.is2D = true;
   }
@@ -226,7 +229,10 @@ export class FilterAntiAlias {
 /**
  * Orients the pixel coordinates based on a given Orientation object.
  */
-export class FilterOrient {
+/**
+ * Orients the pixel coordinates based on a given Orientation object.
+ */
+export class FilterWorldOrient {
   /**
    * @param {Orientation} orientation - The orientation quaternion object.
    */
@@ -254,7 +260,10 @@ export class FilterOrient {
 /**
  * Applies different orientations to points in n latitude bands defined by axis.
  */
-export class FilterOrientSlice {
+/**
+ * Applies different orientations to points in n latitude bands defined by axis.
+ */
+export class FilterWorldOrientSlice {
   /**
    * @param {Orientation[]} orientations - Array of orientations (South to North).
    * @param {THREE.Vector3} axis - The axis defining the poles for slicing.
@@ -343,7 +352,11 @@ export class FilterWorldTrails {
  * Applies an alpha falloff based on distance from an origin point on the sphere.
  * Alpha falls off from 1.0 at `radius` to 0.0 at `0` distance using a quintic kernel.
  */
-export class FilterHole {
+/**
+ * Applies an alpha falloff based on distance from an origin point on the sphere.
+ * Alpha falls off from 1.0 at `radius` to 0.0 at `0` distance using a quintic kernel.
+ */
+export class FilterWorldHole {
   /**
    * @param {THREE.Vector3} origin - The center point of the falloff (normalized).
    * @param {number} radius - The radius (in radians) at which fading starts.
@@ -374,7 +387,10 @@ export class FilterHole {
 /**
  * Replicates the plotted pixel horizontally across the globe.
  */
-export class FilterReplicate {
+/**
+ * Replicates the plotted pixel horizontally across the globe.
+ */
+export class FilterWorldReplicate {
   /**
    * @param {number} count - The number of times to replicate the pixel across the width (Daydream.W).
    */
@@ -410,7 +426,11 @@ export class FilterReplicate {
  * Applies a Mobius Transformation to the 3D vectors.
  * Projects sphere -> complex plane -> transform -> sphere.
  */
-export class FilterMobius {
+/**
+ * Applies a Mobius Transformation to the 3D vectors.
+ * Projects sphere -> complex plane -> transform -> sphere.
+ */
+export class FilterWorldMobius {
   constructor() {
     this.is2D = false;
     this.params = new MobiusParams();
@@ -429,7 +449,10 @@ export class FilterMobius {
 /**
  * Splits the color into its R, G, B components and shifts them.
  */
-export class FilterChromaticShift {
+/**
+ * Splits the color into its R, G, B components and shifts them.
+ */
+export class FilterPixelChromaticShift {
   constructor() {
     this.is2D = true;
   }
@@ -513,7 +536,7 @@ export class FilterScreenTrails {
  * Applies a variable 3x3 Gaussian Blur.
  * @param {number} factor - Blur intensity [0.0 to 1.0].
  */
-export class FilterGaussianBlur {
+export class FilterScreenGaussianBlur {
   constructor(factor = 1.0) {
     this.is2D = true;
 
@@ -564,7 +587,7 @@ export class FilterGaussianBlur {
           const weight = this.kernel[k++];
 
           // Optimization: Skip zero-weight neighbors if factor is 0
-          if (weight > 0.001) {
+          if (weight > 0.00001) {
             pass(wrap(cx + dx, Daydream.W), ny, color, age, alpha * weight, tag);
           }
         }
@@ -597,7 +620,13 @@ class TemporalNode {
  * - O(1) Insertion / Free
  * - O(Window) Flush
  */
-export class FilterTemporal {
+/**
+ * Optimized Temporal Filter using TypedArray Linked Lists.
+ * - Zero Garbage Collection (Pre-allocated memory)
+ * - O(1) Insertion / Free
+ * - O(Window) Flush
+ */
+export class FilterScreenTemporal {
   /**
    * @param {Function} ttlFn - Function(x, y) => delay frames (float)
    * @param {number} windowSize - TAA Window (e.g. 1.5 frames)
@@ -716,7 +745,7 @@ export class FilterTemporal {
         if (dist <= win) {
           const intensity = 1.0 - (dist / win);
 
-          if (intensity > 0.01) {
+          if (intensity > 0.0001) {
             // Reconstruct Color
             this._tempColor.r = this.data[base + 2];
             this._tempColor.g = this.data[base + 3];
@@ -772,7 +801,7 @@ export class FilterTemporal {
 /**
  * Pipeline-compatible Slew Rate Limiter.
  */
-export class FilterSlewRate {
+export class FilterPixelSlew {
   constructor(riseLimit = 1.0, fallLimit = 0.05) {
     this.is2D = true;
     this.hasHistory = true; // Signals pipeline to call flush
@@ -860,3 +889,150 @@ export class FilterSlewRate {
     }
   }
 }
+
+class SlewNode {
+  constructor() {
+    this.x = 0;
+    this.y = 0;
+    this.r = 0;
+    this.g = 0;
+    this.b = 0;
+    this.a = 0; // Current intensity
+  }
+}
+
+export class FilterScreenSlew {
+  static Space = "Screen";
+  constructor(rise = 1.0, fall = 0.05) {
+    this.is2D = true;
+    this.rise = rise;
+    this.fall = fall;
+    this.buffer = new StaticCircularBuffer(50000); // Sparse list
+    this.pool = [];
+  }
+
+  plot(x, y, colorInput, age, alpha, tag, pass) {
+    this.pass = pass;
+    pass(x, y, colorInput, age, alpha, tag);
+
+    // For Screen Slew, we just Add a new node.
+    // The decay happens in Flush.
+    // Note: This does NOT do "max blending" with previous frame's node at same position 
+    // because it's sparse. It just starts a new decay trail.
+    // This effectively works like Trails but with Slew parameters controlling the fade curve.
+
+    let node = this.pool.pop() || new SlewNode();
+    node.x = x;
+    node.y = y;
+    const c = colorInput.isColor ? colorInput : (colorInput.color || colorInput);
+    node.r = c.r;
+    node.g = c.g;
+    node.b = c.b;
+    node.a = alpha; // Start alpha
+    this.buffer.push_back(node);
+  }
+
+  flush(trailFn, globalAlpha) {
+    if (!this.pass) return;
+
+    const count = this.buffer.size();
+    for (let i = 0; i < count; i++) {
+      const node = this.buffer.pop_front();
+
+      // Apply Decay (Fall)
+      node.a -= this.fall;
+
+      if (node.a > 0.00001) {
+        // Still alive
+        // Reuse temp color object to avoid GC, but class scope not shown here so using local
+        const c = { r: node.r, g: node.g, b: node.b };
+        this.pass(node.x, node.y, c, 0, node.a * globalAlpha, 0);
+        this.buffer.push_back(node);
+      } else {
+        // Dead
+        this.pool.push(node);
+      }
+    }
+  }
+}
+
+export class FilterPixelTrails {
+  constructor(decayFn) {
+    this.is2D = true;
+    // decayFn could be a simple float (0.1) or function
+    this.decay = typeof decayFn === 'number' ? decayFn : 0.05;
+    this.buffer = new Float32Array(Daydream.W * Daydream.H * 3).fill(0);
+  }
+
+  plot(x, y, c, age, alpha, tag, pass) {
+    this.pass = pass;
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    if (ix < 0 || ix >= Daydream.W || iy < 0 || iy >= Daydream.H) return;
+    const idx = (ix + iy * Daydream.W) * 3;
+
+    // Additive blend into buffer
+    this.buffer[idx] += c.r * alpha;
+    this.buffer[idx + 1] += c.g * alpha;
+    this.buffer[idx + 2] += c.b * alpha;
+
+    // Clamp
+    this.buffer[idx] = Math.min(1.0, this.buffer[idx]);
+    this.buffer[idx + 1] = Math.min(1.0, this.buffer[idx + 1]);
+    this.buffer[idx + 2] = Math.min(1.0, this.buffer[idx + 2]);
+  }
+
+  flush(unused, globalAlpha) {
+    if (!this.pass) return;
+    const len = this.buffer.length;
+    const decay = this.decay;
+
+    for (let i = 0; i < len; i++) {
+      if (this.buffer[i] > 0.00001) {
+        this.buffer[i] -= decay;
+        if (this.buffer[i] < 0) this.buffer[i] = 0;
+      }
+    }
+
+    const pixelCount = Daydream.W * Daydream.H;
+    for (let i = 0; i < pixelCount; i++) {
+      const r = this.buffer[i * 3];
+      const g = this.buffer[i * 3 + 1];
+      const b = this.buffer[i * 3 + 2];
+
+      if (r > 0 || g > 0 || b > 0) {
+        const color = colorPool.acquire().setRGB(r, g, b);
+        const x = i % Daydream.W;
+        const y = Math.floor(i / Daydream.W);
+        this.pass(x, y, color, 0, 1.0, 0);
+      }
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------
+// NAMESPACE EXPORT
+// ----------------------------------------------------------------------------
+
+export const Filter = {
+  World: {
+    Orient: FilterWorldOrient,
+    Slice: FilterWorldOrientSlice,
+    Trails: FilterWorldTrails,
+    Hole: FilterWorldHole,
+    Replicate: FilterWorldReplicate,
+    Mobius: FilterWorldMobius
+  },
+  Screen: {
+    AntiAlias: FilterScreenAntiAlias,
+    Trails: FilterScreenTrails,
+    Temporal: FilterScreenTemporal,
+    Blur: FilterScreenGaussianBlur,
+    Slew: FilterScreenSlew
+  },
+  Pixel: {
+    Slew: FilterPixelSlew,
+    ChromaticShift: FilterPixelChromaticShift,
+    Trails: FilterPixelTrails
+  }
+};

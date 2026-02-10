@@ -13,9 +13,7 @@ import { Palettes } from "../palettes.js";
 import { Color4, AnimatedPalette, CircularPalette } from "../color.js";
 import {
     createRenderPipeline,
-    FilterAntiAlias,
-    FilterOrient,
-    FilterSlewRate,
+    Filter,
 } from "../filters.js";
 
 export class TestSlewRate {
@@ -43,10 +41,10 @@ export class TestSlewRate {
         this.t = 0;
 
         // Setup Pipeline
-        this.filterSlew = new FilterSlewRate(this.params.rise, this.params.fall);
+        this.filterSlew = new Filter.Pixel.Slew(this.params.rise, this.params.fall);
         this.filterSlew.mode = this.params.mode;
-        this.filterOrient = new FilterOrient(this.orientation);
-        this.filterAA = new FilterAntiAlias();
+        this.filterOrient = new Filter.World.Orient(this.orientation);
+        this.filterAA = new Filter.Screen.AntiAlias();
 
         this.filters = createRenderPipeline(
             this.filterOrient,

@@ -18,7 +18,7 @@ import { Plot } from "../plot.js";
 import { ProceduralPalette } from "../color.js";
 import { easeMid, easeOutExpo, easeInSin, easeOutSin } from "../easing.js";
 import {
-    createRenderPipeline, FilterAntiAlias
+    createRenderPipeline, Filter
 } from "../filters.js";
 
 
@@ -49,7 +49,7 @@ export class Thrusters {
         );
 
         // Output Filters
-        this.filters = createRenderPipeline(new FilterAntiAlias())
+        this.filters = createRenderPipeline(new Filter.Screen.AntiAlias())
 
         // State
         this.t = 0;

@@ -15,7 +15,7 @@ import { Palettes } from "../palettes.js";
 import {
     Timeline, ParticleSystem, Sprite, RandomWalk, MobiusWarp, Orientation, RandomTimer
 } from "../animation.js";
-import { createRenderPipeline, FilterOrient, FilterAntiAlias, quinticKernel } from "../filters.js";
+import { createRenderPipeline, Filter, quinticKernel } from "../filters.js";
 import { Plot } from "../plot.js";
 import { MobiusParams } from "../3dmath.js";
 import { Solids } from "../solids.js";
@@ -35,7 +35,7 @@ export class MindSplatter {
 
         this.orientation = new Orientation();
         this.mobius = new MobiusParams();
-        this.pipeline = createRenderPipeline(new FilterOrient(this.orientation), new FilterAntiAlias());
+        this.pipeline = createRenderPipeline(new Filter.World.Orient(this.orientation), new Filter.Screen.AntiAlias());
 
         this.timeline = new Timeline();
         this.timeline = new Timeline();

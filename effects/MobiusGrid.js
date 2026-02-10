@@ -12,7 +12,7 @@ import {
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import {
-    createRenderPipeline, FilterAntiAlias, FilterOrient, FilterHole
+    createRenderPipeline, Filter
 } from "../filters.js";
 import { wrap } from "../util.js";
 import { GenerativePalette } from "../color.js";
@@ -28,13 +28,13 @@ export class MobiusGrid {
         this.palette = new GenerativePalette("circular", "split-complementary", "flat");
         this.orientation = new Orientation();
         this.timeline = new Timeline();
-        this.holeN = new FilterHole(new THREE.Vector3(0, 0, 1), 1.2);
-        this.holeS = new FilterHole(new THREE.Vector3(0, 0, -1), 1.2);
+        this.holeN = new Filter.World.Hole(new THREE.Vector3(0, 0, 1), 1.2);
+        this.holeS = new Filter.World.Hole(new THREE.Vector3(0, 0, -1), 1.2);
         this.filters = createRenderPipeline(
             this.holeN,
             this.holeS,
-            new FilterOrient(this.orientation),
-            new FilterAntiAlias()
+            new Filter.World.Orient(this.orientation),
+            new Filter.Screen.AntiAlias()
         );
         this.params = new MobiusParams(1, 0, 0, 0, 0, 0, 1, 0);
 

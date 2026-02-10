@@ -23,7 +23,7 @@ import {
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import {
-    createRenderPipeline, FilterAntiAlias
+    createRenderPipeline, Filter
 } from "../filters.js";
 
 export class Test {
@@ -36,7 +36,7 @@ export class Test {
         this.orientation = new Orientation();
         this.timeline = new Timeline();
         this.filters = createRenderPipeline(
-            new FilterAntiAlias()
+            new Filter.Screen.AntiAlias()
         );
 
         this.amplitude = 0;

@@ -17,7 +17,7 @@ import { Scan } from "../scan.js";
 import { GenerativePalette } from "../color.js";
 import { easeMid } from "../easing.js";
 import {
-    createRenderPipeline, FilterAntiAlias, FilterOrient
+    createRenderPipeline, Filter
 } from "../filters.js";
 import { TWO_PI } from "../3dmath.js";
 
@@ -38,8 +38,8 @@ export class Moire {
         this.timeline = new Timeline();
 
         this.filters = createRenderPipeline(
-            new FilterOrient(this.cameraOrientation),
-            new FilterAntiAlias()
+            new Filter.World.Orient(this.cameraOrientation),
+            new Filter.Screen.AntiAlias()
         );
 
         const rotationAxis1 = Daydream.X_AXIS;

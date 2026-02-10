@@ -20,7 +20,7 @@ import {
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import {
-    createRenderPipeline, FilterAntiAlias, FilterWorldTrails
+    createRenderPipeline, Filter
 } from "../filters.js";
 
 /**
@@ -60,8 +60,8 @@ export class FlowField {
 
         // --- Filters ---
         this.filters = createRenderPipeline(
-            new FilterWorldTrails(this.TRAIL_LENGTH),
-            new FilterAntiAlias()
+            new Filter.World.Trails(this.TRAIL_LENGTH),
+            new Filter.Screen.AntiAlias()
         );
 
         // --- Initialize Particles ---

@@ -17,7 +17,7 @@ import { Palettes } from "../palettes.js";
 import { TWO_PI } from "../3dmath.js";
 import { color4Pool } from "../memory.js";
 
-import { createRenderPipeline, FilterAntiAlias } from "../filters.js";
+import { createRenderPipeline, Filter } from "../filters.js";
 
 export class TestShapes {
     static Ring = class {
@@ -48,7 +48,7 @@ export class TestShapes {
         this._twist = 0;
 
         this.scanPipeline = createRenderPipeline();
-        this.plotPipeline = createRenderPipeline(new FilterAntiAlias());
+        this.plotPipeline = createRenderPipeline(new Filter.Screen.AntiAlias());
 
         this.setupGUI();
         this.rebuild();

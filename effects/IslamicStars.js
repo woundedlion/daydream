@@ -11,7 +11,7 @@ import { color4Pool } from "../memory.js";
 import { Solids } from "../solids.js";
 import { Plot } from "../plot.js";
 import { Scan } from "../scan.js";
-import { createRenderPipeline, FilterAntiAlias } from "../filters.js";
+import { createRenderPipeline, Filter } from "../filters.js";
 import { Palettes } from "../palettes.js";
 import { easeInOutSin, easeMid } from "../easing.js";
 import { Daydream } from "../driver.js";
@@ -31,7 +31,7 @@ export class IslamicStars {
     constructor() {
         this.orientation = new THREE.Quaternion();
         this.transformedVertices = [];
-        this.pipeline = createRenderPipeline(new FilterAntiAlias());
+        this.pipeline = createRenderPipeline(new Filter.Screen.AntiAlias());
 
         this.params = {
             solid: 'dodecahedron',

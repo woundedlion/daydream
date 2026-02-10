@@ -12,7 +12,7 @@ import {
 import { vectorToPixel } from "../geometry.js";
 import { easeInOutSin, easeMid } from "../easing.js";
 import {
-    createRenderPipeline, FilterAntiAlias
+    createRenderPipeline, Filter
 } from "../filters.js";
 import { GenerativePalette } from "../color.js";
 import { GSReaction } from "./GSReactionDiffusion.js";
@@ -231,7 +231,7 @@ export class BZReactionDiffusion {
         this.orientation = new Orientation();
 
         this.filters = createRenderPipeline(
-            new FilterAntiAlias()
+            new Filter.Screen.AntiAlias()
         );
 
         this.timeline = new Timeline();
