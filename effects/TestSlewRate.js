@@ -24,7 +24,10 @@ export class TestSlewRate {
         this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
 
         // Palette Setup
-        this.palette = new AnimatedPalette(new CircularPalette(Palettes.richSunset));
+        this.palette = new AnimatedPalette(
+            new CircularPalette(
+                Palettes.richSunset));
+
         this.modifier = new PaletteAnimation(PaletteBehaviors.Cycle(0.02));
         this.palette.add(this.modifier);
         this.timeline.add(0, this.modifier);
@@ -33,7 +36,7 @@ export class TestSlewRate {
         this.params = {
             mode: 'exponential',
             rise: 1.0,
-            fall: 0.2,
+            fall: 0.03,
             speed: 0.05,
             lightSize: 0.15
         };
@@ -41,15 +44,15 @@ export class TestSlewRate {
         this.t = 0;
 
         // Setup Pipeline
-        this.filterSlew = new Filter.Pixel.Slew(this.params.rise, this.params.fall);
+        this.filterSlew = new Filter.Screen.Slew(this.params.rise, this.params.fall, 500000);
         this.filterSlew.mode = this.params.mode;
         this.filterOrient = new Filter.World.Orient(this.orientation);
         this.filterAA = new Filter.Screen.AntiAlias();
 
         this.filters = createRenderPipeline(
             this.filterOrient,
+            this.filterSlew,
             this.filterAA,
-            this.filterSlew
         );
 
         // Load Mesh
