@@ -766,7 +766,6 @@ export class FilterScreenTemporal {
     }
 
     // 2. Clean Up Old Bucket
-    // The bucket at `frame - win - 1` has completely fallen out of scope.
     const cleanFrame = Math.floor(frame - win - 1);
     let cleanIdx = cleanFrame % this.bufferSize;
     if (cleanIdx < 0) cleanIdx += this.bufferSize;
@@ -809,9 +808,7 @@ export class FilterPixelSlew {
     this.fall = fallLimit;
     this.mode = 'linear'; // 'linear' or 'exponential'
 
-    // Persistent history buffer
     this.history = new Float32Array(Daydream.W * Daydream.H * 3).fill(0);
-    // Target buffer for the current frame
     this.target = new Float32Array(Daydream.W * Daydream.H * 3).fill(0);
   }
 
@@ -845,7 +842,6 @@ export class FilterPixelSlew {
 
       if (this.mode === 'exponential') {
         // Exponential Decay (Lerp)
-        // out = cur + (tgt - cur) * rate
         if (tgt > cur) {
           out = cur + (tgt - cur) * this.rise;
         } else {
