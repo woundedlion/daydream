@@ -27,5 +27,6 @@ export { TestTemporal } from "./TestTemporal.js";
 export { Thrusters } from "./Thrusters.js";
 export { Voronoi } from "./Voronoi.js";
 export { GnomonicStars } from "./GnomonicStars.js";
+export { TestSlewRate } from "./TestSlewRate.js";
 
 

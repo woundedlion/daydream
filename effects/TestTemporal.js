@@ -36,7 +36,7 @@ export class TestTemporal {
         this.params = {
             Global: {
                 temporalEnabled: true,
-                windowSize: 2,
+                windowSize: 3,
                 speed: 0.01,
                 lightSpeed: 0.05,
                 lightAlpha: 1.0,
@@ -71,7 +71,7 @@ export class TestTemporal {
             'Quantum Tunnel': this.delayQuantumTunnel.bind(this),
             'Datamosh': this.delayDatamosh.bind(this)
         };
-        this.currentDelayMode = 'Vertical Wave';
+        this.currentDelayMode = 'Diagonal Spiral';
 
         this.filterTemporal = new FilterTemporal(this.delayModes[this.currentDelayMode], this.params.Global.windowSize, 200);
 
