@@ -79,31 +79,23 @@ export class Moire {
     drawLayer(pipeline, palette, orientation) {
         const count = Math.ceil(this.density);
         const basis = makeBasis(orientation.get(), Daydream.Z_AXIS);
+
+        // Pre-create the wave function to avoid recreating it in the loop.
+        const wave = sinWave(-this.amp, this.amp, 4, 0);
+
+        // Pre-create the shader function to avoid recreating it in the loop.
+        const shader = (v, frag) => {
+            const c = palette.get(frag.v0);
+            c.alpha *= this.alpha;
+            frag.color = c;
+        };
+
         for (let i = 0; i <= count; i++) {
             const t = i / count;
             const r = t * 2.0;
             Plot.DistortedRing.draw(this.filters, basis, r,
-                sinWave(-this.amp, this.amp, 4, 0),
-                (v, frag) => {
-                    const val = (frag.v0 !== undefined) ? frag.v0 : frag; // Adapt to what DistortedRing puts in v0. Wait, distRing puts t in v0?
-                    // DistortedRing passes basis, r, thickness, shader, ...
-                    // Scan.Ring.draw calls shader(p, scratch)
-                    // scratch.v0 is set to sampleResult.t
-                    // varying.v0 IS t.
-                    // So frag.v0 is correct.
-                    // Old code: (v, t) => ... t.v0 ...
-                    // It seems old code expected 't' to be the fragment object?
-                    // Yes, scan.js passed _scanScratch as 2nd arg.
-                    // So old code was (v, frag) actually?
-                    // scan.js old: fragmentShaderFn(p, _scanScratch)
-                    // Moire.js old: (v, t) => { ... t.v0 ... }
-                    // So 't' WAS 'frag'.
-                    // New code: (v, frag) => ...
-
-                    const c = palette.get(frag.v0);
-                    c.alpha *= this.alpha;
-                    frag.color = c;
-                },
+                wave,
+                shader,
                 this.rotation);
         }
     }
@@ -117,4 +109,3 @@ export class Moire {
         this.drawLayer(this.filters, this.interferencePalette, this.layer2Orientation);  // Interference layer
     }
 }
-
