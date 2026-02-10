@@ -115,12 +115,6 @@ export class TestSlewRate {
                 let r = 1.0 - (dist / width)
                 intensity = r * r;
             }
-
-            // Apply intensity to alpha for slew rate testing
-            // High intensity = target 1.0 (Rise)
-            // Low intensity = target 0.0 (Fall)
-
-            // We'll modulate the color brightness too
             baseColor.lerp(new Color4(1, 1, 1, 1), intensity);
             frag.color = baseColor;
         });
