@@ -12,7 +12,7 @@ import {
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import {
-    createRenderPipeline, FilterAntiAlias
+    createRenderPipeline, Filter
 } from "../filters.js";
 import { GenerativePalette } from "../color.js";
 import { Plot } from "../plot.js";
@@ -40,7 +40,7 @@ export class RingShower {
         this.palette = new GenerativePalette();
         this.orientation = new Orientation();
         this.filters = createRenderPipeline(
-            new FilterAntiAlias()
+            new Filter.Screen.AntiAlias()
         );
 
         this.timeline = new Timeline();

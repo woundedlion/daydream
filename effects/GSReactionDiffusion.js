@@ -12,7 +12,7 @@ import {
 import { vectorPool } from "../memory.js";
 import { easeInOutSin, easeMid } from "../easing.js";
 import {
-    createRenderPipeline, FilterAntiAlias, FilterOrient
+    createRenderPipeline, Filter
 } from "../filters.js";
 import { GenerativePalette } from "../color.js";
 
@@ -188,8 +188,8 @@ export class GSReactionDiffusion {
         // Visualization
         this.orientation = new Orientation();
         this.filters = createRenderPipeline(
-            new FilterOrient(this.orientation),
-            new FilterAntiAlias()
+            new Filter.World.Orient(this.orientation),
+            new Filter.Screen.AntiAlias()
         );
 
         this.timeline = new Timeline();

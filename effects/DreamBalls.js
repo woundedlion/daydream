@@ -12,7 +12,7 @@ import {
 } from "../animation.js";
 import { easeMid, easeInOutSin } from "../easing.js";
 import {
-    createRenderPipeline, FilterAntiAlias, FilterOrientSlice
+    createRenderPipeline, Filter
 } from "../filters.js";
 import { AlphaFalloffPalette, FalloffPalette } from "../color.js";
 import { Solids } from "../solids.js";
@@ -91,11 +91,11 @@ export class DreamBalls {
 
 
         // Filters
-        this.sliceFilter = new FilterOrientSlice(this.orientations, this.hemisphereAxis);
+        this.sliceFilter = new Filter.World.Slice(this.orientations, this.hemisphereAxis);
         this.sliceFilter.enabled = this.enableSlice;
         this.filters = createRenderPipeline(
             this.sliceFilter,
-            new FilterAntiAlias()
+            new Filter.Screen.AntiAlias()
         );
 
         this.timeline.add(9, new RandomWalk(this.globalOrientation, Daydream.UP));

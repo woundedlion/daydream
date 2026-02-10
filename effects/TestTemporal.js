@@ -14,9 +14,7 @@ import { Color4, AnimatedPalette, CircularPalette } from "../color.js";
 import FastNoiseLite from "../FastNoiseLite.js";
 import {
     createRenderPipeline,
-    FilterAntiAlias,
-    FilterOrient,
-    FilterTemporal,
+    Filter,
 } from "../filters.js";
 
 export class TestTemporal {
@@ -73,10 +71,10 @@ export class TestTemporal {
         };
         this.currentDelayMode = 'Diagonal Spiral';
 
-        this.filterTemporal = new FilterTemporal(this.delayModes[this.currentDelayMode], this.params.Global.windowSize, 200);
+        this.filterTemporal = new Filter.Screen.Temporal(this.delayModes[this.currentDelayMode], this.params.Global.windowSize, 200);
 
-        this.filterOrient = new FilterOrient(this.orientation);
-        this.filterAA = new FilterAntiAlias();
+        this.filterOrient = new Filter.World.Orient(this.orientation);
+        this.filterAA = new Filter.Screen.AntiAlias();
 
         this.filters = createRenderPipeline(
             this.filterOrient,

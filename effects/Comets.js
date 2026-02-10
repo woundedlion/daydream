@@ -17,7 +17,7 @@ import { Scan } from "../scan.js";
 import { GenerativePalette, blendAlpha } from "../color.js";
 import { easeMid } from "../easing.js";
 import {
-    createRenderPipeline, FilterAntiAlias, FilterOrient, quinticKernel
+    createRenderPipeline, quinticKernel
 } from "../filters.js";
 import { randomBetween, wrap } from "../util.js";
 

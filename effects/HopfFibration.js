@@ -11,7 +11,7 @@ import { Timeline, Rotation, Orientation } from "../animation.js";
 import { vectorPool } from "../memory.js";
 import { Plot } from "../plot.js";
 import { TWO_PI } from "../3dmath.js";
-import { createRenderPipeline, FilterAntiAlias, FilterWorldTrails, FilterOrient } from "../filters.js";
+import { createRenderPipeline, Filter } from "../filters.js";
 import { Palettes } from "../palettes.js";
 import { easeMid } from "../easing.js";
 
@@ -47,9 +47,9 @@ export class HopfFibration {
         this.gui.add(this, 'alpha', 0, 1).name('Opacity');
 
         this.pipeline = createRenderPipeline(
-            new FilterWorldTrails(40, 200000),
-            new FilterOrient(this.orientation),
-            new FilterAntiAlias()
+            new Filter.World.Trails(40, 200000),
+            new Filter.World.Orient(this.orientation),
+            new Filter.Screen.AntiAlias()
         );
 
         // Timeline with standard Rotation animation

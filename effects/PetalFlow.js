@@ -10,7 +10,7 @@ import { sinWave } from "../geometry.js";
 import { Mutation, Rotation, Timeline, Orientation } from "../animation.js";
 import { easeMid } from "../easing.js";
 import { ProceduralPalette } from "../color.js";
-import { createRenderPipeline, FilterOrient, FilterAntiAlias } from "../filters.js";
+import { createRenderPipeline, Filter } from "../filters.js";
 import { Plot } from "../plot.js";
 import { invStereo, TWO_PI } from "../3dmath.js";
 import { wrap } from "../util.js";
@@ -32,8 +32,8 @@ export class PetalFlow {
 
         this.orientation = new Orientation();
         this.filters = createRenderPipeline(
-            new FilterOrient(this.orientation),
-            new FilterAntiAlias()
+            new Filter.World.Orient(this.orientation),
+            new Filter.Screen.AntiAlias()
         );
         this.timeline = new Timeline();
         this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, Math.PI / 4, 160, easeMid, true));

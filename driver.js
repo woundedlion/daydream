@@ -364,7 +364,7 @@ export class Daydream {
           `
           #include <begin_vertex>
           #if defined(USE_INSTANCING_COLOR)
-             if (dot(instanceColor, instanceColor) < 0.0001) {
+             if (dot(instanceColor, instanceColor) < 0.00000001) {
                  transformed *= 0.0;
              }
           #endif

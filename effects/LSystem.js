@@ -8,7 +8,7 @@ import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { Timeline, Rotation, Orientation } from "../animation.js";
 import { Plot } from "../plot.js";
-import { createRenderPipeline, FilterOrient, FilterAntiAlias } from "../filters.js";
+import { createRenderPipeline, Filter } from "../filters.js";
 import { easeMid } from "../easing.js";
 import { GenerativePalette } from "../color.js";
 import { TWO_PI } from "../3dmath.js";
@@ -47,8 +47,8 @@ export class LSystem {
         this.orientation = new Orientation();
         this.timeline = new Timeline();
         this.filters = createRenderPipeline(
-            new FilterOrient(this.orientation),
-            new FilterAntiAlias()
+            new Filter.World.Orient(this.orientation),
+            new Filter.Screen.AntiAlias()
         );
         this.palette = new GenerativePalette();
 
