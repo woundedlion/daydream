@@ -897,29 +897,23 @@ class SlewNode {
     this.r = 0;
     this.g = 0;
     this.b = 0;
-    this.a = 0; // Current intensity
+    this.a = 0;
   }
 }
 
 export class FilterScreenSlew {
   static Space = "Screen";
-  constructor(rise = 1.0, fall = 0.05) {
+  constructor(rise = 1.0, fall = 0.05, maxCapacity) {
     this.is2D = true;
     this.rise = rise;
     this.fall = fall;
-    this.buffer = new StaticCircularBuffer(50000); // Sparse list
+    this.buffer = new StaticCircularBuffer(maxCapacity); // Sparse list
     this.pool = [];
   }
 
   plot(x, y, colorInput, age, alpha, tag, pass) {
     this.pass = pass;
     pass(x, y, colorInput, age, alpha, tag);
-
-    // For Screen Slew, we just Add a new node.
-    // The decay happens in Flush.
-    // Note: This does NOT do "max blending" with previous frame's node at same position 
-    // because it's sparse. It just starts a new decay trail.
-    // This effectively works like Trails but with Slew parameters controlling the fade curve.
 
     let node = this.pool.pop() || new SlewNode();
     node.x = x;
@@ -928,7 +922,7 @@ export class FilterScreenSlew {
     node.r = c.r;
     node.g = c.g;
     node.b = c.b;
-    node.a = alpha; // Start alpha
+    node.a = alpha;
     this.buffer.push_back(node);
   }
 
@@ -937,14 +931,14 @@ export class FilterScreenSlew {
 
     const count = this.buffer.size();
     for (let i = 0; i < count; i++) {
-      const node = this.buffer.pop_front();
+      const node = this.buffer.front();
+      this.buffer.pop();
 
       // Apply Decay (Fall)
       node.a -= this.fall;
 
       if (node.a > 0.00001) {
         // Still alive
-        // Reuse temp color object to avoid GC, but class scope not shown here so using local
         const c = { r: node.r, g: node.g, b: node.b };
         this.pass(node.x, node.y, c, 0, node.a * globalAlpha, 0);
         this.buffer.push_back(node);

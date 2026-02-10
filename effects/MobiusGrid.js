@@ -22,7 +22,7 @@ import { makeBasis, mobiusTransform, sinWave } from "../geometry.js";
 
 export class MobiusGrid {
     constructor() {
-        this.alpha = 0.2;
+        this.alpha = 1.0;
         this.numRings = 0;
         this.numLines = 0;
         this.palette = new GenerativePalette("circular", "split-complementary", "flat");
@@ -88,14 +88,7 @@ export class MobiusGrid {
             const opacity = Math.min(1.0, Math.max(0.0, numRings - i));
 
             const fragmentShader = (pTransformed, frag) => {
-                const t = frag.v0; // t matches previous logic (i/numRings + phase) which determines geometry, but color logic depended on i/numRings.
-                // Wait, drawAxisRings iterates i. 
-                // The shader uses 'i' from closure? Yes.
-                // "const res = this.palette.get(i / numRings);"
-                // So 'tPoly' was unused in original code?
-                // Original: (pTransformed, tPoly) => ...
-                // It ignored tPoly.
-
+                const t = frag.v0;
                 const res = this.palette.get(i / numRings);
                 res.alpha *= opacity * this.alpha;
                 frag.color = res;
