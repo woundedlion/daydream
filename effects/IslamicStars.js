@@ -8,7 +8,7 @@ import { gui } from "gui";
 import { Timeline, RandomWalk, Mutation, MeshMorph, Sprite, Orientation } from "../animation.js";
 import { MeshOps, sinWave } from "../geometry.js";
 import { color4Pool } from "../memory.js";
-import { Solids } from "../solids.js";
+import { Solids, PlatonicSolids, ArchimedeanSolids } from "../solids.js";
 import { Plot } from "../plot.js";
 import { Scan } from "../scan.js";
 import { createRenderPipeline, Filter } from "../filters.js";
@@ -46,7 +46,7 @@ export class IslamicStars {
             hankinAngle: Math.PI / 4
         };
 
-        this.solidsList = Object.keys(Solids).filter(k => typeof Solids[k] === 'function' && k !== 'normalize');
+        this.solidsList = [...PlatonicSolids, ...ArchimedeanSolids];
         this.solidIndex = this.solidsList.indexOf(this.params.solid);
         if (this.solidIndex === -1) {
             this.solidIndex = 0;
