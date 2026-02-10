@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
-import { Timeline, Rotation, Orientation } from "../animation.js";
+import { Timeline, Animation, Orientation } from "../animation.js";
 import { Plot } from "../plot.js";
 import { createRenderPipeline, Filter } from "../filters.js";
 import { easeMid } from "../easing.js";
@@ -117,7 +117,7 @@ export class LSystem {
         this.regenerate();
 
         // Spin the tree
-        this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, TWO_PI, 1200, easeMid, true));
+        this.timeline.add(0, new Animation.Rotation(this.orientation, Daydream.Y_AXIS, TWO_PI, 1200, easeMid, true));
     }
 
     regenerate() {

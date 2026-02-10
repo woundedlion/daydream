@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { sinWave } from "../geometry.js";
-import { Mutation, Rotation, Timeline, Orientation } from "../animation.js";
+import { Animation, Timeline, Orientation } from "../animation.js";
 import { easeMid } from "../easing.js";
 import { ProceduralPalette } from "../color.js";
 import { createRenderPipeline, Filter } from "../filters.js";
@@ -36,8 +36,8 @@ export class PetalFlow {
             new Filter.Screen.AntiAlias()
         );
         this.timeline = new Timeline();
-        this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, Math.PI / 4, 160, easeMid, true));
-        this.timeline.add(0, new Mutation(this, 'twistFactor', sinWave(2.0, 2.5, 1, 0), 160, easeMid, true));
+        this.timeline.add(0, new Animation.Rotation(this.orientation, Daydream.Y_AXIS, Math.PI / 4, 160, easeMid, true));
+        this.timeline.add(0, new Animation.Mutation(this, 'twistFactor', sinWave(2.0, 2.5, 1, 0), 160, easeMid, true));
         this.setupGui();
     }
 

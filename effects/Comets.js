@@ -12,7 +12,7 @@ import {
 } from "../geometry.js";
 import { vectorPool, dotPool, color4Pool } from "../memory.js";
 import { Plot } from "../plot.js";
-import { Path, deepTween, Timeline, Sprite, Motion, RandomWalk, PeriodicTimer, ColorWipe, OrientationTrail, Orientation } from "../animation.js";
+import { Path, deepTween, Timeline, Animation, OrientationTrail, Orientation } from "../animation.js";
 import { Scan } from "../scan.js";
 import { GenerativePalette, blendAlpha } from "../color.js";
 import { easeMid } from "../easing.js";
@@ -75,13 +75,13 @@ export class Comets {
         this.nodes = [];
 
         this.timeline.add(0,
-            new PeriodicTimer(2 * this.cycleDuration, () => {
+            new Animation.PeriodicTimer(2 * this.cycleDuration, () => {
                 this.curFunction = Math.floor(randomBetween(0, this.functions.length));
                 this.updatePath();
                 this.updatePalette();
             }, true)
         );
-        this.timeline.add(0, new RandomWalk(this.orientation, randomVector()));
+        this.timeline.add(0, new Animation.RandomWalk(this.orientation, randomVector()));
 
         for (let i = 0; i < this.numNodes; ++i) {
             this.spawnNode(this.path);
@@ -111,7 +111,7 @@ export class Comets {
     updatePalette() {
         this.nextPalette = new GenerativePalette("straight", "triadic", "ascending");
         this.timeline.add(0,
-            new ColorWipe(this.palette, this.nextPalette, 48, easeMid)
+            new Animation.ColorWipe(this.palette, this.nextPalette, 48, easeMid)
         );
     }
 
@@ -120,7 +120,7 @@ export class Comets {
         let node = new Comets.Node(path, this.trailLength);
         this.nodes.push(node);
         this.timeline.add(i * this.spacing,
-            new Motion(node.orientation, node.path, this.cycleDuration, true)
+            new Animation.Motion(node.orientation, node.path, this.cycleDuration, true)
         );
     }
 

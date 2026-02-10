@@ -5,7 +5,7 @@
 
 import * as THREE from "three";
 import { gui } from "gui";
-import { Timeline, RandomWalk, Mutation, MeshMorph, Sprite, Orientation } from "../animation.js";
+import { Timeline, Animation, Orientation } from "../animation.js";
 import { MeshOps, sinWave } from "../geometry.js";
 import { color4Pool } from "../memory.js";
 import { Solids, PlatonicSolids, ArchimedeanSolids } from "../solids.js";
@@ -67,7 +67,7 @@ export class IslamicStars {
     }
 
     startRotation() {
-        this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
+        this.timeline.add(0, new Animation.RandomWalk(this.orientation, Daydream.UP));
     }
 
     startHankin() {
@@ -80,11 +80,11 @@ export class IslamicStars {
             this.compiledHankin = null;
         }
 
-        this.timeline.add(0, new Mutation(
+        this.timeline.add(0, new Animation.Mutation(
             this.params, 'hankinAngle', sinWave(0, Math.PI / 2, 1, 0), 64, easeMid, false)
             .then(() => this.startMorph()));
 
-        this.timeline.add(0, new Sprite((opacity) => {
+        this.timeline.add(0, new Animation.Sprite((opacity) => {
             let mesh = this.scanSolid;
 
             if (this.params.hankin) {
@@ -128,19 +128,19 @@ export class IslamicStars {
 
         // Start Morph
         const morphParams = { ...this.params, target: nextName };
-        this.currentMorph = new MeshMorph(this.renderMesh, nextMesh, 16, false, easeInOutSin, morphParams);
+        this.currentMorph = new Animation.MeshMorph(this.renderMesh, nextMesh, 16, false, easeInOutSin, morphParams);
         this.timeline.add(0, this.currentMorph.then(() => {
             this.currentMorph = null;
             this.startHankin();
         }));
 
         // Draw outgoing mesh
-        this.timeline.add(0, new Sprite((opacity) => {
+        this.timeline.add(0, new Animation.Sprite((opacity) => {
             this.drawMesh(this.renderMesh, opacity);
         }, 16, 0, easeMid, 16, easeMid));
 
         // Draw incoming mesh
-        this.timeline.add(0, new Sprite((opacity) => {
+        this.timeline.add(0, new Animation.Sprite((opacity) => {
             if (this.currentMorph && this.currentMorph.destMesh) {
                 this.drawMesh(this.currentMorph.destMesh, opacity);
             }

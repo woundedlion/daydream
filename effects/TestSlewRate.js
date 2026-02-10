@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
-import { Timeline, Orientation, Rotation, RandomWalk, PaletteAnimation, PaletteBehaviors } from "../animation.js";
+import { Timeline, Orientation, Animation, PaletteBehaviors } from "../animation.js";
 import { Plot } from "../plot.js";
 import { Solids } from "../solids.js";
 import { Palettes } from "../palettes.js";
@@ -21,14 +21,14 @@ export class TestSlewRate {
         // Setup Timeline and Orientation
         this.timeline = new Timeline();
         this.orientation = new Orientation();
-        this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
+        this.timeline.add(0, new Animation.RandomWalk(this.orientation, Daydream.UP));
 
         // Palette Setup
         this.palette = new AnimatedPalette(
             new CircularPalette(
                 Palettes.richSunset));
 
-        this.modifier = new PaletteAnimation(PaletteBehaviors.Cycle(0.02));
+        this.modifier = new Animation.PaletteAnimation(PaletteBehaviors.Cycle(0.02));
         this.palette.add(this.modifier);
         this.timeline.add(0, this.modifier);
 

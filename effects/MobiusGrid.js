@@ -8,7 +8,7 @@ import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { MobiusParams, TWO_PI } from "../3dmath.js";
 import {
-    Timeline, Rotation, PeriodicTimer, ColorWipe, MobiusWarpCircular, Mutation, Orientation
+    Timeline, Animation, Orientation
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import {
@@ -38,15 +38,15 @@ export class MobiusGrid {
         );
         this.params = new MobiusParams(1, 0, 0, 0, 0, 0, 1, 0);
 
-        this.warpAnim = new MobiusWarpCircular(this.params, 160, 1.0, true);
+        this.warpAnim = new Animation.MobiusWarpCircular(this.params, 160, 1.0, true);
         this.timeline.add(0, this.warpAnim);
-        this.timeline.add(0, new Rotation(this.orientation, Daydream.Y_AXIS, TWO_PI, 400, easeMid, true));
-        this.timeline.add(0, new PeriodicTimer(120, () => this.wipePalette(), true));
+        this.timeline.add(0, new Animation.Rotation(this.orientation, Daydream.Y_AXIS, TWO_PI, 400, easeMid, true));
+        this.timeline.add(0, new Animation.PeriodicTimer(120, () => this.wipePalette(), true));
         this.timeline.add(0,
-            new Mutation(this, 'numRings', (t) => sinWave(12, 1, 1, 0)(t), 320, easeMid, true)
+            new Animation.Mutation(this, 'numRings', (t) => sinWave(12, 1, 1, 0)(t), 320, easeMid, true)
         )
         this.timeline.add(160,
-            new Mutation(this, 'numLines', (t) => sinWave(12, 1, 1, 0)(t), 320, easeMid, true)
+            new Animation.Mutation(this, 'numLines', (t) => sinWave(12, 1, 1, 0)(t), 320, easeMid, true)
         )
 
         this.setupGui();
@@ -69,7 +69,7 @@ export class MobiusGrid {
 
     wipePalette() {
         this.nextPalette = new GenerativePalette("circular", "split-complementary", "flat");
-        this.timeline.add(0, new ColorWipe(this.palette, this.nextPalette, 60, easeMid));
+        this.timeline.add(0, new Animation.ColorWipe(this.palette, this.nextPalette, 60, easeMid));
     }
 
     drawAxisRings(pipeline, normal, numRings, mobiusParams, axisComponent, phase = 0, rotationQ) {

@@ -7,7 +7,7 @@
 import * as THREE from "three";
 import { gui } from "../gui.js";
 import { Daydream } from "../driver.js";
-import { Timeline, Rotation, Orientation } from "../animation.js";
+import { Timeline, Animation, Orientation } from "../animation.js";
 import { vectorPool } from "../memory.js";
 import { Plot } from "../plot.js";
 import { TWO_PI } from "../3dmath.js";
@@ -55,7 +55,7 @@ export class HopfFibration {
         // Timeline with standard Rotation animation
         this.timeline = new Timeline();
         const duration = this.cameraSpeed > 0 ? (TWO_PI / this.cameraSpeed) : 10000;
-        this.rotationAnim = new Rotation(this.orientation, Daydream.Y_AXIS, TWO_PI, duration, easeMid, true);
+        this.rotationAnim = new Animation.Rotation(this.orientation, Daydream.Y_AXIS, TWO_PI, duration, easeMid, true);
         this.timeline.add(0, this.rotationAnim);
 
         this.initFibers();

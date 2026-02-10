@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Timeline, Sprite, RandomWalk, Rotation, Mutation, Orientation
+    Timeline, Animation, Orientation
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import { Scan } from "../scan.js";
@@ -57,7 +57,7 @@ export class TestShapes {
     rebuild() {
         this.rings = [];
         this.timeline = new Timeline(); // Reset timeline
-        this.timeline.add(0, new Mutation(this, '_twist', (t) => (Math.PI / 4) * Math.sin(t * Math.PI), 480, easeMid, true));
+        this.timeline.add(0, new Animation.Mutation(this, '_twist', (t) => (Math.PI / 4) * Math.sin(t * Math.PI), 480, easeMid, true));
 
         const seed1 = Math.floor(Math.random() * 65535);
         const seed2 = Math.floor(Math.random() * 65535);
@@ -106,9 +106,9 @@ export class TestShapes {
         let ring = new TestShapes.Ring(normal, scale, color, mode, layerIndex);
         this.rings.push(ring);
         const antipode = (normal.x < -0.5) ? normal.clone().negate() : normal;
-        this.timeline.add(0, new RandomWalk(ring.orientation, antipode, { seed: seed }));
-        this.timeline.add(0, new Rotation(ring.orientation, ring.normal, TWO_PI, 160, easeMid, true, "Local"));
-        this.timeline.add(0, new Sprite((alpha) => this.drawShape(ring, alpha), -1));
+        this.timeline.add(0, new Animation.RandomWalk(ring.orientation, antipode, { seed: seed }));
+        this.timeline.add(0, new Animation.Rotation(ring.orientation, ring.normal, TWO_PI, 160, easeMid, true, "Local"));
+        this.timeline.add(0, new Animation.Sprite((alpha) => this.drawShape(ring, alpha), -1));
     }
 
     drawShape(ring, spriteAlpha) {

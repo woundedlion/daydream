@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Timeline, Sprite, Rotation, Orientation
+    Timeline, Animation, Orientation
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import { Scan } from "../scan.js";
@@ -55,14 +55,14 @@ export class SpinShapes {
             // Layer 1
             const s1 = new SpinShapes.Shape(normal, 0);
             this.shapes.push(s1);
-            this.timeline.add(0, new Rotation(s1.orientation, s1.normal, TWO_PI, 300 + i * 2, easeMid, true, "Local"));
-            this.timeline.add(0, new Sprite((alpha) => this.drawShape(s1, alpha), -1));
+            this.timeline.add(0, new Animation.Rotation(s1.orientation, s1.normal, TWO_PI, 300 + i * 2, easeMid, true, "Local"));
+            this.timeline.add(0, new Animation.Sprite((alpha) => this.drawShape(s1, alpha), -1));
 
             // Layer 2
             const s2 = new SpinShapes.Shape(normal, 1);
             this.shapes.push(s2);
-            this.timeline.add(0, new Rotation(s2.orientation, s2.normal, -TWO_PI, 300 + i * 2, easeMid, true, "Local"));
-            this.timeline.add(0, new Sprite((alpha) => this.drawShape(s2, alpha), -1));
+            this.timeline.add(0, new Animation.Rotation(s2.orientation, s2.normal, -TWO_PI, 300 + i * 2, easeMid, true, "Local"));
+            this.timeline.add(0, new Animation.Sprite((alpha) => this.drawShape(s2, alpha), -1));
         }
     }
 

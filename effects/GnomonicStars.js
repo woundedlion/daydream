@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { GUI } from "gui";
 import { Daydream } from "../driver.js";
 import { MobiusParams } from "../3dmath.js";
-import { Timeline, MobiusGenerate, Orientation, RandomWalk } from "../animation.js";
+import { Timeline, Animation, Orientation } from "../animation.js";
 import { createRenderPipeline } from "../filters.js";
 import { Scan } from "../scan.js";
 import { gnomonicMobiusTransform, fibSpiral, makeBasis } from "../geometry.js";
@@ -19,9 +19,10 @@ export class GnomonicStars {
             scale: 0.5,
             speed: 0.05
         };
-        this.generator = new MobiusGenerate(this.params, this.genParams.scale, this.genParams.speed);
+        this.generator = new Animation.MobiusGenerate(this.params, this.genParams.scale, this.genParams.speed);
         this.timeline.add(0, this.generator);
-        this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP, RandomWalk.Brisk));
+        this.timeline.add(0, new Animation.RandomWalk(this.orientation, Daydream.UP, Animation.RandomWalk.Brisk));
+
 
         // Spiral parameters
         this.spiralParams = {

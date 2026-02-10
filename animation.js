@@ -197,7 +197,7 @@ export class Timeline {
   /**
    * Add animation.
    * @param {number} inFrames - Delay.
-   * @param {Animation} animation - Animation.
+   * @param {Animation.Base} animation - Animation.
    * @returns {Timeline} Self.
    */
   add(inFrames, animation) {
@@ -255,7 +255,7 @@ export class Timeline {
 /**
  * Animation base class.
  */
-export class Animation {
+class Base {
   /**
    * @param {number} duration - Frames.
    * @param {boolean} repeat - Loop.
@@ -292,7 +292,7 @@ export class Animation {
   /**
    * Sets a callback to run after completion.
    * @param {Function} post - Callback function.
-   * @returns {Animation} Self.
+   * @returns {Base} Self.
    */
   then(post) {
     this.post = post;
@@ -313,7 +313,7 @@ export const PARTICLE_BASE = new THREE.Vector3(0, 1, 0);
 /**
  * Physics particle system.
  */
-export class ParticleSystem extends Animation {
+class ParticleSystem extends Base {
   static Particle = class {
     /**
      * @param {THREE.Vector3} position - Position.
@@ -551,7 +551,7 @@ export class ParticleSystem extends Animation {
 /**
  * Randomized timer.
  */
-export class RandomTimer extends Animation {
+class RandomTimer extends Base {
   /**
    * @param {number} min - Min delay frames.
    * @param {number} max - Max delay frames.
@@ -591,7 +591,7 @@ export class RandomTimer extends Animation {
 /**
  * Regular interval timer.
  */
-export class PeriodicTimer extends Animation {
+class PeriodicTimer extends Base {
   /**
    * @param {number} period - Interval frames.
    * @param {Function} f - Callback.
@@ -627,7 +627,7 @@ export class PeriodicTimer extends Animation {
 /**
  * Property transition.
  */
-export class Transition extends Animation {
+class Transition extends Base {
   /**
    * @param {Object} target - Object.
    * @param {string} property - Property name.
@@ -663,7 +663,7 @@ export class Transition extends Animation {
 /**
  * Property mutation.
  */
-export class Mutation extends Animation {
+class Mutation extends Base {
   /**
    * @param {Object} target - Object.
    * @param {string} property - Property name.
@@ -695,7 +695,7 @@ export class Mutation extends Animation {
 /**
  * Fade-in/out sprite animation.
  */
-export class Sprite extends Animation {
+class Sprite extends Base {
   /**
    * @param {Function} drawFn - Draw callback(opacity).
    * @param {number} duration - Total frames.
@@ -737,7 +737,7 @@ export class Sprite extends Animation {
 /**
  * Orientation path animation.
  */
-export class Motion extends Animation {
+class Motion extends Base {
   static get MAX_ANGLE() { return TWO_PI / Daydream.W; }
 
   /**
@@ -806,7 +806,7 @@ export class Motion extends Animation {
 /**
  * Axis rotation.
  */
-export class Rotation extends Animation {
+class Rotation extends Base {
   static get MAX_ANGLE() { return TWO_PI / Daydream.W; }
 
   /**
@@ -877,7 +877,7 @@ export class Rotation extends Animation {
 /**
  * Random surface walk.
  */
-export class RandomWalk extends Animation {
+class RandomWalk extends Base {
   static Languid = { speed: 0.02, pivotStrength: 0.1, noiseScale: 0.02 };
   static Brisk = { speed: 0.06, pivotStrength: 0.1, noiseScale: 0.02 };
   static Energetic = { speed: 0.05, pivotStrength: 0.4, noiseScale: 0.08 };
@@ -927,7 +927,7 @@ export class RandomWalk extends Animation {
 /**
  * Transitions from one color palette to another.
  */
-export class ColorWipe extends Animation {
+class ColorWipe extends Base {
   /**
    * @param {Object} fromPalette - The source palette.
    * @param {Object} toPalette - The target palette.
@@ -957,7 +957,7 @@ export class ColorWipe extends Animation {
 /**
  * Animates the Mobius parameters for a continuous loxodromic flow.
  */
-export class MobiusFlow extends Animation {
+class MobiusFlow extends Base {
   /**
    * @param {Object} params - The Mobius parameters object.
    * @param {number} numRings - Number of rings in the flow.
@@ -991,7 +991,7 @@ export class MobiusFlow extends Animation {
 /**
  * Animates the Mobius parameters for a warping effect pulling the poles together.
  */
-export class MobiusWarp extends Animation {
+class MobiusWarp extends Base {
   /**
    * @param {Object} params - The Mobius parameters.
    * @param {number} duration - Animation duration.
@@ -1017,7 +1017,7 @@ export class MobiusWarp extends Animation {
 /**
  * Animates the Mobius parameters for a warping effect pulling the poles together in a circular motion.
  */
-export class MobiusWarpCircular extends Animation {
+class MobiusWarpCircular extends Base {
   /**
    * @param {Object} params - The Mobius parameters.
    * @param {number} duration - Animation duration.
@@ -1094,7 +1094,7 @@ export class OrientationTrail {
  * "Super-Source" mesh morphing.
  * Projects source vertices onto destination surface, animates, then swaps topology.
  */
-export class MeshMorph extends Animation {
+class MeshMorph extends Base {
   /**
    * @param {Object} source - Source mesh {vertices, faces}.
    * @param {string} dest - Target solid name.
@@ -1395,7 +1395,7 @@ export const deepTween = (orientationTrail, drawFn) => {
  * Continuously modulates Mobius parameters to create an evolving warp.
  * Uses multiple frequencies for non-repeating chaos.
  */
-export class MobiusGenerate extends Animation {
+class MobiusGenerate extends Base {
   /**
    * @param {MobiusParams} params - The params to animate.
    * @param {number} scale - Magnitude of modulation.
@@ -1447,7 +1447,7 @@ export class MobiusGenerate extends Animation {
 /**
  * Adapts an arbitrary behavior function to the Animation system.
  */
-export class PaletteAnimation extends Animation {
+class PaletteAnimation extends Base {
   /**
    * @param {Function} behaviorFn - Function(t, age) returning transformed t.
    * @param {number} duration - Duration in frames (-1 for infinite).
@@ -1488,4 +1488,24 @@ export const PaletteBehaviors = {
    * @param {Function} fn - Custom transform function.
    */
   Mutate: (fn) => fn
+};
+
+export const Animation = {
+  Base,
+  ParticleSystem,
+  RandomTimer,
+  PeriodicTimer,
+  Transition,
+  Mutation,
+  Sprite,
+  Motion,
+  Rotation,
+  RandomWalk,
+  ColorWipe,
+  MobiusFlow,
+  MobiusWarp,
+  MobiusWarpCircular,
+  MeshMorph,
+  MobiusGenerate,
+  PaletteAnimation
 };
