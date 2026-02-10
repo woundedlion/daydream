@@ -83,7 +83,7 @@ export class Dynamo {
 
     rotate() {
         this.timeline.add(0,
-            new Rotation(
+            new Animation.Rotation(
                 this.orientation,
                 randomVector().clone(),
                 Math.PI,

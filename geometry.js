@@ -346,7 +346,7 @@ export function rotateBetween(from, to) {
   } else {
     var axis = vectorPool.acquire().set(diff.x, diff.y, diff.z).normalize();
   }
-  new Rotation(from, axis, angle, 1, easeOutCirc).step();
+  new Animation.Rotation(from, axis, angle, 1, easeOutCirc).step();
 }
 
 /**

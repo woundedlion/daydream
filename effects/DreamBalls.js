@@ -259,7 +259,7 @@ export class DreamBalls {
         this.hemisphereAxis.copy(axis);
         for (let i = 0; i < this.orientations.length; i++) {
             const direction = (i % 2 === 0) ? 1 : -1;
-            this.timeline.add(0, new Rotation(this.orientations[i], axis, direction * TWO_PI, 80, easeInOutSin, false));
+            this.timeline.add(0, new Animation.Rotation(this.orientations[i], axis, direction * TWO_PI, 80, easeInOutSin, false));
         }
     }
 }
