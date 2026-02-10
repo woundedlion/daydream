@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Timeline, Rotation, PeriodicTimer, Sprite, tween, Orientation
+    Timeline, Animation, tween, Orientation
 } from "../animation.js";
 import { vectorToPixel } from "../geometry.js";
 import { easeInOutSin, easeMid } from "../easing.js";
@@ -236,11 +236,11 @@ export class BZReactionDiffusion {
 
         this.timeline = new Timeline();
         this.timeline.add(0,
-            new Rotation(this.orientation, Daydream.Y_AXIS, Math.PI / 2, this.quarterSpinDuration, easeMid, true)
+            new Animation.Rotation(this.orientation, Daydream.Y_AXIS, Math.PI / 2, this.quarterSpinDuration, easeMid, true)
         );
 
         this.spawn();
-        this.timeline.add(0, new PeriodicTimer(96, () => this.spawn(), true));
+        this.timeline.add(0, new Animation.PeriodicTimer(96, () => this.spawn(), true));
 
         this.setupGui();
     }

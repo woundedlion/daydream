@@ -13,7 +13,7 @@ import { quinticKernel } from "../filters.js";
 import { Palettes } from "../palettes.js";
 import {
     Timeline,
-    Rotation,
+    Animation,
     Orientation
 } from "../animation.js";
 import { easeMid } from "../easing.js";
@@ -82,7 +82,7 @@ export class SphericalHarmonics {
         this.orientation = new Orientation();
 
         const axis = new THREE.Vector3(0.5, 1, 0.2).normalize();
-        this.timeline.add(0, new Rotation(this.orientation, axis, TWO_PI * 100, 10000, easeMid, true));
+        this.timeline.add(0, new Animation.Rotation(this.orientation, axis, TWO_PI * 100, 10000, easeMid, true));
     }
 
     drawFrame() {

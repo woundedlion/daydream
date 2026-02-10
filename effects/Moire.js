@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Timeline, Rotation, PeriodicTimer, ColorWipe, Transition, Mutation, RandomTimer, Orientation
+    Timeline, Animation, Orientation
 } from "../animation.js";
 import { sinWave, makeBasis } from "../geometry.js";
 import { vectorPool, quaternionPool, color4Pool } from "../memory.js";
@@ -46,15 +46,15 @@ export class Moire {
         const rotationAxis2 = Daydream.X_AXIS.clone().negate();
 
         this.timeline
-            .add(0, new PeriodicTimer(80, () => this.colorWipe()))
-            .add(0, new Rotation(this.cameraOrientation, Daydream.Y_AXIS, TWO_PI, 300, easeMid, true))
-            .add(0, new Rotation(this.layer1Orientation, rotationAxis1, TWO_PI, 300, easeMid, true))
-            //            .add(0, new Rotation(this.layer2Orientation, rotationAxis2, TWO_PI, 300, easeMid, true))
+            .add(0, new Animation.PeriodicTimer(80, () => this.colorWipe()))
+            .add(0, new Animation.Rotation(this.cameraOrientation, Daydream.Y_AXIS, TWO_PI, 300, easeMid, true))
+            .add(0, new Animation.Rotation(this.layer1Orientation, rotationAxis1, TWO_PI, 300, easeMid, true))
+            //            .add(0, new Animation.Rotation(this.layer2Orientation, rotationAxis2, TWO_PI, 300, easeMid, true))
             .add(0,
-                new Transition(this, 'rotation', TWO_PI, 160, easeMid, false, true)
+                new Animation.Transition(this, 'rotation', TWO_PI, 160, easeMid, false, true)
                     .then(() => this.rotation = 0))
             .add(0,
-                new Mutation(this, 'amp', sinWave(0.1, 0.5, 1, 0), 160, easeMid, true));
+                new Animation.Mutation(this, 'amp', sinWave(0.1, 0.5, 1, 0), 160, easeMid, true));
         this.setupGui();
     }
 
@@ -69,10 +69,10 @@ export class Moire {
         this.nextBasePalette = new GenerativePalette("circular", "analagous", "bell");
         this.nextInterferencePalette = new GenerativePalette("circular", "analagous", "cup");
         this.timeline.add(0,
-            new ColorWipe(this.basePalette, this.nextBasePalette, 80, easeMid)
+            new Animation.ColorWipe(this.basePalette, this.nextBasePalette, 80, easeMid)
         );
         this.timeline.add(0,
-            new ColorWipe(this.interferencePalette, this.nextInterferencePalette, 80, easeMid)
+            new Animation.ColorWipe(this.interferencePalette, this.nextInterferencePalette, 80, easeMid)
         );
     }
 

@@ -8,7 +8,7 @@ import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { TWO_PI } from "../3dmath.js";
 import {
-    Timeline, Sprite, Transition, RandomTimer, Rotation, Mutation, Orientation
+    Timeline, Animation, Orientation
 } from "../animation.js";
 import {
     angleBetween, sinWave, makeBasis
@@ -27,14 +27,14 @@ class ThrusterContext {
         this.orientation = new Orientation();
         this.point = new THREE.Vector3();
         this.radius = 0;
-        this.motion = new Transition(this, 'radius', 0.3, 8, easeMid);
+        this.motion = new Animation.Transition(this, 'radius', 0.3, 8, easeMid);
     }
 
     reset(orientation, point) {
         this.orientation.set(orientation.get().clone());
         this.point.copy(point);
         this.radius = 0;
-        this.motion = new Transition(this, 'radius', 0.3, 8, easeMid);
+        this.motion = new Animation.Transition(this, 'radius', 0.3, 8, easeMid);
     }
 }
 
@@ -70,11 +70,11 @@ export class Thrusters {
         // Animations
         this.timeline = new Timeline();
         this.timeline.add(0,
-            new Sprite(this.drawRing.bind(this), -1,
+            new Animation.Sprite(this.drawRing.bind(this), -1,
                 16, easeInSin,
                 16, easeOutSin)
         );
-        this.timeline.add(0, new RandomTimer(16, 48,
+        this.timeline.add(0, new Animation.RandomTimer(16, 48,
             () => this.onFireThruster(), true)
         );
     }
@@ -105,7 +105,7 @@ export class Thrusters {
         if (!(this.warp === undefined || this.warp.done())) {
             this.warp.cancel();
         }
-        this.warp = new Mutation(
+        this.warp = new Animation.Mutation(
             this, 'amplitude', (t) => 0.7 * Math.exp(-2 * t), 32, easeMid);
         this.timeline.add(1 / 16,
             this.warp
@@ -117,7 +117,7 @@ export class Thrusters {
             this.orientation.orient(this.ring))
             .normalize();
         this.timeline.add(0,
-            new Rotation(this.orientation, thrustAxis, TWO_PI, 8 * 16, easeOutExpo, false)
+            new Animation.Rotation(this.orientation, thrustAxis, TWO_PI, 8 * 16, easeOutExpo, false)
         );
 
         // show thrusters
@@ -134,7 +134,7 @@ export class Thrusters {
         ctx.reset(this.orientation, point);
 
         this.timeline.add(0,
-            new Sprite(
+            new Animation.Sprite(
                 (opacity) => {
                     ctx.motion.step();
                     this.drawThruster(ctx, opacity);

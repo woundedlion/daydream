@@ -7,8 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Timeline, Rotation, PeriodicTimer, MobiusWarp, Orientation,
-    RandomWalk, Sprite
+    Timeline, Animation, Orientation
 } from "../animation.js";
 import { easeMid, easeInOutSin } from "../easing.js";
 import {
@@ -98,8 +97,8 @@ export class DreamBalls {
             new Filter.Screen.AntiAlias()
         );
 
-        this.timeline.add(9, new RandomWalk(this.globalOrientation, Daydream.UP));
-        this.timeline.add(0, new PeriodicTimer(160, () => this.spinSlices(), true));
+        this.timeline.add(9, new Animation.RandomWalk(this.globalOrientation, Daydream.UP));
+        this.timeline.add(0, new Animation.PeriodicTimer(160, () => this.spinSlices(), true));
         this.startWarp();
         this.nextPreset();
         this.setupGui();
@@ -127,7 +126,7 @@ export class DreamBalls {
 
     startWarp() {
         if (this.warpAnim) this.warpAnim.cancel();
-        this.warpAnim = new MobiusWarp(this.mobiusParams, 200, this.params.warpScale, true);
+        this.warpAnim = new Animation.MobiusWarp(this.mobiusParams, 200, this.params.warpScale, true);
     }
 
     nextPreset() {
@@ -144,14 +143,14 @@ export class DreamBalls {
         const spriteMesh = this.displacedMesh;
 
         const mobiusParams = new MobiusParams();
-        const warpAnim = new MobiusWarp(mobiusParams, 200, params.warpScale, true);
+        const warpAnim = new Animation.MobiusWarp(mobiusParams, 200, params.warpScale, true);
 
         const drawFn = (opacity) => {
             warpAnim.step();
             this.drawScene(params, opacity, baseMesh, spriteMesh, tangents, mobiusParams);
         };
-        this.timeline.add(0, new Sprite(drawFn, 320, 32, easeMid, 32, easeMid));
-        this.timeline.add(320 - 32, new PeriodicTimer(0, () => this.nextPreset(), false));
+        this.timeline.add(0, new Animation.Sprite(drawFn, 320, 32, easeMid, 32, easeMid));
+        this.timeline.add(320 - 32, new Animation.PeriodicTimer(0, () => this.nextPreset(), false));
     }
 
     setupGui() {

@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Timeline, RandomWalk, OrientationTrail, Orientation, tween, deepTween
+    Timeline, Animation, OrientationTrail, Orientation, tween, deepTween
 } from "../animation.js";
 import { Scan } from "../scan.js";
 import { makeBasis } from "../geometry.js";
@@ -64,7 +64,7 @@ export class RingSpin {
     spawnRing(normal, palette) {
         let ring = new RingSpin.Ring(normal, palette);
         this.rings.push(ring);
-        this.timeline.add(0, new RandomWalk(ring.orientation, ring.normal, RandomWalk.Energetic));
+        this.timeline.add(0, new Animation.RandomWalk(ring.orientation, ring.normal, Animation.RandomWalk.Energetic));
     }
 
     drawFrame() {

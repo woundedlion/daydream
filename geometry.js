@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { wrap } from "./util.js";
 import { Daydream } from "./driver.js";
-import { Rotation, Orientation } from "./animation.js";
+import { Animation, Orientation } from "./animation.js";
 import { easeOutCirc } from "./easing.js";
 import { Palettes } from "./palettes.js";
 import { vectorPool, quaternionPool, dotPool, basisPool } from "./memory.js";

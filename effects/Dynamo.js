@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Timeline, Transition, RandomTimer, Rotation, Orientation
+    Timeline, Animation, Orientation
 } from "../animation.js";
 import {
     angleBetween, pixelToVector, randomVector
@@ -60,7 +60,7 @@ export class Dynamo {
         this.timeline = new Timeline();
 
         this.timeline.add(0,
-            new RandomTimer(4, 64, () => {
+            new Animation.RandomTimer(4, 64, () => {
                 this.reverse();
             }, true)
         );

@@ -16,7 +16,7 @@ import {
     GenerativePalette
 } from "../color.js";
 import {
-    Timeline, PeriodicTimer, ColorWipe
+    Timeline, Animation
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import {
@@ -71,7 +71,7 @@ export class FlowField {
 
         // --- Animation: Periodically change the palette ---
         this.timeline.add(0,
-            new PeriodicTimer(200, () => {
+            new Animation.PeriodicTimer(200, () => {
                 this.updatePalette();
             }, true)
         );

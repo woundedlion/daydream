@@ -13,7 +13,7 @@ import { vectorPool } from "../memory.js";
 import { GenerativePalette, AlphaFalloffPalette } from "../color.js";
 import { Palettes } from "../palettes.js";
 import {
-    Timeline, ParticleSystem, Sprite, RandomWalk, MobiusWarp, Orientation, RandomTimer
+    Timeline, Animation, Orientation
 } from "../animation.js";
 import { createRenderPipeline, Filter, quinticKernel } from "../filters.js";
 import { Plot } from "../plot.js";
@@ -39,12 +39,12 @@ export class MindSplatter {
 
         this.timeline = new Timeline();
         this.timeline = new Timeline();
-        this.particleSystem = new ParticleSystem(2048, this.friction, 0.001, this.trailLength);
+        this.particleSystem = new Animation.ParticleSystem(2048, this.friction, 0.001, this.trailLength);
         this.particleSystem.resolutionScale = 2;
 
         this.timeline.add(0, this.particleSystem);
-        this.timeline.add(0, new Sprite((opacity) => this.drawParticles(opacity), -1));
-        this.timeline.add(0, new RandomWalk(this.orientation, Daydream.UP));
+        this.timeline.add(0, new Animation.Sprite((opacity) => this.drawParticles(opacity), -1));
+        this.timeline.add(0, new Animation.RandomWalk(this.orientation, Daydream.UP));
 
         this.enableWarp = true;
         if (this.enableWarp) this.startWarp();
@@ -81,12 +81,12 @@ export class MindSplatter {
     }
 
     scheduleWarp() {
-        this.warpTimer = new RandomTimer(180, 300, () => this.performWarp());
+        this.warpTimer = new Animation.RandomTimer(180, 300, () => this.performWarp());
         this.timeline.add(0, this.warpTimer);
     }
 
     performWarp() {
-        this.warpAnim = new MobiusWarp(this.mobius, 160, this.warpScale, false);
+        this.warpAnim = new Animation.MobiusWarp(this.mobius, 160, this.warpScale, false);
         this.warpAnim.then(() => this.scheduleWarp());
         this.timeline.add(0, this.warpAnim);
     }

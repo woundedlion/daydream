@@ -19,7 +19,7 @@ import {
     GenerativePalette
 } from "../color.js";
 import {
-    Timeline, Sprite, RandomWalk, Mutation, Orientation
+    Timeline, Animation, Orientation
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import {
@@ -46,15 +46,15 @@ export class Test {
         this.thickness = 4 * TWO_PI / Daydream.W;
 
         this.timeline.add(0,
-            new Sprite((opacity) => this.drawFn(opacity), -1, 48, easeMid, 0, easeMid)
+            new Animation.Sprite((opacity) => this.drawFn(opacity), -1, 48, easeMid, 0, easeMid)
         );
 
         this.timeline.add(0,
-            new RandomWalk(this.orientation, this.normal, { speed: 0.01, pivotStrength: 0.05 }) // Very smooth for test
+            new Animation.RandomWalk(this.orientation, this.normal, { speed: 0.01, pivotStrength: 0.05 }) // Very smooth for test
         );
 
         this.timeline.add(0,
-            new Mutation(this, 'amplitude',
+            new Animation.Mutation(this, 'amplitude',
                 sinWave(-this.amplitudeRange, this.amplitudeRange, 1, 0), 32, easeMid, true)
         );
 

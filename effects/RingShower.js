@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Timeline, Sprite, Transition, RandomTimer, Orientation
+    Timeline, Animation, Orientation
 } from "../animation.js";
 import { easeMid } from "../easing.js";
 import {
@@ -45,7 +45,7 @@ export class RingShower {
 
         this.timeline = new Timeline();
         this.timeline.add(0,
-            new RandomTimer(4, 48,
+            new Animation.RandomTimer(4, 48,
                 () => this.spawnRing(),
                 true
             )
@@ -60,7 +60,7 @@ export class RingShower {
         this.rings.unshift(ring);
 
         this.timeline.add(0,
-            new Sprite((opacity) => this.drawRing(opacity, ring),
+            new Animation.Sprite((opacity) => this.drawRing(opacity, ring),
                 ring.duration,
                 4, easeMid,
                 0, easeMid
@@ -69,7 +69,7 @@ export class RingShower {
             }));
 
         this.timeline.add(0,
-            new Transition(ring, 'radius', 2, ring.duration, easeMid)
+            new Animation.Transition(ring, 'radius', 2, ring.duration, easeMid)
         );
     }
 

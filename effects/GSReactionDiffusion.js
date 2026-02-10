@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import {
-    Timeline, Rotation, PeriodicTimer, Sprite, Orientation
+    Timeline, Animation, Orientation
 } from "../animation.js";
 import { vectorPool } from "../memory.js";
 import { easeInOutSin, easeMid } from "../easing.js";
@@ -17,7 +17,7 @@ import {
 import { GenerativePalette } from "../color.js";
 
 
-export class GSReaction extends Sprite {
+export class GSReaction extends Animation.Sprite {
     constructor(rd, duration = 192, fadeOut = 32, fadeIn = 32) {
         // 16 FPS. 10s exist + 2s fade = 12s total (192 frames).
         super((alpha) => this.render(alpha), duration, fadeIn, easeMid, fadeOut, easeMid);
@@ -194,10 +194,10 @@ export class GSReactionDiffusion {
 
         this.timeline = new Timeline();
         this.timeline.add(0,
-            new Rotation(this.orientation, Daydream.Y_AXIS, Math.PI / 2, this.quarterSpinDuration, easeMid, true)
+            new Animation.Rotation(this.orientation, Daydream.Y_AXIS, Math.PI / 2, this.quarterSpinDuration, easeMid, true)
         );
         this.spawn();
-        this.timeline.add(0, new PeriodicTimer(96, () => this.spawn(), true));
+        this.timeline.add(0, new Animation.PeriodicTimer(96, () => this.spawn(), true));
 
         this.setupGui();
     }
