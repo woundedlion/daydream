@@ -1162,19 +1162,148 @@ export const MeshOps = {
   },
 
   /**
+   * Expand operator: Separates faces (e = aa).
+   * @param {Object} mesh 
+   * @param {number} t - Expansion factor. Default 2-sqrt(2) ~= 0.5857.
+   * @returns {Object}
+   */
+  expand(mesh, t = 2.0 - Math.sqrt(2.0)) {
+    const newVerts = [];
+    const newFaces = [];
+
+    // Helper: Map (faceIdx, vertIdxInFace) -> newVertexIdx
+    const faceVertsMap = [];
+
+    // 1. Inset Faces
+    mesh.faces.forEach((f, fi) => {
+      const centroid = new THREE.Vector3();
+      f.forEach(vi => centroid.add(mesh.vertices[vi]));
+      centroid.divideScalar(f.length);
+
+      const fIndices = [];
+      f.forEach((vi, i) => {
+        const v = mesh.vertices[vi];
+        // Move vertex towards centroid
+        const newV = new THREE.Vector3().copy(v).lerp(centroid, t);
+        newVerts.push(newV);
+        fIndices.push(newVerts.length - 1);
+      });
+      faceVertsMap[fi] = fIndices;
+      newFaces.push(fIndices);
+    });
+
+    // 2. Edge Faces (Quads)
+    // Find edges
+    const edgeMap = new Map(); // key -> [faceIdx, index_of_edge_start_in_face]
+
+    mesh.faces.forEach((f, fi) => {
+      f.forEach((u, i) => {
+        const v = f[(i + 1) % f.length];
+        const key = u < v ? `${u}_${v}` : `${v}_${u}`;
+        if (!edgeMap.has(key)) {
+          edgeMap.set(key, []);
+        }
+        edgeMap.get(key).push({ fi, i, u, v });
+      });
+    });
+
+    for (const [key, entries] of edgeMap) {
+      if (entries.length !== 2) continue; // Boundary or non-manifold
+      // Entry 1: Face A, edge u->v
+      const e1 = entries[0];
+      // Entry 2: Face B, edge v->u (if consistent winding)
+      const e2 = entries[1];
+
+      // Vertices in Face A corresponding to u, v
+      // faceVertsMap[fi] matches order of mesh.faces[fi]
+      const A_u_idx = faceVertsMap[e1.fi][e1.i];
+      const A_v_idx = faceVertsMap[e1.fi][(e1.i + 1) % mesh.faces[e1.fi].length];
+
+      // Vertices in Face B corresponding to u, v
+      // We need indices of u and v in Face B
+      const idx_v_in_B = mesh.faces[e2.fi].indexOf(e1.v);
+      const idx_u_in_B = mesh.faces[e2.fi].indexOf(e1.u); // Usually next one
+
+      const B_v_idx = faceVertsMap[e2.fi][idx_v_in_B];
+      const B_u_idx = faceVertsMap[e2.fi][idx_u_in_B];
+
+      // Create Quad: A_v -> A_u -> B_u -> B_v
+      // Reversing winding order to ensuring outward normals
+      newFaces.push([A_v_idx, A_u_idx, B_u_idx, B_v_idx]);
+    }
+
+    // 3. Vertex Faces
+    const vertToFaces = new Array(mesh.vertices.length).fill(null).map(() => []);
+    mesh.faces.forEach((f, fi) => {
+      f.forEach(vi => vertToFaces[vi].push(fi));
+    });
+
+    // Sort faces around vertex for proper winding
+    // We can rely on Edge Map or reconstruct cycle.
+    // Simpler: Use existing edgeToFaces logic or just "walk"
+
+    const edgeToFacesLookup = {};
+    mesh.faces.forEach((f, fi) => {
+      f.forEach((u, i) => {
+        const v = f[(i + 1) % f.length];
+        const key = u < v ? `${u}_${v}` : `${v}_${u}`;
+        if (!edgeToFacesLookup[key]) edgeToFacesLookup[key] = [];
+        edgeToFacesLookup[key].push(fi);
+      });
+    });
+
+    mesh.vertices.forEach((v, vi) => {
+      const adjacentFaces = vertToFaces[vi];
+      if (adjacentFaces.length < 3) return;
+
+      // Walk around the vertex
+      const orderedIndices = [];
+      let startFace = adjacentFaces[0];
+      let currFace = startFace;
+      let safety = 0;
+
+      do {
+        // Find the vertex in this face corresponding to 'vi'
+        const idxInFace = mesh.faces[currFace].indexOf(vi);
+        // The vertex created for 'vi' in this face
+        orderedIndices.push(faceVertsMap[currFace][idxInFace]);
+
+        // Find previous edge entering vi: prev -> vi
+        const fLen = mesh.faces[currFace].length;
+        const prevVi = mesh.faces[currFace][(idxInFace - 1 + fLen) % fLen];
+
+        // Find the face across this edge
+        const key = prevVi < vi ? `${prevVi}_${vi}` : `${vi}_${prevVi}`;
+        const neighbors = edgeToFacesLookup[key];
+        const nextFace = neighbors.find(fid => fid !== currFace);
+
+        if (nextFace === undefined) break;
+        currFace = nextFace;
+        safety++;
+      } while (currFace !== startFace && safety < 20);
+
+      newFaces.push(orderedIndices);
+    });
+
+    this.normalize({ vertices: newVerts, faces: newFaces });
+    return { vertices: newVerts, faces: newFaces };
+  },
+
+  /**
    * Snub operator: Creates a chiral semi-regular polyhedron.
    * Expands faces, twists them, and inserts triangles.
    * @param {Object} mesh 
+   * @param {number} t - Expansion factor. Default 0.5.
+   * @param {number} twist - Twist angle in radians. Default 0.
    * @returns {Object}
    */
-  snub(mesh) {
+  snub(mesh, t = 0.5, twist = 0) {
     const newVerts = [];
     const newFaces = [];
 
     // 1. Create new vertices (n per face)
     // Structure: newVertsMap[faceIndex][vertIndexInFace] = globalIndex
     const newVertsMap = new Array(mesh.faces.length).fill(null).map(() => []);
-    const SHRINK_FACTOR = 0.5; // Adjustable
 
     mesh.faces.forEach((f, fi) => {
       // Calculate face centroid
@@ -1182,10 +1311,32 @@ export const MeshOps = {
       f.forEach(vi => centroid.add(mesh.vertices[vi]));
       centroid.divideScalar(f.length);
 
+      // Calculate Face Normal (assuming planar/semi-planar)
+      // Use average normal or just tri
+      const v0 = mesh.vertices[f[0]];
+      const v1 = mesh.vertices[f[1]];
+      const v2 = mesh.vertices[f[2]];
+      const ab = new THREE.Vector3().subVectors(v1, v0);
+      const ac = new THREE.Vector3().subVectors(v2, v0);
+      const normal = new THREE.Vector3().crossVectors(ab, ac).normalize();
+
+      // Robust normal? If f > 3, this is approx. But for canonical it's fine.
+      // Better: Newell's method? Or just normalized centroid (for spherical solids center=0)
+      // If solid is centered at 0, centroid is the normal direction!
+      // This is much robust for convex solids.
+      if (centroid.lengthSq() > 1e-6) {
+        normal.copy(centroid).normalize();
+      }
+
       f.forEach((vi, i) => {
         // Create new vertex towards centroid
         const v = mesh.vertices[vi];
-        const newV = new THREE.Vector3().copy(v).lerp(centroid, SHRINK_FACTOR);
+        const newV = new THREE.Vector3().copy(v).lerp(centroid, t);
+
+        if (twist !== 0) {
+          newV.sub(centroid).applyAxisAngle(normal, twist).add(centroid);
+        }
+
         newVerts.push(newV);
         newVertsMap[fi][i] = newVerts.length - 1;
       });
@@ -1301,12 +1452,93 @@ export const MeshOps = {
   },
 
   /**
-   * Truncate operator: Cuts corners off the polyhedron.
+   * Bitruncate operator: Truncate the rectified mesh.
    * @param {Object} mesh 
-   * @param {number} t - Truncation depth [0..0.5]. 0 = no change, 0.5 = ambo.
+   * @param {number} t - Truncation depth. Default 1/3 (if regular).
    * @returns {Object}
    */
-  truncate(mesh, t = 0.25) {
+  bitruncate(mesh, t = 1 / 3) {
+    return this.truncate(this.ambo(mesh), t);
+  },
+
+  /**
+   * Canonicalize operator: Iteratively relaxes the mesh to equalize edge lengths.
+   * @param {Object} mesh 
+   * @param {number} iterations - Number of relaxation steps. Default 100.
+   * @returns {Object}
+   */
+  canonicalize(mesh, iterations = 100) {
+    const positions = mesh.vertices.map(v => v.clone());
+    const faces = mesh.faces;
+
+    // Build adjacency
+    const neighbors = new Array(positions.length).fill(null).map(() => []);
+    faces.forEach(f => {
+      for (let i = 0; i < f.length; i++) {
+        const u = f[i];
+        const v = f[(i + 1) % f.length];
+        neighbors[u].push(v);
+        neighbors[v].push(u);
+      }
+    });
+    // Deduplicate neighbors
+    neighbors.forEach((n, i) => {
+      neighbors[i] = [...new Set(n)];
+    });
+
+    for (let iter = 0; iter < iterations; iter++) {
+      // 1. Calculate target edge length (average)
+      let totalLen = 0;
+      let edgeCount = 0;
+      for (let i = 0; i < positions.length; i++) {
+        const p = positions[i];
+        neighbors[i].forEach(ni => {
+          if (i < ni) {
+            totalLen += p.distanceTo(positions[ni]);
+            edgeCount++;
+          }
+        });
+      }
+      const targetLen = totalLen / edgeCount;
+
+      // 2. Apply forces
+      const movements = new Array(positions.length).fill(null).map(() => new THREE.Vector3());
+
+      for (let i = 0; i < positions.length; i++) {
+        const p = positions[i];
+        const nList = neighbors[i];
+        const force = new THREE.Vector3();
+
+        nList.forEach(ni => {
+          const neighbor = positions[ni];
+          const vec = new THREE.Vector3().subVectors(neighbor, p);
+          const dist = vec.length();
+          const diff = dist - targetLen;
+
+          // Hooke's Law: Pull if too long, Push if too short
+          force.addScaledVector(vec.normalize(), diff * 0.1);
+        });
+
+        movements[i].add(force);
+      }
+
+      // 3. Move and Normalize
+      for (let i = 0; i < positions.length; i++) {
+        positions[i].add(movements[i]);
+        positions[i].normalize(); // Constraint to Sphere
+      }
+    }
+
+    return { vertices: positions, faces: faces };
+  },
+
+  /**
+   * Truncate operator: Cuts corners off the polyhedron.
+   * @param {Object} mesh 
+   * @param {number} t - Truncation depth [0..0.5]. 0 = no change, 0.5 = ambo. Default 1/3.
+   * @returns {Object}
+   */
+  truncate(mesh, t = 1 / 3) {
     const newVerts = [];
     const newFaces = [];
     const edgeMap = new Map(); // key -> [idxNearU, idxNearV]
