@@ -86,9 +86,24 @@ export class IslamicStars {
             this.transformedVertices.push(new THREE.Vector3());
         }
 
-        // The sprite's draw callback closes over the mesh and topology indices
+        // Randomize palette mapping for this shape
+        const availablePalettes = [
+            Palettes.embers,
+            Palettes.richSunset,
+            Palettes.brightSunrise,
+            Palettes.bruisedMoss,
+            Palettes.lavenderLake
+        ];
+
+        // Fisher-Yates shuffle
+        for (let i = availablePalettes.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [availablePalettes[i], availablePalettes[j]] = [availablePalettes[j], availablePalettes[i]];
+        }
+
+        // The sprite's draw callback closes over the mesh, topology indices, AND the specific palette mapping
         const sprite = new Animation.Sprite(
-            (opacity) => this.drawMesh(mesh, opacity, faceColorIndices),
+            (opacity) => this.drawMesh(mesh, opacity, faceColorIndices, availablePalettes),
             duration,
             fade, easeMid,
             fade, easeMid
@@ -101,7 +116,7 @@ export class IslamicStars {
         this.timeline.add(nextDelay, this.nextShapeTimer);
     }
 
-    drawMesh(mesh, spriteOpacity, faceTopologyIndices) {
+    drawMesh(mesh, spriteOpacity, faceTopologyIndices, currentPalettes) {
         const count = mesh.vertices.length;
 
         for (let i = 0; i < count; i++) {
@@ -117,15 +132,7 @@ export class IslamicStars {
             const i = Math.round(frag.v2);
             const topologyIndex = faceTopologyIndices[i] || 0;
 
-            let palette;
-            switch (topologyIndex % 5) {
-                case 0: palette = Palettes.embers; break;
-                case 1: palette = Palettes.richSunset; break;
-                case 2: palette = Palettes.brightSunrise; break;
-                case 3: palette = Palettes.bruisedMoss; break;
-                case 4: palette = Palettes.lavenderLake; break;
-                default: palette = Palettes.embers;
-            }
+            const palette = currentPalettes[topologyIndex % currentPalettes.length];
 
             const distFromEdge = -frag.v1;
             const size = frag.size || 1;
