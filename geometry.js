@@ -427,6 +427,15 @@ export class HEVertex {
 }
 
 /**
+ * Simple 32-bit integer hash mixer.
+ */
+function hash32(n, seed = 0) {
+  n = Math.imul(n ^ seed, 0x5bd1e995);
+  n ^= n >>> 15;
+  return Math.imul(n, 0x97455bcd);
+}
+
+/**
  * Face in a Half-Edge data structure.
  * Stores a reference to one of the half-edges bordering this face.
  */
@@ -434,7 +443,7 @@ export class HEFace {
   constructor() {
     this.halfEdge = null;
     this.vertexCount = 0;
-    this.angleSignature = '';
+    this.intrinsicHash = 0;
   }
 
   computeProperties() {
@@ -456,7 +465,7 @@ export class HEFace {
     // Calculate Angles
     const angles = [];
     if (this.vertexCount < 3) {
-      this.angleSignature = "0";
+      this.intrinsicHash = 0;
       return;
     }
 
@@ -471,15 +480,25 @@ export class HEFace {
       let angle = v1.angleTo(v2);
       angles.push(Math.round(angle * (180 / Math.PI)));
     }
+
+    // Compute Intrinsic Hash
+    // 1. Hash Vertex Count
+    let h = hash32(this.vertexCount, 0x12345678);
+
+    // 2. Hash Angles (Sorted for rotation invariance)
     angles.sort((a, b) => a - b);
-    this.angleSignature = angles.join('_');
+
+    for (const angle of angles) {
+      h = hash32(angle, h);
+    }
+    this.intrinsicHash = h;
   }
 
   getVertexCount() { // Keep for backward compatibility if needed, but prefer property
-    return this.vertexCount || this._calculateVertexCount();
+    return this.vertexCount || this.getVertexCount();
   }
 
-  _calculateVertexCount() {
+  getVertexCount() {
     let count = 0;
     let he = this.halfEdge;
     if (!he) return 0;
@@ -585,7 +604,7 @@ export class HalfEdgeMesh {
       if (pairHe) he.pair = pairHe;
     }
 
-    // 4. Compute Properties (Angles, Counts)
+    // 4. Compute Properties (Hashes, Counts)
     for (const face of this.faces) {
       face.computeProperties();
     }
@@ -636,19 +655,24 @@ export const MeshOps = {
     let nextID = 0;
 
     heMesh.faces.forEach((face, i) => {
-      const mySig = face.angleSignature;
+      let neighborAcc = 0;
       const neighbors = face.getNeighbors();
 
-      const neighborSigs = neighbors.map(n => n ? n.angleSignature : 'null');
-      neighborSigs.sort(); // Order invariance for neighbors
-
-      // Full Topology Signature: MyAngles : NeighborAngles
-      const fullSignature = `${mySig}:${neighborSigs.join(',')}`;
-
-      if (!signatureToID.has(fullSignature)) {
-        signatureToID.set(fullSignature, nextID++);
+      for (const n of neighbors) {
+        if (n) {
+          // Use simple addition for order-independence without XOR cancellation
+          // We re-hash the intrinsic hash to scatter bits before adding
+          neighborAcc = (neighborAcc + hash32(n.intrinsicHash)) | 0;
+        }
       }
-      faceColorIndices[i] = signatureToID.get(fullSignature);
+
+      // Combine Self + Neighbors
+      const finalHash = hash32(neighborAcc, face.intrinsicHash);
+
+      if (!signatureToID.has(finalHash)) {
+        signatureToID.set(finalHash, nextID++);
+      }
+      faceColorIndices[i] = signatureToID.get(finalHash);
     });
 
     return { faceColorIndices, uniqueCount: nextID };
