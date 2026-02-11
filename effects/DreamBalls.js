@@ -14,7 +14,7 @@ import {
     createRenderPipeline, Filter
 } from "../filters.js";
 import { AlphaFalloffPalette, FalloffPalette } from "../color.js";
-import { Solids } from "../solids.js";
+import { Solids, AllSolids } from "../solids.js";
 import { MobiusParams, TWO_PI } from "../3dmath.js";
 import { mobiusTransform, randomVector } from "../geometry.js";
 import { vectorPool } from "../memory.js";
@@ -107,7 +107,7 @@ export class DreamBalls {
 
 
     loadSolid(name) {
-        this.baseMesh = Solids[name]();
+        this.baseMesh = Solids.get(name);
 
         // Pre-allocate the reusable displaced mesh to avoid GC
         this.displacedMesh = {
@@ -184,7 +184,7 @@ export class DreamBalls {
         this.paramFolder.add(this.params, 'offsetRadius', 0.0, 1.0).listen().onChange(manualChange);
         this.paramFolder.add(this.params, 'offsetSpeed', 0.0, 5.0).listen().onChange(manualChange);
         this.paramFolder.add(this.params, 'numCopies', 1, 100, 1).listen().onChange(manualChange);
-        this.paramFolder.add(this.params, 'solidName', Object.keys(Solids)).onChange((v) => {
+        this.paramFolder.add(this.params, 'solidName', AllSolids).onChange((v) => {
             this.loadSolid(v);
             manualChange();
         });

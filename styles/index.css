@@ -108,6 +108,18 @@
     gap: 4px;
 }
 
+.effect-sidebar-heading {
+    color: #666;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    margin: 5px 0 2px 0;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    user-select: none;
+}
+
 /* Scrollbar styling for sidebar */
 .effect-sidebar::-webkit-scrollbar {
     width: 8px;
@@ -128,7 +140,7 @@
 
 /* Effect Buttons */
 .effect-button {
-    padding: 12px 15px;
+    padding: 2px 1px;
     background: transparent;
     border: 1px solid transparent;
     color: #888;

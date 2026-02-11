@@ -8,7 +8,7 @@ import { gui } from "gui";
 import { Daydream } from "../driver.js";
 import { Timeline, Orientation, Animation, PaletteBehaviors } from "../animation.js";
 import { Plot } from "../plot.js";
-import { Solids } from "../solids.js";
+import { Solids, AllSolids } from "../solids.js";
 import { Palettes } from "../palettes.js";
 import { Color4, AnimatedPalette, CircularPalette } from "../color.js";
 import {
@@ -57,7 +57,7 @@ export class TestSlewRate {
 
         // Load Mesh
         this.solidName = 'icosahedron';
-        this.mesh = Solids[this.solidName]();
+        this.mesh = Solids.get(this.solidName);
 
         this.setupGui();
     }
@@ -65,8 +65,8 @@ export class TestSlewRate {
     setupGui() {
         this.gui = new gui.GUI({ autoPlace: false });
 
-        this.gui.add(this, 'solidName', Object.keys(Solids)).name('Solid').onChange(v => {
-            this.mesh = Solids[v]();
+        this.gui.add(this, 'solidName', AllSolids).name('Solid').onChange(v => {
+            this.mesh = Solids.get(v);
         });
 
         const folder = this.gui.addFolder('Slew Rate Settings');

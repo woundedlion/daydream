@@ -18,7 +18,7 @@ import {
 import { createRenderPipeline, Filter, quinticKernel } from "../filters.js";
 import { Plot } from "../plot.js";
 import { MobiusParams } from "../3dmath.js";
-import { Solids } from "../solids.js";
+import { Solids, AllSolids } from "../solids.js";
 
 export class MindSplatter {
     constructor() {
@@ -65,7 +65,7 @@ export class MindSplatter {
                 a.strength = v;
             }
         });
-        this.gui.add(this, 'solidName', Object.keys(Solids)).name("Solid").onChange(() => this.rebuild());
+        this.gui.add(this, 'solidName', AllSolids).name("Solid").onChange(() => this.rebuild());
         this.gui.add(this, 'rebuild').name("Respawn");
         this.gui.add(this, 'enableWarp').name('Enable Warp').onChange(v => {
             if (v) this.startWarp(); else this.stopWarp();
@@ -105,7 +105,7 @@ export class MindSplatter {
         const eventHorizon = 0.2;
 
 
-        let emitters = Solids[this.solidName]();
+        let emitters = Solids.get(this.solidName);
         this.emitCounters = [];
         for (let i = 0; i < emitters.vertices.length; i++) {
             this.emitCounters.push(0);
