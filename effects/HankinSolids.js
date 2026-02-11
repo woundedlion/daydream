@@ -35,7 +35,7 @@ export class HankinSolids {
 
         this.params = {
             solid: 'dodecahedron',
-            plot: true,
+            plot: false,
             scan: true,
             rotationSpeed: 0.5,
             opacity: 1.0,

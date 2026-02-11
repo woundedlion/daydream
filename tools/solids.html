@@ -656,7 +656,15 @@
 
         async function generateThumbnails() {
             const footer = document.getElementById('footer');
-            const thumbKeys = Object.keys(Solids).filter(k => typeof Solids[k] === 'function' && k !== 'normalize');
+
+            // Gather all solid names from categories
+            const thumbKeys = [];
+            if (Solids.PlatonicSolids) thumbKeys.push(...Object.keys(Solids.PlatonicSolids));
+            if (Solids.Archimedean) thumbKeys.push(...Object.keys(Solids.Archimedean));
+            if (Solids.IslamicStarPatterns) thumbKeys.push(...Object.keys(Solids.IslamicStarPatterns)); // These might be names or keys
+
+            // Filter out functions/internal props just in case
+            // actually standard keys from these sub-objects should be fine.
 
             // Create offscreen renderer
             const width = 256; // High-res for larger thumbs
@@ -706,7 +714,7 @@
                 offScene.add(light);
                 offScene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-                const meshData = Solids[key]();
+                const meshData = Solids.get(key);
                 // Triangulate
                 const vertices = [];
                 meshData.faces.forEach(f => {
@@ -892,7 +900,7 @@
         window.copyCode = (index, lang, btn) => {
             const item = savedSolids[index];
             // Reconstruct mesh to generate code
-            let mesh = Solids[item.base]();
+            let mesh = Solids.get(item.base);
             mesh = MeshOps.clone(mesh);
 
             // Re-run pipeline with params
@@ -965,10 +973,23 @@
         }
 
         function generateJavascript(m, item) {
-            // camelCase for function name
-            const funcName = item.title.replace(/(?:^\w|[A-Z]|\b\w)/g, (word, index) => {
-                return index === 0 ? word.toLowerCase() : word.toUpperCase();
-            }).replace(/\s+/g, '');
+            // Function name: <base_solid>_<op><param>
+            let funcName = item.base;
+            state.ops.forEach(o => {
+                if (o.op === 'hankin') {
+                    funcName += `_hk${Math.round(o.params.angle)}`;
+                } else if (o.op === 'truncate') {
+                    // Truncate param t usually small float, maybe keep as is or multiply?
+                    // User example was just hk72. Let's do _truncate<t> for now or just _truncate?
+                    // The prompt said <op><param>.
+                    funcName += `_truncate${o.params.t}`;
+                } else {
+                    funcName += `_${o.op}`;
+                }
+            });
+
+            // Clean up: remove dots if any
+            funcName = funcName.replace(/\./g, '');
 
             let s = `  // Base: ${item.base}, Ops: ${item.desc}\n`;
             s += `  ${funcName}() {\n`;
@@ -980,7 +1001,7 @@
             s += m.faces.map((f, i) => `        [${f.join(', ')}]${i < m.faces.length - 1 ? ',' : ''}`).join('\n');
             s += '\n      ]\n';
             s += '    };\n';
-            s += '    this.normalize(m);\n';
+            s += '    normalize(m);\n';
             s += '    return m;\n';
             s += '  },';
             return s;
@@ -1010,7 +1031,7 @@
         function renderBaseSolid() {
             const thumb = baseThumbnails[state.base];
             const title = state.base.replace(/([A-Z])/g, ' $1').trim();
-            const mesh = Solids[state.base]();
+            const mesh = Solids.get(state.base);
 
             document.getElementById('baseThumb').src = thumb || '';
             document.getElementById('baseTitle').innerText = title;
@@ -1242,7 +1263,7 @@
 
         function update() {
             // 1. Generate Mesh
-            let mesh = Solids[state.base]();
+            let mesh = Solids.get(state.base);
 
             // Deep copy to avoid mutating original registry
             mesh = MeshOps.clone(mesh);
