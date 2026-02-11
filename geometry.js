@@ -433,9 +433,53 @@ export class HEVertex {
 export class HEFace {
   constructor() {
     this.halfEdge = null;
+    this.vertexCount = 0;
+    this.angleSignature = '';
   }
 
-  getVertexCount() {
+  computeProperties() {
+    let he = this.halfEdge;
+    if (!he) return;
+    const start = he;
+
+    // Collect vertices
+    const verts = [];
+    let safety = 0;
+    do {
+      verts.push(he.vertex.position);
+      he = he.next;
+      safety++;
+    } while (he !== start && he && safety < 100);
+
+    this.vertexCount = verts.length;
+
+    // Calculate Angles
+    const angles = [];
+    if (this.vertexCount < 3) {
+      this.angleSignature = "0";
+      return;
+    }
+
+    for (let i = 0; i < this.vertexCount; i++) {
+      const prev = verts[(i - 1 + this.vertexCount) % this.vertexCount];
+      const curr = verts[i];
+      const next = verts[(i + 1) % this.vertexCount];
+
+      const v1 = _tempVec.subVectors(prev, curr).normalize();
+      const v2 = _tempVec2.subVectors(next, curr).normalize();
+
+      let angle = v1.angleTo(v2);
+      angles.push(Math.round(angle * (180 / Math.PI)));
+    }
+    angles.sort((a, b) => a - b);
+    this.angleSignature = angles.join('_');
+  }
+
+  getVertexCount() { // Keep for backward compatibility if needed, but prefer property
+    return this.vertexCount || this._calculateVertexCount();
+  }
+
+  _calculateVertexCount() {
     let count = 0;
     let he = this.halfEdge;
     if (!he) return 0;
@@ -540,6 +584,11 @@ export class HalfEdgeMesh {
       const pairHe = edgeMap.get(`${end},${start}`);
       if (pairHe) he.pair = pairHe;
     }
+
+    // 4. Compute Properties (Angles, Counts)
+    for (const face of this.faces) {
+      face.computeProperties();
+    }
   }
 
   /**
@@ -580,26 +629,26 @@ export const MeshOps = {
      * @returns {Object} { faceColorIndices: Int32Array, uniqueCount: number }
      */
   classifyFacesByTopology(mesh) {
-    const faceToIndex = new Map();
     const heMesh = new HalfEdgeMesh(mesh);
-    heMesh.faces.forEach((f, i) => faceToIndex.set(f, i));
-    const counts = heMesh.faces.map(f => f.getVertexCount());
 
     const signatureToID = new Map();
     const faceColorIndices = new Int32Array(heMesh.faces.length);
     let nextID = 0;
 
     heMesh.faces.forEach((face, i) => {
-      const myCount = counts[i];
+      const mySig = face.angleSignature;
       const neighbors = face.getNeighbors();
-      const neighborCounts = neighbors.map(n => n ? counts[faceToIndex.get(n)] : 0);
 
-      neighborCounts.sort((a, b) => a - b);
-      const signature = `${myCount}:${neighborCounts.join(',')}`;
-      if (!signatureToID.has(signature)) {
-        signatureToID.set(signature, nextID++);
+      const neighborSigs = neighbors.map(n => n ? n.angleSignature : 'null');
+      neighborSigs.sort(); // Order invariance for neighbors
+
+      // Full Topology Signature: MyAngles : NeighborAngles
+      const fullSignature = `${mySig}:${neighborSigs.join(',')}`;
+
+      if (!signatureToID.has(fullSignature)) {
+        signatureToID.set(fullSignature, nextID++);
       }
-      faceColorIndices[i] = signatureToID.get(signature);
+      faceColorIndices[i] = signatureToID.get(fullSignature);
     });
 
     return { faceColorIndices, uniqueCount: nextID };
