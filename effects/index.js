@@ -9,7 +9,10 @@ export { DreamBalls } from "./DreamBalls.js";
 export { Dynamo } from "./Dynamo.js";
 export { FlowField } from "./FlowField.js";
 export { GSReactionDiffusion } from "./GSReactionDiffusion.js";
+export { GnomonicStars } from "./GnomonicStars.js";
+export { HankinSolids } from "./HankinSolids.js";
 export { HopfFibration } from "./HopfFibration.js";
+export { IslamicStars } from "./IslamicStars.js";
 export { LSystem } from "./LSystem.js";
 export { MetaballEffect } from "./MetaballEffect.js";
 export { MindSplatter } from "./MindSplatter.js";
@@ -22,11 +25,9 @@ export { SphericalHarmonics } from "./SphericalHarmonics.js";
 export { SpinShapes } from "./SpinShapes.js";
 export { Test } from "./Test.js";
 export { TestShapes } from "./TestShapes.js";
-export { IslamicStars } from "./IslamicStars.js";
+export { TestSlewRate } from "./TestSlewRate.js";
 export { TestTemporal } from "./TestTemporal.js";
 export { Thrusters } from "./Thrusters.js";
 export { Voronoi } from "./Voronoi.js";
-export { GnomonicStars } from "./GnomonicStars.js";
-export { TestSlewRate } from "./TestSlewRate.js";
 
 

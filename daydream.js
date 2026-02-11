@@ -19,6 +19,7 @@ const HiResFavorites = [
   "FlowField",
   "GnomonicStars",
   "GSReactionDiffusion",
+  "HankinSolids",
   "HopfFibration",
   "IslamicStars",
   "LSystem",
@@ -32,8 +33,8 @@ const HiResFavorites = [
   "SpinShapes",
   "Test",
   "TestShapes",
-  "TestTemporal",
   "TestSlewRate",
+  "TestTemporal",
   "Voronoi",
 ];
 
@@ -44,6 +45,7 @@ const LoResFavorites = [
   "FlowField",
   "GnomonicStars",
   "GSReactionDiffusion",
+  "HankinSolids",
   "IslamicStars",
   "MetaballEffect",
   "MobiusGrid",
@@ -53,8 +55,8 @@ const LoResFavorites = [
   "RingSpin",
   "Test",
   "TestShapes",
-  "TestTemporal",
   "TestSlewRate",
+  "TestTemporal",
   "Thrusters",
   "Voronoi",
 ];
@@ -195,6 +197,12 @@ function populateEffectSidebar(options) {
   if (!sidebar) return;
 
   sidebar.innerHTML = '';
+
+  const heading = document.createElement('h3');
+  heading.innerText = 'Effects';
+  heading.className = 'effect-sidebar-heading';
+  sidebar.appendChild(heading);
+
   options.forEach(effectName => {
     const btn = document.createElement('button');
     btn.className = 'effect-button';

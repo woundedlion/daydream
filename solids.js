@@ -5,2092 +5,5729 @@
 
 import * as THREE from "three";
 
+
+function normalize(m) {
+  m.vertices.forEach(v => v.normalize());
+}
+
 /**
  * Collection of standard geometric solids.
  */
 export const Solids = {
-  // Helper for normalization
-  normalize(m) {
-    m.vertices.forEach(v => v.normalize());
+
+  normalize: normalize,
+
+  get(name) {
+    if (this.PlatonicSolids[name]) return this.PlatonicSolids[name]();
+    if (this.Archimedean[name]) return this.Archimedean[name]();
+    if (this.IslamicStarPatterns && this.IslamicStarPatterns[name]) return this.IslamicStarPatterns[name]();
+    console.warn(`Solid '${name}' not found, returning tetrahedron.`);
+    return this.PlatonicSolids['tetrahedron']();
   },
 
-  // 1. TETRAHEDRON (4 Verts, 4 Faces)
-  // Source: Standard construction
-  // 1. TETRAHEDRON (4 Verts, 4 Faces)
-  // Source: Standard construction
-  tetrahedron() {
-    const s = 1.0;
-    const c = 1.0 / Math.sqrt(3.0); // Normalize to sphere
-    const m = {
-      vertices: [
-        new THREE.Vector3(c, c, c),   // 0: (+,+,+)
-        new THREE.Vector3(c, -c, -c), // 1: (+,-,-)
-        new THREE.Vector3(-c, c, -c), // 2: (-,+,-)
-        new THREE.Vector3(-c, -c, c)  // 3: (-,-,+)
-      ],
-      faces: [
-        // Reversed to CCW
-        [0, 3, 1], [0, 2, 3], [0, 1, 2], [1, 3, 2]
-      ]
-    };
-    this.normalize(m);
-    return m;
+  PlatonicSolids: {
+
+    // 1. TETRAHEDRON (4 Verts, 4 Faces)
+    // Source: Standard construction
+    // 1. TETRAHEDRON (4 Verts, 4 Faces)
+    // Source: Standard construction
+    tetrahedron() {
+      const s = 1.0;
+      const c = 1.0 / Math.sqrt(3.0); // Normalize to sphere
+      const m = {
+        vertices: [
+          new THREE.Vector3(c, c, c),   // 0: (+,+,+)
+          new THREE.Vector3(c, -c, -c), // 1: (+,-,-)
+          new THREE.Vector3(-c, c, -c), // 2: (-,+,-)
+          new THREE.Vector3(-c, -c, c)  // 3: (-,-,+)
+        ],
+        faces: [
+          // Reversed to CCW
+          [0, 3, 1], [0, 2, 3], [0, 1, 2], [1, 3, 2]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
+
+    // 2. CUBE (8 Verts, 6 Faces)
+    // Source: Geometric Tools (Ref 3.7)
+    // Order: Bottom Ring (0-3), Top Ring (4-7)
+    cube() {
+      const a = 1.0 / Math.sqrt(3.0);
+      const m = {
+        vertices: [
+          new THREE.Vector3(-a, -a, -a), // 0
+          new THREE.Vector3(a, -a, -a), // 1
+          new THREE.Vector3(a, a, -a), // 2
+          new THREE.Vector3(-a, a, -a), // 3
+          new THREE.Vector3(-a, -a, a), // 4
+          new THREE.Vector3(a, -a, a), // 5
+          new THREE.Vector3(a, a, a), // 6
+          new THREE.Vector3(-a, a, a)  // 7
+        ],
+        faces: [
+          [0, 3, 2, 1], // Bottom
+          [0, 1, 5, 4], // Front
+          [0, 4, 7, 3], // Left
+          [6, 5, 1, 2], // Right
+          [6, 2, 3, 7], // Back
+          [6, 7, 4, 5]  // Top
+        ]
+      };
+      normalize(m);
+      return m;
+    },
+
+    // 3. OCTAHEDRON (6 Verts, 8 Faces)
+    // Source: Geometric Tools
+    // Order: Equator (0-3), Top (4), Bottom (5)
+    octahedron() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(1, 0, 0), // 0
+          new THREE.Vector3(-1, 0, 0), // 1
+          new THREE.Vector3(0, 1, 0), // 2
+          new THREE.Vector3(0, -1, 0), // 3
+          new THREE.Vector3(0, 0, 1), // 4 (Top)
+          new THREE.Vector3(0, 0, -1)  // 5 (Bottom)
+        ],
+        faces: [
+          [4, 0, 2], [4, 2, 1], [4, 1, 3], [4, 3, 0], // Top Fan
+          [5, 2, 0], [5, 1, 2], [5, 3, 1], [5, 0, 3]  // Bottom Fan
+        ]
+      };
+      normalize(m);
+      return m;
+    },
+
+    // 4. ICOSAHEDRON (12 Verts, 20 Faces)
+    // Source: Schneide Blog (Verified standard strip construction)
+    // Structure:
+    //   0-3: XZ plane rectangle
+    //   4-7: YZ plane rectangle
+    //   8-11: XY plane rectangle
+    icosahedron() {
+      const X = 0.525731112119;
+      const Z = 0.850650808352;
+
+      const m = {
+        vertices: [
+          new THREE.Vector3(-X, 0.0, Z), new THREE.Vector3(X, 0.0, Z), new THREE.Vector3(-X, 0.0, -Z), new THREE.Vector3(X, 0.0, -Z),    // 0-3
+          new THREE.Vector3(0.0, Z, X), new THREE.Vector3(0.0, Z, -X), new THREE.Vector3(0.0, -Z, X), new THREE.Vector3(0.0, -Z, -X),    // 4-7
+          new THREE.Vector3(Z, X, 0.0), new THREE.Vector3(-Z, X, 0.0), new THREE.Vector3(Z, -X, 0.0), new THREE.Vector3(-Z, -X, 0.0)     // 8-11
+        ],
+        faces: [
+          [0, 1, 4], [0, 4, 9], [9, 4, 5], [4, 8, 5], [4, 1, 8],
+          [8, 1, 10], [8, 10, 3], [5, 8, 3], [5, 3, 2], [2, 3, 7],
+          [7, 3, 10], [7, 10, 6], [7, 6, 11], [11, 6, 0], [0, 6, 1],
+          [6, 10, 1], [9, 11, 0], [9, 2, 11], [9, 5, 2], [7, 11, 2]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
+
+    // 5. DODECAHEDRON (20 Verts, 12 Faces)
+    // Source: Geometric Tools (Ref 3.7)
+    // Order is CRITICAL here. 
+    //   0-7:   Cube vertices (Â±1, Â±1, Â±1)
+    //   8-11:  (Â±1/phi, Â±phi, 0)   [XY plane]
+    //   12-15: (Â±phi, 0, Â±1/phi)   [XZ plane]
+    //   16-19: (0, Â±1/phi, Â±phi)   [YZ plane]
+    dodecahedron() {
+      const a = 1.0 / Math.sqrt(3.0);     // Cube corners
+      const phi = (1.0 + Math.sqrt(5.0)) / 2.0;
+      const b = (1.0 / phi) / Math.sqrt(3.0); // scaled 1/phi
+      const c = phi / Math.sqrt(3.0);          // scaled phi
+
+      // Note: We re-normalize at the end to be perfectly spherical, 
+      // but the constants above ensure correct relative geometry.
+      const m = {
+        vertices: [
+          // Cube Vertices (0-7)
+          new THREE.Vector3(a, a, a), new THREE.Vector3(a, a, -a), new THREE.Vector3(a, -a, a), new THREE.Vector3(a, -a, -a), // 0-3
+          new THREE.Vector3(-a, a, a), new THREE.Vector3(-a, a, -a), new THREE.Vector3(-a, -a, a), new THREE.Vector3(-a, -a, -a), // 4-7
+
+          // XY Plane Points (8-11) -> (Â±1/phi, Â±phi, 0)
+          new THREE.Vector3(b, c, 0.0), new THREE.Vector3(-b, c, 0.0), new THREE.Vector3(b, -c, 0.0), new THREE.Vector3(-b, -c, 0.0),
+
+          // XZ Plane Points (12-15) -> (Â±phi, 0, Â±1/phi)
+          new THREE.Vector3(c, 0.0, b), new THREE.Vector3(c, 0.0, -b), new THREE.Vector3(-c, 0.0, b), new THREE.Vector3(-c, 0.0, -b),
+
+          // YZ Plane Points (16-19) -> (0, Â±1/phi, Â±phi)
+          new THREE.Vector3(0.0, b, c), new THREE.Vector3(0.0, -b, c), new THREE.Vector3(0.0, b, -c), new THREE.Vector3(0.0, -b, -c)
+        ],
+        faces: [
+          // 12 Pentagonal Faces (Reversed to CCW winding)
+          [0, 8, 9, 4, 16],
+          [0, 12, 13, 1, 8],
+          [0, 16, 17, 2, 12],
+          [8, 1, 18, 5, 9],
+          [12, 2, 10, 3, 13],
+          [16, 4, 14, 6, 17],
+          [9, 5, 15, 14, 4],
+          [6, 11, 10, 2, 17],
+          [3, 19, 18, 1, 13],
+          [7, 15, 5, 18, 19],
+          [7, 11, 6, 14, 15],
+          [7, 19, 3, 10, 11]
+        ]
+      };
+      normalize(m); // Ensure exact unit radius
+      return m;
+    },
   },
 
-  // 2. CUBE (8 Verts, 6 Faces)
-  // Source: Geometric Tools (Ref 3.7)
-  // Order: Bottom Ring (0-3), Top Ring (4-7)
-  cube() {
-    const a = 1.0 / Math.sqrt(3.0);
-    const m = {
-      vertices: [
-        new THREE.Vector3(-a, -a, -a), // 0
-        new THREE.Vector3(a, -a, -a), // 1
-        new THREE.Vector3(a, a, -a), // 2
-        new THREE.Vector3(-a, a, -a), // 3
-        new THREE.Vector3(-a, -a, a), // 4
-        new THREE.Vector3(a, -a, a), // 5
-        new THREE.Vector3(a, a, a), // 6
-        new THREE.Vector3(-a, a, a)  // 7
-      ],
-      faces: [
-        [0, 3, 2, 1], // Bottom
-        [0, 1, 5, 4], // Front
-        [0, 4, 7, 3], // Left
-        [6, 5, 1, 2], // Right
-        [6, 2, 3, 7], // Back
-        [6, 7, 4, 5]  // Top
-      ]
-    };
-    this.normalize(m);
-    return m;
+  Archimedean: {
+    // 1. Truncated Tetrahedron
+    truncatedTetrahedron() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(0.3333333, 1, 0.3333333), // 0
+          new THREE.Vector3(-1, 0.3333333, -0.3333333), // 1
+          new THREE.Vector3(-0.3333333, -0.3333333, 1), // 2
+          new THREE.Vector3(0.3333333, 0.3333333, 1), // 3
+          new THREE.Vector3(-0.3333333, -1, 0.3333333), // 4
+          new THREE.Vector3(1, -0.3333333, -0.3333333), // 5
+          new THREE.Vector3(1, 0.3333333, 0.3333333), // 6
+          new THREE.Vector3(0.3333333, -0.3333333, -1), // 7
+          new THREE.Vector3(-0.3333333, 1, -0.3333333), // 8
+          new THREE.Vector3(-1, -0.3333333, 0.3333333), // 9
+          new THREE.Vector3(-0.3333333, 0.3333333, -1), // 10
+          new THREE.Vector3(0.3333333, -1, -0.3333333) // 11
+        ],
+        faces: [
+          [0, 8, 1, 9, 2, 3],
+          [3, 2, 4, 11, 5, 6],
+          [6, 5, 7, 10, 8, 0],
+          [9, 1, 10, 7, 11, 4],
+          [3, 6, 0],
+          [8, 10, 1],
+          [9, 4, 2],
+          [11, 7, 5]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
+
+    // 2. Cuboctahedron
+    cuboctahedron() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(-0.7071068, 0, -0.7071068), // 0
+          new THREE.Vector3(0, 0.7071068, -0.7071068), // 1
+          new THREE.Vector3(0.7071068, 0, -0.7071068), // 2
+          new THREE.Vector3(0, -0.7071068, -0.7071068), // 3
+          new THREE.Vector3(0.7071068, -0.7071068, 0), // 4
+          new THREE.Vector3(0, -0.7071068, 0.7071068), // 5
+          new THREE.Vector3(-0.7071068, -0.7071068, 0), // 6
+          new THREE.Vector3(-0.7071068, 0, 0.7071068), // 7
+          new THREE.Vector3(-0.7071068, 0.7071068, 0), // 8
+          new THREE.Vector3(0.7071068, 0, 0.7071068), // 9
+          new THREE.Vector3(0.7071068, 0.7071068, 0), // 10
+          new THREE.Vector3(0, 0.7071068, 0.7071068) // 11
+        ],
+        faces: [
+          [0, 1, 2, 3],
+          [3, 4, 5, 6],
+          [6, 7, 8, 0],
+          [9, 4, 2, 10],
+          [10, 1, 8, 11],
+          [11, 7, 5, 9],
+          [3, 6, 0],
+          [0, 8, 1],
+          [1, 10, 2],
+          [2, 4, 3],
+          [4, 9, 5],
+          [5, 7, 6],
+          [7, 11, 8],
+          [10, 11, 9]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
+
+    // 3. Truncated Cube
+    truncatedCube() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(-0.6785983, -0.2810846, -0.6785983), // 0
+          new THREE.Vector3(-0.2810846, 0.6785983, -0.6785983), // 1
+          new THREE.Vector3(0.6785983, 0.2810846, -0.6785983), // 2
+          new THREE.Vector3(0.2810846, -0.6785983, -0.6785983), // 3
+          new THREE.Vector3(-0.2810846, -0.6785983, -0.6785983), // 4
+          new THREE.Vector3(0.6785983, -0.6785983, -0.2810846), // 5
+          new THREE.Vector3(0.2810846, -0.6785983, 0.6785983), // 6
+          new THREE.Vector3(-0.6785983, -0.6785983, 0.2810846), // 7
+          new THREE.Vector3(-0.6785983, -0.6785983, -0.2810846), // 8
+          new THREE.Vector3(-0.6785983, -0.2810846, 0.6785983), // 9
+          new THREE.Vector3(-0.6785983, 0.6785983, 0.2810846), // 10
+          new THREE.Vector3(-0.6785983, 0.2810846, -0.6785983), // 11
+          new THREE.Vector3(0.6785983, 0.2810846, 0.6785983), // 12
+          new THREE.Vector3(0.6785983, -0.6785983, 0.2810846), // 13
+          new THREE.Vector3(0.6785983, -0.2810846, -0.6785983), // 14
+          new THREE.Vector3(0.6785983, 0.6785983, -0.2810846), // 15
+          new THREE.Vector3(0.6785983, 0.6785983, 0.2810846), // 16
+          new THREE.Vector3(0.2810846, 0.6785983, -0.6785983), // 17
+          new THREE.Vector3(-0.6785983, 0.6785983, -0.2810846), // 18
+          new THREE.Vector3(-0.2810846, 0.6785983, 0.6785983), // 19
+          new THREE.Vector3(0.2810846, 0.6785983, 0.6785983), // 20
+          new THREE.Vector3(-0.6785983, 0.2810846, 0.6785983), // 21
+          new THREE.Vector3(-0.2810846, -0.6785983, 0.6785983), // 22
+          new THREE.Vector3(0.6785983, -0.2810846, 0.6785983) // 23
+        ],
+        faces: [
+          [0, 11, 1, 17, 2, 14, 3, 4],
+          [4, 3, 5, 13, 6, 22, 7, 8],
+          [8, 7, 9, 21, 10, 18, 11, 0],
+          [12, 23, 13, 5, 14, 2, 15, 16],
+          [16, 15, 17, 1, 18, 10, 19, 20],
+          [20, 19, 21, 9, 22, 6, 23, 12],
+          [4, 8, 0],
+          [11, 18, 1],
+          [17, 15, 2],
+          [14, 5, 3],
+          [13, 23, 6],
+          [22, 9, 7],
+          [21, 19, 10],
+          [16, 20, 12]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
+
+    // 4. Truncated Octahedron
+    truncatedOctahedron() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(0.4472136, 0, 0.8944272), // 0
+          new THREE.Vector3(0.8944272, 0.4472136, 0), // 1
+          new THREE.Vector3(0, 0.8944272, 0.4472136), // 2
+          new THREE.Vector3(0, 0.4472136, 0.8944272), // 3
+          new THREE.Vector3(-0.4472136, 0.8944272, 0), // 4
+          new THREE.Vector3(-0.8944272, 0, 0.4472136), // 5
+          new THREE.Vector3(-0.4472136, 0, 0.8944272), // 6
+          new THREE.Vector3(-0.8944272, -0.4472136, 0), // 7
+          new THREE.Vector3(0, -0.8944272, 0.4472136), // 8
+          new THREE.Vector3(0, -0.4472136, 0.8944272), // 9
+          new THREE.Vector3(0.4472136, -0.8944272, 0), // 10
+          new THREE.Vector3(0.8944272, 0, 0.4472136), // 11
+          new THREE.Vector3(0, 0.4472136, -0.8944272), // 12
+          new THREE.Vector3(0.4472136, 0.8944272, 0), // 13
+          new THREE.Vector3(0.8944272, 0, -0.4472136), // 14
+          new THREE.Vector3(-0.4472136, 0, -0.8944272), // 15
+          new THREE.Vector3(-0.8944272, 0.4472136, 0), // 16
+          new THREE.Vector3(0, 0.8944272, -0.4472136), // 17
+          new THREE.Vector3(0, -0.4472136, -0.8944272), // 18
+          new THREE.Vector3(-0.4472136, -0.8944272, 0), // 19
+          new THREE.Vector3(-0.8944272, 0, -0.4472136), // 20
+          new THREE.Vector3(0.4472136, 0, -0.8944272), // 21
+          new THREE.Vector3(0.8944272, -0.4472136, 0), // 22
+          new THREE.Vector3(0, -0.8944272, -0.4472136) // 23
+        ],
+        faces: [
+          [0, 11, 1, 13, 2, 3],
+          [3, 2, 4, 16, 5, 6],
+          [6, 5, 7, 19, 8, 9],
+          [9, 8, 10, 22, 11, 0],
+          [12, 17, 13, 1, 14, 21],
+          [15, 20, 16, 4, 17, 12],
+          [18, 23, 19, 7, 20, 15],
+          [21, 14, 22, 10, 23, 18],
+          [3, 6, 9, 0],
+          [11, 22, 14, 1],
+          [13, 17, 4, 2],
+          [16, 20, 7, 5],
+          [19, 23, 10, 8],
+          [21, 18, 15, 12]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
+
+    // 5. Rhombicuboctahedron
+    rhombicuboctahedron() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(-0.3574067, 0.3574067, -0.8628562), // 0
+          new THREE.Vector3(0.3574067, 0.3574067, -0.8628562), // 1
+          new THREE.Vector3(0.3574067, -0.3574067, -0.8628562), // 2
+          new THREE.Vector3(-0.3574067, -0.3574067, -0.8628562), // 3
+          new THREE.Vector3(0.3574067, -0.8628562, -0.3574067), // 4
+          new THREE.Vector3(0.3574067, -0.8628562, 0.3574067), // 5
+          new THREE.Vector3(-0.3574067, -0.8628562, 0.3574067), // 6
+          new THREE.Vector3(-0.3574067, -0.8628562, -0.3574067), // 7
+          new THREE.Vector3(-0.8628562, -0.3574067, 0.3574067), // 8
+          new THREE.Vector3(-0.8628562, 0.3574067, 0.3574067), // 9
+          new THREE.Vector3(-0.8628562, 0.3574067, -0.3574067), // 10
+          new THREE.Vector3(-0.8628562, -0.3574067, -0.3574067), // 11
+          new THREE.Vector3(0.8628562, -0.3574067, 0.3574067), // 12
+          new THREE.Vector3(0.8628562, -0.3574067, -0.3574067), // 13
+          new THREE.Vector3(0.8628562, 0.3574067, -0.3574067), // 14
+          new THREE.Vector3(0.8628562, 0.3574067, 0.3574067), // 15
+          new THREE.Vector3(0.3574067, 0.8628562, -0.3574067), // 16
+          new THREE.Vector3(-0.3574067, 0.8628562, -0.3574067), // 17
+          new THREE.Vector3(-0.3574067, 0.8628562, 0.3574067), // 18
+          new THREE.Vector3(0.3574067, 0.8628562, 0.3574067), // 19
+          new THREE.Vector3(-0.3574067, 0.3574067, 0.8628562), // 20
+          new THREE.Vector3(-0.3574067, -0.3574067, 0.8628562), // 21
+          new THREE.Vector3(0.3574067, -0.3574067, 0.8628562), // 22
+          new THREE.Vector3(0.3574067, 0.3574067, 0.8628562) // 23
+        ],
+        faces: [
+          [0, 1, 2, 3],
+          [4, 5, 6, 7],
+          [8, 9, 10, 11],
+          [12, 13, 14, 15],
+          [16, 17, 18, 19],
+          [20, 21, 22, 23],
+          [7, 11, 3],
+          [10, 17, 0],
+          [16, 14, 1],
+          [13, 4, 2],
+          [12, 22, 5],
+          [21, 8, 6],
+          [20, 18, 9],
+          [19, 23, 15],
+          [3, 11, 10, 0],
+          [0, 17, 16, 1],
+          [1, 14, 13, 2],
+          [2, 4, 7, 3],
+          [4, 13, 12, 5],
+          [5, 22, 21, 6],
+          [6, 8, 11, 7],
+          [8, 21, 20, 9],
+          [9, 18, 17, 10],
+          [15, 23, 22, 12],
+          [14, 16, 19, 15],
+          [18, 20, 23, 19]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
+
+    // 6. Truncated Cuboctahedron (Great Rhombicuboctahedron)
+    truncatedCuboctahedron() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(-0.520841, 0.2157394, -0.8259426), // 0
+          new THREE.Vector3(0.2157394, 0.520841, -0.8259426), // 1
+          new THREE.Vector3(0.520841, -0.2157394, -0.8259426), // 2
+          new THREE.Vector3(-0.2157394, -0.520841, -0.8259426), // 3
+          new THREE.Vector3(0.2157394, -0.8259426, -0.520841), // 4
+          new THREE.Vector3(0.520841, -0.8259426, 0.2157394), // 5
+          new THREE.Vector3(-0.2157394, -0.8259426, 0.520841), // 6
+          new THREE.Vector3(-0.520841, -0.8259426, -0.2157394), // 7
+          new THREE.Vector3(-0.8259426, -0.520841, 0.2157394), // 8
+          new THREE.Vector3(-0.8259426, 0.2157394, 0.520841), // 9
+          new THREE.Vector3(-0.8259426, 0.520841, -0.2157394), // 10
+          new THREE.Vector3(-0.8259426, -0.2157394, -0.520841), // 11
+          new THREE.Vector3(0.8259426, -0.2157394, 0.520841), // 12
+          new THREE.Vector3(0.8259426, -0.520841, -0.2157394), // 13
+          new THREE.Vector3(0.8259426, 0.2157394, -0.520841), // 14
+          new THREE.Vector3(0.8259426, 0.520841, 0.2157394), // 15
+          new THREE.Vector3(0.520841, 0.8259426, -0.2157394), // 16
+          new THREE.Vector3(-0.2157394, 0.8259426, -0.520841), // 17
+          new THREE.Vector3(-0.520841, 0.8259426, 0.2157394), // 18
+          new THREE.Vector3(0.2157394, 0.8259426, 0.520841), // 19
+          new THREE.Vector3(-0.2157394, 0.520841, 0.8259426), // 20
+          new THREE.Vector3(-0.520841, -0.2157394, 0.8259426), // 21
+          new THREE.Vector3(0.2157394, -0.520841, 0.8259426), // 22
+          new THREE.Vector3(0.520841, 0.2157394, 0.8259426), // 23
+          new THREE.Vector3(-0.2157394, -0.8259426, -0.520841), // 24
+          new THREE.Vector3(-0.8259426, -0.520841, -0.2157394), // 25
+          new THREE.Vector3(-0.520841, -0.2157394, -0.8259426), // 26
+          new THREE.Vector3(-0.8259426, 0.2157394, -0.520841), // 27
+          new THREE.Vector3(-0.520841, 0.8259426, -0.2157394), // 28
+          new THREE.Vector3(-0.2157394, 0.520841, -0.8259426), // 29
+          new THREE.Vector3(0.2157394, 0.8259426, -0.520841), // 30
+          new THREE.Vector3(0.8259426, 0.520841, -0.2157394), // 31
+          new THREE.Vector3(0.520841, 0.2157394, -0.8259426), // 32
+          new THREE.Vector3(0.8259426, -0.2157394, -0.520841), // 33
+          new THREE.Vector3(0.520841, -0.8259426, -0.2157394), // 34
+          new THREE.Vector3(0.2157394, -0.520841, -0.8259426), // 35
+          new THREE.Vector3(0.8259426, -0.520841, 0.2157394), // 36
+          new THREE.Vector3(0.520841, -0.2157394, 0.8259426), // 37
+          new THREE.Vector3(0.2157394, -0.8259426, 0.520841), // 38
+          new THREE.Vector3(-0.2157394, -0.520841, 0.8259426), // 39
+          new THREE.Vector3(-0.8259426, -0.2157394, 0.520841), // 40
+          new THREE.Vector3(-0.520841, -0.8259426, 0.2157394), // 41
+          new THREE.Vector3(-0.520841, 0.2157394, 0.8259426), // 42
+          new THREE.Vector3(-0.2157394, 0.8259426, 0.520841), // 43
+          new THREE.Vector3(-0.8259426, 0.520841, 0.2157394), // 44
+          new THREE.Vector3(0.520841, 0.8259426, 0.2157394), // 45
+          new THREE.Vector3(0.2157394, 0.520841, 0.8259426), // 46
+          new THREE.Vector3(0.8259426, 0.2157394, 0.520841) // 47
+        ],
+        faces: [
+          [0, 29, 1, 32, 2, 35, 3, 26],
+          [4, 34, 5, 38, 6, 41, 7, 24],
+          [8, 40, 9, 44, 10, 27, 11, 25],
+          [12, 36, 13, 33, 14, 31, 15, 47],
+          [16, 30, 17, 28, 18, 43, 19, 45],
+          [20, 42, 21, 39, 22, 37, 23, 46],
+          [24, 7, 25, 11, 26, 3],
+          [27, 10, 28, 17, 29, 0],
+          [30, 16, 31, 14, 32, 1],
+          [33, 13, 34, 4, 35, 2],
+          [36, 12, 37, 22, 38, 5],
+          [39, 21, 40, 8, 41, 6],
+          [42, 20, 43, 18, 44, 9],
+          [45, 19, 46, 23, 47, 15],
+          [26, 11, 27, 0],
+          [29, 17, 30, 1],
+          [32, 14, 33, 2],
+          [35, 4, 24, 3],
+          [34, 13, 36, 5],
+          [38, 22, 39, 6],
+          [41, 8, 25, 7],
+          [40, 21, 42, 9],
+          [44, 18, 28, 10],
+          [47, 23, 37, 12],
+          [31, 16, 45, 15],
+          [43, 20, 46, 19]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
+
+    // 7. Snub Cube
+    snubCube() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(-0.4623206, -0.2513586, -0.8503402), // 0
+          new THREE.Vector3(-0.2513586, 0.4623206, -0.8503402), // 1
+          new THREE.Vector3(0.4623206, 0.2513586, -0.8503402), // 2
+          new THREE.Vector3(0.2513586, -0.4623206, -0.8503402), // 3
+          new THREE.Vector3(-0.2513586, -0.8503402, -0.4623206), // 4
+          new THREE.Vector3(0.4623206, -0.8503402, -0.2513586), // 5
+          new THREE.Vector3(0.2513586, -0.8503402, 0.4623206), // 6
+          new THREE.Vector3(-0.4623206, -0.8503402, 0.2513586), // 7
+          new THREE.Vector3(-0.8503402, -0.4623206, -0.2513586), // 8
+          new THREE.Vector3(-0.8503402, -0.2513586, 0.4623206), // 9
+          new THREE.Vector3(-0.8503402, 0.4623206, 0.2513586), // 10
+          new THREE.Vector3(-0.8503402, 0.2513586, -0.4623206), // 11
+          new THREE.Vector3(0.8503402, 0.2513586, 0.4623206), // 12
+          new THREE.Vector3(0.8503402, -0.4623206, 0.2513586), // 13
+          new THREE.Vector3(0.8503402, -0.2513586, -0.4623206), // 14
+          new THREE.Vector3(0.8503402, 0.4623206, -0.2513586), // 15
+          new THREE.Vector3(0.4623206, 0.8503402, 0.2513586), // 16
+          new THREE.Vector3(0.2513586, 0.8503402, -0.4623206), // 17
+          new THREE.Vector3(-0.4623206, 0.8503402, -0.2513586), // 18
+          new THREE.Vector3(-0.2513586, 0.8503402, 0.4623206), // 19
+          new THREE.Vector3(0.2513586, 0.4623206, 0.8503402), // 20
+          new THREE.Vector3(-0.4623206, 0.2513586, 0.8503402), // 21
+          new THREE.Vector3(-0.2513586, -0.4623206, 0.8503402), // 22
+          new THREE.Vector3(0.4623206, -0.2513586, 0.8503402) // 23
+        ],
+        faces: [
+          [0, 1, 2, 3],
+          [4, 5, 6, 7],
+          [8, 9, 10, 11],
+          [12, 13, 14, 15],
+          [16, 17, 18, 19],
+          [20, 21, 22, 23],
+          [4, 8, 0],
+          [11, 18, 1],
+          [17, 15, 2],
+          [14, 5, 3],
+          [13, 23, 6],
+          [22, 9, 7],
+          [21, 19, 10],
+          [16, 20, 12],
+          [0, 8, 11],
+          [0, 11, 1],
+          [1, 18, 17],
+          [1, 17, 2],
+          [2, 15, 14],
+          [2, 14, 3],
+          [3, 5, 4],
+          [3, 4, 0],
+          [5, 14, 13],
+          [5, 13, 6],
+          [6, 23, 22],
+          [6, 22, 7],
+          [7, 9, 8],
+          [7, 8, 4],
+          [9, 22, 21],
+          [9, 21, 10],
+          [10, 19, 18],
+          [10, 18, 11],
+          [12, 20, 23],
+          [12, 23, 13],
+          [15, 17, 16],
+          [15, 16, 12],
+          [19, 21, 20],
+          [19, 20, 16]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
+
+    // 8. Icosidodecahedron
+    icosidodecahedron() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(0.5, 0.809017, 0.309017), // 0
+          new THREE.Vector3(0, 1, 0), // 1
+          new THREE.Vector3(-0.5, 0.809017, 0.309017), // 2
+          new THREE.Vector3(-0.309017, 0.5, 0.809017), // 3
+          new THREE.Vector3(0.309017, 0.5, 0.809017), // 4
+          new THREE.Vector3(0.809017, 0.309017, 0.5), // 5
+          new THREE.Vector3(1, 0, 0), // 6
+          new THREE.Vector3(0.809017, 0.309017, -0.5), // 7
+          new THREE.Vector3(0.5, 0.809017, -0.309017), // 8
+          new THREE.Vector3(0, 0, 1), // 9
+          new THREE.Vector3(0.309017, -0.5, 0.809017), // 10
+          new THREE.Vector3(0.809017, -0.309017, 0.5), // 11
+          new THREE.Vector3(0.309017, 0.5, -0.809017), // 12
+          new THREE.Vector3(-0.309017, 0.5, -0.809017), // 13
+          new THREE.Vector3(-0.5, 0.809017, -0.309017), // 14
+          new THREE.Vector3(0.5, -0.809017, 0.309017), // 15
+          new THREE.Vector3(0.5, -0.809017, -0.309017), // 16
+          new THREE.Vector3(0.809017, -0.309017, -0.5), // 17
+          new THREE.Vector3(-0.809017, 0.309017, 0.5), // 18
+          new THREE.Vector3(-0.809017, -0.309017, 0.5), // 19
+          new THREE.Vector3(-0.309017, -0.5, 0.809017), // 20
+          new THREE.Vector3(-0.809017, 0.309017, -0.5), // 21
+          new THREE.Vector3(-1, 0, 0), // 22
+          new THREE.Vector3(-0.5, -0.809017, 0.309017), // 23
+          new THREE.Vector3(0, -1, 0), // 24
+          new THREE.Vector3(0.309017, -0.5, -0.809017), // 25
+          new THREE.Vector3(0, 0, -1), // 26
+          new THREE.Vector3(-0.809017, -0.309017, -0.5), // 27
+          new THREE.Vector3(-0.309017, -0.5, -0.809017), // 28
+          new THREE.Vector3(-0.5, -0.809017, -0.309017) // 29
+        ],
+        faces: [
+          [0, 1, 2, 3, 4],
+          [5, 6, 7, 8, 0],
+          [4, 9, 10, 11, 5],
+          [8, 12, 13, 14, 1],
+          [11, 15, 16, 17, 6],
+          [3, 18, 19, 20, 9],
+          [14, 21, 22, 18, 2],
+          [23, 24, 15, 10, 20],
+          [25, 26, 12, 7, 17],
+          [27, 21, 13, 26, 28],
+          [29, 23, 19, 22, 27],
+          [28, 25, 16, 24, 29],
+          [4, 5, 0],
+          [0, 8, 1],
+          [1, 14, 2],
+          [2, 18, 3],
+          [3, 9, 4],
+          [5, 11, 6],
+          [6, 17, 7],
+          [7, 12, 8],
+          [9, 20, 10],
+          [10, 15, 11],
+          [12, 26, 13],
+          [13, 21, 14],
+          [15, 24, 16],
+          [16, 25, 17],
+          [18, 22, 19],
+          [19, 23, 20],
+          [21, 27, 22],
+          [23, 29, 24],
+          [25, 28, 26],
+          [28, 29, 27]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
+
+    // 9. Truncated Dodecahedron
+    truncatedDodecahedron() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(0.5448937, 0.7132751, 0.4408282), // 0
+          new THREE.Vector3(0.1683814, 0.9857219, 0), // 1
+          new THREE.Vector3(-0.4408282, 0.8816565, 0.1683814), // 2
+          new THREE.Vector3(-0.4408282, 0.5448937, 0.7132751), // 3
+          new THREE.Vector3(0.1683814, 0.4408282, 0.8816565), // 4
+          new THREE.Vector3(0.7132751, 0.4408282, 0.5448937), // 5
+          new THREE.Vector3(0.9857219, 0, 0.1683814), // 6
+          new THREE.Vector3(0.8816565, 0.1683814, -0.4408282), // 7
+          new THREE.Vector3(0.5448937, 0.7132751, -0.4408282), // 8
+          new THREE.Vector3(0.4408282, 0.8816565, 0.1683814), // 9
+          new THREE.Vector3(0.4408282, 0.5448937, 0.7132751), // 10
+          new THREE.Vector3(0, 0.1683814, 0.9857219), // 11
+          new THREE.Vector3(0.1683814, -0.4408282, 0.8816565), // 12
+          new THREE.Vector3(0.7132751, -0.4408282, 0.5448937), // 13
+          new THREE.Vector3(0.8816565, 0.1683814, 0.4408282), // 14
+          new THREE.Vector3(0.4408282, 0.8816565, -0.1683814), // 15
+          new THREE.Vector3(0.4408282, 0.5448937, -0.7132751), // 16
+          new THREE.Vector3(-0.1683814, 0.4408282, -0.8816565), // 17
+          new THREE.Vector3(-0.5448937, 0.7132751, -0.4408282), // 18
+          new THREE.Vector3(-0.1683814, 0.9857219, 0), // 19
+          new THREE.Vector3(0.8816565, -0.1683814, 0.4408282), // 20
+          new THREE.Vector3(0.5448937, -0.7132751, 0.4408282), // 21
+          new THREE.Vector3(0.4408282, -0.8816565, -0.1683814), // 22
+          new THREE.Vector3(0.7132751, -0.4408282, -0.5448937), // 23
+          new THREE.Vector3(0.9857219, 0, -0.1683814), // 24
+          new THREE.Vector3(-0.1683814, 0.4408282, 0.8816565), // 25
+          new THREE.Vector3(-0.7132751, 0.4408282, 0.5448937), // 26
+          new THREE.Vector3(-0.8816565, -0.1683814, 0.4408282), // 27
+          new THREE.Vector3(-0.4408282, -0.5448937, 0.7132751), // 28
+          new THREE.Vector3(0, -0.1683814, 0.9857219), // 29
+          new THREE.Vector3(-0.4408282, 0.8816565, -0.1683814), // 30
+          new THREE.Vector3(-0.7132751, 0.4408282, -0.5448937), // 31
+          new THREE.Vector3(-0.9857219, 0, -0.1683814), // 32
+          new THREE.Vector3(-0.8816565, 0.1683814, 0.4408282), // 33
+          new THREE.Vector3(-0.5448937, 0.7132751, 0.4408282), // 34
+          new THREE.Vector3(-0.5448937, -0.7132751, 0.4408282), // 35
+          new THREE.Vector3(-0.1683814, -0.9857219, 0), // 36
+          new THREE.Vector3(0.4408282, -0.8816565, 0.1683814), // 37
+          new THREE.Vector3(0.4408282, -0.5448937, 0.7132751), // 38
+          new THREE.Vector3(-0.1683814, -0.4408282, 0.8816565), // 39
+          new THREE.Vector3(0.4408282, -0.5448937, -0.7132751), // 40
+          new THREE.Vector3(0, -0.1683814, -0.9857219), // 41
+          new THREE.Vector3(0.1683814, 0.4408282, -0.8816565), // 42
+          new THREE.Vector3(0.7132751, 0.4408282, -0.5448937), // 43
+          new THREE.Vector3(0.8816565, -0.1683814, -0.4408282), // 44
+          new THREE.Vector3(-0.7132751, -0.4408282, -0.5448937), // 45
+          new THREE.Vector3(-0.8816565, 0.1683814, -0.4408282), // 46
+          new THREE.Vector3(-0.4408282, 0.5448937, -0.7132751), // 47
+          new THREE.Vector3(0, 0.1683814, -0.9857219), // 48
+          new THREE.Vector3(-0.1683814, -0.4408282, -0.8816565), // 49
+          new THREE.Vector3(-0.5448937, -0.7132751, -0.4408282), // 50
+          new THREE.Vector3(-0.4408282, -0.8816565, 0.1683814), // 51
+          new THREE.Vector3(-0.7132751, -0.4408282, 0.5448937), // 52
+          new THREE.Vector3(-0.9857219, 0, 0.1683814), // 53
+          new THREE.Vector3(-0.8816565, -0.1683814, -0.4408282), // 54
+          new THREE.Vector3(-0.4408282, -0.5448937, -0.7132751), // 55
+          new THREE.Vector3(0.1683814, -0.4408282, -0.8816565), // 56
+          new THREE.Vector3(0.5448937, -0.7132751, -0.4408282), // 57
+          new THREE.Vector3(0.1683814, -0.9857219, 0), // 58
+          new THREE.Vector3(-0.4408282, -0.8816565, -0.1683814) // 59
+        ],
+        faces: [
+          [0, 9, 1, 19, 2, 34, 3, 25, 4, 10],
+          [5, 14, 6, 24, 7, 43, 8, 15, 9, 0],
+          [10, 4, 11, 29, 12, 38, 13, 20, 14, 5],
+          [15, 8, 16, 42, 17, 47, 18, 30, 19, 1],
+          [20, 13, 21, 37, 22, 57, 23, 44, 24, 6],
+          [25, 3, 26, 33, 27, 52, 28, 39, 29, 11],
+          [30, 18, 31, 46, 32, 53, 33, 26, 34, 2],
+          [35, 51, 36, 58, 37, 21, 38, 12, 39, 28],
+          [40, 56, 41, 48, 42, 16, 43, 7, 44, 23],
+          [45, 54, 46, 31, 47, 17, 48, 41, 49, 55],
+          [50, 59, 51, 35, 52, 27, 53, 32, 54, 45],
+          [55, 49, 56, 40, 57, 22, 58, 36, 59, 50],
+          [10, 5, 0],
+          [9, 15, 1],
+          [19, 30, 2],
+          [34, 26, 3],
+          [25, 11, 4],
+          [14, 20, 6],
+          [24, 44, 7],
+          [43, 16, 8],
+          [29, 39, 12],
+          [38, 21, 13],
+          [42, 48, 17],
+          [47, 31, 18],
+          [37, 58, 22],
+          [57, 40, 23],
+          [33, 53, 27],
+          [52, 35, 28],
+          [46, 54, 32],
+          [51, 59, 36],
+          [56, 49, 41],
+          [55, 50, 45]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
+
+    // 10. Truncated Icosahedron (Soccer Ball)
+    truncatedIcosahedron() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(-0.2017741, 0, 0.9794321), // 0
+          new THREE.Vector3(0.4035482, 0.3264774, 0.8547288), // 1
+          new THREE.Vector3(-0.2017741, 0.6529547, 0.7300256), // 2
+          new THREE.Vector3(-0.4035482, 0.3264774, 0.8547288), // 3
+          new THREE.Vector3(-0.3264774, 0.8547288, 0.4035482), // 4
+          new THREE.Vector3(-0.8547288, 0.4035482, 0.3264774), // 5
+          new THREE.Vector3(-0.6529547, 0.7300256, 0.2017741), // 6
+          new THREE.Vector3(0, 0.9794321, 0.2017741), // 7
+          new THREE.Vector3(-0.3264774, 0.8547288, -0.4035482), // 8
+          new THREE.Vector3(0.3264774, 0.8547288, 0.4035482), // 9
+          new THREE.Vector3(0.6529547, 0.7300256, -0.2017741), // 10
+          new THREE.Vector3(0, 0.9794321, -0.2017741), // 11
+          new THREE.Vector3(0.2017741, 0.6529547, 0.7300256), // 12
+          new THREE.Vector3(0.7300256, 0.2017741, 0.6529547), // 13
+          new THREE.Vector3(0.6529547, 0.7300256, 0.2017741), // 14
+          new THREE.Vector3(0.8547288, 0.4035482, 0.3264774), // 15
+          new THREE.Vector3(0.7300256, -0.2017741, 0.6529547), // 16
+          new THREE.Vector3(0.9794321, -0.2017741, 0), // 17
+          new THREE.Vector3(0.9794321, 0.2017741, 0), // 18
+          new THREE.Vector3(0.8547288, -0.4035482, -0.3264774), // 19
+          new THREE.Vector3(0.7300256, 0.2017741, -0.6529547), // 20
+          new THREE.Vector3(0.3264774, 0.8547288, -0.4035482), // 21
+          new THREE.Vector3(0.8547288, 0.4035482, -0.3264774), // 22
+          new THREE.Vector3(0.4035482, 0.3264774, -0.8547288), // 23
+          new THREE.Vector3(0.2017741, 0.6529547, -0.7300256), // 24
+          new THREE.Vector3(0.2017741, 0, -0.9794321), // 25
+          new THREE.Vector3(-0.4035482, 0.3264774, -0.8547288), // 26
+          new THREE.Vector3(-0.2017741, 0, -0.9794321), // 27
+          new THREE.Vector3(0.4035482, -0.3264774, -0.8547288), // 28
+          new THREE.Vector3(-0.2017741, -0.6529547, -0.7300256), // 29
+          new THREE.Vector3(0.2017741, -0.6529547, -0.7300256), // 30
+          new THREE.Vector3(0.7300256, -0.2017741, -0.6529547), // 31
+          new THREE.Vector3(0.6529547, -0.7300256, -0.2017741), // 32
+          new THREE.Vector3(0.3264774, -0.8547288, -0.4035482), // 33
+          new THREE.Vector3(0.6529547, -0.7300256, 0.2017741), // 34
+          new THREE.Vector3(0, -0.9794321, 0.2017741), // 35
+          new THREE.Vector3(0, -0.9794321, -0.2017741), // 36
+          new THREE.Vector3(-0.3264774, -0.8547288, 0.4035482), // 37
+          new THREE.Vector3(-0.6529547, -0.7300256, -0.2017741), // 38
+          new THREE.Vector3(-0.6529547, -0.7300256, 0.2017741), // 39
+          new THREE.Vector3(-0.2017741, -0.6529547, 0.7300256), // 40
+          new THREE.Vector3(-0.7300256, -0.2017741, 0.6529547), // 41
+          new THREE.Vector3(-0.4035482, -0.3264774, 0.8547288), // 42
+          new THREE.Vector3(0.2017741, -0.6529547, 0.7300256), // 43
+          new THREE.Vector3(0.2017741, 0, 0.9794321), // 44
+          new THREE.Vector3(0.3264774, -0.8547288, 0.4035482), // 45
+          new THREE.Vector3(0.8547288, -0.4035482, 0.3264774), // 46
+          new THREE.Vector3(0.4035482, -0.3264774, 0.8547288), // 47
+          new THREE.Vector3(-0.9794321, 0.2017741, 0), // 48
+          new THREE.Vector3(-0.8547288, -0.4035482, 0.3264774), // 49
+          new THREE.Vector3(-0.7300256, 0.2017741, 0.6529547), // 50
+          new THREE.Vector3(-0.8547288, 0.4035482, -0.3264774), // 51
+          new THREE.Vector3(-0.7300256, -0.2017741, -0.6529547), // 52
+          new THREE.Vector3(-0.9794321, -0.2017741, 0), // 53
+          new THREE.Vector3(-0.6529547, 0.7300256, -0.2017741), // 54
+          new THREE.Vector3(-0.2017741, 0.6529547, -0.7300256), // 55
+          new THREE.Vector3(-0.7300256, 0.2017741, -0.6529547), // 56
+          new THREE.Vector3(-0.3264774, -0.8547288, -0.4035482), // 57
+          new THREE.Vector3(-0.8547288, -0.4035482, -0.3264774), // 58
+          new THREE.Vector3(-0.4035482, -0.3264774, -0.8547288) // 59
+        ],
+        faces: [
+          [0, 44, 1, 12, 2, 3],
+          [3, 2, 4, 6, 5, 50],
+          [6, 4, 7, 11, 8, 54],
+          [9, 14, 10, 21, 11, 7],
+          [12, 1, 13, 15, 14, 9],
+          [15, 13, 16, 46, 17, 18],
+          [18, 17, 19, 31, 20, 22],
+          [21, 10, 22, 20, 23, 24],
+          [24, 23, 25, 27, 26, 55],
+          [27, 25, 28, 30, 29, 59],
+          [30, 28, 31, 19, 32, 33],
+          [33, 32, 34, 45, 35, 36],
+          [36, 35, 37, 39, 38, 57],
+          [39, 37, 40, 42, 41, 49],
+          [42, 40, 43, 47, 44, 0],
+          [45, 34, 46, 16, 47, 43],
+          [48, 53, 49, 41, 50, 5],
+          [51, 56, 52, 58, 53, 48],
+          [54, 8, 55, 26, 56, 51],
+          [57, 38, 58, 52, 59, 29],
+          [3, 50, 41, 42, 0],
+          [44, 47, 16, 13, 1],
+          [12, 9, 7, 4, 2],
+          [6, 54, 51, 48, 5],
+          [11, 21, 24, 55, 8],
+          [14, 15, 18, 22, 10],
+          [46, 34, 32, 19, 17],
+          [31, 28, 25, 23, 20],
+          [27, 59, 52, 56, 26],
+          [30, 33, 36, 57, 29],
+          [45, 43, 40, 37, 35],
+          [39, 49, 53, 58, 38]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
+
+    // 11. Rhombicosidodecahedron
+    rhombicosidodecahedron() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(0.223919, 0.948536, 0.223919), // 0
+          new THREE.Vector3(-0.223919, 0.948536, 0.223919), // 1
+          new THREE.Vector3(-0.3623085, 0.724617, 0.5862275), // 2
+          new THREE.Vector3(0, 0.5862275, 0.8101465), // 3
+          new THREE.Vector3(0.3623085, 0.724617, 0.5862275), // 4
+          new THREE.Vector3(0.948536, 0.223919, 0.223919), // 5
+          new THREE.Vector3(0.948536, 0.223919, -0.223919), // 6
+          new THREE.Vector3(0.724617, 0.5862275, -0.3623085), // 7
+          new THREE.Vector3(0.5862275, 0.8101465, 0), // 8
+          new THREE.Vector3(0.724617, 0.5862275, 0.3623085), // 9
+          new THREE.Vector3(0.223919, 0.223919, 0.948536), // 10
+          new THREE.Vector3(0.223919, -0.223919, 0.948536), // 11
+          new THREE.Vector3(0.5862275, -0.3623085, 0.724617), // 12
+          new THREE.Vector3(0.8101465, 0, 0.5862275), // 13
+          new THREE.Vector3(0.5862275, 0.3623085, 0.724617), // 14
+          new THREE.Vector3(0.3623085, 0.724617, -0.5862275), // 15
+          new THREE.Vector3(0, 0.5862275, -0.8101465), // 16
+          new THREE.Vector3(-0.3623085, 0.724617, -0.5862275), // 17
+          new THREE.Vector3(-0.223919, 0.948536, -0.223919), // 18
+          new THREE.Vector3(0.223919, 0.948536, -0.223919), // 19
+          new THREE.Vector3(0.724617, -0.5862275, 0.3623085), // 20
+          new THREE.Vector3(0.5862275, -0.8101465, 0), // 21
+          new THREE.Vector3(0.724617, -0.5862275, -0.3623085), // 22
+          new THREE.Vector3(0.948536, -0.223919, -0.223919), // 23
+          new THREE.Vector3(0.948536, -0.223919, 0.223919), // 24
+          new THREE.Vector3(-0.5862275, 0.3623085, 0.724617), // 25
+          new THREE.Vector3(-0.8101465, 0, 0.5862275), // 26
+          new THREE.Vector3(-0.5862275, -0.3623085, 0.724617), // 27
+          new THREE.Vector3(-0.223919, -0.223919, 0.948536), // 28
+          new THREE.Vector3(-0.223919, 0.223919, 0.948536), // 29
+          new THREE.Vector3(-0.724617, 0.5862275, -0.3623085), // 30
+          new THREE.Vector3(-0.948536, 0.223919, -0.223919), // 31
+          new THREE.Vector3(-0.948536, 0.223919, 0.223919), // 32
+          new THREE.Vector3(-0.724617, 0.5862275, 0.3623085), // 33
+          new THREE.Vector3(-0.5862275, 0.8101465, 0), // 34
+          new THREE.Vector3(-0.223919, -0.948536, 0.223919), // 35
+          new THREE.Vector3(0.223919, -0.948536, 0.223919), // 36
+          new THREE.Vector3(0.3623085, -0.724617, 0.5862275), // 37
+          new THREE.Vector3(0, -0.5862275, 0.8101465), // 38
+          new THREE.Vector3(-0.3623085, -0.724617, 0.5862275), // 39
+          new THREE.Vector3(0.223919, -0.223919, -0.948536), // 40
+          new THREE.Vector3(0.223919, 0.223919, -0.948536), // 41
+          new THREE.Vector3(0.5862275, 0.3623085, -0.724617), // 42
+          new THREE.Vector3(0.8101465, 0, -0.5862275), // 43
+          new THREE.Vector3(0.5862275, -0.3623085, -0.724617), // 44
+          new THREE.Vector3(-0.8101465, 0, -0.5862275), // 45
+          new THREE.Vector3(-0.5862275, 0.3623085, -0.724617), // 46
+          new THREE.Vector3(-0.223919, 0.223919, -0.948536), // 47
+          new THREE.Vector3(-0.223919, -0.223919, -0.948536), // 48
+          new THREE.Vector3(-0.5862275, -0.3623085, -0.724617), // 49
+          new THREE.Vector3(-0.5862275, -0.8101465, 0), // 50
+          new THREE.Vector3(-0.724617, -0.5862275, 0.3623085), // 51
+          new THREE.Vector3(-0.948536, -0.223919, 0.223919), // 52
+          new THREE.Vector3(-0.948536, -0.223919, -0.223919), // 53
+          new THREE.Vector3(-0.724617, -0.5862275, -0.3623085), // 54
+          new THREE.Vector3(0, -0.5862275, -0.8101465), // 55
+          new THREE.Vector3(0.3623085, -0.724617, -0.5862275), // 56
+          new THREE.Vector3(0.223919, -0.948536, -0.223919), // 57
+          new THREE.Vector3(-0.223919, -0.948536, -0.223919), // 58
+          new THREE.Vector3(-0.3623085, -0.724617, -0.5862275) // 59
+        ],
+        faces: [
+          [0, 1, 2, 3, 4],
+          [5, 6, 7, 8, 9],
+          [10, 11, 12, 13, 14],
+          [15, 16, 17, 18, 19],
+          [20, 21, 22, 23, 24],
+          [25, 26, 27, 28, 29],
+          [30, 31, 32, 33, 34],
+          [35, 36, 37, 38, 39],
+          [40, 41, 42, 43, 44],
+          [45, 46, 47, 48, 49],
+          [50, 51, 52, 53, 54],
+          [55, 56, 57, 58, 59],
+          [14, 9, 4],
+          [8, 19, 0],
+          [18, 34, 1],
+          [33, 25, 2],
+          [29, 10, 3],
+          [13, 24, 5],
+          [23, 43, 6],
+          [42, 15, 7],
+          [28, 38, 11],
+          [37, 20, 12],
+          [41, 47, 16],
+          [46, 30, 17],
+          [36, 57, 21],
+          [56, 44, 22],
+          [32, 52, 26],
+          [51, 39, 27],
+          [45, 53, 31],
+          [50, 58, 35],
+          [55, 48, 40],
+          [59, 54, 49],
+          [4, 9, 8, 0],
+          [0, 19, 18, 1],
+          [1, 34, 33, 2],
+          [2, 25, 29, 3],
+          [3, 10, 14, 4],
+          [9, 14, 13, 5],
+          [5, 24, 23, 6],
+          [6, 43, 42, 7],
+          [7, 15, 19, 8],
+          [10, 29, 28, 11],
+          [11, 38, 37, 12],
+          [12, 20, 24, 13],
+          [15, 42, 41, 16],
+          [16, 47, 46, 17],
+          [17, 30, 34, 18],
+          [20, 37, 36, 21],
+          [21, 57, 56, 22],
+          [22, 44, 43, 23],
+          [25, 33, 32, 26],
+          [26, 52, 51, 27],
+          [27, 39, 38, 28],
+          [30, 46, 45, 31],
+          [31, 53, 52, 32],
+          [39, 51, 50, 35],
+          [35, 58, 57, 36],
+          [44, 56, 55, 40],
+          [40, 48, 47, 41],
+          [49, 54, 53, 45],
+          [48, 55, 59, 49],
+          [54, 59, 58, 50]
+        ]
+      }
+      normalize(m);
+      return m;
+    },
+
+    // 12. Truncated Icosidodecahedron (Great Rhombicosidodecahedron)
+    truncatedIcosidodecahedron() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(0.3442612, 0.9012876, 0.2629922), // 0
+          new THREE.Vector3(-0.1314961, 0.9825566, 0.1314961), // 1
+          new THREE.Vector3(-0.4255303, 0.7697915, 0.4757573), // 2
+          new THREE.Vector3(-0.1314961, 0.5570264, 0.8200185), // 3
+          new THREE.Vector3(0.3442612, 0.6382954, 0.6885225), // 4
+          new THREE.Vector3(0.9012876, 0.2629922, 0.3442612), // 5
+          new THREE.Vector3(0.9825566, 0.1314961, -0.1314961), // 6
+          new THREE.Vector3(0.7697915, 0.4757573, -0.4255303), // 7
+          new THREE.Vector3(0.5570264, 0.8200185, -0.1314961), // 8
+          new THREE.Vector3(0.6382954, 0.6885225, 0.3442612), // 9
+          new THREE.Vector3(0.2629922, 0.3442612, 0.9012876), // 10
+          new THREE.Vector3(0.1314961, -0.1314961, 0.9825566), // 11
+          new THREE.Vector3(0.4757573, -0.4255303, 0.7697915), // 12
+          new THREE.Vector3(0.8200185, -0.1314961, 0.5570264), // 13
+          new THREE.Vector3(0.6885225, 0.3442612, 0.6382954), // 14
+          new THREE.Vector3(0.4255303, 0.7697915, -0.4757573), // 15
+          new THREE.Vector3(0.1314961, 0.5570264, -0.8200185), // 16
+          new THREE.Vector3(-0.3442612, 0.6382954, -0.6885225), // 17
+          new THREE.Vector3(-0.3442612, 0.9012876, -0.2629922), // 18
+          new THREE.Vector3(0.1314961, 0.9825566, -0.1314961), // 19
+          new THREE.Vector3(0.7697915, -0.4757573, 0.4255303), // 20
+          new THREE.Vector3(0.5570264, -0.8200185, 0.1314961), // 21
+          new THREE.Vector3(0.6382954, -0.6885225, -0.3442612), // 22
+          new THREE.Vector3(0.9012876, -0.2629922, -0.3442612), // 23
+          new THREE.Vector3(0.9825566, -0.1314961, 0.1314961), // 24
+          new THREE.Vector3(-0.4757573, 0.4255303, 0.7697915), // 25
+          new THREE.Vector3(-0.8200185, 0.1314961, 0.5570264), // 26
+          new THREE.Vector3(-0.6885225, -0.3442612, 0.6382954), // 27
+          new THREE.Vector3(-0.2629922, -0.3442612, 0.9012876), // 28
+          new THREE.Vector3(-0.1314961, 0.1314961, 0.9825566), // 29
+          new THREE.Vector3(-0.6382954, 0.6885225, -0.3442612), // 30
+          new THREE.Vector3(-0.9012876, 0.2629922, -0.3442612), // 31
+          new THREE.Vector3(-0.9825566, 0.1314961, 0.1314961), // 32
+          new THREE.Vector3(-0.7697915, 0.4757573, 0.4255303), // 33
+          new THREE.Vector3(-0.5570264, 0.8200185, 0.1314961), // 34
+          new THREE.Vector3(-0.3442612, -0.9012876, 0.2629922), // 35
+          new THREE.Vector3(0.1314961, -0.9825566, 0.1314961), // 36
+          new THREE.Vector3(0.4255303, -0.7697915, 0.4757573), // 37
+          new THREE.Vector3(0.1314961, -0.5570264, 0.8200185), // 38
+          new THREE.Vector3(-0.3442612, -0.6382954, 0.6885225), // 39
+          new THREE.Vector3(0.2629922, -0.3442612, -0.9012876), // 40
+          new THREE.Vector3(0.1314961, 0.1314961, -0.9825566), // 41
+          new THREE.Vector3(0.4757573, 0.4255303, -0.7697915), // 42
+          new THREE.Vector3(0.8200185, 0.1314961, -0.5570264), // 43
+          new THREE.Vector3(0.6885225, -0.3442612, -0.6382954), // 44
+          new THREE.Vector3(-0.8200185, -0.1314961, -0.5570264), // 45
+          new THREE.Vector3(-0.6885225, 0.3442612, -0.6382954), // 46
+          new THREE.Vector3(-0.2629922, 0.3442612, -0.9012876), // 47
+          new THREE.Vector3(-0.1314961, -0.1314961, -0.9825566), // 48
+          new THREE.Vector3(-0.4757573, -0.4255303, -0.7697915), // 49
+          new THREE.Vector3(-0.5570264, -0.8200185, -0.1314961), // 50
+          new THREE.Vector3(-0.6382954, -0.6885225, 0.3442612), // 51
+          new THREE.Vector3(-0.9012876, -0.2629922, 0.3442612), // 52
+          new THREE.Vector3(-0.9825566, -0.1314961, -0.1314961), // 53
+          new THREE.Vector3(-0.7697915, -0.4757573, -0.4255303), // 54
+          new THREE.Vector3(-0.1314961, -0.5570264, -0.8200185), // 55
+          new THREE.Vector3(0.3442612, -0.6382954, -0.6885225), // 56
+          new THREE.Vector3(0.3442612, -0.9012876, -0.2629922), // 57
+          new THREE.Vector3(-0.1314961, -0.9825566, -0.1314961), // 58
+          new THREE.Vector3(-0.4255303, -0.7697915, -0.4757573), // 59
+          new THREE.Vector3(0.4757573, 0.4255303, 0.7697915), // 60
+          new THREE.Vector3(0.7697915, 0.4757573, 0.4255303), // 61
+          new THREE.Vector3(0.4255303, 0.7697915, 0.4757573), // 62
+          new THREE.Vector3(0.5570264, 0.8200185, 0.1314961), // 63
+          new THREE.Vector3(0.3442612, 0.9012876, -0.2629922), // 64
+          new THREE.Vector3(0.1314961, 0.9825566, 0.1314961), // 65
+          new THREE.Vector3(-0.1314961, 0.9825566, -0.1314961), // 66
+          new THREE.Vector3(-0.5570264, 0.8200185, -0.1314961), // 67
+          new THREE.Vector3(-0.3442612, 0.9012876, 0.2629922), // 68
+          new THREE.Vector3(-0.6382954, 0.6885225, 0.3442612), // 69
+          new THREE.Vector3(-0.6885225, 0.3442612, 0.6382954), // 70
+          new THREE.Vector3(-0.3442612, 0.6382954, 0.6885225), // 71
+          new THREE.Vector3(-0.2629922, 0.3442612, 0.9012876), // 72
+          new THREE.Vector3(0.1314961, 0.1314961, 0.9825566), // 73
+          new THREE.Vector3(0.1314961, 0.5570264, 0.8200185), // 74
+          new THREE.Vector3(0.8200185, 0.1314961, 0.5570264), // 75
+          new THREE.Vector3(0.9012876, -0.2629922, 0.3442612), // 76
+          new THREE.Vector3(0.9825566, 0.1314961, 0.1314961), // 77
+          new THREE.Vector3(0.9825566, -0.1314961, -0.1314961), // 78
+          new THREE.Vector3(0.8200185, -0.1314961, -0.5570264), // 79
+          new THREE.Vector3(0.9012876, 0.2629922, -0.3442612), // 80
+          new THREE.Vector3(0.6885225, 0.3442612, -0.6382954), // 81
+          new THREE.Vector3(0.3442612, 0.6382954, -0.6885225), // 82
+          new THREE.Vector3(0.6382954, 0.6885225, -0.3442612), // 83
+          new THREE.Vector3(-0.1314961, -0.1314961, 0.9825566), // 84
+          new THREE.Vector3(-0.1314961, -0.5570264, 0.8200185), // 85
+          new THREE.Vector3(0.2629922, -0.3442612, 0.9012876), // 86
+          new THREE.Vector3(0.3442612, -0.6382954, 0.6885225), // 87
+          new THREE.Vector3(0.6382954, -0.6885225, 0.3442612), // 88
+          new THREE.Vector3(0.6885225, -0.3442612, 0.6382954), // 89
+          new THREE.Vector3(0.2629922, 0.3442612, -0.9012876), // 90
+          new THREE.Vector3(-0.1314961, 0.1314961, -0.9825566), // 91
+          new THREE.Vector3(-0.1314961, 0.5570264, -0.8200185), // 92
+          new THREE.Vector3(-0.4757573, 0.4255303, -0.7697915), // 93
+          new THREE.Vector3(-0.7697915, 0.4757573, -0.4255303), // 94
+          new THREE.Vector3(-0.4255303, 0.7697915, -0.4757573), // 95
+          new THREE.Vector3(0.3442612, -0.9012876, 0.2629922), // 96
+          new THREE.Vector3(0.1314961, -0.9825566, -0.1314961), // 97
+          new THREE.Vector3(0.5570264, -0.8200185, -0.1314961), // 98
+          new THREE.Vector3(0.4255303, -0.7697915, -0.4757573), // 99
+          new THREE.Vector3(0.4757573, -0.4255303, -0.7697915), // 100
+          new THREE.Vector3(0.7697915, -0.4757573, -0.4255303), // 101
+          new THREE.Vector3(-0.9012876, 0.2629922, 0.3442612), // 102
+          new THREE.Vector3(-0.9825566, -0.1314961, 0.1314961), // 103
+          new THREE.Vector3(-0.8200185, -0.1314961, 0.5570264), // 104
+          new THREE.Vector3(-0.7697915, -0.4757573, 0.4255303), // 105
+          new THREE.Vector3(-0.4255303, -0.7697915, 0.4757573), // 106
+          new THREE.Vector3(-0.4757573, -0.4255303, 0.7697915), // 107
+          new THREE.Vector3(-0.8200185, 0.1314961, -0.5570264), // 108
+          new THREE.Vector3(-0.9012876, -0.2629922, -0.3442612), // 109
+          new THREE.Vector3(-0.9825566, 0.1314961, -0.1314961), // 110
+          new THREE.Vector3(-0.5570264, -0.8200185, 0.1314961), // 111
+          new THREE.Vector3(-0.3442612, -0.9012876, -0.2629922), // 112
+          new THREE.Vector3(-0.1314961, -0.9825566, 0.1314961), // 113
+          new THREE.Vector3(0.1314961, -0.5570264, -0.8200185), // 114
+          new THREE.Vector3(-0.2629922, -0.3442612, -0.9012876), // 115
+          new THREE.Vector3(0.1314961, -0.1314961, -0.9825566), // 116
+          new THREE.Vector3(-0.3442612, -0.6382954, -0.6885225), // 117
+          new THREE.Vector3(-0.6382954, -0.6885225, -0.3442612), // 118
+          new THREE.Vector3(-0.6885225, -0.3442612, -0.6382954) // 119
+        ],
+        faces: [
+          [0, 65, 1, 68, 2, 71, 3, 74, 4, 62],
+          [5, 77, 6, 80, 7, 83, 8, 63, 9, 61],
+          [10, 73, 11, 86, 12, 89, 13, 75, 14, 60],
+          [15, 82, 16, 92, 17, 95, 18, 66, 19, 64],
+          [20, 88, 21, 98, 22, 101, 23, 78, 24, 76],
+          [25, 70, 26, 104, 27, 107, 28, 84, 29, 72],
+          [30, 94, 31, 110, 32, 102, 33, 69, 34, 67],
+          [35, 113, 36, 96, 37, 87, 38, 85, 39, 106],
+          [40, 116, 41, 90, 42, 81, 43, 79, 44, 100],
+          [45, 108, 46, 93, 47, 91, 48, 115, 49, 119],
+          [50, 111, 51, 105, 52, 103, 53, 109, 54, 118],
+          [55, 114, 56, 99, 57, 97, 58, 112, 59, 117],
+          [60, 14, 61, 9, 62, 4],
+          [63, 8, 64, 19, 65, 0],
+          [66, 18, 67, 34, 68, 1],
+          [69, 33, 70, 25, 71, 2],
+          [72, 29, 73, 10, 74, 3],
+          [75, 13, 76, 24, 77, 5],
+          [78, 23, 79, 43, 80, 6],
+          [81, 42, 82, 15, 83, 7],
+          [84, 28, 85, 38, 86, 11],
+          [87, 37, 88, 20, 89, 12],
+          [90, 41, 91, 47, 92, 16],
+          [93, 46, 94, 30, 95, 17],
+          [96, 36, 97, 57, 98, 21],
+          [99, 56, 100, 44, 101, 22],
+          [102, 32, 103, 52, 104, 26],
+          [105, 51, 106, 39, 107, 27],
+          [108, 45, 109, 53, 110, 31],
+          [111, 50, 112, 58, 113, 35],
+          [114, 55, 115, 48, 116, 40],
+          [117, 59, 118, 54, 119, 49],
+          [62, 9, 63, 0],
+          [65, 19, 66, 1],
+          [68, 34, 69, 2],
+          [71, 25, 72, 3],
+          [74, 10, 60, 4],
+          [61, 14, 75, 5],
+          [77, 24, 78, 6],
+          [80, 43, 81, 7],
+          [83, 15, 64, 8],
+          [73, 29, 84, 11],
+          [86, 38, 87, 12],
+          [89, 20, 76, 13],
+          [82, 42, 90, 16],
+          [92, 47, 93, 17],
+          [95, 30, 67, 18],
+          [88, 37, 96, 21],
+          [98, 57, 99, 22],
+          [101, 44, 79, 23],
+          [70, 33, 102, 26],
+          [104, 52, 105, 27],
+          [107, 39, 85, 28],
+          [94, 46, 108, 31],
+          [110, 53, 103, 32],
+          [106, 51, 111, 35],
+          [113, 58, 97, 36],
+          [100, 56, 114, 40],
+          [116, 48, 91, 41],
+          [119, 54, 109, 45],
+          [115, 55, 117, 49],
+          [118, 59, 112, 50]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
+
+    // 13. Snub Dodecahedron
+    snubDodecahedron() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(0.3931419, 0.7639342, 0.5117069), // 0
+          new THREE.Vector3(0.1535, 0.9727329, 0.1738636), // 1
+          new THREE.Vector3(-0.2982737, 0.9174342, 0.2633387), // 2
+          new THREE.Vector3(-0.3378433, 0.6744591, 0.6564806), // 3
+          new THREE.Vector3(0.0894751, 0.5795909, 0.8099806), // 4
+          new THREE.Vector3(0.7639342, 0.5117069, 0.3931419), // 5
+          new THREE.Vector3(0.9727329, 0.1738636, 0.1535), // 6
+          new THREE.Vector3(0.9174342, 0.2633387, -0.2982737), // 7
+          new THREE.Vector3(0.6744591, 0.6564806, -0.3378433), // 8
+          new THREE.Vector3(0.5795909, 0.8099806, 0.0894751), // 9
+          new THREE.Vector3(0.5117069, 0.3931419, 0.7639342), // 10
+          new THREE.Vector3(0.1738636, 0.1535, 0.9727329), // 11
+          new THREE.Vector3(0.2633387, -0.2982737, 0.9174342), // 12
+          new THREE.Vector3(0.6564806, -0.3378433, 0.6744591), // 13
+          new THREE.Vector3(0.8099806, 0.0894751, 0.5795909), // 14
+          new THREE.Vector3(0.2982737, 0.9174342, -0.2633387), // 15
+          new THREE.Vector3(0.3378433, 0.6744591, -0.6564806), // 16
+          new THREE.Vector3(-0.0894751, 0.5795909, -0.8099806), // 17
+          new THREE.Vector3(-0.3931419, 0.7639342, -0.5117069), // 18
+          new THREE.Vector3(-0.1535, 0.9727329, -0.1738636), // 19
+          new THREE.Vector3(0.9174342, -0.2633387, 0.2982737), // 20
+          new THREE.Vector3(0.6744591, -0.6564806, 0.3378433), // 21
+          new THREE.Vector3(0.5795909, -0.8099806, -0.0894751), // 22
+          new THREE.Vector3(0.7639342, -0.5117069, -0.3931419), // 23
+          new THREE.Vector3(0.9727329, -0.1738636, -0.1535), // 24
+          new THREE.Vector3(-0.2633387, 0.2982737, 0.9174342), // 25
+          new THREE.Vector3(-0.6564806, 0.3378433, 0.6744591), // 26
+          new THREE.Vector3(-0.8099806, -0.0894751, 0.5795909), // 27
+          new THREE.Vector3(-0.5117069, -0.3931419, 0.7639342), // 28
+          new THREE.Vector3(-0.1738636, -0.1535, 0.9727329), // 29
+          new THREE.Vector3(-0.5795909, 0.8099806, -0.0894751), // 30
+          new THREE.Vector3(-0.7639342, 0.5117069, -0.3931419), // 31
+          new THREE.Vector3(-0.9727329, 0.1738636, -0.1535), // 32
+          new THREE.Vector3(-0.9174342, 0.2633387, 0.2982737), // 33
+          new THREE.Vector3(-0.6744591, 0.6564806, 0.3378433), // 34
+          new THREE.Vector3(-0.3931419, -0.7639342, 0.5117069), // 35
+          new THREE.Vector3(-0.1535, -0.9727329, 0.1738636), // 36
+          new THREE.Vector3(0.2982737, -0.9174342, 0.2633387), // 37
+          new THREE.Vector3(0.3378433, -0.6744591, 0.6564806), // 38
+          new THREE.Vector3(-0.0894751, -0.5795909, 0.8099806), // 39
+          new THREE.Vector3(0.5117069, -0.3931419, -0.7639342), // 40
+          new THREE.Vector3(0.1738636, -0.1535, -0.9727329), // 41
+          new THREE.Vector3(0.2633387, 0.2982737, -0.9174342), // 42
+          new THREE.Vector3(0.6564806, 0.3378433, -0.6744591), // 43
+          new THREE.Vector3(0.8099806, -0.0894751, -0.5795909), // 44
+          new THREE.Vector3(-0.6564806, -0.3378433, -0.6744591), // 45
+          new THREE.Vector3(-0.8099806, 0.0894751, -0.5795909), // 46
+          new THREE.Vector3(-0.5117069, 0.3931419, -0.7639342), // 47
+          new THREE.Vector3(-0.1738636, 0.1535, -0.9727329), // 48
+          new THREE.Vector3(-0.2633387, -0.2982737, -0.9174342), // 49
+          new THREE.Vector3(-0.6744591, -0.6564806, -0.3378433), // 50
+          new THREE.Vector3(-0.5795909, -0.8099806, 0.0894751), // 51
+          new THREE.Vector3(-0.7639342, -0.5117069, 0.3931419), // 52
+          new THREE.Vector3(-0.9727329, -0.1738636, 0.1535), // 53
+          new THREE.Vector3(-0.9174342, -0.2633387, -0.2982737), // 54
+          new THREE.Vector3(-0.3378433, -0.6744591, -0.6564806), // 55
+          new THREE.Vector3(0.0894751, -0.5795909, -0.8099806), // 56
+          new THREE.Vector3(0.3931419, -0.7639342, -0.5117069), // 57
+          new THREE.Vector3(0.1535, -0.9727329, -0.1738636), // 58
+          new THREE.Vector3(-0.2982737, -0.9174342, -0.2633387) // 59
+        ],
+        faces: [
+          [0, 1, 2, 3, 4],
+          [5, 6, 7, 8, 9],
+          [10, 11, 12, 13, 14],
+          [15, 16, 17, 18, 19],
+          [20, 21, 22, 23, 24],
+          [25, 26, 27, 28, 29],
+          [30, 31, 32, 33, 34],
+          [35, 36, 37, 38, 39],
+          [40, 41, 42, 43, 44],
+          [45, 46, 47, 48, 49],
+          [50, 51, 52, 53, 54],
+          [55, 56, 57, 58, 59],
+          [10, 5, 0],
+          [9, 15, 1],
+          [19, 30, 2],
+          [34, 26, 3],
+          [25, 11, 4],
+          [14, 20, 6],
+          [24, 44, 7],
+          [43, 16, 8],
+          [29, 39, 12],
+          [38, 21, 13],
+          [42, 48, 17],
+          [47, 31, 18],
+          [37, 58, 22],
+          [57, 40, 23],
+          [33, 53, 27],
+          [52, 35, 28],
+          [46, 54, 32],
+          [51, 59, 36],
+          [56, 49, 41],
+          [55, 50, 45],
+          [0, 5, 9],
+          [0, 9, 1],
+          [1, 15, 19],
+          [1, 19, 2],
+          [2, 30, 34],
+          [2, 34, 3],
+          [3, 26, 25],
+          [3, 25, 4],
+          [4, 11, 10],
+          [4, 10, 0],
+          [5, 10, 14],
+          [5, 14, 6],
+          [6, 20, 24],
+          [6, 24, 7],
+          [7, 44, 43],
+          [7, 43, 8],
+          [8, 16, 15],
+          [8, 15, 9],
+          [11, 25, 29],
+          [11, 29, 12],
+          [12, 39, 38],
+          [12, 38, 13],
+          [13, 21, 20],
+          [13, 20, 14],
+          [16, 43, 42],
+          [16, 42, 17],
+          [17, 48, 47],
+          [17, 47, 18],
+          [18, 31, 30],
+          [18, 30, 19],
+          [21, 38, 37],
+          [21, 37, 22],
+          [22, 58, 57],
+          [22, 57, 23],
+          [23, 40, 44],
+          [23, 44, 24],
+          [26, 34, 33],
+          [26, 33, 27],
+          [27, 53, 52],
+          [27, 52, 28],
+          [28, 35, 39],
+          [28, 39, 29],
+          [31, 47, 46],
+          [31, 46, 32],
+          [32, 54, 53],
+          [32, 53, 33],
+          [35, 52, 51],
+          [35, 51, 36],
+          [36, 59, 58],
+          [36, 58, 37],
+          [40, 57, 56],
+          [40, 56, 41],
+          [41, 49, 48],
+          [41, 48, 42],
+          [45, 50, 54],
+          [45, 54, 46],
+          [49, 56, 55],
+          [49, 55, 45],
+          [50, 55, 59],
+          [50, 59, 51]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
   },
 
-  // 3. OCTAHEDRON (6 Verts, 8 Faces)
-  // Source: Geometric Tools
-  // Order: Equator (0-3), Top (4), Bottom (5)
-  octahedron() {
-    const m = {
-      vertices: [
-        new THREE.Vector3(1, 0, 0), // 0
-        new THREE.Vector3(-1, 0, 0), // 1
-        new THREE.Vector3(0, 1, 0), // 2
-        new THREE.Vector3(0, -1, 0), // 3
-        new THREE.Vector3(0, 0, 1), // 4 (Top)
-        new THREE.Vector3(0, 0, -1)  // 5 (Bottom)
-      ],
-      faces: [
-        [4, 0, 2], [4, 2, 1], [4, 1, 3], [4, 3, 0], // Top Fan
-        [5, 2, 0], [5, 1, 2], [5, 3, 1], [5, 0, 3]  // Bottom Fan
-      ]
-    };
-    this.normalize(m);
-    return m;
-  },
+  IslamicStarPatterns: {
 
-  // 4. ICOSAHEDRON (12 Verts, 20 Faces)
-  // Source: Schneide Blog (Verified standard strip construction)
-  // Structure:
-  //   0-3: XZ plane rectangle
-  //   4-7: YZ plane rectangle
-  //   8-11: XY plane rectangle
-  icosahedron() {
-    const X = 0.525731112119;
-    const Z = 0.850650808352;
 
-    const m = {
-      vertices: [
-        new THREE.Vector3(-X, 0.0, Z), new THREE.Vector3(X, 0.0, Z), new THREE.Vector3(-X, 0.0, -Z), new THREE.Vector3(X, 0.0, -Z),    // 0-3
-        new THREE.Vector3(0.0, Z, X), new THREE.Vector3(0.0, Z, -X), new THREE.Vector3(0.0, -Z, X), new THREE.Vector3(0.0, -Z, -X),    // 4-7
-        new THREE.Vector3(Z, X, 0.0), new THREE.Vector3(-Z, X, 0.0), new THREE.Vector3(Z, -X, 0.0), new THREE.Vector3(-Z, -X, 0.0)     // 8-11
-      ],
-      faces: [
-        [0, 1, 4], [0, 4, 9], [9, 4, 5], [4, 8, 5], [4, 1, 8],
-        [8, 1, 10], [8, 10, 3], [5, 8, 3], [5, 3, 2], [2, 3, 7],
-        [7, 3, 10], [7, 10, 6], [7, 6, 11], [11, 6, 0], [0, 6, 1],
-        [6, 10, 1], [9, 11, 0], [9, 2, 11], [9, 5, 2], [7, 11, 2]
-      ]
-    };
-    this.normalize(m);
-    return m;
-  },
+    octahedron_hk34_ambo_hk72() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(0.3484017313921151, 0.3484017313921151, 0.8701910520833647),
+          new THREE.Vector3(0.6983667186071533, 0.15674135600968428, 0.6983667186071533),
+          new THREE.Vector3(0.8701910520833647, 0.3484017313921151, 0.3484017313921151),
+          new THREE.Vector3(0.6983667186071533, 0.6983667186071533, 0.15674135600968428),
+          new THREE.Vector3(0.3484017313921151, 0.8701910520833647, 0.3484017313921151),
+          new THREE.Vector3(0.15674135600968428, 0.6983667186071533, 0.6983667186071533),
+          new THREE.Vector3(-0.3484017313921151, 0.3484017313921151, 0.8701910520833647),
+          new THREE.Vector3(-0.15674135600968428, 0.6983667186071533, 0.6983667186071533),
+          new THREE.Vector3(-0.3484017313921151, 0.8701910520833647, 0.3484017313921151),
+          new THREE.Vector3(-0.6983667186071533, 0.6983667186071533, 0.15674135600968428),
+          new THREE.Vector3(-0.8701910520833647, 0.3484017313921151, 0.3484017313921151),
+          new THREE.Vector3(-0.6983667186071533, 0.15674135600968428, 0.6983667186071533),
+          new THREE.Vector3(-0.3484017313921151, -0.3484017313921151, 0.8701910520833647),
+          new THREE.Vector3(-0.6983667186071533, -0.15674135600968428, 0.6983667186071533),
+          new THREE.Vector3(-0.8701910520833647, -0.3484017313921151, 0.3484017313921151),
+          new THREE.Vector3(-0.6983667186071533, -0.6983667186071533, 0.15674135600968428),
+          new THREE.Vector3(-0.3484017313921151, -0.8701910520833647, 0.3484017313921151),
+          new THREE.Vector3(-0.15674135600968428, -0.6983667186071533, 0.6983667186071533),
+          new THREE.Vector3(0.3484017313921151, -0.3484017313921151, 0.8701910520833647),
+          new THREE.Vector3(0.15674135600968428, -0.6983667186071533, 0.6983667186071533),
+          new THREE.Vector3(0.3484017313921151, -0.8701910520833647, 0.3484017313921151),
+          new THREE.Vector3(0.6983667186071533, -0.6983667186071533, 0.15674135600968428),
+          new THREE.Vector3(0.8701910520833647, -0.3484017313921151, 0.3484017313921151),
+          new THREE.Vector3(0.6983667186071533, -0.15674135600968428, 0.6983667186071533),
+          new THREE.Vector3(0.3484017313921151, 0.3484017313921151, -0.8701910520833647),
+          new THREE.Vector3(0.15674135600968428, 0.6983667186071533, -0.6983667186071533),
+          new THREE.Vector3(0.3484017313921151, 0.8701910520833647, -0.3484017313921151),
+          new THREE.Vector3(0.6983667186071533, 0.6983667186071533, -0.15674135600968428),
+          new THREE.Vector3(0.8701910520833647, 0.3484017313921151, -0.3484017313921151),
+          new THREE.Vector3(0.6983667186071533, 0.15674135600968428, -0.6983667186071533),
+          new THREE.Vector3(-0.3484017313921151, 0.3484017313921151, -0.8701910520833647),
+          new THREE.Vector3(-0.6983667186071533, 0.15674135600968428, -0.6983667186071533),
+          new THREE.Vector3(-0.8701910520833647, 0.3484017313921151, -0.3484017313921151),
+          new THREE.Vector3(-0.6983667186071533, 0.6983667186071533, -0.15674135600968428),
+          new THREE.Vector3(-0.3484017313921151, 0.8701910520833647, -0.3484017313921151),
+          new THREE.Vector3(-0.15674135600968428, 0.6983667186071533, -0.6983667186071533),
+          new THREE.Vector3(-0.3484017313921151, -0.3484017313921151, -0.8701910520833647),
+          new THREE.Vector3(-0.15674135600968428, -0.6983667186071533, -0.6983667186071533),
+          new THREE.Vector3(-0.3484017313921151, -0.8701910520833647, -0.3484017313921151),
+          new THREE.Vector3(-0.6983667186071533, -0.6983667186071533, -0.15674135600968428),
+          new THREE.Vector3(-0.8701910520833647, -0.3484017313921151, -0.3484017313921151),
+          new THREE.Vector3(-0.6983667186071533, -0.15674135600968428, -0.6983667186071533),
+          new THREE.Vector3(0.3484017313921151, -0.3484017313921151, -0.8701910520833647),
+          new THREE.Vector3(0.6983667186071533, -0.15674135600968428, -0.6983667186071533),
+          new THREE.Vector3(0.8701910520833647, -0.3484017313921151, -0.3484017313921151),
+          new THREE.Vector3(0.6983667186071533, -0.6983667186071533, -0.15674135600968428),
+          new THREE.Vector3(0.3484017313921151, -0.8701910520833647, -0.3484017313921151),
+          new THREE.Vector3(0.15674135600968428, -0.6983667186071533, -0.6983667186071533),
+          new THREE.Vector3(0, 0.5263604811623005, 0.8502615149885306),
+          new THREE.Vector3(-0.5263604811623005, 0, 0.8502615149885306),
+          new THREE.Vector3(0, -0.5263604811623005, 0.8502615149885306),
+          new THREE.Vector3(0.5263604811623005, 0, 0.8502615149885306),
+          new THREE.Vector3(0.8502615149885306, 0, 0.5263604811623005),
+          new THREE.Vector3(0.8502615149885306, -0.5263604811623005, 0),
+          new THREE.Vector3(0.8502615149885306, 0, -0.5263604811623005),
+          new THREE.Vector3(0.8502615149885306, 0.5263604811623005, 0),
+          new THREE.Vector3(0.5263604811623005, 0.8502615149885306, 0),
+          new THREE.Vector3(0, 0.8502615149885306, -0.5263604811623005),
+          new THREE.Vector3(-0.5263604811623005, 0.8502615149885306, 0),
+          new THREE.Vector3(0, 0.8502615149885306, 0.5263604811623005),
+          new THREE.Vector3(-0.8502615149885306, 0.5263604811623005, 0),
+          new THREE.Vector3(-0.8502615149885306, 0, -0.5263604811623005),
+          new THREE.Vector3(-0.8502615149885306, -0.5263604811623005, 0),
+          new THREE.Vector3(-0.8502615149885306, 0, 0.5263604811623005),
+          new THREE.Vector3(-0.5263604811623005, -0.8502615149885306, 0),
+          new THREE.Vector3(0, -0.8502615149885306, -0.5263604811623005),
+          new THREE.Vector3(0.5263604811623005, -0.8502615149885306, 0),
+          new THREE.Vector3(0, -0.8502615149885306, 0.5263604811623005),
+          new THREE.Vector3(0.5263604811623005, 0, -0.8502615149885306),
+          new THREE.Vector3(0, -0.5263604811623005, -0.8502615149885306),
+          new THREE.Vector3(-0.5263604811623005, 0, -0.8502615149885306),
+          new THREE.Vector3(0, 0.5263604811623005, -0.8502615149885306),
+          new THREE.Vector3(0.43895372792207926, 0.5643237298121512, 0.6991840621139839),
+          new THREE.Vector3(0.5643237298121512, 0.43895372792207926, 0.6991840621139839),
+          new THREE.Vector3(0.6991840621139839, 0.43895372792207926, 0.5643237298121512),
+          new THREE.Vector3(0.699184062113984, 0.5643237298121514, 0.4389537279220794),
+          new THREE.Vector3(0.5643237298121514, 0.699184062113984, 0.4389537279220794),
+          new THREE.Vector3(0.43895372792207926, 0.6991840621139839, 0.5643237298121512),
+          new THREE.Vector3(-0.5643237298121512, 0.43895372792207926, 0.6991840621139839),
+          new THREE.Vector3(-0.43895372792207926, 0.5643237298121512, 0.6991840621139839),
+          new THREE.Vector3(-0.43895372792207926, 0.6991840621139839, 0.5643237298121512),
+          new THREE.Vector3(-0.5643237298121514, 0.699184062113984, 0.4389537279220794),
+          new THREE.Vector3(-0.699184062113984, 0.5643237298121514, 0.4389537279220794),
+          new THREE.Vector3(-0.6991840621139839, 0.43895372792207926, 0.5643237298121512),
+          new THREE.Vector3(-0.43895372792207926, -0.5643237298121512, 0.6991840621139839),
+          new THREE.Vector3(-0.5643237298121512, -0.43895372792207926, 0.6991840621139839),
+          new THREE.Vector3(-0.6991840621139839, -0.43895372792207926, 0.5643237298121512),
+          new THREE.Vector3(-0.699184062113984, -0.5643237298121514, 0.4389537279220794),
+          new THREE.Vector3(-0.5643237298121514, -0.699184062113984, 0.4389537279220794),
+          new THREE.Vector3(-0.43895372792207926, -0.6991840621139839, 0.5643237298121512),
+          new THREE.Vector3(0.5643237298121512, -0.43895372792207926, 0.6991840621139839),
+          new THREE.Vector3(0.43895372792207926, -0.5643237298121512, 0.6991840621139839),
+          new THREE.Vector3(0.43895372792207926, -0.6991840621139839, 0.5643237298121512),
+          new THREE.Vector3(0.5643237298121514, -0.699184062113984, 0.4389537279220794),
+          new THREE.Vector3(0.699184062113984, -0.5643237298121514, 0.4389537279220794),
+          new THREE.Vector3(0.6991840621139839, -0.43895372792207926, 0.5643237298121512),
+          new THREE.Vector3(0.5643237298121512, 0.43895372792207926, -0.6991840621139839),
+          new THREE.Vector3(0.43895372792207926, 0.5643237298121512, -0.6991840621139839),
+          new THREE.Vector3(0.43895372792207926, 0.6991840621139839, -0.5643237298121512),
+          new THREE.Vector3(0.5643237298121514, 0.699184062113984, -0.4389537279220794),
+          new THREE.Vector3(0.699184062113984, 0.5643237298121514, -0.4389537279220794),
+          new THREE.Vector3(0.6991840621139839, 0.43895372792207926, -0.5643237298121512),
+          new THREE.Vector3(-0.43895372792207926, 0.5643237298121512, -0.6991840621139839),
+          new THREE.Vector3(-0.5643237298121512, 0.43895372792207926, -0.6991840621139839),
+          new THREE.Vector3(-0.6991840621139839, 0.43895372792207926, -0.5643237298121512),
+          new THREE.Vector3(-0.699184062113984, 0.5643237298121514, -0.4389537279220794),
+          new THREE.Vector3(-0.5643237298121514, 0.699184062113984, -0.4389537279220794),
+          new THREE.Vector3(-0.43895372792207926, 0.6991840621139839, -0.5643237298121512),
+          new THREE.Vector3(-0.5643237298121512, -0.43895372792207926, -0.6991840621139839),
+          new THREE.Vector3(-0.43895372792207926, -0.5643237298121512, -0.6991840621139839),
+          new THREE.Vector3(-0.43895372792207926, -0.6991840621139839, -0.5643237298121512),
+          new THREE.Vector3(-0.5643237298121514, -0.699184062113984, -0.4389537279220794),
+          new THREE.Vector3(-0.699184062113984, -0.5643237298121514, -0.4389537279220794),
+          new THREE.Vector3(-0.6991840621139839, -0.43895372792207926, -0.5643237298121512),
+          new THREE.Vector3(0.43895372792207926, -0.5643237298121512, -0.6991840621139839),
+          new THREE.Vector3(0.5643237298121512, -0.43895372792207926, -0.6991840621139839),
+          new THREE.Vector3(0.6991840621139839, -0.43895372792207926, -0.5643237298121512),
+          new THREE.Vector3(0.699184062113984, -0.5643237298121514, -0.4389537279220794),
+          new THREE.Vector3(0.5643237298121514, -0.699184062113984, -0.4389537279220794),
+          new THREE.Vector3(0.43895372792207926, -0.6991840621139839, -0.5643237298121512),
+          new THREE.Vector3(0.10253556271613322, 0.22822106160773614, 0.9681950244744721),
+          new THREE.Vector3(-0.10253556271613322, 0.22822106160773614, 0.9681950244744721),
+          new THREE.Vector3(-0.22822106160773614, 0.10253556271613322, 0.9681950244744721),
+          new THREE.Vector3(-0.22822106160773614, -0.10253556271613322, 0.9681950244744721),
+          new THREE.Vector3(-0.10253556271613322, -0.22822106160773614, 0.9681950244744721),
+          new THREE.Vector3(0.10253556271613322, -0.22822106160773614, 0.9681950244744721),
+          new THREE.Vector3(0.22822106160773614, -0.10253556271613322, 0.9681950244744721),
+          new THREE.Vector3(0.22822106160773614, 0.10253556271613322, 0.9681950244744721),
+          new THREE.Vector3(0.9681950244744721, 0.10253556271613322, 0.22822106160773614),
+          new THREE.Vector3(0.9681950244744721, -0.10253556271613322, 0.22822106160773614),
+          new THREE.Vector3(0.9681950244744721, -0.22822106160773614, 0.10253556271613322),
+          new THREE.Vector3(0.9681950244744721, -0.22822106160773614, -0.10253556271613322),
+          new THREE.Vector3(0.9681950244744721, -0.10253556271613322, -0.22822106160773614),
+          new THREE.Vector3(0.9681950244744721, 0.10253556271613322, -0.22822106160773614),
+          new THREE.Vector3(0.9681950244744721, 0.22822106160773614, -0.10253556271613322),
+          new THREE.Vector3(0.9681950244744721, 0.22822106160773614, 0.10253556271613322),
+          new THREE.Vector3(0.22822106160773614, 0.9681950244744721, 0.10253556271613322),
+          new THREE.Vector3(0.22822106160773614, 0.9681950244744721, -0.10253556271613322),
+          new THREE.Vector3(0.10253556271613322, 0.9681950244744721, -0.22822106160773614),
+          new THREE.Vector3(-0.10253556271613322, 0.9681950244744721, -0.22822106160773614),
+          new THREE.Vector3(-0.22822106160773614, 0.9681950244744721, -0.10253556271613322),
+          new THREE.Vector3(-0.22822106160773614, 0.9681950244744721, 0.10253556271613322),
+          new THREE.Vector3(-0.10253556271613322, 0.9681950244744721, 0.22822106160773614),
+          new THREE.Vector3(0.10253556271613322, 0.9681950244744721, 0.22822106160773614),
+          new THREE.Vector3(-0.9681950244744721, 0.22822106160773614, 0.10253556271613322),
+          new THREE.Vector3(-0.9681950244744721, 0.22822106160773614, -0.10253556271613322),
+          new THREE.Vector3(-0.9681950244744721, 0.10253556271613322, -0.22822106160773614),
+          new THREE.Vector3(-0.9681950244744721, -0.10253556271613322, -0.22822106160773614),
+          new THREE.Vector3(-0.9681950244744721, -0.22822106160773614, -0.10253556271613322),
+          new THREE.Vector3(-0.9681950244744721, -0.22822106160773614, 0.10253556271613322),
+          new THREE.Vector3(-0.9681950244744721, -0.10253556271613322, 0.22822106160773614),
+          new THREE.Vector3(-0.9681950244744721, 0.10253556271613322, 0.22822106160773614),
+          new THREE.Vector3(-0.22822106160773614, -0.9681950244744721, 0.10253556271613322),
+          new THREE.Vector3(-0.22822106160773614, -0.9681950244744721, -0.10253556271613322),
+          new THREE.Vector3(-0.10253556271613322, -0.9681950244744721, -0.22822106160773614),
+          new THREE.Vector3(0.10253556271613322, -0.9681950244744721, -0.22822106160773614),
+          new THREE.Vector3(0.22822106160773614, -0.9681950244744721, -0.10253556271613322),
+          new THREE.Vector3(0.22822106160773614, -0.9681950244744721, 0.10253556271613322),
+          new THREE.Vector3(0.10253556271613322, -0.9681950244744721, 0.22822106160773614),
+          new THREE.Vector3(-0.10253556271613322, -0.9681950244744721, 0.22822106160773614),
+          new THREE.Vector3(0.22822106160773614, 0.10253556271613322, -0.9681950244744721),
+          new THREE.Vector3(0.22822106160773614, -0.10253556271613322, -0.9681950244744721),
+          new THREE.Vector3(0.10253556271613322, -0.22822106160773614, -0.9681950244744721),
+          new THREE.Vector3(-0.10253556271613322, -0.22822106160773614, -0.9681950244744721),
+          new THREE.Vector3(-0.22822106160773614, -0.10253556271613322, -0.9681950244744721),
+          new THREE.Vector3(-0.22822106160773614, 0.10253556271613322, -0.9681950244744721),
+          new THREE.Vector3(-0.10253556271613322, 0.22822106160773614, -0.9681950244744721),
+          new THREE.Vector3(0.10253556271613322, 0.22822106160773614, -0.9681950244744721),
+          new THREE.Vector3(0.6840725813150024, 0.06473073690325404, 0.7265360522320905),
+          new THREE.Vector3(0.6840725813150024, -0.06473073690325404, 0.7265360522320905),
+          new THREE.Vector3(0.7265360522320905, -0.06473073690325404, 0.6840725813150024),
+          new THREE.Vector3(0.7265360522320905, 0.06473073690325404, 0.6840725813150024),
+          new THREE.Vector3(0.7265360522320907, 0.6840725813150025, 0.06473073690325405),
+          new THREE.Vector3(0.7265360522320907, 0.6840725813150025, -0.06473073690325405),
+          new THREE.Vector3(0.6840725813150025, 0.7265360522320907, -0.06473073690325405),
+          new THREE.Vector3(0.6840725813150025, 0.7265360522320907, 0.06473073690325405),
+          new THREE.Vector3(0.06473073690325404, 0.7265360522320905, 0.6840725813150024),
+          new THREE.Vector3(-0.06473073690325404, 0.7265360522320905, 0.6840725813150024),
+          new THREE.Vector3(-0.06473073690325404, 0.6840725813150024, 0.7265360522320905),
+          new THREE.Vector3(0.06473073690325404, 0.6840725813150024, 0.7265360522320905),
+          new THREE.Vector3(-0.6840725813150025, 0.7265360522320907, 0.06473073690325405),
+          new THREE.Vector3(-0.6840725813150025, 0.7265360522320907, -0.06473073690325405),
+          new THREE.Vector3(-0.7265360522320907, 0.6840725813150025, -0.06473073690325405),
+          new THREE.Vector3(-0.7265360522320907, 0.6840725813150025, 0.06473073690325405),
+          new THREE.Vector3(-0.7265360522320905, 0.06473073690325404, 0.6840725813150024),
+          new THREE.Vector3(-0.7265360522320905, -0.06473073690325404, 0.6840725813150024),
+          new THREE.Vector3(-0.6840725813150024, -0.06473073690325404, 0.7265360522320905),
+          new THREE.Vector3(-0.6840725813150024, 0.06473073690325404, 0.7265360522320905),
+          new THREE.Vector3(-0.7265360522320907, -0.6840725813150025, 0.06473073690325405),
+          new THREE.Vector3(-0.7265360522320907, -0.6840725813150025, -0.06473073690325405),
+          new THREE.Vector3(-0.6840725813150025, -0.7265360522320907, -0.06473073690325405),
+          new THREE.Vector3(-0.6840725813150025, -0.7265360522320907, 0.06473073690325405),
+          new THREE.Vector3(-0.06473073690325404, -0.7265360522320905, 0.6840725813150024),
+          new THREE.Vector3(0.06473073690325404, -0.7265360522320905, 0.6840725813150024),
+          new THREE.Vector3(0.06473073690325404, -0.6840725813150024, 0.7265360522320905),
+          new THREE.Vector3(-0.06473073690325404, -0.6840725813150024, 0.7265360522320905),
+          new THREE.Vector3(0.6840725813150025, -0.7265360522320907, 0.06473073690325405),
+          new THREE.Vector3(0.6840725813150025, -0.7265360522320907, -0.06473073690325405),
+          new THREE.Vector3(0.7265360522320907, -0.6840725813150025, -0.06473073690325405),
+          new THREE.Vector3(0.7265360522320907, -0.6840725813150025, 0.06473073690325405),
+          new THREE.Vector3(0.06473073690325404, 0.6840725813150024, -0.7265360522320905),
+          new THREE.Vector3(-0.06473073690325404, 0.6840725813150024, -0.7265360522320905),
+          new THREE.Vector3(-0.06473073690325404, 0.7265360522320905, -0.6840725813150024),
+          new THREE.Vector3(0.06473073690325404, 0.7265360522320905, -0.6840725813150024),
+          new THREE.Vector3(0.7265360522320905, 0.06473073690325404, -0.6840725813150024),
+          new THREE.Vector3(0.7265360522320905, -0.06473073690325404, -0.6840725813150024),
+          new THREE.Vector3(0.6840725813150024, -0.06473073690325404, -0.7265360522320905),
+          new THREE.Vector3(0.6840725813150024, 0.06473073690325404, -0.7265360522320905),
+          new THREE.Vector3(-0.6840725813150024, 0.06473073690325404, -0.7265360522320905),
+          new THREE.Vector3(-0.6840725813150024, -0.06473073690325404, -0.7265360522320905),
+          new THREE.Vector3(-0.7265360522320905, -0.06473073690325404, -0.6840725813150024),
+          new THREE.Vector3(-0.7265360522320905, 0.06473073690325404, -0.6840725813150024),
+          new THREE.Vector3(-0.06473073690325404, -0.6840725813150024, -0.7265360522320905),
+          new THREE.Vector3(0.06473073690325404, -0.6840725813150024, -0.7265360522320905),
+          new THREE.Vector3(0.06473073690325404, -0.7265360522320905, -0.6840725813150024),
+          new THREE.Vector3(-0.06473073690325404, -0.7265360522320905, -0.6840725813150024)
+        ],
+        faces: [
+          [5, 72, 0, 73, 1, 74, 2, 75, 3, 76, 4, 77],
+          [11, 78, 6, 79, 7, 80, 8, 81, 9, 82, 10, 83],
+          [17, 84, 12, 85, 13, 86, 14, 87, 15, 88, 16, 89],
+          [23, 90, 18, 91, 19, 92, 20, 93, 21, 94, 22, 95],
+          [29, 96, 24, 97, 25, 98, 26, 99, 27, 100, 28, 101],
+          [35, 102, 30, 103, 31, 104, 32, 105, 33, 106, 34, 107],
+          [41, 108, 36, 109, 37, 110, 38, 111, 39, 112, 40, 113],
+          [47, 114, 42, 115, 43, 116, 44, 117, 45, 118, 46, 119],
+          [0, 120, 48, 121, 6, 122, 49, 123, 12, 124, 50, 125, 18, 126, 51, 127],
+          [2, 128, 52, 129, 22, 130, 53, 131, 44, 132, 54, 133, 28, 134, 55, 135],
+          [4, 136, 56, 137, 26, 138, 57, 139, 34, 140, 58, 141, 8, 142, 59, 143],
+          [10, 144, 60, 145, 32, 146, 61, 147, 40, 148, 62, 149, 14, 150, 63, 151],
+          [16, 152, 64, 153, 38, 154, 65, 155, 46, 156, 66, 157, 20, 158, 67, 159],
+          [24, 160, 68, 161, 42, 162, 69, 163, 36, 164, 70, 165, 30, 166, 71, 167],
+          [1, 168, 51, 169, 23, 170, 52, 171],
+          [3, 172, 55, 173, 27, 174, 56, 175],
+          [5, 176, 59, 177, 7, 178, 48, 179],
+          [9, 180, 58, 181, 33, 182, 60, 183],
+          [11, 184, 63, 185, 13, 186, 49, 187],
+          [15, 188, 62, 189, 39, 190, 64, 191],
+          [17, 192, 67, 193, 19, 194, 50, 195],
+          [21, 196, 66, 197, 45, 198, 53, 199],
+          [25, 200, 71, 201, 35, 202, 57, 203],
+          [29, 204, 54, 205, 43, 206, 68, 207],
+          [31, 208, 70, 209, 41, 210, 61, 211],
+          [37, 212, 69, 213, 47, 214, 65, 215],
+          [72, 5, 179, 48, 120, 0],
+          [73, 0, 127, 51, 168, 1],
+          [74, 1, 171, 52, 128, 2],
+          [75, 2, 135, 55, 172, 3],
+          [76, 3, 175, 56, 136, 4],
+          [77, 4, 143, 59, 176, 5],
+          [78, 11, 187, 49, 122, 6],
+          [79, 6, 121, 48, 178, 7],
+          [80, 7, 177, 59, 142, 8],
+          [81, 8, 141, 58, 180, 9],
+          [82, 9, 183, 60, 144, 10],
+          [83, 10, 151, 63, 184, 11],
+          [84, 17, 195, 50, 124, 12],
+          [85, 12, 123, 49, 186, 13],
+          [86, 13, 185, 63, 150, 14],
+          [87, 14, 149, 62, 188, 15],
+          [88, 15, 191, 64, 152, 16],
+          [89, 16, 159, 67, 192, 17],
+          [90, 23, 169, 51, 126, 18],
+          [91, 18, 125, 50, 194, 19],
+          [92, 19, 193, 67, 158, 20],
+          [93, 20, 157, 66, 196, 21],
+          [94, 21, 199, 53, 130, 22],
+          [95, 22, 129, 52, 170, 23],
+          [96, 29, 207, 68, 160, 24],
+          [97, 24, 167, 71, 200, 25],
+          [98, 25, 203, 57, 138, 26],
+          [99, 26, 137, 56, 174, 27],
+          [100, 27, 173, 55, 134, 28],
+          [101, 28, 133, 54, 204, 29],
+          [102, 35, 201, 71, 166, 30],
+          [103, 30, 165, 70, 208, 31],
+          [104, 31, 211, 61, 146, 32],
+          [105, 32, 145, 60, 182, 33],
+          [106, 33, 181, 58, 140, 34],
+          [107, 34, 139, 57, 202, 35],
+          [108, 41, 209, 70, 164, 36],
+          [109, 36, 163, 69, 212, 37],
+          [110, 37, 215, 65, 154, 38],
+          [111, 38, 153, 64, 190, 39],
+          [112, 39, 189, 62, 148, 40],
+          [113, 40, 147, 61, 210, 41],
+          [114, 47, 213, 69, 162, 42],
+          [115, 42, 161, 68, 206, 43],
+          [116, 43, 205, 54, 132, 44],
+          [117, 44, 131, 53, 198, 45],
+          [118, 45, 197, 66, 156, 46],
+          [119, 46, 155, 65, 214, 47]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
 
-  // 5. DODECAHEDRON (20 Verts, 12 Faces)
-  // Source: Geometric Tools (Ref 3.7)
-  // Order is CRITICAL here. 
-  //   0-7:   Cube vertices (Â±1, Â±1, Â±1)
-  //   8-11:  (Â±1/phi, Â±phi, 0)   [XY plane]
-  //   12-15: (Â±phi, 0, Â±1/phi)   [XZ plane]
-  //   16-19: (0, Â±1/phi, Â±phi)   [YZ plane]
-  dodecahedron() {
-    const a = 1.0 / Math.sqrt(3.0);     // Cube corners
-    const phi = (1.0 + Math.sqrt(5.0)) / 2.0;
-    const b = (1.0 / phi) / Math.sqrt(3.0); // scaled 1/phi
-    const c = phi / Math.sqrt(3.0);          // scaled phi
+    // Base: rhombicuboctahedron, Ops: Hk(54.00), Ambo, Hk(72.00)
+    rhombicuboctahedron_hk54_ambo_hk72() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(-0.18006546507415827, 0.18006546507415827, -0.9670330173139147),
+          new THREE.Vector3(0, 0.2759109841519905, -0.9611831921253512),
+          new THREE.Vector3(0.18006546507415827, 0.18006546507415827, -0.9670330173139147),
+          new THREE.Vector3(0.2759109841519905, 0, -0.9611831921253512),
+          new THREE.Vector3(0.18006546507415827, -0.18006546507415827, -0.9670330173139147),
+          new THREE.Vector3(0, -0.2759109841519905, -0.9611831921253512),
+          new THREE.Vector3(-0.18006546507415827, -0.18006546507415827, -0.9670330173139147),
+          new THREE.Vector3(-0.2759109841519905, 0, -0.9611831921253512),
+          new THREE.Vector3(0.18006546507415827, -0.9670330173139147, -0.18006546507415827),
+          new THREE.Vector3(0.2759109841519905, -0.9611831921253512, 0),
+          new THREE.Vector3(0.18006546507415827, -0.9670330173139147, 0.18006546507415827),
+          new THREE.Vector3(0, -0.9611831921253512, 0.2759109841519905),
+          new THREE.Vector3(-0.18006546507415827, -0.9670330173139147, 0.18006546507415827),
+          new THREE.Vector3(-0.2759109841519905, -0.9611831921253512, 0),
+          new THREE.Vector3(-0.18006546507415827, -0.9670330173139147, -0.18006546507415827),
+          new THREE.Vector3(0, -0.9611831921253512, -0.2759109841519905),
+          new THREE.Vector3(-0.9670330173139147, -0.18006546507415827, 0.18006546507415827),
+          new THREE.Vector3(-0.9611831921253512, 0, 0.2759109841519905),
+          new THREE.Vector3(-0.9670330173139147, 0.18006546507415827, 0.18006546507415827),
+          new THREE.Vector3(-0.9611831921253512, 0.2759109841519905, 0),
+          new THREE.Vector3(-0.9670330173139147, 0.18006546507415827, -0.18006546507415827),
+          new THREE.Vector3(-0.9611831921253512, 0, -0.2759109841519905),
+          new THREE.Vector3(-0.9670330173139147, -0.18006546507415827, -0.18006546507415827),
+          new THREE.Vector3(-0.9611831921253512, -0.2759109841519905, 0),
+          new THREE.Vector3(0.9670330173139147, -0.18006546507415827, 0.18006546507415827),
+          new THREE.Vector3(0.9611831921253512, -0.2759109841519905, 0),
+          new THREE.Vector3(0.9670330173139147, -0.18006546507415827, -0.18006546507415827),
+          new THREE.Vector3(0.9611831921253512, 0, -0.2759109841519905),
+          new THREE.Vector3(0.9670330173139147, 0.18006546507415827, -0.18006546507415827),
+          new THREE.Vector3(0.9611831921253512, 0.2759109841519905, 0),
+          new THREE.Vector3(0.9670330173139147, 0.18006546507415827, 0.18006546507415827),
+          new THREE.Vector3(0.9611831921253512, 0, 0.2759109841519905),
+          new THREE.Vector3(0.18006546507415827, 0.9670330173139147, -0.18006546507415827),
+          new THREE.Vector3(0, 0.9611831921253512, -0.2759109841519905),
+          new THREE.Vector3(-0.18006546507415827, 0.9670330173139147, -0.18006546507415827),
+          new THREE.Vector3(-0.2759109841519905, 0.9611831921253512, 0),
+          new THREE.Vector3(-0.18006546507415827, 0.9670330173139147, 0.18006546507415827),
+          new THREE.Vector3(0, 0.9611831921253512, 0.2759109841519905),
+          new THREE.Vector3(0.18006546507415827, 0.9670330173139147, 0.18006546507415827),
+          new THREE.Vector3(0.2759109841519905, 0.9611831921253512, 0),
+          new THREE.Vector3(-0.18006546507415827, 0.18006546507415827, 0.9670330173139147),
+          new THREE.Vector3(-0.2759109841519905, 0, 0.9611831921253512),
+          new THREE.Vector3(-0.18006546507415827, -0.18006546507415827, 0.9670330173139147),
+          new THREE.Vector3(0, -0.2759109841519905, 0.9611831921253512),
+          new THREE.Vector3(0.18006546507415827, -0.18006546507415827, 0.9670330173139147),
+          new THREE.Vector3(0.2759109841519905, 0, 0.9611831921253512),
+          new THREE.Vector3(0.18006546507415827, 0.18006546507415827, 0.9670330173139147),
+          new THREE.Vector3(0, 0.2759109841519905, 0.9611831921253512),
+          new THREE.Vector3(-0.5234357067537138, -0.6723318539162639, -0.5234357067537138),
+          new THREE.Vector3(-0.6301139560483173, -0.6301139560483173, -0.45377616154474026),
+          new THREE.Vector3(-0.6723318539162639, -0.5234357067537138, -0.5234357067537138),
+          new THREE.Vector3(-0.6301139560483173, -0.45377616154474026, -0.6301139560483173),
+          new THREE.Vector3(-0.5234357067537138, -0.5234357067537138, -0.6723318539162639),
+          new THREE.Vector3(-0.45377616154474026, -0.6301139560483173, -0.6301139560483173),
+          new THREE.Vector3(-0.6723318539162639, 0.5234357067537138, -0.5234357067537138),
+          new THREE.Vector3(-0.6301139560483173, 0.6301139560483173, -0.45377616154474026),
+          new THREE.Vector3(-0.5234357067537138, 0.6723318539162639, -0.5234357067537138),
+          new THREE.Vector3(-0.45377616154474026, 0.6301139560483173, -0.6301139560483173),
+          new THREE.Vector3(-0.5234357067537138, 0.5234357067537138, -0.6723318539162639),
+          new THREE.Vector3(-0.6301139560483173, 0.45377616154474026, -0.6301139560483173),
+          new THREE.Vector3(0.5234357067537138, 0.6723318539162639, -0.5234357067537138),
+          new THREE.Vector3(0.6301139560483173, 0.6301139560483173, -0.45377616154474026),
+          new THREE.Vector3(0.6723318539162639, 0.5234357067537138, -0.5234357067537138),
+          new THREE.Vector3(0.6301139560483173, 0.45377616154474026, -0.6301139560483173),
+          new THREE.Vector3(0.5234357067537138, 0.5234357067537138, -0.6723318539162639),
+          new THREE.Vector3(0.45377616154474026, 0.6301139560483173, -0.6301139560483173),
+          new THREE.Vector3(0.6723318539162639, -0.5234357067537138, -0.5234357067537138),
+          new THREE.Vector3(0.6301139560483173, -0.6301139560483173, -0.45377616154474026),
+          new THREE.Vector3(0.5234357067537138, -0.6723318539162639, -0.5234357067537138),
+          new THREE.Vector3(0.45377616154474026, -0.6301139560483173, -0.6301139560483173),
+          new THREE.Vector3(0.5234357067537138, -0.5234357067537138, -0.6723318539162639),
+          new THREE.Vector3(0.6301139560483173, -0.45377616154474026, -0.6301139560483173),
+          new THREE.Vector3(0.6723318539162639, -0.5234357067537138, 0.5234357067537138),
+          new THREE.Vector3(0.6301139560483173, -0.45377616154474026, 0.6301139560483173),
+          new THREE.Vector3(0.5234357067537138, -0.5234357067537138, 0.6723318539162639),
+          new THREE.Vector3(0.45377616154474026, -0.6301139560483173, 0.6301139560483173),
+          new THREE.Vector3(0.5234357067537138, -0.6723318539162639, 0.5234357067537138),
+          new THREE.Vector3(0.6301139560483173, -0.6301139560483173, 0.45377616154474026),
+          new THREE.Vector3(-0.5234357067537138, -0.5234357067537138, 0.6723318539162639),
+          new THREE.Vector3(-0.6301139560483173, -0.45377616154474026, 0.6301139560483173),
+          new THREE.Vector3(-0.6723318539162639, -0.5234357067537138, 0.5234357067537138),
+          new THREE.Vector3(-0.6301139560483173, -0.6301139560483173, 0.45377616154474026),
+          new THREE.Vector3(-0.5234357067537138, -0.6723318539162639, 0.5234357067537138),
+          new THREE.Vector3(-0.45377616154474026, -0.6301139560483173, 0.6301139560483173),
+          new THREE.Vector3(-0.5234357067537138, 0.5234357067537138, 0.6723318539162639),
+          new THREE.Vector3(-0.45377616154474026, 0.6301139560483173, 0.6301139560483173),
+          new THREE.Vector3(-0.5234357067537138, 0.6723318539162639, 0.5234357067537138),
+          new THREE.Vector3(-0.6301139560483173, 0.6301139560483173, 0.45377616154474026),
+          new THREE.Vector3(-0.6723318539162639, 0.5234357067537138, 0.5234357067537138),
+          new THREE.Vector3(-0.6301139560483173, 0.45377616154474026, 0.6301139560483173),
+          new THREE.Vector3(0.5234357067537138, 0.6723318539162639, 0.5234357067537138),
+          new THREE.Vector3(0.45377616154474026, 0.6301139560483173, 0.6301139560483173),
+          new THREE.Vector3(0.5234357067537138, 0.5234357067537138, 0.6723318539162639),
+          new THREE.Vector3(0.6301139560483173, 0.45377616154474026, 0.6301139560483173),
+          new THREE.Vector3(0.6723318539162639, 0.5234357067537138, 0.5234357067537138),
+          new THREE.Vector3(0.6301139560483173, 0.6301139560483173, 0.45377616154474026),
+          new THREE.Vector3(-0.556470092367758, -0.18006551394869388, -0.8111211050062818),
+          new THREE.Vector3(-0.6796591431877704, -0.27591103305691095, -0.6796591431877704),
+          new THREE.Vector3(-0.8111211050062818, -0.18006551394869388, -0.556470092367758),
+          new THREE.Vector3(-0.874757688101707, 0, -0.4845606124180514),
+          new THREE.Vector3(-0.8111211050062818, 0.18006551394869388, -0.556470092367758),
+          new THREE.Vector3(-0.6796591431877704, 0.27591103305691095, -0.6796591431877704),
+          new THREE.Vector3(-0.556470092367758, 0.18006551394869388, -0.8111211050062818),
+          new THREE.Vector3(-0.4845606124180514, 0, -0.874757688101707),
+          new THREE.Vector3(-0.18006551394869388, 0.556470092367758, -0.8111211050062818),
+          new THREE.Vector3(-0.27591103305691095, 0.6796591431877704, -0.6796591431877704),
+          new THREE.Vector3(-0.18006551394869388, 0.8111211050062818, -0.556470092367758),
+          new THREE.Vector3(0, 0.874757688101707, -0.4845606124180514),
+          new THREE.Vector3(0.18006551394869388, 0.8111211050062818, -0.556470092367758),
+          new THREE.Vector3(0.27591103305691095, 0.6796591431877704, -0.6796591431877704),
+          new THREE.Vector3(0.18006551394869388, 0.556470092367758, -0.8111211050062818),
+          new THREE.Vector3(0, 0.4845606124180514, -0.874757688101707),
+          new THREE.Vector3(0.556470092367758, 0.18006551394869388, -0.8111211050062818),
+          new THREE.Vector3(0.6796591431877704, 0.27591103305691095, -0.6796591431877704),
+          new THREE.Vector3(0.8111211050062818, 0.18006551394869388, -0.556470092367758),
+          new THREE.Vector3(0.874757688101707, 0, -0.4845606124180514),
+          new THREE.Vector3(0.8111211050062818, -0.18006551394869388, -0.556470092367758),
+          new THREE.Vector3(0.6796591431877704, -0.27591103305691095, -0.6796591431877704),
+          new THREE.Vector3(0.556470092367758, -0.18006551394869388, -0.8111211050062818),
+          new THREE.Vector3(0.4845606124180514, 0, -0.874757688101707),
+          new THREE.Vector3(0.18006551394869388, -0.556470092367758, -0.8111211050062818),
+          new THREE.Vector3(0.27591103305691095, -0.6796591431877704, -0.6796591431877704),
+          new THREE.Vector3(0.18006551394869388, -0.8111211050062818, -0.556470092367758),
+          new THREE.Vector3(0, -0.874757688101707, -0.4845606124180514),
+          new THREE.Vector3(-0.18006551394869388, -0.8111211050062818, -0.556470092367758),
+          new THREE.Vector3(-0.27591103305691095, -0.6796591431877704, -0.6796591431877704),
+          new THREE.Vector3(-0.18006551394869388, -0.556470092367758, -0.8111211050062818),
+          new THREE.Vector3(0, -0.4845606124180514, -0.874757688101707),
+          new THREE.Vector3(0.556470092367758, -0.8111211050062818, -0.18006551394869388),
+          new THREE.Vector3(0.6796591431877704, -0.6796591431877704, -0.27591103305691095),
+          new THREE.Vector3(0.8111211050062818, -0.556470092367758, -0.18006551394869388),
+          new THREE.Vector3(0.874757688101707, -0.4845606124180514, 0),
+          new THREE.Vector3(0.8111211050062818, -0.556470092367758, 0.18006551394869388),
+          new THREE.Vector3(0.6796591431877704, -0.6796591431877704, 0.27591103305691095),
+          new THREE.Vector3(0.556470092367758, -0.8111211050062818, 0.18006551394869388),
+          new THREE.Vector3(0.4845606124180514, -0.874757688101707, 0),
+          new THREE.Vector3(0.18006551394869388, -0.8111211050062818, 0.556470092367758),
+          new THREE.Vector3(0.27591103305691095, -0.6796591431877704, 0.6796591431877704),
+          new THREE.Vector3(0.18006551394869388, -0.556470092367758, 0.8111211050062818),
+          new THREE.Vector3(0, -0.4845606124180514, 0.874757688101707),
+          new THREE.Vector3(-0.18006551394869388, -0.556470092367758, 0.8111211050062818),
+          new THREE.Vector3(-0.27591103305691095, -0.6796591431877704, 0.6796591431877704),
+          new THREE.Vector3(-0.18006551394869388, -0.8111211050062818, 0.556470092367758),
+          new THREE.Vector3(0, -0.874757688101707, 0.4845606124180514),
+          new THREE.Vector3(-0.556470092367758, -0.8111211050062818, 0.18006551394869388),
+          new THREE.Vector3(-0.6796591431877704, -0.6796591431877704, 0.27591103305691095),
+          new THREE.Vector3(-0.8111211050062818, -0.556470092367758, 0.18006551394869388),
+          new THREE.Vector3(-0.874757688101707, -0.4845606124180514, 0),
+          new THREE.Vector3(-0.8111211050062818, -0.556470092367758, -0.18006551394869388),
+          new THREE.Vector3(-0.6796591431877704, -0.6796591431877704, -0.27591103305691095),
+          new THREE.Vector3(-0.556470092367758, -0.8111211050062818, -0.18006551394869388),
+          new THREE.Vector3(-0.4845606124180514, -0.874757688101707, 0),
+          new THREE.Vector3(-0.8111211050062818, -0.18006551394869388, 0.556470092367758),
+          new THREE.Vector3(-0.6796591431877704, -0.27591103305691095, 0.6796591431877704),
+          new THREE.Vector3(-0.556470092367758, -0.18006551394869388, 0.8111211050062818),
+          new THREE.Vector3(-0.4845606124180514, 0, 0.874757688101707),
+          new THREE.Vector3(-0.556470092367758, 0.18006551394869388, 0.8111211050062818),
+          new THREE.Vector3(-0.6796591431877704, 0.27591103305691095, 0.6796591431877704),
+          new THREE.Vector3(-0.8111211050062818, 0.18006551394869388, 0.556470092367758),
+          new THREE.Vector3(-0.874757688101707, 0, 0.4845606124180514),
+          new THREE.Vector3(-0.8111211050062818, 0.556470092367758, 0.18006551394869388),
+          new THREE.Vector3(-0.6796591431877704, 0.6796591431877704, 0.27591103305691095),
+          new THREE.Vector3(-0.556470092367758, 0.8111211050062818, 0.18006551394869388),
+          new THREE.Vector3(-0.4845606124180514, 0.874757688101707, 0),
+          new THREE.Vector3(-0.556470092367758, 0.8111211050062818, -0.18006551394869388),
+          new THREE.Vector3(-0.6796591431877704, 0.6796591431877704, -0.27591103305691095),
+          new THREE.Vector3(-0.8111211050062818, 0.556470092367758, -0.18006551394869388),
+          new THREE.Vector3(-0.874757688101707, 0.4845606124180514, 0),
+          new THREE.Vector3(0.8111211050062818, 0.18006551394869388, 0.556470092367758),
+          new THREE.Vector3(0.6796591431877704, 0.27591103305691095, 0.6796591431877704),
+          new THREE.Vector3(0.556470092367758, 0.18006551394869388, 0.8111211050062818),
+          new THREE.Vector3(0.4845606124180514, 0, 0.874757688101707),
+          new THREE.Vector3(0.556470092367758, -0.18006551394869388, 0.8111211050062818),
+          new THREE.Vector3(0.6796591431877704, -0.27591103305691095, 0.6796591431877704),
+          new THREE.Vector3(0.8111211050062818, -0.18006551394869388, 0.556470092367758),
+          new THREE.Vector3(0.874757688101707, 0, 0.4845606124180514),
+          new THREE.Vector3(0.8111211050062818, 0.556470092367758, -0.18006551394869388),
+          new THREE.Vector3(0.6796591431877704, 0.6796591431877704, -0.27591103305691095),
+          new THREE.Vector3(0.556470092367758, 0.8111211050062818, -0.18006551394869388),
+          new THREE.Vector3(0.4845606124180514, 0.874757688101707, 0),
+          new THREE.Vector3(0.556470092367758, 0.8111211050062818, 0.18006551394869388),
+          new THREE.Vector3(0.6796591431877704, 0.6796591431877704, 0.27591103305691095),
+          new THREE.Vector3(0.8111211050062818, 0.556470092367758, 0.18006551394869388),
+          new THREE.Vector3(0.874757688101707, 0.4845606124180514, 0),
+          new THREE.Vector3(-0.18006551394869388, 0.8111211050062818, 0.556470092367758),
+          new THREE.Vector3(-0.27591103305691095, 0.6796591431877704, 0.6796591431877704),
+          new THREE.Vector3(-0.18006551394869388, 0.556470092367758, 0.8111211050062818),
+          new THREE.Vector3(0, 0.4845606124180514, 0.874757688101707),
+          new THREE.Vector3(0.18006551394869388, 0.556470092367758, 0.8111211050062818),
+          new THREE.Vector3(0.27591103305691095, 0.6796591431877704, 0.6796591431877704),
+          new THREE.Vector3(0.18006551394869388, 0.8111211050062818, 0.556470092367758),
+          new THREE.Vector3(0, 0.874757688101707, 0.4845606124180514),
+          new THREE.Vector3(-0.3813855415909706, 0.0822895213005279, -0.9207461666222085),
+          new THREE.Vector3(-0.6070860911802199, 0.3657112199263784, -0.705479823606233),
+          new THREE.Vector3(-0.3657112199263784, 0.6070860911802199, -0.705479823606233),
+          new THREE.Vector3(-0.0822895213005279, 0.3813855415909706, -0.9207461666222085),
+          new THREE.Vector3(0.0822895213005279, 0.3813855415909706, -0.9207461666222085),
+          new THREE.Vector3(0.3657112199263784, 0.6070860911802199, -0.705479823606233),
+          new THREE.Vector3(0.6070860911802199, 0.3657112199263784, -0.705479823606233),
+          new THREE.Vector3(0.3813855415909706, 0.0822895213005279, -0.9207461666222085),
+          new THREE.Vector3(0.3813855415909706, -0.0822895213005279, -0.9207461666222085),
+          new THREE.Vector3(0.6070860911802199, -0.3657112199263784, -0.705479823606233),
+          new THREE.Vector3(0.3657112199263784, -0.6070860911802199, -0.705479823606233),
+          new THREE.Vector3(0.0822895213005279, -0.3813855415909706, -0.9207461666222085),
+          new THREE.Vector3(-0.0822895213005279, -0.3813855415909706, -0.9207461666222085),
+          new THREE.Vector3(-0.3657112199263784, -0.6070860911802199, -0.705479823606233),
+          new THREE.Vector3(-0.6070860911802199, -0.3657112199263784, -0.705479823606233),
+          new THREE.Vector3(-0.3813855415909706, -0.0822895213005279, -0.9207461666222085),
+          new THREE.Vector3(0.0822895213005279, -0.9207461666222085, -0.3813855415909706),
+          new THREE.Vector3(0.3657112199263784, -0.705479823606233, -0.6070860911802199),
+          new THREE.Vector3(0.60708609118022, -0.7054798236062331, -0.36571121992637845),
+          new THREE.Vector3(0.3813855415909706, -0.9207461666222085, -0.0822895213005279),
+          new THREE.Vector3(0.3813855415909706, -0.9207461666222085, 0.0822895213005279),
+          new THREE.Vector3(0.60708609118022, -0.7054798236062331, 0.36571121992637845),
+          new THREE.Vector3(0.3657112199263784, -0.705479823606233, 0.6070860911802199),
+          new THREE.Vector3(0.0822895213005279, -0.9207461666222085, 0.3813855415909706),
+          new THREE.Vector3(-0.0822895213005279, -0.9207461666222085, 0.3813855415909706),
+          new THREE.Vector3(-0.3657112199263784, -0.705479823606233, 0.6070860911802199),
+          new THREE.Vector3(-0.60708609118022, -0.7054798236062331, 0.36571121992637845),
+          new THREE.Vector3(-0.3813855415909706, -0.9207461666222085, 0.0822895213005279),
+          new THREE.Vector3(-0.3813855415909706, -0.9207461666222085, -0.0822895213005279),
+          new THREE.Vector3(-0.60708609118022, -0.7054798236062331, -0.36571121992637845),
+          new THREE.Vector3(-0.3657112199263784, -0.705479823606233, -0.6070860911802199),
+          new THREE.Vector3(-0.0822895213005279, -0.9207461666222085, -0.3813855415909706),
+          new THREE.Vector3(-0.9207461666222085, -0.3813855415909706, 0.0822895213005279),
+          new THREE.Vector3(-0.7054798236062331, -0.60708609118022, 0.36571121992637845),
+          new THREE.Vector3(-0.705479823606233, -0.3657112199263784, 0.6070860911802199),
+          new THREE.Vector3(-0.9207461666222085, -0.0822895213005279, 0.3813855415909706),
+          new THREE.Vector3(-0.9207461666222085, 0.0822895213005279, 0.3813855415909706),
+          new THREE.Vector3(-0.705479823606233, 0.3657112199263784, 0.6070860911802199),
+          new THREE.Vector3(-0.7054798236062331, 0.60708609118022, 0.36571121992637845),
+          new THREE.Vector3(-0.9207461666222085, 0.3813855415909706, 0.0822895213005279),
+          new THREE.Vector3(-0.9207461666222085, 0.3813855415909706, -0.0822895213005279),
+          new THREE.Vector3(-0.7054798236062331, 0.60708609118022, -0.36571121992637845),
+          new THREE.Vector3(-0.705479823606233, 0.3657112199263784, -0.6070860911802199),
+          new THREE.Vector3(-0.9207461666222085, 0.0822895213005279, -0.3813855415909706),
+          new THREE.Vector3(-0.9207461666222085, -0.0822895213005279, -0.3813855415909706),
+          new THREE.Vector3(-0.705479823606233, -0.3657112199263784, -0.6070860911802199),
+          new THREE.Vector3(-0.7054798236062331, -0.60708609118022, -0.36571121992637845),
+          new THREE.Vector3(-0.9207461666222085, -0.3813855415909706, -0.0822895213005279),
+          new THREE.Vector3(0.9207461666222085, -0.0822895213005279, 0.3813855415909706),
+          new THREE.Vector3(0.705479823606233, -0.3657112199263784, 0.6070860911802199),
+          new THREE.Vector3(0.7054798236062331, -0.60708609118022, 0.36571121992637845),
+          new THREE.Vector3(0.9207461666222085, -0.3813855415909706, 0.0822895213005279),
+          new THREE.Vector3(0.9207461666222085, -0.3813855415909706, -0.0822895213005279),
+          new THREE.Vector3(0.7054798236062331, -0.60708609118022, -0.36571121992637845),
+          new THREE.Vector3(0.705479823606233, -0.3657112199263784, -0.6070860911802199),
+          new THREE.Vector3(0.9207461666222085, -0.0822895213005279, -0.3813855415909706),
+          new THREE.Vector3(0.9207461666222085, 0.0822895213005279, -0.3813855415909706),
+          new THREE.Vector3(0.705479823606233, 0.3657112199263784, -0.6070860911802199),
+          new THREE.Vector3(0.7054798236062331, 0.60708609118022, -0.36571121992637845),
+          new THREE.Vector3(0.9207461666222085, 0.3813855415909706, -0.0822895213005279),
+          new THREE.Vector3(0.9207461666222085, 0.3813855415909706, 0.0822895213005279),
+          new THREE.Vector3(0.7054798236062331, 0.60708609118022, 0.36571121992637845),
+          new THREE.Vector3(0.705479823606233, 0.3657112199263784, 0.6070860911802199),
+          new THREE.Vector3(0.9207461666222085, 0.0822895213005279, 0.3813855415909706),
+          new THREE.Vector3(0.3813855415909706, 0.9207461666222085, -0.0822895213005279),
+          new THREE.Vector3(0.60708609118022, 0.7054798236062331, -0.36571121992637845),
+          new THREE.Vector3(0.3657112199263784, 0.705479823606233, -0.6070860911802199),
+          new THREE.Vector3(0.0822895213005279, 0.9207461666222085, -0.3813855415909706),
+          new THREE.Vector3(-0.0822895213005279, 0.9207461666222085, -0.3813855415909706),
+          new THREE.Vector3(-0.3657112199263784, 0.705479823606233, -0.6070860911802199),
+          new THREE.Vector3(-0.60708609118022, 0.7054798236062331, -0.36571121992637845),
+          new THREE.Vector3(-0.3813855415909706, 0.9207461666222085, -0.0822895213005279),
+          new THREE.Vector3(-0.3813855415909706, 0.9207461666222085, 0.0822895213005279),
+          new THREE.Vector3(-0.60708609118022, 0.7054798236062331, 0.36571121992637845),
+          new THREE.Vector3(-0.3657112199263784, 0.705479823606233, 0.6070860911802199),
+          new THREE.Vector3(-0.0822895213005279, 0.9207461666222085, 0.3813855415909706),
+          new THREE.Vector3(0.0822895213005279, 0.9207461666222085, 0.3813855415909706),
+          new THREE.Vector3(0.3657112199263784, 0.705479823606233, 0.6070860911802199),
+          new THREE.Vector3(0.60708609118022, 0.7054798236062331, 0.36571121992637845),
+          new THREE.Vector3(0.3813855415909706, 0.9207461666222085, 0.0822895213005279),
+          new THREE.Vector3(-0.0822895213005279, 0.3813855415909706, 0.9207461666222085),
+          new THREE.Vector3(-0.3657112199263784, 0.6070860911802199, 0.705479823606233),
+          new THREE.Vector3(-0.6070860911802199, 0.3657112199263784, 0.705479823606233),
+          new THREE.Vector3(-0.3813855415909706, 0.0822895213005279, 0.9207461666222085),
+          new THREE.Vector3(-0.3813855415909706, -0.0822895213005279, 0.9207461666222085),
+          new THREE.Vector3(-0.6070860911802199, -0.3657112199263784, 0.705479823606233),
+          new THREE.Vector3(-0.3657112199263784, -0.6070860911802199, 0.705479823606233),
+          new THREE.Vector3(-0.0822895213005279, -0.3813855415909706, 0.9207461666222085),
+          new THREE.Vector3(0.0822895213005279, -0.3813855415909706, 0.9207461666222085),
+          new THREE.Vector3(0.3657112199263784, -0.6070860911802199, 0.705479823606233),
+          new THREE.Vector3(0.6070860911802199, -0.3657112199263784, 0.705479823606233),
+          new THREE.Vector3(0.3813855415909706, -0.0822895213005279, 0.9207461666222085),
+          new THREE.Vector3(0.3813855415909706, 0.0822895213005279, 0.9207461666222085),
+          new THREE.Vector3(0.6070860911802199, 0.3657112199263784, 0.705479823606233),
+          new THREE.Vector3(0.3657112199263784, 0.6070860911802199, 0.705479823606233),
+          new THREE.Vector3(0.0822895213005279, 0.3813855415909706, 0.9207461666222085),
+          new THREE.Vector3(-0.1158362125066182, 0.052743296574155385, -0.9918669853052939),
+          new THREE.Vector3(-0.052743296574155385, 0.1158362125066182, -0.9918669853052939),
+          new THREE.Vector3(0.052743296574155385, 0.1158362125066182, -0.9918669853052939),
+          new THREE.Vector3(0.1158362125066182, 0.052743296574155385, -0.9918669853052939),
+          new THREE.Vector3(0.1158362125066182, -0.052743296574155385, -0.9918669853052939),
+          new THREE.Vector3(0.052743296574155385, -0.1158362125066182, -0.9918669853052939),
+          new THREE.Vector3(-0.052743296574155385, -0.1158362125066182, -0.9918669853052939),
+          new THREE.Vector3(-0.1158362125066182, -0.052743296574155385, -0.9918669853052939),
+          new THREE.Vector3(0.052743296574155385, -0.9918669853052939, -0.1158362125066182),
+          new THREE.Vector3(0.1158362125066182, -0.9918669853052939, -0.052743296574155385),
+          new THREE.Vector3(0.1158362125066182, -0.9918669853052939, 0.052743296574155385),
+          new THREE.Vector3(0.052743296574155385, -0.9918669853052939, 0.1158362125066182),
+          new THREE.Vector3(-0.052743296574155385, -0.9918669853052939, 0.1158362125066182),
+          new THREE.Vector3(-0.1158362125066182, -0.9918669853052939, 0.052743296574155385),
+          new THREE.Vector3(-0.1158362125066182, -0.9918669853052939, -0.052743296574155385),
+          new THREE.Vector3(-0.052743296574155385, -0.9918669853052939, -0.1158362125066182),
+          new THREE.Vector3(-0.9918669853052939, -0.1158362125066182, 0.052743296574155385),
+          new THREE.Vector3(-0.9918669853052939, -0.052743296574155385, 0.1158362125066182),
+          new THREE.Vector3(-0.9918669853052939, 0.052743296574155385, 0.1158362125066182),
+          new THREE.Vector3(-0.9918669853052939, 0.1158362125066182, 0.052743296574155385),
+          new THREE.Vector3(-0.9918669853052939, 0.1158362125066182, -0.052743296574155385),
+          new THREE.Vector3(-0.9918669853052939, 0.052743296574155385, -0.1158362125066182),
+          new THREE.Vector3(-0.9918669853052939, -0.052743296574155385, -0.1158362125066182),
+          new THREE.Vector3(-0.9918669853052939, -0.1158362125066182, -0.052743296574155385),
+          new THREE.Vector3(0.9918669853052939, -0.052743296574155385, 0.1158362125066182),
+          new THREE.Vector3(0.9918669853052939, -0.1158362125066182, 0.052743296574155385),
+          new THREE.Vector3(0.9918669853052939, -0.1158362125066182, -0.052743296574155385),
+          new THREE.Vector3(0.9918669853052939, -0.052743296574155385, -0.1158362125066182),
+          new THREE.Vector3(0.9918669853052939, 0.052743296574155385, -0.1158362125066182),
+          new THREE.Vector3(0.9918669853052939, 0.1158362125066182, -0.052743296574155385),
+          new THREE.Vector3(0.9918669853052939, 0.1158362125066182, 0.052743296574155385),
+          new THREE.Vector3(0.9918669853052939, 0.052743296574155385, 0.1158362125066182),
+          new THREE.Vector3(0.1158362125066182, 0.9918669853052939, -0.052743296574155385),
+          new THREE.Vector3(0.052743296574155385, 0.9918669853052939, -0.1158362125066182),
+          new THREE.Vector3(-0.052743296574155385, 0.9918669853052939, -0.1158362125066182),
+          new THREE.Vector3(-0.1158362125066182, 0.9918669853052939, -0.052743296574155385),
+          new THREE.Vector3(-0.1158362125066182, 0.9918669853052939, 0.052743296574155385),
+          new THREE.Vector3(-0.052743296574155385, 0.9918669853052939, 0.1158362125066182),
+          new THREE.Vector3(0.052743296574155385, 0.9918669853052939, 0.1158362125066182),
+          new THREE.Vector3(0.1158362125066182, 0.9918669853052939, 0.052743296574155385),
+          new THREE.Vector3(-0.052743296574155385, 0.1158362125066182, 0.9918669853052939),
+          new THREE.Vector3(-0.1158362125066182, 0.052743296574155385, 0.9918669853052939),
+          new THREE.Vector3(-0.1158362125066182, -0.052743296574155385, 0.9918669853052939),
+          new THREE.Vector3(-0.052743296574155385, -0.1158362125066182, 0.9918669853052939),
+          new THREE.Vector3(0.052743296574155385, -0.1158362125066182, 0.9918669853052939),
+          new THREE.Vector3(0.1158362125066182, -0.052743296574155385, 0.9918669853052939),
+          new THREE.Vector3(0.1158362125066182, 0.052743296574155385, 0.9918669853052939),
+          new THREE.Vector3(0.052743296574155385, 0.1158362125066182, 0.9918669853052939),
+          new THREE.Vector3(-0.5394724890944486, -0.6176816162266019, -0.572222731535486),
+          new THREE.Vector3(-0.572222731535486, -0.6176816162266019, -0.5394724890944486),
+          new THREE.Vector3(-0.6176816162266019, -0.572222731535486, -0.5394724890944486),
+          new THREE.Vector3(-0.6176816162266019, -0.5394724890944486, -0.572222731535486),
+          new THREE.Vector3(-0.5722227315354861, -0.5394724890944487, -0.6176816162266018),
+          new THREE.Vector3(-0.5394724890944487, -0.5722227315354861, -0.6176816162266018),
+          new THREE.Vector3(-0.6176816162266019, 0.5394724890944486, -0.572222731535486),
+          new THREE.Vector3(-0.6176816162266019, 0.572222731535486, -0.5394724890944486),
+          new THREE.Vector3(-0.572222731535486, 0.6176816162266019, -0.5394724890944486),
+          new THREE.Vector3(-0.5394724890944486, 0.6176816162266019, -0.572222731535486),
+          new THREE.Vector3(-0.5394724890944487, 0.5722227315354861, -0.6176816162266018),
+          new THREE.Vector3(-0.5722227315354861, 0.5394724890944487, -0.6176816162266018),
+          new THREE.Vector3(0.5394724890944486, 0.6176816162266019, -0.572222731535486),
+          new THREE.Vector3(0.572222731535486, 0.6176816162266019, -0.5394724890944486),
+          new THREE.Vector3(0.6176816162266019, 0.572222731535486, -0.5394724890944486),
+          new THREE.Vector3(0.6176816162266019, 0.5394724890944486, -0.572222731535486),
+          new THREE.Vector3(0.5722227315354861, 0.5394724890944487, -0.6176816162266018),
+          new THREE.Vector3(0.5394724890944487, 0.5722227315354861, -0.6176816162266018),
+          new THREE.Vector3(0.6176816162266019, -0.5394724890944486, -0.572222731535486),
+          new THREE.Vector3(0.6176816162266019, -0.572222731535486, -0.5394724890944486),
+          new THREE.Vector3(0.572222731535486, -0.6176816162266019, -0.5394724890944486),
+          new THREE.Vector3(0.5394724890944486, -0.6176816162266019, -0.572222731535486),
+          new THREE.Vector3(0.5394724890944487, -0.5722227315354861, -0.6176816162266018),
+          new THREE.Vector3(0.5722227315354861, -0.5394724890944487, -0.6176816162266018),
+          new THREE.Vector3(0.6176816162266019, -0.572222731535486, 0.5394724890944486),
+          new THREE.Vector3(0.6176816162266019, -0.5394724890944486, 0.572222731535486),
+          new THREE.Vector3(0.5722227315354861, -0.5394724890944487, 0.6176816162266018),
+          new THREE.Vector3(0.5394724890944487, -0.5722227315354861, 0.6176816162266018),
+          new THREE.Vector3(0.5394724890944486, -0.6176816162266019, 0.572222731535486),
+          new THREE.Vector3(0.572222731535486, -0.6176816162266019, 0.5394724890944486),
+          new THREE.Vector3(-0.5394724890944487, -0.5722227315354861, 0.6176816162266018),
+          new THREE.Vector3(-0.5722227315354861, -0.5394724890944487, 0.6176816162266018),
+          new THREE.Vector3(-0.6176816162266019, -0.5394724890944486, 0.572222731535486),
+          new THREE.Vector3(-0.6176816162266019, -0.572222731535486, 0.5394724890944486),
+          new THREE.Vector3(-0.572222731535486, -0.6176816162266019, 0.5394724890944486),
+          new THREE.Vector3(-0.5394724890944486, -0.6176816162266019, 0.572222731535486),
+          new THREE.Vector3(-0.5722227315354861, 0.5394724890944487, 0.6176816162266018),
+          new THREE.Vector3(-0.5394724890944487, 0.5722227315354861, 0.6176816162266018),
+          new THREE.Vector3(-0.5394724890944486, 0.6176816162266019, 0.572222731535486),
+          new THREE.Vector3(-0.572222731535486, 0.6176816162266019, 0.5394724890944486),
+          new THREE.Vector3(-0.6176816162266019, 0.572222731535486, 0.5394724890944486),
+          new THREE.Vector3(-0.6176816162266019, 0.5394724890944486, 0.572222731535486),
+          new THREE.Vector3(0.572222731535486, 0.6176816162266019, 0.5394724890944486),
+          new THREE.Vector3(0.5394724890944486, 0.6176816162266019, 0.572222731535486),
+          new THREE.Vector3(0.5394724890944487, 0.5722227315354861, 0.6176816162266018),
+          new THREE.Vector3(0.5722227315354861, 0.5394724890944487, 0.6176816162266018),
+          new THREE.Vector3(0.6176816162266019, 0.5394724890944486, 0.572222731535486),
+          new THREE.Vector3(0.6176816162266019, 0.572222731535486, 0.5394724890944486),
+          new THREE.Vector3(-0.6194473092146286, -0.052743305125972646, -0.7832644348310122),
+          new THREE.Vector3(-0.6640607227431398, -0.11583625171178388, -0.7386510131985353),
+          new THREE.Vector3(-0.7386510131985354, -0.11583625171178388, -0.6640607227431399),
+          new THREE.Vector3(-0.7832644348310122, -0.052743305125972646, -0.6194473092146286),
+          new THREE.Vector3(-0.7832644348310122, 0.052743305125972646, -0.6194473092146286),
+          new THREE.Vector3(-0.7386510131985354, 0.11583625171178388, -0.6640607227431399),
+          new THREE.Vector3(-0.6640607227431398, 0.11583625171178388, -0.7386510131985353),
+          new THREE.Vector3(-0.6194473092146286, 0.052743305125972646, -0.7832644348310122),
+          new THREE.Vector3(-0.052743305125972646, 0.6194473092146286, -0.7832644348310122),
+          new THREE.Vector3(-0.11583625171178388, 0.6640607227431399, -0.7386510131985354),
+          new THREE.Vector3(-0.11583625171178388, 0.7386510131985353, -0.6640607227431398),
+          new THREE.Vector3(-0.052743305125972646, 0.7832644348310122, -0.6194473092146286),
+          new THREE.Vector3(0.052743305125972646, 0.7832644348310122, -0.6194473092146286),
+          new THREE.Vector3(0.11583625171178388, 0.7386510131985353, -0.6640607227431398),
+          new THREE.Vector3(0.11583625171178388, 0.6640607227431399, -0.7386510131985354),
+          new THREE.Vector3(0.052743305125972646, 0.6194473092146286, -0.7832644348310122),
+          new THREE.Vector3(0.6194473092146286, 0.052743305125972646, -0.7832644348310122),
+          new THREE.Vector3(0.6640607227431398, 0.11583625171178388, -0.7386510131985353),
+          new THREE.Vector3(0.7386510131985354, 0.11583625171178388, -0.6640607227431399),
+          new THREE.Vector3(0.7832644348310122, 0.052743305125972646, -0.6194473092146286),
+          new THREE.Vector3(0.7832644348310122, -0.052743305125972646, -0.6194473092146286),
+          new THREE.Vector3(0.7386510131985354, -0.11583625171178388, -0.6640607227431399),
+          new THREE.Vector3(0.6640607227431398, -0.11583625171178388, -0.7386510131985353),
+          new THREE.Vector3(0.6194473092146286, -0.052743305125972646, -0.7832644348310122),
+          new THREE.Vector3(0.052743305125972646, -0.6194473092146286, -0.7832644348310122),
+          new THREE.Vector3(0.11583625171178388, -0.6640607227431399, -0.7386510131985354),
+          new THREE.Vector3(0.11583625171178388, -0.7386510131985353, -0.6640607227431398),
+          new THREE.Vector3(0.052743305125972646, -0.7832644348310122, -0.6194473092146286),
+          new THREE.Vector3(-0.052743305125972646, -0.7832644348310122, -0.6194473092146286),
+          new THREE.Vector3(-0.11583625171178388, -0.7386510131985353, -0.6640607227431398),
+          new THREE.Vector3(-0.11583625171178388, -0.6640607227431399, -0.7386510131985354),
+          new THREE.Vector3(-0.052743305125972646, -0.6194473092146286, -0.7832644348310122),
+          new THREE.Vector3(0.6194473092146286, -0.7832644348310122, -0.052743305125972646),
+          new THREE.Vector3(0.6640607227431399, -0.7386510131985354, -0.11583625171178388),
+          new THREE.Vector3(0.7386510131985353, -0.6640607227431398, -0.11583625171178388),
+          new THREE.Vector3(0.7832644348310122, -0.6194473092146286, -0.052743305125972646),
+          new THREE.Vector3(0.7832644348310122, -0.6194473092146286, 0.052743305125972646),
+          new THREE.Vector3(0.7386510131985353, -0.6640607227431398, 0.11583625171178388),
+          new THREE.Vector3(0.6640607227431399, -0.7386510131985354, 0.11583625171178388),
+          new THREE.Vector3(0.6194473092146286, -0.7832644348310122, 0.052743305125972646),
+          new THREE.Vector3(0.052743305125972646, -0.7832644348310122, 0.6194473092146286),
+          new THREE.Vector3(0.11583625171178388, -0.7386510131985353, 0.6640607227431398),
+          new THREE.Vector3(0.11583625171178388, -0.6640607227431399, 0.7386510131985354),
+          new THREE.Vector3(0.052743305125972646, -0.6194473092146286, 0.7832644348310122),
+          new THREE.Vector3(-0.052743305125972646, -0.6194473092146286, 0.7832644348310122),
+          new THREE.Vector3(-0.11583625171178388, -0.6640607227431399, 0.7386510131985354),
+          new THREE.Vector3(-0.11583625171178388, -0.7386510131985353, 0.6640607227431398),
+          new THREE.Vector3(-0.052743305125972646, -0.7832644348310122, 0.6194473092146286),
+          new THREE.Vector3(-0.6194473092146286, -0.7832644348310122, 0.052743305125972646),
+          new THREE.Vector3(-0.6640607227431399, -0.7386510131985354, 0.11583625171178388),
+          new THREE.Vector3(-0.7386510131985353, -0.6640607227431398, 0.11583625171178388),
+          new THREE.Vector3(-0.7832644348310122, -0.6194473092146286, 0.052743305125972646),
+          new THREE.Vector3(-0.7832644348310122, -0.6194473092146286, -0.052743305125972646),
+          new THREE.Vector3(-0.7386510131985353, -0.6640607227431398, -0.11583625171178388),
+          new THREE.Vector3(-0.6640607227431399, -0.7386510131985354, -0.11583625171178388),
+          new THREE.Vector3(-0.6194473092146286, -0.7832644348310122, -0.052743305125972646),
+          new THREE.Vector3(-0.7832644348310122, -0.052743305125972646, 0.6194473092146286),
+          new THREE.Vector3(-0.7386510131985354, -0.11583625171178388, 0.6640607227431399),
+          new THREE.Vector3(-0.6640607227431398, -0.11583625171178388, 0.7386510131985353),
+          new THREE.Vector3(-0.6194473092146286, -0.052743305125972646, 0.7832644348310122),
+          new THREE.Vector3(-0.6194473092146286, 0.052743305125972646, 0.7832644348310122),
+          new THREE.Vector3(-0.6640607227431398, 0.11583625171178388, 0.7386510131985353),
+          new THREE.Vector3(-0.7386510131985354, 0.11583625171178388, 0.6640607227431399),
+          new THREE.Vector3(-0.7832644348310122, 0.052743305125972646, 0.6194473092146286),
+          new THREE.Vector3(-0.7832644348310122, 0.6194473092146286, 0.052743305125972646),
+          new THREE.Vector3(-0.7386510131985353, 0.6640607227431398, 0.11583625171178388),
+          new THREE.Vector3(-0.6640607227431399, 0.7386510131985354, 0.11583625171178388),
+          new THREE.Vector3(-0.6194473092146286, 0.7832644348310122, 0.052743305125972646),
+          new THREE.Vector3(-0.6194473092146286, 0.7832644348310122, -0.052743305125972646),
+          new THREE.Vector3(-0.6640607227431399, 0.7386510131985354, -0.11583625171178388),
+          new THREE.Vector3(-0.7386510131985353, 0.6640607227431398, -0.11583625171178388),
+          new THREE.Vector3(-0.7832644348310122, 0.6194473092146286, -0.052743305125972646),
+          new THREE.Vector3(0.7832644348310122, 0.052743305125972646, 0.6194473092146286),
+          new THREE.Vector3(0.7386510131985354, 0.11583625171178388, 0.6640607227431399),
+          new THREE.Vector3(0.6640607227431398, 0.11583625171178388, 0.7386510131985353),
+          new THREE.Vector3(0.6194473092146286, 0.052743305125972646, 0.7832644348310122),
+          new THREE.Vector3(0.6194473092146286, -0.052743305125972646, 0.7832644348310122),
+          new THREE.Vector3(0.6640607227431398, -0.11583625171178388, 0.7386510131985353),
+          new THREE.Vector3(0.7386510131985354, -0.11583625171178388, 0.6640607227431399),
+          new THREE.Vector3(0.7832644348310122, -0.052743305125972646, 0.6194473092146286),
+          new THREE.Vector3(0.7832644348310122, 0.6194473092146286, -0.052743305125972646),
+          new THREE.Vector3(0.7386510131985353, 0.6640607227431398, -0.11583625171178388),
+          new THREE.Vector3(0.6640607227431399, 0.7386510131985354, -0.11583625171178388),
+          new THREE.Vector3(0.6194473092146286, 0.7832644348310122, -0.052743305125972646),
+          new THREE.Vector3(0.6194473092146286, 0.7832644348310122, 0.052743305125972646),
+          new THREE.Vector3(0.6640607227431399, 0.7386510131985354, 0.11583625171178388),
+          new THREE.Vector3(0.7386510131985353, 0.6640607227431398, 0.11583625171178388),
+          new THREE.Vector3(0.7832644348310122, 0.6194473092146286, 0.052743305125972646),
+          new THREE.Vector3(-0.052743305125972646, 0.7832644348310122, 0.6194473092146286),
+          new THREE.Vector3(-0.11583625171178388, 0.7386510131985353, 0.6640607227431398),
+          new THREE.Vector3(-0.11583625171178388, 0.6640607227431399, 0.7386510131985354),
+          new THREE.Vector3(-0.052743305125972646, 0.6194473092146286, 0.7832644348310122),
+          new THREE.Vector3(0.052743305125972646, 0.6194473092146286, 0.7832644348310122),
+          new THREE.Vector3(0.11583625171178388, 0.6640607227431399, 0.7386510131985354),
+          new THREE.Vector3(0.11583625171178388, 0.7386510131985353, 0.6640607227431398),
+          new THREE.Vector3(0.052743305125972646, 0.7832644348310122, 0.6194473092146286),
+          new THREE.Vector3(-0.31973340026958946, 0.24826238019569805, -0.9144049121322639),
+          new THREE.Vector3(-0.4204961940344514, 0.24826247177116886, -0.8726675746884437),
+          new THREE.Vector3(-0.4685845908016556, 0.32333631308160743, -0.8221204959773463),
+          new THREE.Vector3(-0.48283835448876783, 0.41780289610195365, -0.7696153996922094),
+          new THREE.Vector3(-0.41780289610195365, 0.48283835448876783, -0.7696153996922094),
+          new THREE.Vector3(-0.3233363130816073, 0.46858459080165576, -0.8221204959773464),
+          new THREE.Vector3(-0.24826247177116886, 0.42049619403445143, -0.8726675746884439),
+          new THREE.Vector3(-0.24826238019569805, 0.31973340026958946, -0.9144049121322639),
+          new THREE.Vector3(0.24826238019569805, 0.31973340026958946, -0.9144049121322639),
+          new THREE.Vector3(0.24826247177116886, 0.42049619403445143, -0.8726675746884439),
+          new THREE.Vector3(0.3233363130816073, 0.46858459080165576, -0.8221204959773464),
+          new THREE.Vector3(0.41780289610195365, 0.48283835448876783, -0.7696153996922094),
+          new THREE.Vector3(0.48283835448876783, 0.41780289610195365, -0.7696153996922094),
+          new THREE.Vector3(0.4685845908016556, 0.32333631308160743, -0.8221204959773463),
+          new THREE.Vector3(0.4204961940344514, 0.24826247177116886, -0.8726675746884437),
+          new THREE.Vector3(0.31973340026958946, 0.24826238019569805, -0.9144049121322639),
+          new THREE.Vector3(0.31973340026958946, -0.24826238019569805, -0.9144049121322639),
+          new THREE.Vector3(0.4204961940344514, -0.24826247177116886, -0.8726675746884437),
+          new THREE.Vector3(0.4685845908016556, -0.32333631308160743, -0.8221204959773463),
+          new THREE.Vector3(0.48283835448876783, -0.41780289610195365, -0.7696153996922094),
+          new THREE.Vector3(0.41780289610195365, -0.48283835448876783, -0.7696153996922094),
+          new THREE.Vector3(0.3233363130816073, -0.46858459080165576, -0.8221204959773464),
+          new THREE.Vector3(0.24826247177116886, -0.42049619403445143, -0.8726675746884439),
+          new THREE.Vector3(0.24826238019569805, -0.31973340026958946, -0.9144049121322639),
+          new THREE.Vector3(-0.24826238019569805, -0.31973340026958946, -0.9144049121322639),
+          new THREE.Vector3(-0.24826247177116886, -0.42049619403445143, -0.8726675746884439),
+          new THREE.Vector3(-0.3233363130816073, -0.46858459080165576, -0.8221204959773464),
+          new THREE.Vector3(-0.41780289610195365, -0.48283835448876783, -0.7696153996922094),
+          new THREE.Vector3(-0.48283835448876783, -0.41780289610195365, -0.7696153996922094),
+          new THREE.Vector3(-0.4685845908016556, -0.32333631308160743, -0.8221204959773463),
+          new THREE.Vector3(-0.4204961940344514, -0.24826247177116886, -0.8726675746884437),
+          new THREE.Vector3(-0.31973340026958946, -0.24826238019569805, -0.9144049121322639),
+          new THREE.Vector3(0.24826238019569805, -0.9144049121322639, -0.31973340026958946),
+          new THREE.Vector3(0.24826247177116892, -0.8726675746884439, -0.4204961940344515),
+          new THREE.Vector3(0.32333631308160743, -0.8221204959773463, -0.4685845908016556),
+          new THREE.Vector3(0.4178028961019536, -0.7696153996922093, -0.48283835448876783),
+          new THREE.Vector3(0.48283835448876783, -0.7696153996922093, -0.4178028961019536),
+          new THREE.Vector3(0.4685845908016557, -0.8221204959773464, -0.3233363130816074),
+          new THREE.Vector3(0.42049619403445143, -0.8726675746884439, -0.24826247177116886),
+          new THREE.Vector3(0.31973340026958946, -0.9144049121322639, -0.24826238019569805),
+          new THREE.Vector3(0.31973340026958946, -0.9144049121322639, 0.24826238019569805),
+          new THREE.Vector3(0.42049619403445143, -0.8726675746884439, 0.24826247177116886),
+          new THREE.Vector3(0.4685845908016557, -0.8221204959773464, 0.3233363130816074),
+          new THREE.Vector3(0.48283835448876783, -0.7696153996922093, 0.4178028961019536),
+          new THREE.Vector3(0.4178028961019536, -0.7696153996922093, 0.48283835448876783),
+          new THREE.Vector3(0.32333631308160743, -0.8221204959773463, 0.4685845908016556),
+          new THREE.Vector3(0.24826247177116892, -0.8726675746884439, 0.4204961940344515),
+          new THREE.Vector3(0.24826238019569805, -0.9144049121322639, 0.31973340026958946),
+          new THREE.Vector3(-0.24826238019569805, -0.9144049121322639, 0.31973340026958946),
+          new THREE.Vector3(-0.24826247177116892, -0.8726675746884439, 0.4204961940344515),
+          new THREE.Vector3(-0.32333631308160743, -0.8221204959773463, 0.4685845908016556),
+          new THREE.Vector3(-0.4178028961019536, -0.7696153996922093, 0.48283835448876783),
+          new THREE.Vector3(-0.48283835448876783, -0.7696153996922093, 0.4178028961019536),
+          new THREE.Vector3(-0.4685845908016557, -0.8221204959773464, 0.3233363130816074),
+          new THREE.Vector3(-0.42049619403445143, -0.8726675746884439, 0.24826247177116886),
+          new THREE.Vector3(-0.31973340026958946, -0.9144049121322639, 0.24826238019569805),
+          new THREE.Vector3(-0.31973340026958946, -0.9144049121322639, -0.24826238019569805),
+          new THREE.Vector3(-0.42049619403445143, -0.8726675746884439, -0.24826247177116886),
+          new THREE.Vector3(-0.4685845908016557, -0.8221204959773464, -0.3233363130816074),
+          new THREE.Vector3(-0.48283835448876783, -0.7696153996922093, -0.4178028961019536),
+          new THREE.Vector3(-0.4178028961019536, -0.7696153996922093, -0.48283835448876783),
+          new THREE.Vector3(-0.32333631308160743, -0.8221204959773463, -0.4685845908016556),
+          new THREE.Vector3(-0.24826247177116892, -0.8726675746884439, -0.4204961940344515),
+          new THREE.Vector3(-0.24826238019569805, -0.9144049121322639, -0.31973340026958946),
+          new THREE.Vector3(-0.9144049121322639, -0.31973340026958946, 0.24826238019569805),
+          new THREE.Vector3(-0.8726675746884437, -0.4204961940344514, 0.24826247177116886),
+          new THREE.Vector3(-0.8221204959773464, -0.4685845908016557, 0.3233363130816074),
+          new THREE.Vector3(-0.7696153996922093, -0.48283835448876783, 0.4178028961019536),
+          new THREE.Vector3(-0.7696153996922093, -0.4178028961019536, 0.48283835448876783),
+          new THREE.Vector3(-0.8221204959773464, -0.3233363130816073, 0.46858459080165576),
+          new THREE.Vector3(-0.8726675746884439, -0.24826247177116886, 0.42049619403445143),
+          new THREE.Vector3(-0.9144049121322639, -0.24826238019569805, 0.31973340026958946),
+          new THREE.Vector3(-0.9144049121322639, 0.24826238019569805, 0.31973340026958946),
+          new THREE.Vector3(-0.8726675746884439, 0.24826247177116886, 0.42049619403445143),
+          new THREE.Vector3(-0.8221204959773464, 0.3233363130816073, 0.46858459080165576),
+          new THREE.Vector3(-0.7696153996922093, 0.4178028961019536, 0.48283835448876783),
+          new THREE.Vector3(-0.7696153996922093, 0.48283835448876783, 0.4178028961019536),
+          new THREE.Vector3(-0.8221204959773464, 0.4685845908016557, 0.3233363130816074),
+          new THREE.Vector3(-0.8726675746884437, 0.4204961940344514, 0.24826247177116886),
+          new THREE.Vector3(-0.9144049121322639, 0.31973340026958946, 0.24826238019569805),
+          new THREE.Vector3(-0.9144049121322639, 0.31973340026958946, -0.24826238019569805),
+          new THREE.Vector3(-0.8726675746884437, 0.4204961940344514, -0.24826247177116886),
+          new THREE.Vector3(-0.8221204959773464, 0.4685845908016557, -0.3233363130816074),
+          new THREE.Vector3(-0.7696153996922093, 0.48283835448876783, -0.4178028961019536),
+          new THREE.Vector3(-0.7696153996922093, 0.4178028961019536, -0.48283835448876783),
+          new THREE.Vector3(-0.8221204959773464, 0.3233363130816073, -0.46858459080165576),
+          new THREE.Vector3(-0.8726675746884439, 0.24826247177116886, -0.42049619403445143),
+          new THREE.Vector3(-0.9144049121322639, 0.24826238019569805, -0.31973340026958946),
+          new THREE.Vector3(-0.9144049121322639, -0.24826238019569805, -0.31973340026958946),
+          new THREE.Vector3(-0.8726675746884439, -0.24826247177116886, -0.42049619403445143),
+          new THREE.Vector3(-0.8221204959773464, -0.3233363130816073, -0.46858459080165576),
+          new THREE.Vector3(-0.7696153996922093, -0.4178028961019536, -0.48283835448876783),
+          new THREE.Vector3(-0.7696153996922093, -0.48283835448876783, -0.4178028961019536),
+          new THREE.Vector3(-0.8221204959773464, -0.4685845908016557, -0.3233363130816074),
+          new THREE.Vector3(-0.8726675746884437, -0.4204961940344514, -0.24826247177116886),
+          new THREE.Vector3(-0.9144049121322639, -0.31973340026958946, -0.24826238019569805),
+          new THREE.Vector3(0.9144049121322639, -0.24826238019569805, 0.31973340026958946),
+          new THREE.Vector3(0.8726675746884439, -0.24826247177116886, 0.42049619403445143),
+          new THREE.Vector3(0.8221204959773464, -0.3233363130816073, 0.46858459080165576),
+          new THREE.Vector3(0.7696153996922093, -0.4178028961019536, 0.48283835448876783),
+          new THREE.Vector3(0.7696153996922093, -0.48283835448876783, 0.4178028961019536),
+          new THREE.Vector3(0.8221204959773464, -0.4685845908016557, 0.3233363130816074),
+          new THREE.Vector3(0.8726675746884437, -0.4204961940344514, 0.24826247177116886),
+          new THREE.Vector3(0.9144049121322639, -0.31973340026958946, 0.24826238019569805),
+          new THREE.Vector3(0.9144049121322639, -0.31973340026958946, -0.24826238019569805),
+          new THREE.Vector3(0.8726675746884437, -0.4204961940344514, -0.24826247177116886),
+          new THREE.Vector3(0.8221204959773464, -0.4685845908016557, -0.3233363130816074),
+          new THREE.Vector3(0.7696153996922093, -0.48283835448876783, -0.4178028961019536),
+          new THREE.Vector3(0.7696153996922093, -0.4178028961019536, -0.48283835448876783),
+          new THREE.Vector3(0.8221204959773464, -0.3233363130816073, -0.46858459080165576),
+          new THREE.Vector3(0.8726675746884439, -0.24826247177116886, -0.42049619403445143),
+          new THREE.Vector3(0.9144049121322639, -0.24826238019569805, -0.31973340026958946),
+          new THREE.Vector3(0.9144049121322639, 0.24826238019569805, -0.31973340026958946),
+          new THREE.Vector3(0.8726675746884439, 0.24826247177116886, -0.42049619403445143),
+          new THREE.Vector3(0.8221204959773464, 0.3233363130816073, -0.46858459080165576),
+          new THREE.Vector3(0.7696153996922093, 0.4178028961019536, -0.48283835448876783),
+          new THREE.Vector3(0.7696153996922093, 0.48283835448876783, -0.4178028961019536),
+          new THREE.Vector3(0.8221204959773464, 0.4685845908016557, -0.3233363130816074),
+          new THREE.Vector3(0.8726675746884437, 0.4204961940344514, -0.24826247177116886),
+          new THREE.Vector3(0.9144049121322639, 0.31973340026958946, -0.24826238019569805),
+          new THREE.Vector3(0.9144049121322639, 0.31973340026958946, 0.24826238019569805),
+          new THREE.Vector3(0.8726675746884437, 0.4204961940344514, 0.24826247177116886),
+          new THREE.Vector3(0.8221204959773464, 0.4685845908016557, 0.3233363130816074),
+          new THREE.Vector3(0.7696153996922093, 0.48283835448876783, 0.4178028961019536),
+          new THREE.Vector3(0.7696153996922093, 0.4178028961019536, 0.48283835448876783),
+          new THREE.Vector3(0.8221204959773464, 0.3233363130816073, 0.46858459080165576),
+          new THREE.Vector3(0.8726675746884439, 0.24826247177116886, 0.42049619403445143),
+          new THREE.Vector3(0.9144049121322639, 0.24826238019569805, 0.31973340026958946),
+          new THREE.Vector3(0.31973340026958946, 0.9144049121322639, -0.24826238019569805),
+          new THREE.Vector3(0.42049619403445143, 0.8726675746884439, -0.24826247177116886),
+          new THREE.Vector3(0.4685845908016557, 0.8221204959773464, -0.3233363130816074),
+          new THREE.Vector3(0.48283835448876783, 0.7696153996922093, -0.4178028961019536),
+          new THREE.Vector3(0.4178028961019536, 0.7696153996922093, -0.48283835448876783),
+          new THREE.Vector3(0.32333631308160743, 0.8221204959773463, -0.4685845908016556),
+          new THREE.Vector3(0.24826247177116892, 0.8726675746884439, -0.4204961940344515),
+          new THREE.Vector3(0.24826238019569805, 0.9144049121322639, -0.31973340026958946),
+          new THREE.Vector3(-0.24826238019569805, 0.9144049121322639, -0.31973340026958946),
+          new THREE.Vector3(-0.24826247177116892, 0.8726675746884439, -0.4204961940344515),
+          new THREE.Vector3(-0.32333631308160743, 0.8221204959773463, -0.4685845908016556),
+          new THREE.Vector3(-0.4178028961019536, 0.7696153996922093, -0.48283835448876783),
+          new THREE.Vector3(-0.48283835448876783, 0.7696153996922093, -0.4178028961019536),
+          new THREE.Vector3(-0.4685845908016557, 0.8221204959773464, -0.3233363130816074),
+          new THREE.Vector3(-0.42049619403445143, 0.8726675746884439, -0.24826247177116886),
+          new THREE.Vector3(-0.31973340026958946, 0.9144049121322639, -0.24826238019569805),
+          new THREE.Vector3(-0.31973340026958946, 0.9144049121322639, 0.24826238019569805),
+          new THREE.Vector3(-0.42049619403445143, 0.8726675746884439, 0.24826247177116886),
+          new THREE.Vector3(-0.4685845908016557, 0.8221204959773464, 0.3233363130816074),
+          new THREE.Vector3(-0.48283835448876783, 0.7696153996922093, 0.4178028961019536),
+          new THREE.Vector3(-0.4178028961019536, 0.7696153996922093, 0.48283835448876783),
+          new THREE.Vector3(-0.32333631308160743, 0.8221204959773463, 0.4685845908016556),
+          new THREE.Vector3(-0.24826247177116892, 0.8726675746884439, 0.4204961940344515),
+          new THREE.Vector3(-0.24826238019569805, 0.9144049121322639, 0.31973340026958946),
+          new THREE.Vector3(0.24826238019569805, 0.9144049121322639, 0.31973340026958946),
+          new THREE.Vector3(0.24826247177116892, 0.8726675746884439, 0.4204961940344515),
+          new THREE.Vector3(0.32333631308160743, 0.8221204959773463, 0.4685845908016556),
+          new THREE.Vector3(0.4178028961019536, 0.7696153996922093, 0.48283835448876783),
+          new THREE.Vector3(0.48283835448876783, 0.7696153996922093, 0.4178028961019536),
+          new THREE.Vector3(0.4685845908016557, 0.8221204959773464, 0.3233363130816074),
+          new THREE.Vector3(0.42049619403445143, 0.8726675746884439, 0.24826247177116886),
+          new THREE.Vector3(0.31973340026958946, 0.9144049121322639, 0.24826238019569805),
+          new THREE.Vector3(-0.24826238019569805, 0.31973340026958946, 0.9144049121322639),
+          new THREE.Vector3(-0.24826247177116886, 0.42049619403445143, 0.8726675746884439),
+          new THREE.Vector3(-0.3233363130816073, 0.46858459080165576, 0.8221204959773464),
+          new THREE.Vector3(-0.41780289610195365, 0.48283835448876783, 0.7696153996922094),
+          new THREE.Vector3(-0.48283835448876783, 0.41780289610195365, 0.7696153996922094),
+          new THREE.Vector3(-0.4685845908016556, 0.32333631308160743, 0.8221204959773463),
+          new THREE.Vector3(-0.4204961940344514, 0.24826247177116886, 0.8726675746884437),
+          new THREE.Vector3(-0.31973340026958946, 0.24826238019569805, 0.9144049121322639),
+          new THREE.Vector3(-0.31973340026958946, -0.24826238019569805, 0.9144049121322639),
+          new THREE.Vector3(-0.4204961940344514, -0.24826247177116886, 0.8726675746884437),
+          new THREE.Vector3(-0.4685845908016556, -0.32333631308160743, 0.8221204959773463),
+          new THREE.Vector3(-0.48283835448876783, -0.41780289610195365, 0.7696153996922094),
+          new THREE.Vector3(-0.41780289610195365, -0.48283835448876783, 0.7696153996922094),
+          new THREE.Vector3(-0.3233363130816073, -0.46858459080165576, 0.8221204959773464),
+          new THREE.Vector3(-0.24826247177116886, -0.42049619403445143, 0.8726675746884439),
+          new THREE.Vector3(-0.24826238019569805, -0.31973340026958946, 0.9144049121322639),
+          new THREE.Vector3(0.24826238019569805, -0.31973340026958946, 0.9144049121322639),
+          new THREE.Vector3(0.24826247177116886, -0.42049619403445143, 0.8726675746884439),
+          new THREE.Vector3(0.3233363130816073, -0.46858459080165576, 0.8221204959773464),
+          new THREE.Vector3(0.41780289610195365, -0.48283835448876783, 0.7696153996922094),
+          new THREE.Vector3(0.48283835448876783, -0.41780289610195365, 0.7696153996922094),
+          new THREE.Vector3(0.4685845908016556, -0.32333631308160743, 0.8221204959773463),
+          new THREE.Vector3(0.4204961940344514, -0.24826247177116886, 0.8726675746884437),
+          new THREE.Vector3(0.31973340026958946, -0.24826238019569805, 0.9144049121322639),
+          new THREE.Vector3(0.31973340026958946, 0.24826238019569805, 0.9144049121322639),
+          new THREE.Vector3(0.4204961940344514, 0.24826247177116886, 0.8726675746884437),
+          new THREE.Vector3(0.4685845908016556, 0.32333631308160743, 0.8221204959773463),
+          new THREE.Vector3(0.48283835448876783, 0.41780289610195365, 0.7696153996922094),
+          new THREE.Vector3(0.41780289610195365, 0.48283835448876783, 0.7696153996922094),
+          new THREE.Vector3(0.3233363130816073, 0.46858459080165576, 0.8221204959773464),
+          new THREE.Vector3(0.24826247177116886, 0.42049619403445143, 0.8726675746884439),
+          new THREE.Vector3(0.24826238019569805, 0.31973340026958946, 0.9144049121322639),
+          new THREE.Vector3(-0.031314096945751616, 0.3671246218490183, -0.9296445231187496),
+          new THREE.Vector3(-0.031314088630536696, 0.3977616470388167, -0.9169542518567687),
+          new THREE.Vector3(0.031314088630536696, 0.3977616470388167, -0.9169542518567687),
+          new THREE.Vector3(0.031314096945751616, 0.3671246218490183, -0.9296445231187496),
+          new THREE.Vector3(0.3671246218490183, 0.031314096945751616, -0.9296445231187496),
+          new THREE.Vector3(0.3977616470388167, 0.031314088630536696, -0.9169542518567687),
+          new THREE.Vector3(0.3977616470388167, -0.031314088630536696, -0.9169542518567687),
+          new THREE.Vector3(0.3671246218490183, -0.031314096945751616, -0.9296445231187496),
+          new THREE.Vector3(0.031314096945751616, -0.3671246218490183, -0.9296445231187496),
+          new THREE.Vector3(0.031314088630536696, -0.3977616470388167, -0.9169542518567687),
+          new THREE.Vector3(-0.031314088630536696, -0.3977616470388167, -0.9169542518567687),
+          new THREE.Vector3(-0.031314096945751616, -0.3671246218490183, -0.9296445231187496),
+          new THREE.Vector3(-0.3671246218490183, -0.031314096945751616, -0.9296445231187496),
+          new THREE.Vector3(-0.3977616470388167, -0.031314088630536696, -0.9169542518567687),
+          new THREE.Vector3(-0.3977616470388167, 0.031314088630536696, -0.9169542518567687),
+          new THREE.Vector3(-0.3671246218490183, 0.031314096945751616, -0.9296445231187496),
+          new THREE.Vector3(0.3671246218490183, -0.9296445231187496, -0.031314096945751616),
+          new THREE.Vector3(0.3977616470388167, -0.9169542518567687, -0.031314088630536696),
+          new THREE.Vector3(0.3977616470388167, -0.9169542518567687, 0.031314088630536696),
+          new THREE.Vector3(0.3671246218490183, -0.9296445231187496, 0.031314096945751616),
+          new THREE.Vector3(0.031314096945751616, -0.9296445231187496, 0.3671246218490183),
+          new THREE.Vector3(0.031314088630536696, -0.9169542518567687, 0.3977616470388167),
+          new THREE.Vector3(-0.031314088630536696, -0.9169542518567687, 0.3977616470388167),
+          new THREE.Vector3(-0.031314096945751616, -0.9296445231187496, 0.3671246218490183),
+          new THREE.Vector3(-0.3671246218490183, -0.9296445231187496, 0.031314096945751616),
+          new THREE.Vector3(-0.3977616470388167, -0.9169542518567687, 0.031314088630536696),
+          new THREE.Vector3(-0.3977616470388167, -0.9169542518567687, -0.031314088630536696),
+          new THREE.Vector3(-0.3671246218490183, -0.9296445231187496, -0.031314096945751616),
+          new THREE.Vector3(-0.031314096945751616, -0.9296445231187496, -0.3671246218490183),
+          new THREE.Vector3(-0.031314088630536696, -0.9169542518567687, -0.3977616470388167),
+          new THREE.Vector3(0.031314088630536696, -0.9169542518567687, -0.3977616470388167),
+          new THREE.Vector3(0.031314096945751616, -0.9296445231187496, -0.3671246218490183),
+          new THREE.Vector3(-0.9296445231187496, -0.031314096945751616, 0.3671246218490183),
+          new THREE.Vector3(-0.9169542518567687, -0.031314088630536696, 0.3977616470388167),
+          new THREE.Vector3(-0.9169542518567687, 0.031314088630536696, 0.3977616470388167),
+          new THREE.Vector3(-0.9296445231187496, 0.031314096945751616, 0.3671246218490183),
+          new THREE.Vector3(-0.9296445231187496, 0.3671246218490183, 0.031314096945751616),
+          new THREE.Vector3(-0.9169542518567687, 0.3977616470388167, 0.031314088630536696),
+          new THREE.Vector3(-0.9169542518567687, 0.3977616470388167, -0.031314088630536696),
+          new THREE.Vector3(-0.9296445231187496, 0.3671246218490183, -0.031314096945751616),
+          new THREE.Vector3(-0.9296445231187496, 0.031314096945751616, -0.3671246218490183),
+          new THREE.Vector3(-0.9169542518567687, 0.031314088630536696, -0.3977616470388167),
+          new THREE.Vector3(-0.9169542518567687, -0.031314088630536696, -0.3977616470388167),
+          new THREE.Vector3(-0.9296445231187496, -0.031314096945751616, -0.3671246218490183),
+          new THREE.Vector3(-0.9296445231187496, -0.3671246218490183, -0.031314096945751616),
+          new THREE.Vector3(-0.9169542518567687, -0.3977616470388167, -0.031314088630536696),
+          new THREE.Vector3(-0.9169542518567687, -0.3977616470388167, 0.031314088630536696),
+          new THREE.Vector3(-0.9296445231187496, -0.3671246218490183, 0.031314096945751616),
+          new THREE.Vector3(0.9296445231187496, -0.3671246218490183, 0.031314096945751616),
+          new THREE.Vector3(0.9169542518567687, -0.3977616470388167, 0.031314088630536696),
+          new THREE.Vector3(0.9169542518567687, -0.3977616470388167, -0.031314088630536696),
+          new THREE.Vector3(0.9296445231187496, -0.3671246218490183, -0.031314096945751616),
+          new THREE.Vector3(0.9296445231187496, -0.031314096945751616, -0.3671246218490183),
+          new THREE.Vector3(0.9169542518567687, -0.031314088630536696, -0.3977616470388167),
+          new THREE.Vector3(0.9169542518567687, 0.031314088630536696, -0.3977616470388167),
+          new THREE.Vector3(0.9296445231187496, 0.031314096945751616, -0.3671246218490183),
+          new THREE.Vector3(0.9296445231187496, 0.3671246218490183, -0.031314096945751616),
+          new THREE.Vector3(0.9169542518567687, 0.3977616470388167, -0.031314088630536696),
+          new THREE.Vector3(0.9169542518567687, 0.3977616470388167, 0.031314088630536696),
+          new THREE.Vector3(0.9296445231187496, 0.3671246218490183, 0.031314096945751616),
+          new THREE.Vector3(0.9296445231187496, 0.031314096945751616, 0.3671246218490183),
+          new THREE.Vector3(0.9169542518567687, 0.031314088630536696, 0.3977616470388167),
+          new THREE.Vector3(0.9169542518567687, -0.031314088630536696, 0.3977616470388167),
+          new THREE.Vector3(0.9296445231187496, -0.031314096945751616, 0.3671246218490183),
+          new THREE.Vector3(0.031314096945751616, 0.9296445231187496, -0.3671246218490183),
+          new THREE.Vector3(0.031314088630536696, 0.9169542518567687, -0.3977616470388167),
+          new THREE.Vector3(-0.031314088630536696, 0.9169542518567687, -0.3977616470388167),
+          new THREE.Vector3(-0.031314096945751616, 0.9296445231187496, -0.3671246218490183),
+          new THREE.Vector3(-0.3671246218490183, 0.9296445231187496, -0.031314096945751616),
+          new THREE.Vector3(-0.3977616470388167, 0.9169542518567687, -0.031314088630536696),
+          new THREE.Vector3(-0.3977616470388167, 0.9169542518567687, 0.031314088630536696),
+          new THREE.Vector3(-0.3671246218490183, 0.9296445231187496, 0.031314096945751616),
+          new THREE.Vector3(-0.031314096945751616, 0.9296445231187496, 0.3671246218490183),
+          new THREE.Vector3(-0.031314088630536696, 0.9169542518567687, 0.3977616470388167),
+          new THREE.Vector3(0.031314088630536696, 0.9169542518567687, 0.3977616470388167),
+          new THREE.Vector3(0.031314096945751616, 0.9296445231187496, 0.3671246218490183),
+          new THREE.Vector3(0.3671246218490183, 0.9296445231187496, 0.031314096945751616),
+          new THREE.Vector3(0.3977616470388167, 0.9169542518567687, 0.031314088630536696),
+          new THREE.Vector3(0.3977616470388167, 0.9169542518567687, -0.031314088630536696),
+          new THREE.Vector3(0.3671246218490183, 0.9296445231187496, -0.031314096945751616),
+          new THREE.Vector3(-0.3671246218490183, 0.031314096945751616, 0.9296445231187496),
+          new THREE.Vector3(-0.3977616470388167, 0.031314088630536696, 0.9169542518567687),
+          new THREE.Vector3(-0.3977616470388167, -0.031314088630536696, 0.9169542518567687),
+          new THREE.Vector3(-0.3671246218490183, -0.031314096945751616, 0.9296445231187496),
+          new THREE.Vector3(-0.031314096945751616, -0.3671246218490183, 0.9296445231187496),
+          new THREE.Vector3(-0.031314088630536696, -0.3977616470388167, 0.9169542518567687),
+          new THREE.Vector3(0.031314088630536696, -0.3977616470388167, 0.9169542518567687),
+          new THREE.Vector3(0.031314096945751616, -0.3671246218490183, 0.9296445231187496),
+          new THREE.Vector3(0.3671246218490183, -0.031314096945751616, 0.9296445231187496),
+          new THREE.Vector3(0.3977616470388167, -0.031314088630536696, 0.9169542518567687),
+          new THREE.Vector3(0.3977616470388167, 0.031314088630536696, 0.9169542518567687),
+          new THREE.Vector3(0.3671246218490183, 0.031314096945751616, 0.9296445231187496),
+          new THREE.Vector3(0.031314096945751616, 0.3671246218490183, 0.9296445231187496),
+          new THREE.Vector3(0.031314088630536696, 0.3977616470388167, 0.9169542518567687),
+          new THREE.Vector3(-0.031314088630536696, 0.3977616470388167, 0.9169542518567687),
+          new THREE.Vector3(-0.031314096945751616, 0.3671246218490183, 0.9296445231187496),
+          new THREE.Vector3(-0.6354253952894567, -0.6758071018852587, -0.3735228614993801),
+          new THREE.Vector3(-0.6461629655129724, -0.6801632204642645, -0.3461956318718676),
+          new THREE.Vector3(-0.6801632204642645, -0.6461629655129724, -0.34619563187186747),
+          new THREE.Vector3(-0.6758071018852587, -0.6354253952894569, -0.3735228614993802),
+          new THREE.Vector3(-0.6758071018852587, -0.3735228614993801, -0.6354253952894567),
+          new THREE.Vector3(-0.6801632204642644, -0.3461956318718674, -0.6461629655129724),
+          new THREE.Vector3(-0.6461629655129724, -0.3461956318718674, -0.6801632204642644),
+          new THREE.Vector3(-0.6354253952894567, -0.37352286149938013, -0.6758071018852586),
+          new THREE.Vector3(-0.3735228614993801, -0.6354253952894567, -0.6758071018852587),
+          new THREE.Vector3(-0.3461956318718674, -0.6461629655129724, -0.6801632204642644),
+          new THREE.Vector3(-0.3461956318718674, -0.6801632204642644, -0.6461629655129724),
+          new THREE.Vector3(-0.37352286149938013, -0.6758071018852586, -0.6354253952894567),
+          new THREE.Vector3(-0.6758071018852587, 0.6354253952894569, -0.3735228614993802),
+          new THREE.Vector3(-0.6801632204642645, 0.6461629655129724, -0.34619563187186747),
+          new THREE.Vector3(-0.6461629655129724, 0.6801632204642645, -0.3461956318718676),
+          new THREE.Vector3(-0.6354253952894567, 0.6758071018852587, -0.3735228614993801),
+          new THREE.Vector3(-0.37352286149938013, 0.6758071018852586, -0.6354253952894567),
+          new THREE.Vector3(-0.3461956318718674, 0.6801632204642644, -0.6461629655129724),
+          new THREE.Vector3(-0.3461956318718674, 0.6461629655129724, -0.6801632204642644),
+          new THREE.Vector3(-0.3735228614993801, 0.6354253952894567, -0.6758071018852587),
+          new THREE.Vector3(-0.6354253952894567, 0.37352286149938013, -0.6758071018852586),
+          new THREE.Vector3(-0.6461629655129724, 0.3461956318718674, -0.6801632204642644),
+          new THREE.Vector3(-0.6801632204642644, 0.3461956318718674, -0.6461629655129724),
+          new THREE.Vector3(-0.6758071018852587, 0.3735228614993801, -0.6354253952894567),
+          new THREE.Vector3(0.6354253952894567, 0.6758071018852587, -0.3735228614993801),
+          new THREE.Vector3(0.6461629655129724, 0.6801632204642645, -0.3461956318718676),
+          new THREE.Vector3(0.6801632204642645, 0.6461629655129724, -0.34619563187186747),
+          new THREE.Vector3(0.6758071018852587, 0.6354253952894569, -0.3735228614993802),
+          new THREE.Vector3(0.6758071018852587, 0.3735228614993801, -0.6354253952894567),
+          new THREE.Vector3(0.6801632204642644, 0.3461956318718674, -0.6461629655129724),
+          new THREE.Vector3(0.6461629655129724, 0.3461956318718674, -0.6801632204642644),
+          new THREE.Vector3(0.6354253952894567, 0.37352286149938013, -0.6758071018852586),
+          new THREE.Vector3(0.3735228614993801, 0.6354253952894567, -0.6758071018852587),
+          new THREE.Vector3(0.3461956318718674, 0.6461629655129724, -0.6801632204642644),
+          new THREE.Vector3(0.3461956318718674, 0.6801632204642644, -0.6461629655129724),
+          new THREE.Vector3(0.37352286149938013, 0.6758071018852586, -0.6354253952894567),
+          new THREE.Vector3(0.6758071018852587, -0.6354253952894569, -0.3735228614993802),
+          new THREE.Vector3(0.6801632204642645, -0.6461629655129724, -0.34619563187186747),
+          new THREE.Vector3(0.6461629655129724, -0.6801632204642645, -0.3461956318718676),
+          new THREE.Vector3(0.6354253952894567, -0.6758071018852587, -0.3735228614993801),
+          new THREE.Vector3(0.37352286149938013, -0.6758071018852586, -0.6354253952894567),
+          new THREE.Vector3(0.3461956318718674, -0.6801632204642644, -0.6461629655129724),
+          new THREE.Vector3(0.3461956318718674, -0.6461629655129724, -0.6801632204642644),
+          new THREE.Vector3(0.3735228614993801, -0.6354253952894567, -0.6758071018852587),
+          new THREE.Vector3(0.6354253952894567, -0.37352286149938013, -0.6758071018852586),
+          new THREE.Vector3(0.6461629655129724, -0.3461956318718674, -0.6801632204642644),
+          new THREE.Vector3(0.6801632204642644, -0.3461956318718674, -0.6461629655129724),
+          new THREE.Vector3(0.6758071018852587, -0.3735228614993801, -0.6354253952894567),
+          new THREE.Vector3(0.6758071018852587, -0.3735228614993801, 0.6354253952894567),
+          new THREE.Vector3(0.6801632204642644, -0.3461956318718674, 0.6461629655129724),
+          new THREE.Vector3(0.6461629655129724, -0.3461956318718674, 0.6801632204642644),
+          new THREE.Vector3(0.6354253952894567, -0.37352286149938013, 0.6758071018852586),
+          new THREE.Vector3(0.3735228614993801, -0.6354253952894567, 0.6758071018852587),
+          new THREE.Vector3(0.3461956318718674, -0.6461629655129724, 0.6801632204642644),
+          new THREE.Vector3(0.3461956318718674, -0.6801632204642644, 0.6461629655129724),
+          new THREE.Vector3(0.37352286149938013, -0.6758071018852586, 0.6354253952894567),
+          new THREE.Vector3(0.6354253952894567, -0.6758071018852587, 0.3735228614993801),
+          new THREE.Vector3(0.6461629655129724, -0.6801632204642645, 0.3461956318718676),
+          new THREE.Vector3(0.6801632204642645, -0.6461629655129724, 0.34619563187186747),
+          new THREE.Vector3(0.6758071018852587, -0.6354253952894569, 0.3735228614993802),
+          new THREE.Vector3(-0.6354253952894567, -0.37352286149938013, 0.6758071018852586),
+          new THREE.Vector3(-0.6461629655129724, -0.3461956318718674, 0.6801632204642644),
+          new THREE.Vector3(-0.6801632204642644, -0.3461956318718674, 0.6461629655129724),
+          new THREE.Vector3(-0.6758071018852587, -0.3735228614993801, 0.6354253952894567),
+          new THREE.Vector3(-0.6758071018852587, -0.6354253952894569, 0.3735228614993802),
+          new THREE.Vector3(-0.6801632204642645, -0.6461629655129724, 0.34619563187186747),
+          new THREE.Vector3(-0.6461629655129724, -0.6801632204642645, 0.3461956318718676),
+          new THREE.Vector3(-0.6354253952894567, -0.6758071018852587, 0.3735228614993801),
+          new THREE.Vector3(-0.37352286149938013, -0.6758071018852586, 0.6354253952894567),
+          new THREE.Vector3(-0.3461956318718674, -0.6801632204642644, 0.6461629655129724),
+          new THREE.Vector3(-0.3461956318718674, -0.6461629655129724, 0.6801632204642644),
+          new THREE.Vector3(-0.3735228614993801, -0.6354253952894567, 0.6758071018852587),
+          new THREE.Vector3(-0.3735228614993801, 0.6354253952894567, 0.6758071018852587),
+          new THREE.Vector3(-0.3461956318718674, 0.6461629655129724, 0.6801632204642644),
+          new THREE.Vector3(-0.3461956318718674, 0.6801632204642644, 0.6461629655129724),
+          new THREE.Vector3(-0.37352286149938013, 0.6758071018852586, 0.6354253952894567),
+          new THREE.Vector3(-0.6354253952894567, 0.6758071018852587, 0.3735228614993801),
+          new THREE.Vector3(-0.6461629655129724, 0.6801632204642645, 0.3461956318718676),
+          new THREE.Vector3(-0.6801632204642645, 0.6461629655129724, 0.34619563187186747),
+          new THREE.Vector3(-0.6758071018852587, 0.6354253952894569, 0.3735228614993802),
+          new THREE.Vector3(-0.6758071018852587, 0.3735228614993801, 0.6354253952894567),
+          new THREE.Vector3(-0.6801632204642644, 0.3461956318718674, 0.6461629655129724),
+          new THREE.Vector3(-0.6461629655129724, 0.3461956318718674, 0.6801632204642644),
+          new THREE.Vector3(-0.6354253952894567, 0.37352286149938013, 0.6758071018852586),
+          new THREE.Vector3(0.37352286149938013, 0.6758071018852586, 0.6354253952894567),
+          new THREE.Vector3(0.3461956318718674, 0.6801632204642644, 0.6461629655129724),
+          new THREE.Vector3(0.3461956318718674, 0.6461629655129724, 0.6801632204642644),
+          new THREE.Vector3(0.3735228614993801, 0.6354253952894567, 0.6758071018852587),
+          new THREE.Vector3(0.6354253952894567, 0.37352286149938013, 0.6758071018852586),
+          new THREE.Vector3(0.6461629655129724, 0.3461956318718674, 0.6801632204642644),
+          new THREE.Vector3(0.6801632204642644, 0.3461956318718674, 0.6461629655129724),
+          new THREE.Vector3(0.6758071018852587, 0.3735228614993801, 0.6354253952894567),
+          new THREE.Vector3(0.6758071018852587, 0.6354253952894569, 0.3735228614993802),
+          new THREE.Vector3(0.6801632204642645, 0.6461629655129724, 0.34619563187186747),
+          new THREE.Vector3(0.6461629655129724, 0.6801632204642645, 0.3461956318718676),
+          new THREE.Vector3(0.6354253952894567, 0.6758071018852587, 0.3735228614993801)
+        ],
+        faces: [
+          [7, 288, 0, 289, 1, 290, 2, 291, 3, 292, 4, 293, 5, 294, 6, 295],
+          [15, 296, 8, 297, 9, 298, 10, 299, 11, 300, 12, 301, 13, 302, 14, 303],
+          [23, 304, 16, 305, 17, 306, 18, 307, 19, 308, 20, 309, 21, 310, 22, 311],
+          [31, 312, 24, 313, 25, 314, 26, 315, 27, 316, 28, 317, 29, 318, 30, 319],
+          [39, 320, 32, 321, 33, 322, 34, 323, 35, 324, 36, 325, 37, 326, 38, 327],
+          [47, 328, 40, 329, 41, 330, 42, 331, 43, 332, 44, 333, 45, 334, 46, 335],
+          [53, 336, 48, 337, 49, 338, 50, 339, 51, 340, 52, 341],
+          [59, 342, 54, 343, 55, 344, 56, 345, 57, 346, 58, 347],
+          [65, 348, 60, 349, 61, 350, 62, 351, 63, 352, 64, 353],
+          [71, 354, 66, 355, 67, 356, 68, 357, 69, 358, 70, 359],
+          [77, 360, 72, 361, 73, 362, 74, 363, 75, 364, 76, 365],
+          [83, 366, 78, 367, 79, 368, 80, 369, 81, 370, 82, 371],
+          [89, 372, 84, 373, 85, 374, 86, 375, 87, 376, 88, 377],
+          [95, 378, 90, 379, 91, 380, 92, 381, 93, 382, 94, 383],
+          [103, 384, 96, 385, 97, 386, 98, 387, 99, 388, 100, 389, 101, 390, 102, 391],
+          [111, 392, 104, 393, 105, 394, 106, 395, 107, 396, 108, 397, 109, 398, 110, 399],
+          [119, 400, 112, 401, 113, 402, 114, 403, 115, 404, 116, 405, 117, 406, 118, 407],
+          [127, 408, 120, 409, 121, 410, 122, 411, 123, 412, 124, 413, 125, 414, 126, 415],
+          [135, 416, 128, 417, 129, 418, 130, 419, 131, 420, 132, 421, 133, 422, 134, 423],
+          [143, 424, 136, 425, 137, 426, 138, 427, 139, 428, 140, 429, 141, 430, 142, 431],
+          [151, 432, 144, 433, 145, 434, 146, 435, 147, 436, 148, 437, 149, 438, 150, 439],
+          [159, 440, 152, 441, 153, 442, 154, 443, 155, 444, 156, 445, 157, 446, 158, 447],
+          [167, 448, 160, 449, 161, 450, 162, 451, 163, 452, 164, 453, 165, 454, 166, 455],
+          [175, 456, 168, 457, 169, 458, 170, 459, 171, 460, 172, 461, 173, 462, 174, 463],
+          [183, 464, 176, 465, 177, 466, 178, 467, 179, 468, 180, 469, 181, 470, 182, 471],
+          [191, 472, 184, 473, 185, 474, 186, 475, 187, 476, 188, 477, 189, 478, 190, 479],
+          [0, 480, 192, 481, 102, 482, 193, 483, 58, 484, 194, 485, 104, 486, 195, 487],
+          [2, 488, 196, 489, 110, 490, 197, 491, 64, 492, 198, 493, 112, 494, 199, 495],
+          [4, 496, 200, 497, 118, 498, 201, 499, 70, 500, 202, 501, 120, 502, 203, 503],
+          [6, 504, 204, 505, 126, 506, 205, 507, 52, 508, 206, 509, 96, 510, 207, 511],
+          [8, 512, 208, 513, 122, 514, 209, 515, 68, 516, 210, 517, 128, 518, 211, 519],
+          [10, 520, 212, 521, 134, 522, 213, 523, 76, 524, 214, 525, 136, 526, 215, 527],
+          [12, 528, 216, 529, 142, 530, 217, 531, 82, 532, 218, 533, 144, 534, 219, 535],
+          [14, 536, 220, 537, 150, 538, 221, 539, 48, 540, 222, 541, 124, 542, 223, 543],
+          [16, 544, 224, 545, 146, 546, 225, 547, 80, 548, 226, 549, 152, 550, 227, 551],
+          [18, 552, 228, 553, 158, 554, 229, 555, 88, 556, 230, 557, 160, 558, 231, 559],
+          [20, 560, 232, 561, 166, 562, 233, 563, 54, 564, 234, 565, 100, 566, 235, 567],
+          [22, 568, 236, 569, 98, 570, 237, 571, 50, 572, 238, 573, 148, 574, 239, 575],
+          [24, 576, 240, 577, 174, 578, 241, 579, 72, 580, 242, 581, 132, 582, 243, 583],
+          [26, 584, 244, 585, 130, 586, 245, 587, 66, 588, 246, 589, 116, 590, 247, 591],
+          [28, 592, 248, 593, 114, 594, 249, 595, 62, 596, 250, 597, 176, 598, 251, 599],
+          [30, 600, 252, 601, 182, 602, 253, 603, 94, 604, 254, 605, 168, 606, 255, 607],
+          [32, 608, 256, 609, 178, 610, 257, 611, 60, 612, 258, 613, 108, 614, 259, 615],
+          [34, 616, 260, 617, 106, 618, 261, 619, 56, 620, 262, 621, 164, 622, 263, 623],
+          [36, 624, 264, 625, 162, 626, 265, 627, 86, 628, 266, 629, 184, 630, 267, 631],
+          [38, 632, 268, 633, 190, 634, 269, 635, 90, 636, 270, 637, 180, 638, 271, 639],
+          [40, 640, 272, 641, 186, 642, 273, 643, 84, 644, 274, 645, 156, 646, 275, 647],
+          [42, 648, 276, 649, 154, 650, 277, 651, 78, 652, 278, 653, 140, 654, 279, 655],
+          [44, 656, 280, 657, 138, 658, 281, 659, 74, 660, 282, 661, 172, 662, 283, 663],
+          [46, 664, 284, 665, 170, 666, 285, 667, 92, 668, 286, 669, 188, 670, 287, 671],
+          [1, 672, 195, 673, 111, 674, 196, 675],
+          [3, 676, 199, 677, 119, 678, 200, 679],
+          [5, 680, 203, 681, 127, 682, 204, 683],
+          [7, 684, 207, 685, 103, 686, 192, 687],
+          [9, 688, 211, 689, 135, 690, 212, 691],
+          [11, 692, 215, 693, 143, 694, 216, 695],
+          [13, 696, 219, 697, 151, 698, 220, 699],
+          [15, 700, 223, 701, 123, 702, 208, 703],
+          [17, 704, 227, 705, 159, 706, 228, 707],
+          [19, 708, 231, 709, 167, 710, 232, 711],
+          [21, 712, 235, 713, 99, 714, 236, 715],
+          [23, 716, 239, 717, 147, 718, 224, 719],
+          [25, 720, 243, 721, 131, 722, 244, 723],
+          [27, 724, 247, 725, 115, 726, 248, 727],
+          [29, 728, 251, 729, 183, 730, 252, 731],
+          [31, 732, 255, 733, 175, 734, 240, 735],
+          [33, 736, 259, 737, 107, 738, 260, 739],
+          [35, 740, 263, 741, 163, 742, 264, 743],
+          [37, 744, 267, 745, 191, 746, 268, 747],
+          [39, 748, 271, 749, 179, 750, 256, 751],
+          [41, 752, 275, 753, 155, 754, 276, 755],
+          [43, 756, 279, 757, 139, 758, 280, 759],
+          [45, 760, 283, 761, 171, 762, 284, 763],
+          [47, 764, 287, 765, 187, 766, 272, 767],
+          [49, 768, 221, 769, 149, 770, 238, 771],
+          [51, 772, 237, 773, 97, 774, 206, 775],
+          [53, 776, 205, 777, 125, 778, 222, 779],
+          [55, 780, 233, 781, 165, 782, 262, 783],
+          [57, 784, 261, 785, 105, 786, 194, 787],
+          [59, 788, 193, 789, 101, 790, 234, 791],
+          [61, 792, 257, 793, 177, 794, 250, 795],
+          [63, 796, 249, 797, 113, 798, 198, 799],
+          [65, 800, 197, 801, 109, 802, 258, 803],
+          [67, 804, 245, 805, 129, 806, 210, 807],
+          [69, 808, 209, 809, 121, 810, 202, 811],
+          [71, 812, 201, 813, 117, 814, 246, 815],
+          [73, 816, 241, 817, 173, 818, 282, 819],
+          [75, 820, 281, 821, 137, 822, 214, 823],
+          [77, 824, 213, 825, 133, 826, 242, 827],
+          [79, 828, 277, 829, 153, 830, 226, 831],
+          [81, 832, 225, 833, 145, 834, 218, 835],
+          [83, 836, 217, 837, 141, 838, 278, 839],
+          [85, 840, 273, 841, 185, 842, 266, 843],
+          [87, 844, 265, 845, 161, 846, 230, 847],
+          [89, 848, 229, 849, 157, 850, 274, 851],
+          [91, 852, 269, 853, 189, 854, 286, 855],
+          [93, 856, 285, 857, 169, 858, 254, 859],
+          [95, 860, 253, 861, 181, 862, 270, 863],
+          [288, 7, 687, 192, 480, 0],
+          [289, 0, 487, 195, 672, 1],
+          [290, 1, 675, 196, 488, 2],
+          [291, 2, 495, 199, 676, 3],
+          [292, 3, 679, 200, 496, 4],
+          [293, 4, 503, 203, 680, 5],
+          [294, 5, 683, 204, 504, 6],
+          [295, 6, 511, 207, 684, 7],
+          [296, 15, 703, 208, 512, 8],
+          [297, 8, 519, 211, 688, 9],
+          [298, 9, 691, 212, 520, 10],
+          [299, 10, 527, 215, 692, 11],
+          [300, 11, 695, 216, 528, 12],
+          [301, 12, 535, 219, 696, 13],
+          [302, 13, 699, 220, 536, 14],
+          [303, 14, 543, 223, 700, 15],
+          [304, 23, 719, 224, 544, 16],
+          [305, 16, 551, 227, 704, 17],
+          [306, 17, 707, 228, 552, 18],
+          [307, 18, 559, 231, 708, 19],
+          [308, 19, 711, 232, 560, 20],
+          [309, 20, 567, 235, 712, 21],
+          [310, 21, 715, 236, 568, 22],
+          [311, 22, 575, 239, 716, 23],
+          [312, 31, 735, 240, 576, 24],
+          [313, 24, 583, 243, 720, 25],
+          [314, 25, 723, 244, 584, 26],
+          [315, 26, 591, 247, 724, 27],
+          [316, 27, 727, 248, 592, 28],
+          [317, 28, 599, 251, 728, 29],
+          [318, 29, 731, 252, 600, 30],
+          [319, 30, 607, 255, 732, 31],
+          [320, 39, 751, 256, 608, 32],
+          [321, 32, 615, 259, 736, 33],
+          [322, 33, 739, 260, 616, 34],
+          [323, 34, 623, 263, 740, 35],
+          [324, 35, 743, 264, 624, 36],
+          [325, 36, 631, 267, 744, 37],
+          [326, 37, 747, 268, 632, 38],
+          [327, 38, 639, 271, 748, 39],
+          [328, 47, 767, 272, 640, 40],
+          [329, 40, 647, 275, 752, 41],
+          [330, 41, 755, 276, 648, 42],
+          [331, 42, 655, 279, 756, 43],
+          [332, 43, 759, 280, 656, 44],
+          [333, 44, 663, 283, 760, 45],
+          [334, 45, 763, 284, 664, 46],
+          [335, 46, 671, 287, 764, 47],
+          [336, 53, 779, 222, 540, 48],
+          [337, 48, 539, 221, 768, 49],
+          [338, 49, 771, 238, 572, 50],
+          [339, 50, 571, 237, 772, 51],
+          [340, 51, 775, 206, 508, 52],
+          [341, 52, 507, 205, 776, 53],
+          [342, 59, 791, 234, 564, 54],
+          [343, 54, 563, 233, 780, 55],
+          [344, 55, 783, 262, 620, 56],
+          [345, 56, 619, 261, 784, 57],
+          [346, 57, 787, 194, 484, 58],
+          [347, 58, 483, 193, 788, 59],
+          [348, 65, 803, 258, 612, 60],
+          [349, 60, 611, 257, 792, 61],
+          [350, 61, 795, 250, 596, 62],
+          [351, 62, 595, 249, 796, 63],
+          [352, 63, 799, 198, 492, 64],
+          [353, 64, 491, 197, 800, 65],
+          [354, 71, 815, 246, 588, 66],
+          [355, 66, 587, 245, 804, 67],
+          [356, 67, 807, 210, 516, 68],
+          [357, 68, 515, 209, 808, 69],
+          [358, 69, 811, 202, 500, 70],
+          [359, 70, 499, 201, 812, 71],
+          [360, 77, 827, 242, 580, 72],
+          [361, 72, 579, 241, 816, 73],
+          [362, 73, 819, 282, 660, 74],
+          [363, 74, 659, 281, 820, 75],
+          [364, 75, 823, 214, 524, 76],
+          [365, 76, 523, 213, 824, 77],
+          [366, 83, 839, 278, 652, 78],
+          [367, 78, 651, 277, 828, 79],
+          [368, 79, 831, 226, 548, 80],
+          [369, 80, 547, 225, 832, 81],
+          [370, 81, 835, 218, 532, 82],
+          [371, 82, 531, 217, 836, 83],
+          [372, 89, 851, 274, 644, 84],
+          [373, 84, 643, 273, 840, 85],
+          [374, 85, 843, 266, 628, 86],
+          [375, 86, 627, 265, 844, 87],
+          [376, 87, 847, 230, 556, 88],
+          [377, 88, 555, 229, 848, 89],
+          [378, 95, 863, 270, 636, 90],
+          [379, 90, 635, 269, 852, 91],
+          [380, 91, 855, 286, 668, 92],
+          [381, 92, 667, 285, 856, 93],
+          [382, 93, 859, 254, 604, 94],
+          [383, 94, 603, 253, 860, 95],
+          [384, 103, 685, 207, 510, 96],
+          [385, 96, 509, 206, 774, 97],
+          [386, 97, 773, 237, 570, 98],
+          [387, 98, 569, 236, 714, 99],
+          [388, 99, 713, 235, 566, 100],
+          [389, 100, 565, 234, 790, 101],
+          [390, 101, 789, 193, 482, 102],
+          [391, 102, 481, 192, 686, 103],
+          [392, 111, 673, 195, 486, 104],
+          [393, 104, 485, 194, 786, 105],
+          [394, 105, 785, 261, 618, 106],
+          [395, 106, 617, 260, 738, 107],
+          [396, 107, 737, 259, 614, 108],
+          [397, 108, 613, 258, 802, 109],
+          [398, 109, 801, 197, 490, 110],
+          [399, 110, 489, 196, 674, 111],
+          [400, 119, 677, 199, 494, 112],
+          [401, 112, 493, 198, 798, 113],
+          [402, 113, 797, 249, 594, 114],
+          [403, 114, 593, 248, 726, 115],
+          [404, 115, 725, 247, 590, 116],
+          [405, 116, 589, 246, 814, 117],
+          [406, 117, 813, 201, 498, 118],
+          [407, 118, 497, 200, 678, 119],
+          [408, 127, 681, 203, 502, 120],
+          [409, 120, 501, 202, 810, 121],
+          [410, 121, 809, 209, 514, 122],
+          [411, 122, 513, 208, 702, 123],
+          [412, 123, 701, 223, 542, 124],
+          [413, 124, 541, 222, 778, 125],
+          [414, 125, 777, 205, 506, 126],
+          [415, 126, 505, 204, 682, 127],
+          [416, 135, 689, 211, 518, 128],
+          [417, 128, 517, 210, 806, 129],
+          [418, 129, 805, 245, 586, 130],
+          [419, 130, 585, 244, 722, 131],
+          [420, 131, 721, 243, 582, 132],
+          [421, 132, 581, 242, 826, 133],
+          [422, 133, 825, 213, 522, 134],
+          [423, 134, 521, 212, 690, 135],
+          [424, 143, 693, 215, 526, 136],
+          [425, 136, 525, 214, 822, 137],
+          [426, 137, 821, 281, 658, 138],
+          [427, 138, 657, 280, 758, 139],
+          [428, 139, 757, 279, 654, 140],
+          [429, 140, 653, 278, 838, 141],
+          [430, 141, 837, 217, 530, 142],
+          [431, 142, 529, 216, 694, 143],
+          [432, 151, 697, 219, 534, 144],
+          [433, 144, 533, 218, 834, 145],
+          [434, 145, 833, 225, 546, 146],
+          [435, 146, 545, 224, 718, 147],
+          [436, 147, 717, 239, 574, 148],
+          [437, 148, 573, 238, 770, 149],
+          [438, 149, 769, 221, 538, 150],
+          [439, 150, 537, 220, 698, 151],
+          [440, 159, 705, 227, 550, 152],
+          [441, 152, 549, 226, 830, 153],
+          [442, 153, 829, 277, 650, 154],
+          [443, 154, 649, 276, 754, 155],
+          [444, 155, 753, 275, 646, 156],
+          [445, 156, 645, 274, 850, 157],
+          [446, 157, 849, 229, 554, 158],
+          [447, 158, 553, 228, 706, 159],
+          [448, 167, 709, 231, 558, 160],
+          [449, 160, 557, 230, 846, 161],
+          [450, 161, 845, 265, 626, 162],
+          [451, 162, 625, 264, 742, 163],
+          [452, 163, 741, 263, 622, 164],
+          [453, 164, 621, 262, 782, 165],
+          [454, 165, 781, 233, 562, 166],
+          [455, 166, 561, 232, 710, 167],
+          [456, 175, 733, 255, 606, 168],
+          [457, 168, 605, 254, 858, 169],
+          [458, 169, 857, 285, 666, 170],
+          [459, 170, 665, 284, 762, 171],
+          [460, 171, 761, 283, 662, 172],
+          [461, 172, 661, 282, 818, 173],
+          [462, 173, 817, 241, 578, 174],
+          [463, 174, 577, 240, 734, 175],
+          [464, 183, 729, 251, 598, 176],
+          [465, 176, 597, 250, 794, 177],
+          [466, 177, 793, 257, 610, 178],
+          [467, 178, 609, 256, 750, 179],
+          [468, 179, 749, 271, 638, 180],
+          [469, 180, 637, 270, 862, 181],
+          [470, 181, 861, 253, 602, 182],
+          [471, 182, 601, 252, 730, 183],
+          [472, 191, 745, 267, 630, 184],
+          [473, 184, 629, 266, 842, 185],
+          [474, 185, 841, 273, 642, 186],
+          [475, 186, 641, 272, 766, 187],
+          [476, 187, 765, 287, 670, 188],
+          [477, 188, 669, 286, 854, 189],
+          [478, 189, 853, 269, 634, 190],
+          [479, 190, 633, 268, 746, 191]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
 
-    // Note: We re-normalize at the end to be perfectly spherical, 
-    // but the constants above ensure correct relative geometry.
-    const m = {
-      vertices: [
-        // Cube Vertices (0-7)
-        new THREE.Vector3(a, a, a), new THREE.Vector3(a, a, -a), new THREE.Vector3(a, -a, a), new THREE.Vector3(a, -a, -a), // 0-3
-        new THREE.Vector3(-a, a, a), new THREE.Vector3(-a, a, -a), new THREE.Vector3(-a, -a, a), new THREE.Vector3(-a, -a, -a), // 4-7
+    // Base: truncatedIcosahedron, Ops: Hk(54.00), Ambo, Hk(72.00)
+    truncatedIcosahedron_hk54_ambo_hk72() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(-0.13643034657141423, 0.12253304187549746, 0.9830424274583175),
+          new THREE.Vector3(0, 0.08030324822505722, 0.9967704792601477),
+          new THREE.Vector3(0.13643034657141423, 0.12253304187549746, 0.9830424274583175),
+          new THREE.Vector3(0.24305233098361406, 0.21139222871615032, 0.9466989437206798),
+          new THREE.Vector3(0.2728606831213184, 0.3432819584530778, 0.8987238422380853),
+          new THREE.Vector3(0.24305232415081213, 0.4735701696674988, 0.8465558824590287),
+          new THREE.Vector3(0.136430333279271, 0.5640308808516683, 0.814405261283962),
+          new THREE.Vector3(0, 0.6046591312421654, 0.7964843595485537),
+          new THREE.Vector3(-0.136430333279271, 0.5640308808516683, 0.814405261283962),
+          new THREE.Vector3(-0.24305232415081213, 0.4735701696674988, 0.8465558824590287),
+          new THREE.Vector3(-0.2728606831213184, 0.3432819584530778, 0.8987238422380853),
+          new THREE.Vector3(-0.24305233098361406, 0.21139222871615032, 0.9466989437206798),
+          new THREE.Vector3(-0.4711233091351996, 0.41901154923633643, 0.7761907943257664),
+          new THREE.Vector3(-0.3729857031297945, 0.5232003172627283, 0.766252630192519),
+          new THREE.Vector3(-0.3346929383496025, 0.6397604746319139, 0.6918722223920089),
+          new THREE.Vector3(-0.3420398003006827, 0.7353067151655882, 0.5850921377378623),
+          new THREE.Vector3(-0.41901154923633654, 0.7761907943257663, 0.4711233091351996),
+          new THREE.Vector3(-0.5232003172627283, 0.766252630192519, 0.3729857031297945),
+          new THREE.Vector3(-0.6397604746319139, 0.6918722223920089, 0.3346929383496025),
+          new THREE.Vector3(-0.7353067151655882, 0.5850921377378623, 0.3420398003006827),
+          new THREE.Vector3(-0.7761907943257664, 0.4711233091351996, 0.41901154923633654),
+          new THREE.Vector3(-0.766252630192519, 0.3729857031297945, 0.5232003172627284),
+          new THREE.Vector3(-0.6918722223920089, 0.3346929383496025, 0.6397604746319139),
+          new THREE.Vector3(-0.5850921377378623, 0.3420398003006827, 0.7353067151655883),
+          new THREE.Vector3(-0.5640308808516683, 0.814405261283962, 0.136430333279271),
+          new THREE.Vector3(-0.4735701696674988, 0.8465558824590287, 0.24305232415081213),
+          new THREE.Vector3(-0.3432819584530778, 0.8987238422380853, 0.2728606831213184),
+          new THREE.Vector3(-0.21139222871615032, 0.9466989437206798, 0.24305233098361406),
+          new THREE.Vector3(-0.12253304187549746, 0.9830424274583175, 0.13643034657141423),
+          new THREE.Vector3(-0.0803032482250572, 0.9967704792601477, 0),
+          new THREE.Vector3(-0.12253304187549746, 0.9830424274583175, -0.13643034657141423),
+          new THREE.Vector3(-0.21139222871615032, 0.9466989437206798, -0.24305233098361406),
+          new THREE.Vector3(-0.3432819584530778, 0.8987238422380853, -0.2728606831213184),
+          new THREE.Vector3(-0.4735701696674988, 0.8465558824590287, -0.24305232415081213),
+          new THREE.Vector3(-0.5640308808516683, 0.814405261283962, -0.136430333279271),
+          new THREE.Vector3(-0.6046591312421654, 0.7964843595485536, 0),
+          new THREE.Vector3(0.3432819584530778, 0.8987238422380853, 0.2728606831213184),
+          new THREE.Vector3(0.4735701696674988, 0.8465558824590287, 0.24305232415081213),
+          new THREE.Vector3(0.5640308808516683, 0.814405261283962, 0.136430333279271),
+          new THREE.Vector3(0.6046591312421654, 0.7964843595485536, 0),
+          new THREE.Vector3(0.5640308808516683, 0.814405261283962, -0.136430333279271),
+          new THREE.Vector3(0.4735701696674988, 0.8465558824590287, -0.24305232415081213),
+          new THREE.Vector3(0.3432819584530778, 0.8987238422380853, -0.2728606831213184),
+          new THREE.Vector3(0.21139222871615032, 0.9466989437206798, -0.24305233098361406),
+          new THREE.Vector3(0.12253304187549746, 0.9830424274583175, -0.13643034657141423),
+          new THREE.Vector3(0.0803032482250572, 0.9967704792601477, 0),
+          new THREE.Vector3(0.12253304187549746, 0.9830424274583175, 0.13643034657141423),
+          new THREE.Vector3(0.21139222871615032, 0.9466989437206798, 0.24305233098361406),
+          new THREE.Vector3(0.3346929383496025, 0.6397604746319139, 0.6918722223920089),
+          new THREE.Vector3(0.3729857031297945, 0.5232003172627283, 0.766252630192519),
+          new THREE.Vector3(0.4711233091351996, 0.41901154923633643, 0.7761907943257664),
+          new THREE.Vector3(0.5850921377378623, 0.3420398003006827, 0.7353067151655883),
+          new THREE.Vector3(0.6918722223920089, 0.3346929383496025, 0.6397604746319139),
+          new THREE.Vector3(0.766252630192519, 0.3729857031297945, 0.5232003172627284),
+          new THREE.Vector3(0.7761907943257664, 0.4711233091351996, 0.41901154923633654),
+          new THREE.Vector3(0.7353067151655882, 0.5850921377378623, 0.3420398003006827),
+          new THREE.Vector3(0.6397604746319139, 0.6918722223920089, 0.3346929383496025),
+          new THREE.Vector3(0.5232003172627283, 0.766252630192519, 0.3729857031297945),
+          new THREE.Vector3(0.41901154923633654, 0.7761907943257663, 0.4711233091351996),
+          new THREE.Vector3(0.3420398003006827, 0.7353067151655882, 0.5850921377378623),
+          new THREE.Vector3(0.8987238422380852, 0.27286068312131834, 0.34328195845307774),
+          new THREE.Vector3(0.8465558824590287, 0.24305232415081213, 0.4735701696674988),
+          new THREE.Vector3(0.814405261283962, 0.13643033327927104, 0.5640308808516683),
+          new THREE.Vector3(0.7964843595485536, 0, 0.6046591312421654),
+          new THREE.Vector3(0.814405261283962, -0.13643033327927104, 0.5640308808516683),
+          new THREE.Vector3(0.8465558824590287, -0.24305232415081213, 0.4735701696674988),
+          new THREE.Vector3(0.8987238422380852, -0.27286068312131834, 0.34328195845307774),
+          new THREE.Vector3(0.9466989437206798, -0.24305233098361406, 0.21139222871615032),
+          new THREE.Vector3(0.9830424274583175, -0.13643034657141423, 0.12253304187549746),
+          new THREE.Vector3(0.9967704792601477, 0, 0.0803032482250572),
+          new THREE.Vector3(0.9830424274583175, 0.13643034657141423, 0.12253304187549746),
+          new THREE.Vector3(0.9466989437206798, 0.24305233098361406, 0.21139222871615032),
+          new THREE.Vector3(0.9830424274583175, 0.13643034657141423, -0.12253304187549746),
+          new THREE.Vector3(0.9967704792601477, 0, -0.0803032482250572),
+          new THREE.Vector3(0.9830424274583175, -0.13643034657141423, -0.12253304187549746),
+          new THREE.Vector3(0.9466989437206798, -0.24305233098361406, -0.21139222871615032),
+          new THREE.Vector3(0.8987238422380852, -0.27286068312131834, -0.34328195845307774),
+          new THREE.Vector3(0.8465558824590287, -0.24305232415081213, -0.4735701696674988),
+          new THREE.Vector3(0.814405261283962, -0.13643033327927104, -0.5640308808516683),
+          new THREE.Vector3(0.7964843595485536, 0, -0.6046591312421654),
+          new THREE.Vector3(0.814405261283962, 0.13643033327927104, -0.5640308808516683),
+          new THREE.Vector3(0.8465558824590287, 0.24305232415081213, -0.4735701696674988),
+          new THREE.Vector3(0.8987238422380852, 0.27286068312131834, -0.34328195845307774),
+          new THREE.Vector3(0.9466989437206798, 0.24305233098361406, -0.21139222871615032),
+          new THREE.Vector3(0.41901154923633654, 0.7761907943257663, -0.4711233091351996),
+          new THREE.Vector3(0.5232003172627283, 0.766252630192519, -0.3729857031297945),
+          new THREE.Vector3(0.6397604746319139, 0.6918722223920089, -0.3346929383496025),
+          new THREE.Vector3(0.7353067151655882, 0.5850921377378623, -0.3420398003006827),
+          new THREE.Vector3(0.7761907943257664, 0.4711233091351996, -0.41901154923633654),
+          new THREE.Vector3(0.766252630192519, 0.3729857031297945, -0.5232003172627284),
+          new THREE.Vector3(0.6918722223920089, 0.3346929383496025, -0.6397604746319139),
+          new THREE.Vector3(0.5850921377378623, 0.3420398003006827, -0.7353067151655883),
+          new THREE.Vector3(0.4711233091351996, 0.41901154923633643, -0.7761907943257664),
+          new THREE.Vector3(0.3729857031297945, 0.5232003172627283, -0.766252630192519),
+          new THREE.Vector3(0.3346929383496025, 0.6397604746319139, -0.6918722223920089),
+          new THREE.Vector3(0.3420398003006827, 0.7353067151655882, -0.5850921377378623),
+          new THREE.Vector3(0.136430333279271, 0.5640308808516683, -0.814405261283962),
+          new THREE.Vector3(0.24305232415081213, 0.4735701696674988, -0.8465558824590287),
+          new THREE.Vector3(0.2728606831213184, 0.3432819584530778, -0.8987238422380853),
+          new THREE.Vector3(0.24305233098361406, 0.21139222871615032, -0.9466989437206798),
+          new THREE.Vector3(0.13643034657141423, 0.12253304187549746, -0.9830424274583175),
+          new THREE.Vector3(0, 0.08030324822505722, -0.9967704792601477),
+          new THREE.Vector3(-0.13643034657141423, 0.12253304187549746, -0.9830424274583175),
+          new THREE.Vector3(-0.24305233098361406, 0.21139222871615032, -0.9466989437206798),
+          new THREE.Vector3(-0.2728606831213184, 0.3432819584530778, -0.8987238422380853),
+          new THREE.Vector3(-0.24305232415081213, 0.4735701696674988, -0.8465558824590287),
+          new THREE.Vector3(-0.136430333279271, 0.5640308808516683, -0.814405261283962),
+          new THREE.Vector3(0, 0.6046591312421654, -0.7964843595485537),
+          new THREE.Vector3(-0.13643034657141423, -0.12253304187549746, -0.9830424274583175),
+          new THREE.Vector3(0, -0.08030324822505722, -0.9967704792601477),
+          new THREE.Vector3(0.13643034657141423, -0.12253304187549746, -0.9830424274583175),
+          new THREE.Vector3(0.24305233098361406, -0.21139222871615032, -0.9466989437206798),
+          new THREE.Vector3(0.2728606831213184, -0.3432819584530778, -0.8987238422380853),
+          new THREE.Vector3(0.24305232415081213, -0.4735701696674988, -0.8465558824590287),
+          new THREE.Vector3(0.136430333279271, -0.5640308808516683, -0.814405261283962),
+          new THREE.Vector3(0, -0.6046591312421654, -0.7964843595485537),
+          new THREE.Vector3(-0.136430333279271, -0.5640308808516683, -0.814405261283962),
+          new THREE.Vector3(-0.24305232415081213, -0.4735701696674988, -0.8465558824590287),
+          new THREE.Vector3(-0.2728606831213184, -0.3432819584530778, -0.8987238422380853),
+          new THREE.Vector3(-0.24305233098361406, -0.21139222871615032, -0.9466989437206798),
+          new THREE.Vector3(0.3346929383496025, -0.6397604746319139, -0.6918722223920089),
+          new THREE.Vector3(0.3729857031297945, -0.5232003172627283, -0.766252630192519),
+          new THREE.Vector3(0.4711233091351996, -0.41901154923633643, -0.7761907943257664),
+          new THREE.Vector3(0.5850921377378623, -0.3420398003006827, -0.7353067151655883),
+          new THREE.Vector3(0.6918722223920089, -0.3346929383496025, -0.6397604746319139),
+          new THREE.Vector3(0.766252630192519, -0.3729857031297945, -0.5232003172627284),
+          new THREE.Vector3(0.7761907943257664, -0.4711233091351996, -0.41901154923633654),
+          new THREE.Vector3(0.7353067151655882, -0.5850921377378623, -0.3420398003006827),
+          new THREE.Vector3(0.6397604746319139, -0.6918722223920089, -0.3346929383496025),
+          new THREE.Vector3(0.5232003172627283, -0.766252630192519, -0.3729857031297945),
+          new THREE.Vector3(0.41901154923633654, -0.7761907943257663, -0.4711233091351996),
+          new THREE.Vector3(0.3420398003006827, -0.7353067151655882, -0.5850921377378623),
+          new THREE.Vector3(0.3432819584530778, -0.8987238422380853, -0.2728606831213184),
+          new THREE.Vector3(0.4735701696674988, -0.8465558824590287, -0.24305232415081213),
+          new THREE.Vector3(0.5640308808516683, -0.814405261283962, -0.136430333279271),
+          new THREE.Vector3(0.6046591312421654, -0.7964843595485536, 0),
+          new THREE.Vector3(0.5640308808516683, -0.814405261283962, 0.136430333279271),
+          new THREE.Vector3(0.4735701696674988, -0.8465558824590287, 0.24305232415081213),
+          new THREE.Vector3(0.3432819584530778, -0.8987238422380853, 0.2728606831213184),
+          new THREE.Vector3(0.21139222871615032, -0.9466989437206798, 0.24305233098361406),
+          new THREE.Vector3(0.12253304187549746, -0.9830424274583175, 0.13643034657141423),
+          new THREE.Vector3(0.0803032482250572, -0.9967704792601477, 0),
+          new THREE.Vector3(0.12253304187549746, -0.9830424274583175, -0.13643034657141423),
+          new THREE.Vector3(0.21139222871615032, -0.9466989437206798, -0.24305233098361406),
+          new THREE.Vector3(-0.12253304187549746, -0.9830424274583175, -0.13643034657141423),
+          new THREE.Vector3(-0.0803032482250572, -0.9967704792601477, 0),
+          new THREE.Vector3(-0.12253304187549746, -0.9830424274583175, 0.13643034657141423),
+          new THREE.Vector3(-0.21139222871615032, -0.9466989437206798, 0.24305233098361406),
+          new THREE.Vector3(-0.3432819584530778, -0.8987238422380853, 0.2728606831213184),
+          new THREE.Vector3(-0.4735701696674988, -0.8465558824590287, 0.24305232415081213),
+          new THREE.Vector3(-0.5640308808516683, -0.814405261283962, 0.136430333279271),
+          new THREE.Vector3(-0.6046591312421654, -0.7964843595485536, 0),
+          new THREE.Vector3(-0.5640308808516683, -0.814405261283962, -0.136430333279271),
+          new THREE.Vector3(-0.4735701696674988, -0.8465558824590287, -0.24305232415081213),
+          new THREE.Vector3(-0.3432819584530778, -0.8987238422380853, -0.2728606831213184),
+          new THREE.Vector3(-0.21139222871615032, -0.9466989437206798, -0.24305233098361406),
+          new THREE.Vector3(-0.6397604746319139, -0.6918722223920089, 0.3346929383496025),
+          new THREE.Vector3(-0.5232003172627283, -0.766252630192519, 0.3729857031297945),
+          new THREE.Vector3(-0.41901154923633654, -0.7761907943257663, 0.4711233091351996),
+          new THREE.Vector3(-0.3420398003006827, -0.7353067151655882, 0.5850921377378623),
+          new THREE.Vector3(-0.3346929383496025, -0.6397604746319139, 0.6918722223920089),
+          new THREE.Vector3(-0.3729857031297945, -0.5232003172627283, 0.766252630192519),
+          new THREE.Vector3(-0.4711233091351996, -0.41901154923633643, 0.7761907943257664),
+          new THREE.Vector3(-0.5850921377378623, -0.3420398003006827, 0.7353067151655883),
+          new THREE.Vector3(-0.6918722223920089, -0.3346929383496025, 0.6397604746319139),
+          new THREE.Vector3(-0.766252630192519, -0.3729857031297945, 0.5232003172627284),
+          new THREE.Vector3(-0.7761907943257664, -0.4711233091351996, 0.41901154923633654),
+          new THREE.Vector3(-0.7353067151655882, -0.5850921377378623, 0.3420398003006827),
+          new THREE.Vector3(-0.2728606831213184, -0.3432819584530778, 0.8987238422380853),
+          new THREE.Vector3(-0.24305232415081213, -0.4735701696674988, 0.8465558824590287),
+          new THREE.Vector3(-0.136430333279271, -0.5640308808516683, 0.814405261283962),
+          new THREE.Vector3(0, -0.6046591312421654, 0.7964843595485537),
+          new THREE.Vector3(0.136430333279271, -0.5640308808516683, 0.814405261283962),
+          new THREE.Vector3(0.24305232415081213, -0.4735701696674988, 0.8465558824590287),
+          new THREE.Vector3(0.2728606831213184, -0.3432819584530778, 0.8987238422380853),
+          new THREE.Vector3(0.24305233098361406, -0.21139222871615032, 0.9466989437206798),
+          new THREE.Vector3(0.13643034657141423, -0.12253304187549746, 0.9830424274583175),
+          new THREE.Vector3(0, -0.08030324822505722, 0.9967704792601477),
+          new THREE.Vector3(-0.13643034657141423, -0.12253304187549746, 0.9830424274583175),
+          new THREE.Vector3(-0.24305233098361406, -0.21139222871615032, 0.9466989437206798),
+          new THREE.Vector3(0.41901154923633654, -0.7761907943257663, 0.4711233091351996),
+          new THREE.Vector3(0.5232003172627283, -0.766252630192519, 0.3729857031297945),
+          new THREE.Vector3(0.6397604746319139, -0.6918722223920089, 0.3346929383496025),
+          new THREE.Vector3(0.7353067151655882, -0.5850921377378623, 0.3420398003006827),
+          new THREE.Vector3(0.7761907943257664, -0.4711233091351996, 0.41901154923633654),
+          new THREE.Vector3(0.766252630192519, -0.3729857031297945, 0.5232003172627284),
+          new THREE.Vector3(0.6918722223920089, -0.3346929383496025, 0.6397604746319139),
+          new THREE.Vector3(0.5850921377378623, -0.3420398003006827, 0.7353067151655883),
+          new THREE.Vector3(0.4711233091351996, -0.41901154923633643, 0.7761907943257664),
+          new THREE.Vector3(0.3729857031297945, -0.5232003172627283, 0.766252630192519),
+          new THREE.Vector3(0.3346929383496025, -0.6397604746319139, 0.6918722223920089),
+          new THREE.Vector3(0.3420398003006827, -0.7353067151655882, 0.5850921377378623),
+          new THREE.Vector3(-0.9830424274583175, 0.13643034657141423, 0.12253304187549746),
+          new THREE.Vector3(-0.9967704792601477, 0, 0.0803032482250572),
+          new THREE.Vector3(-0.9830424274583175, -0.13643034657141423, 0.12253304187549746),
+          new THREE.Vector3(-0.9466989437206798, -0.24305233098361406, 0.21139222871615032),
+          new THREE.Vector3(-0.8987238422380852, -0.27286068312131834, 0.34328195845307774),
+          new THREE.Vector3(-0.8465558824590287, -0.24305232415081213, 0.4735701696674988),
+          new THREE.Vector3(-0.814405261283962, -0.13643033327927104, 0.5640308808516683),
+          new THREE.Vector3(-0.7964843595485536, 0, 0.6046591312421654),
+          new THREE.Vector3(-0.814405261283962, 0.13643033327927104, 0.5640308808516683),
+          new THREE.Vector3(-0.8465558824590287, 0.24305232415081213, 0.4735701696674988),
+          new THREE.Vector3(-0.8987238422380852, 0.27286068312131834, 0.34328195845307774),
+          new THREE.Vector3(-0.9466989437206798, 0.24305233098361406, 0.21139222871615032),
+          new THREE.Vector3(-0.8987238422380852, 0.27286068312131834, -0.34328195845307774),
+          new THREE.Vector3(-0.8465558824590287, 0.24305232415081213, -0.4735701696674988),
+          new THREE.Vector3(-0.814405261283962, 0.13643033327927104, -0.5640308808516683),
+          new THREE.Vector3(-0.7964843595485536, 0, -0.6046591312421654),
+          new THREE.Vector3(-0.814405261283962, -0.13643033327927104, -0.5640308808516683),
+          new THREE.Vector3(-0.8465558824590287, -0.24305232415081213, -0.4735701696674988),
+          new THREE.Vector3(-0.8987238422380852, -0.27286068312131834, -0.34328195845307774),
+          new THREE.Vector3(-0.9466989437206798, -0.24305233098361406, -0.21139222871615032),
+          new THREE.Vector3(-0.9830424274583175, -0.13643034657141423, -0.12253304187549746),
+          new THREE.Vector3(-0.9967704792601477, 0, -0.0803032482250572),
+          new THREE.Vector3(-0.9830424274583175, 0.13643034657141423, -0.12253304187549746),
+          new THREE.Vector3(-0.9466989437206798, 0.24305233098361406, -0.21139222871615032),
+          new THREE.Vector3(-0.6397604746319139, 0.6918722223920089, -0.3346929383496025),
+          new THREE.Vector3(-0.5232003172627283, 0.766252630192519, -0.3729857031297945),
+          new THREE.Vector3(-0.41901154923633654, 0.7761907943257663, -0.4711233091351996),
+          new THREE.Vector3(-0.3420398003006827, 0.7353067151655882, -0.5850921377378623),
+          new THREE.Vector3(-0.3346929383496025, 0.6397604746319139, -0.6918722223920089),
+          new THREE.Vector3(-0.3729857031297945, 0.5232003172627283, -0.766252630192519),
+          new THREE.Vector3(-0.4711233091351996, 0.41901154923633643, -0.7761907943257664),
+          new THREE.Vector3(-0.5850921377378623, 0.3420398003006827, -0.7353067151655883),
+          new THREE.Vector3(-0.6918722223920089, 0.3346929383496025, -0.6397604746319139),
+          new THREE.Vector3(-0.766252630192519, 0.3729857031297945, -0.5232003172627284),
+          new THREE.Vector3(-0.7761907943257664, 0.4711233091351996, -0.41901154923633654),
+          new THREE.Vector3(-0.7353067151655882, 0.5850921377378623, -0.3420398003006827),
+          new THREE.Vector3(-0.41901154923633654, -0.7761907943257663, -0.4711233091351996),
+          new THREE.Vector3(-0.5232003172627283, -0.766252630192519, -0.3729857031297945),
+          new THREE.Vector3(-0.6397604746319139, -0.6918722223920089, -0.3346929383496025),
+          new THREE.Vector3(-0.7353067151655882, -0.5850921377378623, -0.3420398003006827),
+          new THREE.Vector3(-0.7761907943257664, -0.4711233091351996, -0.41901154923633654),
+          new THREE.Vector3(-0.766252630192519, -0.3729857031297945, -0.5232003172627284),
+          new THREE.Vector3(-0.6918722223920089, -0.3346929383496025, -0.6397604746319139),
+          new THREE.Vector3(-0.5850921377378623, -0.3420398003006827, -0.7353067151655883),
+          new THREE.Vector3(-0.4711233091351996, -0.41901154923633643, -0.7761907943257664),
+          new THREE.Vector3(-0.3729857031297945, -0.5232003172627283, -0.766252630192519),
+          new THREE.Vector3(-0.3346929383496025, -0.6397604746319139, -0.6918722223920089),
+          new THREE.Vector3(-0.3420398003006827, -0.7353067151655882, -0.5850921377378623),
+          new THREE.Vector3(-0.4609499604037402, 0.19427323273650268, 0.8659001357234557),
+          new THREE.Vector3(-0.5698262348165082, 0.2036623704750848, 0.796127942586687),
+          new THREE.Vector3(-0.6552231732112744, 0.12006746194213978, 0.745832687584636),
+          new THREE.Vector3(-0.6956964939578869, 0, 0.7183358464497672),
+          new THREE.Vector3(-0.6552231732112744, -0.12006746194213978, 0.745832687584636),
+          new THREE.Vector3(-0.5698262348165082, -0.2036623704750848, 0.796127942586687),
+          new THREE.Vector3(-0.4609499604037402, -0.19427323273650268, 0.8659001357234557),
+          new THREE.Vector3(-0.36616388296952646, -0.1258702718271442, 0.9219982025355798),
+          new THREE.Vector3(-0.34088251702858685, 0, 0.940105903387621),
+          new THREE.Vector3(-0.36616388296952646, 0.1258702718271442, 0.9219982025355798),
+          new THREE.Vector3(0.34088251702858685, 0, 0.940105903387621),
+          new THREE.Vector3(0.36616388296952646, -0.1258702718271442, 0.9219982025355798),
+          new THREE.Vector3(0.4609499604037402, -0.19427323273650268, 0.8659001357234557),
+          new THREE.Vector3(0.5698262348165082, -0.2036623704750848, 0.796127942586687),
+          new THREE.Vector3(0.6552231732112744, -0.12006746194213978, 0.745832687584636),
+          new THREE.Vector3(0.6956964939578869, 0, 0.7183358464497672),
+          new THREE.Vector3(0.6552231732112744, 0.12006746194213978, 0.745832687584636),
+          new THREE.Vector3(0.5698262348165082, 0.2036623704750848, 0.796127942586687),
+          new THREE.Vector3(0.4609499604037402, 0.19427323273650268, 0.8659001357234557),
+          new THREE.Vector3(0.36616388296952646, 0.1258702718271442, 0.9219982025355798),
+          new THREE.Vector3(0.12006746194213978, 0.745832687584636, 0.6552231732112745),
+          new THREE.Vector3(0.20366237047508481, 0.7961279425866871, 0.5698262348165082),
+          new THREE.Vector3(0.19427323273650268, 0.8659001357234557, 0.4609499604037402),
+          new THREE.Vector3(0.1258702718271442, 0.9219982025355798, 0.36616388296952646),
+          new THREE.Vector3(0, 0.940105903387621, 0.34088251702858685),
+          new THREE.Vector3(-0.1258702718271442, 0.9219982025355798, 0.36616388296952646),
+          new THREE.Vector3(-0.19427323273650268, 0.8659001357234557, 0.4609499604037402),
+          new THREE.Vector3(-0.20366237047508481, 0.7961279425866871, 0.5698262348165082),
+          new THREE.Vector3(-0.12006746194213978, 0.745832687584636, 0.6552231732112745),
+          new THREE.Vector3(0, 0.7183358464497672, 0.6956964939578869),
+          new THREE.Vector3(-0.745832687584636, 0.6552231732112745, 0.12006746194213978),
+          new THREE.Vector3(-0.7183358464497672, 0.6956964939578869, 0),
+          new THREE.Vector3(-0.745832687584636, 0.6552231732112745, -0.12006746194213978),
+          new THREE.Vector3(-0.7961279425866868, 0.5698262348165081, -0.20366237047508476),
+          new THREE.Vector3(-0.8659001357234557, 0.4609499604037402, -0.19427323273650268),
+          new THREE.Vector3(-0.9219982025355798, 0.36616388296952646, -0.1258702718271442),
+          new THREE.Vector3(-0.940105903387621, 0.34088251702858685, 0),
+          new THREE.Vector3(-0.9219982025355798, 0.36616388296952646, 0.1258702718271442),
+          new THREE.Vector3(-0.8659001357234557, 0.4609499604037402, 0.19427323273650268),
+          new THREE.Vector3(-0.7961279425866868, 0.5698262348165081, 0.20366237047508476),
+          new THREE.Vector3(0, 0.940105903387621, -0.34088251702858685),
+          new THREE.Vector3(0.1258702718271442, 0.9219982025355798, -0.36616388296952646),
+          new THREE.Vector3(0.19427323273650268, 0.8659001357234557, -0.4609499604037402),
+          new THREE.Vector3(0.20366237047508481, 0.7961279425866871, -0.5698262348165082),
+          new THREE.Vector3(0.12006746194213978, 0.745832687584636, -0.6552231732112745),
+          new THREE.Vector3(0, 0.7183358464497672, -0.6956964939578869),
+          new THREE.Vector3(-0.12006746194213978, 0.745832687584636, -0.6552231732112745),
+          new THREE.Vector3(-0.20366237047508481, 0.7961279425866871, -0.5698262348165082),
+          new THREE.Vector3(-0.19427323273650268, 0.8659001357234557, -0.4609499604037402),
+          new THREE.Vector3(-0.1258702718271442, 0.9219982025355798, -0.36616388296952646),
+          new THREE.Vector3(0.745832687584636, 0.6552231732112745, 0.12006746194213978),
+          new THREE.Vector3(0.7961279425866868, 0.5698262348165081, 0.20366237047508476),
+          new THREE.Vector3(0.8659001357234557, 0.4609499604037402, 0.19427323273650268),
+          new THREE.Vector3(0.9219982025355798, 0.36616388296952646, 0.1258702718271442),
+          new THREE.Vector3(0.940105903387621, 0.34088251702858685, 0),
+          new THREE.Vector3(0.9219982025355798, 0.36616388296952646, -0.1258702718271442),
+          new THREE.Vector3(0.8659001357234557, 0.4609499604037402, -0.19427323273650268),
+          new THREE.Vector3(0.7961279425866868, 0.5698262348165081, -0.20366237047508476),
+          new THREE.Vector3(0.745832687584636, 0.6552231732112745, -0.12006746194213978),
+          new THREE.Vector3(0.7183358464497672, 0.6956964939578869, 0),
+          new THREE.Vector3(0.8659001357234557, -0.4609499604037402, 0.19427323273650268),
+          new THREE.Vector3(0.7961279425866868, -0.5698262348165081, 0.20366237047508476),
+          new THREE.Vector3(0.745832687584636, -0.6552231732112745, 0.12006746194213978),
+          new THREE.Vector3(0.7183358464497672, -0.6956964939578869, 0),
+          new THREE.Vector3(0.745832687584636, -0.6552231732112745, -0.12006746194213978),
+          new THREE.Vector3(0.7961279425866868, -0.5698262348165081, -0.20366237047508476),
+          new THREE.Vector3(0.8659001357234557, -0.4609499604037402, -0.19427323273650268),
+          new THREE.Vector3(0.9219982025355798, -0.36616388296952646, -0.1258702718271442),
+          new THREE.Vector3(0.940105903387621, -0.34088251702858685, 0),
+          new THREE.Vector3(0.9219982025355798, -0.36616388296952646, 0.1258702718271442),
+          new THREE.Vector3(0.6552231732112744, -0.12006746194213978, -0.745832687584636),
+          new THREE.Vector3(0.5698262348165082, -0.2036623704750848, -0.796127942586687),
+          new THREE.Vector3(0.4609499604037402, -0.19427323273650268, -0.8659001357234557),
+          new THREE.Vector3(0.36616388296952646, -0.1258702718271442, -0.9219982025355798),
+          new THREE.Vector3(0.34088251702858685, 0, -0.940105903387621),
+          new THREE.Vector3(0.36616388296952646, 0.1258702718271442, -0.9219982025355798),
+          new THREE.Vector3(0.4609499604037402, 0.19427323273650268, -0.8659001357234557),
+          new THREE.Vector3(0.5698262348165082, 0.2036623704750848, -0.796127942586687),
+          new THREE.Vector3(0.6552231732112744, 0.12006746194213978, -0.745832687584636),
+          new THREE.Vector3(0.6956964939578869, 0, -0.7183358464497672),
+          new THREE.Vector3(-0.34088251702858685, 0, -0.940105903387621),
+          new THREE.Vector3(-0.36616388296952646, -0.1258702718271442, -0.9219982025355798),
+          new THREE.Vector3(-0.4609499604037402, -0.19427323273650268, -0.8659001357234557),
+          new THREE.Vector3(-0.5698262348165082, -0.2036623704750848, -0.796127942586687),
+          new THREE.Vector3(-0.6552231732112744, -0.12006746194213978, -0.745832687584636),
+          new THREE.Vector3(-0.6956964939578869, 0, -0.7183358464497672),
+          new THREE.Vector3(-0.6552231732112744, 0.12006746194213978, -0.745832687584636),
+          new THREE.Vector3(-0.5698262348165082, 0.2036623704750848, -0.796127942586687),
+          new THREE.Vector3(-0.4609499604037402, 0.19427323273650268, -0.8659001357234557),
+          new THREE.Vector3(-0.36616388296952646, 0.1258702718271442, -0.9219982025355798),
+          new THREE.Vector3(0.12006746194213978, -0.745832687584636, -0.6552231732112745),
+          new THREE.Vector3(0.20366237047508481, -0.7961279425866871, -0.5698262348165082),
+          new THREE.Vector3(0.19427323273650268, -0.8659001357234557, -0.4609499604037402),
+          new THREE.Vector3(0.1258702718271442, -0.9219982025355798, -0.36616388296952646),
+          new THREE.Vector3(0, -0.940105903387621, -0.34088251702858685),
+          new THREE.Vector3(-0.1258702718271442, -0.9219982025355798, -0.36616388296952646),
+          new THREE.Vector3(-0.19427323273650268, -0.8659001357234557, -0.4609499604037402),
+          new THREE.Vector3(-0.20366237047508481, -0.7961279425866871, -0.5698262348165082),
+          new THREE.Vector3(-0.12006746194213978, -0.745832687584636, -0.6552231732112745),
+          new THREE.Vector3(0, -0.7183358464497672, -0.6956964939578869),
+          new THREE.Vector3(0.19427323273650268, -0.8659001357234557, 0.4609499604037402),
+          new THREE.Vector3(0.20366237047508481, -0.7961279425866871, 0.5698262348165082),
+          new THREE.Vector3(0.12006746194213978, -0.745832687584636, 0.6552231732112745),
+          new THREE.Vector3(0, -0.7183358464497672, 0.6956964939578869),
+          new THREE.Vector3(-0.12006746194213978, -0.745832687584636, 0.6552231732112745),
+          new THREE.Vector3(-0.20366237047508481, -0.7961279425866871, 0.5698262348165082),
+          new THREE.Vector3(-0.19427323273650268, -0.8659001357234557, 0.4609499604037402),
+          new THREE.Vector3(-0.1258702718271442, -0.9219982025355798, 0.36616388296952646),
+          new THREE.Vector3(0, -0.940105903387621, 0.34088251702858685),
+          new THREE.Vector3(0.1258702718271442, -0.9219982025355798, 0.36616388296952646),
+          new THREE.Vector3(-0.745832687584636, -0.6552231732112745, 0.12006746194213978),
+          new THREE.Vector3(-0.7961279425866868, -0.5698262348165081, 0.20366237047508476),
+          new THREE.Vector3(-0.8659001357234557, -0.4609499604037402, 0.19427323273650268),
+          new THREE.Vector3(-0.9219982025355798, -0.36616388296952646, 0.1258702718271442),
+          new THREE.Vector3(-0.940105903387621, -0.34088251702858685, 0),
+          new THREE.Vector3(-0.9219982025355798, -0.36616388296952646, -0.1258702718271442),
+          new THREE.Vector3(-0.8659001357234557, -0.4609499604037402, -0.19427323273650268),
+          new THREE.Vector3(-0.7961279425866868, -0.5698262348165081, -0.20366237047508476),
+          new THREE.Vector3(-0.745832687584636, -0.6552231732112745, -0.12006746194213978),
+          new THREE.Vector3(-0.7183358464497672, -0.6956964939578869, 0),
+          new THREE.Vector3(-0.27740284419505984, 0.12414488132179799, 0.9526991710262417),
+          new THREE.Vector3(-0.27740284419505984, -0.12414488132179799, 0.9526991710262417),
+          new THREE.Vector3(-0.058432745577391754, 0, 0.9982913473752478),
+          new THREE.Vector3(0.058432745577391754, 0, 0.9982913473752478),
+          new THREE.Vector3(0.27740284419505984, -0.12414488132179799, 0.9526991710262417),
+          new THREE.Vector3(0.27740284419505984, 0.12414488132179799, 0.9526991710262417),
+          new THREE.Vector3(0.33266634720021404, 0.21356311504535777, 0.9185444449413377),
+          new THREE.Vector3(0.5335369769753658, 0.29028886764976813, 0.7943995641480448),
+          new THREE.Vector3(0.33770536767621917, 0.4518725959946986, 0.8256913719009551),
+          new THREE.Vector3(0.2792726077952536, 0.5464187590243793, 0.789577957089416),
+          new THREE.Vector3(0.25613413043303207, 0.7391360671876053, 0.6229552001627037),
+          new THREE.Vector3(0.05526351066658686, 0.6624103101202071, 0.747100077255554),
+          new THREE.Vector3(-0.05526351066658686, 0.6624103101202071, 0.747100077255554),
+          new THREE.Vector3(-0.25613413043303207, 0.7391360671876053, 0.6229552001627037),
+          new THREE.Vector3(-0.2792726077952536, 0.5464187590243793, 0.789577957089416),
+          new THREE.Vector3(-0.33770536767621917, 0.4518725959946986, 0.8256913719009551),
+          new THREE.Vector3(-0.5335369769753658, 0.29028886764976813, 0.7943995641480448),
+          new THREE.Vector3(-0.33266634720021404, 0.21356311504535777, 0.9185444449413377),
+          new THREE.Vector3(-0.29028886764976813, 0.7943995641480447, 0.5335369769753658),
+          new THREE.Vector3(-0.21356311504535777, 0.9185444449413377, 0.33266634720021404),
+          new THREE.Vector3(-0.45187259599469864, 0.8256913719009551, 0.3377053676762192),
+          new THREE.Vector3(-0.5464187590243793, 0.789577957089416, 0.2792726077952536),
+          new THREE.Vector3(-0.6624103101202071, 0.747100077255554, 0.05526351066658685),
+          new THREE.Vector3(-0.7391360671876053, 0.6229552001627037, 0.25613413043303207),
+          new THREE.Vector3(-0.7943995641480448, 0.5335369769753657, 0.2902888676497681),
+          new THREE.Vector3(-0.9185444449413377, 0.33266634720021404, 0.21356311504535777),
+          new THREE.Vector3(-0.8256913719009551, 0.3377053676762192, 0.45187259599469864),
+          new THREE.Vector3(-0.7895779570894159, 0.27927260779525365, 0.5464187590243793),
+          new THREE.Vector3(-0.7471000772555542, 0.05526351066658687, 0.6624103101202072),
+          new THREE.Vector3(-0.6229552001627038, 0.25613413043303207, 0.7391360671876054),
+          new THREE.Vector3(-0.12414488132179796, 0.9526991710262415, 0.2774028441950598),
+          new THREE.Vector3(0.12414488132179796, 0.9526991710262415, 0.2774028441950598),
+          new THREE.Vector3(0, 0.9982913473752478, 0.05843274557739175),
+          new THREE.Vector3(0, 0.9982913473752478, -0.05843274557739175),
+          new THREE.Vector3(0.12414488132179796, 0.9526991710262415, -0.2774028441950598),
+          new THREE.Vector3(-0.12414488132179796, 0.9526991710262415, -0.2774028441950598),
+          new THREE.Vector3(-0.21356311504535777, 0.9185444449413377, -0.33266634720021404),
+          new THREE.Vector3(-0.29028886764976813, 0.7943995641480447, -0.5335369769753658),
+          new THREE.Vector3(-0.45187259599469864, 0.8256913719009551, -0.3377053676762192),
+          new THREE.Vector3(-0.5464187590243793, 0.789577957089416, -0.2792726077952536),
+          new THREE.Vector3(-0.7391360671876053, 0.6229552001627037, -0.25613413043303207),
+          new THREE.Vector3(-0.6624103101202071, 0.747100077255554, -0.05526351066658685),
+          new THREE.Vector3(0.21356311504535777, 0.9185444449413377, 0.33266634720021404),
+          new THREE.Vector3(0.29028886764976813, 0.7943995641480447, 0.5335369769753658),
+          new THREE.Vector3(0.45187259599469864, 0.8256913719009551, 0.3377053676762192),
+          new THREE.Vector3(0.5464187590243793, 0.789577957089416, 0.2792726077952536),
+          new THREE.Vector3(0.7391360671876053, 0.6229552001627037, 0.25613413043303207),
+          new THREE.Vector3(0.6624103101202071, 0.747100077255554, 0.05526351066658685),
+          new THREE.Vector3(0.6624103101202071, 0.747100077255554, -0.05526351066658685),
+          new THREE.Vector3(0.7391360671876053, 0.6229552001627037, -0.25613413043303207),
+          new THREE.Vector3(0.5464187590243793, 0.789577957089416, -0.2792726077952536),
+          new THREE.Vector3(0.45187259599469864, 0.8256913719009551, -0.3377053676762192),
+          new THREE.Vector3(0.29028886764976813, 0.7943995641480447, -0.5335369769753658),
+          new THREE.Vector3(0.21356311504535777, 0.9185444449413377, -0.33266634720021404),
+          new THREE.Vector3(0.6229552001627038, 0.25613413043303207, 0.7391360671876054),
+          new THREE.Vector3(0.7471000772555542, 0.05526351066658687, 0.6624103101202072),
+          new THREE.Vector3(0.7895779570894159, 0.27927260779525365, 0.5464187590243793),
+          new THREE.Vector3(0.8256913719009551, 0.3377053676762192, 0.45187259599469864),
+          new THREE.Vector3(0.9185444449413377, 0.33266634720021404, 0.21356311504535777),
+          new THREE.Vector3(0.7943995641480448, 0.5335369769753657, 0.2902888676497681),
+          new THREE.Vector3(0.7471000772555542, -0.05526351066658687, 0.6624103101202072),
+          new THREE.Vector3(0.6229552001627038, -0.25613413043303207, 0.7391360671876054),
+          new THREE.Vector3(0.7895779570894159, -0.27927260779525365, 0.5464187590243793),
+          new THREE.Vector3(0.8256913719009551, -0.3377053676762192, 0.45187259599469864),
+          new THREE.Vector3(0.7943995641480448, -0.5335369769753657, 0.2902888676497681),
+          new THREE.Vector3(0.9185444449413377, -0.33266634720021404, 0.21356311504535777),
+          new THREE.Vector3(0.9526991710262417, -0.27740284419505984, 0.12414488132179799),
+          new THREE.Vector3(0.9526991710262417, -0.27740284419505984, -0.12414488132179799),
+          new THREE.Vector3(0.9982913473752478, -0.05843274557739175, 0),
+          new THREE.Vector3(0.9982913473752478, 0.05843274557739175, 0),
+          new THREE.Vector3(0.9526991710262417, 0.27740284419505984, -0.12414488132179799),
+          new THREE.Vector3(0.9526991710262417, 0.27740284419505984, 0.12414488132179799),
+          new THREE.Vector3(0.9185444449413377, -0.33266634720021404, -0.21356311504535777),
+          new THREE.Vector3(0.7943995641480448, -0.5335369769753657, -0.2902888676497681),
+          new THREE.Vector3(0.8256913719009551, -0.3377053676762192, -0.45187259599469864),
+          new THREE.Vector3(0.7895779570894159, -0.27927260779525365, -0.5464187590243793),
+          new THREE.Vector3(0.6229552001627038, -0.25613413043303207, -0.7391360671876054),
+          new THREE.Vector3(0.7471000772555542, -0.05526351066658687, -0.6624103101202072),
+          new THREE.Vector3(0.7471000772555542, 0.05526351066658687, -0.6624103101202072),
+          new THREE.Vector3(0.6229552001627038, 0.25613413043303207, -0.7391360671876054),
+          new THREE.Vector3(0.7895779570894159, 0.27927260779525365, -0.5464187590243793),
+          new THREE.Vector3(0.8256913719009551, 0.3377053676762192, -0.45187259599469864),
+          new THREE.Vector3(0.7943995641480448, 0.5335369769753657, -0.2902888676497681),
+          new THREE.Vector3(0.9185444449413377, 0.33266634720021404, -0.21356311504535777),
+          new THREE.Vector3(0.5335369769753658, 0.29028886764976813, -0.7943995641480448),
+          new THREE.Vector3(0.33266634720021404, 0.21356311504535777, -0.9185444449413377),
+          new THREE.Vector3(0.33770536767621917, 0.4518725959946986, -0.8256913719009551),
+          new THREE.Vector3(0.2792726077952536, 0.5464187590243793, -0.789577957089416),
+          new THREE.Vector3(0.05526351066658686, 0.6624103101202071, -0.747100077255554),
+          new THREE.Vector3(0.25613413043303207, 0.7391360671876053, -0.6229552001627037),
+          new THREE.Vector3(0.27740284419505984, 0.12414488132179799, -0.9526991710262417),
+          new THREE.Vector3(0.27740284419505984, -0.12414488132179799, -0.9526991710262417),
+          new THREE.Vector3(0.058432745577391754, 0, -0.9982913473752478),
+          new THREE.Vector3(-0.058432745577391754, 0, -0.9982913473752478),
+          new THREE.Vector3(-0.27740284419505984, -0.12414488132179799, -0.9526991710262417),
+          new THREE.Vector3(-0.27740284419505984, 0.12414488132179799, -0.9526991710262417),
+          new THREE.Vector3(-0.33266634720021404, 0.21356311504535777, -0.9185444449413377),
+          new THREE.Vector3(-0.5335369769753658, 0.29028886764976813, -0.7943995641480448),
+          new THREE.Vector3(-0.33770536767621917, 0.4518725959946986, -0.8256913719009551),
+          new THREE.Vector3(-0.2792726077952536, 0.5464187590243793, -0.789577957089416),
+          new THREE.Vector3(-0.25613413043303207, 0.7391360671876053, -0.6229552001627037),
+          new THREE.Vector3(-0.05526351066658686, 0.6624103101202071, -0.747100077255554),
+          new THREE.Vector3(0.33266634720021404, -0.21356311504535777, -0.9185444449413377),
+          new THREE.Vector3(0.5335369769753658, -0.29028886764976813, -0.7943995641480448),
+          new THREE.Vector3(0.33770536767621917, -0.4518725959946986, -0.8256913719009551),
+          new THREE.Vector3(0.2792726077952536, -0.5464187590243793, -0.789577957089416),
+          new THREE.Vector3(0.25613413043303207, -0.7391360671876053, -0.6229552001627037),
+          new THREE.Vector3(0.05526351066658686, -0.6624103101202071, -0.747100077255554),
+          new THREE.Vector3(-0.05526351066658686, -0.6624103101202071, -0.747100077255554),
+          new THREE.Vector3(-0.25613413043303207, -0.7391360671876053, -0.6229552001627037),
+          new THREE.Vector3(-0.2792726077952536, -0.5464187590243793, -0.789577957089416),
+          new THREE.Vector3(-0.33770536767621917, -0.4518725959946986, -0.8256913719009551),
+          new THREE.Vector3(-0.5335369769753658, -0.29028886764976813, -0.7943995641480448),
+          new THREE.Vector3(-0.33266634720021404, -0.21356311504535777, -0.9185444449413377),
+          new THREE.Vector3(0.7391360671876053, -0.6229552001627037, -0.25613413043303207),
+          new THREE.Vector3(0.6624103101202071, -0.747100077255554, -0.05526351066658685),
+          new THREE.Vector3(0.5464187590243793, -0.789577957089416, -0.2792726077952536),
+          new THREE.Vector3(0.45187259599469864, -0.8256913719009551, -0.3377053676762192),
+          new THREE.Vector3(0.21356311504535777, -0.9185444449413377, -0.33266634720021404),
+          new THREE.Vector3(0.29028886764976813, -0.7943995641480447, -0.5335369769753658),
+          new THREE.Vector3(0.6624103101202071, -0.747100077255554, 0.05526351066658685),
+          new THREE.Vector3(0.7391360671876053, -0.6229552001627037, 0.25613413043303207),
+          new THREE.Vector3(0.5464187590243793, -0.789577957089416, 0.2792726077952536),
+          new THREE.Vector3(0.45187259599469864, -0.8256913719009551, 0.3377053676762192),
+          new THREE.Vector3(0.29028886764976813, -0.7943995641480447, 0.5335369769753658),
+          new THREE.Vector3(0.21356311504535777, -0.9185444449413377, 0.33266634720021404),
+          new THREE.Vector3(0.12414488132179796, -0.9526991710262415, 0.2774028441950598),
+          new THREE.Vector3(-0.12414488132179796, -0.9526991710262415, 0.2774028441950598),
+          new THREE.Vector3(0, -0.9982913473752478, 0.05843274557739175),
+          new THREE.Vector3(0, -0.9982913473752478, -0.05843274557739175),
+          new THREE.Vector3(-0.12414488132179796, -0.9526991710262415, -0.2774028441950598),
+          new THREE.Vector3(0.12414488132179796, -0.9526991710262415, -0.2774028441950598),
+          new THREE.Vector3(-0.21356311504535777, -0.9185444449413377, 0.33266634720021404),
+          new THREE.Vector3(-0.29028886764976813, -0.7943995641480447, 0.5335369769753658),
+          new THREE.Vector3(-0.45187259599469864, -0.8256913719009551, 0.3377053676762192),
+          new THREE.Vector3(-0.5464187590243793, -0.789577957089416, 0.2792726077952536),
+          new THREE.Vector3(-0.7391360671876053, -0.6229552001627037, 0.25613413043303207),
+          new THREE.Vector3(-0.6624103101202071, -0.747100077255554, 0.05526351066658685),
+          new THREE.Vector3(-0.6624103101202071, -0.747100077255554, -0.05526351066658685),
+          new THREE.Vector3(-0.7391360671876053, -0.6229552001627037, -0.25613413043303207),
+          new THREE.Vector3(-0.5464187590243793, -0.789577957089416, -0.2792726077952536),
+          new THREE.Vector3(-0.45187259599469864, -0.8256913719009551, -0.3377053676762192),
+          new THREE.Vector3(-0.29028886764976813, -0.7943995641480447, -0.5335369769753658),
+          new THREE.Vector3(-0.21356311504535777, -0.9185444449413377, -0.33266634720021404),
+          new THREE.Vector3(-0.25613413043303207, -0.7391360671876053, 0.6229552001627037),
+          new THREE.Vector3(-0.05526351066658686, -0.6624103101202071, 0.747100077255554),
+          new THREE.Vector3(-0.2792726077952536, -0.5464187590243793, 0.789577957089416),
+          new THREE.Vector3(-0.33770536767621917, -0.4518725959946986, 0.8256913719009551),
+          new THREE.Vector3(-0.33266634720021404, -0.21356311504535777, 0.9185444449413377),
+          new THREE.Vector3(-0.5335369769753658, -0.29028886764976813, 0.7943995641480448),
+          new THREE.Vector3(-0.6229552001627038, -0.25613413043303207, 0.7391360671876054),
+          new THREE.Vector3(-0.7471000772555542, -0.05526351066658687, 0.6624103101202072),
+          new THREE.Vector3(-0.7895779570894159, -0.27927260779525365, 0.5464187590243793),
+          new THREE.Vector3(-0.8256913719009551, -0.3377053676762192, 0.45187259599469864),
+          new THREE.Vector3(-0.9185444449413377, -0.33266634720021404, 0.21356311504535777),
+          new THREE.Vector3(-0.7943995641480448, -0.5335369769753657, 0.2902888676497681),
+          new THREE.Vector3(0.05526351066658686, -0.6624103101202071, 0.747100077255554),
+          new THREE.Vector3(0.25613413043303207, -0.7391360671876053, 0.6229552001627037),
+          new THREE.Vector3(0.2792726077952536, -0.5464187590243793, 0.789577957089416),
+          new THREE.Vector3(0.33770536767621917, -0.4518725959946986, 0.8256913719009551),
+          new THREE.Vector3(0.5335369769753658, -0.29028886764976813, 0.7943995641480448),
+          new THREE.Vector3(0.33266634720021404, -0.21356311504535777, 0.9185444449413377),
+          new THREE.Vector3(-0.9526991710262417, 0.27740284419505984, 0.12414488132179799),
+          new THREE.Vector3(-0.9526991710262417, 0.27740284419505984, -0.12414488132179799),
+          new THREE.Vector3(-0.9982913473752478, 0.05843274557739175, 0),
+          new THREE.Vector3(-0.9982913473752478, -0.05843274557739175, 0),
+          new THREE.Vector3(-0.9526991710262417, -0.27740284419505984, -0.12414488132179799),
+          new THREE.Vector3(-0.9526991710262417, -0.27740284419505984, 0.12414488132179799),
+          new THREE.Vector3(-0.9185444449413377, 0.33266634720021404, -0.21356311504535777),
+          new THREE.Vector3(-0.7943995641480448, 0.5335369769753657, -0.2902888676497681),
+          new THREE.Vector3(-0.8256913719009551, 0.3377053676762192, -0.45187259599469864),
+          new THREE.Vector3(-0.7895779570894159, 0.27927260779525365, -0.5464187590243793),
+          new THREE.Vector3(-0.6229552001627038, 0.25613413043303207, -0.7391360671876054),
+          new THREE.Vector3(-0.7471000772555542, 0.05526351066658687, -0.6624103101202072),
+          new THREE.Vector3(-0.7471000772555542, -0.05526351066658687, -0.6624103101202072),
+          new THREE.Vector3(-0.6229552001627038, -0.25613413043303207, -0.7391360671876054),
+          new THREE.Vector3(-0.7895779570894159, -0.27927260779525365, -0.5464187590243793),
+          new THREE.Vector3(-0.8256913719009551, -0.3377053676762192, -0.45187259599469864),
+          new THREE.Vector3(-0.7943995641480448, -0.5335369769753657, -0.2902888676497681),
+          new THREE.Vector3(-0.9185444449413377, -0.33266634720021404, -0.21356311504535777),
+          new THREE.Vector3(-0.11098708622360996, 0.24668492750510482, 0.9627192805970982),
+          new THREE.Vector3(-0.04243078871567205, 0.20970943935535477, 0.9768426583714639),
+          new THREE.Vector3(0.04243078871567205, 0.20970943935535477, 0.9768426583714639),
+          new THREE.Vector3(0.11098708622360996, 0.24668492750510482, 0.9627192805970982),
+          new THREE.Vector3(0.15341789624715857, 0.31533937079786545, 0.9364956114877967),
+          new THREE.Vector3(0.15341788493451233, 0.3892903164936674, 0.9082488657116401),
+          new THREE.Vector3(0.11098709477826504, 0.4579447703177026, 0.8820251992609663),
+          new THREE.Vector3(0.042430788285552704, 0.49492023717817557, 0.8679018302993519),
+          new THREE.Vector3(-0.042430788285552704, 0.49492023717817557, 0.8679018302993519),
+          new THREE.Vector3(-0.11098709477826504, 0.4579447703177026, 0.8820251992609663),
+          new THREE.Vector3(-0.15341788493451233, 0.3892903164936674, 0.9082488657116401),
+          new THREE.Vector3(-0.15341789624715857, 0.31533937079786545, 0.9364956114877967),
+          new THREE.Vector3(-0.5525624788761233, 0.46779905732402427, 0.6898106616347909),
+          new THREE.Vector3(-0.4927348849832951, 0.5188979163510036, 0.6985393943988311),
+          new THREE.Vector3(-0.45030403927681695, 0.587552355698606, 0.6723157751562889),
+          new THREE.Vector3(-0.4415753217460759, 0.647379913911619, 0.6212169365758103),
+          new THREE.Vector3(-0.4677990573240245, 0.6898106616347909, 0.5525624788761232),
+          new THREE.Vector3(-0.5188979163510039, 0.698539394398831, 0.4927348849832952),
+          new THREE.Vector3(-0.5875523556986059, 0.6723157751562888, 0.45030403927681706),
+          new THREE.Vector3(-0.647379913911619, 0.6212169365758103, 0.441575321746076),
+          new THREE.Vector3(-0.6898106616347909, 0.5525624788761232, 0.46779905732402455),
+          new THREE.Vector3(-0.6985393943988308, 0.4927348849832952, 0.5188979163510039),
+          new THREE.Vector3(-0.672315775156289, 0.4503040392768169, 0.5875523556986059),
+          new THREE.Vector3(-0.6212169365758103, 0.4415753217460759, 0.6473799139116189),
+          new THREE.Vector3(-0.49492023717817546, 0.8679018302993519, 0.042430788285552704),
+          new THREE.Vector3(-0.45794477031770253, 0.8820251992609662, 0.11098709477826495),
+          new THREE.Vector3(-0.3892903164936674, 0.9082488657116401, 0.15341788493451233),
+          new THREE.Vector3(-0.31533937079786545, 0.9364956114877967, 0.15341789624715857),
+          new THREE.Vector3(-0.24668492750510482, 0.9627192805970981, 0.1109870862236099),
+          new THREE.Vector3(-0.20970943935535477, 0.976842658371464, 0.04243078871567205),
+          new THREE.Vector3(-0.20970943935535477, 0.976842658371464, -0.04243078871567205),
+          new THREE.Vector3(-0.24668492750510482, 0.9627192805970981, -0.1109870862236099),
+          new THREE.Vector3(-0.31533937079786545, 0.9364956114877967, -0.15341789624715857),
+          new THREE.Vector3(-0.3892903164936674, 0.9082488657116401, -0.15341788493451233),
+          new THREE.Vector3(-0.45794477031770253, 0.8820251992609662, -0.11098709477826495),
+          new THREE.Vector3(-0.49492023717817546, 0.8679018302993519, -0.042430788285552704),
+          new THREE.Vector3(0.31533937079786545, 0.9364956114877967, 0.15341789624715857),
+          new THREE.Vector3(0.3892903164936674, 0.9082488657116401, 0.15341788493451233),
+          new THREE.Vector3(0.45794477031770253, 0.8820251992609662, 0.11098709477826495),
+          new THREE.Vector3(0.49492023717817546, 0.8679018302993519, 0.042430788285552704),
+          new THREE.Vector3(0.49492023717817546, 0.8679018302993519, -0.042430788285552704),
+          new THREE.Vector3(0.45794477031770253, 0.8820251992609662, -0.11098709477826495),
+          new THREE.Vector3(0.3892903164936674, 0.9082488657116401, -0.15341788493451233),
+          new THREE.Vector3(0.31533937079786545, 0.9364956114877967, -0.15341789624715857),
+          new THREE.Vector3(0.24668492750510482, 0.9627192805970981, -0.1109870862236099),
+          new THREE.Vector3(0.20970943935535477, 0.976842658371464, -0.04243078871567205),
+          new THREE.Vector3(0.20970943935535477, 0.976842658371464, 0.04243078871567205),
+          new THREE.Vector3(0.24668492750510482, 0.9627192805970981, 0.1109870862236099),
+          new THREE.Vector3(0.4415753217460759, 0.647379913911619, 0.6212169365758103),
+          new THREE.Vector3(0.45030403927681695, 0.587552355698606, 0.6723157751562889),
+          new THREE.Vector3(0.4927348849832951, 0.5188979163510036, 0.6985393943988311),
+          new THREE.Vector3(0.5525624788761233, 0.46779905732402427, 0.6898106616347909),
+          new THREE.Vector3(0.6212169365758103, 0.4415753217460759, 0.6473799139116189),
+          new THREE.Vector3(0.672315775156289, 0.4503040392768169, 0.5875523556986059),
+          new THREE.Vector3(0.6985393943988308, 0.4927348849832952, 0.5188979163510039),
+          new THREE.Vector3(0.6898106616347909, 0.5525624788761232, 0.46779905732402455),
+          new THREE.Vector3(0.647379913911619, 0.6212169365758103, 0.441575321746076),
+          new THREE.Vector3(0.5875523556986059, 0.6723157751562888, 0.45030403927681706),
+          new THREE.Vector3(0.5188979163510039, 0.698539394398831, 0.4927348849832952),
+          new THREE.Vector3(0.4677990573240245, 0.6898106616347909, 0.5525624788761232),
+          new THREE.Vector3(0.9364956114877968, 0.15341789624715857, 0.31533937079786545),
+          new THREE.Vector3(0.9082488657116402, 0.15341788493451222, 0.3892903164936674),
+          new THREE.Vector3(0.8820251992609661, 0.11098709477826507, 0.4579447703177024),
+          new THREE.Vector3(0.8679018302993519, 0.04243078828555267, 0.4949202371781757),
+          new THREE.Vector3(0.8679018302993519, -0.04243078828555267, 0.4949202371781757),
+          new THREE.Vector3(0.8820251992609661, -0.11098709477826507, 0.4579447703177024),
+          new THREE.Vector3(0.9082488657116402, -0.15341788493451222, 0.3892903164936674),
+          new THREE.Vector3(0.9364956114877968, -0.15341789624715857, 0.31533937079786545),
+          new THREE.Vector3(0.9627192805970981, -0.1109870862236099, 0.24668492750510482),
+          new THREE.Vector3(0.976842658371464, -0.04243078871567205, 0.20970943935535477),
+          new THREE.Vector3(0.976842658371464, 0.04243078871567205, 0.20970943935535477),
+          new THREE.Vector3(0.9627192805970981, 0.1109870862236099, 0.24668492750510482),
+          new THREE.Vector3(0.9627192805970981, 0.1109870862236099, -0.24668492750510482),
+          new THREE.Vector3(0.976842658371464, 0.04243078871567205, -0.20970943935535477),
+          new THREE.Vector3(0.976842658371464, -0.04243078871567205, -0.20970943935535477),
+          new THREE.Vector3(0.9627192805970981, -0.1109870862236099, -0.24668492750510482),
+          new THREE.Vector3(0.9364956114877968, -0.15341789624715857, -0.31533937079786545),
+          new THREE.Vector3(0.9082488657116402, -0.15341788493451222, -0.3892903164936674),
+          new THREE.Vector3(0.8820251992609661, -0.11098709477826507, -0.4579447703177024),
+          new THREE.Vector3(0.8679018302993519, -0.04243078828555267, -0.4949202371781757),
+          new THREE.Vector3(0.8679018302993519, 0.04243078828555267, -0.4949202371781757),
+          new THREE.Vector3(0.8820251992609661, 0.11098709477826507, -0.4579447703177024),
+          new THREE.Vector3(0.9082488657116402, 0.15341788493451222, -0.3892903164936674),
+          new THREE.Vector3(0.9364956114877968, 0.15341789624715857, -0.31533937079786545),
+          new THREE.Vector3(0.4677990573240245, 0.6898106616347909, -0.5525624788761232),
+          new THREE.Vector3(0.5188979163510039, 0.698539394398831, -0.4927348849832952),
+          new THREE.Vector3(0.5875523556986059, 0.6723157751562888, -0.45030403927681706),
+          new THREE.Vector3(0.647379913911619, 0.6212169365758103, -0.441575321746076),
+          new THREE.Vector3(0.6898106616347909, 0.5525624788761232, -0.46779905732402455),
+          new THREE.Vector3(0.6985393943988308, 0.4927348849832952, -0.5188979163510039),
+          new THREE.Vector3(0.672315775156289, 0.4503040392768169, -0.5875523556986059),
+          new THREE.Vector3(0.6212169365758103, 0.4415753217460759, -0.6473799139116189),
+          new THREE.Vector3(0.5525624788761233, 0.46779905732402427, -0.6898106616347909),
+          new THREE.Vector3(0.4927348849832951, 0.5188979163510036, -0.6985393943988311),
+          new THREE.Vector3(0.45030403927681695, 0.587552355698606, -0.6723157751562889),
+          new THREE.Vector3(0.4415753217460759, 0.647379913911619, -0.6212169365758103),
+          new THREE.Vector3(0.042430788285552704, 0.49492023717817557, -0.8679018302993519),
+          new THREE.Vector3(0.11098709477826504, 0.4579447703177026, -0.8820251992609663),
+          new THREE.Vector3(0.15341788493451233, 0.3892903164936674, -0.9082488657116401),
+          new THREE.Vector3(0.15341789624715857, 0.31533937079786545, -0.9364956114877967),
+          new THREE.Vector3(0.11098708622360996, 0.24668492750510482, -0.9627192805970982),
+          new THREE.Vector3(0.04243078871567205, 0.20970943935535477, -0.9768426583714639),
+          new THREE.Vector3(-0.04243078871567205, 0.20970943935535477, -0.9768426583714639),
+          new THREE.Vector3(-0.11098708622360996, 0.24668492750510482, -0.9627192805970982),
+          new THREE.Vector3(-0.15341789624715857, 0.31533937079786545, -0.9364956114877967),
+          new THREE.Vector3(-0.15341788493451233, 0.3892903164936674, -0.9082488657116401),
+          new THREE.Vector3(-0.11098709477826504, 0.4579447703177026, -0.8820251992609663),
+          new THREE.Vector3(-0.042430788285552704, 0.49492023717817557, -0.8679018302993519),
+          new THREE.Vector3(-0.11098708622360996, -0.24668492750510482, -0.9627192805970982),
+          new THREE.Vector3(-0.04243078871567205, -0.20970943935535477, -0.9768426583714639),
+          new THREE.Vector3(0.04243078871567205, -0.20970943935535477, -0.9768426583714639),
+          new THREE.Vector3(0.11098708622360996, -0.24668492750510482, -0.9627192805970982),
+          new THREE.Vector3(0.15341789624715857, -0.31533937079786545, -0.9364956114877967),
+          new THREE.Vector3(0.15341788493451233, -0.3892903164936674, -0.9082488657116401),
+          new THREE.Vector3(0.11098709477826504, -0.4579447703177026, -0.8820251992609663),
+          new THREE.Vector3(0.042430788285552704, -0.49492023717817557, -0.8679018302993519),
+          new THREE.Vector3(-0.042430788285552704, -0.49492023717817557, -0.8679018302993519),
+          new THREE.Vector3(-0.11098709477826504, -0.4579447703177026, -0.8820251992609663),
+          new THREE.Vector3(-0.15341788493451233, -0.3892903164936674, -0.9082488657116401),
+          new THREE.Vector3(-0.15341789624715857, -0.31533937079786545, -0.9364956114877967),
+          new THREE.Vector3(0.4415753217460759, -0.647379913911619, -0.6212169365758103),
+          new THREE.Vector3(0.45030403927681695, -0.587552355698606, -0.6723157751562889),
+          new THREE.Vector3(0.4927348849832951, -0.5188979163510036, -0.6985393943988311),
+          new THREE.Vector3(0.5525624788761233, -0.46779905732402427, -0.6898106616347909),
+          new THREE.Vector3(0.6212169365758103, -0.4415753217460759, -0.6473799139116189),
+          new THREE.Vector3(0.672315775156289, -0.4503040392768169, -0.5875523556986059),
+          new THREE.Vector3(0.6985393943988308, -0.4927348849832952, -0.5188979163510039),
+          new THREE.Vector3(0.6898106616347909, -0.5525624788761232, -0.46779905732402455),
+          new THREE.Vector3(0.647379913911619, -0.6212169365758103, -0.441575321746076),
+          new THREE.Vector3(0.5875523556986059, -0.6723157751562888, -0.45030403927681706),
+          new THREE.Vector3(0.5188979163510039, -0.698539394398831, -0.4927348849832952),
+          new THREE.Vector3(0.4677990573240245, -0.6898106616347909, -0.5525624788761232),
+          new THREE.Vector3(0.31533937079786545, -0.9364956114877967, -0.15341789624715857),
+          new THREE.Vector3(0.3892903164936674, -0.9082488657116401, -0.15341788493451233),
+          new THREE.Vector3(0.45794477031770253, -0.8820251992609662, -0.11098709477826495),
+          new THREE.Vector3(0.49492023717817546, -0.8679018302993519, -0.042430788285552704),
+          new THREE.Vector3(0.49492023717817546, -0.8679018302993519, 0.042430788285552704),
+          new THREE.Vector3(0.45794477031770253, -0.8820251992609662, 0.11098709477826495),
+          new THREE.Vector3(0.3892903164936674, -0.9082488657116401, 0.15341788493451233),
+          new THREE.Vector3(0.31533937079786545, -0.9364956114877967, 0.15341789624715857),
+          new THREE.Vector3(0.24668492750510482, -0.9627192805970981, 0.1109870862236099),
+          new THREE.Vector3(0.20970943935535477, -0.976842658371464, 0.04243078871567205),
+          new THREE.Vector3(0.20970943935535477, -0.976842658371464, -0.04243078871567205),
+          new THREE.Vector3(0.24668492750510482, -0.9627192805970981, -0.1109870862236099),
+          new THREE.Vector3(-0.24668492750510482, -0.9627192805970981, -0.1109870862236099),
+          new THREE.Vector3(-0.20970943935535477, -0.976842658371464, -0.04243078871567205),
+          new THREE.Vector3(-0.20970943935535477, -0.976842658371464, 0.04243078871567205),
+          new THREE.Vector3(-0.24668492750510482, -0.9627192805970981, 0.1109870862236099),
+          new THREE.Vector3(-0.31533937079786545, -0.9364956114877967, 0.15341789624715857),
+          new THREE.Vector3(-0.3892903164936674, -0.9082488657116401, 0.15341788493451233),
+          new THREE.Vector3(-0.45794477031770253, -0.8820251992609662, 0.11098709477826495),
+          new THREE.Vector3(-0.49492023717817546, -0.8679018302993519, 0.042430788285552704),
+          new THREE.Vector3(-0.49492023717817546, -0.8679018302993519, -0.042430788285552704),
+          new THREE.Vector3(-0.45794477031770253, -0.8820251992609662, -0.11098709477826495),
+          new THREE.Vector3(-0.3892903164936674, -0.9082488657116401, -0.15341788493451233),
+          new THREE.Vector3(-0.31533937079786545, -0.9364956114877967, -0.15341789624715857),
+          new THREE.Vector3(-0.647379913911619, -0.6212169365758103, 0.441575321746076),
+          new THREE.Vector3(-0.5875523556986059, -0.6723157751562888, 0.45030403927681706),
+          new THREE.Vector3(-0.5188979163510039, -0.698539394398831, 0.4927348849832952),
+          new THREE.Vector3(-0.4677990573240245, -0.6898106616347909, 0.5525624788761232),
+          new THREE.Vector3(-0.4415753217460759, -0.647379913911619, 0.6212169365758103),
+          new THREE.Vector3(-0.45030403927681695, -0.587552355698606, 0.6723157751562889),
+          new THREE.Vector3(-0.4927348849832951, -0.5188979163510036, 0.6985393943988311),
+          new THREE.Vector3(-0.5525624788761233, -0.46779905732402427, 0.6898106616347909),
+          new THREE.Vector3(-0.6212169365758103, -0.4415753217460759, 0.6473799139116189),
+          new THREE.Vector3(-0.672315775156289, -0.4503040392768169, 0.5875523556986059),
+          new THREE.Vector3(-0.6985393943988308, -0.4927348849832952, 0.5188979163510039),
+          new THREE.Vector3(-0.6898106616347909, -0.5525624788761232, 0.46779905732402455),
+          new THREE.Vector3(-0.15341789624715857, -0.31533937079786545, 0.9364956114877967),
+          new THREE.Vector3(-0.15341788493451233, -0.3892903164936674, 0.9082488657116401),
+          new THREE.Vector3(-0.11098709477826504, -0.4579447703177026, 0.8820251992609663),
+          new THREE.Vector3(-0.042430788285552704, -0.49492023717817557, 0.8679018302993519),
+          new THREE.Vector3(0.042430788285552704, -0.49492023717817557, 0.8679018302993519),
+          new THREE.Vector3(0.11098709477826504, -0.4579447703177026, 0.8820251992609663),
+          new THREE.Vector3(0.15341788493451233, -0.3892903164936674, 0.9082488657116401),
+          new THREE.Vector3(0.15341789624715857, -0.31533937079786545, 0.9364956114877967),
+          new THREE.Vector3(0.11098708622360996, -0.24668492750510482, 0.9627192805970982),
+          new THREE.Vector3(0.04243078871567205, -0.20970943935535477, 0.9768426583714639),
+          new THREE.Vector3(-0.04243078871567205, -0.20970943935535477, 0.9768426583714639),
+          new THREE.Vector3(-0.11098708622360996, -0.24668492750510482, 0.9627192805970982),
+          new THREE.Vector3(0.4677990573240245, -0.6898106616347909, 0.5525624788761232),
+          new THREE.Vector3(0.5188979163510039, -0.698539394398831, 0.4927348849832952),
+          new THREE.Vector3(0.5875523556986059, -0.6723157751562888, 0.45030403927681706),
+          new THREE.Vector3(0.647379913911619, -0.6212169365758103, 0.441575321746076),
+          new THREE.Vector3(0.6898106616347909, -0.5525624788761232, 0.46779905732402455),
+          new THREE.Vector3(0.6985393943988308, -0.4927348849832952, 0.5188979163510039),
+          new THREE.Vector3(0.672315775156289, -0.4503040392768169, 0.5875523556986059),
+          new THREE.Vector3(0.6212169365758103, -0.4415753217460759, 0.6473799139116189),
+          new THREE.Vector3(0.5525624788761233, -0.46779905732402427, 0.6898106616347909),
+          new THREE.Vector3(0.4927348849832951, -0.5188979163510036, 0.6985393943988311),
+          new THREE.Vector3(0.45030403927681695, -0.587552355698606, 0.6723157751562889),
+          new THREE.Vector3(0.4415753217460759, -0.647379913911619, 0.6212169365758103),
+          new THREE.Vector3(-0.9627192805970981, 0.1109870862236099, 0.24668492750510482),
+          new THREE.Vector3(-0.976842658371464, 0.04243078871567205, 0.20970943935535477),
+          new THREE.Vector3(-0.976842658371464, -0.04243078871567205, 0.20970943935535477),
+          new THREE.Vector3(-0.9627192805970981, -0.1109870862236099, 0.24668492750510482),
+          new THREE.Vector3(-0.9364956114877968, -0.15341789624715857, 0.31533937079786545),
+          new THREE.Vector3(-0.9082488657116402, -0.15341788493451222, 0.3892903164936674),
+          new THREE.Vector3(-0.8820251992609661, -0.11098709477826507, 0.4579447703177024),
+          new THREE.Vector3(-0.8679018302993519, -0.04243078828555267, 0.4949202371781757),
+          new THREE.Vector3(-0.8679018302993519, 0.04243078828555267, 0.4949202371781757),
+          new THREE.Vector3(-0.8820251992609661, 0.11098709477826507, 0.4579447703177024),
+          new THREE.Vector3(-0.9082488657116402, 0.15341788493451222, 0.3892903164936674),
+          new THREE.Vector3(-0.9364956114877968, 0.15341789624715857, 0.31533937079786545),
+          new THREE.Vector3(-0.9364956114877968, 0.15341789624715857, -0.31533937079786545),
+          new THREE.Vector3(-0.9082488657116402, 0.15341788493451222, -0.3892903164936674),
+          new THREE.Vector3(-0.8820251992609661, 0.11098709477826507, -0.4579447703177024),
+          new THREE.Vector3(-0.8679018302993519, 0.04243078828555267, -0.4949202371781757),
+          new THREE.Vector3(-0.8679018302993519, -0.04243078828555267, -0.4949202371781757),
+          new THREE.Vector3(-0.8820251992609661, -0.11098709477826507, -0.4579447703177024),
+          new THREE.Vector3(-0.9082488657116402, -0.15341788493451222, -0.3892903164936674),
+          new THREE.Vector3(-0.9364956114877968, -0.15341789624715857, -0.31533937079786545),
+          new THREE.Vector3(-0.9627192805970981, -0.1109870862236099, -0.24668492750510482),
+          new THREE.Vector3(-0.976842658371464, -0.04243078871567205, -0.20970943935535477),
+          new THREE.Vector3(-0.976842658371464, 0.04243078871567205, -0.20970943935535477),
+          new THREE.Vector3(-0.9627192805970981, 0.1109870862236099, -0.24668492750510482),
+          new THREE.Vector3(-0.647379913911619, 0.6212169365758103, -0.441575321746076),
+          new THREE.Vector3(-0.5875523556986059, 0.6723157751562888, -0.45030403927681706),
+          new THREE.Vector3(-0.5188979163510039, 0.698539394398831, -0.4927348849832952),
+          new THREE.Vector3(-0.4677990573240245, 0.6898106616347909, -0.5525624788761232),
+          new THREE.Vector3(-0.4415753217460759, 0.647379913911619, -0.6212169365758103),
+          new THREE.Vector3(-0.45030403927681695, 0.587552355698606, -0.6723157751562889),
+          new THREE.Vector3(-0.4927348849832951, 0.5188979163510036, -0.6985393943988311),
+          new THREE.Vector3(-0.5525624788761233, 0.46779905732402427, -0.6898106616347909),
+          new THREE.Vector3(-0.6212169365758103, 0.4415753217460759, -0.6473799139116189),
+          new THREE.Vector3(-0.672315775156289, 0.4503040392768169, -0.5875523556986059),
+          new THREE.Vector3(-0.6985393943988308, 0.4927348849832952, -0.5188979163510039),
+          new THREE.Vector3(-0.6898106616347909, 0.5525624788761232, -0.46779905732402455),
+          new THREE.Vector3(-0.4677990573240245, -0.6898106616347909, -0.5525624788761232),
+          new THREE.Vector3(-0.5188979163510039, -0.698539394398831, -0.4927348849832952),
+          new THREE.Vector3(-0.5875523556986059, -0.6723157751562888, -0.45030403927681706),
+          new THREE.Vector3(-0.647379913911619, -0.6212169365758103, -0.441575321746076),
+          new THREE.Vector3(-0.6898106616347909, -0.5525624788761232, -0.46779905732402455),
+          new THREE.Vector3(-0.6985393943988308, -0.4927348849832952, -0.5188979163510039),
+          new THREE.Vector3(-0.672315775156289, -0.4503040392768169, -0.5875523556986059),
+          new THREE.Vector3(-0.6212169365758103, -0.4415753217460759, -0.6473799139116189),
+          new THREE.Vector3(-0.5525624788761233, -0.46779905732402427, -0.6898106616347909),
+          new THREE.Vector3(-0.4927348849832951, -0.5188979163510036, -0.6985393943988311),
+          new THREE.Vector3(-0.45030403927681695, -0.587552355698606, -0.6723157751562889),
+          new THREE.Vector3(-0.4415753217460759, -0.647379913911619, -0.6212169365758103),
+          new THREE.Vector3(-0.468555929680684, 0.0905488836328299, 0.8787811106492436),
+          new THREE.Vector3(-0.5208826895068224, 0.11053591618351956, 0.8464413949031613),
+          new THREE.Vector3(-0.5790918258360318, 0.08830199671529187, 0.8104661711792689),
+          new THREE.Vector3(-0.611431539837848, 0.035975227888410545, 0.7904791300659966),
+          new THREE.Vector3(-0.611431539837848, -0.035975227888410545, 0.7904791300659966),
+          new THREE.Vector3(-0.5790918258360318, -0.08830199671529187, 0.8104661711792689),
+          new THREE.Vector3(-0.5208826895068224, -0.11053591618351956, 0.8464413949031613),
+          new THREE.Vector3(-0.468555929680684, -0.0905488836328299, 0.8787811106492436),
+          new THREE.Vector3(-0.432580730382718, -0.03233972289212344, 0.9010150132072245),
+          new THREE.Vector3(-0.432580730382718, 0.03233972289212344, 0.9010150132072245),
+          new THREE.Vector3(0.432580730382718, 0.03233972289212344, 0.9010150132072245),
+          new THREE.Vector3(0.432580730382718, -0.03233972289212344, 0.9010150132072245),
+          new THREE.Vector3(0.468555929680684, -0.0905488836328299, 0.8787811106492436),
+          new THREE.Vector3(0.5208826895068224, -0.11053591618351956, 0.8464413949031613),
+          new THREE.Vector3(0.5790918258360318, -0.08830199671529187, 0.8104661711792689),
+          new THREE.Vector3(0.611431539837848, -0.035975227888410545, 0.7904791300659966),
+          new THREE.Vector3(0.611431539837848, 0.035975227888410545, 0.7904791300659966),
+          new THREE.Vector3(0.5790918258360318, 0.08830199671529187, 0.8104661711792689),
+          new THREE.Vector3(0.5208826895068224, 0.11053591618351956, 0.8464413949031613),
+          new THREE.Vector3(0.468555929680684, 0.0905488836328299, 0.8787811106492436),
+          new THREE.Vector3(0.035975227888410545, 0.7904791300659967, 0.611431539837848),
+          new THREE.Vector3(0.08830199671529185, 0.8104661711792689, 0.5790918258360315),
+          new THREE.Vector3(0.11053591618351961, 0.8464413949031614, 0.5208826895068224),
+          new THREE.Vector3(0.0905488836328299, 0.8787811106492436, 0.468555929680684),
+          new THREE.Vector3(0.03233972289212344, 0.9010150132072245, 0.432580730382718),
+          new THREE.Vector3(-0.03233972289212344, 0.9010150132072245, 0.432580730382718),
+          new THREE.Vector3(-0.0905488836328299, 0.8787811106492436, 0.468555929680684),
+          new THREE.Vector3(-0.11053591618351961, 0.8464413949031614, 0.5208826895068224),
+          new THREE.Vector3(-0.08830199671529185, 0.8104661711792689, 0.5790918258360315),
+          new THREE.Vector3(-0.035975227888410545, 0.7904791300659967, 0.611431539837848),
+          new THREE.Vector3(-0.8104661711792688, 0.5790918258360316, 0.08830199671529189),
+          new THREE.Vector3(-0.7904791300659967, 0.611431539837848, 0.035975227888410545),
+          new THREE.Vector3(-0.7904791300659967, 0.611431539837848, -0.035975227888410545),
+          new THREE.Vector3(-0.8104661711792688, 0.5790918258360316, -0.08830199671529189),
+          new THREE.Vector3(-0.8464413949031613, 0.5208826895068223, -0.11053591618351957),
+          new THREE.Vector3(-0.8787811106492436, 0.46855592968068405, -0.09054888363282988),
+          new THREE.Vector3(-0.9010150132072245, 0.432580730382718, -0.03233972289212344),
+          new THREE.Vector3(-0.9010150132072245, 0.432580730382718, 0.03233972289212344),
+          new THREE.Vector3(-0.8787811106492436, 0.46855592968068405, 0.09054888363282988),
+          new THREE.Vector3(-0.8464413949031613, 0.5208826895068223, 0.11053591618351957),
+          new THREE.Vector3(-0.03233972289212344, 0.9010150132072245, -0.432580730382718),
+          new THREE.Vector3(0.03233972289212344, 0.9010150132072245, -0.432580730382718),
+          new THREE.Vector3(0.0905488836328299, 0.8787811106492436, -0.468555929680684),
+          new THREE.Vector3(0.11053591618351961, 0.8464413949031614, -0.5208826895068224),
+          new THREE.Vector3(0.08830199671529185, 0.8104661711792689, -0.5790918258360315),
+          new THREE.Vector3(0.035975227888410545, 0.7904791300659967, -0.611431539837848),
+          new THREE.Vector3(-0.035975227888410545, 0.7904791300659967, -0.611431539837848),
+          new THREE.Vector3(-0.08830199671529185, 0.8104661711792689, -0.5790918258360315),
+          new THREE.Vector3(-0.11053591618351961, 0.8464413949031614, -0.5208826895068224),
+          new THREE.Vector3(-0.0905488836328299, 0.8787811106492436, -0.468555929680684),
+          new THREE.Vector3(0.7904791300659967, 0.611431539837848, 0.035975227888410545),
+          new THREE.Vector3(0.8104661711792688, 0.5790918258360316, 0.08830199671529189),
+          new THREE.Vector3(0.8464413949031613, 0.5208826895068223, 0.11053591618351957),
+          new THREE.Vector3(0.8787811106492436, 0.46855592968068405, 0.09054888363282988),
+          new THREE.Vector3(0.9010150132072245, 0.432580730382718, 0.03233972289212344),
+          new THREE.Vector3(0.9010150132072245, 0.432580730382718, -0.03233972289212344),
+          new THREE.Vector3(0.8787811106492436, 0.46855592968068405, -0.09054888363282988),
+          new THREE.Vector3(0.8464413949031613, 0.5208826895068223, -0.11053591618351957),
+          new THREE.Vector3(0.8104661711792688, 0.5790918258360316, -0.08830199671529189),
+          new THREE.Vector3(0.7904791300659967, 0.611431539837848, -0.035975227888410545),
+          new THREE.Vector3(0.8787811106492436, -0.46855592968068405, 0.09054888363282988),
+          new THREE.Vector3(0.8464413949031613, -0.5208826895068223, 0.11053591618351957),
+          new THREE.Vector3(0.8104661711792688, -0.5790918258360316, 0.08830199671529189),
+          new THREE.Vector3(0.7904791300659967, -0.611431539837848, 0.035975227888410545),
+          new THREE.Vector3(0.7904791300659967, -0.611431539837848, -0.035975227888410545),
+          new THREE.Vector3(0.8104661711792688, -0.5790918258360316, -0.08830199671529189),
+          new THREE.Vector3(0.8464413949031613, -0.5208826895068223, -0.11053591618351957),
+          new THREE.Vector3(0.8787811106492436, -0.46855592968068405, -0.09054888363282988),
+          new THREE.Vector3(0.9010150132072245, -0.432580730382718, -0.03233972289212344),
+          new THREE.Vector3(0.9010150132072245, -0.432580730382718, 0.03233972289212344),
+          new THREE.Vector3(0.611431539837848, -0.035975227888410545, -0.7904791300659966),
+          new THREE.Vector3(0.5790918258360318, -0.08830199671529187, -0.8104661711792689),
+          new THREE.Vector3(0.5208826895068224, -0.11053591618351956, -0.8464413949031613),
+          new THREE.Vector3(0.468555929680684, -0.0905488836328299, -0.8787811106492436),
+          new THREE.Vector3(0.432580730382718, -0.03233972289212344, -0.9010150132072245),
+          new THREE.Vector3(0.432580730382718, 0.03233972289212344, -0.9010150132072245),
+          new THREE.Vector3(0.468555929680684, 0.0905488836328299, -0.8787811106492436),
+          new THREE.Vector3(0.5208826895068224, 0.11053591618351956, -0.8464413949031613),
+          new THREE.Vector3(0.5790918258360318, 0.08830199671529187, -0.8104661711792689),
+          new THREE.Vector3(0.611431539837848, 0.035975227888410545, -0.7904791300659966),
+          new THREE.Vector3(-0.432580730382718, 0.03233972289212344, -0.9010150132072245),
+          new THREE.Vector3(-0.432580730382718, -0.03233972289212344, -0.9010150132072245),
+          new THREE.Vector3(-0.468555929680684, -0.0905488836328299, -0.8787811106492436),
+          new THREE.Vector3(-0.5208826895068224, -0.11053591618351956, -0.8464413949031613),
+          new THREE.Vector3(-0.5790918258360318, -0.08830199671529187, -0.8104661711792689),
+          new THREE.Vector3(-0.611431539837848, -0.035975227888410545, -0.7904791300659966),
+          new THREE.Vector3(-0.611431539837848, 0.035975227888410545, -0.7904791300659966),
+          new THREE.Vector3(-0.5790918258360318, 0.08830199671529187, -0.8104661711792689),
+          new THREE.Vector3(-0.5208826895068224, 0.11053591618351956, -0.8464413949031613),
+          new THREE.Vector3(-0.468555929680684, 0.0905488836328299, -0.8787811106492436),
+          new THREE.Vector3(0.035975227888410545, -0.7904791300659967, -0.611431539837848),
+          new THREE.Vector3(0.08830199671529185, -0.8104661711792689, -0.5790918258360315),
+          new THREE.Vector3(0.11053591618351961, -0.8464413949031614, -0.5208826895068224),
+          new THREE.Vector3(0.0905488836328299, -0.8787811106492436, -0.468555929680684),
+          new THREE.Vector3(0.03233972289212344, -0.9010150132072245, -0.432580730382718),
+          new THREE.Vector3(-0.03233972289212344, -0.9010150132072245, -0.432580730382718),
+          new THREE.Vector3(-0.0905488836328299, -0.8787811106492436, -0.468555929680684),
+          new THREE.Vector3(-0.11053591618351961, -0.8464413949031614, -0.5208826895068224),
+          new THREE.Vector3(-0.08830199671529185, -0.8104661711792689, -0.5790918258360315),
+          new THREE.Vector3(-0.035975227888410545, -0.7904791300659967, -0.611431539837848),
+          new THREE.Vector3(0.0905488836328299, -0.8787811106492436, 0.468555929680684),
+          new THREE.Vector3(0.11053591618351961, -0.8464413949031614, 0.5208826895068224),
+          new THREE.Vector3(0.08830199671529185, -0.8104661711792689, 0.5790918258360315),
+          new THREE.Vector3(0.035975227888410545, -0.7904791300659967, 0.611431539837848),
+          new THREE.Vector3(-0.035975227888410545, -0.7904791300659967, 0.611431539837848),
+          new THREE.Vector3(-0.08830199671529185, -0.8104661711792689, 0.5790918258360315),
+          new THREE.Vector3(-0.11053591618351961, -0.8464413949031614, 0.5208826895068224),
+          new THREE.Vector3(-0.0905488836328299, -0.8787811106492436, 0.468555929680684),
+          new THREE.Vector3(-0.03233972289212344, -0.9010150132072245, 0.432580730382718),
+          new THREE.Vector3(0.03233972289212344, -0.9010150132072245, 0.432580730382718),
+          new THREE.Vector3(-0.7904791300659967, -0.611431539837848, 0.035975227888410545),
+          new THREE.Vector3(-0.8104661711792688, -0.5790918258360316, 0.08830199671529189),
+          new THREE.Vector3(-0.8464413949031613, -0.5208826895068223, 0.11053591618351957),
+          new THREE.Vector3(-0.8787811106492436, -0.46855592968068405, 0.09054888363282988),
+          new THREE.Vector3(-0.9010150132072245, -0.432580730382718, 0.03233972289212344),
+          new THREE.Vector3(-0.9010150132072245, -0.432580730382718, -0.03233972289212344),
+          new THREE.Vector3(-0.8787811106492436, -0.46855592968068405, -0.09054888363282988),
+          new THREE.Vector3(-0.8464413949031613, -0.5208826895068223, -0.11053591618351957),
+          new THREE.Vector3(-0.8104661711792688, -0.5790918258360316, -0.08830199671529189),
+          new THREE.Vector3(-0.7904791300659967, -0.611431539837848, -0.035975227888410545),
+          new THREE.Vector3(-0.2027522317612541, 0.05848499438394128, 0.9774819885541324),
+          new THREE.Vector3(-0.25618154682623295, 0.02876290770069807, 0.9662006573203723),
+          new THREE.Vector3(-0.25618154682623295, -0.02876290770069807, 0.9662006573203723),
+          new THREE.Vector3(-0.2027522317612541, -0.05848499438394128, 0.9774819885541324),
+          new THREE.Vector3(-0.15351177943628871, -0.031042128411967764, 0.9876591111501777),
+          new THREE.Vector3(-0.15351177943628871, 0.031042128411967764, 0.9876591111501777),
+          new THREE.Vector3(0.15351177943628871, 0.031042128411967764, 0.9876591111501777),
+          new THREE.Vector3(0.15351177943628871, -0.031042128411967764, 0.9876591111501777),
+          new THREE.Vector3(0.2027522317612541, -0.05848499438394128, 0.9774819885541324),
+          new THREE.Vector3(0.25618154682623295, -0.02876290770069807, 0.9662006573203723),
+          new THREE.Vector3(0.25618154682623295, 0.02876290770069807, 0.9662006573203723),
+          new THREE.Vector3(0.2027522317612541, 0.05848499438394128, 0.9774819885541324),
+          new THREE.Vector3(0.3561193044222007, 0.3066381526005693, 0.8826959184155991),
+          new THREE.Vector3(0.4033935179948199, 0.2669569068529626, 0.8752186466953623),
+          new THREE.Vector3(0.44993287984745056, 0.2847333601316419, 0.8464557385122535),
+          new THREE.Vector3(0.45075002781698864, 0.3427838737531675, 0.824210912520428),
+          new THREE.Vector3(0.40707295517328224, 0.3792284728993729, 0.8309496822966481),
+          new THREE.Vector3(0.35684573793520047, 0.36004338396766916, 0.8619918102735036),
+          new THREE.Vector3(0.2033339440198485, 0.6084306354217213, 0.7671163334786019),
+          new THREE.Vector3(0.25356114938515417, 0.627615737863776, 0.7360742008168658),
+          new THREE.Vector3(0.24799777953211752, 0.6708438474449625, 0.6989031647462897),
+          new THREE.Vector3(0.19375133436017458, 0.6992437766539795, 0.6881268496755024),
+          new THREE.Vector3(0.14721198994848045, 0.6814673067951943, 0.7168897682243156),
+          new THREE.Vector3(0.15336707554637033, 0.634698122179525, 0.7573881658965492),
+          new THREE.Vector3(-0.15336707554637033, 0.634698122179525, 0.7573881658965492),
+          new THREE.Vector3(-0.14721198994848045, 0.6814673067951943, 0.7168897682243156),
+          new THREE.Vector3(-0.19375133436017458, 0.6992437766539795, 0.6881268496755024),
+          new THREE.Vector3(-0.24799777953211752, 0.6708438474449625, 0.6989031647462897),
+          new THREE.Vector3(-0.25356114938515417, 0.627615737863776, 0.7360742008168658),
+          new THREE.Vector3(-0.2033339440198485, 0.6084306354217213, 0.7671163334786019),
+          new THREE.Vector3(-0.35684573793520047, 0.36004338396766916, 0.8619918102735036),
+          new THREE.Vector3(-0.40707295517328224, 0.3792284728993729, 0.8309496822966481),
+          new THREE.Vector3(-0.45075002781698864, 0.3427838737531675, 0.824210912520428),
+          new THREE.Vector3(-0.44993287984745056, 0.2847333601316419, 0.8464557385122535),
+          new THREE.Vector3(-0.4033935179948199, 0.2669569068529626, 0.8752186466953623),
+          new THREE.Vector3(-0.3561193044222007, 0.3066381526005693, 0.8826959184155991),
+          new THREE.Vector3(-0.3427838737531674, 0.824210912520428, 0.45075002781698864),
+          new THREE.Vector3(-0.28473336013164197, 0.8464557385122534, 0.44993287984745056),
+          new THREE.Vector3(-0.2669569068529626, 0.8752186466953623, 0.4033935179948199),
+          new THREE.Vector3(-0.30663815260056926, 0.8826959184155989, 0.35611930442220063),
+          new THREE.Vector3(-0.36004338396766916, 0.8619918102735036, 0.3568457379352006),
+          new THREE.Vector3(-0.37922847289937317, 0.8309496822966481, 0.4070729551732822),
+          new THREE.Vector3(-0.627615737863776, 0.7360742008168659, 0.25356114938515417),
+          new THREE.Vector3(-0.6084306354217214, 0.7671163334786019, 0.20333394401984867),
+          new THREE.Vector3(-0.6346981221795249, 0.7573881658965492, 0.15336707554637022),
+          new THREE.Vector3(-0.6814673067951944, 0.7168897682243156, 0.14721198994848042),
+          new THREE.Vector3(-0.6992437766539795, 0.6881268496755024, 0.19375133436017458),
+          new THREE.Vector3(-0.6708438474449625, 0.6989031647462897, 0.24799777953211752),
+          new THREE.Vector3(-0.8242109125204281, 0.45075002781698853, 0.34278387375316743),
+          new THREE.Vector3(-0.8464557385122534, 0.44993287984745056, 0.28473336013164185),
+          new THREE.Vector3(-0.8752186466953623, 0.4033935179948199, 0.2669569068529626),
+          new THREE.Vector3(-0.8826959184155989, 0.35611930442220063, 0.3066381526005692),
+          new THREE.Vector3(-0.8619918102735035, 0.3568457379352005, 0.3600433839676692),
+          new THREE.Vector3(-0.8309496822966481, 0.40707295517328207, 0.3792284728993732),
+          new THREE.Vector3(-0.7360742008168658, 0.2535611493851541, 0.6276157378637757),
+          new THREE.Vector3(-0.7671163334786019, 0.2033339440198483, 0.6084306354217214),
+          new THREE.Vector3(-0.7573881658965492, 0.15336707554637038, 0.6346981221795248),
+          new THREE.Vector3(-0.7168897682243156, 0.14721198994848037, 0.6814673067951943),
+          new THREE.Vector3(-0.6881268496755023, 0.1937513343601748, 0.6992437766539793),
+          new THREE.Vector3(-0.6989031647462898, 0.2479977795321173, 0.6708438474449624),
+          new THREE.Vector3(-0.058484994383941294, 0.9774819885541324, 0.20275223176125415),
+          new THREE.Vector3(-0.028762907700698077, 0.9662006573203724, 0.256181546826233),
+          new THREE.Vector3(0.028762907700698077, 0.9662006573203724, 0.256181546826233),
+          new THREE.Vector3(0.058484994383941294, 0.9774819885541324, 0.20275223176125415),
+          new THREE.Vector3(0.03104212841196775, 0.9876591111501778, 0.15351177943628871),
+          new THREE.Vector3(-0.03104212841196775, 0.9876591111501778, 0.15351177943628871),
+          new THREE.Vector3(-0.03104212841196775, 0.9876591111501778, -0.15351177943628871),
+          new THREE.Vector3(0.03104212841196775, 0.9876591111501778, -0.15351177943628871),
+          new THREE.Vector3(0.058484994383941294, 0.9774819885541324, -0.20275223176125415),
+          new THREE.Vector3(0.028762907700698077, 0.9662006573203724, -0.256181546826233),
+          new THREE.Vector3(-0.028762907700698077, 0.9662006573203724, -0.256181546826233),
+          new THREE.Vector3(-0.058484994383941294, 0.9774819885541324, -0.20275223176125415),
+          new THREE.Vector3(-0.30663815260056926, 0.8826959184155989, -0.35611930442220063),
+          new THREE.Vector3(-0.2669569068529626, 0.8752186466953623, -0.4033935179948199),
+          new THREE.Vector3(-0.28473336013164197, 0.8464557385122534, -0.44993287984745056),
+          new THREE.Vector3(-0.3427838737531674, 0.824210912520428, -0.45075002781698864),
+          new THREE.Vector3(-0.37922847289937317, 0.8309496822966481, -0.4070729551732822),
+          new THREE.Vector3(-0.36004338396766916, 0.8619918102735036, -0.3568457379352006),
+          new THREE.Vector3(-0.6084306354217214, 0.7671163334786019, -0.20333394401984867),
+          new THREE.Vector3(-0.627615737863776, 0.7360742008168659, -0.25356114938515417),
+          new THREE.Vector3(-0.6708438474449625, 0.6989031647462897, -0.24799777953211752),
+          new THREE.Vector3(-0.6992437766539795, 0.6881268496755024, -0.19375133436017458),
+          new THREE.Vector3(-0.6814673067951944, 0.7168897682243156, -0.14721198994848042),
+          new THREE.Vector3(-0.6346981221795249, 0.7573881658965492, -0.15336707554637022),
+          new THREE.Vector3(0.30663815260056926, 0.8826959184155989, 0.35611930442220063),
+          new THREE.Vector3(0.2669569068529626, 0.8752186466953623, 0.4033935179948199),
+          new THREE.Vector3(0.28473336013164197, 0.8464557385122534, 0.44993287984745056),
+          new THREE.Vector3(0.3427838737531674, 0.824210912520428, 0.45075002781698864),
+          new THREE.Vector3(0.37922847289937317, 0.8309496822966481, 0.4070729551732822),
+          new THREE.Vector3(0.36004338396766916, 0.8619918102735036, 0.3568457379352006),
+          new THREE.Vector3(0.6084306354217214, 0.7671163334786019, 0.20333394401984867),
+          new THREE.Vector3(0.627615737863776, 0.7360742008168659, 0.25356114938515417),
+          new THREE.Vector3(0.6708438474449625, 0.6989031647462897, 0.24799777953211752),
+          new THREE.Vector3(0.6992437766539795, 0.6881268496755024, 0.19375133436017458),
+          new THREE.Vector3(0.6814673067951944, 0.7168897682243156, 0.14721198994848042),
+          new THREE.Vector3(0.6346981221795249, 0.7573881658965492, 0.15336707554637022),
+          new THREE.Vector3(0.6346981221795249, 0.7573881658965492, -0.15336707554637022),
+          new THREE.Vector3(0.6814673067951944, 0.7168897682243156, -0.14721198994848042),
+          new THREE.Vector3(0.6992437766539795, 0.6881268496755024, -0.19375133436017458),
+          new THREE.Vector3(0.6708438474449625, 0.6989031647462897, -0.24799777953211752),
+          new THREE.Vector3(0.627615737863776, 0.7360742008168659, -0.25356114938515417),
+          new THREE.Vector3(0.6084306354217214, 0.7671163334786019, -0.20333394401984867),
+          new THREE.Vector3(0.36004338396766916, 0.8619918102735036, -0.3568457379352006),
+          new THREE.Vector3(0.37922847289937317, 0.8309496822966481, -0.4070729551732822),
+          new THREE.Vector3(0.3427838737531674, 0.824210912520428, -0.45075002781698864),
+          new THREE.Vector3(0.28473336013164197, 0.8464557385122534, -0.44993287984745056),
+          new THREE.Vector3(0.2669569068529626, 0.8752186466953623, -0.4033935179948199),
+          new THREE.Vector3(0.30663815260056926, 0.8826959184155989, -0.35611930442220063),
+          new THREE.Vector3(0.6989031647462898, 0.2479977795321173, 0.6708438474449624),
+          new THREE.Vector3(0.6881268496755023, 0.1937513343601748, 0.6992437766539793),
+          new THREE.Vector3(0.7168897682243156, 0.14721198994848037, 0.6814673067951943),
+          new THREE.Vector3(0.7573881658965492, 0.15336707554637038, 0.6346981221795248),
+          new THREE.Vector3(0.7671163334786019, 0.2033339440198483, 0.6084306354217214),
+          new THREE.Vector3(0.7360742008168658, 0.2535611493851541, 0.6276157378637757),
+          new THREE.Vector3(0.8309496822966481, 0.40707295517328207, 0.3792284728993732),
+          new THREE.Vector3(0.8619918102735035, 0.3568457379352005, 0.3600433839676692),
+          new THREE.Vector3(0.8826959184155989, 0.35611930442220063, 0.3066381526005692),
+          new THREE.Vector3(0.8752186466953623, 0.4033935179948199, 0.2669569068529626),
+          new THREE.Vector3(0.8464557385122534, 0.44993287984745056, 0.28473336013164185),
+          new THREE.Vector3(0.8242109125204281, 0.45075002781698853, 0.34278387375316743),
+          new THREE.Vector3(0.7573881658965492, -0.15336707554637038, 0.6346981221795248),
+          new THREE.Vector3(0.7168897682243156, -0.14721198994848037, 0.6814673067951943),
+          new THREE.Vector3(0.6881268496755023, -0.1937513343601748, 0.6992437766539793),
+          new THREE.Vector3(0.6989031647462898, -0.2479977795321173, 0.6708438474449624),
+          new THREE.Vector3(0.7360742008168658, -0.2535611493851541, 0.6276157378637757),
+          new THREE.Vector3(0.7671163334786019, -0.2033339440198483, 0.6084306354217214),
+          new THREE.Vector3(0.8619918102735035, -0.3568457379352005, 0.3600433839676692),
+          new THREE.Vector3(0.8309496822966481, -0.40707295517328207, 0.3792284728993732),
+          new THREE.Vector3(0.8242109125204281, -0.45075002781698853, 0.34278387375316743),
+          new THREE.Vector3(0.8464557385122534, -0.44993287984745056, 0.28473336013164185),
+          new THREE.Vector3(0.8752186466953623, -0.4033935179948199, 0.2669569068529626),
+          new THREE.Vector3(0.8826959184155989, -0.35611930442220063, 0.3066381526005692),
+          new THREE.Vector3(0.9774819885541325, -0.20275223176125415, 0.05848499438394128),
+          new THREE.Vector3(0.9662006573203725, -0.256181546826233, 0.028762907700698077),
+          new THREE.Vector3(0.9662006573203725, -0.256181546826233, -0.028762907700698077),
+          new THREE.Vector3(0.9774819885541325, -0.20275223176125415, -0.05848499438394128),
+          new THREE.Vector3(0.9876591111501778, -0.15351177943628871, -0.03104212841196775),
+          new THREE.Vector3(0.9876591111501778, -0.15351177943628871, 0.03104212841196775),
+          new THREE.Vector3(0.9876591111501778, 0.15351177943628871, 0.03104212841196775),
+          new THREE.Vector3(0.9876591111501778, 0.15351177943628871, -0.03104212841196775),
+          new THREE.Vector3(0.9774819885541325, 0.20275223176125415, -0.05848499438394128),
+          new THREE.Vector3(0.9662006573203725, 0.256181546826233, -0.028762907700698077),
+          new THREE.Vector3(0.9662006573203725, 0.256181546826233, 0.028762907700698077),
+          new THREE.Vector3(0.9774819885541325, 0.20275223176125415, 0.05848499438394128),
+          new THREE.Vector3(0.8826959184155989, -0.35611930442220063, -0.3066381526005692),
+          new THREE.Vector3(0.8752186466953623, -0.4033935179948199, -0.2669569068529626),
+          new THREE.Vector3(0.8464557385122534, -0.44993287984745056, -0.28473336013164185),
+          new THREE.Vector3(0.8242109125204281, -0.45075002781698853, -0.34278387375316743),
+          new THREE.Vector3(0.8309496822966481, -0.40707295517328207, -0.3792284728993732),
+          new THREE.Vector3(0.8619918102735035, -0.3568457379352005, -0.3600433839676692),
+          new THREE.Vector3(0.7671163334786019, -0.2033339440198483, -0.6084306354217214),
+          new THREE.Vector3(0.7360742008168658, -0.2535611493851541, -0.6276157378637757),
+          new THREE.Vector3(0.6989031647462898, -0.2479977795321173, -0.6708438474449624),
+          new THREE.Vector3(0.6881268496755023, -0.1937513343601748, -0.6992437766539793),
+          new THREE.Vector3(0.7168897682243156, -0.14721198994848037, -0.6814673067951943),
+          new THREE.Vector3(0.7573881658965492, -0.15336707554637038, -0.6346981221795248),
+          new THREE.Vector3(0.7573881658965492, 0.15336707554637038, -0.6346981221795248),
+          new THREE.Vector3(0.7168897682243156, 0.14721198994848037, -0.6814673067951943),
+          new THREE.Vector3(0.6881268496755023, 0.1937513343601748, -0.6992437766539793),
+          new THREE.Vector3(0.6989031647462898, 0.2479977795321173, -0.6708438474449624),
+          new THREE.Vector3(0.7360742008168658, 0.2535611493851541, -0.6276157378637757),
+          new THREE.Vector3(0.7671163334786019, 0.2033339440198483, -0.6084306354217214),
+          new THREE.Vector3(0.8619918102735035, 0.3568457379352005, -0.3600433839676692),
+          new THREE.Vector3(0.8309496822966481, 0.40707295517328207, -0.3792284728993732),
+          new THREE.Vector3(0.8242109125204281, 0.45075002781698853, -0.34278387375316743),
+          new THREE.Vector3(0.8464557385122534, 0.44993287984745056, -0.28473336013164185),
+          new THREE.Vector3(0.8752186466953623, 0.4033935179948199, -0.2669569068529626),
+          new THREE.Vector3(0.8826959184155989, 0.35611930442220063, -0.3066381526005692),
+          new THREE.Vector3(0.45075002781698864, 0.3427838737531675, -0.824210912520428),
+          new THREE.Vector3(0.44993287984745056, 0.2847333601316419, -0.8464557385122535),
+          new THREE.Vector3(0.4033935179948199, 0.2669569068529626, -0.8752186466953623),
+          new THREE.Vector3(0.3561193044222007, 0.3066381526005693, -0.8826959184155991),
+          new THREE.Vector3(0.35684573793520047, 0.36004338396766916, -0.8619918102735036),
+          new THREE.Vector3(0.40707295517328224, 0.3792284728993729, -0.8309496822966481),
+          new THREE.Vector3(0.25356114938515417, 0.627615737863776, -0.7360742008168658),
+          new THREE.Vector3(0.2033339440198485, 0.6084306354217213, -0.7671163334786019),
+          new THREE.Vector3(0.15336707554637033, 0.634698122179525, -0.7573881658965492),
+          new THREE.Vector3(0.14721198994848045, 0.6814673067951943, -0.7168897682243156),
+          new THREE.Vector3(0.19375133436017458, 0.6992437766539795, -0.6881268496755024),
+          new THREE.Vector3(0.24799777953211752, 0.6708438474449625, -0.6989031647462897),
+          new THREE.Vector3(0.2027522317612541, 0.05848499438394128, -0.9774819885541324),
+          new THREE.Vector3(0.25618154682623295, 0.02876290770069807, -0.9662006573203723),
+          new THREE.Vector3(0.25618154682623295, -0.02876290770069807, -0.9662006573203723),
+          new THREE.Vector3(0.2027522317612541, -0.05848499438394128, -0.9774819885541324),
+          new THREE.Vector3(0.15351177943628871, -0.031042128411967764, -0.9876591111501777),
+          new THREE.Vector3(0.15351177943628871, 0.031042128411967764, -0.9876591111501777),
+          new THREE.Vector3(-0.15351177943628871, 0.031042128411967764, -0.9876591111501777),
+          new THREE.Vector3(-0.15351177943628871, -0.031042128411967764, -0.9876591111501777),
+          new THREE.Vector3(-0.2027522317612541, -0.05848499438394128, -0.9774819885541324),
+          new THREE.Vector3(-0.25618154682623295, -0.02876290770069807, -0.9662006573203723),
+          new THREE.Vector3(-0.25618154682623295, 0.02876290770069807, -0.9662006573203723),
+          new THREE.Vector3(-0.2027522317612541, 0.05848499438394128, -0.9774819885541324),
+          new THREE.Vector3(-0.3561193044222007, 0.3066381526005693, -0.8826959184155991),
+          new THREE.Vector3(-0.4033935179948199, 0.2669569068529626, -0.8752186466953623),
+          new THREE.Vector3(-0.44993287984745056, 0.2847333601316419, -0.8464557385122535),
+          new THREE.Vector3(-0.45075002781698864, 0.3427838737531675, -0.824210912520428),
+          new THREE.Vector3(-0.40707295517328224, 0.3792284728993729, -0.8309496822966481),
+          new THREE.Vector3(-0.35684573793520047, 0.36004338396766916, -0.8619918102735036),
+          new THREE.Vector3(-0.2033339440198485, 0.6084306354217213, -0.7671163334786019),
+          new THREE.Vector3(-0.25356114938515417, 0.627615737863776, -0.7360742008168658),
+          new THREE.Vector3(-0.24799777953211752, 0.6708438474449625, -0.6989031647462897),
+          new THREE.Vector3(-0.19375133436017458, 0.6992437766539795, -0.6881268496755024),
+          new THREE.Vector3(-0.14721198994848045, 0.6814673067951943, -0.7168897682243156),
+          new THREE.Vector3(-0.15336707554637033, 0.634698122179525, -0.7573881658965492),
+          new THREE.Vector3(0.3561193044222007, -0.3066381526005693, -0.8826959184155991),
+          new THREE.Vector3(0.4033935179948199, -0.2669569068529626, -0.8752186466953623),
+          new THREE.Vector3(0.44993287984745056, -0.2847333601316419, -0.8464557385122535),
+          new THREE.Vector3(0.45075002781698864, -0.3427838737531675, -0.824210912520428),
+          new THREE.Vector3(0.40707295517328224, -0.3792284728993729, -0.8309496822966481),
+          new THREE.Vector3(0.35684573793520047, -0.36004338396766916, -0.8619918102735036),
+          new THREE.Vector3(0.2033339440198485, -0.6084306354217213, -0.7671163334786019),
+          new THREE.Vector3(0.25356114938515417, -0.627615737863776, -0.7360742008168658),
+          new THREE.Vector3(0.24799777953211752, -0.6708438474449625, -0.6989031647462897),
+          new THREE.Vector3(0.19375133436017458, -0.6992437766539795, -0.6881268496755024),
+          new THREE.Vector3(0.14721198994848045, -0.6814673067951943, -0.7168897682243156),
+          new THREE.Vector3(0.15336707554637033, -0.634698122179525, -0.7573881658965492),
+          new THREE.Vector3(-0.15336707554637033, -0.634698122179525, -0.7573881658965492),
+          new THREE.Vector3(-0.14721198994848045, -0.6814673067951943, -0.7168897682243156),
+          new THREE.Vector3(-0.19375133436017458, -0.6992437766539795, -0.6881268496755024),
+          new THREE.Vector3(-0.24799777953211752, -0.6708438474449625, -0.6989031647462897),
+          new THREE.Vector3(-0.25356114938515417, -0.627615737863776, -0.7360742008168658),
+          new THREE.Vector3(-0.2033339440198485, -0.6084306354217213, -0.7671163334786019),
+          new THREE.Vector3(-0.35684573793520047, -0.36004338396766916, -0.8619918102735036),
+          new THREE.Vector3(-0.40707295517328224, -0.3792284728993729, -0.8309496822966481),
+          new THREE.Vector3(-0.45075002781698864, -0.3427838737531675, -0.824210912520428),
+          new THREE.Vector3(-0.44993287984745056, -0.2847333601316419, -0.8464557385122535),
+          new THREE.Vector3(-0.4033935179948199, -0.2669569068529626, -0.8752186466953623),
+          new THREE.Vector3(-0.3561193044222007, -0.3066381526005693, -0.8826959184155991),
+          new THREE.Vector3(0.6708438474449625, -0.6989031647462897, -0.24799777953211752),
+          new THREE.Vector3(0.6992437766539795, -0.6881268496755024, -0.19375133436017458),
+          new THREE.Vector3(0.6814673067951944, -0.7168897682243156, -0.14721198994848042),
+          new THREE.Vector3(0.6346981221795249, -0.7573881658965492, -0.15336707554637022),
+          new THREE.Vector3(0.6084306354217214, -0.7671163334786019, -0.20333394401984867),
+          new THREE.Vector3(0.627615737863776, -0.7360742008168659, -0.25356114938515417),
+          new THREE.Vector3(0.37922847289937317, -0.8309496822966481, -0.4070729551732822),
+          new THREE.Vector3(0.36004338396766916, -0.8619918102735036, -0.3568457379352006),
+          new THREE.Vector3(0.30663815260056926, -0.8826959184155989, -0.35611930442220063),
+          new THREE.Vector3(0.2669569068529626, -0.8752186466953623, -0.4033935179948199),
+          new THREE.Vector3(0.28473336013164197, -0.8464557385122534, -0.44993287984745056),
+          new THREE.Vector3(0.3427838737531674, -0.824210912520428, -0.45075002781698864),
+          new THREE.Vector3(0.6346981221795249, -0.7573881658965492, 0.15336707554637022),
+          new THREE.Vector3(0.6814673067951944, -0.7168897682243156, 0.14721198994848042),
+          new THREE.Vector3(0.6992437766539795, -0.6881268496755024, 0.19375133436017458),
+          new THREE.Vector3(0.6708438474449625, -0.6989031647462897, 0.24799777953211752),
+          new THREE.Vector3(0.627615737863776, -0.7360742008168659, 0.25356114938515417),
+          new THREE.Vector3(0.6084306354217214, -0.7671163334786019, 0.20333394401984867),
+          new THREE.Vector3(0.36004338396766916, -0.8619918102735036, 0.3568457379352006),
+          new THREE.Vector3(0.37922847289937317, -0.8309496822966481, 0.4070729551732822),
+          new THREE.Vector3(0.3427838737531674, -0.824210912520428, 0.45075002781698864),
+          new THREE.Vector3(0.28473336013164197, -0.8464557385122534, 0.44993287984745056),
+          new THREE.Vector3(0.2669569068529626, -0.8752186466953623, 0.4033935179948199),
+          new THREE.Vector3(0.30663815260056926, -0.8826959184155989, 0.35611930442220063),
+          new THREE.Vector3(0.058484994383941294, -0.9774819885541324, 0.20275223176125415),
+          new THREE.Vector3(0.028762907700698077, -0.9662006573203724, 0.256181546826233),
+          new THREE.Vector3(-0.028762907700698077, -0.9662006573203724, 0.256181546826233),
+          new THREE.Vector3(-0.058484994383941294, -0.9774819885541324, 0.20275223176125415),
+          new THREE.Vector3(-0.03104212841196775, -0.9876591111501778, 0.15351177943628871),
+          new THREE.Vector3(0.03104212841196775, -0.9876591111501778, 0.15351177943628871),
+          new THREE.Vector3(0.03104212841196775, -0.9876591111501778, -0.15351177943628871),
+          new THREE.Vector3(-0.03104212841196775, -0.9876591111501778, -0.15351177943628871),
+          new THREE.Vector3(-0.058484994383941294, -0.9774819885541324, -0.20275223176125415),
+          new THREE.Vector3(-0.028762907700698077, -0.9662006573203724, -0.256181546826233),
+          new THREE.Vector3(0.028762907700698077, -0.9662006573203724, -0.256181546826233),
+          new THREE.Vector3(0.058484994383941294, -0.9774819885541324, -0.20275223176125415),
+          new THREE.Vector3(-0.30663815260056926, -0.8826959184155989, 0.35611930442220063),
+          new THREE.Vector3(-0.2669569068529626, -0.8752186466953623, 0.4033935179948199),
+          new THREE.Vector3(-0.28473336013164197, -0.8464557385122534, 0.44993287984745056),
+          new THREE.Vector3(-0.3427838737531674, -0.824210912520428, 0.45075002781698864),
+          new THREE.Vector3(-0.37922847289937317, -0.8309496822966481, 0.4070729551732822),
+          new THREE.Vector3(-0.36004338396766916, -0.8619918102735036, 0.3568457379352006),
+          new THREE.Vector3(-0.6084306354217214, -0.7671163334786019, 0.20333394401984867),
+          new THREE.Vector3(-0.627615737863776, -0.7360742008168659, 0.25356114938515417),
+          new THREE.Vector3(-0.6708438474449625, -0.6989031647462897, 0.24799777953211752),
+          new THREE.Vector3(-0.6992437766539795, -0.6881268496755024, 0.19375133436017458),
+          new THREE.Vector3(-0.6814673067951944, -0.7168897682243156, 0.14721198994848042),
+          new THREE.Vector3(-0.6346981221795249, -0.7573881658965492, 0.15336707554637022),
+          new THREE.Vector3(-0.6346981221795249, -0.7573881658965492, -0.15336707554637022),
+          new THREE.Vector3(-0.6814673067951944, -0.7168897682243156, -0.14721198994848042),
+          new THREE.Vector3(-0.6992437766539795, -0.6881268496755024, -0.19375133436017458),
+          new THREE.Vector3(-0.6708438474449625, -0.6989031647462897, -0.24799777953211752),
+          new THREE.Vector3(-0.627615737863776, -0.7360742008168659, -0.25356114938515417),
+          new THREE.Vector3(-0.6084306354217214, -0.7671163334786019, -0.20333394401984867),
+          new THREE.Vector3(-0.36004338396766916, -0.8619918102735036, -0.3568457379352006),
+          new THREE.Vector3(-0.37922847289937317, -0.8309496822966481, -0.4070729551732822),
+          new THREE.Vector3(-0.3427838737531674, -0.824210912520428, -0.45075002781698864),
+          new THREE.Vector3(-0.28473336013164197, -0.8464557385122534, -0.44993287984745056),
+          new THREE.Vector3(-0.2669569068529626, -0.8752186466953623, -0.4033935179948199),
+          new THREE.Vector3(-0.30663815260056926, -0.8826959184155989, -0.35611930442220063),
+          new THREE.Vector3(-0.24799777953211752, -0.6708438474449625, 0.6989031647462897),
+          new THREE.Vector3(-0.19375133436017458, -0.6992437766539795, 0.6881268496755024),
+          new THREE.Vector3(-0.14721198994848045, -0.6814673067951943, 0.7168897682243156),
+          new THREE.Vector3(-0.15336707554637033, -0.634698122179525, 0.7573881658965492),
+          new THREE.Vector3(-0.2033339440198485, -0.6084306354217213, 0.7671163334786019),
+          new THREE.Vector3(-0.25356114938515417, -0.627615737863776, 0.7360742008168658),
+          new THREE.Vector3(-0.40707295517328224, -0.3792284728993729, 0.8309496822966481),
+          new THREE.Vector3(-0.35684573793520047, -0.36004338396766916, 0.8619918102735036),
+          new THREE.Vector3(-0.3561193044222007, -0.3066381526005693, 0.8826959184155991),
+          new THREE.Vector3(-0.4033935179948199, -0.2669569068529626, 0.8752186466953623),
+          new THREE.Vector3(-0.44993287984745056, -0.2847333601316419, 0.8464557385122535),
+          new THREE.Vector3(-0.45075002781698864, -0.3427838737531675, 0.824210912520428),
+          new THREE.Vector3(-0.6989031647462898, -0.2479977795321173, 0.6708438474449624),
+          new THREE.Vector3(-0.6881268496755023, -0.1937513343601748, 0.6992437766539793),
+          new THREE.Vector3(-0.7168897682243156, -0.14721198994848037, 0.6814673067951943),
+          new THREE.Vector3(-0.7573881658965492, -0.15336707554637038, 0.6346981221795248),
+          new THREE.Vector3(-0.7671163334786019, -0.2033339440198483, 0.6084306354217214),
+          new THREE.Vector3(-0.7360742008168658, -0.2535611493851541, 0.6276157378637757),
+          new THREE.Vector3(-0.8309496822966481, -0.40707295517328207, 0.3792284728993732),
+          new THREE.Vector3(-0.8619918102735035, -0.3568457379352005, 0.3600433839676692),
+          new THREE.Vector3(-0.8826959184155989, -0.35611930442220063, 0.3066381526005692),
+          new THREE.Vector3(-0.8752186466953623, -0.4033935179948199, 0.2669569068529626),
+          new THREE.Vector3(-0.8464557385122534, -0.44993287984745056, 0.28473336013164185),
+          new THREE.Vector3(-0.8242109125204281, -0.45075002781698853, 0.34278387375316743),
+          new THREE.Vector3(0.15336707554637033, -0.634698122179525, 0.7573881658965492),
+          new THREE.Vector3(0.14721198994848045, -0.6814673067951943, 0.7168897682243156),
+          new THREE.Vector3(0.19375133436017458, -0.6992437766539795, 0.6881268496755024),
+          new THREE.Vector3(0.24799777953211752, -0.6708438474449625, 0.6989031647462897),
+          new THREE.Vector3(0.25356114938515417, -0.627615737863776, 0.7360742008168658),
+          new THREE.Vector3(0.2033339440198485, -0.6084306354217213, 0.7671163334786019),
+          new THREE.Vector3(0.35684573793520047, -0.36004338396766916, 0.8619918102735036),
+          new THREE.Vector3(0.40707295517328224, -0.3792284728993729, 0.8309496822966481),
+          new THREE.Vector3(0.45075002781698864, -0.3427838737531675, 0.824210912520428),
+          new THREE.Vector3(0.44993287984745056, -0.2847333601316419, 0.8464557385122535),
+          new THREE.Vector3(0.4033935179948199, -0.2669569068529626, 0.8752186466953623),
+          new THREE.Vector3(0.3561193044222007, -0.3066381526005693, 0.8826959184155991),
+          new THREE.Vector3(-0.9774819885541325, 0.20275223176125415, 0.05848499438394128),
+          new THREE.Vector3(-0.9662006573203725, 0.256181546826233, 0.028762907700698077),
+          new THREE.Vector3(-0.9662006573203725, 0.256181546826233, -0.028762907700698077),
+          new THREE.Vector3(-0.9774819885541325, 0.20275223176125415, -0.05848499438394128),
+          new THREE.Vector3(-0.9876591111501778, 0.15351177943628871, -0.03104212841196775),
+          new THREE.Vector3(-0.9876591111501778, 0.15351177943628871, 0.03104212841196775),
+          new THREE.Vector3(-0.9876591111501778, -0.15351177943628871, 0.03104212841196775),
+          new THREE.Vector3(-0.9876591111501778, -0.15351177943628871, -0.03104212841196775),
+          new THREE.Vector3(-0.9774819885541325, -0.20275223176125415, -0.05848499438394128),
+          new THREE.Vector3(-0.9662006573203725, -0.256181546826233, -0.028762907700698077),
+          new THREE.Vector3(-0.9662006573203725, -0.256181546826233, 0.028762907700698077),
+          new THREE.Vector3(-0.9774819885541325, -0.20275223176125415, 0.05848499438394128),
+          new THREE.Vector3(-0.8826959184155989, 0.35611930442220063, -0.3066381526005692),
+          new THREE.Vector3(-0.8752186466953623, 0.4033935179948199, -0.2669569068529626),
+          new THREE.Vector3(-0.8464557385122534, 0.44993287984745056, -0.28473336013164185),
+          new THREE.Vector3(-0.8242109125204281, 0.45075002781698853, -0.34278387375316743),
+          new THREE.Vector3(-0.8309496822966481, 0.40707295517328207, -0.3792284728993732),
+          new THREE.Vector3(-0.8619918102735035, 0.3568457379352005, -0.3600433839676692),
+          new THREE.Vector3(-0.7671163334786019, 0.2033339440198483, -0.6084306354217214),
+          new THREE.Vector3(-0.7360742008168658, 0.2535611493851541, -0.6276157378637757),
+          new THREE.Vector3(-0.6989031647462898, 0.2479977795321173, -0.6708438474449624),
+          new THREE.Vector3(-0.6881268496755023, 0.1937513343601748, -0.6992437766539793),
+          new THREE.Vector3(-0.7168897682243156, 0.14721198994848037, -0.6814673067951943),
+          new THREE.Vector3(-0.7573881658965492, 0.15336707554637038, -0.6346981221795248),
+          new THREE.Vector3(-0.7573881658965492, -0.15336707554637038, -0.6346981221795248),
+          new THREE.Vector3(-0.7168897682243156, -0.14721198994848037, -0.6814673067951943),
+          new THREE.Vector3(-0.6881268496755023, -0.1937513343601748, -0.6992437766539793),
+          new THREE.Vector3(-0.6989031647462898, -0.2479977795321173, -0.6708438474449624),
+          new THREE.Vector3(-0.7360742008168658, -0.2535611493851541, -0.6276157378637757),
+          new THREE.Vector3(-0.7671163334786019, -0.2033339440198483, -0.6084306354217214),
+          new THREE.Vector3(-0.8619918102735035, -0.3568457379352005, -0.3600433839676692),
+          new THREE.Vector3(-0.8309496822966481, -0.40707295517328207, -0.3792284728993732),
+          new THREE.Vector3(-0.8242109125204281, -0.45075002781698853, -0.34278387375316743),
+          new THREE.Vector3(-0.8464557385122534, -0.44993287984745056, -0.28473336013164185),
+          new THREE.Vector3(-0.8752186466953623, -0.4033935179948199, -0.2669569068529626),
+          new THREE.Vector3(-0.8826959184155989, -0.35611930442220063, -0.3066381526005692),
+          new THREE.Vector3(-0.022277042429400297, 0.011754044210221623, 0.9996827375849313),
+          new THREE.Vector3(-0.022277042429400297, -0.011754044210221623, 0.9996827375849313),
+          new THREE.Vector3(0.022277042429400297, -0.011754044210221623, 0.9996827375849313),
+          new THREE.Vector3(0.022277042429400297, 0.011754044210221623, 0.9996827375849313),
+          new THREE.Vector3(0.2846962360432027, 0.15975643208121687, 0.9452121114287061),
+          new THREE.Vector3(0.30223530616333094, 0.1462747038786718, 0.9419434859446528),
+          new THREE.Vector3(0.32385548659733443, 0.1812568850644065, 0.928581480225377),
+          new THREE.Vector3(0.30518905515315775, 0.19291452088638847, 0.932546850429456),
+          new THREE.Vector3(0.3105482595321253, 0.47818666582941965, 0.8215213272487273),
+          new THREE.Vector3(0.32956670140742367, 0.4854510582625895, 0.8097672871604299),
+          new THREE.Vector3(0.30728965645579265, 0.5214960686433191, 0.7959993199901891),
+          new THREE.Vector3(0.28827120555115193, 0.5142316740012167, 0.8077533642789686),
+          new THREE.Vector3(0.02049282605993195, 0.6535626842390887, 0.7565949126515948),
+          new THREE.Vector3(0.021620179141807347, 0.670283865000739, 0.7417898005321637),
+          new THREE.Vector3(-0.021620179141807347, 0.670283865000739, 0.7417898005321637),
+          new THREE.Vector3(-0.02049282605993195, 0.6535626842390887, 0.7565949126515948),
+          new THREE.Vector3(-0.28827120555115193, 0.5142316740012167, 0.8077533642789686),
+          new THREE.Vector3(-0.30728965645579265, 0.5214960686433191, 0.7959993199901891),
+          new THREE.Vector3(-0.32956670140742367, 0.4854510582625895, 0.8097672871604299),
+          new THREE.Vector3(-0.3105482595321253, 0.47818666582941965, 0.8215213272487273),
+          new THREE.Vector3(-0.30518905515315775, 0.19291452088638847, 0.932546850429456),
+          new THREE.Vector3(-0.32385548659733443, 0.1812568850644065, 0.928581480225377),
+          new THREE.Vector3(-0.30223530616333094, 0.1462747038786718, 0.9419434859446528),
+          new THREE.Vector3(-0.2846962360432027, 0.15975643208121687, 0.9452121114287061),
+          new THREE.Vector3(-0.2789841682060812, 0.7522975952676343, 0.5968384723230364),
+          new THREE.Vector3(-0.2582976147657275, 0.7606866041207104, 0.5955150984799945),
+          new THREE.Vector3(-0.2716596304988084, 0.7823067760704049, 0.5605329189901163),
+          new THREE.Vector3(-0.29164943037149504, 0.7727904165030297, 0.5636803898709413),
+          new THREE.Vector3(-0.48545105826258916, 0.8097672871604299, 0.32956670140742383),
+          new THREE.Vector3(-0.4781866658294197, 0.8215213272487274, 0.3105482595321256),
+          new THREE.Vector3(-0.5142316740012167, 0.8077533642789686, 0.2882712055511519),
+          new THREE.Vector3(-0.5214960686433192, 0.795999319990189, 0.30728965645579254),
+          new THREE.Vector3(-0.7522975952676343, 0.5968384723230364, 0.2789841682060812),
+          new THREE.Vector3(-0.7606866041207103, 0.5955150984799945, 0.2582976147657275),
+          new THREE.Vector3(-0.782306776070405, 0.5605329189901163, 0.27165963049880854),
+          new THREE.Vector3(-0.7727904165030298, 0.5636803898709413, 0.29164943037149504),
+          new THREE.Vector3(-0.8097672871604297, 0.3295667014074238, 0.48545105826258966),
+          new THREE.Vector3(-0.8215213272487273, 0.31054825953212567, 0.47818666582941954),
+          new THREE.Vector3(-0.8077533642789684, 0.2882712055511519, 0.5142316740012168),
+          new THREE.Vector3(-0.795999319990189, 0.30728965645579237, 0.5214960686433194),
+          new THREE.Vector3(-0.5968384723230364, 0.27898416820608146, 0.7522975952676342),
+          new THREE.Vector3(-0.5955150984799945, 0.2582976147657273, 0.7606866041207104),
+          new THREE.Vector3(-0.5605329189901164, 0.27165963049880865, 0.7823067760704048),
+          new THREE.Vector3(-0.5636803898709415, 0.29164943037149516, 0.7727904165030297),
+          new THREE.Vector3(-0.19291452088638847, 0.932546850429456, 0.30518905515315775),
+          new THREE.Vector3(-0.1812568850644065, 0.928581480225377, 0.32385548659733443),
+          new THREE.Vector3(-0.14627470387867175, 0.9419434859446527, 0.30223530616333105),
+          new THREE.Vector3(-0.15975643208121693, 0.945212111428706, 0.2846962360432026),
+          new THREE.Vector3(-0.01175404421022163, 0.9996827375849315, 0.022277042429400307),
+          new THREE.Vector3(0.01175404421022163, 0.9996827375849315, 0.022277042429400307),
+          new THREE.Vector3(0.01175404421022163, 0.9996827375849315, -0.022277042429400307),
+          new THREE.Vector3(-0.01175404421022163, 0.9996827375849315, -0.022277042429400307),
+          new THREE.Vector3(-0.15975643208121693, 0.945212111428706, -0.2846962360432026),
+          new THREE.Vector3(-0.14627470387867175, 0.9419434859446527, -0.30223530616333105),
+          new THREE.Vector3(-0.1812568850644065, 0.928581480225377, -0.32385548659733443),
+          new THREE.Vector3(-0.19291452088638847, 0.932546850429456, -0.30518905515315775),
+          new THREE.Vector3(-0.4781866658294197, 0.8215213272487274, -0.3105482595321256),
+          new THREE.Vector3(-0.48545105826258916, 0.8097672871604299, -0.32956670140742383),
+          new THREE.Vector3(-0.5214960686433192, 0.795999319990189, -0.30728965645579254),
+          new THREE.Vector3(-0.5142316740012167, 0.8077533642789686, -0.2882712055511519),
+          new THREE.Vector3(-0.6535626842390889, 0.756594912651595, -0.020492826059932065),
+          new THREE.Vector3(-0.6702838650007389, 0.7417898005321637, -0.021620179141807347),
+          new THREE.Vector3(-0.6702838650007389, 0.7417898005321637, 0.021620179141807347),
+          new THREE.Vector3(-0.6535626842390889, 0.756594912651595, 0.020492826059932065),
+          new THREE.Vector3(0.4781866658294197, 0.8215213272487274, 0.3105482595321256),
+          new THREE.Vector3(0.48545105826258916, 0.8097672871604299, 0.32956670140742383),
+          new THREE.Vector3(0.5214960686433192, 0.795999319990189, 0.30728965645579254),
+          new THREE.Vector3(0.5142316740012167, 0.8077533642789686, 0.2882712055511519),
+          new THREE.Vector3(0.6535626842390889, 0.756594912651595, 0.020492826059932065),
+          new THREE.Vector3(0.6702838650007389, 0.7417898005321637, 0.021620179141807347),
+          new THREE.Vector3(0.6702838650007389, 0.7417898005321637, -0.021620179141807347),
+          new THREE.Vector3(0.6535626842390889, 0.756594912651595, -0.020492826059932065),
+          new THREE.Vector3(0.5142316740012167, 0.8077533642789686, -0.2882712055511519),
+          new THREE.Vector3(0.5214960686433192, 0.795999319990189, -0.30728965645579254),
+          new THREE.Vector3(0.48545105826258916, 0.8097672871604299, -0.32956670140742383),
+          new THREE.Vector3(0.4781866658294197, 0.8215213272487274, -0.3105482595321256),
+          new THREE.Vector3(0.19291452088638847, 0.932546850429456, -0.30518905515315775),
+          new THREE.Vector3(0.1812568850644065, 0.928581480225377, -0.32385548659733443),
+          new THREE.Vector3(0.14627470387867175, 0.9419434859446527, -0.30223530616333105),
+          new THREE.Vector3(0.15975643208121693, 0.945212111428706, -0.2846962360432026),
+          new THREE.Vector3(0.15975643208121693, 0.945212111428706, 0.2846962360432026),
+          new THREE.Vector3(0.14627470387867175, 0.9419434859446527, 0.30223530616333105),
+          new THREE.Vector3(0.1812568850644065, 0.928581480225377, 0.32385548659733443),
+          new THREE.Vector3(0.19291452088638847, 0.932546850429456, 0.30518905515315775),
+          new THREE.Vector3(0.5636803898709415, 0.29164943037149516, 0.7727904165030297),
+          new THREE.Vector3(0.5605329189901164, 0.27165963049880865, 0.7823067760704048),
+          new THREE.Vector3(0.5955150984799945, 0.2582976147657273, 0.7606866041207104),
+          new THREE.Vector3(0.5968384723230364, 0.27898416820608146, 0.7522975952676342),
+          new THREE.Vector3(0.795999319990189, 0.30728965645579237, 0.5214960686433194),
+          new THREE.Vector3(0.8077533642789684, 0.2882712055511519, 0.5142316740012168),
+          new THREE.Vector3(0.8215213272487273, 0.31054825953212567, 0.47818666582941954),
+          new THREE.Vector3(0.8097672871604297, 0.3295667014074238, 0.48545105826258966),
+          new THREE.Vector3(0.7727904165030298, 0.5636803898709413, 0.29164943037149504),
+          new THREE.Vector3(0.782306776070405, 0.5605329189901163, 0.27165963049880854),
+          new THREE.Vector3(0.7606866041207103, 0.5955150984799945, 0.2582976147657275),
+          new THREE.Vector3(0.7522975952676343, 0.5968384723230364, 0.2789841682060812),
+          new THREE.Vector3(0.29164943037149504, 0.7727904165030297, 0.5636803898709413),
+          new THREE.Vector3(0.2716596304988084, 0.7823067760704049, 0.5605329189901163),
+          new THREE.Vector3(0.2582976147657275, 0.7606866041207104, 0.5955150984799945),
+          new THREE.Vector3(0.2789841682060812, 0.7522975952676343, 0.5968384723230364),
+          new THREE.Vector3(0.7565949126515951, 0.020492826059932016, 0.6535626842390888),
+          new THREE.Vector3(0.7417898005321638, 0.021620179141807375, 0.670283865000739),
+          new THREE.Vector3(0.7417898005321638, -0.021620179141807375, 0.670283865000739),
+          new THREE.Vector3(0.7565949126515951, -0.020492826059932016, 0.6535626842390888),
+          new THREE.Vector3(0.8077533642789684, -0.2882712055511519, 0.5142316740012168),
+          new THREE.Vector3(0.795999319990189, -0.30728965645579237, 0.5214960686433194),
+          new THREE.Vector3(0.8097672871604297, -0.3295667014074238, 0.48545105826258966),
+          new THREE.Vector3(0.8215213272487273, -0.31054825953212567, 0.47818666582941954),
+          new THREE.Vector3(0.932546850429456, -0.30518905515315775, 0.19291452088638847),
+          new THREE.Vector3(0.928581480225377, -0.32385548659733443, 0.1812568850644065),
+          new THREE.Vector3(0.9419434859446529, -0.302235306163331, 0.14627470387867178),
+          new THREE.Vector3(0.9452121114287059, -0.28469623604320266, 0.15975643208121681),
+          new THREE.Vector3(0.9996827375849315, -0.022277042429400307, 0.01175404421022163),
+          new THREE.Vector3(0.9996827375849315, -0.022277042429400307, -0.01175404421022163),
+          new THREE.Vector3(0.9996827375849315, 0.022277042429400307, -0.01175404421022163),
+          new THREE.Vector3(0.9996827375849315, 0.022277042429400307, 0.01175404421022163),
+          new THREE.Vector3(0.9452121114287059, 0.28469623604320266, 0.15975643208121681),
+          new THREE.Vector3(0.9419434859446529, 0.302235306163331, 0.14627470387867178),
+          new THREE.Vector3(0.928581480225377, 0.32385548659733443, 0.1812568850644065),
+          new THREE.Vector3(0.932546850429456, 0.30518905515315775, 0.19291452088638847),
+          new THREE.Vector3(0.9452121114287059, -0.28469623604320266, -0.15975643208121681),
+          new THREE.Vector3(0.9419434859446529, -0.302235306163331, -0.14627470387867178),
+          new THREE.Vector3(0.928581480225377, -0.32385548659733443, -0.1812568850644065),
+          new THREE.Vector3(0.932546850429456, -0.30518905515315775, -0.19291452088638847),
+          new THREE.Vector3(0.8215213272487273, -0.31054825953212567, -0.47818666582941954),
+          new THREE.Vector3(0.8097672871604297, -0.3295667014074238, -0.48545105826258966),
+          new THREE.Vector3(0.795999319990189, -0.30728965645579237, -0.5214960686433194),
+          new THREE.Vector3(0.8077533642789684, -0.2882712055511519, -0.5142316740012168),
+          new THREE.Vector3(0.7565949126515951, -0.020492826059932016, -0.6535626842390888),
+          new THREE.Vector3(0.7417898005321638, -0.021620179141807375, -0.670283865000739),
+          new THREE.Vector3(0.7417898005321638, 0.021620179141807375, -0.670283865000739),
+          new THREE.Vector3(0.7565949126515951, 0.020492826059932016, -0.6535626842390888),
+          new THREE.Vector3(0.8077533642789684, 0.2882712055511519, -0.5142316740012168),
+          new THREE.Vector3(0.795999319990189, 0.30728965645579237, -0.5214960686433194),
+          new THREE.Vector3(0.8097672871604297, 0.3295667014074238, -0.48545105826258966),
+          new THREE.Vector3(0.8215213272487273, 0.31054825953212567, -0.47818666582941954),
+          new THREE.Vector3(0.932546850429456, 0.30518905515315775, -0.19291452088638847),
+          new THREE.Vector3(0.928581480225377, 0.32385548659733443, -0.1812568850644065),
+          new THREE.Vector3(0.9419434859446529, 0.302235306163331, -0.14627470387867178),
+          new THREE.Vector3(0.9452121114287059, 0.28469623604320266, -0.15975643208121681),
+          new THREE.Vector3(0.7522975952676343, 0.5968384723230364, -0.2789841682060812),
+          new THREE.Vector3(0.7606866041207103, 0.5955150984799945, -0.2582976147657275),
+          new THREE.Vector3(0.782306776070405, 0.5605329189901163, -0.27165963049880854),
+          new THREE.Vector3(0.7727904165030298, 0.5636803898709413, -0.29164943037149504),
+          new THREE.Vector3(0.5968384723230364, 0.27898416820608146, -0.7522975952676342),
+          new THREE.Vector3(0.5955150984799945, 0.2582976147657273, -0.7606866041207104),
+          new THREE.Vector3(0.5605329189901164, 0.27165963049880865, -0.7823067760704048),
+          new THREE.Vector3(0.5636803898709415, 0.29164943037149516, -0.7727904165030297),
+          new THREE.Vector3(0.32956670140742367, 0.4854510582625895, -0.8097672871604299),
+          new THREE.Vector3(0.3105482595321253, 0.47818666582941965, -0.8215213272487273),
+          new THREE.Vector3(0.28827120555115193, 0.5142316740012167, -0.8077533642789686),
+          new THREE.Vector3(0.30728965645579265, 0.5214960686433191, -0.7959993199901891),
+          new THREE.Vector3(0.2789841682060812, 0.7522975952676343, -0.5968384723230364),
+          new THREE.Vector3(0.2582976147657275, 0.7606866041207104, -0.5955150984799945),
+          new THREE.Vector3(0.2716596304988084, 0.7823067760704049, -0.5605329189901163),
+          new THREE.Vector3(0.29164943037149504, 0.7727904165030297, -0.5636803898709413),
+          new THREE.Vector3(0.30518905515315775, 0.19291452088638847, -0.932546850429456),
+          new THREE.Vector3(0.32385548659733443, 0.1812568850644065, -0.928581480225377),
+          new THREE.Vector3(0.30223530616333094, 0.1462747038786718, -0.9419434859446528),
+          new THREE.Vector3(0.2846962360432027, 0.15975643208121687, -0.9452121114287061),
+          new THREE.Vector3(0.022277042429400297, 0.011754044210221623, -0.9996827375849313),
+          new THREE.Vector3(0.022277042429400297, -0.011754044210221623, -0.9996827375849313),
+          new THREE.Vector3(-0.022277042429400297, -0.011754044210221623, -0.9996827375849313),
+          new THREE.Vector3(-0.022277042429400297, 0.011754044210221623, -0.9996827375849313),
+          new THREE.Vector3(-0.2846962360432027, 0.15975643208121687, -0.9452121114287061),
+          new THREE.Vector3(-0.30223530616333094, 0.1462747038786718, -0.9419434859446528),
+          new THREE.Vector3(-0.32385548659733443, 0.1812568850644065, -0.928581480225377),
+          new THREE.Vector3(-0.30518905515315775, 0.19291452088638847, -0.932546850429456),
+          new THREE.Vector3(-0.3105482595321253, 0.47818666582941965, -0.8215213272487273),
+          new THREE.Vector3(-0.32956670140742367, 0.4854510582625895, -0.8097672871604299),
+          new THREE.Vector3(-0.30728965645579265, 0.5214960686433191, -0.7959993199901891),
+          new THREE.Vector3(-0.28827120555115193, 0.5142316740012167, -0.8077533642789686),
+          new THREE.Vector3(-0.02049282605993195, 0.6535626842390887, -0.7565949126515948),
+          new THREE.Vector3(-0.021620179141807347, 0.670283865000739, -0.7417898005321637),
+          new THREE.Vector3(0.021620179141807347, 0.670283865000739, -0.7417898005321637),
+          new THREE.Vector3(0.02049282605993195, 0.6535626842390887, -0.7565949126515948),
+          new THREE.Vector3(0.2846962360432027, -0.15975643208121687, -0.9452121114287061),
+          new THREE.Vector3(0.30223530616333094, -0.1462747038786718, -0.9419434859446528),
+          new THREE.Vector3(0.32385548659733443, -0.1812568850644065, -0.928581480225377),
+          new THREE.Vector3(0.30518905515315775, -0.19291452088638847, -0.932546850429456),
+          new THREE.Vector3(0.3105482595321253, -0.47818666582941965, -0.8215213272487273),
+          new THREE.Vector3(0.32956670140742367, -0.4854510582625895, -0.8097672871604299),
+          new THREE.Vector3(0.30728965645579265, -0.5214960686433191, -0.7959993199901891),
+          new THREE.Vector3(0.28827120555115193, -0.5142316740012167, -0.8077533642789686),
+          new THREE.Vector3(0.02049282605993195, -0.6535626842390887, -0.7565949126515948),
+          new THREE.Vector3(0.021620179141807347, -0.670283865000739, -0.7417898005321637),
+          new THREE.Vector3(-0.021620179141807347, -0.670283865000739, -0.7417898005321637),
+          new THREE.Vector3(-0.02049282605993195, -0.6535626842390887, -0.7565949126515948),
+          new THREE.Vector3(-0.28827120555115193, -0.5142316740012167, -0.8077533642789686),
+          new THREE.Vector3(-0.30728965645579265, -0.5214960686433191, -0.7959993199901891),
+          new THREE.Vector3(-0.32956670140742367, -0.4854510582625895, -0.8097672871604299),
+          new THREE.Vector3(-0.3105482595321253, -0.47818666582941965, -0.8215213272487273),
+          new THREE.Vector3(-0.30518905515315775, -0.19291452088638847, -0.932546850429456),
+          new THREE.Vector3(-0.32385548659733443, -0.1812568850644065, -0.928581480225377),
+          new THREE.Vector3(-0.30223530616333094, -0.1462747038786718, -0.9419434859446528),
+          new THREE.Vector3(-0.2846962360432027, -0.15975643208121687, -0.9452121114287061),
+          new THREE.Vector3(0.5636803898709415, -0.29164943037149516, -0.7727904165030297),
+          new THREE.Vector3(0.5605329189901164, -0.27165963049880865, -0.7823067760704048),
+          new THREE.Vector3(0.5955150984799945, -0.2582976147657273, -0.7606866041207104),
+          new THREE.Vector3(0.5968384723230364, -0.27898416820608146, -0.7522975952676342),
+          new THREE.Vector3(0.7727904165030298, -0.5636803898709413, -0.29164943037149504),
+          new THREE.Vector3(0.782306776070405, -0.5605329189901163, -0.27165963049880854),
+          new THREE.Vector3(0.7606866041207103, -0.5955150984799945, -0.2582976147657275),
+          new THREE.Vector3(0.7522975952676343, -0.5968384723230364, -0.2789841682060812),
+          new THREE.Vector3(0.5214960686433192, -0.795999319990189, -0.30728965645579254),
+          new THREE.Vector3(0.5142316740012167, -0.8077533642789686, -0.2882712055511519),
+          new THREE.Vector3(0.4781866658294197, -0.8215213272487274, -0.3105482595321256),
+          new THREE.Vector3(0.48545105826258916, -0.8097672871604299, -0.32956670140742383),
+          new THREE.Vector3(0.29164943037149504, -0.7727904165030297, -0.5636803898709413),
+          new THREE.Vector3(0.2716596304988084, -0.7823067760704049, -0.5605329189901163),
+          new THREE.Vector3(0.2582976147657275, -0.7606866041207104, -0.5955150984799945),
+          new THREE.Vector3(0.2789841682060812, -0.7522975952676343, -0.5968384723230364),
+          new THREE.Vector3(0.6535626842390889, -0.756594912651595, -0.020492826059932065),
+          new THREE.Vector3(0.6702838650007389, -0.7417898005321637, -0.021620179141807347),
+          new THREE.Vector3(0.6702838650007389, -0.7417898005321637, 0.021620179141807347),
+          new THREE.Vector3(0.6535626842390889, -0.756594912651595, 0.020492826059932065),
+          new THREE.Vector3(0.5142316740012167, -0.8077533642789686, 0.2882712055511519),
+          new THREE.Vector3(0.5214960686433192, -0.795999319990189, 0.30728965645579254),
+          new THREE.Vector3(0.48545105826258916, -0.8097672871604299, 0.32956670140742383),
+          new THREE.Vector3(0.4781866658294197, -0.8215213272487274, 0.3105482595321256),
+          new THREE.Vector3(0.19291452088638847, -0.932546850429456, 0.30518905515315775),
+          new THREE.Vector3(0.1812568850644065, -0.928581480225377, 0.32385548659733443),
+          new THREE.Vector3(0.14627470387867175, -0.9419434859446527, 0.30223530616333105),
+          new THREE.Vector3(0.15975643208121693, -0.945212111428706, 0.2846962360432026),
+          new THREE.Vector3(0.01175404421022163, -0.9996827375849315, 0.022277042429400307),
+          new THREE.Vector3(-0.01175404421022163, -0.9996827375849315, 0.022277042429400307),
+          new THREE.Vector3(-0.01175404421022163, -0.9996827375849315, -0.022277042429400307),
+          new THREE.Vector3(0.01175404421022163, -0.9996827375849315, -0.022277042429400307),
+          new THREE.Vector3(0.15975643208121693, -0.945212111428706, -0.2846962360432026),
+          new THREE.Vector3(0.14627470387867175, -0.9419434859446527, -0.30223530616333105),
+          new THREE.Vector3(0.1812568850644065, -0.928581480225377, -0.32385548659733443),
+          new THREE.Vector3(0.19291452088638847, -0.932546850429456, -0.30518905515315775),
+          new THREE.Vector3(-0.15975643208121693, -0.945212111428706, 0.2846962360432026),
+          new THREE.Vector3(-0.14627470387867175, -0.9419434859446527, 0.30223530616333105),
+          new THREE.Vector3(-0.1812568850644065, -0.928581480225377, 0.32385548659733443),
+          new THREE.Vector3(-0.19291452088638847, -0.932546850429456, 0.30518905515315775),
+          new THREE.Vector3(-0.4781866658294197, -0.8215213272487274, 0.3105482595321256),
+          new THREE.Vector3(-0.48545105826258916, -0.8097672871604299, 0.32956670140742383),
+          new THREE.Vector3(-0.5214960686433192, -0.795999319990189, 0.30728965645579254),
+          new THREE.Vector3(-0.5142316740012167, -0.8077533642789686, 0.2882712055511519),
+          new THREE.Vector3(-0.6535626842390889, -0.756594912651595, 0.020492826059932065),
+          new THREE.Vector3(-0.6702838650007389, -0.7417898005321637, 0.021620179141807347),
+          new THREE.Vector3(-0.6702838650007389, -0.7417898005321637, -0.021620179141807347),
+          new THREE.Vector3(-0.6535626842390889, -0.756594912651595, -0.020492826059932065),
+          new THREE.Vector3(-0.5142316740012167, -0.8077533642789686, -0.2882712055511519),
+          new THREE.Vector3(-0.5214960686433192, -0.795999319990189, -0.30728965645579254),
+          new THREE.Vector3(-0.48545105826258916, -0.8097672871604299, -0.32956670140742383),
+          new THREE.Vector3(-0.4781866658294197, -0.8215213272487274, -0.3105482595321256),
+          new THREE.Vector3(-0.19291452088638847, -0.932546850429456, -0.30518905515315775),
+          new THREE.Vector3(-0.1812568850644065, -0.928581480225377, -0.32385548659733443),
+          new THREE.Vector3(-0.14627470387867175, -0.9419434859446527, -0.30223530616333105),
+          new THREE.Vector3(-0.15975643208121693, -0.945212111428706, -0.2846962360432026),
+          new THREE.Vector3(-0.29164943037149504, -0.7727904165030297, 0.5636803898709413),
+          new THREE.Vector3(-0.2716596304988084, -0.7823067760704049, 0.5605329189901163),
+          new THREE.Vector3(-0.2582976147657275, -0.7606866041207104, 0.5955150984799945),
+          new THREE.Vector3(-0.2789841682060812, -0.7522975952676343, 0.5968384723230364),
+          new THREE.Vector3(-0.30728965645579265, -0.5214960686433191, 0.7959993199901891),
+          new THREE.Vector3(-0.28827120555115193, -0.5142316740012167, 0.8077533642789686),
+          new THREE.Vector3(-0.3105482595321253, -0.47818666582941965, 0.8215213272487273),
+          new THREE.Vector3(-0.32956670140742367, -0.4854510582625895, 0.8097672871604299),
+          new THREE.Vector3(-0.5636803898709415, -0.29164943037149516, 0.7727904165030297),
+          new THREE.Vector3(-0.5605329189901164, -0.27165963049880865, 0.7823067760704048),
+          new THREE.Vector3(-0.5955150984799945, -0.2582976147657273, 0.7606866041207104),
+          new THREE.Vector3(-0.5968384723230364, -0.27898416820608146, 0.7522975952676342),
+          new THREE.Vector3(-0.795999319990189, -0.30728965645579237, 0.5214960686433194),
+          new THREE.Vector3(-0.8077533642789684, -0.2882712055511519, 0.5142316740012168),
+          new THREE.Vector3(-0.8215213272487273, -0.31054825953212567, 0.47818666582941954),
+          new THREE.Vector3(-0.8097672871604297, -0.3295667014074238, 0.48545105826258966),
+          new THREE.Vector3(-0.7727904165030298, -0.5636803898709413, 0.29164943037149504),
+          new THREE.Vector3(-0.782306776070405, -0.5605329189901163, 0.27165963049880854),
+          new THREE.Vector3(-0.7606866041207103, -0.5955150984799945, 0.2582976147657275),
+          new THREE.Vector3(-0.7522975952676343, -0.5968384723230364, 0.2789841682060812),
+          new THREE.Vector3(-0.02049282605993195, -0.6535626842390887, 0.7565949126515948),
+          new THREE.Vector3(-0.021620179141807347, -0.670283865000739, 0.7417898005321637),
+          new THREE.Vector3(0.021620179141807347, -0.670283865000739, 0.7417898005321637),
+          new THREE.Vector3(0.02049282605993195, -0.6535626842390887, 0.7565949126515948),
+          new THREE.Vector3(0.28827120555115193, -0.5142316740012167, 0.8077533642789686),
+          new THREE.Vector3(0.30728965645579265, -0.5214960686433191, 0.7959993199901891),
+          new THREE.Vector3(0.32956670140742367, -0.4854510582625895, 0.8097672871604299),
+          new THREE.Vector3(0.3105482595321253, -0.47818666582941965, 0.8215213272487273),
+          new THREE.Vector3(0.30518905515315775, -0.19291452088638847, 0.932546850429456),
+          new THREE.Vector3(0.32385548659733443, -0.1812568850644065, 0.928581480225377),
+          new THREE.Vector3(0.30223530616333094, -0.1462747038786718, 0.9419434859446528),
+          new THREE.Vector3(0.2846962360432027, -0.15975643208121687, 0.9452121114287061),
+          new THREE.Vector3(-0.2846962360432027, -0.15975643208121687, 0.9452121114287061),
+          new THREE.Vector3(-0.30223530616333094, -0.1462747038786718, 0.9419434859446528),
+          new THREE.Vector3(-0.32385548659733443, -0.1812568850644065, 0.928581480225377),
+          new THREE.Vector3(-0.30518905515315775, -0.19291452088638847, 0.932546850429456),
+          new THREE.Vector3(0.7522975952676343, -0.5968384723230364, 0.2789841682060812),
+          new THREE.Vector3(0.7606866041207103, -0.5955150984799945, 0.2582976147657275),
+          new THREE.Vector3(0.782306776070405, -0.5605329189901163, 0.27165963049880854),
+          new THREE.Vector3(0.7727904165030298, -0.5636803898709413, 0.29164943037149504),
+          new THREE.Vector3(0.5968384723230364, -0.27898416820608146, 0.7522975952676342),
+          new THREE.Vector3(0.5955150984799945, -0.2582976147657273, 0.7606866041207104),
+          new THREE.Vector3(0.5605329189901164, -0.27165963049880865, 0.7823067760704048),
+          new THREE.Vector3(0.5636803898709415, -0.29164943037149516, 0.7727904165030297),
+          new THREE.Vector3(0.2789841682060812, -0.7522975952676343, 0.5968384723230364),
+          new THREE.Vector3(0.2582976147657275, -0.7606866041207104, 0.5955150984799945),
+          new THREE.Vector3(0.2716596304988084, -0.7823067760704049, 0.5605329189901163),
+          new THREE.Vector3(0.29164943037149504, -0.7727904165030297, 0.5636803898709413),
+          new THREE.Vector3(-0.9996827375849315, 0.022277042429400307, 0.01175404421022163),
+          new THREE.Vector3(-0.9996827375849315, 0.022277042429400307, -0.01175404421022163),
+          new THREE.Vector3(-0.9996827375849315, -0.022277042429400307, -0.01175404421022163),
+          new THREE.Vector3(-0.9996827375849315, -0.022277042429400307, 0.01175404421022163),
+          new THREE.Vector3(-0.9452121114287059, -0.28469623604320266, 0.15975643208121681),
+          new THREE.Vector3(-0.9419434859446529, -0.302235306163331, 0.14627470387867178),
+          new THREE.Vector3(-0.928581480225377, -0.32385548659733443, 0.1812568850644065),
+          new THREE.Vector3(-0.932546850429456, -0.30518905515315775, 0.19291452088638847),
+          new THREE.Vector3(-0.7565949126515951, -0.020492826059932016, 0.6535626842390888),
+          new THREE.Vector3(-0.7417898005321638, -0.021620179141807375, 0.670283865000739),
+          new THREE.Vector3(-0.7417898005321638, 0.021620179141807375, 0.670283865000739),
+          new THREE.Vector3(-0.7565949126515951, 0.020492826059932016, 0.6535626842390888),
+          new THREE.Vector3(-0.932546850429456, 0.30518905515315775, 0.19291452088638847),
+          new THREE.Vector3(-0.928581480225377, 0.32385548659733443, 0.1812568850644065),
+          new THREE.Vector3(-0.9419434859446529, 0.302235306163331, 0.14627470387867178),
+          new THREE.Vector3(-0.9452121114287059, 0.28469623604320266, 0.15975643208121681),
+          new THREE.Vector3(-0.8215213272487273, 0.31054825953212567, -0.47818666582941954),
+          new THREE.Vector3(-0.8097672871604297, 0.3295667014074238, -0.48545105826258966),
+          new THREE.Vector3(-0.795999319990189, 0.30728965645579237, -0.5214960686433194),
+          new THREE.Vector3(-0.8077533642789684, 0.2882712055511519, -0.5142316740012168),
+          new THREE.Vector3(-0.7565949126515951, 0.020492826059932016, -0.6535626842390888),
+          new THREE.Vector3(-0.7417898005321638, 0.021620179141807375, -0.670283865000739),
+          new THREE.Vector3(-0.7417898005321638, -0.021620179141807375, -0.670283865000739),
+          new THREE.Vector3(-0.7565949126515951, -0.020492826059932016, -0.6535626842390888),
+          new THREE.Vector3(-0.8077533642789684, -0.2882712055511519, -0.5142316740012168),
+          new THREE.Vector3(-0.795999319990189, -0.30728965645579237, -0.5214960686433194),
+          new THREE.Vector3(-0.8097672871604297, -0.3295667014074238, -0.48545105826258966),
+          new THREE.Vector3(-0.8215213272487273, -0.31054825953212567, -0.47818666582941954),
+          new THREE.Vector3(-0.932546850429456, -0.30518905515315775, -0.19291452088638847),
+          new THREE.Vector3(-0.928581480225377, -0.32385548659733443, -0.1812568850644065),
+          new THREE.Vector3(-0.9419434859446529, -0.302235306163331, -0.14627470387867178),
+          new THREE.Vector3(-0.9452121114287059, -0.28469623604320266, -0.15975643208121681),
+          new THREE.Vector3(-0.9452121114287059, 0.28469623604320266, -0.15975643208121681),
+          new THREE.Vector3(-0.9419434859446529, 0.302235306163331, -0.14627470387867178),
+          new THREE.Vector3(-0.928581480225377, 0.32385548659733443, -0.1812568850644065),
+          new THREE.Vector3(-0.932546850429456, 0.30518905515315775, -0.19291452088638847),
+          new THREE.Vector3(-0.29164943037149504, 0.7727904165030297, -0.5636803898709413),
+          new THREE.Vector3(-0.2716596304988084, 0.7823067760704049, -0.5605329189901163),
+          new THREE.Vector3(-0.2582976147657275, 0.7606866041207104, -0.5955150984799945),
+          new THREE.Vector3(-0.2789841682060812, 0.7522975952676343, -0.5968384723230364),
+          new THREE.Vector3(-0.5636803898709415, 0.29164943037149516, -0.7727904165030297),
+          new THREE.Vector3(-0.5605329189901164, 0.27165963049880865, -0.7823067760704048),
+          new THREE.Vector3(-0.5955150984799945, 0.2582976147657273, -0.7606866041207104),
+          new THREE.Vector3(-0.5968384723230364, 0.27898416820608146, -0.7522975952676342),
+          new THREE.Vector3(-0.7727904165030298, 0.5636803898709413, -0.29164943037149504),
+          new THREE.Vector3(-0.782306776070405, 0.5605329189901163, -0.27165963049880854),
+          new THREE.Vector3(-0.7606866041207103, 0.5955150984799945, -0.2582976147657275),
+          new THREE.Vector3(-0.7522975952676343, 0.5968384723230364, -0.2789841682060812),
+          new THREE.Vector3(-0.7522975952676343, -0.5968384723230364, -0.2789841682060812),
+          new THREE.Vector3(-0.7606866041207103, -0.5955150984799945, -0.2582976147657275),
+          new THREE.Vector3(-0.782306776070405, -0.5605329189901163, -0.27165963049880854),
+          new THREE.Vector3(-0.7727904165030298, -0.5636803898709413, -0.29164943037149504),
+          new THREE.Vector3(-0.5968384723230364, -0.27898416820608146, -0.7522975952676342),
+          new THREE.Vector3(-0.5955150984799945, -0.2582976147657273, -0.7606866041207104),
+          new THREE.Vector3(-0.5605329189901164, -0.27165963049880865, -0.7823067760704048),
+          new THREE.Vector3(-0.5636803898709415, -0.29164943037149516, -0.7727904165030297),
+          new THREE.Vector3(-0.2789841682060812, -0.7522975952676343, -0.5968384723230364),
+          new THREE.Vector3(-0.2582976147657275, -0.7606866041207104, -0.5955150984799945),
+          new THREE.Vector3(-0.2716596304988084, -0.7823067760704049, -0.5605329189901163),
+          new THREE.Vector3(-0.29164943037149504, -0.7727904165030297, -0.5636803898709413)
+        ],
+        faces: [
+          [11, 540, 0, 541, 1, 542, 2, 543, 3, 544, 4, 545, 5, 546, 6, 547, 7, 548, 8, 549, 9, 550, 10, 551],
+          [23, 552, 12, 553, 13, 554, 14, 555, 15, 556, 16, 557, 17, 558, 18, 559, 19, 560, 20, 561, 21, 562, 22, 563],
+          [35, 564, 24, 565, 25, 566, 26, 567, 27, 568, 28, 569, 29, 570, 30, 571, 31, 572, 32, 573, 33, 574, 34, 575],
+          [47, 576, 36, 577, 37, 578, 38, 579, 39, 580, 40, 581, 41, 582, 42, 583, 43, 584, 44, 585, 45, 586, 46, 587],
+          [59, 588, 48, 589, 49, 590, 50, 591, 51, 592, 52, 593, 53, 594, 54, 595, 55, 596, 56, 597, 57, 598, 58, 599],
+          [71, 600, 60, 601, 61, 602, 62, 603, 63, 604, 64, 605, 65, 606, 66, 607, 67, 608, 68, 609, 69, 610, 70, 611],
+          [83, 612, 72, 613, 73, 614, 74, 615, 75, 616, 76, 617, 77, 618, 78, 619, 79, 620, 80, 621, 81, 622, 82, 623],
+          [95, 624, 84, 625, 85, 626, 86, 627, 87, 628, 88, 629, 89, 630, 90, 631, 91, 632, 92, 633, 93, 634, 94, 635],
+          [107, 636, 96, 637, 97, 638, 98, 639, 99, 640, 100, 641, 101, 642, 102, 643, 103, 644, 104, 645, 105, 646, 106, 647],
+          [119, 648, 108, 649, 109, 650, 110, 651, 111, 652, 112, 653, 113, 654, 114, 655, 115, 656, 116, 657, 117, 658, 118, 659],
+          [131, 660, 120, 661, 121, 662, 122, 663, 123, 664, 124, 665, 125, 666, 126, 667, 127, 668, 128, 669, 129, 670, 130, 671],
+          [143, 672, 132, 673, 133, 674, 134, 675, 135, 676, 136, 677, 137, 678, 138, 679, 139, 680, 140, 681, 141, 682, 142, 683],
+          [155, 684, 144, 685, 145, 686, 146, 687, 147, 688, 148, 689, 149, 690, 150, 691, 151, 692, 152, 693, 153, 694, 154, 695],
+          [167, 696, 156, 697, 157, 698, 158, 699, 159, 700, 160, 701, 161, 702, 162, 703, 163, 704, 164, 705, 165, 706, 166, 707],
+          [179, 708, 168, 709, 169, 710, 170, 711, 171, 712, 172, 713, 173, 714, 174, 715, 175, 716, 176, 717, 177, 718, 178, 719],
+          [191, 720, 180, 721, 181, 722, 182, 723, 183, 724, 184, 725, 185, 726, 186, 727, 187, 728, 188, 729, 189, 730, 190, 731],
+          [203, 732, 192, 733, 193, 734, 194, 735, 195, 736, 196, 737, 197, 738, 198, 739, 199, 740, 200, 741, 201, 742, 202, 743],
+          [215, 744, 204, 745, 205, 746, 206, 747, 207, 748, 208, 749, 209, 750, 210, 751, 211, 752, 212, 753, 213, 754, 214, 755],
+          [227, 756, 216, 757, 217, 758, 218, 759, 219, 760, 220, 761, 221, 762, 222, 763, 223, 764, 224, 765, 225, 766, 226, 767],
+          [239, 768, 228, 769, 229, 770, 230, 771, 231, 772, 232, 773, 233, 774, 234, 775, 235, 776, 236, 777, 237, 778, 238, 779],
+          [249, 780, 240, 781, 241, 782, 242, 783, 243, 784, 244, 785, 245, 786, 246, 787, 247, 788, 248, 789],
+          [259, 790, 250, 791, 251, 792, 252, 793, 253, 794, 254, 795, 255, 796, 256, 797, 257, 798, 258, 799],
+          [269, 800, 260, 801, 261, 802, 262, 803, 263, 804, 264, 805, 265, 806, 266, 807, 267, 808, 268, 809],
+          [279, 810, 270, 811, 271, 812, 272, 813, 273, 814, 274, 815, 275, 816, 276, 817, 277, 818, 278, 819],
+          [289, 820, 280, 821, 281, 822, 282, 823, 283, 824, 284, 825, 285, 826, 286, 827, 287, 828, 288, 829],
+          [299, 830, 290, 831, 291, 832, 292, 833, 293, 834, 294, 835, 295, 836, 296, 837, 297, 838, 298, 839],
+          [309, 840, 300, 841, 301, 842, 302, 843, 303, 844, 304, 845, 305, 846, 306, 847, 307, 848, 308, 849],
+          [319, 850, 310, 851, 311, 852, 312, 853, 313, 854, 314, 855, 315, 856, 316, 857, 317, 858, 318, 859],
+          [329, 860, 320, 861, 321, 862, 322, 863, 323, 864, 324, 865, 325, 866, 326, 867, 327, 868, 328, 869],
+          [339, 870, 330, 871, 331, 872, 332, 873, 333, 874, 334, 875, 335, 876, 336, 877, 337, 878, 338, 879],
+          [349, 880, 340, 881, 341, 882, 342, 883, 343, 884, 344, 885, 345, 886, 346, 887, 347, 888, 348, 889],
+          [359, 890, 350, 891, 351, 892, 352, 893, 353, 894, 354, 895, 355, 896, 356, 897, 357, 898, 358, 899],
+          [0, 900, 360, 901, 248, 902, 361, 903, 178, 904, 362, 905],
+          [2, 906, 363, 907, 176, 908, 364, 909, 250, 910, 365, 911],
+          [4, 912, 366, 913, 258, 914, 367, 915, 50, 916, 368, 917],
+          [6, 918, 369, 919, 48, 920, 370, 921, 260, 922, 371, 923],
+          [8, 924, 372, 925, 268, 926, 373, 927, 14, 928, 374, 929],
+          [10, 930, 375, 931, 12, 932, 376, 933, 240, 934, 377, 935],
+          [16, 936, 378, 937, 266, 938, 379, 939, 26, 940, 380, 941],
+          [18, 942, 381, 943, 24, 944, 382, 945, 270, 946, 383, 947],
+          [20, 948, 384, 949, 278, 950, 385, 951, 202, 952, 386, 953],
+          [22, 954, 387, 955, 200, 956, 388, 957, 242, 958, 389, 959],
+          [28, 960, 390, 961, 264, 962, 391, 963, 46, 964, 392, 965],
+          [30, 966, 393, 967, 44, 968, 394, 969, 280, 970, 395, 971],
+          [32, 972, 396, 973, 288, 974, 397, 975, 218, 976, 398, 977],
+          [34, 978, 399, 979, 216, 980, 400, 981, 272, 982, 401, 983],
+          [36, 984, 402, 985, 262, 986, 403, 987, 58, 988, 404, 989],
+          [38, 990, 405, 991, 56, 992, 406, 993, 290, 994, 407, 995],
+          [40, 996, 408, 997, 298, 998, 409, 999, 86, 1000, 410, 1001],
+          [42, 1002, 411, 1003, 84, 1004, 412, 1005, 282, 1006, 413, 1007],
+          [52, 1008, 414, 1009, 256, 1010, 415, 1011, 62, 1012, 416, 1013],
+          [54, 1014, 417, 1015, 60, 1016, 418, 1017, 292, 1018, 419, 1019],
+          [64, 1020, 420, 1021, 254, 1022, 421, 1023, 186, 1024, 422, 1025],
+          [66, 1026, 423, 1027, 184, 1028, 424, 1029, 300, 1030, 425, 1031],
+          [68, 1032, 426, 1033, 308, 1034, 427, 1035, 74, 1036, 428, 1037],
+          [70, 1038, 429, 1039, 72, 1040, 430, 1041, 294, 1042, 431, 1043],
+          [76, 1044, 432, 1045, 306, 1046, 433, 1047, 126, 1048, 434, 1049],
+          [78, 1050, 435, 1051, 124, 1052, 436, 1053, 310, 1054, 437, 1055],
+          [80, 1056, 438, 1057, 318, 1058, 439, 1059, 90, 1060, 440, 1061],
+          [82, 1062, 441, 1063, 88, 1064, 442, 1065, 296, 1066, 443, 1067],
+          [92, 1068, 444, 1069, 316, 1070, 445, 1071, 98, 1072, 446, 1073],
+          [94, 1074, 447, 1075, 96, 1076, 448, 1077, 284, 1078, 449, 1079],
+          [100, 1080, 450, 1081, 314, 1082, 451, 1083, 110, 1084, 452, 1085],
+          [102, 1086, 453, 1087, 108, 1088, 454, 1089, 320, 1090, 455, 1091],
+          [104, 1092, 456, 1093, 328, 1094, 457, 1095, 222, 1096, 458, 1097],
+          [106, 1098, 459, 1099, 220, 1100, 460, 1101, 286, 1102, 461, 1103],
+          [112, 1104, 462, 1105, 312, 1106, 463, 1107, 122, 1108, 464, 1109],
+          [114, 1110, 465, 1111, 120, 1112, 466, 1113, 330, 1114, 467, 1115],
+          [116, 1116, 468, 1117, 338, 1118, 469, 1119, 238, 1120, 470, 1121],
+          [118, 1122, 471, 1123, 236, 1124, 472, 1125, 322, 1126, 473, 1127],
+          [128, 1128, 474, 1129, 304, 1130, 475, 1131, 134, 1132, 476, 1133],
+          [130, 1134, 477, 1135, 132, 1136, 478, 1137, 332, 1138, 479, 1139],
+          [136, 1140, 480, 1141, 302, 1142, 481, 1143, 182, 1144, 482, 1145],
+          [138, 1146, 483, 1147, 180, 1148, 484, 1149, 340, 1150, 485, 1151],
+          [140, 1152, 486, 1153, 348, 1154, 487, 1155, 146, 1156, 488, 1157],
+          [142, 1158, 489, 1159, 144, 1160, 490, 1161, 334, 1162, 491, 1163],
+          [148, 1164, 492, 1165, 346, 1166, 493, 1167, 158, 1168, 494, 1169],
+          [150, 1170, 495, 1171, 156, 1172, 496, 1173, 350, 1174, 497, 1175],
+          [152, 1176, 498, 1177, 358, 1178, 499, 1179, 230, 1180, 500, 1181],
+          [154, 1182, 501, 1183, 228, 1184, 502, 1185, 336, 1186, 503, 1187],
+          [160, 1188, 504, 1189, 344, 1190, 505, 1191, 170, 1192, 506, 1193],
+          [162, 1194, 507, 1195, 168, 1196, 508, 1197, 246, 1198, 509, 1199],
+          [164, 1200, 510, 1201, 244, 1202, 511, 1203, 198, 1204, 512, 1205],
+          [166, 1206, 513, 1207, 196, 1208, 514, 1209, 352, 1210, 515, 1211],
+          [172, 1212, 516, 1213, 342, 1214, 517, 1215, 190, 1216, 518, 1217],
+          [174, 1218, 519, 1219, 188, 1220, 520, 1221, 252, 1222, 521, 1223],
+          [192, 1224, 522, 1225, 276, 1226, 523, 1227, 214, 1228, 524, 1229],
+          [194, 1230, 525, 1231, 212, 1232, 526, 1233, 354, 1234, 527, 1235],
+          [204, 1236, 528, 1237, 274, 1238, 529, 1239, 226, 1240, 530, 1241],
+          [206, 1242, 531, 1243, 224, 1244, 532, 1245, 326, 1246, 533, 1247],
+          [208, 1248, 534, 1249, 324, 1250, 535, 1251, 234, 1252, 536, 1253],
+          [210, 1254, 537, 1255, 232, 1256, 538, 1257, 356, 1258, 539, 1259],
+          [1, 1260, 362, 1261, 177, 1262, 363, 1263],
+          [3, 1264, 365, 1265, 259, 1266, 366, 1267],
+          [5, 1268, 368, 1269, 49, 1270, 369, 1271],
+          [7, 1272, 371, 1273, 269, 1274, 372, 1275],
+          [9, 1276, 374, 1277, 13, 1278, 375, 1279],
+          [11, 1280, 377, 1281, 249, 1282, 360, 1283],
+          [15, 1284, 373, 1285, 267, 1286, 378, 1287],
+          [17, 1288, 380, 1289, 25, 1290, 381, 1291],
+          [19, 1292, 383, 1293, 279, 1294, 384, 1295],
+          [21, 1296, 386, 1297, 201, 1298, 387, 1299],
+          [23, 1300, 389, 1301, 241, 1302, 376, 1303],
+          [27, 1304, 379, 1305, 265, 1306, 390, 1307],
+          [29, 1308, 392, 1309, 45, 1310, 393, 1311],
+          [31, 1312, 395, 1313, 289, 1314, 396, 1315],
+          [33, 1316, 398, 1317, 217, 1318, 399, 1319],
+          [35, 1320, 401, 1321, 271, 1322, 382, 1323],
+          [37, 1324, 404, 1325, 57, 1326, 405, 1327],
+          [39, 1328, 407, 1329, 299, 1330, 408, 1331],
+          [41, 1332, 410, 1333, 85, 1334, 411, 1335],
+          [43, 1336, 413, 1337, 281, 1338, 394, 1339],
+          [47, 1340, 391, 1341, 263, 1342, 402, 1343],
+          [51, 1344, 367, 1345, 257, 1346, 414, 1347],
+          [53, 1348, 416, 1349, 61, 1350, 417, 1351],
+          [55, 1352, 419, 1353, 291, 1354, 406, 1355],
+          [59, 1356, 403, 1357, 261, 1358, 370, 1359],
+          [63, 1360, 415, 1361, 255, 1362, 420, 1363],
+          [65, 1364, 422, 1365, 185, 1366, 423, 1367],
+          [67, 1368, 425, 1369, 309, 1370, 426, 1371],
+          [69, 1372, 428, 1373, 73, 1374, 429, 1375],
+          [71, 1376, 431, 1377, 293, 1378, 418, 1379],
+          [75, 1380, 427, 1381, 307, 1382, 432, 1383],
+          [77, 1384, 434, 1385, 125, 1386, 435, 1387],
+          [79, 1388, 437, 1389, 319, 1390, 438, 1391],
+          [81, 1392, 440, 1393, 89, 1394, 441, 1395],
+          [83, 1396, 443, 1397, 295, 1398, 430, 1399],
+          [87, 1400, 409, 1401, 297, 1402, 442, 1403],
+          [91, 1404, 439, 1405, 317, 1406, 444, 1407],
+          [93, 1408, 446, 1409, 97, 1410, 447, 1411],
+          [95, 1412, 449, 1413, 283, 1414, 412, 1415],
+          [99, 1416, 445, 1417, 315, 1418, 450, 1419],
+          [101, 1420, 452, 1421, 109, 1422, 453, 1423],
+          [103, 1424, 455, 1425, 329, 1426, 456, 1427],
+          [105, 1428, 458, 1429, 221, 1430, 459, 1431],
+          [107, 1432, 461, 1433, 285, 1434, 448, 1435],
+          [111, 1436, 451, 1437, 313, 1438, 462, 1439],
+          [113, 1440, 464, 1441, 121, 1442, 465, 1443],
+          [115, 1444, 467, 1445, 339, 1446, 468, 1447],
+          [117, 1448, 470, 1449, 237, 1450, 471, 1451],
+          [119, 1452, 473, 1453, 321, 1454, 454, 1455],
+          [123, 1456, 463, 1457, 311, 1458, 436, 1459],
+          [127, 1460, 433, 1461, 305, 1462, 474, 1463],
+          [129, 1464, 476, 1465, 133, 1466, 477, 1467],
+          [131, 1468, 479, 1469, 331, 1470, 466, 1471],
+          [135, 1472, 475, 1473, 303, 1474, 480, 1475],
+          [137, 1476, 482, 1477, 181, 1478, 483, 1479],
+          [139, 1480, 485, 1481, 349, 1482, 486, 1483],
+          [141, 1484, 488, 1485, 145, 1486, 489, 1487],
+          [143, 1488, 491, 1489, 333, 1490, 478, 1491],
+          [147, 1492, 487, 1493, 347, 1494, 492, 1495],
+          [149, 1496, 494, 1497, 157, 1498, 495, 1499],
+          [151, 1500, 497, 1501, 359, 1502, 498, 1503],
+          [153, 1504, 500, 1505, 229, 1506, 501, 1507],
+          [155, 1508, 503, 1509, 335, 1510, 490, 1511],
+          [159, 1512, 493, 1513, 345, 1514, 504, 1515],
+          [161, 1516, 506, 1517, 169, 1518, 507, 1519],
+          [163, 1520, 509, 1521, 245, 1522, 510, 1523],
+          [165, 1524, 512, 1525, 197, 1526, 513, 1527],
+          [167, 1528, 515, 1529, 351, 1530, 496, 1531],
+          [171, 1532, 505, 1533, 343, 1534, 516, 1535],
+          [173, 1536, 518, 1537, 189, 1538, 519, 1539],
+          [175, 1540, 521, 1541, 251, 1542, 364, 1543],
+          [179, 1544, 361, 1545, 247, 1546, 508, 1547],
+          [183, 1548, 481, 1549, 301, 1550, 424, 1551],
+          [187, 1552, 421, 1553, 253, 1554, 520, 1555],
+          [191, 1556, 517, 1557, 341, 1558, 484, 1559],
+          [193, 1560, 524, 1561, 213, 1562, 525, 1563],
+          [195, 1564, 527, 1565, 353, 1566, 514, 1567],
+          [199, 1568, 511, 1569, 243, 1570, 388, 1571],
+          [203, 1572, 385, 1573, 277, 1574, 522, 1575],
+          [205, 1576, 530, 1577, 225, 1578, 531, 1579],
+          [207, 1580, 533, 1581, 325, 1582, 534, 1583],
+          [209, 1584, 536, 1585, 233, 1586, 537, 1587],
+          [211, 1588, 539, 1589, 355, 1590, 526, 1591],
+          [215, 1592, 523, 1593, 275, 1594, 528, 1595],
+          [219, 1596, 397, 1597, 287, 1598, 460, 1599],
+          [223, 1600, 457, 1601, 327, 1602, 532, 1603],
+          [227, 1604, 529, 1605, 273, 1606, 400, 1607],
+          [231, 1608, 499, 1609, 357, 1610, 538, 1611],
+          [235, 1612, 535, 1613, 323, 1614, 472, 1615],
+          [239, 1616, 469, 1617, 337, 1618, 502, 1619],
+          [540, 11, 1283, 360, 900, 0],
+          [541, 0, 905, 362, 1260, 1],
+          [542, 1, 1263, 363, 906, 2],
+          [543, 2, 911, 365, 1264, 3],
+          [544, 3, 1267, 366, 912, 4],
+          [545, 4, 917, 368, 1268, 5],
+          [546, 5, 1271, 369, 918, 6],
+          [547, 6, 923, 371, 1272, 7],
+          [548, 7, 1275, 372, 924, 8],
+          [549, 8, 929, 374, 1276, 9],
+          [550, 9, 1279, 375, 930, 10],
+          [551, 10, 935, 377, 1280, 11],
+          [552, 23, 1303, 376, 932, 12],
+          [553, 12, 931, 375, 1278, 13],
+          [554, 13, 1277, 374, 928, 14],
+          [555, 14, 927, 373, 1284, 15],
+          [556, 15, 1287, 378, 936, 16],
+          [557, 16, 941, 380, 1288, 17],
+          [558, 17, 1291, 381, 942, 18],
+          [559, 18, 947, 383, 1292, 19],
+          [560, 19, 1295, 384, 948, 20],
+          [561, 20, 953, 386, 1296, 21],
+          [562, 21, 1299, 387, 954, 22],
+          [563, 22, 959, 389, 1300, 23],
+          [564, 35, 1323, 382, 944, 24],
+          [565, 24, 943, 381, 1290, 25],
+          [566, 25, 1289, 380, 940, 26],
+          [567, 26, 939, 379, 1304, 27],
+          [568, 27, 1307, 390, 960, 28],
+          [569, 28, 965, 392, 1308, 29],
+          [570, 29, 1311, 393, 966, 30],
+          [571, 30, 971, 395, 1312, 31],
+          [572, 31, 1315, 396, 972, 32],
+          [573, 32, 977, 398, 1316, 33],
+          [574, 33, 1319, 399, 978, 34],
+          [575, 34, 983, 401, 1320, 35],
+          [576, 47, 1343, 402, 984, 36],
+          [577, 36, 989, 404, 1324, 37],
+          [578, 37, 1327, 405, 990, 38],
+          [579, 38, 995, 407, 1328, 39],
+          [580, 39, 1331, 408, 996, 40],
+          [581, 40, 1001, 410, 1332, 41],
+          [582, 41, 1335, 411, 1002, 42],
+          [583, 42, 1007, 413, 1336, 43],
+          [584, 43, 1339, 394, 968, 44],
+          [585, 44, 967, 393, 1310, 45],
+          [586, 45, 1309, 392, 964, 46],
+          [587, 46, 963, 391, 1340, 47],
+          [588, 59, 1359, 370, 920, 48],
+          [589, 48, 919, 369, 1270, 49],
+          [590, 49, 1269, 368, 916, 50],
+          [591, 50, 915, 367, 1344, 51],
+          [592, 51, 1347, 414, 1008, 52],
+          [593, 52, 1013, 416, 1348, 53],
+          [594, 53, 1351, 417, 1014, 54],
+          [595, 54, 1019, 419, 1352, 55],
+          [596, 55, 1355, 406, 992, 56],
+          [597, 56, 991, 405, 1326, 57],
+          [598, 57, 1325, 404, 988, 58],
+          [599, 58, 987, 403, 1356, 59],
+          [600, 71, 1379, 418, 1016, 60],
+          [601, 60, 1015, 417, 1350, 61],
+          [602, 61, 1349, 416, 1012, 62],
+          [603, 62, 1011, 415, 1360, 63],
+          [604, 63, 1363, 420, 1020, 64],
+          [605, 64, 1025, 422, 1364, 65],
+          [606, 65, 1367, 423, 1026, 66],
+          [607, 66, 1031, 425, 1368, 67],
+          [608, 67, 1371, 426, 1032, 68],
+          [609, 68, 1037, 428, 1372, 69],
+          [610, 69, 1375, 429, 1038, 70],
+          [611, 70, 1043, 431, 1376, 71],
+          [612, 83, 1399, 430, 1040, 72],
+          [613, 72, 1039, 429, 1374, 73],
+          [614, 73, 1373, 428, 1036, 74],
+          [615, 74, 1035, 427, 1380, 75],
+          [616, 75, 1383, 432, 1044, 76],
+          [617, 76, 1049, 434, 1384, 77],
+          [618, 77, 1387, 435, 1050, 78],
+          [619, 78, 1055, 437, 1388, 79],
+          [620, 79, 1391, 438, 1056, 80],
+          [621, 80, 1061, 440, 1392, 81],
+          [622, 81, 1395, 441, 1062, 82],
+          [623, 82, 1067, 443, 1396, 83],
+          [624, 95, 1415, 412, 1004, 84],
+          [625, 84, 1003, 411, 1334, 85],
+          [626, 85, 1333, 410, 1000, 86],
+          [627, 86, 999, 409, 1400, 87],
+          [628, 87, 1403, 442, 1064, 88],
+          [629, 88, 1063, 441, 1394, 89],
+          [630, 89, 1393, 440, 1060, 90],
+          [631, 90, 1059, 439, 1404, 91],
+          [632, 91, 1407, 444, 1068, 92],
+          [633, 92, 1073, 446, 1408, 93],
+          [634, 93, 1411, 447, 1074, 94],
+          [635, 94, 1079, 449, 1412, 95],
+          [636, 107, 1435, 448, 1076, 96],
+          [637, 96, 1075, 447, 1410, 97],
+          [638, 97, 1409, 446, 1072, 98],
+          [639, 98, 1071, 445, 1416, 99],
+          [640, 99, 1419, 450, 1080, 100],
+          [641, 100, 1085, 452, 1420, 101],
+          [642, 101, 1423, 453, 1086, 102],
+          [643, 102, 1091, 455, 1424, 103],
+          [644, 103, 1427, 456, 1092, 104],
+          [645, 104, 1097, 458, 1428, 105],
+          [646, 105, 1431, 459, 1098, 106],
+          [647, 106, 1103, 461, 1432, 107],
+          [648, 119, 1455, 454, 1088, 108],
+          [649, 108, 1087, 453, 1422, 109],
+          [650, 109, 1421, 452, 1084, 110],
+          [651, 110, 1083, 451, 1436, 111],
+          [652, 111, 1439, 462, 1104, 112],
+          [653, 112, 1109, 464, 1440, 113],
+          [654, 113, 1443, 465, 1110, 114],
+          [655, 114, 1115, 467, 1444, 115],
+          [656, 115, 1447, 468, 1116, 116],
+          [657, 116, 1121, 470, 1448, 117],
+          [658, 117, 1451, 471, 1122, 118],
+          [659, 118, 1127, 473, 1452, 119],
+          [660, 131, 1471, 466, 1112, 120],
+          [661, 120, 1111, 465, 1442, 121],
+          [662, 121, 1441, 464, 1108, 122],
+          [663, 122, 1107, 463, 1456, 123],
+          [664, 123, 1459, 436, 1052, 124],
+          [665, 124, 1051, 435, 1386, 125],
+          [666, 125, 1385, 434, 1048, 126],
+          [667, 126, 1047, 433, 1460, 127],
+          [668, 127, 1463, 474, 1128, 128],
+          [669, 128, 1133, 476, 1464, 129],
+          [670, 129, 1467, 477, 1134, 130],
+          [671, 130, 1139, 479, 1468, 131],
+          [672, 143, 1491, 478, 1136, 132],
+          [673, 132, 1135, 477, 1466, 133],
+          [674, 133, 1465, 476, 1132, 134],
+          [675, 134, 1131, 475, 1472, 135],
+          [676, 135, 1475, 480, 1140, 136],
+          [677, 136, 1145, 482, 1476, 137],
+          [678, 137, 1479, 483, 1146, 138],
+          [679, 138, 1151, 485, 1480, 139],
+          [680, 139, 1483, 486, 1152, 140],
+          [681, 140, 1157, 488, 1484, 141],
+          [682, 141, 1487, 489, 1158, 142],
+          [683, 142, 1163, 491, 1488, 143],
+          [684, 155, 1511, 490, 1160, 144],
+          [685, 144, 1159, 489, 1486, 145],
+          [686, 145, 1485, 488, 1156, 146],
+          [687, 146, 1155, 487, 1492, 147],
+          [688, 147, 1495, 492, 1164, 148],
+          [689, 148, 1169, 494, 1496, 149],
+          [690, 149, 1499, 495, 1170, 150],
+          [691, 150, 1175, 497, 1500, 151],
+          [692, 151, 1503, 498, 1176, 152],
+          [693, 152, 1181, 500, 1504, 153],
+          [694, 153, 1507, 501, 1182, 154],
+          [695, 154, 1187, 503, 1508, 155],
+          [696, 167, 1531, 496, 1172, 156],
+          [697, 156, 1171, 495, 1498, 157],
+          [698, 157, 1497, 494, 1168, 158],
+          [699, 158, 1167, 493, 1512, 159],
+          [700, 159, 1515, 504, 1188, 160],
+          [701, 160, 1193, 506, 1516, 161],
+          [702, 161, 1519, 507, 1194, 162],
+          [703, 162, 1199, 509, 1520, 163],
+          [704, 163, 1523, 510, 1200, 164],
+          [705, 164, 1205, 512, 1524, 165],
+          [706, 165, 1527, 513, 1206, 166],
+          [707, 166, 1211, 515, 1528, 167],
+          [708, 179, 1547, 508, 1196, 168],
+          [709, 168, 1195, 507, 1518, 169],
+          [710, 169, 1517, 506, 1192, 170],
+          [711, 170, 1191, 505, 1532, 171],
+          [712, 171, 1535, 516, 1212, 172],
+          [713, 172, 1217, 518, 1536, 173],
+          [714, 173, 1539, 519, 1218, 174],
+          [715, 174, 1223, 521, 1540, 175],
+          [716, 175, 1543, 364, 908, 176],
+          [717, 176, 907, 363, 1262, 177],
+          [718, 177, 1261, 362, 904, 178],
+          [719, 178, 903, 361, 1544, 179],
+          [720, 191, 1559, 484, 1148, 180],
+          [721, 180, 1147, 483, 1478, 181],
+          [722, 181, 1477, 482, 1144, 182],
+          [723, 182, 1143, 481, 1548, 183],
+          [724, 183, 1551, 424, 1028, 184],
+          [725, 184, 1027, 423, 1366, 185],
+          [726, 185, 1365, 422, 1024, 186],
+          [727, 186, 1023, 421, 1552, 187],
+          [728, 187, 1555, 520, 1220, 188],
+          [729, 188, 1219, 519, 1538, 189],
+          [730, 189, 1537, 518, 1216, 190],
+          [731, 190, 1215, 517, 1556, 191],
+          [732, 203, 1575, 522, 1224, 192],
+          [733, 192, 1229, 524, 1560, 193],
+          [734, 193, 1563, 525, 1230, 194],
+          [735, 194, 1235, 527, 1564, 195],
+          [736, 195, 1567, 514, 1208, 196],
+          [737, 196, 1207, 513, 1526, 197],
+          [738, 197, 1525, 512, 1204, 198],
+          [739, 198, 1203, 511, 1568, 199],
+          [740, 199, 1571, 388, 956, 200],
+          [741, 200, 955, 387, 1298, 201],
+          [742, 201, 1297, 386, 952, 202],
+          [743, 202, 951, 385, 1572, 203],
+          [744, 215, 1595, 528, 1236, 204],
+          [745, 204, 1241, 530, 1576, 205],
+          [746, 205, 1579, 531, 1242, 206],
+          [747, 206, 1247, 533, 1580, 207],
+          [748, 207, 1583, 534, 1248, 208],
+          [749, 208, 1253, 536, 1584, 209],
+          [750, 209, 1587, 537, 1254, 210],
+          [751, 210, 1259, 539, 1588, 211],
+          [752, 211, 1591, 526, 1232, 212],
+          [753, 212, 1231, 525, 1562, 213],
+          [754, 213, 1561, 524, 1228, 214],
+          [755, 214, 1227, 523, 1592, 215],
+          [756, 227, 1607, 400, 980, 216],
+          [757, 216, 979, 399, 1318, 217],
+          [758, 217, 1317, 398, 976, 218],
+          [759, 218, 975, 397, 1596, 219],
+          [760, 219, 1599, 460, 1100, 220],
+          [761, 220, 1099, 459, 1430, 221],
+          [762, 221, 1429, 458, 1096, 222],
+          [763, 222, 1095, 457, 1600, 223],
+          [764, 223, 1603, 532, 1244, 224],
+          [765, 224, 1243, 531, 1578, 225],
+          [766, 225, 1577, 530, 1240, 226],
+          [767, 226, 1239, 529, 1604, 227],
+          [768, 239, 1619, 502, 1184, 228],
+          [769, 228, 1183, 501, 1506, 229],
+          [770, 229, 1505, 500, 1180, 230],
+          [771, 230, 1179, 499, 1608, 231],
+          [772, 231, 1611, 538, 1256, 232],
+          [773, 232, 1255, 537, 1586, 233],
+          [774, 233, 1585, 536, 1252, 234],
+          [775, 234, 1251, 535, 1612, 235],
+          [776, 235, 1615, 472, 1124, 236],
+          [777, 236, 1123, 471, 1450, 237],
+          [778, 237, 1449, 470, 1120, 238],
+          [779, 238, 1119, 469, 1616, 239],
+          [780, 249, 1281, 377, 934, 240],
+          [781, 240, 933, 376, 1302, 241],
+          [782, 241, 1301, 389, 958, 242],
+          [783, 242, 957, 388, 1570, 243],
+          [784, 243, 1569, 511, 1202, 244],
+          [785, 244, 1201, 510, 1522, 245],
+          [786, 245, 1521, 509, 1198, 246],
+          [787, 246, 1197, 508, 1546, 247],
+          [788, 247, 1545, 361, 902, 248],
+          [789, 248, 901, 360, 1282, 249],
+          [790, 259, 1265, 365, 910, 250],
+          [791, 250, 909, 364, 1542, 251],
+          [792, 251, 1541, 521, 1222, 252],
+          [793, 252, 1221, 520, 1554, 253],
+          [794, 253, 1553, 421, 1022, 254],
+          [795, 254, 1021, 420, 1362, 255],
+          [796, 255, 1361, 415, 1010, 256],
+          [797, 256, 1009, 414, 1346, 257],
+          [798, 257, 1345, 367, 914, 258],
+          [799, 258, 913, 366, 1266, 259],
+          [800, 269, 1273, 371, 922, 260],
+          [801, 260, 921, 370, 1358, 261],
+          [802, 261, 1357, 403, 986, 262],
+          [803, 262, 985, 402, 1342, 263],
+          [804, 263, 1341, 391, 962, 264],
+          [805, 264, 961, 390, 1306, 265],
+          [806, 265, 1305, 379, 938, 266],
+          [807, 266, 937, 378, 1286, 267],
+          [808, 267, 1285, 373, 926, 268],
+          [809, 268, 925, 372, 1274, 269],
+          [810, 279, 1293, 383, 946, 270],
+          [811, 270, 945, 382, 1322, 271],
+          [812, 271, 1321, 401, 982, 272],
+          [813, 272, 981, 400, 1606, 273],
+          [814, 273, 1605, 529, 1238, 274],
+          [815, 274, 1237, 528, 1594, 275],
+          [816, 275, 1593, 523, 1226, 276],
+          [817, 276, 1225, 522, 1574, 277],
+          [818, 277, 1573, 385, 950, 278],
+          [819, 278, 949, 384, 1294, 279],
+          [820, 289, 1313, 395, 970, 280],
+          [821, 280, 969, 394, 1338, 281],
+          [822, 281, 1337, 413, 1006, 282],
+          [823, 282, 1005, 412, 1414, 283],
+          [824, 283, 1413, 449, 1078, 284],
+          [825, 284, 1077, 448, 1434, 285],
+          [826, 285, 1433, 461, 1102, 286],
+          [827, 286, 1101, 460, 1598, 287],
+          [828, 287, 1597, 397, 974, 288],
+          [829, 288, 973, 396, 1314, 289],
+          [830, 299, 1329, 407, 994, 290],
+          [831, 290, 993, 406, 1354, 291],
+          [832, 291, 1353, 419, 1018, 292],
+          [833, 292, 1017, 418, 1378, 293],
+          [834, 293, 1377, 431, 1042, 294],
+          [835, 294, 1041, 430, 1398, 295],
+          [836, 295, 1397, 443, 1066, 296],
+          [837, 296, 1065, 442, 1402, 297],
+          [838, 297, 1401, 409, 998, 298],
+          [839, 298, 997, 408, 1330, 299],
+          [840, 309, 1369, 425, 1030, 300],
+          [841, 300, 1029, 424, 1550, 301],
+          [842, 301, 1549, 481, 1142, 302],
+          [843, 302, 1141, 480, 1474, 303],
+          [844, 303, 1473, 475, 1130, 304],
+          [845, 304, 1129, 474, 1462, 305],
+          [846, 305, 1461, 433, 1046, 306],
+          [847, 306, 1045, 432, 1382, 307],
+          [848, 307, 1381, 427, 1034, 308],
+          [849, 308, 1033, 426, 1370, 309],
+          [850, 319, 1389, 437, 1054, 310],
+          [851, 310, 1053, 436, 1458, 311],
+          [852, 311, 1457, 463, 1106, 312],
+          [853, 312, 1105, 462, 1438, 313],
+          [854, 313, 1437, 451, 1082, 314],
+          [855, 314, 1081, 450, 1418, 315],
+          [856, 315, 1417, 445, 1070, 316],
+          [857, 316, 1069, 444, 1406, 317],
+          [858, 317, 1405, 439, 1058, 318],
+          [859, 318, 1057, 438, 1390, 319],
+          [860, 329, 1425, 455, 1090, 320],
+          [861, 320, 1089, 454, 1454, 321],
+          [862, 321, 1453, 473, 1126, 322],
+          [863, 322, 1125, 472, 1614, 323],
+          [864, 323, 1613, 535, 1250, 324],
+          [865, 324, 1249, 534, 1582, 325],
+          [866, 325, 1581, 533, 1246, 326],
+          [867, 326, 1245, 532, 1602, 327],
+          [868, 327, 1601, 457, 1094, 328],
+          [869, 328, 1093, 456, 1426, 329],
+          [870, 339, 1445, 467, 1114, 330],
+          [871, 330, 1113, 466, 1470, 331],
+          [872, 331, 1469, 479, 1138, 332],
+          [873, 332, 1137, 478, 1490, 333],
+          [874, 333, 1489, 491, 1162, 334],
+          [875, 334, 1161, 490, 1510, 335],
+          [876, 335, 1509, 503, 1186, 336],
+          [877, 336, 1185, 502, 1618, 337],
+          [878, 337, 1617, 469, 1118, 338],
+          [879, 338, 1117, 468, 1446, 339],
+          [880, 349, 1481, 485, 1150, 340],
+          [881, 340, 1149, 484, 1558, 341],
+          [882, 341, 1557, 517, 1214, 342],
+          [883, 342, 1213, 516, 1534, 343],
+          [884, 343, 1533, 505, 1190, 344],
+          [885, 344, 1189, 504, 1514, 345],
+          [886, 345, 1513, 493, 1166, 346],
+          [887, 346, 1165, 492, 1494, 347],
+          [888, 347, 1493, 487, 1154, 348],
+          [889, 348, 1153, 486, 1482, 349],
+          [890, 359, 1501, 497, 1174, 350],
+          [891, 350, 1173, 496, 1530, 351],
+          [892, 351, 1529, 515, 1210, 352],
+          [893, 352, 1209, 514, 1566, 353],
+          [894, 353, 1565, 527, 1234, 354],
+          [895, 354, 1233, 526, 1590, 355],
+          [896, 355, 1589, 539, 1258, 356],
+          [897, 356, 1257, 538, 1610, 357],
+          [898, 357, 1609, 499, 1178, 358],
+          [899, 358, 1177, 498, 1502, 359]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
 
-        // XY Plane Points (8-11) -> (Â±1/phi, Â±phi, 0)
-        new THREE.Vector3(b, c, 0.0), new THREE.Vector3(-b, c, 0.0), new THREE.Vector3(b, -c, 0.0), new THREE.Vector3(-b, -c, 0.0),
-
-        // XZ Plane Points (12-15) -> (Â±phi, 0, Â±1/phi)
-        new THREE.Vector3(c, 0.0, b), new THREE.Vector3(c, 0.0, -b), new THREE.Vector3(-c, 0.0, b), new THREE.Vector3(-c, 0.0, -b),
-
-        // YZ Plane Points (16-19) -> (0, Â±1/phi, Â±phi)
-        new THREE.Vector3(0.0, b, c), new THREE.Vector3(0.0, -b, c), new THREE.Vector3(0.0, b, -c), new THREE.Vector3(0.0, -b, -c)
-      ],
-      faces: [
-        // 12 Pentagonal Faces (Reversed to CCW winding)
-        [0, 8, 9, 4, 16],
-        [0, 12, 13, 1, 8],
-        [0, 16, 17, 2, 12],
-        [8, 1, 18, 5, 9],
-        [12, 2, 10, 3, 13],
-        [16, 4, 14, 6, 17],
-        [9, 5, 15, 14, 4],
-        [6, 11, 10, 2, 17],
-        [3, 19, 18, 1, 13],
-        [7, 15, 5, 18, 19],
-        [7, 11, 6, 14, 15],
-        [7, 19, 3, 10, 11]
-      ]
-    };
-    this.normalize(m); // Ensure exact unit radius
-    return m;
-  },
-
-  // --- ARCHIMEDEAN SOLIDS ---
-
-  // 1. Truncated Tetrahedron
-  truncatedTetrahedron() {
-    const m = {
-      vertices: [
-        new THREE.Vector3(0.3333333, 1, 0.3333333), // 0
-        new THREE.Vector3(-1, 0.3333333, -0.3333333), // 1
-        new THREE.Vector3(-0.3333333, -0.3333333, 1), // 2
-        new THREE.Vector3(0.3333333, 0.3333333, 1), // 3
-        new THREE.Vector3(-0.3333333, -1, 0.3333333), // 4
-        new THREE.Vector3(1, -0.3333333, -0.3333333), // 5
-        new THREE.Vector3(1, 0.3333333, 0.3333333), // 6
-        new THREE.Vector3(0.3333333, -0.3333333, -1), // 7
-        new THREE.Vector3(-0.3333333, 1, -0.3333333), // 8
-        new THREE.Vector3(-1, -0.3333333, 0.3333333), // 9
-        new THREE.Vector3(-0.3333333, 0.3333333, -1), // 10
-        new THREE.Vector3(0.3333333, -1, -0.3333333) // 11
-      ],
-      faces: [
-        [0, 8, 1, 9, 2, 3],
-        [3, 2, 4, 11, 5, 6],
-        [6, 5, 7, 10, 8, 0],
-        [9, 1, 10, 7, 11, 4],
-        [3, 6, 0],
-        [8, 10, 1],
-        [9, 4, 2],
-        [11, 7, 5]
-      ]
-    };
-    this.normalize(m);
-    return m;
-  },
-
-  // 2. Cuboctahedron
-  cuboctahedron() {
-    const m = {
-      vertices: [
-        new THREE.Vector3(-0.7071068, 0, -0.7071068), // 0
-        new THREE.Vector3(0, 0.7071068, -0.7071068), // 1
-        new THREE.Vector3(0.7071068, 0, -0.7071068), // 2
-        new THREE.Vector3(0, -0.7071068, -0.7071068), // 3
-        new THREE.Vector3(0.7071068, -0.7071068, 0), // 4
-        new THREE.Vector3(0, -0.7071068, 0.7071068), // 5
-        new THREE.Vector3(-0.7071068, -0.7071068, 0), // 6
-        new THREE.Vector3(-0.7071068, 0, 0.7071068), // 7
-        new THREE.Vector3(-0.7071068, 0.7071068, 0), // 8
-        new THREE.Vector3(0.7071068, 0, 0.7071068), // 9
-        new THREE.Vector3(0.7071068, 0.7071068, 0), // 10
-        new THREE.Vector3(0, 0.7071068, 0.7071068) // 11
-      ],
-      faces: [
-        [0, 1, 2, 3],
-        [3, 4, 5, 6],
-        [6, 7, 8, 0],
-        [9, 4, 2, 10],
-        [10, 1, 8, 11],
-        [11, 7, 5, 9],
-        [3, 6, 0],
-        [0, 8, 1],
-        [1, 10, 2],
-        [2, 4, 3],
-        [4, 9, 5],
-        [5, 7, 6],
-        [7, 11, 8],
-        [10, 11, 9]
-      ]
-    };
-    this.normalize(m);
-    return m;
-  },
-
-  // 3. Truncated Cube
-  truncatedCube() {
-    const m = {
-      vertices: [
-        new THREE.Vector3(-0.6785983, -0.2810846, -0.6785983), // 0
-        new THREE.Vector3(-0.2810846, 0.6785983, -0.6785983), // 1
-        new THREE.Vector3(0.6785983, 0.2810846, -0.6785983), // 2
-        new THREE.Vector3(0.2810846, -0.6785983, -0.6785983), // 3
-        new THREE.Vector3(-0.2810846, -0.6785983, -0.6785983), // 4
-        new THREE.Vector3(0.6785983, -0.6785983, -0.2810846), // 5
-        new THREE.Vector3(0.2810846, -0.6785983, 0.6785983), // 6
-        new THREE.Vector3(-0.6785983, -0.6785983, 0.2810846), // 7
-        new THREE.Vector3(-0.6785983, -0.6785983, -0.2810846), // 8
-        new THREE.Vector3(-0.6785983, -0.2810846, 0.6785983), // 9
-        new THREE.Vector3(-0.6785983, 0.6785983, 0.2810846), // 10
-        new THREE.Vector3(-0.6785983, 0.2810846, -0.6785983), // 11
-        new THREE.Vector3(0.6785983, 0.2810846, 0.6785983), // 12
-        new THREE.Vector3(0.6785983, -0.6785983, 0.2810846), // 13
-        new THREE.Vector3(0.6785983, -0.2810846, -0.6785983), // 14
-        new THREE.Vector3(0.6785983, 0.6785983, -0.2810846), // 15
-        new THREE.Vector3(0.6785983, 0.6785983, 0.2810846), // 16
-        new THREE.Vector3(0.2810846, 0.6785983, -0.6785983), // 17
-        new THREE.Vector3(-0.6785983, 0.6785983, -0.2810846), // 18
-        new THREE.Vector3(-0.2810846, 0.6785983, 0.6785983), // 19
-        new THREE.Vector3(0.2810846, 0.6785983, 0.6785983), // 20
-        new THREE.Vector3(-0.6785983, 0.2810846, 0.6785983), // 21
-        new THREE.Vector3(-0.2810846, -0.6785983, 0.6785983), // 22
-        new THREE.Vector3(0.6785983, -0.2810846, 0.6785983) // 23
-      ],
-      faces: [
-        [0, 11, 1, 17, 2, 14, 3, 4],
-        [4, 3, 5, 13, 6, 22, 7, 8],
-        [8, 7, 9, 21, 10, 18, 11, 0],
-        [12, 23, 13, 5, 14, 2, 15, 16],
-        [16, 15, 17, 1, 18, 10, 19, 20],
-        [20, 19, 21, 9, 22, 6, 23, 12],
-        [4, 8, 0],
-        [11, 18, 1],
-        [17, 15, 2],
-        [14, 5, 3],
-        [13, 23, 6],
-        [22, 9, 7],
-        [21, 19, 10],
-        [16, 20, 12]
-      ]
-    };
-    this.normalize(m);
-    return m;
-  },
-
-  // 4. Truncated Octahedron
-  truncatedOctahedron() {
-    const m = {
-      vertices: [
-        new THREE.Vector3(0.4472136, 0, 0.8944272), // 0
-        new THREE.Vector3(0.8944272, 0.4472136, 0), // 1
-        new THREE.Vector3(0, 0.8944272, 0.4472136), // 2
-        new THREE.Vector3(0, 0.4472136, 0.8944272), // 3
-        new THREE.Vector3(-0.4472136, 0.8944272, 0), // 4
-        new THREE.Vector3(-0.8944272, 0, 0.4472136), // 5
-        new THREE.Vector3(-0.4472136, 0, 0.8944272), // 6
-        new THREE.Vector3(-0.8944272, -0.4472136, 0), // 7
-        new THREE.Vector3(0, -0.8944272, 0.4472136), // 8
-        new THREE.Vector3(0, -0.4472136, 0.8944272), // 9
-        new THREE.Vector3(0.4472136, -0.8944272, 0), // 10
-        new THREE.Vector3(0.8944272, 0, 0.4472136), // 11
-        new THREE.Vector3(0, 0.4472136, -0.8944272), // 12
-        new THREE.Vector3(0.4472136, 0.8944272, 0), // 13
-        new THREE.Vector3(0.8944272, 0, -0.4472136), // 14
-        new THREE.Vector3(-0.4472136, 0, -0.8944272), // 15
-        new THREE.Vector3(-0.8944272, 0.4472136, 0), // 16
-        new THREE.Vector3(0, 0.8944272, -0.4472136), // 17
-        new THREE.Vector3(0, -0.4472136, -0.8944272), // 18
-        new THREE.Vector3(-0.4472136, -0.8944272, 0), // 19
-        new THREE.Vector3(-0.8944272, 0, -0.4472136), // 20
-        new THREE.Vector3(0.4472136, 0, -0.8944272), // 21
-        new THREE.Vector3(0.8944272, -0.4472136, 0), // 22
-        new THREE.Vector3(0, -0.8944272, -0.4472136) // 23
-      ],
-      faces: [
-        [0, 11, 1, 13, 2, 3],
-        [3, 2, 4, 16, 5, 6],
-        [6, 5, 7, 19, 8, 9],
-        [9, 8, 10, 22, 11, 0],
-        [12, 17, 13, 1, 14, 21],
-        [15, 20, 16, 4, 17, 12],
-        [18, 23, 19, 7, 20, 15],
-        [21, 14, 22, 10, 23, 18],
-        [3, 6, 9, 0],
-        [11, 22, 14, 1],
-        [13, 17, 4, 2],
-        [16, 20, 7, 5],
-        [19, 23, 10, 8],
-        [21, 18, 15, 12]
-      ]
-    };
-    this.normalize(m);
-    return m;
-  },
-
-  // 5. Rhombicuboctahedron
-  rhombicuboctahedron() {
-    const m = {
-      vertices: [
-        new THREE.Vector3(-0.3574067, 0.3574067, -0.8628562), // 0
-        new THREE.Vector3(0.3574067, 0.3574067, -0.8628562), // 1
-        new THREE.Vector3(0.3574067, -0.3574067, -0.8628562), // 2
-        new THREE.Vector3(-0.3574067, -0.3574067, -0.8628562), // 3
-        new THREE.Vector3(0.3574067, -0.8628562, -0.3574067), // 4
-        new THREE.Vector3(0.3574067, -0.8628562, 0.3574067), // 5
-        new THREE.Vector3(-0.3574067, -0.8628562, 0.3574067), // 6
-        new THREE.Vector3(-0.3574067, -0.8628562, -0.3574067), // 7
-        new THREE.Vector3(-0.8628562, -0.3574067, 0.3574067), // 8
-        new THREE.Vector3(-0.8628562, 0.3574067, 0.3574067), // 9
-        new THREE.Vector3(-0.8628562, 0.3574067, -0.3574067), // 10
-        new THREE.Vector3(-0.8628562, -0.3574067, -0.3574067), // 11
-        new THREE.Vector3(0.8628562, -0.3574067, 0.3574067), // 12
-        new THREE.Vector3(0.8628562, -0.3574067, -0.3574067), // 13
-        new THREE.Vector3(0.8628562, 0.3574067, -0.3574067), // 14
-        new THREE.Vector3(0.8628562, 0.3574067, 0.3574067), // 15
-        new THREE.Vector3(0.3574067, 0.8628562, -0.3574067), // 16
-        new THREE.Vector3(-0.3574067, 0.8628562, -0.3574067), // 17
-        new THREE.Vector3(-0.3574067, 0.8628562, 0.3574067), // 18
-        new THREE.Vector3(0.3574067, 0.8628562, 0.3574067), // 19
-        new THREE.Vector3(-0.3574067, 0.3574067, 0.8628562), // 20
-        new THREE.Vector3(-0.3574067, -0.3574067, 0.8628562), // 21
-        new THREE.Vector3(0.3574067, -0.3574067, 0.8628562), // 22
-        new THREE.Vector3(0.3574067, 0.3574067, 0.8628562) // 23
-      ],
-      faces: [
-        [0, 1, 2, 3],
-        [4, 5, 6, 7],
-        [8, 9, 10, 11],
-        [12, 13, 14, 15],
-        [16, 17, 18, 19],
-        [20, 21, 22, 23],
-        [7, 11, 3],
-        [10, 17, 0],
-        [16, 14, 1],
-        [13, 4, 2],
-        [12, 22, 5],
-        [21, 8, 6],
-        [20, 18, 9],
-        [19, 23, 15],
-        [3, 11, 10, 0],
-        [0, 17, 16, 1],
-        [1, 14, 13, 2],
-        [2, 4, 7, 3],
-        [4, 13, 12, 5],
-        [5, 22, 21, 6],
-        [6, 8, 11, 7],
-        [8, 21, 20, 9],
-        [9, 18, 17, 10],
-        [15, 23, 22, 12],
-        [14, 16, 19, 15],
-        [18, 20, 23, 19]
-      ]
-    };
-    this.normalize(m);
-    return m;
-  },
-
-  // 6. Truncated Cuboctahedron (Great Rhombicuboctahedron)
-  truncatedCuboctahedron() {
-    const m = {
-      vertices: [
-        new THREE.Vector3(-0.520841, 0.2157394, -0.8259426), // 0
-        new THREE.Vector3(0.2157394, 0.520841, -0.8259426), // 1
-        new THREE.Vector3(0.520841, -0.2157394, -0.8259426), // 2
-        new THREE.Vector3(-0.2157394, -0.520841, -0.8259426), // 3
-        new THREE.Vector3(0.2157394, -0.8259426, -0.520841), // 4
-        new THREE.Vector3(0.520841, -0.8259426, 0.2157394), // 5
-        new THREE.Vector3(-0.2157394, -0.8259426, 0.520841), // 6
-        new THREE.Vector3(-0.520841, -0.8259426, -0.2157394), // 7
-        new THREE.Vector3(-0.8259426, -0.520841, 0.2157394), // 8
-        new THREE.Vector3(-0.8259426, 0.2157394, 0.520841), // 9
-        new THREE.Vector3(-0.8259426, 0.520841, -0.2157394), // 10
-        new THREE.Vector3(-0.8259426, -0.2157394, -0.520841), // 11
-        new THREE.Vector3(0.8259426, -0.2157394, 0.520841), // 12
-        new THREE.Vector3(0.8259426, -0.520841, -0.2157394), // 13
-        new THREE.Vector3(0.8259426, 0.2157394, -0.520841), // 14
-        new THREE.Vector3(0.8259426, 0.520841, 0.2157394), // 15
-        new THREE.Vector3(0.520841, 0.8259426, -0.2157394), // 16
-        new THREE.Vector3(-0.2157394, 0.8259426, -0.520841), // 17
-        new THREE.Vector3(-0.520841, 0.8259426, 0.2157394), // 18
-        new THREE.Vector3(0.2157394, 0.8259426, 0.520841), // 19
-        new THREE.Vector3(-0.2157394, 0.520841, 0.8259426), // 20
-        new THREE.Vector3(-0.520841, -0.2157394, 0.8259426), // 21
-        new THREE.Vector3(0.2157394, -0.520841, 0.8259426), // 22
-        new THREE.Vector3(0.520841, 0.2157394, 0.8259426), // 23
-        new THREE.Vector3(-0.2157394, -0.8259426, -0.520841), // 24
-        new THREE.Vector3(-0.8259426, -0.520841, -0.2157394), // 25
-        new THREE.Vector3(-0.520841, -0.2157394, -0.8259426), // 26
-        new THREE.Vector3(-0.8259426, 0.2157394, -0.520841), // 27
-        new THREE.Vector3(-0.520841, 0.8259426, -0.2157394), // 28
-        new THREE.Vector3(-0.2157394, 0.520841, -0.8259426), // 29
-        new THREE.Vector3(0.2157394, 0.8259426, -0.520841), // 30
-        new THREE.Vector3(0.8259426, 0.520841, -0.2157394), // 31
-        new THREE.Vector3(0.520841, 0.2157394, -0.8259426), // 32
-        new THREE.Vector3(0.8259426, -0.2157394, -0.520841), // 33
-        new THREE.Vector3(0.520841, -0.8259426, -0.2157394), // 34
-        new THREE.Vector3(0.2157394, -0.520841, -0.8259426), // 35
-        new THREE.Vector3(0.8259426, -0.520841, 0.2157394), // 36
-        new THREE.Vector3(0.520841, -0.2157394, 0.8259426), // 37
-        new THREE.Vector3(0.2157394, -0.8259426, 0.520841), // 38
-        new THREE.Vector3(-0.2157394, -0.520841, 0.8259426), // 39
-        new THREE.Vector3(-0.8259426, -0.2157394, 0.520841), // 40
-        new THREE.Vector3(-0.520841, -0.8259426, 0.2157394), // 41
-        new THREE.Vector3(-0.520841, 0.2157394, 0.8259426), // 42
-        new THREE.Vector3(-0.2157394, 0.8259426, 0.520841), // 43
-        new THREE.Vector3(-0.8259426, 0.520841, 0.2157394), // 44
-        new THREE.Vector3(0.520841, 0.8259426, 0.2157394), // 45
-        new THREE.Vector3(0.2157394, 0.520841, 0.8259426), // 46
-        new THREE.Vector3(0.8259426, 0.2157394, 0.520841) // 47
-      ],
-      faces: [
-        [0, 29, 1, 32, 2, 35, 3, 26],
-        [4, 34, 5, 38, 6, 41, 7, 24],
-        [8, 40, 9, 44, 10, 27, 11, 25],
-        [12, 36, 13, 33, 14, 31, 15, 47],
-        [16, 30, 17, 28, 18, 43, 19, 45],
-        [20, 42, 21, 39, 22, 37, 23, 46],
-        [24, 7, 25, 11, 26, 3],
-        [27, 10, 28, 17, 29, 0],
-        [30, 16, 31, 14, 32, 1],
-        [33, 13, 34, 4, 35, 2],
-        [36, 12, 37, 22, 38, 5],
-        [39, 21, 40, 8, 41, 6],
-        [42, 20, 43, 18, 44, 9],
-        [45, 19, 46, 23, 47, 15],
-        [26, 11, 27, 0],
-        [29, 17, 30, 1],
-        [32, 14, 33, 2],
-        [35, 4, 24, 3],
-        [34, 13, 36, 5],
-        [38, 22, 39, 6],
-        [41, 8, 25, 7],
-        [40, 21, 42, 9],
-        [44, 18, 28, 10],
-        [47, 23, 37, 12],
-        [31, 16, 45, 15],
-        [43, 20, 46, 19]
-      ]
-    };
-    this.normalize(m);
-    return m;
-  },
-
-  // 7. Snub Cube
-  snubCube() {
-    const m = {
-      vertices: [
-        new THREE.Vector3(-0.4623206, -0.2513586, -0.8503402), // 0
-        new THREE.Vector3(-0.2513586, 0.4623206, -0.8503402), // 1
-        new THREE.Vector3(0.4623206, 0.2513586, -0.8503402), // 2
-        new THREE.Vector3(0.2513586, -0.4623206, -0.8503402), // 3
-        new THREE.Vector3(-0.2513586, -0.8503402, -0.4623206), // 4
-        new THREE.Vector3(0.4623206, -0.8503402, -0.2513586), // 5
-        new THREE.Vector3(0.2513586, -0.8503402, 0.4623206), // 6
-        new THREE.Vector3(-0.4623206, -0.8503402, 0.2513586), // 7
-        new THREE.Vector3(-0.8503402, -0.4623206, -0.2513586), // 8
-        new THREE.Vector3(-0.8503402, -0.2513586, 0.4623206), // 9
-        new THREE.Vector3(-0.8503402, 0.4623206, 0.2513586), // 10
-        new THREE.Vector3(-0.8503402, 0.2513586, -0.4623206), // 11
-        new THREE.Vector3(0.8503402, 0.2513586, 0.4623206), // 12
-        new THREE.Vector3(0.8503402, -0.4623206, 0.2513586), // 13
-        new THREE.Vector3(0.8503402, -0.2513586, -0.4623206), // 14
-        new THREE.Vector3(0.8503402, 0.4623206, -0.2513586), // 15
-        new THREE.Vector3(0.4623206, 0.8503402, 0.2513586), // 16
-        new THREE.Vector3(0.2513586, 0.8503402, -0.4623206), // 17
-        new THREE.Vector3(-0.4623206, 0.8503402, -0.2513586), // 18
-        new THREE.Vector3(-0.2513586, 0.8503402, 0.4623206), // 19
-        new THREE.Vector3(0.2513586, 0.4623206, 0.8503402), // 20
-        new THREE.Vector3(-0.4623206, 0.2513586, 0.8503402), // 21
-        new THREE.Vector3(-0.2513586, -0.4623206, 0.8503402), // 22
-        new THREE.Vector3(0.4623206, -0.2513586, 0.8503402) // 23
-      ],
-      faces: [
-        [0, 1, 2, 3],
-        [4, 5, 6, 7],
-        [8, 9, 10, 11],
-        [12, 13, 14, 15],
-        [16, 17, 18, 19],
-        [20, 21, 22, 23],
-        [4, 8, 0],
-        [11, 18, 1],
-        [17, 15, 2],
-        [14, 5, 3],
-        [13, 23, 6],
-        [22, 9, 7],
-        [21, 19, 10],
-        [16, 20, 12],
-        [0, 8, 11],
-        [0, 11, 1],
-        [1, 18, 17],
-        [1, 17, 2],
-        [2, 15, 14],
-        [2, 14, 3],
-        [3, 5, 4],
-        [3, 4, 0],
-        [5, 14, 13],
-        [5, 13, 6],
-        [6, 23, 22],
-        [6, 22, 7],
-        [7, 9, 8],
-        [7, 8, 4],
-        [9, 22, 21],
-        [9, 21, 10],
-        [10, 19, 18],
-        [10, 18, 11],
-        [12, 20, 23],
-        [12, 23, 13],
-        [15, 17, 16],
-        [15, 16, 12],
-        [19, 21, 20],
-        [19, 20, 16]
-      ]
-    };
-    this.normalize(m);
-    return m;
-  },
-
-  // 8. Icosidodecahedron
-  icosidodecahedron() {
-    const m = {
-      vertices: [
-        new THREE.Vector3(0.5, 0.809017, 0.309017), // 0
-        new THREE.Vector3(0, 1, 0), // 1
-        new THREE.Vector3(-0.5, 0.809017, 0.309017), // 2
-        new THREE.Vector3(-0.309017, 0.5, 0.809017), // 3
-        new THREE.Vector3(0.309017, 0.5, 0.809017), // 4
-        new THREE.Vector3(0.809017, 0.309017, 0.5), // 5
-        new THREE.Vector3(1, 0, 0), // 6
-        new THREE.Vector3(0.809017, 0.309017, -0.5), // 7
-        new THREE.Vector3(0.5, 0.809017, -0.309017), // 8
-        new THREE.Vector3(0, 0, 1), // 9
-        new THREE.Vector3(0.309017, -0.5, 0.809017), // 10
-        new THREE.Vector3(0.809017, -0.309017, 0.5), // 11
-        new THREE.Vector3(0.309017, 0.5, -0.809017), // 12
-        new THREE.Vector3(-0.309017, 0.5, -0.809017), // 13
-        new THREE.Vector3(-0.5, 0.809017, -0.309017), // 14
-        new THREE.Vector3(0.5, -0.809017, 0.309017), // 15
-        new THREE.Vector3(0.5, -0.809017, -0.309017), // 16
-        new THREE.Vector3(0.809017, -0.309017, -0.5), // 17
-        new THREE.Vector3(-0.809017, 0.309017, 0.5), // 18
-        new THREE.Vector3(-0.809017, -0.309017, 0.5), // 19
-        new THREE.Vector3(-0.309017, -0.5, 0.809017), // 20
-        new THREE.Vector3(-0.809017, 0.309017, -0.5), // 21
-        new THREE.Vector3(-1, 0, 0), // 22
-        new THREE.Vector3(-0.5, -0.809017, 0.309017), // 23
-        new THREE.Vector3(0, -1, 0), // 24
-        new THREE.Vector3(0.309017, -0.5, -0.809017), // 25
-        new THREE.Vector3(0, 0, -1), // 26
-        new THREE.Vector3(-0.809017, -0.309017, -0.5), // 27
-        new THREE.Vector3(-0.309017, -0.5, -0.809017), // 28
-        new THREE.Vector3(-0.5, -0.809017, -0.309017) // 29
-      ],
-      faces: [
-        [0, 1, 2, 3, 4],
-        [5, 6, 7, 8, 0],
-        [4, 9, 10, 11, 5],
-        [8, 12, 13, 14, 1],
-        [11, 15, 16, 17, 6],
-        [3, 18, 19, 20, 9],
-        [14, 21, 22, 18, 2],
-        [23, 24, 15, 10, 20],
-        [25, 26, 12, 7, 17],
-        [27, 21, 13, 26, 28],
-        [29, 23, 19, 22, 27],
-        [28, 25, 16, 24, 29],
-        [4, 5, 0],
-        [0, 8, 1],
-        [1, 14, 2],
-        [2, 18, 3],
-        [3, 9, 4],
-        [5, 11, 6],
-        [6, 17, 7],
-        [7, 12, 8],
-        [9, 20, 10],
-        [10, 15, 11],
-        [12, 26, 13],
-        [13, 21, 14],
-        [15, 24, 16],
-        [16, 25, 17],
-        [18, 22, 19],
-        [19, 23, 20],
-        [21, 27, 22],
-        [23, 29, 24],
-        [25, 28, 26],
-        [28, 29, 27]
-      ]
-    };
-    this.normalize(m);
-    return m;
-  },
-
-  // 9. Truncated Dodecahedron
-  truncatedDodecahedron() {
-    const m = {
-      vertices: [
-        new THREE.Vector3(0.5448937, 0.7132751, 0.4408282), // 0
-        new THREE.Vector3(0.1683814, 0.9857219, 0), // 1
-        new THREE.Vector3(-0.4408282, 0.8816565, 0.1683814), // 2
-        new THREE.Vector3(-0.4408282, 0.5448937, 0.7132751), // 3
-        new THREE.Vector3(0.1683814, 0.4408282, 0.8816565), // 4
-        new THREE.Vector3(0.7132751, 0.4408282, 0.5448937), // 5
-        new THREE.Vector3(0.9857219, 0, 0.1683814), // 6
-        new THREE.Vector3(0.8816565, 0.1683814, -0.4408282), // 7
-        new THREE.Vector3(0.5448937, 0.7132751, -0.4408282), // 8
-        new THREE.Vector3(0.4408282, 0.8816565, 0.1683814), // 9
-        new THREE.Vector3(0.4408282, 0.5448937, 0.7132751), // 10
-        new THREE.Vector3(0, 0.1683814, 0.9857219), // 11
-        new THREE.Vector3(0.1683814, -0.4408282, 0.8816565), // 12
-        new THREE.Vector3(0.7132751, -0.4408282, 0.5448937), // 13
-        new THREE.Vector3(0.8816565, 0.1683814, 0.4408282), // 14
-        new THREE.Vector3(0.4408282, 0.8816565, -0.1683814), // 15
-        new THREE.Vector3(0.4408282, 0.5448937, -0.7132751), // 16
-        new THREE.Vector3(-0.1683814, 0.4408282, -0.8816565), // 17
-        new THREE.Vector3(-0.5448937, 0.7132751, -0.4408282), // 18
-        new THREE.Vector3(-0.1683814, 0.9857219, 0), // 19
-        new THREE.Vector3(0.8816565, -0.1683814, 0.4408282), // 20
-        new THREE.Vector3(0.5448937, -0.7132751, 0.4408282), // 21
-        new THREE.Vector3(0.4408282, -0.8816565, -0.1683814), // 22
-        new THREE.Vector3(0.7132751, -0.4408282, -0.5448937), // 23
-        new THREE.Vector3(0.9857219, 0, -0.1683814), // 24
-        new THREE.Vector3(-0.1683814, 0.4408282, 0.8816565), // 25
-        new THREE.Vector3(-0.7132751, 0.4408282, 0.5448937), // 26
-        new THREE.Vector3(-0.8816565, -0.1683814, 0.4408282), // 27
-        new THREE.Vector3(-0.4408282, -0.5448937, 0.7132751), // 28
-        new THREE.Vector3(0, -0.1683814, 0.9857219), // 29
-        new THREE.Vector3(-0.4408282, 0.8816565, -0.1683814), // 30
-        new THREE.Vector3(-0.7132751, 0.4408282, -0.5448937), // 31
-        new THREE.Vector3(-0.9857219, 0, -0.1683814), // 32
-        new THREE.Vector3(-0.8816565, 0.1683814, 0.4408282), // 33
-        new THREE.Vector3(-0.5448937, 0.7132751, 0.4408282), // 34
-        new THREE.Vector3(-0.5448937, -0.7132751, 0.4408282), // 35
-        new THREE.Vector3(-0.1683814, -0.9857219, 0), // 36
-        new THREE.Vector3(0.4408282, -0.8816565, 0.1683814), // 37
-        new THREE.Vector3(0.4408282, -0.5448937, 0.7132751), // 38
-        new THREE.Vector3(-0.1683814, -0.4408282, 0.8816565), // 39
-        new THREE.Vector3(0.4408282, -0.5448937, -0.7132751), // 40
-        new THREE.Vector3(0, -0.1683814, -0.9857219), // 41
-        new THREE.Vector3(0.1683814, 0.4408282, -0.8816565), // 42
-        new THREE.Vector3(0.7132751, 0.4408282, -0.5448937), // 43
-        new THREE.Vector3(0.8816565, -0.1683814, -0.4408282), // 44
-        new THREE.Vector3(-0.7132751, -0.4408282, -0.5448937), // 45
-        new THREE.Vector3(-0.8816565, 0.1683814, -0.4408282), // 46
-        new THREE.Vector3(-0.4408282, 0.5448937, -0.7132751), // 47
-        new THREE.Vector3(0, 0.1683814, -0.9857219), // 48
-        new THREE.Vector3(-0.1683814, -0.4408282, -0.8816565), // 49
-        new THREE.Vector3(-0.5448937, -0.7132751, -0.4408282), // 50
-        new THREE.Vector3(-0.4408282, -0.8816565, 0.1683814), // 51
-        new THREE.Vector3(-0.7132751, -0.4408282, 0.5448937), // 52
-        new THREE.Vector3(-0.9857219, 0, 0.1683814), // 53
-        new THREE.Vector3(-0.8816565, -0.1683814, -0.4408282), // 54
-        new THREE.Vector3(-0.4408282, -0.5448937, -0.7132751), // 55
-        new THREE.Vector3(0.1683814, -0.4408282, -0.8816565), // 56
-        new THREE.Vector3(0.5448937, -0.7132751, -0.4408282), // 57
-        new THREE.Vector3(0.1683814, -0.9857219, 0), // 58
-        new THREE.Vector3(-0.4408282, -0.8816565, -0.1683814) // 59
-      ],
-      faces: [
-        [0, 9, 1, 19, 2, 34, 3, 25, 4, 10],
-        [5, 14, 6, 24, 7, 43, 8, 15, 9, 0],
-        [10, 4, 11, 29, 12, 38, 13, 20, 14, 5],
-        [15, 8, 16, 42, 17, 47, 18, 30, 19, 1],
-        [20, 13, 21, 37, 22, 57, 23, 44, 24, 6],
-        [25, 3, 26, 33, 27, 52, 28, 39, 29, 11],
-        [30, 18, 31, 46, 32, 53, 33, 26, 34, 2],
-        [35, 51, 36, 58, 37, 21, 38, 12, 39, 28],
-        [40, 56, 41, 48, 42, 16, 43, 7, 44, 23],
-        [45, 54, 46, 31, 47, 17, 48, 41, 49, 55],
-        [50, 59, 51, 35, 52, 27, 53, 32, 54, 45],
-        [55, 49, 56, 40, 57, 22, 58, 36, 59, 50],
-        [10, 5, 0],
-        [9, 15, 1],
-        [19, 30, 2],
-        [34, 26, 3],
-        [25, 11, 4],
-        [14, 20, 6],
-        [24, 44, 7],
-        [43, 16, 8],
-        [29, 39, 12],
-        [38, 21, 13],
-        [42, 48, 17],
-        [47, 31, 18],
-        [37, 58, 22],
-        [57, 40, 23],
-        [33, 53, 27],
-        [52, 35, 28],
-        [46, 54, 32],
-        [51, 59, 36],
-        [56, 49, 41],
-        [55, 50, 45]
-      ]
-    };
-    this.normalize(m);
-    return m;
-  },
-
-  // 10. Truncated Icosahedron (Soccer Ball)
-  truncatedIcosahedron() {
-    const m = {
-      vertices: [
-        new THREE.Vector3(-0.2017741, 0, 0.9794321), // 0
-        new THREE.Vector3(0.4035482, 0.3264774, 0.8547288), // 1
-        new THREE.Vector3(-0.2017741, 0.6529547, 0.7300256), // 2
-        new THREE.Vector3(-0.4035482, 0.3264774, 0.8547288), // 3
-        new THREE.Vector3(-0.3264774, 0.8547288, 0.4035482), // 4
-        new THREE.Vector3(-0.8547288, 0.4035482, 0.3264774), // 5
-        new THREE.Vector3(-0.6529547, 0.7300256, 0.2017741), // 6
-        new THREE.Vector3(0, 0.9794321, 0.2017741), // 7
-        new THREE.Vector3(-0.3264774, 0.8547288, -0.4035482), // 8
-        new THREE.Vector3(0.3264774, 0.8547288, 0.4035482), // 9
-        new THREE.Vector3(0.6529547, 0.7300256, -0.2017741), // 10
-        new THREE.Vector3(0, 0.9794321, -0.2017741), // 11
-        new THREE.Vector3(0.2017741, 0.6529547, 0.7300256), // 12
-        new THREE.Vector3(0.7300256, 0.2017741, 0.6529547), // 13
-        new THREE.Vector3(0.6529547, 0.7300256, 0.2017741), // 14
-        new THREE.Vector3(0.8547288, 0.4035482, 0.3264774), // 15
-        new THREE.Vector3(0.7300256, -0.2017741, 0.6529547), // 16
-        new THREE.Vector3(0.9794321, -0.2017741, 0), // 17
-        new THREE.Vector3(0.9794321, 0.2017741, 0), // 18
-        new THREE.Vector3(0.8547288, -0.4035482, -0.3264774), // 19
-        new THREE.Vector3(0.7300256, 0.2017741, -0.6529547), // 20
-        new THREE.Vector3(0.3264774, 0.8547288, -0.4035482), // 21
-        new THREE.Vector3(0.8547288, 0.4035482, -0.3264774), // 22
-        new THREE.Vector3(0.4035482, 0.3264774, -0.8547288), // 23
-        new THREE.Vector3(0.2017741, 0.6529547, -0.7300256), // 24
-        new THREE.Vector3(0.2017741, 0, -0.9794321), // 25
-        new THREE.Vector3(-0.4035482, 0.3264774, -0.8547288), // 26
-        new THREE.Vector3(-0.2017741, 0, -0.9794321), // 27
-        new THREE.Vector3(0.4035482, -0.3264774, -0.8547288), // 28
-        new THREE.Vector3(-0.2017741, -0.6529547, -0.7300256), // 29
-        new THREE.Vector3(0.2017741, -0.6529547, -0.7300256), // 30
-        new THREE.Vector3(0.7300256, -0.2017741, -0.6529547), // 31
-        new THREE.Vector3(0.6529547, -0.7300256, -0.2017741), // 32
-        new THREE.Vector3(0.3264774, -0.8547288, -0.4035482), // 33
-        new THREE.Vector3(0.6529547, -0.7300256, 0.2017741), // 34
-        new THREE.Vector3(0, -0.9794321, 0.2017741), // 35
-        new THREE.Vector3(0, -0.9794321, -0.2017741), // 36
-        new THREE.Vector3(-0.3264774, -0.8547288, 0.4035482), // 37
-        new THREE.Vector3(-0.6529547, -0.7300256, -0.2017741), // 38
-        new THREE.Vector3(-0.6529547, -0.7300256, 0.2017741), // 39
-        new THREE.Vector3(-0.2017741, -0.6529547, 0.7300256), // 40
-        new THREE.Vector3(-0.7300256, -0.2017741, 0.6529547), // 41
-        new THREE.Vector3(-0.4035482, -0.3264774, 0.8547288), // 42
-        new THREE.Vector3(0.2017741, -0.6529547, 0.7300256), // 43
-        new THREE.Vector3(0.2017741, 0, 0.9794321), // 44
-        new THREE.Vector3(0.3264774, -0.8547288, 0.4035482), // 45
-        new THREE.Vector3(0.8547288, -0.4035482, 0.3264774), // 46
-        new THREE.Vector3(0.4035482, -0.3264774, 0.8547288), // 47
-        new THREE.Vector3(-0.9794321, 0.2017741, 0), // 48
-        new THREE.Vector3(-0.8547288, -0.4035482, 0.3264774), // 49
-        new THREE.Vector3(-0.7300256, 0.2017741, 0.6529547), // 50
-        new THREE.Vector3(-0.8547288, 0.4035482, -0.3264774), // 51
-        new THREE.Vector3(-0.7300256, -0.2017741, -0.6529547), // 52
-        new THREE.Vector3(-0.9794321, -0.2017741, 0), // 53
-        new THREE.Vector3(-0.6529547, 0.7300256, -0.2017741), // 54
-        new THREE.Vector3(-0.2017741, 0.6529547, -0.7300256), // 55
-        new THREE.Vector3(-0.7300256, 0.2017741, -0.6529547), // 56
-        new THREE.Vector3(-0.3264774, -0.8547288, -0.4035482), // 57
-        new THREE.Vector3(-0.8547288, -0.4035482, -0.3264774), // 58
-        new THREE.Vector3(-0.4035482, -0.3264774, -0.8547288) // 59
-      ],
-      faces: [
-        [0, 44, 1, 12, 2, 3],
-        [3, 2, 4, 6, 5, 50],
-        [6, 4, 7, 11, 8, 54],
-        [9, 14, 10, 21, 11, 7],
-        [12, 1, 13, 15, 14, 9],
-        [15, 13, 16, 46, 17, 18],
-        [18, 17, 19, 31, 20, 22],
-        [21, 10, 22, 20, 23, 24],
-        [24, 23, 25, 27, 26, 55],
-        [27, 25, 28, 30, 29, 59],
-        [30, 28, 31, 19, 32, 33],
-        [33, 32, 34, 45, 35, 36],
-        [36, 35, 37, 39, 38, 57],
-        [39, 37, 40, 42, 41, 49],
-        [42, 40, 43, 47, 44, 0],
-        [45, 34, 46, 16, 47, 43],
-        [48, 53, 49, 41, 50, 5],
-        [51, 56, 52, 58, 53, 48],
-        [54, 8, 55, 26, 56, 51],
-        [57, 38, 58, 52, 59, 29],
-        [3, 50, 41, 42, 0],
-        [44, 47, 16, 13, 1],
-        [12, 9, 7, 4, 2],
-        [6, 54, 51, 48, 5],
-        [11, 21, 24, 55, 8],
-        [14, 15, 18, 22, 10],
-        [46, 34, 32, 19, 17],
-        [31, 28, 25, 23, 20],
-        [27, 59, 52, 56, 26],
-        [30, 33, 36, 57, 29],
-        [45, 43, 40, 37, 35],
-        [39, 49, 53, 58, 38]
-      ]
-    };
-    this.normalize(m);
-    return m;
-  },
-
-  // 11. Rhombicosidodecahedron
-  rhombicosidodecahedron() {
-    const m = {
-      vertices: [
-        new THREE.Vector3(0.223919, 0.948536, 0.223919), // 0
-        new THREE.Vector3(-0.223919, 0.948536, 0.223919), // 1
-        new THREE.Vector3(-0.3623085, 0.724617, 0.5862275), // 2
-        new THREE.Vector3(0, 0.5862275, 0.8101465), // 3
-        new THREE.Vector3(0.3623085, 0.724617, 0.5862275), // 4
-        new THREE.Vector3(0.948536, 0.223919, 0.223919), // 5
-        new THREE.Vector3(0.948536, 0.223919, -0.223919), // 6
-        new THREE.Vector3(0.724617, 0.5862275, -0.3623085), // 7
-        new THREE.Vector3(0.5862275, 0.8101465, 0), // 8
-        new THREE.Vector3(0.724617, 0.5862275, 0.3623085), // 9
-        new THREE.Vector3(0.223919, 0.223919, 0.948536), // 10
-        new THREE.Vector3(0.223919, -0.223919, 0.948536), // 11
-        new THREE.Vector3(0.5862275, -0.3623085, 0.724617), // 12
-        new THREE.Vector3(0.8101465, 0, 0.5862275), // 13
-        new THREE.Vector3(0.5862275, 0.3623085, 0.724617), // 14
-        new THREE.Vector3(0.3623085, 0.724617, -0.5862275), // 15
-        new THREE.Vector3(0, 0.5862275, -0.8101465), // 16
-        new THREE.Vector3(-0.3623085, 0.724617, -0.5862275), // 17
-        new THREE.Vector3(-0.223919, 0.948536, -0.223919), // 18
-        new THREE.Vector3(0.223919, 0.948536, -0.223919), // 19
-        new THREE.Vector3(0.724617, -0.5862275, 0.3623085), // 20
-        new THREE.Vector3(0.5862275, -0.8101465, 0), // 21
-        new THREE.Vector3(0.724617, -0.5862275, -0.3623085), // 22
-        new THREE.Vector3(0.948536, -0.223919, -0.223919), // 23
-        new THREE.Vector3(0.948536, -0.223919, 0.223919), // 24
-        new THREE.Vector3(-0.5862275, 0.3623085, 0.724617), // 25
-        new THREE.Vector3(-0.8101465, 0, 0.5862275), // 26
-        new THREE.Vector3(-0.5862275, -0.3623085, 0.724617), // 27
-        new THREE.Vector3(-0.223919, -0.223919, 0.948536), // 28
-        new THREE.Vector3(-0.223919, 0.223919, 0.948536), // 29
-        new THREE.Vector3(-0.724617, 0.5862275, -0.3623085), // 30
-        new THREE.Vector3(-0.948536, 0.223919, -0.223919), // 31
-        new THREE.Vector3(-0.948536, 0.223919, 0.223919), // 32
-        new THREE.Vector3(-0.724617, 0.5862275, 0.3623085), // 33
-        new THREE.Vector3(-0.5862275, 0.8101465, 0), // 34
-        new THREE.Vector3(-0.223919, -0.948536, 0.223919), // 35
-        new THREE.Vector3(0.223919, -0.948536, 0.223919), // 36
-        new THREE.Vector3(0.3623085, -0.724617, 0.5862275), // 37
-        new THREE.Vector3(0, -0.5862275, 0.8101465), // 38
-        new THREE.Vector3(-0.3623085, -0.724617, 0.5862275), // 39
-        new THREE.Vector3(0.223919, -0.223919, -0.948536), // 40
-        new THREE.Vector3(0.223919, 0.223919, -0.948536), // 41
-        new THREE.Vector3(0.5862275, 0.3623085, -0.724617), // 42
-        new THREE.Vector3(0.8101465, 0, -0.5862275), // 43
-        new THREE.Vector3(0.5862275, -0.3623085, -0.724617), // 44
-        new THREE.Vector3(-0.8101465, 0, -0.5862275), // 45
-        new THREE.Vector3(-0.5862275, 0.3623085, -0.724617), // 46
-        new THREE.Vector3(-0.223919, 0.223919, -0.948536), // 47
-        new THREE.Vector3(-0.223919, -0.223919, -0.948536), // 48
-        new THREE.Vector3(-0.5862275, -0.3623085, -0.724617), // 49
-        new THREE.Vector3(-0.5862275, -0.8101465, 0), // 50
-        new THREE.Vector3(-0.724617, -0.5862275, 0.3623085), // 51
-        new THREE.Vector3(-0.948536, -0.223919, 0.223919), // 52
-        new THREE.Vector3(-0.948536, -0.223919, -0.223919), // 53
-        new THREE.Vector3(-0.724617, -0.5862275, -0.3623085), // 54
-        new THREE.Vector3(0, -0.5862275, -0.8101465), // 55
-        new THREE.Vector3(0.3623085, -0.724617, -0.5862275), // 56
-        new THREE.Vector3(0.223919, -0.948536, -0.223919), // 57
-        new THREE.Vector3(-0.223919, -0.948536, -0.223919), // 58
-        new THREE.Vector3(-0.3623085, -0.724617, -0.5862275) // 59
-      ],
-      faces: [
-        [0, 1, 2, 3, 4],
-        [5, 6, 7, 8, 9],
-        [10, 11, 12, 13, 14],
-        [15, 16, 17, 18, 19],
-        [20, 21, 22, 23, 24],
-        [25, 26, 27, 28, 29],
-        [30, 31, 32, 33, 34],
-        [35, 36, 37, 38, 39],
-        [40, 41, 42, 43, 44],
-        [45, 46, 47, 48, 49],
-        [50, 51, 52, 53, 54],
-        [55, 56, 57, 58, 59],
-        [14, 9, 4],
-        [8, 19, 0],
-        [18, 34, 1],
-        [33, 25, 2],
-        [29, 10, 3],
-        [13, 24, 5],
-        [23, 43, 6],
-        [42, 15, 7],
-        [28, 38, 11],
-        [37, 20, 12],
-        [41, 47, 16],
-        [46, 30, 17],
-        [36, 57, 21],
-        [56, 44, 22],
-        [32, 52, 26],
-        [51, 39, 27],
-        [45, 53, 31],
-        [50, 58, 35],
-        [55, 48, 40],
-        [59, 54, 49],
-        [4, 9, 8, 0],
-        [0, 19, 18, 1],
-        [1, 34, 33, 2],
-        [2, 25, 29, 3],
-        [3, 10, 14, 4],
-        [9, 14, 13, 5],
-        [5, 24, 23, 6],
-        [6, 43, 42, 7],
-        [7, 15, 19, 8],
-        [10, 29, 28, 11],
-        [11, 38, 37, 12],
-        [12, 20, 24, 13],
-        [15, 42, 41, 16],
-        [16, 47, 46, 17],
-        [17, 30, 34, 18],
-        [20, 37, 36, 21],
-        [21, 57, 56, 22],
-        [22, 44, 43, 23],
-        [25, 33, 32, 26],
-        [26, 52, 51, 27],
-        [27, 39, 38, 28],
-        [30, 46, 45, 31],
-        [31, 53, 52, 32],
-        [39, 51, 50, 35],
-        [35, 58, 57, 36],
-        [44, 56, 55, 40],
-        [40, 48, 47, 41],
-        [49, 54, 53, 45],
-        [48, 55, 59, 49],
-        [54, 59, 58, 50]
-      ]
-    }
-    this.normalize(m);
-    return m;
-  },
-
-  // 12. Truncated Icosidodecahedron (Great Rhombicosidodecahedron)
-  truncatedIcosidodecahedron() {
-    const m = {
-      vertices: [
-        new THREE.Vector3(0.3442612, 0.9012876, 0.2629922), // 0
-        new THREE.Vector3(-0.1314961, 0.9825566, 0.1314961), // 1
-        new THREE.Vector3(-0.4255303, 0.7697915, 0.4757573), // 2
-        new THREE.Vector3(-0.1314961, 0.5570264, 0.8200185), // 3
-        new THREE.Vector3(0.3442612, 0.6382954, 0.6885225), // 4
-        new THREE.Vector3(0.9012876, 0.2629922, 0.3442612), // 5
-        new THREE.Vector3(0.9825566, 0.1314961, -0.1314961), // 6
-        new THREE.Vector3(0.7697915, 0.4757573, -0.4255303), // 7
-        new THREE.Vector3(0.5570264, 0.8200185, -0.1314961), // 8
-        new THREE.Vector3(0.6382954, 0.6885225, 0.3442612), // 9
-        new THREE.Vector3(0.2629922, 0.3442612, 0.9012876), // 10
-        new THREE.Vector3(0.1314961, -0.1314961, 0.9825566), // 11
-        new THREE.Vector3(0.4757573, -0.4255303, 0.7697915), // 12
-        new THREE.Vector3(0.8200185, -0.1314961, 0.5570264), // 13
-        new THREE.Vector3(0.6885225, 0.3442612, 0.6382954), // 14
-        new THREE.Vector3(0.4255303, 0.7697915, -0.4757573), // 15
-        new THREE.Vector3(0.1314961, 0.5570264, -0.8200185), // 16
-        new THREE.Vector3(-0.3442612, 0.6382954, -0.6885225), // 17
-        new THREE.Vector3(-0.3442612, 0.9012876, -0.2629922), // 18
-        new THREE.Vector3(0.1314961, 0.9825566, -0.1314961), // 19
-        new THREE.Vector3(0.7697915, -0.4757573, 0.4255303), // 20
-        new THREE.Vector3(0.5570264, -0.8200185, 0.1314961), // 21
-        new THREE.Vector3(0.6382954, -0.6885225, -0.3442612), // 22
-        new THREE.Vector3(0.9012876, -0.2629922, -0.3442612), // 23
-        new THREE.Vector3(0.9825566, -0.1314961, 0.1314961), // 24
-        new THREE.Vector3(-0.4757573, 0.4255303, 0.7697915), // 25
-        new THREE.Vector3(-0.8200185, 0.1314961, 0.5570264), // 26
-        new THREE.Vector3(-0.6885225, -0.3442612, 0.6382954), // 27
-        new THREE.Vector3(-0.2629922, -0.3442612, 0.9012876), // 28
-        new THREE.Vector3(-0.1314961, 0.1314961, 0.9825566), // 29
-        new THREE.Vector3(-0.6382954, 0.6885225, -0.3442612), // 30
-        new THREE.Vector3(-0.9012876, 0.2629922, -0.3442612), // 31
-        new THREE.Vector3(-0.9825566, 0.1314961, 0.1314961), // 32
-        new THREE.Vector3(-0.7697915, 0.4757573, 0.4255303), // 33
-        new THREE.Vector3(-0.5570264, 0.8200185, 0.1314961), // 34
-        new THREE.Vector3(-0.3442612, -0.9012876, 0.2629922), // 35
-        new THREE.Vector3(0.1314961, -0.9825566, 0.1314961), // 36
-        new THREE.Vector3(0.4255303, -0.7697915, 0.4757573), // 37
-        new THREE.Vector3(0.1314961, -0.5570264, 0.8200185), // 38
-        new THREE.Vector3(-0.3442612, -0.6382954, 0.6885225), // 39
-        new THREE.Vector3(0.2629922, -0.3442612, -0.9012876), // 40
-        new THREE.Vector3(0.1314961, 0.1314961, -0.9825566), // 41
-        new THREE.Vector3(0.4757573, 0.4255303, -0.7697915), // 42
-        new THREE.Vector3(0.8200185, 0.1314961, -0.5570264), // 43
-        new THREE.Vector3(0.6885225, -0.3442612, -0.6382954), // 44
-        new THREE.Vector3(-0.8200185, -0.1314961, -0.5570264), // 45
-        new THREE.Vector3(-0.6885225, 0.3442612, -0.6382954), // 46
-        new THREE.Vector3(-0.2629922, 0.3442612, -0.9012876), // 47
-        new THREE.Vector3(-0.1314961, -0.1314961, -0.9825566), // 48
-        new THREE.Vector3(-0.4757573, -0.4255303, -0.7697915), // 49
-        new THREE.Vector3(-0.5570264, -0.8200185, -0.1314961), // 50
-        new THREE.Vector3(-0.6382954, -0.6885225, 0.3442612), // 51
-        new THREE.Vector3(-0.9012876, -0.2629922, 0.3442612), // 52
-        new THREE.Vector3(-0.9825566, -0.1314961, -0.1314961), // 53
-        new THREE.Vector3(-0.7697915, -0.4757573, -0.4255303), // 54
-        new THREE.Vector3(-0.1314961, -0.5570264, -0.8200185), // 55
-        new THREE.Vector3(0.3442612, -0.6382954, -0.6885225), // 56
-        new THREE.Vector3(0.3442612, -0.9012876, -0.2629922), // 57
-        new THREE.Vector3(-0.1314961, -0.9825566, -0.1314961), // 58
-        new THREE.Vector3(-0.4255303, -0.7697915, -0.4757573), // 59
-        new THREE.Vector3(0.4757573, 0.4255303, 0.7697915), // 60
-        new THREE.Vector3(0.7697915, 0.4757573, 0.4255303), // 61
-        new THREE.Vector3(0.4255303, 0.7697915, 0.4757573), // 62
-        new THREE.Vector3(0.5570264, 0.8200185, 0.1314961), // 63
-        new THREE.Vector3(0.3442612, 0.9012876, -0.2629922), // 64
-        new THREE.Vector3(0.1314961, 0.9825566, 0.1314961), // 65
-        new THREE.Vector3(-0.1314961, 0.9825566, -0.1314961), // 66
-        new THREE.Vector3(-0.5570264, 0.8200185, -0.1314961), // 67
-        new THREE.Vector3(-0.3442612, 0.9012876, 0.2629922), // 68
-        new THREE.Vector3(-0.6382954, 0.6885225, 0.3442612), // 69
-        new THREE.Vector3(-0.6885225, 0.3442612, 0.6382954), // 70
-        new THREE.Vector3(-0.3442612, 0.6382954, 0.6885225), // 71
-        new THREE.Vector3(-0.2629922, 0.3442612, 0.9012876), // 72
-        new THREE.Vector3(0.1314961, 0.1314961, 0.9825566), // 73
-        new THREE.Vector3(0.1314961, 0.5570264, 0.8200185), // 74
-        new THREE.Vector3(0.8200185, 0.1314961, 0.5570264), // 75
-        new THREE.Vector3(0.9012876, -0.2629922, 0.3442612), // 76
-        new THREE.Vector3(0.9825566, 0.1314961, 0.1314961), // 77
-        new THREE.Vector3(0.9825566, -0.1314961, -0.1314961), // 78
-        new THREE.Vector3(0.8200185, -0.1314961, -0.5570264), // 79
-        new THREE.Vector3(0.9012876, 0.2629922, -0.3442612), // 80
-        new THREE.Vector3(0.6885225, 0.3442612, -0.6382954), // 81
-        new THREE.Vector3(0.3442612, 0.6382954, -0.6885225), // 82
-        new THREE.Vector3(0.6382954, 0.6885225, -0.3442612), // 83
-        new THREE.Vector3(-0.1314961, -0.1314961, 0.9825566), // 84
-        new THREE.Vector3(-0.1314961, -0.5570264, 0.8200185), // 85
-        new THREE.Vector3(0.2629922, -0.3442612, 0.9012876), // 86
-        new THREE.Vector3(0.3442612, -0.6382954, 0.6885225), // 87
-        new THREE.Vector3(0.6382954, -0.6885225, 0.3442612), // 88
-        new THREE.Vector3(0.6885225, -0.3442612, 0.6382954), // 89
-        new THREE.Vector3(0.2629922, 0.3442612, -0.9012876), // 90
-        new THREE.Vector3(-0.1314961, 0.1314961, -0.9825566), // 91
-        new THREE.Vector3(-0.1314961, 0.5570264, -0.8200185), // 92
-        new THREE.Vector3(-0.4757573, 0.4255303, -0.7697915), // 93
-        new THREE.Vector3(-0.7697915, 0.4757573, -0.4255303), // 94
-        new THREE.Vector3(-0.4255303, 0.7697915, -0.4757573), // 95
-        new THREE.Vector3(0.3442612, -0.9012876, 0.2629922), // 96
-        new THREE.Vector3(0.1314961, -0.9825566, -0.1314961), // 97
-        new THREE.Vector3(0.5570264, -0.8200185, -0.1314961), // 98
-        new THREE.Vector3(0.4255303, -0.7697915, -0.4757573), // 99
-        new THREE.Vector3(0.4757573, -0.4255303, -0.7697915), // 100
-        new THREE.Vector3(0.7697915, -0.4757573, -0.4255303), // 101
-        new THREE.Vector3(-0.9012876, 0.2629922, 0.3442612), // 102
-        new THREE.Vector3(-0.9825566, -0.1314961, 0.1314961), // 103
-        new THREE.Vector3(-0.8200185, -0.1314961, 0.5570264), // 104
-        new THREE.Vector3(-0.7697915, -0.4757573, 0.4255303), // 105
-        new THREE.Vector3(-0.4255303, -0.7697915, 0.4757573), // 106
-        new THREE.Vector3(-0.4757573, -0.4255303, 0.7697915), // 107
-        new THREE.Vector3(-0.8200185, 0.1314961, -0.5570264), // 108
-        new THREE.Vector3(-0.9012876, -0.2629922, -0.3442612), // 109
-        new THREE.Vector3(-0.9825566, 0.1314961, -0.1314961), // 110
-        new THREE.Vector3(-0.5570264, -0.8200185, 0.1314961), // 111
-        new THREE.Vector3(-0.3442612, -0.9012876, -0.2629922), // 112
-        new THREE.Vector3(-0.1314961, -0.9825566, 0.1314961), // 113
-        new THREE.Vector3(0.1314961, -0.5570264, -0.8200185), // 114
-        new THREE.Vector3(-0.2629922, -0.3442612, -0.9012876), // 115
-        new THREE.Vector3(0.1314961, -0.1314961, -0.9825566), // 116
-        new THREE.Vector3(-0.3442612, -0.6382954, -0.6885225), // 117
-        new THREE.Vector3(-0.6382954, -0.6885225, -0.3442612), // 118
-        new THREE.Vector3(-0.6885225, -0.3442612, -0.6382954) // 119
-      ],
-      faces: [
-        [0, 65, 1, 68, 2, 71, 3, 74, 4, 62],
-        [5, 77, 6, 80, 7, 83, 8, 63, 9, 61],
-        [10, 73, 11, 86, 12, 89, 13, 75, 14, 60],
-        [15, 82, 16, 92, 17, 95, 18, 66, 19, 64],
-        [20, 88, 21, 98, 22, 101, 23, 78, 24, 76],
-        [25, 70, 26, 104, 27, 107, 28, 84, 29, 72],
-        [30, 94, 31, 110, 32, 102, 33, 69, 34, 67],
-        [35, 113, 36, 96, 37, 87, 38, 85, 39, 106],
-        [40, 116, 41, 90, 42, 81, 43, 79, 44, 100],
-        [45, 108, 46, 93, 47, 91, 48, 115, 49, 119],
-        [50, 111, 51, 105, 52, 103, 53, 109, 54, 118],
-        [55, 114, 56, 99, 57, 97, 58, 112, 59, 117],
-        [60, 14, 61, 9, 62, 4],
-        [63, 8, 64, 19, 65, 0],
-        [66, 18, 67, 34, 68, 1],
-        [69, 33, 70, 25, 71, 2],
-        [72, 29, 73, 10, 74, 3],
-        [75, 13, 76, 24, 77, 5],
-        [78, 23, 79, 43, 80, 6],
-        [81, 42, 82, 15, 83, 7],
-        [84, 28, 85, 38, 86, 11],
-        [87, 37, 88, 20, 89, 12],
-        [90, 41, 91, 47, 92, 16],
-        [93, 46, 94, 30, 95, 17],
-        [96, 36, 97, 57, 98, 21],
-        [99, 56, 100, 44, 101, 22],
-        [102, 32, 103, 52, 104, 26],
-        [105, 51, 106, 39, 107, 27],
-        [108, 45, 109, 53, 110, 31],
-        [111, 50, 112, 58, 113, 35],
-        [114, 55, 115, 48, 116, 40],
-        [117, 59, 118, 54, 119, 49],
-        [62, 9, 63, 0],
-        [65, 19, 66, 1],
-        [68, 34, 69, 2],
-        [71, 25, 72, 3],
-        [74, 10, 60, 4],
-        [61, 14, 75, 5],
-        [77, 24, 78, 6],
-        [80, 43, 81, 7],
-        [83, 15, 64, 8],
-        [73, 29, 84, 11],
-        [86, 38, 87, 12],
-        [89, 20, 76, 13],
-        [82, 42, 90, 16],
-        [92, 47, 93, 17],
-        [95, 30, 67, 18],
-        [88, 37, 96, 21],
-        [98, 57, 99, 22],
-        [101, 44, 79, 23],
-        [70, 33, 102, 26],
-        [104, 52, 105, 27],
-        [107, 39, 85, 28],
-        [94, 46, 108, 31],
-        [110, 53, 103, 32],
-        [106, 51, 111, 35],
-        [113, 58, 97, 36],
-        [100, 56, 114, 40],
-        [116, 48, 91, 41],
-        [119, 54, 109, 45],
-        [115, 55, 117, 49],
-        [118, 59, 112, 50]
-      ]
-    };
-    this.normalize(m);
-    return m;
-  },
-
-  // 13. Snub Dodecahedron
-  snubDodecahedron() {
-    const m = {
-      vertices: [
-        new THREE.Vector3(0.3931419, 0.7639342, 0.5117069), // 0
-        new THREE.Vector3(0.1535, 0.9727329, 0.1738636), // 1
-        new THREE.Vector3(-0.2982737, 0.9174342, 0.2633387), // 2
-        new THREE.Vector3(-0.3378433, 0.6744591, 0.6564806), // 3
-        new THREE.Vector3(0.0894751, 0.5795909, 0.8099806), // 4
-        new THREE.Vector3(0.7639342, 0.5117069, 0.3931419), // 5
-        new THREE.Vector3(0.9727329, 0.1738636, 0.1535), // 6
-        new THREE.Vector3(0.9174342, 0.2633387, -0.2982737), // 7
-        new THREE.Vector3(0.6744591, 0.6564806, -0.3378433), // 8
-        new THREE.Vector3(0.5795909, 0.8099806, 0.0894751), // 9
-        new THREE.Vector3(0.5117069, 0.3931419, 0.7639342), // 10
-        new THREE.Vector3(0.1738636, 0.1535, 0.9727329), // 11
-        new THREE.Vector3(0.2633387, -0.2982737, 0.9174342), // 12
-        new THREE.Vector3(0.6564806, -0.3378433, 0.6744591), // 13
-        new THREE.Vector3(0.8099806, 0.0894751, 0.5795909), // 14
-        new THREE.Vector3(0.2982737, 0.9174342, -0.2633387), // 15
-        new THREE.Vector3(0.3378433, 0.6744591, -0.6564806), // 16
-        new THREE.Vector3(-0.0894751, 0.5795909, -0.8099806), // 17
-        new THREE.Vector3(-0.3931419, 0.7639342, -0.5117069), // 18
-        new THREE.Vector3(-0.1535, 0.9727329, -0.1738636), // 19
-        new THREE.Vector3(0.9174342, -0.2633387, 0.2982737), // 20
-        new THREE.Vector3(0.6744591, -0.6564806, 0.3378433), // 21
-        new THREE.Vector3(0.5795909, -0.8099806, -0.0894751), // 22
-        new THREE.Vector3(0.7639342, -0.5117069, -0.3931419), // 23
-        new THREE.Vector3(0.9727329, -0.1738636, -0.1535), // 24
-        new THREE.Vector3(-0.2633387, 0.2982737, 0.9174342), // 25
-        new THREE.Vector3(-0.6564806, 0.3378433, 0.6744591), // 26
-        new THREE.Vector3(-0.8099806, -0.0894751, 0.5795909), // 27
-        new THREE.Vector3(-0.5117069, -0.3931419, 0.7639342), // 28
-        new THREE.Vector3(-0.1738636, -0.1535, 0.9727329), // 29
-        new THREE.Vector3(-0.5795909, 0.8099806, -0.0894751), // 30
-        new THREE.Vector3(-0.7639342, 0.5117069, -0.3931419), // 31
-        new THREE.Vector3(-0.9727329, 0.1738636, -0.1535), // 32
-        new THREE.Vector3(-0.9174342, 0.2633387, 0.2982737), // 33
-        new THREE.Vector3(-0.6744591, 0.6564806, 0.3378433), // 34
-        new THREE.Vector3(-0.3931419, -0.7639342, 0.5117069), // 35
-        new THREE.Vector3(-0.1535, -0.9727329, 0.1738636), // 36
-        new THREE.Vector3(0.2982737, -0.9174342, 0.2633387), // 37
-        new THREE.Vector3(0.3378433, -0.6744591, 0.6564806), // 38
-        new THREE.Vector3(-0.0894751, -0.5795909, 0.8099806), // 39
-        new THREE.Vector3(0.5117069, -0.3931419, -0.7639342), // 40
-        new THREE.Vector3(0.1738636, -0.1535, -0.9727329), // 41
-        new THREE.Vector3(0.2633387, 0.2982737, -0.9174342), // 42
-        new THREE.Vector3(0.6564806, 0.3378433, -0.6744591), // 43
-        new THREE.Vector3(0.8099806, -0.0894751, -0.5795909), // 44
-        new THREE.Vector3(-0.6564806, -0.3378433, -0.6744591), // 45
-        new THREE.Vector3(-0.8099806, 0.0894751, -0.5795909), // 46
-        new THREE.Vector3(-0.5117069, 0.3931419, -0.7639342), // 47
-        new THREE.Vector3(-0.1738636, 0.1535, -0.9727329), // 48
-        new THREE.Vector3(-0.2633387, -0.2982737, -0.9174342), // 49
-        new THREE.Vector3(-0.6744591, -0.6564806, -0.3378433), // 50
-        new THREE.Vector3(-0.5795909, -0.8099806, 0.0894751), // 51
-        new THREE.Vector3(-0.7639342, -0.5117069, 0.3931419), // 52
-        new THREE.Vector3(-0.9727329, -0.1738636, 0.1535), // 53
-        new THREE.Vector3(-0.9174342, -0.2633387, -0.2982737), // 54
-        new THREE.Vector3(-0.3378433, -0.6744591, -0.6564806), // 55
-        new THREE.Vector3(0.0894751, -0.5795909, -0.8099806), // 56
-        new THREE.Vector3(0.3931419, -0.7639342, -0.5117069), // 57
-        new THREE.Vector3(0.1535, -0.9727329, -0.1738636), // 58
-        new THREE.Vector3(-0.2982737, -0.9174342, -0.2633387) // 59
-      ],
-      faces: [
-        [0, 1, 2, 3, 4],
-        [5, 6, 7, 8, 9],
-        [10, 11, 12, 13, 14],
-        [15, 16, 17, 18, 19],
-        [20, 21, 22, 23, 24],
-        [25, 26, 27, 28, 29],
-        [30, 31, 32, 33, 34],
-        [35, 36, 37, 38, 39],
-        [40, 41, 42, 43, 44],
-        [45, 46, 47, 48, 49],
-        [50, 51, 52, 53, 54],
-        [55, 56, 57, 58, 59],
-        [10, 5, 0],
-        [9, 15, 1],
-        [19, 30, 2],
-        [34, 26, 3],
-        [25, 11, 4],
-        [14, 20, 6],
-        [24, 44, 7],
-        [43, 16, 8],
-        [29, 39, 12],
-        [38, 21, 13],
-        [42, 48, 17],
-        [47, 31, 18],
-        [37, 58, 22],
-        [57, 40, 23],
-        [33, 53, 27],
-        [52, 35, 28],
-        [46, 54, 32],
-        [51, 59, 36],
-        [56, 49, 41],
-        [55, 50, 45],
-        [0, 5, 9],
-        [0, 9, 1],
-        [1, 15, 19],
-        [1, 19, 2],
-        [2, 30, 34],
-        [2, 34, 3],
-        [3, 26, 25],
-        [3, 25, 4],
-        [4, 11, 10],
-        [4, 10, 0],
-        [5, 10, 14],
-        [5, 14, 6],
-        [6, 20, 24],
-        [6, 24, 7],
-        [7, 44, 43],
-        [7, 43, 8],
-        [8, 16, 15],
-        [8, 15, 9],
-        [11, 25, 29],
-        [11, 29, 12],
-        [12, 39, 38],
-        [12, 38, 13],
-        [13, 21, 20],
-        [13, 20, 14],
-        [16, 43, 42],
-        [16, 42, 17],
-        [17, 48, 47],
-        [17, 47, 18],
-        [18, 31, 30],
-        [18, 30, 19],
-        [21, 38, 37],
-        [21, 37, 22],
-        [22, 58, 57],
-        [22, 57, 23],
-        [23, 40, 44],
-        [23, 44, 24],
-        [26, 34, 33],
-        [26, 33, 27],
-        [27, 53, 52],
-        [27, 52, 28],
-        [28, 35, 39],
-        [28, 39, 29],
-        [31, 47, 46],
-        [31, 46, 32],
-        [32, 54, 53],
-        [32, 53, 33],
-        [35, 52, 51],
-        [35, 51, 36],
-        [36, 59, 58],
-        [36, 58, 37],
-        [40, 57, 56],
-        [40, 56, 41],
-        [41, 49, 48],
-        [41, 48, 42],
-        [45, 50, 54],
-        [45, 54, 46],
-        [49, 56, 55],
-        [49, 55, 45],
-        [50, 55, 59],
-        [50, 59, 51]
-      ]
-    };
-    this.normalize(m);
-    return m;
-  },
-
-  // Islamic Stars
-
-  // Base: truncatedIcosidodecahedron, Ops: Hk(69.00)
-  star1() {
-    const m = {
-      vertices: [
-        new THREE.Vector3(0.23996231855534536, 0.950172760175986, 0.19897188618770079),
-        new THREE.Vector3(0, 0.9911632191630323, 0.13264792866221042),
-        new THREE.Vector3(-0.23996231855534536, 0.950172760175986, 0.19897188618770079),
-        new THREE.Vector3(-0.3882671937231125, 0.8428583484272784, 0.3726102397476745),
-        new THREE.Vector3(-0.3882671944531609, 0.7102104273240789, 0.5872390779159886),
-        new THREE.Vector3(-0.2399623145393176, 0.6028960293292889, 0.760877431272548),
-        new THREE.Vector3(0, 0.5619056088777573, 0.8272013580209577),
-        new THREE.Vector3(0.2399623145393176, 0.6028960293292889, 0.760877431272548),
-        new THREE.Vector3(0.3882671944531609, 0.7102104273240789, 0.5872390779159886),
-        new THREE.Vector3(0.3882671937231125, 0.8428583484272784, 0.3726102397476745),
-        new THREE.Vector3(0.950172760175986, 0.19897188618770079, 0.23996231855534536),
-        new THREE.Vector3(0.9911632191630323, 0.13264792866221042, 0),
-        new THREE.Vector3(0.950172760175986, 0.19897188618770079, -0.23996231855534536),
-        new THREE.Vector3(0.8428583484272784, 0.3726102397476745, -0.3882671937231125),
-        new THREE.Vector3(0.7102104273240789, 0.5872390779159886, -0.3882671944531609),
-        new THREE.Vector3(0.6028960293292889, 0.760877431272548, -0.2399623145393176),
-        new THREE.Vector3(0.5619056088777573, 0.8272013580209577, 0),
-        new THREE.Vector3(0.6028960293292889, 0.760877431272548, 0.2399623145393176),
-        new THREE.Vector3(0.7102104273240789, 0.5872390779159886, 0.3882671944531609),
-        new THREE.Vector3(0.8428583484272784, 0.3726102397476745, 0.3882671937231125),
-        new THREE.Vector3(0.19897188618770079, 0.23996231855534536, 0.950172760175986),
-        new THREE.Vector3(0.13264792866221042, 0, 0.9911632191630323),
-        new THREE.Vector3(0.19897188618770079, -0.23996231855534536, 0.950172760175986),
-        new THREE.Vector3(0.3726102397476746, -0.3882671937231126, 0.8428583484272786),
-        new THREE.Vector3(0.5872390779159886, -0.3882671944531609, 0.7102104273240789),
-        new THREE.Vector3(0.760877431272548, -0.2399623145393176, 0.6028960293292889),
-        new THREE.Vector3(0.8272013580209577, 0, 0.5619056088777573),
-        new THREE.Vector3(0.760877431272548, 0.2399623145393176, 0.6028960293292889),
-        new THREE.Vector3(0.5872390779159886, 0.3882671944531609, 0.7102104273240789),
-        new THREE.Vector3(0.3726102397476746, 0.3882671937231126, 0.8428583484272786),
-        new THREE.Vector3(0.3882671944531609, 0.7102104273240789, -0.5872390779159886),
-        new THREE.Vector3(0.2399623145393176, 0.6028960293292889, -0.760877431272548),
-        new THREE.Vector3(0, 0.5619056088777573, -0.8272013580209577),
-        new THREE.Vector3(-0.2399623145393176, 0.6028960293292889, -0.760877431272548),
-        new THREE.Vector3(-0.3882671944531609, 0.7102104273240789, -0.5872390779159886),
-        new THREE.Vector3(-0.3882671937231125, 0.8428583484272784, -0.3726102397476745),
-        new THREE.Vector3(-0.23996231855534536, 0.950172760175986, -0.19897188618770079),
-        new THREE.Vector3(0, 0.9911632191630323, -0.13264792866221042),
-        new THREE.Vector3(0.23996231855534536, 0.950172760175986, -0.19897188618770079),
-        new THREE.Vector3(0.3882671937231125, 0.8428583484272784, -0.3726102397476745),
-        new THREE.Vector3(0.7102104273240789, -0.5872390779159886, 0.3882671944531609),
-        new THREE.Vector3(0.6028960293292889, -0.760877431272548, 0.2399623145393176),
-        new THREE.Vector3(0.5619056088777573, -0.8272013580209577, 0),
-        new THREE.Vector3(0.6028960293292889, -0.760877431272548, -0.2399623145393176),
-        new THREE.Vector3(0.7102104273240789, -0.5872390779159886, -0.3882671944531609),
-        new THREE.Vector3(0.8428583484272784, -0.3726102397476745, -0.3882671937231125),
-        new THREE.Vector3(0.950172760175986, -0.19897188618770079, -0.23996231855534536),
-        new THREE.Vector3(0.9911632191630323, -0.13264792866221042, 0),
-        new THREE.Vector3(0.950172760175986, -0.19897188618770079, 0.23996231855534536),
-        new THREE.Vector3(0.8428583484272784, -0.3726102397476745, 0.3882671937231125),
-        new THREE.Vector3(-0.5872390779159886, 0.3882671944531609, 0.7102104273240789),
-        new THREE.Vector3(-0.760877431272548, 0.2399623145393176, 0.6028960293292889),
-        new THREE.Vector3(-0.8272013580209577, 0, 0.5619056088777573),
-        new THREE.Vector3(-0.760877431272548, -0.2399623145393176, 0.6028960293292889),
-        new THREE.Vector3(-0.5872390779159886, -0.3882671944531609, 0.7102104273240789),
-        new THREE.Vector3(-0.3726102397476746, -0.3882671937231126, 0.8428583484272786),
-        new THREE.Vector3(-0.19897188618770079, -0.23996231855534536, 0.950172760175986),
-        new THREE.Vector3(-0.13264792866221042, 0, 0.9911632191630323),
-        new THREE.Vector3(-0.19897188618770079, 0.23996231855534536, 0.950172760175986),
-        new THREE.Vector3(-0.3726102397476746, 0.3882671937231126, 0.8428583484272786),
-        new THREE.Vector3(-0.7102104273240789, 0.5872390779159886, -0.3882671944531609),
-        new THREE.Vector3(-0.8428583484272784, 0.3726102397476745, -0.3882671937231125),
-        new THREE.Vector3(-0.950172760175986, 0.19897188618770079, -0.23996231855534536),
-        new THREE.Vector3(-0.9911632191630323, 0.13264792866221042, 0),
-        new THREE.Vector3(-0.950172760175986, 0.19897188618770079, 0.23996231855534536),
-        new THREE.Vector3(-0.8428583484272784, 0.3726102397476745, 0.3882671937231125),
-        new THREE.Vector3(-0.7102104273240789, 0.5872390779159886, 0.3882671944531609),
-        new THREE.Vector3(-0.6028960293292889, 0.760877431272548, 0.2399623145393176),
-        new THREE.Vector3(-0.5619056088777573, 0.8272013580209577, 0),
-        new THREE.Vector3(-0.6028960293292889, 0.760877431272548, -0.2399623145393176),
-        new THREE.Vector3(-0.23996231855534536, -0.950172760175986, 0.19897188618770079),
-        new THREE.Vector3(0, -0.9911632191630323, 0.13264792866221042),
-        new THREE.Vector3(0.23996231855534536, -0.950172760175986, 0.19897188618770079),
-        new THREE.Vector3(0.3882671937231125, -0.8428583484272784, 0.3726102397476745),
-        new THREE.Vector3(0.3882671944531609, -0.7102104273240789, 0.5872390779159886),
-        new THREE.Vector3(0.2399623145393176, -0.6028960293292889, 0.760877431272548),
-        new THREE.Vector3(0, -0.5619056088777573, 0.8272013580209577),
-        new THREE.Vector3(-0.2399623145393176, -0.6028960293292889, 0.760877431272548),
-        new THREE.Vector3(-0.3882671944531609, -0.7102104273240789, 0.5872390779159886),
-        new THREE.Vector3(-0.3882671937231125, -0.8428583484272784, 0.3726102397476745),
-        new THREE.Vector3(0.19897188618770079, -0.23996231855534536, -0.950172760175986),
-        new THREE.Vector3(0.13264792866221042, 0, -0.9911632191630323),
-        new THREE.Vector3(0.19897188618770079, 0.23996231855534536, -0.950172760175986),
-        new THREE.Vector3(0.3726102397476746, 0.3882671937231126, -0.8428583484272786),
-        new THREE.Vector3(0.5872390779159886, 0.3882671944531609, -0.7102104273240789),
-        new THREE.Vector3(0.760877431272548, 0.2399623145393176, -0.6028960293292889),
-        new THREE.Vector3(0.8272013580209577, 0, -0.5619056088777573),
-        new THREE.Vector3(0.760877431272548, -0.2399623145393176, -0.6028960293292889),
-        new THREE.Vector3(0.5872390779159886, -0.3882671944531609, -0.7102104273240789),
-        new THREE.Vector3(0.3726102397476746, -0.3882671937231126, -0.8428583484272786),
-        new THREE.Vector3(-0.8272013580209577, 0, -0.5619056088777573),
-        new THREE.Vector3(-0.760877431272548, 0.2399623145393176, -0.6028960293292889),
-        new THREE.Vector3(-0.5872390779159886, 0.3882671944531609, -0.7102104273240789),
-        new THREE.Vector3(-0.3726102397476746, 0.3882671937231126, -0.8428583484272786),
-        new THREE.Vector3(-0.19897188618770079, 0.23996231855534536, -0.950172760175986),
-        new THREE.Vector3(-0.13264792866221042, 0, -0.9911632191630323),
-        new THREE.Vector3(-0.19897188618770079, -0.23996231855534536, -0.950172760175986),
-        new THREE.Vector3(-0.3726102397476746, -0.3882671937231126, -0.8428583484272786),
-        new THREE.Vector3(-0.5872390779159886, -0.3882671944531609, -0.7102104273240789),
-        new THREE.Vector3(-0.760877431272548, -0.2399623145393176, -0.6028960293292889),
-        new THREE.Vector3(-0.5619056088777573, -0.8272013580209577, 0),
-        new THREE.Vector3(-0.6028960293292889, -0.760877431272548, 0.2399623145393176),
-        new THREE.Vector3(-0.7102104273240789, -0.5872390779159886, 0.3882671944531609),
-        new THREE.Vector3(-0.8428583484272784, -0.3726102397476745, 0.3882671937231125),
-        new THREE.Vector3(-0.950172760175986, -0.19897188618770079, 0.23996231855534536),
-        new THREE.Vector3(-0.9911632191630323, -0.13264792866221042, 0),
-        new THREE.Vector3(-0.950172760175986, -0.19897188618770079, -0.23996231855534536),
-        new THREE.Vector3(-0.8428583484272784, -0.3726102397476745, -0.3882671937231125),
-        new THREE.Vector3(-0.7102104273240789, -0.5872390779159886, -0.3882671944531609),
-        new THREE.Vector3(-0.6028960293292889, -0.760877431272548, -0.2399623145393176),
-        new THREE.Vector3(0, -0.5619056088777573, -0.8272013580209577),
-        new THREE.Vector3(0.2399623145393176, -0.6028960293292889, -0.760877431272548),
-        new THREE.Vector3(0.3882671944531609, -0.7102104273240789, -0.5872390779159886),
-        new THREE.Vector3(0.3882671937231125, -0.8428583484272784, -0.3726102397476745),
-        new THREE.Vector3(0.23996231855534536, -0.950172760175986, -0.19897188618770079),
-        new THREE.Vector3(0, -0.9911632191630323, -0.13264792866221042),
-        new THREE.Vector3(-0.23996231855534536, -0.950172760175986, -0.19897188618770079),
-        new THREE.Vector3(-0.3882671937231125, -0.8428583484272784, -0.3726102397476745),
-        new THREE.Vector3(-0.3882671944531609, -0.7102104273240789, -0.5872390779159886),
-        new THREE.Vector3(-0.2399623145393176, -0.6028960293292889, -0.760877431272548),
-        new THREE.Vector3(0.7355439505253093, 0.41360066995774764, 0.536572066600679),
-        new THREE.Vector3(0.536572066600679, 0.7355439505253093, 0.41360066995774764),
-        new THREE.Vector3(0.41360066995774764, 0.536572066600679, 0.7355439505253093),
-        new THREE.Vector3(0.45459116105561487, 0.868191836484192, -0.1989718858339396),
-        new THREE.Vector3(0.13264792866221042, 0.9911632191630323, 0),
-        new THREE.Vector3(0.45459116105561487, 0.868191836484192, 0.1989718858339396),
-        new THREE.Vector3(-0.45459116105561487, 0.868191836484192, -0.1989718858339396),
-        new THREE.Vector3(-0.45459116105561487, 0.868191836484192, 0.1989718858339396),
-        new THREE.Vector3(-0.13264792866221042, 0.9911632191630323, 0),
-        new THREE.Vector3(-0.7355439505253093, 0.41360066995774764, 0.536572066600679),
-        new THREE.Vector3(-0.41360066995774764, 0.536572066600679, 0.7355439505253093),
-        new THREE.Vector3(-0.536572066600679, 0.7355439505253093, 0.41360066995774764),
-        new THREE.Vector3(0, 0.13264792866221042, 0.9911632191630323),
-        new THREE.Vector3(0.1989718858339396, 0.45459116105561487, 0.868191836484192),
-        new THREE.Vector3(-0.1989718858339396, 0.45459116105561487, 0.868191836484192),
-        new THREE.Vector3(0.868191836484192, -0.1989718858339396, 0.45459116105561487),
-        new THREE.Vector3(0.9911632191630323, 0, 0.13264792866221042),
-        new THREE.Vector3(0.868191836484192, 0.1989718858339396, 0.45459116105561487),
-        new THREE.Vector3(0.868191836484192, -0.1989718858339396, -0.45459116105561487),
-        new THREE.Vector3(0.868191836484192, 0.1989718858339396, -0.45459116105561487),
-        new THREE.Vector3(0.9911632191630323, 0, -0.13264792866221042),
-        new THREE.Vector3(0.41360066995774764, 0.536572066600679, -0.7355439505253093),
-        new THREE.Vector3(0.536572066600679, 0.7355439505253093, -0.41360066995774764),
-        new THREE.Vector3(0.7355439505253093, 0.41360066995774764, -0.536572066600679),
-        new THREE.Vector3(-0.1989718858339396, -0.45459116105561487, 0.868191836484192),
-        new THREE.Vector3(0.1989718858339396, -0.45459116105561487, 0.868191836484192),
-        new THREE.Vector3(0, -0.13264792866221042, 0.9911632191630323),
-        new THREE.Vector3(0.536572066600679, -0.7355439505253093, 0.41360066995774764),
-        new THREE.Vector3(0.7355439505253093, -0.41360066995774764, 0.536572066600679),
-        new THREE.Vector3(0.41360066995774764, -0.536572066600679, 0.7355439505253093),
-        new THREE.Vector3(0, 0.13264792866221042, -0.9911632191630323),
-        new THREE.Vector3(-0.1989718858339396, 0.45459116105561487, -0.868191836484192),
-        new THREE.Vector3(0.1989718858339396, 0.45459116105561487, -0.868191836484192),
-        new THREE.Vector3(-0.7355439505253093, 0.41360066995774764, -0.536572066600679),
-        new THREE.Vector3(-0.536572066600679, 0.7355439505253093, -0.41360066995774764),
-        new THREE.Vector3(-0.41360066995774764, 0.536572066600679, -0.7355439505253093),
-        new THREE.Vector3(0.13264792866221042, -0.9911632191630323, 0),
-        new THREE.Vector3(0.45459116105561487, -0.868191836484192, -0.1989718858339396),
-        new THREE.Vector3(0.45459116105561487, -0.868191836484192, 0.1989718858339396),
-        new THREE.Vector3(0.41360066995774764, -0.536572066600679, -0.7355439505253093),
-        new THREE.Vector3(0.7355439505253093, -0.41360066995774764, -0.536572066600679),
-        new THREE.Vector3(0.536572066600679, -0.7355439505253093, -0.41360066995774764),
-        new THREE.Vector3(-0.9911632191630323, 0, 0.13264792866221042),
-        new THREE.Vector3(-0.868191836484192, -0.1989718858339396, 0.45459116105561487),
-        new THREE.Vector3(-0.868191836484192, 0.1989718858339396, 0.45459116105561487),
-        new THREE.Vector3(-0.536572066600679, -0.7355439505253093, 0.41360066995774764),
-        new THREE.Vector3(-0.41360066995774764, -0.536572066600679, 0.7355439505253093),
-        new THREE.Vector3(-0.7355439505253093, -0.41360066995774764, 0.536572066600679),
-        new THREE.Vector3(-0.868191836484192, -0.1989718858339396, -0.45459116105561487),
-        new THREE.Vector3(-0.9911632191630323, 0, -0.13264792866221042),
-        new THREE.Vector3(-0.868191836484192, 0.1989718858339396, -0.45459116105561487),
-        new THREE.Vector3(-0.45459116105561487, -0.868191836484192, -0.1989718858339396),
-        new THREE.Vector3(-0.13264792866221042, -0.9911632191630323, 0),
-        new THREE.Vector3(-0.45459116105561487, -0.868191836484192, 0.1989718858339396),
-        new THREE.Vector3(-0.1989718858339396, -0.45459116105561487, -0.868191836484192),
-        new THREE.Vector3(0, -0.13264792866221042, -0.9911632191630323),
-        new THREE.Vector3(0.1989718858339396, -0.45459116105561487, -0.868191836484192),
-        new THREE.Vector3(-0.536572066600679, -0.7355439505253093, -0.41360066995774764),
-        new THREE.Vector3(-0.7355439505253093, -0.41360066995774764, -0.536572066600679),
-        new THREE.Vector3(-0.41360066995774764, -0.536572066600679, -0.7355439505253093),
-        new THREE.Vector3(0.19176743056603945, 0.8996563013124593, 0.3922292595955646),
-        new THREE.Vector3(0.0732486462172136, 0.9449264763170864, 0.3189805482820552),
-        new THREE.Vector3(-0.0732486462172136, 0.9449264763170864, 0.3189805482820552),
-        new THREE.Vector3(-0.19176743056603945, 0.8996563013124593, 0.3922292595955646),
-        new THREE.Vector3(-0.23703767530743317, 0.8264076372340299, 0.5107480373003068),
-        new THREE.Vector3(-0.1917674995546761, 0.7531590060839546, 0.6292668254954944),
-        new THREE.Vector3(-0.07324865380488925, 0.7078888801176622, 0.702515457567685),
-        new THREE.Vector3(0.07324865380488925, 0.7078888801176622, 0.702515457567685),
-        new THREE.Vector3(0.1917674995546761, 0.7531590060839546, 0.6292668254954944),
-        new THREE.Vector3(0.23703767530743317, 0.8264076372340299, 0.5107480373003068),
-        new THREE.Vector3(0.8996563013124592, 0.39222925959556454, 0.19176743056603948),
-        new THREE.Vector3(0.9449264763170863, 0.31898054828205513, 0.07324864621721358),
-        new THREE.Vector3(0.9449264763170863, 0.31898054828205513, -0.07324864621721358),
-        new THREE.Vector3(0.8996563013124592, 0.39222925959556454, -0.19176743056603948),
-        new THREE.Vector3(0.8264076372340299, 0.5107480373003068, -0.23703767530743317),
-        new THREE.Vector3(0.7531590060839546, 0.6292668254954944, -0.1917674995546761),
-        new THREE.Vector3(0.7078888801176622, 0.702515457567685, -0.07324865380488925),
-        new THREE.Vector3(0.7078888801176622, 0.702515457567685, 0.07324865380488925),
-        new THREE.Vector3(0.7531590060839546, 0.6292668254954944, 0.1917674995546761),
-        new THREE.Vector3(0.8264076372340299, 0.5107480373003068, 0.23703767530743317),
-        new THREE.Vector3(0.39222925959556454, 0.19176743056603948, 0.8996563013124592),
-        new THREE.Vector3(0.31898054828205513, 0.07324864621721358, 0.9449264763170863),
-        new THREE.Vector3(0.31898054828205513, -0.07324864621721358, 0.9449264763170863),
-        new THREE.Vector3(0.39222925959556454, -0.19176743056603948, 0.8996563013124592),
-        new THREE.Vector3(0.5107480373003069, -0.23703767530743317, 0.8264076372340301),
-        new THREE.Vector3(0.6292668254954944, -0.1917674995546761, 0.7531590060839546),
-        new THREE.Vector3(0.702515457567685, -0.07324865380488925, 0.7078888801176622),
-        new THREE.Vector3(0.702515457567685, 0.07324865380488925, 0.7078888801176622),
-        new THREE.Vector3(0.6292668254954944, 0.1917674995546761, 0.7531590060839546),
-        new THREE.Vector3(0.5107480373003069, 0.23703767530743317, 0.8264076372340301),
-        new THREE.Vector3(0.23703767530743317, 0.8264076372340299, -0.5107480373003068),
-        new THREE.Vector3(0.1917674995546761, 0.7531590060839546, -0.6292668254954944),
-        new THREE.Vector3(0.07324865380488925, 0.7078888801176622, -0.702515457567685),
-        new THREE.Vector3(-0.07324865380488925, 0.7078888801176622, -0.702515457567685),
-        new THREE.Vector3(-0.1917674995546761, 0.7531590060839546, -0.6292668254954944),
-        new THREE.Vector3(-0.23703767530743317, 0.8264076372340299, -0.5107480373003068),
-        new THREE.Vector3(-0.19176743056603945, 0.8996563013124593, -0.3922292595955646),
-        new THREE.Vector3(-0.0732486462172136, 0.9449264763170864, -0.3189805482820552),
-        new THREE.Vector3(0.0732486462172136, 0.9449264763170864, -0.3189805482820552),
-        new THREE.Vector3(0.19176743056603945, 0.8996563013124593, -0.3922292595955646),
-        new THREE.Vector3(0.8264076372340299, -0.5107480373003068, 0.23703767530743317),
-        new THREE.Vector3(0.7531590060839546, -0.6292668254954944, 0.1917674995546761),
-        new THREE.Vector3(0.7078888801176622, -0.702515457567685, 0.07324865380488925),
-        new THREE.Vector3(0.7078888801176622, -0.702515457567685, -0.07324865380488925),
-        new THREE.Vector3(0.7531590060839546, -0.6292668254954944, -0.1917674995546761),
-        new THREE.Vector3(0.8264076372340299, -0.5107480373003068, -0.23703767530743317),
-        new THREE.Vector3(0.8996563013124592, -0.39222925959556454, -0.19176743056603948),
-        new THREE.Vector3(0.9449264763170863, -0.31898054828205513, -0.07324864621721358),
-        new THREE.Vector3(0.9449264763170863, -0.31898054828205513, 0.07324864621721358),
-        new THREE.Vector3(0.8996563013124592, -0.39222925959556454, 0.19176743056603948),
-        new THREE.Vector3(-0.5107480373003069, 0.23703767530743317, 0.8264076372340301),
-        new THREE.Vector3(-0.6292668254954944, 0.1917674995546761, 0.7531590060839546),
-        new THREE.Vector3(-0.702515457567685, 0.07324865380488925, 0.7078888801176622),
-        new THREE.Vector3(-0.702515457567685, -0.07324865380488925, 0.7078888801176622),
-        new THREE.Vector3(-0.6292668254954944, -0.1917674995546761, 0.7531590060839546),
-        new THREE.Vector3(-0.5107480373003069, -0.23703767530743317, 0.8264076372340301),
-        new THREE.Vector3(-0.39222925959556454, -0.19176743056603948, 0.8996563013124592),
-        new THREE.Vector3(-0.31898054828205513, -0.07324864621721358, 0.9449264763170863),
-        new THREE.Vector3(-0.31898054828205513, 0.07324864621721358, 0.9449264763170863),
-        new THREE.Vector3(-0.39222925959556454, 0.19176743056603948, 0.8996563013124592),
-        new THREE.Vector3(-0.7531590060839546, 0.6292668254954944, -0.1917674995546761),
-        new THREE.Vector3(-0.8264076372340299, 0.5107480373003068, -0.23703767530743317),
-        new THREE.Vector3(-0.8996563013124592, 0.39222925959556454, -0.19176743056603948),
-        new THREE.Vector3(-0.9449264763170863, 0.31898054828205513, -0.07324864621721358),
-        new THREE.Vector3(-0.9449264763170863, 0.31898054828205513, 0.07324864621721358),
-        new THREE.Vector3(-0.8996563013124592, 0.39222925959556454, 0.19176743056603948),
-        new THREE.Vector3(-0.8264076372340299, 0.5107480373003068, 0.23703767530743317),
-        new THREE.Vector3(-0.7531590060839546, 0.6292668254954944, 0.1917674995546761),
-        new THREE.Vector3(-0.7078888801176622, 0.702515457567685, 0.07324865380488925),
-        new THREE.Vector3(-0.7078888801176622, 0.702515457567685, -0.07324865380488925),
-        new THREE.Vector3(-0.19176743056603945, -0.8996563013124593, 0.3922292595955646),
-        new THREE.Vector3(-0.0732486462172136, -0.9449264763170864, 0.3189805482820552),
-        new THREE.Vector3(0.0732486462172136, -0.9449264763170864, 0.3189805482820552),
-        new THREE.Vector3(0.19176743056603945, -0.8996563013124593, 0.3922292595955646),
-        new THREE.Vector3(0.23703767530743317, -0.8264076372340299, 0.5107480373003068),
-        new THREE.Vector3(0.1917674995546761, -0.7531590060839546, 0.6292668254954944),
-        new THREE.Vector3(0.07324865380488925, -0.7078888801176622, 0.702515457567685),
-        new THREE.Vector3(-0.07324865380488925, -0.7078888801176622, 0.702515457567685),
-        new THREE.Vector3(-0.1917674995546761, -0.7531590060839546, 0.6292668254954944),
-        new THREE.Vector3(-0.23703767530743317, -0.8264076372340299, 0.5107480373003068),
-        new THREE.Vector3(0.39222925959556454, -0.19176743056603948, -0.8996563013124592),
-        new THREE.Vector3(0.31898054828205513, -0.07324864621721358, -0.9449264763170863),
-        new THREE.Vector3(0.31898054828205513, 0.07324864621721358, -0.9449264763170863),
-        new THREE.Vector3(0.39222925959556454, 0.19176743056603948, -0.8996563013124592),
-        new THREE.Vector3(0.5107480373003069, 0.23703767530743317, -0.8264076372340301),
-        new THREE.Vector3(0.6292668254954944, 0.1917674995546761, -0.7531590060839546),
-        new THREE.Vector3(0.702515457567685, 0.07324865380488925, -0.7078888801176622),
-        new THREE.Vector3(0.702515457567685, -0.07324865380488925, -0.7078888801176622),
-        new THREE.Vector3(0.6292668254954944, -0.1917674995546761, -0.7531590060839546),
-        new THREE.Vector3(0.5107480373003069, -0.23703767530743317, -0.8264076372340301),
-        new THREE.Vector3(-0.702515457567685, -0.07324865380488925, -0.7078888801176622),
-        new THREE.Vector3(-0.702515457567685, 0.07324865380488925, -0.7078888801176622),
-        new THREE.Vector3(-0.6292668254954944, 0.1917674995546761, -0.7531590060839546),
-        new THREE.Vector3(-0.5107480373003069, 0.23703767530743317, -0.8264076372340301),
-        new THREE.Vector3(-0.39222925959556454, 0.19176743056603948, -0.8996563013124592),
-        new THREE.Vector3(-0.31898054828205513, 0.07324864621721358, -0.9449264763170863),
-        new THREE.Vector3(-0.31898054828205513, -0.07324864621721358, -0.9449264763170863),
-        new THREE.Vector3(-0.39222925959556454, -0.19176743056603948, -0.8996563013124592),
-        new THREE.Vector3(-0.5107480373003069, -0.23703767530743317, -0.8264076372340301),
-        new THREE.Vector3(-0.6292668254954944, -0.1917674995546761, -0.7531590060839546),
-        new THREE.Vector3(-0.7078888801176622, -0.702515457567685, -0.07324865380488925),
-        new THREE.Vector3(-0.7078888801176622, -0.702515457567685, 0.07324865380488925),
-        new THREE.Vector3(-0.7531590060839546, -0.6292668254954944, 0.1917674995546761),
-        new THREE.Vector3(-0.8264076372340299, -0.5107480373003068, 0.23703767530743317),
-        new THREE.Vector3(-0.8996563013124592, -0.39222925959556454, 0.19176743056603948),
-        new THREE.Vector3(-0.9449264763170863, -0.31898054828205513, 0.07324864621721358),
-        new THREE.Vector3(-0.9449264763170863, -0.31898054828205513, -0.07324864621721358),
-        new THREE.Vector3(-0.8996563013124592, -0.39222925959556454, -0.19176743056603948),
-        new THREE.Vector3(-0.8264076372340299, -0.5107480373003068, -0.23703767530743317),
-        new THREE.Vector3(-0.7531590060839546, -0.6292668254954944, -0.1917674995546761),
-        new THREE.Vector3(-0.07324865380488925, -0.7078888801176622, -0.702515457567685),
-        new THREE.Vector3(0.07324865380488925, -0.7078888801176622, -0.702515457567685),
-        new THREE.Vector3(0.1917674995546761, -0.7531590060839546, -0.6292668254954944),
-        new THREE.Vector3(0.23703767530743317, -0.8264076372340299, -0.5107480373003068),
-        new THREE.Vector3(0.19176743056603945, -0.8996563013124593, -0.3922292595955646),
-        new THREE.Vector3(0.0732486462172136, -0.9449264763170864, -0.3189805482820552),
-        new THREE.Vector3(-0.0732486462172136, -0.9449264763170864, -0.3189805482820552),
-        new THREE.Vector3(-0.19176743056603945, -0.8996563013124593, -0.3922292595955646),
-        new THREE.Vector3(-0.23703767530743317, -0.8264076372340299, -0.5107480373003068),
-        new THREE.Vector3(-0.1917674995546761, -0.7531590060839546, -0.6292668254954944),
-        new THREE.Vector3(0.5411631123687399, 0.5208268592521778, 0.6602135022043177),
-        new THREE.Vector3(0.6273088175724348, 0.48792206747188316, 0.6069725722549882),
-        new THREE.Vector3(0.6602135022043177, 0.5411631123687399, 0.5208268592521778),
-        new THREE.Vector3(0.6069725722549882, 0.6273088175724348, 0.48792206747188316),
-        new THREE.Vector3(0.5208268592521778, 0.6602135022043177, 0.5411631123687399),
-        new THREE.Vector3(0.48792206747188316, 0.6069725722549882, 0.6273088175724348),
-        new THREE.Vector3(0.44093916128611643, 0.895956501980165, 0.0532409861268811),
-        new THREE.Vector3(0.44093916128611643, 0.895956501980165, -0.0532409861268811),
-        new THREE.Vector3(0.35479345402780643, 0.9288612359224024, -0.1064819673922564),
-        new THREE.Vector3(0.26864773041900153, 0.9617659774646921, -0.05324097606266097),
-        new THREE.Vector3(0.26864773041900153, 0.9617659774646921, 0.05324097606266097),
-        new THREE.Vector3(0.35479345402780643, 0.9288612359224024, 0.1064819673922564),
-        new THREE.Vector3(-0.26864773041900153, 0.9617659774646921, -0.05324097606266097),
-        new THREE.Vector3(-0.35479345402780643, 0.9288612359224024, -0.1064819673922564),
-        new THREE.Vector3(-0.44093916128611643, 0.895956501980165, -0.0532409861268811),
-        new THREE.Vector3(-0.44093916128611643, 0.895956501980165, 0.0532409861268811),
-        new THREE.Vector3(-0.35479345402780643, 0.9288612359224024, 0.1064819673922564),
-        new THREE.Vector3(-0.26864773041900153, 0.9617659774646921, 0.05324097606266097),
-        new THREE.Vector3(-0.6069725722549882, 0.6273088175724348, 0.48792206747188316),
-        new THREE.Vector3(-0.6602135022043177, 0.5411631123687399, 0.5208268592521778),
-        new THREE.Vector3(-0.6273088175724348, 0.48792206747188316, 0.6069725722549882),
-        new THREE.Vector3(-0.5411631123687399, 0.5208268592521778, 0.6602135022043177),
-        new THREE.Vector3(-0.48792206747188316, 0.6069725722549882, 0.6273088175724348),
-        new THREE.Vector3(-0.5208268592521778, 0.6602135022043177, 0.5411631123687399),
-        new THREE.Vector3(-0.1064819673922564, 0.35479345402780643, 0.9288612359224026),
-        new THREE.Vector3(-0.053240976062661004, 0.2686477304190017, 0.9617659774646922),
-        new THREE.Vector3(0.053240976062661004, 0.2686477304190017, 0.9617659774646922),
-        new THREE.Vector3(0.1064819673922564, 0.35479345402780643, 0.9288612359224026),
-        new THREE.Vector3(0.0532409861268811, 0.44093916128611643, 0.895956501980165),
-        new THREE.Vector3(-0.0532409861268811, 0.44093916128611643, 0.895956501980165),
-        new THREE.Vector3(0.895956501980165, 0.0532409861268811, 0.44093916128611643),
-        new THREE.Vector3(0.895956501980165, -0.0532409861268811, 0.44093916128611643),
-        new THREE.Vector3(0.9288612359224026, -0.1064819673922564, 0.35479345402780643),
-        new THREE.Vector3(0.961765977464692, -0.05324097606266099, 0.2686477304190016),
-        new THREE.Vector3(0.961765977464692, 0.05324097606266099, 0.2686477304190016),
-        new THREE.Vector3(0.9288612359224026, 0.1064819673922564, 0.35479345402780643),
-        new THREE.Vector3(0.961765977464692, -0.05324097606266099, -0.2686477304190016),
-        new THREE.Vector3(0.9288612359224026, -0.1064819673922564, -0.35479345402780643),
-        new THREE.Vector3(0.895956501980165, -0.0532409861268811, -0.44093916128611643),
-        new THREE.Vector3(0.895956501980165, 0.0532409861268811, -0.44093916128611643),
-        new THREE.Vector3(0.9288612359224026, 0.1064819673922564, -0.35479345402780643),
-        new THREE.Vector3(0.961765977464692, 0.05324097606266099, -0.2686477304190016),
-        new THREE.Vector3(0.6273088175724348, 0.48792206747188316, -0.6069725722549882),
-        new THREE.Vector3(0.5411631123687399, 0.5208268592521778, -0.6602135022043177),
-        new THREE.Vector3(0.48792206747188316, 0.6069725722549882, -0.6273088175724348),
-        new THREE.Vector3(0.5208268592521778, 0.6602135022043177, -0.5411631123687399),
-        new THREE.Vector3(0.6069725722549882, 0.6273088175724348, -0.48792206747188316),
-        new THREE.Vector3(0.6602135022043177, 0.5411631123687399, -0.5208268592521778),
-        new THREE.Vector3(-0.053240976062661004, -0.2686477304190017, 0.9617659774646922),
-        new THREE.Vector3(-0.1064819673922564, -0.35479345402780643, 0.9288612359224026),
-        new THREE.Vector3(-0.0532409861268811, -0.44093916128611643, 0.895956501980165),
-        new THREE.Vector3(0.0532409861268811, -0.44093916128611643, 0.895956501980165),
-        new THREE.Vector3(0.1064819673922564, -0.35479345402780643, 0.9288612359224026),
-        new THREE.Vector3(0.053240976062661004, -0.2686477304190017, 0.9617659774646922),
-        new THREE.Vector3(0.48792206747188316, -0.6069725722549882, 0.6273088175724348),
-        new THREE.Vector3(0.5208268592521778, -0.6602135022043177, 0.5411631123687399),
-        new THREE.Vector3(0.6069725722549882, -0.6273088175724348, 0.48792206747188316),
-        new THREE.Vector3(0.6602135022043177, -0.5411631123687399, 0.5208268592521778),
-        new THREE.Vector3(0.6273088175724348, -0.48792206747188316, 0.6069725722549882),
-        new THREE.Vector3(0.5411631123687399, -0.5208268592521778, 0.6602135022043177),
-        new THREE.Vector3(0.1064819673922564, 0.35479345402780643, -0.9288612359224026),
-        new THREE.Vector3(0.053240976062661004, 0.2686477304190017, -0.9617659774646922),
-        new THREE.Vector3(-0.053240976062661004, 0.2686477304190017, -0.9617659774646922),
-        new THREE.Vector3(-0.1064819673922564, 0.35479345402780643, -0.9288612359224026),
-        new THREE.Vector3(-0.0532409861268811, 0.44093916128611643, -0.895956501980165),
-        new THREE.Vector3(0.0532409861268811, 0.44093916128611643, -0.895956501980165),
-        new THREE.Vector3(-0.5411631123687399, 0.5208268592521778, -0.6602135022043177),
-        new THREE.Vector3(-0.6273088175724348, 0.48792206747188316, -0.6069725722549882),
-        new THREE.Vector3(-0.6602135022043177, 0.5411631123687399, -0.5208268592521778),
-        new THREE.Vector3(-0.6069725722549882, 0.6273088175724348, -0.48792206747188316),
-        new THREE.Vector3(-0.5208268592521778, 0.6602135022043177, -0.5411631123687399),
-        new THREE.Vector3(-0.48792206747188316, 0.6069725722549882, -0.6273088175724348),
-        new THREE.Vector3(0.35479345402780643, -0.9288612359224024, 0.1064819673922564),
-        new THREE.Vector3(0.26864773041900153, -0.9617659774646921, 0.05324097606266097),
-        new THREE.Vector3(0.26864773041900153, -0.9617659774646921, -0.05324097606266097),
-        new THREE.Vector3(0.35479345402780643, -0.9288612359224024, -0.1064819673922564),
-        new THREE.Vector3(0.44093916128611643, -0.895956501980165, -0.0532409861268811),
-        new THREE.Vector3(0.44093916128611643, -0.895956501980165, 0.0532409861268811),
-        new THREE.Vector3(0.5208268592521778, -0.6602135022043177, -0.5411631123687399),
-        new THREE.Vector3(0.48792206747188316, -0.6069725722549882, -0.6273088175724348),
-        new THREE.Vector3(0.5411631123687399, -0.5208268592521778, -0.6602135022043177),
-        new THREE.Vector3(0.6273088175724348, -0.48792206747188316, -0.6069725722549882),
-        new THREE.Vector3(0.6602135022043177, -0.5411631123687399, -0.5208268592521778),
-        new THREE.Vector3(0.6069725722549882, -0.6273088175724348, -0.48792206747188316),
-        new THREE.Vector3(-0.9288612359224026, 0.1064819673922564, 0.35479345402780643),
-        new THREE.Vector3(-0.961765977464692, 0.05324097606266099, 0.2686477304190016),
-        new THREE.Vector3(-0.961765977464692, -0.05324097606266099, 0.2686477304190016),
-        new THREE.Vector3(-0.9288612359224026, -0.1064819673922564, 0.35479345402780643),
-        new THREE.Vector3(-0.895956501980165, -0.0532409861268811, 0.44093916128611643),
-        new THREE.Vector3(-0.895956501980165, 0.0532409861268811, 0.44093916128611643),
-        new THREE.Vector3(-0.6602135022043177, -0.5411631123687399, 0.5208268592521778),
-        new THREE.Vector3(-0.6069725722549882, -0.6273088175724348, 0.48792206747188316),
-        new THREE.Vector3(-0.5208268592521778, -0.6602135022043177, 0.5411631123687399),
-        new THREE.Vector3(-0.48792206747188316, -0.6069725722549882, 0.6273088175724348),
-        new THREE.Vector3(-0.5411631123687399, -0.5208268592521778, 0.6602135022043177),
-        new THREE.Vector3(-0.6273088175724348, -0.48792206747188316, 0.6069725722549882),
-        new THREE.Vector3(-0.895956501980165, 0.0532409861268811, -0.44093916128611643),
-        new THREE.Vector3(-0.895956501980165, -0.0532409861268811, -0.44093916128611643),
-        new THREE.Vector3(-0.9288612359224026, -0.1064819673922564, -0.35479345402780643),
-        new THREE.Vector3(-0.961765977464692, -0.05324097606266099, -0.2686477304190016),
-        new THREE.Vector3(-0.961765977464692, 0.05324097606266099, -0.2686477304190016),
-        new THREE.Vector3(-0.9288612359224026, 0.1064819673922564, -0.35479345402780643),
-        new THREE.Vector3(-0.44093916128611643, -0.895956501980165, 0.0532409861268811),
-        new THREE.Vector3(-0.44093916128611643, -0.895956501980165, -0.0532409861268811),
-        new THREE.Vector3(-0.35479345402780643, -0.9288612359224024, -0.1064819673922564),
-        new THREE.Vector3(-0.26864773041900153, -0.9617659774646921, -0.05324097606266097),
-        new THREE.Vector3(-0.26864773041900153, -0.9617659774646921, 0.05324097606266097),
-        new THREE.Vector3(-0.35479345402780643, -0.9288612359224024, 0.1064819673922564),
-        new THREE.Vector3(0.0532409861268811, -0.44093916128611643, -0.895956501980165),
-        new THREE.Vector3(-0.0532409861268811, -0.44093916128611643, -0.895956501980165),
-        new THREE.Vector3(-0.1064819673922564, -0.35479345402780643, -0.9288612359224026),
-        new THREE.Vector3(-0.053240976062661004, -0.2686477304190017, -0.9617659774646922),
-        new THREE.Vector3(0.053240976062661004, -0.2686477304190017, -0.9617659774646922),
-        new THREE.Vector3(0.1064819673922564, -0.35479345402780643, -0.9288612359224026),
-        new THREE.Vector3(-0.48792206747188316, -0.6069725722549882, -0.6273088175724348),
-        new THREE.Vector3(-0.5208268592521778, -0.6602135022043177, -0.5411631123687399),
-        new THREE.Vector3(-0.6069725722549882, -0.6273088175724348, -0.48792206747188316),
-        new THREE.Vector3(-0.6602135022043177, -0.5411631123687399, -0.5208268592521778),
-        new THREE.Vector3(-0.6273088175724348, -0.48792206747188316, -0.6069725722549882),
-        new THREE.Vector3(-0.5411631123687399, -0.5208268592521778, -0.6602135022043177),
-        new THREE.Vector3(0.4809036310039436, 0.8008837301845626, 0.356815005868424),
-        new THREE.Vector3(0.5405038484966376, 0.7781184701081497, 0.31998005599861457),
-        new THREE.Vector3(0.5177385650274743, 0.8149534499659031, 0.2603798238573106),
-        new THREE.Vector3(0.45813839102899256, 0.8377186825748558, 0.29721477676995445),
-        new THREE.Vector3(0.03683496520464217, 0.9986422636143263, 0.03683496520464217),
-        new THREE.Vector3(0.03683496520464217, 0.9986422636143263, -0.03683496520464217),
-        new THREE.Vector3(-0.03683496520464217, 0.9986422636143263, -0.03683496520464217),
-        new THREE.Vector3(-0.03683496520464217, 0.9986422636143263, 0.03683496520464217),
-        new THREE.Vector3(-0.45813839102899256, 0.8377186825748558, 0.29721477676995445),
-        new THREE.Vector3(-0.5177385650274743, 0.8149534499659031, 0.2603798238573106),
-        new THREE.Vector3(-0.5405038484966376, 0.7781184701081497, 0.31998005599861457),
-        new THREE.Vector3(-0.4809036310039436, 0.8008837301845626, 0.356815005868424),
-        new THREE.Vector3(-0.31998005599861457, 0.5405038484966376, 0.7781184701081497),
-        new THREE.Vector3(-0.356815005868424, 0.4809036310039436, 0.8008837301845628),
-        new THREE.Vector3(-0.29721477676995467, 0.45813839102899256, 0.8377186825748557),
-        new THREE.Vector3(-0.2603798238573106, 0.5177385650274743, 0.8149534499659031),
-        new THREE.Vector3(0.2603798238573106, 0.5177385650274743, 0.8149534499659031),
-        new THREE.Vector3(0.29721477676995467, 0.45813839102899256, 0.8377186825748557),
-        new THREE.Vector3(0.356815005868424, 0.4809036310039436, 0.8008837301845628),
-        new THREE.Vector3(0.31998005599861457, 0.5405038484966376, 0.7781184701081497),
-        new THREE.Vector3(0.8008837301845626, 0.356815005868424, 0.4809036310039436),
-        new THREE.Vector3(0.7781184701081497, 0.31998005599861457, 0.5405038484966376),
-        new THREE.Vector3(0.8149534499659031, 0.2603798238573106, 0.5177385650274743),
-        new THREE.Vector3(0.8377186825748558, 0.29721477676995445, 0.45813839102899256),
-        new THREE.Vector3(0.9986422636143263, 0.03683496520464217, 0.03683496520464217),
-        new THREE.Vector3(0.9986422636143263, -0.03683496520464217, 0.03683496520464217),
-        new THREE.Vector3(0.9986422636143263, -0.03683496520464217, -0.03683496520464217),
-        new THREE.Vector3(0.9986422636143263, 0.03683496520464217, -0.03683496520464217),
-        new THREE.Vector3(0.8377186825748558, 0.29721477676995445, -0.45813839102899256),
-        new THREE.Vector3(0.8149534499659031, 0.2603798238573106, -0.5177385650274743),
-        new THREE.Vector3(0.7781184701081497, 0.31998005599861457, -0.5405038484966376),
-        new THREE.Vector3(0.8008837301845626, 0.356815005868424, -0.4809036310039436),
-        new THREE.Vector3(0.5405038484966376, 0.7781184701081497, -0.31998005599861457),
-        new THREE.Vector3(0.4809036310039436, 0.8008837301845626, -0.356815005868424),
-        new THREE.Vector3(0.45813839102899256, 0.8377186825748558, -0.29721477676995445),
-        new THREE.Vector3(0.5177385650274743, 0.8149534499659031, -0.2603798238573106),
-        new THREE.Vector3(0.03683496520464217, 0.03683496520464217, 0.9986422636143263),
-        new THREE.Vector3(-0.03683496520464217, 0.03683496520464217, 0.9986422636143263),
-        new THREE.Vector3(-0.03683496520464217, -0.03683496520464217, 0.9986422636143263),
-        new THREE.Vector3(0.03683496520464217, -0.03683496520464217, 0.9986422636143263),
-        new THREE.Vector3(0.29721477676995467, -0.45813839102899256, 0.8377186825748557),
-        new THREE.Vector3(0.2603798238573106, -0.5177385650274743, 0.8149534499659031),
-        new THREE.Vector3(0.31998005599861457, -0.5405038484966376, 0.7781184701081497),
-        new THREE.Vector3(0.356815005868424, -0.4809036310039436, 0.8008837301845628),
-        new THREE.Vector3(0.7781184701081497, -0.31998005599861457, 0.5405038484966376),
-        new THREE.Vector3(0.8008837301845626, -0.356815005868424, 0.4809036310039436),
-        new THREE.Vector3(0.8377186825748558, -0.29721477676995445, 0.45813839102899256),
-        new THREE.Vector3(0.8149534499659031, -0.2603798238573106, 0.5177385650274743),
-        new THREE.Vector3(0.31998005599861457, 0.5405038484966376, -0.7781184701081497),
-        new THREE.Vector3(0.356815005868424, 0.4809036310039436, -0.8008837301845628),
-        new THREE.Vector3(0.29721477676995467, 0.45813839102899256, -0.8377186825748557),
-        new THREE.Vector3(0.2603798238573106, 0.5177385650274743, -0.8149534499659031),
-        new THREE.Vector3(-0.2603798238573106, 0.5177385650274743, -0.8149534499659031),
-        new THREE.Vector3(-0.29721477676995467, 0.45813839102899256, -0.8377186825748557),
-        new THREE.Vector3(-0.356815005868424, 0.4809036310039436, -0.8008837301845628),
-        new THREE.Vector3(-0.31998005599861457, 0.5405038484966376, -0.7781184701081497),
-        new THREE.Vector3(-0.4809036310039436, 0.8008837301845626, -0.356815005868424),
-        new THREE.Vector3(-0.5405038484966376, 0.7781184701081497, -0.31998005599861457),
-        new THREE.Vector3(-0.5177385650274743, 0.8149534499659031, -0.2603798238573106),
-        new THREE.Vector3(-0.45813839102899256, 0.8377186825748558, -0.29721477676995445),
-        new THREE.Vector3(0.5405038484966376, -0.7781184701081497, 0.31998005599861457),
-        new THREE.Vector3(0.4809036310039436, -0.8008837301845626, 0.356815005868424),
-        new THREE.Vector3(0.45813839102899256, -0.8377186825748558, 0.29721477676995445),
-        new THREE.Vector3(0.5177385650274743, -0.8149534499659031, 0.2603798238573106),
-        new THREE.Vector3(0.5177385650274743, -0.8149534499659031, -0.2603798238573106),
-        new THREE.Vector3(0.45813839102899256, -0.8377186825748558, -0.29721477676995445),
-        new THREE.Vector3(0.4809036310039436, -0.8008837301845626, -0.356815005868424),
-        new THREE.Vector3(0.5405038484966376, -0.7781184701081497, -0.31998005599861457),
-        new THREE.Vector3(0.8008837301845626, -0.356815005868424, -0.4809036310039436),
-        new THREE.Vector3(0.7781184701081497, -0.31998005599861457, -0.5405038484966376),
-        new THREE.Vector3(0.8149534499659031, -0.2603798238573106, -0.5177385650274743),
-        new THREE.Vector3(0.8377186825748558, -0.29721477676995445, -0.45813839102899256),
-        new THREE.Vector3(-0.7781184701081497, 0.31998005599861457, 0.5405038484966376),
-        new THREE.Vector3(-0.8008837301845626, 0.356815005868424, 0.4809036310039436),
-        new THREE.Vector3(-0.8377186825748558, 0.29721477676995445, 0.45813839102899256),
-        new THREE.Vector3(-0.8149534499659031, 0.2603798238573106, 0.5177385650274743),
-        new THREE.Vector3(-0.8149534499659031, -0.2603798238573106, 0.5177385650274743),
-        new THREE.Vector3(-0.8377186825748558, -0.29721477676995445, 0.45813839102899256),
-        new THREE.Vector3(-0.8008837301845626, -0.356815005868424, 0.4809036310039436),
-        new THREE.Vector3(-0.7781184701081497, -0.31998005599861457, 0.5405038484966376),
-        new THREE.Vector3(-0.356815005868424, -0.4809036310039436, 0.8008837301845628),
-        new THREE.Vector3(-0.31998005599861457, -0.5405038484966376, 0.7781184701081497),
-        new THREE.Vector3(-0.2603798238573106, -0.5177385650274743, 0.8149534499659031),
-        new THREE.Vector3(-0.29721477676995467, -0.45813839102899256, 0.8377186825748557),
-        new THREE.Vector3(-0.8008837301845626, 0.356815005868424, -0.4809036310039436),
-        new THREE.Vector3(-0.7781184701081497, 0.31998005599861457, -0.5405038484966376),
-        new THREE.Vector3(-0.8149534499659031, 0.2603798238573106, -0.5177385650274743),
-        new THREE.Vector3(-0.8377186825748558, 0.29721477676995445, -0.45813839102899256),
-        new THREE.Vector3(-0.9986422636143263, 0.03683496520464217, -0.03683496520464217),
-        new THREE.Vector3(-0.9986422636143263, -0.03683496520464217, -0.03683496520464217),
-        new THREE.Vector3(-0.9986422636143263, -0.03683496520464217, 0.03683496520464217),
-        new THREE.Vector3(-0.9986422636143263, 0.03683496520464217, 0.03683496520464217),
-        new THREE.Vector3(-0.4809036310039436, -0.8008837301845626, 0.356815005868424),
-        new THREE.Vector3(-0.5405038484966376, -0.7781184701081497, 0.31998005599861457),
-        new THREE.Vector3(-0.5177385650274743, -0.8149534499659031, 0.2603798238573106),
-        new THREE.Vector3(-0.45813839102899256, -0.8377186825748558, 0.29721477676995445),
-        new THREE.Vector3(-0.03683496520464217, -0.9986422636143263, 0.03683496520464217),
-        new THREE.Vector3(-0.03683496520464217, -0.9986422636143263, -0.03683496520464217),
-        new THREE.Vector3(0.03683496520464217, -0.9986422636143263, -0.03683496520464217),
-        new THREE.Vector3(0.03683496520464217, -0.9986422636143263, 0.03683496520464217),
-        new THREE.Vector3(0.356815005868424, -0.4809036310039436, -0.8008837301845628),
-        new THREE.Vector3(0.31998005599861457, -0.5405038484966376, -0.7781184701081497),
-        new THREE.Vector3(0.2603798238573106, -0.5177385650274743, -0.8149534499659031),
-        new THREE.Vector3(0.29721477676995467, -0.45813839102899256, -0.8377186825748557),
-        new THREE.Vector3(0.03683496520464217, -0.03683496520464217, -0.9986422636143263),
-        new THREE.Vector3(-0.03683496520464217, -0.03683496520464217, -0.9986422636143263),
-        new THREE.Vector3(-0.03683496520464217, 0.03683496520464217, -0.9986422636143263),
-        new THREE.Vector3(0.03683496520464217, 0.03683496520464217, -0.9986422636143263),
-        new THREE.Vector3(-0.7781184701081497, -0.31998005599861457, -0.5405038484966376),
-        new THREE.Vector3(-0.8008837301845626, -0.356815005868424, -0.4809036310039436),
-        new THREE.Vector3(-0.8377186825748558, -0.29721477676995445, -0.45813839102899256),
-        new THREE.Vector3(-0.8149534499659031, -0.2603798238573106, -0.5177385650274743),
-        new THREE.Vector3(-0.29721477676995467, -0.45813839102899256, -0.8377186825748557),
-        new THREE.Vector3(-0.2603798238573106, -0.5177385650274743, -0.8149534499659031),
-        new THREE.Vector3(-0.31998005599861457, -0.5405038484966376, -0.7781184701081497),
-        new THREE.Vector3(-0.356815005868424, -0.4809036310039436, -0.8008837301845628),
-        new THREE.Vector3(-0.5405038484966376, -0.7781184701081497, -0.31998005599861457),
-        new THREE.Vector3(-0.4809036310039436, -0.8008837301845626, -0.356815005868424),
-        new THREE.Vector3(-0.45813839102899256, -0.8377186825748558, -0.29721477676995445),
-        new THREE.Vector3(-0.5177385650274743, -0.8149534499659031, -0.2603798238573106)
-      ],
-      faces: [
-        [9, 180, 0, 181, 1, 182, 2, 183, 3, 184, 4, 185, 5, 186, 6, 187, 7, 188, 8, 189],
-        [19, 190, 10, 191, 11, 192, 12, 193, 13, 194, 14, 195, 15, 196, 16, 197, 17, 198, 18, 199],
-        [29, 200, 20, 201, 21, 202, 22, 203, 23, 204, 24, 205, 25, 206, 26, 207, 27, 208, 28, 209],
-        [39, 210, 30, 211, 31, 212, 32, 213, 33, 214, 34, 215, 35, 216, 36, 217, 37, 218, 38, 219],
-        [49, 220, 40, 221, 41, 222, 42, 223, 43, 224, 44, 225, 45, 226, 46, 227, 47, 228, 48, 229],
-        [59, 230, 50, 231, 51, 232, 52, 233, 53, 234, 54, 235, 55, 236, 56, 237, 57, 238, 58, 239],
-        [69, 240, 60, 241, 61, 242, 62, 243, 63, 244, 64, 245, 65, 246, 66, 247, 67, 248, 68, 249],
-        [79, 250, 70, 251, 71, 252, 72, 253, 73, 254, 74, 255, 75, 256, 76, 257, 77, 258, 78, 259],
-        [89, 260, 80, 261, 81, 262, 82, 263, 83, 264, 84, 265, 85, 266, 86, 267, 87, 268, 88, 269],
-        [99, 270, 90, 271, 91, 272, 92, 273, 93, 274, 94, 275, 95, 276, 96, 277, 97, 278, 98, 279],
-        [109, 280, 100, 281, 101, 282, 102, 283, 103, 284, 104, 285, 105, 286, 106, 287, 107, 288, 108, 289],
-        [119, 290, 110, 291, 111, 292, 112, 293, 113, 294, 114, 295, 115, 296, 116, 297, 117, 298, 118, 299],
-        [122, 300, 28, 301, 120, 302, 18, 303, 121, 304, 8, 305],
-        [125, 306, 16, 307, 123, 308, 38, 309, 124, 310, 0, 311],
-        [128, 312, 36, 313, 126, 314, 68, 315, 127, 316, 2, 317],
-        [131, 318, 66, 319, 129, 320, 50, 321, 130, 322, 4, 323],
-        [134, 324, 58, 325, 132, 326, 20, 327, 133, 328, 6, 329],
-        [137, 330, 26, 331, 135, 332, 48, 333, 136, 334, 10, 335],
-        [140, 336, 46, 337, 138, 338, 86, 339, 139, 340, 12, 341],
-        [143, 342, 84, 343, 141, 344, 30, 345, 142, 346, 14, 347],
-        [146, 348, 56, 349, 144, 350, 76, 351, 145, 352, 22, 353],
-        [149, 354, 74, 355, 147, 356, 40, 357, 148, 358, 24, 359],
-        [152, 360, 82, 361, 150, 362, 94, 363, 151, 364, 32, 365],
-        [155, 366, 92, 367, 153, 368, 60, 369, 154, 370, 34, 371],
-        [158, 372, 72, 373, 156, 374, 114, 375, 157, 376, 42, 377],
-        [161, 378, 112, 379, 159, 380, 88, 381, 160, 382, 44, 383],
-        [164, 384, 64, 385, 162, 386, 104, 387, 163, 388, 52, 389],
-        [167, 390, 102, 391, 165, 392, 78, 393, 166, 394, 54, 395],
-        [170, 396, 90, 397, 168, 398, 106, 399, 169, 400, 62, 401],
-        [173, 402, 100, 403, 171, 404, 116, 405, 172, 406, 70, 407],
-        [176, 408, 110, 409, 174, 410, 96, 411, 175, 412, 80, 413],
-        [179, 414, 118, 415, 177, 416, 108, 417, 178, 418, 98, 419],
-        [9, 420, 121, 421, 17, 422, 125, 423],
-        [1, 424, 124, 425, 37, 426, 128, 427],
-        [3, 428, 127, 429, 67, 430, 131, 431],
-        [5, 432, 130, 433, 59, 434, 134, 435],
-        [7, 436, 133, 437, 29, 438, 122, 439],
-        [19, 440, 120, 441, 27, 442, 137, 443],
-        [11, 444, 136, 445, 47, 446, 140, 447],
-        [13, 448, 139, 449, 85, 450, 143, 451],
-        [15, 452, 142, 453, 39, 454, 123, 455],
-        [21, 456, 132, 457, 57, 458, 146, 459],
-        [23, 460, 145, 461, 75, 462, 149, 463],
-        [25, 464, 148, 465, 49, 466, 135, 467],
-        [31, 468, 141, 469, 83, 470, 152, 471],
-        [33, 472, 151, 473, 93, 474, 155, 475],
-        [35, 476, 154, 477, 69, 478, 126, 479],
-        [41, 480, 147, 481, 73, 482, 158, 483],
-        [43, 484, 157, 485, 113, 486, 161, 487],
-        [45, 488, 160, 489, 87, 490, 138, 491],
-        [51, 492, 129, 493, 65, 494, 164, 495],
-        [53, 496, 163, 497, 103, 498, 167, 499],
-        [55, 500, 166, 501, 77, 502, 144, 503],
-        [61, 504, 153, 505, 91, 506, 170, 507],
-        [63, 508, 169, 509, 105, 510, 162, 511],
-        [79, 512, 165, 513, 101, 514, 173, 515],
-        [71, 516, 172, 517, 115, 518, 156, 519],
-        [89, 520, 159, 521, 111, 522, 176, 523],
-        [81, 524, 175, 525, 95, 526, 150, 527],
-        [99, 528, 178, 529, 107, 530, 168, 531],
-        [97, 532, 174, 533, 119, 534, 179, 535],
-        [109, 536, 177, 537, 117, 538, 171, 539],
-        [180, 9, 423, 125, 311, 0],
-        [181, 0, 310, 124, 424, 1],
-        [182, 1, 427, 128, 317, 2],
-        [183, 2, 316, 127, 428, 3],
-        [184, 3, 431, 131, 323, 4],
-        [185, 4, 322, 130, 432, 5],
-        [186, 5, 435, 134, 329, 6],
-        [187, 6, 328, 133, 436, 7],
-        [188, 7, 439, 122, 305, 8],
-        [189, 8, 304, 121, 420, 9],
-        [190, 19, 443, 137, 335, 10],
-        [191, 10, 334, 136, 444, 11],
-        [192, 11, 447, 140, 341, 12],
-        [193, 12, 340, 139, 448, 13],
-        [194, 13, 451, 143, 347, 14],
-        [195, 14, 346, 142, 452, 15],
-        [196, 15, 455, 123, 307, 16],
-        [197, 16, 306, 125, 422, 17],
-        [198, 17, 421, 121, 303, 18],
-        [199, 18, 302, 120, 440, 19],
-        [200, 29, 437, 133, 327, 20],
-        [201, 20, 326, 132, 456, 21],
-        [202, 21, 459, 146, 353, 22],
-        [203, 22, 352, 145, 460, 23],
-        [204, 23, 463, 149, 359, 24],
-        [205, 24, 358, 148, 464, 25],
-        [206, 25, 467, 135, 331, 26],
-        [207, 26, 330, 137, 442, 27],
-        [208, 27, 441, 120, 301, 28],
-        [209, 28, 300, 122, 438, 29],
-        [210, 39, 453, 142, 345, 30],
-        [211, 30, 344, 141, 468, 31],
-        [212, 31, 471, 152, 365, 32],
-        [213, 32, 364, 151, 472, 33],
-        [214, 33, 475, 155, 371, 34],
-        [215, 34, 370, 154, 476, 35],
-        [216, 35, 479, 126, 313, 36],
-        [217, 36, 312, 128, 426, 37],
-        [218, 37, 425, 124, 309, 38],
-        [219, 38, 308, 123, 454, 39],
-        [220, 49, 465, 148, 357, 40],
-        [221, 40, 356, 147, 480, 41],
-        [222, 41, 483, 158, 377, 42],
-        [223, 42, 376, 157, 484, 43],
-        [224, 43, 487, 161, 383, 44],
-        [225, 44, 382, 160, 488, 45],
-        [226, 45, 491, 138, 337, 46],
-        [227, 46, 336, 140, 446, 47],
-        [228, 47, 445, 136, 333, 48],
-        [229, 48, 332, 135, 466, 49],
-        [230, 59, 433, 130, 321, 50],
-        [231, 50, 320, 129, 492, 51],
-        [232, 51, 495, 164, 389, 52],
-        [233, 52, 388, 163, 496, 53],
-        [234, 53, 499, 167, 395, 54],
-        [235, 54, 394, 166, 500, 55],
-        [236, 55, 503, 144, 349, 56],
-        [237, 56, 348, 146, 458, 57],
-        [238, 57, 457, 132, 325, 58],
-        [239, 58, 324, 134, 434, 59],
-        [240, 69, 477, 154, 369, 60],
-        [241, 60, 368, 153, 504, 61],
-        [242, 61, 507, 170, 401, 62],
-        [243, 62, 400, 169, 508, 63],
-        [244, 63, 511, 162, 385, 64],
-        [245, 64, 384, 164, 494, 65],
-        [246, 65, 493, 129, 319, 66],
-        [247, 66, 318, 131, 430, 67],
-        [248, 67, 429, 127, 315, 68],
-        [249, 68, 314, 126, 478, 69],
-        [250, 79, 515, 173, 407, 70],
-        [251, 70, 406, 172, 516, 71],
-        [252, 71, 519, 156, 373, 72],
-        [253, 72, 372, 158, 482, 73],
-        [254, 73, 481, 147, 355, 74],
-        [255, 74, 354, 149, 462, 75],
-        [256, 75, 461, 145, 351, 76],
-        [257, 76, 350, 144, 502, 77],
-        [258, 77, 501, 166, 393, 78],
-        [259, 78, 392, 165, 512, 79],
-        [260, 89, 523, 176, 413, 80],
-        [261, 80, 412, 175, 524, 81],
-        [262, 81, 527, 150, 361, 82],
-        [263, 82, 360, 152, 470, 83],
-        [264, 83, 469, 141, 343, 84],
-        [265, 84, 342, 143, 450, 85],
-        [266, 85, 449, 139, 339, 86],
-        [267, 86, 338, 138, 490, 87],
-        [268, 87, 489, 160, 381, 88],
-        [269, 88, 380, 159, 520, 89],
-        [270, 99, 531, 168, 397, 90],
-        [271, 90, 396, 170, 506, 91],
-        [272, 91, 505, 153, 367, 92],
-        [273, 92, 366, 155, 474, 93],
-        [274, 93, 473, 151, 363, 94],
-        [275, 94, 362, 150, 526, 95],
-        [276, 95, 525, 175, 411, 96],
-        [277, 96, 410, 174, 532, 97],
-        [278, 97, 535, 179, 419, 98],
-        [279, 98, 418, 178, 528, 99],
-        [280, 109, 539, 171, 403, 100],
-        [281, 100, 402, 173, 514, 101],
-        [282, 101, 513, 165, 391, 102],
-        [283, 102, 390, 167, 498, 103],
-        [284, 103, 497, 163, 387, 104],
-        [285, 104, 386, 162, 510, 105],
-        [286, 105, 509, 169, 399, 106],
-        [287, 106, 398, 168, 530, 107],
-        [288, 107, 529, 178, 417, 108],
-        [289, 108, 416, 177, 536, 109],
-        [290, 119, 533, 174, 409, 110],
-        [291, 110, 408, 176, 522, 111],
-        [292, 111, 521, 159, 379, 112],
-        [293, 112, 378, 161, 486, 113],
-        [294, 113, 485, 157, 375, 114],
-        [295, 114, 374, 156, 518, 115],
-        [296, 115, 517, 172, 405, 116],
-        [297, 116, 404, 171, 538, 117],
-        [298, 117, 537, 177, 415, 118],
-        [299, 118, 414, 179, 534, 119]
-      ]
-    };
-    this.normalize(m);
-    return m;
+    // Base: dodecahedron, Ops: Hk(54.00), Ambo, Hk(72.00)
+    dodecahedron_hk54_ambo_hk72() {
+      const m = {
+        vertices: [
+          new THREE.Vector3(0.36955922151009757, 0.720675029376653, 0.5865607247590067),
+          new THREE.Vector3(0.38478490047682595, 0.8436489381027186, 0.37442896469583453),
+          new THREE.Vector3(0.2284001597491915, 0.9490751891258445, 0.2170015032489091),
+          new THREE.Vector3(0, 0.9906236917271204, 0.13661881784341043),
+          new THREE.Vector3(-0.2284001597491915, 0.9490751891258445, 0.2170015032489091),
+          new THREE.Vector3(-0.38478490047682595, 0.8436489381027186, 0.37442896469583453),
+          new THREE.Vector3(-0.36955922151009757, 0.720675029376653, 0.5865607247590067),
+          new THREE.Vector3(-0.23781014685242408, 0.6058387912502945, 0.7592138651726603),
+          new THREE.Vector3(0, 0.5795159676157472, 0.8149608845081979),
+          new THREE.Vector3(0.23781014685242408, 0.6058387912502945, 0.7592138651726603),
+          new THREE.Vector3(0.720675029376653, 0.5865607247590067, 0.36955922151009757),
+          new THREE.Vector3(0.8436489381027186, 0.37442896469583453, 0.38478490047682595),
+          new THREE.Vector3(0.9490751891258445, 0.2170015032489091, 0.2284001597491915),
+          new THREE.Vector3(0.9906236917271204, 0.13661881784341043, 0),
+          new THREE.Vector3(0.9490751891258445, 0.2170015032489091, -0.2284001597491915),
+          new THREE.Vector3(0.8436489381027186, 0.37442896469583453, -0.38478490047682595),
+          new THREE.Vector3(0.720675029376653, 0.5865607247590067, -0.36955922151009757),
+          new THREE.Vector3(0.6058387912502945, 0.7592138651726603, -0.23781014685242408),
+          new THREE.Vector3(0.5795159676157472, 0.8149608845081979, 0),
+          new THREE.Vector3(0.6058387912502945, 0.7592138651726603, 0.23781014685242408),
+          new THREE.Vector3(0.5865607247590067, 0.36955922151009757, 0.720675029376653),
+          new THREE.Vector3(0.37442896469583453, 0.38478490047682595, 0.8436489381027186),
+          new THREE.Vector3(0.2170015032489091, 0.2284001597491915, 0.9490751891258445),
+          new THREE.Vector3(0.13661881784341043, 0, 0.9906236917271204),
+          new THREE.Vector3(0.2170015032489091, -0.2284001597491915, 0.9490751891258445),
+          new THREE.Vector3(0.37442896469583453, -0.38478490047682595, 0.8436489381027186),
+          new THREE.Vector3(0.5865607247590067, -0.36955922151009757, 0.720675029376653),
+          new THREE.Vector3(0.7592138651726603, -0.23781014685242408, 0.6058387912502945),
+          new THREE.Vector3(0.8149608845081979, 0, 0.5795159676157472),
+          new THREE.Vector3(0.7592138651726603, 0.23781014685242408, 0.6058387912502945),
+          new THREE.Vector3(0.2284001597491915, 0.9490751891258445, -0.2170015032489091),
+          new THREE.Vector3(0.38478490047682595, 0.8436489381027186, -0.37442896469583453),
+          new THREE.Vector3(0.36955922151009757, 0.720675029376653, -0.5865607247590067),
+          new THREE.Vector3(0.23781014685242408, 0.6058387912502945, -0.7592138651726603),
+          new THREE.Vector3(0, 0.5795159676157472, -0.8149608845081979),
+          new THREE.Vector3(-0.23781014685242408, 0.6058387912502945, -0.7592138651726603),
+          new THREE.Vector3(-0.36955922151009757, 0.720675029376653, -0.5865607247590067),
+          new THREE.Vector3(-0.38478490047682595, 0.8436489381027186, -0.37442896469583453),
+          new THREE.Vector3(-0.2284001597491915, 0.9490751891258445, -0.2170015032489091),
+          new THREE.Vector3(0, 0.9906236917271204, -0.13661881784341043),
+          new THREE.Vector3(0.9490751891258445, -0.2170015032489091, 0.2284001597491915),
+          new THREE.Vector3(0.8436489381027186, -0.37442896469583453, 0.38478490047682595),
+          new THREE.Vector3(0.720675029376653, -0.5865607247590067, 0.36955922151009757),
+          new THREE.Vector3(0.6058387912502945, -0.7592138651726603, 0.23781014685242408),
+          new THREE.Vector3(0.5795159676157472, -0.8149608845081979, 0),
+          new THREE.Vector3(0.6058387912502945, -0.7592138651726603, -0.23781014685242408),
+          new THREE.Vector3(0.720675029376653, -0.5865607247590067, -0.36955922151009757),
+          new THREE.Vector3(0.8436489381027186, -0.37442896469583453, -0.38478490047682595),
+          new THREE.Vector3(0.9490751891258445, -0.2170015032489091, -0.2284001597491915),
+          new THREE.Vector3(0.9906236917271204, -0.13661881784341043, 0),
+          new THREE.Vector3(-0.2170015032489091, 0.2284001597491915, 0.9490751891258445),
+          new THREE.Vector3(-0.37442896469583453, 0.38478490047682595, 0.8436489381027186),
+          new THREE.Vector3(-0.5865607247590067, 0.36955922151009757, 0.720675029376653),
+          new THREE.Vector3(-0.7592138651726603, 0.23781014685242408, 0.6058387912502945),
+          new THREE.Vector3(-0.8149608845081979, 0, 0.5795159676157472),
+          new THREE.Vector3(-0.7592138651726603, -0.23781014685242408, 0.6058387912502945),
+          new THREE.Vector3(-0.5865607247590067, -0.36955922151009757, 0.720675029376653),
+          new THREE.Vector3(-0.37442896469583453, -0.38478490047682595, 0.8436489381027186),
+          new THREE.Vector3(-0.2170015032489091, -0.2284001597491915, 0.9490751891258445),
+          new THREE.Vector3(-0.13661881784341043, 0, 0.9906236917271204),
+          new THREE.Vector3(-0.5795159676157472, 0.8149608845081979, 0),
+          new THREE.Vector3(-0.6058387912502945, 0.7592138651726603, -0.23781014685242408),
+          new THREE.Vector3(-0.720675029376653, 0.5865607247590067, -0.36955922151009757),
+          new THREE.Vector3(-0.8436489381027186, 0.37442896469583453, -0.38478490047682595),
+          new THREE.Vector3(-0.9490751891258445, 0.2170015032489091, -0.2284001597491915),
+          new THREE.Vector3(-0.9906236917271204, 0.13661881784341043, 0),
+          new THREE.Vector3(-0.9490751891258445, 0.2170015032489091, 0.2284001597491915),
+          new THREE.Vector3(-0.8436489381027186, 0.37442896469583453, 0.38478490047682595),
+          new THREE.Vector3(-0.720675029376653, 0.5865607247590067, 0.36955922151009757),
+          new THREE.Vector3(-0.6058387912502945, 0.7592138651726603, 0.23781014685242408),
+          new THREE.Vector3(-0.36955922151009757, -0.720675029376653, 0.5865607247590067),
+          new THREE.Vector3(-0.38478490047682595, -0.8436489381027186, 0.37442896469583453),
+          new THREE.Vector3(-0.2284001597491915, -0.9490751891258445, 0.2170015032489091),
+          new THREE.Vector3(0, -0.9906236917271204, 0.13661881784341043),
+          new THREE.Vector3(0.2284001597491915, -0.9490751891258445, 0.2170015032489091),
+          new THREE.Vector3(0.38478490047682595, -0.8436489381027186, 0.37442896469583453),
+          new THREE.Vector3(0.36955922151009757, -0.720675029376653, 0.5865607247590067),
+          new THREE.Vector3(0.23781014685242408, -0.6058387912502945, 0.7592138651726603),
+          new THREE.Vector3(0, -0.5795159676157472, 0.8149608845081979),
+          new THREE.Vector3(-0.23781014685242408, -0.6058387912502945, 0.7592138651726603),
+          new THREE.Vector3(0.5865607247590067, -0.36955922151009757, -0.720675029376653),
+          new THREE.Vector3(0.37442896469583453, -0.38478490047682595, -0.8436489381027186),
+          new THREE.Vector3(0.2170015032489091, -0.2284001597491915, -0.9490751891258445),
+          new THREE.Vector3(0.13661881784341043, 0, -0.9906236917271204),
+          new THREE.Vector3(0.2170015032489091, 0.2284001597491915, -0.9490751891258445),
+          new THREE.Vector3(0.37442896469583453, 0.38478490047682595, -0.8436489381027186),
+          new THREE.Vector3(0.5865607247590067, 0.36955922151009757, -0.720675029376653),
+          new THREE.Vector3(0.7592138651726603, 0.23781014685242408, -0.6058387912502945),
+          new THREE.Vector3(0.8149608845081979, 0, -0.5795159676157472),
+          new THREE.Vector3(0.7592138651726603, -0.23781014685242408, -0.6058387912502945),
+          new THREE.Vector3(-0.5865607247590067, -0.36955922151009757, -0.720675029376653),
+          new THREE.Vector3(-0.7592138651726603, -0.23781014685242408, -0.6058387912502945),
+          new THREE.Vector3(-0.8149608845081979, 0, -0.5795159676157472),
+          new THREE.Vector3(-0.7592138651726603, 0.23781014685242408, -0.6058387912502945),
+          new THREE.Vector3(-0.5865607247590067, 0.36955922151009757, -0.720675029376653),
+          new THREE.Vector3(-0.37442896469583453, 0.38478490047682595, -0.8436489381027186),
+          new THREE.Vector3(-0.2170015032489091, 0.2284001597491915, -0.9490751891258445),
+          new THREE.Vector3(-0.13661881784341043, 0, -0.9906236917271204),
+          new THREE.Vector3(-0.2170015032489091, -0.2284001597491915, -0.9490751891258445),
+          new THREE.Vector3(-0.37442896469583453, -0.38478490047682595, -0.8436489381027186),
+          new THREE.Vector3(-0.720675029376653, -0.5865607247590067, -0.36955922151009757),
+          new THREE.Vector3(-0.6058387912502945, -0.7592138651726603, -0.23781014685242408),
+          new THREE.Vector3(-0.5795159676157472, -0.8149608845081979, 0),
+          new THREE.Vector3(-0.6058387912502945, -0.7592138651726603, 0.23781014685242408),
+          new THREE.Vector3(-0.720675029376653, -0.5865607247590067, 0.36955922151009757),
+          new THREE.Vector3(-0.8436489381027186, -0.37442896469583453, 0.38478490047682595),
+          new THREE.Vector3(-0.9490751891258445, -0.2170015032489091, 0.2284001597491915),
+          new THREE.Vector3(-0.9906236917271204, -0.13661881784341043, 0),
+          new THREE.Vector3(-0.9490751891258445, -0.2170015032489091, -0.2284001597491915),
+          new THREE.Vector3(-0.8436489381027186, -0.37442896469583453, -0.38478490047682595),
+          new THREE.Vector3(-0.36955922151009757, -0.720675029376653, -0.5865607247590067),
+          new THREE.Vector3(-0.23781014685242408, -0.6058387912502945, -0.7592138651726603),
+          new THREE.Vector3(0, -0.5795159676157472, -0.8149608845081979),
+          new THREE.Vector3(0.23781014685242408, -0.6058387912502945, -0.7592138651726603),
+          new THREE.Vector3(0.36955922151009757, -0.720675029376653, -0.5865607247590067),
+          new THREE.Vector3(0.38478490047682595, -0.8436489381027186, -0.37442896469583453),
+          new THREE.Vector3(0.2284001597491915, -0.9490751891258445, -0.2170015032489091),
+          new THREE.Vector3(0, -0.9906236917271204, -0.13661881784341043),
+          new THREE.Vector3(-0.2284001597491915, -0.9490751891258445, -0.2170015032489091),
+          new THREE.Vector3(-0.38478490047682595, -0.8436489381027186, -0.37442896469583453),
+          new THREE.Vector3(0.38813604753571496, 0.528317673388045, 0.7551363086153362),
+          new THREE.Vector3(0.7551363086153362, 0.38813604753571496, 0.528317673388045),
+          new THREE.Vector3(0.528317673388045, 0.7551363086153362, 0.38813604753571496),
+          new THREE.Vector3(0.4666999048634079, 0.8548359523991226, 0.22681863522729118),
+          new THREE.Vector3(0.4666999048634079, 0.8548359523991226, -0.22681863522729118),
+          new THREE.Vector3(0.09969964378378647, 0.9950175782514529, 0),
+          new THREE.Vector3(-0.09969964378378647, 0.9950175782514529, 0),
+          new THREE.Vector3(-0.4666999048634079, 0.8548359523991226, -0.22681863522729118),
+          new THREE.Vector3(-0.4666999048634079, 0.8548359523991226, 0.22681863522729118),
+          new THREE.Vector3(-0.528317673388045, 0.7551363086153362, 0.38813604753571496),
+          new THREE.Vector3(-0.7551363086153362, 0.38813604753571496, 0.528317673388045),
+          new THREE.Vector3(-0.38813604753571496, 0.528317673388045, 0.7551363086153362),
+          new THREE.Vector3(-0.22681863522729118, 0.4666999048634079, 0.8548359523991226),
+          new THREE.Vector3(0, 0.09969964378378647, 0.9950175782514529),
+          new THREE.Vector3(0.22681863522729118, 0.4666999048634079, 0.8548359523991226),
+          new THREE.Vector3(0.8548359523991226, 0.22681863522729118, 0.4666999048634079),
+          new THREE.Vector3(0.8548359523991226, -0.22681863522729118, 0.4666999048634079),
+          new THREE.Vector3(0.9950175782514529, 0, 0.09969964378378647),
+          new THREE.Vector3(0.9950175782514529, 0, -0.09969964378378647),
+          new THREE.Vector3(0.8548359523991226, -0.22681863522729118, -0.4666999048634079),
+          new THREE.Vector3(0.8548359523991226, 0.22681863522729118, -0.4666999048634079),
+          new THREE.Vector3(0.7551363086153362, 0.38813604753571496, -0.528317673388045),
+          new THREE.Vector3(0.38813604753571496, 0.528317673388045, -0.7551363086153362),
+          new THREE.Vector3(0.528317673388045, 0.7551363086153362, -0.38813604753571496),
+          new THREE.Vector3(0, -0.09969964378378647, 0.9950175782514529),
+          new THREE.Vector3(-0.22681863522729118, -0.4666999048634079, 0.8548359523991226),
+          new THREE.Vector3(0.22681863522729118, -0.4666999048634079, 0.8548359523991226),
+          new THREE.Vector3(0.38813604753571496, -0.528317673388045, 0.7551363086153362),
+          new THREE.Vector3(0.528317673388045, -0.7551363086153362, 0.38813604753571496),
+          new THREE.Vector3(0.7551363086153362, -0.38813604753571496, 0.528317673388045),
+          new THREE.Vector3(0.22681863522729118, 0.4666999048634079, -0.8548359523991226),
+          new THREE.Vector3(0, 0.09969964378378647, -0.9950175782514529),
+          new THREE.Vector3(-0.22681863522729118, 0.4666999048634079, -0.8548359523991226),
+          new THREE.Vector3(-0.38813604753571496, 0.528317673388045, -0.7551363086153362),
+          new THREE.Vector3(-0.7551363086153362, 0.38813604753571496, -0.528317673388045),
+          new THREE.Vector3(-0.528317673388045, 0.7551363086153362, -0.38813604753571496),
+          new THREE.Vector3(0.4666999048634079, -0.8548359523991226, 0.22681863522729118),
+          new THREE.Vector3(0.09969964378378647, -0.9950175782514529, 0),
+          new THREE.Vector3(0.4666999048634079, -0.8548359523991226, -0.22681863522729118),
+          new THREE.Vector3(0.528317673388045, -0.7551363086153362, -0.38813604753571496),
+          new THREE.Vector3(0.38813604753571496, -0.528317673388045, -0.7551363086153362),
+          new THREE.Vector3(0.7551363086153362, -0.38813604753571496, -0.528317673388045),
+          new THREE.Vector3(-0.8548359523991226, 0.22681863522729118, 0.4666999048634079),
+          new THREE.Vector3(-0.9950175782514529, 0, 0.09969964378378647),
+          new THREE.Vector3(-0.8548359523991226, -0.22681863522729118, 0.4666999048634079),
+          new THREE.Vector3(-0.7551363086153362, -0.38813604753571496, 0.528317673388045),
+          new THREE.Vector3(-0.528317673388045, -0.7551363086153362, 0.38813604753571496),
+          new THREE.Vector3(-0.38813604753571496, -0.528317673388045, 0.7551363086153362),
+          new THREE.Vector3(-0.8548359523991226, 0.22681863522729118, -0.4666999048634079),
+          new THREE.Vector3(-0.8548359523991226, -0.22681863522729118, -0.4666999048634079),
+          new THREE.Vector3(-0.9950175782514529, 0, -0.09969964378378647),
+          new THREE.Vector3(-0.4666999048634079, -0.8548359523991226, 0.22681863522729118),
+          new THREE.Vector3(-0.4666999048634079, -0.8548359523991226, -0.22681863522729118),
+          new THREE.Vector3(-0.09969964378378647, -0.9950175782514529, 0),
+          new THREE.Vector3(0.22681863522729118, -0.4666999048634079, -0.8548359523991226),
+          new THREE.Vector3(-0.22681863522729118, -0.4666999048634079, -0.8548359523991226),
+          new THREE.Vector3(0, -0.09969964378378647, -0.9950175782514529),
+          new THREE.Vector3(-0.38813604753571496, -0.528317673388045, -0.7551363086153362),
+          new THREE.Vector3(-0.528317673388045, -0.7551363086153362, -0.38813604753571496),
+          new THREE.Vector3(-0.7551363086153362, -0.38813604753571496, -0.528317673388045),
+          new THREE.Vector3(0.17376873011853555, 0.7669488511160021, 0.6177328615225485),
+          new THREE.Vector3(0.21244805770693695, 0.8295333178160277, 0.5164690672341211),
+          new THREE.Vector3(0.16997944809518772, 0.898248971622788, 0.4052848038156119),
+          new THREE.Vector3(0.06871565380676051, 0.9369282992111899, 0.3427003371155861),
+          new THREE.Vector3(-0.06871565380676051, 0.9369282992111899, 0.3427003371155861),
+          new THREE.Vector3(-0.16997944809518772, 0.898248971622788, 0.4052848038156119),
+          new THREE.Vector3(-0.21244805770693695, 0.8295333178160277, 0.5164690672341211),
+          new THREE.Vector3(-0.17376873011853555, 0.7669488511160021, 0.6177328615225485),
+          new THREE.Vector3(-0.06258446670002553, 0.7244802415042533, 0.6864485153293087),
+          new THREE.Vector3(0.06258446670002553, 0.7244802415042533, 0.6864485153293087),
+          new THREE.Vector3(0.7669488511160021, 0.6177328615225485, 0.17376873011853555),
+          new THREE.Vector3(0.8295333178160277, 0.5164690672341211, 0.21244805770693695),
+          new THREE.Vector3(0.898248971622788, 0.4052848038156119, 0.16997944809518772),
+          new THREE.Vector3(0.9369282992111899, 0.3427003371155861, 0.06871565380676051),
+          new THREE.Vector3(0.9369282992111899, 0.3427003371155861, -0.06871565380676051),
+          new THREE.Vector3(0.898248971622788, 0.4052848038156119, -0.16997944809518772),
+          new THREE.Vector3(0.8295333178160277, 0.5164690672341211, -0.21244805770693695),
+          new THREE.Vector3(0.7669488511160021, 0.6177328615225485, -0.17376873011853555),
+          new THREE.Vector3(0.7244802415042533, 0.6864485153293087, -0.06258446670002553),
+          new THREE.Vector3(0.7244802415042533, 0.6864485153293087, 0.06258446670002553),
+          new THREE.Vector3(0.6177328615225485, 0.17376873011853555, 0.7669488511160021),
+          new THREE.Vector3(0.5164690672341211, 0.21244805770693695, 0.8295333178160277),
+          new THREE.Vector3(0.4052848038156119, 0.16997944809518772, 0.898248971622788),
+          new THREE.Vector3(0.3427003371155861, 0.06871565380676051, 0.9369282992111899),
+          new THREE.Vector3(0.3427003371155861, -0.06871565380676051, 0.9369282992111899),
+          new THREE.Vector3(0.4052848038156119, -0.16997944809518772, 0.898248971622788),
+          new THREE.Vector3(0.5164690672341211, -0.21244805770693695, 0.8295333178160277),
+          new THREE.Vector3(0.6177328615225485, -0.17376873011853555, 0.7669488511160021),
+          new THREE.Vector3(0.6864485153293087, -0.06258446670002553, 0.7244802415042533),
+          new THREE.Vector3(0.6864485153293087, 0.06258446670002553, 0.7244802415042533),
+          new THREE.Vector3(0.06871565380676051, 0.9369282992111899, -0.3427003371155861),
+          new THREE.Vector3(0.16997944809518772, 0.898248971622788, -0.4052848038156119),
+          new THREE.Vector3(0.21244805770693695, 0.8295333178160277, -0.5164690672341211),
+          new THREE.Vector3(0.17376873011853555, 0.7669488511160021, -0.6177328615225485),
+          new THREE.Vector3(0.06258446670002553, 0.7244802415042533, -0.6864485153293087),
+          new THREE.Vector3(-0.06258446670002553, 0.7244802415042533, -0.6864485153293087),
+          new THREE.Vector3(-0.17376873011853555, 0.7669488511160021, -0.6177328615225485),
+          new THREE.Vector3(-0.21244805770693695, 0.8295333178160277, -0.5164690672341211),
+          new THREE.Vector3(-0.16997944809518772, 0.898248971622788, -0.4052848038156119),
+          new THREE.Vector3(-0.06871565380676051, 0.9369282992111899, -0.3427003371155861),
+          new THREE.Vector3(0.9369282992111899, -0.3427003371155861, 0.06871565380676051),
+          new THREE.Vector3(0.898248971622788, -0.4052848038156119, 0.16997944809518772),
+          new THREE.Vector3(0.8295333178160277, -0.5164690672341211, 0.21244805770693695),
+          new THREE.Vector3(0.7669488511160021, -0.6177328615225485, 0.17376873011853555),
+          new THREE.Vector3(0.7244802415042533, -0.6864485153293087, 0.06258446670002553),
+          new THREE.Vector3(0.7244802415042533, -0.6864485153293087, -0.06258446670002553),
+          new THREE.Vector3(0.7669488511160021, -0.6177328615225485, -0.17376873011853555),
+          new THREE.Vector3(0.8295333178160277, -0.5164690672341211, -0.21244805770693695),
+          new THREE.Vector3(0.898248971622788, -0.4052848038156119, -0.16997944809518772),
+          new THREE.Vector3(0.9369282992111899, -0.3427003371155861, -0.06871565380676051),
+          new THREE.Vector3(-0.3427003371155861, 0.06871565380676051, 0.9369282992111899),
+          new THREE.Vector3(-0.4052848038156119, 0.16997944809518772, 0.898248971622788),
+          new THREE.Vector3(-0.5164690672341211, 0.21244805770693695, 0.8295333178160277),
+          new THREE.Vector3(-0.6177328615225485, 0.17376873011853555, 0.7669488511160021),
+          new THREE.Vector3(-0.6864485153293087, 0.06258446670002553, 0.7244802415042533),
+          new THREE.Vector3(-0.6864485153293087, -0.06258446670002553, 0.7244802415042533),
+          new THREE.Vector3(-0.6177328615225485, -0.17376873011853555, 0.7669488511160021),
+          new THREE.Vector3(-0.5164690672341211, -0.21244805770693695, 0.8295333178160277),
+          new THREE.Vector3(-0.4052848038156119, -0.16997944809518772, 0.898248971622788),
+          new THREE.Vector3(-0.3427003371155861, -0.06871565380676051, 0.9369282992111899),
+          new THREE.Vector3(-0.7244802415042533, 0.6864485153293087, 0.06258446670002553),
+          new THREE.Vector3(-0.7244802415042533, 0.6864485153293087, -0.06258446670002553),
+          new THREE.Vector3(-0.7669488511160021, 0.6177328615225485, -0.17376873011853555),
+          new THREE.Vector3(-0.8295333178160277, 0.5164690672341211, -0.21244805770693695),
+          new THREE.Vector3(-0.898248971622788, 0.4052848038156119, -0.16997944809518772),
+          new THREE.Vector3(-0.9369282992111899, 0.3427003371155861, -0.06871565380676051),
+          new THREE.Vector3(-0.9369282992111899, 0.3427003371155861, 0.06871565380676051),
+          new THREE.Vector3(-0.898248971622788, 0.4052848038156119, 0.16997944809518772),
+          new THREE.Vector3(-0.8295333178160277, 0.5164690672341211, 0.21244805770693695),
+          new THREE.Vector3(-0.7669488511160021, 0.6177328615225485, 0.17376873011853555),
+          new THREE.Vector3(-0.17376873011853555, -0.7669488511160021, 0.6177328615225485),
+          new THREE.Vector3(-0.21244805770693695, -0.8295333178160277, 0.5164690672341211),
+          new THREE.Vector3(-0.16997944809518772, -0.898248971622788, 0.4052848038156119),
+          new THREE.Vector3(-0.06871565380676051, -0.9369282992111899, 0.3427003371155861),
+          new THREE.Vector3(0.06871565380676051, -0.9369282992111899, 0.3427003371155861),
+          new THREE.Vector3(0.16997944809518772, -0.898248971622788, 0.4052848038156119),
+          new THREE.Vector3(0.21244805770693695, -0.8295333178160277, 0.5164690672341211),
+          new THREE.Vector3(0.17376873011853555, -0.7669488511160021, 0.6177328615225485),
+          new THREE.Vector3(0.06258446670002553, -0.7244802415042533, 0.6864485153293087),
+          new THREE.Vector3(-0.06258446670002553, -0.7244802415042533, 0.6864485153293087),
+          new THREE.Vector3(0.6177328615225485, -0.17376873011853555, -0.7669488511160021),
+          new THREE.Vector3(0.5164690672341211, -0.21244805770693695, -0.8295333178160277),
+          new THREE.Vector3(0.4052848038156119, -0.16997944809518772, -0.898248971622788),
+          new THREE.Vector3(0.3427003371155861, -0.06871565380676051, -0.9369282992111899),
+          new THREE.Vector3(0.3427003371155861, 0.06871565380676051, -0.9369282992111899),
+          new THREE.Vector3(0.4052848038156119, 0.16997944809518772, -0.898248971622788),
+          new THREE.Vector3(0.5164690672341211, 0.21244805770693695, -0.8295333178160277),
+          new THREE.Vector3(0.6177328615225485, 0.17376873011853555, -0.7669488511160021),
+          new THREE.Vector3(0.6864485153293087, 0.06258446670002553, -0.7244802415042533),
+          new THREE.Vector3(0.6864485153293087, -0.06258446670002553, -0.7244802415042533),
+          new THREE.Vector3(-0.5164690672341211, -0.21244805770693695, -0.8295333178160277),
+          new THREE.Vector3(-0.6177328615225485, -0.17376873011853555, -0.7669488511160021),
+          new THREE.Vector3(-0.6864485153293087, -0.06258446670002553, -0.7244802415042533),
+          new THREE.Vector3(-0.6864485153293087, 0.06258446670002553, -0.7244802415042533),
+          new THREE.Vector3(-0.6177328615225485, 0.17376873011853555, -0.7669488511160021),
+          new THREE.Vector3(-0.5164690672341211, 0.21244805770693695, -0.8295333178160277),
+          new THREE.Vector3(-0.4052848038156119, 0.16997944809518772, -0.898248971622788),
+          new THREE.Vector3(-0.3427003371155861, 0.06871565380676051, -0.9369282992111899),
+          new THREE.Vector3(-0.3427003371155861, -0.06871565380676051, -0.9369282992111899),
+          new THREE.Vector3(-0.4052848038156119, -0.16997944809518772, -0.898248971622788),
+          new THREE.Vector3(-0.8295333178160277, -0.5164690672341211, -0.21244805770693695),
+          new THREE.Vector3(-0.7669488511160021, -0.6177328615225485, -0.17376873011853555),
+          new THREE.Vector3(-0.7244802415042533, -0.6864485153293087, -0.06258446670002553),
+          new THREE.Vector3(-0.7244802415042533, -0.6864485153293087, 0.06258446670002553),
+          new THREE.Vector3(-0.7669488511160021, -0.6177328615225485, 0.17376873011853555),
+          new THREE.Vector3(-0.8295333178160277, -0.5164690672341211, 0.21244805770693695),
+          new THREE.Vector3(-0.898248971622788, -0.4052848038156119, 0.16997944809518772),
+          new THREE.Vector3(-0.9369282992111899, -0.3427003371155861, 0.06871565380676051),
+          new THREE.Vector3(-0.9369282992111899, -0.3427003371155861, -0.06871565380676051),
+          new THREE.Vector3(-0.898248971622788, -0.4052848038156119, -0.16997944809518772),
+          new THREE.Vector3(-0.21244805770693695, -0.8295333178160277, -0.5164690672341211),
+          new THREE.Vector3(-0.17376873011853555, -0.7669488511160021, -0.6177328615225485),
+          new THREE.Vector3(-0.06258446670002553, -0.7244802415042533, -0.6864485153293087),
+          new THREE.Vector3(0.06258446670002553, -0.7244802415042533, -0.6864485153293087),
+          new THREE.Vector3(0.17376873011853555, -0.7669488511160021, -0.6177328615225485),
+          new THREE.Vector3(0.21244805770693695, -0.8295333178160277, -0.5164690672341211),
+          new THREE.Vector3(0.16997944809518772, -0.898248971622788, -0.4052848038156119),
+          new THREE.Vector3(0.06871565380676051, -0.9369282992111899, -0.3427003371155861),
+          new THREE.Vector3(-0.06871565380676051, -0.9369282992111899, -0.3427003371155861),
+          new THREE.Vector3(-0.16997944809518772, -0.898248971622788, -0.4052848038156119),
+          new THREE.Vector3(0.48698118824360515, 0.6091540894558543, 0.6259238113349384),
+          new THREE.Vector3(0.5428855097981513, 0.5186989970625953, 0.6604745821736512),
+          new THREE.Vector3(0.6259238113349384, 0.48698118824360515, 0.6091540894558543),
+          new THREE.Vector3(0.6604745821736512, 0.5428855097981513, 0.5186989970625953),
+          new THREE.Vector3(0.6091540894558543, 0.6259238113349384, 0.48698118824360515),
+          new THREE.Vector3(0.5186989970625953, 0.6604745821736512, 0.5428855097981513),
+          new THREE.Vector3(0.3522914189341558, 0.9297276995710199, 0.10722481427234333),
+          new THREE.Vector3(0.442746511327415, 0.8951769287323068, 0.05132049271779715),
+          new THREE.Vector3(0.442746511327415, 0.8951769287323068, -0.05132049271779715),
+          new THREE.Vector3(0.3522914189341558, 0.9297276995710199, -0.10722481427234333),
+          new THREE.Vector3(0.2692531173973686, 0.9614455083900101, -0.05590432155454618),
+          new THREE.Vector3(0.2692531173973686, 0.9614455083900101, 0.05590432155454618),
+          new THREE.Vector3(-0.2692531173973686, 0.9614455083900101, 0.05590432155454618),
+          new THREE.Vector3(-0.2692531173973686, 0.9614455083900101, -0.05590432155454618),
+          new THREE.Vector3(-0.3522914189341558, 0.9297276995710199, -0.10722481427234333),
+          new THREE.Vector3(-0.442746511327415, 0.8951769287323068, -0.05132049271779715),
+          new THREE.Vector3(-0.442746511327415, 0.8951769287323068, 0.05132049271779715),
+          new THREE.Vector3(-0.3522914189341558, 0.9297276995710199, 0.10722481427234333),
+          new THREE.Vector3(-0.5186989970625953, 0.6604745821736512, 0.5428855097981513),
+          new THREE.Vector3(-0.6091540894558543, 0.6259238113349384, 0.48698118824360515),
+          new THREE.Vector3(-0.6604745821736512, 0.5428855097981513, 0.5186989970625953),
+          new THREE.Vector3(-0.6259238113349384, 0.48698118824360515, 0.6091540894558543),
+          new THREE.Vector3(-0.5428855097981513, 0.5186989970625953, 0.6604745821736512),
+          new THREE.Vector3(-0.48698118824360515, 0.6091540894558543, 0.6259238113349384),
+          new THREE.Vector3(-0.05132049271779715, 0.442746511327415, 0.8951769287323068),
+          new THREE.Vector3(-0.10722481427234333, 0.3522914189341558, 0.9297276995710199),
+          new THREE.Vector3(-0.05590432155454618, 0.2692531173973686, 0.9614455083900101),
+          new THREE.Vector3(0.05590432155454618, 0.2692531173973686, 0.9614455083900101),
+          new THREE.Vector3(0.10722481427234333, 0.3522914189341558, 0.9297276995710199),
+          new THREE.Vector3(0.05132049271779715, 0.442746511327415, 0.8951769287323068),
+          new THREE.Vector3(0.9297276995710199, 0.10722481427234333, 0.3522914189341558),
+          new THREE.Vector3(0.8951769287323068, 0.05132049271779715, 0.442746511327415),
+          new THREE.Vector3(0.8951769287323068, -0.05132049271779715, 0.442746511327415),
+          new THREE.Vector3(0.9297276995710199, -0.10722481427234333, 0.3522914189341558),
+          new THREE.Vector3(0.9614455083900101, -0.05590432155454618, 0.2692531173973686),
+          new THREE.Vector3(0.9614455083900101, 0.05590432155454618, 0.2692531173973686),
+          new THREE.Vector3(0.9614455083900101, 0.05590432155454618, -0.2692531173973686),
+          new THREE.Vector3(0.9614455083900101, -0.05590432155454618, -0.2692531173973686),
+          new THREE.Vector3(0.9297276995710199, -0.10722481427234333, -0.3522914189341558),
+          new THREE.Vector3(0.8951769287323068, -0.05132049271779715, -0.442746511327415),
+          new THREE.Vector3(0.8951769287323068, 0.05132049271779715, -0.442746511327415),
+          new THREE.Vector3(0.9297276995710199, 0.10722481427234333, -0.3522914189341558),
+          new THREE.Vector3(0.6604745821736512, 0.5428855097981513, -0.5186989970625953),
+          new THREE.Vector3(0.6259238113349384, 0.48698118824360515, -0.6091540894558543),
+          new THREE.Vector3(0.5428855097981513, 0.5186989970625953, -0.6604745821736512),
+          new THREE.Vector3(0.48698118824360515, 0.6091540894558543, -0.6259238113349384),
+          new THREE.Vector3(0.5186989970625953, 0.6604745821736512, -0.5428855097981513),
+          new THREE.Vector3(0.6091540894558543, 0.6259238113349384, -0.48698118824360515),
+          new THREE.Vector3(0.05590432155454618, -0.2692531173973686, 0.9614455083900101),
+          new THREE.Vector3(-0.05590432155454618, -0.2692531173973686, 0.9614455083900101),
+          new THREE.Vector3(-0.10722481427234333, -0.3522914189341558, 0.9297276995710199),
+          new THREE.Vector3(-0.05132049271779715, -0.442746511327415, 0.8951769287323068),
+          new THREE.Vector3(0.05132049271779715, -0.442746511327415, 0.8951769287323068),
+          new THREE.Vector3(0.10722481427234333, -0.3522914189341558, 0.9297276995710199),
+          new THREE.Vector3(0.5428855097981513, -0.5186989970625953, 0.6604745821736512),
+          new THREE.Vector3(0.48698118824360515, -0.6091540894558543, 0.6259238113349384),
+          new THREE.Vector3(0.5186989970625953, -0.6604745821736512, 0.5428855097981513),
+          new THREE.Vector3(0.6091540894558543, -0.6259238113349384, 0.48698118824360515),
+          new THREE.Vector3(0.6604745821736512, -0.5428855097981513, 0.5186989970625953),
+          new THREE.Vector3(0.6259238113349384, -0.48698118824360515, 0.6091540894558543),
+          new THREE.Vector3(0.05132049271779715, 0.442746511327415, -0.8951769287323068),
+          new THREE.Vector3(0.10722481427234333, 0.3522914189341558, -0.9297276995710199),
+          new THREE.Vector3(0.05590432155454618, 0.2692531173973686, -0.9614455083900101),
+          new THREE.Vector3(-0.05590432155454618, 0.2692531173973686, -0.9614455083900101),
+          new THREE.Vector3(-0.10722481427234333, 0.3522914189341558, -0.9297276995710199),
+          new THREE.Vector3(-0.05132049271779715, 0.442746511327415, -0.8951769287323068),
+          new THREE.Vector3(-0.48698118824360515, 0.6091540894558543, -0.6259238113349384),
+          new THREE.Vector3(-0.5428855097981513, 0.5186989970625953, -0.6604745821736512),
+          new THREE.Vector3(-0.6259238113349384, 0.48698118824360515, -0.6091540894558543),
+          new THREE.Vector3(-0.6604745821736512, 0.5428855097981513, -0.5186989970625953),
+          new THREE.Vector3(-0.6091540894558543, 0.6259238113349384, -0.48698118824360515),
+          new THREE.Vector3(-0.5186989970625953, 0.6604745821736512, -0.5428855097981513),
+          new THREE.Vector3(0.442746511327415, -0.8951769287323068, 0.05132049271779715),
+          new THREE.Vector3(0.3522914189341558, -0.9297276995710199, 0.10722481427234333),
+          new THREE.Vector3(0.2692531173973686, -0.9614455083900101, 0.05590432155454618),
+          new THREE.Vector3(0.2692531173973686, -0.9614455083900101, -0.05590432155454618),
+          new THREE.Vector3(0.3522914189341558, -0.9297276995710199, -0.10722481427234333),
+          new THREE.Vector3(0.442746511327415, -0.8951769287323068, -0.05132049271779715),
+          new THREE.Vector3(0.6091540894558543, -0.6259238113349384, -0.48698118824360515),
+          new THREE.Vector3(0.5186989970625953, -0.6604745821736512, -0.5428855097981513),
+          new THREE.Vector3(0.48698118824360515, -0.6091540894558543, -0.6259238113349384),
+          new THREE.Vector3(0.5428855097981513, -0.5186989970625953, -0.6604745821736512),
+          new THREE.Vector3(0.6259238113349384, -0.48698118824360515, -0.6091540894558543),
+          new THREE.Vector3(0.6604745821736512, -0.5428855097981513, -0.5186989970625953),
+          new THREE.Vector3(-0.8951769287323068, 0.05132049271779715, 0.442746511327415),
+          new THREE.Vector3(-0.9297276995710199, 0.10722481427234333, 0.3522914189341558),
+          new THREE.Vector3(-0.9614455083900101, 0.05590432155454618, 0.2692531173973686),
+          new THREE.Vector3(-0.9614455083900101, -0.05590432155454618, 0.2692531173973686),
+          new THREE.Vector3(-0.9297276995710199, -0.10722481427234333, 0.3522914189341558),
+          new THREE.Vector3(-0.8951769287323068, -0.05132049271779715, 0.442746511327415),
+          new THREE.Vector3(-0.6259238113349384, -0.48698118824360515, 0.6091540894558543),
+          new THREE.Vector3(-0.6604745821736512, -0.5428855097981513, 0.5186989970625953),
+          new THREE.Vector3(-0.6091540894558543, -0.6259238113349384, 0.48698118824360515),
+          new THREE.Vector3(-0.5186989970625953, -0.6604745821736512, 0.5428855097981513),
+          new THREE.Vector3(-0.48698118824360515, -0.6091540894558543, 0.6259238113349384),
+          new THREE.Vector3(-0.5428855097981513, -0.5186989970625953, 0.6604745821736512),
+          new THREE.Vector3(-0.9297276995710199, 0.10722481427234333, -0.3522914189341558),
+          new THREE.Vector3(-0.8951769287323068, 0.05132049271779715, -0.442746511327415),
+          new THREE.Vector3(-0.8951769287323068, -0.05132049271779715, -0.442746511327415),
+          new THREE.Vector3(-0.9297276995710199, -0.10722481427234333, -0.3522914189341558),
+          new THREE.Vector3(-0.9614455083900101, -0.05590432155454618, -0.2692531173973686),
+          new THREE.Vector3(-0.9614455083900101, 0.05590432155454618, -0.2692531173973686),
+          new THREE.Vector3(-0.3522914189341558, -0.9297276995710199, 0.10722481427234333),
+          new THREE.Vector3(-0.442746511327415, -0.8951769287323068, 0.05132049271779715),
+          new THREE.Vector3(-0.442746511327415, -0.8951769287323068, -0.05132049271779715),
+          new THREE.Vector3(-0.3522914189341558, -0.9297276995710199, -0.10722481427234333),
+          new THREE.Vector3(-0.2692531173973686, -0.9614455083900101, -0.05590432155454618),
+          new THREE.Vector3(-0.2692531173973686, -0.9614455083900101, 0.05590432155454618),
+          new THREE.Vector3(0.10722481427234333, -0.3522914189341558, -0.9297276995710199),
+          new THREE.Vector3(0.05132049271779715, -0.442746511327415, -0.8951769287323068),
+          new THREE.Vector3(-0.05132049271779715, -0.442746511327415, -0.8951769287323068),
+          new THREE.Vector3(-0.10722481427234333, -0.3522914189341558, -0.9297276995710199),
+          new THREE.Vector3(-0.05590432155454618, -0.2692531173973686, -0.9614455083900101),
+          new THREE.Vector3(0.05590432155454618, -0.2692531173973686, -0.9614455083900101),
+          new THREE.Vector3(-0.5428855097981513, -0.5186989970625953, -0.6604745821736512),
+          new THREE.Vector3(-0.48698118824360515, -0.6091540894558543, -0.6259238113349384),
+          new THREE.Vector3(-0.5186989970625953, -0.6604745821736512, -0.5428855097981513),
+          new THREE.Vector3(-0.6091540894558543, -0.6259238113349384, -0.48698118824360515),
+          new THREE.Vector3(-0.6604745821736512, -0.5428855097981513, -0.5186989970625953),
+          new THREE.Vector3(-0.6259238113349384, -0.48698118824360515, -0.6091540894558543),
+          new THREE.Vector3(0.49496590031147375, 0.7955535639980673, 0.3494328037532046),
+          new THREE.Vector3(0.5275209837951205, 0.7831186286139048, 0.32931265565372),
+          new THREE.Vector3(0.5041140778060826, 0.8209917980756407, 0.2680325802029467),
+          new THREE.Vector3(0.4715589943224364, 0.8334267334598032, 0.2881527283024307),
+          new THREE.Vector3(0.03787316946173606, 0.9990799781175567, 0.02012014809948405),
+          new THREE.Vector3(0.03787316946173606, 0.9990799781175567, -0.02012014809948405),
+          new THREE.Vector3(-0.03787316946173606, 0.9990799781175567, -0.02012014809948405),
+          new THREE.Vector3(-0.03787316946173606, 0.9990799781175567, 0.02012014809948405),
+          new THREE.Vector3(-0.4715589943224364, 0.8334267334598032, 0.2881527283024307),
+          new THREE.Vector3(-0.5041140778060826, 0.8209917980756407, 0.2680325802029467),
+          new THREE.Vector3(-0.5275209837951205, 0.7831186286139048, 0.32931265565372),
+          new THREE.Vector3(-0.49496590031147375, 0.7955535639980673, 0.3494328037532046),
+          new THREE.Vector3(-0.32931265565372, 0.5275209837951205, 0.7831186286139048),
+          new THREE.Vector3(-0.34943280375320457, 0.49496590031147364, 0.7955535639980671),
+          new THREE.Vector3(-0.2881527283024307, 0.4715589943224364, 0.8334267334598032),
+          new THREE.Vector3(-0.26803258020294674, 0.5041140778060827, 0.8209917980756409),
+          new THREE.Vector3(0.26803258020294674, 0.5041140778060827, 0.8209917980756409),
+          new THREE.Vector3(0.2881527283024307, 0.4715589943224364, 0.8334267334598032),
+          new THREE.Vector3(0.34943280375320457, 0.49496590031147364, 0.7955535639980671),
+          new THREE.Vector3(0.32931265565372, 0.5275209837951205, 0.7831186286139048),
+          new THREE.Vector3(0.7955535639980671, 0.34943280375320457, 0.49496590031147364),
+          new THREE.Vector3(0.7831186286139048, 0.32931265565372, 0.5275209837951205),
+          new THREE.Vector3(0.8209917980756409, 0.26803258020294674, 0.5041140778060827),
+          new THREE.Vector3(0.8334267334598032, 0.2881527283024307, 0.4715589943224364),
+          new THREE.Vector3(0.9990799781175567, 0.02012014809948405, 0.03787316946173606),
+          new THREE.Vector3(0.9990799781175567, -0.02012014809948405, 0.03787316946173606),
+          new THREE.Vector3(0.9990799781175567, -0.02012014809948405, -0.03787316946173606),
+          new THREE.Vector3(0.9990799781175567, 0.02012014809948405, -0.03787316946173606),
+          new THREE.Vector3(0.8334267334598032, 0.2881527283024307, -0.4715589943224364),
+          new THREE.Vector3(0.8209917980756409, 0.26803258020294674, -0.5041140778060827),
+          new THREE.Vector3(0.7831186286139048, 0.32931265565372, -0.5275209837951205),
+          new THREE.Vector3(0.7955535639980671, 0.34943280375320457, -0.49496590031147364),
+          new THREE.Vector3(0.5275209837951205, 0.7831186286139048, -0.32931265565372),
+          new THREE.Vector3(0.49496590031147375, 0.7955535639980673, -0.3494328037532046),
+          new THREE.Vector3(0.4715589943224364, 0.8334267334598032, -0.2881527283024307),
+          new THREE.Vector3(0.5041140778060826, 0.8209917980756407, -0.2680325802029467),
+          new THREE.Vector3(0.02012014809948405, 0.03787316946173606, 0.9990799781175567),
+          new THREE.Vector3(-0.02012014809948405, 0.03787316946173606, 0.9990799781175567),
+          new THREE.Vector3(-0.02012014809948405, -0.03787316946173606, 0.9990799781175567),
+          new THREE.Vector3(0.02012014809948405, -0.03787316946173606, 0.9990799781175567),
+          new THREE.Vector3(0.2881527283024307, -0.4715589943224364, 0.8334267334598032),
+          new THREE.Vector3(0.26803258020294674, -0.5041140778060827, 0.8209917980756409),
+          new THREE.Vector3(0.32931265565372, -0.5275209837951205, 0.7831186286139048),
+          new THREE.Vector3(0.34943280375320457, -0.49496590031147364, 0.7955535639980671),
+          new THREE.Vector3(0.7831186286139048, -0.32931265565372, 0.5275209837951205),
+          new THREE.Vector3(0.7955535639980671, -0.34943280375320457, 0.49496590031147364),
+          new THREE.Vector3(0.8334267334598032, -0.2881527283024307, 0.4715589943224364),
+          new THREE.Vector3(0.8209917980756409, -0.26803258020294674, 0.5041140778060827),
+          new THREE.Vector3(0.32931265565372, 0.5275209837951205, -0.7831186286139048),
+          new THREE.Vector3(0.34943280375320457, 0.49496590031147364, -0.7955535639980671),
+          new THREE.Vector3(0.2881527283024307, 0.4715589943224364, -0.8334267334598032),
+          new THREE.Vector3(0.26803258020294674, 0.5041140778060827, -0.8209917980756409),
+          new THREE.Vector3(-0.26803258020294674, 0.5041140778060827, -0.8209917980756409),
+          new THREE.Vector3(-0.2881527283024307, 0.4715589943224364, -0.8334267334598032),
+          new THREE.Vector3(-0.34943280375320457, 0.49496590031147364, -0.7955535639980671),
+          new THREE.Vector3(-0.32931265565372, 0.5275209837951205, -0.7831186286139048),
+          new THREE.Vector3(-0.49496590031147375, 0.7955535639980673, -0.3494328037532046),
+          new THREE.Vector3(-0.5275209837951205, 0.7831186286139048, -0.32931265565372),
+          new THREE.Vector3(-0.5041140778060826, 0.8209917980756407, -0.2680325802029467),
+          new THREE.Vector3(-0.4715589943224364, 0.8334267334598032, -0.2881527283024307),
+          new THREE.Vector3(0.5275209837951205, -0.7831186286139048, 0.32931265565372),
+          new THREE.Vector3(0.49496590031147375, -0.7955535639980673, 0.3494328037532046),
+          new THREE.Vector3(0.4715589943224364, -0.8334267334598032, 0.2881527283024307),
+          new THREE.Vector3(0.5041140778060826, -0.8209917980756407, 0.2680325802029467),
+          new THREE.Vector3(0.5041140778060826, -0.8209917980756407, -0.2680325802029467),
+          new THREE.Vector3(0.4715589943224364, -0.8334267334598032, -0.2881527283024307),
+          new THREE.Vector3(0.49496590031147375, -0.7955535639980673, -0.3494328037532046),
+          new THREE.Vector3(0.5275209837951205, -0.7831186286139048, -0.32931265565372),
+          new THREE.Vector3(0.7955535639980671, -0.34943280375320457, -0.49496590031147364),
+          new THREE.Vector3(0.7831186286139048, -0.32931265565372, -0.5275209837951205),
+          new THREE.Vector3(0.8209917980756409, -0.26803258020294674, -0.5041140778060827),
+          new THREE.Vector3(0.8334267334598032, -0.2881527283024307, -0.4715589943224364),
+          new THREE.Vector3(-0.7831186286139048, 0.32931265565372, 0.5275209837951205),
+          new THREE.Vector3(-0.7955535639980671, 0.34943280375320457, 0.49496590031147364),
+          new THREE.Vector3(-0.8334267334598032, 0.2881527283024307, 0.4715589943224364),
+          new THREE.Vector3(-0.8209917980756409, 0.26803258020294674, 0.5041140778060827),
+          new THREE.Vector3(-0.8209917980756409, -0.26803258020294674, 0.5041140778060827),
+          new THREE.Vector3(-0.8334267334598032, -0.2881527283024307, 0.4715589943224364),
+          new THREE.Vector3(-0.7955535639980671, -0.34943280375320457, 0.49496590031147364),
+          new THREE.Vector3(-0.7831186286139048, -0.32931265565372, 0.5275209837951205),
+          new THREE.Vector3(-0.34943280375320457, -0.49496590031147364, 0.7955535639980671),
+          new THREE.Vector3(-0.32931265565372, -0.5275209837951205, 0.7831186286139048),
+          new THREE.Vector3(-0.26803258020294674, -0.5041140778060827, 0.8209917980756409),
+          new THREE.Vector3(-0.2881527283024307, -0.4715589943224364, 0.8334267334598032),
+          new THREE.Vector3(-0.7955535639980671, 0.34943280375320457, -0.49496590031147364),
+          new THREE.Vector3(-0.7831186286139048, 0.32931265565372, -0.5275209837951205),
+          new THREE.Vector3(-0.8209917980756409, 0.26803258020294674, -0.5041140778060827),
+          new THREE.Vector3(-0.8334267334598032, 0.2881527283024307, -0.4715589943224364),
+          new THREE.Vector3(-0.9990799781175567, 0.02012014809948405, -0.03787316946173606),
+          new THREE.Vector3(-0.9990799781175567, -0.02012014809948405, -0.03787316946173606),
+          new THREE.Vector3(-0.9990799781175567, -0.02012014809948405, 0.03787316946173606),
+          new THREE.Vector3(-0.9990799781175567, 0.02012014809948405, 0.03787316946173606),
+          new THREE.Vector3(-0.49496590031147375, -0.7955535639980673, 0.3494328037532046),
+          new THREE.Vector3(-0.5275209837951205, -0.7831186286139048, 0.32931265565372),
+          new THREE.Vector3(-0.5041140778060826, -0.8209917980756407, 0.2680325802029467),
+          new THREE.Vector3(-0.4715589943224364, -0.8334267334598032, 0.2881527283024307),
+          new THREE.Vector3(-0.03787316946173606, -0.9990799781175567, 0.02012014809948405),
+          new THREE.Vector3(-0.03787316946173606, -0.9990799781175567, -0.02012014809948405),
+          new THREE.Vector3(0.03787316946173606, -0.9990799781175567, -0.02012014809948405),
+          new THREE.Vector3(0.03787316946173606, -0.9990799781175567, 0.02012014809948405),
+          new THREE.Vector3(0.34943280375320457, -0.49496590031147364, -0.7955535639980671),
+          new THREE.Vector3(0.32931265565372, -0.5275209837951205, -0.7831186286139048),
+          new THREE.Vector3(0.26803258020294674, -0.5041140778060827, -0.8209917980756409),
+          new THREE.Vector3(0.2881527283024307, -0.4715589943224364, -0.8334267334598032),
+          new THREE.Vector3(0.02012014809948405, -0.03787316946173606, -0.9990799781175567),
+          new THREE.Vector3(-0.02012014809948405, -0.03787316946173606, -0.9990799781175567),
+          new THREE.Vector3(-0.02012014809948405, 0.03787316946173606, -0.9990799781175567),
+          new THREE.Vector3(0.02012014809948405, 0.03787316946173606, -0.9990799781175567),
+          new THREE.Vector3(-0.7831186286139048, -0.32931265565372, -0.5275209837951205),
+          new THREE.Vector3(-0.7955535639980671, -0.34943280375320457, -0.49496590031147364),
+          new THREE.Vector3(-0.8334267334598032, -0.2881527283024307, -0.4715589943224364),
+          new THREE.Vector3(-0.8209917980756409, -0.26803258020294674, -0.5041140778060827),
+          new THREE.Vector3(-0.2881527283024307, -0.4715589943224364, -0.8334267334598032),
+          new THREE.Vector3(-0.26803258020294674, -0.5041140778060827, -0.8209917980756409),
+          new THREE.Vector3(-0.32931265565372, -0.5275209837951205, -0.7831186286139048),
+          new THREE.Vector3(-0.34943280375320457, -0.49496590031147364, -0.7955535639980671),
+          new THREE.Vector3(-0.5275209837951205, -0.7831186286139048, -0.32931265565372),
+          new THREE.Vector3(-0.49496590031147375, -0.7955535639980673, -0.3494328037532046),
+          new THREE.Vector3(-0.4715589943224364, -0.8334267334598032, -0.2881527283024307),
+          new THREE.Vector3(-0.5041140778060826, -0.8209917980756407, -0.2680325802029467)
+        ],
+        faces: [
+          [9, 180, 0, 181, 1, 182, 2, 183, 3, 184, 4, 185, 5, 186, 6, 187, 7, 188, 8, 189],
+          [19, 190, 10, 191, 11, 192, 12, 193, 13, 194, 14, 195, 15, 196, 16, 197, 17, 198, 18, 199],
+          [29, 200, 20, 201, 21, 202, 22, 203, 23, 204, 24, 205, 25, 206, 26, 207, 27, 208, 28, 209],
+          [39, 210, 30, 211, 31, 212, 32, 213, 33, 214, 34, 215, 35, 216, 36, 217, 37, 218, 38, 219],
+          [49, 220, 40, 221, 41, 222, 42, 223, 43, 224, 44, 225, 45, 226, 46, 227, 47, 228, 48, 229],
+          [59, 230, 50, 231, 51, 232, 52, 233, 53, 234, 54, 235, 55, 236, 56, 237, 57, 238, 58, 239],
+          [69, 240, 60, 241, 61, 242, 62, 243, 63, 244, 64, 245, 65, 246, 66, 247, 67, 248, 68, 249],
+          [79, 250, 70, 251, 71, 252, 72, 253, 73, 254, 74, 255, 75, 256, 76, 257, 77, 258, 78, 259],
+          [89, 260, 80, 261, 81, 262, 82, 263, 83, 264, 84, 265, 85, 266, 86, 267, 87, 268, 88, 269],
+          [99, 270, 90, 271, 91, 272, 92, 273, 93, 274, 94, 275, 95, 276, 96, 277, 97, 278, 98, 279],
+          [109, 280, 100, 281, 101, 282, 102, 283, 103, 284, 104, 285, 105, 286, 106, 287, 107, 288, 108, 289],
+          [119, 290, 110, 291, 111, 292, 112, 293, 113, 294, 114, 295, 115, 296, 116, 297, 117, 298, 118, 299],
+          [0, 300, 120, 301, 20, 302, 121, 303, 10, 304, 122, 305],
+          [2, 306, 123, 307, 18, 308, 124, 309, 30, 310, 125, 311],
+          [4, 312, 126, 313, 38, 314, 127, 315, 60, 316, 128, 317],
+          [6, 318, 129, 319, 68, 320, 130, 321, 52, 322, 131, 323],
+          [8, 324, 132, 325, 50, 326, 133, 327, 22, 328, 134, 329],
+          [12, 330, 135, 331, 28, 332, 136, 333, 40, 334, 137, 335],
+          [14, 336, 138, 337, 48, 338, 139, 339, 88, 340, 140, 341],
+          [16, 342, 141, 343, 86, 344, 142, 345, 32, 346, 143, 347],
+          [24, 348, 144, 349, 58, 350, 145, 351, 78, 352, 146, 353],
+          [26, 354, 147, 355, 76, 356, 148, 357, 42, 358, 149, 359],
+          [34, 360, 150, 361, 84, 362, 151, 363, 96, 364, 152, 365],
+          [36, 366, 153, 367, 94, 368, 154, 369, 62, 370, 155, 371],
+          [44, 372, 156, 373, 74, 374, 157, 375, 116, 376, 158, 377],
+          [46, 378, 159, 379, 114, 380, 160, 381, 80, 382, 161, 383],
+          [54, 384, 162, 385, 66, 386, 163, 387, 106, 388, 164, 389],
+          [56, 390, 165, 391, 104, 392, 166, 393, 70, 394, 167, 395],
+          [64, 396, 168, 397, 92, 398, 169, 399, 108, 400, 170, 401],
+          [72, 402, 171, 403, 102, 404, 172, 405, 118, 406, 173, 407],
+          [82, 408, 174, 409, 112, 410, 175, 411, 98, 412, 176, 413],
+          [90, 414, 177, 415, 110, 416, 178, 417, 100, 418, 179, 419],
+          [1, 420, 122, 421, 19, 422, 123, 423],
+          [3, 424, 125, 425, 39, 426, 126, 427],
+          [5, 428, 128, 429, 69, 430, 129, 431],
+          [7, 432, 131, 433, 51, 434, 132, 435],
+          [9, 436, 134, 437, 21, 438, 120, 439],
+          [11, 440, 121, 441, 29, 442, 135, 443],
+          [13, 444, 137, 445, 49, 446, 138, 447],
+          [15, 448, 140, 449, 87, 450, 141, 451],
+          [17, 452, 143, 453, 31, 454, 124, 455],
+          [23, 456, 133, 457, 59, 458, 144, 459],
+          [25, 460, 146, 461, 77, 462, 147, 463],
+          [27, 464, 149, 465, 41, 466, 136, 467],
+          [33, 468, 142, 469, 85, 470, 150, 471],
+          [35, 472, 152, 473, 95, 474, 153, 475],
+          [37, 476, 155, 477, 61, 478, 127, 479],
+          [43, 480, 148, 481, 75, 482, 156, 483],
+          [45, 484, 158, 485, 115, 486, 159, 487],
+          [47, 488, 161, 489, 89, 490, 139, 491],
+          [53, 492, 130, 493, 67, 494, 162, 495],
+          [55, 496, 164, 497, 105, 498, 165, 499],
+          [57, 500, 167, 501, 79, 502, 145, 503],
+          [63, 504, 154, 505, 93, 506, 168, 507],
+          [65, 508, 170, 509, 107, 510, 163, 511],
+          [71, 512, 166, 513, 103, 514, 171, 515],
+          [73, 516, 173, 517, 117, 518, 157, 519],
+          [81, 520, 160, 521, 113, 522, 174, 523],
+          [83, 524, 176, 525, 97, 526, 151, 527],
+          [91, 528, 179, 529, 109, 530, 169, 531],
+          [99, 532, 175, 533, 111, 534, 177, 535],
+          [101, 536, 178, 537, 119, 538, 172, 539],
+          [180, 9, 439, 120, 300, 0],
+          [181, 0, 305, 122, 420, 1],
+          [182, 1, 423, 123, 306, 2],
+          [183, 2, 311, 125, 424, 3],
+          [184, 3, 427, 126, 312, 4],
+          [185, 4, 317, 128, 428, 5],
+          [186, 5, 431, 129, 318, 6],
+          [187, 6, 323, 131, 432, 7],
+          [188, 7, 435, 132, 324, 8],
+          [189, 8, 329, 134, 436, 9],
+          [190, 19, 421, 122, 304, 10],
+          [191, 10, 303, 121, 440, 11],
+          [192, 11, 443, 135, 330, 12],
+          [193, 12, 335, 137, 444, 13],
+          [194, 13, 447, 138, 336, 14],
+          [195, 14, 341, 140, 448, 15],
+          [196, 15, 451, 141, 342, 16],
+          [197, 16, 347, 143, 452, 17],
+          [198, 17, 455, 124, 308, 18],
+          [199, 18, 307, 123, 422, 19],
+          [200, 29, 441, 121, 302, 20],
+          [201, 20, 301, 120, 438, 21],
+          [202, 21, 437, 134, 328, 22],
+          [203, 22, 327, 133, 456, 23],
+          [204, 23, 459, 144, 348, 24],
+          [205, 24, 353, 146, 460, 25],
+          [206, 25, 463, 147, 354, 26],
+          [207, 26, 359, 149, 464, 27],
+          [208, 27, 467, 136, 332, 28],
+          [209, 28, 331, 135, 442, 29],
+          [210, 39, 425, 125, 310, 30],
+          [211, 30, 309, 124, 454, 31],
+          [212, 31, 453, 143, 346, 32],
+          [213, 32, 345, 142, 468, 33],
+          [214, 33, 471, 150, 360, 34],
+          [215, 34, 365, 152, 472, 35],
+          [216, 35, 475, 153, 366, 36],
+          [217, 36, 371, 155, 476, 37],
+          [218, 37, 479, 127, 314, 38],
+          [219, 38, 313, 126, 426, 39],
+          [220, 49, 445, 137, 334, 40],
+          [221, 40, 333, 136, 466, 41],
+          [222, 41, 465, 149, 358, 42],
+          [223, 42, 357, 148, 480, 43],
+          [224, 43, 483, 156, 372, 44],
+          [225, 44, 377, 158, 484, 45],
+          [226, 45, 487, 159, 378, 46],
+          [227, 46, 383, 161, 488, 47],
+          [228, 47, 491, 139, 338, 48],
+          [229, 48, 337, 138, 446, 49],
+          [230, 59, 457, 133, 326, 50],
+          [231, 50, 325, 132, 434, 51],
+          [232, 51, 433, 131, 322, 52],
+          [233, 52, 321, 130, 492, 53],
+          [234, 53, 495, 162, 384, 54],
+          [235, 54, 389, 164, 496, 55],
+          [236, 55, 499, 165, 390, 56],
+          [237, 56, 395, 167, 500, 57],
+          [238, 57, 503, 145, 350, 58],
+          [239, 58, 349, 144, 458, 59],
+          [240, 69, 429, 128, 316, 60],
+          [241, 60, 315, 127, 478, 61],
+          [242, 61, 477, 155, 370, 62],
+          [243, 62, 369, 154, 504, 63],
+          [244, 63, 507, 168, 396, 64],
+          [245, 64, 401, 170, 508, 65],
+          [246, 65, 511, 163, 386, 66],
+          [247, 66, 385, 162, 494, 67],
+          [248, 67, 493, 130, 320, 68],
+          [249, 68, 319, 129, 430, 69],
+          [250, 79, 501, 167, 394, 70],
+          [251, 70, 393, 166, 512, 71],
+          [252, 71, 515, 171, 402, 72],
+          [253, 72, 407, 173, 516, 73],
+          [254, 73, 519, 157, 374, 74],
+          [255, 74, 373, 156, 482, 75],
+          [256, 75, 481, 148, 356, 76],
+          [257, 76, 355, 147, 462, 77],
+          [258, 77, 461, 146, 352, 78],
+          [259, 78, 351, 145, 502, 79],
+          [260, 89, 489, 161, 382, 80],
+          [261, 80, 381, 160, 520, 81],
+          [262, 81, 523, 174, 408, 82],
+          [263, 82, 413, 176, 524, 83],
+          [264, 83, 527, 151, 362, 84],
+          [265, 84, 361, 150, 470, 85],
+          [266, 85, 469, 142, 344, 86],
+          [267, 86, 343, 141, 450, 87],
+          [268, 87, 449, 140, 340, 88],
+          [269, 88, 339, 139, 490, 89],
+          [270, 99, 535, 177, 414, 90],
+          [271, 90, 419, 179, 528, 91],
+          [272, 91, 531, 169, 398, 92],
+          [273, 92, 397, 168, 506, 93],
+          [274, 93, 505, 154, 368, 94],
+          [275, 94, 367, 153, 474, 95],
+          [276, 95, 473, 152, 364, 96],
+          [277, 96, 363, 151, 526, 97],
+          [278, 97, 525, 176, 412, 98],
+          [279, 98, 411, 175, 532, 99],
+          [280, 109, 529, 179, 418, 100],
+          [281, 100, 417, 178, 536, 101],
+          [282, 101, 539, 172, 404, 102],
+          [283, 102, 403, 171, 514, 103],
+          [284, 103, 513, 166, 392, 104],
+          [285, 104, 391, 165, 498, 105],
+          [286, 105, 497, 164, 388, 106],
+          [287, 106, 387, 163, 510, 107],
+          [288, 107, 509, 170, 400, 108],
+          [289, 108, 399, 169, 530, 109],
+          [290, 119, 537, 178, 416, 110],
+          [291, 110, 415, 177, 534, 111],
+          [292, 111, 533, 175, 410, 112],
+          [293, 112, 409, 174, 522, 113],
+          [294, 113, 521, 160, 380, 114],
+          [295, 114, 379, 159, 486, 115],
+          [296, 115, 485, 158, 376, 116],
+          [297, 116, 375, 157, 518, 117],
+          [298, 117, 517, 173, 406, 118],
+          [299, 118, 405, 172, 538, 119]
+        ]
+      };
+      normalize(m);
+      return m;
+    },
   },
 };
 
-export const PlatonicSolids = [
-  "tetrahedron",
-  "cube",
-  "octahedron",
-  "icosahedron",
-  "dodecahedron"
-];
-
-export const ArchimedeanSolids = [
-  "truncatedTetrahedron",
-  "cuboctahedron",
-  "truncatedCube",
-  "truncatedOctahedron",
-  "rhombicuboctahedron",
-  "truncatedCuboctahedron",
-  "snubCube",
-  "icosidodecahedron",
-  "truncatedDodecahedron",
-  "truncatedIcosahedron",
-  "rhombicosidodecahedron",
-  "truncatedIcosidodecahedron",
-  "snubDodecahedron"
-];
-
+export const PlatonicSolids = Object.keys(Solids.PlatonicSolids);
+export const ArchimedeanSolids = Object.keys(Solids.Archimedean);
+export const IslamicStarPatterns = Object.keys(Solids.IslamicStarPatterns);
+export const AllSolids = [...PlatonicSolids, ...ArchimedeanSolids, ...IslamicStarPatterns];

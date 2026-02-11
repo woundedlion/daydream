@@ -866,6 +866,48 @@ export const Plot = {
             }
             Plot.rasterize(pipeline, points, fragmentShaderFn, true, age);
         }
+
+        /**
+         * Calculates a single point on a distorted ring.
+         * @param {Function} shiftFn - Distortion function
+         * @param {Object} basis - Coordinate basis {u, v, w}
+         * @param {number} radius - Radius in radians
+         * @param {number} angle - Angle in radians
+         * @returns {THREE.Vector3} The calculated point
+         */
+        static point(shiftFn, basis, radius, angle) {
+            const res = getAntipode(basis, radius);
+            const { u, v, w } = res.basis;
+            radius = res.radius;
+
+            const thetaEq = radius * (Math.PI / 2);
+            const r = Math.sin(thetaEq);
+            const d = Math.cos(thetaEq);
+
+            // Re-construct basis vector U for this angle (without twist)
+            // But wait, the sample function does:
+            // let uTemp = vectorPool.acquire();
+            // uTemp.copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
+            // where cosRing/sinRing are from t = theta + phase.
+            // Here 'angle' is passed as the 4th arg, effectively 't'.
+
+            const cosRing = Math.cos(angle);
+            const sinRing = Math.sin(angle);
+            const uTemp = vectorPool.acquire().copy(u).multiplyScalar(cosRing).addScaledVector(w, sinRing);
+
+            let shift = shiftFn(angle / (TWO_PI)); // Normalizing assuming 0-2PI cycle
+            // Note: sample uses theta / TWO_PI where theta is 0..2PI. 
+            // Here angle is the absolute angle. 
+            // Thrusters passes 'warpPhase' which seems to be an absolute angle.
+            // ringFn does sinWave..., which expects input. 
+
+            let cosShift = Math.cos(shift);
+            let sinShift = Math.sin(shift);
+            let vScale = d * cosShift - r * sinShift;
+            let uScale = r * cosShift + d * sinShift;
+
+            return vectorPool.acquire().copy(v).multiplyScalar(vScale).addScaledVector(uTemp, uScale).normalize();
+        }
     },
 
     Spiral: class {

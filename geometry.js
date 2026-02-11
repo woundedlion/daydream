@@ -434,6 +434,38 @@ export class HEFace {
   constructor() {
     this.halfEdge = null;
   }
+
+  getVertexCount() {
+    let count = 0;
+    let he = this.halfEdge;
+    if (!he) return 0;
+    const start = he;
+    let safety = 0;
+    do {
+      count++;
+      he = he.next;
+      safety++;
+    } while (he !== start && he && safety < 100);
+    return count;
+  }
+
+  getNeighbors() {
+    const neighbors = [];
+    let he = this.halfEdge;
+    if (!he) return neighbors;
+    const start = he;
+    let safety = 0;
+    do {
+      if (he.pair && he.pair.face) {
+        neighbors.push(he.pair.face);
+      } else {
+        neighbors.push(null); // Boundary or incomplete mesh
+      }
+      he = he.next;
+      safety++;
+    } while (he !== start && he && safety < 100);
+    return neighbors;
+  }
 }
 
 /**
@@ -541,6 +573,38 @@ export class HalfEdgeMesh {
  * Procedural mesh operations.
  */
 export const MeshOps = {
+  /**
+     * Colors faces based on their vertex count and the sorted vertex counts of their neighbors.
+     * Useful for visualizing topological symmetry (e.g., distinguishing face types).
+     * @param {Object} mesh - {vertices, faces}
+     * @returns {Object} { faceColorIndices: Int32Array, uniqueCount: number }
+     */
+  classifyFacesByTopology(mesh) {
+    const faceToIndex = new Map();
+    const heMesh = new HalfEdgeMesh(mesh);
+    heMesh.faces.forEach((f, i) => faceToIndex.set(f, i));
+    const counts = heMesh.faces.map(f => f.getVertexCount());
+
+    const signatureToID = new Map();
+    const faceColorIndices = new Int32Array(heMesh.faces.length);
+    let nextID = 0;
+
+    heMesh.faces.forEach((face, i) => {
+      const myCount = counts[i];
+      const neighbors = face.getNeighbors();
+      const neighborCounts = neighbors.map(n => n ? counts[faceToIndex.get(n)] : 0);
+
+      neighborCounts.sort((a, b) => a - b);
+      const signature = `${myCount}:${neighborCounts.join(',')}`;
+      if (!signatureToID.has(signature)) {
+        signatureToID.set(signature, nextID++);
+      }
+      faceColorIndices[i] = signatureToID.get(signature);
+    });
+
+    return { faceColorIndices, uniqueCount: nextID };
+  },
+
   /**
    * Computes the KDTree and Adjacency Map for a mesh.
    * Stores the result in mesh.kdTree.

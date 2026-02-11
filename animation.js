@@ -1157,7 +1157,7 @@ class MeshMorph extends Base {
    */
   init() {
     // Resolve Dest
-    let destSolid = Solids[this.params.target]();
+    let destSolid = Solids.get(this.params.target);
     if (this.params.dual) destSolid = MeshOps.dual(destSolid);
 
     // Hankin
