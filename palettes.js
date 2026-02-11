@@ -190,5 +190,29 @@ export const Palettes = {
         [0.500, 0.500, 0.500], // B
         [0.364, 0.124, 0.528], // C
         [0.142, 0.378, 0.876]  // D
-    )
+    ),
+
+    /** @type {ProceduralPalette} A Bright green to dark purple palette. */
+    bruisedMoss: new ProceduralPalette(
+        [0.500, 0.500, 0.500], // A
+        [0.500, 0.500, 0.500], // B
+        [0.142, 0.252, 0.000], // C
+        [0.492, 0.200, 0.670]  // D
+    ),
+
+    /** @type {ProceduralPalette} A Bright yellow to dark purple palette. */
+    bruisedBanana: new ProceduralPalette(
+        [0.620, 0.620, 0.620], // A
+        [0.742, 0.742, 0.742], // B
+        [0.162, 0.286, 0.012], // C
+        [0.235, 0.205, 0.688]  // D
+    ),
+
+    /** @type {ProceduralPalette} A Bright yellow to pink palette. */
+    brightSunrise: new ProceduralPalette(
+        [0.620, 0.620, 0.620], // A
+        [0.742, 0.742, 0.742], // B
+        [0.162, 0.286, 0.012], // C
+        [0.090, 0.205, 0.688]  // D
+    ),
 };
