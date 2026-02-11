@@ -29,19 +29,28 @@ export class IslamicStars {
         this.orientation = new Orientation();
         this.pipeline = createRenderPipeline(new Filter.Screen.AntiAlias());
         this.timeline = new Timeline();
-        this.timeline
-            .add(0, new Animation.RandomWalk(this.orientation, Daydream.UP))
-            .add(0, new Animation.Sprite((opacity) => this.draw(), -1, 4, easeMid, 0, easeMid));
+        this.timeline.add(0, new Animation.RandomWalk(this.orientation, Daydream.UP));
 
         this.transformedVertices = [];
         this.solidsList = IslamicStarPatterns;
+        this.shapeIndex = 0;
 
         this.setupGUI();
+        this.nextShape();
     }
 
     setupGUI() {
         this.gui = new gui.GUI({ autoPlace: false });
-        this.gui.add(this.params, 'solid', this.solidsList).name("Solid");
+        this.gui.add(this.params, 'solid', this.solidsList).name("Solid").onChange((value) => {
+            const index = this.solidsList.indexOf(value);
+            if (index >= 0) {
+                this.shapeIndex = index;
+                if (this.nextShapeTimer) {
+                    this.nextShapeTimer.cancel();
+                }
+                this.spawnShape(value);
+            }
+        });
         this.gui.add(this.params, 'opacity', 0.1, 1.0).name("Opacity");
         this.gui.add(this.params, 'debugBB').name("Debug BB");
     }
@@ -50,28 +59,51 @@ export class IslamicStars {
         this.timeline.step();
     }
 
-    draw() {
-        const solidName = this.params.solid;
-        if (!Solids.get(solidName)) return;
+    nextShape() {
+        const solidName = this.solidsList[this.shapeIndex];
+        this.shapeIndex = (this.shapeIndex + 1) % this.solidsList.length;
+        this.spawnShape(solidName);
+    }
 
-        // Cache the solid mesh to avoid reconstruction every frame if it hasn't changed
-        if (!this.cachedSolid || this.cachedSolidName !== solidName) {
-            this.cachedSolid = Solids.get(solidName);
-            this.cachedSolidName = solidName;
+    spawnShape(solidName) {
+        const duration = 96;
+        const fade = 32;
+        const overlap = fade;
+        const nextDelay = duration - overlap;
 
-            // Analyze Topology
-            const { faceColorIndices } = MeshOps.classifyFacesByTopology(this.cachedSolid);
-            this.faceTopologyIndices = faceColorIndices;
+        const mesh = Solids.get(solidName);
+        if (!mesh) {
+            // Fallback or skip if solid load failed
+            this.timeline.add(1, new Animation.PeriodicTimer(0, () => this.nextShape(), false));
+            return;
         }
 
-        const mesh = this.cachedSolid;
-        if (!mesh || mesh.vertices.length === 0) return;
+        // Pre-calculate topology for this specific mesh instance
+        const { faceColorIndices } = MeshOps.classifyFacesByTopology(mesh);
 
+        // Ensure vertex buffer capacity
         while (this.transformedVertices.length < mesh.vertices.length) {
             this.transformedVertices.push(new THREE.Vector3());
         }
 
+        // The sprite's draw callback closes over the mesh and topology indices
+        const sprite = new Animation.Sprite(
+            (opacity) => this.drawMesh(mesh, opacity, faceColorIndices),
+            duration,
+            fade, easeMid,
+            fade, easeMid
+        );
+
+        this.timeline.add(0, sprite);
+
+        // Schedule next shape
+        this.nextShapeTimer = new Animation.PeriodicTimer(0, () => this.nextShape(), false);
+        this.timeline.add(nextDelay, this.nextShapeTimer);
+    }
+
+    drawMesh(mesh, spriteOpacity, faceTopologyIndices) {
         const count = mesh.vertices.length;
+
         for (let i = 0; i < count; i++) {
             this.transformedVertices[i].copy(this.orientation.orient(mesh.vertices[i]));
         }
@@ -83,14 +115,15 @@ export class IslamicStars {
 
         const scanShader = (p, frag) => {
             const i = Math.round(frag.v2);
-            const topologyIndex = this.faceTopologyIndices[i] || 0;
+            const topologyIndex = faceTopologyIndices[i] || 0;
 
             let palette;
-            switch (topologyIndex % 4) {
+            switch (topologyIndex % 5) {
                 case 0: palette = Palettes.embers; break;
                 case 1: palette = Palettes.richSunset; break;
-                case 2: palette = Palettes.emeraldForest; break;
-                case 3: palette = Palettes.lavenderLake; break;
+                case 2: palette = Palettes.brightSunrise; break;
+                case 3: palette = Palettes.bruisedMoss; break;
+                case 4: palette = Palettes.lavenderLake; break;
                 default: palette = Palettes.embers;
             }
 
@@ -99,7 +132,7 @@ export class IslamicStars {
 
             const intensity = Math.min(1, Math.max(0, (distFromEdge / size)));
             const res = palette.get(intensity);
-            res.alpha *= this.params.opacity;
+            res.alpha *= this.params.opacity * spriteOpacity;
             frag.color = res;
         };
 
