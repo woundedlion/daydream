@@ -20,6 +20,7 @@ export class IslamicStars {
     constructor() {
         this.params = {
             solid: IslamicStarPatterns[0],
+            run: true,
             plot: true,
             scan: true,
             opacity: 1.0,
@@ -33,7 +34,7 @@ export class IslamicStars {
 
         this.transformedVertices = [];
         this.solidsList = IslamicStarPatterns;
-        this.shapeIndex = 0;
+        this.shapeIndex = -1;
 
         this.setupGUI();
         this.nextShape();
@@ -41,7 +42,7 @@ export class IslamicStars {
 
     setupGUI() {
         this.gui = new gui.GUI({ autoPlace: false });
-        this.gui.add(this.params, 'solid', this.solidsList).name("Solid").onChange((value) => {
+        this.gui.add(this.params, 'solid', this.solidsList).name("Solid").listen().onChange((value) => {
             const index = this.solidsList.indexOf(value);
             if (index >= 0) {
                 this.shapeIndex = index;
@@ -51,6 +52,7 @@ export class IslamicStars {
                 this.spawnShape(value);
             }
         });
+        this.gui.add(this.params, 'run').name("Run");
         this.gui.add(this.params, 'opacity', 0.1, 1.0).name("Opacity");
         this.gui.add(this.params, 'debugBB').name("Debug BB");
     }
@@ -60,8 +62,13 @@ export class IslamicStars {
     }
 
     nextShape() {
+        if (this.params.run) {
+            this.shapeIndex = (this.shapeIndex + 1) % this.solidsList.length;
+        }
+        if (this.shapeIndex < 0) this.shapeIndex = 0;
+
         const solidName = this.solidsList[this.shapeIndex];
-        this.shapeIndex = (this.shapeIndex + 1) % this.solidsList.length;
+        this.params.solid = solidName;
         this.spawnShape(solidName);
     }
 
