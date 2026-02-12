@@ -83,8 +83,8 @@
             grid-auto-flow: column;
             align-items: center;
             overflow-x: auto;
-            padding: calc((100vw - 474px) * 0.008);
-            gap: calc((100vw - 474px) * 0.008);
+            padding: 0.5rem;
+            gap: 0.5rem;
             backdrop-filter: blur(10px);
             box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
             z-index: 10;
@@ -113,7 +113,8 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-width: calc((100vw - 474px) * 0.09);
+            width: calc((100vw - 474px) * 0.09);
+            height: calc((100vw - 474px) * 0.09);
             height: 100%;
             background-color: var(--slate-800);
             border: 2px solid var(--slate-700);
@@ -882,9 +883,19 @@
                     </div>
                     <div class="details uppercase opacity-70">${item.desc}</div>
                     <div class="saved-actions" onclick="event.stopPropagation()">
-                        <button class="action-btn" onclick="copyCode(${index}, 'js', this)">JS</button>
-                        <button class="action-btn" onclick="copyCode(${index}, 'cpp', this)">C++</button>
-                        <button class="action-btn del-btn" onclick="deleteSolid(${index})">&times;</button>
+                        <div class="flex flex-col gap-1">
+                            <div class="flex gap-1 justify-end">
+                                <span class="text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1">Raw</span>
+                                <button class="action-btn" onclick="copyCode(${index}, 'js', this)">JS</button>
+                                <button class="action-btn" onclick="copyCode(${index}, 'cpp', this)">C++</button>
+                            </div>
+                            <div class="flex gap-1 justify-end">
+                                <span class="text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1">Recipe</span>
+                                <button class="action-btn" onclick="copyCode(${index}, 'recipe_js', this)">JS</button>
+                                <button class="action-btn" onclick="copyCode(${index}, 'recipe_cpp', this)">C++</button>
+                            </div>
+                        </div>
+                        <button class="action-btn del-btn self-start ml-1" onclick="deleteSolid(${index})">&times;</button>
                     </div>
                 `;
                 el.onclick = () => restoreSolid(item);
@@ -916,10 +927,34 @@
             });
 
             let code = '';
-            if (lang === 'cpp') {
-                code = generateCPlusPlus(mesh, item);
+
+            if (lang === 'recipe_js') {
+                code = generateRecipeJS(item);
+            } else if (lang === 'recipe_cpp') {
+                code = generateRecipeCpp(item);
             } else {
-                code = generateJavascript(mesh, item);
+                // Raw Mesh Export
+                // Reconstruct mesh to generate code
+                let mesh = Solids.get(item.base);
+                mesh = MeshOps.clone(mesh);
+
+                // Re-run pipeline with params
+                item.ops.forEach(o => {
+                    const opName = typeof o === 'string' ? o : o.op; // helper for legacy
+                    if (opName === 'truncate') {
+                        mesh = MeshOps.truncate(mesh, o.params.t);
+                    } else if (opName === 'hankin') {
+                        mesh = MeshOps.hankin(mesh, o.params.angle * (Math.PI / 180));
+                    } else if (MeshOps[opName]) {
+                        mesh = MeshOps[opName](mesh);
+                    }
+                });
+
+                if (lang === 'cpp') {
+                    code = generateCPlusPlus(mesh, item);
+                } else {
+                    code = generateJavascript(mesh, item);
+                }
             }
 
             navigator.clipboard.writeText(code).then(() => {
@@ -970,6 +1005,73 @@
             s += '  };\n';
             s += '};\n';
             return s;
+        }
+
+        function generateRecipeJS(item) {
+            // Find base category access string
+            let baseAccess = `Solids.get('${item.base}')`; // Fallback
+            if (Solids.PlatonicSolids && Solids.PlatonicSolids[item.base]) baseAccess = `Solids.PlatonicSolids.${item.base}()`;
+            else if (Solids.Archimedean && Solids.Archimedean[item.base]) baseAccess = `Solids.Archimedean.${item.base}()`;
+            else if (Solids.IslamicStarPatterns && Solids.IslamicStarPatterns[item.base]) baseAccess = `Solids.IslamicStarPatterns.${item.base}()`;
+
+            let s = baseAccess;
+            let name = item.base;
+
+            item.ops.forEach(o => {
+                const opName = typeof o === 'string' ? o : o.op;
+                let params = '';
+                let nameSuffix = `_${opName}`;
+
+                if (opName === 'truncate' || opName === 'expand' || opName === 'bitruncate') {
+                    params = `, ${o.params.t}`;
+                    // Format parameter for name: 0.33 -> 033, 0.5 -> 05
+                    const tStr = o.params.t.toString().replace('.', '');
+                    nameSuffix += tStr;
+                } else if (opName === 'hankin') {
+                    // Format angle for name: 59 -> hk59
+                    const angle = Math.round(o.params.angle);
+                    params = `, ${angle} * (Math.PI / 180)`;
+                    nameSuffix = `_hk${angle}`;
+                } else if (opName === 'canonicalize') {
+                    params = `, ${o.params.iter}`;
+                    nameSuffix = `_can`;
+                }
+
+                s = `MeshOps.${opName}(${s}${params})`;
+                name += nameSuffix;
+            });
+
+            // Clean up name
+            name = name.replace(/\./g, '');
+
+            return `${name}: () => ${s},`;
+        }
+
+        function generateRecipeCpp(item) {
+            // C++ Style: MeshOps::Op(MeshOps::Op(...))
+            let s = `Solids::${capitalize(item.base)}()`;
+
+            item.ops.forEach(o => {
+                const opName = typeof o === 'string' ? o : o.op;
+                const CapOp = capitalize(opName);
+
+                let params = '';
+                if (opName === 'truncate' || opName === 'expand' || opName === 'bitruncate') {
+                    params = `, ${o.params.t}f`;
+                } else if (opName === 'hankin') {
+                    params = `, ${o.params.angle}f * DEG2RAD`;
+                } else if (opName === 'canonicalize') {
+                    params = `, ${o.params.iter}`;
+                }
+
+                s = `MeshOps::${CapOp}(${s}${params})`;
+            });
+
+            return `Mesh ${item.title.replace(/\s+/g, '')}() { return ${s}; }`;
+        }
+
+        function capitalize(s) {
+            return s.charAt(0).toUpperCase() + s.slice(1);
         }
 
         function generateJavascript(m, item) {
