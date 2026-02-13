@@ -43,7 +43,8 @@ export class TestTemporal {
             'Diagonal Spiral': { delayBase: 12, delayAmp: 6, xSpirals: 2.0, yFreq: 0.3 },
             'Liquid Time': { delayBase: 12, delayAmp: 25, noiseFreq: 0.015, timeScale: 1.0, rippleFreq: 0.06 },
             'Quantum Tunnel': { delayBase: 5, delayAmp: 20, spiralTightness: 10.0, spiralAngle: 5.0 },
-            'Datamosh': { delayBase: 20, delayAmp: 15, flowSpeed: 0.05, glitchScale: 25.0 }
+            'Datamosh': { delayBase: 20, delayAmp: 15, flowSpeed: 0.05, glitchScale: 25.0 },
+            'Noise Warp': { delayBase: 10, delayAmp: 10, noiseFreq: 0.125 }
         };
 
         this.modeDefaults = {
@@ -51,7 +52,8 @@ export class TestTemporal {
             'Diagonal Spiral': { windowSize: 3.0, speed: 0.01 },
             'Liquid Time': { windowSize: 6.0, speed: 0.02 },
             'Quantum Tunnel': { windowSize: 4.0, speed: 0.03 },
-            'Datamosh': { windowSize: 12.0, speed: 0.0 }
+            'Datamosh': { windowSize: 12.0, speed: 0.0 },
+            'Noise Warp': { windowSize: 4.0, speed: 0.02 }
         };
 
         this.t = 0;
@@ -67,13 +69,13 @@ export class TestTemporal {
             'Diagonal Spiral': this.delayDiagonalSpiral.bind(this),
             'Liquid Time': this.delayLiquidTime.bind(this),
             'Quantum Tunnel': this.delayQuantumTunnel.bind(this),
-            'Datamosh': this.delayDatamosh.bind(this)
+            'Datamosh': this.delayDatamosh.bind(this),
+            'Noise Warp': this.delayNoiseWarp.bind(this)
         };
         this.currentDelayMode = 'Diagonal Spiral';
 
-        this.filterTemporal = new Filter.Screen.Temporal(this.delayModes[this.currentDelayMode], this.params.Global.windowSize, 200);
-
         this.filterOrient = new Filter.World.Orient(this.orientation);
+        this.filterTemporal = new Filter.Screen.Temporal(this.delayModes[this.currentDelayMode], this.params.Global.windowSize, 200);
         this.filterAA = new Filter.Screen.AntiAlias();
 
         this.filters = createRenderPipeline(
@@ -169,8 +171,13 @@ export class TestTemporal {
         return Math.max(0, ep.delayBase + Math.abs(total) % ep.delayAmp);
     }
 
-    updateBlur() {
-        this.filterBlur.update(this.blurEnabled ? this.blurStrength : 0);
+    delayNoiseWarp(x, y) {
+        const p = this.params.Global;
+        if (!p.temporalEnabled) return 0;
+        const ep = this.params['Noise Warp'];
+
+        const noiseVal = this.noise.GetNoise(x, y, this.t * p.speed * 50.0); // increased speed multiplier for visible modulation
+        return Math.max(0, ep.delayBase + (noiseVal * 0.5 + 0.5) * ep.delayAmp);
     }
 
     setupGui() {
@@ -196,6 +203,11 @@ export class TestTemporal {
                 if (defs) {
                     if (defs.windowSize !== undefined) this.globalCtrls.windowSize.setValue(defs.windowSize);
                     if (defs.speed !== undefined) this.globalCtrls.speed.setValue(defs.speed);
+                }
+
+                // Update Noise Freq if present
+                if (this.params[v] && this.params[v].noiseFreq !== undefined) {
+                    this.noise.SetFrequency(this.params[v].noiseFreq);
                 }
             });
 
