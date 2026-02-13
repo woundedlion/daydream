@@ -1169,7 +1169,9 @@ export const MeshOps = {
    */
   expand(mesh, t = 2.0 - Math.sqrt(2.0)) {
     const newVerts = [];
-    const newFaces = [];
+    const insetFaces = [];
+    const edgeFaces = [];
+    const vertexFaces = [];
 
     // Helper: Map (faceIdx, vertIdxInFace) -> newVertexIdx
     const faceVertsMap = [];
@@ -1189,7 +1191,7 @@ export const MeshOps = {
         fIndices.push(newVerts.length - 1);
       });
       faceVertsMap[fi] = fIndices;
-      newFaces.push(fIndices);
+      insetFaces.push(fIndices);
     });
 
     // 2. Edge Faces (Quads)
@@ -1229,7 +1231,7 @@ export const MeshOps = {
 
       // Create Quad: A_v -> A_u -> B_u -> B_v
       // Reversing winding order to ensuring outward normals
-      newFaces.push([A_v_idx, A_u_idx, B_u_idx, B_v_idx]);
+      edgeFaces.push([A_v_idx, A_u_idx, B_u_idx, B_v_idx]);
     }
 
     // 3. Vertex Faces
@@ -1282,8 +1284,11 @@ export const MeshOps = {
         safety++;
       } while (currFace !== startFace && safety < 20);
 
-      newFaces.push(orderedIndices);
+      vertexFaces.push(orderedIndices);
     });
+
+    // Collect faces in order: Inset (Originals), Vertex (Corners), Edge (Connectors)
+    const newFaces = [...insetFaces, ...vertexFaces, ...edgeFaces];
 
     this.normalize({ vertices: newVerts, faces: newFaces });
     return { vertices: newVerts, faces: newFaces };
