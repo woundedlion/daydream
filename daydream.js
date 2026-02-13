@@ -4,6 +4,7 @@
  */
 
 
+import createHolosphereModule from "./holosphere_wasm.js";
 import { Daydream } from "./driver.js";
 import { GUI, resetGUI } from "gui";
 import * as allEffects from "./effects/index.js";
@@ -16,6 +17,7 @@ const HiResFavorites = [
   "BZReactionDiffusion",
   "Comets",
   "DreamBalls",
+  "FlamingMesh",
   "FlowField",
   "GnomonicStars",
   "GSReactionDiffusion",
@@ -61,11 +63,35 @@ const LoResFavorites = [
   "Voronoi",
 ];
 
+let wasmModule = null;
+let wasmEngine = null;
+let wasmMemoryView = null;
+
+// Initialize Wasm
+createHolosphereModule().then(module => {
+  wasmModule = module;
+  wasmEngine = new module.HolosphereEngine();
+
+  // Sync resolution from controls
+  const p = resolutionPresets[controls.resolution];
+  if (p) {
+    wasmEngine.setResolution(p.w, p.h);
+  }
+
+  // Set initial effect matching URL or default
+  if (controls.effect) {
+    wasmEngine.setEffect(controls.effect);
+  }
+
+  console.log("Wasm Engine Loaded");
+});
+
 
 const urlParams = new URLSearchParams(window.location.search);
 const initialEffect = urlParams.get('effect');
 
 const initialResolution = urlParams.get('resolution');
+const initialWasm = urlParams.get('wasm') === 'true';
 
 // Default to Holosphere
 const resolutionPresets = {
@@ -87,10 +113,14 @@ const controls = {
   effect: (initialEffect && allEffects[initialEffect]) ? initialEffect : 'PetalFlow',
   resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Holosphere (20x96)",
   testAll: false,
+  useWasm: initialWasm,
 
   setResolution: function (preserveParams = false) {
     const p = resolutionPresets[this.resolution];
     if (p) {
+      if (wasmEngine) {
+        wasmEngine.setResolution(p.w, p.h);
+      }
       // Update available effects based on resolution
       const availableEffects = effectsByResolution[this.resolution] || Object.keys(allEffects);
 
@@ -103,6 +133,7 @@ const controls = {
       const newUrl = new URL(window.location);
       newUrl.searchParams.set('effect', this.effect);
       newUrl.searchParams.set('resolution', this.resolution);
+      newUrl.searchParams.set('wasm', this.useWasm);
       window.history.replaceState({}, '', newUrl);
 
       daydream.updateResolution(p.h, p.w, p.size);
@@ -142,10 +173,14 @@ const controls = {
     // Update URL
     const newUrl = new URL(window.location);
     newUrl.searchParams.set('effect', this.effect);
+    newUrl.searchParams.set('wasm', this.useWasm);
     window.history.replaceState({}, '', newUrl);
 
 
     activeEffect = new EffectClass();
+    if (this.useWasm && wasmEngine) {
+      wasmEngine.setEffect(this.effect);
+    }
     if (activeEffect && activeEffect.gui && window.innerWidth < 900) {
       activeEffect.gui.close();
     }
@@ -191,6 +226,17 @@ document.getElementById('gui-container').appendChild(guiInstance.domElement);
 guiInstance.add(controls, 'resolution', Object.keys(resolutionPresets))
   .name('Resolution')
   .onChange(() => controls.setResolution());
+
+guiInstance.add(controls, 'useWasm')
+  .name('Use WASM')
+  .onChange((v) => {
+    if (v && wasmEngine) {
+      wasmEngine.setEffect(controls.effect);
+    }
+    const newUrl = new URL(window.location);
+    newUrl.searchParams.set('wasm', v);
+    window.history.replaceState({}, '', newUrl);
+  });
 
 function populateEffectSidebar(options) {
   const sidebar = document.getElementById('effect-sidebar');
@@ -273,7 +319,30 @@ window.addEventListener("keydown", (e) => daydream.keydown(e));
 
 
 daydream.renderer.setAnimationLoop(() => {
-  if (activeEffect) {
+  if (controls.useWasm && wasmEngine) {
+    const wasmWrapper = {
+      drawFrame: () => {
+        // 1. Explicitly clear JS buffer to prevent inter-frame persistence
+        // (This addresses the user request for a clean buffer)
+        Daydream.pixels.fill(0);
+
+        // 2. Step the C++ engine
+        wasmEngine.drawFrame();
+
+        // 3. Extract and convert pixels
+        const wasmPixels = wasmEngine.getPixels();
+        for (let i = 0; i < wasmPixels.length; i++) {
+          Daydream.pixels[i] = wasmPixels[i] / 255.0;
+        }
+
+        // Diagnostic: If you still see a black screen, check the console for this:
+        // console.log("WASM Frame Max Pixel:", Math.max(...wasmPixels));
+      }
+    };
+    daydream.render(wasmWrapper);
+  }
+  else if (activeEffect) {
+    // Existing JS Logic
     daydream.render(activeEffect);
   }
 });

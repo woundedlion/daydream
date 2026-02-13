@@ -4,7 +4,9 @@
  */
 
 export { BZReactionDiffusion } from "./BZReactionDiffusion.js";
+export { BasicEffect } from "./BasicEffect.js";
 export { Comets } from "./Comets.js";
+export { FlamingMesh } from "./FlamingMesh.js";
 export { DreamBalls } from "./DreamBalls.js";
 export { Dynamo } from "./Dynamo.js";
 export { FlowField } from "./FlowField.js";

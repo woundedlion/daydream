@@ -260,7 +260,9 @@ export class Daydream {
         Daydream.pixels.fill(0);
 
         const start = performance.now();
-        effect.drawFrame();
+        if (effect) {
+          effect.drawFrame();
+        }
         const duration = performance.now() - start;
         const stats = document.getElementById("perf-stats");
         if (stats) stats.innerText = `${duration.toFixed(3)} ms`;
@@ -283,7 +285,7 @@ export class Daydream {
           labels.push({ "position": Daydream.Z_AXIS.clone().negate(), "content": "-Z" });
         }
 
-        if (typeof effect.getLabels === 'function') {
+        if (effect && typeof effect.getLabels === 'function') {
           labels.push(...effect.getLabels());
         }
 
