@@ -144,14 +144,6 @@ export class MindSplatter {
     }
 
     drawParticles(opacity) {
-        const fragmentShader = (v, frag) => {
-            const alpha = Math.min(frag.v0, frag.v3);
-            const particle = this.particleSystem.particles[Math.floor(frag.v2)];
-            const c = particle.palette.get(frag.v0);
-            c.alpha *= alpha * opacity;
-            frag.color = c;
-        }
-
         const vertexShader = (frag) => {
             let holeAlpha = 1.0;
             const point = frag.pos;
@@ -165,6 +157,14 @@ export class MindSplatter {
             mobiusTransform(frag.pos, this.mobius, frag.pos);
             this.orientation.orient(frag.pos, undefined, frag.pos);
             frag.v3 *= holeAlpha;
+        }
+
+        const fragmentShader = (v, frag) => {
+            const alpha = Math.min(frag.v0, frag.v3);
+            const particle = this.particleSystem.particles[Math.floor(frag.v2)];
+            const c = particle.palette.get(frag.v0);
+            c.alpha *= alpha * opacity;
+            frag.color = c;
         }
 
         Plot.ParticleSystem.draw(
