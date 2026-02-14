@@ -9,7 +9,7 @@ import { Daydream } from "./driver.js";
 import { GUI, resetGUI } from "gui";
 import * as allEffects from "./effects/index.js";
 
-import { BufferGeometry, AddEquation, MaxEquation } from "three";
+import { BufferGeometry, AddEquation, MaxEquation, Color } from "three";
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -331,8 +331,24 @@ daydream.renderer.setAnimationLoop(() => {
 
         // 3. Extract and convert pixels
         const wasmPixels = wasmEngine.getPixels();
-        for (let i = 0; i < wasmPixels.length; i++) {
-          Daydream.pixels[i] = wasmPixels[i] / 255.0;
+        const tempColor = new Color();
+
+        for (let i = 0; i < wasmPixels.length; i += 3) {
+          // Normalize 0-255 -> 0.0-1.0
+          const r = wasmPixels[i] / 255.0;
+          const g = wasmPixels[i + 1] / 255.0;
+          const b = wasmPixels[i + 2] / 255.0;
+
+          // Load sRGB values into Color container
+          tempColor.setRGB(r, g, b);
+
+          // Decode sRGB -> Linear
+          tempColor.convertSRGBToLinear();
+
+          // Store Linear values
+          Daydream.pixels[i] = tempColor.r;
+          Daydream.pixels[i + 1] = tempColor.g;
+          Daydream.pixels[i + 2] = tempColor.b;
         }
 
         // Diagnostic: If you still see a black screen, check the console for this:
