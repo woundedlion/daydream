@@ -198,14 +198,15 @@ export class DreamBalls {
 
     drawScene(params, opacity, baseMesh, targetMesh, tangents, mobiusParams) {
         const scratch = vectorPool.acquire();
-        const transform = (frag) => {
+
+        const vertexShader = (frag) => {
             mobiusTransform(frag.pos, mobiusParams, scratch);
             this.globalOrientation.orient(scratch, undefined, frag.pos);
         };
+
         const palette = params.palette;
-        const fargmentShader = (v, frag) => {
-            const val = (frag.v0 !== undefined) ? frag.v0 : frag;
-            const c = palette.get(val);
+        const fragmentShader = (v, frag) => {
+            const c = palette.get(frag.v0);
             c.alpha *= params.alpha * opacity;
             frag.color = c;
         };
@@ -213,7 +214,7 @@ export class DreamBalls {
         for (let i = 0; i < params.numCopies; i++) {
             const offset = (i / params.numCopies) * TWO_PI;
             this.updateDisplacedMesh(baseMesh, targetMesh, tangents, params, offset);
-            Plot.Mesh.draw(this.filters, targetMesh, fargmentShader, 0, transform);
+            Plot.Mesh.draw(this.filters, targetMesh, fragmentShader, 0, vertexShader);
         }
     }
 
