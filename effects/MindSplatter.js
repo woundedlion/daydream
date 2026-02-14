@@ -135,8 +135,7 @@ export class MindSplatter {
                 const currentHue = this.emitterHues[i];
                 this.emitterHues[i] = (this.emitterHues[i] + G * 0.1) % 1;
 
-                const palette = new AlphaFalloffPalette((t) => t,
-                    new GenerativePalette('straight', 'complementary', 'flat', 'mid', currentHue));
+                const palette = new GenerativePalette('straight', 'complementary', 'flat', 'mid', currentHue);
                 const life = 160;
                 this.particleSystem.spawn(axis, vel, palette, life);
             });
