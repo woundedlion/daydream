@@ -320,40 +320,46 @@ window.addEventListener("keydown", (e) => daydream.keydown(e));
 
 daydream.renderer.setAnimationLoop(() => {
   if (controls.useWasm && wasmEngine) {
-    daydream.renderer.outputColorSpace = LinearSRGBColorSpace;
+    daydream.renderer.outputColorSpace = SRGBColorSpace;
     const wasmWrapper = {
       drawFrame: () => {
         // 1. Explicitly clear JS buffer to prevent inter-frame persistence
-        // (This addresses the user request for a clean buffer)
         Daydream.pixels.fill(0);
 
         // 2. Step the C++ engine
         wasmEngine.drawFrame();
 
         // 3. Extract and convert pixels
+        // getPixels() returns a Uint16Array view of the Linear 16-bit buffer
         const wasmPixels = wasmEngine.getPixels();
         const tempColor = new Color();
 
         for (let i = 0; i < wasmPixels.length; i += 3) {
-          // Normalize 0-255 -> 0.0-1.0
-          const r = wasmPixels[i] / 255.0;
-          const g = wasmPixels[i + 1] / 255.0;
-          const b = wasmPixels[i + 2] / 255.0;
+          // Flatten 16-bit Linear (0-65535) -> Float Linear (0.0-1.0)
+          const r = wasmPixels[i] / 65535.0;
+          const g = wasmPixels[i + 1] / 65535.0;
+          const b = wasmPixels[i + 2] / 65535.0;
 
-          // Load sRGB values into Color container
+          // setRGB takes Linear floats by default
           tempColor.setRGB(r, g, b);
 
-          // Skip decoding sRGB -> Linear for WASM (output is already sRGB, handled by LinearSRGBColorSpace output)
-          // tempColor.convertSRGBToLinear();
-
-          // Store Linear values (actually sRGB values now, but treated as Linear by renderer)
+          // Store Linear values in Float32Array (Three.js will handle tonemapping via outputColorSpace)
           Daydream.pixels[i] = tempColor.r;
           Daydream.pixels[i + 1] = tempColor.g;
           Daydream.pixels[i + 2] = tempColor.b;
         }
 
-        // Diagnostic: If you still see a black screen, check the console for this:
-        // console.log("WASM Frame Max Pixel:", Math.max(...wasmPixels));
+        // Diagnostic: Check if we are receiving data
+        if (Math.random() < 0.01) { // Log occasionally (1% of frames)
+          let maxVal = 0;
+          for (let k = 0; k < wasmPixels.length; k++) if (wasmPixels[k] > maxVal) maxVal = wasmPixels[k];
+          console.log("WASM Stats:", {
+            length: wasmPixels.length,
+            max: maxVal,
+            firstPx: [wasmPixels[0], wasmPixels[1], wasmPixels[2]],
+            midPx: [wasmPixels[Math.floor(wasmPixels.length / 2)], wasmPixels[Math.floor(wasmPixels.length / 2) + 1], wasmPixels[Math.floor(wasmPixels.length / 2) + 2]]
+          });
+        }
       }
     };
     daydream.render(wasmWrapper);
