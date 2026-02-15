@@ -348,25 +348,12 @@ daydream.renderer.setAnimationLoop(() => {
           Daydream.pixels[i + 1] = tempColor.g;
           Daydream.pixels[i + 2] = tempColor.b;
         }
-
-        // Diagnostic: Check if we are receiving data
-        if (Math.random() < 0.01) { // Log occasionally (1% of frames)
-          let maxVal = 0;
-          for (let k = 0; k < wasmPixels.length; k++) if (wasmPixels[k] > maxVal) maxVal = wasmPixels[k];
-          console.log("WASM Stats:", {
-            length: wasmPixels.length,
-            max: maxVal,
-            firstPx: [wasmPixels[0], wasmPixels[1], wasmPixels[2]],
-            midPx: [wasmPixels[Math.floor(wasmPixels.length / 2)], wasmPixels[Math.floor(wasmPixels.length / 2) + 1], wasmPixels[Math.floor(wasmPixels.length / 2) + 2]]
-          });
-        }
       }
     };
     daydream.render(wasmWrapper);
   }
   else if (activeEffect) {
     daydream.renderer.outputColorSpace = SRGBColorSpace;
-    // Existing JS Logic
     daydream.render(activeEffect);
   }
 });
