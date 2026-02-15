@@ -15,6 +15,8 @@ import {
 } from "../palettes.js";
 import { gui } from "../gui.js";
 
+import FastNoiseLite from "../FastNoiseLite.js";
+
 /**
  * Metaballs Effect (V5: Smooth Orbital Physics)
  * * Uses a central gravity force for smooth, "soft" containment
@@ -26,11 +28,20 @@ export class MetaballEffect {
         this.t = 0;
 
         // --- Tunable Knobs ---
+
         this.maxInfluence = 10.0;
-        this.gravity = 0.005;
-        this.numBalls = 16;
+        this.gravity = 0.003;
+        this.numBalls = 25;
         this.radiusScale = 1.0;
-        this.velocityScale = 1.0;
+        this.velocityScale = 0.7;
+
+        // Noise params
+        this.noiseStrength = 0.0077;
+        this.noiseSpeed = 4.0;
+
+        this.noise = new FastNoiseLite();
+        this.noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+        this.noise.SetSeed(Math.random() * 10000);
 
         this.balls = [];
 
@@ -40,6 +51,8 @@ export class MetaballEffect {
         this.gui.add(this, 'numBalls', 1, 50).step(1).name('Ball Count').onChange(() => this.initBalls());
         this.gui.add(this, 'radiusScale', 0.1, 3.0).name('Size Scale').onChange(() => this.initBalls());
         this.gui.add(this, 'velocityScale', 0.1, 5.0).name('Speed Scale').onChange(() => this.initBalls());
+        this.gui.add(this, 'noiseStrength', 0.0, 0.01).name('Noise Power');
+        this.gui.add(this, 'noiseSpeed', 0.0, 100.0).name('Noise Speed');
 
         this.initBalls();
     }
@@ -66,13 +79,24 @@ export class MetaballEffect {
     }
 
     drawFrame() {
-        this.t++;
+        this.t += 0.01;
 
         // 1. Animate the balls
-        // 1. Animate the balls
-        for (const ball of this.balls) {
+        for (let i = 0; i < this.balls.length; i++) {
+            const ball = this.balls[i];
+
+            // Gravity
             const F = vectorPool.acquire().copy(ball.p).multiplyScalar(-this.gravity);
-            ball.v.add(F);
+
+            // Noise
+            // Use ball index to offset noise so they don't all move the same way
+            const nx = this.noise.GetNoise(this.t * this.noiseSpeed, i * 10.0, 0.0);
+            const ny = this.noise.GetNoise(this.t * this.noiseSpeed, i * 10.0, 100.0);
+            const nz = this.noise.GetNoise(this.t * this.noiseSpeed, i * 10.0, 200.0);
+
+            const noiseForce = vectorPool.acquire().set(nx, ny, nz).multiplyScalar(this.noiseStrength);
+
+            ball.v.add(F).add(noiseForce);
             ball.p.add(ball.v);
         }
 
@@ -100,8 +124,6 @@ export class MetaballEffect {
                 // 5. Get the color and plot the dot
                 const color = this.palette.get(palette_t); //
 
-                // Write directly to global buffer
-                // TODO: Optimization - precalc index
                 // Write directly to global buffer
                 // TODO: Optimization - precalc index
                 let index = (y * Daydream.W + x) * 3;
