@@ -633,7 +633,7 @@ export class FilterScreenTemporal {
    * @param {number} maxDelay - Maximum supported delay in frames (e.g. 300)
    * @param {number} capacity - Maximum number of active particles (e.g. 1,000,000)
    */
-  constructor(ttlFn, windowSize = 1.5, maxDelay = 300, capacity = 1000000) {
+  constructor(ttlFn, windowSize = 1.5, maxDelay = 300, capacity = 100000) {
     this.is2D = true;
     this.ttlFn = ttlFn;
     this.windowSize = windowSize;
