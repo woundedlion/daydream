@@ -419,10 +419,14 @@ export class ProceduralPalette {
     for (let i = 0; i < TABLE_SIZE; i++) {
       const t = i / (TABLE_SIZE - 1);
       const color = new THREE.Color();
+      const r = this.a[0] + this.b[0] * Math.cos(2 * Math.PI * (this.c[0] * t + this.d[0]));
+      const g = this.a[1] + this.b[1] * Math.cos(2 * Math.PI * (this.c[1] * t + this.d[1]));
+      const b = this.a[2] + this.b[2] * Math.cos(2 * Math.PI * (this.c[2] * t + this.d[2]));
+
       color.setRGB(
-        this.a[0] + this.b[0] * Math.cos(2 * Math.PI * (this.c[0] * t + this.d[0])),
-        this.a[1] + this.b[1] * Math.cos(2 * Math.PI * (this.c[1] * t + this.d[1])),
-        this.a[2] + this.b[2] * Math.cos(2 * Math.PI * (this.c[2] * t + this.d[2]))
+        Math.max(0, Math.min(1, r)),
+        Math.max(0, Math.min(1, g)),
+        Math.max(0, Math.min(1, b))
       ).convertSRGBToLinear();
       this.table[i] = color;
     }
@@ -489,12 +493,15 @@ export class MutatingPalette {
    * @returns {{color: THREE.Color, alpha: number}} The sampled color and alpha.
    */
   get(p) {
-    // a + b * cos(2 * PI * (c * t + d));
     const result = color4Pool.acquire();
+    const r = this.a.x + this.b.x * Math.cos(2 * Math.PI * (this.c.x * p + this.d.x));
+    const g = this.a.y + this.b.y * Math.cos(2 * Math.PI * (this.c.y * p + this.d.y));
+    const b = this.a.z + this.b.z * Math.cos(2 * Math.PI * (this.c.z * p + this.d.z));
+
     result.color.setRGB(
-      this.a.x + this.b.x * Math.cos(2 * Math.PI * (this.c.x * p + this.d.x)),
-      this.a.y + this.b.y * Math.cos(2 * Math.PI * (this.c.y * p + this.d.y)),
-      this.a.z + this.b.z * Math.cos(2 * Math.PI * (this.c.z * p + this.d.z))
+      Math.max(0, Math.min(1, r)),
+      Math.max(0, Math.min(1, g)),
+      Math.max(0, Math.min(1, b))
     ).convertSRGBToLinear();
     result.alpha = 1.0;
     return result;
