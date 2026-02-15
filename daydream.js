@@ -9,7 +9,7 @@ import { Daydream } from "./driver.js";
 import { GUI, resetGUI } from "gui";
 import * as allEffects from "./effects/index.js";
 
-import { BufferGeometry, AddEquation, MaxEquation, Color } from "three";
+import { BufferGeometry, AddEquation, MaxEquation, Color, LinearSRGBColorSpace, SRGBColorSpace } from "three";
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -320,6 +320,7 @@ window.addEventListener("keydown", (e) => daydream.keydown(e));
 
 daydream.renderer.setAnimationLoop(() => {
   if (controls.useWasm && wasmEngine) {
+    daydream.renderer.outputColorSpace = LinearSRGBColorSpace;
     const wasmWrapper = {
       drawFrame: () => {
         // 1. Explicitly clear JS buffer to prevent inter-frame persistence
@@ -342,10 +343,10 @@ daydream.renderer.setAnimationLoop(() => {
           // Load sRGB values into Color container
           tempColor.setRGB(r, g, b);
 
-          // Decode sRGB -> Linear
-          tempColor.convertSRGBToLinear();
+          // Skip decoding sRGB -> Linear for WASM (output is already sRGB, handled by LinearSRGBColorSpace output)
+          // tempColor.convertSRGBToLinear();
 
-          // Store Linear values
+          // Store Linear values (actually sRGB values now, but treated as Linear by renderer)
           Daydream.pixels[i] = tempColor.r;
           Daydream.pixels[i + 1] = tempColor.g;
           Daydream.pixels[i + 2] = tempColor.b;
@@ -358,6 +359,7 @@ daydream.renderer.setAnimationLoop(() => {
     daydream.render(wasmWrapper);
   }
   else if (activeEffect) {
+    daydream.renderer.outputColorSpace = SRGBColorSpace;
     // Existing JS Logic
     daydream.render(activeEffect);
   }
