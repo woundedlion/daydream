@@ -151,10 +151,29 @@ export class Gradient {
     let lastPoint = [0, 0x000000];
     this.colors = points.reduce((r, nextPoint) => {
       let s = Math.floor(nextPoint[0] * size) - Math.floor(lastPoint[0] * size);
+
+      // Extract sRGB components manually to ensure we stay in sRGB space for interpolation
+      const lastHex = lastPoint[1];
+      const nextHex = nextPoint[1];
+
+      const r1 = ((lastHex >> 16) & 255) / 255;
+      const g1 = ((lastHex >> 8) & 255) / 255;
+      const b1 = (lastHex & 255) / 255;
+
+      const r2 = ((nextHex >> 16) & 255) / 255;
+      const g2 = ((nextHex >> 8) & 255) / 255;
+      const b2 = (nextHex & 255) / 255;
+
       for (let i = 0; i < s; i++) {
-        r.push(new THREE.Color(lastPoint[1]).lerp(
-          new THREE.Color(nextPoint[1]),
-          i / s));
+        const t = i / s;
+        // Interpolate in sRGB space
+        const ri = r1 + (r2 - r1) * t;
+        const gi = g1 + (g2 - g1) * t;
+        const bi = b1 + (b2 - b1) * t;
+
+        // Convert to Linear for storage
+        // setRGB takes values as-is. convertSRGBToLinear applies the gamma curve.
+        r.push(new THREE.Color().setRGB(ri, gi, bi).convertSRGBToLinear());
       }
       lastPoint = nextPoint;
       return r;
@@ -170,7 +189,8 @@ export class Gradient {
     const t = Math.max(0, Math.min(1, a));
     const sourceColor = this.colors[Math.floor(t * (this.colors.length - 1))];
     const result = color4Pool.acquire();
-    result.color.copy(sourceColor).convertSRGBToLinear();
+    // Color is already Linear in storage, so we just copy it.
+    result.color.copy(sourceColor);
     result.alpha = 1.0;
     return result;
   }
