@@ -7,13 +7,12 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { pixelToSpherical, vectorToPixel, pixelToVector } from "./geometry.js";
-import { G as g } from "./geometry.js";
-import { vectorPool, quaternionPool, colorPool, color4Pool, dotPool, fragmentPool, basisPool } from "./memory.js";
+import { vectorPool, quaternionPool, colorPool } from "./memory.js";
 import { GUI } from "gui";
 
-import { Plot } from "./plot.js";
-
-import { Scan } from "./scan.js"; // scan.js
+// Constants
+const PHI = (1 + Math.sqrt(5)) / 2;
+const g = 1 / PHI;
 
 class LabelPool {
   constructor(scene) {
@@ -250,12 +249,8 @@ export class Daydream {
         if (this.stepFrames != 0) this.stepFrames--;
 
         colorPool.reset();
-        color4Pool.reset();
-        dotPool.reset();
         vectorPool.reset();
         quaternionPool.reset();
-        fragmentPool.reset();
-        basisPool.reset();
 
         Daydream.pixels.fill(0);
 
