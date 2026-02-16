@@ -84,6 +84,11 @@ createHolosphereModule().then(module => {
   }
 
   console.log("Wasm Engine Loaded");
+
+  // Re-run effect setup now that WASM is ready, to replace JS GUI with WASM GUI
+  if (controls.useWasm) {
+    controls.changeEffect(true);
+  }
 });
 
 
@@ -159,15 +164,11 @@ const controls = {
       }
     }
 
-    const EffectClass = allEffects[this.effect];
-    if (typeof EffectClass !== 'function') {
-      console.error(`Effect '${this.effect}' is not a constructor. Check your imports in daydream.js.`);
-      return;
-    }
+    activeEffect = null;
 
     // Clear existing params to avoid pollution, unless we are initializing (preserveParams = true)
     if (!preserveParams) {
-      resetGUI(['resolution', 'effect']);
+      resetGUI(['resolution', 'effect', 'wasm']);
     }
 
     // Update URL
@@ -176,11 +177,35 @@ const controls = {
     newUrl.searchParams.set('wasm', this.useWasm);
     window.history.replaceState({}, '', newUrl);
 
+    if (this.useWasm) {
+      if (wasmEngine) {
+        // WASM Mode - The Primary Mode
+        wasmEngine.setEffect(this.effect);
+        activeEffect = { gui: new GUI({ autoPlace: false }) };
 
-    activeEffect = new EffectClass();
-    if (this.useWasm && wasmEngine) {
-      wasmEngine.setEffect(this.effect);
+        // 1. Get Params from C++
+        const params = wasmEngine.getParameterDefinitions();
+
+        // 2. Build GUI
+        const state = {};
+        params.forEach(p => {
+          state[p.name] = p.value;
+          activeEffect.gui.add(state, p.name, p.min, p.max)
+            .onChange(v => {
+              wasmEngine.setParameter(p.name, v);
+            });
+        });
+      }
+    } else {
+      // Fallback or legacy mode if user explicitly disables WASM
+      const EffectClass = allEffects[this.effect];
+      if (typeof EffectClass === 'function') {
+        activeEffect = new EffectClass();
+      } else {
+        console.warn(`Effect '${this.effect}' not found in JS registry (or WASM disabled).`);
+      }
     }
+
     if (activeEffect && activeEffect.gui && window.innerWidth < 900) {
       activeEffect.gui.close();
     }
@@ -196,12 +221,7 @@ const controls = {
       };
 
       if (guiContainer) {
-        // Check if we need to move it (auto-place or just detached)
-        const autoContainer = document.querySelector('body > .dg.ac');
-        if (autoContainer) {
-          guiContainer.appendChild(autoContainer);
-          addEffectClass(autoContainer);
-        } else if (activeEffect.gui.domElement.parentElement !== guiContainer) {
+        if (activeEffect.gui.domElement.parentElement !== guiContainer) {
           guiContainer.appendChild(activeEffect.gui.domElement);
           addEffectClass(activeEffect.gui.domElement);
         } else {
@@ -230,9 +250,8 @@ guiInstance.add(controls, 'resolution', Object.keys(resolutionPresets))
 guiInstance.add(controls, 'useWasm')
   .name('Use WASM')
   .onChange((v) => {
-    if (v && wasmEngine) {
-      wasmEngine.setEffect(controls.effect);
-    }
+    // Force a full effect refresh to update the GUI
+    controls.changeEffect();
     const newUrl = new URL(window.location);
     newUrl.searchParams.set('wasm', v);
     window.history.replaceState({}, '', newUrl);
