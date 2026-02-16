@@ -66,16 +66,4 @@ export const quaternionPool = new StaticPool(THREE.Quaternion, 4000000);
 /** @type {StaticPool} Global pool for temporary Color objects used in blending. */
 export const colorPool = new StaticPool(THREE.Color, 1000000);
 
-/** @type {StaticPool} Global pool for temporary Dot objects. */
-export const dotPool = new StaticPool(null, 10000);
-
-/** @type {StaticPool} Global pool for temporary Color4 objects. */
-export const color4Pool = new StaticPool(null, 250000);
-
-/** @type {StaticPool} Global pool for Fragment objects (Pos + Data). */
-export const fragmentPool = new StaticPool(null, 2000000);
-
-
-
-/** @type {StaticPool} Global pool for Basis objects {u, v, w}. */
-export const basisPool = new StaticPool(null, 20000);
+// Removed unused pools: dotPool, color4Pool, fragmentPool, basisPool

@@ -7,7 +7,7 @@
 import createHolosphereModule from "./holosphere_wasm.js";
 import { Daydream } from "./driver.js";
 import { GUI, resetGUI } from "gui";
-import * as allEffects from "./effects/index.js";
+// Removed allEffects import
 
 import { BufferGeometry, AddEquation, MaxEquation, Color, LinearSRGBColorSpace, SRGBColorSpace } from "three";
 
@@ -115,10 +115,10 @@ const daydream = new Daydream();
 let activeEffect;
 
 const controls = {
-  effect: (initialEffect && allEffects[initialEffect]) ? initialEffect : 'IslamicStars',
+  effect: initialEffect || 'IslamicStars',
   resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Phantasm (144x288)",
   testAll: false,
-  useWasm: initialWasm,
+  useWasm: true,
 
   setResolution: function (preserveParams = false) {
     const p = resolutionPresets[this.resolution];
@@ -127,7 +127,7 @@ const controls = {
         wasmEngine.setResolution(p.w, p.h);
       }
       // Update available effects based on resolution
-      const availableEffects = effectsByResolution[this.resolution] || Object.keys(allEffects);
+      const availableEffects = effectsByResolution[this.resolution] || HiResFavorites;
 
       // Check if current effect is valid
       if (!availableEffects.includes(this.effect)) {
@@ -207,13 +207,7 @@ const controls = {
         });
       }
     } else {
-      // Fallback or legacy mode if user explicitly disables WASM
-      const EffectClass = allEffects[this.effect];
-      if (typeof EffectClass === 'function') {
-        activeEffect = new EffectClass();
-      } else {
-        console.warn(`Effect '${this.effect}' not found in JS registry (or WASM disabled).`);
-      }
+      console.warn("WASM Engine not ready or useWasm is false (should be true).");
     }
 
     if (activeEffect && activeEffect.gui && window.innerWidth < 900) {
@@ -257,15 +251,7 @@ guiInstance.add(controls, 'resolution', Object.keys(resolutionPresets))
   .name('Resolution')
   .onChange(() => controls.setResolution());
 
-guiInstance.add(controls, 'useWasm')
-  .name('Use WASM')
-  .onChange((v) => {
-    // Force a full effect refresh to update the GUI
-    controls.changeEffect();
-    const newUrl = new URL(window.location);
-    newUrl.searchParams.set('wasm', v);
-    window.history.replaceState({}, '', newUrl);
-  });
+// Removed useWasm toggle (hardcoded to true)
 
 function populateEffectSidebar(options) {
   const sidebar = document.getElementById('effect-sidebar');
@@ -348,7 +334,7 @@ window.addEventListener("keydown", (e) => daydream.keydown(e));
 
 
 daydream.renderer.setAnimationLoop(() => {
-  if (controls.useWasm && wasmEngine) {
+  if (wasmEngine) {
     daydream.renderer.outputColorSpace = SRGBColorSpace;
     const wasmWrapper = {
       drawFrame: () => {
@@ -380,9 +366,5 @@ daydream.renderer.setAnimationLoop(() => {
       }
     };
     daydream.render(wasmWrapper);
-  }
-  else if (activeEffect) {
-    daydream.renderer.outputColorSpace = SRGBColorSpace;
-    daydream.render(activeEffect);
   }
 });
