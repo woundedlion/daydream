@@ -96,7 +96,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const initialEffect = urlParams.get('effect');
 
 const initialResolution = urlParams.get('resolution');
-const initialWasm = urlParams.get('wasm') === 'true';
+const initialWasm = urlParams.get('wasm') !== 'false';
 
 // Default to Holosphere
 const resolutionPresets = {
@@ -115,8 +115,8 @@ const daydream = new Daydream();
 let activeEffect;
 
 const controls = {
-  effect: (initialEffect && allEffects[initialEffect]) ? initialEffect : 'PetalFlow',
-  resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Holosphere (20x96)",
+  effect: (initialEffect && allEffects[initialEffect]) ? initialEffect : 'IslamicStars',
+  resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Phantasm (144x288)",
   testAll: false,
   useWasm: initialWasm,
 
@@ -187,13 +187,23 @@ const controls = {
         const params = wasmEngine.getParameterDefinitions();
 
         // 2. Build GUI
+        // 2. Build GUI
         const state = {};
         params.forEach(p => {
           state[p.name] = p.value;
-          activeEffect.gui.add(state, p.name, p.min, p.max)
-            .onChange(v => {
-              wasmEngine.setParameter(p.name, v);
-            });
+
+          let controller;
+          if (typeof p.value === 'boolean') {
+            controller = activeEffect.gui.add(state, p.name);
+          } else {
+            controller = activeEffect.gui.add(state, p.name, p.min, p.max);
+          }
+
+          controller.onChange(v => {
+            // Convert boolean to float (1.0/0.0) for C++ as setParameter expects float
+            const floatVal = (typeof v === 'boolean') ? (v ? 1.0 : 0.0) : v;
+            wasmEngine.setParameter(p.name, floatVal);
+          });
         });
       }
     } else {
