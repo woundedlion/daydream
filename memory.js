@@ -37,6 +37,8 @@ export class StaticPool {
             const newCap = this.capacity * 2;
             console.warn(`StaticPool: Expanding capacity for ${this.Type.name} from ${this.capacity} to ${newCap}`);
             this.capacity = newCap;
+            // The array grows automatically in JS, but we want to be explicit about the "static" capacity
+            this.store.length = newCap;
         }
 
         if (this.cursor >= this.initializedCount) {

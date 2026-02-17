@@ -9,14 +9,7 @@ import { Daydream } from "./driver.js";
 import { vectorPool, quaternionPool } from "./memory.js";
 import { TWO_PI } from "./3dmath.js";
 
-// Removed mobiusTransform and gnomonicMobiusTransform
-
-import { KDTree } from "./spatial.js";
-
 const _tempSpherical = new THREE.Spherical();
-
-
-// Removed Dot class
 
 /**
  * Converts a pixel y-coordinate to a spherical phi angle.
@@ -345,115 +338,7 @@ export const MeshOps = {
     return { faceColorIndices, uniqueCount: nextID };
   },
 
-  /**
-   * Computes the KDTree and Adjacency Map for a mesh.
-   * Stores the result in mesh.kdTree.
-   * @param {Object} mesh - {vertices, faces}
-   */
-  computeKdTree(mesh) {
-    if (mesh.kdTree) return;
 
-    // Adjacency map
-    const adjacency = new Array(mesh.vertices.length).fill(null).map(() => []);
-
-    // Find edges
-    for (const face of mesh.faces) {
-      for (let i = 0; i < face.length; i++) {
-        const idxA = face[i];
-        const idxB = face[(i + 1) % face.length];
-
-        // Add B to A's list
-        if (!adjacency[idxA].includes(idxB)) adjacency[idxA].push(idxB);
-        // Add A to B's list
-        if (!adjacency[idxB].includes(idxA)) adjacency[idxB].push(idxA);
-      }
-    }
-
-    // Format points
-    const points = mesh.vertices.map((v, i) => ({ pos: v, index: i }));
-
-    // Build Tree
-    const tree = new KDTree(points);
-
-    mesh.kdTree = {
-      tree,
-      adjacency
-    };
-  },
-
-  /**
-   * Finds the closest point on the mesh "wireframe" (vertices and edges) to a target point.
-   * Assumes all points are on a unit sphere.
-   * @param {THREE.Vector3} p - Target point (normalized)
-   * @param {Object} mesh - {vertices, faces}
-   * @returns {THREE.Vector3} Closest point on the edges/vertices of the mesh
-   */
-  closestPointOnMeshGraph(p, mesh) {
-    // Ensure KDTree
-    if (!mesh.kdTree) {
-      this.computeKdTree(mesh);
-    }
-
-    const { tree, adjacency } = mesh.kdTree;
-
-    // Closest vertex
-    const nearestNodes = tree.nearest(p, 1);
-    if (!nearestNodes.length) return mesh.vertices[0].clone();
-
-    const closestVertexNode = nearestNodes[0]; // This is the object { pos, index }
-    const closestVertexIndex = closestVertexNode.index;
-    const closestVertexPos = closestVertexNode.pos;
-
-    let bestPoint = closestVertexPos.clone();
-    let maxDot = p.dot(bestPoint);
-
-    // Check connected edges
-    // adjacency[i] contains indices of neighbors.
-    // Each neighbor forms an edge (closestVertexIndex, neighborIndex).
-
-
-
-    const neighbors = adjacency[closestVertexIndex];
-    if (!neighbors) return bestPoint; // Should not happen for valid mesh
-
-    const A = closestVertexPos;
-
-    const tmpN = vectorPool.acquire();
-    const tmpC = vectorPool.acquire();
-    const vA = vectorPool.acquire();
-    const vB = vectorPool.acquire();
-
-    for (const neighborIdx of neighbors) {
-      const B = mesh.vertices[neighborIdx];
-
-      // Great circle normal
-      tmpN.crossVectors(A, B);
-      const lenSq = tmpN.lengthSq();
-      if (lenSq < 0.000001) continue; // Degenerate edge
-      tmpN.multiplyScalar(1.0 / Math.sqrt(lenSq)); // Normalize
-
-      // Project P
-      const pDotN = p.dot(tmpN);
-      tmpC.copy(p).addScaledVector(tmpN, -pDotN); // P_proj
-
-      // Normalize
-      tmpC.normalize();
-
-      // Arc check
-      const crossAC = vA.crossVectors(A, tmpC);
-      const crossCB = vB.crossVectors(tmpC, B);
-
-      if (crossAC.dot(tmpN) > 0 && crossCB.dot(tmpN) > 0) {
-        const d = p.dot(tmpC);
-        if (d > maxDot) {
-          maxDot = d;
-          bestPoint.copy(tmpC);
-        }
-      }
-    }
-
-    return bestPoint; // already cloned or copied
-  },
 
   /**
    * Computes the dual of a mesh.
@@ -1187,12 +1072,14 @@ export const MeshOps = {
         const p = positions[i];
         const nList = neighbors[i];
 
-        // Use global scratch _tempVec for force accumulator
+        // Use vectorPool for force accumulator
+        const _tempVec = vectorPool.acquire();
         _tempVec.set(0, 0, 0);
 
         nList.forEach(ni => {
           const neighbor = positions[ni];
-          // Use global scratch _tempVec2 for vector calculation
+          // Use vectorPool for vector calculation
+          const _tempVec2 = vectorPool.acquire();
           _tempVec2.subVectors(neighbor, p);
           const dist = _tempVec2.length();
           const diff = dist - targetLen;
