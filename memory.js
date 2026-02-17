@@ -63,7 +63,6 @@ export const vectorPool = new StaticPool(THREE.Vector3, 10000);
 /** @type {StaticPool} Global pool for temporary Quaternion objects. */
 export const quaternionPool = new StaticPool(THREE.Quaternion, 10000);
 
-/** @type {StaticPool} Global pool for temporary Color objects used in blending. */
-export const colorPool = new StaticPool(THREE.Color, 1000000);
+
 
 // Removed unused pools: dotPool, color4Pool, fragmentPool, basisPool

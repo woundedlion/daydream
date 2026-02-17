@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { pixelToSpherical, vectorToPixel, pixelToVector } from "./geometry.js";
-import { vectorPool, quaternionPool, colorPool } from "./memory.js";
+import { vectorPool, quaternionPool } from "./memory.js";
 import { GUI } from "gui";
 
 // Constants
@@ -243,57 +243,57 @@ export class Daydream {
     if (this.timeAccumulator > 0.25) this.timeAccumulator = 0.25;
     if (this.timeAccumulator < this.frameInterval) return;
 
-    if (this.timeAccumulator >= this.frameInterval) {
-      this.timeAccumulator -= this.frameInterval;
 
-      if (!this.paused || this.stepFrames != 0) {
-        if (this.stepFrames != 0) this.stepFrames--;
+    this.timeAccumulator -= this.frameInterval;
 
-        colorPool.reset();
-        vectorPool.reset();
-        quaternionPool.reset();
+    if (!this.paused || this.stepFrames != 0) {
+      if (this.stepFrames != 0) this.stepFrames--;
 
-        Daydream.pixels.fill(0);
+      // colorPool.reset(); // Removed
+      vectorPool.reset();
+      quaternionPool.reset();
 
-        const start = performance.now();
-        if (effect) {
-          effect.drawFrame();
-        }
-        const duration = performance.now() - start;
-        const stats = document.getElementById("perf-stats");
-        if (stats) stats.innerText = `${duration.toFixed(3)} ms`;
+      Daydream.pixels.fill(0);
 
-        this.dotMesh.instanceColor.needsUpdate = true;
-
-        this.xAxis.visible = this.labelAxes;
-        this.yAxis.visible = this.labelAxes;
-        this.zAxis.visible = this.labelAxes;
-
-        this.labelPool.reset();
-        labels = [];
-
-        if (this.labelAxes) {
-          labels.push({ "position": Daydream.X_AXIS, "content": "X" });
-          labels.push({ "position": Daydream.Y_AXIS, "content": "Y" });
-          labels.push({ "position": Daydream.Z_AXIS, "content": "Z" });
-          labels.push({ "position": Daydream.X_AXIS.clone().negate(), "content": "-X" });
-          labels.push({ "position": Daydream.Y_AXIS.clone().negate(), "content": "-Y" });
-          labels.push({ "position": Daydream.Z_AXIS.clone().negate(), "content": "-Z" });
-        }
-
-        if (effect && typeof effect.getLabels === 'function') {
-          labels.push(...effect.getLabels());
-        }
-
-        for (const label of labels) {
-          if (!this.cullBackLabels || label.position.dot(this.camera.position) > Daydream.SPHERE_RADIUS) {
-            this.labelPool.acquire(label.position, label.content);
-          }
-        }
-
-        this.labelPool.cleanup();
+      const start = performance.now();
+      if (effect) {
+        effect.drawFrame();
       }
+      const duration = performance.now() - start;
+      const stats = document.getElementById("perf-stats");
+      if (stats) stats.innerText = `${duration.toFixed(3)} ms`;
+
+      this.dotMesh.instanceColor.needsUpdate = true;
+
+      this.xAxis.visible = this.labelAxes;
+      this.yAxis.visible = this.labelAxes;
+      this.zAxis.visible = this.labelAxes;
+
+      this.labelPool.reset();
+      labels = [];
+
+      if (this.labelAxes) {
+        labels.push({ "position": Daydream.X_AXIS, "content": "X" });
+        labels.push({ "position": Daydream.Y_AXIS, "content": "Y" });
+        labels.push({ "position": Daydream.Z_AXIS, "content": "Z" });
+        labels.push({ "position": Daydream.X_AXIS.clone().negate(), "content": "-X" });
+        labels.push({ "position": Daydream.Y_AXIS.clone().negate(), "content": "-Y" });
+        labels.push({ "position": Daydream.Z_AXIS.clone().negate(), "content": "-Z" });
+      }
+
+      if (effect && typeof effect.getLabels === 'function') {
+        labels.push(...effect.getLabels());
+      }
+
+      for (const label of labels) {
+        if (!this.cullBackLabels || label.position.dot(this.camera.position) > Daydream.SPHERE_RADIUS) {
+          this.labelPool.acquire(label.position, label.content);
+        }
+      }
+
+      this.labelPool.cleanup();
     }
+
 
     this.controls.update();
 
@@ -443,7 +443,7 @@ export class Daydream {
     this.setupDots();
 
     this.precomputeMatrices();
-    console.log(this.renderer.info.render.triangles);
+    // console.log(this.renderer.info.render.triangles);
 
   }
 

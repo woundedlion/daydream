@@ -339,21 +339,12 @@ daydream.renderer.setAnimationLoop(() => {
         // 3. Extract and convert pixels
         // getPixels() returns a Uint16Array view of the Linear 16-bit buffer
         const wasmPixels = wasmEngine.getPixels();
-        const tempColor = new Color();
+        const inv65535 = 1.0 / 65535.0;
 
-        for (let i = 0; i < wasmPixels.length; i += 3) {
+        for (let i = 0; i < wasmPixels.length; i++) {
           // Flatten 16-bit Linear (0-65535) -> Float Linear (0.0-1.0)
-          const r = wasmPixels[i] / 65535.0;
-          const g = wasmPixels[i + 1] / 65535.0;
-          const b = wasmPixels[i + 2] / 65535.0;
-
-          // setRGB takes Linear floats by default
-          tempColor.setRGB(r, g, b);
-
           // Store Linear values in Float32Array (Three.js will handle tonemapping via outputColorSpace)
-          Daydream.pixels[i] = tempColor.r;
-          Daydream.pixels[i + 1] = tempColor.g;
-          Daydream.pixels[i + 2] = tempColor.b;
+          Daydream.pixels[i] = wasmPixels[i] * inv65535;
         }
       }
     };
