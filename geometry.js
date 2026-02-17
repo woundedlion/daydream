@@ -420,13 +420,13 @@ export const MeshOps = {
     // adjacency[i] contains indices of neighbors.
     // Each neighbor forms an edge (closestVertexIndex, neighborIndex).
 
+
+
     const neighbors = adjacency[closestVertexIndex];
     if (!neighbors) return bestPoint; // Should not happen for valid mesh
 
-    const tempN = new THREE.Vector3();
-    const tempC = new THREE.Vector3();
-    const vA = new THREE.Vector3();
-    const vB = new THREE.Vector3();
+    // Use global scratch vectors instead of allocating new ones
+    // _tempN, _tempC, _vA, _vB are declared at module scope
 
     const A = closestVertexPos;
 
@@ -434,27 +434,27 @@ export const MeshOps = {
       const B = mesh.vertices[neighborIdx];
 
       // Great circle normal
-      tempN.crossVectors(A, B);
-      const lenSq = tempN.lengthSq();
+      _tempN.crossVectors(A, B);
+      const lenSq = _tempN.lengthSq();
       if (lenSq < 0.000001) continue; // Degenerate edge
-      tempN.multiplyScalar(1.0 / Math.sqrt(lenSq)); // Normalize
+      _tempN.multiplyScalar(1.0 / Math.sqrt(lenSq)); // Normalize
 
       // Project P
-      const pDotN = p.dot(tempN);
-      tempC.copy(p).addScaledVector(tempN, -pDotN); // P_proj
+      const pDotN = p.dot(_tempN);
+      _tempC.copy(p).addScaledVector(_tempN, -pDotN); // P_proj
 
       // Normalize
-      tempC.normalize();
+      _tempC.normalize();
 
       // Arc check
-      const crossAC = vA.crossVectors(A, tempC);
-      const crossCB = vB.crossVectors(tempC, B);
+      const crossAC = _vA.crossVectors(A, _tempC);
+      const crossCB = _vB.crossVectors(_tempC, B);
 
-      if (crossAC.dot(tempN) > 0 && crossCB.dot(tempN) > 0) {
-        const d = p.dot(tempC);
+      if (crossAC.dot(_tempN) > 0 && crossCB.dot(_tempN) > 0) {
+        const d = p.dot(_tempC);
         if (d > maxDot) {
           maxDot = d;
-          bestPoint.copy(tempC);
+          bestPoint.copy(_tempC);
         }
       }
     }
@@ -687,7 +687,6 @@ export const MeshOps = {
     };
   },
 
-  /**
   /**
    * Returns the topological structure of a Hankin pattern.
    */
@@ -1167,7 +1166,13 @@ export const MeshOps = {
       neighbors[i] = [...new Set(n)];
     });
 
+    // Pre-allocate movements array once
+    const movements = new Array(positions.length).fill(null).map(() => new THREE.Vector3());
+
     for (let iter = 0; iter < iterations; iter++) {
+      // Reset movements
+      for (let m of movements) m.set(0, 0, 0);
+
       // 1. Calculate target edge length (average)
       let totalLen = 0;
       let edgeCount = 0;
@@ -1183,24 +1188,27 @@ export const MeshOps = {
       const targetLen = totalLen / edgeCount;
 
       // 2. Apply forces
-      const movements = new Array(positions.length).fill(null).map(() => new THREE.Vector3());
+      // movements array is already allocated and reset
 
       for (let i = 0; i < positions.length; i++) {
         const p = positions[i];
         const nList = neighbors[i];
-        const force = new THREE.Vector3();
+
+        // Use global scratch _tempVec for force accumulator
+        _tempVec.set(0, 0, 0);
 
         nList.forEach(ni => {
           const neighbor = positions[ni];
-          const vec = new THREE.Vector3().subVectors(neighbor, p);
-          const dist = vec.length();
+          // Use global scratch _tempVec2 for vector calculation
+          _tempVec2.subVectors(neighbor, p);
+          const dist = _tempVec2.length();
           const diff = dist - targetLen;
 
           // Hooke's Law: Pull if too long, Push if too short
-          force.addScaledVector(vec.normalize(), diff * 0.1);
+          _tempVec.addScaledVector(_tempVec2.normalize(), diff * 0.1);
         });
 
-        movements[i].add(force);
+        movements[i].add(_tempVec);
       }
 
       // 3. Move and Normalize
