@@ -316,15 +316,7 @@ guiInstance.add(controls, 'resetDefaults').name('Reset Defaults');
 
 controls.setResolution(true);
 
-// Helper to catch any late-bound auto-placed GUIs
-const moveAutoGui = () => {
-  const autoContainer = document.querySelector('body > .dg.ac');
-  if (autoContainer) {
-    document.getElementById('gui-container').appendChild(autoContainer);
-    autoContainer.classList.add('effect-gui');
-  }
-};
-setInterval(moveAutoGui, 1000);
+
 
 guiInstance.add(daydream, 'labelAxes').name('Show Axes');
 guiInstance.add(daydream, 'cullBackLabels').name('Cull Back Labels');
@@ -339,7 +331,7 @@ daydream.renderer.setAnimationLoop(() => {
     const wasmWrapper = {
       drawFrame: () => {
         // 1. Explicitly clear JS buffer to prevent inter-frame persistence
-        Daydream.pixels.fill(0);
+        // Daydream.pixels.fill(0); // Handled by driver.js render loop
 
         // 2. Step the C++ engine
         wasmEngine.drawFrame();
