@@ -41,17 +41,7 @@ export const phiToY = (phi) => {
   return (phi * (Daydream.H - 1)) / Math.PI;
 }
 
-/**
- * Converts spherical coordinates on a unit sphere to 2D pixel coordinates.
- * @param {THREE.Spherical} s - The spherical coordinates (radius assumed to be 1).
- * @returns {{x: number, y: number}} The pixel coordinates (x is wrapped).
- */
-export const sphericalToPixel = (s) => {
-  return {
-    x: wrap((s.theta * Daydream.W) / TWO_PI, Daydream.W),
-    y: phiToY(s.phi),
-  };
-};
+
 
 /**
  * Converts 2D pixel coordinates to spherical coordinates on a unit sphere.
@@ -182,9 +172,7 @@ export class HEFace {
     this.intrinsicHash = h;
   }
 
-  getVertexCount() { // Keep for backward compatibility if needed, but prefer property
-    return this.vertexCount || this.getVertexCount();
-  }
+
 
   getVertexCount() {
     let count = 0;
@@ -1353,51 +1341,7 @@ export const MeshOps = {
   }
 };
 
-/**
- * Creates a basis object { u, v, w } from an orientation and normal.
- * @param {THREE.Quaternion} orientation - The orientation quaternion.
- * @param {THREE.Vector3} normal - The local normal vector.
- * @returns {{u: THREE.Vector3, v: THREE.Vector3, w: THREE.Vector3}} The basis vectors.
- */
-export const makeBasis = (orientation, normal) => {
-  let refAxis = Daydream.X_AXIS;
-  if (Math.abs(normal.dot(refAxis)) > 0.9999) {
-    refAxis = Daydream.Y_AXIS;
-  }
-  let v = vectorPool.acquire().copy(normal).applyQuaternion(orientation).normalize();
-  let ref = _tempVec.copy(refAxis).applyQuaternion(orientation).normalize();
-  let u = vectorPool.acquire().crossVectors(v, ref).normalize();
-  let w = vectorPool.acquire().crossVectors(v, u).normalize();
 
-  // Zero-Alloc: Use basisPool if available, otherwise fallback (should typically avail)
-  const basis = basisPool.acquire();
-  if (basis) {
-    basis.u.copy(u);
-    basis.v.copy(v);
-    basis.w.copy(w);
-    return basis;
-  }
-  return { u, v, w };
-};
-
-/**
- * Adjusted basis and radius for drawing on the opposite side of the sphere.
- * @param {Object} basis - {u, v, w}
- * @param {number} radius - angular radius (0-2)
- * @returns {{basis: Object, radius: number}}
- */
-export const getAntipode = (basis, radius) => {
-  if (radius > 1.0) {
-    const u = vectorPool.acquire().copy(basis.u).negate(); // Flip U to maintain chirality
-    const v = vectorPool.acquire().copy(basis.v).negate(); // Flip V (Antipode)
-    const w = vectorPool.acquire().copy(basis.w);          // W stays (Rotation axis)
-    return {
-      basis: { u, v, w },
-      radius: 2.0 - radius
-    };
-  }
-  return { basis, radius };
-};
 
 // Inject Type into pool to handle circular dependency
-// Removed unused basisPool and dotPool configuration
+// Removed unused pools and functions

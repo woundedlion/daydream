@@ -107,6 +107,7 @@ export class Daydream {
       alpha: Daydream.SCENE_ALPHA,
     });
 
+    // Cap pixel ratio at 1 to disable high-DPI rendering for performance/aesthetic reasons.
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
 
     this.labelRenderer = new CSS2DRenderer();
