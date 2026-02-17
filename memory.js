@@ -58,13 +58,8 @@ export class StaticPool {
     }
 }
 
-
 /** @type {StaticPool} Global pool for temporary Vector3 objects. */
-export const vectorPool = new StaticPool(THREE.Vector3, 10000);
+export const vectorPool = new StaticPool(THREE.Vector3, 100000);
 
 /** @type {StaticPool} Global pool for temporary Quaternion objects. */
 export const quaternionPool = new StaticPool(THREE.Quaternion, 10000);
-
-
-
-// Removed unused pools: dotPool, color4Pool, fragmentPool, basisPool

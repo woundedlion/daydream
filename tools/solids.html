@@ -538,12 +538,21 @@
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { Solids } from 'solids';
-        import { MeshOps } from 'geometry';
+        import { PlatonicSolids, ArchimedeanSolids, IslamicStarPatterns } from '../solids.js';
+        import createHolosphereModule from '../holosphere_wasm.js';
+
+        let camera, scene, renderer, controls;
+        let mainMesh, frameMesh, edgeLines, vertPoints, normalLines;
+        let labelsContainer;
+        let draggingIndex = -1;
+
+        // WASM Module
+        let WasmModule = null;
+        let MeshOpsWasm = null;
 
         // --- STATE ---
         const state = {
-            base: 'icosahedron',
+            base: 'cube',
             ops: [], // Array of objects { op: string, params: object }
             showGeodesics: true,
             showFaces: true,
@@ -554,25 +563,30 @@
 
         const baseThumbnails = {};
         // Make draggingIndex global so inline handlers can see it if needed, mainly strictly module scope is fine for listeners but good for debug
-        let draggingIndex = -1;
+        // let draggingIndex = -1; // This was moved up
 
         const OP_DEFS = {
-            kis: { label: 'Kis', params: {} },
-            ambo: { label: 'Ambo', params: {} },
-            gyro: { label: 'Gyro', params: {} },
-            snub: { label: 'Snub', params: {} },
-            dual: { label: 'Dual', params: {} },
-            truncate: { label: 'Truncate', params: { t: { val: 0.25, min: 0.01, max: 0.5, step: 0.01 } } },
-            hankin: { label: 'Hankin', params: { angle: { val: 0.0, min: 0.0, max: 180, step: 1 } } }
+            kis: { params: {} },
+            ambo: { params: {} },
+            gyro: { params: {} },
+            snub: { params: {} },
+            dual: { params: {} },
+            truncate: { params: { t: { val: 0.33, min: 0.01, max: 0.99, step: 0.01 } } },
+            expand: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 } } },
+            hankin: { params: { angle: { val: 30, min: 0, max: 180, step: 1 } } }
         };
 
-        let scene, camera, renderer, controls;
-        let mainMesh, edgeLines, vertPoints, normalLines;
-        let labelsContainer; // DOM element for labels
-
-        // --- MAIN ---
-
-        function init() {
+        // Initialize
+        async function init() {
+            // Load WASM
+            try {
+                WasmModule = await createHolosphereModule();
+                MeshOpsWasm = WasmModule.MeshOps;
+                console.log('WASM Module Loaded');
+            } catch (e) {
+                console.error('Failed to load WASM:', e);
+                return;
+            }
             // Initialize Three.js
             const canvas = document.getElementById('canvas');
             const container = document.getElementById('canvas-container');
@@ -655,17 +669,24 @@
             animate();
         }
 
+        function wasmMeshToJs(wasmMesh) {
+            const vArray = wasmMesh.getVertices(); // Float32Array
+
+            const vertices = [];
+            for (let i = 0; i < vArray.length; i += 3) {
+                vertices.push(new THREE.Vector3(vArray[i], vArray[i + 1], vArray[i + 2]));
+            }
+
+            const faces = wasmMesh.getFaces(); // Returns Array<Array<number>> directly now!
+
+            return { vertices, faces };
+        }
+
         async function generateThumbnails() {
             const footer = document.getElementById('footer');
 
-            // Gather all solid names from categories
-            const thumbKeys = [];
-            if (Solids.PlatonicSolids) thumbKeys.push(...Object.keys(Solids.PlatonicSolids));
-            if (Solids.Archimedean) thumbKeys.push(...Object.keys(Solids.Archimedean));
-            if (Solids.IslamicStarPatterns) thumbKeys.push(...Object.keys(Solids.IslamicStarPatterns)); // These might be names or keys
-
-            // Filter out functions/internal props just in case
-            // actually standard keys from these sub-objects should be fine.
+            // Gather all solid names from exported lists
+            const thumbKeys = [...PlatonicSolids, ...ArchimedeanSolids, ...IslamicStarPatterns];
 
             // Create offscreen renderer
             const width = 256; // High-res for larger thumbs
@@ -715,7 +736,11 @@
                 offScene.add(light);
                 offScene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-                const meshData = Solids.get(key);
+                // Generate mesh via WASM
+                const wasmMesh = MeshOpsWasm.fromSolidName(key);
+                const meshData = wasmMeshToJs(wasmMesh);
+                wasmMesh.delete();
+
                 // Triangulate
                 const vertices = [];
                 meshData.faces.forEach(f => {
@@ -764,8 +789,6 @@
                     // Update active state
                     document.querySelectorAll('.thumb-btn').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
-                    // auto reset ops?
-                    // resetOps(); // Maybe nicer to keep ops applied?
                 };
 
                 const img = document.createElement('img');
@@ -885,13 +908,7 @@
                     <div class="saved-actions" onclick="event.stopPropagation()">
                         <div class="flex flex-col gap-1">
                             <div class="flex gap-1 justify-end">
-                                <span class="text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1">Raw</span>
-                                <button class="action-btn" onclick="copyCode(${index}, 'js', this)">JS</button>
-                                <button class="action-btn" onclick="copyCode(${index}, 'cpp', this)">C++</button>
-                            </div>
-                            <div class="flex gap-1 justify-end">
                                 <span class="text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1">Recipe</span>
-                                <button class="action-btn" onclick="copyCode(${index}, 'recipe_js', this)">JS</button>
                                 <button class="action-btn" onclick="copyCode(${index}, 'recipe_cpp', this)">C++</button>
                             </div>
                         </div>
@@ -910,51 +927,14 @@
 
         window.copyCode = (index, lang, btn) => {
             const item = savedSolids[index];
-            // Reconstruct mesh to generate code
-            let mesh = Solids.get(item.base);
-            mesh = MeshOps.clone(mesh);
-
-            // Re-run pipeline with params
-            item.ops.forEach(o => {
-                const opName = typeof o === 'string' ? o : o.op; // helper for legacy
-                if (opName === 'truncate') {
-                    mesh = MeshOps.truncate(mesh, o.params.t);
-                } else if (opName === 'hankin') {
-                    mesh = MeshOps.hankin(mesh, o.params.angle * (Math.PI / 180));
-                } else if (MeshOps[opName]) {
-                    mesh = MeshOps[opName](mesh);
-                }
-            });
 
             let code = '';
 
-            if (lang === 'recipe_js') {
-                code = generateRecipeJS(item);
-            } else if (lang === 'recipe_cpp') {
+            if (lang === 'recipe_cpp') {
                 code = generateRecipeCpp(item);
             } else {
-                // Raw Mesh Export
-                // Reconstruct mesh to generate code
-                let mesh = Solids.get(item.base);
-                mesh = MeshOps.clone(mesh);
-
-                // Re-run pipeline with params
-                item.ops.forEach(o => {
-                    const opName = typeof o === 'string' ? o : o.op; // helper for legacy
-                    if (opName === 'truncate') {
-                        mesh = MeshOps.truncate(mesh, o.params.t);
-                    } else if (opName === 'hankin') {
-                        mesh = MeshOps.hankin(mesh, o.params.angle * (Math.PI / 180));
-                    } else if (MeshOps[opName]) {
-                        mesh = MeshOps[opName](mesh);
-                    }
-                });
-
-                if (lang === 'cpp') {
-                    code = generateCPlusPlus(mesh, item);
-                } else {
-                    code = generateJavascript(mesh, item);
-                }
+                console.warn("Only C++ Recipe export supported currently.");
+                return;
             }
 
             navigator.clipboard.writeText(code).then(() => {
@@ -971,85 +951,9 @@
             });
         };
 
-        function generateCPlusPlus(m, item) {
-            const structName = item.title.replace(/\s+/g, '');
-            const totalIndices = m.faces.reduce((acc, f) => acc + f.length, 0);
-
-            let s = `// Base: ${item.base}, Ops: ${item.desc}\n`;
-            s += `struct ${structName} {\n`;
-            s += `  static constexpr int NUM_VERTS = ${m.vertices.length};\n`;
-            s += `  static constexpr std::array<Vector, NUM_VERTS> vertices = {\n`;
-            s += m.vertices.map((v, i) => `    Vector(${v.x}f, ${v.y}f, ${v.z}f)${i < m.vertices.length - 1 ? ',' : ''}`).join('\n');
-            s += '\n  };\n';
-
-            s += `  static constexpr int NUM_FACES = ${m.faces.length};\n`;
-            s += `  static constexpr int TOTAL_FACE_INDICES = ${totalIndices};\n`;
-
-            s += `  static constexpr std::array<uint8_t, NUM_FACES> face_counts = {\n`;
-            s += '    ' + m.faces.map(f => f.length).join(', ') + '\n';
-            s += '  };\n';
-
-            s += `  static constexpr std::array<int, TOTAL_FACE_INDICES> faces = {\n`;
-
-            // Flatten faces
-            const flatFaces = [];
-            m.faces.forEach(f => flatFaces.push(...f));
-
-            // Wrap lines for readability
-            let faceStr = '    ';
-            flatFaces.forEach((idx, i) => {
-                faceStr += `${idx}${i < flatFaces.length - 1 ? ', ' : ''}`;
-                if ((i + 1) % 20 === 0 && i < flatFaces.length - 1) faceStr += '\n    ';
-            });
-            s += faceStr + '\n';
-            s += '  };\n';
-            s += '};\n';
-            return s;
-        }
-
-        function generateRecipeJS(item) {
-            // Find base category access string
-            let baseAccess = `Solids.get('${item.base}')`; // Fallback
-            if (Solids.PlatonicSolids && Solids.PlatonicSolids[item.base]) baseAccess = `Solids.PlatonicSolids.${item.base}()`;
-            else if (Solids.Archimedean && Solids.Archimedean[item.base]) baseAccess = `Solids.Archimedean.${item.base}()`;
-            else if (Solids.IslamicStarPatterns && Solids.IslamicStarPatterns[item.base]) baseAccess = `Solids.IslamicStarPatterns.${item.base}()`;
-
-            let s = baseAccess;
-            let name = item.base;
-
-            item.ops.forEach(o => {
-                const opName = typeof o === 'string' ? o : o.op;
-                let params = '';
-                let nameSuffix = `_${opName}`;
-
-                if (opName === 'truncate' || opName === 'expand' || opName === 'bitruncate') {
-                    params = `, ${o.params.t}`;
-                    // Format parameter for name: 0.33 -> 033, 0.5 -> 05
-                    const tStr = o.params.t.toString().replace('.', '');
-                    nameSuffix += tStr;
-                } else if (opName === 'hankin') {
-                    // Format angle for name: 59 -> hk59
-                    const angle = Math.round(o.params.angle);
-                    params = `, ${angle} * (Math.PI / 180)`;
-                    nameSuffix = `_hk${angle}`;
-                } else if (opName === 'canonicalize') {
-                    params = `, ${o.params.iter}`;
-                    nameSuffix = `_can`;
-                }
-
-                s = `MeshOps.${opName}(${s}${params})`;
-                name += nameSuffix;
-            });
-
-            // Clean up name
-            name = name.replace(/\./g, '');
-
-            return `${name}: () => ${s},`;
-        }
-
         function generateRecipeCpp(item) {
             // C++ Style: MeshOps::Op(MeshOps::Op(...))
-            let s = `Solids::${capitalize(item.base)}()`;
+            let s = `Solids::get_by_name("${item.base}")`;
 
             item.ops.forEach(o => {
                 const opName = typeof o === 'string' ? o : o.op;
@@ -1072,41 +976,6 @@
 
         function capitalize(s) {
             return s.charAt(0).toUpperCase() + s.slice(1);
-        }
-
-        function generateJavascript(m, item) {
-            // Function name: <base_solid>_<op><param>
-            let funcName = item.base;
-            state.ops.forEach(o => {
-                if (o.op === 'hankin') {
-                    funcName += `_hk${Math.round(o.params.angle)}`;
-                } else if (o.op === 'truncate') {
-                    // Truncate param t usually small float, maybe keep as is or multiply?
-                    // User example was just hk72. Let's do _truncate<t> for now or just _truncate?
-                    // The prompt said <op><param>.
-                    funcName += `_truncate${o.params.t}`;
-                } else {
-                    funcName += `_${o.op}`;
-                }
-            });
-
-            // Clean up: remove dots if any
-            funcName = funcName.replace(/\./g, '');
-
-            let s = `  // Base: ${item.base}, Ops: ${item.desc}\n`;
-            s += `  ${funcName}() {\n`;
-            s += '    const m = {\n';
-            s += '      vertices: [\n';
-            s += m.vertices.map((v, i) => `        new THREE.Vector3(${v.x}, ${v.y}, ${v.z})${i < m.vertices.length - 1 ? ',' : ''}`).join('\n');
-            s += '\n      ],\n';
-            s += '      faces: [\n';
-            s += m.faces.map((f, i) => `        [${f.join(', ')}]${i < m.faces.length - 1 ? ',' : ''}`).join('\n');
-            s += '\n      ]\n';
-            s += '    };\n';
-            s += '    normalize(m);\n';
-            s += '    return m;\n';
-            s += '  },';
-            return s;
         }
 
         function restoreSolid(item) {
@@ -1133,11 +1002,12 @@
         function renderBaseSolid() {
             const thumb = baseThumbnails[state.base];
             const title = state.base.replace(/([A-Z])/g, ' $1').trim();
-            const mesh = Solids.get(state.base);
+            // We can't synchronously get stats unless we cache or have the mesh.
+            // window.currentMesh is updated after update() calls.
 
             document.getElementById('baseThumb').src = thumb || '';
             document.getElementById('baseTitle').innerText = title;
-            document.getElementById('baseStats').innerText = `${mesh.vertices.length} Vertices • ${mesh.faces.length} Faces`;
+            // defer stats update to after mesh generation logic in update()
         }
 
         window.enableDrag = (e) => {
@@ -1363,48 +1233,92 @@
             renderSavedList();
         };
 
-        function update() {
-            // 1. Generate Mesh
-            let mesh = Solids.get(state.base);
+        async function update() {
+            if (!MeshOpsWasm) return;
 
-            // Deep copy to avoid mutating original registry
-            mesh = MeshOps.clone(mesh);
+            // 1. Generate Mesh (WASM)
+            let mesh = MeshOpsWasm.fromSolidName(state.base);
 
-            // Apply Ops
+            // 2. Apply Operations
             try {
-                state.ops.forEach(o => {
+                for (const o of state.ops) {
                     const opName = typeof o === 'string' ? o : o.op;
+                    let nextMesh = null;
+
                     if (opName === 'truncate') {
-                        mesh = MeshOps.truncate(mesh, o.params.t);
+                        nextMesh = mesh.truncate(o.params.t);
+                    } else if (opName === 'expand') {
+                        nextMesh = mesh.expand(o.params.t);
+                    } else if (opName === 'snub') {
+                        nextMesh = mesh.snub();
                     } else if (opName === 'hankin') {
-                        mesh = MeshOps.hankin(mesh, o.params.angle * (Math.PI / 180));
-                    } else if (MeshOps[opName]) {
-                        mesh = MeshOps[opName](mesh);
+                        nextMesh = mesh.hankin(o.params.angle * (Math.PI / 180));
+                    } else if (mesh[opName]) {
+                        nextMesh = mesh[opName]();
                     }
-                });
+
+                    if (nextMesh) {
+                        mesh.delete();
+                        mesh = nextMesh;
+                    }
+                }
             } catch (e) {
-                console.error(e);
+                console.error("Op Error:", e);
             }
 
-            // 2. Render
-            if (mainMesh) scene.remove(mainMesh);
-            if (edgeLines) scene.remove(edgeLines);
-            if (vertPoints) scene.remove(vertPoints);
-            if (normalLines) scene.remove(normalLines);
-            labelsContainer.innerHTML = ''; // Clear labels
+            // 3. Convert to JS for Rendering
+            const meshData = wasmMeshToJs(mesh);
+            mesh.delete(); // Done with WASM mesh
 
-            // Faces (Translucent)
+            // Store for stats/helpers
+            window.currentMesh = meshData;
+
+            // 4. Render
+            if (mainMesh) {
+                mainMesh.geometry.dispose();
+                scene.remove(mainMesh);
+            }
+            if (edgeLines) {
+                edgeLines.geometry.dispose();
+                scene.remove(edgeLines);
+            }
+            if (vertPoints) {
+                vertPoints.geometry.dispose();
+                scene.remove(vertPoints);
+            }
+            if (normalLines) {
+                normalLines.geometry.dispose();
+                scene.remove(normalLines);
+            }
+            if (labelsContainer) labelsContainer.innerHTML = '';
+
+            // Faces
             const geometry = new THREE.BufferGeometry();
             const vertices = [];
-            // Triangulate faces for display
-            mesh.faces.forEach(f => {
-                // Fan triangulation
+
+            const faceCenters = [];
+            const faceNormals = [];
+
+            meshData.faces.forEach(f => {
                 for (let i = 1; i < f.length - 1; i++) {
-                    vertices.push(...mesh.vertices[f[0]].toArray());
-                    vertices.push(...mesh.vertices[f[i]].toArray());
-                    vertices.push(...mesh.vertices[f[i + 1]].toArray());
+                    vertices.push(...meshData.vertices[f[0]].toArray());
+                    vertices.push(...meshData.vertices[f[i]].toArray());
+                    vertices.push(...meshData.vertices[f[i + 1]].toArray());
                 }
+                // Center/Normal for other viz
+                const center = new THREE.Vector3();
+                f.forEach(idx => center.add(meshData.vertices[idx]));
+                center.divideScalar(f.length);
+                faceCenters.push(center);
+
+                // Normal
+                const v0 = meshData.vertices[f[0]];
+                const v1 = meshData.vertices[f[1]];
+                const v2 = meshData.vertices[f[f.length - 1]];
+                const n = new THREE.Vector3().crossVectors(new THREE.Vector3().subVectors(v1, v0), new THREE.Vector3().subVectors(v2, v0)).normalize();
+                faceNormals.push(n);
             });
+
             geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
             geometry.computeVertexNormals();
 
@@ -1416,7 +1330,7 @@
                 flatShading: true,
                 shininess: 50,
                 polygonOffset: true,
-                polygonOffsetFactor: 1, // Push back
+                polygonOffsetFactor: 1,
                 polygonOffsetUnits: 1
             });
 
@@ -1425,7 +1339,7 @@
 
             // Vertices
             if (state.showVertices) {
-                const dotGeo = new THREE.BufferGeometry().setFromPoints(mesh.vertices);
+                const dotGeo = new THREE.BufferGeometry().setFromPoints(meshData.vertices);
                 const dotMat = new THREE.PointsMaterial({ color: 0xa5b4fc, size: 0.05 });
                 vertPoints = new THREE.Points(dotGeo, dotMat);
                 scene.add(vertPoints);
@@ -1433,25 +1347,22 @@
 
             // Edges
             const edgeIndices = new Set();
-            mesh.faces.forEach(f => {
+            meshData.faces.forEach(f => {
                 for (let i = 0; i < f.length; i++) {
                     const a = f[i];
                     const b = f[(i + 1) % f.length];
                     const key = a < b ? `${a}_${b}` : `${b}_${a}`;
-                    if (!edgeIndices.has(key)) {
-                        edgeIndices.add(key);
-                    }
+                    if (!edgeIndices.has(key)) edgeIndices.add(key);
                 }
             });
 
             const lineGeoPoints = [];
             edgeIndices.forEach(key => {
                 const [ai, bi] = key.split('_').map(Number);
-                const va = mesh.vertices[ai];
-                const vb = mesh.vertices[bi];
+                const va = meshData.vertices[ai];
+                const vb = meshData.vertices[bi];
 
                 if (state.showGeodesics) {
-                    // Slerp subdivision
                     const steps = 12;
                     for (let j = 0; j < steps; j++) {
                         const t1 = j / steps;
@@ -1470,22 +1381,15 @@
             edgeLines = new THREE.LineSegments(lineGeo, lineMat);
             scene.add(edgeLines);
 
-            // Face Normals
+            // Normals
             if (state.showNormals) {
                 const normalPoints = [];
                 const colors = [];
-                mesh.faces.forEach(f => {
-                    const centroid = new THREE.Vector3();
-                    f.forEach(vi => centroid.add(mesh.vertices[vi]));
-                    centroid.divideScalar(f.length);
-                    // Compute normal via cross product of first two edges
-                    const v0 = mesh.vertices[f[0]];
-                    const v1 = mesh.vertices[f[1]];
-                    const v2 = mesh.vertices[f[f.length - 1]]; // Use last to be safe for winding
-                    const n = new THREE.Vector3().crossVectors(new THREE.Vector3().subVectors(v1, v0), new THREE.Vector3().subVectors(v2, v0)).normalize();
-                    const p2 = centroid.clone().add(n.multiplyScalar(0.15));
-                    normalPoints.push(centroid, p2);
-                    colors.push(0, 1, 0, 0, 1, 0); // Bright Green
+                faceCenters.forEach((c, i) => {
+                    const n = faceNormals[i];
+                    const p2 = c.clone().add(n.multiplyScalar(0.15));
+                    normalPoints.push(c, p2);
+                    colors.push(0, 1, 0, 0, 1, 0);
                 });
                 const normGeo = new THREE.BufferGeometry().setFromPoints(normalPoints);
                 normGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -1494,27 +1398,20 @@
                 scene.add(normalLines);
             }
 
-            // Indices (prepare for animation loop)
-            // We'll update positions in animate() to track camera
-            // Just create elements here if static? No, creates too many if high poly.
-            // Let's just create them for the first N vertices to avoid lag?
-            // Or only if < 500 vertices.
-            if (state.showIndices && mesh.vertices.length < 1000) {
-                mesh.vertices.forEach((v, i) => {
+            // Indices (limit to < 1000)
+            if (state.showIndices && meshData.vertices.length < 1000) {
+                meshData.vertices.forEach((v, i) => {
                     const el = document.createElement('div');
                     el.textContent = i;
                     el.className = 'absolute text-[0.75rem] font-mono text-white bg-black/50 px-1 rounded transform -translate-x-1/2 -translate-y-1/2 pointer-events-none';
-                    el.dataset.index = i; // Store index to retrieve pos
+                    el.dataset.index = i;
                     labelsContainer.appendChild(el);
                 });
             }
 
-            // Update Live Stats
-            mesh.edgeCount = edgeIndices.size;
-            document.getElementById('meshStats').innerText = `${mesh.vertices.length}V / ${mesh.edgeCount}E / ${mesh.faces.length}F`;
-
-            // Store current mesh for generation
-            window.currentMesh = mesh;
+            // Update Stats
+            renderBaseSolid();
+            document.getElementById('meshStats').innerText = `${meshData.vertices.length}V / ${edgeIndices.size}E / ${meshData.faces.length}F`;
         }
 
         function animate() {
