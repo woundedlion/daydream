@@ -36,8 +36,6 @@ export const phiToY = (phi) => {
   return (phi * (Daydream.H - 1)) / Math.PI;
 }
 
-
-
 /**
  * Converts 2D pixel coordinates to spherical coordinates on a unit sphere.
  * @param {number} x - The pixel x-coordinate [0, Daydream.W - 1].
@@ -82,11 +80,6 @@ export const pixelToVector = (x, y) => {
   v.setFromSpherical(_tempSpherical);
   return v;
 };
-
-// Removed large block of unused math functions (logPolarToVector, fibSpiral, waves, gradients, intersection)
-
-
-
 
 /**
  * Vertex in a Half-Edge data structure.
