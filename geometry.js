@@ -14,12 +14,7 @@ import { TWO_PI } from "./3dmath.js";
 import { KDTree } from "./spatial.js";
 
 const _tempSpherical = new THREE.Spherical();
-const _tempVec = new THREE.Vector3();
-const _tempVec2 = new THREE.Vector3();
-const _tempN = new THREE.Vector3();
-const _tempC = new THREE.Vector3();
-const _vA = new THREE.Vector3();
-const _vB = new THREE.Vector3();
+
 
 // Removed Dot class
 
@@ -147,13 +142,16 @@ export class HEFace {
       return;
     }
 
+    const v1 = vectorPool.acquire();
+    const v2 = vectorPool.acquire();
+
     for (let i = 0; i < this.vertexCount; i++) {
       const prev = verts[(i - 1 + this.vertexCount) % this.vertexCount];
       const curr = verts[i];
       const next = verts[(i + 1) % this.vertexCount];
 
-      const v1 = _tempVec.subVectors(prev, curr).normalize();
-      const v2 = _tempVec2.subVectors(next, curr).normalize();
+      v1.subVectors(prev, curr).normalize();
+      v2.subVectors(next, curr).normalize();
 
       let angle = v1.angleTo(v2);
       angles.push(Math.round(angle * (180 / Math.PI)));
@@ -425,36 +423,38 @@ export const MeshOps = {
     const neighbors = adjacency[closestVertexIndex];
     if (!neighbors) return bestPoint; // Should not happen for valid mesh
 
-    // Use global scratch vectors instead of allocating new ones
-    // _tempN, _tempC, _vA, _vB are declared at module scope
-
     const A = closestVertexPos;
+
+    const tmpN = vectorPool.acquire();
+    const tmpC = vectorPool.acquire();
+    const vA = vectorPool.acquire();
+    const vB = vectorPool.acquire();
 
     for (const neighborIdx of neighbors) {
       const B = mesh.vertices[neighborIdx];
 
       // Great circle normal
-      _tempN.crossVectors(A, B);
-      const lenSq = _tempN.lengthSq();
+      tmpN.crossVectors(A, B);
+      const lenSq = tmpN.lengthSq();
       if (lenSq < 0.000001) continue; // Degenerate edge
-      _tempN.multiplyScalar(1.0 / Math.sqrt(lenSq)); // Normalize
+      tmpN.multiplyScalar(1.0 / Math.sqrt(lenSq)); // Normalize
 
       // Project P
-      const pDotN = p.dot(_tempN);
-      _tempC.copy(p).addScaledVector(_tempN, -pDotN); // P_proj
+      const pDotN = p.dot(tmpN);
+      tmpC.copy(p).addScaledVector(tmpN, -pDotN); // P_proj
 
       // Normalize
-      _tempC.normalize();
+      tmpC.normalize();
 
       // Arc check
-      const crossAC = _vA.crossVectors(A, _tempC);
-      const crossCB = _vB.crossVectors(_tempC, B);
+      const crossAC = vA.crossVectors(A, tmpC);
+      const crossCB = vB.crossVectors(tmpC, B);
 
-      if (crossAC.dot(_tempN) > 0 && crossCB.dot(_tempN) > 0) {
-        const d = p.dot(_tempC);
+      if (crossAC.dot(tmpN) > 0 && crossCB.dot(tmpN) > 0) {
+        const d = p.dot(tmpC);
         if (d > maxDot) {
           maxDot = d;
-          bestPoint.copy(_tempC);
+          bestPoint.copy(tmpC);
         }
       }
     }
