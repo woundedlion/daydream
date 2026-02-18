@@ -7,7 +7,6 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { pixelToSpherical, vectorToPixel, pixelToVector } from "./geometry.js";
-import { vectorPool, quaternionPool } from "./memory.js";
 import { GUI } from "gui";
 
 // Constants
@@ -248,10 +247,6 @@ export class Daydream {
 
     if (!this.paused || this.stepFrames != 0) {
       if (this.stepFrames != 0) this.stepFrames--;
-
-      // colorPool.reset(); // Removed
-      vectorPool.reset();
-      quaternionPool.reset();
 
       Daydream.pixels.fill(0);
 
