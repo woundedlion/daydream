@@ -68,7 +68,6 @@ export const vectorToPixel = (v) => {
   _tempPixel.y = (_tempSpherical.phi * (Daydream.H - 1)) / Math.PI;
   return _tempPixel;
 };
-
 /**
  * Converts 2D pixel coordinates to a 3D vector (position on unit sphere).
  * @param {number} x - The pixel x-coordinate.

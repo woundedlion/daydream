@@ -445,6 +445,7 @@
                 <button onclick="addOp('dual')" class="btn btn-secondary text-[0.65rem]">Dual</button>
                 <button onclick="addOp('truncate')" class="btn btn-secondary text-[0.65rem]">Truncate</button>
                 <button onclick="addOp('hankin')" class="btn btn-secondary text-[0.65rem]">Hankin</button>
+                <button onclick="addOp('canonicalize')" class="btn btn-secondary text-[0.65rem]">Canon</button>
             </div>
         </div>
 
@@ -573,7 +574,8 @@
             dual: { params: {} },
             truncate: { params: { t: { val: 0.33, min: 0.01, max: 0.99, step: 0.01 } } },
             expand: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 } } },
-            hankin: { params: { angle: { val: 30, min: 0, max: 180, step: 1 } } }
+            hankin: { params: { angle: { val: 30, min: 0, max: 180, step: 1 } } },
+            canonicalize: { params: { iter: { val: 100, min: 1, max: 500, step: 1 } } }
         };
 
         // Initialize
@@ -1233,42 +1235,50 @@
             renderSavedList();
         };
 
-        async function update() {
-            if (!MeshOpsWasm) return;
+        function update() {
+            if (!WasmModule || !MeshOpsWasm) return;
 
-            // 1. Generate Mesh (WASM)
-            let mesh = MeshOpsWasm.fromSolidName(state.base);
-
-            // 2. Apply Operations
+            // 1. Generate Mesh directly from WASM
+            let currentWasmMesh = null;
             try {
-                for (const o of state.ops) {
+                // Use the string name directly
+                currentWasmMesh = MeshOpsWasm.fromSolidName(state.base);
+            } catch (e) {
+                console.error("Error creating base solid:", e);
+                return;
+            }
+
+            // Apply Ops
+            try {
+                state.ops.forEach(o => {
                     const opName = typeof o === 'string' ? o : o.op;
                     let nextMesh = null;
 
                     if (opName === 'truncate') {
-                        nextMesh = mesh.truncate(o.params.t);
+                        nextMesh = currentWasmMesh.truncate(o.params.t);
                     } else if (opName === 'expand') {
-                        nextMesh = mesh.expand(o.params.t);
+                        nextMesh = currentWasmMesh.expand(o.params.t);
                     } else if (opName === 'snub') {
-                        nextMesh = mesh.snub();
+                        nextMesh = currentWasmMesh.snub();
                     } else if (opName === 'hankin') {
-                        nextMesh = mesh.hankin(o.params.angle * (Math.PI / 180));
-                    } else if (mesh[opName]) {
-                        nextMesh = mesh[opName]();
+                        nextMesh = currentWasmMesh.hankin(o.params.angle * (Math.PI / 180));
+                    } else if (opName === 'canonicalize') {
+                        nextMesh = currentWasmMesh.canonicalize(o.params.iter);
+                    } else if (currentWasmMesh[opName]) {
+                        nextMesh = currentWasmMesh[opName]();
                     }
 
                     if (nextMesh) {
-                        mesh.delete();
-                        mesh = nextMesh;
+                        currentWasmMesh.delete();
+                        currentWasmMesh = nextMesh;
                     }
-                }
+                });
             } catch (e) {
-                console.error("Op Error:", e);
+                console.error("WASM Op Error:", e);
             }
 
-            // 3. Convert to JS for Rendering
-            const meshData = wasmMeshToJs(mesh);
-            mesh.delete(); // Done with WASM mesh
+            const meshData = wasmMeshToJs(currentWasmMesh);
+            currentWasmMesh.delete(); // Cleanup final result
 
             // Store for stats/helpers
             window.currentMesh = meshData;
@@ -1430,10 +1440,6 @@
                     const v = window.currentMesh.vertices[i];
                     if (v) {
                         // Backface Culling for Labels
-                        // Assumption: Mesh is generally convex and centered at origin, so v approximates normal
-                        // View Vector = camPos - v
-                        // Dot(v, camPos - v) > 0 implies facing camera
-                        // Expanded: v.dot(camPos) - v.dot(v) > 0
                         const dot = v.dot(camPos) - v.lengthSq();
 
                         if (dot < 0) {
