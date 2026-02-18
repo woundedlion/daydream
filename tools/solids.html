@@ -444,6 +444,13 @@
                 <button onclick="addOp('snub')" class="btn btn-secondary text-[0.65rem]">Snub</button>
                 <button onclick="addOp('dual')" class="btn btn-secondary text-[0.65rem]">Dual</button>
                 <button onclick="addOp('truncate')" class="btn btn-secondary text-[0.65rem]">Truncate</button>
+                <button onclick="addOp('bitruncate')" class="btn btn-secondary text-[0.65rem] relative group">
+                    Bitruncate
+                    <span
+                        class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
+                        Truncate(Ambo(x), t)
+                    </span>
+                </button>
                 <button onclick="addOp('hankin')" class="btn btn-secondary text-[0.65rem]">Hankin</button>
                 <button onclick="addOp('canonicalize')" class="btn btn-secondary text-[0.65rem]">Canon</button>
             </div>
@@ -539,7 +546,7 @@
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { PlatonicSolids, ArchimedeanSolids, IslamicStarPatterns } from '../solids.js';
+        // Removed solids.js import
         import createHolosphereModule from '../holosphere_wasm.js';
 
         let camera, scene, renderer, controls;
@@ -563,8 +570,11 @@
         };
 
         const baseThumbnails = {};
-        // Make draggingIndex global so inline handlers can see it if needed, mainly strictly module scope is fine for listeners but good for debug
-        // let draggingIndex = -1; // This was moved up
+
+        // Lists (populated from WASM)
+        let PlatonicSolids = [];
+        let ArchimedeanSolids = [];
+        let IslamicStarPatterns = [];
 
         const OP_DEFS = {
             kis: { params: {} },
@@ -573,6 +583,7 @@
             snub: { params: {} },
             dual: { params: {} },
             truncate: { params: { t: { val: 0.33, min: 0.01, max: 0.99, step: 0.01 } } },
+            bitruncate: { params: { t: { val: 0.33, min: 0.01, max: 0.99, step: 0.01 } } },
             expand: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 } } },
             hankin: { params: { angle: { val: 30, min: 0, max: 180, step: 1 } } },
             canonicalize: { params: { iter: { val: 100, min: 1, max: 500, step: 1 } } }
@@ -585,6 +596,35 @@
                 WasmModule = await createHolosphereModule();
                 MeshOpsWasm = WasmModule.MeshOps;
                 console.log('WASM Module Loaded');
+
+                // Populate Registry from WASM
+                const registry = MeshOpsWasm.getRegistry();
+                // registry is array of {name, category}
+                // Filter into existing categories
+                PlatonicSolids = [];
+                ArchimedeanSolids = [];
+                IslamicStarPatterns = [];
+
+                // Hardcoded knowledge of Platonic for ordering if desired, or just push
+                const platonics = ['tetrahedron', 'cube', 'octahedron', 'dodecahedron', 'icosahedron'];
+
+                for (let i = 0; i < registry.length; i++) {
+                    const item = registry[i];
+                    const name = item.name;
+                    const cat = item.category; // "Simple" or "Complex"
+
+                    if (cat === "Complex") {
+                        IslamicStarPatterns.push(name);
+                    } else {
+                        // Simple: Platonic or Archimedean
+                        if (platonics.includes(name)) {
+                            PlatonicSolids.push(name);
+                        } else {
+                            ArchimedeanSolids.push(name);
+                        }
+                    }
+                }
+
             } catch (e) {
                 console.error('Failed to load WASM:', e);
                 return;
@@ -596,23 +636,14 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0f172a); // slate-900
 
-            // New Camera Position: Closer to fill viewport
-            // Unit sphere radius = 1.0. At z=2.0, FOV=45 deg covers approx height = 2 * tan(22.5) * 2 = 1.65.
-            // Sphere diam = 2.0. So 2.0 is slightly cropped? No, tan(22.5) ~ 0.41. 
-            // Visible height at z=2 is 2*2*0.41 = 1.65. Sphere is 2.0. So it crops.
-            // Let's try z=2.8. 2.8 * 0.82 = 2.3. Fits.
-            // Previous was (2,2,4) -> dist 4.9.
-            // Setting position to (0,0,2.8) looks straight on.
-            // Setting position to (1.5, 1.5, 1.5) -> dist ~2.6.
-
             camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-            camera.position.set(2, 1.5, 2); // Nice angle, closer
+            camera.position.set(2, 1.5, 2);
 
             renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
-            controls.autoRotate = true; // Slowly rotate for effect?
+            controls.autoRotate = true;
             controls.autoRotateSpeed = 2.0;
 
             // Lights
@@ -673,6 +704,14 @@
 
         function wasmMeshToJs(wasmMesh) {
             const vArray = wasmMesh.getVertices(); // Float32Array
+
+            // NaN Check
+            for (let i = 0; i < vArray.length; i++) {
+                if (Number.isNaN(vArray[i])) {
+                    console.error("WASM returned NaN vertex at index", i);
+                    return { vertices: [], faces: [] }; // Fail gracefully
+                }
+            }
 
             const vertices = [];
             for (let i = 0; i < vArray.length; i += 3) {
@@ -738,7 +777,6 @@
                 offScene.add(light);
                 offScene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-                // Generate mesh via WASM
                 const wasmMesh = MeshOpsWasm.fromSolidName(key);
                 const meshData = wasmMeshToJs(wasmMesh);
                 wasmMesh.delete();
@@ -851,7 +889,6 @@
             renderer.setSize(w, h);
             camera.aspect = w / h;
             camera.updateProjectionMatrix();
-            camera.updateProjectionMatrix();
         }
 
         // --- SAVED ITEMS ---
@@ -872,6 +909,7 @@
             // Generate summary
             const opsSummary = state.ops.map(o => {
                 if (o.op === 'truncate') return `Tr(${o.params.t})`;
+                if (o.op === 'bitruncate') return `BiTr(${o.params.t})`;
                 if (o.op === 'hankin') return `Hk(${o.params.angle.toFixed(2)})`;
                 return o.op.charAt(0).toUpperCase() + o.op.slice(1);
             }).join(', ') || 'Base Solid';
@@ -953,27 +991,53 @@
             });
         };
 
+        // Format float with f suffix and .0 if integer, to satisfy C++ strictness and convention
+        function formatFloat(val) {
+            const s = val.toString();
+            return (s.indexOf('.') === -1 ? s + ".0" : s) + "f";
+        }
+
         function generateRecipeCpp(item) {
-            // C++ Style: MeshOps::Op(MeshOps::Op(...))
-            let s = `Solids::get_by_name("${item.base}")`;
+            // C++ Style: op(op(...))
+            // Base Name: icosahedron -> icosahedron()
+            let s = `${item.base}()`;
+            let nameParts = [item.base];
 
             item.ops.forEach(o => {
                 const opName = typeof o === 'string' ? o : o.op;
-                const CapOp = capitalize(opName);
 
                 let params = '';
-                if (opName === 'truncate' || opName === 'expand' || opName === 'bitruncate') {
-                    params = `, ${o.params.t}f`;
+                // Suffix construction for function name
+                let suffix = `_${opName}`;
+
+                if (opName === 'truncate') {
+                    params = `, ${formatFloat(o.params.t)}`;
+                    // convention: truncate05 or bitruncate033 using string replacement of "0."
+                    suffix += o.params.t.toString().replace('0.', '');
+                } else if (opName === 'bitruncate') {
+                    params = `, ${formatFloat(o.params.t)}`;
+                    suffix += o.params.t.toString().replace('0.', '');
+                } else if (opName === 'expand') {
+                    params = `, ${formatFloat(o.params.t)}`;
+                    suffix += o.params.t.toString().replace('0.', '');
                 } else if (opName === 'hankin') {
-                    params = `, ${o.params.angle}f * DEG2RAD`;
+                    params = `, ${formatFloat(o.params.angle)} * D2R`;
+                    // convention: hk{angle}
+                    suffix = `_hk${Math.round(o.params.angle)}`;
                 } else if (opName === 'canonicalize') {
                     params = `, ${o.params.iter}`;
                 }
 
-                s = `MeshOps::${CapOp}(${s}${params})`;
+                s = `${opName}(${s}${params})`;
+                nameParts.push(suffix);
             });
 
-            return `Mesh ${item.title.replace(/\s+/g, '')}() { return ${s}; }`;
+            // Construct function name from parts
+            // But actually we want linear concatenation: "base" + "_op" + "_op"
+            // The existing C++ names in solids.h seem to follow base_op_op...
+            const funcName = nameParts.join('');
+
+            return `inline PolyMesh ${funcName}() {\n  return ${s};\n}`;
         }
 
         function capitalize(s) {
@@ -1256,6 +1320,8 @@
 
                     if (opName === 'truncate') {
                         nextMesh = currentWasmMesh.truncate(o.params.t);
+                    } else if (opName === 'bitruncate') {
+                        nextMesh = currentWasmMesh.bitruncate(o.params.t);
                     } else if (opName === 'expand') {
                         nextMesh = currentWasmMesh.expand(o.params.t);
                     } else if (opName === 'snub') {
