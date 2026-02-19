@@ -1,421 +1,421 @@
 /* Global variables */
 :root {
-    --black: #000000;
+  --black: #000000;
 }
 
 * {
-    box-sizing: border-box;
-    margin: 0;
+  box-sizing: border-box;
+  margin: 0;
 }
 
 /* Navigation Tabs */
 /* Navigation Tabs */
 .nav-tabs {
-    position: relative;
-    padding: 10px;
-    z-index: 1000;
-    display: flex;
-    gap: 5px;
-    align-items: center;
-    background: var(--black);
-    flex-shrink: 0;
+  position: relative;
+  padding: 10px;
+  z-index: 1000;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  background: var(--black);
+  flex-shrink: 0;
 }
 
 .nav-label {
-    color: white;
-    font-family: Arial, sans-serif;
-    font-size: 14px;
-    font-weight: bold;
-    margin-right: 5px;
-    padding: 8px 0;
+  color: white;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  font-weight: bold;
+  margin-right: 5px;
+  padding: 8px 0;
 }
 
 .tab {
-    padding: 8px 12px;
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    text-decoration: none;
-    font-family: Arial, sans-serif;
-    font-size: 14px;
-    border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    transition: background 0.2s;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  text-decoration: none;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: background 0.2s;
 }
 
 .tab:hover {
-    background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .tab.active {
-    background: rgba(255, 255, 255, 0.4);
-    font-weight: bold;
+  background: rgba(255, 255, 255, 0.4);
+  font-weight: bold;
 }
 
 /* Layout */
 /* Layout */
 .layout-container {
-    position: fixed;
-    /* Lock to viewport to prevent body scroll */
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    height: 100dvh;
-    /* Use dynamic viewport height for mobile browsers */
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: var(--black);
+  position: fixed;
+  /* Lock to viewport to prevent body scroll */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100dvh;
+  /* Use dynamic viewport height for mobile browsers */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--black);
 }
 
 /* Main Area Layout (Sidebar + Canvas) */
 .main-area {
-    display: flex;
-    flex-direction: row;
-    flex-grow: 1;
-    overflow: hidden;
-    position: relative;
-    width: 100%;
-    height: 100%;
+  display: flex;
+  flex-direction: row;
+  flex-grow: 1;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 
 .canvas-container {
-    position: relative;
-    flex-grow: 1;
-    /* Takes available space */
-    min-height: 0;
-    /* Important for flex items to shrink */
-    width: auto;
-    overflow: hidden;
-    /* Clip canvas overflow */
+  position: relative;
+  flex-grow: 1;
+  /* Takes available space */
+  min-height: 0;
+  /* Important for flex items to shrink */
+  width: auto;
+  overflow: hidden;
+  /* Clip canvas overflow */
 }
 
 /* Sidebar Styling */
 .effect-sidebar {
-    width: fit-content;
-    min-width: 15rem;
-    max-width: 25rem;
-    background: rgba(20, 20, 20, 0.95);
-    border-right: 1px solid #333;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 10px;
-    flex-shrink: 0;
-    z-index: 50;
-    gap: 4px;
+  width: fit-content;
+  min-width: 15rem;
+  max-width: 25rem;
+  background: rgba(20, 20, 20, 0.95);
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px;
+  flex-shrink: 0;
+  z-index: 50;
+  gap: 4px;
 }
 
 .effect-sidebar-heading {
-    color: #666;
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 11px;
-    font-weight: 700;
-    text-align: center;
-    margin: 5px 0 2px 0;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    user-select: none;
+  color: #666;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  margin: 5px 0 2px 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  user-select: none;
 }
 
 /* Scrollbar styling for sidebar */
 .effect-sidebar::-webkit-scrollbar {
-    width: 8px;
+  width: 8px;
 }
 
 .effect-sidebar::-webkit-scrollbar-track {
-    background: #111;
+  background: #111;
 }
 
 .effect-sidebar::-webkit-scrollbar-thumb {
-    background: #444;
-    border-radius: 4px;
+  background: #444;
+  border-radius: 4px;
 }
 
 .effect-sidebar::-webkit-scrollbar-thumb:hover {
-    background: #666;
+  background: #666;
 }
 
 /* Effect Buttons */
 .effect-button {
-    padding: 2px 1px;
-    background: transparent;
-    border: 1px solid transparent;
-    color: #888;
-    text-align: left;
-    cursor: pointer;
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 14px;
-    border-radius: 6px;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    user-select: none;
+  padding: 2px 1px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #888;
+  text-align: left;
+  cursor: pointer;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 14px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
 }
 
 .effect-button:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: #ddd;
-    border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #ddd;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .effect-button.active {
-    background: linear-gradient(90deg, rgba(50, 100, 200, 0.2), rgba(50, 100, 200, 0.1));
-    color: #fff;
-    border-color: rgba(60, 120, 240, 0.4);
-    font-weight: 600;
-    box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
-    border-left: 3px solid #48f;
+  background: linear-gradient(90deg, rgba(50, 100, 200, 0.2), rgba(50, 100, 200, 0.1));
+  color: #fff;
+  border-color: rgba(60, 120, 240, 0.4);
+  font-weight: 600;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+  border-left: 3px solid #48f;
 }
 
 #canvas {
-    display: block;
-    width: 100%;
-    height: 100%;
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 /* GUI Container Defaults (Desktop) */
 .gui-container {
-    position: absolute;
-    top: 0;
-    right: 0;
-    z-index: 1000;
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1000;
 }
 
 /* --- Mobile Styles --- */
 @media only screen and (max-width: 900px) {
 
-    /* Switch Layout to Mobile (Page Scroll) */
-    .layout-container {
-        flex-direction: column;
-        position: absolute;
-        /* Allow page to grow */
-        height: auto;
-        min-height: 100dvh;
-        overflow: visible;
-        /* Let page scroll */
-    }
+  /* Switch Layout to Mobile (Page Scroll) */
+  .layout-container {
+    flex-direction: column;
+    position: absolute;
+    /* Allow page to grow */
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+    /* Let page scroll */
+  }
 
-    /* GUI Container becomes a flex item at the bottom */
-    .gui-container {
-        position: static;
-        width: 100%;
-        max-height: none;
-        /* No internal limit */
-        width: 100%;
-        height: auto;
-        min-height: auto;
-        flex-shrink: 0;
-        z-index: 1000;
-        background: rgba(0, 0, 0, 0.8);
-        display: flex;
-        flex-direction: column;
-        overflow-y: visible;
-        /* No internal scrollbars */
-    }
+  /* GUI Container becomes a flex item at the bottom */
+  .gui-container {
+    position: static;
+    width: 100%;
+    max-height: none;
+    /* No internal limit */
+    width: 100%;
+    height: auto;
+    min-height: auto;
+    flex-shrink: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    overflow-y: visible;
+    /* No internal scrollbars */
+  }
 
-    /* Target dat.gui root inside our container */
-    .gui-container .dg.ac,
-    .gui-container .dg.a,
-    /* Often used for sub-menus */
-    .dg.ac {
-        position: static !important;
-        top: auto !important;
-        bottom: auto !important;
-        left: 0 !important;
-        /* STRICT LEFT ALIGN */
-        right: auto !important;
-        width: 100% !important;
-        width: 100% !important;
-        margin: 0 0 10px 0 !important;
-        /* NO MARGINS */
-        padding: 0 !important;
-        display: block !important;
-        float: none !important;
-        transform: none !important;
-        max-width: 100% !important;
-    }
+  /* Target dat.gui root inside our container */
+  .gui-container .dg.ac,
+  .gui-container .dg.a,
+  /* Often used for sub-menus */
+  .dg.ac {
+    position: static !important;
+    top: auto !important;
+    bottom: auto !important;
+    left: 0 !important;
+    /* STRICT LEFT ALIGN */
+    right: auto !important;
+    width: 100% !important;
+    width: 100% !important;
+    margin: 0 0 10px 0 !important;
+    /* NO MARGINS */
+    padding: 0 !important;
+    display: block !important;
+    float: none !important;
+    transform: none !important;
+    max-width: 100% !important;
+  }
 
-    .gui-container .dg.main {
-        width: 100% !important;
-    }
+  .gui-container .dg.main {
+    width: 100% !important;
+  }
 
-    /* Restore dat.gui sizing logic */
-    .gui-container .dg {
-        box-sizing: content-box !important;
-    }
+  /* Restore dat.gui sizing logic */
+  .gui-container .dg {
+    box-sizing: content-box !important;
+  }
 
-    /* Force open folders to actually show content if JS animation fails */
-    .gui-container .dg li:not(.closed)>ul {
-        display: block !important;
-        height: auto !important;
-        overflow: visible !important;
-    }
+  /* Force open folders to actually show content if JS animation fails */
+  .gui-container .dg li:not(.closed)>ul {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
 
-    /* Restore Button Styles & Polish */
-    .dg li {
-        height: 34px !important;
-        line-height: 34px !important;
-        border-bottom: 1px solid #333 !important;
-        overflow: hidden !important;
-    }
+  /* Restore Button Styles & Polish */
+  .dg li {
+    height: 34px !important;
+    line-height: 34px !important;
+    border-bottom: 1px solid #333 !important;
+    overflow: hidden !important;
+  }
 
-    .dg li.folder {
-        height: auto !important;
-        overflow: visible !important;
-    }
+  .dg li.folder {
+    height: auto !important;
+    overflow: visible !important;
+  }
 
-    .dg ul.closed li.cr {
-        display: none;
-    }
+  .dg ul.closed li.cr {
+    display: none;
+  }
 
-    .dg .property-name {
-        width: 40% !important;
-        font-size: 14px !important;
-    }
+  .dg .property-name {
+    width: 40% !important;
+    font-size: 14px !important;
+  }
 
-    .dg .c {
-        width: 60% !important;
-    }
+  .dg .c {
+    width: 60% !important;
+  }
 
-    .dg .slider {
-        margin-top: 5px !important;
-    }
+  .dg .slider {
+    margin-top: 5px !important;
+  }
 
-    .gui-container .dg li.folder.closed {
-        height: 34px !important;
-        overflow: hidden !important;
-    }
+  .gui-container .dg li.folder.closed {
+    height: 34px !important;
+    overflow: hidden !important;
+  }
 
-    .gui-container .dg li.folder.closed ul {
-        display: none !important;
-    }
+  .gui-container .dg li.folder.closed ul {
+    display: none !important;
+  }
 
-    .dg .close-button {
-        position: relative !important;
-        float: none !important;
-        width: 100% !important;
-        display: block !important;
-        margin-top: 5px !important;
-    }
+  .dg .close-button {
+    position: relative !important;
+    float: none !important;
+    width: 100% !important;
+    display: block !important;
+    margin-top: 5px !important;
+  }
 
-    /* Mobile Main Area Layout */
-    .main-area {
-        flex-direction: column;
-        height: auto;
-        min-height: 50vh;
-    }
+  /* Mobile Main Area Layout */
+  .main-area {
+    flex-direction: column;
+    height: auto;
+    min-height: 50vh;
+  }
 
-    .effect-sidebar {
-        width: 100%;
-        max-width: none;
-        min-width: 0;
-        height: auto;
-        max-height: 40vh;
-        border-right: none;
-        border-bottom: 1px solid #333;
-        flex-direction: row;
-        flex-wrap: wrap;
-        align-content: flex-start;
-        gap: 2px;
-    }
+  .effect-sidebar {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    height: auto;
+    max-height: 40vh;
+    border-right: none;
+    border-bottom: 1px solid #333;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 2px;
+  }
 
-    .effect-button {
-        padding: 6px 10px;
-        font-size: 12px;
-        flex-shrink: 0;
-        flex-grow: 1;
-        text-align: center;
-    }
+  .effect-button {
+    padding: 6px 10px;
+    font-size: 12px;
+    flex-shrink: 0;
+    flex-grow: 1;
+    text-align: center;
+  }
 
-    .canvas-container {
-        min-height: 50vh;
-    }
+  .canvas-container {
+    min-height: 50vh;
+  }
 }
 
 /* --- Desktop Styles --- */
 @media only screen and (min-width: 901px) {
-    .gui-container {
-        position: absolute;
-        /* Force absolute to sit flush top-right */
-        display: flex;
-        flex-direction: row;
-        /* Align right, stack horizontally */
-        align-items: flex-start;
-        flex-wrap: wrap;
-        width: auto;
-        /* Allow it to shrink/grow as needed, don't force full width */
-        /* Spans width to allow float-like behavior */
-        right: 0;
-        top: 0;
-        bottom: auto;
-        /* Let it grow down */
-        pointer-events: none;
-        max-height: 100vh;
-        z-index: 2000;
-    }
+  .gui-container {
+    position: absolute;
+    /* Force absolute to sit flush top-right */
+    display: flex;
+    flex-direction: row;
+    /* Align right, stack horizontally */
+    align-items: flex-start;
+    flex-wrap: wrap;
+    width: auto;
+    /* Allow it to shrink/grow as needed, don't force full width */
+    /* Spans width to allow float-like behavior */
+    right: 0;
+    top: 0;
+    bottom: auto;
+    /* Let it grow down */
+    pointer-events: none;
+    max-height: 100vh;
+    z-index: 2000;
+  }
 
-    .gui-container>.global-gui {
-        order: 1;
-    }
+  .gui-container>.global-gui {
+    order: 1;
+  }
 
-    .gui-container>.effect-gui {
-        order: 2;
-    }
+  .gui-container>.effect-gui {
+    order: 2;
+  }
 
-    /* Re-enable pointer events for controls */
-    .gui-container .dg.ac,
-    .gui-container .dg.a,
-    .gui-container .dg.main {
-        pointer-events: auto;
-        position: relative !important;
-        float: none !important;
-        margin: 0 0 5px 10px !important;
-        /* Spacing between horizontal panels */
-        clear: none !important;
-        /* Allow stacking next to each other */
-        width: auto !important;
-        max-width: none !important;
-        left: auto !important;
-        right: auto !important;
-        top: auto !important;
-        bottom: auto !important;
-        transform: none !important;
-        overflow: visible !important;
-        /* Allow folders to expand */
-        height: auto !important;
-    }
+  /* Re-enable pointer events for controls */
+  .gui-container .dg.ac,
+  .gui-container .dg.a,
+  .gui-container .dg.main {
+    pointer-events: auto;
+    position: relative !important;
+    float: none !important;
+    margin: 0 0 5px 10px !important;
+    /* Spacing between horizontal panels */
+    clear: none !important;
+    /* Allow stacking next to each other */
+    width: auto !important;
+    max-width: none !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    overflow: visible !important;
+    /* Allow folders to expand */
+    height: auto !important;
+  }
 
-    /* Ensure content inside doesn't get clipped */
-    .gui-container .dg ul {
-        overflow: visible !important;
-    }
+  /* Ensure content inside doesn't get clipped */
+  .gui-container .dg ul {
+    overflow: visible !important;
+  }
 
-    /* Ensure close button fits within the panel and doesn't bleed out */
-    .gui-container .dg .close-button {
-        width: 100% !important;
-        min-width: 0 !important;
-    }
+  /* Ensure close button fits within the panel and doesn't bleed out */
+  .gui-container .dg .close-button {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
 
-    /* Ensure dat.gui auto-container behaves */
-    .dg.ac {
-        z-index: 1001 !important;
-    }
+  /* Ensure dat.gui auto-container behaves */
+  .dg.ac {
+    z-index: 1001 !important;
+  }
 }
 
 div.labelLayer {
-    pointer-events: none;
-    position: absolute;
-    top: 0px;
+  pointer-events: none;
+  position: absolute;
+  top: 0px;
 }
 
 div.label {
-    pointer-events: none;
-    background-color: transparent;
-    color: white;
-    font-family: Arial;
-    font-size: 10px;
+  pointer-events: none;
+  background-color: transparent;
+  color: white;
+  font-family: Arial;
+  font-size: 10px;
 }

@@ -6,1536 +6,1536 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solids Generator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-                "dat-gui": "https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.module.js",
-                "gui": "../gui.js",
-                "solids": "../solids.js",
-                "geometry": "../geometry.js"
-            }
-        }
-    </script>
-    <style>
-        :root {
-            --slate-900: #0f172a;
-            --slate-800: #1e293b;
-            --slate-700: #334155;
-            --blue-500: #3b82f6;
-            --indigo-400: #818cf8;
-            --sidebar-width: 224px;
-            --footer-height: calc((100vw - 474px) * 0.22);
-            --right-sidebar-width: 250px;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solids Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+        "dat-gui": "https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.module.js",
+        "gui": "../gui.js",
+        "solids": "../solids.js",
+        "geometry": "../geometry.js"
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --slate-900: #0f172a;
+      --slate-800: #1e293b;
+      --slate-700: #334155;
+      --blue-500: #3b82f6;
+      --indigo-400: #818cf8;
+      --sidebar-width: 224px;
+      --footer-height: calc((100vw - 474px) * 0.22);
+      --right-sidebar-width: 250px;
+    }
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--slate-900);
-            color: #E2E8F0;
-            overflow: hidden;
-            margin: 0;
-            display: flex;
-        }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--slate-900);
+      color: #E2E8F0;
+      overflow: hidden;
+      margin: 0;
+      display: flex;
+    }
 
-        #sidebar {
-            width: var(--sidebar-width);
-            flex-shrink: 0;
-            height: 100vh;
-            background-color: rgba(15, 23, 42, 0.95);
-            border-right: 1px solid var(--slate-700);
-            display: flex;
-            flex-direction: column;
-            z-index: 20;
-            overflow-y: auto;
-            overflow-x: hidden;
-        }
+    #sidebar {
+      width: var(--sidebar-width);
+      flex-shrink: 0;
+      height: 100vh;
+      background-color: rgba(15, 23, 42, 0.95);
+      border-right: 1px solid var(--slate-700);
+      display: flex;
+      flex-direction: column;
+      z-index: 20;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
 
-        #main {
-            flex: 1;
-            min-width: 0;
-            position: relative;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
+    #main {
+      flex: 1;
+      min-width: 0;
+      position: relative;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
 
-        #canvas-container {
-            flex: 1;
-            position: relative;
-            background: linear-gradient(to bottom, #0f172a, #1e293b);
-            min-height: 0;
-            /* Allow shrinking */
-            overflow: hidden;
-        }
+    #canvas-container {
+      flex: 1;
+      position: relative;
+      background: linear-gradient(to bottom, #0f172a, #1e293b);
+      min-height: 0;
+      /* Allow shrinking */
+      overflow: hidden;
+    }
 
-        #footer {
-            height: var(--footer-height);
-            background-color: rgba(15, 23, 42, 0.95);
-            border-top: 1px solid var(--slate-700);
-            display: grid;
-            grid-template-rows: repeat(2, 1fr);
-            grid-auto-flow: column;
-            align-items: center;
-            overflow-x: auto;
-            padding: 0.5rem;
-            gap: 0.5rem;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
-            z-index: 10;
-        }
+    #footer {
+      height: var(--footer-height);
+      background-color: rgba(15, 23, 42, 0.95);
+      border-top: 1px solid var(--slate-700);
+      display: grid;
+      grid-template-rows: repeat(2, 1fr);
+      grid-auto-flow: column;
+      align-items: center;
+      overflow-x: auto;
+      padding: 0.5rem;
+      gap: 0.5rem;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+      z-index: 10;
+    }
 
-        /* Scrollbar styling for footer */
-        #footer::-webkit-scrollbar {
-            height: 8px;
-        }
+    /* Scrollbar styling for footer */
+    #footer::-webkit-scrollbar {
+      height: 8px;
+    }
 
-        #footer::-webkit-scrollbar-track {
-            background: var(--slate-900);
-        }
+    #footer::-webkit-scrollbar-track {
+      background: var(--slate-900);
+    }
 
-        #footer::-webkit-scrollbar-thumb {
-            background: var(--slate-700);
-            border-radius: 4px;
-        }
+    #footer::-webkit-scrollbar-thumb {
+      background: var(--slate-700);
+      border-radius: 4px;
+    }
 
-        #footer::-webkit-scrollbar-thumb:hover {
-            background: var(--slate-600);
-        }
+    #footer::-webkit-scrollbar-thumb:hover {
+      background: var(--slate-600);
+    }
 
-        .thumb-btn {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: calc((100vw - 474px) * 0.09);
-            height: calc((100vw - 474px) * 0.09);
-            height: 100%;
-            background-color: var(--slate-800);
-            border: 2px solid var(--slate-700);
-            border-radius: 0.75rem;
-            cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            padding: calc((100vw - 474px) * 0.005);
-            position: relative;
-        }
+    .thumb-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: calc((100vw - 474px) * 0.09);
+      height: calc((100vw - 474px) * 0.09);
+      height: 100%;
+      background-color: var(--slate-800);
+      border: 2px solid var(--slate-700);
+      border-radius: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      padding: calc((100vw - 474px) * 0.005);
+      position: relative;
+    }
 
-        .thumb-btn:hover {
-            border-color: var(--blue-500);
-            background-color: var(--slate-700);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-        }
+    .thumb-btn:hover {
+      border-color: var(--blue-500);
+      background-color: var(--slate-700);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
 
-        .thumb-btn.active {
-            border-color: var(--blue-500);
-            background-color: rgba(59, 130, 246, 0.15);
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
-        }
+    .thumb-btn.active {
+      border-color: var(--blue-500);
+      background-color: rgba(59, 130, 246, 0.15);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+    }
 
-        .thumb-btn img {
-            width: calc((100vw - 474px) * 0.06);
-            height: calc((100vw - 474px) * 0.06);
-            object-fit: contain;
-            margin-bottom: calc((100vw - 474px) * 0.004);
-            filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
-        }
+    .thumb-btn img {
+      width: calc((100vw - 474px) * 0.06);
+      height: calc((100vw - 474px) * 0.06);
+      object-fit: contain;
+      margin-bottom: calc((100vw - 474px) * 0.004);
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+    }
 
-        .thumb-btn span {
-            font-size: calc((100vw - 474px) * 0.008);
-            text-align: center;
-            line-height: 1.1;
-            color: #cbd5e1;
-        }
+    .thumb-btn span {
+      font-size: calc((100vw - 474px) * 0.008);
+      text-align: center;
+      line-height: 1.1;
+      color: #cbd5e1;
+    }
 
-        #code-panel {
-            position: absolute;
-            bottom: var(--footer-height);
-            /* Sit above footer */
-            left: 0;
-            right: 0;
-            height: 200px;
-            background-color: var(--slate-800);
-            border-top: 1px solid var(--slate-700);
-            padding: 1rem;
-            transform: translateY(150%);
-            /* Hide fully */
-            transition: transform 0.3s ease;
-            z-index: 30;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
+    #code-panel {
+      position: absolute;
+      bottom: var(--footer-height);
+      /* Sit above footer */
+      left: 0;
+      right: 0;
+      height: 200px;
+      background-color: var(--slate-800);
+      border-top: 1px solid var(--slate-700);
+      padding: 1rem;
+      transform: translateY(150%);
+      /* Hide fully */
+      transition: transform 0.3s ease;
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
 
-        #code-panel.open {
-            transform: translateY(0);
-        }
+    #code-panel.open {
+      transform: translateY(0);
+    }
 
-        textarea {
-            font-family: 'JetBrains Mono', monospace;
-            background-color: var(--slate-900);
-            color: #a5b4fc;
-            border: 1px solid var(--slate-700);
-            resize: none;
-            font-size: 0.8rem;
-        }
+    textarea {
+      font-family: 'JetBrains Mono', monospace;
+      background-color: var(--slate-900);
+      color: #a5b4fc;
+      border: 1px solid var(--slate-700);
+      resize: none;
+      font-size: 0.8rem;
+    }
 
-        .btn {
-            padding: 0.4rem 0.6rem;
-            border-radius: 0.25rem;
-            font-weight: 500;
-            font-size: 0.875rem;
-            transition: all 0.2s;
-            cursor: pointer;
-        }
+    .btn {
+      padding: 0.4rem 0.6rem;
+      border-radius: 0.25rem;
+      font-weight: 500;
+      font-size: 0.875rem;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
 
-        .btn-primary {
-            background-color: var(--blue-500);
-            color: white;
-        }
+    .btn-primary {
+      background-color: var(--blue-500);
+      color: white;
+    }
 
-        .btn-primary:hover {
-            background-color: #2563eb;
-        }
+    .btn-primary:hover {
+      background-color: #2563eb;
+    }
 
-        .btn-secondary {
-            background-color: var(--slate-700);
-            color: white;
-        }
+    .btn-secondary {
+      background-color: var(--slate-700);
+      color: white;
+    }
 
-        .btn-secondary:hover {
-            background-color: var(--slate-600);
-        }
+    .btn-secondary:hover {
+      background-color: var(--slate-600);
+    }
 
-        .op-item {
-            background-color: var(--slate-800);
-            border: 1px solid var(--slate-700);
-            padding: 0.4rem;
-            margin-bottom: 0.4rem;
-            border-radius: 0.25rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            width: 100%;
-            box-sizing: border-box;
-            position: relative;
-            transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), border-color 0.2s, opacity 0.2s;
-            user-select: none;
-        }
+    .op-item {
+      background-color: var(--slate-800);
+      border: 1px solid var(--slate-700);
+      padding: 0.4rem;
+      margin-bottom: 0.4rem;
+      border-radius: 0.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      box-sizing: border-box;
+      position: relative;
+      transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), border-color 0.2s, opacity 0.2s;
+      user-select: none;
+    }
 
-        .op-item:hover {
-            border-color: var(--indigo-400);
-        }
+    .op-item:hover {
+      border-color: var(--indigo-400);
+    }
 
-        .op-item.dragging {
-            opacity: 0.2;
-            transform: scale(0.98);
-            border-style: dashed;
-            z-index: 10;
-        }
+    .op-item.dragging {
+      opacity: 0.2;
+      transform: scale(0.98);
+      border-style: dashed;
+      z-index: 10;
+    }
 
-        .drag-handle {
-            cursor: grab;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 1rem;
-            height: 1.5rem;
-            margin-right: 0.25rem;
-            color: var(--slate-500);
-            flex-shrink: 0;
-            opacity: 0.5;
-            transition: opacity 0.2s;
-        }
+    .drag-handle {
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 1rem;
+      height: 1.5rem;
+      margin-right: 0.25rem;
+      color: var(--slate-500);
+      flex-shrink: 0;
+      opacity: 0.5;
+      transition: opacity 0.2s;
+    }
 
-        .op-item:hover .drag-handle {
-            opacity: 1;
-        }
+    .op-item:hover .drag-handle {
+      opacity: 1;
+    }
 
-        .drag-handle:active {
-            cursor: grabbing;
-        }
+    .drag-handle:active {
+      cursor: grabbing;
+    }
 
-        .drag-handle svg {
-            width: 0.8rem;
-            height: 0.8rem;
-            fill: currentColor;
-        }
+    .drag-handle svg {
+      width: 0.8rem;
+      height: 0.8rem;
+      fill: currentColor;
+    }
 
-        #saveBtn {
-            width: 3rem;
-            height: 3rem;
-            border-radius: 50%;
-            background-color: rgba(15, 23, 42, 0.8);
-            border: 2px solid var(--slate-700);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.2s;
-            backdrop-filter: blur(5px);
-        }
+    #saveBtn {
+      width: 3rem;
+      height: 3rem;
+      border-radius: 50%;
+      background-color: rgba(15, 23, 42, 0.8);
+      border: 2px solid var(--slate-700);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      backdrop-filter: blur(5px);
+    }
 
-        #save-actions {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            z-index: 40;
-        }
+    #save-actions {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      z-index: 40;
+    }
 
-        #meshStats {
-            background-color: rgba(15, 23, 42, 0.8);
-            border: 1px solid var(--slate-700);
-            border-radius: 0.5rem;
-            padding: 0.4rem 0.8rem;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.65rem;
-            color: rgba(165, 180, 252, 0.8);
-            text-transform: uppercase;
-            backdrop-filter: blur(5px);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-            pointer-events: none;
-            white-space: nowrap;
-        }
+    #meshStats {
+      background-color: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--slate-700);
+      border-radius: 0.5rem;
+      padding: 0.4rem 0.8rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: rgba(165, 180, 252, 0.8);
+      text-transform: uppercase;
+      backdrop-filter: blur(5px);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+      pointer-events: none;
+      white-space: nowrap;
+    }
 
-        #saveBtn:hover {
-            border-color: var(--blue-500);
-            transform: scale(1.1);
-        }
+    #saveBtn:hover {
+      border-color: var(--blue-500);
+      transform: scale(1.1);
+    }
 
-        #saveBtn svg {
-            width: 1.5rem;
-            height: 1.5rem;
-            stroke: #fbbf24;
-            fill: none;
-            stroke-width: 2;
-        }
+    #saveBtn svg {
+      width: 1.5rem;
+      height: 1.5rem;
+      stroke: #fbbf24;
+      fill: none;
+      stroke-width: 2;
+    }
 
-        #right-sidebar {
-            width: var(--right-sidebar-width);
-            flex-shrink: 0;
-            height: 100vh;
-            background-color: rgba(15, 23, 42, 0.95);
-            border-left: 1px solid var(--slate-700);
-            display: flex;
-            flex-direction: column;
-            z-index: 20;
-            overflow-y: auto;
-            padding: 1rem;
-        }
+    #right-sidebar {
+      width: var(--right-sidebar-width);
+      flex-shrink: 0;
+      height: 100vh;
+      background-color: rgba(15, 23, 42, 0.95);
+      border-left: 1px solid var(--slate-700);
+      display: flex;
+      flex-direction: column;
+      z-index: 20;
+      overflow-y: auto;
+      padding: 1rem;
+    }
 
-        .saved-item {
-            background-color: var(--slate-800);
-            border: 1px solid var(--slate-700);
-            border-radius: 0.5rem;
-            padding: 0.5rem;
-            margin-bottom: 0.75rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            position: relative;
-        }
+    .saved-item {
+      background-color: var(--slate-800);
+      border: 1px solid var(--slate-700);
+      border-radius: 0.5rem;
+      padding: 0.5rem;
+      margin-bottom: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
 
-        .saved-item:hover {
-            border-color: var(--blue-500);
-            transform: translateY(-2px);
-        }
+    .saved-item:hover {
+      border-color: var(--blue-500);
+      transform: translateY(-2px);
+    }
 
-        .saved-item img {
-            width: 100%;
-            height: 120px;
-            object-fit: cover;
-            border-radius: 0.25rem;
-            margin-bottom: 0.5rem;
-            background-color: #000;
-        }
+    .saved-item img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 0.25rem;
+      margin-bottom: 0.5rem;
+      background-color: #000;
+    }
 
-        .saved-item .title {
-            font-size: 0.8rem;
-            font-weight: 500;
-            color: #cbd5e1;
-            margin-bottom: 0.1rem;
-        }
+    .saved-item .title {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #cbd5e1;
+      margin-bottom: 0.1rem;
+    }
 
-        .saved-item .details {
-            font-size: 0.7rem;
-            color: #94a3b8;
-            margin-bottom: 0.5rem;
-        }
+    .saved-item .details {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      margin-bottom: 0.5rem;
+    }
 
-        .saved-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 0.4rem;
-            margin-top: 0.4rem;
-        }
+    .saved-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.4rem;
+      margin-top: 0.4rem;
+    }
 
-        .action-btn {
-            font-size: 0.65rem;
-            padding: 0.2rem 0.4rem;
-            border-radius: 0.2rem;
-            background-color: var(--slate-700);
-            color: #cbd5e1;
-            border: 1px solid var(--slate-600);
-            transition: all 0.2s;
-            font-weight: 600;
-        }
+    .action-btn {
+      font-size: 0.65rem;
+      padding: 0.2rem 0.4rem;
+      border-radius: 0.2rem;
+      background-color: var(--slate-700);
+      color: #cbd5e1;
+      border: 1px solid var(--slate-600);
+      transition: all 0.2s;
+      font-weight: 600;
+    }
 
-        .action-btn:hover {
-            background-color: var(--blue-500);
-            color: white;
-            border-color: var(--blue-400);
-        }
+    .action-btn:hover {
+      background-color: var(--blue-500);
+      color: white;
+      border-color: var(--blue-400);
+    }
 
-        .del-btn:hover {
-            background-color: #ef4444;
-            border-color: #f87171;
-        }
-    </style>
+    .del-btn:hover {
+      background-color: #ef4444;
+      border-color: #f87171;
+    }
+  </style>
 </head>
 
 <body>
 
-    <div id="sidebar" class="p-4 space-y-6">
-        <div>
-            <h1 class="text-xl font-bold text-white mb-1">Solids Generator</h1>
-            <p class="text-xs text-indigo-300">Conway Mesh Operators</p>
-        </div>
-
-        <!-- Base Solid Display -->
-        <div id="baseSolidDisplay" class="space-y-2">
-            <label class="text-xs uppercase font-semibold text-slate-400">Source Solid</label>
-            <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-3 flex items-center space-x-3">
-                <img id="baseThumb" src=""
-                    class="w-12 h-12 object-contain bg-slate-900 rounded-md border border-slate-700 shadow-sm" />
-                <div class="flex flex-col min-w-0">
-                    <div id="baseTitle" class="text-xs font-black text-white uppercase tracking-wider line-clamp-2">
-                    </div>
-                    <span id="baseStats"
-                        class="text-[0.6rem] text-indigo-300/60 font-medium uppercase tracking-tight"></span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Operations Queue -->
-        <div class="space-y-2 flex-1 overflow-hidden flex flex-col">
-            <div class="flex items-center justify-between">
-                <label class="text-xs uppercase font-semibold text-slate-400">Operations</label>
-                <button onclick="resetOps()"
-                    class="text-[0.65rem] text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear
-                    All</button>
-            </div>
-            <div id="opsList" class="relative flex-1 overflow-y-auto space-y-2 pr-2">
-                <!-- Operations go here -->
-            </div>
-
-            <label class="text-xs uppercase font-semibold text-slate-400 mt-4">Add Operation</label>
-            <div class="grid grid-cols-2 gap-2 pt-1">
-                <button onclick="addOp('kis')" class="btn btn-secondary text-[0.65rem]">Kis</button>
-                <button onclick="addOp('ambo')" class="btn btn-secondary text-[0.65rem]">Ambo</button>
-                <button onclick="addOp('gyro')" class="btn btn-secondary text-[0.65rem]">Gyro</button>
-                <button onclick="addOp('snub')" class="btn btn-secondary text-[0.65rem]">Snub</button>
-                <button onclick="addOp('dual')" class="btn btn-secondary text-[0.65rem]">Dual</button>
-                <button onclick="addOp('truncate')" class="btn btn-secondary text-[0.65rem]">Truncate</button>
-                <button onclick="addOp('bitruncate')" class="btn btn-secondary text-[0.65rem] relative group">
-                    Bitruncate
-                    <span
-                        class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
-                        Truncate(Ambo(x), t)
-                    </span>
-                </button>
-                <button onclick="addOp('hankin')" class="btn btn-secondary text-[0.65rem]">Hankin</button>
-                <button onclick="addOp('canonicalize')" class="btn btn-secondary text-[0.65rem]">Canon</button>
-            </div>
-        </div>
-
-        <!-- Visualization Options -->
-        <div class="space-y-2 border-t border-slate-700 pt-4">
-            <label class="text-xs uppercase font-semibold text-slate-400">Visualization</label>
-
-            <div class="flex items-center justify-between">
-                <span class="text-sm">Geodesic Edges</span>
-                <button id="toggleGeo"
-                    class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
-                    <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform"></div>
-                </button>
-            </div>
-
-            <div class="flex items-center justify-between">
-                <span class="text-sm">Show Faces</span>
-                <button id="toggleFaces"
-                    class="w-10 h-5 rounded-full bg-blue-500 relative transition-colors focus:outline-none">
-                    <div
-                        class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transform translate-x-5 transition-transform">
-                    </div>
-                </button>
-            </div>
-
-            <div class="flex items-center justify-between">
-                <span class="text-sm">Show Vertices</span>
-                <button id="toggleVerts"
-                    class="w-10 h-5 rounded-full bg-blue-500 relative transition-colors focus:outline-none">
-                    <div
-                        class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transform translate-x-5 transition-transform">
-                    </div>
-                </button>
-            </div>
-
-            <div class="flex items-center justify-between">
-                <span class="text-sm">Show Normals</span>
-                <button id="toggleNormals"
-                    class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
-                    <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform">
-                    </div>
-                </button>
-            </div>
-
-            <div class="flex items-center justify-between">
-                <span class="text-sm">Show Indices</span>
-                <button id="toggleIndices"
-                    class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
-                    <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform">
-                    </div>
-                </button>
-            </div>
-        </div>
+  <div id="sidebar" class="p-4 space-y-6">
+    <div>
+      <h1 class="text-xl font-bold text-white mb-1">Solids Generator</h1>
+      <p class="text-xs text-indigo-300">Conway Mesh Operators</p>
     </div>
 
-    <div id="main">
-        <div id="canvas-container">
-            <!-- Index Labels Overlay -->
-            <div id="labels" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
-            <div id="save-actions">
-                <div id="meshStats"></div>
-                <button id="saveBtn" title="Save to Collection">
-                    <!-- Star Icon -->
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round"
-                        stroke-linejoin="round">
-                        <polygon
-                            points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
-                        </polygon>
-                    </svg>
-                </button>
-            </div>
-            <canvas id="canvas" class="w-full h-full block"></canvas>
+    <!-- Base Solid Display -->
+    <div id="baseSolidDisplay" class="space-y-2">
+      <label class="text-xs uppercase font-semibold text-slate-400">Source Solid</label>
+      <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-3 flex items-center space-x-3">
+        <img id="baseThumb" src=""
+          class="w-12 h-12 object-contain bg-slate-900 rounded-md border border-slate-700 shadow-sm" />
+        <div class="flex flex-col min-w-0">
+          <div id="baseTitle" class="text-xs font-black text-white uppercase tracking-wider line-clamp-2">
+          </div>
+          <span id="baseStats"
+            class="text-[0.6rem] text-indigo-300/60 font-medium uppercase tracking-tight"></span>
         </div>
-
-        <div id="footer">
-            <!-- Dynamic Thumbnails -->
-        </div>
+      </div>
     </div>
 
-    <div id="right-sidebar">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-bold text-white">Saved Solids</h2>
-            <button onclick="clearSavedSolids()"
-                class="text-xs text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear All</button>
-        </div>
-        <div id="savedList" class="flex-1 overflow-y-auto">
-            <!-- Saved items go here -->
-        </div>
+    <!-- Operations Queue -->
+    <div class="space-y-2 flex-1 overflow-hidden flex flex-col">
+      <div class="flex items-center justify-between">
+        <label class="text-xs uppercase font-semibold text-slate-400">Operations</label>
+        <button onclick="resetOps()"
+          class="text-[0.65rem] text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear
+          All</button>
+      </div>
+      <div id="opsList" class="relative flex-1 overflow-y-auto space-y-2 pr-2">
+        <!-- Operations go here -->
+      </div>
+
+      <label class="text-xs uppercase font-semibold text-slate-400 mt-4">Add Operation</label>
+      <div class="grid grid-cols-2 gap-2 pt-1">
+        <button onclick="addOp('kis')" class="btn btn-secondary text-[0.65rem]">Kis</button>
+        <button onclick="addOp('ambo')" class="btn btn-secondary text-[0.65rem]">Ambo</button>
+        <button onclick="addOp('gyro')" class="btn btn-secondary text-[0.65rem]">Gyro</button>
+        <button onclick="addOp('snub')" class="btn btn-secondary text-[0.65rem]">Snub</button>
+        <button onclick="addOp('dual')" class="btn btn-secondary text-[0.65rem]">Dual</button>
+        <button onclick="addOp('truncate')" class="btn btn-secondary text-[0.65rem]">Truncate</button>
+        <button onclick="addOp('bitruncate')" class="btn btn-secondary text-[0.65rem] relative group">
+          Bitruncate
+          <span
+            class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
+            Truncate(Ambo(x), t)
+          </span>
+        </button>
+        <button onclick="addOp('hankin')" class="btn btn-secondary text-[0.65rem]">Hankin</button>
+        <button onclick="addOp('canonicalize')" class="btn btn-secondary text-[0.65rem]">Canon</button>
+      </div>
     </div>
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        // Removed solids.js import
-        import createHolosphereModule from '../holosphere_wasm.js';
-
-        let camera, scene, renderer, controls;
-        let mainMesh, frameMesh, edgeLines, vertPoints, normalLines;
-        let labelsContainer;
-        let draggingIndex = -1;
-
-        // WASM Module
-        let WasmModule = null;
-        let MeshOpsWasm = null;
-
-        // --- STATE ---
-        const state = {
-            base: 'cube',
-            ops: [], // Array of objects { op: string, params: object }
-            showGeodesics: true,
-            showFaces: true,
-            showVertices: false,
-            showNormals: false,
-            showIndices: false
-        };
-
-        const baseThumbnails = {};
-
-        // Lists (populated from WASM)
-        let PlatonicSolids = [];
-        let ArchimedeanSolids = [];
-        let IslamicStarPatterns = [];
-
-        const OP_DEFS = {
-            kis: { params: {} },
-            ambo: { params: {} },
-            gyro: { params: {} },
-            snub: { params: {} },
-            dual: { params: {} },
-            truncate: { params: { t: { val: 0.33, min: 0.01, max: 0.99, step: 0.01 } } },
-            bitruncate: { params: { t: { val: 0.33, min: 0.01, max: 0.99, step: 0.01 } } },
-            expand: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 } } },
-            hankin: { params: { angle: { val: 30, min: 0, max: 180, step: 1 } } },
-            canonicalize: { params: { iter: { val: 100, min: 1, max: 500, step: 1 } } }
-        };
-
-        // Initialize
-        async function init() {
-            // Load WASM
-            try {
-                WasmModule = await createHolosphereModule();
-                MeshOpsWasm = WasmModule.MeshOps;
-                console.log('WASM Module Loaded');
-
-                // Populate Registry from WASM
-                const registry = MeshOpsWasm.getRegistry();
-                // registry is array of {name, category}
-                // Filter into existing categories
-                PlatonicSolids = [];
-                ArchimedeanSolids = [];
-                IslamicStarPatterns = [];
-
-                // Hardcoded knowledge of Platonic for ordering if desired, or just push
-                const platonics = ['tetrahedron', 'cube', 'octahedron', 'dodecahedron', 'icosahedron'];
-
-                for (let i = 0; i < registry.length; i++) {
-                    const item = registry[i];
-                    const name = item.name;
-                    const cat = item.category; // "Simple" or "Complex"
-
-                    if (cat === "Complex") {
-                        IslamicStarPatterns.push(name);
-                    } else {
-                        // Simple: Platonic or Archimedean
-                        if (platonics.includes(name)) {
-                            PlatonicSolids.push(name);
-                        } else {
-                            ArchimedeanSolids.push(name);
-                        }
-                    }
-                }
-
-            } catch (e) {
-                console.error('Failed to load WASM:', e);
-                return;
-            }
-            // Initialize Three.js
-            const canvas = document.getElementById('canvas');
-            const container = document.getElementById('canvas-container');
-
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0f172a); // slate-900
-
-            camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-            camera.position.set(2, 1.5, 2);
-
-            renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-
-            controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.autoRotate = true;
-            controls.autoRotateSpeed = 2.0;
-
-            // Lights
-            const ambLight = new THREE.AmbientLight(0xffffff, 0.5);
-            scene.add(ambLight);
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-            dirLight.position.set(5, 10, 7);
-            scene.add(dirLight);
-
-            // Secondary Light for drama
-            const rimLight = new THREE.SpotLight(0x3b82f6, 5);
-            rimLight.position.set(-5, 0, -5);
-            scene.add(rimLight);
-
-            // Events
-            window.addEventListener('resize', onResize);
-
-            // Toggles
-            document.getElementById('toggleGeo').parentElement.addEventListener('click', () => {
-                state.showGeodesics = !state.showGeodesics;
-                updateToggles();
-                update();
-            });
-            document.getElementById('toggleFaces').parentElement.addEventListener('click', () => {
-                state.showFaces = !state.showFaces;
-                updateToggles();
-                update();
-            });
-            document.getElementById('toggleVerts').parentElement.addEventListener('click', () => {
-                state.showVertices = !state.showVertices;
-                updateToggles();
-                update();
-            });
-            document.getElementById('toggleNormals').parentElement.addEventListener('click', () => {
-                state.showNormals = !state.showNormals;
-                updateToggles();
-                update();
-            });
-            document.getElementById('toggleIndices').parentElement.addEventListener('click', () => {
-                state.showIndices = !state.showIndices;
-                updateToggles();
-                update();
-            });
-
-            labelsContainer = document.getElementById('labels');
-
-            document.getElementById('saveBtn').addEventListener('click', saveSolid);
-
-            // Generate Thumbnails
-            generateThumbnails();
-
-            updateToggles();
-            onResize();
-            update();
-            renderBaseSolid();
-            animate();
-        }
-
-        function wasmMeshToJs(wasmMesh) {
-            const vArray = wasmMesh.getVertices(); // Float32Array
-
-            // NaN Check
-            for (let i = 0; i < vArray.length; i++) {
-                if (Number.isNaN(vArray[i])) {
-                    console.error("WASM returned NaN vertex at index", i);
-                    return { vertices: [], faces: [] }; // Fail gracefully
-                }
-            }
-
-            const vertices = [];
-            for (let i = 0; i < vArray.length; i += 3) {
-                vertices.push(new THREE.Vector3(vArray[i], vArray[i + 1], vArray[i + 2]));
-            }
-
-            const faces = wasmMesh.getFaces(); // Returns Array<Array<number>> directly now!
-
-            return { vertices, faces };
-        }
-
-        async function generateThumbnails() {
-            const footer = document.getElementById('footer');
-
-            // Gather all solid names from exported lists
-            const thumbKeys = [...PlatonicSolids, ...ArchimedeanSolids, ...IslamicStarPatterns];
-
-            // Create offscreen renderer
-            const width = 256; // High-res for larger thumbs
-            const height = 256;
-            const offRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-            offRenderer.setSize(width, height);
-            offRenderer.setClearColor(0x000000, 0); // Transparent
-
-            const offScene = new THREE.Scene();
-            const offCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 10);
-            offCamera.position.set(1.5, 1.5, 1.5);
-            offCamera.lookAt(0, 0, 0);
-
-            const light = new THREE.DirectionalLight(0xffffff, 1.5);
-            light.position.set(2, 5, 3);
-            offScene.add(light);
-            offScene.add(new THREE.AmbientLight(0xffffff, 0.5));
-
-            // Material for thumbnails
-            const mat = new THREE.MeshPhongMaterial({
-                color: 0x3b82f6,
-                flatShading: true,
-                shininess: 30
-            });
-            const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
-
-            for (const key of thumbKeys) {
-                // Clear scene
-                while (offScene.children.length > 0) {
-                    const obj = offScene.children[0];
-                    if (obj.isLight) { // Keep lighting? adjust
-                        // Actually, better to remove meshes.
-                        if (obj.isMesh || obj.isLineSegments) offScene.remove(obj);
-                        else break; // light is at end? No.
-                    }
-                    if (obj.isLight) {
-                        // Keep light
-                        offScene.children.push(offScene.children.shift()); // Cycle
-                        if (offScene.children[0].isLight && offScene.children.length <= 2) break; // Assuming 2 lights
-                    } else {
-                        offScene.remove(obj);
-                    }
-                }
-
-                // Re-add lights if cleared (simpler to just clear all and re-add)
-                offScene.clear();
-                offScene.add(light);
-                offScene.add(new THREE.AmbientLight(0xffffff, 0.5));
-
-                const wasmMesh = MeshOpsWasm.fromSolidName(key);
-                const meshData = wasmMeshToJs(wasmMesh);
-                wasmMesh.delete();
-
-                // Triangulate
-                const vertices = [];
-                meshData.faces.forEach(f => {
-                    for (let i = 1; i < f.length - 1; i++) {
-                        vertices.push(...meshData.vertices[f[0]].toArray());
-                        vertices.push(...meshData.vertices[f[i]].toArray());
-                        vertices.push(...meshData.vertices[f[i + 1]].toArray());
-                    }
-                });
-                const geo = new THREE.BufferGeometry();
-                geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-                geo.computeVertexNormals();
-
-                const mesh = new THREE.Mesh(geo, mat);
-                offScene.add(mesh);
-
-                // Edges (optional, but looks nice)
-                const edgeIndices = new Set();
-                meshData.faces.forEach(f => {
-                    for (let i = 0; i < f.length; i++) {
-                        const a = f[i];
-                        const b = f[(i + 1) % f.length];
-                        const k = a < b ? `${a}_${b}` : `${b}_${a}`;
-                        if (!edgeIndices.has(k)) edgeIndices.add(k);
-                    }
-                });
-                const linePoints = [];
-                edgeIndices.forEach(k => {
-                    const [ai, bi] = k.split('_').map(Number);
-                    linePoints.push(meshData.vertices[ai], meshData.vertices[bi]);
-                });
-                const lineGeo = new THREE.BufferGeometry().setFromPoints(linePoints);
-                const lines = new THREE.LineSegments(lineGeo, lineMat);
-                offScene.add(lines);
-
-                // Render
-                offRenderer.render(offScene, offCamera);
-
-                // Create Button
-                const btn = document.createElement('div');
-                btn.className = `thumb-btn ${state.base === key ? 'active' : ''}`;
-                btn.onclick = () => {
-                    state.base = key;
-                    update();
-                    renderBaseSolid();
-                    // Update active state
-                    document.querySelectorAll('.thumb-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                };
-
-                const img = document.createElement('img');
-                const dataURL = offRenderer.domElement.toDataURL();
-                img.src = dataURL;
-                baseThumbnails[key] = dataURL;
-
-                const span = document.createElement('span');
-                // Format Name: truncatedIcosahedron -> Truncated Icosahedron -> Truncated\nIcosahedron?
-                // Split camel case
-                const title = key.replace(/([A-Z])/g, ' $1').trim();
-                const parts = title.split(' ');
-                span.innerHTML = parts.join('<br>');
-
-                btn.appendChild(img);
-                btn.appendChild(span);
-                footer.appendChild(btn);
-            }
-
-            // Cleanup
-            offRenderer.dispose();
-        }
-
-        function updateToggles() {
-            const tG = document.getElementById('toggleGeo');
-            const tF = document.getElementById('toggleFaces');
-            const tV = document.getElementById('toggleVerts');
-
-            tG.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showGeodesics ? 'bg-blue-500' : 'bg-slate-700'}`;
-            tG.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showGeodesics ? 'translate-x-5' : ''}`;
-
-            tF.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showFaces ? 'bg-blue-500' : 'bg-slate-700'}`;
-            tF.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showFaces ? 'translate-x-5' : ''}`;
-
-            tV.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showVertices ? 'bg-blue-500' : 'bg-slate-700'}`;
-            tV.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showVertices ? 'translate-x-5' : ''}`;
-
-            const tN = document.getElementById('toggleNormals');
-            tN.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showNormals ? 'bg-blue-500' : 'bg-slate-700'}`;
-            tN.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showNormals ? 'translate-x-5' : ''}`;
-
-            const tI = document.getElementById('toggleIndices');
-            tI.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showIndices ? 'bg-blue-500' : 'bg-slate-700'}`;
-            tI.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showIndices ? 'translate-x-5' : ''}`;
-        }
-
-        function onResize() {
-            const sidebar = document.getElementById('sidebar');
-            const rightSidebar = document.getElementById('right-sidebar');
-            const container = document.getElementById('canvas-container');
-
-            // Explicitly calculate available width
-            const sidebarWidth = sidebar.getBoundingClientRect().width;
-            const rightWidth = rightSidebar.getBoundingClientRect().width;
-            const w = window.innerWidth - sidebarWidth - rightWidth;
-            const h = container.clientHeight;
-
-            renderer.setSize(w, h);
-            camera.aspect = w / h;
-            camera.updateProjectionMatrix();
-        }
-
-        // --- SAVED ITEMS ---
-        const savedSolids = [];
-
-        function saveSolid() {
-            // Capture thumbnail
-            renderer.render(scene, camera);
-            const dataURL = renderer.domElement.toDataURL('image/png');
-
-            const title = state.base.replace(/([A-Z])/g, ' $1').trim();
-
-            // Get current counts from window.currentMesh
-            const vCount = window.currentMesh.vertices.length;
-            const fCount = window.currentMesh.faces.length;
-            const eCount = window.currentMesh.edgeCount || 0;
-
-            // Generate summary
-            const opsSummary = state.ops.map(o => {
-                if (o.op === 'truncate') return `Tr(${o.params.t})`;
-                if (o.op === 'bitruncate') return `BiTr(${o.params.t})`;
-                if (o.op === 'hankin') return `Hk(${o.params.angle.toFixed(2)})`;
-                return o.op.charAt(0).toUpperCase() + o.op.slice(1);
-            }).join(', ') || 'Base Solid';
-
-            const item = {
-                id: Date.now(),
-                base: state.base,
-                ops: JSON.parse(JSON.stringify(state.ops)), // Deep copy
-                geodesics: state.showGeodesics,
-                faces: state.showFaces,
-                vertices: state.showVertices,
-                thumb: dataURL,
-                title: title,
-                desc: opsSummary,
-                stats: `${vCount}V ${eCount}E ${fCount}F`
-            };
-
-            savedSolids.push(item);
-            renderSavedList();
-        }
-
-        function renderSavedList() {
-            const list = document.getElementById('savedList');
-            list.innerHTML = '';
-
-            savedSolids.forEach((item, index) => {
-                const el = document.createElement('div');
-                el.className = 'saved-item';
-                el.innerHTML = `
-                    <img src="${item.thumb}" alt="${item.title}" />
-                    <div class="flex justify-between items-start">
-                        <div class="title capitalize">${item.title}</div>
-                        <div class="text-[0.55rem] font-mono text-indigo-400 opacity-60">${item.stats}</div>
-                    </div>
-                    <div class="details uppercase opacity-70">${item.desc}</div>
-                    <div class="saved-actions" onclick="event.stopPropagation()">
-                        <div class="flex flex-col gap-1">
-                            <div class="flex gap-1 justify-end">
-                                <span class="text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1">Recipe</span>
-                                <button class="action-btn" onclick="copyCode(${index}, 'recipe_cpp', this)">C++</button>
-                            </div>
-                        </div>
-                        <button class="action-btn del-btn self-start ml-1" onclick="deleteSolid(${index})">&times;</button>
-                    </div>
-                `;
-                el.onclick = () => restoreSolid(item);
-                list.insertBefore(el, list.firstChild); // Newest first
-            });
-        }
-
-        window.deleteSolid = (index) => {
-            savedSolids.splice(index, 1);
-            renderSavedList();
-        };
-
-        window.copyCode = (index, lang, btn) => {
-            const item = savedSolids[index];
-
-            let code = '';
-
-            if (lang === 'recipe_cpp') {
-                code = generateRecipeCpp(item);
+    <!-- Visualization Options -->
+    <div class="space-y-2 border-t border-slate-700 pt-4">
+      <label class="text-xs uppercase font-semibold text-slate-400">Visualization</label>
+
+      <div class="flex items-center justify-between">
+        <span class="text-sm">Geodesic Edges</span>
+        <button id="toggleGeo"
+          class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
+          <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform"></div>
+        </button>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <span class="text-sm">Show Faces</span>
+        <button id="toggleFaces"
+          class="w-10 h-5 rounded-full bg-blue-500 relative transition-colors focus:outline-none">
+          <div
+            class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transform translate-x-5 transition-transform">
+          </div>
+        </button>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <span class="text-sm">Show Vertices</span>
+        <button id="toggleVerts"
+          class="w-10 h-5 rounded-full bg-blue-500 relative transition-colors focus:outline-none">
+          <div
+            class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transform translate-x-5 transition-transform">
+          </div>
+        </button>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <span class="text-sm">Show Normals</span>
+        <button id="toggleNormals"
+          class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
+          <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform">
+          </div>
+        </button>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <span class="text-sm">Show Indices</span>
+        <button id="toggleIndices"
+          class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
+          <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform">
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="canvas-container">
+      <!-- Index Labels Overlay -->
+      <div id="labels" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+      <div id="save-actions">
+        <div id="meshStats"></div>
+        <button id="saveBtn" title="Save to Collection">
+          <!-- Star Icon -->
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round"
+            stroke-linejoin="round">
+            <polygon
+              points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+            </polygon>
+          </svg>
+        </button>
+      </div>
+      <canvas id="canvas" class="w-full h-full block"></canvas>
+    </div>
+
+    <div id="footer">
+      <!-- Dynamic Thumbnails -->
+    </div>
+  </div>
+
+  <div id="right-sidebar">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-bold text-white">Saved Solids</h2>
+      <button onclick="clearSavedSolids()"
+        class="text-xs text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear All</button>
+    </div>
+    <div id="savedList" class="flex-1 overflow-y-auto">
+      <!-- Saved items go here -->
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    // Removed solids.js import
+    import createHolosphereModule from '../holosphere_wasm.js';
+
+    let camera, scene, renderer, controls;
+    let mainMesh, frameMesh, edgeLines, vertPoints, normalLines;
+    let labelsContainer;
+    let draggingIndex = -1;
+
+    // WASM Module
+    let WasmModule = null;
+    let MeshOpsWasm = null;
+
+    // --- STATE ---
+    const state = {
+      base: 'cube',
+      ops: [], // Array of objects { op: string, params: object }
+      showGeodesics: true,
+      showFaces: true,
+      showVertices: false,
+      showNormals: false,
+      showIndices: false
+    };
+
+    const baseThumbnails = {};
+
+    // Lists (populated from WASM)
+    let PlatonicSolids = [];
+    let ArchimedeanSolids = [];
+    let IslamicStarPatterns = [];
+
+    const OP_DEFS = {
+      kis: { params: {} },
+      ambo: { params: {} },
+      gyro: { params: {} },
+      snub: { params: {} },
+      dual: { params: {} },
+      truncate: { params: { t: { val: 0.33, min: 0.01, max: 0.99, step: 0.01 } } },
+      bitruncate: { params: { t: { val: 0.33, min: 0.01, max: 0.99, step: 0.01 } } },
+      expand: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 } } },
+      hankin: { params: { angle: { val: 30, min: 0, max: 180, step: 1 } } },
+      canonicalize: { params: { iter: { val: 100, min: 1, max: 500, step: 1 } } }
+    };
+
+    // Initialize
+    async function init() {
+      // Load WASM
+      try {
+        WasmModule = await createHolosphereModule();
+        MeshOpsWasm = WasmModule.MeshOps;
+        console.log('WASM Module Loaded');
+
+        // Populate Registry from WASM
+        const registry = MeshOpsWasm.getRegistry();
+        // registry is array of {name, category}
+        // Filter into existing categories
+        PlatonicSolids = [];
+        ArchimedeanSolids = [];
+        IslamicStarPatterns = [];
+
+        // Hardcoded knowledge of Platonic for ordering if desired, or just push
+        const platonics = ['tetrahedron', 'cube', 'octahedron', 'dodecahedron', 'icosahedron'];
+
+        for (let i = 0; i < registry.length; i++) {
+          const item = registry[i];
+          const name = item.name;
+          const cat = item.category; // "Simple" or "Complex"
+
+          if (cat === "Complex") {
+            IslamicStarPatterns.push(name);
+          } else {
+            // Simple: Platonic or Archimedean
+            if (platonics.includes(name)) {
+              PlatonicSolids.push(name);
             } else {
-                console.warn("Only C++ Recipe export supported currently.");
-                return;
+              ArchimedeanSolids.push(name);
             }
+          }
+        }
 
-            navigator.clipboard.writeText(code).then(() => {
-                console.log(`${lang.toUpperCase()} copied!`);
-                if (btn) {
-                    const originalText = btn.innerText;
-                    btn.innerText = 'Copied!';
-                    btn.classList.add('text-green-400');
-                    setTimeout(() => {
-                        btn.innerText = originalText;
-                        btn.classList.remove('text-green-400');
-                    }, 1500);
-                }
-            });
+      } catch (e) {
+        console.error('Failed to load WASM:', e);
+        return;
+      }
+      // Initialize Three.js
+      const canvas = document.getElementById('canvas');
+      const container = document.getElementById('canvas-container');
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0f172a); // slate-900
+
+      camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+      camera.position.set(2, 1.5, 2);
+
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 2.0;
+
+      // Lights
+      const ambLight = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambLight);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+      dirLight.position.set(5, 10, 7);
+      scene.add(dirLight);
+
+      // Secondary Light for drama
+      const rimLight = new THREE.SpotLight(0x3b82f6, 5);
+      rimLight.position.set(-5, 0, -5);
+      scene.add(rimLight);
+
+      // Events
+      window.addEventListener('resize', onResize);
+
+      // Toggles
+      document.getElementById('toggleGeo').parentElement.addEventListener('click', () => {
+        state.showGeodesics = !state.showGeodesics;
+        updateToggles();
+        update();
+      });
+      document.getElementById('toggleFaces').parentElement.addEventListener('click', () => {
+        state.showFaces = !state.showFaces;
+        updateToggles();
+        update();
+      });
+      document.getElementById('toggleVerts').parentElement.addEventListener('click', () => {
+        state.showVertices = !state.showVertices;
+        updateToggles();
+        update();
+      });
+      document.getElementById('toggleNormals').parentElement.addEventListener('click', () => {
+        state.showNormals = !state.showNormals;
+        updateToggles();
+        update();
+      });
+      document.getElementById('toggleIndices').parentElement.addEventListener('click', () => {
+        state.showIndices = !state.showIndices;
+        updateToggles();
+        update();
+      });
+
+      labelsContainer = document.getElementById('labels');
+
+      document.getElementById('saveBtn').addEventListener('click', saveSolid);
+
+      // Generate Thumbnails
+      generateThumbnails();
+
+      updateToggles();
+      onResize();
+      update();
+      renderBaseSolid();
+      animate();
+    }
+
+    function wasmMeshToJs(wasmMesh) {
+      const vArray = wasmMesh.getVertices(); // Float32Array
+
+      // NaN Check
+      for (let i = 0; i < vArray.length; i++) {
+        if (Number.isNaN(vArray[i])) {
+          console.error("WASM returned NaN vertex at index", i);
+          return { vertices: [], faces: [] }; // Fail gracefully
+        }
+      }
+
+      const vertices = [];
+      for (let i = 0; i < vArray.length; i += 3) {
+        vertices.push(new THREE.Vector3(vArray[i], vArray[i + 1], vArray[i + 2]));
+      }
+
+      const faces = wasmMesh.getFaces(); // Returns Array<Array<number>> directly now!
+
+      return { vertices, faces };
+    }
+
+    async function generateThumbnails() {
+      const footer = document.getElementById('footer');
+
+      // Gather all solid names from exported lists
+      const thumbKeys = [...PlatonicSolids, ...ArchimedeanSolids, ...IslamicStarPatterns];
+
+      // Create offscreen renderer
+      const width = 256; // High-res for larger thumbs
+      const height = 256;
+      const offRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      offRenderer.setSize(width, height);
+      offRenderer.setClearColor(0x000000, 0); // Transparent
+
+      const offScene = new THREE.Scene();
+      const offCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 10);
+      offCamera.position.set(1.5, 1.5, 1.5);
+      offCamera.lookAt(0, 0, 0);
+
+      const light = new THREE.DirectionalLight(0xffffff, 1.5);
+      light.position.set(2, 5, 3);
+      offScene.add(light);
+      offScene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+      // Material for thumbnails
+      const mat = new THREE.MeshPhongMaterial({
+        color: 0x3b82f6,
+        flatShading: true,
+        shininess: 30
+      });
+      const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
+
+      for (const key of thumbKeys) {
+        // Clear scene
+        while (offScene.children.length > 0) {
+          const obj = offScene.children[0];
+          if (obj.isLight) { // Keep lighting? adjust
+            // Actually, better to remove meshes.
+            if (obj.isMesh || obj.isLineSegments) offScene.remove(obj);
+            else break; // light is at end? No.
+          }
+          if (obj.isLight) {
+            // Keep light
+            offScene.children.push(offScene.children.shift()); // Cycle
+            if (offScene.children[0].isLight && offScene.children.length <= 2) break; // Assuming 2 lights
+          } else {
+            offScene.remove(obj);
+          }
+        }
+
+        // Re-add lights if cleared (simpler to just clear all and re-add)
+        offScene.clear();
+        offScene.add(light);
+        offScene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+        const wasmMesh = MeshOpsWasm.fromSolidName(key);
+        const meshData = wasmMeshToJs(wasmMesh);
+        wasmMesh.delete();
+
+        // Triangulate
+        const vertices = [];
+        meshData.faces.forEach(f => {
+          for (let i = 1; i < f.length - 1; i++) {
+            vertices.push(...meshData.vertices[f[0]].toArray());
+            vertices.push(...meshData.vertices[f[i]].toArray());
+            vertices.push(...meshData.vertices[f[i + 1]].toArray());
+          }
+        });
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geo.computeVertexNormals();
+
+        const mesh = new THREE.Mesh(geo, mat);
+        offScene.add(mesh);
+
+        // Edges (optional, but looks nice)
+        const edgeIndices = new Set();
+        meshData.faces.forEach(f => {
+          for (let i = 0; i < f.length; i++) {
+            const a = f[i];
+            const b = f[(i + 1) % f.length];
+            const k = a < b ? `${a}_${b}` : `${b}_${a}`;
+            if (!edgeIndices.has(k)) edgeIndices.add(k);
+          }
+        });
+        const linePoints = [];
+        edgeIndices.forEach(k => {
+          const [ai, bi] = k.split('_').map(Number);
+          linePoints.push(meshData.vertices[ai], meshData.vertices[bi]);
+        });
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(linePoints);
+        const lines = new THREE.LineSegments(lineGeo, lineMat);
+        offScene.add(lines);
+
+        // Render
+        offRenderer.render(offScene, offCamera);
+
+        // Create Button
+        const btn = document.createElement('div');
+        btn.className = `thumb-btn ${state.base === key ? 'active' : ''}`;
+        btn.onclick = () => {
+          state.base = key;
+          update();
+          renderBaseSolid();
+          // Update active state
+          document.querySelectorAll('.thumb-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
         };
 
-        // Format float with f suffix and .0 if integer, to satisfy C++ strictness and convention
-        function formatFloat(val) {
-            const s = val.toString();
-            return (s.indexOf('.') === -1 ? s + ".0" : s) + "f";
+        const img = document.createElement('img');
+        const dataURL = offRenderer.domElement.toDataURL();
+        img.src = dataURL;
+        baseThumbnails[key] = dataURL;
+
+        const span = document.createElement('span');
+        // Format Name: truncatedIcosahedron -> Truncated Icosahedron -> Truncated\nIcosahedron?
+        // Split camel case
+        const title = key.replace(/([A-Z])/g, ' $1').trim();
+        const parts = title.split(' ');
+        span.innerHTML = parts.join('<br>');
+
+        btn.appendChild(img);
+        btn.appendChild(span);
+        footer.appendChild(btn);
+      }
+
+      // Cleanup
+      offRenderer.dispose();
+    }
+
+    function updateToggles() {
+      const tG = document.getElementById('toggleGeo');
+      const tF = document.getElementById('toggleFaces');
+      const tV = document.getElementById('toggleVerts');
+
+      tG.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showGeodesics ? 'bg-blue-500' : 'bg-slate-700'}`;
+      tG.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showGeodesics ? 'translate-x-5' : ''}`;
+
+      tF.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showFaces ? 'bg-blue-500' : 'bg-slate-700'}`;
+      tF.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showFaces ? 'translate-x-5' : ''}`;
+
+      tV.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showVertices ? 'bg-blue-500' : 'bg-slate-700'}`;
+      tV.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showVertices ? 'translate-x-5' : ''}`;
+
+      const tN = document.getElementById('toggleNormals');
+      tN.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showNormals ? 'bg-blue-500' : 'bg-slate-700'}`;
+      tN.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showNormals ? 'translate-x-5' : ''}`;
+
+      const tI = document.getElementById('toggleIndices');
+      tI.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showIndices ? 'bg-blue-500' : 'bg-slate-700'}`;
+      tI.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showIndices ? 'translate-x-5' : ''}`;
+    }
+
+    function onResize() {
+      const sidebar = document.getElementById('sidebar');
+      const rightSidebar = document.getElementById('right-sidebar');
+      const container = document.getElementById('canvas-container');
+
+      // Explicitly calculate available width
+      const sidebarWidth = sidebar.getBoundingClientRect().width;
+      const rightWidth = rightSidebar.getBoundingClientRect().width;
+      const w = window.innerWidth - sidebarWidth - rightWidth;
+      const h = container.clientHeight;
+
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+
+    // --- SAVED ITEMS ---
+    const savedSolids = [];
+
+    function saveSolid() {
+      // Capture thumbnail
+      renderer.render(scene, camera);
+      const dataURL = renderer.domElement.toDataURL('image/png');
+
+      const title = state.base.replace(/([A-Z])/g, ' $1').trim();
+
+      // Get current counts from window.currentMesh
+      const vCount = window.currentMesh.vertices.length;
+      const fCount = window.currentMesh.faces.length;
+      const eCount = window.currentMesh.edgeCount || 0;
+
+      // Generate summary
+      const opsSummary = state.ops.map(o => {
+        if (o.op === 'truncate') return `Tr(${o.params.t})`;
+        if (o.op === 'bitruncate') return `BiTr(${o.params.t})`;
+        if (o.op === 'hankin') return `Hk(${o.params.angle.toFixed(2)})`;
+        return o.op.charAt(0).toUpperCase() + o.op.slice(1);
+      }).join(', ') || 'Base Solid';
+
+      const item = {
+        id: Date.now(),
+        base: state.base,
+        ops: JSON.parse(JSON.stringify(state.ops)), // Deep copy
+        geodesics: state.showGeodesics,
+        faces: state.showFaces,
+        vertices: state.showVertices,
+        thumb: dataURL,
+        title: title,
+        desc: opsSummary,
+        stats: `${vCount}V ${eCount}E ${fCount}F`
+      };
+
+      savedSolids.push(item);
+      renderSavedList();
+    }
+
+    function renderSavedList() {
+      const list = document.getElementById('savedList');
+      list.innerHTML = '';
+
+      savedSolids.forEach((item, index) => {
+        const el = document.createElement('div');
+        el.className = 'saved-item';
+        el.innerHTML = `
+          <img src="${item.thumb}" alt="${item.title}" />
+          <div class="flex justify-between items-start">
+            <div class="title capitalize">${item.title}</div>
+            <div class="text-[0.55rem] font-mono text-indigo-400 opacity-60">${item.stats}</div>
+          </div>
+          <div class="details uppercase opacity-70">${item.desc}</div>
+          <div class="saved-actions" onclick="event.stopPropagation()">
+            <div class="flex flex-col gap-1">
+              <div class="flex gap-1 justify-end">
+                <span class="text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1">Recipe</span>
+                <button class="action-btn" onclick="copyCode(${index}, 'recipe_cpp', this)">C++</button>
+              </div>
+            </div>
+            <button class="action-btn del-btn self-start ml-1" onclick="deleteSolid(${index})">&times;</button>
+          </div>
+        `;
+        el.onclick = () => restoreSolid(item);
+        list.insertBefore(el, list.firstChild); // Newest first
+      });
+    }
+
+    window.deleteSolid = (index) => {
+      savedSolids.splice(index, 1);
+      renderSavedList();
+    };
+
+    window.copyCode = (index, lang, btn) => {
+      const item = savedSolids[index];
+
+      let code = '';
+
+      if (lang === 'recipe_cpp') {
+        code = generateRecipeCpp(item);
+      } else {
+        console.warn("Only C++ Recipe export supported currently.");
+        return;
+      }
+
+      navigator.clipboard.writeText(code).then(() => {
+        console.log(`${lang.toUpperCase()} copied!`);
+        if (btn) {
+          const originalText = btn.innerText;
+          btn.innerText = 'Copied!';
+          btn.classList.add('text-green-400');
+          setTimeout(() => {
+            btn.innerText = originalText;
+            btn.classList.remove('text-green-400');
+          }, 1500);
+        }
+      });
+    };
+
+    // Format float with f suffix and .0 if integer, to satisfy C++ strictness and convention
+    function formatFloat(val) {
+      const s = val.toString();
+      return (s.indexOf('.') === -1 ? s + ".0" : s) + "f";
+    }
+
+    function generateRecipeCpp(item) {
+      // C++ Style: op(op(...))
+      // Base Name: icosahedron -> icosahedron()
+      let s = `${item.base}()`;
+      let nameParts = [item.base];
+
+      item.ops.forEach(o => {
+        const opName = typeof o === 'string' ? o : o.op;
+
+        let params = '';
+        // Suffix construction for function name
+        let suffix = `_${opName}`;
+
+        if (opName === 'truncate') {
+          params = `, ${formatFloat(o.params.t)}`;
+          // convention: truncate05 or bitruncate033 using string replacement of "0."
+          suffix += o.params.t.toString().replace('0.', '');
+        } else if (opName === 'bitruncate') {
+          params = `, ${formatFloat(o.params.t)}`;
+          suffix += o.params.t.toString().replace('0.', '');
+        } else if (opName === 'expand') {
+          params = `, ${formatFloat(o.params.t)}`;
+          suffix += o.params.t.toString().replace('0.', '');
+        } else if (opName === 'hankin') {
+          params = `, ${formatFloat(o.params.angle)} * D2R`;
+          // convention: hk{angle}
+          suffix = `_hk${Math.round(o.params.angle)}`;
+        } else if (opName === 'canonicalize') {
+          params = `, ${o.params.iter}`;
         }
 
-        function generateRecipeCpp(item) {
-            // C++ Style: op(op(...))
-            // Base Name: icosahedron -> icosahedron()
-            let s = `${item.base}()`;
-            let nameParts = [item.base];
+        s = `${opName}(${s}${params})`;
+        nameParts.push(suffix);
+      });
 
-            item.ops.forEach(o => {
-                const opName = typeof o === 'string' ? o : o.op;
+      // Construct function name from parts
+      // But actually we want linear concatenation: "base" + "_op" + "_op"
+      // The existing C++ names in solids.h seem to follow base_op_op...
+      const funcName = nameParts.join('');
 
-                let params = '';
-                // Suffix construction for function name
-                let suffix = `_${opName}`;
+      return `inline PolyMesh ${funcName}() {\n  return ${s};\n}`;
+    }
 
-                if (opName === 'truncate') {
-                    params = `, ${formatFloat(o.params.t)}`;
-                    // convention: truncate05 or bitruncate033 using string replacement of "0."
-                    suffix += o.params.t.toString().replace('0.', '');
-                } else if (opName === 'bitruncate') {
-                    params = `, ${formatFloat(o.params.t)}`;
-                    suffix += o.params.t.toString().replace('0.', '');
-                } else if (opName === 'expand') {
-                    params = `, ${formatFloat(o.params.t)}`;
-                    suffix += o.params.t.toString().replace('0.', '');
-                } else if (opName === 'hankin') {
-                    params = `, ${formatFloat(o.params.angle)} * D2R`;
-                    // convention: hk{angle}
-                    suffix = `_hk${Math.round(o.params.angle)}`;
-                } else if (opName === 'canonicalize') {
-                    params = `, ${o.params.iter}`;
-                }
+    function capitalize(s) {
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
 
-                s = `${opName}(${s}${params})`;
-                nameParts.push(suffix);
-            });
+    function restoreSolid(item) {
+      state.base = item.base;
+      state.ops = JSON.parse(JSON.stringify(item.ops));
+      state.showGeodesics = item.geodesics;
+      state.showFaces = item.faces !== undefined ? item.faces : true;
+      state.showVertices = item.vertices;
 
-            // Construct function name from parts
-            // But actually we want linear concatenation: "base" + "_op" + "_op"
-            // The existing C++ names in solids.h seem to follow base_op_op...
-            const funcName = nameParts.join('');
+      // Update UI
+      updateToggles();
+      renderOps();
 
-            return `inline PolyMesh ${funcName}() {\n  return ${s};\n}`;
+      // Highlight active base in footer
+      document.querySelectorAll('.thumb-btn').forEach(b => {
+        if (b.classList.contains('active')) b.classList.remove('active');
+        if (b.onclick.toString().includes(state.base)) b.classList.add('active');
+      });
+
+      update();
+      renderBaseSolid();
+    }
+
+    function renderBaseSolid() {
+      const thumb = baseThumbnails[state.base];
+      const title = state.base.replace(/([A-Z])/g, ' $1').trim();
+      // We can't synchronously get stats unless we cache or have the mesh.
+      // window.currentMesh is updated after update() calls.
+
+      document.getElementById('baseThumb').src = thumb || '';
+      document.getElementById('baseTitle').innerText = title;
+      // defer stats update to after mesh generation logic in update()
+    }
+
+    window.enableDrag = (e) => {
+      const item = e.target.closest('.op-item');
+      if (item) item.draggable = true;
+    };
+
+    // Helper: Calculate insertion index based on static layout (ignoring transforms)
+    function getDragTargetIndex(e, list) {
+      const items = [...list.children];
+      // Calculate mouse Y relative to the scrolling list container
+      const listRect = list.getBoundingClientRect();
+      const mouseY = e.clientY - listRect.top + list.scrollTop;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        // mid point of the item in the list's coordinate space
+        // offsetTop is correct because container is relative
+        const mid = item.offsetTop + (item.offsetHeight / 2);
+        if (mouseY < mid) {
+          return i;
         }
+      }
+      return items.length;
+    }
 
-        function capitalize(s) {
-            return s.charAt(0).toUpperCase() + s.slice(1);
-        }
+    function renderOps() {
+      const list = document.getElementById('opsList');
+      // Clean up overrides if any
+      list.innerHTML = '';
 
-        function restoreSolid(item) {
-            state.base = item.base;
-            state.ops = JSON.parse(JSON.stringify(item.ops));
-            state.showGeodesics = item.geodesics;
-            state.showFaces = item.faces !== undefined ? item.faces : true;
-            state.showVertices = item.vertices;
+      // Container-level Drag Events
+      list.ondragover = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
 
-            // Update UI
-            updateToggles();
-            renderOps();
+        if (draggingIndex === -1) return;
 
-            // Highlight active base in footer
-            document.querySelectorAll('.thumb-btn').forEach(b => {
-                if (b.classList.contains('active')) b.classList.remove('active');
-                if (b.onclick.toString().includes(state.base)) b.classList.add('active');
-            });
+        const targetIndex = getDragTargetIndex(e, list);
+        const items = [...list.children];
+        const draggingItem = items[draggingIndex];
 
-            update();
-            renderBaseSolid();
-        }
+        if (!draggingItem) return;
 
-        function renderBaseSolid() {
-            const thumb = baseThumbnails[state.base];
-            const title = state.base.replace(/([A-Z])/g, ' $1').trim();
-            // We can't synchronously get stats unless we cache or have the mesh.
-            // window.currentMesh is updated after update() calls.
+        // Amount to visual shift: height of item + gap (space-y-2 is 0.5rem = 8px)
+        const shiftAmount = draggingItem.offsetHeight + 8;
 
-            document.getElementById('baseThumb').src = thumb || '';
-            document.getElementById('baseTitle').innerText = title;
-            // defer stats update to after mesh generation logic in update()
-        }
+        items.forEach((item, idx) => {
+          if (idx === draggingIndex) return;
 
-        window.enableDrag = (e) => {
-            const item = e.target.closest('.op-item');
-            if (item) item.draggable = true;
-        };
+          item.style.transform = '';
 
-        // Helper: Calculate insertion index based on static layout (ignoring transforms)
-        function getDragTargetIndex(e, list) {
-            const items = [...list.children];
-            // Calculate mouse Y relative to the scrolling list container
-            const listRect = list.getBoundingClientRect();
-            const mouseY = e.clientY - listRect.top + list.scrollTop;
-
-            for (let i = 0; i < items.length; i++) {
-                const item = items[i];
-                // mid point of the item in the list's coordinate space
-                // offsetTop is correct because container is relative
-                const mid = item.offsetTop + (item.offsetHeight / 2);
-                if (mouseY < mid) {
-                    return i;
-                }
+          // Transformation Logic
+          if (draggingIndex < targetIndex) {
+            // Dragging Down: items between draggingIndex and targetIndex shift UP
+            if (idx > draggingIndex && idx < targetIndex) {
+              item.style.transform = `translateY(-${shiftAmount}px)`;
             }
-            return items.length;
+          } else {
+            // Dragging Up: items between targetIndex and draggingIndex shift DOWN
+            if (idx >= targetIndex && idx < draggingIndex) {
+              item.style.transform = `translateY(${shiftAmount}px)`;
+            }
+          }
+        });
+      };
+
+      list.ondrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const fromIndex = draggingIndex;
+        if (fromIndex === -1) return;
+
+        const list = document.getElementById('opsList');
+        let toIndex = getDragTargetIndex(e, list);
+
+        // Adjust index: removing the item at fromIndex shifts subsequent indices down by 1
+        if (fromIndex < toIndex) {
+          toIndex--;
         }
 
-        function renderOps() {
-            const list = document.getElementById('opsList');
-            // Clean up overrides if any
-            list.innerHTML = '';
+        if (fromIndex !== toIndex) {
+          const [movedItem] = state.ops.splice(fromIndex, 1);
+          state.ops.splice(toIndex, 0, movedItem);
+          update();
+        }
+        renderOps();
+        draggingIndex = -1;
+      };
 
-            // Container-level Drag Events
-            list.ondragover = (e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
+      state.ops.forEach((o, i) => {
+        const opDef = OP_DEFS[o.op];
+        const el = document.createElement('div');
+        el.className = 'op-item flex-col items-stretch text-sm text-indigo-300';
+        el.draggable = false;
 
-                if (draggingIndex === -1) return;
+        // Item Drag Start/End
+        el.addEventListener('dragstart', (e) => {
+          draggingIndex = i;
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', i); // Required for Firefox
+          setTimeout(() => el.classList.add('dragging'), 0);
+        });
 
-                const targetIndex = getDragTargetIndex(e, list);
-                const items = [...list.children];
-                const draggingItem = items[draggingIndex];
+        el.addEventListener('dragend', () => {
+          el.draggable = false;
+          el.classList.remove('dragging');
+          draggingIndex = -1;
+          if (list) {
+            [...list.children].forEach(c => c.style.transform = '');
+          }
+        });
 
-                if (!draggingItem) return;
-
-                // Amount to visual shift: height of item + gap (space-y-2 is 0.5rem = 8px)
-                const shiftAmount = draggingItem.offsetHeight + 8;
-
-                items.forEach((item, idx) => {
-                    if (idx === draggingIndex) return;
-
-                    item.style.transform = '';
-
-                    // Transformation Logic
-                    if (draggingIndex < targetIndex) {
-                        // Dragging Down: items between draggingIndex and targetIndex shift UP
-                        if (idx > draggingIndex && idx < targetIndex) {
-                            item.style.transform = `translateY(-${shiftAmount}px)`;
-                        }
-                    } else {
-                        // Dragging Up: items between targetIndex and draggingIndex shift DOWN
-                        if (idx >= targetIndex && idx < draggingIndex) {
-                            item.style.transform = `translateY(${shiftAmount}px)`;
-                        }
-                    }
-                });
-            };
-
-            list.ondrop = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const fromIndex = draggingIndex;
-                if (fromIndex === -1) return;
-
-                const list = document.getElementById('opsList');
-                let toIndex = getDragTargetIndex(e, list);
-
-                // Adjust index: removing the item at fromIndex shifts subsequent indices down by 1
-                if (fromIndex < toIndex) {
-                    toIndex--;
-                }
-
-                if (fromIndex !== toIndex) {
-                    const [movedItem] = state.ops.splice(fromIndex, 1);
-                    state.ops.splice(toIndex, 0, movedItem);
-                    update();
-                }
-                renderOps();
-                draggingIndex = -1;
-            };
-
-            state.ops.forEach((o, i) => {
-                const opDef = OP_DEFS[o.op];
-                const el = document.createElement('div');
-                el.className = 'op-item flex-col items-stretch text-sm text-indigo-300';
-                el.draggable = false;
-
-                // Item Drag Start/End
-                el.addEventListener('dragstart', (e) => {
-                    draggingIndex = i;
-                    e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', i); // Required for Firefox
-                    setTimeout(() => el.classList.add('dragging'), 0);
-                });
-
-                el.addEventListener('dragend', () => {
-                    el.draggable = false;
-                    el.classList.remove('dragging');
-                    draggingIndex = -1;
-                    if (list) {
-                        [...list.children].forEach(c => c.style.transform = '');
-                    }
-                });
-
-                let controlsHtml = '';
-                if (opDef.params && Object.keys(opDef.params).length > 0) {
-                    controlsHtml = '<div class="mt-2 space-y-2">';
-                    Object.keys(opDef.params).forEach(key => {
-                        const def = opDef.params[key];
-                        const val = o.params[key];
-                        controlsHtml += `
-                            <div class="flex items-center text-[0.6rem] space-x-1" draggable="false">
-                                <span class="w-12 text-slate-400 capitalize truncate">${key}</span>
-                                <input type="range" 
-                                    min="${def.min}" max="${def.max}" step="${def.step}" value="${val}"
-                                    class="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer min-w-0"
-                                    oninput="updateOpParam(${i}, '${key}', this.value)"
-                                    onmousedown="event.stopPropagation()"
-                                />
-                                <input type="number" step="${def.step}" value="${Number(val).toFixed(2)}"
-                                    class="w-12 bg-transparent text-right font-mono text-slate-500 focus:outline-none focus:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                    onchange="updateOpParam(${i}, '${key}', this.value)"
-                                    onmousedown="event.stopPropagation()"
-                                />
-                                <span class="text-[0.5rem] text-slate-600 ml-0.5">${key === 'angle' ? 'deg' : ''}</span>
-                            </div>
+        let controlsHtml = '';
+        if (opDef.params && Object.keys(opDef.params).length > 0) {
+          controlsHtml = '<div class="mt-2 space-y-2">';
+          Object.keys(opDef.params).forEach(key => {
+            const def = opDef.params[key];
+            const val = o.params[key];
+            controlsHtml += `
+              <div class="flex items-center text-[0.6rem] space-x-1" draggable="false">
+                <span class="w-12 text-slate-400 capitalize truncate">${key}</span>
+                <input type="range" 
+                  min="${def.min}" max="${def.max}" step="${def.step}" value="${val}"
+                  class="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer min-w-0"
+                  oninput="updateOpParam(${i}, '${key}', this.value)"
+                  onmousedown="event.stopPropagation()"
+                />
+                <input type="number" step="${def.step}" value="${Number(val).toFixed(2)}"
+                  class="w-12 bg-transparent text-right font-mono text-slate-500 focus:outline-none focus:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  onchange="updateOpParam(${i}, '${key}', this.value)"
+                  onmousedown="event.stopPropagation()"
+                />
+                <span class="text-[0.5rem] text-slate-600 ml-0.5">${key === 'angle' ? 'deg' : ''}</span>
+              </div>
                          `;
-                    });
-                    controlsHtml += '</div>';
-                }
-
-                el.innerHTML = `
-                <div class="flex justify-between items-center w-full" draggable="false">
-                    <div class="flex items-center">
-                        <div class="drag-handle" onmousedown="enableDrag(event)" ontouchstart="enableDrag(event)">
-                            <svg viewBox="0 0 24 24"><path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
-                        </div>
-                        <span class="font-bold">${i + 1}. ${o.op.toUpperCase()}</span>
-                    </div>
-                    <button onclick="removeOp(${i})" class="text-slate-500 hover:text-white" draggable="false">&times;</button>
-                </div>
-                ${controlsHtml}
-            `;
-                list.appendChild(el);
-            });
+          });
+          controlsHtml += '</div>';
         }
 
-        window.updateOpParam = (index, key, value) => {
-            const val = parseFloat(value);
-            state.ops[index].params[key] = val;
+        el.innerHTML = `
+        <div class="flex justify-between items-center w-full" draggable="false">
+          <div class="flex items-center">
+            <div class="drag-handle" onmousedown="enableDrag(event)" ontouchstart="enableDrag(event)">
+              <svg viewBox="0 0 24 24"><path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+            </div>
+            <span class="font-bold">${i + 1}. ${o.op.toUpperCase()}</span>
+          </div>
+          <button onclick="removeOp(${i})" class="text-slate-500 hover:text-white" draggable="false">&times;</button>
+        </div>
+        ${controlsHtml}
+      `;
+        list.appendChild(el);
+      });
+    }
 
-            // Sync UI elements
-            const item = document.getElementById('opsList').children[index];
-            if (item) {
-                const paramIndex = Object.keys(state.ops[index].params).indexOf(key);
-                const slider = item.querySelectorAll('input[type="range"]')[paramIndex];
-                const input = item.querySelectorAll('input[type="number"]')[paramIndex];
+    window.updateOpParam = (index, key, value) => {
+      const val = parseFloat(value);
+      state.ops[index].params[key] = val;
 
-                if (slider) slider.value = val;
-                if (input) input.value = val.toFixed(2);
-            }
-            update();
-        };
+      // Sync UI elements
+      const item = document.getElementById('opsList').children[index];
+      if (item) {
+        const paramIndex = Object.keys(state.ops[index].params).indexOf(key);
+        const slider = item.querySelectorAll('input[type="range"]')[paramIndex];
+        const input = item.querySelectorAll('input[type="number"]')[paramIndex];
 
-        window.removeOp = (index) => {
-            state.ops.splice(index, 1);
-            renderOps();
-            update();
-        };
+        if (slider) slider.value = val;
+        if (input) input.value = val.toFixed(2);
+      }
+      update();
+    };
 
-        function computeInternalAngle(mesh) {
-            if (!mesh || !mesh.faces || mesh.faces.length === 0) return 0;
-            const face = mesh.faces[0];
-            if (face.length < 3) return 0;
+    window.removeOp = (index) => {
+      state.ops.splice(index, 1);
+      renderOps();
+      update();
+    };
 
-            const v1 = mesh.vertices[face[0]];
-            const v2 = mesh.vertices[face[1]];
-            const v3 = mesh.vertices[face[2]];
+    function computeInternalAngle(mesh) {
+      if (!mesh || !mesh.faces || mesh.faces.length === 0) return 0;
+      const face = mesh.faces[0];
+      if (face.length < 3) return 0;
 
-            // Spherical internal angle at v2 is the angle between the planes OV2V1 and OV2V3
-            // Vector cross product gives normals to these planes.
-            const n1 = new THREE.Vector3().crossVectors(v2, v1).normalize();
-            const n2 = new THREE.Vector3().crossVectors(v2, v3).normalize();
+      const v1 = mesh.vertices[face[0]];
+      const v2 = mesh.vertices[face[1]];
+      const v3 = mesh.vertices[face[2]];
 
-            // The angle between normals is the internal angle
-            return n1.angleTo(n2);
+      // Spherical internal angle at v2 is the angle between the planes OV2V1 and OV2V3
+      // Vector cross product gives normals to these planes.
+      const n1 = new THREE.Vector3().crossVectors(v2, v1).normalize();
+      const n2 = new THREE.Vector3().crossVectors(v2, v3).normalize();
+
+      // The angle between normals is the internal angle
+      return n1.angleTo(n2);
+    }
+
+    window.addOp = (opName) => {
+      const def = OP_DEFS[opName];
+      const newOp = { op: opName, params: {} };
+      if (def && def.params) {
+        Object.keys(def.params).forEach(k => {
+          let val = def.params[k].val;
+          if (opName === 'hankin' && k === 'angle') {
+            val = computeInternalAngle(window.currentMesh) * (180 / Math.PI);
+          }
+          newOp.params[k] = val;
+        });
+      }
+      state.ops.push(newOp);
+      renderOps();
+      update();
+    };
+
+    window.resetOps = () => {
+      state.ops = [];
+      renderOps();
+      update();
+    };
+
+    window.clearSavedSolids = () => {
+      savedSolids.length = 0;
+      renderSavedList();
+    };
+
+    function update() {
+      if (!WasmModule || !MeshOpsWasm) return;
+
+      // 1. Generate Mesh directly from WASM
+      let currentWasmMesh = null;
+      try {
+        // Use the string name directly
+        currentWasmMesh = MeshOpsWasm.fromSolidName(state.base);
+      } catch (e) {
+        console.error("Error creating base solid:", e);
+        return;
+      }
+
+      // Apply Ops
+      try {
+        state.ops.forEach(o => {
+          const opName = typeof o === 'string' ? o : o.op;
+          let nextMesh = null;
+
+          if (opName === 'truncate') {
+            nextMesh = currentWasmMesh.truncate(o.params.t);
+          } else if (opName === 'bitruncate') {
+            nextMesh = currentWasmMesh.bitruncate(o.params.t);
+          } else if (opName === 'expand') {
+            nextMesh = currentWasmMesh.expand(o.params.t);
+          } else if (opName === 'snub') {
+            nextMesh = currentWasmMesh.snub();
+          } else if (opName === 'hankin') {
+            nextMesh = currentWasmMesh.hankin(o.params.angle * (Math.PI / 180));
+          } else if (opName === 'canonicalize') {
+            nextMesh = currentWasmMesh.canonicalize(o.params.iter);
+          } else if (currentWasmMesh[opName]) {
+            nextMesh = currentWasmMesh[opName]();
+          }
+
+          if (nextMesh) {
+            currentWasmMesh.delete();
+            currentWasmMesh = nextMesh;
+          }
+        });
+      } catch (e) {
+        console.error("WASM Op Error:", e);
+      }
+
+      const meshData = wasmMeshToJs(currentWasmMesh);
+      currentWasmMesh.delete(); // Cleanup final result
+
+      // Store for stats/helpers
+      window.currentMesh = meshData;
+
+      // 4. Render
+      if (mainMesh) {
+        mainMesh.geometry.dispose();
+        scene.remove(mainMesh);
+      }
+      if (edgeLines) {
+        edgeLines.geometry.dispose();
+        scene.remove(edgeLines);
+      }
+      if (vertPoints) {
+        vertPoints.geometry.dispose();
+        scene.remove(vertPoints);
+      }
+      if (normalLines) {
+        normalLines.geometry.dispose();
+        scene.remove(normalLines);
+      }
+      if (labelsContainer) labelsContainer.innerHTML = '';
+
+      // Faces
+      const geometry = new THREE.BufferGeometry();
+      const vertices = [];
+
+      const faceCenters = [];
+      const faceNormals = [];
+
+      meshData.faces.forEach(f => {
+        for (let i = 1; i < f.length - 1; i++) {
+          vertices.push(...meshData.vertices[f[0]].toArray());
+          vertices.push(...meshData.vertices[f[i]].toArray());
+          vertices.push(...meshData.vertices[f[i + 1]].toArray());
         }
+        // Center/Normal for other viz
+        const center = new THREE.Vector3();
+        f.forEach(idx => center.add(meshData.vertices[idx]));
+        center.divideScalar(f.length);
+        faceCenters.push(center);
 
-        window.addOp = (opName) => {
-            const def = OP_DEFS[opName];
-            const newOp = { op: opName, params: {} };
-            if (def && def.params) {
-                Object.keys(def.params).forEach(k => {
-                    let val = def.params[k].val;
-                    if (opName === 'hankin' && k === 'angle') {
-                        val = computeInternalAngle(window.currentMesh) * (180 / Math.PI);
-                    }
-                    newOp.params[k] = val;
-                });
-            }
-            state.ops.push(newOp);
-            renderOps();
-            update();
-        };
+        // Normal
+        const v0 = meshData.vertices[f[0]];
+        const v1 = meshData.vertices[f[1]];
+        const v2 = meshData.vertices[f[f.length - 1]];
+        const n = new THREE.Vector3().crossVectors(new THREE.Vector3().subVectors(v1, v0), new THREE.Vector3().subVectors(v2, v0)).normalize();
+        faceNormals.push(n);
+      });
 
-        window.resetOps = () => {
-            state.ops = [];
-            renderOps();
-            update();
-        };
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.computeVertexNormals();
 
-        window.clearSavedSolids = () => {
-            savedSolids.length = 0;
-            renderSavedList();
-        };
+      const material = new THREE.MeshPhongMaterial({
+        color: 0x3b82f6,
+        transparent: true,
+        opacity: 0.9,
+        side: THREE.DoubleSide,
+        flatShading: true,
+        shininess: 50,
+        polygonOffset: true,
+        polygonOffsetFactor: 1,
+        polygonOffsetUnits: 1
+      });
 
-        function update() {
-            if (!WasmModule || !MeshOpsWasm) return;
+      mainMesh = new THREE.Mesh(geometry, material);
+      if (state.showFaces) scene.add(mainMesh);
 
-            // 1. Generate Mesh directly from WASM
-            let currentWasmMesh = null;
-            try {
-                // Use the string name directly
-                currentWasmMesh = MeshOpsWasm.fromSolidName(state.base);
-            } catch (e) {
-                console.error("Error creating base solid:", e);
-                return;
-            }
+      // Vertices
+      if (state.showVertices) {
+        const dotGeo = new THREE.BufferGeometry().setFromPoints(meshData.vertices);
+        const dotMat = new THREE.PointsMaterial({ color: 0xa5b4fc, size: 0.05 });
+        vertPoints = new THREE.Points(dotGeo, dotMat);
+        scene.add(vertPoints);
+      }
 
-            // Apply Ops
-            try {
-                state.ops.forEach(o => {
-                    const opName = typeof o === 'string' ? o : o.op;
-                    let nextMesh = null;
-
-                    if (opName === 'truncate') {
-                        nextMesh = currentWasmMesh.truncate(o.params.t);
-                    } else if (opName === 'bitruncate') {
-                        nextMesh = currentWasmMesh.bitruncate(o.params.t);
-                    } else if (opName === 'expand') {
-                        nextMesh = currentWasmMesh.expand(o.params.t);
-                    } else if (opName === 'snub') {
-                        nextMesh = currentWasmMesh.snub();
-                    } else if (opName === 'hankin') {
-                        nextMesh = currentWasmMesh.hankin(o.params.angle * (Math.PI / 180));
-                    } else if (opName === 'canonicalize') {
-                        nextMesh = currentWasmMesh.canonicalize(o.params.iter);
-                    } else if (currentWasmMesh[opName]) {
-                        nextMesh = currentWasmMesh[opName]();
-                    }
-
-                    if (nextMesh) {
-                        currentWasmMesh.delete();
-                        currentWasmMesh = nextMesh;
-                    }
-                });
-            } catch (e) {
-                console.error("WASM Op Error:", e);
-            }
-
-            const meshData = wasmMeshToJs(currentWasmMesh);
-            currentWasmMesh.delete(); // Cleanup final result
-
-            // Store for stats/helpers
-            window.currentMesh = meshData;
-
-            // 4. Render
-            if (mainMesh) {
-                mainMesh.geometry.dispose();
-                scene.remove(mainMesh);
-            }
-            if (edgeLines) {
-                edgeLines.geometry.dispose();
-                scene.remove(edgeLines);
-            }
-            if (vertPoints) {
-                vertPoints.geometry.dispose();
-                scene.remove(vertPoints);
-            }
-            if (normalLines) {
-                normalLines.geometry.dispose();
-                scene.remove(normalLines);
-            }
-            if (labelsContainer) labelsContainer.innerHTML = '';
-
-            // Faces
-            const geometry = new THREE.BufferGeometry();
-            const vertices = [];
-
-            const faceCenters = [];
-            const faceNormals = [];
-
-            meshData.faces.forEach(f => {
-                for (let i = 1; i < f.length - 1; i++) {
-                    vertices.push(...meshData.vertices[f[0]].toArray());
-                    vertices.push(...meshData.vertices[f[i]].toArray());
-                    vertices.push(...meshData.vertices[f[i + 1]].toArray());
-                }
-                // Center/Normal for other viz
-                const center = new THREE.Vector3();
-                f.forEach(idx => center.add(meshData.vertices[idx]));
-                center.divideScalar(f.length);
-                faceCenters.push(center);
-
-                // Normal
-                const v0 = meshData.vertices[f[0]];
-                const v1 = meshData.vertices[f[1]];
-                const v2 = meshData.vertices[f[f.length - 1]];
-                const n = new THREE.Vector3().crossVectors(new THREE.Vector3().subVectors(v1, v0), new THREE.Vector3().subVectors(v2, v0)).normalize();
-                faceNormals.push(n);
-            });
-
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-            geometry.computeVertexNormals();
-
-            const material = new THREE.MeshPhongMaterial({
-                color: 0x3b82f6,
-                transparent: true,
-                opacity: 0.9,
-                side: THREE.DoubleSide,
-                flatShading: true,
-                shininess: 50,
-                polygonOffset: true,
-                polygonOffsetFactor: 1,
-                polygonOffsetUnits: 1
-            });
-
-            mainMesh = new THREE.Mesh(geometry, material);
-            if (state.showFaces) scene.add(mainMesh);
-
-            // Vertices
-            if (state.showVertices) {
-                const dotGeo = new THREE.BufferGeometry().setFromPoints(meshData.vertices);
-                const dotMat = new THREE.PointsMaterial({ color: 0xa5b4fc, size: 0.05 });
-                vertPoints = new THREE.Points(dotGeo, dotMat);
-                scene.add(vertPoints);
-            }
-
-            // Edges
-            const edgeIndices = new Set();
-            meshData.faces.forEach(f => {
-                for (let i = 0; i < f.length; i++) {
-                    const a = f[i];
-                    const b = f[(i + 1) % f.length];
-                    const key = a < b ? `${a}_${b}` : `${b}_${a}`;
-                    if (!edgeIndices.has(key)) edgeIndices.add(key);
-                }
-            });
-
-            const lineGeoPoints = [];
-            edgeIndices.forEach(key => {
-                const [ai, bi] = key.split('_').map(Number);
-                const va = meshData.vertices[ai];
-                const vb = meshData.vertices[bi];
-
-                if (state.showGeodesics) {
-                    const steps = 12;
-                    for (let j = 0; j < steps; j++) {
-                        const t1 = j / steps;
-                        const t2 = (j + 1) / steps;
-                        const p1 = new THREE.Vector3().copy(va).lerp(vb, t1).normalize().multiplyScalar(1.002);
-                        const p2 = new THREE.Vector3().copy(va).lerp(vb, t2).normalize().multiplyScalar(1.002);
-                        lineGeoPoints.push(p1, p2);
-                    }
-                } else {
-                    lineGeoPoints.push(va, vb);
-                }
-            });
-
-            const lineGeo = new THREE.BufferGeometry().setFromPoints(lineGeoPoints);
-            const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
-            edgeLines = new THREE.LineSegments(lineGeo, lineMat);
-            scene.add(edgeLines);
-
-            // Normals
-            if (state.showNormals) {
-                const normalPoints = [];
-                const colors = [];
-                faceCenters.forEach((c, i) => {
-                    const n = faceNormals[i];
-                    const p2 = c.clone().add(n.multiplyScalar(0.15));
-                    normalPoints.push(c, p2);
-                    colors.push(0, 1, 0, 0, 1, 0);
-                });
-                const normGeo = new THREE.BufferGeometry().setFromPoints(normalPoints);
-                normGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-                const normMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.8 });
-                normalLines = new THREE.LineSegments(normGeo, normMat);
-                scene.add(normalLines);
-            }
-
-            // Indices (limit to < 1000)
-            if (state.showIndices && meshData.vertices.length < 1000) {
-                meshData.vertices.forEach((v, i) => {
-                    const el = document.createElement('div');
-                    el.textContent = i;
-                    el.className = 'absolute text-[0.75rem] font-mono text-white bg-black/50 px-1 rounded transform -translate-x-1/2 -translate-y-1/2 pointer-events-none';
-                    el.dataset.index = i;
-                    labelsContainer.appendChild(el);
-                });
-            }
-
-            // Update Stats
-            renderBaseSolid();
-            document.getElementById('meshStats').innerText = `${meshData.vertices.length}V / ${edgeIndices.size}E / ${meshData.faces.length}F`;
+      // Edges
+      const edgeIndices = new Set();
+      meshData.faces.forEach(f => {
+        for (let i = 0; i < f.length; i++) {
+          const a = f[i];
+          const b = f[(i + 1) % f.length];
+          const key = a < b ? `${a}_${b}` : `${b}_${a}`;
+          if (!edgeIndices.has(key)) edgeIndices.add(key);
         }
+      });
 
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
+      const lineGeoPoints = [];
+      edgeIndices.forEach(key => {
+        const [ai, bi] = key.split('_').map(Number);
+        const va = meshData.vertices[ai];
+        const vb = meshData.vertices[bi];
 
-            // Update Labels
-            if (state.showIndices && window.currentMesh && labelsContainer.children.length > 0) {
-                const rect = renderer.domElement.getBoundingClientRect();
-                const tempV = new THREE.Vector3();
-                const camPos = camera.position;
-
-                Array.from(labelsContainer.children).forEach(el => {
-                    const i = parseInt(el.dataset.index);
-                    const v = window.currentMesh.vertices[i];
-                    if (v) {
-                        // Backface Culling for Labels
-                        const dot = v.dot(camPos) - v.lengthSq();
-
-                        if (dot < 0) {
-                            el.style.display = 'none';
-                            return;
-                        }
-
-                        tempV.copy(v);
-                        tempV.project(camera);
-
-                        // Check if behind camera frustum (NDC z)
-                        if (tempV.z > 1) {
-                            el.style.display = 'none';
-                        } else {
-                            el.style.display = 'block';
-                            const x = (tempV.x * rect.width / 2) + rect.width / 2;
-                            const y = -(tempV.y * rect.height / 2) + rect.height / 2;
-                            el.style.left = `${x}px`;
-                            el.style.top = `${y}px`;
-                        }
-                    }
-                });
-            }
+        if (state.showGeodesics) {
+          const steps = 12;
+          for (let j = 0; j < steps; j++) {
+            const t1 = j / steps;
+            const t2 = (j + 1) / steps;
+            const p1 = new THREE.Vector3().copy(va).lerp(vb, t1).normalize().multiplyScalar(1.002);
+            const p2 = new THREE.Vector3().copy(va).lerp(vb, t2).normalize().multiplyScalar(1.002);
+            lineGeoPoints.push(p1, p2);
+          }
+        } else {
+          lineGeoPoints.push(va, vb);
         }
+      });
+
+      const lineGeo = new THREE.BufferGeometry().setFromPoints(lineGeoPoints);
+      const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
+      edgeLines = new THREE.LineSegments(lineGeo, lineMat);
+      scene.add(edgeLines);
+
+      // Normals
+      if (state.showNormals) {
+        const normalPoints = [];
+        const colors = [];
+        faceCenters.forEach((c, i) => {
+          const n = faceNormals[i];
+          const p2 = c.clone().add(n.multiplyScalar(0.15));
+          normalPoints.push(c, p2);
+          colors.push(0, 1, 0, 0, 1, 0);
+        });
+        const normGeo = new THREE.BufferGeometry().setFromPoints(normalPoints);
+        normGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        const normMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.8 });
+        normalLines = new THREE.LineSegments(normGeo, normMat);
+        scene.add(normalLines);
+      }
+
+      // Indices (limit to < 1000)
+      if (state.showIndices && meshData.vertices.length < 1000) {
+        meshData.vertices.forEach((v, i) => {
+          const el = document.createElement('div');
+          el.textContent = i;
+          el.className = 'absolute text-[0.75rem] font-mono text-white bg-black/50 px-1 rounded transform -translate-x-1/2 -translate-y-1/2 pointer-events-none';
+          el.dataset.index = i;
+          labelsContainer.appendChild(el);
+        });
+      }
+
+      // Update Stats
+      renderBaseSolid();
+      document.getElementById('meshStats').innerText = `${meshData.vertices.length}V / ${edgeIndices.size}E / ${meshData.faces.length}F`;
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+
+      // Update Labels
+      if (state.showIndices && window.currentMesh && labelsContainer.children.length > 0) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        const tempV = new THREE.Vector3();
+        const camPos = camera.position;
+
+        Array.from(labelsContainer.children).forEach(el => {
+          const i = parseInt(el.dataset.index);
+          const v = window.currentMesh.vertices[i];
+          if (v) {
+            // Backface Culling for Labels
+            const dot = v.dot(camPos) - v.lengthSq();
+
+            if (dot < 0) {
+              el.style.display = 'none';
+              return;
+            }
+
+            tempV.copy(v);
+            tempV.project(camera);
+
+            // Check if behind camera frustum (NDC z)
+            if (tempV.z > 1) {
+              el.style.display = 'none';
+            } else {
+              el.style.display = 'block';
+              const x = (tempV.x * rect.width / 2) + rect.width / 2;
+              const y = -(tempV.y * rect.height / 2) + rect.height / 2;
+              el.style.left = `${x}px`;
+              el.style.top = `${y}px`;
+            }
+          }
+        });
+      }
+    }
 
 
 
-        window.onload = init;
+    window.onload = init;
 
-    </script>
+  </script>
 </body>
 
 </html>

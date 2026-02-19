@@ -211,8 +211,6 @@ export class Daydream {
     this.mainViewport.width = width;
     this.mainViewport.height = height;
 
-    // Make the PIP viewport square to reduce empty space ("black bars") 
-    // around the central spherical content.
     const pipSize = Math.floor(Math.min(width, height) * 0.3);
     this.pipViewport.x = width - pipSize;
     this.pipViewport.y = 0;

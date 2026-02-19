@@ -6,760 +6,760 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mobius Transformation Visualizer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js",
-                "three/addons/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/controls/OrbitControls.js"
-            }
-        }
-    </script>
-    <style>
-        :root {
-            --slate-900: #0f172a;
-            --slate-800: #1e293b;
-            --slate-700: #334155;
-            --blue-500: #3b82f6;
-            --indigo-400: #818cf8;
-            --panel-height: 280px;
-            --sidebar-width: 240px;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobius Transformation Visualizer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js",
+        "three/addons/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/controls/OrbitControls.js"
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --slate-900: #0f172a;
+      --slate-800: #1e293b;
+      --slate-700: #334155;
+      --blue-500: #3b82f6;
+      --indigo-400: #818cf8;
+      --panel-height: 280px;
+      --sidebar-width: 240px;
+    }
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--slate-900);
-            color: #E2E8F0;
-            overflow: hidden;
-            margin: 0;
-        }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--slate-900);
+      color: #E2E8F0;
+      overflow: hidden;
+      margin: 0;
+    }
 
-        #canvasContainer {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: calc(100vw - var(--sidebar-width));
-            height: calc(100vh - var(--panel-height));
-            z-index: 10;
-        }
+    #canvasContainer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: calc(100vw - var(--sidebar-width));
+      height: calc(100vh - var(--panel-height));
+      z-index: 10;
+    }
 
-        #presetSidebar {
-            position: fixed;
-            top: 0;
-            right: 0;
-            width: var(--sidebar-width);
-            height: calc(100vh - var(--panel-height));
-            background-color: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(8px);
-            border-left: 1px solid var(--slate-700);
-            z-index: 15;
-            padding: 1.5rem;
-            overflow-y: auto;
-        }
+    #presetSidebar {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: var(--sidebar-width);
+      height: calc(100vh - var(--panel-height));
+      background-color: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(8px);
+      border-left: 1px solid var(--slate-700);
+      z-index: 15;
+      padding: 1.5rem;
+      overflow-y: auto;
+    }
 
-        #controls {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100vw;
-            height: var(--panel-height);
-            z-index: 20;
-            background-color: rgba(30, 41, 59, 0.95);
-            backdrop-filter: blur(8px);
-            box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.4);
-            border-top: 1px solid var(--slate-700);
-            display: flex;
-            flex-direction: column;
-            padding: 1rem;
-        }
+    #controls {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100vw;
+      height: var(--panel-height);
+      z-index: 20;
+      background-color: rgba(30, 41, 59, 0.95);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.4);
+      border-top: 1px solid var(--slate-700);
+      display: flex;
+      flex-direction: column;
+      padding: 1rem;
+    }
 
-        .preset-btn {
-            display: block;
-            width: 100%;
-            text-align: left;
-            padding: 0.75rem 1rem;
-            margin-bottom: 0.75rem;
-            background-color: var(--slate-800);
-            border: 1px solid var(--slate-700);
-            border-radius: 0.5rem;
-            color: #e2e8f0;
-            font-size: 0.9rem;
-            transition: all 0.2s ease;
-        }
+    .preset-btn {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.75rem;
+      background-color: var(--slate-800);
+      border: 1px solid var(--slate-700);
+      border-radius: 0.5rem;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+      transition: all 0.2s ease;
+    }
 
-        .preset-btn:hover {
-            background-color: var(--slate-700);
-            border-color: var(--indigo-400);
-        }
+    .preset-btn:hover {
+      background-color: var(--slate-700);
+      border-color: var(--indigo-400);
+    }
 
-        .preset-btn.active {
-            background-color: rgba(59, 130, 246, 0.2);
-            border-color: var(--blue-500);
-            color: white;
-        }
+    .preset-btn.active {
+      background-color: rgba(59, 130, 246, 0.2);
+      border-color: var(--blue-500);
+      color: white;
+    }
 
-        .preset-desc {
-            font-size: 0.75rem;
-            color: #94a3b8;
-            margin-top: 0.25rem;
-            line-height: 1.2;
-        }
+    .preset-desc {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-top: 0.25rem;
+      line-height: 1.2;
+    }
 
-        #parameters {
-            display: flex;
-            flex-direction: row;
-            gap: 1.5rem;
-            justify-content: center;
-            align-items: flex-start;
-            overflow-x: auto;
-            padding-bottom: 0.5rem;
-            height: 100%;
-            width: 100%;
-        }
+    #parameters {
+      display: flex;
+      flex-direction: row;
+      gap: 1.5rem;
+      justify-content: center;
+      align-items: flex-start;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+      height: 100%;
+      width: 100%;
+    }
 
-        .param-group {
-            background-color: var(--slate-700);
-            border-radius: 0.75rem;
-            padding: 0.75rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            width: 160px;
-            flex-shrink: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+    .param-group {
+      background-color: var(--slate-700);
+      border-radius: 0.75rem;
+      padding: 0.75rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      width: 160px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
 
-        .complex-plane-control {
-            position: relative;
-            width: 100%;
-            padding-top: 100%;
-            background-color: #0f172a;
-            border-radius: 0.5rem;
-            border: 1px solid var(--slate-800);
-            cursor: grab;
-            margin-top: 0.5rem;
-            overflow: hidden;
-            touch-action: none;
-        }
+    .complex-plane-control {
+      position: relative;
+      width: 100%;
+      padding-top: 100%;
+      background-color: #0f172a;
+      border-radius: 0.5rem;
+      border: 1px solid var(--slate-800);
+      cursor: grab;
+      margin-top: 0.5rem;
+      overflow: hidden;
+      touch-action: none;
+    }
 
-        .complex-plane-inner {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
+    .complex-plane-inner {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
 
-        .complex-plane-dot {
-            position: absolute;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background-color: var(--blue-500);
-            border: 2px solid #ffffff;
-            pointer-events: none;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
-            z-index: 10;
-        }
+    .complex-plane-dot {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: var(--blue-500);
+      border: 2px solid #ffffff;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+      z-index: 10;
+    }
 
-        .axis-h {
-            position: absolute;
-            top: 50%;
-            left: 0;
-            width: 100%;
-            height: 1px;
-            background-color: #475569;
-        }
+    .axis-h {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 1px;
+      background-color: #475569;
+    }
 
-        .axis-v {
-            position: absolute;
-            left: 50%;
-            top: 0;
-            height: 100%;
-            width: 1px;
-            background-color: #475569;
-        }
+    .axis-v {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      height: 100%;
+      width: 1px;
+      background-color: #475569;
+    }
 
-        .complex-plane-label {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            color: var(--indigo-400);
-            text-align: center;
-            margin-top: 0.5rem;
-            white-space: nowrap;
-            user-select: none;
-            width: 100%;
-        }
+    .complex-plane-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--indigo-400);
+      text-align: center;
+      margin-top: 0.5rem;
+      white-space: nowrap;
+      user-select: none;
+      width: 100%;
+    }
 
-        #parameters::-webkit-scrollbar {
-            height: 6px;
-        }
+    #parameters::-webkit-scrollbar {
+      height: 6px;
+    }
 
-        #parameters::-webkit-scrollbar-track {
-            background: var(--slate-800);
-            border-radius: 3px;
-        }
+    #parameters::-webkit-scrollbar-track {
+      background: var(--slate-800);
+      border-radius: 3px;
+    }
 
-        #parameters::-webkit-scrollbar-thumb {
-            background: var(--slate-600);
-            border-radius: 3px;
-        }
+    #parameters::-webkit-scrollbar-thumb {
+      background: var(--slate-600);
+      border-radius: 3px;
+    }
 
-        @media (max-width: 768px) {
-            :root {
-                --panel-height: 260px;
-                --sidebar-width: 0px;
-            }
+    @media (max-width: 768px) {
+      :root {
+        --panel-height: 260px;
+        --sidebar-width: 0px;
+      }
 
-            #canvasContainer {
-                width: 100vw;
-                height: 50vh;
-            }
+      #canvasContainer {
+        width: 100vw;
+        height: 50vh;
+      }
 
-            #presetSidebar {
-                display: none;
-            }
+      #presetSidebar {
+        display: none;
+      }
 
-            #controls {
-                height: 50vh;
-            }
+      #controls {
+        height: 50vh;
+      }
 
-            .param-group {
-                width: 130px;
-            }
+      .param-group {
+        width: 130px;
+      }
 
-            #parameters {
-                justify-content: flex-start;
-            }
-        }
-    </style>
+      #parameters {
+        justify-content: flex-start;
+      }
+    }
+  </style>
 </head>
 
 <body>
-    <div id="canvasContainer">
-        <canvas id="threeCanvas" class="w-full h-full"></canvas>
+  <div id="canvasContainer">
+    <canvas id="threeCanvas" class="w-full h-full"></canvas>
+  </div>
+
+  <div id="presetSidebar">
+    <h2 class="text-lg font-bold text-white mb-4 border-b border-slate-700 pb-2">Presets</h2>
+    <div id="presetList"></div>
+    <div class="mt-4 p-3 bg-slate-800 rounded border border-slate-700">
+      <p class="text-xs text-indigo-300 italic">
+        Drag any bottom control to stop animation.
+      </p>
+    </div>
+  </div>
+
+  <div id="controls">
+    <div class="flex justify-between items-center mb-2 px-2 w-full max-w-7xl mx-auto">
+      <div class="flex flex-col">
+        <h1 class="text-lg font-bold text-white leading-tight">Mobius Visualizer</h1>
+        <p class="text-xs text-indigo-300 font-mono">f(z) = (az + b) / (cz + d)</p>
+      </div>
+      <button id="resetBtn"
+        class="px-3 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs font-medium transition-colors shadow-sm border border-slate-500">
+        Stop / Reset
+      </button>
     </div>
 
-    <div id="presetSidebar">
-        <h2 class="text-lg font-bold text-white mb-4 border-b border-slate-700 pb-2">Presets</h2>
-        <div id="presetList"></div>
-        <div class="mt-4 p-3 bg-slate-800 rounded border border-slate-700">
-            <p class="text-xs text-indigo-300 italic">
-                Drag any bottom control to stop animation.
-            </p>
-        </div>
+    <div id="parameters" class="w-full max-w-7xl mx-auto">
+      <div id="A_param_group" class="param-group">
+        <h3 class="text-xs uppercase tracking-wider font-semibold text-indigo-400">Param A</h3>
+        <div id="A_control_container" class="w-full"></div>
+      </div>
+      <div id="B_param_group" class="param-group">
+        <h3 class="text-xs uppercase tracking-wider font-semibold text-indigo-400">Param B</h3>
+        <div id="B_control_container" class="w-full"></div>
+      </div>
+      <div id="C_param_group" class="param-group">
+        <h3 class="text-xs uppercase tracking-wider font-semibold text-indigo-400">Param C</h3>
+        <div id="C_control_container" class="w-full"></div>
+      </div>
+      <div id="D_param_group" class="param-group">
+        <h3 class="text-xs uppercase tracking-wider font-semibold text-indigo-400">Param D</h3>
+        <div id="D_control_container" class="w-full"></div>
+      </div>
     </div>
+  </div>
 
-    <div id="controls">
-        <div class="flex justify-between items-center mb-2 px-2 w-full max-w-7xl mx-auto">
-            <div class="flex flex-col">
-                <h1 class="text-lg font-bold text-white leading-tight">Mobius Visualizer</h1>
-                <p class="text-xs text-indigo-300 font-mono">f(z) = (az + b) / (cz + d)</p>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const config = {
+      A: { re: 1.0, im: 0.0 },
+      B: { re: 0.0, im: 0.0 },
+      C: { re: 0.0, im: 0.0 },
+      D: { re: 1.0, im: 0.0 },
+      MAX_EXTENT: 2.0,
+    };
+
+    const uiUpdaters = {};
+    let isAnimating = false;
+    let activePreset = null;
+    let animationTime = 0;
+
+    let scene, camera, renderer, controls, sphereMesh;
+
+    const vertexShader = `
+        varying vec3 vPosition;
+        void main() {
+          vPosition = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `;
+
+    const complexFunctions = `
+        struct CNum { float re; float im; };
+        CNum cmult(CNum p, CNum q) { return CNum(p.re * q.re - p.im * q.im, p.re * q.im + p.im * q.re); }
+        CNum cadd(CNum p, CNum q) { return CNum(p.re + q.re, p.im + q.im); }
+        CNum cdiv(CNum p, CNum q) {
+          float denom = q.re * q.re + q.im * q.im;
+          if (denom < 1e-6) return CNum(0.0, 0.0);
+          return CNum((p.re * q.re + p.im * q.im) / denom, (p.im * q.re - p.re * q.im) / denom);
+        }
+      `;
+
+    const fragmentShader = `
+        ${complexFunctions}
+        uniform CNum u_a;
+        uniform CNum u_b;
+        uniform CNum u_c;
+        uniform CNum u_d;
+        varying vec3 vPosition;
+
+        const float GRID_SCALE_R = 1.5;
+        const float GRID_SCALE_THETA = 12.0;
+
+        float pattern(float val, float thickness) {
+          float fw = fwidth(val);
+          float dist = abs(fract(val + 0.5) - 0.5);
+          return 1.0 - smoothstep(0.0, fw * thickness, dist);
+        }
+
+        void main() {
+          vec3 p = normalize(vPosition);
+          float denom = 1.0 - p.z;
+          CNum w;
+          bool isInfinity = false;
+
+          if (denom < 1e-4) { isInfinity = true; }
+          else { w.re = p.x / denom; w.im = p.y / denom; }
+
+          CNum w_prime;
+          if (isInfinity) {
+            float c_mag = length(vec2(u_c.re, u_c.im));
+            if (c_mag < 1e-6) w_prime = CNum(100.0, 100.0);
+            else w_prime = cdiv(u_a, u_c);
+          } else {
+            CNum aw = cmult(u_a, w);
+            CNum num = cadd(aw, u_b);
+            CNum cw = cmult(u_c, w);
+            CNum den = cadd(cw, u_d);
+            float den_mag = den.re*den.re + den.im*den.im;
+            if (den_mag < 1e-6) w_prime = CNum(100.0, 100.0);
+            else w_prime = cdiv(num, den);
+          }
+
+          float r = length(vec2(w_prime.re, w_prime.im));
+          float theta = atan(w_prime.im, w_prime.re);
+          float log_r = log(r + 0.0001);
+          float u = log_r * GRID_SCALE_R;
+          float v = (theta / 3.14159) * GRID_SCALE_THETA;
+
+          float gridR = pattern(u, 1.5);
+          float gridTheta = pattern(v, 1.5);
+          float grid = max(gridR, gridTheta);
+
+          vec3 colorBg = vec3(0.059, 0.09, 0.165);
+          vec3 colorLine = vec3(0.506, 0.549, 0.973);
+          vec3 baseColor = mix(colorBg, colorBg * 1.5, 0.5 + 0.5*sin(theta));
+          vec3 finalColor = mix(baseColor, colorLine, grid);
+
+          gl_FragColor = vec4(finalColor, 1.0);
+        }
+      `;
+
+    const updateMobiusUniforms = () => {
+      if (!sphereMesh || !sphereMesh.material.uniforms) return;
+      const u = sphereMesh.material.uniforms;
+      u.u_a.value = { re: config.A.re, im: config.A.im };
+      u.u_b.value = { re: config.B.re, im: config.B.im };
+      u.u_c.value = { re: config.C.re, im: config.C.im };
+      u.u_d.value = { re: config.D.re, im: config.D.im };
+    };
+
+    const applyConfig = (newVals) => {
+      if (newVals.A) { config.A.re = newVals.A.re; config.A.im = newVals.A.im; }
+      if (newVals.B) { config.B.re = newVals.B.re; config.B.im = newVals.B.im; }
+      if (newVals.C) { config.C.re = newVals.C.re; config.C.im = newVals.C.im; }
+      if (newVals.D) { config.D.re = newVals.D.re; config.D.im = newVals.D.im; }
+      Object.values(uiUpdaters).forEach(u => u());
+      updateMobiusUniforms();
+    };
+
+    const presets = [
+      {
+        id: 'identity',
+        name: 'Identity',
+        desc: 'Reset to default state. f(z) = z',
+        animate: false,
+        setup: () => ({ A: { re: 1, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 }, D: { re: 1, im: 0 } })
+      },
+      {
+        id: 'elliptic',
+        name: 'Elliptic (Rotation)',
+        desc: 'Continuous rotation around the poles.',
+        animate: true,
+        update: (t) => {
+          const angle = t * 0.5;
+          return {
+            A: { re: Math.cos(angle), im: Math.sin(angle) },
+            B: { re: 0, im: 0 }, C: { re: 0, im: 0 },
+            D: { re: Math.cos(-angle), im: Math.sin(-angle) }
+          };
+        }
+      },
+      {
+        id: 'hyperbolic',
+        name: 'Hyperbolic (Zoom)',
+        desc: 'Continuous flow from Source to Sink.',
+        animate: true,
+        update: (t) => {
+          const gridScaleR = 1.5;
+          const logPeriod = 1.0 / gridScaleR;
+          const speed = 0.4;
+          const flowParam = (t * speed) % logPeriod;
+          const scale = Math.exp(flowParam);
+          const s = Math.sqrt(scale);
+          return {
+            A: { re: s, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 },
+            D: { re: 1 / s, im: 0 }
+          };
+        }
+      },
+      {
+        id: 'loxodromic',
+        name: 'Loxodromic (Spiral)',
+        desc: 'Seamless spiral flow.',
+        animate: true,
+        update: (t) => {
+          const angle = t * 0.3;
+          const gridScaleR = 1.5;
+          const logPeriod = 1.0 / gridScaleR;
+          const speed = 0.3;
+          const flowParam = (t * speed) % logPeriod;
+          const scale = Math.exp(flowParam);
+          const s = Math.sqrt(scale);
+          return {
+            A: { re: s * Math.cos(angle), im: s * Math.sin(angle) },
+            B: { re: 0, im: 0 }, C: { re: 0, im: 0 },
+            D: { re: (1 / s) * Math.cos(-angle), im: (1 / s) * Math.sin(-angle) }
+          };
+        }
+      },
+      {
+        id: 'parabolic',
+        name: 'Parabolic (Drift)',
+        desc: 'Continuous translation along Real axis.',
+        animate: true,
+        update: (t) => {
+          return {
+            A: { re: 1, im: 0 },
+            B: { re: t * 0.8, im: 0 },
+            C: { re: 0, im: 0 },
+            D: { re: 1, im: 0 }
+          };
+        }
+      },
+      {
+        id: 'inversion',
+        name: 'Inversion (Rotation)',
+        desc: 'Continuous rotation around Real axis (swaps 0 and ∞).',
+        animate: true,
+        update: (t) => {
+          // Rotate around Real Axis (swaps poles)
+          const theta = t * 0.5;
+          const c = Math.cos(theta);
+          const s = Math.sin(theta);
+          return {
+            A: { re: c, im: 0 },
+            B: { re: 0, im: s }, // i*sin
+            C: { re: 0, im: s }, // i*sin
+            D: { re: c, im: 0 }
+          };
+        }
+      },
+      {
+        id: 'tumble',
+        name: 'Tumble',
+        desc: 'Rotation around Imaginary axis.',
+        animate: true,
+        update: (t) => {
+          const theta = t * 0.4;
+          const c = Math.cos(theta);
+          const s = Math.sin(theta);
+          return {
+            A: { re: c, im: 0 },
+            B: { re: -s, im: 0 },
+            C: { re: s, im: 0 },
+            D: { re: c, im: 0 }
+          };
+        }
+      },
+      {
+        id: 'cayley',
+        name: 'Cayley Transform',
+        desc: 'Transition: Identity -> Cayley.',
+        animate: true,
+        update: (t) => {
+          // Interpolate from Identity (1,0,0,1) to Cayley (1,-i,1,i)
+          // We oscillate simply 0 to 1 to 0 so the user can see it happen repeatedly
+          // or just saturate at 1. Let's saturate at 1.
+          const p = Math.min(1.0, t * 0.5);
+
+          // A: 1 -> 1
+          // B: 0 -> -i
+          // C: 0 -> 1
+          // D: 1 -> i
+          return {
+            A: { re: 1, im: 0 },
+            B: { re: 0, im: -p },
+            C: { re: p, im: 0 },
+            D: { re: 1 - p, im: p }
+          };
+        }
+      }
+    ];
+
+    const stopAnimation = () => {
+      isAnimating = false;
+      activePreset = null;
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    };
+
+    const startPreset = (preset) => {
+      stopAnimation(); // Stop any existing animation
+      activePreset = preset;
+      document.querySelectorAll('.preset-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.id === preset.id);
+      });
+
+      if (preset.animate) {
+        isAnimating = true;
+        animationTime = 0;
+      } else if (preset.setup) {
+        applyConfig(preset.setup());
+      }
+    };
+
+    const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
+      const container = document.getElementById(`${id}_control_container`);
+      if (!container) return;
+
+      const controlId = `${id}_plane`;
+      const dotId = `${id}_dot`;
+      const labelId = `${id}_label`;
+
+      container.innerHTML = `
+          <div id="${controlId}" class="complex-plane-control">
+            <div class="complex-plane-inner">
+              <div class="axis-h"></div>
+              <div class="axis-v"></div>
+              <div id="${dotId}" class="complex-plane-dot"></div>
             </div>
-            <button id="resetBtn"
-                class="px-3 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs font-medium transition-colors shadow-sm border border-slate-500">
-                Stop / Reset
-            </button>
-        </div>
+          </div>
+          <div id="${labelId}" class="complex-plane-label"></div>
+        `;
 
-        <div id="parameters" class="w-full max-w-7xl mx-auto">
-            <div id="A_param_group" class="param-group">
-                <h3 class="text-xs uppercase tracking-wider font-semibold text-indigo-400">Param A</h3>
-                <div id="A_control_container" class="w-full"></div>
-            </div>
-            <div id="B_param_group" class="param-group">
-                <h3 class="text-xs uppercase tracking-wider font-semibold text-indigo-400">Param B</h3>
-                <div id="B_control_container" class="w-full"></div>
-            </div>
-            <div id="C_param_group" class="param-group">
-                <h3 class="text-xs uppercase tracking-wider font-semibold text-indigo-400">Param C</h3>
-                <div id="C_control_container" class="w-full"></div>
-            </div>
-            <div id="D_param_group" class="param-group">
-                <h3 class="text-xs uppercase tracking-wider font-semibold text-indigo-400">Param D</h3>
-                <div id="D_control_container" class="w-full"></div>
-            </div>
-        </div>
-    </div>
+      const planeElement = document.getElementById(controlId);
+      const dotElement = document.getElementById(dotId);
+      const labelElement = document.getElementById(labelId);
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+      const updateUI = () => {
+        const re = paramObj.re;
+        const im = paramObj.im;
+        const sign = im >= 0 ? '+' : '-';
+        labelElement.textContent = `${re.toFixed(2)} ${sign} ${Math.abs(im).toFixed(2)}i`;
+        const xPercent = ((re / maxExtent) * 0.5 + 0.5) * 100;
+        const yPercent = ((-im / maxExtent) * 0.5 + 0.5) * 100;
+        dotElement.style.left = `${Math.min(100, Math.max(0, xPercent))}%`;
+        dotElement.style.top = `${Math.min(100, Math.max(0, yPercent))}%`;
+      };
 
-        const config = {
-            A: { re: 1.0, im: 0.0 },
-            B: { re: 0.0, im: 0.0 },
-            C: { re: 0.0, im: 0.0 },
-            D: { re: 1.0, im: 0.0 },
-            MAX_EXTENT: 2.0,
+      uiUpdaters[id] = updateUI;
+
+      const handleInput = (clientX, clientY) => {
+        if (isAnimating) stopAnimation();
+
+        const rect = planeElement.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        let x = clientX - rect.left;
+        let y = clientY - rect.top;
+        let nx = (x / width) * 2 - 1;
+        let ny = -((y / height) * 2 - 1);
+        let re = nx * maxExtent;
+        let im = ny * maxExtent;
+        re = Math.max(-maxExtent, Math.min(maxExtent, re));
+        im = Math.max(-maxExtent, Math.min(maxExtent, im));
+        if (Math.abs(re) < 0.1) re = 0.0;
+        if (Math.abs(im) < 0.1) im = 0.0;
+        if (Math.abs(re - Math.round(re)) < 0.05) re = Math.round(re);
+        if (Math.abs(im - Math.round(im)) < 0.05) im = Math.round(im);
+
+        paramObj.re = re;
+        paramObj.im = im;
+        updateUI();
+        onChange();
+      };
+
+      const onMouseDown = (e) => {
+        e.preventDefault();
+        handleInput(e.clientX, e.clientY);
+        const onMouseMove = (ev) => handleInput(ev.clientX, ev.clientY);
+        const onMouseUp = () => {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+          planeElement.style.cursor = 'grab';
         };
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+        planeElement.style.cursor = 'grabbing';
+      };
 
-        const uiUpdaters = {};
-        let isAnimating = false;
-        let activePreset = null;
-        let animationTime = 0;
-
-        let scene, camera, renderer, controls, sphereMesh;
-
-        const vertexShader = `
-                varying vec3 vPosition;
-                void main() {
-                    vPosition = position;
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                }
-            `;
-
-        const complexFunctions = `
-                struct CNum { float re; float im; };
-                CNum cmult(CNum p, CNum q) { return CNum(p.re * q.re - p.im * q.im, p.re * q.im + p.im * q.re); }
-                CNum cadd(CNum p, CNum q) { return CNum(p.re + q.re, p.im + q.im); }
-                CNum cdiv(CNum p, CNum q) {
-                    float denom = q.re * q.re + q.im * q.im;
-                    if (denom < 1e-6) return CNum(0.0, 0.0);
-                    return CNum((p.re * q.re + p.im * q.im) / denom, (p.im * q.re - p.re * q.im) / denom);
-                }
-            `;
-
-        const fragmentShader = `
-                ${complexFunctions}
-                uniform CNum u_a;
-                uniform CNum u_b;
-                uniform CNum u_c;
-                uniform CNum u_d;
-                varying vec3 vPosition;
-
-                const float GRID_SCALE_R = 1.5;
-                const float GRID_SCALE_THETA = 12.0;
-
-                float pattern(float val, float thickness) {
-                    float fw = fwidth(val);
-                    float dist = abs(fract(val + 0.5) - 0.5);
-                    return 1.0 - smoothstep(0.0, fw * thickness, dist);
-                }
-
-                void main() {
-                    vec3 p = normalize(vPosition);
-                    float denom = 1.0 - p.z;
-                    CNum w;
-                    bool isInfinity = false;
-
-                    if (denom < 1e-4) { isInfinity = true; }
-                    else { w.re = p.x / denom; w.im = p.y / denom; }
-
-                    CNum w_prime;
-                    if (isInfinity) {
-                        float c_mag = length(vec2(u_c.re, u_c.im));
-                        if (c_mag < 1e-6) w_prime = CNum(100.0, 100.0);
-                        else w_prime = cdiv(u_a, u_c);
-                    } else {
-                        CNum aw = cmult(u_a, w);
-                        CNum num = cadd(aw, u_b);
-                        CNum cw = cmult(u_c, w);
-                        CNum den = cadd(cw, u_d);
-                        float den_mag = den.re*den.re + den.im*den.im;
-                        if (den_mag < 1e-6) w_prime = CNum(100.0, 100.0);
-                        else w_prime = cdiv(num, den);
-                    }
-
-                    float r = length(vec2(w_prime.re, w_prime.im));
-                    float theta = atan(w_prime.im, w_prime.re);
-                    float log_r = log(r + 0.0001);
-                    float u = log_r * GRID_SCALE_R;
-                    float v = (theta / 3.14159) * GRID_SCALE_THETA;
-
-                    float gridR = pattern(u, 1.5);
-                    float gridTheta = pattern(v, 1.5);
-                    float grid = max(gridR, gridTheta);
-
-                    vec3 colorBg = vec3(0.059, 0.09, 0.165);
-                    vec3 colorLine = vec3(0.506, 0.549, 0.973);
-                    vec3 baseColor = mix(colorBg, colorBg * 1.5, 0.5 + 0.5*sin(theta));
-                    vec3 finalColor = mix(baseColor, colorLine, grid);
-
-                    gl_FragColor = vec4(finalColor, 1.0);
-                }
-            `;
-
-        const updateMobiusUniforms = () => {
-            if (!sphereMesh || !sphereMesh.material.uniforms) return;
-            const u = sphereMesh.material.uniforms;
-            u.u_a.value = { re: config.A.re, im: config.A.im };
-            u.u_b.value = { re: config.B.re, im: config.B.im };
-            u.u_c.value = { re: config.C.re, im: config.C.im };
-            u.u_d.value = { re: config.D.re, im: config.D.im };
+      const onTouchStart = (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        handleInput(touch.clientX, touch.clientY);
+        const onTouchMove = (ev) => {
+          ev.preventDefault();
+          const moveTouch = ev.touches[0];
+          handleInput(moveTouch.clientX, moveTouch.clientY);
         };
-
-        const applyConfig = (newVals) => {
-            if (newVals.A) { config.A.re = newVals.A.re; config.A.im = newVals.A.im; }
-            if (newVals.B) { config.B.re = newVals.B.re; config.B.im = newVals.B.im; }
-            if (newVals.C) { config.C.re = newVals.C.re; config.C.im = newVals.C.im; }
-            if (newVals.D) { config.D.re = newVals.D.re; config.D.im = newVals.D.im; }
-            Object.values(uiUpdaters).forEach(u => u());
-            updateMobiusUniforms();
+        const onTouchEnd = () => {
+          document.removeEventListener('touchmove', onTouchMove);
+          document.removeEventListener('touchend', onTouchEnd);
         };
+        document.addEventListener('touchmove', onTouchMove, { passive: false });
+        document.addEventListener('touchend', onTouchEnd);
+      }
 
-        const presets = [
-            {
-                id: 'identity',
-                name: 'Identity',
-                desc: 'Reset to default state. f(z) = z',
-                animate: false,
-                setup: () => ({ A: { re: 1, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 }, D: { re: 1, im: 0 } })
-            },
-            {
-                id: 'elliptic',
-                name: 'Elliptic (Rotation)',
-                desc: 'Continuous rotation around the poles.',
-                animate: true,
-                update: (t) => {
-                    const angle = t * 0.5;
-                    return {
-                        A: { re: Math.cos(angle), im: Math.sin(angle) },
-                        B: { re: 0, im: 0 }, C: { re: 0, im: 0 },
-                        D: { re: Math.cos(-angle), im: Math.sin(-angle) }
-                    };
-                }
-            },
-            {
-                id: 'hyperbolic',
-                name: 'Hyperbolic (Zoom)',
-                desc: 'Continuous flow from Source to Sink.',
-                animate: true,
-                update: (t) => {
-                    const gridScaleR = 1.5;
-                    const logPeriod = 1.0 / gridScaleR;
-                    const speed = 0.4;
-                    const flowParam = (t * speed) % logPeriod;
-                    const scale = Math.exp(flowParam);
-                    const s = Math.sqrt(scale);
-                    return {
-                        A: { re: s, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 },
-                        D: { re: 1 / s, im: 0 }
-                    };
-                }
-            },
-            {
-                id: 'loxodromic',
-                name: 'Loxodromic (Spiral)',
-                desc: 'Seamless spiral flow.',
-                animate: true,
-                update: (t) => {
-                    const angle = t * 0.3;
-                    const gridScaleR = 1.5;
-                    const logPeriod = 1.0 / gridScaleR;
-                    const speed = 0.3;
-                    const flowParam = (t * speed) % logPeriod;
-                    const scale = Math.exp(flowParam);
-                    const s = Math.sqrt(scale);
-                    return {
-                        A: { re: s * Math.cos(angle), im: s * Math.sin(angle) },
-                        B: { re: 0, im: 0 }, C: { re: 0, im: 0 },
-                        D: { re: (1 / s) * Math.cos(-angle), im: (1 / s) * Math.sin(-angle) }
-                    };
-                }
-            },
-            {
-                id: 'parabolic',
-                name: 'Parabolic (Drift)',
-                desc: 'Continuous translation along Real axis.',
-                animate: true,
-                update: (t) => {
-                    return {
-                        A: { re: 1, im: 0 },
-                        B: { re: t * 0.8, im: 0 },
-                        C: { re: 0, im: 0 },
-                        D: { re: 1, im: 0 }
-                    };
-                }
-            },
-            {
-                id: 'inversion',
-                name: 'Inversion (Rotation)',
-                desc: 'Continuous rotation around Real axis (swaps 0 and ∞).',
-                animate: true,
-                update: (t) => {
-                    // Rotate around Real Axis (swaps poles)
-                    const theta = t * 0.5;
-                    const c = Math.cos(theta);
-                    const s = Math.sin(theta);
-                    return {
-                        A: { re: c, im: 0 },
-                        B: { re: 0, im: s }, // i*sin
-                        C: { re: 0, im: s }, // i*sin
-                        D: { re: c, im: 0 }
-                    };
-                }
-            },
-            {
-                id: 'tumble',
-                name: 'Tumble',
-                desc: 'Rotation around Imaginary axis.',
-                animate: true,
-                update: (t) => {
-                    const theta = t * 0.4;
-                    const c = Math.cos(theta);
-                    const s = Math.sin(theta);
-                    return {
-                        A: { re: c, im: 0 },
-                        B: { re: -s, im: 0 },
-                        C: { re: s, im: 0 },
-                        D: { re: c, im: 0 }
-                    };
-                }
-            },
-            {
-                id: 'cayley',
-                name: 'Cayley Transform',
-                desc: 'Transition: Identity -> Cayley.',
-                animate: true,
-                update: (t) => {
-                    // Interpolate from Identity (1,0,0,1) to Cayley (1,-i,1,i)
-                    // We oscillate simply 0 to 1 to 0 so the user can see it happen repeatedly
-                    // or just saturate at 1. Let's saturate at 1.
-                    const p = Math.min(1.0, t * 0.5);
+      planeElement.addEventListener('mousedown', onMouseDown);
+      planeElement.addEventListener('touchstart', onTouchStart, { passive: false });
+      updateUI();
+    };
 
-                    // A: 1 -> 1
-                    // B: 0 -> -i
-                    // C: 0 -> 1
-                    // D: 1 -> i
-                    return {
-                        A: { re: 1, im: 0 },
-                        B: { re: 0, im: -p },
-                        C: { re: p, im: 0 },
-                        D: { re: 1 - p, im: p }
-                    };
-                }
-            }
-        ];
+    const initThree = () => {
+      const container = document.getElementById('canvasContainer');
+      const width = container.clientWidth;
+      const height = container.clientHeight;
 
-        const stopAnimation = () => {
-            isAnimating = false;
-            activePreset = null;
-            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-        };
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0f172a);
 
-        const startPreset = (preset) => {
-            stopAnimation(); // Stop any existing animation
-            activePreset = preset;
-            document.querySelectorAll('.preset-btn').forEach(b => {
-                b.classList.toggle('active', b.dataset.id === preset.id);
-            });
+      camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+      camera.position.set(2.5, 2.5, 4);
 
-            if (preset.animate) {
-                isAnimating = true;
-                animationTime = 0;
-            } else if (preset.setup) {
-                applyConfig(preset.setup());
-            }
-        };
+      renderer = new THREE.WebGLRenderer({
+        canvas: document.getElementById('threeCanvas'),
+        antialias: true
+      });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(window.devicePixelRatio);
 
-        const createComplexPlaneControl = (id, paramObj, maxExtent, onChange) => {
-            const container = document.getElementById(`${id}_control_container`);
-            if (!container) return;
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.minDistance = 2;
+      controls.maxDistance = 15;
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
 
-            const controlId = `${id}_plane`;
-            const dotId = `${id}_dot`;
-            const labelId = `${id}_label`;
+      const uniforms = {
+        u_a: { value: config.A },
+        u_b: { value: config.B },
+        u_c: { value: config.C },
+        u_d: { value: config.D }
+      };
 
-            container.innerHTML = `
-                    <div id="${controlId}" class="complex-plane-control">
-                        <div class="complex-plane-inner">
-                            <div class="axis-h"></div>
-                            <div class="axis-v"></div>
-                            <div id="${dotId}" class="complex-plane-dot"></div>
-                        </div>
-                    </div>
-                    <div id="${labelId}" class="complex-plane-label"></div>
-                `;
+      const geometry = new THREE.SphereGeometry(1.5, 128, 128);
+      const material = new THREE.ShaderMaterial({
+        uniforms: uniforms,
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader,
+        side: THREE.DoubleSide
+      });
 
-            const planeElement = document.getElementById(controlId);
-            const dotElement = document.getElementById(dotId);
-            const labelElement = document.getElementById(labelId);
+      sphereMesh = new THREE.Mesh(geometry, material);
+      scene.add(sphereMesh);
 
-            const updateUI = () => {
-                const re = paramObj.re;
-                const im = paramObj.im;
-                const sign = im >= 0 ? '+' : '-';
-                labelElement.textContent = `${re.toFixed(2)} ${sign} ${Math.abs(im).toFixed(2)}i`;
-                const xPercent = ((re / maxExtent) * 0.5 + 0.5) * 100;
-                const yPercent = ((-im / maxExtent) * 0.5 + 0.5) * 100;
-                dotElement.style.left = `${Math.min(100, Math.max(0, xPercent))}%`;
-                dotElement.style.top = `${Math.min(100, Math.max(0, yPercent))}%`;
-            };
+      const wireGeo = new THREE.SphereGeometry(1.48, 32, 16);
+      const wireMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.05 });
+      scene.add(new THREE.Mesh(wireGeo, wireMat));
 
-            uiUpdaters[id] = updateUI;
+      updateMobiusUniforms();
+      animate();
+    };
 
-            const handleInput = (clientX, clientY) => {
-                if (isAnimating) stopAnimation();
+    const animate = () => {
+      requestAnimationFrame(animate);
 
-                const rect = planeElement.getBoundingClientRect();
-                const width = rect.width;
-                const height = rect.height;
-                let x = clientX - rect.left;
-                let y = clientY - rect.top;
-                let nx = (x / width) * 2 - 1;
-                let ny = -((y / height) * 2 - 1);
-                let re = nx * maxExtent;
-                let im = ny * maxExtent;
-                re = Math.max(-maxExtent, Math.min(maxExtent, re));
-                im = Math.max(-maxExtent, Math.min(maxExtent, im));
-                if (Math.abs(re) < 0.1) re = 0.0;
-                if (Math.abs(im) < 0.1) im = 0.0;
-                if (Math.abs(re - Math.round(re)) < 0.05) re = Math.round(re);
-                if (Math.abs(im - Math.round(im)) < 0.05) im = Math.round(im);
+      if (isAnimating && activePreset && activePreset.update) {
+        animationTime += 0.01;
+        const newVals = activePreset.update(animationTime);
+        applyConfig(newVals);
+      }
 
-                paramObj.re = re;
-                paramObj.im = im;
-                updateUI();
-                onChange();
-            };
+      controls.update();
+      renderer.render(scene, camera);
+    };
 
-            const onMouseDown = (e) => {
-                e.preventDefault();
-                handleInput(e.clientX, e.clientY);
-                const onMouseMove = (ev) => handleInput(ev.clientX, ev.clientY);
-                const onMouseUp = () => {
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
-                    planeElement.style.cursor = 'grab';
-                };
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
-                planeElement.style.cursor = 'grabbing';
-            };
+    const onWindowResize = () => {
+      if (!renderer) return;
+      const container = document.getElementById('canvasContainer');
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    };
 
-            const onTouchStart = (e) => {
-                e.preventDefault();
-                const touch = e.touches[0];
-                handleInput(touch.clientX, touch.clientY);
-                const onTouchMove = (ev) => {
-                    ev.preventDefault();
-                    const moveTouch = ev.touches[0];
-                    handleInput(moveTouch.clientX, moveTouch.clientY);
-                };
-                const onTouchEnd = () => {
-                    document.removeEventListener('touchmove', onTouchMove);
-                    document.removeEventListener('touchend', onTouchEnd);
-                };
-                document.addEventListener('touchmove', onTouchMove, { passive: false });
-                document.addEventListener('touchend', onTouchEnd);
-            }
+    const init = () => {
+      const presetList = document.getElementById('presetList');
+      presets.forEach(preset => {
+        const btn = document.createElement('button');
+        btn.className = 'preset-btn';
+        btn.dataset.id = preset.id;
+        btn.innerHTML = `
+            <div class="font-semibold">${preset.name}</div>
+            <div class="preset-desc">${preset.desc}</div>
+          `;
+        btn.onclick = () => startPreset(preset);
+        presetList.appendChild(btn);
+      });
 
-            planeElement.addEventListener('mousedown', onMouseDown);
-            planeElement.addEventListener('touchstart', onTouchStart, { passive: false });
-            updateUI();
-        };
+      const onParamChange = () => updateMobiusUniforms();
 
-        const initThree = () => {
-            const container = document.getElementById('canvasContainer');
-            const width = container.clientWidth;
-            const height = container.clientHeight;
+      createComplexPlaneControl('A', config.A, config.MAX_EXTENT, onParamChange);
+      createComplexPlaneControl('B', config.B, config.MAX_EXTENT, onParamChange);
+      createComplexPlaneControl('C', config.C, config.MAX_EXTENT, onParamChange);
+      createComplexPlaneControl('D', config.D, config.MAX_EXTENT, onParamChange);
 
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0f172a);
+      document.getElementById('resetBtn').addEventListener('click', () => {
+        stopAnimation();
+        applyConfig({ A: { re: 1, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 }, D: { re: 1, im: 0 } });
+      });
 
-            camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-            camera.position.set(2.5, 2.5, 4);
+      initThree();
+    };
 
-            renderer = new THREE.WebGLRenderer({
-                canvas: document.getElementById('threeCanvas'),
-                antialias: true
-            });
-            renderer.setSize(width, height);
-            renderer.setPixelRatio(window.devicePixelRatio);
+    window.addEventListener('resize', onWindowResize);
+    window.onload = init;
 
-            controls = new OrbitControls(camera, renderer.domElement);
-            controls.minDistance = 2;
-            controls.maxDistance = 15;
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-
-            const uniforms = {
-                u_a: { value: config.A },
-                u_b: { value: config.B },
-                u_c: { value: config.C },
-                u_d: { value: config.D }
-            };
-
-            const geometry = new THREE.SphereGeometry(1.5, 128, 128);
-            const material = new THREE.ShaderMaterial({
-                uniforms: uniforms,
-                vertexShader: vertexShader,
-                fragmentShader: fragmentShader,
-                side: THREE.DoubleSide
-            });
-
-            sphereMesh = new THREE.Mesh(geometry, material);
-            scene.add(sphereMesh);
-
-            const wireGeo = new THREE.SphereGeometry(1.48, 32, 16);
-            const wireMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.05 });
-            scene.add(new THREE.Mesh(wireGeo, wireMat));
-
-            updateMobiusUniforms();
-            animate();
-        };
-
-        const animate = () => {
-            requestAnimationFrame(animate);
-
-            if (isAnimating && activePreset && activePreset.update) {
-                animationTime += 0.01;
-                const newVals = activePreset.update(animationTime);
-                applyConfig(newVals);
-            }
-
-            controls.update();
-            renderer.render(scene, camera);
-        };
-
-        const onWindowResize = () => {
-            if (!renderer) return;
-            const container = document.getElementById('canvasContainer');
-            const width = container.clientWidth;
-            const height = container.clientHeight;
-            camera.aspect = width / height;
-            camera.updateProjectionMatrix();
-            renderer.setSize(width, height);
-        };
-
-        const init = () => {
-            const presetList = document.getElementById('presetList');
-            presets.forEach(preset => {
-                const btn = document.createElement('button');
-                btn.className = 'preset-btn';
-                btn.dataset.id = preset.id;
-                btn.innerHTML = `
-                        <div class="font-semibold">${preset.name}</div>
-                        <div class="preset-desc">${preset.desc}</div>
-                    `;
-                btn.onclick = () => startPreset(preset);
-                presetList.appendChild(btn);
-            });
-
-            const onParamChange = () => updateMobiusUniforms();
-
-            createComplexPlaneControl('A', config.A, config.MAX_EXTENT, onParamChange);
-            createComplexPlaneControl('B', config.B, config.MAX_EXTENT, onParamChange);
-            createComplexPlaneControl('C', config.C, config.MAX_EXTENT, onParamChange);
-            createComplexPlaneControl('D', config.D, config.MAX_EXTENT, onParamChange);
-
-            document.getElementById('resetBtn').addEventListener('click', () => {
-                stopAnimation();
-                applyConfig({ A: { re: 1, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 }, D: { re: 1, im: 0 } });
-            });
-
-            initThree();
-        };
-
-        window.addEventListener('resize', onWindowResize);
-        window.onload = init;
-
-    </script>
+  </script>
 </body>
 
 </html>
