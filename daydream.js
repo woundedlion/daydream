@@ -16,7 +16,6 @@ import { BufferGeometry, AddEquation, MaxEquation, Color, LinearSRGBColorSpace, 
 const HiResFavorites = [
   "BZReactionDiffusion",
   "ChaoticStrings",
-  "ChaoticStrings",
   "Comets",
   "DreamBalls",
   "FlamingMesh",
