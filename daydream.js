@@ -192,15 +192,21 @@ const controls = {
         // 2. Build GUI
         // 2. Build GUI
         const state = {};
+        activeEffect.controllers = [];
+
         params.forEach(p => {
           state[p.name] = p.value;
 
           let controller;
-          if (typeof p.value === 'boolean') {
+          const isBool = (typeof p.value === 'boolean');
+
+          if (isBool) {
             controller = activeEffect.gui.add(state, p.name);
           } else {
             controller = activeEffect.gui.add(state, p.name, p.min, p.max);
           }
+          controller.isBoolean = isBool;
+          activeEffect.controllers.push(controller);
 
           controller.onChange(v => {
             // Convert boolean to float (1.0/0.0) for C++ as setParameter expects float
@@ -339,7 +345,27 @@ daydream.renderer.setAnimationLoop(() => {
         // 2. Step the C++ engine
         wasmEngine.drawFrame();
 
-        // 3. Extract and convert pixels
+        // 3. Sync GUI with Animations
+        if (activeEffect && activeEffect.controllers) {
+          const values = wasmEngine.getParamValues();
+          for (let i = 0; i < activeEffect.controllers.length; i++) {
+            if (i >= values.length) break;
+            const c = activeEffect.controllers[i];
+
+            // Skip if user is interacting
+            if (c.domElement.contains(document.activeElement)) continue;
+
+            let val = values[i];
+            if (c.isBoolean) val = (val > 0.5);
+
+            if (c.getValue() !== val) {
+              c.object[c.property] = val;
+              c.updateDisplay();
+            }
+          }
+        }
+
+        // 4. Extract and convert pixels
         // getPixels() returns a Uint16Array view of the Linear 16-bit buffer
         const wasmPixels = wasmEngine.getPixels();
         const inv65535 = 1.0 / 65535.0;
