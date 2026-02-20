@@ -254,7 +254,10 @@ export class Daydream {
       }
       const duration = performance.now() - start;
       const stats = document.getElementById("perf-stats");
-      if (stats) stats.innerText = `${duration.toFixed(3)} ms`;
+      if (stats) {
+        stats.innerText = `${duration.toFixed(3)} ms`;
+        stats.style.color = duration > 62 ? 'red' : 'grey';
+      }
 
       this.dotMesh.instanceColor.needsUpdate = true;
 
