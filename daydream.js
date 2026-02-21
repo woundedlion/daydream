@@ -7,7 +7,6 @@
 import createHolosphereModule from "./holosphere_wasm.js";
 import { Daydream } from "./driver.js";
 import { GUI, resetGUI } from "gui";
-// Removed allEffects import
 
 import { BufferGeometry, AddEquation, MaxEquation, Color, LinearSRGBColorSpace, SRGBColorSpace } from "three";
 
@@ -259,7 +258,6 @@ guiInstance.add(controls, 'resolution', Object.keys(resolutionPresets))
   .name('Resolution')
   .onChange(() => controls.setResolution());
 
-// Removed useWasm toggle (hardcoded to true)
 
 function populateEffectSidebar(options) {
   const sidebar = document.getElementById('effect-sidebar');
@@ -338,13 +336,9 @@ daydream.renderer.setAnimationLoop(() => {
     daydream.renderer.outputColorSpace = SRGBColorSpace;
     const wasmWrapper = {
       drawFrame: () => {
-        // 1. Explicitly clear JS buffer to prevent inter-frame persistence
-        // Daydream.pixels.fill(0); // Handled by driver.js render loop
-
-        // 2. Step the C++ engine
         wasmEngine.drawFrame();
 
-        // 3. Sync GUI with Animations
+        // Sync GUI with Animations
         if (activeEffect && activeEffect.controllers) {
           const values = wasmEngine.getParamValues();
           for (let i = 0; i < activeEffect.controllers.length; i++) {
@@ -364,8 +358,7 @@ daydream.renderer.setAnimationLoop(() => {
           }
         }
 
-        // 4. Extract and convert pixels
-        // getPixels() returns a Uint16Array view of the Linear 16-bit buffer
+        // Extract and convert pixels
         const wasmPixels = wasmEngine.getPixels();
         const inv65535 = 1.0 / 65535.0;
 
