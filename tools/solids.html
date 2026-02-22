@@ -418,8 +418,7 @@
         <div class="flex flex-col min-w-0">
           <div id="baseTitle" class="text-xs font-black text-white uppercase tracking-wider line-clamp-2">
           </div>
-          <span id="baseStats"
-            class="text-[0.6rem] text-indigo-300/60 font-medium uppercase tracking-tight"></span>
+          <span id="baseStats" class="text-[0.6rem] text-indigo-300/60 font-medium uppercase tracking-tight"></span>
         </div>
       </div>
     </div>
@@ -451,6 +450,7 @@
             Truncate(Ambo(x), t)
           </span>
         </button>
+        <button onclick="addOp('expand')" class="btn btn-secondary text-[0.65rem]">Expand</button>
         <button onclick="addOp('hankin')" class="btn btn-secondary text-[0.65rem]">Hankin</button>
         <button onclick="addOp('canonicalize')" class="btn btn-secondary text-[0.65rem]">Canon</button>
       </div>
@@ -462,8 +462,7 @@
 
       <div class="flex items-center justify-between">
         <span class="text-sm">Geodesic Edges</span>
-        <button id="toggleGeo"
-          class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
+        <button id="toggleGeo" class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
           <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform"></div>
         </button>
       </div>
@@ -472,8 +471,7 @@
         <span class="text-sm">Show Faces</span>
         <button id="toggleFaces"
           class="w-10 h-5 rounded-full bg-blue-500 relative transition-colors focus:outline-none">
-          <div
-            class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transform translate-x-5 transition-transform">
+          <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transform translate-x-5 transition-transform">
           </div>
         </button>
       </div>
@@ -482,8 +480,7 @@
         <span class="text-sm">Show Vertices</span>
         <button id="toggleVerts"
           class="w-10 h-5 rounded-full bg-blue-500 relative transition-colors focus:outline-none">
-          <div
-            class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transform translate-x-5 transition-transform">
+          <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transform translate-x-5 transition-transform">
           </div>
         </button>
       </div>
@@ -516,8 +513,7 @@
         <div id="meshStats"></div>
         <button id="saveBtn" title="Save to Collection">
           <!-- Star Icon -->
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round"
-            stroke-linejoin="round">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
             <polygon
               points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
             </polygon>
@@ -951,6 +947,10 @@
                 <span class="text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1">Recipe</span>
                 <button class="action-btn" onclick="copyCode(${index}, 'recipe_cpp', this)">C++</button>
               </div>
+              <div class="flex gap-1 justify-end">
+                <span class="text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1">Registry</span>
+                <button class="action-btn" onclick="copyCode(${index}, 'registry', this)">C++</button>
+              </div>
             </div>
             <button class="action-btn del-btn self-start ml-1" onclick="deleteSolid(${index})">&times;</button>
           </div>
@@ -972,8 +972,56 @@
 
       if (lang === 'recipe_cpp') {
         code = generateRecipeCpp(item);
+      } else if (lang === 'registry') {
+        const { funcName } = generateFuncAndRecipe(item);
+
+        // Find max capacity for this generated mesh.
+        let max_verts = 0;
+        let max_faces = 0;
+        let max_indices = 0;
+        try {
+          const wasmMesh = MeshOpsWasm.fromSolidName(funcName);
+          const v = wasmMesh.getVertices();
+          max_verts = v.length / 3;
+          const f = wasmMesh.getFaces();
+          max_faces = f.length;
+          f.forEach(face => { max_indices += face.length; });
+          wasmMesh.delete();
+        } catch (e) {
+          // Generate Mesh
+          let currentWasmMesh = null;
+          try {
+            currentWasmMesh = MeshOpsWasm.fromSolidName(item.base);
+          } catch (err) { }
+          if (currentWasmMesh) {
+            item.ops.forEach(o => {
+              const opName = typeof o === 'string' ? o : o.op;
+              let nextMesh = null;
+              if (opName === 'truncate') nextMesh = currentWasmMesh.truncate(o.params.t);
+              else if (opName === 'bitruncate') nextMesh = currentWasmMesh.bitruncate(o.params.t);
+              else if (opName === 'expand') nextMesh = currentWasmMesh.expand(o.params.t);
+              else if (opName === 'snub') nextMesh = currentWasmMesh.snub();
+              else if (opName === 'hankin') nextMesh = currentWasmMesh.hankin(o.params.angle * (Math.PI / 180));
+              else if (opName === 'canonicalize') nextMesh = currentWasmMesh.canonicalize(o.params.iter);
+              else if (currentWasmMesh[opName]) nextMesh = currentWasmMesh[opName]();
+
+              if (nextMesh) {
+                currentWasmMesh.delete();
+                currentWasmMesh = nextMesh;
+              }
+            });
+            const v = currentWasmMesh.getVertices();
+            max_verts = v.length / 3;
+            const f = currentWasmMesh.getFaces();
+            max_faces = f.length;
+            f.forEach(face => { max_indices += face.length; });
+            currentWasmMesh.delete();
+          }
+        }
+
+        code = `{"${funcName}", IslamicStarPatterns::${funcName}, Category::Complex, {${max_verts}, ${max_faces}, ${max_indices}}},`;
       } else {
-        console.warn("Only C++ Recipe export supported currently.");
+        console.warn("Unsupported export type.");
         return;
       }
 
@@ -997,9 +1045,7 @@
       return (s.indexOf('.') === -1 ? s + ".0" : s) + "f";
     }
 
-    function generateRecipeCpp(item) {
-      // C++ Style: op(op(...))
-      // Base Name: icosahedron -> icosahedron()
+    function generateFuncAndRecipe(item) {
       let s = `${item.base}()`;
       let nameParts = [item.base];
 
@@ -1007,12 +1053,10 @@
         const opName = typeof o === 'string' ? o : o.op;
 
         let params = '';
-        // Suffix construction for function name
         let suffix = `_${opName}`;
 
         if (opName === 'truncate') {
           params = `, ${formatFloat(o.params.t)}`;
-          // convention: truncate05 or bitruncate033 using string replacement of "0."
           suffix += o.params.t.toString().replace('0.', '');
         } else if (opName === 'bitruncate') {
           params = `, ${formatFloat(o.params.t)}`;
@@ -1022,7 +1066,6 @@
           suffix += o.params.t.toString().replace('0.', '');
         } else if (opName === 'hankin') {
           params = `, ${formatFloat(o.params.angle)} * D2R`;
-          // convention: hk{angle}
           suffix = `_hk${Math.round(o.params.angle)}`;
         } else if (opName === 'canonicalize') {
           params = `, ${o.params.iter}`;
@@ -1032,12 +1075,12 @@
         nameParts.push(suffix);
       });
 
-      // Construct function name from parts
-      // But actually we want linear concatenation: "base" + "_op" + "_op"
-      // The existing C++ names in solids.h seem to follow base_op_op...
-      const funcName = nameParts.join('');
+      return { funcName: nameParts.join(''), recipe: s };
+    }
 
-      return `inline PolyMesh ${funcName}() {\n  return ${s};\n}`;
+    function generateRecipeCpp(item) {
+      const { funcName, recipe } = generateFuncAndRecipe(item);
+      return `inline PolyMesh ${funcName}() {\n  return ${recipe};\n}`;
     }
 
     function capitalize(s) {
