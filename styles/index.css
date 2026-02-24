@@ -187,6 +187,9 @@
 
 /* --- Mobile Styles --- */
 @media only screen and (max-width: 900px) {
+  #arena-stats {
+    display: none !important;
+  }
 
   /* Switch Layout to Mobile (Page Scroll) */
   .layout-container {
