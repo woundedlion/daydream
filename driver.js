@@ -263,7 +263,7 @@ export class Daydream {
       if (arenaStats && effect && effect.getArenaMetrics) {
         const m = effect.getArenaMetrics();
         const fmt = (x) => `${(x.high_water_mark / 1024).toFixed(0)} / ${(x.capacity / 1024).toFixed(0)} KB`;
-        arenaStats.innerText = `Geo: ${fmt(m.geometry_arena)} | Scratch A: ${fmt(m.scratch_arena_a)} | Scratch B: ${fmt(m.scratch_arena_b)} | Tooling: ${fmt(m.tooling_arena)} | `;
+        arenaStats.innerText = `Geo: ${fmt(m.geometry_arena)} | Scratch A: ${fmt(m.scratch_arena_a)} | Scratch B: ${fmt(m.scratch_arena_b)} | `;
       }
 
       this.dotMesh.instanceColor.needsUpdate = true;
