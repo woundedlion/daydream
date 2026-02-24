@@ -427,9 +427,12 @@
     <div class="space-y-2 flex-1 overflow-hidden flex flex-col">
       <div class="flex items-center justify-between">
         <label class="text-xs uppercase font-semibold text-slate-400">Operations</label>
-        <button onclick="resetOps()"
-          class="text-[0.65rem] text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear
-          All</button>
+        <div class="flex gap-2 items-center">
+          <span id="arenaStats" class="text-[0.6rem] font-mono text-slate-500 whitespace-nowrap"></span>
+          <button onclick="resetOps()"
+            class="text-[0.65rem] text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear
+            All</button>
+        </div>
       </div>
       <div id="opsList" class="relative flex-1 overflow-y-auto space-y-2 pr-2">
         <!-- Operations go here -->
@@ -625,6 +628,21 @@
         console.error('Failed to load WASM:', e);
         return;
       }
+
+      // Start Memory Metrics Loop
+      function updateArenaMetrics() {
+        if (MeshOpsWasm) {
+          const m = MeshOpsWasm.getArenaMetrics();
+          const fmt = (x) => `${(x.high_water_mark / 1024).toFixed(0)} / ${(x.capacity / 1024).toFixed(0)} KB`;
+          const statsEl = document.getElementById('arenaStats');
+          if (statsEl) {
+            statsEl.innerText = `Tooling: ${fmt(m.tooling_arena)} | Scratch A: ${fmt(m.scratch_arena_a)} | Scratch B: ${fmt(m.scratch_arena_b)}`;
+          }
+        }
+        setTimeout(updateArenaMetrics, 500); // 2fps update is enough 
+      }
+      updateArenaMetrics();
+
       // Initialize Three.js
       const canvas = document.getElementById('canvas');
       const container = document.getElementById('canvas-container');
