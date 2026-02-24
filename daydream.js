@@ -364,9 +364,11 @@ daydream.renderer.setAnimationLoop(() => {
 
         for (let i = 0; i < wasmPixels.length; i++) {
           // Flatten 16-bit Linear (0-65535) -> Float Linear (0.0-1.0)
-          // Store Linear values in Float32Array (Three.js will handle tonemapping via outputColorSpace)
           Daydream.pixels[i] = wasmPixels[i] * inv65535;
         }
+      },
+      getArenaMetrics: () => {
+        return wasmEngine.getArenaMetrics();
       }
     };
     daydream.render(wasmWrapper);

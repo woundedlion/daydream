@@ -776,6 +776,7 @@
         const wasmMesh = MeshOpsWasm.fromSolidName(key);
         const meshData = wasmMeshToJs(wasmMesh);
         wasmMesh.delete();
+        MeshOpsWasm.clearToolingMemory();
 
         // Triangulate
         const vertices = [];
@@ -1388,6 +1389,7 @@
 
       const meshData = wasmMeshToJs(currentWasmMesh);
       currentWasmMesh.delete(); // Cleanup final result
+      MeshOpsWasm.clearToolingMemory(); // Flush the 64MB arena
 
       // Store for stats/helpers
       window.currentMesh = meshData;
@@ -1419,14 +1421,30 @@
       const faceNormals = [];
 
       meshData.faces.forEach(f => {
+        // Collect vertices for the triangulated face
         for (let i = 1; i < f.length - 1; i++) {
-          vertices.push(...meshData.vertices[f[0]].toArray());
-          vertices.push(...meshData.vertices[f[i]].toArray());
-          vertices.push(...meshData.vertices[f[i + 1]].toArray());
+          let v0 = new THREE.Vector3().copy(meshData.vertices[f[0]]);
+          let v1 = new THREE.Vector3().copy(meshData.vertices[f[i]]);
+          let v2 = new THREE.Vector3().copy(meshData.vertices[f[i + 1]]);
+
+          if (state.showGeodesics) {
+            v0.normalize();
+            v1.normalize();
+            v2.normalize();
+          }
+
+          vertices.push(...v0.toArray());
+          vertices.push(...v1.toArray());
+          vertices.push(...v2.toArray());
         }
+
         // Center/Normal for other viz
         const center = new THREE.Vector3();
-        f.forEach(idx => center.add(meshData.vertices[idx]));
+        f.forEach(idx => {
+          let v = new THREE.Vector3().copy(meshData.vertices[idx]);
+          if (state.showGeodesics) v.normalize();
+          center.add(v);
+        });
         center.divideScalar(f.length);
         faceCenters.push(center);
 

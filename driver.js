@@ -259,6 +259,13 @@ export class Daydream {
         stats.style.color = duration > 62 ? 'red' : 'grey';
       }
 
+      const arenaStats = document.getElementById("arena-stats");
+      if (arenaStats && effect && effect.getArenaMetrics) {
+        const m = effect.getArenaMetrics();
+        const fmt = (x) => `${(x.high_water_mark / 1024).toFixed(0)} / ${(x.capacity / 1024).toFixed(0)} KB`;
+        arenaStats.innerText = `Geo: ${fmt(m.geometry_arena)} | Scratch A: ${fmt(m.scratch_arena_a)} | Scratch B: ${fmt(m.scratch_arena_b)} | Tooling: ${fmt(m.tooling_arena)} | `;
+      }
+
       this.dotMesh.instanceColor.needsUpdate = true;
 
       this.xAxis.visible = this.labelAxes;
