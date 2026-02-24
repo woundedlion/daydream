@@ -427,12 +427,9 @@
     <div class="space-y-2 flex-1 overflow-hidden flex flex-col">
       <div class="flex items-center justify-between">
         <label class="text-xs uppercase font-semibold text-slate-400">Operations</label>
-        <div class="flex gap-2 items-center">
-          <span id="arenaStats" class="text-[0.6rem] font-mono text-slate-500 whitespace-nowrap"></span>
-          <button onclick="resetOps()"
-            class="text-[0.65rem] text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear
-            All</button>
-        </div>
+        <button onclick="resetOps()"
+          class="text-[0.65rem] text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear
+          All</button>
       </div>
       <div id="opsList" class="relative flex-1 overflow-y-auto space-y-2 pr-2">
         <!-- Operations go here -->
@@ -513,7 +510,12 @@
       <!-- Index Labels Overlay -->
       <div id="labels" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
       <div id="save-actions">
-        <div id="meshStats"></div>
+        <div class="flex flex-col items-end gap-1">
+          <div id="meshStats"></div>
+          <div id="arenaStats"
+            class="font-mono text-[0.6rem] text-slate-500 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700 whitespace-nowrap">
+          </div>
+        </div>
         <button id="saveBtn" title="Save to Collection">
           <!-- Star Icon -->
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
@@ -633,10 +635,10 @@
       function updateArenaMetrics() {
         if (MeshOpsWasm) {
           const m = MeshOpsWasm.getArenaMetrics();
-          const fmt = (x) => `${(x.high_water_mark / 1024).toFixed(0)} / ${(x.capacity / 1024).toFixed(0)} KB`;
+          const fmt = (x) => `${(x.high_water_mark / 1024).toFixed(0)} / ${(x.capacity / 1024).toFixed(0)}KB`;
           const statsEl = document.getElementById('arenaStats');
           if (statsEl) {
-            statsEl.innerText = `Tooling: ${fmt(m.tooling_arena)} | Scratch A: ${fmt(m.scratch_arena_a)} | Scratch B: ${fmt(m.scratch_arena_b)}`;
+            statsEl.innerText = `${fmt(m.tooling_arena)}`;
           }
         }
         setTimeout(updateArenaMetrics, 500); // 2fps update is enough 
@@ -920,6 +922,10 @@
       const vCount = window.currentMesh.vertices.length;
       const fCount = window.currentMesh.faces.length;
       const eCount = window.currentMesh.edgeCount || 0;
+      let iCount = 0;
+      if (window.currentMesh && window.currentMesh.faces) {
+        window.currentMesh.faces.forEach(f => iCount += f.length);
+      }
 
       // Generate summary
       const opsSummary = state.ops.map(o => {
@@ -939,7 +945,8 @@
         thumb: dataURL,
         title: title,
         desc: opsSummary,
-        stats: `${vCount}V ${eCount}E ${fCount}F`
+        stats: `${vCount}V ${eCount}E ${fCount}F`,
+        vCount, fCount, iCount
       };
 
       savedSolids.push(item);
@@ -952,16 +959,17 @@
 
       savedSolids.forEach((item, index) => {
         const el = document.createElement('div');
-        el.className = 'saved-item';
+        el.className = 'saved-item relative pr-6'; // Added relative + right padding space
         el.innerHTML = `
+          <button class="action-btn del-btn absolute top-2 right-2 flex items-center justify-center w-5 h-5 text-sm" onclick="deleteSolid(${index}); event.stopPropagation();">&times;</button>
           <img src="${item.thumb}" alt="${item.title}" />
-          <div class="flex justify-between items-start">
+          <div class="flex justify-between items-start mt-1">
             <div class="title capitalize">${item.title}</div>
             <div class="text-[0.55rem] font-mono text-indigo-400 opacity-60">${item.stats}</div>
           </div>
           <div class="details uppercase opacity-70">${item.desc}</div>
           <div class="saved-actions" onclick="event.stopPropagation()">
-            <div class="flex flex-col gap-1">
+            <div class="flex flex-col gap-1 w-full">
               <div class="flex gap-1 justify-end">
                 <span class="text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1">Recipe</span>
                 <button class="action-btn" onclick="copyCode(${index}, 'recipe_cpp', this)">C++</button>
@@ -971,7 +979,6 @@
                 <button class="action-btn" onclick="copyCode(${index}, 'registry', this)">C++</button>
               </div>
             </div>
-            <button class="action-btn del-btn self-start ml-1" onclick="deleteSolid(${index})">&times;</button>
           </div>
         `;
         el.onclick = () => restoreSolid(item);
@@ -994,51 +1001,11 @@
       } else if (lang === 'registry') {
         const { funcName } = generateFuncAndRecipe(item);
 
-        // Find max capacity for this generated mesh.
-        let max_verts = 0;
-        let max_faces = 0;
-        let max_indices = 0;
-        try {
-          const wasmMesh = MeshOpsWasm.fromSolidName(funcName);
-          const v = wasmMesh.getVertices();
-          max_verts = v.length / 3;
-          const f = wasmMesh.getFaces();
-          max_faces = f.length;
-          f.forEach(face => { max_indices += face.length; });
-          wasmMesh.delete();
-        } catch (e) {
-          // Generate Mesh
-          let currentWasmMesh = null;
-          try {
-            currentWasmMesh = MeshOpsWasm.fromSolidName(item.base);
-          } catch (err) { }
-          if (currentWasmMesh) {
-            item.ops.forEach(o => {
-              const opName = typeof o === 'string' ? o : o.op;
-              let nextMesh = null;
-              if (opName === 'truncate') nextMesh = currentWasmMesh.truncate(o.params.t);
-              else if (opName === 'bitruncate') nextMesh = currentWasmMesh.bitruncate(o.params.t);
-              else if (opName === 'expand') nextMesh = currentWasmMesh.expand(o.params.t);
-              else if (opName === 'snub') nextMesh = currentWasmMesh.snub();
-              else if (opName === 'hankin') nextMesh = currentWasmMesh.hankin(o.params.angle * (Math.PI / 180));
-              else if (opName === 'canonicalize') nextMesh = currentWasmMesh.canonicalize(o.params.iter);
-              else if (currentWasmMesh[opName]) nextMesh = currentWasmMesh[opName]();
+        const isComplex = IslamicStarPatterns.includes(item.base);
+        const nsName = isComplex ? "IslamicStarPatterns" : "Archimedean";
+        const catName = isComplex ? "Complex" : "Simple";
 
-              if (nextMesh) {
-                currentWasmMesh.delete();
-                currentWasmMesh = nextMesh;
-              }
-            });
-            const v = currentWasmMesh.getVertices();
-            max_verts = v.length / 3;
-            const f = currentWasmMesh.getFaces();
-            max_faces = f.length;
-            f.forEach(face => { max_indices += face.length; });
-            currentWasmMesh.delete();
-          }
-        }
-
-        code = `{"${funcName}", IslamicStarPatterns::${funcName}, Category::Complex, {${max_verts}, ${max_faces}, ${max_indices}}},`;
+        code = `    {"${funcName}",\n     ${nsName}::${funcName},\n     Category::${catName}},`;
       } else {
         console.warn("Unsupported export type.");
         return;
@@ -1065,7 +1032,7 @@
     }
 
     function generateFuncAndRecipe(item) {
-      let s = `${item.base}()`;
+      let s = `${item.base}(ctx)`;
       let nameParts = [item.base];
 
       item.ops.forEach(o => {
@@ -1075,19 +1042,21 @@
         let suffix = `_${opName}`;
 
         if (opName === 'truncate') {
-          params = `, ${formatFloat(o.params.t)}`;
+          params = `, ctx, ${formatFloat(o.params.t)}`;
           suffix += o.params.t.toString().replace('0.', '');
         } else if (opName === 'bitruncate') {
-          params = `, ${formatFloat(o.params.t)}`;
+          params = `, ctx, ${formatFloat(o.params.t)}`;
           suffix += o.params.t.toString().replace('0.', '');
         } else if (opName === 'expand') {
-          params = `, ${formatFloat(o.params.t)}`;
+          params = `, ctx, ${formatFloat(o.params.t)}`;
           suffix += o.params.t.toString().replace('0.', '');
         } else if (opName === 'hankin') {
-          params = `, ${formatFloat(o.params.angle)} * D2R`;
+          params = `, ctx, ${formatFloat(o.params.angle)} * D2R`;
           suffix = `_hk${Math.round(o.params.angle)}`;
         } else if (opName === 'canonicalize') {
-          params = `, ${o.params.iter}`;
+          params = `, ctx, ${o.params.iter}`;
+        } else {
+          params = `, ctx`; // Normal unary ops like ambo/dual/kis need ctx
         }
 
         s = `${opName}(${s}${params})`;
@@ -1099,7 +1068,8 @@
 
     function generateRecipeCpp(item) {
       const { funcName, recipe } = generateFuncAndRecipe(item);
-      return `inline PolyMesh ${funcName}() {\n  return ${recipe};\n}`;
+      const comment = `// V=${item.vCount || 0}, F=${item.fCount || 0}, I=${item.iCount || 0}`;
+      return `${comment}\ninline PolyMesh ${funcName}(ScratchContext &ctx) {\n  return ${recipe};\n}`;
     }
 
     function capitalize(s) {
