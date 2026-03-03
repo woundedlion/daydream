@@ -103,7 +103,7 @@ pov-master/
 │   ├── HopfFibration.h
 │   ├── IslamicStars.h
 │   ├── LSystem.h
-│   ├── MetaballEffect.h
+│   ├── Metaballs.h
 │   ├── MindSplatter.h
 │   ├── MobiusGrid.h
 │   ├── Moire.h
@@ -588,7 +588,7 @@ L-systems rendered by a `SphericalTurtle` that advances by geodesic arcs and tur
 #### SphericalHarmonics
 Renders the real spherical harmonics Yˡₘ(θ, φ) as SDF `HarmonicBlob` shapes. The harmonic defines a lobe-radius function that deforms a unit sphere surface. Animates through different (l, m) combinations.
 
-#### MetaballEffect
+#### Metaballs
 Spherical metaballs: N point-sources on the sphere whose implicit field functions sum and threshold into a rendered surface.
 
 #### MobiusGrid
