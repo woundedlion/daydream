@@ -262,8 +262,19 @@ export class Daydream {
       const arenaStats = document.getElementById("arena-stats");
       if (arenaStats && effect && effect.getArenaMetrics) {
         const m = effect.getArenaMetrics();
-        const fmt = (x) => `${(x.high_water_mark / 1024).toFixed(0)} / ${(x.capacity / 1024).toFixed(0)} KB`;
-        arenaStats.innerText = `Geo: ${fmt(m.geometry_arena)} | Scratch A: ${fmt(m.scratch_arena_a)} | Scratch B: ${fmt(m.scratch_arena_b)} | `;
+        const fmt = (x) => `${(x.usage / 1024).toFixed(0)} - ${(x.high_water_mark / 1024).toFixed(0)} / ${(x.capacity / 1024).toFixed(0)} KB`;
+        arenaStats.innerHTML = `<table style="width:100%; text-align:center; border-collapse: collapse; line-height: 1.2;">
+          <tr style="color: #999;">
+            <th style="font-weight:normal; border-right: 1px solid #444; width:33%; padding: 0 4px;">Scratch A</th>
+            <th style="font-weight:normal; border-right: 1px solid #444; width:33%; padding: 0 4px;">Scratch B</th>
+            <th style="font-weight:normal; width:33%; padding: 0 4px;">Persistent</th>
+          </tr>
+          <tr style="white-space: nowrap;">
+            <td style="border-right: 1px solid #444; padding: 0 8px;">${fmt(m.scratch_arena_a)}</td>
+            <td style="border-right: 1px solid #444; padding: 0 8px;">${fmt(m.scratch_arena_b)}</td>
+            <td style="padding: 0 8px;">${fmt(m.persistent_arena)}</td>
+          </tr>
+        </table>`;
       }
 
       this.dotMesh.instanceColor.needsUpdate = true;
