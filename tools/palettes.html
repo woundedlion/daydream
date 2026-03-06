@@ -156,76 +156,182 @@
   <div class="container space-y-8">
     <h1 class="text-3xl font-bold text-center text-white pt-4">Procedural Color Palette Generator</h1>
 
+    <style>
+      /* Tab Styles */
+      .tab-btn {
+        padding: 0.5rem 1.5rem;
+        background-color: #334155;
+        color: #94A3B8;
+        border-radius: 0.5rem 0.5rem 0 0;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1px solid transparent;
+        border-bottom: none;
+      }
+
+      .tab-btn.active {
+        background-color: #1E293B;
+        color: #3B82F6;
+        border-color: #475569;
+      }
+
+      .tab-content {
+        display: none;
+        background-color: #1E293B;
+        border: 1px solid #475569;
+        border-radius: 0 0.5rem 0.5rem 0.5rem;
+        padding: 1.5rem;
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+    </style>
     <!-- 1. PALETTE PARAMETERS (CONTROLS) -->
-    <h2 class="text-2xl font-semibold text-white">Palette Parameters: C(t) = A + B &middot; cos(2 &pi; (Ct + D))
-    </h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-
-      <!-- PARAMETER A: BASE / OFFSET -->
-      <div class="param-group space-y-4">
-        <h3 class="text-lg font-bold text-blue-400">Vector A (Base Value)</h3>
-        <p class="text-xs text-gray-400">Sets the center value of the color oscillation.</p>
-        <!-- NEW: Lock Checkbox for A -->
-        <div class="flex items-center space-x-2 text-sm text-gray-300">
-          <input type="checkbox" id="lock_A"
-            class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
-          <label for="lock_A">Lock R, G, B</label>
-        </div>
-        <div id="A_R_container"></div>
-        <div id="A_G_container"></div>
-        <div id="A_B_container"></div>
-      </div>
-
-      <!-- PARAMETER B: AMPLITUDE -->
-      <div class="param-group space-y-4">
-        <h3 class="text-lg font-bold text-green-400">Vector B (Amplitude)</h3>
-        <p class="text-xs text-gray-400">Controls the range/intensity of the oscillation.</p>
-        <!-- NEW: Lock Checkbox for B -->
-        <div class="flex items-center space-x-2 text-sm text-gray-300">
-          <input type="checkbox" id="lock_B"
-            class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
-          <label for="lock_B">Lock R, G, B</label>
-        </div>
-        <div id="B_R_container"></div>
-        <div id="B_G_container"></div>
-        <div id="B_B_container"></div>
-      </div>
-
-      <!-- PARAMETER C: FREQUENCY -->
-      <div class="param-group space-y-4">
-        <h3 class="text-lg font-bold text-red-400">Vector C (Frequency)</h3>
-        <p class="text-xs text-gray-400">Determines the number of cycles across the palette (0 to 5).</p>
-        <!-- NEW: Lock Checkbox for C -->
-        <div class="flex items-center space-x-2 text-sm text-gray-300">
-          <input type="checkbox" id="lock_C"
-            class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
-          <label for="lock_C">Lock R, G, B</label>
-        </div>
-        <div id="C_R_container"></div>
-        <div id="C_G_container"></div>
-        <div id="C_B_container"></div>
-      </div>
-
-      <!-- PARAMETER D: PHASE -->
-      <div class="param-group space-y-4">
-        <h3 class="text-lg font-bold text-yellow-400">Vector D (Phase Shift)</h3>
-        <p class="text-xs text-gray-400">Shifts the starting point of the wave (0 to 1).</p>
-        <!-- NEW: Lock Checkbox for D -->
-        <div class="flex items-center space-x-2 text-sm text-gray-300">
-          <input type="checkbox" id="lock_D"
-            class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
-          <label for="lock_D">Lock R, G, B</label>
-        </div>
-        <div id="D_R_container"></div>
-        <div id="D_G_container"></div>
-        <div id="D_B_container"></div>
-      </div>
+    <div class="flex border-b border-slate-600 mb-0">
+      <button id="tab-btn-procedural" class="tab-btn active" onclick="switchTab('procedural')">Procedural
+        (Cosine)</button>
+      <button id="tab-btn-generative" class="tab-btn" onclick="switchTab('generative')">Generative</button>
     </div>
+
+    <div id="tab-content-procedural" class="tab-content active mb-6">
+      <h2 class="text-2xl font-semibold text-white mb-4">Palette Parameters: C(t) = A + B &middot; cos(2 &pi; (Ct + D))
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+        <!-- PARAMETER A: BASE / OFFSET -->
+        <div class="param-group space-y-4">
+          <h3 class="text-lg font-bold text-blue-400">Vector A (Base Value)</h3>
+          <p class="text-xs text-gray-400">Sets the center value of the color oscillation.</p>
+          <!-- NEW: Lock Checkbox for A -->
+          <div class="flex items-center space-x-2 text-sm text-gray-300">
+            <input type="checkbox" id="lock_A"
+              class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
+            <label for="lock_A">Lock R, G, B</label>
+          </div>
+          <div id="A_R_container"></div>
+          <div id="A_G_container"></div>
+          <div id="A_B_container"></div>
+        </div>
+
+        <!-- PARAMETER B: AMPLITUDE -->
+        <div class="param-group space-y-4">
+          <h3 class="text-lg font-bold text-green-400">Vector B (Amplitude)</h3>
+          <p class="text-xs text-gray-400">Controls the range/intensity of the oscillation.</p>
+          <!-- NEW: Lock Checkbox for B -->
+          <div class="flex items-center space-x-2 text-sm text-gray-300">
+            <input type="checkbox" id="lock_B"
+              class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
+            <label for="lock_B">Lock R, G, B</label>
+          </div>
+          <div id="B_R_container"></div>
+          <div id="B_G_container"></div>
+          <div id="B_B_container"></div>
+        </div>
+
+        <!-- PARAMETER C: FREQUENCY -->
+        <div class="param-group space-y-4">
+          <h3 class="text-lg font-bold text-red-400">Vector C (Frequency)</h3>
+          <p class="text-xs text-gray-400">Determines the number of cycles across the palette (0 to 5).</p>
+          <!-- NEW: Lock Checkbox for C -->
+          <div class="flex items-center space-x-2 text-sm text-gray-300">
+            <input type="checkbox" id="lock_C"
+              class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
+            <label for="lock_C">Lock R, G, B</label>
+          </div>
+          <div id="C_R_container"></div>
+          <div id="C_G_container"></div>
+          <div id="C_B_container"></div>
+        </div>
+
+        <!-- PARAMETER D: PHASE -->
+        <div class="param-group space-y-4">
+          <h3 class="text-lg font-bold text-yellow-400">Vector D (Phase Shift)</h3>
+          <p class="text-xs text-gray-400">Shifts the starting point of the wave (0 to 1).</p>
+          <!-- NEW: Lock Checkbox for D -->
+          <div class="flex items-center space-x-2 text-sm text-gray-300">
+            <input type="checkbox" id="lock_D"
+              class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
+            <label for="lock_D">Lock R, G, B</label>
+          </div>
+          <div id="D_R_container"></div>
+          <div id="D_G_container"></div>
+          <div id="D_B_container"></div>
+        </div>
+      </div>
+    </div> <!-- End Procedural Tab -->
+
+    <div id="tab-content-generative" class="tab-content mb-6">
+      <h2 class="text-2xl font-semibold text-white mb-4">Generative Palette Parameters</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+
+        <!-- Base Hue -->
+        <div class="param-group space-y-4 col-span-1">
+          <h3 class="text-lg font-bold text-blue-400">Base Hue</h3>
+          <p class="text-xs text-gray-400">Base color (0-255).</p>
+          <div class="flex items-center space-x-2">
+            <span class="w-4 h-4 text-center font-bold text-blue-500">H</span>
+            <input type="range" id="gen_seed_slider" min="0" max="255" step="1" value="42" class="b-thumb">
+            <span id="gen_seed_value" class="slider-label w-12 text-right">42</span>
+          </div>
+        </div>
+
+        <!-- Harmony Type -->
+        <div class="param-group space-y-4 col-span-1">
+          <h3 class="text-lg font-bold text-green-400">Harmony Type</h3>
+          <p class="text-xs text-gray-400">Color relationship.</p>
+          <select id="gen_harmony" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+            <option value="ANALOGOUS">Analogous</option>
+            <option value="COMPLEMENTARY">Complementary</option>
+            <option value="SPLIT_COMPLEMENTARY">Split Complementary</option>
+            <option value="TRIADIC">Triadic</option>
+          </select>
+        </div>
+
+        <!-- Saturation Profile -->
+        <div class="param-group space-y-4 col-span-1">
+          <h3 class="text-lg font-bold text-yellow-400">Saturation</h3>
+          <p class="text-xs text-gray-400">Color intensity.</p>
+          <select id="gen_saturation" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+            <option value="MID">Mid</option>
+            <option value="PASTEL">Pastel</option>
+            <option value="VIBRANT">Vibrant</option>
+          </select>
+        </div>
+
+        <!-- Brightness Profile -->
+        <div class="param-group space-y-4 col-span-1">
+          <h3 class="text-lg font-bold text-red-400">Brightness</h3>
+          <p class="text-xs text-gray-400">Luminance distribution.</p>
+          <select id="gen_brightness" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+            <option value="FLAT">Flat</option>
+            <option value="ASCENDING">Ascending</option>
+            <option value="DESCENDING">Descending</option>
+            <option value="BELL">Bell</option>
+            <option value="CUP">Cup</option>
+          </select>
+        </div>
+
+        <!-- Gradient Shape -->
+        <div class="param-group space-y-4 col-span-1">
+          <h3 class="text-lg font-bold text-purple-400">Gradient Shape</h3>
+          <p class="text-xs text-gray-400">Spatial distribution.</p>
+          <select id="gen_shape" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+            <option value="STRAIGHT">Straight</option>
+            <option value="CIRCULAR">Circular</option>
+            <option value="VIGNETTE">Vignette</option>
+            <option value="FALLOFF">Falloff</option>
+          </select>
+        </div>
+
+      </div>
+    </div> <!-- End Generative Tab -->
 
     <!-- 2. RGB WAVE FUNCTIONS (GRAPH) -->
     <div class="space-y-4 p-4 param-group">
-      <h2 class="text-xl font-semibold text-white">RGB Wave Functions</h2> <canvas id="waveGraphCanvas"
-        width="1024" height="300"></canvas>
+      <h2 class="text-xl font-semibold text-white">RGB Wave Functions</h2> <canvas id="waveGraphCanvas" width="1024"
+        height="300"></canvas>
     </div>
 
     <!-- 3. RESULTING PALETTE (STATIC STRIP) -->
@@ -236,8 +342,8 @@
           class="hidden px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-sm font-medium transition-all shadow-lg">Reset
           Zoom</button>
       </div>
-      <p class="text-sm text-gray-400">Click to set phase, or click and drag to zoom.</p> <canvas
-        id="colorStripCanvas" width="1024" height="100"></canvas>
+      <p class="text-sm text-gray-400">Click to set phase, or click and drag to zoom.</p> <canvas id="colorStripCanvas"
+        width="1024" height="100"></canvas>
     </div>
 
     <!-- NEW: Wrapper for sections 4 and 5 -->
@@ -260,8 +366,7 @@
             <h3 class="text-lg font-bold text-indigo-400">Global Phase Speed (Cycles/s)</h3>
             <div class="flex items-center space-x-2">
               <span class="w-12 text-gray-400">Speed:</span>
-              <input type="range" id="speed_slider" min="0" max="2000" step="1" value="300"
-                class="w-full speed-thumb">
+              <input type="range" id="speed_slider" min="0" max="2000" step="1" value="300" class="w-full speed-thumb">
               <span id="speed_value" class="slider-label w-16 text-right">0.300</span>
             </div>
             <p class="text-sm text-gray-400">Current Phase (t): <span id="t_value"
@@ -285,8 +390,7 @@
           </button>
         </div>
         <p class="text-sm text-gray-400">Copy the parameter vectors for use in other tools or scripts.
-          <span id="copy_code_prompt"
-            class="ml-2 text-sm text-gray-500 transition-colors duration-300"></span>
+          <span id="copy_code_prompt" class="ml-2 text-sm text-gray-500 transition-colors duration-300"></span>
         </p>
         <pre class="bg-slate-900 p-4 rounded-lg border border-slate-700 overflow-x-auto">
 <code id="palette_code_output" class="font-mono text-sm text-slate-300 whitespace-pre">
@@ -337,12 +441,245 @@
         ];
       }
 
-      /**
-             * Calculates a single channel value (R=0, G=1, B=2) for plotting.
-             */
       getChannelValue(t, channelIndex) {
         const PI2 = TWO_PI;
         return this.a[channelIndex] + this.b[channelIndex] * Math.cos(PI2 * (this.c[channelIndex] * t + this.d[channelIndex]));
+      }
+    }
+
+    // --- Tab Switcher Logic ---
+    let activeTab = 'procedural';
+
+    function switchTab(tabName) {
+      activeTab = tabName;
+      // Update buttons
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      // Update content
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      const activeContent = document.getElementById(`tab-content-${tabName}`);
+      if (activeContent) activeContent.classList.add('active');
+
+      // Update palette based on visible tab
+      updatePalette();
+    }
+
+    // --- Generative Palette Implementation ---
+    class CPixel {
+      constructor(r, g, b) {
+        this.r = r; this.g = g; this.b = b;
+      }
+    }
+
+    // A simple seeded PRNG for consistent palette generation
+    class PRNG {
+      constructor(seed) {
+        this.state = seed ? seed : Math.floor(Math.random() * 0xFFFFFFFF);
+      }
+      next() {
+        this.state = (this.state * 1664525 + 1013904223) >>> 0;
+        return this.state / 0x100000000;
+      }
+      nextInt(min, max) {
+        return Math.floor(this.next() * (max - min + 1)) + min;
+      }
+    }
+
+    function lerp8(a, b, t) {
+      return Math.round(a + (b - a) * t);
+    }
+
+    // HSV to RGB conversion for JS (expecting h, s, v in 0..255)
+    // Returns CPixel with values in 0..255
+    function hsvToRgb(h, s, v) {
+      const h_norm = h / 255.0;
+      const s_norm = s / 255.0;
+      const v_norm = v / 255.0;
+
+      let r = 0, g = 0, b = 0;
+      let i = Math.floor(h_norm * 6);
+      let f = h_norm * 6 - i;
+      let p = v_norm * (1 - s_norm);
+      let q = v_norm * (1 - f * s_norm);
+      let t_val = v_norm * (1 - (1 - f) * s_norm);
+
+      switch (i % 6) {
+        case 0: r = v_norm, g = t_val, b = p; break;
+        case 1: r = q, g = v_norm, b = p; break;
+        case 2: r = p, g = v_norm, b = t_val; break;
+        case 3: r = p, g = q, b = v_norm; break;
+        case 4: r = t_val, g = p, b = v_norm; break;
+        case 5: r = v_norm, g = p, b = q; break;
+      }
+      return new CPixel(Math.round(r * 255), Math.round(g * 255), Math.round(b * 255));
+    }
+
+    // Precise sRGB to Linear conversion formula
+    function srgbToLinear(srgb) {
+      const s = srgb / 255.0;
+      return (s <= 0.04045) ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    }
+
+    class GenerativePalette {
+      constructor(gradientShape, harmonyType, brightnessProfile, satProfile, hueValue) {
+        this.gradientShape = gradientShape;
+        this.harmonyType = harmonyType;
+
+        // Use a stable deterministic PRNG seed based on the profile strings so that
+        // scrubbing the Hue doesn't scramble the randomized saturation/brightness structure.
+        const hashStr = gradientShape + harmonyType + brightnessProfile + satProfile;
+        let stableSeed = 0;
+        for (let i = 0; i < hashStr.length; i++) {
+          stableSeed = ((stableSeed << 5) - stableSeed) + hashStr.charCodeAt(i);
+          stableSeed |= 0; // Convert to 32bit integer
+        }
+        this.prng = new PRNG(Math.abs(stableSeed) || 1337);
+
+        let h1 = hueValue;
+        let hues = this.calcHues(h1, harmonyType);
+        let h2 = hues.h2;
+        let h3 = hues.h3;
+
+        let s1 = 0, s2 = 0, s3 = 0;
+        switch (satProfile) {
+          case "PASTEL":
+            s1 = s2 = s3 = 100;
+            break;
+          case "MID":
+            s1 = this.prng.nextInt(153, 204);
+            s2 = this.prng.nextInt(153, 204);
+            s3 = this.prng.nextInt(153, 204);
+            break;
+          case "VIBRANT":
+            s1 = s2 = s3 = 255;
+            break;
+        }
+
+        let v1 = 0, v2 = 0, v3 = 0;
+        switch (brightnessProfile) {
+          case "ASCENDING":
+            v1 = this.prng.nextInt(25, 76);
+            v2 = this.prng.nextInt(127, 178);
+            v3 = this.prng.nextInt(204, 255);
+            break;
+          case "DESCENDING":
+            v1 = this.prng.nextInt(204, 255);
+            v2 = this.prng.nextInt(127, 178);
+            v3 = this.prng.nextInt(25, 76);
+            break;
+          case "FLAT":
+            v1 = v2 = v3 = 255;
+            break;
+          case "BELL":
+            v1 = this.prng.nextInt(51, 127);
+            v2 = this.prng.nextInt(178, 255);
+            v3 = v1;
+            break;
+          case "CUP":
+            v1 = this.prng.nextInt(178, 255);
+            v2 = this.prng.nextInt(51, 127);
+            v3 = v1;
+            break;
+        }
+
+        this.a = hsvToRgb(h1, s1, v1);
+        this.b = hsvToRgb(h2, s2, v2);
+        this.c = hsvToRgb(h3, s3, v3);
+
+        this.updateLuts();
+      }
+
+      wrapHue(hue) {
+        return ((hue % 256) + 256) % 256;
+      }
+
+      calcHues(h1, harmonyType) {
+        let h2, h3;
+        switch (harmonyType) {
+          case "TRIADIC":
+            h2 = this.wrapHue(h1 + 85);
+            h3 = this.wrapHue(h1 + 170);
+            break;
+          case "SPLIT_COMPLEMENTARY":
+            const complement = this.wrapHue(h1 + 128);
+            h2 = this.wrapHue(complement - 21);
+            h3 = this.wrapHue(complement + 21);
+            break;
+          case "COMPLEMENTARY":
+            h2 = this.wrapHue(h1 + 128);
+            h3 = this.wrapHue(h1 + this.prng.nextInt(-7, 7));
+            break;
+          case "ANALOGOUS":
+          default:
+            const dir = (this.prng.nextInt(0, 1) === 0) ? 1 : -1;
+            h2 = this.wrapHue(h1 + dir * this.prng.nextInt(11, 22));
+            h3 = this.wrapHue(h2 + dir * this.prng.nextInt(11, 22));
+            break;
+        }
+        return { h2, h3 };
+      }
+
+      updateLuts() {
+        const vignetteColor = new CPixel(0, 0, 0);
+        switch (this.gradientShape) {
+          case "VIGNETTE":
+            this.shape = [0, 0.1, 0.5, 0.9, 1.0];
+            this.colors = [vignetteColor, this.a, this.b, this.c, vignetteColor];
+            this.size = 5;
+            break;
+          case "STRAIGHT":
+            this.shape = [0, 0.5, 1.0];
+            this.colors = [this.a, this.b, this.c];
+            this.size = 3;
+            break;
+          case "CIRCULAR":
+            this.shape = [0, 0.33, 0.66, 1.0];
+            this.colors = [this.a, this.b, this.c, this.a];
+            this.size = 4;
+            break;
+          case "FALLOFF":
+            this.shape = [0, 0.33, 0.66, 0.9, 1.0];
+            this.colors = [this.a, this.b, this.c, vignetteColor, vignetteColor];
+            this.size = 5;
+            break;
+        }
+      }
+
+      get(t) {
+        let seg = -1;
+        for (let i = 0; i < this.size - 1; ++i) {
+          if (t >= this.shape[i] && t < this.shape[i + 1]) {
+            seg = i;
+            break;
+          }
+        }
+        if (seg < 0) seg = this.size - 2;
+
+        const start = this.shape[seg];
+        const end = this.shape[seg + 1];
+        const c1 = this.colors[seg];
+        const c2 = this.colors[seg + 1];
+
+        const dist = end - start;
+        if (dist < 0.0001) {
+          return [srgbToLinear(c1.r), srgbToLinear(c1.g), srgbToLinear(c1.b)];
+        }
+
+        const p = Math.max(0, Math.min(1, (t - start) / dist));
+
+        const rVal = lerp8(c1.r, c2.r, p);
+        const gVal = lerp8(c1.g, c2.g, p);
+        const bVal = lerp8(c1.b, c2.b, p);
+
+        // Convert to linear 0..1 to match procedurals format
+        return [srgbToLinear(rVal), srgbToLinear(gVal), srgbToLinear(bVal)];
+      }
+
+      getChannelValue(t, channelIndex) {
+        // Just return the rgb from get
+        return this.get(t)[channelIndex];
       }
     }
 
@@ -1018,28 +1355,45 @@
       const codeOutput = document.getElementById('palette_code_output');
       if (!codeOutput) return;
 
-      const f = (n) => n.toFixed(3); // Formatter
-
-      // Use template literal for multi-line string
-      const codeString =
-        `[${f(parameters.A_R)}, ${f(parameters.A_G)}, ${f(parameters.A_B)}], // A
+      if (activeTab === 'procedural') {
+        const f = (n) => n.toFixed(3); // Formatter
+        // Use template literal for multi-line string
+        const codeString =
+          `[${f(parameters.A_R)}, ${f(parameters.A_G)}, ${f(parameters.A_B)}], // A
 [${f(parameters.B_R)}, ${f(parameters.B_G)}, ${f(parameters.B_B)}], // B
 [${f(parameters.C_R)}, ${f(parameters.C_G)}, ${f(parameters.C_B)}], // C
 [${f(parameters.D_R)}, ${f(parameters.D_G)}, ${f(parameters.D_B)}]  // D`;
+        codeOutput.textContent = codeString;
+      } else {
+        const shape = document.getElementById('gen_shape').value;
+        const harmony = document.getElementById('gen_harmony').value;
+        const brightness = document.getElementById('gen_brightness').value;
+        const sat = document.getElementById('gen_saturation').value;
+        const hueValue = parseInt(document.getElementById('gen_seed_slider').value);
 
-      codeOutput.textContent = codeString;
+        const codeString = `GenerativePalette(GradientShape::${shape}, HarmonyType::${harmony},\n                  BrightnessProfile::${brightness}, SaturationProfile::${sat}, ${hueValue})`;
+        codeOutput.textContent = codeString;
+      }
     }
 
     /**
-         * Main update function: reads parameters, initializes palette, and redraws visualizations.
-         */
+     * Main update function: reads parameters, initializes palette, and redraws visualizations.
+     */
     function updatePalette() {
-      const A = [parameters.A_R, parameters.A_G, parameters.A_B];
-      const B = [parameters.B_R, parameters.B_G, parameters.B_B];
-      const C = [parameters.C_R, parameters.C_G, parameters.C_B];
-      const D = [parameters.D_R, parameters.D_G, parameters.D_B];
-
-      palette = new ProceduralPalette(A, B, C, D);
+      if (activeTab === 'procedural') {
+        const A = [parameters.A_R, parameters.A_G, parameters.A_B];
+        const B = [parameters.B_R, parameters.B_G, parameters.B_B];
+        const C = [parameters.C_R, parameters.C_G, parameters.C_B];
+        const D = [parameters.D_R, parameters.D_G, parameters.D_B];
+        palette = new ProceduralPalette(A, B, C, D);
+      } else {
+        const shape = document.getElementById('gen_shape').value;
+        const harmony = document.getElementById('gen_harmony').value;
+        const brightness = document.getElementById('gen_brightness').value;
+        const sat = document.getElementById('gen_saturation').value;
+        const hueValue = parseInt(document.getElementById('gen_seed_slider').value);
+        palette = new GenerativePalette(shape, harmony, brightness, sat, hueValue);
+      }
 
       // Redraw static graph elements
       drawWaveGraph();
@@ -1087,6 +1441,22 @@
           }
         });
       }
+
+      // 2.5 Initialize Generative Palette UI Controls
+      const genSeedSlider = document.getElementById('gen_seed_slider');
+      const genSeedValue = document.getElementById('gen_seed_value');
+      if (genSeedSlider && genSeedValue) {
+        genSeedSlider.addEventListener('input', () => {
+          genSeedValue.textContent = genSeedSlider.value;
+          updatePalette();
+        });
+      }
+
+      const dropdowns = ['gen_harmony', 'gen_saturation', 'gen_brightness', 'gen_shape'];
+      dropdowns.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', updatePalette);
+      });
 
       // 3. MODIFIED: Add new drag-and-drop listeners
       colorStripCanvas.addEventListener('mousedown', handleDragStart);
