@@ -385,7 +385,8 @@ export class Daydream {
       };
     }
 
-    const detail = Math.floor(-0.0006 * Daydream.W * Daydream.H) + 32;
+    const totalPixels = Daydream.W * Daydream.H;
+    const detail = Math.max(3, Math.round(30 * Math.exp(-totalPixels / 30000)));
 
     this.dotGeometry = new THREE.SphereGeometry(
       Daydream.DOT_SIZE,
