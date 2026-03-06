@@ -362,12 +362,9 @@ daydream.renderer.setAnimationLoop(() => {
 
         // Extract and convert pixels
         const wasmPixels = wasmEngine.getPixels();
-        const inv65535 = 1.0 / 65535.0;
 
-        for (let i = 0; i < wasmPixels.length; i++) {
-          // Flatten 16-bit Linear (0-65535) -> Float Linear (0.0-1.0)
-          Daydream.pixels[i] = wasmPixels[i] * inv65535;
-        }
+        // Native, zero-overhead memory copy from WASM to WebGL
+        Daydream.pixels.set(wasmPixels);
       },
       getArenaMetrics: () => {
         return wasmEngine.getArenaMetrics();
