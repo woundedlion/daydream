@@ -436,7 +436,7 @@ export class Daydream {
     if (this.dotMesh) {
       if (!this.dotMesh.instanceColor) {
         this.dotMesh.instanceColor = new THREE.InstancedBufferAttribute(
-          new Float32Array(this.dotMesh.count * 3), 3
+          new Uint16Array(this.dotMesh.count * 3), 3, true
         );
         this.dotMesh.instanceColor.setUsage(THREE.StreamDrawUsage);
       }
