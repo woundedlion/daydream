@@ -1,6 +1,6 @@
 # Holosphere
 
-A persistence-of-vision (POV) LED sphere and its real-time simulator. The device spins a strip of LEDs at 480 RPM while a Teensy microcontroller fires pixels at microsecond intervals to paint full-color imagery on the surface of a virtual sphere. The simulator renders the same effects in a browser window at up to 576×288 resolution using the identical C++ code compiled to WebAssembly.
+A persistence-of-vision (POV) LED sphere and its real-time simulator. The device spins a strip of LEDs at 480 RPM while a Teensy microcontroller fires pixels at microsecond intervals to paint full-color imagery on the surface of a virtual sphere. The simulator renders the same effects in a browser window at up to 288×144 resolution using the identical C++ code compiled to WebAssembly.
 
 ```
 pov-master/      C++20 firmware, rendering engine, and all effects
@@ -33,7 +33,7 @@ daydream-master/ Three.js web simulator (runs the same WASM binary)
 | LEDs | 96-pixel WS2801 addressable strip (40 physical pixels exposed per half-arm) |
 | Protocol | SPI at 6 MHz via FastLED |
 | Rotation | 480 RPM (8 revolutions/second) |
-| Virtual resolution | 96 columns × 20 rows (hardware), up to 576×288 (WASM simulator) |
+| Virtual resolution | 96 columns × 20 rows (hardware), up to 288×144 (WASM simulator) |
 | Pin assignments | DATA: pin 11, CLOCK: pin 13, RANDOM seed: analog pin 15 |
 
 The POV effect works because each revolution takes ~125 ms and the ISR fires every `1,000,000 / (RPM/60) / width` microseconds to advance one column. The LED strip is mounted on both sides of a rotating arm: the top half of the strip handles one hemisphere and the bottom half handles the opposite hemisphere, so one full revolution paints a complete sphere.
@@ -84,8 +84,8 @@ pov-master/
 ├── solids.h                Platonic + Archimedean + Islamic solid geometry data
 ├── spatial.h               AABB, BVH, k-nearest-neighbor graph
 ├── static_circular_buffer.h Lock-free fixed-capacity circular buffer
-├── rotate.h                Quaternion tween helpers
-├── generators.h            IGenerator<T> interface for procedural geometry
+├── rotate.h                Quaternion projection helpers
+├── generators.h            IGenerator<T> and IMeshGenerator interfaces + solid generators
 ├── presets.h               Pre-built filter pipeline type aliases
 ├── util.h                  wrap(), fast_wrap(), clamp()
 │
@@ -137,7 +137,7 @@ daydream-master/
 
 ## 3. Architecture Overview
 
-The system has three physical execution targets sharing one codebase:
+The system has two physical execution targets sharing one codebase:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -172,7 +172,7 @@ template <int W, int H> class HopfFibration : public Effect { ... };
 template <int W, int H> struct Pipeline<W, H, Filter1, Filter2, ...> { ... };
 ```
 
-This means the compiler generates fully specialized, zero-overhead versions of the entire pipeline for each supported resolution. The hardware runs `<96, 20>` (96 columns × 20 rows). The simulator supports `<96, 20>`, `<288, 144>`, and `<576, 288>`.
+This means the compiler generates fully specialized, zero-overhead versions of the entire pipeline for each supported resolution. The hardware runs `<96, 20>` (96 columns × 20 rows). The simulator supports `<96, 20>` and `<288, 144>`.
 
 The `platform.h` header abstracts all target-specific differences:
 
@@ -404,7 +404,20 @@ timeline.add(0, Animation::Rotation<W>(orientation, Y_AXIS, 2 * PI_F, 600, ease_
 // World::Orient distributes all steps → motion blur
 ```
 
-`Orientation::upsample(count)` resamples the history to a higher resolution via SLERP — used to increase motion blur quality without changing the animation speed.
+`Orientation::upsample(count)` resamples the orientation history to a higher resolution via SLERP. This is used to rewrite the history when combining multiple animations for accurate parallel sub-frame path tracing — ensuring that concurrent rotations, motions, and walks all contribute to a single coherent set of intermediate orientations.
+
+#### OrientationTrail
+
+`OrientationTrail<OrientationType, CAPACITY>` maintains a circular buffer of past `Orientation` snapshots, allowing effects to recall where an object was over previous frames. Each snapshot is a full `Orientation` (with its own sub-frame history). Used by `ParticleSystem` to record per-particle trajectories for trail rendering.
+
+#### `tween` and `deep_tween`
+
+Two traversal helpers linearize multi-level orientation history into a single callback loop:
+
+| Function | Input | Description |
+|---|---|---|
+| `tween(orientation, callback)` | `Orientation<W>` | Iterates over the sub-frame quaternion history of a single orientation, calling `callback(quaternion, t)` for each step with `t ∈ [0, 1]`. Used by `World::Orient` to distribute motion blur. |
+| `deep_tween(trail, callback)` | Any `Tweenable` (`Orientation` or `OrientationTrail`) | Flattens a trail of orientations into a single continuous traversal, calling `callback(quaternion, t)` with a global `t` spanning all frames and sub-frames. Used by `Plot::Mesh::Particle` for rendering trails with full sub-frame accuracy. |
 
 ### 6.4 Geometry Transformers (`transformers.h`)
 
@@ -507,6 +520,29 @@ Twenty named `ProceduralPalette` instances are pre-defined: `richSunset`, `ember
 
 Each solid is generated by a `SolidGenerator` that builds and normalizes vertices, then pushes face connectivity into a `PolyMesh` via an `Arena`.
 
+### 6.8 Generators (`generators.h`)
+
+The generator system provides a uniform interface for procedural geometry creation:
+
+| Type | Description |
+|---|---|
+| `IGenerator<T>` | Generic concept/interface: `virtual T generate(Arena&, MemoryCtx&) = 0` |
+| `IMeshGenerator` | Specialization of `IGenerator<PolyMesh>` for mesh generation |
+| `SolidGenerator` | Wraps the `Solids::` registry by integer ID |
+| `SolidNameGenerator` | Wraps the `Solids::` registry by string name |
+| `IcosahedronGenerator` | Direct generator for the icosahedron |
+| `DodecahedronGenerator` | Direct generator for the dodecahedron |
+| `CubeGenerator` | Direct generator for the cube |
+| `OctahedronGenerator` | Direct generator for the octahedron |
+| `TetrahedronGenerator` | Direct generator for the tetrahedron |
+
+The `generate_mesh<Gen>(arena, args...)` helper encapsulates the `MemoryCtx` + `ScopedScratch` boilerplate:
+
+```cpp
+auto mesh = generate_mesh<DodecahedronGenerator>(persistent_arena);
+auto mesh = generate_mesh<SolidGenerator>(persistent_arena, solid_id);
+```
+
 ---
 
 ## 7. The Effect System
@@ -607,7 +643,9 @@ Spherical Voronoi diagram with animated seed positions. Cell boundaries are draw
 Flowers constructed from distorted ring SDFs whose radii oscillate via sine waves.
 
 #### DreamBalls
-Physics-based particle system. Particles are spawned at random positions, attracted toward configurable attractor points, and leave color trails via `World::Trails`.
+Draws twisting wireframe knotted structures derived from Archimedean solids. Mesh vertices are displaced along per-vertex tangent frames to create orbiting knot patterns, and a Möbius warp is applied to the geometry. Multiple copies orbit simultaneously with animated `OrientSlice` hemisphere rotation effects.
+
+**Parameters**: Copies (number of knot copies), Radius (displacement), Speed (orbit speed), Warp (Möbius warp scale), Alpha
 
 #### SpinShapes
 Catalog of spinning SDF shapes (rings, stars, polygons, flowers) with live rotation and color cycling.
@@ -652,7 +690,7 @@ The simulator runs the identical C++ rendering engine compiled to WebAssembly vi
 
 | Method | Description |
 |---|---|
-| `setResolution(w, h)` | Switch active resolution (96×20, 288×144, or 576×288) |
+| `setResolution(w, h)` | Switch active resolution (96×20 or 288×144) |
 | `setEffect(name)` | Instantiate a new effect by string name; resets all arenas |
 | `drawFrame()` | Advance one frame and copy pixels to the output buffer |
 | `getPixels()` | Return a zero-copy `Uint16Array` view into WASM linear memory |
@@ -677,7 +715,6 @@ for (let i = 0; i < wasmPixels.length; i++) {
 |---|---|---|
 | Holosphere (20×96) | 96 × 20 | Matches physical hardware |
 | Phantasm (144×288) | 288 × 144 | High-quality preview (default) |
-| Pie-in-the-sky (288×576) | 576 × 288 | Maximum fidelity |
 
 ### GUI Auto-Generation
 
@@ -771,7 +808,7 @@ Most LED art codebases use gamma-corrected 8-bit values throughout and blend in 
 
 ### Why Compile-Time Resolution?
 
-Templating on `<W, H>` means every pixel coordinate transform, bounding box computation, and LUT index is resolved at compile time. The hardware target (`<96, 20>`) runs with no runtime overhead from generality. The simulator builds separate specializations for `<288, 144>` and `<576, 288>`. Binary size increases, but for an embedded firmware this is the right trade-off.
+Templating on `<W, H>` means every pixel coordinate transform, bounding box computation, and LUT index is resolved at compile time. The hardware target (`<96, 20>`) runs with no runtime overhead from generality. The simulator builds separate specializations for `<288, 144>`. Binary size increases, but for an embedded firmware this is the right trade-off.
 
 ### Why Arena Allocation?
 
