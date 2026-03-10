@@ -384,6 +384,7 @@
     flex-shrink: 0;
     flex-grow: 1;
     text-align: center;
+    width: auto;
   }
 
   .effect-size {
