@@ -419,11 +419,14 @@ daydream.renderer.setAnimationLoop(() => {
           }
         }
 
-        // Extract and convert pixels
-        const wasmPixels = wasmEngine.getPixels();
+        if (!wasmMemoryView || wasmMemoryView.buffer.byteLength === 0 || wasmMemoryView.length !== Daydream.W * Daydream.H * 3) {
+          wasmMemoryView = wasmEngine.getPixels();
+          daydream.dotMesh.instanceColor.array = wasmMemoryView;
+          Daydream.pixels = wasmMemoryView;
+        }
 
-        // Native, zero-overhead memory copy from WASM to WebGL
-        Daydream.pixels.set(wasmPixels);
+        // Tell Three.js the buffer needs an update (it will upload directly from WASM memory)
+        daydream.dotMesh.instanceColor.needsUpdate = true;
       },
       getArenaMetrics: () => {
         return wasmEngine.getArenaMetrics();
