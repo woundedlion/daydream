@@ -185,8 +185,8 @@
 .sort-btn {
   flex: 1;
   padding: 3px 6px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: #666;
   font-family: 'Segoe UI', Arial, sans-serif;
   font-size: 10px;
@@ -199,13 +199,13 @@
 }
 
 .sort-btn:hover {
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.1);
   color: #aaa;
 }
 
 .sort-btn.active {
   color: #8af;
-  border-color: rgba(60,120,240,0.3);
+  border-color: rgba(60, 120, 240, 0.3);
 }
 
 .effect-button:hover {
@@ -384,6 +384,10 @@
     flex-shrink: 0;
     flex-grow: 1;
     text-align: center;
+  }
+
+  .effect-size {
+    display: none;
   }
 
   .canvas-container {
