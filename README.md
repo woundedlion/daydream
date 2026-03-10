@@ -95,7 +95,7 @@ pov-master/
 │   ├── Comets.h
 │   ├── DreamBalls.h
 │   ├── Dynamo.h
-│   ├── FlamingMesh.h
+│   ├── MeshFeedback.h
 │   ├── FlowField.h
 │   ├── GnomonicStars.h
 │   ├── GSReactionDiffusion.h
@@ -659,7 +659,7 @@ Animated concentric ring patterns using `Scan::Ring` with per-ring phase offsets
 #### ChaoticStrings
 Lissajous curves whose frequency ratios slowly sweep through rational approximations, transitioning between closed figures and dense space-filling curves.
 
-#### FlamingMesh
+#### MeshFeedback
 Icosahedral mesh faces rendered with `Scan::Mesh`, distorted by a `NoiseTransformer` and given a phosphor-trail appearance via `Screen::Slew`.
 
 #### MindSplatter

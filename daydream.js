@@ -17,7 +17,7 @@ const HiResFavorites = [
   "ChaoticStrings",
   "Comets",
   "DreamBalls",
-  "FlamingMesh",
+  "MeshFeedback",
   "FlowField",
   "GnomonicStars",
   "GSReactionDiffusion",
@@ -37,7 +37,7 @@ const HiResFavorites = [
   "Test",
   "TestShapes",
   "TestSlewRate",
-  "TestTemporal",
+
   "Voronoi",
 ];
 
@@ -61,7 +61,7 @@ const LoResFavorites = [
   "Test",
   "TestShapes",
   "TestSlewRate",
-  "TestTemporal",
+
   "Thrusters",
   "Voronoi",
 ];
