@@ -140,7 +140,10 @@
 
 /* Effect Buttons */
 .effect-button {
-  padding: 2px 1px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 6px 2px 1px;
   background: transparent;
   border: 1px solid transparent;
   color: #888;
@@ -152,8 +155,57 @@
   transition: all 0.2s ease;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   user-select: none;
+  width: 100%;
+}
+
+.effect-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.effect-size {
+  color: #555;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.effect-button.active .effect-size {
+  color: #8af;
+}
+
+.sort-controls {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.sort-btn {
+  flex: 1;
+  padding: 3px 6px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #666;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.sort-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: #aaa;
+}
+
+.sort-btn.active {
+  color: #8af;
+  border-color: rgba(60,120,240,0.3);
 }
 
 .effect-button:hover {
