@@ -88,9 +88,9 @@ createHolosphereModule().then(module => {
 
   console.log("Wasm Engine Loaded");
 
-  // Re-run effect setup now that WASM is ready, to replace JS GUI with WASM GUI
+  // Re-run resolution setup now that WASM is ready, to populate sizes and replace JS GUI with WASM GUI
   if (controls.useWasm) {
-    controls.changeEffect(true);
+    controls.setResolution(true);
   }
 });
 
@@ -259,6 +259,8 @@ guiInstance.add(controls, 'resolution', Object.keys(resolutionPresets))
   .onChange(() => controls.setResolution());
 
 
+let sidebarSort = { key: 'name', dir: 'asc' };
+
 function populateEffectSidebar(options) {
   const sidebar = document.getElementById('effect-sidebar');
   if (!sidebar) return;
@@ -270,13 +272,72 @@ function populateEffectSidebar(options) {
   heading.className = 'effect-sidebar-heading';
   sidebar.appendChild(heading);
 
-  options.forEach(effectName => {
+  // Query effect sizes from WASM
+  let effectSizes = null;
+  if (wasmEngine) {
+    try { effectSizes = wasmEngine.getEffectSizes(); } catch (e) { }
+  }
+
+  // Sort controls
+  const sortRow = document.createElement('div');
+  sortRow.className = 'sort-controls';
+
+  const makeArrow = (dir) => dir === 'asc' ? '▲' : '▼';
+
+  const nameBtn = document.createElement('button');
+  nameBtn.className = 'sort-btn' + (sidebarSort.key === 'name' ? ' active' : '');
+  nameBtn.innerText = 'Name ' + (sidebarSort.key === 'name' ? makeArrow(sidebarSort.dir) : '⇅');
+  nameBtn.onclick = () => {
+    if (sidebarSort.key === 'name') sidebarSort.dir = sidebarSort.dir === 'asc' ? 'desc' : 'asc';
+    else { sidebarSort.key = 'name'; sidebarSort.dir = 'asc'; }
+    populateEffectSidebar(options);
+  };
+
+  const sizeBtn = document.createElement('button');
+  sizeBtn.className = 'sort-btn' + (sidebarSort.key === 'size' ? ' active' : '');
+  sizeBtn.innerText = 'Size ' + (sidebarSort.key === 'size' ? makeArrow(sidebarSort.dir) : '⇅');
+  sizeBtn.onclick = () => {
+    if (sidebarSort.key === 'size') sidebarSort.dir = sidebarSort.dir === 'asc' ? 'desc' : 'asc';
+    else { sidebarSort.key = 'size'; sidebarSort.dir = 'desc'; }
+    populateEffectSidebar(options);
+  };
+
+  sortRow.appendChild(nameBtn);
+  sortRow.appendChild(sizeBtn);
+  sidebar.appendChild(sortRow);
+
+  // Build sortable list
+  const items = options.map(name => ({
+    name,
+    size: effectSizes ? (effectSizes[name] || 0) : 0
+  }));
+
+  items.sort((a, b) => {
+    const mul = sidebarSort.dir === 'asc' ? 1 : -1;
+    if (sidebarSort.key === 'size') return (a.size - b.size) * mul;
+    return a.name.localeCompare(b.name) * mul;
+  });
+
+  items.forEach(({ name, size }) => {
     const btn = document.createElement('button');
     btn.className = 'effect-button';
-    btn.innerText = effectName;
-    btn.dataset.effect = effectName;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'effect-name';
+    nameSpan.textContent = name;
+    btn.appendChild(nameSpan);
+
+    if (size > 0) {
+      const sizeSpan = document.createElement('span');
+      sizeSpan.className = 'effect-size';
+      const kb = (size / 1024).toFixed(1);
+      sizeSpan.textContent = `${kb} KB`;
+      btn.appendChild(sizeSpan);
+    }
+
+    btn.dataset.effect = name;
     btn.onclick = () => {
-      controls.effect = effectName;
+      controls.effect = name;
       controls.changeEffect();
     };
     sidebar.appendChild(btn);
