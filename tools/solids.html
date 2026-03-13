@@ -1028,44 +1028,55 @@
     }
 
     function generateFuncAndRecipe(item) {
-      let s = `${item.base}(ctx)`;
+      // Build the function name from base + ops, matching solids.h conventions
       let nameParts = [item.base];
+
+      // Build the SolidBuilder chain
+      let chain = '';
 
       item.ops.forEach(o => {
         const opName = typeof o === 'string' ? o : o.op;
 
-        let params = '';
-        let suffix = `_${opName}`;
-
         if (opName === 'truncate') {
-          params = `, ctx, ${formatFloat(o.params.t)}`;
-          suffix += o.params.t.toString().replace('0.', '');
+          chain += `.truncate(${formatFloat(o.params.t)})`;
+          nameParts.push(`_truncate${o.params.t.toString().replace('0.', '')}`);
         } else if (opName === 'bitruncate') {
-          params = `, ctx, ${formatFloat(o.params.t)}`;
-          suffix += o.params.t.toString().replace('0.', '');
+          chain += `.bitruncate(${formatFloat(o.params.t)})`;
+          nameParts.push(`_bitruncate${o.params.t.toString().replace('0.', '')}`);
         } else if (opName === 'expand') {
-          params = `, ctx, ${formatFloat(o.params.t)}`;
-          suffix += o.params.t.toString().replace('0.', '');
+          chain += `.expand(${formatFloat(o.params.t)})`;
+          nameParts.push(`_expand${o.params.t.toString().replace('0.', '')}`);
+        } else if (opName === 'chamfer') {
+          chain += `.chamfer(${formatFloat(o.params.t)})`;
+          nameParts.push(`_chamfer${o.params.t.toString().replace('0.', '')}`);
         } else if (opName === 'hankin') {
-          params = `, ctx, ${formatFloat(o.params.angle)} * D2R`;
-          suffix = `_hk${Math.round(o.params.angle)}`;
+          chain += `.hankin(${formatFloat(o.params.angle)} * D2R)`;
+          nameParts.push(`_hk${Math.round(o.params.angle)}`);
+        } else if (opName === 'snub') {
+          // snub may have t and twist params in OP_DEFS but SolidBuilder defaults work
+          chain += `.snub()`;
+          nameParts.push(`_snub`);
         } else if (opName === 'canonicalize') {
-          params = `, ctx, ${o.params.iter}`;
+          const iter = o.params.iter || 100;
+          chain += `.canonicalize(${iter})`;
+          nameParts.push(`_canonicalize`);
         } else {
-          params = `, ctx`; // Normal unary ops like ambo/dual/kis need ctx
+          // Simple parameterless ops: dual, kis, ambo, gyro
+          chain += `.${opName}()`;
+          nameParts.push(`_${opName}`);
         }
-
-        s = `${opName}(${s}${params})`;
-        nameParts.push(suffix);
       });
 
-      return { funcName: nameParts.join(''), recipe: s };
+      const funcName = nameParts.join('');
+      const recipe = `SolidBuilder(${item.base}(a, b), a, b)${chain}.build()`;
+
+      return { funcName, recipe };
     }
 
     function generateRecipeCpp(item) {
       const { funcName, recipe } = generateFuncAndRecipe(item);
       const comment = `// V=${item.vCount || 0}, F=${item.fCount || 0}, I=${item.iCount || 0}`;
-      return `${comment}\ninline PolyMesh ${funcName}(ScratchContext &ctx) {\n  return ${recipe};\n}`;
+      return `${comment}\nFLASHMEM inline PolyMesh ${funcName}(Arena &a, Arena &b) {\n  return ${recipe};\n}`;
     }
 
     function capitalize(s) {
