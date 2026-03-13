@@ -111,7 +111,6 @@ pov-master/
 │   ├── RingShower.h
 │   ├── RingSpin.h
 │   ├── SphericalHarmonics.h
-│   ├── SpinShapes.h
 │   └── Voronoi.h
 │
 ├── wasm_bridge.cpp         Emscripten bindings — HolosphereEngine JS class
@@ -646,9 +645,6 @@ Flowers constructed from distorted ring SDFs whose radii oscillate via sine wave
 Draws twisting wireframe knotted structures derived from Archimedean solids. Mesh vertices are displaced along per-vertex tangent frames to create orbiting knot patterns, and a Möbius warp is applied to the geometry. Multiple copies orbit simultaneously with animated `OrientSlice` hemisphere rotation effects.
 
 **Parameters**: Copies (number of knot copies), Radius (displacement), Speed (orbit speed), Warp (Möbius warp scale), Alpha
-
-#### SpinShapes
-Catalog of spinning SDF shapes (rings, stars, polygons, flowers) with live rotation and color cycling.
 
 #### Comets
 Particles with long orientation-trail-based tails, launched in bursts and influenced by rotational gravity.
