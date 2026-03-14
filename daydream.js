@@ -19,6 +19,7 @@ const HiResFavorites = [
   "DreamBalls",
   "MeshFeedback",
   "FlowField",
+  "Flyby",
   "GnomonicStars",
   "GSReactionDiffusion",
   "HankinSolids",
