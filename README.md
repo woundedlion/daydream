@@ -102,7 +102,7 @@ pov-master/
 │   ├── HankinSolids.h
 │   ├── HopfFibration.h
 │   ├── IslamicStars.h
-│   ├── LSystem.h
+
 │   ├── Metaballs.h
 │   ├── MindSplatter.h
 │   ├── MobiusGrid.h
@@ -615,10 +615,7 @@ Procedurally generates authentic Islamic geometric patterns using Hankin's metho
 #### HankinSolids
 Similar to IslamicStars but sequences through the full Archimedean solid library with animated palette transitions.
 
-#### LSystem
-L-systems rendered by a `SphericalTurtle` that advances by geodesic arcs and turns around the surface normal. Three built-in rule sets (fractal tree, Koch snowflake variant, Lévy curve) with live angle and step-size modulation.
 
-**Parameters**: Rule (0–2), Angle (modifier), Step (modifier)
 
 #### SphericalHarmonics
 Renders the real spherical harmonics Yˡₘ(θ, φ) as SDF `HarmonicBlob` shapes. The harmonic defines a lobe-radius function that deforms a unit sphere surface. Animates through different (l, m) combinations.
