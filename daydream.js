@@ -25,7 +25,6 @@ const HiResFavorites = [
   "HankinSolids",
   "HopfFibration",
   "IslamicStars",
-  "LSystem",
   "Liquid2D",
   "Metaballs",
   "MindSplatter",
