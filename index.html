@@ -12,7 +12,7 @@
             "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
             "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/renderers/webgpu/WebGPURenderer.js",
             "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-            "dat-gui": "https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.module.js",
+            "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.21.0/dist/lil-gui.esm.min.js",
             "gui": "./gui.js"
           }
         }
@@ -30,13 +30,30 @@
                 <a href="tools/solids.html" target="_blank" class="tab">Solids</a>
                 <a href="tools/splines.html" target="_blank" class="tab">Splines</a>
                 <span id="arena-stats"
-                    style="color: grey; margin-left: 10px; font-family: monospace; font-size: 12px;"></span>
+                    style="color: grey; margin-left: 10px; font-family: monospace; font-size: 12px;">
+                    <table style="width:100%; text-align:center; border-collapse: collapse; line-height: 1.2; display:inline-table;">
+                        <tr style="color: #999;">
+                            <th style="font-weight:normal; border-right: 1px solid #444; width:33%; padding: 0 4px;">Scratch A</th>
+                            <th style="font-weight:normal; border-right: 1px solid #444; width:33%; padding: 0 4px;">Scratch B</th>
+                            <th style="font-weight:normal; width:33%; padding: 0 4px;">Persistent</th>
+                        </tr>
+                        <tr style="white-space: nowrap;">
+                            <td id="stat-scratch-a" style="border-right: 1px solid #444; padding: 0 8px;"></td>
+                            <td id="stat-scratch-b" style="border-right: 1px solid #444; padding: 0 8px;"></td>
+                            <td id="stat-persistent" style="padding: 0 8px;"></td>
+                        </tr>
+                    </table>
+                </span>
                 <span id="perf-stats"
                     style="color: grey; margin-left: 10px; font-family: monospace; font-size: 12px;"></span>
             </div>
             <div class="main-area">
                 <div id="effect-sidebar" class="effect-sidebar"></div>
                 <div id="canvas-container" class="canvas-container">
+                    <div id="loading-overlay" class="loading-overlay">
+                        <div class="spinner"></div>
+                        <span>Loading engine...</span>
+                    </div>
                     <canvas id="canvas"></canvas>
                 </div>
             </div>

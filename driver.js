@@ -89,7 +89,7 @@ export class Daydream {
   static DOT_COLOR = 0x0000ff;
 
   static pixelPositions = new Array(Daydream.W * Daydream.H);
-  static pixels = new Float32Array(Daydream.W * Daydream.H * 3);
+  static pixels = null;
 
   static X_AXIS = new THREE.Vector3(1, 0, 0);
   static Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -246,7 +246,7 @@ export class Daydream {
     if (!this.paused || this.stepFrames != 0) {
       if (this.stepFrames != 0) this.stepFrames--;
 
-      Daydream.pixels.fill(0);
+      if (Daydream.pixels) Daydream.pixels.fill(0);
 
       const start = performance.now();
       if (effect) {
@@ -263,18 +263,9 @@ export class Daydream {
       if (arenaStats && effect && effect.getArenaMetrics) {
         const m = effect.getArenaMetrics();
         const fmt = (x) => `${(x.usage / 1024).toFixed(0)} - ${(x.high_water_mark / 1024).toFixed(0)} / ${(x.capacity / 1024).toFixed(0)} KB`;
-        arenaStats.innerHTML = `<table style="width:100%; text-align:center; border-collapse: collapse; line-height: 1.2;">
-          <tr style="color: #999;">
-            <th style="font-weight:normal; border-right: 1px solid #444; width:33%; padding: 0 4px;">Scratch A</th>
-            <th style="font-weight:normal; border-right: 1px solid #444; width:33%; padding: 0 4px;">Scratch B</th>
-            <th style="font-weight:normal; width:33%; padding: 0 4px;">Persistent</th>
-          </tr>
-          <tr style="white-space: nowrap;">
-            <td style="border-right: 1px solid #444; padding: 0 8px;">${fmt(m.scratch_arena_a)}</td>
-            <td style="border-right: 1px solid #444; padding: 0 8px;">${fmt(m.scratch_arena_b)}</td>
-            <td style="padding: 0 8px;">${fmt(m.persistent_arena)}</td>
-          </tr>
-        </table>`;
+        document.getElementById("stat-scratch-a").textContent = fmt(m.scratch_arena_a);
+        document.getElementById("stat-scratch-b").textContent = fmt(m.scratch_arena_b);
+        document.getElementById("stat-persistent").textContent = fmt(m.persistent_arena);
       }
 
       this.dotMesh.instanceColor.needsUpdate = true;
@@ -357,9 +348,9 @@ export class Daydream {
   setupDots() {
     if (this.dotMesh) {
       this.scene.remove(this.dotMesh);
-    }
-    if (this.dotGeometry) {
-      this.dotGeometry.dispose();
+      this.dotMesh.geometry.dispose();
+      if (this.dotMesh.instanceColor) this.dotMesh.instanceColor.array = null;
+      this.dotMesh.dispose();
     }
 
     if (!this.dotMaterial) {
