@@ -61,8 +61,7 @@ class LabelPool {
   }
 }
 
-/** @type {Array<{position: THREE.Vector3, content: string}>} Global array to store labels to be rendered. */
-export var labels = [];
+
 
 export const pixelKey = (x, y) => `${x},${y}`;
 export const keyPixel = (k) => k.split(',');
