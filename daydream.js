@@ -213,6 +213,7 @@ function applyResolution(preserveParams = false) {
 
   if (wasmEngine) {
     wasmEngine.setResolution(p.w, p.h);
+    wasmMemoryView = null; // Force refreshPixelView to re-fetch after resize
   }
 
   // Update available effects based on resolution
