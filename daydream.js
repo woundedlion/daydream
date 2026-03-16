@@ -7,6 +7,8 @@
 import createHolosphereModule from "./holosphere_wasm.js";
 import { Daydream } from "./driver.js";
 import { GUI, resetGUI } from "gui";
+import { EffectSidebar } from "./sidebar.js";
+import { AppState, URLSync } from "./state.js";
 
 import { BufferGeometry, AddEquation, MaxEquation, Color, LinearSRGBColorSpace, SRGBColorSpace } from "three";
 
@@ -63,9 +65,51 @@ const LoResFavorites = [
   "Voronoi",
 ];
 
+// Resolution presets and effect lists per resolution
+const resolutionPresets = {
+  "Holosphere (20x96)": { h: 20, w: 96, size: 2 },
+  "Phantasm (144x288)": { h: 144, w: 288, size: 0.25 },
+};
+
+const effectsByResolution = {
+  "Holosphere (20x96)": LoResFavorites,
+  "Phantasm (144x288)": HiResFavorites,
+};
+
 let wasmModule = null;
 let wasmEngine = null;
 let wasmMemoryView = null;
+let wasmAdapter = null;
+
+// Guard WASM memory view — spec-correct detached buffer check
+function refreshPixelView() {
+  if (!wasmMemoryView || wasmMemoryView.buffer.byteLength === 0) {
+    wasmMemoryView = wasmEngine.getPixels();
+    daydream.dotMesh.instanceColor.array = wasmMemoryView;
+    Daydream.pixels = wasmMemoryView;
+  }
+}
+
+function syncGUI() {
+  if (activeEffect && activeEffect.controllers) {
+    const values = wasmEngine.getParamValues();
+    for (let i = 0; i < activeEffect.controllers.length; i++) {
+      if (i >= values.length) break;
+      const c = activeEffect.controllers[i];
+
+      // Skip if user is interacting
+      if (c.domElement.contains(document.activeElement)) continue;
+
+      let val = values[i];
+      if (c.isBoolean) val = (val > 0.5);
+
+      if (c.getValue() !== val) {
+        c.object[c.property] = val;
+        c.updateDisplay();
+      }
+    }
+  }
+}
 
 // Initialize Wasm
 createHolosphereModule().then(module => {
@@ -83,7 +127,24 @@ createHolosphereModule().then(module => {
     wasmEngine.setEffect(controls.effect);
   }
 
+  // Create persistent adapter object (avoids per-frame allocation)
+  wasmAdapter = {
+    drawFrame() {
+      wasmEngine.drawFrame();
+      syncGUI();
+      refreshPixelView();
+      daydream.dotMesh.instanceColor.needsUpdate = true;
+    },
+    getArenaMetrics() {
+      return wasmEngine.getArenaMetrics();
+    }
+  };
+
   console.log("Wasm Engine Loaded");
+
+  // Remove loading overlay
+  const loadingOverlay = document.getElementById('loading-overlay');
+  if (loadingOverlay) loadingOverlay.remove();
 
   // Re-run resolution setup now that WASM is ready, to populate sizes and replace JS GUI with WASM GUI
   if (controls.useWasm) {
@@ -92,31 +153,29 @@ createHolosphereModule().then(module => {
 });
 
 
-const urlParams = new URLSearchParams(window.location.search);
-const initialEffect = urlParams.get('effect');
-
-const initialResolution = urlParams.get('resolution');
-const initialWasm = urlParams.get('wasm') !== 'false';
-
-// Default to Holosphere
-const resolutionPresets = {
-  "Holosphere (20x96)": { h: 20, w: 96, size: 2 },
-  "Phantasm (144x288)": { h: 144, w: 288, size: 0.25 },
-};
-
-const effectsByResolution = {
-  "Holosphere (20x96)": LoResFavorites,
-  "Phantasm (144x288)": HiResFavorites,
-};
-
 const daydream = new Daydream();
 let activeEffect;
 
-const controls = {
+// Centralized state with URL sync
+const urlParams = new URLSearchParams(window.location.search);
+const initialEffect = urlParams.get('effect');
+const initialResolution = urlParams.get('resolution');
+
+const appState = new AppState({
   effect: initialEffect || 'IslamicStars',
   resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Phantasm (144x288)",
+  useWasm: true
+});
+const urlSync = new URLSync(appState, ['effect', 'resolution', 'wasm']);
+
+const controls = {
+  get effect() { return appState.get('effect'); },
+  set effect(v) { appState.set('effect', v); },
+  get resolution() { return appState.get('resolution'); },
+  set resolution(v) { appState.set('resolution', v); },
+  get useWasm() { return appState.get('useWasm'); },
+  set useWasm(v) { appState.set('useWasm', v); },
   testAll: false,
-  useWasm: true,
 
   setResolution: function (preserveParams = false) {
     const p = resolutionPresets[this.resolution];
@@ -132,17 +191,14 @@ const controls = {
         this.effect = availableEffects[0];
       }
 
-      // Update URL
-      const newUrl = new URL(window.location);
-      newUrl.searchParams.set('effect', this.effect);
-      newUrl.searchParams.set('resolution', this.resolution);
-      newUrl.searchParams.set('wasm', this.useWasm);
-      window.history.replaceState({}, '', newUrl);
-
       daydream.updateResolution(p.h, p.w, p.size);
 
       // Update the sidebar options
-      populateEffectSidebar(availableEffects);
+      let effectSizes = null;
+      if (wasmEngine) {
+        try { effectSizes = wasmEngine.getEffectSizes(); } catch (e) { }
+      }
+      sidebar.setEffects(availableEffects, effectSizes);
 
       // Restart effect to use new resolution
       this.changeEffect(preserveParams);
@@ -169,12 +225,6 @@ const controls = {
       resetGUI(['resolution', 'effect', 'wasm']);
     }
 
-    // Update URL
-    const newUrl = new URL(window.location);
-    newUrl.searchParams.set('effect', this.effect);
-    newUrl.searchParams.set('wasm', this.useWasm);
-    window.history.replaceState({}, '', newUrl);
-
     if (this.useWasm) {
       if (wasmEngine) {
         // WASM Mode - The Primary Mode
@@ -198,7 +248,7 @@ const controls = {
           if (isBool) {
             controller = activeEffect.gui.add(state, p.name);
           } else {
-            controller = activeEffect.gui.add(state, p.name, p.min, p.max);
+            controller = activeEffect.gui.add(state, p.name, p.min, p.max).decimals(3);
           }
           controller.isBoolean = isBool;
           activeEffect.controllers.push(controller);
@@ -240,7 +290,7 @@ const controls = {
     }
 
     // Update active state in sidebar
-    updateSidebarActiveState();
+    sidebar.setActive(this.effect);
   }
 };
 
@@ -255,106 +305,13 @@ guiInstance.add(controls, 'resolution', Object.keys(resolutionPresets))
   .name('Resolution')
   .onChange(() => controls.setResolution());
 
-
-let sidebarSort = { key: 'name', dir: 'asc' };
-
-function populateEffectSidebar(options) {
-  const sidebar = document.getElementById('effect-sidebar');
-  if (!sidebar) return;
-
-  sidebar.innerHTML = '';
-
-  const heading = document.createElement('h3');
-  heading.innerText = 'Effects';
-  heading.className = 'effect-sidebar-heading';
-  sidebar.appendChild(heading);
-
-  // Query effect sizes from WASM
-  let effectSizes = null;
-  if (wasmEngine) {
-    try { effectSizes = wasmEngine.getEffectSizes(); } catch (e) { }
+const sidebar = new EffectSidebar(
+  document.getElementById('effect-sidebar'),
+  (name) => {
+    controls.effect = name;
+    controls.changeEffect();
   }
-
-  // Sort controls
-  const sortRow = document.createElement('div');
-  sortRow.className = 'sort-controls';
-
-  const makeArrow = (dir) => dir === 'asc' ? '▲' : '▼';
-
-  const nameBtn = document.createElement('button');
-  nameBtn.className = 'sort-btn' + (sidebarSort.key === 'name' ? ' active' : '');
-  nameBtn.innerText = 'Name ' + (sidebarSort.key === 'name' ? makeArrow(sidebarSort.dir) : '⇅');
-  nameBtn.onclick = () => {
-    if (sidebarSort.key === 'name') sidebarSort.dir = sidebarSort.dir === 'asc' ? 'desc' : 'asc';
-    else { sidebarSort.key = 'name'; sidebarSort.dir = 'asc'; }
-    populateEffectSidebar(options);
-  };
-
-  const sizeBtn = document.createElement('button');
-  sizeBtn.className = 'sort-btn' + (sidebarSort.key === 'size' ? ' active' : '');
-  sizeBtn.innerText = 'Size ' + (sidebarSort.key === 'size' ? makeArrow(sidebarSort.dir) : '⇅');
-  sizeBtn.onclick = () => {
-    if (sidebarSort.key === 'size') sidebarSort.dir = sidebarSort.dir === 'asc' ? 'desc' : 'asc';
-    else { sidebarSort.key = 'size'; sidebarSort.dir = 'desc'; }
-    populateEffectSidebar(options);
-  };
-
-  sortRow.appendChild(nameBtn);
-  sortRow.appendChild(sizeBtn);
-  sidebar.appendChild(sortRow);
-
-  // Build sortable list
-  const items = options.map(name => ({
-    name,
-    size: effectSizes ? (effectSizes[name] || 0) : 0
-  }));
-
-  items.sort((a, b) => {
-    const mul = sidebarSort.dir === 'asc' ? 1 : -1;
-    if (sidebarSort.key === 'size') return (a.size - b.size) * mul;
-    return a.name.localeCompare(b.name) * mul;
-  });
-
-  items.forEach(({ name, size }) => {
-    const btn = document.createElement('button');
-    btn.className = 'effect-button';
-
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'effect-name';
-    nameSpan.textContent = name;
-    btn.appendChild(nameSpan);
-
-    if (size > 0) {
-      const sizeSpan = document.createElement('span');
-      sizeSpan.className = 'effect-size';
-      const kb = (size / 1024).toFixed(1);
-      sizeSpan.textContent = `${kb} KB`;
-      btn.appendChild(sizeSpan);
-    }
-
-    btn.dataset.effect = name;
-    btn.onclick = () => {
-      controls.effect = name;
-      controls.changeEffect();
-    };
-    sidebar.appendChild(btn);
-  });
-  updateSidebarActiveState();
-}
-
-function updateSidebarActiveState() {
-  const sidebar = document.getElementById('effect-sidebar');
-  if (!sidebar) return;
-  const buttons = sidebar.querySelectorAll('.effect-button');
-  buttons.forEach(btn => {
-    if (btn.dataset.effect === controls.effect) {
-      btn.classList.add('active');
-      btn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    } else {
-      btn.classList.remove('active');
-    }
-  });
-}
+);
 
 let testAllInterval = null;
 guiInstance.add(controls, 'testAll').name('Test All').onChange((v) => {
@@ -384,51 +341,13 @@ controls.setResolution(true);
 
 guiInstance.add(daydream, 'labelAxes').name('Show Axes');
 guiInstance.add(daydream, 'cullBackLabels').name('Cull Back Labels');
-window.addEventListener("resize", () => daydream.setCanvasSize());
 window.addEventListener("keydown", (e) => daydream.keydown(e));
 
 
 
 daydream.renderer.setAnimationLoop(() => {
-  if (wasmEngine) {
+  if (wasmAdapter) {
     daydream.renderer.outputColorSpace = SRGBColorSpace;
-    const wasmWrapper = {
-      drawFrame: () => {
-        wasmEngine.drawFrame();
-
-        // Sync GUI with Animations
-        if (activeEffect && activeEffect.controllers) {
-          const values = wasmEngine.getParamValues();
-          for (let i = 0; i < activeEffect.controllers.length; i++) {
-            if (i >= values.length) break;
-            const c = activeEffect.controllers[i];
-
-            // Skip if user is interacting
-            if (c.domElement.contains(document.activeElement)) continue;
-
-            let val = values[i];
-            if (c.isBoolean) val = (val > 0.5);
-
-            if (c.getValue() !== val) {
-              c.object[c.property] = val;
-              c.updateDisplay();
-            }
-          }
-        }
-
-        if (!wasmMemoryView || wasmMemoryView.buffer.byteLength === 0 || wasmMemoryView.length !== Daydream.W * Daydream.H * 3) {
-          wasmMemoryView = wasmEngine.getPixels();
-          daydream.dotMesh.instanceColor.array = wasmMemoryView;
-          Daydream.pixels = wasmMemoryView;
-        }
-
-        // Tell Three.js the buffer needs an update (it will upload directly from WASM memory)
-        daydream.dotMesh.instanceColor.needsUpdate = true;
-      },
-      getArenaMetrics: () => {
-        return wasmEngine.getArenaMetrics();
-      }
-    };
-    daydream.render(wasmWrapper);
+    daydream.render(wasmAdapter);
   }
 });

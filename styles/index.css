@@ -91,6 +91,47 @@
   /* Clip canvas overflow */
 }
 
+/* Loading overlay */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #000;
+  color: #888;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 14px;
+  z-index: 100;
+  transition: opacity 0.3s ease;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #48f;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Effect list container (keyboard nav scope) */
+.effect-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  outline: none;
+}
+
 /* Sidebar Styling */
 .effect-sidebar {
   width: fit-content;
@@ -239,8 +280,22 @@
 
 /* --- Mobile Styles --- */
 @media only screen and (max-width: 900px) {
-  #arena-stats {
-    display: none !important;
+  /* Hide tool links on mobile */
+  .tab,
+  .nav-label {
+    display: none;
+  }
+
+  /* Show arena and perf stats on mobile */
+  #arena-stats,
+  #perf-stats {
+    display: inline !important;
+    font-size: 10px;
+  }
+
+  /* Hide sort buttons on mobile */
+  .sort-controls {
+    display: none;
   }
 
   /* Switch Layout to Mobile (Page Scroll) */
@@ -258,103 +313,18 @@
   .gui-container {
     position: static;
     width: 100%;
-    max-height: none;
-    /* No internal limit */
-    width: 100%;
     height: auto;
-    min-height: auto;
     flex-shrink: 0;
     z-index: 1000;
     background: rgba(0, 0, 0, 0.8);
     display: flex;
     flex-direction: column;
     overflow-y: visible;
-    /* No internal scrollbars */
   }
 
-  /* Target dat.gui root inside our container */
-  .gui-container .dg.ac,
-  .gui-container .dg.a,
-  /* Often used for sub-menus */
-  .dg.ac {
-    position: static !important;
-    top: auto !important;
-    bottom: auto !important;
-    left: 0 !important;
-    /* STRICT LEFT ALIGN */
-    right: auto !important;
-    width: 100% !important;
-    width: 100% !important;
-    margin: 0 0 10px 0 !important;
-    /* NO MARGINS */
-    padding: 0 !important;
-    display: block !important;
-    float: none !important;
-    transform: none !important;
-    max-width: 100% !important;
-  }
-
-  .gui-container .dg.main {
-    width: 100% !important;
-  }
-
-  /* Restore dat.gui sizing logic */
-  .gui-container .dg {
-    box-sizing: content-box !important;
-  }
-
-  /* Force open folders to actually show content if JS animation fails */
-  .gui-container .dg li:not(.closed)>ul {
-    display: block !important;
-    height: auto !important;
-    overflow: visible !important;
-  }
-
-  /* Restore Button Styles & Polish */
-  .dg li {
-    height: 34px !important;
-    line-height: 34px !important;
-    border-bottom: 1px solid #333 !important;
-    overflow: hidden !important;
-  }
-
-  .dg li.folder {
-    height: auto !important;
-    overflow: visible !important;
-  }
-
-  .dg ul.closed li.cr {
-    display: none;
-  }
-
-  .dg .property-name {
-    width: 40% !important;
-    font-size: 14px !important;
-  }
-
-  .dg .c {
-    width: 60% !important;
-  }
-
-  .dg .slider {
-    margin-top: 5px !important;
-  }
-
-  .gui-container .dg li.folder.closed {
-    height: 34px !important;
-    overflow: hidden !important;
-  }
-
-  .gui-container .dg li.folder.closed ul {
-    display: none !important;
-  }
-
-  .dg .close-button {
-    position: relative !important;
-    float: none !important;
-    width: 100% !important;
-    display: block !important;
-    margin-top: 5px !important;
+  /* lil-gui panels stretch to full width on mobile */
+  .gui-container .lil-gui {
+    width: 100%;
   }
 
   /* Mobile Main Area Layout */
@@ -378,11 +348,20 @@
     gap: 2px;
   }
 
+  .effect-sidebar-heading {
+    display: none;
+  }
+
+  .effect-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 2px;
+    width: 100%;
+  }
+
   .effect-button {
     padding: 6px 10px;
     font-size: 12px;
-    flex-shrink: 0;
-    flex-grow: 1;
     text-align: center;
     width: auto;
   }
@@ -400,19 +379,14 @@
 @media only screen and (min-width: 901px) {
   .gui-container {
     position: absolute;
-    /* Force absolute to sit flush top-right */
     display: flex;
     flex-direction: row;
-    /* Align right, stack horizontally */
     align-items: flex-start;
     flex-wrap: wrap;
     width: auto;
-    /* Allow it to shrink/grow as needed, don't force full width */
-    /* Spans width to allow float-like behavior */
     right: 0;
     top: 0;
     bottom: auto;
-    /* Let it grow down */
     pointer-events: none;
     max-height: 100vh;
     z-index: 2000;
@@ -426,43 +400,10 @@
     order: 2;
   }
 
-  /* Re-enable pointer events for controls */
-  .gui-container .dg.ac,
-  .gui-container .dg.a,
-  .gui-container .dg.main {
+  /* Re-enable pointer events for lil-gui panels */
+  .gui-container > .lil-gui {
     pointer-events: auto;
-    position: relative !important;
-    float: none !important;
-    margin: 0 0 5px 10px !important;
-    /* Spacing between horizontal panels */
-    clear: none !important;
-    /* Allow stacking next to each other */
-    width: auto !important;
-    max-width: none !important;
-    left: auto !important;
-    right: auto !important;
-    top: auto !important;
-    bottom: auto !important;
-    transform: none !important;
-    overflow: visible !important;
-    /* Allow folders to expand */
-    height: auto !important;
-  }
-
-  /* Ensure content inside doesn't get clipped */
-  .gui-container .dg ul {
-    overflow: visible !important;
-  }
-
-  /* Ensure close button fits within the panel and doesn't bleed out */
-  .gui-container .dg .close-button {
-    width: 100% !important;
-    min-width: 0 !important;
-  }
-
-  /* Ensure dat.gui auto-container behaves */
-  .dg.ac {
-    z-index: 1001 !important;
+    margin: 0 0 5px 10px;
   }
 }
 

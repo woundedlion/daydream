@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
@@ -18,11 +18,8 @@ const _tempVector = new THREE.Vector3();
  * @returns {THREE.Spherical} The spherical coordinates (radius is 1).
  */
 export const pixelToSpherical = (x, y) => {
-  return new THREE.Spherical(
-    1,
-    (y * Math.PI) / (Daydream.H - 1),
-    (x * TWO_PI) / Daydream.W
-  );
+  _tempSpherical.set(1, (y * Math.PI) / (Daydream.H - 1), (x * TWO_PI) / Daydream.W);
+  return _tempSpherical;
 };
 
 const _tempPixel = { x: 0, y: 0 };

@@ -1,8 +1,9 @@
 
-import transform from "dat-gui";
+import { GUI as LilGUI } from "lil-gui";
 
 // Helper to manage URL state
 const getUrlParams = () => new URLSearchParams(window.location.search);
+let urlTimer = null;
 const setUrlParam = (key, value) => {
   const params = getUrlParams();
   if (value === null || value === undefined) {
@@ -15,7 +16,10 @@ const setUrlParam = (key, value) => {
     params.set(key, value);
   }
   const newUrl = `${window.location.pathname}?${params.toString()}`;
-  window.history.replaceState({}, '', newUrl);
+  clearTimeout(urlTimer);
+  urlTimer = setTimeout(() => {
+    window.history.replaceState({}, '', newUrl);
+  }, 200);
 };
 
 class DeepLinkGUI {
@@ -24,7 +28,7 @@ class DeepLinkGUI {
     if (options && options.domElement && options.addFolder) {
       this.gui = options;
     } else {
-      this.gui = new transform.GUI(options);
+      this.gui = new LilGUI(options);
     }
     this.parent = null;
     this.folderName = null;
