@@ -29,44 +29,40 @@
                 <a href="tools/palettes.html" target="_blank" class="tab">Palettes</a>
                 <a href="tools/solids.html" target="_blank" class="tab">Solids</a>
                 <a href="tools/splines.html" target="_blank" class="tab">Splines</a>
-                <span id="arena-stats"
-                    style="color: grey; margin-left: 10px; font-family: monospace; font-size: 12px;">
+                <span style="color: grey; margin-left: 10px; font-family: monospace; font-size: 12px;">
                     <table style="text-align:center; border-collapse: collapse; line-height: 1.2; display:inline-table;">
                         <tr style="color: #999;">
                             <th style="font-weight:normal; border-right: 1px solid #444; padding: 0 4px;">Scratch A</th>
                             <th style="font-weight:normal; border-right: 1px solid #444; padding: 0 4px;">Scratch B</th>
-                            <th style="font-weight:normal; padding: 0 4px;">Persistent</th>
+                            <th style="font-weight:normal; border-right: 1px solid #444; padding: 0 4px;">Persistent</th>
+                            <th style="font-weight:normal; padding: 0 4px;">Compute</th>
                         </tr>
                         <tr style="white-space: nowrap;">
                             <td id="stat-scratch-a" style="border-right: 1px solid #444; padding: 0 8px;"></td>
                             <td id="stat-scratch-b" style="border-right: 1px solid #444; padding: 0 8px;"></td>
-                            <td id="stat-persistent" style="padding: 0 8px;"></td>
+                            <td id="stat-persistent" style="border-right: 1px solid #444; padding: 0 8px;"></td>
+                            <td id="perf-stats" style="padding: 0 8px;"></td>
                         </tr>
                     </table>
                 </span>
-                <span id="perf-stats"
-                    style="color: grey; margin-left: 10px; font-family: monospace; font-size: 12px;"></span>
             </div>
             <div class="main-area">
                 <div id="effect-sidebar" class="effect-sidebar"></div>
                 <div id="stats-bar" class="stats-bar">
-                    <span id="arena-stats-mobile"
-                        style="color: grey; font-family: monospace; font-size: 10px;">
-                        <table style="text-align:center; border-collapse: collapse; line-height: 1.2; display:inline-table;">
-                            <tr style="color: #999;">
-                                <th style="font-weight:normal; border-right: 1px solid #444; padding: 0 4px;">Scratch A</th>
-                                <th style="font-weight:normal; border-right: 1px solid #444; padding: 0 4px;">Scratch B</th>
-                                <th style="font-weight:normal; padding: 0 4px;">Persistent</th>
-                            </tr>
-                            <tr style="white-space: nowrap;">
-                                <td id="stat-scratch-a-m" style="border-right: 1px solid #444; padding: 0 4px;"></td>
-                                <td id="stat-scratch-b-m" style="border-right: 1px solid #444; padding: 0 4px;"></td>
-                                <td id="stat-persistent-m" style="padding: 0 4px;"></td>
-                            </tr>
-                        </table>
-                    </span>
-                    <span id="perf-stats-mobile"
-                        style="color: grey; font-family: monospace; font-size: 10px;"></span>
+                    <table style="color: grey; font-family: monospace; font-size: 10px; text-align:center; border-collapse: collapse; line-height: 1.2; display:inline-table;">
+                        <tr style="color: #999;">
+                            <th style="font-weight:normal; border-right: 1px solid #444; padding: 0 4px;">Scratch A</th>
+                            <th style="font-weight:normal; border-right: 1px solid #444; padding: 0 4px;">Scratch B</th>
+                            <th style="font-weight:normal; border-right: 1px solid #444; padding: 0 4px;">Persistent</th>
+                            <th style="font-weight:normal; padding: 0 4px;">Compute</th>
+                        </tr>
+                        <tr style="white-space: nowrap;">
+                            <td id="stat-scratch-a-m" style="border-right: 1px solid #444; padding: 0 4px;"></td>
+                            <td id="stat-scratch-b-m" style="border-right: 1px solid #444; padding: 0 4px;"></td>
+                            <td id="stat-persistent-m" style="border-right: 1px solid #444; padding: 0 4px;"></td>
+                            <td id="perf-stats-mobile" style="padding: 0 4px;"></td>
+                        </tr>
+                    </table>
                 </div>
                 <div id="canvas-container" class="canvas-container">
                     <div id="loading-overlay" class="loading-overlay">
