@@ -227,7 +227,7 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { initScene } from './shared.js';
 
     const SLATE_900 = 0x0f172a;
     const FAST_COLOR = 0x34d399;   // emerald
@@ -518,63 +518,24 @@
       }
     }
 
-    // --- Init ---
-
     function initThree() {
-      const container = document.getElementById('canvasContainer');
-      const w = container.clientWidth;
-      const h = container.clientHeight;
-
-      scene = new THREE.Scene();
-      scene.background = new THREE.Color(SLATE_900);
-
-      camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
-      camera.position.set(1.5, 1.5, 3);
-
-      renderer = new THREE.WebGLRenderer({
-        canvas: document.getElementById('threeCanvas'),
-        antialias: true
+      const result = initScene('canvasContainer', 'threeCanvas', {
+        background: SLATE_900,
+        cameraDistance: 3,
       });
-      renderer.setSize(w, h);
-      renderer.setPixelRatio(window.devicePixelRatio);
-
-      controls = new OrbitControls(camera, renderer.domElement);
-      controls.minDistance = 2;
-      controls.maxDistance = 10;
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
+      scene = result.scene;
+      camera = result.camera;
+      renderer = result.renderer;
+      controls = result.controls;
+      sphereMesh = result.sphere;
 
       raycaster = new THREE.Raycaster();
       mouse = new THREE.Vector2();
-
-      // Sphere
-      const geo = new THREE.SphereGeometry(1.0, 64, 32);
-      const mat = new THREE.MeshBasicMaterial({
-        color: 0x334155, wireframe: true, transparent: true, opacity: 0.2
-      });
-      sphereMesh = new THREE.Mesh(geo, mat);
-      sphereMesh.renderOrder = 0;
-      scene.add(sphereMesh);
 
       // Input
       renderer.domElement.addEventListener('mousedown', onMouseDown);
       renderer.domElement.addEventListener('mouseup', onMouseUp);
       renderer.domElement.addEventListener('mousemove', onMouseMove);
-
-      const animate = () => {
-        requestAnimationFrame(animate);
-        controls.update();
-        renderer.render(scene, camera);
-      };
-      animate();
-    }
-
-    function onResize() {
-      if (!renderer) return;
-      const container = document.getElementById('canvasContainer');
-      camera.aspect = container.clientWidth / container.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
     }
 
     // --- UI wiring ---
@@ -673,7 +634,6 @@
     }
 
     // --- Bootstrap ---
-    window.addEventListener('resize', onResize);
     window.onload = () => {
       initUI();
       initThree();

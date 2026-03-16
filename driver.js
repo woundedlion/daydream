@@ -254,18 +254,29 @@ export class Daydream {
       }
       const duration = performance.now() - start;
       const stats = document.getElementById("perf-stats");
-      if (stats) {
-        stats.innerText = `${duration.toFixed(3)} ms`;
-        stats.style.color = duration > 62 ? 'red' : 'grey';
-      }
+      const statsM = document.getElementById("perf-stats-mobile");
+      const perfText = `${duration.toFixed(3)} ms`;
+      const perfColor = duration > 62 ? 'red' : 'grey';
+      if (stats) { stats.innerText = perfText; stats.style.color = perfColor; }
+      if (statsM) { statsM.innerText = perfText; statsM.style.color = perfColor; }
 
-      const arenaStats = document.getElementById("arena-stats");
-      if (arenaStats && effect && effect.getArenaMetrics) {
+      if (effect && effect.getArenaMetrics) {
         const m = effect.getArenaMetrics();
         const fmt = (x) => `${(x.usage / 1024).toFixed(0)} - ${(x.high_water_mark / 1024).toFixed(0)} / ${(x.capacity / 1024).toFixed(0)} KB`;
-        document.getElementById("stat-scratch-a").textContent = fmt(m.scratch_arena_a);
-        document.getElementById("stat-scratch-b").textContent = fmt(m.scratch_arena_b);
-        document.getElementById("stat-persistent").textContent = fmt(m.persistent_arena);
+        // Desktop stats
+        const sa = document.getElementById("stat-scratch-a");
+        const sb = document.getElementById("stat-scratch-b");
+        const sp = document.getElementById("stat-persistent");
+        if (sa) sa.textContent = fmt(m.scratch_arena_a);
+        if (sb) sb.textContent = fmt(m.scratch_arena_b);
+        if (sp) sp.textContent = fmt(m.persistent_arena);
+        // Mobile stats
+        const sam = document.getElementById("stat-scratch-a-m");
+        const sbm = document.getElementById("stat-scratch-b-m");
+        const spm = document.getElementById("stat-persistent-m");
+        if (sam) sam.textContent = fmt(m.scratch_arena_a);
+        if (sbm) sbm.textContent = fmt(m.scratch_arena_b);
+        if (spm) spm.textContent = fmt(m.persistent_arena);
       }
 
       this.dotMesh.instanceColor.needsUpdate = true;

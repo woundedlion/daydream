@@ -47,16 +47,6 @@ class DeepLinkGUI {
     return keys.join('.');
   }
 
-  _getDescriptor(object, prop) {
-    let curr = object;
-    while (curr) {
-      const desc = Object.getOwnPropertyDescriptor(curr, prop);
-      if (desc) return desc;
-      curr = Object.getPrototypeOf(curr);
-    }
-    return undefined;
-  }
-
   add(object, prop, ...args) {
     const key = this._getKey(prop);
 
