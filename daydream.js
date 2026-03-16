@@ -225,43 +225,37 @@ const controls = {
       resetGUI(['resolution', 'effect', 'wasm']);
     }
 
-    if (this.useWasm) {
-      if (wasmEngine) {
-        // WASM Mode - The Primary Mode
-        wasmEngine.setEffect(this.effect);
-        activeEffect = { gui: new GUI({ autoPlace: false }) };
+    if (wasmEngine) {
+      wasmEngine.setEffect(this.effect);
+      activeEffect = { gui: new GUI({ autoPlace: false }) };
 
-        // 1. Get Params from C++
-        const params = wasmEngine.getParameterDefinitions();
+      // Get Params from C++
+      const params = wasmEngine.getParameterDefinitions();
 
-        // 2. Build GUI
-        // 2. Build GUI
-        const state = {};
-        activeEffect.controllers = [];
+      // Build GUI
+      const state = {};
+      activeEffect.controllers = [];
 
-        params.forEach(p => {
-          state[p.name] = p.value;
+      params.forEach(p => {
+        state[p.name] = p.value;
 
-          let controller;
-          const isBool = (typeof p.value === 'boolean');
+        let controller;
+        const isBool = (typeof p.value === 'boolean');
 
-          if (isBool) {
-            controller = activeEffect.gui.add(state, p.name);
-          } else {
-            controller = activeEffect.gui.add(state, p.name, p.min, p.max).decimals(3);
-          }
-          controller.isBoolean = isBool;
-          activeEffect.controllers.push(controller);
+        if (isBool) {
+          controller = activeEffect.gui.add(state, p.name);
+        } else {
+          controller = activeEffect.gui.add(state, p.name, p.min, p.max).decimals(3);
+        }
+        controller.isBoolean = isBool;
+        activeEffect.controllers.push(controller);
 
-          controller.onChange(v => {
-            // Convert boolean to float (1.0/0.0) for C++ as setParameter expects float
-            const floatVal = (typeof v === 'boolean') ? (v ? 1.0 : 0.0) : v;
-            wasmEngine.setParameter(p.name, floatVal);
-          });
+        controller.onChange(v => {
+          // Convert boolean to float (1.0/0.0) for C++ as setParameter expects float
+          const floatVal = (typeof v === 'boolean') ? (v ? 1.0 : 0.0) : v;
+          wasmEngine.setParameter(p.name, floatVal);
         });
-      }
-    } else {
-      console.warn("WASM Engine not ready or useWasm is false (should be true).");
+      });
     }
 
     if (activeEffect && activeEffect.gui && window.innerWidth < 900) {

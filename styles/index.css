@@ -91,6 +91,16 @@
   /* Clip canvas overflow */
 }
 
+/* Stats bar — mobile-only readout below effect selectors */
+.stats-bar {
+  display: none;
+  width: 100%;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.6);
+  border-bottom: 1px solid #333;
+  text-align: center;
+}
+
 /* Loading overlay */
 .loading-overlay {
   position: absolute;
@@ -280,17 +290,14 @@
 
 /* --- Mobile Styles --- */
 @media only screen and (max-width: 900px) {
-  /* Hide tool links on mobile */
-  .tab,
-  .nav-label {
+  /* Hide entire nav-tabs header on mobile */
+  .nav-tabs {
     display: none;
   }
 
-  /* Show arena and perf stats on mobile */
-  #arena-stats,
-  #perf-stats {
-    display: inline !important;
-    font-size: 10px;
+  /* Show stats bar below effect selectors */
+  .stats-bar {
+    display: block;
   }
 
   /* Hide sort buttons on mobile */
