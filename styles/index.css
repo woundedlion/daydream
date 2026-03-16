@@ -410,7 +410,42 @@
   /* Re-enable pointer events for lil-gui panels */
   .gui-container > .lil-gui {
     pointer-events: auto;
-    margin: 0 0 5px 10px;
+    margin: 0 0 1px 10px;
+    width: auto;
+    --spacing: 4px;
+    --padding: 4px;
+  }
+
+  /* Grid layout: labels auto-size to widest, controls fill the rest */
+  .gui-container .lil-gui > .lil-children {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    row-gap: var(--spacing);
+    padding: 0 var(--padding);
+  }
+
+  .gui-container .lil-gui .lil-controller {
+    display: contents;
+  }
+
+  .gui-container .lil-gui .lil-controller > .lil-name {
+    padding-right: 10px;
+    line-height: var(--widget-height);
+    align-self: center;
+  }
+
+  /* Function/button controllers: span both columns */
+  .gui-container .lil-gui .lil-controller.lil-function > .lil-name {
+    display: none;
+  }
+
+  .gui-container .lil-gui .lil-controller.lil-function > .lil-widget {
+    grid-column: 1 / -1;
+  }
+
+  /* 1px gap between adjacent panels */
+  .gui-container > .lil-gui + .lil-gui {
+    margin-left: 1px;
   }
 }
 

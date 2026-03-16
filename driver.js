@@ -428,6 +428,7 @@ export class Daydream {
         this.dotMesh.instanceColor = new THREE.InstancedBufferAttribute(
           new Uint16Array(this.dotMesh.count * 3), 3, true
         );
+        this.dotMesh.instanceColor.colorSpace = THREE.LinearSRGBColorSpace;
         this.dotMesh.instanceColor.setUsage(THREE.StreamDrawUsage);
       }
       Daydream.pixels = this.dotMesh.instanceColor.array;
