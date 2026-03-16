@@ -163,8 +163,6 @@ const controls = {
     }
 
     activeEffect = null;
-    daydream.showLattice = false;
-    if (daydream.latticePoints) daydream.latticePoints.visible = false;
 
     // Clear existing params to avoid pollution, unless we are initializing (preserveParams = true)
     if (!preserveParams) {
@@ -211,13 +209,6 @@ const controls = {
             wasmEngine.setParameter(p.name, floatVal);
           });
         });
-
-        // Add lattice toggle for reaction-diffusion effects
-        if (this.effect === 'BZReactionDiffusion' || this.effect === 'GSReactionDiffusion') {
-          activeEffect.gui.add(daydream, 'showLattice').name('Show Lattice').onChange(v => {
-            if (daydream.latticePoints) daydream.latticePoints.visible = v;
-          });
-        }
       }
     } else {
       console.warn("WASM Engine not ready or useWasm is false (should be true).");

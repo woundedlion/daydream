@@ -12,8 +12,6 @@ import { GUI } from "gui";
 // Constants
 const PHI = (1 + Math.sqrt(5)) / 2;
 const g = 1 / PHI;
-const GOLDEN_ANGLE = 2.399963229728653;
-const RD_N = 7680;
 
 class LabelPool {
   constructor(scene) {
@@ -193,8 +191,6 @@ export class Daydream {
     this.precomputeMatrices();
     this.labelAxes = false;
     this.cullBackLabels = true;
-    this.showLattice = false;
-    this.setupLattice();
   }
 
   keydown(e) {
@@ -466,53 +462,6 @@ export class Daydream {
 
   }
 
-  setupLattice() {
-    const positions = new Float32Array(RD_N * 3);
-    for (let i = 0; i < RD_N; i++) {
-      const y = 1.0 - (i / (RD_N - 1)) * 2.0;
-      const r = Math.sqrt(Math.max(0, 1 - y * y));
-      const theta = GOLDEN_ANGLE * i;
-      // Slightly outside sphere to overlay on top of dots
-      const scale = Daydream.SPHERE_RADIUS * 1.005;
-      positions[i * 3]     = Math.cos(theta) * r * scale;
-      positions[i * 3 + 1] = y * scale;
-      positions[i * 3 + 2] = Math.sin(theta) * r * scale;
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    const mat = new THREE.ShaderMaterial({
-      transparent: true,
-      depthTest: false,
-      uniforms: {
-        pointSize: { value: 3.0 },
-      },
-      vertexShader: `
-        uniform float pointSize;
-        varying float vVisible;
-        void main() {
-          vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-          gl_Position = projectionMatrix * mvPos;
-          gl_PointSize = pointSize;
-          // Back-face cull: normal is just normalized position (sphere surface)
-          vec3 normal = normalize((modelViewMatrix * vec4(normalize(position), 0.0)).xyz);
-          vVisible = -normal.z > 0.0 ? 1.0 : 0.0;
-        }
-      `,
-      fragmentShader: `
-        varying float vVisible;
-        void main() {
-          if (vVisible < 0.5) discard;
-          // Round dot: discard outside circle
-          vec2 c = gl_PointCoord - vec2(0.5);
-          if (dot(c, c) > 0.25) discard;
-          gl_FragColor = vec4(1.0, 1.0, 1.0, 0.8);
-        }
-      `,
-    });
-    this.latticePoints = new THREE.Points(geo, mat);
-    this.latticePoints.visible = false;
-    this.scene.add(this.latticePoints);
-  }
 
   static snapToGrid(v) {
     const pixel = vectorToPixel(v);
