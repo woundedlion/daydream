@@ -111,20 +111,159 @@ function syncGUI() {
   }
 }
 
-// Initialize Wasm
+///////////////////////////////////////////////////////////////////////////////
+// Instances
+///////////////////////////////////////////////////////////////////////////////
+
+const daydream = new Daydream();
+let activeEffect;
+
+///////////////////////////////////////////////////////////////////////////////
+// Centralized State
+///////////////////////////////////////////////////////////////////////////////
+
+const urlParams = new URLSearchParams(window.location.search);
+const initialEffect = urlParams.get('effect');
+const initialResolution = urlParams.get('resolution');
+
+const appState = new AppState({
+  effect: initialEffect || 'IslamicStars',
+  resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Phantasm (144x288)",
+});
+const urlSync = new URLSync(appState, ['effect', 'resolution']);
+
+///////////////////////////////////////////////////////////////////////////////
+// Reactive Handlers — subscribe to appState
+///////////////////////////////////////////////////////////////////////////////
+
+/** Tear down the current effect GUI and build a new one for the active effect. */
+function applyEffect(preserveParams = false) {
+  // Tear down existing GUI
+  if (activeEffect && activeEffect.gui) {
+    try {
+      const dom = activeEffect.gui.domElement;
+      if (dom && dom.parentNode) dom.parentNode.removeChild(dom);
+      activeEffect.gui.destroy();
+    } catch (e) {
+      console.warn("GUI destroy warning:", e);
+    }
+  }
+  activeEffect = null;
+
+  // Clear existing params to avoid pollution, unless we are initializing
+  if (!preserveParams) {
+    resetGUI(['resolution', 'effect']);
+  }
+
+  if (wasmEngine) {
+    wasmEngine.setEffect(appState.get('effect'));
+    activeEffect = { gui: new GUI({ autoPlace: false }) };
+
+    // Get Params from C++
+    const params = wasmEngine.getParameterDefinitions();
+
+    // Build GUI
+    const state = {};
+    activeEffect.controllers = [];
+
+    params.forEach(p => {
+      state[p.name] = p.value;
+
+      let controller;
+      const isBool = (typeof p.value === 'boolean');
+
+      if (isBool) {
+        controller = activeEffect.gui.add(state, p.name);
+      } else {
+        controller = activeEffect.gui.add(state, p.name, p.min, p.max).decimals(3);
+      }
+      controller.isBoolean = isBool;
+      activeEffect.controllers.push(controller);
+
+      controller.onChange(v => {
+        const floatVal = (typeof v === 'boolean') ? (v ? 1.0 : 0.0) : v;
+        wasmEngine.setParameter(p.name, floatVal);
+      });
+    });
+  }
+
+  if (activeEffect && activeEffect.gui && window.innerWidth < 900) {
+    activeEffect.gui.close();
+  }
+
+  // Attach new effect's GUI to container
+  if (activeEffect && activeEffect.gui) {
+    const guiContainer = document.getElementById('gui-container');
+    if (guiContainer) {
+      activeEffect.gui.domElement.classList.add('effect-gui');
+      activeEffect.gui.domElement.classList.remove('global-gui');
+      guiContainer.appendChild(activeEffect.gui.domElement);
+    }
+  }
+
+  // Update sidebar highlight
+  sidebar.setActive(appState.get('effect'));
+}
+
+/** Apply a resolution change: resize geometry, refresh sidebar list, then re-apply effect. */
+function applyResolution(preserveParams = false) {
+  const resolution = appState.get('resolution');
+  const p = resolutionPresets[resolution];
+  if (!p) return;
+
+  if (wasmEngine) {
+    wasmEngine.setResolution(p.w, p.h);
+  }
+
+  // Update available effects based on resolution
+  const availableEffects = effectsByResolution[resolution] || HiResFavorites;
+
+  // If current effect isn't in the new list, switch to the first one
+  if (!availableEffects.includes(appState.get('effect'))) {
+    // This will trigger the 'effect' subscriber, which calls applyEffect
+    appState.set('effect', availableEffects[0]);
+  }
+
+  daydream.updateResolution(p.h, p.w, p.size);
+
+  // Update the sidebar options
+  let effectSizes = null;
+  if (wasmEngine) {
+    try { effectSizes = wasmEngine.getEffectSizes(); } catch (e) { }
+  }
+  sidebar.setEffects(availableEffects, effectSizes);
+
+  // Apply the current effect in the new resolution
+  applyEffect(preserveParams);
+}
+
+// Subscribe: react to state changes
+appState.subscribe((key, value, old) => {
+  if (key === 'effect') {
+    applyEffect();
+  } else if (key === 'resolution') {
+    applyResolution();
+  }
+});
+
+///////////////////////////////////////////////////////////////////////////////
+// Initialize WASM
+///////////////////////////////////////////////////////////////////////////////
+
 createHolosphereModule().then(module => {
   wasmModule = module;
   wasmEngine = new module.HolosphereEngine();
 
-  // Sync resolution from controls
-  const p = resolutionPresets[controls.resolution];
+  // Sync resolution from state
+  const p = resolutionPresets[appState.get('resolution')];
   if (p) {
     wasmEngine.setResolution(p.w, p.h);
   }
 
-  // Set initial effect matching URL or default
-  if (controls.effect) {
-    wasmEngine.setEffect(controls.effect);
+  // Set initial effect
+  const effect = appState.get('effect');
+  if (effect) {
+    wasmEngine.setEffect(effect);
   }
 
   // Create persistent adapter object (avoids per-frame allocation)
@@ -146,147 +285,13 @@ createHolosphereModule().then(module => {
   const loadingOverlay = document.getElementById('loading-overlay');
   if (loadingOverlay) loadingOverlay.remove();
 
-  // Re-run resolution setup now that WASM is ready, to populate sizes and replace JS GUI with WASM GUI
-  if (controls.useWasm) {
-    controls.setResolution(true);
-  }
+  // Run initial resolution setup now that WASM is ready
+  applyResolution(true);
 });
 
-
-const daydream = new Daydream();
-let activeEffect;
-
-// Centralized state with URL sync
-const urlParams = new URLSearchParams(window.location.search);
-const initialEffect = urlParams.get('effect');
-const initialResolution = urlParams.get('resolution');
-
-const appState = new AppState({
-  effect: initialEffect || 'IslamicStars',
-  resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Phantasm (144x288)",
-  useWasm: true
-});
-const urlSync = new URLSync(appState, ['effect', 'resolution', 'wasm']);
-
-const controls = {
-  get effect() { return appState.get('effect'); },
-  set effect(v) { appState.set('effect', v); },
-  get resolution() { return appState.get('resolution'); },
-  set resolution(v) { appState.set('resolution', v); },
-  get useWasm() { return appState.get('useWasm'); },
-  set useWasm(v) { appState.set('useWasm', v); },
-  testAll: false,
-
-  setResolution: function (preserveParams = false) {
-    const p = resolutionPresets[this.resolution];
-    if (p) {
-      if (wasmEngine) {
-        wasmEngine.setResolution(p.w, p.h);
-      }
-      // Update available effects based on resolution
-      const availableEffects = effectsByResolution[this.resolution] || HiResFavorites;
-
-      // Check if current effect is valid
-      if (!availableEffects.includes(this.effect)) {
-        this.effect = availableEffects[0];
-      }
-
-      daydream.updateResolution(p.h, p.w, p.size);
-
-      // Update the sidebar options
-      let effectSizes = null;
-      if (wasmEngine) {
-        try { effectSizes = wasmEngine.getEffectSizes(); } catch (e) { }
-      }
-      sidebar.setEffects(availableEffects, effectSizes);
-
-      // Restart effect to use new resolution
-      this.changeEffect(preserveParams);
-    }
-  },
-
-  changeEffect: function (preserveParams = false) {
-    if (activeEffect && activeEffect.gui) {
-      try {
-        const dom = activeEffect.gui.domElement;
-        if (dom && dom.parentNode) {
-          dom.parentNode.removeChild(dom);
-        }
-        activeEffect.gui.destroy();
-      } catch (e) {
-        console.warn("GUI destroy warning:", e);
-      }
-    }
-
-    activeEffect = null;
-
-    // Clear existing params to avoid pollution, unless we are initializing (preserveParams = true)
-    if (!preserveParams) {
-      resetGUI(['resolution', 'effect', 'wasm']);
-    }
-
-    if (wasmEngine) {
-      wasmEngine.setEffect(this.effect);
-      activeEffect = { gui: new GUI({ autoPlace: false }) };
-
-      // Get Params from C++
-      const params = wasmEngine.getParameterDefinitions();
-
-      // Build GUI
-      const state = {};
-      activeEffect.controllers = [];
-
-      params.forEach(p => {
-        state[p.name] = p.value;
-
-        let controller;
-        const isBool = (typeof p.value === 'boolean');
-
-        if (isBool) {
-          controller = activeEffect.gui.add(state, p.name);
-        } else {
-          controller = activeEffect.gui.add(state, p.name, p.min, p.max).decimals(3);
-        }
-        controller.isBoolean = isBool;
-        activeEffect.controllers.push(controller);
-
-        controller.onChange(v => {
-          // Convert boolean to float (1.0/0.0) for C++ as setParameter expects float
-          const floatVal = (typeof v === 'boolean') ? (v ? 1.0 : 0.0) : v;
-          wasmEngine.setParameter(p.name, floatVal);
-        });
-      });
-    }
-
-    if (activeEffect && activeEffect.gui && window.innerWidth < 900) {
-      activeEffect.gui.close();
-    }
-
-    // Ensure new effect's GUI is attached to our container
-    if (activeEffect && activeEffect.gui) {
-      const guiContainer = document.getElementById('gui-container');
-
-      // Helper to add class
-      const addEffectClass = (el) => {
-        el.classList.add('effect-gui');
-        el.classList.remove('global-gui'); // Safety
-      };
-
-      if (guiContainer) {
-        if (activeEffect.gui.domElement.parentElement !== guiContainer) {
-          guiContainer.appendChild(activeEffect.gui.domElement);
-          addEffectClass(activeEffect.gui.domElement);
-        } else {
-          // Already in container, just ensure class
-          addEffectClass(activeEffect.gui.domElement);
-        }
-      }
-    }
-
-    // Update active state in sidebar
-    sidebar.setActive(this.effect);
-  }
-};
+///////////////////////////////////////////////////////////////////////////////
+// GUI + Sidebar Setup
+///////////////////////////////////////////////////////////////////////////////
 
 const guiInstance = new GUI({ autoPlace: false });
 guiInstance.domElement.classList.add('global-gui');
@@ -295,27 +300,24 @@ if (window.innerWidth < 900) {
 }
 document.getElementById('gui-container').appendChild(guiInstance.domElement);
 
-guiInstance.add(controls, 'resolution', Object.keys(resolutionPresets))
+guiInstance.add({ resolution: appState.get('resolution') }, 'resolution', Object.keys(resolutionPresets))
   .name('Resolution')
-  .onChange(() => controls.setResolution());
+  .onChange((v) => appState.set('resolution', v));
 
 const sidebar = new EffectSidebar(
   document.getElementById('effect-sidebar'),
-  (name) => {
-    controls.effect = name;
-    controls.changeEffect();
-  }
+  (name) => appState.set('effect', name)
 );
 
 let testAllInterval = null;
-guiInstance.add(controls, 'testAll').name('Test All').onChange((v) => {
+guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => {
   if (v) {
     testAllInterval = setInterval(() => {
-      const currentList = effectsByResolution[controls.resolution];
-      const currentIndex = currentList.indexOf(controls.effect);
+      const currentList = effectsByResolution[appState.get('resolution')];
+      const currentEffect = appState.get('effect');
+      const currentIndex = currentList.indexOf(currentEffect);
       const nextIndex = (currentIndex + 1) % currentList.length;
-      controls.effect = currentList[nextIndex];
-      controls.changeEffect();
+      appState.set('effect', currentList[nextIndex]);
     }, 1000);
   } else {
     clearInterval(testAllInterval);
@@ -323,21 +325,19 @@ guiInstance.add(controls, 'testAll').name('Test All').onChange((v) => {
   }
 });
 
-controls.resetDefaults = () => {
-  resetGUI(['resolution', 'effect']);
-  controls.changeEffect();
-};
-guiInstance.add(controls, 'resetDefaults').name('Reset Defaults');
+guiInstance.add({
+  resetDefaults: () => {
+    resetGUI(['resolution', 'effect']);
+    applyEffect();
+  }
+}, 'resetDefaults').name('Reset Defaults');
 
-controls.setResolution(true);
-
-
+// Initial resolution setup (will be re-run after WASM loads)
+applyResolution(true);
 
 guiInstance.add(daydream, 'labelAxes').name('Show Axes');
 guiInstance.add(daydream, 'cullBackLabels').name('Cull Back Labels');
 window.addEventListener("keydown", (e) => daydream.keydown(e));
-
-
 
 daydream.renderer.setAnimationLoop(() => {
   if (wasmAdapter) {
