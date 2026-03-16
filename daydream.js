@@ -10,7 +10,7 @@ import { GUI, resetGUI } from "gui";
 import { EffectSidebar } from "./sidebar.js";
 import { AppState, URLSync } from "./state.js";
 
-import { BufferGeometry, AddEquation, MaxEquation, Color, LinearSRGBColorSpace, SRGBColorSpace } from "three";
+import { SRGBColorSpace } from "three";
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -219,9 +219,11 @@ function applyResolution(preserveParams = false) {
   const availableEffects = effectsByResolution[resolution] || HiResFavorites;
 
   // If current effect isn't in the new list, switch to the first one
+  let effectChanged = false;
   if (!availableEffects.includes(appState.get('effect'))) {
     // This will trigger the 'effect' subscriber, which calls applyEffect
     appState.set('effect', availableEffects[0]);
+    effectChanged = true;
   }
 
   daydream.updateResolution(p.h, p.w, p.size);
@@ -233,8 +235,10 @@ function applyResolution(preserveParams = false) {
   }
   sidebar.setEffects(availableEffects, effectSizes);
 
-  // Apply the current effect in the new resolution
-  applyEffect(preserveParams);
+  // Apply the current effect in the new resolution (if not already handled by effect switch)
+  if (!effectChanged) {
+    applyEffect(preserveParams);
+  }
 }
 
 // Subscribe: react to state changes
