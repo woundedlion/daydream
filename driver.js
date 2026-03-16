@@ -188,9 +188,14 @@ export class Daydream {
 
     // Initialization
     this.pixelMatrices = [];
-    this.precomputeMatrices();
+    this.timeAccumulator = 0;
     this.labelAxes = false;
     this.cullBackLabels = true;
+
+    // Cache stats elements lazily
+    this._statsGroup = null;
+
+    this.precomputeMatrices();
   }
 
   keydown(e) {
@@ -248,36 +253,19 @@ export class Daydream {
 
       if (Daydream.pixels) Daydream.pixels.fill(0);
 
+      if (this.labelAxes) {
+        this.xAxis.position.x = Daydream.SPHERE_RADIUS + 5;
+        this.yAxis.position.y = Daydream.SPHERE_RADIUS + 5;
+        this.zAxis.position.z = Daydream.SPHERE_RADIUS + 5;
+      }
+
       const start = performance.now();
       if (effect) {
         effect.drawFrame();
       }
       const duration = performance.now() - start;
-      const stats = document.getElementById("perf-stats");
-      const statsM = document.getElementById("perf-stats-mobile");
-      const perfText = `${duration.toFixed(3)} ms`;
-      const perfColor = duration > 62 ? 'red' : 'grey';
-      if (stats) { stats.innerText = perfText; stats.style.color = perfColor; }
-      if (statsM) { statsM.innerText = perfText; statsM.style.color = perfColor; }
 
-      if (effect && effect.getArenaMetrics) {
-        const m = effect.getArenaMetrics();
-        const fmt = (x) => `${(x.usage / 1024).toFixed(0)} - ${(x.high_water_mark / 1024).toFixed(0)} / ${(x.capacity / 1024).toFixed(0)} KB`;
-        // Desktop stats
-        const sa = document.getElementById("stat-scratch-a");
-        const sb = document.getElementById("stat-scratch-b");
-        const sp = document.getElementById("stat-persistent");
-        if (sa) sa.textContent = fmt(m.scratch_arena_a);
-        if (sb) sb.textContent = fmt(m.scratch_arena_b);
-        if (sp) sp.textContent = fmt(m.persistent_arena);
-        // Mobile stats
-        const sam = document.getElementById("stat-scratch-a-m");
-        const sbm = document.getElementById("stat-scratch-b-m");
-        const spm = document.getElementById("stat-persistent-m");
-        if (sam) sam.textContent = fmt(m.scratch_arena_a);
-        if (sbm) sbm.textContent = fmt(m.scratch_arena_b);
-        if (spm) spm.textContent = fmt(m.persistent_arena);
-      }
+      this._updateStats(duration, effect);
 
       this.dotMesh.instanceColor.needsUpdate = true;
 
@@ -286,7 +274,7 @@ export class Daydream {
       this.zAxis.visible = this.labelAxes;
 
       this.labelPool.reset();
-      labels = [];
+      let labels = [];
 
       if (this.labelAxes) {
         labels.push({ "position": Daydream.X_AXIS, "content": "X" });
@@ -448,6 +436,37 @@ export class Daydream {
 
       this.dotMesh.instanceMatrix.needsUpdate = true;
       this.dotMesh.instanceColor.needsUpdate = true;
+    }
+  }
+
+  _updateStats(duration, effect) {
+    if (!this._statsGroup) {
+      this._statsGroup = {
+        perf: [document.getElementById("perf-stats"), document.getElementById("perf-stats-mobile")],
+        scratchA: [document.getElementById("stat-scratch-a"), document.getElementById("stat-scratch-a-m")],
+        scratchB: [document.getElementById("stat-scratch-b"), document.getElementById("stat-scratch-b-m")],
+        persist: [document.getElementById("stat-persistent"), document.getElementById("stat-persistent-m")]
+      };
+    }
+
+    const perfText = `${duration.toFixed(3)} ms`;
+    const perfColor = duration > 62 ? 'red' : 'grey';
+    this._statsGroup.perf.forEach(el => {
+      if (el) { el.innerText = perfText; el.style.color = perfColor; }
+    });
+
+    if (effect && effect.getArenaMetrics) {
+      const m = effect.getArenaMetrics();
+      const fmt = (x) => `${(x.usage / 1024).toFixed(0)} - ${(x.high_water_mark / 1024).toFixed(0)} / ${(x.capacity / 1024).toFixed(0)} KB`;
+
+      const updateRow = (elements, val) => {
+        const text = fmt(val);
+        elements.forEach(el => { if (el) el.textContent = text; });
+      };
+
+      updateRow(this._statsGroup.scratchA, m.scratch_arena_a);
+      updateRow(this._statsGroup.scratchB, m.scratch_arena_b);
+      updateRow(this._statsGroup.persist, m.persistent_arena);
     }
   }
 
