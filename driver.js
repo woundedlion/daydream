@@ -132,6 +132,7 @@ export class Daydream {
     this.scene.background = new THREE.Color(Daydream.SCENE_BACKGROUND_COLOR);
     this.paused = false;
     this.stepFrames = 0;
+    this.recorder = null;
 
     // Timing Variables
     this.clock = new THREE.Clock(true);
@@ -300,6 +301,12 @@ export class Daydream {
 
     this.controls.update();
 
+    // Update backface cull uniforms
+    if (this.cullUniforms) {
+      this.cullUniforms.uCameraPos.value.copy(this.camera.position);
+      this.cullUniforms.uCullThreshold.value = -Daydream.DOT_SIZE / Daydream.SPHERE_RADIUS;
+    }
+
     this.renderer.setScissorTest(true);
     this.renderer.setViewport(
       this.mainViewport.x,
@@ -317,6 +324,9 @@ export class Daydream {
     this.renderer.setClearColor(this.scene.background, Daydream.SCENE_ALPHA ? 0 : 1);
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
+
+    // Capture a video frame (simulation-synced)
+    if (this.recorder) this.recorder.captureFrame();
 
     if (this.labelPool.activeCount > 0) {
       this.labelRenderer.render(this.scene, this.camera);
@@ -359,13 +369,32 @@ export class Daydream {
         depthWrite: false
       });
 
+      // Uniforms for backface culling (updated per frame in render())
+      this.cullUniforms = {
+        uCameraPos: { value: new THREE.Vector3(0, 0, 1) },
+        uCullThreshold: { value: -0.06 }
+      };
+
       this.dotMaterial.onBeforeCompile = (shader) => {
+        shader.uniforms.uCameraPos = this.cullUniforms.uCameraPos;
+        shader.uniforms.uCullThreshold = this.cullUniforms.uCullThreshold;
+
+        // Inject uniforms declaration
+        shader.vertexShader = 'uniform vec3 uCameraPos;\nuniform float uCullThreshold;\n' + shader.vertexShader;
+
         shader.vertexShader = shader.vertexShader.replace(
           '#include <begin_vertex>',
           `
           #include <begin_vertex>
           #if defined(USE_INSTANCING_COLOR)
+             // Hide black pixels
              if (dot(instanceColor, instanceColor) < 0.00000001) {
+                 transformed *= 0.0;
+             }
+             // Backface cull: dot of instance position with camera direction
+             vec3 instPos = (instanceMatrix[3]).xyz;
+             float facing = dot(normalize(instPos), normalize(uCameraPos));
+             if (facing < uCullThreshold) {
                  transformed *= 0.0;
              }
           #endif
@@ -445,7 +474,8 @@ export class Daydream {
         perf: [document.getElementById("perf-stats"), document.getElementById("perf-stats-mobile")],
         scratchA: [document.getElementById("stat-scratch-a"), document.getElementById("stat-scratch-a-m")],
         scratchB: [document.getElementById("stat-scratch-b"), document.getElementById("stat-scratch-b-m")],
-        persist: [document.getElementById("stat-persistent"), document.getElementById("stat-persistent-m")]
+        persist: [document.getElementById("stat-persistent"), document.getElementById("stat-persistent-m")],
+        stack: [document.getElementById("stat-stack"), document.getElementById("stat-stack-m")]
       };
     }
 
@@ -467,6 +497,9 @@ export class Daydream {
       updateRow(this._statsGroup.scratchA, m.scratch_arena_a);
       updateRow(this._statsGroup.scratchB, m.scratch_arena_b);
       updateRow(this._statsGroup.persist, m.persistent_arena);
+      if (m.stack) {
+        updateRow(this._statsGroup.stack, m.stack);
+      }
     }
   }
 
@@ -479,8 +512,6 @@ export class Daydream {
     this.setupDots();
 
     this.precomputeMatrices();
-    // console.log(this.renderer.info.render.triangles);
-
   }
 
 

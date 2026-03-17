@@ -91,6 +91,42 @@
   /* Clip canvas overflow */
 }
 
+/* Recording indicator — pulsing red dot */
+.canvas-container.recording::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 14px;
+  height: 14px;
+  background: #e22;
+  border-radius: 50%;
+  box-shadow: 0 0 8px 2px rgba(238, 34, 34, 0.6);
+  animation: rec-pulse 1s ease-in-out infinite;
+  z-index: 200;
+  pointer-events: none;
+}
+
+@keyframes rec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Duration readout next to recording dot */
+.rec-duration {
+  position: absolute;
+  top: 12px;
+  left: 32px;
+  color: #e22;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 14px;
+  z-index: 200;
+  pointer-events: none;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+}
+
 /* Stats bar — mobile-only readout below effect selectors */
 .stats-bar {
   display: none;
@@ -421,7 +457,7 @@
     display: grid;
     grid-template-columns: auto 1fr;
     row-gap: var(--spacing);
-    padding: 0 var(--padding);
+    padding: var(--spacing) var(--padding) var(--spacing);
   }
 
   .gui-container .lil-gui .lil-controller {
