@@ -191,6 +191,7 @@ export class Daydream {
     this.timeAccumulator = 0;
     this.labelAxes = false;
     this.cullBackLabels = true;
+    this.cullBackSphere = false;
 
     // Cache stats elements lazily
     this._statsGroup = null;
@@ -304,7 +305,9 @@ export class Daydream {
     // Update backface cull uniforms
     if (this.cullUniforms) {
       this.cullUniforms.uCameraPos.value.copy(this.camera.position);
-      this.cullUniforms.uCullThreshold.value = -Daydream.DOT_SIZE / Daydream.SPHERE_RADIUS;
+      this.cullUniforms.uCullThreshold.value = this.cullBackSphere
+        ? -Daydream.DOT_SIZE / Daydream.SPHERE_RADIUS
+        : -2.0;
     }
 
     this.renderer.setScissorTest(true);

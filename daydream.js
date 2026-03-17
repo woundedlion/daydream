@@ -346,6 +346,7 @@ applyResolution(true);
 
 guiInstance.add(daydream, 'labelAxes').name('Show Axes');
 guiInstance.add(daydream, 'cullBackLabels').name('Cull Back Labels');
+guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere');
 
 // Video recording
 const REC_RESOLUTIONS = { 'Native': null, '720p': 720, '1080p': 1080 };
