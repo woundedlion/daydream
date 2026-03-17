@@ -490,7 +490,7 @@ export class Daydream {
 
     if (effect && effect.getArenaMetrics) {
       const m = effect.getArenaMetrics();
-      const fmt = (x) => `${(x.usage / 1024).toFixed(1)} - ${(x.high_water_mark / 1024).toFixed(1)} / ${(x.capacity / 1024).toFixed(0)} KB`;
+      const fmt = (x) => `${(x.usage / 1024).toFixed(1)} - ${(x.high_water_mark / 1024).toFixed(1)} / ${(x.capacity / 1024).toFixed(0)}`;
 
       const updateRow = (elements, val) => {
         const text = fmt(val);
@@ -501,7 +501,7 @@ export class Daydream {
       updateRow(this._statsGroup.scratchB, m.scratch_arena_b);
       updateRow(this._statsGroup.persist, m.persistent_arena);
       if (m.stack) {
-        const stackText = `${(m.stack.high_water_mark / 1024).toFixed(1)} / ${(m.stack.capacity / 1024).toFixed(0)} KB`;
+        const stackText = `${(m.stack.high_water_mark / 1024).toFixed(1)} / ${(m.stack.capacity / 1024).toFixed(0)}`;
         this._statsGroup.stack.forEach(el => { if (el) el.textContent = stackText; });
       }
     }
