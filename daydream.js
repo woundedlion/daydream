@@ -349,7 +349,8 @@ guiInstance.add(daydream, 'cullBackLabels').name('Cull Back Labels');
 
 // Video recording
 const REC_RESOLUTIONS = { 'Native': null, '720p': 720, '1080p': 1080 };
-const recSettings = { _quality: 16, _resolution: 'Native' };
+const REC_FORMATS = { 'Auto': 'auto', 'MP4': 'mp4', 'WebM': 'webm' };
+const recSettings = { _quality: 16, _resolution: 'Native', _format: 'Auto' };
 Object.defineProperty(recSettings, 'quality', {
   get() { return this._quality; },
   set(v) {
@@ -368,6 +369,14 @@ Object.defineProperty(recSettings, 'recResolution', {
 });
 guiInstance.add(recSettings, 'quality', 1, 20, 1).name('Rec Quality (Mbps)');
 guiInstance.add(recSettings, 'recResolution', Object.keys(REC_RESOLUTIONS)).name('Rec Resolution');
+Object.defineProperty(recSettings, 'recFormat', {
+  get() { return this._format; },
+  set(v) {
+    this._format = v;
+    if (recorder) recorder.format = REC_FORMATS[v];
+  }
+});
+guiInstance.add(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
 
 // Duration readout element
 const durationEl = document.createElement('div');
