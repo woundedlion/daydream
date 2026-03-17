@@ -49,10 +49,11 @@ class DeepLinkGUI {
 
   add(object, prop, ...args) {
     const key = this._getKey(prop);
+    const isFunction = typeof object[prop] === 'function';
 
-    // 1. Load initial value from URL
+    // 1. Load initial value from URL (skip for buttons)
     const params = getUrlParams();
-    if (params.has(key)) {
+    if (!isFunction && params.has(key)) {
       let val = params.get(key);
       const currentVal = object[prop];
       if (typeof currentVal === 'number') {
@@ -66,13 +67,15 @@ class DeepLinkGUI {
     // 2. Create Controller
     const controller = this.gui.add(object, prop, ...args);
 
-    // 3. Attach URL/State Listener (Only triggers on UI change)
-    controller.onChange((v) => {
-      setUrlParam(key, v);
-    });
+    // 3. Attach URL/State Listener (skip for buttons)
+    if (!isFunction) {
+      controller.onChange((v) => {
+        setUrlParam(key, v);
+      });
+    }
 
     // 4. Update Display
-    if (params.has(key)) {
+    if (!isFunction && params.has(key)) {
       try { controller.updateDisplay(); } catch (e) { }
     }
 

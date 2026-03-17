@@ -428,17 +428,13 @@
       get(t) {
         const PI2 = TWO_PI;
 
-        // Calculate R, G, B values
-        const r = this.a[0] + this.b[0] * Math.cos(PI2 * (this.c[0] * t + this.d[0]));
-        const g = this.a[1] + this.b[1] * Math.cos(PI2 * (this.c[1] * t + this.d[1]));
-        const b = this.a[2] + this.b[2] * Math.cos(PI2 * (this.c[2] * t + this.d[2]));
+        // Calculate sRGB values from cosine formula
+        const r = Math.max(0, Math.min(1, this.a[0] + this.b[0] * Math.cos(PI2 * (this.c[0] * t + this.d[0]))));
+        const g = Math.max(0, Math.min(1, this.a[1] + this.b[1] * Math.cos(PI2 * (this.c[1] * t + this.d[1]))));
+        const b = Math.max(0, Math.min(1, this.a[2] + this.b[2] * Math.cos(PI2 * (this.c[2] * t + this.d[2]))));
 
-        // Clamp values to the valid [0, 1] range before returning
-        return [
-          Math.max(0, Math.min(1, r)),
-          Math.max(0, Math.min(1, g)),
-          Math.max(0, Math.min(1, b))
-        ];
+        // Convert sRGB -> Linear to match C++ pipeline and GenerativePalette
+        return [srgbToLinearFloat(r), srgbToLinearFloat(g), srgbToLinearFloat(b)];
       }
 
       getChannelValue(t, channelIndex) {
@@ -520,6 +516,91 @@
     function srgbToLinear(srgb) {
       const s = srgb / 255.0;
       return (s <= 0.04045) ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    }
+
+    // sRGB float [0,1] -> Linear float [0,1]
+    function srgbToLinearFloat(s) {
+      return (s <= 0.04045) ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    }
+
+    // Linear float [0,1] -> sRGB float [0,1]
+    function linearToSrgbFloat(l) {
+      return (l <= 0.0031308) ? l * 12.92 : 1.055 * Math.pow(l, 1.0 / 2.4) - 0.055;
+    }
+
+    // ---- OKLab / OKLCH Color Space (Björn Ottosson, 2020) ----
+
+    function linearRgbToOklab(r, g, b) {
+      const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+      const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+      const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+      const l_ = Math.cbrt(l), m_ = Math.cbrt(m), s_ = Math.cbrt(s);
+      return {
+        L: 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+        a: 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+        b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
+      };
+    }
+
+    function oklabToLinearRgb(lab) {
+      const l_ = lab.L + 0.3963377774 * lab.a + 0.2158037573 * lab.b;
+      const m_ = lab.L - 0.1055613458 * lab.a - 0.0638541728 * lab.b;
+      const s_ = lab.L - 0.0894841775 * lab.a - 1.2914855480 * lab.b;
+      const l = l_ * l_ * l_, m = m_ * m_ * m_, s = s_ * s_ * s_;
+      return {
+        r: +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+        g: -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+        b: -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
+      };
+    }
+
+    function oklabToOklch(lab) {
+      return {
+        L: lab.L,
+        C: Math.sqrt(lab.a * lab.a + lab.b * lab.b),
+        h: Math.atan2(lab.b, lab.a)
+      };
+    }
+
+    function oklchToOklab(lch) {
+      return { L: lch.L, a: lch.C * Math.cos(lch.h), b: lch.C * Math.sin(lch.h) };
+    }
+
+    // sRGB [0-255] -> OKLCH
+    function srgbToOklch(r, g, b) {
+      return oklabToOklch(linearRgbToOklab(
+        srgbToLinearFloat(r / 255.0),
+        srgbToLinearFloat(g / 255.0),
+        srgbToLinearFloat(b / 255.0)
+      ));
+    }
+
+    // Interpolate two OKLCH colors (shortest-arc hue)
+    function lerpOklch(a, b, t) {
+      let h;
+      if (a.C < 1e-4 && b.C < 1e-4) {
+        h = 0;
+      } else if (a.C < 1e-4) {
+        h = b.h;
+      } else if (b.C < 1e-4) {
+        h = a.h;
+      } else {
+        let dh = b.h - a.h;
+        if (dh > Math.PI) dh -= 2 * Math.PI;
+        if (dh < -Math.PI) dh += 2 * Math.PI;
+        h = a.h + dh * t;
+      }
+      return { L: a.L + (b.L - a.L) * t, C: a.C + (b.C - a.C) * t, h };
+    }
+
+    // OKLCH -> linear RGB [0,1] (gamut-clamped)
+    function oklchToLinearRgb(lch) {
+      const rgb = oklabToLinearRgb(oklchToOklab(lch));
+      return [
+        Math.max(0, Math.min(1, rgb.r)),
+        Math.max(0, Math.min(1, rgb.g)),
+        Math.max(0, Math.min(1, rgb.b))
+      ];
     }
 
     class GenerativePalette {
@@ -664,17 +745,15 @@
 
         const dist = end - start;
         if (dist < 0.0001) {
-          return [srgbToLinear(c1.r), srgbToLinear(c1.g), srgbToLinear(c1.b)];
+          return [srgbToLinearFloat(c1.r / 255), srgbToLinearFloat(c1.g / 255), srgbToLinearFloat(c1.b / 255)];
         }
 
         const p = Math.max(0, Math.min(1, (t - start) / dist));
 
-        const rVal = lerp8(c1.r, c2.r, p);
-        const gVal = lerp8(c1.g, c2.g, p);
-        const bVal = lerp8(c1.b, c2.b, p);
-
-        // Convert to linear 0..1 to match procedurals format
-        return [srgbToLinear(rVal), srgbToLinear(gVal), srgbToLinear(bVal)];
+        // Interpolate in OKLCH for perceptually uniform gradients
+        const lch1 = srgbToOklch(c1.r, c1.g, c1.b);
+        const lch2 = srgbToOklch(c2.r, c2.g, c2.b);
+        return oklchToLinearRgb(lerpOklch(lch1, lch2, p));
       }
 
       getChannelValue(t, channelIndex) {
@@ -740,12 +819,11 @@
     // --- Helper Functions ---
 
     /**
-         * Converts float RGB [0, 1] to a HEX string.
+         * Converts linear RGB [0, 1] to a HEX string (applies linear→sRGB).
          */
-    function rgbToHex(r, g, b) {
+    function linearRgbToHex(r, g, b) {
       const toHex = (c) => {
-        const i = Math.round(c * 255);
-        // Clamp value to 0-255, convert to hex, and pad with '0' if needed
+        const i = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, c))) * 255);
         const hex = Math.max(0, Math.min(255, i)).toString(16);
         return hex.length === 1 ? "0" + hex : hex;
       };
@@ -1177,9 +1255,9 @@
         const tx = x / (width - 1);
         const [r, g, b] = palette.get(tx); // Get color in [0, 1] range
 
-        const rInt = Math.round(r * 255);
-        const gInt = Math.round(g * 255);
-        const bInt = Math.round(b * 255);
+        const rInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, r))) * 255);
+        const gInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, g))) * 255);
+        const bInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, b))) * 255);
 
         for (let y = 0; y < height; y++) {
           const index = (y * width + x) * 4;
@@ -1304,7 +1382,7 @@
       if (!palette || !colorSwatch) return; // Safety check
 
       const [r, g, b] = palette.get(animationTime);
-      const hex = rgbToHex(r, g, b); // Get the hex code
+      const hex = linearRgbToHex(r, g, b); // Get the hex code
 
       colorSwatch.style.backgroundColor = hex;
 
@@ -1371,7 +1449,7 @@
         const sat = document.getElementById('gen_saturation').value;
         const hueValue = parseInt(document.getElementById('gen_seed_slider').value);
 
-        const codeString = `GenerativePalette(GradientShape::${shape}, HarmonyType::${harmony},\n                  BrightnessProfile::${brightness}, SaturationProfile::${sat}, ${hueValue})`;
+        const codeString = `GenerativePalette palette{\n    GradientShape::${shape}, HarmonyType::${harmony},\n    BrightnessProfile::${brightness}, SaturationProfile::${sat}, ${hueValue}};`;
         codeOutput.textContent = codeString;
       }
     }

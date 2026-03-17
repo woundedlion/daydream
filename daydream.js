@@ -9,6 +9,7 @@ import { Daydream } from "./driver.js";
 import { GUI, resetGUI } from "gui";
 import { EffectSidebar } from "./sidebar.js";
 import { AppState, URLSync } from "./state.js";
+import { VideoRecorder } from "./recorder.js";
 
 import { SRGBColorSpace } from "three";
 
@@ -80,6 +81,7 @@ let wasmModule = null;
 let wasmEngine = null;
 let wasmMemoryView = null;
 let wasmAdapter = null;
+const recorder = new VideoRecorder(document.querySelector('#canvas-container canvas') || document.createElement('canvas'));
 
 // Guard WASM memory view — spec-correct detached buffer check
 function refreshPixelView() {
@@ -161,6 +163,10 @@ function applyEffect(preserveParams = false) {
 
     // Get Params from C++
     const params = wasmEngine.getParameterDefinitions();
+
+    // Reset button at top of effect folder
+    const effectActions = { reset() { applyEffect(); } };
+    activeEffect.gui.add(effectActions, 'reset').name('Reset Defaults');
 
     // Build GUI
     const state = {};
@@ -286,6 +292,10 @@ createHolosphereModule().then(module => {
 
   console.log("Wasm Engine Loaded");
 
+  // Wire recorder to the actual canvas now that daydream is ready
+  recorder.canvas = daydream.canvas;
+  daydream.recorder = recorder;
+
   // Remove loading overlay
   const loadingOverlay = document.getElementById('loading-overlay');
   if (loadingOverlay) loadingOverlay.remove();
@@ -330,23 +340,65 @@ guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => 
   }
 });
 
-guiInstance.add({
-  resetDefaults: () => {
-    resetGUI(['resolution', 'effect']);
-    applyEffect();
-  }
-}, 'resetDefaults').name('Reset Defaults');
 
 // Initial resolution setup (will be re-run after WASM loads)
 applyResolution(true);
 
 guiInstance.add(daydream, 'labelAxes').name('Show Axes');
 guiInstance.add(daydream, 'cullBackLabels').name('Cull Back Labels');
+
+// Video recording
+const REC_RESOLUTIONS = { 'Native': null, '720p': 720, '1080p': 1080 };
+const recSettings = { _quality: 16, _resolution: 'Native' };
+Object.defineProperty(recSettings, 'quality', {
+  get() { return this._quality; },
+  set(v) {
+    this._quality = v;
+    if (recorder) recorder.bitrateMbps = v;
+  }
+});
+Object.defineProperty(recSettings, 'recResolution', {
+  get() { return this._resolution; },
+  set(v) {
+    this._resolution = v;
+    if (recorder) {
+      recorder.targetHeight = REC_RESOLUTIONS[v];
+    }
+  }
+});
+guiInstance.add(recSettings, 'quality', 1, 20, 1).name('Rec Quality (Mbps)');
+guiInstance.add(recSettings, 'recResolution', Object.keys(REC_RESOLUTIONS)).name('Rec Resolution');
+
+// Duration readout element
+const durationEl = document.createElement('div');
+durationEl.className = 'rec-duration';
+durationEl.style.display = 'none';
+document.getElementById('canvas-container')?.appendChild(durationEl);
+
+const recordState = { record: () => {
+  if (!recorder) return;
+  const canvasEl = document.getElementById('canvas-container');
+  const nowRecording = recorder.toggle(appState.get('effect'));
+  if (nowRecording) {
+    canvasEl?.classList.add('recording');
+    durationEl.style.display = '';
+    recordCtrl.name('■ Stop');
+  } else {
+    canvasEl?.classList.remove('recording');
+    durationEl.style.display = 'none';
+    recordCtrl.name('● Record');
+  }
+}};
+const recordCtrl = guiInstance.add(recordState, 'record').name('● Record');
 window.addEventListener("keydown", (e) => daydream.keydown(e));
 
 daydream.renderer.setAnimationLoop(() => {
   if (wasmAdapter) {
     daydream.renderer.outputColorSpace = SRGBColorSpace;
     daydream.render(wasmAdapter);
+  }
+  // Update duration readout
+  if (recorder?.isRecording) {
+    durationEl.textContent = recorder.elapsedFormatted;
   }
 });
