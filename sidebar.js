@@ -42,9 +42,24 @@ export class EffectSidebar {
     this.listEl.className = 'effect-list';
     this.listEl.addEventListener('keydown', (e) => this._onKeyDown(e));
 
+    // Scroll arrow indicators (mobile horizontal scroll)
+    this.arrowLeft = document.createElement('div');
+    this.arrowLeft.className = 'scroll-arrow scroll-arrow-left';
+    this.arrowLeft.textContent = '\u2039';
+
+    this.arrowRight = document.createElement('div');
+    this.arrowRight.className = 'scroll-arrow scroll-arrow-right';
+    this.arrowRight.textContent = '\u203A';
+
+    this.listEl.addEventListener('scroll', () => this._updateScrollArrows(), { passive: true });
+    this._resizeObs = new ResizeObserver(() => this._updateScrollArrows());
+    this._resizeObs.observe(this.listEl);
+
     this.container.appendChild(this.heading);
     this.container.appendChild(this.sortRow);
     this.container.appendChild(this.listEl);
+    this.container.appendChild(this.arrowLeft);
+    this.container.appendChild(this.arrowRight);
   }
 
   /** Create buttons once for the given effect names and sizes. */
@@ -81,6 +96,8 @@ export class EffectSidebar {
 
     this._applySortOrder();
     this._updateActiveClass();
+    // Defer so the grid has laid out before we measure scroll extents
+    requestAnimationFrame(() => this._updateScrollArrows());
   }
 
   /** Toggle .active class on old and new button only. */
@@ -93,7 +110,7 @@ export class EffectSidebar {
     const newBtn = this.buttons.get(name);
     if (newBtn) {
       newBtn.classList.add('active');
-      newBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      newBtn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
     }
   }
 
@@ -170,5 +187,18 @@ export class EffectSidebar {
         this.onSelect(focused.dataset.effect);
       }
     }
+  }
+
+  /** Show/hide scroll arrows based on current scroll position. */
+  _updateScrollArrows() {
+    const el = this.listEl;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    if (maxScroll <= 0) {
+      this.arrowLeft.classList.remove('visible');
+      this.arrowRight.classList.remove('visible');
+      return;
+    }
+    this.arrowLeft.classList.toggle('visible', el.scrollLeft > 4);
+    this.arrowRight.classList.toggle('visible', el.scrollLeft < maxScroll - 4);
   }
 }

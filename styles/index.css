@@ -170,6 +170,11 @@
   to { transform: rotate(360deg); }
 }
 
+/* Scroll arrows — hidden on desktop, styled only in mobile media query */
+.scroll-arrow {
+  display: none;
+}
+
 /* Effect list container (keyboard nav scope) */
 .effect-list {
   display: flex;
@@ -378,17 +383,17 @@
   }
 
   .effect-sidebar {
+    position: relative;
     width: 100%;
     max-width: none;
     min-width: 0;
     height: auto;
-    max-height: 40vh;
     border-right: none;
     border-bottom: 1px solid #333;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-content: flex-start;
-    gap: 2px;
+    flex-direction: column;
+    gap: 0;
+    padding: 6px 0;
+    overflow: visible;
   }
 
   .effect-sidebar-heading {
@@ -397,9 +402,53 @@
 
   .effect-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    grid-template-rows: repeat(8, auto);
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(110px, max-content);
     gap: 2px;
     width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+    padding: 0 6px;
+  }
+
+  .effect-list::-webkit-scrollbar {
+    display: none; /* Chrome / Safari */
+  }
+
+  /* Scroll arrow indicators */
+  .scroll-arrow {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 18px;
+    font-family: Arial, sans-serif;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 60;
+    user-select: none;
+  }
+
+  .scroll-arrow.visible {
+    opacity: 1;
+  }
+
+  .scroll-arrow-left {
+    left: 0;
+    background: linear-gradient(to right, rgba(20, 20, 20, 0.95), transparent);
+  }
+
+  .scroll-arrow-right {
+    right: 0;
+    background: linear-gradient(to left, rgba(20, 20, 20, 0.95), transparent);
   }
 
   .effect-button {
