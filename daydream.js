@@ -166,9 +166,25 @@ function applyEffect(preserveParams = false) {
     // Get Params from C++
     const params = wasmEngine.getParameterDefinitions();
 
-    // Reset button at top of effect folder
-    const effectActions = { reset() { applyEffect(); } };
-    activeEffect.gui.add(effectActions, 'reset').name('Reset Defaults');
+    // Reset + Export buttons at top of effect folder
+    const effectActions = {
+      reset() { applyEffect(); },
+      export() {
+        const values = wasmEngine.getParamValues();
+        const items = [];
+        for (let i = 0; i < params.length; i++) {
+          const v = (i < values.length) ? values[i] : 0;
+          items.push(v.toFixed(4) + 'f');
+        }
+        const cpp = '{ ' + items.join(', ') + ' }';
+        navigator.clipboard.writeText(cpp).then(() => {
+          exportCtrl.name('✓ Copied!');
+          setTimeout(() => exportCtrl.name('Export'), 1500);
+        });
+      }
+    };
+    activeEffect.gui.add(effectActions, 'reset').name('Reset');
+    const exportCtrl = activeEffect.gui.add(effectActions, 'export').name('Export');
 
     // Build GUI
     const state = {};
