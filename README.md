@@ -131,7 +131,6 @@ IOMUXC_SW_PAD_CTL_PAD_GPIO_B0_03 &= ~IOMUXC_PAD_SRE;  // Pin 13 (CLOCK)
 │   ├── IslamicStars.h
 │   ├── Liquid2D.h
 │   ├── Raymarch.h
-
 │   ├── MeshFeedback.h
 │   ├── Metaballs.h
 │   ├── MindSplatter.h
@@ -709,9 +708,12 @@ Available transformers:
 | `MobiusWarpGnomonicTransformer` | Möbius via gnomonic projection (preserves straight lines in hemisphere) |
 | `NoiseTransformer` | Distorts surface positions with 3D simplex noise |
 | `OrientTransformer` | Applies an `Orientation` quaternion rotation to all vertices |
-| `StereoNoiseWarp` | Stereographic-space noise warp with pole attenuation. Projects a sphere point to the complex plane via `stereo()`, adds FastNoiseLite-driven displacement, then reprojects. Returns a `StereoWarpResult` (warped coordinates + displacement magnitude for hue shift). Used by Liquid2D and Flyby. |
 
 Transformers integrate with the `MeshOps::transform()` pipeline and can be chained: `MeshOps::transform(input, output, arena, ripple_transformer, orient_transformer)`.
+
+#### Standalone Utilities
+
+`stereo_noise_warp()` (`transformers.h`) is a free function, not a `Transformer<>` specialization — it is called directly by effects rather than managed through the transformer pool. It projects a sphere point to the complex plane via `stereo()`, adds FastNoiseLite-driven displacement with pole attenuation, then reprojects. Returns a `StereoWarpResult` containing the warped coordinates and displacement magnitude (used for hue shift by Liquid2D and Flyby).
 
 ### 6.5 Memory Architecture (`memory.h`, `memory.cpp`)
 
