@@ -178,7 +178,7 @@ template <int W, int H> class HopfFibration : public Effect { ... };
 template <int W, int H, typename... Filters> struct Pipeline { ... };
 ```
 
-This means the compiler generates fully specialized, zero-overhead versions of the entire pipeline for each supported resolution. The hardware runs `<96, 20>` (96 columns × 20 rows). The simulator supports `<96, 20>` and `<288, 144>`.
+This means the compiler generates fully specialized, zero-overhead versions of the entire pipeline for each supported resolution. The original Holosphere runs `<96, 20>` (96 columns × 20 rows). The new art piece runs `<288, 144>`. The simulator supports both resolutions.
 
 The `platform.h` header abstracts all target-specific differences:
 
@@ -254,6 +254,64 @@ JS:  wasmEngine.getPixels()
 ---
 
 ## 5. The Rendering Pipeline
+
+### End-to-End Flow
+
+A typical effect frame follows a four-stage pipeline. Not every effect uses every stage — some skip generation entirely, others skip transformations — but the available primitives compose along this flow:
+
+```
+┌─────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│  Generate   │     │  Transform   │     │  Rasterize   │     │   Filter     │
+│             │ ──▸ │              │ ──▸ │              │ ──▸ │   Pipeline   │
+│ geometry.h  │     │transformers.h│     │ sdf.h/scan.h │     │  filter.h    │
+│ solids.h    │     │              │     │ plot.h       │     │              │
+│ generators.h│     │              │     │              │     │              │
+└─────────────┘     └──────────────┘     └──────────────┘     └──────────────┘
+
+  Solids::get()      MeshOps::transform    Scan::Mesh::draw     Pipeline<W,H,
+  MeshOps::hankin    RippleTransformer      Scan::Ring::draw       Orient,
+  generate(arena,fn) NoiseTransformer       Plot::SplineChain      AntiAlias,
+  ParticleSystem     OrientTransformer      Scan::Shader::draw     Feedback>
+```
+
+**Generate**: Create or update geometry — mesh from the solids registry, Hankin pattern compilation, Fibonacci lattice for reaction-diffusion, or particle positions from physics. The `generate()` wrapper manages arena lifecycle.
+
+**Transform**: Deform geometry in world space — ripple wavelets, noise displacement, Möbius warps, quaternion rotation. `MeshOps::transform()` chains transformers: `transform(input, output, arena, ripple, orient)`.
+
+**Rasterize**: Convert geometry to pixels. Two families:
+- **SDF path** (`sdf.h` → `scan.h`): analytic shapes with scanline intervals and `quintic_kernel` anti-aliasing
+- **Plot path** (`plot.h`): line/curve rasterization with adaptive step size scaled by `sin(φ)` for uniform sampling
+- **Shader path** (`Scan::Shader`): full-screen per-pixel evaluation with optional SSAA
+
+**Filter**: The `Pipeline<W, H, Filters...>` variadic template processes each plotted point through a chain of filter stages before it reaches the canvas.
+
+### Pipeline Domain Transitions
+
+The filter pipeline operates across three coordinate domains. Each filter declares which domain it works in, and the pipeline automatically converts between them at compile time:
+
+```
+          World Space                Screen Space             Pixel Space
+     (3D unit-sphere vectors)     (fractional x, y)       (integer x, y)
+    ┌──────────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+    │ World::Orient        │    │ Screen::AntiAlias│    │ Pixel::Feedback │
+    │ World::Trails        │──▸ │ Screen::Blur     │──▸ │ Pixel::Chromatic│
+    │ World::Replicate     │    │ Screen::Trails   │    │   Shift         │
+    │ World::Mobius        │    │                  │    │                 │
+    │ World::Hole          │    │                  │    │                 │
+    └──────────────────────┘    └─────────────────┘    └─────────────────┘
+    Coordinate: Vector(x,y,z)   Coordinate: float x,y   Coordinate: int x,y
+
+         vector_to_pixel() ──▸         floor/clamp ──▸
+    ◂── pixel_to_vector()         ◂── expand to float
+```
+
+**World → Screen**: `vector_to_pixel()` projects a 3D unit-sphere vector to fractional pixel coordinates via `(theta / 2π * W, phi / π * H)`.
+
+**Screen → Pixel**: `AntiAlias` distributes the fractional coordinate to its 4 nearest integer pixels using `quintic_kernel` bilinear weights, with `sin(φ)` density compensation.
+
+**Pixel → Canvas**: The base `Pipeline<W,H>` (the identity terminal) blends the final color into `canvas(x, y)` using the active blend mode.
+
+**World filters** operate on the 3D vector before projection — they can rotate, replicate, or warp geometry in spherical coordinates without loss. **Screen filters** operate after projection but before integer snapping — they distribute sub-pixel energy for anti-aliasing and blur. **Pixel filters** operate per-frame on the full canvas — feedback and chromatic aberration read from the previous frame buffer.
 
 ### The Canvas
 
@@ -489,6 +547,43 @@ Two traversal helpers linearize multi-level orientation history into a single ca
 |---|---|---|
 | `tween(orientation, callback)` | `Orientation<W>` | Iterates over the sub-frame quaternion history of a single orientation, calling `callback(quaternion, t)` for each step with `t ∈ [0, 1]`. Used by `World::Orient` to distribute motion blur. |
 | `deep_tween(trail, callback)` | Any `Tweenable` (`Orientation` or `OrientationTrail`) | Flattens a trail of orientations into a single continuous traversal, calling `callback(quaternion, t)` with a global `t` spanning all frames and sub-frames. Used by `Plot::Mesh::Particle` for rendering trails with full sub-frame accuracy. |
+
+#### Animations and Mutable State
+
+Animations do not render directly — they mutate external state that the rendering pipeline reads. Each animation type targets a specific kind of mutable variable:
+
+| Animation | Target State | What It Mutates |
+|---|---|---|
+| `Rotation`, `RandomWalk`, `Motion` | `Orientation<W>` | Quaternion orientation — pushes sub-frame steps into the orientation history, which `World::Orient` reads for motion blur |
+| `Transition` | `float*` | Smoothly interpolates any float parameter (e.g. `speed`, `alpha`, `twist`) from current value to target with easing |
+| `Mutation` | `float*` | Applies an arbitrary scalar function `f(t)` to a float over time (more general than `Transition`) |
+| `Driver` | `float*` | Continuously increments a float each frame, wrapping at 0..1 — used for phase accumulators |
+| `Lerp` | `T*` (type-erased) | Interpolates any type with a `lerp()` function — `MeshState`, params structs, etc. The caller owns start, subject, and target; Lerp holds pointers |
+| `ColorWipe` | `GenerativePalette*` | Interpolates palette coefficients toward a target palette using `lerp_oklch_srgb` |
+| `Ripple`, `MobiusWarp`, `Noise` | `TransformerParams` | Animate transformer parameters (expansion radius, warp strength, noise scale) which the transformer pool reads during `MeshOps::transform()` |
+| `ParticleSystem` | `Vector[]` positions | Physics simulation updates particle positions; `VectorTrail` records history for trail rendering |
+
+This separation means effects declare *what state exists* (orientations, floats, palettes) and *what animations drive that state* (rotations, transitions, drivers), but never manually interpolate or update values per-frame. The `Timeline` handles all timing, easing, sequencing, and cleanup:
+
+```cpp
+// Effect declares mutable state:
+Orientation<W> orientation;
+float twist = 0.0f;
+GenerativePalette palette;
+
+// Timeline drives state via animations:
+timeline.add(0, Animation::Rotation<W>(orientation, Y_AXIS, TAU, 600, ease_mid, true));
+timeline.add(0, Animation::Transition(twist, 2.5f, 1000, easing::cubic_in_out));
+timeline.add(0, Animation::ColorWipe(palette, target_palette, 2000));
+
+// Rendering reads state — no manual updates needed:
+void draw_frame() {
+    Canvas canvas(*this);
+    timeline.step(canvas);  // all state updated automatically
+    // orientation, twist, palette are now current-frame values
+    filters.plot(canvas, v, palette.get(t), ...);
+}
+```
 
 ### 6.4 Geometry Transformers (`transformers.h`)
 
