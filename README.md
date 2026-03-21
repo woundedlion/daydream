@@ -22,14 +22,25 @@ A persistence-of-vision (POV) LED sphere and its real-time simulator. The device
 
 ## 1. Hardware
 
+Two physical targets share the same rendering engine:
+
+### Holosphere (2015)
+
 | Component | Detail |
 |---|---|
 | Controller | Teensy 4.1 (600 MHz ARM Cortex-M7) |
-| LEDs | 96-pixel addressable strip (40 physical pixels exposed per half-arm) |
+| LEDs | 40-pixel addressable strip (20 per half-arm, two-arm rotation) |
 | Protocol | SPI via FastLED (WS2801 at 6 MHz) or DMA (HD107S at 12 MHz) |
 | Rotation | 480 RPM (8 revolutions/second) |
-| Virtual resolution | 96 columns × 20 rows (hardware), up to 288×144 (WASM simulator) |
+| Virtual resolution | 96 × 20 |
 | Pin assignments | DATA: pin 11, CLOCK: pin 13, RANDOM seed: analog pin 15 |
+
+### New Art Piece
+
+| Component | Detail |
+|---|---|
+| LEDs | 2 × 144-pixel strips around the ring |
+| Virtual resolution | 288 × 144 (effect-dependent horizontal; most use 288) |
 
 The POV effect works because each revolution takes ~125 ms and the ISR fires every `1,000,000 / (RPM/60) / width` microseconds to advance one column. The LED strip is mounted on both sides of a rotating arm: the top half of the strip handles one hemisphere and the bottom half handles the opposite hemisphere, so one full revolution paints a complete sphere.
 
@@ -81,9 +92,9 @@ IOMUXC_SW_PAD_CTL_PAD_GPIO_B0_03 &= ~IOMUXC_PAD_SRE;  // Pin 13 (CLOCK)
 ├── hankin.h                Hankin pattern compilation and update system
 ├── solids.h                Platonic + Archimedean + Catalan + Islamic solid registry
 ├── spatial.h               AABB, KDTree, k-nearest-neighbor, MeshState
-├── static_circular_buffer.h Lock-free fixed-capacity circular buffer
+├── static_circular_buffer.h Fixed-capacity non-allocating circular buffer
 ├── rotate.h                Quaternion projection helpers
-├── generators.h            IGenerator<T> and IMeshGenerator interfaces + solid generators
+├── generators.h            Universal `generate()` wrapper for procedural geometry creation
 ├── presets.h               Generic Presets<Params, Size> template for preset management
 ├── util.h                  wrap(), fast_wrap(), clamp()
 │
@@ -115,7 +126,6 @@ IOMUXC_SW_PAD_CTL_PAD_GPIO_B0_03 &= ~IOMUXC_PAD_SRE;  // Pin 13 (CLOCK)
 │   ├── RingShower.h
 │   ├── RingSpin.h
 │   ├── SphericalHarmonics.h
-│   ├── SpinShapes.h
 │   ├── SplineFlow.h
 │   ├── Thrusters.h
 │   ├── Voronoi.h
@@ -177,7 +187,7 @@ The `platform.h` header abstracts all target-specific differences:
 | `DMAMEM` | Teensy DMA-accessible RAM segment | No-op macro |
 | `hs::log()` | `Serial.println()` | `std::cout` |
 | `hs::millis()` | `::millis()` | `std::chrono` |
-| `hs::rand_f()` | `random()` | `std::rand()` |
+| `hs::rand_f()` | `random()` | `std::mt19937` |
 | `hs::disable_interrupts()` | `noInterrupts()` | No-op |
 | `CRGB`, `CHSV` | FastLED types | Struct mocks |
 
@@ -208,7 +218,7 @@ POVDisplay<S,RPM>::show<Effect>()
                                            [new frame begins displaying]
 ```
 
-Three volatile indices manage the double buffer:
+Three `std::atomic<int>` indices manage the double buffer:
 
 | Index | Role |
 |---|---|
@@ -299,7 +309,7 @@ The pipeline handles the 3D/2D coordinate mismatch automatically at compile time
 
 | Filter | Effect |
 |---|---|
-| `Screen::AntiAlias<W,H>` | Distributes a sub-pixel coordinate to its 4 nearest integer pixels using `quintic_kernel` bilinear weights. |
+| `Screen::AntiAlias<W,H>` | Distributes a sub-pixel coordinate to its 4 nearest integer pixels using `quintic_kernel` bilinear weights. Scales the X fractional by `sin(φ)` from a trig LUT for spherical density compensation near the poles. |
 | `Screen::Blur<W, H>` | Applies a parameterized 3×3 Gaussian convolution kernel at plot time. |
 | `Screen::Trails<W>` | Screen-space variant of trail decay; stores 2D coordinates with TTL and redraws via a trail color function. Uses arena-allocated storage. |
 
@@ -307,7 +317,7 @@ The pipeline handles the 3D/2D coordinate mismatch automatically at compile time
 
 | Filter | Effect |
 |---|---|
-| `Pixel::Feedback<W, H, SpaceTransformFn>` | Full-screen feedback loop. Samples the previous frame from the Canvas front buffer with bilinear interpolation, applies a 3D spatial transformation (e.g. NoiseTransformer) and fade, then blends into the back buffer. Stateless — uses Canvas double-buffering, no internal frame storage needed. |
+| `Pixel::Feedback<W, H, SpaceTransformFn, ColorTransformFn>` | Full-screen feedback loop. Samples the previous frame from the Canvas front buffer with bilinear interpolation, applies a 3D spatial transformation (e.g. NoiseTransformer) and fade, then blends into the back buffer. The optional `ColorTransformFn` (default: identity) transforms each sampled pixel — used by `MeshFeedback` for `HueShiftFade`. Stateless — uses Canvas double-buffering, no internal frame storage needed. |
 | `Pixel::ChromaticShift<W>` | Splits a pixel into R, G, B channels and offsets them by 1–3 pixels horizontally to simulate chromatic aberration. |
 
 #### Combining Filters
@@ -388,7 +398,7 @@ Convenience structs that construct an SDF shape and rasterize in a single `draw(
 | `Scan::SphericalPolygon` | Regular N-gon with geodesic (great-circle) edges |
 | `Scan::HarmonicBlob` | Spherical harmonic shape |
 | `Scan::Mesh` | Rasterizes all faces of a `MeshState` or `PolyMesh` |
-| `Scan::Shader` | Full-screen per-pixel shader with configurable SSAA (super-sample anti-aliasing). Accepts a fragment shader callback and optional vertex shader. |
+| `Scan::Shader` | Full-screen per-pixel shader with configurable SSAA (super-sample anti-aliasing). The single-callback overload accepts a fragment shader. The two-callback overload separates a per-pixel vertex shader (called once at pixel center) from a per-subsample fragment shader (called SAMPLES×) — enabling efficient SSAA with expensive per-pixel work computed once (used by BZReactionDiffusion for 4× SSAA). |
 | `Scan::TransformedVolume` | Wraps an SDF shape with a world-space position and orientation quaternion for volumetric rendering |
 | `Scan::Volume` | Volumetric ray-marcher that steps along the view direction through a `TransformedVolume`, applying a fragment shader at the hit point with configurable step count and AA width |
 
@@ -402,7 +412,7 @@ Plot::Bezier::draw<W, H>(pipeline, canvas, p0, p1, p2, p3, fragment_shader);
 Plot::SplineChain::draw<W, H>(pipeline, canvas, control_points, tension, shader);
 ```
 
-All `Plot` primitives accept a `Fragments` array (an arena-backed `StaticCircularBuffer<Fragment>`) where each fragment carries position, texture registers (v0–v3), age, color, and blend mode. The rasterizer supports two interpolation strategies via `SplineMode`:
+All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<Fragment>`) where each fragment carries position, texture registers (v0–v3), age, color, and blend mode. The rasterizer supports two interpolation strategies via `SplineMode`:
 - **Geodesic**: great-circle arc between segment endpoints (default)
 - **Planar**: planar projection within the tangent plane of a basis (for effects that live in a 2D local space)
 
@@ -428,7 +438,7 @@ All `Plot` primitives accept a `Fragments` array (an arena-backed `StaticCircula
 
 ### 6.3 The Animation System (`animation.h`)
 
-The `Timeline<W>` class manages a list of running `IAnimation` objects. Each frame, `timeline.step(canvas)` advances all active animations. Finished animations are removed; repeating animations are rewound. All animation types inherit from `AnimationBase<Derived>` using CRTP for method chaining (e.g. `.then()` returns the derived type).
+The `Timeline<W>` class manages a list of running `IAnimation` objects. Each frame, `timeline.step(canvas)` advances all active animations. Finished animations are removed; repeating animations are rewound. All animation types inherit from `AnimationBase` and support method chaining via `.then()` for sequencing.
 
 #### Animation Types
 
@@ -449,6 +459,7 @@ The `Timeline<W>` class manages a list of running `IAnimation` objects. Each fra
 | `Ripple` | Animates a `RippleParams` to expand a Ricker wavelet across the sphere |
 | `MobiusWarp` | Animates `MobiusParams` to apply and release a Möbius transformation |
 | `Noise` | Animates `NoiseParams` over time for flowing distortion fields |
+| `MeshCarousel<W>` | Double-buffered mesh transition system with crossfade. Manages a pair of `MeshState` buffers and an `Animation::Lerp` to morph between shapes. Used by IslamicStars, MeshFeedback, and HankinSolids for smooth geometry transitions. |
 
 #### Orientation and Motion Blur
 
@@ -499,6 +510,7 @@ Available transformers:
 | `MobiusWarpGnomonicTransformer` | Möbius via gnomonic projection (preserves straight lines in hemisphere) |
 | `NoiseTransformer` | Distorts surface positions with 3D simplex noise |
 | `OrientTransformer` | Applies an `Orientation` quaternion rotation to all vertices |
+| `StereoNoiseWarp` | Stereographic-space noise warp with pole attenuation. Projects a sphere point to the complex plane via `stereo()`, adds FastNoiseLite-driven displacement, then reprojects. Returns a `StereoWarpResult` (warped coordinates + displacement magnitude for hue shift). Used by Liquid2D and Flyby. |
 
 Transformers integrate with the `MeshOps::transform()` pipeline and can be chained: `MeshOps::transform(input, output, arena, ripple_transformer, orient_transformer)`.
 
@@ -588,6 +600,58 @@ FastLED output ← CRGB(gamma encode) ← linear→sRGB ← Pixel16
 
 Twenty-one named `ProceduralPalette` instances are pre-defined: `darkRainbow`, `bloodStream`, `vintageSunset`, `richSunset`, `undersea`, `lateSunset`, `mangoPeel`, `iceMelt`, `lemonLime`, `algae`, `embers`, `fireGlow`, `darkPrimary`, `mauveFade`, `lavenderLake`, `desertRose`, `bruisedMoss`, `bruisedBanana`, `brightSunrise`, `fireAndIce`, and `peachPop`.
 
+#### OKLCH Perceptual Color
+
+All palette interpolation and procedural color generation is performed in the OKLCH perceptual color space. The pipeline:
+
+```
+Pixel (sRGB 16-bit) → linear RGB float → OKLab (L, a, b) → OKLCH (L, C, h)
+                                                                  ↓
+                                              shortest-arc hue interpolation
+                                                                  ↓
+                                    OKLCH → OKLab → linear RGB → Pixel
+```
+
+| Function | Description |
+|---|---|
+| `linear_rgb_to_oklab()` | Convert linear RGB to the OKLab perceptual space |
+| `oklab_to_oklch()` | Convert OKLab (rectangular) to OKLCH (polar: Lightness, Chroma, Hue) |
+| `lerp_oklch()` | Interpolate two OKLCH values with shortest-arc hue (avoids the red→green→blue detour) |
+| `lerp_oklch_srgb()` | Same as above but returns an sRGB `CPixel` (used by `GenerativePalette` transitions) |
+| `hue_rotate()` | Rodrigues hue rotation in linear RGB space — a single-axis rotation in the color cube. Used by `MeshFeedback`'s `HueShiftFade` and `Flyby`'s displacement-driven hue shift. |
+
+#### Palette Modifiers
+
+Seven modifier types compose with any palette source via `StaticPalette<Source, Mods...>` at compile time:
+
+| Modifier | Effect |
+|---|---|
+| `CycleModifier` | Shifts the lookup parameter by a continuously incrementing offset (palette scrolling) |
+| `BreatheModifier` | Oscillates the lookup parameter with a sinusoidal "breathing" envelope |
+| `RippleModifier` | Applies a wavelet distortion to the lookup parameter |
+| `FoldModifier` | Folds the parameter space (mirror at edges) to create ping-pong patterns |
+| `PinchModifier` | Non-linearly warps the lookup parameter toward a focal point |
+| `QuantizeModifier` | Posterizes the palette into discrete bands |
+| `ScaleModifier` | Scales and offsets the lookup parameter |
+
+```cpp
+// Compose a baked palette with a breathing modifier
+StaticPalette<BakedPalette, BreatheModifier> palette;
+```
+
+#### Additional Palette Types
+
+| Type | Description |
+|---|---|
+| `MutatingPalette` | Extends `ProceduralPalette` with continuous random coefficient mutation |
+| `AnimatedPalette` | Wraps any `Palette` with a time-varying lookup offset |
+| `CircularPalette` | Wraps the lookup parameter modulo 1.0 for seamless looping |
+| `ReversePalette` | Mirrors the lookup parameter (1.0 - t) |
+| `VignettePalette` | Applies a radial brightness falloff based on distance from center |
+| `TransparentVignette` | Like `VignettePalette` but fades alpha instead of brightness |
+| `AlphaFalloffPalette` | Applies a custom alpha curve (via callback) over the palette parameter |
+| `BakedPalette` | Precomputes a `GenerativePalette` into a fast 16-bit LUT for O(1) lookup. Arena-allocated. |
+
 ### 6.7 The Mesh System (`mesh.h`, `conway.h`, `hankin.h`, `spatial.h`, `solids.h`)
 
 The mesh system is split across several files:
@@ -671,35 +735,27 @@ SolidBuilder(dodecahedron(a, b), a, b)
 
 ### 6.8 Generators (`generators.h`)
 
-The generator system provides a uniform interface for procedural geometry creation. All generators take explicit `(Arena& geom, Arena& a, Arena& b)` parameters:
-
-| Type | Description |
-|---|---|
-| `IGenerator<T>` | Generic concept/interface: `virtual T generate(Arena& geom, Arena& a, Arena& b) = 0` |
-| `IMeshGenerator` | Specialization of `IGenerator<PolyMesh>` for mesh generation |
-| `SolidGenerator` | Wraps the `Solids::` registry by integer ID |
-| `SolidNameGenerator` | Wraps the `Solids::` registry by string name |
-| `IcosahedronGenerator` | Direct generator for the icosahedron |
-| `DodecahedronGenerator` | Direct generator for the dodecahedron |
-| `CubeGenerator` | Direct generator for the cube |
-| `OctahedronGenerator` | Direct generator for the octahedron |
-| `TetrahedronGenerator` | Direct generator for the tetrahedron |
-
-The `generate_mesh<Gen>(arena, args...)` helper encapsulates the `ScratchScope` boilerplate:
+`generators.h` provides a single universal generation wrapper that manages arena lifecycle for all procedural geometry creation:
 
 ```cpp
-auto mesh = generate_mesh<DodecahedronGenerator>(persistent_arena);
-auto mesh = generate_mesh<SolidGenerator>(persistent_arena, solid_id);
+template <typename GenerateFn, typename... Args>
+auto generate(Arena &target, GenerateFn &&fn, Args &&...args);
+```
+
+It resets and scopes both scratch arenas, then invokes `fn(target, scratch_a, scratch_b, args...)`. All procedural geometry creation goes through this wrapper to ensure deterministic arena lifecycle:
+
+```cpp
+auto mesh = generate(persistent_arena, Solids::get_by_name, std::string_view("icosahedron"));
 ```
 
 ### 6.9 The Preset System (`presets.h`)
 
-`Presets<Params, Size>` is a generic template for managing named parameter presets. It stores a fixed-size array of `Entry{name, params}` and provides navigation (next/prev), lookup by name, and interpolation support:
+`Presets<Params, Size>` is a generic template for managing parameter presets. It stores a fixed-size array of `PresetEntry<Params>` (each containing only a `Params` struct — no name field) and provides navigation and interpolation support:
 
 ```cpp
-Presets<MeshFeedbackParams, 8> presets = {{
-    {"Organic", {0.95f, 1.2f, ...}},
-    {"Crystal", {0.88f, 0.5f, ...}},
+Presets<MeshFeedbackParams, 4> presets = {{
+    {{{0.95f, 1.2f, ...}}},
+    {{{0.88f, 0.5f, ...}}},
     ...
 }};
 presets.next();  // advance to next preset
@@ -714,18 +770,18 @@ The system has three layers:
 
 | Class | Role |
 |---|---|
-| `HD107SFrame<N>` | Pre-formatted DMA buffer for the HD107S protocol. Applies inline color correction (color correction → temperature → gamma → brightness) during `load()` so the buffer is ready for immediate DMA transfer. Uses `DMAMEM` placement and `arm_dcache_flush_delete()` for cache coherency. |
+| `HD107SFrame<N>` | Pre-formatted DMA buffer for the HD107S protocol. `packPixel()` writes `Pixel16` values directly into the frame buffer with inline color correction (color correction → temperature → gamma → brightness), bypassing the CRGB intermediate. Uses `DMAMEM` placement and `arm_dcache_flush_delete()` for cache coherency. |
 | `TeensySPIDMA` | Low-level DMA+SPI driver wired to LPSPI4. Configures a `DMAChannel` with completion interrupt for fully async byte-stream transmission at 12 MHz. |
 | `DMALEDController<N>` | Double-buffered high-level controller. `show(leds)` loads the back buffer and triggers DMA, returning immediately. The previous transfer is guaranteed complete before the next begins. |
 
-In the ISR, `DMALEDController::show()` replaces `FastLED.show()` as a drop-in:
+In the ISR, `DMALEDController::show()` replaces `FastLED.show()` as a drop-in. The ISR writes `Pixel16` values directly via `packPixel()` — the 16-bit linear pipeline reaches all the way to the SPI wire with no 8-bit intermediate:
 
 ```cpp
-#ifdef USE_DMA_LEDS
-  ledController_.show(leds_);      // non-blocking DMA
-#else
-  FastLED.show();                  // blocking SPI
-#endif
+// ISR path:
+for (y in 0..S/2):
+  frame.packPixel(S/2-y-1, get_pixel(x, y));   // Pixel16 → HD107S frame
+  frame.packPixel(S/2+y,   get_pixel(x±W/2, y));
+ledController_.submitFrame();  // non-blocking DMA
 ```
 
 Because the DMA transfer runs in hardware, the ISR returns immediately and the main loop gets more CPU time for rendering.
@@ -839,9 +895,6 @@ Draws twisting wireframe knotted structures derived from Archimedean solids. Mes
 
 **Parameters**: Copies (number of knot copies), Radius (displacement), Speed (orbit speed), Warp (Möbius warp scale), Alpha
 
-#### SpinShapes
-Catalog of spinning SDF shapes (rings, stars, polygons, flowers) with live rotation and color cycling.
-
 #### Comets
 Particles with long orientation-trail-based tails, launched in bursts and influenced by rotational gravity.
 
@@ -912,7 +965,9 @@ The simulator runs the identical C++ rendering engine compiled to WebAssembly vi
 | `getArenaMetrics()` | Memory usage stats for geometry, scratch, and tooling arenas |
 | `getEffectSizes()` | Return `sizeof` for every registered effect at the current resolution |
 
-The bridge also exposes a `MeshOps` class for the JavaScript tools, with dedicated 8 MB tooling arenas (separate from the engine's 345 KB arena) for interactive solid manipulation.
+The bridge also exposes a `MeshOps` class for the JavaScript tools, with dedicated 8 MB tooling arenas (separate from the engine's 335 KB arena) for interactive solid manipulation.
+
+The WASM bridge includes stack high-water-mark instrumentation: `stack_paint_canary()` fills the stack with a known pattern at init time, and `stack_high_water_mark()` scans for the deepest overwrite. This is reported via `getArenaMetrics()` and logged on every effect switch to catch stack-hungry template instantiations early.
 
 Pixel data is 16-bit linear light (`uint16_t` per channel). JavaScript divides by 65535 to produce float linear values:
 
