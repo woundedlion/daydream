@@ -11,7 +11,22 @@ A persistence-of-vision (POV) LED sphere and its real-time simulator. The device
 3. [Architecture Overview](#3-architecture-overview)
 4. [Data Flow: Frame Lifecycle](#4-data-flow-frame-lifecycle)
 5. [The Rendering Pipeline](#5-the-rendering-pipeline)
+   - [End-to-End Flow](#end-to-end-flow)
+   - [Pipeline Domain Transitions](#pipeline-domain-transitions)
+   - [The Canvas](#the-canvas)
+   - [The Filter Pipeline](#the-filter-pipeline)
 6. [Core Subsystems](#6-core-subsystems)
+   - [6.0 The Shader Interface](#60-the-shader-interface)
+   - [6.1 SDF Shapes and the Scan Rasterizer](#61-sdf-shapes-sdfh-and-the-scan-rasterizer-scanh)
+   - [6.2 The Curve Rasterizer](#62-the-curve-rasterizer-ploth)
+   - [6.3 The Animation System](#63-the-animation-system-animationh)
+   - [6.4 Geometry Transformers](#64-geometry-transformers-transformersh)
+   - [6.5 Memory Architecture](#65-memory-architecture-memoryh-memorycpp)
+   - [6.6 The Color System](#66-the-color-system-colorh)
+   - [6.7 The Mesh System](#67-the-mesh-system-meshh-conwayh-hankinh-spatialh-solidsh)
+   - [6.8 Generators](#68-generators-generatorsh)
+   - [6.9 The Preset System](#69-the-preset-system-presetsh)
+   - [6.10 DMA LED Controller](#610-dma-led-controller-dma_ledh)
 7. [The Effect System](#7-the-effect-system)
 8. [Effects Reference](#8-effects-reference)
 9. [The Web Simulator (Daydream)](#9-the-web-simulator-daydream)
@@ -396,6 +411,95 @@ Pipeline<W, H,
 ---
 
 ## 6. Core Subsystems
+
+### 6.0 The Shader Interface
+
+All rasterizers — SDF scanline, curve plotting, mesh, volumetric, and full-screen shader — share a common shading model based on the `Fragment` struct and two function signatures.
+
+#### The Fragment
+
+A `Fragment` (`geometry.h`) is the data packet exchanged between rasterizers and shaders. It carries the pixel position, four general-purpose float registers, and the output color:
+
+```cpp
+struct Fragment {
+  Vector pos;              // World-space position (unit vector on sphere)
+  float v0 = 0.0f;        // Register 0: normalized progress t (0–1)
+  float v1 = 0.0f;        // Register 1: arc length / distance
+  float v2 = 0.0f;        // Register 2: index / face ID
+  float v3 = 0.0f;        // Register 3: auxiliary
+  float size = 1.0f;      // Size metric for normalization
+  float age = 0.0f;       // Age (for trail decay / motion blur)
+  Color4 color;           // Output: shader writes RGBA here
+};
+```
+
+The registers are *inputs* — populated by the rasterizer before the shader runs. The shader reads them and writes `color`. The rasterizer then forwards the color through the filter pipeline to the canvas.
+
+#### Shader Signatures
+
+Two shader types are defined as zero-allocation `FunctionRef` callables (`concepts.h`):
+
+| Signature | Type | Role |
+|---|---|---|
+| `FragmentShaderFn` | `void(const Vector &, Fragment &)` | Per-pixel/per-sample shader. Receives the world position and a pre-populated Fragment; writes `color`. Called for every rasterized point. |
+| `VertexShaderFn` | `void(Fragment &)` | Per-vertex or per-pixel-center shader. Runs once before sub-sampling to set up expensive shared state in the Fragment registers. Optional. |
+
+`FunctionRef` is a non-owning, non-allocating type-erased callable (similar to `std::function_ref` from C++26). It captures a pointer to any lambda, functor, or function pointer with zero heap allocation — critical for ISR-safe code on Teensy.
+
+Effects pass lambdas that capture their state:
+
+```cpp
+auto shader = [&](const Vector &p, Fragment &f) {
+    float t = f.v0;           // read: normalized progress from rasterizer
+    f.color = palette.get(t); // write: color from palette lookup
+};
+Scan::Ring::draw<W, H>(pipeline, canvas, basis, radius, thickness, shader);
+```
+
+#### Register Conventions by Rasterizer
+
+Each rasterizer family populates the Fragment registers with a consistent convention. Shaders can rely on these semantics:
+
+**SDF Scanline Path** (`Scan::Ring`, `Scan::Star`, `Scan::Polygon`, `Scan::Flower`, `Scan::Line`, `Scan::Mesh`):
+
+| Register | Source | Meaning |
+|---|---|---|
+| `v0` | `DistanceResult.t` | Normalized parameter (0–1) — azimuthal angle for rings, perimeter progress for polygons |
+| `v1` | `DistanceResult.raw_dist` | Unsigned distance to shape centerline (for distance-based effects) |
+| `v2` | Set by rasterizer | Face index for `Scan::Mesh` (0 otherwise) |
+| `v3` | `DistanceResult.aux` | Auxiliary — barycentric coordinate for faces, secondary parameter for others |
+| `size` | `DistanceResult.size` | Shape radius or apothem for normalization |
+
+The `DistanceResult` struct is returned by each SDF shape's `distance<ComputeUVs>()` method:
+
+```cpp
+struct DistanceResult {
+  float dist;        // Signed distance (negative = inside)
+  float t;           // Normalized parameter (0–1)
+  float raw_dist;    // Unsigned / supplementary distance
+  float aux;         // Auxiliary (barycentric, etc.)
+  float size = 1.0f; // Size metric
+};
+```
+
+**Curve Plot Path** (`Plot::Line`, `Plot::Multiline`, `Plot::Ring`, `Plot::Polygon`, `Plot::SplineChain`, `Plot::Bezier`):
+
+| Register | Meaning |
+|---|---|
+| `v0` | Path progress (0.0 → 1.0 along the full curve) |
+| `v1` | Cumulative arc length in radians |
+| `v2` | Vertex index (integer cast to float) |
+| `v3` | Inherited from control-point Fragment (user-defined) |
+
+Plot primitives interpolate registers between control-point Fragments via `Fragment::lerp()`. The vertex shader, if provided, runs once per control point before rasterization.
+
+**Full-Screen Shader Path** (`Scan::Shader`):
+
+Registers are not pre-populated — the shader receives only `pos` (reconstructed from pixel coordinates). The single-callback overload provides a `Color4(const Vector &)` interface. The two-callback overload separates per-pixel vertex setup from per-subsample fragment evaluation.
+
+**Volumetric Path** (`Scan::Volume`):
+
+The fragment shader receives `pos` set to the closest local-space hit point (in the SDF's coordinate frame) and `size` set to the closest signed distance. No register convention — the shader computes lighting from the local-space position directly.
 
 ### 6.1 SDF Shapes (`sdf.h`) and the Scan Rasterizer (`scan.h`)
 
