@@ -73,115 +73,109 @@ IOMUXC_SW_PAD_CTL_PAD_GPIO_B0_03 &= ~IOMUXC_PAD_SRE;  // Pin 13 (CLOCK)
 ## 2. Repository Map
 
 ```
-├── Holosphere.ino          Entry point — POVDisplay setup and effect playlist
-├── constants.h             RPM, NUM_PIXELS, MAX_W/MAX_H
-├── platform.h              Arduino vs. WASM vs. Desktop abstraction layer
+├── core/                       Rendering engine
+│   ├── platform.h              Arduino vs. WASM vs. Desktop abstraction layer
+│   ├── constants.h             MAX_W, MAX_H (resolution bounds)
+│   ├── canvas.h                Effect base class + Canvas RAII write-buffer guard
+│   ├── effects_engine.h        Master include for the full engine
+│   ├── effects.h               Include list for all effects
+│   ├── effects_legacy.h        Pre-engine effects (TheMatrix, Spirals, etc.)
+│   ├── effect_registry.h       Self-registering factory: REGISTER_EFFECT macro
+│   ├── led.h                   Backward-compat shim → hardware/pov_single.h
+│   │
+│   ├── 3dmath.h                Vector, Quaternion, Spherical, Complex, Möbius math
+│   ├── geometry.h              Fragment, Dots/Points, PixelLUT, coord conversions
+│   ├── color.h                 Pixel16 (16-bit linear), Color4, blend modes, palettes
+│   ├── palettes.h              Named palette instances (ProceduralPalette + Gradient)
+│   ├── color_luts.h            Precomputed sRGB ↔ linear LUTs
+│   │
+│   ├── concepts.h              C++20 concepts: TrailFn, PlotFn, FragmentShaderFn, etc.
+│   ├── filter.h                Composable render pipeline + all Filter::World/Screen/Pix
+│   ├── sdf.h                   SDF shape primitives, CSG operations, distance queries
+│   ├── scan.h                  Rasterization primitives (Ring, Circle, Star, Mesh, etc.)
+│   ├── plot.h                  Line/curve rasterizer with geodesic/planar strategies
+│   ├── animation.h             Timeline, all Animation:: types, ParticleSystem
+│   ├── transformers.h          Ripple, Noise, Möbius warp geometry transformers
+│   ├── easing.h                Easing functions (cubic, sine, elastic, expo, etc.)
+│   ├── waves.h                 sin_wave / tri_wave / square_wave generators
+│   │
+│   ├── memory.h / memory.cpp   Arena allocator, ScratchScope, Persist<T>
+│   ├── mesh.h                  PolyMesh, HalfEdgeMesh, MeshOps (compile, clone, etc.)
+│   ├── conway.h                Conway operators (dual, kis, ambo, truncate, etc.)
+│   ├── hankin.h                Hankin pattern compilation and update system
+│   ├── solids.h                Platonic + Archimedean + Catalan + Islamic solid registry
+│   ├── spatial.h               AABB, KDTree, k-nearest-neighbor, MeshState
+│   ├── static_circular_buffer.h Fixed-capacity non-allocating circular buffer
+│   ├── rotate.h                Quaternion projection helpers
+│   ├── generators.h            Universal generate() wrapper for procedural geometry
+│   ├── presets.h               Generic Presets<Params, Size> template
+│   ├── styles.h                Feedback::Style named presets + Feedback::Filter wrapper
+│   ├── util.h                  wrap(), fast_wrap(), clamp()
+│   ├── reaction_graph.h/.cpp   Precomputed Fibonacci-lattice K-NN graph (301 KB table)
+│   ├── FastNoiseLite.h         Third-party: single-header noise library
+│   └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
-├── led.h                   POVDisplay<S,RPM> — ISR, double-buffer, effect dispatch
-├── dma_led.h               Non-blocking DMA LED controller for HD107S (Teensy 4.x only)
-├── canvas.h                Effect base class + Canvas RAII write-buffer guard
-├── effects_engine.h        Master include for the full engine (incl. hankin/conway)
-├── effects.h               Include list for all effects
-├── effects_legacy.h        Pre-engine effects (TheMatrix, Spirals, etc.)
-├── effect_registry.h       Self-registering factory: REGISTER_EFFECT macro
+├── effects/                    One .h per effect (27 effects + 2 test/debug)
+│   ├── BZReactionDiffusion.h, ChaoticStrings.h, Comets.h, DreamBalls.h,
+│   │   Dynamo.h, FlowField.h, Flyby.h, GnomonicStars.h, GSReactionDiffusion.h,
+│   │   HankinSolids.h, HopfFibration.h, IslamicStars.h, Liquid2D.h,
+│   │   MeshFeedback.h, Metaballs.h, MindSplatter.h, MobiusGrid.h, Moire.h,
+│   │   PetalFlow.h, Raymarch.h, RingShower.h, RingSpin.h,
+│   │   SphericalHarmonics.h, SplineFlow.h, Thrusters.h, Voronoi.h
+│   └── Test.h, TestShapes.h    (test/debug)
 │
-├── 3dmath.h                Vector, Quaternion, Spherical, Complex, Möbius math
-├── geometry.h              Fragment, Dots/Points, PixelLUT, coord conversions
-├── color.h                 Pixel16 (16-bit linear), Color4, blend modes, palettes
-├── palettes.h              Named palette instances (ProceduralPalette + Gradient)
-├── color_luts.h            Precomputed sRGB ↔ linear LUTs
+├── hardware/                   Hardware drivers
+│   ├── dma_led.h               Non-blocking DMA LED controller for HD107S (Teensy 4.x)
+│   ├── pov_single.h            Single-Teensy POV driver (Holosphere)
+│   └── pov_segmented.h         Multi-Teensy segmented POV driver (Phantasm, stub)
 │
-├── concepts.h              C++20 concepts: TrailFn, PlotFn, FragmentShaderFn, etc.
-├── filter.h                Composable render pipeline + all Filter::World/Screen/Pix
-├── sdf.h                   SDF shape primitives, CSG operations, distance queries
-├── scan.h                  Rasterization primitives (Ring, Circle, Star, Mesh, etc.)
-├── plot.h                  Line/curve rasterizer with geodesic/planar strategies
-├── animation.h             Timeline, all Animation:: types, ParticleSystem
-├── transformers.h          Ripple, Noise, Möbius warp geometry transformers
-├── easing.h                Easing functions (cubic, sine, elastic, expo, etc.)
-├── waves.h                 sin_wave / tri_wave / square_wave generators
+├── targets/                    Per-target entry points
+│   ├── Holosphere/
+│   │   └── Holosphere.ino      Holosphere entry — NUM_PIXELS=40, RPM=480
+│   ├── Phantasm/
+│   │   └── Phantasm.ino        Phantasm entry — 4×Teensy segmented (stub)
+│   └── wasm/
+│       └── wasm_bridge.cpp     Emscripten bindings — HolosphereEngine JS class
 │
-├── memory.h / memory.cpp   Arena allocator, ScratchScope, Persist<T>
-├── mesh.h                  PolyMesh, HalfEdgeMesh, MeshOps (compile, clone, etc.)
-├── conway.h                Conway operators (dual, kis, ambo, truncate, expand, etc.)
-├── hankin.h                Hankin pattern compilation and update system
-├── solids.h                Platonic + Archimedean + Catalan + Islamic solid registry
-├── spatial.h               AABB, KDTree, k-nearest-neighbor, MeshState
-├── static_circular_buffer.h Fixed-capacity non-allocating circular buffer
-├── rotate.h                Quaternion projection helpers
-├── generators.h            Universal `generate()` wrapper for procedural geometry creation
-├── presets.h               Generic Presets<Params, Size> template for preset management
-├── styles.h                Feedback::Style named presets + Feedback::Filter<W,H> wrapper
-├── util.h                  wrap(), fast_wrap(), clamp()
-│
-├── reaction_graph.h        Precomputed Fibonacci-lattice K-NN graph for reaction-diffusion
-├── reaction_graph.cpp      301 KB neighbor table (RD_N=7680, RD_K=6)
-│
-├── effects/                One .h per effect (27 effects + 2 test effects)
-│   ├── BZReactionDiffusion.h
-│   ├── ChaoticStrings.h
-│   ├── Comets.h
-│   ├── DreamBalls.h
-│   ├── Dynamo.h
-│   ├── FlowField.h
-│   ├── Flyby.h
-│   ├── GnomonicStars.h
-│   ├── GSReactionDiffusion.h
-│   ├── HankinSolids.h
-│   ├── HopfFibration.h
-│   ├── IslamicStars.h
-│   ├── Liquid2D.h
-│   ├── Raymarch.h
-│   ├── MeshFeedback.h
-│   ├── Metaballs.h
-│   ├── MindSplatter.h
-│   ├── MobiusGrid.h
-│   ├── Moire.h
-│   ├── PetalFlow.h
-│   ├── RingShower.h
-│   ├── RingSpin.h
-│   ├── SphericalHarmonics.h
-│   ├── SplineFlow.h
-│   ├── Thrusters.h
-│   ├── Voronoi.h
-│   ├── Test.h              (test/debug)
-│   └── TestShapes.h         (test/debug)
-│
-├── wasm_bridge.cpp         Emscripten bindings — HolosphereEngine JS class
-├── CMakeLists.txt          Emscripten build (outputs holosphere_wasm.js + .wasm)
-├── tests/                  Unit tests (CMake subdirectory)
-├── FastNoiseLite.h         Third-party: single-header noise library
-└── FastNoiseLite_config.h  FastNoiseLite build configuration
+├── CMakeLists.txt              Emscripten build (outputs holosphere_wasm.js + .wasm)
+├── tests/                      Unit tests (CMake subdirectory)
+└── build_release.bat           WASM release build script
 ```
 
 ---
 
 ## 3. Architecture Overview
 
-The system has two physical execution targets sharing one codebase:
+Three build targets share a common engine:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        C++ Codebase                             │
-│                                                                 │
-│  ┌─────────────┐   ┌──────────────────────────────────────┐    │
-│  │ Holosphere  │   │            Rendering Engine           │    │
-│  │    .ino     │   │                                       │    │
-│  │             │   │  Effects → Canvas → Filter Pipeline   │    │
-│  │ POVDisplay  │   │      → SDF/Plot → Pixel Buffer        │    │
-│  │ <96, 480>   │   │                                       │    │
-│  └──────┬──────┘   └──────────────────────────────────────┘    │
-│         │                         ↑                             │
-└─────────┼─────────────────────────┼─────────────────────────────┘
-          │                         │
-    Arduino/Teensy             wasm_bridge.cpp
-    ISR + FastLED/DMA        (Emscripten build)
-          │                         │
-    Physical LED strip         ┌────┴──────────┐
-    spinning at 480 RPM        │  daydream/    │
-                               │  Three.js +   │
-                               │  WASM Engine  │
-                               └───────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                            C++ Codebase                                 │
+│                                                                         │
+│  ┌──────────────┐   ┌──────────────────────────────────────────────┐    │
+│  │   targets/   │   │          core/  (Rendering Engine)           │    │
+│  │              │   │                                              │    │
+│  │ Holosphere/  │   │  Effects → Canvas → Filter Pipeline          │    │
+│  │  .ino        │   │      → SDF/Plot → Pixel Buffer               │    │
+│  │              │   │                                              │    │
+│  │ Phantasm/    │   │  effects/  (27 visual algorithms)            │    │
+│  │  .ino (stub) │   │                                              │    │
+│  │              │   ├──────────────────────────────────────────────┤    │
+│  │ wasm/        │   │          hardware/  (Drivers)                │    │
+│  │  wasm_bridge │   │  pov_single.h — single-Teensy POV            │    │
+│  │  .cpp        │   │  pov_segmented.h — multi-Teensy POV (stub)   │    │
+│  │              │   │  dma_led.h — HD107S DMA SPI pipeline          │    │
+│  └──────┬───────┘   └──────────────────────────────────────────────┘    │
+│         │                              ↑                                │
+└─────────┼──────────────────────────────┼────────────────────────────────┘
+          │                              │
+   ┌──────┴──────┐              ┌────────┴────────┐
+   │  Teensy 4.x │              │   Emscripten    │
+   │  ISR + DMA  │              │   WASM build    │
+   │  480 RPM    │              │                 │
+   └──────┬──────┘              └────────┬────────┘
+    Physical LED strip            daydream/
+    (Holosphere/Phantasm)         Three.js + WASM
 ```
 
 ### Compile-Time Resolution Parameterization
@@ -1005,7 +999,7 @@ presets.next();  // advance to next preset
 presets.apply(current_params);  // copy current preset into live params
 ```
 
-### 6.10 DMA LED Controller (`dma_led.h`)
+### 6.10 DMA LED Controller (`hardware/dma_led.h`)
 
 An optional non-blocking DMA-based LED output path for HD107S (APA102-compatible) LEDs on Teensy 4.x. Enabled by defining `USE_DMA_LEDS` in `led.h`; the default FastLED/WS2801 path remains as fallback.
 
@@ -1247,21 +1241,25 @@ params.forEach(p => {
 
 ## 10. Building
 
-### Firmware (Arduino / Teensy 4.1)
+### Firmware (Arduino / Teensy 4.x)
 
-1. Install [Arduino IDE](https://www.arduino.cc/en/software) with Teensyduino.
+Each hardware target has its own `.ino` entry point in `targets/`:
+
+1. Install [Arduino IDE](https://www.arduino.cc/en/software) with Teensyduino (or use [Visual Micro](https://www.visualmicro.com/) for Visual Studio).
 2. Install the `FastLED` library.
-3. Open `Holosphere.ino`.
-4. Select **Board: Teensy 4.1**, **CPU Speed: 600 MHz**.
-5. Upload.
+3. Open `targets/Holosphere/Holosphere.ino` (or `targets/Phantasm/Phantasm.ino`).
+4. Set **Additional Include Directories** to: `../../core;../../hardware`
+5. Select **Board: Teensy 4.0** (or 4.1), **CPU Speed: 600 MHz**.
+6. Upload.
 
-Hardware configuration is in `constants.h`:
+Target-specific constants are defined in each `.ino` file (not a global `constants.h`):
 ```cpp
-static constexpr unsigned int RPM       = 480;
-static constexpr int          NUM_PIXELS = 40;
+// targets/Holosphere/Holosphere.ino
+static constexpr int NUM_PIXELS = 40;
+static constexpr unsigned int RPM = 480;
 ```
 
-And in `led.h`:
+Pin assignments are in `core/led.h` (also included by `hardware/pov_single.h`):
 ```cpp
 static constexpr int PIN_DATA   = 11;
 static constexpr int PIN_CLOCK  = 13;
@@ -1270,8 +1268,13 @@ static constexpr int PIN_RANDOM = 15;
 
 ### WASM (Simulator)
 
-Requires [Emscripten](https://emscripten.org/) and CMake.
+Requires [Emscripten](https://emscripten.org/) and CMake. Use the included build script:
 
+```bash
+./build_release.bat    # configures CMake + Ninja, builds, installs to ../daydream/
+```
+
+Or manually:
 ```bash
 mkdir build && cd build
 emcmake cmake .. -DCMAKE_BUILD_TYPE=Release
@@ -1280,9 +1283,11 @@ cmake --install .     # copies holosphere_wasm.js + .wasm to ../daydream/
 ```
 
 The `CMakeLists.txt` configures:
+- Source paths: `targets/wasm/wasm_bridge.cpp`, `core/memory.cpp`, `core/reaction_graph.cpp`
+- Include paths: project root (for `effects/`, `hardware/`) and `core/` (for engine headers)
 - `-sALLOW_MEMORY_GROWTH=1` — WASM heap can grow for large meshes
 - `-sMODULARIZE=1 -sEXPORT_ES6=1` — ES6 module output
-- `-sSTACK_SIZE=8388608` — 8 MB stack (effects use deep template recursion)
+- `-sSTACK_SIZE=8192` — minimal stack (effects use arena allocation, not deep recursion)
 - `-O3 -ffast-math -flto -msimd128` for release, `-O0 -g -sASSERTIONS=1` for debug
 
 ### Running the Simulator
