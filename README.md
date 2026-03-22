@@ -111,6 +111,7 @@ IOMUXC_SW_PAD_CTL_PAD_GPIO_B0_03 &= ~IOMUXC_PAD_SRE;  // Pin 13 (CLOCK)
 ├── rotate.h                Quaternion projection helpers
 ├── generators.h            Universal `generate()` wrapper for procedural geometry creation
 ├── presets.h               Generic Presets<Params, Size> template for preset management
+├── styles.h                Feedback::Style named presets + Feedback::Filter<W,H> wrapper
 ├── util.h                  wrap(), fast_wrap(), clamp()
 │
 ├── reaction_graph.h        Precomputed Fibonacci-lattice K-NN graph for reaction-diffusion
@@ -389,8 +390,43 @@ The pipeline handles the 3D/2D coordinate mismatch automatically at compile time
 
 | Filter | Effect |
 |---|---|
-| `Pixel::Feedback<W, H, SpaceTransformFn, ColorTransformFn>` | Full-screen feedback loop. Samples the previous frame from the Canvas front buffer with bilinear interpolation, applies a 3D spatial transformation (e.g. NoiseTransformer) and fade, then blends into the back buffer. The optional `ColorTransformFn` (default: identity) transforms each sampled pixel — used by `MeshFeedback` for `HueShiftFade`. Stateless — uses Canvas double-buffering, no internal frame storage needed. |
+| `Pixel::Feedback<W, H, SpaceTransformFn, ColorTransformFn>` | Low-level full-screen feedback loop. Samples the previous frame from the Canvas front buffer with bilinear interpolation, applies a spatial transformation and color transform with fade, then blends into the back buffer. Stateless — uses Canvas double-buffering, no internal frame storage. Most effects should use the higher-level `Feedback::Filter` wrapper instead (see below). |
 | `Pixel::ChromaticShift<W>` | Splits a pixel into R, G, B channels and offsets them by 1–3 pixels horizontally to simulate chromatic aberration. |
+
+#### Feedback Styles (`styles.h`)
+
+`Feedback::Style` bundles spatial transform, color transform, and scalar parameters into a single POD-copyable struct with named presets. `Feedback::Filter<W,H>` is a drop-in pipeline filter that takes a `Style&` directly — no template parameters for transform types, no adapter boilerplate.
+
+```cpp
+// Declare a style member and use it in the pipeline:
+Feedback::Style style = Feedback::Style::Smoke();
+Pipeline<W, H, Filter::World::Orient<W>, Filter::Screen::AntiAlias<W, H>,
+         Feedback::Filter<W, H>> filters(..., Feedback::Filter<W, H>(style));
+```
+
+The Filter auto-syncs from the Style every frame — when the Style lerps between presets, the function pointers snap at the midpoint while scalars interpolate smoothly.
+
+| Preset | Description |
+|---|---|
+| `Style::Churn()` | Dense fine-grain turbulence with strong hue shift. Tight scale, slow drift. |
+| `Style::Smoke()` | Gentle drifting haze with slow noise. Classic smoke look. |
+| `Style::Frozen()` | Static frozen distortion — no temporal movement. |
+| `Style::Shatter()` | Extreme static warping with fast decay. Shattering glass look. |
+| `Style::Drift()` | Flowing medium-strength distortion. Gentle liquid drift. |
+
+Available transform functions:
+
+| Space Transform | Description |
+|---|---|
+| `Feedback::noise_warp` (default) | 3D simplex noise distortion via `noise_transform()` |
+| `Feedback::identity_warp` | No spatial distortion (pass-through) |
+
+| Color Transform | Description |
+|---|---|
+| `Feedback::hue_fade` (default) | Multiplies by fade, then rotates hue by `style.hue_shift` |
+| `Feedback::plain_fade` | Multiplies by fade only — no color shift |
+
+Custom presets can use any function matching the `Feedback::SpaceFn` / `Feedback::ColorFn` signatures.
 
 #### Combining Filters
 
@@ -405,6 +441,12 @@ Pipeline<W, H,
     Filter::World::Trails<W, 50000>,
     Filter::World::Orient<W>,
     Filter::Screen::AntiAlias<W, H>>
+
+// Orientation + anti-aliasing + feedback with Smoke style
+Pipeline<W, H,
+    Filter::World::Orient<W>,
+    Filter::Screen::AntiAlias<W, H>,
+    Feedback::Filter<W, H>>
 ```
 
 ---
