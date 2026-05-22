@@ -131,6 +131,24 @@ POV display requires pixel data to be ready before each column interval fires �
 - **SDF distances**: in radians on the unit sphere (matching `angle_between()`)
 - All pixel LUTs are pre-computed and lazy-initialized (`PixelLUT<W,H>`) on first use
 
+```
+   Side view (looking down −Z):          Top view (looking down −Y):
+
+         +Y (φ=0, north pole)                   +Z (θ=π/2)
+          │                                      │
+          │  ╱ point P                           │
+          │ ╱φ                                   │  ╱ point P
+          │╱                                    │ ╱θ
+  ────────●────────  equator (φ=π/2)    ────────●────────  +X (θ=0)
+          │                                      │
+          │                                      │
+         −Y (φ=π, south pole)                   −Z (θ=3π/2)
+
+   Pixel canvas → sphere:
+      x ∈ [0, W)  →  θ ∈ [0, 2π)    column wraps around the equator (x=0 at +X)
+      y ∈ [0, H)  →  φ ∈ [0, π]     row descends from north pole (y=0) to south pole
+```
+
 ---
 
 ## 3. Repository Map
@@ -1025,7 +1043,7 @@ All Conway operators are templated on input mesh type and take `(const MeshT& me
 | `MeshOps::needle` | Needle operator = kis ∘ dual |
 | `MeshOps::zip` | Zip operator = dual ∘ kis |
 | `MeshOps::bevel` | Bevel operator = truncate ∘ ambo |
-| `MeshOps::relax` | Edge-length relaxation by spring forces on the unit sphere — NOT canonical-form computation (which requires midsphere tangency + planarization + centroid); renamed from `canonicalize` to be honest about what it does. |
+| `MeshOps::relax` | Edge-length relaxation by spring forces on the unit sphere. |
 | `MeshOps::normalize` | Project all vertices onto the unit sphere |
 | `MeshOps::compute_kdtree` | Build a KDTree for nearest-neighbor queries on mesh vertices |
 | `MeshOps::closest_point_on_mesh_graph` | Find the closest point on a mesh edge graph |
@@ -1642,7 +1660,7 @@ The left-edge effect list is a small custom widget:
 - **Persistent button references**: items are sorted by name or size (live `sizeof` from `getEffectSizes()`) without recreating DOM nodes — `setEffects()` mutates the existing buttons' positions.
 - **Keyboard navigation**: arrow keys / Home / End move the focused button; Enter selects.
 - **Mobile horizontal scroll**: when laid out as a horizontal strip, scroll arrows fade in/out based on scroll position via a `ResizeObserver` + scroll listener.
-- **Two effect lists**: `HiResFavorites` and `LoResFavorites` filter what's shown per resolution. Effects not in the active list are still in the WASM registry and can be loaded directly via `?effect=…`, but they won't show in the sidebar.
+- **Per-resolution filtering**: each resolution has its own curated effect list — effects outside the active list are still in the WASM registry and can be loaded directly via `?effect=…`, but they won't show in the sidebar.
 
 ### 10.6 GUI Auto-Generation
 
