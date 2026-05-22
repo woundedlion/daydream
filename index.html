@@ -9,10 +9,10 @@
     <script type="importmap">
         {
           "imports": {
-            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-            "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/renderers/webgpu/WebGPURenderer.js",
-            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-            "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.21.0/dist/lil-gui.esm.min.js",
+            "three": "./three.js/build/three.module.js",
+            "three/webgpu": "./three.js/examples/jsm/renderers/webgpu/WebGPURenderer.js",
+            "three/addons/": "./three.js/examples/jsm/",
+            "lil-gui": "./node_modules/lil-gui/dist/lil-gui.esm.min.js",
             "gui": "./gui.js"
           }
         }
@@ -29,7 +29,7 @@
                 <a href="tools/palettes.html" target="_blank" class="tab">Palettes</a>
                 <a href="tools/solids.html" target="_blank" class="tab">Solids</a>
                 <a href="tools/splines.html" target="_blank" class="tab">Splines</a>
-                <span style="color: grey; margin-left: 10px; font-family: monospace; font-size: 12px;">
+                <span id="global-stats-desktop" style="color: grey; margin-left: 10px; font-family: monospace; font-size: 12px;">
                     <table
                         style="text-align:center; border-collapse: collapse; line-height: 1.2; display:inline-table;">
                         <tr style="color: #999;">
@@ -79,6 +79,7 @@
                         <div class="spinner"></div>
                         <span>Loading engine...</span>
                     </div>
+                    <div id="segment-stats" class="segment-stats" style="display:none;"></div>
                     <canvas id="canvas"></canvas>
                 </div>
             </div>

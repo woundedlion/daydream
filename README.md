@@ -925,7 +925,7 @@ All Conway operators take explicit `(const PolyMesh& mesh, Arena& target, Arena&
 | `MeshOps::bitruncate` | Truncate the rectified mesh |
 | `MeshOps::snub` | Chiral semi-regular polyhedron with twist |
 | `MeshOps::gyro` | Gyro operator |
-| `MeshOps::canonicalize` | Iterative canonicalization |
+| `MeshOps::relax` | Edge-length relaxation by spring forces on the unit sphere (renamed from `canonicalize`) |
 | `MeshOps::normalize` | Project all vertices onto the unit sphere |
 | `MeshOps::compute_kdtree` | Build a KDTree for nearest-neighbor queries on mesh vertices |
 | `MeshOps::closest_point_on_mesh_graph` | Find the closest point on a mesh edge graph |

@@ -190,7 +190,6 @@ export class Daydream {
     this.pixelMatrices = [];
     this.timeAccumulator = 0;
     this.labelAxes = false;
-    this.cullBackLabels = true;
     this.cullBackSphere = false;
 
     // Cache stats elements lazily
@@ -291,7 +290,7 @@ export class Daydream {
       }
 
       for (const label of labels) {
-        if (!this.cullBackLabels || label.position.dot(this.camera.position) > Daydream.SPHERE_RADIUS) {
+        if (label.position.dot(this.camera.position) > Daydream.SPHERE_RADIUS) {
           this.labelPool.acquire(label.position, label.content);
         }
       }

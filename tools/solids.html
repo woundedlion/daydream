@@ -9,13 +9,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Solids Generator</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="../vendor/tailwindcss.js"></script>
   <script type="importmap">
     {
       "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-        "dat-gui": "https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.module.js",
+        "three": "../three.js/build/three.module.js",
+        "three/addons/": "../three.js/examples/jsm/",
         "gui": "../gui.js",
         "solids": "../solids.js",
         "geometry": "../geometry.js"
@@ -447,7 +446,35 @@
         </button>
         <button onclick="addOp('expand')" class="btn btn-secondary text-[0.65rem]">Expand</button>
         <button onclick="addOp('hankin')" class="btn btn-secondary text-[0.65rem]">Hankin</button>
-        <button onclick="addOp('canonicalize')" class="btn btn-secondary text-[0.65rem]">Canon</button>
+        <button onclick="addOp('relax')" class="btn btn-secondary text-[0.65rem]">Relax</button>
+        <button onclick="addOp('meta')" class="btn btn-secondary text-[0.65rem] relative group">
+          Meta
+          <span
+            class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
+            Kis(Ambo(x))
+          </span>
+        </button>
+        <button onclick="addOp('needle')" class="btn btn-secondary text-[0.65rem] relative group">
+          Needle
+          <span
+            class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
+            Kis(Dual(x))
+          </span>
+        </button>
+        <button onclick="addOp('zip')" class="btn btn-secondary text-[0.65rem] relative group">
+          Zip
+          <span
+            class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
+            Dual(Kis(x))
+          </span>
+        </button>
+        <button onclick="addOp('bevel')" class="btn btn-secondary text-[0.65rem] relative group">
+          Bevel
+          <span
+            class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
+            Truncate(Ambo(x), t)
+          </span>
+        </button>
       </div>
     </div>
 
@@ -583,7 +610,11 @@
       bitruncate: { params: { t: { val: 0.33, min: 0.01, max: 0.5, step: 0.01 } } },
       expand: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 } } },
       hankin: { params: { angle: { val: 54, min: 0, max: 90, step: 1 } } },
-      canonicalize: { params: { iter: { val: 100, min: 1, max: 500, step: 1 } } }
+      relax: { params: { iter: { val: 100, min: 1, max: 500, step: 1 } } },
+      meta: { params: {} },
+      needle: { params: {} },
+      zip: { params: {} },
+      bevel: { params: { t: { val: 0.25, min: 0.01, max: 0.5, step: 0.01 } } }
     };
 
     // Initialize
@@ -1056,12 +1087,15 @@
           // snub may have t and twist params in OP_DEFS but SolidBuilder defaults work
           chain += `.snub()`;
           nameParts.push(`_snub`);
-        } else if (opName === 'canonicalize') {
+        } else if (opName === 'relax') {
           const iter = o.params.iter || 100;
-          chain += `.canonicalize(${iter})`;
-          nameParts.push(`_canonicalize`);
+          chain += `.relax(${iter})`;
+          nameParts.push(`_relax`);
+        } else if (opName === 'bevel') {
+          chain += `.bevel(${formatFloat(o.params.t)})`;
+          nameParts.push(`_bevel${o.params.t.toString().replace('0.', '')}`);
         } else {
-          // Simple parameterless ops: dual, kis, ambo, gyro
+          // Simple parameterless ops: dual, kis, ambo, gyro, meta, needle, zip
           chain += `.${opName}()`;
           nameParts.push(`_${opName}`);
         }
@@ -1364,13 +1398,16 @@
             nextMesh = currentWasmMesh.bitruncate(o.params.t);
           } else if (opName === 'expand') {
             nextMesh = currentWasmMesh.expand(o.params.t);
+          } else if (opName === 'bevel') {
+            nextMesh = currentWasmMesh.bevel(o.params.t);
           } else if (opName === 'snub') {
             nextMesh = currentWasmMesh.snub();
           } else if (opName === 'hankin') {
             nextMesh = currentWasmMesh.hankin(o.params.angle * (Math.PI / 180));
-          } else if (opName === 'canonicalize') {
-            nextMesh = currentWasmMesh.canonicalize(o.params.iter);
+          } else if (opName === 'relax') {
+            nextMesh = currentWasmMesh.relax(o.params.iter);
           } else if (currentWasmMesh[opName]) {
+            // Parameterless ops: dual, kis, ambo, gyro, meta, needle, zip
             nextMesh = currentWasmMesh[opName]();
           }
 
