@@ -334,7 +334,10 @@ export class Daydream {
       this.labelRenderer.render(this.scene, this.camera);
     }
 
-    if (!this.isMobile) {
+    // Skip the picture-in-picture render under headless automation
+    // (Playwright/Puppeteer/Selenium set navigator.webdriver) so clean
+    // screenshots aren't obscured by the PiP corner.
+    if (!this.isMobile && !navigator.webdriver) {
       this.renderer.setViewport(
         this.pipViewport.x,
         this.pipViewport.y,
