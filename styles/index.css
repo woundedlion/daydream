@@ -519,6 +519,11 @@
     align-self: center;
   }
 
+  /* Folders span both columns so they stack vertically */
+  .gui-container .lil-gui .lil-children > .lil-gui {
+    grid-column: 1 / -1;
+  }
+
   /* Function/button controllers: span both columns */
   .gui-container .lil-gui .lil-controller.lil-function > .lil-name {
     display: none;
@@ -546,4 +551,54 @@ div.label {
   color: white;
   font-family: Arial;
   font-size: 10px;
+}
+
+/* Per-segment stats overlay */
+.segment-stats {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 150;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  color: #aaa;
+  line-height: 1.4;
+  backdrop-filter: blur(4px);
+}
+
+.segment-stats table {
+  border-collapse: collapse;
+}
+
+.segment-stats th {
+  font-weight: normal;
+  color: #666;
+  padding: 0 6px;
+  text-align: center;
+  border-bottom: 1px solid #333;
+}
+
+.segment-stats td {
+  padding: 1px 6px;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.segment-stats .seg-label {
+  text-align: left;
+  color: #8af;
+}
+
+.segment-stats .seg-time {
+  color: #ccc;
+}
+
+.segment-stats .seg-time.slow {
+  color: #f66;
 }
