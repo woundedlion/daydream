@@ -10,17 +10,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Solids Generator</title>
   <script src="../vendor/tailwindcss.js"></script>
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "../three.js/build/three.module.js",
-        "three/addons/": "../three.js/examples/jsm/",
-        "gui": "../gui.js",
-        "solids": "../solids.js",
-        "geometry": "../geometry.js"
-      }
-    }
-  </script>
+  <script>window.__DAYDREAM_EXTRA_IMPORTS = { 'solids': '../solids.js', 'geometry': '../geometry.js' };</script>
+  <script src="../vendor-importmap.js"></script>
   <style>
     :root {
       --slate-900: #0f172a;
