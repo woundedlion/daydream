@@ -8,6 +8,15 @@
 
 A persistence-of-vision (POV) LED sphere and its real-time simulator. The device spins a strip of LEDs at 480 RPM while a Teensy microcontroller fires pixels at microsecond intervals to paint full-color imagery on the surface of a virtual sphere. The simulator renders the same effects in a browser window at up to 288×144 resolution using the identical C++ code compiled to WebAssembly.
 
+The project spans **two repositories** that ship as one product:
+
+| Repo | Role | What lives here |
+|---|---|---|
+| [**Holosphere**](https://github.com/woundedlion/Holosphere) | C++ engine + firmware | All rendering code, effects, hardware drivers (`pov_single.h`, `pov_segmented.h`), the Emscripten/WASM target, unit tests, and this README. |
+| [**daydream**](https://github.com/woundedlion/daydream) | Web simulator | Three.js renderer, the compiled `holosphere_wasm.{js,wasm}` artifacts (output of Holosphere's WASM build), GUI/sidebar, recorder, segmented-POV Web Workers, and standalone geometry tools. |
+
+Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holosphere_wasm.wasm`, this README, and `docs/screenshots/` into the sibling `daydream/` checkout — so both repos always serve the same README. The live demo is daydream served from GitHub Pages.
+
 ---
 
 ## Table of Contents
@@ -37,6 +46,17 @@ A persistence-of-vision (POV) LED sphere and its real-time simulator. The device
 8. [The Effect System](#8-the-effect-system)
 9. [Effects Reference](#9-effects-reference)
 10. [The Web Simulator (Daydream)](#10-the-web-simulator-daydream)
+    - [10.1 Process and Threading Model](#101-process-and-threading-model)
+    - [10.2 The WASM Bridge](#102-the-wasm-bridge)
+    - [10.3 The Three.js Renderer](#103-the-threejs-renderer-driverjs)
+    - [10.4 Application State](#104-application-state-statejs)
+    - [10.5 The Effect Sidebar](#105-the-effect-sidebar-sidebarjs)
+    - [10.6 GUI Auto-Generation](#106-gui-auto-generation)
+    - [10.7 Segmented POV Workers](#107-segmented-pov-workers-segment_workerjs)
+    - [10.8 Vendor Importmap](#108-vendor-importmap-local-first--cdn-fallback)
+    - [10.9 Video Recording](#109-video-recording-recorderjs)
+    - [10.10 Resolution Presets](#1010-resolution-presets)
+    - [10.11 Geometry Tools](#1011-geometry-tools-daydreamtools)
 11. [Building](#11-building)
 
 ---
@@ -115,6 +135,8 @@ POV display requires pixel data to be ready before each column interval fires �
 
 ## 3. Repository Map
 
+### Holosphere (engine + firmware)
+
 ```
 ├── core/                       Rendering engine
 │   ├── platform.h              Arduino vs. WASM vs. Desktop abstraction layer
@@ -178,6 +200,42 @@ POV display requires pixel data to be ready before each column interval fires �
 ├── tests/                      Unit tests (CMake subdirectory)
 └── build_release.bat           WASM release build script
 ```
+
+### daydream (web simulator)
+
+```
+├── index.html                  Main simulator page
+├── vendor-importmap.js         Local-first / CDN-fallback importmap helper
+├── holosphere_wasm.js          Installed from Holosphere's WASM build
+├── holosphere_wasm.wasm        Installed from Holosphere's WASM build
+├── README.md                   Installed from Holosphere (this file)
+├── docs/screenshots/           Installed from Holosphere
+│
+├── daydream.js                 App entry: WASM loader, state wiring, GUI/sidebar
+├── driver.js                   Three.js scene: sphere mesh, dots, OrbitControls,
+│                                  axes overlay, picture-in-picture camera, resize
+├── geometry.js                 Sphere-pixel position math (pixelToVector, etc.)
+├── state.js                    AppState (pub/sub) + URLSync (query-string mirror)
+├── gui.js                      lil-gui wrapper used by the main page and tools
+├── sidebar.js                  Effect list + sort + keyboard navigation
+├── recorder.js                 MediaRecorder pipeline (mp4 / webm), sim-synced
+├── segment_worker.js           Web Worker that hosts one WASM instance per
+│                                  Phantasm hardware segment (parallel render)
+├── styles/                     CSS for the main page and tools
+│
+├── tools/                      Standalone geometry tools (own HTML pages)
+│   ├── lissajous.html          Spherical Lissajous curve designer
+│   ├── mobius.html             Möbius transformation visualizer
+│   ├── palettes.html           Procedural palette tuner
+│   ├── solids.html             Conway operator playground (uses MeshOps bridge)
+│   └── splines.html            Catmull-Rom spline designer
+│
+├── three.js/                   Optional vendored Three.js checkout
+├── node_modules/lil-gui/       Optional local lil-gui (npm install)
+└── package.json
+```
+
+If the local `three.js/` and `node_modules/lil-gui/` directories are missing (e.g. on the GitHub Pages deploy), [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) probes them at startup and falls back to jsdelivr. See [§10.8](#108-vendor-importmap-local-first--cdn-fallback).
 
 ---
 
@@ -1485,9 +1543,37 @@ TheMatrix, ChainWiggle, RingRotate, RingTwist, Curves, Kaleidoscope, StarsFade, 
 
 ## 10. The Web Simulator (Daydream)
 
-The simulator runs the identical C++ rendering engine compiled to WebAssembly via Emscripten, visualized as a 3D sphere in Three.js.
+The [`daydream`](https://github.com/woundedlion/daydream) repo is a static web app that wraps the WASM build from this repo in a Three.js scene. The C++ rendering engine is unchanged — the same effect classes, the same arenas, the same per-frame `Pixel16[]` buffer. Daydream's job is to:
 
-### WASM Bridge
+1. Drive the WASM engine one frame at a time at a fixed cadence.
+2. Map each `(x, y, color)` pixel to a position on a 3D sphere and render it as an instanced dot mesh.
+3. Provide a UI for switching effects, tuning parameters, sweeping resolutions, recording video, and exercising the segmented-POV multi-board mode.
+4. Host five standalone geometry tools that reuse the engine's `MeshOps` for interactive design work.
+
+### 10.1 Process and Threading Model
+
+```
+Main thread                                Web Workers (segment mode only)
+─────────────                              ──────────────────────────────
+index.html → vendor-importmap.js           segment_worker.js × N
+              ↓ (resolves three/lil-gui    each owns its own WASM module
+              ↓  to local or CDN)
+            daydream.js (entry)            engine.setClip(y0,y1,x0,x1)
+              ├─ createHolosphereModule()  engine.drawFrame()  → pixel slice
+              ├─ Daydream (driver.js)      postMessage(Transfer pixels)
+              │    ├─ Three.WebGLRenderer
+              │    ├─ instanced dot mesh
+              │    ├─ OrbitControls
+              │    └─ PiP camera
+              ├─ AppState + URLSync
+              ├─ EffectSidebar
+              ├─ lil-gui (params + global)
+              └─ VideoRecorder (MediaRecorder)
+```
+
+A normal page load creates one WASM instance on the main thread. The dot mesh has one instance per LED pixel; the per-frame work is `instanceColor.needsUpdate = true` after the WASM buffer view is refreshed. When the user enables Segmented POV (§10.5), `daydream.js` spawns N Web Workers, each holding its own WASM module so the four-Teensy Phantasm layout can be exercised in software.
+
+### 10.2 The WASM Bridge
 
 `wasm.cpp` compiles to `holosphere_wasm.js` + `.wasm` and exposes a single `HolosphereEngine` class:
 
@@ -1502,30 +1588,63 @@ The simulator runs the identical C++ rendering engine compiled to WebAssembly vi
 | `getParamValues()` | Return current parameter values (including animation-driven updates) |
 | `getArenaMetrics()` | Memory usage stats for geometry, scratch, and tooling arenas |
 | `getEffectSizes()` | Return `sizeof` for every registered effect at the current resolution |
+| `setClip(y0, y1, x0, x1)` | Restrict rendering to a sub-rectangle (used by segment workers) |
 
 The bridge also exposes a `MeshOps` class for the JavaScript tools, with dedicated 8 MB tooling arenas (separate from the engine's 335 KB arena) for interactive solid manipulation.
 
 The WASM bridge includes stack high-water-mark instrumentation: `stack_paint_canary()` fills the stack with a known pattern at init time, and `stack_high_water_mark()` scans for the deepest overwrite. This is reported via `getArenaMetrics()` and logged on every effect switch to catch stack-hungry template instantiations early.
 
-Pixel data is 16-bit linear light (`uint16_t` per channel). JavaScript divides by 65535 to produce float linear values:
+Pixel data is 16-bit linear light (`uint16_t` per channel). JavaScript divides by 65535 to produce float linear values that feed directly into Three.js (which expects linear color when `THREE.ColorManagement.enabled = true`):
 
 ```js
 const wasmPixels = wasmEngine.getPixels();   // Uint16Array view, zero-copy
 for (let i = 0; i < wasmPixels.length; i++) {
     Daydream.pixels[i] = wasmPixels[i] / 65535.0;  // linear float
 }
-// → Three.js DataTexture → sphere mesh
+// → instanced sphere mesh per-instance colors → WebGL renderer
 ```
 
-### Resolution Presets
+### 10.3 The Three.js Renderer (`driver.js`)
 
-| Name | Width × Height | Notes |
-|---|---|---|
-| Holosphere (20×96) | 96 × 20 | Matches physical hardware |
-| Phantasm (144×288) | 288 × 144 | High-quality preview (default) |
+The `Daydream` class owns the entire render side. Notable features:
 
+| Feature | Details |
+|---|---|
+| **Instanced dot mesh** | One `InstancedMesh` of `W × H` small spheres. Per-instance position is precomputed in `setupDots()` from `pixelToVector(x, y)`; per-instance color is updated each frame from the WASM pixel buffer. Single draw call per frame. |
+| **Linear color pipeline** | `THREE.ColorManagement.enabled = true` and `setPixelRatio(min(devicePixelRatio, 1))`. Colors arriving from WASM are already linear, so no extra conversion. |
+| **OrbitControls camera** | A normal `PerspectiveCamera` at `(0, 0, 220)` with FOV 20°, plus `OrbitControls` for mouse/touch navigation. |
+| **Picture-in-picture** | A clone of the main camera at a fixed orientation renders to a 30%-sized bottom-right viewport so the front and back of the sphere are visible simultaneously. Suppressed when `isMobile` or `navigator.webdriver` (§ headless capture). |
+| **Axes overlay** | Three `THREE.Line`s for X/Y/Z visible on toggle, plus a `CSS2DRenderer`-backed `LabelPool` for "+X / +Y / +Z" labels with zero allocation per frame. |
+| **Resize observer** | `ResizeObserver` on the canvas container recomputes camera aspect, viewport, and `isMobile` (width ≤ 900). |
+| **Fixed-rate stepping** | The simulation ticks at `1/FPS` seconds independent of the actual render rate, with a time accumulator to keep effects deterministic. |
 
-### GUI Auto-Generation
+### 10.4 Application State (`state.js`)
+
+Daydream uses a tiny pub/sub state container plus a URL-syncing wrapper:
+
+```js
+const appState = new AppState({ effect: 'IslamicStars', resolution: 'Phantasm (144x288)' });
+new URLSync(appState, ['effect', 'resolution']);  // mirrors keys to query string
+
+appState.subscribe((key, value, old) => {
+  if (key === 'effect') applyEffect();
+  else if (key === 'resolution') applyResolution();
+});
+```
+
+- **`AppState`** — flat key→value store with a `subscribe(callback)` API. Setting a key fires the callback only if the value actually changed. The sidebar and lil-gui both write through `appState.set(...)`, so they stay in sync without explicit coupling.
+- **`URLSync`** — reads tracked keys from `window.location.search` on construction (URL beats default), then debounces writes back to the query string via `history.replaceState`. Shareable links like `?effect=Raymarch&resolution=Phantasm%20(144x288)` work out of the box.
+
+### 10.5 The Effect Sidebar (`sidebar.js`)
+
+The left-edge effect list is a small custom widget:
+
+- **Persistent button references**: items are sorted by name or size (live `sizeof` from `getEffectSizes()`) without recreating DOM nodes — `setEffects()` mutates the existing buttons' positions.
+- **Keyboard navigation**: arrow keys / Home / End move the focused button; Enter selects.
+- **Mobile horizontal scroll**: when laid out as a horizontal strip, scroll arrows fade in/out based on scroll position via a `ResizeObserver` + scroll listener.
+- **Two effect lists**: `HiResFavorites` and `LoResFavorites` filter what's shown per resolution. Effects not in the active list are still in the WASM registry and can be loaded directly via `?effect=…`, but they won't show in the sidebar.
+
+### 10.6 GUI Auto-Generation
 
 The effect parameter panel is entirely driven by what C++ registers via `registerParam()`. When an effect is loaded, the simulator calls `getParameterDefinitions()` and builds `lil-gui` controls:
 
@@ -1536,13 +1655,84 @@ params.forEach(p => {
 });
 ```
 
-`getParamValues()` is polled each frame to sync the GUI with parameter values that the animation system has changed autonomously. The sync skips any control the user is currently interacting with to avoid fighting the slider.
+`getParamValues()` is polled each frame to sync the GUI with parameter values that the animation system has changed autonomously. The sync skips any control the user is currently interacting with to avoid fighting the slider. A per-effect **Reset** rebuilds the GUI from defaults, and **Export** copies the current `{ name, value }` set as a C++-formatted initializer suitable for `Presets<…>` arrays.
+
+### 10.7 Segmented POV Workers (`segment_worker.js`)
+
+Phantasm in hardware is four Teensys each rendering a Y-band of the canvas (§7.10). Daydream reproduces this in software so the partitioning is exercised before fabrication:
+
+```
+Main thread                  Workers (one WASM each)
+───────────                  ──────────────────────────
+drawFrame() {                postMessage({type:'render'})
+  if (pendingSegmentFrame)
+    compositeSegments();       worker N:
+  renderSegmentsParallel();      engine.setClip(yN0, yN1, xN0, xN1)
+}                                engine.drawFrame()
+                                 postMessage({type:'frame', pixels:Transferable})
+```
+
+Key properties:
+- **Isolated WASM instances per worker** — each segment has its own arena, its own random seed (`std::mt19937(1337)` is deterministic, so all workers produce the same result), and its own effect state.
+- **`setClip(y0, y1, x0, x1)`** — the WASM engine restricts rendering and pixel readback to the worker's quadrant; the rest of the canvas isn't even visited.
+- **One-frame pipeline** — frame N's render is dispatched fire-and-forget; frame N-1's results are composited synchronously when they arrive. Wall-clock time is measured against the slowest worker — exactly what the multi-Teensy hardware sees.
+- **Boundary overlay** — a "Show Boundaries" toggle paints cyan markers on the segment edges in the composite buffer to make the partition visible.
+
+### 10.8 Vendor Importmap (Local-First / CDN Fallback)
+
+`vendor-importmap.js` is loaded as a regular (non-module) `<script>` in every HTML page. At parse time it:
+
+1. Locates itself via `document.currentScript.src`, so it works whether called as `./vendor-importmap.js` (root) or `../vendor-importmap.js` (a tool page).
+2. Synchronously probes `three.js/build/three.module.js` and `node_modules/lil-gui/dist/lil-gui.esm.min.js` with `XMLHttpRequest('HEAD', …, false)`.
+3. Builds a `<script type="importmap">` with local URLs when present, otherwise jsdelivr URLs pinned to versions from `package.json`.
+4. Injects that importmap into `<head>` before any module loads.
+
+The probe HEAD requests cost a few hundred milliseconds total when 404'ing on the live GitHub Pages deploy (the only requests that 404 in the console), and the actual library code loads cleanly from CDN afterward. Local dev with a populated `three.js/` and `node_modules/` skips the CDN entirely.
+
+A page-specific local import (e.g. `solids.html` referencing `../solids.js`) is added by setting `window.__DAYDREAM_EXTRA_IMPORTS` before the helper script.
+
+### 10.9 Video Recording (`recorder.js`)
+
+A `VideoRecorder` wraps `MediaRecorder` over `canvas.captureStream(0)` — the manual-frame-request mode where frames are taken on demand instead of on wall-clock. After every simulation tick, `recorder.captureFrame()` requests a frame from the stream; this means recorded video is locked to the effect's simulation rate (16 FPS by default) regardless of how fast the browser actually renders. The result is byte-perfect repeatability between recordings.
+
+Codec priority is MP4/H.264 → WebM/VP9 → WebM/VP8, with optional offscreen-canvas downscaling to a target height for size-controlled exports.
+
+### 10.10 Resolution Presets
+
+| Name | Width × Height | Notes |
+|---|---|---|
+| Holosphere (20×96) | 96 × 20 | Matches the original Holosphere hardware |
+| Phantasm (144×288) | 288 × 144 | Matches Phantasm; default in the web simulator |
+
+Switching presets does a full WASM reset: `setResolution(w, h)` reallocates buffers, `setEffect(name)` rebuilds the effect at the new template instantiation. The sidebar swaps to the matching favorites list (§10.5).
+
+### 10.11 Geometry Tools (`daydream/tools/`)
+
+Five standalone HTML pages that share the engine's WASM `MeshOps` but render with their own Three.js scenes:
+
+| Tool | What it does |
+|---|---|
+| `lissajous.html` | Designs spherical Lissajous curves with live frequency / phase / amplitude sliders; outputs the C++ literal needed by `ChaoticStrings`. |
+| `mobius.html` | Visualizes Möbius transformations on the sphere via stereographic projection; lets you sweep the four complex coefficients and see the warp on a latitude-longitude grid. |
+| `palettes.html` | Tunes `ProceduralPalette` cosine coefficients and `GenerativePalette` harmony rules; exports the C++ initializer. |
+| `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated 8 MB tooling arenas. |
+| `splines.html` | Catmull-Rom spline designer with closed-loop and open-chain modes; click to add control points, drag to edit, export to a C++ `Plot::SplineChain` initializer. |
+
+All five reuse `vendor-importmap.js` so they work offline (with the local `three.js/`) or from GitHub Pages (via CDN).
 
 ---
 
 ## 11. Building
 
-### Firmware (Arduino / Teensy 4.x)
+The two repos should be checked out as siblings so the WASM install step can write directly into the simulator tree:
+
+```
+work/
+├── Holosphere/          (this repo — C++ engine + firmware + WASM build)
+└── daydream/            (web simulator — receives WASM artifacts)
+```
+
+### Firmware (Arduino / Teensy 4.x) — Holosphere repo
 
 Each hardware target has its own `.ino` entry point in `targets/`:
 
@@ -1567,7 +1757,7 @@ static constexpr int PIN_CLOCK  = 13;
 static constexpr int PIN_RANDOM = 15;
 ```
 
-### WASM (Simulator)
+### WASM Build — Holosphere repo (installs into daydream)
 
 Requires [Emscripten](https://emscripten.org/) and CMake. Use the included build script:
 
@@ -1580,7 +1770,8 @@ Or manually:
 mkdir build && cd build
 emcmake cmake .. -DCMAKE_BUILD_TYPE=Release
 emmake make
-cmake --install .     # copies holosphere_wasm.js + .wasm to ../daydream/
+cmake --install .     # copies holosphere_wasm.{js,wasm}, README.md, and
+                      # docs/screenshots/ into ../daydream/
 ```
 
 The `CMakeLists.txt` configures:
@@ -1591,7 +1782,9 @@ The `CMakeLists.txt` configures:
 - `-sSTACK_SIZE=8192` — minimal stack (effects use arena allocation, not deep recursion)
 - `-O3 -ffast-math -flto -msimd128` for release, `-O0 -g -sASSERTIONS=1` for debug
 
-### Running the Simulator
+The install step also writes `README.md` and `docs/screenshots/` so the daydream repo always serves the same documentation as Holosphere.
+
+### Running the Simulator — daydream repo
 
 The simulator is a static web app. Serve the daydream directory from any HTTP server:
 
@@ -1600,10 +1793,22 @@ python3 -m http.server 8080
 # open http://localhost:8080
 ```
 
-URL parameters control the initial state:
+URL parameters control the initial state (mirrored back by `URLSync`, §10.4):
 ```
-?effect=IslamicStars&resolution=Phantasm%20(144x288)&wasm=true
+?effect=IslamicStars&resolution=Phantasm%20(144x288)
 ```
+
+**Optional local vendor checkout.** The simulator runs against jsdelivr CDN by default. To work offline (and to get the WebGPU renderer file, which isn't in npm), populate the local vendor dirs:
+
+```bash
+cd daydream
+npm install              # populates node_modules/lil-gui/
+git clone --depth 1 https://github.com/mrdoob/three.js.git
+```
+
+[`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) detects these at startup and switches to local URLs automatically (§10.8).
+
+**Live demo.** The `master` branch of daydream is published to <https://woundedlion.github.io/daydream/> via GitHub Pages. The CDN-fallback path is what powers it.
 
 ---
 
