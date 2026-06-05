@@ -5,7 +5,7 @@
 
 
 import createHolosphereModule from "./holosphere_wasm.js";
-import { Daydream } from "./driver.js";
+import { Daydream, SLOW_FRAME_MS } from "./driver.js";
 import { GUI, resetGUI } from "gui";
 import { EffectSidebar } from "./sidebar.js";
 import { AppState, URLSync } from "./state.js";
@@ -314,7 +314,7 @@ function updateSegmentStats() {
   for (let s = 0; s < numSegs; s++) {
     const r = segmentResults[s];
     const timing = segmentTimings[s] || 0;
-    const slowClass = timing > 62 ? ' slow' : '';
+    const slowClass = timing > SLOW_FRAME_MS ? ' slow' : '';
 
     // Per-segment arena from worker
     const a = segmentArenas[s];
@@ -340,7 +340,7 @@ function updateSegmentStats() {
   }
 
   const maxTime = Math.max(...segmentTimings);
-  const wallClass = segmentWallTime > 62 ? ' slow' : '';
+  const wallClass = segmentWallTime > SLOW_FRAME_MS ? ' slow' : '';
 
   el.innerHTML = `<table>`
     + `<tr><th></th><th>Range</th><th>Compute</th><th>Render</th><th>Scr A</th><th>Scr B</th><th>Persist</th></tr>`

@@ -63,6 +63,9 @@ class LabelPool {
 
 
 
+/** Per-frame time (ms) above which a frame/segment is flagged "slow" in stats. */
+export const SLOW_FRAME_MS = 62;
+
 export const pixelKey = (x, y) => `${x},${y}`;
 export const keyPixel = (k) => k.split(',');
 export const XY = (x, y) => x + y * Daydream.W;
@@ -485,7 +488,7 @@ export class Daydream {
     }
 
     const perfText = `${duration.toFixed(3)} ms`;
-    const perfColor = duration > 62 ? 'red' : 'grey';
+    const perfColor = duration > SLOW_FRAME_MS ? 'red' : 'grey';
     this._statsGroup.perf.forEach(el => {
       if (el) { el.innerText = perfText; el.style.color = perfColor; }
     });
