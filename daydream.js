@@ -241,6 +241,11 @@ function renderSegmentsParallel() {
 
 /** Composite segment results into the display buffer (quadrant model). */
 function compositeSegments() {
+  // Safe to hold dst across the fill loop below: refreshPixelView() re-fetches
+  // the view if a prior memory growth detached it, and in segment mode the main
+  // engine never calls drawFrame() (only the workers render), so its WASM
+  // linear memory cannot grow here. The fill loop itself makes no WASM calls,
+  // so dst cannot detach mid-loop.
   refreshPixelView();
   const dst = wasmMemoryView;
   if (!dst) return;
