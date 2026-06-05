@@ -167,7 +167,12 @@ self.onmessage = async (e) => {
             capacity: arenaMetrics.persistent_arena.capacity,
           },
         };
-      } catch (e) { /* ignore */ }
+      } catch (e) {
+        // Surface rather than swallow: a missing/renamed binding or a shape
+        // change in getArenaMetrics should be diagnosable, not invisible.
+        console.warn('segment_worker: getArenaMetrics failed:', e);
+        arenaMetrics = null;
+      }
 
       self.postMessage({
         type: 'frame',
