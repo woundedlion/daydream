@@ -1,21 +1,25 @@
 
 import { GUI as LilGUI } from "lil-gui";
-import { urlWriter } from "./state.js";
 
-// Helper to read URL state. Writes go through the shared urlWriter (state.js)
-// so GUI param edits and AppState (effect/resolution) changes share one
-// debounced, fresh-read writer instead of racing two separate ones.
+// Helper to manage URL state
 const getUrlParams = () => new URLSearchParams(window.location.search);
+let urlTimer = null;
 const setUrlParam = (key, value) => {
+  const params = getUrlParams();
   if (value === null || value === undefined) {
-    urlWriter.delete(key);
+    params.delete(key);
   } else {
     // Round numbers to save space and avoid float jitter
     if (typeof value === 'number') {
       value = parseFloat(value.toFixed(4));
     }
-    urlWriter.set(key, value);
+    params.set(key, value);
   }
+  const newUrl = `${window.location.pathname}?${params.toString()}`;
+  clearTimeout(urlTimer);
+  urlTimer = setTimeout(() => {
+    window.history.replaceState({}, '', newUrl);
+  }, 200);
 };
 
 class DeepLinkGUI {
@@ -128,10 +132,6 @@ class DeepLinkGUI {
 }
 
 export const resetGUI = (excludedKeys = []) => {
-  // Land any queued writes first (e.g. a just-changed effect/resolution that is
-  // in excludedKeys) so they survive, and so no pending param write fires after
-  // this and resurrects a key we delete below.
-  urlWriter.flush();
   const params = getUrlParams();
   const keys = Array.from(params.keys());
   for (const key of keys) {
