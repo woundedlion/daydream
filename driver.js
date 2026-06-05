@@ -66,8 +66,6 @@ class LabelPool {
 /** Per-frame time (ms) above which a frame/segment is flagged "slow" in stats. */
 export const SLOW_FRAME_MS = 62;
 
-export const pixelKey = (x, y) => `${x},${y}`;
-export const keyPixel = (k) => k.split(',');
 export const XY = (x, y) => x + y * Daydream.W;
 
 export class Daydream {
