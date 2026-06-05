@@ -689,8 +689,10 @@ guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => 
 });
 
 
-// Initial resolution setup (will be re-run after WASM loads)
-applyResolution(true);
+// Resolution setup runs once, after the WASM engine loads (see the
+// createHolosphereModule().then handler above). It used to also run here
+// synchronously with a null engine, but nothing renders until wasmAdapter is
+// set (the animation loop is gated on it), so that early pass was redundant.
 
 guiInstance.add(daydream, 'labelAxes').name('Show Axes');
 guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere');
