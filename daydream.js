@@ -561,7 +561,8 @@ function applyResolution(preserveParams = false) {
   // Update the sidebar options
   let effectSizes = null;
   if (wasmEngine) {
-    try { effectSizes = wasmEngine.getEffectSizes(); } catch (e) { }
+    try { effectSizes = wasmEngine.getEffectSizes(); }
+    catch (e) { console.warn('getEffectSizes failed (sidebar sizes unavailable):', e); }
   }
   sidebar.setEffects(availableEffects, effectSizes);
 

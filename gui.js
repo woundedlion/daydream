@@ -76,7 +76,8 @@ class DeepLinkGUI {
 
     // 4. Update Display
     if (!isFunction && params.has(key)) {
-      try { controller.updateDisplay(); } catch (e) { }
+      try { controller.updateDisplay(); }
+      catch (e) { console.warn(`DeepLinkGUI: updateDisplay failed for "${key}":`, e); }
     }
 
     return controller;
@@ -107,7 +108,8 @@ class DeepLinkGUI {
 
     // 4. Update Display
     if (params.has(key)) {
-      try { controller.updateDisplay(); } catch (e) { }
+      try { controller.updateDisplay(); }
+      catch (e) { console.warn(`DeepLinkGUI: updateDisplay failed for "${key}":`, e); }
     }
 
     return controller;
