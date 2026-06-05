@@ -82,7 +82,13 @@ self.onmessage = async (e) => {
         canvasH = msg.h;
         segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
         engine.setResolution(canvasW, canvasH);
-        // clip will be re-applied on the next setEffect
+        // Re-apply this segment's clip here rather than relying on a follow-up
+        // setEffect message to do it. (No-op while no effect is bound —
+        // setResolution clears the effect on an actual size change — but it
+        // makes the handler self-contained: any path that changes resolution
+        // without a trailing setEffect, or a same-size call that keeps the
+        // effect, still ends with the correct clip instead of a stale one.)
+        applyClip();
       }
       break;
     }
