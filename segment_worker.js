@@ -61,6 +61,12 @@ self.onmessage = async (e) => {
       if (msg.effectName) {
         engine.setEffect(msg.effectName);
       }
+      // Apply the main engine's current tuned param values (sent at init) so
+      // this segment matches instead of rendering effect defaults. Must run
+      // after setEffect, which rebuilds the effect with defaults.
+      if (msg.params) {
+        for (const p of msg.params) engine.setParameter(p.name, p.value);
+      }
       applyClip();
 
       self.postMessage({ type: 'ready', segId });

@@ -115,6 +115,21 @@ function createSegmentWorkers(numSegments) {
 
   let readyCount = 0;
 
+  // Snapshot the main engine's current param values so freshly-spawned (or
+  // resized) workers build their effect with the user's tuned values, not the
+  // effect defaults. Sent once in the init message; ongoing changes are still
+  // broadcast live via workerSetParameter. Flattened to {name, value} (bools
+  // encoded as 1/0) so it survives structured-clone postMessage.
+  let initialParams = [];
+  if (wasmEngine) {
+    const defs = wasmEngine.getParameterDefinitions();
+    for (let i = 0; i < defs.length; i++) {
+      const p = defs[i];
+      const v = (typeof p.value === 'boolean') ? (p.value ? 1.0 : 0.0) : p.value;
+      initialParams.push({ name: p.name, value: v });
+    }
+  }
+
   for (let i = 0; i < numSegments; i++) {
     const worker = new Worker('./segment_worker.js', { type: 'module' });
 
@@ -153,6 +168,7 @@ function createSegmentWorkers(numSegments) {
       w: res.w,
       h: res.h,
       effectName: appState.get('effect'),
+      params: initialParams,
     });
 
     segmentWorkers.push(worker);
