@@ -20,6 +20,15 @@ let segRange = null; // { x0, x1, y0, y1, w, h }
 /** Mirrors the 2-arm quadrant layout from pov_segmented.h */
 function computeSegmentRange(id, total, w, h) {
   const NUM_ARMS = 2;
+  // The layout is symmetric across the 2 arms, so the segment count is always a
+  // positive even number (it mirrors pov_segmented.h's per-arm split — there can
+  // never be an odd number of segments). An odd total would make armId exceed
+  // NUM_ARMS and index x0 past the canvas, silently rendering a degenerate band.
+  // That's a configuration bug with no valid rendering, so fail fast.
+  if (!Number.isInteger(total) || total < NUM_ARMS || total % NUM_ARMS !== 0) {
+    throw new Error(
+      `segment_worker: totalSegs must be a positive even number (got ${total})`);
+  }
   const ySegsPerArm = Math.floor(total / NUM_ARMS);
   const armId = Math.floor(id / ySegsPerArm);
   const ySegId = id % ySegsPerArm;
