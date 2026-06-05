@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
-import { pixelToSpherical, vectorToPixel, pixelToVector } from "./geometry.js";
+import { pixelToSpherical } from "./geometry.js";
 import { GUI } from "gui";
 
 // Constants
@@ -439,12 +439,13 @@ export class Daydream {
     this.pixelMatrices = new Array(Daydream.W * Daydream.H);
     const vector = new THREE.Vector3();
     const dummy = new THREE.Object3D();
+    const sph = new THREE.Spherical(); // reused scratch (out-param, no per-dot alloc)
 
     for (let i = 0; i < Daydream.W * Daydream.H; i++) {
       const x = i % Daydream.W;
       const y = Math.floor(i / Daydream.W);
 
-      vector.setFromSpherical(pixelToSpherical(x, y));
+      vector.setFromSpherical(pixelToSpherical(x, y, sph));
       vector.multiplyScalar(Daydream.SPHERE_RADIUS);
 
       dummy.position.set(0, 0, 0);
@@ -521,17 +522,6 @@ export class Daydream {
     this.setupDots();
 
     this.precomputeMatrices();
-  }
-
-
-  static snapToGrid(v) {
-    const pixel = vectorToPixel(v);
-    const ix = Math.floor(pixel.x + 0.5);
-    const iy = Math.floor(pixel.y + 0.5);
-    return {
-      position: pixelToVector(ix, iy),
-      index: ix + iy * Daydream.W
-    };
   }
 }
 
