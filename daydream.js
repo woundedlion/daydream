@@ -510,7 +510,12 @@ function applyResolution(preserveParams = false) {
   if (!p) return;
 
   if (wasmEngine) {
-    wasmEngine.setResolution(p.w, p.h);
+    // setResolution returns false for a size the WASM factory can't build; keep
+    // the current (valid) resolution rather than driving the engine blank.
+    if (wasmEngine.setResolution(p.w, p.h) === false) {
+      console.error(`Unsupported resolution ${p.w}x${p.h}; keeping current.`);
+      return;
+    }
     wasmMemoryView = null; // Force refreshPixelView to re-fetch after resize
   }
 
