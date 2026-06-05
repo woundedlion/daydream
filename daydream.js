@@ -38,6 +38,7 @@ const HiResFavorites = [
   "SplineFlow",
   "Test",
   "TestShapes",
+  "Thrusters",
   "Voronoi",
 ];
 
