@@ -137,7 +137,7 @@ export class Daydream {
 
     // Timing Variables
     this.clock = new THREE.Clock(true);
-    this.frameInterval = 1 / 16;
+    this.frameInterval = 1 / Daydream.FPS; // single source of truth (was hardcoded 1/16)
     this.timeAccumulator = 0;
 
     this.resources = [];
