@@ -100,6 +100,3 @@ export function initScene(containerId, canvasId, opts = {}) {
 
   return { scene, camera, renderer, controls, sphere };
 }
-
-/** Current Three.js version string used across all tools. */
-export const THREE_VERSION = '0.160.0';
