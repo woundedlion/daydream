@@ -1777,22 +1777,17 @@ static constexpr int PIN_RANDOM = 15;
 
 ### WASM Build — Holosphere repo (installs into daydream)
 
-Requires [Emscripten](https://emscripten.org/) and CMake. Use the included build script:
+The build is driven by **CMake presets** ([`CMakePresets.json`](CMakePresets.json)) so the same commands work on any platform with CMake ≥ 3.21, Ninja, and [Emscripten](https://emscripten.org/). Set up the Emscripten environment once (`emsdk_env`, which exports `EMSDK`), then:
 
 ```bash
-./build_release.bat    # configures CMake + Ninja, builds, installs to ../daydream/
+cmake --preset wasm-release                     # configure (Emscripten toolchain)
+cmake --build  --preset wasm-release            # build holosphere_wasm.{js,wasm}
+cmake --build  --preset wasm-release-install    # build + install into ../daydream/
 ```
 
-Or manually:
-```bash
-mkdir build && cd build
-emcmake cmake .. -DCMAKE_BUILD_TYPE=Release
-emmake make
-cmake --install .     # copies holosphere_wasm.{js,wasm}, README.md, and
-                      # docs/screenshots/ into ../daydream/
-```
+Use `wasm-debug` for an unoptimized build with assertions (`-sASSERTIONS=1`). Build outputs go to `build/<preset>/`. The Windows convenience wrappers `build_release.bat` / `build_debug.bat` simply forward to these presets.
 
-The `CMakeLists.txt` configures:
+The WASM target (`CMakeLists.txt`, `EMSCRIPTEN` branch) configures:
 - Source paths: `targets/wasm/wasm.cpp`, `core/memory.cpp`, `core/reaction_graph.cpp`
 - Include paths: project root (for `effects/`, `hardware/`) and `core/` (for engine headers)
 - `-sALLOW_MEMORY_GROWTH=1` — WASM heap can grow for large meshes
@@ -1801,6 +1796,20 @@ The `CMakeLists.txt` configures:
 - `-O3 -ffast-math -flto -msimd128` for release, `-O0 -g -sASSERTIONS=1` for debug
 
 The install step also writes `README.md` and `docs/screenshots/` so the daydream repo always serves the same documentation as Holosphere.
+
+### Tests — Holosphere repo
+
+The unit suite is a native (non-WASM) Clang build with asserts enabled, also driven by a preset:
+
+```bash
+cmake --preset tests          # configure (cmake/toolchain-native-clang.cmake)
+cmake --build --preset tests  # build the run_tests executable
+ctest --preset tests          # run the suite (or: build_tests.bat)
+```
+
+The suite must use Clang — the engine relies on GCC/Clang `__attribute__` extensions MSVC rejects. The native toolchain file ([`cmake/toolchain-native-clang.cmake`](cmake/toolchain-native-clang.cmake)) locates Clang via `EMSDK` (or a sibling `../emsdk`) and, on Windows, transparently handles the resource compiler and `lld-link` so no Visual Studio Developer Prompt is required. Tests build with `-DHS_TEST_BUILD`, which only widens a couple of test-build buffer budgets (MSVC-STL `std::function` is larger than the device's `inplace_function`) — the firmware/WASM footprint is unchanged.
+
+Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-diffusion graph integrity, filters, the plot samplers, solids-registry invariants, animation, and an effect smoke harness that constructs and renders every effect at 288×144 with asserts on. `tests/run_tests.cpp` is the driver; add a `tests/test_<module>.h` and one line there to extend it.
 
 ### Running the Simulator — daydream repo
 
