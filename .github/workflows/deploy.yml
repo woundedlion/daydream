@@ -1,0 +1,68 @@
+# Deploy the daydream simulator to GitHub Pages (Pages source: GitHub Actions),
+# GATED on the Holosphere engine's native unit suite. The `deploy` job
+# `needs: gate`, so the live site only updates when the engine tests pass.
+#
+# The committed app files are published as-is (three.js / lil-gui load from the
+# CDN via vendor-importmap.js, so they don't need vendoring here). The engine's
+# WASM module is whatever is committed in this repo — built and installed from
+# Holosphere; the gate verifies that engine's suite is green.
+#
+# If the engine repo (woundedlion/pov) is PRIVATE, add a repository secret
+# POV_TOKEN = a PAT with read access. For a public engine repo the default
+# workflow token is sufficient.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; let an in-progress deploy finish rather than cancel it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Engine unit tests (deploy gate)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout engine (woundedlion/pov)
+        uses: actions/checkout@v4
+        with:
+          repository: woundedlion/pov
+          token: ${{ secrets.POV_TOKEN || github.token }}
+
+      - name: Install Clang + Ninja
+        run: sudo apt-get update && sudo apt-get install -y clang ninja-build
+
+      - run: cmake --preset tests -DHS_INSTALL_GIT_HOOKS=OFF
+      - run: cmake --build --preset tests
+      - run: ctest --preset tests --output-on-failure
+
+  deploy:
+    name: Deploy to Pages
+    needs: gate                  # ← only deploys if the engine suite passes
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
