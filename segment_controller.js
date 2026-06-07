@@ -49,6 +49,15 @@ export class SegmentController {
     this.frameResolve = null; // promise resolve for the current frame
     this.ready = false;       // true once all workers are initialized
 
+    // Generation fence. renderGen bumps on every resolution change; renderParallel
+    // snapshots it into inflightGen at dispatch. Worker frame responses carry the
+    // bounds of the resolution they were rendered at, so a response whose snapshot
+    // no longer matches renderGen references a stale W/H and must be dropped before
+    // it reaches the compositor (otherwise its old x1/y1 index past the resized
+    // display buffer). Counter-only; no per-pixel cost.
+    this.renderGen = 0;
+    this.inflightGen = 0;
+
     // Pipeline flags (were a module global + a render-loop local)
     this.renderInFlight = false;
     this.pendingFrame = false; // true when workers have new results to display
@@ -99,15 +108,20 @@ export class SegmentController {
         } else if (msg.type === 'effectReady') {
           // Worker finished loading effect, no action needed
         } else if (msg.type === 'frame') {
-          this.results[msg.segId] = {
-            pixels: msg.pixels ? new Uint16Array(msg.pixels) : null,
-            x0: msg.x0, x1: msg.x1,
-            y0: msg.y0, y1: msg.y1,
-            quadW: msg.quadW, quadH: msg.quadH,
-          };
-          this.timings[msg.segId] = msg.elapsed;
-          this.renderUs[msg.segId] = msg.renderUs || 0;
-          this.arenas[msg.segId] = msg.arenaMetrics;
+          // Drop results from a render dispatched before the last resolution
+          // change: their x0..y1 reference the old W/H and would index past the
+          // resized display buffer. Still settle the frame so the promise resolves.
+          if (this.inflightGen === this.renderGen) {
+            this.results[msg.segId] = {
+              pixels: msg.pixels ? new Uint16Array(msg.pixels) : null,
+              x0: msg.x0, x1: msg.x1,
+              y0: msg.y0, y1: msg.y1,
+              quadW: msg.quadW, quadH: msg.quadH,
+            };
+            this.timings[msg.segId] = msg.elapsed;
+            this.renderUs[msg.segId] = msg.renderUs || 0;
+            this.arenas[msg.segId] = msg.arenaMetrics;
+          }
           this.pending--;
           if (this.pending === 0 && this.frameResolve) {
             this.frameResolve();
@@ -145,6 +159,7 @@ export class SegmentController {
     this.pending = 0;
     this.frameResolve = null;
     this.renderInFlight = false;
+    this.pendingFrame = false;
   }
 
   /** Tell all workers to set a new effect. */
@@ -163,6 +178,13 @@ export class SegmentController {
 
   /** Tell all workers to update resolution. */
   setResolution(w, h) {
+    // Open a new generation: any render still in flight (or a settled result not
+    // yet composited) was sized to the old W/H and must not reach the compositor.
+    // Drop already-settled results and the pending-composite flag here; the
+    // generation check in onmessage drops the in-flight ones as they arrive.
+    this.renderGen++;
+    this.results.fill(null);
+    this.pendingFrame = false;
     for (const worker of this.workers) {
       worker.postMessage({ type: 'setResolution', w, h });
     }
@@ -174,6 +196,7 @@ export class SegmentController {
    */
   renderParallel() {
     return new Promise((resolve) => {
+      this.inflightGen = this.renderGen; // tag this dispatch's resolution
       this.pending = this.workers.length;
       this.frameStart = performance.now();
       this.frameResolve = () => {
@@ -207,6 +230,11 @@ export class SegmentController {
     for (let s = 0; s < this.results.length; s++) {
       const r = this.results[s];
       if (!r || !r.pixels) continue;
+      // Skip any rectangle that doesn't fit the current display buffer. The
+      // generation fence should already have dropped stale-resolution results;
+      // this is a final guard so a mismatched rect is never partially blitted
+      // past the buffer (per-result, not per-pixel — no hot-path cost).
+      if (r.x0 < 0 || r.y0 < 0 || r.x1 > w || r.y1 > h) continue;
 
       let srcIdx = 0;
       for (let y = r.y0; y < r.y1; y++) {
