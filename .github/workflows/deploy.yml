@@ -7,6 +7,12 @@
 # WASM module is whatever is committed in this repo — built and installed from
 # Holosphere; the gate verifies that engine's suite is green.
 #
+# The gate pins its engine checkout to the SHA the committed .wasm was built
+# from (holosphere_wasm.sha, written next to the module by the Holosphere WASM
+# install step), so it tests the exact source the deployed module corresponds to
+# rather than a decoupled engine HEAD. If that file is absent (a module built
+# before provenance was recorded), it falls back to engine HEAD with a warning.
+#
 # If the engine repo (woundedlion/pov) is PRIVATE, add a repository secret
 # POV_TOKEN = a PAT with read access. For a public engine repo the default
 # workflow token is sufficient.
@@ -32,18 +38,38 @@ jobs:
     name: Engine unit tests (deploy gate)
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout engine (woundedlion/pov)
+      - name: Checkout daydream (for the pinned engine SHA)
+        uses: actions/checkout@v4
+
+      - name: Resolve engine SHA the committed WASM was built from
+        id: engine
+        run: |
+          if [ -f holosphere_wasm.sha ]; then
+            sha="$(tr -d '[:space:]' < holosphere_wasm.sha)"
+            echo "Pinning engine checkout to $sha (from holosphere_wasm.sha)"
+            echo "ref=$sha" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::holosphere_wasm.sha not found; falling back to engine HEAD (gate is decoupled from the committed WASM)"
+            echo "ref=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout engine (woundedlion/pov) at the pinned SHA
         uses: actions/checkout@v4
         with:
           repository: woundedlion/pov
+          ref: ${{ steps.engine.outputs.ref }}
           token: ${{ secrets.POV_TOKEN || github.token }}
+          path: engine
 
       - name: Install Clang + Ninja
         run: sudo apt-get update && sudo apt-get install -y clang ninja-build
 
       - run: cmake --preset tests -DHS_INSTALL_GIT_HOOKS=OFF
+        working-directory: engine
       - run: cmake --build --preset tests
+        working-directory: engine
       - run: ctest --preset tests --output-on-failure
+        working-directory: engine
 
   deploy:
     name: Deploy to Pages

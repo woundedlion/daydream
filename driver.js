@@ -521,6 +521,38 @@ export class Daydream {
 
     this.precomputeMatrices();
   }
+
+  /**
+   * Release everything this instance owns: the ResizeObserver, the WebGL
+   * program/geometry/material resources, the OrbitControls listeners, and the
+   * label DOM layer. Call before discarding a Daydream (e.g. on SPA navigation
+   * away) so it leaves behind no live observer firing into a dead scene and no
+   * leaked GPU material/geometry/context.
+   */
+  dispose() {
+    this.resizeObserver?.disconnect();
+
+    if (this.dotMesh) {
+      this.scene.remove(this.dotMesh);
+      this.dotMesh.geometry?.dispose();
+      if (this.dotMesh.instanceColor) this.dotMesh.instanceColor.array = null;
+      this.dotMesh.dispose();
+      this.dotMesh = null;
+    }
+    this.dotMaterial?.dispose();
+    this.dotMaterial = null;
+
+    for (const axis of [this.xAxis, this.yAxis, this.zAxis]) {
+      if (!axis) continue;
+      this.scene.remove(axis);
+      axis.geometry?.dispose();
+    }
+    this.axisMaterial?.dispose();
+
+    this.controls?.dispose();
+    this.labelRenderer?.domElement?.remove();
+    this.renderer?.dispose();
+  }
 }
 
 export const prettify = (r) => {
