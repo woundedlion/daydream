@@ -29,6 +29,14 @@ function computeSegmentRange(id, total, w, h) {
     throw new Error(
       `segment_worker: totalSegs must be a positive even number (got ${total})`);
   }
+  // Guard the resolution carried across the postMessage boundary (init /
+  // setResolution / setSegment all funnel through here). A non-integer or
+  // non-positive dimension would produce a degenerate segRange and feed garbage
+  // into setClip; fail fast instead.
+  if (!Number.isInteger(w) || w <= 0 || !Number.isInteger(h) || h <= 0) {
+    throw new Error(
+      `segment_worker: canvas dimensions must be positive integers (got ${w}x${h})`);
+  }
   const ySegsPerArm = Math.floor(total / NUM_ARMS);
   const armId = Math.floor(id / ySegsPerArm);
   const ySegId = id % ySegsPerArm;
