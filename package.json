@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "importmap": "node scripts/generate-importmap.mjs",
+    "importmap:local": "node scripts/generate-importmap.mjs --local"
+  },
   "dependencies": {
     "gui": "^0.15.6",
     "lil-gui": "^0.21.0",

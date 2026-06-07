@@ -52,10 +52,18 @@ export class AppState {
   snapshot() { return { ...this._state }; }
 }
 
+// The app-wide active URLSync instance. The GUI layer (gui.js) routes its
+// param writes through this rather than issuing its own competing
+// replaceState, so there is a single URL writer and no clobber race.
+let _activeURLSync = null;
+export const getActiveURLSync = () => _activeURLSync;
+
 /**
- * URL synchronization layer.
- * Subscribes to an AppState and keeps URL params in sync.
- * Also reads initial values from URL on construction.
+ * URL synchronization layer — the single owner of URL writes.
+ * Subscribes to an AppState for tracked keys, accepts ad-hoc param writes from
+ * the GUI layer, and reads initial values from the URL on construction. All
+ * writes funnel through one debounced flush (read-modify-write at fire time),
+ * so concurrent AppState and GUI updates merge instead of clobbering.
  */
 export class URLSync {
   /**
@@ -66,6 +74,7 @@ export class URLSync {
     this.state = state;
     this.trackedKeys = new Set(trackedKeys);
     this._timer = null;
+    this._adhoc = new Map(); // GUI-set params (key -> string), merged on flush
 
     // Read initial values from URL
     const params = new URLSearchParams(window.location.search);
@@ -82,9 +91,43 @@ export class URLSync {
     // Subscribe to changes and debounce URL writes
     state.subscribe((key, value) => {
       if (!this.trackedKeys.has(key)) return;
-      clearTimeout(this._timer);
-      this._timer = setTimeout(() => this._flush(), 200);
+      this._schedule();
     });
+
+    // Become the app-wide URL writer the GUI delegates to.
+    _activeURLSync = this;
+  }
+
+  _schedule() {
+    clearTimeout(this._timer);
+    this._timer = setTimeout(() => this._flush(), 200);
+  }
+
+  /** Ad-hoc param write from the GUI layer; merged into the single flush. */
+  setParam(key, value) {
+    if (value === null || value === undefined) {
+      this._adhoc.delete(key);
+    } else {
+      // Round numbers to save space and avoid float jitter (matches the GUI's
+      // previous behavior).
+      this._adhoc.set(key,
+        typeof value === 'number' ? String(parseFloat(value.toFixed(4))) : String(value));
+    }
+    this._schedule();
+  }
+
+  /** Clear every URL param except the excluded keys (immediate). */
+  reset(excludedKeys = []) {
+    clearTimeout(this._timer);
+    const excl = new Set(excludedKeys);
+    for (const k of [...this._adhoc.keys()]) {
+      if (!excl.has(k)) this._adhoc.delete(k);
+    }
+    const params = new URLSearchParams(window.location.search);
+    for (const k of [...params.keys()]) {
+      if (!excl.has(k)) params.delete(k);
+    }
+    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
   }
 
   _flush() {
@@ -94,6 +137,9 @@ export class URLSync {
       if (val !== null && val !== undefined) {
         params.set(key, val);
       }
+    }
+    for (const [key, val] of this._adhoc) {
+      params.set(key, val);
     }
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState({}, '', newUrl);

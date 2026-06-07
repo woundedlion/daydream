@@ -297,7 +297,7 @@ export class SegmentController {
         ? `x[${r.x0}–${r.x1}] y[${r.y0}–${r.y1}]`
         : '?';
 
-      const renderMs = this.renderUs[s] || 0;
+      const renderMs = (this.renderUs[s] || 0) / 1000; // µs → ms for display
       rows += `<tr>`
            + `<td class="seg-label">Seg ${s}</td>`
            + `<td style="color:#555;font-size:0.8em">${rangeStr}</td>`

@@ -1,24 +1,32 @@
 
 import { GUI as LilGUI } from "lil-gui";
+import { getActiveURLSync } from "./state.js";
 
-// Helper to manage URL state
+// Helper to read URL state.
 const getUrlParams = () => new URLSearchParams(window.location.search);
+
+// URL writes funnel through the app's single URLSync writer when present (the
+// main simulator), so GUI param changes and effect/resolution changes can't
+// clobber each other. Standalone pages without a URLSync (the tool pages) fall
+// back to a self-contained debounced write that reads the URL at fire time.
 let urlTimer = null;
 const setUrlParam = (key, value) => {
-  const params = getUrlParams();
-  if (value === null || value === undefined) {
-    params.delete(key);
-  } else {
-    // Round numbers to save space and avoid float jitter
-    if (typeof value === 'number') {
-      value = parseFloat(value.toFixed(4));
-    }
-    params.set(key, value);
+  const sync = getActiveURLSync();
+  if (sync) {
+    sync.setParam(key, value);
+    return;
   }
-  const newUrl = `${window.location.pathname}?${params.toString()}`;
   clearTimeout(urlTimer);
   urlTimer = setTimeout(() => {
-    window.history.replaceState({}, '', newUrl);
+    const params = getUrlParams(); // read at fire time so we don't clobber
+    if (value === null || value === undefined) {
+      params.delete(key);
+    } else if (typeof value === 'number') {
+      params.set(key, parseFloat(value.toFixed(4)));
+    } else {
+      params.set(key, value);
+    }
+    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
   }, 200);
 };
 
@@ -134,15 +142,18 @@ class DeepLinkGUI {
 }
 
 export const resetGUI = (excludedKeys = []) => {
+  const sync = getActiveURLSync();
+  if (sync) {
+    sync.reset(excludedKeys);
+    return;
+  }
   const params = getUrlParams();
-  const keys = Array.from(params.keys());
-  for (const key of keys) {
+  for (const key of Array.from(params.keys())) {
     if (!excludedKeys.includes(key)) {
       params.delete(key);
     }
   }
-  const newUrl = `${window.location.pathname}?${params.toString()}`;
-  window.history.replaceState({}, '', newUrl);
+  window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
 };
 
 // compatibility with import * as gui from 'gui'
