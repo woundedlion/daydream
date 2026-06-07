@@ -37,8 +37,8 @@ const HiResFavorites = [
   "RingSpin",
   "SphericalHarmonics",
   "SplineFlow",
-  "Test",
-  "TestShapes",
+  "DistortedRing",
+  "ShapeShifter",
   "Thrusters",
   "Voronoi",
 ];
@@ -60,8 +60,8 @@ const LoResFavorites = [
   "RingShower",
   "RingSpin",
   "SplineFlow",
-  "Test",
-  "TestShapes",
+  "DistortedRing",
+  "ShapeShifter",
   "Thrusters",
   "Voronoi",
 ];
