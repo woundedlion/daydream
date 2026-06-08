@@ -131,6 +131,13 @@ self.onmessage = async (e) => {
       break;
     }
 
+    case 'setAnimationsPaused': {
+      if (engine) {
+        engine.setAnimationsPaused(msg.paused);
+      }
+      break;
+    }
+
     case 'render': {
       if (!engine || !segRange) break;
 
