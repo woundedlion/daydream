@@ -127,6 +127,15 @@ export class URLSync {
     for (const k of [...params.keys()]) {
       if (!excl.has(k)) params.delete(k);
     }
+    // Re-assert current state for tracked keys. reset() clears this._timer above,
+    // which cancels any flush already scheduled for an in-flight change (e.g. an
+    // effect switch reaches us via applyEffect()->resetGUI() before its flush
+    // fires). Excluding a key by name only preserves its STALE url value, so
+    // without this the new effect/resolution would be lost and never persisted.
+    for (const key of this.trackedKeys) {
+      const val = this.state.get(key);
+      if (val !== null && val !== undefined) params.set(key, val);
+    }
     window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
   }
 
