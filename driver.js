@@ -249,7 +249,12 @@ export class Daydream {
 
     this.timeAccumulator -= this.frameInterval;
 
-    if (!this.paused || this.stepFrames != 0) {
+    // The simulation advances only when running or single-stepping. Capture the
+    // decision before stepFrames is decremented so the recorder can be gated on
+    // the same condition (a paused recording must not pad the video with
+    // duplicate frames or advance elapsedSeconds).
+    const advanced = !this.paused || this.stepFrames != 0;
+    if (advanced) {
       if (this.stepFrames != 0) this.stepFrames--;
 
       if (Daydream.pixels) Daydream.pixels.fill(0);
@@ -328,8 +333,10 @@ export class Daydream {
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
 
-    // Capture a video frame (simulation-synced)
-    if (this.recorder) this.recorder.captureFrame();
+    // Capture a video frame (simulation-synced) — only when the simulation
+    // actually advanced this tick, so pausing freezes the recording instead of
+    // padding it with duplicate frames.
+    if (this.recorder && advanced) this.recorder.captureFrame();
 
     if (this.labelPool.activeCount > 0) {
       this.labelRenderer.render(this.scene, this.camera);
