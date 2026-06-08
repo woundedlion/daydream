@@ -11,21 +11,14 @@
   <title>Spherical Spline Designer</title>
   <script src="../vendor/tailwindcss.js"></script>
   <script src="../vendor-importmap.js"></script>
+  <link rel="stylesheet" href="tools.css">
   <style>
     :root {
-      --slate-900: #0f172a;
-      --slate-800: #1e293b;
-      --slate-700: #334155;
-      --blue-500: #3b82f6;
-      --indigo-400: #818cf8;
       --emerald-400: #34d399;
       --rose-400: #fb7185;
     }
 
     body {
-      font-family: 'Inter', sans-serif;
-      background-color: var(--slate-900);
-      color: #E2E8F0;
       overflow: hidden;
     }
 
@@ -61,31 +54,6 @@
       padding: 1rem;
       margin-bottom: 1.5rem;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-
-    input[type=range] {
-      height: 6px;
-      -webkit-appearance: none;
-      width: 100%;
-      background: #475569;
-      border-radius: 3px;
-      cursor: pointer;
-    }
-
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      height: 16px;
-      width: 16px;
-      border-radius: 50%;
-      background: var(--blue-500);
-      cursor: pointer;
-      margin-top: 3px;
-    }
-
-    .slider-label {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.875rem;
-      color: var(--indigo-400);
     }
 
     .btn {
@@ -220,7 +188,7 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { initScene } from './shared.js';
+    import { initScene, copyToClipboard } from './shared.js';
 
     const SLATE_900 = 0x0f172a;
     const FAST_COLOR = 0x34d399;   // emerald
@@ -615,7 +583,7 @@
       // Copy
       document.getElementById('btn-copy').addEventListener('click', () => {
         const text = document.getElementById('export-output').textContent;
-        navigator.clipboard.writeText(text).then(() => {
+        copyToClipboard(text).then(() => {
           const btn = document.getElementById('btn-copy');
           btn.textContent = 'Copied!';
           setTimeout(() => { btn.textContent = 'Copy'; }, 1500);

@@ -11,20 +11,9 @@
   <title>Spherical Lissajous Visualizer</title>
   <script src="../vendor/tailwindcss.js"></script>
   <script src="../vendor-importmap.js"></script>
+  <link rel="stylesheet" href="tools.css">
   <style>
-    /* Custom styles inspired by palettes.html */
-    :root {
-      --slate-900: #0f172a;
-      --slate-800: #1e293b;
-      --slate-700: #334155;
-      --blue-500: #3b82f6;
-      --indigo-400: #818cf8;
-    }
-
     body {
-      font-family: 'Inter', sans-serif;
-      background-color: var(--slate-900);
-      color: #E2E8F0;
       overflow: hidden;
       /* Prevent scrolling */
     }
@@ -63,43 +52,6 @@
       padding: 1rem;
       margin-bottom: 1.5rem;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-
-    /* Custom slider styles */
-    input[type=range] {
-      height: 6px;
-      -webkit-appearance: none;
-      width: 100%;
-      background: #475569;
-      border-radius: 3px;
-      cursor: pointer;
-    }
-
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      height: 16px;
-      width: 16px;
-      border-radius: 50%;
-      background: var(--blue-500);
-      cursor: pointer;
-      margin-top: 3px;
-      /* ADJUSTED: Moved down by 8px from -5px */
-    }
-
-    /* Style for disabled slider thumb */
-    input[type=range]:disabled::-webkit-slider-thumb {
-      background: var(--slate-800);
-      cursor: default;
-    }
-
-    input[type=range]:disabled {
-      background: #47556950;
-    }
-
-    .slider-label {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.875rem;
-      color: var(--indigo-400);
     }
 
     /* Media query for smaller screens */
@@ -195,7 +147,8 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { initScene, copyToClipboard } from './shared.js';
+    import { createSlider as buildSlider } from './slider.js';
 
     // Utility to get CSS variable color and convert to numeric hex
     const getCssColor = (name) => {
@@ -236,59 +189,19 @@
       return new THREE.Vector3(x, y, z);
     };
 
-    // --- Window Resize Handler ---
-    const onWindowResize = () => {
-      if (!renderer) return;
-
-      const container = document.getElementById('canvasContainer');
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
-    };
-
     // --- THREE.js Setup ---
     const initThree = () => {
-      const container = document.getElementById('canvasContainer');
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-
-      scene = new THREE.Scene();
-      scene.background = new THREE.Color(SLATE_900);
-
-      camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-      // ADJUSTMENT: Move the camera closer to make the visualization fill the space
-      camera.position.set(1.5, 1.5, 3);
-
-      renderer = new THREE.WebGLRenderer({
-        canvas: document.getElementById('threeCanvas'),
-        antialias: true
+      // Camera moved closer than the default to make the curve fill the space.
+      const result = initScene('canvasContainer', 'threeCanvas', {
+        background: SLATE_900,
+        cameraPosition: [1.5, 1.5, 3],
       });
-      renderer.setSize(width, height);
-      renderer.setPixelRatio(window.devicePixelRatio);
-
-      controls = new OrbitControls(camera, renderer.domElement);
-      controls.minDistance = 2;
-      controls.maxDistance = 10;
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
-
-      // Reference Sphere (Unit Sphere)
-      const geometry = new THREE.SphereGeometry(1.0, 64, 32);
-      const material = new THREE.MeshBasicMaterial({
-        color: 0x334155,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.2
-      });
-      const sphere = new THREE.Mesh(geometry, material);
-      sphere.renderOrder = 0;
-      scene.add(sphere);
+      scene = result.scene;
+      camera = result.camera;
+      renderer = result.renderer;
+      controls = result.controls;
 
       regenerateCurve();
-      animate();
     };
 
     const regenerateCurve = () => {
@@ -320,12 +233,6 @@
       line = new THREE.Line(geometry, material);
       line.renderOrder = 1;
       scene.add(line);
-    };
-
-    const animate = () => {
-      requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
     };
 
     // --- RATIONAL CONSTRAINT LOGIC ---
@@ -451,23 +358,9 @@
     // --- End RATIONAL CONSTRAINT LOGIC ---
 
     // --- Copy to Clipboard Helper ---
-    function copyToClipboard(text, feedbackElement, originalMessage = "") {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = 0;
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-
-      let success = false;
-      try {
-        success = document.execCommand('copy');
-      } catch (err) {
-        console.error('Failed to copy text: ', err);
-      }
-
-      document.body.removeChild(textarea);
+    // Copies via the shared clipboard primitive, then shows transient feedback.
+    async function copyWithFeedback(text, feedbackElement, originalMessage = "") {
+      const success = await copyToClipboard(text);
 
       if (success && feedbackElement) {
         feedbackElement.textContent = "Copied!";
@@ -524,44 +417,21 @@
     // --- UI Setup ---
 
     const createSlider = (id, params) => {
-      const container = document.getElementById(`${id}_container`);
-      if (!container) return;
+      // C1/C2 show 2 decimals; A and Duration show 3.
+      const decimals = (id === 'A' || id === 'Duration') ? 3 : 2;
+      const scale = params.scale || 1;
 
-      const sliderId = `${id}_slider`;
-      const valueSpanId = `${id}_value`;
-
-      // Determine number of decimal places for display
-      let decimals = 0;
-      if (id === 'A' || id === 'Duration') {
-        decimals = 3;
-      } else {
-        decimals = 2; // C1 and C2 always use 2 decimals for display
-      }
-
-      const scale = params.scale || 1; // Robustly define scale here (though fixed in config now)
-
-      const initialValue = params.default * scale;
-      const displayInitialValue = params.default;
-
-      container.innerHTML = `
-        <span class="w-20 text-center font-bold text-white text-lg">${params.label}:</span>
-        <input type="range" id="${sliderId}"
-          min="${Math.round(params.min * scale)}"
-          max="${Math.round(params.max * scale)}"
-          step="${Math.round(params.step * scale)}"
-          value="${Math.round(initialValue)}"
-          class="flex-grow">
-        <span id="${valueSpanId}" class="slider-label w-24 text-right">
-          ${(displayInitialValue).toFixed(decimals)}
-        </span>
-      `;
-
-      const slider = document.getElementById(sliderId);
-      const valueSpan = document.getElementById(valueSpanId);
-
-      slider.addEventListener('input', () => {
-        const rawValue = parseFloat(slider.value);
-        let newValue = rawValue / scale;
+      const handles = buildSlider(`${id}_container`, {
+        id,
+        label: params.label,
+        min: params.min,
+        max: params.max,
+        step: params.step,
+        value: params.default,
+        scale,
+        decimals,
+      }, (rawValue) => {
+        const newValue = rawValue / scale;
 
         // 1. Update state based on input value first
         state[id] = id === 'Samples' ? Math.round(newValue) : newValue;
@@ -572,7 +442,7 @@
         } else {
           // 3. For unlocked controls, update UI and re-render normally
           // FIX: Ensure Samples is always displayed as a whole number
-          valueSpan.textContent = id === 'Samples' ? Math.round(state[id]).toFixed(0) : state[id].toFixed(decimals);
+          handles.valueSpan.textContent = id === 'Samples' ? Math.round(state[id]).toFixed(0) : state[id].toFixed(decimals);
           regenerateCurve();
           updateCodeSnippet();
         }
@@ -627,7 +497,7 @@
 
       if (copyButton && codeOutput) {
         const handleCopy = () => {
-          copyToClipboard(codeOutput.textContent, prompt, "");
+          copyWithFeedback(codeOutput.textContent, prompt, "");
         };
 
         copyButton.addEventListener('click', handleCopy);
@@ -637,9 +507,6 @@
       updateCodeSnippet();
       initThree();
     };
-
-    // Attach resize listener
-    window.addEventListener('resize', onWindowResize);
 
     // Start everything when the window is fully loaded
     window.onload = init;
