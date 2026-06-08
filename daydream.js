@@ -6,7 +6,7 @@
 
 import createHolosphereModule from "./holosphere_wasm.js";
 import { Daydream, SLOW_FRAME_MS } from "./driver.js";
-import { GUI, resetGUI } from "gui";
+import { GUI, resetGUI, setUrlParam } from "gui";
 import { EffectSidebar } from "./sidebar.js";
 import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
@@ -233,11 +233,28 @@ function applyEffect(preserveParams = false) {
         controller.disable();
       }
 
+      // Push the GUI's initial value into the engine. DeepLinkGUI.add() may have
+      // overridden state[p.name] from a ?param=value deep link, but nothing fires
+      // onChange on load — without this the slider shows the URL value while the
+      // engine still renders the effect default. Skip read-only telemetry, which
+      // flows engine → GUI, never the reverse.
+      if (!p.readonly) {
+        const initVal = isBool ? (state[p.name] ? 1.0 : 0.0) : state[p.name];
+        wasmEngine.setParameter(p.name, initVal);
+        segments.setParameter(p.name, initVal);
+      }
+
       controller.onChange(v => {
         const floatVal = (typeof v === 'boolean') ? (v ? 1.0 : 0.0) : v;
         wasmEngine.setParameter(p.name, floatVal);
         // Forward to workers
         segments.setParameter(p.name, floatVal);
+        // Persist to the deep-link URL. DeepLinkGUI.add() installed its own
+        // setUrlParam handler, but lil-gui keeps a single onChange slot, so this
+        // handler replaced it — write the URL here too or the edit never sticks.
+        // Effect params are top-level, so the URL key is just p.name (the same
+        // key DeepLinkGUI derives) and is cleared on effect switch via resetGUI.
+        setUrlParam(p.name, v);
         // Touching an animated slider takes over from the animation.
         if (p.animated && pauseController && !animState.pause) {
           setPaused(true);
