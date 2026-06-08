@@ -170,6 +170,23 @@
   to { transform: rotate(360deg); }
 }
 
+/* Error state when the WASM engine fails to load (see daydream.js init catch). */
+.loading-overlay.error {
+  color: #e66;
+}
+
+.load-error-title {
+  font-weight: 600;
+}
+
+.load-error-detail {
+  max-width: 80%;
+  color: #888;
+  font-size: 0.85em;
+  text-align: center;
+  word-break: break-word;
+}
+
 /* Scroll arrows — hidden on desktop, styled only in mobile media query */
 .scroll-arrow {
   display: none;
