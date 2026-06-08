@@ -176,6 +176,13 @@ export class SegmentController {
     }
   }
 
+  /** Tell all workers to pause/resume parameter-driving animations. */
+  setAnimationsPaused(paused) {
+    for (const w of this.workers) {
+      w.postMessage({ type: 'setAnimationsPaused', paused });
+    }
+  }
+
   /** Tell all workers to update resolution. */
   setResolution(w, h) {
     // Open a new generation: any render still in flight (or a settled result not

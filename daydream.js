@@ -194,6 +194,22 @@ function applyEffect(preserveParams = false) {
     activeEffect.gui.add(effectActions, 'reset').name('Reset');
     const exportCtrl = activeEffect.gui.add(effectActions, 'export').name('Export');
 
+    // Standard "Pause Animation" toggle — shown only when the effect has at
+    // least one animation-driven param. Grabbing such a slider auto-engages it
+    // (the animation freezes so the user's value takes over); untoggle resumes.
+    const hasAnimated = params.some(p => p.animated);
+    const animState = { pause: false };
+    let pauseController = null;
+    const setPaused = (v) => {
+      animState.pause = v;
+      wasmEngine.setAnimationsPaused(v);
+      segments.setAnimationsPaused(v);
+    };
+    if (hasAnimated) {
+      pauseController = activeEffect.gui.add(animState, 'pause').name('Pause Animation');
+      pauseController.onChange(setPaused);
+    }
+
     // Build GUI
     const state = {};
     activeEffect.controllers = [];
@@ -217,6 +233,11 @@ function applyEffect(preserveParams = false) {
         wasmEngine.setParameter(p.name, floatVal);
         // Forward to workers
         segments.setParameter(p.name, floatVal);
+        // Touching an animated slider takes over from the animation.
+        if (p.animated && pauseController && !animState.pause) {
+          setPaused(true);
+          pauseController.updateDisplay();
+        }
       });
     });
   }
