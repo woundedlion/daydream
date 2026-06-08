@@ -130,6 +130,21 @@ export class SegmentController {
         }
       };
 
+      // Surface worker faults loudly. A WASM trap or uncaught throw inside a
+      // segment worker otherwise vanishes silently: `pending` never reaches 0,
+      // `frameResolve` never fires, and the segmented view freezes with no
+      // diagnostic. We deliberately do NOT auto-respawn or time out — a worker
+      // fault is a deterministic bug to fix at the source, not to mask. These
+      // handlers just make the failure visible and attributable to a segment.
+      worker.onerror = (e) => {
+        console.error(`[Segmented] Worker seg ${i} error: ${e.message}`
+          + ` (${e.filename}:${e.lineno}:${e.colno})`, e);
+      };
+      worker.onmessageerror = (e) => {
+        console.error(`[Segmented] Worker seg ${i} message deserialization`
+          + ` failed`, e);
+      };
+
       worker.postMessage({
         type: 'init',
         segId: i,
