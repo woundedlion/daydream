@@ -84,22 +84,13 @@ Two physical targets share the same rendering engine:
 | Controllers | 4× Teensy 4.1 (600 MHz ARM Cortex-M7) |
 | LEDs | 2 × 144-pixel strips (288 total, 72 per segment) |
 | Protocol | DMA (HD107S at 24 MHz) |
-| Rotation | 1200 RPM (20 revolutions/second) |
+| Rotation | 480 RPM (8 revolutions/second) 16 FPS from 2 sides of the ring |
 | Virtual resolution | 288 × 144 |
 | Driver | `POVSegmented<288, 4, 1200>` in `pov_segmented.h` |
 | Synchronization | 2-wire: column clock (PWM) + frame sync (pulse) |
 | Pin assignments | ID: pins 21–22, Column clock: pin 2 (in) / pin 5 (out), Frame sync: pin 3 (out) / pin 4 (in), SPI: pins 11 + 13 |
 
 The POV effect works because each revolution takes ~125 ms and the ISR fires every `1,000,000 / (RPM/60) / width` microseconds to advance one column. The LED strip is mounted on both sides of a rotating arm: the top half of the strip handles one hemisphere and the bottom half handles the opposite hemisphere, so one full revolution paints a complete sphere.
-
-### Slew Rate Limiting
-
-The firmware directly manipulates Teensy 4 IOMUX registers to enable slew rate limiting on both SPI pins, reducing electromagnetic interference at 6 MHz:
-
-```cpp
-IOMUXC_SW_PAD_CTL_PAD_GPIO_B0_02 &= ~IOMUXC_PAD_SRE;  // Pin 11 (DATA)
-IOMUXC_SW_PAD_CTL_PAD_GPIO_B0_03 &= ~IOMUXC_PAD_SRE;  // Pin 13 (CLOCK)
-```
 
 ---
 
@@ -253,7 +244,7 @@ POV display requires pixel data to be ready before each column interval fires �
 └── package.json
 ```
 
-If the local `three.js/` and `node_modules/lil-gui/` directories are missing (e.g. on the GitHub Pages deploy), [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) probes them at startup and falls back to jsdelivr. See [§10.8](#108-vendor-importmap-local-first--cdn-fallback).
+When the local `three.js/` and `node_modules/lil-gui/` directories are absent (e.g. on the GitHub Pages deploy, and by default), [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) resolves libraries from jsdelivr; `npm run importmap:local` switches it to the vendored copies for offline dev. See [§10.8](#108-vendor-importmap-local-first--cdn-fallback).
 
 ---
 
@@ -379,7 +370,7 @@ JS:  wasmEngine.getPixels()
 
 ### End-to-End Flow
 
-A typical effect frame follows a four-stage pipeline. Not every effect uses every stage — some skip generation entirely, others skip transformations — but the available primitives compose along this flow:
+A typical effect frame follows a four-stage pipeline. Not every effect uses every stage — some skip generation entirely, others skip transformations, and a few full-screen shader effects (e.g. Liquid2D, Flyby, Raymarch) extend `Effect` directly and bypass the filter pipeline altogether — but the available primitives compose along this flow:
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
@@ -1127,7 +1118,7 @@ Non-blocking DMA-based LED output for HD107S (APA102-compatible) LEDs on Teensy 
 
 | Class | Role |
 |---|---|
-| `HD107SFrame<N>` | Pre-formatted DMA buffer for the HD107S protocol. `packPixel()` writes `Pixel16` values directly into the frame buffer with inline color correction (color correction → temperature → gamma → brightness), bypassing the CRGB intermediate. Uses `DMAMEM` placement and `arm_dcache_flush_delete()` for cache coherency. |
+| `HD107SFrame<N>` | Pre-formatted DMA buffer for the HD107S protocol. `packPixel()` writes `Pixel16` values directly into the frame buffer with inline color correction (color correction → temperature → gamma → brightness), bypassing the CRGB intermediate. The buffer is 32-byte-aligned (`__attribute__((aligned(32)))`) and flushed with `arm_dcache_flush_delete()` for cache coherency. |
 | `TeensySPIDMA` | Low-level DMA+SPI driver wired to LPSPI4. Configures a `DMAChannel` with completion interrupt for fully async byte-stream transmission. |
 | `DMALEDController<N>` | Double-buffered high-level controller. `show(leds)` loads the back buffer and triggers DMA, returning immediately. The previous transfer is guaranteed complete before the next begins. |
 
@@ -1604,7 +1595,7 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `setParameter(name, value)` | Update a live effect parameter |
 | `getParameterDefinitions()` | Return the full `[{name, value, min, max}]` parameter list |
 | `getParamValues()` | Return current parameter values (including animation-driven updates) |
-| `getArenaMetrics()` | Memory usage stats for geometry, scratch, and tooling arenas |
+| `getArenaMetrics()` | Memory usage stats for geometry, scratch, and tooling arenas, plus the stack high-water mark (see below) |
 | `getEffectSizes()` | Return `sizeof` for every registered effect at the current resolution |
 | `setClip(y0, y1, x0, x1)` | Restrict rendering to a sub-rectangle (used by segment workers) |
 
@@ -1701,11 +1692,11 @@ Key properties:
 `vendor-importmap.js` is loaded as a regular (non-module) `<script>` in every HTML page. At parse time it:
 
 1. Locates itself via `document.currentScript.src`, so it works whether called as `./vendor-importmap.js` (root) or `../vendor-importmap.js` (a tool page).
-2. Synchronously probes `three.js/build/three.module.js` and `node_modules/lil-gui/dist/lil-gui.esm.min.js` with `XMLHttpRequest('HEAD', …, false)`.
-3. Builds a `<script type="importmap">` with local URLs when present, otherwise jsdelivr URLs pinned to versions from `package.json`.
+2. Reads a build-time-baked `VENDOR` decision (per library, `'cdn'` or `'local'`).
+3. Builds a `<script type="importmap">` with local page-relative URLs for any `'local'` library, otherwise jsdelivr URLs pinned to versions from `package.json`.
 4. Injects that importmap into `<head>` before any module loads.
 
-The probe HEAD requests cost a few hundred milliseconds total when 404'ing on the live GitHub Pages deploy (the only requests that 404 in the console), and the actual library code loads cleanly from CDN afterward. Local dev with a populated `three.js/` and `node_modules/` skips the CDN entirely.
+The local-vs-CDN choice is **baked at build time**, not probed at runtime — there is no main-thread-blocking synchronous XHR and nothing 404s on the CDN-only Pages deploy. The committed default is all-CDN, which is what the deploy and a fresh checkout serve. For offline / local dev with a populated `three.js/` and `node_modules/`, run `npm run importmap:local` (detects vendored dirs and rewrites the `VENDOR` block); `npm run importmap` reverts to all-CDN. The generated `local` block must not be committed — it would break the live deploy.
 
 A page-specific local import (e.g. `solids.html` referencing `../solids.js`) is added by setting `window.__DAYDREAM_EXTRA_IMPORTS` before the helper script.
 
@@ -1736,7 +1727,7 @@ Five standalone HTML pages that share the engine's WASM `MeshOps` but render wit
 | `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated 8 MB tooling arenas. |
 | `splines.html` | Catmull-Rom spline designer with closed-loop and open-chain modes; click to add control points, drag to edit, export to a C++ `Plot::SplineChain` initializer. |
 
-All five reuse `vendor-importmap.js` so they work offline (with the local `three.js/`) or from GitHub Pages (via CDN).
+All five reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`.
 
 ---
 
@@ -1811,6 +1802,14 @@ The suite must use Clang — the engine relies on GCC/Clang `__attribute__` exte
 
 Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-diffusion graph integrity, filters, the plot samplers, solids-registry invariants, animation, and an effect smoke harness that constructs and renders every effect at 288×144 with asserts on. `tests/run_tests.cpp` is the driver; add a `tests/test_<module>.h` and one line there to extend it.
 
+#### Continuous testing
+
+Three layers run the same suite so a regression can't reach the live demo:
+
+- **Local pre-commit hook** ([`.githooks/pre-commit`](.githooks/pre-commit)) — builds + runs the suite before each commit. **On by default (opt-out):** configuring the `tests` preset points `core.hooksPath` at `.githooks` automatically. Skip a single commit with `HS_SKIP_TESTS=1 git commit …` (or `--no-verify`); disable the auto-enable with `-DHS_INSTALL_GIT_HOOKS=OFF`. Doc-only commits skip the suite.
+- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — runs the native suite *and* compiles the WASM module on every push and pull request.
+- **Gated deploy** (`.github/workflows/deploy.yml`, **daydream repo**) — daydream's GitHub Pages source is *GitHub Actions*. On a push to daydream's `master` (or manual dispatch), the engine's native unit suite runs as a **gate** (`deploy` `needs: gate`, checking out the engine repo); only if it passes does the workflow publish the simulator to Pages. The engine's WASM is whatever is committed in daydream (built + installed from Holosphere). If the engine repo is private, add a `POV_TOKEN` secret (a read-access PAT) for the gate's checkout.
+
 ### Running the Simulator — daydream repo
 
 The simulator is a static web app. Serve the daydream directory from any HTTP server:
@@ -1833,7 +1832,7 @@ npm install              # populates node_modules/lil-gui/
 git clone --depth 1 https://github.com/mrdoob/three.js.git
 ```
 
-[`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) detects these at startup and switches to local URLs automatically (§10.8).
+After populating them, run `npm run importmap:local` to point [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) at the local copies (don't commit the result); `npm run importmap` reverts to all-CDN (§10.8).
 
 **Live demo.** The `master` branch of daydream is published to <https://woundedlion.github.io/daydream/> via GitHub Pages. The CDN-fallback path is what powers it.
 
