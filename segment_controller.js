@@ -228,7 +228,10 @@ export class SegmentController {
     const dst = this._getMemoryView();
     if (!dst) return;
 
-    dst.fill(0);
+    // No clear here: driver.render() already filled this same buffer with zero
+    // immediately before invoking the adapter (Driver.pixels === this view in
+    // segment mode — the WASM memory can't grow here, see above), so we only
+    // need to blit the quadrants over the pre-cleared background.
 
     const w = Daydream.W;
     const h = Daydream.H;

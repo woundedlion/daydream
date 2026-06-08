@@ -40,7 +40,10 @@ export class EffectSidebar {
     this.listEl.setAttribute('role', 'listbox');
     this.listEl.setAttribute('tabindex', '0');
     this.listEl.className = 'effect-list';
-    this.listEl.addEventListener('keydown', (e) => this._onKeyDown(e));
+    // Keep bound handlers so dispose() can detach them.
+    this._onKeyDownBound = (e) => this._onKeyDown(e);
+    this._onScrollBound = () => this._updateScrollArrows();
+    this.listEl.addEventListener('keydown', this._onKeyDownBound);
 
     // Scroll arrow indicators (mobile horizontal scroll)
     this.arrowLeft = document.createElement('div');
@@ -51,8 +54,8 @@ export class EffectSidebar {
     this.arrowRight.className = 'scroll-arrow scroll-arrow-right';
     this.arrowRight.textContent = '\u203A';
 
-    this.listEl.addEventListener('scroll', () => this._updateScrollArrows(), { passive: true });
-    this._resizeObs = new ResizeObserver(() => this._updateScrollArrows());
+    this.listEl.addEventListener('scroll', this._onScrollBound, { passive: true });
+    this._resizeObs = new ResizeObserver(this._onScrollBound);
     this._resizeObs.observe(this.listEl);
 
     this.container.appendChild(this.heading);
@@ -60,6 +63,19 @@ export class EffectSidebar {
     this.container.appendChild(this.listEl);
     this.container.appendChild(this.arrowLeft);
     this.container.appendChild(this.arrowRight);
+  }
+
+  /**
+   * Release the resources this sidebar owns: the ResizeObserver and the
+   * keydown/scroll listeners on the list element. Mirrors Daydream.dispose();
+   * call before discarding the sidebar so no observer keeps firing into a dead
+   * DOM subtree.
+   */
+  dispose() {
+    this._resizeObs?.disconnect();
+    this._resizeObs = null;
+    this.listEl.removeEventListener('keydown', this._onKeyDownBound);
+    this.listEl.removeEventListener('scroll', this._onScrollBound);
   }
 
   /** Create buttons once for the given effect names and sizes. */

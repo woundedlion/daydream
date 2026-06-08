@@ -168,7 +168,13 @@ function applyEffect(preserveParams = false) {
   }
 
   if (wasmEngine) {
-    wasmEngine.setEffect(appState.get('effect'));
+    // setEffect() returns false for an unknown/stale effect name; the engine
+    // resets to a blank state on failure, so surface it and skip building a GUI
+    // for an effect that doesn't exist (mirrors the setResolution guard below).
+    if (wasmEngine.setEffect(appState.get('effect')) === false) {
+      console.error(`setEffect("${appState.get('effect')}") failed; effect unavailable.`);
+      return;
+    }
     activeEffect = { gui: new GUI({ autoPlace: false }) };
 
     // Get Params from C++
@@ -370,8 +376,11 @@ createHolosphereModule().then(module => {
     effect = allowedEffects[0];
     appState.set('effect', effect);
   }
-  if (effect) {
-    wasmEngine.setEffect(effect);
+  if (effect && wasmEngine.setEffect(effect) === false) {
+    // Already validated against the allow-list above; a failure here means the
+    // engine itself rejected the name. applyResolution(true) below re-validates
+    // and self-heals, but log so the blank render isn't silent.
+    console.error(`Initial setEffect("${effect}") failed.`);
   }
 
   // Create persistent adapter object (avoids per-frame allocation). Segmented
@@ -537,7 +546,8 @@ recFolder.add(recSettings, 'quality', 1, 20, 1).name('Rec Quality (Mbps)');
 recFolder.add(recSettings, 'recResolution', Object.keys(REC_RESOLUTIONS)).name('Rec Resolution');
 recFolder.add(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
 const recordCtrl = recFolder.add(recordState, 'record').name('\u25cf Record');
-window.addEventListener("keydown", (e) => daydream.keydown(e));
+const onKeyDown = (e) => daydream.keydown(e);
+window.addEventListener("keydown", onKeyDown);
 
 daydream.renderer.setAnimationLoop(() => {
   if (wasmAdapter) {
@@ -548,4 +558,26 @@ daydream.renderer.setAnimationLoop(() => {
   if (recorder?.isRecording) {
     durationEl.textContent = recorder.elapsedFormatted;
   }
+});
+
+///////////////////////////////////////////////////////////////////////////////
+// Teardown — release the listeners, timers and observers this module owns so a
+// page discard leaves nothing firing into a dead scene. Symmetric with
+// Daydream.dispose() and EffectSidebar.dispose().
+///////////////////////////////////////////////////////////////////////////////
+
+function disposeApp() {
+  window.removeEventListener("keydown", onKeyDown);
+  if (testAllInterval !== null) {
+    clearInterval(testAllInterval);
+    testAllInterval = null;
+  }
+  sidebar.dispose();
+  daydream.dispose();
+}
+
+// pagehide (not unload) so the bfcache path is respected: only tear down on a
+// real discard, never when the page is merely frozen for back/forward cache.
+window.addEventListener("pagehide", (e) => {
+  if (!e.persisted) disposeApp();
 });
