@@ -10,8 +10,12 @@
 # The gate pins its engine checkout to the SHA the committed .wasm was built
 # from (holosphere_wasm.sha, written next to the module by the Holosphere WASM
 # install step), so it tests the exact source the deployed module corresponds to
-# rather than a decoupled engine HEAD. If that file is absent (a module built
-# before provenance was recorded), it falls back to engine HEAD with a warning.
+# rather than a decoupled engine HEAD. It also asserts the committed .wasm is
+# byte-identical to the hash recorded at build time (holosphere_wasm.wasm.sha256),
+# binding the deployed artifact to that engine source. Both provenance files are
+# committed alongside the module; if either is missing, or the .wasm doesn't match
+# its recorded hash, the gate fails hard rather than deploying an unverifiable
+# artifact (a silent fallback to engine HEAD would make the gate inert).
 #
 # If the engine repo (woundedlion/pov) is PRIVATE, add a repository secret
 # POV_TOKEN = a PAT with read access. For a public engine repo the default
@@ -41,17 +45,24 @@ jobs:
       - name: Checkout daydream (for the pinned engine SHA)
         uses: actions/checkout@v4
 
+      - name: Verify committed WASM matches its recorded build hash
+        run: |
+          if [ ! -f holosphere_wasm.wasm.sha256 ]; then
+            echo "::error::holosphere_wasm.wasm.sha256 not found — the deployed artifact is unverifiable. The Holosphere WASM install writes it next to the module; commit it with the .wasm."
+            exit 1
+          fi
+          sha256sum -c holosphere_wasm.wasm.sha256
+
       - name: Resolve engine SHA the committed WASM was built from
         id: engine
         run: |
-          if [ -f holosphere_wasm.sha ]; then
-            sha="$(tr -d '[:space:]' < holosphere_wasm.sha)"
-            echo "Pinning engine checkout to $sha (from holosphere_wasm.sha)"
-            echo "ref=$sha" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::holosphere_wasm.sha not found; falling back to engine HEAD (gate is decoupled from the committed WASM)"
-            echo "ref=" >> "$GITHUB_OUTPUT"
+          if [ ! -f holosphere_wasm.sha ]; then
+            echo "::error::holosphere_wasm.sha not found — engine provenance is unrecorded, so the gate can't pin to the source the committed WASM was built from. The Holosphere WASM install writes it next to the module; commit it with the .wasm."
+            exit 1
           fi
+          sha="$(tr -d '[:space:]' < holosphere_wasm.sha)"
+          echo "Pinning engine checkout to $sha (from holosphere_wasm.sha)"
+          echo "ref=$sha" >> "$GITHUB_OUTPUT"
 
       - name: Checkout engine (woundedlion/pov) at the pinned SHA
         uses: actions/checkout@v4
