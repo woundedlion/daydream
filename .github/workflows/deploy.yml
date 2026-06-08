@@ -12,10 +12,14 @@
 # install step), so it tests the exact source the deployed module corresponds to
 # rather than a decoupled engine HEAD. It also asserts the committed .wasm is
 # byte-identical to the hash recorded at build time (holosphere_wasm.wasm.sha256),
-# binding the deployed artifact to that engine source. Both provenance files are
-# committed alongside the module; if either is missing, or the .wasm doesn't match
-# its recorded hash, the gate fails hard rather than deploying an unverifiable
-# artifact (a silent fallback to engine HEAD would make the gate inert).
+# binding the deployed artifact to that recorded hash. Finally it asserts the
+# three provenance files (.wasm, .wasm.sha256, .sha) share a last-touch commit —
+# they are written atomically by the install, so a lone-file commit means the
+# engine source-pin has decoupled from the binary; this binds the source-pin to
+# the exact artifact. All three are committed alongside the module; if any is
+# missing, the .wasm doesn't match its recorded hash, or they were not committed
+# together, the gate fails hard rather than deploying an unverifiable artifact
+# (a silent fallback to engine HEAD would make the gate inert).
 #
 # If the engine repo (woundedlion/pov) is PRIVATE, add a repository secret
 # POV_TOKEN = a PAT with read access. For a public engine repo the default
@@ -44,6 +48,8 @@ jobs:
     steps:
       - name: Checkout daydream (for the pinned engine SHA)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history: the provenance-atomicity check reads git log per file
 
       - name: Verify committed WASM matches its recorded build hash
         run: |
@@ -52,6 +58,25 @@ jobs:
             exit 1
           fi
           sha256sum -c holosphere_wasm.wasm.sha256
+
+      - name: Verify the provenance trio was committed atomically
+        # The Holosphere WASM install writes .wasm, .wasm.sha256, and .sha in one
+        # build event, so they must be committed together. The sha256 check above
+        # only binds .wasm↔.wasm.sha256 (internal consistency); it cannot catch a
+        # .sha advanced to a different engine commit while the binary is stale.
+        # Asserting all three share a last-touch commit binds the engine source-pin
+        # to the exact artifact, closing the .sha↔.wasm decoupling gap. (A source
+        # change that yields a byte-identical .wasm must still be re-committed as the
+        # full trio — rebuild and stage all three rather than the lone .sha.)
+        run: |
+          wasm_c="$(git log -1 --format=%H -- holosphere_wasm.wasm)"
+          sha_c="$(git log -1 --format=%H -- holosphere_wasm.sha)"
+          s256_c="$(git log -1 --format=%H -- holosphere_wasm.wasm.sha256)"
+          echo "last-touch commits: .wasm=$wasm_c .sha=$sha_c .wasm.sha256=$s256_c"
+          if [ -z "$wasm_c" ] || [ "$wasm_c" != "$sha_c" ] || [ "$wasm_c" != "$s256_c" ]; then
+            echo "::error::WASM provenance files were not committed atomically — the engine source-pin (.sha) is decoupled from the binary (.wasm) and/or its hash (.wasm.sha256). Re-run the Holosphere WASM install and commit all three together."
+            exit 1
+          fi
 
       - name: Resolve engine SHA the committed WASM was built from
         id: engine
