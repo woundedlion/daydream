@@ -93,22 +93,34 @@ function refreshPixelView() {
 }
 
 function syncGUI() {
-  if (activeEffect && activeEffect.controllers) {
-    const values = wasmEngine.getParamValues();
-    for (let i = 0; i < activeEffect.controllers.length; i++) {
-      if (i >= values.length) break;
-      const c = activeEffect.controllers[i];
+  if (!activeEffect || !activeEffect.controllerByName) return;
 
-      // Skip if user is interacting
-      if (c.domElement.contains(document.activeElement)) continue;
+  // Zero-copy view over WASM memory (see wasm.cpp getParamValues). Like
+  // getPixels(), heap growth can detach the buffer and leave a zero-length
+  // view; it is fetched fresh and consumed synchronously here, but guard anyway
+  // so a detached/stale view skips this frame rather than silently mis-reading.
+  const values = wasmEngine.getParamValues();
+  if (values.length === 0) return;
 
-      let val = values[i];
-      if (c.isBoolean) val = (val > 0.5);
+  // values[i] is the i-th parameter in getParameters() order; paramNames was
+  // captured from the same iteration at GUI-build time, so names[i] labels
+  // values[i]. Look the controller up by that name so the controller-build
+  // order is decoupled from the value-stream order.
+  const names = activeEffect.paramNames;
+  const n = Math.min(names.length, values.length);
+  for (let i = 0; i < n; i++) {
+    const c = activeEffect.controllerByName.get(names[i]);
+    if (!c) continue;
 
-      if (c.getValue() !== val) {
-        c.object[c.property] = val;
-        c.updateDisplay();
-      }
+    // Skip if user is interacting
+    if (c.domElement.contains(document.activeElement)) continue;
+
+    let val = values[i];
+    if (c.isBoolean) val = (val > 0.5);
+
+    if (c.getValue() !== val) {
+      c.object[c.property] = val;
+      c.updateDisplay();
     }
   }
 }
@@ -216,9 +228,13 @@ function applyEffect(preserveParams = false) {
       pauseController.onChange(setPaused);
     }
 
-    // Build GUI
+    // Build GUI. syncGUI() binds the engine's per-frame value stream back to
+    // these controllers by parameter NAME, not array index — paramNames records
+    // the value-stream order (getParamValues mirrors getParameterDefinitions) so
+    // a C++ param reorder can't silently mis-bind sliders.
     const state = {};
-    activeEffect.controllers = [];
+    activeEffect.paramNames = [];
+    activeEffect.controllerByName = new Map();
 
     params.forEach(p => {
       state[p.name] = p.value;
@@ -232,7 +248,8 @@ function applyEffect(preserveParams = false) {
         controller = activeEffect.gui.add(state, p.name, p.min, p.max).decimals(3);
       }
       controller.isBoolean = isBool;
-      activeEffect.controllers.push(controller);
+      activeEffect.paramNames.push(p.name);
+      activeEffect.controllerByName.set(p.name, controller);
 
       // Read-only telemetry: keep it updating live (syncGUI) but block editing.
       if (p.readonly && typeof controller.disable === 'function') {
