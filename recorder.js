@@ -120,8 +120,14 @@ export class VideoRecorder {
   captureFrame() {
     if (!this.isRecording || !this.track || typeof this.track.requestFrame !== 'function') return;
 
-    // If using an offscreen canvas, blit the source canvas scaled to the target resolution
+    // If using an offscreen canvas, blit the source canvas scaled to the target
+    // resolution. Re-sync the offscreen dimensions first: if the source canvas
+    // was resized mid-recording (window/resolution change), its aspect ratio
+    // has changed and the offscreen would otherwise scale into stale, wrong-
+    // aspect dimensions. _ensureOffscreen only reassigns on an actual change, so
+    // this is a no-op on the steady-state path.
     if (this._offscreen && this._offCtx) {
+      this._ensureOffscreen();
       this._offCtx.drawImage(this.canvas, 0, 0, this._offscreen.width, this._offscreen.height);
     }
 
@@ -149,8 +155,10 @@ export class VideoRecorder {
       this._offscreen = document.createElement('canvas');
       this._offCtx = this._offscreen.getContext('2d');
     }
-    this._offscreen.width = evenW;
-    this._offscreen.height = evenH;
+    // Reassign only on change — writing canvas.width/height clears the bitmap,
+    // so doing it every captureFrame would needlessly blank the offscreen.
+    if (this._offscreen.width !== evenW) this._offscreen.width = evenW;
+    if (this._offscreen.height !== evenH) this._offscreen.height = evenH;
     return this._offscreen;
   }
 

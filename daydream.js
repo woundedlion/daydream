@@ -314,8 +314,19 @@ createHolosphereModule().then(module => {
     wasmEngine.setResolution(p.w, p.h);
   }
 
-  // Set initial effect
-  const effect = appState.get('effect');
+  // Set initial effect — validate against this resolution's allow-list first.
+  // The effect name is hydrated from the URL, so a stale or hand-edited value
+  // can be unknown to the engine; setEffect() on an unknown name leaves
+  // currentEffect null and renders blank. applyResolution(true) below
+  // re-validates and self-heals, but don't feed an unvalidated name across the
+  // WASM boundary in the first place — fall back to the list's default.
+  const allowedEffects =
+    effectsByResolution[appState.get('resolution')] || HiResFavorites;
+  let effect = appState.get('effect');
+  if (!allowedEffects.includes(effect)) {
+    effect = allowedEffects[0];
+    appState.set('effect', effect);
+  }
   if (effect) {
     wasmEngine.setEffect(effect);
   }
