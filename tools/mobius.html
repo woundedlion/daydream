@@ -373,10 +373,10 @@
     const updateMobiusUniforms = () => {
       if (!sphereMesh || !sphereMesh.material.uniforms) return;
       const u = sphereMesh.material.uniforms;
-      u.u_a.value = { re: config.A.re, im: config.A.im };
-      u.u_b.value = { re: config.B.re, im: config.B.im };
-      u.u_c.value = { re: config.C.re, im: config.C.im };
-      u.u_d.value = { re: config.D.re, im: config.D.im };
+      u.u_a.value.re = config.A.re; u.u_a.value.im = config.A.im;
+      u.u_b.value.re = config.B.re; u.u_b.value.im = config.B.im;
+      u.u_c.value.re = config.C.re; u.u_c.value.im = config.C.im;
+      u.u_d.value.re = config.D.re; u.u_d.value.im = config.D.im;
     };
 
     const applyConfig = (newVals) => {
@@ -658,11 +658,13 @@
       renderer = result.renderer;
       controls = result.controls;
 
+      // Each struct uniform keeps its own stable value object; updateMobiusUniforms
+      // mutates these in place so Three.js re-uploads without per-tick allocation.
       const uniforms = {
-        u_a: { value: config.A },
-        u_b: { value: config.B },
-        u_c: { value: config.C },
-        u_d: { value: config.D }
+        u_a: { value: { re: config.A.re, im: config.A.im } },
+        u_b: { value: { re: config.B.re, im: config.B.im } },
+        u_c: { value: { re: config.C.re, im: config.C.im } },
+        u_d: { value: { re: config.D.re, im: config.D.im } }
       };
 
       const geometry = new THREE.SphereGeometry(1.5, 128, 128);
