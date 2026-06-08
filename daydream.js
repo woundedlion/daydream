@@ -438,6 +438,21 @@ createHolosphereModule().then(module => {
 
   // Run initial resolution setup now that WASM is ready
   applyResolution(true);
+}).catch(err => {
+  // Nothing renders without the engine, so a load/instantiation failure must
+  // be surfaced — otherwise the loading overlay spins forever and the rejection
+  // goes unhandled. Turn the overlay into an explicit error state.
+  console.error('Failed to load the Holosphere WASM engine:', err);
+  const loadingOverlay = document.getElementById('loading-overlay');
+  if (loadingOverlay) {
+    loadingOverlay.classList.add('error');
+    loadingOverlay.innerHTML =
+      '<span class="load-error-title">Failed to load the rendering engine.</span>' +
+      '<span class="load-error-detail"></span>';
+    const detail = loadingOverlay.querySelector('.load-error-detail');
+    // textContent (not innerHTML) so an arbitrary error message can't inject markup.
+    if (detail) detail.textContent = (err && err.message) ? err.message : String(err);
+  }
 });
 
 ///////////////////////////////////////////////////////////////////////////////
