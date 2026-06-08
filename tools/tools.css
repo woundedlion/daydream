@@ -1,0 +1,73 @@
+/*
+ * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
+ * Licensed under the Polyform Noncommercial License 1.0.0
+ */
+
+/*
+ * Shared design tokens and control styling for the geometry tool pages.
+ * Link this before a page's own <style> block so page-specific rules win.
+ * Pages keep their own layout CSS and may add extra tokens (e.g. accent
+ * colors) or override individual properties such as the slider thumb offset.
+ */
+
+:root {
+  --slate-900: #0f172a;
+  --slate-800: #1e293b;
+  --slate-700: #334155;
+  --slate-600: #475569;
+  --slate-500: #64748b;
+  --blue-500: #3b82f6;
+  --indigo-400: #818cf8;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--slate-900);
+  color: #e2e8f0;
+}
+
+/* Range slider */
+input[type=range] {
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  background: var(--slate-600);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: var(--blue-500);
+  cursor: pointer;
+  margin-top: 3px;
+}
+
+input[type=range]::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border: none;
+  border-radius: 50%;
+  background: var(--blue-500);
+  cursor: pointer;
+}
+
+input[type=range]:disabled {
+  background: #47556950;
+}
+
+input[type=range]:disabled::-webkit-slider-thumb {
+  background: var(--slate-800);
+  cursor: default;
+}
+
+.slider-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.875rem;
+  color: var(--indigo-400);
+}

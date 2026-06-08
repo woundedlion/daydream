@@ -836,33 +836,40 @@
          * @param {HTMLElement} feedbackElement - The span to show "Copied!".
          * @param {string} originalMessage - The message to restore after copying.
          */
-    function copyToClipboard(text, feedbackElement, originalMessage = "") {
-      // Create a temporary textarea element to hold the text
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-
-      // Make it invisible and add it to the DOM
-      textarea.style.position = 'fixed';
-      textarea.style.top = 0;
-      textarea.style.left = 0;
-      textarea.style.width = '1px';
-      textarea.style.height = '1px';
-      textarea.style.opacity = 0;
-      document.body.appendChild(textarea);
-
-      // Select the text and attempt to copy it
-      textarea.focus();
-      textarea.select();
-
+    async function copyToClipboard(text, feedbackElement, originalMessage = "") {
+      // Prefer the async Clipboard API; fall back to the legacy execCommand path
+      // for non-secure contexts / older browsers. (This page is a classic script
+      // with inline onclick handlers, so it can't import tools/shared.js as a
+      // module — the same primitive is kept inline here.)
       let success = false;
       try {
-        success = document.execCommand('copy');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          success = true;
+        }
       } catch (err) {
-        console.error('Failed to copy text: ', err);
+        // Fall through to the legacy path below.
       }
 
-      // Clean up and remove the temporary element
-      document.body.removeChild(textarea);
+      if (!success) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.top = 0;
+        textarea.style.left = 0;
+        textarea.style.width = '1px';
+        textarea.style.height = '1px';
+        textarea.style.opacity = 0;
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        try {
+          success = document.execCommand('copy');
+        } catch (err) {
+          console.error('Failed to copy text: ', err);
+        }
+        document.body.removeChild(textarea);
+      }
 
       // Show visual feedback to the user
       if (success && feedbackElement) {

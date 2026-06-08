@@ -12,22 +12,15 @@
   <script src="../vendor/tailwindcss.js"></script>
   <script>window.__DAYDREAM_EXTRA_IMPORTS = { 'solids': '../solids.js', 'geometry': '../geometry.js' };</script>
   <script src="../vendor-importmap.js"></script>
+  <link rel="stylesheet" href="tools.css">
   <style>
     :root {
-      --slate-900: #0f172a;
-      --slate-800: #1e293b;
-      --slate-700: #334155;
-      --blue-500: #3b82f6;
-      --indigo-400: #818cf8;
       --sidebar-width: 224px;
       --footer-height: calc((100vw - 474px) * 0.22);
       --right-sidebar-width: 250px;
     }
 
     body {
-      font-family: 'Inter', sans-serif;
-      background-color: var(--slate-900);
-      color: #E2E8F0;
       overflow: hidden;
       margin: 0;
       display: flex;
@@ -559,7 +552,7 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { initScene, copyToClipboard } from './shared.js';
     // Removed solids.js import
     import createHolosphereModule from '../holosphere_wasm.js';
 
@@ -663,37 +656,27 @@
       }
       updateArenaMetrics();
 
-      // Initialize Three.js
-      const canvas = document.getElementById('canvas');
-      const container = document.getElementById('canvas-container');
-
-      scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0f172a); // slate-900
-
-      camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-      camera.position.set(2, 1.5, 2);
-
-      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-
-      controls = new OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.autoRotate = true;
-      controls.autoRotateSpeed = 2.0;
-
-      // Lights
-      const ambLight = new THREE.AmbientLight(0xffffff, 0.5);
-      scene.add(ambLight);
-      const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-      dirLight.position.set(5, 10, 7);
-      scene.add(dirLight);
-
-      // Secondary Light for drama
-      const rimLight = new THREE.SpotLight(0x3b82f6, 5);
-      rimLight.position.set(-5, 0, -5);
-      scene.add(rimLight);
-
-      // Events
-      window.addEventListener('resize', onResize);
+      // Initialize Three.js. The shared scaffold supplies the renderer / camera /
+      // OrbitControls / resize / animation loop; the solids-specific bits (auto-
+      // rotate, transparent buffer, light rig, free-zoom range, window-relative
+      // resize, and the per-frame index-label projection) are passed as options.
+      const result = initScene('canvas-container', 'canvas', {
+        cameraPosition: [2, 1.5, 2],
+        far: 100,
+        minDistance: 0,
+        maxDistance: Infinity,
+        alpha: true,
+        autoRotate: true,
+        autoRotateSpeed: 2.0,
+        lights: true,
+        showSphere: false,
+        onResize: onResize,
+        onAfterRender: updateLabels,
+      });
+      scene = result.scene;
+      camera = result.camera;
+      renderer = result.renderer;
+      controls = result.controls;
 
       // Toggles
       document.getElementById('toggleGeo').parentElement.addEventListener('click', () => {
@@ -733,7 +716,6 @@
       onResize();
       update();
       renderBaseSolid();
-      animate();
     }
 
     function wasmMeshToJs(wasmMesh) {
@@ -1029,7 +1011,7 @@
         return;
       }
 
-      navigator.clipboard.writeText(code).then(() => {
+      copyToClipboard(code).then(() => {
         console.log(`${lang.toUpperCase()} copied!`);
         if (btn) {
           const originalText = btn.innerText;
@@ -1575,13 +1557,11 @@
       document.getElementById('meshStats').innerText = `${meshData.vertices.length}V / ${edgeIndices.size}E / ${meshData.faces.length}F`;
     }
 
-    function animate() {
-      requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
-
-      // Update Labels
-      if (state.showIndices && window.currentMesh && labelsContainer.children.length > 0) {
+    // Project vertex-index labels onto the canvas. Runs each frame after the
+    // render (via initScene's onAfterRender hook), so the labels track the
+    // current camera; guarded because the loop starts before init finishes.
+    function updateLabels() {
+      if (state.showIndices && window.currentMesh && labelsContainer && labelsContainer.children.length > 0) {
         const rect = renderer.domElement.getBoundingClientRect();
         const tempV = new THREE.Vector3();
         const camPos = camera.position;
