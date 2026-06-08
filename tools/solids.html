@@ -771,24 +771,8 @@
       const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
 
       for (const key of thumbKeys) {
-        // Clear scene
-        while (offScene.children.length > 0) {
-          const obj = offScene.children[0];
-          if (obj.isLight) { // Keep lighting? adjust
-            // Actually, better to remove meshes.
-            if (obj.isMesh || obj.isLineSegments) offScene.remove(obj);
-            else break; // light is at end? No.
-          }
-          if (obj.isLight) {
-            // Keep light
-            offScene.children.push(offScene.children.shift()); // Cycle
-            if (offScene.children[0].isLight && offScene.children.length <= 2) break; // Assuming 2 lights
-          } else {
-            offScene.remove(obj);
-          }
-        }
-
-        // Re-add lights if cleared (simpler to just clear all and re-add)
+        // Reset to just the lights; the previous iteration's mesh/lines are
+        // detached here and their GPU buffers freed at the end of the loop body.
         offScene.clear();
         offScene.add(light);
         offScene.add(new THREE.AmbientLight(0xffffff, 0.5));
@@ -863,9 +847,16 @@
         btn.appendChild(img);
         btn.appendChild(span);
         footer.appendChild(btn);
+
+        // Free the per-iteration geometry GPU buffers; the thumbnail image is
+        // already captured into dataURL above.
+        geo.dispose();
+        lineGeo.dispose();
       }
 
       // Cleanup
+      mat.dispose();
+      lineMat.dispose();
       offRenderer.dispose();
     }
 
