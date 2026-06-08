@@ -1,0 +1,6 @@
+# The deploy gate reads these on a Linux runner; CRLF would make sha256sum -c
+# look for a filename with a trailing CR and break provenance verification.
+holosphere_wasm.sha        text eol=lf
+holosphere_wasm.wasm.sha256 text eol=lf
+*.yml                      text eol=lf
+holosphere_wasm.wasm       binary
