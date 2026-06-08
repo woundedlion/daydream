@@ -228,6 +228,11 @@ function applyEffect(preserveParams = false) {
       controller.isBoolean = isBool;
       activeEffect.controllers.push(controller);
 
+      // Read-only telemetry: keep it updating live (syncGUI) but block editing.
+      if (p.readonly && typeof controller.disable === 'function') {
+        controller.disable();
+      }
+
       controller.onChange(v => {
         const floatVal = (typeof v === 'boolean') ? (v ? 1.0 : 0.0) : v;
         wasmEngine.setParameter(p.name, floatVal);
