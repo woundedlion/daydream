@@ -10,7 +10,7 @@ const getUrlParams = () => new URLSearchParams(window.location.search);
 // clobber each other. Standalone pages without a URLSync (the tool pages) fall
 // back to a self-contained debounced write that reads the URL at fire time.
 let urlTimer = null;
-const setUrlParam = (key, value) => {
+export const setUrlParam = (key, value) => {
   const sync = getActiveURLSync();
   if (sync) {
     sync.setParam(key, value);
