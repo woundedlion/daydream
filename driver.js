@@ -241,81 +241,120 @@ export class Daydream {
   }
 
   render(effect) {
+    if (!this._advanceFrameClock()) return;
+
+    const advanced = this._stepSimulation(effect);
+
+    this.controls.update();
+    this._updateCullUniforms();
+
+    this.renderer.setScissorTest(true);
+    this._renderMainView();
+
+    // Capture a video frame (simulation-synced) — only when the simulation
+    // actually advanced this tick, so pausing freezes the recording instead of
+    // padding it with duplicate frames.
+    if (this.recorder && advanced) this.recorder.captureFrame();
+
+    if (this.labelPool.activeCount > 0) {
+      this.labelRenderer.render(this.scene, this.camera);
+    }
+
+    this._renderPip();
+    this.renderer.setScissorTest(false);
+  }
+
+  /// Fixed-timestep gate. Accumulates real elapsed time (clamped to avoid a
+  /// spiral-of-death after a stall) and returns true — consuming one frame
+  /// interval — only when enough has accrued to advance a frame.
+  _advanceFrameClock() {
     const delta = this.clock.getDelta();
     this.timeAccumulator += delta;
     if (this.timeAccumulator > 0.25) this.timeAccumulator = 0.25;
-    if (this.timeAccumulator < this.frameInterval) return;
-
-
+    if (this.timeAccumulator < this.frameInterval) return false;
     this.timeAccumulator -= this.frameInterval;
+    return true;
+  }
 
-    // The simulation advances only when running or single-stepping. Capture the
-    // decision before stepFrames is decremented so the recorder can be gated on
-    // the same condition (a paused recording must not pad the video with
-    // duplicate frames or advance elapsedSeconds).
+  /// Advance the simulation one frame when running or single-stepping: clear the
+  /// pixel buffer, draw the effect, refresh stats/labels. Returns whether the
+  /// simulation actually advanced (false while paused) so the caller can gate
+  /// the recorder on the same decision — captured before stepFrames is
+  /// decremented.
+  _stepSimulation(effect) {
     const advanced = !this.paused || this.stepFrames != 0;
-    if (advanced) {
-      if (this.stepFrames != 0) this.stepFrames--;
+    if (!advanced) return false;
 
-      if (Daydream.pixels) Daydream.pixels.fill(0);
+    if (this.stepFrames != 0) this.stepFrames--;
 
-      if (this.labelAxes) {
-        this.xAxis.position.set(0, 0, 0);
-        this.yAxis.position.set(0, 0, 0);
-        this.zAxis.position.set(0, 0, 0);
-      }
+    if (Daydream.pixels) Daydream.pixels.fill(0);
 
-      const start = performance.now();
-      if (effect) {
-        effect.drawFrame();
-      }
-      const duration = performance.now() - start;
-
-      this._updateStats(duration, effect);
-
-      this.dotMesh.instanceColor.needsUpdate = true;
-
-      this.xAxis.visible = this.labelAxes;
-      this.yAxis.visible = this.labelAxes;
-      this.zAxis.visible = this.labelAxes;
-
-      this.labelPool.reset();
-      let labels = [];
-
-      if (this.labelAxes) {
-        labels.push({ "position": Daydream.X_AXIS, "content": "X" });
-        labels.push({ "position": Daydream.Y_AXIS, "content": "Y" });
-        labels.push({ "position": Daydream.Z_AXIS, "content": "Z" });
-        labels.push({ "position": Daydream.X_AXIS.clone().negate(), "content": "-X" });
-        labels.push({ "position": Daydream.Y_AXIS.clone().negate(), "content": "-Y" });
-        labels.push({ "position": Daydream.Z_AXIS.clone().negate(), "content": "-Z" });
-      }
-
-      if (effect && typeof effect.getLabels === 'function') {
-        labels.push(...effect.getLabels());
-      }
-
-      for (const label of labels) {
-        if (label.position.dot(this.camera.position) > Daydream.SPHERE_RADIUS) {
-          this.labelPool.acquire(label.position, label.content);
-        }
-      }
-
-      this.labelPool.cleanup();
+    if (this.labelAxes) {
+      this.xAxis.position.set(0, 0, 0);
+      this.yAxis.position.set(0, 0, 0);
+      this.zAxis.position.set(0, 0, 0);
     }
 
+    const start = performance.now();
+    if (effect) {
+      effect.drawFrame();
+    }
+    const duration = performance.now() - start;
 
-    this.controls.update();
+    this._updateStats(duration, effect);
 
-    // Update backface cull uniforms
+    this.dotMesh.instanceColor.needsUpdate = true;
+
+    this.xAxis.visible = this.labelAxes;
+    this.yAxis.visible = this.labelAxes;
+    this.zAxis.visible = this.labelAxes;
+
+    this._refreshLabels(effect);
+    return true;
+  }
+
+  /// Rebuild the floating label set (axis labels + effect-supplied labels),
+  /// acquiring pooled sprites only for labels on the camera-facing hemisphere.
+  _refreshLabels(effect) {
+    this.labelPool.reset();
+    let labels = [];
+
+    if (this.labelAxes) {
+      labels.push({ "position": Daydream.X_AXIS, "content": "X" });
+      labels.push({ "position": Daydream.Y_AXIS, "content": "Y" });
+      labels.push({ "position": Daydream.Z_AXIS, "content": "Z" });
+      labels.push({ "position": Daydream.X_AXIS.clone().negate(), "content": "-X" });
+      labels.push({ "position": Daydream.Y_AXIS.clone().negate(), "content": "-Y" });
+      labels.push({ "position": Daydream.Z_AXIS.clone().negate(), "content": "-Z" });
+    }
+
+    if (effect && typeof effect.getLabels === 'function') {
+      labels.push(...effect.getLabels());
+    }
+
+    for (const label of labels) {
+      if (label.position.dot(this.camera.position) > Daydream.SPHERE_RADIUS) {
+        this.labelPool.acquire(label.position, label.content);
+      }
+    }
+
+    this.labelPool.cleanup();
+  }
+
+  /// Push the current camera position / cull mode into the backface-cull shader
+  /// uniforms.
+  _updateCullUniforms() {
     if (this.cullUniforms) {
       this.cullUniforms.uCameraPos.value.copy(this.camera.position);
       this.cullUniforms.uCullThreshold.value = this.cullBackSphere
         ? -Daydream.DOT_SIZE / Daydream.SPHERE_RADIUS
         : -2.0;
     }
+  }
 
-    this.renderer.setScissorTest(true);
+  /// Render the main sphere view into its viewport. Assumes the scissor test is
+  /// already enabled by the caller.
+  _renderMainView() {
     this.renderer.setViewport(
       this.mainViewport.x,
       this.mainViewport.y,
@@ -332,38 +371,29 @@ export class Daydream {
     this.renderer.setClearColor(this.scene.background, Daydream.SCENE_ALPHA ? 0 : 1);
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
+  }
 
-    // Capture a video frame (simulation-synced) — only when the simulation
-    // actually advanced this tick, so pausing freezes the recording instead of
-    // padding it with duplicate frames.
-    if (this.recorder && advanced) this.recorder.captureFrame();
+  /// Render the picture-in-picture corner view. Skipped on mobile and under
+  /// headless automation (Playwright/Puppeteer/Selenium set navigator.webdriver)
+  /// so clean screenshots aren't obscured by the PiP corner.
+  _renderPip() {
+    if (this.isMobile || navigator.webdriver) return;
 
-    if (this.labelPool.activeCount > 0) {
-      this.labelRenderer.render(this.scene, this.camera);
-    }
-
-    // Skip the picture-in-picture render under headless automation
-    // (Playwright/Puppeteer/Selenium set navigator.webdriver) so clean
-    // screenshots aren't obscured by the PiP corner.
-    if (!this.isMobile && !navigator.webdriver) {
-      this.renderer.setViewport(
-        this.pipViewport.x,
-        this.pipViewport.y,
-        this.pipViewport.width,
-        this.pipViewport.height
-      );
-      this.renderer.setScissor(
-        this.pipViewport.x,
-        this.pipViewport.y,
-        this.pipViewport.width,
-        this.pipViewport.height
-      );
-      this.pipCamera.position.copy(this.camera.position);
-      this.pipCamera.quaternion.copy(this.camera.quaternion);
-      this.renderer.render(this.scene, this.pipCamera);
-    }
-
-    this.renderer.setScissorTest(false);
+    this.renderer.setViewport(
+      this.pipViewport.x,
+      this.pipViewport.y,
+      this.pipViewport.width,
+      this.pipViewport.height
+    );
+    this.renderer.setScissor(
+      this.pipViewport.x,
+      this.pipViewport.y,
+      this.pipViewport.width,
+      this.pipViewport.height
+    );
+    this.pipCamera.position.copy(this.camera.position);
+    this.pipCamera.quaternion.copy(this.camera.quaternion);
+    this.renderer.render(this.scene, this.pipCamera);
   }
 
   setupDots() {
