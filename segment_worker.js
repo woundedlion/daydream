@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
@@ -8,6 +9,22 @@
  */
 
 import createHolosphereModule from "./holosphere_wasm.js";
+
+/** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
+/** @typedef {import('./worker_protocol.js').ControllerInboundMsg} ControllerInboundMsg */
+/** @typedef {import('./worker_protocol.js').SegArenaMetrics} SegArenaMetrics */
+
+/**
+ * Send a protocol message back to the controller. The dedicated-worker global's
+ * `postMessage(message, transfer)` overload isn't visible under the default DOM
+ * lib (where `self` is typed as `Window`, whose `postMessage` takes a target
+ * origin), so the call is routed through one cast; the `msg` argument is still
+ * checked against the protocol union.
+ * @param {ControllerInboundMsg} msg
+ * @param {Transferable[]=} transfer
+ */
+const post = /** @type {(msg: ControllerInboundMsg, transfer?: Transferable[]) => void} */ (
+  self.postMessage.bind(self));
 
 let wasmModule = null;
 let engine = null;
@@ -60,7 +77,7 @@ function applyClip() {
 }
 
 self.onmessage = async (e) => {
-  const msg = e.data;
+  const msg = /** @type {WorkerInboundMsg} */ (e.data);
 
   switch (msg.type) {
     case 'init': {
@@ -86,7 +103,7 @@ self.onmessage = async (e) => {
       }
       applyClip();
 
-      self.postMessage({ type: 'ready', segId });
+      post({ type: 'ready', segId });
       break;
     }
 
@@ -95,7 +112,7 @@ self.onmessage = async (e) => {
         engine.setEffect(msg.name);
         applyClip();
       }
-      self.postMessage({ type: 'effectReady', segId });
+      post({ type: 'effectReady', segId });
       break;
     }
 
@@ -161,6 +178,7 @@ self.onmessage = async (e) => {
       }
 
       // Get arena metrics
+      /** @type {SegArenaMetrics | null} */
       let arenaMetrics = null;
       try {
         arenaMetrics = engine.getArenaMetrics();
@@ -189,7 +207,7 @@ self.onmessage = async (e) => {
         arenaMetrics = null;
       }
 
-      self.postMessage({
+      post({
         type: 'frame',
         segId,
         x0, x1, y0, y1,

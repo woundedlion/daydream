@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
@@ -21,6 +22,20 @@
  */
 import { Daydream, SLOW_FRAME_MS } from "./driver.js";
 
+/** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
+/** @typedef {import('./worker_protocol.js').ControllerInboundMsg} ControllerInboundMsg */
+/** @typedef {import('./worker_protocol.js').SegArenaMetrics} SegArenaMetrics */
+
+/**
+ * A composited frame result for one segment, kept across the one-frame pipeline.
+ * `pixels` is the segment's RGB16 rectangle (quadW*quadH*3), null if absent.
+ * @typedef {{
+ *   pixels: Uint16Array | null,
+ *   x0: number, x1: number, y0: number, y1: number,
+ *   quadW: number, quadH: number,
+ * }} FrameResult
+ */
+
 export class SegmentController {
   constructor({ resolutionPresets, appState, getWasmEngine, refreshPixelView,
                 getMemoryView }) {
@@ -36,16 +51,22 @@ export class SegmentController {
     this.showBoundaries = true;
 
     // Per-segment data
+    /** @type {Worker[]} */
     this.workers = [];        // Web Worker instances
+    /** @type {Array<FrameResult | null>} */
     this.results = [];        // per-segment frame results
+    /** @type {number[]} */
     this.timings = [];        // ms per segment (worker-measured)
+    /** @type {number[]} */
     this.renderUs = [];       // µs rasterization time per segment
+    /** @type {Array<SegArenaMetrics | null>} */
     this.arenas = [];         // per-segment arena metrics
 
     // Frame lifecycle
     this.pending = 0;         // count of outstanding render responses
     this.frameStart = 0;      // wall-clock start of parallel render
     this.wallTime = 0;        // dispatch -> last worker response (ms)
+    /** @type {(() => void) | null} */
     this.frameResolve = null; // promise resolve for the current frame
     this.ready = false;       // true once all workers are initialized
 
@@ -67,7 +88,18 @@ export class SegmentController {
     // loop would deadlock-freeze. We latch the fault, settle the in-flight frame
     // to unblock the pipeline, and stop dispatching to a known-broken worker pool.
     this.faulted = false;
-    this.faultInfo = null;     // { segId, message } of the first fault this session
+    /** @type {{ segId: number, message: string } | null} */
+    this.faultInfo = null;     // first fault this session
+  }
+
+  /**
+   * Post a protocol message to one worker, type-checked against the union the
+   * worker accepts (`WorkerInboundMsg`).
+   * @param {Worker} worker
+   * @param {WorkerInboundMsg} msg
+   */
+  _post(worker, msg) {
+    worker.postMessage(msg);
   }
 
   create(numSegments) {
@@ -90,6 +122,7 @@ export class SegmentController {
     // effect defaults. Sent once in the init message; ongoing changes are still
     // broadcast live via setParameter. Flattened to {name, value} (bools encoded
     // as 1/0) so it survives structured-clone postMessage.
+    /** @type {import('./worker_protocol.js').SegParam[]} */
     let initialParams = [];
     const engine = this._getWasmEngine();
     if (engine) {
@@ -105,7 +138,7 @@ export class SegmentController {
       const worker = new Worker('./segment_worker.js', { type: 'module' });
 
       worker.onmessage = (e) => {
-        const msg = e.data;
+        const msg = /** @type {ControllerInboundMsg} */ (e.data);
         if (msg.type === 'ready') {
           readyCount++;
           if (readyCount === numSegments) {
@@ -157,7 +190,7 @@ export class SegmentController {
         this._onWorkerFault(i, 'message deserialization failed');
       };
 
-      worker.postMessage({
+      this._post(worker, {
         type: 'init',
         segId: i,
         totalSegs: numSegments,
@@ -213,28 +246,42 @@ export class SegmentController {
     }
   }
 
-  /** Tell all workers to set a new effect. */
+  /**
+   * Tell all workers to set a new effect.
+   * @param {string} name
+   */
   setEffect(name) {
     for (const w of this.workers) {
-      w.postMessage({ type: 'setEffect', name });
+      this._post(w, { type: 'setEffect', name });
     }
   }
 
-  /** Tell all workers to set a parameter. */
+  /**
+   * Tell all workers to set a parameter.
+   * @param {string} name
+   * @param {number} value
+   */
   setParameter(name, value) {
     for (const w of this.workers) {
-      w.postMessage({ type: 'setParameter', name, value });
+      this._post(w, { type: 'setParameter', name, value });
     }
   }
 
-  /** Tell all workers to pause/resume parameter-driving animations. */
+  /**
+   * Tell all workers to pause/resume parameter-driving animations.
+   * @param {boolean} paused
+   */
   setAnimationsPaused(paused) {
     for (const w of this.workers) {
-      w.postMessage({ type: 'setAnimationsPaused', paused });
+      this._post(w, { type: 'setAnimationsPaused', paused });
     }
   }
 
-  /** Tell all workers to update resolution. */
+  /**
+   * Tell all workers to update resolution.
+   * @param {number} w
+   * @param {number} h
+   */
   setResolution(w, h) {
     // Open a new generation: any render still in flight (or a settled result not
     // yet composited) was sized to the old W/H and must not reach the compositor.
@@ -244,7 +291,7 @@ export class SegmentController {
     this.results.fill(null);
     this.pendingFrame = false;
     for (const worker of this.workers) {
-      worker.postMessage({ type: 'setResolution', w, h });
+      this._post(worker, { type: 'setResolution', w, h });
     }
   }
 
@@ -263,7 +310,7 @@ export class SegmentController {
         resolve();
       };
       for (const w of this.workers) {
-        w.postMessage({ type: 'render' });
+        this._post(w, { type: 'render' });
       }
     });
   }
@@ -383,10 +430,10 @@ export class SegmentController {
     // segmented view sit silently stale. Recovery is a resolution change / mode
     // toggle (re-creates the pool, clearing the latch).
     if (this.faulted) {
-      const f = this.faultInfo || {};
+      const f = this.faultInfo;
       el.innerHTML = `<div style="color:#ff5252;padding:6px;font-size:0.85em">`
-        + `⚠ Segment worker ${f.segId} faulted — segmented render halted.<br>`
-        + `<span style="color:#999">${f.message || 'see console'}</span><br>`
+        + `⚠ Segment worker ${f ? f.segId : '?'} faulted — segmented render halted.<br>`
+        + `<span style="color:#999">${(f && f.message) || 'see console'}</span><br>`
         + `<span style="color:#999">Change resolution or toggle segmented mode to restart.</span>`
         + `</div>`;
       return;
