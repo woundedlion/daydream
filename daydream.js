@@ -430,6 +430,9 @@ createHolosphereModule().then(module => {
 
   // Wire recorder to the actual canvas now that daydream is ready
   recorder.canvas = daydream.canvas;
+  // Track the driver's frame cadence (Daydream.FPS) instead of the recorder's
+  // hardcoded default, so elapsed-time accounting stays correct if FPS changes.
+  recorder.frameInterval = daydream.frameInterval;
   daydream.recorder = recorder;
 
   // Remove loading overlay
