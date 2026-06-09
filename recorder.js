@@ -13,6 +13,32 @@
  * When a target resolution is set, an offscreen canvas is used to scale the
  * source canvas image before capture — the source renderer is never resized.
  */
+
+/**
+ * Pick the best-supported MIME type for the requested output format. Codec
+ * priority: MP4/H.264 > WebM/VP9 > WebM/VP8. Returns '' if nothing in the
+ * candidate list is supported (MediaRecorder then falls back to its default).
+ * The support probe is injected so this stays pure and unit-testable.
+ * @param {'auto'|'mp4'|'webm'} format
+ * @param {(mimeType: string) => boolean} isTypeSupported
+ * @returns {string}
+ */
+export function selectMimeType(
+  format,
+  isTypeSupported = (mt) => MediaRecorder.isTypeSupported(mt)) {
+  const allMimeTypes = {
+    mp4:  ['video/mp4;codecs=avc1'],
+    webm: ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'],
+  };
+  const candidates = format === 'mp4'  ? allMimeTypes.mp4
+                   : format === 'webm' ? allMimeTypes.webm
+                   : [...allMimeTypes.mp4, ...allMimeTypes.webm]; // 'auto'
+  for (const mt of candidates) {
+    if (isTypeSupported(mt)) return mt;
+  }
+  return '';
+}
+
 export class VideoRecorder {
   constructor(canvas, frameInterval = 1 / 16) {
     this.canvas = canvas;
@@ -77,21 +103,8 @@ export class VideoRecorder {
     this.stream = captureSource.captureStream(0);
     this.track = this.stream.getVideoTracks()[0];
 
-    // Build codec candidate list based on requested format
-    const allMimeTypes = {
-      mp4:  ['video/mp4;codecs=avc1'],
-      webm: ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'],
-    };
-    const candidates = this.format === 'mp4'  ? allMimeTypes.mp4
-                     : this.format === 'webm' ? allMimeTypes.webm
-                     : [...allMimeTypes.mp4, ...allMimeTypes.webm]; // 'auto'
-    let mimeType = '';
-    for (const mt of candidates) {
-      if (MediaRecorder.isTypeSupported(mt)) {
-        mimeType = mt;
-        break;
-      }
-    }
+    // Pick the best-supported codec for the requested format.
+    const mimeType = selectMimeType(this.format);
 
     this.mediaRecorder = new MediaRecorder(this.stream, {
       mimeType,
