@@ -1,5 +1,6 @@
 # npm dependencies — restored with `npm install`, never committed.
-/node_modules/
+# Match at any depth so a stray install under tests/ is never committed.
+node_modules/
 
 # Vendored third-party libraries served directly by the page. These are large
 # and reproducible; keeping them out of the repo avoids accidental vendoring

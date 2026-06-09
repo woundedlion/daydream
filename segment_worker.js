@@ -9,6 +9,7 @@
  */
 
 import createHolosphereModule from "./holosphere_wasm.js";
+import { computeSegmentRange } from "./segment_layout.js";
 
 /** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
 /** @typedef {import('./worker_protocol.js').ControllerInboundMsg} ControllerInboundMsg */
@@ -33,41 +34,6 @@ let totalSegs = 1;
 let canvasW = 0;
 let canvasH = 0;
 let segRange = null; // { x0, x1, y0, y1, w, h }
-
-/** Mirrors the 2-arm quadrant layout from pov_segmented.h */
-function computeSegmentRange(id, total, w, h) {
-  const NUM_ARMS = 2;
-  // The layout is symmetric across the 2 arms, so the segment count is always a
-  // positive even number (it mirrors pov_segmented.h's per-arm split — there can
-  // never be an odd number of segments). An odd total would make armId exceed
-  // NUM_ARMS and index x0 past the canvas, silently rendering a degenerate band.
-  // That's a configuration bug with no valid rendering, so fail fast.
-  if (!Number.isInteger(total) || total < NUM_ARMS || total % NUM_ARMS !== 0) {
-    throw new Error(
-      `segment_worker: totalSegs must be a positive even number (got ${total})`);
-  }
-  // Guard the resolution carried across the postMessage boundary (init /
-  // setResolution / setSegment all funnel through here). A non-integer or
-  // non-positive dimension would produce a degenerate segRange and feed garbage
-  // into setClip; fail fast instead.
-  if (!Number.isInteger(w) || w <= 0 || !Number.isInteger(h) || h <= 0) {
-    throw new Error(
-      `segment_worker: canvas dimensions must be positive integers (got ${w}x${h})`);
-  }
-  const ySegsPerArm = Math.floor(total / NUM_ARMS);
-  const armId = Math.floor(id / ySegsPerArm);
-  const ySegId = id % ySegsPerArm;
-
-  const armW = Math.floor(w / NUM_ARMS);
-  const x0 = armId * armW;
-  const x1 = (armId === NUM_ARMS - 1) ? w : x0 + armW;
-
-  const segH = Math.floor(h / ySegsPerArm);
-  const y0 = ySegId * segH;
-  const y1 = (ySegId === ySegsPerArm - 1) ? h : y0 + segH;
-
-  return { x0, x1, y0, y1, w: x1 - x0, h: y1 - y0 };
-}
 
 /** Apply stored clip to the engine. Must be called after every setEffect. */
 function applyClip() {
