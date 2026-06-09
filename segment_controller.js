@@ -102,6 +102,16 @@ export class SegmentController {
     worker.postMessage(msg);
   }
 
+  /**
+   * Post the same protocol message to every worker.
+   * @param {WorkerInboundMsg} msg
+   */
+  _broadcast(msg) {
+    for (const w of this.workers) {
+      this._post(w, msg);
+    }
+  }
+
   create(numSegments) {
     this.destroy();
 
@@ -251,9 +261,7 @@ export class SegmentController {
    * @param {string} name
    */
   setEffect(name) {
-    for (const w of this.workers) {
-      this._post(w, { type: 'setEffect', name });
-    }
+    this._broadcast({ type: 'setEffect', name });
   }
 
   /**
@@ -262,9 +270,7 @@ export class SegmentController {
    * @param {number} value
    */
   setParameter(name, value) {
-    for (const w of this.workers) {
-      this._post(w, { type: 'setParameter', name, value });
-    }
+    this._broadcast({ type: 'setParameter', name, value });
   }
 
   /**
@@ -272,9 +278,7 @@ export class SegmentController {
    * @param {boolean} paused
    */
   setAnimationsPaused(paused) {
-    for (const w of this.workers) {
-      this._post(w, { type: 'setAnimationsPaused', paused });
-    }
+    this._broadcast({ type: 'setAnimationsPaused', paused });
   }
 
   /**
@@ -290,9 +294,7 @@ export class SegmentController {
     this.renderGen++;
     this.results.fill(null);
     this.pendingFrame = false;
-    for (const worker of this.workers) {
-      this._post(worker, { type: 'setResolution', w, h });
-    }
+    this._broadcast({ type: 'setResolution', w, h });
   }
 
   /**
@@ -309,9 +311,7 @@ export class SegmentController {
         this.wallTime = performance.now() - this.frameStart;
         resolve();
       };
-      for (const w of this.workers) {
-        this._post(w, { type: 'render' });
-      }
+      this._broadcast({ type: 'render' });
     });
   }
 
@@ -382,27 +382,23 @@ export class SegmentController {
         xBounds.add(r.x0);
       }
 
+      const plotCyan = (idx) => {
+        dst[idx]     = 0;     // R
+        dst[idx + 1] = 65535; // G (cyan)
+        dst[idx + 2] = 65535; // B
+      };
+
       // Horizontal boundary lines (full width)
       for (const boundaryY of yBounds) {
         if (boundaryY >= h) continue;
         const rowStart = boundaryY * w * 3;
-        for (let x = 0; x < w; x++) {
-          const idx = rowStart + x * 3;
-          dst[idx]     = 0;     // R
-          dst[idx + 1] = 65535; // G (cyan)
-          dst[idx + 2] = 65535; // B
-        }
+        for (let x = 0; x < w; x++) plotCyan(rowStart + x * 3);
       }
 
       // Vertical boundary lines (full height)
       for (const boundaryX of xBounds) {
         if (boundaryX >= w) continue;
-        for (let y = 0; y < h; y++) {
-          const idx = (y * w + boundaryX) * 3;
-          dst[idx]     = 0;     // R
-          dst[idx + 1] = 65535; // G (cyan)
-          dst[idx + 2] = 65535; // B
-        }
+        for (let y = 0; y < h; y++) plotCyan((y * w + boundaryX) * 3);
       }
     }
   }
