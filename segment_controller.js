@@ -244,9 +244,24 @@ export class SegmentController {
     if (!dst) return;
 
     // No clear here: driver.render() already filled this same buffer with zero
-    // immediately before invoking the adapter (Driver.pixels === this view in
+    // immediately before invoking the adapter (Daydream.pixels === this view in
     // segment mode — the WASM memory can't grow here, see above), so we only
     // need to blit the quadrants over the pre-cleared background.
+    //
+    // That elision is load-bearing and structural, not incidental: it holds
+    // only while the compositor's view (dst), the buffer driver.render() clears
+    // (Daydream.pixels), and the displayed attribute (instanceColor.array) are
+    // the one aliased wasmMemoryView. refreshPixelView() points all three at the
+    // same view. Assert the part this module can reach — dst === Daydream.pixels
+    // — so a future divergence fails loudly here instead of compositing onto an
+    // uncleared, garbage background.
+    if (dst !== Daydream.pixels) {
+      throw new Error(
+        "SegmentController.composite: display-buffer alias broken " +
+        "(getMemoryView() !== Daydream.pixels) — the cleared background and the " +
+        "composite target are different buffers; render()/refreshPixelView() " +
+        "aliasing invariant violated");
+    }
 
     const w = Daydream.W;
     const h = Daydream.H;
