@@ -281,13 +281,17 @@ function applyEffect(preserveParams = false) {
       // flows engine → GUI, never the reverse.
       if (!p.readonly) {
         const initVal = isBool ? (state[p.name] ? 1.0 : 0.0) : state[p.name];
-        wasmEngine.setParameter(p.name, initVal);
+        if (wasmEngine.setParameter(p.name, initVal) === false)
+          console.warn(`setParameter("${p.name}") rejected as unknown.`);
         segments.setParameter(p.name, initVal);
       }
 
       controller.onChange(v => {
         const floatVal = (typeof v === 'boolean') ? (v ? 1.0 : 0.0) : v;
-        wasmEngine.setParameter(p.name, floatVal);
+        // setParameter returns false on an unknown name; surface it (the UI
+        // degrades gracefully — see the doctrine note at the top of this file).
+        if (wasmEngine.setParameter(p.name, floatVal) === false)
+          console.warn(`setParameter("${p.name}") rejected as unknown.`);
         // Forward to workers
         segments.setParameter(p.name, floatVal);
         // Persist to the deep-link URL. DeepLinkGUI.add() installed its own
