@@ -15,6 +15,24 @@ import { SegmentController } from "./segment_controller.js";
 import { SRGBColorSpace } from "three";
 
 ///////////////////////////////////////////////////////////////////////////////
+//
+// Failure-handling doctrine (boundary between this file and the engine layers):
+//
+//   * This main-thread UI layer DEGRADES GRACEFULLY. When an engine call that
+//     depends on user/config input fails (setEffect, setResolution,
+//     getEffectSizes, getArenaMetrics, ...), it logs via console.error/warn,
+//     keeps the last good state, and returns — never white-screening the user
+//     over a bad effect name or an unsupported resolution.
+//   * The engine/protocol/pure layers TRAP. segment_layout.js validates its
+//     inputs with `throw`, segment_controller.composite() throws on an
+//     out-of-bounds blit, and the WASM module fail-fasts on a broken invariant.
+//     These are programmer/contract errors that must not be silently absorbed.
+//
+// Rule of thumb: degrade where the failure is the user's (recoverable input);
+// trap where the failure is ours (a violated invariant). The graceful catches
+// below are deliberate, not missing error handling.
+//
+///////////////////////////////////////////////////////////////////////////////
 
 const HiResFavorites = [
   "BZReactionDiffusion",
