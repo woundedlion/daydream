@@ -12,7 +12,7 @@ The project spans **two repositories** that ship as one product:
 
 | Repo | Role | What lives here |
 |---|---|---|
-| [**Holosphere**](https://github.com/woundedlion/Holosphere) | C++ engine + firmware | All rendering code, effects, hardware drivers (`pov_single.h`, `pov_segmented.h`), the Emscripten/WASM target, unit tests, and this README. |
+| [**Holosphere**](https://github.com/woundedlion/pov) | C++ engine + firmware | All rendering code, effects, hardware drivers (`pov_single.h`, `pov_segmented.h`), the Emscripten/WASM target, unit tests, and this README. |
 | [**daydream**](https://github.com/woundedlion/daydream) | Web simulator | Three.js renderer, the compiled `holosphere_wasm.{js,wasm}` artifacts (output of Holosphere's WASM build), GUI/sidebar, recorder, segmented-POV Web Workers, and standalone geometry tools. |
 
 Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holosphere_wasm.wasm`, this README, and `docs/screenshots/` into the sibling `daydream/` checkout — so both repos always serve the same README. The live demo is daydream served from GitHub Pages.
@@ -84,9 +84,9 @@ Two physical targets share the same rendering engine:
 | Controllers | 4× Teensy 4.1 (600 MHz ARM Cortex-M7) |
 | LEDs | 2 × 144-pixel strips (288 total, 72 per segment) |
 | Protocol | DMA (HD107S at 24 MHz) |
-| Rotation | 480 RPM (8 revolutions/second) 16 FPS from 2 sides of the ring |
+| Rotation | 480 RPM (8 revolutions/second), 16 FPS from 2 sides of the ring |
 | Virtual resolution | 288 × 144 |
-| Driver | `POVSegmented<288, 4, 1200>` in `pov_segmented.h` |
+| Driver | `POVSegmented<288, 4, 480>` in `pov_segmented.h` |
 | Synchronization | 2-wire: column clock (PWM) + frame sync (pulse) |
 | Pin assignments | ID: pins 21–22, Column clock: pin 2 (in) / pin 5 (out), Frame sync: pin 3 (out) / pin 4 (in), SPI: pins 11 + 13 |
 
@@ -96,7 +96,7 @@ The POV effect works because each revolution takes ~125 ms and the ISR fires eve
 
 ## 2. Engineering Philosophies
 
-The four design decisions below shape the rest of the codebase. Skim them first — every later section makes more sense once you know *why* the engine looks the way it does.
+The five design decisions below shape the rest of the codebase. Skim them first — every later section makes more sense once you know *why* the engine looks the way it does.
 
 ### Why 16-bit Linear Color?
 
@@ -113,6 +113,12 @@ The Teensy heap fragments under heavy mesh subdivision. The single-block partiti
 ### Why the ISR Double Buffer?
 
 POV display requires pixel data to be ready before each column interval fires — typically 13–130 µs for the hardware resolution at 480 RPM. A naive approach (rendering in the ISR) would block the main loop. Instead, the main loop renders freely into a back buffer while the ISR reads from a separate front buffer. `queue_frame()` / `advance_display()` synchronize with minimal interrupt-disabled critical sections.
+
+### Why Fail-Fast (`HS_CHECK`)?
+
+On hardware there is no debugger attached and no console to read — a corrupted arena that ships garbage to the LEDs is the worst possible outcome, because the failure is silent and the cause is already gone by the time it shows on the sphere. So invariant violations *trap at the violation site* rather than being masked by bounded fallbacks. `HS_CHECK(cond)` (`platform.h`) compiles to a single predicted-not-taken branch to `__builtin_trap()` and, unlike `assert()`, is **not** stripped by `NDEBUG` — it still fires in the optimized device build, where `NDEBUG` is defined only to keep newlib's `__assert_func`→`fprintf` (and all of stdio) out of the image. It pulls in no stdio of its own.
+
+The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths only — container growth, arena OOM, capacity and bounds guards at allocation/registration/config seams — where a violation is a logic or sizing bug with no valid recovery. It is never placed in the per-pixel hot loop; hot paths that need a check use a stripped `assert` backed by a cold trap at the corresponding bind/setup site. Genuinely *transient* conditions (a DMA overrun, a dropped frame) are not invariant violations and get bounded/soft handling instead. The native test suite includes a death harness that asserts these traps actually fire (`SIGILL` / `STATUS_ILLEGAL_INSTRUCTION`), so the safety net is verified rather than assumed.
 
 ### Coordinate Conventions
 
@@ -189,7 +195,7 @@ POV display requires pixel data to be ready before each column interval fires �
 │   ├── FastNoiseLite.h         Third-party: single-header noise library
 │   └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
-├── effects/                    27 effect headers (BZReactionDiffusion.h, HopfFibration.h,
+├── effects/                    28 effect headers (BZReactionDiffusion.h, HopfFibration.h,
 │                                IslamicStars.h, Raymarch.h, …) — see §9 Effects Reference
 │
 ├── hardware/                   Hardware drivers
@@ -201,7 +207,7 @@ POV display requires pixel data to be ready before each column interval fires �
 │   ├── Holosphere/
 │   │   └── Holosphere.ino      Holosphere entry — NUM_PIXELS=40, RPM=480
 │   ├── Phantasm/
-│   │   └── Phantasm.ino        Phantasm entry — 4×Teensy, TOTAL_PIXELS=288, RPM=1200
+│   │   └── Phantasm.ino        Phantasm entry — 4×Teensy, TOTAL_PIXELS=288, RPM=480
 │   └── wasm/
 │       └── wasm.cpp            Emscripten bindings — HolosphereEngine JS class
 │
@@ -228,6 +234,8 @@ POV display requires pixel data to be ready before each column interval fires �
 ├── gui.js                      lil-gui wrapper used by the main page and tools
 ├── sidebar.js                  Effect list + sort + keyboard navigation
 ├── recorder.js                 MediaRecorder pipeline (mp4 / webm), sim-synced
+├── segment_controller.js       Orchestrates the segmented-POV worker pool:
+│                                  dispatch, generation fence, and compositing
 ├── segment_worker.js           Web Worker that hosts one WASM instance per
 │                                  Phantasm hardware segment (parallel render)
 ├── styles/                     CSS for the main page and tools
@@ -262,7 +270,7 @@ Three build targets share a common engine:
 │  │ Holosphere/  │   │  Effects → Canvas → Filter Pipeline          │    │
 │  │  .ino        │   │      → SDF/Plot → Pixel Buffer               │    │
 │  │              │   │                                              │    │
-│  │ Phantasm/    │   │  effects/  (27 visual algorithms)            │    │
+│  │ Phantasm/    │   │  effects/  (28 visual algorithms)            │    │
 │  │  .ino        │   │                                              │    │
 │  │              │   ├──────────────────────────────────────────────┤    │
 │  │ wasm/        │   │          hardware/  (Drivers)                │    │
@@ -512,12 +520,15 @@ The Filter auto-syncs from the Style every frame — when the Style lerps betwee
 | `Style::Frozen()` | Static frozen distortion — no temporal movement. |
 | `Style::Shatter()` | Extreme static warping with fast decay. Shattering glass look. |
 | `Style::Drift()` | Flowing medium-strength distortion. Gentle liquid drift. |
+| `Style::Melting()` | Image melts and drips downward off the sphere. |
+| `Style::Swirling()` | Fast downward swirl with strong distortion, no hue shift. |
 
 Available transform functions:
 
 | Space Transform | Description |
 |---|---|
 | `Feedback::noise_warp` (default) | 3D simplex noise distortion via `noise_transform()` |
+| `Feedback::melt_warp` | Downward melt — slerps samples toward the north pole (image drips south) plus noise wobble |
 | `Feedback::identity_warp` | No spatial distortion (pass-through) |
 
 | Color Transform | Description |
@@ -668,8 +679,8 @@ The `process_pixel` function applies anti-aliasing based on shape type:
 | `SDF::HarmonicBlob` | Shape defined by a spherical harmonic Yˡₘ function |
 | `SDF::Line` | Geodesic line segment between two sphere-surface points |
 | `SDF::Face` | Planar polygon face (used for mesh rendering) |
-| `SDF::Torus` | Torus SDF with configurable major/minor radii |
-| `SDF::TwistedTorus` | Torus with configurable twist deformation and amplitude |
+| `SDF::Torus` | 3D volumetric torus SDF with configurable major/minor radii (Cartesian ray-space, not a 2D sphere-surface shape) |
+| `SDF::Warp::Twist` | Domain warp composed with a volumetric SDF via `SDF::WarpedVolume<Shape, Warp>` — e.g. `WarpedVolume<Torus, Warp::Twist>` twists a torus by oscillating Y around the ring azimuth, with an analytic Lipschitz bound for safe sphere-tracing (used by Raymarch) |
 
 #### CSG Operations (`sdf.h`)
 
@@ -761,6 +772,7 @@ The `Timeline<W>` class manages a list of running `IAnimation` objects. Each fra
 | `Ripple` | Animates a `RippleParams` to expand a Ricker wavelet across the sphere |
 | `MobiusWarp` | Animates `MobiusParams` to apply and release a Möbius transformation |
 | `Noise` | Animates `NoiseParams` over time for flowing distortion fields |
+| `MeshMorph` | Morphs one `MeshState` into another by cloning both, building a nearest-vertex correspondence, and interpolating positions over a duration. The vertex-level primitive beneath `MeshCarousel`. |
 | `MeshCarousel<W>` | Double-buffered mesh transition system with crossfade. Manages a pair of `MeshState` buffers and an `Animation::Lerp` to morph between shapes. Used by IslamicStars, MeshFeedback, and HankinSolids for smooth geometry transitions. |
 
 #### Orientation and Motion Blur
@@ -869,7 +881,10 @@ A single contiguous memory block (`GLOBAL_ARENA_SIZE = 335 KB`) is partitioned i
 Effects that need more scratch memory can repartition at init time:
 
 ```cpp
-configure_arenas(256 * 1024, 48 * 1024, 41 * 1024);
+// The three sizes must sum to GLOBAL_ARENA_SIZE (335 KB on device); an
+// over-subscribed partition traps at init() via HS_CHECK rather than silently
+// scaling down. Here scratch is doubled at the expense of persistent space:
+configure_arenas(271 * 1024, 32 * 1024, 32 * 1024);  // 271 + 32 + 32 = 335 KB
 ```
 
 `ScratchScope` (aliased as `ScopedScratch` for backward compatibility) provides stack-like RAII lifetime:
@@ -960,7 +975,7 @@ Pixel (sRGB 16-bit) → linear RGB float → OKLab (L, a, b) → OKLCH (L, C, h)
 | `oklab_to_oklch()` | Convert OKLab (rectangular) to OKLCH (polar: Lightness, Chroma, Hue) |
 | `lerp_oklch()` | Interpolate two OKLCH values with shortest-arc hue (avoids the red→green→blue detour) |
 | `lerp_oklch_srgb()` | Same as above but returns an sRGB `CPixel` (used by `GenerativePalette` transitions) |
-| `hue_rotate()` | Rodrigues hue rotation in linear RGB space — a single-axis rotation in the color cube. Used by `MeshFeedback`'s `HueShiftFade` and `Flyby`'s displacement-driven hue shift. |
+| `hue_rotate()` | Perceptual hue rotation — rotates the (a,b) chroma plane in OKLab, preserving lightness and chroma. Forward nonlinearity uses `fast_cbrt` (hot per-pixel path); inverse is exact. Used by the feedback `hue_fade` transform and `Flyby`'s displacement-driven hue shift. |
 
 #### Palette Modifiers
 
@@ -1152,7 +1167,7 @@ The top arm's physical LED ordering is reversed (LED 0 at the tip, descending in
 |---|---|
 | S (total pixels) | 40 |
 | RPM | 480 |
-| Column interval | ~434 µs |
+| Column interval | ~1302 µs (= 125 ms / 96 columns) |
 | ISR duration | ~20 µs |
 
 #### Multi-Teensy Segmented POV Driver (`pov_segmented.h`)
@@ -1181,7 +1196,7 @@ Arm A                               Arm B (x offset by W/2)
 | Wire | Pin (out) | Pin (in) | Purpose |
 |---|---|---|---|
 | Column clock | 5 (PWM) | 2 (ext. interrupt) | Segment 0 generates a PWM at (RPM/60)×W Hz. All boards fire `show_col()` ISR on each rising edge — zero inter-board phase drift. |
-| Frame sync | 3 (GPIO) | 4 (ext. interrupt) | Segment 0 pulses HIGH when `x` wraps to 0. All boards reset `x=0` on this edge, bounding any column drift from missed/spurious pulses to ≤ 1 revolution. |
+| Frame sync | 3 (GPIO) | 4 (ext. interrupt) | Segment 0 pulses HIGH at each frame boundary (`x==0` and `x==W/2`, two per revolution). Boards snap `x` to the nearest boundary on this edge, bounding any column drift from missed/spurious pulses to ≤ ½ revolution. |
 
 The column clock ensures all 4 boards paint the same column at the same instant.  The frame sync is insurance against electrical noise on the clock line — a spurious or missed pulse would cause permanent 1-column drift without periodic re-alignment.
 
@@ -1209,9 +1224,10 @@ for (int i = 0; i < PPS; ++i, y += y_step_) {
 | S (total pixels) | 288 |
 | N (segments) | 4 |
 | PPS (pixels per segment) | 72 |
-| RPM | 1200 |
-| Column frequency | 5760 Hz |
-| Column interval | ~173 µs |
+| RPM | 480 (8 rev/s, ~125 ms/rev) |
+| Frame rate | 16 FPS (2 frames/rev — one per side; each side draws W/2 = 144 cols per 62.5 ms frame) |
+| Column frequency | 2304 Hz |
+| Column interval | ~434 µs (= 125 ms / 288 = 62.5 ms / 144) |
 | ISR duration (72px pack + DMA trigger) | ~96 µs worst case |
 
 ---
@@ -1284,7 +1300,7 @@ All screenshots below were captured from the [live WebAssembly simulator](https:
 
 Simulates the Belousov-Zhabotinsky reaction — a 3-species cyclic competition (A beats B, B beats C, C beats A) producing rotating spiral waves. The simulation runs on a spherical k-nearest-neighbor graph (`ReactionGraph`: 7680 nodes, 6 neighbors each, precomputed Fibonacci lattice) with configurable diffusion rate and time step. Spiral waves are seeded periodically and evolve continuously.
 
-**Parameters**: Alpha (color intensity), Diff (diffusion rate), Speed (time step), GlobalAlpha
+**Parameters**: Alpha (color intensity), Diff (diffusion rate), Speed (time step)
 
 </td></tr></table>
 
@@ -1452,7 +1468,7 @@ Lissajous curves whose frequency ratios slowly sweep through rational approximat
 
 #### MeshFeedback
 
-Catalan solid mesh faces rendered with `Scan::Mesh`, distorted by a `NoiseTransformer` and given a feedback-loop appearance via `Filter::Pixel::Feedback`. Cycles through the Catalan solid library with crossfade morphing between shapes using `Animation::Lerp` and the `Presets` system.
+Platonic solid mesh faces rendered with `Plot::Mesh`, given a noise-distorted, feedback-loop appearance via `Filter::Pixel::Feedback`. Cycles through the Platonic solid library, crossfade-morphing between shapes with `Animation::MeshMorph`, while a `Presets` cycle hard-cuts the feedback/distortion style parameters.
 
 </td></tr></table>
 
@@ -1528,7 +1544,7 @@ Volumetric raymarcher that renders twisted tori at the 20 vertices of a dodecahe
 
 Stereographic-projection shader (extends `Effect` directly) with noise-driven warp distortion. A single `Rotation` animation continuously rotates the tangent plane around the Y-axis, producing a fly-through effect on the sphere surface. Uses `Scan::Shader::draw` for full-screen pixel shading with a baked palette.
 
-**Parameters**: Warp Scale, Warp Strength, Pattern Freq, Speed, Pole Fade, Falloff, Drift, Hue Shift
+**Parameters**: Warp Scale, Warp Strength, Pattern Freq, Speed, Pole Fade, Drift, Hue Shift
 
 </td></tr></table>
 
@@ -1544,9 +1560,23 @@ Catmull-Rom spline curves whose control points drift via independent random walk
 
 </td></tr></table>
 
+The two effects below are registered and selectable but not pictured here:
+
+#### DistortedRing
+
+Concentric rings built from per-azimuth distorted ring SDFs, their radii oscillating via a sine-wave amplitude mutation while a random walk slowly reorients the stack.
+
+**Parameters**: Alpha, MaxAmplitude, Thickness, Rings, Show Bounding
+
+#### ShapeShifter
+
+Layered polygons, stars, and flowers (planar or spherical) that morph between shape types and twist over time, drawn through either the `Plot` or `Scan` rasterizer with independent per-ring orientations.
+
+**Parameters**: Alpha, Count, Radius, Sides, Twist, Debug BB
+
 ### Legacy Effects (`effects_legacy.h`)
 
-TheMatrix, ChainWiggle, RingRotate, RingTwist, Curves, Kaleidoscope, StarsFade, DotTrails, Burnout, Spinner, Spiral — built before the current engine and using an older rendering API. Functional but not representative of current architecture.
+TheMatrix, ChainWiggle, RingRotate, RingTwist, Curves, Kaleidoscope, StarsFade, DotTrails, Burnout, Fire, Spinner, Spiral, WaveTrails, RingTrails — built before the current engine and using an older rendering API. Functional but not representative of current architecture.
 
 ---
 
@@ -1588,18 +1618,21 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 
 | Method | Description |
 |---|---|
-| `setResolution(w, h)` | Switch active resolution (96×20 or 288×144) |
-| `setEffect(name)` | Instantiate a new effect by string name; resets all arenas to defaults |
+| `setResolution(w, h)` → `bool` | Switch active resolution (96×20 or 288×144); returns `false` on an unsupported size |
+| `setEffect(name)` → `bool` | Instantiate a new effect by string name; resets all arenas to defaults; returns `false` on an unknown name |
 | `drawFrame()` | Advance one frame and copy pixels to the output buffer |
 | `getPixels()` | Return a zero-copy `Uint16Array` view into WASM linear memory |
-| `setParameter(name, value)` | Update a live effect parameter |
+| `getBufferLength()` → `int` | Length of the pixel buffer (`W × H × 3`) for sizing the view |
+| `setParameter(name, value)` → `bool` | Update a live effect parameter; returns `false` on an unknown name |
+| `setAnimationsPaused(paused)` | Freeze/resume the current effect's animation drivers (the GUI "Pause Animation" toggle) |
 | `getParameterDefinitions()` | Return the full `[{name, value, min, max}]` parameter list |
 | `getParamValues()` | Return current parameter values (including animation-driven updates) |
 | `getArenaMetrics()` | Memory usage stats for geometry, scratch, and tooling arenas, plus the stack high-water mark (see below) |
 | `getEffectSizes()` | Return `sizeof` for every registered effect at the current resolution |
-| `setClip(y0, y1, x0, x1)` | Restrict rendering to a sub-rectangle (used by segment workers) |
+| `setClip(y0, y1, x0, x1)` → `bool` | Restrict rendering to a sub-rectangle (used by segment workers) |
+| `getRenderUs()` → `double` | Last frame's rasterization time in microseconds (per-frame profiling) |
 
-The bridge also exposes a `MeshOps` class for the JavaScript tools, with dedicated 8 MB tooling arenas (separate from the engine's 335 KB arena) for interactive solid manipulation.
+The bridge also exposes a `MeshOps` class for the JavaScript tools, with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 335 KB arena) for interactive solid manipulation.
 
 The WASM bridge includes stack high-water-mark instrumentation: `stack_paint_canary()` fills the stack with a known pattern at init time, and `stack_high_water_mark()` scans for the deepest overwrite. This is reported via `getArenaMetrics()` and logged on every effect switch to catch stack-hungry template instantiations early.
 
@@ -1668,22 +1701,22 @@ params.forEach(p => {
 
 ### 10.7 Segmented POV Workers (`segment_worker.js`)
 
-Phantasm in hardware is four Teensys each rendering a Y-band of the canvas (§7.10). Daydream reproduces this in software so the partitioning is exercised before fabrication:
+Phantasm in hardware is four Teensys each rendering a Y-band of the canvas (§7.10). Daydream reproduces this in software so the partitioning is exercised before fabrication. A `SegmentController` (`segment_controller.js`) owns the worker pool — dispatching renders (`renderParallel()`), fencing stale frames by generation, and compositing results (`composite()`) — while each `segment_worker.js` hosts one WASM instance:
 
 ```
 Main thread                  Workers (one WASM each)
 ───────────                  ──────────────────────────
 drawFrame() {                postMessage({type:'render'})
   if (pendingSegmentFrame)
-    compositeSegments();       worker N:
-  renderSegmentsParallel();      engine.setClip(yN0, yN1, xN0, xN1)
+    controller.composite();    worker N:
+  controller.renderParallel();   engine.setClip(yN0, yN1, xN0, xN1)
 }                                engine.drawFrame()
                                  postMessage({type:'frame', pixels:Transferable})
 ```
 
 Key properties:
 - **Isolated WASM instances per worker** — each segment has its own arena, its own random seed (`std::mt19937(1337)` is deterministic, so all workers produce the same result), and its own effect state.
-- **`setClip(y0, y1, x0, x1)`** — the WASM engine restricts rendering and pixel readback to the worker's quadrant; the rest of the canvas isn't even visited.
+- **`setClip(y0, y1, x0, x1)`** — the WASM engine restricts *rendering* to the worker's quadrant: the rasterizer's scanline culling skips out-of-clip rows and columns, so out-of-band pixels are never shaded. The pixel readback in `drawFrame()` still copies the full canvas buffer; `segment_worker.js` then extracts just the quadrant rectangle from it (`segment_worker.js:149-159`) before transferring the result back, so only the quadrant crosses the worker boundary.
 - **One-frame pipeline** — frame N's render is dispatched fire-and-forget; frame N-1's results are composited synchronously when they arrive. Wall-clock time is measured against the slowest worker — exactly what the multi-Teensy hardware sees.
 - **Boundary overlay** — a "Show Boundaries" toggle paints cyan markers on the segment edges in the composite buffer to make the partition visible.
 
@@ -1710,8 +1743,8 @@ Codec priority is MP4/H.264 → WebM/VP9 → WebM/VP8, with optional offscreen-c
 
 | Name | Width × Height | Notes |
 |---|---|---|
-| Holosphere (20×96) | 96 × 20 | Matches the original Holosphere hardware |
-| Phantasm (144×288) | 288 × 144 | Matches Phantasm; default in the web simulator |
+| `Holosphere (20x96)` | 96 × 20 | Matches the original Holosphere hardware |
+| `Phantasm (144x288)` | 288 × 144 | Matches Phantasm; default in the web simulator |
 
 Switching presets does a full WASM reset: `setResolution(w, h)` reallocates buffers, `setEffect(name)` rebuilds the effect at the new template instantiation. The sidebar swaps to the matching favorites list (§10.5).
 
@@ -1724,8 +1757,8 @@ Five standalone HTML pages that share the engine's WASM `MeshOps` but render wit
 | `lissajous.html` | Designs spherical Lissajous curves with live frequency / phase / amplitude sliders; outputs the C++ literal needed by `ChaoticStrings`. |
 | `mobius.html` | Visualizes Möbius transformations on the sphere via stereographic projection; lets you sweep the four complex coefficients and see the warp on a latitude-longitude grid. |
 | `palettes.html` | Tunes `ProceduralPalette` cosine coefficients and `GenerativePalette` harmony rules; exports the C++ initializer. |
-| `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated 8 MB tooling arenas. |
-| `splines.html` | Catmull-Rom spline designer with closed-loop and open-chain modes; click to add control points, drag to edit, export to a C++ `Plot::SplineChain` initializer. |
+| `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated tooling arenas (16 MB, separate from the engine's 335 KB arena). |
+| `splines.html` | Dual-mode (Bézier / Catmull-Rom) spherical spline designer with closed-loop and open-chain modes; click to add control points, drag to edit, export the control points as a `constexpr std::array<Vector>` or as `Fragment` positions. |
 
 All five reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`.
 
@@ -1784,7 +1817,7 @@ The WASM target (`CMakeLists.txt`, `EMSCRIPTEN` branch) configures:
 - `-sALLOW_MEMORY_GROWTH=1` — WASM heap can grow for large meshes
 - `-sMODULARIZE=1 -sEXPORT_ES6=1` — ES6 module output
 - `-sSTACK_SIZE=8192` — minimal stack (effects use arena allocation, not deep recursion)
-- `-O3 -ffast-math -flto -msimd128` for release, `-O0 -g -sASSERTIONS=1` for debug
+- `-O3 -ffast-math -fno-finite-math-only -flto -msimd128` for release, `-O0 -g -sASSERTIONS=1` for debug (`-fno-finite-math-only` must follow `-ffast-math`, which otherwise folds `std::isfinite()` to true and lets the compiler assume no NaN/Inf — the render sink relies on real finite semantics)
 
 The install step also writes `README.md` and `docs/screenshots/` so the daydream repo always serves the same documentation as Holosphere.
 
