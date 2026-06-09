@@ -583,6 +583,20 @@
     let ArchimedeanSolids = [];
     let IslamicStarPatterns = [];
 
+    // Catalan solids live in `namespace Catalan` in solids.h, which sees
+    // Archimedean/Platonic via using-directives but is NOT itself visible from
+    // them. The WASM registry only reports Simple/Complex, so — like the
+    // hardcoded Platonic list below — we keep the known Catalan base names here
+    // to qualify a generated registry entry with the right namespace. Emitting
+    // `Archimedean::<catalan base>...` would not compile.
+    const CATALAN_BASES = new Set([
+      'triakisTetrahedron', 'rhombicDodecahedron', 'triakisOctahedron',
+      'tetrakisHexahedron', 'deltoidalIcositetrahedron', 'disdyakisDodecahedron',
+      'pentagonalIcositetrahedron', 'rhombicTriacontahedron', 'triakisIcosahedron',
+      'pentakisDodecahedron', 'deltoidalHexecontahedron', 'disdyakisTriacontahedron',
+      'pentagonalHexecontahedron',
+    ]);
+
     const OP_DEFS = {
       kis: { params: {} },
       ambo: { params: {} },
@@ -993,7 +1007,13 @@
         const { funcName } = generateFuncAndRecipe(item);
 
         const isComplex = IslamicStarPatterns.includes(item.base);
-        const nsName = isComplex ? "IslamicStarPatterns" : "Archimedean";
+        // Catalan bases must qualify with `Catalan::` — `Archimedean::` cannot
+        // resolve a name defined in `namespace Catalan`. Archimedean and
+        // Platonic bases both resolve under `Archimedean::` (it `using`s
+        // Platonic), so they share that qualifier.
+        const nsName = isComplex
+          ? "IslamicStarPatterns"
+          : (CATALAN_BASES.has(item.base) ? "Catalan" : "Archimedean");
         const catName = isComplex ? "Complex" : "Simple";
 
         code = `    {"${funcName}",\n     ${nsName}::${funcName},\n     Category::${catName}},`;
@@ -1022,6 +1042,15 @@
       return (s.indexOf('.') === -1 ? s + ".0" : s) + "f";
     }
 
+    // Stable, unambiguous suffix for a fractional op parameter (0..1+).
+    // toString().replace('0.','') was injective for clean 0.01-step values but
+    // produced junk for float-error inputs (0.30000000000000004 -> "3000...")
+    // and read ambiguously (0.5 -> "5"). Quantize to hundredths and pad to two
+    // digits so 0.05 -> "05" and 0.5 -> "50" stay distinct and self-describing.
+    function pctSuffix(val) {
+      return String(Math.round(val * 100)).padStart(2, '0');
+    }
+
     function generateFuncAndRecipe(item) {
       // Build the function name from base + ops, matching solids.h conventions
       let nameParts = [item.base];
@@ -1034,16 +1063,16 @@
 
         if (opName === 'truncate') {
           chain += `.truncate(${formatFloat(o.params.t)})`;
-          nameParts.push(`_truncate${o.params.t.toString().replace('0.', '')}`);
+          nameParts.push(`_truncate${pctSuffix(o.params.t)}`);
         } else if (opName === 'bitruncate') {
           chain += `.bitruncate(${formatFloat(o.params.t)})`;
-          nameParts.push(`_bitruncate${o.params.t.toString().replace('0.', '')}`);
+          nameParts.push(`_bitruncate${pctSuffix(o.params.t)}`);
         } else if (opName === 'expand') {
           chain += `.expand(${formatFloat(o.params.t)})`;
-          nameParts.push(`_expand${o.params.t.toString().replace('0.', '')}`);
+          nameParts.push(`_expand${pctSuffix(o.params.t)}`);
         } else if (opName === 'chamfer') {
           chain += `.chamfer(${formatFloat(o.params.t)})`;
-          nameParts.push(`_chamfer${o.params.t.toString().replace('0.', '')}`);
+          nameParts.push(`_chamfer${pctSuffix(o.params.t)}`);
         } else if (opName === 'hankin') {
           chain += `.hankin(${formatFloat(o.params.angle)} * D2R)`;
           nameParts.push(`_hk${Math.round(o.params.angle)}`);
@@ -1057,7 +1086,7 @@
           nameParts.push(`_relax`);
         } else if (opName === 'bevel') {
           chain += `.bevel(${formatFloat(o.params.t)})`;
-          nameParts.push(`_bevel${o.params.t.toString().replace('0.', '')}`);
+          nameParts.push(`_bevel${pctSuffix(o.params.t)}`);
         } else {
           // Simple parameterless ops: dual, kis, ambo, gyro, meta, needle, zip
           chain += `.${opName}()`;
