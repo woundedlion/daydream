@@ -54,6 +54,27 @@ function makeController({ resolution = 'lo', effect = 'TestEffect',
 beforeEach(() => { FakeWorker.instances = []; });
 globalThis.Worker = FakeWorker;
 
+// tick()'s composite/fault branches call updateStats(), which is pure DOM. Stub
+// document so getElementById returns null — updateStats then early-returns,
+// keeping the tick() state-machine tests DOM-free without exercising the overlay.
+globalThis.document = { getElementById: () => null };
+
+/** Drive a worker's 'ready' message; once all arrive the controller is ready. */
+function deliverReady(controller, segId) {
+  controller.workers[segId].onmessage({ data: { type: 'ready' } });
+}
+
+/** Build a controller with `n` workers all signalled ready. */
+function readyController(n = 2, opts = {}) {
+  const c = makeController(opts);
+  c.create(n);
+  for (let s = 0; s < n; s++) deliverReady(c, s);
+  return c;
+}
+
+/** Let the renderParallel() promise's .then (pendingFrame/renderInFlight) run. */
+const flush = () => new Promise((r) => setImmediate(r));
+
 /** Deliver a worker->controller 'frame' message to segment `segId`. */
 function deliverFrame(controller, segId, overrides = {}) {
   const quadW = overrides.quadW ?? 2;
@@ -201,4 +222,94 @@ test('composite() throws if the display-buffer alias is broken', () => {
   c.results = [];
 
   assert.throws(() => c.composite(), /alias broken/);
+});
+
+// ---------------------------------------------------------------------------
+// tick() — the one-frame-deep render-loop state machine (review #16, the
+// riskiest untested glue). Each tick (a) applies the previous frame's composite
+// when one is pending, and (b) dispatches the next parallel render unless one is
+// already in flight. The transitions below walk a full pipeline cycle plus the
+// two guard states (not-ready, faulted).
+// ---------------------------------------------------------------------------
+
+test('tick() is a no-op until every worker has signalled ready', () => {
+  const c = makeController();
+  c.create(2);            // workers spawned but no 'ready' delivered yet
+  assert.equal(c.ready, false);
+
+  c.tick();
+
+  assert.equal(c.renderInFlight, false, 'no render dispatched before ready');
+  assert.equal(c.pending, 0);
+  for (const w of c.workers)
+    assert.ok(!w.posted.some((m) => m.type === 'render'),
+      'no worker received a render message');
+});
+
+test('the first tick() once ready dispatches a parallel render', () => {
+  const c = readyController(2);
+  assert.equal(c.ready, true);
+
+  c.tick();
+
+  assert.equal(c.renderInFlight, true, 'render now in flight');
+  assert.equal(c.pending, 2, 'one outstanding response per worker');
+  assert.equal(c.pendingFrame, false, 'nothing to composite on the first tick');
+  for (const w of c.workers)
+    assert.ok(w.posted.some((m) => m.type === 'render'),
+      'every worker was told to render');
+});
+
+test('a completed render arms pendingFrame and frees the in-flight slot', async () => {
+  const c = readyController(2);
+  c.tick();                       // dispatch frame N
+
+  deliverFrame(c, 0);
+  deliverFrame(c, 1);             // last response settles the promise
+  await flush();                  // let renderParallel().then(...) run
+
+  assert.equal(c.pending, 0);
+  assert.equal(c.pendingFrame, true, 'results are waiting to be composited');
+  assert.equal(c.renderInFlight, false, 'slot freed for the next dispatch');
+});
+
+test('the next tick() composites the armed frame and dispatches the following one', async () => {
+  Daydream.W = 4; Daydream.H = 2;
+  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+
+  const c = readyController(2);
+  c.showBoundaries = false;
+  c.tick();                       // dispatch frame N
+
+  // Frame N completes: seg 0 → left half, seg 1 → right half, each filled 111.
+  const quad = () => new Uint16Array(2 * 2 * 3).fill(111);
+  deliverFrame(c, 0, { pixels: quad(), x0: 0, x1: 2, y0: 0, y1: 2 });
+  deliverFrame(c, 1, { pixels: quad(), x0: 2, x1: 4, y0: 0, y1: 2 });
+  await flush();
+  assert.equal(c.pendingFrame, true);
+
+  c.tick();                       // composite N, then dispatch N+1
+
+  assert.equal(c.pendingFrame, false, 'pending frame was composited and cleared');
+  assert.ok(Daydream.pixels.some((v) => v === 111),
+    'the composited quadrants reached the display buffer');
+  assert.equal(c.renderInFlight, true, 'the following frame was dispatched');
+  assert.equal(c.pending, 2);
+});
+
+test('a faulted pool keeps tick() from dispatching another doomed render', () => {
+  const c = readyController(2);
+  c.tick();                       // frame in flight, pending = 2
+
+  // Worker 0 traps: the latch zeroes pending and releases the in-flight slot.
+  c.workers[0].onerror({ message: 'boom', filename: 'w.js', lineno: 1, colno: 1 });
+  assert.equal(c.faulted, true);
+  assert.equal(c.renderInFlight, false);
+
+  const before = c.workers.map((w) => w.posted.length);
+  c.tick();
+
+  assert.equal(c.renderInFlight, false, 'faulted pool never re-dispatches');
+  c.workers.forEach((w, i) =>
+    assert.equal(w.posted.length, before[i], 'no new render broadcast'));
 });
