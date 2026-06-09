@@ -378,8 +378,11 @@ export class SegmentController {
       const xBounds = new Set();
       for (const r of this.results) {
         if (!r) continue;
+        // Skip the x0/y0 == 0 edges: those are the canvas border (and the x=0
+        // wrap seam), not internal segment splits. Drawing a cyan line there was
+        // a redundant marker down the left/top edge. (Y already filtered this.)
         if (r.y0 > 0) yBounds.add(r.y0);
-        xBounds.add(r.x0);
+        if (r.x0 > 0) xBounds.add(r.x0);
       }
 
       const plotCyan = (idx) => {
