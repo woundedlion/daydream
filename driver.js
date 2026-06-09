@@ -373,11 +373,12 @@ export class Daydream {
     this.renderer.render(this.scene, this.camera);
   }
 
-  /// Render the picture-in-picture corner view. Skipped on mobile and under
-  /// headless automation (Playwright/Puppeteer/Selenium set navigator.webdriver)
-  /// so clean screenshots aren't obscured by the PiP corner.
+  /// Render the picture-in-picture corner view. Skipped on mobile, under
+  /// headless automation (Playwright/Puppeteer/Selenium set navigator.webdriver),
+  /// and while recording, so clean screenshots/videos aren't obscured by the
+  /// PiP corner.
   _renderPip() {
-    if (this.isMobile || navigator.webdriver) return;
+    if (this.isMobile || navigator.webdriver || this.recorder?.isRecording) return;
 
     this.renderer.setViewport(
       this.pipViewport.x,
