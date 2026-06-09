@@ -1414,7 +1414,7 @@
 
       const meshData = wasmMeshToJs(currentWasmMesh);
       currentWasmMesh.delete(); // Cleanup final result
-      MeshOpsWasm.clearToolingMemory(); // Flush the 64MB arena
+      MeshOpsWasm.clearToolingMemory(); // Flush the 16 MB tooling arenas (8 MB + 4 MB + 4 MB)
 
       // Store for stats/helpers
       window.currentMesh = meshData;
