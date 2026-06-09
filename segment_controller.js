@@ -61,6 +61,13 @@ export class SegmentController {
     // Pipeline flags (were a module global + a render-loop local)
     this.renderInFlight = false;
     this.pendingFrame = false; // true when workers have new results to display
+
+    // Fault latch. A worker WASM trap / uncaught throw fires onerror but never
+    // sends its 'frame', so `pending` would never reach 0 and the whole segmented
+    // loop would deadlock-freeze. We latch the fault, settle the in-flight frame
+    // to unblock the pipeline, and stop dispatching to a known-broken worker pool.
+    this.faulted = false;
+    this.faultInfo = null;     // { segId, message } of the first fault this session
   }
 
   create(numSegments) {
@@ -130,19 +137,24 @@ export class SegmentController {
         }
       };
 
-      // Surface worker faults loudly. A WASM trap or uncaught throw inside a
-      // segment worker otherwise vanishes silently: `pending` never reaches 0,
-      // `frameResolve` never fires, and the segmented view freezes with no
-      // diagnostic. We deliberately do NOT auto-respawn or time out — a worker
-      // fault is a deterministic bug to fix at the source, not to mask. These
-      // handlers just make the failure visible and attributable to a segment.
+      // Surface worker faults loudly AND keep the pipeline from deadlocking. A
+      // WASM trap or uncaught throw inside a segment worker otherwise vanishes
+      // silently: the worker never sends its 'frame', so `pending` never reaches
+      // 0, `frameResolve` never fires, `renderInFlight` stays true, and the
+      // segmented view freezes forever with only a console line. We deliberately
+      // do NOT auto-respawn or time out — a worker fault is a deterministic bug
+      // to fix at the source, not to mask — but we settle the in-flight frame so
+      // the render loop unblocks, latch the fault to stop re-dispatching into a
+      // broken pool, and surface a visible UI state (see updateStats/tick).
       worker.onerror = (e) => {
         console.error(`[Segmented] Worker seg ${i} error: ${e.message}`
           + ` (${e.filename}:${e.lineno}:${e.colno})`, e);
+        this._onWorkerFault(i, e.message);
       };
       worker.onmessageerror = (e) => {
         console.error(`[Segmented] Worker seg ${i} message deserialization`
           + ` failed`, e);
+        this._onWorkerFault(i, 'message deserialization failed');
       };
 
       worker.postMessage({
@@ -175,6 +187,30 @@ export class SegmentController {
     this.frameResolve = null;
     this.renderInFlight = false;
     this.pendingFrame = false;
+    this.faulted = false;
+    this.faultInfo = null;
+  }
+
+  /**
+   * Latch a worker fault and break the render-loop deadlock. The faulting worker
+   * will never send its 'frame', so we settle the in-flight frame here (resolve
+   * its promise, zero `pending`) to release `renderInFlight`; `faulted` then stops
+   * `tick()` from dispatching another doomed render. Recovery is by re-creating
+   * the pool (resolution change / mode toggle), which clears the latch via
+   * destroy(). Only the first fault per session is recorded for the UI.
+   */
+  _onWorkerFault(segId, message) {
+    if (!this.faulted) {
+      this.faulted = true;
+      this.faultInfo = { segId, message };
+    }
+    this.pending = 0;
+    this.renderInFlight = false;
+    if (this.frameResolve) {
+      const resolve = this.frameResolve;
+      this.frameResolve = null;
+      resolve();
+    }
   }
 
   /** Tell all workers to set a new effect. */
@@ -343,6 +379,19 @@ export class SegmentController {
     if (globalStatsMobile) globalStatsMobile.style.display = 'none';
     el.style.display = '';
 
+    // A worker fault froze the pipeline — make it visible instead of letting the
+    // segmented view sit silently stale. Recovery is a resolution change / mode
+    // toggle (re-creates the pool, clearing the latch).
+    if (this.faulted) {
+      const f = this.faultInfo || {};
+      el.innerHTML = `<div style="color:#ff5252;padding:6px;font-size:0.85em">`
+        + `⚠ Segment worker ${f.segId} faulted — segmented render halted.<br>`
+        + `<span style="color:#999">${f.message || 'see console'}</span><br>`
+        + `<span style="color:#999">Change resolution or toggle segmented mode to restart.</span>`
+        + `</div>`;
+      return;
+    }
+
     const fmtKB = (x) => (x / 1024).toFixed(1);
     const numSegs = this.count;
 
@@ -395,6 +444,13 @@ export class SegmentController {
    */
   tick() {
     if (!(this.ready && this.workers.length > 0)) return;
+
+    // A faulted pool is broken until re-created: keep the visible fault state up
+    // and stop dispatching renders that would just deadlock again.
+    if (this.faulted) {
+      this.updateStats();
+      return;
+    }
 
     // 1. Apply the PREVIOUS frame's composite results synchronously. This runs
     //    AFTER driver.render() called pixels.fill(0), so it overwrites the clear.
