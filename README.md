@@ -676,7 +676,6 @@ The `process_pixel` function applies anti-aliasing based on shape type:
 | `SDF::SphericalPolygon` | Regular N-gon with geodesic (great-circle) edges |
 | `SDF::Star` | N-pointed star using the standard inradius/circumradius construction |
 | `SDF::Flower` | Inverted star (N-petal flower shape from the antipodal perspective) |
-| `SDF::HarmonicBlob` | Shape defined by a spherical harmonic Yˡₘ function |
 | `SDF::Line` | Geodesic line segment between two sphere-surface points |
 | `SDF::Face` | Planar polygon face (used for mesh rendering) |
 | `SDF::Torus` | 3D volumetric torus SDF with configurable major/minor radii (Cartesian ray-space, not a 2D sphere-surface shape) |
@@ -709,7 +708,6 @@ Convenience structs that construct an SDF shape and rasterize in a single `draw(
 | `Scan::DistortedRing` | Ring with per-azimuth radius perturbation |
 | `Scan::PlanarPolygon` | Regular N-gon in the tangent plane |
 | `Scan::SphericalPolygon` | Regular N-gon with geodesic (great-circle) edges |
-| `Scan::HarmonicBlob` | Spherical harmonic shape |
 | `Scan::Mesh` | Rasterizes all faces of a `MeshState` or `PolyMesh` |
 | `Scan::Shader` | Full-screen per-pixel shader with configurable SSAA (super-sample anti-aliasing). The single-callback overload accepts a fragment shader. The two-callback overload separates a per-pixel vertex shader (called once at pixel center) from a per-subsample fragment shader (called SAMPLES×) — enabling efficient SSAA with expensive per-pixel work computed once (used by BZReactionDiffusion for 4× SSAA). |
 | `Scan::TransformedVolume` | Wraps an SDF shape with a world-space position and orientation quaternion for volumetric rendering |
@@ -1356,7 +1354,7 @@ Similar to IslamicStars but sequences through the full Archimedean solid library
 
 #### SphericalHarmonics
 
-Renders the real spherical harmonics Yˡₘ(θ, φ) as SDF `HarmonicBlob` shapes. The harmonic defines a lobe-radius function that deforms a unit sphere surface. Animates through different (l, m) combinations.
+Visualizes the real spherical harmonics Yˡₘ(θ, φ) as a colored scalar field over the sphere: the harmonic value drives a perceptual positive/negative palette split with ambient-occlusion shading. Continuously morphs between (l, m) modes.
 
 </td></tr></table>
 
