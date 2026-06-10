@@ -163,7 +163,13 @@ export class SegmentController {
           // resized display buffer. Still settle the frame so the promise resolves.
           if (this.inflightGen === this.renderGen) {
             this.results[msg.segId] = {
-              pixels: msg.pixels ? new Uint16Array(msg.pixels) : null,
+              // msg.pixels arrives as a buffer the worker TRANSFERRED (see
+              // segment_worker.js postMessage transfer list), so the controller
+              // already owns it exclusively — and the worker allocates a fresh
+              // buffer every render, so there's no aliasing across frames. Hold
+              // the transferred view directly; a `new Uint16Array(msg.pixels)`
+              // copy here would defeat the zero-copy transfer every frame.
+              pixels: msg.pixels ?? null,
               x0: msg.x0, x1: msg.x1,
               y0: msg.y0, y1: msg.y1,
               quadW: msg.quadW, quadH: msg.quadH,
