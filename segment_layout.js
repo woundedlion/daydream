@@ -32,7 +32,7 @@ export function computeSegmentRange(id, total, w, h) {
       `segment_worker: totalSegs must be a positive even number (got ${total})`);
   }
   // Guard the resolution carried across the postMessage boundary (init /
-  // setResolution / setSegment all funnel through here). A non-integer or
+  // setResolution both funnel through here). A non-integer or
   // non-positive dimension would produce a degenerate segRange and feed garbage
   // into setClip; fail fast instead.
   if (!Number.isInteger(w) || w <= 0 || !Number.isInteger(h) || h <= 0) {

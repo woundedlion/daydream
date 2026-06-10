@@ -99,14 +99,6 @@ self.onmessage = async (e) => {
       break;
     }
 
-    case 'setSegment': {
-      segId = msg.segId;
-      totalSegs = msg.totalSegs;
-      segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
-      applyClip();
-      break;
-    }
-
     case 'setParameter': {
       if (engine) {
         engine.setParameter(msg.name, msg.value);
