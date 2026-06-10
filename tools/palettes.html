@@ -10,6 +10,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Procedural Color Palette Generator</title>
   <script src="../vendor/tailwindcss.js"></script>
+  <!-- Resolves bare module specifiers (e.g. 'three') for the ES-module script
+       below, which imports from tools/shared.js. Must precede that module. -->
+  <script src="../vendor-importmap.js"></script>
   <style>
     @import url('../vendor/fonts/fonts.css');
 
@@ -190,9 +193,9 @@
     </style>
     <!-- 1. PALETTE PARAMETERS (CONTROLS) -->
     <div class="flex border-b border-slate-600 mb-0">
-      <button id="tab-btn-procedural" class="tab-btn active" onclick="switchTab('procedural')">Procedural
+      <button id="tab-btn-procedural" class="tab-btn active" data-tab="procedural">Procedural
         (Cosine)</button>
-      <button id="tab-btn-generative" class="tab-btn" onclick="switchTab('generative')">Generative</button>
+      <button id="tab-btn-generative" class="tab-btn" data-tab="generative">Generative</button>
     </div>
 
     <div id="tab-content-procedural" class="tab-content active mb-6">
@@ -404,7 +407,16 @@
 
     </div> <!-- This closes the grid wrapper for Animated Preview and Export Palette Code -->
   </div> <!-- This closes .container -->
-  <script>
+  <script type="module">
+    // Shared primitives, imported rather than re-implemented inline: the
+    // clipboard copy (tools/shared.js) and the OKLab/OKLCH/sRGB color math
+    // (tools/color.js, which mirrors the engine's core/color.h pipeline).
+    import { copyToClipboard as copyTextToClipboard } from './shared.js';
+    import {
+      srgbToLinearFloat, linearToSrgbFloat, srgbToOklch, lerpOklch,
+      oklchToLinearRgb, linearRgbToHex,
+    } from './color.js';
+
     // --- Palette Class and Data Structure ---
     const TWO_PI = 2 * Math.PI;
 
@@ -512,96 +524,9 @@
       return new CPixel(Math.round(r * 255), Math.round(g * 255), Math.round(b * 255));
     }
 
-    // Precise sRGB to Linear conversion formula
-    function srgbToLinear(srgb) {
-      const s = srgb / 255.0;
-      return (s <= 0.04045) ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-    }
-
-    // sRGB float [0,1] -> Linear float [0,1]
-    function srgbToLinearFloat(s) {
-      return (s <= 0.04045) ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-    }
-
-    // Linear float [0,1] -> sRGB float [0,1]
-    function linearToSrgbFloat(l) {
-      return (l <= 0.0031308) ? l * 12.92 : 1.055 * Math.pow(l, 1.0 / 2.4) - 0.055;
-    }
-
-    // ---- OKLab / OKLCH Color Space (Björn Ottosson, 2020) ----
-
-    function linearRgbToOklab(r, g, b) {
-      const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
-      const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
-      const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
-      const l_ = Math.cbrt(l), m_ = Math.cbrt(m), s_ = Math.cbrt(s);
-      return {
-        L: 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
-        a: 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
-        b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
-      };
-    }
-
-    function oklabToLinearRgb(lab) {
-      const l_ = lab.L + 0.3963377774 * lab.a + 0.2158037573 * lab.b;
-      const m_ = lab.L - 0.1055613458 * lab.a - 0.0638541728 * lab.b;
-      const s_ = lab.L - 0.0894841775 * lab.a - 1.2914855480 * lab.b;
-      const l = l_ * l_ * l_, m = m_ * m_ * m_, s = s_ * s_ * s_;
-      return {
-        r: +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-        g: -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-        b: -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
-      };
-    }
-
-    function oklabToOklch(lab) {
-      return {
-        L: lab.L,
-        C: Math.sqrt(lab.a * lab.a + lab.b * lab.b),
-        h: Math.atan2(lab.b, lab.a)
-      };
-    }
-
-    function oklchToOklab(lch) {
-      return { L: lch.L, a: lch.C * Math.cos(lch.h), b: lch.C * Math.sin(lch.h) };
-    }
-
-    // sRGB [0-255] -> OKLCH
-    function srgbToOklch(r, g, b) {
-      return oklabToOklch(linearRgbToOklab(
-        srgbToLinearFloat(r / 255.0),
-        srgbToLinearFloat(g / 255.0),
-        srgbToLinearFloat(b / 255.0)
-      ));
-    }
-
-    // Interpolate two OKLCH colors (shortest-arc hue)
-    function lerpOklch(a, b, t) {
-      let h;
-      if (a.C < 1e-4 && b.C < 1e-4) {
-        h = 0;
-      } else if (a.C < 1e-4) {
-        h = b.h;
-      } else if (b.C < 1e-4) {
-        h = a.h;
-      } else {
-        let dh = b.h - a.h;
-        if (dh > Math.PI) dh -= 2 * Math.PI;
-        if (dh < -Math.PI) dh += 2 * Math.PI;
-        h = a.h + dh * t;
-      }
-      return { L: a.L + (b.L - a.L) * t, C: a.C + (b.C - a.C) * t, h };
-    }
-
-    // OKLCH -> linear RGB [0,1] (gamut-clamped)
-    function oklchToLinearRgb(lch) {
-      const rgb = oklabToLinearRgb(oklchToOklab(lch));
-      return [
-        Math.max(0, Math.min(1, rgb.r)),
-        Math.max(0, Math.min(1, rgb.g)),
-        Math.max(0, Math.min(1, rgb.b))
-      ];
-    }
+    // sRGB / linear-RGB / OKLab / OKLCH math now lives in tools/color.js
+    // (imported at the top of this module) so the tools and the engine share one
+    // perceptual pipeline instead of drifting inline copies.
 
     class GenerativePalette {
       constructor(gradientShape, harmonyType, brightnessProfile, satProfile, hueValue) {
@@ -819,57 +744,14 @@
     // --- Helper Functions ---
 
     /**
-         * Converts linear RGB [0, 1] to a HEX string (applies linear→sRGB).
-         */
-    function linearRgbToHex(r, g, b) {
-      const toHex = (c) => {
-        const i = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, c))) * 255);
-        const hex = Math.max(0, Math.min(255, i)).toString(16);
-        return hex.length === 1 ? "0" + hex : hex;
-      };
-      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-    }
-
-    /**
-         * MODIFIED: Copies text to the clipboard and shows feedback on a specific element.
-         * @param {string} text - The text to copy.
-         * @param {HTMLElement} feedbackElement - The span to show "Copied!".
-         * @param {string} originalMessage - The message to restore after copying.
-         */
+     * Copies text via the shared clipboard primitive (tools/shared.js) and
+     * shows "Copied!" feedback on a specific element.
+     * @param {string} text - The text to copy.
+     * @param {HTMLElement} feedbackElement - The span to show "Copied!".
+     * @param {string} originalMessage - The message to restore after copying.
+     */
     async function copyToClipboard(text, feedbackElement, originalMessage = "") {
-      // Prefer the async Clipboard API; fall back to the legacy execCommand path
-      // for non-secure contexts / older browsers. (This page is a classic script
-      // with inline onclick handlers, so it can't import tools/shared.js as a
-      // module — the same primitive is kept inline here.)
-      let success = false;
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-          success = true;
-        }
-      } catch (err) {
-        // Fall through to the legacy path below.
-      }
-
-      if (!success) {
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.style.position = 'fixed';
-        textarea.style.top = 0;
-        textarea.style.left = 0;
-        textarea.style.width = '1px';
-        textarea.style.height = '1px';
-        textarea.style.opacity = 0;
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        try {
-          success = document.execCommand('copy');
-        } catch (err) {
-          console.error('Failed to copy text: ', err);
-        }
-        document.body.removeChild(textarea);
-      }
+      const success = await copyTextToClipboard(text);
 
       // Show visual feedback to the user
       if (success && feedbackElement) {
@@ -1513,6 +1395,13 @@
         console.error("Fatal Error: Canvas elements not found. Stopping init.");
         return;
       }
+
+      // 0. Tab buttons. Wired here via listeners rather than inline onclick
+      // attributes, which a `<script type="module">` (module scope, not global)
+      // cannot reach.
+      document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+      });
 
       // 1. Initialize all 12 R/G/B sliders
       sliderDefinitions.forEach(createSlider);
