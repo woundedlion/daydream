@@ -214,12 +214,30 @@
     let dragIndex = -1;
     let lastMouseDown = 0;
 
-    // --- Spline evaluation (pure JS, matching C++ Spline:: namespace) ---
+    // --- Spline evaluation ---
+    // Hand-maintained JS mirror of core/3dmath.h `Spline::` (cubic_fast,
+    // cubic_slerp, catmull_rom_tangents) and the `slerp`/`normalized_or` it
+    // builds on. The WASM bridge (`spline_cubic_fast` / `spline_cubic_slerp`)
+    // is the authoritative implementation; this port exists only so the tool
+    // need not async-load the engine for an interactive preview. Keep the
+    // degenerate-case fallbacks below in lockstep with `normalized_or` — that
+    // (antipodal/coincident) handling is exactly where a careless port drifts.
+
+    // Matches std::numeric_limits<float>::epsilon() used by C++ normalized_or.
+    const FLT_EPSILON = 1.1920929e-7;
 
     function vec3Normalize(v) {
       const len = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
       if (len < 1e-10) return { x: 1, y: 0, z: 0 };
       return { x: v.x/len, y: v.y/len, z: v.z/len };
+    }
+
+    // Mirror of C++ normalized_or(v, fallback): normalize v, or return the
+    // (already-unit) fallback direction when v has collapsed to ~zero.
+    function normalizedOr(v, fallback) {
+      const m = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+      if (m < FLT_EPSILON) return fallback;
+      return { x: v.x/m, y: v.y/m, z: v.z/m };
     }
 
     function vec3Dot(a, b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
@@ -236,7 +254,10 @@
       const theta = Math.acos(d);
       const sinTheta = Math.sin(theta);
       if (sinTheta < 0.0001) {
-        return vec3Normalize(vec3Add(v1, vec3Scale(vec3Sub(v2, v1), t)));
+        // Antipodal endpoints: the lerp midpoint can collapse to zero. Match
+        // C++ slerp's normalized_or((v1+(v2-v1)t), v1) — fall back to v1, not a
+        // fixed axis.
+        return normalizedOr(vec3Add(v1, vec3Scale(vec3Sub(v2, v1), t)), v1);
       }
       const s1 = Math.sin((1-t)*theta) / sinTheta;
       const s2 = Math.sin(t*theta) / sinTheta;
@@ -246,10 +267,13 @@
     function cubicFast(p0, p1, p2, p3, t) {
       const u = 1 - t;
       const uu = u*u, tt = t*t;
-      return vec3Normalize(vec3Add(
+      const blended = vec3Add(
         vec3Add(vec3Scale(p0, uu*u), vec3Scale(p1, 3*uu*t)),
         vec3Add(vec3Scale(p2, 3*u*tt), vec3Scale(p3, tt*t))
-      ));
+      );
+      // Match C++ cubic_fast: degrade to p1 (via normalized_or) when antipodal
+      // /coincident control points sum to a near-zero vector.
+      return normalizedOr(blended, p1);
     }
 
     function cubicSlerp(p0, p1, p2, p3, t) {
