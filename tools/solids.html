@@ -916,6 +916,10 @@
     const savedSolids = [];
 
     function saveSolid() {
+      // Nothing to save until the first successful update() has produced a mesh
+      // (clicking save before then would dereference an undefined currentMesh).
+      if (!window.currentMesh) return;
+
       // Capture thumbnail
       renderer.render(scene, camera);
       const dataURL = renderer.domElement.toDataURL('image/png');
