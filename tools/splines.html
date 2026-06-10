@@ -142,7 +142,7 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { initScene, copyToClipboard } from './shared.js';
+    import { initScene, copyWithFeedback } from './shared.js';
 
     const SLATE_900 = 0x0f172a;
     const FAST_COLOR = 0x34d399;   // emerald
@@ -561,11 +561,8 @@
       // Copy
       document.getElementById('btn-copy').addEventListener('click', () => {
         const text = document.getElementById('export-output').textContent;
-        copyToClipboard(text).then(() => {
-          const btn = document.getElementById('btn-copy');
-          btn.textContent = 'Copied!';
-          setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
-        });
+        copyWithFeedback(text,
+          { element: document.getElementById('btn-copy'), revertText: 'Copy' });
       });
 
       // Export format change

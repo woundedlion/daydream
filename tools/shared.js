@@ -194,3 +194,43 @@ export async function copyToClipboard(text) {
   document.body.removeChild(textarea);
   return ok;
 }
+
+/**
+ * Copy `text`, then briefly swap an element's label to a "copied" message
+ * (optionally toggling CSS classes) and restore it after `revertMs`. This is
+ * the transient-feedback wrapper every tool re-derived around copyToClipboard.
+ *
+ * @param {string} text - Text to copy.
+ * @param {object} [opts]
+ * @param {HTMLElement} [opts.element] - Element whose label flips on success.
+ * @param {string} [opts.copiedText='Copied!'] - Label shown while copied.
+ * @param {string} [opts.revertText] - Label to restore (default: current text).
+ * @param {number} [opts.revertMs=1500] - How long the copied label stays.
+ * @param {string[]} [opts.copiedClasses=[]] - Classes added while copied, removed on revert.
+ * @param {string[]} [opts.idleClasses=[]] - Classes removed while copied, restored on revert (only if there is text to restore).
+ * @returns {Promise<boolean>} Whether the copy succeeded.
+ */
+export async function copyWithFeedback(text, opts = {}) {
+  const {
+    element,
+    copiedText = 'Copied!',
+    revertText,
+    revertMs = 1500,
+    copiedClasses = [],
+    idleClasses = [],
+  } = opts;
+
+  const success = await copyToClipboard(text);
+  if (success && element) {
+    const original = revertText !== undefined ? revertText : element.textContent;
+    element.textContent = copiedText;
+    if (copiedClasses.length) element.classList.add(...copiedClasses);
+    if (idleClasses.length) element.classList.remove(...idleClasses);
+    setTimeout(() => {
+      element.textContent = original;
+      if (copiedClasses.length) element.classList.remove(...copiedClasses);
+      if (idleClasses.length && original) element.classList.add(...idleClasses);
+    }, revertMs);
+  }
+  return success;
+}
