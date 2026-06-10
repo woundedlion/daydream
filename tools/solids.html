@@ -1424,6 +1424,15 @@
         });
       } catch (e) {
         console.error("WASM Op Error:", e);
+        // A mid-chain op failed: the partial mesh is meaningless, so surface the
+        // error and skip the render rather than displaying a half-applied solid
+        // with wrong stats. currentWasmMesh still points at the last valid op
+        // result (the failing op threw before the swap), so it is safe to free.
+        currentWasmMesh.delete();
+        MeshOpsWasm.clearToolingMemory();
+        const statsEl = document.getElementById('meshStats');
+        if (statsEl) statsEl.innerText = `Op error: ${e?.message || e}`;
+        return;
       }
 
       const meshData = wasmMeshToJs(currentWasmMesh);
