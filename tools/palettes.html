@@ -410,7 +410,7 @@
     // Shared primitives, imported rather than re-implemented inline: the
     // clipboard copy (tools/shared.js) and the OKLab/OKLCH/sRGB color math
     // (tools/color.js, which mirrors the engine's core/color.h pipeline).
-    import { copyToClipboard as copyTextToClipboard } from './shared.js';
+    import { copyWithFeedback } from './shared.js';
     import {
       srgbToLinearFloat, linearToSrgbFloat, srgbToOklch, lerpOklch,
       oklchToLinearRgb, linearRgbToHex,
@@ -742,33 +742,12 @@
 
     // --- Helper Functions ---
 
-    /**
-     * Copies text via the shared clipboard primitive (tools/shared.js) and
-     * shows "Copied!" feedback on a specific element.
-     * @param {string} text - The text to copy.
-     * @param {HTMLElement} feedbackElement - The span to show "Copied!".
-     * @param {string} originalMessage - The message to restore after copying.
-     */
-    async function copyToClipboard(text, feedbackElement, originalMessage = "") {
-      const success = await copyTextToClipboard(text);
-
-      // Show visual feedback to the user
-      if (success && feedbackElement) {
-        feedbackElement.textContent = "Copied!";
-        feedbackElement.classList.remove('text-gray-500');
-        feedbackElement.classList.add('text-green-400');
-
-        // Reset the message after 1.5 seconds
-        setTimeout(() => {
-          feedbackElement.textContent = originalMessage;
-          feedbackElement.classList.remove('text-green-400');
-          // Only add back if there was an original message
-          if (originalMessage) {
-            feedbackElement.classList.add('text-gray-500');
-          }
-        }, 1500);
-      }
-    }
+    // Copy-with-feedback lives in tools/shared.js; this page just supplies the
+    // green/gray color classes its prompt spans use.
+    const COPY_FEEDBACK = {
+      copiedClasses: ['text-green-400'],
+      idleClasses: ['text-gray-500'],
+    };
 
 
     // --- UI and Event Functions ---
@@ -1439,7 +1418,8 @@
         colorSwatch.addEventListener('click', () => {
           if (hexValueSpan) {
             const hex = hexValueSpan.textContent;
-            copyToClipboard(hex, copyPromptSpan, "(Click swatch to copy)");
+            copyWithFeedback(hex,
+              { element: copyPromptSpan, revertText: "(Click swatch to copy)", ...COPY_FEEDBACK });
           }
         });
       }
@@ -1457,7 +1437,8 @@
       if (copyCodeButton && codeOutput && copyCodePrompt) {
         copyCodeButton.addEventListener('click', () => {
           // Get the text content, preserving line breaks
-          copyToClipboard(codeOutput.textContent, copyCodePrompt, "");
+          copyWithFeedback(codeOutput.textContent,
+            { element: copyCodePrompt, revertText: "", ...COPY_FEEDBACK });
         });
       }
 
