@@ -107,10 +107,11 @@
     }
 
     .param-group {
-      background-color: var(--slate-700);
-      border-radius: 0.75rem;
+      /* Visual base (background/border-radius/box-shadow) is inherited from
+         tools.css; mobius packs param-groups into a horizontal scrolling panel,
+         so it overrides padding/margin and adds the column layout. */
       padding: 0.75rem;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      margin-bottom: 0;
       width: 160px;
       flex-shrink: 0;
       display: flex;
