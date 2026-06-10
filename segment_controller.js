@@ -430,11 +430,23 @@ export class SegmentController {
     // toggle (re-creates the pool, clearing the latch).
     if (this.faulted) {
       const f = this.faultInfo;
-      el.innerHTML = `<div style="color:#ff5252;padding:6px;font-size:0.85em">`
-        + `⚠ Segment worker ${f ? f.segId : '?'} faulted — segmented render halted.<br>`
-        + `<span style="color:#999">${(f && f.message) || 'see console'}</span><br>`
-        + `<span style="color:#999">Change resolution or toggle segmented mode to restart.</span>`
-        + `</div>`;
+      // Build via text nodes, not innerHTML: the worker fault message is
+      // arbitrary error text and must never be parsed as markup.
+      const box = document.createElement('div');
+      box.style.cssText = 'color:#ff5252;padding:6px;font-size:0.85em';
+      box.append(
+        `⚠ Segment worker ${f ? f.segId : '?'} faulted — segmented render halted.`);
+      box.appendChild(document.createElement('br'));
+      const msg = document.createElement('span');
+      msg.style.color = '#999';
+      msg.textContent = (f && f.message) || 'see console';
+      box.appendChild(msg);
+      box.appendChild(document.createElement('br'));
+      const hint = document.createElement('span');
+      hint.style.color = '#999';
+      hint.textContent = 'Change resolution or toggle segmented mode to restart.';
+      box.appendChild(hint);
+      el.replaceChildren(box);
       return;
     }
 

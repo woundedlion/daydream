@@ -44,8 +44,10 @@ class LabelPool {
     labelObj.position.copy(position).multiplyScalar(Daydream.SPHERE_RADIUS);
     labelObj.visible = true;
 
-    if (labelObj.element.innerHTML !== content) {
-      labelObj.element.innerHTML = content;
+    // Labels are plain text (axis names, effect-supplied strings); use
+    // textContent so a label string can never inject markup.
+    if (labelObj.element.textContent !== content) {
+      labelObj.element.textContent = content;
     }
 
     this.activeCount++;
