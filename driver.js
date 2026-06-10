@@ -261,6 +261,10 @@ export class Daydream {
     // padding it with duplicate frames.
     if (this.recorder && advanced) this.recorder.captureFrame();
 
+    // Rebuild labels every rendered frame, not just on a simulation step, so a
+    // paused frame still tracks camera orbits and clears the label DOM when
+    // labels are toggled off (otherwise stale label DIVs persist while paused).
+    this._refreshLabels(effect);
     if (this.labelPool.activeCount > 0) {
       this.labelRenderer.render(this.scene, this.camera);
     }
@@ -314,7 +318,6 @@ export class Daydream {
     this.yAxis.visible = this.labelAxes;
     this.zAxis.visible = this.labelAxes;
 
-    this._refreshLabels(effect);
     return true;
   }
 
