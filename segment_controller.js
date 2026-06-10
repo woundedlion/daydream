@@ -118,6 +118,10 @@ export class SegmentController {
     const res = this._resolutionPresets[this._appState.get('resolution')];
     if (!res) return;
 
+    // Keep the segment count in sync with the pool we're about to build so
+    // updateStats() and any other reader see the live size rather than a stale
+    // value carried over from a previous create()/constructor default.
+    this.count = numSegments;
     this.workers = [];
     this.results = new Array(numSegments).fill(null);
     this.timings = new Array(numSegments).fill(0);
