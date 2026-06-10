@@ -384,12 +384,20 @@ export class SegmentController {
       const xBounds = new Set();
       for (const r of this.results) {
         if (!r) continue;
-        // Skip the x0/y0 == 0 edges: those are the canvas border (and the x=0
-        // wrap seam), not internal segment splits. Drawing a cyan line there was
-        // a redundant marker down the left/top edge. (Y already filtered this.)
+        // Y does NOT wrap (the sphere's poles cap the column), so y0 == 0 is the
+        // top canvas edge — never an internal split — and is skipped.
+        // X DOES wrap (the sphere is a cylinder in x), so x0 == 0 is collected
+        // separately below: on its own it could be a same-segment wrap rather
+        // than a boundary, so we only mark it once we know the layout is split.
         if (r.y0 > 0) yBounds.add(r.y0);
         if (r.x0 > 0) xBounds.add(r.x0);
       }
+      // If the layout is split in x at all, the wrap seam at x == 0 (== x == w)
+      // is a genuine boundary — it's where the last arm meets the first — and
+      // must be marked too. The earlier "drop x == 0" fix over-reached: it
+      // removed this real arm-0/arm-1 seam along with the spurious left-edge
+      // border, leaving the boundary between those two quadrants unmarked.
+      if (xBounds.size > 0) xBounds.add(0);
 
       const plotCyan = (idx) => {
         dst[idx]     = 0;     // R

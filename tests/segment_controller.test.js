@@ -212,6 +212,54 @@ test('composite() skips a rectangle that overflows the current display buffer', 
     'out-of-bounds rect is never partially blitted');
 });
 
+test('composite() marks both the internal split and the x=0 wrap seam', () => {
+  // 2-arm layout over W=4: arm 0 = x[0,2), arm 1 = x[2,4). On the wrapped
+  // cylinder there are two vertical arm boundaries — the internal split at
+  // x=2 and the wrap seam at x=0 (where arm 1 meets arm 0). Both must be cyan.
+  Daydream.W = 4; Daydream.H = 2;
+  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+
+  const c = makeController();
+  c.showBoundaries = true;
+  const quadL = new Uint16Array(2 * 2 * 3).fill(111);
+  const quadR = new Uint16Array(2 * 2 * 3).fill(222);
+  c.results = [
+    { pixels: quadL, x0: 0, x1: 2, y0: 0, y1: 2, quadW: 2, quadH: 2 },
+    { pixels: quadR, x0: 2, x1: 4, y0: 0, y1: 2, quadW: 2, quadH: 2 },
+  ];
+
+  c.composite();
+
+  const isCyan = (x, y) => {
+    const i = idx(x, y, 4);
+    return Daydream.pixels[i] === 0 && Daydream.pixels[i + 1] === 65535 &&
+           Daydream.pixels[i + 2] === 65535;
+  };
+  // Internal split column x=2 is cyan top-to-bottom.
+  assert.ok(isCyan(2, 0) && isCyan(2, 1), 'internal arm split at x=2 marked');
+  // Wrap-seam column x=0 (arm 1 -> arm 0) is cyan top-to-bottom.
+  assert.ok(isCyan(0, 0) && isCyan(0, 1), 'wrap-seam boundary at x=0 marked');
+  // The arm interiors (x=1, x=3) keep their blitted pixel values.
+  assert.equal(Daydream.pixels[idx(1, 0, 4)], 111, 'arm-0 interior untouched');
+  assert.equal(Daydream.pixels[idx(3, 0, 4)], 222, 'arm-1 interior untouched');
+});
+
+test('composite() draws no x=0 line when the layout is not split in x', () => {
+  // A single full-width segment spanning x[0,4): x does not split, so x=0 is a
+  // same-segment wrap, not a boundary — no spurious cyan line down the edge.
+  Daydream.W = 4; Daydream.H = 2;
+  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+
+  const c = makeController();
+  c.showBoundaries = true;
+  const full = new Uint16Array(4 * 2 * 3).fill(123);
+  c.results = [{ pixels: full, x0: 0, x1: 4, y0: 0, y1: 2, quadW: 4, quadH: 2 }];
+
+  c.composite();
+  assert.ok(Daydream.pixels.every((v) => v === 123),
+    'full-width segment leaves no boundary overlay');
+});
+
 test('composite() throws if the display-buffer alias is broken', () => {
   Daydream.W = 4; Daydream.H = 2;
   Daydream.pixels = new Uint16Array(4 * 2 * 3);
