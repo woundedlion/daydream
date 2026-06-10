@@ -645,6 +645,10 @@ function disposeApp() {
   }
   sidebar.dispose();
   daydream.dispose();
+  // Terminate the segment-worker pool too: each worker holds a live WASM
+  // module, so a discard with Segmented POV enabled would leak N workers
+  // until the tab closes. destroy() is a no-op when the pool is empty.
+  segments.destroy();
 }
 
 // pagehide (not unload) so the bfcache path is respected: only tear down on a
