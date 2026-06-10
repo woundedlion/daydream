@@ -52,8 +52,6 @@
 
 /** @typedef {{ type: 'setResolution', w: number, h: number }} SetResolutionMsg */
 
-/** @typedef {{ type: 'setSegment', segId: number, totalSegs: number }} SetSegmentMsg */
-
 /** @typedef {{ type: 'setParameter', name: string, value: number }} SetParameterMsg */
 
 /** @typedef {{ type: 'setAnimationsPaused', paused: boolean }} SetAnimationsPausedMsg */
@@ -62,7 +60,7 @@
 
 /**
  * Every message the controller sends to a worker.
- * @typedef {InitMsg | SetEffectMsg | SetResolutionMsg | SetSegmentMsg
+ * @typedef {InitMsg | SetEffectMsg | SetResolutionMsg
  *   | SetParameterMsg | SetAnimationsPausedMsg | RenderMsg} WorkerInboundMsg
  */
 
