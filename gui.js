@@ -55,6 +55,21 @@ class DeepLinkGUI {
     return keys.join('.');
   }
 
+  // Install our deep-link URL writer as the controller's onChange and redirect
+  // any later caller onChange(fn) to a user slot that runs *ahead* of the
+  // writer. lil-gui keeps a single onChange slot, so without this a caller
+  // doing `gui.add(...).onChange(cb)` would silently overwrite the URL writer
+  // and break deep-link persistence for that control.
+  _attachUrlWriter(controller, writeUrl) {
+    let userOnChange = null;
+    controller.onChange((v) => {
+      if (userOnChange) userOnChange(v);
+      writeUrl(v);
+    });
+    controller.onChange = (fn) => { userOnChange = fn; return controller; };
+    return controller;
+  }
+
   add(object, prop, ...args) {
     const key = this._getKey(prop);
     const isFunction = typeof object[prop] === 'function';
@@ -77,9 +92,7 @@ class DeepLinkGUI {
 
     // 3. Attach URL/State Listener (skip for buttons)
     if (!isFunction) {
-      controller.onChange((v) => {
-        setUrlParam(key, v);
-      });
+      this._attachUrlWriter(controller, (v) => setUrlParam(key, v));
     }
 
     // 4. Update Display
@@ -103,7 +116,7 @@ class DeepLinkGUI {
     const controller = this.gui.addColor(object, prop);
 
     // 3. Attach URL/State Listener
-    controller.onChange((v) => {
+    this._attachUrlWriter(controller, (v) => {
       // Handle Color Serialization
       let strVal = v;
       if (typeof v === 'object' && v.getHexString) {
