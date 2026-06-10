@@ -66,7 +66,6 @@
                be less negative, which moves the thumb *down* visually.
       */
       margin-top: -3px;
-      /* MODIFIED: Was -5px. Nudged 2px down. */
     }
 
     /* For Firefox: */
@@ -92,7 +91,7 @@
     }
 
 
-    /* NEW: Custom checkbox style */
+    /* Custom checkbox style */
     input[type=checkbox] {
       background-color: #475569;
       /* Slate 600 */
@@ -207,7 +206,7 @@
         <div class="param-group space-y-4">
           <h3 class="text-lg font-bold text-blue-400">Vector A (Base Value)</h3>
           <p class="text-xs text-gray-400">Sets the center value of the color oscillation.</p>
-          <!-- NEW: Lock Checkbox for A -->
+          <!-- Lock Checkbox for A -->
           <div class="flex items-center space-x-2 text-sm text-gray-300">
             <input type="checkbox" id="lock_A"
               class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
@@ -222,7 +221,7 @@
         <div class="param-group space-y-4">
           <h3 class="text-lg font-bold text-green-400">Vector B (Amplitude)</h3>
           <p class="text-xs text-gray-400">Controls the range/intensity of the oscillation.</p>
-          <!-- NEW: Lock Checkbox for B -->
+          <!-- Lock Checkbox for B -->
           <div class="flex items-center space-x-2 text-sm text-gray-300">
             <input type="checkbox" id="lock_B"
               class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
@@ -237,7 +236,7 @@
         <div class="param-group space-y-4">
           <h3 class="text-lg font-bold text-red-400">Vector C (Frequency)</h3>
           <p class="text-xs text-gray-400">Determines the number of cycles across the palette (0 to 5).</p>
-          <!-- NEW: Lock Checkbox for C -->
+          <!-- Lock Checkbox for C -->
           <div class="flex items-center space-x-2 text-sm text-gray-300">
             <input type="checkbox" id="lock_C"
               class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
@@ -252,7 +251,7 @@
         <div class="param-group space-y-4">
           <h3 class="text-lg font-bold text-yellow-400">Vector D (Phase Shift)</h3>
           <p class="text-xs text-gray-400">Shifts the starting point of the wave (0 to 1).</p>
-          <!-- NEW: Lock Checkbox for D -->
+          <!-- Lock Checkbox for D -->
           <div class="flex items-center space-x-2 text-sm text-gray-300">
             <input type="checkbox" id="lock_D"
               class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
@@ -349,14 +348,14 @@
         width="1024" height="100"></canvas>
     </div>
 
-    <!-- NEW: Wrapper for sections 4 and 5 -->
+    <!-- Wrapper for sections 4 and 5 -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
       <!-- 4. ANIMATED PREVIEW (SWATCH & SPEED) -->
       <div class="space-y-4 p-4 param-group">
         <h2 class="text-2xl font-semibold text-white">Animated Preview</h2>
 
-        <!-- NEW: This flex container puts swatch and controls side-by-side -->
+        <!-- This flex container puts swatch and controls side-by-side -->
         <div class="flex flex-col sm:flex-row gap-4">
           <!-- Swatch -->
           <div id="colorSwatch" class="w-full sm:w-1/2 h-32 rounded-lg border-4 border-slate-700 shadow-inner"
@@ -698,7 +697,7 @@
 
     let parameters = { ...defaultParams };
     let palette;
-    let previousParams = null; // NEW: For zoom history
+    let previousParams = null; // For zoom history
 
     // Animation state
     let animationSpeed = 0.3; // Cycles per second (Default: 0.3 cycles/s)
@@ -706,22 +705,22 @@
     let lastTime = 0;
     let animationFrameId = null;
 
-    // NEW: Drag-to-zoom state
+    // Drag-to-zoom state
     let isDragging = false;
-    let isSelectionActive = false; // NEW: Tracks if drag is active AND within Y-bounds
+    let isSelectionActive = false; // Tracks if drag is active AND within Y-bounds
     let dragStartTime = 0.0;
     let dragEndTime = 0.0;
     const DRAG_THRESHOLD = 0.01; // Minimum drag distance (as %) to be considered a zoom
-    let lockedDragStartValues = {}; // NEW: For locked slider relative movement
+    let lockedDragStartValues = {}; // For locked slider relative movement
 
     // DOM Elements
-    // FIXED: These are now declared inside init() after window.onload
+    // Declared inside init() after the window load handler.
     // to ensure elements exist.
     let colorStripCanvas, colorStripCtx, waveGraphCanvas, waveGraphCtx,
       colorSwatch, tValueSpan, speedSlider, speedValueSpan,
       hexValueSpan, copyPromptSpan, resetZoomButton;
 
-    // MODIFIED: Added 'group' property
+    // Each entry carries a 'group' property.
     const sliderDefinitions = [
       // A (Base): Range [0, 1]
       { param: 'A_R', container: 'A_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'A' },
@@ -797,7 +796,7 @@
       const slider = document.getElementById(`${def.param}_slider`);
       const valueSpan = document.getElementById(`${def.param}_value`);
 
-      // NEW: mousedown listener to store initial values for locked drag
+      // mousedown listener to store initial values for locked drag
       slider.addEventListener('mousedown', () => {
         const lockCheckbox = document.getElementById(`lock_${def.group}`);
         const isLocked = lockCheckbox ? lockCheckbox.checked : false;
@@ -892,7 +891,7 @@
         updatePalette();
       });
 
-      // NEW: Clear locked values on mouseup
+      // Clear locked values on mouseup
       slider.addEventListener('mouseup', () => {
         lockedDragStartValues = {};
       });
@@ -902,7 +901,7 @@
     }
 
     /**
-         * NEW: Updates all slider positions and value spans from the 'parameters' object.
+         * Updates all slider positions and value spans from the 'parameters' object.
          * Used after zooming or resetting zoom.
          */
     function updateAllSliders() {
@@ -922,7 +921,7 @@
     }
 
     /**
-         * NEW: Helper function to get the normalized (0-1) X coordinate from a mouse event.
+         * Helper function to get the normalized (0-1) X coordinate from a mouse event.
          */
     function getNormalizedX(event) {
       if (!colorStripCanvas) return 0; // Safety check
@@ -933,14 +932,14 @@
     }
 
     /**
-         * NEW: Handles the start of a drag or click on the color strip.
+         * Handles the start of a drag or click on the color strip.
          */
     function handleDragStart(event) {
       // Only trigger on left mouse button
       if (event.button !== 0 || !colorStripCanvas) return;
 
       isDragging = true;
-      isSelectionActive = true; // NEW: Selection is active on start
+      isSelectionActive = true; // Selection is active on start
       dragStartTime = getNormalizedX(event);
       dragEndTime = dragStartTime;
       colorStripCanvas.style.cursor = 'crosshair';
@@ -950,8 +949,8 @@
     }
 
     /**
-         * NEW: Handles mouse movement during a drag.
-         * MODIFIED: Now cancels drag if mouse moves above or below the canvas.
+         * Handles mouse movement during a drag.
+         * Cancels drag if the mouse moves above or below the canvas.
          */
     function handleDragMove(event) {
       if (!isDragging) return;
@@ -959,7 +958,7 @@
       // Always update the end time, even if off-canvas (for left/right)
       dragEndTime = getNormalizedX(event);
 
-      // NEW: Check if mouse is outside the canvas's Y-bounds to deactivate selection
+      // Check if mouse is outside the canvas's Y-bounds to deactivate selection
       if (colorStripCanvas) { // Safety check
         const rect = colorStripCanvas.getBoundingClientRect();
         const y = event.clientY;
@@ -973,12 +972,12 @@
         }
       }
 
-      // REMOVED: Redraw is now handled by the 'animate' loop
+      // Redraw is handled by the 'animate' loop.
       // drawColorStrip(animationTime, { start: dragStartTime, end: dragEndTime });
     }
 
     /**
-         * NEW: Handles the end of a drag (zoom) or a simple click (set phase).
+         * Handles the end of a drag (zoom) or a simple click (set phase).
          */
     function handleDragEnd(event) {
       if (!isDragging || !colorStripCanvas) return;
@@ -986,10 +985,10 @@
       const wasSelectionActive = isSelectionActive; // Store state before reset
 
       isDragging = false;
-      isSelectionActive = false; // NEW: Reset selection state
+      isSelectionActive = false; // Reset selection state
       colorStripCanvas.style.cursor = 'pointer';
 
-      // NEW: If mouse was released outside Y-bounds, do nothing.
+      // If mouse was released outside Y-bounds, do nothing.
       if (!wasSelectionActive) {
         drawColorStrip(animationTime); // Redraw to be safe
         return;
@@ -1006,7 +1005,6 @@
         // --- This was a CLICK ---
         animationTime = t_start; // Use t_start (which equals dragStartTime)
 
-        // REMOVED: Reset speed to default
 
         // Force update of visual elements
         updateSwatch();
@@ -1020,12 +1018,12 @@
     }
 
     /**
-         * NEW: Cancels drag if mouse leaves the canvas.
+         * Cancels drag if mouse leaves the canvas.
          */
     function handleDragLeave() {
       if (isDragging) {
         isDragging = false;
-        isSelectionActive = false; // NEW: Also reset this
+        isSelectionActive = false; // Also reset this
         if (colorStripCanvas) {
           colorStripCanvas.style.cursor = 'pointer';
         }
@@ -1035,7 +1033,7 @@
     }
 
     /**
-         * NEW: Calculates and applies new C (frequency) and D (phase) parameters
+         * Calculates and applies new C (frequency) and D (phase) parameters
          * to zoom the palette from t_start to t_end.
          */
     function zoomPalette(t_start, t_end) {
@@ -1084,7 +1082,7 @@
     }
 
     /**
-         * NEW: Restores the parameters from before the zoom.
+         * Restores the parameters from before the zoom.
          */
     function handleResetZoom() {
       if (!previousParams) return;
@@ -1106,7 +1104,7 @@
     }
 
     /**
-         * NEW: Hides the reset button and clears the zoom history.
+         * Hides the reset button and clears the zoom history.
          */
     function hideResetZoomButton() {
       if (resetZoomButton) {
@@ -1116,7 +1114,7 @@
     }
 
     /**
-         * NEW: Shows the reset button.
+         * Shows the reset button.
          */
     function showResetZoomButton() {
       if (resetZoomButton) {
@@ -1127,7 +1125,7 @@
     // --- Drawing and Animation Functions ---
 
     /**
-         * MODIFIED: Draws the color strip, the time marker, and an optional selection overlay.
+         * Draws the color strip, the time marker, and an optional selection overlay.
          * @param {number} t The current time parameter (0 to 1) for the marker position.
          * @param {object | null} selectionRange - e.g., { start: 0.2, end: 0.5 }
          */
@@ -1173,7 +1171,7 @@
 
       colorStripCtx.shadowBlur = 0; // Reset shadow
 
-      // 3. NEW: Draw the selection overlay if it exists
+      // 3. Draw the selection overlay if it exists
       if (selectionRange) {
         // Ensure startX is the smaller value
         const startRaw = selectionRange.start * width;
@@ -1260,7 +1258,6 @@
          * Simple linear interpolation map function.
          */
     function mapValue(value, fromMin, fromMax, toMin, toMax) {
-      // FIXED: Corrected typo 'fromM-in' to 'fromMin'
       return (value - fromMin) * (toMax - toMin) / (fromMax - fromMin) + toMin;
     }
 
@@ -1303,7 +1300,6 @@
 
       updateSwatch();
 
-      // MODIFIED:
       // Always draw the color strip.
       // If dragging AND selection is active, draw with the selection overlay.
       // Otherwise, just draw with the time marker.
@@ -1316,7 +1312,7 @@
 
 
     /**
-         * NEW: Updates the code output block with the current parameters.
+         * Updates the code output block with the current parameters.
          */
     function updatePaletteCodeOutput() {
       const codeOutput = document.getElementById('palette_code_output');
@@ -1369,7 +1365,7 @@
       updateSwatch();
       drawColorStrip(animationTime);
 
-      // NEW: Update the code output
+      // Update the code output
       updatePaletteCodeOutput();
     }
 
@@ -1377,7 +1373,7 @@
          * Initialize the sliders and the first visualization.
          */
     function init() {
-      // FIXED: Assign DOM elements *inside* init, after DOM load.
+      // Assign DOM elements inside init, after DOM load.
       colorStripCanvas = document.getElementById('colorStripCanvas');
       colorStripCtx = colorStripCanvas ? colorStripCanvas.getContext('2d') : null;
       waveGraphCanvas = document.getElementById('waveGraphCanvas');
@@ -1432,14 +1428,13 @@
         if (el) el.addEventListener('change', updatePalette);
       });
 
-      // 3. MODIFIED: Add new drag-and-drop listeners
+      // 3. Add drag-and-drop listeners
       colorStripCanvas.addEventListener('mousedown', handleDragStart);
       document.addEventListener('mousemove', handleDragMove); // Listen on document to drag outside
       document.addEventListener('mouseup', handleDragEnd); // Listen on document to release outside
-      // REMOVED: colorStripCanvas.addEventListener('mouseleave', handleDragLeave);
       // The document's 'mousemove' listener now handles this logic.
 
-      // 4. NEW: Add click-to-copy to the swatch
+      // 4. Add click-to-copy to the swatch
       if (colorSwatch) {
         colorSwatch.addEventListener('click', () => {
           if (hexValueSpan) {
@@ -1449,12 +1444,12 @@
         });
       }
 
-      // 5. NEW: Add listener for the reset zoom button
+      // 5. Add listener for the reset zoom button
       if (resetZoomButton) {
         resetZoomButton.addEventListener('click', handleResetZoom);
       }
 
-      // 6. NEW: Add listener for the copy code button
+      // 6. Add listener for the copy code button
       const copyCodeButton = document.getElementById('copy_code_button');
       const copyCodePrompt = document.getElementById('copy_code_prompt');
       const codeOutput = document.getElementById('palette_code_output');
