@@ -96,6 +96,9 @@ export class Daydream {
   static X_AXIS = new THREE.Vector3(1, 0, 0);
   static Y_AXIS = new THREE.Vector3(0, 1, 0);
   static Z_AXIS = new THREE.Vector3(0, 0, 1);
+  static NEG_X_AXIS = new THREE.Vector3(-1, 0, 0);
+  static NEG_Y_AXIS = new THREE.Vector3(0, -1, 0);
+  static NEG_Z_AXIS = new THREE.Vector3(0, 0, -1);
   static UP = Daydream.Y_AXIS;
 
   constructor() {
@@ -325,9 +328,9 @@ export class Daydream {
       labels.push({ "position": Daydream.X_AXIS, "content": "X" });
       labels.push({ "position": Daydream.Y_AXIS, "content": "Y" });
       labels.push({ "position": Daydream.Z_AXIS, "content": "Z" });
-      labels.push({ "position": Daydream.X_AXIS.clone().negate(), "content": "-X" });
-      labels.push({ "position": Daydream.Y_AXIS.clone().negate(), "content": "-Y" });
-      labels.push({ "position": Daydream.Z_AXIS.clone().negate(), "content": "-Z" });
+      labels.push({ "position": Daydream.NEG_X_AXIS, "content": "-X" });
+      labels.push({ "position": Daydream.NEG_Y_AXIS, "content": "-Y" });
+      labels.push({ "position": Daydream.NEG_Z_AXIS, "content": "-Z" });
     }
 
     if (effect && typeof effect.getLabels === 'function') {
