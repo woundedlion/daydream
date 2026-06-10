@@ -83,7 +83,11 @@ function deliverFrame(controller, segId, overrides = {}) {
   controller.workers[segId].onmessage({
     data: {
       type: 'frame', segId,
-      pixels: px.buffer,
+      // The protocol delivers `pixels` as the Uint16Array view (worker_protocol
+      // FrameMessage; the worker transfers its .buffer but the field is the
+      // typed-array view), and composite() indexes it element-wise. Sending a
+      // bare ArrayBuffer here would index to undefined->0 and blit a black quad.
+      pixels: px,
       x0: overrides.x0 ?? 0, x1: overrides.x1 ?? quadW,
       y0: overrides.y0 ?? 0, y1: overrides.y1 ?? quadH,
       quadW, quadH,
