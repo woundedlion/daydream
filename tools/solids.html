@@ -1366,6 +1366,20 @@
     function update() {
       if (!WasmModule || !MeshOpsWasm) return;
 
+      // MeshOps error-handling contract (the JS-facing surface of the WASM mesh
+      // kernel). The module is built with exceptions disabled
+      // (-fno-exceptions / DISABLE_EXCEPTION_CATCHING), so an engine-side failure
+      // — an internal HS_CHECK firing, or a mesh that grows past the tooling
+      // arena's capacity — calls abort() and tears down the ENTIRE module. It
+      // does NOT surface as a catchable JS exception. The try/catch blocks below
+      // therefore only catch Embind-level marshalling errors (e.g. passing a bad
+      // argument type across the boundary); they can never recover from an
+      // engine overflow or invariant trap, which is fatal to the page by design.
+      // The C++ wrapper deliberately pre-rejects the *known* recoverable cases —
+      // an unknown solid name (fromSolidName) and an oversized mesh (fromData) —
+      // returning an empty mesh instead of aborting; but an arbitrary op chain
+      // that simply outgrows the arena has no such guard and will abort.
+
       // 1. Generate Mesh directly from WASM
       let currentWasmMesh = null;
       try {
