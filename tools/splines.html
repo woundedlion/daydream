@@ -143,6 +143,11 @@
   <script type="module">
     import * as THREE from 'three';
     import { initScene, copyWithFeedback } from './shared.js';
+    import createHolosphereModule from '../holosphere_wasm.js';
+
+    // The Holosphere WASM engine — the single source of truth for spline math.
+    // Loaded once in the bootstrap before any curve is generated.
+    let WasmModule = null;
 
     const SLATE_900 = 0x0f172a;
     const FAST_COLOR = 0x34d399;   // emerald
@@ -169,80 +174,34 @@
     let lastMouseDown = 0;
 
     // --- Spline evaluation ---
-    // Hand-maintained JS mirror of core/3dmath.h `Spline::` (cubic_fast,
-    // cubic_slerp, catmull_rom_tangents) and the `slerp`/`normalized_or` it
-    // builds on. The WASM bridge (`spline_cubic_fast` / `spline_cubic_slerp`)
-    // is the authoritative implementation; this port exists only so the tool
-    // need not async-load the engine for an interactive preview. Keep the
-    // degenerate-case fallbacks below in lockstep with `normalized_or` — that
-    // (antipodal/coincident) handling is exactly where a careless port drifts.
+    // Evaluated by the Holosphere WASM engine (single source of truth) via the
+    // `spline_cubic_fast` / `spline_cubic_slerp` / `spline_catmull_rom_tangents`
+    // bindings, so the preview can never drift from the device's spline math.
+    // The bridge takes flat floats and returns plain `{x,y,z}` objects.
 
-    // Matches std::numeric_limits<float>::epsilon() used by C++ normalized_or.
-    const FLT_EPSILON = 1.1920929e-7;
-
+    // Local-space (non-spline) helper, used by the point/UI projection code.
     function vec3Normalize(v) {
       const len = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
       if (len < 1e-10) return { x: 1, y: 0, z: 0 };
       return { x: v.x/len, y: v.y/len, z: v.z/len };
     }
 
-    // Mirror of C++ normalized_or(v, fallback): normalize v, or return the
-    // (already-unit) fallback direction when v has collapsed to ~zero.
-    function normalizedOr(v, fallback) {
-      const m = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
-      if (m < FLT_EPSILON) return fallback;
-      return { x: v.x/m, y: v.y/m, z: v.z/m };
-    }
-
-    function vec3Dot(a, b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
-
-    function vec3Add(a, b) { return { x: a.x+b.x, y: a.y+b.y, z: a.z+b.z }; }
-    function vec3Sub(a, b) { return { x: a.x-b.x, y: a.y-b.y, z: a.z-b.z }; }
-    function vec3Scale(v, s) { return { x: v.x*s, y: v.y*s, z: v.z*s }; }
-
-    function slerpVec(v1, v2, t) {
-      let d = Math.max(-1, Math.min(1, vec3Dot(v1, v2)));
-      if (d > 0.9999) {
-        return vec3Normalize(vec3Add(v1, vec3Scale(vec3Sub(v2, v1), t)));
-      }
-      const theta = Math.acos(d);
-      const sinTheta = Math.sin(theta);
-      if (sinTheta < 0.0001) {
-        // Antipodal endpoints: the lerp midpoint can collapse to zero. Match
-        // C++ slerp's normalized_or((v1+(v2-v1)t), v1) — fall back to v1, not a
-        // fixed axis.
-        return normalizedOr(vec3Add(v1, vec3Scale(vec3Sub(v2, v1), t)), v1);
-      }
-      const s1 = Math.sin((1-t)*theta) / sinTheta;
-      const s2 = Math.sin(t*theta) / sinTheta;
-      return vec3Normalize(vec3Add(vec3Scale(v1, s1), vec3Scale(v2, s2)));
-    }
-
     function cubicFast(p0, p1, p2, p3, t) {
-      const u = 1 - t;
-      const uu = u*u, tt = t*t;
-      const blended = vec3Add(
-        vec3Add(vec3Scale(p0, uu*u), vec3Scale(p1, 3*uu*t)),
-        vec3Add(vec3Scale(p2, 3*u*tt), vec3Scale(p3, tt*t))
-      );
-      // Match C++ cubic_fast: degrade to p1 (via normalized_or) when antipodal
-      // /coincident control points sum to a near-zero vector.
-      return normalizedOr(blended, p1);
+      return WasmModule.spline_cubic_fast(
+        p0.x, p0.y, p0.z, p1.x, p1.y, p1.z,
+        p2.x, p2.y, p2.z, p3.x, p3.y, p3.z, t);
     }
 
     function cubicSlerp(p0, p1, p2, p3, t) {
-      const b01 = slerpVec(p0, p1, t);
-      const b12 = slerpVec(p1, p2, t);
-      const b23 = slerpVec(p2, p3, t);
-      const b012 = slerpVec(b01, b12, t);
-      const b123 = slerpVec(b12, b23, t);
-      return slerpVec(b012, b123, t);
+      return WasmModule.spline_cubic_slerp(
+        p0.x, p0.y, p0.z, p1.x, p1.y, p1.z,
+        p2.x, p2.y, p2.z, p3.x, p3.y, p3.z, t);
     }
 
     function catmullRomTangents(prev, start, end, next, tension) {
-      const cp1 = slerpVec(start, slerpVec(prev, end, 0.5), tension);
-      const cp2 = slerpVec(end, slerpVec(start, next, 0.5), tension);
-      return { cp1, cp2 };
+      return WasmModule.spline_catmull_rom_tangents(
+        prev.x, prev.y, prev.z, start.x, start.y, start.z,
+        end.x, end.y, end.z, next.x, next.y, next.z, tension);
     }
 
     // --- Curve generation ---
@@ -570,7 +529,8 @@
     }
 
     // --- Bootstrap ---
-    window.onload = () => {
+    window.onload = async () => {
+      WasmModule = await createHolosphereModule();
       initUI();
       initThree();
     };
