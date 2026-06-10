@@ -436,6 +436,20 @@ createHolosphereModule().then(module => {
         // Normal mode: single engine renders full canvas
         wasmEngine.drawFrame();
         refreshPixelView();
+        // refreshPixelView() must leave the three pixel-buffer aliases pointing
+        // at the one WASM view: wasmMemoryView (the rendered source), Daydream.pixels
+        // (the buffer driver.render() clears each frame), and instanceColor.array
+        // (the attribute THREE displays). composite() asserts this same invariant on
+        // the segment path; assert it here too so a future divergence — e.g. a resize
+        // that re-points only some of the three — fails loudly instead of silently
+        // displaying a stale buffer that the engine never rendered into.
+        if (Daydream.pixels !== wasmMemoryView ||
+            daydream.dotMesh.instanceColor.array !== wasmMemoryView) {
+          throw new Error(
+            "drawFrame: display-buffer alias broken after refreshPixelView() — " +
+            "Daydream.pixels / instanceColor.array / wasmMemoryView diverged; the " +
+            "rendered WASM buffer is not the one being cleared and displayed");
+        }
         daydream.dotMesh.instanceColor.needsUpdate = true;
         // Hide segment stats if they were showing
         const segEl = document.getElementById('segment-stats');
