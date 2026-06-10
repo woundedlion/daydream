@@ -181,7 +181,11 @@
     let scene, camera, renderer, controls, line;
 
     // --- Lissajous Function ---
-    const lissajous = (t, m1, m2, a) => {
+    // Argument order mirrors the engine's lissajous(m1, m2, a, t)
+    // (core/geometry.h) so this preview and the exported snippet below — which
+    // emits lissajous(C1, C2, A, t) for pasting into engine path code — agree on
+    // which slider maps to which parameter. t is last in both.
+    const lissajous = (m1, m2, a, t) => {
       const phase = a;
       const x = Math.sin(m2 * t) * Math.cos(m1 * t - phase);
       const y = Math.cos(m2 * t);
@@ -217,7 +221,7 @@
 
       for (let i = 0; i <= segments; i++) {
         const t = (i / segments) * domain;
-        const point = lissajous(t, state.C1, state.C2, state.A);
+        const point = lissajous(state.C1, state.C2, state.A, t);
         points.push(point);
       }
 
