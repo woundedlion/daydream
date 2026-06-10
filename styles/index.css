@@ -568,6 +568,10 @@ div.label {
   color: white;
   font-family: Arial;
   font-size: 10px;
+  /* Honor newlines in multi-line labels (e.g. coordsLabel) while collapsing
+     other whitespace; content reaches the DOM via textContent, so \n is the
+     only break that survives. */
+  white-space: pre-line;
 }
 
 /* Per-segment stats overlay */
