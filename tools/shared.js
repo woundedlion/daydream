@@ -40,7 +40,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
  * @param {Function} [opts.onAnimate] - Callback run every frame before controls.update()
  * @param {Function} [opts.onAfterRender] - Callback run every frame after the render
  * @param {Function} [opts.onResize] - Custom resize handler (replaces the default aspect/size update)
- * @returns {{ scene, camera, renderer, controls, sphere, lights, resize }}
+ * @returns {{ scene, camera, renderer, controls, sphere, lights, resize, dispose }}
  */
 export function initScene(containerId, canvasId, opts = {}) {
   const {
@@ -134,8 +134,9 @@ export function initScene(containerId, canvasId, opts = {}) {
   window.addEventListener('resize', resize);
 
   // Animation loop
+  let rafId = 0;
   const animate = () => {
-    requestAnimationFrame(animate);
+    rafId = requestAnimationFrame(animate);
     if (onAnimate) onAnimate();
     controls.update();
     renderer.render(scene, camera);
@@ -143,7 +144,17 @@ export function initScene(containerId, canvasId, opts = {}) {
   };
   animate();
 
-  return { scene, camera, renderer, controls, sphere, lights: lightRig, resize };
+  // Stop the render loop and detach the resize listener. Tool pages are
+  // long-lived so this rarely matters, but it mirrors the dispose discipline
+  // in driver.js / daydream.js and gives callers an off switch.
+  const dispose = () => {
+    cancelAnimationFrame(rafId);
+    window.removeEventListener('resize', resize);
+    controls.dispose();
+    renderer.dispose();
+  };
+
+  return { scene, camera, renderer, controls, sphere, lights: lightRig, resize, dispose };
 }
 
 /**
