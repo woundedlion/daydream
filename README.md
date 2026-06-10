@@ -96,7 +96,7 @@ The POV effect works because each revolution takes ~125 ms and the ISR fires eve
 
 ## 2. Engineering Philosophies
 
-The five design decisions below shape the rest of the codebase. Skim them first — every later section makes more sense once you know *why* the engine looks the way it does.
+The five design decisions below account for much of the engine's structure; the rest of the document assumes them.
 
 ### Why 16-bit Linear Color?
 
@@ -104,11 +104,11 @@ Most LED art codebases use gamma-corrected 8-bit values throughout and blend in 
 
 ### Why Compile-Time Resolution?
 
-Templating on `<W, H>` means every pixel coordinate transform, bounding box computation, and LUT index is resolved at compile time. The hardware target `<96, 20>` runs with no runtime overhead from generality. The simulator builds separate specializations for `<288, 144>`. Binary size increases, but for an embedded firmware this is the right trade-off.
+Templating on `<W, H>` means every pixel coordinate transform, bounding box computation, and LUT index is resolved at compile time. The hardware target `<96, 20>` runs with no runtime overhead from generality. The simulator builds separate specializations for `<288, 144>`. Each supported resolution is a separate instantiation, so binary size increases in exchange.
 
 ### Why Arena Allocation?
 
-The Teensy heap fragments under heavy mesh subdivision. The single-block partitioned arena design (persistent + scratch A + scratch B, 335 KB total) gives deterministic memory behavior: persistent data allocated once and kept; scratch data RAII-scoped to the function that needed it. The `configure_arenas()` function allows effects to repartition the fixed block based on their needs — mesh-heavy effects can claim more persistent space, while subdivision-heavy effects can expand their scratch pools. All functions take explicit `Arena&` parameters — Conway operators take `(Arena& target, Arena& temp)`, generators take `(Arena& a, Arena& b)` — giving total control over the exact memory layout during heavy geometric operations, with no hidden state or implicit arena references.
+The Teensy heap fragments under heavy mesh subdivision. The single-block partitioned arena design (persistent + scratch A + scratch B, 335 KB total) gives deterministic memory behavior: persistent data allocated once and kept; scratch data RAII-scoped to the function that needed it. The `configure_arenas()` function allows effects to repartition the fixed block based on their needs — mesh-heavy effects can claim more persistent space, while subdivision-heavy effects can expand their scratch pools. All functions take explicit `Arena&` parameters — Conway operators take `(Arena& target, Arena& temp)`, generators take `(Arena& a, Arena& b)` — so the memory layout during heavy geometric operations is explicit at every call site, with no hidden state or implicit arena references.
 
 ### Why the ISR Double Buffer?
 
@@ -200,6 +200,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 │
 ├── hardware/                   Hardware drivers
 │   ├── dma_led.h               Non-blocking DMA LED controller for HD107S (Teensy 4.x)
+│   ├── hd107s_frame.h          HD107S protocol buffer + inline color correction (host-testable)
 │   ├── pov_single.h            Single-Teensy POV driver (Holosphere)
 │   └── pov_segmented.h         Multi-Teensy segmented POV driver (Phantasm)
 │
@@ -308,7 +309,7 @@ The `platform.h` header abstracts all target-specific differences:
 | `DMAMEM` | Teensy DMA-accessible RAM segment | No-op macro |
 | `hs::log()` | `Serial.println()` | `std::cout` |
 | `hs::millis()` | `::millis()` | `std::chrono` |
-| `hs::rand_f()` | `random()` | `std::mt19937` |
+| `hs::rand_f()` | `std::mt19937(1337)` | `std::mt19937(1337)` |
 | `hs::disable_interrupts()` | `noInterrupts()` | No-op |
 | `CRGB`, `CHSV` | FastLED types | Struct mocks |
 
@@ -368,8 +369,9 @@ C++: wasmEngine.drawFrame()
 
 JS:  wasmEngine.getPixels()
        → Uint16Array view into WASM linear memory (no copy)
-       → divide by 65535 → Float32Array of linear light values
-       → Three.js DataTexture → sphere mesh material
+       → bound as the instanced dot-mesh's `instanceColor` attribute, declared
+         `normalized` so the GPU scales 0–65535 → 0–1 (no JS-side divide)
+       → WebGL renderer
 ```
 
 ---
@@ -450,7 +452,7 @@ void MyEffect::draw_frame() override {
 
 ### The Filter Pipeline
 
-The most powerful engine component is the **variadic template filter pipeline**:
+The **filter pipeline** is a variadic template that chains filter stages:
 
 ```cpp
 Pipeline<W, H,
@@ -611,14 +613,14 @@ Scan::Ring::draw<W, H>(pipeline, canvas, basis, radius, thickness, shader);
 
 Each rasterizer family populates the Fragment registers with a consistent convention. Shaders can rely on these semantics:
 
-**SDF Scanline Path** (`Scan::Ring`, `Scan::Star`, `Scan::Polygon`, `Scan::Flower`, `Scan::Line`, `Scan::Mesh`):
+**SDF Scanline Path** (`Scan::Ring`, `Scan::Star`, `Scan::PlanarPolygon`, `Scan::Flower`, `Scan::Line`, `Scan::Mesh`):
 
 | Register | Source | Meaning |
 |---|---|---|
 | `v0` | `DistanceResult.t` | Normalized parameter (0–1) — azimuthal angle for rings, perimeter progress for polygons |
 | `v1` | `DistanceResult.raw_dist` | Unsigned distance to shape centerline (for distance-based effects) |
 | `v2` | Set by rasterizer | Face index for `Scan::Mesh` (0 otherwise) |
-| `v3` | `DistanceResult.aux` | Auxiliary — barycentric coordinate for faces, secondary parameter for others |
+| `v3` | `DistanceResult.aux` | Auxiliary — shape-dependent secondary parameter (0 when unused, including faces) |
 | `size` | `DistanceResult.size` | Shape radius or apothem for normalization |
 
 The `DistanceResult` struct is returned by each SDF shape's `distance<ComputeUVs>()` method:
@@ -633,7 +635,7 @@ struct DistanceResult {
 };
 ```
 
-**Curve Plot Path** (`Plot::Line`, `Plot::Multiline`, `Plot::Ring`, `Plot::Polygon`, `Plot::SplineChain`, `Plot::Bezier`):
+**Curve Plot Path** (`Plot::Line`, `Plot::Multiline`, `Plot::Ring`, `Plot::PlanarPolygon`, `Plot::SplineChain`, `Plot::Bezier`):
 
 | Register | Meaning |
 |---|---|
@@ -672,7 +674,7 @@ The `process_pixel` function applies anti-aliasing based on shape type:
 |---|---|
 | `SDF::Ring` | Geodesic circle at a given radius and thickness |
 | `SDF::DistortedRing` | Ring with per-azimuth radius perturbation via a callback |
-| `SDF::Polygon` | Regular N-gon in the tangent plane of a basis vector |
+| `SDF::PlanarPolygon` | Regular N-gon in the tangent plane of a basis vector |
 | `SDF::SphericalPolygon` | Regular N-gon with geodesic (great-circle) edges |
 | `SDF::Star` | N-pointed star using the standard inradius/circumradius construction |
 | `SDF::Flower` | Inverted star (N-petal flower shape from the antipodal perspective) |
@@ -686,10 +688,10 @@ The `process_pixel` function applies anti-aliasing based on shape type:
 Shapes can be combined using Constructive Solid Geometry:
 
 ```cpp
-SDF::Union<Ring, Polygon>        // min(d_A, d_B)
-SDF::SmoothUnion<Ring, Polygon>  // smooth minimum with blending radius
-SDF::Subtract<Ring, Polygon>     // max(d_A, -d_B)
-SDF::Intersection<Ring, Polygon> // max(d_A, d_B) with interval intersection
+SDF::Union<Ring, PlanarPolygon>        // min(d_A, d_B)
+SDF::SmoothUnion<Ring, PlanarPolygon>  // smooth minimum with blending radius
+SDF::Subtract<Ring, PlanarPolygon>     // max(d_A, -d_B)
+SDF::Intersection<Ring, PlanarPolygon> // max(d_A, d_B) with interval intersection
 SDF::AngularRepeat<Shape>        // N-fold angular repetition around an axis
 ```
 
@@ -771,7 +773,7 @@ The `Timeline<W>` class manages a list of running `IAnimation` objects. Each fra
 | `MobiusWarp` | Animates `MobiusParams` to apply and release a Möbius transformation |
 | `Noise` | Animates `NoiseParams` over time for flowing distortion fields |
 | `MeshMorph` | Morphs one `MeshState` into another by cloning both, building a nearest-vertex correspondence, and interpolating positions over a duration. The vertex-level primitive beneath `MeshCarousel`. |
-| `MeshCarousel<W>` | Double-buffered mesh transition system with crossfade. Manages a pair of `MeshState` buffers and an `Animation::Lerp` to morph between shapes. Used by IslamicStars, MeshFeedback, and HankinSolids for smooth geometry transitions. |
+| `MeshCarousel<W>` | Double-buffered mesh transition system. Manages a pair of `MeshState` buffers and schedules an `Animation::Sprite` that fades the **incoming** shape in. Despite the loose "crossfade" name, the outgoing shape is not drawn — the `draw_outgoing` hook exists for symmetry but is unused, because the front index flips eagerly to the new shape. Used by IslamicStars, MeshFeedback, and HankinSolids for smooth geometry transitions. |
 
 #### Orientation and Motion Blur
 
@@ -827,7 +829,7 @@ GenerativePalette palette;
 
 // Timeline drives state via animations:
 timeline.add(0, Animation::Rotation<W>(orientation, Y_AXIS, TAU, 600, ease_mid, true));
-timeline.add(0, Animation::Transition(twist, 2.5f, 1000, easing::cubic_in_out));
+timeline.add(0, Animation::Transition(twist, 2.5f, 1000, ease_in_out_bicubic));
 timeline.add(0, Animation::ColorWipe(palette, target_palette, 2000));
 
 // Rendering reads state — no manual updates needed:
@@ -885,7 +887,7 @@ Effects that need more scratch memory can repartition at init time:
 configure_arenas(271 * 1024, 32 * 1024, 32 * 1024);  // 271 + 32 + 32 = 335 KB
 ```
 
-`ScratchScope` (aliased as `ScopedScratch` for backward compatibility) provides stack-like RAII lifetime:
+`ScratchScope` provides stack-like RAII lifetime:
 
 ```cpp
 {
@@ -904,7 +906,7 @@ ScratchScope _b(scratch_arena_b);
 PolyMesh result = MeshOps::kis(mesh, scratch_arena_a, scratch_arena_b);
 ```
 
-Conway operators take `(Arena& target, Arena& temp)`, generator functions take `(Arena& a, Arena& b)`, and `classify_faces_by_topology` takes `(Arena& scratch_a, Arena& scratch_b, Arena& persistent)`. This purely functional approach gives total control over the exact memory layout during heavy geometric operations.
+Conway operators take `(Arena& target, Arena& temp)`, generator functions take `(Arena& a, Arena& b)`, and `classify_faces_by_topology` takes `(Arena& scratch_a, Arena& scratch_b, Arena& persistent)`. This purely functional approach makes the memory layout during heavy geometric operations explicit at every call site.
 
 #### Compaction with `Persist<T>`
 
@@ -1064,7 +1066,7 @@ All Conway operators are templated on input mesh type and take `(const MeshT& me
 
 #### Solids Library (`solids.h`)
 
-`solids.h` provides constexpr vertex/face data for all Platonic solids plus procedural generators for Archimedean, Catalan, and Islamic Star Pattern families. The solids are organized into three registries, unified under `Solids::get(arena, a, b, index)` and `Solids::get_by_name(arena, a, b, name)`:
+`solids.h` provides constexpr vertex/face data for all Platonic solids plus procedural generators for Archimedean, Catalan, and Islamic Star Pattern families. The solids are organized into three registries, accessed by name via `Solids::get_by_name(arena, a, b, name)` (the firmware entry point) or by registry index via `Solids::get(arena, a, b, index)` — the latter is compiled only for the WASM build (`#ifdef EMSCRIPTEN`), where the geometry tools drive solids by numeric index:
 
 | Registry | Count | Description |
 |---|---|---|
@@ -1131,7 +1133,7 @@ Non-blocking DMA-based LED output for HD107S (APA102-compatible) LEDs on Teensy 
 
 | Class | Role |
 |---|---|
-| `HD107SFrame<N>` | Pre-formatted DMA buffer for the HD107S protocol. `packPixel()` writes `Pixel16` values directly into the frame buffer with inline color correction (color correction → temperature → gamma → brightness), bypassing the CRGB intermediate. The buffer is 32-byte-aligned (`__attribute__((aligned(32)))`) and flushed with `arm_dcache_flush_delete()` for cache coherency. |
+| `HD107SFrame<N>` | Pre-formatted DMA buffer for the HD107S protocol. `packPixel()` writes `Pixel16` values directly into the frame buffer with inline color correction (color correction → temperature → brightness), bypassing the CRGB intermediate. The buffer is 32-byte-aligned (`__attribute__((aligned(32)))`) and flushed with `arm_dcache_flush_delete()` for cache coherency. |
 | `TeensySPIDMA` | Low-level DMA+SPI driver wired to LPSPI4. Configures a `DMAChannel` with completion interrupt for fully async byte-stream transmission. |
 | `DMALEDController<N>` | Double-buffered high-level controller. `show(leds)` loads the back buffer and triggers DMA, returning immediately. The previous transfer is guaranteed complete before the next begins. |
 
@@ -1330,9 +1332,9 @@ Visualizes the Hopf fibration — a map from S³ to S². Points on S² (the base
 
 #### IslamicStars
 
-Procedurally generates authentic Islamic geometric patterns using Hankin's method (pentagon-based subdivision of the Archimedean solids). Each face of a rotating solid is decorated with its characteristic star polygon, colored by face topology (triangles, pentagons, hexagons, etc.). Ripple waves periodically distort the geometry.
+Procedurally generates Islamic geometric patterns using Hankin's method (pentagon-based subdivision of the Archimedean solids). Each face of a rotating solid is decorated with its characteristic star polygon, colored by face topology (triangles, pentagons, hexagons, etc.). Ripple waves periodically distort the geometry.
 
-**Parameters**: Duration, Ripp Amp, Ripp Width, Ripp Decay, Ripp Dur
+**Parameters**: Duration, Fade, Burst, Ripp Amp, Ripp Width, Ripp Decay, Ripp Dur, Debug BB
 
 </td></tr></table>
 
@@ -1366,6 +1368,8 @@ Visualizes the real spherical harmonics Yˡₘ(θ, φ) as a colored scalar field
 
 Spherical metaballs: N point-sources on the sphere whose implicit field functions sum and threshold into a rendered surface.
 
+**Parameters**: Max Infl, Gravity, Num Balls, Radius, Velocity, Noise Str, Noise Spd
+
 </td></tr></table>
 
 <table border="0"><tr>
@@ -1375,6 +1379,8 @@ Spherical metaballs: N point-sources on the sphere whose implicit field function
 #### MobiusGrid
 
 A latitude-longitude grid that undergoes live Möbius transformation animation via `MobiusWarpCircularTransformer`.
+
+**Parameters**: Rings, Lines, Alpha
 
 </td></tr></table>
 
@@ -1405,6 +1411,8 @@ FastNoiseLite-driven curl flow field. Particles follow the gradient of a 3D nois
 #### Voronoi
 
 Spherical Voronoi diagram with animated seed positions. Cell boundaries are drawn as geodesic edges; cells are optionally filled.
+
+**Parameters**: Num Sites, Speed, Smoothness, Border Thick
 
 </td></tr></table>
 
@@ -1444,9 +1452,23 @@ Particles with long orientation-trail-based tails, launched in bursts and influe
 <td width="300"><img src="docs/screenshots/RingSpin.png" alt="RingSpin" width="280"></td>
 <td valign="top">
 
-#### RingSpin / RingShower
+#### RingSpin
 
-Animated concentric ring patterns using `Scan::Ring` with per-ring phase offsets.
+Four great-circle rings tumble continuously under energetic random-walk rotation, each leaving a fading motion-blur trail of its recent orientations (drawn with `Scan::Ring`, head and tail of the trail thickened). Each ring is colored by a baked vignette palette.
+
+**Parameters**: Alpha, Thickness, Show Bounding
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><img src="docs/screenshots/RingShower.png" alt="RingShower" width="280"></td>
+<td valign="top">
+
+#### RingShower
+
+Rings bloom at random orientations and expand outward: each spawns on a random axis, grows its radius from zero, and fades in and out as a `Sprite` (drawn with `Plot::Ring`), colored by a generative circular analogous palette — a continuous shower of expanding rings.
+
+**Parameters**: Alpha
 
 </td></tr></table>
 
@@ -1498,7 +1520,9 @@ Random-walk particle system with Möbius warp bursts.
 
 #### Dynamo
 
-Rotating ring-pair patterns whose axes precess relative to each other.
+A vertical strand of points — one per latitude row — drifts horizontally around the sphere, each row dragging the next under a gap constraint so the chain wavers like a wind-blown curtain. The strand leaves motion trails, is replicated three times around the sphere, periodically reverses direction, and tumbles under random-axis rotations, while periodic color wipes sweep freshly generated analogous palettes across it.
+
+**Parameters**: Speed, Gap, Trail Len, Wipe Dur
 
 </td></tr></table>
 
@@ -1623,30 +1647,31 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `getBufferLength()` → `int` | Length of the pixel buffer (`W × H × 3`) for sizing the view |
 | `setParameter(name, value)` → `bool` | Update a live effect parameter; returns `false` on an unknown name |
 | `setAnimationsPaused(paused)` | Freeze/resume the current effect's animation drivers (the GUI "Pause Animation" toggle) |
-| `getParameterDefinitions()` | Return the full `[{name, value, min, max}]` parameter list |
+| `getParameterDefinitions()` | Return the parameter list; each entry is `{name, value, animated, readonly}`, and float params additionally carry `{min, max}` (bool params omit `min`/`max` and return `value` as a JS boolean) |
 | `getParamValues()` | Return current parameter values (including animation-driven updates) |
 | `getArenaMetrics()` | Memory usage stats for geometry, scratch, and tooling arenas, plus the stack high-water mark (see below) |
 | `getEffectSizes()` | Return `sizeof` for every registered effect at the current resolution |
 | `setClip(y0, y1, x0, x1)` → `bool` | Restrict rendering to a sub-rectangle (used by segment workers) |
 | `getRenderUs()` → `double` | Last frame's rasterization time in microseconds (per-frame profiling) |
 
-The bridge also exposes a `MeshOps` class for the JavaScript tools, with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 335 KB arena) for interactive solid manipulation.
+The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 335 KB arena) for interactive solid manipulation.
 
 The WASM bridge includes stack high-water-mark instrumentation: `stack_paint_canary()` fills the stack with a known pattern at init time, and `stack_high_water_mark()` scans for the deepest overwrite. This is reported via `getArenaMetrics()` and logged on every effect switch to catch stack-hungry template instantiations early.
 
-Pixel data is 16-bit linear light (`uint16_t` per channel). JavaScript divides by 65535 to produce float linear values that feed directly into Three.js (which expects linear color when `THREE.ColorManagement.enabled = true`):
+Pixel data is 16-bit linear light (`uint16_t` per channel). The zero-copy `Uint16Array` view is bound directly as the instanced dot-mesh's `instanceColor` attribute, declared `normalized` so Three.js scales 0–65535 → 0–1 linear **on the GPU** — there is no per-pixel divide or float copy in JavaScript (Three.js expects linear color when `THREE.ColorManagement.enabled = true`):
 
 ```js
 const wasmPixels = wasmEngine.getPixels();   // Uint16Array view, zero-copy
-for (let i = 0; i < wasmPixels.length; i++) {
-    Daydream.pixels[i] = wasmPixels[i] / 65535.0;  // linear float
-}
-// → instanced sphere mesh per-instance colors → WebGL renderer
+// Bound once as the instance-color buffer; the `true` flag marks it normalized,
+// so the GPU divides by 65535 on read. No JS-side divide or Float32 copy.
+dotMesh.instanceColor =
+    new THREE.InstancedBufferAttribute(wasmPixels, 3, /*normalized=*/ true);
+// → instanced dot-mesh per-instance colors → WebGL renderer
 ```
 
 ### 10.3 The Three.js Renderer (`driver.js`)
 
-The `Daydream` class owns the entire render side. Notable features:
+The `Daydream` class owns the entire render side. Features:
 
 | Feature | Details |
 |---|---|
@@ -1699,7 +1724,7 @@ params.forEach(p => {
 
 ### 10.7 Segmented POV Workers (`segment_worker.js`)
 
-Phantasm in hardware is four Teensys each rendering a Y-band of the canvas (§7.10). Daydream reproduces this in software so the partitioning is exercised before fabrication. A `SegmentController` (`segment_controller.js`) owns the worker pool — dispatching renders (`renderParallel()`), fencing stale frames by generation, and compositing results (`composite()`) — while each `segment_worker.js` hosts one WASM instance:
+Phantasm in hardware is four Teensys each rendering a quadrant of the canvas — one arm's half-width crossed with a Y-band, mirroring `computeSegmentRange()` (§7.10). Daydream reproduces this in software so the partitioning is exercised before fabrication. A `SegmentController` (`segment_controller.js`) owns the worker pool — dispatching renders (`renderParallel()`), fencing stale frames by generation, and compositing results (`composite()`) — while each `segment_worker.js` hosts one WASM instance:
 
 ```
 Main thread                  Workers (one WASM each)
@@ -1748,7 +1773,7 @@ Switching presets does a full WASM reset: `setResolution(w, h)` reallocates buff
 
 ### 10.11 Geometry Tools (`daydream/tools/`)
 
-Five standalone HTML pages that share the engine's WASM `MeshOps` but render with their own Three.js scenes:
+Five standalone HTML pages, each rendering with its own Three.js scene. Only `solids.html` is backed by the engine's WASM `MeshOps` bridge; the other four implement their geometry math directly in JavaScript:
 
 | Tool | What it does |
 |---|---|
