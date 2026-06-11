@@ -114,7 +114,7 @@
       C2: { min: 1, max: 100, step: 0.01, default: 5, scale: 100, label: "C₂" },
       A: { min: 0, max: TWO_PI, step: TWO_PI / 1000, default: 0, scale: 1000 / TWO_PI, label: "A (rad)" },
       Duration: { min: 0, max: (4 * TWO_PI), step: TWO_PI / 500, default: TWO_PI, scale: 1000 / TWO_PI, label: "Domain" },
-      // FIX: Added scale: 1 to Samples to prevent NaN in slider initialization
+      // scale: 1 — Samples is a raw integer count, not a scaled fixed-point value
       Samples: { min: 200, max: 10000, step: 1, default: 4000, scale: 1, label: "Samples" }
     };
 
@@ -259,22 +259,10 @@
         valueSpan.textContent = newActiveC_Snapped.toFixed(2);
       }
 
-      // --- FIX: CALCULATE AND SET THE CORRECT DOMAIN ---
-      // The domain T required to close the loop is T = (2π * N) / C₂ or T = (2π * M) / C₁
-      // Here, passiveC = C₂ and N is the denominator for the ratio C₁/C₂
-      // If the active slider was C₂, then passiveC = C₁ and we'd use (2π * M) / C₁
-      let newDomain;
-      if (activeId === 'C1') {
-        // Ratio was C₁/C₂ ≈ M/N. T = (2π * N) / C₂
-        newDomain = (TWO_PI * N) / passiveC; // passiveC = C₂
-      } else {
-        // Active was C₂. Ratio was C₂/C₁ ≈ M/N. T = (2π * N) / C₁
-        newDomain = (TWO_PI * N) / passiveC; // passiveC = C₁
-        // Note: findBestRationalRatio always gives M/N for (active/passive).
-        // If active=C₂, targetRatio=C₂/C₁. We get M/N ≈ C₂/C₁.
-        // T = (2π * M) / C₂ or T = (2π * N) / C₁.
-        // newDomain = (2 * Math.PI * N) / passiveC; (This is correct)
-      }
+      // Domain that closes the curve: with M/N the rational approximation of the
+      // active/passive frequency ratio (N from findBestRationalRatio), the curve
+      // repeats after T = 2π·N / passiveC.
+      const newDomain = (TWO_PI * N) / passiveC;
 
       state.Duration = newDomain;
 
@@ -329,12 +317,12 @@
         return s.replace(/\.?0+$/, "");
       };
 
-      // Format to match the requested simple lambda: (t) => lissajous(C1, C2, A, t)
+      // Format the params as a lambda: (t) => lissajous(C1, C2, A, t)
       const c1Str = f(state.C1, 2);
       const c2Str = f(state.C2, 2);
       const aStr = f(state.A, 3);
 
-      // --- NEW: Format the domain string ---
+      // Format the domain: exact 2π multiples render as TWO_PI expressions, else a float.
       const domain = state.Duration;
       let domainStr = "";
       const twoPi = TWO_PI;
@@ -347,9 +335,8 @@
       } else {
         domainStr = f(domain, 3); // Use the formatted float value
       }
-      // --- END NEW ---
 
-      // WRAP in square brackets as requested
+      // Emit a [fn, domain] pair, matching timeline.add()'s expected tuple.
       const snippet = `[(t) => lissajous(${c1Str}, ${c2Str}, ${aStr}, t), ${domainStr}]`;
       codeOutput.textContent = snippet;
     };
