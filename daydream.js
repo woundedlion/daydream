@@ -12,8 +12,6 @@ import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
 import { SegmentController } from "./segment_controller.js";
 
-import { SRGBColorSpace } from "three";
-
 ///////////////////////////////////////////////////////////////////////////////
 //
 // Failure-handling doctrine (boundary between this file and the engine layers):
@@ -453,9 +451,8 @@ createHolosphereModule().then(module => {
             "rendered WASM buffer is not the one being cleared and displayed");
         }
         daydream.dotMesh.instanceColor.needsUpdate = true;
-        // Hide segment stats if they were showing
-        const segEl = document.getElementById('segment-stats');
-        if (segEl) segEl.style.display = 'none';
+        // Segment-stats visibility is owned by SegmentController.updateStats(),
+        // invoked on the segmented-mode toggle — no per-frame DOM work needed here.
       }
       syncGUI();
     },
@@ -624,7 +621,6 @@ window.addEventListener("keydown", onKeyDown);
 
 daydream.renderer.setAnimationLoop(() => {
   if (wasmAdapter) {
-    daydream.renderer.outputColorSpace = SRGBColorSpace;
     daydream.render(wasmAdapter);
   }
   // Update duration readout
