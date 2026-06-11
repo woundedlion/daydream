@@ -322,8 +322,12 @@
       }
 
       const f = (n) => {
-        const s = n.toFixed(6);
-        return s.replace(/\.?0+$/, '') + 'f';
+        // Trim trailing zeros but keep at least one fractional digit, so whole
+        // values stay valid C++ float literals: 0 -> "0.0f", 1 -> "1.0f"
+        // (a bare "0f"/"1f" does not compile). Integral coords are reachable —
+        // vec3Normalize's degenerate branch returns {x:1, y:0, z:0} verbatim.
+        const s = n.toFixed(6).replace(/0+$/, '').replace(/\.$/, '.0');
+        return s + 'f';
       };
 
       if (format === 'vectors') {
