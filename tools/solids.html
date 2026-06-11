@@ -762,8 +762,11 @@
 
       // Initialize Three.js. The shared scaffold supplies the renderer / camera /
       // OrbitControls / resize / animation loop; the solids-specific bits (auto-
-      // rotate, transparent buffer, light rig, free-zoom range, window-relative
-      // resize, and the per-frame index-label projection) are passed as options.
+      // rotate, transparent buffer, light rig, free-zoom range, and the per-frame
+      // index-label projection) are passed as options. Resize uses the scaffold's
+      // default (canvas-container clientWidth) — a window-relative override
+      // subtracting both sidebar widths went negative once the ≤640px layout
+      // stacks the sidebars at width:100%.
       const result = initScene('canvas-container', 'canvas', {
         cameraPosition: [2, 1.5, 2],
         far: 100,
@@ -774,7 +777,6 @@
         autoRotateSpeed: 2.0,
         lights: true,
         showSphere: false,
-        onResize: onResize,
         onAfterRender: updateLabels,
       });
       scene = result.scene;
@@ -839,7 +841,7 @@
       generateThumbnails();
 
       updateToggles();
-      onResize();
+      result.resize(); // re-fit the canvas after the sidebars' content settled
       update();
       renderBaseSolid();
     }
@@ -1012,22 +1014,6 @@
       const tI = document.getElementById('toggleIndices');
       tI.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showIndices ? 'bg-blue-500' : 'bg-slate-700'}`;
       tI.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showIndices ? 'translate-x-5' : ''}`;
-    }
-
-    function onResize() {
-      const sidebar = document.getElementById('sidebar');
-      const rightSidebar = document.getElementById('right-sidebar');
-      const container = document.getElementById('canvas-container');
-
-      // Explicitly calculate available width
-      const sidebarWidth = sidebar.getBoundingClientRect().width;
-      const rightWidth = rightSidebar.getBoundingClientRect().width;
-      const w = window.innerWidth - sidebarWidth - rightWidth;
-      const h = container.clientHeight;
-
-      renderer.setSize(w, h);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
     }
 
     // --- SAVED ITEMS ---
