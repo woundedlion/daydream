@@ -5,6 +5,16 @@ import { getActiveURLSync } from "./state.js";
 // Helper to read URL state.
 const getUrlParams = () => new URLSearchParams(window.location.search);
 
+// The set of values lil-gui will accept for an enumerated control
+// (`add(obj, prop, $1)`): an array of choices, or an object whose *values* are
+// the choices. Anything else ($1 a number → a slider's min, or absent) is not
+// enumerated, so there is no list to validate against (returns null).
+const optionValues = (options) => {
+  if (Array.isArray(options)) return options;
+  if (options && typeof options === 'object') return Object.values(options);
+  return null;
+};
+
 // URL writes funnel through the app's single URLSync writer when present (the
 // main simulator), so GUI param changes and effect/resolution changes can't
 // clobber each other. Standalone pages without a URLSync (the tool pages) fall
@@ -107,7 +117,18 @@ class DeepLinkGUI {
       } else if (typeof currentVal === 'boolean') {
         val = (val === 'true');
       }
-      object[prop] = val;
+      // For an enumerated control, a URL value outside the option list would
+      // poison state: lil-gui shows it unselected, and the applyOnLoad replay
+      // (step 3) would push the bogus value through the caller's onChange —
+      // re-injecting it into appState and re-persisting it to the URL even
+      // after upstream validation already corrected the value. Reject it and
+      // keep the already-validated bound value instead.
+      const allowed = optionValues(args[0]);
+      if (allowed && !allowed.includes(val)) {
+        console.warn(`DeepLinkGUI: ignoring out-of-range URL value "${params.get(key)}" for "${key}"`);
+      } else {
+        object[prop] = val;
+      }
     }
 
     // 2. Create Controller
