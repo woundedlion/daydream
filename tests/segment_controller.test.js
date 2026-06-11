@@ -174,6 +174,21 @@ test('destroy() clears the fault latch so a fresh pool can recover', () => {
   assert.equal(c.faultInfo, null);
 });
 
+test('setResolution on a faulted active pool rebuilds it and clears the fault', () => {
+  const c = makeController();
+  c.active = true;
+  c.create(2);
+  const beforeCount = FakeWorker.instances.length;
+  c.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
+  assert.equal(c.faulted, true);
+
+  // The fault UI/docstring promise that a resolution change restarts the pool.
+  c.setResolution(8, 8);
+  assert.equal(c.faulted, false, 'recreating the pool cleared the fault latch');
+  assert.equal(c.workers.length, 2, 'a fresh pool of workers was built');
+  assert.equal(FakeWorker.instances.length, beforeCount + 2, 'new workers were spawned');
+});
+
 // ---------------------------------------------------------------------------
 // Compositor
 // ---------------------------------------------------------------------------
