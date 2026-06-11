@@ -593,14 +593,18 @@ export class SegmentController {
    * No-ops while workers are still spawning (matches the prior ready/length guard).
    */
   tick() {
-    if (!(this.ready && this.workers.length > 0)) return;
-
     // A faulted pool is broken until re-created: keep the visible fault state up
-    // and stop dispatching renders that would just deadlock again.
+    // and stop dispatching renders that would just deadlock again. Checked BEFORE
+    // the ready guard: an init-phase fault (WASM fetch/instantiate failure) latches
+    // `faulted` but leaves `readyCount` short of the segment count forever, so a
+    // ready-first guard would return early every tick and the fault overlay would
+    // never paint — segmented mode would freeze black with console-only diagnostics.
     if (this.faulted) {
       this.updateStats();
       return;
     }
+
+    if (!(this.ready && this.workers.length > 0)) return;
 
     // 1. Apply the PREVIOUS frame's composite results synchronously. This runs
     //    AFTER driver.render() called pixels.fill(0), so it overwrites the clear.
