@@ -46,6 +46,12 @@
       overflow-y: auto;
     }
 
+    /* Mobile-only presets dropdown; the sidebar list is shown on desktop. */
+    #presetSelect {
+      display: none;
+      max-width: 55%;
+    }
+
     #controls {
       position: fixed;
       bottom: 0;
@@ -211,6 +217,12 @@
         display: none;
       }
 
+      /* Presets stay reachable via the controls-header dropdown (the sidebar
+         list above is hidden on mobile). */
+      #presetSelect {
+        display: block;
+      }
+
       #controls {
         height: 50vh;
       }
@@ -247,6 +259,10 @@
         <h1 class="text-lg font-bold text-white leading-tight">Mobius Visualizer</h1>
         <p class="text-xs text-indigo-300 font-mono">f(z) = (az + b) / (cz + d)</p>
       </div>
+      <select id="presetSelect" aria-label="Preset"
+        class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium rounded border border-slate-500 px-2 py-1 mx-2 truncate">
+        <option value="">Presets…</option>
+      </select>
       <button id="resetBtn"
         class="px-3 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs font-medium transition-colors shadow-sm border border-slate-500">
         Stop / Reset
@@ -539,6 +555,8 @@
       document.querySelectorAll('.preset-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.id === preset.id);
       });
+      const presetSelect = document.getElementById('presetSelect');
+      if (presetSelect) presetSelect.value = preset.id;
 
       if (preset.animate) {
         isAnimating = true;
@@ -699,6 +717,7 @@
 
     const init = () => {
       const presetList = document.getElementById('presetList');
+      const presetSelect = document.getElementById('presetSelect');
       presets.forEach(preset => {
         const btn = document.createElement('button');
         btn.className = 'preset-btn';
@@ -709,6 +728,15 @@
           `;
         btn.onclick = () => startPreset(preset);
         presetList.appendChild(btn);
+
+        const opt = document.createElement('option');
+        opt.value = preset.id;
+        opt.textContent = preset.name;
+        presetSelect.appendChild(opt);
+      });
+      presetSelect.addEventListener('change', () => {
+        const preset = presets.find(p => p.id === presetSelect.value);
+        if (preset) startPreset(preset);
       });
 
       const onParamChange = () => updateMobiusUniforms();
