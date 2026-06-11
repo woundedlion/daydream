@@ -556,6 +556,15 @@
       </div>
 
       <div class="flex items-center justify-between">
+        <span class="text-sm">Colorize Faces</span>
+        <button id="toggleColorize"
+          class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
+          <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform">
+          </div>
+        </button>
+      </div>
+
+      <div class="flex items-center justify-between">
         <span class="text-sm">Show Vertices</span>
         <button id="toggleVerts"
           class="w-10 h-5 rounded-full bg-blue-500 relative transition-colors focus:outline-none">
@@ -610,6 +619,20 @@
       polygonOffsetFactor: 1,
       polygonOffsetUnits: 1
     });
+    // Same config as faceMaterial, but sourcing color from the per-vertex
+    // topology-class attribute generated when Colorize Faces is on.
+    const faceColorizeMaterial = new THREE.MeshPhongMaterial({
+      color: 0xffffff,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.9,
+      side: THREE.DoubleSide,
+      flatShading: true,
+      shininess: 50,
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1
+    });
     const vertMaterial = new THREE.PointsMaterial({ color: 0xa5b4fc, size: 0.05 });
     const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
     const normalMaterial = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.8 });
@@ -637,6 +660,7 @@
       ops: [], // Array of objects { op: string, params: object }
       showGeodesics: true,
       showFaces: true,
+      colorizeFaces: false,
       showVertices: false,
       showNormals: false,
       showIndices: false
@@ -766,6 +790,11 @@
       });
       document.getElementById('toggleFaces').parentElement.addEventListener('click', () => {
         state.showFaces = !state.showFaces;
+        updateToggles();
+        update();
+      });
+      document.getElementById('toggleColorize').parentElement.addEventListener('click', () => {
+        state.colorizeFaces = !state.colorizeFaces;
         updateToggles();
         update();
       });
@@ -951,6 +980,10 @@
 
       tF.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showFaces ? 'bg-blue-500' : 'bg-slate-700'}`;
       tF.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showFaces ? 'translate-x-5' : ''}`;
+
+      const tC = document.getElementById('toggleColorize');
+      tC.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.colorizeFaces ? 'bg-blue-500' : 'bg-slate-700'}`;
+      tC.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.colorizeFaces ? 'translate-x-5' : ''}`;
 
       tV.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showVertices ? 'bg-blue-500' : 'bg-slate-700'}`;
       tV.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showVertices ? 'translate-x-5' : ''}`;
@@ -1443,10 +1476,10 @@
       // therefore only catch Embind-level marshalling errors (e.g. passing a bad
       // argument type across the boundary); they can never recover from an
       // engine overflow or invariant trap, which is fatal to the page by design.
-      // The C++ wrapper deliberately pre-rejects the *known* recoverable cases —
-      // an unknown solid name (fromSolidName) and an oversized mesh (fromData) —
-      // returning an empty mesh instead of aborting; but an arbitrary op chain
-      // that simply outgrows the arena has no such guard and will abort.
+      // The C++ wrapper deliberately pre-rejects the *known* recoverable case —
+      // an unknown solid name (fromSolidName) — returning an empty mesh instead
+      // of aborting; but an arbitrary op chain that simply outgrows the arena
+      // has no such guard and will abort.
 
       // 1. Generate Mesh directly from WASM
       let currentWasmMesh = null;
@@ -1503,6 +1536,19 @@
         return;
       }
 
+      // Per-face topology class ids for the Colorize Faces toggle. Runs
+      // engine-side (it reuses the tooling scratch arenas, which are free
+      // between ops); the returned Int32Array is a fresh JS copy, so it stays
+      // valid after the wrapper is deleted and the arenas are flushed below.
+      let faceClasses = null;
+      if (state.colorizeFaces && state.showFaces) {
+        try {
+          faceClasses = currentWasmMesh.classifyFaces();
+        } catch (e) {
+          console.error("WASM classifyFaces error:", e);
+        }
+      }
+
       const meshData = wasmMeshToJs(currentWasmMesh);
       currentWasmMesh.delete(); // Cleanup final result
       MeshOpsWasm.clearToolingMemory(); // Flush the 16 MB tooling arenas (8 MB + 4 MB + 4 MB)
@@ -1532,11 +1578,18 @@
       // Faces
       const geometry = new THREE.BufferGeometry();
       const vertices = [];
+      const faceColors = []; // per-vertex RGB, filled only when colorizing
+      const classColor = new THREE.Color();
 
       const faceCenters = [];
       const faceNormals = [];
 
-      meshData.faces.forEach(f => {
+      meshData.faces.forEach((f, fi) => {
+        if (faceClasses) {
+          // Golden-ratio hue stride keeps consecutive class ids far apart on
+          // the color wheel, so adjacent face groups stay distinguishable.
+          classColor.setHSL((faceClasses[fi] * 0.618034) % 1, 0.65, 0.55);
+        }
         // Collect vertices for the triangulated face
         for (let i = 1; i < f.length - 1; i++) {
           let v0 = new THREE.Vector3().copy(meshData.vertices[f[0]]);
@@ -1552,6 +1605,12 @@
           vertices.push(...v0.toArray());
           vertices.push(...v1.toArray());
           vertices.push(...v2.toArray());
+
+          if (faceClasses) {
+            for (let c = 0; c < 3; c++) {
+              faceColors.push(classColor.r, classColor.g, classColor.b);
+            }
+          }
         }
 
         // Center/Normal for other viz
@@ -1574,8 +1633,11 @@
 
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
       geometry.computeVertexNormals();
+      if (faceClasses) {
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(faceColors, 3));
+      }
 
-      mainMesh = new THREE.Mesh(geometry, faceMaterial);
+      mainMesh = new THREE.Mesh(geometry, faceClasses ? faceColorizeMaterial : faceMaterial);
       if (state.showFaces) scene.add(mainMesh);
 
       // Vertices
