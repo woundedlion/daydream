@@ -10,9 +10,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Procedural Color Palette Generator</title>
   <script src="../vendor/tailwindcss.js"></script>
-  <!-- Resolves bare module specifiers (e.g. 'three') for the ES-module script
-       below, which imports from tools/shared.js. Must precede that module. -->
-  <script src="../vendor-importmap.js"></script>
   <!-- Shared design tokens + control styling for the tool pages. Linked before
        this page's <style> so page-specific rules below win. -->
   <link rel="stylesheet" href="tools.css">
@@ -356,7 +353,7 @@
     // Shared primitives, imported rather than re-implemented inline: the
     // clipboard copy (tools/shared.js) and the OKLab/OKLCH/sRGB color math
     // (tools/color.js, which mirrors the engine's core/color.h pipeline).
-    import { copyWithFeedback } from './shared.js';
+    import { copyWithFeedback } from './clipboard.js';
     import {
       srgbToLinearFloat, linearToSrgbFloat, srgbToOklch, lerpOklch,
       oklchToLinearRgb, linearRgbToHex,
