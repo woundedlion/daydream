@@ -3,7 +3,9 @@
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
  *
- * Segment Worker — runs in a Web Worker to render one Y-band of the canvas.
+ * Segment Worker — runs in a Web Worker to render one rectangular quadrant of
+ * the canvas (an arm column subdivided into a Y-band; both axes are clipped —
+ * see computeSegmentRange in segment_layout.js and the pov_segmented.h layout).
  * Each worker loads its own WASM module instance (isolated memory space),
  * ensuring separate global arenas and effect state.
  */
