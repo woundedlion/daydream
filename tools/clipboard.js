@@ -76,15 +76,24 @@ export async function copyWithFeedback(text, opts = {}) {
 
   const success = await copyToClipboard(text);
   if (success && element) {
-    const original = revertText !== undefined ? revertText : element.textContent;
+    // A second copy within revertMs must not capture the "Copied!" label as the
+    // text to restore — that latches the element on "Copied!" forever. Cancel any
+    // pending revert and reuse the idle label it had stashed, so the original is
+    // captured once and only from the genuine idle state.
+    const pending = element._copyFeedback;
+    if (pending) clearTimeout(pending.timer);
+    const original = pending ? pending.original
+      : (revertText !== undefined ? revertText : element.textContent);
     element.textContent = copiedText;
     if (copiedClasses.length) element.classList.add(...copiedClasses);
     if (idleClasses.length) element.classList.remove(...idleClasses);
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       element.textContent = original;
       if (copiedClasses.length) element.classList.remove(...copiedClasses);
       if (idleClasses.length && original) element.classList.add(...idleClasses);
+      delete element._copyFeedback;
     }, revertMs);
+    element._copyFeedback = { timer, original };
   }
   return success;
 }
