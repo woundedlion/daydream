@@ -1394,18 +1394,6 @@ Visualizes the real spherical harmonics Yˡₘ(θ, φ) as a colored scalar field
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><img src="docs/screenshots/Metaballs.png" alt="Metaballs" width="280"></td>
-<td valign="top">
-
-#### Metaballs
-
-Spherical metaballs: N point-sources on the sphere whose implicit field functions sum and threshold into a rendered surface.
-
-**Parameters**: Max Infl, Gravity, Num Balls, Radius, Velocity, Noise Str, Noise Spd
-
-</td></tr></table>
-
-<table border="0"><tr>
 <td width="300"><img src="docs/screenshots/MobiusGrid.png" alt="MobiusGrid" width="280"></td>
 <td valign="top">
 
