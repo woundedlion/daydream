@@ -143,6 +143,13 @@
   <script type="module">
     import * as THREE from 'three';
     import { initScene, copyWithFeedback, showFatalError } from './shared.js';
+    import {
+      vec3Normalize,
+      generateBezierCurve,
+      generateCatmullRomCurve,
+      splineExportCode,
+      randomPointOnSphere,
+    } from './spline_math.js';
     import createHolosphereModule from '../holosphere_wasm.js';
 
     // The Holosphere WASM engine — the single source of truth for spline math.
@@ -182,13 +189,6 @@
     // bindings, so the preview can never drift from the device's spline math.
     // The bridge takes flat floats and returns plain `{x,y,z}` objects.
 
-    // Local-space (non-spline) helper, used by the point/UI projection code.
-    function vec3Normalize(v) {
-      const len = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
-      if (len < 1e-10) return { x: 1, y: 0, z: 0 };
-      return { x: v.x/len, y: v.y/len, z: v.z/len };
-    }
-
     function cubicFast(p0, p1, p2, p3, t) {
       return WasmModule.spline_cubic_fast(
         p0.x, p0.y, p0.z, p1.x, p1.y, p1.z,
@@ -208,46 +208,17 @@
     }
 
     // --- Curve generation ---
-
-    function generateBezierCurve(pts, numSamples, evalFn) {
-      if (pts.length < 4) return [];
-      const result = [];
-      for (let i = 0; i <= numSamples; i++) {
-        const t = i / numSamples;
-        result.push(evalFn(pts[0], pts[1], pts[2], pts[3], t));
-      }
-      return result;
-    }
-
-    function generateCatmullRomCurve(pts, tension, numSamplesPerSeg, evalFn, closed) {
-      const n = pts.length;
-      if (n < 2) return [];
-      const result = [];
-      const segCount = closed ? n : n - 1;
-
-      for (let i = 0; i < segCount; i++) {
-        const i0 = (i === 0 && !closed) ? 0 : ((i - 1 + n) % n);
-        const i1 = i;
-        const i2 = (i + 1) % n;
-        const i3 = (i + 2 >= n && !closed) ? n - 1 : ((i + 2) % n);
-
-        const { cp1, cp2 } = catmullRomTangents(pts[i0], pts[i1], pts[i2], pts[i3], tension);
-
-        const startJ = (i === 0) ? 0 : 1;
-        for (let j = startJ; j <= numSamplesPerSeg; j++) {
-          const t = j / numSamplesPerSeg;
-          result.push(evalFn(pts[i1], cp1, cp2, pts[i2], t));
-        }
-      }
-      return result;
-    }
+    // The sampling cores (generateBezierCurve / generateCatmullRomCurve) live in
+    // ./spline_math.js; they take the WASM bridge callbacks below so the actual
+    // point/tangent math stays in the engine.
 
     function generateCurve(evalFn) {
       const pts = state.controlPoints;
       if (state.mode === 'bezier') {
         return generateBezierCurve(pts, state.samples, evalFn);
       } else {
-        return generateCatmullRomCurve(pts, state.tension, state.samples, evalFn, state.closed);
+        return generateCatmullRomCurve(
+          pts, state.tension, state.samples, catmullRomTangents, evalFn, state.closed);
       }
     }
 
@@ -317,38 +288,9 @@
     function updateExport() {
       const output = document.getElementById('export-output');
       const format = document.getElementById('export-format').value;
-      const pts = state.controlPoints;
-
-      if (pts.length === 0) {
-        output.textContent = '// Place control points to generate code';
-        return;
-      }
-
-      const f = (n) => {
-        // Trim trailing zeros but keep at least one fractional digit, so whole
-        // values stay valid C++ float literals: 0 -> "0.0f", 1 -> "1.0f"
-        // (a bare "0f"/"1f" does not compile). Integral coords are reachable —
-        // vec3Normalize's degenerate branch returns {x:1, y:0, z:0} verbatim.
-        const s = n.toFixed(6).replace(/0+$/, '').replace(/\.$/, '.0');
-        return s + 'f';
-      };
-
-      if (format === 'vectors') {
-        let code = `constexpr std::array<Vector, ${pts.length}> control_points = {{\n`;
-        pts.forEach((p, i) => {
-          code += `    Vector(${f(p.x)}, ${f(p.y)}, ${f(p.z)})`;
-          code += (i < pts.length - 1) ? ',\n' : '\n';
-        });
-        code += '}};';
-        output.textContent = code;
-      } else {
-        let code = `// ${pts.length} control point fragments\n`;
-        pts.forEach((p, i) => {
-          code += `Fragment f${i};\n`;
-          code += `f${i}.pos = Vector(${f(p.x)}, ${f(p.y)}, ${f(p.z)});\n`;
-        });
-        output.textContent = code;
-      }
+      // The pure snippet builder (incl. the C++ float formatter) lives in
+      // ./spline_math.js; the DOM read/write stays here.
+      output.textContent = splineExportCode(state.controlPoints, format);
     }
 
     // --- Input handling ---
@@ -514,19 +456,7 @@
         const n = state.mode === 'bezier' ? 4 : 6;
         state.controlPoints = [];
         for (let i = 0; i < n; i++) {
-          // Marsaglia's method for uniform sphere sampling
-          let v1, v2, s;
-          do {
-            v1 = 2 * Math.random() - 1;
-            v2 = 2 * Math.random() - 1;
-            s = v1*v1 + v2*v2;
-          } while (s >= 1 || s === 0);
-          const sq = Math.sqrt(1 - s);
-          state.controlPoints.push(vec3Normalize({
-            x: 2 * v1 * sq,
-            y: 2 * v2 * sq,
-            z: 1 - 2 * s
-          }));
+          state.controlPoints.push(randomPointOnSphere());
         }
         updatePointMeshes();
         updateCurves();
