@@ -297,6 +297,16 @@ export class SegmentController {
    * @param {number} h
    */
   setResolution(w, h) {
+    // A faulted pool is broken until re-created — broadcasting setResolution to
+    // dead workers does nothing. When faulted (and active), rebuild the pool at
+    // the new size instead: this is the recovery path _onWorkerFault's docstring
+    // and the fault overlay's hint both promise for a resolution change.
+    // create() reads the new size from appState (already updated when we run)
+    // and runs destroy() first, which clears the fault latch.
+    if (this.faulted && this.active) {
+      this.create(this.count);
+      return;
+    }
     // Open a new generation: any render still in flight (or a settled result not
     // yet composited) was sized to the old W/H and must not reach the compositor.
     // Drop already-settled results and the pending-composite flag here; the
