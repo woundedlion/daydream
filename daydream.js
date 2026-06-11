@@ -385,6 +385,11 @@ function applyResolution(preserveParams = false) {
   if (!effectChanged) {
     applyEffect(preserveParams);
   }
+
+  // The resolution change rebuilt the dot mesh and reframed the camera without
+  // moving OrbitControls, so request a repaint for on-demand rendering (covers
+  // the case where the sim is paused and wouldn't otherwise repaint).
+  daydream.invalidate();
 }
 
 // Subscribe: react to state changes
@@ -544,8 +549,8 @@ guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => 
 // synchronously with a null engine, but nothing renders until wasmAdapter is
 // set (the animation loop is gated on it), so that early pass was redundant.
 
-guiInstance.add(daydream, 'labelAxes').name('Show Axes');
-guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere');
+guiInstance.add(daydream, 'labelAxes').name('Show Axes').onChange(() => daydream.invalidate());
+guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());
 
 // ── Segmented POV controls ──────────────────────────────────────────────────
 const segFolder = guiInstance.addFolder('Segmented POV');

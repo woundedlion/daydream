@@ -134,6 +134,15 @@ export class Daydream {
       Daydream.CAMERA_Z
     );
 
+    // On-demand rendering: the simulation ticks on its own fixed clock, but the
+    // scene only needs repainting when something visible changes. Any camera
+    // change (drag/zoom/pan, damping settle) emits 'change' and marks the frame
+    // dirty, so orbiting repaints at the display's refresh rate while an idle
+    // scene does no GPU work between simulation ticks. Starts dirty so the first
+    // frame always paints.
+    this._needsRender = true;
+    this.controls.addEventListener('change', () => { this._needsRender = true; });
+
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(Daydream.SCENE_BACKGROUND_COLOR);
     this.paused = false;
@@ -243,14 +252,43 @@ export class Daydream {
 
     this.renderer.setSize(width, height);
     this.labelRenderer.setSize(width, height);
+
+    // A resize changes the viewport and camera framing without moving the
+    // OrbitControls camera or advancing the sim, so request a repaint.
+    this._needsRender = true;
+  }
+
+  /// Request a repaint on the next animation frame. For on-demand rendering:
+  /// callers that mutate the visible scene without advancing the simulation or
+  /// moving the camera (e.g. toggling axes/back-face culling, changing
+  /// resolution) must call this, otherwise the change won't show until the next
+  /// sim tick — or never, while paused.
+  invalidate() {
+    this._needsRender = true;
   }
 
   render(effect) {
-    if (!this._advanceFrameClock()) return;
+    // The fixed-timestep clock now gates only the simulation; rendering is
+    // on-demand. _advanceFrameClock() still runs every animation frame (so the
+    // accumulator drains), but only steps the sim when an interval has accrued.
+    const advanced = this._advanceFrameClock() && this._stepSimulation(effect);
 
-    const advanced = this._stepSimulation(effect);
-
+    // controls.update() must run every frame for damping / auto-rotate to
+    // progress; it emits 'change' (→ _needsRender) when it moves the camera.
     this.controls.update();
+
+    // Repaint only when something visible changed — the sim drew a new frame, a
+    // camera move marked us dirty, or an explicit invalidate() did. Otherwise
+    // skip all GPU work this frame.
+    if (!advanced && !this._needsRender) return;
+    this._needsRender = false;
+
+    // Axis-line visibility tracks the toggle every painted frame (not only on a
+    // sim step), so it updates immediately even while paused.
+    this.xAxis.visible = this.labelAxes;
+    this.yAxis.visible = this.labelAxes;
+    this.zAxis.visible = this.labelAxes;
+
     this._updateCullUniforms();
 
     this.renderer.setScissorTest(true);
@@ -318,10 +356,6 @@ export class Daydream {
     this._updateStats(duration, effect);
 
     this.dotMesh.instanceColor.needsUpdate = true;
-
-    this.xAxis.visible = this.labelAxes;
-    this.yAxis.visible = this.labelAxes;
-    this.zAxis.visible = this.labelAxes;
 
     return true;
   }
