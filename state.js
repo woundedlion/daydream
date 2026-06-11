@@ -136,6 +136,14 @@ export class URLSync {
       const val = this.state.get(key);
       if (val !== null && val !== undefined) params.set(key, val);
     }
+    // Merge the ad-hoc writes that survived the prune above (the excluded keys).
+    // reset() cancelled the debounced flush, so a GUI param changed within the
+    // 200 ms window before an effect switch was never written to the URL;
+    // re-asserting it here keeps that fresh value instead of the stale one the
+    // exclude-by-name path would otherwise preserve.
+    for (const [key, val] of this._adhoc) {
+      params.set(key, val);
+    }
     window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
   }
 
