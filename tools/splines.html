@@ -267,6 +267,11 @@
       if (fastLine) { scene.remove(fastLine); fastLine.geometry.dispose(); fastLine.material.dispose(); fastLine = null; }
       if (geoLine) { scene.remove(geoLine); geoLine.geometry.dispose(); geoLine.material.dispose(); geoLine = null; }
 
+      // The export reflects the control points themselves, not the drawn curve,
+      // so refresh it before the minimum-points gate. Otherwise Clear All (and
+      // placing the first 1-3 bezier points) would leave stale code on screen.
+      updateExport();
+
       const minPts = state.mode === 'bezier' ? 4 : 2;
       if (state.controlPoints.length < minPts) return;
 
@@ -284,8 +289,6 @@
           scene.add(geoLine);
         }
       }
-
-      updateExport();
     }
 
     function updatePointMeshes() {
