@@ -1708,7 +1708,7 @@ The `Daydream` class owns the entire render side. Features:
 | **Instanced dot mesh** | One `InstancedMesh` of `W × H` small spheres. Per-instance position is precomputed in `setupDots()` from `pixelToVector(x, y)`; per-instance color is updated each frame from the WASM pixel buffer. Single draw call per frame. |
 | **Linear color pipeline** | `THREE.ColorManagement.enabled = true` and `setPixelRatio(min(devicePixelRatio, 1))`. Colors arriving from WASM are already linear, so no extra conversion. |
 | **OrbitControls camera** | A normal `PerspectiveCamera` at `(0, 0, 220)` with FOV 20°, plus `OrbitControls` for mouse/touch navigation. |
-| **Picture-in-picture** | A clone of the main camera at a fixed orientation renders to a 30%-sized bottom-right viewport so the front and back of the sphere are visible simultaneously. Suppressed when `isMobile` or `navigator.webdriver` (§ headless capture). |
+| **Picture-in-picture** | A second camera tracks the main camera's position and orientation every frame, rendering an exact square-cropped copy of the main view at smaller scale — a 30%-of-min-dimension square viewport in the bottom-right corner (`aspect` forced to 1.0). Suppressed when `isMobile` or `navigator.webdriver` (§ headless capture). |
 | **Axes overlay** | Three `THREE.Line`s for X/Y/Z visible on toggle, plus a `CSS2DRenderer`-backed `LabelPool` for "+X / +Y / +Z" labels with zero allocation per frame. |
 | **Resize observer** | `ResizeObserver` on the canvas container recomputes camera aspect, viewport, and `isMobile` (width ≤ 900). |
 | **Fixed-rate stepping** | The simulation ticks at `1/FPS` seconds independent of the actual render rate, with a time accumulator to keep effects deterministic. |
