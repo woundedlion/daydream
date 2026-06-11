@@ -1699,7 +1699,7 @@ The `Daydream` class owns the entire render side. Features:
 
 | Feature | Details |
 |---|---|
-| **Instanced dot mesh** | One `InstancedMesh` of `W × H` small spheres. Per-instance position is precomputed in `setupDots()` from `pixelToVector(x, y)`; per-instance color is updated each frame from the WASM pixel buffer. Single draw call per frame. |
+| **Instanced dot mesh** | One `InstancedMesh` of `W × H` small spheres, built by `setupDots()`. Per-instance position is precomputed in `precomputeMatrices()` from `pixelToSpherical(x, y)`; per-instance color is updated each frame from the WASM pixel buffer. Single draw call per frame. |
 | **Linear color pipeline** | `THREE.ColorManagement.enabled = true` and `setPixelRatio(min(devicePixelRatio, 1))`. Colors arriving from WASM are already linear, so no extra conversion. |
 | **OrbitControls camera** | A normal `PerspectiveCamera` at `(0, 0, 220)` with FOV 20°, plus `OrbitControls` for mouse/touch navigation. |
 | **Picture-in-picture** | A clone of the main camera at a fixed orientation renders to a 30%-sized bottom-right viewport so the front and back of the sphere are visible simultaneously. Suppressed when `isMobile` or `navigator.webdriver` (§ headless capture). |
@@ -1744,7 +1744,7 @@ params.forEach(p => {
 });
 ```
 
-`getParamValues()` is polled each frame to sync the GUI with parameter values that the animation system has changed autonomously. The sync skips any control the user is currently interacting with to avoid fighting the slider. A per-effect **Reset** rebuilds the GUI from defaults, and **Export** copies the current `{ name, value }` set as a C++-formatted initializer suitable for `Presets<…>` arrays.
+`getParamValues()` is polled each frame to sync the GUI with parameter values that the animation system has changed autonomously. The sync skips any control the user is currently interacting with to avoid fighting the slider. A per-effect **Reset** rebuilds the GUI from defaults, and **Export** copies the current parameter *values* to the clipboard as a C++ brace-enclosed float initializer (e.g. `{ 0.5000f, 1.2000f, … }`) — values only, no names. The list covers every registered parameter in definition order, including readonly telemetry params.
 
 ### 10.7 Segmented POV Workers (`segment_worker.js`)
 
