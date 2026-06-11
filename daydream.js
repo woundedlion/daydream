@@ -198,9 +198,13 @@ function applyEffect(preserveParams = false) {
   }
   activeEffect = null;
 
-  // Clear existing params to avoid pollution, unless we are initializing
+  // Clear the OLD effect's per-effect param URL entries (they don't apply to
+  // the new effect), unless we are initializing. Preserve the global controls'
+  // keys: the global GUI (resolution, axes, segmented-POV, recording…) survives
+  // an effect switch with its controllers still set, so its URL params must too
+  // — otherwise sharing a link drops whichever global state predates the switch.
   if (!preserveParams) {
-    resetGUI(['resolution', 'effect']);
+    resetGUI(['resolution', 'effect', ...guiInstance.collectUrlKeys()]);
   }
 
   if (wasmEngine) {
