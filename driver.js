@@ -68,8 +68,6 @@ class LabelPool {
 /** Per-frame time (ms) above which a frame/segment is flagged "slow" in stats. */
 export const SLOW_FRAME_MS = 62;
 
-export const XY = (x, y) => x + y * Daydream.W;
-
 export class Daydream {
   static SCENE_ANTIALIAS = true;
   static SCENE_ALPHA = true;
@@ -90,7 +88,6 @@ export class Daydream {
   static DOT_SIZE = 2;
   static DOT_COLOR = 0x0000ff;
 
-  static pixelPositions = new Array(Daydream.W * Daydream.H);
   static pixels = null;
 
   static X_AXIS = new THREE.Vector3(1, 0, 0);
@@ -206,7 +203,6 @@ export class Daydream {
     this.resizeObserver.observe(this.canvas.parentElement);
 
     // Initialization
-    this.pixelMatrices = [];
     this.timeAccumulator = 0;
     this.labelAxes = false;
     this.cullBackSphere = false;
@@ -529,8 +525,6 @@ export class Daydream {
   }
 
   precomputeMatrices() {
-    Daydream.pixelPositions = new Array(Daydream.W * Daydream.H);
-    this.pixelMatrices = new Array(Daydream.W * Daydream.H);
     const vector = new THREE.Vector3();
     const dummy = new THREE.Object3D();
     const sph = new THREE.Spherical(); // reused scratch (out-param, no per-dot alloc)
@@ -547,11 +541,10 @@ export class Daydream {
       dummy.position.copy(vector);
       dummy.updateMatrix();
 
-      Daydream.pixelPositions[i] = vector.clone().normalize();
-      this.pixelMatrices[i] = dummy.matrix.clone();
-
+      // setMatrixAt copies dummy.matrix into the instance buffer, so the scratch
+      // Object3D can be reused every iteration with no per-dot matrix retained.
       if (this.dotMesh) {
-        this.dotMesh.setMatrixAt(i, this.pixelMatrices[i]);
+        this.dotMesh.setMatrixAt(i, dummy.matrix);
       }
     }
 
