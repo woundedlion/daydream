@@ -62,7 +62,7 @@ function installWindow(search = '', pathname = '/') {
 
 test('URLSync reads initial tracked keys from the URL into state', () => {
   installWindow('?effect=Voronoi&res=high&untracked=1');
-  const s = new AppState({ effect: 'Metaballs', res: 'low' });
+  const s = new AppState({ effect: 'Moire', res: 'low' });
   new URLSync(s, ['effect', 'res']);
   assert.equal(s.get('effect'), 'Voronoi');
   assert.equal(s.get('res'), 'high');
