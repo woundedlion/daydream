@@ -744,7 +744,7 @@
       slider.addEventListener('mousedown', seedLockedDrag);
       slider.addEventListener('touchstart', seedLockedDrag, { passive: true });
 
-      // REWRITTEN: input listener for relative locked movement
+      // input listener: applies relative movement to the whole locked group
       slider.addEventListener('input', () => {
         const lockCheckbox = document.getElementById(`lock_${def.group}`);
         const isLocked = lockCheckbox ? lockCheckbox.checked : false;
@@ -807,7 +807,7 @@
           });
 
         } else {
-          // --- UNLOCKED MOVEMENT (Original logic) ---
+          // --- UNLOCKED MOVEMENT ---
           const newValue = parseFloat(slider.value) / def.scale;
           parameters[def.param] = newValue;
           valueSpan.textContent = newValue.toFixed(3);
