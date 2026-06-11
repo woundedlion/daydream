@@ -134,19 +134,8 @@ export class SegmentController {
     // Snapshot the main engine's current param values so freshly-spawned (or
     // resized) workers build their effect with the user's tuned values, not the
     // effect defaults. Sent once in the init message; ongoing changes are still
-    // broadcast live via setParameter. Flattened to {name, value} (bools encoded
-    // as 1/0) so it survives structured-clone postMessage.
-    /** @type {import('./worker_protocol.js').SegParam[]} */
-    let initialParams = [];
-    const engine = this._getWasmEngine();
-    if (engine) {
-      const defs = engine.getParameterDefinitions();
-      for (let i = 0; i < defs.length; i++) {
-        const p = defs[i];
-        const v = (typeof p.value === 'boolean') ? (p.value ? 1.0 : 0.0) : p.value;
-        initialParams.push({ name: p.name, value: v });
-      }
-    }
+    // broadcast live via setParameter.
+    const initialParams = this._snapshotParams();
 
     for (let i = 0; i < numSegments; i++) {
       const worker = new Worker('./segment_worker.js', { type: 'module' });
@@ -267,11 +256,36 @@ export class SegmentController {
   }
 
   /**
-   * Tell all workers to set a new effect.
+   * Snapshot the main engine's current tuned parameter values, flattened for
+   * structured-clone transport (bools encoded as 1/0). Empty when no engine is
+   * bound. Shared by the init message (create) and the effect switch (setEffect),
+   * which both need the worker to land on the user's values rather than defaults.
+   * @returns {import('./worker_protocol.js').SegParam[]}
+   */
+  _snapshotParams() {
+    const engine = this._getWasmEngine();
+    if (!engine) return [];
+    const defs = engine.getParameterDefinitions();
+    /** @type {import('./worker_protocol.js').SegParam[]} */
+    const params = [];
+    for (let i = 0; i < defs.length; i++) {
+      const p = defs[i];
+      const v = (typeof p.value === 'boolean') ? (p.value ? 1.0 : 0.0) : p.value;
+      params.push({ name: p.name, value: v });
+    }
+    return params;
+  }
+
+  /**
+   * Tell all workers to set a new effect. The worker's engine.setEffect() rebuilds
+   * the effect with defaults, so we carry the main engine's current tuned values
+   * for the worker to re-apply AFTER the rebuild — the same setEffect-then-params
+   * ordering the init path relies on. Without this the segmented view would drop
+   * deep-linked / tuned values to defaults on every effect switch.
    * @param {string} name
    */
   setEffect(name) {
-    this._broadcast({ type: 'setEffect', name });
+    this._broadcast({ type: 'setEffect', name, params: this._snapshotParams() });
   }
 
   /**

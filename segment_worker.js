@@ -85,6 +85,12 @@ async function handleMessage(msg) {
     case 'setEffect': {
       if (engine) {
         engine.setEffect(msg.name);
+        // setEffect rebuilds the effect with defaults; re-apply the main engine's
+        // current tuned values afterward so this segment matches instead of
+        // reverting to defaults. Same ordering as the init handler above.
+        if (msg.params) {
+          for (const p of msg.params) engine.setParameter(p.name, p.value);
+        }
         applyClip();
       }
       post({ type: 'effectReady', segId });

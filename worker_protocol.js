@@ -48,7 +48,12 @@
  * }} InitMsg
  */
 
-/** @typedef {{ type: 'setEffect', name: string }} SetEffectMsg */
+/**
+ * Switch the worker's effect. `params` (when present) carries the main engine's
+ * current tuned values, applied AFTER engine.setEffect() — which rebuilds the
+ * effect with defaults — so the segment matches instead of reverting to defaults.
+ * @typedef {{ type: 'setEffect', name: string, params?: SegParam[] }} SetEffectMsg
+ */
 
 /** @typedef {{ type: 'setResolution', w: number, h: number }} SetResolutionMsg */
 
