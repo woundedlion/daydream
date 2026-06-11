@@ -595,6 +595,38 @@
     let labelsContainer;
     let draggingIndex = -1;
 
+    // Render materials are configuration-only and identical across updates, so
+    // build them once and reuse. update() rebuilds geometry every call (it
+    // depends on the mesh) but must not churn — or leak — a fresh material per
+    // recompute, which previously happened on every op-slider tick.
+    const faceMaterial = new THREE.MeshPhongMaterial({
+      color: 0x3b82f6,
+      transparent: true,
+      opacity: 0.9,
+      side: THREE.DoubleSide,
+      flatShading: true,
+      shininess: 50,
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1
+    });
+    const vertMaterial = new THREE.PointsMaterial({ color: 0xa5b4fc, size: 0.05 });
+    const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
+    const normalMaterial = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.8 });
+
+    // Coalesce update() calls into one recompute per animation frame. Op-slider
+    // oninput fires on every pointer tick during a drag; without this each tick
+    // replays the entire WASM op chain (relax alone is up to 500 iterations) on
+    // the main thread. scheduleUpdate keeps at most one recompute pending.
+    let pendingUpdate = 0;
+    function scheduleUpdate() {
+      if (pendingUpdate) return;
+      pendingUpdate = requestAnimationFrame(() => {
+        pendingUpdate = 0;
+        update();
+      });
+    }
+
     // WASM Module
     let WasmModule = null;
     let MeshOpsWasm = null;
@@ -1345,7 +1377,7 @@
         if (slider) slider.value = val;
         if (input) input.value = val.toFixed(2);
       }
-      update();
+      scheduleUpdate();
     };
 
     window.removeOp = (index) => {
@@ -1543,26 +1575,13 @@
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
       geometry.computeVertexNormals();
 
-      const material = new THREE.MeshPhongMaterial({
-        color: 0x3b82f6,
-        transparent: true,
-        opacity: 0.9,
-        side: THREE.DoubleSide,
-        flatShading: true,
-        shininess: 50,
-        polygonOffset: true,
-        polygonOffsetFactor: 1,
-        polygonOffsetUnits: 1
-      });
-
-      mainMesh = new THREE.Mesh(geometry, material);
+      mainMesh = new THREE.Mesh(geometry, faceMaterial);
       if (state.showFaces) scene.add(mainMesh);
 
       // Vertices
       if (state.showVertices) {
         const dotGeo = new THREE.BufferGeometry().setFromPoints(meshData.vertices);
-        const dotMat = new THREE.PointsMaterial({ color: 0xa5b4fc, size: 0.05 });
-        vertPoints = new THREE.Points(dotGeo, dotMat);
+        vertPoints = new THREE.Points(dotGeo, vertMaterial);
         scene.add(vertPoints);
       }
 
@@ -1603,8 +1622,7 @@
       });
 
       const lineGeo = new THREE.BufferGeometry().setFromPoints(lineGeoPoints);
-      const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
-      edgeLines = new THREE.LineSegments(lineGeo, lineMat);
+      edgeLines = new THREE.LineSegments(lineGeo, edgeMaterial);
       scene.add(edgeLines);
 
       // Normals
@@ -1619,8 +1637,7 @@
         });
         const normGeo = new THREE.BufferGeometry().setFromPoints(normalPoints);
         normGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-        const normMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.8 });
-        normalLines = new THREE.LineSegments(normGeo, normMat);
+        normalLines = new THREE.LineSegments(normGeo, normalMaterial);
         scene.add(normalLines);
       }
 
