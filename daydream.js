@@ -216,6 +216,12 @@ function applyEffect(preserveParams = false) {
     // for an effect that doesn't exist (mirrors the setResolution guard below).
     if (wasmEngine.setEffect(appState.get('effect')) === false) {
       console.error(`setEffect("${appState.get('effect')}") failed; effect unavailable.`);
+      // The early return skips the end-of-function sidebar/worker sync. Run it
+      // here so the highlight and worker pool track appState instead of stranding
+      // on the previous effect (engine is blank, activeEffect stays null — no GUI
+      // is built for a nonexistent effect). Keeps every surface consistent.
+      if (segments.workers.length > 0) segments.setEffect(appState.get('effect'));
+      sidebar.setActive(appState.get('effect'));
       return;
     }
     activeEffect = { gui: new GUI({ autoPlace: false }) };
