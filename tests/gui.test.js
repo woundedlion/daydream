@@ -1,6 +1,7 @@
 // @ts-check
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { URL } from 'node:url';
 
 // Minimal lil-gui stub: a controller bound to (object, prop) exposing just the
 // chaining surface DeepLinkGUI relies on. The deep-link validation under test
@@ -23,7 +24,7 @@ class StubGUI {
 
 mock.module('lil-gui', { namedExports: { GUI: StubGUI } });
 
-const { GUI: DeepLinkGUI } = await import('../gui.js');
+const { GUI: DeepLinkGUI, setUrlParam } = await import('../gui.js');
 
 function installWindow(search) {
   globalThis.window = {
@@ -82,4 +83,28 @@ test('DeepLinkGUI.add with no matching URL param keeps the default', () => {
   gui.add(obj, 'resolution', RES).onChange((v) => replayed.push(v));
   assert.equal(obj.resolution, 'Phantasm (144x288)');
   assert.deepEqual(replayed, []); // no URL value → no applyOnLoad replay
+});
+
+// Regression for finding 289: the tool-page fallback writer (no active URLSync)
+// must not drop the first of two params changed within the debounce window. A
+// shared timer that only remembered the last key wrote just that key to the URL,
+// silently losing the first from the shareable deep link.
+test('setUrlParam merges multiple keys changed within the debounce window', () => {
+  let lastUrl = '/';
+  globalThis.window = {
+    location: { search: '?keep=1', pathname: '/' },
+    history: { replaceState(_s, _t, url) { lastUrl = url; } },
+  };
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    setUrlParam('a', 0.5);
+    setUrlParam('b', 'two'); // second change before the first timer fires
+    mock.timers.tick(200);
+  } finally {
+    mock.timers.reset();
+  }
+  const q = new URL(lastUrl, 'http://x').searchParams;
+  assert.equal(q.get('a'), '0.5'); // first write survived the second
+  assert.equal(q.get('b'), 'two');
+  assert.equal(q.get('keep'), '1'); // pre-existing params preserved
 });

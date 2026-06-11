@@ -19,23 +19,32 @@ const optionValues = (options) => {
 // main simulator), so GUI param changes and effect/resolution changes can't
 // clobber each other. Standalone pages without a URLSync (the tool pages) fall
 // back to a self-contained debounced write that reads the URL at fire time.
+//
+// Pending writes are accumulated per key (mirroring URLSync._adhoc) and merged
+// in a single flush: a shared timer that only remembered the last key would drop
+// the first of two params changed within the debounce window from the deep link.
 let urlTimer = null;
+const pendingUrlWrites = new Map(); // key -> value (null/undefined => delete)
 export const setUrlParam = (key, value) => {
   const sync = getActiveURLSync();
   if (sync) {
     sync.setParam(key, value);
     return;
   }
+  pendingUrlWrites.set(key, value);
   clearTimeout(urlTimer);
   urlTimer = setTimeout(() => {
     const params = getUrlParams(); // read at fire time so we don't clobber
-    if (value === null || value === undefined) {
-      params.delete(key);
-    } else if (typeof value === 'number') {
-      params.set(key, parseFloat(value.toFixed(4)));
-    } else {
-      params.set(key, value);
+    for (const [k, v] of pendingUrlWrites) {
+      if (v === null || v === undefined) {
+        params.delete(k);
+      } else if (typeof v === 'number') {
+        params.set(k, parseFloat(v.toFixed(4)));
+      } else {
+        params.set(k, v);
+      }
     }
+    pendingUrlWrites.clear();
     window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
   }, 200);
 };
