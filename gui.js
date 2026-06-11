@@ -60,13 +60,24 @@ class DeepLinkGUI {
   // writer. lil-gui keeps a single onChange slot, so without this a caller
   // doing `gui.add(...).onChange(cb)` would silently overwrite the URL writer
   // and break deep-link persistence for that control.
-  _attachUrlWriter(controller, writeUrl) {
+  _attachUrlWriter(controller, writeUrl, applyOnLoad = false) {
     let userOnChange = null;
     controller.onChange((v) => {
       if (userOnChange) userOnChange(v);
       writeUrl(v);
     });
-    controller.onChange = (fn) => { userOnChange = fn; return controller; };
+    controller.onChange = (fn) => {
+      userOnChange = fn;
+      // When the control's value was hydrated from the URL, the caller's
+      // onChange isn't attached until *after* add() returns, so the deep-linked
+      // value was never pushed through the behavior the handler drives — the UI
+      // would show e.g. "Pause" checked while setPaused() never ran. Fire the
+      // handler once now with the loaded value so deep links don't lie about
+      // state. Controls without a registered onChange (property-bound ones read
+      // each frame) never reach here, so they're unaffected.
+      if (applyOnLoad && fn) fn(controller.getValue());
+      return controller;
+    };
     return controller;
   }
 
@@ -90,9 +101,10 @@ class DeepLinkGUI {
     // 2. Create Controller
     const controller = this.gui.add(object, prop, ...args);
 
-    // 3. Attach URL/State Listener (skip for buttons)
+    // 3. Attach URL/State Listener (skip for buttons). Apply-on-load when the
+    // value came from the URL so onChange-driven behavior runs at startup.
     if (!isFunction) {
-      this._attachUrlWriter(controller, (v) => setUrlParam(key, v));
+      this._attachUrlWriter(controller, (v) => setUrlParam(key, v), params.has(key));
     }
 
     // 4. Update Display
@@ -125,7 +137,7 @@ class DeepLinkGUI {
         strVal = `rgb(${v[0]},${v[1]},${v[2]})`;
       }
       setUrlParam(key, strVal);
-    });
+    }, params.has(key));
 
     // 4. Update Display
     if (params.has(key)) {
