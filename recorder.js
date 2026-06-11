@@ -90,7 +90,6 @@ export class VideoRecorder {
     }
 
     this._effectName = effectName;
-    this.chunks = [];
     this.elapsedSeconds = 0;
 
     // Determine capture source: offscreen scaled canvas or native
@@ -100,27 +99,46 @@ export class VideoRecorder {
     }
 
     // Manual frame-request mode: framerate 0 means we control when frames are captured
-    this.stream = captureSource.captureStream(0);
-    this.track = this.stream.getVideoTracks()[0];
+    const stream = captureSource.captureStream(0);
+    const track = stream.getVideoTracks()[0];
 
     // Pick the best-supported codec for the requested format.
     const mimeType = selectMimeType(this.format);
 
-    this.mediaRecorder = new MediaRecorder(this.stream, {
+    const recorder = new MediaRecorder(stream, {
       mimeType,
       videoBitsPerSecond: this.bitrateMbps * 1_000_000,
     });
 
-    this.mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) this.chunks.push(e.data);
+    // Session-local capture state. MediaRecorder.stop() flips state to
+    // 'inactive' synchronously, but ondataavailable/onstop fire asynchronously
+    // later. A fast stop→start can therefore install a brand-new session on
+    // this.* before the old recorder's handlers run. Binding chunks/stream/
+    // recorder/effectName in the closures (instead of reading this.* at fire
+    // time) keeps a stale session from downloading the new session's chunks or
+    // tearing down its stream — the old handlers only ever touch their own.
+    const chunks = [];
+
+    this.mediaRecorder = recorder;
+    this.stream = stream;
+    this.track = track;
+    this.chunks = chunks;
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
     };
 
-    this.mediaRecorder.onstop = () => {
-      this._download();
-      this._cleanup();
+    recorder.onstop = () => {
+      this._download(recorder, chunks, effectName);
+      // This session owns `stream`, so stop its tracks unconditionally.
+      stream.getTracks().forEach(t => t.stop());
+      // Only clear the shared instance state (and offscreen canvas) if this is
+      // still the active session; a rapid stop→start may have already replaced
+      // it, and that newer session must survive this stale teardown.
+      if (this.mediaRecorder === recorder) this._cleanup();
     };
 
-    this.mediaRecorder.start();
+    recorder.start();
   }
 
   stop() {
@@ -176,15 +194,15 @@ export class VideoRecorder {
   }
 
   /** Determine file extension from the recorded mimeType. */
-  _extension() {
-    const mime = this.mediaRecorder?.mimeType ?? '';
+  _extension(recorder = this.mediaRecorder) {
+    const mime = recorder?.mimeType ?? '';
     if (mime.startsWith('video/mp4')) return 'mp4';
     return 'webm';
   }
 
-  _download() {
-    const ext = this._extension();
-    const blob = new Blob(this.chunks, { type: ext === 'mp4' ? 'video/mp4' : 'video/webm' });
+  _download(recorder = this.mediaRecorder, chunks = this.chunks, effectName = this._effectName) {
+    const ext = this._extension(recorder);
+    const blob = new Blob(chunks, { type: ext === 'mp4' ? 'video/mp4' : 'video/webm' });
 
     const now = new Date();
     const ts = now.getFullYear().toString()
@@ -195,25 +213,25 @@ export class VideoRecorder {
       + String(now.getMinutes()).padStart(2, '0')
       + String(now.getSeconds()).padStart(2, '0');
 
-    const filename = `${this._effectName}_${ts}.${ext}`;
+    const filename = `${effectName}_${ts}.${ext}`;
 
     // Use showSaveFilePicker when available for a proper, deterministic download;
     // fall back to anchor-click with a load-event-based revoke.
     if (typeof showSaveFilePicker === 'function') {
-      this._saveWithPicker(blob, filename);
+      this._saveWithPicker(blob, filename, ext);
     } else {
       this._saveWithAnchor(blob, filename);
     }
   }
 
   /** Modern File System Access API — deterministic write, no URL leak. */
-  async _saveWithPicker(blob, filename) {
+  async _saveWithPicker(blob, filename, ext = this._extension()) {
     try {
       const handle = await showSaveFilePicker({
         suggestedName: filename,
         types: [{
           description: 'Video',
-          accept: { [blob.type]: [`.${this._extension()}`] },
+          accept: { [blob.type]: [`.${ext}`] },
         }],
       });
       const writable = await handle.createWritable();
