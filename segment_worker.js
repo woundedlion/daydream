@@ -42,9 +42,18 @@ function applyClip() {
   }
 }
 
-self.onmessage = async (e) => {
-  const msg = /** @type {WorkerInboundMsg} */ (e.data);
-
+/**
+ * Process one protocol message. Only ever invoked through the serialized
+ * queue in self.onmessage below, so 'init''s long await of the WASM
+ * fetch+instantiate cannot interleave with later messages: a setResolution/
+ * setEffect/setParameter that arrives mid-init waits for init to finish
+ * instead of running against a null engine and being silently dropped (a
+ * dropped setResolution is unrecoverable — the worker keeps rendering
+ * old-geometry frames tagged with the current generation, so the
+ * controller's fence never catches them).
+ * @param {WorkerInboundMsg} msg
+ */
+async function handleMessage(msg) {
   switch (msg.type) {
     case 'init': {
       segId = msg.segId;
@@ -178,4 +187,18 @@ self.onmessage = async (e) => {
       break;
     }
   }
+}
+
+// Serialize message handling: each message runs strictly after the previous
+// one settles. The catch keeps one message's failure from wedging the chain
+// (later messages still run) while rethrowing it as an uncaught error on a
+// fresh task so it reaches the worker's global error handler — and thus the
+// controller's worker.onerror fault latch — instead of vanishing as an
+// unhandled rejection.
+let messageQueue = Promise.resolve();
+self.onmessage = (e) => {
+  const msg = /** @type {WorkerInboundMsg} */ (e.data);
+  messageQueue = messageQueue
+    .then(() => handleMessage(msg))
+    .catch((err) => { setTimeout(() => { throw err; }); });
 };
