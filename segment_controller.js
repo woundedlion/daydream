@@ -400,15 +400,15 @@ export class SegmentController {
       // past the buffer (per-result, not per-pixel — no hot-path cost).
       if (r.x0 < 0 || r.y0 < 0 || r.x1 > w || r.y1 > h) continue;
 
+      // Each quad row maps to the contiguous destination span [x0,x1), so blit
+      // it with one TypedArray.set rather than element-by-element — (y1-y0) row
+      // copies instead of ~quadW*quadH*3 scalar stores.
+      const rowLen = (r.x1 - r.x0) * 3;
       let srcIdx = 0;
       for (let y = r.y0; y < r.y1; y++) {
-        const dstRowStart = y * w * 3;
-        for (let x = r.x0; x < r.x1; x++) {
-          const dstIdx = dstRowStart + x * 3;
-          dst[dstIdx]     = r.pixels[srcIdx++];
-          dst[dstIdx + 1] = r.pixels[srcIdx++];
-          dst[dstIdx + 2] = r.pixels[srcIdx++];
-        }
+        const dstIdx = (y * w + r.x0) * 3;
+        dst.set(r.pixels.subarray(srcIdx, srcIdx + rowLen), dstIdx);
+        srcIdx += rowLen;
       }
     }
 
