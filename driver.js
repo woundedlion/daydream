@@ -114,6 +114,10 @@ export class Daydream {
     // Cap pixel ratio at 1 to disable high-DPI rendering for performance/aesthetic reasons.
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
 
+    // The renderer is constructed once and never recreated, so set the output
+    // color space here rather than re-assigning it on every animation-loop tick.
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+
     this.labelRenderer = new CSS2DRenderer();
     this.labelRenderer.domElement.className = "labelLayer";
     this.canvas.parentElement.appendChild(this.labelRenderer.domElement);
