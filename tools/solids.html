@@ -1546,6 +1546,11 @@
         }
       });
 
+      // Persist the edge count on the mesh (same object as window.currentMesh)
+      // so saveSolid reports E instead of falling back to 0 — wasmMeshToJs only
+      // returns {vertices, faces}, so without this every saved card shows 0E.
+      meshData.edgeCount = edgeIndices.size;
+
       const lineGeoPoints = [];
       edgeIndices.forEach(key => {
         const [ai, bi] = key.split('_').map(Number);
