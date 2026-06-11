@@ -3,8 +3,9 @@
 
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google" content="notranslate">
+    <title>Holosphere — POV LED Sphere Simulator</title>
     <link href="./styles/index.css" rel="stylesheet" />
     <script src="./vendor-importmap.js"></script>
 </head>
@@ -70,7 +71,7 @@
                         <span>Loading engine...</span>
                     </div>
                     <div id="segment-stats" class="segment-stats" style="display:none;"></div>
-                    <canvas id="canvas"></canvas>
+                    <canvas id="canvas" role="img" aria-label="Real-time 3D simulation of the LED sphere"></canvas>
                 </div>
             </div>
             <div id="gui-container" class="gui-container"></div>
