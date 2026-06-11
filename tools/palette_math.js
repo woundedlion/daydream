@@ -64,8 +64,12 @@ export class PRNG {
     this.state = (this.state * 1664525 + 1013904223) >>> 0;
     return this.state / 0x100000000;
   }
+  // Half-open [min, max) to match the engine's hs::rand_int, so a ported range
+  // produces exactly the values the device does. (Was inclusive [min, max],
+  // which made every copied range one wider; the call sites use the engine's
+  // own rand_int literals.)
   nextInt(min, max) {
-    return Math.floor(this.next() * (max - min + 1)) + min;
+    return Math.floor(this.next() * (max - min)) + min;
   }
 }
 
@@ -189,11 +193,11 @@ export class GenerativePalette {
         break;
       case "COMPLEMENTARY":
         h2 = this.wrapHue(h1 + 128);
-        h3 = this.wrapHue(h1 + this.prng.nextInt(-7, 7));
+        h3 = this.wrapHue(h1 + this.prng.nextInt(-7, 8));
         break;
       case "ANALOGOUS":
       default:
-        const dir = (this.prng.nextInt(0, 1) === 0) ? 1 : -1;
+        const dir = (this.prng.nextInt(0, 2) === 0) ? 1 : -1;
         h2 = this.wrapHue(h1 + dir * this.prng.nextInt(11, 22));
         h3 = this.wrapHue(h2 + dir * this.prng.nextInt(11, 22));
         break;
