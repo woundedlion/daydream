@@ -106,7 +106,10 @@ export class URLSync {
   /** Ad-hoc param write from the GUI layer; merged into the single flush. */
   setParam(key, value) {
     if (value === null || value === undefined) {
-      this._adhoc.delete(key);
+      // Record a deletion marker rather than forgetting the key: _flush needs
+      // it to actually drop a param already present in the URL. Matches the
+      // gui.js fallback path's delete-on-null semantics.
+      this._adhoc.set(key, null);
     } else {
       // Round numbers to save space and avoid float jitter (matches the GUI's
       // previous behavior).
@@ -142,7 +145,8 @@ export class URLSync {
     // re-asserting it here keeps that fresh value instead of the stale one the
     // exclude-by-name path would otherwise preserve.
     for (const [key, val] of this._adhoc) {
-      params.set(key, val);
+      if (val === null) params.delete(key);
+      else params.set(key, val);
     }
     window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
   }
@@ -156,7 +160,8 @@ export class URLSync {
       }
     }
     for (const [key, val] of this._adhoc) {
-      params.set(key, val);
+      if (val === null) params.delete(key);
+      else params.set(key, val);
     }
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState({}, '', newUrl);
