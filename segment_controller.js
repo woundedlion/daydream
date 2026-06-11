@@ -496,52 +496,95 @@ export class SegmentController {
       hint.textContent = 'Change resolution or toggle segmented mode to restart.';
       box.appendChild(hint);
       el.replaceChildren(box);
+      this._statsTable = null; // torn down — force a rebuild on recovery
       return;
     }
 
     const fmtKB = (x) => (x / 1024).toFixed(1);
     const numSegs = this.count;
 
-    let rows = '';
+    // Build the table once and mutate its cells' text in place. Rebuilding the
+    // whole table via innerHTML every composited frame (~16 Hz steady state)
+    // churned the DOM for values that mostly don't change shape. Rebuild only
+    // when the segment count changes or the table was torn down (the fault
+    // overlay above calls replaceChildren and nulls the cache).
+    if (!this._statsTable || this._statsSegCount !== numSegs
+        || this._statsTable.parentNode !== el) {
+      this._buildStatsTable(numSegs, el);
+    }
+
+    const cells = this._statsCells;
     for (let s = 0; s < numSegs; s++) {
       const r = this.results[s];
       const timing = this.timings[s] || 0;
-      const slowClass = timing > SLOW_FRAME_MS ? ' slow' : '';
+      const c = cells.rows[s];
 
-      // Per-segment arena from worker
+      c.range.textContent = r ? `x[${r.x0}–${r.x1}] y[${r.y0}–${r.y1}]` : '?';
+      c.compute.textContent = `${timing.toFixed(1)} ms`;
+      c.compute.className = timing > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
+      c.render.textContent = `${((this.renderUs[s] || 0) / 1000).toFixed(1)} ms`;
+
       const a = this.arenas[s];
-      let arenaStr = '<td>-</td><td>-</td><td>-</td>';
-      if (a) {
-        arenaStr = `<td>${fmtKB(a.scratch_arena_a.high_water_mark)}</td>`
-                 + `<td>${fmtKB(a.scratch_arena_b.high_water_mark)}</td>`
-                 + `<td>${fmtKB(a.persistent_arena.usage)}</td>`;
-      }
-
-      const rangeStr = r
-        ? `x[${r.x0}–${r.x1}] y[${r.y0}–${r.y1}]`
-        : '?';
-
-      const renderMs = (this.renderUs[s] || 0) / 1000; // µs → ms for display
-      rows += `<tr>`
-           + `<td class="seg-label">Seg ${s}</td>`
-           + `<td style="color:#555;font-size:0.8em">${rangeStr}</td>`
-           + `<td class="seg-time${slowClass}">${timing.toFixed(1)} ms</td>`
-           + `<td class="seg-time">${renderMs.toFixed(1)} ms</td>`
-           + arenaStr
-           + `</tr>`;
+      c.scrA.textContent = a ? fmtKB(a.scratch_arena_a.high_water_mark) : '-';
+      c.scrB.textContent = a ? fmtKB(a.scratch_arena_b.high_water_mark) : '-';
+      c.persist.textContent = a ? fmtKB(a.persistent_arena.usage) : '-';
     }
 
     const maxTime = Math.max(...this.timings);
-    const wallClass = this.wallTime > SLOW_FRAME_MS ? ' slow' : '';
+    cells.maxTime.textContent = `${maxTime.toFixed(1)} ms`;
+    cells.wallTime.textContent = `${this.wallTime.toFixed(1)} ms`;
+    cells.wallTime.className = this.wallTime > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
+  }
 
-    el.innerHTML = `<table>`
-      + `<tr><th></th><th>Range</th><th>Compute</th><th>Render</th><th>Scr A</th><th>Scr B</th><th>Persist</th></tr>`
-      + rows
-      + `<tr style="border-top:1px solid #333"><td class="seg-label">max</td><td></td>`
-      + `<td class="seg-time">${maxTime.toFixed(1)} ms</td><td></td><td colspan="3"></td></tr>`
-      + `<tr><td class="seg-label">wall</td><td></td>`
-      + `<td class="seg-time${wallClass}">${this.wallTime.toFixed(1)} ms</td><td></td><td colspan="3"></td></tr>`
-      + `</table>`;
+  /**
+   * (Re)build the stats-table DOM and cache references to the cells updateStats
+   * mutates each frame, so the steady-state path is textContent writes rather
+   * than an innerHTML re-parse.
+   */
+  _buildStatsTable(numSegs, el) {
+    const table = document.createElement('table');
+    const th = (text) => { const e = document.createElement('th'); e.textContent = text; return e; };
+    const td = (text, className) => {
+      const e = document.createElement('td');
+      if (className) e.className = className;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    };
+    const mkRow = (cells) => {
+      const tr = document.createElement('tr');
+      for (const c of cells) tr.appendChild(c);
+      table.appendChild(tr);
+      return tr;
+    };
+    const spanCell = () => { const e = td(''); e.colSpan = 3; return e; };
+
+    mkRow([th(''), th('Range'), th('Compute'), th('Render'),
+           th('Scr A'), th('Scr B'), th('Persist')]);
+
+    const rows = [];
+    for (let s = 0; s < numSegs; s++) {
+      const range = td('');
+      range.style.cssText = 'color:#555;font-size:0.8em';
+      const compute = td('', 'seg-time');
+      const render = td('', 'seg-time');
+      const scrA = td('-');
+      const scrB = td('-');
+      const persist = td('-');
+      mkRow([td(`Seg ${s}`, 'seg-label'), range, compute, render, scrA, scrB, persist]);
+      rows.push({ range, compute, render, scrA, scrB, persist });
+    }
+
+    const maxTime = td('', 'seg-time');
+    const maxRow = mkRow([td('max', 'seg-label'), td(''), maxTime, td(''), spanCell()]);
+    maxRow.style.borderTop = '1px solid #333';
+
+    const wallTime = td('', 'seg-time');
+    mkRow([td('wall', 'seg-label'), td(''), wallTime, td(''), spanCell()]);
+
+    el.replaceChildren(table);
+    this._statsTable = table;
+    this._statsSegCount = numSegs;
+    this._statsCells = { rows, maxTime, wallTime };
   }
 
   /**
