@@ -1313,7 +1313,14 @@
         const sat = document.getElementById('gen_saturation').value;
         const hueValue = parseInt(document.getElementById('gen_seed_slider').value);
 
-        const codeString = `GenerativePalette palette{\n    GradientShape::${shape}, HarmonyType::${harmony},\n    BrightnessProfile::${brightness}, SaturationProfile::${sat}, ${hueValue}};`;
+        // Reproducibility caveat: this tool draws the per-palette saturation,
+        // brightness and harmony hue offsets from a PRNG seeded by the profile
+        // strings, but the engine's GenerativePalette draws them from its global
+        // RNG. So the export reproduces the gradient shape, harmony, profiles and
+        // base hue exactly, but its randomized structure will differ from this
+        // preview. State that next to the code so the export isn't mistaken for a
+        // pixel-faithful reproduction.
+        const codeString = `// Reproduces the profiles + base hue exactly; the randomized\n// saturation/brightness/hue-offset structure is drawn from the\n// engine's global RNG and will differ from the tool preview.\nGenerativePalette palette{\n    GradientShape::${shape}, HarmonyType::${harmony},\n    BrightnessProfile::${brightness}, SaturationProfile::${sat}, ${hueValue}};`;
         codeOutput.textContent = codeString;
       }
     }
