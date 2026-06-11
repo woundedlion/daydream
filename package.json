@@ -1,4 +1,7 @@
 {
+  "name": "daydream",
+  "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test --experimental-test-module-mocks \"tests/*.test.js\"",
@@ -6,8 +9,8 @@
     "importmap:local": "node scripts/generate-importmap.mjs --local"
   },
   "dependencies": {
-    "lil-gui": "^0.21.0",
-    "three": "^0.183.1"
+    "lil-gui": "0.21.0",
+    "three": "0.183.1"
   },
   "engines": {
     "node": ">=22.3.0"
