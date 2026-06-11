@@ -77,7 +77,9 @@ export class VideoRecorder {
       return false;
     } else {
       this.start(effectName);
-      return true;
+      // start() can refuse (unsupported browser, etc.); report the real state
+      // so the caller's button does not latch into a phantom recording mode.
+      return this.isRecording;
     }
   }
 
