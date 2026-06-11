@@ -7,7 +7,6 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { pixelToSpherical } from "./geometry.js";
-import { GUI } from "gui";
 
 // Constants
 const PHI = (1 + Math.sqrt(5)) / 2;
