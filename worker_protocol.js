@@ -44,7 +44,7 @@
 /**
  * @typedef {{
  *   type: 'init', segId: number, totalSegs: number, w: number, h: number,
- *   effectName?: string, params?: SegParam[],
+ *   effectName?: string, params?: SegParam[], paused?: boolean,
  * }} InitMsg
  */
 

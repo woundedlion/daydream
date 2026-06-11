@@ -76,6 +76,10 @@ async function handleMessage(msg) {
       if (msg.params) {
         for (const p of msg.params) engine.setParameter(p.name, p.value);
       }
+      // Carry the host's paused state onto a freshly-spawned worker so a pool
+      // re-created while paused doesn't animate under a paused GUI. A fresh
+      // engine starts running, so only an active pause needs asserting.
+      if (msg.paused) engine.setAnimationsPaused(true);
       applyClip();
 
       post({ type: 'ready', segId });

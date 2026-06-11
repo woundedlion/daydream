@@ -49,6 +49,11 @@ export class SegmentController {
     this.active = false;
     this.count = 4;
     this.showBoundaries = true;
+    // Mirror of the host's animations-paused state. Tracked (not just broadcast)
+    // so create() can carry it into a freshly-spawned worker pool — otherwise a
+    // pool re-created while paused (segment-count change, mode re-toggle) would
+    // animate under a paused GUI.
+    this._animationsPaused = false;
 
     // Per-segment data
     /** @type {Worker[]} */
@@ -214,6 +219,7 @@ export class SegmentController {
         h: res.h,
         effectName: this._appState.get('effect'),
         params: initialParams,
+        paused: this._animationsPaused,
       });
 
       this.workers.push(worker);
@@ -309,6 +315,7 @@ export class SegmentController {
    * @param {boolean} paused
    */
   setAnimationsPaused(paused) {
+    this._animationsPaused = paused;
     this._broadcast({ type: 'setAnimationsPaused', paused });
   }
 
