@@ -11,12 +11,6 @@
 
 // --- sRGB transfer function (gamma) ---
 
-/** sRGB byte [0,255] -> linear float [0,1]. */
-export function srgbToLinear(srgb) {
-  const s = srgb / 255.0;
-  return (s <= 0.04045) ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-}
-
 /** sRGB float [0,1] -> linear float [0,1]. */
 export function srgbToLinearFloat(s) {
   return (s <= 0.04045) ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);

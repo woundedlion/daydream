@@ -1100,10 +1100,6 @@
       return `${comment}\nFLASHMEM inline PolyMesh ${funcName}(Arena &a, Arena &b) {\n  return ${recipe};\n}`;
     }
 
-    function capitalize(s) {
-      return s.charAt(0).toUpperCase() + s.slice(1);
-    }
-
     function restoreSolid(item) {
       state.base = item.base;
       state.ops = JSON.parse(JSON.stringify(item.ops));
