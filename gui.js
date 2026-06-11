@@ -122,6 +122,19 @@ class DeepLinkGUI {
       const currentVal = object[prop];
       if (typeof currentVal === 'number') {
         val = parseFloat(val);
+        // A non-numeric deep link (?Speed=fast → NaN) must never reach the
+        // engine; fall back to the validated bound value.
+        if (!Number.isFinite(val)) {
+          console.warn(`DeepLinkGUI: ignoring non-numeric URL value "${params.get(key)}" for "${key}"`);
+          val = currentVal;
+        } else {
+          // Clamp to the control's registered range. lil-gui's numeric add()
+          // signature is add(obj, prop, min, max, step), so the bounds (when
+          // present) are args[0]/args[1].
+          const min = args[0], max = args[1];
+          if (typeof min === 'number' && val < min) val = min;
+          if (typeof max === 'number' && val > max) val = max;
+        }
       } else if (typeof currentVal === 'boolean') {
         val = (val === 'true');
       }
