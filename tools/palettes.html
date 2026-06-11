@@ -9,13 +9,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Procedural Color Palette Generator</title>
-  <script src="../vendor/tailwindcss.js"></script>
+  <!-- Vendored Tailwind (Play CDN build) for offline dev. /vendor/ is
+       gitignored, so on the Pages deploy this file 404s; the onerror falls back
+       to the Play CDN — the same in-browser build — instead of serving the tool
+       unstyled. -->
+  <script src="../vendor/tailwindcss.js"
+    onerror="this.remove();document.head.appendChild(Object.assign(document.createElement('script'),{src:'https://cdn.tailwindcss.com'}))"></script>
+  <!-- Self-hosted fonts for offline dev; same gitignored /vendor/ story, so on
+       the deploy this 404s and the onerror falls back to the canonical CDN copy
+       of the same families (Inter + JetBrains Mono). -->
+  <link rel="stylesheet" href="../vendor/fonts/fonts.css"
+    onerror="this.onerror=null;this.href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono&display=swap'">
   <!-- Shared design tokens + control styling for the tool pages. Linked before
        this page's <style> so page-specific rules below win. -->
   <link rel="stylesheet" href="tools.css">
   <style>
-    @import url('../vendor/fonts/fonts.css');
-
     /* tools.css supplies body, .param-group, .slider-label and the base
        range-slider styling shared across the tool pages; only palettes-specific
        extras live here. */
