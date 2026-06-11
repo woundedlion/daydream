@@ -940,21 +940,6 @@
     }
 
     /**
-         * Cancels drag if mouse leaves the canvas.
-         */
-    function handleDragLeave() {
-      if (isDragging) {
-        isDragging = false;
-        isSelectionActive = false; // Also reset this
-        if (colorStripCanvas) {
-          colorStripCanvas.style.cursor = 'pointer';
-        }
-        // Redraw to remove selection overlay
-        drawColorStrip(animationTime);
-      }
-    }
-
-    /**
          * Calculates and applies new C (frequency) and D (phase) parameters
          * to zoom the palette from t_start to t_end.
          */
@@ -1361,7 +1346,6 @@
       colorStripCanvas.addEventListener('mousedown', handleDragStart);
       document.addEventListener('mousemove', handleDragMove); // Listen on document to drag outside
       document.addEventListener('mouseup', handleDragEnd); // Listen on document to release outside
-      // The document's 'mousemove' listener now handles this logic.
 
       // 4. Add click-to-copy to the swatch
       if (colorSwatch) {
