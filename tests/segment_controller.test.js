@@ -398,3 +398,22 @@ test('a faulted pool keeps tick() from dispatching another doomed render', () =>
   c.workers.forEach((w, i) =>
     assert.equal(w.posted.length, before[i], 'no new render broadcast'));
 });
+
+test('an init-phase fault still reaches the fault overlay (faulted checked before ready guard)', () => {
+  // Finding 290: a worker that traps during startup latches `faulted` but never
+  // sends 'ready', so `ready` stays false forever. A ready-first guard would
+  // return at the top of every tick() and the fault overlay would never paint.
+  const c = makeController();
+  c.create(2);                    // workers spawned, none has signalled ready
+  assert.equal(c.ready, false);
+
+  c.workers[0].onerror({ message: 'init boom', filename: 'w.js', lineno: 1, colno: 1 });
+  assert.equal(c.faulted, true);
+
+  let statsShown = 0;
+  c.updateStats = () => { statsShown++; }; // observe the overlay-refresh call
+  c.tick();
+
+  assert.equal(statsShown, 1, 'tick() refreshed the fault overlay despite never being ready');
+  assert.equal(c.renderInFlight, false, 'no doomed render dispatched');
+});
