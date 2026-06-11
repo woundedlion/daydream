@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { findBestRationalRatio, snapToRationalRatio, lissajous } =
+const { findBestRationalRatio, snapToRationalRatio, lissajous, lissajousCodeString } =
   await import('../tools/lissajous_math.js');
 
 const TWO_PI = 2 * Math.PI;
@@ -99,4 +99,22 @@ test('lissajous: point lies on the unit sphere (R = 1) for several t', () => {
     const r = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
     assert.ok(Math.abs(r - 1) < 1e-12, `|point| ≈ 1 at t=${t}, got ${r}`);
   }
+});
+
+test('lissajousCodeString emits a C++ LissajousParams initializer', () => {
+  // The 12:5 default at zero phase over one full 2π period — matches
+  // ChaoticStrings' built-in config{12.0f, 5.0f, 0, 2 * PI_F}.
+  assert.equal(
+    lissajousCodeString(12, 5, 0, TWO_PI),
+    'LissajousParams{12.0f, 5.0f, 0.0f, 2 * PI_F}');
+
+  // Multi-period domain renders as a PI_F multiple; phase stays in radians.
+  assert.equal(
+    lissajousCodeString(3, 2, 1.5708, 2 * TWO_PI),
+    'LissajousParams{3.0f, 2.0f, 1.571f, 4 * PI_F}');
+
+  // A non-2π domain falls back to a plain float literal.
+  assert.equal(
+    lissajousCodeString(1.06, 1.06, 0, 5.909),
+    'LissajousParams{1.06f, 1.06f, 0.0f, 5.909f}');
 });

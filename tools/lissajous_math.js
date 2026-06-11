@@ -93,37 +93,43 @@ export const snapToRationalRatio = (activeC, passiveC, maxDenominator = 8) => {
 /**
  * Builds the export snippet string for the current curve parameters. Pure: it
  * takes plain numbers and returns the string the page writes into the DOM.
- * @param {number} c1 Frequency C₁.
- * @param {number} c2 Frequency C₂.
+ *
+ * The snippet is a C++ `LissajousParams` aggregate initializer — the form the
+ * engine's Lissajous effects (ChaoticStrings, Comets) actually consume
+ * (core/geometry.h: `struct LissajousParams { float m1, m2, a, domain; }`).
+ * Phase A is emitted in radians and fed to the engine as-is: the tool's
+ * radians-labelled slider matches `lissajous()`'s phase with no π scaling
+ * (finding 273). C₁/C₂ map to m1/m2.
+ * @param {number} c1 Frequency C₁ (m1).
+ * @param {number} c2 Frequency C₂ (m2).
  * @param {number} a Phase shift A (radians).
  * @param {number} domain The curve domain (duration).
- * @returns {string} A [fn, domain] pair matching timeline.add()'s tuple.
+ * @returns {string} A `LissajousParams{...}` initializer.
  */
 export const lissajousCodeString = (c1, c2, a, domain) => {
-  // Helper to format floats to a clean string representation (e.g., 3.000 -> 3)
+  // Format a value as a C++ float literal: fixed precision, trailing zeros
+  // trimmed but always at least one fractional digit, with an 'f' suffix
+  // (so e.g. 12 emits as 12.0f, never the invalid 12f).
   const f = (n, fixed = 3) => {
-    const s = n.toFixed(fixed);
-    // Remove trailing zeros and decimal point if they exist
-    return s.replace(/\.?0+$/, '');
+    let s = n.toFixed(fixed).replace(/(\.\d*?)0+$/, '$1');
+    if (s.endsWith('.')) s += '0';
+    return s + 'f';
   };
 
   const c1Str = f(c1, 2);
   const c2Str = f(c2, 2);
   const aStr = f(a, 3);
 
-  // Format the domain: exact 2π multiples render as TWO_PI expressions, else a float.
-  let domainStr = '';
-  const twoPi = TWO_PI;
-  // Check for multiples of 2*PI within a small tolerance
-  const multiple = domain / twoPi;
-
+  // Format the domain: exact 2π multiples render against the engine's PI_F
+  // constant (matching ChaoticStrings' `2 * PI_F`), else a plain float literal.
+  let domainStr;
+  const multiple = domain / TWO_PI;
   if (Math.abs(multiple - Math.round(multiple)) < 0.001 && Math.round(multiple) > 0) {
-    const N = Math.round(multiple);
-    domainStr = (N === 1) ? 'TWO_PI' : `${N} * TWO_PI`;
+    domainStr = `${2 * Math.round(multiple)} * PI_F`;
   } else {
-    domainStr = f(domain, 3); // Use the formatted float value
+    domainStr = f(domain, 3);
   }
 
-  // Emit a [fn, domain] pair, matching timeline.add()'s expected tuple.
-  return `[(t) => lissajous(${c1Str}, ${c2Str}, ${aStr}, t), ${domainStr}]`;
+  // LissajousParams{m1, m2, a, domain} — see core/geometry.h.
+  return `LissajousParams{${c1Str}, ${c2Str}, ${aStr}, ${domainStr}}`;
 };
