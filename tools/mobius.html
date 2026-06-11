@@ -289,6 +289,10 @@
     let isAnimating = false;
     let activePreset = null;
     let animationTime = 0;
+    // Timestamp (ms) of the previous animated frame; 0 means "seed on next
+    // frame". Used to advance animationTime by real elapsed time so preset
+    // flow speed is independent of the display refresh rate.
+    let lastAnimTime = 0;
 
     let scene, camera, renderer, controls, sphereMesh;
 
@@ -539,6 +543,7 @@
       if (preset.animate) {
         isAnimating = true;
         animationTime = 0;
+        lastAnimTime = 0; // re-seed the delta clock for the new preset
       } else if (preset.setup) {
         applyConfig(preset.setup());
       }
@@ -648,7 +653,13 @@
         showSphere: false,
         onAnimate: () => {
           if (isAnimating && activePreset && activePreset.update) {
-            animationTime += 0.01;
+            const now = performance.now();
+            // Seed on the first frame (dt = 0), then advance by real elapsed
+            // seconds. 0.6 units/s reproduces the original 0.01-per-frame speed
+            // at 60 Hz, now matched on any refresh rate.
+            const dt = lastAnimTime ? (now - lastAnimTime) / 1000 : 0;
+            lastAnimTime = now;
+            animationTime += dt * 0.6;
             const newVals = activePreset.update(animationTime);
             applyConfig(newVals);
           }
