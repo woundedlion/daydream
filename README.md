@@ -87,10 +87,10 @@ Two physical targets share the same rendering engine:
 | Rotation | 480 RPM (8 revolutions/second), 16 FPS from 2 sides of the ring |
 | Virtual resolution | 288 × 144 |
 | Driver | `POVSegmented<288, 4, 480>` in `pov_segmented.h` |
-| Synchronization | 2-wire: column clock (PWM) + frame sync (pulse) |
-| Pin assignments | ID: pins 21–22, Column clock: pin 2 (in) / pin 5 (out), Frame sync: pin 3 (out) / pin 4 (in), SPI: pins 11 + 13 |
+| Synchronization | 1-wire: count-coded sync symbols from segment 0 discipline a per-board flywheel timebase (`hardware/pov_sync.h`) |
+| Pin assignments | ID: pins 21–22, Sync symbols: pin 3 (out, segment 0) / pin 4 (in), SPI: pins 11 + 13 |
 
-The POV effect works because each revolution takes ~125 ms and the ISR fires every `1,000,000 / (RPM/60) / width` microseconds to advance one column. The LED strip is mounted on both sides of a rotating arm: the top half of the strip handles one hemisphere and the bottom half handles the opposite hemisphere, so one full revolution paints a complete sphere.
+The POV effect works because each revolution takes ~125 ms and a new column is painted every `1,000,000 / (RPM/60) / width` microseconds (on Holosphere the IntervalTimer ISR advances one column per fire; on Phantasm each board's flywheel ISR derives the column from the CPU cycle counter — see §7.10). The LED strip is mounted on both sides of a rotating arm: the top half of the strip handles one hemisphere and the bottom half handles the opposite hemisphere, so one full revolution paints a complete sphere.
 
 ---
 
@@ -112,7 +112,7 @@ The Teensy heap fragments under heavy mesh subdivision. The single-block partiti
 
 ### Why the ISR Double Buffer?
 
-POV display requires pixel data to be ready before each column interval fires — typically 13–130 µs for the hardware resolution at 480 RPM. A naive approach (rendering in the ISR) would block the main loop. Instead, the main loop renders freely into a back buffer while the ISR reads from a separate front buffer. `queue_frame()` / `advance_display()` synchronize with minimal interrupt-disabled critical sections.
+POV display requires pixel data to be ready before each column interval fires — roughly 434 µs to 1.3 ms depending on resolution at 480 RPM (the per-column period is `1,000,000 / (RPM/60) / W` µs, i.e. ~434 µs for Phantasm's 288 columns and ~1302 µs for Holosphere's 96). A naive approach (rendering in the ISR) would block the main loop. Instead, the main loop renders freely into a back buffer while the ISR reads from a separate front buffer. `queue_frame()` / `advance_display()` synchronize with minimal interrupt-disabled critical sections.
 
 ### Why Fail-Fast (`HS_CHECK`)?
 
@@ -155,21 +155,21 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 ```
 ├── core/                       Rendering engine
 │   ├── platform.h              Arduino vs. WASM vs. Desktop abstraction layer
-│   ├── constants.h             MAX_W, MAX_H (resolution bounds)
+│   ├── constants.h             MAX_W, MAX_H + ClipRegion segment clip rectangle
 │   ├── canvas.h                Effect base class + Canvas RAII write-buffer guard
 │   ├── effects_engine.h        Master include for the full engine
 │   ├── effects.h               Include list for all effects
 │   ├── effects_legacy.h        Pre-engine effects (TheMatrix, Spirals, etc.)
 │   ├── effect_registry.h       Self-registering factory: REGISTER_EFFECT macro
-│   ├── led.h                   Backward-compat shim → hardware/pov_single.h
+│   ├── led.h                   LED pin constants + color-correction RAII guards (driver in hardware/pov_single.h)
 │   │
 │   ├── 3dmath.h                Vector, Quaternion, Spherical, Complex, Möbius math
 │   ├── geometry.h              Fragment, Dots/Points, PixelLUT, coord conversions
-│   ├── color.h                 Pixel16 (16-bit linear), Color4, blend modes, palettes
+│   ├── color.h                 Pixel16 (16-bit linear), Color4, blend helpers, palettes
 │   ├── palettes.h              Named palette instances (ProceduralPalette + Gradient)
 │   ├── color_luts.h            Precomputed sRGB ↔ linear LUTs
 │   │
-│   ├── concepts.h              C++20 concepts: TrailFn, PlotFn, FragmentShaderFn, etc.
+│   ├── concepts.h              FunctionRef/Fn callable wrappers, PipelineRef type erasure, Tweenable concept
 │   ├── filter.h                Composable render pipeline + all Filter::World/Screen/Pix
 │   ├── sdf.h                   SDF shape primitives, CSG operations, distance queries
 │   ├── scan.h                  Rasterization primitives (Ring, Circle, Star, Mesh, etc.)
@@ -190,18 +190,21 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 │   ├── generators.h            Universal generate() wrapper for procedural geometry
 │   ├── presets.h               Generic Presets<Params, Size> template
 │   ├── styles.h                Feedback::Style named presets + space/color transform functions
-│   ├── util.h                  wrap(), fast_wrap(), clamp()
-│   ├── reaction_graph.h/.cpp   Precomputed Fibonacci-lattice K-NN graph (301 KB table)
+│   ├── util.h                  wrap(), fast_wrap(), shortest/fwd_distance, apply_if_changed
+│   ├── reaction_graph.h/.cpp   Precomputed Fibonacci-lattice K-NN graph (90 KB / 92,160-byte table)
 │   ├── FastNoiseLite.h         Third-party: single-header noise library
 │   └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
-├── effects/                    28 effect headers (BZReactionDiffusion.h, HopfFibration.h,
-│                                IslamicStars.h, Raymarch.h, …) — see §9 Effects Reference
+├── effects/                    28 effects (29 headers incl. the shared ReactionDiffusionBase.h):
+│                                BZReactionDiffusion.h, HopfFibration.h, IslamicStars.h,
+│                                Raymarch.h, … — see §9 Effects Reference
 │
 ├── hardware/                   Hardware drivers
 │   ├── dma_led.h               Non-blocking DMA LED controller for HD107S (Teensy 4.x)
 │   ├── hd107s_frame.h          HD107S protocol buffer + inline color correction (host-testable)
+│   ├── pov_segment_map.h       Pure segment index math (host-testable)
 │   ├── pov_single.h            Single-Teensy POV driver (Holosphere)
+│   ├── pov_sync.h              Phantasm sync protocol core: flywheel timebase, symbol codec, epoch/beacon (host-testable)
 │   └── pov_segmented.h         Multi-Teensy segmented POV driver (Phantasm)
 │
 ├── targets/                    Per-target entry points
@@ -210,7 +213,9 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 │   ├── Phantasm/
 │   │   └── Phantasm.ino        Phantasm entry — 4×Teensy, TOTAL_PIXELS=288, RPM=480
 │   └── wasm/
-│       └── wasm.cpp            Emscripten bindings — HolosphereEngine JS class
+│       ├── wasm.cpp            Emscripten bindings — HolosphereEngine JS class
+│       ├── mesh_marshal.h      Pure validate-and-build layer for the mesh-editor boundary (host-testable)
+│       └── param_marshal.h     Pure parameter definition/value marshaling, single ordering source (host-testable)
 │
 ├── CMakeLists.txt              Emscripten build (outputs holosphere_wasm.js + .wasm)
 ├── tests/                      Unit tests (CMake subdirectory)
@@ -239,6 +244,8 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 │                                  dispatch, generation fence, and compositing
 ├── segment_worker.js           Web Worker that hosts one WASM instance per
 │                                  Phantasm hardware segment (parallel render)
+├── segment_layout.js           Pure segment-layout math (Node-unit-testable, no WASM/Worker)
+├── worker_protocol.js          JSDoc @typedef contract for main↔worker messages (no runtime code)
 ├── styles/                     CSS for the main page and tools
 │
 ├── tools/                      Standalone geometry tools (own HTML pages)
@@ -432,7 +439,7 @@ The filter pipeline operates across three coordinate domains. Each filter declar
 
 **Screen → Pixel**: `AntiAlias` distributes the fractional coordinate to its 4 nearest integer pixels using `quintic_kernel` bilinear weights, with `sin(φ)` density compensation.
 
-**Pixel → Canvas**: The base `Pipeline<W,H>` (the identity terminal) blends the final color into `canvas(x, y)` using the active blend mode.
+**Pixel → Canvas**: The base `Pipeline<W,H>` (the identity terminal) composites the final color into `canvas(x, y)` with straight-alpha (`src * α + dst * (1-α)`) in linear light.
 
 **World filters** operate on the 3D vector before projection — they can rotate, replicate, or warp geometry in spherical coordinates without loss. **Screen filters** operate after projection but before integer snapping — they distribute sub-pixel energy for anti-aliasing and blur. **Pixel filters** operate per-frame on the full canvas — feedback and chromatic aberration read from the previous frame buffer.
 
@@ -725,7 +732,7 @@ Plot::Bezier::draw<W, H>(pipeline, canvas, p0, p1, p2, p3, fragment_shader);
 Plot::SplineChain::draw<W, H>(pipeline, canvas, control_points, tension, shader);
 ```
 
-All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<Fragment>`) where each fragment carries position, texture registers (v0–v3), age, color, and blend mode. The rasterizer supports two interpolation strategies via `SplineMode`:
+All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<Fragment>`) where each fragment carries position, texture registers (v0–v3), age, and color. The rasterizer supports two interpolation strategies via `SplineMode`:
 - **Geodesic**: great-circle arc between segment endpoints (default)
 - **Planar**: planar projection within the tangent plane of a basis (for effects that live in a 2D local space)
 
@@ -751,7 +758,7 @@ All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<F
 
 ### 7.3 The Animation System (`animation.h`)
 
-The `Timeline<W>` class manages a list of running `IAnimation` objects. Each frame, `timeline.step(canvas)` advances all active animations. Finished animations are removed; repeating animations are rewound. All animation types inherit from `AnimationBase` and support method chaining via `.then()` for sequencing.
+The `Timeline` class manages a list of running `IAnimation` objects. Each frame, `timeline.step(canvas)` advances all active animations. Finished animations are removed; repeating animations are rewound. All animation types inherit from `AnimationBase` and support method chaining via `.then()` for sequencing.
 
 #### Animation Types
 
@@ -771,9 +778,12 @@ The `Timeline<W>` class manages a list of running `IAnimation` objects. Each fra
 | `ParticleSystem<W>` | Physics simulation with emitters, attractors, friction, gravity. Particles have `VectorTrail` history for trail rendering. |
 | `Ripple` | Animates a `RippleParams` to expand a Ricker wavelet across the sphere |
 | `MobiusWarp` | Animates `MobiusParams` to apply and release a Möbius transformation |
+| `MobiusWarpCircular` | Animates `MobiusParams` for a circular warp that stays warped throughout, suitable for repeating effects |
+| `MobiusWarpEvolving` | Continuously modulates `MobiusParams` over multiple frequencies for a non-repeating, evolving warp |
+| `MobiusFlow` | Animates `MobiusParams` for a continuous loxodromic flow |
 | `Noise` | Animates `NoiseParams` over time for flowing distortion fields |
 | `MeshMorph` | Morphs one `MeshState` into another by cloning both, building a nearest-vertex correspondence, and interpolating positions over a duration. The vertex-level primitive beneath `MeshCarousel`. |
-| `MeshCarousel<W>` | Double-buffered mesh transition system. Manages a pair of `MeshState` buffers and schedules an `Animation::Sprite` that fades the **incoming** shape in. Despite the loose "crossfade" name, the outgoing shape is not drawn — the `draw_outgoing` hook exists for symmetry but is unused, because the front index flips eagerly to the new shape. Used by IslamicStars, MeshFeedback, and HankinSolids for smooth geometry transitions. |
+| `MeshCarousel` | Double-buffered mesh transition system. Manages a pair of `MeshState` buffers and flips the front index eagerly so a freshly-scheduled `Animation::Sprite` captures the new shape. The crossfade emerges from **overlapping** sprites across consecutive transitions: each transition fades only its own incoming shape in (and back out), while the previous transition's sprite — still alive in its fade-out tail — keeps drawing the outgoing shape. No single call ever draws both meshes. Used by IslamicStars (sprite crossfade); MeshFeedback and HankinSolids reuse the buffered pair but drive vertex-level `MeshMorph` transitions over it instead. |
 
 #### Orientation and Motion Blur
 
@@ -802,7 +812,7 @@ Two traversal helpers linearize multi-level orientation history into a single ca
 | Function | Input | Description |
 |---|---|---|
 | `tween(orientation, callback)` | `Orientation<W>` | Iterates over the sub-frame quaternion history of a single orientation, calling `callback(quaternion, t)` for each step with `t ∈ [0, 1]`. Used by `World::Orient` to distribute motion blur. |
-| `deep_tween(trail, callback)` | Any `Tweenable` (`Orientation` or `OrientationTrail`) | Flattens a trail of orientations into a single continuous traversal, calling `callback(quaternion, t)` with a global `t` spanning all frames and sub-frames. Used by `Plot::Mesh::Particle` for rendering trails with full sub-frame accuracy. |
+| `deep_tween(trail, callback)` | Any `Tweenable` (`Orientation` or `OrientationTrail`) | Flattens a trail of orientations into a single continuous traversal, calling `callback(quaternion, t)` with a global `t` spanning all frames and sub-frames. Used by the orientation-trail effects (Comets, ChaoticStrings, RingSpin) for rendering trails with full sub-frame accuracy. |
 
 #### Animations and Mutable State
 
@@ -829,7 +839,7 @@ GenerativePalette palette;
 
 // Timeline drives state via animations:
 timeline.add(0, Animation::Rotation<W>(orientation, Y_AXIS, TAU, 600, ease_mid, true));
-timeline.add(0, Animation::Transition(twist, 2.5f, 1000, ease_in_out_bicubic));
+timeline.add(0, Animation::Transition(twist, 2.5f, 1000, ease_in_out_cubic));
 timeline.add(0, Animation::ColorWipe(palette, target_palette, 2000));
 
 // Rendering reads state — no manual updates needed:
@@ -843,11 +853,11 @@ void draw_frame() {
 
 ### 7.4 Geometry Transformers (`transformers.h`)
 
-Transformers deform the sphere geometry before rendering. The `Transformer<W, ParamsT, AnimT, TransformFunc, CAPACITY>` class manages a pool of active transform instances, each with its own animated parameters:
+Transformers deform the sphere geometry before rendering. The `Transformer<ParamsT, AnimT, TransformFunc, CAPACITY>` class manages a pool of active transform instances, each with its own animated parameters:
 
 ```cpp
-template <int W, int CAPACITY>
-using RippleTransformer = Transformer<W, RippleParams, Animation::Ripple,
+template <int CAPACITY>
+using RippleTransformer = Transformer<RippleParams, Animation::Ripple,
                                       ripple_transform, CAPACITY>;
 ```
 
@@ -938,13 +948,9 @@ Input (sRGB 8-bit) → sRGB→linear LUT → Pixel16 (linear 16-bit) → blend o
 FastLED output ← CRGB(gamma encode) ← linear→sRGB ← Pixel16
 ```
 
-`Color4` wraps `Pixel` with a float alpha channel. Blend modes at the canvas sink:
+`Color4` wraps `Pixel` with a float alpha channel. The canvas sink composites with a single straight-alpha "over" operation — `blend_alpha(α)`, i.e. `dst = src * α + dst * (1-α)`, applied in 16-bit linear light (see `filter.h`). There is no selectable blend-mode tag.
 
-| Tag | Mode | Formula |
-|---|---|---|
-| `BLEND_OVER` (default) | Alpha composite | `dst = src * α + dst * (1-α)` |
-| `BLEND_ADD` | Additive | `dst = src * α + dst` (clamped) |
-| `BLEND_MAX` | Maximum | `dst = max(src * α, dst)` |
+`color.h` additionally provides standalone compositing helpers — `blend_over`, `blend_under`, `blend_add` (with an ARM `uqadd16` saturating-add path), `blend_max`, and `blend_mean` — as building blocks for additive/max/mean mixing. They are not wired into the canvas sink; an effect calls them directly when blending its own intermediate buffers.
 
 #### Palette Types
 
@@ -979,7 +985,16 @@ Pixel (sRGB 16-bit) → linear RGB float → OKLab (L, a, b) → OKLCH (L, C, h)
 
 #### Palette Modifiers
 
-Seven modifier types compose with any palette source via `StaticPalette<Source, Mods...>` at compile time:
+Modifiers compose around any palette source at compile time via
+`StaticPalette<Source, Coords<...>, Colors<...>, Wrap>`. There are two axes: a
+**coordinate** chain that remaps the lookup parameter `t` *before* the source is
+sampled, and a **color** chain that reshapes the resulting sample *after*, with
+the original coordinate in hand. Both chains are inlined by fold expression with
+zero runtime overhead. `Wrap` (default `true`) wraps the final coordinate into
+`[0,1)` before the lookup — leave it on for cycling modifiers that overflow the
+range; set it `false` for bounded remaps that must reach the source endpoints.
+
+Coordinate modifiers (`modify(float) -> float`):
 
 | Modifier | Effect |
 |---|---|
@@ -990,24 +1005,35 @@ Seven modifier types compose with any palette source via `StaticPalette<Source, 
 | `PinchModifier` | Non-linearly warps the lookup parameter toward a focal point |
 | `QuantizeModifier` | Posterizes the palette into discrete bands |
 | `ScaleModifier` | Scales and offsets the lookup parameter |
+| `ReverseModifier` | Mirrors the lookup parameter (1.0 - t) |
+| `MirrorModifier` | Maps [0,1] to [0,1,0] for a seamless symmetric loop |
+| `InsetModifier` | Compresses the source domain into an inset window, clamping outside |
+
+Color modifiers (`shade(Color4, float) -> Color4`):
+
+| Modifier | Effect |
+|---|---|
+| `AlphaFalloffShade` | Scales alpha by a caller-supplied falloff curve over the coordinate |
+| `EdgeFadeShade` | Fades the sample color to black near the edges (opaque vignette) |
+| `EdgeAlphaShade` | Fades the sample alpha near the edges (transparent vignette) |
 
 ```cpp
-// Compose a baked palette with a breathing modifier
-StaticPalette<BakedPalette, BreatheModifier> palette;
+// Compose a baked palette with a breathing coordinate modifier
+StaticPalette<BakedPalette, Coords<BreatheModifier>> palette;
+
+// A transparent vignette: inset the source, fade alpha at the edges
+StaticPalette<ProceduralPalette, Coords<InsetModifier>,
+              Colors<EdgeAlphaShade>, /*Wrap=*/false> vignette;
 ```
 
 #### Additional Palette Types
 
 | Type | Description |
 |---|---|
-| `MutatingPalette` | Extends `ProceduralPalette` with continuous random coefficient mutation |
-| `AnimatedPalette` | Wraps any `Palette` with a time-varying lookup offset |
-| `CircularPalette` | Wraps the lookup parameter modulo 1.0 for seamless looping |
-| `ReversePalette` | Mirrors the lookup parameter (1.0 - t) |
-| `VignettePalette` | Applies a radial brightness falloff based on distance from center |
-| `TransparentVignette` | Like `VignettePalette` but fades alpha instead of brightness |
-| `AlphaFalloffPalette` | Applies a custom alpha curve (via callback) over the palette parameter |
-| `BakedPalette` | Precomputes a `GenerativePalette` into a fast 16-bit LUT for O(1) lookup. Arena-allocated. |
+| `MutatingPalette` | Extends `ProceduralPalette` with continuous coefficient mutation between two procedural palettes |
+| `SolidColorPalette` | Returns a single fixed color for every coordinate |
+| `PaletteFacade<SP>` | Exposes a compile-time `StaticPalette` composition through the polymorphic `Palette` API, for preset tables and baking |
+| `BakedPalette` | Precomputes any palette source (a `Palette` or a `StaticPalette`) into a fast 16-bit LUT for O(1) lookup. Arena-allocated. |
 
 ### 7.7 The Mesh System (`mesh.h`, `conway.h`, `hankin.h`, `spatial.h`, `solids.h`)
 
@@ -1051,8 +1077,6 @@ All Conway operators are templated on input mesh type and take `(const MeshT& me
 | `MeshOps::bevel` | Bevel operator = truncate ∘ ambo |
 | `MeshOps::relax` | Edge-length relaxation by spring forces on the unit sphere. |
 | `MeshOps::normalize` | Project all vertices onto the unit sphere |
-| `MeshOps::compute_kdtree` | Build a KDTree for nearest-neighbor queries on mesh vertices |
-| `MeshOps::closest_point_on_mesh_graph` | Find the closest point on a mesh edge graph |
 
 #### Hankin Pattern System (`hankin.h`)
 
@@ -1103,11 +1127,13 @@ template <typename GenerateFn, typename... Args>
 auto generate(Arena &target, GenerateFn &&fn, Args &&...args);
 ```
 
-It resets and scopes both scratch arenas, then invokes `fn(target, scratch_a, scratch_b, args...)`. All procedural geometry creation goes through this wrapper to ensure deterministic arena lifecycle:
+It resets and scopes both scratch arenas, then invokes `fn(target, scratch_a, scratch_b, args...)`. Direct registry lookups and effect geometry creation go through this wrapper for a deterministic arena lifecycle:
 
 ```cpp
 auto mesh = generate(persistent_arena, Solids::get_by_name, std::string_view("icosahedron"));
 ```
+
+One deliberate exception: `SolidBuilder`'s fluent Conway chain (`solids.h`) owns its own two-arena ping-pong, swapping the scratch arenas between operators, so it manages arena lifecycle directly rather than through `generate()`.
 
 ### 7.9 The Preset System (`presets.h`)
 
@@ -1135,14 +1161,15 @@ Non-blocking DMA-based LED output for HD107S (APA102-compatible) LEDs on Teensy 
 |---|---|
 | `HD107SFrame<N>` | Pre-formatted DMA buffer for the HD107S protocol. `packPixel()` writes `Pixel16` values directly into the frame buffer with inline color correction (color correction → temperature → brightness), bypassing the CRGB intermediate. The buffer is 32-byte-aligned (`__attribute__((aligned(32)))`) and flushed with `arm_dcache_flush_delete()` for cache coherency. |
 | `TeensySPIDMA` | Low-level DMA+SPI driver wired to LPSPI4. Configures a `DMAChannel` with completion interrupt for fully async byte-stream transmission. |
-| `DMALEDController<N>` | Double-buffered high-level controller. `show(leds)` loads the back buffer and triggers DMA, returning immediately. The previous transfer is guaranteed complete before the next begins. |
+| `DMALEDController<N>` | Double-buffered high-level controller. The ISR packs pixels into `backFrame()`, then `submitFrame()` flushes it and triggers async DMA, returning immediately. If the previous transfer is still in flight, `submitFrame()` **drops** the new frame (bumping `getOverrunCount()`) rather than spinning — the in-flight DMA keeps showing the previous column; a transfer that never completes is surfaced as a wedged-channel fault. |
 
 The 16-bit linear pipeline reaches from the canvas all the way to the SPI wire with no 8-bit intermediate:
 
 ```cpp
-// ISR path:
-frame.packPixel(i, get_pixel(x, y));   // Pixel16 → HD107S frame
-ledController_.submitFrame();           // non-blocking DMA
+// ISR path (per column): fetch the display buffer once, index it directly
+const Pixel* buf = effect_->display_buffer();   // 16-bit linear pixels
+frame.packPixel(i, buf[y * width + x]);          // Pixel16 → HD107S frame
+ledController_.submitFrame();                     // non-blocking DMA, drops on overrun
 ```
 
 #### Single-Teensy POV Driver (`pov_single.h`)
@@ -1189,16 +1216,21 @@ Arm A                               Arm B (x offset by W/2)
 └──────────────────────────┘        └──────────────────────────┘
 ```
 
-**Hardware ID detection**: Each Teensy reads a 2-bit ID from GPIO pins 21–22 (active-low with pull-ups).  All-floating = ID 0 (clock master).  The ID determines which arm and which half this board owns.
+**Hardware ID detection**: Each Teensy reads a 2-bit ID from GPIO pins 21–22 (active-low with pull-ups).  All-floating = ID 0 (sync master).  The ID determines which arm and which half this board owns.
 
-**Synchronization** uses two shared wires:
+**Synchronization** rides a single shared wire (full design: `docs/phantasm_frame_sync_spec.md`; host-tested protocol core: `hardware/pov_sync.h`):
 
 | Wire | Pin (out) | Pin (in) | Purpose |
 |---|---|---|---|
-| Column clock | 5 (PWM) | 2 (ext. interrupt) | Segment 0 generates a PWM at (RPM/60)×W Hz. All boards fire `show_col()` ISR on each rising edge — zero inter-board phase drift. |
-| Frame sync | 3 (GPIO) | 4 (ext. interrupt) | Segment 0 pulses HIGH at each frame boundary (`x==0` and `x==W/2`, two per revolution). Boards snap `x` to the nearest boundary on this edge, bounding any column drift from missed/spurious pulses to ≤ ½ revolution. |
+| Sync symbols | 3 (GPIO, segment 0) | 4 (ext. interrupt) | Segment 0 emits count-coded pulse bursts: boundary marks at `x==0` (3 pulses) and `x==W/2` (1 pulse), an epoch mark (5 pulses) when the playlist advances, and a checksummed five-digit index beacon mid-revolution. |
 
-The column clock ensures all 4 boards paint the same column at the same instant.  The frame sync is insurance against electrical noise on the clock line — a spurious or missed pulse would cause permanent 1-column drift without periodic re-alignment.
+Each board generates its own columns from a local **flywheel timebase**: the column index derives from the free-running CPU cycle counter (`x = (now − epoch) · (W/2) / cycles_per_half_rev`, 64-bit intermediate, epoch folded forward each half-revolution so the 32-bit counter wrap is unobservable), never from counting timer interrupts — so an interrupt-masked window cannot drop columns; the ISR resumes at the time-correct column.  Three layers ride that timebase:
+
+* **Column phase** — boundary symbols snap each flywheel twice per revolution; worst-case inter-snap crystal drift is ~0.006 column.  In LOCKED state a symbol is accepted only if its implied correction is ≤ 4 columns (plausibility gate); repeated rejections fall back to a hard-snapping ACQUIRE state, during which the board displays black.
+* **Buffer flip** — the local boundary crossing flips the display buffer; the symbol is a deduplicated backstop (`try_flip` keyed on boundary identity), so flips are exactly-once even when both paths fire.
+* **Content** — the playlist is epoch-counted, not `millis()`-gated: the master emits the epoch mark (with redundancy repeats) when an effect's 960 revolutions elapse, every board counts down to the same absolute commit boundary regardless of which copy it heard, constructs the next roster entry during the final 2-revolution construction window (display black), and all swap to its frame 0 at the same boundary.  The beacon broadcasts the absolute effect index so a board that missed the epoch entirely corrects within ~2 s and a rebooted board rejoins at the correct effect — fail-dark, never fail-wrong.
+
+Symbols are count-coded (odd counts only, distance 2 apart) so a lost or spurious edge yields an invalid even count that is discarded whole: a glitch degrades to a *missed* symbol — covered by the local crossing — never a *misclassified* one.  The master self-censors emissions that would start late rather than poison downstream phase.
 
 **Branchless ISR**: All per-segment decisions are resolved at boot time into three precomputed values:
 
@@ -1211,9 +1243,10 @@ The column clock ensures all 4 boards paint the same column at the same instant.
 The ISR loop has no branches:
 
 ```cpp
+const Pixel* buf = effect_->display_buffer();   // fast path: no per-pixel virtual dispatch
 int y = y_base_;
 for (int i = 0; i < PPS; ++i, y += y_step_) {
-    frame.packPixel(i, effect_->get_pixel(x_col, y));
+    frame.packPixel(i, buf[y * width + x_col]);
 }
 ```
 
@@ -1258,7 +1291,7 @@ public:
 private:
     Pipeline<W, H, ...> filters;
     Orientation<W> orientation;
-    Timeline<W> timeline;
+    Timeline timeline;
     float speed = 1.0f;
 };
 
@@ -1400,7 +1433,7 @@ Overlapping ring families that produce interference patterns as their angular fr
 
 #### FlowField
 
-FastNoiseLite-driven curl flow field. Particles follow the gradient of a 3D noise function mapped onto the sphere.
+FastNoiseLite-driven flow field. Three independently offset 3D-noise channels form a per-particle force vector that is added to each particle's velocity (not curl noise, not a scalar gradient).
 
 </td></tr></table>
 
@@ -1410,7 +1443,7 @@ FastNoiseLite-driven curl flow field. Particles follow the gradient of a 3D nois
 
 #### Voronoi
 
-Spherical Voronoi diagram with animated seed positions. Cell boundaries are drawn as geodesic edges; cells are optionally filled.
+Spherical Voronoi diagram with animated seed positions. Cells are always filled with per-site palette colors (smoothly blended across the seam between the nearest two sites); an optional black border seam is painted between neighboring cells when **Border Thick** > 0 (off by default).
 
 **Parameters**: Num Sites, Speed, Smoothness, Border Thick
 
@@ -1466,7 +1499,7 @@ Four great-circle rings tumble continuously under energetic random-walk rotation
 
 #### RingShower
 
-Rings bloom at random orientations and expand outward: each spawns on a random axis, grows its radius from zero, and fades in and out as a `Sprite` (drawn with `Plot::Ring`), colored by a generative circular analogous palette — a continuous shower of expanding rings.
+Rings bloom at random orientations and grow their radius from zero, fading in over the first few frames and then holding (no fade-out), colored by a generative circular analogous palette — a continuous shower of expanding rings drawn with `Plot::Ring`. Each ring's radius, fade, and lifetime are pure functions of its age driven directly from a recyclable slot rather than a per-ring `Sprite`.
 
 **Parameters**: Alpha
 
@@ -1532,7 +1565,9 @@ A vertical strand of points — one per latitude row — drifts horizontally aro
 
 #### Thrusters
 
-Directional particle jets.
+A central distorted ring (`Plot::DistortedRing`) warps and spins; periodic random "fires" kick it onto a new axis and bloom a pair of opposed thrust rings (`Plot::Ring`) that expand from zero and fade out.
+
+**Parameters**: Radius, Alpha
 
 </td></tr></table>
 
@@ -1592,7 +1627,7 @@ Concentric rings built from per-azimuth distorted ring SDFs, their radii oscilla
 
 #### ShapeShifter
 
-Layered polygons, stars, and flowers (planar or spherical) that morph between shape types and twist over time, drawn through either the `Plot` or `Scan` rasterizer with independent per-ring orientations.
+Layered polygon, star, and flower rings (planar and spherical polygon variants) drawn through both the `Plot` and `Scan` rasterizers at once. The shape type hard-cuts to the next of four (planar polygon, spherical polygon, flower, star) every 48 frames while a twist Mutation shears the layers. All `Plot` rings share one tumbling orientation and all `Scan` rings share another, so layer Count scales with the raster budget rather than the timeline.
 
 **Parameters**: Alpha, Count, Radius, Sides, Twist, Debug BB
 
@@ -1656,6 +1691,8 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 
 The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 335 KB arena) for interactive solid manipulation.
 
+Alongside the classes, the bridge exports a few free spline-evaluation functions — `spline_cubic_fast`, `spline_cubic_slerp`, and `spline_catmull_rom_tangents` — used by the `splines.html` tool so its Bézier / Catmull-Rom curves are evaluated by the same engine code the firmware uses rather than a JavaScript reimplementation.
+
 The WASM bridge includes stack high-water-mark instrumentation: `stack_paint_canary()` fills the stack with a known pattern at init time, and `stack_high_water_mark()` scans for the deepest overwrite. This is reported via `getArenaMetrics()` and logged on every effect switch to catch stack-hungry template instantiations early.
 
 Pixel data is 16-bit linear light (`uint16_t` per channel). The zero-copy `Uint16Array` view is bound directly as the instanced dot-mesh's `instanceColor` attribute, declared `normalized` so Three.js scales 0–65535 → 0–1 linear **on the GPU** — there is no per-pixel divide or float copy in JavaScript (Three.js expects linear color when `THREE.ColorManagement.enabled = true`):
@@ -1704,10 +1741,10 @@ appState.subscribe((key, value, old) => {
 
 The left-edge effect list is a small custom widget:
 
-- **Persistent button references**: items are sorted by name or size (live `sizeof` from `getEffectSizes()`) without recreating DOM nodes — `setEffects()` mutates the existing buttons' positions.
-- **Keyboard navigation**: arrow keys / Home / End move the focused button; Enter selects.
+- **Persistent button references**: re-sorting by name or size (live `sizeof` from `getEffectSizes()`) re-appends the existing button nodes in the new order without recreating them; `setEffects()` itself rebuilds the list from scratch.
+- **Keyboard navigation**: arrow keys move the focused button; Enter or Space selects.
 - **Mobile horizontal scroll**: when laid out as a horizontal strip, scroll arrows fade in/out based on scroll position via a `ResizeObserver` + scroll listener.
-- **Per-resolution filtering**: each resolution has its own curated effect list — effects outside the active list are still in the WASM registry and can be loaded directly via `?effect=…`, but they won't show in the sidebar.
+- **Per-resolution filtering**: each resolution has its own curated effect list, shown in the sidebar. An effect that is not in the active resolution's list — including one hydrated from a `?effect=…` link — is replaced with that list's first effect, so only curated effects load at a given resolution.
 
 ### 10.6 GUI Auto-Generation
 
@@ -1739,7 +1776,7 @@ drawFrame() {                postMessage({type:'render'})
 
 Key properties:
 - **Isolated WASM instances per worker** — each segment has its own arena, its own random seed (`std::mt19937(1337)` is deterministic, so all workers produce the same result), and its own effect state.
-- **`setClip(y0, y1, x0, x1)`** — the WASM engine restricts *rendering* to the worker's quadrant: the rasterizer's scanline culling skips out-of-clip rows and columns, so out-of-band pixels are never shaded. The pixel readback in `drawFrame()` still copies the full canvas buffer; `segment_worker.js` then extracts just the quadrant rectangle from it (`segment_worker.js:149-159`) before transferring the result back, so only the quadrant crosses the worker boundary.
+- **`setClip(y0, y1, x0, x1)`** — the WASM engine restricts *rendering* to the worker's quadrant: the rasterizer's scanline culling skips out-of-clip rows and columns, so out-of-band pixels are never shaded. The pixel readback in `drawFrame()` still copies the full canvas buffer; `segment_worker.js` then extracts just the quadrant rectangle from it (the `pixelsCopy` loop in the render handler) before transferring the result back, so only the quadrant crosses the worker boundary.
 - **One-frame pipeline** — frame N's render is dispatched fire-and-forget; frame N-1's results are composited synchronously when they arrive. Wall-clock time is measured against the slowest worker — exactly what the multi-Teensy hardware sees.
 - **Boundary overlay** — a "Show Boundaries" toggle paints cyan markers on the segment edges in the composite buffer to make the partition visible.
 
@@ -1773,15 +1810,15 @@ Switching presets does a full WASM reset: `setResolution(w, h)` reallocates buff
 
 ### 10.11 Geometry Tools (`daydream/tools/`)
 
-Five standalone HTML pages, each rendering with its own Three.js scene. Only `solids.html` is backed by the engine's WASM `MeshOps` bridge; the other four implement their geometry math directly in JavaScript:
+Five standalone HTML pages. Four render with their own Three.js scene; `palettes.html` renders with 2D canvas contexts. `solids.html` and `splines.html` are backed by the engine's WASM build so their geometry stays identical to the C++ engine — `solids.html` via the `MeshOps` class, `splines.html` via the exported spline evaluators (`spline_cubic_fast` / `spline_cubic_slerp` / `spline_catmull_rom_tangents`); the other three implement their geometry math directly in JavaScript:
 
 | Tool | What it does |
 |---|---|
-| `lissajous.html` | Designs spherical Lissajous curves with live frequency / phase / amplitude sliders; outputs the C++ literal needed by `ChaoticStrings`. |
+| `lissajous.html` | Designs spherical Lissajous curves with live frequency / phase / amplitude sliders; outputs a JavaScript snippet (an arrow function plus its parameter domain) for `ChaoticStrings`. |
 | `mobius.html` | Visualizes Möbius transformations on the sphere via stereographic projection; lets you sweep the four complex coefficients and see the warp on a latitude-longitude grid. |
-| `palettes.html` | Tunes `ProceduralPalette` cosine coefficients and `GenerativePalette` harmony rules; exports the C++ initializer. |
+| `palettes.html` | Tunes `ProceduralPalette` cosine coefficients and `GenerativePalette` harmony rules and exports the C++ initializer; renders its swatches and graphs on 2D canvas contexts rather than a Three.js scene. |
 | `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated tooling arenas (16 MB, separate from the engine's 335 KB arena). |
-| `splines.html` | Dual-mode (Bézier / Catmull-Rom) spherical spline designer with closed-loop and open-chain modes; click to add control points, drag to edit, export the control points as a `constexpr std::array<Vector>` or as `Fragment` positions. |
+| `splines.html` | Dual-mode (Bézier / Catmull-Rom) spherical spline designer with closed-loop and open-chain modes; click to add control points, drag to edit, export the control points as a `constexpr std::array<Vector>` or as `Fragment` positions. Spline evaluation runs through the engine's exported WASM spline functions (the tool's single source of truth). |
 
 All five reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`.
 
