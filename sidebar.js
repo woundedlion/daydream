@@ -35,24 +35,32 @@ export class EffectSidebar {
     this.sortRow.appendChild(this.nameBtn);
     this.sortRow.appendChild(this.sizeBtn);
 
-    // Button list container (for keyboard nav scoping)
+    // Button list container (for keyboard nav scoping). Roving tabindex: the
+    // listbox is not itself a tab stop \u2014 exactly one option carries tabindex=0
+    // (see _setRovingTabbable), so Tab lands on the active option once rather
+    // than on the container and then every button.
     this.listEl = document.createElement('div');
     this.listEl.setAttribute('role', 'listbox');
-    this.listEl.setAttribute('tabindex', '0');
+    this.listEl.setAttribute('aria-label', 'Effects');
     this.listEl.className = 'effect-list';
+    // The option that currently holds tabindex=0 (roving tabindex anchor).
+    this._tabbableBtn = null;
     // Keep bound handlers so dispose() can detach them.
     this._onKeyDownBound = (e) => this._onKeyDown(e);
     this._onScrollBound = () => this._updateScrollArrows();
     this.listEl.addEventListener('keydown', this._onKeyDownBound);
 
-    // Scroll arrow indicators (mobile horizontal scroll)
+    // Scroll arrow indicators (mobile horizontal scroll). Decorative glyphs \u2014
+    // hidden from assistive tech so screen readers don't announce them.
     this.arrowLeft = document.createElement('div');
     this.arrowLeft.className = 'scroll-arrow scroll-arrow-left';
     this.arrowLeft.textContent = '\u2039';
+    this.arrowLeft.setAttribute('aria-hidden', 'true');
 
     this.arrowRight = document.createElement('div');
     this.arrowRight.className = 'scroll-arrow scroll-arrow-right';
     this.arrowRight.textContent = '\u203A';
+    this.arrowRight.setAttribute('aria-hidden', 'true');
 
     this.listEl.addEventListener('scroll', this._onScrollBound, { passive: true });
     this._resizeObs = new ResizeObserver(this._onScrollBound);
@@ -92,6 +100,8 @@ export class EffectSidebar {
       const btn = document.createElement('button');
       btn.className = 'effect-button';
       btn.setAttribute('role', 'option');
+      btn.setAttribute('aria-selected', 'false');
+      btn.tabIndex = -1; // roving tabindex; the active/first option is promoted to 0
       btn.dataset.effect = name;
 
       const nameSpan = document.createElement('span');
@@ -112,20 +122,31 @@ export class EffectSidebar {
 
     this._applySortOrder();
     this._updateActiveClass();
+    // Anchor the roving tabindex on the active option, or the first one if none
+    // is active yet, so the rebuilt list has exactly one tab stop.
+    this._tabbableBtn = null;
+    this._setRovingTabbable(
+      this.buttons.get(this.activeName) || this.listEl.querySelector('.effect-button')
+    );
     // Defer so the grid has laid out before we measure scroll extents
     requestAnimationFrame(() => this._updateScrollArrows());
   }
 
-  /** Toggle .active class on old and new button only. */
+  /** Toggle .active class and aria-selected on old and new button only. */
   setActive(name) {
     const oldBtn = this.buttons.get(this.activeName);
-    if (oldBtn) oldBtn.classList.remove('active');
+    if (oldBtn) {
+      oldBtn.classList.remove('active');
+      oldBtn.setAttribute('aria-selected', 'false');
+    }
 
     this.activeName = name;
 
     const newBtn = this.buttons.get(name);
     if (newBtn) {
       newBtn.classList.add('active');
+      newBtn.setAttribute('aria-selected', 'true');
+      this._setRovingTabbable(newBtn);
       newBtn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
     }
   }
@@ -178,7 +199,21 @@ export class EffectSidebar {
   _updateActiveClass() {
     if (!this.activeName) return;
     const btn = this.buttons.get(this.activeName);
-    if (btn) btn.classList.add('active');
+    if (btn) {
+      btn.classList.add('active');
+      btn.setAttribute('aria-selected', 'true');
+    }
+  }
+
+  /** Roving tabindex: make `btn` the list's sole tab stop (tabindex=0), demoting
+   * the previous anchor to -1. No-op target leaves the list with no tab stop
+   * (e.g. an empty list). */
+  _setRovingTabbable(btn) {
+    if (this._tabbableBtn && this._tabbableBtn !== btn) {
+      this._tabbableBtn.tabIndex = -1;
+    }
+    if (btn) btn.tabIndex = 0;
+    this._tabbableBtn = btn || null;
   }
 
   /** Keyboard navigation: arrow keys move focus, Enter/Space selects. */
@@ -192,10 +227,12 @@ export class EffectSidebar {
     if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
       e.preventDefault();
       const next = idx < btns.length - 1 ? idx + 1 : 0;
+      this._setRovingTabbable(btns[next]);
       btns[next].focus();
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
       e.preventDefault();
       const prev = idx > 0 ? idx - 1 : btns.length - 1;
+      this._setRovingTabbable(btns[prev]);
       btns[prev].focus();
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
