@@ -45,7 +45,6 @@
 
   const imports = Object.assign({
     'three': `${threeBase}build/three.module.js`,
-    'three/webgpu': `${threeBase}examples/jsm/renderers/webgpu/WebGPURenderer.js`,
     'three/addons/': `${threeBase}examples/jsm/`,
     'lil-gui': lilGui,
     'gui': abs('gui.js'),
