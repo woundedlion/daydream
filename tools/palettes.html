@@ -365,7 +365,7 @@
     // C++ export-string generators) lives in palette_math.js so it can be unit
     // tested without a DOM. DOM-coupled wiring stays inline below.
     import {
-      ProceduralPalette, CPixel, PRNG, lerp8, hsvToRgb, GenerativePalette,
+      ProceduralPalette, CPixel, PRNG, hsvToRgb, GenerativePalette,
       mapValue, proceduralPaletteCpp, generativePaletteCpp,
     } from './palette_math.js';
 
@@ -391,7 +391,7 @@
     }
 
     // --- Generative Palette Implementation ---
-    // ProceduralPalette, GenerativePalette, CPixel, PRNG, lerp8, hsvToRgb,
+    // ProceduralPalette, GenerativePalette, CPixel, PRNG, hsvToRgb,
     // mapValue and the C++ export-string generators are imported from
     // palette_math.js (top of this module). The sRGB / linear-RGB / OKLab /
     // OKLCH math lives in tools/color.js so the tools and the engine share one

@@ -69,10 +69,6 @@ export class PRNG {
   }
 }
 
-export function lerp8(a, b, t) {
-  return Math.round(a + (b - a) * t);
-}
-
 // HSV to RGB conversion (h, s, v in 0..255), ported byte-for-byte from the
 // engine's CRGB(const CHSV&) path in core/platform.h: the hue wheel is split
 // into six 43-wide regions (region = h/43) and the channels are mixed with
