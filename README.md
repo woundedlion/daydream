@@ -214,7 +214,6 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 │   │   └── Phantasm.ino        Phantasm entry — 4×Teensy, TOTAL_PIXELS=288, RPM=480
 │   └── wasm/
 │       ├── wasm.cpp            Emscripten bindings — HolosphereEngine JS class
-│       ├── mesh_marshal.h      Pure validate-and-build layer for the mesh-editor boundary (host-testable)
 │       └── param_marshal.h     Pure parameter definition/value marshaling, single ordering source (host-testable)
 │
 ├── CMakeLists.txt              Emscripten build (outputs holosphere_wasm.js + .wasm)
