@@ -481,6 +481,12 @@
       isAnimating = false;
       activePreset = null;
       document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      // Clear the mobile dropdown back to its placeholder. <select> fires
+      // 'change' only on a value change, so without this the just-stopped
+      // preset stays selected and can't be re-tapped on mobile (where the
+      // dropdown is the only preset UI).
+      const presetSelect = document.getElementById('presetSelect');
+      if (presetSelect) presetSelect.value = '';
     };
 
     const startPreset = (preset) => {
