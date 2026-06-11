@@ -31,6 +31,14 @@ export function computeSegmentRange(id, total, w, h) {
     throw new Error(
       `segment_worker: totalSegs must be a positive even number (got ${total})`);
   }
+  // The id selects which sub-rectangle this segment owns; out of [0, total) it
+  // would compute an off-canvas band (e.g. id===total gives x0===w) and feed a
+  // degenerate rect into setClip — the same silent-degenerate failure the total
+  // guard above exists to prevent. Fail fast for symmetry with that guard.
+  if (!Number.isInteger(id) || id < 0 || id >= total) {
+    throw new Error(
+      `segment_worker: segment id must be an integer in [0, ${total}) (got ${id})`);
+  }
   // Guard the resolution carried across the postMessage boundary (init /
   // setResolution both funnel through here). A non-integer or
   // non-positive dimension would produce a degenerate segRange and feed garbage
