@@ -87,7 +87,7 @@
           </button>
         </div>
         <p class="text-sm text-gray-400 mb-2">
-          Geometry function ready for <span class="font-mono text-indigo-300">three.js</span>:
+          C++ <span class="font-mono text-indigo-300">LissajousParams</span> initializer for <span class="font-mono text-indigo-300">ChaoticStrings</span> / <span class="font-mono text-indigo-300">Comets</span>:
           <span id="copy_code_prompt"
             class="ml-2 text-sm text-gray-500 transition-colors duration-300"></span>
         </p>
@@ -141,8 +141,8 @@
 
     // --- Lissajous Function ---
     // lissajous(m1, m2, a, t) lives in ./lissajous_math.js (imported above); the
-    // preview, the exported snippet, and the engine all share its m1/m2/a/t
-    // argument order.
+    // preview and the engine share its m1/m2/a/t argument order, and the
+    // exported LissajousParams initializer lists m1/m2/a/domain in that order.
 
     // --- THREE.js Setup ---
     const initThree = () => {
