@@ -1168,7 +1168,9 @@
         } else if (opName === 'relax') {
           const iter = o.params.iter || 100;
           chain += `.relax(${iter})`;
-          nameParts.push(`_relax`);
+          // Encode the iteration count so two solids differing only in relax
+          // depth export distinct funcNames instead of colliding on `_relax`.
+          nameParts.push(`_relax${iter}`);
         } else if (opName === 'bevel') {
           chain += `.bevel(${formatFloat(o.params.t)})`;
           nameParts.push(`_bevel${pctSuffix(o.params.t)}`);
