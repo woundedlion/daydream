@@ -248,7 +248,14 @@ export class Daydream {
     const fovRad = THREE.MathUtils.degToRad(Daydream.CAMERA_FOV / 2);
     const distForHeight = diameter / (2 * Math.tan(fovRad) * targetCoverage);
     const distForWidth = distForHeight / this.camera.aspect;
-    this.camera.position.z = Math.max(distForHeight, distForWidth);
+    // Re-fit the camera distance along its CURRENT view direction. The orbit
+    // target is the origin (where the sphere is centered), so the position
+    // vector's length is the orbit radius; setLength rescales only that radius
+    // and leaves the azimuth/polar angle intact. Assigning position.z directly
+    // would instead teleport an orbited camera (e.g. from (200,50,10) to z=220),
+    // jarring both the view direction and the orbit. At the default head-on pose
+    // (0,0,z) this is identical to the old z assignment.
+    this.camera.position.setLength(Math.max(distForHeight, distForWidth));
 
     this.renderer.setSize(width, height);
     this.labelRenderer.setSize(width, height);
