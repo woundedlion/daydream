@@ -166,7 +166,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 │   ├── 3dmath.h                Vector, Quaternion, Spherical, Complex, Möbius math
 │   ├── geometry.h              Fragment, Dots/Points, PhiLUT/TrigLUT, coord conversions
 │   ├── color.h                 Pixel16 (16-bit linear), Color4, blend helpers, palettes
-│   ├── palettes.h              Named palette instances (ProceduralPalette + Gradient)
+│   ├── palettes.h              Named ProceduralPalette instances + shared MeshPaletteBank
 │   ├── color_luts.h            Precomputed sRGB ↔ linear LUTs
 │   │
 │   ├── concepts.h              FunctionRef/Fn callable wrappers, PipelineRef type erasure, Tweenable concept
@@ -769,7 +769,7 @@ The `Timeline` class manages a list of running `IAnimation` objects. Each frame,
 |---|---|
 | `Rotation<W>` | Quaternion rotation of an `Orientation` around an axis, with optional repeat. Supports World and Local coordinate spaces. |
 | `RandomWalk<W>` | Continuously perturbs an `Orientation` with smoothly changing random angular velocity driven by Perlin noise. Configurable via `Options` presets (Languid, Energetic). |
-| `Motion<W, PathT>` | Moves an `Orientation` along a `Path` or `ProceduralPath` |
+| `Motion<W, CAP>` | Moves an `Orientation` along a `Path` or `ProceduralPath` (the path is a constructor argument; `CAP` is the orientation sub-frame capacity, default 4) |
 | `Sprite` | Calls a draw function over a duration with fade-in and fade-out envelopes |
 | `PeriodicTimer` | Fires a callback at regular intervals (once or repeatedly) |
 | `RandomTimer` | Fires a callback after a random delay within a min/max range |
@@ -814,7 +814,7 @@ Two traversal helpers linearize multi-level orientation history into a single ca
 
 | Function | Input | Description |
 |---|---|---|
-| `tween(orientation, callback)` | `Orientation<W>` | Iterates over the sub-frame quaternion history of a single orientation, calling `callback(quaternion, t)` for each step with `t ∈ [0, 1]`. Used by `World::Orient` to distribute motion blur. |
+| `tween(orientation, callback)` | `Orientation<CAP>` | Iterates over the sub-frame quaternion history of a single orientation, calling `callback(quaternion, t)` for each step with `t ∈ [0, 1]`. Used by `World::Orient` to distribute motion blur. |
 | `deep_tween(trail, callback)` | Any `Tweenable` (`Orientation` or `OrientationTrail`) | Flattens a trail of orientations into a single continuous traversal, calling `callback(quaternion, t)` with a global `t` spanning all frames and sub-frames. Used by the orientation-trail effects (Comets, ChaoticStrings, RingSpin) for rendering trails with full sub-frame accuracy. |
 
 #### Animations and Mutable State
@@ -823,7 +823,7 @@ Animations do not render directly — they mutate external state that the render
 
 | Animation | Target State | What It Mutates |
 |---|---|---|
-| `Rotation`, `RandomWalk`, `Motion` | `Orientation<W>` | Quaternion orientation — pushes sub-frame steps into the orientation history, which `World::Orient` reads for motion blur |
+| `Rotation`, `RandomWalk`, `Motion` | `Orientation<CAP>` | Quaternion orientation — pushes sub-frame steps into the orientation history, which `World::Orient` reads for motion blur |
 | `Transition` | `float*` | Smoothly interpolates any float parameter (e.g. `speed`, `alpha`, `twist`) from current value to target with easing |
 | `Mutation` | `float*` | Applies an arbitrary scalar function `f(t)` to a float over time (more general than `Transition`) |
 | `Driver` | `float*` | Continuously increments a float each frame, wrapping at 0..1 — used for phase accumulators |
@@ -836,14 +836,14 @@ This separation means effects declare *what state exists* (orientations, floats,
 
 ```cpp
 // Effect declares mutable state:
-Orientation<W> orientation;
+Orientation<16> orientation;   // CAP is the sub-frame capacity, not the display width
 float twist = 0.0f;
 GenerativePalette palette;
 
 // Timeline drives state via animations:
 timeline.add(0, Animation::Rotation<W>(orientation, Y_AXIS, TAU, 600, ease_mid, true));
 timeline.add(0, Animation::Transition(twist, 2.5f, 1000, ease_in_out_cubic));
-timeline.add(0, Animation::ColorWipe(palette, target_palette, 2000));
+timeline.add(0, Animation::ColorWipe(palette, target_palette, 2000, ease_mid));
 
 // Rendering reads state — no manual updates needed:
 void draw_frame() {
@@ -1159,7 +1159,7 @@ Three hardware drivers form a layered stack.  `dma_led.h` handles the SPI wire p
 
 #### DMA LED Controller (`dma_led.h`)
 
-Non-blocking DMA-based LED output for HD107S (APA102-compatible) LEDs on Teensy 4.x.  Enabled by `#define USE_DMA_LEDS` in `led.h`; the default FastLED/WS2801 path remains as fallback.
+Non-blocking DMA-based LED output for HD107S (APA102-compatible) LEDs on Teensy 4.x.  Enabled by `#define USE_DMA_LEDS` in the target sketch (e.g. `targets/Phantasm/Phantasm.ino`) before it includes the driver; `led.h` stays neutral (the define is commented out there) and the default FastLED/WS2801 path remains as fallback.
 
 | Class | Role |
 |---|---|
@@ -1294,7 +1294,7 @@ public:
 
 private:
     Pipeline<W, H, ...> filters;
-    Orientation<W> orientation;
+    Orientation<16> orientation;   // CAP is the sub-frame capacity, not the display width
     Timeline timeline;
     float speed = 1.0f;
 };
@@ -1311,8 +1311,8 @@ Effects register themselves into a global registry using the `REGISTER_EFFECT(Cl
 Effects expose live-adjustable parameters via `registerParam()`. These are reflected into the WASM bridge and auto-generate GUI controls in the simulator:
 
 ```cpp
-registerParam("Twist",   &params.twist,      -5.0f, 5.0f);   // float slider
-registerParam("Enabled", &params.enabled,    false);           // boolean toggle
+registerParam("Twist",   &params.twist, -5.0f, 5.0f);   // float slider (min, max)
+registerParam("Enabled", &params.enabled);              // boolean toggle (bool* overload takes no range)
 ```
 
 The parameter list (`ParamList` — a fixed `std::array<ParamDef, 32>`) is accessible via `getParameters()`, and `updateParameter(name, float)` sets values at runtime. Parameters support both `float*` and `bool*` targets via `std::variant`, with automatic bool threshold at 0.5. The animation system can also write to these parameters, allowing effects to animate their own exposed controls.
@@ -1337,7 +1337,7 @@ All screenshots below were captured from the [live WebAssembly simulator](https:
 
 Simulates the Belousov-Zhabotinsky reaction — a 3-species cyclic competition (A beats B, B beats C, C beats A) producing rotating spiral waves. The simulation runs on a spherical k-nearest-neighbor graph (`ReactionGraph`: 7680 nodes, 6 neighbors each, precomputed Fibonacci lattice) with configurable diffusion rate and time step. Spiral waves are seeded periodically and evolve continuously.
 
-**Parameters**: Alpha (color intensity), Diff (diffusion rate), Speed (time step)
+**Parameters**: Compete (cyclic-competition/predation coefficient), Diff (diffusion rate), Speed (time step)
 
 </td></tr></table>
 
@@ -1415,7 +1415,7 @@ A latitude-longitude grid that undergoes live Möbius transformation animation v
 
 #### Moire
 
-Overlapping ring families that produce interference patterns as their angular frequencies slowly drift.
+Two counter-rotating families of concentric rings that beat against each other into a shifting moiré interference pattern, driven by an animated ring-distortion amplitude.
 
 </td></tr></table>
 
@@ -1437,7 +1437,7 @@ FastNoiseLite-driven flow field. Three independently offset 3D-noise channels fo
 
 Spherical Voronoi diagram with animated seed positions. Cells are always filled with per-site palette colors (smoothly blended across the seam between the nearest two sites); an optional black border seam is painted between neighboring cells when **Border Thick** > 0 (off by default).
 
-**Parameters**: Num Sites, Speed, Smoothness, Border Thick
+**Parameters**: Num Sites, Speed, Sharpness, Border Thick
 
 </td></tr></table>
 
@@ -1708,7 +1708,7 @@ The `Daydream` class owns the entire render side. Features:
 | **Instanced dot mesh** | One `InstancedMesh` of `W × H` small spheres. Per-instance position is precomputed in `setupDots()` from `pixelToVector(x, y)`; per-instance color is updated each frame from the WASM pixel buffer. Single draw call per frame. |
 | **Linear color pipeline** | `THREE.ColorManagement.enabled = true` and `setPixelRatio(min(devicePixelRatio, 1))`. Colors arriving from WASM are already linear, so no extra conversion. |
 | **OrbitControls camera** | A normal `PerspectiveCamera` at `(0, 0, 220)` with FOV 20°, plus `OrbitControls` for mouse/touch navigation. |
-| **Picture-in-picture** | A second camera tracks the main camera's position and orientation every frame, rendering an exact square-cropped copy of the main view at smaller scale — a 30%-of-min-dimension square viewport in the bottom-right corner (`aspect` forced to 1.0). Suppressed when `isMobile` or `navigator.webdriver` (§ headless capture). |
+| **Picture-in-picture** | A clone of the main camera at a fixed orientation renders to a 30%-sized bottom-right viewport so the front and back of the sphere are visible simultaneously. Suppressed when `isMobile` or `navigator.webdriver` (§ headless capture). |
 | **Axes overlay** | Three `THREE.Line`s for X/Y/Z visible on toggle, plus a `CSS2DRenderer`-backed `LabelPool` for "+X / +Y / +Z" labels with zero allocation per frame. |
 | **Resize observer** | `ResizeObserver` on the canvas container recomputes camera aspect, viewport, and `isMobile` (width ≤ 900). |
 | **Fixed-rate stepping** | The simulation ticks at `1/FPS` seconds independent of the actual render rate, with a time accumulator to keep effects deterministic. |
@@ -1799,7 +1799,7 @@ Codec priority is MP4/H.264 → WebM/VP9 → WebM/VP8, with optional offscreen-c
 | `Holosphere (20x96)` | 96 × 20 | Matches the original Holosphere hardware |
 | `Phantasm (144x288)` | 288 × 144 | Matches Phantasm; default in the web simulator |
 
-Switching presets does a full WASM reset: `setResolution(w, h)` reallocates buffers, `setEffect(name)` rebuilds the effect at the new template instantiation. The sidebar swaps to the matching favorites list (§10.5).
+Switching presets does a full WASM reset: `setResolution(w, h)` updates the active width/height and drops the current effect — the pixel buffer is pre-sized to `MAX_W × MAX_H` and deliberately never resized (a realloc could move its backing store under `ALLOW_MEMORY_GROWTH` and detach every outstanding `getPixels()` view), so `getPixels()` returns a view over just the active prefix. `setEffect(name)` then rebuilds the effect at the new template instantiation. The sidebar swaps to the matching favorites list (§10.5).
 
 ### 10.11 Geometry Tools (`daydream/tools/`)
 
@@ -1813,7 +1813,7 @@ Five standalone HTML pages. Four render with their own Three.js scene; `palettes
 | `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated tooling arenas (16 MB, separate from the engine's 335 KB arena). |
 | `splines.html` | Dual-mode (Bézier / Catmull-Rom) spherical spline designer with closed-loop and open-chain modes; click to add control points, drag to edit, export the control points as a `constexpr std::array<Vector>` or as `Fragment` positions. Spline evaluation runs through the engine's exported WASM spline functions (the tool's single source of truth). |
 
-All five reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`. Tailwind (and the palettes page's fonts) load the vendored `/vendor/` copy when present for offline dev and fall back to the CDN via an `onerror` handler when it isn't — so the Pages deploy, where `/vendor/` is gitignored, serves them from the CDN too.
+All five reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`.
 
 ---
 
@@ -1854,7 +1854,7 @@ static constexpr int PIN_RANDOM = 15;
 
 ### WASM Build — Holosphere repo (installs into daydream)
 
-The build is driven by **CMake presets** ([`CMakePresets.json`](CMakePresets.json)) so the same commands work on any platform with CMake ≥ 3.21, Ninja, and [Emscripten](https://emscripten.org/). Set up the Emscripten environment once (`emsdk_env`, which exports `EMSDK`), then:
+The build is driven by **CMake presets** ([`CMakePresets.json`](CMakePresets.json)) so the same commands work on any platform with CMake ≥ 3.29, Ninja, and [Emscripten](https://emscripten.org/). Set up the Emscripten environment once (`emsdk_env`, which exports `EMSDK`), then:
 
 ```bash
 cmake --preset wasm-release                     # configure (Emscripten toolchain)
