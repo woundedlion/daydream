@@ -95,6 +95,15 @@ export class SegmentController {
     this.faulted = false;
     /** @type {{ segId: number, message: string } | null} */
     this.faultInfo = null;     // first fault this session
+
+    // Stats-table DOM cache (populated lazily by _buildStatsTable, mutated in
+    // place by updateStats). Declared here so all instance state is visible up
+    // front; null until the first build / after a fault tears the table down.
+    /** @type {HTMLTableElement | null} */
+    this._statsTable = null;
+    this._statsSegCount = 0;   // segment count the cached table was built for
+    /** @type {{ rows: any[], maxTime: HTMLElement, wallTime: HTMLElement } | null} */
+    this._statsCells = null;   // cached cell references updateStats writes to
   }
 
   /**
