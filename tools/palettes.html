@@ -658,6 +658,14 @@
       colorSwatch, tValueSpan, speedSlider, speedValueSpan,
       hexValueSpan, copyPromptSpan, resetZoomButton;
 
+    // The color strip is static between palette changes; only the sweeping
+    // marker moves each frame. Cache the rendered gradient to an offscreen
+    // canvas so the per-frame draw is a single blit + a 2px line, instead of a
+    // full getImageData readback and `width` palette.get() OKLCH evaluations.
+    // Invalidated on every palette change (updatePalette) and on a size change.
+    let colorStripCache = null;
+    let colorStripDirty = true;
+
     // Each entry carries a 'group' property.
     const sliderDefinitions = [
       // A (Base): Range [0, 1]
@@ -1041,27 +1049,43 @@
       const width = colorStripCanvas.width;
       const height = colorStripCanvas.height;
 
-      // 1. Draw the static color strip (clears the previous marker)
-      const imageData = colorStripCtx.getImageData(0, 0, width, height);
-      const data = imageData.data;
-
-      for (let x = 0; x < width; x++) {
-        const tx = x / (width - 1);
-        const [r, g, b] = palette.get(tx); // Get color in [0, 1] range
-
-        const rInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, r))) * 255);
-        const gInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, g))) * 255);
-        const bInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, b))) * 255);
-
-        for (let y = 0; y < height; y++) {
-          const index = (y * width + x) * 4;
-          data[index] = rInt;
-          data[index + 1] = gInt;
-          data[index + 2] = bInt;
-          data[index + 3] = 255; // Alpha
-        }
+      // 1. Rebuild the cached gradient only when the palette (or size) changed;
+      // otherwise reuse it. The per-frame marker sweep no longer pays for the
+      // full readback and `width` palette evaluations.
+      if (!colorStripCache || colorStripCache.width !== width
+          || colorStripCache.height !== height) {
+        colorStripCache = document.createElement('canvas');
+        colorStripCache.width = width;
+        colorStripCache.height = height;
+        colorStripDirty = true;
       }
-      colorStripCtx.putImageData(imageData, 0, 0);
+      if (colorStripDirty) {
+        const cacheCtx = colorStripCache.getContext('2d');
+        const imageData = cacheCtx.createImageData(width, height);
+        const data = imageData.data;
+
+        for (let x = 0; x < width; x++) {
+          const tx = x / (width - 1);
+          const [r, g, b] = palette.get(tx); // Get color in [0, 1] range
+
+          const rInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, r))) * 255);
+          const gInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, g))) * 255);
+          const bInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, b))) * 255);
+
+          for (let y = 0; y < height; y++) {
+            const index = (y * width + x) * 4;
+            data[index] = rInt;
+            data[index + 1] = gInt;
+            data[index + 2] = bInt;
+            data[index + 3] = 255; // Alpha
+          }
+        }
+        cacheCtx.putImageData(imageData, 0, 0);
+        colorStripDirty = false;
+      }
+
+      // Blit the cached gradient (also clears the previous marker).
+      colorStripCtx.drawImage(colorStripCache, 0, 0);
 
       // 2. Draw the sweeping line marker
       const markerX = Math.round(t * width);
@@ -1271,6 +1295,9 @@
         const hueValue = parseInt(document.getElementById('gen_seed_slider').value);
         palette = new GenerativePalette(shape, harmony, brightness, sat, hueValue);
       }
+
+      // The gradient changed — force the cached color strip to rebuild.
+      colorStripDirty = true;
 
       // Redraw static graph elements
       drawWaveGraph();
