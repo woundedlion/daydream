@@ -40,6 +40,18 @@ class DeepLinkGUI {
     }
     this.parent = null;
     this.folderName = null;
+    // URL param keys this GUI manages a deep-link writer for, plus child
+    // folders, so callers can ask which params belong to this GUI subtree
+    // (e.g. to exclude the global controls from a per-effect resetGUI).
+    this._urlKeys = new Set();
+    this._children = [];
+  }
+
+  // All deep-link URL param keys managed by this GUI and its sub-folders.
+  collectUrlKeys() {
+    const keys = [...this._urlKeys];
+    for (const child of this._children) keys.push(...child.collectUrlKeys());
+    return keys;
   }
 
   get domElement() { return this.gui.domElement; }
@@ -104,6 +116,7 @@ class DeepLinkGUI {
     // 3. Attach URL/State Listener (skip for buttons). Apply-on-load when the
     // value came from the URL so onChange-driven behavior runs at startup.
     if (!isFunction) {
+      this._urlKeys.add(key);
       this._attachUrlWriter(controller, (v) => setUrlParam(key, v), params.has(key));
     }
 
@@ -128,6 +141,7 @@ class DeepLinkGUI {
     const controller = this.gui.addColor(object, prop);
 
     // 3. Attach URL/State Listener
+    this._urlKeys.add(key);
     this._attachUrlWriter(controller, (v) => {
       // Handle Color Serialization
       let strVal = v;
@@ -153,6 +167,7 @@ class DeepLinkGUI {
     const wrapped = new DeepLinkGUI(folder);
     wrapped.parent = this;
     wrapped.folderName = name;
+    this._children.push(wrapped);
     return wrapped;
   }
 
