@@ -293,7 +293,10 @@ function applyEffect(preserveParams = false) {
         const initVal = isBool ? (state[p.name] ? 1.0 : 0.0) : state[p.name];
         if (wasmEngine.setParameter(p.name, initVal) === false)
           console.warn(`setParameter("${p.name}") rejected as unknown.`);
-        segments.setParameter(p.name, initVal);
+        // Workers are synced by segments.setEffect() below, which snapshots these
+        // just-applied engine values and re-applies them AFTER the worker rebuilds
+        // the effect. A per-param broadcast here would arrive BEFORE that rebuild
+        // and be wiped by it — the same ordering trap the init path documents.
       }
 
       controller.onChange(v => {
