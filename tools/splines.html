@@ -172,6 +172,9 @@
     let isDragging = false;
     let dragIndex = -1;
     let lastMouseDown = 0;
+    let mouseDownX = 0, mouseDownY = 0;
+    // Max pointer travel (px) between press and release still treated as a click, not an orbit.
+    const CLICK_MOVE_TOLERANCE = 6;
 
     // --- Spline evaluation ---
     // Evaluated by the Holosphere WASM engine (single source of truth) via the
@@ -353,6 +356,8 @@
     function onMouseDown(e) {
       if (e.button !== 0) return;
       lastMouseDown = Date.now();
+      mouseDownX = e.clientX;
+      mouseDownY = e.clientY;
 
       const rect = renderer.domElement.getBoundingClientRect();
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -383,8 +388,11 @@
         return;
       }
 
-      // Only place point on quick click (< 300ms)
+      // Only place a point on a quick, stationary click — a fast orbit flick can
+      // pass the time check, so also require the pointer to have barely moved.
       if (elapsed > 300) return;
+      const moved = Math.hypot(e.clientX - mouseDownX, e.clientY - mouseDownY);
+      if (moved > CLICK_MOVE_TOLERANCE) return;
 
       const rect = renderer.domElement.getBoundingClientRect();
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
