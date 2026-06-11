@@ -814,6 +814,23 @@
         update();
       });
 
+      // A click on the animation pauses/unpauses the auto-rotation. Track the
+      // pointer-down position so orbit drags (and multi-touch gestures, via
+      // isPrimary) don't toggle it.
+      const canvasEl = document.getElementById('canvas');
+      let pointerDownX = 0, pointerDownY = 0;
+      canvasEl.addEventListener('pointerdown', (e) => {
+        if (!e.isPrimary) return;
+        pointerDownX = e.clientX;
+        pointerDownY = e.clientY;
+      });
+      canvasEl.addEventListener('pointerup', (e) => {
+        if (!e.isPrimary) return;
+        if (Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY) < 5) {
+          controls.autoRotate = !controls.autoRotate;
+        }
+      });
+
       labelsContainer = document.getElementById('labels');
 
       document.getElementById('saveBtn').addEventListener('click', saveSolid);
