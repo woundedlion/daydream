@@ -13,15 +13,16 @@
   <!-- Resolves bare module specifiers (e.g. 'three') for the ES-module script
        below, which imports from tools/shared.js. Must precede that module. -->
   <script src="../vendor-importmap.js"></script>
+  <!-- Shared design tokens + control styling for the tool pages. Linked before
+       this page's <style> so page-specific rules below win. -->
+  <link rel="stylesheet" href="tools.css">
   <style>
     @import url('../vendor/fonts/fonts.css');
 
+    /* tools.css supplies body, .param-group, .slider-label and the base
+       range-slider styling shared across the tool pages; only palettes-specific
+       extras live here. */
     body {
-      font-family: 'Inter', sans-serif;
-      background-color: #0F172A;
-      /* Slate 900 */
-      color: #E2E8F0;
-      /* Slate 200 */
       min-height: 100vh;
     }
 
@@ -30,66 +31,11 @@
       margin: auto;
     }
 
+    /* Each .param-group is a grid cell in the palette tabs, so drop the shared
+       vertical card margin — the grid gap already spaces the cells. */
     .param-group {
-      background-color: #1E293B;
-      /* Slate 800 */
-      border-radius: 0.75rem;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
-      padding: 1rem;
+      margin-bottom: 0;
     }
-
-    .slider-label {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.875rem;
-    }
-
-    input[type=range] {
-      height: 6px;
-      -webkit-appearance: none;
-      width: 100%;
-      background: #475569;
-      border-radius: 3px;
-      cursor: pointer;
-    }
-
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      height: 16px;
-      width: 16px;
-      border-radius: 50%;
-      background: #3B82F6;
-      /* Blue 500 */
-      cursor: pointer;
-      /* The slider line is 6px tall. The thumb is 16px tall.
-               (6px - 16px) / 2 = -5px. This is the mathematical center.
-               User reported this was "too high", so we are adjusting to
-               be less negative, which moves the thumb *down* visually.
-      */
-      margin-top: -3px;
-    }
-
-    /* For Firefox: */
-    input[type=range]::-moz-range-thumb {
-      height: 16px;
-      width: 16px;
-      border-radius: 50%;
-      background: #3B82F6;
-      /* Blue 500 */
-      cursor: pointer;
-      border: none;
-      /* Remove default border */
-    }
-
-    /* For MS Edge: */
-    input[type=range]::-ms-thumb {
-      height: 16px;
-      width: 16px;
-      border-radius: 50%;
-      background: #3B82F6;
-      /* Blue 500 */
-      cursor: pointer;
-    }
-
 
     /* Custom checkbox style */
     input[type=checkbox] {
