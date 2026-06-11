@@ -1250,13 +1250,17 @@
       if (!codeOutput) return;
 
       if (activeTab === 'procedural') {
-        const f = (n) => n.toFixed(3); // Formatter
-        // Use template literal for multi-line string
+        // Emit the C++ initializer the engine actually consumes —
+        // `ProceduralPalette name({r,g,b}f, ...)` — not bare JS arrays. Brace-init
+        // each vec3 with `f`-suffixed floats so the output pastes straight into
+        // palettes.h beside the named instances, matching the generative tab.
+        const f = (n) => n.toFixed(3) + 'f';
+        const v = (r, g, b) => `{${f(r)}, ${f(g)}, ${f(b)}}`;
         const codeString =
-          `[${f(parameters.A_R)}, ${f(parameters.A_G)}, ${f(parameters.A_B)}], // A
-[${f(parameters.B_R)}, ${f(parameters.B_G)}, ${f(parameters.B_B)}], // B
-[${f(parameters.C_R)}, ${f(parameters.C_G)}, ${f(parameters.C_B)}], // C
-[${f(parameters.D_R)}, ${f(parameters.D_G)}, ${f(parameters.D_B)}]  // D`;
+          `ProceduralPalette palette(${v(parameters.A_R, parameters.A_G, parameters.A_B)},  // A
+                          ${v(parameters.B_R, parameters.B_G, parameters.B_B)},  // B
+                          ${v(parameters.C_R, parameters.C_G, parameters.C_B)},  // C
+                          ${v(parameters.D_R, parameters.D_G, parameters.D_B)}); // D`;
         codeOutput.textContent = codeString;
       } else {
         const shape = document.getElementById('gen_shape').value;
