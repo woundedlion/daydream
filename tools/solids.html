@@ -1068,7 +1068,10 @@
         ops: JSON.parse(JSON.stringify(state.ops)), // Deep copy
         geodesics: state.showGeodesics,
         faces: state.showFaces,
+        colorize: state.colorizeFaces,
         vertices: state.showVertices,
+        normals: state.showNormals,
+        indices: state.showIndices,
         thumb: dataURL,
         title: title,
         desc: opsSummary,
@@ -1158,7 +1161,10 @@
       state.ops = JSON.parse(JSON.stringify(item.ops));
       state.showGeodesics = item.geodesics;
       state.showFaces = item.faces !== undefined ? item.faces : true;
+      state.colorizeFaces = !!item.colorize;
       state.showVertices = item.vertices;
+      state.showNormals = !!item.normals;
+      state.showIndices = !!item.indices;
 
       // Update UI
       updateToggles();
