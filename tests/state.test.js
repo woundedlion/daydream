@@ -89,3 +89,23 @@ test('URLSync._flush writes tracked state and ad-hoc params to the URL', () => {
   assert.equal(params.get('speed'), '1.2346');
   assert.ok(calls[0].startsWith('/sim?'));
 });
+
+test('URLSync._flush clears the ad-hoc buffer so a tracked key is not permanently overridden', () => {
+  const calls = installWindow('', '/sim');
+  const s = new AppState({ resolution: 'low' });
+  const sync = new URLSync(s, ['resolution']);
+
+  // The GUI writes a tracked key as an ad-hoc param (mirrors the DeepLinkGUI URL
+  // writer for the Resolution control).
+  sync.setParam('resolution', 'high');
+  sync._flush();
+  let params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
+  assert.equal(params.get('resolution'), 'high');
+
+  // A later programmatic state change must win at the next flush. Before the fix
+  // the stale ad-hoc 'high' was re-applied on every flush and clobbered it.
+  s.set('resolution', 'medium');
+  sync._flush();
+  params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
+  assert.equal(params.get('resolution'), 'medium');
+});

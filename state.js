@@ -149,6 +149,9 @@ export class URLSync {
       else params.set(key, val);
     }
     window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+    // Everything is written to the URL now; drop the buffer so the (excluded)
+    // entries retained above can't override a tracked key on a later flush.
+    this._adhoc.clear();
   }
 
   _flush() {
@@ -165,5 +168,10 @@ export class URLSync {
     }
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState({}, '', newUrl);
+    // The URL is now the store of record for these values (the next flush re-reads
+    // them from window.location.search). Clear the pending-write buffer so a stale
+    // ad-hoc entry can't re-apply on every future flush and permanently override a
+    // tracked key re-read from appState — e.g. a later appState.set('resolution').
+    this._adhoc.clear();
   }
 }
