@@ -588,7 +588,7 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { initScene, copyWithFeedback } from './shared.js';
+    import { initScene, copyWithFeedback, showFatalError } from './shared.js';
     // Removed solids.js import
     import createHolosphereModule from '../holosphere_wasm.js';
 
@@ -735,6 +735,9 @@
 
       } catch (e) {
         console.error('Failed to load WASM:', e);
+        showFatalError('Failed to load the Holosphere WASM engine — the solids '
+          + 'tool needs the built holosphere_wasm artifacts. Build the WASM '
+          + 'target and reload.');
         return;
       }
 

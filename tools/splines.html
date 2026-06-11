@@ -142,7 +142,7 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { initScene, copyWithFeedback } from './shared.js';
+    import { initScene, copyWithFeedback, showFatalError } from './shared.js';
     import createHolosphereModule from '../holosphere_wasm.js';
 
     // The Holosphere WASM engine — the single source of truth for spline math.
@@ -545,7 +545,15 @@
 
     // --- Bootstrap ---
     window.onload = async () => {
-      WasmModule = await createHolosphereModule();
+      try {
+        WasmModule = await createHolosphereModule();
+      } catch (e) {
+        console.error('Failed to load the Holosphere WASM module:', e);
+        showFatalError('Failed to load the Holosphere WASM engine — the spline '
+          + 'tool needs the built holosphere_wasm artifacts. Build the WASM '
+          + 'target and reload.');
+        return;
+      }
       initUI();
       initThree();
     };
