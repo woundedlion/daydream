@@ -1813,7 +1813,7 @@ Five standalone HTML pages. Four render with their own Three.js scene; `palettes
 | `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated tooling arenas (16 MB, separate from the engine's 335 KB arena). |
 | `splines.html` | Dual-mode (Bézier / Catmull-Rom) spherical spline designer with closed-loop and open-chain modes; click to add control points, drag to edit, export the control points as a `constexpr std::array<Vector>` or as `Fragment` positions. Spline evaluation runs through the engine's exported WASM spline functions (the tool's single source of truth). |
 
-All five reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`.
+All five reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`. Tailwind (and the palettes page's fonts) load the vendored `/vendor/` copy when present for offline dev and fall back to the CDN via an `onerror` handler when it isn't — so the Pages deploy, where `/vendor/` is gitignored, serves them from the CDN too.
 
 ---
 

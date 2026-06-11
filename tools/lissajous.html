@@ -9,7 +9,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Spherical Lissajous Visualizer</title>
-  <script src="../vendor/tailwindcss.js"></script>
+  <!-- Vendored Tailwind (Play CDN build) for offline dev. /vendor/ is
+       gitignored, so on the Pages deploy this file 404s; the onerror falls back
+       to the Play CDN — the same in-browser build — instead of serving the tool
+       unstyled. -->
+  <script src="../vendor/tailwindcss.js"
+    onerror="this.remove();document.head.appendChild(Object.assign(document.createElement('script'),{src:'https://cdn.tailwindcss.com'}))"></script>
   <script src="../vendor-importmap.js"></script>
   <link rel="stylesheet" href="tools.css">
   <style>
