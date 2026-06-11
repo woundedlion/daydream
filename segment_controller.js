@@ -151,6 +151,13 @@ export class SegmentController {
         } else if (msg.type === 'effectReady') {
           // Worker finished loading effect, no action needed
         } else if (msg.type === 'frame') {
+          // A late response from a worker that survived a fault must not run
+          // the decrement below: _onWorkerFault already zeroed `pending` and
+          // settled the in-flight frame, so decrementing here would drive
+          // `pending` negative and quietly falsify its "outstanding responses"
+          // invariant. The pool is halted until re-created, so the result is
+          // moot — ignore the frame.
+          if (this.faulted) return;
           // Drop results from a render dispatched before the last resolution
           // change: their x0..y1 reference the old W/H and would index past the
           // resized display buffer. Still settle the frame so the promise resolves.
