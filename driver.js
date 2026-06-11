@@ -664,10 +664,10 @@ export const prettify = (r) => {
   if (Math.abs(r + Math.PI / 4) <= 0.00001) return "-π/4";
   if (Math.abs(r - 3 * Math.PI / 2) <= 0.00001) return "3π/2";
   if (Math.abs(r + 3 * Math.PI / 2) <= 0.00001) return "-3π/2";
-  if (Math.abs(r - g) <= 0.00001) return "φ";
-  if (Math.abs(r - 1 / g) <= 0.00001) return "φ\u207b\u00b9";
-  if (Math.abs(r + g) <= 0.00001) return "-φ";
-  if (Math.abs(r + 1 / g) <= 0.00001) return "-φ\u207b\u00b9";
+  if (Math.abs(r - 1 / g) <= 0.00001) return "φ";
+  if (Math.abs(r - g) <= 0.00001) return "φ\u207b\u00b9";
+  if (Math.abs(r + 1 / g) <= 0.00001) return "-φ";
+  if (Math.abs(r + g) <= 0.00001) return "-φ\u207b\u00b9";
   if (Math.abs(r - 1 / Math.sqrt(3)) <= 0.00001) return "\u221a3\u207b\u00b9";
   if (Math.abs(r + 1 / Math.sqrt(3)) <= 0.00001) return "-\u221a3\u207b\u00b9";
   return r.toFixed(precision);
