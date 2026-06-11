@@ -1261,7 +1261,7 @@
                   oninput="updateOpParam(${i}, '${key}', this.value)"
                   onmousedown="event.stopPropagation()"
                 />
-                <input type="number" step="${def.step}" value="${Number(val).toFixed(2)}"
+                <input type="number" min="${def.min}" max="${def.max}" step="${def.step}" value="${Number(val).toFixed(2)}"
                   class="w-12 bg-transparent text-right font-mono text-slate-500 focus:outline-none focus:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   onchange="updateOpParam(${i}, '${key}', this.value)"
                   onmousedown="event.stopPropagation()"
@@ -1290,7 +1290,18 @@
     }
 
     window.updateOpParam = (index, key, value) => {
-      const val = parseFloat(value);
+      // Clamp to the op's declared range and reject non-numeric input before it
+      // reaches state — the number box has no inherent bounds and the WASM mesh
+      // boundary is deliberately fail-fast, so an out-of-range or NaN value
+      // typed here could kill the page or produce garbage geometry. On a bad
+      // value, fall back to the current value (the sync below restores the UI).
+      const def = OP_DEFS[state.ops[index].op]?.params?.[key];
+      let val = parseFloat(value);
+      if (Number.isNaN(val)) {
+        val = state.ops[index].params[key];
+      } else if (def) {
+        val = Math.min(def.max, Math.max(def.min, val));
+      }
       state.ops[index].params[key] = val;
 
       // Sync UI elements
