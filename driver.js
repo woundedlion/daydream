@@ -296,7 +296,12 @@ export class Daydream {
 
     if (this.stepFrames != 0) this.stepFrames--;
 
-    if (Daydream.pixels) Daydream.pixels.fill(0);
+    // Detach-aware guard: _stepSimulation runs before refreshPixelView heals a
+    // view detached by WASM heap growth. A detached Uint16Array is still truthy,
+    // and fill() on it throws TypeError, permanently freezing the app. Match the
+    // byteLength check refreshPixelView uses so the next adapter drawFrame heals.
+    if (Daydream.pixels && Daydream.pixels.buffer.byteLength !== 0)
+      Daydream.pixels.fill(0);
 
     if (this.labelAxes) {
       this.xAxis.position.set(0, 0, 0);
