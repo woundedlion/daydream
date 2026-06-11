@@ -84,6 +84,7 @@ class DeepLinkGUI {
   // and break deep-link persistence for that control.
   _attachUrlWriter(controller, writeUrl, applyOnLoad = false) {
     let userOnChange = null;
+    let replayed = false;
     controller.onChange((v) => {
       if (userOnChange) userOnChange(v);
       writeUrl(v);
@@ -97,7 +98,14 @@ class DeepLinkGUI {
       // handler once now with the loaded value so deep links don't lie about
       // state. Controls without a registered onChange (property-bound ones read
       // each frame) never reach here, so they're unaffected.
-      if (applyOnLoad && fn) fn(controller.getValue());
+      //
+      // Replay only on the *first* registration: re-registering onChange is a
+      // legitimate lil-gui pattern, and re-firing the side effect on every
+      // registration would be wrong.
+      if (applyOnLoad && fn && !replayed) {
+        replayed = true;
+        fn(controller.getValue());
+      }
       return controller;
     };
     return controller;
