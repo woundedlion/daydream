@@ -414,25 +414,15 @@ createHolosphereModule().then(module => {
     wasmEngine.setResolution(p.w, p.h);
   }
 
-  // Set initial effect — validate against this resolution's allow-list first.
-  // The effect name is hydrated from the URL, so a stale or hand-edited value
-  // can be unknown to the engine; setEffect() on an unknown name leaves
-  // currentEffect null and renders blank. applyResolution(true) below
-  // re-validates and self-heals, but don't feed an unvalidated name across the
-  // WASM boundary in the first place — fall back to the list's default.
-  const allowedEffects =
-    effectsByResolution[appState.get('resolution')] || HiResFavorites;
-  let effect = appState.get('effect');
-  if (!allowedEffects.includes(effect)) {
-    effect = allowedEffects[0];
-    appState.set('effect', effect);
-  }
-  if (effect && wasmEngine.setEffect(effect) === false) {
-    // Already validated against the allow-list above; a failure here means the
-    // engine itself rejected the name. applyResolution(true) below re-validates
-    // and self-heals, but log so the blank render isn't silent.
-    console.error(`Initial setEffect("${effect}") failed.`);
-  }
+  // Don't setEffect here. The effect name is hydrated from the URL and may be
+  // stale or hand-edited, but applyResolution(true) at the end of init already
+  // validates it against this resolution's allow-list (correcting appState) and
+  // performs the single setEffect + GUI build — self-healing a blank render on
+  // its own (applyEffect logs if the engine still rejects the name). A direct
+  // setEffect here only duplicated that work, re-running the effect constructor
+  // an extra time (twice, with the subscriber) before first paint. Nothing
+  // between here and line 491 reads the effect or renders (the animation loop
+  // can't fire mid-synchronous-init), so deferring is safe.
 
   // Create persistent adapter object (avoids per-frame allocation). Segmented
   // mode is pipelined inside SegmentController.tick(): it displays frame N-1's
