@@ -140,14 +140,15 @@ async function handleMessage(msg) {
       const allPixels = engine.getPixels();
       const { x0, x1, y0, y1, w: qw, h: qh } = segRange;
       const pixelsCopy = new Uint16Array(qw * qh * 3);
+      // Each quadrant row [x0,x1) is contiguous in the full canvas buffer, so
+      // copy it in one TypedArray.set rather than element-by-element — qh bulk
+      // copies instead of ~qw*qh*3 scalar stores.
+      const rowLen = (x1 - x0) * 3;
       let dst = 0;
       for (let y = y0; y < y1; y++) {
-        for (let x = x0; x < x1; x++) {
-          const src = (y * canvasW + x) * 3;
-          pixelsCopy[dst++] = allPixels[src];
-          pixelsCopy[dst++] = allPixels[src + 1];
-          pixelsCopy[dst++] = allPixels[src + 2];
-        }
+        const src = (y * canvasW + x0) * 3;
+        pixelsCopy.set(allPixels.subarray(src, src + rowLen), dst);
+        dst += rowLen;
       }
 
       // Get arena metrics
