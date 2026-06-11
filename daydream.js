@@ -623,7 +623,20 @@ recFolder.add(recSettings, 'quality', 1, 20, 1).name('Rec Quality (Mbps)');
 recFolder.add(recSettings, 'recResolution', Object.keys(REC_RESOLUTIONS)).name('Rec Resolution');
 recFolder.add(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
 const recordCtrl = recFolder.add(recordState, 'record').name('\u25cf Record');
-const onKeyDown = (e) => daydream.keydown(e);
+// Global playback shortcuts (Space = pause, ArrowRight = step) must not fire
+// while the user is operating a control. The effect sidebar and lil-gui both
+// implement their own Enter/Space/Arrow activation and call preventDefault but
+// not stopPropagation, so the key still bubbles to this window listener —
+// without a target guard, selecting an effect with Space, or any key on a
+// focused gui control, also toggles the simulation. Ignore keydowns whose
+// target sits inside an interactive element.
+const INTERACTIVE_KEY_TARGET =
+  'input, textarea, select, button, [contenteditable], .lil-gui, .effect-sidebar';
+const onKeyDown = (e) => {
+  const t = e.target;
+  if (t instanceof Element && t.closest(INTERACTIVE_KEY_TARGET)) return;
+  daydream.keydown(e);
+};
 window.addEventListener("keydown", onKeyDown);
 
 daydream.renderer.setAnimationLoop(() => {
