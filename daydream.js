@@ -128,8 +128,11 @@ function syncGUI() {
     const c = activeEffect.controllerByName.get(names[i]);
     if (!c) continue;
 
-    // Skip if user is interacting
-    if (c.domElement.contains(document.activeElement)) continue;
+    // Skip if the user is editing this controller. A focused text input shows up
+    // in activeElement, but lil-gui sliders drag via a non-focusable div (verified
+    // in the lil-gui source), so a drag is invisible to the focus check — the
+    // _dragging flag, set by the pointerdown/up guard at GUI-build time, covers it.
+    if (c._dragging || c.domElement.contains(document.activeElement)) continue;
 
     let val = values[i];
     if (c.isBoolean) val = (val > 0.5);
@@ -280,8 +283,24 @@ function applyEffect(preserveParams = false) {
       activeEffect.controllerByName.set(p.name, controller);
 
       // Read-only telemetry: keep it updating live (syncGUI) but block editing.
-      if (p.readonly && typeof controller.disable === 'function') {
-        controller.disable();
+      if (p.readonly) {
+        if (typeof controller.disable === 'function') controller.disable();
+      } else {
+        // Drag guard for syncGUI. lil-gui sliders drag via a non-focusable div,
+        // so the engine's per-frame value stream would otherwise fight an
+        // in-progress drag. Flag the controller for the duration of the drag; the
+        // window listeners are attached per-drag and removed on release, so they
+        // leave nothing behind when the effect GUI is destroyed.
+        controller.domElement.addEventListener('pointerdown', () => {
+          controller._dragging = true;
+          const end = () => {
+            controller._dragging = false;
+            window.removeEventListener('pointerup', end);
+            window.removeEventListener('pointercancel', end);
+          };
+          window.addEventListener('pointerup', end);
+          window.addEventListener('pointercancel', end);
+        });
       }
 
       // Push the GUI's initial value into the engine. DeepLinkGUI.add() may have
