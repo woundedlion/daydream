@@ -156,6 +156,24 @@ test('a worker fault latches, zeroes pending, and resolves the in-flight frame',
   await done; // the latch settled the promise
 });
 
+test('a surviving worker responding after a fault does not drive pending negative', async () => {
+  const c = makeController();
+  c.create(2);
+  c.renderInFlight = true;
+  const done = c.renderParallel(); // pending=2
+
+  // Worker 0 traps: the latch zeroes pending and settles the frame.
+  c.workers[0].onerror({ message: 'boom', filename: 'w.js', lineno: 1, colno: 1 });
+  assert.equal(c.pending, 0);
+  await done;
+
+  // Worker 1 survived its render and now reports back. The handler must ignore
+  // the late frame rather than decrement the already-zeroed counter.
+  deliverFrame(c, 1);
+  assert.equal(c.pending, 0, 'post-fault frame leaves pending at 0, not negative');
+  assert.equal(c.results[1], null, 'no result is recorded for the halted pool');
+});
+
 test('only the first fault of a session is recorded', () => {
   const c = makeController();
   c.create(2);
