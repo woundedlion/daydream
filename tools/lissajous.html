@@ -98,6 +98,11 @@
     import * as THREE from 'three';
     import { initScene, copyWithFeedback } from './shared.js';
     import { createSlider as buildSlider } from './slider.js';
+    import {
+      lissajous,
+      snapToRationalRatio,
+      lissajousCodeString,
+    } from './lissajous_math.js';
 
     // Utility to get CSS variable color and convert to numeric hex
     const getCssColor = (name) => {
@@ -130,17 +135,9 @@
     let scene, camera, renderer, controls, line;
 
     // --- Lissajous Function ---
-    // Argument order mirrors the engine's lissajous(m1, m2, a, t)
-    // (core/geometry.h) so this preview and the exported snippet below — which
-    // emits lissajous(C1, C2, A, t) for pasting into engine path code — agree on
-    // which slider maps to which parameter. t is last in both.
-    const lissajous = (m1, m2, a, t) => {
-      const phase = a;
-      const x = Math.sin(m2 * t) * Math.cos(m1 * t - phase);
-      const y = Math.cos(m2 * t);
-      const z = Math.sin(m2 * t) * Math.sin(m1 * t - phase);
-      return new THREE.Vector3(x, y, z);
-    };
+    // lissajous(m1, m2, a, t) lives in ./lissajous_math.js (imported above); the
+    // preview, the exported snippet, and the engine all share its m1/m2/a/t
+    // argument order.
 
     // --- THREE.js Setup ---
     const initThree = () => {
@@ -189,36 +186,9 @@
     };
 
     // --- RATIONAL CONSTRAINT LOGIC ---
-
-    /**
-         * Finds the simplest rational approximation (M/N) for a given value (ratio).
-         * @param {number} value The ratio to approximate (e.g., C1/C2).
-         * @param {number} maxDenominator Maximum value for the numerator/denominator.
-         * @returns {{ M: number, N: number }} The best simple rational ratio.
-         */
-    const findBestRationalRatio = (value, maxDenominator = 8) => {
-      if (value === 0) return { M: 1, N: 1 };
-
-      let bestM = 1;
-      let bestN = 1;
-      let minDiff = Infinity;
-
-      // Check ratios M/N where M and N are between 1 and maxDenominator
-      for (let N = 1; N <= maxDenominator; N++) {
-        for (let M = 1; M <= maxDenominator; M++) {
-          const ratio = M / N;
-          const diff = Math.abs(value - ratio);
-
-          // Prefer closer approximation, but also prefer smaller ratios
-          if (diff < minDiff || (diff === minDiff && (M + N) < (bestM + bestN))) {
-            minDiff = diff;
-            bestM = M;
-            bestN = N;
-          }
-        }
-      }
-      return { M: bestM, N: bestN };
-    };
+    // findBestRationalRatio and the snapToRationalRatio closing-domain core live
+    // in ./lissajous_math.js (imported above); this section keeps only the DOM
+    // read/write wiring around them.
 
     /**
          * Snaps the active frequency (C1 or C2) to maintain a simple rational ratio with the passive frequency.
@@ -235,13 +205,11 @@
       const activeConfig = config[activeId];
       const newActiveC_Raw = rawNewValue / activeConfig.scale;
 
-      // 2. Find the closest rational ratio to the *intended* new value
-      // We find M/N such that M/N ≈ activeC / passiveC (e.g., C₁/C₂)
-      const targetRatio = newActiveC_Raw / passiveC;
-      const { M, N } = findBestRationalRatio(targetRatio);
-
-      // 3. Calculate the snapped value: New Active C = Passive C * (M / N)
-      const newActiveC_Snapped = passiveC * (M / N);
+      // 2-3. Snap to the closest simple rational ratio and compute the closing
+      // domain. The pure core (lissajous_math.js) handles the math; the DOM
+      // read/write below stays inline.
+      const { snappedActiveC: newActiveC_Snapped, closingPeriod: newDomain } =
+        snapToRationalRatio(newActiveC_Raw, passiveC);
 
       // 4. Update the actual state
       state[activeId] = newActiveC_Snapped;
@@ -258,11 +226,6 @@
         // Determine decimals for display (2 for C1/C2)
         valueSpan.textContent = newActiveC_Snapped.toFixed(2);
       }
-
-      // Domain that closes the curve: with M/N the rational approximation of the
-      // active/passive frequency ratio (N from findBestRationalRatio), the curve
-      // repeats after T = 2π·N / passiveC.
-      const newDomain = (TWO_PI * N) / passiveC;
 
       state.Duration = newDomain;
 
@@ -309,35 +272,9 @@
       const codeOutput = document.getElementById('lissajous_code_output');
       if (!codeOutput) return;
 
-      // Helper to format floats to a clean string representation (e.g., 3.000 -> 3)
-      const f = (n, fixed = 3) => {
-        const s = n.toFixed(fixed);
-        // Remove trailing zeros and decimal point if they exist
-        return s.replace(/\.?0+$/, "");
-      };
-
-      // Format the params as a lambda: (t) => lissajous(C1, C2, A, t)
-      const c1Str = f(state.C1, 2);
-      const c2Str = f(state.C2, 2);
-      const aStr = f(state.A, 3);
-
-      // Format the domain: exact 2π multiples render as TWO_PI expressions, else a float.
-      const domain = state.Duration;
-      let domainStr = "";
-      const twoPi = TWO_PI;
-      // Check for multiples of 2*PI within a small tolerance
-      const multiple = domain / twoPi;
-
-      if (Math.abs(multiple - Math.round(multiple)) < 0.001 && Math.round(multiple) > 0) {
-        const N = Math.round(multiple);
-        domainStr = (N === 1) ? "TWO_PI" : `${N} * TWO_PI`;
-      } else {
-        domainStr = f(domain, 3); // Use the formatted float value
-      }
-
-      // Emit a [fn, domain] pair, matching timeline.add()'s expected tuple.
-      const snippet = `[(t) => lissajous(${c1Str}, ${c2Str}, ${aStr}, t), ${domainStr}]`;
-      codeOutput.textContent = snippet;
+      // Pure string building lives in lissajous_math.js; this stays DOM-only.
+      codeOutput.textContent =
+        lissajousCodeString(state.C1, state.C2, state.A, state.Duration);
     };
 
     // --- UI Setup ---

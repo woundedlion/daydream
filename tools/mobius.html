@@ -292,6 +292,10 @@
   <script type="module">
     import * as THREE from 'three';
     import { initScene } from './shared.js';
+    import {
+      elliptic, hyperbolic, loxodromic, parabolic,
+      inversion, tumble, cayley, snapComplex,
+    } from './mobius_transforms.js';
 
     const config = {
       A: { re: 1.0, im: 0.0 },
@@ -422,124 +426,49 @@
         name: 'Elliptic (Rotation)',
         desc: 'Continuous rotation around the poles.',
         animate: true,
-        update: (t) => {
-          const angle = t * 0.5;
-          return {
-            A: { re: Math.cos(angle), im: Math.sin(angle) },
-            B: { re: 0, im: 0 }, C: { re: 0, im: 0 },
-            D: { re: Math.cos(-angle), im: Math.sin(-angle) }
-          };
-        }
+        update: (t) => elliptic(t)
       },
       {
         id: 'hyperbolic',
         name: 'Hyperbolic (Zoom)',
         desc: 'Continuous flow from Source to Sink.',
         animate: true,
-        update: (t) => {
-          const gridScaleR = 1.5;
-          const logPeriod = 1.0 / gridScaleR;
-          const speed = 0.4;
-          const flowParam = (t * speed) % logPeriod;
-          const scale = Math.exp(flowParam);
-          const s = Math.sqrt(scale);
-          return {
-            A: { re: s, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 },
-            D: { re: 1 / s, im: 0 }
-          };
-        }
+        update: (t) => hyperbolic(t)
       },
       {
         id: 'loxodromic',
         name: 'Loxodromic (Spiral)',
         desc: 'Seamless spiral flow.',
         animate: true,
-        update: (t) => {
-          const angle = t * 0.3;
-          const gridScaleR = 1.5;
-          const logPeriod = 1.0 / gridScaleR;
-          const speed = 0.3;
-          const flowParam = (t * speed) % logPeriod;
-          const scale = Math.exp(flowParam);
-          const s = Math.sqrt(scale);
-          return {
-            A: { re: s * Math.cos(angle), im: s * Math.sin(angle) },
-            B: { re: 0, im: 0 }, C: { re: 0, im: 0 },
-            D: { re: (1 / s) * Math.cos(-angle), im: (1 / s) * Math.sin(-angle) }
-          };
-        }
+        update: (t) => loxodromic(t)
       },
       {
         id: 'parabolic',
         name: 'Parabolic (Drift)',
         desc: 'Continuous translation along Real axis.',
         animate: true,
-        update: (t) => {
-          return {
-            A: { re: 1, im: 0 },
-            B: { re: t * 0.8, im: 0 },
-            C: { re: 0, im: 0 },
-            D: { re: 1, im: 0 }
-          };
-        }
+        update: (t) => parabolic(t)
       },
       {
         id: 'inversion',
         name: 'Inversion (Rotation)',
         desc: 'Continuous rotation around Real axis (swaps 0 and ∞).',
         animate: true,
-        update: (t) => {
-          // Rotate around Real Axis (swaps poles)
-          const theta = t * 0.5;
-          const c = Math.cos(theta);
-          const s = Math.sin(theta);
-          return {
-            A: { re: c, im: 0 },
-            B: { re: 0, im: s }, // i*sin
-            C: { re: 0, im: s }, // i*sin
-            D: { re: c, im: 0 }
-          };
-        }
+        update: (t) => inversion(t)
       },
       {
         id: 'tumble',
         name: 'Tumble',
         desc: 'Rotation around Imaginary axis.',
         animate: true,
-        update: (t) => {
-          const theta = t * 0.4;
-          const c = Math.cos(theta);
-          const s = Math.sin(theta);
-          return {
-            A: { re: c, im: 0 },
-            B: { re: -s, im: 0 },
-            C: { re: s, im: 0 },
-            D: { re: c, im: 0 }
-          };
-        }
+        update: (t) => tumble(t)
       },
       {
         id: 'cayley',
         name: 'Cayley Transform',
         desc: 'Transition: Identity -> Cayley.',
         animate: true,
-        update: (t) => {
-          // Interpolate from Identity (1,0,0,1) to Cayley (1,-i,1,i)
-          // We oscillate simply 0 to 1 to 0 so the user can see it happen repeatedly
-          // or just saturate at 1. Let's saturate at 1.
-          const p = Math.min(1.0, t * 0.5);
-
-          // A: 1 -> 1
-          // B: 0 -> -i
-          // C: 0 -> 1
-          // D: 1 -> i
-          return {
-            A: { re: 1, im: 0 },
-            B: { re: 0, im: -p },
-            C: { re: p, im: 0 },
-            D: { re: 1 - p, im: p }
-          };
-        }
+        update: (t) => cayley(t)
       }
     ];
 
@@ -617,10 +546,8 @@
         let im = ny * maxExtent;
         re = Math.max(-maxExtent, Math.min(maxExtent, re));
         im = Math.max(-maxExtent, Math.min(maxExtent, im));
-        if (Math.abs(re) < 0.1) re = 0.0;
-        if (Math.abs(im) < 0.1) im = 0.0;
-        if (Math.abs(re - Math.round(re)) < 0.05) re = Math.round(re);
-        if (Math.abs(im - Math.round(im)) < 0.05) im = Math.round(im);
+        re = snapComplex(re);
+        im = snapComplex(im);
 
         paramObj.re = re;
         paramObj.im = im;

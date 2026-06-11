@@ -589,7 +589,10 @@
   <script type="module">
     import * as THREE from 'three';
     import { initScene, copyWithFeedback, showFatalError } from './shared.js';
-    // Removed solids.js import
+    // Pure C++ export-string codegen (formatFloat/pctSuffix/recipe builders) and
+    // the internal-angle geometry helper live in solid_codegen.js so they can be
+    // unit tested without a DOM or the WASM module. DOM/WASM wiring stays inline.
+    import { formatFloat, pctSuffix, generateFuncAndRecipe, generateRecipeCpp, computeInternalAngle } from './solid_codegen.js';
     import createHolosphereModule from '../holosphere_wasm.js';
 
     let camera, scene, renderer, controls;
@@ -1138,75 +1141,6 @@
         .then(() => console.log(`${lang.toUpperCase()} copied!`));
     };
 
-    // Format float with f suffix and .0 if integer, to satisfy C++ strictness and convention
-    function formatFloat(val) {
-      const s = val.toString();
-      return (s.indexOf('.') === -1 ? s + ".0" : s) + "f";
-    }
-
-    // Stable, unambiguous suffix for a fractional op parameter (0..1+).
-    // toString().replace('0.','') was injective for clean 0.01-step values but
-    // produced junk for float-error inputs (0.30000000000000004 -> "3000...")
-    // and read ambiguously (0.5 -> "5"). Quantize to hundredths and pad to two
-    // digits so 0.05 -> "05" and 0.5 -> "50" stay distinct and self-describing.
-    function pctSuffix(val) {
-      return String(Math.round(val * 100)).padStart(2, '0');
-    }
-
-    function generateFuncAndRecipe(item) {
-      // Build the function name from base + ops, matching solids.h conventions
-      let nameParts = [item.base];
-
-      // Build the SolidBuilder chain
-      let chain = '';
-
-      item.ops.forEach(o => {
-        const opName = typeof o === 'string' ? o : o.op;
-
-        if (opName === 'truncate') {
-          chain += `.truncate(${formatFloat(o.params.t)})`;
-          nameParts.push(`_truncate${pctSuffix(o.params.t)}`);
-        } else if (opName === 'expand') {
-          chain += `.expand(${formatFloat(o.params.t)})`;
-          nameParts.push(`_expand${pctSuffix(o.params.t)}`);
-        } else if (opName === 'chamfer') {
-          chain += `.chamfer(${formatFloat(o.params.t)})`;
-          nameParts.push(`_chamfer${pctSuffix(o.params.t)}`);
-        } else if (opName === 'hankin') {
-          chain += `.hankin(${formatFloat(o.params.angle)} * D2R)`;
-          nameParts.push(`_hk${Math.round(o.params.angle)}`);
-        } else if (opName === 'snub') {
-          // snub may have t and twist params in OP_DEFS but SolidBuilder defaults work
-          chain += `.snub()`;
-          nameParts.push(`_snub`);
-        } else if (opName === 'relax') {
-          const iter = o.params.iter || 100;
-          chain += `.relax(${iter})`;
-          // Encode the iteration count so two solids differing only in relax
-          // depth export distinct funcNames instead of colliding on `_relax`.
-          nameParts.push(`_relax${iter}`);
-        } else if (opName === 'bevel') {
-          chain += `.bevel(${formatFloat(o.params.t)})`;
-          nameParts.push(`_bevel${pctSuffix(o.params.t)}`);
-        } else {
-          // Simple parameterless ops: dual, kis, ambo, gyro, meta, needle, zip
-          chain += `.${opName}()`;
-          nameParts.push(`_${opName}`);
-        }
-      });
-
-      const funcName = nameParts.join('');
-      const recipe = `SolidBuilder(${item.base}(a, b), a, b)${chain}.build()`;
-
-      return { funcName, recipe };
-    }
-
-    function generateRecipeCpp(item) {
-      const { funcName, recipe } = generateFuncAndRecipe(item);
-      const comment = `// V=${item.vCount || 0}, F=${item.fCount || 0}, I=${item.iCount || 0}`;
-      return `${comment}\nFLASHMEM inline PolyMesh ${funcName}(Arena &a, Arena &b) {\n  return ${recipe};\n}`;
-    }
-
     function restoreSolid(item) {
       state.base = item.base;
       state.ops = JSON.parse(JSON.stringify(item.ops));
@@ -1425,23 +1359,6 @@
       renderOps();
       update();
     };
-
-    function computeInternalAngle(mesh) {
-      if (!mesh || !mesh.faces || mesh.faces.length === 0) return 0;
-      const face = mesh.faces[0];
-      if (face.length < 3) return 0;
-
-      const v1 = mesh.vertices[face[0]];
-      const v2 = mesh.vertices[face[1]];
-      const v3 = mesh.vertices[face[2]];
-
-      // Planar internal angle at v2 is the angle between the vectors v2->v1 and v2->v3
-      const dir1 = new THREE.Vector3().subVectors(v1, v2).normalize();
-      const dir2 = new THREE.Vector3().subVectors(v3, v2).normalize();
-
-      // The angle between directions is the planar internal angle
-      return dir1.angleTo(dir2);
-    }
 
     window.addOp = (opName) => {
       const def = OP_DEFS[opName];
