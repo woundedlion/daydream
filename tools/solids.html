@@ -674,6 +674,11 @@
     // lives in this script (the window.* handlers below close over it), so it
     // needs no global.
     let currentMesh = null;
+    // Per-face topology class ids for the Colorize Faces toggle, cached from the
+    // last recompute. classifyFaces() needs the live WASM mesh, which update()
+    // frees, so we compute it once per recompute and reuse it when renderMesh()
+    // redraws after a presentation-only toggle.
+    let currentFaceClasses = null;
 
     // Lists (populated from WASM)
     let PlatonicSolids = [];
@@ -794,35 +799,37 @@
       controls = result.controls;
 
       // Toggles
+      // These toggles change only how the cached mesh is presented, so they
+      // redraw via renderMesh() instead of update() — no WASM op-chain replay.
       document.getElementById('toggleGeo').parentElement.addEventListener('click', () => {
         state.showGeodesics = !state.showGeodesics;
         updateToggles();
-        update();
+        renderMesh();
       });
       document.getElementById('toggleFaces').parentElement.addEventListener('click', () => {
         state.showFaces = !state.showFaces;
         updateToggles();
-        update();
+        renderMesh();
       });
       document.getElementById('toggleColorize').parentElement.addEventListener('click', () => {
         state.colorizeFaces = !state.colorizeFaces;
         updateToggles();
-        update();
+        renderMesh();
       });
       document.getElementById('toggleVerts').parentElement.addEventListener('click', () => {
         state.showVertices = !state.showVertices;
         updateToggles();
-        update();
+        renderMesh();
       });
       document.getElementById('toggleNormals').parentElement.addEventListener('click', () => {
         state.showNormals = !state.showNormals;
         updateToggles();
-        update();
+        renderMesh();
       });
       document.getElementById('toggleIndices').parentElement.addEventListener('click', () => {
         state.showIndices = !state.showIndices;
         updateToggles();
-        update();
+        renderMesh();
       });
 
       // A click on the animation pauses/unpauses the auto-rotation. Track the
@@ -1467,13 +1474,14 @@
       // engine-side (it reuses the tooling scratch arenas, which are free
       // between ops); the returned Int32Array is a fresh JS copy, so it stays
       // valid after the wrapper is deleted and the arenas are flushed below.
-      let faceClasses = null;
-      if (state.colorizeFaces && state.showFaces) {
-        try {
-          faceClasses = currentWasmMesh.classifyFaces();
-        } catch (e) {
-          console.error("WASM classifyFaces error:", e);
-        }
+      // Computed on every recompute (it is cheap next to the op chain) and
+      // cached so toggling Colorize redraws from currentMesh without replaying
+      // the whole WASM chain.
+      currentFaceClasses = null;
+      try {
+        currentFaceClasses = currentWasmMesh.classifyFaces();
+      } catch (e) {
+        console.error("WASM classifyFaces error:", e);
       }
 
       const meshData = wasmMeshToJs(currentWasmMesh);
@@ -1483,7 +1491,22 @@
       // Store for stats/helpers
       currentMesh = meshData;
 
-      // 4. Render
+      renderMesh();
+    }
+
+    // Rebuild the THREE scene from the cached currentMesh + currentFaceClasses,
+    // WITHOUT re-running the WASM op chain. update() calls this after a
+    // recompute; presentation-only toggles (faces/verts/normals/indices/
+    // colorize/geodesics) call it directly so they don't pay for the chain
+    // (relax alone runs up to 500 iterations) when only the view changed.
+    function renderMesh() {
+      const meshData = currentMesh;
+      if (!meshData) return;
+
+      // Colorize is applied only when faces are shown; otherwise the per-vertex
+      // color attribute would be built for hidden geometry.
+      const faceClasses = (state.colorizeFaces && state.showFaces) ? currentFaceClasses : null;
+
       if (mainMesh) {
         mainMesh.geometry.dispose();
         scene.remove(mainMesh);
