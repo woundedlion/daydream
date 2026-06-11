@@ -229,7 +229,6 @@ class DeepLinkGUI {
   open() { this.gui.open(); }
   close() { this.gui.close(); }
   destroy() { if (this.gui.destroy) this.gui.destroy(); }
-  remove(c) { this.gui.remove(c); }
 }
 
 export const resetGUI = (excludedKeys = []) => {
