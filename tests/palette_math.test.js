@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const {
-  ProceduralPalette, CPixel, PRNG, lerp8, hsvToRgb, GenerativePalette,
+  ProceduralPalette, CPixel, PRNG, hsvToRgb, GenerativePalette,
   mapValue, proceduralPaletteCpp, generativePaletteCpp,
 } = await import('../tools/palette_math.js');
 
@@ -71,10 +71,7 @@ test('hsvToRgb on primary hues returns pure red/green/blue', () => {
   assert.deepEqual([blue.r, blue.g, blue.b], [0, 0, 255]);
 });
 
-test('lerp8 and mapValue compute the expected interpolations', () => {
-  assert.equal(lerp8(0, 10, 0.5), 5);
-  assert.equal(lerp8(0, 255, 0), 0);
-  assert.equal(lerp8(0, 255, 1), 255);
+test('mapValue computes the expected interpolations', () => {
   assert.equal(mapValue(0.5, 0, 1, 0, 100), 50);
   assert.equal(mapValue(2, 0, 4, 10, 20), 15);
 });
