@@ -454,13 +454,6 @@
         <button onclick="addOp('dual')" class="btn btn-secondary text-[0.65rem]">Dual</button>
         <button onclick="addOp('truncate')" class="btn btn-secondary text-[0.65rem]">Truncate</button>
         <button onclick="addOp('chamfer')" class="btn btn-secondary text-[0.65rem]">Chamfer</button>
-        <button onclick="addOp('bitruncate')" class="btn btn-secondary text-[0.65rem] relative group">
-          Bitruncate
-          <span
-            class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
-            Truncate(Ambo(x), t)
-          </span>
-        </button>
         <button onclick="addOp('expand')" class="btn btn-secondary text-[0.65rem]">Expand</button>
         <button onclick="addOp('hankin')" class="btn btn-secondary text-[0.65rem]">Hankin</button>
         <button onclick="addOp('relax')" class="btn btn-secondary text-[0.65rem]">Relax</button>
@@ -695,7 +688,6 @@
       dual: { params: {} },
       truncate: { params: { t: { val: 0.33, min: 0.01, max: 0.5, step: 0.01 } } },
       chamfer: { params: { t: { val: 0.5, min: 0.01, max: 1.0, step: 0.01 } } },
-      bitruncate: { params: { t: { val: 0.33, min: 0.01, max: 0.5, step: 0.01 } } },
       expand: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 } } },
       hankin: { params: { angle: { val: 54, min: 0, max: 90, step: 1 } } },
       relax: { params: { iter: { val: 100, min: 1, max: 500, step: 1 } } },
@@ -1042,7 +1034,6 @@
       // Generate summary
       const opsSummary = state.ops.map(o => {
         if (o.op === 'truncate') return `Tr(${o.params.t})`;
-        if (o.op === 'bitruncate') return `BiTr(${o.params.t})`;
         if (o.op === 'hankin') return `Hk(${o.params.angle.toFixed(2)})`;
         return o.op.charAt(0).toUpperCase() + o.op.slice(1);
       }).join(', ') || 'Base Solid';
@@ -1161,9 +1152,6 @@
         if (opName === 'truncate') {
           chain += `.truncate(${formatFloat(o.params.t)})`;
           nameParts.push(`_truncate${pctSuffix(o.params.t)}`);
-        } else if (opName === 'bitruncate') {
-          chain += `.bitruncate(${formatFloat(o.params.t)})`;
-          nameParts.push(`_bitruncate${pctSuffix(o.params.t)}`);
         } else if (opName === 'expand') {
           chain += `.expand(${formatFloat(o.params.t)})`;
           nameParts.push(`_expand${pctSuffix(o.params.t)}`);
@@ -1504,8 +1492,6 @@
             nextMesh = currentWasmMesh.truncate(o.params.t);
           } else if (opName === 'chamfer') {
             nextMesh = currentWasmMesh.chamfer(o.params.t);
-          } else if (opName === 'bitruncate') {
-            nextMesh = currentWasmMesh.bitruncate(o.params.t);
           } else if (opName === 'expand') {
             nextMesh = currentWasmMesh.expand(o.params.t);
           } else if (opName === 'bevel') {
