@@ -73,29 +73,37 @@ export function lerp8(a, b, t) {
   return Math.round(a + (b - a) * t);
 }
 
-// HSV to RGB conversion for JS (expecting h, s, v in 0..255)
-// Returns CPixel with values in 0..255
+// HSV to RGB conversion (h, s, v in 0..255), ported byte-for-byte from the
+// engine's CRGB(const CHSV&) path in core/platform.h: the hue wheel is split
+// into six 43-wide regions (region = h/43) and the channels are mixed with
+// >>8 fixed-point math. Float sextant math drifts from the device near every
+// region boundary (e.g. pure green lands at h=86, not 85), so we mirror the
+// integer path exactly to keep an exported palette's base color faithful.
+// Returns CPixel with values in 0..255.
 export function hsvToRgb(h, s, v) {
-  const h_norm = h / 255.0;
-  const s_norm = s / 255.0;
-  const v_norm = v / 255.0;
+  h &= 0xff;
+  s &= 0xff;
+  v &= 0xff;
 
-  let r = 0, g = 0, b = 0;
-  let i = Math.floor(h_norm * 6);
-  let f = h_norm * 6 - i;
-  let p = v_norm * (1 - s_norm);
-  let q = v_norm * (1 - f * s_norm);
-  let t_val = v_norm * (1 - (1 - f) * s_norm);
-
-  switch (i % 6) {
-    case 0: r = v_norm, g = t_val, b = p; break;
-    case 1: r = q, g = v_norm, b = p; break;
-    case 2: r = p, g = v_norm, b = t_val; break;
-    case 3: r = p, g = q, b = v_norm; break;
-    case 4: r = t_val, g = p, b = v_norm; break;
-    case 5: r = v_norm, g = p, b = q; break;
+  if (s === 0) {
+    return new CPixel(v, v, v);
   }
-  return new CPixel(Math.round(r * 255), Math.round(g * 255), Math.round(b * 255));
+
+  const region = Math.floor(h / 43);
+  const remainder = (h - region * 43) * 6;
+
+  const p = (v * (255 - s)) >> 8;
+  const q = (v * (255 - ((s * remainder) >> 8))) >> 8;
+  const t = (v * (255 - ((s * (255 - remainder)) >> 8))) >> 8;
+
+  switch (region) {
+    case 0: return new CPixel(v, t, p);
+    case 1: return new CPixel(q, v, p);
+    case 2: return new CPixel(p, v, t);
+    case 3: return new CPixel(p, q, v);
+    case 4: return new CPixel(t, p, v);
+    default: return new CPixel(v, p, q);
+  }
 }
 
 export class GenerativePalette {

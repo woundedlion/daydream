@@ -57,20 +57,18 @@ test('PRNG is deterministic: same seed -> same sequence', () => {
 });
 
 test('hsvToRgb on primary hues returns pure red/green/blue', () => {
-  // h, s, v in 0..255; full saturation and value. Hue 0 = red.
+  // h, s, v in 0..255; full saturation and value. The engine splits the wheel
+  // into six 43-wide regions (region = h/43), so the pure primaries land on the
+  // region boundaries: red=0, green=86, blue=172 (not the float-math 0/85/170).
   const red = hsvToRgb(0, 255, 255);
   assert.deepEqual([red.r, red.g, red.b], [255, 0, 0]);
   assert.ok(red instanceof CPixel);
 
-  // Green sits at 1/3 of the hue wheel: 255/3 = 85.
-  const green = hsvToRgb(85, 255, 255);
-  assert.equal(green.g, 255);
-  assert.equal(green.r, 0);
+  const green = hsvToRgb(86, 255, 255);
+  assert.deepEqual([green.r, green.g, green.b], [0, 255, 0]);
 
-  // Blue sits at 2/3: 255*2/3 = 170.
-  const blue = hsvToRgb(170, 255, 255);
-  assert.equal(blue.b, 255);
-  assert.equal(blue.g, 0);
+  const blue = hsvToRgb(172, 255, 255);
+  assert.deepEqual([blue.r, blue.g, blue.b], [0, 0, 255]);
 });
 
 test('lerp8 and mapValue compute the expected interpolations', () => {
