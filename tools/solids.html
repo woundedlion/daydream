@@ -661,6 +661,12 @@
 
     const baseThumbnails = {};
 
+    // The most recently built mesh (JS-side copy), read by the stats panel,
+    // index labels, and the internal-angle helper. Module-scoped — every reader
+    // lives in this script (the window.* handlers below close over it), so it
+    // needs no global.
+    let currentMesh = null;
+
     // Lists (populated from WASM)
     let PlatonicSolids = [];
     let ArchimedeanSolids = [];
@@ -1017,7 +1023,7 @@
     function saveSolid() {
       // Nothing to save until the first successful update() has produced a mesh
       // (clicking save before then would dereference an undefined currentMesh).
-      if (!window.currentMesh) return;
+      if (!currentMesh) return;
 
       // Capture thumbnail
       renderer.render(scene, camera);
@@ -1025,13 +1031,13 @@
 
       const title = state.base.replace(/([A-Z])/g, ' $1').trim();
 
-      // Get current counts from window.currentMesh
-      const vCount = window.currentMesh.vertices.length;
-      const fCount = window.currentMesh.faces.length;
-      const eCount = window.currentMesh.edgeCount || 0;
+      // Get current counts from currentMesh
+      const vCount = currentMesh.vertices.length;
+      const fCount = currentMesh.faces.length;
+      const eCount = currentMesh.edgeCount || 0;
       let iCount = 0;
-      if (window.currentMesh && window.currentMesh.faces) {
-        window.currentMesh.faces.forEach(f => iCount += f.length);
+      if (currentMesh && currentMesh.faces) {
+        currentMesh.faces.forEach(f => iCount += f.length);
       }
 
       // Generate summary
@@ -1092,6 +1098,11 @@
       });
     }
 
+    // The handlers below are attached to `window` on purpose: the saved-solids
+    // list and op-chain rows are built as HTML strings with inline onclick/
+    // oninput attributes, which the browser evaluates in global scope and so
+    // can only reach functions on `window`. Keep new handlers consistent with
+    // that pattern, or move the generated markup to addEventListener wiring.
     window.deleteSolid = (index) => {
       savedSolids.splice(index, 1);
       renderSavedList();
@@ -1220,7 +1231,7 @@
       const thumb = baseThumbnails[state.base];
       const title = state.base.replace(/([A-Z])/g, ' $1').trim();
       // We can't synchronously get stats unless we cache or have the mesh.
-      // window.currentMesh is updated after update() calls.
+      // currentMesh is updated after update() calls.
 
       document.getElementById('baseThumb').src = thumb || '';
       document.getElementById('baseTitle').innerText = title;
@@ -1439,7 +1450,7 @@
         Object.keys(def.params).forEach(k => {
           let val = def.params[k].val;
           if (opName === 'hankin' && k === 'angle') {
-            val = (computeInternalAngle(window.currentMesh) / 2) * (180 / Math.PI);
+            val = (computeInternalAngle(currentMesh) / 2) * (180 / Math.PI);
           }
           newOp.params[k] = val;
         });
@@ -1548,7 +1559,7 @@
       MeshOpsWasm.clearToolingMemory(); // Flush the 16 MB tooling arenas (8 MB + 4 MB + 4 MB)
 
       // Store for stats/helpers
-      window.currentMesh = meshData;
+      currentMesh = meshData;
 
       // 4. Render
       if (mainMesh) {
@@ -1652,7 +1663,7 @@
         }
       });
 
-      // Persist the edge count on the mesh (same object as window.currentMesh)
+      // Persist the edge count on the mesh (same object as currentMesh)
       // so saveSolid reports E instead of falling back to 0 — wasmMeshToJs only
       // returns {vertices, faces}, so without this every saved card shows 0E.
       meshData.edgeCount = edgeIndices.size;
@@ -1717,14 +1728,14 @@
     // render (via initScene's onAfterRender hook), so the labels track the
     // current camera; guarded because the loop starts before init finishes.
     function updateLabels() {
-      if (state.showIndices && window.currentMesh && labelsContainer && labelsContainer.children.length > 0) {
+      if (state.showIndices && currentMesh && labelsContainer && labelsContainer.children.length > 0) {
         const rect = renderer.domElement.getBoundingClientRect();
         const tempV = new THREE.Vector3();
         const camPos = camera.position;
 
         Array.from(labelsContainer.children).forEach(el => {
           const i = parseInt(el.dataset.index);
-          const v = window.currentMesh.vertices[i];
+          const v = currentMesh.vertices[i];
           if (v) {
             // Backface Culling for Labels
             const dot = v.dot(camPos) - v.lengthSq();

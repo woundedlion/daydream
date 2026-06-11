@@ -124,7 +124,7 @@
       A: config.A.default,
       Duration: config.Duration.default,
       Samples: config.Samples.default,
-      isRationalLocked: false // NEW: State for the constraint lock
+      isRationalLocked: false // whether the rational-ratio constraint is locked
     };
 
     let scene, camera, renderer, controls, line;
@@ -289,7 +289,6 @@
           durationValueSpan.textContent = newDomain.toFixed(3);
         }
       }
-      // --- END FIX ---
 
       // 6. Re-render the curve and update the code snippet
       regenerateCurve();
@@ -367,8 +366,8 @@
           // 2. Call snapping logic, which will recalculate state[id], update UI (slider/span), and re-render
           snapFrequencies(id, rawValue);
         } else {
-          // 3. For unlocked controls, update UI and re-render normally
-          // FIX: Ensure Samples is always displayed as a whole number
+          // 3. For unlocked controls, update UI and re-render normally.
+          // Samples is always displayed as a whole number.
           handles.valueSpan.textContent = id === 'Samples' ? Math.round(state[id]).toFixed(0) : state[id].toFixed(decimals);
           regenerateCurve();
           updateCodeSnippet();
