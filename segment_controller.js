@@ -121,7 +121,15 @@ export class SegmentController {
     this.destroy();
 
     const res = this._resolutionPresets[this._appState.get('resolution')];
-    if (!res) return;
+    if (!res) {
+      // The old pool is already destroyed above, so a silent return would leave
+      // an active-but-empty controller rendering nothing. This is an invalid
+      // config (an unknown resolution key), guarded upstream today — surface it
+      // loudly rather than failing dark, matching the component's other guards.
+      console.error(`[Segmented] create(${numSegments}) aborted: unknown`
+        + ` resolution "${this._appState.get('resolution')}"; controller is now empty.`);
+      return;
+    }
 
     // Keep the segment count in sync with the pool we're about to build so
     // updateStats() and any other reader see the live size rather than a stale
