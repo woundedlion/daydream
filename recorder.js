@@ -238,8 +238,13 @@ export class VideoRecorder {
       await writable.write(blob);
       await writable.close();
     } catch (err) {
-      // User cancelled the dialog — not an error
-      if (err.name !== 'AbortError') console.error('VideoRecorder: save failed', err);
+      // User cancelled the dialog — not an error; nothing to save.
+      if (err.name === 'AbortError') return;
+      // Any other failure (expired user activation -> SecurityError, disk/write
+      // error, etc.) would otherwise silently lose the recording. Fall back to the
+      // anchor download so the artifact still reaches the user.
+      console.warn('VideoRecorder: picker save failed, falling back to anchor download', err);
+      this._saveWithAnchor(blob, filename);
     }
   }
 
