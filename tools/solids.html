@@ -836,6 +836,7 @@
         // Create Button
         const btn = document.createElement('div');
         btn.className = `thumb-btn ${state.base === key ? 'active' : ''}`;
+        btn.dataset.solid = key; // identify the base so restoreSolid can re-highlight it
         btn.onclick = () => {
           state.base = key;
           update();
@@ -1116,8 +1117,7 @@
 
       // Highlight active base in footer
       document.querySelectorAll('.thumb-btn').forEach(b => {
-        if (b.classList.contains('active')) b.classList.remove('active');
-        if (b.onclick.toString().includes(state.base)) b.classList.add('active');
+        b.classList.toggle('active', b.dataset.solid === state.base);
       });
 
       update();
