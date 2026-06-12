@@ -49,9 +49,13 @@ export const setUrlParam = (key, value) => {
   }, 200);
 };
 
+// lil-gui wrapper that persists every control's value to URL query params,
+// giving the app shareable deep links. Wraps add/addColor/addFolder to hydrate
+// from the URL on creation and write back on change.
 class DeepLinkGUI {
+  // `options` is either lil-gui constructor options or an existing lil-gui
+  // instance to wrap (detected by its domElement/addFolder members).
   constructor(options) {
-    // Handle wrapping existing instance or creating new one
     if (options && options.domElement && options.addFolder) {
       this.gui = options;
     } else {
@@ -76,6 +80,8 @@ class DeepLinkGUI {
   get domElement() { return this.gui.domElement; }
   get width() { return this.gui.width; }
 
+  // Build a control's URL param key by joining its enclosing folder names with
+  // the property, e.g. "Effects.Speed", so nested controls get distinct keys.
   _getKey(prop) {
     let keys = [prop];
     let curr = this;
@@ -120,6 +126,9 @@ class DeepLinkGUI {
     return controller;
   }
 
+  // Add a control, seeding its value from the URL (when present and valid) and
+  // wiring it to write changes back. `args` are forwarded to lil-gui's add()
+  // (min/max/step for numbers, or a choices array/object for an enum).
   add(object, prop, ...args) {
     const key = this._getKey(prop);
     const isFunction = typeof object[prop] === 'function';
@@ -180,6 +189,8 @@ class DeepLinkGUI {
     return controller;
   }
 
+  // Add a color control, seeding from the URL and serializing changes to a
+  // string (#rrggbb for THREE.Color-like values, rgb(r,g,b) for arrays).
   addColor(object, prop) {
     const key = this._getKey(prop);
     // 1. Load from URL
@@ -194,7 +205,6 @@ class DeepLinkGUI {
     // 3. Attach URL/State Listener
     this._urlKeys.add(key);
     this._attachUrlWriter(controller, (v) => {
-      // Handle Color Serialization
       let strVal = v;
       if (typeof v === 'object' && v.getHexString) {
         strVal = '#' + v.getHexString();
@@ -213,6 +223,8 @@ class DeepLinkGUI {
     return controller;
   }
 
+  // Create a child folder wrapped as a DeepLinkGUI, linked into this GUI's
+  // subtree so its name prefixes the keys of controls added inside it.
   addFolder(name) {
     const folder = this.gui.addFolder(name);
     const wrapped = new DeepLinkGUI(folder);
@@ -222,6 +234,7 @@ class DeepLinkGUI {
     return wrapped;
   }
 
+  // Clear all deep-link params except `excludedKeys`.
   static reset(excludedKeys = []) {
     resetGUI(excludedKeys);
   }
@@ -231,6 +244,8 @@ class DeepLinkGUI {
   destroy() { if (this.gui.destroy) this.gui.destroy(); }
 }
 
+// Remove deep-link URL params, preserving `excludedKeys`. Delegates to the
+// app's URLSync when present, else rewrites the query string directly.
 export const resetGUI = (excludedKeys = []) => {
   const sync = getActiveURLSync();
   if (sync) {

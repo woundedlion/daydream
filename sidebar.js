@@ -36,7 +36,7 @@ export class EffectSidebar {
     this.sortRow.appendChild(this.sizeBtn);
 
     // Button list container (for keyboard nav scoping). Roving tabindex: the
-    // listbox is not itself a tab stop \u2014 exactly one option carries tabindex=0
+    // listbox is not itself a tab stop — exactly one option carries tabindex=0
     // (see _setRovingTabbable), so Tab lands on the active option once rather
     // than on the container and then every button.
     this.listEl = document.createElement('div');
@@ -50,7 +50,7 @@ export class EffectSidebar {
     this._onScrollBound = () => this._updateScrollArrows();
     this.listEl.addEventListener('keydown', this._onKeyDownBound);
 
-    // Scroll arrow indicators (mobile horizontal scroll). Decorative glyphs \u2014
+    // Scroll arrow indicators (mobile horizontal scroll). Decorative glyphs —
     // hidden from assistive tech so screen readers don't announce them.
     this.arrowLeft = document.createElement('div');
     this.arrowLeft.className = 'scroll-arrow scroll-arrow-left';
@@ -88,7 +88,6 @@ export class EffectSidebar {
 
   /** Create buttons once for the given effect names and sizes. */
   setEffects(names, effectSizes) {
-    // Clear old buttons
     this.buttons.clear();
     this.listEl.innerHTML = '';
     this.items = [];
@@ -160,6 +159,11 @@ export class EffectSidebar {
 
   // ---- Internal ----
 
+  /**
+   * Build a sort-control button for `key` labelled `label`. Clicking toggles
+   * direction when this key is already active, else activates it (size defaults
+   * to descending, others to ascending).
+   */
   _createSortBtn(key, label) {
     const btn = document.createElement('button');
     btn.className = 'sort-btn' + (this.sort.key === key ? ' active' : '');
@@ -174,6 +178,7 @@ export class EffectSidebar {
     return btn;
   }
 
+  /** Sync the sort buttons' active state and direction arrow to this.sort. */
   _updateSortBtnUI() {
     const arrow = (dir) => dir === 'asc' ? '▲' : '▼';
     this.nameBtn.className = 'sort-btn' + (this.sort.key === 'name' ? ' active' : '');
@@ -182,6 +187,11 @@ export class EffectSidebar {
     this.sizeBtn.innerText = 'Size ' + (this.sort.key === 'size' ? arrow(this.sort.dir) : '⇅');
   }
 
+  /**
+   * Reorder the existing button DOM nodes to match the current sort key and
+   * direction. Re-appending moves nodes in place rather than recreating them,
+   * preserving focus and event handlers.
+   */
   _applySortOrder() {
     const sorted = [...this.items].sort((a, b) => {
       const mul = this.sort.dir === 'asc' ? 1 : -1;
@@ -189,13 +199,13 @@ export class EffectSidebar {
       return a.name.localeCompare(b.name) * mul;
     });
 
-    // Reorder existing DOM nodes (no destroy/recreate)
     sorted.forEach(({ name }) => {
       const btn = this.buttons.get(name);
       if (btn) this.listEl.appendChild(btn);
     });
   }
 
+  /** Mark the currently active effect's button as selected after a rebuild. */
   _updateActiveClass() {
     if (!this.activeName) return;
     const btn = this.buttons.get(this.activeName);

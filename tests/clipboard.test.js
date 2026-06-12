@@ -1,8 +1,8 @@
 // @ts-nocheck
 //
 // clipboard.js — coverage for copyWithFeedback's transient label swap, which
-// every tool page reuses. The regression of record (finding 259): a second
-// copy within revertMs must not latch the element on "Copied!".
+// every tool page reuses. Key invariant: a second copy within revertMs must
+// not latch the element on "Copied!".
 //
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
 import { test, mock, beforeEach } from 'node:test';
@@ -35,8 +35,8 @@ test('a second copy within revertMs still reverts to the idle label', async () =
   await copyWithFeedback('a', { element: el, copiedText: 'Copied!', revertMs: 1500 });
   assert.equal(el.textContent, 'Copied!', 'first copy shows the copied label');
 
-  // Second copy fires before the first revert timer — the bug captured the live
-  // "Copied!" as the text to restore, latching it permanently.
+  // Second copy fires before the first revert timer; the idle text to restore
+  // must stay "Copy", not the live "Copied!" label.
   mock.timers.tick(500);
   await copyWithFeedback('b', { element: el, copiedText: 'Copied!', revertMs: 1500 });
   assert.equal(el.textContent, 'Copied!');

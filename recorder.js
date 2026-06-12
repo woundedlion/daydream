@@ -40,6 +40,11 @@ export function selectMimeType(
 }
 
 export class VideoRecorder {
+  /**
+   * @param {HTMLCanvasElement} canvas Source canvas to record.
+   * @param {number} frameInterval Seconds of video added per captured frame
+   *   (drives the elapsed-time counter; default 1/16 s = 16 fps).
+   */
   constructor(canvas, frameInterval = 1 / 16) {
     this.canvas = canvas;
     this.mediaRecorder = null;
@@ -66,6 +71,7 @@ export class VideoRecorder {
       && typeof MediaRecorder !== 'undefined';
   }
 
+  /** True while a recording session is actively capturing. */
   get isRecording() {
     return this.mediaRecorder !== null && this.mediaRecorder.state === 'recording';
   }
@@ -83,6 +89,10 @@ export class VideoRecorder {
     }
   }
 
+  /**
+   * Begin a recording session. No-op if already recording or unsupported.
+   * @param {string} effectName Base name used for the downloaded file.
+   */
   start(effectName = 'effect') {
     if (this.isRecording) return;
 
@@ -143,6 +153,7 @@ export class VideoRecorder {
     recorder.start();
   }
 
+  /** Stop the active session; download and cleanup happen in onstop. */
   stop() {
     if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
       this.mediaRecorder.stop();
@@ -202,6 +213,7 @@ export class VideoRecorder {
     return 'webm';
   }
 
+  /** Assemble captured chunks into a blob and save it with a timestamped name. */
   _download(recorder = this.mediaRecorder, chunks = this.chunks, effectName = this._effectName) {
     const ext = this._extension(recorder);
     const blob = new Blob(chunks, { type: ext === 'mp4' ? 'video/mp4' : 'video/webm' });
@@ -278,6 +290,7 @@ export class VideoRecorder {
     document.body.appendChild(iframe);
   }
 
+  /** Release the active session's recorder, stream, and offscreen canvas. */
   _cleanup() {
     this.mediaRecorder = null;
     this.chunks = [];

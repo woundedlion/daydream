@@ -157,7 +157,6 @@ async function handleMessage(msg) {
         dst += rowLen;
       }
 
-      // Get arena metrics
       /** @type {SegArenaMetrics | null} */
       let arenaMetrics = null;
       try {

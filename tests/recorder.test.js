@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { selectMimeType } from '../recorder.js';
 
+// Build a fake isTypeSupported probe that accepts only the listed MIME types,
+// so each test can pin down exactly which codecs the "browser" advertises.
 const supports = (...allowed) => (mt) => allowed.includes(mt);
 
 test('mp4 format picks the H.264 candidate when supported', () => {

@@ -1,10 +1,9 @@
 // @ts-check
 //
-// palette_math.js — pure palette math extracted from tools/palettes.html
-// (finding 289). The module mirrors the engine's ProceduralPalette and
-// GenerativePalette and owns the C++ export-string generators, so these tests
-// lock both the numeric output and the exact C++ initializer text that the
-// inline page could not regression-test.
+// palette_math.js — pure palette math extracted from tools/palettes.html.
+// The module mirrors the engine's ProceduralPalette and GenerativePalette and
+// owns the C++ export-string generators, so these tests lock both the numeric
+// output and the exact C++ initializer text the inline page cannot cover.
 //
 // Run: node --test --experimental-test-module-mocks "tests/palette_math.test.js"
 import { test } from 'node:test';

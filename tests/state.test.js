@@ -49,6 +49,8 @@ test('AppState.snapshot is a detached copy', () => {
 
 // --- URLSync (needs a minimal window stub) ---
 
+// Install a minimal window stub so URLSync can read location.search and
+// capture history.replaceState writes. Returns the array of URLs written.
 function installWindow(search = '', pathname = '/') {
   const calls = [];
   globalThis.window = {
@@ -102,8 +104,8 @@ test('URLSync._flush clears the ad-hoc buffer so a tracked key is not permanentl
   let params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
   assert.equal(params.get('resolution'), 'high');
 
-  // A later programmatic state change must win at the next flush. Before the fix
-  // the stale ad-hoc 'high' was re-applied on every flush and clobbered it.
+  // A later programmatic state change must win at the next flush: _flush clears
+  // the ad-hoc buffer so the stale 'high' can't be re-applied over it.
   s.set('resolution', 'medium');
   sync._flush();
   params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);

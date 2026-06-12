@@ -49,6 +49,11 @@ export function showFatalError(message) {
 }
 
 /**
+ * Build a ready-to-run Three.js scene (renderer, perspective camera,
+ * OrbitControls, optional reference sphere / light rig) wired into the given
+ * DOM elements, then start the animation loop. Returns handles plus a dispose()
+ * to tear it back down.
+ *
  * @param {string} containerId - ID of the parent container div
  * @param {string} canvasId - ID of the canvas element
  * @param {object} [opts] - Optional configuration
@@ -148,7 +153,6 @@ export function initScene(containerId, canvasId, opts = {}) {
     lightRig.push(rim);
   }
 
-  // Resize handling
   const defaultResize = () => {
     const w = container.clientWidth;
     const h = container.clientHeight;
@@ -161,7 +165,6 @@ export function initScene(containerId, canvasId, opts = {}) {
     : defaultResize;
   window.addEventListener('resize', resize);
 
-  // Animation loop
   let rafId = 0;
   const animate = () => {
     rafId = requestAnimationFrame(animate);

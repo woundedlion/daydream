@@ -20,19 +20,19 @@ export function formatFloat(val) {
 }
 
 // Stable, unambiguous suffix for a fractional op parameter (0..1+).
-// toString().replace('0.','') was injective for clean 0.01-step values but
-// produced junk for float-error inputs (0.30000000000000004 -> "3000...")
-// and read ambiguously (0.5 -> "5"). Quantize to hundredths and pad to two
-// digits so 0.05 -> "05" and 0.5 -> "50" stay distinct and self-describing.
+// Quantize to hundredths and pad to two digits so 0.05 -> "05" and
+// 0.5 -> "50" stay distinct and self-describing in generated funcNames.
 export function pctSuffix(val) {
   return String(Math.round(val * 100)).padStart(2, '0');
 }
 
+// Derive the C++ funcName and SolidBuilder recipe expression for a solid spec.
+// The funcName is base + one suffix per op (encoding parameters where two solids
+// could otherwise collide); the recipe is the chained SolidBuilder(...).build()
+// call. `item` is { base, ops:[op|{op,params}] }; both naming and chaining follow
+// solids.h conventions.
 export function generateFuncAndRecipe(item) {
-  // Build the function name from base + ops, matching solids.h conventions
   let nameParts = [item.base];
-
-  // Build the SolidBuilder chain
   let chain = '';
 
   item.ops.forEach(o => {
@@ -76,12 +76,18 @@ export function generateFuncAndRecipe(item) {
   return { funcName, recipe };
 }
 
+// Emit the full FLASHMEM C++ function for a solid, prefixed with a comment
+// recording its vertex/face/index counts. Output is pasted verbatim into the
+// engine, so the exact text and formatting are byte-for-byte significant.
 export function generateRecipeCpp(item) {
   const { funcName, recipe } = generateFuncAndRecipe(item);
   const comment = `// V=${item.vCount || 0}, F=${item.fCount || 0}, I=${item.iCount || 0}`;
   return `${comment}\nFLASHMEM inline PolyMesh ${funcName}(Arena &a, Arena &b) {\n  return ${recipe};\n}`;
 }
 
+// Interior angle (radians) at the second vertex of the mesh's first face, used
+// to characterize a solid's face shape. Returns 0 for degenerate input (no
+// faces, a face with fewer than 3 vertices, or a zero-length edge).
 export function computeInternalAngle(mesh) {
   if (!mesh || !mesh.faces || mesh.faces.length === 0) return 0;
   const face = mesh.faces[0];

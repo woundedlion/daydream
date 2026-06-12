@@ -42,6 +42,10 @@
 // --- Controller -> Worker (received by the worker) -------------------------
 
 /**
+ * Bootstrap message: assigns the worker its segment index within the pool and the
+ * canvas geometry, then optionally selects an effect with tuned values. `paused`
+ * carries the host's current pause state so a pool re-created under a paused GUI
+ * doesn't start animating.
  * @typedef {{
  *   type: 'init', segId: number, totalSegs: number, w: number, h: number,
  *   effectName?: string, params?: SegParam[], paused?: boolean,
@@ -55,13 +59,17 @@
  * @typedef {{ type: 'setEffect', name: string, params?: SegParam[] }} SetEffectMsg
  */
 
-/** @typedef {{ type: 'setResolution', w: number, h: number }} SetResolutionMsg */
+/** Resize the worker's canvas; the worker re-derives its segment clip from w/h.
+ * @typedef {{ type: 'setResolution', w: number, h: number }} SetResolutionMsg */
 
-/** @typedef {{ type: 'setParameter', name: string, value: number }} SetParameterMsg */
+/** Push one live tuned-parameter value to the worker's bound effect.
+ * @typedef {{ type: 'setParameter', name: string, value: number }} SetParameterMsg */
 
-/** @typedef {{ type: 'setAnimationsPaused', paused: boolean }} SetAnimationsPausedMsg */
+/** Toggle whether the worker's effect advances its animation clock.
+ * @typedef {{ type: 'setAnimationsPaused', paused: boolean }} SetAnimationsPausedMsg */
 
-/** @typedef {{ type: 'render' }} RenderMsg */
+/** Request one frame; the worker replies with a FrameMsg.
+ * @typedef {{ type: 'render' }} RenderMsg */
 
 /**
  * Every message the controller sends to a worker.
@@ -71,9 +79,11 @@
 
 // --- Worker -> Controller (received by the controller) ---------------------
 
-/** @typedef {{ type: 'ready', segId: number }} ReadyMsg */
+/** Worker has finished bootstrapping (engine instantiated) and can accept work.
+ * @typedef {{ type: 'ready', segId: number }} ReadyMsg */
 
-/** @typedef {{ type: 'effectReady', segId: number }} EffectReadyMsg */
+/** Worker has rebuilt and re-clipped its effect after a setEffect.
+ * @typedef {{ type: 'effectReady', segId: number }} EffectReadyMsg */
 
 /**
  * A rendered quadrant. `pixels` is the segment's RGB16 rectangle (qw*qh*3),

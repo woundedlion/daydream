@@ -9,13 +9,16 @@
  * independently rather than being orchestrated imperatively.
  */
 export class AppState {
+  /** @param {Object} defaults - Initial key/value pairs seeding the state. */
   constructor(defaults = {}) {
     this._state = { ...defaults };
     this._listeners = [];
   }
 
+  /** Read a single state value by key. */
   get(key) { return this._state[key]; }
 
+  /** Set one key; no-op (and no notification) if the value is unchanged. */
   set(key, value) {
     if (this._state[key] === value) return;
     const old = this._state[key];
@@ -44,6 +47,7 @@ export class AppState {
     };
   }
 
+  /** Invoke every subscriber with (key, newValue, oldValue). */
   _notify(key, value, old) {
     this._listeners.forEach(cb => cb(key, value, old));
   }
@@ -98,6 +102,7 @@ export class URLSync {
     _activeURLSync = this;
   }
 
+  /** Debounce a URL write; collapses bursts into one flush after 200 ms. */
   _schedule() {
     clearTimeout(this._timer);
     this._timer = setTimeout(() => this._flush(), 200);
@@ -111,8 +116,7 @@ export class URLSync {
       // gui.js fallback path's delete-on-null semantics.
       this._adhoc.set(key, null);
     } else {
-      // Round numbers to save space and avoid float jitter (matches the GUI's
-      // previous behavior).
+      // Round numbers to save space and avoid float jitter.
       this._adhoc.set(key,
         typeof value === 'number' ? String(parseFloat(value.toFixed(4))) : String(value));
     }
@@ -130,20 +134,16 @@ export class URLSync {
     for (const k of [...params.keys()]) {
       if (!excl.has(k)) params.delete(k);
     }
-    // Re-assert current state for tracked keys. reset() clears this._timer above,
-    // which cancels any flush already scheduled for an in-flight change (e.g. an
-    // effect switch reaches us via applyEffect()->resetGUI() before its flush
-    // fires). Excluding a key by name only preserves its STALE url value, so
-    // without this the new effect/resolution would be lost and never persisted.
+    // Re-assert current state for tracked keys. Clearing this._timer above cancels
+    // any flush already scheduled for an in-flight change, and excluding a key by
+    // name preserves only its stale URL value; without this the new value is lost.
     for (const key of this.trackedKeys) {
       const val = this.state.get(key);
       if (val !== null && val !== undefined) params.set(key, val);
     }
     // Merge the ad-hoc writes that survived the prune above (the excluded keys).
-    // reset() cancelled the debounced flush, so a GUI param changed within the
-    // 200 ms window before an effect switch was never written to the URL;
-    // re-asserting it here keeps that fresh value instead of the stale one the
-    // exclude-by-name path would otherwise preserve.
+    // The cancelled flush may hold a GUI param changed within the 200 ms window;
+    // re-asserting it keeps that fresh value instead of the stale URL one.
     for (const [key, val] of this._adhoc) {
       if (val === null) params.delete(key);
       else params.set(key, val);
@@ -154,6 +154,11 @@ export class URLSync {
     this._adhoc.clear();
   }
 
+  /**
+   * Read-modify-write the URL once: re-read current params, overlay tracked
+   * state keys and surviving ad-hoc writes, then replaceState. Running at fire
+   * time (not schedule time) is what lets concurrent updates merge.
+   */
   _flush() {
     const params = new URLSearchParams(window.location.search);
     for (const key of this.trackedKeys) {

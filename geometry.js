@@ -12,17 +12,14 @@ const TWO_PI = 2 * Math.PI;
  * Converts 2D pixel coordinates to spherical coordinates on a unit sphere.
  *
  * Writes into `out` and returns it. When `out` is omitted a fresh Spherical is
- * allocated, so the result is always an independent object — callers can safely
- * retain it or hold several at once. Pass a reusable `out` to avoid allocation
- * in hot loops (e.g. setupDots).
- * The azimuth is `π/2 − θ`, not `θ`. THREE.Spherical measures theta from +Z
+ * allocated, so the result is always an independent object. Pass a reusable
+ * `out` to avoid allocation in hot loops (e.g. setupDots).
+ *
+ * The azimuth is `π/2 − θ`, not `θ`: THREE.Spherical measures theta from +Z
  * (`x = sinφ·sinθ`), but the engine's `pixel_to_vector` measures it from +X
- * (`x = sinφ·cosθ`, README §2: column x=0 sits at +X). Feeding the raw pixel
- * azimuth straight in put every dot at an x↔z mirror of engine space — a det=−1
- * reflection no camera orbit can undo, so chiral content rendered opposite-
- * handed from the hardware and the axes overlay's X/Z labels were wrong. The
- * `π/2 − θ` complement makes THREE reproduce the engine vector exactly, so the
- * sim now matches the device (and the axes labels line up with real content).
+ * (`x = sinφ·cosθ`, README §2: column x=0 sits at +X). The `π/2 − θ` complement
+ * makes THREE reproduce the engine vector exactly, avoiding an x↔z mirror
+ * (det=−1 reflection) that would render chiral content opposite-handed.
  * @param {number} x - The pixel x-coordinate [0, Daydream.W - 1].
  * @param {number} y - The pixel y-coordinate [0, Daydream.H - 1].
  * @param {THREE.Spherical} [out] - Target to write into (default: new Spherical).

@@ -67,7 +67,7 @@ test('degenerate canvas dimensions fail fast', () => {
 });
 
 test('an out-of-range segment id fails fast instead of going off-canvas', () => {
-  // id === total used to yield x0 === w (a band entirely off the canvas).
+  // id === total would yield x0 === w (a band entirely off the canvas).
   assert.throws(() => computeSegmentRange(4, 4, 288, 144), /segment id must be/);
   assert.throws(() => computeSegmentRange(-1, 4, 288, 144), /segment id must be/);
   assert.throws(() => computeSegmentRange(1.5, 4, 288, 144), /segment id must be/);

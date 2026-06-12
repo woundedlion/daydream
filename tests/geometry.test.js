@@ -18,8 +18,9 @@ function engineVector(x, y) {
   return [Math.sin(phi) * Math.cos(theta), Math.cos(phi), Math.sin(phi) * Math.sin(theta)];
 }
 
-// Regression for the mirrored-azimuth bug: the sim must place each dot at the
-// same world vector the engine renders for that pixel, not its x<->z mirror.
+// The sim must place each dot at the same world vector the engine renders for
+// that pixel, so azimuth runs from +X (not its x<->z mirror). Sample a spread
+// of columns/rows and require sub-1e-12 agreement with engineVector.
 test('pixelToSpherical matches the engine convention (theta from +X)', () => {
   const v = new THREE.Vector3();
   for (const x of [0, 1, 72, 144, 216, 287]) {
@@ -33,8 +34,8 @@ test('pixelToSpherical matches the engine convention (theta from +X)', () => {
   }
 });
 
-// The headline symptom: column x=0 belongs at +X, but the old THREE-native
-// mapping put it at +Z (the mirror). Pin the axis directly.
+// Pin the azimuth origin directly: column x=0 must land on +X with z~0,
+// guarding against a x<->z swap that would put it at +Z.
 test('the x=0 column maps to +X, not +Z', () => {
   const v = new THREE.Vector3().setFromSpherical(pixelToSpherical(0, 72));
   assert.ok(v.x > 0.99, `x=0 should sit near +X, got x=${v.x}`);

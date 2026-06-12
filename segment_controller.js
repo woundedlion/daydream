@@ -3,14 +3,13 @@
  * Required Notice: Copyright 2025 Gabriel Levy. All rights reserved.
  * Licensed under the Polyform Noncommercial License 1.0.0
  *
- * SegmentController — owns the segmented-POV worker pipeline (#15).
+ * SegmentController — owns the segmented-POV worker pipeline.
  *
  * N Web Workers each load their own isolated WASM module instance and render a
  * quadrant of the canvas in parallel; results are composited into the display
  * buffer. The pipeline is one-frame deep: frame N-1's results are displayed
  * while frame N renders on the workers (frame time = max(segment times), not
- * sum). This is a faithful extraction of the loose module-global state and free
- * functions that previously lived in daydream.js.
+ * sum).
  *
  * The host (daydream.js) owns the main-thread WASM engine and pixel view (both
  * reassignable), so those are injected as lazy getters:
@@ -84,7 +83,7 @@ export class SegmentController {
     this.renderGen = 0;
     this.inflightGen = 0;
 
-    // Pipeline flags (were a module global + a render-loop local)
+    // Pipeline flags
     this.renderInFlight = false;
     this.pendingFrame = false; // true when workers have new results to display
 
@@ -126,6 +125,13 @@ export class SegmentController {
     }
   }
 
+  /**
+   * (Re)build the worker pool at the current resolution: destroy any existing
+   * pool, then spawn `numSegments` fresh workers, each loading its own WASM
+   * module and initialized with this engine's tuned params and paused state.
+   * Aborts loudly (leaving an empty controller) if the resolution key is unknown.
+   * @param {number} numSegments
+   */
   create(numSegments) {
     this.destroy();
 
@@ -245,6 +251,11 @@ export class SegmentController {
     console.log(`[Segmented] Spawning ${numSegments} workers...`);
   }
 
+  /**
+   * Terminate all workers and reset per-segment, frame-lifecycle, and fault
+   * state to empty. Clears the fault latch, so it doubles as the recovery reset
+   * create() runs before rebuilding the pool.
+   */
   destroy() {
     for (const w of this.workers) {
       w.terminate();
@@ -453,9 +464,7 @@ export class SegmentController {
       }
       // If the layout is split in x at all, the wrap seam at x == 0 (== x == w)
       // is a genuine boundary — it's where the last arm meets the first — and
-      // must be marked too. The earlier "drop x == 0" fix over-reached: it
-      // removed this real arm-0/arm-1 seam along with the spurious left-edge
-      // border, leaving the boundary between those two quadrants unmarked.
+      // must be marked too.
       if (xBounds.size > 0) xBounds.add(0);
 
       const plotCyan = (idx) => {
@@ -614,7 +623,7 @@ export class SegmentController {
   /**
    * Render-loop step (segment mode active): apply the previous frame's composite
    * synchronously, then dispatch the next frame's parallel render fire-and-forget.
-   * No-ops while workers are still spawning (matches the prior ready/length guard).
+   * No-ops while workers are still spawning.
    */
   tick() {
     // A faulted pool is broken until re-created: keep the visible fault state up
