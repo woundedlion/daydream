@@ -11,18 +11,31 @@ const {
   randomPointOnSphere,
 } = await import('../tools/spline_math.js');
 
-// Euclidean magnitude of a {x,y,z} point; used to assert unit length.
+/**
+ * Computes the Euclidean magnitude of a 3D point; used to assert unit length.
+ * @param {{x:number, y:number, z:number}} p - The point to measure.
+ * @returns {number} The Euclidean length sqrt(x^2 + y^2 + z^2).
+ */
 const mag = (p) => Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
 
-// A trivial linear point evaluator: treats the 4 controls as the ends of a
-// straight lerp from p0 (t=0) to p3 (t=1), ignoring the middle controls. Lets
-// us check the sampling loop without any real spline backend.
+/**
+ * Trivial linear point evaluator: treats the 4 controls as the ends of a
+ * straight lerp from p0 (t=0) to p3 (t=1), ignoring the middle controls. Lets
+ * the sampling loop be checked without any real spline backend.
+ * @param {{x:number, y:number, z:number}} p0 - Start control point (t=0).
+ * @param {{x:number, y:number, z:number}} p1 - Ignored inner control point.
+ * @param {{x:number, y:number, z:number}} p2 - Ignored inner control point.
+ * @param {{x:number, y:number, z:number}} p3 - End control point (t=1).
+ * @param {number} t - Interpolation parameter in [0, 1].
+ * @returns {{x:number, y:number, z:number}} The linearly interpolated point.
+ */
 const lerpEval = (p0, p1, p2, p3, t) => ({
   x: p0.x + (p3.x - p0.x) * t,
   y: p0.y + (p3.y - p0.y) * t,
   z: p0.z + (p3.z - p0.z) * t,
 });
 
+/** Verifies a known (3,0,4) vector normalizes to unit length with preserved direction. */
 test('vec3Normalize: known vector -> unit length, direction preserved', () => {
   const v = vec3Normalize({ x: 3, y: 0, z: 4 });
   assert.ok(Math.abs(mag(v) - 1) < 1e-12);
@@ -30,14 +43,17 @@ test('vec3Normalize: known vector -> unit length, direction preserved', () => {
   assert.ok(Math.abs(v.z - 0.8) < 1e-12);
 });
 
+/** Verifies the zero vector falls back to the safe unit vector {1,0,0}. */
 test('vec3Normalize: zero vector returns the safe {1,0,0}', () => {
   assert.deepEqual(vec3Normalize({ x: 0, y: 0, z: 0 }), { x: 1, y: 0, z: 0 });
 });
 
+/** Verifies fewer than 4 control points yields an empty curve. */
 test('generateBezierCurve: needs >= 4 points', () => {
   assert.deepEqual(generateBezierCurve([{ x: 0, y: 0, z: 0 }], 4, lerpEval), []);
 });
 
+/** Verifies the sampled curve starts at p0, ends at p3, and has N+1 samples. */
 test('generateBezierCurve: endpoints hit p0/p3 and sample count is N+1', () => {
   const p0 = { x: 0, y: 0, z: 0 };
   const p3 = { x: 1, y: 2, z: 3 };
@@ -49,16 +65,25 @@ test('generateBezierCurve: endpoints hit p0/p3 and sample count is N+1', () => {
   assert.deepEqual(curve[curve.length - 1], p3);
 });
 
-// Trivial tangent callback: pass the segment endpoints straight through as the
-// inner controls, so lerpEval reproduces the segment exactly.
+/**
+ * Trivial tangent callback: passes the segment endpoints straight through as the
+ * inner controls, so lerpEval reproduces the segment exactly.
+ * @param {{x:number, y:number, z:number}} prev - Control point before the segment.
+ * @param {{x:number, y:number, z:number}} start - Segment start control point.
+ * @param {{x:number, y:number, z:number}} end - Segment end control point.
+ * @param {{x:number, y:number, z:number}} next - Control point after the segment.
+ * @returns {{cp1:{x:number,y:number,z:number}, cp2:{x:number,y:number,z:number}}} The inner control points (start and end passed through).
+ */
 const passThroughTangents = (prev, start, end, next) => ({ cp1: start, cp2: end });
 
+/** Verifies fewer than 2 control points yields an empty curve. */
 test('generateCatmullRomCurve: needs >= 2 points', () => {
   assert.deepEqual(
     generateCatmullRomCurve([{ x: 0, y: 0, z: 0 }], 0.5, 4, passThroughTangents, lerpEval, false),
     []);
 });
 
+/** Verifies the open curve has the expected sample count and passes through every control point. */
 test('generateCatmullRomCurve: open case passes through every control point', () => {
   const pts = [
     { x: 0, y: 0, z: 0 },
@@ -77,6 +102,7 @@ test('generateCatmullRomCurve: open case passes through every control point', ()
   }
 });
 
+/** Verifies the closed curve adds a wrap segment back to the first point, making it longer than the open curve. */
 test('generateCatmullRomCurve: closed case wraps (one segment per point)', () => {
   const pts = [
     { x: 0, y: 0, z: 0 },
@@ -94,6 +120,7 @@ test('generateCatmullRomCurve: closed case wraps (one segment per point)', () =>
   assert.deepEqual(closed[closed.length - 1], pts[0]);
 });
 
+/** Verifies C++ float formatting for whole numbers, halves, and trailing-zero trimming. */
 test('formatFloatCpp: whole, half, and trailing-zero trimming', () => {
   assert.equal(formatFloatCpp(1), '1.0f');
   assert.equal(formatFloatCpp(0), '0.0f');
@@ -101,6 +128,7 @@ test('formatFloatCpp: whole, half, and trailing-zero trimming', () => {
   assert.equal(formatFloatCpp(1.2500), '1.25f');
 });
 
+/** Verifies the empty placeholder plus the 'vectors' and 'fragments' export formats. */
 test('splineExportCode: empty placeholder, and both export formats', () => {
   assert.equal(splineExportCode([], 'vectors'), '// Place control points to generate code');
 
@@ -115,6 +143,7 @@ test('splineExportCode: empty placeholder, and both export formats', () => {
   assert.ok(frags.includes('f0.pos = Vector(1.0f, 0.0f, 0.0f);'));
 });
 
+/** Verifies that a deterministic RNG sequence produces a unit-length point on the sphere. */
 test('randomPointOnSphere: deterministic RNG yields a unit-length point', () => {
   // A fixed sequence of "random" values; values avoid the s>=1 / s===0 reject.
   const seq = [0.75, 0.25, 0.1, 0.9];

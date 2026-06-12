@@ -14,13 +14,18 @@ const {
   mapValue, proceduralPaletteCpp, generativePaletteCpp,
 } = await import('../tools/palette_math.js');
 
-/** sRGB -> linear, the same transfer the module applies on output. */
+/**
+ * Converts an sRGB channel value to linear light, the same transfer the module applies on output.
+ * @param {number} s - sRGB channel value in [0, 1].
+ * @returns {number} The linearized channel value in [0, 1].
+ */
 function srgbToLinear(s) {
   return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
 }
 
 const NEAR = 1e-6;
 
+/** Verifies ProceduralPalette.get clamps and linearizes the cosine output, and that getChannelValue exposes the raw cosine. */
 test('ProceduralPalette.get at t=0 and t=0.5 for a known coefficient set', () => {
   // a=0.5, b=0.5, c=1, d=0 → sRGB = clamp(0.5 + 0.5*cos(2π·t)).
   const p = new ProceduralPalette([0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [1, 1, 1], [0, 0, 0]);
@@ -40,6 +45,7 @@ test('ProceduralPalette.get at t=0 and t=0.5 for a known coefficient set', () =>
   assert.ok(Math.abs(p.getChannelValue(0.5, 0) - 0.0) < NEAR);
 });
 
+/** Verifies the PRNG yields identical sequences for equal seeds (via next and nextInt) and diverges for different seeds. */
 test('PRNG is deterministic: same seed -> same sequence', () => {
   const a = new PRNG(12345);
   const b = new PRNG(12345);
@@ -55,6 +61,7 @@ test('PRNG is deterministic: same seed -> same sequence', () => {
   assert.notEqual(new PRNG(1).next(), new PRNG(2).next());
 });
 
+/** Verifies hsvToRgb maps the region-boundary hues to pure primaries and returns a CPixel. */
 test('hsvToRgb on primary hues returns pure red/green/blue', () => {
   // h, s, v in 0..255; full saturation and value. The engine splits the wheel
   // into six 43-wide regions (region = h/43), so the pure primaries land on the
@@ -70,11 +77,13 @@ test('hsvToRgb on primary hues returns pure red/green/blue', () => {
   assert.deepEqual([blue.r, blue.g, blue.b], [0, 0, 255]);
 });
 
+/** Verifies mapValue linearly remaps a value from one numeric range to another. */
 test('mapValue computes the expected interpolations', () => {
   assert.equal(mapValue(0.5, 0, 1, 0, 100), 50);
   assert.equal(mapValue(2, 0, 4, 10, 20), 15);
 });
 
+/** Verifies proceduralPaletteCpp emits the ProceduralPalette initializer with f-suffixed floats and per-vector comments. */
 test('proceduralPaletteCpp emits a valid C++ initializer (finding 291 guard)', () => {
   const params = {
     A_R: 0.5, A_G: 0.5, A_B: 0.5,
@@ -93,6 +102,7 @@ test('proceduralPaletteCpp emits a valid C++ initializer (finding 291 guard)', (
   assert.ok(s.includes('{0.500f, 0.500f, 0.500f}'));
 });
 
+/** Verifies generativePaletteCpp emits the GenerativePalette block with the chosen enum tokens, base hue, and caveat comment. */
 test('generativePaletteCpp emits the block with the chosen enum tokens', () => {
   const s = generativePaletteCpp({
     shape: 'VIGNETTE',
@@ -111,6 +121,7 @@ test('generativePaletteCpp emits the block with the chosen enum tokens', () => {
   assert.ok(s.includes('// Reproduces the profiles + base hue exactly'));
 });
 
+/** Verifies GenerativePalette.get yields finite linear RGB triples within [0, 1] across several t values and shapes. */
 test('GenerativePalette.get returns finite linear RGB in range', () => {
   const pal = new GenerativePalette('STRAIGHT', 'ANALOGOUS', 'ASCENDING', 'VIBRANT', 128);
   for (const t of [0, 0.25, 0.5, 0.75, 0.999]) {

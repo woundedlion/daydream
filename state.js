@@ -9,16 +9,29 @@
  * independently rather than being orchestrated imperatively.
  */
 export class AppState {
-  /** @param {Object} defaults - Initial key/value pairs seeding the state. */
+  /**
+   * Creates an AppState seeded with optional initial values.
+   * @param {Object} defaults - Initial key/value pairs seeding the state.
+   */
   constructor(defaults = {}) {
     this._state = { ...defaults };
     this._listeners = [];
   }
 
-  /** Read a single state value by key. */
+  /**
+   * Reads a single state value by key.
+   * @param {string} key - The state key to look up.
+   * @returns {*} The current value for the key, or undefined if unset.
+   */
   get(key) { return this._state[key]; }
 
-  /** Set one key; no-op (and no notification) if the value is unchanged. */
+  /**
+   * Sets one key, notifying subscribers only when the value actually changes.
+   * No-op (and no notification) if the value is unchanged.
+   * @param {string} key - The state key to write.
+   * @param {*} value - The new value to store.
+   * @returns {void}
+   */
   set(key, value) {
     if (this._state[key] === value) return;
     const old = this._state[key];
@@ -26,7 +39,11 @@ export class AppState {
     this._notify(key, value, old);
   }
 
-  /** Batch-set multiple keys, fires one notification per key at the end. */
+  /**
+   * Batch-sets multiple keys, firing one notification per changed key at the end.
+   * @param {Object} patch - Key/value pairs to merge into the state.
+   * @returns {void}
+   */
   update(patch) {
     const changes = [];
     for (const [key, value] of Object.entries(patch)) {
@@ -39,7 +56,11 @@ export class AppState {
     changes.forEach(([key, value, old]) => this._notify(key, value, old));
   }
 
-  /** Subscribe to state changes. Callback receives (key, newValue, oldValue). */
+  /**
+   * Subscribes to state changes.
+   * @param {Function} callback - Invoked as (key, newValue, oldValue) on each change.
+   * @returns {Function} An unsubscribe function that removes the callback.
+   */
   subscribe(callback) {
     this._listeners.push(callback);
     return () => {
@@ -47,12 +68,21 @@ export class AppState {
     };
   }
 
-  /** Invoke every subscriber with (key, newValue, oldValue). */
+  /**
+   * Invokes every subscriber with the change tuple.
+   * @param {string} key - The key that changed.
+   * @param {*} value - The new value.
+   * @param {*} old - The previous value.
+   * @returns {void}
+   */
   _notify(key, value, old) {
     this._listeners.forEach(cb => cb(key, value, old));
   }
 
-  /** Snapshot of current state. */
+  /**
+   * Returns a shallow snapshot of the current state.
+   * @returns {Object} A copy of the current key/value pairs.
+   */
   snapshot() { return { ...this._state }; }
 }
 
@@ -60,6 +90,10 @@ export class AppState {
 // param writes through this rather than issuing its own competing
 // replaceState, so there is a single URL writer and no clobber race.
 let _activeURLSync = null;
+/**
+ * Returns the app-wide active URLSync instance, or null if none is constructed.
+ * @returns {URLSync|null} The single registered URL writer.
+ */
 export const getActiveURLSync = () => _activeURLSync;
 
 /**
@@ -71,8 +105,10 @@ export const getActiveURLSync = () => _activeURLSync;
  */
 export class URLSync {
   /**
-   * @param {AppState} state - The app state to sync
-   * @param {string[]} trackedKeys - Which state keys to sync to URL
+   * Wires a URLSync to an AppState: reads initial values from the URL, subscribes
+   * to tracked-key changes, and registers itself as the app-wide URL writer.
+   * @param {AppState} state - The app state to sync.
+   * @param {string[]} trackedKeys - Which state keys to sync to the URL.
    */
   constructor(state, trackedKeys) {
     this.state = state;
@@ -102,13 +138,22 @@ export class URLSync {
     _activeURLSync = this;
   }
 
-  /** Debounce a URL write; collapses bursts into one flush after 200 ms. */
+  /**
+   * Debounces a URL write, collapsing bursts into one flush after 200 ms.
+   * @returns {void}
+   */
   _schedule() {
     clearTimeout(this._timer);
     this._timer = setTimeout(() => this._flush(), 200);
   }
 
-  /** Ad-hoc param write from the GUI layer; merged into the single flush. */
+  /**
+   * Records an ad-hoc param write from the GUI layer, merged into the single flush.
+   * @param {string} key - The URL param name to write.
+   * @param {*} value - The value to set; null/undefined records a deletion marker.
+   *   Numbers are rounded to 4 decimals to save space and avoid float jitter.
+   * @returns {void}
+   */
   setParam(key, value) {
     if (value === null || value === undefined) {
       // Record a deletion marker rather than forgetting the key: _flush needs
@@ -123,7 +168,13 @@ export class URLSync {
     this._schedule();
   }
 
-  /** Clear every URL param except the excluded keys (immediate). */
+  /**
+   * Clears every URL param except the excluded keys, writing immediately.
+   * Re-asserts current tracked-key state and surviving ad-hoc writes so an
+   * in-flight (cancelled) flush does not lose a fresh value.
+   * @param {string[]} excludedKeys - Param names to preserve through the reset.
+   * @returns {void}
+   */
   reset(excludedKeys = []) {
     clearTimeout(this._timer);
     const excl = new Set(excludedKeys);
@@ -158,6 +209,7 @@ export class URLSync {
    * Read-modify-write the URL once: re-read current params, overlay tracked
    * state keys and surviving ad-hoc writes, then replaceState. Running at fire
    * time (not schedule time) is what lets concurrent updates merge.
+   * @returns {void}
    */
   _flush() {
     const params = new URLSearchParams(window.location.search);

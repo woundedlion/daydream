@@ -3,6 +3,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeSegmentRange } from '../segment_layout.js';
 
+/**
+ * Verifies that the complete set of segments for several canvas sizes covers
+ * every pixel exactly once, with no overlaps, no gaps, and reported w/h
+ * matching the x/y spans.
+ */
 test('a full segment set tiles the canvas exactly once', () => {
   // Mix of dimensions that divide evenly and ones that leave a remainder for
   // the last band/arm to absorb.
@@ -36,6 +41,10 @@ test('a full segment set tiles the canvas exactly once', () => {
   }
 });
 
+/**
+ * Verifies that total=2 splits the canvas into two full-height halves, one per
+ * arm, left and right.
+ */
 test('two arms split the canvas left/right', () => {
   // total=2 → one band per arm, full height each.
   const left = computeSegmentRange(0, 2, 288, 144);
@@ -44,6 +53,11 @@ test('two arms split the canvas left/right', () => {
   assert.deepEqual(right, { x0: 144, x1: 288, y0: 0, y1: 144, w: 144, h: 144 });
 });
 
+/**
+ * Verifies that when the height does not divide evenly across bands, the final
+ * band extends to the full height to absorb the remainder rather than leaving a
+ * gap.
+ */
 test('the last band absorbs an uneven height remainder', () => {
   // total=4 → 2 bands per arm; h=21 → segH=10, last band reaches 21.
   const top = computeSegmentRange(0, 4, 96, 21);
@@ -54,18 +68,30 @@ test('the last band absorbs an uneven height remainder', () => {
   assert.equal(bottom.y1, 21); // remainder absorbed, not 20
 });
 
+/**
+ * Verifies that a non-positive, odd, or non-integer total segment count is
+ * rejected with a "positive even number" error.
+ */
 test('an odd or too-small segment count fails fast', () => {
   assert.throws(() => computeSegmentRange(0, 3, 96, 20), /positive even number/);
   assert.throws(() => computeSegmentRange(0, 0, 96, 20), /positive even number/);
   assert.throws(() => computeSegmentRange(0, 2.5, 96, 20), /positive even number/);
 });
 
+/**
+ * Verifies that zero, negative, or non-integer canvas dimensions are rejected
+ * with a "positive integers" error.
+ */
 test('degenerate canvas dimensions fail fast', () => {
   assert.throws(() => computeSegmentRange(0, 2, 0, 20), /positive integers/);
   assert.throws(() => computeSegmentRange(0, 2, 96, -1), /positive integers/);
   assert.throws(() => computeSegmentRange(0, 2, 96.5, 20), /positive integers/);
 });
 
+/**
+ * Verifies that a segment id outside [0, total), or a non-integer id, is
+ * rejected rather than producing a range that falls off the canvas.
+ */
 test('an out-of-range segment id fails fast instead of going off-canvas', () => {
   // id === total would yield x0 === w (a band entirely off the canvas).
   assert.throws(() => computeSegmentRange(4, 4, 288, 144), /segment id must be/);

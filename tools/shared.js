@@ -73,7 +73,7 @@ export function showFatalError(message) {
  * @param {Function} [opts.onAnimate] - Callback run every frame before controls.update()
  * @param {Function} [opts.onAfterRender] - Callback run every frame after the render
  * @param {Function} [opts.onResize] - Custom resize handler (replaces the default aspect/size update)
- * @returns {{ scene, camera, renderer, controls, sphere, lights, resize, dispose }}
+ * @returns {{scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer, controls: OrbitControls, sphere: (THREE.Mesh|null), lights: Array<THREE.Light>, resize: Function, dispose: Function}} Scene handles, the resize callback, and a dispose() to tear the scene down.
  */
 export function initScene(containerId, canvasId, opts = {}) {
   const {

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 const { formatFloat, pctSuffix, generateFuncAndRecipe, generateRecipeCpp, computeInternalAngle } =
   await import('../tools/solid_codegen.js');
 
+/** Verifies formatFloat renders whole and fractional numbers as C++ float literals (trailing `.0`/decimal plus `f`). */
 test('formatFloat appends a decimal to whole numbers and an f suffix', () => {
   assert.equal(formatFloat(1), '1.0f');
   assert.equal(formatFloat(0.5), '0.5f');
@@ -18,6 +19,7 @@ test('formatFloat appends a decimal to whole numbers and an f suffix', () => {
   }
 });
 
+/** Verifies pctSuffix rounds a fraction to hundredths and emits a zero-padded two-or-three-digit string, snapping float error. */
 test('pctSuffix quantizes to hundredths and pads to two digits', () => {
   assert.equal(pctSuffix(0.05), '05');
   assert.equal(pctSuffix(0.5), '50');
@@ -27,6 +29,7 @@ test('pctSuffix quantizes to hundredths and pads to two digits', () => {
   assert.equal(pctSuffix(1), '100');
 });
 
+/** Verifies generateFuncAndRecipe derives the function name and SolidBuilder call chain for a truncate+dual recipe. */
 test('generateFuncAndRecipe builds func name and SolidBuilder chain', () => {
   const item = {
     base: 'icosahedron',
@@ -43,6 +46,7 @@ test('generateFuncAndRecipe builds func name and SolidBuilder chain', () => {
   assert.match(recipe, /\.truncate\(0\.5f\)/);
 });
 
+/** Verifies generateFuncAndRecipe special-cases hankin (degree angle scaled by D2R) and relax (integer iter count). */
 test('generateFuncAndRecipe handles hankin (angle * D2R) and relax (iter)', () => {
   const item = {
     base: 'cube',
@@ -56,6 +60,7 @@ test('generateFuncAndRecipe handles hankin (angle * D2R) and relax (iter)', () =
   assert.equal(recipe, 'SolidBuilder(cube(a, b), a, b).hankin(30.0f * D2R).relax(200).build()');
 });
 
+/** Verifies generateRecipeCpp emits the full FLASHMEM function source, prefixed by the V/F/I count comment, byte-for-byte. */
 test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comment', () => {
   const item = {
     base: 'tetrahedron',
@@ -75,11 +80,13 @@ test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comme
   assert.equal(cpp, expected);
 });
 
+/** Verifies generateRecipeCpp falls back to zero vertex/face/internal counts when the item omits them. */
 test('generateRecipeCpp defaults missing V/F/I counts to 0', () => {
   const cpp = generateRecipeCpp({ base: 'cube', ops: [] });
   assert.ok(cpp.startsWith('// V=0, F=0, I=0\n'));
 });
 
+/** Verifies computeInternalAngle yields ~90deg (radians) for a unit-square face. */
 test('computeInternalAngle returns ~90deg for a square face', () => {
   // Unit square in the XY plane; internal angle at each corner is 90 deg.
   const mesh = {
@@ -95,6 +102,7 @@ test('computeInternalAngle returns ~90deg for a square face', () => {
   assert.ok(Math.abs(deg - 90) < 1e-6, `expected ~90, got ${deg}`);
 });
 
+/** Verifies computeInternalAngle yields ~60deg (radians) for an equilateral-triangle face. */
 test('computeInternalAngle returns ~60deg for an equilateral triangle', () => {
   const mesh = {
     vertices: [
@@ -108,6 +116,7 @@ test('computeInternalAngle returns ~60deg for an equilateral triangle', () => {
   assert.ok(Math.abs(deg - 60) < 1e-6, `expected ~60, got ${deg}`);
 });
 
+/** Verifies computeInternalAngle returns 0 for null, empty-face, or insufficient-vertex meshes. */
 test('computeInternalAngle guards degenerate input', () => {
   assert.equal(computeInternalAngle(null), 0);
   assert.equal(computeInternalAngle({ faces: [] }), 0);

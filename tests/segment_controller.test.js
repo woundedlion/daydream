@@ -28,7 +28,12 @@ const { SegmentController } = await import('../segment_controller.js');
  * hand. Every constructed instance is recorded in the static `instances` array.
  */
 class FakeWorker {
+  /** @type {Array<FakeWorker>} Every instance constructed since the last reset. */
   static instances = [];
+  /**
+   * @param {string} url - Worker script URL the controller requested.
+   * @param {Object} opts - Worker options bag (e.g. `{ type: 'module' }`).
+   */
   constructor(url, opts) {
     this.url = url;
     this.opts = opts;
@@ -39,11 +44,27 @@ class FakeWorker {
     this.onmessageerror = null;
     FakeWorker.instances.push(this);
   }
+  /**
+   * Records a posted message instead of dispatching it to a real worker.
+   * @param {Object} msg - Protocol message the controller sent.
+   * @returns {void}
+   */
   postMessage(msg) { this.posted.push(msg); }
+  /**
+   * Marks this fake worker as terminated.
+   * @returns {void}
+   */
   terminate() { this.terminated = true; }
 }
 
-/** Build a controller wired to fake injected host deps. */
+/**
+ * Build a controller wired to fake injected host deps.
+ * @param {Object} [config] - Overrides for the controller's host environment.
+ * @param {string} [config.resolution] - Initial app-state resolution key.
+ * @param {string} [config.effect] - Initial app-state effect name.
+ * @param {Object} [config.presets] - Resolution-preset map keyed by resolution name.
+ * @returns {SegmentController} Controller wired to fake injected deps.
+ */
 function makeController({ resolution = 'lo', effect = 'TestEffect',
                          presets = { lo: { w: 4, h: 4 } } } = {}) {
   const state = { resolution, effect };
@@ -64,12 +85,22 @@ globalThis.Worker = FakeWorker;
 // keeping the tick() state-machine tests DOM-free without exercising the overlay.
 globalThis.document = { getElementById: () => null };
 
-/** Drive a worker's 'ready' message; once all arrive the controller is ready. */
+/**
+ * Drive a worker's 'ready' message; once all arrive the controller is ready.
+ * @param {SegmentController} controller - Controller owning the worker pool.
+ * @param {number} segId - Index of the worker to signal ready.
+ * @returns {void}
+ */
 function deliverReady(controller, segId) {
   controller.workers[segId].onmessage({ data: { type: 'ready' } });
 }
 
-/** Build a controller with `n` workers all signalled ready. */
+/**
+ * Build a controller with `n` workers all signalled ready.
+ * @param {number} [n] - Number of workers to create and mark ready.
+ * @param {Object} [opts] - Options forwarded to makeController().
+ * @returns {SegmentController} A ready controller with `n` workers.
+ */
 function readyController(n = 2, opts = {}) {
   const c = makeController(opts);
   c.create(n);
@@ -77,10 +108,29 @@ function readyController(n = 2, opts = {}) {
   return c;
 }
 
-/** Let the renderParallel() promise's .then (pendingFrame/renderInFlight) run. */
+/**
+ * Let the renderParallel() promise's .then (pendingFrame/renderInFlight) run.
+ * @returns {Promise<void>} Resolves on the next macrotask tick.
+ */
 const flush = () => new Promise((r) => setImmediate(r));
 
-/** Deliver a worker->controller 'frame' message to segment `segId`. */
+/**
+ * Deliver a worker->controller 'frame' message to segment `segId`.
+ * @param {SegmentController} controller - Controller owning the worker pool.
+ * @param {number} segId - Index of the worker delivering the frame.
+ * @param {Object} [overrides] - Per-field overrides for the frame payload.
+ * @param {number} [overrides.quadW] - Quadrant width in pixels.
+ * @param {number} [overrides.quadH] - Quadrant height in pixels.
+ * @param {Uint16Array} [overrides.pixels] - RGB16 quadrant pixel buffer.
+ * @param {number} [overrides.x0] - Inclusive left display-buffer column.
+ * @param {number} [overrides.x1] - Exclusive right display-buffer column.
+ * @param {number} [overrides.y0] - Inclusive top display-buffer row.
+ * @param {number} [overrides.y1] - Exclusive bottom display-buffer row.
+ * @param {number} [overrides.elapsed] - Simulated elapsed time for the frame.
+ * @param {number} [overrides.renderUs] - Reported render time in microseconds.
+ * @param {Object} [overrides.arenaMetrics] - Optional arena-metrics payload.
+ * @returns {void}
+ */
 function deliverFrame(controller, segId, overrides = {}) {
   const quadW = overrides.quadW ?? 2;
   const quadH = overrides.quadH ?? 2;
@@ -216,7 +266,13 @@ test('setResolution on a faulted active pool rebuilds it and clears the fault', 
 // Compositor
 // ---------------------------------------------------------------------------
 
-/** Index of (x,y) channel 0 in a W*H*3 RGB16 buffer. */
+/**
+ * Index of (x,y) channel 0 in a W*H*3 RGB16 buffer.
+ * @param {number} x - Pixel column.
+ * @param {number} y - Pixel row.
+ * @param {number} w - Buffer width in pixels.
+ * @returns {number} Flat element offset of the red channel at (x, y).
+ */
 const idx = (x, y, w) => (y * w + x) * 3;
 
 test('composite() blits each quadrant to its display-buffer offset', () => {

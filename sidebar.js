@@ -10,8 +10,11 @@
  */
 export class EffectSidebar {
   /**
-   * @param {HTMLElement} container - The sidebar DOM element
-   * @param {(name: string) => void} onSelect - Callback when an effect is selected
+   * Construct the sidebar: build the heading, sort controls, option list, and
+   * scroll arrows, then attach them to the container along with the keyboard,
+   * scroll, and resize listeners.
+   * @param {HTMLElement} container - The sidebar DOM element this instance owns.
+   * @param {Function} onSelect - Callback invoked with the selected effect name (string).
    */
   constructor(container, onSelect) {
     this.container = container;
@@ -86,7 +89,12 @@ export class EffectSidebar {
     this.listEl.removeEventListener('scroll', this._onScrollBound);
   }
 
-  /** Create buttons once for the given effect names and sizes. */
+  /**
+   * Create the option buttons once for the given effect names and sizes, then
+   * apply the current sort order, active highlight, and roving tabindex anchor.
+   * @param {Array<string>} names - Effect names, one button per name.
+   * @param {Object} [effectSizes] - Map of effect name to size in bytes; missing or absent entries are treated as 0.
+   */
   setEffects(names, effectSizes) {
     this.buttons.clear();
     this.listEl.innerHTML = '';
@@ -131,7 +139,12 @@ export class EffectSidebar {
     requestAnimationFrame(() => this._updateScrollArrows());
   }
 
-  /** Toggle .active class and aria-selected on old and new button only. */
+  /**
+   * Mark `name` as the active effect, toggling the .active class and
+   * aria-selected on only the previous and new buttons, moving the roving
+   * tabindex, and scrolling the new option into view.
+   * @param {string} name - Name of the effect to mark active.
+   */
   setActive(name) {
     const oldBtn = this.buttons.get(this.activeName);
     if (oldBtn) {
@@ -150,7 +163,12 @@ export class EffectSidebar {
     }
   }
 
-  /** Sort by key ('name' | 'size') and direction ('asc' | 'desc'). */
+  /**
+   * Set the sort key and direction, reorder the option buttons, and refresh the
+   * sort-control UI.
+   * @param {string} key - Sort key, either 'name' or 'size'.
+   * @param {string} dir - Sort direction, either 'asc' or 'desc'.
+   */
   sortBy(key, dir) {
     this.sort = { key, dir };
     this._applySortOrder();
@@ -163,6 +181,9 @@ export class EffectSidebar {
    * Build a sort-control button for `key` labelled `label`. Clicking toggles
    * direction when this key is already active, else activates it (size defaults
    * to descending, others to ascending).
+   * @param {string} key - Sort key this button controls ('name' or 'size').
+   * @param {string} label - Human-readable button label.
+   * @returns {HTMLElement} The created sort-control button.
    */
   _createSortBtn(key, label) {
     const btn = document.createElement('button');
@@ -215,9 +236,12 @@ export class EffectSidebar {
     }
   }
 
-  /** Roving tabindex: make `btn` the list's sole tab stop (tabindex=0), demoting
-   * the previous anchor to -1. No-op target leaves the list with no tab stop
-   * (e.g. an empty list). */
+  /**
+   * Roving tabindex: make `btn` the list's sole tab stop (tabindex=0), demoting
+   * the previous anchor to -1. A null/undefined target leaves the list with no
+   * tab stop (e.g. an empty list).
+   * @param {HTMLElement} [btn] - Button to promote to the tab stop, or falsy for none.
+   */
   _setRovingTabbable(btn) {
     if (this._tabbableBtn && this._tabbableBtn !== btn) {
       this._tabbableBtn.tabIndex = -1;
@@ -226,7 +250,12 @@ export class EffectSidebar {
     this._tabbableBtn = btn || null;
   }
 
-  /** Keyboard navigation: arrow keys move focus, Enter/Space selects. */
+  /**
+   * Keyboard navigation handler: arrow keys move focus between options (wrapping
+   * at the ends and updating the roving tabindex), and Enter/Space selects the
+   * focused effect.
+   * @param {KeyboardEvent} e - The keydown event from the list element.
+   */
   _onKeyDown(e) {
     const btns = Array.from(this.listEl.querySelectorAll('.effect-button'));
     if (!btns.length) return;
