@@ -23,8 +23,9 @@ import { computeSegmentRange } from "./segment_layout.js";
  * lib (where `self` is typed as `Window`, whose `postMessage` takes a target
  * origin), so the call is routed through one cast; the `msg` argument is still
  * checked against the protocol union.
- * @param {ControllerInboundMsg} msg
- * @param {Transferable[]=} transfer
+ * @param {ControllerInboundMsg} msg - The protocol message to send to the controller.
+ * @param {Transferable[]=} transfer - Optional objects to transfer ownership of (zero-copy).
+ * @returns {void}
  */
 const post = /** @type {(msg: ControllerInboundMsg, transfer?: Transferable[]) => void} */ (
   self.postMessage.bind(self));
@@ -37,7 +38,11 @@ let canvasW = 0;
 let canvasH = 0;
 let segRange = null; // { x0, x1, y0, y1, w, h }
 
-/** Apply stored clip to the engine. Must be called after every setEffect. */
+/**
+ * Apply the stored segment clip rectangle to the engine. Must be called after
+ * every setEffect, since rebuilding the effect resets the clip.
+ * @returns {void}
+ */
 function applyClip() {
   if (engine && segRange) {
     engine.setClip(segRange.y0, segRange.y1, segRange.x0, segRange.x1);
@@ -53,7 +58,8 @@ function applyClip() {
  * dropped setResolution is unrecoverable — the worker keeps rendering
  * old-geometry frames tagged with the current generation, so the
  * controller's fence never catches them).
- * @param {WorkerInboundMsg} msg
+ * @param {WorkerInboundMsg} msg - The inbound protocol message to process.
+ * @returns {Promise<void>} Resolves once the message has been fully handled.
  */
 async function handleMessage(msg) {
   switch (msg.type) {

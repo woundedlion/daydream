@@ -11,16 +11,25 @@ const { pixelToSpherical } = await import('../geometry.js');
 
 const W = 288, H = 144;
 
-// The engine's pixel_to_vector (core/geometry.h, README §2): theta from +X.
+/**
+ * Reference implementation of the engine's pixel_to_vector (core/geometry.h,
+ * README §2), with azimuth (theta) measured from +X.
+ * @param {number} x - Pixel column index in [0, W).
+ * @param {number} y - Pixel row index in [0, H).
+ * @returns {Array<number>} The world-space unit vector [x, y, z] the engine renders for that pixel.
+ */
 function engineVector(x, y) {
   const phi = (y * Math.PI) / (H - 1);
   const theta = (x * 2 * Math.PI) / W;
   return [Math.sin(phi) * Math.cos(theta), Math.cos(phi), Math.sin(phi) * Math.sin(theta)];
 }
 
-// The sim must place each dot at the same world vector the engine renders for
-// that pixel, so azimuth runs from +X (not its x<->z mirror). Sample a spread
-// of columns/rows and require sub-1e-12 agreement with engineVector.
+/**
+ * Verifies that pixelToSpherical reproduces the engine's world vector across a
+ * spread of columns/rows, requiring sub-1e-12 agreement with engineVector so the
+ * sim places each dot exactly where the engine renders it (azimuth from +X, not
+ * its x<->z mirror).
+ */
 test('pixelToSpherical matches the engine convention (theta from +X)', () => {
   const v = new THREE.Vector3();
   for (const x of [0, 1, 72, 144, 216, 287]) {
@@ -34,8 +43,10 @@ test('pixelToSpherical matches the engine convention (theta from +X)', () => {
   }
 });
 
-// Pin the azimuth origin directly: column x=0 must land on +X with z~0,
-// guarding against a x<->z swap that would put it at +Z.
+/**
+ * Pins the azimuth origin directly: column x=0 must land on +X with z~0,
+ * guarding against an x<->z swap that would put it at +Z.
+ */
 test('the x=0 column maps to +X, not +Z', () => {
   const v = new THREE.Vector3().setFromSpherical(pixelToSpherical(0, 72));
   assert.ok(v.x > 0.99, `x=0 should sit near +X, got x=${v.x}`);

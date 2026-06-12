@@ -99,9 +99,12 @@ let wasmMemoryView = null;
 let wasmAdapter = null;
 const recorder = new VideoRecorder(document.querySelector('#canvas-container canvas') || document.createElement('canvas'));
 
-// Re-fetch the WASM pixel view when missing or detached (heap growth can detach
-// the underlying ArrayBuffer, leaving a zero-length view), and re-point the two
-// display aliases at it so source, displayed attribute, and Daydream.pixels match.
+/**
+ * Re-fetch the WASM pixel view when missing or detached (heap growth can detach
+ * the underlying ArrayBuffer, leaving a zero-length view), and re-point the two
+ * display aliases at it so source, displayed attribute, and Daydream.pixels match.
+ * @returns {void}
+ */
 function refreshPixelView() {
   if (!wasmMemoryView || wasmMemoryView.buffer.byteLength === 0) {
     wasmMemoryView = wasmEngine.getPixels();
@@ -110,9 +113,12 @@ function refreshPixelView() {
   }
 }
 
-// Push the engine's per-frame parameter values back into the effect GUI so
-// animation-driven params track live, without clobbering controllers the user
-// is actively editing.
+/**
+ * Push the engine's per-frame parameter values back into the effect GUI so
+ * animation-driven params track live, without clobbering controllers the user
+ * is actively editing.
+ * @returns {void}
+ */
 function syncGUI() {
   if (!activeEffect || !activeEffect.controllerByName) return;
 
@@ -192,7 +198,13 @@ const segments = new SegmentController({
 // Reactive Handlers — subscribe to appState
 ///////////////////////////////////////////////////////////////////////////////
 
-/** Tear down the current effect GUI and build a new one for the active effect. */
+/**
+ * Tear down the current effect GUI and build a new one for the active effect.
+ * @param {boolean} [preserveParams=false] - When true, keep the existing per-effect
+ *   param URL entries (used during initial hydration); when false, clear them since
+ *   they don't apply to the newly selected effect.
+ * @returns {void}
+ */
 function applyEffect(preserveParams = false) {
   if (activeEffect && activeEffect.gui) {
     try {
@@ -235,7 +247,16 @@ function applyEffect(preserveParams = false) {
 
     // Reset + Export buttons at top of effect folder
     const effectActions = {
+      /**
+       * Rebuild the effect GUI from the engine's current state, discarding edits.
+       * @returns {void}
+       */
       reset() { applyEffect(); },
+      /**
+       * Copy the current parameter values to the clipboard as a C++ brace-init
+       * list of float literals, then flash the Export button to confirm.
+       * @returns {void}
+       */
       export() {
         const values = wasmEngine.getParamValues();
         const items = [];
@@ -259,6 +280,12 @@ function applyEffect(preserveParams = false) {
     const hasAnimated = params.some(p => p.animated);
     const animState = { pause: false };
     let pauseController = null;
+    /**
+     * Pause or resume animation-driven params on both the main engine and the
+     * segment-worker pool, keeping the local toggle state in sync.
+     * @param {boolean} v - True to freeze animations, false to resume.
+     * @returns {void}
+     */
     const setPaused = (v) => {
       animState.pause = v;
       wasmEngine.setAnimationsPaused(v);
@@ -370,7 +397,12 @@ function applyEffect(preserveParams = false) {
   sidebar.setActive(appState.get('effect'));
 }
 
-/** Apply a resolution change: resize geometry, refresh sidebar list, then re-apply effect. */
+/**
+ * Apply a resolution change: resize geometry, refresh sidebar list, then re-apply effect.
+ * @param {boolean} [preserveParams=false] - Forwarded to applyEffect(); when true,
+ *   preserve the current effect's param URL entries through the re-apply.
+ * @returns {void}
+ */
 function applyResolution(preserveParams = false) {
   const resolution = appState.get('resolution');
   const p = resolutionPresets[resolution];
@@ -455,8 +487,11 @@ createHolosphereModule().then(module => {
   // mode is pipelined inside SegmentController.tick(): it displays frame N-1's
   // composite while frame N renders in parallel on the workers.
   wasmAdapter = {
-    // Per-frame entry the driver calls: render (segmented or single-engine),
-    // republish the pixel view, then mirror engine params back into the GUI.
+    /**
+     * Per-frame entry the driver calls: render (segmented or single-engine),
+     * republish the pixel view, then mirror engine params back into the GUI.
+     * @returns {void}
+     */
     drawFrame() {
       if (segments.active) {
         // Composite the previous frame + dispatch the next (no-op while the
@@ -487,6 +522,10 @@ createHolosphereModule().then(module => {
       }
       syncGUI();
     },
+    /**
+     * Report the engine's current arena allocation metrics for the driver's HUD.
+     * @returns {Object} The WASM engine's arena metrics snapshot.
+     */
     getArenaMetrics() {
       return wasmEngine.getArenaMetrics();
     }
@@ -654,6 +693,13 @@ const recordCtrl = recFolder.add(recordState, 'record').name('\u25cf Record');
 // target sits inside an interactive element.
 const INTERACTIVE_KEY_TARGET =
   'input, textarea, select, button, [contenteditable], .lil-gui, .effect-sidebar';
+/**
+ * Window keydown handler for global playback shortcuts. Ignores keys whose
+ * target sits inside an interactive element (gui control, sidebar, input) so
+ * activating those controls doesn't also toggle the simulation.
+ * @param {KeyboardEvent} e - The keydown event.
+ * @returns {void}
+ */
 const onKeyDown = (e) => {
   const t = e.target;
   if (t instanceof Element && t.closest(INTERACTIVE_KEY_TARGET)) return;
@@ -677,6 +723,12 @@ daydream.renderer.setAnimationLoop(() => {
 // Daydream.dispose() and EffectSidebar.dispose().
 ///////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Release the listeners, timers, and worker pool this module owns so a page
+ * discard leaves nothing firing into a dead scene. Symmetric with
+ * Daydream.dispose() and EffectSidebar.dispose().
+ * @returns {void}
+ */
 function disposeApp() {
   window.removeEventListener("keydown", onKeyDown);
   if (testAllInterval !== null) {

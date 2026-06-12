@@ -19,9 +19,10 @@
  * priority: MP4/H.264 > WebM/VP9 > WebM/VP8. Returns '' if nothing in the
  * candidate list is supported (MediaRecorder then falls back to its default).
  * The support probe is injected so this stays pure and unit-testable.
- * @param {'auto'|'mp4'|'webm'} format
- * @param {(mimeType: string) => boolean} isTypeSupported
- * @returns {string}
+ * @param {'auto'|'mp4'|'webm'} format - Requested output container/codec family.
+ * @param {(mimeType: string) => boolean} isTypeSupported - Probe returning whether
+ *   a MIME type is supported by MediaRecorder; injected to keep this function pure.
+ * @returns {string} The best-supported MIME type, or '' if none of the candidates match.
  */
 export function selectMimeType(
   format,
@@ -41,9 +42,10 @@ export function selectMimeType(
 
 export class VideoRecorder {
   /**
-   * @param {HTMLCanvasElement} canvas Source canvas to record.
-   * @param {number} frameInterval Seconds of video added per captured frame
-   *   (drives the elapsed-time counter; default 1/16 s = 16 fps).
+   * Constructs a recorder bound to a source canvas.
+   * @param {HTMLCanvasElement} canvas - Source canvas to record.
+   * @param {number} frameInterval - Seconds of video added per captured frame;
+   *   drives the elapsed-time counter (default 1/16 s = 16 fps).
    */
   constructor(canvas, frameInterval = 1 / 16) {
     this.canvas = canvas;
@@ -65,18 +67,28 @@ export class VideoRecorder {
     this._offCtx = null;
   }
 
-  /** Returns true if the browser supports canvas recording. */
+  /**
+   * Reports whether the browser supports canvas recording.
+   * @returns {boolean} True if both captureStream and MediaRecorder are available.
+   */
   static isSupported() {
     return typeof HTMLCanvasElement.prototype.captureStream === 'function'
       && typeof MediaRecorder !== 'undefined';
   }
 
-  /** True while a recording session is actively capturing. */
+  /**
+   * Whether a recording session is actively capturing.
+   * @returns {boolean} True while the MediaRecorder is in the 'recording' state.
+   */
   get isRecording() {
     return this.mediaRecorder !== null && this.mediaRecorder.state === 'recording';
   }
 
-  /** Start or stop recording. Returns true if now recording. */
+  /**
+   * Starts recording if idle, or stops it if active.
+   * @param {string} effectName - Base name used for the downloaded file when starting.
+   * @returns {boolean} True if a recording session is now active.
+   */
   toggle(effectName) {
     if (this.isRecording) {
       this.stop();
@@ -90,8 +102,9 @@ export class VideoRecorder {
   }
 
   /**
-   * Begin a recording session. No-op if already recording or unsupported.
-   * @param {string} effectName Base name used for the downloaded file.
+   * Begins a recording session. No-op if already recording or unsupported.
+   * @param {string} effectName - Base name used for the downloaded file.
+   * @returns {void}
    */
   start(effectName = 'effect') {
     if (this.isRecording) return;
@@ -153,14 +166,23 @@ export class VideoRecorder {
     recorder.start();
   }
 
-  /** Stop the active session; download and cleanup happen in onstop. */
+  /**
+   * Stops the active session; download and cleanup happen in the onstop handler.
+   * @returns {void}
+   */
   stop() {
     if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
       this.mediaRecorder.stop();
     }
   }
 
-  /** Call once per simulation frame to request a video frame. */
+  /**
+   * Requests a single video frame; call once per simulation frame. When an
+   * offscreen scaling canvas is in use, blits the source canvas into it (scaled
+   * to the target resolution) before requesting the frame, and advances the
+   * elapsed-time counter by one frame interval.
+   * @returns {void}
+   */
   captureFrame() {
     if (!this.isRecording || !this.track || typeof this.track.requestFrame !== 'function') return;
 
@@ -179,7 +201,10 @@ export class VideoRecorder {
     this.elapsedSeconds += this.frameInterval;
   }
 
-  /** Formatted elapsed time string (MM:SS). */
+  /**
+   * Elapsed recording time as a formatted string.
+   * @returns {string} The elapsed time in M:SS form (seconds zero-padded).
+   */
   get elapsedFormatted() {
     const total = Math.floor(this.elapsedSeconds);
     const m = Math.floor(total / 60);
@@ -187,7 +212,12 @@ export class VideoRecorder {
     return `${m}:${String(s).padStart(2, '0')}`;
   }
 
-  /** Create or resize the offscreen scaling canvas. */
+  /**
+   * Creates or resizes the offscreen scaling canvas to match the target height
+   * and the source canvas aspect ratio, rounding both dimensions up to even
+   * values (required by video codecs).
+   * @returns {HTMLCanvasElement} The offscreen canvas sized for the target resolution.
+   */
   _ensureOffscreen() {
     const aspect = this.canvas.width / this.canvas.height;
     const w = Math.round(this.targetHeight * aspect);
@@ -206,14 +236,27 @@ export class VideoRecorder {
     return this._offscreen;
   }
 
-  /** Determine file extension from the recorded mimeType. */
+  /**
+   * Determines the output file extension from the recorder's MIME type.
+   * @param {MediaRecorder} [recorder] - Recorder whose mimeType is inspected;
+   *   defaults to the active recorder.
+   * @returns {string} 'mp4' for MP4 output, otherwise 'webm'.
+   */
   _extension(recorder = this.mediaRecorder) {
     const mime = recorder?.mimeType ?? '';
     if (mime.startsWith('video/mp4')) return 'mp4';
     return 'webm';
   }
 
-  /** Assemble captured chunks into a blob and save it with a timestamped name. */
+  /**
+   * Assembles captured chunks into a blob and saves it under a timestamped name.
+   * Uses showSaveFilePicker when available, falling back to an anchor download.
+   * @param {MediaRecorder} [recorder] - Recorder used to derive the extension;
+   *   defaults to the active recorder.
+   * @param {Blob[]} [chunks] - Captured data chunks; defaults to the active chunks.
+   * @param {string} [effectName] - Base name for the file; defaults to the stored name.
+   * @returns {void}
+   */
   _download(recorder = this.mediaRecorder, chunks = this.chunks, effectName = this._effectName) {
     const ext = this._extension(recorder);
     const blob = new Blob(chunks, { type: ext === 'mp4' ? 'video/mp4' : 'video/webm' });
@@ -238,7 +281,15 @@ export class VideoRecorder {
     }
   }
 
-  /** Modern File System Access API — deterministic write, no URL leak. */
+  /**
+   * Saves the blob via the File System Access API for a deterministic write with
+   * no object-URL leak. Silently returns if the user cancels; on any other
+   * failure, falls back to the anchor download so the recording is not lost.
+   * @param {Blob} blob - The recorded video data to write.
+   * @param {string} filename - Suggested file name for the save dialog.
+   * @param {string} [ext] - File extension without dot; defaults to the recorder's extension.
+   * @returns {Promise<void>} Resolves once the file is written or the fallback completes.
+   */
   async _saveWithPicker(blob, filename, ext = this._extension()) {
     try {
       const handle = await showSaveFilePicker({
@@ -262,7 +313,14 @@ export class VideoRecorder {
     }
   }
 
-  /** Legacy fallback: anchor-click download with iframe-based revoke. */
+  /**
+   * Legacy save path: triggers an anchor-click download and revokes the object
+   * URL once an offscreen iframe load confirms the browser consumed it, with a
+   * 60 s timeout safety net for browsers that never fire the load event.
+   * @param {Blob} blob - The recorded video data to download.
+   * @param {string} filename - File name applied to the download anchor.
+   * @returns {void}
+   */
   _saveWithAnchor(blob, filename) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -290,7 +348,10 @@ export class VideoRecorder {
     document.body.appendChild(iframe);
   }
 
-  /** Release the active session's recorder, stream, and offscreen canvas. */
+  /**
+   * Releases the active session's recorder, stream tracks, and offscreen canvas.
+   * @returns {void}
+   */
   _cleanup() {
     this.mediaRecorder = null;
     this.chunks = [];

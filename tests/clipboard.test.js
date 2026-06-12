@@ -17,7 +17,11 @@ Object.defineProperty(globalThis, 'navigator', {
 
 const { copyWithFeedback } = await import('../tools/clipboard.js');
 
-/** Minimal stand-in for the button element copyWithFeedback mutates. */
+/**
+ * Builds a minimal stand-in for the button element copyWithFeedback mutates.
+ * @param {string} label - Initial idle text for the element's textContent.
+ * @returns {{textContent: string, classList: {add: Function, remove: Function}}} A fake element with a no-op classList.
+ */
 function fakeElement(label) {
   return {
     textContent: label,
@@ -29,6 +33,7 @@ beforeEach(() => {
   mock.timers.enable({ apis: ['setTimeout'] });
 });
 
+/** Verifies a second copy before the first revert timer still restores the real idle label, not "Copied!". */
 test('a second copy within revertMs still reverts to the idle label', async () => {
   const el = fakeElement('Copy');
 

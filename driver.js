@@ -12,23 +12,34 @@ import { pixelToSpherical } from "./geometry.js";
 const PHI = (1 + Math.sqrt(5)) / 2;
 const g = 1 / PHI;
 
-/// Reuses CSS2DObject label sprites across frames so axis/effect labels can be
-/// rebuilt every frame without churning the DOM. acquire() hands out pooled
-/// objects in order; cleanup() hides any left over from the previous frame.
+/**
+ * Reuses CSS2DObject label sprites across frames so axis/effect labels can be
+ * rebuilt every frame without churning the DOM. acquire() hands out pooled
+ * objects in order; cleanup() hides any left over from the previous frame.
+ */
 class LabelPool {
+  /**
+   * @param {THREE.Scene} scene - Scene that pooled label objects are added to and removed from.
+   */
   constructor(scene) {
     this.scene = scene;
     this.pool = [];
     this.activeCount = 0;
   }
 
-  /// Mark all pooled labels free for reuse this frame (without hiding them yet).
+  /**
+   * Mark all pooled labels free for reuse this frame (without hiding them yet).
+   */
   reset() {
     this.activeCount = 0;
   }
 
-  /// Place the next pooled label at `position` (a unit direction, scaled to the
-  /// sphere surface) showing `content`, growing the pool if exhausted.
+  /**
+   * Place the next pooled label at `position` (a unit direction, scaled to the
+   * sphere surface) showing `content`, growing the pool if exhausted.
+   * @param {THREE.Vector3} position - Unit direction, scaled to the sphere surface for placement.
+   * @param {string} content - Plain-text label content (set via textContent so it cannot inject markup).
+   */
   acquire(position, content) {
     let labelObj;
 
@@ -58,8 +69,10 @@ class LabelPool {
     this.activeCount++;
   }
 
-  /// Remove from the scene any pooled labels not acquired this frame, so stale
-  /// labels from a busier previous frame disappear.
+  /**
+   * Remove from the scene any pooled labels not acquired this frame, so stale
+   * labels from a busier previous frame disappear.
+   */
   cleanup() {
     for (let i = this.activeCount; i < this.pool.length; i++) {
       const obj = this.pool[i];
@@ -75,10 +88,12 @@ class LabelPool {
 /** Per-frame time (ms) above which a frame/segment is flagged "slow" in stats. */
 export const SLOW_FRAME_MS = 62;
 
-/// Browser-side simulator: drives the three.js scene that renders the LED
-/// sphere as instanced dots, on a fixed-timestep sim clock with on-demand
-/// repainting. Holds all rendering config (camera, resolution, axes, PiP) and
-/// the shared pixel color buffer effects draw into.
+/**
+ * Browser-side simulator: drives the three.js scene that renders the LED
+ * sphere as instanced dots, on a fixed-timestep sim clock with on-demand
+ * repainting. Holds all rendering config (camera, resolution, axes, PiP) and
+ * the shared pixel color buffer effects draw into.
+ */
 export class Daydream {
   static SCENE_ANTIALIAS = true;
   static SCENE_ALPHA = true;
@@ -109,9 +124,11 @@ export class Daydream {
   static NEG_Z_AXIS = new THREE.Vector3(0, 0, -1);
   static UP = Daydream.Y_AXIS;
 
-  /// Build the renderer, cameras, controls, scene, dot mesh, and axis lines, and
-  /// wire up resize/camera-change observers. Leaves the sim paused-capable and
-  /// ready for render() to be driven from an animation loop.
+  /**
+   * Build the renderer, cameras, controls, scene, dot mesh, and axis lines, and
+   * wire up resize/camera-change observers. Leaves the sim paused-capable and
+   * ready for render() to be driven from an animation loop.
+   */
   constructor() {
     THREE.ColorManagement.enabled = true;
     this.canvas = document.querySelector("#canvas");
@@ -224,8 +241,11 @@ export class Daydream {
     this.precomputeMatrices();
   }
 
-  /// Keyboard handler: space toggles pause; right-arrow single-steps one frame
-  /// while paused.
+  /**
+   * Keyboard handler: space toggles pause; right-arrow single-steps one frame
+   * while paused.
+   * @param {KeyboardEvent} e - The keydown event whose key drives pause/step.
+   */
   keydown(e) {
     if (e.key == ' ') {
       this.paused = !this.paused;
@@ -234,10 +254,12 @@ export class Daydream {
     }
   }
 
-  /// Fit renderer, label layer, and both cameras to the container size. Switches
-  /// to mobile layout at <=900px wide, sizes the square PiP viewport to 30% of
-  /// the smaller dimension, and re-fits the camera distance so the sphere fills
-  /// ~85% of the view.
+  /**
+   * Fit renderer, label layer, and both cameras to the container size. Switches
+   * to mobile layout at <=900px wide, sizes the square PiP viewport to 30% of
+   * the smaller dimension, and re-fits the camera distance so the sphere fills
+   * ~85% of the view.
+   */
   setCanvasSize() {
     const container = this.canvas.parentElement;
     const width = container.clientWidth;
@@ -280,19 +302,24 @@ export class Daydream {
     this._needsRender = true;
   }
 
-  /// Request a repaint on the next animation frame. For on-demand rendering:
-  /// callers that mutate the visible scene without advancing the simulation or
-  /// moving the camera (e.g. toggling axes/back-face culling, changing
-  /// resolution) must call this, otherwise the change won't show until the next
-  /// sim tick — or never, while paused.
+  /**
+   * Request a repaint on the next animation frame. For on-demand rendering:
+   * callers that mutate the visible scene without advancing the simulation or
+   * moving the camera (e.g. toggling axes/back-face culling, changing
+   * resolution) must call this, otherwise the change won't show until the next
+   * sim tick — or never, while paused.
+   */
   invalidate() {
     this._needsRender = true;
   }
 
-  /// Animation-loop body, called once per animation frame with the active
-  /// effect. Advances the fixed-timestep simulation if an interval has accrued,
-  /// updates controls, and repaints the main view, labels, and PiP — but only
-  /// when the sim stepped, the camera moved, or invalidate() was called.
+  /**
+   * Animation-loop body, called once per animation frame with the active
+   * effect. Advances the fixed-timestep simulation if an interval has accrued,
+   * updates controls, and repaints the main view, labels, and PiP — but only
+   * when the sim stepped, the camera moved, or invalidate() was called.
+   * @param {Object} effect - Active effect; its drawFrame()/getLabels()/getArenaMetrics() drive the painted frame.
+   */
   render(effect) {
     // The fixed-timestep clock gates only the simulation; rendering is
     // on-demand. _advanceFrameClock() runs every animation frame (so the
@@ -337,9 +364,12 @@ export class Daydream {
     this.renderer.setScissorTest(false);
   }
 
-  /// Fixed-timestep gate. Accumulates real elapsed time (clamped to avoid a
-  /// spiral-of-death after a stall) and returns true — consuming one frame
-  /// interval — only when enough has accrued to advance a frame.
+  /**
+   * Fixed-timestep gate. Accumulates real elapsed time (clamped to avoid a
+   * spiral-of-death after a stall) and consumes one frame interval only when
+   * enough has accrued to advance a frame.
+   * @returns {boolean} True when a frame interval was consumed and the sim should advance.
+   */
   _advanceFrameClock() {
     const delta = this.clock.getDelta();
     this.timeAccumulator += delta;
@@ -349,10 +379,12 @@ export class Daydream {
     return true;
   }
 
-  /// Advance the simulation one frame when running or single-stepping: clear the
-  /// pixel buffer, draw the effect, refresh stats. Returns whether the
-  /// simulation actually advanced (false while paused) so the caller can gate
-  /// the recorder on the same decision.
+  /**
+   * Advance the simulation one frame when running or single-stepping: clear the
+   * pixel buffer, draw the effect, refresh stats.
+   * @param {Object} effect - Active effect whose drawFrame() paints the pixel buffer.
+   * @returns {boolean} Whether the simulation actually advanced (false while paused), so the caller can gate the recorder on the same decision.
+   */
   _stepSimulation(effect) {
     const advanced = !this.paused || this.stepFrames != 0;
     if (!advanced) return false;
@@ -385,8 +417,11 @@ export class Daydream {
     return true;
   }
 
-  /// Rebuild the floating label set (axis labels + effect-supplied labels),
-  /// acquiring pooled sprites only for labels on the camera-facing hemisphere.
+  /**
+   * Rebuild the floating label set (axis labels + effect-supplied labels),
+   * acquiring pooled sprites only for labels on the camera-facing hemisphere.
+   * @param {Object} effect - Active effect; its getLabels() supplies extra labels when present.
+   */
   _refreshLabels(effect) {
     this.labelPool.reset();
     let labels = [];
@@ -413,8 +448,10 @@ export class Daydream {
     this.labelPool.cleanup();
   }
 
-  /// Push the current camera position / cull mode into the backface-cull shader
-  /// uniforms.
+  /**
+   * Push the current camera position / cull mode into the backface-cull shader
+   * uniforms.
+   */
   _updateCullUniforms() {
     if (this.cullUniforms) {
       this.cullUniforms.uCameraPos.value.copy(this.camera.position);
@@ -424,8 +461,10 @@ export class Daydream {
     }
   }
 
-  /// Render the main sphere view into its viewport. Assumes the scissor test is
-  /// already enabled by the caller.
+  /**
+   * Render the main sphere view into its viewport. Assumes the scissor test is
+   * already enabled by the caller.
+   */
   _renderMainView() {
     this.renderer.setViewport(
       this.mainViewport.x,
@@ -445,10 +484,12 @@ export class Daydream {
     this.renderer.render(this.scene, this.camera);
   }
 
-  /// Render the picture-in-picture corner view. Skipped on mobile, under
-  /// headless automation (Playwright/Puppeteer/Selenium set navigator.webdriver),
-  /// and while recording, so clean screenshots/videos aren't obscured by the
-  /// PiP corner.
+  /**
+   * Render the picture-in-picture corner view. Skipped on mobile, under
+   * headless automation (Playwright/Puppeteer/Selenium set navigator.webdriver),
+   * and while recording, so clean screenshots/videos aren't obscured by the
+   * PiP corner.
+   */
   _renderPip() {
     if (this.isMobile || navigator.webdriver || this.recorder?.isRecording) return;
 
@@ -469,10 +510,12 @@ export class Daydream {
     this.renderer.render(this.scene, this.pipCamera);
   }
 
-  /// (Re)build the InstancedMesh of dots, one instance per pixel (W*H). Disposes
-  /// any previous mesh, lazily builds the dot material (whose injected shader
-  /// hides black pixels and back-face-culls the far hemisphere), and picks a
-  /// sphere tessellation that drops as pixel count rises to cap geometry cost.
+  /**
+   * (Re)build the InstancedMesh of dots, one instance per pixel (W*H). Disposes
+   * any previous mesh, lazily builds the dot material (whose injected shader
+   * hides black pixels and back-face-culls the far hemisphere), and picks a
+   * sphere tessellation that drops as pixel count rises to cap geometry cost.
+   */
   setupDots() {
     if (this.dotMesh) {
       this.scene.remove(this.dotMesh);
@@ -546,10 +589,12 @@ export class Daydream {
     this.scene.add(this.dotMesh);
   }
 
-  /// Compute each dot's instance matrix: map its pixel (x,y) to a point on the
-  /// sphere and orient the dot to face outward from the center. Also allocates
-  /// the shared instanceColor buffer (exposed as Daydream.pixels) that effects
-  /// write pixel colors into.
+  /**
+   * Compute each dot's instance matrix: map its pixel (x,y) to a point on the
+   * sphere and orient the dot to face outward from the center. Also allocates
+   * the shared instanceColor buffer (exposed as Daydream.pixels) that effects
+   * write pixel colors into.
+   */
   precomputeMatrices() {
     const vector = new THREE.Vector3();
     const dummy = new THREE.Object3D();
@@ -590,9 +635,13 @@ export class Daydream {
     }
   }
 
-  /// Write the per-frame stats panels (desktop + mobile): the frame draw
-  /// `duration` in ms (red past SLOW_FRAME_MS) and, if the effect exposes arena
-  /// metrics, each arena's usage|high-water|capacity in KiB.
+  /**
+   * Write the per-frame stats panels (desktop + mobile): the frame draw
+   * duration (red past SLOW_FRAME_MS) and, if the effect exposes arena metrics,
+   * each arena's usage|high-water|capacity in KiB.
+   * @param {number} duration - Frame draw time in milliseconds.
+   * @param {Object} effect - Active effect; its getArenaMetrics() supplies arena usage when present.
+   */
   _updateStats(duration, effect) {
     if (!this._statsGroup) {
       this._statsGroup = {
@@ -629,8 +678,13 @@ export class Daydream {
     }
   }
 
-  /// Change the sphere's pixel grid to `h`x`w` with the given dot size, then
-  /// rebuild the dot mesh and its instance matrices/color buffer.
+  /**
+   * Change the sphere's pixel grid to `h`x`w` with the given dot size, then
+   * rebuild the dot mesh and its instance matrices/color buffer.
+   * @param {number} h - New grid height in pixels.
+   * @param {number} w - New grid width in pixels.
+   * @param {number} dotSize - New dot radius in scene units.
+   */
   updateResolution(h, w, dotSize) {
     Daydream.H = h;
     Daydream.W = w;
@@ -675,9 +729,13 @@ export class Daydream {
   }
 }
 
-/// Format a number for label display, snapping near-matches (within 1e-5) to
-/// symbolic names for common angles/constants (0, ±1, multiples of π, golden
-/// ratio φ, 1/√3); otherwise a 3-decimal string.
+/**
+ * Format a number for label display, snapping near-matches (within 1e-5) to
+ * symbolic names for common angles/constants (0, ±1, multiples of π, golden
+ * ratio φ, 1/√3); otherwise a 3-decimal string.
+ * @param {number} r - The value to format.
+ * @returns {string} The symbolic name or a 3-decimal string representation.
+ */
 export const prettify = (r) => {
   let precision = 3;
   if (Math.abs(r) <= 0.00001) return "0";
@@ -700,9 +758,13 @@ export const prettify = (r) => {
   return r.toFixed(precision);
 }
 
-/// Build a label for a Cartesian point `c` ([x,y,z]): its position is `c`
-/// reprojected onto the sphere surface, and its content lists the spherical
-/// angles, raw coordinates, and normalized direction (each via prettify()).
+/**
+ * Build a label for a Cartesian point `c` ([x,y,z]): its position is `c`
+ * reprojected onto the sphere surface, and its content lists the spherical
+ * angles, raw coordinates, and normalized direction (each via prettify()).
+ * @param {Array<number>} c - Cartesian point as [x, y, z].
+ * @returns {{position: THREE.Vector3, content: string}} Label placement on the sphere surface and its multi-line text.
+ */
 export const coordsLabel = (c) => {
   let s = new THREE.Spherical().setFromCartesianCoords(c[0], c[1], c[2]);
   let n = new THREE.Vector3(c[0], c[1], c[2]).normalize();

@@ -13,24 +13,39 @@
  * three.js dependency.
  */
 
-// Format float with f suffix and .0 if integer, to satisfy C++ strictness and convention
+/**
+ * Formats a number as a C++ float literal, appending `.0` when integral and an
+ * `f` suffix, to satisfy C++ strictness and convention.
+ * @param {number} val - The numeric value to format.
+ * @returns {string} The C++ float literal (e.g. 0.5 -> "0.5f", 2 -> "2.0f").
+ */
 export function formatFloat(val) {
   const s = val.toString();
   return (s.indexOf('.') === -1 ? s + ".0" : s) + "f";
 }
 
-// Stable, unambiguous suffix for a fractional op parameter (0..1+).
-// Quantize to hundredths and pad to two digits so 0.05 -> "05" and
-// 0.5 -> "50" stay distinct and self-describing in generated funcNames.
+/**
+ * Builds a stable, unambiguous suffix for a fractional op parameter (0..1+).
+ * Quantizes to hundredths and pads to two digits so 0.05 -> "05" and 0.5 -> "50"
+ * stay distinct and self-describing in generated funcNames.
+ * @param {number} val - The fractional parameter value (typically 0..1+).
+ * @returns {string} A two-or-more digit percent suffix.
+ */
 export function pctSuffix(val) {
   return String(Math.round(val * 100)).padStart(2, '0');
 }
 
-// Derive the C++ funcName and SolidBuilder recipe expression for a solid spec.
-// The funcName is base + one suffix per op (encoding parameters where two solids
-// could otherwise collide); the recipe is the chained SolidBuilder(...).build()
-// call. `item` is { base, ops:[op|{op,params}] }; both naming and chaining follow
-// solids.h conventions.
+/**
+ * Derives the C++ funcName and SolidBuilder recipe expression for a solid spec.
+ * The funcName is the base plus one suffix per op (encoding parameters where two
+ * solids could otherwise collide); the recipe is the chained
+ * SolidBuilder(...).build() call. Both naming and chaining follow solids.h
+ * conventions.
+ * @param {Object} item - The solid spec.
+ * @param {string} item.base - The base solid name.
+ * @param {Array<(string|{op:string, params:Object})>} item.ops - Ops to apply, each a bare op name or an {op, params} object.
+ * @returns {{funcName: string, recipe: string}} The generated C++ function name and SolidBuilder recipe expression.
+ */
 export function generateFuncAndRecipe(item) {
   let nameParts = [item.base];
   let chain = '';
@@ -76,18 +91,27 @@ export function generateFuncAndRecipe(item) {
   return { funcName, recipe };
 }
 
-// Emit the full FLASHMEM C++ function for a solid, prefixed with a comment
-// recording its vertex/face/index counts. Output is pasted verbatim into the
-// engine, so the exact text and formatting are byte-for-byte significant.
+/**
+ * Emits the full FLASHMEM C++ function for a solid, prefixed with a comment
+ * recording its vertex/face/index counts. Output is pasted verbatim into the
+ * engine, so the exact text and formatting are byte-for-byte significant.
+ * @param {Object} item - The solid spec (see generateFuncAndRecipe), optionally with vCount, fCount, and iCount counts.
+ * @returns {string} The complete C++ function source including its leading count comment.
+ */
 export function generateRecipeCpp(item) {
   const { funcName, recipe } = generateFuncAndRecipe(item);
   const comment = `// V=${item.vCount || 0}, F=${item.fCount || 0}, I=${item.iCount || 0}`;
   return `${comment}\nFLASHMEM inline PolyMesh ${funcName}(Arena &a, Arena &b) {\n  return ${recipe};\n}`;
 }
 
-// Interior angle (radians) at the second vertex of the mesh's first face, used
-// to characterize a solid's face shape. Returns 0 for degenerate input (no
-// faces, a face with fewer than 3 vertices, or a zero-length edge).
+/**
+ * Computes the interior angle (in radians) at the second vertex of the mesh's
+ * first face, used to characterize a solid's face shape. Returns 0 for
+ * degenerate input (no faces, a face with fewer than 3 vertices, or a
+ * zero-length edge).
+ * @param {{faces: Array<Array<number>>, vertices: Array<{x:number, y:number, z:number}>}} mesh - The mesh whose first face is measured; vertices use plain {x, y, z} math (a THREE.Vector3 satisfies this shape).
+ * @returns {number} The internal angle in radians, or 0 for degenerate input.
+ */
 export function computeInternalAngle(mesh) {
   if (!mesh || !mesh.faces || mesh.faces.length === 0) return 0;
   const face = mesh.faces[0];

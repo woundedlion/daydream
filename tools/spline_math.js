@@ -17,8 +17,8 @@
 /**
  * Normalize a plain {x,y,z} vector to unit length. A degenerate (near-zero)
  * vector returns {x:1, y:0, z:0} rather than NaNs.
- * @param {{x:number,y:number,z:number}} v
- * @returns {{x:number,y:number,z:number}}
+ * @param {{x:number,y:number,z:number}} v - Vector to normalize.
+ * @returns {{x:number,y:number,z:number}} Unit-length vector, or {x:1,y:0,z:0} if degenerate.
  */
 export function vec3Normalize(v) {
   const len = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
@@ -29,10 +29,10 @@ export function vec3Normalize(v) {
 /**
  * Sample a 4-point Bézier curve over [0,1]. The actual point math is delegated
  * to evalFn so callers can swap in any backend (e.g. the WASM engine).
- * @param {Array<{x:number,y:number,z:number}>} pts Control points (≥4 used).
- * @param {number} numSamples Number of segments; returns numSamples+1 points.
- * @param {(p0:any,p1:any,p2:any,p3:any,t:number)=>any} evalFn Point evaluator.
- * @returns {Array<any>}
+ * @param {Array<{x:number,y:number,z:number}>} pts - Control points (first 4 are used).
+ * @param {number} numSamples - Number of segments; returns numSamples+1 points.
+ * @param {Function} evalFn - Point evaluator (p0, p1, p2, p3, t) => point.
+ * @returns {Array<*>} Sampled curve points, or [] if fewer than 4 control points.
  */
 export function generateBezierCurve(pts, numSamples, evalFn) {
   if (pts.length < 4) return [];
@@ -48,13 +48,13 @@ export function generateBezierCurve(pts, numSamples, evalFn) {
  * Sample a Catmull-Rom spline through N control points, with closed-loop
  * support. Per-segment tangents come from tangentFn and the per-step point math
  * from evalFn, keeping this routine backend-agnostic.
- * @param {Array<{x:number,y:number,z:number}>} pts Control points (≥2).
- * @param {number} tension Catmull-Rom tension, forwarded to tangentFn.
- * @param {number} numSamplesPerSeg Samples per segment.
- * @param {(prev:any,start:any,end:any,next:any,tension:number)=>{cp1:any,cp2:any}} tangentFn
- * @param {(p0:any,p1:any,p2:any,p3:any,t:number)=>any} evalFn Point evaluator.
- * @param {boolean} closed Whether the spline forms a closed loop.
- * @returns {Array<any>}
+ * @param {Array<{x:number,y:number,z:number}>} pts - Control points (at least 2 required).
+ * @param {number} tension - Catmull-Rom tension, forwarded to tangentFn.
+ * @param {number} numSamplesPerSeg - Samples per segment.
+ * @param {Function} tangentFn - Tangent builder (prev, start, end, next, tension) => {cp1, cp2}.
+ * @param {Function} evalFn - Point evaluator (p0, p1, p2, p3, t) => point.
+ * @param {boolean} closed - Whether the spline forms a closed loop.
+ * @returns {Array<*>} Sampled curve points, or [] if fewer than 2 control points.
  */
 export function generateCatmullRomCurve(pts, tension, numSamplesPerSeg, tangentFn, evalFn, closed) {
   const n = pts.length;
@@ -83,8 +83,8 @@ export function generateCatmullRomCurve(pts, tension, numSamplesPerSeg, tangentF
  * Format a number as a C++ float literal. Trims trailing zeros but keeps at
  * least one fractional digit, so whole values stay valid float literals:
  * 0 -> "0.0f", 1 -> "1.0f" (a bare "0f"/"1f" does not compile).
- * @param {number} n
- * @returns {string}
+ * @param {number} n - Value to format.
+ * @returns {string} C++ float literal (e.g. "1.5f").
  */
 export function formatFloatCpp(n) {
   const s = n.toFixed(6).replace(/0+$/, '').replace(/\.$/, '.0');
@@ -94,9 +94,9 @@ export function formatFloatCpp(n) {
 /**
  * Build the C++ export snippet for a set of control points. Pure string work;
  * the DOM read of the format selector and write of the output stays inline.
- * @param {Array<{x:number,y:number,z:number}>} pts Control points.
- * @param {string} format 'vectors' or 'fragments'.
- * @returns {string}
+ * @param {Array<{x:number,y:number,z:number}>} pts - Control points.
+ * @param {string} format - Output mode: 'vectors' or 'fragments'.
+ * @returns {string} The generated C++ source snippet.
  */
 export function splineExportCode(pts, format) {
   if (pts.length === 0) {
@@ -123,8 +123,8 @@ export function splineExportCode(pts, format) {
 /**
  * Sample a point uniformly on the unit sphere via Marsaglia's method. The RNG
  * is injectable so the result is deterministic under test.
- * @param {() => number} [rng] Uniform [0,1) source; defaults to Math.random.
- * @returns {{x:number,y:number,z:number}}
+ * @param {Function} [rng] - Uniform [0,1) source; defaults to Math.random.
+ * @returns {{x:number,y:number,z:number}} A unit vector uniformly distributed on the sphere.
  */
 export function randomPointOnSphere(rng = Math.random) {
   let v1, v2, s;

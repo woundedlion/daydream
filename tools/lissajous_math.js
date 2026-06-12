@@ -22,10 +22,10 @@ const TWO_PI = 2 * Math.PI;
  * Argument order mirrors the engine's lissajous(m1, m2, a, t) (core/geometry.h)
  * so the preview, the exported snippet, and the engine all agree on which
  * slider maps to which parameter. t is last in every case.
- * @param {number} m1 Axial frequency C₁.
- * @param {number} m2 Orbital frequency C₂.
- * @param {number} a Phase shift A (radians).
- * @param {number} t Parameter.
+ * @param {number} m1 - Axial frequency C₁.
+ * @param {number} m2 - Orbital frequency C₂.
+ * @param {number} a - Phase shift A (radians).
+ * @param {number} t - Curve parameter.
  * @returns {THREE.Vector3} Point on the unit sphere.
  */
 export const lissajous = (m1, m2, a, t) => {
@@ -38,8 +38,8 @@ export const lissajous = (m1, m2, a, t) => {
 
 /**
  * Finds the simplest rational approximation (M/N) for a given value (ratio).
- * @param {number} value The ratio to approximate (e.g., C1/C2).
- * @param {number} maxDenominator Maximum value for the numerator/denominator.
+ * @param {number} value - The ratio to approximate (e.g., C1/C2).
+ * @param {number} [maxDenominator] - Maximum value for the numerator/denominator.
  * @returns {{ M: number, N: number }} The best simple rational ratio.
  */
 export const findBestRationalRatio = (value, maxDenominator = 8) => {
@@ -70,10 +70,11 @@ export const findBestRationalRatio = (value, maxDenominator = 8) => {
  * Pure closing-domain core of snapFrequencies. Snaps the active frequency to
  * maintain a simple rational ratio M/N with the passive frequency, and computes
  * the domain T = 2π·N / passiveC after which the curve closes.
- * @param {number} activeC The intended (raw) active frequency value.
- * @param {number} passiveC The passive (held) frequency value.
- * @param {number} [maxDenominator] Max numerator/denominator for the ratio.
- * @returns {{ snappedActiveC: number, m: number, n: number, closingPeriod: number }}
+ * @param {number} activeC - The intended (raw) active frequency value.
+ * @param {number} passiveC - The passive (held) frequency value.
+ * @param {number} [maxDenominator] - Max numerator/denominator for the ratio.
+ * @returns {{ snappedActiveC: number, m: number, n: number, closingPeriod: number }} The
+ *   snapped active frequency, the rational ratio m/n, and the curve's closing period T.
  */
 export const snapToRationalRatio = (activeC, passiveC, maxDenominator = 8) => {
   // Find M/N such that M/N ≈ activeC / passiveC.
@@ -100,16 +101,21 @@ export const snapToRationalRatio = (activeC, passiveC, maxDenominator = 8) => {
  * Phase A is emitted in radians and fed to the engine as-is: the tool's
  * radians-labelled slider matches `lissajous()`'s phase with no π scaling.
  * C₁/C₂ map to m1/m2.
- * @param {number} c1 Frequency C₁ (m1).
- * @param {number} c2 Frequency C₂ (m2).
- * @param {number} a Phase shift A (radians).
- * @param {number} domain The curve domain (duration).
+ * @param {number} c1 - Frequency C₁ (m1).
+ * @param {number} c2 - Frequency C₂ (m2).
+ * @param {number} a - Phase shift A (radians).
+ * @param {number} domain - The curve domain (duration).
  * @returns {string} A `LissajousParams{...}` initializer.
  */
 export const lissajousCodeString = (c1, c2, a, domain) => {
-  // Format a value as a C++ float literal: fixed precision, trailing zeros
-  // trimmed but always at least one fractional digit, with an 'f' suffix
-  // (so e.g. 12 emits as 12.0f, never the invalid 12f).
+  /**
+   * Formats a value as a C++ float literal: fixed precision, trailing zeros
+   * trimmed but always at least one fractional digit, with an 'f' suffix (so
+   * e.g. 12 emits as 12.0f, never the invalid 12f).
+   * @param {number} n - The value to format.
+   * @param {number} [fixed] - Number of fractional digits before trimming.
+   * @returns {string} The C++ float literal (e.g. "12.0f").
+   */
   const f = (n, fixed = 3) => {
     let s = n.toFixed(fixed).replace(/(\.\d*?)0+$/, '$1');
     if (s.endsWith('.')) s += '0';

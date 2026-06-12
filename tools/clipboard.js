@@ -56,7 +56,7 @@ export async function copyToClipboard(text) {
  * reimplement it.
  *
  * @param {string} text - Text to copy.
- * @param {object} [opts]
+ * @param {Object} [opts] - Feedback options.
  * @param {HTMLElement} [opts.element] - Element whose label flips on success.
  * @param {string} [opts.copiedText='Copied!'] - Label shown while copied.
  * @param {string} [opts.revertText] - Label to restore (default: current text).

@@ -36,6 +36,15 @@ import { Daydream, SLOW_FRAME_MS } from "./driver.js";
  */
 
 export class SegmentController {
+  /**
+   * Wire the controller to the host's reassignable engine/view via lazy getters.
+   * @param {Object} deps - Host-injected dependencies.
+   * @param {Object<string, {w:number, h:number}>} deps.resolutionPresets - Resolution table mapping a preset name to its pixel dimensions.
+   * @param {Object} deps.appState - Pub/sub state; reads the 'resolution' and 'effect' keys.
+   * @param {function(): (Object|null)} deps.getWasmEngine - Returns the current main-thread HolosphereEngine, or null when none is bound.
+   * @param {Function} deps.refreshPixelView - Re-fetches the (possibly detached) WASM pixel view.
+   * @param {function(): (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
+   */
   constructor({ resolutionPresets, appState, getWasmEngine, refreshPixelView,
                 getMemoryView }) {
     this._resolutionPresets = resolutionPresets;
@@ -281,6 +290,8 @@ export class SegmentController {
    * `tick()` from dispatching another doomed render. Recovery is by re-creating
    * the pool (resolution change / mode toggle), which clears the latch via
    * destroy(). Only the first fault per session is recorded for the UI.
+   * @param {number} segId - Index of the worker segment that faulted.
+   * @param {string} message - Human-readable fault message for the UI/console.
    */
   _onWorkerFault(segId, message) {
     if (!this.faulted) {
@@ -375,7 +386,7 @@ export class SegmentController {
 
   /**
    * Dispatch parallel render to all workers.
-   * Returns a Promise that resolves when all workers have responded.
+   * @returns {Promise<void>} Resolves when all workers have responded (last response measures wall time).
    */
   renderParallel() {
     return new Promise((resolve) => {
@@ -573,6 +584,8 @@ export class SegmentController {
    * (Re)build the stats-table DOM and cache references to the cells updateStats
    * mutates each frame, so the steady-state path is textContent writes rather
    * than an innerHTML re-parse.
+   * @param {number} numSegs - Number of segment rows to build.
+   * @param {HTMLElement} el - Container element the table is mounted into.
    */
   _buildStatsTable(numSegs, el) {
     const table = document.createElement('table');

@@ -3,22 +3,27 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-// Pure palette math extracted from tools/palettes.html. This module mirrors the
-// engine's ProceduralPalette and GenerativePalette so the browser tool predicts
-// the exact colors the device produces, and so the C++ export-string generators
-// can be regression-tested without a DOM. No DOM/canvas/window references live
-// here; all UI wiring stays inline in palettes.html.
+// Pure palette math. This module mirrors the engine's ProceduralPalette and
+// GenerativePalette so the browser tool predicts the exact colors the device
+// produces, and so the C++ export-string generators can be regression-tested
+// without a DOM. No DOM/canvas/window references live here; all UI wiring stays
+// inline in palettes.html.
 
 import { srgbToLinearFloat, srgbToOklch, lerpOklch, oklchToLinearRgb } from './color.js';
 
 const TWO_PI = 2 * Math.PI;
 
 /**
- * The core procedural palette class.
- * C(t) = A + B * cos(TWO_PI * (C * t + D))
+ * The core procedural palette, defined by C(t) = A + B * cos(TWO_PI * (C * t + D)).
  */
 export class ProceduralPalette {
-  // a/b/c/d are each a [r, g, b] vec3 of cosine-formula coefficients.
+  /**
+   * Stores the four cosine-formula coefficient vectors.
+   * @param {number[]} a - [r, g, b] vec3 of A (DC offset) coefficients.
+   * @param {number[]} b - [r, g, b] vec3 of B (amplitude) coefficients.
+   * @param {number[]} c - [r, g, b] vec3 of C (frequency) coefficients.
+   * @param {number[]} d - [r, g, b] vec3 of D (phase) coefficients.
+   */
   constructor(a, b, c, d) {
     this.a = a;
     this.b = b;
@@ -27,9 +32,9 @@ export class ProceduralPalette {
   }
 
   /**
-   * Calculates the color vector (R, G, B) for a time parameter t in [0, 1].
-   * @param {number} t Time parameter (0 to 1).
-   * @returns {number[]} Array [R, G, B] of float values in [0, 1].
+   * Calculates the linearized color vector (R, G, B) for a time parameter t.
+   * @param {number} t - Time parameter in [0, 1].
+   * @returns {number[]} Linear [R, G, B] float values in [0, 1], matching the C++ pipeline.
    */
   get(t) {
     const PI2 = TWO_PI;
@@ -43,8 +48,13 @@ export class ProceduralPalette {
     return [srgbToLinearFloat(r), srgbToLinearFloat(g), srgbToLinearFloat(b)];
   }
 
-  // Raw (unclamped, sRGB) cosine value for one channel at t — used to plot the
-  // underlying curves in the tool, where over/undershoot past [0, 1] is visible.
+  /**
+   * Raw (unclamped, sRGB) cosine value for one channel at t, used to plot the
+   * underlying curves where over/undershoot past [0, 1] is visible.
+   * @param {number} t - Time parameter in [0, 1].
+   * @param {number} channelIndex - Channel to sample (0=R, 1=G, 2=B).
+   * @returns {number} Unclamped sRGB cosine value for the channel.
+   */
   getChannelValue(t, channelIndex) {
     const PI2 = TWO_PI;
     return this.a[channelIndex] + this.b[channelIndex] * Math.cos(PI2 * (this.c[channelIndex] * t + this.d[channelIndex]));
@@ -53,39 +63,64 @@ export class ProceduralPalette {
 
 // --- Generative Palette Implementation ---
 
-// An 8-bit RGB color (channels in 0..255), mirroring the engine's CRGB.
+/**
+ * An 8-bit RGB color (channels in 0..255), mirroring the engine's CRGB.
+ */
 export class CPixel {
+  /**
+   * @param {number} r - Red channel in 0..255.
+   * @param {number} g - Green channel in 0..255.
+   * @param {number} b - Blue channel in 0..255.
+   */
   constructor(r, g, b) {
     this.r = r; this.g = g; this.b = b;
   }
 }
 
-// Seeded linear-congruential PRNG for reproducible palette generation. A zero
-// seed falls back to a random one so the tool still works without an explicit seed.
+/**
+ * Seeded linear-congruential PRNG for reproducible palette generation.
+ */
 export class PRNG {
+  /**
+   * @param {number} seed - Initial state; a falsy seed falls back to a random
+   *   one so the tool still works without an explicit seed.
+   */
   constructor(seed) {
     this.state = seed ? seed : Math.floor(Math.random() * 0xFFFFFFFF);
   }
-  // Next float in [0, 1).
+  /**
+   * Advances the state and returns the next float.
+   * @returns {number} Pseudo-random float in [0, 1).
+   */
   next() {
     this.state = (this.state * 1664525 + 1013904223) >>> 0;
     return this.state / 0x100000000;
   }
-  // Half-open [min, max) to match the engine's hs::rand_int, so a ported range
-  // produces exactly the values the device does. Call sites use the engine's
-  // own rand_int literals.
+  /**
+   * Half-open [min, max) integer to match the engine's hs::rand_int, so a
+   * ported range produces exactly the values the device does. Call sites use
+   * the engine's own rand_int literals.
+   * @param {number} min - Inclusive lower bound.
+   * @param {number} max - Exclusive upper bound.
+   * @returns {number} Pseudo-random integer in [min, max).
+   */
   nextInt(min, max) {
     return Math.floor(this.next() * (max - min)) + min;
   }
 }
 
-// HSV to RGB conversion (h, s, v in 0..255), ported byte-for-byte from the
-// engine's CRGB(const CHSV&) path in core/platform.h: the hue wheel is split
-// into six 43-wide regions (region = h/43) and the channels are mixed with
-// >>8 fixed-point math. Float sextant math drifts from the device near every
-// region boundary (e.g. pure green lands at h=86, not 85), so we mirror the
-// integer path exactly to keep an exported palette's base color faithful.
-// Returns CPixel with values in 0..255.
+/**
+ * HSV to RGB conversion, ported byte-for-byte from the engine's
+ * CRGB(const CHSV&) path in core/platform.h: the hue wheel is split into six
+ * 43-wide regions (region = h/43) and the channels are mixed with >>8
+ * fixed-point math. Float sextant math drifts from the device near every region
+ * boundary (e.g. pure green lands at h=86, not 85), so this mirrors the integer
+ * path exactly to keep an exported palette's base color faithful.
+ * @param {number} h - Hue in 0..255 (masked to a byte).
+ * @param {number} s - Saturation in 0..255 (masked to a byte).
+ * @param {number} v - Value/brightness in 0..255 (masked to a byte).
+ * @returns {CPixel} RGB color with channels in 0..255.
+ */
 export function hsvToRgb(h, s, v) {
   h &= 0xff;
   s &= 0xff;
@@ -112,12 +147,22 @@ export function hsvToRgb(h, s, v) {
   }
 }
 
-// Builds a 3-color gradient palette from high-level profile strings (gradient
-// shape, color harmony, brightness/saturation profiles) plus a base hue,
-// mirroring the engine's GenerativePalette so the tool previews device output.
+/**
+ * Builds a 3-color gradient palette from high-level profile strings (gradient
+ * shape, color harmony, brightness/saturation profiles) plus a base hue,
+ * mirroring the engine's GenerativePalette so the tool previews device output.
+ */
 export class GenerativePalette {
-  // satProfile/brightnessProfile values pick fixed or PRNG-sampled HSV ranges
-  // (h, s, v in 0..255) for the three anchor colors a/b/c; hueValue is the base hue.
+  /**
+   * Resolves the profile strings into three anchor colors and gradient stops.
+   * satProfile/brightnessProfile values pick fixed or PRNG-sampled HSV ranges
+   * (h, s, v in 0..255) for the three anchor colors a/b/c.
+   * @param {string} gradientShape - Gradient-shape profile (e.g. "VIGNETTE", "STRAIGHT").
+   * @param {string} harmonyType - Color-harmony rule (e.g. "TRIADIC", "ANALOGOUS").
+   * @param {string} brightnessProfile - Brightness profile (e.g. "ASCENDING", "BELL").
+   * @param {string} satProfile - Saturation profile ("PASTEL", "MID", "VIBRANT").
+   * @param {number} hueValue - Base hue in 0..255.
+   */
   constructor(gradientShape, harmonyType, brightnessProfile, satProfile, hueValue) {
     this.gradientShape = gradientShape;
     this.harmonyType = harmonyType;
@@ -186,13 +231,22 @@ export class GenerativePalette {
     this.updateLuts();
   }
 
-  // Wrap a hue into 0..255, handling negative values (JS % can go negative).
+  /**
+   * Wraps a hue into 0..255, handling negative values (JS % can go negative).
+   * @param {number} hue - Hue value, possibly out of range or negative.
+   * @returns {number} Equivalent hue in 0..255.
+   */
   wrapHue(hue) {
     return ((hue % 256) + 256) % 256;
   }
 
-  // Derive the two companion hues (h2, h3) from base hue h1 per the color-harmony
-  // rule. Offsets are in the 0..255 hue space (85 ≈ 120°, 128 ≈ 180°).
+  /**
+   * Derives the two companion hues (h2, h3) from base hue h1 per the color-harmony
+   * rule. Offsets are in the 0..255 hue space (85 ≈ 120°, 128 ≈ 180°).
+   * @param {number} h1 - Base hue in 0..255.
+   * @param {string} harmonyType - Color-harmony rule (e.g. "TRIADIC", "ANALOGOUS").
+   * @returns {{h2:number, h3:number}} The two companion hues in 0..255.
+   */
   calcHues(h1, harmonyType) {
     let h2, h3;
     switch (harmonyType) {
@@ -219,8 +273,10 @@ export class GenerativePalette {
     return { h2, h3 };
   }
 
-  // Build the gradient's stop positions (shape), colors and stop count from the
-  // gradient-shape profile. Shapes that fade to black insert a black vignette stop.
+  /**
+   * Builds the gradient's stop positions (shape), colors and stop count from the
+   * gradient-shape profile. Shapes that fade to black insert a black vignette stop.
+   */
   updateLuts() {
     const vignetteColor = new CPixel(0, 0, 0);
     switch (this.gradientShape) {
@@ -247,8 +303,12 @@ export class GenerativePalette {
     }
   }
 
-  // Sample the gradient at t in [0, 1], returning linear [R, G, B]. Locates the
-  // stop segment containing t and interpolates between its two endpoint colors.
+  /**
+   * Samples the gradient at t, locating the stop segment containing t and
+   * interpolating between its two endpoint colors in OKLCH for perceptual uniformity.
+   * @param {number} t - Time parameter in [0, 1].
+   * @returns {number[]} Linear [R, G, B] float values.
+   */
   get(t) {
     let seg = -1;
     for (let i = 0; i < this.size - 1; ++i) {
@@ -277,15 +337,26 @@ export class GenerativePalette {
     return oklchToLinearRgb(lerpOklch(lch1, lch2, p));
   }
 
-  // One channel (0=R, 1=G, 2=B) of the linear sample at t, for curve plotting.
+  /**
+   * One channel of the linear sample at t, for curve plotting.
+   * @param {number} t - Time parameter in [0, 1].
+   * @param {number} channelIndex - Channel to sample (0=R, 1=G, 2=B).
+   * @returns {number} Linear value for the channel.
+   */
   getChannelValue(t, channelIndex) {
     return this.get(t)[channelIndex];
   }
 }
 
 /**
- * Linearly remap value from the [fromMin, fromMax] range onto [toMin, toMax].
+ * Linearly remaps a value from the [fromMin, fromMax] range onto [toMin, toMax].
  * Not clamped: inputs outside the source range extrapolate past the target range.
+ * @param {number} value - Input value to remap.
+ * @param {number} fromMin - Lower bound of the source range.
+ * @param {number} fromMax - Upper bound of the source range.
+ * @param {number} toMin - Lower bound of the target range.
+ * @param {number} toMax - Upper bound of the target range.
+ * @returns {number} The remapped value.
  */
 export function mapValue(value, fromMin, fromMax, toMin, toMax) {
   return (value - fromMin) * (toMax - toMin) / (fromMax - fromMin) + toMin;
@@ -296,8 +367,8 @@ export function mapValue(value, fromMin, fromMax, toMin, toMax) {
  * `ProceduralPalette name({r,g,b}f, ...)` — not bare JS arrays. Brace-init
  * each vec3 with `f`-suffixed floats so the output pastes straight into
  * palettes.h beside the named instances, matching the generative tab.
- * @param {{A_R:number,A_G:number,A_B:number,B_R:number,B_G:number,B_B:number,C_R:number,C_G:number,C_B:number,D_R:number,D_G:number,D_B:number}} parameters
- * @returns {string}
+ * @param {{A_R:number,A_G:number,A_B:number,B_R:number,B_G:number,B_B:number,C_R:number,C_G:number,C_B:number,D_R:number,D_G:number,D_B:number}} parameters - The 12 cosine-formula coefficients (A/B/C/D per R/G/B channel).
+ * @returns {string} The C++ ProceduralPalette initializer source.
  */
 export function proceduralPaletteCpp(parameters) {
   const f = (n) => n.toFixed(3) + 'f';
@@ -318,8 +389,8 @@ export function proceduralPaletteCpp(parameters) {
  * base hue exactly, but its randomized structure will differ from this
  * preview. The caveat is stated in the emitted comment so the export isn't
  * mistaken for a pixel-faithful reproduction.
- * @param {{shape:string,harmony:string,brightness:string,sat:string,hueValue:number}} opts
- * @returns {string}
+ * @param {{shape:string,harmony:string,brightness:string,sat:string,hueValue:number}} opts - Gradient shape, harmony, brightness/saturation profiles and base hue.
+ * @returns {string} The C++ GenerativePalette initializer source, prefixed with the reproducibility caveat comment.
  */
 export function generativePaletteCpp({ shape, harmony, brightness, sat, hueValue }) {
   return `// Reproduces the profiles + base hue exactly; the randomized\n// saturation/brightness/hue-offset structure is drawn from the\n// engine's global RNG and will differ from the tool preview.\nGenerativePalette palette{\n    GradientShape::${shape}, HarmonyType::${harmony},\n    BrightnessProfile::${brightness}, SaturationProfile::${sat}, ${hueValue}};`;

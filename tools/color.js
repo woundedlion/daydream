@@ -11,19 +11,33 @@
 
 // --- sRGB transfer function (gamma) ---
 
-/** sRGB float [0,1] -> linear float [0,1]. */
+/**
+ * Applies the sRGB transfer function (gamma) to convert an sRGB channel to linear.
+ * @param {number} s - sRGB channel value in [0, 1].
+ * @returns {number} The linearized channel value in [0, 1].
+ */
 export function srgbToLinearFloat(s) {
   return (s <= 0.04045) ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
 }
 
-/** Linear float [0,1] -> sRGB float [0,1]. */
+/**
+ * Applies the inverse sRGB transfer function to convert a linear channel to sRGB.
+ * @param {number} l - Linear channel value in [0, 1].
+ * @returns {number} The sRGB-encoded channel value in [0, 1].
+ */
 export function linearToSrgbFloat(l) {
   return (l <= 0.0031308) ? l * 12.92 : 1.055 * Math.pow(l, 1.0 / 2.4) - 0.055;
 }
 
 // --- OKLab / OKLCH color space (Björn Ottosson, 2020) ---
 
-/** Linear RGB [0,1] -> OKLab {L,a,b}. */
+/**
+ * Converts a linear RGB color to OKLab using the Björn Ottosson matrices.
+ * @param {number} r - Linear red channel in [0, 1].
+ * @param {number} g - Linear green channel in [0, 1].
+ * @param {number} b - Linear blue channel in [0, 1].
+ * @returns {{L:number, a:number, b:number}} The OKLab color (lightness L, opponent axes a and b).
+ */
 export function linearRgbToOklab(r, g, b) {
   const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
   const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
@@ -36,7 +50,11 @@ export function linearRgbToOklab(r, g, b) {
   };
 }
 
-/** OKLab {L,a,b} -> linear RGB {r,g,b} (may be out of gamut). */
+/**
+ * Converts an OKLab color to linear RGB. The result may be out of the [0, 1] gamut.
+ * @param {{L:number, a:number, b:number}} lab - The OKLab color (lightness L, opponent axes a and b).
+ * @returns {{r:number, g:number, b:number}} The linear RGB color, possibly out of gamut.
+ */
 export function oklabToLinearRgb(lab) {
   const l_ = lab.L + 0.3963377774 * lab.a + 0.2158037573 * lab.b;
   const m_ = lab.L - 0.1055613458 * lab.a - 0.0638541728 * lab.b;
@@ -49,7 +67,11 @@ export function oklabToLinearRgb(lab) {
   };
 }
 
-/** OKLab {L,a,b} -> OKLCH {L,C,h}. */
+/**
+ * Converts an OKLab color to its cylindrical OKLCH form.
+ * @param {{L:number, a:number, b:number}} lab - The OKLab color (lightness L, opponent axes a and b).
+ * @returns {{L:number, C:number, h:number}} The OKLCH color (lightness L, chroma C, hue h in radians).
+ */
 export function oklabToOklch(lab) {
   return {
     L: lab.L,
@@ -58,12 +80,22 @@ export function oklabToOklch(lab) {
   };
 }
 
-/** OKLCH {L,C,h} -> OKLab {L,a,b}. */
+/**
+ * Converts a cylindrical OKLCH color back to OKLab.
+ * @param {{L:number, C:number, h:number}} lch - The OKLCH color (lightness L, chroma C, hue h in radians).
+ * @returns {{L:number, a:number, b:number}} The OKLab color (lightness L, opponent axes a and b).
+ */
 export function oklchToOklab(lch) {
   return { L: lch.L, a: lch.C * Math.cos(lch.h), b: lch.C * Math.sin(lch.h) };
 }
 
-/** sRGB bytes [0,255] -> OKLCH {L,C,h}. */
+/**
+ * Converts an sRGB byte color to OKLCH, applying the full sRGB -> linear -> OKLab -> OKLCH pipeline.
+ * @param {number} r - sRGB red channel in [0, 255].
+ * @param {number} g - sRGB green channel in [0, 255].
+ * @param {number} b - sRGB blue channel in [0, 255].
+ * @returns {{L:number, C:number, h:number}} The OKLCH color (lightness L, chroma C, hue h in radians).
+ */
 export function srgbToOklch(r, g, b) {
   return oklabToOklch(linearRgbToOklab(
     srgbToLinearFloat(r / 255.0),
@@ -72,7 +104,14 @@ export function srgbToOklch(r, g, b) {
   ));
 }
 
-/** Interpolate two OKLCH colors by t, taking the shortest hue arc. */
+/**
+ * Interpolates between two OKLCH colors, taking the shortest hue arc and treating
+ * near-achromatic endpoints (chroma below 1e-4) as having no meaningful hue.
+ * @param {{L:number, C:number, h:number}} a - Start OKLCH color (hue h in radians).
+ * @param {{L:number, C:number, h:number}} b - End OKLCH color (hue h in radians).
+ * @param {number} t - Interpolation factor in [0, 1] (0 yields a, 1 yields b).
+ * @returns {{L:number, C:number, h:number}} The interpolated OKLCH color.
+ */
 export function lerpOklch(a, b, t) {
   let h;
   if (a.C < 1e-4 && b.C < 1e-4) {
@@ -90,7 +129,11 @@ export function lerpOklch(a, b, t) {
   return { L: a.L + (b.L - a.L) * t, C: a.C + (b.C - a.C) * t, h };
 }
 
-/** OKLCH {L,C,h} -> linear RGB [r,g,b] array, clamped into [0,1]. */
+/**
+ * Converts an OKLCH color to linear RGB, clamping each channel into [0, 1].
+ * @param {{L:number, C:number, h:number}} lch - The OKLCH color (lightness L, chroma C, hue h in radians).
+ * @returns {Array<number>} The clamped linear RGB color as [r, g, b], each in [0, 1].
+ */
 export function oklchToLinearRgb(lch) {
   const rgb = oklabToLinearRgb(oklchToOklab(lch));
   return [
@@ -100,8 +143,20 @@ export function oklchToLinearRgb(lch) {
   ];
 }
 
-/** Linear RGB [0,1] -> "#rrggbb" HEX string (applies linear -> sRGB). */
+/**
+ * Converts a linear RGB color to a "#rrggbb" hex string, applying the linear -> sRGB
+ * transfer function and clamping each channel before encoding.
+ * @param {number} r - Linear red channel in [0, 1].
+ * @param {number} g - Linear green channel in [0, 1].
+ * @param {number} b - Linear blue channel in [0, 1].
+ * @returns {string} The color as a "#rrggbb" hex string.
+ */
 export function linearRgbToHex(r, g, b) {
+  /**
+   * Encodes one linear channel as a two-digit sRGB hex byte, clamped into [0, 255].
+   * @param {number} c - Linear channel value in [0, 1].
+   * @returns {string} Two-character lowercase hex byte.
+   */
   const toHex = (c) => {
     const i = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, c))) * 255);
     const hex = Math.max(0, Math.min(255, i)).toString(16);
