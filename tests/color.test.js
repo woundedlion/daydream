@@ -12,6 +12,7 @@ const {
   srgbToOklch, lerpOklch, oklchToLinearRgb, linearRgbToHex,
 } = await import('../tools/color.js');
 
+// Assert a ≈ b within an absolute tolerance (floating-point color math).
 const near = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) <= eps,
   `expected ${a} ≈ ${b} (±${eps})`);
 

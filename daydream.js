@@ -99,7 +99,9 @@ let wasmMemoryView = null;
 let wasmAdapter = null;
 const recorder = new VideoRecorder(document.querySelector('#canvas-container canvas') || document.createElement('canvas'));
 
-// Guard WASM memory view — spec-correct detached buffer check
+// Re-fetch the WASM pixel view when missing or detached (heap growth can detach
+// the underlying ArrayBuffer, leaving a zero-length view), and re-point the two
+// display aliases at it so source, displayed attribute, and Daydream.pixels match.
 function refreshPixelView() {
   if (!wasmMemoryView || wasmMemoryView.buffer.byteLength === 0) {
     wasmMemoryView = wasmEngine.getPixels();
@@ -108,6 +110,9 @@ function refreshPixelView() {
   }
 }
 
+// Push the engine's per-frame parameter values back into the effect GUI so
+// animation-driven params track live, without clobbering controllers the user
+// is actively editing.
 function syncGUI() {
   if (!activeEffect || !activeEffect.controllerByName) return;
 
@@ -189,7 +194,6 @@ const segments = new SegmentController({
 
 /** Tear down the current effect GUI and build a new one for the active effect. */
 function applyEffect(preserveParams = false) {
-  // Tear down existing GUI
   if (activeEffect && activeEffect.gui) {
     try {
       const dom = activeEffect.gui.domElement;
@@ -330,7 +334,6 @@ function applyEffect(preserveParams = false) {
         // degrades gracefully — see the doctrine note at the top of this file).
         if (wasmEngine.setParameter(p.name, floatVal) === false)
           console.warn(`setParameter("${p.name}") rejected as unknown.`);
-        // Forward to workers
         segments.setParameter(p.name, floatVal);
         // No manual URL write: DeepLinkGUI.add()'s _attachUrlWriter redirected
         // this onChange into a user slot that runs *ahead* of the preserved URL
@@ -360,12 +363,10 @@ function applyEffect(preserveParams = false) {
     }
   }
 
-  // Update workers with new effect
   if (segments.workers.length > 0) {
     segments.setEffect(appState.get('effect'));
   }
 
-  // Update sidebar highlight
   sidebar.setActive(appState.get('effect'));
 }
 
@@ -385,15 +386,14 @@ function applyResolution(preserveParams = false) {
     wasmMemoryView = null; // Force refreshPixelView to re-fetch after resize
   }
 
-  // Update workers
   if (segments.workers.length > 0) {
     segments.setResolution(p.w, p.h);
   }
 
-  // Update available effects based on resolution
+  // Fall back to the hi-res list for an unmapped resolution key.
   const availableEffects = effectsByResolution[resolution] || HiResFavorites;
 
-  // If current effect isn't in the new list, switch to the first one
+  // If the current effect isn't offered at the new resolution, switch to the first one.
   let effectChanged = false;
   if (!availableEffects.includes(appState.get('effect'))) {
     appState.set('effect', availableEffects[0]);
@@ -402,7 +402,6 @@ function applyResolution(preserveParams = false) {
 
   daydream.updateResolution(p.h, p.w, p.size);
 
-  // Update the sidebar options
   let effectSizes = null;
   if (wasmEngine) {
     try { effectSizes = wasmEngine.getEffectSizes(); }
@@ -421,7 +420,6 @@ function applyResolution(preserveParams = false) {
   daydream.invalidate();
 }
 
-// Subscribe: react to state changes
 appState.subscribe((key, value, old) => {
   if (key === 'effect') {
     applyEffect();
@@ -438,7 +436,7 @@ createHolosphereModule().then(module => {
   wasmModule = module;
   wasmEngine = new module.HolosphereEngine();
 
-  // Sync resolution from state
+  // Apply the resolution hydrated from state/URL before first paint.
   const p = resolutionPresets[appState.get('resolution')];
   if (p) {
     wasmEngine.setResolution(p.w, p.h);
@@ -448,16 +446,17 @@ createHolosphereModule().then(module => {
   // stale or hand-edited, but applyResolution(true) at the end of init already
   // validates it against this resolution's allow-list (correcting appState) and
   // performs the single setEffect + GUI build — self-healing a blank render on
-  // its own (applyEffect logs if the engine still rejects the name). A direct
-  // setEffect here only duplicated that work, re-running the effect constructor
-  // an extra time (twice, with the subscriber) before first paint. Nothing
-  // between here and line 491 reads the effect or renders (the animation loop
-  // can't fire mid-synchronous-init), so deferring is safe.
+  // its own (applyEffect logs if the engine still rejects the name). Setting it
+  // here would only re-run the effect constructor an extra time before first
+  // paint. Nothing below reads the effect or renders until applyResolution()
+  // (the animation loop can't fire mid-synchronous-init), so deferring is safe.
 
   // Create persistent adapter object (avoids per-frame allocation). Segmented
   // mode is pipelined inside SegmentController.tick(): it displays frame N-1's
   // composite while frame N renders in parallel on the workers.
   wasmAdapter = {
+    // Per-frame entry the driver calls: render (segmented or single-engine),
+    // republish the pixel view, then mirror engine params back into the GUI.
     drawFrame() {
       if (segments.active) {
         // Composite the previous frame + dispatch the next (no-op while the
@@ -502,7 +501,6 @@ createHolosphereModule().then(module => {
   recorder.frameInterval = daydream.frameInterval;
   daydream.recorder = recorder;
 
-  // Remove loading overlay
   const loadingOverlay = document.getElementById('loading-overlay');
   if (loadingOverlay) loadingOverlay.remove();
 
@@ -563,9 +561,8 @@ guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => 
 
 
 // Resolution setup runs once, after the WASM engine loads (see the
-// createHolosphereModule().then handler above). It used to also run here
-// synchronously with a null engine, but nothing renders until wasmAdapter is
-// set (the animation loop is gated on it), so that early pass was redundant.
+// createHolosphereModule().then handler above); nothing renders until
+// wasmAdapter is set, so there is no need to set it up here.
 
 guiInstance.add(daydream, 'labelAxes').name('Show Axes').onChange(() => daydream.invalidate());
 guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());

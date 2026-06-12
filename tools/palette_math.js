@@ -18,11 +18,12 @@ const TWO_PI = 2 * Math.PI;
  * C(t) = A + B * cos(TWO_PI * (C * t + D))
  */
 export class ProceduralPalette {
+  // a/b/c/d are each a [r, g, b] vec3 of cosine-formula coefficients.
   constructor(a, b, c, d) {
-    this.a = a; // [Ar, Ag, Ab]
-    this.b = b; // [Br, Bg, Bb]
-    this.c = c; // [Cr, Cg, Cb]
-    this.d = d; // [Dr, Dg, Db]
+    this.a = a;
+    this.b = b;
+    this.c = c;
+    this.d = d;
   }
 
   /**
@@ -33,15 +34,17 @@ export class ProceduralPalette {
   get(t) {
     const PI2 = TWO_PI;
 
-    // Calculate sRGB values from cosine formula
+    // Cosine formula yields sRGB; clamp each channel to [0, 1].
     const r = Math.max(0, Math.min(1, this.a[0] + this.b[0] * Math.cos(PI2 * (this.c[0] * t + this.d[0]))));
     const g = Math.max(0, Math.min(1, this.a[1] + this.b[1] * Math.cos(PI2 * (this.c[1] * t + this.d[1]))));
     const b = Math.max(0, Math.min(1, this.a[2] + this.b[2] * Math.cos(PI2 * (this.c[2] * t + this.d[2]))));
 
-    // Convert sRGB -> Linear to match C++ pipeline and GenerativePalette
+    // Linearize so callers see the same values as the C++ pipeline and GenerativePalette.
     return [srgbToLinearFloat(r), srgbToLinearFloat(g), srgbToLinearFloat(b)];
   }
 
+  // Raw (unclamped, sRGB) cosine value for one channel at t — used to plot the
+  // underlying curves in the tool, where over/undershoot past [0, 1] is visible.
   getChannelValue(t, channelIndex) {
     const PI2 = TWO_PI;
     return this.a[channelIndex] + this.b[channelIndex] * Math.cos(PI2 * (this.c[channelIndex] * t + this.d[channelIndex]));
@@ -49,25 +52,28 @@ export class ProceduralPalette {
 }
 
 // --- Generative Palette Implementation ---
+
+// An 8-bit RGB color (channels in 0..255), mirroring the engine's CRGB.
 export class CPixel {
   constructor(r, g, b) {
     this.r = r; this.g = g; this.b = b;
   }
 }
 
-// A simple seeded PRNG for consistent palette generation
+// Seeded linear-congruential PRNG for reproducible palette generation. A zero
+// seed falls back to a random one so the tool still works without an explicit seed.
 export class PRNG {
   constructor(seed) {
     this.state = seed ? seed : Math.floor(Math.random() * 0xFFFFFFFF);
   }
+  // Next float in [0, 1).
   next() {
     this.state = (this.state * 1664525 + 1013904223) >>> 0;
     return this.state / 0x100000000;
   }
   // Half-open [min, max) to match the engine's hs::rand_int, so a ported range
-  // produces exactly the values the device does. (Was inclusive [min, max],
-  // which made every copied range one wider; the call sites use the engine's
-  // own rand_int literals.)
+  // produces exactly the values the device does. Call sites use the engine's
+  // own rand_int literals.
   nextInt(min, max) {
     return Math.floor(this.next() * (max - min)) + min;
   }
@@ -106,7 +112,12 @@ export function hsvToRgb(h, s, v) {
   }
 }
 
+// Builds a 3-color gradient palette from high-level profile strings (gradient
+// shape, color harmony, brightness/saturation profiles) plus a base hue,
+// mirroring the engine's GenerativePalette so the tool previews device output.
 export class GenerativePalette {
+  // satProfile/brightnessProfile values pick fixed or PRNG-sampled HSV ranges
+  // (h, s, v in 0..255) for the three anchor colors a/b/c; hueValue is the base hue.
   constructor(gradientShape, harmonyType, brightnessProfile, satProfile, hueValue) {
     this.gradientShape = gradientShape;
     this.harmonyType = harmonyType;
@@ -175,10 +186,13 @@ export class GenerativePalette {
     this.updateLuts();
   }
 
+  // Wrap a hue into 0..255, handling negative values (JS % can go negative).
   wrapHue(hue) {
     return ((hue % 256) + 256) % 256;
   }
 
+  // Derive the two companion hues (h2, h3) from base hue h1 per the color-harmony
+  // rule. Offsets are in the 0..255 hue space (85 ≈ 120°, 128 ≈ 180°).
   calcHues(h1, harmonyType) {
     let h2, h3;
     switch (harmonyType) {
@@ -205,6 +219,8 @@ export class GenerativePalette {
     return { h2, h3 };
   }
 
+  // Build the gradient's stop positions (shape), colors and stop count from the
+  // gradient-shape profile. Shapes that fade to black insert a black vignette stop.
   updateLuts() {
     const vignetteColor = new CPixel(0, 0, 0);
     switch (this.gradientShape) {
@@ -231,6 +247,8 @@ export class GenerativePalette {
     }
   }
 
+  // Sample the gradient at t in [0, 1], returning linear [R, G, B]. Locates the
+  // stop segment containing t and interpolates between its two endpoint colors.
   get(t) {
     let seg = -1;
     for (let i = 0; i < this.size - 1; ++i) {
@@ -259,14 +277,15 @@ export class GenerativePalette {
     return oklchToLinearRgb(lerpOklch(lch1, lch2, p));
   }
 
+  // One channel (0=R, 1=G, 2=B) of the linear sample at t, for curve plotting.
   getChannelValue(t, channelIndex) {
-    // Just return the rgb from get
     return this.get(t)[channelIndex];
   }
 }
 
 /**
- * Simple linear interpolation map function.
+ * Linearly remap value from the [fromMin, fromMax] range onto [toMin, toMax].
+ * Not clamped: inputs outside the source range extrapolate past the target range.
  */
 export function mapValue(value, fromMin, fromMax, toMin, toMax) {
   return (value - fromMin) * (toMax - toMin) / (fromMax - fromMin) + toMin;

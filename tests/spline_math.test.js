@@ -11,6 +11,7 @@ const {
   randomPointOnSphere,
 } = await import('../tools/spline_math.js');
 
+// Euclidean magnitude of a {x,y,z} point; used to assert unit length.
 const mag = (p) => Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
 
 // A trivial linear point evaluator: treats the 4 controls as the ends of a

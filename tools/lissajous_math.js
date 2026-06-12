@@ -98,8 +98,8 @@ export const snapToRationalRatio = (activeC, passiveC, maxDenominator = 8) => {
  * engine's Lissajous effects (ChaoticStrings, Comets) actually consume
  * (core/geometry.h: `struct LissajousParams { float m1, m2, a, domain; }`).
  * Phase A is emitted in radians and fed to the engine as-is: the tool's
- * radians-labelled slider matches `lissajous()`'s phase with no π scaling
- * (finding 273). C₁/C₂ map to m1/m2.
+ * radians-labelled slider matches `lissajous()`'s phase with no π scaling.
+ * C₁/C₂ map to m1/m2.
  * @param {number} c1 Frequency C₁ (m1).
  * @param {number} c2 Frequency C₂ (m2).
  * @param {number} a Phase shift A (radians).

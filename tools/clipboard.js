@@ -51,8 +51,9 @@ export async function copyToClipboard(text) {
 
 /**
  * Copy `text`, then briefly swap an element's label to a "copied" message
- * (optionally toggling CSS classes) and restore it after `revertMs`. This is
- * the transient-feedback wrapper every tool re-derived around copyToClipboard.
+ * (optionally toggling CSS classes) and restore it after `revertMs`. Shared
+ * transient-feedback wrapper around copyToClipboard so tools don't each
+ * reimplement it.
  *
  * @param {string} text - Text to copy.
  * @param {object} [opts]

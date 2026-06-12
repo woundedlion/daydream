@@ -15,6 +15,8 @@ class StubController {
   updateDisplay() { return this; }
   name() { return this; }
 }
+// Minimal lil-gui root stub: hands back StubControllers and nested folders so
+// DeepLinkGUI can wrap it without a real DOM or dropdown widget.
 class StubGUI {
   constructor() { this.domElement = {}; }
   add(object, prop) { return new StubController(object, prop); }
@@ -26,6 +28,8 @@ mock.module('lil-gui', { namedExports: { GUI: StubGUI } });
 
 const { GUI: DeepLinkGUI, setUrlParam } = await import('../gui.js');
 
+// Install a minimal window globally so gui.js can read location.search and call
+// history.replaceState; `search` is the raw query string (e.g. '?resolution=X').
 function installWindow(search) {
   globalThis.window = {
     location: { search, pathname: '/' },
@@ -35,16 +39,15 @@ function installWindow(search) {
 
 const RES = ['Phantasm (144x288)', 'Crystal (192x384)'];
 
-// Regression for the deep-link blanking bug: a garbage ?resolution= must not
-// survive DeepLinkGUI hydration. add() re-reads the raw URL, and its
-// applyOnLoad replay fires the loaded value through the caller's onChange — the
-// exact path that re-injected an invalid resolution into appState (where
-// applyResolution() silently no-ops, leaving a black canvas) even after the
-// startup re-validation had corrected it.
+// A garbage ?resolution= must not survive DeepLinkGUI hydration. add() re-reads
+// the raw URL and its applyOnLoad replay fires the loaded value through the
+// caller's onChange; an out-of-list value here would re-inject an invalid
+// resolution into appState (where applyResolution() silently no-ops, leaving a
+// black canvas), so the value must be rejected against the option list.
 test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
   installWindow('?resolution=GARBAGE');
   const gui = new DeepLinkGUI({ autoPlace: false });
-  const obj = { resolution: 'Phantasm (144x288)' }; // already-validated value
+  const obj = { resolution: 'Phantasm (144x288)' }; // a known-valid option
   const replayed = [];
   gui.add(obj, 'resolution', RES).onChange((v) => replayed.push(v));
 
@@ -54,6 +57,7 @@ test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
   assert.deepEqual(replayed, ['Phantasm (144x288)']);
 });
 
+// A URL value that is in the option list is adopted and replayed through onChange.
 test('DeepLinkGUI.add adopts a valid in-list URL value for a dropdown', () => {
   installWindow('?resolution=' + encodeURIComponent('Crystal (192x384)'));
   const gui = new DeepLinkGUI({ autoPlace: false });
@@ -66,8 +70,8 @@ test('DeepLinkGUI.add adopts a valid in-list URL value for a dropdown', () => {
 });
 
 test('DeepLinkGUI.add leaves a non-enumerated control (no option list) untouched', () => {
-  // A slider-style add() ($1 is a numeric min) has no option list, so a URL
-  // value is adopted as before — the validation must not regress those.
+  // A slider-style add() ($1 is a numeric min) has no option list, so the URL
+  // value is adopted unconditionally — list validation applies only to dropdowns.
   installWindow('?speed=2.5');
   const gui = new DeepLinkGUI({ autoPlace: false });
   const obj = { speed: 1.0 };
@@ -85,10 +89,9 @@ test('DeepLinkGUI.add with no matching URL param keeps the default', () => {
   assert.deepEqual(replayed, []); // no URL value → no applyOnLoad replay
 });
 
-// Regression for finding 289: the tool-page fallback writer (no active URLSync)
-// must not drop the first of two params changed within the debounce window. A
-// shared timer that only remembered the last key wrote just that key to the URL,
-// silently losing the first from the shareable deep link.
+// The tool-page fallback writer (no active URLSync) must merge, not overwrite,
+// params changed within the debounce window: two keys set before the shared
+// timer fires must both reach the URL so neither is lost from the deep link.
 test('setUrlParam merges multiple keys changed within the debounce window', () => {
   let lastUrl = '/';
   globalThis.window = {

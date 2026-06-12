@@ -8,7 +8,7 @@
  * Each preset generator maps an elapsed time `t` (and, where relevant, explicit
  * config values) to the four complex Mobius coefficients {A, B, C, D} of
  * f(z) = (Az + B) / (Cz + D); these feed the live shader uniforms, so the
- * returned coefficients must stay bit-for-bit identical to the inline originals.
+ * returned coefficients must stay bit-for-bit identical to what the shader expects.
  * Also includes the complex-arithmetic helpers and the snap-to-grid helper used
  * by the drag input, all free of DOM / THREE / global-state dependencies.
  */
@@ -16,14 +16,18 @@
 // --- Complex arithmetic ---------------------------------------------------
 // Complex numbers are plain { re, im } objects.
 
+// Complex product p*q.
 export function cmult(p, q) {
   return { re: p.re * q.re - p.im * q.im, im: p.re * q.im + p.im * q.re };
 }
 
+// Complex sum p+q.
 export function cadd(p, q) {
   return { re: p.re + q.re, im: p.im + q.im };
 }
 
+// Complex quotient p/q. Returns 0 when |q|^2 < 1e-6 to avoid divide-by-near-zero
+// blow-up (matches the shader's guarded division).
 export function cdiv(p, q) {
   const denom = q.re * q.re + q.im * q.im;
   if (denom < 1e-6) return { re: 0.0, im: 0.0 };
@@ -35,7 +39,7 @@ export function cdiv(p, q) {
 
 // --- Drag-input snapping --------------------------------------------------
 // Snaps a scalar to zero (if within 0.1 of zero) and then to the nearest
-// integer (if within `threshold`). Mirrors the original handleInput logic.
+// integer (if within `threshold`), so dragged coefficients latch onto grid lines.
 export function snapComplex(value, threshold = 0.05) {
   let v = value;
   if (Math.abs(v) < 0.1) v = 0.0;

@@ -1,8 +1,8 @@
 // @ts-nocheck
 //
 // SegmentController — unit coverage for the simulator's highest-risk, mostly
-// DOM-free glue (review #8): the generation-fence drop, the worker-fault
-// deadlock-break latch, and the quadrant compositor. Driven by a fake Worker
+// DOM-free glue: the generation-fence drop, the worker-fault deadlock-break
+// latch, and the quadrant compositor. Driven by a fake Worker
 // (postMessage captured; onmessage/onerror invoked by hand) and a mocked
 // ./driver.js (so the real three.js/lil-gui chain is never loaded in Node).
 //
@@ -22,6 +22,11 @@ const { SegmentController } = await import('../segment_controller.js');
 // Fakes
 // ---------------------------------------------------------------------------
 
+/**
+ * Stand-in for the Web Worker the controller spawns: captures postMessage
+ * payloads and exposes onmessage/onerror so tests can drive the protocol by
+ * hand. Every constructed instance is recorded in the static `instances` array.
+ */
 class FakeWorker {
   static instances = [];
   constructor(url, opts) {
@@ -302,7 +307,7 @@ test('composite() throws if the display-buffer alias is broken', () => {
   Daydream.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
-  // getMemoryView now returns a DIFFERENT buffer than Daydream.pixels.
+  // getMemoryView returns a DIFFERENT buffer than Daydream.pixels.
   c._getMemoryView = () => new Uint16Array(4 * 2 * 3);
   c.results = [];
 
@@ -310,11 +315,10 @@ test('composite() throws if the display-buffer alias is broken', () => {
 });
 
 // ---------------------------------------------------------------------------
-// tick() — the one-frame-deep render-loop state machine (review #16, the
-// riskiest untested glue). Each tick (a) applies the previous frame's composite
-// when one is pending, and (b) dispatches the next parallel render unless one is
-// already in flight. The transitions below walk a full pipeline cycle plus the
-// two guard states (not-ready, faulted).
+// tick() — the one-frame-deep render-loop state machine. Each tick (a) applies
+// the previous frame's composite when one is pending, and (b) dispatches the
+// next parallel render unless one is already in flight. The transitions below
+// walk a full pipeline cycle plus the two guard states (not-ready, faulted).
 // ---------------------------------------------------------------------------
 
 test('tick() is a no-op until every worker has signalled ready', () => {
@@ -400,9 +404,9 @@ test('a faulted pool keeps tick() from dispatching another doomed render', () =>
 });
 
 test('an init-phase fault still reaches the fault overlay (faulted checked before ready guard)', () => {
-  // Finding 290: a worker that traps during startup latches `faulted` but never
-  // sends 'ready', so `ready` stays false forever. A ready-first guard would
-  // return at the top of every tick() and the fault overlay would never paint.
+  // A worker that traps during startup latches `faulted` but never sends
+  // 'ready', so `ready` stays false forever. A ready-first guard would return
+  // at the top of every tick() and the fault overlay would never paint.
   const c = makeController();
   c.create(2);                    // workers spawned, none has signalled ready
   assert.equal(c.ready, false);
