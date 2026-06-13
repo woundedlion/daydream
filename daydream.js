@@ -528,6 +528,17 @@ createHolosphereModule().then(module => {
      */
     getArenaMetrics() {
       return wasmEngine.getArenaMetrics();
+    },
+    /**
+     * Whether the buffer holds a real frame the recorder may capture this tick.
+     * Single-engine mode always renders the full canvas in drawFrame(); segmented
+     * mode composites a frame late, so report false until (and on any tick where)
+     * a composite has not landed — otherwise the recorder captures the cleared
+     * (black) buffer left by driver.render()'s fill(0).
+     * @returns {boolean} True when the displayed buffer is a real rendered frame.
+     */
+    captureReady() {
+      return segments.active ? segments.frameComposited : true;
     }
   };
 

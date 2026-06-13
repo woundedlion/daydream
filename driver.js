@@ -349,8 +349,13 @@ export class Daydream {
 
     // Capture a video frame (simulation-synced) — only when the simulation
     // actually advanced this tick, so pausing freezes the recording instead of
-    // padding it with duplicate frames.
-    if (this.recorder && advanced) this.recorder.captureFrame();
+    // padding it with duplicate frames. In segmented mode the worker composite
+    // lands a frame late, so also require the adapter to report a real frame in
+    // the buffer (captureReady) — otherwise the recording opens with the cleared
+    // black frames driver.render() left before the pipeline filled.
+    if (this.recorder && advanced &&
+        (typeof effect.captureReady !== 'function' || effect.captureReady()))
+      this.recorder.captureFrame();
 
     // Rebuild labels every rendered frame, not just on a simulation step, so a
     // paused frame still tracks camera orbits and clears the label DOM when
