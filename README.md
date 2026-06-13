@@ -740,9 +740,10 @@ Plot::Bezier::draw<W, H>(pipeline, canvas, p0, p1, p2, p3, fragment_shader);
 Plot::SplineChain::draw<W, H>(pipeline, canvas, control_points, tension, shader);
 ```
 
-All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<Fragment>`) where each fragment carries position, texture registers (v0–v3), age, and color. The rasterizer supports two interpolation strategies via `SplineMode`:
-- **Geodesic**: great-circle arc between segment endpoints (default)
-- **Planar**: planar projection within the tangent plane of a basis (for effects that live in a 2D local space)
+All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<Fragment>`) where each fragment carries position, texture registers (v0–v3), age, and color. Two **independent** axes govern how a path is drawn — do not conflate them:
+
+- **Edge interpolation** — how consecutive fragments are joined. *Geodesic* (the default) walks the great-circle arc between endpoints; *planar* interpolates along an azimuthal-equidistant straight line in a basis's tangent plane (for effects that live in a 2D local space). This is selected by whether a **planar basis** is supplied to the draw call (`null` ⇒ geodesic), **not** by `SplineMode`.
+- **Spline evaluation** (`SplineMode`, the spline primitives `Bezier`/`SplineChain` only) — `SplineMode::Geodesic` (the default) samples control points with spherical, slerp-based cubic interpolation; `SplineMode::Fast` uses a cheaper polynomial-then-normalize approximation that distorts on long arcs. `SplineMode` has only `Fast` and `Geodesic` — there is no `SplineMode::Planar`, and it does not control edge interpolation.
 
 #### Plot Primitives
 
@@ -1356,7 +1357,7 @@ Boundary symbols (`ZERO`/`HALF`) serve **two** layers at once: they snap the fly
 
 ```
  Frame = [ idx_hi  idx_lo  rev_hi  rev_lo  checksum ]   (5 digits, base-8)
-           └── effect index 0–63 ──┘ └ rev mod 64 ┘  └ (Σ digits) mod 8
+           └── effect index 0–63 ──┘ └ rev mod 64 ┘  └ Σ(i+1)·dᵢ mod 8
 
  digit Dk transmitted as (Dk+1) pulses @ 1-col pitch, then a 5-col quiet gap:
 
@@ -1725,7 +1726,7 @@ A central distorted ring (`Plot::DistortedRing`) warps and spins; periodic rando
 
 #### GnomonicStars
 
-Star polygon SDFs that rotate continuously. Uses gnomonic projection (straight lines on sphere remain straight).
+A Fibonacci-spiral field of star-polygon SDFs, continuously deformed by an evolving Möbius warp (built on a gnomonic-projection transformer) and slowly tumbled by a Languid random walk.
 
 </td></tr></table>
 
