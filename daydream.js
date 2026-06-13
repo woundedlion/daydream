@@ -587,6 +587,9 @@ guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => 
   if (v) {
     testAllInterval = setInterval(() => {
       const currentList = effectsByResolution[appState.get('resolution')];
+      // Skip the tick if the active resolution has no effect list (unmapped):
+      // otherwise currentList.indexOf below throws on undefined.
+      if (!currentList || currentList.length === 0) return;
       const currentEffect = appState.get('effect');
       const currentIndex = currentList.indexOf(currentEffect);
       const nextIndex = (currentIndex + 1) % currentList.length;

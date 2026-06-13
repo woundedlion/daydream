@@ -20,6 +20,12 @@ const TWO_PI = 2 * Math.PI;
  * (`x = sinφ·cosθ`, README §2: column x=0 sits at +X). The `π/2 − θ` complement
  * makes THREE reproduce the engine vector exactly, avoiding an x↔z mirror
  * (det=−1 reflection) that would render chiral content opposite-handed.
+ *
+ * Latitude uses `y·π/(H−1)`, which matches the engine's `pixel_to_vector` ONLY
+ * because the WASM build runs with `H_OFFSET == 0` (virtual row count == H). On
+ * a device build with `H_OFFSET == 3` the engine maps rows over `H + H_OFFSET`
+ * virtual rows, so this formula would no longer line up — H_OFFSET is not
+ * exposed to JS, so this is an unenforced assumption, valid for the simulator.
  * @param {number} x - The pixel x-coordinate [0, Daydream.W - 1].
  * @param {number} y - The pixel y-coordinate [0, Daydream.H - 1].
  * @param {THREE.Spherical} [out] - Target to write into (default: new Spherical).
