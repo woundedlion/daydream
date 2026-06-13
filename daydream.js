@@ -208,6 +208,17 @@ const segments = new SegmentController({
 function applyEffect(preserveParams = false) {
   if (activeEffect && activeEffect.gui) {
     try {
+      // Tear down any in-progress slider drag: its pointerup/pointercancel
+      // listeners live on `window` (not on the GUI DOM), so destroying the GUI
+      // mid-drag (effect auto-switch / resolution change) would otherwise leave
+      // them dangling, holding the destroyed controller until the next release.
+      if (activeEffect.activeDragEnds) {
+        for (const end of activeEffect.activeDragEnds) {
+          window.removeEventListener('pointerup', end);
+          window.removeEventListener('pointercancel', end);
+        }
+        activeEffect.activeDragEnds.clear();
+      }
       const dom = activeEffect.gui.domElement;
       if (dom && dom.parentNode) dom.parentNode.removeChild(dom);
       activeEffect.gui.destroy();
@@ -240,7 +251,7 @@ function applyEffect(preserveParams = false) {
       sidebar.setActive(appState.get('effect'));
       return;
     }
-    activeEffect = { gui: new GUI({ autoPlace: false }) };
+    activeEffect = { gui: new GUI({ autoPlace: false }), activeDragEnds: new Set() };
 
     // Get Params from C++
     const params = wasmEngine.getParameterDefinitions();
@@ -326,15 +337,20 @@ function applyEffect(preserveParams = false) {
         // Drag guard for syncGUI. lil-gui sliders drag via a non-focusable div,
         // so the engine's per-frame value stream would otherwise fight an
         // in-progress drag. Flag the controller for the duration of the drag; the
-        // window listeners are attached per-drag and removed on release, so they
-        // leave nothing behind when the effect GUI is destroyed.
+        // window listeners are attached per-drag and removed on release. They are
+        // also registered on the owning effect's activeDragEnds set so a GUI
+        // destroyed mid-drag (applyEffect teardown) removes them too — otherwise
+        // they dangle on `window` until the next release.
         controller.domElement.addEventListener('pointerdown', () => {
           controller._dragging = true;
+          const fx = activeEffect; // effect that owns this controller/drag
           const end = () => {
             controller._dragging = false;
             window.removeEventListener('pointerup', end);
             window.removeEventListener('pointercancel', end);
+            if (fx && fx.activeDragEnds) fx.activeDragEnds.delete(end);
           };
+          if (fx && fx.activeDragEnds) fx.activeDragEnds.add(end);
           window.addEventListener('pointerup', end);
           window.addEventListener('pointercancel', end);
         });
