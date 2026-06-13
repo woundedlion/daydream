@@ -28,8 +28,15 @@ export class AppState {
   /**
    * Sets one key, notifying subscribers only when the value actually changes.
    * No-op (and no notification) if the value is unchanged.
+   *
+   * PRIMITIVES ONLY: change detection is strict `===`, which compares objects
+   * and arrays by reference, not by contents. Mutating an array/object in place
+   * and re-setting it (or setting a new object that is structurally equal) is
+   * therefore either dropped as "unchanged" or fires on every set regardless of
+   * content. All current keys hold primitives (strings/numbers/booleans); keep
+   * it that way, or this detection will silently misbehave for reference values.
    * @param {string} key - The state key to write.
-   * @param {*} value - The new value to store.
+   * @param {*} value - The new value to store (intended to be a primitive).
    * @returns {void}
    */
   set(key, value) {

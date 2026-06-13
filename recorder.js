@@ -184,7 +184,17 @@ export class VideoRecorder {
    * @returns {void}
    */
   captureFrame() {
-    if (!this.isRecording || !this.track || typeof this.track.requestFrame !== 'function') return;
+    if (!this.isRecording || !this.track) return;
+    if (typeof this.track.requestFrame !== 'function') {
+      // Recording is silently a no-op without requestFrame (browser lacks the
+      // captureStream frame-request API). Warn once rather than per frame so the
+      // broken recording is visible without spamming the console.
+      if (!this._warnedNoRequestFrame) {
+        console.warn('Recorder: track.requestFrame is unavailable; recorded frames will not advance in this browser.');
+        this._warnedNoRequestFrame = true;
+      }
+      return;
+    }
 
     // If using an offscreen canvas, blit the source canvas scaled to the target
     // resolution. Re-sync the offscreen dimensions first: if the source canvas
@@ -336,15 +346,18 @@ export class VideoRecorder {
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.src = url;
-    iframe.onload = () => {
-      URL.revokeObjectURL(url);
-      iframe.remove();
-    };
     // Safety net: if the iframe never fires load (some browsers), revoke after 60 s.
-    setTimeout(() => {
+    const safetyTimeout = setTimeout(() => {
       URL.revokeObjectURL(url);
       iframe.remove();
     }, 60_000);
+    iframe.onload = () => {
+      // Cancel the safety net on an early load so it doesn't fire a redundant
+      // (double) revoke/remove 60 s later.
+      clearTimeout(safetyTimeout);
+      URL.revokeObjectURL(url);
+      iframe.remove();
+    };
     document.body.appendChild(iframe);
   }
 

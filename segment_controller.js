@@ -267,6 +267,12 @@ export class SegmentController {
    */
   destroy() {
     for (const w of this.workers) {
+      // terminate() alone stops the worker and drops its handlers, but null them
+      // first to match the dispose discipline elsewhere (and to release the
+      // closures the handlers capture for the GC immediately).
+      w.onmessage = null;
+      w.onerror = null;
+      w.onmessageerror = null;
       w.terminate();
     }
     this.workers = [];
