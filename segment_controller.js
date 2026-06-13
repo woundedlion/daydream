@@ -98,6 +98,8 @@ export class SegmentController {
     // Pipeline flags
     this.renderInFlight = false;
     this.pendingFrame = false; // true when workers have new results to display
+    this.frameComposited = false; // true only on ticks that blit a real composite
+                                  // over the cleared buffer (drives recorder gating)
 
     // Fault latch. A worker WASM trap / uncaught throw fires onerror but never
     // sends its 'frame', so `pending` would never reach 0 and the whole segmented
@@ -667,6 +669,13 @@ export class SegmentController {
       this.composite();
       this.updateStats();
       this.pendingFrame = false;
+      // A real frame now sits in the display buffer this tick.
+      this.frameComposited = true;
+    } else {
+      // No new results: the buffer is still driver.render()'s fill(0) (the
+      // workers haven't produced the first frame yet, or stalled). The recorder
+      // must not capture this cleared/black frame.
+      this.frameComposited = false;
     }
 
     // 2. Dispatch NEXT frame's parallel render (fire-and-forget). Results arrive
