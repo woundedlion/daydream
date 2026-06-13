@@ -88,7 +88,10 @@ export class SegmentController {
     // bounds of the resolution they were rendered at, so a response whose snapshot
     // no longer matches renderGen references a stale W/H and must be dropped before
     // it reaches the compositor (otherwise its old x1/y1 index past the resized
-    // display buffer). Counter-only; no per-pixel cost.
+    // display buffer). Counter-only; no per-pixel cost. No wrap guard is needed
+    // (unlike the C++ wrap_t boundary checks): renderGen only increments on a
+    // resolution change, and a JS Number represents every integer exactly up to
+    // 2^53, so wrap is unreachable within any real session.
     this.renderGen = 0;
     this.inflightGen = 0;
 
