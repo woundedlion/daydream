@@ -107,6 +107,12 @@ export class Daydream {
   static CAMERA_Z = 220;
 
   static SPHERE_RADIUS = 30;
+  // Fixed cosine cutoff for label visibility: a label is shown when the angle
+  // between its (unit) direction and the camera direction is within this cosine.
+  // Pinned to the canonical framing (SPHERE_RADIUS / CAMERA_Z) so the visible
+  // label set no longer drifts with orbit distance the way the old
+  // dot(label, cameraPos) > SPHERE_RADIUS test did.
+  static LABEL_VISIBILITY_COS = Daydream.SPHERE_RADIUS / Daydream.CAMERA_Z;
   static H = 20;
   static W = 96;
   static PIXEL_WIDTH = 2 * Math.PI / Daydream.W;
@@ -444,8 +450,15 @@ export class Daydream {
       labels.push(...effect.getLabels());
     }
 
+    // Compare cos(angle) against a FIXED cutoff. label.position is a unit
+    // direction, so label·cameraPos == |cameraPos|·cos(angle); requiring
+    // cos(angle) > LABEL_VISIBILITY_COS means label·cameraPos > cutoff·|cameraPos|.
+    // Scaling the fixed cosine by the live camera distance (rather than comparing
+    // the raw dot against SPHERE_RADIUS) keeps the visible set independent of zoom.
+    const facingThreshold =
+      Daydream.LABEL_VISIBILITY_COS * this.camera.position.length();
     for (const label of labels) {
-      if (label.position.dot(this.camera.position) > Daydream.SPHERE_RADIUS) {
+      if (label.position.dot(this.camera.position) > facingThreshold) {
         this.labelPool.acquire(label.position, label.content);
       }
     }
