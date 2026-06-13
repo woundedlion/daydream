@@ -359,6 +359,9 @@ export class GenerativePalette {
  * @returns {number} The remapped value.
  */
 export function mapValue(value, fromMin, fromMax, toMin, toMax) {
+  // A collapsed source range has no meaningful mapping and would divide by zero
+  // (NaN / ±Infinity colors). Map the degenerate range to the target floor.
+  if (fromMax === fromMin) return toMin;
   return (value - fromMin) * (toMax - toMin) / (fromMax - fromMin) + toMin;
 }
 
