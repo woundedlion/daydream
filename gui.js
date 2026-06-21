@@ -22,46 +22,56 @@ const optionValues = (options) => {
   return null;
 };
 
-let urlTimer = null;
-const pendingUrlWrites = new Map(); // key -> value (null/undefined => delete)
 /**
- * Persists a single GUI control value to the URL query params.
+ * Builds an independent debounced URL-param writer with its OWN pending-writes
+ * buffer and timer. Each `DeepLinkGUI` owns one (shared down its folder subtree),
+ * so two separate GUIs on a single tool page no longer share one module-global
+ * debounce — a footgun where one GUI's flush could swallow or race the other's.
  *
- * URL writes funnel through the app's single URLSync writer when present (the
- * main simulator), so GUI param changes and effect/resolution changes can't
- * clobber each other. Standalone pages without a URLSync (the tool pages) fall
- * back to a self-contained debounced write that reads the URL at fire time.
+ * The returned writer persists a single GUI control value to the URL query
+ * params. When the app's single URLSync writer is present (the main simulator)
+ * writes funnel through it so GUI param changes and effect/resolution changes
+ * can't clobber each other; the per-instance fallback below is only reached on
+ * standalone tool pages that have no URLSync.
  *
- * Pending writes are accumulated per key and merged in a single flush: a shared
- * timer that only remembered the last key would drop the first of two params
- * changed within the debounce window from the deep link.
- * @param {string} key - The query-param key to write.
- * @param {(string|number|boolean|null|undefined)} value - The value to store; null/undefined deletes the key.
- * @returns {void}
+ * Pending writes are accumulated per key and merged in a single flush: a timer
+ * that only remembered the last key would drop the first of two params changed
+ * within the debounce window from the deep link.
+ * @returns {(key: string, value: (string|number|boolean|null|undefined)) => void}
+ *   A writer; `value` null/undefined deletes the key.
  */
-export const setUrlParam = (key, value) => {
-  const sync = getActiveURLSync();
-  if (sync) {
-    sync.setParam(key, value);
-    return;
-  }
-  pendingUrlWrites.set(key, value);
-  clearTimeout(urlTimer);
-  urlTimer = setTimeout(() => {
-    const params = getUrlParams(); // read at fire time so we don't clobber
-    for (const [k, v] of pendingUrlWrites) {
-      if (v === null || v === undefined) {
-        params.delete(k);
-      } else if (typeof v === 'number') {
-        params.set(k, parseFloat(v.toFixed(4)));
-      } else {
-        params.set(k, v);
-      }
+const makeUrlParamWriter = () => {
+  let urlTimer = null;
+  const pendingUrlWrites = new Map(); // key -> value (null/undefined => delete)
+  return (key, value) => {
+    const sync = getActiveURLSync();
+    if (sync) {
+      sync.setParam(key, value);
+      return;
     }
-    pendingUrlWrites.clear();
-    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
-  }, 200);
+    pendingUrlWrites.set(key, value);
+    clearTimeout(urlTimer);
+    urlTimer = setTimeout(() => {
+      const params = getUrlParams(); // read at fire time so we don't clobber
+      for (const [k, v] of pendingUrlWrites) {
+        if (v === null || v === undefined) {
+          params.delete(k);
+        } else if (typeof v === 'number') {
+          params.set(k, parseFloat(v.toFixed(4)));
+        } else {
+          params.set(k, v);
+        }
+      }
+      pendingUrlWrites.clear();
+      window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+    }, 200);
+  };
 };
+
+// Module-level default writer for standalone callers (and the unit test). Each
+// DeepLinkGUI instance creates its own via makeUrlParamWriter() instead of
+// sharing this one.
+export const setUrlParam = makeUrlParamWriter();
 
 /**
  * lil-gui wrapper that persists every control's value to URL query params,
@@ -86,6 +96,10 @@ class DeepLinkGUI {
     // (e.g. to exclude the global controls from a per-effect resetGUI).
     this._urlKeys = new Set();
     this._children = [];
+    // This GUI tree's own fallback URL writer (its own debounce buffer/timer);
+    // addFolder() shares the root's writer down the subtree. Distinct GUIs get
+    // distinct writers so they don't share module-global debounce state.
+    this._urlWriter = makeUrlParamWriter();
   }
 
   /**
@@ -221,7 +235,7 @@ class DeepLinkGUI {
     // value came from the URL so onChange-driven behavior runs at startup.
     if (!isFunction) {
       this._urlKeys.add(key);
-      this._attachUrlWriter(controller, (v) => setUrlParam(key, v), params.has(key));
+      this._attachUrlWriter(controller, (v) => this._urlWriter(key, v), params.has(key));
     }
 
     // 4. Update Display
@@ -260,7 +274,7 @@ class DeepLinkGUI {
       } else if (Array.isArray(v)) {
         strVal = `rgb(${v[0]},${v[1]},${v[2]})`;
       }
-      setUrlParam(key, strVal);
+      this._urlWriter(key, strVal);
     }, params.has(key));
 
     // 4. Update Display
@@ -283,6 +297,7 @@ class DeepLinkGUI {
     const wrapped = new DeepLinkGUI(folder);
     wrapped.parent = this;
     wrapped.folderName = name;
+    wrapped._urlWriter = this._urlWriter; // share the root tree's debounce writer
     this._children.push(wrapped);
     return wrapped;
   }
