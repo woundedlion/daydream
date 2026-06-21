@@ -111,10 +111,14 @@ async function handleMessage(msg) {
 
     case 'setResolution': {
       if (engine) {
+        // setResolution returns false for a size the WASM factory can't build;
+        // on failure the engine stays at its current geometry, so leave
+        // canvasW/H/segRange and the clip untouched rather than extracting for a
+        // size the engine isn't at (mirrors daydream.js's applyResolution guard).
+        if (engine.setResolution(msg.w, msg.h) === false) break;
         canvasW = msg.w;
         canvasH = msg.h;
         segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
-        engine.setResolution(canvasW, canvasH);
         // Re-apply this segment's clip here rather than relying on a follow-up
         // setEffect message to do it. (No-op while no effect is bound —
         // setResolution clears the effect on an actual size change — but it
