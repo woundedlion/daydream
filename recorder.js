@@ -229,7 +229,11 @@ export class VideoRecorder {
    * @returns {HTMLCanvasElement} The offscreen canvas sized for the target resolution.
    */
   _ensureOffscreen() {
-    const aspect = this.canvas.width / this.canvas.height;
+    // Clamp the aspect: an early or zero-size source layout makes
+    // width/height non-finite (height 0 → Infinity, 0/0 → NaN), which would
+    // propagate to NaN canvas dimensions. Fall back to a square in that case.
+    const rawAspect = this.canvas.width / this.canvas.height;
+    const aspect = Number.isFinite(rawAspect) && rawAspect > 0 ? rawAspect : 1;
     const w = Math.round(this.targetHeight * aspect);
     // Ensure even dimensions (codecs require it)
     const evenW = w % 2 === 0 ? w : w + 1;
