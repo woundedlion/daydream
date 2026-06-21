@@ -174,15 +174,12 @@ const appState = new AppState({
   effect: initialEffect || 'IslamicStars',
   resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Phantasm (144x288)",
 });
-const urlSync = new URLSync(appState, ['effect', 'resolution']);
-// URLSync's constructor re-reads the raw ?resolution= and writes it back into
-// state unconditionally, bypassing the validation in the defaults above. Re-
-// validate here so a garbage value degrades to the default instead of
-// persisting — applyResolution() silently no-ops on an unknown key, which would
-// otherwise leave the engine at its blank startup resolution.
-if (!resolutionPresets[appState.get('resolution')]) {
-  appState.set('resolution', "Phantasm (144x288)");
-}
+// Validate ?resolution= in the sync layer so a garbage value can't overwrite
+// the validated default above — applyResolution() silently no-ops on an unknown
+// key, which would otherwise leave the engine at its blank startup resolution.
+const urlSync = new URLSync(appState, ['effect', 'resolution'], {
+  resolution: (v) => Boolean(resolutionPresets[v]),
+});
 
 // Segmented-POV worker pipeline (own state + lifecycle). wasmEngine and
 // wasmMemoryView are reassignable, so they're passed as lazy getters.

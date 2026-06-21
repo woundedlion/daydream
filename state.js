@@ -116,8 +116,14 @@ export class URLSync {
    * to tracked-key changes, and registers itself as the app-wide URL writer.
    * @param {AppState} state - The app state to sync.
    * @param {string[]} trackedKeys - Which state keys to sync to the URL.
+   * @param {Object<string, (raw: string) => boolean>} [validators] - Optional
+   *   per-key predicate run against the raw URL string on the initial read; a
+   *   key whose validator returns false keeps the state's existing (validated)
+   *   default instead of being overwritten. Lives here, in the sync layer, so a
+   *   garbage URL value can't poison state regardless of which consumer wires
+   *   the URLSync — callers no longer have to re-validate after construction.
    */
-  constructor(state, trackedKeys) {
+  constructor(state, trackedKeys, validators = {}) {
     this.state = state;
     this.trackedKeys = new Set(trackedKeys);
     this._timer = null;
@@ -127,9 +133,11 @@ export class URLSync {
     const params = new URLSearchParams(window.location.search);
     const patch = {};
     for (const key of trackedKeys) {
-      if (params.has(key)) {
-        patch[key] = params.get(key);
-      }
+      if (!params.has(key)) continue;
+      const raw = params.get(key);
+      const validate = validators[key];
+      if (validate && !validate(raw)) continue; // reject → keep the default
+      patch[key] = raw;
     }
     if (Object.keys(patch).length > 0) {
       state.update(patch);

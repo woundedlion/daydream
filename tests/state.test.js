@@ -81,6 +81,23 @@ test('URLSync reads initial tracked keys from the URL into state', () => {
   assert.equal(s.get('res'), 'high');
 });
 
+/** Verifies the optional per-key validator rejects an invalid URL value and keeps the state default. */
+test('URLSync validator rejects an invalid URL value and keeps the default', () => {
+  installWindow('?effect=Voronoi&res=bogus');
+  const s = new AppState({ effect: 'Moire', res: 'low' });
+  new URLSync(s, ['effect', 'res'], { res: (v) => v === 'high' || v === 'low' });
+  assert.equal(s.get('effect'), 'Voronoi'); // unvalidated key still seeded
+  assert.equal(s.get('res'), 'low');        // invalid 'bogus' rejected → default kept
+});
+
+/** Verifies the validator admits a valid URL value (a passing predicate is a no-op gate). */
+test('URLSync validator admits a valid URL value', () => {
+  installWindow('?res=high');
+  const s = new AppState({ res: 'low' });
+  new URLSync(s, ['res'], { res: (v) => v === 'high' || v === 'low' });
+  assert.equal(s.get('res'), 'high');
+});
+
 /** Verifies a newly constructed URLSync registers itself as the active URL writer returned by getActiveURLSync(). */
 test('URLSync registers itself as the active URL writer', () => {
   installWindow('');
