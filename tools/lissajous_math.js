@@ -77,6 +77,14 @@ export const findBestRationalRatio = (value, maxDenominator = 8) => {
  *   snapped active frequency, the rational ratio m/n, and the curve's closing period T.
  */
 export const snapToRationalRatio = (activeC, passiveC, maxDenominator = 8) => {
+  // A zero passive frequency has no orbital motion to lock against: the ratio
+  // (activeC / 0) and the closing period (2π·N / 0) are both undefined and would
+  // poison the caller's state.Duration with Infinity/NaN. Leave the active
+  // frequency unchanged, report a trivial 1/1 ratio, and a finite zero period.
+  if (passiveC === 0) {
+    return { snappedActiveC: activeC, m: 1, n: 1, closingPeriod: 0 };
+  }
+
   // Find M/N such that M/N ≈ activeC / passiveC.
   const targetRatio = activeC / passiveC;
   const { M, N } = findBestRationalRatio(targetRatio, maxDenominator);
