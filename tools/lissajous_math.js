@@ -18,6 +18,15 @@ import * as THREE from 'three';
 const TWO_PI = 2 * Math.PI;
 
 /**
+ * Greatest common divisor of two non-negative integers (Euclid). Used to reduce
+ * a found ratio to lowest terms.
+ * @param {number} a - First integer (>= 0).
+ * @param {number} b - Second integer (>= 0).
+ * @returns {number} gcd(a, b); gcd(0, 0) is 0.
+ */
+const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+
+/**
  * The spherical Lissajous parametric curve (on the unit sphere, R = 1).
  * Argument order mirrors the engine's lissajous(m1, m2, a, t) (core/geometry.h)
  * so the preview, the exported snippet, and the engine all agree on which
@@ -63,7 +72,14 @@ export const findBestRationalRatio = (value, maxDenominator = 8) => {
       }
     }
   }
-  return { M: bestM, N: bestN };
+
+  // The (M+N) tie-break tends to land on the reduced fraction, but it is not
+  // guaranteed when no exact match exists (e.g. an irrational target's closest
+  // grid point can be a non-reduced fraction). Reduce by gcd so the returned
+  // ratio is always in lowest terms — which also makes the closing period
+  // 2π·N/passiveC the true (shortest) period in snapToRationalRatio.
+  const g = gcd(bestM, bestN);
+  return { M: bestM / g, N: bestN / g };
 };
 
 /**

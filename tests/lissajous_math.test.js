@@ -78,6 +78,19 @@ test('findBestRationalRatio: value 0 returns 1/1', () => {
 });
 
 /**
+ * Verifies the returned fraction is always in lowest terms (gcd(M,N) === 1)
+ * across a sweep of targets, so the ratio — and the closing period derived from
+ * N — is never an unreduced multiple regardless of search iteration order.
+ */
+test('findBestRationalRatio: returned ratio is always reduced (gcd(M,N) === 1)', () => {
+  const g = (a, b) => (b === 0 ? a : g(b, a % b));
+  for (let v = 0.1; v <= 4.0; v += 0.07) {
+    const { M, N } = findBestRationalRatio(v);
+    assert.equal(g(M, N), 1, `ratio ${M}/${N} for value ${v.toFixed(2)} not reduced`);
+  }
+});
+
+/**
  * Verifies snapping 6/4 to 3/2 preserves the rational ratio of the active to
  * passive frequency and yields the closing period T = 2π·n / passiveC.
  */
