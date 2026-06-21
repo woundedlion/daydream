@@ -162,8 +162,8 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 │   ├── platform.h              Arduino vs. WASM vs. Desktop abstraction layer
 │   ├── constants.h             MAX_W, MAX_H + ClipRegion segment clip rectangle
 │   ├── canvas.h                Effect base class + Canvas RAII write-buffer guard
-│   ├── effects_engine.h        Master include for the full engine
-│   ├── effects.h               Include list for all effects
+│   ├── engine.h                Engine API umbrella — included by every effect
+│   ├── effects.h               Effect roster (includes each effect + HS_EFFECT_LIST)
 │   ├── effects_legacy.h        Pre-engine effects (TheMatrix, Spirals, etc.)
 │   ├── effect_registry.h       Self-registering factory: REGISTER_EFFECT macro
 │   ├── led.h                   LED pin constants + color-correction RAII guards (driver in hardware/pov_single.h)
@@ -365,7 +365,7 @@ Three `std::atomic<int>` indices manage the double buffer:
 
 The ISR never touches `cur_`. The main loop atomically updates `next_` inside `queue_frame()` with interrupts disabled. `advance_display()` is called by the ISR at every half-revolution to flip `prev_` to `next_`.
 
-Buffer storage is placed in Teensy DMAMEM for DMA-accessible SPI throughput:
+The two framebuffers are placed in Teensy DMAMEM (OCRAM) for capacity — at `MAX_W * MAX_H` 16-bit pixels they are far too large for the tightly-coupled DTCM that holds the stack and hot data. They are software render targets, read by the ISR and packed into the LED controller's protocol frame; they are never DMA'd themselves (the eDMA TX buffer is `HD107SFrame::buffer_`, in the controller, which is the buffer that actually clocks out over SPI):
 
 ```cpp
 static DMAMEM Pixel buffer_a[MAX_W * MAX_H];
@@ -590,7 +590,7 @@ A `Fragment` (`geometry.h`) is the data packet exchanged between rasterizers and
 
 ```cpp
 struct Fragment {
-  Vector pos;              // World-space position (unit vector on sphere)
+  Vector pos;              // Position (typically a unit vector on the sphere)
   float v0 = 0.0f;        // Register 0: normalized progress t (0–1)
   float v1 = 0.0f;        // Register 1: arc length / distance
   float v2 = 0.0f;        // Register 2: index / face ID
@@ -749,7 +749,7 @@ All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<F
 
 | Primitive | Description |
 |---|---|
-| `Plot::Point` | Single point with adaptive thickness |
+| `Plot::Point` | Single plotted point |
 | `Plot::Line` | Geodesic line segment between two points |
 | `Plot::Vertices` | Vertex set rendering |
 | `Plot::Multiline` | Connected line strip from a sequence of fragments |
@@ -984,6 +984,8 @@ Pixel (sRGB 16-bit) → linear RGB float → OKLab (L, a, b) → OKLCH (L, C, h)
                                               shortest-arc hue interpolation
                                                                   ↓
                                     OKLCH → OKLab → linear RGB → Pixel
+                                                       ↓ (only if out of gamut)
+                                              reduce chroma, hold hue + L
 ```
 
 | Function | Description |
@@ -992,7 +994,8 @@ Pixel (sRGB 16-bit) → linear RGB float → OKLab (L, a, b) → OKLCH (L, C, h)
 | `oklab_to_oklch()` | Convert OKLab (rectangular) to OKLCH (polar: Lightness, Chroma, Hue) |
 | `lerp_oklch()` | Interpolate two OKLCH values with shortest-arc hue (avoids the red→green→blue detour) |
 | `lerp_oklch_srgb()` | Same as above but returns an sRGB `CPixel` (used by `GenerativePalette` transitions) |
-| `hue_rotate()` | Perceptual hue rotation — rotates the (a,b) chroma plane in OKLab, preserving lightness and chroma. Forward nonlinearity uses `fast_cbrt` (hot per-pixel path); inverse is exact. Used by the feedback `hue_fade` transform and `Flyby`'s displacement-driven hue shift. |
+| `gamut_clip_preserve_chroma()` | Maps an out-of-gamut OKLab color back into the sRGB cube by reducing chroma while holding hue and lightness (binary search on the chroma scale). The hue-preserving alternative to a per-channel RGB clip. Gated behind an in-gamut test (`oklab_to_linear_rgb_gamut`), so in-gamut colors — the vast majority — pay only the test and skip the search. |
+| `hue_rotate()` | Perceptual hue rotation — rotates the (a,b) chroma plane in OKLab, preserving lightness and chroma. Forward nonlinearity uses `fast_cbrt` (hot per-pixel path); inverse is exact. Out-of-gamut results are chroma-reduced rather than per-channel clipped, which holds hue and stabilizes the feedback loop against saturated-color drift. Used by the feedback `hue_fade` transform and `Flyby`'s displacement-driven hue shift. |
 
 #### Palette Modifiers
 
@@ -1169,7 +1172,7 @@ Non-blocking DMA-based LED output for HD107S (APA102-compatible) LEDs on Teensy 
 
 | Class | Role |
 |---|---|
-| `HD107SFrame<N>` | Pre-formatted DMA buffer for the HD107S protocol. `packPixel()` writes `Pixel16` values directly into the frame buffer with inline color correction (color correction → temperature → brightness), bypassing the CRGB intermediate. The buffer is 32-byte-aligned (`__attribute__((aligned(32)))`) and flushed with `arm_dcache_flush_delete()` for cache coherency. |
+| `HD107SFrame<N>` | Pre-formatted DMA buffer for the HD107S protocol. `packPixel()` writes `Pixel16` values directly into the frame buffer with inline color correction (color correction → temperature → brightness), bypassing the CRGB intermediate. The buffer is 32-byte-aligned (`__attribute__((aligned(32)))`) and cleaned with `arm_dcache_flush()` (clean, no invalidate — the buffer is TX-only) for cache coherency. |
 | `TeensySPIDMA` | Low-level DMA+SPI driver wired to LPSPI4. Configures a `DMAChannel` with completion interrupt for fully async byte-stream transmission. |
 | `DMALEDController<N>` | Double-buffered high-level controller. The ISR packs pixels into `backFrame()`, then `submitFrame()` flushes it and triggers async DMA, returning immediately. If the previous transfer is still in flight, `submitFrame()` **drops** the new frame (bumping `getOverrunCount()`) rather than spinning — the in-flight DMA keeps showing the previous column; a transfer that never completes is surfaced as a wedged-channel fault. |
 
@@ -1177,9 +1180,11 @@ The 16-bit linear pipeline reaches from the canvas all the way to the SPI wire w
 
 ```cpp
 // ISR path (per column): fetch the display buffer once, index it directly
-const Pixel* buf = effect_->display_buffer();   // 16-bit linear pixels
-frame.packPixel(i, buf[y * width + x]);          // Pixel16 → HD107S frame
-ledController_.submitFrame();                     // non-blocking DMA, drops on overrun
+const Pixel* buf = effect_->display_buffer();              // 16-bit linear pixels
+// Physical LED index comes from the single-source-of-truth map (pov_single_map.h),
+// which applies the top-arm reversal / bottom-arm offset — never the raw row index.
+frame.packPixel(pov::strip_top_led(y, S), buf[y * width + x]); // Pixel16 → HD107S frame
+ledController_.submitFrame();                               // non-blocking DMA, drops on overrun
 ```
 
 #### Single-Teensy POV Driver (`pov_single.h`)
@@ -1191,8 +1196,8 @@ Main Loop                              ISR (IntervalTimer)
 ──────────                             ───────────────────
 effect->draw_frame()                   show_col() fires every N µs
   Canvas canvas(*this)                   for y in 0..S/2:
-    render to bufs_[cur_]                  packPixel(S/2-y-1, get_pixel(x, y))    // top arm
-  ~Canvas → queue_frame()                  packPixel(S/2+y,   get_pixel(x+W/2, y)) // bottom arm
+    render to bufs_[cur_]                  packPixel(strip_top_led(y,S),    get_pixel(x, y))                      // top arm
+  ~Canvas → queue_frame()                  packPixel(strip_bottom_led(y,S), get_pixel(strip_opposite_col(x,W), y)) // bottom arm
                                          submitFrame() → async DMA
                                          x = (x+1) % width
                                          if x==0 || x==width/2: advance_display()
@@ -2083,8 +2088,10 @@ After populating them, run `npm run importmap:local` to point [`vendor-importmap
 
 ## License
 
-Core infrastructure files: [Polyform Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/)
+This project is split-licensed: the rendering engine and the visual effects carry different terms.
 
-New effect files: Copyright 2025 Gabriel Levy. All rights reserved.
+**Engine — non-commercial.** The core infrastructure (the rendering engine, math, scan/raster, hardware drivers, and test harness — everything outside `effects/`) is licensed under the [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/) (see [`LICENSE`](LICENSE)). You may use, modify, and distribute it for any non-commercial purpose; commercial use is not granted.
 
-`FastNoiseLite.h`: MIT License (Auburn / Jordan Peck)
+**Effects — proprietary.** The visual effects in `effects/` are Copyright 2025 Gabriel Levy. All rights reserved. They are not covered by the PolyForm license — no rights to use, copy, modify, or distribute them are granted.
+
+**Third-party.** `FastNoiseLite.h` is under the MIT License (Auburn / Jordan Peck).
