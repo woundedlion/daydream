@@ -191,6 +191,7 @@ export class Daydream {
 
     this.resources = [];
     this.labelPool = new LabelPool(this.scene);
+    this._hadLabels = false; // Tracks the previous frame's label count for the N->0 hide.
 
     this.setupDots();
 
@@ -367,9 +368,15 @@ export class Daydream {
     // paused frame still tracks camera orbits and clears the label DOM when
     // labels are toggled off.
     this._refreshLabels(effect);
-    if (this.labelPool.activeCount > 0) {
+    // CSS2DRenderer only shows/hides its label <div>s during a render pass, so
+    // skipping render() at zero labels would leave the previous frame's labels
+    // visible on the N->0 transition. Render one extra frame when the count
+    // falls to zero so that pass can hide them, then settle into skipping.
+    const hasLabels = this.labelPool.activeCount > 0;
+    if (hasLabels || this._hadLabels) {
       this.labelRenderer.render(this.scene, this.camera);
     }
+    this._hadLabels = hasLabels;
 
     this._renderPip();
     this.renderer.setScissorTest(false);
