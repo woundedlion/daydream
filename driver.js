@@ -545,6 +545,11 @@ export class Daydream {
     if (this.dotMesh) {
       this.scene.remove(this.dotMesh);
       this.dotMesh.geometry.dispose();
+      // Load-bearing: instanceColor.array may alias WASM linear memory
+      // (refreshPixelView in daydream.js rebinds it to getPixels()'s zero-copy
+      // view). Detach it before dispose() so Three.js's teardown can't read or
+      // re-upload a buffer the engine owns — which a resolution switch is about
+      // to free/reallocate.
       if (this.dotMesh.instanceColor) this.dotMesh.instanceColor.array = null;
       this.dotMesh.dispose();
     }
@@ -734,6 +739,8 @@ export class Daydream {
     if (this.dotMesh) {
       this.scene.remove(this.dotMesh);
       this.dotMesh.geometry?.dispose();
+      // Detach the possibly WASM-aliased instanceColor buffer before dispose()
+      // (see setupDots() for why).
       if (this.dotMesh.instanceColor) this.dotMesh.instanceColor.array = null;
       this.dotMesh.dispose();
       this.dotMesh = null;
