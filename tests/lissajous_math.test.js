@@ -104,6 +104,21 @@ test('snapToRationalRatio: 1:1 ratio closes after one full 2π/passiveC period',
   assert.equal(closingPeriod, TWO_PI / passiveC);
 });
 
+/**
+ * Verifies a zero passive frequency is guarded: the ratio and closing period
+ * would otherwise divide by zero and hand the caller Infinity/NaN. The active
+ * frequency must pass through unchanged with a trivial 1/1 ratio and a finite
+ * zero period.
+ */
+test('snapToRationalRatio: zero passive frequency yields finite values, not NaN/Infinity', () => {
+  const { snappedActiveC, m, n, closingPeriod } = snapToRationalRatio(6, 0);
+  assert.equal(snappedActiveC, 6);
+  assert.equal(m, 1);
+  assert.equal(n, 1);
+  assert.equal(closingPeriod, 0);
+  assert.ok(Number.isFinite(closingPeriod), 'closing period is finite');
+});
+
 /** Verifies the curve starts at (0, 1, 0) when t=0 (sin(0)=0, cos(0)=1). */
 test('lissajous: at t=0 returns the expected point (0, 1, 0)', () => {
   // sin(0)=0, cos(0)=1: x = 0·cos(-a)=0, y = cos(0)=1, z = 0·sin(-a)=0.
