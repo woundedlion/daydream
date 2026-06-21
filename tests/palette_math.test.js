@@ -121,6 +121,36 @@ test('generativePaletteCpp emits the block with the chosen enum tokens', () => {
   assert.ok(s.includes('// Reproduces the profiles + base hue exactly'));
 });
 
+/**
+ * Verifies GenerativePalette.get's upper boundary. The segment scan uses a
+ * half-open test (t >= shape[i] && t < shape[i+1]), so t === 1.0 matches no
+ * segment and falls through to the last one with p clamped to 1 — it must return
+ * the final stop color, not NaN or a wrapped value. t > 1.0 must clamp to that
+ * same endpoint, and the boundary must be continuous with the interior limit.
+ */
+test('GenerativePalette.get: t === 1.0 and t > 1.0 clamp to the final stop color', () => {
+  const pal = new GenerativePalette('STRAIGHT', 'ANALOGOUS', 'ASCENDING', 'VIBRANT', 128);
+
+  const atOne = pal.get(1.0);
+  const beyond = pal.get(1.5);
+  const justBelow = pal.get(0.99999);
+
+  // Finite and in range at the boundary.
+  assert.equal(atOne.length, 3);
+  for (const ch of atOne) {
+    assert.ok(Number.isFinite(ch), `channel finite at t=1.0`);
+    assert.ok(ch >= -1e-6 && ch <= 1 + 1e-6, `channel ${ch} in [0,1] at t=1.0`);
+  }
+
+  // t > 1.0 clamps to the same endpoint as t === 1.0 (no wrap-around).
+  assert.deepEqual(beyond, atOne);
+
+  // The endpoint is continuous with the interior approaching it.
+  for (let i = 0; i < 3; i++) {
+    assert.ok(Math.abs(atOne[i] - justBelow[i]) < 1e-4, `continuous at t→1 on channel ${i}`);
+  }
+});
+
 /** Verifies GenerativePalette.get yields finite linear RGB triples within [0, 1] across several t values and shapes. */
 test('GenerativePalette.get returns finite linear RGB in range', () => {
   const pal = new GenerativePalette('STRAIGHT', 'ANALOGOUS', 'ASCENDING', 'VIBRANT', 128);
