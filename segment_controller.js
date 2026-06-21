@@ -585,7 +585,10 @@ export class SegmentController {
       c.persist.textContent = a ? fmtKB(a.persistent_arena.usage) : '-';
     }
 
-    const maxTime = Math.max(...this.timings);
+    // Guarded reduce, not Math.max(...timings): the latter spreads the array
+    // (and returns -Infinity on an empty one — reachable before the first frame
+    // or after a reset, when timings is []). Seed 0 since timings are durations.
+    const maxTime = this.timings.reduce((a, b) => Math.max(a, b), 0);
     cells.maxTime.textContent = `${maxTime.toFixed(1)} ms`;
     cells.wallTime.textContent = `${this.wallTime.toFixed(1)} ms`;
     cells.wallTime.className = this.wallTime > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
