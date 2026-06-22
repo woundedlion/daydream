@@ -163,7 +163,12 @@ export class EffectSidebar {
       newBtn.classList.add('active');
       newBtn.setAttribute('aria-selected', 'true');
       this._setRovingTabbable(newBtn);
-      newBtn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      // Instant ('auto'), not 'smooth': every setActive is a programmatic
+      // selection (init, resolution switch, deep-link replay, each "Test All"
+      // tick), so a smooth animation here scrolls the list on its own with no
+      // user gesture behind it. Keyboard navigation scrolls via the focused
+      // button's own default scroll, not this call.
+      newBtn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
     }
   }
 
