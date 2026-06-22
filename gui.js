@@ -225,7 +225,20 @@ class DeepLinkGUI {
           if (typeof max === 'number' && val > max) val = max;
         }
       } else if (typeof currentVal === 'boolean') {
-        val = (val === 'true');
+        // Accept the common truthy/falsy spellings rather than treating
+        // everything but the exact string 'true' as false: a hand-edited or
+        // shared deep link with ?flag=1 or ?flag=on otherwise silently reads as
+        // false. An unrecognized token warns and falls back to the bound value,
+        // matching the numeric branch's warn-and-keep-default behavior.
+        const t = val.trim().toLowerCase();
+        if (t === 'true' || t === '1' || t === 'yes' || t === 'on') {
+          val = true;
+        } else if (t === 'false' || t === '0' || t === 'no' || t === 'off') {
+          val = false;
+        } else {
+          console.warn(`DeepLinkGUI: ignoring unrecognized boolean URL value "${params.get(key)}" for "${key}"`);
+          val = currentVal;
+        }
       }
       // For an enumerated control, a URL value outside the option list would
       // poison state: lil-gui shows it unselected, and the applyOnLoad replay
