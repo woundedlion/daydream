@@ -277,6 +277,12 @@ function applyEffect(preserveParams = false) {
         navigator.clipboard.writeText(cpp).then(() => {
           exportCtrl.name('\u2713 Copied!');
           setTimeout(() => exportCtrl.name('Export'), 1500);
+        }).catch((err) => {
+          // Insecure context or denied permission: surface the failure on the
+          // button instead of an unhandled rejection with no user feedback.
+          console.warn('Export: clipboard write failed', err);
+          exportCtrl.name('\u2717 Copy failed');
+          setTimeout(() => exportCtrl.name('Export'), 1500);
         });
       }
     };
