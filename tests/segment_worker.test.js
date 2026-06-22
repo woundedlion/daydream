@@ -3,8 +3,8 @@
 // segment_worker — unit coverage for the Web Worker's DOM-free, mostly-pure
 // glue: the per-segment clip application, the quadrant row-extraction copy, the
 // arena-metrics marshalling (including the throw path), the setResolution gate
-// (finding 14: a rejected resolution must leave geometry/clip untouched), and
-// the serialized message queue's failure isolation + rethrow.
+// (a rejected resolution must leave geometry/clip untouched), and the serialized
+// message queue's failure isolation + rethrow.
 //
 // Driven by a fake `self` (postMessage captured, onmessage invoked by hand) and
 // a mocked ./holosphere_wasm.js so the real WASM module is never loaded in Node.
@@ -187,10 +187,10 @@ test('render still posts a frame when getArenaMetrics throws', async () => {
 });
 
 /**
- * Finding 14 regression: setResolution returning false must leave the worker's
- * geometry and clip untouched, so it keeps extracting the old-size quadrant.
+ * Regression: setResolution returning false must leave the worker's geometry and
+ * clip untouched, so it keeps extracting the old-size quadrant.
  */
-test('a rejected setResolution leaves segRange and clip untouched (finding 14)', async () => {
+test('a rejected setResolution leaves segRange and clip untouched', async () => {
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
   const clipBefore = { ...engineInstance.clip };
 
