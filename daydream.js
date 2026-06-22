@@ -481,10 +481,16 @@ createHolosphereModule().then(module => {
   wasmModule = module;
   wasmEngine = new module.HolosphereEngine();
 
-  // Apply the resolution hydrated from state/URL before first paint.
+  // Apply the resolution hydrated from state/URL before first paint. Mirror
+  // applyResolution()'s guard: setResolution returns false for a size the WASM
+  // factory can't build, leaving the engine at its previous resolution. Log it
+  // so a hydrated/hand-edited preset the engine rejects is visible rather than
+  // silently diverging from the geometry. applyResolution(true) below re-runs
+  // with the same preset and self-heals (keeps the current valid resolution).
   const p = resolutionPresets[appState.get('resolution')];
-  if (p) {
-    wasmEngine.setResolution(p.w, p.h);
+  if (p && wasmEngine.setResolution(p.w, p.h) === false) {
+    console.error(`Init: unsupported resolution ${p.w}x${p.h} from hydrated preset; ` +
+      `keeping the engine's current resolution.`);
   }
 
   // Don't setEffect here. The effect name is hydrated from the URL and may be
