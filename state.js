@@ -4,6 +4,18 @@
  */
 
 /**
+ * Round a numeric URL-param value to 4 decimals, dropping trailing-zero noise.
+ * Shared by URLSync.setParam and gui.js's ad-hoc writer so the two URL
+ * serializers cannot drift. parseFloat re-parses the fixed-decimal string so
+ * 0.5000 collapses back to 0.5.
+ * @param {number} value - The numeric value to serialize.
+ * @returns {number} The value rounded to 4 decimal places.
+ */
+export function roundUrlNumber(value) {
+  return parseFloat(value.toFixed(4));
+}
+
+/**
  * Centralized application state with subscriber pattern and URL synchronization.
  * Separates state management from DOM manipulation — subscribers react to changes
  * independently rather than being orchestrated imperatively.
@@ -178,7 +190,7 @@ export class URLSync {
     } else {
       // Round numbers to save space and avoid float jitter.
       this._adhoc.set(key,
-        typeof value === 'number' ? String(parseFloat(value.toFixed(4))) : String(value));
+        typeof value === 'number' ? String(roundUrlNumber(value)) : String(value));
     }
     this._schedule();
   }
