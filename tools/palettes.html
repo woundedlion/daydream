@@ -838,16 +838,6 @@
          * @param {number} t The current time parameter (0 to 1) for the marker position.
          * @param {object | null} selectionRange - e.g., { start: 0.2, end: 0.5 }
          */
-    // Per-pixel dither threshold in [0,1): Jimenez "interleaved gradient noise".
-    // Used as floor(channel*255 + thr) so each channel's fractional part rounds
-    // up in proportion -> 8-bit banding (worst in the bright, steep, wide-hue
-    // regions) dissolves into sub-pixel noise. Chosen over an ordered (Bayer)
-    // matrix because IGN has no regular period, so it can't beat against the
-    // canvas's CSS rescale into low-frequency moire "bands"; it's also cheaper.
-    function ditherThreshold(x, y) {
-      const a = (0.06711056 * x + 0.00583715 * y) % 1;
-      return (52.9829189 * a) % 1;
-    }
     function drawColorStrip(t, selectionRange = null) {
       if (!colorStripCtx) return; // Safety check
       const width = colorStripCanvas.width;
@@ -872,25 +862,20 @@
           const tx = x / (width - 1);
           const [r, g, b] = palette.get(tx); // Get color in [0, 1] range
 
-          // Keep the sub-8-bit precision: round per pixel with an ordered dither
-          // (below), not once per column. Steep wide-hue gradients (e.g.
-          // SPLIT_COMPLEMENTARY sweeps ~145deg) otherwise round adjacent columns
-          // to the same 8-bit value then jump, banding the strip.
-          const rF = linearToSrgbFloat(Math.max(0, Math.min(1, r))) * 255;
-          const gF = linearToSrgbFloat(Math.max(0, Math.min(1, g))) * 255;
-          const bF = linearToSrgbFloat(Math.max(0, Math.min(1, b))) * 255;
+          // Plain 8-bit round, no dither: the strip mirrors the device's own
+          // 16->8 truncation (the LED output applies no dithering), so the
+          // preview stays faithful to what the hardware actually shows rather
+          // than a smoother fiction. If output dithering is ever added to the
+          // engine, mirror it here.
+          const rInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, r))) * 255);
+          const gInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, g))) * 255);
+          const bInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, b))) * 255);
 
           for (let y = 0; y < height; y++) {
-            // Per-(x,y) dither threshold in (0,1) so each channel's fractional
-            // part rounds up in proportion across the pixels around it, averaging
-            // to the true value -> ~3 extra bits, no visible band. Same threshold
-            // for all three channels (a uniform sub-pixel offset) so hue is
-            // preserved -- no chroma speckle at the transition.
-            const thr = ditherThreshold(x, y);
             const index = (y * width + x) * 4;
-            data[index] = Math.min(255, Math.floor(rF + thr));
-            data[index + 1] = Math.min(255, Math.floor(gF + thr));
-            data[index + 2] = Math.min(255, Math.floor(bF + thr));
+            data[index] = rInt;
+            data[index + 1] = gInt;
+            data[index + 2] = bInt;
             data[index + 3] = 255; // Alpha
           }
         }
