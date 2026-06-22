@@ -103,7 +103,7 @@ test('mapValue computes the expected interpolations', () => {
 });
 
 /** Verifies proceduralPaletteCpp emits the ProceduralPalette initializer with f-suffixed floats and per-vector comments. */
-test('proceduralPaletteCpp emits a valid C++ initializer (finding 291 guard)', () => {
+test('proceduralPaletteCpp emits a valid C++ initializer', () => {
   const params = {
     A_R: 0.5, A_G: 0.5, A_B: 0.5,
     B_R: 0.5, B_G: 0.5, B_B: 0.5,
