@@ -611,7 +611,15 @@ guiInstance.domElement.classList.add('global-gui');
 if (window.innerWidth < 900) {
   guiInstance.close();
 }
-document.getElementById('gui-container').appendChild(guiInstance.domElement);
+// Guard the container lookup: a page/embed lacking #gui-container must degrade
+// gracefully (no global GUI) rather than throw here and white-screen the whole
+// app before the rest of the scene initializes.
+const guiContainer = document.getElementById('gui-container');
+if (guiContainer) {
+  guiContainer.appendChild(guiInstance.domElement);
+} else {
+  console.warn('daydream: #gui-container not found; skipping global GUI mount.');
+}
 
 guiInstance.add({ resolution: appState.get('resolution') }, 'resolution', Object.keys(resolutionPresets))
   .name('Resolution')
@@ -778,6 +786,10 @@ function disposeApp() {
     clearInterval(testAllInterval);
     testAllInterval = null;
   }
+  // Finalize any in-progress recording before tearing the scene down: otherwise
+  // the MediaRecorder, its capture stream, and the offscreen canvas leak and the
+  // partial recording is never flushed/downloaded. stop() is a no-op when idle.
+  recorder?.stop();
   sidebar.dispose();
   daydream.dispose();
   // Terminate the segment-worker pool too: each worker holds a live WASM
