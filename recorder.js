@@ -217,14 +217,12 @@ export class VideoRecorder {
       return;
     }
 
-    // Blit the source canvas into the offscreen capture buffer. The scaled path
-    // re-syncs the offscreen dimensions first: if the source was resized mid-
-    // recording (window/resolution change), its aspect ratio changed and the
-    // offscreen would otherwise scale into stale, wrong-aspect dimensions
-    // (_ensureOffscreen only reassigns on an actual change — a steady-state
-    // no-op). The native pinned path deliberately keeps its start dimensions, so
-    // a resized source scales into the fixed buffer rather than resizing the
-    // track; do not recompute its dimensions here.
+    // Blit the source canvas into the offscreen capture buffer. Both the scaled
+    // and native paths pin the offscreen dimensions at start(), so a source
+    // resized mid-recording (window/resolution change) scales into the fixed
+    // buffer rather than resizing the captured track — the track's frame size
+    // must stay fixed for the whole session (most H.264/VP9 encoders reject or
+    // corrupt a mid-stream size change).
     // Skip the blit when the source canvas is mid-resize at a transient 0x0:
     // drawImage from a zero-sized source throws (or injects a blank/wrong-aspect
     // frame), corrupting a "byte-perfect" recording. The offscreen keeps its
@@ -232,7 +230,6 @@ export class VideoRecorder {
     // this tick rather than a broken one.
     if (this._offscreen && this._offCtx &&
         this.canvas.width > 0 && this.canvas.height > 0) {
-      if (this.targetHeight) this._ensureOffscreen();
       this._offCtx.drawImage(this.canvas, 0, 0, this._offscreen.width, this._offscreen.height);
     }
 
@@ -252,38 +249,42 @@ export class VideoRecorder {
   }
 
   /**
-   * Creates or resizes the offscreen scaling canvas to match the target height
-   * and the source canvas aspect ratio, rounding both dimensions up to even
-   * values (required by video codecs).
-   * @returns {HTMLCanvasElement} The offscreen canvas sized for the target resolution.
+   * Creates the offscreen scaling canvas at the target height and the source
+   * canvas's start-time aspect ratio, rounding both dimensions up to even values
+   * (required by video codecs). Like _ensurePinnedOffscreen, it sizes only on
+   * creation and never tracks a later source resize: the captured track's frame
+   * size must stay fixed for the whole session, so a resized source scales into
+   * this fixed buffer (captureFrame) rather than changing the track size.
+   * @returns {HTMLCanvasElement} The offscreen canvas pinned to the target height.
    */
   _ensureOffscreen() {
-    // Clamp the aspect: an early or zero-size source layout makes
-    // width/height non-finite (height 0 → Infinity, 0/0 → NaN), which would
-    // propagate to NaN canvas dimensions. Fall back to a square in that case.
-    const rawAspect = this.canvas.width / this.canvas.height;
-    const aspect = Number.isFinite(rawAspect) && rawAspect > 0 ? rawAspect : 1;
-    const w = Math.round(this.targetHeight * aspect);
-    // Ensure even dimensions (codecs require it)
-    const evenW = w % 2 === 0 ? w : w + 1;
-    const evenH = this.targetHeight % 2 === 0 ? this.targetHeight : this.targetHeight + 1;
-
+    // Size only on creation, then never resize — that pin is what keeps the
+    // track frame size constant. A session starts with a fresh offscreen
+    // (_cleanup nulls it), so each session pins to its own start-time aspect.
     if (!this._offscreen) {
+      // Clamp the aspect: an early or zero-size source layout makes
+      // width/height non-finite (height 0 → Infinity, 0/0 → NaN), which would
+      // propagate to NaN canvas dimensions. Fall back to a square in that case.
+      const rawAspect = this.canvas.width / this.canvas.height;
+      const aspect = Number.isFinite(rawAspect) && rawAspect > 0 ? rawAspect : 1;
+      const w = Math.round(this.targetHeight * aspect);
+      // Ensure even dimensions (codecs require it)
+      const evenW = w % 2 === 0 ? w : w + 1;
+      const evenH = this.targetHeight % 2 === 0 ? this.targetHeight : this.targetHeight + 1;
       this._offscreen = document.createElement('canvas');
       this._offCtx = this._offscreen.getContext('2d');
+      this._offscreen.width = evenW;
+      this._offscreen.height = evenH;
     }
-    // Reassign only on change — writing canvas.width/height clears the bitmap,
-    // so doing it every captureFrame would needlessly blank the offscreen.
-    if (this._offscreen.width !== evenW) this._offscreen.width = evenW;
-    if (this._offscreen.height !== evenH) this._offscreen.height = evenH;
     return this._offscreen;
   }
 
   /**
    * Creates the native-resolution offscreen capture canvas, pinned to the source
    * canvas's dimensions at the moment of call (start of recording), rounded up to
-   * even values (codecs require it). Unlike _ensureOffscreen this never tracks a
-   * later source resize: the buffer keeps its start dimensions for the whole
+   * even values (codecs require it). Like _ensureOffscreen this sizes once and
+   * never tracks a later source resize, but at the native source size rather than
+   * a scaled target height: the buffer keeps its start dimensions for the whole
    * session so the captured track's frame size stays fixed, and captureFrame
    * scales a resized source into it instead of changing the track size.
    * @returns {HTMLCanvasElement} The offscreen canvas pinned to the start-time source size.
