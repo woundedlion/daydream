@@ -108,6 +108,12 @@ let recorder = null;
  * @returns {void}
  */
 function refreshPixelView() {
+  // Load-bearing: a non-detached view is never stale. Emscripten grows the heap
+  // by detaching the old ArrayBuffer in place (byteLength drops to 0) and binding
+  // the WASM memory to a fresh one, so the ONLY way a previously-fetched view
+  // stops pointing at live pixel memory is detachment — which the byteLength
+  // guard catches. A still-attached wasmMemoryView therefore aliases current
+  // memory and needs no re-fetch; re-fetching every frame would be wasted work.
   if (!wasmMemoryView || wasmMemoryView.buffer.byteLength === 0) {
     wasmMemoryView = wasmEngine.getPixels();
     daydream.dotMesh.instanceColor.array = wasmMemoryView;
