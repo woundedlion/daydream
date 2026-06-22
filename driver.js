@@ -107,11 +107,13 @@ export class Daydream {
   static CAMERA_Z = 220;
 
   static SPHERE_RADIUS = 30;
-  // Fixed cosine cutoff for label visibility: a label is shown when the angle
-  // between its (unit) direction and the camera direction is within this cosine.
-  // Pinned to the canonical framing (SPHERE_RADIUS / CAMERA_Z) so the visible
-  // label set no longer drifts with orbit distance the way the old
-  // dot(label, cameraPos) > SPHERE_RADIUS test did.
+  // Label-visibility threshold, compared at the use site against cos(angle)
+  // between a label's (unit) direction and the camera direction. Despite the
+  // name this is a framing ratio — sphere radius over the canonical camera
+  // distance — not a true cosine; it equals the intended angular cutoff only at
+  // CAMERA_Z. Pinning it to the canonical framing (rather than the old
+  // dot(label, cameraPos) > SPHERE_RADIUS test) keeps the visible label set from
+  // drifting with orbit distance: the use site rescales it by the live distance.
   static LABEL_VISIBILITY_COS = Daydream.SPHERE_RADIUS / Daydream.CAMERA_Z;
   static H = 20;
   static W = 96;
