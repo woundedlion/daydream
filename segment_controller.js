@@ -20,6 +20,7 @@
  *   - getMemoryView():    current Uint16Array view of the display buffer
  */
 import { Daydream, SLOW_FRAME_MS } from "./driver.js";
+import { blitSegmentRect } from "./segment_layout.js";
 
 /** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
 /** @typedef {import('./worker_protocol.js').ControllerInboundMsg} ControllerInboundMsg */
@@ -465,16 +466,9 @@ export class SegmentController {
       // past the buffer (per-result, not per-pixel — no hot-path cost).
       if (r.x0 < 0 || r.y0 < 0 || r.x1 > w || r.y1 > h) continue;
 
-      // Each quad row maps to the contiguous destination span [x0,x1), so blit
-      // it with one TypedArray.set rather than element-by-element — (y1-y0) row
-      // copies instead of ~quadW*quadH*3 scalar stores.
-      const rowLen = (r.x1 - r.x0) * 3;
-      let srcIdx = 0;
-      for (let y = r.y0; y < r.y1; y++) {
-        const dstIdx = (y * w + r.x0) * 3;
-        dst.set(r.pixels.subarray(srcIdx, srcIdx + rowLen), dstIdx);
-        srcIdx += rowLen;
-      }
+      // Composite this quad back into the canvas (compact -> canvas); see
+      // blitSegmentRect for the contiguous-row fast path.
+      blitSegmentRect(dst, r.pixels, w, r, false);
     }
 
     // Draw segment boundary lines (cyan markers) on both X and Y splits

@@ -11,7 +11,7 @@
  */
 
 import createHolosphereModule from "./holosphere_wasm.js";
-import { computeSegmentRange } from "./segment_layout.js";
+import { computeSegmentRange, blitSegmentRect } from "./segment_layout.js";
 
 /** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
 /** @typedef {import('./worker_protocol.js').ControllerInboundMsg} ControllerInboundMsg */
@@ -156,16 +156,9 @@ async function handleMessage(msg) {
       const allPixels = engine.getPixels();
       const { x0, x1, y0, y1, w: qw, h: qh } = segRange;
       const pixelsCopy = new Uint16Array(qw * qh * 3);
-      // Each quadrant row [x0,x1) is contiguous in the full canvas buffer, so
-      // copy it in one TypedArray.set rather than element-by-element — qh bulk
-      // copies instead of ~qw*qh*3 scalar stores.
-      const rowLen = (x1 - x0) * 3;
-      let dst = 0;
-      for (let y = y0; y < y1; y++) {
-        const src = (y * canvasW + x0) * 3;
-        pixelsCopy.set(allPixels.subarray(src, src + rowLen), dst);
-        dst += rowLen;
-      }
+      // Extract this quadrant from the full canvas (canvas -> compact); see
+      // blitSegmentRect for the contiguous-row fast path.
+      blitSegmentRect(allPixels, pixelsCopy, canvasW, segRange, true);
 
       /** @type {SegArenaMetrics | null} */
       let arenaMetrics = null;
