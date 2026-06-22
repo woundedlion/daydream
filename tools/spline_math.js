@@ -87,7 +87,12 @@ export function generateCatmullRomCurve(pts, tension, numSamplesPerSeg, tangentF
  * @returns {string} C++ float literal (e.g. "1.5f").
  */
 export function formatFloatCpp(n) {
-  const s = n.toFixed(6).replace(/0+$/, '').replace(/\.$/, '.0');
+  // Two-step trim (matching lissajous_math.js): strip only the zeros that follow
+  // the decimal point, then restore a single fractional digit if the dot was left
+  // dangling. Clearer and less fragile than strip-all-trailing-zeros-then-fix-dot,
+  // whose first pass also eats zeros that belong to an integer part.
+  let s = n.toFixed(6).replace(/(\.\d*?)0+$/, '$1');
+  if (s.endsWith('.')) s += '0';
   return s + 'f';
 }
 
