@@ -115,6 +115,13 @@ async function handleMessage(msg) {
         // on failure the engine stays at its current geometry, so leave
         // canvasW/H/segRange and the clip untouched rather than extracting for a
         // size the engine isn't at (mirrors daydream.js's applyResolution guard).
+        //
+        // The `=== false` (not `!`) is load-bearing and coupled to the binding's
+        // boolean contract: only an explicit false counts as a rejection, so a
+        // genuine success (true) adopts the new size. The coupling: were the
+        // binding ever to return a non-boolean (e.g. undefined), it would slip
+        // past this guard and adopt msg.w/h the engine may not have applied —
+        // keep setResolution returning a strict boolean to preserve this.
         if (engine.setResolution(msg.w, msg.h) === false) break;
         canvasW = msg.w;
         canvasH = msg.h;
