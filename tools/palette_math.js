@@ -303,12 +303,19 @@ export class GenerativePalette {
         h2 = this.wrapHue(h1 + 128);
         h3 = this.wrapHue(h1 + this.prng.nextInt(-7, 8));
         break;
-      case "ANALOGOUS":
-      default:
+      case "ANALOGOUS": {
         const dir = (this.prng.nextInt(0, 2) === 0) ? 1 : -1;
         h2 = this.wrapHue(h1 + dir * this.prng.nextInt(11, 22));
         h3 = this.wrapHue(h2 + dir * this.prng.nextInt(11, 22));
         break;
+      }
+      default:
+        // Reject an unrecognized harmony rather than silently rendering it as
+        // analogous: the export path (generativePaletteCpp) already throws on an
+        // unknown token, so the preview must agree or the two disagree on
+        // validation — a bad harmony would preview fine yet fail to export.
+        throw new Error(`PaletteMath.calcHues: unknown harmonyType "${harmonyType}" ` +
+          `(expected one of ${[...HARMONY_TYPES].join(', ')})`);
     }
     return { h2, h3 };
   }
