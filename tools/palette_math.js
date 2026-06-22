@@ -382,6 +382,15 @@ export function proceduralPaletteCpp(parameters) {
                           ${v(parameters.D_R, parameters.D_G, parameters.D_B)}); // D`;
 }
 
+// The four GenerativePalette enum sets, mirrored from core/color.h. A token
+// outside these sets pastes a nonexistent enumerator (e.g. GradientShape::FOO)
+// straight into the emitted C++, which only fails at engine compile time — so
+// generativePaletteCpp rejects it at the source instead.
+export const GRADIENT_SHAPES = new Set(['STRAIGHT', 'CIRCULAR', 'VIGNETTE', 'FALLOFF']);
+export const HARMONY_TYPES = new Set(['TRIADIC', 'SPLIT_COMPLEMENTARY', 'COMPLEMENTARY', 'ANALOGOUS']);
+export const BRIGHTNESS_PROFILES = new Set(['ASCENDING', 'DESCENDING', 'FLAT', 'BELL', 'CUP']);
+export const SATURATION_PROFILES = new Set(['PASTEL', 'MID', 'VIBRANT']);
+
 /**
  * Emit the generative-tab C++ initializer.
  *
@@ -396,5 +405,15 @@ export function proceduralPaletteCpp(parameters) {
  * @returns {string} The C++ GenerativePalette initializer source, prefixed with the reproducibility caveat comment.
  */
 export function generativePaletteCpp({ shape, harmony, brightness, sat, hueValue }) {
+  const reject = (label, token, allowed) => {
+    if (!allowed.has(token)) {
+      throw new Error(`generativePaletteCpp: unknown ${label} "${token}" ` +
+        `(expected one of ${[...allowed].join(', ')})`);
+    }
+  };
+  reject('GradientShape', shape, GRADIENT_SHAPES);
+  reject('HarmonyType', harmony, HARMONY_TYPES);
+  reject('BrightnessProfile', brightness, BRIGHTNESS_PROFILES);
+  reject('SaturationProfile', sat, SATURATION_PROFILES);
   return `// Reproduces the profiles + base hue exactly; the randomized\n// saturation/brightness/hue-offset structure is drawn from the\n// engine's global RNG and will differ from the tool preview.\nGenerativePalette palette{\n    GradientShape::${shape}, HarmonyType::${harmony},\n    BrightnessProfile::${brightness}, SaturationProfile::${sat}, ${hueValue}};`;
 }

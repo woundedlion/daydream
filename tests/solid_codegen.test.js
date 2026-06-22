@@ -122,3 +122,15 @@ test('computeInternalAngle guards degenerate input', () => {
   assert.equal(computeInternalAngle({ faces: [] }), 0);
   assert.equal(computeInternalAngle({ vertices: [], faces: [[0, 1]] }), 0);
 });
+
+/** Verifies generateFuncAndRecipe rejects a base or op that would emit non-compiling C++ (finding 5 guard). */
+test('generateFuncAndRecipe rejects an unknown op or a malformed base', () => {
+  assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'frobnicate', params: {} }] }),
+    /unknown op "frobnicate"/);
+  assert.throws(() => generateFuncAndRecipe({ base: 'cube(a,b); evil()', ops: [] }),
+    /not a valid C\+\+ identifier/);
+  assert.throws(() => generateFuncAndRecipe({ base: '', ops: [] }),
+    /not a valid C\+\+ identifier/);
+  // A well-formed base + known ops still pass.
+  assert.doesNotThrow(() => generateFuncAndRecipe({ base: 'icosahedron', ops: ['dual', { op: 'truncate', params: { t: 0.3 } }] }));
+});

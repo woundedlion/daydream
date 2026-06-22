@@ -13,6 +13,20 @@
  * three.js dependency.
  */
 
+// The Conway/SolidBuilder operators this generator knows how to emit. An op
+// outside this set would be pasted verbatim (`.op()`) into non-compiling C++
+// that only fails at engine compile time, so generateFuncAndRecipe rejects it.
+const KNOWN_OPS = new Set([
+  'truncate', 'expand', 'chamfer', 'hankin', 'snub', 'relax', 'bevel',
+  'dual', 'kis', 'ambo', 'gyro', 'meta', 'needle', 'zip',
+]);
+
+// A base seed-solid name is pasted as a C++ function call (`base(a, b)`). The
+// valid set is the WASM solid registry (dynamic, invisible to this pure
+// module), so guard the shape: every registry name is a valid C++ identifier,
+// and the check also stops an unexpected caller from injecting arbitrary text.
+const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
 /**
  * Formats a number as a C++ float literal, appending `.0` when integral and an
  * `f` suffix, to satisfy C++ strictness and convention.
@@ -47,11 +61,19 @@ export function pctSuffix(val) {
  * @returns {{funcName: string, recipe: string}} The generated C++ function name and SolidBuilder recipe expression.
  */
 export function generateFuncAndRecipe(item) {
+  if (typeof item.base !== 'string' || !CPP_IDENTIFIER.test(item.base)) {
+    throw new Error(`generateFuncAndRecipe: base "${item.base}" is not a valid C++ identifier`);
+  }
+
   let nameParts = [item.base];
   let chain = '';
 
   item.ops.forEach(o => {
     const opName = typeof o === 'string' ? o : o.op;
+    if (!KNOWN_OPS.has(opName)) {
+      throw new Error(`generateFuncAndRecipe: unknown op "${opName}" ` +
+        `(expected one of ${[...KNOWN_OPS].join(', ')})`);
+    }
 
     if (opName === 'truncate') {
       chain += `.truncate(${formatFloat(o.params.t)})`;
