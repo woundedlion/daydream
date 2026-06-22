@@ -409,7 +409,11 @@ function applyEffect(preserveParams = false) {
     });
   }
 
-  if (activeEffect && activeEffect.gui && window.innerWidth < 900) {
+  // Collapse the effect GUI on mobile using the driver's container-width
+  // isMobile, the same source the renderer uses, rather than a separate
+  // window.innerWidth probe that disagrees on a narrow container in a wide
+  // window.
+  if (activeEffect && activeEffect.gui && daydream.isMobile) {
     activeEffect.gui.close();
   }
 
@@ -623,7 +627,10 @@ createHolosphereModule().then(module => {
 
 const guiInstance = new GUI({ autoPlace: false });
 guiInstance.domElement.classList.add('global-gui');
-if (window.innerWidth < 900) {
+// Start the global GUI collapsed on mobile, keyed off the driver's container-
+// width isMobile (the same source the renderer and effect-GUI collapse use)
+// rather than a separate window.innerWidth probe.
+if (daydream.isMobile) {
   guiInstance.close();
 }
 // Guard the container lookup: a page/embed lacking #gui-container must degrade
