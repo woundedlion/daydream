@@ -261,7 +261,11 @@ export class EffectSidebar {
     if (!btns.length) return;
 
     const focused = document.activeElement;
-    const idx = btns.indexOf(focused);
+    let idx = btns.indexOf(focused);
+    // When focus is on the list container itself (not a button), activeElement
+    // isn't in btns and idx is -1, which would lose the current position. Fall
+    // back to the roving tab stop so Arrow keys move relative to it.
+    if (idx === -1) idx = btns.indexOf(this._tabbableBtn);
 
     if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
       e.preventDefault();
