@@ -84,8 +84,8 @@ const LoResFavorites = [
 
 // Resolution presets and effect lists per resolution
 const resolutionPresets = {
-  "Holosphere (20x96)": { h: 20, w: 96, size: 2 },
-  "Phantasm (144x288)": { h: 144, w: 288, size: 0.25 },
+  "Holosphere (20x96)": { h: 20, w: 96, dotSize: 2 },
+  "Phantasm (144x288)": { h: 144, w: 288, dotSize: 0.25 },
 };
 
 const effectsByResolution = {
@@ -447,7 +447,7 @@ function applyResolution(preserveParams = false) {
   // Fall back to the hi-res list for an unmapped resolution key.
   const availableEffects = effectsByResolution[resolution] || HiResFavorites;
 
-  daydream.updateResolution(p.h, p.w, p.size);
+  daydream.updateResolution(p.h, p.w, p.dotSize);
 
   let effectSizes = null;
   if (wasmEngine) {
