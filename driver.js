@@ -340,6 +340,13 @@ export class Daydream {
     const container = this.canvas.parentElement;
     const width = container.clientWidth;
     const height = container.clientHeight;
+    // A 0×0 container (the constructor call before first layout, or a
+    // display:none ancestor) makes aspect = width/height = 0/0 = NaN, which
+    // poisons the camera projection matrix until the next resize. Skip; the
+    // ResizeObserver re-invokes setCanvasSize with real dimensions once the
+    // container has a layout, and the camera keeps its finite constructor-time
+    // projection in the meantime. Mirrors the recorder's aspect clamp.
+    if (width <= 0 || height <= 0) return;
     this.isMobile = width <= 900;
     this.mainViewport.x = 0;
     this.mainViewport.y = 0;
