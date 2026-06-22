@@ -1916,7 +1916,7 @@ params.forEach(p => {
 
 ### 10.7 Segmented POV Workers (`segment_worker.js`)
 
-Phantasm in hardware is four Teensys each rendering a quadrant of the canvas — one arm's half-width crossed with a Y-band, computed by the engine's `segment_map()`/`segment_x_col()` (`pov_segment_map.h`). Daydream reproduces this in software — its `computeSegmentRange()` (`segment_layout.js`) mirrors that math — so the partitioning is exercised before fabrication. A `SegmentController` (`segment_controller.js`) owns the worker pool — dispatching renders (`renderParallel()`), fencing stale frames by generation, and compositing results (`composite()`) — while each `segment_worker.js` hosts one WASM instance:
+Phantasm in hardware is four Teensys each rendering a quadrant of the canvas — one arm's half-width crossed with a Y-band, computed by the engine's `segment_map()`/`segment_x_col()` (`pov_segment_map.h`). Daydream reproduces the *partitioning* in software — its `computeSegmentRange()` (`segment_layout.js`) mirrors the engine's arm/Y-band split (a general even-N tiler that also drives the 2–8-way preview), though it does not model the bottom segment's reversed strip direction (`y_step = -1`) or the hardware's power-of-two segment-count constraint — so the band partition, not the full strip wiring, is exercised before fabrication. A `SegmentController` (`segment_controller.js`) owns the worker pool — dispatching renders (`renderParallel()`), fencing stale frames by generation, and compositing results (`composite()`) — while each `segment_worker.js` hosts one WASM instance:
 
 ```
 Main thread                  Workers (one WASM each)
