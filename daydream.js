@@ -97,7 +97,9 @@ let wasmModule = null;
 let wasmEngine = null;
 let wasmMemoryView = null;
 let wasmAdapter = null;
-const recorder = new VideoRecorder(document.querySelector('#canvas-container canvas') || document.createElement('canvas'));
+// Constructed once daydream's canvas exists (see below). Until then it is null;
+// the recording controls all guard with `if (recorder)` / `recorder?.`.
+let recorder = null;
 
 /**
  * Re-fetch the WASM pixel view when missing or detached (heap growth can detach
@@ -570,8 +572,9 @@ createHolosphereModule().then(module => {
 
   console.log("Wasm Engine Loaded");
 
-  // Wire recorder to the actual canvas now that daydream is ready
-  recorder.canvas = daydream.canvas;
+  // Construct the recorder now that daydream's canvas exists (no throwaway
+  // placeholder canvas at module-eval time).
+  recorder = new VideoRecorder(daydream.canvas);
   // Track the driver's frame cadence (Daydream.FPS) instead of the recorder's
   // hardcoded default, so elapsed-time accounting stays correct if FPS changes.
   recorder.frameInterval = daydream.frameInterval;
