@@ -23,6 +23,19 @@ const optionValues = (options) => {
 };
 
 /**
+ * Whether a URL string is a color literal lil-gui's color parser can accept.
+ * Matches the two forms _attachUrlWriter serializes — `#hex` (3/4/6/8 digits)
+ * and `rgb()/rgba()` with numeric components — so a malformed deep link is
+ * rejected before it reaches the parser and renders a broken swatch.
+ * @param {*} s - Candidate value from the URL.
+ * @returns {boolean} True if `s` is a valid #hex or rgb()/rgba() color string.
+ */
+const isValidColorString = (s) =>
+  typeof s === 'string' &&
+  (/^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(s) ||
+   /^rgba?\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*(,\s*[\d.]+\s*)?\)$/.test(s));
+
+/**
  * Builds an independent debounced URL-param writer with its OWN pending-writes
  * buffer and timer. Each `DeepLinkGUI` owns one (shared down its folder subtree),
  * so two separate GUIs on a single tool page no longer share one module-global
@@ -256,10 +269,18 @@ class DeepLinkGUI {
    */
   addColor(object, prop) {
     const key = this._getKey(prop);
-    // 1. Load from URL
+    // 1. Load from URL (validated). Unlike add()'s NaN/range/enum guards,
+    // addColor previously hydrated the raw string straight into lil-gui's color
+    // parser, which silently accepts garbage and renders a broken swatch. Reject
+    // anything that is not a valid color literal and keep the bound default.
     const params = getUrlParams();
     if (params.has(key)) {
-      object[prop] = params.get(key);
+      const urlVal = params.get(key);
+      if (isValidColorString(urlVal)) {
+        object[prop] = urlVal;
+      } else {
+        console.warn(`DeepLinkGUI: ignoring invalid URL color "${urlVal}" for "${key}"`);
+      }
     }
 
     // 2. Create Controller
