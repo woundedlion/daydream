@@ -48,6 +48,20 @@ export function createSlider(containerId, cfg, onInput) {
     valueClass = 'slider-label w-24 text-right',
   } = cfg;
 
+  // Assert the numeric contract rather than silently building an inert control:
+  // a non-positive scale (the raw step rounds to 0) or step, or min >= max, all
+  // produce a slider the user cannot move and no diagnostic. These are author
+  // config errors, so fail loudly. The `!(a < b)` form also rejects NaN.
+  if (!(min < max)) {
+    throw new Error(`createSlider(${id}): min (${min}) must be < max (${max})`);
+  }
+  if (!(step > 0)) {
+    throw new Error(`createSlider(${id}): step (${step}) must be > 0`);
+  }
+  if (!(scale > 0)) {
+    throw new Error(`createSlider(${id}): scale (${scale}) must be > 0`);
+  }
+
   const sliderId = `${id}_slider`;
   const valueSpanId = `${id}_value`;
 
