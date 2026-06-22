@@ -129,10 +129,11 @@ function syncGUI() {
   const values = wasmEngine.getParamValues();
   if (values.length === 0) return;
 
-  // values[i] is the i-th parameter in getParameters() order; paramNames was
-  // captured from the same iteration at GUI-build time, so names[i] labels
-  // values[i]. Look the controller up by that name so the controller-build
-  // order is decoupled from the value-stream order.
+  // values[i] is the i-th parameter in getParameterDefinitions() order (which
+  // getParamValues() mirrors); paramNames was captured from the same iteration
+  // at GUI-build time, so names[i] labels values[i]. Look the controller up by
+  // that name so the controller-build order is decoupled from the value-stream
+  // order.
   const names = activeEffect.paramNames;
   const n = Math.min(names.length, values.length);
   for (let i = 0; i < n; i++) {
