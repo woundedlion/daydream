@@ -86,10 +86,30 @@ test('ProceduralPalette cosine parity (procedural_palette_linear)', () => {
     for (let ch = 0; ch < 3; ch++) {
       const srgb = Math.max(0, Math.min(1, pal.getChannelValue(t, ch)));
       const jsLinear = M.srgb_to_linear_interp(srgb);
-      assert.ok(Math.abs(jsLinear - wCh[ch]) <= 2,
+      // Within one 16-bit LUT step, matching the docstring (the only divergence is
+      // the float-vs-double cosine input rounding). Measured max over this grid is
+      // exactly 1; a 2-step systematic bias must fail here, not pass.
+      assert.ok(Math.abs(jsLinear - wCh[ch]) <= 1,
         `palette t=${t} ch=${ch}: wasm=${wCh[ch]} js=${jsLinear}`);
     }
   }
+});
+
+/**
+ * Pins the engine's procedural_palette_linear output to fixed golden 16-bit
+ * linear values. The parity test above compares wasm-vs-js, so a *uniform* offset
+ * shared by both sides would slip through; these absolute goldens catch a
+ * systematic shift in the palette formula or the linear LUT.
+ */
+test('ProceduralPalette golden linear values (absolute pin)', () => {
+  const a = [0.5, 0.5, 0.5], b = [0.5, 0.5, 0.5], c = [1, 1, 1], d = [0, 0.33, 0.67];
+  const at = (t) => {
+    const w = M.procedural_palette_linear(
+      a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2], d[0], d[1], d[2], t);
+    return [w.r, w.g, w.b];
+  };
+  assert.deepEqual(at(0.5), [0, 33320, 33320]);
+  assert.deepEqual(at(0.25), [14027, 334, 56690]);
 });
 
 /** Verifies the lissajous curve matches lissajous_math.js. */
