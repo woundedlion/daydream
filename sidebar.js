@@ -3,6 +3,8 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+import { sortItems, navTargetIndex, scrollArrowState } from "./sidebar_logic.js";
+
 /**
  * Self-contained sidebar managing the effect list, sort controls, and keyboard navigation.
  * Owns its container element and maintains persistent button references across a
@@ -216,11 +218,7 @@ export class EffectSidebar {
    * preserving focus and event handlers.
    */
   _applySortOrder() {
-    const sorted = [...this.items].sort((a, b) => {
-      const mul = this.sort.dir === 'asc' ? 1 : -1;
-      if (this.sort.key === 'size') return (a.size - b.size) * mul;
-      return a.name.localeCompare(b.name) * mul;
-    });
+    const sorted = sortItems(this.items, this.sort.key, this.sort.dir);
 
     sorted.forEach(({ name }) => {
       const btn = this.buttons.get(name);
@@ -269,16 +267,11 @@ export class EffectSidebar {
     // back to the roving tab stop so Arrow keys move relative to it.
     if (idx === -1) idx = btns.indexOf(this._tabbableBtn);
 
-    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+    const target = navTargetIndex(idx, btns.length, e.key);
+    if (target !== -1) {
       e.preventDefault();
-      const next = idx < btns.length - 1 ? idx + 1 : 0;
-      this._setRovingTabbable(btns[next]);
-      btns[next].focus();
-    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-      e.preventDefault();
-      const prev = idx > 0 ? idx - 1 : btns.length - 1;
-      this._setRovingTabbable(btns[prev]);
-      btns[prev].focus();
+      this._setRovingTabbable(btns[target]);
+      btns[target].focus();
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       if (focused && focused.dataset.effect) {
@@ -290,13 +283,8 @@ export class EffectSidebar {
   /** Show/hide scroll arrows based on current scroll position. */
   _updateScrollArrows() {
     const el = this.listEl;
-    const maxScroll = el.scrollWidth - el.clientWidth;
-    if (maxScroll <= 0) {
-      this.arrowLeft.classList.remove('visible');
-      this.arrowRight.classList.remove('visible');
-      return;
-    }
-    this.arrowLeft.classList.toggle('visible', el.scrollLeft > 4);
-    this.arrowRight.classList.toggle('visible', el.scrollLeft < maxScroll - 4);
+    const { left, right } = scrollArrowState(el.scrollLeft, el.scrollWidth, el.clientWidth);
+    this.arrowLeft.classList.toggle('visible', left);
+    this.arrowRight.classList.toggle('visible', right);
   }
 }

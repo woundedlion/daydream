@@ -11,6 +11,7 @@ import { EffectSidebar } from "./sidebar.js";
 import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
 import { SegmentController } from "./segment_controller.js";
+import { refreshPixelView as computePixelView } from "./pixel_view.js";
 
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -114,10 +115,14 @@ function refreshPixelView() {
   // stops pointing at live pixel memory is detachment — which the byteLength
   // guard catches. A still-attached wasmMemoryView therefore aliases current
   // memory and needs no re-fetch; re-fetching every frame would be wasted work.
-  if (!wasmMemoryView || wasmMemoryView.buffer.byteLength === 0) {
-    wasmMemoryView = wasmEngine.getPixels();
-    daydream.dotMesh.instanceColor.array = wasmMemoryView;
-    Daydream.pixels = wasmMemoryView;
+  const { view, refreshed } = computePixelView(
+    wasmMemoryView, () => wasmEngine.getPixels());
+  if (refreshed) {
+    // Re-point all three display aliases at the fresh view so source, the
+    // displayed instanceColor attribute, and Daydream.pixels stay in lockstep.
+    wasmMemoryView = view;
+    daydream.dotMesh.instanceColor.array = view;
+    Daydream.pixels = view;
   }
 }
 
