@@ -121,6 +121,16 @@ test('generativePaletteCpp emits the block with the chosen enum tokens', () => {
   assert.ok(s.includes('// Reproduces the profiles + base hue exactly'));
 });
 
+/** Verifies generativePaletteCpp rejects an enum token that would emit a nonexistent C++ enumerator (finding 5 guard). */
+test('generativePaletteCpp rejects an unknown enum token', () => {
+  const ok = { shape: 'STRAIGHT', harmony: 'TRIADIC', brightness: 'FLAT', sat: 'MID', hueValue: 0 };
+  assert.throws(() => generativePaletteCpp({ ...ok, shape: 'SPIRAL' }), /unknown GradientShape "SPIRAL"/);
+  assert.throws(() => generativePaletteCpp({ ...ok, harmony: 'TETRADIC' }), /unknown HarmonyType "TETRADIC"/);
+  assert.throws(() => generativePaletteCpp({ ...ok, brightness: 'DOME' }), /unknown BrightnessProfile "DOME"/);
+  assert.throws(() => generativePaletteCpp({ ...ok, sat: 'NEON' }), /unknown SaturationProfile "NEON"/);
+  assert.doesNotThrow(() => generativePaletteCpp(ok));
+});
+
 /**
  * Verifies GenerativePalette.get's upper boundary. The segment scan uses a
  * half-open test (t >= shape[i] && t < shape[i+1]), so t === 1.0 matches no
