@@ -51,19 +51,31 @@ export function createSlider(containerId, cfg, onInput) {
   const sliderId = `${id}_slider`;
   const valueSpanId = `${id}_value`;
 
-  container.innerHTML = `
-    <span class="${labelClass}">${label}:</span>
-    <input type="range" id="${sliderId}"
-      min="${Math.round(min * scale)}"
-      max="${Math.round(max * scale)}"
-      step="${Math.round(step * scale)}"
-      value="${Math.round(value * scale)}"
-      class="${sliderClass}">
-    <span id="${valueSpanId}" class="${valueClass}">${value.toFixed(decimals)}</span>
-  `;
+  // Build via createElement/textContent rather than interpolating into
+  // innerHTML, matching the textContent-only discipline used elsewhere in
+  // tools/: a label/value/class that ever became data-driven could otherwise
+  // inject markup (latent XSS).
+  container.replaceChildren();
 
-  const slider = document.getElementById(sliderId);
-  const valueSpan = document.getElementById(valueSpanId);
+  const labelSpan = document.createElement('span');
+  labelSpan.className = labelClass;
+  labelSpan.textContent = `${label}:`;
+
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.id = sliderId;
+  slider.min = String(Math.round(min * scale));
+  slider.max = String(Math.round(max * scale));
+  slider.step = String(Math.round(step * scale));
+  slider.value = String(Math.round(value * scale));
+  slider.className = sliderClass;
+
+  const valueSpan = document.createElement('span');
+  valueSpan.id = valueSpanId;
+  valueSpan.className = valueClass;
+  valueSpan.textContent = value.toFixed(decimals);
+
+  container.append(labelSpan, slider, valueSpan);
 
   if (onInput) {
     slider.addEventListener('input', () => onInput(parseFloat(slider.value)));
