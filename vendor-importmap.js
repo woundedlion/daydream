@@ -26,7 +26,20 @@
   const VENDOR = { three: 'cdn', lilGui: 'cdn' };
   // === END GENERATED ===
 
-  const ROOT = new URL('.', document.currentScript.src);
+  // document.currentScript is null when this file is loaded as an ES module
+  // (type="module") or after the script has finished executing. This builder
+  // must run as a classic synchronous <script> so it can detect its own URL and
+  // inject the importmap before the module graph resolves. Fail with a named
+  // cause — like shared.js / slider.js — instead of an opaque
+  // "Cannot read properties of null (reading 'src')".
+  const selfScript = document.currentScript;
+  if (!selfScript) {
+    throw new Error('vendor-importmap.js: document.currentScript is null — load ' +
+      'this as a classic <script> (not type="module" or a deferred/dynamic ' +
+      'import); it must run synchronously to detect its own path and inject the ' +
+      'importmap before modules load.');
+  }
+  const ROOT = new URL('.', selfScript.src);
   const EXTRA = window.__DAYDREAM_EXTRA_IMPORTS || {};
 
   // Versions match daydream/package.json. Bump together when upgrading.
