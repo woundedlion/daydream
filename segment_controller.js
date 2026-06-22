@@ -287,7 +287,15 @@ export class SegmentController {
     this.arenas = [];
     this.ready = false;
     this.pending = 0;
-    this.frameResolve = null;
+    // Settle any in-flight render promise before dropping it (mirroring
+    // _onWorkerFault) so it never leaks unresolved — a footgun for future
+    // awaiters of renderParallel(). The current tick() .then only resets
+    // already-reset state, so this is safe today.
+    if (this.frameResolve) {
+      const resolve = this.frameResolve;
+      this.frameResolve = null;
+      resolve();
+    }
     this.renderInFlight = false;
     this.pendingFrame = false;
     this.faulted = false;
