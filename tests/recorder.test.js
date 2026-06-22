@@ -1,7 +1,7 @@
 // @ts-check
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { selectMimeType } from '../recorder.js';
+import { selectMimeType, VideoRecorder } from '../recorder.js';
 
 /**
  * Builds a fake isTypeSupported probe that accepts only the listed MIME types,
@@ -49,4 +49,44 @@ test('auto falls back to webm when mp4 is unsupported', () => {
 test('returns empty string when nothing in the list is supported', () => {
   assert.equal(selectMimeType('mp4', () => false), '');
   assert.equal(selectMimeType('auto', () => false), '');
+});
+
+/**
+ * A minimal fake canvas with mutable width/height and a no-op 2D context,
+ * standing in for an HTMLCanvasElement so the offscreen-pinning logic runs in
+ * Node without a DOM.
+ * @param {number} width
+ * @param {number} height
+ */
+const fakeCanvas = (width = 0, height = 0) =>
+  ({ width, height, getContext: () => ({ drawImage() {} }) });
+
+/**
+ * Verifies native-resolution capture pins the offscreen buffer to the source's
+ * start-time size (rounded up to even) and never resizes it when the source
+ * canvas changes mid-recording — so the captured track's frame size is fixed
+ * (finding 6).
+ */
+test('native-resolution capture pins the offscreen to the source size at start', () => {
+  const prevDoc = globalThis.document;
+  globalThis.document = { createElement: () => fakeCanvas() };
+  try {
+    const source = fakeCanvas(201, 101);   // odd dims → rounded up to even
+    const rec = new VideoRecorder(source);
+    assert.equal(rec.targetHeight, null);  // native path
+
+    const off = rec._ensurePinnedOffscreen();
+    assert.equal(off.width, 202);
+    assert.equal(off.height, 102);
+
+    // A mid-recording source resize must NOT change the pinned buffer.
+    source.width = 640;
+    source.height = 480;
+    const off2 = rec._ensurePinnedOffscreen();
+    assert.equal(off2, off);
+    assert.equal(off2.width, 202);
+    assert.equal(off2.height, 102);
+  } finally {
+    globalThis.document = prevDoc;
+  }
 });

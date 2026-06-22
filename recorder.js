@@ -10,8 +10,11 @@
  *
  * Codec priority: MP4/H.264 > WebM/VP9 > WebM/VP8.
  *
- * When a target resolution is set, an offscreen canvas is used to scale the
- * source canvas image before capture — the source renderer is never resized.
+ * Capture always goes through an offscreen canvas so the recorded track's frame
+ * size stays fixed for the whole session: when a target resolution is set the
+ * offscreen scales to it; at native resolution the offscreen is pinned to the
+ * source's start-time size. Either way the source renderer is never resized, and
+ * a mid-recording resolution change cannot change the encoded track dimensions.
  */
 
 /**
@@ -117,11 +120,16 @@ export class VideoRecorder {
     this._effectName = effectName;
     this.elapsedSeconds = 0;
 
-    // Determine capture source: offscreen scaled canvas or native
-    let captureSource = this.canvas;
-    if (this.targetHeight) {
-      captureSource = this._ensureOffscreen();
-    }
+    // Determine capture source. Both paths capture through an offscreen canvas
+    // so the recorded track's frame dimensions are fixed for the whole session:
+    // a mid-recording resolution change resizes the source WebGL canvas, and a
+    // captureStream bound directly to it would change the track's frame size,
+    // which most H.264/VP9 encoders reject or corrupt. The scaled path pins the
+    // target height; the native path pins the source's start dimensions (a 1:1
+    // blit when the source is not resized).
+    const captureSource = this.targetHeight
+      ? this._ensureOffscreen()
+      : this._ensurePinnedOffscreen();
 
     // Manual frame-request mode: framerate 0 means we control when frames are captured
     const stream = captureSource.captureStream(0);
@@ -196,14 +204,16 @@ export class VideoRecorder {
       return;
     }
 
-    // If using an offscreen canvas, blit the source canvas scaled to the target
-    // resolution. Re-sync the offscreen dimensions first: if the source canvas
-    // was resized mid-recording (window/resolution change), its aspect ratio
-    // has changed and the offscreen would otherwise scale into stale, wrong-
-    // aspect dimensions. _ensureOffscreen only reassigns on an actual change, so
-    // this is a no-op on the steady-state path.
+    // Blit the source canvas into the offscreen capture buffer. The scaled path
+    // re-syncs the offscreen dimensions first: if the source was resized mid-
+    // recording (window/resolution change), its aspect ratio changed and the
+    // offscreen would otherwise scale into stale, wrong-aspect dimensions
+    // (_ensureOffscreen only reassigns on an actual change — a steady-state
+    // no-op). The native pinned path deliberately keeps its start dimensions, so
+    // a resized source scales into the fixed buffer rather than resizing the
+    // track; do not recompute its dimensions here.
     if (this._offscreen && this._offCtx) {
-      this._ensureOffscreen();
+      if (this.targetHeight) this._ensureOffscreen();
       this._offCtx.drawImage(this.canvas, 0, 0, this._offscreen.width, this._offscreen.height);
     }
 
@@ -247,6 +257,32 @@ export class VideoRecorder {
     // so doing it every captureFrame would needlessly blank the offscreen.
     if (this._offscreen.width !== evenW) this._offscreen.width = evenW;
     if (this._offscreen.height !== evenH) this._offscreen.height = evenH;
+    return this._offscreen;
+  }
+
+  /**
+   * Creates the native-resolution offscreen capture canvas, pinned to the source
+   * canvas's dimensions at the moment of call (start of recording), rounded up to
+   * even values (codecs require it). Unlike _ensureOffscreen this never tracks a
+   * later source resize: the buffer keeps its start dimensions for the whole
+   * session so the captured track's frame size stays fixed, and captureFrame
+   * scales a resized source into it instead of changing the track size.
+   * @returns {HTMLCanvasElement} The offscreen canvas pinned to the start-time source size.
+   */
+  _ensurePinnedOffscreen() {
+    // Size only on creation, then never resize: that is what "pinned" means. A
+    // session starts with a fresh offscreen (_cleanup nulls it), so each session
+    // pins to its own start-time source size. A zero/early source layout would
+    // make a 0-size buffer; floor at 1 so the rounded-up even dimension stays
+    // valid.
+    if (!this._offscreen) {
+      const srcW = this.canvas.width > 0 ? this.canvas.width : 1;
+      const srcH = this.canvas.height > 0 ? this.canvas.height : 1;
+      this._offscreen = document.createElement('canvas');
+      this._offCtx = this._offscreen.getContext('2d');
+      this._offscreen.width = srcW % 2 === 0 ? srcW : srcW + 1;
+      this._offscreen.height = srcH % 2 === 0 ? srcH : srcH + 1;
+    }
     return this._offscreen;
   }
 
