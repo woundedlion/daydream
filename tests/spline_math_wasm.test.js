@@ -25,6 +25,19 @@ import createHolosphereModule from '../holosphere_wasm.js';
 // than skipping the parity check.
 const M = await createHolosphereModule({ print() {}, printErr() {} });
 
+// Explicit, collected guard: a stale or partial build that dropped/renamed one
+// of the spline exports would otherwise surface as a confusing "M.foo is not a
+// function" mid-assertion. Fail once, clearly, that the parity check did not run
+// against a complete module.
+test('WASM parity module is present with the exports this suite pins', () => {
+  for (const name of [
+    'spline_cubic_fast', 'spline_cubic_slerp', 'spline_catmull_rom_tangents',
+  ]) {
+    assert.equal(typeof M[name], 'function',
+      `holosphere_wasm.js is missing export ${name} — parity check would not run`);
+  }
+});
+
 const cubicFast = (p0, p1, p2, p3, t) =>
   M.spline_cubic_fast(p0.x, p0.y, p0.z, p1.x, p1.y, p1.z,
     p2.x, p2.y, p2.z, p3.x, p3.y, p3.z, t);

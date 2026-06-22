@@ -21,7 +21,27 @@ import * as C from '../tools/color.js';
 import * as P from '../tools/palette_math.js';
 import * as L from '../tools/lissajous_math.js';
 
+// Instantiate the shipped module exactly as the browser tools do. Top-level
+// await means a missing or un-instantiable holosphere_wasm.js fails this file
+// loudly (the import/await rejects) rather than silently skipping the parity
+// checks below — so a CI run that lacks the built module goes red, not green.
 const M = await createHolosphereModule({ print() {}, printErr() {} });
+
+// Guard that the loaded module actually exposes the engine exports this suite
+// pins. A stale or partial build that dropped/renamed one of them would
+// otherwise surface as a confusing "M.foo is not a function" mid-assertion; make
+// it a single explicit, collected failure that says the parity check did not run
+// against a complete module.
+test('WASM parity module is present with the exports this suite pins', () => {
+  for (const name of [
+    'srgb_to_linear_float', 'linear_to_srgb_float', 'srgb_to_linear_interp',
+    'linear_rgb_to_oklab', 'oklab_to_linear_rgb', 'hsv_to_rgb',
+    'procedural_palette_linear', 'lissajous',
+  ]) {
+    assert.equal(typeof M[name], 'function',
+      `holosphere_wasm.js is missing export ${name} — parity check would not run`);
+  }
+});
 
 const FLOAT_EPS = 1e-4; // float32 (engine) vs float64 (JS) on smooth transforms
 const near = (a, b, eps = FLOAT_EPS) => Math.abs(a - b) <= eps;
