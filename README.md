@@ -86,7 +86,7 @@ Two physical targets share the same rendering engine:
 
 | Component | Detail |
 |---|---|
-| Controllers | 4× Teensy 4.1 (600 MHz ARM Cortex-M7) |
+| Controllers | 4× Teensy 4.0 (600 MHz ARM Cortex-M7) |
 | LEDs | 2 × 144-pixel strips (288 total, 72 per segment) |
 | Protocol | DMA (HD107S at 24 MHz) |
 | Rotation | 480 RPM (8 revolutions/second), 16 FPS from 2 sides of the ring |
@@ -1996,9 +1996,17 @@ Each hardware target has its own `.ino` entry point in `targets/`:
 1. Install [Arduino IDE](https://www.arduino.cc/en/software) with Teensyduino (or use [Visual Micro](https://www.visualmicro.com/) for Visual Studio).
 2. Install the `FastLED` library.
 3. Open `targets/Holosphere/Holosphere.ino` (or `targets/Phantasm/Phantasm.ino`).
-4. Set **Additional Include Directories** to: `../../core;../../hardware`
-5. Select **Board: Teensy 4.0** (or 4.1), **CPU Speed: 600 MHz**.
+4. Set **Additional Include Directories** to: `../../core;../../effects;../../hardware`
+5. Select **Board: Teensy 4.0**, **CPU Speed: 600 MHz**.
 6. Upload.
+
+> **Optional — headless size/layout gate (CI parity).** A PlatformIO build
+> (`just teensy-size`, needs `pip install platformio`) compiles both firmware
+> images on a stock machine and checks image size and memory-region layout
+> against committed budgets — closing the device-only `#ifdef ARDUINO`
+> compile/size blind spot VMicro alone leaves uncovered. It coexists with VMicro
+> (it owns `.pio/`, never `__vm/`) and asserts the images *fit*, not byte-identity
+> with the bench build. See [`docs/teensy_ci_gate_spec.md`](docs/teensy_ci_gate_spec.md).
 
 Target-specific constants are defined in each `.ino` file (not a global `constants.h`):
 ```cpp
