@@ -384,8 +384,8 @@ export class VideoRecorder {
 
   /**
    * Legacy save path: triggers an anchor-click download and revokes the object
-   * URL once an offscreen iframe load confirms the browser consumed it, with a
-   * 60 s timeout safety net for browsers that never fire the load event.
+   * URL on a short timeout once the click has handed the blob to the browser's
+   * download manager.
    * @param {Blob} blob - The recorded video data to download.
    * @param {string} filename - File name applied to the download anchor.
    * @returns {void}
@@ -399,25 +399,13 @@ export class VideoRecorder {
     a.click();
     document.body.removeChild(a);
 
-    // Revoke after the browser has consumed the blob URL.  An <iframe> load
-    // event fires once the download has been handed to the OS save dialog,
-    // giving us a reliable signal instead of an arbitrary timeout.
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = url;
-    // Safety net: if the iframe never fires load (some browsers), revoke after 60 s.
-    const safetyTimeout = setTimeout(() => {
-      URL.revokeObjectURL(url);
-      iframe.remove();
-    }, 60_000);
-    iframe.onload = () => {
-      // Cancel the safety net on an early load so it doesn't fire a redundant
-      // (double) revoke/remove 60 s later.
-      clearTimeout(safetyTimeout);
-      URL.revokeObjectURL(url);
-      iframe.remove();
-    };
-    document.body.appendChild(iframe);
+    // The click hands the blob to the download manager synchronously, so the
+    // object URL only needs to outlive the click. Revoke on a short timeout
+    // rather than an <iframe> load event: pointing an iframe at a *video* blob
+    // can start inline playback or — for a Content-Disposition download — never
+    // fire load, leaking the URL until a 60 s fallback, and the iframe can
+    // redundantly re-trigger the download the anchor already started.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   /**
