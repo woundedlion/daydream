@@ -447,13 +447,6 @@ function applyResolution(preserveParams = false) {
   // Fall back to the hi-res list for an unmapped resolution key.
   const availableEffects = effectsByResolution[resolution] || HiResFavorites;
 
-  // If the current effect isn't offered at the new resolution, switch to the first one.
-  let effectChanged = false;
-  if (!availableEffects.includes(appState.get('effect'))) {
-    appState.set('effect', availableEffects[0]);
-    effectChanged = true;
-  }
-
   daydream.updateResolution(p.h, p.w, p.size);
 
   let effectSizes = null;
@@ -462,6 +455,17 @@ function applyResolution(preserveParams = false) {
     catch (e) { console.warn('getEffectSizes failed (sidebar sizes unavailable):', e); }
   }
   sidebar.setEffects(availableEffects, effectSizes);
+
+  // If the current effect isn't offered at the new resolution, switch to the first
+  // one. Do this AFTER updateResolution()/setEffects(): appState.set('effect', …)
+  // synchronously fires the effect subscriber -> applyEffect(), which builds the
+  // effect GUI. Running it first would construct that GUI against the pre-resize
+  // dot mesh / stale sidebar (a mid-resize double-apply).
+  let effectChanged = false;
+  if (!availableEffects.includes(appState.get('effect'))) {
+    appState.set('effect', availableEffects[0]);
+    effectChanged = true;
+  }
 
   // Apply the current effect in the new resolution (if not already handled by effect switch)
   if (!effectChanged) {
