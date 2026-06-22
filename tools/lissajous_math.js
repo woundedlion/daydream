@@ -52,12 +52,20 @@ export const lissajous = (m1, m2, a, t) => {
 
 /**
  * Finds the simplest rational approximation (M/N) for a given value (ratio).
- * @param {number} value - The ratio to approximate (e.g., C1/C2).
+ * A negative target returns a negative numerator (sign carried on M, N stays
+ * positive); the search grid itself is positive, so the sign is split off first.
+ * @param {number} value - The ratio to approximate (e.g., C1/C2), may be negative.
  * @param {number} [maxDenominator] - Maximum value for the numerator/denominator.
  * @returns {{ M: number, N: number }} The best simple rational ratio.
  */
 export const findBestRationalRatio = (value, maxDenominator = 8) => {
   if (value === 0) return { M: 1, N: 1 };
+
+  // The M/N grid below is strictly positive, so a negative target would otherwise
+  // snap to the closest positive ratio (wrong magnitude AND wrong sign). Split the
+  // sign off, search on |value|, and carry the sign back on the numerator.
+  const sign = value < 0 ? -1 : 1;
+  const absValue = Math.abs(value);
 
   let bestM = 1;
   let bestN = 1;
@@ -67,7 +75,7 @@ export const findBestRationalRatio = (value, maxDenominator = 8) => {
   for (let N = 1; N <= maxDenominator; N++) {
     for (let M = 1; M <= maxDenominator; M++) {
       const ratio = M / N;
-      const diff = Math.abs(value - ratio);
+      const diff = Math.abs(absValue - ratio);
 
       // Prefer closer approximation, but also prefer smaller ratios
       if (diff < minDiff || (diff === minDiff && (M + N) < (bestM + bestN))) {
@@ -84,7 +92,7 @@ export const findBestRationalRatio = (value, maxDenominator = 8) => {
   // ratio is always in lowest terms — which also makes the closing period
   // 2π·N/passiveC the true (shortest) period in snapToRationalRatio.
   const g = gcd(bestM, bestN);
-  return { M: bestM / g, N: bestN / g };
+  return { M: (sign * bestM) / g, N: bestN / g };
 };
 
 /**
