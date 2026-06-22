@@ -9,9 +9,31 @@
 // without a DOM. No DOM/canvas/window references live here; all UI wiring stays
 // inline in palettes.html.
 
-import { srgbToLinearFloat, srgbToOklch, lerpOklch, oklchToLinearRgb } from './color.js';
+import { srgbToLinearFloat } from './color.js';
 
 const TWO_PI = 2 * Math.PI;
+
+// --- WASM color-math bridge -------------------------------------------------
+// GenerativePalette's perceptual color math lives in the C++ engine (exported
+// via the PaletteOps embind class). Rather than re-implement it here -- which
+// silently drifted when the engine moved key authoring from HSV to OKLCH -- the
+// tool injects the engine's bakeLut through setPaletteOps and this module calls
+// it for the exact colors. The JS side keeps only the deterministic profile
+// randomization (its own stable PRNG), which the engine's global-RNG draws
+// cannot reproduce anyway.
+let bakeLut = null;
+
+/**
+ * Injects the WASM PaletteOps bridge GenerativePalette uses to bake its LUT.
+ * @param {(shape:number, h1:number, s1:number, v1:number, h2:number, s2:number, v2:number, h3:number, s3:number, v3:number) => (Uint8Array|number[])} fn
+ *   Returns a 256*3 sRGB LUT; entry i is the palette sampled at t = i/255.
+ */
+export function setPaletteOps(fn) {
+  bakeLut = fn;
+}
+
+// GradientShape enum order, mirrored from core/color.h (STRAIGHT=0 .. FALLOFF=3).
+const GRADIENT_SHAPE_INDEX = { STRAIGHT: 0, CIRCULAR: 1, VIGNETTE: 2, FALLOFF: 3 };
 
 /**
  * The core procedural palette, defined by C(t) = A + B * cos(TWO_PI * (C * t + D)).
@@ -224,11 +246,22 @@ export class GenerativePalette {
         break;
     }
 
-    this.a = hsvToRgb(h1, s1, v1);
-    this.b = hsvToRgb(h2, s2, v2);
-    this.c = hsvToRgb(h3, s3, v3);
-
-    this.updateLuts();
+    // Resolve the gradient shape to the engine's enum int.
+    const shapeIndex = GRADIENT_SHAPE_INDEX[this.gradientShape];
+    if (shapeIndex === undefined) {
+      throw new Error(`unknown GradientShape "${this.gradientShape}"`);
+    }
+    if (!bakeLut) {
+      throw new Error(
+        'PaletteOps bridge not initialized: call setPaletteOps() with the WASM ' +
+        'PaletteOps.bakeLut before constructing a GenerativePalette.');
+    }
+    // Single source of truth: ask the engine for the exact 256-entry sRGB LUT
+    // (it owns the OKLCH key authoring + gradient evaluation). Copy out of the
+    // WASM memory view immediately -- it aliases the module's buffer and is
+    // invalidated by the next bake.
+    this.lut = Uint8Array.from(
+      bakeLut(shapeIndex, h1, s1, v1, h2, s2, v2, h3, s3, v3));
   }
 
   /**
@@ -274,67 +307,28 @@ export class GenerativePalette {
   }
 
   /**
-   * Builds the gradient's stop positions (shape), colors and stop count from the
-   * gradient-shape profile. Shapes that fade to black insert a black vignette stop.
-   */
-  updateLuts() {
-    const vignetteColor = new CPixel(0, 0, 0);
-    switch (this.gradientShape) {
-      case "VIGNETTE":
-        this.shape = [0, 0.1, 0.5, 0.9, 1.0];
-        this.colors = [vignetteColor, this.a, this.b, this.c, vignetteColor];
-        this.size = 5;
-        break;
-      case "STRAIGHT":
-        this.shape = [0, 0.5, 1.0];
-        this.colors = [this.a, this.b, this.c];
-        this.size = 3;
-        break;
-      case "CIRCULAR":
-        this.shape = [0, 0.33, 0.66, 1.0];
-        this.colors = [this.a, this.b, this.c, this.a];
-        this.size = 4;
-        break;
-      case "FALLOFF":
-        this.shape = [0, 0.33, 0.66, 0.9, 1.0];
-        this.colors = [this.a, this.b, this.c, vignetteColor, vignetteColor];
-        this.size = 5;
-        break;
-    }
-  }
-
-  /**
-   * Samples the gradient at t, locating the stop segment containing t and
-   * interpolating between its two endpoint colors in OKLCH for perceptual uniformity.
-   * @param {number} t - Time parameter in [0, 1].
+   * Samples the engine-baked gradient LUT at t, interpolating between adjacent
+   * entries in linear light (matching the engine's BakedPalette::get).
+   * @param {number} t - Time parameter in [0, 1] (clamped).
    * @returns {number[]} Linear [R, G, B] float values.
    */
   get(t) {
-    let seg = -1;
-    for (let i = 0; i < this.size - 1; ++i) {
-      if (t >= this.shape[i] && t < this.shape[i + 1]) {
-        seg = i;
-        break;
-      }
-    }
-    if (seg < 0) seg = this.size - 2;
-
-    const start = this.shape[seg];
-    const end = this.shape[seg + 1];
-    const c1 = this.colors[seg];
-    const c2 = this.colors[seg + 1];
-
-    const dist = end - start;
-    if (dist < 0.0001) {
-      return [srgbToLinearFloat(c1.r / 255), srgbToLinearFloat(c1.g / 255), srgbToLinearFloat(c1.b / 255)];
-    }
-
-    const p = Math.max(0, Math.min(1, (t - start) / dist));
-
-    // Interpolate in OKLCH for perceptually uniform gradients
-    const lch1 = srgbToOklch(c1.r, c1.g, c1.b);
-    const lch2 = srgbToOklch(c2.r, c2.g, c2.b);
-    return oklchToLinearRgb(lerpOklch(lch1, lch2, p));
+    const sample = (i) => [
+      srgbToLinearFloat(this.lut[3 * i] / 255),
+      srgbToLinearFloat(this.lut[3 * i + 1] / 255),
+      srgbToLinearFloat(this.lut[3 * i + 2] / 255),
+    ];
+    const idx = Math.max(0, Math.min(1, t)) * 255;
+    const lo = Math.floor(idx);
+    if (lo >= 255) return sample(255);
+    const frac = idx - lo;
+    const a = sample(lo);
+    const b = sample(lo + 1);
+    return [
+      a[0] + (b[0] - a[0]) * frac,
+      a[1] + (b[1] - a[1]) * frac,
+      a[2] + (b[2] - a[2]) * frac,
+    ];
   }
 
   /**
