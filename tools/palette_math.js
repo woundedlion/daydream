@@ -315,7 +315,10 @@ export class GenerativePalette {
 
   /**
    * Samples the engine-baked gradient LUT at t, interpolating between adjacent
-   * entries in linear light (matching the engine's BakedPalette::get).
+   * entries in linear light. Domain-verified against the engine: BakedPalette::get
+   * (core/color.h) lerps between two linear-light Color4 LUT entries (lerp16), so
+   * converting each sRGB-8bit entry here to linear first and lerping in linear
+   * matches the engine's interpolation domain (linear, not sRGB).
    * @param {number} t - Time parameter in [0, 1] (clamped).
    * @returns {number[]} Linear [R, G, B] float values.
    */
