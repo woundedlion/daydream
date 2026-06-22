@@ -11,8 +11,27 @@ import assert from 'node:assert/strict';
 
 const {
   ProceduralPalette, CPixel, PRNG, hsvToRgb, GenerativePalette,
-  mapValue, proceduralPaletteCpp, generativePaletteCpp,
+  mapValue, proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
 } = await import('../tools/palette_math.js');
+
+// GenerativePalette's color math now lives in the C++ engine (PaletteOps.bakeLut
+// in the WASM module) and is covered by the native test suite. These tests cover
+// the JS side's responsibilities: resolving profiles into the bakeLut arguments
+// and sampling the returned LUT. A mock bakeLut stands in for the WASM bridge --
+// a smooth in-range sRGB ramp -- and records its last arguments so the delegation
+// (shape enum int + nine [0,255] HSV values) can be asserted.
+let lastBakeArgs = null;
+function mockBakeLut(...args) {
+  lastBakeArgs = args;
+  const lut = new Uint8Array(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    lut[3 * i] = i;            // R ramps up
+    lut[3 * i + 1] = 255 - i;  // G ramps down
+    lut[3 * i + 2] = 128;      // B constant
+  }
+  return lut;
+}
+setPaletteOps(mockBakeLut);
 
 /**
  * Converts an sRGB channel value to linear light, the same transfer the module applies on output.
@@ -131,12 +150,35 @@ test('generativePaletteCpp rejects an unknown enum token', () => {
   assert.doesNotThrow(() => generativePaletteCpp(ok));
 });
 
+/** Verifies GenerativePalette resolves the profiles into a valid bakeLut call: the GradientShape enum int and nine in-range HSV values. */
+test('GenerativePalette delegates resolved (shape, h,s,v x3) to bakeLut', () => {
+  lastBakeArgs = null;
+  new GenerativePalette('VIGNETTE', 'TRIADIC', 'FLAT', 'VIBRANT', 100);
+  assert.ok(Array.isArray(lastBakeArgs) && lastBakeArgs.length === 10, 'bakeLut called with 10 args');
+  // VIGNETTE is index 2 in core/color.h GradientShape order.
+  assert.equal(lastBakeArgs[0], 2, 'shape enum int');
+  // The nine HSV values are integers in [0, 255].
+  for (let i = 1; i < 10; i++) {
+    assert.ok(Number.isInteger(lastBakeArgs[i]), `arg ${i} integer`);
+    assert.ok(lastBakeArgs[i] >= 0 && lastBakeArgs[i] <= 255, `arg ${i} in [0,255]`);
+  }
+  // FLAT/VIBRANT are RNG-free: value 255, saturation 255 on all three keys.
+  assert.deepEqual([lastBakeArgs[3], lastBakeArgs[6], lastBakeArgs[9]], [255, 255, 255], 'FLAT values');
+  assert.deepEqual([lastBakeArgs[2], lastBakeArgs[5], lastBakeArgs[8]], [255, 255, 255], 'VIBRANT saturations');
+});
+
+/** Verifies GenerativePalette rejects an unknown gradient shape before reaching bakeLut. */
+test('GenerativePalette throws on an unknown gradient shape', () => {
+  assert.throws(() => new GenerativePalette('SPIRAL', 'TRIADIC', 'FLAT', 'VIBRANT', 0),
+    /unknown GradientShape "SPIRAL"/);
+});
+
 /**
- * Verifies GenerativePalette.get's upper boundary. The segment scan uses a
- * half-open test (t >= shape[i] && t < shape[i+1]), so t === 1.0 matches no
- * segment and falls through to the last one with p clamped to 1 — it must return
- * the final stop color, not NaN or a wrapped value. t > 1.0 must clamp to that
- * same endpoint, and the boundary must be continuous with the interior limit.
+ * Verifies GenerativePalette.get's upper boundary. get clamps t to [0,1] and
+ * maps it onto the 256-entry LUT: t === 1.0 lands exactly on the final entry
+ * (no lo+1 overrun), and t > 1.0 clamps to that same entry — it must return the
+ * final color, not NaN or a wrapped value, and be continuous with the interior
+ * limit approaching it.
  */
 test('GenerativePalette.get: t === 1.0 and t > 1.0 clamp to the final stop color', () => {
   const pal = new GenerativePalette('STRAIGHT', 'ANALOGOUS', 'ASCENDING', 'VIBRANT', 128);

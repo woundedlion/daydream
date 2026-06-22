@@ -357,6 +357,11 @@
     // clipboard copy (tools/shared.js) and the OKLab/OKLCH/sRGB color math
     // (tools/color.js, which mirrors the engine's core/color.h pipeline).
     import { copyWithFeedback } from './clipboard.js';
+    import { showFatalError } from './shared.js';
+    // The engine module exports the real GenerativePalette color math via the
+    // PaletteOps embind class, so the tool previews the device's exact colors
+    // instead of a hand-ported JS reimplementation that can silently drift.
+    import createHolosphereModule from '../holosphere_wasm.js';
     import {
       srgbToLinearFloat, linearToSrgbFloat, srgbToOklch, lerpOklch,
       oklchToLinearRgb, linearRgbToHex,
@@ -366,7 +371,7 @@
     // tested without a DOM. DOM-coupled wiring stays inline below.
     import {
       ProceduralPalette, CPixel, PRNG, hsvToRgb, GenerativePalette,
-      mapValue, proceduralPaletteCpp, generativePaletteCpp,
+      mapValue, proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
     } from './palette_math.js';
 
     // --- Palette Class and Data Structure ---
@@ -1069,7 +1074,23 @@
     /**
          * Initialize the sliders and the first visualization.
          */
-    function init() {
+    async function init() {
+      // Load the engine module first so GenerativePalette can bake its LUT with
+      // the exact C++ color math (PaletteOps). The generative tab can't render
+      // without it, so fail loudly rather than silently fall back.
+      try {
+        const wasm = await createHolosphereModule();
+        const paletteOps = new wasm.PaletteOps();
+        setPaletteOps((shape, h1, s1, v1, h2, s2, v2, h3, s3, v3) =>
+          paletteOps.bakeLut(shape, h1, s1, v1, h2, s2, v2, h3, s3, v3));
+      } catch (e) {
+        console.error('Failed to load WASM:', e);
+        showFatalError('Failed to load the Holosphere WASM engine — the palette '
+          + 'tool needs the built holosphere_wasm artifacts. Build the WASM '
+          + 'target and reload.');
+        return;
+      }
+
       // Assign DOM elements inside init, after DOM load.
       colorStripCanvas = document.getElementById('colorStripCanvas');
       colorStripCtx = colorStripCanvas ? colorStripCanvas.getContext('2d') : null;
