@@ -838,19 +838,16 @@
          * @param {number} t The current time parameter (0 to 1) for the marker position.
          * @param {object | null} selectionRange - e.g., { start: 0.2, end: 0.5 }
          */
-    // Bayer 8x8 ordered-dither thresholds in (0,1), centered ((v+0.5)/64), used
-    // to break 8-bit banding in the gradient strip without speckle. Reused per
-    // pixel as floor(channel*255 + thr).
-    const BAYER8 = [
-       0, 48, 12, 60,  3, 51, 15, 63,
-      32, 16, 44, 28, 35, 19, 47, 31,
-       8, 56,  4, 52, 11, 59,  7, 55,
-      40, 24, 36, 20, 43, 27, 39, 23,
-       2, 50, 14, 62,  1, 49, 13, 61,
-      34, 18, 46, 30, 33, 17, 45, 29,
-      10, 58,  6, 54,  9, 57,  5, 53,
-      42, 26, 38, 22, 41, 25, 37, 21,
-    ].map((v) => (v + 0.5) / 64);
+    // Per-pixel dither threshold in [0,1): Jimenez "interleaved gradient noise".
+    // Used as floor(channel*255 + thr) so each channel's fractional part rounds
+    // up in proportion -> 8-bit banding (worst in the bright, steep, wide-hue
+    // regions) dissolves into sub-pixel noise. Chosen over an ordered (Bayer)
+    // matrix because IGN has no regular period, so it can't beat against the
+    // canvas's CSS rescale into low-frequency moire "bands"; it's also cheaper.
+    function ditherThreshold(x, y) {
+      const a = (0.06711056 * x + 0.00583715 * y) % 1;
+      return (52.9829189 * a) % 1;
+    }
     function drawColorStrip(t, selectionRange = null) {
       if (!colorStripCtx) return; // Safety check
       const width = colorStripCanvas.width;
@@ -884,13 +881,12 @@
           const bF = linearToSrgbFloat(Math.max(0, Math.min(1, b))) * 255;
 
           for (let y = 0; y < height; y++) {
-            // Bayer 8x8 ordered dither: a per-(x,y) threshold in (0,1) so the
-            // fractional part of each channel rounds up in proportion across the
-            // column's pixels (its height is the dither room), averaging to the
-            // true value -> ~3 extra bits, no visible band. Same threshold for
-            // all three channels (a uniform sub-pixel offset) so hue is preserved
-            // -- no chroma speckle at the transition.
-            const thr = BAYER8[(y & 7) * 8 + (x & 7)];
+            // Per-(x,y) dither threshold in (0,1) so each channel's fractional
+            // part rounds up in proportion across the pixels around it, averaging
+            // to the true value -> ~3 extra bits, no visible band. Same threshold
+            // for all three channels (a uniform sub-pixel offset) so hue is
+            // preserved -- no chroma speckle at the transition.
+            const thr = ditherThreshold(x, y);
             const index = (y * width + x) * 4;
             data[index] = Math.min(255, Math.floor(rF + thr));
             data[index + 1] = Math.min(255, Math.floor(gF + thr));
