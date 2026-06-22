@@ -313,9 +313,9 @@ export class Daydream {
    * @param {KeyboardEvent} e - The keydown event whose key drives pause/step.
    */
   keydown(e) {
-    if (e.key == ' ') {
+    if (e.key === ' ') {
       this.paused = !this.paused;
-    } else if (this.paused && e.key == "ArrowRight") {
+    } else if (this.paused && e.key === "ArrowRight") {
       this.stepFrames++;
     }
   }
@@ -468,10 +468,10 @@ export class Daydream {
    * @returns {boolean} Whether the simulation actually advanced (false while paused), so the caller can gate the recorder on the same decision.
    */
   _stepSimulation(effect) {
-    const advanced = !this.paused || this.stepFrames != 0;
+    const advanced = !this.paused || this.stepFrames !== 0;
     if (!advanced) return false;
 
-    if (this.stepFrames != 0) this.stepFrames--;
+    if (this.stepFrames !== 0) this.stepFrames--;
 
     // Detach-aware guard: _stepSimulation runs before refreshPixelView heals a
     // view detached by WASM heap growth. A detached Uint16Array is still truthy,
