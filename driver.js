@@ -117,6 +117,12 @@ export class Daydream {
   static W = 96;
   static PIXEL_WIDTH = 2 * Math.PI / Daydream.W;
   static FPS = 16;
+  // Spiral-of-death guard for the fixed-timestep clock: after a stall (tab
+  // backgrounded, GC pause, breakpoint) the accumulated real time is clamped to
+  // this many seconds so the sim catches up by at most a few frames per tick
+  // instead of trying to replay the entire backlog at once (which would stall
+  // further and accumulate more — the runaway). 0.25 s is ~4 frames at FPS.
+  static MAX_FRAME_CATCHUP_SECONDS = 0.25;
   static DOT_SIZE = 2;
   static DOT_COLOR = 0x0000ff;
 
@@ -455,7 +461,8 @@ export class Daydream {
   _advanceFrameClock() {
     const delta = this.clock.getDelta();
     this.timeAccumulator += delta;
-    if (this.timeAccumulator > 0.25) this.timeAccumulator = 0.25;
+    if (this.timeAccumulator > Daydream.MAX_FRAME_CATCHUP_SECONDS)
+      this.timeAccumulator = Daydream.MAX_FRAME_CATCHUP_SECONDS;
     if (this.timeAccumulator < this.frameInterval) return false;
     this.timeAccumulator -= this.frameInterval;
     return true;
