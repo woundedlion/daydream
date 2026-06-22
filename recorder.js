@@ -218,7 +218,13 @@ export class VideoRecorder {
     // no-op). The native pinned path deliberately keeps its start dimensions, so
     // a resized source scales into the fixed buffer rather than resizing the
     // track; do not recompute its dimensions here.
-    if (this._offscreen && this._offCtx) {
+    // Skip the blit when the source canvas is mid-resize at a transient 0x0:
+    // drawImage from a zero-sized source throws (or injects a blank/wrong-aspect
+    // frame), corrupting a "byte-perfect" recording. The offscreen keeps its
+    // prior contents, so requestFrame() below re-emits the last good frame for
+    // this tick rather than a broken one.
+    if (this._offscreen && this._offCtx &&
+        this.canvas.width > 0 && this.canvas.height > 0) {
       if (this.targetHeight) this._ensureOffscreen();
       this._offCtx.drawImage(this.canvas, 0, 0, this._offscreen.width, this._offscreen.height);
     }
