@@ -74,6 +74,11 @@ export class VideoRecorder {
     // Offscreen scaling canvas (created on demand, destroyed on cleanup)
     this._offscreen = null;
     this._offCtx = null;
+    // Latch so captureFrame() warns at most once when the browser lacks
+    // track.requestFrame (the manual frame-request API). Declared here so all
+    // instance state is visible at construction rather than springing into
+    // existence on first use.
+    this._warnedNoRequestFrame = false;
   }
 
   /**
