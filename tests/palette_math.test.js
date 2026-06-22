@@ -140,7 +140,7 @@ test('generativePaletteCpp emits the block with the chosen enum tokens', () => {
   assert.ok(s.includes('// Reproduces the profiles + base hue exactly'));
 });
 
-/** Verifies generativePaletteCpp rejects an enum token that would emit a nonexistent C++ enumerator (finding 5 guard). */
+/** Verifies generativePaletteCpp rejects an enum token that would emit a nonexistent C++ enumerator. */
 test('generativePaletteCpp rejects an unknown enum token', () => {
   const ok = { shape: 'STRAIGHT', harmony: 'TRIADIC', brightness: 'FLAT', sat: 'MID', hueValue: 0 };
   assert.throws(() => generativePaletteCpp({ ...ok, shape: 'SPIRAL' }), /unknown GradientShape "SPIRAL"/);

@@ -64,8 +64,7 @@ const fakeCanvas = (width = 0, height = 0) =>
 /**
  * Verifies native-resolution capture pins the offscreen buffer to the source's
  * start-time size (rounded up to even) and never resizes it when the source
- * canvas changes mid-recording — so the captured track's frame size is fixed
- * (finding 6).
+ * canvas changes mid-recording — so the captured track's frame size is fixed.
  */
 test('native-resolution capture pins the offscreen to the source size at start', () => {
   const prevDoc = globalThis.document;
