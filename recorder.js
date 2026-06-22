@@ -59,11 +59,17 @@ export class VideoRecorder {
     this._effectName = 'effect';
     this.frameInterval = frameInterval;
     this.elapsedSeconds = 0;
+    // bitrateMbps, format, and targetHeight below are LATCHED at start(): they
+    // are read only when a session begins (see start()), so assigning any of
+    // them mid-recording has no effect until the next start(). To change them,
+    // stop and restart the recording.
     this.bitrateMbps = 16;
-    // Output format: 'auto' (prefer mp4, fall back to webm), 'mp4', or 'webm'
+    // Output format: 'auto' (prefer mp4, fall back to webm), 'mp4', or 'webm'.
+    // Latched at start() — see the note above.
     this.format = 'auto';
-    // Resolution override: target height in pixels (null = native)
+    // Resolution override: target height in pixels (null = native).
     // Width is computed from the source canvas aspect ratio.
+    // Latched at start() — see the note above.
     this.targetHeight = null;
     // Offscreen scaling canvas (created on demand, destroyed on cleanup)
     this._offscreen = null;
