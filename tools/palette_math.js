@@ -4,9 +4,13 @@
  */
 
 // Pure palette math. This module mirrors the engine's ProceduralPalette and
-// GenerativePalette so the browser tool predicts the exact colors the device
-// produces, and so the C++ export-string generators can be regression-tested
-// without a DOM. No DOM/canvas/window references live here; all UI wiring stays
+// GenerativePalette so the browser tool can predict device colors and the C++
+// export-string generators can be regression-tested without a DOM. Parity is
+// not uniform: GenerativePalette routes through the engine's own baked LUT (via
+// the WASM bridge below), so it is exact, whereas ProceduralPalette evaluates
+// the cosine formula analytically and linearizes with an exact pow — which can
+// differ from the device's interpolated 16-bit-linear LUT by up to ~1 LSB per
+// channel. No DOM/canvas/window references live here; all UI wiring stays
 // inline in palettes.html.
 
 import { srgbToLinearFloat } from './color.js';
@@ -56,7 +60,10 @@ export class ProceduralPalette {
   /**
    * Calculates the linearized color vector (R, G, B) for a time parameter t.
    * @param {number} t - Time parameter in [0, 1].
-   * @returns {number[]} Linear [R, G, B] float values in [0, 1], matching the C++ pipeline.
+   * @returns {number[]} Linear [R, G, B] float values in [0, 1], approximating
+   *   the C++ pipeline: the cosine formula is evaluated analytically and
+   *   linearized with an exact pow, so the result can differ from the device's
+   *   interpolated 16-bit-linear LUT by up to ~1 LSB per channel.
    */
   get(t) {
     const PI2 = TWO_PI;
