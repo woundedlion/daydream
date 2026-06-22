@@ -460,11 +460,19 @@ export class SegmentController {
     for (let s = 0; s < this.results.length; s++) {
       const r = this.results[s];
       if (!r || !r.pixels) continue;
-      // Skip any rectangle that doesn't fit the current display buffer. The
-      // generation fence should already have dropped stale-resolution results;
-      // this is a final guard so a mismatched rect is never partially blitted
-      // past the buffer (per-result, not per-pixel — no hot-path cost).
-      if (r.x0 < 0 || r.y0 < 0 || r.x1 > w || r.y1 > h) continue;
+      // A rectangle that doesn't fit the current display buffer must never reach
+      // here: the generation fence drops stale-resolution results before they're
+      // stored. If one slips through, the layout/fence math is broken — fail
+      // loudly like the alias-break above rather than silently dropping a whole
+      // segment (which paints a stale/garbage band with no diagnostic). Per-
+      // result, not per-pixel — no hot-path cost.
+      if (r.x0 < 0 || r.y0 < 0 || r.x1 > w || r.y1 > h) {
+        throw new Error(
+          `SegmentController.composite: segment ${s} rect ` +
+          `[${r.x0},${r.y0})-[${r.x1},${r.y1}) is out of bounds for the ` +
+          `${w}x${h} display buffer — the generation fence let a stale-resolution ` +
+          `result through (layout/fence invariant violated)`);
+      }
 
       // Composite this quad back into the canvas (compact -> canvas); see
       // blitSegmentRect for the contiguous-row fast path.
