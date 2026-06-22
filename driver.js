@@ -149,6 +149,20 @@ export class Daydream {
     THREE.ColorManagement.enabled = true;
     this.canvas = document.querySelector("#canvas");
 
+    // The driver mounts its label layer, context-loss overlay, and resize
+    // observer on the canvas's container and sizes the viewport from it. A
+    // missing #canvas or a parentless one can't be driven, so fail with a named
+    // diagnostic instead of the opaque "Cannot read properties of null
+    // (reading 'appendChild')" deep in setup that white-screens the app with no
+    // clue why — the same graceful-degrade-or-name-it doctrine applied to
+    // #gui-container's lookup.
+    this.canvasParent = this.canvas?.parentElement;
+    if (!this.canvasParent) {
+      throw new Error(this.canvas
+        ? "Daydream: #canvas has no parent element to mount the renderer into"
+        : "Daydream: #canvas element not found in the document");
+    }
+
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       antialias: Daydream.SCENE_ANTIALIAS,
@@ -167,7 +181,7 @@ export class Daydream {
 
     this.labelRenderer = new CSS2DRenderer();
     this.labelRenderer.domElement.className = "labelLayer";
-    this.canvas.parentElement.appendChild(this.labelRenderer.domElement);
+    this.canvasParent.appendChild(this.labelRenderer.domElement);
 
     this.camera = new THREE.PerspectiveCamera(
       Daydream.CAMERA_FOV,
@@ -250,7 +264,7 @@ export class Daydream {
     this.resizeObserver = new ResizeObserver(() => {
       this.setCanvasSize();
     });
-    this.resizeObserver.observe(this.canvas.parentElement);
+    this.resizeObserver.observe(this.canvasParent);
 
     this.timeAccumulator = 0;
     this.labelAxes = false;
@@ -291,7 +305,7 @@ export class Daydream {
     reload.textContent = "Reload";
     reload.addEventListener("click", () => location.reload());
     overlay.append(title, this._contextLostDetail, reload);
-    this.canvas.parentElement.appendChild(overlay);
+    this.canvasParent.appendChild(overlay);
     this._contextLostOverlay = overlay;
 
     this._onContextLost = (e) => {
@@ -337,7 +351,7 @@ export class Daydream {
    * ~85% of the view.
    */
   setCanvasSize() {
-    const container = this.canvas.parentElement;
+    const container = this.canvasParent;
     const width = container.clientWidth;
     const height = container.clientHeight;
     // A 0×0 container (the constructor call before first layout, or a
