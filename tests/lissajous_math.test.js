@@ -78,6 +78,29 @@ test('findBestRationalRatio: value 0 returns 1/1', () => {
 });
 
 /**
+ * A negative target must snap to the sign-flipped fraction (same magnitude as
+ * its positive counterpart), not collapse to the closest positive ratio. The
+ * sign rides on the numerator; the denominator stays positive.
+ */
+test('findBestRationalRatio: negative target snaps to the sign-flipped fraction', () => {
+  const neg = findBestRationalRatio(-1.5);
+  assert.equal(neg.M, -3);
+  assert.equal(neg.N, 2);
+  // Magnitude matches the positive target exactly (sign split off before search).
+  const pos = findBestRationalRatio(1.5);
+  assert.equal(Math.abs(neg.M), pos.M);
+  assert.equal(neg.N, pos.N);
+});
+
+/** A negative active/passive ratio keeps its sign through the snap. */
+test('snapToRationalRatio: negative ratio keeps its sign', () => {
+  const { snappedActiveC, m, n } = snapToRationalRatio(-3, 2);
+  assert.equal(m, -3);
+  assert.equal(n, 2);
+  assert.ok(snappedActiveC < 0, `expected negative snapped freq, got ${snappedActiveC}`);
+});
+
+/**
  * Verifies the returned fraction is always in lowest terms (gcd(M,N) === 1)
  * across a sweep of targets, so the ratio — and the closing period derived from
  * N — is never an unreduced multiple regardless of search iteration order.
