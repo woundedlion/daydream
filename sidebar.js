@@ -5,8 +5,10 @@
 
 /**
  * Self-contained sidebar managing the effect list, sort controls, and keyboard navigation.
- * Owns its container element and maintains persistent button references — on sort,
- * existing DOM nodes are reordered rather than destroyed and recreated.
+ * Owns its container element and maintains persistent button references across a
+ * SORT: sortBy() reorders the existing button DOM nodes rather than destroying and
+ * recreating them. The roster itself is a separate operation — setEffects() rebuilds
+ * every button from scratch (innerHTML = ''), since the effect set has changed.
  */
 export class EffectSidebar {
   /**
