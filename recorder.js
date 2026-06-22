@@ -149,10 +149,12 @@ export class VideoRecorder {
     // Pick the best-supported codec for the requested format.
     const mimeType = selectMimeType(this.format);
 
-    const recorder = new MediaRecorder(stream, {
-      mimeType,
-      videoBitsPerSecond: this.bitrateMbps * 1_000_000,
-    });
+    // Omit the mimeType key entirely when no candidate is supported (selectMimeType
+    // returns ''): some engines throw on an explicitly-empty mimeType, whereas
+    // omitting it takes the UA-default codec path selectMimeType intends.
+    const options = { videoBitsPerSecond: this.bitrateMbps * 1_000_000 };
+    if (mimeType) options.mimeType = mimeType;
+    const recorder = new MediaRecorder(stream, options);
 
     // Session-local capture state. MediaRecorder.stop() flips state to
     // 'inactive' synchronously, but ondataavailable/onstop fire asynchronously
