@@ -187,6 +187,24 @@
   word-break: break-word;
 }
 
+/* Reload button on the GPU context-lost overlay (reuses .loading-overlay.error). */
+.context-lost-reload {
+  margin-top: 4px;
+  padding: 6px 16px;
+  background: #222;
+  color: #eee;
+  border: 1px solid #555;
+  border-radius: 6px;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.context-lost-reload:hover {
+  background: #333;
+  border-color: #777;
+}
+
 /* Scroll arrows — hidden on desktop, styled only in mobile media query */
 .scroll-arrow {
   display: none;

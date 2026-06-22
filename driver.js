@@ -151,6 +151,10 @@ export class Daydream {
 
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
+    // Replace the silent blank-canvas failure mode of a lost GPU context with a
+    // logged reason + reload prompt, and halt rendering while it is lost.
+    this._setupContextLossHandling();
+
     this.labelRenderer = new CSS2DRenderer();
     this.labelRenderer.domElement.className = "labelLayer";
     this.canvas.parentElement.appendChild(this.labelRenderer.domElement);
@@ -249,6 +253,61 @@ export class Daydream {
   }
 
   /**
+   * Wire WebGL context-loss / -restore handling on the canvas.
+   * @details On this project's typical hardware Chrome applies the
+   *          `exit_on_context_lost` workaround (the D3D device can't be reset
+   *          inside the GPU sandbox), so a lost context tears down the whole GPU
+   *          process and generally will NOT auto-restore — recovery is a page
+   *          reload. These handlers do not prevent the loss; they replace the
+   *          silent blank canvas (and the later uncaught throw on re-create) with
+   *          a logged reason plus a visible reload prompt, and they flip a flag so
+   *          render() stops pushing GL calls into a dead context. The restore
+   *          handler is wired for completeness on hardware that can recover.
+   */
+  _setupContextLossHandling() {
+    this._contextLost = false;
+
+    // Reuse the engine-load error overlay styling (.loading-overlay.error).
+    const overlay = document.createElement("div");
+    overlay.className = "loading-overlay error context-lost-overlay";
+    overlay.style.display = "none";
+    const title = document.createElement("div");
+    title.className = "load-error-title";
+    title.textContent = "GPU context lost";
+    this._contextLostDetail = document.createElement("div");
+    this._contextLostDetail.className = "load-error-detail";
+    const reload = document.createElement("button");
+    reload.className = "context-lost-reload";
+    reload.textContent = "Reload";
+    reload.addEventListener("click", () => location.reload());
+    overlay.append(title, this._contextLostDetail, reload);
+    this.canvas.parentElement.appendChild(overlay);
+    this._contextLostOverlay = overlay;
+
+    this._onContextLost = (e) => {
+      // preventDefault signals we intend to handle a restore; standard per the
+      // spec even though exit_on_context_lost usually precludes one here.
+      e.preventDefault();
+      this._contextLost = true;
+      const reason = e.statusMessage || "no reason reported";
+      console.error(`[daydream] WebGL context lost: ${reason}`);
+      this._contextLostDetail.textContent =
+        `${reason}. The GPU process was likely reset — reload to recover.`;
+      overlay.style.display = "flex";
+    };
+
+    this._onContextRestored = () => {
+      this._contextLost = false;
+      console.warn("[daydream] WebGL context restored");
+      overlay.style.display = "none";
+    };
+
+    this.canvas.addEventListener("webglcontextlost", this._onContextLost, false);
+    this.canvas.addEventListener(
+      "webglcontextrestored", this._onContextRestored, false);
+  }
+
+  /**
    * Keyboard handler: space toggles pause; right-arrow single-steps one frame
    * while paused.
    * @param {KeyboardEvent} e - The keydown event whose key drives pause/step.
@@ -328,6 +387,11 @@ export class Daydream {
    * @param {Object} effect - Active effect; its drawFrame()/getLabels()/getArenaMetrics() drive the painted frame.
    */
   render(effect) {
+    // A lost WebGL context rejects all GL calls, so skip rendering entirely until
+    // it is restored (see _setupContextLossHandling). The animation loop keeps
+    // firing; this just makes each tick a no-op instead of a stream of GL errors.
+    if (this._contextLost) return;
+
     // The fixed-timestep clock gates only the simulation; rendering is
     // on-demand. _advanceFrameClock() runs every animation frame (so the
     // accumulator drains), but only steps the sim when an interval has accrued.
@@ -735,6 +799,14 @@ export class Daydream {
    */
   dispose() {
     this.resizeObserver?.disconnect();
+
+    if (this._onContextLost) {
+      this.canvas.removeEventListener(
+        "webglcontextlost", this._onContextLost, false);
+      this.canvas.removeEventListener(
+        "webglcontextrestored", this._onContextRestored, false);
+    }
+    this._contextLostOverlay?.remove();
 
     if (this.dotMesh) {
       this.scene.remove(this.dotMesh);
