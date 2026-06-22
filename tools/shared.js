@@ -97,6 +97,15 @@ export function initScene(containerId, canvasId, opts = {}) {
 
   const container = document.getElementById(containerId);
   const canvas = document.getElementById(canvasId);
+  // Fail with a clear, id-naming error rather than the opaque
+  // "Cannot read clientWidth of null" a wrong id otherwise throws three lines
+  // down — matching the guarded-lookup discipline in slider.js / createSlider.
+  if (!container) {
+    throw new Error(`initScene: container element #${containerId} not found`);
+  }
+  if (!canvas) {
+    throw new Error(`initScene: canvas element #${canvasId} not found`);
+  }
   const width = container.clientWidth;
   const height = container.clientHeight;
 
