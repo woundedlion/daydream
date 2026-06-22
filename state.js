@@ -155,14 +155,33 @@ export class URLSync {
       state.update(patch);
     }
 
-    // Subscribe to changes and debounce URL writes
-    state.subscribe((key, value) => {
+    // Subscribe to changes and debounce URL writes. Keep the unsubscribe handle
+    // so dispose() can tear the subscription down — otherwise a page discard
+    // leaves this callback firing _schedule() into a dead page.
+    this._unsubscribe = state.subscribe((key, value) => {
       if (!this.trackedKeys.has(key)) return;
       this._schedule();
     });
 
     // Become the app-wide URL writer the GUI delegates to.
     _activeURLSync = this;
+  }
+
+  /**
+   * Tear down the URLSync: drop the AppState subscription, cancel any pending
+   * debounced flush, and clear the app-wide writer slot if it still points here.
+   * Without this, a pagehide discard can leave the 200 ms timer firing
+   * history.replaceState into a dead page. Symmetric with disposeApp().
+   * @returns {void}
+   */
+  dispose() {
+    if (this._unsubscribe) {
+      this._unsubscribe();
+      this._unsubscribe = null;
+    }
+    clearTimeout(this._timer);
+    this._timer = null;
+    if (_activeURLSync === this) _activeURLSync = null;
   }
 
   /**

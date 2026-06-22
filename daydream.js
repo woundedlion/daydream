@@ -805,6 +805,10 @@ function disposeApp() {
   // the MediaRecorder, its capture stream, and the offscreen canvas leak and the
   // partial recording is never flushed/downloaded. stop() is a no-op when idle.
   recorder?.stop();
+  // Drop the URL-sync subscription and cancel its pending debounced flush so a
+  // discard can't leave the 200 ms timer firing history.replaceState into a
+  // dead page.
+  urlSync.dispose();
   sidebar.dispose();
   daydream.dispose();
   // Terminate the segment-worker pool too: each worker holds a live WASM
