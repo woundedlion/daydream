@@ -57,3 +57,33 @@ export function computeSegmentRange(id, total, w, h) {
 
   return { x0, x1, y0, y1, w: x1 - x0, h: y1 - y0 };
 }
+
+/**
+ * Blit a segment's pixel rectangle row-by-row between the full W*H*3 canvas
+ * buffer and a compact, tightly-packed per-segment buffer. Each canvas row
+ * [x0,x1) is contiguous, so one row moves in a single TypedArray.set — (y1-y0)
+ * bulk copies instead of ~(x1-x0)*(y1-y0)*3 scalar stores. Shared by the worker
+ * (extract: canvas -> compact) and the compositor (composite: compact -> canvas)
+ * so the two ends of the postMessage boundary cannot drift apart.
+ * @param {Uint16Array} canvas - Full canvas buffer (W*H*3, row stride canvasW*3).
+ * @param {Uint16Array} compact - Packed segment buffer ((x1-x0)*(y1-y0)*3), rows back-to-back.
+ * @param {number} canvasW - Canvas width in pixels (the canvas row stride / 3).
+ * @param {{x0:number,x1:number,y0:number,y1:number}} rect - Sub-rectangle to move.
+ * @param {boolean} gather - true copies canvas->compact (extract a segment);
+ *   false copies compact->canvas (composite a segment back).
+ * @returns {void}
+ */
+export function blitSegmentRect(canvas, compact, canvasW, rect, gather) {
+  const { x0, x1, y0, y1 } = rect;
+  const rowLen = (x1 - x0) * 3;
+  let compactIdx = 0;
+  for (let y = y0; y < y1; y++) {
+    const canvasIdx = (y * canvasW + x0) * 3;
+    if (gather) {
+      compact.set(canvas.subarray(canvasIdx, canvasIdx + rowLen), compactIdx);
+    } else {
+      canvas.set(compact.subarray(compactIdx, compactIdx + rowLen), canvasIdx);
+    }
+    compactIdx += rowLen;
+  }
+}
