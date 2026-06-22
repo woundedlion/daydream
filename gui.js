@@ -1,6 +1,6 @@
 
 import { GUI as LilGUI } from "lil-gui";
-import { getActiveURLSync } from "./state.js";
+import { getActiveURLSync, roundUrlNumber } from "./state.js";
 
 /**
  * Reads the current URL query string into a parsed params object.
@@ -70,7 +70,7 @@ const makeUrlParamWriter = () => {
         if (v === null || v === undefined) {
           params.delete(k);
         } else if (typeof v === 'number') {
-          params.set(k, parseFloat(v.toFixed(4)));
+          params.set(k, roundUrlNumber(v));
         } else {
           params.set(k, v);
         }
