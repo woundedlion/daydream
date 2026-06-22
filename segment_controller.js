@@ -577,9 +577,17 @@ export class SegmentController {
     }
 
     const cells = this._statsCells;
+    // Derive maxTime from the same numSegs span the per-row loop walks, rather
+    // than reducing over the whole this.timings array: the two lengths are kept
+    // in lockstep by create(), so reading both from numSegs removes the latent
+    // drift where a stale tail entry in timings could outrank the live segments.
+    // Seeded 0 (timings are durations) so an empty/sub-frame state reads 0, not
+    // -Infinity.
+    let maxTime = 0;
     for (let s = 0; s < numSegs; s++) {
       const r = this.results[s];
       const timing = this.timings[s] || 0;
+      if (timing > maxTime) maxTime = timing;
       const c = cells.rows[s];
 
       c.range.textContent = r ? `x[${r.x0}–${r.x1}] y[${r.y0}–${r.y1}]` : '?';
@@ -593,10 +601,6 @@ export class SegmentController {
       c.persist.textContent = a ? fmtKB(a.persistent_arena.usage) : '-';
     }
 
-    // Guarded reduce, not Math.max(...timings): the latter spreads the array
-    // (and returns -Infinity on an empty one — reachable before the first frame
-    // or after a reset, when timings is []). Seed 0 since timings are durations.
-    const maxTime = this.timings.reduce((a, b) => Math.max(a, b), 0);
     cells.maxTime.textContent = `${maxTime.toFixed(1)} ms`;
     cells.wallTime.textContent = `${this.wallTime.toFixed(1)} ms`;
     cells.wallTime.className = this.wallTime > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
