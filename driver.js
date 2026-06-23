@@ -940,6 +940,12 @@ export class Daydream {
   }
 }
 
+// Module-level scratch for coordsLabel's transient conversions. Safe to reuse:
+// coordsLabel is synchronous and reads both objects into its return value before
+// yielding, so two calls never overlap.
+const _coordsScratchSph = new THREE.Spherical();
+const _coordsScratchVec = new THREE.Vector3();
+
 /**
  * Build a label for a Cartesian point `c` ([x,y,z]): its position is `c`
  * reprojected onto the sphere surface, and its content lists the spherical
@@ -948,8 +954,12 @@ export class Daydream {
  * @returns {{position: THREE.Vector3, content: string}} Label placement on the sphere surface and its multi-line text.
  */
 export const coordsLabel = (c) => {
-  let s = new THREE.Spherical().setFromCartesianCoords(c[0], c[1], c[2]);
-  let n = new THREE.Vector3(c[0], c[1], c[2]).normalize();
+  // Reuse module-level scratch for the two transient conversions (synchronous,
+  // consumed before return) so the per-frame label refresh allocates only the
+  // retained `position` Vector3, not a fresh Spherical + direction Vector3 each
+  // call — avoiding the GC churn that would defeat the pooled-label design.
+  const s = _coordsScratchSph.setFromCartesianCoords(c[0], c[1], c[2]);
+  const n = _coordsScratchVec.set(c[0], c[1], c[2]).normalize();
   return {
     position: new THREE.Vector3()
       .setFromSphericalCoords(Daydream.SPHERE_RADIUS, s.phi, s.theta),
