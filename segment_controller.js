@@ -231,7 +231,10 @@ export class SegmentController {
               // buffer every render, so there's no aliasing across frames. Hold
               // the transferred view directly; a `new Uint16Array(msg.pixels)`
               // copy here would defeat the zero-copy transfer every frame.
-              pixels: msg.pixels ?? null,
+              // FrameMsg.pixels is non-nullable in the protocol (the worker
+              // always allocates a fresh buffer per render), so there is no
+              // `?? null` fallback — trust the protocol as the source of truth.
+              pixels: msg.pixels,
               x0: msg.x0, x1: msg.x1,
               y0: msg.y0, y1: msg.y1,
               quadW: msg.quadW, quadH: msg.quadH,
