@@ -12,6 +12,7 @@ import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
 import { SegmentController } from "./segment_controller.js";
 import { refreshPixelView as computePixelView } from "./pixel_view.js";
+import { resolveParamSync } from "./param_sync.js";
 
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -157,15 +158,16 @@ function syncGUI() {
     // in activeElement, but lil-gui sliders drag via a non-focusable div (verified
     // in the lil-gui source), so a drag is invisible to the focus check — the
     // _dragging flag, set by the pointerdown/up guard at GUI-build time, covers it.
-    if (c._dragging || c.domElement.contains(document.activeElement)) continue;
+    const isEditing =
+      c._dragging || c.domElement.contains(document.activeElement);
 
-    let val = values[i];
-    if (c.isBoolean) val = (val > 0.5);
-
-    if (c.getValue() !== val) {
-      c.object[c.property] = val;
-      c.updateDisplay();
-    }
+    // The bool-coercion / skip-while-editing / skip-if-unchanged decision lives
+    // in the DOM-free resolveParamSync (param_sync.js) so it can be unit-tested.
+    const { update, value } = resolveParamSync(
+      c.getValue(), values[i], c.isBoolean, isEditing);
+    if (!update) continue;
+    c.object[c.property] = value;
+    c.updateDisplay();
   }
 }
 
