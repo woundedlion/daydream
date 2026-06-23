@@ -81,10 +81,11 @@ const makeUrlParamWriter = () => {
   };
 };
 
-// Module-level default writer for standalone callers (and the unit test). Each
-// DeepLinkGUI instance creates its own via makeUrlParamWriter() instead of
-// sharing this one.
-export const setUrlParam = makeUrlParamWriter();
+// Each DeepLinkGUI instance creates its own writer via makeUrlParamWriter();
+// it is exported so the unit test can build one in isolation. (There is no
+// module-level shared instance: production never calls a standalone writer —
+// every control routes through its GUI's own writer or the active URLSync.)
+export { makeUrlParamWriter };
 
 /**
  * lil-gui wrapper that persists every control's value to URL query params,
@@ -397,7 +398,4 @@ export const resetGUI = (excludedKeys = []) => {
   window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
 };
 
-// compatibility with import * as gui from 'gui'
-export const gui = { GUI: DeepLinkGUI };
 export { DeepLinkGUI as GUI };
-export default { GUI: DeepLinkGUI };

@@ -137,6 +137,29 @@
   text-align: center;
 }
 
+/* Global engine memory/compute stats tables. The desktop header readout
+   (#global-stats-desktop) and the mobile stats-bar share one structure; only
+   the font size and data-cell padding differ. Replaces the per-cell inline
+   styles that were duplicated across both <table>s in index.html. The column
+   divider uses :not(:last-child) so the last cell in each row omits it. */
+#global-stats-desktop { margin-left: 10px; }
+.global-stats {
+  color: grey;
+  font-family: monospace;
+  text-align: center;
+  border-collapse: collapse;
+  line-height: 1.2;
+  display: inline-table;
+}
+.global-stats--desktop { font-size: 12px; }
+.global-stats--mobile { font-size: 10px; }
+.global-stats .stats-head { color: #999; }
+.global-stats th { font-weight: normal; padding: 0 4px; }
+.global-stats td { padding: 0 4px; white-space: nowrap; }
+.global-stats--desktop td { padding: 0 8px; }
+.global-stats th:not(:last-child),
+.global-stats td:not(:last-child) { border-right: 1px solid #444; }
+
 /* Loading overlay */
 .loading-overlay {
   position: absolute;

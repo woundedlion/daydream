@@ -72,7 +72,7 @@ class StubGUI {
 
 mock.module('lil-gui', { namedExports: { GUI: StubGUI } });
 
-const { GUI: DeepLinkGUI, setUrlParam } = await import('../gui.js');
+const { GUI: DeepLinkGUI, makeUrlParamWriter } = await import('../gui.js');
 
 /**
  * Installs a minimal global window so gui.js can read location.search and call
@@ -158,12 +158,13 @@ test('DeepLinkGUI.add with no matching URL param keeps the default', () => {
  * the shared timer fires must both reach the URL so neither is lost from the
  * deep link.
  */
-test('setUrlParam merges multiple keys changed within the debounce window', () => {
+test('makeUrlParamWriter merges multiple keys changed within the debounce window', () => {
   let lastUrl = '/';
   globalThis.window = {
     location: { search: '?keep=1', pathname: '/' },
     history: { replaceState(_s, _t, url) { lastUrl = url; } },
   };
+  const setUrlParam = makeUrlParamWriter();
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     setUrlParam('a', 0.5);
