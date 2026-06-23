@@ -90,10 +90,12 @@ const RES = ['Phantasm (144x288)', 'Crystal (192x384)'];
 
 /**
  * Verifies a garbage ?resolution= does not survive DeepLinkGUI hydration. add()
- * re-reads the raw URL and its applyOnLoad replay fires the loaded value through
- * the caller's onChange; an out-of-list value would re-inject an invalid
+ * re-reads the raw URL; an out-of-list value would re-inject an invalid
  * resolution into appState (where applyResolution() silently no-ops, leaving a
- * black canvas), so the value must be rejected against the option list.
+ * black canvas), so the value is rejected against the option list. Because the
+ * value was rejected, the bound default is left in place and the applyOnLoad
+ * replay does NOT fire — replaying would push the default back through onChange,
+ * spuriously re-persisting it to the URL (finding 122).
  */
 test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
   installWindow('?resolution=GARBAGE');
@@ -104,8 +106,8 @@ test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
 
   // The garbage URL value must not poison the bound object...
   assert.equal(obj.resolution, 'Phantasm (144x288)');
-  // ...and the applyOnLoad replay must fire the valid value, not the garbage.
-  assert.deepEqual(replayed, ['Phantasm (144x288)']);
+  // ...and a rejected value must not replay (no spurious onChange/URL write).
+  assert.deepEqual(replayed, []);
 });
 
 /**
