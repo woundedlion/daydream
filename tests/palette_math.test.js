@@ -80,6 +80,15 @@ test('PRNG is deterministic: same seed -> same sequence', () => {
   assert.notEqual(new PRNG(1).next(), new PRNG(2).next());
 });
 
+/** Verifies seed 0 is a valid, reproducible seed (not silently randomized). */
+test('PRNG seed 0 is reproducible', () => {
+  const a = new PRNG(0);
+  const b = new PRNG(0);
+  for (let i = 0; i < 8; i++) {
+    assert.equal(a.next(), b.next());
+  }
+});
+
 /** Verifies hsvToRgb maps the region-boundary hues to pure primaries and returns a CPixel. */
 test('hsvToRgb on primary hues returns pure red/green/blue', () => {
   // h, s, v in 0..255; full saturation and value. The engine splits the wheel
