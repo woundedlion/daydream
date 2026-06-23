@@ -143,6 +143,12 @@
       touch-action: none;
     }
 
+    /* Visible keyboard-focus ring for the now-focusable (tabindex) pad. */
+    .complex-plane-control:focus-visible {
+      outline: 2px solid var(--blue-500);
+      outline-offset: 2px;
+    }
+
     .complex-plane-inner {
       position: absolute;
       top: 0;
@@ -535,8 +541,13 @@
       const dotId = `${id}_dot`;
       const labelId = `${id}_label`;
 
+      // role="application" + tabindex make the otherwise mouse/touch-only pad
+      // keyboard-reachable; the arrow-key handler below adjusts re/im. aria-label
+      // is refreshed with the current value in updateUI so a screen reader
+      // announces it on focus and after each change.
       container.innerHTML = `
-          <div id="${controlId}" class="complex-plane-control">
+          <div id="${controlId}" class="complex-plane-control" tabindex="0" role="application"
+               aria-label="Parameter ${id} complex value. Use the arrow keys to adjust the real and imaginary parts.">
             <div class="complex-plane-inner">
               <div class="axis-h"></div>
               <div class="axis-v"></div>
@@ -564,6 +575,9 @@
         const label = `${re.toFixed(2)} ${sign} ${Math.abs(im).toFixed(2)}i`;
         if (label !== lastLabel) {
           labelElement.textContent = label;
+          // Keep the pad's accessible name in sync with its value so a screen
+          // reader announces the new value after each keyboard/drag change.
+          planeElement.setAttribute('aria-label', `Parameter ${id} = ${label}. Use the arrow keys to adjust the real and imaginary parts.`);
           lastLabel = label;
         }
         const xPercent = ((re / maxExtent) * 0.5 + 0.5) * 100;
@@ -636,8 +650,35 @@
         document.addEventListener('touchend', onTouchEnd);
       }
 
+      // Keyboard equivalent of dragging the dot: arrows nudge re/im (Shift for a
+      // coarser step), Home recenters to the origin. Mirrors handleInput's
+      // stop-animation / clamp / snap / notify sequence.
+      const onKeyDown = (e) => {
+        const step = e.shiftKey ? 0.2 : 0.05;
+        let dRe = 0, dIm = 0;
+        switch (e.key) {
+          case 'ArrowLeft': dRe = -step; break;
+          case 'ArrowRight': dRe = step; break;
+          case 'ArrowUp': dIm = step; break;
+          case 'ArrowDown': dIm = -step; break;
+          case 'Home': break; // handled below as recenter
+          default: return;
+        }
+        e.preventDefault();
+        if (isAnimating) stopAnimation();
+        let re = e.key === 'Home' ? 0 : paramObj.re + dRe;
+        let im = e.key === 'Home' ? 0 : paramObj.im + dIm;
+        re = snapComplex(Math.max(-maxExtent, Math.min(maxExtent, re)));
+        im = snapComplex(Math.max(-maxExtent, Math.min(maxExtent, im)));
+        paramObj.re = re;
+        paramObj.im = im;
+        updateUI();
+        onChange();
+      };
+
       planeElement.addEventListener('mousedown', onMouseDown);
       planeElement.addEventListener('touchstart', onTouchStart, { passive: false });
+      planeElement.addEventListener('keydown', onKeyDown);
       updateUI();
     };
 

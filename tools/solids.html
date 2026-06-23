@@ -517,32 +517,32 @@
 
       <div class="flex items-center justify-between">
         <span class="text-sm">Geodesic Edges</span>
-        <button id="toggleGeo" class="toggle-switch is-on"><div class="toggle-knob"></div></button>
+        <button id="toggleGeo" class="toggle-switch is-on" role="switch" aria-checked="true" aria-label="Geodesic Edges"><div class="toggle-knob"></div></button>
       </div>
 
       <div class="flex items-center justify-between">
         <span class="text-sm">Show Faces</span>
-        <button id="toggleFaces" class="toggle-switch is-on"><div class="toggle-knob"></div></button>
+        <button id="toggleFaces" class="toggle-switch is-on" role="switch" aria-checked="true" aria-label="Show Faces"><div class="toggle-knob"></div></button>
       </div>
 
       <div class="flex items-center justify-between">
         <span class="text-sm">Colorize Faces</span>
-        <button id="toggleColorize" class="toggle-switch"><div class="toggle-knob"></div></button>
+        <button id="toggleColorize" class="toggle-switch" role="switch" aria-checked="false" aria-label="Colorize Faces"><div class="toggle-knob"></div></button>
       </div>
 
       <div class="flex items-center justify-between">
         <span class="text-sm">Show Vertices</span>
-        <button id="toggleVerts" class="toggle-switch"><div class="toggle-knob"></div></button>
+        <button id="toggleVerts" class="toggle-switch" role="switch" aria-checked="false" aria-label="Show Vertices"><div class="toggle-knob"></div></button>
       </div>
 
       <div class="flex items-center justify-between">
         <span class="text-sm">Show Normals</span>
-        <button id="toggleNormals" class="toggle-switch"><div class="toggle-knob"></div></button>
+        <button id="toggleNormals" class="toggle-switch" role="switch" aria-checked="false" aria-label="Show Normals"><div class="toggle-knob"></div></button>
       </div>
 
       <div class="flex items-center justify-between">
         <span class="text-sm">Show Indices</span>
-        <button id="toggleIndices" class="toggle-switch"><div class="toggle-knob"></div></button>
+        <button id="toggleIndices" class="toggle-switch" role="switch" aria-checked="false" aria-label="Show Indices"><div class="toggle-knob"></div></button>
       </div>
     </div>
   </div>
@@ -1022,7 +1022,9 @@
       };
       for (const [id, on] of Object.entries(toggleState)) {
         const btn = document.getElementById(id);
-        if (btn) btn.classList.toggle('is-on', !!on);
+        if (!btn) continue;
+        btn.classList.toggle('is-on', !!on);
+        btn.setAttribute('aria-checked', on ? 'true' : 'false'); // role="switch" state
       }
     }
 

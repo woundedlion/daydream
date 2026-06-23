@@ -82,6 +82,12 @@
       /* Indicate it's clickable */
     }
 
+    /* Visible keyboard-focus ring for the now-focusable (tabindex) strip. */
+    #colorStripCanvas:focus-visible {
+      outline: 2px solid var(--blue-500);
+      outline-offset: 2px;
+    }
+
     #waveGraphCanvas {
       border: 1px solid #475569;
       border-radius: 0.5rem;
@@ -290,8 +296,12 @@
           class="hidden px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-sm font-medium transition-all shadow-lg">Reset
           Zoom</button>
       </div>
-      <p class="text-sm text-gray-400">Click to set phase, or click and drag to zoom.</p> <canvas id="colorStripCanvas"
-        width="1024" height="100"></canvas>
+      <p class="text-sm text-gray-400">Click to set phase, or click and drag to zoom. With the strip focused,
+        ← / → move the phase, Shift+← / → zoom out / in, and Home / End jump to the ends.</p>
+      <canvas id="colorStripCanvas" width="1024" height="100"
+        tabindex="0" role="slider" aria-label="Palette phase"
+        aria-valuemin="0" aria-valuemax="1" aria-valuenow="0"
+        aria-keyshortcuts="ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight Home End"></canvas>
     </div>
 
     <!-- Wrapper for sections 4 and 5 -->
@@ -732,12 +742,61 @@
         // Force update of visual elements
         updateSwatch();
         drawColorStrip(animationTime); // Redraw without selection
+        updateStripAria();
 
       } else {
         // --- This was a ZOOM (drag) ---
         zoomPalette(t_start, t_end);
         showResetZoomButton();
       }
+    }
+
+    /**
+     * Reflect the current phase on the strip's role="slider" so a screen reader
+     * announces it. Cheap, so called only on discrete phase changes (click /
+     * keyboard), not every animation frame.
+     */
+    function updateStripAria() {
+      if (!colorStripCanvas) return;
+      colorStripCanvas.setAttribute('aria-valuenow', animationTime.toFixed(3));
+    }
+
+    /**
+     * Keyboard control for the focusable strip (mouse/touch parity for a11y):
+     * ← / → nudge the phase, Home / End jump to the ends, and Shift+← / →
+     * zoom out (reset) / in (a window centered on the current phase) — the same
+     * operations the click and click-drag gestures provide.
+     */
+    function setStripPhase(t) {
+      animationTime = Math.max(0, Math.min(1, t));
+      updateSwatch();
+      drawColorStrip(animationTime);
+      updateStripAria();
+    }
+
+    function zoomAroundPhase() {
+      const half = 0.1;
+      const t0 = Math.max(0, animationTime - half);
+      const t1 = Math.min(1, animationTime + half);
+      if (t1 - t0 < DRAG_THRESHOLD) return;
+      zoomPalette(t0, t1);
+      showResetZoomButton();
+    }
+
+    function handleStripKeyDown(event) {
+      const step = 0.02;
+      switch (event.key) {
+        case 'ArrowLeft':
+          if (event.shiftKey) handleResetZoom(); else setStripPhase(animationTime - step);
+          break;
+        case 'ArrowRight':
+          if (event.shiftKey) zoomAroundPhase(); else setStripPhase(animationTime + step);
+          break;
+        case 'Home': setStripPhase(0); break;
+        case 'End': setStripPhase(1); break;
+        default: return;
+      }
+      event.preventDefault();
     }
 
     /**
@@ -1188,6 +1247,8 @@
       colorStripCanvas.addEventListener('mousedown', handleDragStart);
       document.addEventListener('mousemove', handleDragMove); // Listen on document to drag outside
       document.addEventListener('mouseup', handleDragEnd); // Listen on document to release outside
+      colorStripCanvas.addEventListener('keydown', handleStripKeyDown); // keyboard parity (a11y)
+      updateStripAria(); // seed aria-valuenow
 
       // 4. Add click-to-copy to the swatch
       if (colorSwatch) {
