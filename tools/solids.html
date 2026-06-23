@@ -168,32 +168,7 @@
       font-size: 0.8rem;
     }
 
-    .btn {
-      padding: 0.4rem 0.6rem;
-      border-radius: 0.25rem;
-      font-weight: 500;
-      font-size: 0.875rem;
-      transition: all 0.2s;
-      cursor: pointer;
-    }
-
-    .btn-primary {
-      background-color: var(--blue-500);
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background-color: #2563eb;
-    }
-
-    .btn-secondary {
-      background-color: var(--slate-700);
-      color: white;
-    }
-
-    .btn-secondary:hover {
-      background-color: var(--slate-600);
-    }
+    /* .btn / .btn-primary / .btn-secondary now live in tools.css (shared). */
 
     .op-item {
       background-color: var(--slate-800);
@@ -542,54 +517,32 @@
 
       <div class="flex items-center justify-between">
         <span class="text-sm">Geodesic Edges</span>
-        <button id="toggleGeo" class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
-          <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform"></div>
-        </button>
+        <button id="toggleGeo" class="toggle-switch is-on"><div class="toggle-knob"></div></button>
       </div>
 
       <div class="flex items-center justify-between">
         <span class="text-sm">Show Faces</span>
-        <button id="toggleFaces"
-          class="w-10 h-5 rounded-full bg-blue-500 relative transition-colors focus:outline-none">
-          <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transform translate-x-5 transition-transform">
-          </div>
-        </button>
+        <button id="toggleFaces" class="toggle-switch is-on"><div class="toggle-knob"></div></button>
       </div>
 
       <div class="flex items-center justify-between">
         <span class="text-sm">Colorize Faces</span>
-        <button id="toggleColorize"
-          class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
-          <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform">
-          </div>
-        </button>
+        <button id="toggleColorize" class="toggle-switch"><div class="toggle-knob"></div></button>
       </div>
 
       <div class="flex items-center justify-between">
         <span class="text-sm">Show Vertices</span>
-        <button id="toggleVerts"
-          class="w-10 h-5 rounded-full bg-blue-500 relative transition-colors focus:outline-none">
-          <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transform translate-x-5 transition-transform">
-          </div>
-        </button>
+        <button id="toggleVerts" class="toggle-switch"><div class="toggle-knob"></div></button>
       </div>
 
       <div class="flex items-center justify-between">
         <span class="text-sm">Show Normals</span>
-        <button id="toggleNormals"
-          class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
-          <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform">
-          </div>
-        </button>
+        <button id="toggleNormals" class="toggle-switch"><div class="toggle-knob"></div></button>
       </div>
 
       <div class="flex items-center justify-between">
         <span class="text-sm">Show Indices</span>
-        <button id="toggleIndices"
-          class="w-10 h-5 rounded-full bg-slate-700 relative transition-colors focus:outline-none">
-          <div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform">
-          </div>
-        </button>
+        <button id="toggleIndices" class="toggle-switch"><div class="toggle-knob"></div></button>
       </div>
     </div>
   </div>
@@ -1057,30 +1010,20 @@
     }
 
     function updateToggles() {
-      const tG = document.getElementById('toggleGeo');
-      const tF = document.getElementById('toggleFaces');
-      const tV = document.getElementById('toggleVerts');
-
-      tG.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showGeodesics ? 'bg-blue-500' : 'bg-slate-700'}`;
-      tG.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showGeodesics ? 'translate-x-5' : ''}`;
-
-      tF.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showFaces ? 'bg-blue-500' : 'bg-slate-700'}`;
-      tF.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showFaces ? 'translate-x-5' : ''}`;
-
-      const tC = document.getElementById('toggleColorize');
-      tC.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.colorizeFaces ? 'bg-blue-500' : 'bg-slate-700'}`;
-      tC.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.colorizeFaces ? 'translate-x-5' : ''}`;
-
-      tV.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showVertices ? 'bg-blue-500' : 'bg-slate-700'}`;
-      tV.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showVertices ? 'translate-x-5' : ''}`;
-
-      const tN = document.getElementById('toggleNormals');
-      tN.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showNormals ? 'bg-blue-500' : 'bg-slate-700'}`;
-      tN.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showNormals ? 'translate-x-5' : ''}`;
-
-      const tI = document.getElementById('toggleIndices');
-      tI.className = `w-10 h-5 rounded-full relative transition-colors focus:outline-none ${state.showIndices ? 'bg-blue-500' : 'bg-slate-700'}`;
-      tI.children[0].className = `w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-transform ${state.showIndices ? 'translate-x-5' : ''}`;
+      // Each toggle's on/off look is driven by the shared `.toggle-switch.is-on`
+      // CSS (tools.css), so syncing state is just toggling that one class.
+      const toggleState = {
+        toggleGeo: state.showGeodesics,
+        toggleFaces: state.showFaces,
+        toggleColorize: state.colorizeFaces,
+        toggleVerts: state.showVertices,
+        toggleNormals: state.showNormals,
+        toggleIndices: state.showIndices,
+      };
+      for (const [id, on] of Object.entries(toggleState)) {
+        const btn = document.getElementById(id);
+        if (btn) btn.classList.toggle('is-on', !!on);
+      }
     }
 
     // --- SAVED ITEMS ---

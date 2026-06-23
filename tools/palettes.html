@@ -356,7 +356,7 @@
     // Shared primitives, imported rather than re-implemented inline: the
     // clipboard copy (tools/clipboard.js) and the OKLab/OKLCH/sRGB color math
     // (tools/color.js, which mirrors the engine's core/color.h pipeline).
-    import { copyWithFeedback } from './clipboard.js';
+    import { copyWithFeedback, COPY_FEEDBACK } from './clipboard.js';
     // The engine module exports the real GenerativePalette color math via the
     // PaletteOps embind class, so the tool previews the device's exact colors
     // instead of a hand-ported JS reimplementation that can silently drift.
@@ -482,12 +482,8 @@
 
     // --- Helper Functions ---
 
-    // Copy-with-feedback lives in tools/shared.js; this page just supplies the
-    // green/gray color classes its prompt spans use.
-    const COPY_FEEDBACK = {
-      copiedClasses: ['text-green-400'],
-      idleClasses: ['text-gray-500'],
-    };
+    // COPY_FEEDBACK (the green/gray prompt color classes) is imported from
+    // clipboard.js — see the import above.
 
 
     // --- UI and Event Functions ---

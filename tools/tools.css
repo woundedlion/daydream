@@ -72,6 +72,73 @@ input[type=range]:disabled::-webkit-slider-thumb {
   color: var(--indigo-400);
 }
 
+/* Compact button base + primary/secondary fills. A page may still define its
+ * own .btn color variants (e.g. splines' .btn-blue/.btn-emerald/.btn-rose) in
+ * its own <style>, which override these via the cascade order. */
+.btn {
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.25rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background-color: var(--blue-500);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #2563eb;
+}
+
+.btn-secondary {
+  background-color: var(--slate-700);
+  color: white;
+}
+
+.btn-secondary:hover {
+  background-color: var(--slate-600);
+}
+
+/* Toggle switch: a 40×20 pill with a sliding 12px knob. Markup is
+ * `<button class="toggle-switch"><div class="toggle-knob"></div></button>`;
+ * add `.is-on` for the active (blue, knob-right) state. Replaces the long
+ * repeated Tailwind utility strings the solids toggles hand-rolled. */
+.toggle-switch {
+  width: 2.5rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  position: relative;
+  flex-shrink: 0;
+  background-color: var(--slate-700);
+  transition: background-color 0.2s;
+}
+
+.toggle-switch:focus {
+  outline: none;
+}
+
+.toggle-switch.is-on {
+  background-color: var(--blue-500);
+}
+
+.toggle-knob {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 9999px;
+  background: #fff;
+  position: absolute;
+  top: 0.25rem;
+  left: 0.25rem;
+  transition: transform 0.2s;
+}
+
+.toggle-switch.is-on .toggle-knob {
+  transform: translateX(1.25rem);
+}
+
 /*
  * Fixed-right-panel shell: a full-bleed canvas (`.tool-stage`) with a fixed
  * scrolling controls panel pinned to the right (`.tool-panel`), collapsing to

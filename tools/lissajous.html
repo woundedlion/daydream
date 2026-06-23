@@ -101,7 +101,7 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { initScene, copyWithFeedback, showFatalError } from './shared.js';
+    import { initScene, copyWithFeedback, showFatalError, COPY_FEEDBACK } from './shared.js';
     import { createSlider as buildSlider } from './slider.js';
     import {
       lissajous,
@@ -271,12 +271,8 @@
 
     // --- End RATIONAL CONSTRAINT LOGIC ---
 
-    // Copy-with-feedback lives in tools/shared.js; this page just supplies the
-    // green/gray color classes its prompt span uses.
-    const COPY_FEEDBACK = {
-      copiedClasses: ['text-green-400'],
-      idleClasses: ['text-gray-500'],
-    };
+    // COPY_FEEDBACK (the green/gray prompt color classes) is imported from
+    // shared.js — see the import above.
 
     // --- Code Snippet Updater ---
     const updateCodeSnippet = () => {

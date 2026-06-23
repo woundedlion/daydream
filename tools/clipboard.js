@@ -98,3 +98,13 @@ export async function copyWithFeedback(text, opts = {}) {
   }
   return success;
 }
+
+/**
+ * Default copied/idle color classes for the tool pages' copy prompts, so each
+ * page doesn't redeclare the same literal. Spread into a copyWithFeedback opts
+ * object: `copyWithFeedback(text, { element, revertText: '', ...COPY_FEEDBACK })`.
+ */
+export const COPY_FEEDBACK = {
+  copiedClasses: ['text-green-400'],
+  idleClasses: ['text-gray-500'],
+};
