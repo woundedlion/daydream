@@ -22,6 +22,15 @@
 import { Daydream, SLOW_FRAME_MS } from "./driver.js";
 import { blitSegmentRect } from "./segment_layout.js";
 
+// Upper bound on how long a freshly-spawned worker pool may take to report all
+// 'ready' messages before we treat the init as failed. A worker's init awaits a
+// WASM fetch + instantiate; a non-throwing failure (a 404 that resolves to an
+// HTML error page, a non-throwing abort) never fires worker.onerror and never
+// sends 'ready', so without this bound `ready` would stay false forever and the
+// segmented view would freeze black with no fault overlay. Generous enough to
+// cover a cold cache loading every worker's module on a slow connection.
+const INIT_WATCHDOG_MS = 20000;
+
 /** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
 /** @typedef {import('./worker_protocol.js').ControllerInboundMsg} ControllerInboundMsg */
 /** @typedef {import('./worker_protocol.js').SegArenaMetrics} SegArenaMetrics */
@@ -110,6 +119,15 @@ export class SegmentController {
     /** @type {{ segId: number, message: string } | null} */
     this.faultInfo = null;     // first fault this session
 
+    // Bounded init watchdog. Distinct from the deliberate no-timeout policy on
+    // RENDER faults (which DO fire worker.onerror): this only covers the init
+    // window, where a non-throwing WASM load failure produces no signal at all.
+    // Armed in create(), cleared once all workers report 'ready' (or on
+    // fault/destroy); if it fires first, it latches a fault and paints the
+    // overlay instead of freezing black forever.
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    this._initWatchdog = null;
+
     // Stats-table DOM cache (populated lazily by _buildStatsTable, mutated in
     // place by updateStats). Declared here so all instance state is visible up
     // front; null until the first build / after a fault tears the table down.
@@ -189,6 +207,7 @@ export class SegmentController {
           readyCount++;
           if (readyCount === numSegments) {
             this.ready = true;
+            this._clearInitWatchdog();
             console.log(`[Segmented] All ${numSegments} workers ready`);
           }
         } else if (msg.type === 'effectReady') {
@@ -263,7 +282,32 @@ export class SegmentController {
       this.workers.push(worker);
     }
 
+    // Arm the init watchdog: if not every worker has reported 'ready' by the
+    // deadline, a worker's WASM load failed without throwing (no onerror), so
+    // latch a fault to surface the overlay rather than freeze black forever.
+    this._clearInitWatchdog();
+    this._initWatchdog = setTimeout(() => {
+      this._initWatchdog = null;
+      if (!this.ready && !this.faulted) {
+        this._onWorkerFault(-1,
+          `worker init timed out after ${INIT_WATCHDOG_MS} ms `
+          + `(${readyCount}/${numSegments} ready) — a WASM module likely failed `
+          + `to load without throwing`);
+      }
+    }, INIT_WATCHDOG_MS);
+    // Don't let a pending watchdog hold a Node test process open; harmless and
+    // absent in the browser, where Timeout has no unref().
+    if (typeof this._initWatchdog.unref === 'function') this._initWatchdog.unref();
+
     console.log(`[Segmented] Spawning ${numSegments} workers...`);
+  }
+
+  /** Cancel the init watchdog if one is pending. Idempotent. */
+  _clearInitWatchdog() {
+    if (this._initWatchdog !== null) {
+      clearTimeout(this._initWatchdog);
+      this._initWatchdog = null;
+    }
   }
 
   /**
@@ -281,6 +325,7 @@ export class SegmentController {
       w.onmessageerror = null;
       w.terminate();
     }
+    this._clearInitWatchdog();
     this.workers = [];
     this.results = [];
     this.timings = [];
@@ -314,6 +359,9 @@ export class SegmentController {
    * @param {string} message - Human-readable fault message for the UI/console.
    */
   _onWorkerFault(segId, message) {
+    // A real fault during the init window supersedes the watchdog; cancel it so
+    // it can't fire a second, redundant fault later.
+    this._clearInitWatchdog();
     if (!this.faulted) {
       this.faulted = true;
       this.faultInfo = { segId, message };
@@ -561,8 +609,9 @@ export class SegmentController {
       // arbitrary error text and must never be parsed as markup.
       const box = document.createElement('div');
       box.style.cssText = 'color:#ff5252;padding:6px;font-size:0.85em';
-      box.append(
-        `⚠ Segment worker ${f ? f.segId : '?'} faulted — segmented render halted.`);
+      // segId < 0 is a pool-wide fault (e.g. the init watchdog), not one worker.
+      const who = !f ? 'worker ?' : (f.segId < 0 ? 'pool init' : `worker ${f.segId}`);
+      box.append(`⚠ Segment ${who} faulted — segmented render halted.`);
       box.appendChild(document.createElement('br'));
       const msg = document.createElement('span');
       msg.style.color = '#999';
