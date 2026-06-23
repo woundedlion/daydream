@@ -781,7 +781,10 @@
         return;
       }
 
-      // Start Memory Metrics Loop
+      // Start Memory Metrics Loop. Keep the timer handle so the self-
+      // rescheduling loop can be cancelled — previously it ran forever with no
+      // way to stop it.
+      let arenaMetricsTimer = null;
       function updateArenaMetrics() {
         if (MeshOpsWasm) {
           const m = MeshOpsWasm.getArenaMetrics();
@@ -791,8 +794,11 @@
             statsEl.innerText = `${fmt(m.tooling_arena)}`;
           }
         }
-        setTimeout(updateArenaMetrics, 500); // 2fps update is enough 
+        arenaMetricsTimer = setTimeout(updateArenaMetrics, 500); // 2fps update is enough
       }
+      window.addEventListener('pagehide', () => {
+        if (arenaMetricsTimer !== null) { clearTimeout(arenaMetricsTimer); arenaMetricsTimer = null; }
+      }, { once: true });
       updateArenaMetrics();
 
       // Initialize Three.js. The shared scaffold supplies the renderer / camera /
