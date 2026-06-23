@@ -274,6 +274,11 @@ export class Daydream {
     this.timeAccumulator = 0;
     this.labelAxes = false;
     this.cullBackSphere = false;
+    // Seam overlap for the persist-effect column gap-fill (see
+    // _updateCullUniforms): how far neighbouring pills overshoot the cell
+    // boundary so their straight bodies overlap. 1.0 = exact meet; higher
+    // closes any hairline seam at the cost of longer terminal caps.
+    this.columnFillOverlap = 1.15;
 
     // DOM stats elements are looked up and cached on first _updateStats() call.
     this._statsGroup = null;
@@ -585,7 +590,30 @@ export class Daydream {
       this.cullUniforms.uCullThreshold.value = this.cullBackSphere
         ? -Daydream.DOT_SIZE / Daydream.SPHERE_RADIUS
         : -2.0;
+      // Column gap-fill for persist (strobe == false) effects. The column cell
+      // half-arc at latitude phi is PI*SPHERE_RADIUS*sin(phi)/W; the shader
+      // extends each dot's straight middle out to it (forming a pill) so a lit
+      // run tiles flush and only its terminal caps round. uColumnFillArc carries
+      // the equator half-arc (PI*R/W), which the shader scales by sin(phi).
+      // columnFillOverlap overshoots the boundary slightly so neighbouring
+      // straight bodies overlap (no floating seam); it is exposed as a global
+      // GUI slider. Strobe (true) and the pre-effect default (undefined) leave
+      // it 0 so dots stay round — the strobe look the mesh already renders.
+      this.cullUniforms.uColumnFillArc.value = this._strobeColumns === false
+        ? this.columnFillOverlap * Math.PI * Daydream.SPHERE_RADIUS / Daydream.W
+        : 0;
     }
+  }
+
+  /**
+   * Set the active effect's POV column-strobe mode (from the engine's
+   * strobeColumns()). false (persist) fills the inter-column gaps so columns
+   * merge into a continuous band; true (strobe) leaves discrete dots with dark
+   * gaps. Applied via uColumnFillScale in _updateCullUniforms() each frame.
+   * @param {boolean} strobe - true to strobe columns, false to persist/smear.
+   */
+  setStrobeColumns(strobe) {
+    this._strobeColumns = strobe;
   }
 
   /**
@@ -664,18 +692,23 @@ export class Daydream {
         depthWrite: false
       });
 
-      // Uniforms for backface culling (updated per frame in render())
+      // Uniforms for backface culling + column gap-fill (updated per frame in
+      // _updateCullUniforms()). uColumnFillScale > 0 widens each dot east-west
+      // to fill the inter-column gap for persist (strobe == false) effects; 0
+      // leaves discrete dots with dark gaps for strobe effects.
       this.cullUniforms = {
         uCameraPos: { value: new THREE.Vector3(0, 0, 1) },
-        uCullThreshold: { value: -0.06 }
+        uCullThreshold: { value: -0.06 },
+        uColumnFillArc: { value: 0 }
       };
 
       this.dotMaterial.onBeforeCompile = (shader) => {
         shader.uniforms.uCameraPos = this.cullUniforms.uCameraPos;
         shader.uniforms.uCullThreshold = this.cullUniforms.uCullThreshold;
+        shader.uniforms.uColumnFillArc = this.cullUniforms.uColumnFillArc;
 
         // Inject uniforms declaration
-        shader.vertexShader = 'uniform vec3 uCameraPos;\nuniform float uCullThreshold;\n' + shader.vertexShader;
+        shader.vertexShader = 'uniform vec3 uCameraPos;\nuniform float uCullThreshold;\nuniform float uColumnFillArc;\n' + shader.vertexShader;
 
         shader.vertexShader = shader.vertexShader.replace(
           '#include <begin_vertex>',
@@ -686,8 +719,26 @@ export class Daydream {
              if (dot(instanceColor, instanceColor) < 0.00000001) {
                  transformed *= 0.0;
              }
-             // Backface cull: dot of instance position with camera direction
              vec3 instPos = (instanceMatrix[3]).xyz;
+             // Column gap-fill (persist effects, uColumnFillArc > 0): extend each
+             // dot east-west into a PILL whose STRAIGHT (full-radius) middle
+             // reaches the column-cell boundary, so a run of lit columns tiles
+             // flush — flat seams, no scalloping — and only the run's terminal
+             // caps stay rounded. The dot's local +x is the longitude (sweep)
+             // tangent after the per-instance lookAt. We TRANSLATE the two
+             // x-halves apart by ext (not scale — scaling a sphere yields an
+             // oval): the bridge between them becomes a full-radius cylinder and
+             // the original rounded caps ride OUT past the cell boundary into the
+             // neighbour cell. Where the neighbour is lit, its own straight body
+             // buries this cap (flat join); where the neighbour is dark (culled
+             // to nothing) the cap shows as the rounded terminal. ext = the cell
+             // half-arc = uColumnFillArc * sinPhi; sinPhi (latitude
+             // foreshortening from instPos) shrinks the cell toward the poles.
+             // Strobe effects pass uColumnFillArc == 0 -> round dots.
+             float sinPhi = length(instPos.xz) / max(length(instPos), 1e-6);
+             float ext = uColumnFillArc * sinPhi;
+             transformed.x += sign(transformed.x) * ext;
+             // Backface cull: dot of instance position with camera direction
              float facing = dot(normalize(instPos), normalize(uCameraPos));
              if (facing < uCullThreshold) {
                  transformed *= 0.0;
