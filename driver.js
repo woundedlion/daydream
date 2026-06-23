@@ -185,7 +185,11 @@ export class Daydream {
 
     this.camera = new THREE.PerspectiveCamera(
       Daydream.CAMERA_FOV,
-      this.canvas.width / this.canvas.height,
+      // Fall back to a square aspect if the canvas has no intrinsic size yet
+      // (0/0 = NaN), so the constructor-time projection is always finite.
+      // setCanvasSize() (called below, and again by the ResizeObserver) replaces
+      // this with the real container aspect once it has a layout.
+      this.canvas.width / this.canvas.height || 1,
       Daydream.CAMERA_NEAR,
       Daydream.CAMERA_FAR
     );
