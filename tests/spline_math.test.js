@@ -53,6 +53,13 @@ test('generateBezierCurve: needs >= 4 points', () => {
   assert.deepEqual(generateBezierCurve([{ x: 0, y: 0, z: 0 }], 4, lerpEval), []);
 });
 
+/** A zero/NaN sample count is degenerate (would divide by zero -> NaN points). */
+test('generateBezierCurve: non-positive sample count returns []', () => {
+  const pts = [{ x: 0, y: 0, z: 0 }, { x: 1, y: 1, z: 1 }, { x: 2, y: 2, z: 2 }, { x: 3, y: 3, z: 3 }];
+  assert.deepEqual(generateBezierCurve(pts, 0, lerpEval), []);
+  assert.deepEqual(generateBezierCurve(pts, NaN, lerpEval), []);
+});
+
 /** Verifies the sampled curve starts at p0, ends at p3, and has N+1 samples. */
 test('generateBezierCurve: endpoints hit p0/p3 and sample count is N+1', () => {
   const p0 = { x: 0, y: 0, z: 0 };
@@ -81,6 +88,13 @@ test('generateCatmullRomCurve: needs >= 2 points', () => {
   assert.deepEqual(
     generateCatmullRomCurve([{ x: 0, y: 0, z: 0 }], 0.5, 4, passThroughTangents, lerpEval, false),
     []);
+});
+
+/** A zero/NaN per-segment sample count is degenerate (divide by zero). */
+test('generateCatmullRomCurve: non-positive sample count returns []', () => {
+  const pts = [{ x: 0, y: 0, z: 0 }, { x: 1, y: 1, z: 1 }];
+  assert.deepEqual(generateCatmullRomCurve(pts, 0.5, 0, passThroughTangents, lerpEval, false), []);
+  assert.deepEqual(generateCatmullRomCurve(pts, 0.5, NaN, passThroughTangents, lerpEval, false), []);
 });
 
 /** Verifies the open curve has the expected sample count and passes through every control point. */
