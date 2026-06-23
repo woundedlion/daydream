@@ -8,6 +8,7 @@ import createHolosphereModule from "./holosphere_wasm.js";
 import { Daydream, SLOW_FRAME_MS } from "./driver.js";
 import { GUI, resetGUI } from "gui";
 import { EffectSidebar } from "./sidebar.js";
+import { resolveActiveEffect } from "./sidebar_logic.js";
 import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
 import { SegmentController } from "./segment_controller.js";
@@ -489,8 +490,9 @@ function applyResolution(preserveParams = false) {
   // effect GUI. Running it first would construct that GUI against the pre-resize
   // dot mesh / stale sidebar (a mid-resize double-apply).
   let effectChanged = false;
-  if (!availableEffects.includes(appState.get('effect'))) {
-    appState.set('effect', availableEffects[0]);
+  const resolvedEffect = resolveActiveEffect(availableEffects, appState.get('effect'));
+  if (resolvedEffect !== appState.get('effect')) {
+    appState.set('effect', resolvedEffect);
     effectChanged = true;
   }
 
