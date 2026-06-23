@@ -204,11 +204,16 @@ class DeepLinkGUI {
     const key = this._getKey(prop);
     const isFunction = typeof object[prop] === 'function';
 
-    // 1. Load initial value from URL (skip for buttons)
+    // 1. Load initial value from URL (skip for buttons). urlApplied tracks
+    // whether a URL value was actually accepted into the bound state; it gates
+    // the apply-on-load replay (step 3) so a rejected value never fires a
+    // spurious onChange that re-persists the default back to the URL.
     const params = getUrlParams();
+    let urlApplied = false;
     if (!isFunction && params.has(key)) {
       let val = params.get(key);
       const currentVal = object[prop];
+      urlApplied = true; // cleared below if any validation rejects the value
       if (typeof currentVal === 'number') {
         val = parseFloat(val);
         // A non-numeric deep link (?Speed=fast → NaN) must never reach the
@@ -216,6 +221,7 @@ class DeepLinkGUI {
         if (!Number.isFinite(val)) {
           console.warn(`DeepLinkGUI: ignoring non-numeric URL value "${params.get(key)}" for "${key}"`);
           val = currentVal;
+          urlApplied = false;
         } else {
           // Clamp to the control's registered range. lil-gui's numeric add()
           // signature is add(obj, prop, min, max, step), so the bounds (when
@@ -238,17 +244,19 @@ class DeepLinkGUI {
         } else {
           console.warn(`DeepLinkGUI: ignoring unrecognized boolean URL value "${params.get(key)}" for "${key}"`);
           val = currentVal;
+          urlApplied = false;
         }
       }
       // For an enumerated control, a URL value outside the option list would
       // poison state: lil-gui shows it unselected, and the applyOnLoad replay
       // (step 3) would push the bogus value through the caller's onChange —
       // re-injecting it into appState and re-persisting it to the URL even
-      // after upstream validation already corrected the value. Reject it and
-      // keep the already-validated bound value instead.
+      // after upstream validation already corrected the value. Reject it,
+      // clear urlApplied so step 3 doesn't replay, and keep the bound value.
       const allowed = optionValues(args[0]);
       if (allowed && !allowed.includes(val)) {
         console.warn(`DeepLinkGUI: ignoring out-of-range URL value "${params.get(key)}" for "${key}"`);
+        urlApplied = false;
       } else {
         object[prop] = val;
       }
@@ -257,15 +265,17 @@ class DeepLinkGUI {
     // 2. Create Controller
     const controller = this.gui.add(object, prop, ...args);
 
-    // 3. Attach URL/State Listener (skip for buttons). Apply-on-load when the
-    // value came from the URL so onChange-driven behavior runs at startup.
+    // 3. Attach URL/State Listener (skip for buttons). Apply-on-load only when a
+    // URL value was actually accepted — a rejected value left the bound default
+    // in place, so replaying onChange would just re-persist that default.
     if (!isFunction) {
       this._urlKeys.add(key);
-      this._attachUrlWriter(controller, (v) => this._urlWriter(key, v), params.has(key));
+      this._attachUrlWriter(controller, (v) => this._urlWriter(key, v), urlApplied);
     }
 
-    // 4. Update Display
-    if (!isFunction && params.has(key)) {
+    // 4. Update Display (only when a URL value was applied; a rejected value
+    // left the controller showing its default already).
+    if (!isFunction && urlApplied) {
       try { controller.updateDisplay(); }
       catch (e) { console.warn(`DeepLinkGUI: updateDisplay failed for "${key}":`, e); }
     }
@@ -287,10 +297,12 @@ class DeepLinkGUI {
     // parser, which silently accepts garbage and renders a broken swatch. Reject
     // anything that is not a valid color literal and keep the bound default.
     const params = getUrlParams();
+    let urlApplied = false;
     if (params.has(key)) {
       const urlVal = params.get(key);
       if (isValidColorString(urlVal)) {
         object[prop] = urlVal;
+        urlApplied = true;
       } else {
         console.warn(`DeepLinkGUI: ignoring invalid URL color "${urlVal}" for "${key}"`);
       }
@@ -299,7 +311,9 @@ class DeepLinkGUI {
     // 2. Create Controller
     const controller = this.gui.addColor(object, prop);
 
-    // 3. Attach URL/State Listener
+    // 3. Attach URL/State Listener. Apply-on-load only when the URL color was
+    // valid and applied — a rejected color left the bound default, so replaying
+    // onChange would just re-persist that default.
     this._urlKeys.add(key);
     this._attachUrlWriter(controller, (v) => {
       let strVal = v;
@@ -309,10 +323,10 @@ class DeepLinkGUI {
         strVal = `rgb(${v[0]},${v[1]},${v[2]})`;
       }
       this._urlWriter(key, strVal);
-    }, params.has(key));
+    }, urlApplied);
 
     // 4. Update Display
-    if (params.has(key)) {
+    if (urlApplied) {
       try { controller.updateDisplay(); }
       catch (e) { console.warn(`DeepLinkGUI: updateDisplay failed for "${key}":`, e); }
     }
