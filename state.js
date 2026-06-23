@@ -245,7 +245,10 @@ export class URLSync {
       if (val === null) params.delete(key);
       else params.set(key, val);
     }
-    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+    // Omit the '?' entirely when there are no params, so clearing every query
+    // key leaves a clean pathname instead of a dangling "path?".
+    const qs = params.toString();
+    window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
     // Everything is written to the URL now; drop the buffer so the (excluded)
     // entries retained above can't override a tracked key on a later flush.
     this._adhoc.clear();
@@ -285,7 +288,10 @@ export class URLSync {
       if (val === null) params.delete(key);
       else params.set(key, val);
     }
-    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    // Omit the '?' entirely when there are no params (see flush()), so a fully
+    // cleared query leaves a clean pathname rather than a dangling "path?".
+    const qs = params.toString();
+    const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState({}, '', newUrl);
     // The URL is now the store of record for these values (the next flush re-reads
     // them from window.location.search). Clear the pending-write buffer so a stale
