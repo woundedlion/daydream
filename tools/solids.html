@@ -1057,14 +1057,14 @@
 
       const title = state.base.replace(/([A-Z])/g, ' $1').trim();
 
-      // Get current counts from currentMesh
+      // Get current counts from currentMesh. Derive the edge count directly from
+      // the faces (not currentMesh.edgeCount, which is only set on a successful
+      // renderMesh pass — after a failed op chain it would be stale/0).
       const vCount = currentMesh.vertices.length;
       const fCount = currentMesh.faces.length;
-      const eCount = currentMesh.edgeCount || 0;
+      const eCount = uniqueEdges(currentMesh.faces, vCount).length;
       let iCount = 0;
-      if (currentMesh && currentMesh.faces) {
-        currentMesh.faces.forEach(f => iCount += f.length);
-      }
+      currentMesh.faces.forEach(f => iCount += f.length);
 
       // Generate summary
       const opsSummary = state.ops.map(o => {
@@ -1086,7 +1086,7 @@
         thumb: dataURL,
         title: title,
         desc: opsSummary,
-        stats: `${vCount}V ${eCount}E ${fCount}F`,
+        stats: `${vCount}V ${eCount}E ${fCount}F ${iCount}I`,
         vCount, fCount, iCount
       };
 
