@@ -668,6 +668,11 @@ let testAllInterval = null;
 guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => {
   if (v) {
     testAllInterval = setInterval(() => {
+      // Skip ticks while the engine is still loading (wasmEngine === null): the
+      // effect subscriber's applyEffect() no-ops on the engine until it exists
+      // (it guards `if (wasmEngine)`), so advancing here would only churn
+      // appState through the roster and apply nothing. Resume once it's ready.
+      if (!wasmEngine) return;
       const currentList = effectsByResolution[appState.get('resolution')];
       // Skip the tick if the active resolution has no effect list (unmapped):
       // otherwise currentList.indexOf below throws on undefined.
