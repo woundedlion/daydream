@@ -35,5 +35,10 @@
 export function resolveParamSync(current, incoming, isBoolean, isEditing) {
   const value = isBoolean ? incoming > 0.5 : incoming;
   if (isEditing) return { update: false, value };
+  // A NaN engine value (e.g. an uninitialized or garbage param) compares
+  // unequal to everything, so `current !== value` would be true every frame —
+  // re-running updateDisplay forever and writing NaN into the controller. A NaN
+  // is never a value worth adopting, so treat it as no-change.
+  if (typeof value === 'number' && Number.isNaN(value)) return { update: false, value };
   return { update: current !== value, value };
 }

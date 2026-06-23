@@ -40,3 +40,13 @@ test('boolean: editing suppresses a flip', () => {
   assert.deepEqual(resolveParamSync(false, 1, true, true),
     { update: false, value: true });
 });
+
+test('numeric: a NaN engine value never updates (no per-frame churn)', () => {
+  // NaN !== anything, so without the guard this would update every frame and
+  // write NaN into the controller.
+  assert.deepEqual(resolveParamSync(0.5, NaN, false, false),
+    { update: false, value: NaN });
+  // Even when the controller already holds NaN, still no update.
+  assert.deepEqual(resolveParamSync(NaN, NaN, false, false),
+    { update: false, value: NaN });
+});
