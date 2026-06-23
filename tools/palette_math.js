@@ -21,6 +21,7 @@
 // palettes.html.
 
 import { srgbToLinearFloat } from './color.js';
+import { formatFloatCpp } from './cpp_format.js';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -398,7 +399,11 @@ export function mapValue(value, fromMin, fromMax, toMin, toMax) {
  * @returns {string} The C++ ProceduralPalette initializer source.
  */
 export function proceduralPaletteCpp(parameters) {
-  const f = (n) => n.toFixed(3) + 'f';
+  // Shared C++ float formatter at 3-digit precision (the cosine coefficients are
+  // small magnitudes). Unlike the former bespoke `n.toFixed(3) + 'f'`, this
+  // trims trailing zeros (0.5 -> "0.5f", not "0.500f") and is scientific-
+  // notation-safe, matching the other tool generators.
+  const f = (n) => formatFloatCpp(n, 3);
   const v = (r, g, b) => `{${f(r)}, ${f(g)}, ${f(b)}}`;
   return `ProceduralPalette palette(${v(parameters.A_R, parameters.A_G, parameters.A_B)},  // A
                           ${v(parameters.B_R, parameters.B_G, parameters.B_B)},  // B

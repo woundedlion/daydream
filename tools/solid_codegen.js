@@ -13,6 +13,8 @@
  * three.js dependency.
  */
 
+import { formatFloatCpp } from './cpp_format.js';
+
 // The Conway/SolidBuilder operators this generator knows how to emit. An op
 // outside this set would be pasted verbatim (`.op()`) into non-compiling C++
 // that only fails at engine compile time, so generateFuncAndRecipe rejects it.
@@ -27,21 +29,11 @@ const KNOWN_OPS = new Set([
 // and the check also stops an unexpected caller from injecting arbitrary text.
 const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-/**
- * Formats a number as a C++ float literal, keeping at least one fractional digit
- * and an `f` suffix, to satisfy C++ strictness and convention.
- * @param {number} val - The numeric value to format.
- * @returns {string} The C++ float literal (e.g. 0.5 -> "0.5f", 2 -> "2.0f").
- */
-export function formatFloat(val) {
-  // Route through toFixed, not val.toString(): toString emits scientific
-  // notation for extreme magnitudes (e.g. 1e-7), which is not a valid C++ float
-  // literal. Trim trailing zeros but keep one fractional digit so whole values
-  // stay valid literals (2 -> "2.0f"), matching spline_math/lissajous formatters.
-  let s = val.toFixed(6).replace(/(\.\d*?)0+$/, '$1');
-  if (s.endsWith('.')) s += '0';
-  return s + 'f';
-}
+// C++ float-literal formatter — the shared formatFloatCpp (cpp_format.js).
+// Re-exported under the historical `formatFloat` name so solids.html and the
+// recipe builders below keep their call sites; output is identical (6-digit
+// toFixed + trailing-zero trim + `f` suffix, scientific-notation-safe).
+export const formatFloat = formatFloatCpp;
 
 /**
  * Builds a stable, unambiguous suffix for a fractional op parameter (0..1+).
