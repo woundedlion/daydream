@@ -223,9 +223,10 @@ export class Daydream {
 
     this.setupDots();
 
+    // No linewidth: the WebGL renderer ignores LineBasicMaterial.linewidth
+    // (always draws 1px), so setting it is dead, misleading config.
     this.axisMaterial = new THREE.LineBasicMaterial({
-      color: 0xffffff,
-      linewidth: 5
+      color: 0xffffff
     });
 
     // Diametric axis lines, drawn at 0.95 of the sphere radius; hidden until the

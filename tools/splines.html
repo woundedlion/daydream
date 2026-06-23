@@ -233,7 +233,8 @@
       const verts = points.map(p => new THREE.Vector3(p.x, p.y, p.z));
       const geo = new THREE.BufferGeometry().setFromPoints(verts);
       const mat = new THREE.LineBasicMaterial({
-        color, linewidth: 2, transparent: true, opacity: 0.9,
+        // linewidth is a no-op in the WebGL renderer (always 1px); omitted.
+        color, transparent: true, opacity: 0.9,
         depthWrite: false, depthTest: false
       });
       const line = new THREE.Line(geo, mat);
