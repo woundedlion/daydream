@@ -70,10 +70,14 @@ test('findBestRationalRatio: simplest form preferred (0.5 → 1/2 not 2/4)', () 
   assert.equal(N, 2);
 });
 
-/** Verifies the degenerate input 0 returns the fraction 1/1. */
-test('findBestRationalRatio: value 0 returns 1/1', () => {
+/**
+ * Verifies the input 0 returns the fraction 0/1 (its exact value), so a
+ * deliberately-zeroed frequency stays zero rather than snapping up to the
+ * passive frequency.
+ */
+test('findBestRationalRatio: value 0 returns 0/1 (stays zero, no snap-up)', () => {
   const { M, N } = findBestRationalRatio(0);
-  assert.equal(M, 1);
+  assert.equal(M, 0);
   assert.equal(N, 1);
 });
 

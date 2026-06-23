@@ -61,7 +61,10 @@ export const lissajous = (m1, m2, a, t) => {
  * @returns {{ M: number, N: number }} The best simple rational ratio.
  */
 export const findBestRationalRatio = (value, maxDenominator = 8) => {
-  if (value === 0) return { M: 1, N: 1 };
+  // 0 is exactly the fraction 0/1, not 1/1. Returning {M:0,N:1} keeps a
+  // deliberately-zeroed frequency at zero (snappedActiveC = passiveC·0/1 = 0)
+  // instead of snapping it up to the passive frequency (passiveC·1/1).
+  if (value === 0) return { M: 0, N: 1 };
 
   // The M/N grid below is strictly positive, so a negative target would otherwise
   // snap to the closest positive ratio (wrong magnitude AND wrong sign). Split the
