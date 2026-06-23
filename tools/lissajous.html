@@ -171,7 +171,9 @@
       }
 
       const points = [];
-      const segments = parseInt(state.Samples);
+      // state.Samples is already a rounded integer (set via Math.round on every
+      // slider change), so no parseInt/string round-trip is needed.
+      const segments = state.Samples;
       const domain = state.Duration;
 
       for (let i = 0; i <= segments; i++) {
