@@ -49,6 +49,23 @@ export function navTargetIndex(idx, len, key) {
 }
 
 /**
+ * Resolve which effect should be active for a resolution's offered list. The
+ * requested effect (from app state, including a `?effect=` deep link) is kept
+ * when the resolution offers it; otherwise it falls back to the list's first
+ * entry. The fallback is what stops an off-list request — a different-resolution
+ * effect or a stale/garbage deep link — from leaving the canvas black.
+ * @param {Array<string>} availableEffects - Effects offered at this resolution.
+ * @param {string} currentEffect - The requested/active effect name.
+ * @returns {string} The effect to activate: currentEffect if offered, else the
+ *   first available effect (undefined only when the list is empty).
+ */
+export function resolveActiveEffect(availableEffects, currentEffect) {
+  return availableEffects.includes(currentEffect)
+    ? currentEffect
+    : availableEffects[0];
+}
+
+/**
  * Decide which horizontal scroll arrows should be visible. When the content
  * fits (no overflow) neither arrow shows; otherwise the left arrow shows once
  * scrolled past a 4px deadzone from the start, and the right arrow shows until
