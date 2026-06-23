@@ -413,6 +413,10 @@
       renderer.domElement.addEventListener('mousedown', onMouseDown);
       renderer.domElement.addEventListener('mouseup', onMouseUp);
       renderer.domElement.addEventListener('mousemove', onMouseMove);
+
+      // Wire the scaffold's dispose() to teardown — it stops the render loop and
+      // detaches the resize listener, which previously leaked on page unload.
+      window.addEventListener('pagehide', () => result.dispose(), { once: true });
     }
 
     // --- UI wiring ---
@@ -496,7 +500,11 @@
     }
 
     // --- Bootstrap ---
-    window.onload = async () => {
+    // addEventListener (not window.onload =) avoids clobbering any other load
+    // handler. The inner try/catch surfaces a synchronous initUI/initThree
+    // failure (a bare window.onload assignment would swallow it) distinctly from
+    // the WASM-load failure handled above.
+    window.addEventListener('load', async () => {
       try {
         WasmModule = await createHolosphereModule();
       } catch (e) {
@@ -506,9 +514,14 @@
           + 'target and reload.');
         return;
       }
-      initUI();
-      initThree();
-    };
+      try {
+        initUI();
+        initThree();
+      } catch (e) {
+        console.error('Spline tool failed to initialize:', e);
+        showFatalError('The spline tool failed to initialize — see the browser console for details.');
+      }
+    });
   </script>
 </body>
 
