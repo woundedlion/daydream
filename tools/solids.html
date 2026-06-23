@@ -442,7 +442,7 @@
     <div class="space-y-2 flex-1 overflow-hidden flex flex-col">
       <div class="flex items-center justify-between">
         <label class="text-xs uppercase font-semibold text-slate-400">Operations</label>
-        <button onclick="resetOps()"
+        <button id="clearOpsBtn"
           class="text-[0.65rem] text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear
           All</button>
       </div>
@@ -451,39 +451,42 @@
       </div>
 
       <label class="text-xs uppercase font-semibold text-slate-400 mt-4">Add Operation</label>
-      <div class="grid grid-cols-2 gap-2 pt-1">
-        <button onclick="addOp('kis')" class="btn btn-secondary text-[0.65rem]">Kis</button>
-        <button onclick="addOp('ambo')" class="btn btn-secondary text-[0.65rem]">Ambo</button>
-        <button onclick="addOp('gyro')" class="btn btn-secondary text-[0.65rem]">Gyro</button>
-        <button onclick="addOp('snub')" class="btn btn-secondary text-[0.65rem]">Snub</button>
-        <button onclick="addOp('dual')" class="btn btn-secondary text-[0.65rem]">Dual</button>
-        <button onclick="addOp('truncate')" class="btn btn-secondary text-[0.65rem]">Truncate</button>
-        <button onclick="addOp('chamfer')" class="btn btn-secondary text-[0.65rem]">Chamfer</button>
-        <button onclick="addOp('expand')" class="btn btn-secondary text-[0.65rem]">Expand</button>
-        <button onclick="addOp('hankin')" class="btn btn-secondary text-[0.65rem]">Hankin</button>
-        <button onclick="addOp('relax')" class="btn btn-secondary text-[0.65rem]">Relax</button>
-        <button onclick="addOp('meta')" class="btn btn-secondary text-[0.65rem] relative group">
+      <!-- Add-operation buttons carry the op name in data-op; a single delegated
+           click listener (wired in init) dispatches to addOp, so no handler is
+           pinned to window. -->
+      <div id="addOpGrid" class="grid grid-cols-2 gap-2 pt-1">
+        <button data-op="kis" class="btn btn-secondary text-[0.65rem]">Kis</button>
+        <button data-op="ambo" class="btn btn-secondary text-[0.65rem]">Ambo</button>
+        <button data-op="gyro" class="btn btn-secondary text-[0.65rem]">Gyro</button>
+        <button data-op="snub" class="btn btn-secondary text-[0.65rem]">Snub</button>
+        <button data-op="dual" class="btn btn-secondary text-[0.65rem]">Dual</button>
+        <button data-op="truncate" class="btn btn-secondary text-[0.65rem]">Truncate</button>
+        <button data-op="chamfer" class="btn btn-secondary text-[0.65rem]">Chamfer</button>
+        <button data-op="expand" class="btn btn-secondary text-[0.65rem]">Expand</button>
+        <button data-op="hankin" class="btn btn-secondary text-[0.65rem]">Hankin</button>
+        <button data-op="relax" class="btn btn-secondary text-[0.65rem]">Relax</button>
+        <button data-op="meta" class="btn btn-secondary text-[0.65rem] relative group">
           Meta
           <span
             class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
             Kis(Ambo(x))
           </span>
         </button>
-        <button onclick="addOp('needle')" class="btn btn-secondary text-[0.65rem] relative group">
+        <button data-op="needle" class="btn btn-secondary text-[0.65rem] relative group">
           Needle
           <span
             class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
             Kis(Dual(x))
           </span>
         </button>
-        <button onclick="addOp('zip')" class="btn btn-secondary text-[0.65rem] relative group">
+        <button data-op="zip" class="btn btn-secondary text-[0.65rem] relative group">
           Zip
           <span
             class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
             Dual(Kis(x))
           </span>
         </button>
-        <button onclick="addOp('bevel')" class="btn btn-secondary text-[0.65rem] relative group">
+        <button data-op="bevel" class="btn btn-secondary text-[0.65rem] relative group">
           Bevel
           <span
             class="absolute hidden group-hover:block bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black text-white text-[0.5rem] p-1 rounded whitespace-nowrap z-50">
@@ -525,7 +528,7 @@
   <div id="right-sidebar">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-bold text-white">Saved Solids</h2>
-      <button onclick="clearSavedSolids()"
+      <button id="clearSavedBtn"
         class="text-xs text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear All</button>
     </div>
     <div id="savedList" class="flex-1 overflow-y-auto">
@@ -884,6 +887,17 @@
 
       document.getElementById('saveBtn').addEventListener('click', saveSolid);
 
+      // Static control buttons — wired here rather than via inline onclick so
+      // their handlers stay module-scoped (no window.* globals). The add-op grid
+      // uses one delegated listener that reads the clicked button's data-op
+      // (closest() so a click on a tooltip span still resolves the button).
+      document.getElementById('clearOpsBtn').addEventListener('click', resetOps);
+      document.getElementById('clearSavedBtn').addEventListener('click', clearSavedSolids);
+      document.getElementById('addOpGrid').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-op]');
+        if (btn) addOp(btn.dataset.op);
+      });
+
       // Generate Thumbnails
       generateThumbnails();
 
@@ -1127,43 +1141,59 @@
       savedSolids.forEach((item, index) => {
         const el = document.createElement('div');
         el.className = 'saved-item relative pr-6'; // Added relative + right padding space
+        // The card markup carries no inline handlers; the action buttons are
+        // wired below via addEventListener so deleteSolid/copyCode stay module-
+        // scoped (no window.* globals) and no handler-bearing string is parsed.
         el.innerHTML = `
-          <button class="action-btn del-btn absolute top-2 right-2 flex items-center justify-center w-5 h-5 text-sm" onclick="deleteSolid(${index}); event.stopPropagation();">&times;</button>
+          <button class="action-btn del-btn absolute top-2 right-2 flex items-center justify-center w-5 h-5 text-sm">&times;</button>
           <img src="${item.thumb}" alt="${item.title}" />
           <div class="flex justify-between items-start mt-1">
             <div class="title capitalize">${item.title}</div>
             <div class="text-[0.55rem] font-mono text-indigo-400 opacity-60">${item.stats}</div>
           </div>
           <div class="details uppercase opacity-70">${item.desc}</div>
-          <div class="saved-actions" onclick="event.stopPropagation()">
+          <div class="saved-actions">
             <div class="flex flex-col gap-1 w-full">
               <div class="flex gap-1 justify-end">
                 <span class="text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1">Recipe</span>
-                <button class="action-btn" onclick="copyCode(${index}, 'recipe_cpp', this)">C++</button>
+                <button class="action-btn" data-copy="recipe_cpp">C++</button>
               </div>
               <div class="flex gap-1 justify-end">
                 <span class="text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1">Registry</span>
-                <button class="action-btn" onclick="copyCode(${index}, 'registry', this)">C++</button>
+                <button class="action-btn" data-copy="registry">C++</button>
               </div>
             </div>
           </div>
         `;
         el.onclick = () => restoreSolid(item);
+
+        // stopPropagation on the action controls so they don't also trigger the
+        // card's restore click (previously inline `event.stopPropagation()`).
+        el.querySelector('.del-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteSolid(index);
+        });
+        el.querySelector('.saved-actions').addEventListener('click', (e) => e.stopPropagation());
+        el.querySelectorAll('[data-copy]').forEach((btn) => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            copyCode(index, btn.dataset.copy, btn);
+          });
+        });
+
         list.insertBefore(el, list.firstChild); // Newest first
       });
     }
 
-    // The handlers below are attached to `window` on purpose: the saved-solids
-    // list and op-chain rows are built as HTML strings with inline onclick/
-    // oninput attributes, which the browser evaluates in global scope and so
-    // can only reach functions on `window`. Keep new handlers consistent with
-    // that pattern, or move the generated markup to addEventListener wiring.
-    window.deleteSolid = (index) => {
+    // These handlers are module-scoped and bound via addEventListener where the
+    // generated markup needs them (saved-solids cards and op-chain rows), so no
+    // function is pinned to window. Keep new handlers wired the same way.
+    function deleteSolid(index) {
       savedSolids.splice(index, 1);
       renderSavedList();
-    };
+    }
 
-    window.copyCode = (index, lang, btn) => {
+    function copyCode(index, lang, btn) {
       const item = savedSolids[index];
 
       let code = '';
@@ -1191,7 +1221,7 @@
 
       copyWithFeedback(code, { element: btn, copiedClasses: ['text-green-400'] })
         .then(() => console.log(`${lang.toUpperCase()} copied!`));
-    };
+    }
 
     function restoreSolid(item) {
       state.base = item.base;
@@ -1227,10 +1257,10 @@
       // defer stats update to after mesh generation logic in update()
     }
 
-    window.enableDrag = (e) => {
+    function enableDrag(e) {
       const item = e.target.closest('.op-item');
       if (item) item.draggable = true;
-    };
+    }
 
     // Helper: Calculate insertion index based on static layout (ignoring transforms)
     function getDragTargetIndex(e, list) {
@@ -1344,19 +1374,17 @@
           Object.keys(opDef.params).forEach(key => {
             const def = opDef.params[key];
             const val = o.params[key];
+            // data-key tags the row; the inputs are wired via addEventListener
+            // after innerHTML (no inline oninput/onchange/onmousedown attrs).
             controlsHtml += `
-              <div class="flex items-center text-[0.6rem] space-x-1" draggable="false">
+              <div class="op-param flex items-center text-[0.6rem] space-x-1" data-key="${key}" draggable="false">
                 <span class="w-12 text-slate-400 capitalize truncate">${key}</span>
-                <input type="range" 
+                <input type="range"
                   min="${def.min}" max="${def.max}" step="${def.step}" value="${val}"
                   class="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer min-w-0"
-                  oninput="updateOpParam(${i}, '${key}', this.value)"
-                  onmousedown="event.stopPropagation()"
                 />
                 <input type="number" min="${def.min}" max="${def.max}" step="${def.step}" value="${Number(val).toFixed(2)}"
                   class="w-12 bg-transparent text-right font-mono text-slate-500 focus:outline-none focus:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  onchange="updateOpParam(${i}, '${key}', this.value)"
-                  onmousedown="event.stopPropagation()"
                 />
                 <span class="text-[0.5rem] text-slate-600 ml-0.5">${key === 'angle' ? 'deg' : ''}</span>
               </div>
@@ -1368,20 +1396,38 @@
         el.innerHTML = `
         <div class="flex justify-between items-center w-full" draggable="false">
           <div class="flex items-center">
-            <div class="drag-handle" onmousedown="enableDrag(event)" ontouchstart="enableDrag(event)">
+            <div class="drag-handle">
               <svg viewBox="0 0 24 24"><path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
             </div>
             <span class="font-bold">${i + 1}. ${o.op.toUpperCase()}</span>
           </div>
-          <button onclick="removeOp(${i})" class="text-slate-500 hover:text-white" draggable="false">&times;</button>
+          <button class="remove-op-btn text-slate-500 hover:text-white" draggable="false">&times;</button>
         </div>
         ${controlsHtml}
       `;
+
+        // Wire the drag handle, remove button, and per-param inputs without
+        // inline attributes — handlers stay module-scoped (no window.*).
+        const handle = el.querySelector('.drag-handle');
+        handle.addEventListener('mousedown', enableDrag);
+        handle.addEventListener('touchstart', enableDrag);
+        el.querySelector('.remove-op-btn').addEventListener('click', () => removeOp(i));
+        el.querySelectorAll('.op-param').forEach((row) => {
+          const key = row.dataset.key;
+          const range = row.querySelector('input[type="range"]');
+          const number = row.querySelector('input[type="number"]');
+          range.addEventListener('input', (e) => updateOpParam(i, key, e.target.value));
+          number.addEventListener('change', (e) => updateOpParam(i, key, e.target.value));
+          // Don't let an input drag start the row reorder (was inline onmousedown).
+          range.addEventListener('mousedown', (e) => e.stopPropagation());
+          number.addEventListener('mousedown', (e) => e.stopPropagation());
+        });
+
         list.appendChild(el);
       });
     }
 
-    window.updateOpParam = (index, key, value) => {
+    function updateOpParam(index, key, value) {
       // Clamp to the op's declared range and reject non-numeric input before it
       // reaches state — the number box has no inherent bounds and the WASM mesh
       // boundary is deliberately fail-fast, so an out-of-range or NaN value
@@ -1407,15 +1453,15 @@
         if (input) input.value = val.toFixed(2);
       }
       scheduleUpdate();
-    };
+    }
 
-    window.removeOp = (index) => {
+    function removeOp(index) {
       state.ops.splice(index, 1);
       renderOps();
       update();
-    };
+    }
 
-    window.addOp = (opName) => {
+    function addOp(opName) {
       const def = OP_DEFS[opName];
       const newOp = { op: opName, params: {} };
       if (def && def.params) {
@@ -1430,18 +1476,18 @@
       state.ops.push(newOp);
       renderOps();
       update();
-    };
+    }
 
-    window.resetOps = () => {
+    function resetOps() {
       state.ops = [];
       renderOps();
       update();
-    };
+    }
 
-    window.clearSavedSolids = () => {
+    function clearSavedSolids() {
       savedSolids.length = 0;
       renderSavedList();
-    };
+    }
 
     function update() {
       if (!WasmModule || !MeshOpsWasm) return;
