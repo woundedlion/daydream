@@ -36,6 +36,10 @@ export function vec3Normalize(v) {
  */
 export function generateBezierCurve(pts, numSamples, evalFn) {
   if (pts.length < 4) return [];
+  // numSamples is the divisor for t = i / numSamples; a zero or non-positive
+  // count would divide by zero and emit NaN points. Treat it as degenerate.
+  // The `!(n >= 1)` form also rejects NaN.
+  if (!(numSamples >= 1)) return [];
   const result = [];
   for (let i = 0; i <= numSamples; i++) {
     const t = i / numSamples;
@@ -59,6 +63,9 @@ export function generateBezierCurve(pts, numSamples, evalFn) {
 export function generateCatmullRomCurve(pts, tension, numSamplesPerSeg, tangentFn, evalFn, closed) {
   const n = pts.length;
   if (n < 2) return [];
+  // numSamplesPerSeg is the divisor for t = j / numSamplesPerSeg; a zero or
+  // non-positive count would divide by zero and emit NaN points. Degenerate.
+  if (!(numSamplesPerSeg >= 1)) return [];
   const result = [];
   const segCount = closed ? n : n - 1;
 
@@ -139,9 +146,13 @@ export function randomPointOnSphere(rng = Math.random) {
     s = v1*v1 + v2*v2;
   } while (s >= 1 || s === 0);
   const sq = Math.sqrt(1 - s);
-  return vec3Normalize({
+  // Unit by construction (Marsaglia): with s = v1²+v2² in (0,1),
+  // (2·v1·√(1-s))² + (2·v2·√(1-s))² + (1-2s)² = 4s(1-s) + (1-2s)² = 1.
+  // The loop already excludes s == 0 and s >= 1, so no degenerate case — no
+  // vec3Normalize needed.
+  return {
     x: 2 * v1 * sq,
     y: 2 * v2 * sq,
     z: 1 - 2 * s
-  });
+  };
 }
