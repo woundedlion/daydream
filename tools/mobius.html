@@ -530,15 +530,34 @@
       const dotElement = document.getElementById(dotId);
       const labelElement = document.getElementById(labelId);
 
+      // Cache the last strings written to the DOM so a preset animation (which
+      // calls applyConfig -> updateUI every frame) only touches the label/dot
+      // when their rounded values actually change. Both outputs are quantized
+      // (2-decimal text, clamped percent), so most frames are no-ops; skipping
+      // them avoids ~12 redundant text/style mutations per frame at 60 Hz while
+      // the shader uniforms keep updating every frame.
+      let lastLabel = null, lastLeft = null, lastTop = null;
       const updateUI = () => {
         const re = paramObj.re;
         const im = paramObj.im;
         const sign = im >= 0 ? '+' : '-';
-        labelElement.textContent = `${re.toFixed(2)} ${sign} ${Math.abs(im).toFixed(2)}i`;
+        const label = `${re.toFixed(2)} ${sign} ${Math.abs(im).toFixed(2)}i`;
+        if (label !== lastLabel) {
+          labelElement.textContent = label;
+          lastLabel = label;
+        }
         const xPercent = ((re / maxExtent) * 0.5 + 0.5) * 100;
         const yPercent = ((-im / maxExtent) * 0.5 + 0.5) * 100;
-        dotElement.style.left = `${Math.min(100, Math.max(0, xPercent))}%`;
-        dotElement.style.top = `${Math.min(100, Math.max(0, yPercent))}%`;
+        const left = `${Math.min(100, Math.max(0, xPercent))}%`;
+        const top = `${Math.min(100, Math.max(0, yPercent))}%`;
+        if (left !== lastLeft) {
+          dotElement.style.left = left;
+          lastLeft = left;
+        }
+        if (top !== lastTop) {
+          dotElement.style.top = top;
+          lastTop = top;
+        }
       };
 
       uiUpdaters[id] = updateUI;
