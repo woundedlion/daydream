@@ -153,6 +153,80 @@ test('DeepLinkGUI.add with no matching URL param keeps the default', () => {
 });
 
 /**
+ * Verifies the numeric (slider) path clamps an out-of-range URL value to the
+ * control's registered min/max — the add(obj, prop, min, max) bounds. A deep
+ * link past the slider range must land at the boundary, not drive the engine
+ * out of range, and the clamped value replays through onChange.
+ */
+test('DeepLinkGUI.add clamps an out-of-range numeric URL value to the slider min/max', () => {
+  installWindow('?speed=99');
+  const guiHi = new DeepLinkGUI({ autoPlace: false });
+  const objHi = { speed: 1.0 };
+  const hi = [];
+  guiHi.add(objHi, 'speed', 0, 10).onChange((v) => hi.push(v));
+  assert.equal(objHi.speed, 10, 'value above max clamps to max');
+  assert.deepEqual(hi, [10], 'the clamped value replays through onChange');
+
+  installWindow('?speed=-5');
+  const guiLo = new DeepLinkGUI({ autoPlace: false });
+  const objLo = { speed: 1.0 };
+  const lo = [];
+  guiLo.add(objLo, 'speed', 0, 10).onChange((v) => lo.push(v));
+  assert.equal(objLo.speed, 0, 'value below min clamps to min');
+  assert.deepEqual(lo, [0]);
+});
+
+/**
+ * Verifies a non-numeric URL value for a numeric control (e.g. ?speed=fast →
+ * NaN) is rejected: the bound default is kept and no applyOnLoad replay fires, so
+ * a malformed deep link never reaches the engine as NaN.
+ */
+test('DeepLinkGUI.add rejects a non-numeric URL value for a slider', () => {
+  installWindow('?speed=fast');
+  const gui = new DeepLinkGUI({ autoPlace: false });
+  const obj = { speed: 1.0 };
+  const replayed = [];
+  gui.add(obj, 'speed', 0, 10).onChange((v) => replayed.push(v));
+  assert.equal(obj.speed, 1.0, 'NaN URL value falls back to the bound default');
+  assert.deepEqual(replayed, []);
+});
+
+/**
+ * Verifies the boolean (checkbox) path adopts the common truthy/falsy spellings
+ * a hand-edited or shared deep link can carry (on/1/yes/true, off/0/no/false),
+ * adopting and replaying each, while an unrecognized token keeps the default and
+ * does not replay.
+ */
+test('DeepLinkGUI.add maps boolean URL spellings for a checkbox', () => {
+  for (const truthy of ['true', '1', 'yes', 'on']) {
+    installWindow(`?glow=${truthy}`);
+    const gui = new DeepLinkGUI({ autoPlace: false });
+    const obj = { glow: false };
+    const replayed = [];
+    gui.add(obj, 'glow').onChange((v) => replayed.push(v));
+    assert.equal(obj.glow, true, `"${truthy}" adopted as true`);
+    assert.deepEqual(replayed, [true]);
+  }
+  for (const falsy of ['false', '0', 'no', 'off']) {
+    installWindow(`?glow=${falsy}`);
+    const gui = new DeepLinkGUI({ autoPlace: false });
+    const obj = { glow: true };
+    const replayed = [];
+    gui.add(obj, 'glow').onChange((v) => replayed.push(v));
+    assert.equal(obj.glow, false, `"${falsy}" adopted as false`);
+    assert.deepEqual(replayed, [false]);
+  }
+  // An unrecognized token keeps the bound default and does not replay.
+  installWindow('?glow=maybe');
+  const gui = new DeepLinkGUI({ autoPlace: false });
+  const obj = { glow: false };
+  const replayed = [];
+  gui.add(obj, 'glow').onChange((v) => replayed.push(v));
+  assert.equal(obj.glow, false, 'unrecognized boolean keeps the default');
+  assert.deepEqual(replayed, []);
+});
+
+/**
  * Verifies the tool-page fallback writer (no active URLSync) merges, not
  * overwrites, params changed within the debounce window: two keys set before
  * the shared timer fires must both reach the URL so neither is lost from the
