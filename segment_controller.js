@@ -220,6 +220,17 @@ export class SegmentController {
           // invariant. The pool is halted until re-created, so the result is
           // moot — ignore the frame.
           if (this.faulted) return;
+          // segId indexes the per-segment results/timings/renderUs/arenas
+          // arrays; a value outside [0, numSegments) would write past them.
+          // The controller assigns each worker's segId, so an out-of-range
+          // value is a protocol violation, not a normal condition — drop the
+          // frame loudly (without decrementing `pending`, since this is not one
+          // of the expected responses) rather than corrupting state.
+          if (msg.segId < 0 || msg.segId >= numSegments) {
+            console.error(`[Segmented] frame from out-of-range segId ${msg.segId} `
+              + `(expected 0..${numSegments - 1}); dropping`);
+            return;
+          }
           // Drop results from a render dispatched before the last resolution
           // change: their x0..y1 reference the old W/H and would index past the
           // resized display buffer. Still settle the frame so the promise resolves.
@@ -368,6 +379,12 @@ export class SegmentController {
     if (!this.faulted) {
       this.faulted = true;
       this.faultInfo = { segId, message };
+    } else {
+      // Already latched: the UI faultInfo only records the first fault, but a
+      // second failing worker shouldn't vanish — surface it so a cascade is
+      // visible rather than silently coalesced into the first.
+      console.warn(`[Segmented] additional worker fault (seg ${segId}): ${message} `
+        + `— first fault already latched, UI shows that one`);
     }
     this.pending = 0;
     this.renderInFlight = false;
@@ -538,7 +555,11 @@ export class SegmentController {
       blitted++;
     }
 
-    // Draw segment boundary lines (cyan markers) on both X and Y splits
+    // Draw segment boundary lines (cyan markers) on both X and Y splits.
+    // NOTE: these are written into the same display buffer the recorder
+    // captures from, so with showBoundaries on (the default) the cyan markers
+    // are BAKED INTO recorded video. Turning off the "Show Boundaries" GUI
+    // toggle removes them from both the live view and any recording.
     if (this.showBoundaries) {
       // Collect unique Y and X boundaries
       const yBounds = new Set();
