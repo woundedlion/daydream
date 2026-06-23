@@ -698,8 +698,18 @@ export class Daydream {
       };
     }
 
+    // Level-of-detail for the per-dot sphere: more total pixels -> fewer
+    // segments per dot so the overall triangle budget stays bounded. The
+    // segment count decays exponentially from MAX_DOT_SEGMENTS with a scale of
+    // LOD_DECAY_PIXELS, floored at MIN_DOT_SEGMENTS so even huge displays keep a
+    // recognizable sphere.
+    const MAX_DOT_SEGMENTS = 30;
+    const LOD_DECAY_PIXELS = 30000;
+    const MIN_DOT_SEGMENTS = 3;
     const totalPixels = Daydream.W * Daydream.H;
-    const detail = Math.max(3, Math.round(30 * Math.exp(-totalPixels / 30000)));
+    const detail = Math.max(
+      MIN_DOT_SEGMENTS,
+      Math.round(MAX_DOT_SEGMENTS * Math.exp(-totalPixels / LOD_DECAY_PIXELS)));
 
     this.dotGeometry = new THREE.SphereGeometry(
       Daydream.DOT_SIZE,

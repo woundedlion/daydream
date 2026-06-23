@@ -236,7 +236,7 @@ export class URLSync {
     // name preserves only its stale URL value; without this the new value is lost.
     for (const key of this.trackedKeys) {
       const val = this.state.get(key);
-      if (val !== null && val !== undefined) params.set(key, val);
+      if (val !== null && val !== undefined) this._setTrackedParam(params, key, val);
     }
     // Merge the ad-hoc writes that survived the prune above (the excluded keys).
     // The cancelled flush may hold a GUI param changed within the 200 ms window;
@@ -252,6 +252,22 @@ export class URLSync {
   }
 
   /**
+   * Write a tracked key into a URLSearchParams, rounding numeric values via
+   * roundUrlNumber so the tracked-key path serializes numbers the same way the
+   * ad-hoc writer (setParam) does. Tracked keys are strings today, but without
+   * this a future numeric tracked key would land in the URL with full float
+   * noise (URLSearchParams.set just String()s it). Strings pass through
+   * unchanged (String(s) === s).
+   * @param {URLSearchParams} params - The params object to mutate.
+   * @param {string} key - The tracked key.
+   * @param {*} val - The value to serialize.
+   * @returns {void}
+   */
+  _setTrackedParam(params, key, val) {
+    params.set(key, typeof val === 'number' ? String(roundUrlNumber(val)) : String(val));
+  }
+
+  /**
    * Read-modify-write the URL once: re-read current params, overlay tracked
    * state keys and surviving ad-hoc writes, then replaceState. Running at fire
    * time (not schedule time) is what lets concurrent updates merge.
@@ -262,7 +278,7 @@ export class URLSync {
     for (const key of this.trackedKeys) {
       const val = this.state.get(key);
       if (val !== null && val !== undefined) {
-        params.set(key, val);
+        this._setTrackedParam(params, key, val);
       }
     }
     for (const [key, val] of this._adhoc) {
