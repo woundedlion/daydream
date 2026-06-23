@@ -49,9 +49,9 @@ export function createSlider(containerId, cfg, onInput) {
   } = cfg;
 
   // Assert the numeric contract rather than silently building an inert control:
-  // a non-positive scale (the raw step rounds to 0) or step, or min >= max, all
-  // produce a slider the user cannot move and no diagnostic. These are author
-  // config errors, so fail loudly. The `!(a < b)` form also rejects NaN.
+  // a non-positive scale or step, or min >= max, all produce a slider the user
+  // cannot move and no diagnostic. These are author config errors, so fail
+  // loudly. The `!(a < b)` form also rejects NaN.
   if (!(min < max)) {
     throw new Error(`createSlider(${id}): min (${min}) must be < max (${max})`);
   }
@@ -60,6 +60,16 @@ export function createSlider(containerId, cfg, onInput) {
   }
   if (!(scale > 0)) {
     throw new Error(`createSlider(${id}): scale (${scale}) must be > 0`);
+  }
+  // step>0 and scale>0 in display space is not enough: the slider runs in
+  // SCALED INTEGER units (min/max/step are each rounded by *scale), and a small
+  // fractional step can floor to 0 even when both are positive (e.g. step 0.4,
+  // scale 1 -> step="0", which browsers treat as broken). Require the rounded
+  // step to be >= 1 so the control is actually movable.
+  const sliderStep = Math.round(step * scale);
+  if (sliderStep < 1) {
+    throw new Error(`createSlider(${id}): step (${step}) * scale (${scale}) rounds to `
+      + `${sliderStep} in scaled units; must be >= 1 (increase step or scale)`);
   }
 
   const sliderId = `${id}_slider`;
@@ -80,7 +90,7 @@ export function createSlider(containerId, cfg, onInput) {
   slider.id = sliderId;
   slider.min = String(Math.round(min * scale));
   slider.max = String(Math.round(max * scale));
-  slider.step = String(Math.round(step * scale));
+  slider.step = String(sliderStep);
   slider.value = String(Math.round(value * scale));
   slider.className = sliderClass;
 
