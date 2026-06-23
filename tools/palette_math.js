@@ -6,12 +6,19 @@
 // Pure palette math. This module mirrors the engine's ProceduralPalette and
 // GenerativePalette so the browser tool can predict device colors and the C++
 // export-string generators can be regression-tested without a DOM. Parity is
-// not uniform: GenerativePalette routes through the engine's own baked LUT (via
-// the WASM bridge below), so it is exact, whereas ProceduralPalette evaluates
-// the cosine formula analytically and linearizes with an exact pow — which can
-// differ from the device's interpolated 16-bit-linear LUT by up to ~1 LSB per
-// channel. No DOM/canvas/window references live here; all UI wiring stays
-// inline in palettes.html.
+// not exact on either path:
+//   - ProceduralPalette evaluates the cosine formula analytically and
+//     linearizes with an exact pow, which can differ from the device's
+//     interpolated 16-bit-linear LUT by up to ~1 LSB per channel.
+//   - GenerativePalette previews via the baked-LUT sampler (BakedPalette
+//     below), which reconstructs each entry from the WASM bridge's 8-bit sRGB
+//     LUT, not the engine's native 16-bit-LINEAR BakedPalette. The
+//     interpolation domain matches (linear), but the 8-bit source quantization
+//     means the preview can diverge by MORE than ~1 LSB, most visibly in dark
+//     tones where 8-bit sRGB maps to coarse linear steps. It is close, not
+//     exact.
+// No DOM/canvas/window references live here; all UI wiring stays inline in
+// palettes.html.
 
 import { srgbToLinearFloat } from './color.js';
 
@@ -111,11 +118,13 @@ export class CPixel {
  */
 export class PRNG {
   /**
-   * @param {number} seed - Initial state; a falsy seed falls back to a random
-   *   one so the tool still works without an explicit seed.
+   * @param {number} seed - Initial state. A non-finite seed (undefined/null/NaN)
+   *   falls back to a random one so the tool still works without an explicit
+   *   seed. Note 0 is a VALID seed and stays reproducible — the old `seed ? ...`
+   *   test treated 0 as "unset" and silently randomized it.
    */
   constructor(seed) {
-    this.state = seed ? seed : Math.floor(Math.random() * 0xFFFFFFFF);
+    this.state = Number.isFinite(seed) ? seed : Math.floor(Math.random() * 0xFFFFFFFF);
   }
   /**
    * Advances the state and returns the next float.
@@ -325,7 +334,11 @@ export class GenerativePalette {
    * entries in linear light. Domain-verified against the engine: BakedPalette::get
    * (core/color.h) lerps between two linear-light Color4 LUT entries (lerp16), so
    * converting each sRGB-8bit entry here to linear first and lerping in linear
-   * matches the engine's interpolation domain (linear, not sRGB).
+   * matches the engine's interpolation DOMAIN (linear, not sRGB). Note the
+   * SOURCE precision does not match: `this.lut` is the bridge's 8-bit sRGB LUT,
+   * while the engine's BakedPalette holds 16-bit linear entries — so this
+   * reconstruction can diverge by more than ~1 LSB (see the module header),
+   * most in dark tones. Close, not exact.
    * @param {number} t - Time parameter in [0, 1] (clamped).
    * @returns {number[]} Linear [R, G, B] float values.
    */
