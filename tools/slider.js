@@ -102,7 +102,15 @@ export function createSlider(containerId, cfg, onInput) {
   container.append(labelSpan, slider, valueSpan);
 
   if (onInput) {
-    slider.addEventListener('input', () => onInput(parseFloat(slider.value)));
+    slider.addEventListener('input', () => {
+      const raw = parseFloat(slider.value);
+      // Keep the readout live by default (raw -> display space via scale), so a
+      // caller that does not touch valueSpan no longer sees a frozen number.
+      // This runs BEFORE onInput, so a caller that wants a custom readout (e.g.
+      // a snapped value) can still overwrite valueSpan.textContent inside onInput.
+      valueSpan.textContent = (raw / scale).toFixed(decimals);
+      onInput(raw);
+    });
   }
 
   return { slider, valueSpan };
