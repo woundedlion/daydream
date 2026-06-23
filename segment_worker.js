@@ -53,7 +53,7 @@ let segRange = null; // { x0, x1, y0, y1, w, h }
  */
 function applyClip() {
   if (engine && segRange) {
-    engine.setClip(segRange.y0, segRange.y1, segRange.x0, segRange.x1);
+    engine.setClip(segRange.x0, segRange.x1, segRange.y0, segRange.y1);
   }
 }
 

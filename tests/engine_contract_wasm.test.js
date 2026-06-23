@@ -78,7 +78,7 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
 
   // The remaining void setters the worker drives, called the same way it does.
   engine.setAnimationsPaused(false);
-  engine.setClip(0, H, 0, W);
+  engine.setClip(0, W, 0, H);
   engine.drawFrame();
 
   // getPixels: a Uint16Array view sized W*H*3 (the worker copies rows out of it).

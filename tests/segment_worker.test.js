@@ -61,7 +61,7 @@ class FakeEngine {
   setEffect(name) { this.calls.push(['setEffect', name]); this.effect = name; this.params = []; }
   setParameter(name, value) { this.params.push([name, value]); }
   setAnimationsPaused(p) { this.paused = p; }
-  setClip(y0, y1, x0, x1) { this.clip = { y0, y1, x0, x1 }; }
+  setClip(x0, x1, y0, y1) { this.clip = { y0, y1, x0, x1 }; }
   drawFrame() { this.calls.push(['drawFrame']); }
   getRenderUs() { return 1234; }
   /** Each channel encodes its flat canvas index so extraction can be checked. */
