@@ -1,7 +1,16 @@
 // @ts-check
-import { test, mock } from 'node:test';
+import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { URL } from 'node:url';
+
+// installWindow() and the writer test below stub globalThis.window; restore the
+// host value after each test so the stub never leaks to another suite if the
+// runner shares a process (matching recorder.test.js's save/restore discipline).
+const _savedWindow = globalThis.window;
+afterEach(() => {
+  if (_savedWindow === undefined) delete globalThis.window;
+  else globalThis.window = _savedWindow;
+});
 
 // Minimal lil-gui stub: a controller bound to (object, prop) exposing just the
 // chaining surface DeepLinkGUI relies on. The deep-link validation under test

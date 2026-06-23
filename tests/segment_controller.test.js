@@ -7,7 +7,7 @@
 // ./driver.js (so the real three.js/lil-gui chain is never loaded in Node).
 //
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
-import { test, mock, beforeEach } from 'node:test';
+import { test, mock, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 
 // Mutable stand-in for the driver module's Daydream/ SLOW_FRAME_MS exports.
@@ -78,6 +78,21 @@ function makeController({ resolution = 'lo', effect = 'TestEffect',
 }
 
 beforeEach(() => { FakeWorker.instances = []; });
+
+// Save the host globals before stubbing and restore them once the file finishes,
+// so these module-scope stubs never leak into another suite if the test runner
+// ever shares a process (node --test isolates per file today, but the cleanup
+// shouldn't depend on that — matching recorder.test.js's save/restore discipline).
+const _savedGlobals = { Worker: globalThis.Worker, document: globalThis.document };
+const _restoreGlobal = (key, val) => {
+  if (val === undefined) delete globalThis[key];
+  else globalThis[key] = val;
+};
+after(() => {
+  _restoreGlobal('Worker', _savedGlobals.Worker);
+  _restoreGlobal('document', _savedGlobals.document);
+});
+
 globalThis.Worker = FakeWorker;
 
 // tick()'s composite/fault branches call updateStats(), which is pure DOM. Stub
