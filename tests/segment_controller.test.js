@@ -351,17 +351,20 @@ test('composite() blits each quadrant to its display-buffer offset', () => {
   assert.equal(Daydream.pixels[idx(1, 1, 4)], 0);
 });
 
-test('composite() skips a rectangle that overflows the current display buffer', () => {
+test('composite() throws on a rectangle that overflows the current display buffer', () => {
   Daydream.W = 4; Daydream.H = 2;
   Daydream.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
   c.showBoundaries = false;
   const quad = new Uint16Array(2 * 2 * 3).fill(222);
-  // x1 = 99 overshoots W=4 (e.g. a stale-resolution rect the fence missed).
+  // x1 = 99 overshoots W=4 (e.g. a stale-resolution rect the fence missed). Such
+  // a rect means the generation fence failed to drop a stale-resolution result,
+  // so composite() fails loudly rather than silently skipping a whole segment
+  // (which would paint a stale/garbage band with no diagnostic).
   c.results = [{ pixels: quad, x0: 0, x1: 99, y0: 0, y1: 2, quadW: 2, quadH: 2 }];
 
-  c.composite();
+  assert.throws(() => c.composite(), /out of bounds/);
   assert.ok(Daydream.pixels.every((v) => v === 0),
     'out-of-bounds rect is never partially blitted');
 });
