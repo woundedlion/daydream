@@ -768,7 +768,16 @@ export class SegmentController {
     if (!this.renderInFlight) {
       this.renderInFlight = true;
       this.renderParallel().then(() => {
-        this.pendingFrame = true;
+        // Only arm the compositor if this render's generation is still current.
+        // A setResolution() during the in-flight render bumps renderGen and
+        // clears pendingFrame, and the generation fence in onmessage drops this
+        // render's worker responses (they were sized to the old W/H). Arming
+        // unconditionally here would re-set pendingFrame after setResolution
+        // cleared it, so the next tick() would composite an all-null (black)
+        // frame over the cleared buffer. Re-check the fence before arming.
+        if (this.inflightGen === this.renderGen) {
+          this.pendingFrame = true;
+        }
         this.renderInFlight = false;
       });
     }
