@@ -343,8 +343,10 @@ export class VideoRecorder {
     const filename = `${effectName}_${ts}.${ext}`;
 
     // Use showSaveFilePicker when available for a proper, deterministic download;
-    // fall back to anchor-click with a load-event-based revoke.
-    if (typeof showSaveFilePicker === 'function') {
+    // fall back to anchor-click with a load-event-based revoke. Reference it off
+    // `window` rather than as a bare global so the lookup is explicit and a
+    // missing API reads as `undefined` instead of a ReferenceError.
+    if (typeof window.showSaveFilePicker === 'function') {
       this._saveWithPicker(blob, filename, ext);
     } else {
       this._saveWithAnchor(blob, filename);
@@ -362,7 +364,7 @@ export class VideoRecorder {
    */
   async _saveWithPicker(blob, filename, ext = this._extension()) {
     try {
-      const handle = await showSaveFilePicker({
+      const handle = await window.showSaveFilePicker({
         suggestedName: filename,
         types: [{
           description: 'Video',

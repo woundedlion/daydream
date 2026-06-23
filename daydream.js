@@ -723,11 +723,21 @@ segFolder.add(segState, 'boundaries').name('Show Boundaries').onChange(v => {
 const REC_RESOLUTIONS = { 'Native': null, '720p': 720, '1080p': 1080 };
 const REC_FORMATS = { 'Auto': 'auto', 'MP4': 'mp4', 'WebM': 'webm' };
 const recSettings = { _quality: 16, _resolution: 'Native', _format: 'Auto' };
+// bitrate/resolution/format are LATCHED at recorder.start() (see recorder.js),
+// so changing one mid-recording has no effect until the next start(). Surface
+// that instead of deferring silently: warn the user the change applies to the
+// next recording.
+const warnIfRecording = (label) => {
+  if (recorder?.isRecording) {
+    console.warn(`Recording: ${label} change applies to the next recording (the current one is already running).`);
+  }
+};
 Object.defineProperty(recSettings, 'quality', {
   get() { return this._quality; },
   set(v) {
     this._quality = v;
     if (recorder) recorder.bitrateMbps = v;
+    warnIfRecording('bitrate');
   }
 });
 Object.defineProperty(recSettings, 'recResolution', {
@@ -737,6 +747,7 @@ Object.defineProperty(recSettings, 'recResolution', {
     if (recorder) {
       recorder.targetHeight = REC_RESOLUTIONS[v];
     }
+    warnIfRecording('resolution');
   }
 });
 Object.defineProperty(recSettings, 'recFormat', {
@@ -744,6 +755,7 @@ Object.defineProperty(recSettings, 'recFormat', {
   set(v) {
     this._format = v;
     if (recorder) recorder.format = REC_FORMATS[v];
+    warnIfRecording('format');
   }
 });
 
