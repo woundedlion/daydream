@@ -179,7 +179,7 @@
       const geometry = new THREE.BufferGeometry().setFromPoints(points);
       const material = new THREE.LineBasicMaterial({
         color: 0x818cf8,
-        linewidth: 2,
+        // linewidth is a no-op in the WebGL renderer (always 1px); omitted.
         transparent: true,
         opacity: 0.9,
         depthWrite: false,
