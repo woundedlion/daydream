@@ -422,7 +422,13 @@ export class SegmentController {
     });
   }
 
-  /** Composite segment results into the display buffer (quadrant model). */
+  /**
+   * Composite segment results into the display buffer (quadrant model).
+   * @returns {number} How many segment rectangles were actually blitted this
+   *   call. 0 means every result was null/empty (a fully-fenced frame), so the
+   *   display buffer still holds only driver.render()'s fill(0) — the caller
+   *   uses this to avoid marking a black buffer as a real composited frame.
+   */
   composite() {
     // Safe to hold dst across the fill loop below: refreshPixelView() re-fetches
     // the view if a prior memory growth detached it, and in segment mode the main
@@ -431,7 +437,7 @@ export class SegmentController {
     // so dst cannot detach mid-loop.
     this._refreshPixelView();
     const dst = this._getMemoryView();
-    if (!dst) return;
+    if (!dst) return 0;
 
     // No clear here: driver.render() already filled this same buffer with zero
     // immediately before invoking the adapter (Daydream.pixels === this view in
@@ -457,6 +463,7 @@ export class SegmentController {
     const h = Daydream.H;
 
     // Copy each quadrant's pixel rectangle into the right position
+    let blitted = 0;
     for (let s = 0; s < this.results.length; s++) {
       const r = this.results[s];
       if (!r || !r.pixels) continue;
@@ -477,6 +484,7 @@ export class SegmentController {
       // Composite this quad back into the canvas (compact -> canvas); see
       // blitSegmentRect for the contiguous-row fast path.
       blitSegmentRect(dst, r.pixels, w, r, false);
+      blitted++;
     }
 
     // Draw segment boundary lines (cyan markers) on both X and Y splits
@@ -518,6 +526,11 @@ export class SegmentController {
         for (let y = 0; y < h; y++) plotCyan((y * w + boundaryX) * 3);
       }
     }
+
+    // Boundary markers are decoration, not content: report only the count of
+    // actual segment blits so a frame that drew nothing but cyan lines over the
+    // cleared buffer still counts as empty.
+    return blitted;
   }
 
   /** Update the per-segment stats overlay. */
@@ -683,11 +696,14 @@ export class SegmentController {
     // 1. Apply the PREVIOUS frame's composite results synchronously. This runs
     //    AFTER driver.render() called pixels.fill(0), so it overwrites the clear.
     if (this.pendingFrame) {
-      this.composite();
+      const blitted = this.composite();
       this.updateStats();
       this.pendingFrame = false;
-      // A real frame now sits in the display buffer this tick.
-      this.frameComposited = true;
+      // Only mark a real frame if at least one segment rectangle was actually
+      // blitted. A fully-fenced frame (every result dropped by the generation
+      // fence) composites nothing, leaving the buffer at driver.render()'s
+      // fill(0) — the recorder must not capture that black frame.
+      this.frameComposited = blitted > 0;
     } else {
       // No new results: the buffer is still driver.render()'s fill(0) (the
       // workers haven't produced the first frame yet, or stalled). The recorder
