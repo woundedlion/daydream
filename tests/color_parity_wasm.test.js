@@ -72,6 +72,26 @@ test('OKLab matrix parity (linear_rgb_to_oklab / oklab_to_linear_rgb)', () => {
 });
 
 /**
+ * Pins the engine's OKLab transform to fixed golden values in both directions.
+ * The parity test above is wasm-vs-js only, so a coordinated drift shared by both
+ * ports (e.g. a mistyped Ottosson coefficient copied into each) would slip
+ * through; these absolutes catch a systematic shift in the matrices. The forward
+ * red golden is Ottosson's published reference (L≈0.628, a≈0.225, b≈0.126), so it
+ * also pins the engine to the canonical OKLab definition, not just to itself.
+ */
+test('OKLab golden values (absolute pin)', () => {
+  const fwd1 = M.linear_rgb_to_oklab(0.1, 0.5, 0.9);
+  assert.ok(near(fwd1.L, 0.757296) && near(fwd1.a, -0.067583) && near(fwd1.b, -0.101862),
+    `oklab(0.1,0.5,0.9): (${fwd1.L},${fwd1.a},${fwd1.b})`);
+  const fwdRed = M.linear_rgb_to_oklab(1, 0, 0);
+  assert.ok(near(fwdRed.L, 0.627955) && near(fwdRed.a, 0.224863) && near(fwdRed.b, 0.125846),
+    `oklab(1,0,0) vs Ottosson red: (${fwdRed.L},${fwdRed.a},${fwdRed.b})`);
+  const inv = M.oklab_to_linear_rgb(0.7, 0.1, -0.05);
+  assert.ok(near(inv.r, 0.57893) && near(inv.g, 0.228833) && near(inv.b, 0.50137),
+    `oklab_to_linear_rgb(0.7,0.1,-0.05): (${inv.r},${inv.g},${inv.b})`);
+});
+
+/**
  * Verifies the integer HSV sextant split matches byte-for-byte. This is the path
  * where float sextant math would drift from the device at every region boundary,
  * so an exact match across the wheel is the point.
@@ -139,5 +159,25 @@ test('lissajous parity (lissajous)', () => {
     const j = L.lissajous(m1, m2, a, t);
     assert.ok(near(w.x, j.x) && near(w.y, j.y) && near(w.z, j.z),
       `lissajous(${m1},${m2},${a},${t}): wasm(${w.x},${w.y},${w.z}) js(${j.x},${j.y},${j.z})`);
+  }
+});
+
+/**
+ * Pins the lissajous curve to fixed golden points. The parity test above is
+ * wasm-vs-js only, so a phase/axis-swap or amplitude drift copied into both ports
+ * would pass; these absolutes catch a systematic change in the curve formula.
+ * Every golden point lies on the unit sphere (the curve is sphere-mapped), which
+ * is itself an invariant a drift would break.
+ */
+test('lissajous golden points (absolute pin)', () => {
+  const p1 = M.lissajous(3, 2, 0, 0.7);
+  assert.ok(near(p1.x, -0.4975) && near(p1.y, 0.169967) && near(p1.z, 0.850649),
+    `lissajous(3,2,0,0.7): (${p1.x},${p1.y},${p1.z})`);
+  const p2 = M.lissajous(5, 4, 0.5, 1.2);
+  assert.ok(near(p2.x, -0.705952) && near(p2.y, 0.087499) && near(p2.z, 0.702834),
+    `lissajous(5,4,0.5,1.2): (${p2.x},${p2.y},${p2.z})`);
+  for (const p of [p1, p2]) {
+    assert.ok(near(Math.hypot(p.x, p.y, p.z), 1, 1e-3),
+      `lissajous point off the unit sphere: (${p.x},${p.y},${p.z})`);
   }
 });
