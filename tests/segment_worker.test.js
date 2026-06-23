@@ -54,7 +54,11 @@ class FakeEngine {
     this.curH = h;
     return true;
   }
-  setEffect(name) { this.calls.push(['setEffect', name]); this.effect = name; }
+  // Model the real engine's setEffect: it rebuilds the effect with DEFAULT
+  // params, so any tuned values must be (re-)applied AFTER it. Clearing params
+  // here makes that ordering observable — a handler that applied params before
+  // setEffect would have them wiped by this rebuild.
+  setEffect(name) { this.calls.push(['setEffect', name]); this.effect = name; this.params = []; }
   setParameter(name, value) { this.params.push([name, value]); }
   setAnimationsPaused(p) { this.paused = p; }
   setClip(y0, y1, x0, x1) { this.clip = { y0, y1, x0, x1 }; }
@@ -243,4 +247,59 @@ test('a throwing message is isolated and rethrown on a fresh task', async () => 
   posted.length = 0;
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   assert.ok(posted.find((p) => p.msg.type === 'ready'), 'queue still processes after a failure');
+});
+
+// ---------------------------------------------------------------------------
+// Live-tuning handlers — setEffect / setParameter / setAnimationsPaused. These
+// are the receiver half of the controller's broadcasts: a worker that re-applied
+// params before (instead of after) setEffect's rebuild-to-defaults, or dropped a
+// handler, would render a different effect/params than the main thread. The
+// FakeEngine.setEffect above clears params to model that rebuild, so the
+// "params AFTER rebuild" ordering is directly observable below.
+// ---------------------------------------------------------------------------
+
+test('init applies the carried params AFTER setEffect rebuilds to defaults', async () => {
+  await dispatch({
+    type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma',
+    params: [{ name: 'Speed', value: 0.5 }, { name: 'Glow', value: 1.0 }],
+  });
+  assert.equal(engineInstance.effect, 'Plasma');
+  // The params survived the rebuild-to-defaults, so they were applied after it.
+  assert.deepEqual(engineInstance.params, [['Speed', 0.5], ['Glow', 1.0]]);
+});
+
+test('setEffect handler rebuilds, then re-applies the carried param snapshot', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  posted.length = 0;
+  await dispatch({
+    type: 'setEffect', name: 'Waves',
+    params: [{ name: 'Freq', value: 0.25 }],
+  });
+  assert.equal(engineInstance.effect, 'Waves', 'switched to the new effect');
+  // Applied AFTER the rebuild-to-defaults; a before-rebuild apply would be wiped.
+  assert.deepEqual(engineInstance.params, [['Freq', 0.25]]);
+  assert.ok(posted.find((p) => p.msg.type === 'effectReady'), 'effectReady posted');
+});
+
+test('setEffect with no params just rebuilds, leaving defaults', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  posted.length = 0;
+  await dispatch({ type: 'setEffect', name: 'Waves' });
+  assert.equal(engineInstance.effect, 'Waves');
+  assert.deepEqual(engineInstance.params, [], 'no snapshot to re-apply');
+  assert.ok(posted.find((p) => p.msg.type === 'effectReady'));
+});
+
+test('setParameter handler forwards name/value to the engine', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  await dispatch({ type: 'setParameter', name: 'Speed', value: 0.9 });
+  assert.deepEqual(engineInstance.params.at(-1), ['Speed', 0.9]);
+});
+
+test('setAnimationsPaused handler forwards the flag (both directions) to the engine', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  await dispatch({ type: 'setAnimationsPaused', paused: true });
+  assert.equal(engineInstance.paused, true);
+  await dispatch({ type: 'setAnimationsPaused', paused: false });
+  assert.equal(engineInstance.paused, false);
 });
