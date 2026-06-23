@@ -242,6 +242,20 @@
       return line;
     }
 
+    // Coalesce updateCurves() into one recompute per animation frame. Dragging
+    // a control point fires mousemove on every pointer tick; without this each
+    // tick rebuilds both line geometries and re-runs the full WASM spline
+    // sampling on the main thread (solids.html solves the same problem with
+    // scheduleUpdate). Keeps at most one recompute pending.
+    let curvesUpdatePending = 0;
+    function scheduleUpdateCurves() {
+      if (curvesUpdatePending) return;
+      curvesUpdatePending = requestAnimationFrame(() => {
+        curvesUpdatePending = 0;
+        updateCurves();
+      });
+    }
+
     function updateCurves() {
       // Remove old
       if (fastLine) { scene.remove(fastLine); fastLine.geometry.dispose(); fastLine.material.dispose(); fastLine = null; }
@@ -374,8 +388,10 @@
         const pt = hits[0].point;
         const norm = vec3Normalize({ x: pt.x, y: pt.y, z: pt.z });
         state.controlPoints[dragIndex] = norm;
+        // Move the dragged dot immediately for responsiveness, but coalesce the
+        // expensive curve rebuild (geometry + WASM sampling) to one per frame.
         pointMeshes[dragIndex].position.set(norm.x, norm.y, norm.z);
-        updateCurves();
+        scheduleUpdateCurves();
       }
     }
 
