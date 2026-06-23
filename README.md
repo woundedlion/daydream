@@ -324,7 +324,7 @@ The `platform.h` header abstracts all target-specific differences:
 | `DMAMEM` | Teensy DMA-accessible RAM segment | No-op macro |
 | `hs::log()` | `Serial.println()` | `vprintf`/`printf` |
 | `hs::millis()` | `::millis()` | `std::chrono` |
-| `hs::rand_f()` | `std::mt19937(1337)` | `std::mt19937(1337)` |
+| `hs::rand_f()` | `Pcg32(1337)` | `Pcg32(1337)` |
 | `hs::disable_interrupts()` | `noInterrupts()` | No-op |
 | `CRGB`, `CHSV` | FastLED types | Struct mocks |
 
@@ -1056,7 +1056,7 @@ The mesh system is split across several files:
 - **`mesh.h`** — Core data structures (`PolyMesh`, `HalfEdgeMesh`) and fundamental `MeshOps` (compile, clone, classify)
 - **`conway.h`** — Conway mesh operators and vertex transformations
 - **`hankin.h`** — Hankin pattern compilation and dynamic update
-- **`spatial.h`** — `MeshState` (flat-array renderer format), `KDTree`, and a speculative `AABB` (test-only — no production consumer yet)
+- **`spatial.h`** — `MeshState` (flat-array renderer format) and `KDTree`
 - **`solids.h`** — Platonic + Archimedean + Catalan + Islamic Star Pattern solid geometry data and registry
 
 `PolyMesh` stores vertices and face connectivity via `ArenaVector` arrays. `MeshState` (in `spatial.h`) is the flat compiled format consumed by the renderer. `HalfEdgeMesh` provides a half-edge traversal structure built from either a `PolyMesh` or `MeshState`.
@@ -1251,7 +1251,7 @@ for (int i = 0; i < PPS; ++i, y += y_step_) {
 }
 ```
 
-**Effect transparency**: Effects render the full 288×144 canvas — segmentation is handled entirely in the ISR.  No changes to any effect code are needed.  All 4 boards share the same deterministic random seed (`std::mt19937(1337)` in `platform.h`), so identical effect sequences produce identical canvases.
+**Effect transparency**: Effects render the full 288×144 canvas — segmentation is handled entirely in the ISR.  No changes to any effect code are needed.  All 4 boards share the same deterministic random seed (`Pcg32(1337)` in `platform.h`), so identical effect sequences produce identical canvases.
 
 | Parameter | Value (Phantasm) |
 |---|---|
@@ -1588,6 +1588,8 @@ Two counter-rotating families of concentric rings that beat against each other i
 #### FlowField
 
 FastNoiseLite-driven flow field. Three independently offset 3D-noise channels form a per-particle force vector that is added to each particle's velocity (not curl noise, not a scalar gradient).
+
+**Parameters**: Scale, Force, Max Spd, Alpha, Time Spd
 
 </td></tr></table>
 
@@ -1930,8 +1932,9 @@ drawFrame() {                postMessage({type:'render'})
 ```
 
 Key properties:
-- **Isolated WASM instances per worker** — each segment has its own arena, its own random seed (`std::mt19937(1337)` is deterministic, so all workers produce the same result), and its own effect state.
-- **`setClip(y0, y1, x0, x1)`** — the WASM engine restricts *rendering* to the worker's quadrant: the rasterizer's scanline culling skips out-of-clip rows and columns, so out-of-band pixels are never shaded. The pixel readback in `drawFrame()` still copies the full canvas buffer; `segment_worker.js` then extracts just the quadrant rectangle from it (the `pixelsCopy` loop in the render handler) before transferring the result back, so only the quadrant crosses the worker boundary.
+- **Isolated WASM instances per worker** — each segment has its own arena, its own random seed (`Pcg32(1337)` is deterministic, so all workers produce the same result), and its own effect state.
+- **`setClip(y0, y1, x0, x1)`** — for a non-stateful effect the WASM engine restricts *rendering* to the worker's quadrant: the rasterizer's scanline culling skips out-of-clip rows and columns, so out-of-band pixels are never shaded. The pixel readback in `drawFrame()` still copies the full canvas buffer; `segment_worker.js` then extracts just the quadrant rectangle from it (the `pixelsCopy` loop in the render handler) before transferring the result back, so only the quadrant crosses the worker boundary.
+- **Cross-segment stateful effects render full-frame** — an effect whose per-frame state reads pixels *outside* the worker's band (`MeshFeedback`'s feedback warp samples the previous frame at unbounded offsets; `Dynamo`/`SplineFlow` reproject `World::Trails` under rotation) cannot be band-clipped: a clipped worker would have stale/zero history outside its band, so cross-band trails read as black and seams appear. Those effects report `Effect::needs_full_frame()` (derived from a compile-time `any_crosses_segments` filter-pipeline trait), and `setClip` leaves their clip at the full canvas — every worker computes the bit-identical full frame and `segment_worker.js` slices its quadrant from the full readback. This mirrors the device exactly, where each board independently renders the whole canvas; only non-stateful effects keep segmented rendering's clipping win. Design: `docs/segmented_stateful_effects_spec.md`.
 - **One-frame pipeline** — frame N's render is dispatched fire-and-forget; frame N-1's results are composited synchronously when they arrive. Wall-clock time is measured against the slowest worker — exactly what the multi-Teensy hardware sees.
 - **Boundary overlay** — a "Show Boundaries" toggle paints cyan markers on the segment edges in the composite buffer to make the partition visible.
 
