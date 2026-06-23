@@ -12,10 +12,28 @@
  */
 
 /**
- * Compute the canvas sub-rectangle a segment renders. Mirrors the 2-arm
- * quadrant layout from pov_segmented.h.
+ * Compute the canvas sub-rectangle a segment renders. This is the SIMULATOR's
+ * own render tiler, not a 1:1 port of the firmware map.
+ *
+ * Relationship to the firmware (hardware/pov_segment_map.h, no shared source of
+ * truth — there is no codegen bridging C++ and JS, and the device does not build
+ * in CI):
+ *  - For `total` in {2, 4} this tiling corresponds to the physical segment→
+ *    canvas mapping the firmware uses (arm partition, the w/2 arm-B offset, and
+ *    per-segment row coverage). That correspondence is pinned by
+ *    tests/segment_crosscheck.test.js against the same fixture the C++ host
+ *    tests (test_pov_segmented.h) lock down, so a convention change on either
+ *    side trips a test.
+ *  - For `total` in {6, 8} this is SIMULATOR-ONLY: extra Y-bands per arm spread
+ *    the browser render across more Web Workers for parallelism. The firmware
+ *    `segment_map()` rejects N > 4 (even, power-of-two, <= 4), so these counts
+ *    have no device counterpart and intentionally do not mirror any C++ map.
+ * The shared invariant in every case is NUM_ARMS = 2 vertical halves (arm A =
+ * left, arm B = the w/2-shifted right half), each split into equal Y-bands.
+ *
  * @param {number} id - segment index in [0, total)
- * @param {number} total - total segment count (positive even number)
+ * @param {number} total - total segment count (positive even number; the GUI
+ *   exposes 2..8 in steps of 2)
  * @param {number} w - canvas width in pixels
  * @param {number} h - canvas height in pixels
  * @returns {SegRange}
