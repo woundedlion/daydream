@@ -105,7 +105,10 @@ export function generateFuncAndRecipe(item) {
       chain += `.snub()`;
       nameParts.push(`_snub`);
     } else if (opName === 'relax') {
-      const iter = o.params.iter || 100;
+      // `??` not `||`: an explicit iter:0 is a valid (no-op relax) count and
+      // must not be silently coerced to the 100 default — only an
+      // absent/undefined iter falls back.
+      const iter = o.params.iter ?? 100;
       chain += `.relax(${iter})`;
       // Encode the iteration count so two solids differing only in relax
       // depth export distinct funcNames instead of colliding on `_relax`.

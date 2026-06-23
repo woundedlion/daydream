@@ -60,6 +60,21 @@ test('generateFuncAndRecipe handles hankin (angle * D2R) and relax (iter)', () =
   assert.equal(recipe, 'SolidBuilder(cube(a, b), a, b).hankin(30.0f * D2R).relax(200).build()');
 });
 
+/** Verifies an explicit relax iter:0 is preserved (not coerced to the default 100). */
+test('generateFuncAndRecipe preserves an explicit relax iter:0', () => {
+  const item = { base: 'cube', ops: [{ op: 'relax', params: { iter: 0 } }] };
+  const { funcName, recipe } = generateFuncAndRecipe(item);
+  assert.equal(funcName, 'cube_relax0');
+  assert.equal(recipe, 'SolidBuilder(cube(a, b), a, b).relax(0).build()');
+});
+
+/** Verifies an absent relax iter still falls back to the default 100. */
+test('generateFuncAndRecipe defaults an absent relax iter to 100', () => {
+  const item = { base: 'cube', ops: [{ op: 'relax', params: {} }] };
+  const { funcName } = generateFuncAndRecipe(item);
+  assert.equal(funcName, 'cube_relax100');
+});
+
 /** Verifies generateRecipeCpp emits the full FLASHMEM function source, prefixed by the V/F/I count comment, byte-for-byte. */
 test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comment', () => {
   const item = {

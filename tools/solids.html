@@ -1075,6 +1075,23 @@
         vCount, fCount, iCount
       };
 
+      // Warn on a funcName collision rather than letting it overwrite silently:
+      // generateFuncAndRecipe encodes op params at coarse granularity (pctSuffix
+      // to 0.01, hankin to 1 deg), so two near-identical solids can share a
+      // funcName and the later C++ paste would clobber the earlier definition.
+      try {
+        const { funcName } = generateFuncAndRecipe(item);
+        const clash = savedSolids.some(s => generateFuncAndRecipe(s).funcName === funcName);
+        if (clash) {
+          console.warn(`Saved solid generates funcName "${funcName}", which collides with an `
+            + `existing saved solid — their exported C++ would overwrite each other. `
+            + `Vary an op parameter by at least the suffix granularity to keep names unique.`);
+        }
+      } catch (e) {
+        // generateFuncAndRecipe only throws on an invalid base/op, which the
+        // registry-backed state should never produce; ignore so a save still works.
+      }
+
       savedSolids.push(item);
       renderSavedList();
     }
