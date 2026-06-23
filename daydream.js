@@ -265,6 +265,12 @@ function applyEffect(preserveParams = false) {
       sidebar.setActive(appState.get('effect'));
       return;
     }
+    // Tell the renderer whether this effect strobes its POV columns (discrete
+    // dots) or persists them (fill the inter-column gaps into a continuous
+    // band). Re-read on every effect switch since it is per-effect; resolution
+    // changes re-run applyEffect(), so the fill scale tracks W/DOT_SIZE too.
+    daydream.setStrobeColumns(wasmEngine.strobeColumns());
+
     activeEffect = { gui: new GUI({ autoPlace: false }), activeDragEnds: new Set() };
 
     // Get Params from C++
@@ -697,6 +703,7 @@ guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => 
 
 guiInstance.add(daydream, 'labelAxes').name('Show Axes').onChange(() => daydream.invalidate());
 guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());
+guiInstance.add(daydream, 'columnFillOverlap', 1.0, 2.0, 0.01).name('Column Fill Overlap').onChange(() => daydream.invalidate());
 
 // ── Segmented POV controls ──────────────────────────────────────────────────
 const segFolder = guiInstance.addFolder('Segmented POV');
