@@ -650,8 +650,11 @@
     function getNormalizedX(event) {
       if (!colorStripCanvas) return 0; // Safety check
       const rect = colorStripCanvas.getBoundingClientRect();
-      // Use clientX for consistency across mouse/touch events
-      const x = (event.clientX || (event.touches && event.touches[0].clientX)) - rect.left;
+      // The strip is driven by mouse events only (the drag handlers reject
+      // anything without button===0), so read clientX directly. The old
+      // `clientX || touches[0].clientX` fallback both broke at the left edge
+      // (clientX===0 is falsy → NaN) and never fired (no touch listeners).
+      const x = event.clientX - rect.left;
       return Math.max(0, Math.min(1, x / rect.width));
     }
 
@@ -927,18 +930,28 @@
       const height = waveGraphCanvas.height;
       waveGraphCtx.clearRect(0, 0, width, height);
 
+      // The graph maps the conceptual value range [VALUE_MIN, VALUE_MAX] — wider
+      // than [0, 1] so out-of-range excursions are visible — onto the canvas band
+      // between yTop (10%) and yBottom (90%) of the height. toY() is the single
+      // place that mapping lives, replacing the inline magic constants that were
+      // repeated (and recomputed) across the wave and overlay draws.
+      const VALUE_MIN = -0.5, VALUE_MAX = 1.5;
+      const yTop = height * 0.1, yBottom = height * 0.9;
+      const toY = (value) => mapValue(value, VALUE_MIN, VALUE_MAX, yBottom, yTop);
+
       // Background grid and center line
       waveGraphCtx.fillStyle = '#1E293B';
       waveGraphCtx.fillRect(0, 0, width, height);
       waveGraphCtx.strokeStyle = '#475569';
       waveGraphCtx.lineWidth = 1;
 
-      // Draw 0.0 and 1.0 boundary lines. These lines are positioned at 10% and 90% of the canvas height.
+      // Draw the range-boundary lines at the top/bottom of the value band (10%
+      // and 90% of the canvas height).
       waveGraphCtx.beginPath();
-      waveGraphCtx.moveTo(0, height * 0.1);
-      waveGraphCtx.lineTo(width, height * 0.1);
-      waveGraphCtx.moveTo(0, height * 0.9);
-      waveGraphCtx.lineTo(width, height * 0.9);
+      waveGraphCtx.moveTo(0, yTop);
+      waveGraphCtx.lineTo(width, yTop);
+      waveGraphCtx.moveTo(0, yBottom);
+      waveGraphCtx.lineTo(width, yBottom);
       waveGraphCtx.stroke();
 
       // Draw center line (0.5 reference)
@@ -963,9 +976,7 @@
           const t = x / (width - 1);
           const value = palette.getChannelValue(t, channelIndex);
 
-          // Map the value from conceptual range [-0.5, 1.5] to canvas height [height*0.9, height*0.1]
-          // This expanded range helps visualize when the wave goes out of the [0, 1] color range
-          const mappedY = mapValue(value, -0.5, 1.5, height * 0.9, height * 0.1);
+          const mappedY = toY(value);
 
           if (x === 0) {
             waveGraphCtx.moveTo(x, mappedY);
@@ -978,10 +989,11 @@
 
       // Draw clamped region overlay (optional, but informative)
       waveGraphCtx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-      // Area below 0
-      waveGraphCtx.fillRect(0, mapValue(0, -0.5, 1.5, height * 0.9, height * 0.1), width, height * 0.9 - mapValue(0, -0.5, 1.5, height * 0.9, height * 0.1));
-      // Area above 1
-      waveGraphCtx.fillRect(0, height * 0.1, width, mapValue(1, -0.5, 1.5, height * 0.9, height * 0.1) - height * 0.1);
+      const y0 = toY(0), y1 = toY(1); // canvas y of the value-0 and value-1 lines
+      // Area below 0 (between the value-0 line and the band bottom)
+      waveGraphCtx.fillRect(0, y0, width, yBottom - y0);
+      // Area above 1 (between the band top and the value-1 line)
+      waveGraphCtx.fillRect(0, yTop, width, y1 - yTop);
     }
 
     /**
