@@ -85,6 +85,13 @@
 /** Worker has rebuilt and re-clipped its effect after a setEffect.
  * @typedef {{ type: 'effectReady', segId: number }} EffectReadyMsg */
 
+/** Worker module body started executing — its static imports (incl. the WASM
+ * glue ./holosphere_wasm.js) all resolved. Sent before the WASM instantiate so
+ * the controller can detect a missing/renamed glue file fast, ahead of the
+ * slower init watchdog. Carries no segId: the controller maps it to the worker
+ * via the per-worker message handler.
+ * @typedef {{ type: 'booted' }} BootedMsg */
+
 /**
  * A rendered quadrant. `pixels` is the segment's RGB16 rectangle (qw*qh*3),
  * transferred (not copied) across the boundary.
@@ -99,7 +106,7 @@
 
 /**
  * Every message a worker sends back to the controller.
- * @typedef {ReadyMsg | EffectReadyMsg | FrameMsg} ControllerInboundMsg
+ * @typedef {ReadyMsg | EffectReadyMsg | FrameMsg | BootedMsg} ControllerInboundMsg
  */
 
 export {};

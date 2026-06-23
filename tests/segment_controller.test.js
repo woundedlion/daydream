@@ -111,6 +111,16 @@ function deliverReady(controller, segId) {
 }
 
 /**
+ * Drive a worker's 'booted' ping (module body ran, static imports resolved).
+ * @param {SegmentController} controller - Controller owning the worker pool.
+ * @param {number} segId - Index of the worker to signal booted.
+ * @returns {void}
+ */
+function deliverBooted(controller, segId) {
+  controller.workers[segId].onmessage({ data: { type: 'booted' } });
+}
+
+/**
  * Build a controller with `n` workers all signalled ready.
  * @param {number} [n] - Number of workers to create and mark ready.
  * @param {Object} [opts] - Options forwarded to makeController().
@@ -291,6 +301,38 @@ test('only the first fault of a session is recorded', () => {
   c.workers[0].onerror({ message: 'first', filename: '', lineno: 0, colno: 0 });
   c.workers[1].onerror({ message: 'second', filename: '', lineno: 0, colno: 0 });
   assert.deepEqual(c.faultInfo, { segId: 0, message: 'first' });
+});
+
+test('the boot watchdog faults fast when a worker never sends booted', () => {
+  // A missing/renamed holosphere_wasm.js makes the worker module fail to load,
+  // so no 'booted' ever arrives. Capture the scheduled timers (the boot watchdog
+  // is armed before the init watchdog) and fire the boot one by hand.
+  const realSetTimeout = globalThis.setTimeout;
+  const timers = [];
+  globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
+  try {
+    const c = makeController();
+    c.create(2);
+    timers[0](); // boot watchdog callback, with 0/2 booted
+    assert.equal(c.faulted, true);
+    assert.match(c.faultInfo.message, /module load timed out/);
+    assert.match(c.faultInfo.message, /0\/2 booted/);
+    assert.match(c.faultInfo.message, /holosphere_wasm\.js/);
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+});
+
+test('a booted ping is handled and does not by itself make the pool ready', () => {
+  const c = makeController();
+  c.create(2);
+  deliverBooted(c, 0);
+  deliverBooted(c, 1);
+  assert.equal(c.ready, false, 'booted alone does not signal readiness');
+  assert.equal(c.faulted, false, 'a clean boot does not fault');
+  deliverReady(c, 0);
+  deliverReady(c, 1);
+  assert.equal(c.ready, true, 'readiness still requires the ready messages');
 });
 
 test('destroy() clears the fault latch so a fresh pool can recover', () => {

@@ -30,6 +30,14 @@ import { computeSegmentRange, blitSegmentRect } from "./segment_layout.js";
 const post = /** @type {(msg: ControllerInboundMsg, transfer?: Transferable[]) => void} */ (
   self.postMessage.bind(self));
 
+// Proof-of-life: reaching this top-level statement means the module body is
+// executing, so every static import above — including the ./holosphere_wasm.js
+// glue — resolved. Sent before the WASM instantiate in 'init' so the controller
+// can fault fast on a missing/renamed glue file (the common deploy breakage)
+// instead of waiting out the 20 s init watchdog. A failed module fetch never
+// runs this line, so the 'booted' ping simply never arrives.
+post({ type: 'booted' });
+
 let wasmModule = null;
 let engine = null;
 let segId = 0;

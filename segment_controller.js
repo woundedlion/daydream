@@ -31,6 +31,14 @@ import { blitSegmentRect } from "./segment_layout.js";
 // cover a cold cache loading every worker's module on a slow connection.
 const INIT_WATCHDOG_MS = 20000;
 
+// Short bound for the per-worker 'booted' ping (module body started, static
+// imports resolved). A missing/renamed holosphere_wasm.js — the most common
+// deploy breakage — makes the worker module fail to load, so 'booted' never
+// arrives; this surfaces it in a few seconds instead of waiting out the 20 s
+// init watchdog. Only the module fetch + evaluate has to complete by here, not
+// the WASM instantiate, so it can be far tighter than INIT_WATCHDOG_MS.
+const BOOT_WATCHDOG_MS = 4000;
+
 /** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
 /** @typedef {import('./worker_protocol.js').ControllerInboundMsg} ControllerInboundMsg */
 /** @typedef {import('./worker_protocol.js').SegArenaMetrics} SegArenaMetrics */
@@ -128,6 +136,14 @@ export class SegmentController {
     /** @type {ReturnType<typeof setTimeout> | null} */
     this._initWatchdog = null;
 
+    // Short companion to the init watchdog: every worker pings 'booted' the
+    // moment its module body runs (so its static imports, incl. the WASM glue,
+    // resolved). If any worker has not booted by BOOT_WATCHDOG_MS, its module
+    // failed to load — usually a missing/renamed holosphere_wasm.js — and we
+    // surface that fast rather than waiting out the full init watchdog.
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    this._bootWatchdog = null;
+
     // Stats-table DOM cache (populated lazily by _buildStatsTable, mutated in
     // place by updateStats). Declared here so all instance state is visible up
     // front; null until the first build / after a fault tears the table down.
@@ -191,6 +207,7 @@ export class SegmentController {
     this.ready = false;
 
     let readyCount = 0;
+    let bootedCount = 0;
 
     // Snapshot the main engine's current param values so freshly-spawned (or
     // resized) workers build their effect with the user's tuned values, not the
@@ -207,9 +224,17 @@ export class SegmentController {
           readyCount++;
           if (readyCount === numSegments) {
             this.ready = true;
+            this._clearBootWatchdog();
             this._clearInitWatchdog();
             console.log(`[Segmented] All ${numSegments} workers ready`);
           }
+        } else if (msg.type === 'booted') {
+          // Module body ran (static imports, incl. the WASM glue, resolved).
+          // Once every worker has booted, the common missing/renamed-glue
+          // breakage is ruled out, so retire the short boot watchdog and let
+          // the init watchdog cover the slower WASM-instantiate phase.
+          bootedCount++;
+          if (bootedCount === numSegments) this._clearBootWatchdog();
         } else if (msg.type === 'effectReady') {
           // Worker finished loading effect, no action needed
         } else if (msg.type === 'frame') {
@@ -296,6 +321,22 @@ export class SegmentController {
       this.workers.push(worker);
     }
 
+    // Arm the boot watchdog: every worker pings 'booted' as soon as its module
+    // body runs, so if any are still missing by the deadline their module
+    // failed to load (commonly a missing/renamed holosphere_wasm.js) — surface
+    // that in a few seconds instead of waiting out the full init watchdog.
+    this._clearBootWatchdog();
+    this._bootWatchdog = setTimeout(() => {
+      this._bootWatchdog = null;
+      if (!this.ready && !this.faulted) {
+        this._onWorkerFault(-1,
+          `worker module load timed out after ${BOOT_WATCHDOG_MS} ms `
+          + `(${bootedCount}/${numSegments} booted) — a worker module likely `
+          + `failed to load (commonly a missing or renamed holosphere_wasm.js)`);
+      }
+    }, BOOT_WATCHDOG_MS);
+    if (typeof this._bootWatchdog.unref === 'function') this._bootWatchdog.unref();
+
     // Arm the init watchdog: if not every worker has reported 'ready' by the
     // deadline, a worker's WASM load failed without throwing (no onerror), so
     // latch a fault to surface the overlay rather than freeze black forever.
@@ -324,6 +365,14 @@ export class SegmentController {
     }
   }
 
+  /** Cancel the boot watchdog if one is pending. Idempotent. */
+  _clearBootWatchdog() {
+    if (this._bootWatchdog !== null) {
+      clearTimeout(this._bootWatchdog);
+      this._bootWatchdog = null;
+    }
+  }
+
   /**
    * Terminate all workers and reset per-segment, frame-lifecycle, and fault
    * state to empty. Clears the fault latch, so it doubles as the recovery reset
@@ -339,6 +388,7 @@ export class SegmentController {
       w.onmessageerror = null;
       w.terminate();
     }
+    this._clearBootWatchdog();
     this._clearInitWatchdog();
     this.workers = [];
     this.results = [];
@@ -373,8 +423,9 @@ export class SegmentController {
    * @param {string} message - Human-readable fault message for the UI/console.
    */
   _onWorkerFault(segId, message) {
-    // A real fault during the init window supersedes the watchdog; cancel it so
-    // it can't fire a second, redundant fault later.
+    // A real fault during the init window supersedes the watchdogs; cancel both
+    // so they can't fire a second, redundant fault later.
+    this._clearBootWatchdog();
     this._clearInitWatchdog();
     if (!this.faulted) {
       this.faulted = true;
