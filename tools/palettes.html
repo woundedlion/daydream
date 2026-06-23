@@ -1017,6 +1017,15 @@
       const deltaTime = (currentTime - lastTime) / 1000; // Time passed in seconds
       lastTime = currentTime;
 
+      // When the marker is parked (speed 0) and the user isn't dragging a
+      // selection, nothing changes frame-to-frame — skip the swatch/strip
+      // redraw instead of repainting an identical frame. On-demand changes
+      // (param edits, clicks, drag start) redraw directly, and the loop resumes
+      // drawing as soon as speed becomes nonzero or a drag begins. Discrete
+      // interactions (click-to-set-phase, drag start) call drawColorStrip
+      // themselves, so the marker still updates while parked.
+      if (animationSpeed === 0 && !isDragging) return;
+
       // Update global time based on speed
       animationTime += animationSpeed * deltaTime;
       animationTime %= 1.0; // Keep t between 0 and 1 (wrap around)
