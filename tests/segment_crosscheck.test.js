@@ -37,6 +37,14 @@ import { computeSegmentRange } from '../segment_layout.js';
  * segments [0, N/2) are arm A, [N/2, N) arm B; within an arm the even slot is
  * the top strip (y_base 0, +1) and the odd slot the bottom strip (y_base
  * ROWS-1, -1, reversed).
+ *
+ * This is a hand port, so on its own it could drift from the C++ in lockstep
+ * with `computeSegmentRange` and keep the cross-check green. To prevent that,
+ * the port is itself pinned against hardcoded goldens — for every config the
+ * sweep exercises — in the "pov_segment_map port matches independent goldens"
+ * test below (the goldens mirror the C++ host-test fixture). An edit that
+ * silently changes this port's convention trips those goldens regardless of how
+ * `computeSegmentRange` changes.
  * @param {number} segmentId - Hardware segment id in [0, N).
  * @param {number} S - Total LEDs across both arms (ROWS = S/2).
  * @param {number} N - Segment count (even; N/2 per arm).
@@ -156,4 +164,45 @@ test('segment layout ↔ pov_segment_map: correspondence holds across configs', 
   crossCheck(/*S=*/288, /*N=*/4, /*w=*/288);
   crossCheck(/*S=*/288, /*N=*/2, /*w=*/96);
   crossCheck(/*S=*/8, /*N=*/4, /*w=*/8);
+});
+
+/**
+ * Pins the cppSegmentMap port against hardcoded {armB, yBase, yStep} goldens for
+ * EVERY config the sweep above exercises. Without this the port (a hand
+ * reimplementation of the C++) and computeSegmentRange could drift together and
+ * keep the cross-check green; here the firmware side is independent literals
+ * derived from pov_segment_map.h's rule (arm A = [0,N/2), top slot y_base 0 +1,
+ * bottom slot y_base ROWS-1 -1), so a convention change in the port fails
+ * regardless of how computeSegmentRange changes. The canonical N=4/S=288 case is
+ * additionally pinned in the fixture test above.
+ */
+test('pov_segment_map port matches independent goldens', () => {
+  /** @type {Array<{S:number, N:number, golden: CppSegmentMap[]}>} */
+  const cases = [
+    // S=288, N=2 → ROWS=144, one band per arm: both segments are the top slot.
+    { S: 288, N: 2, golden: [
+      { armB: false, yBase: 0, yStep: 1 },
+      { armB: true, yBase: 0, yStep: 1 },
+    ] },
+    // S=288, N=4 → ROWS=144: arm A top/bottom, arm B top/bottom.
+    { S: 288, N: 4, golden: [
+      { armB: false, yBase: 0, yStep: 1 },
+      { armB: false, yBase: 143, yStep: -1 },
+      { armB: true, yBase: 0, yStep: 1 },
+      { armB: true, yBase: 143, yStep: -1 },
+    ] },
+    // S=8, N=4 → ROWS=4: same shape at the small extreme.
+    { S: 8, N: 4, golden: [
+      { armB: false, yBase: 0, yStep: 1 },
+      { armB: false, yBase: 3, yStep: -1 },
+      { armB: true, yBase: 0, yStep: 1 },
+      { armB: true, yBase: 3, yStep: -1 },
+    ] },
+  ];
+  for (const { S, N, golden } of cases) {
+    for (let id = 0; id < N; id++) {
+      assert.deepEqual(cppSegmentMap(id, S, N), golden[id],
+        `port matches golden for id=${id} (S=${S}, N=${N})`);
+    }
+  }
 });
