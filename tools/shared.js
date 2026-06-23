@@ -23,7 +23,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // The clipboard helpers live in their own dependency-free module so non-3D
 // pages can import them without pulling Three.js in. Re-exported here for the
 // scene-based callers that already depend on this module.
-export { copyToClipboard, copyWithFeedback } from './clipboard.js';
+export { copyToClipboard, copyWithFeedback, COPY_FEEDBACK } from './clipboard.js';
 
 /**
  * Render a visible error banner across the top of the page. Tool pages that
