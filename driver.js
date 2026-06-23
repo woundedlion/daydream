@@ -759,6 +759,14 @@ export class Daydream {
         this.dotMesh.instanceColor.colorSpace = THREE.LinearSRGBColorSpace;
         this.dotMesh.instanceColor.setUsage(THREE.StreamDrawUsage);
       }
+      // Transient alias: on a resolution change this rebuilds the dot mesh, so
+      // instanceColor.array is a FRESH JS-owned Uint16Array, not the WASM pixel
+      // memory. Pointing Daydream.pixels at it here is deliberately short-lived
+      // — applyResolution() nulls wasmMemoryView, so the next frame's
+      // refreshPixelView() re-fetches the WASM view and re-points all three
+      // aliases (source, instanceColor.array, Daydream.pixels) back at it. Until
+      // that re-fetch, Daydream.pixels is this scratch buffer; nothing should
+      // rely on it aliasing WASM memory across the rebuild boundary.
       Daydream.pixels = this.dotMesh.instanceColor.array;
       Daydream.pixels.fill(0);
 
