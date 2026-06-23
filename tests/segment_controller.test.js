@@ -477,3 +477,89 @@ test('an init-phase fault still reaches the fault overlay (faulted checked befor
   assert.equal(statsShown, 1, 'tick() refreshed the fault overlay despite never being ready');
   assert.equal(c.renderInFlight, false, 'no doomed render dispatched');
 });
+
+// ---------------------------------------------------------------------------
+// Broadcast paths — setEffect / setParameter / setAnimationsPaused carry the
+// main thread's intent to every worker, and _snapshotParams() flattens the
+// engine's tuned values for transport. setEffect must ship that snapshot in the
+// SAME message so the worker re-applies it AFTER its rebuild-to-defaults; a
+// dropped or reordered replay would render a different effect/params than the
+// main thread — the exact divergence segment mode exists to catch.
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal stand-in for the WASM engine exposing just getParameterDefinitions().
+ * @param {Array<{name: string, value: number|boolean}>} defs - Param defs.
+ * @returns {{ getParameterDefinitions: () => Array }} Fake engine.
+ */
+function fakeEngine(defs) {
+  return { getParameterDefinitions: () => defs };
+}
+
+test('_snapshotParams() flattens param defs (bool -> 1/0, number passthrough)', () => {
+  const c = makeController();
+  c._getWasmEngine = () => fakeEngine([
+    { name: 'Speed', value: 0.5 },
+    { name: 'Glow', value: true },
+    { name: 'Invert', value: false },
+    { name: 'Count', value: 7 },
+  ]);
+  assert.deepEqual(c._snapshotParams(), [
+    { name: 'Speed', value: 0.5 },
+    { name: 'Glow', value: 1.0 },
+    { name: 'Invert', value: 0.0 },
+    { name: 'Count', value: 7 },
+  ]);
+});
+
+test('_snapshotParams() is empty when no engine is bound', () => {
+  const c = makeController(); // getWasmEngine -> null
+  assert.deepEqual(c._snapshotParams(), []);
+});
+
+test('setEffect broadcasts the name plus the tuned param snapshot to every worker', () => {
+  const c = readyController(2);
+  c._getWasmEngine = () => fakeEngine([
+    { name: 'Speed', value: 0.5 },
+    { name: 'Glow', value: true },
+  ]);
+
+  c.setEffect('NewEffect');
+
+  for (const w of c.workers) {
+    const msgs = w.posted.filter((m) => m.type === 'setEffect');
+    assert.equal(msgs.length, 1, 'each worker received exactly one setEffect');
+    assert.equal(msgs[0].name, 'NewEffect');
+    // The snapshot rides in the SAME message, so the worker's rebuild-to-defaults
+    // and the param re-apply cannot be split or reordered in transit.
+    assert.deepEqual(msgs[0].params, [
+      { name: 'Speed', value: 0.5 },
+      { name: 'Glow', value: 1.0 },
+    ]);
+  }
+});
+
+test('setParameter broadcasts the name/value to every worker', () => {
+  const c = readyController(2);
+  c.setParameter('Speed', 0.75);
+  for (const w of c.workers) {
+    const msgs = w.posted.filter((m) => m.type === 'setParameter');
+    assert.equal(msgs.length, 1);
+    assert.equal(msgs[0].name, 'Speed');
+    assert.equal(msgs[0].value, 0.75);
+  }
+});
+
+test('setAnimationsPaused records the flag and broadcasts it to every worker', () => {
+  const c = readyController(2);
+  assert.equal(c._animationsPaused, false, 'unpaused by default');
+
+  c.setAnimationsPaused(true);
+
+  assert.equal(c._animationsPaused, true, 'controller remembers the paused state');
+  for (const w of c.workers) {
+    const msgs = w.posted.filter((m) => m.type === 'setAnimationsPaused');
+    assert.equal(msgs.length, 1);
+    assert.equal(msgs[0].paused, true);
+  }
+});
