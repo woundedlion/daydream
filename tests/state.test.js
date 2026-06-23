@@ -1,7 +1,22 @@
 // @ts-check
-import { test } from 'node:test';
+import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { AppState, URLSync, getActiveURLSync } from '../state.js';
+
+// installWindow() below stubs globalThis.window; restore the host value after
+// each test so the stub never leaks to another suite if the runner shares a
+// process (matching recorder.test.js's save/restore discipline). Dispose the
+// active URLSync first: a tracked-key change arms a 200 ms debounced _flush(), so
+// tearing down the window stub while that timer is pending would fire the
+// deferred flush into a deleted window. dispose() cancels the timer (and drops
+// the app-wide writer slot) before the global is restored.
+const _savedWindow = globalThis.window;
+afterEach(() => {
+  const sync = getActiveURLSync();
+  if (sync) sync.dispose();
+  if (_savedWindow === undefined) delete globalThis.window;
+  else globalThis.window = _savedWindow;
+});
 
 /** Verifies get() returns initial defaults and set() updates a value in place. */
 test('AppState.get returns defaults and set updates', () => {
