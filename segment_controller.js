@@ -504,13 +504,20 @@ export class SegmentController {
    */
   setResolution(w, h) {
     // A faulted pool is broken until re-created — broadcasting setResolution to
-    // dead workers does nothing. When faulted (and active), rebuild the pool at
-    // the new size instead: this is the recovery path _onWorkerFault's docstring
-    // and the fault overlay's hint both promise for a resolution change.
-    // create() reads the new size from appState (already updated when we run)
-    // and runs destroy() first, which clears the fault latch.
-    if (this.faulted && this.active) {
-      this.create(this.count);
+    // dead workers does nothing. So handle BOTH faulted cases here and never
+    // fall through to the broadcast below:
+    //   - faulted + active: rebuild the pool at the new size (the recovery path
+    //     _onWorkerFault's docstring and the fault overlay's hint both promise
+    //     for a resolution change). create() reads the new size from appState
+    //     (already updated when we run) and runs destroy() first, which clears
+    //     the fault latch.
+    //   - faulted + inactive: there is nothing to rebuild or broadcast to; drop
+    //     the call. The next create() (on reactivation) reads the size from
+    //     appState, so the new W/H is not lost.
+    if (this.faulted) {
+      if (this.active) {
+        this.create(this.count);
+      }
       return;
     }
     // Open a new generation: any render still in flight (or a settled result not
