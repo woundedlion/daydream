@@ -651,6 +651,27 @@
       });
     }
 
+    // Extract the unique undirected edges of a polygon-face mesh as [lo, hi]
+    // vertex-index pairs. Shared by renderMesh() and generateThumbnails(), which
+    // previously duplicated this block verbatim. Keys are numeric (lo*N + hi)
+    // rather than `${a}_${b}` template strings, so no per-half-edge string is
+    // allocated.
+    function uniqueEdges(faces, vertexCount) {
+      const seen = new Set();
+      const edges = [];
+      for (const f of faces) {
+        for (let i = 0; i < f.length; i++) {
+          const a = f[i];
+          const b = f[(i + 1) % f.length];
+          const lo = a < b ? a : b;
+          const hi = a < b ? b : a;
+          const key = lo * vertexCount + hi;
+          if (!seen.has(key)) { seen.add(key); edges.push([lo, hi]); }
+        }
+      }
+      return edges;
+    }
+
     // WASM Module
     let WasmModule = null;
     let MeshOpsWasm = null;
@@ -943,20 +964,10 @@
         offScene.add(mesh);
 
         // Edges (optional, but looks nice)
-        const edgeIndices = new Set();
-        meshData.faces.forEach(f => {
-          for (let i = 0; i < f.length; i++) {
-            const a = f[i];
-            const b = f[(i + 1) % f.length];
-            const k = a < b ? `${a}_${b}` : `${b}_${a}`;
-            if (!edgeIndices.has(k)) edgeIndices.add(k);
-          }
-        });
         const linePoints = [];
-        edgeIndices.forEach(k => {
-          const [ai, bi] = k.split('_').map(Number);
+        for (const [ai, bi] of uniqueEdges(meshData.faces, meshData.vertices.length)) {
           linePoints.push(meshData.vertices[ai], meshData.vertices[bi]);
-        });
+        }
         const lineGeo = new THREE.BufferGeometry().setFromPoints(linePoints);
         const lines = new THREE.LineSegments(lineGeo, lineMat);
         offScene.add(lines);
@@ -1604,24 +1615,15 @@
       }
 
       // Edges
-      const edgeIndices = new Set();
-      meshData.faces.forEach(f => {
-        for (let i = 0; i < f.length; i++) {
-          const a = f[i];
-          const b = f[(i + 1) % f.length];
-          const key = a < b ? `${a}_${b}` : `${b}_${a}`;
-          if (!edgeIndices.has(key)) edgeIndices.add(key);
-        }
-      });
+      const edges = uniqueEdges(meshData.faces, meshData.vertices.length);
 
       // Persist the edge count on the mesh (same object as currentMesh)
       // so saveSolid reports E instead of falling back to 0 — wasmMeshToJs only
       // returns {vertices, faces}, so without this every saved card shows 0E.
-      meshData.edgeCount = edgeIndices.size;
+      meshData.edgeCount = edges.length;
 
       const lineGeoPoints = [];
-      edgeIndices.forEach(key => {
-        const [ai, bi] = key.split('_').map(Number);
+      for (const [ai, bi] of edges) {
         const va = meshData.vertices[ai];
         const vb = meshData.vertices[bi];
 
@@ -1637,7 +1639,7 @@
         } else {
           lineGeoPoints.push(va, vb);
         }
-      });
+      }
 
       const lineGeo = new THREE.BufferGeometry().setFromPoints(lineGeoPoints);
       edgeLines = new THREE.LineSegments(lineGeo, edgeMaterial);
@@ -1672,7 +1674,7 @@
 
       // Update Stats
       renderBaseSolid();
-      document.getElementById('meshStats').innerText = `${meshData.vertices.length}V / ${edgeIndices.size}E / ${meshData.faces.length}F`;
+      document.getElementById('meshStats').innerText = `${meshData.vertices.length}V / ${edges.length}E / ${meshData.faces.length}F`;
     }
 
     // Project vertex-index labels onto the canvas. Runs each frame after the
