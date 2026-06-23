@@ -14,6 +14,7 @@
 // preserving the page's existing caller behavior exactly.
 
 import * as THREE from 'three';
+import { formatFloatCpp } from './cpp_format.js';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -145,19 +146,9 @@ export const snapToRationalRatio = (activeC, passiveC, maxDenominator = 8) => {
  * @returns {string} A `LissajousParams{...}` initializer.
  */
 export const lissajousCodeString = (c1, c2, a, domain) => {
-  /**
-   * Formats a value as a C++ float literal: fixed precision, trailing zeros
-   * trimmed but always at least one fractional digit, with an 'f' suffix (so
-   * e.g. 12 emits as 12.0f, never the invalid 12f).
-   * @param {number} n - The value to format.
-   * @param {number} [fixed] - Number of fractional digits before trimming.
-   * @returns {string} The C++ float literal (e.g. "12.0f").
-   */
-  const f = (n, fixed = 3) => {
-    let s = n.toFixed(fixed).replace(/(\.\d*?)0+$/, '$1');
-    if (s.endsWith('.')) s += '0';
-    return s + 'f';
-  };
+  // C++ float-literal formatter — the shared formatFloatCpp (cpp_format.js).
+  // Every call below passes an explicit digit count, so behavior is unchanged.
+  const f = formatFloatCpp;
 
   const c1Str = f(c1, 2);
   const c2Str = f(c2, 2);

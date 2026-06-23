@@ -126,8 +126,9 @@ test('proceduralPaletteCpp emits a valid C++ initializer', () => {
   assert.ok(s.includes('// B'));
   assert.ok(s.includes('// C'));
   assert.ok(s.includes('// D'));
-  // Floats carry the `f` suffix, not bare JS numbers.
-  assert.ok(s.includes('{0.500f, 0.500f, 0.500f}'));
+  // Floats carry the `f` suffix, not bare JS numbers, and trailing zeros are
+  // trimmed by the shared formatFloatCpp (0.5 -> "0.5f", not "0.500f").
+  assert.ok(s.includes('{0.5f, 0.5f, 0.5f}'));
 });
 
 /** Verifies generativePaletteCpp emits the GenerativePalette block with the chosen enum tokens, base hue, and caveat comment. */

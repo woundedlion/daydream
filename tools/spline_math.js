@@ -8,11 +8,15 @@
 // engine. Contains a plain-object vector normalize (vec3Normalize), the
 // sampling cores for 4-point Bézier (generateBezierCurve) and N-point
 // Catmull-Rom (generateCatmullRomCurve) curves — both take injected eval/tangent
-// callbacks so the actual math stays in the WASM engine — the C++ float-literal
-// formatter (formatFloatCpp) and the export-snippet string builder
-// (splineExportCode), and uniform unit-sphere sampling via Marsaglia's method
-// (randomPointOnSphere, with an injectable RNG). All DOM/THREE/WASM wiring stays
-// inline in the page.
+// callbacks so the actual math stays in the WASM engine — the export-snippet
+// string builder (splineExportCode), and uniform unit-sphere sampling via
+// Marsaglia's method (randomPointOnSphere, with an injectable RNG). The C++
+// float-literal formatter is the shared formatFloatCpp (cpp_format.js),
+// re-exported here for back-compat. All DOM/THREE/WASM wiring stays inline.
+
+import { formatFloatCpp } from './cpp_format.js';
+
+export { formatFloatCpp };
 
 /**
  * Normalize a plain {x,y,z} vector to unit length. A degenerate (near-zero)
@@ -84,23 +88,6 @@ export function generateCatmullRomCurve(pts, tension, numSamplesPerSeg, tangentF
     }
   }
   return result;
-}
-
-/**
- * Format a number as a C++ float literal. Trims trailing zeros but keeps at
- * least one fractional digit, so whole values stay valid float literals:
- * 0 -> "0.0f", 1 -> "1.0f" (a bare "0f"/"1f" does not compile).
- * @param {number} n - Value to format.
- * @returns {string} C++ float literal (e.g. "1.5f").
- */
-export function formatFloatCpp(n) {
-  // Two-step trim (matching lissajous_math.js): strip only the zeros that follow
-  // the decimal point, then restore a single fractional digit if the dot was left
-  // dangling. Clearer and less fragile than strip-all-trailing-zeros-then-fix-dot,
-  // whose first pass also eats zeros that belong to an integer part.
-  let s = n.toFixed(6).replace(/(\.\d*?)0+$/, '$1');
-  if (s.endsWith('.')) s += '0';
-  return s + 'f';
 }
 
 /**

@@ -25,6 +25,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // scene-based callers that already depend on this module.
 export { copyToClipboard, copyWithFeedback, COPY_FEEDBACK } from './clipboard.js';
 
+// The C++ float-literal formatter likewise lives in a dependency-free module
+// (cpp_format.js) so the pure code generators can share it without dragging
+// Three.js into their unit tests; re-exported here for scene-based pages.
+export { formatFloatCpp } from './cpp_format.js';
+
 /**
  * Render a visible error banner across the top of the page. Tool pages that
  * boot a WASM engine call this from their bootstrap catch so a missing or
