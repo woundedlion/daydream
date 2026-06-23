@@ -283,6 +283,16 @@ function applyEffect(preserveParams = false) {
        */
       export() {
         const values = wasmEngine.getParamValues();
+        // Like syncGUI(), guard the zero-copy view: heap growth can detach it
+        // and leave a zero-length result. Without this the loop below would copy
+        // an all-zero preset to the clipboard and report success. Surface the
+        // failure on the button instead (this is a user-initiated action).
+        if (values.length === 0) {
+          console.warn('Export: parameter view detached (zero-length); skipping copy');
+          exportCtrl.name('✗ Copy failed');
+          setTimeout(() => exportCtrl.name('Export'), 1500);
+          return;
+        }
         const items = [];
         for (let i = 0; i < params.length; i++) {
           const v = (i < values.length) ? values[i] : 0;
