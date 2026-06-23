@@ -194,10 +194,23 @@ export class EffectSidebar {
    * @param {string} label - Human-readable button label.
    * @returns {HTMLElement} The created sort-control button.
    */
+  /**
+   * Glyph for a sort button: the directional arrow when this key is the active
+   * sort, else the neutral both-ways glyph. Shared by the initial render and
+   * the update path so the button shows the correct arrow from the first paint
+   * (the Name-ascending default is active immediately, not only after a click).
+   * @param {string} key - Sort key this button controls ('name' or 'size').
+   * @returns {string} '▲' / '▼' if active, otherwise '⇅'.
+   */
+  _sortGlyph(key) {
+    if (this.sort.key !== key) return '⇅';
+    return this.sort.dir === 'asc' ? '▲' : '▼';
+  }
+
   _createSortBtn(key, label) {
     const btn = document.createElement('button');
     btn.className = 'sort-btn' + (this.sort.key === key ? ' active' : '');
-    btn.innerText = label + ' ⇅';
+    btn.innerText = label + ' ' + this._sortGlyph(key);
     btn.onclick = () => {
       if (this.sort.key === key) {
         this.sortBy(key, this.sort.dir === 'asc' ? 'desc' : 'asc');
@@ -210,11 +223,10 @@ export class EffectSidebar {
 
   /** Sync the sort buttons' active state and direction arrow to this.sort. */
   _updateSortBtnUI() {
-    const arrow = (dir) => dir === 'asc' ? '▲' : '▼';
     this.nameBtn.className = 'sort-btn' + (this.sort.key === 'name' ? ' active' : '');
-    this.nameBtn.innerText = 'Name ' + (this.sort.key === 'name' ? arrow(this.sort.dir) : '⇅');
+    this.nameBtn.innerText = 'Name ' + this._sortGlyph('name');
     this.sizeBtn.className = 'sort-btn' + (this.sort.key === 'size' ? ' active' : '');
-    this.sizeBtn.innerText = 'Size ' + (this.sort.key === 'size' ? arrow(this.sort.dir) : '⇅');
+    this.sizeBtn.innerText = 'Size ' + this._sortGlyph('size');
   }
 
   /**
