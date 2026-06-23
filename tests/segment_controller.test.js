@@ -173,6 +173,28 @@ test('frame at the current generation is stored and settles the frame', async ()
   await done; // frameResolve fired
 });
 
+test('frames delivered out of order within a generation land in their own slots', async () => {
+  const c = makeController();
+  c.create(2);
+  const done = c.renderParallel(); // pending=2, current generation
+  assert.equal(c.pending, 2);
+
+  // Workers respond in arbitrary order; the handler keys on msg.segId, so seg 1
+  // arriving before seg 0 must still file each frame in its own slot and count
+  // pending down to 0 regardless of arrival order.
+  deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2 });
+  assert.ok(c.results[1], 'seg-1 frame stored despite arriving first');
+  assert.equal(c.results[1].x1, 4);
+  assert.equal(c.results[0], null, 'seg-0 slot still empty');
+  assert.equal(c.pending, 1);
+
+  deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2 });
+  assert.ok(c.results[0], 'seg-0 frame stored when it arrives');
+  assert.equal(c.results[0].x1, 2);
+  assert.equal(c.pending, 0);
+  await done; // settles once every segment has reported, order-independent
+});
+
 test('a frame dispatched before a resolution change is dropped but still settles', async () => {
   const c = makeController();
   c.create(2);
@@ -205,6 +227,25 @@ test('a worker fault latches, zeroes pending, and resolves the in-flight frame',
 
   assert.equal(c.faulted, true);
   assert.deepEqual(c.faultInfo, { segId: 0, message: 'boom' });
+  assert.equal(c.pending, 0, 'pending zeroed so the loop cannot deadlock');
+  assert.equal(c.renderInFlight, false);
+  assert.equal(c.frameResolve, null);
+  await done; // the latch settled the promise
+});
+
+test('a worker onmessageerror latches the fault the same way onerror does', async () => {
+  const c = makeController();
+  c.create(2);
+  c.renderInFlight = true;
+  const done = c.renderParallel(); // pending=2, frameResolve set
+
+  // A payload that fails structured-clone deserialization fires onmessageerror,
+  // never onerror. It must still break the deadlock: latch the fault, zero
+  // pending, free the in-flight slot, and settle the frame.
+  c.workers[1].onmessageerror({ type: 'messageerror' });
+
+  assert.equal(c.faulted, true);
+  assert.deepEqual(c.faultInfo, { segId: 1, message: 'message deserialization failed' });
   assert.equal(c.pending, 0, 'pending zeroed so the loop cannot deadlock');
   assert.equal(c.renderInFlight, false);
   assert.equal(c.frameResolve, null);
