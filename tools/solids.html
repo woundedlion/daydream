@@ -1733,15 +1733,21 @@
         scene.add(normalLines);
       }
 
-      // Indices (limit to < 1000)
+      // Indices (limit to < 1000). Build into a DocumentFragment and insert in a
+      // single appendChild so up to ~1000 labels cost one DOM mutation instead
+      // of one per vertex. Flag the labels for re-projection so updateLabels
+      // positions the freshly-created set on the next frame.
       if (state.showIndices && meshData.vertices.length < 1000) {
+        const frag = document.createDocumentFragment();
         meshData.vertices.forEach((v, i) => {
           const el = document.createElement('div');
           el.textContent = i;
           el.className = 'absolute text-[0.75rem] font-mono text-white bg-black/50 px-1 rounded transform -translate-x-1/2 -translate-y-1/2 pointer-events-none';
           el.dataset.index = i;
-          labelsContainer.appendChild(el);
+          frag.appendChild(el);
         });
+        labelsContainer.appendChild(frag);
+        labelsNeedReproject = true;
       }
 
       // Update Stats
@@ -1749,11 +1755,37 @@
       document.getElementById('meshStats').innerText = `${meshData.vertices.length}V / ${edges.length}E / ${meshData.faces.length}F`;
     }
 
+    // Set true whenever the label set is (re)built, so updateLabels re-projects
+    // it once even if the camera happens not to have moved that frame.
+    let labelsNeedReproject = false;
+    // Cached camera transform from the last projection — lets updateLabels skip
+    // the ~1000-label loop on frames where the camera is identical (autorotate
+    // paused and no user input). During autorotation the camera changes every
+    // frame, so the loop runs as before.
+    const _labelCam = { px: NaN, py: NaN, pz: NaN, qx: NaN, qy: NaN, qz: NaN, qw: NaN };
+    function labelCameraMoved() {
+      const p = camera.position, q = camera.quaternion;
+      if (p.x === _labelCam.px && p.y === _labelCam.py && p.z === _labelCam.pz &&
+          q.x === _labelCam.qx && q.y === _labelCam.qy && q.z === _labelCam.qz && q.w === _labelCam.qw) {
+        return false;
+      }
+      _labelCam.px = p.x; _labelCam.py = p.y; _labelCam.pz = p.z;
+      _labelCam.qx = q.x; _labelCam.qy = q.y; _labelCam.qz = q.z; _labelCam.qw = q.w;
+      return true;
+    }
+
     // Project vertex-index labels onto the canvas. Runs each frame after the
     // render (via initScene's onAfterRender hook), so the labels track the
     // current camera; guarded because the loop starts before init finishes.
     function updateLabels() {
       if (state.showIndices && currentMesh && labelsContainer && labelsContainer.children.length > 0) {
+        // Nothing to do when neither the camera nor the label set changed since
+        // the last projection. (A canvas resize without camera motion is the one
+        // gap; autorotate — on by default — refreshes positions within a frame.)
+        const moved = labelCameraMoved();
+        if (!moved && !labelsNeedReproject) return;
+        labelsNeedReproject = false;
+
         const rect = renderer.domElement.getBoundingClientRect();
         const tempV = new THREE.Vector3();
         const camPos = camera.position;
