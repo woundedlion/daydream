@@ -154,6 +154,14 @@ async function handleMessage(msg) {
     case 'render': {
       if (!engine || !segRange) break;
 
+      // Two timings travel back to the controller as separate columns because
+      // they measure overlapping-but-different spans:
+      //   elapsed  — JS wall time (ms) bracketing the drawFrame() call: the C++
+      //              render PLUS the embind boundary-crossing overhead.
+      //   renderUs — the engine's own internal render timer (µs), the C++ render
+      //              proper, excluding the JS<->WASM call overhead.
+      // So elapsed >= renderUs/1000; the gap is the marshaling cost. Keep both:
+      // renderUs isolates engine cost, elapsed is what the JS frame loop pays.
       const t0 = performance.now();
       engine.drawFrame();
       const elapsed = performance.now() - t0;
