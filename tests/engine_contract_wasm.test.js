@@ -48,8 +48,13 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
   assert.equal(typeof ok, 'boolean', 'setResolution must return a boolean');
   assert.equal(ok, true, `the ${W}x${H} preset must be a buildable resolution`);
 
-  // DistortedRing is the C++ bootstrap default — a guaranteed-registered name.
-  engine.setEffect('DistortedRing');
+  // setEffect must return a strict boolean — daydream.js gates on `=== false`,
+  // so a non-boolean (or a void-returning FakeEngine) would slip past that guard.
+  // DistortedRing is the C++ bootstrap default — a guaranteed-registered name, so
+  // the call must report success.
+  const effectOk = engine.setEffect('DistortedRing');
+  assert.equal(typeof effectOk, 'boolean', 'setEffect must return a boolean');
+  assert.equal(effectOk, true, 'setEffect must succeed for a registered effect');
 
   // getParameterDefinitions: array-like of { name:string, value:number|boolean },
   // exactly what SegmentController._snapshotParams iterates.
@@ -62,8 +67,13 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
     assert.ok(typeof p.value === 'number' || typeof p.value === 'boolean',
       'param def value must be a number or boolean');
     // setParameter takes a numeric value (the controller flattens bools to 1/0
-    // before sending), so coerce the same way before the contract call.
-    engine.setParameter(p.name, typeof p.value === 'boolean' ? (p.value ? 1 : 0) : p.value);
+    // before sending), so coerce the same way before the contract call. It
+    // likewise returns a strict boolean (the GUI gates on `=== false`); a known
+    // param name fed its own current value must report success.
+    const paramOk = engine.setParameter(
+      p.name, typeof p.value === 'boolean' ? (p.value ? 1 : 0) : p.value);
+    assert.equal(typeof paramOk, 'boolean', 'setParameter must return a boolean');
+    assert.equal(paramOk, true, 'setParameter must succeed for a known param name');
   }
 
   // The remaining void setters the worker drives, called the same way it does.
@@ -88,5 +98,11 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
       assert.equal(typeof m[arena][field], 'number',
         `getArenaMetrics().${arena}.${field} must be a number`);
     }
+    // A real arena reports a nonzero capacity and usage that fits within it; a
+    // FakeEngine modeling capacity as 0 (or usage past capacity) would
+    // mis-represent the contract the worker marshals.
+    assert.ok(m[arena].capacity > 0, `${arena}.capacity must be > 0`);
+    assert.ok(m[arena].usage <= m[arena].capacity,
+      `${arena}.usage must not exceed capacity`);
   }
 });
