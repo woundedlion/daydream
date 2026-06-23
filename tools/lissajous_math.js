@@ -43,12 +43,13 @@ export const lissajous = (m1, m2, a, t) => {
   const x = Math.sin(m2 * t) * Math.cos(m1 * t - phase);
   const y = Math.cos(m2 * t);
   const z = Math.sin(m2 * t) * Math.sin(m1 * t - phase);
-  // Mirror the engine's lissajous(), which returns v.normalized() (core/geometry.h).
-  // The components are unit-length in exact math, but the engine still normalizes
-  // (float32 rounding leaves |v| slightly off 1, e.g. near the sin(m2·t)≈0 points);
-  // applying the same normalize keeps this export/preview tool in lockstep with the
-  // device instead of silently diverging.
-  return new THREE.Vector3(x, y, z).normalize();
+  // Match the engine's lissajous() (core/geometry.h), which returns this raw
+  // vector with NO normalize: sin²(m2·t)(cos²(m1·t−a)+sin²(m1·t−a)) + cos²(m2·t)
+  // = 1, so the components are already unit-length and the engine omits the
+  // normalize on purpose. Do the same here, so this export/preview tool predicts
+  // the device output exactly instead of diverging by a renormalization step the
+  // engine never performs.
+  return new THREE.Vector3(x, y, z);
 };
 
 /**
