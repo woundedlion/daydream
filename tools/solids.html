@@ -825,6 +825,10 @@
       renderer = result.renderer;
       controls = result.controls;
 
+      // Wire the scaffold's dispose() to teardown — it stops the render loop and
+      // detaches the resize listener, which previously leaked on page unload.
+      window.addEventListener('pagehide', () => result.dispose(), { once: true });
+
       // Toggles
       // These toggles change only how the cached mesh is presented, so they
       // redraw via renderMesh() instead of update() — no WASM op-chain replay.
@@ -1740,7 +1744,15 @@
 
 
 
-    window.onload = init;
+    // addEventListener (not window.onload =) avoids clobbering any other load
+    // handler; .catch surfaces an init failure (init() returns a promise) that a
+    // bare assignment would otherwise swallow.
+    window.addEventListener('load', () => {
+      init().catch((e) => {
+        console.error('Solids tool failed to initialize:', e);
+        showFatalError('The solids tool failed to initialize — see the browser console for details.');
+      });
+    });
 
   </script>
 </body>

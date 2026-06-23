@@ -101,7 +101,7 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { initScene, copyWithFeedback } from './shared.js';
+    import { initScene, copyWithFeedback, showFatalError } from './shared.js';
     import { createSlider as buildSlider } from './slider.js';
     import {
       lissajous,
@@ -155,6 +155,10 @@
       camera = result.camera;
       renderer = result.renderer;
       controls = result.controls;
+
+      // Wire the scaffold's dispose() to teardown — it stops the render loop and
+      // detaches the resize listener, which previously leaked on page unload.
+      window.addEventListener('pagehide', () => result.dispose(), { once: true });
 
       regenerateCurve();
     };
@@ -377,8 +381,17 @@
       initThree();
     };
 
-    // Start everything when the window is fully loaded
-    window.onload = init;
+    // Start everything when the window is fully loaded. addEventListener (not
+    // window.onload =) avoids clobbering any other load handler, and the
+    // try/catch surfaces a synchronous init failure instead of swallowing it.
+    window.addEventListener('load', () => {
+      try {
+        init();
+      } catch (e) {
+        console.error('Lissajous tool failed to initialize:', e);
+        showFatalError('The Lissajous tool failed to initialize — see the browser console for details.');
+      }
+    });
 
   </script>
 </body>

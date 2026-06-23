@@ -1215,10 +1215,28 @@
       if (animationFrameId === null) {
         animate(0); // Start the animation loop
       }
+
+      // Stop the RAF loop and detach the document-level drag listeners on
+      // teardown — previously both leaked on page unload (no dispose path).
+      window.addEventListener('pagehide', () => {
+        if (animationFrameId !== null) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
+        document.removeEventListener('mousemove', handleDragMove);
+        document.removeEventListener('mouseup', handleDragEnd);
+      }, { once: true });
     }
 
-    // Start the application
-    window.onload = init;
+    // Start the application. addEventListener (not window.onload =) avoids
+    // clobbering any other load handler; .catch surfaces an init failure
+    // (init() returns a promise) that a bare assignment would swallow.
+    window.addEventListener('load', () => {
+      init().catch((e) => {
+        console.error('Palette tool failed to initialize:', e);
+        showFatalError('The palette tool failed to initialize — see the browser console for details.');
+      });
+    });
 
   </script>
 </body>

@@ -296,7 +296,7 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { initScene } from './shared.js';
+    import { initScene, showFatalError } from './shared.js';
     import {
       elliptic, hyperbolic, loxodromic, parabolic,
       inversion, tumble, cayley, snapComplex,
@@ -677,13 +677,15 @@
       scene.add(wireMesh);
 
       // Dispose both spheres' GPU resources on teardown (the page otherwise kept
-      // no handle to the wireframe and had no dispose path at all).
+      // no handle to the wireframe and had no dispose path at all), and run the
+      // scaffold's dispose() to stop its render loop and drop the resize listener.
       window.addEventListener('pagehide', () => {
         for (const m of [sphereMesh, wireMesh]) {
           if (!m) continue;
           m.geometry.dispose();
           m.material.dispose();
         }
+        result.dispose();
       }, { once: true });
 
       updateMobiusUniforms();
@@ -728,7 +730,16 @@
       initThree();
     };
 
-    window.onload = init;
+    // addEventListener (not window.onload =) avoids clobbering any other load
+    // handler, and the try/catch surfaces a synchronous init failure.
+    window.addEventListener('load', () => {
+      try {
+        init();
+      } catch (e) {
+        console.error('Möbius tool failed to initialize:', e);
+        showFatalError('The Möbius tool failed to initialize — see the browser console for details.');
+      }
+    });
 
   </script>
 </body>
