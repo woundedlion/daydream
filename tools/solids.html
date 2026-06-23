@@ -942,6 +942,15 @@
       const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
 
       for (const key of thumbKeys) {
+        // Yield to the event loop before each solid. Each iteration is a full
+        // WASM build + triangulation + WebGL render + toDataURL — heavy enough
+        // that running the whole list synchronously froze first paint and input
+        // during init(). Deferring each to its own macrotask lets the page paint
+        // and stay responsive while the footer fills in progressively; this is
+        // why generateThumbnails() is async and init() deliberately does not
+        // await it.
+        await new Promise(resolve => setTimeout(resolve));
+
         // Reset to just the lights; the previous iteration's mesh/lines are
         // detached here and their GPU buffers freed at the end of the loop body.
         offScene.clear();
@@ -998,6 +1007,13 @@
         const dataURL = offRenderer.domElement.toDataURL();
         img.src = dataURL;
         baseThumbnails[key] = dataURL;
+
+        // init() now renders the base preview before this (deferred) loop has
+        // produced its thumbnail, so refresh it the moment its own thumb exists
+        // rather than leaving the preview blank until the next selection.
+        if (key === state.base) {
+          document.getElementById('baseThumb').src = dataURL;
+        }
 
         const span = document.createElement('span');
         // Format Name: truncatedIcosahedron -> Truncated Icosahedron -> Truncated\nIcosahedron?
