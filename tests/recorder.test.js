@@ -90,6 +90,56 @@ test('native-resolution capture pins the offscreen to the source size at start',
   }
 });
 
+/**
+ * Verifies the targetHeight (downscale) path sizes the offscreen to the target
+ * height and the source's start-time aspect, rounding both dimensions up to even
+ * (codecs require it), and then pins that buffer against a mid-recording resize.
+ */
+test('targetHeight capture scales the offscreen to the target height and pins it', () => {
+  const prevDoc = globalThis.document;
+  globalThis.document = { createElement: () => fakeCanvas() };
+  try {
+    const source = fakeCanvas(800, 600);   // 4:3 source
+    const rec = new VideoRecorder(source);
+    rec.targetHeight = 121;                 // odd target → rounded up to even
+    assert.notEqual(rec.targetHeight, null); // downscale path, not native
+
+    const off = rec._ensureOffscreen();
+    // height 121 → 122; width round(121 * 800/600) = round(161.33) = 161 → 162.
+    assert.equal(off.height, 122);
+    assert.equal(off.width, 162);
+
+    // A mid-recording source resize must NOT change the pinned buffer.
+    source.width = 1920;
+    source.height = 1080;
+    const off2 = rec._ensureOffscreen();
+    assert.equal(off2, off);
+    assert.equal(off2.width, 162);
+    assert.equal(off2.height, 122);
+  } finally {
+    globalThis.document = prevDoc;
+  }
+});
+
+/**
+ * Verifies the downscale path clamps a degenerate source aspect: a 0x0 source
+ * makes width/height non-finite, which would propagate to NaN canvas dimensions;
+ * the offscreen falls back to a square at the target height instead.
+ */
+test('targetHeight capture falls back to a square when the source aspect is degenerate', () => {
+  const prevDoc = globalThis.document;
+  globalThis.document = { createElement: () => fakeCanvas() };
+  try {
+    const rec = new VideoRecorder(fakeCanvas(0, 0)); // 0/0 → NaN aspect
+    rec.targetHeight = 120;
+    const off = rec._ensureOffscreen();
+    assert.equal(off.height, 120);
+    assert.equal(off.width, 120, 'square fallback, not NaN');
+  } finally {
+    globalThis.document = prevDoc;
+  }
+});
+
 // ---------------------------------------------------------------------------
 // MediaRecorder session lifecycle, behind a fake MediaRecorder/captureStream.
 // ---------------------------------------------------------------------------
@@ -212,6 +262,33 @@ test('a stopped session downloads its own chunks and clears instance state', () 
     // It was still the active session, so cleanup ran.
     assert.equal(rec.mediaRecorder, null);
     assert.equal(stream.track.stopped, true);
+  } finally {
+    restore();
+  }
+});
+
+/** Verifies ondataavailable drops empty (size:0) flushes and keeps real chunks. */
+test('a session retains only non-empty chunks', () => {
+  const restore = installRecorderEnv();
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    const downloads = [];
+    rec._download = (recorder, chunks, name) => downloads.push({ recorder, chunks, name });
+
+    rec.start('e');
+    const recorder = rec.mediaRecorder;
+    // MediaRecorder can emit zero-byte dataavailable events (e.g. a flush with
+    // nothing buffered); those must be filtered so the saved file has no empty
+    // fragments, while the real chunk between them is kept.
+    recorder.ondataavailable({ data: { size: 0 } });
+    recorder.ondataavailable({ data: { size: 42 } });
+    recorder.ondataavailable({ data: { size: 0 } });
+    rec.stop();
+    recorder.onstop();
+
+    assert.equal(downloads.length, 1);
+    assert.deepEqual(downloads[0].chunks, [{ size: 42 }],
+      'only the non-empty chunk is retained');
   } finally {
     restore();
   }
