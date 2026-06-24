@@ -241,6 +241,14 @@ function applyEffect(preserveParams = false) {
           items.push(v.toFixed(4) + 'f');
         }
         const cpp = '{ ' + items.join(', ') + ' }';
+        // navigator.clipboard is undefined on insecure/older contexts; bail through
+        // the same flash so writeText access never throws synchronously.
+        if (!navigator.clipboard) {
+          console.warn('Export: clipboard API unavailable (insecure context?)');
+          exportCtrl.name('✗ Copy failed');
+          setTimeout(() => exportCtrl.name('Export'), 1500);
+          return;
+        }
         navigator.clipboard.writeText(cpp).then(() => {
           exportCtrl.name('\u2713 Copied!');
           setTimeout(() => exportCtrl.name('Export'), 1500);
