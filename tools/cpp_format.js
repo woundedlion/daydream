@@ -25,9 +25,8 @@
 export function formatFloatCpp(n, digits = 6) {
   let s = n.toFixed(digits).replace(/(\.\d*?)0+$/, '$1');
   if (s.endsWith('.')) s += '0';
-  // Nonzero magnitude that collapsed to "0.0": widen precision by the count of
-  // leading fractional zeros so `digits` significant figures survive, then
-  // re-trim. toFixed's 100-digit ceiling caps sub-1e-100 inputs back to "0.0".
+  // Nonzero magnitude that collapsed to "0.0": widen precision past the leading
+  // fractional zeros so `digits` significant figures survive (toFixed caps at 100).
   if (parseFloat(s) === 0 && Number.isFinite(n) && n !== 0) {
     const leadingZeros = Math.ceil(-Math.log10(Math.abs(n)));
     const prec = Math.min(100, leadingZeros + digits);

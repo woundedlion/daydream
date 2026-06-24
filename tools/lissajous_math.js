@@ -36,8 +36,7 @@ export const lissajous = (m1, m2, a, t) => {
   const x = Math.sin(m2 * t) * Math.cos(m1 * t - phase);
   const y = Math.cos(m2 * t);
   const z = Math.sin(m2 * t) * Math.sin(m1 * t - phase);
-  // No normalize, matching the engine (core/geometry.h): the components are
-  // already unit-length since sin²(m2·t)(cos²+sin²) + cos²(m2·t) = 1.
+  // Already unit-length: sin²(m2·t)(cos²+sin²) + cos²(m2·t) = 1.
   return new THREE.Vector3(x, y, z);
 };
 
@@ -51,11 +50,8 @@ export const lissajous = (m1, m2, a, t) => {
  * @returns {{ M: number, N: number }} The best simple rational ratio.
  */
 export const findBestRationalRatio = (value, maxTerm = 8) => {
-  // 0 is the fraction 0/1, not 1/1, so a zeroed frequency stays at zero.
   if (value === 0) return { M: 0, N: 1 };
 
-  // The M/N grid is strictly positive: split the sign off, search on |value|,
-  // and carry the sign back on the numerator.
   const sign = value < 0 ? -1 : 1;
   const absValue = Math.abs(value);
 
@@ -68,7 +64,6 @@ export const findBestRationalRatio = (value, maxTerm = 8) => {
       const ratio = M / N;
       const diff = Math.abs(absValue - ratio);
 
-      // Prefer a closer approximation, tie-breaking on the smaller ratio.
       if (diff < minDiff || (diff === minDiff && (M + N) < (bestM + bestN))) {
         minDiff = diff;
         bestM = M;
@@ -77,9 +72,7 @@ export const findBestRationalRatio = (value, maxTerm = 8) => {
     }
   }
 
-  // The (M+N) tie-break does not guarantee a reduced fraction when no exact
-  // match exists. Reduce by gcd so the ratio is in lowest terms — which also
-  // makes the closing period 2π·N/passiveC the true (shortest) period.
+  // Reduce to lowest terms so 2π·N/passiveC is the true (shortest) period.
   const g = gcd(bestM, bestN);
   return { M: (sign * bestM) / g, N: bestN / g };
 };
@@ -95,8 +88,6 @@ export const findBestRationalRatio = (value, maxTerm = 8) => {
  *   snapped active frequency, the rational ratio m/n, and the curve's closing period T.
  */
 export const snapToRationalRatio = (activeC, passiveC, maxTerm = 8) => {
-  // A zero passive frequency makes the ratio and closing period undefined
-  // (Infinity/NaN). Pass the active frequency through with a trivial 1/1 ratio.
   if (passiveC === 0) {
     return { snappedActiveC: activeC, m: 1, n: 1, closingPeriod: 0 };
   }
@@ -106,7 +97,6 @@ export const snapToRationalRatio = (activeC, passiveC, maxTerm = 8) => {
 
   const snappedActiveC = passiveC * (M / N);
 
-  // With M/N the rational ratio, the curve repeats after T = 2π·N / passiveC.
   const closingPeriod = (TWO_PI * N) / passiveC;
 
   return { snappedActiveC, m: M, n: N, closingPeriod };
@@ -135,8 +125,7 @@ export const lissajousCodeString = (c1, c2, a, domain) => {
   const c2Str = f(c2, 2);
   const aStr = f(a, 3);
 
-  // Exact 2π multiples render against the engine's PI_F constant (matching
-  // ChaoticStrings' `2 * PI_F`); otherwise a plain float literal.
+  // Emit exact 2π multiples against PI_F to match the engine's source form.
   let domainStr;
   const multiple = domain / TWO_PI;
   if (Math.abs(multiple - Math.round(multiple)) < 0.001 && Math.round(multiple) > 0) {
