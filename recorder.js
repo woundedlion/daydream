@@ -59,25 +59,18 @@ export class VideoRecorder {
     this._effectName = 'effect';
     this.frameInterval = frameInterval;
     this.elapsedSeconds = 0;
-    // bitrateMbps, format, and targetHeight below are LATCHED at start(): they
-    // are read only when a session begins (see start()), so assigning any of
-    // them mid-recording has no effect until the next start(). To change them,
-    // stop and restart the recording.
+    // bitrateMbps, format, and targetHeight are latched at start(): assigning any
+    // mid-recording has no effect until the next start().
     this.bitrateMbps = 16;
-    // Output format: 'auto' (prefer mp4, fall back to webm), 'mp4', or 'webm'.
-    // Latched at start() — see the note above.
+    // 'auto' (prefer mp4, fall back to webm), 'mp4', or 'webm'.
     this.format = 'auto';
-    // Resolution override: target height in pixels (null = native).
-    // Width is computed from the source canvas aspect ratio.
-    // Latched at start() — see the note above.
+    // Resolution override: target height in pixels (null = native); width follows
+    // the source canvas aspect.
     this.targetHeight = null;
-    // Offscreen scaling canvas (created on demand, destroyed on cleanup)
     this._offscreen = null;
     this._offCtx = null;
     // Latch so captureFrame() warns at most once when the browser lacks
-    // track.requestFrame (the manual frame-request API). Declared here so all
-    // instance state is visible at construction rather than springing into
-    // existence on first use.
+    // track.requestFrame.
     this._warnedNoRequestFrame = false;
   }
 
@@ -109,8 +102,8 @@ export class VideoRecorder {
       return false;
     } else {
       this.start(effectName);
-      // start() can refuse (unsupported browser, etc.); report the real state
-      // so the caller's button does not latch into a phantom recording mode.
+      // start() can refuse (unsupported browser); report the real state so the
+      // caller's button doesn't latch into a phantom recording mode.
       return this.isRecording;
     }
   }
@@ -131,47 +124,41 @@ export class VideoRecorder {
     this._effectName = effectName;
     this.elapsedSeconds = 0;
 
-    // Determine capture source. Both paths capture through an offscreen canvas
-    // so the recorded track's frame dimensions are fixed for the whole session:
-    // a mid-recording resolution change resizes the source WebGL canvas, and a
-    // captureStream bound directly to it would change the track's frame size,
-    // which most H.264/VP9 encoders reject or corrupt. The scaled path pins the
-    // target height; the native path pins the source's start dimensions (a 1:1
-    // blit when the source is not resized).
+    // Both paths capture through an offscreen canvas so the track's frame
+    // dimensions stay fixed for the session: a captureStream bound to the source
+    // would change track size on a mid-recording resize, which most H.264/VP9
+    // encoders reject or corrupt. Scaled path pins the target height; native path
+    // pins the source's start dimensions.
     const captureSource = this.targetHeight
       ? this._ensureOffscreen()
       : this._ensurePinnedOffscreen();
 
-    // A null 2D context (getContext('2d') can fail under memory pressure or a
-    // lost context) is tolerated by the blit guard, but starting the recorder
-    // anyway would produce a permanently blank file with no diagnostic — the only
-    // silent-failure path. Abort the session loudly instead.
+    // A null 2D context (getContext('2d') can fail under memory pressure or a lost
+    // context) would otherwise start the recorder and produce a permanently blank
+    // file with no diagnostic. Abort the session loudly instead.
     if (!this._offCtx) {
       console.error('VideoRecorder: failed to acquire a 2D drawing context for the capture canvas; recording aborted.');
       return;
     }
 
-    // Manual frame-request mode: framerate 0 means we control when frames are captured
+    // framerate 0: manual frame-request mode, we control when frames are captured.
     const stream = captureSource.captureStream(0);
     const track = stream.getVideoTracks()[0];
 
-    // Pick the best-supported codec for the requested format.
     const mimeType = selectMimeType(this.format);
 
-    // Omit the mimeType key entirely when no candidate is supported (selectMimeType
-    // returns ''): some engines throw on an explicitly-empty mimeType, whereas
-    // omitting it takes the UA-default codec path selectMimeType intends.
+    // Omit the mimeType key when no candidate is supported (selectMimeType returns
+    // ''): some engines throw on an empty mimeType, whereas omitting it takes the
+    // UA-default codec path.
     const options = { videoBitsPerSecond: this.bitrateMbps * 1_000_000 };
     if (mimeType) options.mimeType = mimeType;
     const recorder = new MediaRecorder(stream, options);
 
-    // Session-local capture state. MediaRecorder.stop() flips state to
-    // 'inactive' synchronously, but ondataavailable/onstop fire asynchronously
-    // later. A fast stop→start can therefore install a brand-new session on
-    // this.* before the old recorder's handlers run. Binding chunks/stream/
-    // recorder/effectName in the closures (instead of reading this.* at fire
-    // time) keeps a stale session from downloading the new session's chunks or
-    // tearing down its stream — the old handlers only ever touch their own.
+    // Session-local capture state. stop() flips state synchronously but
+    // ondataavailable/onstop fire later, so a fast stop→start can install a new
+    // session on this.* before the old handlers run. Binding chunks/stream/
+    // recorder/effectName in the closures (not reading this.* at fire time) keeps
+    // a stale handler from touching the new session's state.
     const chunks = [];
 
     this.mediaRecorder = recorder;
@@ -187,9 +174,8 @@ export class VideoRecorder {
       this._download(recorder, chunks, effectName);
       // This session owns `stream`, so stop its tracks unconditionally.
       stream.getTracks().forEach(t => t.stop());
-      // Only clear the shared instance state (and offscreen canvas) if this is
-      // still the active session; a rapid stop→start may have already replaced
-      // it, and that newer session must survive this stale teardown.
+      // Clear shared instance state only if this is still the active session: a
+      // rapid stop→start may have replaced it, and that session must survive.
       if (this.mediaRecorder === recorder) this._cleanup();
     };
 
@@ -216,9 +202,8 @@ export class VideoRecorder {
   captureFrame() {
     if (!this.isRecording || !this.track) return;
     if (typeof this.track.requestFrame !== 'function') {
-      // Recording is silently a no-op without requestFrame (browser lacks the
-      // captureStream frame-request API). Warn once rather than per frame so the
-      // broken recording is visible without spamming the console.
+      // Without requestFrame recording is a silent no-op; warn once (not per
+      // frame) so the broken recording is visible without spamming the console.
       if (!this._warnedNoRequestFrame) {
         console.warn('Recorder: track.requestFrame is unavailable; recorded frames will not advance in this browser.');
         this._warnedNoRequestFrame = true;
@@ -226,23 +211,17 @@ export class VideoRecorder {
       return;
     }
 
-    // Blit the source canvas into the offscreen capture buffer. Both the scaled
-    // and native paths pin the offscreen dimensions at start(), so a source
-    // resized mid-recording (window/resolution change) scales into the fixed
-    // buffer rather than resizing the captured track — the track's frame size
-    // must stay fixed for the whole session (most H.264/VP9 encoders reject or
-    // corrupt a mid-stream size change).
-    // Skip the blit when the source canvas is mid-resize at a transient 0x0:
-    // drawImage from a zero-sized source throws (or injects a blank/wrong-aspect
-    // frame), corrupting a "byte-perfect" recording. The offscreen keeps its
-    // prior contents, so requestFrame() below re-emits the last good frame for
-    // this tick rather than a broken one.
+    // Blit the source into the offscreen buffer (dimensions pinned at start()), so
+    // a mid-recording resize scales into the fixed buffer rather than resizing the
+    // track (most H.264/VP9 encoders reject a mid-stream size change).
+    // Skip the blit at a transient 0x0 source (mid-resize): drawImage from a
+    // zero-sized source throws or injects a blank/wrong-aspect frame. The offscreen
+    // keeps its prior contents, so requestFrame() re-emits the last good frame.
     if (this._offscreen && this._offCtx &&
         this.canvas.width > 0 && this.canvas.height > 0) {
-      // Letterbox/pillarbox the source into the pinned offscreen so a
-      // mid-recording window resize (changing the source aspect away from the
-      // pinned one) preserves geometry instead of stretching. When the source
-      // aspect matches the offscreen's, the destination rect fills it exactly.
+      // Letterbox/pillarbox the source into the pinned offscreen so a resize that
+      // changes the source aspect preserves geometry instead of stretching. A
+      // matching aspect fills the destination rect exactly.
       const offW = this._offscreen.width, offH = this._offscreen.height;
       const srcAspect = this.canvas.width / this.canvas.height;
       const offAspect = offW / offH;
@@ -288,17 +267,15 @@ export class VideoRecorder {
    * @returns {HTMLCanvasElement} The offscreen canvas pinned to the target height.
    */
   _ensureOffscreen() {
-    // Size only on creation, then never resize — that pin is what keeps the
-    // track frame size constant. A session starts with a fresh offscreen
-    // (_cleanup nulls it), so each session pins to its own start-time aspect.
+    // Size only on creation, never resize — that pin keeps the track frame size
+    // constant. _cleanup nulls it, so each session pins to its own start aspect.
     if (!this._offscreen) {
-      // Clamp the aspect: an early or zero-size source layout makes
-      // width/height non-finite (height 0 → Infinity, 0/0 → NaN), which would
-      // propagate to NaN canvas dimensions. Fall back to a square in that case.
+      // Clamp the aspect: an early/zero-size source layout makes it non-finite
+      // (0 → Infinity, 0/0 → NaN), which would poison the canvas dimensions.
       const rawAspect = this.canvas.width / this.canvas.height;
       const aspect = Number.isFinite(rawAspect) && rawAspect > 0 ? rawAspect : 1;
       const w = Math.round(this.targetHeight * aspect);
-      // Ensure even dimensions (codecs require it)
+      // Even dimensions (codecs require it).
       const evenW = w % 2 === 0 ? w : w + 1;
       const evenH = this.targetHeight % 2 === 0 ? this.targetHeight : this.targetHeight + 1;
       this._offscreen = document.createElement('canvas');
@@ -320,11 +297,9 @@ export class VideoRecorder {
    * @returns {HTMLCanvasElement} The offscreen canvas pinned to the start-time source size.
    */
   _ensurePinnedOffscreen() {
-    // Size only on creation, then never resize: that is what "pinned" means. A
-    // session starts with a fresh offscreen (_cleanup nulls it), so each session
-    // pins to its own start-time source size. A zero/early source layout would
-    // make a 0-size buffer; floor at 1 so the rounded-up even dimension stays
-    // valid.
+    // Size only on creation, never resize: that is what "pinned" means. _cleanup
+    // nulls it, so each session pins to its own start-time source size. Floor at
+    // 1 so a zero/early source layout still yields a valid even dimension.
     if (!this._offscreen) {
       const srcW = this.canvas.width > 0 ? this.canvas.width : 1;
       const srcH = this.canvas.height > 0 ? this.canvas.height : 1;
@@ -372,9 +347,7 @@ export class VideoRecorder {
 
     const filename = `${effectName}_${ts}.${ext}`;
 
-    // Use showSaveFilePicker when available for a proper, deterministic download;
-    // fall back to anchor-click with a load-event-based revoke. Reference it off
-    // `window` rather than as a bare global so the lookup is explicit and a
+    // Reference showSaveFilePicker off `window`, not as a bare global, so a
     // missing API reads as `undefined` instead of a ReferenceError.
     if (typeof window.showSaveFilePicker === 'function') {
       this._saveWithPicker(blob, filename, ext);
@@ -407,9 +380,8 @@ export class VideoRecorder {
     } catch (err) {
       // User cancelled the dialog — not an error; nothing to save.
       if (err.name === 'AbortError') return;
-      // Any other failure (expired user activation -> SecurityError, disk/write
-      // error, etc.) would otherwise silently lose the recording. Fall back to the
-      // anchor download so the artifact still reaches the user.
+      // Any other failure (expired activation → SecurityError, disk/write error)
+      // would silently lose the recording; fall back to the anchor download.
       console.warn('VideoRecorder: picker save failed, falling back to anchor download', err);
       this._saveWithAnchor(blob, filename);
     }
@@ -432,12 +404,10 @@ export class VideoRecorder {
     a.click();
     document.body.removeChild(a);
 
-    // The click hands the blob to the download manager synchronously, so the
-    // object URL only needs to outlive the click. Revoke on a short timeout
-    // rather than an <iframe> load event: pointing an iframe at a *video* blob
-    // can start inline playback or — for a Content-Disposition download — never
-    // fire load, leaking the URL until a 60 s fallback, and the iframe can
-    // redundantly re-trigger the download the anchor already started.
+    // The click hands the blob to the download manager synchronously, so the URL
+    // only needs to outlive the click. Revoke on a short timeout rather than an
+    // <iframe> load event: an iframe pointed at a video blob can start inline
+    // playback or never fire load, and can re-trigger the download.
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
@@ -453,7 +423,6 @@ export class VideoRecorder {
       this.stream = null;
     }
     this.track = null;
-    // Tear down offscreen canvas to free memory
     if (this._offscreen) {
       this._offscreen.width = 0;
       this._offscreen.height = 0;
