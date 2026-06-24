@@ -1,6 +1,6 @@
 /*
  * Bakes the local-vs-CDN vendoring decision into vendor-importmap.js at build
- * time, replacing the old runtime synchronous-XHR HEAD probing.
+ * time.
  *
  *   node scripts/generate-importmap.mjs            # all-CDN (default, deploy-safe)
  *   node scripts/generate-importmap.mjs --local    # local where vendored, else CDN

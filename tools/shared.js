@@ -20,14 +20,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-// The clipboard helpers live in their own dependency-free module so non-3D
-// pages can import them without pulling Three.js in. Re-exported here for the
-// scene-based callers that already depend on this module.
+// Re-exported from their dependency-free modules for scene-based pages.
 export { copyToClipboard, copyWithFeedback, COPY_FEEDBACK } from './clipboard.js';
-
-// The C++ float-literal formatter likewise lives in a dependency-free module
-// (cpp_format.js) so the pure code generators can share it without dragging
-// Three.js into their unit tests; re-exported here for scene-based pages.
 export { formatFloatCpp } from './cpp_format.js';
 
 /**
@@ -103,8 +97,7 @@ export function initScene(containerId, canvasId, opts = {}) {
   const container = document.getElementById(containerId);
   const canvas = document.getElementById(canvasId);
   // Fail with a clear, id-naming error rather than the opaque
-  // "Cannot read clientWidth of null" a wrong id otherwise throws three lines
-  // down — matching the guarded-lookup discipline in slider.js / createSlider.
+  // "Cannot read clientWidth of null" a wrong id throws further down.
   if (!container) {
     throw new Error(`initScene: container element #${containerId} not found`);
   }
@@ -189,9 +182,7 @@ export function initScene(containerId, canvasId, opts = {}) {
   };
   animate();
 
-  // Stop the render loop and detach the resize listener. Tool pages are
-  // long-lived so this rarely matters, but it mirrors the dispose discipline
-  // in driver.js / daydream.js and gives callers an off switch.
+  // Stop the render loop and detach the resize listener.
   const dispose = () => {
     cancelAnimationFrame(rafId);
     window.removeEventListener('resize', resize);

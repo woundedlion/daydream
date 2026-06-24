@@ -3,11 +3,9 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-// Shared sRGB / linear-RGB / OKLab / OKLCH color-space math for the browser
-// tools. This mirrors the engine's perceptual pipeline (core/color.h: the same
-// sRGB transfer function and Björn Ottosson OKLab matrices) so the tools predict
-// what the device renders. Kept in one module rather than re-implemented inline
-// per tool, where the copies would silently drift from each other and the engine.
+// Shared sRGB / linear-RGB / OKLab / OKLCH color-space math, mirroring the
+// engine's perceptual pipeline (core/color.h: same sRGB transfer function and
+// Björn Ottosson OKLab matrices) so the tools predict what the device renders.
 
 // --- sRGB transfer function (gamma) ---
 

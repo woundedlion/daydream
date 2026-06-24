@@ -28,7 +28,7 @@ export async function copyToClipboard(text) {
       return true;
     }
   } catch (err) {
-    // Secure-context or permissions failure — fall through to the legacy path.
+    // Fall through to the legacy execCommand path.
   }
 
   const textarea = document.createElement('textarea');
@@ -77,10 +77,8 @@ export async function copyWithFeedback(text, opts = {}) {
 
   const success = await copyToClipboard(text);
   if (success && element) {
-    // A second copy within revertMs must not capture the "Copied!" label as the
-    // text to restore — that latches the element on "Copied!" forever. Cancel any
-    // pending revert and reuse the idle label it had stashed, so the original is
-    // captured once and only from the genuine idle state.
+    // A second copy within revertMs must reuse the stashed idle label, not the
+    // current "Copied!" text, or the element latches on "Copied!" forever.
     const pending = element._copyFeedback;
     if (pending) clearTimeout(pending.timer);
     const original = pending ? pending.original

@@ -48,10 +48,8 @@ export function createSlider(containerId, cfg, onInput) {
     valueClass = 'slider-label w-24 text-right',
   } = cfg;
 
-  // Assert the numeric contract rather than silently building an inert control:
-  // a non-positive scale or step, or min >= max, all produce a slider the user
-  // cannot move and no diagnostic. These are author config errors, so fail
-  // loudly. The `!(a < b)` form also rejects NaN.
+  // Reject config that would build an inert, unmovable control. The `!(a < b)`
+  // form also rejects NaN.
   if (!(min < max)) {
     throw new Error(`createSlider(${id}): min (${min}) must be < max (${max})`);
   }
@@ -61,11 +59,9 @@ export function createSlider(containerId, cfg, onInput) {
   if (!(scale > 0)) {
     throw new Error(`createSlider(${id}): scale (${scale}) must be > 0`);
   }
-  // step>0 and scale>0 in display space is not enough: the slider runs in
-  // SCALED INTEGER units (min/max/step are each rounded by *scale), and a small
-  // fractional step can floor to 0 even when both are positive (e.g. step 0.4,
-  // scale 1 -> step="0", which browsers treat as broken). Require the rounded
-  // step to be >= 1 so the control is actually movable.
+  // The slider runs in scaled integer units, so a small fractional step can
+  // round to 0 even when step and scale are both positive (e.g. step 0.4,
+  // scale 1). Require the rounded step >= 1 so the control is movable.
   const sliderStep = Math.round(step * scale);
   if (sliderStep < 1) {
     throw new Error(`createSlider(${id}): step (${step}) * scale (${scale}) rounds to `
@@ -75,10 +71,8 @@ export function createSlider(containerId, cfg, onInput) {
   const sliderId = `${id}_slider`;
   const valueSpanId = `${id}_value`;
 
-  // Build via createElement/textContent rather than interpolating into
-  // innerHTML, matching the textContent-only discipline used elsewhere in
-  // tools/: a label/value/class that ever became data-driven could otherwise
-  // inject markup (latent XSS).
+  // Build via createElement/textContent, not innerHTML, so a data-driven
+  // label/value/class can never inject markup (latent XSS).
   container.replaceChildren();
 
   const labelSpan = document.createElement('span');
@@ -104,10 +98,8 @@ export function createSlider(containerId, cfg, onInput) {
   if (onInput) {
     slider.addEventListener('input', () => {
       const raw = parseFloat(slider.value);
-      // Keep the readout live by default (raw -> display space via scale), so a
-      // caller that does not touch valueSpan no longer sees a frozen number.
-      // This runs BEFORE onInput, so a caller that wants a custom readout (e.g.
-      // a snapped value) can still overwrite valueSpan.textContent inside onInput.
+      // Update the readout before onInput, so a caller wanting a custom readout
+      // (e.g. a snapped value) can overwrite valueSpan.textContent inside it.
       valueSpan.textContent = (raw / scale).toFixed(decimals);
       onInput(raw);
     });
