@@ -49,10 +49,8 @@ class FakeEngine {
     this.curH = h;
     return true;
   }
-  // Model the real engine's setEffect: it rebuilds the effect with DEFAULT
-  // params, so any tuned values must be (re-)applied AFTER it. Clearing params
-  // here makes that ordering observable — a handler that applied params before
-  // setEffect would have them wiped by this rebuild.
+  // Clearing params models the real engine rebuilding to DEFAULTS, making the
+  // "tuned params re-applied AFTER setEffect" ordering observable.
   setEffect(name) { this.calls.push(['setEffect', name]); this.effect = name; this.params = []; }
   setParameter(name, value) { this.params.push([name, value]); }
   setAnimationsPaused(p) { this.paused = p; }
@@ -244,12 +242,10 @@ test('a throwing message is isolated and rethrown on a fresh task', async () => 
 });
 
 // ---------------------------------------------------------------------------
-// Live-tuning handlers — setEffect / setParameter / setAnimationsPaused. These
-// are the receiver half of the controller's broadcasts: a worker that re-applied
-// params before (instead of after) setEffect's rebuild-to-defaults, or dropped a
-// handler, would render a different effect/params than the main thread. The
-// FakeEngine.setEffect above clears params to model that rebuild, so the
-// "params AFTER rebuild" ordering is directly observable below.
+// Live-tuning handlers — setEffect / setParameter / setAnimationsPaused, the
+// receiver half of the controller's broadcasts. FakeEngine.setEffect clears
+// params to model the engine's rebuild-to-defaults, so the "params applied AFTER
+// rebuild" ordering is directly observable below.
 // ---------------------------------------------------------------------------
 
 test('init applies the carried params AFTER setEffect rebuilds to defaults', async () => {
