@@ -1,10 +1,7 @@
 // @ts-nocheck
 //
-// clipboard.js — coverage for copyWithFeedback's transient label swap, which
-// every tool page reuses. Key invariant: a second copy within revertMs must
-// not latch the element on "Copied!".
-//
-// Run: node --test --experimental-test-module-mocks "tests/*.test.js"
+// copyWithFeedback's transient label swap. Key invariant: a second copy within
+// revertMs must not latch the element on "Copied!".
 import { test, mock, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 

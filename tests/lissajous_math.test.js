@@ -47,12 +47,10 @@ test('findBestRationalRatio: target ~1.5 snaps to 3/2', () => {
 test('findBestRationalRatio: irrational (PI) clamped to maxDenominator returns the closest reachable fraction', () => {
   const maxDenominator = 8;
   const { M, N } = findBestRationalRatio(Math.PI, maxDenominator);
-  // Both terms must respect the bound.
   assert.ok(M >= 1 && M <= maxDenominator, 'M within bound');
   assert.ok(N >= 1 && N <= maxDenominator, 'N within bound');
-  // Returned ratio must equal the closest achievable approximation. Because the
-  // numerator is capped at 8, fine fractions like 22/7 are out of reach, so the
-  // best reachable approximation to PI is 3/1.
+  // With the numerator capped at 8, fine fractions like 22/7 are out of reach, so
+  // the closest reachable approximation to PI is 3/1.
   const value = M / N;
   const expectedErr = closestError(Math.PI, maxDenominator);
   assert.ok(
@@ -128,9 +126,8 @@ test('snapToRationalRatio: closing period equals 2π·n/passiveC for a known rat
   const { m, n, snappedActiveC, closingPeriod } = snapToRationalRatio(activeC, passiveC);
   assert.equal(m, 3);
   assert.equal(n, 2);
-  // Snapped frequency preserves the rational ratio against the passive one.
   assert.equal(snappedActiveC, passiveC * (m / n));
-  // The documented closing relation: T = 2π·n / passiveC.
+  // Closing relation: T = 2π·n / passiveC.
   assert.equal(closingPeriod, (TWO_PI * n) / passiveC);
 });
 
@@ -184,8 +181,7 @@ test('lissajous: point lies on the unit sphere (R = 1) for several t', () => {
  * with phase in radians, and a non-2π domain as a plain float literal.
  */
 test('lissajousCodeString emits a C++ LissajousParams initializer', () => {
-  // The 12:5 default at zero phase over one full 2π period — matches
-  // ChaoticStrings' built-in config{12.0f, 5.0f, 0, 2 * PI_F}.
+  // Matches ChaoticStrings' built-in config{12.0f, 5.0f, 0, 2 * PI_F}.
   assert.equal(
     lissajousCodeString(12, 5, 0, TWO_PI),
     'LissajousParams{12.0f, 5.0f, 0.0f, 2 * PI_F}');
@@ -195,7 +191,6 @@ test('lissajousCodeString emits a C++ LissajousParams initializer', () => {
     lissajousCodeString(3, 2, 1.5708, 2 * TWO_PI),
     'LissajousParams{3.0f, 2.0f, 1.571f, 4 * PI_F}');
 
-  // A non-2π domain falls back to a plain float literal.
   assert.equal(
     lissajousCodeString(1.06, 1.06, 0, 5.909),
     'LissajousParams{1.06f, 1.06f, 0.0f, 5.909f}');

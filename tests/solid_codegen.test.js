@@ -10,9 +10,7 @@ test('formatFloat appends a decimal to whole numbers and an f suffix', () => {
   assert.equal(formatFloat(1), '1.0f');
   assert.equal(formatFloat(0.5), '0.5f');
   assert.equal(formatFloat(2), '2.0f');
-  // Already-fractional values keep their decimal, gain only the f suffix.
   assert.equal(formatFloat(0.25), '0.25f');
-  // Every output ends in the C++ float-literal marker.
   for (const v of [0, 1, 0.5, 3.14]) {
     assert.match(formatFloat(v), /f$/);
     assert.ok(formatFloat(v).includes('.'));
@@ -24,7 +22,6 @@ test('pctSuffix quantizes to hundredths and pads to two digits', () => {
   assert.equal(pctSuffix(0.05), '05');
   assert.equal(pctSuffix(0.5), '50');
   assert.equal(pctSuffix(0.3), '30');
-  // Float-error input still snaps cleanly.
   assert.equal(pctSuffix(0.30000000000000004), '30');
   assert.equal(pctSuffix(1), '100');
 });
@@ -42,7 +39,6 @@ test('generateFuncAndRecipe builds func name and SolidBuilder chain', () => {
 
   assert.equal(funcName, 'icosahedron_truncate50_dual');
   assert.equal(recipe, 'SolidBuilder(icosahedron(a, b), a, b).truncate(0.5f).dual().build()');
-  // Float literals embedded in the recipe are well-formed.
   assert.match(recipe, /\.truncate\(0\.5f\)/);
 });
 
@@ -90,8 +86,7 @@ test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comme
     'FLASHMEM inline PolyMesh tetrahedron_kis(Arena &a, Arena &b) {\n' +
     '  return SolidBuilder(tetrahedron(a, b), a, b).kis().build();\n' +
     '}';
-  // Lock the full structure so any formatting drift is caught (this string is
-  // pasted byte-for-byte into the engine).
+  // This string is pasted byte-for-byte into the engine, so lock it whole.
   assert.equal(cpp, expected);
 });
 
@@ -146,6 +141,5 @@ test('generateFuncAndRecipe rejects an unknown op or a malformed base', () => {
     /not a valid C\+\+ identifier/);
   assert.throws(() => generateFuncAndRecipe({ base: '', ops: [] }),
     /not a valid C\+\+ identifier/);
-  // A well-formed base + known ops still pass.
   assert.doesNotThrow(() => generateFuncAndRecipe({ base: 'icosahedron', ops: ['dual', { op: 'truncate', params: { t: 0.3 } }] }));
 });

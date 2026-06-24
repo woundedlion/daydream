@@ -5,12 +5,10 @@ import { prettify } from '../label_format.js';
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 
-// Symbolic glyphs spelled with escapes so the expectations are independent of
-// this file's own text encoding.
-const PI = 'π';        // π
-const PHI_GLYPH = 'φ'; // φ
+const PI = 'π';
+const PHI_GLYPH = 'φ';
 const INV = '⁻¹'; // superscript -1
-const SQRT = '√';      // √
+const SQRT = '√';
 
 test('prettify snaps the basic constants', () => {
   assert.equal(prettify(0), '0');
