@@ -3,19 +3,14 @@ import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { URL } from 'node:url';
 
-// installWindow() and the writer test below stub globalThis.window; restore the
-// host value after each test so the stub never leaks to another suite if the
-// runner shares a process (matching recorder.test.js's save/restore discipline).
+// Restore globalThis.window after each test so the stub never leaks to another suite.
 const _savedWindow = globalThis.window;
 afterEach(() => {
   if (_savedWindow === undefined) delete globalThis.window;
   else globalThis.window = _savedWindow;
 });
 
-// Minimal lil-gui stub: a controller bound to (object, prop) exposing just the
-// chaining surface DeepLinkGUI relies on. The deep-link validation under test
-// runs entirely inside DeepLinkGUI.add() before the underlying gui.add(), so
-// the stub only has to bind and replay values, not implement a real dropdown.
+// Minimal lil-gui stub exposing the chaining surface DeepLinkGUI relies on.
 class StubController {
   /**
    * Binds the controller to a target object property.
@@ -51,8 +46,7 @@ class StubController {
    */
   name() { return this; }
 }
-// Minimal lil-gui root stub: hands back StubControllers and nested folders so
-// DeepLinkGUI can wrap it without a real DOM or dropdown widget.
+// Minimal lil-gui root stub handing back StubControllers and nested folders.
 class StubGUI {
   /**
    * Creates the root stub with a placeholder DOM element.
@@ -113,8 +107,6 @@ test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
   const replayed = [];
   gui.add(obj, 'resolution', RES).onChange((v) => replayed.push(v));
 
-  // Garbage URL value must not poison the bound object, and a rejected value
-  // must not replay through onChange.
   assert.equal(obj.resolution, 'Phantasm (144x288)');
   assert.deepEqual(replayed, []);
 });
@@ -158,7 +150,7 @@ test('DeepLinkGUI.add with no matching URL param keeps the default', () => {
   const replayed = [];
   gui.add(obj, 'resolution', RES).onChange((v) => replayed.push(v));
   assert.equal(obj.resolution, 'Phantasm (144x288)');
-  assert.deepEqual(replayed, []); // no URL value → no applyOnLoad replay
+  assert.deepEqual(replayed, []);
 });
 
 /**
@@ -225,7 +217,6 @@ test('DeepLinkGUI.add maps boolean URL spellings for a checkbox', () => {
     assert.equal(obj.glow, false, `"${falsy}" adopted as false`);
     assert.deepEqual(replayed, [false]);
   }
-  // An unrecognized token keeps the bound default and does not replay.
   installWindow('?glow=maybe');
   const gui = new DeepLinkGUI({ autoPlace: false });
   const obj = { glow: false };
@@ -251,13 +242,13 @@ test('makeUrlParamWriter merges multiple keys changed within the debounce window
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     setUrlParam('a', 0.5);
-    setUrlParam('b', 'two'); // second change before the first timer fires
+    setUrlParam('b', 'two'); // before the first timer fires
     mock.timers.tick(200);
   } finally {
     mock.timers.reset();
   }
   const q = new URL(lastUrl, 'http://x').searchParams;
-  assert.equal(q.get('a'), '0.5'); // first write survived the second
+  assert.equal(q.get('a'), '0.5');
   assert.equal(q.get('b'), 'two');
-  assert.equal(q.get('keep'), '1'); // pre-existing params preserved
+  assert.equal(q.get('keep'), '1');
 });

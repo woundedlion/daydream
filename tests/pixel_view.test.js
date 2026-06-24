@@ -13,7 +13,7 @@ const detachedView = () => {
   const buf = new ArrayBuffer(8);
   const view = new Uint16Array(buf);
   buf.transfer();           // detaches buf in place; view.buffer.byteLength -> 0
-  assert.equal(view.buffer.byteLength, 0); // guard: the model is actually detached
+  assert.equal(view.buffer.byteLength, 0);
   return view;
 };
 
@@ -51,6 +51,6 @@ test('refreshPixelView: a live view is reused without re-fetching', () => {
   let calls = 0;
   const r = refreshPixelView(live, () => { calls++; return new Uint16Array(4); });
   assert.equal(r.refreshed, false);
-  assert.equal(r.view, live);   // same instance, not a fresh fetch
-  assert.equal(calls, 0);       // getPixels must not be called in steady state
+  assert.equal(r.view, live);
+  assert.equal(calls, 0);
 });

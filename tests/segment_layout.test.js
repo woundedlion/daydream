@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import { computeSegmentRange } from '../segment_layout.js';
 
 test('a full segment set tiles the canvas exactly once', () => {
-  // Mix of even-dividing dims and ones leaving a remainder for the last band/arm.
   const cases = [
     { w: 288, h: 144, total: 4 },
     { w: 288, h: 144, total: 8 },

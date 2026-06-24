@@ -99,13 +99,11 @@ function crossCheck(S, N, w) {
     const rect = computeSegmentRange(id, N, w, ROWS);
     const m = cppSegmentMap(id, S, N);
 
-    // (1) Arm partition: the web arm (rect on the left vs right half) must match
-    // the firmware arm_b flag for the same id.
+    // (1) Arm partition.
     const webArmB = rect.x0 === halfW;
     assert.equal(webArmB, m.armB, `arm side agrees for id=${id} (S=${S},N=${N})`);
 
-    // (2) Arm B is the w/2 half: the web rect of an arm-B segment starts at the
-    // same column the firmware shifts arm B by.
+    // (2) Arm B is the w/2 half.
     if (m.armB) {
       assert.equal(rect.x0, halfW, `arm-B rect starts at w/2 for id=${id}`);
       assert.equal(cppSegmentXCol(true, 0, w), halfW, 'firmware arm-B offset is w/2');
@@ -113,9 +111,7 @@ function crossCheck(S, N, w) {
       assert.equal(rect.x0, 0, `arm-A rect starts at 0 for id=${id}`);
     }
 
-    // (3) Row coverage: the firmware segment's PPS LEDs cover exactly the web
-    // rect's contiguous row span [y0, y1) (as a set; the bottom strip is
-    // reversed in traversal order).
+    // (3) Row coverage as a SET — the bottom strip is reversed in traversal order.
     const cppRows = [];
     for (let i = 0; i < PPS; i++) cppRows.push(cppSegmentY(m, i));
     cppRows.sort((a, b) => a - b);
@@ -132,8 +128,6 @@ function crossCheck(S, N, w) {
  * side trips the cross-check.
  */
 test('segment layout ↔ pov_segment_map: canonical N=4/S=288 fixture agrees', () => {
-  // Shared fixture — must equal both sides. C++ counterpart: the s0..s3 cases in
-  // test_pov_segmented.h (arm A top/bottom, arm B top/bottom; ROWS=144, PPS=72).
   const fixture = [
     { id: 0, armB: false, rows: [0, 72] },    // arm A, top
     { id: 1, armB: false, rows: [72, 144] },  // arm A, bottom (reversed strip)

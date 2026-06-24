@@ -60,8 +60,6 @@ test('resolveActiveEffect keeps an effect the resolution offers', () => {
 });
 
 test('resolveActiveEffect falls back to the first effect for an off-list request', () => {
-  // An unsupported effect (e.g. a stale ?effect= deep link) falls back to the
-  // first entry — the guard that keeps the canvas from going black.
   assert.equal(resolveActiveEffect(RESO_EFFECTS, 'NotHere'), 'Voronoi');
   assert.equal(resolveActiveEffect(RESO_EFFECTS, 'GARBAGE_FROM_URL'), 'Voronoi');
   assert.equal(resolveActiveEffect(RESO_EFFECTS, undefined), 'Voronoi');
