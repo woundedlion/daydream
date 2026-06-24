@@ -14,8 +14,8 @@ import * as C from '../tools/color.js';
 import * as P from '../tools/palette_math.js';
 import * as L from '../tools/lissajous_math.js';
 
-// Top-level await means a missing or un-instantiable module fails this file
-// loudly rather than silently skipping the parity checks.
+// Top-level await fails this file loudly if the module can't instantiate,
+// rather than silently skipping the parity checks.
 const M = await createHolosphereModule({ print() {}, printErr() {} });
 
 test('WASM parity module is present with the exports this suite pins', () => {

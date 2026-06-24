@@ -7,9 +7,8 @@ const {
   mapValue, proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
 } = await import('../tools/palette_math.js');
 
-// A mock bakeLut stands in for the WASM bridge (a smooth in-range sRGB ramp) and
-// records its last arguments so the delegation (shape enum int + nine [0,255]
-// HSV values) can be asserted.
+// Mock bakeLut (smooth in-range sRGB ramp) records its last args so the
+// delegation (shape enum int + nine [0,255] HSV values) can be asserted.
 let lastBakeArgs = null;
 function mockBakeLut(...args) {
   lastBakeArgs = args;
@@ -188,7 +187,6 @@ test('GenerativePalette.get: t === 1.0 and t > 1.0 clamp to the final stop color
     assert.ok(ch >= -1e-6 && ch <= 1 + 1e-6, `channel ${ch} in [0,1] at t=1.0`);
   }
 
-  // t > 1.0 clamps to the same endpoint as t === 1.0 (no wrap-around).
   assert.deepEqual(beyond, atOne);
 
   for (let i = 0; i < 3; i++) {
