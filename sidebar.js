@@ -133,7 +133,7 @@ export class EffectSidebar {
     this._setRovingTabbable(
       this.buttons.get(this.activeName) || this.listEl.querySelector('.effect-button')
     );
-    // Defer so the grid has laid out before measuring scroll extents.
+    // Defer until the grid has laid out before measuring scroll extents.
     requestAnimationFrame(() => this._updateScrollArrows());
   }
 

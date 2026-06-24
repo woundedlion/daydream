@@ -30,10 +30,10 @@ import { computeSegmentRange, blitSegmentRect } from "./segment_layout.js";
 const post = /** @type {(msg: ControllerInboundMsg, transfer?: Transferable[]) => void} */ (
   self.postMessage.bind(self));
 
-// Proof-of-life: reaching this statement means every static import above (incl.
-// the ./holosphere_wasm.js glue) resolved. Sent before the WASM instantiate so the
+// Proof-of-life: reaching here means every static import above (incl. the
+// ./holosphere_wasm.js glue) resolved. Sent before the WASM instantiate so the
 // controller can fault fast on a missing/renamed glue file; a failed module fetch
-// never runs this line, so 'booted' simply never arrives.
+// never runs this line, so 'booted' never arrives.
 post({ type: 'booted' });
 
 let wasmModule = null;
@@ -76,7 +76,6 @@ async function handleMessage(msg) {
       canvasH = msg.h;
       segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
 
-      // Each worker gets its own isolated WASM instance.
       wasmModule = await createHolosphereModule();
       engine = new wasmModule.HolosphereEngine();
       engine.setResolution(canvasW, canvasH);
@@ -84,8 +83,8 @@ async function handleMessage(msg) {
       if (msg.effectName) {
         engine.setEffect(msg.effectName);
       }
-      // Apply tuned param values after setEffect (which rebuilds with defaults) so
-      // this segment matches instead of rendering effect defaults.
+      // Apply tuned params after setEffect (which rebuilds with defaults) so this
+      // segment matches instead of rendering effect defaults.
       if (msg.params) {
         for (const p of msg.params) engine.setParameter(p.name, p.value);
       }
@@ -100,8 +99,8 @@ async function handleMessage(msg) {
     case 'setEffect': {
       if (engine) {
         engine.setEffect(msg.name);
-        // setEffect rebuilds with defaults; re-apply tuned values afterward so this
-        // segment matches. Same ordering as the init handler.
+        // Re-apply tuned values after setEffect rebuilds with defaults (same ordering
+        // as init).
         if (msg.params) {
           for (const p of msg.params) engine.setParameter(p.name, p.value);
         }
@@ -113,18 +112,15 @@ async function handleMessage(msg) {
 
     case 'setResolution': {
       if (engine) {
-        // On a size the engine can't build, setResolution returns false and stays
-        // at its current geometry; leave canvasW/H/segRange/clip untouched.
-        // `=== false` (not `!`) is load-bearing: a non-boolean return (e.g.
-        // undefined) must NOT be treated as rejection, so keep this binding
-        // returning a strict boolean.
+        // On a size the engine can't build, setResolution returns false and keeps its
+        // current geometry; leave canvasW/H/segRange/clip untouched. `=== false` (not
+        // `!`) is load-bearing: a non-boolean return must NOT count as rejection.
         if (engine.setResolution(msg.w, msg.h) === false) break;
         canvasW = msg.w;
         canvasH = msg.h;
         segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
-        // Re-apply the clip here so the handler is self-contained — any path that
-        // changes resolution without a trailing setEffect still ends correctly
-        // clipped rather than stale.
+        // Re-clip here so the handler is self-contained: a resolution change without a
+        // trailing setEffect still ends correctly clipped.
         applyClip();
       }
       break;
@@ -161,7 +157,6 @@ async function handleMessage(msg) {
       const allPixels = engine.getPixels();
       const { x0, x1, y0, y1, w: qw, h: qh } = segRange;
       const pixelsCopy = new Uint16Array(qw * qh * 3);
-      // Extract this quadrant (canvas -> compact).
       blitSegmentRect(allPixels, pixelsCopy, canvasW, segRange, true);
 
       /** @type {SegArenaMetrics | null} */
@@ -207,11 +202,11 @@ async function handleMessage(msg) {
   }
 }
 
-// Serialize message handling: each message runs strictly after the previous one
-// settles (so 'init''s long await can't interleave). The catch keeps one failure
-// from wedging the chain, and rethrows on a fresh task so it reaches the global
-// error handler (and the controller's onerror fault latch) instead of vanishing as
-// an unhandled rejection.
+// Serialize message handling: each message runs strictly after the previous settles
+// (so 'init''s long await can't interleave). The catch keeps one failure from
+// wedging the chain, and rethrows on a fresh task so it reaches the global error
+// handler (and the controller's onerror fault latch) instead of vanishing as an
+// unhandled rejection.
 let messageQueue = Promise.resolve();
 self.onmessage = (e) => {
   const msg = /** @type {WorkerInboundMsg} */ (e.data);

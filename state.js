@@ -113,8 +113,8 @@ export class AppState {
   snapshot() { return { ...this._state }; }
 }
 
-// The app-wide active URLSync. gui.js routes its param writes through this so
-// there is a single URL writer and no clobber race.
+// gui.js routes its param writes through this so there is a single URL writer and
+// no clobber race.
 let _activeURLSync = null;
 /**
  * Returns the app-wide active URLSync instance, or null if none is constructed.
@@ -206,11 +206,10 @@ export class URLSync {
    */
   setParam(key, value) {
     if (value === null || value === undefined) {
-      // Record a deletion marker, not a forget: _flush needs it to drop a param
-      // already present in the URL.
+      // A deletion marker, not a forget: _flush needs it to drop a param already in
+      // the URL.
       this._adhoc.set(key, null);
     } else {
-      // Round numbers to save space and avoid float jitter.
       this._adhoc.set(key,
         typeof value === 'number' ? String(roundUrlNumber(value)) : String(value));
     }
@@ -240,8 +239,8 @@ export class URLSync {
       const val = this.state.get(key);
       if (val !== null && val !== undefined) this._setTrackedParam(params, key, val);
     }
-    // Merge the ad-hoc writes that survived the prune (excluded keys): the cancelled
-    // flush may hold a GUI param changed within the debounce window.
+    // Merge ad-hoc writes that survived the prune: the cancelled flush may hold a GUI
+    // param changed within the debounce window.
     for (const [key, val] of this._adhoc) {
       if (val === null) params.delete(key);
       else params.set(key, val);
@@ -249,8 +248,8 @@ export class URLSync {
     // Omit the '?' when there are no params, leaving a clean pathname.
     const qs = params.toString();
     window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
-    // Drop the buffer so the retained excluded entries can't override a tracked key
-    // on a later flush.
+    // Drop the buffer so retained excluded entries can't override a tracked key on a
+    // later flush.
     this._adhoc.clear();
   }
 
@@ -292,7 +291,7 @@ export class URLSync {
     const qs = params.toString();
     const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState({}, '', newUrl);
-    // The URL is now the store of record (the next flush re-reads from it). Clear the
+    // The URL is now the store of record (the next flush re-reads it). Clear the
     // buffer so a stale ad-hoc entry can't re-apply on every flush and permanently
     // override a tracked key re-read from appState.
     this._adhoc.clear();
