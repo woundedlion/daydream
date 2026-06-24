@@ -57,10 +57,11 @@ export const lissajous = (m1, m2, a, t) => {
  * A negative target returns a negative numerator (sign carried on M, N stays
  * positive); the search grid itself is positive, so the sign is split off first.
  * @param {number} value - The ratio to approximate (e.g., C1/C2), may be negative.
- * @param {number} [maxDenominator] - Maximum value for the numerator/denominator.
+ * @param {number} [maxTerm] - Maximum value for both the numerator and the
+ *   denominator (the search grid is square: M, N each range over [1, maxTerm]).
  * @returns {{ M: number, N: number }} The best simple rational ratio.
  */
-export const findBestRationalRatio = (value, maxDenominator = 8) => {
+export const findBestRationalRatio = (value, maxTerm = 8) => {
   // 0 is exactly the fraction 0/1, not 1/1. Returning {M:0,N:1} keeps a
   // deliberately-zeroed frequency at zero (snappedActiveC = passiveC·0/1 = 0)
   // instead of snapping it up to the passive frequency (passiveC·1/1).
@@ -76,9 +77,9 @@ export const findBestRationalRatio = (value, maxDenominator = 8) => {
   let bestN = 1;
   let minDiff = Infinity;
 
-  // Check ratios M/N where M and N are between 1 and maxDenominator
-  for (let N = 1; N <= maxDenominator; N++) {
-    for (let M = 1; M <= maxDenominator; M++) {
+  // Check ratios M/N where M and N are between 1 and maxTerm
+  for (let N = 1; N <= maxTerm; N++) {
+    for (let M = 1; M <= maxTerm; M++) {
       const ratio = M / N;
       const diff = Math.abs(absValue - ratio);
 
@@ -106,11 +107,11 @@ export const findBestRationalRatio = (value, maxDenominator = 8) => {
  * the domain T = 2π·N / passiveC after which the curve closes.
  * @param {number} activeC - The intended (raw) active frequency value.
  * @param {number} passiveC - The passive (held) frequency value.
- * @param {number} [maxDenominator] - Max numerator/denominator for the ratio.
+ * @param {number} [maxTerm] - Max numerator/denominator for the ratio.
  * @returns {{ snappedActiveC: number, m: number, n: number, closingPeriod: number }} The
  *   snapped active frequency, the rational ratio m/n, and the curve's closing period T.
  */
-export const snapToRationalRatio = (activeC, passiveC, maxDenominator = 8) => {
+export const snapToRationalRatio = (activeC, passiveC, maxTerm = 8) => {
   // A zero passive frequency has no orbital motion to lock against: the ratio
   // (activeC / 0) and the closing period (2π·N / 0) are both undefined and would
   // poison the caller's state.Duration with Infinity/NaN. Leave the active
@@ -121,7 +122,7 @@ export const snapToRationalRatio = (activeC, passiveC, maxDenominator = 8) => {
 
   // Find M/N such that M/N ≈ activeC / passiveC.
   const targetRatio = activeC / passiveC;
-  const { M, N } = findBestRationalRatio(targetRatio, maxDenominator);
+  const { M, N } = findBestRationalRatio(targetRatio, maxTerm);
 
   // Snapped active frequency keeps the rational ratio against the passive one.
   const snappedActiveC = passiveC * (M / N);
