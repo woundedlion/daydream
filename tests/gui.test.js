@@ -104,18 +104,18 @@ const RES = ['Phantasm (144x288)', 'Crystal (192x384)'];
  * black canvas), so the value is rejected against the option list. Because the
  * value was rejected, the bound default is left in place and the applyOnLoad
  * replay does NOT fire — replaying would push the default back through onChange,
- * spuriously re-persisting it to the URL (finding 122).
+ * spuriously re-persisting it to the URL.
  */
 test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
   installWindow('?resolution=GARBAGE');
   const gui = new DeepLinkGUI({ autoPlace: false });
-  const obj = { resolution: 'Phantasm (144x288)' }; // a known-valid option
+  const obj = { resolution: 'Phantasm (144x288)' };
   const replayed = [];
   gui.add(obj, 'resolution', RES).onChange((v) => replayed.push(v));
 
-  // The garbage URL value must not poison the bound object...
+  // Garbage URL value must not poison the bound object, and a rejected value
+  // must not replay through onChange.
   assert.equal(obj.resolution, 'Phantasm (144x288)');
-  // ...and a rejected value must not replay (no spurious onChange/URL write).
   assert.deepEqual(replayed, []);
 });
 

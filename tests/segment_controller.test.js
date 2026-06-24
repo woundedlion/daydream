@@ -1,10 +1,8 @@
 // @ts-nocheck
 //
-// SegmentController — unit coverage for the simulator's highest-risk, mostly
-// DOM-free glue: the generation-fence drop, the worker-fault deadlock-break
-// latch, and the quadrant compositor. Driven by a fake Worker
-// (postMessage captured; onmessage/onerror invoked by hand) and a mocked
-// ./driver.js (so the real three.js/lil-gui chain is never loaded in Node).
+// SegmentController — unit coverage for the generation-fence drop, the
+// worker-fault deadlock-break latch, and the quadrant compositor. Driven by a
+// fake Worker and a mocked ./driver.js.
 //
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
 import { test, mock, beforeEach, after } from 'node:test';
@@ -71,18 +69,16 @@ function makeController({ resolution = 'lo', effect = 'TestEffect',
   return new SegmentController({
     resolutionPresets: presets,
     appState: { get: (k) => state[k], set: (k, v) => { state[k] = v; } },
-    getWasmEngine: () => null,           // skip the initial-param snapshot
+    getWasmEngine: () => null,
     refreshPixelView: () => {},
-    getMemoryView: () => Daydream.pixels, // aliased to the cleared buffer
+    getMemoryView: () => Daydream.pixels,
   });
 }
 
 beforeEach(() => { FakeWorker.instances = []; });
 
-// Save the host globals before stubbing and restore them once the file finishes,
-// so these module-scope stubs never leak into another suite if the test runner
-// ever shares a process (node --test isolates per file today, but the cleanup
-// shouldn't depend on that — matching recorder.test.js's save/restore discipline).
+// Save/restore host globals so these module-scope stubs never leak into another
+// suite if the test runner shares a process.
 const _savedGlobals = { Worker: globalThis.Worker, document: globalThis.document };
 const _restoreGlobal = (key, val) => {
   if (val === undefined) delete globalThis[key];
@@ -95,9 +91,8 @@ after(() => {
 
 globalThis.Worker = FakeWorker;
 
-// tick()'s composite/fault branches call updateStats(), which is pure DOM. Stub
-// document so getElementById returns null — updateStats then early-returns,
-// keeping the tick() state-machine tests DOM-free without exercising the overlay.
+// updateStats() is pure DOM; with getElementById -> null it early-returns,
+// keeping the tick() state-machine tests DOM-free.
 globalThis.document = { getElementById: () => null };
 
 /**
@@ -163,10 +158,8 @@ function deliverFrame(controller, segId, overrides = {}) {
   controller.workers[segId].onmessage({
     data: {
       type: 'frame', segId,
-      // The protocol delivers `pixels` as the Uint16Array view (worker_protocol
-      // FrameMessage; the worker transfers its .buffer but the field is the
-      // typed-array view), and composite() indexes it element-wise. Sending a
-      // bare ArrayBuffer here would index to undefined->0 and blit a black quad.
+      // Must be the Uint16Array view, not a bare ArrayBuffer: composite() indexes
+      // pixels element-wise (a buffer would index to undefined->0).
       pixels: px,
       x0: overrides.x0 ?? 0, x1: overrides.x1 ?? quadW,
       y0: overrides.y0 ?? 0, y1: overrides.y1 ?? quadH,
@@ -185,7 +178,7 @@ function deliverFrame(controller, segId, overrides = {}) {
 test('frame at the current generation is stored and settles the frame', async () => {
   const c = makeController();
   c.create(2);
-  const done = c.renderParallel(); // pending=2, inflightGen=renderGen=0
+  const done = c.renderParallel();
   assert.equal(c.pending, 2);
 
   deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2 });
@@ -195,18 +188,17 @@ test('frame at the current generation is stored and settles the frame', async ()
 
   deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2 });
   assert.equal(c.pending, 0);
-  await done; // frameResolve fired
+  await done;
 });
 
 test('frames delivered out of order within a generation land in their own slots', async () => {
   const c = makeController();
   c.create(2);
-  const done = c.renderParallel(); // pending=2, current generation
+  const done = c.renderParallel();
   assert.equal(c.pending, 2);
 
-  // Workers respond in arbitrary order; the handler keys on msg.segId, so seg 1
-  // arriving before seg 0 must still file each frame in its own slot and count
-  // pending down to 0 regardless of arrival order.
+  // The handler keys on msg.segId, so out-of-order arrival must still file each
+  // frame in its own slot.
   deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2 });
   assert.ok(c.results[1], 'seg-1 frame stored despite arriving first');
   assert.equal(c.results[1].x1, 4);
@@ -217,15 +209,15 @@ test('frames delivered out of order within a generation land in their own slots'
   assert.ok(c.results[0], 'seg-0 frame stored when it arrives');
   assert.equal(c.results[0].x1, 2);
   assert.equal(c.pending, 0);
-  await done; // settles once every segment has reported, order-independent
+  await done;
 });
 
 test('a frame dispatched before a resolution change is dropped but still settles', async () => {
   const c = makeController();
   c.create(2);
-  const done = c.renderParallel(); // inflightGen = 0
+  const done = c.renderParallel();
 
-  c.setResolution(8, 8); // renderGen -> 1, results cleared, pendingFrame=false
+  c.setResolution(8, 8); // bumps renderGen, clears results
   assert.notEqual(c.inflightGen, c.renderGen);
 
   deliverFrame(c, 0); // stale generation
@@ -235,7 +227,7 @@ test('a frame dispatched before a resolution change is dropped but still settles
   deliverFrame(c, 1);
   assert.equal(c.results[1], null);
   assert.equal(c.pending, 0);
-  await done; // promise resolves even though every result was dropped
+  await done; // resolves even though every result was dropped
 });
 
 // ---------------------------------------------------------------------------
@@ -246,7 +238,7 @@ test('a worker fault latches, zeroes pending, and resolves the in-flight frame',
   const c = makeController();
   c.create(2);
   c.renderInFlight = true;
-  const done = c.renderParallel(); // pending=2, frameResolve set
+  const done = c.renderParallel();
 
   c.workers[0].onerror({ message: 'boom', filename: 'w.js', lineno: 1, colno: 2 });
 
@@ -255,18 +247,17 @@ test('a worker fault latches, zeroes pending, and resolves the in-flight frame',
   assert.equal(c.pending, 0, 'pending zeroed so the loop cannot deadlock');
   assert.equal(c.renderInFlight, false);
   assert.equal(c.frameResolve, null);
-  await done; // the latch settled the promise
+  await done;
 });
 
 test('a worker onmessageerror latches the fault the same way onerror does', async () => {
   const c = makeController();
   c.create(2);
   c.renderInFlight = true;
-  const done = c.renderParallel(); // pending=2, frameResolve set
+  const done = c.renderParallel();
 
   // A payload that fails structured-clone deserialization fires onmessageerror,
-  // never onerror. It must still break the deadlock: latch the fault, zero
-  // pending, free the in-flight slot, and settle the frame.
+  // never onerror; it must break the deadlock the same way.
   c.workers[1].onmessageerror({ type: 'messageerror' });
 
   assert.equal(c.faulted, true);
@@ -274,22 +265,20 @@ test('a worker onmessageerror latches the fault the same way onerror does', asyn
   assert.equal(c.pending, 0, 'pending zeroed so the loop cannot deadlock');
   assert.equal(c.renderInFlight, false);
   assert.equal(c.frameResolve, null);
-  await done; // the latch settled the promise
+  await done;
 });
 
 test('a surviving worker responding after a fault does not drive pending negative', async () => {
   const c = makeController();
   c.create(2);
   c.renderInFlight = true;
-  const done = c.renderParallel(); // pending=2
+  const done = c.renderParallel();
 
-  // Worker 0 traps: the latch zeroes pending and settles the frame.
   c.workers[0].onerror({ message: 'boom', filename: 'w.js', lineno: 1, colno: 1 });
   assert.equal(c.pending, 0);
   await done;
 
-  // Worker 1 survived its render and now reports back. The handler must ignore
-  // the late frame rather than decrement the already-zeroed counter.
+  // A surviving worker reporting late must not decrement the already-zeroed counter.
   deliverFrame(c, 1);
   assert.equal(c.pending, 0, 'post-fault frame leaves pending at 0, not negative');
   assert.equal(c.results[1], null, 'no result is recorded for the halted pool');
@@ -304,16 +293,15 @@ test('only the first fault of a session is recorded', () => {
 });
 
 test('the boot watchdog faults fast when a worker never sends booted', () => {
-  // A missing/renamed holosphere_wasm.js makes the worker module fail to load,
-  // so no 'booted' ever arrives. Capture the scheduled timers (the boot watchdog
-  // is armed before the init watchdog) and fire the boot one by hand.
+  // When the worker module fails to load no 'booted' arrives. Capture the
+  // scheduled timers (boot watchdog is armed first) and fire the boot one by hand.
   const realSetTimeout = globalThis.setTimeout;
   const timers = [];
   globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
   try {
     const c = makeController();
     c.create(2);
-    timers[0](); // boot watchdog callback, with 0/2 booted
+    timers[0](); // boot watchdog callback
     assert.equal(c.faulted, true);
     assert.match(c.faultInfo.message, /module load timed out/);
     assert.match(c.faultInfo.message, /0\/2 booted/);
@@ -353,7 +341,6 @@ test('setResolution on a faulted active pool rebuilds it and clears the fault', 
   c.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
   assert.equal(c.faulted, true);
 
-  // The fault UI/docstring promise that a resolution change restarts the pool.
   c.setResolution(8, 8);
   assert.equal(c.faulted, false, 'recreating the pool cleared the fault latch');
   assert.equal(c.workers.length, 2, 'a fresh pool of workers was built');
@@ -375,20 +362,18 @@ const idx = (x, y, w) => (y * w + x) * 3;
 
 test('composite() blits each quadrant to its display-buffer offset', () => {
   Daydream.W = 4; Daydream.H = 2;
-  Daydream.pixels = new Uint16Array(4 * 2 * 3); // pre-cleared background
+  Daydream.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
   c.showBoundaries = false;
-  // Right-half quadrant x[2,4) y[0,2): fill with a recognizable value.
-  const quad = new Uint16Array(2 * 2 * 3).fill(111);
+  const quad = new Uint16Array(2 * 2 * 3).fill(111); // right-half quadrant x[2,4) y[0,2)
   c.results = [{ pixels: quad, x0: 2, x1: 4, y0: 0, y1: 2, quadW: 2, quadH: 2 }];
 
   c.composite();
 
-  // Blitted region carries the value...
   assert.equal(Daydream.pixels[idx(2, 0, 4)], 111);
   assert.equal(Daydream.pixels[idx(3, 1, 4)], 111);
-  // ...and the untouched left half stays cleared.
+  // Untouched left half stays cleared.
   assert.equal(Daydream.pixels[idx(0, 0, 4)], 0);
   assert.equal(Daydream.pixels[idx(1, 1, 4)], 0);
 });
@@ -400,10 +385,8 @@ test('composite() throws on a rectangle that overflows the current display buffe
   const c = makeController();
   c.showBoundaries = false;
   const quad = new Uint16Array(2 * 2 * 3).fill(222);
-  // x1 = 99 overshoots W=4 (e.g. a stale-resolution rect the fence missed). Such
-  // a rect means the generation fence failed to drop a stale-resolution result,
-  // so composite() fails loudly rather than silently skipping a whole segment
-  // (which would paint a stale/garbage band with no diagnostic).
+  // x1 = 99 overshoots W=4: composite() must fail loudly rather than silently
+  // skip the segment (which would paint a stale/garbage band with no diagnostic).
   c.results = [{ pixels: quad, x0: 0, x1: 99, y0: 0, y1: 2, quadW: 2, quadH: 2 }];
 
   assert.throws(() => c.composite(), /out of bounds/);
@@ -434,11 +417,8 @@ test('composite() marks both the internal split and the x=0 wrap seam', () => {
     return Daydream.pixels[i] === 0 && Daydream.pixels[i + 1] === 65535 &&
            Daydream.pixels[i + 2] === 65535;
   };
-  // Internal split column x=2 is cyan top-to-bottom.
   assert.ok(isCyan(2, 0) && isCyan(2, 1), 'internal arm split at x=2 marked');
-  // Wrap-seam column x=0 (arm 1 -> arm 0) is cyan top-to-bottom.
   assert.ok(isCyan(0, 0) && isCyan(0, 1), 'wrap-seam boundary at x=0 marked');
-  // The arm interiors (x=1, x=3) keep their blitted pixel values.
   assert.equal(Daydream.pixels[idx(1, 0, 4)], 111, 'arm-0 interior untouched');
   assert.equal(Daydream.pixels[idx(3, 0, 4)], 222, 'arm-1 interior untouched');
 });
@@ -464,7 +444,6 @@ test('composite() throws if the display-buffer alias is broken', () => {
   Daydream.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
-  // getMemoryView returns a DIFFERENT buffer than Daydream.pixels.
   c._getMemoryView = () => new Uint16Array(4 * 2 * 3);
   c.results = [];
 
@@ -472,15 +451,15 @@ test('composite() throws if the display-buffer alias is broken', () => {
 });
 
 // ---------------------------------------------------------------------------
-// tick() — the one-frame-deep render-loop state machine. Each tick (a) applies
-// the previous frame's composite when one is pending, and (b) dispatches the
-// next parallel render unless one is already in flight. The transitions below
-// walk a full pipeline cycle plus the two guard states (not-ready, faulted).
+// tick() — the one-frame-deep render-loop state machine. Each tick (a) composites
+// the previous frame when one is pending, and (b) dispatches the next parallel
+// render unless one is already in flight. Tests walk a full pipeline cycle plus
+// the two guard states (not-ready, faulted).
 // ---------------------------------------------------------------------------
 
 test('tick() is a no-op until every worker has signalled ready', () => {
   const c = makeController();
-  c.create(2);            // workers spawned but no 'ready' delivered yet
+  c.create(2);
   assert.equal(c.ready, false);
 
   c.tick();
@@ -512,7 +491,7 @@ test('a completed render arms pendingFrame and frees the in-flight slot', async 
 
   deliverFrame(c, 0);
   deliverFrame(c, 1);             // last response settles the promise
-  await flush();                  // let renderParallel().then(...) run
+  await flush();
 
   assert.equal(c.pending, 0);
   assert.equal(c.pendingFrame, true, 'results are waiting to be composited');
@@ -527,7 +506,6 @@ test('the next tick() composites the armed frame and dispatches the following on
   c.showBoundaries = false;
   c.tick();                       // dispatch frame N
 
-  // Frame N completes: seg 0 → left half, seg 1 → right half, each filled 111.
   const quad = () => new Uint16Array(2 * 2 * 3).fill(111);
   deliverFrame(c, 0, { pixels: quad(), x0: 0, x1: 2, y0: 0, y1: 2 });
   deliverFrame(c, 1, { pixels: quad(), x0: 2, x1: 4, y0: 0, y1: 2 });
@@ -547,7 +525,6 @@ test('a faulted pool keeps tick() from dispatching another doomed render', () =>
   const c = readyController(2);
   c.tick();                       // frame in flight, pending = 2
 
-  // Worker 0 traps: the latch zeroes pending and releases the in-flight slot.
   c.workers[0].onerror({ message: 'boom', filename: 'w.js', lineno: 1, colno: 1 });
   assert.equal(c.faulted, true);
   assert.equal(c.renderInFlight, false);
@@ -565,14 +542,14 @@ test('an init-phase fault still reaches the fault overlay (faulted checked befor
   // 'ready', so `ready` stays false forever. A ready-first guard would return
   // at the top of every tick() and the fault overlay would never paint.
   const c = makeController();
-  c.create(2);                    // workers spawned, none has signalled ready
+  c.create(2);
   assert.equal(c.ready, false);
 
   c.workers[0].onerror({ message: 'init boom', filename: 'w.js', lineno: 1, colno: 1 });
   assert.equal(c.faulted, true);
 
   let statsShown = 0;
-  c.updateStats = () => { statsShown++; }; // observe the overlay-refresh call
+  c.updateStats = () => { statsShown++; };
   c.tick();
 
   assert.equal(statsShown, 1, 'tick() refreshed the fault overlay despite never being ready');
@@ -581,11 +558,10 @@ test('an init-phase fault still reaches the fault overlay (faulted checked befor
 
 // ---------------------------------------------------------------------------
 // Broadcast paths — setEffect / setParameter / setAnimationsPaused carry the
-// main thread's intent to every worker, and _snapshotParams() flattens the
-// engine's tuned values for transport. setEffect must ship that snapshot in the
-// SAME message so the worker re-applies it AFTER its rebuild-to-defaults; a
-// dropped or reordered replay would render a different effect/params than the
-// main thread — the exact divergence segment mode exists to catch.
+// main thread's intent to every worker; _snapshotParams() flattens the engine's
+// tuned values for transport. setEffect must ship that snapshot in the SAME
+// message so the worker re-applies it AFTER its rebuild-to-defaults; a dropped or
+// reordered replay would diverge from the main thread.
 // ---------------------------------------------------------------------------
 
 /**
@@ -614,7 +590,7 @@ test('_snapshotParams() flattens param defs (bool -> 1/0, number passthrough)', 
 });
 
 test('_snapshotParams() is empty when no engine is bound', () => {
-  const c = makeController(); // getWasmEngine -> null
+  const c = makeController();
   assert.deepEqual(c._snapshotParams(), []);
 });
 
@@ -631,8 +607,7 @@ test('setEffect broadcasts the name plus the tuned param snapshot to every worke
     const msgs = w.posted.filter((m) => m.type === 'setEffect');
     assert.equal(msgs.length, 1, 'each worker received exactly one setEffect');
     assert.equal(msgs[0].name, 'NewEffect');
-    // The snapshot rides in the SAME message, so the worker's rebuild-to-defaults
-    // and the param re-apply cannot be split or reordered in transit.
+    // The snapshot rides in the same message so rebuild and re-apply can't reorder.
     assert.deepEqual(msgs[0].params, [
       { name: 'Speed', value: 0.5 },
       { name: 'Glow', value: 1.0 },
