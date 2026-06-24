@@ -30,10 +30,8 @@ import { computeSegmentRange, blitSegmentRect } from "./segment_layout.js";
 const post = /** @type {(msg: ControllerInboundMsg, transfer?: Transferable[]) => void} */ (
   self.postMessage.bind(self));
 
-// Proof-of-life: reaching here means every static import above (incl. the
-// ./holosphere_wasm.js glue) resolved. Sent before the WASM instantiate so the
-// controller can fault fast on a missing/renamed glue file; a failed module fetch
-// never runs this line, so 'booted' never arrives.
+// Sent before the WASM instantiate so the controller can fault fast on a
+// missing/renamed glue file; a failed module fetch never runs this line.
 post({ type: 'booted' });
 
 let wasmModule = null;
@@ -83,12 +81,10 @@ async function handleMessage(msg) {
       if (msg.effectName) {
         engine.setEffect(msg.effectName);
       }
-      // Apply tuned params after setEffect (which rebuilds with defaults) so this
-      // segment matches instead of rendering effect defaults.
+      // Tuned params must follow setEffect, which rebuilds with defaults.
       if (msg.params) {
         for (const p of msg.params) engine.setParameter(p.name, p.value);
       }
-      // A fresh engine starts running, so only carry an active pause.
       if (msg.paused) engine.setAnimationsPaused(true);
       applyClip();
 
@@ -99,8 +95,7 @@ async function handleMessage(msg) {
     case 'setEffect': {
       if (engine) {
         engine.setEffect(msg.name);
-        // Re-apply tuned values after setEffect rebuilds with defaults (same ordering
-        // as init).
+        // Tuned params must follow setEffect, which rebuilds with defaults.
         if (msg.params) {
           for (const p of msg.params) engine.setParameter(p.name, p.value);
         }
@@ -112,15 +107,12 @@ async function handleMessage(msg) {
 
     case 'setResolution': {
       if (engine) {
-        // On a size the engine can't build, setResolution returns false and keeps its
-        // current geometry; leave canvasW/H/segRange/clip untouched. `=== false` (not
-        // `!`) is load-bearing: a non-boolean return must NOT count as rejection.
+        // `=== false` (not `!`) is load-bearing: only an explicit false rejection
+        // keeps the current geometry; a non-boolean return must not count as one.
         if (engine.setResolution(msg.w, msg.h) === false) break;
         canvasW = msg.w;
         canvasH = msg.h;
         segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
-        // Re-clip here so the handler is self-contained: a resolution change without a
-        // trailing setEffect still ends correctly clipped.
         applyClip();
       }
       break;
@@ -143,12 +135,8 @@ async function handleMessage(msg) {
     case 'render': {
       if (!engine || !segRange) break;
 
-      // Two timings, overlapping but different spans:
-      //   elapsed  — JS wall time (ms) around drawFrame(): C++ render PLUS embind
-      //              boundary-crossing overhead (what the JS frame loop pays).
-      //   renderUs — the engine's internal render timer (µs): C++ render proper,
-      //              excluding JS<->WASM overhead (isolates engine cost).
-      // So elapsed >= renderUs/1000; the gap is the marshaling cost.
+      // elapsed: JS wall time (ms) incl. embind overhead. renderUs: engine-internal
+      // render timer (µs), excluding JS<->WASM overhead.
       const t0 = performance.now();
       engine.drawFrame();
       const elapsed = performance.now() - t0;
@@ -182,7 +170,6 @@ async function handleMessage(msg) {
           },
         };
       } catch (e) {
-        // Surface rather than swallow so a binding/shape change stays diagnosable.
         console.warn('segment_worker: getArenaMetrics failed:', e);
         arenaMetrics = null;
       }
@@ -203,10 +190,9 @@ async function handleMessage(msg) {
 }
 
 // Serialize message handling: each message runs strictly after the previous settles
-// (so 'init''s long await can't interleave). The catch keeps one failure from
-// wedging the chain, and rethrows on a fresh task so it reaches the global error
-// handler (and the controller's onerror fault latch) instead of vanishing as an
-// unhandled rejection.
+// (so 'init''s long await can't interleave). The catch rethrows on a fresh task so a
+// failure reaches the global error handler instead of vanishing as an unhandled
+// rejection, without wedging the chain.
 let messageQueue = Promise.resolve();
 self.onmessage = (e) => {
   const msg = /** @type {WorkerInboundMsg} */ (e.data);

@@ -113,8 +113,7 @@ export class AppState {
   snapshot() { return { ...this._state }; }
 }
 
-// gui.js routes its param writes through this so there is a single URL writer and
-// no clobber race.
+// Single app-wide URL writer; gui.js routes its param writes through this.
 let _activeURLSync = null;
 /**
  * Returns the app-wide active URLSync instance, or null if none is constructed.
@@ -154,15 +153,13 @@ export class URLSync {
       if (!params.has(key)) continue;
       const raw = params.get(key);
       const validate = validators[key];
-      if (validate && !validate(raw)) continue; // reject → keep the default
+      if (validate && !validate(raw)) continue;
       patch[key] = raw;
     }
     if (Object.keys(patch).length > 0) {
       state.update(patch);
     }
 
-    // Keep the unsubscribe handle so dispose() can detach this — otherwise a page
-    // discard leaves the callback firing _schedule() into a dead page.
     this._unsubscribe = state.subscribe((key, value) => {
       if (!this.trackedKeys.has(key)) return;
       this._schedule();
@@ -206,8 +203,7 @@ export class URLSync {
    */
   setParam(key, value) {
     if (value === null || value === undefined) {
-      // A deletion marker, not a forget: _flush needs it to drop a param already in
-      // the URL.
+      // null is a deletion marker (drop the param on flush), not a forget.
       this._adhoc.set(key, null);
     } else {
       this._adhoc.set(key,
@@ -233,23 +229,18 @@ export class URLSync {
     for (const k of [...params.keys()]) {
       if (!excl.has(k)) params.delete(k);
     }
-    // Re-assert tracked-key state: clearing this._timer cancelled any flush for an
-    // in-flight change, so without this its new value would be lost.
+    // Re-assert tracked state and surviving ad-hoc writes: clearing this._timer
+    // cancelled any flush for a change made within the debounce window.
     for (const key of this.trackedKeys) {
       const val = this.state.get(key);
       if (val !== null && val !== undefined) this._setTrackedParam(params, key, val);
     }
-    // Merge ad-hoc writes that survived the prune: the cancelled flush may hold a GUI
-    // param changed within the debounce window.
     for (const [key, val] of this._adhoc) {
       if (val === null) params.delete(key);
       else params.set(key, val);
     }
-    // Omit the '?' when there are no params, leaving a clean pathname.
     const qs = params.toString();
     window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
-    // Drop the buffer so retained excluded entries can't override a tracked key on a
-    // later flush.
     this._adhoc.clear();
   }
 
@@ -287,13 +278,11 @@ export class URLSync {
       if (val === null) params.delete(key);
       else params.set(key, val);
     }
-    // Omit the '?' when there are no params, leaving a clean pathname.
     const qs = params.toString();
     const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState({}, '', newUrl);
-    // The URL is now the store of record (the next flush re-reads it). Clear the
-    // buffer so a stale ad-hoc entry can't re-apply on every flush and permanently
-    // override a tracked key re-read from appState.
+    // The URL is now the store of record; clear the buffer so a stale ad-hoc entry
+    // can't re-apply on every flush.
     this._adhoc.clear();
   }
 }
