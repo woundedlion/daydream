@@ -113,9 +113,8 @@ export class AppState {
   snapshot() { return { ...this._state }; }
 }
 
-// The app-wide active URLSync instance. The GUI layer (gui.js) routes its
-// param writes through this rather than issuing its own competing
-// replaceState, so there is a single URL writer and no clobber race.
+// The app-wide active URLSync. gui.js routes its param writes through this so
+// there is a single URL writer and no clobber race.
 let _activeURLSync = null;
 /**
  * Returns the app-wide active URLSync instance, or null if none is constructed.
@@ -149,7 +148,6 @@ export class URLSync {
     this._timer = null;
     this._adhoc = new Map(); // GUI-set params (key -> string), merged on flush
 
-    // Read initial values from URL
     const params = new URLSearchParams(window.location.search);
     const patch = {};
     for (const key of trackedKeys) {
@@ -163,15 +161,13 @@ export class URLSync {
       state.update(patch);
     }
 
-    // Subscribe to changes and debounce URL writes. Keep the unsubscribe handle
-    // so dispose() can tear the subscription down — otherwise a page discard
-    // leaves this callback firing _schedule() into a dead page.
+    // Keep the unsubscribe handle so dispose() can detach this — otherwise a page
+    // discard leaves the callback firing _schedule() into a dead page.
     this._unsubscribe = state.subscribe((key, value) => {
       if (!this.trackedKeys.has(key)) return;
       this._schedule();
     });
 
-    // Become the app-wide URL writer the GUI delegates to.
     _activeURLSync = this;
   }
 
@@ -210,9 +206,8 @@ export class URLSync {
    */
   setParam(key, value) {
     if (value === null || value === undefined) {
-      // Record a deletion marker rather than forgetting the key: _flush needs
-      // it to actually drop a param already present in the URL. Matches the
-      // gui.js fallback path's delete-on-null semantics.
+      // Record a deletion marker, not a forget: _flush needs it to drop a param
+      // already present in the URL.
       this._adhoc.set(key, null);
     } else {
       // Round numbers to save space and avoid float jitter.
@@ -239,26 +234,23 @@ export class URLSync {
     for (const k of [...params.keys()]) {
       if (!excl.has(k)) params.delete(k);
     }
-    // Re-assert current state for tracked keys. Clearing this._timer above cancels
-    // any flush already scheduled for an in-flight change, and excluding a key by
-    // name preserves only its stale URL value; without this the new value is lost.
+    // Re-assert tracked-key state: clearing this._timer cancelled any flush for an
+    // in-flight change, so without this its new value would be lost.
     for (const key of this.trackedKeys) {
       const val = this.state.get(key);
       if (val !== null && val !== undefined) this._setTrackedParam(params, key, val);
     }
-    // Merge the ad-hoc writes that survived the prune above (the excluded keys).
-    // The cancelled flush may hold a GUI param changed within the 200 ms window;
-    // re-asserting it keeps that fresh value instead of the stale URL one.
+    // Merge the ad-hoc writes that survived the prune (excluded keys): the cancelled
+    // flush may hold a GUI param changed within the debounce window.
     for (const [key, val] of this._adhoc) {
       if (val === null) params.delete(key);
       else params.set(key, val);
     }
-    // Omit the '?' entirely when there are no params, so clearing every query
-    // key leaves a clean pathname instead of a dangling "path?".
+    // Omit the '?' when there are no params, leaving a clean pathname.
     const qs = params.toString();
     window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
-    // Everything is written to the URL now; drop the buffer so the (excluded)
-    // entries retained above can't override a tracked key on a later flush.
+    // Drop the buffer so the retained excluded entries can't override a tracked key
+    // on a later flush.
     this._adhoc.clear();
   }
 
@@ -296,15 +288,13 @@ export class URLSync {
       if (val === null) params.delete(key);
       else params.set(key, val);
     }
-    // Omit the '?' entirely when there are no params (see flush()), so a fully
-    // cleared query leaves a clean pathname rather than a dangling "path?".
+    // Omit the '?' when there are no params, leaving a clean pathname.
     const qs = params.toString();
     const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState({}, '', newUrl);
-    // The URL is now the store of record for these values (the next flush re-reads
-    // them from window.location.search). Clear the pending-write buffer so a stale
-    // ad-hoc entry can't re-apply on every future flush and permanently override a
-    // tracked key re-read from appState — e.g. a later appState.set('resolution').
+    // The URL is now the store of record (the next flush re-reads from it). Clear the
+    // buffer so a stale ad-hoc entry can't re-apply on every flush and permanently
+    // override a tracked key re-read from appState.
     this._adhoc.clear();
   }
 }
