@@ -239,7 +239,28 @@ export class VideoRecorder {
     // this tick rather than a broken one.
     if (this._offscreen && this._offCtx &&
         this.canvas.width > 0 && this.canvas.height > 0) {
-      this._offCtx.drawImage(this.canvas, 0, 0, this._offscreen.width, this._offscreen.height);
+      // Letterbox/pillarbox the source into the pinned offscreen so a
+      // mid-recording window resize (changing the source aspect away from the
+      // pinned one) preserves geometry instead of stretching. When the source
+      // aspect matches the offscreen's, the destination rect fills it exactly.
+      const offW = this._offscreen.width, offH = this._offscreen.height;
+      const srcAspect = this.canvas.width / this.canvas.height;
+      const offAspect = offW / offH;
+      let destW, destH;
+      if (srcAspect > offAspect) {
+        // Source is wider: fit to width, pillarbox/letterbox vertically.
+        destW = offW;
+        destH = Math.round(offW / srcAspect);
+      } else {
+        // Source is taller (or equal): fit to height, bars horizontally.
+        destH = offH;
+        destW = Math.round(offH * srcAspect);
+      }
+      const destX = Math.round((offW - destW) / 2);
+      const destY = Math.round((offH - destH) / 2);
+      // Clear first so the bars left by a shrunken dest rect are clean black.
+      this._offCtx.clearRect(0, 0, offW, offH);
+      this._offCtx.drawImage(this.canvas, destX, destY, destW, destH);
     }
 
     this.track.requestFrame();
