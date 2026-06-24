@@ -3,13 +3,9 @@ import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { AppState, URLSync, getActiveURLSync } from '../state.js';
 
-// installWindow() below stubs globalThis.window; restore the host value after
-// each test so the stub never leaks to another suite if the runner shares a
-// process (matching recorder.test.js's save/restore discipline). Dispose the
-// active URLSync first: a tracked-key change arms a 200 ms debounced _flush(), so
-// tearing down the window stub while that timer is pending would fire the
-// deferred flush into a deleted window. dispose() cancels the timer (and drops
-// the app-wide writer slot) before the global is restored.
+// Restore the host window after each test so the stub never leaks. Dispose the
+// active URLSync first: a tracked-key change arms a 200 ms debounced _flush(),
+// which would otherwise fire into a deleted window after teardown.
 const _savedWindow = globalThis.window;
 afterEach(() => {
   const sync = getActiveURLSync();
@@ -18,7 +14,6 @@ afterEach(() => {
   else globalThis.window = _savedWindow;
 });
 
-/** Verifies get() returns initial defaults and set() updates a value in place. */
 test('AppState.get returns defaults and set updates', () => {
   const s = new AppState({ a: 1, b: 'x' });
   assert.equal(s.get('a'), 1);
@@ -27,18 +22,16 @@ test('AppState.get returns defaults and set updates', () => {
   assert.equal(s.get('a'), 2);
 });
 
-/** Verifies set() notifies subscribers with (key, newValue, oldValue) and skips writes that don't change the value. */
 test('AppState.set notifies with (key, new, old) and skips no-op writes', () => {
   const s = new AppState({ a: 1 });
   const events = [];
   s.subscribe((key, value, old) => events.push([key, value, old]));
 
   s.set('a', 1);            // same value → no notification
-  s.set('a', 2);            // change → one notification
+  s.set('a', 2);
   assert.deepEqual(events, [['a', 2, 1]]);
 });
 
-/** Verifies update() applies a batch of writes and only notifies for keys whose value actually changed. */
 test('AppState.update batches and only fires for changed keys', () => {
   const s = new AppState({ a: 1, b: 2, c: 3 });
   const events = [];
@@ -48,7 +41,6 @@ test('AppState.update batches and only fires for changed keys', () => {
   assert.deepEqual(events, [['b', 20, 2], ['c', 30, 3]]);
 });
 
-/** Verifies subscribe() returns a function that detaches the listener so later changes no longer notify it. */
 test('AppState.subscribe returns an unsubscribe function', () => {
   const s = new AppState({ a: 1 });
   let count = 0;
@@ -59,7 +51,6 @@ test('AppState.subscribe returns an unsubscribe function', () => {
   assert.equal(count, 1);
 });
 
-/** Verifies snapshot() returns a detached copy that does not mutate the live state when modified. */
 test('AppState.snapshot is a detached copy', () => {
   const s = new AppState({ a: 1 });
   const snap = s.snapshot();
@@ -87,7 +78,6 @@ function installWindow(search = '', pathname = '/') {
   return calls;
 }
 
-/** Verifies URLSync seeds state from tracked URL params on construction and ignores untracked ones. */
 test('URLSync reads initial tracked keys from the URL into state', () => {
   installWindow('?effect=Voronoi&res=high&untracked=1');
   const s = new AppState({ effect: 'Moire', res: 'low' });
@@ -96,7 +86,6 @@ test('URLSync reads initial tracked keys from the URL into state', () => {
   assert.equal(s.get('res'), 'high');
 });
 
-/** Verifies the optional per-key validator rejects an invalid URL value and keeps the state default. */
 test('URLSync validator rejects an invalid URL value and keeps the default', () => {
   installWindow('?effect=Voronoi&res=bogus');
   const s = new AppState({ effect: 'Moire', res: 'low' });
@@ -105,7 +94,6 @@ test('URLSync validator rejects an invalid URL value and keeps the default', () 
   assert.equal(s.get('res'), 'low');        // invalid 'bogus' rejected → default kept
 });
 
-/** Verifies the validator admits a valid URL value (a passing predicate is a no-op gate). */
 test('URLSync validator admits a valid URL value', () => {
   installWindow('?res=high');
   const s = new AppState({ res: 'low' });
@@ -113,7 +101,6 @@ test('URLSync validator admits a valid URL value', () => {
   assert.equal(s.get('res'), 'high');
 });
 
-/** Verifies a newly constructed URLSync registers itself as the active URL writer returned by getActiveURLSync(). */
 test('URLSync registers itself as the active URL writer', () => {
   installWindow('');
   const s = new AppState({});
@@ -121,7 +108,6 @@ test('URLSync registers itself as the active URL writer', () => {
   assert.equal(getActiveURLSync(), sync);
 });
 
-/** Verifies _flush() writes tracked state plus ad-hoc params (rounded to 4 dp) onto the current pathname. */
 test('URLSync._flush writes tracked state and ad-hoc params to the URL', () => {
   const calls = installWindow('', '/sim');
   const s = new AppState({ effect: 'Voronoi' });
@@ -137,7 +123,6 @@ test('URLSync._flush writes tracked state and ad-hoc params to the URL', () => {
   assert.ok(calls[0].startsWith('/sim?'));
 });
 
-/** Verifies _flush() clears the ad-hoc buffer so a later programmatic state change wins over a stale ad-hoc value for the same tracked key. */
 test('URLSync._flush clears the ad-hoc buffer so a tracked key is not permanently overridden', () => {
   const calls = installWindow('', '/sim');
   const s = new AppState({ resolution: 'low' });

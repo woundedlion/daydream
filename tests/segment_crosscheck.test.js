@@ -13,8 +13,7 @@
 //     over a full rotation BOTH arms read the entire width, with arm B reading a
 //     w/2-shifted column. So the column decompositions intentionally differ.
 //
-// What the two MUST agree on — and what was previously asserted only in prose —
-// is the shared convention:
+// What the two MUST agree on is the shared convention:
 //   1. Arm partition: segments [0, N/2) are arm A; [N/2, N) are arm B.
 //   2. Arm B is the w/2 half: its web rect starts at x = floor(w/2), and the
 //      firmware's arm-B column offset segment_x_col(true, 0, w) is floor(w/2).

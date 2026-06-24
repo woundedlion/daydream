@@ -1,13 +1,9 @@
 // @ts-nocheck
 //
-// segment_worker — unit coverage for the Web Worker's DOM-free, mostly-pure
-// glue: the per-segment clip application, the quadrant row-extraction copy, the
-// arena-metrics marshalling (including the throw path), the setResolution gate
-// (a rejected resolution must leave geometry/clip untouched), and the serialized
-// message queue's failure isolation + rethrow.
-//
-// Driven by a fake `self` (postMessage captured, onmessage invoked by hand) and
-// a mocked ./holosphere_wasm.js so the real WASM module is never loaded in Node.
+// segment_worker — unit coverage for the per-segment clip application, the
+// quadrant row-extraction copy, arena-metrics marshalling (including the throw
+// path), the setResolution gate, and the serialized message queue's failure
+// isolation + rethrow. Driven by a fake `self` and a mocked ./holosphere_wasm.js.
 //
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
 import { test, mock, beforeEach } from 'node:test';
@@ -18,9 +14,8 @@ import assert from 'node:assert/strict';
 // and assigns self.onmessage at module-evaluation time.
 // ---------------------------------------------------------------------------
 
-// Stable postMessage sink. The worker binds `self.postMessage` once at import,
-// so the function reference must never change — it forwards into this mutable
-// array, which tests clear in beforeEach.
+// The worker binds `self.postMessage` once at import, so the reference must
+// never change; it forwards into this mutable array.
 const posted = [];
 /** @type {{ postMessage: Function, onmessage: ?Function }} */
 const fakeSelf = {
@@ -121,7 +116,6 @@ test('init applies the segment clip and posts ready', async () => {
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
 
   assert.ok(engineInstance, 'engine constructed');
-  // setResolution(8,4) then setEffect, with the clip applied last.
   assert.deepEqual(engineInstance.calls[0], ['setResolution', 8, 4]);
   assert.equal(engineInstance.effect, 'Plasma');
   // segId 3 of 4 over 8x4 → arm B (x0=4), bottom band (y0=2): clip {2,4,4,8}.

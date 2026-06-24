@@ -72,7 +72,7 @@ test('native-resolution capture pins the offscreen to the source size at start',
   try {
     const source = fakeCanvas(201, 101);   // odd dims → rounded up to even
     const rec = new VideoRecorder(source);
-    assert.equal(rec.targetHeight, null);  // native path
+    assert.equal(rec.targetHeight, null);
 
     const off = rec._ensurePinnedOffscreen();
     assert.equal(off.width, 202);
@@ -102,7 +102,7 @@ test('targetHeight capture scales the offscreen to the target height and pins it
     const source = fakeCanvas(800, 600);   // 4:3 source
     const rec = new VideoRecorder(source);
     rec.targetHeight = 121;                 // odd target → rounded up to even
-    assert.notEqual(rec.targetHeight, null); // downscale path, not native
+    assert.notEqual(rec.targetHeight, null);
 
     const off = rec._ensureOffscreen();
     // height 121 → 122; width round(121 * 800/600) = round(161.33) = 161 → 162.
@@ -211,10 +211,10 @@ test('toggle starts then stops, reporting the true state each time', () => {
   const restore = installRecorderEnv();
   try {
     const rec = new VideoRecorder(recordableCanvas());
-    rec._download = () => {}; // isolate from the download/DOM machinery
-    assert.equal(rec.toggle('e'), true);   // was idle -> now recording
+    rec._download = () => {};
+    assert.equal(rec.toggle('e'), true);   // idle → recording
     assert.equal(rec.isRecording, true);
-    assert.equal(rec.toggle('e'), false);  // was recording -> stop() ran
+    assert.equal(rec.toggle('e'), false);  // recording → stopped
     rec.mediaRecorder.onstop();            // fire the async teardown
     assert.equal(rec.isRecording, false);
   } finally {
@@ -351,7 +351,7 @@ test('captureFrame warns once when the browser lacks requestFrame', () => {
     delete rec.track.requestFrame;
     rec.captureFrame();
     rec.captureFrame();
-    assert.equal(rec.elapsedSeconds, 0); // never advanced
+    assert.equal(rec.elapsedSeconds, 0);
     assert.equal(warns.length, 1);       // warned once, not per frame
   } finally {
     console.warn = prevWarn;
