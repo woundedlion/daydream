@@ -1,19 +1,16 @@
 // @ts-check
 //
-// WASM-backed spline parity: wires the REAL exported WASM evaluators
+// WASM-backed spline parity: drives the REAL exported WASM evaluators
 // (spline_cubic_fast / spline_cubic_slerp / spline_catmull_rom_tangents) through
-// the same sampling cores the splines.html tool uses and pins their output, so an
-// engine-side change fails here instead of silently drifting from the preview.
-// The pure spline_math.test.js only exercises the sampling loop with fake
-// evaluators, leaving the engine math itself unverified.
-//
+// the same sampling cores splines.html uses, pinning the engine math that
+// spline_math.test.js leaves unverified (it uses fake evaluators).
 // The wrappers below are byte-identical to splines.html's bridge callbacks.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateBezierCurve, generateCatmullRomCurve } from '../tools/spline_math.js';
 import createHolosphereModule from '../holosphere_wasm.js';
 
-// Top-level await means a load/instantiation failure fails this file loudly
+// Top-level await fails this file loudly if the module can't instantiate,
 // rather than skipping the parity check.
 const M = await createHolosphereModule({ print() {}, printErr() {} });
 

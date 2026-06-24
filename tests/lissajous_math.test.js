@@ -49,8 +49,6 @@ test('findBestRationalRatio: irrational (PI) clamped to maxDenominator returns t
   const { M, N } = findBestRationalRatio(Math.PI, maxDenominator);
   assert.ok(M >= 1 && M <= maxDenominator, 'M within bound');
   assert.ok(N >= 1 && N <= maxDenominator, 'N within bound');
-  // With the numerator capped at 8, fine fractions like 22/7 are out of reach, so
-  // the closest reachable approximation to PI is 3/1.
   const value = M / N;
   const expectedErr = closestError(Math.PI, maxDenominator);
   assert.ok(
@@ -127,7 +125,6 @@ test('snapToRationalRatio: closing period equals 2π·n/passiveC for a known rat
   assert.equal(m, 3);
   assert.equal(n, 2);
   assert.equal(snappedActiveC, passiveC * (m / n));
-  // Closing relation: T = 2π·n / passiveC.
   assert.equal(closingPeriod, (TWO_PI * n) / passiveC);
 });
 
@@ -186,7 +183,6 @@ test('lissajousCodeString emits a C++ LissajousParams initializer', () => {
     lissajousCodeString(12, 5, 0, TWO_PI),
     'LissajousParams{12.0f, 5.0f, 0.0f, 2 * PI_F}');
 
-  // Multi-period domain renders as a PI_F multiple; phase stays in radians.
   assert.equal(
     lissajousCodeString(3, 2, 1.5708, 2 * TWO_PI),
     'LissajousParams{3.0f, 2.0f, 1.571f, 4 * PI_F}');

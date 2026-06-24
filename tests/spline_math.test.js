@@ -129,7 +129,6 @@ test('generateCatmullRomCurve: closed case wraps (one segment per point)', () =>
   // Closed has n segments vs n-1 open, so it is strictly longer (the wrap seg).
   assert.equal(closed.length, perSeg + 1 + (pts.length - 1) * perSeg);
   assert.ok(closed.length > open.length);
-  // The closing segment runs from the last control point back to the first.
   assert.deepEqual(closed[closed.length - 1], pts[0]);
 });
 

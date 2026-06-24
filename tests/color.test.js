@@ -101,11 +101,9 @@ test('lerpOklch endpoints and shortest-hue-arc midpoint', () => {
 
 /** Verifies lerpOklch interpolates hue along the short arc across the +/-pi seam, not the long way. */
 test('lerpOklch wraps the hue across the +/-pi seam by the short arc', () => {
-  // a near +pi, b near -pi: the short arc crosses the seam, not the long way.
   const a = { L: 0.5, C: 0.2, h: Math.PI - 0.1 };
   const b = { L: 0.5, C: 0.2, h: -Math.PI + 0.1 };
   const mid = lerpOklch(a, b, 0.5);
-  // Midpoint sits on the seam (~±pi), i.e. |h| close to pi, NOT near 0.
   assert.ok(Math.abs(Math.abs(mid.h) - Math.PI) < 0.15,
     `hue ${mid.h} should sit near the seam, not interpolate the long way`);
 });
@@ -141,7 +139,6 @@ test('oklchToLinearRgb matches a golden in-gamut linear RGB', () => {
 test('linearRgbToHex produces #rrggbb with correct fixed points', () => {
   assert.equal(linearRgbToHex(0, 0, 0), '#000000');
   assert.equal(linearRgbToHex(1, 1, 1), '#ffffff');
-  // Out-of-range inputs clamp rather than overflow the two-digit channels.
   assert.equal(linearRgbToHex(-1, 2, 0), '#00ff00');
   assert.match(linearRgbToHex(0.5, 0.25, 0.75), /^#[0-9a-f]{6}$/);
 });
