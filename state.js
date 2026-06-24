@@ -60,6 +60,14 @@ export class AppState {
 
   /**
    * Batch-sets multiple keys, firing one notification per changed key at the end.
+   *
+   * BATCH-THEN-NOTIFY: every key in the patch is written into the state FIRST,
+   * and only then are subscribers notified (one notification per changed key).
+   * This is deliberately unlike set(), which writes and notifies one key at a
+   * time — so a subscriber whose callback reads a *sibling* batched key here
+   * sees that sibling's fully-advanced (post-batch) value, not its pre-batch one.
+   * Keep callbacks that depend on cross-key ordering aware of this: the batch is
+   * an atomic snapshot, not a sequence of independent set()s.
    * @param {Object} patch - Key/value pairs to merge into the state.
    * @returns {void}
    */
