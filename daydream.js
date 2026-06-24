@@ -15,11 +15,8 @@ import { SegmentController } from "./segment_controller.js";
 import { refreshPixelView as computePixelView } from "./pixel_view.js";
 import { resolveParamSync } from "./param_sync.js";
 
-// Failure-handling boundary: this UI layer DEGRADES GRACEFULLY on failures from
-// user/config-dependent engine calls (setEffect, setResolution, getEffectSizes,
-// ...) — log, keep last good state, return. The engine/protocol/pure layers TRAP
-// on invariant violations (programmer/contract errors). The graceful catches
-// below are deliberate, not missing error handling.
+// This UI layer degrades gracefully (log, keep last good state, return) on
+// failures from user/config-dependent engine calls; the lower layers trap.
 
 const HiResFavorites = [
   "BZReactionDiffusion",
@@ -85,8 +82,6 @@ let wasmModule = null;
 let wasmEngine = null;
 let wasmMemoryView = null;
 let wasmAdapter = null;
-// Null until daydream's canvas exists (see below); recording controls guard with
-// `if (recorder)` / `recorder?.`.
 let recorder = null;
 
 /**
@@ -99,8 +94,6 @@ function refreshPixelView() {
   const { view, refreshed } = computePixelView(
     wasmMemoryView, () => wasmEngine.getPixels());
   if (refreshed) {
-    // Re-point all three display aliases at the fresh view so source, the
-    // displayed instanceColor attribute, and Daydream.pixels stay in lockstep.
     wasmMemoryView = view;
     daydream.dotMesh.instanceColor.array = view;
     Daydream.pixels = view;
@@ -116,21 +109,18 @@ function refreshPixelView() {
 function syncGUI() {
   if (!activeEffect || !activeEffect.controllerByName) return;
 
-  // Zero-copy view over WASM memory; heap growth can detach it to a zero-length
-  // view, so guard rather than mis-read this frame.
+  // Heap growth can detach this view to zero length; guard rather than mis-read.
   const values = wasmEngine.getParamValues();
   if (values.length === 0) return;
 
-  // Look up by name (paramNames mirrors getParamValues() order) so
-  // controller-build order stays decoupled from value-stream order.
   const names = activeEffect.paramNames;
   const n = Math.min(names.length, values.length);
   for (let i = 0; i < n; i++) {
     const c = activeEffect.controllerByName.get(names[i]);
     if (!c) continue;
 
-    // lil-gui sliders drag via a non-focusable div, invisible to the
-    // activeElement check, so the _dragging flag covers an in-progress drag.
+    // lil-gui sliders drag via a non-focusable div, invisible to activeElement,
+    // so _dragging covers an in-progress drag.
     const isEditing =
       c._dragging || c.domElement.contains(document.activeElement);
 
@@ -161,14 +151,10 @@ const appState = new AppState({
   effect: initialEffect || 'IslamicStars',
   resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Phantasm (144x288)",
 });
-// Validate ?resolution= in the sync layer so a garbage value can't overwrite
-// the validated default above.
 const urlSync = new URLSync(appState, ['effect', 'resolution'], {
   resolution: (v) => Boolean(resolutionPresets[v]),
 });
 
-// wasmEngine and wasmMemoryView are reassignable, so they're passed as lazy
-// getters.
 const segments = new SegmentController({
   resolutionPresets,
   appState,
@@ -191,9 +177,8 @@ const segments = new SegmentController({
 function applyEffect(preserveParams = false) {
   if (activeEffect && activeEffect.gui) {
     try {
-      // The in-progress drag's pointerup/pointercancel listeners live on
-      // `window`, not the GUI DOM, so destroying the GUI mid-drag would leave
-      // them dangling.
+      // The drag's pointerup/pointercancel listeners live on `window`, not the
+      // GUI DOM, so destroying the GUI mid-drag would leave them dangling.
       if (activeEffect.activeDragEnds) {
         for (const end of activeEffect.activeDragEnds) {
           window.removeEventListener('pointerup', end);
@@ -210,27 +195,19 @@ function applyEffect(preserveParams = false) {
   }
   activeEffect = null;
 
-  // Clear the old effect's per-effect param URL entries (they don't apply to the
-  // new effect), but preserve the global controls' keys: the global GUI survives
-  // an effect switch, so its URL params must too.
+  // Clear the old effect's param URL entries but keep the global GUI's keys.
   if (!preserveParams) {
     resetGUI(['resolution', 'effect', ...guiInstance.collectUrlKeys()]);
   }
 
   if (wasmEngine) {
-    // setEffect() returns false for an unknown/stale effect name; the engine
-    // resets to a blank state on failure, so surface it and skip building a GUI
-    // for an effect that doesn't exist (mirrors the setResolution guard below).
     if (wasmEngine.setEffect(appState.get('effect')) === false) {
       console.error(`setEffect("${appState.get('effect')}") failed; effect unavailable.`);
-      // The early return skips the end-of-function sidebar/worker sync; run it
-      // here so the highlight and worker pool track appState rather than stranding
-      // on the previous effect.
+      // The early return skips the end-of-function sync; run it here.
       if (segments.workers.length > 0) segments.setEffect(appState.get('effect'));
       sidebar.setActive(appState.get('effect'));
       return;
     }
-    // Strobe mode is per-effect, so re-read on every switch.
     daydream.setStrobeColumns(wasmEngine.strobeColumns());
 
     activeEffect = { gui: new GUI({ autoPlace: false }), activeDragEnds: new Set() };
@@ -250,8 +227,8 @@ function applyEffect(preserveParams = false) {
        */
       export() {
         const values = wasmEngine.getParamValues();
-        // A heap-growth detach leaves the view zero-length; without this guard
-        // the loop would copy an all-zero preset and report success.
+        // A heap-growth detach leaves the view zero-length; skip so we don't copy
+        // an all-zero preset.
         if (values.length === 0) {
           console.warn('Export: parameter view detached (zero-length); skipping copy');
           exportCtrl.name('✗ Copy failed');
@@ -268,7 +245,6 @@ function applyEffect(preserveParams = false) {
           exportCtrl.name('\u2713 Copied!');
           setTimeout(() => exportCtrl.name('Export'), 1500);
         }).catch((err) => {
-          // Insecure context or denied permission.
           console.warn('Export: clipboard write failed', err);
           exportCtrl.name('\u2717 Copy failed');
           setTimeout(() => exportCtrl.name('Export'), 1500);
@@ -278,8 +254,7 @@ function applyEffect(preserveParams = false) {
     activeEffect.gui.add(effectActions, 'reset').name('Reset');
     const exportCtrl = activeEffect.gui.add(effectActions, 'export').name('Export');
 
-    // "Pause Animation" toggle, shown only when the effect has an animation-driven
-    // param. Grabbing such a slider auto-engages it.
+    // "Pause Animation" toggle, shown only when the effect has an animated param.
     const hasAnimated = params.some(p => p.animated);
     const animState = { pause: false };
     let pauseController = null;
@@ -299,9 +274,8 @@ function applyEffect(preserveParams = false) {
       pauseController.onChange(setPaused);
     }
 
-    // syncGUI() binds the per-frame value stream to controllers by name, not
-    // index, so a C++ param reorder can't silently mis-bind sliders. paramNames
-    // records the value-stream order.
+    // paramNames records the value-stream order; syncGUI() binds by name, not
+    // index, so a C++ param reorder can't mis-bind sliders.
     const state = {};
     activeEffect.paramNames = [];
     activeEffect.controllerByName = new Map();
@@ -321,14 +295,11 @@ function applyEffect(preserveParams = false) {
       activeEffect.paramNames.push(p.name);
       activeEffect.controllerByName.set(p.name, controller);
 
-      // Read-only telemetry: keep it updating live (syncGUI) but block editing.
       if (p.readonly) {
         if (typeof controller.disable === 'function') controller.disable();
       } else {
-        // Drag guard for syncGUI: flag the controller while dragging so the
-        // per-frame value stream doesn't fight an in-progress drag. The window
-        // listeners are registered on the owning effect's activeDragEnds so a GUI
-        // destroyed mid-drag removes them rather than leaving them on `window`.
+        // Flag _dragging so syncGUI's value stream doesn't fight a drag. The window
+        // listeners go on activeDragEnds so a GUI destroyed mid-drag removes them.
         controller.domElement.addEventListener('pointerdown', () => {
           controller._dragging = true;
           const fx = activeEffect;
@@ -345,16 +316,12 @@ function applyEffect(preserveParams = false) {
       }
 
       // Push the GUI's initial value into the engine: a ?param=value deep link
-      // overrides state[p.name] but nothing fires onChange on load, so without
-      // this the slider would show the URL value while the engine renders the
-      // default. Read-only telemetry flows engine → GUI only.
+      // sets state[p.name] but fires no onChange, so the engine would otherwise
+      // render the default while the slider shows the URL value.
       if (!p.readonly) {
         const initVal = isBool ? (state[p.name] ? 1.0 : 0.0) : state[p.name];
         if (wasmEngine.setParameter(p.name, initVal) === false)
           console.warn(`setParameter("${p.name}") rejected as unknown.`);
-        // Don't broadcast per-param to workers here: segments.setEffect() below
-        // snapshots these values and re-applies them after the worker rebuilds
-        // the effect, so a broadcast now would be wiped by that rebuild.
       }
 
       controller.onChange(v => {
@@ -362,8 +329,6 @@ function applyEffect(preserveParams = false) {
         if (wasmEngine.setParameter(p.name, floatVal) === false)
           console.warn(`setParameter("${p.name}") rejected as unknown.`);
         segments.setParameter(p.name, floatVal);
-        // DeepLinkGUI.add()'s _attachUrlWriter persists the value after this
-        // handler returns, so no manual URL write here.
         // Touching an animated slider takes over from the animation.
         if (p.animated && pauseController && !animState.pause) {
           setPaused(true);
@@ -373,8 +338,8 @@ function applyEffect(preserveParams = false) {
     });
   }
 
-  // Use the driver's container-width isMobile rather than window.innerWidth,
-  // which disagrees on a narrow container in a wide window.
+  // Driver's container-width isMobile, not window.innerWidth (differs for a
+  // narrow container in a wide window).
   if (activeEffect && activeEffect.gui && daydream.isMobile) {
     activeEffect.gui.close();
   }
@@ -412,13 +377,11 @@ function applyResolution(preserveParams = false) {
   if (!p) return;
 
   if (wasmEngine) {
-    // setResolution returns false for a size the WASM factory can't build; keep
-    // the current (valid) resolution rather than driving the engine blank.
     if (wasmEngine.setResolution(p.w, p.h) === false) {
       console.error(`Unsupported resolution ${p.w}x${p.h}; keeping current.`);
       return;
     }
-    wasmMemoryView = null; // Force refreshPixelView to re-fetch after resize
+    wasmMemoryView = null; // force refreshPixelView to re-fetch after resize
   }
 
   if (segments.workers.length > 0) {
@@ -436,15 +399,12 @@ function applyResolution(preserveParams = false) {
   }
   sidebar.setEffects(availableEffects, effectSizes);
 
-  // If the current effect isn't offered at the new resolution, switch to the
-  // first. Do this after updateResolution()/setEffects(): appState.set('effect',…)
-  // synchronously fires applyEffect(), which would otherwise build the GUI
-  // against the pre-resize dot mesh / stale sidebar.
+  // Done after updateResolution()/setEffects() because appState.set('effect',…)
+  // synchronously fires applyEffect(), which would otherwise build against the
+  // pre-resize dot mesh / stale sidebar.
   let effectChanged = false;
   const resolvedEffect = resolveActiveEffect(availableEffects, appState.get('effect'));
   if (resolvedEffect !== appState.get('effect')) {
-    // Off-list effect: the resulting applyEffect() runs preserveParams=false,
-    // dropping the effect-specific URL entries but keeping the global ones.
     appState.set('effect', resolvedEffect);
     effectChanged = true;
   }
@@ -453,8 +413,6 @@ function applyResolution(preserveParams = false) {
     applyEffect(preserveParams);
   }
 
-  // The resize rebuilt the dot mesh without moving OrbitControls, so request a
-  // repaint (covers the paused-sim case).
   daydream.invalidate();
 }
 
@@ -474,21 +432,16 @@ createHolosphereModule().then(module => {
   wasmModule = module;
   wasmEngine = new module.HolosphereEngine();
 
-  // Apply the hydrated resolution before first paint. setResolution returns false
-  // for a size the WASM factory can't build; log so a rejected preset is visible
-  // rather than silently diverging from the geometry.
+  // Apply the hydrated resolution before first paint.
   const p = resolutionPresets[appState.get('resolution')];
   if (p && wasmEngine.setResolution(p.w, p.h) === false) {
     console.error(`Init: unsupported resolution ${p.w}x${p.h} from hydrated preset; ` +
       `keeping the engine's current resolution.`);
   }
 
-  // Don't setEffect here. applyResolution(true) at the end of init validates the
-  // hydrated effect name against this resolution's allow-list and performs the
-  // single setEffect + GUI build; doing it here would only re-run the effect
-  // constructor an extra time before first paint.
+  // setEffect happens once via applyResolution(true) below, after it validates the
+  // hydrated effect against this resolution's allow-list.
 
-  // Persistent adapter (avoids per-frame allocation).
   wasmAdapter = {
     /**
      * Per-frame entry the driver calls: render (segmented or single-engine),
@@ -497,17 +450,14 @@ createHolosphereModule().then(module => {
      */
     drawFrame() {
       if (segments.active) {
-        // Composite the previous frame + dispatch the next. Runs after
-        // driver.render() cleared the buffer, so the composite overwrites it.
+        // Composite the previous frame (overwriting driver.render()'s cleared
+        // buffer) and dispatch the next.
         segments.tick();
       } else {
         wasmEngine.drawFrame();
         refreshPixelView();
-        // All three pixel-buffer aliases must point at the one WASM view:
-        // wasmMemoryView (source), Daydream.pixels (cleared each frame), and
-        // instanceColor.array (displayed). Assert so a future divergence (e.g. a
-        // resize re-pointing only some) fails loudly instead of displaying a
-        // stale buffer the engine never rendered into.
+        // All three aliases must point at the one WASM view; fail loudly if a
+        // future change re-points only some.
         if (Daydream.pixels !== wasmMemoryView ||
             daydream.dotMesh.instanceColor.array !== wasmMemoryView) {
           throw new Error(
@@ -543,7 +493,6 @@ createHolosphereModule().then(module => {
 
   // Construct the recorder now that daydream's canvas exists.
   recorder = new VideoRecorder(daydream.canvas);
-  // Track the driver's frame cadence so elapsed-time accounting stays correct.
   recorder.frameInterval = daydream.frameInterval;
   daydream.recorder = recorder;
 
@@ -552,8 +501,6 @@ createHolosphereModule().then(module => {
 
   applyResolution(true);
 }).catch(err => {
-  // Nothing renders without the engine; surface the failure instead of spinning
-  // the loading overlay forever on an unhandled rejection.
   console.error('Failed to load the Holosphere WASM engine:', err);
   const loadingOverlay = document.getElementById('loading-overlay');
   if (loadingOverlay) {
@@ -573,11 +520,9 @@ createHolosphereModule().then(module => {
 
 const guiInstance = new GUI({ autoPlace: false });
 guiInstance.domElement.classList.add('global-gui');
-// Collapse on mobile, keyed off the driver's container-width isMobile.
 if (daydream.isMobile) {
   guiInstance.close();
 }
-// A page/embed lacking #gui-container degrades gracefully (no global GUI).
 const guiContainer = document.getElementById('gui-container');
 if (guiContainer) {
   guiContainer.appendChild(guiInstance.domElement);
@@ -598,10 +543,8 @@ let testAllInterval = null;
 guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => {
   if (v) {
     testAllInterval = setInterval(() => {
-      // applyEffect() no-ops until wasmEngine exists.
       if (!wasmEngine) return;
       const currentList = effectsByResolution[appState.get('resolution')];
-      // currentList.indexOf below throws on undefined.
       if (!currentList || currentList.length === 0) return;
       const currentEffect = appState.get('effect');
       const currentIndex = currentList.indexOf(currentEffect);
@@ -646,8 +589,8 @@ segFolder.add(segState, 'boundaries').name('Show Boundaries').onChange(v => {
 const REC_RESOLUTIONS = { 'Native': null, '720p': 720, '1080p': 1080 };
 const REC_FORMATS = { 'Auto': 'auto', 'MP4': 'mp4', 'WebM': 'webm' };
 const recSettings = { _quality: 16, _resolution: 'Native', _format: 'Auto' };
-// bitrate/resolution/format are latched at recorder.start(), so a mid-recording
-// change has no effect until the next start(); warn instead of deferring silently.
+// These settings are latched at recorder.start(); warn that a mid-recording
+// change won't take effect until the next start().
 const warnIfRecording = (label) => {
   if (recorder?.isRecording) {
     console.warn(`Recording: ${label} change applies to the next recording (the current one is already running).`);
@@ -706,10 +649,6 @@ recFolder.add(recSettings, 'quality', 1, 20, 1).name('Rec Quality (Mbps)');
 recFolder.add(recSettings, 'recResolution', Object.keys(REC_RESOLUTIONS)).name('Rec Resolution');
 recFolder.add(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
 const recordCtrl = recFolder.add(recordState, 'record').name('\u25cf Record');
-// Global playback shortcuts (Space = pause, ArrowRight = step) must not fire
-// while the user operates a control. The sidebar and lil-gui call preventDefault
-// but not stopPropagation, so the key still bubbles here; ignore keydowns whose
-// target sits inside an interactive element.
 const INTERACTIVE_KEY_TARGET =
   'input, textarea, select, button, [contenteditable], .lil-gui, .effect-sidebar';
 /**
@@ -751,21 +690,15 @@ function disposeApp() {
     clearInterval(testAllInterval);
     testAllInterval = null;
   }
-  // Finalize any in-progress recording first, else the MediaRecorder, its stream,
-  // and the offscreen canvas leak and the partial recording is never flushed.
   recorder?.stop();
-  // Cancel the pending debounced flush so a discard can't leave the 200 ms timer
-  // firing history.replaceState into a dead page.
   urlSync.dispose();
   sidebar.dispose();
   daydream.dispose();
-  // Each worker holds a live WASM module, so a discard with Segmented POV enabled
-  // would leak N workers.
   segments.destroy();
 }
 
-// pagehide (not unload) so bfcache is respected: tear down only on a real
-// discard, never when the page is merely frozen for back/forward cache.
+// pagehide (not unload) so bfcache is respected: e.persisted is false only on a
+// real discard, true when merely frozen for back/forward cache.
 window.addEventListener("pagehide", (e) => {
   if (!e.persisted) disposeApp();
 });

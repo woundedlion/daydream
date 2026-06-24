@@ -8,7 +8,6 @@
  * the symbolic-snapping logic can be unit-tested without importing Three.js.
  */
 
-// Golden ratio and its inverse, used by prettify() to name recognizable angles.
 const PHI = (1 + Math.sqrt(5)) / 2;
 const g = 1 / PHI;
 
