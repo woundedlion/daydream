@@ -28,7 +28,6 @@ export async function copyToClipboard(text) {
       return true;
     }
   } catch (err) {
-    // Fall through to the legacy execCommand path.
   }
 
   const textarea = document.createElement('textarea');
@@ -77,8 +76,6 @@ export async function copyWithFeedback(text, opts = {}) {
 
   const success = await copyToClipboard(text);
   if (success && element) {
-    // A second copy within revertMs must reuse the stashed idle label, not the
-    // current "Copied!" text, or the element latches on "Copied!" forever.
     const pending = element._copyFeedback;
     if (pending) clearTimeout(pending.timer);
     const original = pending ? pending.original

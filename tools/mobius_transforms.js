@@ -149,8 +149,8 @@ export function inversion(t) {
   const s = Math.sin(theta);
   return {
     A: { re: c, im: 0 },
-    B: { re: 0, im: s }, // i*sin
-    C: { re: 0, im: s }, // i*sin
+    B: { re: 0, im: s },
+    C: { re: 0, im: s },
     D: { re: c, im: 0 },
   };
 }

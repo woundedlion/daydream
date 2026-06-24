@@ -14,19 +14,16 @@
 
 import { formatFloatCpp } from './cpp_format.js';
 
-// The Conway/SolidBuilder operators this generator can emit. An op outside this
-// set would paste into non-compiling C++, so generateFuncAndRecipe rejects it.
+// The Conway/SolidBuilder operators this generator can emit.
 const KNOWN_OPS = new Set([
   'truncate', 'expand', 'chamfer', 'hankin', 'snub', 'relax', 'bevel',
   'dual', 'kis', 'ambo', 'gyro', 'meta', 'needle', 'zip',
 ]);
 
-// A base seed-solid name is pasted as a C++ function call (`base(a, b)`). The
-// valid set is the WASM solid registry, invisible to this pure module, so guard
-// the shape: every registry name is a valid C++ identifier.
+// A base seed-solid name is pasted as a C++ function call (`base(a, b)`), so
+// guard its shape against the valid-identifier pattern.
 const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-// Re-exported as `formatFloat` for solids.html and the recipe builders below.
 export const formatFloat = formatFloatCpp;
 
 /**
@@ -95,8 +92,6 @@ export function generateFuncAndRecipe(item) {
       // not fall back to the 100 default.
       const iter = o.params.iter ?? 100;
       chain += `.relax(${iter})`;
-      // Encode the count so solids differing only in relax depth get distinct
-      // funcNames instead of colliding on `_relax`.
       nameParts.push(`_relax${iter}`);
     } else if (opName === 'bevel') {
       chain += `.bevel(${formatFloat(o.params.t)})`;
@@ -144,7 +139,6 @@ export function computeInternalAngle(mesh) {
   const v2 = mesh.vertices[face[1]];
   const v3 = mesh.vertices[face[2]];
 
-  // Internal angle at v2: the angle between vectors v2->v1 and v2->v3.
   const dir1 = { x: v1.x - v2.x, y: v1.y - v2.y, z: v1.z - v2.z };
   const dir2 = { x: v3.x - v2.x, y: v3.y - v2.y, z: v3.z - v2.z };
 

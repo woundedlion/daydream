@@ -48,8 +48,7 @@ export function createSlider(containerId, cfg, onInput) {
     valueClass = 'slider-label w-24 text-right',
   } = cfg;
 
-  // Reject config that would build an inert, unmovable control. The `!(a < b)`
-  // form also rejects NaN.
+  // `!(a < b)` rather than `a >= b` so NaN bounds are rejected too.
   if (!(min < max)) {
     throw new Error(`createSlider(${id}): min (${min}) must be < max (${max})`);
   }
@@ -59,9 +58,8 @@ export function createSlider(containerId, cfg, onInput) {
   if (!(scale > 0)) {
     throw new Error(`createSlider(${id}): scale (${scale}) must be > 0`);
   }
-  // The slider runs in scaled integer units, so a small fractional step can
-  // round to 0 even when step and scale are both positive (e.g. step 0.4,
-  // scale 1). Require the rounded step >= 1 so the control is movable.
+  // Scaled units are integer, so a small fractional step can round to 0 (e.g.
+  // step 0.4, scale 1); require >= 1 so the control stays movable.
   const sliderStep = Math.round(step * scale);
   if (sliderStep < 1) {
     throw new Error(`createSlider(${id}): step (${step}) * scale (${scale}) rounds to `
@@ -71,8 +69,6 @@ export function createSlider(containerId, cfg, onInput) {
   const sliderId = `${id}_slider`;
   const valueSpanId = `${id}_value`;
 
-  // Build via createElement/textContent, not innerHTML, so a data-driven
-  // label/value/class can never inject markup (latent XSS).
   container.replaceChildren();
 
   const labelSpan = document.createElement('span');
@@ -98,8 +94,8 @@ export function createSlider(containerId, cfg, onInput) {
   if (onInput) {
     slider.addEventListener('input', () => {
       const raw = parseFloat(slider.value);
-      // Update the readout before onInput, so a caller wanting a custom readout
-      // (e.g. a snapped value) can overwrite valueSpan.textContent inside it.
+      // Set the readout before onInput so a caller can overwrite it with a
+      // custom (e.g. snapped) value.
       valueSpan.textContent = (raw / scale).toFixed(decimals);
       onInput(raw);
     });

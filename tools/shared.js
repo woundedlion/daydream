@@ -37,7 +37,7 @@ export function showFatalError(message) {
   const existing = document.getElementById('fatal-error-overlay');
   const el = existing || document.createElement('div');
   el.id = 'fatal-error-overlay';
-  el.textContent = `⚠ ${message}`; // textContent, not innerHTML — no injection
+  el.textContent = `⚠ ${message}`;
   Object.assign(el.style, {
     position: 'fixed', top: '0', left: '0', right: '0', zIndex: '9999',
     padding: '12px 16px', background: '#7f1d1d', color: '#fff',
@@ -96,8 +96,6 @@ export function initScene(containerId, canvasId, opts = {}) {
 
   const container = document.getElementById(containerId);
   const canvas = document.getElementById(canvasId);
-  // Fail with a clear, id-naming error rather than the opaque
-  // "Cannot read clientWidth of null" a wrong id throws further down.
   if (!container) {
     throw new Error(`initScene: container element #${containerId} not found`);
   }
@@ -182,7 +180,6 @@ export function initScene(containerId, canvasId, opts = {}) {
   };
   animate();
 
-  // Stop the render loop and detach the resize listener.
   const dispose = () => {
     cancelAnimationFrame(rafId);
     window.removeEventListener('resize', resize);

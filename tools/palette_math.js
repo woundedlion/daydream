@@ -20,11 +20,8 @@ import { formatFloatCpp } from './cpp_format.js';
 const TWO_PI = 2 * Math.PI;
 
 // --- WASM color-math bridge -------------------------------------------------
-// GenerativePalette's perceptual color math lives in the C++ engine (PaletteOps
-// embind class). Rather than re-implement it here, the tool injects the engine's
-// bakeLut through setPaletteOps and this module calls it for the exact colors.
-// The JS side keeps only the deterministic profile randomization (its own stable
-// PRNG), which the engine's global-RNG draws cannot reproduce anyway.
+// The engine's PaletteOps.bakeLut is injected via setPaletteOps; this module
+// calls it for the exact colors and keeps only the JS-side profile PRNG.
 let bakeLut = null;
 
 /**
@@ -68,7 +65,6 @@ export class ProceduralPalette {
   get(t) {
     const PI2 = TWO_PI;
 
-    // Cosine formula yields sRGB; clamp to [0, 1].
     const r = Math.max(0, Math.min(1, this.a[0] + this.b[0] * Math.cos(PI2 * (this.c[0] * t + this.d[0]))));
     const g = Math.max(0, Math.min(1, this.a[1] + this.b[1] * Math.cos(PI2 * (this.c[1] * t + this.d[1]))));
     const b = Math.max(0, Math.min(1, this.a[2] + this.b[2] * Math.cos(PI2 * (this.c[2] * t + this.d[2]))));
@@ -197,8 +193,8 @@ export class GenerativePalette {
     this.gradientShape = gradientShape;
     this.harmonyType = harmonyType;
 
-    // Seed the PRNG from the profile strings so scrubbing the hue doesn't
-    // scramble the randomized saturation/brightness structure.
+    // Seed from the profile strings (not the hue) so scrubbing the hue keeps the
+    // randomized saturation/brightness structure stable.
     const hashStr = gradientShape + harmonyType + brightnessProfile + satProfile;
     let stableSeed = 0;
     for (let i = 0; i < hashStr.length; i++) {
@@ -263,9 +259,8 @@ export class GenerativePalette {
         'PaletteOps bridge not initialized: call setPaletteOps() with the WASM ' +
         'PaletteOps.bakeLut before constructing a GenerativePalette.');
     }
-    // Ask the engine for the exact 256-entry sRGB LUT. Copy out of the WASM
-    // memory view immediately — it aliases the module's buffer and the next
-    // bake invalidates it.
+    // Copy out of the WASM memory view: it aliases the module buffer and the
+    // next bake invalidates it.
     this.lut = Uint8Array.from(
       bakeLut(shapeIndex, h1, s1, v1, h2, s2, v2, h3, s3, v3));
   }
@@ -309,8 +304,6 @@ export class GenerativePalette {
         break;
       }
       default:
-        // Reject an unknown harmony so the preview agrees with the export path
-        // (generativePaletteCpp), which also throws on an unknown token.
         throw new Error(`PaletteMath.calcHues: unknown harmonyType "${harmonyType}" ` +
           `(expected one of ${[...HARMONY_TYPES].join(', ')})`);
     }
@@ -371,7 +364,6 @@ export class GenerativePalette {
  * @returns {number} The remapped value.
  */
 export function mapValue(value, fromMin, fromMax, toMin, toMax) {
-  // A collapsed source range would divide by zero; map it to the target floor.
   if (fromMax === fromMin) return toMin;
   return (value - fromMin) * (toMax - toMin) / (fromMax - fromMin) + toMin;
 }
@@ -385,7 +377,6 @@ export function mapValue(value, fromMin, fromMax, toMin, toMax) {
  * @returns {string} The C++ ProceduralPalette initializer source.
  */
 export function proceduralPaletteCpp(parameters) {
-  // 3-digit precision: the cosine coefficients are small magnitudes.
   const f = (n) => formatFloatCpp(n, 3);
   const v = (r, g, b) => `{${f(r)}, ${f(g)}, ${f(b)}}`;
   return `ProceduralPalette palette(${v(parameters.A_R, parameters.A_G, parameters.A_B)},  // A
