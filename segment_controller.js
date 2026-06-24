@@ -29,9 +29,8 @@ import { blitSegmentRect } from "./segment_layout.js";
 const INIT_WATCHDOG_MS = 20000;
 
 // Deadline for the per-worker 'booted' ping (module body started, static imports
-// resolved). A missing/renamed holosphere_wasm.js makes the module fail to load,
-// so 'booted' never arrives; only fetch+evaluate must finish by here, not the WASM
-// instantiate, so it is far tighter than INIT_WATCHDOG_MS.
+// resolved). Covers only fetch+evaluate, not the WASM instantiate, so it is far
+// tighter than INIT_WATCHDOG_MS; a missing/renamed holosphere_wasm.js trips it.
 const BOOT_WATCHDOG_MS = 4000;
 
 /** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
@@ -92,10 +91,9 @@ export class SegmentController {
     this.ready = false;
 
     // Generation fence. renderGen bumps on every resolution change; renderParallel
-    // snapshots it into inflightGen at dispatch. A frame response whose snapshot no
-    // longer matches renderGen was sized to a stale W/H and must be dropped before
-    // the compositor, or its old x1/y1 index past the resized buffer. JS Numbers are
-    // exact to 2^53, so no wrap guard is needed.
+    // snapshots it into inflightGen at dispatch. A frame whose snapshot no longer
+    // matches renderGen was sized to a stale W/H and must be dropped before the
+    // compositor, or its old x1/y1 index past the resized buffer.
     this.renderGen = 0;
     this.inflightGen = 0;
 
@@ -105,25 +103,24 @@ export class SegmentController {
                                   // (drives recorder gating)
 
     // Fault latch. A worker WASM trap / uncaught throw fires onerror but never
-    // sends its 'frame', so `pending` would never reach 0 and the loop would
-    // deadlock-freeze. We latch, settle the in-flight frame, and stop dispatching.
+    // sends its 'frame', so `pending` never reaches 0 and the loop deadlock-freezes.
+    // We latch, settle the in-flight frame, and stop dispatching.
     this.faulted = false;
     /** @type {{ segId: number, message: string } | null} */
     this.faultInfo = null;     // first fault this session
 
     // Init watchdog: covers the init window, where a non-throwing WASM load failure
-    // fires no onerror. Armed in create(), cleared once all workers report 'ready';
-    // if it fires first it latches a fault rather than freezing black.
+    // fires no onerror. Cleared once all workers report 'ready'; if it fires first it
+    // latches a fault rather than freezing black.
     /** @type {ReturnType<typeof setTimeout> | null} */
     this._initWatchdog = null;
 
-    // Short companion: every worker pings 'booted' once its module body runs (static
-    // imports, incl. the WASM glue, resolved). A worker not booted by BOOT_WATCHDOG_MS
-    // failed to load its module — usually a missing/renamed holosphere_wasm.js.
+    // Boot watchdog: every worker pings 'booted' once its module body runs (static
+    // imports, incl. the WASM glue, resolved). Not booted by BOOT_WATCHDOG_MS means
+    // the module failed to load — usually a missing/renamed holosphere_wasm.js.
     /** @type {ReturnType<typeof setTimeout> | null} */
     this._bootWatchdog = null;
 
-    // Stats-table DOM cache (built by _buildStatsTable, mutated by updateStats).
     /** @type {HTMLTableElement | null} */
     this._statsTable = null;
     this._statsSegCount = 0;   // segment count the cached table was built for
@@ -164,14 +161,14 @@ export class SegmentController {
     const res = this._resolutionPresets[this._appState.get('resolution')];
     if (!res) {
       // The old pool is already destroyed, so a silent return would leave an
-      // active-but-empty controller rendering nothing. Surface loudly.
+      // active-but-empty controller rendering nothing.
       console.error(`[Segmented] create(${numSegments}) aborted: unknown`
         + ` resolution "${this._appState.get('resolution')}"; controller is now empty.`);
       return;
     }
 
     // Keep count in sync with the pool so updateStats() and other readers see the
-    // live size, not a stale value from a previous create()/constructor default.
+    // live size, not a stale value.
     this.count = numSegments;
     this.workers = [];
     this.results = new Array(numSegments).fill(null);
@@ -202,21 +199,18 @@ export class SegmentController {
             console.log(`[Segmented] All ${numSegments} workers ready`);
           }
         } else if (msg.type === 'booted') {
-          // Once every worker has booted, the missing/renamed-glue breakage is
-          // ruled out; retire the boot watchdog and let the init watchdog cover
-          // the slower WASM-instantiate phase.
+          // All booted rules out the missing/renamed-glue breakage; retire the boot
+          // watchdog and let the init watchdog cover the WASM-instantiate phase.
           bootedCount++;
           if (bootedCount === numSegments) this._clearBootWatchdog();
         } else if (msg.type === 'effectReady') {
           // no action needed
         } else if (msg.type === 'frame') {
-          // A late frame from a worker that survived a fault must not decrement:
-          // _onWorkerFault already zeroed `pending`, so decrementing would drive it
-          // negative. The pool is halted until re-created — ignore the frame.
+          // _onWorkerFault already zeroed `pending`; a late frame from a survived
+          // fault would drive it negative. The pool is halted — ignore the frame.
           if (this.faulted) return;
-          // segId indexes per-segment arrays; out of [0, numSegments) is a protocol
-          // violation (the controller assigns each segId). Drop loudly without
-          // decrementing `pending` (this is not an expected response).
+          // segId out of [0, numSegments) is a protocol violation (the controller
+          // assigns each segId). Drop without decrementing `pending`.
           if (msg.segId < 0 || msg.segId >= numSegments) {
             console.error(`[Segmented] frame from out-of-range segId ${msg.segId} `
               + `(expected 0..${numSegments - 1}); dropping`);
@@ -226,10 +220,9 @@ export class SegmentController {
           // (their x0..y1 reference the old W/H). Still settle the frame.
           if (this.inflightGen === this.renderGen) {
             this.results[msg.segId] = {
-              // msg.pixels was TRANSFERRED by the worker, which allocates a fresh
-              // buffer per render, so the controller owns it exclusively with no
-              // cross-frame aliasing. Hold the view directly — a copy here would
-              // defeat the zero-copy transfer. FrameMsg.pixels is non-nullable.
+              // msg.pixels was TRANSFERRED (fresh buffer per render), so the
+              // controller owns it exclusively; hold the view directly rather than
+              // copy, which would defeat the zero-copy transfer.
               pixels: msg.pixels,
               x0: msg.x0, x1: msg.x1,
               y0: msg.y0, y1: msg.y1,
@@ -247,11 +240,10 @@ export class SegmentController {
         }
       };
 
-      // A WASM trap or uncaught throw otherwise vanishes silently: the worker never
-      // sends 'frame', `pending` never reaches 0, and the view freezes forever. We
-      // deliberately do NOT auto-respawn or time out — a fault is a deterministic
-      // bug to fix at the source — but settle the in-flight frame to unblock the
-      // loop, latch the fault, and surface a visible UI state (see updateStats/tick).
+      // A WASM trap or uncaught throw never sends 'frame', so `pending` never reaches
+      // 0 and the view freezes. Deliberately no auto-respawn/timeout — a fault is a
+      // deterministic bug to fix at the source; settle the in-flight frame, latch the
+      // fault, and surface a UI state (see updateStats/tick).
       worker.onerror = (e) => {
         console.error(`[Segmented] Worker seg ${i} error: ${e.message}`
           + ` (${e.filename}:${e.lineno}:${e.colno})`, e);
@@ -277,8 +269,8 @@ export class SegmentController {
       this.workers.push(worker);
     }
 
-    // Arm the boot watchdog: any worker not booted by the deadline failed to load
-    // its module (commonly a missing/renamed holosphere_wasm.js).
+    // Any worker not booted by the deadline failed to load its module (commonly a
+    // missing/renamed holosphere_wasm.js).
     this._clearBootWatchdog();
     this._bootWatchdog = setTimeout(() => {
       this._bootWatchdog = null;
@@ -291,9 +283,9 @@ export class SegmentController {
     }, BOOT_WATCHDOG_MS);
     if (typeof this._bootWatchdog.unref === 'function') this._bootWatchdog.unref();
 
-    // Arm the init watchdog: if not all workers report 'ready' by the deadline, a
-    // WASM load failed without throwing (no onerror); latch a fault to surface the
-    // overlay rather than freeze black.
+    // Not all workers 'ready' by the deadline means a WASM load failed without
+    // throwing (no onerror); latch a fault to surface the overlay rather than freeze
+    // black.
     this._clearInitWatchdog();
     this._initWatchdog = setTimeout(() => {
       this._initWatchdog = null;
@@ -334,8 +326,8 @@ export class SegmentController {
    */
   destroy() {
     for (const w of this.workers) {
-      // Null the handlers before terminate() to release the closures they capture
-      // for the GC immediately.
+      // Null the handlers before terminate() to release their captured closures to
+      // the GC immediately.
       w.onmessage = null;
       w.onerror = null;
       w.onmessageerror = null;
@@ -350,8 +342,8 @@ export class SegmentController {
     this.arenas = [];
     this.ready = false;
     this.pending = 0;
-    // Settle any in-flight render promise before dropping it (mirroring
-    // _onWorkerFault) so it never leaks unresolved.
+    // Settle any in-flight render promise before dropping it so it never leaks
+    // unresolved.
     if (this.frameResolve) {
       const resolve = this.frameResolve;
       this.frameResolve = null;
@@ -382,8 +374,7 @@ export class SegmentController {
       this.faulted = true;
       this.faultInfo = { segId, message };
     } else {
-      // faultInfo records only the first fault; still surface a second so a
-      // cascade is visible rather than coalesced into the first.
+      // Still surface a second fault so a cascade is visible, not coalesced.
       console.warn(`[Segmented] additional worker fault (seg ${segId}): ${message} `
         + `— first fault already latched, UI shows that one`);
     }
@@ -468,7 +459,7 @@ export class SegmentController {
     }
     // Open a new generation: any in-flight render (or settled-but-uncomposited
     // result) was sized to the old W/H. Drop settled results and the pending flag
-    // here; the generation check in onmessage drops in-flight ones as they arrive.
+    // here; onmessage's generation check drops in-flight ones as they arrive.
     this.renderGen++;
     this.results.fill(null);
     this.pendingFrame = false;
@@ -500,19 +491,17 @@ export class SegmentController {
    *   uses this to avoid marking a black buffer as a real composited frame.
    */
   composite() {
-    // Safe to hold dst across the fill loop: refreshPixelView() re-fetches the view
-    // if a prior growth detached it, and in segment mode the main engine never
-    // renders, so its WASM memory can't grow here and dst can't detach mid-loop.
+    // Safe to hold dst across the loop: refreshPixelView() re-fetches a detached
+    // view, and in segment mode the main engine never renders, so its WASM memory
+    // can't grow here and dst can't detach mid-loop.
     this._refreshPixelView();
     const dst = this._getMemoryView();
     if (!dst) return 0;
 
-    // No clear here: driver.render() already filled this buffer with zero before
-    // invoking the adapter, so we only blit quadrants over the pre-cleared
-    // background. That elision holds only while dst, the buffer driver.render()
-    // clears (Daydream.pixels), and the displayed attribute are the one aliased
-    // view. Assert the reachable part so a future divergence fails loudly rather
-    // than compositing onto an uncleared background.
+    // No clear here: driver.render() already zero-filled this buffer, so we only blit
+    // quadrants over it. That elision holds only while dst and the buffer
+    // driver.render() clears are the same aliased view (Daydream.pixels) — assert it
+    // so a future divergence fails loudly rather than compositing onto garbage.
     if (dst !== Daydream.pixels) {
       throw new Error(
         "SegmentController.composite: display-buffer alias broken " +
@@ -529,8 +518,7 @@ export class SegmentController {
       const r = this.results[s];
       if (!r || !r.pixels) continue;
       // The generation fence drops stale-resolution results before storing them, so
-      // an out-of-bounds rect here means the layout/fence math is broken — fail
-      // loudly rather than silently painting a garbage band.
+      // an out-of-bounds rect here means the layout/fence math is broken.
       if (r.x0 < 0 || r.y0 < 0 || r.x1 > w || r.y1 > h) {
         throw new Error(
           `SegmentController.composite: segment ${s} rect ` +
@@ -543,17 +531,16 @@ export class SegmentController {
       blitted++;
     }
 
-    // Cyan boundary markers. These write into the same buffer the recorder captures,
-    // so with showBoundaries on they are BAKED INTO recorded video; the GUI toggle
-    // removes them from both the live view and any recording.
+    // Cyan boundary markers write into the same buffer the recorder captures, so
+    // they are BAKED INTO recorded video; the GUI toggle removes them from both.
     if (this.showBoundaries) {
       const yBounds = new Set();
       const xBounds = new Set();
       for (const r of this.results) {
         if (!r) continue;
-        // Y does NOT wrap, so y0 == 0 is the top canvas edge, not an internal split.
-        // X DOES wrap (cylinder), so x0 == 0 could be a same-segment wrap; it's only
-        // marked below once the layout is known to be split.
+        // Y does NOT wrap: y0 == 0 is the top canvas edge, not an internal split.
+        // X DOES wrap (cylinder): x0 == 0 could be a same-segment wrap, marked below
+        // only once the layout is known to be split.
         if (r.y0 > 0) yBounds.add(r.y0);
         if (r.x0 > 0) xBounds.add(r.x0);
       }
@@ -631,9 +618,8 @@ export class SegmentController {
     const fmtKB = (x) => (x / 1024).toFixed(1);
     const numSegs = this.count;
 
-    // Build the table once and mutate cell text in place; rebuilding via innerHTML
-    // every composited frame churned the DOM. Rebuild only on a segment-count
-    // change or after the fault overlay tore the table down.
+    // Build the table once and mutate cell text in place. Rebuild only on a
+    // segment-count change or after the fault overlay tore the table down.
     if (!this._statsTable || this._statsSegCount !== numSegs
         || this._statsTable.parentNode !== el) {
       this._buildStatsTable(numSegs, el);
@@ -641,8 +627,7 @@ export class SegmentController {
 
     const cells = this._statsCells;
     // Derive maxTime over the same numSegs span the row loop walks, not the whole
-    // timings array, so a stale tail entry can't outrank the live segments. Seeded
-    // 0 so an empty/sub-frame state reads 0, not -Infinity.
+    // timings array, so a stale tail entry can't outrank the live segments.
     let maxTime = 0;
     for (let s = 0; s < numSegs; s++) {
       const r = this.results[s];
@@ -726,11 +711,11 @@ export class SegmentController {
    */
   tick() {
     // Checked BEFORE the ready guard: an init-phase fault latches `faulted` but
-    // leaves readyCount short forever, so a ready-first guard would return early
-    // every tick and the fault overlay would never paint.
+    // leaves readyCount short forever, so a ready-first guard would return every tick
+    // and the fault overlay would never paint.
     if (this.faulted) {
-      // A faulted tick composites nothing; clear the gate so the recorder doesn't
-      // keep capturing the frozen black buffer as fresh content.
+      // Composites nothing; clear the gate so the recorder doesn't keep capturing the
+      // frozen black buffer as fresh content.
       this.frameComposited = false;
       this.updateStats();
       return;
@@ -744,12 +729,11 @@ export class SegmentController {
       const blitted = this.composite();
       this.updateStats();
       this.pendingFrame = false;
-      // Only a real frame if at least one rectangle was blitted: a fully-fenced
-      // frame composites nothing, leaving the buffer black — don't record that.
+      // A fully-fenced frame composites nothing, leaving the buffer black — only a
+      // real frame if at least one rectangle was blitted.
       this.frameComposited = blitted > 0;
     } else {
-      // Buffer is still driver.render()'s fill(0) (no first frame yet, or stalled);
-      // don't record this black frame.
+      // Buffer is still driver.render()'s fill(0) (no first frame yet, or stalled).
       this.frameComposited = false;
     }
 
