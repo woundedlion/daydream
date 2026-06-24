@@ -142,6 +142,15 @@ export class VideoRecorder {
       ? this._ensureOffscreen()
       : this._ensurePinnedOffscreen();
 
+    // A null 2D context (getContext('2d') can fail under memory pressure or a
+    // lost context) is tolerated by the blit guard, but starting the recorder
+    // anyway would produce a permanently blank file with no diagnostic — the only
+    // silent-failure path. Abort the session loudly instead.
+    if (!this._offCtx) {
+      console.error('VideoRecorder: failed to acquire a 2D drawing context for the capture canvas; recording aborted.');
+      return;
+    }
+
     // Manual frame-request mode: framerate 0 means we control when frames are captured
     const stream = captureSource.captureStream(0);
     const track = stream.getVideoTracks()[0];
