@@ -28,12 +28,10 @@ export class EffectSidebar {
     this.activeName = null;
     this.sort = { key: 'name', dir: 'asc' };
 
-    // Static heading
     this.heading = document.createElement('h3');
     this.heading.innerText = 'Effects';
     this.heading.className = 'effect-sidebar-heading';
 
-    // Sort controls
     this.sortRow = document.createElement('div');
     this.sortRow.className = 'sort-controls';
 
@@ -42,23 +40,19 @@ export class EffectSidebar {
     this.sortRow.appendChild(this.nameBtn);
     this.sortRow.appendChild(this.sizeBtn);
 
-    // Button list container (for keyboard nav scoping). Roving tabindex: the
-    // listbox is not itself a tab stop — exactly one option carries tabindex=0
-    // (see _setRovingTabbable), so Tab lands on the active option once rather
-    // than on the container and then every button.
+    // Roving tabindex: the listbox is not a tab stop — exactly one option carries
+    // tabindex=0 (see _setRovingTabbable), so Tab lands on the active option once.
     this.listEl = document.createElement('div');
     this.listEl.setAttribute('role', 'listbox');
     this.listEl.setAttribute('aria-label', 'Effects');
     this.listEl.className = 'effect-list';
-    // The option that currently holds tabindex=0 (roving tabindex anchor).
-    this._tabbableBtn = null;
+    this._tabbableBtn = null; // option currently holding tabindex=0
     // Keep bound handlers so dispose() can detach them.
     this._onKeyDownBound = (e) => this._onKeyDown(e);
     this._onScrollBound = () => this._updateScrollArrows();
     this.listEl.addEventListener('keydown', this._onKeyDownBound);
 
-    // Scroll arrow indicators (mobile horizontal scroll). Decorative glyphs —
-    // hidden from assistive tech so screen readers don't announce them.
+    // Decorative scroll-arrow glyphs — hidden from assistive tech.
     this.arrowLeft = document.createElement('div');
     this.arrowLeft.className = 'scroll-arrow scroll-arrow-left';
     this.arrowLeft.textContent = '\u2039';
@@ -133,13 +127,13 @@ export class EffectSidebar {
 
     this._applySortOrder();
     this._updateActiveClass();
-    // Anchor the roving tabindex on the active option, or the first one if none
-    // is active yet, so the rebuilt list has exactly one tab stop.
+    // Anchor the roving tabindex on the active option (or the first) so the rebuilt
+    // list has exactly one tab stop.
     this._tabbableBtn = null;
     this._setRovingTabbable(
       this.buttons.get(this.activeName) || this.listEl.querySelector('.effect-button')
     );
-    // Defer so the grid has laid out before we measure scroll extents
+    // Defer so the grid has laid out before measuring scroll extents.
     requestAnimationFrame(() => this._updateScrollArrows());
   }
 
@@ -163,11 +157,8 @@ export class EffectSidebar {
       newBtn.classList.add('active');
       newBtn.setAttribute('aria-selected', 'true');
       this._setRovingTabbable(newBtn);
-      // Instant ('auto'), not 'smooth': every setActive is a programmatic
-      // selection (init, resolution switch, deep-link replay, each "Test All"
-      // tick), so a smooth animation here scrolls the list on its own with no
-      // user gesture behind it. Keyboard navigation scrolls via the focused
-      // button's own default scroll, not this call.
+      // 'auto', not 'smooth': setActive is always programmatic, so a smooth
+      // animation would scroll the list with no user gesture behind it.
       newBtn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
     }
   }
@@ -279,9 +270,8 @@ export class EffectSidebar {
 
     const focused = document.activeElement;
     let idx = btns.indexOf(focused);
-    // When focus is on the list container itself (not a button), activeElement
-    // isn't in btns and idx is -1, which would lose the current position. Fall
-    // back to the roving tab stop so Arrow keys move relative to it.
+    // When focus is on the container (not a button), fall back to the roving tab
+    // stop so Arrow keys move relative to it.
     if (idx === -1) idx = btns.indexOf(this._tabbableBtn);
 
     const target = navTargetIndex(idx, btns.length, e.key);

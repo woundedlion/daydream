@@ -40,23 +40,20 @@
  */
 export function computeSegmentRange(id, total, w, h) {
   const NUM_ARMS = 2;
-  // The 2-arm layout is symmetric, so total must be a positive even number. An
-  // odd total makes armId exceed NUM_ARMS and pushes x0 past the canvas,
-  // silently rendering a degenerate band — a config bug with no valid output, so
-  // fail fast.
+  // The 2-arm layout is symmetric, so an odd total pushes x0 past the canvas and
+  // renders a degenerate band; fail fast.
   if (!Number.isInteger(total) || total < NUM_ARMS || total % NUM_ARMS !== 0) {
     throw new Error(
       `segment_worker: totalSegs must be a positive even number (got ${total})`);
   }
-  // id out of [0, total) computes an off-canvas band (e.g. id===total gives
-  // x0===w) and feeds a degenerate rect into setClip; fail fast.
+  // id out of [0, total) computes an off-canvas band and feeds a degenerate rect
+  // into setClip; fail fast.
   if (!Number.isInteger(id) || id < 0 || id >= total) {
     throw new Error(
       `segment_worker: segment id must be an integer in [0, ${total}) (got ${id})`);
   }
-  // Resolution arrives across the postMessage boundary (init / setResolution
-  // both funnel through here). A non-integer or non-positive dimension produces
-  // a degenerate segRange and feeds garbage into setClip; fail fast.
+  // Resolution arrives across postMessage; a non-integer/non-positive dimension
+  // feeds garbage into setClip. Fail fast.
   if (!Number.isInteger(w) || w <= 0 || !Number.isInteger(h) || h <= 0) {
     throw new Error(
       `segment_worker: canvas dimensions must be positive integers (got ${w}x${h})`);
