@@ -40,14 +40,12 @@ export class EffectSidebar {
     this.sortRow.appendChild(this.nameBtn);
     this.sortRow.appendChild(this.sizeBtn);
 
-    // Roving tabindex: the listbox is not a tab stop — exactly one option carries
-    // tabindex=0 (see _setRovingTabbable), so Tab lands on the active option once.
+    // Roving tabindex: exactly one option carries tabindex=0 (see _setRovingTabbable).
     this.listEl = document.createElement('div');
     this.listEl.setAttribute('role', 'listbox');
     this.listEl.setAttribute('aria-label', 'Effects');
     this.listEl.className = 'effect-list';
     this._tabbableBtn = null; // option currently holding tabindex=0
-    // Keep bound handlers so dispose() can detach them.
     this._onKeyDownBound = (e) => this._onKeyDown(e);
     this._onScrollBound = () => this._updateScrollArrows();
     this.listEl.addEventListener('keydown', this._onKeyDownBound);
@@ -106,7 +104,7 @@ export class EffectSidebar {
       btn.className = 'effect-button';
       btn.setAttribute('role', 'option');
       btn.setAttribute('aria-selected', 'false');
-      btn.tabIndex = -1; // roving tabindex; the active/first option is promoted to 0
+      btn.tabIndex = -1; // roving tabindex
       btn.dataset.effect = name;
 
       const nameSpan = document.createElement('span');
@@ -127,8 +125,6 @@ export class EffectSidebar {
 
     this._applySortOrder();
     this._updateActiveClass();
-    // Anchor the roving tabindex on the active option (or the first) so the rebuilt
-    // list has exactly one tab stop.
     this._tabbableBtn = null;
     this._setRovingTabbable(
       this.buttons.get(this.activeName) || this.listEl.querySelector('.effect-button')
@@ -157,8 +153,6 @@ export class EffectSidebar {
       newBtn.classList.add('active');
       newBtn.setAttribute('aria-selected', 'true');
       this._setRovingTabbable(newBtn);
-      // 'auto', not 'smooth': setActive is always programmatic, so a smooth
-      // animation would scroll the list with no user gesture behind it.
       newBtn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
     }
   }
@@ -270,8 +264,7 @@ export class EffectSidebar {
 
     const focused = document.activeElement;
     let idx = btns.indexOf(focused);
-    // When focus is on the container (not a button), fall back to the roving tab
-    // stop so Arrow keys move relative to it.
+    // Focus on the container (not a button): navigate relative to the roving tab stop.
     if (idx === -1) idx = btns.indexOf(this._tabbableBtn);
 
     const target = navTargetIndex(idx, btns.length, e.key);

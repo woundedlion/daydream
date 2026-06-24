@@ -40,20 +40,14 @@
  */
 export function computeSegmentRange(id, total, w, h) {
   const NUM_ARMS = 2;
-  // The 2-arm layout is symmetric, so an odd total pushes x0 past the canvas into a
-  // degenerate band.
   if (!Number.isInteger(total) || total < NUM_ARMS || total % NUM_ARMS !== 0) {
     throw new Error(
       `segment_worker: totalSegs must be a positive even number (got ${total})`);
   }
-  // id out of [0, total) computes an off-canvas band, feeding a degenerate rect into
-  // setClip.
   if (!Number.isInteger(id) || id < 0 || id >= total) {
     throw new Error(
       `segment_worker: segment id must be an integer in [0, ${total}) (got ${id})`);
   }
-  // Resolution arrives across postMessage; a non-integer/non-positive dimension
-  // feeds garbage into setClip.
   if (!Number.isInteger(w) || w <= 0 || !Number.isInteger(h) || h <= 0) {
     throw new Error(
       `segment_worker: canvas dimensions must be positive integers (got ${w}x${h})`);
