@@ -227,9 +227,19 @@ class DeepLinkGUI {
           // Clamp to the control's registered range. lil-gui's numeric add()
           // signature is add(obj, prop, min, max, step), so the bounds (when
           // present) are args[0]/args[1].
-          const min = args[0], max = args[1];
+          const min = args[0], max = args[1], step = args[2];
           if (typeof min === 'number' && val < min) val = min;
           if (typeof max === 'number' && val > max) val = max;
+          // lil-gui snaps dragged values to the step grid, but the URL path
+          // bypasses that, so a deep-linked off-step value (?Segments=3 on a
+          // step=2 control) would load a value the slider can never produce.
+          // Snap to the nearest step multiple, anchored at min when present so
+          // the grid matches the control's. Effect params have no step (step is
+          // undefined here) and are left untouched.
+          if (Number.isFinite(step) && step > 0) {
+            const anchor = typeof min === 'number' ? min : 0;
+            val = anchor + Math.round((val - anchor) / step) * step;
+          }
         }
       } else if (typeof currentVal === 'boolean') {
         // Accept the common truthy/falsy spellings rather than treating
