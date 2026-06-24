@@ -107,7 +107,7 @@ test('generateCatmullRomCurve: open case passes through every control point', ()
   ];
   const perSeg = 4;
   const curve = generateCatmullRomCurve(pts, 0.5, perSeg, passThroughTangents, lerpEval, false);
-  // Open: (n-1) segments; first emits perSeg+1, the rest perSeg points each.
+  // Open: n-1 segments; first emits perSeg+1, the rest perSeg each.
   assert.equal(curve.length, perSeg + 1 + (pts.length - 2) * perSeg);
   for (const cp of pts) {
     assert.ok(curve.some((q) => q.x === cp.x && q.y === cp.y && q.z === cp.z),
@@ -126,7 +126,7 @@ test('generateCatmullRomCurve: closed case wraps (one segment per point)', () =>
   const perSeg = 4;
   const open = generateCatmullRomCurve(pts, 0.5, perSeg, passThroughTangents, lerpEval, false);
   const closed = generateCatmullRomCurve(pts, 0.5, perSeg, passThroughTangents, lerpEval, true);
-  // Closed has n segments vs n-1 open, so it is strictly longer (the wrap seg).
+  // Closed: n segments (vs n-1 open), with the extra wrap segment.
   assert.equal(closed.length, perSeg + 1 + (pts.length - 1) * perSeg);
   assert.ok(closed.length > open.length);
   assert.deepEqual(closed[closed.length - 1], pts[0]);

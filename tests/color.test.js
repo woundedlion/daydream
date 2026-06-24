@@ -28,7 +28,6 @@ test('srgb<->linear fixed points and round-trip', () => {
   near(srgbToLinearFloat(1), 1);
   near(linearToSrgbFloat(0), 0);
   near(linearToSrgbFloat(1), 1);
-  // The piecewise pieces meet continuously around the 0.04045 knee.
   near(srgbToLinearFloat(0.04045), 0.04045 / 12.92);
   for (const s of [0.02, 0.1, 0.25, 0.5, 0.9]) {
     near(linearToSrgbFloat(srgbToLinearFloat(s)), s, 1e-6);

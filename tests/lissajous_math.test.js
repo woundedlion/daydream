@@ -86,7 +86,6 @@ test('findBestRationalRatio: negative target snaps to the sign-flipped fraction'
   const neg = findBestRationalRatio(-1.5);
   assert.equal(neg.M, -3);
   assert.equal(neg.N, 2);
-  // Magnitude matches the positive target exactly (sign split off before search).
   const pos = findBestRationalRatio(1.5);
   assert.equal(Math.abs(neg.M), pos.M);
   assert.equal(neg.N, pos.N);
@@ -118,7 +117,6 @@ test('findBestRationalRatio: returned ratio is always reduced (gcd(M,N) === 1)',
  * passive frequency and yields the closing period T = 2π·n / passiveC.
  */
 test('snapToRationalRatio: closing period equals 2π·n/passiveC for a known ratio', () => {
-  // activeC/passiveC = 6/4 = 1.5 → 3/2.
   const passiveC = 4;
   const activeC = 6;
   const { m, n, snappedActiveC, closingPeriod } = snapToRationalRatio(activeC, passiveC);
@@ -155,7 +153,6 @@ test('snapToRationalRatio: zero passive frequency yields finite values, not NaN/
 
 /** Verifies the curve starts at (0, 1, 0) when t=0 (sin(0)=0, cos(0)=1). */
 test('lissajous: at t=0 returns the expected point (0, 1, 0)', () => {
-  // sin(0)=0, cos(0)=1: x = 0·cos(-a)=0, y = cos(0)=1, z = 0·sin(-a)=0.
   const p = lissajous(12, 5, 0, 0);
   assert.equal(p.x, 0);
   assert.equal(p.y, 1);

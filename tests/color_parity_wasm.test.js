@@ -29,7 +29,7 @@ test('WASM parity module is present with the exports this suite pins', () => {
   }
 });
 
-const FLOAT_EPS = 1e-4; // float32 (engine) vs float64 (JS) on smooth transforms
+const FLOAT_EPS = 1e-4;
 const near = (a, b, eps = FLOAT_EPS) => Math.abs(a - b) <= eps;
 
 /** Verifies the sRGB transfer function and its inverse match color.js. */
@@ -112,8 +112,7 @@ test('ProceduralPalette cosine parity (procedural_palette_linear)', () => {
     for (let ch = 0; ch < 3; ch++) {
       const srgb = Math.max(0, Math.min(1, pal.getChannelValue(t, ch)));
       const jsLinear = M.srgb_to_linear_interp(srgb);
-      // Within one 16-bit LUT step (the only divergence is float-vs-double cosine
-      // input rounding); a 2-step systematic bias must fail here.
+      // Within one 16-bit LUT step: the only divergence is float-vs-double cosine rounding.
       assert.ok(Math.abs(jsLinear - wCh[ch]) <= 1,
         `palette t=${t} ch=${ch}: wasm=${wCh[ch]} js=${jsLinear}`);
     }

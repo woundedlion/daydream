@@ -37,8 +37,6 @@ test('a second copy within revertMs still reverts to the idle label', async () =
   await copyWithFeedback('a', { element: el, copiedText: 'Copied!', revertMs: 1500 });
   assert.equal(el.textContent, 'Copied!', 'first copy shows the copied label');
 
-  // Second copy fires before the first revert timer; the idle text to restore
-  // must stay "Copy", not the live "Copied!" label.
   mock.timers.tick(500);
   await copyWithFeedback('b', { element: el, copiedText: 'Copied!', revertMs: 1500 });
   assert.equal(el.textContent, 'Copied!');
