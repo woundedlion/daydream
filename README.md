@@ -348,7 +348,7 @@ POVDisplay<S,RPM>::show<Effect>()
       ↓                                    leds[S/2 + y]     = get_pixel(x±W/2, y)
     [effect renders to bufs_[cur_]]
       ↓                                  FastLED.show()
-    ~Canvas():                           if show_bg(): FastLED.showColor(black)
+    ~Canvas():                           if strobe_columns(): FastLED.showColor(black)
       queue_frame()                      x = (x+1) % width
       ↓ next_ = cur_ (interrupt-safe)    if x==0 || x==width/2:
                                            advance_display()  (prev_ = next_)
@@ -505,7 +505,7 @@ The pipeline handles the 3D/2D coordinate mismatch automatically at compile time
 
 | Filter | Effect |
 |---|---|
-| `Screen::AntiAlias<W,H>` | Distributes a sub-pixel coordinate to its 4 nearest integer pixels using `quintic_kernel` bilinear weights. Scales the X fractional by `sin(φ)` from a trig LUT for spherical density compensation near the poles. |
+| `Screen::AntiAlias<W,H>` | Distributes a sub-pixel coordinate to its 4 nearest integer pixels using `quintic_kernel` bilinear weights, eased uniformly on both axes in framebuffer space — no `sin(φ)` density compensation, because anti-aliasing is a property of the pixel grid, not of where the columns map on the sphere. |
 | `Screen::Blur<W, H>` | Applies a parameterized 3×3 Gaussian convolution kernel at plot time. |
 | `Screen::Trails<W, MAX_PIXELS>` | Screen-space variant of trail decay; stores 2D coordinates with TTL and redraws via a trail color function. Uses arena-allocated storage (`MAX_PIXELS` capacity, default 1024). |
 
@@ -659,7 +659,7 @@ struct DistanceResult {
 | `v2` | Vertex index (integer cast to float) |
 | `v3` | Inherited from control-point Fragment (user-defined) |
 
-Plot primitives interpolate registers between control-point Fragments via `Fragment::lerp()`. The vertex shader, if provided, runs once per control point before rasterization.
+Plot primitives interpolate registers between control-point Fragments via `Fragment::lerp()`. The vertex shader, if provided, runs once per control point before rasterization. For the always-planar primitives (`Plot::PlanarPolygon`, `Plot::Star`, `Plot::Flower`) the rasterizer re-derives `v0`/`v1` from the rendered azimuthal-equidistant arc — which bows longer than the great-circle chord between vertices — so both stay consistent with the drawn position.
 
 **Full-Screen Shader Path** (`Scan::Shader`):
 
@@ -889,23 +889,23 @@ Transformers integrate with the `MeshOps::transform()` pipeline and can be chain
 
 ### 7.5 Memory Architecture (`memory.h`, `memory.cpp`)
 
-A single contiguous memory block (`GLOBAL_ARENA_SIZE = 335 KB`) is partitioned into three arena allocators. This block is the same size on both Teensy and WASM targets. Individual effects can call `configure_arenas()` to repartition the block at runtime.
+A single contiguous memory block (`GLOBAL_ARENA_SIZE = 330 KiB`) is partitioned into three arena allocators. This block is the same size on both Teensy and WASM targets. Individual effects can call `configure_arenas()` to repartition the block at runtime.
 
 | Arena | Default Size | Purpose |
 |---|---|---|
-| `persistent_arena` | 303 KB | Long-lived compiled mesh data, persists across frames |
+| `persistent_arena` | 298 KiB | Long-lived compiled mesh data, persists across frames |
 | `scratch_arena_a` | 16 KB | Short-lived intermediate geometry (RAII scoped) |
 | `scratch_arena_b` | 16 KB | Secondary scratch for ping-pong subdivision passes |
 
 Effects that need more scratch memory can repartition at init time:
 
 ```cpp
-// The three sizes must not exceed GLOBAL_ARENA_SIZE (335 KB on device); an
+// The three sizes must not exceed GLOBAL_ARENA_SIZE (330 KiB on device); an
 // over-subscribed partition traps at init() via HS_CHECK rather than silently
 // scaling down. Under-subscription is allowed (the surplus is just unused),
 // but partitioning the full budget is the norm. Here scratch is doubled at the
 // expense of persistent space:
-configure_arenas(271 * 1024, 32 * 1024, 32 * 1024);  // 271 + 32 + 32 = 335 KB
+configure_arenas(266 * 1024, 32 * 1024, 32 * 1024);  // 266 + 32 + 32 = 330 KiB
 ```
 
 `ScratchScope` provides stack-like RAII lifetime:
@@ -1446,7 +1446,7 @@ public:
         persist_pixels = false;   // clear buffer each frame (this is the default)
     }
 
-    bool show_bg() const override { return false; }
+    bool strobe_columns() const override { return false; }
 
     void draw_frame() override {
         Canvas canvas(*this);       // acquire write buffer
@@ -1810,7 +1810,7 @@ Main thread                                Web Workers (segment mode only)
 index.html → vendor-importmap.js           segment_worker.js × N
               ↓ (resolves three/lil-gui    each owns its own WASM module
               ↓  to local or CDN)
-            daydream.js (entry)            engine.setClip(y0,y1,x0,x1)
+            daydream.js (entry)            engine.setClip(x0,x1,y0,y1)
               ├─ createHolosphereModule()  engine.drawFrame()  → pixel slice
               ├─ Daydream (driver.js)      postMessage(Transfer pixels)
               │    ├─ Three.WebGLRenderer
@@ -1843,10 +1843,10 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `getArenaMetrics()` | Memory usage stats for geometry, scratch, and tooling arenas, plus the stack high-water mark (see below) |
 | `getEffectSizes()` | Return `sizeof` for every registered effect at the current resolution |
 | `getSupportedResolutions()` → `[[w, h], …]` | *(static)* List the resolutions the build supports, as `[width, height]` pairs |
-| `setClip(y0, y1, x0, x1)` → `bool` | Restrict rendering to a sub-rectangle (used by segment workers) |
+| `setClip(x0, x1, y0, y1)` → `bool` | Restrict rendering to a sub-rectangle (used by segment workers) |
 | `getRenderUs()` → `double` | Last frame's rasterization time in microseconds (per-frame profiling) |
 
-The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 335 KB arena) for interactive solid manipulation.
+The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 330 KiB arena) for interactive solid manipulation.
 
 Alongside the classes, the bridge exports a few free spline-evaluation functions — `spline_cubic_fast`, `spline_cubic_slerp`, and `spline_catmull_rom_tangents` — used by the `splines.html` tool so its Bézier / Catmull-Rom curves are evaluated by the same engine code the firmware uses rather than a JavaScript reimplementation.
 
@@ -1926,14 +1926,14 @@ Main thread                  Workers (one WASM each)
 drawFrame() {                postMessage({type:'render'})
   if (pendingSegmentFrame)
     controller.composite();    worker N:
-  controller.renderParallel();   engine.setClip(yN0, yN1, xN0, xN1)
+  controller.renderParallel();   engine.setClip(xN0, xN1, yN0, yN1)
 }                                engine.drawFrame()
                                  postMessage({type:'frame', pixels:Transferable})
 ```
 
 Key properties:
 - **Isolated WASM instances per worker** — each segment has its own arena, its own random seed (`Pcg32(1337)` is deterministic, so all workers produce the same result), and its own effect state.
-- **`setClip(y0, y1, x0, x1)`** — for a non-stateful effect the WASM engine restricts *rendering* to the worker's quadrant: the rasterizer's scanline culling skips out-of-clip rows and columns, so out-of-band pixels are never shaded. The pixel readback in `drawFrame()` still copies the full canvas buffer; `segment_worker.js` then extracts just the quadrant rectangle from it (the `pixelsCopy` loop in the render handler) before transferring the result back, so only the quadrant crosses the worker boundary.
+- **`setClip(x0, x1, y0, y1)`** — for a non-stateful effect the WASM engine restricts *rendering* to the worker's quadrant: the rasterizer's scanline culling skips out-of-clip rows and columns, so out-of-band pixels are never shaded. The pixel readback in `drawFrame()` still copies the full canvas buffer; `segment_worker.js` then extracts just the quadrant rectangle from it (the `pixelsCopy` loop in the render handler) before transferring the result back, so only the quadrant crosses the worker boundary.
 - **Cross-segment stateful effects render full-frame** — an effect whose per-frame state reads pixels *outside* the worker's band (`MeshFeedback`'s feedback warp samples the previous frame at unbounded offsets; `Dynamo`/`SplineFlow` reproject `World::Trails` under rotation) cannot be band-clipped: a clipped worker would have stale/zero history outside its band, so cross-band trails read as black and seams appear. Those effects report `Effect::needs_full_frame()` (derived from a compile-time `any_crosses_segments` filter-pipeline trait), and `setClip` leaves their clip at the full canvas — every worker computes the bit-identical full frame and `segment_worker.js` slices its quadrant from the full readback. This mirrors the device exactly, where each board independently renders the whole canvas; only non-stateful effects keep segmented rendering's clipping win. Design: `docs/segmented_stateful_effects_spec.md`.
 - **One-frame pipeline** — frame N's render is dispatched fire-and-forget; frame N-1's results are composited synchronously when they arrive. Wall-clock time is measured against the slowest worker — exactly what the multi-Teensy hardware sees.
 - **Boundary overlay** — a "Show Boundaries" toggle paints cyan markers on the segment edges in the composite buffer to make the partition visible.
@@ -1975,7 +1975,7 @@ Five standalone HTML pages. Four render with their own Three.js scene; `palettes
 | `lissajous.html` | Designs spherical Lissajous curves with live frequency / phase / amplitude sliders; outputs a C++ `LissajousParams` initializer for the engine's Lissajous effects (`ChaoticStrings`, `Comets`). |
 | `mobius.html` | Visualizes Möbius transformations on the sphere via stereographic projection; lets you sweep the four complex coefficients and see the warp on a latitude-longitude grid. |
 | `palettes.html` | Tunes `ProceduralPalette` cosine coefficients and `GenerativePalette` harmony rules and exports the C++ initializer; renders its swatches and graphs on 2D canvas contexts rather than a Three.js scene. |
-| `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated tooling arenas (16 MB, separate from the engine's 335 KB arena). |
+| `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated tooling arenas (16 MB, separate from the engine's 330 KiB arena). |
 | `splines.html` | Dual-mode (Bézier / Catmull-Rom) spherical spline designer with closed-loop and open-chain modes; click to add control points, drag to edit, export the control points as a `constexpr std::array<Vector>` or as `Fragment` positions. Spline evaluation runs through the engine's exported WASM spline functions (the tool's single source of truth). |
 
 All five reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`.
