@@ -818,6 +818,10 @@ export class SegmentController {
     // ready-first guard would return early every tick and the fault overlay would
     // never paint — segmented mode would freeze black with console-only diagnostics.
     if (this.faulted) {
+      // A faulted tick composites nothing, so clear the gate the recorder reads.
+      // Otherwise it can stay true from the last good composite and the recorder
+      // keeps capturing the now-frozen black buffer as if it were fresh content.
+      this.frameComposited = false;
       this.updateStats();
       return;
     }
