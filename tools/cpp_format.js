@@ -23,6 +23,9 @@
  * @returns {string} The C++ float literal (e.g. "1.5f").
  */
 export function formatFloatCpp(n, digits = 6) {
+  if (!Number.isFinite(n)) {
+    throw new Error(`formatFloatCpp: non-finite value ${n}`);
+  }
   let s = n.toFixed(digits).replace(/(\.\d*?)0+$/, '$1');
   if (s.endsWith('.')) s += '0';
   // Nonzero magnitude that collapsed to "0.0": widen precision past the leading
