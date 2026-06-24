@@ -3,13 +3,6 @@
 // Executed parity between the browser tools' hand-ported color math and the
 // engine functions they mirror, run against the real shipped WASM module.
 //
-// tools/color.js, tools/palette_math.js and tools/lissajous_math.js re-implement
-// the engine's perceptual pipeline (the sRGB transfer, the Ottosson OKLab
-// matrices, the integer HSV sextant split, the ProceduralPalette cosine formula,
-// the lissajous curve). These tests call the engine's own functions through the
-// WASM bridge and assert the JS ports reproduce them, so an engine-side change
-// surfaces as a JS test failure instead of a silent divergence in the preview.
-//
 // The C++ runs the math in float; the JS ports run it in double, so float
 // outputs are compared within a small tolerance while integer outputs (the HSV
 // bytes, the LUT-quantized palette) must match exactly (or within 1 LUT step,
@@ -21,17 +14,10 @@ import * as C from '../tools/color.js';
 import * as P from '../tools/palette_math.js';
 import * as L from '../tools/lissajous_math.js';
 
-// Instantiate the shipped module exactly as the browser tools do. Top-level
-// await means a missing or un-instantiable holosphere_wasm.js fails this file
-// loudly (the import/await rejects) rather than silently skipping the parity
-// checks below — so a CI run that lacks the built module goes red, not green.
+// Top-level await means a missing or un-instantiable module fails this file
+// loudly rather than silently skipping the parity checks.
 const M = await createHolosphereModule({ print() {}, printErr() {} });
 
-// Guard that the loaded module actually exposes the engine exports this suite
-// pins. A stale or partial build that dropped/renamed one of them would
-// otherwise surface as a confusing "M.foo is not a function" mid-assertion; make
-// it a single explicit, collected failure that says the parity check did not run
-// against a complete module.
 test('WASM parity module is present with the exports this suite pins', () => {
   for (const name of [
     'srgb_to_linear_float', 'linear_to_srgb_float', 'srgb_to_linear_interp',
@@ -126,9 +112,8 @@ test('ProceduralPalette cosine parity (procedural_palette_linear)', () => {
     for (let ch = 0; ch < 3; ch++) {
       const srgb = Math.max(0, Math.min(1, pal.getChannelValue(t, ch)));
       const jsLinear = M.srgb_to_linear_interp(srgb);
-      // Within one 16-bit LUT step, matching the docstring (the only divergence is
-      // the float-vs-double cosine input rounding). Measured max over this grid is
-      // exactly 1; a 2-step systematic bias must fail here, not pass.
+      // Within one 16-bit LUT step (the only divergence is float-vs-double cosine
+      // input rounding); a 2-step systematic bias must fail here.
       assert.ok(Math.abs(jsLinear - wCh[ch]) <= 1,
         `palette t=${t} ch=${ch}: wasm=${wCh[ch]} js=${jsLinear}`);
     }

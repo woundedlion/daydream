@@ -1,19 +1,10 @@
 // @ts-nocheck
 //
-// Real-engine contract pin for the segmented-render path.
-//
-// segment_worker.test.js and segment_controller.test.js both run against a
-// hand-written FakeEngine standing in for the WASM HolosphereEngine. Those mocks
-// are fast and DOM-free, but nothing stops FakeEngine's method surface from
-// drifting away from the real engine — a renamed/dropped binding, or a changed
-// return shape (e.g. getArenaMetrics losing a field, setResolution returning
-// non-boolean) — which the mocked suites would never catch.
-//
-// This test loads the REAL shipped module and exercises exactly the methods and
-// return shapes the worker/controller (and therefore the FakeEngines) rely on,
-// so a divergence between the contract and the engine fails here. Top-level await
-// means an absent/un-instantiable module fails this file loudly rather than
-// skipping the check.
+// Real-engine contract pin for the segmented-render path. segment_worker and
+// segment_controller run against a hand-written FakeEngine; this test loads the
+// REAL shipped module and exercises exactly the methods and return shapes the
+// worker/controller rely on, so a divergence between the FakeEngine contract and
+// the engine fails here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import createHolosphereModule from '../holosphere_wasm.js';
@@ -24,13 +15,11 @@ const M = await createHolosphereModule({ print() {}, printErr() {} });
 // "Holosphere (20x96)" preset). Used to pin getPixels()'s length below.
 const W = 96, H = 20;
 
-// One shared engine, constructed once: the engine owns a single global arena, so
-// a second instantiation traps (the app itself only ever makes one). A missing
-// HolosphereEngine class throws here and fails the whole file loudly.
+// One shared engine: the engine owns a single global arena, so a second
+// instantiation traps (the app itself only ever makes one).
 const engine = new M.HolosphereEngine();
 
 test('HolosphereEngine exposes the method surface the FakeEngines mock', () => {
-  // Every method the worker's FakeEngine and the controller's snapshot path call.
   for (const name of [
     'setResolution', 'setEffect', 'setParameter', 'setAnimationsPaused',
     'setClip', 'drawFrame', 'getRenderUs', 'getPixels', 'getArenaMetrics',
@@ -66,17 +55,15 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
     assert.equal(typeof p.name, 'string', 'param def must carry a string name');
     assert.ok(typeof p.value === 'number' || typeof p.value === 'boolean',
       'param def value must be a number or boolean');
-    // setParameter takes a numeric value (the controller flattens bools to 1/0
-    // before sending), so coerce the same way before the contract call. It
-    // likewise returns a strict boolean (the GUI gates on `=== false`); a known
-    // param name fed its own current value must report success.
+    // setParameter takes a numeric value (the controller flattens bools to 1/0),
+    // and returns a strict boolean (the GUI gates on `=== false`).
     const paramOk = engine.setParameter(
       p.name, typeof p.value === 'boolean' ? (p.value ? 1 : 0) : p.value);
     assert.equal(typeof paramOk, 'boolean', 'setParameter must return a boolean');
     assert.equal(paramOk, true, 'setParameter must succeed for a known param name');
   }
 
-  // The remaining void setters the worker drives, called the same way it does.
+  // The remaining void setters the worker drives.
   engine.setAnimationsPaused(false);
   engine.setClip(0, W, 0, H);
   engine.drawFrame();

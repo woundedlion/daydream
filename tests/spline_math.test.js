@@ -109,7 +109,6 @@ test('generateCatmullRomCurve: open case passes through every control point', ()
   const curve = generateCatmullRomCurve(pts, 0.5, perSeg, passThroughTangents, lerpEval, false);
   // Open: (n-1) segments; first emits perSeg+1, the rest perSeg points each.
   assert.equal(curve.length, perSeg + 1 + (pts.length - 2) * perSeg);
-  // Each control point is reproduced exactly somewhere on the curve.
   for (const cp of pts) {
     assert.ok(curve.some((q) => q.x === cp.x && q.y === cp.y && q.z === cp.z),
       `control point (${cp.x}) missing from open curve`);
@@ -130,7 +129,7 @@ test('generateCatmullRomCurve: closed case wraps (one segment per point)', () =>
   // Closed has n segments vs n-1 open, so it is strictly longer (the wrap seg).
   assert.equal(closed.length, perSeg + 1 + (pts.length - 1) * perSeg);
   assert.ok(closed.length > open.length);
-  // The closing segment runs from the last control point back toward the first.
+  // The closing segment runs from the last control point back to the first.
   assert.deepEqual(closed[closed.length - 1], pts[0]);
 });
 

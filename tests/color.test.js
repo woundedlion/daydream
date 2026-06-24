@@ -2,9 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-// tools/color.js is a pure-math module (no DOM); import it directly. It mirrors
-// the engine's perceptual pipeline (core/color.h), so these tests pin the
-// round-trips and known fixed points that keep the tool's preview honest.
+// tools/color.js mirrors the engine's perceptual pipeline (core/color.h).
 const {
   srgbToLinearFloat, linearToSrgbFloat,
   linearRgbToOklab, oklabToLinearRgb,
@@ -71,7 +69,6 @@ test('Oklab<->Oklch round-trip', () => {
 /** Verifies srgbToOklch yields finite components with lightness in (0,1) and non-negative chroma. */
 test('srgbToOklch is the composition of the byte->linear->oklab->oklch chain', () => {
   const lch = srgbToOklch(128, 64, 200);
-  // Finite, and L within the valid lightness range.
   assert.ok(Number.isFinite(lch.L) && Number.isFinite(lch.C) && Number.isFinite(lch.h));
   assert.ok(lch.L > 0 && lch.L < 1);
   assert.ok(lch.C >= 0);
@@ -118,12 +115,11 @@ test('lerpOklch treats near-zero chroma endpoints as hueless', () => {
   const gray = { L: 0.5, C: 0, h: 0 };
   const blue = { L: 0.5, C: 0.2, h: 1.23 };
   assert.equal(lerpOklch(gray, gray, 0.5).h, 0);
-  near(lerpOklch(gray, blue, 0.5).h, blue.h); // adopt the chromatic end's hue
+  near(lerpOklch(gray, blue, 0.5).h, blue.h);
 });
 
 /** Verifies oklchToLinearRgb clamps an out-of-gamut high-chroma color into the [0,1] RGB cube. */
 test('oklchToLinearRgb clamps out-of-gamut results into [0,1]', () => {
-  // A high-chroma OKLCH that lands outside the RGB cube must be clamped.
   const rgb = oklchToLinearRgb({ L: 0.5, C: 0.5, h: 0 });
   for (const c of rgb) assert.ok(c >= 0 && c <= 1);
 });

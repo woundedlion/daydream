@@ -1,11 +1,4 @@
 // @ts-check
-//
-// palette_math.js — pure palette math extracted from tools/palettes.html.
-// The module mirrors the engine's ProceduralPalette and GenerativePalette and
-// owns the C++ export-string generators, so these tests lock both the numeric
-// output and the exact C++ initializer text the inline page cannot cover.
-//
-// Run: node --test --experimental-test-module-mocks "tests/palette_math.test.js"
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -14,20 +7,17 @@ const {
   mapValue, proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
 } = await import('../tools/palette_math.js');
 
-// GenerativePalette's color math now lives in the C++ engine (PaletteOps.bakeLut
-// in the WASM module) and is covered by the native test suite. These tests cover
-// the JS side's responsibilities: resolving profiles into the bakeLut arguments
-// and sampling the returned LUT. A mock bakeLut stands in for the WASM bridge --
-// a smooth in-range sRGB ramp -- and records its last arguments so the delegation
-// (shape enum int + nine [0,255] HSV values) can be asserted.
+// A mock bakeLut stands in for the WASM bridge (a smooth in-range sRGB ramp) and
+// records its last arguments so the delegation (shape enum int + nine [0,255]
+// HSV values) can be asserted.
 let lastBakeArgs = null;
 function mockBakeLut(...args) {
   lastBakeArgs = args;
   const lut = new Uint8Array(256 * 3);
   for (let i = 0; i < 256; i++) {
-    lut[3 * i] = i;            // R ramps up
-    lut[3 * i + 1] = 255 - i;  // G ramps down
-    lut[3 * i + 2] = 128;      // B constant
+    lut[3 * i] = i;
+    lut[3 * i + 1] = 255 - i;
+    lut[3 * i + 2] = 128;
   }
   return lut;
 }
@@ -49,17 +39,17 @@ test('ProceduralPalette.get at t=0 and t=0.5 for a known coefficient set', () =>
   // a=0.5, b=0.5, c=1, d=0 → sRGB = clamp(0.5 + 0.5*cos(2π·t)).
   const p = new ProceduralPalette([0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [1, 1, 1], [0, 0, 0]);
 
-  // t=0: cos(0)=1 → sRGB 1.0 → linear 1.0 on every channel.
+  // t=0: cos(0)=1 → sRGB 1.0 → linear 1.0.
   const at0 = p.get(0);
   for (const ch of at0) assert.ok(Math.abs(ch - srgbToLinear(1.0)) < NEAR);
   assert.ok(Math.abs(at0[0] - 1.0) < NEAR);
 
-  // t=0.5: cos(π) = -1 → sRGB clamp(0.0) → linear 0.0.
+  // t=0.5: cos(π)=-1 → sRGB clamp(0.0) → linear 0.0.
   const at05 = p.get(0.5);
   for (const ch of at05) assert.ok(Math.abs(ch - srgbToLinear(0.0)) < NEAR);
   assert.ok(Math.abs(at05[0] - 0.0) < NEAR);
 
-  // getChannelValue returns the raw (un-clamped, un-linearized) cosine value.
+  // getChannelValue returns the raw (un-clamped, un-linearized) cosine.
   assert.ok(Math.abs(p.getChannelValue(0, 0) - 1.0) < NEAR);
   assert.ok(Math.abs(p.getChannelValue(0.5, 0) - 0.0) < NEAR);
 });
@@ -76,7 +66,6 @@ test('PRNG is deterministic: same seed -> same sequence', () => {
   for (let i = 0; i < 16; i++) {
     assert.equal(c.nextInt(0, 100), d.nextInt(0, 100));
   }
-  // A different seed should (overwhelmingly likely) diverge.
   assert.notEqual(new PRNG(1).next(), new PRNG(2).next());
 });
 
@@ -91,9 +80,8 @@ test('PRNG seed 0 is reproducible', () => {
 
 /** Verifies hsvToRgb maps the region-boundary hues to pure primaries and returns a CPixel. */
 test('hsvToRgb on primary hues returns pure red/green/blue', () => {
-  // h, s, v in 0..255; full saturation and value. The engine splits the wheel
-  // into six 43-wide regions (region = h/43), so the pure primaries land on the
-  // region boundaries: red=0, green=86, blue=172 (not the float-math 0/85/170).
+  // The engine splits the wheel into six 43-wide regions (region = h/43), so the
+  // pure primaries land on red=0, green=86, blue=172 (not the float-math 0/85/170).
   const red = hsvToRgb(0, 255, 255);
   assert.deepEqual([red.r, red.g, red.b], [255, 0, 0]);
   assert.ok(red instanceof CPixel);
@@ -121,13 +109,12 @@ test('proceduralPaletteCpp emits a valid C++ initializer', () => {
   };
   const s = proceduralPaletteCpp(params);
   assert.ok(s.includes('ProceduralPalette palette('));
-  assert.ok(s.includes('f}')); // f-suffixed floats inside brace-init vec3s
+  assert.ok(s.includes('f}'));
   assert.ok(s.includes('// A'));
   assert.ok(s.includes('// B'));
   assert.ok(s.includes('// C'));
   assert.ok(s.includes('// D'));
-  // Floats carry the `f` suffix, not bare JS numbers, and trailing zeros are
-  // trimmed by the shared formatFloatCpp (0.5 -> "0.5f", not "0.500f").
+  // Trailing zeros are trimmed: 0.5 -> "0.5f", not "0.500f".
   assert.ok(s.includes('{0.5f, 0.5f, 0.5f}'));
 });
 
@@ -146,7 +133,6 @@ test('generativePaletteCpp emits the block with the chosen enum tokens', () => {
   assert.ok(s.includes('BrightnessProfile::ASCENDING'));
   assert.ok(s.includes('SaturationProfile::VIBRANT'));
   assert.ok(s.includes('42}'));
-  // Reproducibility caveat comment is preserved.
   assert.ok(s.includes('// Reproduces the profiles + base hue exactly'));
 });
 
@@ -167,12 +153,11 @@ test('GenerativePalette delegates resolved (shape, h,s,v x3) to bakeLut', () => 
   assert.ok(Array.isArray(lastBakeArgs) && lastBakeArgs.length === 10, 'bakeLut called with 10 args');
   // VIGNETTE is index 2 in core/color.h GradientShape order.
   assert.equal(lastBakeArgs[0], 2, 'shape enum int');
-  // The nine HSV values are integers in [0, 255].
   for (let i = 1; i < 10; i++) {
     assert.ok(Number.isInteger(lastBakeArgs[i]), `arg ${i} integer`);
     assert.ok(lastBakeArgs[i] >= 0 && lastBakeArgs[i] <= 255, `arg ${i} in [0,255]`);
   }
-  // FLAT/VIBRANT are RNG-free: value 255, saturation 255 on all three keys.
+  // FLAT/VIBRANT are RNG-free: value and saturation pin to 255 on all three keys.
   assert.deepEqual([lastBakeArgs[3], lastBakeArgs[6], lastBakeArgs[9]], [255, 255, 255], 'FLAT values');
   assert.deepEqual([lastBakeArgs[2], lastBakeArgs[5], lastBakeArgs[8]], [255, 255, 255], 'VIBRANT saturations');
 });
@@ -197,7 +182,6 @@ test('GenerativePalette.get: t === 1.0 and t > 1.0 clamp to the final stop color
   const beyond = pal.get(1.5);
   const justBelow = pal.get(0.99999);
 
-  // Finite and in range at the boundary.
   assert.equal(atOne.length, 3);
   for (const ch of atOne) {
     assert.ok(Number.isFinite(ch), `channel finite at t=1.0`);
@@ -207,7 +191,6 @@ test('GenerativePalette.get: t === 1.0 and t > 1.0 clamp to the final stop color
   // t > 1.0 clamps to the same endpoint as t === 1.0 (no wrap-around).
   assert.deepEqual(beyond, atOne);
 
-  // The endpoint is continuous with the interior approaching it.
   for (let i = 0; i < 3; i++) {
     assert.ok(Math.abs(atOne[i] - justBelow[i]) < 1e-4, `continuous at t→1 on channel ${i}`);
   }

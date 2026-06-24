@@ -1,34 +1,22 @@
 // @ts-check
 //
-// WASM-backed spline parity (README §10.11's "single source of truth").
+// WASM-backed spline parity: wires the REAL exported WASM evaluators
+// (spline_cubic_fast / spline_cubic_slerp / spline_catmull_rom_tangents) through
+// the same sampling cores the splines.html tool uses and pins their output, so an
+// engine-side change fails here instead of silently drifting from the preview.
+// The pure spline_math.test.js only exercises the sampling loop with fake
+// evaluators, leaving the engine math itself unverified.
 //
-// The pure spline_math.test.js exercises the sampling-loop bookkeeping with
-// INJECTED fake evaluators (lerpEval / passThroughTangents), so the real
-// exported engine math (spline_cubic_fast / spline_cubic_slerp /
-// spline_catmull_rom_tangents) is never executed and the highest-drift-risk
-// boundary — the JS tool agreeing with the device's spline math — is unverified.
-//
-// This test wires the REAL exported WASM evaluators through the same sampling
-// cores the splines.html tool uses (generateBezierCurve / generateCatmullRomCurve
-// from tools/spline_math.js) and pins their output. An engine-side change to the
-// spline math now fails a JS test instead of silently drifting from the preview.
-//
-// The wrappers below are byte-identical to splines.html's cubicFast / cubicSlerp
-// / catmullRomTangents bridge callbacks (flat floats in, {x,y,z} out).
+// The wrappers below are byte-identical to splines.html's bridge callbacks.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateBezierCurve, generateCatmullRomCurve } from '../tools/spline_math.js';
 import createHolosphereModule from '../holosphere_wasm.js';
 
-// Instantiate the shipped module exactly as the browser tool does. Top-level
-// await means a load/instantiation failure fails this test file loudly rather
-// than skipping the parity check.
+// Top-level await means a load/instantiation failure fails this file loudly
+// rather than skipping the parity check.
 const M = await createHolosphereModule({ print() {}, printErr() {} });
 
-// Explicit, collected guard: a stale or partial build that dropped/renamed one
-// of the spline exports would otherwise surface as a confusing "M.foo is not a
-// function" mid-assertion. Fail once, clearly, that the parity check did not run
-// against a complete module.
 test('WASM parity module is present with the exports this suite pins', () => {
   for (const name of [
     'spline_cubic_fast', 'spline_cubic_slerp', 'spline_catmull_rom_tangents',
@@ -67,11 +55,10 @@ const mag = (v) => Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
 test('spline_cubic_fast (real WASM) Bézier curve pins to the engine', () => {
   const curve = generateBezierCurve(P, 4, cubicFast);
   assert.equal(curve.length, 5);
-  // A normalized-Bézier evaluator interpolates its endpoints: t=0 -> normalize(p0),
-  // t=1 -> normalize(p3). p0/p3 are already unit, so these are exact.
+  // p0/p3 are already unit, so the endpoints interpolate exactly.
   closeVec(curve[0], 0, 1, 0, 't=0');
   closeVec(curve[4], -1, 0, 0, 't=1');
-  // Pinned interior sample (t=0.5) — golden vector captured from the engine.
+  // Pinned interior sample (t=0.5) — golden vector from the engine.
   closeVec(curve[2], 0.534522, 0.267261, 0.801784, 't=0.5');
   // cubic_fast renormalizes, so every sample is on the unit sphere.
   for (const p of curve) assert.ok(Math.abs(mag(p) - 1) <= EPS, `non-unit sample mag=${mag(p)}`);
@@ -86,9 +73,8 @@ test('spline_cubic_slerp (real WASM) pins to the engine and differs from cubic_f
   const slerpMid = cubicSlerp(P[0], P[1], P[2], P[3], 0.5);
   closeVec(slerpMid, 0.486519, 0.243259, 0.839121, 'slerp t=0.5');
   assert.ok(Math.abs(mag(slerpMid) - 1) <= EPS, `slerp sample not unit: ${mag(slerpMid)}`);
-  // cubic_fast (normalized Bézier) and cubic_slerp (spherical de Casteljau) are
-  // different curves between the endpoints; identical midpoints would mean the
-  // two evaluators collapsed to one.
+  // cubic_fast and cubic_slerp are different curves between the endpoints;
+  // identical midpoints would mean the two evaluators collapsed to one.
   const fastMid = cubicFast(P[0], P[1], P[2], P[3], 0.5);
   assert.ok(mag({ x: slerpMid.x - fastMid.x, y: slerpMid.y - fastMid.y, z: slerpMid.z - fastMid.z }) > 1e-3,
     'cubic_fast and cubic_slerp produced the same midpoint');
