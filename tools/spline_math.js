@@ -3,16 +3,10 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-// Pure, backend-agnostic spline helpers extracted from tools/splines.html so
-// they can be unit-tested in Node without a DOM, THREE, or the Holosphere WASM
-// engine. Contains a plain-object vector normalize (vec3Normalize), the
-// sampling cores for 4-point Bézier (generateBezierCurve) and N-point
-// Catmull-Rom (generateCatmullRomCurve) curves — both take injected eval/tangent
-// callbacks so the actual math stays in the WASM engine — the export-snippet
-// string builder (splineExportCode), and uniform unit-sphere sampling via
-// Marsaglia's method (randomPointOnSphere, with an injectable RNG). The C++
-// float-literal formatter is the shared formatFloatCpp (cpp_format.js),
-// re-exported here for back-compat. All DOM/THREE/WASM wiring stays inline.
+// Pure, backend-agnostic spline helpers from tools/splines.html, unit-testable
+// in Node without a DOM, THREE, or the WASM engine. The Bézier and Catmull-Rom
+// sampling cores take injected eval/tangent callbacks so the actual math stays
+// in the WASM engine.
 
 import { formatFloatCpp } from './cpp_format.js';
 
@@ -40,9 +34,7 @@ export function vec3Normalize(v) {
  */
 export function generateBezierCurve(pts, numSamples, evalFn) {
   if (pts.length < 4) return [];
-  // numSamples is the divisor for t = i / numSamples; a zero or non-positive
-  // count would divide by zero and emit NaN points. Treat it as degenerate.
-  // The `!(n >= 1)` form also rejects NaN.
+  // numSamples is the divisor for t = i / numSamples; reject 0/negative/NaN.
   if (!(numSamples >= 1)) return [];
   const result = [];
   for (let i = 0; i <= numSamples; i++) {
@@ -67,8 +59,7 @@ export function generateBezierCurve(pts, numSamples, evalFn) {
 export function generateCatmullRomCurve(pts, tension, numSamplesPerSeg, tangentFn, evalFn, closed) {
   const n = pts.length;
   if (n < 2) return [];
-  // numSamplesPerSeg is the divisor for t = j / numSamplesPerSeg; a zero or
-  // non-positive count would divide by zero and emit NaN points. Degenerate.
+  // numSamplesPerSeg is the divisor for t = j / numSamplesPerSeg; reject 0/negative/NaN.
   if (!(numSamplesPerSeg >= 1)) return [];
   const result = [];
   const segCount = closed ? n : n - 1;
@@ -135,8 +126,6 @@ export function randomPointOnSphere(rng = Math.random) {
   const sq = Math.sqrt(1 - s);
   // Unit by construction (Marsaglia): with s = v1²+v2² in (0,1),
   // (2·v1·√(1-s))² + (2·v2·√(1-s))² + (1-2s)² = 4s(1-s) + (1-2s)² = 1.
-  // The loop already excludes s == 0 and s >= 1, so no degenerate case — no
-  // vec3Normalize needed.
   return {
     x: 2 * v1 * sq,
     y: 2 * v2 * sq,

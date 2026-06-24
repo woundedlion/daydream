@@ -4,35 +4,29 @@
  */
 
 /**
- * Pure code-generation and geometry helpers extracted from the solids tool page
- * (tools/solids.html) so they can be unit-tested without a DOM or WASM runtime.
- * These produce the C++ source strings that get pasted verbatim into the engine
- * (SolidBuilder recipes, FLASHMEM functions), so their output formatting must
- * stay byte-for-byte stable. computeInternalAngle uses plain {x, y, z} vector
- * math (a THREE.Vector3 satisfies that shape) so the module stays free of any
- * three.js dependency.
+ * Pure code-generation and geometry helpers from the solids tool page
+ * (tools/solids.html), unit-testable without a DOM or WASM runtime. The C++
+ * source strings are pasted verbatim into the engine (SolidBuilder recipes,
+ * FLASHMEM functions), so their output formatting must stay byte-for-byte
+ * stable. computeInternalAngle uses plain {x, y, z} vector math (a
+ * THREE.Vector3 satisfies that shape) to avoid a three.js dependency.
  */
 
 import { formatFloatCpp } from './cpp_format.js';
 
-// The Conway/SolidBuilder operators this generator knows how to emit. An op
-// outside this set would be pasted verbatim (`.op()`) into non-compiling C++
-// that only fails at engine compile time, so generateFuncAndRecipe rejects it.
+// The Conway/SolidBuilder operators this generator can emit. An op outside this
+// set would paste into non-compiling C++, so generateFuncAndRecipe rejects it.
 const KNOWN_OPS = new Set([
   'truncate', 'expand', 'chamfer', 'hankin', 'snub', 'relax', 'bevel',
   'dual', 'kis', 'ambo', 'gyro', 'meta', 'needle', 'zip',
 ]);
 
 // A base seed-solid name is pasted as a C++ function call (`base(a, b)`). The
-// valid set is the WASM solid registry (dynamic, invisible to this pure
-// module), so guard the shape: every registry name is a valid C++ identifier,
-// and the check also stops an unexpected caller from injecting arbitrary text.
+// valid set is the WASM solid registry, invisible to this pure module, so guard
+// the shape: every registry name is a valid C++ identifier.
 const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-// C++ float-literal formatter — the shared formatFloatCpp (cpp_format.js).
-// Re-exported under the historical `formatFloat` name so solids.html and the
-// recipe builders below keep their call sites; output is identical (6-digit
-// toFixed + trailing-zero trim + `f` suffix, scientific-notation-safe).
+// Re-exported as `formatFloat` for solids.html and the recipe builders below.
 export const formatFloat = formatFloatCpp;
 
 /**
@@ -93,23 +87,22 @@ export function generateFuncAndRecipe(item) {
       chain += `.hankin(${formatFloat(o.params.angle)} * D2R)`;
       nameParts.push(`_hk${Math.round(o.params.angle)}`);
     } else if (opName === 'snub') {
-      // snub may have t and twist params in OP_DEFS but SolidBuilder defaults work
+      // SolidBuilder's snub defaults suffice; ignore any t/twist params.
       chain += `.snub()`;
       nameParts.push(`_snub`);
     } else if (opName === 'relax') {
-      // `??` not `||`: an explicit iter:0 is a valid (no-op relax) count and
-      // must not be silently coerced to the 100 default — only an
-      // absent/undefined iter falls back.
+      // `??` not `||`: an explicit iter:0 is a valid no-op relax count and must
+      // not fall back to the 100 default.
       const iter = o.params.iter ?? 100;
       chain += `.relax(${iter})`;
-      // Encode the iteration count so two solids differing only in relax
-      // depth export distinct funcNames instead of colliding on `_relax`.
+      // Encode the count so solids differing only in relax depth get distinct
+      // funcNames instead of colliding on `_relax`.
       nameParts.push(`_relax${iter}`);
     } else if (opName === 'bevel') {
       chain += `.bevel(${formatFloat(o.params.t)})`;
       nameParts.push(`_bevel${pctSuffix(o.params.t)}`);
     } else {
-      // Simple parameterless ops: dual, kis, ambo, gyro, meta, needle, zip
+      // Parameterless ops: dual, kis, ambo, gyro, meta, needle, zip.
       chain += `.${opName}()`;
       nameParts.push(`_${opName}`);
     }
@@ -151,9 +144,7 @@ export function computeInternalAngle(mesh) {
   const v2 = mesh.vertices[face[1]];
   const v3 = mesh.vertices[face[2]];
 
-  // Planar internal angle at v2 is the angle between the vectors v2->v1 and v2->v3.
-  // Use plain {x, y, z} math (THREE.Vector3 satisfies this shape) so the module
-  // carries no three.js dependency.
+  // Internal angle at v2: the angle between vectors v2->v1 and v2->v3.
   const dir1 = { x: v1.x - v2.x, y: v1.y - v2.y, z: v1.z - v2.z };
   const dir2 = { x: v3.x - v2.x, y: v3.y - v2.y, z: v3.z - v2.z };
 
@@ -162,8 +153,7 @@ export function computeInternalAngle(mesh) {
   const len2 = Math.sqrt(dir2.x * dir2.x + dir2.y * dir2.y + dir2.z * dir2.z);
   if (len1 === 0 || len2 === 0) return 0;
 
-  // Clamp to [-1, 1] to guard against floating-point drift before acos, matching
-  // THREE.Vector3.angleTo.
+  // Clamp to [-1, 1] to guard against floating-point drift before acos.
   const cos = Math.min(1, Math.max(-1, dot / (len1 * len2)));
   return Math.acos(cos);
 }

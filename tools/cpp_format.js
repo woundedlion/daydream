@@ -4,10 +4,8 @@
  */
 
 // Dependency-free C++ float-literal formatter shared by the tool pages' code
-// generators. Kept in its own module (like clipboard.js) so the pure,
-// THREE-free generators (spline_math, solid_codegen, palette_math) can import
-// it without pulling Three.js into their unit tests, while shared.js re-exports
-// it for the scene-based pages.
+// generators, so the THREE-free generators can import it without pulling
+// Three.js into their unit tests.
 
 /**
  * Format a number as a C++ float literal: fixed precision, trailing zeros
@@ -27,10 +25,9 @@
 export function formatFloatCpp(n, digits = 6) {
   let s = n.toFixed(digits).replace(/(\.\d*?)0+$/, '$1');
   if (s.endsWith('.')) s += '0';
-  // Guard against a nonzero magnitude collapsing to "0.0": widen the precision
-  // by the count of leading fractional zeros so `digits` significant figures
-  // survive, then re-trim. `toFixed`'s 100-digit ceiling caps truly negligible
-  // (sub-1e-100, far below float range) inputs back to "0.0", which is correct.
+  // Nonzero magnitude that collapsed to "0.0": widen precision by the count of
+  // leading fractional zeros so `digits` significant figures survive, then
+  // re-trim. toFixed's 100-digit ceiling caps sub-1e-100 inputs back to "0.0".
   if (parseFloat(s) === 0 && Number.isFinite(n) && n !== 0) {
     const leadingZeros = Math.ceil(-Math.log10(Math.abs(n)));
     const prec = Math.min(100, leadingZeros + digits);

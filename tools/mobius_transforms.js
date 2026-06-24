@@ -4,13 +4,11 @@
  */
 
 /*
- * Pure math extracted from the Mobius Transformation Visualizer (mobius.html).
- * Each preset generator maps an elapsed time `t` (and, where relevant, explicit
- * config values) to the four complex Mobius coefficients {A, B, C, D} of
- * f(z) = (Az + B) / (Cz + D); these feed the live shader uniforms, so the
- * returned coefficients must stay bit-for-bit identical to what the shader expects.
- * Also includes the complex-arithmetic helpers and the snap-to-grid helper used
- * by the drag input, all free of DOM / THREE / global-state dependencies.
+ * Pure math from the Mobius Transformation Visualizer (mobius.html). Each preset
+ * generator maps elapsed time `t` to the four complex Mobius coefficients
+ * {A, B, C, D} of f(z) = (Az + B) / (Cz + D); these feed the live shader
+ * uniforms, so the coefficients must stay bit-for-bit identical to what the
+ * shader expects.
  */
 
 // --- Complex arithmetic ---------------------------------------------------
@@ -69,8 +67,6 @@ export function snapComplex(value, threshold = 0.05) {
 }
 
 // --- Preset coefficient generators ----------------------------------------
-// Each generator returns the four complex Mobius coefficients {A, B, C, D} of
-// f(z) = (Az + B) / (Cz + D), where each coefficient is a { re, im } object.
 
 /**
  * Elliptic (Rotation) preset: continuous rotation around the poles.

@@ -3,22 +3,16 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-// Pure palette math. This module mirrors the engine's ProceduralPalette and
-// GenerativePalette so the browser tool can predict device colors and the C++
-// export-string generators can be regression-tested without a DOM. Parity is
-// not exact on either path:
+// Pure palette math mirroring the engine's ProceduralPalette and
+// GenerativePalette so the browser tool can predict device colors. Parity is
+// close, not exact, on either path:
 //   - ProceduralPalette evaluates the cosine formula analytically and
 //     linearizes with an exact pow, which can differ from the device's
 //     interpolated 16-bit-linear LUT by up to ~1 LSB per channel.
-//   - GenerativePalette previews via the baked-LUT sampler (BakedPalette
-//     below), which reconstructs each entry from the WASM bridge's 8-bit sRGB
-//     LUT, not the engine's native 16-bit-LINEAR BakedPalette. The
-//     interpolation domain matches (linear), but the 8-bit source quantization
-//     means the preview can diverge by MORE than ~1 LSB, most visibly in dark
-//     tones where 8-bit sRGB maps to coarse linear steps. It is close, not
-//     exact.
-// No DOM/canvas/window references live here; all UI wiring stays inline in
-// palettes.html.
+//   - GenerativePalette previews via a sampler reconstructing each entry from
+//     the WASM bridge's 8-bit sRGB LUT, not the engine's native 16-bit-linear
+//     BakedPalette. The interpolation domain matches (linear), but the 8-bit
+//     source quantization can diverge by MORE than ~1 LSB, most in dark tones.
 
 import { srgbToLinearFloat } from './color.js';
 import { formatFloatCpp } from './cpp_format.js';
@@ -26,13 +20,11 @@ import { formatFloatCpp } from './cpp_format.js';
 const TWO_PI = 2 * Math.PI;
 
 // --- WASM color-math bridge -------------------------------------------------
-// GenerativePalette's perceptual color math lives in the C++ engine (exported
-// via the PaletteOps embind class). Rather than re-implement it here -- which
-// silently drifted when the engine moved key authoring from HSV to OKLCH -- the
-// tool injects the engine's bakeLut through setPaletteOps and this module calls
-// it for the exact colors. The JS side keeps only the deterministic profile
-// randomization (its own stable PRNG), which the engine's global-RNG draws
-// cannot reproduce anyway.
+// GenerativePalette's perceptual color math lives in the C++ engine (PaletteOps
+// embind class). Rather than re-implement it here, the tool injects the engine's
+// bakeLut through setPaletteOps and this module calls it for the exact colors.
+// The JS side keeps only the deterministic profile randomization (its own stable
+// PRNG), which the engine's global-RNG draws cannot reproduce anyway.
 let bakeLut = null;
 
 /**
@@ -76,12 +68,11 @@ export class ProceduralPalette {
   get(t) {
     const PI2 = TWO_PI;
 
-    // Cosine formula yields sRGB; clamp each channel to [0, 1].
+    // Cosine formula yields sRGB; clamp to [0, 1].
     const r = Math.max(0, Math.min(1, this.a[0] + this.b[0] * Math.cos(PI2 * (this.c[0] * t + this.d[0]))));
     const g = Math.max(0, Math.min(1, this.a[1] + this.b[1] * Math.cos(PI2 * (this.c[1] * t + this.d[1]))));
     const b = Math.max(0, Math.min(1, this.a[2] + this.b[2] * Math.cos(PI2 * (this.c[2] * t + this.d[2]))));
 
-    // Linearize so callers see the same values as the C++ pipeline and GenerativePalette.
     return [srgbToLinearFloat(r), srgbToLinearFloat(g), srgbToLinearFloat(b)];
   }
 
@@ -206,13 +197,13 @@ export class GenerativePalette {
     this.gradientShape = gradientShape;
     this.harmonyType = harmonyType;
 
-    // Use a stable deterministic PRNG seed based on the profile strings so that
-    // scrubbing the Hue doesn't scramble the randomized saturation/brightness structure.
+    // Seed the PRNG from the profile strings so scrubbing the hue doesn't
+    // scramble the randomized saturation/brightness structure.
     const hashStr = gradientShape + harmonyType + brightnessProfile + satProfile;
     let stableSeed = 0;
     for (let i = 0; i < hashStr.length; i++) {
       stableSeed = ((stableSeed << 5) - stableSeed) + hashStr.charCodeAt(i);
-      stableSeed |= 0; // Convert to 32bit integer
+      stableSeed |= 0;
     }
     this.prng = new PRNG(Math.abs(stableSeed) || 1337);
 
@@ -263,7 +254,6 @@ export class GenerativePalette {
         break;
     }
 
-    // Resolve the gradient shape to the engine's enum int.
     const shapeIndex = GRADIENT_SHAPE_INDEX[this.gradientShape];
     if (shapeIndex === undefined) {
       throw new Error(`unknown GradientShape "${this.gradientShape}"`);
@@ -273,10 +263,9 @@ export class GenerativePalette {
         'PaletteOps bridge not initialized: call setPaletteOps() with the WASM ' +
         'PaletteOps.bakeLut before constructing a GenerativePalette.');
     }
-    // Single source of truth: ask the engine for the exact 256-entry sRGB LUT
-    // (it owns the OKLCH key authoring + gradient evaluation). Copy out of the
-    // WASM memory view immediately -- it aliases the module's buffer and is
-    // invalidated by the next bake.
+    // Ask the engine for the exact 256-entry sRGB LUT. Copy out of the WASM
+    // memory view immediately — it aliases the module's buffer and the next
+    // bake invalidates it.
     this.lut = Uint8Array.from(
       bakeLut(shapeIndex, h1, s1, v1, h2, s2, v2, h3, s3, v3));
   }
@@ -320,10 +309,8 @@ export class GenerativePalette {
         break;
       }
       default:
-        // Reject an unrecognized harmony rather than silently rendering it as
-        // analogous: the export path (generativePaletteCpp) already throws on an
-        // unknown token, so the preview must agree or the two disagree on
-        // validation — a bad harmony would preview fine yet fail to export.
+        // Reject an unknown harmony so the preview agrees with the export path
+        // (generativePaletteCpp), which also throws on an unknown token.
         throw new Error(`PaletteMath.calcHues: unknown harmonyType "${harmonyType}" ` +
           `(expected one of ${[...HARMONY_TYPES].join(', ')})`);
     }
@@ -384,8 +371,7 @@ export class GenerativePalette {
  * @returns {number} The remapped value.
  */
 export function mapValue(value, fromMin, fromMax, toMin, toMax) {
-  // A collapsed source range has no meaningful mapping and would divide by zero
-  // (NaN / ±Infinity colors). Map the degenerate range to the target floor.
+  // A collapsed source range would divide by zero; map it to the target floor.
   if (fromMax === fromMin) return toMin;
   return (value - fromMin) * (toMax - toMin) / (fromMax - fromMin) + toMin;
 }
@@ -399,10 +385,7 @@ export function mapValue(value, fromMin, fromMax, toMin, toMax) {
  * @returns {string} The C++ ProceduralPalette initializer source.
  */
 export function proceduralPaletteCpp(parameters) {
-  // Shared C++ float formatter at 3-digit precision (the cosine coefficients are
-  // small magnitudes). Unlike the former bespoke `n.toFixed(3) + 'f'`, this
-  // trims trailing zeros (0.5 -> "0.5f", not "0.500f") and is scientific-
-  // notation-safe, matching the other tool generators.
+  // 3-digit precision: the cosine coefficients are small magnitudes.
   const f = (n) => formatFloatCpp(n, 3);
   const v = (r, g, b) => `{${f(r)}, ${f(g)}, ${f(b)}}`;
   return `ProceduralPalette palette(${v(parameters.A_R, parameters.A_G, parameters.A_B)},  // A
@@ -412,9 +395,8 @@ export function proceduralPaletteCpp(parameters) {
 }
 
 // The four GenerativePalette enum sets, mirrored from core/color.h. A token
-// outside these sets pastes a nonexistent enumerator (e.g. GradientShape::FOO)
-// straight into the emitted C++, which only fails at engine compile time — so
-// generativePaletteCpp rejects it at the source instead.
+// outside these sets would paste a nonexistent enumerator into the emitted C++,
+// so generativePaletteCpp rejects it at the source.
 export const GRADIENT_SHAPES = new Set(['STRAIGHT', 'CIRCULAR', 'VIGNETTE', 'FALLOFF']);
 export const HARMONY_TYPES = new Set(['TRIADIC', 'SPLIT_COMPLEMENTARY', 'COMPLEMENTARY', 'ANALOGOUS']);
 export const BRIGHTNESS_PROFILES = new Set(['ASCENDING', 'DESCENDING', 'FLAT', 'BELL', 'CUP']);
