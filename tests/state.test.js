@@ -3,9 +3,8 @@ import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { AppState, URLSync, getActiveURLSync } from '../state.js';
 
-// Restore the host window after each test so the stub never leaks. Dispose the
-// active URLSync first: a tracked-key change arms a 200 ms debounced _flush(),
-// which would otherwise fire into a deleted window after teardown.
+// Dispose the active URLSync before restoring window: a debounced _flush() would
+// otherwise fire into a deleted window after teardown.
 const _savedWindow = globalThis.window;
 afterEach(() => {
   const sync = getActiveURLSync();
@@ -27,7 +26,7 @@ test('AppState.set notifies with (key, new, old) and skips no-op writes', () => 
   const events = [];
   s.subscribe((key, value, old) => events.push([key, value, old]));
 
-  s.set('a', 1);            // same value → no notification
+  s.set('a', 1);            // no-op: same value
   s.set('a', 2);
   assert.deepEqual(events, [['a', 2, 1]]);
 });
@@ -90,8 +89,8 @@ test('URLSync validator rejects an invalid URL value and keeps the default', () 
   installWindow('?effect=Voronoi&res=bogus');
   const s = new AppState({ effect: 'Moire', res: 'low' });
   new URLSync(s, ['effect', 'res'], { res: (v) => v === 'high' || v === 'low' });
-  assert.equal(s.get('effect'), 'Voronoi'); // unvalidated key still seeded
-  assert.equal(s.get('res'), 'low');        // invalid 'bogus' rejected → default kept
+  assert.equal(s.get('effect'), 'Voronoi');
+  assert.equal(s.get('res'), 'low');
 });
 
 test('URLSync validator admits a valid URL value', () => {
@@ -128,15 +127,12 @@ test('URLSync._flush clears the ad-hoc buffer so a tracked key is not permanentl
   const s = new AppState({ resolution: 'low' });
   const sync = new URLSync(s, ['resolution']);
 
-  // The GUI writes a tracked key as an ad-hoc param (mirrors the DeepLinkGUI URL
-  // writer for the Resolution control).
+  // The GUI can write a tracked key as an ad-hoc param.
   sync.setParam('resolution', 'high');
   sync._flush();
   let params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
   assert.equal(params.get('resolution'), 'high');
 
-  // A later programmatic state change must win at the next flush: _flush clears
-  // the ad-hoc buffer so the stale 'high' can't be re-applied over it.
   s.set('resolution', 'medium');
   sync._flush();
   params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);

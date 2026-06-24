@@ -78,7 +78,6 @@ test('native-resolution capture pins the offscreen to the source size at start',
     assert.equal(off.width, 202);
     assert.equal(off.height, 102);
 
-    // A mid-recording source resize must NOT change the pinned buffer.
     source.width = 640;
     source.height = 480;
     const off2 = rec._ensurePinnedOffscreen();
@@ -109,7 +108,6 @@ test('targetHeight capture scales the offscreen to the target height and pins it
     assert.equal(off.height, 122);
     assert.equal(off.width, 162);
 
-    // A mid-recording source resize must NOT change the pinned buffer.
     source.width = 1920;
     source.height = 1080;
     const off2 = rec._ensureOffscreen();
@@ -161,9 +159,8 @@ const recordableCanvas = (w = 64, h = 32) => ({
 });
 
 /**
- * Minimal MediaRecorder stand-in. start()/stop() flip state synchronously the
- * way the spec does; onstop is fired by the test to model the async callback,
- * which is exactly the window the stop->start race lives in.
+ * Minimal MediaRecorder stand-in. start()/stop() flip state synchronously like
+ * the spec; the test fires onstop manually to model the async stop->start window.
  */
 class FakeMediaRecorder {
   static instances = [];
@@ -177,7 +174,7 @@ class FakeMediaRecorder {
     FakeMediaRecorder.instances.push(this);
   }
   start() { this.state = 'recording'; }
-  stop() { this.state = 'inactive'; } // onstop is invoked manually by the test
+  stop() { this.state = 'inactive'; }
 }
 
 /**
@@ -212,10 +209,10 @@ test('toggle starts then stops, reporting the true state each time', () => {
   try {
     const rec = new VideoRecorder(recordableCanvas());
     rec._download = () => {};
-    assert.equal(rec.toggle('e'), true);   // idle → recording
+    assert.equal(rec.toggle('e'), true);
     assert.equal(rec.isRecording, true);
-    assert.equal(rec.toggle('e'), false);  // recording → stopped
-    rec.mediaRecorder.onstop();            // fire the async teardown
+    assert.equal(rec.toggle('e'), false);
+    rec.mediaRecorder.onstop();
     assert.equal(rec.isRecording, false);
   } finally {
     restore();
@@ -229,7 +226,7 @@ test('start refuses and stays idle when recording is unsupported', () => {
   const prevErr = console.error;
   console.error = (...a) => errs.push(a.join(' '));
   try {
-    delete globalThis.MediaRecorder; // isSupported() now false
+    delete globalThis.MediaRecorder;
     const rec = new VideoRecorder(recordableCanvas());
     rec.start('e');
     assert.equal(rec.mediaRecorder, null);
@@ -259,7 +256,6 @@ test('a stopped session downloads its own chunks and clears instance state', () 
     assert.equal(downloads.length, 1);
     assert.equal(downloads[0].name, 'solo');
     assert.deepEqual(downloads[0].chunks, [{ size: 10 }]);
-    // It was still the active session, so cleanup ran.
     assert.equal(rec.mediaRecorder, null);
     assert.equal(stream.track.stopped, true);
   } finally {
@@ -277,9 +273,7 @@ test('a session retains only non-empty chunks', () => {
 
     rec.start('e');
     const recorder = rec.mediaRecorder;
-    // MediaRecorder can emit zero-byte dataavailable events (e.g. a flush with
-    // nothing buffered); those must be filtered so the saved file has no empty
-    // fragments, while the real chunk between them is kept.
+    // MediaRecorder can emit zero-byte dataavailable events (a flush with nothing buffered).
     recorder.ondataavailable({ data: { size: 0 } });
     recorder.ondataavailable({ data: { size: 42 } });
     recorder.ondataavailable({ data: { size: 0 } });
@@ -306,29 +300,25 @@ test('a stale onstop does not clobber the session that replaced it', () => {
     const downloads = [];
     rec._download = (recorder, chunks, name) => downloads.push({ recorder, chunks, name });
 
-    // Session A: capture a chunk, then stop (state flips, onstop deferred).
     rec.start('first');
     const recorderA = rec.mediaRecorder;
     const streamA = rec.stream;
     recorderA.ondataavailable({ data: { size: 10 } });
     rec.stop();
 
-    // Session B installed before A's onstop runs.
+    // Session B installed before A's deferred onstop runs.
     rec.start('second');
     const recorderB = rec.mediaRecorder;
     assert.notEqual(recorderB, recorderA);
     recorderB.ondataavailable({ data: { size: 20 } });
 
-    // Now the stale handler from A finally fires.
     recorderA.onstop();
 
-    // It downloaded A's chunk under A's name — not B's.
     assert.equal(downloads.length, 1);
     assert.equal(downloads[0].name, 'first');
     assert.deepEqual(downloads[0].chunks, [{ size: 10 }]);
-    assert.equal(streamA.track.stopped, true); // A owns its stream, stops it
+    assert.equal(streamA.track.stopped, true);
 
-    // The active session B survived the stale teardown untouched.
     assert.equal(rec.mediaRecorder, recorderB);
     assert.deepEqual(rec.chunks, [{ size: 20 }]);
     assert.equal(rec.stream.track.stopped, false);
@@ -347,12 +337,11 @@ test('captureFrame warns once when the browser lacks requestFrame', () => {
     const rec = new VideoRecorder(recordableCanvas());
     rec._download = () => {};
     rec.start('e');
-    // Drop the manual-frame API the fake track normally provides.
     delete rec.track.requestFrame;
     rec.captureFrame();
     rec.captureFrame();
     assert.equal(rec.elapsedSeconds, 0);
-    assert.equal(warns.length, 1);       // warned once, not per frame
+    assert.equal(warns.length, 1);
   } finally {
     console.warn = prevWarn;
     restore();

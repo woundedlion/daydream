@@ -8,7 +8,6 @@
 import { test, mock, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 
-// Mutable stand-in for the driver module's Daydream/ SLOW_FRAME_MS exports.
 const Daydream = { W: 0, H: 0, pixels: null };
 mock.module('../driver.js', {
   namedExports: { Daydream, SLOW_FRAME_MS: 50 },
@@ -77,8 +76,6 @@ function makeController({ resolution = 'lo', effect = 'TestEffect',
 
 beforeEach(() => { FakeWorker.instances = []; });
 
-// Save/restore host globals so these module-scope stubs never leak into another
-// suite if the test runner shares a process.
 const _savedGlobals = { Worker: globalThis.Worker, document: globalThis.document };
 const _restoreGlobal = (key, val) => {
   if (val === undefined) delete globalThis[key];
@@ -91,8 +88,7 @@ after(() => {
 
 globalThis.Worker = FakeWorker;
 
-// updateStats() is pure DOM; with getElementById -> null it early-returns,
-// keeping the tick() state-machine tests DOM-free.
+// getElementById -> null makes updateStats() early-return, keeping tick() tests DOM-free.
 globalThis.document = { getElementById: () => null };
 
 /**
@@ -159,7 +155,7 @@ function deliverFrame(controller, segId, overrides = {}) {
     data: {
       type: 'frame', segId,
       // Must be the Uint16Array view, not a bare ArrayBuffer: composite() indexes
-      // pixels element-wise (a buffer would index to undefined->0).
+      // pixels element-wise.
       pixels: px,
       x0: overrides.x0 ?? 0, x1: overrides.x1 ?? quadW,
       y0: overrides.y0 ?? 0, y1: overrides.y1 ?? quadH,
@@ -197,8 +193,6 @@ test('frames delivered out of order within a generation land in their own slots'
   const done = c.renderParallel();
   assert.equal(c.pending, 2);
 
-  // The handler keys on msg.segId, so out-of-order arrival must still file each
-  // frame in its own slot.
   deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2 });
   assert.ok(c.results[1], 'seg-1 frame stored despite arriving first');
   assert.equal(c.results[1].x1, 4);
@@ -217,17 +211,17 @@ test('a frame dispatched before a resolution change is dropped but still settles
   c.create(2);
   const done = c.renderParallel();
 
-  c.setResolution(8, 8); // bumps renderGen, clears results
+  c.setResolution(8, 8);
   assert.notEqual(c.inflightGen, c.renderGen);
 
-  deliverFrame(c, 0); // stale generation
+  deliverFrame(c, 0);
   assert.equal(c.results[0], null, 'stale-generation result is discarded');
   assert.equal(c.pending, 1, 'but pending still decremented');
 
   deliverFrame(c, 1);
   assert.equal(c.results[1], null);
   assert.equal(c.pending, 0);
-  await done; // resolves even though every result was dropped
+  await done;
 });
 
 // ---------------------------------------------------------------------------
@@ -256,8 +250,7 @@ test('a worker onmessageerror latches the fault the same way onerror does', asyn
   c.renderInFlight = true;
   const done = c.renderParallel();
 
-  // A payload that fails structured-clone deserialization fires onmessageerror,
-  // never onerror; it must break the deadlock the same way.
+  // A failed structured-clone deserialization fires onmessageerror, not onerror.
   c.workers[1].onmessageerror({ type: 'messageerror' });
 
   assert.equal(c.faulted, true);
@@ -278,7 +271,6 @@ test('a surviving worker responding after a fault does not drive pending negativ
   assert.equal(c.pending, 0);
   await done;
 
-  // A surviving worker reporting late must not decrement the already-zeroed counter.
   deliverFrame(c, 1);
   assert.equal(c.pending, 0, 'post-fault frame leaves pending at 0, not negative');
   assert.equal(c.results[1], null, 'no result is recorded for the halted pool');
@@ -293,15 +285,13 @@ test('only the first fault of a session is recorded', () => {
 });
 
 test('the boot watchdog faults fast when a worker never sends booted', () => {
-  // When the worker module fails to load no 'booted' arrives. Capture the
-  // scheduled timers (boot watchdog is armed first) and fire the boot one by hand.
   const realSetTimeout = globalThis.setTimeout;
   const timers = [];
   globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
   try {
     const c = makeController();
     c.create(2);
-    timers[0](); // boot watchdog callback
+    timers[0](); // boot watchdog is armed first
     assert.equal(c.faulted, true);
     assert.match(c.faultInfo.message, /module load timed out/);
     assert.match(c.faultInfo.message, /0\/2 booted/);
@@ -366,14 +356,13 @@ test('composite() blits each quadrant to its display-buffer offset', () => {
 
   const c = makeController();
   c.showBoundaries = false;
-  const quad = new Uint16Array(2 * 2 * 3).fill(111); // right-half quadrant x[2,4) y[0,2)
+  const quad = new Uint16Array(2 * 2 * 3).fill(111);
   c.results = [{ pixels: quad, x0: 2, x1: 4, y0: 0, y1: 2, quadW: 2, quadH: 2 }];
 
   c.composite();
 
   assert.equal(Daydream.pixels[idx(2, 0, 4)], 111);
   assert.equal(Daydream.pixels[idx(3, 1, 4)], 111);
-  // Untouched left half stays cleared.
   assert.equal(Daydream.pixels[idx(0, 0, 4)], 0);
   assert.equal(Daydream.pixels[idx(1, 1, 4)], 0);
 });
@@ -385,9 +374,7 @@ test('composite() throws on a rectangle that overflows the current display buffe
   const c = makeController();
   c.showBoundaries = false;
   const quad = new Uint16Array(2 * 2 * 3).fill(222);
-  // x1 = 99 overshoots W=4: composite() must fail loudly rather than silently
-  // skip the segment (which would paint a stale/garbage band with no diagnostic).
-  c.results = [{ pixels: quad, x0: 0, x1: 99, y0: 0, y1: 2, quadW: 2, quadH: 2 }];
+  c.results = [{ pixels: quad, x0: 0, x1: 99, y0: 0, y1: 2, quadW: 2, quadH: 2 }]; // x1=99 overshoots W=4
 
   assert.throws(() => c.composite(), /out of bounds/);
   assert.ok(Daydream.pixels.every((v) => v === 0),
@@ -395,9 +382,8 @@ test('composite() throws on a rectangle that overflows the current display buffe
 });
 
 test('composite() marks both the internal split and the x=0 wrap seam', () => {
-  // 2-arm layout over W=4: arm 0 = x[0,2), arm 1 = x[2,4). On the wrapped
-  // cylinder there are two vertical arm boundaries — the internal split at
-  // x=2 and the wrap seam at x=0 (where arm 1 meets arm 0). Both must be cyan.
+  // On the wrapped cylinder a 2-arm split has two boundaries: the internal split
+  // at x=2 and the wrap seam at x=0 where arm 1 meets arm 0.
   Daydream.W = 4; Daydream.H = 2;
   Daydream.pixels = new Uint16Array(4 * 2 * 3);
 
@@ -424,8 +410,8 @@ test('composite() marks both the internal split and the x=0 wrap seam', () => {
 });
 
 test('composite() draws no x=0 line when the layout is not split in x', () => {
-  // A single full-width segment spanning x[0,4): x does not split, so x=0 is a
-  // same-segment wrap, not a boundary — no spurious cyan line down the edge.
+  // A single full-width segment never splits in x, so x=0 is a same-segment wrap,
+  // not a boundary.
   Daydream.W = 4; Daydream.H = 2;
   Daydream.pixels = new Uint16Array(4 * 2 * 3);
 
@@ -451,10 +437,7 @@ test('composite() throws if the display-buffer alias is broken', () => {
 });
 
 // ---------------------------------------------------------------------------
-// tick() — the one-frame-deep render-loop state machine. Each tick (a) composites
-// the previous frame when one is pending, and (b) dispatches the next parallel
-// render unless one is already in flight. Tests walk a full pipeline cycle plus
-// the two guard states (not-ready, faulted).
+// tick() — the one-frame-deep render-loop state machine
 // ---------------------------------------------------------------------------
 
 test('tick() is a no-op until every worker has signalled ready', () => {
@@ -487,10 +470,10 @@ test('the first tick() once ready dispatches a parallel render', () => {
 
 test('a completed render arms pendingFrame and frees the in-flight slot', async () => {
   const c = readyController(2);
-  c.tick();                       // dispatch frame N
+  c.tick();
 
   deliverFrame(c, 0);
-  deliverFrame(c, 1);             // last response settles the promise
+  deliverFrame(c, 1);
   await flush();
 
   assert.equal(c.pending, 0);
@@ -504,7 +487,7 @@ test('the next tick() composites the armed frame and dispatches the following on
 
   const c = readyController(2);
   c.showBoundaries = false;
-  c.tick();                       // dispatch frame N
+  c.tick();
 
   const quad = () => new Uint16Array(2 * 2 * 3).fill(111);
   deliverFrame(c, 0, { pixels: quad(), x0: 0, x1: 2, y0: 0, y1: 2 });
@@ -512,7 +495,7 @@ test('the next tick() composites the armed frame and dispatches the following on
   await flush();
   assert.equal(c.pendingFrame, true);
 
-  c.tick();                       // composite N, then dispatch N+1
+  c.tick();
 
   assert.equal(c.pendingFrame, false, 'pending frame was composited and cleared');
   assert.ok(Daydream.pixels.some((v) => v === 111),
@@ -523,7 +506,7 @@ test('the next tick() composites the armed frame and dispatches the following on
 
 test('a faulted pool keeps tick() from dispatching another doomed render', () => {
   const c = readyController(2);
-  c.tick();                       // frame in flight, pending = 2
+  c.tick();
 
   c.workers[0].onerror({ message: 'boom', filename: 'w.js', lineno: 1, colno: 1 });
   assert.equal(c.faulted, true);
@@ -538,9 +521,8 @@ test('a faulted pool keeps tick() from dispatching another doomed render', () =>
 });
 
 test('an init-phase fault still reaches the fault overlay (faulted checked before ready guard)', () => {
-  // A worker that traps during startup latches `faulted` but never sends
-  // 'ready', so `ready` stays false forever. A ready-first guard would return
-  // at the top of every tick() and the fault overlay would never paint.
+  // A startup trap latches `faulted` but never sends 'ready'; a ready-first guard
+  // would return before the fault overlay ever painted.
   const c = makeController();
   c.create(2);
   assert.equal(c.ready, false);
@@ -557,11 +539,7 @@ test('an init-phase fault still reaches the fault overlay (faulted checked befor
 });
 
 // ---------------------------------------------------------------------------
-// Broadcast paths — setEffect / setParameter / setAnimationsPaused carry the
-// main thread's intent to every worker; _snapshotParams() flattens the engine's
-// tuned values for transport. setEffect must ship that snapshot in the SAME
-// message so the worker re-applies it AFTER its rebuild-to-defaults; a dropped or
-// reordered replay would diverge from the main thread.
+// Broadcast paths — setEffect / setParameter / setAnimationsPaused / _snapshotParams
 // ---------------------------------------------------------------------------
 
 /**
@@ -607,7 +585,6 @@ test('setEffect broadcasts the name plus the tuned param snapshot to every worke
     const msgs = w.posted.filter((m) => m.type === 'setEffect');
     assert.equal(msgs.length, 1, 'each worker received exactly one setEffect');
     assert.equal(msgs[0].name, 'NewEffect');
-    // The snapshot rides in the same message so rebuild and re-apply can't reorder.
     assert.deepEqual(msgs[0].params, [
       { name: 'Speed', value: 0.5 },
       { name: 'Glow', value: 1.0 },
