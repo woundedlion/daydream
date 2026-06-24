@@ -32,8 +32,6 @@ const TWO_PI = 2 * Math.PI;
  * @returns {THREE.Spherical} `out`, set to the spherical coordinates (radius 1).
  */
 export const pixelToSpherical = (x, y, out = new THREE.Spherical()) => {
-  // Guard the H === 1 single-row canvas: dividing by H - 1 would be a
-  // divide-by-zero → NaN latitude. Not reachable from the shipped presets.
   out.set(1, (y * Math.PI) / Math.max(1, Daydream.H - 1), Math.PI / 2 - (x * TWO_PI) / Daydream.W);
   return out;
 };

@@ -10,7 +10,6 @@ import { pixelToSpherical } from "./geometry.js";
 import { isViewLive } from "./pixel_view.js";
 import { prettify } from "./label_format.js";
 
-// Re-exported from label_format.js for import stability.
 export { prettify } from "./label_format.js";
 
 /**
@@ -61,7 +60,6 @@ class LabelPool {
     labelObj.position.copy(position).multiplyScalar(Daydream.SPHERE_RADIUS);
     labelObj.visible = true;
 
-    // textContent (not innerHTML) so a label string can't inject markup.
     if (labelObj.element.textContent !== content) {
       labelObj.element.textContent = content;
     }
@@ -107,21 +105,15 @@ export class Daydream {
   static CAMERA_Z = 220;
 
   static SPHERE_RADIUS = 30;
-  // Label-visibility threshold, compared at the use site against cos(angle)
-  // between a label's unit direction and the camera direction. Despite the name
-  // this is a framing ratio (sphere radius over canonical camera distance), not a
-  // true cosine; it equals the intended angular cutoff only at CAMERA_Z. The use
-  // site rescales it by the live distance so the visible set doesn't drift with
-  // orbit distance.
+  // A framing ratio, not a true cosine: the use site rescales it by the live
+  // camera distance so the visible label set doesn't drift with orbit distance.
   static LABEL_VISIBILITY_COS = Daydream.SPHERE_RADIUS / Daydream.CAMERA_Z;
   static H = 20;
   static W = 96;
   static PIXEL_WIDTH = 2 * Math.PI / Daydream.W;
   static FPS = 16;
-  // Spiral-of-death guard for the fixed-timestep clock: after a stall (tab
-  // backgrounded, GC pause, breakpoint) accumulated real time is clamped to this
-  // many seconds, so the sim catches up by at most a few frames per tick instead
-  // of replaying the whole backlog at once. 0.25 s is ~4 frames at FPS.
+  // Clamp accumulated real time after a stall so the sim catches up by at most a
+  // few frames per tick rather than replaying the whole backlog (spiral of death).
   static MAX_FRAME_CATCHUP_SECONDS = 0.25;
   static DOT_SIZE = 2;
   static DOT_COLOR = 0x0000ff;
@@ -145,10 +137,6 @@ export class Daydream {
     THREE.ColorManagement.enabled = true;
     this.canvas = document.querySelector("#canvas");
 
-    // The driver mounts its label layer, context-loss overlay, and resize
-    // observer on the canvas's container. A missing or parentless #canvas can't
-    // be driven, so fail with a named diagnostic instead of an opaque
-    // "Cannot read properties of null" deep in setup.
     this.canvasParent = this.canvas?.parentElement;
     if (!this.canvasParent) {
       throw new Error(this.canvas
@@ -162,14 +150,10 @@ export class Daydream {
       alpha: Daydream.SCENE_ALPHA,
     });
 
-    // Cap pixel ratio at 1: high-DPI rendering costs GPU work without improving
-    // the dot-grid aesthetic.
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
 
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-    // Replace a lost GPU context's silent blank-canvas with a logged reason +
-    // reload prompt, and halt rendering while it is lost.
     this._setupContextLossHandling();
 
     this.labelRenderer = new CSS2DRenderer();
@@ -178,9 +162,7 @@ export class Daydream {
 
     this.camera = new THREE.PerspectiveCamera(
       Daydream.CAMERA_FOV,
-      // Fall back to a square aspect when the canvas has no size yet (0/0 = NaN)
-      // so the constructor-time projection is finite; setCanvasSize() replaces
-      // it with the real container aspect once laid out.
+      // Square fallback when the canvas has no size yet (0/0 = NaN).
       this.canvas.width / this.canvas.height || 1,
       Daydream.CAMERA_NEAR,
       Daydream.CAMERA_FAR
@@ -195,10 +177,8 @@ export class Daydream {
       Daydream.CAMERA_Z
     );
 
-    // On-demand rendering: repaint only when something visible changes. A camera
-    // change (drag/zoom/pan, damping settle) emits 'change' and marks the frame
-    // dirty, so an idle scene does no GPU work between sim ticks. Starts dirty so
-    // the first frame always paints.
+    // On-demand rendering: a camera 'change' marks the frame dirty so an idle
+    // scene does no GPU work. Starts dirty so the first frame always paints.
     this._needsRender = true;
     this.controls.addEventListener('change', () => { this._needsRender = true; });
 
@@ -214,18 +194,15 @@ export class Daydream {
 
     this.resources = [];
     this.labelPool = new LabelPool(this.scene);
-    this._hadLabels = false; // Tracks the previous frame's label count for the N->0 hide.
+    this._hadLabels = false;
 
     this.setupDots();
 
-    // No linewidth: the WebGL renderer ignores LineBasicMaterial.linewidth
-    // (always 1px), so setting it would be dead config.
     this.axisMaterial = new THREE.LineBasicMaterial({
       color: 0xffffff
     });
 
-    // Diametric axis lines at 0.95 of the sphere radius; hidden until the
-    // axis-label toggle turns them on.
+    // Diametric axis lines at 0.95 of the sphere radius, hidden until toggled on.
     let xAxisGeometry = new THREE.BufferGeometry().setFromPoints([
       Daydream.X_AXIS.clone().negate().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95),
       Daydream.X_AXIS.clone().multiplyScalar(Daydream.SPHERE_RADIUS).multiplyScalar(0.95)
@@ -265,13 +242,11 @@ export class Daydream {
     this.timeAccumulator = 0;
     this.labelAxes = false;
     this.cullBackSphere = false;
-    // Seam overlap for the persist-effect column gap-fill (see
-    // _updateCullUniforms): how far neighbouring pills overshoot the cell boundary
-    // so their straight bodies overlap. 1.0 = exact meet; higher closes any
-    // hairline seam at the cost of longer terminal caps.
+    // Persist column gap-fill overlap (see _updateCullUniforms): 1.0 = pills meet
+    // exactly; higher closes any hairline seam at the cost of longer terminal caps.
     this.columnFillOverlap = 1.15;
 
-    this._statsGroup = null; // DOM stats elements cached on first _updateStats().
+    this._statsGroup = null;
 
     this.precomputeMatrices();
   }
@@ -291,7 +266,6 @@ export class Daydream {
   _setupContextLossHandling() {
     this._contextLost = false;
 
-    // Reuse the engine-load error overlay styling (.loading-overlay.error).
     const overlay = document.createElement("div");
     overlay.className = "loading-overlay error context-lost-overlay";
     overlay.style.display = "none";
@@ -309,9 +283,7 @@ export class Daydream {
     this._contextLostOverlay = overlay;
 
     this._onContextLost = (e) => {
-      // preventDefault signals we intend to handle a restore (spec-standard, even
-      // though exit_on_context_lost usually precludes one here).
-      e.preventDefault();
+      e.preventDefault(); // signal intent to handle a restore
       this._contextLost = true;
       const reason = e.statusMessage || "no reason reported";
       console.error(`[daydream] WebGL context lost: ${reason}`);
@@ -354,10 +326,8 @@ export class Daydream {
     const container = this.canvasParent;
     const width = container.clientWidth;
     const height = container.clientHeight;
-    // A 0×0 container (before first layout, or a display:none ancestor) makes
-    // aspect = 0/0 = NaN, poisoning the camera projection matrix. Skip; the
-    // ResizeObserver re-invokes with real dimensions once laid out, and the
-    // camera keeps its finite constructor-time projection meanwhile.
+    // Skip a 0×0 container: aspect = 0/0 = NaN would poison the projection matrix.
+    // The ResizeObserver re-invokes once laid out.
     if (width <= 0 || height <= 0) return;
     this.isMobile = width <= 900;
     this.mainViewport.x = 0;
@@ -382,17 +352,12 @@ export class Daydream {
     const fovRad = THREE.MathUtils.degToRad(Daydream.CAMERA_FOV / 2);
     const distForHeight = diameter / (2 * Math.tan(fovRad) * targetCoverage);
     const distForWidth = distForHeight / this.camera.aspect;
-    // Re-fit the camera distance along its current view direction. The orbit
-    // target is the origin, so the position vector's length is the orbit radius;
-    // setLength rescales only that radius, leaving azimuth/polar intact so an
-    // orbited camera doesn't teleport.
+    // setLength rescales only the orbit radius, leaving azimuth/polar intact.
     this.camera.position.setLength(Math.max(distForHeight, distForWidth));
 
     this.renderer.setSize(width, height);
     this.labelRenderer.setSize(width, height);
 
-    // A resize changes viewport/framing without moving the camera or advancing
-    // the sim, so request a repaint.
     this._needsRender = true;
   }
 
@@ -415,26 +380,16 @@ export class Daydream {
    * @param {Object} effect - Active effect; its drawFrame()/getLabels()/getArenaMetrics() drive the painted frame.
    */
   render(effect) {
-    // A lost WebGL context rejects all GL calls, so skip rendering until restored;
-    // the animation loop keeps firing, this just makes each tick a no-op.
     if (this._contextLost) return;
 
-    // The fixed-timestep clock gates only the simulation; rendering is on-demand.
-    // _advanceFrameClock() runs every frame to drain the accumulator but only
-    // steps the sim when an interval has accrued.
     const advanced = this._advanceFrameClock() && this._stepSimulation(effect);
 
-    // controls.update() must run every frame for damping/auto-rotate; it emits
-    // 'change' (→ _needsRender) when it moves the camera.
+    // Must run every frame for damping/auto-rotate; emits 'change' (→ _needsRender).
     this.controls.update();
 
-    // Repaint only when something visible changed (sim stepped, camera moved, or
-    // invalidate()); otherwise skip all GPU work.
     if (!advanced && !this._needsRender) return;
     this._needsRender = false;
 
-    // Track the axis toggle every painted frame (not only on a sim step) so it
-    // updates even while paused.
     this.xAxis.visible = this.labelAxes;
     this.yAxis.visible = this.labelAxes;
     this.zAxis.visible = this.labelAxes;
@@ -444,20 +399,15 @@ export class Daydream {
     this.renderer.setScissorTest(true);
     this._renderMainView();
 
-    // Capture a video frame only when the sim actually advanced, so pausing
-    // freezes the recording instead of padding it with duplicates. In segmented
-    // mode the composite lands a frame late, so also require captureReady, else
-    // the recording opens with the cleared black frames driver.render() left.
+    // Capture only when the sim advanced. In segmented mode the composite lands a
+    // frame late, so captureReady() gates out the leading cleared black frames.
     if (this.recorder && advanced &&
         (typeof effect.captureReady !== 'function' || effect.captureReady()))
       this.recorder.captureFrame();
 
-    // Rebuild labels every rendered frame, not just on a sim step, so a paused
-    // frame still tracks camera orbits and clears labels when toggled off.
     this._refreshLabels(effect);
-    // CSS2DRenderer only shows/hides label <div>s during a render pass, so render
-    // one extra frame when the count falls to zero to let that pass hide the
-    // previous frame's labels, then settle into skipping.
+    // CSS2DRenderer hides label <div>s only during a render pass, so render one
+    // extra frame when the count falls to zero to let that pass hide them.
     const hasLabels = this.labelPool.activeCount > 0;
     if (hasLabels || this._hadLabels) {
       this.labelRenderer.render(this.scene, this.camera);
@@ -496,10 +446,8 @@ export class Daydream {
 
     if (this.stepFrames !== 0) this.stepFrames--;
 
-    // Detach-aware guard: this runs before refreshPixelView heals a view detached
-    // by WASM heap growth. A detached Uint16Array is still truthy but fill() on it
-    // throws TypeError, freezing the app; isViewLive's byteLength check skips it
-    // until the next drawFrame heals.
+    // A WASM-detached Uint16Array is still truthy but fill() on it throws, so skip
+    // it (isViewLive checks byteLength); the next drawFrame heals the view.
     if (isViewLive(Daydream.pixels))
       Daydream.pixels.fill(0);
 
@@ -544,9 +492,8 @@ export class Daydream {
       labels.push(...effect.getLabels());
     }
 
-    // label.position is a unit direction, so label·cameraPos == |cameraPos|·cos(angle).
-    // Scaling the fixed cosine cutoff by the live camera distance keeps the
-    // visible set independent of zoom.
+    // position is a unit direction, so position·cameraPos == |cameraPos|·cos(angle);
+    // scaling the cutoff by the live distance keeps the visible set zoom-independent.
     const facingThreshold =
       Daydream.LABEL_VISIBILITY_COS * this.camera.position.length();
     for (const label of labels) {
@@ -568,12 +515,8 @@ export class Daydream {
       this.cullUniforms.uCullThreshold.value = this.cullBackSphere
         ? -Daydream.DOT_SIZE / Daydream.SPHERE_RADIUS
         : -2.0;
-      // Column gap-fill for persist (strobe == false) effects. uColumnFillArc
-      // carries the equator half-arc (PI*R/W); the shader scales it by sin(phi)
-      // and extends each dot's straight middle out to the cell boundary (a pill)
-      // so a lit run tiles flush and only the terminal caps round. columnFillOverlap
-      // overshoots slightly so neighbouring bodies overlap (no seam). Strobe and
-      // the pre-effect default leave it 0 so dots stay round.
+      // Persist effects pass the equator half-arc (PI*R/W) so the shader fills the
+      // inter-column gaps; strobe and the pre-effect default pass 0 (round dots).
       this.cullUniforms.uColumnFillArc.value = this._strobeColumns === false
         ? this.columnFillOverlap * Math.PI * Daydream.SPHERE_RADIUS / Daydream.W
         : 0;
@@ -650,9 +593,8 @@ export class Daydream {
     if (this.dotMesh) {
       this.scene.remove(this.dotMesh);
       this.dotMesh.geometry.dispose();
-      // instanceColor.array may alias WASM linear memory (refreshPixelView rebinds
-      // it to getPixels()'s zero-copy view). Detach before dispose() so Three.js's
-      // teardown can't read/re-upload a buffer the engine is about to free.
+      // instanceColor.array may alias WASM memory; detach before dispose() so
+      // Three.js can't read/re-upload a buffer the engine is about to free.
       if (this.dotMesh.instanceColor) this.dotMesh.instanceColor.array = null;
       this.dotMesh.dispose();
     }
@@ -665,10 +607,8 @@ export class Daydream {
         depthWrite: false
       });
 
-      // Uniforms for backface culling + column gap-fill (updated per frame in
-      // _updateCullUniforms()). uColumnFillArc > 0 widens each dot east-west to
-      // fill the inter-column gap for persist (strobe == false) effects; 0 leaves
-      // discrete dots with dark gaps for strobe effects.
+      // Backface-cull + column gap-fill uniforms, updated per frame in
+      // _updateCullUniforms().
       this.cullUniforms = {
         uCameraPos: { value: new THREE.Vector3(0, 0, 1) },
         uCullThreshold: { value: -0.06 },
@@ -721,9 +661,8 @@ export class Daydream {
       };
     }
 
-    // Level-of-detail for the per-dot sphere: segment count decays exponentially
-    // from MAX_DOT_SEGMENTS (scale LOD_DECAY_PIXELS) as pixel count rises, floored
-    // at MIN_DOT_SEGMENTS, so the triangle budget stays bounded.
+    // Per-dot sphere LOD: segment count decays exponentially as pixel count rises
+    // so the triangle budget stays bounded.
     const MAX_DOT_SEGMENTS = 30;
     const LOD_DECAY_PIXELS = 30000;
     const MIN_DOT_SEGMENTS = 3;
@@ -761,7 +700,7 @@ export class Daydream {
   precomputeMatrices() {
     const vector = new THREE.Vector3();
     const dummy = new THREE.Object3D();
-    const sph = new THREE.Spherical(); // reused scratch (out-param, no per-dot alloc)
+    const sph = new THREE.Spherical(); // reused scratch out-param
 
     for (let i = 0; i < Daydream.W * Daydream.H; i++) {
       const x = i % Daydream.W;
@@ -775,8 +714,6 @@ export class Daydream {
       dummy.position.copy(vector);
       dummy.updateMatrix();
 
-      // setMatrixAt copies dummy.matrix into the instance buffer, so the scratch
-      // Object3D can be reused with no per-dot matrix retained.
       if (this.dotMesh) {
         this.dotMesh.setMatrixAt(i, dummy.matrix);
       }
@@ -790,11 +727,8 @@ export class Daydream {
         this.dotMesh.instanceColor.colorSpace = THREE.LinearSRGBColorSpace;
         this.dotMesh.instanceColor.setUsage(THREE.StreamDrawUsage);
       }
-      // Transient alias: instanceColor.array here is a fresh JS-owned Uint16Array,
-      // not WASM pixel memory. Pointing Daydream.pixels at it is short-lived —
-      // applyResolution() nulls wasmMemoryView, so the next refreshPixelView()
-      // re-fetches the WASM view and re-points all three aliases. Nothing should
-      // rely on Daydream.pixels aliasing WASM memory across the rebuild.
+      // A fresh JS-owned buffer, not WASM memory; the next refreshPixelView()
+      // re-fetches the WASM view and re-points all three aliases.
       Daydream.pixels = this.dotMesh.instanceColor.array;
       Daydream.pixels.fill(0);
 
@@ -907,9 +841,7 @@ export class Daydream {
   }
 }
 
-// Module-level scratch for coordsLabel's transient conversions. Safe to reuse:
-// coordsLabel is synchronous and reads both into its return value before
-// yielding, so two calls never overlap.
+// Reused scratch for coordsLabel's transient conversions (synchronous, no overlap).
 const _coordsScratchSph = new THREE.Spherical();
 const _coordsScratchVec = new THREE.Vector3();
 
@@ -921,9 +853,6 @@ const _coordsScratchVec = new THREE.Vector3();
  * @returns {{position: THREE.Vector3, content: string}} Label placement on the sphere surface and its multi-line text.
  */
 export const coordsLabel = (c) => {
-  // Reuse module-level scratch so the per-frame label refresh allocates only the
-  // retained `position` Vector3, avoiding GC churn that would defeat the
-  // pooled-label design.
   const s = _coordsScratchSph.setFromCartesianCoords(c[0], c[1], c[2]);
   const n = _coordsScratchVec.set(c[0], c[1], c[2]).normalize();
   return {

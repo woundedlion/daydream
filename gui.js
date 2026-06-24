@@ -65,7 +65,7 @@ const makeUrlParamWriter = () => {
     pendingUrlWrites.set(key, value);
     clearTimeout(urlTimer);
     urlTimer = setTimeout(() => {
-      const params = getUrlParams(); // read at fire time so we don't clobber
+      const params = getUrlParams();
       for (const [k, v] of pendingUrlWrites) {
         if (v === null || v === undefined) {
           params.delete(k);
@@ -81,8 +81,6 @@ const makeUrlParamWriter = () => {
   };
 };
 
-// Exported so the unit test can build a writer in isolation; production routes
-// every control through its GUI's own writer or the active URLSync.
 export { makeUrlParamWriter };
 
 /**
@@ -103,13 +101,8 @@ class DeepLinkGUI {
     }
     this.parent = null;
     this.folderName = null;
-    // URL param keys this GUI manages a deep-link writer for, plus child
-    // folders, so callers can ask which params belong to this GUI subtree
-    // (e.g. to exclude the global controls from a per-effect resetGUI).
     this._urlKeys = new Set();
     this._children = [];
-    // This tree's own fallback URL writer (own debounce buffer/timer); addFolder()
-    // shares it down the subtree. Distinct GUIs get distinct writers.
     this._urlWriter = makeUrlParamWriter();
   }
 
@@ -170,17 +163,8 @@ class DeepLinkGUI {
     });
     controller.onChange = (fn) => {
       userOnChange = fn;
-      // When the control's value was hydrated from the URL, the caller's
-      // onChange isn't attached until *after* add() returns, so the deep-linked
-      // value was never pushed through the behavior the handler drives — the UI
-      // would show e.g. "Pause" checked while setPaused() never ran. Fire the
-      // handler once now with the loaded value so deep links don't lie about
-      // state. Controls without a registered onChange (property-bound ones read
-      // each frame) never reach here, so they're unaffected.
-      //
-      // Replay only on the *first* registration: re-registering onChange is a
-      // legitimate lil-gui pattern, and re-firing the side effect on every
-      // registration would be wrong.
+      // For a URL-hydrated value, fire the just-registered handler once so its
+      // side effect runs the deep-linked state — but only on first registration.
       if (applyOnLoad && fn && !replayed) {
         replayed = true;
         fn(controller.getValue());
@@ -202,42 +186,30 @@ class DeepLinkGUI {
     const key = this._getKey(prop);
     const isFunction = typeof object[prop] === 'function';
 
-    // Load initial value from URL (skip for buttons). urlApplied tracks whether a
-    // URL value was accepted into the bound state; it gates the apply-on-load
-    // replay below so a rejected value never re-persists the default to the URL.
     const params = getUrlParams();
     let urlApplied = false;
     if (!isFunction && params.has(key)) {
       let val = params.get(key);
       const currentVal = object[prop];
-      urlApplied = true; // cleared below if any validation rejects the value
+      urlApplied = true;
       if (typeof currentVal === 'number') {
         val = parseFloat(val);
-        // A non-numeric deep link (?Speed=fast → NaN) must never reach the
-        // engine; fall back to the validated bound value.
         if (!Number.isFinite(val)) {
           console.warn(`DeepLinkGUI: ignoring non-numeric URL value "${params.get(key)}" for "${key}"`);
           val = currentVal;
           urlApplied = false;
         } else {
-          // Clamp to the control's registered range. lil-gui's numeric add()
-          // signature is add(obj, prop, min, max, step), so bounds are args[0..2].
+          // lil-gui numeric add() signature is add(obj, prop, min, max, step).
           const min = args[0], max = args[1], step = args[2];
           if (typeof min === 'number' && val < min) val = min;
           if (typeof max === 'number' && val > max) val = max;
-          // The URL path bypasses lil-gui's step snapping, so snap a deep-linked
-          // off-step value to the nearest step multiple (anchored at min) — else
-          // it loads a value the slider can never produce. Effect params have no
-          // step and are left untouched.
+          // The URL path bypasses lil-gui's step snapping, so snap to a step multiple.
           if (Number.isFinite(step) && step > 0) {
             const anchor = typeof min === 'number' ? min : 0;
             val = anchor + Math.round((val - anchor) / step) * step;
           }
         }
       } else if (typeof currentVal === 'boolean') {
-        // Accept the common truthy/falsy spellings so a deep link with ?flag=1 or
-        // ?flag=on doesn't silently read as false. An unrecognized token warns and
-        // keeps the bound value, matching the numeric branch.
         const t = val.trim().toLowerCase();
         if (t === 'true' || t === '1' || t === 'yes' || t === 'on') {
           val = true;
@@ -249,10 +221,6 @@ class DeepLinkGUI {
           urlApplied = false;
         }
       }
-      // For an enumerated control, a URL value outside the option list would
-      // poison state: lil-gui shows it unselected and the applyOnLoad replay would
-      // push the bogus value through the caller's onChange, re-injecting it into
-      // appState and the URL. Reject it, clear urlApplied, keep the bound value.
       const allowed = optionValues(args[0]);
       if (allowed && !allowed.includes(val)) {
         console.warn(`DeepLinkGUI: ignoring out-of-range URL value "${params.get(key)}" for "${key}"`);
@@ -264,16 +232,11 @@ class DeepLinkGUI {
 
     const controller = this.gui.add(object, prop, ...args);
 
-    // Attach URL writer (skip for buttons). Apply-on-load only when a URL value
-    // was accepted — a rejected value left the default, so replaying onChange
-    // would just re-persist it.
     if (!isFunction) {
       this._urlKeys.add(key);
       this._attachUrlWriter(controller, (v) => this._urlWriter(key, v), urlApplied);
     }
 
-    // updateDisplay only when a URL value was applied (a rejected value already
-    // shows its default).
     if (!isFunction && urlApplied) {
       try { controller.updateDisplay(); }
       catch (e) { console.warn(`DeepLinkGUI: updateDisplay failed for "${key}":`, e); }
@@ -291,9 +254,7 @@ class DeepLinkGUI {
    */
   addColor(object, prop) {
     const key = this._getKey(prop);
-    // Load from URL (validated). lil-gui's color parser silently accepts garbage
-    // and renders a broken swatch, so reject anything that is not a valid color
-    // literal and keep the bound default.
+    // lil-gui's color parser silently accepts garbage, so reject invalid literals.
     const params = getUrlParams();
     let urlApplied = false;
     if (params.has(key)) {
@@ -308,8 +269,6 @@ class DeepLinkGUI {
 
     const controller = this.gui.addColor(object, prop);
 
-    // Attach URL writer. Apply-on-load only when the URL color was applied — a
-    // rejected color left the default, so replaying onChange would re-persist it.
     this._urlKeys.add(key);
     this._attachUrlWriter(controller, (v) => {
       let strVal = v;
@@ -340,7 +299,7 @@ class DeepLinkGUI {
     const wrapped = new DeepLinkGUI(folder);
     wrapped.parent = this;
     wrapped.folderName = name;
-    wrapped._urlWriter = this._urlWriter; // share the root tree's debounce writer
+    wrapped._urlWriter = this._urlWriter;
     this._children.push(wrapped);
     return wrapped;
   }
