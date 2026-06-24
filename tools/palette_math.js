@@ -6,9 +6,10 @@
 // Pure palette math mirroring the engine's ProceduralPalette and
 // GenerativePalette so the browser tool can predict device colors. Parity is
 // close, not exact, on either path:
-//   - ProceduralPalette evaluates the cosine formula analytically and
-//     linearizes with an exact pow, which can differ from the device's
-//     interpolated 16-bit-linear LUT by up to ~1 LSB per channel.
+//   - ProceduralPalette evaluates the cosine with the engine's fast_cosf
+//     approximation (so the curve matches the device) and linearizes with an
+//     exact pow; only the linearization differs from the device's interpolated
+//     16-bit-linear LUT, by up to ~1 LSB per channel.
 //   - GenerativePalette previews via a sampler reconstructing each entry from
 //     the WASM bridge's 8-bit sRGB LUT, not the engine's native 16-bit-linear
 //     BakedPalette. The interpolation domain matches (linear), but the 8-bit
@@ -18,6 +19,19 @@ import { srgbToLinearFloat } from './color.js';
 import { formatFloatCpp } from './cpp_format.js';
 
 const TWO_PI = 2 * Math.PI;
+
+// Mirror of the engine's fast_cosf (core/3dmath.h): a Bhaskara I sine
+// approximation, range-reduced to [0, 2π). ProceduralPalette::get evaluates its
+// cosine this way on the per-sample path, so the browser preview must use the
+// same approximation (not Math.cos) to predict device colors.
+function fastSin(x) {
+  x -= Math.floor(x / TWO_PI) * TWO_PI;
+  let sign = 1;
+  if (x > Math.PI) { x -= Math.PI; sign = -1; }
+  const xpi = x * (Math.PI - x);
+  return (sign * 16 * xpi) / (5 * Math.PI * Math.PI - 4 * xpi);
+}
+function fastCos(x) { return fastSin(x + Math.PI * 0.5); }
 
 // --- WASM color-math bridge -------------------------------------------------
 // The engine's PaletteOps.bakeLut is injected via setPaletteOps; this module
@@ -58,16 +72,16 @@ export class ProceduralPalette {
    * Calculates the linearized color vector (R, G, B) for a time parameter t.
    * @param {number} t - Time parameter in [0, 1].
    * @returns {number[]} Linear [R, G, B] float values in [0, 1], approximating
-   *   the C++ pipeline: the cosine formula is evaluated analytically and
-   *   linearized with an exact pow, so the result can differ from the device's
-   *   interpolated 16-bit-linear LUT by up to ~1 LSB per channel.
+   *   the C++ pipeline: the cosine uses the engine's fast_cosf approximation
+   *   and is linearized with an exact pow, so the result can differ from the
+   *   device's interpolated 16-bit-linear LUT by up to ~1 LSB per channel.
    */
   get(t) {
     const PI2 = TWO_PI;
 
-    const r = Math.max(0, Math.min(1, this.a[0] + this.b[0] * Math.cos(PI2 * (this.c[0] * t + this.d[0]))));
-    const g = Math.max(0, Math.min(1, this.a[1] + this.b[1] * Math.cos(PI2 * (this.c[1] * t + this.d[1]))));
-    const b = Math.max(0, Math.min(1, this.a[2] + this.b[2] * Math.cos(PI2 * (this.c[2] * t + this.d[2]))));
+    const r = Math.max(0, Math.min(1, this.a[0] + this.b[0] * fastCos(PI2 * (this.c[0] * t + this.d[0]))));
+    const g = Math.max(0, Math.min(1, this.a[1] + this.b[1] * fastCos(PI2 * (this.c[1] * t + this.d[1]))));
+    const b = Math.max(0, Math.min(1, this.a[2] + this.b[2] * fastCos(PI2 * (this.c[2] * t + this.d[2]))));
 
     return [srgbToLinearFloat(r), srgbToLinearFloat(g), srgbToLinearFloat(b)];
   }
@@ -81,7 +95,7 @@ export class ProceduralPalette {
    */
   getChannelValue(t, channelIndex) {
     const PI2 = TWO_PI;
-    return this.a[channelIndex] + this.b[channelIndex] * Math.cos(PI2 * (this.c[channelIndex] * t + this.d[channelIndex]));
+    return this.a[channelIndex] + this.b[channelIndex] * fastCos(PI2 * (this.c[channelIndex] * t + this.d[channelIndex]));
   }
 }
 

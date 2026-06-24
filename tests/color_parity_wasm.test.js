@@ -132,8 +132,8 @@ test('ProceduralPalette golden linear values (absolute pin)', () => {
       a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2], d[0], d[1], d[2], t);
     return [w.r, w.g, w.b];
   };
-  assert.deepEqual(at(0.5), [0, 33320, 33320]);
-  assert.deepEqual(at(0.25), [14027, 334, 56690]);
+  assert.deepEqual(at(0.5), [0, 33327, 33327]);
+  assert.deepEqual(at(0.25), [14028, 338, 56614]);
 });
 
 /** Verifies the lissajous curve matches lissajous_math.js. */
