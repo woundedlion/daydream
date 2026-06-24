@@ -58,7 +58,7 @@ test('snapComplex leaves values outside threshold untouched', () => {
   assert.equal(snapComplex(0.5), 0.5);
   assert.equal(snapComplex(1.2), 1.2);
   assert.equal(snapComplex(-1.5), -1.5);
-  // 1.93 is 0.07 from 2 -> outside the default 0.05 threshold.
+  // 1.93 is 0.07 from 2, just outside the 0.05 default threshold.
   assert.equal(snapComplex(1.93), 1.93);
 });
 
@@ -72,9 +72,8 @@ test('snapComplex respects an explicit threshold', () => {
 
 /** Complex multiplication follows (a+bi)(c+di). */
 test('cmult computes (a+bi)(c+di)', () => {
-  // (1 + 2i)(3 + 4i) = 3 + 4i + 6i + 8i^2 = -5 + 10i
+  // (1+2i)(3+4i) = -5 + 10i
   assertComplex(cmult({ re: 1, im: 2 }, { re: 3, im: 4 }), -5, 10, 'cmult');
-  // i * i = -1
   assertComplex(cmult({ re: 0, im: 1 }, { re: 0, im: 1 }), -1, 0, 'i*i');
 });
 
@@ -85,9 +84,8 @@ test('cadd computes (a+bi)+(c+di)', () => {
 
 /** Complex division follows (a+bi)/(c+di). */
 test('cdiv computes (a+bi)/(c+di)', () => {
-  // (1 + 0i) / (0 + 1i) = -i
+  // (1+0i)/(0+1i) = -i
   assertComplex(cdiv({ re: 1, im: 0 }, { re: 0, im: 1 }), 0, -1, 'cdiv 1/i');
-  // (3 + 4i) / (1 + 0i) = 3 + 4i
   assertComplex(cdiv({ re: 3, im: 4 }, { re: 1, im: 0 }), 3, 4, 'cdiv /1');
 });
 

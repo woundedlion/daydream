@@ -28,7 +28,6 @@ test('formatFloatCpp: never emits scientific notation', () => {
 test('formatFloatCpp: small nonzero value is preserved, not zeroed', () => {
   assert.equal(formatFloatCpp(1e-7), '0.0000001f');
   assert.equal(formatFloatCpp(1.5e-7, 6), '0.00000015f');
-  // The default 6-digit path would have rounded these to "0.0f".
   assert.notEqual(formatFloatCpp(1e-7), '0.0f');
 });
 

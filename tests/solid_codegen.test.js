@@ -86,7 +86,6 @@ test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comme
     'FLASHMEM inline PolyMesh tetrahedron_kis(Arena &a, Arena &b) {\n' +
     '  return SolidBuilder(tetrahedron(a, b), a, b).kis().build();\n' +
     '}';
-  // This string is pasted byte-for-byte into the engine, so lock it whole.
   assert.equal(cpp, expected);
 });
 
@@ -98,7 +97,6 @@ test('generateRecipeCpp defaults missing V/F/I counts to 0', () => {
 
 /** Verifies computeInternalAngle yields ~90deg (radians) for a unit-square face. */
 test('computeInternalAngle returns ~90deg for a square face', () => {
-  // Unit square in the XY plane; internal angle at each corner is 90 deg.
   const mesh = {
     vertices: [
       { x: 0, y: 0, z: 0 },

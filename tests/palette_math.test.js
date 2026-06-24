@@ -35,20 +35,16 @@ const NEAR = 1e-6;
 
 /** Verifies ProceduralPalette.get clamps and linearizes the cosine output, and that getChannelValue exposes the raw cosine. */
 test('ProceduralPalette.get at t=0 and t=0.5 for a known coefficient set', () => {
-  // a=0.5, b=0.5, c=1, d=0 → sRGB = clamp(0.5 + 0.5*cos(2π·t)).
   const p = new ProceduralPalette([0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [1, 1, 1], [0, 0, 0]);
 
-  // t=0: cos(0)=1 → sRGB 1.0 → linear 1.0.
   const at0 = p.get(0);
   for (const ch of at0) assert.ok(Math.abs(ch - srgbToLinear(1.0)) < NEAR);
   assert.ok(Math.abs(at0[0] - 1.0) < NEAR);
 
-  // t=0.5: cos(π)=-1 → sRGB clamp(0.0) → linear 0.0.
   const at05 = p.get(0.5);
   for (const ch of at05) assert.ok(Math.abs(ch - srgbToLinear(0.0)) < NEAR);
   assert.ok(Math.abs(at05[0] - 0.0) < NEAR);
 
-  // getChannelValue returns the raw (un-clamped, un-linearized) cosine.
   assert.ok(Math.abs(p.getChannelValue(0, 0) - 1.0) < NEAR);
   assert.ok(Math.abs(p.getChannelValue(0.5, 0) - 0.0) < NEAR);
 });
@@ -79,8 +75,7 @@ test('PRNG seed 0 is reproducible', () => {
 
 /** Verifies hsvToRgb maps the region-boundary hues to pure primaries and returns a CPixel. */
 test('hsvToRgb on primary hues returns pure red/green/blue', () => {
-  // The engine splits the wheel into six 43-wide regions (region = h/43), so the
-  // pure primaries land on red=0, green=86, blue=172 (not the float-math 0/85/170).
+  // Six 43-wide regions (region = h/43): primaries land on 0/86/172, not 0/85/170.
   const red = hsvToRgb(0, 255, 255);
   assert.deepEqual([red.r, red.g, red.b], [255, 0, 0]);
   assert.ok(red instanceof CPixel);
@@ -113,7 +108,6 @@ test('proceduralPaletteCpp emits a valid C++ initializer', () => {
   assert.ok(s.includes('// B'));
   assert.ok(s.includes('// C'));
   assert.ok(s.includes('// D'));
-  // Trailing zeros are trimmed: 0.5 -> "0.5f", not "0.500f".
   assert.ok(s.includes('{0.5f, 0.5f, 0.5f}'));
 });
 
@@ -205,7 +199,6 @@ test('GenerativePalette.get returns finite linear RGB in range', () => {
       assert.ok(ch >= -1e-6 && ch <= 1 + 1e-6, `channel ${ch} in [0,1] at t=${t}`);
     }
   }
-  // Vignette shape exercises the black endpoints and 5-segment LUT.
   const vig = new GenerativePalette('VIGNETTE', 'COMPLEMENTARY', 'BELL', 'MID', 200);
   const mid = vig.get(0.5);
   for (const ch of mid) assert.ok(Number.isFinite(ch));

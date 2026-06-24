@@ -52,12 +52,10 @@ const mag = (v) => Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
 test('spline_cubic_fast (real WASM) Bézier curve pins to the engine', () => {
   const curve = generateBezierCurve(P, 4, cubicFast);
   assert.equal(curve.length, 5);
-  // p0/p3 are already unit, so the endpoints interpolate exactly.
   closeVec(curve[0], 0, 1, 0, 't=0');
   closeVec(curve[4], -1, 0, 0, 't=1');
-  // Pinned interior sample (t=0.5) — golden vector from the engine.
+  // Interior sample (t=0.5): golden vector from the engine.
   closeVec(curve[2], 0.534522, 0.267261, 0.801784, 't=0.5');
-  // cubic_fast renormalizes, so every sample is on the unit sphere.
   for (const p of curve) assert.ok(Math.abs(mag(p) - 1) <= EPS, `non-unit sample mag=${mag(p)}`);
 });
 
@@ -70,8 +68,6 @@ test('spline_cubic_slerp (real WASM) pins to the engine and differs from cubic_f
   const slerpMid = cubicSlerp(P[0], P[1], P[2], P[3], 0.5);
   closeVec(slerpMid, 0.486519, 0.243259, 0.839121, 'slerp t=0.5');
   assert.ok(Math.abs(mag(slerpMid) - 1) <= EPS, `slerp sample not unit: ${mag(slerpMid)}`);
-  // cubic_fast and cubic_slerp are different curves between the endpoints;
-  // identical midpoints would mean the two evaluators collapsed to one.
   const fastMid = cubicFast(P[0], P[1], P[2], P[3], 0.5);
   assert.ok(mag({ x: slerpMid.x - fastMid.x, y: slerpMid.y - fastMid.y, z: slerpMid.z - fastMid.z }) > 1e-3,
     'cubic_fast and cubic_slerp produced the same midpoint');
@@ -83,15 +79,13 @@ test('spline_cubic_slerp (real WASM) pins to the engine and differs from cubic_f
  * pinned tangents, the expected sample count, and a pinned interior sample.
  */
 test('Catmull-Rom (real WASM tangents + eval) closed loop pins to the engine', () => {
-  // Tangents for the (p0,p1,p2,p3) window at tension 0.5 — golden from the engine.
+  // Tangents at tension 0.5: golden from the engine.
   const t = catmullRomTangents(P[0], P[1], P[2], P[3], 0.5);
   closeVec(t.cp1, 0.707107, 0.5, 0.5, 'cp1');
   closeVec(t.cp2, 0.707107, 0, 0.707107, 'cp2');
 
-  // Closed loop, 4 control points, 3 samples/segment: the first segment emits
-  // j=0..3 (4 points) and each of the remaining 3 segments emits j=1..3, so
-  // 4 + 3*3 = 13 points. Pins the closed-loop index bookkeeping against the
-  // real evaluators.
+  // Closed loop, 4 points, 3 samples/segment: first segment emits 4, the other
+  // 3 emit 3 each, so 4 + 3*3 = 13.
   const curve = generateCatmullRomCurve(P, 0.5, 3, catmullRomTangents, cubicFast, true);
   assert.equal(curve.length, 13);
   closeVec(curve[5], 0.571435, 0.124877, 0.81109, 'closed-loop sample [5]');

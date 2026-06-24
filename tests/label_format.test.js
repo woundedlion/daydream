@@ -25,14 +25,14 @@ test('prettify names multiples of pi', () => {
 });
 
 test('prettify names the golden ratio and its inverse', () => {
-  assert.equal(prettify(PHI), PHI_GLYPH);              // φ ≈ 1.618
-  assert.equal(prettify(1 / PHI), PHI_GLYPH + INV);    // φ⁻¹ ≈ 0.618
+  assert.equal(prettify(PHI), PHI_GLYPH);
+  assert.equal(prettify(1 / PHI), PHI_GLYPH + INV);
   assert.equal(prettify(1 / Math.sqrt(3)), SQRT + '3' + INV);
 });
 
 test('prettify snaps within the 1e-5 tolerance but not outside it', () => {
-  assert.equal(prettify(Math.PI + 5e-6), PI);          // inside the band -> symbol
-  assert.equal(prettify(Math.PI + 5e-4), '3.142');     // outside -> 3-decimal string
+  assert.equal(prettify(Math.PI + 5e-6), PI);
+  assert.equal(prettify(Math.PI + 5e-4), '3.142');
 });
 
 test('prettify falls back to a 3-decimal string for arbitrary values', () => {
