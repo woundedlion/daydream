@@ -455,8 +455,13 @@ function applyEffect(preserveParams = false) {
 
 /**
  * Apply a resolution change: resize geometry, refresh sidebar list, then re-apply effect.
- * @param {boolean} [preserveParams=false] - Forwarded to applyEffect(); when true,
- *   preserve the current effect's param URL entries through the re-apply.
+ * @param {boolean} [preserveParams=false] - Forwarded to applyEffect() when the
+ *   active effect is still offered at the new resolution; when true, preserve that
+ *   effect's param URL entries through the re-apply. When the active/hydrated effect
+ *   is NOT offered (off-list) it is corrected to the list's first entry, and only
+ *   GLOBAL param URL entries (resolution, effect, and the global GUI's deep-link
+ *   keys) carry over — the effect-specific entries are dropped regardless of this
+ *   flag, since they target an effect this resolution can't run.
  * @returns {void}
  */
 function applyResolution(preserveParams = false) {
@@ -498,6 +503,13 @@ function applyResolution(preserveParams = false) {
   let effectChanged = false;
   const resolvedEffect = resolveActiveEffect(availableEffects, appState.get('effect'));
   if (resolvedEffect !== appState.get('effect')) {
+    // Off-list effect (e.g. a hydrated ?effect= invalid for this resolution).
+    // appState.set fires the effect subscriber -> applyEffect() with its default
+    // preserveParams=false, which clears the effect-specific param URL entries but
+    // KEEPS the global ones (resetGUI excludes resolution, effect, and the global
+    // GUI's collectUrlKeys()). That is the intended outcome even when init asked to
+    // preserve params: the dropped entries targeted an effect this resolution can't
+    // run, while the global controls (and so their URL keys) survive the switch.
     appState.set('effect', resolvedEffect);
     effectChanged = true;
   }
