@@ -53,14 +53,16 @@ export class SegmentController {
    * @param {function(): (Object|null)} deps.getWasmEngine - Returns the current main-thread HolosphereEngine, or null when none is bound.
    * @param {Function} deps.refreshPixelView - Re-fetches the (possibly detached) WASM pixel view.
    * @param {function(): (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
+   * @param {Document} [deps.statsDoc] - DOM document the stats overlay renders into; defaults to the global `document`.
    */
   constructor({ resolutionPresets, appState, getWasmEngine, refreshPixelView,
-                getMemoryView }) {
+                getMemoryView, statsDoc = globalThis.document }) {
     this._resolutionPresets = resolutionPresets;
     this._appState = appState;
     this._getWasmEngine = getWasmEngine;
     this._refreshPixelView = refreshPixelView;
     this._getMemoryView = getMemoryView;
+    this._doc = statsDoc;
 
     this.active = false;
     this.count = 4;
@@ -511,11 +513,11 @@ export class SegmentController {
 
   /** Update the per-segment stats overlay. */
   updateStats() {
-    const el = document.getElementById('segment-stats');
+    const el = this._doc.getElementById('segment-stats');
     if (!el) return;
 
-    const globalStatsDesktop = document.getElementById('global-stats-desktop');
-    const globalStatsMobile = document.getElementById('stats-bar');
+    const globalStatsDesktop = this._doc.getElementById('global-stats-desktop');
+    const globalStatsMobile = this._doc.getElementById('stats-bar');
 
     if (!this.active) {
       el.style.display = 'none';
@@ -532,18 +534,18 @@ export class SegmentController {
       const f = this.faultInfo;
       // Build via text nodes, not innerHTML: the fault message is arbitrary text
       // and must never be parsed as markup.
-      const box = document.createElement('div');
+      const box = this._doc.createElement('div');
       box.style.cssText = 'color:#ff5252;padding:6px;font-size:0.85em';
       // segId < 0 is a pool-wide fault (e.g. the init watchdog), not one worker.
       const who = !f ? 'worker ?' : (f.segId < 0 ? 'pool init' : `worker ${f.segId}`);
       box.append(`⚠ Segment ${who} faulted — segmented render halted.`);
-      box.appendChild(document.createElement('br'));
-      const msg = document.createElement('span');
+      box.appendChild(this._doc.createElement('br'));
+      const msg = this._doc.createElement('span');
       msg.style.color = '#999';
       msg.textContent = (f && f.message) || 'see console';
       box.appendChild(msg);
-      box.appendChild(document.createElement('br'));
-      const hint = document.createElement('span');
+      box.appendChild(this._doc.createElement('br'));
+      const hint = this._doc.createElement('span');
       hint.style.color = '#999';
       hint.textContent = 'Change resolution or toggle segmented mode to restart.';
       box.appendChild(hint);
@@ -596,16 +598,16 @@ export class SegmentController {
    * @param {HTMLElement} el - Container element the table is mounted into.
    */
   _buildStatsTable(numSegs, el) {
-    const table = document.createElement('table');
-    const th = (text) => { const e = document.createElement('th'); e.textContent = text; return e; };
+    const table = this._doc.createElement('table');
+    const th = (text) => { const e = this._doc.createElement('th'); e.textContent = text; return e; };
     const td = (text, className) => {
-      const e = document.createElement('td');
+      const e = this._doc.createElement('td');
       if (className) e.className = className;
       if (text !== undefined) e.textContent = text;
       return e;
     };
     const mkRow = (cells) => {
-      const tr = document.createElement('tr');
+      const tr = this._doc.createElement('tr');
       for (const c of cells) tr.appendChild(c);
       table.appendChild(tr);
       return tr;
