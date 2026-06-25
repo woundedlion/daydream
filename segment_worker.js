@@ -202,4 +202,7 @@ self.onmessage = (e) => {
   messageQueue = messageQueue
     .then(() => handleMessage(msg))
     .catch((err) => { setTimeout(() => { throw err; }); });
+  // The DOM worker ignores this; test harnesses await it to track the real
+  // settle point of the serialized queue.
+  return messageQueue;
 };
