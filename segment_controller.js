@@ -488,6 +488,13 @@ export class SegmentController {
           `${w}x${h} display buffer — the generation fence let a stale-resolution ` +
           `result through (layout/fence invariant violated)`);
       }
+      if (r.quadW !== r.x1 - r.x0 || r.quadH !== r.y1 - r.y0) {
+        throw new Error(
+          `SegmentController.composite: segment ${s} quad ${r.quadW}x${r.quadH} ` +
+          `does not match rect [${r.x0},${r.y0})-[${r.x1},${r.y1}) ` +
+          `(${r.x1 - r.x0}x${r.y1 - r.y0}) — protocol drift would subarray a ` +
+          `mis-sized compact buffer (layout invariant violated)`);
+      }
 
       compositeSegment(dst, r.pixels, w, r);
       blitted++;
