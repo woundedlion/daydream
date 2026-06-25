@@ -161,6 +161,7 @@ const segments = new SegmentController({
   getWasmEngine: () => wasmEngine,
   refreshPixelView,
   getMemoryView: () => wasmMemoryView,
+  statsDoc: document,
 });
 
 ///////////////////////////////////////////////////////////////////////////////
