@@ -87,16 +87,15 @@ await import('../segment_worker.js');
 
 /**
  * Deliver one protocol message through the worker's serialized queue and wait
- * for it (and any rethrow task) to settle. Uses setImmediate so a stubbed
- * setTimeout in the rethrow test cannot stall draining.
+ * for it to settle. onmessage returns the queue tail, so awaiting it tracks the
+ * real settle point rather than a fixed number of microtask turns. The error
+ * path resolves the tail (the rethrow is deferred to a fresh task), so this
+ * never stalls on a thrown handler.
  * @param {Object} msg - Protocol message to deliver.
  * @returns {Promise<void>}
  */
 async function dispatch(msg) {
-  fakeSelf.onmessage({ data: msg });
-  for (let i = 0; i < 4; i++) {
-    await new Promise((r) => setImmediate(r));
-  }
+  await fakeSelf.onmessage({ data: msg });
 }
 
 beforeEach(() => {
