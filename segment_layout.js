@@ -96,3 +96,13 @@ export function blitSegmentRect(canvas, compact, canvasW, rect, gather) {
     compactIdx += rowLen;
   }
 }
+
+/** Extract rect from the full canvas into a compact per-segment buffer. */
+export function extractSegment(canvas, compact, canvasW, rect) {
+  blitSegmentRect(canvas, compact, canvasW, rect, true);
+}
+
+/** Composite a compact per-segment buffer back into the full canvas. */
+export function compositeSegment(canvas, compact, canvasW, rect) {
+  blitSegmentRect(canvas, compact, canvasW, rect, false);
+}

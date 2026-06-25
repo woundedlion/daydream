@@ -11,7 +11,7 @@
  */
 
 import createHolosphereModule from "./holosphere_wasm.js";
-import { computeSegmentRange, blitSegmentRect } from "./segment_layout.js";
+import { computeSegmentRange, extractSegment } from "./segment_layout.js";
 
 /** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
 /** @typedef {import('./worker_protocol.js').ControllerInboundMsg} ControllerInboundMsg */
@@ -145,7 +145,7 @@ async function handleMessage(msg) {
       const allPixels = engine.getPixels();
       const { x0, x1, y0, y1, w: qw, h: qh } = segRange;
       const pixelsCopy = new Uint16Array(qw * qh * 3);
-      blitSegmentRect(allPixels, pixelsCopy, canvasW, segRange, true);
+      extractSegment(allPixels, pixelsCopy, canvasW, segRange);
 
       /** @type {SegArenaMetrics | null} */
       let arenaMetrics = null;

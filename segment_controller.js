@@ -20,7 +20,7 @@
  *   - getMemoryView():    current Uint16Array view of the display buffer
  */
 import { Daydream, SLOW_FRAME_MS } from "./driver.js";
-import { blitSegmentRect } from "./segment_layout.js";
+import { compositeSegment } from "./segment_layout.js";
 
 // Deadline for all workers to report 'ready'. A non-throwing WASM load failure
 // fires no onerror and never sends 'ready', so this bound latches a fault instead
@@ -489,7 +489,7 @@ export class SegmentController {
           `result through (layout/fence invariant violated)`);
       }
 
-      blitSegmentRect(dst, r.pixels, w, r, false);
+      compositeSegment(dst, r.pixels, w, r);
       blitted++;
     }
 
