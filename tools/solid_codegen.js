@@ -20,6 +20,13 @@ const KNOWN_OPS = new Set([
   'dual', 'kis', 'ambo', 'gyro', 'meta', 'needle', 'zip',
 ]);
 
+// Ops that read a params object. The string|object op contract permits a bare
+// string, but for these that leaves o.params undefined, so reject it with a
+// clear message instead of an opaque TypeError on the param read.
+const PARAMETERIZED_OPS = new Set([
+  'truncate', 'expand', 'chamfer', 'hankin', 'relax', 'bevel',
+]);
+
 // A base seed-solid name is pasted as a C++ function call (`base(a, b)`), so
 // guard its shape against the valid-identifier pattern.
 const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -90,6 +97,9 @@ export function generateFuncAndRecipe(item) {
     if (!KNOWN_OPS.has(opName)) {
       throw new Error(`generateFuncAndRecipe: unknown op "${opName}" ` +
         `(expected one of ${[...KNOWN_OPS].join(', ')})`);
+    }
+    if (PARAMETERIZED_OPS.has(opName) && (typeof o === 'string' || !o.params)) {
+      throw new Error(`generateFuncAndRecipe: op "${opName}" requires a params object`);
     }
 
     if (opName === 'truncate') {

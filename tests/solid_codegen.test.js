@@ -140,6 +140,9 @@ test('generateFuncAndRecipe rejects an unknown op or a malformed base', () => {
   assert.throws(() => generateFuncAndRecipe({ base: '', ops: [] }),
     /not a valid C\+\+ identifier/);
   assert.doesNotThrow(() => generateFuncAndRecipe({ base: 'icosahedron', ops: ['dual', { op: 'truncate', params: { t: 0.3 } }] }));
+  // A parameterized op given as a bare string has no params: descriptive throw, not an opaque TypeError.
+  assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: ['truncate'] }),
+    /op "truncate" requires a params object/);
 });
 
 /** Verifies generateFuncAndRecipe rejects non-finite fractional params and non-integer/negative relax counts. */
