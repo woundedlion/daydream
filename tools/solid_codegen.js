@@ -53,10 +53,16 @@ export const formatFloat = formatFloatCpp;
  * with the same caveat at 1° granularity.) Generated-source byte-stability is a
  * hard requirement (see module header), so widening precision is intentionally
  * avoided; author distinct params at least 0.01 apart to keep names unique.
+ *
+ * A negative value is rejected: its `-` prefix would taint the funcName into an
+ * invalid C++ identifier, and the upstream tool clamps these params to min 0.01.
  * @param {number} val - The fractional parameter value (typically 0..1+).
  * @returns {string} A two-or-more digit percent suffix.
  */
 export function pctSuffix(val) {
+  if (val < 0) {
+    throw new Error(`pctSuffix: value ${val} is negative; suffix must stay a valid C++ identifier`);
+  }
   return String(Math.round(val * 100)).padStart(2, '0');
 }
 

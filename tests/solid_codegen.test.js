@@ -153,3 +153,10 @@ test('generateFuncAndRecipe rejects non-finite or out-of-range op params', () =>
   assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'relax', params: { iter: -1 } }] }),
     /must be a non-negative integer/);
 });
+
+/** Verifies a negative fractional param is rejected rather than emitting a `-`-tainted, non-identifier funcName. */
+test('pctSuffix and generateFuncAndRecipe reject negative fractional params', () => {
+  assert.throws(() => pctSuffix(-0.5), /negative/);
+  assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'truncate', params: { t: -0.5 } }] }),
+    /negative/);
+});
