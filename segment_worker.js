@@ -72,11 +72,14 @@ async function handleMessage(msg) {
       totalSegs = msg.totalSegs;
       canvasW = msg.w;
       canvasH = msg.h;
-      segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
 
       wasmModule = await createHolosphereModule();
       engine = new wasmModule.HolosphereEngine();
-      engine.setResolution(canvasW, canvasH);
+      // A rejected resolution leaves no usable geometry: skip segRange/ready so
+      // the controller's init watchdog latches the fault (symmetric with the
+      // setResolution handler's `=== false` guard).
+      if (engine.setResolution(canvasW, canvasH) === false) break;
+      segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
 
       if (msg.effectName) {
         engine.setEffect(msg.effectName);
