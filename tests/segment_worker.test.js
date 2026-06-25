@@ -85,6 +85,9 @@ mock.module('../holosphere_wasm.js', {
 
 await import('../segment_worker.js');
 
+// 'booted' is posted once at module-eval time, before any beforeEach clears `posted`.
+const bootedAtLoad = posted.filter((p) => p.msg.type === 'booted');
+
 /**
  * Deliver one protocol message through the worker's serialized queue and wait
  * for it to settle. onmessage returns the queue tail, so awaiting it tracks the
@@ -102,6 +105,11 @@ beforeEach(() => {
   posted.length = 0;
   engineInstance = null;
   nextResolutionOk = true;
+});
+
+/** The worker posts 'booted' at module load; the controller's boot watchdog depends on this ping. */
+test('worker posts booted at module load', () => {
+  assert.equal(bootedAtLoad.length, 1, 'exactly one booted ping emitted at load');
 });
 
 /** init builds the segRange, drives the engine setup in order, and posts ready. */
