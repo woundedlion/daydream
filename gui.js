@@ -59,6 +59,14 @@ const makeUrlParamWriter = () => {
   return (key, value) => {
     const sync = getActiveURLSync();
     if (sync) {
+      // Flush any writes buffered before the sync registered mid-debounce so
+      // they funnel through the same authority instead of being stranded.
+      if (pendingUrlWrites.size) {
+        clearTimeout(urlTimer);
+        urlTimer = null;
+        for (const [k, v] of pendingUrlWrites) sync.setParam(k, v);
+        pendingUrlWrites.clear();
+      }
       sync.setParam(key, value);
       return;
     }
