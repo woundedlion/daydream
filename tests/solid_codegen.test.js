@@ -141,3 +141,15 @@ test('generateFuncAndRecipe rejects an unknown op or a malformed base', () => {
     /not a valid C\+\+ identifier/);
   assert.doesNotThrow(() => generateFuncAndRecipe({ base: 'icosahedron', ops: ['dual', { op: 'truncate', params: { t: 0.3 } }] }));
 });
+
+/** Verifies generateFuncAndRecipe rejects non-finite fractional params and non-integer/negative relax counts. */
+test('generateFuncAndRecipe rejects non-finite or out-of-range op params', () => {
+  assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'truncate', params: { t: NaN } }] }),
+    /must be a finite number/);
+  assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'hankin', params: { angle: Infinity } }] }),
+    /must be a finite number/);
+  assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'relax', params: { iter: 1.5 } }] }),
+    /must be a non-negative integer/);
+  assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'relax', params: { iter: -1 } }] }),
+    /must be a non-negative integer/);
+});
