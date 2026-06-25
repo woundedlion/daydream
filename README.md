@@ -912,7 +912,7 @@ configure_arenas(266 * 1024, 32 * 1024, 32 * 1024);  // 266 + 32 + 32 = 330 KiB
 
 ```cpp
 {
-    ScratchScope _(scratch_arena_a);     // save offset
+    ScratchScope scratch_a_guard(scratch_arena_a);  // save offset
     // ... allocate from scratch_arena_a ...
 }                                        // restore offset — all allocations freed
 ```
@@ -967,7 +967,7 @@ FastLED output ← CRGB(gamma encode) ← linear→sRGB ← Pixel16
 
 | Type | Description |
 |---|---|
-| `ProceduralPalette` | Cosine palette: `0.5 + 0.5*cos(2π*(c*t + d))` per channel. Defined by 4 vec3 coefficients. |
+| `ProceduralPalette` | Cosine palette: `a + b*cos(2π*(c*t + d))` per channel. Defined by 4 vec3 coefficients. |
 | `Gradient` | Linear interpolation between a sorted list of (position, color) stops. |
 | `GenerativePalette` | Procedurally generated palette from harmony rules (triadic, analogous, etc.) combined with brightness/saturation profiles. Supports snapshot/lerp for animated transitions. |
 | `SolidColorPalette` | Constant color, adapts to the `Palette` interface. |
@@ -1096,10 +1096,10 @@ All Conway operators are templated on input mesh type and take `(const MeshT& me
 | Operation | Description |
 |---|---|
 | `MeshOps::compile_hankin` | Pre-compute topological data for fast Hankin pattern updates |
-| `MeshOps::update_hankin` | Update dynamic vertices based on angle parameter (no reallocation) |
+| `MeshOps::update_hankin` | Update dynamic vertices based on angle parameter (no new allocation when reusing a sufficiently-sized output mesh) |
 | `MeshOps::hankin` | One-shot Hankin pattern generation (compile + update) |
 
-`compile_hankin` produces a `CompiledHankin` struct containing base vertices, static midpoints, and dynamic instructions. `update_hankin` evaluates the dynamic vertices by sweeping the Hankin angle, producing the star polygon line intersections for each face without reallocating memory.
+`compile_hankin` produces a `CompiledHankin` struct containing base vertices, static midpoints, and dynamic instructions. `update_hankin` evaluates the dynamic vertices by sweeping the Hankin angle, producing the star polygon line intersections for each face. It re-binds the output mesh's vectors on every call, so it avoids new allocation only in the steady state — reusing the same output mesh against the same arena, already sized large enough.
 
 #### Solids Library (`solids.h`)
 
@@ -1168,7 +1168,7 @@ Three hardware drivers form a layered stack.  `dma_led.h` handles the SPI wire p
 
 #### DMA LED Controller (`dma_led.h`)
 
-Non-blocking DMA-based LED output for HD107S (APA102-compatible) LEDs on Teensy 4.x.  Enabled by `#define USE_DMA_LEDS` in the target sketch (e.g. `targets/Phantasm/Phantasm.ino`) before it includes the driver; `led.h` stays neutral (the define is commented out there) and the default FastLED/WS2801 path remains as fallback.
+Non-blocking DMA-based LED output for HD107S (APA102-compatible) LEDs on Teensy 4.x.  Enabled by `#define USE_DMA_LEDS` in the target sketch (e.g. `targets/Phantasm/Phantasm.ino`) before it includes the driver; `led.h` stays neutral (the define is commented out there) and the default FastLED/WS2801 path remains as fallback. The FastLED fallback applies only to the single-board `POVDisplay`; the segmented `POVSegmented` driver `#error`s without `USE_DMA_LEDS` (the FastLED path cannot honor the master sync pulse-width contract), so DMA LEDs are mandatory on Phantasm.
 
 | Class | Role |
 |---|---|
@@ -1845,6 +1845,8 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `getSupportedResolutions()` → `[[w, h], …]` | *(static)* List the resolutions the build supports, as `[width, height]` pairs |
 | `setClip(x0, x1, y0, y1)` → `bool` | Restrict rendering to a sub-rectangle (used by segment workers) |
 | `getRenderUs()` → `double` | Last frame's rasterization time in microseconds (per-frame profiling) |
+| `getParamGeneration()` → `int` | Monotonic counter bumped whenever the parameter set changes (effect/resolution switch). A JS consumer caches it alongside `getParameterDefinitions()` and re-fetches the definitions when it changes, so cached descriptors never mis-describe a later `getParamValues()` stream |
+| `strobeColumns()` → `bool` | Whether the current effect renders as discrete strobed columns (dark inter-column gaps) rather than a continuous smeared band; `false` when no effect is set. Daydream reads it to decide whether to fill the inter-column gap |
 
 The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 330 KiB arena) for interactive solid manipulation.
 
@@ -1855,13 +1857,22 @@ The WASM bridge includes stack high-water-mark instrumentation: `stack_paint_can
 Pixel data is 16-bit linear light (`uint16_t` per channel). The zero-copy `Uint16Array` view is bound directly as the instanced dot-mesh's `instanceColor` attribute, declared `normalized` so Three.js scales 0–65535 → 0–1 linear **on the GPU** — there is no per-pixel divide or float copy in JavaScript (Three.js expects linear color when `THREE.ColorManagement.enabled = true`):
 
 ```js
-const wasmPixels = wasmEngine.getPixels();   // Uint16Array view, zero-copy
-// Bound once as the instance-color buffer; the `true` flag marks it normalized,
-// so the GPU divides by 65535 on read. No JS-side divide or Float32 copy.
+let wasmPixels = wasmEngine.getPixels();     // Uint16Array view, zero-copy
+// The `true` flag marks the attribute normalized, so the GPU divides by 65535 on
+// read. No JS-side divide or Float32 copy.
 dotMesh.instanceColor =
     new THREE.InstancedBufferAttribute(wasmPixels, 3, /*normalized=*/ true);
 // → instanced dot-mesh per-instance colors → WebGL renderer
 ```
+
+The view aliases WASM linear memory and is **not** bound once: with
+`ALLOW_MEMORY_GROWTH` (e.g. the lazy 16 MB MeshOps allocation) any later heap
+growth detaches the `ArrayBuffer` and leaves the cached view zero-length. Re-fetch
+it after anything that may allocate — a resolution/effect change, and defensively
+each frame — rebinding `instanceColor` to a fresh `getPixels()` view when the old
+one has detached (`wasmPixels.byteLength === 0`), mirroring `daydream.js`'s
+`refreshPixelView`. Copying the snippet without this guard ships a latent
+black-frame-after-growth bug.
 
 ### 10.3 The Three.js Renderer (`driver.js`)
 
