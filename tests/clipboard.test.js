@@ -2,7 +2,7 @@
 //
 // copyWithFeedback's transient label swap. Key invariant: a second copy within
 // revertMs must not latch the element on "Copied!".
-import { test, mock, beforeEach } from 'node:test';
+import { test, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 // copyToClipboard prefers navigator.clipboard.writeText; stub it to succeed.
@@ -30,6 +30,10 @@ beforeEach(() => {
   mock.timers.enable({ apis: ['setTimeout'] });
 });
 
+afterEach(() => {
+  mock.timers.reset();
+});
+
 /** Verifies a second copy before the first revert timer still restores the real idle label, not "Copied!". */
 test('a second copy within revertMs still reverts to the idle label', async () => {
   const el = fakeElement('Copy');
@@ -43,6 +47,4 @@ test('a second copy within revertMs still reverts to the idle label', async () =
 
   mock.timers.tick(2000);
   assert.equal(el.textContent, 'Copy', 'element reverts to idle, not "Copied!"');
-
-  mock.timers.reset();
 });
