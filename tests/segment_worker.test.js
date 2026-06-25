@@ -69,11 +69,14 @@ class FakeEngine {
 
 /** The single engine the mocked factory hands back, so tests can configure it. */
 let engineInstance = null;
+/** Seeds the next-constructed engine's resolutionOk, so init-time rejection is testable. */
+let nextResolutionOk = true;
 mock.module('../holosphere_wasm.js', {
   defaultExport: async () => ({
     HolosphereEngine: class {
       constructor() {
         engineInstance = new FakeEngine();
+        engineInstance.resolutionOk = nextResolutionOk;
         return engineInstance;
       }
     },
@@ -99,6 +102,7 @@ async function dispatch(msg) {
 beforeEach(() => {
   posted.length = 0;
   engineInstance = null;
+  nextResolutionOk = true;
 });
 
 /** init builds the segRange, drives the engine setup in order, and posts ready. */
@@ -114,6 +118,16 @@ test('init applies the segment clip and posts ready', async () => {
   const ready = posted.find((p) => p.msg.type === 'ready');
   assert.ok(ready, 'ready posted');
   assert.equal(ready.msg.segId, 3);
+});
+
+/** Regression: an init whose setResolution is rejected posts no ready, so the controller's init watchdog latches the fault. */
+test('init with a rejected resolution posts no ready', async () => {
+  nextResolutionOk = false;
+  await dispatch({ type: 'init', segId: 0, totalSegs: 1, w: 8, h: 4, effectName: 'Plasma' });
+
+  assert.ok(engineInstance, 'engine constructed');
+  assert.deepEqual(engineInstance.calls[0], ['setResolution', 8, 4], 'setResolution attempted');
+  assert.ok(!posted.some((p) => p.msg.type === 'ready'), 'no ready for a rejected resolution');
 });
 
 /** render copies exactly this segment's quadrant rows out of the full buffer. */
