@@ -105,9 +105,9 @@ export class Daydream {
   static CAMERA_Z = 220;
 
   static SPHERE_RADIUS = 30;
-  // A framing ratio, not a true cosine: the use site rescales it by the live
-  // camera distance so the visible label set doesn't drift with orbit distance.
-  static LABEL_VISIBILITY_COS = Daydream.SPHERE_RADIUS / Daydream.CAMERA_Z;
+  // The use site rescales this by the live camera distance so the visible label
+  // set doesn't drift with orbit distance.
+  static LABEL_VISIBILITY_FRAMING_RATIO = Daydream.SPHERE_RADIUS / Daydream.CAMERA_Z;
   static H = 20;
   static W = 96;
   static PIXEL_WIDTH = 2 * Math.PI / Daydream.W;
@@ -495,7 +495,7 @@ export class Daydream {
     // position is a unit direction, so position·cameraPos == |cameraPos|·cos(angle);
     // scaling the cutoff by the live distance keeps the visible set zoom-independent.
     const facingThreshold =
-      Daydream.LABEL_VISIBILITY_COS * this.camera.position.length();
+      Daydream.LABEL_VISIBILITY_FRAMING_RATIO * this.camera.position.length();
     for (const label of labels) {
       if (label.position.dot(this.camera.position) > facingThreshold) {
         this.labelPool.acquire(label.position, label.content);
