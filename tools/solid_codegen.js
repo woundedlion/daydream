@@ -24,6 +24,21 @@ const KNOWN_OPS = new Set([
 // guard its shape against the valid-identifier pattern.
 const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+// Op params become C++ literals, so reject anything that would emit NaN/Inf or a
+// malformed token. requireFinite covers fractional params; requireCount also
+// enforces a non-negative integer (e.g. a relax iteration count).
+function requireFinite(opName, param, val) {
+  if (!Number.isFinite(val)) {
+    throw new Error(`generateFuncAndRecipe: ${opName} param "${param}" must be a finite number, got ${val}`);
+  }
+}
+
+function requireCount(opName, param, val) {
+  if (!Number.isInteger(val) || val < 0) {
+    throw new Error(`generateFuncAndRecipe: ${opName} param "${param}" must be a non-negative integer, got ${val}`);
+  }
+}
+
 export const formatFloat = formatFloatCpp;
 
 /**
@@ -72,15 +87,19 @@ export function generateFuncAndRecipe(item) {
     }
 
     if (opName === 'truncate') {
+      requireFinite(opName, 't', o.params.t);
       chain += `.truncate(${formatFloat(o.params.t)})`;
       nameParts.push(`_truncate${pctSuffix(o.params.t)}`);
     } else if (opName === 'expand') {
+      requireFinite(opName, 't', o.params.t);
       chain += `.expand(${formatFloat(o.params.t)})`;
       nameParts.push(`_expand${pctSuffix(o.params.t)}`);
     } else if (opName === 'chamfer') {
+      requireFinite(opName, 't', o.params.t);
       chain += `.chamfer(${formatFloat(o.params.t)})`;
       nameParts.push(`_chamfer${pctSuffix(o.params.t)}`);
     } else if (opName === 'hankin') {
+      requireFinite(opName, 'angle', o.params.angle);
       chain += `.hankin(${formatFloat(o.params.angle)} * D2R)`;
       nameParts.push(`_hk${Math.round(o.params.angle)}`);
     } else if (opName === 'snub') {
@@ -91,9 +110,11 @@ export function generateFuncAndRecipe(item) {
       // `??` not `||`: an explicit iter:0 is a valid no-op relax count and must
       // not fall back to the 100 default.
       const iter = o.params.iter ?? 100;
+      requireCount(opName, 'iter', iter);
       chain += `.relax(${iter})`;
       nameParts.push(`_relax${iter}`);
     } else if (opName === 'bevel') {
+      requireFinite(opName, 't', o.params.t);
       chain += `.bevel(${formatFloat(o.params.t)})`;
       nameParts.push(`_bevel${pctSuffix(o.params.t)}`);
     } else {
