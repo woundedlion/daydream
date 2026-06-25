@@ -78,27 +78,48 @@ const effectsByResolution = {
   "Phantasm (144x288)": HiResFavorites,
 };
 
-let wasmModule = null;
-let wasmEngine = null;
-let wasmMemoryView = null;
-let wasmAdapter = null;
-let recorder = null;
-
 /**
- * Re-fetch the WASM pixel view when missing or detached (heap growth can detach
- * the underlying ArrayBuffer, leaving a zero-length view), and re-point the two
- * display aliases at it so source, displayed attribute, and Daydream.pixels match.
- * @returns {void}
+ * Owns the main-thread WASM engine and its reassignable display state. The pixel
+ * view detaches on heap growth, so consumers read it through view()/refresh()
+ * rather than caching it; engine, adapter, and recorder are late-bound at WASM load.
  */
-function refreshPixelView() {
-  const { view, refreshed } = computePixelView(
-    wasmMemoryView, () => wasmEngine.getPixels());
-  if (refreshed) {
-    wasmMemoryView = view;
-    daydream.dotMesh.instanceColor.array = view;
-    Daydream.pixels = view;
+class EngineHost {
+  constructor() {
+    this.module = null;
+    this.engine = null;
+    this.adapter = null;
+    this.recorder = null;
+    this._view = null;
+  }
+
+  /** Current Uint16Array display view; null until the first refresh() or after a resize. */
+  view() {
+    return this._view;
+  }
+
+  /** Drop the cached view so the next refresh() re-fetches it (used after a resize). */
+  invalidateView() {
+    this._view = null;
+  }
+
+  /**
+   * Re-fetch the WASM pixel view when missing or detached (heap growth can detach
+   * the underlying ArrayBuffer, leaving a zero-length view), and re-point the two
+   * display aliases at it so source, displayed attribute, and Daydream.pixels match.
+   * @returns {void}
+   */
+  refresh() {
+    const { view, refreshed } = computePixelView(
+      this._view, () => this.engine.getPixels());
+    if (refreshed) {
+      this._view = view;
+      daydream.dotMesh.instanceColor.array = view;
+      Daydream.pixels = view;
+    }
   }
 }
+
+const host = new EngineHost();
 
 /**
  * Push the engine's per-frame parameter values back into the effect GUI so
@@ -110,7 +131,7 @@ function syncGUI() {
   if (!activeEffect || !activeEffect.controllerByName) return;
 
   // Heap growth can detach this view to zero length; guard rather than mis-read.
-  const values = wasmEngine.getParamValues();
+  const values = host.engine.getParamValues();
   if (values.length === 0) return;
 
   const names = activeEffect.paramNames;
@@ -158,9 +179,9 @@ const urlSync = new URLSync(appState, ['effect', 'resolution'], {
 const segments = new SegmentController({
   resolutionPresets,
   appState,
-  getWasmEngine: () => wasmEngine,
-  refreshPixelView,
-  getMemoryView: () => wasmMemoryView,
+  getWasmEngine: () => host.engine,
+  refreshPixelView: () => host.refresh(),
+  getMemoryView: () => host.view(),
   statsDoc: document,
 });
 
@@ -201,19 +222,19 @@ function applyEffect(preserveParams = false) {
     resetGUI(['resolution', 'effect', ...guiInstance.collectUrlKeys()]);
   }
 
-  if (wasmEngine) {
-    if (wasmEngine.setEffect(appState.get('effect')) === false) {
+  if (host.engine) {
+    if (host.engine.setEffect(appState.get('effect')) === false) {
       console.error(`setEffect("${appState.get('effect')}") failed; effect unavailable.`);
       // The early return skips the end-of-function sync; run it here.
       if (segments.workers.length > 0) segments.setEffect(appState.get('effect'));
       sidebar.setActive(appState.get('effect'));
       return;
     }
-    daydream.setStrobeColumns(wasmEngine.strobeColumns());
+    daydream.setStrobeColumns(host.engine.strobeColumns());
 
     activeEffect = { gui: new GUI({ autoPlace: false }), activeDragEnds: new Set() };
 
-    const params = wasmEngine.getParameterDefinitions();
+    const params = host.engine.getParameterDefinitions();
 
     const effectActions = {
       /**
@@ -227,7 +248,7 @@ function applyEffect(preserveParams = false) {
        * @returns {void}
        */
       export() {
-        const values = wasmEngine.getParamValues();
+        const values = host.engine.getParamValues();
         // A heap-growth detach leaves the view zero-length; skip so we don't copy
         // an all-zero preset.
         if (values.length === 0) {
@@ -275,7 +296,7 @@ function applyEffect(preserveParams = false) {
      */
     const setPaused = (v) => {
       animState.pause = v;
-      wasmEngine.setAnimationsPaused(v);
+      host.engine.setAnimationsPaused(v);
       segments.setAnimationsPaused(v);
     };
     if (hasAnimated) {
@@ -329,13 +350,13 @@ function applyEffect(preserveParams = false) {
       // render the default while the slider shows the URL value.
       if (!p.readonly) {
         const initVal = isBool ? (state[p.name] ? 1.0 : 0.0) : state[p.name];
-        if (wasmEngine.setParameter(p.name, initVal) === false)
+        if (host.engine.setParameter(p.name, initVal) === false)
           console.warn(`setParameter("${p.name}") rejected as unknown.`);
       }
 
       controller.onChange(v => {
         const floatVal = (typeof v === 'boolean') ? (v ? 1.0 : 0.0) : v;
-        if (wasmEngine.setParameter(p.name, floatVal) === false)
+        if (host.engine.setParameter(p.name, floatVal) === false)
           console.warn(`setParameter("${p.name}") rejected as unknown.`);
         segments.setParameter(p.name, floatVal);
         // Touching an animated slider takes over from the animation.
@@ -385,12 +406,12 @@ function applyResolution(preserveParams = false) {
   const p = resolutionPresets[resolution];
   if (!p) return;
 
-  if (wasmEngine) {
-    if (wasmEngine.setResolution(p.w, p.h) === false) {
+  if (host.engine) {
+    if (host.engine.setResolution(p.w, p.h) === false) {
       console.error(`Unsupported resolution ${p.w}x${p.h}; keeping current.`);
       return;
     }
-    wasmMemoryView = null; // force refreshPixelView to re-fetch after resize
+    host.invalidateView(); // force host.refresh() to re-fetch after resize
   }
 
   if (segments.workers.length > 0) {
@@ -402,8 +423,8 @@ function applyResolution(preserveParams = false) {
   daydream.updateResolution(p.h, p.w, p.dotSize);
 
   let effectSizes = null;
-  if (wasmEngine) {
-    try { effectSizes = wasmEngine.getEffectSizes(); }
+  if (host.engine) {
+    try { effectSizes = host.engine.getEffectSizes(); }
     catch (e) { console.warn('getEffectSizes failed (sidebar sizes unavailable):', e); }
   }
   sidebar.setEffects(availableEffects, effectSizes);
@@ -438,12 +459,12 @@ appState.subscribe((key, value, old) => {
 ///////////////////////////////////////////////////////////////////////////////
 
 createHolosphereModule().then(module => {
-  wasmModule = module;
-  wasmEngine = new module.HolosphereEngine();
+  host.module = module;
+  host.engine = new module.HolosphereEngine();
 
   // Apply the hydrated resolution before first paint.
   const p = resolutionPresets[appState.get('resolution')];
-  if (p && wasmEngine.setResolution(p.w, p.h) === false) {
+  if (p && host.engine.setResolution(p.w, p.h) === false) {
     console.error(`Init: unsupported resolution ${p.w}x${p.h} from hydrated preset; ` +
       `keeping the engine's current resolution.`);
   }
@@ -451,7 +472,7 @@ createHolosphereModule().then(module => {
   // setEffect happens once via applyResolution(true) below, after it validates the
   // hydrated effect against this resolution's allow-list.
 
-  wasmAdapter = {
+  host.adapter = {
     /**
      * Per-frame entry the driver calls: render (segmented or single-engine),
      * republish the pixel view, then mirror engine params back into the GUI.
@@ -463,15 +484,15 @@ createHolosphereModule().then(module => {
         // buffer) and dispatch the next.
         segments.tick();
       } else {
-        wasmEngine.drawFrame();
-        refreshPixelView();
+        host.engine.drawFrame();
+        host.refresh();
         // All three aliases must point at the one WASM view; fail loudly if a
         // future change re-points only some.
-        if (Daydream.pixels !== wasmMemoryView ||
-            daydream.dotMesh.instanceColor.array !== wasmMemoryView) {
+        if (Daydream.pixels !== host.view() ||
+            daydream.dotMesh.instanceColor.array !== host.view()) {
           throw new Error(
-            "drawFrame: display-buffer alias broken after refreshPixelView() — " +
-            "Daydream.pixels / instanceColor.array / wasmMemoryView diverged; the " +
+            "drawFrame: display-buffer alias broken after host.refresh() — " +
+            "Daydream.pixels / instanceColor.array / host view diverged; the " +
             "rendered WASM buffer is not the one being cleared and displayed");
         }
         daydream.dotMesh.instanceColor.needsUpdate = true;
@@ -483,7 +504,7 @@ createHolosphereModule().then(module => {
      * @returns {Object} The WASM engine's arena metrics snapshot.
      */
     getArenaMetrics() {
-      return wasmEngine.getArenaMetrics();
+      return host.engine.getArenaMetrics();
     },
     /**
      * Whether the buffer holds a real frame the recorder may capture this tick.
@@ -501,9 +522,9 @@ createHolosphereModule().then(module => {
   console.log("Wasm Engine Loaded");
 
   // Construct the recorder now that daydream's canvas exists.
-  recorder = new VideoRecorder(daydream.canvas);
-  recorder.frameInterval = daydream.frameInterval;
-  daydream.recorder = recorder;
+  host.recorder = new VideoRecorder(daydream.canvas);
+  host.recorder.frameInterval = daydream.frameInterval;
+  daydream.recorder = host.recorder;
 
   const loadingOverlay = document.getElementById('loading-overlay');
   if (loadingOverlay) loadingOverlay.remove();
@@ -552,7 +573,7 @@ let testAllInterval = null;
 guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => {
   if (v) {
     testAllInterval = setInterval(() => {
-      if (!wasmEngine) return;
+      if (!host.engine) return;
       const currentList = effectsByResolution[appState.get('resolution')];
       if (!currentList || currentList.length === 0) return;
       const currentEffect = appState.get('effect');
@@ -601,7 +622,7 @@ const recSettings = { _quality: 16, _resolution: 'Native', _format: 'Auto' };
 // These settings are latched at recorder.start(); warn that a mid-recording
 // change won't take effect until the next start().
 const warnIfRecording = (label) => {
-  if (recorder?.isRecording) {
+  if (host.recorder?.isRecording) {
     console.warn(`Recording: ${label} change applies to the next recording (the current one is already running).`);
   }
 };
@@ -609,7 +630,7 @@ Object.defineProperty(recSettings, 'quality', {
   get() { return this._quality; },
   set(v) {
     this._quality = v;
-    if (recorder) recorder.bitrateMbps = v;
+    if (host.recorder) host.recorder.bitrateMbps = v;
     warnIfRecording('bitrate');
   }
 });
@@ -617,8 +638,8 @@ Object.defineProperty(recSettings, 'recResolution', {
   get() { return this._resolution; },
   set(v) {
     this._resolution = v;
-    if (recorder) {
-      recorder.targetHeight = REC_RESOLUTIONS[v];
+    if (host.recorder) {
+      host.recorder.targetHeight = REC_RESOLUTIONS[v];
     }
     warnIfRecording('resolution');
   }
@@ -627,7 +648,7 @@ Object.defineProperty(recSettings, 'recFormat', {
   get() { return this._format; },
   set(v) {
     this._format = v;
-    if (recorder) recorder.format = REC_FORMATS[v];
+    if (host.recorder) host.recorder.format = REC_FORMATS[v];
     warnIfRecording('format');
   }
 });
@@ -638,9 +659,9 @@ durationEl.style.display = 'none';
 document.getElementById('canvas-container')?.appendChild(durationEl);
 
 const recordState = { record: () => {
-  if (!recorder) return;
+  if (!host.recorder) return;
   const canvasEl = document.getElementById('canvas-container');
-  const nowRecording = recorder.toggle(appState.get('effect'));
+  const nowRecording = host.recorder.toggle(appState.get('effect'));
   if (nowRecording) {
     canvasEl?.classList.add('recording');
     durationEl.style.display = '';
@@ -675,11 +696,11 @@ const onKeyDown = (e) => {
 window.addEventListener("keydown", onKeyDown);
 
 daydream.renderer.setAnimationLoop(() => {
-  if (wasmAdapter) {
-    daydream.render(wasmAdapter);
+  if (host.adapter) {
+    daydream.render(host.adapter);
   }
-  if (recorder?.isRecording) {
-    durationEl.textContent = recorder.elapsedFormatted;
+  if (host.recorder?.isRecording) {
+    durationEl.textContent = host.recorder.elapsedFormatted;
   }
 });
 
@@ -699,7 +720,7 @@ function disposeApp() {
     clearInterval(testAllInterval);
     testAllInterval = null;
   }
-  recorder?.stop();
+  host.recorder?.stop();
   urlSync.dispose();
   sidebar.dispose();
   daydream.dispose();
