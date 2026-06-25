@@ -301,6 +301,42 @@ test('the boot watchdog faults fast when a worker never sends booted', () => {
   }
 });
 
+test('the boot watchdog names the segments that never booted', () => {
+  const realSetTimeout = globalThis.setTimeout;
+  const timers = [];
+  globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
+  try {
+    const c = makeController();
+    c.create(3);
+    deliverBooted(c, 0); // only seg 0 boots; 1 and 2 hang
+    timers[0]();
+    assert.equal(c.faulted, true);
+    assert.match(c.faultInfo.message, /1\/3 booted/);
+    assert.match(c.faultInfo.message, /never booted: 1, 2/);
+    assert.equal(c.faultInfo.segId, -1, 'multiple missing -> pool-wide segId');
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+});
+
+test('a single missing segment is named directly in the watchdog fault', () => {
+  const realSetTimeout = globalThis.setTimeout;
+  const timers = [];
+  globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
+  try {
+    const c = makeController();
+    c.create(2);
+    deliverBooted(c, 0);
+    deliverReady(c, 0); // seg 0 fully up; seg 1 never readies
+    timers[1](); // init watchdog
+    assert.equal(c.faulted, true);
+    assert.match(c.faultInfo.message, /never ready: 1/);
+    assert.equal(c.faultInfo.segId, 1);
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+});
+
 test('a booted ping is handled and does not by itself make the pool ready', () => {
   const c = makeController();
   c.create(2);

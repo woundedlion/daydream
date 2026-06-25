@@ -163,8 +163,17 @@ export class SegmentController {
     this.arenas = new Array(numSegments).fill(null);
     this.ready = false;
 
+    // Per-index boot/ready state so a watchdog fault names the segments that
+    // never reported, not just a count.
+    const booted = new Array(numSegments).fill(false);
+    const readied = new Array(numSegments).fill(false);
     let readyCount = 0;
     let bootedCount = 0;
+    const missing = (state) => {
+      const out = [];
+      for (let i = 0; i < numSegments; i++) if (!state[i]) out.push(i);
+      return out;
+    };
 
     const initialParams = this._snapshotParams();
 
@@ -174,7 +183,7 @@ export class SegmentController {
       worker.onmessage = (e) => {
         const msg = /** @type {ControllerInboundMsg} */ (e.data);
         if (msg.type === 'ready') {
-          readyCount++;
+          if (!readied[i]) { readied[i] = true; readyCount++; }
           if (readyCount === numSegments) {
             this.ready = true;
             this._clearBootWatchdog();
@@ -182,7 +191,7 @@ export class SegmentController {
             console.log(`[Segmented] All ${numSegments} workers ready`);
           }
         } else if (msg.type === 'booted') {
-          bootedCount++;
+          if (!booted[i]) { booted[i] = true; bootedCount++; }
           if (bootedCount === numSegments) this._clearBootWatchdog();
         } else if (msg.type === 'effectReady') {
           // no action needed
@@ -244,9 +253,11 @@ export class SegmentController {
     this._bootWatchdog = setTimeout(() => {
       this._bootWatchdog = null;
       if (!this.ready && !this.faulted) {
-        this._onWorkerFault(-1,
+        const stuck = missing(booted);
+        this._onWorkerFault(stuck.length === 1 ? stuck[0] : -1,
           `worker module load timed out after ${BOOT_WATCHDOG_MS} ms `
-          + `(${bootedCount}/${numSegments} booted) — a worker module likely `
+          + `(${bootedCount}/${numSegments} booted; never booted: `
+          + `${stuck.join(', ')}) — a worker module likely `
           + `failed to load (commonly a missing or renamed holosphere_wasm.js)`);
       }
     }, BOOT_WATCHDOG_MS);
@@ -256,10 +267,11 @@ export class SegmentController {
     this._initWatchdog = setTimeout(() => {
       this._initWatchdog = null;
       if (!this.ready && !this.faulted) {
-        this._onWorkerFault(-1,
+        const stuck = missing(readied);
+        this._onWorkerFault(stuck.length === 1 ? stuck[0] : -1,
           `worker init timed out after ${INIT_WATCHDOG_MS} ms `
-          + `(${readyCount}/${numSegments} ready) — a WASM module likely failed `
-          + `to load without throwing`);
+          + `(${readyCount}/${numSegments} ready; never ready: ${stuck.join(', ')}) `
+          + `— a WASM module likely failed to load without throwing`);
       }
     }, INIT_WATCHDOG_MS);
     // unref() exists under Node (keep the test process from hanging), not the browser.
