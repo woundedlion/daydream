@@ -276,6 +276,10 @@ class DeepLinkGUI {
         strVal = '#' + v.getHexString();
       } else if (Array.isArray(v)) {
         strVal = `rgb(${v[0]},${v[1]},${v[2]})`;
+      } else if (typeof v === 'number') {
+        strVal = '#' + ((v >>> 0) & 0xffffff).toString(16).padStart(6, '0');
+      } else if (typeof v === 'string') {
+        strVal = /^[0-9a-fA-F]{6}$/.test(v) ? `#${v}` : v;
       }
       this._urlWriter(key, strVal);
     }, urlApplied);
