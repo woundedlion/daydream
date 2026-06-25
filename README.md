@@ -418,7 +418,7 @@ A typical effect frame follows a four-stage pipeline. Not every effect uses ever
 
 **Rasterize**: Convert geometry to pixels. Two families:
 - **SDF path** (`sdf.h` → `scan.h`): analytic shapes with scanline intervals and `quintic_kernel` anti-aliasing
-- **Plot path** (`plot.h`): line/curve rasterization with adaptive step size scaled by `sin(φ)` for uniform sampling
+- **Plot path** (`plot.h`): line/curve rasterization with adaptive step size from full 2-D screen-velocity tracking for uniform sampling
 - **Shader path** (`Scan::Shader`): full-screen per-pixel evaluation with optional SSAA
 
 **Filter**: The `Pipeline<W, H, Filters...>` variadic template processes each plotted point through a chain of filter stages before it reaches the canvas.
@@ -1071,7 +1071,7 @@ The mesh system is split across several files:
 
 #### Conway Operators (`conway.h`)
 
-All Conway operators are templated on input mesh type and take `(const MeshT& mesh, Arena& target, Arena& temp)`. `MeshT` can be either `PolyMesh` or `MeshState`. **Primitive** operators produce their `PolyMesh` into `target` and use `temp` for intermediate computation. **Composed** operators (`gyro`, `meta`, `needle`, `zip`, `bevel`) reuse the same internal ping-pong as their two constituent ops, so they return their output in `temp` — the *opposite* arena from a primitive (see the load-bearing COMPOSITION POLARITY note in `conway.h`). Plan arena lifetimes accordingly when invoking a composed operator directly rather than through `SolidBuilder`:
+All Conway operators take `(const PolyMesh& mesh, Arena& target, Arena& temp)`. **Primitive** operators produce their `PolyMesh` into `target` and use `temp` for intermediate computation. **Composed** operators (`gyro`, `meta`, `needle`, `zip`, `bevel`) reuse the same internal ping-pong as their two constituent ops, so they return their output in `temp` — the *opposite* arena from a primitive (see the load-bearing COMPOSITION POLARITY note in `conway.h`). Plan arena lifetimes accordingly when invoking a composed operator directly rather than through `SolidBuilder`:
 
 | Operation | Description |
 |---|---|
@@ -1543,7 +1543,7 @@ Procedurally generates Islamic geometric patterns using Hankin's method (pentago
 
 #### HankinSolids
 
-Similar to IslamicStars but sequences through the full Archimedean solid library with animated palette transitions.
+Similar to IslamicStars but sequences through the Platonic and Archimedean solids with animated palette transitions.
 
 </td></tr></table>
 
@@ -1579,6 +1579,8 @@ A latitude-longitude grid that undergoes live Möbius transformation animation v
 
 Two counter-rotating families of concentric rings that beat against each other into a shifting moiré interference pattern, driven by an animated ring-distortion amplitude.
 
+**Parameters**: Alpha, Density, Amp
+
 </td></tr></table>
 
 <table border="0"><tr>
@@ -1599,7 +1601,7 @@ FastNoiseLite-driven flow field. Three independently offset 3D-noise channels fo
 
 #### Voronoi
 
-Spherical Voronoi diagram with animated seed positions. Cells are always filled with per-site palette colors (smoothly blended across the seam between the nearest two sites); an optional black border seam is painted between neighboring cells when **Border Thick** > 0 (off by default).
+Spherical Voronoi diagram with animated seed positions. Cells are always filled with per-site palette colors (blended across the seam between the nearest two sites); an optional black border seam is painted between neighboring cells when **Border Thick** > 0 (off by default).
 
 **Parameters**: Num Sites, Speed, Sharpness, Border Thick
 
@@ -1612,6 +1614,8 @@ Spherical Voronoi diagram with animated seed positions. Cells are always filled 
 #### PetalFlow
 
 Polyline rings drift pole-to-pole through an inverse stereographic projection, each wobbled into petal lobes and twisted by an angle that grows with its position; rasterized via Plot.
+
+**Parameters**: Twist, Speed, Alpha
 
 </td></tr></table>
 
@@ -1634,6 +1638,8 @@ Draws twisting wireframe knotted structures derived from Archimedean solids. Mes
 #### Comets
 
 A single head traces spherical Lissajous curves, cycling through a dozen configurations, trailed by a long 115-frame orientation tail and periodically wiping the palette to a fresh triadic scheme.
+
+**Parameters**: Alpha, Thickness, Cycle Dur, Debug BB
 
 </td></tr></table>
 
@@ -1669,6 +1675,8 @@ Rings bloom at random orientations and grow their radius from zero, fading in ov
 
 A head traces a fixed 12:5 spherical Lissajous figure whose long trail is continuously warped by a noise transformer, over a slowly cycling gradient palette.
 
+**Parameters**: Alpha, Cycle Dur, Speed, Jitter Amp, Noise Freq, Scale Factor, Cycle Speed
+
 </td></tr></table>
 
 <table border="0"><tr>
@@ -1700,6 +1708,8 @@ Stereographic-projection shader (extends `Effect` directly) that samples world-s
 #### MindSplatter
 
 Random-walk particle system with Möbius warp bursts.
+
+**Parameters**: Friction, Well Str, Init Spd, Ang Spd, Particles
 
 </td></tr></table>
 
@@ -1734,6 +1744,8 @@ A central distorted ring (`Plot::DistortedRing`) warps and spins; periodic rando
 #### GnomonicStars
 
 A Fibonacci-spiral field of star-polygon SDFs, continuously deformed by an evolving Möbius warp (built on a gnomonic-projection transformer) and slowly tumbled by a Languid random walk.
+
+**Parameters**: Points, Radius, Sides, Debug BB, Warp Speed
 
 </td></tr></table>
 
