@@ -317,6 +317,10 @@ export class SegmentController {
     this.arenas = [];
     this.ready = false;
     this.pending = 0;
+    // Open a new generation before settling: the in-flight render's `.then`
+    // resolves on a later microtask, after a fresh pool may exist; bumping here
+    // fails its `inflightGen === renderGen` guard so it can't arm the new pool.
+    this.renderGen++;
     // Settle any in-flight render promise so it never leaks unresolved.
     if (this.frameResolve) {
       const resolve = this.frameResolve;

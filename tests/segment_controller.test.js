@@ -224,6 +224,21 @@ test('a frame dispatched before a resolution change is dropped but still settles
   await done;
 });
 
+test('destroy() bumps the generation so a stale in-flight .then cannot arm a new pool', async () => {
+  const c = makeController();
+  c.create(2);
+  const done = c.renderParallel();
+  const dispatchGen = c.inflightGen;
+
+  // Recreate the pool while a render is in flight; destroy() settles `done`.
+  c.create(2);
+  await done;
+
+  // The stale .then's guard (inflightGen === renderGen) must fail.
+  assert.equal(c.inflightGen, dispatchGen, 'inflight snapshot is unchanged');
+  assert.notEqual(c.inflightGen, c.renderGen, 'generation moved on under it');
+});
+
 // ---------------------------------------------------------------------------
 // Fault latch (deadlock break)
 // ---------------------------------------------------------------------------
