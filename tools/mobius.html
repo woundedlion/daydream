@@ -636,10 +636,13 @@
       const onTouchStart = (e) => {
         e.preventDefault();
         const touch = e.touches[0];
+        if (!touch) return;
         handleInput(touch.clientX, touch.clientY);
         const onTouchMove = (ev) => {
           ev.preventDefault();
+          // touchend can fire a move with an empty list mid-gesture.
           const moveTouch = ev.touches[0];
+          if (!moveTouch) return;
           handleInput(moveTouch.clientX, moveTouch.clientY);
         };
         const onTouchEnd = () => {
