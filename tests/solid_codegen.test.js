@@ -71,6 +71,23 @@ test('generateFuncAndRecipe defaults an absent relax iter to 100', () => {
   assert.equal(funcName, 'cube_relax100');
 });
 
+/** Verifies snub emits both t and twist params (matching the live preview) and encodes each in the funcName. */
+test('generateFuncAndRecipe emits snub t and twist', () => {
+  const item = { base: 'icosahedron', ops: [{ op: 'snub', params: { t: 0.33, twist: 0.28 } }] };
+  const { funcName, recipe } = generateFuncAndRecipe(item);
+  assert.equal(funcName, 'icosahedron_snub33_tw28');
+  assert.equal(recipe, 'SolidBuilder(icosahedron(a, b), a, b).snub(0.33f, 0.28f).build()');
+});
+
+/** Verifies snub falls back to SolidBuilder's own defaults (t=0.5, twist=0.0) when params are unset. */
+test('generateFuncAndRecipe defaults snub t/twist', () => {
+  for (const ops of [['snub'], [{ op: 'snub', params: {} }]]) {
+    const { funcName, recipe } = generateFuncAndRecipe({ base: 'cube', ops });
+    assert.equal(funcName, 'cube_snub50_tw00');
+    assert.equal(recipe, 'SolidBuilder(cube(a, b), a, b).snub(0.5f, 0.0f).build()');
+  }
+});
+
 /** Verifies generateRecipeCpp emits the full FLASHMEM function source, prefixed by the V/F/I count comment, byte-for-byte. */
 test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comment', () => {
   const item = {
