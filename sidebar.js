@@ -119,7 +119,7 @@ export class EffectSidebar {
         btn.appendChild(sizeSpan);
       }
 
-      btn.onclick = () => this.onSelect(name);
+      btn.onclick = () => { this._setRovingTabbable(btn); this.onSelect(name); };
       this.buttons.set(name, btn);
     });
 
