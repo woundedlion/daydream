@@ -196,6 +196,7 @@ class DeepLinkGUI {
 
     const params = getUrlParams();
     let urlApplied = false;
+    let valClamped = false;
     if (!isFunction && params.has(key)) {
       let val = params.get(key);
       const currentVal = object[prop];
@@ -209,6 +210,7 @@ class DeepLinkGUI {
         } else {
           // lil-gui numeric add() signature is add(obj, prop, min, max, step).
           const min = args[0], max = args[1], step = args[2];
+          const raw = val;
           if (typeof min === 'number' && val < min) val = min;
           if (typeof max === 'number' && val > max) val = max;
           // The URL path bypasses lil-gui's step snapping, so snap to a step multiple.
@@ -216,6 +218,7 @@ class DeepLinkGUI {
             const anchor = typeof min === 'number' ? min : 0;
             val = anchor + Math.round((val - anchor) / step) * step;
           }
+          valClamped = val !== raw;
         }
       } else if (typeof currentVal === 'boolean') {
         const t = val.trim().toLowerCase();
@@ -246,6 +249,8 @@ class DeepLinkGUI {
     }
 
     if (!isFunction && urlApplied) {
+      // Clamping/snapping changed the value: rewrite the URL so it no longer holds the stale out-of-range one.
+      if (valClamped) this._urlWriter(key, controller.getValue());
       try { controller.updateDisplay(); }
       catch (e) { console.warn(`DeepLinkGUI: updateDisplay failed for "${key}":`, e); }
     }
