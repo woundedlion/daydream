@@ -25,9 +25,15 @@ const local = process.argv.includes('--local');
 
 const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
 const versions = {
-  three: pkg.dependencies.three,
-  lilGui: pkg.dependencies['lil-gui'],
+  three: pkg.dependencies?.three,
+  lilGui: pkg.dependencies?.['lil-gui'],
 };
+for (const [lib, name] of [['three', 'three'], ['lilGui', 'lil-gui']]) {
+  if (typeof versions[lib] !== 'string' || versions[lib] === '') {
+    console.error(`generate-importmap: package.json dependencies.${name} is missing or empty`);
+    process.exit(1);
+  }
+}
 
 // Entry points that must exist for a library to count as locally vendored.
 const probes = {
