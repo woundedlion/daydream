@@ -1,0 +1,18 @@
+#!/bin/sh
+# Refuse any non-fast-forward move of refs/heads/master so concurrent
+# code-review-fix sessions cannot clobber each other's landed work.
+# Escape hatch for intentional rewinds: HS_ALLOW_NONFF=1.
+[ "$1" = "prepared" ] || exit 0
+[ "${HS_ALLOW_NONFF:-0}" = "1" ] && exit 0
+
+z='0000000000000000000000000000000000000000'
+while read -r old new ref; do
+	[ "$ref" = "refs/heads/master" ] || continue
+	case "$old" in "$z"|"") continue ;; esac   # ref creation
+	case "$new" in "$z"|"") continue ;; esac   # ref deletion
+	if ! git merge-base --is-ancestor "$old" "$new"; then
+		echo "reference-transaction: REFUSED non-fast-forward update of master ($old -> $new); set HS_ALLOW_NONFF=1 to override" >&2
+		exit 1
+	fi
+done
+exit 0

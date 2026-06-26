@@ -4,3 +4,6 @@ holosphere_wasm.sha        text eol=lf
 holosphere_wasm.wasm.sha256 text eol=lf
 *.yml                      text eol=lf
 holosphere_wasm.wasm       binary
+
+# Git hooks are sourced by /bin/sh; CRLF would break the shebang on checkout.
+.githooks/**               text eol=lf

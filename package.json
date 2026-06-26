@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks || true",
     "test": "node --test --experimental-test-module-mocks \"tests/*.test.js\"",
     "importmap": "node scripts/generate-importmap.mjs",
     "importmap:local": "node scripts/generate-importmap.mjs --local"
