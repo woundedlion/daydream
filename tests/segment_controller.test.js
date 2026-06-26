@@ -429,7 +429,29 @@ test('composite() throws on a rectangle that overflows the current display buffe
 
   assert.throws(() => c.composite(), /out of bounds/);
   assert.ok(Daydream.pixels.every((v) => v === 0),
-    'out-of-bounds rect is never partially blitted');
+    'a leading out-of-bounds rect is never partially blitted');
+});
+
+test('composite() blits good segments before throwing on a later overflow', () => {
+  // The bounds check runs per result inside the blit loop, so a good segment
+  // ahead of the overflowing one is already composited when the throw fires —
+  // the no-partial-output guarantee only holds for a leading bad segment.
+  Daydream.W = 4; Daydream.H = 2;
+  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+
+  const c = makeController();
+  c.showBoundaries = false;
+  const good = new Uint16Array(2 * 2 * 3).fill(111);
+  const bad = new Uint16Array(2 * 2 * 3).fill(222);
+  c.results = [
+    { pixels: good, x0: 0, x1: 2, y0: 0, y1: 2, quadW: 2, quadH: 2 },
+    { pixels: bad, x0: 2, x1: 99, y0: 0, y1: 2, quadW: 2, quadH: 2 }, // x1=99 overshoots W=4
+  ];
+
+  assert.throws(() => c.composite(), /segment 1 .* out of bounds/);
+  assert.equal(Daydream.pixels[idx(0, 0, 4)], 111,
+    'the good leading segment was blitted before the overflow threw');
+  assert.equal(Daydream.pixels[idx(1, 1, 4)], 111, 'good segment fully blitted');
 });
 
 test('composite() marks both the internal split and the x=0 wrap seam', () => {
