@@ -720,9 +720,13 @@ export class Daydream {
     }
 
     if (this.dotMesh) {
-      if (!this.dotMesh.instanceColor) {
+      const needed = this.dotMesh.count * 3;
+      // Reallocate on a count change too, not just when null — a stale buffer
+      // sized to a previous count would silently mismatch the instance count.
+      if (!this.dotMesh.instanceColor ||
+          this.dotMesh.instanceColor.array.length !== needed) {
         this.dotMesh.instanceColor = new THREE.InstancedBufferAttribute(
-          new Uint16Array(this.dotMesh.count * 3), 3, true
+          new Uint16Array(needed), 3, true
         );
         this.dotMesh.instanceColor.colorSpace = THREE.LinearSRGBColorSpace;
         this.dotMesh.instanceColor.setUsage(THREE.StreamDrawUsage);
