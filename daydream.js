@@ -472,6 +472,7 @@ createHolosphereModule().then(module => {
   // setEffect happens once via applyResolution(true) below, after it validates the
   // hydrated effect against this resolution's allow-list.
 
+  let aliasDivergenceLogged = false;
   host.adapter = {
     /**
      * Per-frame entry the driver calls: render (segmented or single-engine),
@@ -486,14 +487,20 @@ createHolosphereModule().then(module => {
       } else {
         host.engine.drawFrame();
         host.refresh();
-        // All three aliases must point at the one WASM view; fail loudly if a
-        // future change re-points only some.
-        if (Daydream.pixels !== host.view() ||
-            daydream.dotMesh.instanceColor.array !== host.view()) {
-          throw new Error(
-            "drawFrame: display-buffer alias broken after host.refresh() — " +
-            "Daydream.pixels / instanceColor.array / host view diverged; the " +
-            "rendered WASM buffer is not the one being cleared and displayed");
+        // All three aliases must point at the one WASM view. Throwing here would
+        // fault the animation loop every frame and halt rendering; instead log
+        // once and re-point the aliases so a future divergence self-heals.
+        const view = host.view();
+        if (Daydream.pixels !== view ||
+            daydream.dotMesh.instanceColor.array !== view) {
+          if (!aliasDivergenceLogged) {
+            console.error(
+              "drawFrame: display-buffer alias diverged after host.refresh() — " +
+              "re-pointing Daydream.pixels / instanceColor.array at the WASM view");
+            aliasDivergenceLogged = true;
+          }
+          Daydream.pixels = view;
+          daydream.dotMesh.instanceColor.array = view;
         }
         daydream.dotMesh.instanceColor.needsUpdate = true;
       }
