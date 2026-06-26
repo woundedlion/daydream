@@ -19,7 +19,6 @@ const g = 1 / PHI;
  * @returns {string} The symbolic name or a 3-decimal string representation.
  */
 export const prettify = (r) => {
-  let precision = 3;
   if (Math.abs(r) <= 0.00001) return "0";
   if (Math.abs(r - 1) <= 0.00001) return "1";
   if (Math.abs(r + 1) <= 0.00001) return "-1";
@@ -37,5 +36,5 @@ export const prettify = (r) => {
   if (Math.abs(r + g) <= 0.00001) return "-φ⁻¹";
   if (Math.abs(r - 1 / Math.sqrt(3)) <= 0.00001) return "√3⁻¹";
   if (Math.abs(r + 1 / Math.sqrt(3)) <= 0.00001) return "-√3⁻¹";
-  return r.toFixed(precision);
+  return r.toFixed(3);
 }
