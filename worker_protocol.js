@@ -94,13 +94,17 @@
 
 /**
  * A rendered quadrant. `pixels` is the segment's RGB16 rectangle (qw*qh*3),
- * transferred (not copied) across the boundary.
+ * transferred (not copied) across the boundary. `paramValues` carries segment 0's
+ * post-frame parameter values (ordered to match the effect's param list) so the
+ * GUI can track animation-driven changes the un-stepped main engine cannot supply;
+ * null on every other segment.
  * @typedef {{
  *   type: 'frame', segId: number,
  *   x0: number, x1: number, y0: number, y1: number,
  *   quadW: number, quadH: number,
  *   pixels: Uint16Array, elapsed: number, renderUs: number,
  *   arenaMetrics: SegArenaMetrics | null,
+ *   paramValues: number[] | null,
  * }} FrameMsg
  */
 

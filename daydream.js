@@ -131,9 +131,13 @@ const host = new EngineHost();
 function syncGUI() {
   if (!activeEffect || !activeEffect.controllerByName) return;
 
-  // Heap growth can detach this view to zero length; guard rather than mis-read.
-  const values = host.engine.getParamValues();
-  if (values.length === 0) return;
+  // In segmented mode the main engine is never stepped, so its values are stale;
+  // source animation-tracking values from segment 0's worker instead.
+  // Heap growth can detach the main view to zero length; guard rather than mis-read.
+  const values = segments.active
+    ? segments.getParamValues()
+    : host.engine.getParamValues();
+  if (!values || values.length === 0) return;
 
   const names = activeEffect.paramNames;
   const n = Math.min(names.length, values.length);

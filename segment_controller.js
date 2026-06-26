@@ -81,6 +81,9 @@ export class SegmentController {
     /** @type {Array<SegArenaMetrics | null>} */
     this.arenas = [];
 
+    /** @type {number[] | null} */
+    this.paramValues = null;  // segment 0's latest param values, for GUI sync
+
     this.pending = 0;         // count of outstanding render responses
     this.frameStart = 0;
     this.wallTime = 0;        // dispatch -> last worker response (ms)
@@ -148,6 +151,16 @@ export class SegmentController {
   }
 
   /**
+   * Segment 0's most recent post-frame parameter values (ordered to match the
+   * effect's param list), or null before the first frame. The GUI reads these in
+   * segmented mode since the main-thread engine is never stepped.
+   * @returns {number[] | null}
+   */
+  getParamValues() {
+    return this.paramValues;
+  }
+
+  /**
    * (Re)build the worker pool at the current resolution: destroy any existing
    * pool, then spawn `numSegments` fresh workers, each loading its own WASM
    * module and initialized with this engine's tuned params and paused state.
@@ -170,6 +183,7 @@ export class SegmentController {
     this.timings = new Array(numSegments).fill(0);
     this.renderUs = new Array(numSegments).fill(0);
     this.arenas = new Array(numSegments).fill(null);
+    this.paramValues = null;
     this.ready = false;
 
     // Per-index boot/ready state so a watchdog fault names the segments that
@@ -212,6 +226,9 @@ export class SegmentController {
               + `(expected 0..${numSegments - 1}); dropping`);
             return;
           }
+          // Mirror segment 0's live params for GUI sync (resolution-independent,
+          // so captured regardless of the generation fence below).
+          if (msg.segId === 0 && msg.paramValues) this.paramValues = msg.paramValues;
           // Generation fence: keep only results from the current resolution; still
           // settle the frame either way.
           if (this.inflightGen === this.renderGen) {

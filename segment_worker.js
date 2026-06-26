@@ -145,6 +145,11 @@ async function handleMessage(msg) {
       const elapsed = performance.now() - t0;
       const renderUs = engine.getRenderUs();
 
+      // Segment 0 mirrors its post-frame param values back so the GUI can track
+      // animation-driven params; the main engine is never stepped in this mode.
+      const paramValues =
+        segId === 0 ? Array.from(engine.getParamValues()) : null;
+
       const allPixels = engine.getPixels();
       const { x0, x1, y0, y1, w: qw, h: qh } = segRange;
       const pixelsCopy = new Uint16Array(qw * qh * 3);
@@ -186,6 +191,7 @@ async function handleMessage(msg) {
         elapsed,
         renderUs,
         arenaMetrics,
+        paramValues,
       }, [pixelsCopy.buffer]);
       break;
     }

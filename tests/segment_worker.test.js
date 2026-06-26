@@ -50,6 +50,7 @@ class FakeEngine {
   setClip(x0, x1, y0, y1) { this.clip = { y0, y1, x0, x1 }; }
   drawFrame() { this.calls.push(['drawFrame']); }
   getRenderUs() { return 1234; }
+  getParamValues() { return [0.5, 1.5, 2.5]; }
   /** Each channel encodes its flat canvas index so extraction can be checked. */
   getPixels() {
     const buf = new Uint16Array(this.curW * this.curH * 3);
@@ -192,6 +193,21 @@ test('render still posts a frame when getArenaMetrics throws', async () => {
   const frame = posted.find((p) => p.msg.type === 'frame');
   assert.ok(frame, 'frame still posted');
   assert.equal(frame.msg.arenaMetrics, null);
+});
+
+/** Segment 0 mirrors its post-frame param values; other segments send null. */
+test('render streams param values from segment 0 only', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  const frame0 = posted.find((p) => p.msg.type === 'frame').msg;
+  assert.deepEqual(frame0.paramValues, [0.5, 1.5, 2.5], 'segment 0 carries params');
+
+  await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  const frame1 = posted.find((p) => p.msg.type === 'frame').msg;
+  assert.equal(frame1.paramValues, null, 'non-zero segments omit params');
 });
 
 /**
