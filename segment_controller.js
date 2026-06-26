@@ -116,6 +116,14 @@ export class SegmentController {
     this._statsSegCount = 0;   // segment count the cached table was built for
     /** @type {{ rows: any[], maxTime: HTMLElement, wallTime: HTMLElement } | null} */
     this._statsCells = null;
+
+    // Cached boundary-overlay seam coordinates, rebuilt only when renderGen bumps
+    // (segment geometry is fixed within a generation).
+    /** @type {number[]} */
+    this._boundaryYs = [];
+    /** @type {number[]} */
+    this._boundaryXs = [];
+    this._boundaryGen = -1;
   }
 
   /**
@@ -495,16 +503,7 @@ export class SegmentController {
 
     // Boundary markers write into the recorded buffer, so they are baked into video.
     if (this.showBoundaries) {
-      const yBounds = new Set();
-      const xBounds = new Set();
-      for (const r of this.results) {
-        if (!r) continue;
-        // Y does not wrap (y0 == 0 is the top edge); X wraps on the cylinder, so
-        // the x == 0 seam is handled below only once the layout is split.
-        if (r.y0 > 0) yBounds.add(r.y0);
-        if (r.x0 > 0) xBounds.add(r.x0);
-      }
-      if (xBounds.size > 0) xBounds.add(0);
+      if (this._boundaryGen !== this.renderGen) this._rebuildBoundaries();
 
       const plotCyan = (idx) => {
         dst[idx]     = 0;
@@ -512,19 +511,40 @@ export class SegmentController {
         dst[idx + 2] = 65535;
       };
 
-      for (const boundaryY of yBounds) {
+      for (const boundaryY of this._boundaryYs) {
         if (boundaryY >= h) continue;
         const rowStart = boundaryY * w * 3;
         for (let x = 0; x < w; x++) plotCyan(rowStart + x * 3);
       }
 
-      for (const boundaryX of xBounds) {
+      for (const boundaryX of this._boundaryXs) {
         if (boundaryX >= w) continue;
         for (let y = 0; y < h; y++) plotCyan((y * w + boundaryX) * 3);
       }
     }
 
     return blitted;
+  }
+
+  /**
+   * Recompute the cached boundary-overlay seam coordinates from the current
+   * layout and stamp them with renderGen. Segment geometry is fixed within a
+   * generation, so composite() reuses this cache until the next resolution bump.
+   */
+  _rebuildBoundaries() {
+    const yBounds = new Set();
+    const xBounds = new Set();
+    for (const r of this.results) {
+      if (!r) continue;
+      // Y does not wrap (y0 == 0 is the top edge); X wraps on the cylinder, so
+      // the x == 0 seam is added below only once the layout is split.
+      if (r.y0 > 0) yBounds.add(r.y0);
+      if (r.x0 > 0) xBounds.add(r.x0);
+    }
+    if (xBounds.size > 0) xBounds.add(0);
+    this._boundaryYs = [...yBounds];
+    this._boundaryXs = [...xBounds];
+    this._boundaryGen = this.renderGen;
   }
 
   /** Update the per-segment stats overlay. */
