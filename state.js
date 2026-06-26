@@ -110,7 +110,9 @@ export class AppState {
    * @returns {void}
    */
   _notify(key, value, old) {
-    this._listeners.forEach(cb => cb(key, value, old));
+    // Snapshot so a subscriber added during dispatch is not invoked for the
+    // current event (and an unsubscribe mid-dispatch stays safe).
+    this._listeners.slice().forEach(cb => cb(key, value, old));
   }
 
   /**
