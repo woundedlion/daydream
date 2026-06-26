@@ -80,7 +80,14 @@ export class AppState {
         changes.push([key, value, old]);
       }
     }
-    changes.forEach(([key, value, old]) => this._notify(key, value, old));
+    // A subscriber may re-enter set()/update() while this batch drains, changing
+    // a key still queued below. Skip a queued tuple whose value is no longer
+    // current — the re-entrant write already notified with the live value, so
+    // firing the stale tuple would interleave a superseded notification.
+    changes.forEach(([key, value, old]) => {
+      if (this._state[key] !== value) return;
+      this._notify(key, value, old);
+    });
   }
 
   /**
