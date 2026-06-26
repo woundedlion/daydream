@@ -92,6 +92,10 @@ export function splineExportCode(pts, format) {
   if (pts.length === 0) {
     return '// Place control points to generate code';
   }
+  if (format !== 'vectors' && format !== 'fragments') {
+    throw new Error(`splineExportCode: unknown format "${format}" ` +
+      `(expected one of vectors, fragments)`);
+  }
   const f = formatFloatCpp;
   if (format === 'vectors') {
     let code = `constexpr std::array<Vector, ${pts.length}> control_points = {{\n`;
