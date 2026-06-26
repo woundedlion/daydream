@@ -328,6 +328,64 @@ test('a stale onstop does not clobber the session that replaced it', () => {
 });
 
 /** Verifies captureFrame no-ops and warns exactly once when requestFrame is absent. */
+/**
+ * Drives captureFrame once with a chosen source/offscreen size and returns the
+ * drawImage destination rect the recorder computed. The offscreen and its
+ * context are swapped for a spy after start(), so the recorded args reflect the
+ * letterbox math against exactly `offW`x`offH`.
+ * @param {{srcW:number, srcH:number, offW:number, offH:number}} dims
+ * @returns {{img:any, x:number, y:number, w:number, h:number}} The drawImage call.
+ */
+const captureLetterbox = ({ srcW, srcH, offW, offH }) => {
+  const restore = installRecorderEnv();
+  try {
+    const source = recordableCanvas(srcW, srcH);
+    const rec = new VideoRecorder(source);
+    rec._download = () => {};
+    rec.start('e');
+
+    /** @type {any[]} */
+    const draws = [];
+    const spyCtx = { clearRect() {}, drawImage(...a) { draws.push(a); } };
+    rec._offscreen = { width: offW, height: offH };
+    rec._offCtx = spyCtx;
+
+    rec.captureFrame();
+    assert.equal(draws.length, 1, 'exactly one drawImage per captureFrame');
+    const [img, x, y, w, h] = draws[0];
+    return { img, x, y, w, h };
+  } finally {
+    restore();
+  }
+};
+
+/**
+ * Wider-than-target source: fit to the offscreen width, letterbox top/bottom.
+ * 64x32 (2:1) into a 100x100 (1:1) offscreen -> destW=100, destH=round(100/2)=50,
+ * centered at y=round((100-50)/2)=25, x=0.
+ */
+test('captureFrame letterboxes a wider-than-target source to fit width', () => {
+  const { img, x, y, w, h } = captureLetterbox({ srcW: 64, srcH: 32, offW: 100, offH: 100 });
+  assert.equal(img.width, 64, 'blits the source canvas');
+  assert.equal(w, 100, 'destW spans the full offscreen width');
+  assert.equal(h, 50, 'destH = offW / srcAspect');
+  assert.equal(x, 0, 'no horizontal offset when fitting width');
+  assert.equal(y, 25, 'centered vertically: (offH - destH) / 2');
+});
+
+/**
+ * Taller-than-target source: fit to the offscreen height, pillarbox left/right.
+ * 30x60 (1:2) into a 100x100 (1:1) offscreen -> destH=100, destW=round(100*0.5)=50,
+ * centered at x=round((100-50)/2)=25, y=0.
+ */
+test('captureFrame pillarboxes a taller-than-target source to fit height', () => {
+  const { x, y, w, h } = captureLetterbox({ srcW: 30, srcH: 60, offW: 100, offH: 100 });
+  assert.equal(h, 100, 'destH spans the full offscreen height');
+  assert.equal(w, 50, 'destW = offH * srcAspect');
+  assert.equal(y, 0, 'no vertical offset when fitting height');
+  assert.equal(x, 25, 'centered horizontally: (offW - destW) / 2');
+});
+
 test('captureFrame warns once when the browser lacks requestFrame', () => {
   const restore = installRecorderEnv();
   const warns = [];
