@@ -56,36 +56,43 @@ export async function copyToClipboard(text) {
  *
  * @param {string} text - Text to copy.
  * @param {Object} [opts] - Feedback options.
- * @param {HTMLElement} [opts.element] - Element whose label flips on success.
- * @param {string} [opts.copiedText='Copied!'] - Label shown while copied.
+ * @param {HTMLElement} [opts.element] - Element whose label flips on copy.
+ * @param {string} [opts.copiedText='Copied!'] - Label shown on success.
+ * @param {string} [opts.failedText='Copy failed'] - Label shown on failure.
  * @param {string} [opts.revertText] - Label to restore (default: current text).
- * @param {number} [opts.revertMs=1500] - How long the copied label stays.
- * @param {string[]} [opts.copiedClasses=[]] - Classes added while copied, removed on revert.
- * @param {string[]} [opts.idleClasses=[]] - Classes removed while copied, restored on revert (only if there is text to restore).
+ * @param {number} [opts.revertMs=1500] - How long the flashed label stays.
+ * @param {string[]} [opts.copiedClasses=[]] - Classes added on success, removed on revert.
+ * @param {string[]} [opts.failedClasses=[]] - Classes added on failure, removed on revert.
+ * @param {string[]} [opts.idleClasses=[]] - Classes removed while flashed, restored on revert (only if there is text to restore).
  * @returns {Promise<boolean>} Whether the copy succeeded.
  */
 export async function copyWithFeedback(text, opts = {}) {
   const {
     element,
     copiedText = 'Copied!',
+    failedText = 'Copy failed',
     revertText,
     revertMs = 1500,
     copiedClasses = [],
+    failedClasses = [],
     idleClasses = [],
   } = opts;
 
   const success = await copyToClipboard(text);
-  if (success && element) {
+  // Flash on both outcomes: a silent failure (the label never flipping) leaves
+  // the user unsure whether the copy happened.
+  if (element) {
     const pending = element._copyFeedback;
     if (pending) clearTimeout(pending.timer);
     const original = pending ? pending.original
       : (revertText !== undefined ? revertText : element.textContent);
-    element.textContent = copiedText;
-    if (copiedClasses.length) element.classList.add(...copiedClasses);
+    const flashClasses = success ? copiedClasses : failedClasses;
+    element.textContent = success ? copiedText : failedText;
+    if (flashClasses.length) element.classList.add(...flashClasses);
     if (idleClasses.length) element.classList.remove(...idleClasses);
     const timer = setTimeout(() => {
       element.textContent = original;
-      if (copiedClasses.length) element.classList.remove(...copiedClasses);
+      if (flashClasses.length) element.classList.remove(...flashClasses);
       if (idleClasses.length && original) element.classList.add(...idleClasses);
       delete element._copyFeedback;
     }, revertMs);
