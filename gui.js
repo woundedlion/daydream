@@ -236,6 +236,7 @@ class DeepLinkGUI {
       if (allowed && !allowed.includes(val)) {
         console.warn(`DeepLinkGUI: ignoring out-of-range URL value "${params.get(key)}" for "${key}"`);
         urlApplied = false;
+        valClamped = true;
       } else {
         object[prop] = val;
       }
@@ -248,9 +249,13 @@ class DeepLinkGUI {
       this._attachUrlWriter(controller, (v) => this._urlWriter(key, v), urlApplied);
     }
 
+    if (!isFunction && valClamped) {
+      // The applied value differs from the URL string (number clamped/snapped, or
+      // out-of-range enum rejected): rewrite the URL so it no longer holds the stale one.
+      this._urlWriter(key, controller.getValue());
+    }
+
     if (!isFunction && urlApplied) {
-      // Clamping/snapping changed the value: rewrite the URL so it no longer holds the stale out-of-range one.
-      if (valClamped) this._urlWriter(key, controller.getValue());
       try { controller.updateDisplay(); }
       catch (e) { console.warn(`DeepLinkGUI: updateDisplay failed for "${key}":`, e); }
     }
