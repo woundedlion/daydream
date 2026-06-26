@@ -190,17 +190,14 @@ const segments = new SegmentController({
 ///////////////////////////////////////////////////////////////////////////////
 
 /**
- * Tear down the current effect GUI and build a new one for the active effect.
- * @param {boolean} [preserveParams=false] - When true, keep the existing per-effect
- *   param URL entries (used during initial hydration); when false, clear them since
- *   they don't apply to the newly selected effect.
+ * Tear down the active effect GUI and clear activeEffect. The drag's
+ * pointerup/pointercancel listeners live on `window`, not the GUI DOM, so
+ * destroying the GUI mid-drag would leave them dangling — drain them first.
  * @returns {void}
  */
-function applyEffect(preserveParams = false) {
+function destroyActiveEffectGui() {
   if (activeEffect && activeEffect.gui) {
     try {
-      // The drag's pointerup/pointercancel listeners live on `window`, not the
-      // GUI DOM, so destroying the GUI mid-drag would leave them dangling.
       if (activeEffect.activeDragEnds) {
         for (const end of activeEffect.activeDragEnds) {
           window.removeEventListener('pointerup', end);
@@ -216,6 +213,17 @@ function applyEffect(preserveParams = false) {
     }
   }
   activeEffect = null;
+}
+
+/**
+ * Tear down the current effect GUI and build a new one for the active effect.
+ * @param {boolean} [preserveParams=false] - When true, keep the existing per-effect
+ *   param URL entries (used during initial hydration); when false, clear them since
+ *   they don't apply to the newly selected effect.
+ * @returns {void}
+ */
+function applyEffect(preserveParams = false) {
+  destroyActiveEffectGui();
 
   // Clear the old effect's param URL entries but keep the global GUI's keys.
   if (!preserveParams) {
@@ -727,6 +735,8 @@ function disposeApp() {
     clearInterval(testAllInterval);
     testAllInterval = null;
   }
+  destroyActiveEffectGui();
+  guiInstance.destroy();
   host.recorder?.stop();
   urlSync.dispose();
   sidebar.dispose();
