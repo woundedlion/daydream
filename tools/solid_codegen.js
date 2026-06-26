@@ -119,9 +119,17 @@ export function generateFuncAndRecipe(item) {
       chain += `.hankin(${formatFloat(o.params.angle)} * D2R)`;
       nameParts.push(`_hk${Math.round(o.params.angle)}`);
     } else if (opName === 'snub') {
-      // SolidBuilder's snub defaults suffice; ignore any t/twist params.
-      chain += `.snub()`;
-      nameParts.push(`_snub`);
+      // snub(t, twist): emit both so the generated recipe matches the live
+      // preview (currentWasmMesh.snub(t, twist)); fall back to SolidBuilder's
+      // own defaults when a param is unset. The twist suffix keeps two snubs
+      // that share a `t` but differ in twist from colliding on one funcName.
+      const params = (typeof o === 'object' && o.params) ? o.params : {};
+      const t = params.t ?? 0.5;
+      const twist = params.twist ?? 0.0;
+      requireFinite(opName, 't', t);
+      requireFinite(opName, 'twist', twist);
+      chain += `.snub(${formatFloat(t)}, ${formatFloat(twist)})`;
+      nameParts.push(`_snub${pctSuffix(t)}_tw${pctSuffix(twist)}`);
     } else if (opName === 'relax') {
       // `??` not `||`: an explicit iter:0 is a valid no-op relax count and must
       // not fall back to the 100 default.
