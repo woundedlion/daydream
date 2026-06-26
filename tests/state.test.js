@@ -1,5 +1,5 @@
 // @ts-check
-import { test, afterEach } from 'node:test';
+import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { AppState, URLSync, getActiveURLSync } from '../state.js';
 
@@ -137,4 +137,55 @@ test('URLSync._flush clears the ad-hoc buffer so a tracked key is not permanentl
   sync._flush();
   params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
   assert.equal(params.get('resolution'), 'medium');
+});
+
+test('URLSync.setParam(k, null) drops the key from the URL on flush', () => {
+  const calls = installWindow('?keep=1', '/sim');
+  const s = new AppState({});
+  const sync = new URLSync(s, []);
+
+  sync.setParam('speed', 1.5); // first write the param
+  sync._flush();
+  let params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
+  assert.equal(params.get('speed'), '1.5');
+
+  sync.setParam('speed', null); // deletion marker
+  sync._flush();
+  params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
+  assert.equal(params.has('speed'), false, 'null marker removes the param');
+  assert.equal(params.get('keep'), '1', 'unrelated params survive');
+});
+
+test('URLSync.reset preserves the excluded keys and clears the rest', () => {
+  const calls = installWindow('?effect=Voronoi&speed=2&junk=x', '/sim');
+  const s = new AppState({ effect: 'Voronoi' });
+  const sync = new URLSync(s, ['effect']);
+
+  sync.reset(['junk']);
+
+  assert.equal(calls.length, 1);
+  const params = new URLSearchParams(calls[0].split('?')[1]);
+  assert.equal(params.get('junk'), 'x', 'excluded key preserved');
+  assert.equal(params.get('effect'), 'Voronoi', 'tracked state re-asserted');
+  assert.equal(params.has('speed'), false, 'unexcluded, untracked key cleared');
+});
+
+test('URLSync.reset cancels a pending debounced flush', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const calls = installWindow('?effect=Voronoi', '/sim');
+    const s = new AppState({ effect: 'Voronoi' });
+    const sync = new URLSync(s, ['effect']);
+
+    s.set('effect', 'Moire'); // arms the 200 ms debounce
+    sync.reset();             // resets immediately and must cancel the pending flush
+    assert.equal(calls.length, 1, 'reset wrote once');
+
+    mock.timers.tick(200);    // would fire the cancelled flush if still armed
+    assert.equal(calls.length, 1, 'no stale debounced write fired after reset');
+    const params = new URLSearchParams(calls[0].split('?')[1]);
+    assert.equal(params.get('effect'), 'Moire', 'reset re-asserted current state');
+  } finally {
+    mock.timers.reset();
+  }
 });
