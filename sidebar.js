@@ -172,14 +172,6 @@ export class EffectSidebar {
   // ---- Internal ----
 
   /**
-   * Build a sort-control button for `key` labelled `label`. Clicking toggles
-   * direction when this key is already active, else activates it (size defaults
-   * to descending, others to ascending).
-   * @param {string} key - Sort key this button controls ('name' or 'size').
-   * @param {string} label - Human-readable button label.
-   * @returns {HTMLElement} The created sort-control button.
-   */
-  /**
    * Glyph for a sort button: the directional arrow when this key is the active
    * sort, else the neutral both-ways glyph. Shared by the initial render and
    * the update path so the button shows the correct arrow from the first paint
@@ -192,6 +184,14 @@ export class EffectSidebar {
     return this.sort.dir === 'asc' ? '▲' : '▼';
   }
 
+  /**
+   * Build a sort-control button for `key` labelled `label`. Clicking toggles
+   * direction when this key is already active, else activates it (size defaults
+   * to descending, others to ascending).
+   * @param {string} key - Sort key this button controls ('name' or 'size').
+   * @param {string} label - Human-readable button label.
+   * @returns {HTMLElement} The created sort-control button.
+   */
   _createSortBtn(key, label) {
     const btn = document.createElement('button');
     btn.className = 'sort-btn' + (this.sort.key === key ? ' active' : '');
