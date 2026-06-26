@@ -162,8 +162,11 @@ export class Daydream {
 
     this.camera = new THREE.PerspectiveCamera(
       Daydream.CAMERA_FOV,
-      // Square fallback when the canvas has no size yet (0/0 = NaN).
-      this.canvas.width / this.canvas.height || 1,
+      // Square fallback until the canvas has a real size: width/0 yields a
+      // truthy Infinity that slips past `|| 1`, so require both dimensions > 0.
+      this.canvas.width > 0 && this.canvas.height > 0
+        ? this.canvas.width / this.canvas.height
+        : 1,
       Daydream.CAMERA_NEAR,
       Daydream.CAMERA_FAR
     );
