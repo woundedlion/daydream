@@ -114,6 +114,7 @@ class EngineHost {
     if (refreshed) {
       this._view = view;
       daydream.dotMesh.instanceColor.array = view;
+      daydream.dotMesh.instanceColor.needsUpdate = true;
       Daydream.pixels = view;
     }
   }
