@@ -471,15 +471,9 @@ createHolosphereModule().then(module => {
   host.module = module;
   host.engine = new module.HolosphereEngine();
 
-  // Apply the hydrated resolution before first paint.
-  const p = resolutionPresets[appState.get('resolution')];
-  if (p && host.engine.setResolution(p.w, p.h) === false) {
-    console.error(`Init: unsupported resolution ${p.w}x${p.h} from hydrated preset; ` +
-      `keeping the engine's current resolution.`);
-  }
-
-  // setEffect happens once via applyResolution(true) below, after it validates the
-  // hydrated effect against this resolution's allow-list.
+  // Resolution and effect are both applied once via applyResolution(true) below,
+  // before first paint: it sets the hydrated resolution and validates the hydrated
+  // effect against this resolution's allow-list.
 
   let aliasDivergenceLogged = false;
   host.adapter = {
