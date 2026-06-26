@@ -497,6 +497,15 @@ export class SegmentController {
           `result through (layout/fence invariant violated)`);
       }
 
+      const expectedLen = (r.x1 - r.x0) * (r.y1 - r.y0) * 3;
+      if (r.pixels.length !== expectedLen) {
+        throw new Error(
+          `SegmentController.composite: segment ${s} pixel buffer length ` +
+          `${r.pixels.length} != expected ${expectedLen} for rect ` +
+          `[${r.x0},${r.y0})-[${r.x1},${r.y1}) — a rect/buffer mismatch would ` +
+          `blit a truncated row (segment-result invariant violated)`);
+      }
+
       compositeSegment(dst, r.pixels, w, r);
       blitted++;
     }
