@@ -235,6 +235,8 @@ export class GenerativePalette {
       case "VIBRANT":
         s1 = s2 = s3 = 255;
         break;
+      default:
+        throw new Error(`unknown SaturationProfile "${satProfile}"`);
     }
 
     let v1 = 0, v2 = 0, v3 = 0;
@@ -262,6 +264,8 @@ export class GenerativePalette {
         v2 = this.prng.nextInt(51, 127);
         v3 = v1;
         break;
+      default:
+        throw new Error(`unknown BrightnessProfile "${brightnessProfile}"`);
     }
 
     const shapeIndex = GRADIENT_SHAPE_INDEX[this.gradientShape];
