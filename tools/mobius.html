@@ -338,6 +338,10 @@
         }
       `;
 
+    // GLSL port of cmult/cadd/cdiv (incl. the 1e-6 divide guard) from
+    // mobius_transforms.js. GLSL cannot import the JS module, so this is a manual
+    // duplicate: the on-screen warp runs this copy while presets use the JS one —
+    // keep the two in sync when editing either.
     const complexFunctions = `
         struct CNum { float re; float im; };
         CNum cmult(CNum p, CNum q) { return CNum(p.re * q.re - p.im * q.im, p.re * q.im + p.im * q.re); }
