@@ -113,7 +113,7 @@ Templating on `<W, H>` means every pixel coordinate transform, bounding box comp
 
 ### Why Arena Allocation?
 
-The Teensy heap fragments under heavy mesh subdivision. The single-block partitioned arena design (persistent + scratch A + scratch B, 335 KB total) gives deterministic memory behavior: persistent data allocated once and kept; scratch data RAII-scoped to the function that needed it. The `configure_arenas()` function allows effects to repartition the fixed block based on their needs — mesh-heavy effects can claim more persistent space, while subdivision-heavy effects can expand their scratch pools. All functions take explicit `Arena&` parameters — Conway operators take `(Arena& target, Arena& temp)`, generators take `(Arena& a, Arena& b)` — so the memory layout during heavy geometric operations is explicit at every call site, with no hidden state or implicit arena references.
+The Teensy heap fragments under heavy mesh subdivision. The single-block partitioned arena design (persistent + scratch A + scratch B, 330 KiB total) gives deterministic memory behavior: persistent data allocated once and kept; scratch data RAII-scoped to the function that needed it. The `configure_arenas()` function allows effects to repartition the fixed block based on their needs — mesh-heavy effects can claim more persistent space, while subdivision-heavy effects can expand their scratch pools. All functions take explicit `Arena&` parameters — Conway operators take `(Arena& target, Arena& temp)`, generators take `(Arena& a, Arena& b)` — so the memory layout during heavy geometric operations is explicit at every call site, with no hidden state or implicit arena references.
 
 ### Why the ISR Double Buffer?
 
@@ -196,7 +196,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 │   ├── presets.h               Generic Presets<Params, Size> template
 │   ├── styles.h                Feedback::Style named presets + space/color transform functions
 │   ├── util.h                  wrap(), fast_wrap(), shortest/fwd_distance, apply_if_changed
-│   ├── reaction_graph.h/.cpp   Precomputed Fibonacci-lattice K-NN graph (90 KB / 92,160-byte table)
+│   ├── reaction_graph.h/.cpp   Precomputed Fibonacci-lattice K-NN graph (90 KiB / 92,160-byte table)
 │   ├── FastNoiseLite.h         Third-party: single-header noise library
 │   └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
@@ -443,7 +443,7 @@ The filter pipeline operates across three coordinate domains. Each filter declar
     ◂── pixel_to_vector()         ◂── expand to float
 ```
 
-**World → Screen**: `vector_to_pixel()` projects a 3D unit-sphere vector to fractional pixel coordinates via `(theta / 2π * W, phi / π * H)`.
+**World → Screen**: `vector_to_pixel()` projects a 3D unit-sphere vector to fractional pixel coordinates near `(theta / 2π * W, phi / π * H)`, deriving `theta`/`phi` with the approximate `fast_atan2`/`fast_acos`. The approximation makes the projection sub-pixel inexact, so `vector → pixel → vector` does not exactly invert the exact-trig `pixel_to_vector()`.
 
 **Screen → Pixel**: `AntiAlias` distributes the fractional coordinate to its 4 nearest integer pixels using `quintic_kernel` bilinear weights, with `sin(φ)` density compensation.
 
@@ -636,7 +636,7 @@ Each rasterizer family populates the Fragment registers with a consistent conven
 | `v1` | `DistanceResult.raw_dist` | Unsigned distance to shape centerline (for distance-based effects) |
 | `v2` | Set by rasterizer | Face index for `Scan::Mesh` (0 otherwise) |
 | `v3` | `DistanceResult.aux` | Auxiliary — shape-dependent secondary parameter (0 when unused, including faces) |
-| `size` | `DistanceResult.size` | Shape radius or apothem for normalization |
+| `size` | `DistanceResult.size` | Shape radius or apothem for normalization (mesh `Face` floors it to ≥0.25× circumradius on sliver faces, so a normalized shader can see up to a 4× overstated inradius there) |
 
 The `DistanceResult` struct is returned by each SDF shape's `distance<ComputeUVs>()` method:
 
@@ -1071,7 +1071,7 @@ The mesh system is split across several files:
 
 #### Conway Operators (`conway.h`)
 
-All Conway operators take `(const PolyMesh& mesh, Arena& target, Arena& temp)`. **Primitive** operators produce their `PolyMesh` into `target` and use `temp` for intermediate computation. **Composed** operators (`gyro`, `meta`, `needle`, `zip`, `bevel`) reuse the same internal ping-pong as their two constituent ops, so they return their output in `temp` — the *opposite* arena from a primitive (see the load-bearing COMPOSITION POLARITY note in `conway.h`). Plan arena lifetimes accordingly when invoking a composed operator directly rather than through `SolidBuilder`:
+All Conway *geometry* operators (`dual` through `bevel` below) take `(const PolyMesh& mesh, Arena& target, Arena& temp)`; `transform`, `relax`, and `normalize` are listed in the same table but are mesh utilities with their own signatures. **Primitive** operators produce their `PolyMesh` into `target` and use `temp` for intermediate computation. **Composed** operators (`gyro`, `meta`, `needle`, `zip`, `bevel`) reuse the same internal ping-pong as their two constituent ops, so they return their output in `temp` — the *opposite* arena from a primitive (see the load-bearing COMPOSITION POLARITY note in `conway.h`). Plan arena lifetimes accordingly when invoking a composed operator directly rather than through `SolidBuilder`:
 
 | Operation | Description |
 |---|---|
@@ -1487,7 +1487,7 @@ When `persist_pixels = true`, `Canvas` copies the previous frame's buffer into t
 
 ## 9. Effects Reference
 
-All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) at the Phantasm 288×144 resolution.
+All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) at each effect's highest available resolution — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for effects only registered there (RingShower, Dynamo).
 
 ### Core Effects (Modern Engine)
 
@@ -1785,7 +1785,9 @@ Catmull-Rom spline curves whose control points drift via independent random walk
 
 </td></tr></table>
 
-The two effects below are registered and selectable but not pictured here:
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=DistortedRing" target="_blank"><img src="docs/screenshots/DistortedRing.png" alt="DistortedRing" width="280"></a></td>
+<td valign="top">
 
 #### DistortedRing
 
@@ -1793,11 +1795,19 @@ Concentric rings built from per-azimuth distorted ring SDFs, their radii oscilla
 
 **Parameters**: Alpha, MaxAmplitude, Thickness, Rings, Show Bounding
 
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=ShapeShifter" target="_blank"><img src="docs/screenshots/ShapeShifter.png" alt="ShapeShifter" width="280"></a></td>
+<td valign="top">
+
 #### ShapeShifter
 
 Layered polygon, star, and flower rings (planar and spherical polygon variants) drawn through both the `Plot` and `Scan` rasterizers at once. The shape type hard-cuts to the next of four (planar polygon, spherical polygon, flower, star) every 48 frames while a twist Mutation shears the layers. All `Plot` rings share one tumbling orientation and all `Scan` rings share another, so layer Count scales with the raster budget rather than the timeline.
 
 **Parameters**: Alpha, Count, Radius, Sides, Twist, Debug BB
+
+</td></tr></table>
 
 ### Legacy Effects (`effects_legacy.h`)
 
@@ -1848,7 +1858,7 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `drawFrame()` | Advance one frame and copy pixels to the output buffer |
 | `getPixels()` | Return a zero-copy `Uint16Array` view into WASM linear memory |
 | `getBufferLength()` → `int` | Length of the pixel buffer (`W × H × 3`) for sizing the view |
-| `setParameter(name, value)` → `bool` | Update a live effect parameter; returns `false` on an unknown name |
+| `setParameter(name, value)` → `bool` | Update a live effect parameter; returns `false` if the write was not applied (no active effect, unknown name, read-only param, or non-finite value) |
 | `setAnimationsPaused(paused)` | Freeze/resume the current effect's animation drivers (the GUI "Pause Animation" toggle) |
 | `getParameterDefinitions()` | Return the parameter list; each entry is `{name, value, animated, readonly}`, and float params additionally carry `{min, max}` (bool params omit `min`/`max` and return `value` as a JS boolean) |
 | `getParamValues()` | Return current parameter values (including animation-driven updates) |
@@ -1857,7 +1867,7 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `getSupportedResolutions()` → `[[w, h], …]` | *(static)* List the resolutions the build supports, as `[width, height]` pairs |
 | `setClip(x0, x1, y0, y1)` → `bool` | Restrict rendering to a sub-rectangle (used by segment workers) |
 | `getRenderUs()` → `double` | Last frame's rasterization time in microseconds (per-frame profiling) |
-| `getParamGeneration()` → `int` | Monotonic counter bumped whenever the parameter set changes (effect/resolution switch). A JS consumer caches it alongside `getParameterDefinitions()` and re-fetches the definitions when it changes, so cached descriptors never mis-describe a later `getParamValues()` stream |
+| `getParamGeneration()` → `uint32_t` | Monotonic counter bumped whenever the parameter set changes (effect/resolution switch). A JS consumer caches it alongside `getParameterDefinitions()` and re-fetches the definitions when it changes, so cached descriptors never mis-describe a later `getParamValues()` stream |
 | `strobeColumns()` → `bool` | Whether the current effect renders as discrete strobed columns (dark inter-column gaps) rather than a continuous smeared band; `false` when no effect is set. Daydream reads it to decide whether to fill the inter-column gap |
 
 The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 330 KiB arena) for interactive solid manipulation.
