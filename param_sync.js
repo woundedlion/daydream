@@ -35,7 +35,8 @@
 export function resolveParamSync(current, incoming, isBoolean, isEditing) {
   const value = isBoolean ? incoming > 0.5 : incoming;
   if (isEditing) return { update: false, value };
-  // NaN !== NaN, so without this guard current !== value is true every frame.
-  if (typeof value === 'number' && Number.isNaN(value)) return { update: false, value };
+  // A NaN engine value would churn every frame (NaN !== current) and a boolean
+  // coerces it to a spurious false; never write it.
+  if (Number.isNaN(incoming)) return { update: false, value };
   return { update: current !== value, value };
 }

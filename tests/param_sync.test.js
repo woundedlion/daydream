@@ -48,3 +48,9 @@ test('numeric: a NaN engine value never updates (no per-frame churn)', () => {
   assert.deepEqual(resolveParamSync(NaN, NaN, false, false),
     { update: false, value: NaN });
 });
+
+test('boolean: a NaN engine value never flips the toggle', () => {
+  // NaN coerces to false; without the guard a `true` toggle would write a spurious false every frame.
+  assert.deepEqual(resolveParamSync(true, NaN, true, false),
+    { update: false, value: false });
+});
