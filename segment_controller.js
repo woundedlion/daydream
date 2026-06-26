@@ -502,7 +502,9 @@ export class SegmentController {
     }
 
     // Boundary markers write into the recorded buffer, so they are baked into video.
-    if (this.showBoundaries) {
+    // Skip on a fully generation-fenced frame (blitted === 0): the buffer is black
+    // and stamping seams would show cyan lines on an otherwise-blank sphere.
+    if (this.showBoundaries && blitted > 0) {
       if (this._boundaryGen !== this.renderGen) this._rebuildBoundaries();
 
       const plotCyan = (idx) => {
