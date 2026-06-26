@@ -78,7 +78,7 @@ const makeUrlParamWriter = () => {
         if (v === null || v === undefined) {
           params.delete(k);
         } else if (typeof v === 'number') {
-          params.set(k, roundUrlNumber(v));
+          params.set(k, String(roundUrlNumber(v)));
         } else {
           params.set(k, v);
         }
