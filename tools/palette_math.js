@@ -361,7 +361,9 @@ export class GenerativePalette {
   }
 
   /**
-   * One channel of the linear sample at t, for curve plotting.
+   * One channel of the linear sample at t, for curve plotting. Recomputes the
+   * full triple via get(t) and discards two channels; cost is negligible at
+   * plot resolution.
    * @param {number} t - Time parameter in [0, 1].
    * @param {number} channelIndex - Channel to sample (0=R, 1=G, 2=B).
    * @returns {number} Linear value for the channel.
