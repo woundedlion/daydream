@@ -3,9 +3,11 @@ import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 
-// geometry.js only needs Daydream.W / Daydream.H from driver.js; stub it so the
-// test doesn't drag in the whole browser-only driver/GUI graph.
-mock.module('../driver.js', { namedExports: { Daydream: { W: 288, H: 144 } } });
+// geometry.js only needs Daydream.W / Daydream.H / Daydream.H_OFFSET from
+// driver.js; stub it so the test doesn't drag in the whole browser-only
+// driver/GUI graph.
+const Daydream = { W: 288, H: 144, H_OFFSET: 0 };
+mock.module('../driver.js', { namedExports: { Daydream } });
 
 const { pixelToSpherical } = await import('../geometry.js');
 
@@ -40,6 +42,21 @@ test('pixelToSpherical matches the engine convention (theta from +X)', () => {
         Math.abs(v.x - ex) < 1e-12 && Math.abs(v.y - ey) < 1e-12 && Math.abs(v.z - ez) < 1e-12,
         `pixel (${x},${y}) -> (${v.x},${v.y},${v.z}); engine (${ex},${ey},${ez})`);
     }
+  }
+});
+
+/**
+ * Verifies a non-zero H_OFFSET maps phi over `H + H_OFFSET` virtual rows, so the
+ * sim can preview the device's row->latitude mapping (device H_OFFSET == 3).
+ */
+test('H_OFFSET widens the latitude denominator to H + H_OFFSET - 1', () => {
+  try {
+    Daydream.H_OFFSET = 3;
+    const phi = pixelToSpherical(0, 50).phi;
+    assert.ok(Math.abs(phi - (50 * Math.PI) / (H + 3 - 1)) < 1e-12,
+      `phi should use H + H_OFFSET - 1, got ${phi}`);
+  } finally {
+    Daydream.H_OFFSET = 0;
   }
 });
 
