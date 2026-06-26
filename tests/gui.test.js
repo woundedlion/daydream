@@ -157,24 +157,41 @@ test('DeepLinkGUI.add with no matching URL param keeps the default', () => {
  * Verifies the numeric (slider) path clamps an out-of-range URL value to the
  * control's registered min/max — the add(obj, prop, min, max) bounds. A deep
  * link past the slider range must land at the boundary, not drive the engine
- * out of range, and the clamped value replays through onChange.
+ * out of range, the clamped value replays through onChange, and the corrected
+ * value is written back to the URL so the stale out-of-range one is replaced.
  */
 test('DeepLinkGUI.add clamps an out-of-range numeric URL value to the slider min/max', () => {
-  installWindow('?speed=99');
-  const guiHi = new DeepLinkGUI({ autoPlace: false });
-  const objHi = { speed: 1.0 };
-  const hi = [];
-  guiHi.add(objHi, 'speed', 0, 10).onChange((v) => hi.push(v));
-  assert.equal(objHi.speed, 10, 'value above max clamps to max');
-  assert.deepEqual(hi, [10], 'the clamped value replays through onChange');
+  let lastUrl = '/';
+  globalThis.window = {
+    location: { search: '?speed=99', pathname: '/' },
+    history: { replaceState(_s, _t, url) { lastUrl = url; } },
+  };
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const guiHi = new DeepLinkGUI({ autoPlace: false });
+    const objHi = { speed: 1.0 };
+    const hi = [];
+    guiHi.add(objHi, 'speed', 0, 10).onChange((v) => hi.push(v));
+    assert.equal(objHi.speed, 10, 'value above max clamps to max');
+    assert.deepEqual(hi, [10], 'the clamped value replays through onChange');
+    mock.timers.tick(200);
+    assert.equal(new URL(lastUrl, 'http://x').searchParams.get('speed'), '10',
+      'the clamped value replaces the out-of-range one in the URL');
 
-  installWindow('?speed=-5');
-  const guiLo = new DeepLinkGUI({ autoPlace: false });
-  const objLo = { speed: 1.0 };
-  const lo = [];
-  guiLo.add(objLo, 'speed', 0, 10).onChange((v) => lo.push(v));
-  assert.equal(objLo.speed, 0, 'value below min clamps to min');
-  assert.deepEqual(lo, [0]);
+    globalThis.window.location.search = '?speed=-5';
+    lastUrl = '/';
+    const guiLo = new DeepLinkGUI({ autoPlace: false });
+    const objLo = { speed: 1.0 };
+    const lo = [];
+    guiLo.add(objLo, 'speed', 0, 10).onChange((v) => lo.push(v));
+    assert.equal(objLo.speed, 0, 'value below min clamps to min');
+    assert.deepEqual(lo, [0]);
+    mock.timers.tick(200);
+    assert.equal(new URL(lastUrl, 'http://x').searchParams.get('speed'), '0',
+      'the clamped low value replaces the out-of-range one in the URL');
+  } finally {
+    mock.timers.reset();
+  }
 });
 
 /**
