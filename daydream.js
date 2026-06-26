@@ -581,8 +581,8 @@ guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => 
   if (v) {
     testAllInterval = setInterval(() => {
       if (!host.engine) return;
-      const currentList = effectsByResolution[appState.get('resolution')];
-      if (!currentList || currentList.length === 0) return;
+      const currentList = effectsByResolution[appState.get('resolution')] || HiResFavorites;
+      if (currentList.length === 0) return;
       const currentEffect = appState.get('effect');
       const currentIndex = currentList.indexOf(currentEffect);
       const nextIndex = (currentIndex + 1) % currentList.length;
