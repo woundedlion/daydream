@@ -271,15 +271,18 @@ export class VideoRecorder {
   }
 
   /**
-   * Determines the output file extension from the recorder's MIME type.
+   * Determines the output file extension from the recorder's MIME type, so the
+   * filename matches the real container the browser chose.
    * @param {MediaRecorder} [recorder] - Recorder whose mimeType is inspected;
    *   defaults to the active recorder.
-   * @returns {string} 'mp4' for MP4 output, otherwise 'webm'.
+   * @returns {string} The container extension (e.g. 'mp4', 'webm', 'mkv'),
+   *   falling back to 'webm' for an empty/unknown type.
    */
   _extension(recorder = this.mediaRecorder) {
     const mime = recorder?.mimeType ?? '';
-    if (mime.startsWith('video/mp4')) return 'mp4';
-    return 'webm';
+    const subtype = mime.split(';')[0].split('/')[1] ?? '';
+    const EXT = { mp4: 'mp4', webm: 'webm', 'x-matroska': 'mkv', ogg: 'ogv' };
+    return EXT[subtype] ?? (subtype || 'webm');
   }
 
   /**
