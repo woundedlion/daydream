@@ -498,15 +498,18 @@ test('composite() draws no x=0 line when the layout is not split in x', () => {
     'full-width segment leaves no boundary overlay');
 });
 
-test('composite() throws if the display-buffer alias is broken', () => {
+test('composite() self-heals a broken display-buffer alias instead of throwing', () => {
   Daydream.W = 4; Daydream.H = 2;
   Daydream.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
-  c._getMemoryView = () => new Uint16Array(4 * 2 * 3);
+  const target = new Uint16Array(4 * 2 * 3);
+  c._getMemoryView = () => target;
   c.results = [];
 
-  assert.throws(() => c.composite(), /alias broken/);
+  assert.doesNotThrow(() => c.composite());
+  assert.equal(Daydream.pixels, target,
+    'Daydream.pixels re-pointed at the composite target');
 });
 
 // ---------------------------------------------------------------------------

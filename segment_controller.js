@@ -98,6 +98,7 @@ export class SegmentController {
     this.renderInFlight = false;
     this.pendingFrame = false; // true when workers have new results to display
     this.frameComposited = false; // true only on ticks that blit a real composite
+    this._aliasDivergenceLogged = false; // throttle the composite alias-divergence warning
 
     // Fault latch: a worker trap fires onerror but never sends its 'frame', so
     // `pending` never reaches 0. Latch, settle the in-flight frame, stop dispatching.
@@ -473,13 +474,19 @@ export class SegmentController {
     if (!dst) return 0;
 
     // No clear: driver.render() already zero-filled this buffer; we blit over it.
-    // That elision holds only while dst aliases the buffer render() clears.
+    // That elision holds only while dst aliases the buffer render() clears. On a
+    // divergence, self-heal rather than fault the render loop (mirrors the
+    // single-engine path): re-point the display alias at the composite target.
+    // driver.render() re-clears Daydream.pixels next frame, restoring the elision.
     if (dst !== Daydream.pixels) {
-      throw new Error(
-        "SegmentController.composite: display-buffer alias broken " +
-        "(getMemoryView() !== Daydream.pixels) — the cleared background and the " +
-        "composite target are different buffers; render()/refreshPixelView() " +
-        "aliasing invariant violated");
+      if (!this._aliasDivergenceLogged) {
+        console.error(
+          "SegmentController.composite: display-buffer alias diverged " +
+          "(getMemoryView() !== Daydream.pixels) — re-pointing Daydream.pixels " +
+          "at the composite target");
+        this._aliasDivergenceLogged = true;
+      }
+      Daydream.pixels = dst;
     }
 
     const w = Daydream.W;
