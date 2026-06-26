@@ -56,12 +56,14 @@
     ? abs('node_modules/lil-gui/dist/lil-gui.esm.min.js')
     : `${CDN}/lil-gui@${LIL_GUI_VERSION}/dist/lil-gui.esm.min.js`;
 
-  const imports = Object.assign({
+  // EXTRA adds page-specific imports; core keys win so a stray EXTRA entry
+  // can't clobber 'three'/'lil-gui'/etc.
+  const imports = Object.assign({}, EXTRA, {
     'three': `${threeBase}build/three.module.js`,
     'three/addons/': `${threeBase}examples/jsm/`,
     'lil-gui': lilGui,
     'gui': abs('gui.js'),
-  }, EXTRA);
+  });
 
   const s = document.createElement('script');
   s.type = 'importmap';
