@@ -68,7 +68,6 @@ export class VideoRecorder {
     this.targetHeight = null;
     this._offscreen = null;
     this._offCtx = null;
-    this._warnedNoRequestFrame = false;
   }
 
   /**
@@ -128,9 +127,17 @@ export class VideoRecorder {
       return;
     }
 
-    // framerate 0: manual frame-request mode, frames are captured on requestFrame().
-    const stream = captureSource.captureStream(0);
-    const track = stream.getVideoTracks()[0];
+    // framerate 0: manual frame-request mode, frames are captured on
+    // requestFrame(). Browsers without requestFrame would record an empty video
+    // in that mode, so fall back to a timed captureStream at the frame rate.
+    let stream = captureSource.captureStream(0);
+    let track = stream.getVideoTracks()[0];
+    if (typeof track?.requestFrame !== 'function') {
+      stream.getTracks().forEach(t => t.stop());
+      const fps = Math.max(1, Math.round(1 / this.frameInterval));
+      stream = captureSource.captureStream(fps);
+      track = stream.getVideoTracks()[0];
+    }
 
     const mimeType = selectMimeType(this.format);
 
@@ -183,13 +190,6 @@ export class VideoRecorder {
    */
   captureFrame() {
     if (!this.isRecording || !this.track) return;
-    if (typeof this.track.requestFrame !== 'function') {
-      if (!this._warnedNoRequestFrame) {
-        console.warn('Recorder: track.requestFrame is unavailable; recorded frames will not advance in this browser.');
-        this._warnedNoRequestFrame = true;
-      }
-      return;
-    }
 
     // Skip the blit at a transient 0x0 source (mid-resize): drawImage from a
     // zero-sized source throws. The offscreen keeps its prior good frame.
@@ -213,7 +213,8 @@ export class VideoRecorder {
       this._offCtx.drawImage(this.canvas, destX, destY, destW, destH);
     }
 
-    this.track.requestFrame();
+    // Timed-fallback tracks have no requestFrame; the stream samples on its own.
+    if (typeof this.track.requestFrame === 'function') this.track.requestFrame();
     this.elapsedSeconds += this.frameInterval;
   }
 
