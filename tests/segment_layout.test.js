@@ -3,12 +3,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeSegmentRange } from '../segment_layout.js';
 
+// The exactly-once tiling invariant holds for even widths only: the symmetric
+// floor(w/2) arm split drops an odd width's trailing column (see the odd-width
+// case below), which is acceptable since every real canvas (96, 288) is even.
 test('a full segment set tiles the canvas exactly once', () => {
   const cases = [
     { w: 288, h: 144, total: 4 },
     { w: 288, h: 144, total: 8 },
     { w: 96, h: 20, total: 2 },
-    { w: 97, h: 21, total: 4 },   // odd dims: last arm/band takes the remainder
+    { w: 96, h: 21, total: 4 },   // odd height: last band takes the remainder
     { w: 100, h: 30, total: 6 },
   ];
 
@@ -39,6 +42,14 @@ test('two arms split the canvas left/right', () => {
   const right = computeSegmentRange(1, 2, 288, 144);
   assert.deepEqual(left, { x0: 0, x1: 144, y0: 0, y1: 144, w: 144, h: 144 });
   assert.deepEqual(right, { x0: 144, x1: 288, y0: 0, y1: 144, w: 144, h: 144 });
+});
+
+test('an odd canvas width drops the trailing column instead of widening arm B', () => {
+  const left = computeSegmentRange(0, 2, 97, 144);
+  const right = computeSegmentRange(1, 2, 97, 144);
+  assert.equal(left.x1, 48);
+  assert.equal(right.x0, 48);
+  assert.equal(right.x1, 96); // floor(97/2)*2 = 96; column 96 dropped, not absorbed
 });
 
 test('the last band absorbs an uneven height remainder', () => {
