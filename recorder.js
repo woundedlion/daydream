@@ -27,6 +27,9 @@
  *   a MIME type is supported by MediaRecorder; injected to keep this function pure.
  * @returns {string} The best-supported MIME type, or '' if none of the candidates match.
  */
+// Chunk-delivery interval for MediaRecorder.start(); bounds encoder buffering.
+const RECORDER_TIMESLICE_MS = 1000;
+
 export function selectMimeType(
   format,
   isTypeSupported = (mt) => MediaRecorder.isTypeSupported(mt)) {
@@ -156,7 +159,9 @@ export class VideoRecorder {
       if (this.mediaRecorder === recorder) this._cleanup();
     };
 
-    recorder.start();
+    // Timeslice so ondataavailable delivers chunks incrementally; without it the
+    // encoder buffers the whole recording in memory until stop().
+    recorder.start(RECORDER_TIMESLICE_MS);
   }
 
   /**
