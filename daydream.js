@@ -204,16 +204,18 @@ const segments = new SegmentController({
  */
 function destroyActiveEffectGui() {
   if (activeEffect && activeEffect.gui) {
-    try {
-      if (activeEffect.activeDragEnds) {
-        for (const end of activeEffect.activeDragEnds) {
-          window.removeEventListener('pointerup', end);
-          window.removeEventListener('pointercancel', end);
-        }
-        activeEffect.activeDragEnds.clear();
+    if (activeEffect.activeDragEnds) {
+      for (const end of activeEffect.activeDragEnds) {
+        window.removeEventListener('pointerup', end);
+        window.removeEventListener('pointercancel', end);
       }
-      const dom = activeEffect.gui.domElement;
-      if (dom && dom.parentNode) dom.parentNode.removeChild(dom);
+      activeEffect.activeDragEnds.clear();
+    }
+    const dom = activeEffect.gui.domElement;
+    if (dom && dom.parentNode) dom.parentNode.removeChild(dom);
+    // Only lil-gui's own teardown is tolerated to throw; a leaked listener set or
+    // a detached DOM node above is a real bug and should surface, not be muffled.
+    try {
       activeEffect.gui.destroy();
     } catch (e) {
       console.warn("GUI destroy warning:", e);
