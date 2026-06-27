@@ -440,6 +440,9 @@ export class Daydream {
    */
   _advanceFrameClock() {
     const delta = this.clock.getDelta();
+    // Drain getDelta each frame but don't accrue while paused, so unpause neither
+    // stalls on an emptied accumulator nor replays the paused span as backlog.
+    if (this.paused) return false;
     this.timeAccumulator += delta;
     if (this.timeAccumulator > Daydream.MAX_FRAME_CATCHUP_SECONDS)
       this.timeAccumulator = Daydream.MAX_FRAME_CATCHUP_SECONDS;
