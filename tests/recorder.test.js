@@ -179,8 +179,9 @@ class FakeMediaRecorder {
 
 /**
  * Installs the browser globals the recorder touches and returns a restore fn.
- * showSaveFilePicker is left undefined so _download takes the anchor path,
- * which the tests stub out per-instance.
+ * showSaveFilePicker is left undefined so the recorder buffers chunks and saves
+ * via the anchor path (_download), which the tests stub out per-instance; the
+ * streaming test re-defines showSaveFilePicker to exercise the disk path.
  * @returns {() => void} A function that restores the saved globals.
  */
 const installRecorderEnv = () => {
@@ -322,6 +323,41 @@ test('a stale onstop does not clobber the session that replaced it', () => {
     assert.equal(rec.mediaRecorder, recorderB);
     assert.deepEqual(rec.chunks, [{ size: 20 }]);
     assert.equal(rec.stream.track.stopped, false);
+  } finally {
+    restore();
+  }
+});
+
+/**
+ * With the File System Access API present, each chunk streams straight to the
+ * writable as it arrives and the file is closed at stop — nothing is buffered in
+ * RAM and no blob download is assembled.
+ */
+test('streams chunks to disk when the File System Access API is present', async () => {
+  const restore = installRecorderEnv();
+  const writes = [];
+  let closed = false;
+  const writable = { write: async (d) => { writes.push(d); }, close: async () => { closed = true; } };
+  globalThis.showSaveFilePicker = async () => ({ createWritable: async () => writable });
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    let downloaded = false;
+    rec._download = () => { downloaded = true; };
+
+    rec.start('stream');
+    const sessionChunks = rec.chunks;
+    const recorder = rec.mediaRecorder;
+    recorder.ondataavailable({ data: { size: 10 } });
+    recorder.ondataavailable({ data: { size: 20 } });
+    rec.stop();
+    recorder.onstop();
+
+    await new Promise((r) => setTimeout(r));
+
+    assert.deepEqual(writes, [{ size: 10 }, { size: 20 }], 'each chunk written to disk in order');
+    assert.equal(closed, true, 'writable closed at stop');
+    assert.equal(downloaded, false, 'no in-memory blob download while streaming');
+    assert.deepEqual(sessionChunks, [], 'streamed chunks are not retained in RAM');
   } finally {
     restore();
   }
