@@ -64,11 +64,11 @@ test('generateFuncAndRecipe preserves an explicit relax iter:0', () => {
   assert.equal(recipe, 'SolidBuilder(cube(a, b), a, b).relax(0).build()');
 });
 
-/** Verifies an absent relax iter still falls back to the default 100. */
-test('generateFuncAndRecipe defaults an absent relax iter to 100', () => {
+/** Verifies an absent relax iter falls back to SolidBuilder's C++ default of 8. */
+test('generateFuncAndRecipe defaults an absent relax iter to 8', () => {
   const item = { base: 'cube', ops: [{ op: 'relax', params: {} }] };
   const { funcName } = generateFuncAndRecipe(item);
-  assert.equal(funcName, 'cube_relax100');
+  assert.equal(funcName, 'cube_relax8');
 });
 
 /** Verifies snub emits both t and twist params (matching the live preview) and encodes each in the funcName. */
