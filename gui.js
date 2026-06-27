@@ -238,6 +238,12 @@ class DeepLinkGUI {
       }
       const allowed = optionValues(args[0]);
       if (allowed) {
+        // The URL carries the option value, not its label, so an object-enum
+        // whose labels share a value can't round-trip to the exact label.
+        const hasDuplicateValues = new Set(allowed.map(String)).size !== allowed.length;
+        if (hasDuplicateValues) {
+          console.warn(`DeepLinkGUI: enum "${key}" has options sharing a value; the deep link may restore a different label.`);
+        }
         // Deep-link values arrive as strings, but an enum's option values may be
         // numbers (or other non-strings); fall back to a string-form match so a
         // typed option isn't rejected for being unequal to the raw URL string.
