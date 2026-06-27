@@ -445,7 +445,7 @@ The filter pipeline operates across three coordinate domains. Each filter declar
 
 **World → Screen**: `vector_to_pixel()` projects a 3D unit-sphere vector to fractional pixel coordinates near `(theta / 2π * W, phi / π * H)`, deriving `theta`/`phi` with the approximate `fast_atan2`/`fast_acos`. The approximation makes the projection sub-pixel inexact, so `vector → pixel → vector` does not exactly invert the exact-trig `pixel_to_vector()`.
 
-**Screen → Pixel**: `AntiAlias` distributes the fractional coordinate to its 4 nearest integer pixels using `quintic_kernel` bilinear weights, with `sin(φ)` density compensation.
+**Screen → Pixel**: `AntiAlias` distributes the fractional coordinate to its 4 nearest integer pixels as a `quintic_kernel`-eased 2×2 splat.
 
 **Pixel → Canvas**: The base `Pipeline<W,H>` (the identity terminal) composites the final color into `canvas(x, y)` with straight-alpha (`src * α + dst * (1-α)`) in linear light.
 
@@ -473,7 +473,7 @@ The **filter pipeline** is a variadic template that chains filter stages:
 Pipeline<W, H,
     Filter::World::Trails<W, MAX_ITEMS>,   // 3D world-space trail decay
     Filter::World::Orient<W>,              // quaternion rotation + motion blur
-    Filter::Screen::AntiAlias<W, H>        // bilinear sub-pixel AA
+    Filter::Screen::AntiAlias<W, H>        // quintic-eased 2×2 splat AA
 > filters;
 ```
 
@@ -505,7 +505,7 @@ The pipeline handles the 3D/2D coordinate mismatch automatically at compile time
 
 | Filter | Effect |
 |---|---|
-| `Screen::AntiAlias<W,H>` | Distributes a sub-pixel coordinate to its 4 nearest integer pixels using `quintic_kernel` bilinear weights, eased uniformly on both axes in framebuffer space — no `sin(φ)` density compensation, because anti-aliasing is a property of the pixel grid, not of where the columns map on the sphere. |
+| `Screen::AntiAlias<W,H>` | Distributes a sub-pixel coordinate to its 4 nearest integer pixels as a `quintic_kernel`-eased 2×2 splat, applied uniformly on both axes in framebuffer space — no `sin(φ)` density compensation, because anti-aliasing is a property of the pixel grid, not of where the columns map on the sphere. |
 | `Screen::Blur<W, H>` | Applies a parameterized 3×3 Gaussian convolution kernel at plot time. |
 | `Screen::Trails<W, MAX_PIXELS>` | Screen-space variant of trail decay; stores 2D coordinates with TTL and redraws via a trail color function. Uses arena-allocated storage (`MAX_PIXELS` capacity, default 1024). |
 
@@ -532,6 +532,7 @@ The Filter auto-syncs from the Style every frame — when the Style lerps betwee
 
 | Preset | Description |
 |---|---|
+| `Style::SlowTwist()` | Static fine-grain turbulence — high amplitude over a tight scale, no temporal drift. Frozen, twisted distortion. |
 | `Style::Churn()` | Dense fine-grain turbulence with strong hue shift. Tight scale, slow drift. |
 | `Style::Smoke()` | Gentle drifting haze with slow noise. Classic smoke look. |
 | `Style::Frozen()` | Static frozen distortion — no temporal movement. |
@@ -680,7 +681,7 @@ The rendering pipeline splits shape definitions from rasterization. `sdf.h` defi
 `scan.h` contains `Scan::rasterize()`, which drives the scanline loop and anti-aliasing, plus convenience wrappers that pair SDF shapes with the rasterizer.
 
 The `process_pixel` function applies anti-aliasing based on shape type:
-- **Solid shapes**: quintic smoothstep over a 1-pixel AA border. Full interior pixels (`d < -pixel_width`) skip AA math entirely.
+- **Solid shapes**: quintic smoothstep over a 2-pixel AA band centered on the edge (`-pixel_width <= d <= pixel_width`). Full interior pixels (`d < -pixel_width`) skip AA math entirely.
 - **Strokes**: opacity falloff across the full stroke thickness.
 
 #### SDF Shape Primitives (`sdf.h`)
@@ -1533,7 +1534,7 @@ Visualizes the Hopf fibration — a map from S³ to S². Points on S² (the base
 
 Procedurally generates Islamic geometric patterns using Hankin's method (pentagon-based subdivision of the Archimedean solids). Each face of a rotating solid is decorated with its characteristic star polygon, colored by face topology (triangles, pentagons, hexagons, etc.). Ripple waves periodically distort the geometry.
 
-**Parameters**: Duration, Fade, Burst, Ripp Amp, Ripp Width, Ripp Decay, Ripp Dur, Debug BB
+**Parameters**: Duration, Fade, Burst, Ripp Amp, Ripp Decay, Ripp Dur, Debug BB
 
 </td></tr></table>
 
