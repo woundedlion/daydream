@@ -307,7 +307,9 @@ class DeepLinkGUI {
       } else if (typeof v === 'number') {
         strVal = '#' + ((v >>> 0) & 0xffffff).toString(16).padStart(6, '0');
       } else if (typeof v === 'string') {
-        strVal = /^[0-9a-fA-F]{6}$/.test(v) ? `#${v}` : v;
+        // Prefix any bare 3/4/6/8-digit hex so it round-trips through the reader,
+        // which only accepts `#hex` and `rgb()/rgba()`.
+        strVal = /^([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v) ? `#${v}` : v;
       }
       this._urlWriter(key, strVal);
     }, urlApplied);
