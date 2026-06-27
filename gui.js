@@ -234,10 +234,19 @@ class DeepLinkGUI {
         }
       }
       const allowed = optionValues(args[0]);
-      if (allowed && !allowed.includes(val)) {
-        console.warn(`DeepLinkGUI: ignoring out-of-range URL value "${params.get(key)}" for "${key}"`);
-        urlApplied = false;
-        valClamped = true;
+      if (allowed) {
+        // Deep-link values arrive as strings, but an enum's option values may be
+        // numbers (or other non-strings); fall back to a string-form match so a
+        // typed option isn't rejected for being unequal to the raw URL string.
+        let idx = allowed.indexOf(val);
+        if (idx < 0) idx = allowed.findIndex((opt) => String(opt) === String(val));
+        if (idx < 0) {
+          console.warn(`DeepLinkGUI: ignoring out-of-range URL value "${params.get(key)}" for "${key}"`);
+          urlApplied = false;
+          valClamped = true;
+        } else {
+          object[prop] = allowed[idx];
+        }
       } else {
         object[prop] = val;
       }
