@@ -112,8 +112,9 @@ export class Daydream {
   static W = 96;
   // Virtual-row padding the engine adds below the logical H (engine maps phi
   // over H + H_OFFSET rows; core/platform.h). The WASM/sim build runs with 0;
-  // the device build uses 3. Exposed as a GUI slider so the device's row->
-  // latitude mapping can be previewed in the simulator (see pixelToSpherical).
+  // the device build uses 3. The sim stays at 0 (full-sphere mapping): the
+  // device's south-pole clipping is a compile-time engine fork the sim cannot
+  // reproduce by repositioning dots alone (see pixelToSpherical).
   static H_OFFSET = 0;
   static PIXEL_WIDTH = 2 * Math.PI / Daydream.W;
   static FPS = 16;
