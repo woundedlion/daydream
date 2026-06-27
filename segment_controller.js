@@ -518,21 +518,19 @@ export class SegmentController {
     const w = Daydream.W;
     const h = Daydream.H;
 
-    let blitted = 0;
+    // Pre-pass: validate every result before blitting any, so a bad segment faults
+    // cleanly (overlay + halt) like a worker fault rather than leaving a partial frame.
     for (let s = 0; s < this.results.length; s++) {
       const r = this.results[s];
       if (!r || !r.pixels) continue;
-      // A fence/layout invariant violation latches a fault (overlay + halt) like
-      // a worker fault, rather than throwing uncontained into the host render loop.
       if (r.x0 < 0 || r.y0 < 0 || r.x1 > w || r.y1 > h) {
         this._onWorkerFault(s,
           `SegmentController.composite: segment ${s} rect ` +
           `[${r.x0},${r.y0})-[${r.x1},${r.y1}) is out of bounds for the ` +
           `${w}x${h} display buffer — the generation fence let a stale-resolution ` +
           `result through (layout/fence invariant violated)`);
-        return blitted;
+        return 0;
       }
-
       const expectedLen = (r.x1 - r.x0) * (r.y1 - r.y0) * 3;
       if (r.pixels.length !== expectedLen) {
         this._onWorkerFault(s,
@@ -540,9 +538,14 @@ export class SegmentController {
           `${r.pixels.length} != expected ${expectedLen} for rect ` +
           `[${r.x0},${r.y0})-[${r.x1},${r.y1}) — a rect/buffer mismatch would ` +
           `blit a truncated row (segment-result invariant violated)`);
-        return blitted;
+        return 0;
       }
+    }
 
+    let blitted = 0;
+    for (let s = 0; s < this.results.length; s++) {
+      const r = this.results[s];
+      if (!r || !r.pixels) continue;
       compositeSegment(dst, r.pixels, w, r);
       blitted++;
     }
