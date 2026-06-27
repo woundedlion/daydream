@@ -397,7 +397,7 @@ export function mapValue(value, fromMin, fromMax, toMin, toMax) {
  * @returns {string} The C++ ProceduralPalette initializer source.
  */
 export function proceduralPaletteCpp(parameters) {
-  const f = (n) => formatFloatCpp(n, 3);
+  const f = (n) => formatFloatCpp(n, 6);
   const v = (r, g, b) => `{${f(r)}, ${f(g)}, ${f(b)}}`;
   return `ProceduralPalette palette(${v(parameters.A_R, parameters.A_G, parameters.A_B)},  // A
                           ${v(parameters.B_R, parameters.B_G, parameters.B_B)},  // B
