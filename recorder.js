@@ -147,8 +147,10 @@ export class VideoRecorder {
     const recorder = new MediaRecorder(stream, options);
 
     // ondataavailable/onstop fire after a fast stop→start may have installed a new
-    // session, so the closures bind chunks/stream/recorder rather than read this.*.
+    // session, so the closures bind the per-session chunks/stream/recorder/sink
+    // rather than read this.*.
     const chunks = [];
+    const sink = this._openSink(recorder, effectName, chunks);
 
     this.mediaRecorder = recorder;
     this.stream = stream;
@@ -156,11 +158,11 @@ export class VideoRecorder {
     this.chunks = chunks;
 
     recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunks.push(e.data);
+      if (e.data.size > 0) sink.write(e.data);
     };
 
     recorder.onstop = () => {
-      this._download(recorder, chunks, effectName);
+      sink.finish();
       stream.getTracks().forEach(t => t.stop());
       // Only clean up if a rapid stop→start hasn't already replaced this session.
       if (this.mediaRecorder === recorder) this._cleanup();
@@ -289,6 +291,70 @@ export class VideoRecorder {
   }
 
   /**
+   * Builds the per-session data sink. With the File System Access API present,
+   * streams each chunk straight to a user-chosen file as it arrives so a long
+   * recording never buffers the whole video in RAM; otherwise it accumulates
+   * chunks for a single blob download at stop. The save dialog is raised here
+   * (under start()'s user gesture) so its transient activation is preserved.
+   * @param {MediaRecorder} recorder - Session recorder, queried for its container type.
+   * @param {string} effectName - Base name for the suggested file.
+   * @param {Blob[]} chunks - Per-session buffer; the fallback path fills it, the
+   *   streaming path leaves it empty (each chunk is released after its disk write).
+   * @returns {{write: (data: Blob) => void, finish: () => void}} The session sink.
+   */
+  _openSink(recorder, effectName, chunks) {
+    if (typeof globalThis.showSaveFilePicker !== 'function') {
+      return {
+        write: (data) => { chunks.push(data); },
+        finish: () => { this._download(recorder, chunks, effectName); },
+      };
+    }
+
+    const ext = this._extension(recorder);
+    const filename = this._timestampedName(effectName, ext);
+
+    let writable = null;
+    let failed = false;
+    const opened = globalThis.showSaveFilePicker({
+      suggestedName: filename,
+      types: [{ description: 'Video', accept: { [this._mimeForExt(ext)]: [`.${ext}`] } }],
+    })
+      .then((handle) => handle.createWritable())
+      .then((w) => { writable = w; })
+      .catch((err) => {
+        failed = true;
+        if (err?.name !== 'AbortError')
+          console.warn('VideoRecorder: streaming save unavailable, buffering in memory', err);
+      });
+
+    // One serialized chain; each link awaits the picker, so chunks that arrive
+    // before the file opens are written in order once it does. A chunk that
+    // cannot stream (picker cancelled/unavailable) falls back to the blob buffer.
+    let chain = Promise.resolve();
+    return {
+      write: (data) => {
+        chain = chain.then(async () => {
+          await opened;
+          if (failed || !writable) { chunks.push(data); return; }
+          await writable.write(data);
+        });
+      },
+      finish: () => {
+        chain
+          .then(async () => {
+            await opened;
+            if (failed || !writable) { this._download(recorder, chunks, effectName); return; }
+            await writable.close();
+          })
+          .catch((err) => {
+            console.warn('VideoRecorder: streaming save failed', err);
+            if (chunks.length) this._download(recorder, chunks, effectName);
+          });
+      },
+    };
+  }
+
+  /**
    * Determines the output file extension from the recorder's MIME type, so the
    * filename matches the real container the browser chose.
    * @param {MediaRecorder} [recorder] - Recorder whose mimeType is inspected;
@@ -315,8 +381,28 @@ export class VideoRecorder {
   }
 
   /**
-   * Assembles captured chunks into a blob and saves it under a timestamped name.
-   * Uses showSaveFilePicker when available, falling back to an anchor download.
+   * Builds the download file name from the effect name, a local-time timestamp,
+   * and the container extension.
+   * @param {string} effectName - Base name for the file.
+   * @param {string} ext - Container extension without the dot.
+   * @returns {string} A name of the form `effect_YYYYMMDD_HHMMSS.ext`.
+   */
+  _timestampedName(effectName, ext) {
+    const now = new Date();
+    const ts = now.getFullYear().toString()
+      + String(now.getMonth() + 1).padStart(2, '0')
+      + String(now.getDate()).padStart(2, '0')
+      + '_'
+      + String(now.getHours()).padStart(2, '0')
+      + String(now.getMinutes()).padStart(2, '0')
+      + String(now.getSeconds()).padStart(2, '0');
+    return `${effectName}_${ts}.${ext}`;
+  }
+
+  /**
+   * Buffered fallback save: assembles captured chunks into a blob and downloads
+   * it under a timestamped name via an anchor click. Used when the File System
+   * Access API is unavailable; the streaming sink handles the file otherwise.
    * @param {MediaRecorder} [recorder] - Recorder used to derive the extension;
    *   defaults to the active recorder.
    * @param {Blob[]} [chunks] - Captured data chunks; defaults to the active chunks.
@@ -326,52 +412,7 @@ export class VideoRecorder {
   _download(recorder = this.mediaRecorder, chunks = this.chunks, effectName = this._effectName) {
     const ext = this._extension(recorder);
     const blob = new Blob(chunks, { type: this._mimeForExt(ext) });
-
-    const now = new Date();
-    const ts = now.getFullYear().toString()
-      + String(now.getMonth() + 1).padStart(2, '0')
-      + String(now.getDate()).padStart(2, '0')
-      + '_'
-      + String(now.getHours()).padStart(2, '0')
-      + String(now.getMinutes()).padStart(2, '0')
-      + String(now.getSeconds()).padStart(2, '0');
-
-    const filename = `${effectName}_${ts}.${ext}`;
-
-    // Reference off `window` so a missing API reads undefined, not a ReferenceError.
-    if (typeof window.showSaveFilePicker === 'function') {
-      this._saveWithPicker(blob, filename, ext);
-    } else {
-      this._saveWithAnchor(blob, filename);
-    }
-  }
-
-  /**
-   * Saves the blob via the File System Access API for a deterministic write with
-   * no object-URL leak. Silently returns if the user cancels; on any other
-   * failure, falls back to the anchor download so the recording is not lost.
-   * @param {Blob} blob - The recorded video data to write.
-   * @param {string} filename - Suggested file name for the save dialog.
-   * @param {string} [ext] - File extension without dot; defaults to the recorder's extension.
-   * @returns {Promise<void>} Resolves once the file is written or the fallback completes.
-   */
-  async _saveWithPicker(blob, filename, ext = this._extension()) {
-    try {
-      const handle = await window.showSaveFilePicker({
-        suggestedName: filename,
-        types: [{
-          description: 'Video',
-          accept: { [this._mimeForExt(ext)]: [`.${ext}`] },
-        }],
-      });
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-    } catch (err) {
-      if (err.name === 'AbortError') return; // user cancelled the dialog
-      console.warn('VideoRecorder: picker save failed, falling back to anchor download', err);
-      this._saveWithAnchor(blob, filename);
-    }
+    this._saveWithAnchor(blob, this._timestampedName(effectName, ext));
   }
 
   /**
