@@ -67,15 +67,17 @@ export const glslComplexFunctions = `
 // --- Drag-input snapping --------------------------------------------------
 
 /**
- * Snaps a scalar to zero (if within 0.1 of zero) and then to the nearest
- * integer (if within `threshold`), so dragged coefficients latch onto grid lines.
+ * Snaps a scalar to zero (within twice `threshold`) and then to the nearest
+ * integer (within `threshold`), so dragged coefficients latch onto grid lines.
+ * Zero gets the wider band so coefficients settle onto an exact 0 more readily;
+ * deriving it from `threshold` keeps the two bands proportional.
  * @param {number} value - The scalar coefficient component to snap.
  * @param {number} [threshold=0.05] - Maximum distance to the nearest integer for snapping.
  * @returns {number} The snapped value.
  */
 export function snapComplex(value, threshold = 0.05) {
   let v = value;
-  if (Math.abs(v) < 0.1) v = 0.0;
+  if (Math.abs(v) < threshold * 2) v = 0.0;
   if (Math.abs(v - Math.round(v)) < threshold) v = Math.round(v);
   return v;
 }
