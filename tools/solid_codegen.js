@@ -132,8 +132,8 @@ export function generateFuncAndRecipe(item) {
       nameParts.push(`_snub${pctSuffix(t)}_tw${pctSuffix(twist)}`);
     } else if (opName === 'relax') {
       // `??` not `||`: an explicit iter:0 is a valid no-op relax count and must
-      // not fall back to the 100 default.
-      const iter = o.params.iter ?? 100;
+      // not fall back to the default. 8 matches SolidBuilder's C++ relax default.
+      const iter = o.params.iter ?? 8;
       requireCount(opName, 'iter', iter);
       chain += `.relax(${iter})`;
       nameParts.push(`_relax${iter}`);
