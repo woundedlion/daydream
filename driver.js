@@ -117,8 +117,9 @@ export class Daydream {
   static H_OFFSET = 0;
   static PIXEL_WIDTH = 2 * Math.PI / Daydream.W;
   static FPS = 16;
-  // Clamp accumulated real time after a stall so the sim catches up by at most a
-  // few frames per tick rather than replaying the whole backlog (spiral of death).
+  // Cap on accumulated real time: the clock consumes one interval per frame, so
+  // this bounds the post-stall backlog to a few frames instead of letting it grow
+  // unboundedly and step every frame until drained.
   static MAX_FRAME_CATCHUP_SECONDS = 0.25;
   static DOT_SIZE = 2;
   static DOT_COLOR = 0x0000ff;
