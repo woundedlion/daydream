@@ -266,10 +266,16 @@ function applyEffect(preserveParams = false) {
        * @returns {void}
        */
       export() {
-        const values = host.engine.getParamValues();
-        // A heap-growth detach leaves the view zero-length; skip so we don't copy
-        // an all-zero preset.
-        if (values.length === 0) {
+        // In segmented mode the main engine is never stepped, so its values are
+        // stale; source from segment 0's worker as syncGUI does (null before the
+        // first frame).
+        const values = segments.active
+          ? segments.getParamValues()
+          : host.engine.getParamValues();
+        // A heap-growth detach leaves the view zero-length, and the segmented
+        // source is null before the first frame; skip so we don't copy an
+        // all-zero preset.
+        if (!values || values.length === 0) {
           console.warn('Export: parameter view detached (zero-length); skipping copy');
           exportCtrl.name('✗ Copy failed');
           setTimeout(() => exportCtrl.name('Export'), 1500);
