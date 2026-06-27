@@ -194,6 +194,9 @@ async function handleMessage(msg) {
       }, [pixelsCopy.buffer]);
       break;
     }
+
+    default:
+      console.warn('segment_worker: unknown message type', msg.type);
   }
 }
 
