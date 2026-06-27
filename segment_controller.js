@@ -228,12 +228,12 @@ export class SegmentController {
               + `(expected 0..${numSegments - 1}); dropping`);
             return;
           }
-          // Mirror segment 0's live params for GUI sync (resolution-independent,
-          // so captured regardless of the generation fence below).
-          if (msg.segId === 0 && msg.paramValues) this.paramValues = msg.paramValues;
           // Generation fence: keep only results from the current resolution; still
           // settle the frame either way.
           if (this.inflightGen === this.renderGen) {
+            // Mirror segment 0's live params for GUI sync, inside the fence so a
+            // stale-generation frame can't publish params against a new descriptor list.
+            if (msg.segId === 0 && msg.paramValues) this.paramValues = msg.paramValues;
             this.results[msg.segId] = {
               pixels: msg.pixels,
               x0: msg.x0, x1: msg.x1,
