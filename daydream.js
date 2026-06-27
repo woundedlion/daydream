@@ -173,12 +173,14 @@ const urlParams = new URLSearchParams(window.location.search);
 const initialEffect = urlParams.get('effect');
 const initialResolution = urlParams.get('resolution');
 
+const knownEffects = new Set(Object.values(effectsByResolution).flat());
 const appState = new AppState({
-  effect: initialEffect || 'IslamicStars',
+  effect: (initialEffect && knownEffects.has(initialEffect)) ? initialEffect : 'IslamicStars',
   resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Phantasm (144x288)",
 });
 const urlSync = new URLSync(appState, ['effect', 'resolution'], {
   resolution: (v) => Boolean(resolutionPresets[v]),
+  effect: (v) => knownEffects.has(v),
 });
 
 const segments = new SegmentController({
