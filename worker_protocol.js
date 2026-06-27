@@ -82,9 +82,6 @@
 /** Worker has finished bootstrapping (engine instantiated) and can accept work.
  * @typedef {{ type: 'ready', segId: number }} ReadyMsg */
 
-/** Worker has rebuilt and re-clipped its effect after a setEffect.
- * @typedef {{ type: 'effectReady', segId: number }} EffectReadyMsg */
-
 /** Worker module body started executing — its static imports (incl. the WASM
  * glue ./holosphere_wasm.js) all resolved. Sent before the WASM instantiate so
  * the controller can detect a missing/renamed glue file fast, ahead of the
@@ -110,7 +107,7 @@
 
 /**
  * Every message a worker sends back to the controller.
- * @typedef {ReadyMsg | EffectReadyMsg | FrameMsg | BootedMsg} ControllerInboundMsg
+ * @typedef {ReadyMsg | FrameMsg | BootedMsg} ControllerInboundMsg
  */
 
 export {};

@@ -216,8 +216,6 @@ export class SegmentController {
         } else if (msg.type === 'booted') {
           if (!booted[i]) { booted[i] = true; bootedCount++; }
           if (bootedCount === numSegments) this._clearBootWatchdog();
-        } else if (msg.type === 'effectReady') {
-          // no action needed
         } else if (msg.type === 'frame') {
           // A halted pool zeroed `pending`; ignore late frames so it can't go negative.
           if (this.faulted) return;

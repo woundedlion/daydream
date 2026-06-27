@@ -288,7 +288,6 @@ test('setEffect handler rebuilds, then re-applies the carried param snapshot', a
   });
   assert.equal(engineInstance.effect, 'Waves', 'switched to the new effect');
   assert.deepEqual(engineInstance.params, [['Freq', 0.25]]);
-  assert.ok(posted.find((p) => p.msg.type === 'effectReady'), 'effectReady posted');
 });
 
 test('setEffect with no params just rebuilds, leaving defaults', async () => {
@@ -297,7 +296,6 @@ test('setEffect with no params just rebuilds, leaving defaults', async () => {
   await dispatch({ type: 'setEffect', name: 'Waves' });
   assert.equal(engineInstance.effect, 'Waves');
   assert.deepEqual(engineInstance.params, [], 'no snapshot to re-apply');
-  assert.ok(posted.find((p) => p.msg.type === 'effectReady'));
 });
 
 test('setParameter handler forwards name/value to the engine', async () => {
