@@ -435,10 +435,9 @@ test('composite() faults on a rectangle that overflows the current display buffe
     'a leading out-of-bounds rect is never partially blitted');
 });
 
-test('composite() blits good segments before faulting on a later overflow', () => {
-  // The bounds check runs per result inside the blit loop, so a good segment
-  // ahead of the overflowing one is already composited when the fault latches —
-  // the no-partial-output guarantee only holds for a leading bad segment.
+test('composite() faults atomically when a non-leading segment overflows', () => {
+  // The bounds pre-pass validates every result before any blit, so a good
+  // segment ahead of the overflowing one is never composited — no partial frame.
   Daydream.W = 4; Daydream.H = 2;
   Daydream.pixels = new Uint16Array(4 * 2 * 3);
 
@@ -452,12 +451,11 @@ test('composite() blits good segments before faulting on a later overflow', () =
   ];
 
   const blitted = c.composite();
-  assert.equal(blitted, 1, 'the good leading segment was blitted before the fault');
+  assert.equal(blitted, 0, 'a later out-of-bounds rect blits nothing');
   assert.equal(c.faulted, true);
   assert.match(c.faultInfo.message, /segment 1 .* out of bounds/);
-  assert.equal(Daydream.pixels[idx(0, 0, 4)], 111,
-    'the good leading segment was blitted before the overflow faulted');
-  assert.equal(Daydream.pixels[idx(1, 1, 4)], 111, 'good segment fully blitted');
+  assert.ok(Daydream.pixels.every((v) => v === 0),
+    'the good leading segment is not blitted when a later segment overflows');
 });
 
 test('composite() marks both the internal split and the x=0 wrap seam', () => {
