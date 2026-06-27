@@ -1,18 +1,51 @@
 #!/bin/sh
 # Refuse any non-fast-forward move of refs/heads/master so concurrent
 # code-review-fix sessions cannot clobber each other's landed work.
-# Escape hatch for intentional rewinds: HS_ALLOW_NONFF=1.
+#
+# The fast-forward check derives the ref's current value itself (git update-ref
+# reports a zero old-OID to this hook, so the stdin old field cannot be trusted).
+#
+# An intentional rewind needs a deliberate, one-shot, target-scoped token; a
+# leaked or global env var can no longer bless routine landings. Authorize the
+# exact new commit, then perform the rewind:
+#   git rev-parse <target> > "$(git rev-parse --git-common-dir)/hs-allow-nonff"
+# The token authorizes only that one new value and is consumed on use. Write the
+# literal ANY instead of a SHA for a blind rewind. Every refusal and every
+# override is appended to <git-common-dir>/hs-nonff.log.
 [ "$1" = "prepared" ] || exit 0
-[ "${HS_ALLOW_NONFF:-0}" = "1" ] && exit 0
 
 z='0000000000000000000000000000000000000000'
+gitdir=$(git rev-parse --git-common-dir 2>/dev/null) || gitdir=.git
+tokfile="$gitdir/hs-allow-nonff"
+logfile="$gitdir/hs-nonff.log"
+
 while read -r old new ref; do
 	[ "$ref" = "refs/heads/master" ] || continue
-	case "$old" in "$z"|"") continue ;; esac   # ref creation
-	case "$new" in "$z"|"") continue ;; esac   # ref deletion
-	if ! git merge-base --is-ancestor "$old" "$new"; then
-		echo "reference-transaction: REFUSED non-fast-forward update of master ($old -> $new); set HS_ALLOW_NONFF=1 to override" >&2
-		exit 1
+	case "$new" in "$z"|"") continue ;; esac                 # deletion
+	cur=$(git rev-parse --verify -q "$ref" 2>/dev/null) || cur=''
+	[ -z "$cur" ] && continue                                # creation
+	git merge-base --is-ancestor "$cur" "$new" 2>/dev/null && continue  # fast-forward
+
+	ts=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
+	tok=''
+	[ -f "$tokfile" ] && tok=$(tr -d ' \t\r\n' < "$tokfile")
+	granted=0
+	case "$tok" in
+		ANY) granted=1 ;;
+		???????*) case "$new" in "$tok"*) granted=1 ;; esac ;;
+	esac
+
+	if [ "$granted" = 1 ]; then
+		rm -f "$tokfile"
+		echo "$ts OVERRIDE master $cur -> $new (token=$tok)" >> "$logfile"
+		continue
 	fi
+
+	echo "$ts REFUSED master $cur -> $new" >> "$logfile"
+	echo "reference-transaction: REFUSED non-fast-forward update of master ($cur -> $new)." >&2
+	echo "  Authorize this exact rewind, then retry (one-shot):" >&2
+	echo "    git rev-parse $new > \"$tokfile\"" >&2
+	echo "  Write ANY into that file for a blind rewind. Routine landings cannot override." >&2
+	exit 1
 done
 exit 0
