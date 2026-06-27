@@ -513,21 +513,25 @@ export class SegmentController {
     for (let s = 0; s < this.results.length; s++) {
       const r = this.results[s];
       if (!r || !r.pixels) continue;
+      // A fence/layout invariant violation latches a fault (overlay + halt) like
+      // a worker fault, rather than throwing uncontained into the host render loop.
       if (r.x0 < 0 || r.y0 < 0 || r.x1 > w || r.y1 > h) {
-        throw new Error(
+        this._onWorkerFault(s,
           `SegmentController.composite: segment ${s} rect ` +
           `[${r.x0},${r.y0})-[${r.x1},${r.y1}) is out of bounds for the ` +
           `${w}x${h} display buffer — the generation fence let a stale-resolution ` +
           `result through (layout/fence invariant violated)`);
+        return blitted;
       }
 
       const expectedLen = (r.x1 - r.x0) * (r.y1 - r.y0) * 3;
       if (r.pixels.length !== expectedLen) {
-        throw new Error(
+        this._onWorkerFault(s,
           `SegmentController.composite: segment ${s} pixel buffer length ` +
           `${r.pixels.length} != expected ${expectedLen} for rect ` +
           `[${r.x0},${r.y0})-[${r.x1},${r.y1}) — a rect/buffer mismatch would ` +
           `blit a truncated row (segment-result invariant violated)`);
+        return blitted;
       }
 
       compositeSegment(dst, r.pixels, w, r);

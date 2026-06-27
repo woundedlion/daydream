@@ -418,7 +418,7 @@ test('composite() blits each quadrant to its display-buffer offset', () => {
   assert.equal(Daydream.pixels[idx(1, 1, 4)], 0);
 });
 
-test('composite() throws on a rectangle that overflows the current display buffer', () => {
+test('composite() faults on a rectangle that overflows the current display buffer', () => {
   Daydream.W = 4; Daydream.H = 2;
   Daydream.pixels = new Uint16Array(4 * 2 * 3);
 
@@ -427,14 +427,17 @@ test('composite() throws on a rectangle that overflows the current display buffe
   const quad = new Uint16Array(2 * 2 * 3).fill(222);
   c.results = [{ pixels: quad, x0: 0, x1: 99, y0: 0, y1: 2, quadW: 2, quadH: 2 }]; // x1=99 overshoots W=4
 
-  assert.throws(() => c.composite(), /out of bounds/);
+  const blitted = c.composite();
+  assert.equal(blitted, 0, 'a leading out-of-bounds rect blits nothing');
+  assert.equal(c.faulted, true, 'an overflow latches a fault instead of throwing');
+  assert.match(c.faultInfo.message, /out of bounds/);
   assert.ok(Daydream.pixels.every((v) => v === 0),
     'a leading out-of-bounds rect is never partially blitted');
 });
 
-test('composite() blits good segments before throwing on a later overflow', () => {
+test('composite() blits good segments before faulting on a later overflow', () => {
   // The bounds check runs per result inside the blit loop, so a good segment
-  // ahead of the overflowing one is already composited when the throw fires —
+  // ahead of the overflowing one is already composited when the fault latches —
   // the no-partial-output guarantee only holds for a leading bad segment.
   Daydream.W = 4; Daydream.H = 2;
   Daydream.pixels = new Uint16Array(4 * 2 * 3);
@@ -448,9 +451,12 @@ test('composite() blits good segments before throwing on a later overflow', () =
     { pixels: bad, x0: 2, x1: 99, y0: 0, y1: 2, quadW: 2, quadH: 2 }, // x1=99 overshoots W=4
   ];
 
-  assert.throws(() => c.composite(), /segment 1 .* out of bounds/);
+  const blitted = c.composite();
+  assert.equal(blitted, 1, 'the good leading segment was blitted before the fault');
+  assert.equal(c.faulted, true);
+  assert.match(c.faultInfo.message, /segment 1 .* out of bounds/);
   assert.equal(Daydream.pixels[idx(0, 0, 4)], 111,
-    'the good leading segment was blitted before the overflow threw');
+    'the good leading segment was blitted before the overflow faulted');
   assert.equal(Daydream.pixels[idx(1, 1, 4)], 111, 'good segment fully blitted');
 });
 
