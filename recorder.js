@@ -286,6 +286,17 @@ export class VideoRecorder {
   }
 
   /**
+   * Canonical container MIME type for a file extension, used for both the blob
+   * type and the save picker's accept filter so the two never disagree.
+   * @param {string} ext - File extension without dot.
+   * @returns {string} The matching MIME type, defaulting to 'video/webm'.
+   */
+  _mimeForExt(ext) {
+    const MIME = { mp4: 'video/mp4', webm: 'video/webm', mkv: 'video/x-matroska', ogv: 'video/ogg' };
+    return MIME[ext] ?? 'video/webm';
+  }
+
+  /**
    * Assembles captured chunks into a blob and saves it under a timestamped name.
    * Uses showSaveFilePicker when available, falling back to an anchor download.
    * @param {MediaRecorder} [recorder] - Recorder used to derive the extension;
@@ -296,7 +307,7 @@ export class VideoRecorder {
    */
   _download(recorder = this.mediaRecorder, chunks = this.chunks, effectName = this._effectName) {
     const ext = this._extension(recorder);
-    const blob = new Blob(chunks, { type: ext === 'mp4' ? 'video/mp4' : 'video/webm' });
+    const blob = new Blob(chunks, { type: this._mimeForExt(ext) });
 
     const now = new Date();
     const ts = now.getFullYear().toString()
@@ -332,7 +343,7 @@ export class VideoRecorder {
         suggestedName: filename,
         types: [{
           description: 'Video',
-          accept: { [blob.type]: [`.${ext}`] },
+          accept: { [this._mimeForExt(ext)]: [`.${ext}`] },
         }],
       });
       const writable = await handle.createWritable();
