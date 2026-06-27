@@ -413,4 +413,18 @@ export class VideoRecorder {
       this._offCtx = null;
     }
   }
+
+  /**
+   * Stop any active recording and release the stream tracks and offscreen canvas.
+   * Idempotent; call on teardown so a mid-recording discard does not leak the
+   * captured stream/track (onstop, which normally cleans up, cannot flush on a
+   * synchronous page discard).
+   * @returns {void}
+   */
+  dispose() {
+    if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+      this.mediaRecorder.stop();
+    }
+    this._cleanup();
+  }
 }
