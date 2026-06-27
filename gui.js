@@ -153,24 +153,25 @@ class DeepLinkGUI {
 
   /**
    * Installs the deep-link URL writer as the controller's onChange and redirects
-   * any later caller onChange(fn) to a user slot that runs ahead of the writer.
+   * any later caller onChange(fn) to user handlers that run ahead of the writer.
    * lil-gui keeps a single onChange slot, so without this a caller doing
    * `gui.add(...).onChange(cb)` would silently overwrite the URL writer and break
-   * deep-link persistence for that control.
+   * deep-link persistence for that control. Every caller handler is fanned out, so
+   * repeated onChange(fn) registrations compose rather than clobber one another.
    * @param {Object} controller - The lil-gui controller to wrap.
    * @param {Function} writeUrl - Callback that persists the control's value to the URL.
    * @param {boolean} [applyOnLoad=false] - When true (value hydrated from URL), replay the caller's onChange once on first registration so its side effect runs at startup.
    * @returns {Object} The same controller, for chaining.
    */
   _attachUrlWriter(controller, writeUrl, applyOnLoad = false) {
-    let userOnChange = null;
+    const userOnChange = [];
     let replayed = false;
     controller.onChange((v) => {
-      if (userOnChange) userOnChange(v);
+      for (const fn of userOnChange) fn(v);
       writeUrl(v);
     });
     controller.onChange = (fn) => {
-      userOnChange = fn;
+      if (fn) userOnChange.push(fn);
       // For a URL-hydrated value, fire the just-registered handler once so its
       // side effect runs the deep-linked state — but only on first registration.
       if (applyOnLoad && fn && !replayed) {
