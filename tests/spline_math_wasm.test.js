@@ -79,14 +79,16 @@ test('spline_cubic_slerp (real WASM) pins to the engine and differs from cubic_f
  * pinned tangents, the expected sample count, and a pinned interior sample.
  */
 test('Catmull-Rom (real WASM tangents + eval) closed loop pins to the engine', () => {
-  // Tangents at tension 0.5: golden from the engine.
+  // Tangents at tension 0.5: golden from the engine. P1 and P3 are antipodal,
+  // so cp2's inner slerp(start, next) takes the 180° path — cp2 pins slerp's
+  // antipodal tie-break (rotation about least_parallel_axis), not a unique blend.
   const t = catmullRomTangents(P[0], P[1], P[2], P[3], 0.5);
   closeVec(t.cp1, 0.707107, 0.5, 0.5, 'cp1');
-  closeVec(t.cp2, 0.707107, 0, 0.707107, 'cp2');
+  closeVec(t.cp2, 0, -0.707107, 0.707107, 'cp2');
 
   // Closed loop, 4 points, 3 samples/segment: first segment emits 4, the other
   // 3 emit 3 each, so 4 + 3*3 = 13.
   const curve = generateCatmullRomCurve(P, 0.5, 3, catmullRomTangents, cubicFast, true);
   assert.equal(curve.length, 13);
-  closeVec(curve[5], 0.571435, 0.124877, 0.81109, 'closed-loop sample [5]');
+  closeVec(curve[5], 0.250718, -0.262322, 0.931841, 'closed-loop sample [5]');
 });
