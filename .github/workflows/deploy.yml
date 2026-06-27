@@ -1,6 +1,7 @@
 # Deploy the daydream simulator to GitHub Pages (Pages source: GitHub Actions),
-# GATED on the Holosphere engine's native unit suite. The `deploy` job
-# `needs: gate`, so the live site only updates when the engine tests pass.
+# GATED on the Holosphere engine's native unit suite and the simulator's JS unit
+# suite. The `deploy` job `needs: [gate, js-tests]`, so the live site only updates
+# when both suites pass.
 #
 # The committed app files are published as-is (three.js / lil-gui load from the
 # CDN via vendor-importmap.js, so they don't need vendoring here). The engine's
@@ -111,9 +112,23 @@ jobs:
       - run: ctest --preset tests --output-on-failure
         working-directory: engine
 
+  js-tests:
+    name: Simulator JS unit tests (deploy gate)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'      # package.json engines: node >=22.3.0
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
   deploy:
     name: Deploy to Pages
-    needs: gate                  # ← only deploys if the engine suite passes
+    needs: [gate, js-tests]       # ← only deploys if both suites pass
     runs-on: ubuntu-24.04
     environment:
       name: github-pages
