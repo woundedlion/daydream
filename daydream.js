@@ -242,10 +242,11 @@ function applyEffect(preserveParams = false) {
       console.error(`setEffect("${appState.get('effect')}") failed; effect unavailable.`);
       // The early return skips the end-of-function sync; run it here so the
       // column-fill mode tracks the engine's actual (unchanged) effect rather
-      // than leaving the previous effect's mode stale.
+      // than leaving the previous effect's mode stale. The sidebar is left on
+      // its current highlight, which already reflects the engine's actual
+      // (prior) effect — re-highlighting the failed name would desync UI/engine.
       if (segments.workers.length > 0) segments.setEffect(appState.get('effect'));
       daydream.setStrobeColumns(host.engine.strobeColumns());
-      sidebar.setActive(appState.get('effect'));
       return;
     }
     daydream.setStrobeColumns(host.engine.strobeColumns());
