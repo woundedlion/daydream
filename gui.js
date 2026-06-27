@@ -109,6 +109,7 @@ class DeepLinkGUI {
     }
     this.parent = null;
     this.folderName = null;
+    this._folderIndex = 0;
     this._urlKeys = new Set();
     this._children = [];
     this._urlWriter = makeUrlParamWriter();
@@ -145,7 +146,9 @@ class DeepLinkGUI {
     let keys = [prop];
     let curr = this;
     while (curr.parent) {
-      if (curr.folderName) keys.unshift(curr.folderName);
+      // A positional fallback for an empty folder name keeps the level from
+      // collapsing, so two deep links can't collide on a dropped segment.
+      keys.unshift(curr.folderName || `#${curr._folderIndex}`);
       curr = curr.parent;
     }
     return keys.join('.');
@@ -333,6 +336,7 @@ class DeepLinkGUI {
     const wrapped = new DeepLinkGUI(folder);
     wrapped.parent = this;
     wrapped.folderName = name;
+    wrapped._folderIndex = this._children.length;
     wrapped._urlWriter = this._urlWriter;
     this._children.push(wrapped);
     return wrapped;
