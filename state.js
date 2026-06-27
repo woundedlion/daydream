@@ -26,8 +26,8 @@ export class AppState {
    * @param {Object} defaults - Initial key/value pairs seeding the state.
    */
   constructor(defaults = {}) {
-    this._state = { ...defaults };
-    this._listeners = [];
+    this.state = { ...defaults };
+    this.listeners = [];
   }
 
   /**
@@ -35,7 +35,7 @@ export class AppState {
    * @param {string} key - The state key to look up.
    * @returns {*} The current value for the key, or undefined if unset.
    */
-  get(key) { return this._state[key]; }
+  get(key) { return this.state[key]; }
 
   /**
    * Sets one key, notifying subscribers only when the value actually changes.
@@ -52,10 +52,10 @@ export class AppState {
    * @returns {void}
    */
   set(key, value) {
-    if (this._state[key] === value) return;
-    const old = this._state[key];
-    this._state[key] = value;
-    this._notify(key, value, old);
+    if (this.state[key] === value) return;
+    const old = this.state[key];
+    this.state[key] = value;
+    this.notify(key, value, old);
   }
 
   /**
@@ -74,9 +74,9 @@ export class AppState {
   update(patch) {
     const changes = [];
     for (const [key, value] of Object.entries(patch)) {
-      if (this._state[key] !== value) {
-        const old = this._state[key];
-        this._state[key] = value;
+      if (this.state[key] !== value) {
+        const old = this.state[key];
+        this.state[key] = value;
         changes.push([key, value, old]);
       }
     }
@@ -85,8 +85,8 @@ export class AppState {
     // current — the re-entrant write already notified with the live value, so
     // firing the stale tuple would interleave a superseded notification.
     changes.forEach(([key, value, old]) => {
-      if (this._state[key] !== value) return;
-      this._notify(key, value, old);
+      if (this.state[key] !== value) return;
+      this.notify(key, value, old);
     });
   }
 
@@ -96,9 +96,9 @@ export class AppState {
    * @returns {Function} An unsubscribe function that removes the callback.
    */
   subscribe(callback) {
-    this._listeners.push(callback);
+    this.listeners.push(callback);
     return () => {
-      this._listeners = this._listeners.filter(l => l !== callback);
+      this.listeners = this.listeners.filter(l => l !== callback);
     };
   }
 
@@ -109,26 +109,26 @@ export class AppState {
    * @param {*} old - The previous value.
    * @returns {void}
    */
-  _notify(key, value, old) {
+  notify(key, value, old) {
     // Snapshot so a subscriber added during dispatch is not invoked for the
     // current event (and an unsubscribe mid-dispatch stays safe).
-    this._listeners.slice().forEach(cb => cb(key, value, old));
+    this.listeners.slice().forEach(cb => cb(key, value, old));
   }
 
   /**
    * Returns a shallow snapshot of the current state.
    * @returns {Object} A copy of the current key/value pairs.
    */
-  snapshot() { return { ...this._state }; }
+  snapshot() { return { ...this.state }; }
 }
 
 // Single app-wide URL writer; gui.js routes its param writes through this.
-let _activeURLSync = null;
+let activeURLSync = null;
 /**
  * Returns the app-wide active URLSync instance, or null if none is constructed.
  * @returns {URLSync|null} The single registered URL writer.
  */
-export const getActiveURLSync = () => _activeURLSync;
+export const getActiveURLSync = () => activeURLSync;
 
 /**
  * URL synchronization layer — the single owner of URL writes.
@@ -153,8 +153,8 @@ export class URLSync {
   constructor(state, trackedKeys, validators = {}) {
     this.state = state;
     this.trackedKeys = new Set(trackedKeys);
-    this._timer = null;
-    this._adhoc = new Map(); // GUI-set params (key -> string), merged on flush
+    this.timer = null;
+    this.adhoc = new Map(); // GUI-set params (key -> string), merged on flush
 
     const params = new URLSearchParams(window.location.search);
     const patch = {};
@@ -169,12 +169,12 @@ export class URLSync {
       state.update(patch);
     }
 
-    this._unsubscribe = state.subscribe((key, value) => {
+    this.unsubscribe = state.subscribe((key, value) => {
       if (!this.trackedKeys.has(key)) return;
-      this._schedule();
+      this.schedule();
     });
 
-    _activeURLSync = this;
+    activeURLSync = this;
   }
 
   /**
@@ -185,22 +185,22 @@ export class URLSync {
    * @returns {void}
    */
   dispose() {
-    if (this._unsubscribe) {
-      this._unsubscribe();
-      this._unsubscribe = null;
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
     }
-    clearTimeout(this._timer);
-    this._timer = null;
-    if (_activeURLSync === this) _activeURLSync = null;
+    clearTimeout(this.timer);
+    this.timer = null;
+    if (activeURLSync === this) activeURLSync = null;
   }
 
   /**
    * Debounces a URL write, collapsing bursts into one flush after 200 ms.
    * @returns {void}
    */
-  _schedule() {
-    clearTimeout(this._timer);
-    this._timer = setTimeout(() => this._flush(), 200);
+  schedule() {
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.flush(), 200);
   }
 
   /**
@@ -213,12 +213,12 @@ export class URLSync {
   setParam(key, value) {
     if (value === null || value === undefined) {
       // null is a deletion marker (drop the param on flush), not a forget.
-      this._adhoc.set(key, null);
+      this.adhoc.set(key, null);
     } else {
-      this._adhoc.set(key,
+      this.adhoc.set(key,
         typeof value === 'number' ? String(roundUrlNumber(value)) : String(value));
     }
-    this._schedule();
+    this.schedule();
   }
 
   /**
@@ -229,28 +229,28 @@ export class URLSync {
    * @returns {void}
    */
   reset(excludedKeys = []) {
-    clearTimeout(this._timer);
+    clearTimeout(this.timer);
     const excl = new Set(excludedKeys);
-    for (const k of [...this._adhoc.keys()]) {
-      if (!excl.has(k)) this._adhoc.delete(k);
+    for (const k of [...this.adhoc.keys()]) {
+      if (!excl.has(k)) this.adhoc.delete(k);
     }
     const params = new URLSearchParams(window.location.search);
     for (const k of [...params.keys()]) {
       if (!excl.has(k)) params.delete(k);
     }
-    // Re-assert tracked state and surviving ad-hoc writes: clearing this._timer
+    // Re-assert tracked state and surviving ad-hoc writes: clearing this.timer
     // cancelled any flush for a change made within the debounce window.
     for (const key of this.trackedKeys) {
       const val = this.state.get(key);
-      if (val !== null && val !== undefined) this._setTrackedParam(params, key, val);
+      if (val !== null && val !== undefined) this.setTrackedParam(params, key, val);
     }
-    for (const [key, val] of this._adhoc) {
+    for (const [key, val] of this.adhoc) {
       if (val === null) params.delete(key);
       else params.set(key, val);
     }
     const qs = params.toString();
     window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
-    this._adhoc.clear();
+    this.adhoc.clear();
   }
 
   /**
@@ -265,7 +265,7 @@ export class URLSync {
    * @param {*} val - The value to serialize.
    * @returns {void}
    */
-  _setTrackedParam(params, key, val) {
+  setTrackedParam(params, key, val) {
     params.set(key, typeof val === 'number' ? String(roundUrlNumber(val)) : String(val));
   }
 
@@ -275,15 +275,15 @@ export class URLSync {
    * time (not schedule time) is what lets concurrent updates merge.
    * @returns {void}
    */
-  _flush() {
+  flush() {
     const params = new URLSearchParams(window.location.search);
     for (const key of this.trackedKeys) {
       const val = this.state.get(key);
       if (val !== null && val !== undefined) {
-        this._setTrackedParam(params, key, val);
+        this.setTrackedParam(params, key, val);
       }
     }
-    for (const [key, val] of this._adhoc) {
+    for (const [key, val] of this.adhoc) {
       if (val === null) params.delete(key);
       else params.set(key, val);
     }
@@ -292,6 +292,6 @@ export class URLSync {
     window.history.replaceState({}, '', newUrl);
     // The URL is now the store of record; clear the buffer so a stale ad-hoc entry
     // can't re-apply on every flush.
-    this._adhoc.clear();
+    this.adhoc.clear();
   }
 }

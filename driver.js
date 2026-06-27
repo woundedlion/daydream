@@ -161,7 +161,7 @@ export class Daydream {
 
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-    this._setupContextLossHandling();
+    this.setupContextLossHandling();
 
     this.labelRenderer = new CSS2DRenderer();
     this.labelRenderer.domElement.className = "labelLayer";
@@ -189,8 +189,8 @@ export class Daydream {
 
     // On-demand rendering: a camera 'change' marks the frame dirty so an idle
     // scene does no GPU work. Starts dirty so the first frame always paints.
-    this._needsRender = true;
-    this.controls.addEventListener('change', () => { this._needsRender = true; });
+    this.needsRender = true;
+    this.controls.addEventListener('change', () => { this.needsRender = true; });
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(Daydream.SCENE_BACKGROUND_COLOR);
@@ -204,7 +204,7 @@ export class Daydream {
 
     this.resources = [];
     this.labelPool = new LabelPool(this.scene);
-    this._hadLabels = false;
+    this.hadLabels = false;
 
     this.setupDots();
 
@@ -252,11 +252,11 @@ export class Daydream {
     this.timeAccumulator = 0;
     this.labelAxes = false;
     this.cullBackSphere = false;
-    // Persist column gap-fill overlap (see _updateCullUniforms): 1.0 = pills meet
+    // Persist column gap-fill overlap (see updateCullUniforms): 1.0 = pills meet
     // exactly; higher closes any hairline seam at the cost of longer terminal caps.
     this.columnFillOverlap = 1.15;
 
-    this._statsGroup = null;
+    this.statsGroup = null;
 
     this.precomputeMatrices();
   }
@@ -273,8 +273,8 @@ export class Daydream {
    *          render() stops pushing GL calls into a dead context. The restore
    *          handler is wired for completeness on hardware that can recover.
    */
-  _setupContextLossHandling() {
-    this._contextLost = false;
+  setupContextLossHandling() {
+    this.contextLost = false;
 
     const overlay = document.createElement("div");
     overlay.className = "loading-overlay error context-lost-overlay";
@@ -282,35 +282,35 @@ export class Daydream {
     const title = document.createElement("div");
     title.className = "load-error-title";
     title.textContent = "GPU context lost";
-    this._contextLostDetail = document.createElement("div");
-    this._contextLostDetail.className = "load-error-detail";
+    this.contextLostDetail = document.createElement("div");
+    this.contextLostDetail.className = "load-error-detail";
     const reload = document.createElement("button");
     reload.className = "context-lost-reload";
     reload.textContent = "Reload";
     reload.addEventListener("click", () => location.reload());
-    overlay.append(title, this._contextLostDetail, reload);
+    overlay.append(title, this.contextLostDetail, reload);
     this.canvasParent.appendChild(overlay);
-    this._contextLostOverlay = overlay;
+    this.contextLostOverlay = overlay;
 
-    this._onContextLost = (e) => {
+    this.onContextLost = (e) => {
       e.preventDefault(); // signal intent to handle a restore
-      this._contextLost = true;
+      this.contextLost = true;
       const reason = e.statusMessage || "no reason reported";
       console.error(`[daydream] WebGL context lost: ${reason}`);
-      this._contextLostDetail.textContent =
+      this.contextLostDetail.textContent =
         `${reason}. The GPU process was likely reset — reload to recover.`;
       overlay.style.display = "flex";
     };
 
-    this._onContextRestored = () => {
-      this._contextLost = false;
+    this.onContextRestored = () => {
+      this.contextLost = false;
       console.warn("[daydream] WebGL context restored");
       overlay.style.display = "none";
     };
 
-    this.canvas.addEventListener("webglcontextlost", this._onContextLost, false);
+    this.canvas.addEventListener("webglcontextlost", this.onContextLost, false);
     this.canvas.addEventListener(
-      "webglcontextrestored", this._onContextRestored, false);
+      "webglcontextrestored", this.onContextRestored, false);
   }
 
   /**
@@ -368,7 +368,7 @@ export class Daydream {
     this.renderer.setSize(width, height);
     this.labelRenderer.setSize(width, height);
 
-    this._needsRender = true;
+    this.needsRender = true;
   }
 
   /**
@@ -379,7 +379,7 @@ export class Daydream {
    * sim tick — or never, while paused.
    */
   invalidate() {
-    this._needsRender = true;
+    this.needsRender = true;
   }
 
   /**
@@ -390,29 +390,29 @@ export class Daydream {
    * @param {Object} effect - Active effect; its drawFrame()/getLabels()/getArenaMetrics() drive the painted frame.
    */
   render(effect) {
-    if (this._contextLost) return;
+    if (this.contextLost) return;
 
     // A pending single-step must fire immediately, even while paused and before
     // the fixed-timestep clock has accrued a full interval; the frame clock still
     // advances once per frame either way.
-    const clockReady = this._advanceFrameClock();
+    const clockReady = this.advanceFrameClock();
     const advanced =
-      (clockReady || this.stepFrames !== 0) && this._stepSimulation(effect);
+      (clockReady || this.stepFrames !== 0) && this.stepSimulation(effect);
 
-    // Must run every frame for damping/auto-rotate; emits 'change' (→ _needsRender).
+    // Must run every frame for damping/auto-rotate; emits 'change' (→ needsRender).
     this.controls.update();
 
-    if (!advanced && !this._needsRender) return;
-    this._needsRender = false;
+    if (!advanced && !this.needsRender) return;
+    this.needsRender = false;
 
     this.xAxis.visible = this.labelAxes;
     this.yAxis.visible = this.labelAxes;
     this.zAxis.visible = this.labelAxes;
 
-    this._updateCullUniforms();
+    this.updateCullUniforms();
 
     this.renderer.setScissorTest(true);
-    this._renderMainView();
+    this.renderMainView();
 
     // Capture only when the sim advanced. In segmented mode the composite lands a
     // frame late, so captureReady() gates out the leading cleared black frames.
@@ -420,16 +420,16 @@ export class Daydream {
         (typeof effect.captureReady !== 'function' || effect.captureReady()))
       this.recorder.captureFrame();
 
-    this._refreshLabels(effect);
+    this.refreshLabels(effect);
     // CSS2DRenderer hides label <div>s only during a render pass, so render one
     // extra frame when the count falls to zero to let that pass hide them.
     const hasLabels = this.labelPool.activeCount > 0;
-    if (hasLabels || this._hadLabels) {
+    if (hasLabels || this.hadLabels) {
       this.labelRenderer.render(this.scene, this.camera);
     }
-    this._hadLabels = hasLabels;
+    this.hadLabels = hasLabels;
 
-    this._renderPip();
+    this.renderPip();
     this.renderer.setScissorTest(false);
   }
 
@@ -439,7 +439,7 @@ export class Daydream {
    * enough has accrued to advance a frame.
    * @returns {boolean} True when a frame interval was consumed and the sim should advance.
    */
-  _advanceFrameClock() {
+  advanceFrameClock() {
     const delta = this.clock.getDelta();
     // Drain getDelta each frame but don't accrue while paused, so unpause neither
     // stalls on an emptied accumulator nor replays the paused span as backlog.
@@ -458,7 +458,7 @@ export class Daydream {
    * @param {Object} effect - Active effect whose drawFrame() paints the pixel buffer.
    * @returns {boolean} Whether the simulation actually advanced (false while paused), so the caller can gate the recorder on the same decision.
    */
-  _stepSimulation(effect) {
+  stepSimulation(effect) {
     const advanced = !this.paused || this.stepFrames !== 0;
     if (!advanced) return false;
 
@@ -481,7 +481,7 @@ export class Daydream {
     }
     const duration = performance.now() - start;
 
-    this._updateStats(duration, effect);
+    this.updateStats(duration, effect);
 
     this.dotMesh.instanceColor.needsUpdate = true;
 
@@ -493,7 +493,7 @@ export class Daydream {
    * acquiring pooled sprites only for labels on the camera-facing hemisphere.
    * @param {Object} effect - Active effect; its getLabels() supplies extra labels when present.
    */
-  _refreshLabels(effect) {
+  refreshLabels(effect) {
     this.labelPool.reset();
     let labels = [];
 
@@ -527,7 +527,7 @@ export class Daydream {
    * Push the current camera position / cull mode into the backface-cull shader
    * uniforms.
    */
-  _updateCullUniforms() {
+  updateCullUniforms() {
     if (this.cullUniforms) {
       this.cullUniforms.uCameraPos.value.copy(this.camera.position);
       this.cullUniforms.uCullThreshold.value = this.cullBackSphere
@@ -535,7 +535,7 @@ export class Daydream {
         : -2.0;
       // Persist effects pass the equator half-arc (PI*R/W) so the shader fills the
       // inter-column gaps; strobe and the pre-effect default pass 0 (round dots).
-      this.cullUniforms.uColumnFillArc.value = this._strobeColumns === false
+      this.cullUniforms.uColumnFillArc.value = this.strobeColumns === false
         ? this.columnFillOverlap * Math.PI * Daydream.SPHERE_RADIUS / Daydream.W
         : 0;
     }
@@ -545,18 +545,18 @@ export class Daydream {
    * Set the active effect's POV column-strobe mode (from the engine's
    * strobeColumns()). false (persist) fills the inter-column gaps so columns
    * merge into a continuous band; true (strobe) leaves discrete dots with dark
-   * gaps. Applied via uColumnFillScale in _updateCullUniforms() each frame.
+   * gaps. Applied via uColumnFillScale in updateCullUniforms() each frame.
    * @param {boolean} strobe - true to strobe columns, false to persist/smear.
    */
   setStrobeColumns(strobe) {
-    this._strobeColumns = strobe;
+    this.strobeColumns = strobe;
   }
 
   /**
    * Render the main sphere view into its viewport. Assumes the scissor test is
    * already enabled by the caller.
    */
-  _renderMainView() {
+  renderMainView() {
     this.renderer.setViewport(
       this.mainViewport.x,
       this.mainViewport.y,
@@ -581,7 +581,7 @@ export class Daydream {
    * and while recording, so clean screenshots/videos aren't obscured by the
    * PiP corner.
    */
-  _renderPip() {
+  renderPip() {
     if (this.isMobile || navigator.webdriver || this.recorder?.isRecording) return;
 
     this.renderer.setViewport(
@@ -626,7 +626,7 @@ export class Daydream {
       });
 
       // Backface-cull + column gap-fill uniforms, updated per frame in
-      // _updateCullUniforms().
+      // updateCullUniforms().
       this.cullUniforms = {
         uCameraPos: { value: new THREE.Vector3(0, 0, 1) },
         uCullThreshold: { value: -0.06 },
@@ -766,9 +766,9 @@ export class Daydream {
    * @param {number} duration - Frame draw time in milliseconds.
    * @param {Object} effect - Active effect; its getArenaMetrics() supplies arena usage when present.
    */
-  _updateStats(duration, effect) {
-    if (!this._statsGroup) {
-      this._statsGroup = {
+  updateStats(duration, effect) {
+    if (!this.statsGroup) {
+      this.statsGroup = {
         perf: [document.getElementById("perf-stats"), document.getElementById("perf-stats-mobile")],
         scratchA: [document.getElementById("stat-scratch-a"), document.getElementById("stat-scratch-a-m")],
         scratchB: [document.getElementById("stat-scratch-b"), document.getElementById("stat-scratch-b-m")],
@@ -779,7 +779,7 @@ export class Daydream {
 
     const perfText = `${duration.toFixed(3)} ms`;
     const perfColor = duration > SLOW_FRAME_MS ? 'red' : 'grey';
-    this._statsGroup.perf.forEach(el => {
+    this.statsGroup.perf.forEach(el => {
       if (el) { el.innerText = perfText; el.style.color = perfColor; }
     });
 
@@ -792,12 +792,12 @@ export class Daydream {
         elements.forEach(el => { if (el) el.textContent = text; });
       };
 
-      updateRow(this._statsGroup.scratchA, m.scratch_arena_a);
-      updateRow(this._statsGroup.scratchB, m.scratch_arena_b);
-      updateRow(this._statsGroup.persist, m.persistent_arena);
+      updateRow(this.statsGroup.scratchA, m.scratch_arena_a);
+      updateRow(this.statsGroup.scratchB, m.scratch_arena_b);
+      updateRow(this.statsGroup.persist, m.persistent_arena);
       if (m.stack) {
         const stackText = `${(m.stack.high_water_mark / 1024).toFixed(1)}|${(m.stack.capacity / 1024).toFixed(0)}`;
-        this._statsGroup.stack.forEach(el => { if (el) el.textContent = stackText; });
+        this.statsGroup.stack.forEach(el => { if (el) el.textContent = stackText; });
       }
     }
   }
@@ -830,13 +830,13 @@ export class Daydream {
   dispose() {
     this.resizeObserver?.disconnect();
 
-    if (this._onContextLost) {
+    if (this.onContextLost) {
       this.canvas.removeEventListener(
-        "webglcontextlost", this._onContextLost, false);
+        "webglcontextlost", this.onContextLost, false);
       this.canvas.removeEventListener(
-        "webglcontextrestored", this._onContextRestored, false);
+        "webglcontextrestored", this.onContextRestored, false);
     }
-    this._contextLostOverlay?.remove();
+    this.contextLostOverlay?.remove();
 
     if (this.dotMesh) {
       this.scene.remove(this.dotMesh);
@@ -864,8 +864,8 @@ export class Daydream {
 }
 
 // Reused scratch for coordsLabel's transient conversions (synchronous, no overlap).
-const _coordsScratchSph = new THREE.Spherical();
-const _coordsScratchVec = new THREE.Vector3();
+const coordsScratchSph = new THREE.Spherical();
+const coordsScratchVec = new THREE.Vector3();
 
 /**
  * Build a label for a Cartesian point `c` ([x,y,z]): its position is `c`
@@ -875,8 +875,8 @@ const _coordsScratchVec = new THREE.Vector3();
  * @returns {{position: THREE.Vector3, content: string}} Label placement on the sphere surface and its multi-line text.
  */
 export const coordsLabel = (c) => {
-  const s = _coordsScratchSph.setFromCartesianCoords(c[0], c[1], c[2]);
-  const n = _coordsScratchVec.set(c[0], c[1], c[2]).normalize();
+  const s = coordsScratchSph.setFromCartesianCoords(c[0], c[1], c[2]);
+  const n = coordsScratchVec.set(c[0], c[1], c[2]).normalize();
   return {
     position: new THREE.Vector3()
       .setFromSphericalCoords(Daydream.SPHERE_RADIUS, s.phi, s.theta),

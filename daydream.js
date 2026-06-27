@@ -89,17 +89,17 @@ class EngineHost {
     this.engine = null;
     this.adapter = null;
     this.recorder = null;
-    this._view = null;
+    this.view = null;
   }
 
   /** Current Uint16Array display view; null until the first refresh() or after a resize. */
   view() {
-    return this._view;
+    return this.view;
   }
 
   /** Drop the cached view so the next refresh() re-fetches it (used after a resize). */
   invalidateView() {
-    this._view = null;
+    this.view = null;
   }
 
   /**
@@ -110,9 +110,9 @@ class EngineHost {
    */
   refresh() {
     const { view, refreshed } = computePixelView(
-      this._view, () => this.engine.getPixels());
+      this.view, () => this.engine.getPixels());
     if (refreshed) {
-      this._view = view;
+      this.view = view;
       daydream.dotMesh.instanceColor.array = view;
       daydream.dotMesh.instanceColor.needsUpdate = true;
       Daydream.pixels = view;
@@ -146,9 +146,9 @@ function syncGUI() {
     if (!c) continue;
 
     // lil-gui sliders drag via a non-focusable div, invisible to activeElement,
-    // so _dragging covers an in-progress drag.
+    // so dragging covers an in-progress drag.
     const isEditing =
-      c._dragging || c.domElement.contains(document.activeElement);
+      c.dragging || c.domElement.contains(document.activeElement);
 
     const { update, value } = resolveParamSync(
       c.getValue(), values[i], c.isBoolean, isEditing);
@@ -355,13 +355,13 @@ function applyEffect(preserveParams = false) {
       if (p.readonly) {
         if (typeof controller.disable === 'function') controller.disable();
       } else {
-        // Flag _dragging so syncGUI's value stream doesn't fight a drag. The window
+        // Flag dragging so syncGUI's value stream doesn't fight a drag. The window
         // listeners go on activeDragEnds so a GUI destroyed mid-drag removes them.
         controller.domElement.addEventListener('pointerdown', () => {
-          controller._dragging = true;
+          controller.dragging = true;
           const fx = activeEffect;
           const end = () => {
-            controller._dragging = false;
+            controller.dragging = false;
             window.removeEventListener('pointerup', end);
             window.removeEventListener('pointercancel', end);
             if (fx && fx.activeDragEnds) fx.activeDragEnds.delete(end);
@@ -657,7 +657,7 @@ segFolder.add(segState, 'boundaries').name('Show Boundaries').onChange(v => {
 // Video recording
 const REC_RESOLUTIONS = { 'Native': null, '720p': 720, '1080p': 1080 };
 const REC_FORMATS = { 'Auto': 'auto', 'MP4': 'mp4', 'WebM': 'webm' };
-const recSettings = { _quality: 16, _resolution: 'Native', _format: 'Auto' };
+const recSettings = { quality: 16, resolution: 'Native', format: 'Auto' };
 // These settings are latched at recorder.start(); warn that a mid-recording
 // change won't take effect until the next start().
 const warnIfRecording = (label) => {
@@ -666,17 +666,17 @@ const warnIfRecording = (label) => {
   }
 };
 Object.defineProperty(recSettings, 'quality', {
-  get() { return this._quality; },
+  get() { return this.quality; },
   set(v) {
-    this._quality = v;
+    this.quality = v;
     if (host.recorder) host.recorder.bitrateMbps = v;
     warnIfRecording('bitrate');
   }
 });
 Object.defineProperty(recSettings, 'recResolution', {
-  get() { return this._resolution; },
+  get() { return this.resolution; },
   set(v) {
-    this._resolution = v;
+    this.resolution = v;
     if (host.recorder) {
       host.recorder.targetHeight = REC_RESOLUTIONS[v];
     }
@@ -684,9 +684,9 @@ Object.defineProperty(recSettings, 'recResolution', {
   }
 });
 Object.defineProperty(recSettings, 'recFormat', {
-  get() { return this._format; },
+  get() { return this.format; },
   set(v) {
-    this._format = v;
+    this.format = v;
     if (host.recorder) host.recorder.format = REC_FORMATS[v];
     warnIfRecording('format');
   }
