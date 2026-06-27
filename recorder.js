@@ -34,7 +34,7 @@ export function selectMimeType(
   format,
   isTypeSupported = (mt) => MediaRecorder.isTypeSupported(mt)) {
   const allMimeTypes = {
-    mp4:  ['video/mp4;codecs=avc1'],
+    mp4:  ['video/mp4;codecs=avc1', 'video/mp4;codecs=avc1.42E01E', 'video/mp4'],
     webm: ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'],
   };
   const candidates = format === 'mp4'  ? allMimeTypes.mp4
