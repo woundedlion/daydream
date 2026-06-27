@@ -242,6 +242,12 @@ export class VideoRecorder {
       const evenH = this.targetHeight % 2 === 0 ? this.targetHeight : this.targetHeight + 1;
       this._offscreen = document.createElement('canvas');
       this._offCtx = this._offscreen.getContext('2d');
+      // A null 2d context must not latch the canvas; drop it so a later start()
+      // retries creation rather than reusing a context-less buffer forever.
+      if (!this._offCtx) {
+        this._offscreen = null;
+        return null;
+      }
       this._offscreen.width = evenW;
       this._offscreen.height = evenH;
     }
@@ -264,6 +270,12 @@ export class VideoRecorder {
       const srcH = this.canvas.height > 0 ? this.canvas.height : 1;
       this._offscreen = document.createElement('canvas');
       this._offCtx = this._offscreen.getContext('2d');
+      // A null 2d context must not latch the canvas; drop it so a later start()
+      // retries creation rather than reusing a context-less buffer forever.
+      if (!this._offCtx) {
+        this._offscreen = null;
+        return null;
+      }
       this._offscreen.width = srcW % 2 === 0 ? srcW : srcW + 1;
       this._offscreen.height = srcH % 2 === 0 ? srcH : srcH + 1;
     }
