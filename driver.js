@@ -390,7 +390,12 @@ export class Daydream {
   render(effect) {
     if (this._contextLost) return;
 
-    const advanced = this._advanceFrameClock() && this._stepSimulation(effect);
+    // A pending single-step must fire immediately, even while paused and before
+    // the fixed-timestep clock has accrued a full interval; the frame clock still
+    // advances once per frame either way.
+    const clockReady = this._advanceFrameClock();
+    const advanced =
+      (clockReady || this.stepFrames !== 0) && this._stepSimulation(effect);
 
     // Must run every frame for damping/auto-rotate; emits 'change' (→ _needsRender).
     this.controls.update();
