@@ -757,10 +757,10 @@ function disposeApp() {
   }
   destroyActiveEffectGui();
   guiInstance.destroy();
-  // Best-effort on a real discard: stop() ends the MediaRecorder, but its async
-  // onstop download cannot be flushed synchronously here, so an in-progress
-  // recording may be lost when the page is torn down.
-  host.recorder?.stop();
+  // Best-effort on a real discard: dispose() ends the MediaRecorder and releases
+  // the stream/offscreen, but its async onstop download cannot be flushed
+  // synchronously here, so an in-progress recording may be lost on teardown.
+  host.recorder?.dispose();
   urlSync.dispose();
   sidebar.dispose();
   daydream.dispose();
