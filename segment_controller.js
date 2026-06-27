@@ -57,18 +57,18 @@ export class SegmentController {
    */
   constructor({ resolutionPresets, appState, getWasmEngine, refreshPixelView,
                 getMemoryView, statsDoc = globalThis.document }) {
-    this._resolutionPresets = resolutionPresets;
-    this._appState = appState;
-    this._getWasmEngine = getWasmEngine;
-    this._refreshPixelView = refreshPixelView;
-    this._getMemoryView = getMemoryView;
-    this._doc = statsDoc;
+    this.resolutionPresets = resolutionPresets;
+    this.appState = appState;
+    this.getWasmEngine = getWasmEngine;
+    this.refreshPixelView = refreshPixelView;
+    this.getMemoryView = getMemoryView;
+    this.doc = statsDoc;
 
     this.active = false;
     this.count = 4;
     this.showBoundaries = true;
     // Tracked so create() can carry it into a freshly-spawned pool.
-    this._animationsPaused = false;
+    this.animationsPaused = false;
 
     /** @type {Worker[]} */
     this.workers = [];
@@ -86,7 +86,7 @@ export class SegmentController {
 
     this.pending = 0;         // count of outstanding render responses
     /** @type {boolean[]} */
-    this._frameSeen = [];     // per-segId first-arrival flag, reset each dispatch
+    this.frameSeen = [];     // per-segId first-arrival flag, reset each dispatch
     this.frameStart = 0;
     this.wallTime = 0;        // dispatch -> last worker response (ms)
     /** @type {(() => void) | null} */
@@ -103,7 +103,7 @@ export class SegmentController {
     this.renderInFlight = false;
     this.pendingFrame = false; // true when workers have new results to display
     this.frameComposited = false; // true only on ticks that blit a real composite
-    this._aliasDivergenceLogged = false; // throttle the composite alias-divergence warning
+    this.aliasDivergenceLogged = false; // throttle the composite alias-divergence warning
 
     // Fault latch: a worker trap fires onerror but never sends its 'frame', so
     // `pending` never reaches 0. Latch, settle the in-flight frame, stop dispatching.
@@ -112,24 +112,24 @@ export class SegmentController {
     this.faultInfo = null;     // first fault this session
 
     /** @type {ReturnType<typeof setTimeout> | null} */
-    this._initWatchdog = null;
+    this.initWatchdog = null;
 
     /** @type {ReturnType<typeof setTimeout> | null} */
-    this._bootWatchdog = null;
+    this.bootWatchdog = null;
 
     /** @type {HTMLTableElement | null} */
-    this._statsTable = null;
-    this._statsSegCount = 0;   // segment count the cached table was built for
+    this.statsTable = null;
+    this.statsSegCount = 0;   // segment count the cached table was built for
     /** @type {{ rows: any[], maxTime: HTMLElement, wallTime: HTMLElement } | null} */
-    this._statsCells = null;
+    this.statsCells = null;
 
     // Cached boundary-overlay seam coordinates, rebuilt only when renderGen bumps
     // (segment geometry is fixed within a generation).
     /** @type {number[]} */
-    this._boundaryYs = [];
+    this.boundaryYs = [];
     /** @type {number[]} */
-    this._boundaryXs = [];
-    this._boundaryGen = -1;
+    this.boundaryXs = [];
+    this.boundaryGen = -1;
   }
 
   /**
@@ -138,7 +138,7 @@ export class SegmentController {
    * @param {Worker} worker
    * @param {WorkerInboundMsg} msg
    */
-  _post(worker, msg) {
+  post(worker, msg) {
     worker.postMessage(msg);
   }
 
@@ -146,9 +146,9 @@ export class SegmentController {
    * Post the same protocol message to every worker.
    * @param {WorkerInboundMsg} msg
    */
-  _broadcast(msg) {
+  broadcast(msg) {
     for (const w of this.workers) {
-      this._post(w, msg);
+      this.post(w, msg);
     }
   }
 
@@ -172,10 +172,10 @@ export class SegmentController {
   create(numSegments) {
     this.destroy();
 
-    const res = this._resolutionPresets[this._appState.get('resolution')];
+    const res = this.resolutionPresets[this.appState.get('resolution')];
     if (!res) {
       console.error(`[Segmented] create(${numSegments}) aborted: unknown`
-        + ` resolution "${this._appState.get('resolution')}"; controller is now empty.`);
+        + ` resolution "${this.appState.get('resolution')}"; controller is now empty.`);
       return;
     }
 
@@ -200,7 +200,7 @@ export class SegmentController {
       return out;
     };
 
-    const initialParams = this._snapshotParams();
+    const initialParams = this.snapshotParams();
 
     for (let i = 0; i < numSegments; i++) {
       const worker = new Worker('./segment_worker.js', { type: 'module' });
@@ -211,15 +211,15 @@ export class SegmentController {
           if (!readied[i]) { readied[i] = true; readyCount++; }
           if (readyCount === numSegments) {
             this.ready = true;
-            this._clearBootWatchdog();
-            this._clearInitWatchdog();
+            this.clearBootWatchdog();
+            this.clearInitWatchdog();
             console.log(`[Segmented] All ${numSegments} workers ready`);
           }
         } else if (msg.type === 'booted') {
           if (!booted[i]) { booted[i] = true; bootedCount++; }
-          if (bootedCount === numSegments) this._clearBootWatchdog();
+          if (bootedCount === numSegments) this.clearBootWatchdog();
         } else if (msg.type === 'initFailed') {
-          this._onWorkerFault(i, `worker seg ${i} init failed: ${msg.reason}`);
+          this.onWorkerFault(i, `worker seg ${i} init failed: ${msg.reason}`);
         } else if (msg.type === 'frame') {
           // A halted pool zeroed `pending`; ignore late frames so it can't go negative.
           if (this.faulted) return;
@@ -235,7 +235,7 @@ export class SegmentController {
             // stale-generation frame can't publish params against a new descriptor
             // list, and only on seg 0's first frame this generation so a doubled
             // 'frame' message can't re-publish.
-            if (msg.segId === 0 && msg.paramValues && !this._frameSeen[0])
+            if (msg.segId === 0 && msg.paramValues && !this.frameSeen[0])
               this.paramValues = msg.paramValues;
             this.results[msg.segId] = {
               pixels: msg.pixels,
@@ -249,8 +249,8 @@ export class SegmentController {
           }
           // Count distinct segments: a worker emitting two 'frame' messages in
           // one generation must not drop pending twice and resolve the barrier early.
-          if (this._frameSeen[msg.segId]) return;
-          this._frameSeen[msg.segId] = true;
+          if (this.frameSeen[msg.segId]) return;
+          this.frameSeen[msg.segId] = true;
           this.pending--;
           if (this.pending === 0 && this.frameResolve) {
             this.frameResolve();
@@ -262,72 +262,72 @@ export class SegmentController {
       worker.onerror = (e) => {
         console.error(`[Segmented] Worker seg ${i} error: ${e.message}`
           + ` (${e.filename}:${e.lineno}:${e.colno})`, e);
-        this._onWorkerFault(i, e.message);
+        this.onWorkerFault(i, e.message);
       };
       worker.onmessageerror = (e) => {
         console.error(`[Segmented] Worker seg ${i} message deserialization`
           + ` failed`, e);
-        this._onWorkerFault(i, 'message deserialization failed');
+        this.onWorkerFault(i, 'message deserialization failed');
       };
 
-      this._post(worker, {
+      this.post(worker, {
         type: 'init',
         segId: i,
         totalSegs: numSegments,
         w: res.w,
         h: res.h,
-        effectName: this._appState.get('effect'),
+        effectName: this.appState.get('effect'),
         params: initialParams,
-        paused: this._animationsPaused,
+        paused: this.animationsPaused,
       });
 
       this.workers.push(worker);
     }
 
-    this._clearBootWatchdog();
-    this._bootWatchdog = setTimeout(() => {
-      this._bootWatchdog = null;
+    this.clearBootWatchdog();
+    this.bootWatchdog = setTimeout(() => {
+      this.bootWatchdog = null;
       if (!this.ready && !this.faulted) {
         const stuck = missing(booted);
-        this._onWorkerFault(stuck.length === 1 ? stuck[0] : -1,
+        this.onWorkerFault(stuck.length === 1 ? stuck[0] : -1,
           `worker module load timed out after ${BOOT_WATCHDOG_MS} ms `
           + `(${bootedCount}/${numSegments} booted; never booted: `
           + `${stuck.join(', ')}) — a worker module likely `
           + `failed to load (commonly a missing or renamed holosphere_wasm.js)`);
       }
     }, BOOT_WATCHDOG_MS);
-    if (typeof this._bootWatchdog.unref === 'function') this._bootWatchdog.unref();
+    if (typeof this.bootWatchdog.unref === 'function') this.bootWatchdog.unref();
 
-    this._clearInitWatchdog();
-    this._initWatchdog = setTimeout(() => {
-      this._initWatchdog = null;
+    this.clearInitWatchdog();
+    this.initWatchdog = setTimeout(() => {
+      this.initWatchdog = null;
       if (!this.ready && !this.faulted) {
         const stuck = missing(readied);
-        this._onWorkerFault(stuck.length === 1 ? stuck[0] : -1,
+        this.onWorkerFault(stuck.length === 1 ? stuck[0] : -1,
           `worker init timed out after ${INIT_WATCHDOG_MS} ms `
           + `(${readyCount}/${numSegments} ready; never ready: ${stuck.join(', ')}) `
           + `— a WASM module likely failed to load without throwing`);
       }
     }, INIT_WATCHDOG_MS);
     // unref() exists under Node (keep the test process from hanging), not the browser.
-    if (typeof this._initWatchdog.unref === 'function') this._initWatchdog.unref();
+    if (typeof this.initWatchdog.unref === 'function') this.initWatchdog.unref();
 
     console.log(`[Segmented] Spawning ${numSegments} workers...`);
   }
 
   /** Cancel the init watchdog if one is pending. Idempotent. */
-  _clearInitWatchdog() {
-    if (this._initWatchdog !== null) {
-      clearTimeout(this._initWatchdog);
-      this._initWatchdog = null;
+  clearInitWatchdog() {
+    if (this.initWatchdog !== null) {
+      clearTimeout(this.initWatchdog);
+      this.initWatchdog = null;
     }
   }
 
   /** Cancel the boot watchdog if one is pending. Idempotent. */
-  _clearBootWatchdog() {
-    if (this._bootWatchdog !== null) {
-      clearTimeout(this._bootWatchdog);
-      this._bootWatchdog = null;
+  clearBootWatchdog() {
+    if (this.bootWatchdog !== null) {
+      clearTimeout(this.bootWatchdog);
+      this.bootWatchdog = null;
     }
   }
 
@@ -343,8 +343,8 @@ export class SegmentController {
       w.onmessageerror = null;
       w.terminate();
     }
-    this._clearBootWatchdog();
-    this._clearInitWatchdog();
+    this.clearBootWatchdog();
+    this.clearInitWatchdog();
     this.workers = [];
     this.results = [];
     this.timings = [];
@@ -378,9 +378,9 @@ export class SegmentController {
    * @param {number} segId - Index of the worker segment that faulted.
    * @param {string} message - Human-readable fault message for the UI/console.
    */
-  _onWorkerFault(segId, message) {
-    this._clearBootWatchdog();
-    this._clearInitWatchdog();
+  onWorkerFault(segId, message) {
+    this.clearBootWatchdog();
+    this.clearInitWatchdog();
     if (!this.faulted) {
       // No auto-restart by design: stay latched until a user-driven resolution/mode
       // change rebuilds the pool, rather than retrying a deterministically-faulting render.
@@ -406,8 +406,8 @@ export class SegmentController {
    * which both need the worker to land on the user's values rather than defaults.
    * @returns {import('./worker_protocol.js').SegParam[]}
    */
-  _snapshotParams() {
-    const engine = this._getWasmEngine();
+  snapshotParams() {
+    const engine = this.getWasmEngine();
     if (!engine) return [];
     const defs = engine.getParameterDefinitions();
     /** @type {import('./worker_protocol.js').SegParam[]} */
@@ -429,7 +429,7 @@ export class SegmentController {
    * @param {string} name
    */
   setEffect(name) {
-    this._broadcast({ type: 'setEffect', name, params: this._snapshotParams() });
+    this.broadcast({ type: 'setEffect', name, params: this.snapshotParams() });
   }
 
   /**
@@ -438,7 +438,7 @@ export class SegmentController {
    * @param {number} value
    */
   setParameter(name, value) {
-    this._broadcast({ type: 'setParameter', name, value });
+    this.broadcast({ type: 'setParameter', name, value });
   }
 
   /**
@@ -446,8 +446,8 @@ export class SegmentController {
    * @param {boolean} paused
    */
   setAnimationsPaused(paused) {
-    this._animationsPaused = paused;
-    this._broadcast({ type: 'setAnimationsPaused', paused });
+    this.animationsPaused = paused;
+    this.broadcast({ type: 'setAnimationsPaused', paused });
   }
 
   /**
@@ -469,7 +469,7 @@ export class SegmentController {
     this.renderGen++;
     this.results.fill(null);
     this.pendingFrame = false;
-    this._broadcast({ type: 'setResolution', w, h });
+    this.broadcast({ type: 'setResolution', w, h });
   }
 
   /**
@@ -480,13 +480,13 @@ export class SegmentController {
     return new Promise((resolve) => {
       this.inflightGen = this.renderGen;
       this.pending = this.workers.length;
-      this._frameSeen = new Array(this.workers.length).fill(false);
+      this.frameSeen = new Array(this.workers.length).fill(false);
       this.frameStart = performance.now();
       this.frameResolve = () => {
         this.wallTime = performance.now() - this.frameStart;
         resolve();
       };
-      this._broadcast({ type: 'render' });
+      this.broadcast({ type: 'render' });
     });
   }
 
@@ -498,8 +498,8 @@ export class SegmentController {
    *   uses this to avoid marking a black buffer as a real composited frame.
    */
   composite() {
-    this._refreshPixelView();
-    const dst = this._getMemoryView();
+    this.refreshPixelView();
+    const dst = this.getMemoryView();
     if (!dst) return 0;
 
     // No clear: driver.render() already zero-filled this buffer; we blit over it.
@@ -508,12 +508,12 @@ export class SegmentController {
     // single-engine path): re-point the display alias at the composite target.
     // driver.render() re-clears Daydream.pixels next frame, restoring the elision.
     if (dst !== Daydream.pixels) {
-      if (!this._aliasDivergenceLogged) {
+      if (!this.aliasDivergenceLogged) {
         console.error(
           "SegmentController.composite: display-buffer alias diverged " +
           "(getMemoryView() !== Daydream.pixels) — re-pointing Daydream.pixels " +
           "at the composite target");
-        this._aliasDivergenceLogged = true;
+        this.aliasDivergenceLogged = true;
       }
       Daydream.pixels = dst;
     }
@@ -527,7 +527,7 @@ export class SegmentController {
       const r = this.results[s];
       if (!r || !r.pixels) continue;
       if (r.x0 < 0 || r.y0 < 0 || r.x1 > w || r.y1 > h) {
-        this._onWorkerFault(s,
+        this.onWorkerFault(s,
           `SegmentController.composite: segment ${s} rect ` +
           `[${r.x0},${r.y0})-[${r.x1},${r.y1}) is out of bounds for the ` +
           `${w}x${h} display buffer — the generation fence let a stale-resolution ` +
@@ -536,7 +536,7 @@ export class SegmentController {
       }
       const expectedLen = (r.x1 - r.x0) * (r.y1 - r.y0) * 3;
       if (r.pixels.length !== expectedLen) {
-        this._onWorkerFault(s,
+        this.onWorkerFault(s,
           `SegmentController.composite: segment ${s} pixel buffer length ` +
           `${r.pixels.length} != expected ${expectedLen} for rect ` +
           `[${r.x0},${r.y0})-[${r.x1},${r.y1}) — a rect/buffer mismatch would ` +
@@ -557,7 +557,7 @@ export class SegmentController {
     // Skip on a fully generation-fenced frame (blitted === 0): the buffer is black
     // and stamping seams would show cyan lines on an otherwise-blank sphere.
     if (this.showBoundaries && blitted > 0) {
-      if (this._boundaryGen !== this.renderGen) this._rebuildBoundaries();
+      if (this.boundaryGen !== this.renderGen) this.rebuildBoundaries();
 
       const plotCyan = (idx) => {
         dst[idx]     = 0;
@@ -565,13 +565,13 @@ export class SegmentController {
         dst[idx + 2] = 65535;
       };
 
-      for (const boundaryY of this._boundaryYs) {
+      for (const boundaryY of this.boundaryYs) {
         if (boundaryY >= h) continue;
         const rowStart = boundaryY * w * 3;
         for (let x = 0; x < w; x++) plotCyan(rowStart + x * 3);
       }
 
-      for (const boundaryX of this._boundaryXs) {
+      for (const boundaryX of this.boundaryXs) {
         if (boundaryX >= w) continue;
         for (let y = 0; y < h; y++) plotCyan((y * w + boundaryX) * 3);
       }
@@ -585,7 +585,7 @@ export class SegmentController {
    * layout and stamp them with renderGen. Segment geometry is fixed within a
    * generation, so composite() reuses this cache until the next resolution bump.
    */
-  _rebuildBoundaries() {
+  rebuildBoundaries() {
     const yBounds = new Set();
     const xBounds = new Set();
     for (const r of this.results) {
@@ -596,18 +596,18 @@ export class SegmentController {
       if (r.x0 > 0) xBounds.add(r.x0);
     }
     if (xBounds.size > 0) xBounds.add(0);
-    this._boundaryYs = [...yBounds];
-    this._boundaryXs = [...xBounds];
-    this._boundaryGen = this.renderGen;
+    this.boundaryYs = [...yBounds];
+    this.boundaryXs = [...xBounds];
+    this.boundaryGen = this.renderGen;
   }
 
   /** Update the per-segment stats overlay. */
   updateStats() {
-    const el = this._doc.getElementById('segment-stats');
+    const el = this.doc.getElementById('segment-stats');
     if (!el) return;
 
-    const globalStatsDesktop = this._doc.getElementById('global-stats-desktop');
-    const globalStatsMobile = this._doc.getElementById('stats-bar');
+    const globalStatsDesktop = this.doc.getElementById('global-stats-desktop');
+    const globalStatsMobile = this.doc.getElementById('stats-bar');
 
     if (!this.active) {
       el.style.display = 'none';
@@ -624,23 +624,23 @@ export class SegmentController {
       const f = this.faultInfo;
       // Build via text nodes, not innerHTML: the fault message is arbitrary text
       // and must never be parsed as markup.
-      const box = this._doc.createElement('div');
+      const box = this.doc.createElement('div');
       box.style.cssText = 'color:#ff5252;padding:6px;font-size:0.85em';
       // segId < 0 is a pool-wide fault (e.g. the init watchdog), not one worker.
       const who = !f ? 'worker ?' : (f.segId < 0 ? 'pool init' : `worker ${f.segId}`);
       box.append(`⚠ Segment ${who} faulted — segmented render halted.`);
-      box.appendChild(this._doc.createElement('br'));
-      const msg = this._doc.createElement('span');
+      box.appendChild(this.doc.createElement('br'));
+      const msg = this.doc.createElement('span');
       msg.style.color = '#999';
       msg.textContent = (f && f.message) || 'see console';
       box.appendChild(msg);
-      box.appendChild(this._doc.createElement('br'));
-      const hint = this._doc.createElement('span');
+      box.appendChild(this.doc.createElement('br'));
+      const hint = this.doc.createElement('span');
       hint.style.color = '#999';
       hint.textContent = 'Change resolution or toggle segmented mode to restart.';
       box.appendChild(hint);
       el.replaceChildren(box);
-      this._statsTable = null; // force a rebuild on recovery
+      this.statsTable = null; // force a rebuild on recovery
       return;
     }
 
@@ -649,12 +649,12 @@ export class SegmentController {
 
     // Build the table once; rebuild only on a segment-count change or after the
     // fault overlay tore it down.
-    if (!this._statsTable || this._statsSegCount !== numSegs
-        || this._statsTable.parentNode !== el) {
-      this._buildStatsTable(numSegs, el);
+    if (!this.statsTable || this.statsSegCount !== numSegs
+        || this.statsTable.parentNode !== el) {
+      this.buildStatsTable(numSegs, el);
     }
 
-    const cells = this._statsCells;
+    const cells = this.statsCells;
     // Derive maxTime over numSegs, not the whole timings array, so a stale tail
     // entry can't outrank the live segments.
     let maxTime = 0;
@@ -687,17 +687,17 @@ export class SegmentController {
    * @param {number} numSegs - Number of segment rows to build.
    * @param {HTMLElement} el - Container element the table is mounted into.
    */
-  _buildStatsTable(numSegs, el) {
-    const table = this._doc.createElement('table');
-    const th = (text) => { const e = this._doc.createElement('th'); e.textContent = text; return e; };
+  buildStatsTable(numSegs, el) {
+    const table = this.doc.createElement('table');
+    const th = (text) => { const e = this.doc.createElement('th'); e.textContent = text; return e; };
     const td = (text, className) => {
-      const e = this._doc.createElement('td');
+      const e = this.doc.createElement('td');
       if (className) e.className = className;
       if (text !== undefined) e.textContent = text;
       return e;
     };
     const mkRow = (cells) => {
-      const tr = this._doc.createElement('tr');
+      const tr = this.doc.createElement('tr');
       for (const c of cells) tr.appendChild(c);
       table.appendChild(tr);
       return tr;
@@ -728,9 +728,9 @@ export class SegmentController {
     mkRow([td('wall', 'seg-label'), td(''), wallTime, td(''), spanCell()]);
 
     el.replaceChildren(table);
-    this._statsTable = table;
-    this._statsSegCount = numSegs;
-    this._statsCells = { rows, maxTime, wallTime };
+    this.statsTable = table;
+    this.statsSegCount = numSegs;
+    this.statsCells = { rows, maxTime, wallTime };
   }
 
   /**

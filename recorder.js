@@ -59,15 +59,15 @@ export class VideoRecorder {
     this.chunks = [];
     this.stream = null;
     this.track = null;
-    this._effectName = 'effect';
+    this.effectName = 'effect';
     this.frameInterval = frameInterval;
     this.elapsedSeconds = 0;
     // bitrateMbps, format, and targetHeight are latched at start().
     this.bitrateMbps = 16;
     this.format = 'auto';
     this.targetHeight = null;
-    this._offscreen = null;
-    this._offCtx = null;
+    this.offscreen = null;
+    this.offCtx = null;
   }
 
   /**
@@ -115,14 +115,14 @@ export class VideoRecorder {
       return;
     }
 
-    this._effectName = effectName;
+    this.effectName = effectName;
     this.elapsedSeconds = 0;
 
     const captureSource = this.targetHeight
-      ? this._ensureOffscreen()
-      : this._ensurePinnedOffscreen();
+      ? this.ensureOffscreen()
+      : this.ensurePinnedOffscreen();
 
-    if (!this._offCtx) {
+    if (!this.offCtx) {
       console.error('VideoRecorder: failed to acquire a 2D drawing context for the capture canvas; recording aborted.');
       return;
     }
@@ -150,7 +150,7 @@ export class VideoRecorder {
     // session, so the closures bind the per-session chunks/stream/recorder/sink
     // rather than read this.*.
     const chunks = [];
-    const sink = this._openSink(recorder, effectName, chunks);
+    const sink = this.openSink(recorder, effectName, chunks);
 
     this.mediaRecorder = recorder;
     this.stream = stream;
@@ -165,7 +165,7 @@ export class VideoRecorder {
       sink.finish();
       stream.getTracks().forEach(t => t.stop());
       // Only clean up if a rapid stop→start hasn't already replaced this session.
-      if (this.mediaRecorder === recorder) this._cleanup();
+      if (this.mediaRecorder === recorder) this.cleanup();
     };
 
     // Timeslice so ondataavailable delivers chunks incrementally; without it the
@@ -195,10 +195,10 @@ export class VideoRecorder {
 
     // Skip the blit at a transient 0x0 source (mid-resize): drawImage from a
     // zero-sized source throws. The offscreen keeps its prior good frame.
-    if (this._offscreen && this._offCtx &&
+    if (this.offscreen && this.offCtx &&
         this.canvas.width > 0 && this.canvas.height > 0) {
       // Letterbox/pillarbox the source into the pinned offscreen.
-      const offW = this._offscreen.width, offH = this._offscreen.height;
+      const offW = this.offscreen.width, offH = this.offscreen.height;
       const srcAspect = this.canvas.width / this.canvas.height;
       const offAspect = offW / offH;
       let destW, destH;
@@ -211,8 +211,8 @@ export class VideoRecorder {
       }
       const destX = Math.round((offW - destW) / 2);
       const destY = Math.round((offH - destH) / 2);
-      this._offCtx.clearRect(0, 0, offW, offH);
-      this._offCtx.drawImage(this.canvas, destX, destY, destW, destH);
+      this.offCtx.clearRect(0, 0, offW, offH);
+      this.offCtx.drawImage(this.canvas, destX, destY, destW, destH);
     }
 
     // Timed-fallback tracks have no requestFrame; the stream samples on its own.
@@ -234,60 +234,60 @@ export class VideoRecorder {
   /**
    * Creates the offscreen scaling canvas at the target height and the source
    * canvas's start-time aspect ratio, rounding both dimensions up to even values
-   * (required by video codecs). Like _ensurePinnedOffscreen, it sizes only on
+   * (required by video codecs). Like ensurePinnedOffscreen, it sizes only on
    * creation and never tracks a later source resize: the captured track's frame
    * size must stay fixed for the whole session, so a resized source scales into
    * this fixed buffer (captureFrame) rather than changing the track size.
    * @returns {HTMLCanvasElement} The offscreen canvas pinned to the target height.
    */
-  _ensureOffscreen() {
-    if (!this._offscreen) {
+  ensureOffscreen() {
+    if (!this.offscreen) {
       // Clamp a non-finite aspect (0 → Infinity, 0/0 → NaN) from a zero-size source.
       const rawAspect = this.canvas.width / this.canvas.height;
       const aspect = Number.isFinite(rawAspect) && rawAspect > 0 ? rawAspect : 1;
       const w = Math.round(this.targetHeight * aspect);
       const evenW = w % 2 === 0 ? w : w + 1;
       const evenH = this.targetHeight % 2 === 0 ? this.targetHeight : this.targetHeight + 1;
-      this._offscreen = document.createElement('canvas');
-      this._offCtx = this._offscreen.getContext('2d');
+      this.offscreen = document.createElement('canvas');
+      this.offCtx = this.offscreen.getContext('2d');
       // A null 2d context must not latch the canvas; drop it so a later start()
       // retries creation rather than reusing a context-less buffer forever.
-      if (!this._offCtx) {
-        this._offscreen = null;
+      if (!this.offCtx) {
+        this.offscreen = null;
         return null;
       }
-      this._offscreen.width = evenW;
-      this._offscreen.height = evenH;
+      this.offscreen.width = evenW;
+      this.offscreen.height = evenH;
     }
-    return this._offscreen;
+    return this.offscreen;
   }
 
   /**
    * Creates the native-resolution offscreen capture canvas, pinned to the source
    * canvas's dimensions at the moment of call (start of recording), rounded up to
-   * even values (codecs require it). Like _ensureOffscreen this sizes once and
+   * even values (codecs require it). Like ensureOffscreen this sizes once and
    * never tracks a later source resize, but at the native source size rather than
    * a scaled target height: the buffer keeps its start dimensions for the whole
    * session so the captured track's frame size stays fixed, and captureFrame
    * scales a resized source into it instead of changing the track size.
    * @returns {HTMLCanvasElement} The offscreen canvas pinned to the start-time source size.
    */
-  _ensurePinnedOffscreen() {
-    if (!this._offscreen) {
+  ensurePinnedOffscreen() {
+    if (!this.offscreen) {
       const srcW = this.canvas.width > 0 ? this.canvas.width : 1;
       const srcH = this.canvas.height > 0 ? this.canvas.height : 1;
-      this._offscreen = document.createElement('canvas');
-      this._offCtx = this._offscreen.getContext('2d');
+      this.offscreen = document.createElement('canvas');
+      this.offCtx = this.offscreen.getContext('2d');
       // A null 2d context must not latch the canvas; drop it so a later start()
       // retries creation rather than reusing a context-less buffer forever.
-      if (!this._offCtx) {
-        this._offscreen = null;
+      if (!this.offCtx) {
+        this.offscreen = null;
         return null;
       }
-      this._offscreen.width = srcW % 2 === 0 ? srcW : srcW + 1;
-      this._offscreen.height = srcH % 2 === 0 ? srcH : srcH + 1;
+      this.offscreen.width = srcW % 2 === 0 ? srcW : srcW + 1;
+      this.offscreen.height = srcH % 2 === 0 ? srcH : srcH + 1;
     }
-    return this._offscreen;
+    return this.offscreen;
   }
 
   /**
@@ -302,22 +302,22 @@ export class VideoRecorder {
    *   streaming path leaves it empty (each chunk is released after its disk write).
    * @returns {{write: (data: Blob) => void, finish: () => void}} The session sink.
    */
-  _openSink(recorder, effectName, chunks) {
+  openSink(recorder, effectName, chunks) {
     if (typeof globalThis.showSaveFilePicker !== 'function') {
       return {
         write: (data) => { chunks.push(data); },
-        finish: () => { this._download(recorder, chunks, effectName); },
+        finish: () => { this.download(recorder, chunks, effectName); },
       };
     }
 
-    const ext = this._extension(recorder);
-    const filename = this._timestampedName(effectName, ext);
+    const ext = this.extension(recorder);
+    const filename = this.timestampedName(effectName, ext);
 
     let writable = null;
     let failed = false;
     const opened = globalThis.showSaveFilePicker({
       suggestedName: filename,
-      types: [{ description: 'Video', accept: { [this._mimeForExt(ext)]: [`.${ext}`] } }],
+      types: [{ description: 'Video', accept: { [this.mimeForExt(ext)]: [`.${ext}`] } }],
     })
       .then((handle) => handle.createWritable())
       .then((w) => { writable = w; })
@@ -343,12 +343,12 @@ export class VideoRecorder {
         chain
           .then(async () => {
             await opened;
-            if (failed || !writable) { this._download(recorder, chunks, effectName); return; }
+            if (failed || !writable) { this.download(recorder, chunks, effectName); return; }
             await writable.close();
           })
           .catch((err) => {
             console.warn('VideoRecorder: streaming save failed', err);
-            if (chunks.length) this._download(recorder, chunks, effectName);
+            if (chunks.length) this.download(recorder, chunks, effectName);
           });
       },
     };
@@ -362,7 +362,7 @@ export class VideoRecorder {
    * @returns {string} The container extension (e.g. 'mp4', 'webm', 'mkv'),
    *   falling back to 'webm' for an empty/unknown type.
    */
-  _extension(recorder = this.mediaRecorder) {
+  extension(recorder = this.mediaRecorder) {
     const mime = recorder?.mimeType ?? '';
     const subtype = mime.split(';')[0].split('/')[1] ?? '';
     const EXT = { mp4: 'mp4', webm: 'webm', 'x-matroska': 'mkv', ogg: 'ogv' };
@@ -375,7 +375,7 @@ export class VideoRecorder {
    * @param {string} ext - File extension without dot.
    * @returns {string} The matching MIME type, defaulting to 'video/webm'.
    */
-  _mimeForExt(ext) {
+  mimeForExt(ext) {
     const MIME = { mp4: 'video/mp4', webm: 'video/webm', mkv: 'video/x-matroska', ogv: 'video/ogg' };
     return MIME[ext] ?? 'video/webm';
   }
@@ -387,7 +387,7 @@ export class VideoRecorder {
    * @param {string} ext - Container extension without the dot.
    * @returns {string} A name of the form `effect_YYYYMMDD_HHMMSS.ext`.
    */
-  _timestampedName(effectName, ext) {
+  timestampedName(effectName, ext) {
     const now = new Date();
     const ts = now.getFullYear().toString()
       + String(now.getMonth() + 1).padStart(2, '0')
@@ -409,10 +409,10 @@ export class VideoRecorder {
    * @param {string} [effectName] - Base name for the file; defaults to the stored name.
    * @returns {void}
    */
-  _download(recorder = this.mediaRecorder, chunks = this.chunks, effectName = this._effectName) {
-    const ext = this._extension(recorder);
-    const blob = new Blob(chunks, { type: this._mimeForExt(ext) });
-    this._saveWithAnchor(blob, this._timestampedName(effectName, ext));
+  download(recorder = this.mediaRecorder, chunks = this.chunks, effectName = this.effectName) {
+    const ext = this.extension(recorder);
+    const blob = new Blob(chunks, { type: this.mimeForExt(ext) });
+    this.saveWithAnchor(blob, this.timestampedName(effectName, ext));
   }
 
   /**
@@ -423,7 +423,7 @@ export class VideoRecorder {
    * @param {string} filename - File name applied to the download anchor.
    * @returns {void}
    */
-  _saveWithAnchor(blob, filename) {
+  saveWithAnchor(blob, filename) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -440,7 +440,7 @@ export class VideoRecorder {
    * Releases the active session's recorder, stream tracks, and offscreen canvas.
    * @returns {void}
    */
-  _cleanup() {
+  cleanup() {
     this.mediaRecorder = null;
     this.chunks = [];
     if (this.stream) {
@@ -448,11 +448,11 @@ export class VideoRecorder {
       this.stream = null;
     }
     this.track = null;
-    if (this._offscreen) {
-      this._offscreen.width = 0;
-      this._offscreen.height = 0;
-      this._offscreen = null;
-      this._offCtx = null;
+    if (this.offscreen) {
+      this.offscreen.width = 0;
+      this.offscreen.height = 0;
+      this.offscreen = null;
+      this.offCtx = null;
     }
   }
 
@@ -467,6 +467,6 @@ export class VideoRecorder {
     if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
       this.mediaRecorder.stop();
     }
-    this._cleanup();
+    this.cleanup();
   }
 }

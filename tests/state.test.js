@@ -3,14 +3,14 @@ import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { AppState, URLSync, getActiveURLSync } from '../state.js';
 
-// Dispose the active URLSync before restoring window: a debounced _flush() would
+// Dispose the active URLSync before restoring window: a debounced flush() would
 // otherwise fire into a deleted window after teardown.
-const _savedWindow = globalThis.window;
+const savedWindow = globalThis.window;
 afterEach(() => {
   const sync = getActiveURLSync();
   if (sync) sync.dispose();
-  if (_savedWindow === undefined) delete globalThis.window;
-  else globalThis.window = _savedWindow;
+  if (savedWindow === undefined) delete globalThis.window;
+  else globalThis.window = savedWindow;
 });
 
 test('AppState.get returns defaults and set updates', () => {
@@ -71,7 +71,7 @@ function installWindow(search = '', pathname = '/') {
   globalThis.window = {
     location: { search, pathname },
     history: {
-      replaceState: (_state, _title, url) => { calls.push(url); },
+      replaceState: (state, title, url) => { calls.push(url); },
     },
   };
   return calls;
@@ -107,13 +107,13 @@ test('URLSync registers itself as the active URL writer', () => {
   assert.equal(getActiveURLSync(), sync);
 });
 
-test('URLSync._flush writes tracked state and ad-hoc params to the URL', () => {
+test('URLSync.flush writes tracked state and ad-hoc params to the URL', () => {
   const calls = installWindow('', '/sim');
   const s = new AppState({ effect: 'Voronoi' });
   const sync = new URLSync(s, ['effect']);
 
   sync.setParam('speed', 1.23456); // rounded to 4 dp
-  sync._flush();
+  sync.flush();
 
   assert.equal(calls.length, 1);
   const params = new URLSearchParams(calls[0].split('?')[1]);
@@ -122,19 +122,19 @@ test('URLSync._flush writes tracked state and ad-hoc params to the URL', () => {
   assert.ok(calls[0].startsWith('/sim?'));
 });
 
-test('URLSync._flush clears the ad-hoc buffer so a tracked key is not permanently overridden', () => {
+test('URLSync.flush clears the ad-hoc buffer so a tracked key is not permanently overridden', () => {
   const calls = installWindow('', '/sim');
   const s = new AppState({ resolution: 'low' });
   const sync = new URLSync(s, ['resolution']);
 
   // The GUI can write a tracked key as an ad-hoc param.
   sync.setParam('resolution', 'high');
-  sync._flush();
+  sync.flush();
   let params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
   assert.equal(params.get('resolution'), 'high');
 
   s.set('resolution', 'medium');
-  sync._flush();
+  sync.flush();
   params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
   assert.equal(params.get('resolution'), 'medium');
 });
@@ -145,12 +145,12 @@ test('URLSync.setParam(k, null) drops the key from the URL on flush', () => {
   const sync = new URLSync(s, []);
 
   sync.setParam('speed', 1.5); // first write the param
-  sync._flush();
+  sync.flush();
   let params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
   assert.equal(params.get('speed'), '1.5');
 
   sync.setParam('speed', null); // deletion marker
-  sync._flush();
+  sync.flush();
   params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
   assert.equal(params.has('speed'), false, 'null marker removes the param');
   assert.equal(params.get('keep'), '1', 'unrelated params survive');

@@ -74,13 +74,13 @@ test('native-resolution capture pins the offscreen to the source size at start',
     const rec = new VideoRecorder(source);
     assert.equal(rec.targetHeight, null);
 
-    const off = rec._ensurePinnedOffscreen();
+    const off = rec.ensurePinnedOffscreen();
     assert.equal(off.width, 202);
     assert.equal(off.height, 102);
 
     source.width = 640;
     source.height = 480;
-    const off2 = rec._ensurePinnedOffscreen();
+    const off2 = rec.ensurePinnedOffscreen();
     assert.equal(off2, off);
     assert.equal(off2.width, 202);
     assert.equal(off2.height, 102);
@@ -103,14 +103,14 @@ test('targetHeight capture scales the offscreen to the target height and pins it
     rec.targetHeight = 121;                 // odd target → rounded up to even
     assert.notEqual(rec.targetHeight, null);
 
-    const off = rec._ensureOffscreen();
+    const off = rec.ensureOffscreen();
     // height 121 → 122; width round(121 * 800/600) = round(161.33) = 161 → 162.
     assert.equal(off.height, 122);
     assert.equal(off.width, 162);
 
     source.width = 1920;
     source.height = 1080;
-    const off2 = rec._ensureOffscreen();
+    const off2 = rec.ensureOffscreen();
     assert.equal(off2, off);
     assert.equal(off2.width, 162);
     assert.equal(off2.height, 122);
@@ -130,7 +130,7 @@ test('targetHeight capture falls back to a square when the source aspect is dege
   try {
     const rec = new VideoRecorder(fakeCanvas(0, 0)); // 0/0 → NaN aspect
     rec.targetHeight = 120;
-    const off = rec._ensureOffscreen();
+    const off = rec.ensureOffscreen();
     assert.equal(off.height, 120);
     assert.equal(off.width, 120, 'square fallback, not NaN');
   } finally {
@@ -180,7 +180,7 @@ class FakeMediaRecorder {
 /**
  * Installs the browser globals the recorder touches and returns a restore fn.
  * showSaveFilePicker is left undefined so the recorder buffers chunks and saves
- * via the anchor path (_download), which the tests stub out per-instance; the
+ * via the anchor path (download), which the tests stub out per-instance; the
  * streaming test re-defines showSaveFilePicker to exercise the disk path.
  * @returns {() => void} A function that restores the saved globals.
  */
@@ -209,7 +209,7 @@ test('toggle starts then stops, reporting the true state each time', () => {
   const restore = installRecorderEnv();
   try {
     const rec = new VideoRecorder(recordableCanvas());
-    rec._download = () => {};
+    rec.download = () => {};
     assert.equal(rec.toggle('e'), true);
     assert.equal(rec.isRecording, true);
     assert.equal(rec.toggle('e'), false);
@@ -245,7 +245,7 @@ test('a stopped session downloads its own chunks and clears instance state', () 
   try {
     const rec = new VideoRecorder(recordableCanvas());
     const downloads = [];
-    rec._download = (recorder, chunks, name) => downloads.push({ recorder, chunks, name });
+    rec.download = (recorder, chunks, name) => downloads.push({ recorder, chunks, name });
 
     rec.start('solo');
     const recorder = rec.mediaRecorder;
@@ -270,7 +270,7 @@ test('a session retains only non-empty chunks', () => {
   try {
     const rec = new VideoRecorder(recordableCanvas());
     const downloads = [];
-    rec._download = (recorder, chunks, name) => downloads.push({ recorder, chunks, name });
+    rec.download = (recorder, chunks, name) => downloads.push({ recorder, chunks, name });
 
     rec.start('e');
     const recorder = rec.mediaRecorder;
@@ -299,7 +299,7 @@ test('a stale onstop does not clobber the session that replaced it', () => {
   try {
     const rec = new VideoRecorder(recordableCanvas());
     const downloads = [];
-    rec._download = (recorder, chunks, name) => downloads.push({ recorder, chunks, name });
+    rec.download = (recorder, chunks, name) => downloads.push({ recorder, chunks, name });
 
     rec.start('first');
     const recorderA = rec.mediaRecorder;
@@ -342,7 +342,7 @@ test('streams chunks to disk when the File System Access API is present', async 
   try {
     const rec = new VideoRecorder(recordableCanvas());
     let downloaded = false;
-    rec._download = () => { downloaded = true; };
+    rec.download = () => { downloaded = true; };
 
     rec.start('stream');
     const sessionChunks = rec.chunks;
@@ -376,14 +376,14 @@ const captureLetterbox = ({ srcW, srcH, offW, offH }) => {
   try {
     const source = recordableCanvas(srcW, srcH);
     const rec = new VideoRecorder(source);
-    rec._download = () => {};
+    rec.download = () => {};
     rec.start('e');
 
     /** @type {any[]} */
     const draws = [];
     const spyCtx = { clearRect() {}, drawImage(...a) { draws.push(a); } };
-    rec._offscreen = { width: offW, height: offH };
-    rec._offCtx = spyCtx;
+    rec.offscreen = { width: offW, height: offH };
+    rec.offCtx = spyCtx;
 
     rec.captureFrame();
     assert.equal(draws.length, 1, 'exactly one drawImage per captureFrame');
@@ -430,7 +430,7 @@ test('captureFrame advances elapsed when the track lacks requestFrame', () => {
   const restore = installRecorderEnv();
   try {
     const rec = new VideoRecorder(recordableCanvas());
-    rec._download = () => {};
+    rec.download = () => {};
     rec.start('e');
     delete rec.track.requestFrame;
     rec.captureFrame();

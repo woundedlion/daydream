@@ -82,7 +82,7 @@ export async function copyWithFeedback(text, opts = {}) {
   // Flash on both outcomes: a silent failure (the label never flipping) leaves
   // the user unsure whether the copy happened.
   if (element) {
-    const pending = element._copyFeedback;
+    const pending = element.copyFeedback;
     if (pending) clearTimeout(pending.timer);
     const original = pending ? pending.original
       : (revertText !== undefined ? revertText : element.textContent);
@@ -94,9 +94,9 @@ export async function copyWithFeedback(text, opts = {}) {
       element.textContent = original;
       if (flashClasses.length) element.classList.remove(...flashClasses);
       if (idleClasses.length && original) element.classList.add(...idleClasses);
-      delete element._copyFeedback;
+      delete element.copyFeedback;
     }, revertMs);
-    element._copyFeedback = { timer, original };
+    element.copyFeedback = { timer, original };
   }
   return success;
 }

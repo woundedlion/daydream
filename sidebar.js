@@ -35,20 +35,20 @@ export class EffectSidebar {
     this.sortRow = document.createElement('div');
     this.sortRow.className = 'sort-controls';
 
-    this.nameBtn = this._createSortBtn('name', 'Name');
-    this.sizeBtn = this._createSortBtn('size', 'Size');
+    this.nameBtn = this.createSortBtn('name', 'Name');
+    this.sizeBtn = this.createSortBtn('size', 'Size');
     this.sortRow.appendChild(this.nameBtn);
     this.sortRow.appendChild(this.sizeBtn);
 
-    // Roving tabindex: exactly one option carries tabindex=0 (see _setRovingTabbable).
+    // Roving tabindex: exactly one option carries tabindex=0 (see setRovingTabbable).
     this.listEl = document.createElement('div');
     this.listEl.setAttribute('role', 'listbox');
     this.listEl.setAttribute('aria-label', 'Effects');
     this.listEl.className = 'effect-list';
-    this._tabbableBtn = null; // option currently holding tabindex=0
-    this._onKeyDownBound = (e) => this._onKeyDown(e);
-    this._onScrollBound = () => this._updateScrollArrows();
-    this.listEl.addEventListener('keydown', this._onKeyDownBound);
+    this.tabbableBtn = null; // option currently holding tabindex=0
+    this.onKeyDownBound = (e) => this.onKeyDown(e);
+    this.onScrollBound = () => this.updateScrollArrows();
+    this.listEl.addEventListener('keydown', this.onKeyDownBound);
 
     // Decorative scroll-arrow glyphs — hidden from assistive tech.
     this.arrowLeft = document.createElement('div');
@@ -61,9 +61,9 @@ export class EffectSidebar {
     this.arrowRight.textContent = '\u203A';
     this.arrowRight.setAttribute('aria-hidden', 'true');
 
-    this.listEl.addEventListener('scroll', this._onScrollBound, { passive: true });
-    this._resizeObs = new ResizeObserver(this._onScrollBound);
-    this._resizeObs.observe(this.listEl);
+    this.listEl.addEventListener('scroll', this.onScrollBound, { passive: true });
+    this.resizeObs = new ResizeObserver(this.onScrollBound);
+    this.resizeObs.observe(this.listEl);
 
     this.container.appendChild(this.heading);
     this.container.appendChild(this.sortRow);
@@ -79,10 +79,10 @@ export class EffectSidebar {
    * DOM subtree.
    */
   dispose() {
-    this._resizeObs?.disconnect();
-    this._resizeObs = null;
-    this.listEl.removeEventListener('keydown', this._onKeyDownBound);
-    this.listEl.removeEventListener('scroll', this._onScrollBound);
+    this.resizeObs?.disconnect();
+    this.resizeObs = null;
+    this.listEl.removeEventListener('keydown', this.onKeyDownBound);
+    this.listEl.removeEventListener('scroll', this.onScrollBound);
   }
 
   /**
@@ -119,18 +119,18 @@ export class EffectSidebar {
         btn.appendChild(sizeSpan);
       }
 
-      btn.onclick = () => { this._setRovingTabbable(btn); this.onSelect(name); };
+      btn.onclick = () => { this.setRovingTabbable(btn); this.onSelect(name); };
       this.buttons.set(name, btn);
     });
 
-    this._applySortOrder();
-    this._updateActiveClass();
-    this._tabbableBtn = null;
-    this._setRovingTabbable(
+    this.applySortOrder();
+    this.updateActiveClass();
+    this.tabbableBtn = null;
+    this.setRovingTabbable(
       this.buttons.get(this.activeName) || this.listEl.querySelector('.effect-button')
     );
     // Defer until the grid has laid out before measuring scroll extents.
-    requestAnimationFrame(() => this._updateScrollArrows());
+    requestAnimationFrame(() => this.updateScrollArrows());
   }
 
   /**
@@ -152,7 +152,7 @@ export class EffectSidebar {
     if (newBtn) {
       newBtn.classList.add('active');
       newBtn.setAttribute('aria-selected', 'true');
-      this._setRovingTabbable(newBtn);
+      this.setRovingTabbable(newBtn);
       newBtn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
     }
   }
@@ -165,8 +165,8 @@ export class EffectSidebar {
    */
   sortBy(key, dir) {
     this.sort = { key, dir };
-    this._applySortOrder();
-    this._updateSortBtnUI();
+    this.applySortOrder();
+    this.updateSortBtnUI();
   }
 
   // ---- Internal ----
@@ -179,7 +179,7 @@ export class EffectSidebar {
    * @param {string} key - Sort key this button controls ('name' or 'size').
    * @returns {string} '▲' / '▼' if active, otherwise '⇅'.
    */
-  _sortGlyph(key) {
+  sortGlyph(key) {
     if (this.sort.key !== key) return '⇅';
     return this.sort.dir === 'asc' ? '▲' : '▼';
   }
@@ -192,10 +192,10 @@ export class EffectSidebar {
    * @param {string} label - Human-readable button label.
    * @returns {HTMLElement} The created sort-control button.
    */
-  _createSortBtn(key, label) {
+  createSortBtn(key, label) {
     const btn = document.createElement('button');
     btn.className = 'sort-btn' + (this.sort.key === key ? ' active' : '');
-    btn.innerText = label + ' ' + this._sortGlyph(key);
+    btn.innerText = label + ' ' + this.sortGlyph(key);
     btn.onclick = () => {
       if (this.sort.key === key) {
         this.sortBy(key, this.sort.dir === 'asc' ? 'desc' : 'asc');
@@ -207,11 +207,11 @@ export class EffectSidebar {
   }
 
   /** Sync the sort buttons' active state and direction arrow to this.sort. */
-  _updateSortBtnUI() {
+  updateSortBtnUI() {
     this.nameBtn.className = 'sort-btn' + (this.sort.key === 'name' ? ' active' : '');
-    this.nameBtn.innerText = 'Name ' + this._sortGlyph('name');
+    this.nameBtn.innerText = 'Name ' + this.sortGlyph('name');
     this.sizeBtn.className = 'sort-btn' + (this.sort.key === 'size' ? ' active' : '');
-    this.sizeBtn.innerText = 'Size ' + this._sortGlyph('size');
+    this.sizeBtn.innerText = 'Size ' + this.sortGlyph('size');
   }
 
   /**
@@ -219,7 +219,7 @@ export class EffectSidebar {
    * direction. Re-appending moves nodes in place rather than recreating them,
    * preserving focus and event handlers.
    */
-  _applySortOrder() {
+  applySortOrder() {
     const sorted = sortItems(this.items, this.sort.key, this.sort.dir);
 
     sorted.forEach(({ name }) => {
@@ -229,7 +229,7 @@ export class EffectSidebar {
   }
 
   /** Mark the currently active effect's button as selected after a rebuild. */
-  _updateActiveClass() {
+  updateActiveClass() {
     if (!this.activeName) return;
     const btn = this.buttons.get(this.activeName);
     if (btn) {
@@ -244,12 +244,12 @@ export class EffectSidebar {
    * tab stop (e.g. an empty list).
    * @param {HTMLElement} [btn] - Button to promote to the tab stop, or falsy for none.
    */
-  _setRovingTabbable(btn) {
-    if (this._tabbableBtn && this._tabbableBtn !== btn) {
-      this._tabbableBtn.tabIndex = -1;
+  setRovingTabbable(btn) {
+    if (this.tabbableBtn && this.tabbableBtn !== btn) {
+      this.tabbableBtn.tabIndex = -1;
     }
     if (btn) btn.tabIndex = 0;
-    this._tabbableBtn = btn || null;
+    this.tabbableBtn = btn || null;
   }
 
   /**
@@ -258,19 +258,19 @@ export class EffectSidebar {
    * focused effect.
    * @param {KeyboardEvent} e - The keydown event from the list element.
    */
-  _onKeyDown(e) {
+  onKeyDown(e) {
     const btns = Array.from(this.listEl.querySelectorAll('.effect-button'));
     if (!btns.length) return;
 
     const focused = document.activeElement;
     let idx = btns.indexOf(focused);
     // Focus on the container (not a button): navigate relative to the roving tab stop.
-    if (idx === -1) idx = btns.indexOf(this._tabbableBtn);
+    if (idx === -1) idx = btns.indexOf(this.tabbableBtn);
 
     const target = navTargetIndex(idx, btns.length, e.key);
     if (target !== -1) {
       e.preventDefault();
-      this._setRovingTabbable(btns[target]);
+      this.setRovingTabbable(btns[target]);
       btns[target].focus();
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -281,7 +281,7 @@ export class EffectSidebar {
   }
 
   /** Show/hide scroll arrows based on current scroll position. */
-  _updateScrollArrows() {
+  updateScrollArrows() {
     const el = this.listEl;
     const { left, right } = scrollArrowState(el.scrollLeft, el.scrollWidth, el.clientWidth);
     this.arrowLeft.classList.toggle('visible', left);

@@ -76,14 +76,14 @@ function makeController({ resolution = 'lo', effect = 'TestEffect',
 
 beforeEach(() => { FakeWorker.instances = []; });
 
-const _savedGlobals = { Worker: globalThis.Worker, document: globalThis.document };
-const _restoreGlobal = (key, val) => {
+const savedGlobals = { Worker: globalThis.Worker, document: globalThis.document };
+const restoreGlobal = (key, val) => {
   if (val === undefined) delete globalThis[key];
   else globalThis[key] = val;
 };
 after(() => {
-  _restoreGlobal('Worker', _savedGlobals.Worker);
-  _restoreGlobal('document', _savedGlobals.document);
+  restoreGlobal('Worker', savedGlobals.Worker);
+  restoreGlobal('document', savedGlobals.document);
 });
 
 globalThis.Worker = FakeWorker;
@@ -510,7 +510,7 @@ test('composite() self-heals a broken display-buffer alias instead of throwing',
 
   const c = makeController();
   const target = new Uint16Array(4 * 2 * 3);
-  c._getMemoryView = () => target;
+  c.getMemoryView = () => target;
   c.results = [];
 
   assert.doesNotThrow(() => c.composite());
@@ -621,7 +621,7 @@ test('an init-phase fault still reaches the fault overlay (faulted checked befor
 });
 
 // ---------------------------------------------------------------------------
-// Broadcast paths — setEffect / setParameter / setAnimationsPaused / _snapshotParams
+// Broadcast paths — setEffect / setParameter / setAnimationsPaused / snapshotParams
 // ---------------------------------------------------------------------------
 
 /**
@@ -633,15 +633,15 @@ function fakeEngine(defs) {
   return { getParameterDefinitions: () => defs };
 }
 
-test('_snapshotParams() flattens param defs (bool -> 1/0, number passthrough)', () => {
+test('snapshotParams() flattens param defs (bool -> 1/0, number passthrough)', () => {
   const c = makeController();
-  c._getWasmEngine = () => fakeEngine([
+  c.getWasmEngine = () => fakeEngine([
     { name: 'Speed', value: 0.5 },
     { name: 'Glow', value: true },
     { name: 'Invert', value: false },
     { name: 'Count', value: 7 },
   ]);
-  assert.deepEqual(c._snapshotParams(), [
+  assert.deepEqual(c.snapshotParams(), [
     { name: 'Speed', value: 0.5 },
     { name: 'Glow', value: 1.0 },
     { name: 'Invert', value: 0.0 },
@@ -649,14 +649,14 @@ test('_snapshotParams() flattens param defs (bool -> 1/0, number passthrough)', 
   ]);
 });
 
-test('_snapshotParams() is empty when no engine is bound', () => {
+test('snapshotParams() is empty when no engine is bound', () => {
   const c = makeController();
-  assert.deepEqual(c._snapshotParams(), []);
+  assert.deepEqual(c.snapshotParams(), []);
 });
 
 test('setEffect broadcasts the name plus the tuned param snapshot to every worker', () => {
   const c = readyController(2);
-  c._getWasmEngine = () => fakeEngine([
+  c.getWasmEngine = () => fakeEngine([
     { name: 'Speed', value: 0.5 },
     { name: 'Glow', value: true },
   ]);
@@ -687,11 +687,11 @@ test('setParameter broadcasts the name/value to every worker', () => {
 
 test('setAnimationsPaused records the flag and broadcasts it to every worker', () => {
   const c = readyController(2);
-  assert.equal(c._animationsPaused, false, 'unpaused by default');
+  assert.equal(c.animationsPaused, false, 'unpaused by default');
 
   c.setAnimationsPaused(true);
 
-  assert.equal(c._animationsPaused, true, 'controller remembers the paused state');
+  assert.equal(c.animationsPaused, true, 'controller remembers the paused state');
   for (const w of c.workers) {
     const msgs = w.posted.filter((m) => m.type === 'setAnimationsPaused');
     assert.equal(msgs.length, 1);

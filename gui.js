@@ -24,7 +24,7 @@ const optionValues = (options) => {
 
 /**
  * Whether a URL string is a color literal lil-gui's color parser can accept.
- * Matches the two forms _attachUrlWriter serializes — `#hex` (3/4/6/8 digits)
+ * Matches the two forms attachUrlWriter serializes — `#hex` (3/4/6/8 digits)
  * and `rgb()/rgba()` with numeric components — so a malformed deep link is
  * rejected before it reaches the parser and renders a broken swatch.
  * @param {*} s - Candidate value from the URL.
@@ -115,10 +115,10 @@ class DeepLinkGUI {
     }
     this.parent = null;
     this.folderName = null;
-    this._folderIndex = 0;
-    this._urlKeys = new Set();
-    this._children = [];
-    this._urlWriter = makeUrlParamWriter();
+    this.folderIndex = 0;
+    this.urlKeys = new Set();
+    this.children = [];
+    this.urlWriter = makeUrlParamWriter();
   }
 
   /**
@@ -126,8 +126,8 @@ class DeepLinkGUI {
    * @returns {Array<string>} The flattened list of managed param keys.
    */
   collectUrlKeys() {
-    const keys = [...this._urlKeys];
-    for (const child of this._children) keys.push(...child.collectUrlKeys());
+    const keys = [...this.urlKeys];
+    for (const child of this.children) keys.push(...child.collectUrlKeys());
     return keys;
   }
 
@@ -148,13 +148,13 @@ class DeepLinkGUI {
    * @param {string} prop - The control's property name.
    * @returns {string} The dot-joined param key.
    */
-  _getKey(prop) {
+  getKey(prop) {
     let keys = [prop];
     let curr = this;
     while (curr.parent) {
       // A positional fallback for an empty folder name keeps the level from
       // collapsing, so two deep links can't collide on a dropped segment.
-      keys.unshift(curr.folderName || `#${curr._folderIndex}`);
+      keys.unshift(curr.folderName || `#${curr.folderIndex}`);
       curr = curr.parent;
     }
     return keys.join('.');
@@ -172,7 +172,7 @@ class DeepLinkGUI {
    * @param {boolean} [applyOnLoad=false] - When true (value hydrated from URL), replay the caller's onChange once on first registration so its side effect runs at startup.
    * @returns {Object} The same controller, for chaining.
    */
-  _attachUrlWriter(controller, writeUrl, applyOnLoad = false) {
+  attachUrlWriter(controller, writeUrl, applyOnLoad = false) {
     const userOnChange = [];
     controller.onChange((v) => {
       for (const fn of userOnChange) fn(v);
@@ -198,7 +198,7 @@ class DeepLinkGUI {
    * @returns {Object} The created lil-gui controller.
    */
   add(object, prop, ...args) {
-    const key = this._getKey(prop);
+    const key = this.getKey(prop);
     const isFunction = typeof object[prop] === 'function';
 
     const params = getUrlParams();
@@ -267,14 +267,14 @@ class DeepLinkGUI {
     const controller = this.gui.add(object, prop, ...args);
 
     if (!isFunction) {
-      this._urlKeys.add(key);
-      this._attachUrlWriter(controller, (v) => this._urlWriter(key, v), urlApplied);
+      this.urlKeys.add(key);
+      this.attachUrlWriter(controller, (v) => this.urlWriter(key, v), urlApplied);
     }
 
     if (!isFunction && valClamped) {
       // The applied value differs from the URL string (number clamped/snapped, or
       // out-of-range enum rejected): rewrite the URL so it no longer holds the stale one.
-      this._urlWriter(key, controller.getValue());
+      this.urlWriter(key, controller.getValue());
     }
 
     if (!isFunction && urlApplied) {
@@ -293,7 +293,7 @@ class DeepLinkGUI {
    * @returns {Object} The created lil-gui color controller.
    */
   addColor(object, prop) {
-    const key = this._getKey(prop);
+    const key = this.getKey(prop);
     // lil-gui's color parser silently accepts garbage, so reject invalid literals.
     const params = getUrlParams();
     let urlApplied = false;
@@ -309,8 +309,8 @@ class DeepLinkGUI {
 
     const controller = this.gui.addColor(object, prop);
 
-    this._urlKeys.add(key);
-    this._attachUrlWriter(controller, (v) => {
+    this.urlKeys.add(key);
+    this.attachUrlWriter(controller, (v) => {
       let strVal = v;
       if (typeof v === 'object' && v.getHexString) {
         strVal = '#' + v.getHexString();
@@ -323,7 +323,7 @@ class DeepLinkGUI {
         // which only accepts `#hex` and `rgb()/rgba()`.
         strVal = /^([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v) ? `#${v}` : v;
       }
-      this._urlWriter(key, strVal);
+      this.urlWriter(key, strVal);
     }, urlApplied);
 
     if (urlApplied) {
@@ -345,9 +345,9 @@ class DeepLinkGUI {
     const wrapped = new DeepLinkGUI(folder);
     wrapped.parent = this;
     wrapped.folderName = name;
-    wrapped._folderIndex = this._children.length;
-    wrapped._urlWriter = this._urlWriter;
-    this._children.push(wrapped);
+    wrapped.folderIndex = this.children.length;
+    wrapped.urlWriter = this.urlWriter;
+    this.children.push(wrapped);
     return wrapped;
   }
 
@@ -375,7 +375,7 @@ class DeepLinkGUI {
    * @returns {void}
    */
   destroy() {
-    if (this._urlWriter && this._urlWriter.cancel) this._urlWriter.cancel();
+    if (this.urlWriter && this.urlWriter.cancel) this.urlWriter.cancel();
     if (this.gui.destroy) this.gui.destroy();
   }
 }

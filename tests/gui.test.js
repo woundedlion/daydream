@@ -4,10 +4,10 @@ import assert from 'node:assert/strict';
 import { URL } from 'node:url';
 
 // Restore globalThis.window after each test so the stub never leaks to another suite.
-const _savedWindow = globalThis.window;
+const savedWindow = globalThis.window;
 afterEach(() => {
-  if (_savedWindow === undefined) delete globalThis.window;
-  else globalThis.window = _savedWindow;
+  if (savedWindow === undefined) delete globalThis.window;
+  else globalThis.window = savedWindow;
 });
 
 // Minimal lil-gui stub exposing the chaining surface DeepLinkGUI relies on.
@@ -17,13 +17,13 @@ class StubController {
    * @param {Object} object - The object whose property this controller edits.
    * @param {string} prop - The property name bound by this controller.
    */
-  constructor(object, prop) { this.object = object; this.prop = prop; this._on = null; }
+  constructor(object, prop) { this.object = object; this.prop = prop; this.on = null; }
   /**
    * Registers the change callback, mirroring lil-gui's chaining API.
    * @param {Function} fn - Handler invoked with the new value on setValue.
    * @returns {StubController} This controller, for chaining.
    */
-  onChange(fn) { this._on = fn; return this; }
+  onChange(fn) { this.on = fn; return this; }
   /**
    * Reads the current bound value.
    * @returns {*} The current value of the bound property.
@@ -34,7 +34,7 @@ class StubController {
    * @param {*} v - The new value to assign to the bound property.
    * @returns {StubController} This controller, for chaining.
    */
-  setValue(v) { this.object[this.prop] = v; if (this._on) this._on(v); return this; }
+  setValue(v) { this.object[this.prop] = v; if (this.on) this.on(v); return this; }
   /**
    * No-op display refresh that preserves the chaining surface.
    * @returns {StubController} This controller, for chaining.
@@ -171,7 +171,7 @@ test('DeepLinkGUI.add clamps an out-of-range numeric URL value to the slider min
   let lastUrl = '/';
   globalThis.window = {
     location: { search: '?speed=99', pathname: '/' },
-    history: { replaceState(_s, _t, url) { lastUrl = url; } },
+    history: { replaceState(s, t, url) { lastUrl = url; } },
   };
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -260,7 +260,7 @@ test('makeUrlParamWriter merges multiple keys changed within the debounce window
   let lastUrl = '/';
   globalThis.window = {
     location: { search: '?keep=1', pathname: '/' },
-    history: { replaceState(_s, _t, url) { lastUrl = url; } },
+    history: { replaceState(s, t, url) { lastUrl = url; } },
   };
   const setUrlParam = makeUrlParamWriter();
   mock.timers.enable({ apis: ['setTimeout'] });
