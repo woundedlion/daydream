@@ -24,8 +24,9 @@ const TWO_PI = 2 * Math.PI;
  * Latitude uses `y·π/(H + H_OFFSET − 1)`, matching the engine's
  * `pixel_to_vector`, which maps phi over `H + H_OFFSET` virtual rows
  * (core/geometry.h). The WASM/sim build runs with `Daydream.H_OFFSET == 0`
- * (virtual row count == H); raising it to the device value (3) via the GUI
- * slider previews the device's row->latitude mapping in the simulator.
+ * (virtual row count == H), so the simulator maps the full sphere; the device's
+ * south-pole clipping (H_OFFSET == 3) is a compile-time engine fork the sim
+ * does not reproduce (see the device/host divergence ledger).
  * @param {number} x - The pixel x-coordinate [0, Daydream.W - 1].
  * @param {number} y - The pixel y-coordinate [0, Daydream.H - 1].
  * @param {THREE.Spherical} [out] - Target to write into (default: new Spherical).

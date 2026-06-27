@@ -626,13 +626,6 @@ const testAllController = guiInstance.add({ testAll: false }, 'testAll').name('T
 guiInstance.add(daydream, 'labelAxes').name('Show Axes').onChange(() => daydream.invalidate());
 guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());
 guiInstance.add(daydream, 'columnFillOverlap', 1.0, 2.0, 0.01).name('Column Fill Overlap').onChange(() => daydream.invalidate());
-// Preview the engine's virtual-row padding (H_OFFSET): 0 is the sim default, 3
-// the device build. Repositions the dots to where the device maps each row.
-guiInstance.add({ hOffset: Daydream.H_OFFSET }, 'hOffset', 0, 3, 1).name('Row Offset (H_OFFSET)').onChange((v) => {
-  Daydream.H_OFFSET = v;
-  daydream.setupDots();
-  daydream.invalidate();
-});
 
 // ── Segmented POV controls ──────────────────────────────────────────────────
 const segFolder = guiInstance.addFolder('Segmented POV');
