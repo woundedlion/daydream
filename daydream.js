@@ -665,7 +665,7 @@ const warnIfRecording = (label) => {
     console.warn(`Recording: ${label} change applies to the next recording (the current one is already running).`);
   }
 };
-Object.defineProperty(recSettings, 'quality', {
+Object.defineProperty(recSettings, 'recQuality', {
   get() { return this.quality; },
   set(v) {
     this.quality = v;
@@ -714,7 +714,7 @@ const recordState = { record: () => {
 
 const recFolder = guiInstance.addFolder('Recording');
 recFolder.close();
-recFolder.add(recSettings, 'quality', 1, 20, 1).name('Rec Quality (Mbps)');
+recFolder.add(recSettings, 'recQuality', 1, 20, 1).name('Rec Quality (Mbps)');
 recFolder.add(recSettings, 'recResolution', Object.keys(REC_RESOLUTIONS)).name('Rec Resolution');
 recFolder.add(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
 const recordCtrl = recFolder.add(recordState, 'record').name('\u25cf Record');
