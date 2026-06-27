@@ -485,6 +485,11 @@ appState.subscribe((key, value, old) => {
 // Initialize WASM
 ///////////////////////////////////////////////////////////////////////////////
 
+// Assigned in the GUI setup below; declared here so the load-failure handler can
+// tear the Test-All ticker down.
+let testAllInterval = null;
+let testAllController = null;
+
 createHolosphereModule().then(module => {
   host.module = module;
   host.engine = new module.HolosphereEngine();
@@ -604,8 +609,7 @@ const sidebar = new EffectSidebar(
   (name) => appState.set('effect', name)
 );
 
-let testAllInterval = null;
-const testAllController = guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => {
+testAllController = guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => {
   if (v) {
     testAllInterval = setInterval(() => {
       if (!host.engine) return;
