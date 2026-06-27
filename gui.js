@@ -56,7 +56,21 @@ const isValidColorString = (s) =>
 const makeUrlParamWriter = () => {
   let urlTimer = null;
   const pendingUrlWrites = new Map(); // key -> value (null/undefined => delete)
-  return (key, value) => {
+  const commit = () => {
+    const params = getUrlParams();
+    for (const [k, v] of pendingUrlWrites) {
+      if (v === null || v === undefined) {
+        params.delete(k);
+      } else if (typeof v === 'number') {
+        params.set(k, String(roundUrlNumber(v)));
+      } else {
+        params.set(k, v);
+      }
+    }
+    pendingUrlWrites.clear();
+    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+  };
+  const writer = (key, value) => {
     const sync = getActiveURLSync();
     if (sync) {
       // Flush any writes buffered before the sync registered mid-debounce so
@@ -72,21 +86,13 @@ const makeUrlParamWriter = () => {
     }
     pendingUrlWrites.set(key, value);
     clearTimeout(urlTimer);
-    urlTimer = setTimeout(() => {
-      const params = getUrlParams();
-      for (const [k, v] of pendingUrlWrites) {
-        if (v === null || v === undefined) {
-          params.delete(k);
-        } else if (typeof v === 'number') {
-          params.set(k, String(roundUrlNumber(v)));
-        } else {
-          params.set(k, v);
-        }
-      }
-      pendingUrlWrites.clear();
-      window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
-    }, 200);
+    urlTimer = setTimeout(commit, 200);
   };
+  // Symmetric with URLSync.dispose(): a discarded GUI must not leave the 200 ms
+  // timer firing history.replaceState into a dead page.
+  writer.cancel = () => { clearTimeout(urlTimer); urlTimer = null; pendingUrlWrites.clear(); };
+  writer.flush = () => { if (urlTimer !== null) { clearTimeout(urlTimer); urlTimer = null; commit(); } };
+  return writer;
 };
 
 export { makeUrlParamWriter };
@@ -371,7 +377,10 @@ class DeepLinkGUI {
    * Destroys the wrapped lil-gui instance and its DOM, if supported.
    * @returns {void}
    */
-  destroy() { if (this.gui.destroy) this.gui.destroy(); }
+  destroy() {
+    if (this._urlWriter && this._urlWriter.cancel) this._urlWriter.cancel();
+    if (this.gui.destroy) this.gui.destroy();
+  }
 }
 
 /**
