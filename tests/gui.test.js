@@ -102,13 +102,20 @@ const RES = ['Phantasm (144x288)', 'Crystal (192x384)'];
  */
 test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
   installWindow('?resolution=GARBAGE');
-  const gui = new DeepLinkGUI({ autoPlace: false });
-  const obj = { resolution: 'Phantasm (144x288)' };
-  const replayed = [];
-  gui.add(obj, 'resolution', RES).onChange((v) => replayed.push(v));
+  // Rejecting the value rewrites the URL through the 200ms debounce; drive it
+  // under mock timers so the pending write can't fire after afterEach drops window.
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const gui = new DeepLinkGUI({ autoPlace: false });
+    const obj = { resolution: 'Phantasm (144x288)' };
+    const replayed = [];
+    gui.add(obj, 'resolution', RES).onChange((v) => replayed.push(v));
 
-  assert.equal(obj.resolution, 'Phantasm (144x288)');
-  assert.deepEqual(replayed, []);
+    assert.equal(obj.resolution, 'Phantasm (144x288)');
+    assert.deepEqual(replayed, []);
+  } finally {
+    mock.timers.reset();
+  }
 });
 
 /**
