@@ -560,6 +560,13 @@ createHolosphereModule().then(module => {
   applyResolution(true);
 }).catch(err => {
   console.error('Failed to load the Holosphere WASM engine:', err);
+  // No engine: the Test All ticker would spin uselessly for the page lifetime.
+  if (testAllInterval !== null) {
+    clearInterval(testAllInterval);
+    testAllInterval = null;
+  }
+  testAllController.setValue(false);
+  testAllController.disable();
   const loadingOverlay = document.getElementById('loading-overlay');
   if (loadingOverlay) {
     loadingOverlay.classList.add('error');
@@ -598,7 +605,7 @@ const sidebar = new EffectSidebar(
 );
 
 let testAllInterval = null;
-guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => {
+const testAllController = guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => {
   if (v) {
     testAllInterval = setInterval(() => {
       if (!host.engine) return;
