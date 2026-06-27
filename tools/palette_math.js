@@ -437,5 +437,9 @@ export function generativePaletteCpp({ shape, harmony, brightness, sat, hueValue
   reject('HarmonyType', harmony, HARMONY_TYPES);
   reject('BrightnessProfile', brightness, BRIGHTNESS_PROFILES);
   reject('SaturationProfile', sat, SATURATION_PROFILES);
+  if (!Number.isInteger(hueValue) || hueValue < 0 || hueValue > 255) {
+    throw new Error(`generativePaletteCpp: hueValue ${hueValue} must be an ` +
+      `integer in 0..255`);
+  }
   return `// Reproduces the profiles + base hue exactly; the randomized\n// saturation/brightness/hue-offset structure is drawn from the\n// engine's global RNG and will differ from the tool preview.\nGenerativePalette palette{\n    GradientShape::${shape}, HarmonyType::${harmony},\n    BrightnessProfile::${brightness}, SaturationProfile::${sat}, ${hueValue}};`;
 }

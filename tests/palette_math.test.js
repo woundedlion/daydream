@@ -139,6 +139,16 @@ test('generativePaletteCpp rejects an unknown enum token', () => {
   assert.doesNotThrow(() => generativePaletteCpp(ok));
 });
 
+/** Verifies generativePaletteCpp rejects a hueValue that would paste invalid C++. */
+test('generativePaletteCpp rejects an out-of-range or non-integer hue', () => {
+  const ok = { shape: 'STRAIGHT', harmony: 'TRIADIC', brightness: 'FLAT', sat: 'MID', hueValue: 0 };
+  assert.throws(() => generativePaletteCpp({ ...ok, hueValue: NaN }), /hueValue/);
+  assert.throws(() => generativePaletteCpp({ ...ok, hueValue: 256 }), /hueValue/);
+  assert.throws(() => generativePaletteCpp({ ...ok, hueValue: -1 }), /hueValue/);
+  assert.throws(() => generativePaletteCpp({ ...ok, hueValue: 1.5 }), /hueValue/);
+  assert.doesNotThrow(() => generativePaletteCpp({ ...ok, hueValue: 255 }));
+});
+
 /** Verifies GenerativePalette resolves the profiles into a valid bakeLut call: the GradientShape enum int and nine in-range HSV values. */
 test('GenerativePalette delegates resolved (shape, h,s,v x3) to bakeLut', () => {
   lastBakeArgs = null;
