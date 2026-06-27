@@ -82,6 +82,10 @@
 /** Worker has finished bootstrapping (engine instantiated) and can accept work.
  * @typedef {{ type: 'ready', segId: number }} ReadyMsg */
 
+/** Worker's engine rejected the init resolution; no usable geometry. Lets the
+ * controller fault immediately instead of waiting out the init watchdog.
+ * @typedef {{ type: 'initFailed', segId: number, reason: string }} InitFailedMsg */
+
 /** Worker module body started executing — its static imports (incl. the WASM
  * glue ./holosphere_wasm.js) all resolved. Sent before the WASM instantiate so
  * the controller can detect a missing/renamed glue file fast, ahead of the
@@ -107,7 +111,7 @@
 
 /**
  * Every message a worker sends back to the controller.
- * @typedef {ReadyMsg | FrameMsg | BootedMsg} ControllerInboundMsg
+ * @typedef {ReadyMsg | InitFailedMsg | FrameMsg | BootedMsg} ControllerInboundMsg
  */
 
 export {};

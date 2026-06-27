@@ -128,14 +128,17 @@ test('init applies the segment clip and posts ready', async () => {
   assert.equal(ready.msg.segId, 3);
 });
 
-/** Regression: an init whose setResolution is rejected posts no ready, so the controller's init watchdog latches the fault. */
-test('init with a rejected resolution posts no ready', async () => {
+/** Regression: an init whose setResolution is rejected posts no ready and an explicit initFailed so the controller faults at once. */
+test('init with a rejected resolution posts initFailed, not ready', async () => {
   nextResolutionOk = false;
   await dispatch({ type: 'init', segId: 0, totalSegs: 1, w: 8, h: 4, effectName: 'Plasma' });
 
   assert.ok(engineInstance, 'engine constructed');
   assert.deepEqual(engineInstance.calls[0], ['setResolution', 8, 4], 'setResolution attempted');
   assert.ok(!posted.some((p) => p.msg.type === 'ready'), 'no ready for a rejected resolution');
+  const failed = posted.find((p) => p.msg.type === 'initFailed');
+  assert.ok(failed, 'initFailed posted');
+  assert.equal(failed.msg.segId, 0);
 });
 
 /** render copies exactly this segment's quadrant rows out of the full buffer. */

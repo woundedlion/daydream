@@ -74,9 +74,14 @@ async function handleMessage(msg) {
       wasmModule = await createHolosphereModule();
       engine = new wasmModule.HolosphereEngine();
       // A rejected resolution leaves no usable geometry: skip the canvasW/canvasH
-      // commit, segRange, and ready so the controller's init watchdog latches the
-      // fault (symmetric with the setResolution handler's `=== false` guard).
-      if (engine.setResolution(msg.w, msg.h) === false) break;
+      // commit, segRange, and ready (symmetric with the setResolution handler's
+      // `=== false` guard), and post initFailed so the controller faults at once
+      // instead of waiting out the full init watchdog.
+      if (engine.setResolution(msg.w, msg.h) === false) {
+        post({ type: 'initFailed', segId,
+               reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
+        break;
+      }
       canvasW = msg.w;
       canvasH = msg.h;
       segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
