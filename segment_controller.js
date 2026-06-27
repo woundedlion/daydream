@@ -232,8 +232,11 @@ export class SegmentController {
           // settle the frame either way.
           if (this.inflightGen === this.renderGen) {
             // Mirror segment 0's live params for GUI sync, inside the fence so a
-            // stale-generation frame can't publish params against a new descriptor list.
-            if (msg.segId === 0 && msg.paramValues) this.paramValues = msg.paramValues;
+            // stale-generation frame can't publish params against a new descriptor
+            // list, and only on seg 0's first frame this generation so a doubled
+            // 'frame' message can't re-publish.
+            if (msg.segId === 0 && msg.paramValues && !this._frameSeen[0])
+              this.paramValues = msg.paramValues;
             this.results[msg.segId] = {
               pixels: msg.pixels,
               x0: msg.x0, x1: msg.x1,
