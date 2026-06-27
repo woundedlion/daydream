@@ -89,17 +89,17 @@ class EngineHost {
     this.engine = null;
     this.adapter = null;
     this.recorder = null;
-    this.view = null;
+    this.pixelView = null;
   }
 
   /** Current Uint16Array display view; null until the first refresh() or after a resize. */
   view() {
-    return this.view;
+    return this.pixelView;
   }
 
   /** Drop the cached view so the next refresh() re-fetches it (used after a resize). */
   invalidateView() {
-    this.view = null;
+    this.pixelView = null;
   }
 
   /**
@@ -110,9 +110,9 @@ class EngineHost {
    */
   refresh() {
     const { view, refreshed } = computePixelView(
-      this.view, () => this.engine.getPixels());
+      this.pixelView, () => this.engine.getPixels());
     if (refreshed) {
-      this.view = view;
+      this.pixelView = view;
       daydream.dotMesh.instanceColor.array = view;
       daydream.dotMesh.instanceColor.needsUpdate = true;
       Daydream.pixels = view;
