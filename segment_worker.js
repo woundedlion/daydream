@@ -104,7 +104,6 @@ async function handleMessage(msg) {
         }
         applyClip();
       }
-      post({ type: 'effectReady', segId });
       break;
     }
 
