@@ -154,7 +154,7 @@ const makeFakeStream = () => {
 /** A fake canvas that can be recorded (has captureStream) and blitted into. */
 const recordableCanvas = (w = 64, h = 32) => ({
   width: w, height: h,
-  getContext: () => ({ drawImage() {} }),
+  getContext: () => ({ clearRect() {}, drawImage() {} }),
   captureStream: () => makeFakeStream(),
 });
 
@@ -363,7 +363,6 @@ test('streams chunks to disk when the File System Access API is present', async 
   }
 });
 
-/** Verifies captureFrame no-ops and warns exactly once when requestFrame is absent. */
 /**
  * Drives captureFrame once with a chosen source/offscreen size and returns the
  * drawImage destination rect the recorder computed. The offscreen and its
@@ -422,11 +421,13 @@ test('captureFrame pillarboxes a taller-than-target source to fit height', () =>
   assert.equal(x, 25, 'centered horizontally: (offW - destW) / 2');
 });
 
-test('captureFrame warns once when the browser lacks requestFrame', () => {
+/**
+ * A track without requestFrame is the timed-fallback mode (the capture stream
+ * self-samples at the frame rate), not an error: captureFrame skips the manual
+ * requestFrame call but still advances the elapsed-time counter.
+ */
+test('captureFrame advances elapsed when the track lacks requestFrame', () => {
   const restore = installRecorderEnv();
-  const warns = [];
-  const prevWarn = console.warn;
-  console.warn = (...a) => warns.push(a.join(' '));
   try {
     const rec = new VideoRecorder(recordableCanvas());
     rec._download = () => {};
@@ -434,10 +435,8 @@ test('captureFrame warns once when the browser lacks requestFrame', () => {
     delete rec.track.requestFrame;
     rec.captureFrame();
     rec.captureFrame();
-    assert.equal(rec.elapsedSeconds, 0);
-    assert.equal(warns.length, 1);
+    assert.equal(rec.elapsedSeconds, 2 * rec.frameInterval);
   } finally {
-    console.warn = prevWarn;
     restore();
   }
 });
