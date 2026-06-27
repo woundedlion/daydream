@@ -85,6 +85,8 @@ export class SegmentController {
     this.paramValues = null;  // segment 0's latest param values, for GUI sync
 
     this.pending = 0;         // count of outstanding render responses
+    /** @type {boolean[]} */
+    this._frameSeen = [];     // per-segId first-arrival flag, reset each dispatch
     this.frameStart = 0;
     this.wallTime = 0;        // dispatch -> last worker response (ms)
     /** @type {(() => void) | null} */
@@ -242,6 +244,10 @@ export class SegmentController {
             this.renderUs[msg.segId] = msg.renderUs || 0;
             this.arenas[msg.segId] = msg.arenaMetrics;
           }
+          // Count distinct segments: a worker emitting two 'frame' messages in
+          // one generation must not drop pending twice and resolve the barrier early.
+          if (this._frameSeen[msg.segId]) return;
+          this._frameSeen[msg.segId] = true;
           this.pending--;
           if (this.pending === 0 && this.frameResolve) {
             this.frameResolve();
@@ -469,6 +475,7 @@ export class SegmentController {
     return new Promise((resolve) => {
       this.inflightGen = this.renderGen;
       this.pending = this.workers.length;
+      this._frameSeen = new Array(this.workers.length).fill(false);
       this.frameStart = performance.now();
       this.frameResolve = () => {
         this.wallTime = performance.now() - this.frameStart;
