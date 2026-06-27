@@ -174,19 +174,16 @@ class DeepLinkGUI {
    */
   _attachUrlWriter(controller, writeUrl, applyOnLoad = false) {
     const userOnChange = [];
-    let replayed = false;
     controller.onChange((v) => {
       for (const fn of userOnChange) fn(v);
       writeUrl(v);
     });
     controller.onChange = (fn) => {
       if (fn) userOnChange.push(fn);
-      // For a URL-hydrated value, fire the just-registered handler once so its
-      // side effect runs the deep-linked state — but only on first registration.
-      if (applyOnLoad && fn && !replayed) {
-        replayed = true;
-        fn(controller.getValue());
-      }
+      // For a URL-hydrated value, fire each newly-registered handler once so its
+      // load-time side effect runs the deep-linked state — once per handler, so a
+      // second fan-out consumer isn't skipped by a single shared latch.
+      if (applyOnLoad && fn) fn(controller.getValue());
       return controller;
     };
     return controller;
