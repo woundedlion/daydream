@@ -309,6 +309,7 @@
     import {
       elliptic, hyperbolic, loxodromic, parabolic,
       inversion, tumble, cayley, snapComplex,
+      glslComplexFunctions,
     } from './mobius_transforms.js';
 
     const config = {
@@ -338,23 +339,8 @@
         }
       `;
 
-    // GLSL port of cmult/cadd/cdiv (incl. the 1e-6 divide guard) from
-    // mobius_transforms.js. GLSL cannot import the JS module, so this is a manual
-    // duplicate: the on-screen warp runs this copy while presets use the JS one —
-    // keep the two in sync when editing either.
-    const complexFunctions = `
-        struct CNum { float re; float im; };
-        CNum cmult(CNum p, CNum q) { return CNum(p.re * q.re - p.im * q.im, p.re * q.im + p.im * q.re); }
-        CNum cadd(CNum p, CNum q) { return CNum(p.re + q.re, p.im + q.im); }
-        CNum cdiv(CNum p, CNum q) {
-          float denom = q.re * q.re + q.im * q.im;
-          if (denom < 1e-6) return CNum(0.0, 0.0);
-          return CNum((p.re * q.re + p.im * q.im) / denom, (p.im * q.re - p.re * q.im) / denom);
-        }
-      `;
-
     const fragmentShader = `
-        ${complexFunctions}
+        ${glslComplexFunctions}
         uniform CNum u_a;
         uniform CNum u_b;
         uniform CNum u_c;

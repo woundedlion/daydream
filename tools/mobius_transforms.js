@@ -50,6 +50,20 @@ export function cdiv(p, q) {
   };
 }
 
+// GLSL port of cmult/cadd/cdiv consumed by the mobius.html fragment shader.
+// Single source of truth for the shader; tests/mobius_transforms.test.js pins
+// this against the JS functions above so the two cannot silently diverge.
+export const glslComplexFunctions = `
+        struct CNum { float re; float im; };
+        CNum cmult(CNum p, CNum q) { return CNum(p.re * q.re - p.im * q.im, p.re * q.im + p.im * q.re); }
+        CNum cadd(CNum p, CNum q) { return CNum(p.re + q.re, p.im + q.im); }
+        CNum cdiv(CNum p, CNum q) {
+          float denom = q.re * q.re + q.im * q.im;
+          if (denom < 1e-6) return CNum(0.0, 0.0);
+          return CNum((p.re * q.re + p.im * q.im) / denom, (p.im * q.re - p.re * q.im) / denom);
+        }
+      `;
+
 // --- Drag-input snapping --------------------------------------------------
 
 /**

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 const {
   cmult, cadd, cdiv, snapComplex,
   elliptic, hyperbolic, loxodromic, parabolic, inversion, tumble, cayley,
+  glslComplexFunctions,
 } = await import('../tools/mobius_transforms.js');
 
 const EPS = 1e-12;
@@ -92,6 +93,95 @@ test('cdiv computes (a+bi)/(c+di)', () => {
 /** Dividing by a ~zero denominator yields 0 rather than NaN/Infinity. */
 test('cdiv guards against a near-zero denominator', () => {
   assertComplex(cdiv({ re: 1, im: 1 }, { re: 0, im: 0 }), 0, 0, 'cdiv by ~0');
+});
+
+// --- GLSL/JS parity -------------------------------------------------------
+// The shader can't import the JS module, so the GLSL source for cmult/cadd/cdiv
+// lives in mobius_transforms.js (glslComplexFunctions). These tests transpile
+// that GLSL body to JS and assert it agrees with the JS functions, so the two
+// implementations cannot silently diverge.
+
+/**
+ * Transpiles the body of one `CNum NAME(CNum p, CNum q) { ... return CNum(RE, IM); }`
+ * GLSL function from `src` into a JS function over {re,im} operands.
+ * @param {string} src - The GLSL source containing the function.
+ * @param {string} name - The function name to extract (cmult/cadd/cdiv).
+ * @returns {(p:{re:number,im:number}, q:{re:number,im:number}) => {re:number,im:number}}
+ */
+function transpileGlslCNum(src, name) {
+  const body = src.slice(src.indexOf(`CNum ${name}(`));
+  const open = body.indexOf('{');
+  let depth = 0, end = -1;
+  for (let i = open; i < body.length; i++) {
+    if (body[i] === '{') depth++;
+    else if (body[i] === '}' && --depth === 0) { end = i; break; }
+  }
+  // GLSL -> JS: `float` decls become `const`, `CNum(re, im)` constructors become
+  // `{ re, im }` objects. Constructors can nest parens, so split args by the
+  // top-level comma rather than with a regex.
+  const toObj = (s) => {
+    let out = '', i = 0;
+    while ((i = s.indexOf('CNum(', i)) !== -1) {
+      let depth = 0, j = i + 4, start = j + 1, comma = -1, end2 = -1;
+      for (; j < s.length; j++) {
+        if (s[j] === '(') depth++;
+        else if (s[j] === ')') { if (--depth === 0) { end2 = j; break; } }
+        else if (s[j] === ',' && depth === 1) comma = j;
+      }
+      out = s.slice(0, i)
+        + `({ re: (${s.slice(start, comma)}), im: (${s.slice(comma + 1, end2)}) })`
+        + s.slice(end2 + 1);
+      s = out;
+      i = 0;
+    }
+    return s;
+  };
+  const js = toObj(body.slice(open + 1, end).replace(/\bfloat\b/g, 'const'));
+  // eslint-disable-next-line no-new-func
+  return new Function('p', 'q', js);
+}
+
+const glsl = {
+  cmult: transpileGlslCNum(glslComplexFunctions, 'cmult'),
+  cadd: transpileGlslCNum(glslComplexFunctions, 'cadd'),
+  cdiv: transpileGlslCNum(glslComplexFunctions, 'cdiv'),
+};
+
+/** The GLSL source defines exactly the three complex ops the JS module exports. */
+test('glslComplexFunctions defines cmult, cadd and cdiv with the 1e-6 guard', () => {
+  assert.match(glslComplexFunctions, /CNum cmult\(/);
+  assert.match(glslComplexFunctions, /CNum cadd\(/);
+  assert.match(glslComplexFunctions, /CNum cdiv\(/);
+  assert.match(glslComplexFunctions, /denom < 1e-6/);
+});
+
+/** GLSL cmult/cadd/cdiv agree bit-for-bit with the JS versions across representative inputs. */
+test('GLSL complex ops match the JS implementations', () => {
+  const cases = [
+    { re: 1, im: 2 }, { re: 3, im: 4 }, { re: 0, im: 1 }, { re: -2, im: 0.5 },
+    { re: 0, im: 0 }, { re: 0.001, im: 0 }, { re: 1e-3, im: 1e-3 }, { re: -5, im: 7 },
+  ];
+  for (const p of cases) {
+    for (const q of cases) {
+      for (const [name, jsFn] of [['cmult', cmult], ['cadd', cadd], ['cdiv', cdiv]]) {
+        const a = jsFn(p, q);
+        const b = glsl[name](p, q);
+        assert.equal(b.re, a.re, `${name}.re for p=${JSON.stringify(p)} q=${JSON.stringify(q)}`);
+        assert.equal(b.im, a.im, `${name}.im for p=${JSON.stringify(p)} q=${JSON.stringify(q)}`);
+      }
+    }
+  }
+});
+
+/** The 1e-6 guard fires identically in both: |q|^2 just below the threshold yields 0. */
+test('GLSL and JS cdiv share the 1e-6 near-zero-denominator guard', () => {
+  // |q|^2 = 4e-7 < 1e-6 -> guarded to 0 in both.
+  const q = { re: 4e-4, im: 0 };
+  assert.ok(q.re * q.re < 1e-6);
+  const a = cdiv({ re: 1, im: 1 }, q);
+  const b = glsl.cdiv({ re: 1, im: 1 }, q);
+  assert.deepEqual(b, a);
+  assertComplex(a, 0, 0, 'cdiv guarded');
 });
 
 // --- preset generators ----------------------------------------------------
