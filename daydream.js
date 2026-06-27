@@ -12,7 +12,7 @@ import { resolveActiveEffect } from "./sidebar_logic.js";
 import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
 import { SegmentController } from "./segment_controller.js";
-import { refreshPixelView as computePixelView } from "./pixel_view.js";
+import { EngineHost } from "./engine_host.js";
 import { resolveParamSync } from "./param_sync.js";
 
 // This UI layer degrades gracefully (log, keep last good state, return) on
@@ -78,49 +78,13 @@ const effectsByResolution = {
   "Phantasm (144x288)": HiResFavorites,
 };
 
-/**
- * Owns the main-thread WASM engine and its reassignable display state. The pixel
- * view detaches on heap growth, so consumers read it through view()/refresh()
- * rather than caching it; engine, adapter, and recorder are late-bound at WASM load.
- */
-class EngineHost {
-  constructor() {
-    this.module = null;
-    this.engine = null;
-    this.adapter = null;
-    this.recorder = null;
-    this.pixelView = null;
-  }
-
-  /** Current Uint16Array display view; null until the first refresh() or after a resize. */
-  view() {
-    return this.pixelView;
-  }
-
-  /** Drop the cached view so the next refresh() re-fetches it (used after a resize). */
-  invalidateView() {
-    this.pixelView = null;
-  }
-
-  /**
-   * Re-fetch the WASM pixel view when missing or detached (heap growth can detach
-   * the underlying ArrayBuffer, leaving a zero-length view), and re-point the two
-   * display aliases at it so source, displayed attribute, and Daydream.pixels match.
-   * @returns {void}
-   */
-  refresh() {
-    const { view, refreshed } = computePixelView(
-      this.pixelView, () => this.engine.getPixels());
-    if (refreshed) {
-      this.pixelView = view;
-      daydream.dotMesh.instanceColor.array = view;
-      daydream.dotMesh.instanceColor.needsUpdate = true;
-      Daydream.pixels = view;
-    }
-  }
-}
-
-const host = new EngineHost();
+// Re-point the two display aliases so source, displayed attribute, and
+// Daydream.pixels all reference the WASM view host.refresh() just fetched.
+const host = new EngineHost((view) => {
+  daydream.dotMesh.instanceColor.array = view;
+  daydream.dotMesh.instanceColor.needsUpdate = true;
+  Daydream.pixels = view;
+});
 
 /**
  * Push the engine's per-frame parameter values back into the effect GUI so
