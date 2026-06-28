@@ -93,7 +93,7 @@ Two physical targets share the same rendering engine:
 | Virtual resolution | 288 × 144 |
 | Driver | `POVSegmented<288, 4, 480>` in `pov_segmented.h` |
 | Synchronization | 1-wire: count-coded sync symbols from segment 0 discipline a per-board flywheel timebase (`hardware/pov_sync.h`) |
-| Pin assignments | ID: pins 21–22, Sync symbols: pin 3 (out, segment 0) / pin 4 (in), SPI: pins 11 + 13 |
+| Pin assignments | ID: pins 21–22, Sync: pin 3 (shared — master drives, downstream receive), master-enable: pin 5, SPI: pins 11 + 13 |
 
 The POV effect works because each revolution takes ~125 ms and a new column is painted every `1,000,000 / (RPM/60) / width` microseconds (on Holosphere the IntervalTimer ISR advances one column per fire; on Phantasm each board's flywheel ISR derives the column from the CPU cycle counter — see §7.10). The LED strip is mounted on both sides of a rotating arm: the top half of the strip handles one hemisphere and the bottom half handles the opposite hemisphere, so one full revolution paints a complete sphere.
 
@@ -1282,10 +1282,11 @@ x = ( x_boundary + (now − epoch) · (W/2) / cycles_per_half_rev )  mod W
 
 | Signal | Master (seg 0) | Downstream (seg 1–3) | Electrical | Direction |
 |---|---|---|---|---|
-| `SYNC` | pin 3 (GPIO out) | pin 4 (ext. interrupt in) | 3.3 V CMOS, active-high pulses, idle LOW | master → all |
+| `SYNC` | pin 3 (GPIO out) | pin 3 (ext. interrupt in) | 3.3 V CMOS, active-high pulses, idle LOW | master → all |
+| `MASTER_EN` | pin 5 (drive LOW) | pin 5 (drive HIGH) | 3.3 V CMOS, gates the external sync-out buffer | per-board strap out |
 | `ID[1:0]` | pins 21–22 | pins 21–22 | active-low, internal pull-ups | strap (board identity) |
 
-`ID[1:0]` straps select the board: all-floating = `00` = master; the other three codes select arm/half.  The former column-clock wire is **deleted** — `SYNC` is the only inter-board connection.  It is assumed physically reliable (a hard, soldered line); a severed wire is out of scope (boards free-run and precess apart at crystal rate, a slow smear, never an instant break).
+`ID[1:0]` straps select the board: all-floating = `00` = master; the other three codes select arm/half.  `SYNC` is one shared pin 3 — the master drives it and downstream boards receive on its rising edge; `MASTER_EN` (pin 5) gates an external level shifter so only the master drives the shared bus.  The former column-clock wire is **deleted** and pin 4 is freed — `SYNC` is the only inter-board connection.  It is assumed physically reliable (a hard, soldered line); a severed wire is out of scope (boards free-run and precess apart at crystal rate, a slow smear, never an instant break).
 
 **Signal levels & symbol waveforms.** The wire idles LOW.  A **symbol** is a burst of short active-high pulses at a fixed pitch; **the meaning is the count of rising edges — pulse width carries no information.**  Each pulse is HIGH for one ISR body (pin set HIGH at ISR entry, LOW at exit; tens of µs) and the rising edge is the only timed event.  Pulses are drawn narrow, to scale against the ~868 µs pitch:
 
