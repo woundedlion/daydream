@@ -375,7 +375,8 @@ class DeepLinkGUI {
    * @returns {void}
    */
   destroy() {
-    if (this.urlWriter && this.urlWriter.cancel) this.urlWriter.cancel();
+    // urlWriter is shared root→children (addFolder); only the root may cancel it.
+    if (this.parent === null && this.urlWriter && this.urlWriter.cancel) this.urlWriter.cancel();
     if (this.gui.destroy) this.gui.destroy();
   }
 }
