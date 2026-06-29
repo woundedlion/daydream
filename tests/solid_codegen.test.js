@@ -100,7 +100,7 @@ test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comme
   const cpp = generateRecipeCpp(item);
   const expected =
     '// V=8, F=12, I=4\n' +
-    'FLASHMEM inline PolyMesh tetrahedron_kis(Arena &a, Arena &b) {\n' +
+    'FLASHMEM static PolyMesh tetrahedron_kis(Arena &a, Arena &b) {\n' +
     '  return SolidBuilder(tetrahedron(a, b), a, b).kis().build();\n' +
     '}';
   assert.equal(cpp, expected);
