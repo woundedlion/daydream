@@ -27,14 +27,16 @@ export function formatFloatCpp(n, digits = 6) {
     throw new Error(`formatFloatCpp: non-finite value ${n}`);
   }
   let s = n.toFixed(digits).replace(/(\.\d*?)0+$/, '$1');
-  if (s.endsWith('.')) s += '0';
+  if (!s.includes('.')) s += '.0';
+  else if (s.endsWith('.')) s += '0';
   // Nonzero magnitude that collapsed to "0.0": widen precision past the leading
   // fractional zeros so `digits` significant figures survive (toFixed caps at 100).
   if (parseFloat(s) === 0 && Number.isFinite(n) && n !== 0) {
     const leadingZeros = Math.ceil(-Math.log10(Math.abs(n)));
     const prec = Math.min(100, leadingZeros + digits);
     s = n.toFixed(prec).replace(/(\.\d*?)0+$/, '$1');
-    if (s.endsWith('.')) s += '0';
+    if (!s.includes('.')) s += '.0';
+    else if (s.endsWith('.')) s += '0';
   }
   return s + 'f';
 }

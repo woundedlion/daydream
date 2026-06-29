@@ -9,6 +9,12 @@ test('formatFloatCpp: whole value renders as "2.0f"', () => {
   assert.equal(formatFloatCpp(2), '2.0f');
 });
 
+/** digits=0 (no fractional digits requested) still yields a valid literal, not "2f". */
+test('formatFloatCpp: digits=0 whole value stays a valid float literal', () => {
+  assert.equal(formatFloatCpp(2, 0), '2.0f');
+  assert.equal(formatFloatCpp(-3, 0), '-3.0f');
+});
+
 /** Trailing zeros are trimmed but at least one fractional digit remains. */
 test('formatFloatCpp: trims trailing zeros to a single fractional digit', () => {
   assert.equal(formatFloatCpp(1.5), '1.5f');
