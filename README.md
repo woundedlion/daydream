@@ -58,7 +58,7 @@ Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holospher
     - [10.5 The Effect Sidebar](#105-the-effect-sidebar-sidebarjs)
     - [10.6 GUI Auto-Generation](#106-gui-auto-generation)
     - [10.7 Segmented POV Workers](#107-segmented-pov-workers-segment_workerjs)
-    - [10.8 Vendor Importmap](#108-vendor-importmap-local-first--cdn-fallback)
+    - [10.8 Vendor Importmap](#108-vendor-importmap-build-time-baked)
     - [10.9 Video Recording](#109-video-recording-recorderjs)
     - [10.10 Resolution Presets](#1010-resolution-presets)
     - [10.11 Geometry Tools](#1011-geometry-tools-daydreamtools)
@@ -234,7 +234,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 
 ```
 ├── index.html                  Main simulator page
-├── vendor-importmap.js         Local-first / CDN-fallback importmap helper
+├── vendor-importmap.js         Build-time-baked vendor-resolution importmap helper
 ├── holosphere_wasm.js          Installed from Holosphere's WASM build
 ├── holosphere_wasm.wasm        Installed from Holosphere's WASM build
 ├── README.md                   Installed from Holosphere (this file)
@@ -268,7 +268,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 └── package.json
 ```
 
-When the local `three.js/` and `node_modules/lil-gui/` directories are absent (e.g. on the GitHub Pages deploy, and by default), [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) resolves libraries from jsdelivr; `npm run importmap:local` switches it to the vendored copies for offline dev. See [§10.8](#108-vendor-importmap-local-first--cdn-fallback).
+When the local `three.js/` and `node_modules/lil-gui/` directories are absent (e.g. on the GitHub Pages deploy, and by default), [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) resolves libraries from jsdelivr; `npm run importmap:local` switches it to the vendored copies for offline dev. See [§10.8](#108-vendor-importmap-build-time-baked).
 
 ---
 
@@ -1973,7 +1973,7 @@ Key properties:
 - **One-frame pipeline** — frame N's render is dispatched fire-and-forget; frame N-1's results are composited synchronously when they arrive. Wall-clock time is measured against the slowest worker — exactly what the multi-Teensy hardware sees.
 - **Boundary overlay** — a "Show Boundaries" toggle paints cyan markers on the segment edges in the composite buffer to make the partition visible.
 
-### 10.8 Vendor Importmap (Local-First / CDN Fallback)
+### 10.8 Vendor Importmap (Build-Time-Baked)
 
 `vendor-importmap.js` is loaded as a regular (non-module) `<script>` in every HTML page. At parse time it:
 
@@ -2128,7 +2128,7 @@ git clone --depth 1 https://github.com/mrdoob/three.js.git
 
 After populating them, run `npm run importmap:local` to point [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) at the local copies (don't commit the result); `npm run importmap` reverts to all-CDN (§10.8).
 
-**Live demo.** The `master` branch of daydream is published to <https://woundedlion.github.io/daydream/> via GitHub Pages. The CDN-fallback path is what powers it.
+**Live demo.** The `master` branch of daydream is published to <https://woundedlion.github.io/daydream/> via GitHub Pages. The build-time-baked CDN default is what powers it.
 
 ---
 
