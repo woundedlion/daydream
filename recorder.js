@@ -230,7 +230,10 @@ export class VideoRecorder {
   }
 
   /**
-   * Elapsed recording time as a formatted string.
+   * Elapsed recording time as a formatted string. Counts captured frames
+   * (frameInterval each), so it tracks the manual requestFrame path exactly; on
+   * the timed-fallback path (a track without requestFrame, which encodes on the
+   * wall clock) it can drift from the encoded file's real duration.
    * @returns {string} The elapsed time in M:SS form (seconds zero-padded).
    */
   get elapsedFormatted() {
