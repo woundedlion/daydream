@@ -48,3 +48,33 @@ test('a second copy within revertMs still reverts to the idle label', async () =
   mock.timers.tick(2000);
   assert.equal(el.textContent, 'Copy', 'element reverts to idle, not "Copied!"');
 });
+
+/** A rejected clipboard write flashes the failure label and reverts, never latching "Copied!". */
+test('a rejected clipboard write flashes the failure label, not "Copied!"', async () => {
+  const restore = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  // Reject the async path and fail the execCommand fallback so the copy reports failure.
+  Object.defineProperty(globalThis, 'navigator', {
+    value: { clipboard: { writeText: async () => { throw new Error('denied'); } } },
+    configurable: true,
+  });
+  globalThis.document = {
+    createElement: () => ({ style: {}, focus() {}, select() {} }),
+    body: { appendChild() {}, removeChild() {} },
+    execCommand: () => false,
+  };
+
+  try {
+    const el = fakeElement('Copy');
+    const ok = await copyWithFeedback('x', {
+      element: el, copiedText: 'Copied!', failedText: 'Copy failed', revertMs: 1500,
+    });
+    assert.equal(ok, false, 'copy reports failure');
+    assert.equal(el.textContent, 'Copy failed', 'failure label flashed, not "Copied!"');
+
+    mock.timers.tick(2000);
+    assert.equal(el.textContent, 'Copy', 'element reverts to idle');
+  } finally {
+    delete globalThis.document;
+    Object.defineProperty(globalThis, 'navigator', restore);
+  }
+});
