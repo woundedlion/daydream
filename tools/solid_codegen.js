@@ -24,7 +24,7 @@ const KNOWN_OPS = new Set([
 // string, but for these that leaves o.params undefined, so reject it with a
 // clear message instead of an opaque TypeError on the param read.
 const PARAMETERIZED_OPS = new Set([
-  'truncate', 'expand', 'chamfer', 'hankin', 'relax', 'bevel',
+  'truncate', 'expand', 'chamfer', 'hankin', 'bevel',
 ]);
 
 // A base seed-solid name is pasted as a C++ function call (`base(a, b)`), so
@@ -133,7 +133,8 @@ export function generateFuncAndRecipe(item) {
     } else if (opName === 'relax') {
       // `??` not `||`: an explicit iter:0 is a valid no-op relax count and must
       // not fall back to the default. 8 matches SolidBuilder's C++ relax default.
-      const iter = o.params.iter ?? 8;
+      const params = (typeof o === 'object' && o.params) ? o.params : {};
+      const iter = params.iter ?? 8;
       requireCount(opName, 'iter', iter);
       chain += `.relax(${iter})`;
       nameParts.push(`_relax${iter}`);
