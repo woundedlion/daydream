@@ -53,6 +53,10 @@ export function computeSegmentRange(id, total, w, h) {
       `segment_worker: canvas dimensions must be positive integers (got ${w}x${h})`);
   }
   const ySegsPerArm = Math.floor(total / NUM_ARMS);
+  if (h < ySegsPerArm) {
+    throw new Error(
+      `segment_worker: canvas height must be >= ${ySegsPerArm} y-segments per arm (got ${h})`);
+  }
   const armId = Math.floor(id / ySegsPerArm);
   const ySegId = id % ySegsPerArm;
 
