@@ -507,10 +507,12 @@ createHolosphereModule().then(module => {
     },
     /**
      * Report the engine's current arena allocation metrics for the driver's HUD.
-     * @returns {Object} The WASM engine's arena metrics snapshot.
+     * @returns {?Object} The main engine's arena metrics, or null in segmented
+     *   mode where the main engine is idle and the HUD reads per-segment worker
+     *   stats instead.
      */
     getArenaMetrics() {
-      return host.engine.getArenaMetrics();
+      return segments.active ? null : host.engine.getArenaMetrics();
     },
     /**
      * Whether the buffer holds a real frame the recorder may capture this tick.

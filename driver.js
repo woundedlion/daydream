@@ -790,6 +790,7 @@ export class Daydream {
 
     if (effect && effect.getArenaMetrics) {
       const m = effect.getArenaMetrics();
+      if (!m) return;
       const fmt = (x) => `${(x.usage / 1024).toFixed(1)}|${(x.high_water_mark / 1024).toFixed(1)}|${(x.capacity / 1024).toFixed(0)}`;
 
       const updateRow = (elements, val) => {
