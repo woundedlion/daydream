@@ -96,6 +96,23 @@ test('HSV sextant parity (hsv_to_rgb) is exact across the wheel', () => {
 });
 
 /**
+ * Out-of-range HSV inputs: the WASM uint8_t cast and palette_math.js's `& 0xff`
+ * both wrap mod 256, so the two must still agree past the [0,255] edges (the
+ * in-range sweep above can't catch a clamp-vs-wrap divergence).
+ */
+test('HSV out-of-range parity (hsv_to_rgb) wraps mod 256 on both sides', () => {
+  for (const [h, s, v] of [
+    [-1, 128, 200], [256, 128, 200], [300, 64, 64], [-256, 255, 255],
+    [128, -1, 200], [128, 256, 200], [128, 128, -5], [128, 128, 511],
+  ]) {
+    const w = M.hsv_to_rgb(h, s, v);
+    const j = P.hsvToRgb(h, s, v);
+    assert.ok(w.r === j.r && w.g === j.g && w.b === j.b,
+      `hsv_to_rgb(${h},${s},${v}): wasm(${w.r},${w.g},${w.b}) js(${j.r},${j.g},${j.b})`);
+  }
+});
+
+/**
  * Verifies the ProceduralPalette cosine formula matches the engine. The engine's
  * get() clamps the cosine to sRGB then quantizes through the interpolated linear
  * LUT; the JS port computes the same clamped sRGB cosine, so feeding it through
