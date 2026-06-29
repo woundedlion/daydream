@@ -368,6 +368,8 @@ export class Daydream {
     // setLength rescales only the orbit radius, leaving azimuth/polar intact.
     this.camera.position.setLength(Math.max(distForHeight, distForWidth));
 
+    // Re-apply on resize so moving to a different-DPR monitor refreshes the ratio.
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
     this.renderer.setSize(width, height);
     this.labelRenderer.setSize(width, height);
 
