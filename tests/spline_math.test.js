@@ -10,6 +10,7 @@ const {
   splineExportCode,
   randomPointOnSphere,
 } = await import('../tools/spline_math.js');
+const { formatFloatCpp: cppFormatFloatCpp } = await import('../tools/cpp_format.js');
 
 /**
  * Computes the Euclidean magnitude of a 3D point; used to assert unit length.
@@ -132,12 +133,9 @@ test('generateCatmullRomCurve: closed case wraps (one segment per point)', () =>
   assert.deepEqual(closed[closed.length - 1], pts[0]);
 });
 
-/** Verifies C++ float formatting for whole numbers, halves, and trailing-zero trimming. */
-test('formatFloatCpp: whole, half, and trailing-zero trimming', () => {
-  assert.equal(formatFloatCpp(1), '1.0f');
-  assert.equal(formatFloatCpp(0), '0.0f');
-  assert.equal(formatFloatCpp(0.5), '0.5f');
-  assert.equal(formatFloatCpp(1.2500), '1.25f');
+/** spline_math re-exports cpp_format's formatter; its behavior is pinned in cpp_format.test.js. */
+test('formatFloatCpp re-exports the authoritative cpp_format formatter', () => {
+  assert.equal(formatFloatCpp, cppFormatFloatCpp);
 });
 
 /** Verifies the empty placeholder plus the 'vectors' and 'fragments' export formats. */

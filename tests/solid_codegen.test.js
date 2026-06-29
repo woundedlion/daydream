@@ -4,17 +4,11 @@ import assert from 'node:assert/strict';
 
 const { formatFloat, pctSuffix, generateFuncAndRecipe, generateRecipeCpp, computeInternalAngle } =
   await import('../tools/solid_codegen.js');
+const { formatFloatCpp } = await import('../tools/cpp_format.js');
 
-/** Verifies formatFloat renders whole and fractional numbers as C++ float literals (trailing `.0`/decimal plus `f`). */
-test('formatFloat appends a decimal to whole numbers and an f suffix', () => {
-  assert.equal(formatFloat(1), '1.0f');
-  assert.equal(formatFloat(0.5), '0.5f');
-  assert.equal(formatFloat(2), '2.0f');
-  assert.equal(formatFloat(0.25), '0.25f');
-  for (const v of [0, 1, 0.5, 3.14]) {
-    assert.match(formatFloat(v), /f$/);
-    assert.ok(formatFloat(v).includes('.'));
-  }
+/** formatFloat re-exports cpp_format's formatter; its behavior is pinned in cpp_format.test.js. */
+test('formatFloat is wired to the authoritative formatFloatCpp', () => {
+  assert.equal(formatFloat, formatFloatCpp);
 });
 
 /** Verifies pctSuffix rounds a fraction to hundredths and emits a zero-padded two-or-three-digit string, snapping float error. */
