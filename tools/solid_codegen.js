@@ -164,7 +164,7 @@ export function generateFuncAndRecipe(item) {
 export function generateRecipeCpp(item) {
   const { funcName, recipe } = generateFuncAndRecipe(item);
   const comment = `// V=${item.vCount || 0}, F=${item.fCount || 0}, I=${item.iCount || 0}`;
-  return `${comment}\nFLASHMEM inline PolyMesh ${funcName}(Arena &a, Arena &b) {\n  return ${recipe};\n}`;
+  return `${comment}\nFLASHMEM static PolyMesh ${funcName}(Arena &a, Arena &b) {\n  return ${recipe};\n}`;
 }
 
 /**
