@@ -171,7 +171,10 @@ async function handleMessage(msg) {
       let arenaMetrics = null;
       try {
         arenaMetrics = engine.getArenaMetrics();
-        // Convert to a plain object (embind vals can't be transferred).
+        // Convert to a plain object (embind vals can't be transferred). The
+        // engine's `stack` metric is intentionally omitted: the segmented stats
+        // view shows only the three arenas. SegArenaMetrics is the authority for
+        // the shape carried across the worker boundary.
         arenaMetrics = {
           scratch_arena_a: {
             usage: arenaMetrics.scratch_arena_a.usage,
