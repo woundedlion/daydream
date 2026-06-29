@@ -139,6 +139,14 @@ export class VideoRecorder {
       track = stream.getVideoTracks()[0];
     }
 
+    // No video track means captureFrame would silently no-op the whole session
+    // (it guards on !this.track); surface it instead of recording nothing.
+    if (!track) {
+      stream.getTracks().forEach(t => t.stop());
+      console.error('VideoRecorder: capture stream produced no video track; recording aborted.');
+      return;
+    }
+
     const mimeType = selectMimeType(this.format);
 
     // Omit the mimeType key entirely when empty: some engines throw on an empty one.
