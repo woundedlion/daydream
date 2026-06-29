@@ -12,7 +12,7 @@
  * @returns {number} The value rounded to 4 decimal places.
  */
 export function roundUrlNumber(value) {
-  return parseFloat(value.toFixed(4));
+  return Number.isFinite(value) ? parseFloat(value.toFixed(4)) : 0;
 }
 
 /**
