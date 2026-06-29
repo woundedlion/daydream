@@ -35,11 +35,12 @@ export function cadd(p, q) {
 }
 
 /**
- * Computes the complex quotient p/q. Returns 0 when |q|^2 < 1e-6 to avoid
- * divide-by-near-zero blow-up, matching the shader's guarded division.
+ * Computes the complex quotient p/q. Returns 0 when |q|^2 < 1e-6 (i.e. |q| <
+ * 1e-3) to avoid divide-by-near-zero blow-up, matching the shader's guarded
+ * division.
  * @param {{re:number, im:number}} p - Complex dividend.
  * @param {{re:number, im:number}} q - Complex divisor.
- * @returns {{re:number, im:number}} The complex quotient p/q, or {re:0, im:0} when |q|^2 < 1e-6.
+ * @returns {{re:number, im:number}} The complex quotient p/q, or {re:0, im:0} when |q|^2 < 1e-6 (|q| < 1e-3).
  */
 export function cdiv(p, q) {
   const denom = q.re * q.re + q.im * q.im;
