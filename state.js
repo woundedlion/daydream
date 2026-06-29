@@ -9,10 +9,11 @@
  * serializers cannot drift. parseFloat re-parses the fixed-decimal string so
  * 0.5000 collapses back to 0.5.
  * @param {number} value - The numeric value to serialize.
- * @returns {number} The value rounded to 4 decimal places.
+ * @returns {number|null} The value rounded to 4 decimal places, or null for a
+ *   non-finite input so callers drop the key rather than emit a misleading 0.
  */
 export function roundUrlNumber(value) {
-  return Number.isFinite(value) ? parseFloat(value.toFixed(4)) : 0;
+  return Number.isFinite(value) ? parseFloat(value.toFixed(4)) : null;
 }
 
 /**
@@ -214,9 +215,13 @@ export class URLSync {
     if (value === null || value === undefined) {
       // null is a deletion marker (drop the param on flush), not a forget.
       this.adhoc.set(key, null);
+    } else if (typeof value === 'number') {
+      const rounded = roundUrlNumber(value);
+      // Non-finite rounds to null: drop the key rather than serialize a 0 the
+      // engine never rendered.
+      this.adhoc.set(key, rounded === null ? null : String(rounded));
     } else {
-      this.adhoc.set(key,
-        typeof value === 'number' ? String(roundUrlNumber(value)) : String(value));
+      this.adhoc.set(key, String(value));
     }
     this.schedule();
   }
@@ -266,7 +271,13 @@ export class URLSync {
    * @returns {void}
    */
   setTrackedParam(params, key, val) {
-    params.set(key, typeof val === 'number' ? String(roundUrlNumber(val)) : String(val));
+    if (typeof val === 'number') {
+      const rounded = roundUrlNumber(val);
+      if (rounded === null) params.delete(key);
+      else params.set(key, String(rounded));
+    } else {
+      params.set(key, String(val));
+    }
   }
 
   /**
