@@ -764,6 +764,10 @@ export class SegmentController {
       this.frameComposited = false;
     }
 
+    // composite() can latch a fault via its bounds/length pre-pass; bail before
+    // dispatching a render to the just-halted pool.
+    if (this.faulted) return;
+
     if (!this.renderInFlight) {
       this.renderInFlight = true;
       this.renderParallel().then(() => {

@@ -632,6 +632,32 @@ test('a faulted pool keeps tick() from dispatching another doomed render', () =>
     assert.equal(w.posted.length, before[i], 'no new render broadcast'));
 });
 
+test('a fault latched by composite() mid-tick() does not re-dispatch a doomed render', async () => {
+  // The fence-escaping out-of-bounds result faults inside composite(), so the pool
+  // is clean at tick() entry and only latches partway through — the post-composite
+  // faulted re-check is what stops the second render.
+  Daydream.W = 4; Daydream.H = 2;
+  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+
+  const c = readyController(2);
+  c.showBoundaries = false;
+  c.tick();
+
+  deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2 });
+  deliverFrame(c, 1, { x0: 2, x1: 99, y0: 0, y1: 2 }); // x1=99 overshoots W=4
+  await flush();
+  assert.equal(c.pendingFrame, true);
+  assert.equal(c.faulted, false, 'not yet faulted at tick() entry');
+
+  const before = c.workers.map((w) => w.posted.length);
+  c.tick();
+
+  assert.equal(c.faulted, true, 'composite() latched the fault during tick()');
+  assert.equal(c.renderInFlight, false, 'no render dispatched to the just-faulted pool');
+  c.workers.forEach((w, i) =>
+    assert.equal(w.posted.length, before[i], 'no new render broadcast'));
+});
+
 test('an init-phase fault still reaches the fault overlay (faulted checked before ready guard)', () => {
   // A startup trap latches `faulted` but never sends 'ready'; a ready-first guard
   // would return before the fault overlay ever painted.
