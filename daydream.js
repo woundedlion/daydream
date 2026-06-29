@@ -252,10 +252,15 @@ function applyEffect(preserveParams = false) {
           setTimeout(() => exportCtrl.name('Export'), 1500);
           return;
         }
+        if (params.length !== values.length) {
+          console.warn(`Export: param/value length skew (${params.length} vs ${values.length}); skipping copy`);
+          exportCtrl.name('✗ Copy failed');
+          setTimeout(() => exportCtrl.name('Export'), 1500);
+          return;
+        }
         const items = [];
         for (let i = 0; i < params.length; i++) {
-          const v = (i < values.length) ? values[i] : 0;
-          items.push(v.toFixed(4) + 'f');
+          items.push(values[i].toFixed(4) + 'f');
         }
         const cpp = '{ ' + items.join(', ') + ' }';
         // navigator.clipboard is undefined on insecure/older contexts; bail through
