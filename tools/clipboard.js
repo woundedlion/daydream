@@ -88,6 +88,10 @@ export async function copyWithFeedback(text, opts = {}) {
       : (revertText !== undefined ? revertText : element.textContent);
     const flashClasses = success ? copiedClasses : failedClasses;
     element.textContent = success ? copiedText : failedText;
+    // Clear both outcome class sets before flashing: a rapid failure-then-success
+    // re-entry would otherwise leave the prior outcome's classes on the element.
+    if (copiedClasses.length) element.classList.remove(...copiedClasses);
+    if (failedClasses.length) element.classList.remove(...failedClasses);
     if (flashClasses.length) element.classList.add(...flashClasses);
     if (idleClasses.length) element.classList.remove(...idleClasses);
     const timer = setTimeout(() => {
