@@ -144,7 +144,16 @@ export class VideoRecorder {
     // Omit the mimeType key entirely when empty: some engines throw on an empty one.
     const options = { videoBitsPerSecond: this.bitrateMbps * 1_000_000 };
     if (mimeType) options.mimeType = mimeType;
-    const recorder = new MediaRecorder(stream, options);
+    let recorder;
+    try {
+      recorder = new MediaRecorder(stream, options);
+    } catch (err) {
+      // Construction can throw on unsupported options; stop the live capture
+      // tracks so the stream doesn't leak.
+      stream.getTracks().forEach(t => t.stop());
+      console.error('VideoRecorder: MediaRecorder construction failed.', err);
+      return;
+    }
 
     // ondataavailable/onstop fire after a fast stop→start may have installed a new
     // session, so the closures bind the per-session chunks/stream/recorder/sink
