@@ -95,7 +95,7 @@ test('lerpOklch endpoints and shortest-hue-arc midpoint', () => {
   near(at0.L, a.L); near(at0.C, a.C); near(at0.h, a.h);
   near(at1.L, b.L); near(at1.C, b.C);
   const mid = lerpOklch(a, b, 0.5);
-  near(mid.L, 0.5); near(mid.C, 0.15);
+  near(mid.L, 0.5); near(mid.C, 0.15); near(mid.h, 0.6);
 });
 
 /** Verifies lerpOklch interpolates hue along the short arc across the +/-pi seam, not the long way. */
