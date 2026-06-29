@@ -53,15 +53,18 @@ export class SegmentController {
    * @param {function(): (Object|null)} deps.getWasmEngine - Returns the current main-thread HolosphereEngine, or null when none is bound.
    * @param {Function} deps.refreshPixelView - Re-fetches the (possibly detached) WASM pixel view.
    * @param {function(): (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
+   * @param {function(Uint16Array): void} [deps.repointDisplayAliases] - Re-points both display aliases (Three.js instanceColor + Daydream.pixels) at the given view; defaults to re-pointing Daydream.pixels only.
    * @param {Document} [deps.statsDoc] - DOM document the stats overlay renders into; defaults to the global `document`.
    */
   constructor({ resolutionPresets, appState, getWasmEngine, refreshPixelView,
-                getMemoryView, statsDoc = globalThis.document }) {
+                getMemoryView, repointDisplayAliases, statsDoc = globalThis.document }) {
     this.resolutionPresets = resolutionPresets;
     this.appState = appState;
     this.getWasmEngine = getWasmEngine;
     this.refreshPixelView = refreshPixelView;
     this.getMemoryView = getMemoryView;
+    this.repointDisplayAliases =
+      repointDisplayAliases || ((view) => { Daydream.pixels = view; });
     this.doc = statsDoc;
 
     this.active = false;
@@ -505,17 +508,17 @@ export class SegmentController {
     // No clear: driver.render() already zero-filled this buffer; we blit over it.
     // That elision holds only while dst aliases the buffer render() clears. On a
     // divergence, self-heal rather than fault the render loop (mirrors the
-    // single-engine path): re-point the display alias at the composite target.
+    // single-engine path): re-point both display aliases at the composite target.
     // driver.render() re-clears Daydream.pixels next frame, restoring the elision.
     if (dst !== Daydream.pixels) {
       if (!this.aliasDivergenceLogged) {
         console.error(
           "SegmentController.composite: display-buffer alias diverged " +
           "(getMemoryView() !== Daydream.pixels) — re-pointing Daydream.pixels " +
-          "at the composite target");
+          "/ instanceColor.array at the composite target");
         this.aliasDivergenceLogged = true;
       }
-      Daydream.pixels = dst;
+      this.repointDisplayAliases(dst);
     }
 
     const w = Daydream.W;

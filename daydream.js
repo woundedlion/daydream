@@ -78,13 +78,16 @@ const effectsByResolution = {
   "Phantasm (144x288)": HiResFavorites,
 };
 
-// Re-point the two display aliases so source, displayed attribute, and
-// Daydream.pixels all reference the WASM view host.refresh() just fetched.
-const host = new EngineHost((view) => {
+// Re-point both display aliases (Three.js instanceColor + Daydream.pixels) so
+// source, displayed attribute, and Daydream.pixels all reference the same WASM
+// view. Shared by EngineHost.refresh() and SegmentController's composite heal.
+function repointDisplayAliases(view) {
   daydream.dotMesh.instanceColor.array = view;
   daydream.dotMesh.instanceColor.needsUpdate = true;
   Daydream.pixels = view;
-});
+}
+
+const host = new EngineHost(repointDisplayAliases);
 
 /**
  * Push the engine's per-frame parameter values back into the effect GUI so
@@ -153,6 +156,7 @@ const segments = new SegmentController({
   getWasmEngine: () => host.engine,
   refreshPixelView: () => host.refresh(),
   getMemoryView: () => host.view(),
+  repointDisplayAliases,
   statsDoc: document,
 });
 
