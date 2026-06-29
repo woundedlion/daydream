@@ -1990,6 +1990,8 @@ A page-specific local import (e.g. `solids.html` referencing `../solids.js`) is 
 
 A `VideoRecorder` wraps `MediaRecorder` over `canvas.captureStream(0)` — the manual-frame-request mode where frames are taken on demand instead of on wall-clock. After every simulation tick, `recorder.captureFrame()` requests a frame from the stream; this means recorded video is locked to the effect's simulation rate (16 FPS by default) regardless of how fast the browser actually renders. The result is byte-perfect repeatability between recordings.
 
+This sim-tick locking holds wherever `CanvasCaptureMediaStreamTrack.requestFrame()` is available (Chromium, Firefox). On a browser that lacks it, the recorder falls back to a timed `captureStream(fps)` that samples the canvas on the browser's own wall-clock timer, so on that path the recording is *not* tick-locked and the byte-perfect-repeatability guarantee does not hold.
+
 Codec priority is MP4/H.264 → WebM/VP9 → WebM/VP8, with optional offscreen-canvas downscaling to a target height for size-controlled exports.
 
 ### 10.10 Resolution Presets
