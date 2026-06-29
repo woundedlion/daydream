@@ -170,6 +170,10 @@ class DeepLinkGUI {
    * `gui.add(...).onChange(cb)` would silently overwrite the URL writer and break
    * deep-link persistence for that control. Every caller handler is fanned out, so
    * repeated onChange(fn) registrations compose rather than clobber one another.
+   *
+   * Only `onChange` participates in URL persistence and load-time replay;
+   * `onFinishChange` is left untouched, so a control wired solely through
+   * `onFinishChange` is not deep-linked.
    * @param {Object} controller - The lil-gui controller to wrap.
    * @param {Function} writeUrl - Callback that persists the control's value to the URL.
    * @param {boolean} [applyOnLoad=false] - When true (value hydrated from URL), replay the caller's onChange once on first registration so its side effect runs at startup.
