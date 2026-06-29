@@ -164,6 +164,11 @@ async function handleMessage(msg) {
           `segment_worker: pixel buffer length ${allPixels.length} != ` +
           `${expectedLen} (canvasW=${canvasW}, canvasH=${canvasH})`);
       }
+      if (x0 < 0 || y0 < 0 || x1 > canvasW || y1 > canvasH) {
+        throw new Error(
+          `segment_worker: segment rect [${x0},${y0})-[${x1},${y1}) out of ` +
+          `bounds for the ${canvasW}x${canvasH} canvas`);
+      }
       const pixelsCopy = new Uint16Array(qw * qh * 3);
       extractSegment(allPixels, pixelsCopy, canvasW, segRange);
 
