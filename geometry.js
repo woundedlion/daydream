@@ -34,6 +34,6 @@ const TWO_PI = 2 * Math.PI;
  */
 export const pixelToSpherical = (x, y, out = new THREE.Spherical()) => {
   const hVirt = Daydream.H + (Daydream.H_OFFSET ?? 0);
-  out.set(1, (y * Math.PI) / Math.max(1, hVirt - 1), Math.PI / 2 - (x * TWO_PI) / Daydream.W);
+  out.set(1, (y * Math.PI) / Math.max(1, hVirt - 1), Math.PI / 2 - (x * TWO_PI) / (Daydream.W || 1));
   return out;
 };
