@@ -369,6 +369,7 @@ export class SegmentController {
     this.pendingFrame = false;
     this.faulted = false;
     this.faultInfo = null;
+    this.aliasDivergenceLogged = false;
   }
 
   /**
