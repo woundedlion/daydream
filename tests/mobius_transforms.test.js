@@ -256,6 +256,55 @@ test('loxodromic at t=0 is the identity transform', () => {
   assertComplex(c.D, 1, 0, 'D');
 });
 
+// --- non-trivial goldens (catch a sign flip or wrong rate) ----------------
+// Expected coefficients are derived from the closed form at a chosen t, not by
+// calling the generator, so a wrong rotation rate/sign/conjugate fails here.
+
+/** elliptic(pi): angle = pi/2, so A = i and D = conj(A) = -i. */
+test('elliptic at t=pi rotates a quarter turn (A=i, D=-i)', () => {
+  const c = elliptic(Math.PI);
+  assertComplex(c.A, 0, 1, 'A');
+  assertComplex(c.B, 0, 0, 'B');
+  assertComplex(c.C, 0, 0, 'C');
+  assertComplex(c.D, 0, -1, 'D');
+});
+
+/** hyperbolic(1): s = sqrt(e^0.4) = e^0.2, so A = e^0.2, D = e^-0.2. */
+test('hyperbolic at t=1 scales by e^0.2 (A=e^0.2, D=e^-0.2)', () => {
+  const c = hyperbolic(1);
+  assertComplex(c.A, Math.exp(0.2), 0, 'A');
+  assertComplex(c.B, 0, 0, 'B');
+  assertComplex(c.C, 0, 0, 'C');
+  assertComplex(c.D, Math.exp(-0.2), 0, 'D');
+});
+
+/** loxodromic(1): angle=0.3, s=e^0.15; A=s*e^{i0.3}, D=(1/s)*e^{-i0.3}. */
+test('loxodromic at t=1 spirals (scale e^0.15, angle 0.3)', () => {
+  const c = loxodromic(1);
+  assertComplex(c.A, Math.exp(0.15) * Math.cos(0.3), Math.exp(0.15) * Math.sin(0.3), 'A');
+  assertComplex(c.B, 0, 0, 'B');
+  assertComplex(c.C, 0, 0, 'C');
+  assertComplex(c.D, Math.exp(-0.15) * Math.cos(0.3), -Math.exp(-0.15) * Math.sin(0.3), 'D');
+});
+
+/** inversion(pi): theta=pi/2 -> c=0,s=1, so B=C=i and A=D=0. */
+test('inversion at t=pi swaps 0/inf (B=C=i, A=D=0)', () => {
+  const c = inversion(Math.PI);
+  assertComplex(c.A, 0, 0, 'A');
+  assertComplex(c.B, 0, 1, 'B');
+  assertComplex(c.C, 0, 1, 'C');
+  assertComplex(c.D, 0, 0, 'D');
+});
+
+/** tumble(pi/0.8): theta=pi/2 -> c=0,s=1, so B=-1, C=1 (the sign asymmetry). */
+test('tumble at theta=pi/2 gives B=-1, C=1', () => {
+  const c = tumble(Math.PI / 0.8);
+  assertComplex(c.A, 0, 0, 'A');
+  assertComplex(c.B, -1, 0, 'B');
+  assertComplex(c.C, 1, 0, 'C');
+  assertComplex(c.D, 0, 0, 'D');
+});
+
 /** Every preset generator returns finite A,B,C,D coefficients across a spread of t values. */
 test('all preset generators produce finite coefficients across a range of t', () => {
   const gens = { elliptic, hyperbolic, loxodromic, parabolic, inversion, tumble, cayley };
