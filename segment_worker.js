@@ -156,6 +156,14 @@ async function handleMessage(msg) {
 
       const allPixels = engine.getPixels();
       const { x0, x1, y0, y1, w: qw, h: qh } = segRange;
+      // extractSegment's row subarrays clamp rather than throw, so a short source
+      // would silently zero-fill the tail; fault on a stride/length mismatch.
+      const expectedLen = canvasW * canvasH * 3;
+      if (allPixels.length !== expectedLen) {
+        throw new Error(
+          `segment_worker: pixel buffer length ${allPixels.length} != ` +
+          `${expectedLen} (canvasW=${canvasW}, canvasH=${canvasH})`);
+      }
       const pixelsCopy = new Uint16Array(qw * qh * 3);
       extractSegment(allPixels, pixelsCopy, canvasW, segRange);
 
