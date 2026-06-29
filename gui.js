@@ -70,7 +70,8 @@ const makeUrlParamWriter = () => {
       }
     }
     pendingUrlWrites.clear();
-    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+    const qs = params.toString();
+    window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
   };
   const writer = (key, value) => {
     const sync = getActiveURLSync();
@@ -401,7 +402,8 @@ export const resetGUI = (excludedKeys = []) => {
       params.delete(key);
     }
   }
-  window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+  const qs = params.toString();
+  window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
 };
 
 export { DeepLinkGUI as GUI };
