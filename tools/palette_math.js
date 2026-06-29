@@ -306,11 +306,12 @@ export class GenerativePalette {
         h2 = this.wrapHue(h1 + 85);
         h3 = this.wrapHue(h1 + 170);
         break;
-      case "SPLIT_COMPLEMENTARY":
+      case "SPLIT_COMPLEMENTARY": {
         const complement = this.wrapHue(h1 + 128);
         h2 = this.wrapHue(complement - 21);
         h3 = this.wrapHue(complement + 21);
         break;
+      }
       case "COMPLEMENTARY":
         h2 = this.wrapHue(h1 + 128);
         h3 = this.wrapHue(h1 + this.prng.nextInt(-7, 8));
