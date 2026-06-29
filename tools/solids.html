@@ -1430,7 +1430,10 @@
         Object.keys(def.params).forEach(k => {
           let val = def.params[k].val;
           if (opName === 'hankin' && k === 'angle') {
-            val = (computeInternalAngle(currentMesh) / 2) * (180 / Math.PI);
+            // computeInternalAngle returns 0 for a null/load-failed mesh; keep
+            // the OP_DEFS default rather than seeding a degenerate 0deg angle.
+            const derived = (computeInternalAngle(currentMesh) / 2) * (180 / Math.PI);
+            if (derived > 0) val = derived;
           }
           newOp.params[k] = val;
         });
