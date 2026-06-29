@@ -58,7 +58,7 @@ Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holospher
     - [10.5 The Effect Sidebar](#105-the-effect-sidebar-sidebarjs)
     - [10.6 GUI Auto-Generation](#106-gui-auto-generation)
     - [10.7 Segmented POV Workers](#107-segmented-pov-workers-segment_workerjs)
-    - [10.8 Vendor Importmap](#108-vendor-importmap-build-time-baked)
+    - [10.8 Vendor Importmap](#108-vendor-importmap-local-first--cdn-fallback)
     - [10.9 Video Recording](#109-video-recording-recorderjs)
     - [10.10 Resolution Presets](#1010-resolution-presets)
     - [10.11 Geometry Tools](#1011-geometry-tools-daydreamtools)
@@ -234,7 +234,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 
 ```
 ├── index.html                  Main simulator page
-├── vendor-importmap.js         Build-time-baked vendor-resolution importmap helper
+├── vendor-importmap.js         Local-first / CDN-fallback importmap helper
 ├── holosphere_wasm.js          Installed from Holosphere's WASM build
 ├── holosphere_wasm.wasm        Installed from Holosphere's WASM build
 ├── README.md                   Installed from Holosphere (this file)
@@ -268,7 +268,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 └── package.json
 ```
 
-When the local `three.js/` and `node_modules/lil-gui/` directories are absent (e.g. on the GitHub Pages deploy, and by default), [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) resolves libraries from jsdelivr; `npm run importmap:local` switches it to the vendored copies for offline dev. See [§10.8](#108-vendor-importmap-build-time-baked).
+When the local `three.js/` and `node_modules/lil-gui/` directories are absent (e.g. on the GitHub Pages deploy, and by default), [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) resolves libraries from jsdelivr; `npm run importmap:local` switches it to the vendored copies for offline dev. See [§10.8](#108-vendor-importmap-local-first--cdn-fallback).
 
 ---
 
@@ -1108,11 +1108,11 @@ All Conway *geometry* operators (`dual` through `bevel` below) take `(const Poly
 
 | Registry | Count | Description |
 |---|---|---|
-| `simple_registry` | 16 entries | 5 Platonic (tetrahedron through icosahedron) + 11 Archimedean solids |
+| `simple_registry` | 18 entries | 5 Platonic (tetrahedron through icosahedron) + 13 Archimedean solids |
 | `catalan_registry` | 13 entries | Duals of the Archimedean solids (triakisTetrahedron, rhombicDodecahedron, pentakisDodecahedron, etc.) |
 | `islamic_registry` | 23 entries | Complex multi-operator recipes producing Islamic star patterns from base solids |
 
-Total: **52 registered solids** (`Solids::NUM_ENTRIES`).
+Total: **54 registered solids** (`Solids::NUM_ENTRIES`).
 
 `Collections` namespace provides typed spans for iterating subsets: `get_platonic_solids()`, `get_archimedean_solids()`, `get_simple_solids()`, `get_catalan_solids()`, `get_islamic_solids()`.
 
@@ -1973,7 +1973,7 @@ Key properties:
 - **One-frame pipeline** — frame N's render is dispatched fire-and-forget; frame N-1's results are composited synchronously when they arrive. Wall-clock time is measured against the slowest worker — exactly what the multi-Teensy hardware sees.
 - **Boundary overlay** — a "Show Boundaries" toggle paints cyan markers on the segment edges in the composite buffer to make the partition visible.
 
-### 10.8 Vendor Importmap (Build-Time-Baked)
+### 10.8 Vendor Importmap (Local-First / CDN Fallback)
 
 `vendor-importmap.js` is loaded as a regular (non-module) `<script>` in every HTML page. At parse time it:
 
@@ -1989,8 +1989,6 @@ A page-specific local import (e.g. `solids.html` referencing `../solids.js`) is 
 ### 10.9 Video Recording (`recorder.js`)
 
 A `VideoRecorder` wraps `MediaRecorder` over `canvas.captureStream(0)` — the manual-frame-request mode where frames are taken on demand instead of on wall-clock. After every simulation tick, `recorder.captureFrame()` requests a frame from the stream; this means recorded video is locked to the effect's simulation rate (16 FPS by default) regardless of how fast the browser actually renders. The result is byte-perfect repeatability between recordings.
-
-This sim-tick locking holds wherever `CanvasCaptureMediaStreamTrack.requestFrame()` is available (Chromium, Firefox). On a browser that lacks it, the recorder falls back to a timed `captureStream(fps)` that samples the canvas on the browser's own wall-clock timer, so on that path the recording is *not* tick-locked and the byte-perfect-repeatability guarantee does not hold.
 
 Codec priority is MP4/H.264 → WebM/VP9 → WebM/VP8, with optional offscreen-canvas downscaling to a target height for size-controlled exports.
 
@@ -2103,7 +2101,7 @@ Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-
 Three layers run the same suite so a regression can't reach the live demo:
 
 - **Local pre-commit hook** ([`.githooks/pre-commit`](.githooks/pre-commit)) — builds + runs the suite before each commit. **On by default (opt-out):** configuring the `tests` preset points `core.hooksPath` at `.githooks` automatically. Skip a single commit with `HS_SKIP_TESTS=1 git commit …` (or `--no-verify`); disable the auto-enable with `-DHS_INSTALL_GIT_HOOKS=OFF`. Doc-only commits skip the suite.
-- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on every push and pull request, runs the native suite on both Linux (clang-18) and Windows (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell), and builds the WASM module. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](scripts/wasm_smoke.mjs)) — instantiating the module the way the browser does and driving every registered effect at both resolutions, so a SIMD-codegen fault, an embind signature mismatch, a stack overflow, or an `ALLOW_MEMORY_GROWTH` detachment fails here rather than riding a green build to deploy — and **verifies the install provenance trio** (`holosphere_wasm.wasm` + `.sha` + `.wasm.sha256`, the same artifacts the daydream deploy gate consumes), asserting the recorded `sha256` verifies and a clean checkout records no `-dirty` marker. The native suite there runs with `HS_SMOKE_FRAMES=120` to reach effect-lifecycle transitions the default short run skips.
+- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on every push and pull request, runs the native suite on both Linux (clang-18) and Windows (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell), and builds the WASM module. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](scripts/wasm_smoke.mjs)) — instantiating the module the way the browser does and driving every registered effect at every enumerated resolution, so a SIMD-codegen fault, an embind signature mismatch, a stack overflow, or an `ALLOW_MEMORY_GROWTH` detachment fails here rather than riding a green build to deploy — and **verifies the install provenance trio** (`holosphere_wasm.wasm` + `.sha` + `.wasm.sha256`, the same artifacts the daydream deploy gate consumes), asserting the recorded `sha256` verifies and a clean checkout records no `-dirty` marker. The native suite there runs with `HS_SMOKE_FRAMES=120` to reach effect-lifecycle transitions the default short run skips.
 - **Gated deploy** (`.github/workflows/deploy.yml`, **daydream repo**) — daydream's GitHub Pages source is *GitHub Actions*. On a push to daydream's `master` (or manual dispatch), the engine's native unit suite runs as a **gate** (`deploy` `needs: gate`, checking out the engine repo); only if it passes does the workflow publish the simulator to Pages. The engine's WASM is whatever is committed in daydream (built + installed from Holosphere). If the engine repo is private, add a `POV_TOKEN` secret (a read-access PAT) for the gate's checkout.
 
 ### Running the Simulator — daydream repo
@@ -2130,7 +2128,7 @@ git clone --depth 1 https://github.com/mrdoob/three.js.git
 
 After populating them, run `npm run importmap:local` to point [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) at the local copies (don't commit the result); `npm run importmap` reverts to all-CDN (§10.8).
 
-**Live demo.** The `master` branch of daydream is published to <https://woundedlion.github.io/daydream/> via GitHub Pages. The build-time-baked CDN default is what powers it.
+**Live demo.** The `master` branch of daydream is published to <https://woundedlion.github.io/daydream/> via GitHub Pages. The CDN-fallback path is what powers it.
 
 ---
 
