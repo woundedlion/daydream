@@ -23,7 +23,7 @@ test('HolosphereEngine exposes the method surface the FakeEngines mock', () => {
   for (const name of [
     'setResolution', 'setEffect', 'setParameter', 'setAnimationsPaused',
     'setClip', 'drawFrame', 'getRenderUs', 'getPixels', 'getArenaMetrics',
-    'getParameterDefinitions',
+    'getParameterDefinitions', 'getParamValues',
   ]) {
     assert.equal(typeof engine[name], 'function',
       `HolosphereEngine is missing method ${name} (FakeEngine implements it)`);
