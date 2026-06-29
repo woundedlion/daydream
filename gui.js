@@ -94,7 +94,6 @@ const makeUrlParamWriter = () => {
   // Symmetric with URLSync.dispose(): a discarded GUI must not leave the 200 ms
   // timer firing history.replaceState into a dead page.
   writer.cancel = () => { clearTimeout(urlTimer); urlTimer = null; pendingUrlWrites.clear(); };
-  writer.flush = () => { if (urlTimer !== null) { clearTimeout(urlTimer); urlTimer = null; commit(); } };
   return writer;
 };
 
