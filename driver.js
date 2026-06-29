@@ -256,6 +256,9 @@ export class Daydream {
     // exactly; higher closes any hairline seam at the cost of longer terminal caps.
     this.columnFillOverlap = 1.15;
 
+    // Round dots until an effect binds and sets its mode (see updateCullUniforms).
+    this.strobeColumns = true;
+
     this.statsGroup = null;
 
     this.precomputeMatrices();
