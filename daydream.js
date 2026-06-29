@@ -399,7 +399,9 @@ function applyEffect(preserveParams = false) {
  *   GLOBAL param URL entries (resolution, effect, and the global GUI's deep-link
  *   keys) carry over — the effect-specific entries are dropped regardless of this
  *   flag, since they target an effect this resolution can't run.
- * @returns {void}
+ * @returns {boolean|void} false when the engine rejected the resolution (the
+ *   caller must revert appState so UI/URL don't advertise an unapplied value);
+ *   otherwise undefined.
  */
 function applyResolution(preserveParams = false) {
   const resolution = appState.get('resolution');
@@ -409,7 +411,7 @@ function applyResolution(preserveParams = false) {
   if (host.engine) {
     if (host.engine.setResolution(p.w, p.h) === false) {
       console.error(`Unsupported resolution ${p.w}x${p.h}; keeping current.`);
-      return;
+      return false;
     }
     host.invalidateView(); // force host.refresh() to re-fetch after resize
   }
@@ -450,7 +452,9 @@ appState.subscribe((key, value, old) => {
   if (key === 'effect') {
     applyEffect();
   } else if (key === 'resolution') {
-    applyResolution();
+    // A rejected resolution leaves the engine on the old value; revert appState
+    // so the dropdown/URL re-sync to what actually applied.
+    if (applyResolution() === false) appState.set('resolution', old);
   }
 });
 
