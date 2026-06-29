@@ -873,18 +873,20 @@ const coordsScratchSph = new THREE.Spherical();
 const coordsScratchVec = new THREE.Vector3();
 
 /**
- * Build a label for a Cartesian point `c` ([x,y,z]): its position is `c`
- * reprojected onto the sphere surface, and its content lists the spherical
- * angles, raw coordinates, and normalized direction (each via prettify()).
+ * Build a label for a Cartesian point `c` ([x,y,z]): its position is `c`'s
+ * direction as a unit vector (the getLabels contract — LabelPool.acquire scales
+ * it to the sphere surface and refreshLabels' facing test assumes unit length),
+ * and its content lists the spherical angles, raw coordinates, and normalized
+ * direction (each via prettify()).
  * @param {Array<number>} c - Cartesian point as [x, y, z].
- * @returns {{position: THREE.Vector3, content: string}} Label placement on the sphere surface and its multi-line text.
+ * @returns {{position: THREE.Vector3, content: string}} Unit-direction label placement and its multi-line text.
  */
 export const coordsLabel = (c) => {
   const s = coordsScratchSph.setFromCartesianCoords(c[0], c[1], c[2]);
   const n = coordsScratchVec.set(c[0], c[1], c[2]).normalize();
   return {
     position: new THREE.Vector3()
-      .setFromSphericalCoords(Daydream.SPHERE_RADIUS, s.phi, s.theta),
+      .setFromSphericalCoords(1, s.phi, s.theta),
     content:
       `\u03B8, \u03A6 : ${prettify(s.theta)}, ${prettify(s.phi)}\nx, y, z : ${prettify(c[0])}, ${prettify(c[1])}, ${prettify(c[2])}\nx\u0302, y\u0302, z\u0302 : ${prettify(n.x)}, ${prettify(n.y)}, ${prettify(n.z)}`
   };
