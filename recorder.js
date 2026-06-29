@@ -345,7 +345,16 @@ export class VideoRecorder {
         chain = chain.then(async () => {
           await opened;
           if (failed || !writable) { chunks.push(data); return; }
-          await writable.write(data);
+          try {
+            await writable.write(data);
+          } catch (err) {
+            // A mid-stream write rejection (disk full, handle revoked) would leave
+            // the chain rejected and drop every later chunk; fall back to the
+            // in-memory buffer so finish() can still download what remains.
+            console.warn('VideoRecorder: streaming write failed, buffering in memory', err);
+            failed = true;
+            chunks.push(data);
+          }
         });
       },
       finish: () => {
