@@ -486,6 +486,38 @@ test('composite() marks both the internal split and the x=0 wrap seam', () => {
   assert.equal(Daydream.pixels[idx(3, 0, 4)], 222, 'arm-1 interior untouched');
 });
 
+test('composite() marks every internal split plus the wrap seam for a 4-arm layout', () => {
+  // A 4-arm split over W=8 has internal boundaries at x=2,4,6 and the wrap seam
+  // at x=0; the >2-arm case exercises production row-seam handling the 2-arm
+  // test cannot.
+  Daydream.W = 8; Daydream.H = 2;
+  Daydream.pixels = new Uint16Array(8 * 2 * 3);
+
+  const c = makeController();
+  c.showBoundaries = true;
+  const arm = (fill) => new Uint16Array(2 * 2 * 3).fill(fill);
+  c.results = [
+    { pixels: arm(111), x0: 0, x1: 2, y0: 0, y1: 2, quadW: 2, quadH: 2 },
+    { pixels: arm(222), x0: 2, x1: 4, y0: 0, y1: 2, quadW: 2, quadH: 2 },
+    { pixels: arm(333), x0: 4, x1: 6, y0: 0, y1: 2, quadW: 2, quadH: 2 },
+    { pixels: arm(444), x0: 6, x1: 8, y0: 0, y1: 2, quadW: 2, quadH: 2 },
+  ];
+
+  c.composite();
+
+  const isCyan = (x, y) => {
+    const i = idx(x, y, 8);
+    return Daydream.pixels[i] === 0 && Daydream.pixels[i + 1] === 65535 &&
+           Daydream.pixels[i + 2] === 65535;
+  };
+  for (const x of [0, 2, 4, 6])
+    assert.ok(isCyan(x, 0) && isCyan(x, 1), `boundary at x=${x} marked`);
+  assert.equal(Daydream.pixels[idx(1, 0, 8)], 111, 'arm-0 interior untouched');
+  assert.equal(Daydream.pixels[idx(3, 0, 8)], 222, 'arm-1 interior untouched');
+  assert.equal(Daydream.pixels[idx(5, 0, 8)], 333, 'arm-2 interior untouched');
+  assert.equal(Daydream.pixels[idx(7, 0, 8)], 444, 'arm-3 interior untouched');
+});
+
 test('composite() draws no x=0 line when the layout is not split in x', () => {
   // A single full-width segment never splits in x, so x=0 is a same-segment wrap,
   // not a boundary.
