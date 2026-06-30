@@ -52,6 +52,11 @@ import { computeSegmentRange } from '../segment_layout.js';
 function cppSegmentMap(segmentId, S, N) {
   const segsPerArm = N / 2;
   const rows = S / 2;
+  // The armSeg===0 vs else split collapses every non-top slot onto the single
+  // reversed bottom strip; that holds only with <=2 bands per arm (armSeg in
+  // {0,1}). A wider arm needs a per-band offset, so assert the precondition.
+  assert.ok(segsPerArm <= 2,
+    `cppSegmentMap only models <=2 bands per arm (got segsPerArm=${segsPerArm} for N=${N})`);
   const armSeg = segmentId % segsPerArm; // C++ masks (power-of-two segsPerArm)
   const armB = segmentId >= segsPerArm;
   return armSeg === 0
