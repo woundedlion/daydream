@@ -81,6 +81,11 @@ test('an out-of-range segment id fails fast instead of going off-canvas', () => 
   assert.throws(() => computeSegmentRange(1.5, 4, 288, 144), /segment id must be/);
 });
 
+test('a height too small for one band per arm fails fast', () => {
+  // total=8 → 4 y-segments per arm; h=3 cannot hold one row each.
+  assert.throws(() => computeSegmentRange(0, 8, 96, 3), /y-segments per arm/);
+});
+
 test('extract then composite round-trips a non-trivial rect through the shared blit', () => {
   const canvasW = 8, canvasH = 6;
   const src = new Uint16Array(canvasW * canvasH * 3);
