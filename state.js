@@ -235,6 +235,7 @@ export class URLSync {
    */
   reset(excludedKeys = []) {
     clearTimeout(this.timer);
+    this.timer = null;
     const excl = new Set(excludedKeys);
     for (const k of [...this.adhoc.keys()]) {
       if (!excl.has(k)) this.adhoc.delete(k);
