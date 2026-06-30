@@ -298,6 +298,11 @@ test('init applies the carried params AFTER setEffect rebuilds to defaults', asy
   assert.deepEqual(engineInstance.params, [['Speed', 0.5], ['Glow', 1.0]]);
 });
 
+test('init with paused:true pauses animations on the rebuilt engine', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma', paused: true });
+  assert.equal(engineInstance.paused, true);
+});
+
 test('setEffect handler rebuilds, then re-applies the carried param snapshot', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   posted.length = 0;
