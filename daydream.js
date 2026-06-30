@@ -453,8 +453,12 @@ appState.subscribe((key, value, old) => {
     applyEffect();
   } else if (key === 'resolution') {
     // A rejected resolution leaves the engine on the old value; revert appState
-    // so the dropdown/URL re-sync to what actually applied.
-    if (applyResolution() === false) appState.set('resolution', old);
+    // and the dropdown to what actually applied (the controller is bound to its
+    // own object literal, so it does not track appState on its own).
+    if (applyResolution() === false) {
+      appState.set('resolution', old);
+      resolutionController.setValue(old);
+    }
   }
 });
 
@@ -583,7 +587,8 @@ if (guiContainer) {
   console.warn('daydream: #gui-container not found; skipping global GUI mount.');
 }
 
-guiInstance.add({ resolution: appState.get('resolution') }, 'resolution', Object.keys(resolutionPresets))
+const resolutionController = guiInstance
+  .add({ resolution: appState.get('resolution') }, 'resolution', Object.keys(resolutionPresets))
   .name('Resolution')
   .onChange((v) => appState.set('resolution', v));
 
