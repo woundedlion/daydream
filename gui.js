@@ -23,17 +23,18 @@ const optionValues = (options) => {
 };
 
 /**
- * Whether a URL string is a color literal lil-gui's color parser can accept.
- * Matches the two forms attachUrlWriter serializes — `#hex` (3/4/6/8 digits)
- * and `rgb()/rgba()` with numeric components — so a malformed deep link is
- * rejected before it reaches the parser and renders a broken swatch.
+ * Whether a URL string is a color literal lil-gui's color parser can round-trip.
+ * Accepts only the alpha-less forms the serializer emits — `#rgb`/`#rrggbb` and
+ * `rgb()` — so an alpha deep link (4-/8-digit hex, `rgba()`) that lil-gui drops
+ * on serialize can't mis-hydrate, and a malformed link is rejected before the
+ * parser renders a broken swatch.
  * @param {*} s - Candidate value from the URL.
- * @returns {boolean} True if `s` is a valid #hex or rgb()/rgba() color string.
+ * @returns {boolean} True if `s` is a valid #rgb/#rrggbb or rgb() color string.
  */
 const isValidColorString = (s) =>
   typeof s === 'string' &&
-  (/^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(s) ||
-   /^rgba?\(\s*(?:\d+(?:\.\d+)?|\.\d+)\s*,\s*(?:\d+(?:\.\d+)?|\.\d+)\s*,\s*(?:\d+(?:\.\d+)?|\.\d+)\s*(,\s*(?:\d+(?:\.\d+)?|\.\d+)\s*)?\)$/.test(s));
+  (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s) ||
+   /^rgb\(\s*(?:\d+(?:\.\d+)?|\.\d+)\s*,\s*(?:\d+(?:\.\d+)?|\.\d+)\s*,\s*(?:\d+(?:\.\d+)?|\.\d+)\s*\)$/.test(s));
 
 /**
  * Builds an independent debounced URL-param writer with its OWN pending-writes
@@ -328,9 +329,9 @@ class DeepLinkGUI {
       } else if (typeof v === 'number') {
         strVal = '#' + ((v >>> 0) & 0xffffff).toString(16).padStart(6, '0');
       } else if (typeof v === 'string') {
-        // Prefix any bare 3/4/6/8-digit hex so it round-trips through the reader,
-        // which only accepts `#hex` and `rgb()/rgba()`.
-        strVal = /^([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v) ? `#${v}` : v;
+        // Prefix bare 3/6-digit hex so it round-trips through the reader, which
+        // accepts only `#rgb`/`#rrggbb` and `rgb()` (alpha forms don't round-trip).
+        strVal = /^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v) ? `#${v}` : v;
       }
       this.urlWriter(key, strVal);
     }, urlApplied);
