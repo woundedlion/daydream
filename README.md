@@ -1252,7 +1252,7 @@ for (int i = 0; i < PPS; ++i, y += y_step_) {
 }
 ```
 
-**Effect transparency**: Effects render the full 288×144 canvas — segmentation is handled entirely in the ISR.  No changes to any effect code are needed.  All 4 boards share the same deterministic random seed (`Pcg32(1337)` in `platform.h`), so identical effect sequences produce identical canvases.
+**Effect transparency**: Effects are written against the full 288×144 canvas with no per-segment code.  Each board clips rendering to the quadrant it paints this frame (`clip_to_segment`), except stateful effects (`needs_full_frame()` / `persists_pixels()`), which render the full canvas; the ISR then packs this board's LEDs.  All 4 boards share the same deterministic random seed (`Pcg32(1337)` in `platform.h`), so identical effect sequences produce identical canvases.
 
 | Parameter | Value (Phantasm) |
 |---|---|
