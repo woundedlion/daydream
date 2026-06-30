@@ -30,6 +30,12 @@ const INIT_WATCHDOG_MS = 20000;
 // Deadline for the per-worker 'booted' ping (fetch+evaluate, not WASM instantiate).
 const BOOT_WATCHDOG_MS = 4000;
 
+// Deadline for a dispatched parallel render to report every 'frame'. A worker that
+// accepts 'render' but hangs without throwing fires no onerror and never settles
+// `pending`, freezing the pipeline; this bound latches a fault instead. Sized well
+// above any legitimate frame (SLOW_FRAME_MS is the per-frame slow threshold).
+const RENDER_WATCHDOG_MS = 8 * SLOW_FRAME_MS;
+
 /** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
 /** @typedef {import('./worker_protocol.js').ControllerInboundMsg} ControllerInboundMsg */
 /** @typedef {import('./worker_protocol.js').SegArenaMetrics} SegArenaMetrics */
@@ -119,6 +125,9 @@ export class SegmentController {
 
     /** @type {ReturnType<typeof setTimeout> | null} */
     this.bootWatchdog = null;
+
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    this.renderWatchdog = null;
 
     /** @type {HTMLTableElement | null} */
     this.statsTable = null;
@@ -334,6 +343,14 @@ export class SegmentController {
     }
   }
 
+  /** Cancel the render watchdog if one is pending. Idempotent. */
+  clearRenderWatchdog() {
+    if (this.renderWatchdog !== null) {
+      clearTimeout(this.renderWatchdog);
+      this.renderWatchdog = null;
+    }
+  }
+
   /**
    * Terminate all workers and reset per-segment, frame-lifecycle, and fault
    * state to empty. Clears the fault latch, so it doubles as the recovery reset
@@ -348,6 +365,7 @@ export class SegmentController {
     }
     this.clearBootWatchdog();
     this.clearInitWatchdog();
+    this.clearRenderWatchdog();
     this.workers = [];
     this.results = [];
     this.timings = [];
@@ -385,6 +403,7 @@ export class SegmentController {
   onWorkerFault(segId, message) {
     this.clearBootWatchdog();
     this.clearInitWatchdog();
+    this.clearRenderWatchdog();
     if (!this.faulted) {
       // No auto-restart by design: stay latched until a user-driven resolution/mode
       // change rebuilds the pool, rather than retrying a deterministically-faulting render.
@@ -478,7 +497,8 @@ export class SegmentController {
 
   /**
    * Dispatch parallel render to all workers.
-   * @returns {Promise<void>} Resolves when all workers have responded (last response measures wall time).
+   * @returns {Promise<void>} Resolves when all workers have responded (last
+   *   response measures wall time), or when the render watchdog latches a fault.
    */
   renderParallel() {
     return new Promise((resolve) => {
@@ -487,10 +507,22 @@ export class SegmentController {
       this.frameSeen = new Array(this.workers.length).fill(false);
       this.frameStart = performance.now();
       this.frameResolve = () => {
+        this.clearRenderWatchdog();
         this.wallTime = performance.now() - this.frameStart;
         resolve();
       };
       this.broadcast({ type: 'render' });
+
+      this.renderWatchdog = setTimeout(() => {
+        this.renderWatchdog = null;
+        if (this.pending > 0 && !this.faulted) {
+          this.onWorkerFault(-1,
+            `render timed out after ${RENDER_WATCHDOG_MS} ms `
+            + `(${this.workers.length - this.pending}/${this.workers.length} `
+            + `segments responded) — a worker accepted 'render' but never replied`);
+        }
+      }, RENDER_WATCHDOG_MS);
+      if (typeof this.renderWatchdog.unref === 'function') this.renderWatchdog.unref();
     });
   }
 
