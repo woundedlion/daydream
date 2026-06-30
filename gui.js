@@ -33,7 +33,7 @@ const optionValues = (options) => {
 const isValidColorString = (s) =>
   typeof s === 'string' &&
   (/^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(s) ||
-   /^rgba?\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*(,\s*[\d.]+\s*)?\)$/.test(s));
+   /^rgba?\(\s*(?:\d+(?:\.\d+)?|\.\d+)\s*,\s*(?:\d+(?:\.\d+)?|\.\d+)\s*,\s*(?:\d+(?:\.\d+)?|\.\d+)\s*(,\s*(?:\d+(?:\.\d+)?|\.\d+)\s*)?\)$/.test(s));
 
 /**
  * Builds an independent debounced URL-param writer with its OWN pending-writes
