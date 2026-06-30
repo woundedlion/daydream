@@ -65,6 +65,9 @@ export function createSlider(containerId, cfg, onInput) {
     throw new Error(`createSlider(${id}): step (${step}) * scale (${scale}) rounds to `
       + `${sliderStep} in scaled units; must be >= 1 (increase step or scale)`);
   }
+  if (!Number.isFinite(value)) {
+    throw new Error(`createSlider(${id}): value (${value}) must be a finite number`);
+  }
 
   const sliderId = `${id}_slider`;
   const valueSpanId = `${id}_value`;
