@@ -197,7 +197,9 @@ function destroyActiveEffectGui() {
  * @param {boolean} [preserveParams=false] - When true, keep the existing per-effect
  *   param URL entries (used during initial hydration); when false, clear them since
  *   they don't apply to the newly selected effect.
- * @returns {void}
+ * @returns {boolean|void} false when the engine rejected the effect (the caller
+ *   must revert appState so UI/URL don't advertise an unapplied effect); otherwise
+ *   undefined.
  */
 function applyEffect(preserveParams = false) {
   destroyActiveEffectGui();
@@ -210,14 +212,12 @@ function applyEffect(preserveParams = false) {
   if (host.engine) {
     if (host.engine.setEffect(appState.get('effect')) === false) {
       console.error(`setEffect("${appState.get('effect')}") failed; effect unavailable.`);
-      // The early return skips the end-of-function sync; run it here so the
-      // column-fill mode tracks the engine's actual (unchanged) effect rather
-      // than leaving the previous effect's mode stale. The sidebar is left on
-      // its current highlight, which already reflects the engine's actual
-      // (prior) effect — re-highlighting the failed name would desync UI/engine.
-      if (segments.workers.length > 0) segments.setEffect(appState.get('effect'));
+      // Engine is unchanged: sync strobe-column mode to the effect still loaded and
+      // signal failure so the subscriber reverts appState. Do NOT broadcast the
+      // failed name to the worker pool — that would diverge workers from the main
+      // engine, which rejected it.
       daydream.setStrobeColumns(host.engine.strobeColumns());
-      return;
+      return false;
     }
     daydream.setStrobeColumns(host.engine.strobeColumns());
 
@@ -450,7 +450,11 @@ function applyResolution(preserveParams = false) {
 
 appState.subscribe((key, value, old) => {
   if (key === 'effect') {
-    applyEffect();
+    // A rejected effect leaves the engine on the old one; revert appState so the
+    // re-fire re-applies the prior effect and keeps state/URL/engine coherent.
+    if (applyEffect() === false) {
+      appState.set('effect', old);
+    }
   } else if (key === 'resolution') {
     // A rejected resolution leaves the engine on the old value; revert appState
     // and the dropdown to what actually applied (the controller is bound to its
