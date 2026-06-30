@@ -1,13 +1,11 @@
 // @ts-check
-import { test, mock } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 
-// geometry.js only needs Daydream.W / Daydream.H / Daydream.H_OFFSET from
-// driver.js; stub it so the test doesn't drag in the whole browser-only
-// driver/GUI graph.
+// pixelToSpherical takes the sphere resolution as a parameter; pass a plain
+// stand-in for the Daydream driver so the test stays free of the browser graph.
 const Daydream = { W: 288, H: 144, H_OFFSET: 0 };
-mock.module('../driver.js', { namedExports: { Daydream } });
 
 const { pixelToSpherical } = await import('../geometry.js');
 
@@ -36,7 +34,7 @@ test('pixelToSpherical matches the engine convention (theta from +X)', () => {
   const v = new THREE.Vector3();
   for (const x of [0, 1, 72, 144, 216, 287]) {
     for (const y of [0, 1, 72, 143]) {
-      v.setFromSpherical(pixelToSpherical(x, y));
+      v.setFromSpherical(pixelToSpherical(x, y, Daydream));
       const [ex, ey, ez] = engineVector(x, y);
       assert.ok(
         Math.abs(v.x - ex) < 1e-12 && Math.abs(v.y - ey) < 1e-12 && Math.abs(v.z - ez) < 1e-12,
@@ -52,7 +50,7 @@ test('pixelToSpherical matches the engine convention (theta from +X)', () => {
 test('H_OFFSET widens the latitude denominator to H + H_OFFSET - 1', () => {
   try {
     Daydream.H_OFFSET = 3;
-    const phi = pixelToSpherical(0, 50).phi;
+    const phi = pixelToSpherical(0, 50, Daydream).phi;
     assert.ok(Math.abs(phi - (50 * Math.PI) / (H + 3 - 1)) < 1e-12,
       `phi should use H + H_OFFSET - 1, got ${phi}`);
   } finally {
@@ -65,7 +63,7 @@ test('H_OFFSET widens the latitude denominator to H + H_OFFSET - 1', () => {
  * guarding against an x<->z swap that would put it at +Z.
  */
 test('the x=0 column maps to +X, not +Z', () => {
-  const v = new THREE.Vector3().setFromSpherical(pixelToSpherical(0, 72));
+  const v = new THREE.Vector3().setFromSpherical(pixelToSpherical(0, 72, Daydream));
   assert.ok(v.x > 0.99, `x=0 should sit near +X, got x=${v.x}`);
   assert.ok(Math.abs(v.z) < 1e-9, `x=0 should have z~0, got z=${v.z}`);
 });
