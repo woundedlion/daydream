@@ -729,7 +729,7 @@ export class Daydream {
       const x = i % Daydream.W;
       const y = Math.floor(i / Daydream.W);
 
-      vector.setFromSpherical(pixelToSpherical(x, y, sph));
+      vector.setFromSpherical(pixelToSpherical(x, y, Daydream, sph));
       vector.multiplyScalar(Daydream.SPHERE_RADIUS);
 
       dummy.position.set(0, 0, 0);
