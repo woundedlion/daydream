@@ -124,6 +124,7 @@ export class VideoRecorder {
 
     if (!this.offCtx) {
       console.error('VideoRecorder: failed to acquire a 2D drawing context for the capture canvas; recording aborted.');
+      this.cleanup();
       return;
     }
 
@@ -144,6 +145,7 @@ export class VideoRecorder {
     if (!track) {
       stream.getTracks().forEach(t => t.stop());
       console.error('VideoRecorder: capture stream produced no video track; recording aborted.');
+      this.cleanup();
       return;
     }
 
@@ -160,6 +162,7 @@ export class VideoRecorder {
       // tracks so the stream doesn't leak.
       stream.getTracks().forEach(t => t.stop());
       console.error('VideoRecorder: MediaRecorder construction failed.', err);
+      this.cleanup();
       return;
     }
 
