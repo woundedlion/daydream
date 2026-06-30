@@ -198,6 +198,22 @@ test('render still posts a frame when getArenaMetrics throws', async () => {
   assert.equal(frame.msg.arenaMetrics, null);
 });
 
+/** A pixel buffer whose length disagrees with the canvas faults instead of zero-filling the tail. */
+test('render faults on a pixel buffer of the wrong length', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  engineInstance.getPixels = () => new Uint16Array(8 * 4 * 3 - 3); // one pixel short
+  const captured = [];
+  const realSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (fn) => { captured.push(fn); return 0; };
+  try {
+    await dispatch({ type: 'render' });
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+  assert.equal(captured.length, 1, 'one rethrow task scheduled');
+  assert.throws(() => captured[0](), /pixel buffer length/);
+});
+
 /** Segment 0 mirrors its post-frame param values; other segments send null. */
 test('render streams param values from segment 0 only', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
