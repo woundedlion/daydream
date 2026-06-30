@@ -23,20 +23,6 @@ const optionValues = (options) => {
 };
 
 /**
- * Whether a URL string is a color literal lil-gui's color parser can round-trip.
- * Accepts only the alpha-less forms the serializer emits — `#rgb`/`#rrggbb` and
- * `rgb()` — so an alpha deep link (4-/8-digit hex, `rgba()`) that lil-gui drops
- * on serialize can't mis-hydrate, and a malformed link is rejected before the
- * parser renders a broken swatch.
- * @param {*} s - Candidate value from the URL.
- * @returns {boolean} True if `s` is a valid #rgb/#rrggbb or rgb() color string.
- */
-const isValidColorString = (s) =>
-  typeof s === 'string' &&
-  (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s) ||
-   /^rgb\(\s*(?:\d+(?:\.\d+)?|\.\d+)\s*,\s*(?:\d+(?:\.\d+)?|\.\d+)\s*,\s*(?:\d+(?:\.\d+)?|\.\d+)\s*\)$/.test(s));
-
-/**
  * Builds an independent debounced URL-param writer with its OWN pending-writes
  * buffer and timer. Each `DeepLinkGUI` owns one (shared down its folder subtree),
  * so two separate GUIs on a single tool page no longer share one module-global
@@ -102,7 +88,7 @@ export { makeUrlParamWriter };
 
 /**
  * lil-gui wrapper that persists every control's value to URL query params,
- * giving the app shareable deep links. Wraps add/addColor/addFolder to hydrate
+ * giving the app shareable deep links. Wraps add/addFolder to hydrate
  * from the URL on creation and write back on change.
  */
 class DeepLinkGUI {
@@ -287,56 +273,6 @@ class DeepLinkGUI {
     }
 
     if (!isFunction && urlApplied) {
-      try { controller.updateDisplay(); }
-      catch (e) { console.warn(`DeepLinkGUI: updateDisplay failed for "${key}":`, e); }
-    }
-
-    return controller;
-  }
-
-  /**
-   * Adds a color control, seeding from the URL and serializing changes to a
-   * string (#rrggbb for THREE.Color-like values, rgb(r,g,b) for arrays).
-   * @param {Object} object - The object holding the bound color property.
-   * @param {string} prop - The color property name to control.
-   * @returns {Object} The created lil-gui color controller.
-   */
-  addColor(object, prop) {
-    const key = this.getKey(prop);
-    // lil-gui's color parser silently accepts garbage, so reject invalid literals.
-    const params = getUrlParams();
-    let urlApplied = false;
-    if (params.has(key)) {
-      const urlVal = params.get(key);
-      if (isValidColorString(urlVal)) {
-        object[prop] = urlVal;
-        urlApplied = true;
-      } else {
-        console.warn(`DeepLinkGUI: ignoring invalid URL color "${urlVal}" for "${key}"`);
-        this.urlWriter(key, null);
-      }
-    }
-
-    const controller = this.gui.addColor(object, prop);
-
-    this.urlKeys.add(key);
-    this.attachUrlWriter(controller, (v) => {
-      let strVal = v;
-      if (typeof v === 'object' && v.getHexString) {
-        strVal = '#' + v.getHexString();
-      } else if (Array.isArray(v)) {
-        strVal = `rgb(${v[0]},${v[1]},${v[2]})`;
-      } else if (typeof v === 'number') {
-        strVal = '#' + ((v >>> 0) & 0xffffff).toString(16).padStart(6, '0');
-      } else if (typeof v === 'string') {
-        // Prefix bare 3/6-digit hex so it round-trips through the reader, which
-        // accepts only `#rgb`/`#rrggbb` and `rgb()` (alpha forms don't round-trip).
-        strVal = /^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v) ? `#${v}` : v;
-      }
-      this.urlWriter(key, strVal);
-    }, urlApplied);
-
-    if (urlApplied) {
       try { controller.updateDisplay(); }
       catch (e) { console.warn(`DeepLinkGUI: updateDisplay failed for "${key}":`, e); }
     }
