@@ -575,6 +575,14 @@ export class SegmentController {
           `result through (layout/fence invariant violated)`);
         return 0;
       }
+      if (r.x1 <= r.x0 || r.y1 <= r.y0) {
+        this.onWorkerFault(s,
+          `SegmentController.composite: segment ${s} rect ` +
+          `[${r.x0},${r.y0})-[${r.x1},${r.y1}) is empty/inverted — a zero or ` +
+          `negative expectedLen would mask layout corruption (segment-rect ` +
+          `invariant violated)`);
+        return 0;
+      }
       const expectedLen = (r.x1 - r.x0) * (r.y1 - r.y0) * 3;
       if (r.pixels.length !== expectedLen) {
         this.onWorkerFault(s,
