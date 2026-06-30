@@ -36,5 +36,6 @@ export const prettify = (r) => {
   if (Math.abs(r + g) <= 0.00001) return "-φ⁻¹";
   if (Math.abs(r - 1 / Math.sqrt(3)) <= 0.00001) return "√3⁻¹";
   if (Math.abs(r + 1 / Math.sqrt(3)) <= 0.00001) return "-√3⁻¹";
-  return r.toFixed(3);
+  const s = r.toFixed(3);
+  return s === "-0.000" ? "0.000" : s;
 }
