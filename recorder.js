@@ -131,13 +131,21 @@ export class VideoRecorder {
     // framerate 0: manual frame-request mode, frames are captured on
     // requestFrame(). Browsers without requestFrame would record an empty video
     // in that mode, so fall back to a timed captureStream at the frame rate.
-    let stream = captureSource.captureStream(0);
-    let track = stream.getVideoTracks()[0];
-    if (typeof track?.requestFrame !== 'function') {
-      stream.getTracks().forEach(t => t.stop());
-      const fps = Math.max(1, Math.round(1 / this.frameInterval));
-      stream = captureSource.captureStream(fps);
+    let stream, track;
+    try {
+      stream = captureSource.captureStream(0);
       track = stream.getVideoTracks()[0];
+      if (typeof track?.requestFrame !== 'function') {
+        stream.getTracks().forEach(t => t.stop());
+        const fps = Math.max(1, Math.round(1 / this.frameInterval));
+        stream = captureSource.captureStream(fps);
+        track = stream.getVideoTracks()[0];
+      }
+    } catch (err) {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      console.error('VideoRecorder: captureStream failed; recording aborted.', err);
+      this.cleanup();
+      return;
     }
 
     // No video track means captureFrame would silently no-op the whole session
