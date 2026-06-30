@@ -68,6 +68,7 @@ export function createSlider(containerId, cfg, onInput) {
 
   const sliderId = `${id}_slider`;
   const valueSpanId = `${id}_value`;
+  const clampedValue = Math.min(max, Math.max(min, value));
 
   container.replaceChildren();
 
@@ -81,13 +82,13 @@ export function createSlider(containerId, cfg, onInput) {
   slider.min = String(Math.round(min * scale));
   slider.max = String(Math.round(max * scale));
   slider.step = String(sliderStep);
-  slider.value = String(Math.round(value * scale));
+  slider.value = String(Math.round(clampedValue * scale));
   slider.className = sliderClass;
 
   const valueSpan = document.createElement('span');
   valueSpan.id = valueSpanId;
   valueSpan.className = valueClass;
-  valueSpan.textContent = value.toFixed(decimals);
+  valueSpan.textContent = clampedValue.toFixed(decimals);
 
   container.append(labelSpan, slider, valueSpan);
 
