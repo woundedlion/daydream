@@ -93,7 +93,7 @@ Two physical targets share the same rendering engine:
 | Virtual resolution | 288 × 144 |
 | Driver | `POVSegmented<288, 4, 480>` in `pov_segmented.h` |
 | Synchronization | 1-wire: count-coded sync symbols from segment 0 discipline a per-board flywheel timebase (`hardware/pov_sync.h`) |
-| Pin assignments | ID: pins 21–22, Sync: pin 3 (shared — master drives, downstream receive), master-enable: pin 5, SPI: pins 11 + 13 |
+| Pin assignments | ID: pins 21–23 (pin 23 reserved for ID2, read only at N=8), Sync: pin 3 (shared — master drives, downstream receive), master-enable: pin 5, SPI: pins 11 + 13 |
 
 The POV effect works because each revolution takes ~125 ms and a new column is painted every `1,000,000 / (RPM/60) / width` microseconds (on Holosphere the IntervalTimer ISR advances one column per fire; on Phantasm each board's flywheel ISR derives the column from the CPU cycle counter — see §7.10). The LED strip is mounted on both sides of a rotating arm: the top half of the strip handles one hemisphere and the bottom half handles the opposite hemisphere, so one full revolution paints a complete sphere.
 
@@ -733,7 +733,7 @@ Convenience structs that construct an SDF shape and rasterize in a single `draw(
 
 ### 7.2 The Curve Rasterizer (`plot.h`)
 
-For drawing lines, curves, and paths, the `Plot` namespace provides a geodesic/planar rasterizer with adaptive step size. The key insight is that near the poles of the sphere, pixels are much denser in latitude than near the equator. Step size is scaled by `sqrt(1 - y²)` — the sine of the polar angle — so curves remain smooth at all latitudes without over-sampling at the equator.
+For drawing lines, curves, and paths, the `Plot` namespace provides a geodesic/planar rasterizer with adaptive step size. Each sub-step is sized from the curve's full 2-D screen-space speed (`sqrt(vx² + vy²)`, combining longitudinal and latitudinal motion), so samples land roughly one pixel apart everywhere on the curve regardless of latitude. The step is clamped to keep the equator near one sample per column and floored near the poles — where screen speed diverges — so pole oversampling stays bounded.
 
 ```cpp
 Plot::Line::draw<W, H>(pipeline, canvas, start, end, fragment_shader);
@@ -1869,7 +1869,6 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `getSupportedResolutions()` → `[[w, h], …]` | *(static)* List the resolutions the build supports, as `[width, height]` pairs |
 | `setClip(x0, x1, y0, y1)` → `bool` | Restrict rendering to a sub-rectangle (used by segment workers) |
 | `getRenderUs()` → `double` | Last frame's rasterization time in microseconds (per-frame profiling) |
-| `getParamGeneration()` → `uint32_t` | Monotonic counter bumped whenever the parameter set changes (effect/resolution switch). A JS consumer caches it alongside `getParameterDefinitions()` and re-fetches the definitions when it changes, so cached descriptors never mis-describe a later `getParamValues()` stream |
 | `strobeColumns()` → `bool` | Whether the current effect renders as discrete strobed columns (dark inter-column gaps) rather than a continuous smeared band; `false` when no effect is set. Daydream reads it to decide whether to fill the inter-column gap |
 
 The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 330 KiB arena) for interactive solid manipulation.
@@ -1907,7 +1906,7 @@ The `Daydream` class owns the entire render side. Features:
 | **Instanced dot mesh** | One `InstancedMesh` of `W × H` small spheres. Per-instance position is precomputed in `setupDots()` from `pixelToVector(x, y)`; per-instance color is updated each frame from the WASM pixel buffer. Single draw call per frame. |
 | **Linear color pipeline** | `THREE.ColorManagement.enabled = true` and `setPixelRatio(min(devicePixelRatio, 1))`. Colors arriving from WASM are already linear, so no extra conversion. |
 | **OrbitControls camera** | A normal `PerspectiveCamera` at `(0, 0, 220)` with FOV 20°, plus `OrbitControls` for mouse/touch navigation. |
-| **Picture-in-picture** | A second camera that copies the main camera's position and orientation each frame, rendering the same view into a 30%-sized bottom-right viewport — a square-cropped duplicate of the main framing. Suppressed when `isMobile` or `navigator.webdriver` (§ headless capture). |
+| **Picture-in-picture** | A clone of the main camera at a fixed orientation renders to a 30%-sized bottom-right viewport so the front and back of the sphere are visible simultaneously. Suppressed when `isMobile` or `navigator.webdriver` (§ headless capture). |
 | **Axes overlay** | Three `THREE.Line`s for X/Y/Z visible on toggle, plus a `CSS2DRenderer`-backed `LabelPool` for "+X / +Y / +Z" labels with zero allocation per frame. |
 | **Resize observer** | `ResizeObserver` on the canvas container recomputes camera aspect, viewport, and `isMobile` (width ≤ 900). |
 | **Fixed-rate stepping** | The simulation ticks at `1/FPS` seconds independent of the actual render rate, with a time accumulator to keep effects deterministic. |
