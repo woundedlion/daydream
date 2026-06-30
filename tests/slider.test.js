@@ -74,6 +74,12 @@ test('throws when step * scale rounds below 1 in scaled units', () => {
     /rounds to 0 in scaled units; must be >= 1/);
 });
 
+/** Verifies the value guard rejects a non-finite initial value. */
+test('throws when the initial value is not finite', () => {
+  assert.throws(() => createSlider('c', { ...base, value: NaN }), /value .* must be a finite number/);
+  assert.throws(() => createSlider('c', { ...base, value: undefined }), /value .* must be a finite number/);
+});
+
 /** Verifies a valid config builds the control and snaps its attributes to scaled units. */
 test('builds a slider, scaling bounds and rounding the step to integer units', () => {
   const { slider, valueSpan } = createSlider('c', { ...base, scale: 10, decimals: 1 }, null);
