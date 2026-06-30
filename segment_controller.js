@@ -562,9 +562,13 @@ export class SegmentController {
     const w = Daydream.W;
     const h = Daydream.H;
 
+    // Iterate the configured segment count (the same source updateStats reads),
+    // not results.length, so the two can't drift after a teardown reset.
+    const n = this.count;
+
     // Pre-pass: validate every result before blitting any, so a bad segment faults
     // cleanly (overlay + halt) like a worker fault rather than leaving a partial frame.
-    for (let s = 0; s < this.results.length; s++) {
+    for (let s = 0; s < n; s++) {
       const r = this.results[s];
       if (!r || !r.pixels) continue;
       if (r.x0 < 0 || r.y0 < 0 || r.x1 > w || r.y1 > h) {
@@ -595,7 +599,7 @@ export class SegmentController {
     }
 
     let blitted = 0;
-    for (let s = 0; s < this.results.length; s++) {
+    for (let s = 0; s < n; s++) {
       const r = this.results[s];
       if (!r || !r.pixels) continue;
       compositeSegment(dst, r.pixels, w, r);
