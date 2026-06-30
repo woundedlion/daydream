@@ -409,7 +409,7 @@ export function proceduralPaletteCpp(parameters) {
 // The four GenerativePalette enum sets, mirrored from core/color.h. A token
 // outside these sets would paste a nonexistent enumerator into the emitted C++,
 // so generativePaletteCpp rejects it at the source.
-export const GRADIENT_SHAPES = new Set(['STRAIGHT', 'CIRCULAR', 'VIGNETTE', 'FALLOFF']);
+export const GRADIENT_SHAPES = new Set(Object.keys(GRADIENT_SHAPE_INDEX));
 export const HARMONY_TYPES = new Set(['TRIADIC', 'SPLIT_COMPLEMENTARY', 'COMPLEMENTARY', 'ANALOGOUS']);
 export const BRIGHTNESS_PROFILES = new Set(['ASCENDING', 'DESCENDING', 'FLAT', 'BELL', 'CUP']);
 export const SATURATION_PROFILES = new Set(['PASTEL', 'MID', 'VIBRANT']);
