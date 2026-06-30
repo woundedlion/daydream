@@ -66,57 +66,6 @@ export function oklabToLinearRgb(lab) {
 }
 
 /**
- * Converts an OKLab color to its cylindrical OKLCH form.
- * @param {{L:number, a:number, b:number}} lab - The OKLab color (lightness L, opponent axes a and b).
- * @returns {{L:number, C:number, h:number}} The OKLCH color (lightness L, chroma C, hue h in radians).
- */
-export function oklabToOklch(lab) {
-  return {
-    L: lab.L,
-    C: Math.sqrt(lab.a * lab.a + lab.b * lab.b),
-    h: Math.atan2(lab.b, lab.a)
-  };
-}
-
-/**
- * Converts a cylindrical OKLCH color back to OKLab.
- * @param {{L:number, C:number, h:number}} lch - The OKLCH color (lightness L, chroma C, hue h in radians).
- * @returns {{L:number, a:number, b:number}} The OKLab color (lightness L, opponent axes a and b).
- */
-export function oklchToOklab(lch) {
-  return { L: lch.L, a: lch.C * Math.cos(lch.h), b: lch.C * Math.sin(lch.h) };
-}
-
-/**
- * Converts an sRGB byte color to OKLCH, applying the full sRGB -> linear -> OKLab -> OKLCH pipeline.
- * @param {number} r - sRGB red channel in [0, 255].
- * @param {number} g - sRGB green channel in [0, 255].
- * @param {number} b - sRGB blue channel in [0, 255].
- * @returns {{L:number, C:number, h:number}} The OKLCH color (lightness L, chroma C, hue h in radians).
- */
-export function srgbToOklch(r, g, b) {
-  return oklabToOklch(linearRgbToOklab(
-    srgbToLinearFloat(r / 255.0),
-    srgbToLinearFloat(g / 255.0),
-    srgbToLinearFloat(b / 255.0)
-  ));
-}
-
-/**
- * Converts an OKLCH color to linear RGB, clamping each channel into [0, 1].
- * @param {{L:number, C:number, h:number}} lch - The OKLCH color (lightness L, chroma C, hue h in radians).
- * @returns {Array<number>} The clamped linear RGB color as [r, g, b], each in [0, 1].
- */
-export function oklchToLinearRgb(lch) {
-  const rgb = oklabToLinearRgb(oklchToOklab(lch));
-  return [
-    Math.max(0, Math.min(1, rgb.r)),
-    Math.max(0, Math.min(1, rgb.g)),
-    Math.max(0, Math.min(1, rgb.b))
-  ];
-}
-
-/**
  * Converts a linear RGB color to a "#rrggbb" hex string, applying the linear -> sRGB
  * transfer function and clamping each channel before encoding.
  * @param {number} r - Linear red channel in [0, 1].
