@@ -366,16 +366,16 @@ export class VideoRecorder {
       write: (data) => {
         chain = chain.then(async () => {
           await opened;
-          if (failed || !writable) { chunks.push(data); return; }
+          // Picker cancelled/unavailable: no writable opened, so buffer every
+          // chunk for the blob-download fallback in finish().
+          if (!writable) { chunks.push(data); return; }
+          // A prior write errored the writable; stop feeding it.
+          if (failed) return;
           try {
             await writable.write(data);
           } catch (err) {
-            // A mid-stream write rejection (disk full, handle revoked) would leave
-            // the chain rejected and drop every later chunk; fall back to the
-            // in-memory buffer so finish() can still download what remains.
-            console.warn('VideoRecorder: streaming write failed, buffering in memory', err);
+            console.warn('VideoRecorder: streaming write failed', err);
             failed = true;
-            chunks.push(data);
           }
         });
       },
@@ -383,7 +383,16 @@ export class VideoRecorder {
         chain
           .then(async () => {
             await opened;
-            if (failed || !writable) { this.download(recorder, chunks, effectName); return; }
+            // Picker cancelled: every chunk was buffered, so the blob is whole.
+            if (!writable) { this.download(recorder, chunks, effectName); return; }
+            // Mid-stream write failed: only the on-disk prefix is contiguous.
+            // Flush it and report truncation rather than downloading the
+            // post-failure tail as if it were a complete video.
+            if (failed) {
+              try { await writable.close(); } catch { /* writable already errored */ }
+              console.error('VideoRecorder: streaming write failed mid-session; the saved file is truncated to the data written before the failure.');
+              return;
+            }
             await writable.close();
           })
           .catch((err) => {
