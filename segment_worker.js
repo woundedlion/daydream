@@ -93,7 +93,7 @@ async function handleMessage(msg) {
       if (msg.params) {
         for (const p of msg.params) engine.setParameter(p.name, p.value);
       }
-      if (msg.paused) engine.setAnimationsPaused(true);
+      if (typeof msg.paused === 'boolean') engine.setAnimationsPaused(msg.paused);
       applyClip();
 
       post({ type: 'ready', segId });
