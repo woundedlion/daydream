@@ -89,6 +89,9 @@ function repointDisplayAliases(view) {
 
 const host = new EngineHost(repointDisplayAliases);
 
+// Throttle the syncGUI param/value length-skew warning to once per skew episode.
+let syncGuiSkewLogged = false;
+
 /**
  * Push the engine's per-frame parameter values back into the effect GUI so
  * animation-driven params track live, without clobbering controllers the user
@@ -107,7 +110,18 @@ function syncGUI() {
   if (!values || values.length === 0) return;
 
   const names = activeEffect.paramNames;
-  const n = Math.min(names.length, values.length);
+  // A names/values length skew means the cached param list drifted from the
+  // engine's value stream (e.g. a stale list after an async effect change); skip
+  // rather than silently mis-bind sliders by index, mirroring export()'s check.
+  if (names.length !== values.length) {
+    if (!syncGuiSkewLogged) {
+      console.warn(`syncGUI: param/value length skew (${names.length} vs ${values.length}); skipping sync`);
+      syncGuiSkewLogged = true;
+    }
+    return;
+  }
+  syncGuiSkewLogged = false;
+  const n = names.length;
   for (let i = 0; i < n; i++) {
     const c = activeEffect.controllerByName.get(names[i]);
     if (!c) continue;
