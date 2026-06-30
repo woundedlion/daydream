@@ -312,6 +312,7 @@ class DeepLinkGUI {
         urlApplied = true;
       } else {
         console.warn(`DeepLinkGUI: ignoring invalid URL color "${urlVal}" for "${key}"`);
+        this.urlWriter(key, null);
       }
     }
 
