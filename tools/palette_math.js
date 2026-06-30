@@ -207,6 +207,11 @@ export class GenerativePalette {
     this.gradientShape = gradientShape;
     this.harmonyType = harmonyType;
 
+    assertMember('GradientShape', gradientShape, GRADIENT_SHAPES);
+    assertMember('HarmonyType', harmonyType, HARMONY_TYPES);
+    assertMember('BrightnessProfile', brightnessProfile, BRIGHTNESS_PROFILES);
+    assertMember('SaturationProfile', satProfile, SATURATION_PROFILES);
+
     // Seed from the profile strings (not the hue) so scrubbing the hue keeps the
     // randomized saturation/brightness structure stable.
     const hashStr = gradientShape + harmonyType + brightnessProfile + satProfile;
@@ -235,8 +240,6 @@ export class GenerativePalette {
       case "VIBRANT":
         s1 = s2 = s3 = 255;
         break;
-      default:
-        throw new Error(`unknown SaturationProfile "${satProfile}"`);
     }
 
     let v1 = 0, v2 = 0, v3 = 0;
@@ -264,14 +267,9 @@ export class GenerativePalette {
         v2 = this.prng.nextInt(51, 127);
         v3 = v1;
         break;
-      default:
-        throw new Error(`unknown BrightnessProfile "${brightnessProfile}"`);
     }
 
     const shapeIndex = GRADIENT_SHAPE_INDEX[this.gradientShape];
-    if (shapeIndex === undefined) {
-      throw new Error(`unknown GradientShape "${this.gradientShape}"`);
-    }
     if (!bakeLut) {
       throw new Error(
         'PaletteOps bridge not initialized: call setPaletteOps() with the WASM ' +
@@ -415,6 +413,21 @@ export const BRIGHTNESS_PROFILES = new Set(['ASCENDING', 'DESCENDING', 'FLAT', '
 export const SATURATION_PROFILES = new Set(['PASTEL', 'MID', 'VIBRANT']);
 
 /**
+ * Throws if `token` is not in `allowed`, naming the value and the permitted set.
+ * Shared by GenerativePalette and generativePaletteCpp so the preview and the
+ * C++ export reject the same vocabulary with one error format.
+ * @param {string} label - Enum name shown in the error (e.g. "GradientShape").
+ * @param {string} token - The candidate value to validate.
+ * @param {Set<string>} allowed - The permitted values.
+ */
+function assertMember(label, token, allowed) {
+  if (!allowed.has(token)) {
+    throw new Error(`unknown ${label} "${token}" ` +
+      `(expected one of ${[...allowed].join(', ')})`);
+  }
+}
+
+/**
  * Emit the generative-tab C++ initializer.
  *
  * Reproducibility caveat: this tool draws the per-palette saturation,
@@ -428,16 +441,10 @@ export const SATURATION_PROFILES = new Set(['PASTEL', 'MID', 'VIBRANT']);
  * @returns {string} The C++ GenerativePalette initializer source, prefixed with the reproducibility caveat comment.
  */
 export function generativePaletteCpp({ shape, harmony, brightness, sat, hueValue }) {
-  const reject = (label, token, allowed) => {
-    if (!allowed.has(token)) {
-      throw new Error(`generativePaletteCpp: unknown ${label} "${token}" ` +
-        `(expected one of ${[...allowed].join(', ')})`);
-    }
-  };
-  reject('GradientShape', shape, GRADIENT_SHAPES);
-  reject('HarmonyType', harmony, HARMONY_TYPES);
-  reject('BrightnessProfile', brightness, BRIGHTNESS_PROFILES);
-  reject('SaturationProfile', sat, SATURATION_PROFILES);
+  assertMember('GradientShape', shape, GRADIENT_SHAPES);
+  assertMember('HarmonyType', harmony, HARMONY_TYPES);
+  assertMember('BrightnessProfile', brightness, BRIGHTNESS_PROFILES);
+  assertMember('SaturationProfile', sat, SATURATION_PROFILES);
   if (!Number.isInteger(hueValue) || hueValue < 0 || hueValue > 255) {
     throw new Error(`generativePaletteCpp: hueValue ${hueValue} must be an ` +
       `integer in 0..255`);
