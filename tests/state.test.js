@@ -64,12 +64,14 @@ test('AppState.snapshot is a detached copy', () => {
  * and so history.replaceState writes can be captured for assertions.
  * @param {string} [search] - The location.search query string (e.g. '?effect=Voronoi').
  * @param {string} [pathname] - The location.pathname the stub reports.
+ * @param {string} [hash] - The location.hash the stub reports (always a string in a
+ *   real browser; '' when no fragment).
  * @returns {Array<string>} A live array that collects each URL passed to history.replaceState.
  */
-function installWindow(search = '', pathname = '/') {
+function installWindow(search = '', pathname = '/', hash = '') {
   const calls = [];
   globalThis.window = {
-    location: { search, pathname },
+    location: { search, pathname, hash },
     history: {
       replaceState: (state, title, url) => { calls.push(url); },
     },
@@ -120,6 +122,18 @@ test('URLSync.flush writes tracked state and ad-hoc params to the URL', () => {
   assert.equal(params.get('effect'), 'Voronoi');
   assert.equal(params.get('speed'), '1.2346');
   assert.ok(calls[0].startsWith('/sim?'));
+});
+
+test('URLSync.flush preserves an existing location.hash', () => {
+  const calls = installWindow('', '/sim', '#frag');
+  const s = new AppState({ effect: 'Voronoi' });
+  const sync = new URLSync(s, ['effect']);
+
+  sync.flush();
+
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].endsWith('#frag'), `expected hash preserved, got ${calls[0]}`);
+  assert.equal(new URLSearchParams(calls[0].split('?')[1].split('#')[0]).get('effect'), 'Voronoi');
 });
 
 test('URLSync.flush clears the ad-hoc buffer so a tracked key is not permanently overridden', () => {

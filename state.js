@@ -255,7 +255,10 @@ export class URLSync {
       else params.set(key, val);
     }
     const qs = params.toString();
-    window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+    // Preserve any location.hash: rebuilding from pathname alone would drop a
+    // fragment a consumer relies on (URLSync is the single owner of URL writes).
+    const base = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState({}, '', base + window.location.hash);
     this.adhoc.clear();
   }
 
@@ -300,8 +303,9 @@ export class URLSync {
       else params.set(key, val);
     }
     const qs = params.toString();
-    const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-    window.history.replaceState({}, '', newUrl);
+    // Preserve any location.hash; rebuilding from pathname alone would drop it.
+    const base = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState({}, '', base + window.location.hash);
     // The URL is now the store of record; clear the buffer so a stale ad-hoc entry
     // can't re-apply on every flush.
     this.adhoc.clear();
