@@ -44,17 +44,17 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
   const defs = engine.getParameterDefinitions();
   assert.equal(typeof defs.length, 'number',
     'getParameterDefinitions must return an array-like value');
-  if (defs.length > 0) {
-    const p = defs[0];
-    assert.equal(typeof p.name, 'string', 'param def must carry a string name');
-    assert.ok(typeof p.value === 'number' || typeof p.value === 'boolean',
-      'param def value must be a number or boolean');
-    // Controller flattens bools to 1/0 before calling setParameter.
-    const paramOk = engine.setParameter(
-      p.name, typeof p.value === 'boolean' ? (p.value ? 1 : 0) : p.value);
-    assert.equal(typeof paramOk, 'boolean', 'setParameter must return a boolean');
-    assert.equal(paramOk, true, 'setParameter must succeed for a known param name');
-  }
+  assert.ok(defs.length > 0,
+    'the bootstrap effect (DistortedRing) must expose at least one parameter');
+  const p = defs[0];
+  assert.equal(typeof p.name, 'string', 'param def must carry a string name');
+  assert.ok(typeof p.value === 'number' || typeof p.value === 'boolean',
+    'param def value must be a number or boolean');
+  // Controller flattens bools to 1/0 before calling setParameter.
+  const paramOk = engine.setParameter(
+    p.name, typeof p.value === 'boolean' ? (p.value ? 1 : 0) : p.value);
+  assert.equal(typeof paramOk, 'boolean', 'setParameter must return a boolean');
+  assert.equal(paramOk, true, 'setParameter must succeed for a known param name');
 
   engine.setAnimationsPaused(false);
   engine.setClip(0, W, 0, H);
