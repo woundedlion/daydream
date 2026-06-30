@@ -363,6 +363,51 @@ test('streams chunks to disk when the File System Access API is present', async 
   }
 });
 
+test('a mid-stream streaming write failure closes the writable, skips download, and reports truncation', async () => {
+  const restore = installRecorderEnv();
+  const writes = [];
+  let closed = false;
+  let writeCount = 0;
+  const writable = {
+    write: async (d) => {
+      writeCount++;
+      if (writeCount === 2) throw new Error('disk full');
+      writes.push(d);
+    },
+    close: async () => { closed = true; },
+  };
+  globalThis.showSaveFilePicker = async () => ({ createWritable: async () => writable });
+  const errs = [];
+  const prevErr = console.error;
+  const prevWarn = console.warn;
+  console.error = (...a) => errs.push(a.join(' '));
+  console.warn = () => {};
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    let downloaded = false;
+    rec.download = () => { downloaded = true; };
+
+    rec.start('stream');
+    const recorder = rec.mediaRecorder;
+    recorder.ondataavailable({ data: { size: 10 } });
+    recorder.ondataavailable({ data: { size: 20 } }); // this write throws
+    recorder.ondataavailable({ data: { size: 30 } }); // dropped after the failure
+    rec.stop();
+    recorder.onstop();
+
+    await new Promise((r) => setTimeout(r));
+
+    assert.deepEqual(writes, [{ size: 10 }], 'only the pre-failure chunk reached disk');
+    assert.equal(closed, true, 'the writable is closed to flush the on-disk prefix');
+    assert.equal(downloaded, false, 'no blob download of the post-failure tail');
+    assert.ok(errs.some((e) => /truncated/.test(e)), 'the truncation is reported to the user');
+  } finally {
+    console.error = prevErr;
+    console.warn = prevWarn;
+    restore();
+  }
+});
+
 /**
  * Drives captureFrame once with a chosen source/offscreen size and returns the
  * drawImage destination rect the recorder computed. The offscreen and its
