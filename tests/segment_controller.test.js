@@ -702,6 +702,33 @@ test('the next tick() composites the armed frame and dispatches the following on
   assert.equal(c.pending, 2);
 });
 
+test('tick() re-blits the last composite when a render overruns the tick (preview holds, not black)', async () => {
+  Daydream.W = 4; Daydream.H = 2;
+  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+
+  const c = readyController(2);
+  c.showBoundaries = false;
+  c.tick();
+
+  const quad = () => new Uint16Array(2 * 2 * 3).fill(111);
+  deliverFrame(c, 0, { pixels: quad(), x0: 0, x1: 2, y0: 0, y1: 2 });
+  deliverFrame(c, 1, { pixels: quad(), x0: 2, x1: 4, y0: 0, y1: 2 });
+  await flush();
+  c.tick(); // composite the armed frame, dispatch the next (now in flight)
+  assert.equal(c.pendingFrame, false);
+  assert.equal(c.renderInFlight, true, 'the next render is in flight and will overrun');
+
+  // driver.stepSimulation() clears the buffer before each tick.
+  Daydream.pixels.fill(0);
+  // Overrun tick: render still in flight, no new pendingFrame.
+  c.tick();
+
+  assert.ok(Daydream.pixels.some((v) => v === 111),
+    'the last composite is re-blitted so the preview holds instead of flashing black');
+  assert.equal(c.frameComposited, false,
+    'a re-blit is not a new frame; the recorder must not capture a duplicate');
+});
+
 test('a faulted pool keeps tick() from dispatching another doomed render', () => {
   const c = readyController(2);
   c.tick();

@@ -813,6 +813,13 @@ export class SegmentController {
       this.updateStats();
       this.pendingFrame = false;
       this.frameComposited = blitted > 0;
+    } else if (this.results.some(r => r && r.pixels)) {
+      // Render overran this tick: re-blit the last composite over driver's clear so
+      // the preview holds the last frame instead of flashing black. The generation is
+      // unchanged, so the cached results stay valid. Not a new frame, so
+      // frameComposited stays false — the recorder must not capture a duplicate.
+      this.composite();
+      this.frameComposited = false;
     } else {
       this.frameComposited = false;
     }
