@@ -26,6 +26,9 @@ export function formatFloatCpp(n, digits = 6) {
   if (!Number.isFinite(n)) {
     throw new Error(`formatFloatCpp: non-finite value ${n}`);
   }
+  if (Math.abs(n) >= 1e21) {
+    throw new Error(`formatFloatCpp: magnitude ${n} formats in exponential notation`);
+  }
   let s = n.toFixed(digits).replace(/(\.\d*?)0+$/, '$1');
   if (!s.includes('.')) s += '.0';
   else if (s.endsWith('.')) s += '0';
