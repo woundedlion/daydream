@@ -159,6 +159,12 @@ export class VideoRecorder {
 
     const mimeType = selectMimeType(this.format);
 
+    // An explicitly-chosen container with no supported codec means we fall back
+    // to the browser default below; warn so the format choice isn't silently ignored.
+    if (!mimeType && this.format !== 'auto') {
+      console.warn(`VideoRecorder: requested format "${this.format}" is unsupported; using the browser default.`);
+    }
+
     // Omit the mimeType key entirely when empty: some engines throw on an empty one.
     const options = { videoBitsPerSecond: this.bitrateMbps * 1_000_000 };
     if (mimeType) options.mimeType = mimeType;
