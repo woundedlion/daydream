@@ -1948,7 +1948,7 @@ params.forEach(p => {
 });
 ```
 
-`getParamValues()` is polled each frame to sync the GUI with parameter values that the animation system has changed autonomously. The sync skips any control the user is currently interacting with to avoid fighting the slider. A per-effect **Reset** rebuilds the GUI from defaults, and **Export** copies the current `{ name, value }` set as a C++-formatted initializer suitable for `Presets<…>` arrays.
+`getParamValues()` is polled each frame to sync the GUI with parameter values that the animation system has changed autonomously. The sync skips any control the user is currently interacting with to avoid fighting the slider. A per-effect **Reset** rebuilds the GUI from defaults, and **Export** copies the current editable parameter values as a C++ float brace-init list. Readonly (engine-written) params are skipped, so the result drops straight into a `Presets<…>` array **only** for effects whose `Params` is a flat all-float aggregate; effects that interleave non-float members (e.g. a `const char*` solid name or a `const Palette*`) export a bare float list that must be hand-edited to match the struct's layout.
 
 ### 10.7 Segmented POV Workers (`segment_worker.js`)
 
