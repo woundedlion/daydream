@@ -14,6 +14,7 @@ import { VideoRecorder } from "./recorder.js";
 import { SegmentController } from "./segment_controller.js";
 import { EngineHost } from "./engine_host.js";
 import { resolveParamSync } from "./param_sync.js";
+import { formatExportParams } from "./tools/export_params.js";
 
 // This UI layer degrades gracefully (log, keep last good state, return) on
 // failures from user/config-dependent engine calls; the lower layers trap.
@@ -272,11 +273,7 @@ function applyEffect(preserveParams = false) {
           setTimeout(() => exportCtrl.name('Export'), 1500);
           return;
         }
-        const items = [];
-        for (let i = 0; i < params.length; i++) {
-          items.push(values[i].toFixed(4) + 'f');
-        }
-        const cpp = '{ ' + items.join(', ') + ' }';
+        const cpp = formatExportParams(params, values);
         // navigator.clipboard is undefined on insecure/older contexts; bail through
         // the same flash so writeText access never throws synchronously.
         if (!navigator.clipboard) {
