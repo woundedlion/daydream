@@ -116,6 +116,9 @@ export function generateFuncAndRecipe(item) {
       nameParts.push(`_chamfer${pctSuffix(o.params.t)}`);
     } else if (opName === 'hankin') {
       requireFinite(opName, 'angle', o.params.angle);
+      if (o.params.angle < 0) {
+        throw new Error(`generateFuncAndRecipe: hankin angle ${o.params.angle} is negative; suffix must stay a valid C++ identifier`);
+      }
       chain += `.hankin(${formatFloat(o.params.angle)} * D2R)`;
       nameParts.push(`_hk${Math.round(o.params.angle)}`);
     } else if (opName === 'snub') {
