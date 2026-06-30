@@ -492,6 +492,11 @@ export class SegmentController {
     this.renderGen++;
     this.results.fill(null);
     this.pendingFrame = false;
+    // renderInFlight/pending are left intact: the outstanding old-generation
+    // render still owns the in-flight latch and releases it via frameResolve;
+    // tick() then dispatches the re-render at the new size. A render that never
+    // replies is bounded by renderParallel's watchdog, so a resize during a hung
+    // frame faults and recovers rather than wedging the pipeline.
     this.broadcast({ type: 'setResolution', w, h });
   }
 
