@@ -17,6 +17,9 @@
  * a mid-recording resolution change cannot change the encoded track dimensions.
  */
 
+// Chunk-delivery interval for MediaRecorder.start(); bounds encoder buffering.
+const RECORDER_TIMESLICE_MS = 1000;
+
 /**
  * Pick the best-supported MIME type for the requested output format. Codec
  * priority: MP4/H.264 > WebM/VP9 > WebM/VP8. Returns '' if nothing in the
@@ -27,9 +30,6 @@
  *   a MIME type is supported by MediaRecorder; injected to keep this function pure.
  * @returns {string} The best-supported MIME type, or '' if none of the candidates match.
  */
-// Chunk-delivery interval for MediaRecorder.start(); bounds encoder buffering.
-const RECORDER_TIMESLICE_MS = 1000;
-
 export function selectMimeType(
   format,
   isTypeSupported = (mt) => MediaRecorder.isTypeSupported(mt)) {

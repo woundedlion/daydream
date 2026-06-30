@@ -94,7 +94,6 @@ const makeUrlParamWriter = () => {
   // Symmetric with URLSync.dispose(): a discarded GUI must not leave the 200 ms
   // timer firing history.replaceState into a dead page.
   writer.cancel = () => { clearTimeout(urlTimer); urlTimer = null; pendingUrlWrites.clear(); };
-  writer.flush = () => { if (urlTimer !== null) { clearTimeout(urlTimer); urlTimer = null; commit(); } };
   return writer;
 };
 
@@ -231,6 +230,8 @@ class DeepLinkGUI {
           if (Number.isFinite(step) && step > 0) {
             const anchor = typeof min === 'number' ? min : 0;
             val = anchor + Math.round((val - anchor) / step) * step;
+            if (typeof min === 'number' && val < min) val = min;
+            if (typeof max === 'number' && val > max) val = max;
           }
           valClamped = val !== raw;
         }
