@@ -816,6 +816,14 @@ test('setEffect broadcasts the name plus the tuned param snapshot to every worke
   }
 });
 
+test('setEffect drops the outgoing effect param values so the rebuilt GUI is not bound by index', () => {
+  const c = readyController(2);
+  c.paramValues = [0.1, 0.2, 0.3];
+  c.setEffect('NewEffect');
+  assert.equal(c.getParamValues(), null,
+    'stale values are cleared until segment 0 reports the new effect first frame');
+});
+
 test('setParameter broadcasts the name/value to every worker', () => {
   const c = readyController(2);
   c.setParameter('Speed', 0.75);

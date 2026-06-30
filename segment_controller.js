@@ -452,6 +452,10 @@ export class SegmentController {
    * @param {string} name
    */
   setEffect(name) {
+    // Drop the outgoing effect's values so getParamValues() returns null until
+    // segment 0 reports the new effect's first frame; otherwise the synchronously
+    // rebuilt GUI would bind the new effect's sliders to stale values by index.
+    this.paramValues = null;
     this.broadcast({ type: 'setEffect', name, params: this.snapshotParams() });
   }
 
