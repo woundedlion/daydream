@@ -511,6 +511,39 @@ test('composite() faults atomically when a non-leading segment overflows', () =>
     'the good leading segment is not blitted when a later segment overflows');
 });
 
+test('composite() faults on an empty/inverted segment rect', () => {
+  Daydream.W = 4; Daydream.H = 2;
+  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+
+  const c = makeController();
+  c.showBoundaries = false;
+  const quad = new Uint16Array(2 * 2 * 3).fill(123);
+  c.results = [{ pixels: quad, x0: 2, x1: 2, y0: 0, y1: 2, quadW: 2, quadH: 2 }]; // x1 == x0
+
+  const blitted = c.composite();
+  assert.equal(blitted, 0, 'an empty/inverted rect blits nothing');
+  assert.equal(c.faulted, true, 'a zero-area rect latches a fault instead of masking corruption');
+  assert.match(c.faultInfo.message, /empty\/inverted/);
+  assert.ok(Daydream.pixels.every((v) => v === 0), 'nothing is blitted on an empty/inverted rect');
+});
+
+test('composite() faults on a pixel buffer whose length disagrees with its rect', () => {
+  Daydream.W = 4; Daydream.H = 2;
+  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+
+  const c = makeController();
+  c.showBoundaries = false;
+  // rect [0,0)-[2,2) expects 2 * 2 * 3 = 12 elements; supply 6.
+  const short = new Uint16Array(6).fill(123);
+  c.results = [{ pixels: short, x0: 0, x1: 2, y0: 0, y1: 2, quadW: 2, quadH: 2 }];
+
+  const blitted = c.composite();
+  assert.equal(blitted, 0, 'a length-mismatched buffer blits nothing');
+  assert.equal(c.faulted, true, 'a rect/buffer mismatch latches a fault instead of blitting a truncated row');
+  assert.match(c.faultInfo.message, /pixel buffer length/);
+  assert.ok(Daydream.pixels.every((v) => v === 0), 'nothing is blitted on a buffer-length mismatch');
+});
+
 test('composite() marks both the internal split and the x=0 wrap seam', () => {
   // On the wrapped cylinder a 2-arm split has two boundaries: the internal split
   // at x=2 and the wrap seam at x=0 where arm 1 meets arm 0.
