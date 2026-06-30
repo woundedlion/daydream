@@ -46,3 +46,8 @@ test('formatFloatCpp: zero renders as "0.0f"', () => {
 test('formatFloatCpp: negative small value keeps sign and magnitude', () => {
   assert.equal(formatFloatCpp(-1e-7), '-0.0000001f');
 });
+
+/** A value with more than the default 6 fractional digits rounds at the 6th. */
+test('formatFloatCpp: rounds to the default 6 fractional digits', () => {
+  assert.equal(formatFloatCpp(0.12345678), '0.123457f');
+});
