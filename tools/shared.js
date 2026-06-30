@@ -187,6 +187,9 @@ export function initScene(containerId, canvasId, opts = {}) {
     window.removeEventListener('resize', resize);
     controls.dispose();
     renderer.dispose();
+    sphere?.geometry.dispose();
+    sphere?.material.dispose();
+    scene.clear();
   };
 
   return { scene, camera, renderer, controls, sphere, lights: lightRig, resize, dispose };
