@@ -62,6 +62,7 @@ export class EffectSidebar {
     this.arrowRight.setAttribute('aria-hidden', 'true');
 
     this.listEl.addEventListener('scroll', this.onScrollBound, { passive: true });
+    this.scrollArrowsRaf = 0;
     this.resizeObs = new ResizeObserver(this.onScrollBound);
     this.resizeObs.observe(this.listEl);
 
@@ -79,6 +80,7 @@ export class EffectSidebar {
    * DOM subtree.
    */
   dispose() {
+    cancelAnimationFrame(this.scrollArrowsRaf);
     this.resizeObs?.disconnect();
     this.resizeObs = null;
     this.listEl.removeEventListener('keydown', this.onKeyDownBound);
@@ -130,7 +132,8 @@ export class EffectSidebar {
       this.buttons.get(this.activeName) || this.listEl.querySelector('.effect-button')
     );
     // Defer until the grid has laid out before measuring scroll extents.
-    requestAnimationFrame(() => this.updateScrollArrows());
+    cancelAnimationFrame(this.scrollArrowsRaf);
+    this.scrollArrowsRaf = requestAnimationFrame(() => this.updateScrollArrows());
   }
 
   /**
