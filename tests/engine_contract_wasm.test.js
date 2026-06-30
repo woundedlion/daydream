@@ -64,6 +64,14 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
   assert.ok(px instanceof Uint16Array, 'getPixels must return a Uint16Array');
   assert.equal(px.length, W * H * 3, 'getPixels length must be W*H*3');
 
+  // Segment 0 streams these post-frame; the worker does Array.from() on the view.
+  const paramValues = engine.getParamValues();
+  assert.equal(typeof paramValues.length, 'number',
+    'getParamValues must return an array-like value');
+  for (const v of paramValues) {
+    assert.equal(typeof v, 'number', 'getParamValues elements must be numbers');
+  }
+
   assert.equal(typeof engine.getRenderUs(), 'number', 'getRenderUs must return a number');
 
   const m = engine.getArenaMetrics();
