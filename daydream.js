@@ -557,8 +557,10 @@ createHolosphereModule().then(module => {
     clearInterval(testAllInterval);
     testAllInterval = null;
   }
-  testAllController.setValue(false);
-  testAllController.disable();
+  if (testAllController) {
+    testAllController.setValue(false);
+    testAllController.disable();
+  }
   const loadingOverlay = document.getElementById('loading-overlay');
   if (loadingOverlay) {
     loadingOverlay.classList.add('error');
