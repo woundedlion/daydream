@@ -541,7 +541,11 @@ createHolosphereModule().then(module => {
   const loadingOverlay = document.getElementById('loading-overlay');
   if (loadingOverlay) loadingOverlay.remove();
 
-  applyResolution(true);
+  try {
+    applyResolution(true);
+  } catch (err) {
+    console.error('Initial resolution/effect render failed:', err);
+  }
 }).catch(err => {
   console.error('Failed to load the Holosphere WASM engine:', err);
   // No engine: the Test All ticker would spin uselessly for the page lifetime.
