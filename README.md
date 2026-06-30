@@ -1232,7 +1232,7 @@ Arm A                               Arm B (x offset by W/2)
 └──────────────────────────┘        └──────────────────────────┘
 ```
 
-**Hardware ID detection**: Each Teensy reads a 2-bit ID from GPIO pins 21–22 (active-low with pull-ups).  All-floating = ID 0 (sync master).  The ID determines which arm and which half this board owns.
+**Hardware ID detection**: Each Teensy reads its segment ID from up to three GPIO straps — pin 21 (ID0), pin 22 (ID1), pin 23 (ID2), active-low with pull-ups.  The build reads `kIdStraps = log2(N)` of them and decodes the ID as `raw & (N-1)`, so a 4-segment build reads 2 straps (pins 21–22) while an 8-segment build adds pin 23 (ID2); the header permits any power-of-two `N ≤ 8`.  All-floating = ID 0 (sync master).  The ID determines which arm and which half this board owns.
 
 **Branchless ISR**: All per-segment decisions are resolved at boot time into three precomputed values:
 
@@ -1284,9 +1284,9 @@ x = ( x_boundary + (now − epoch) · (W/2) / cycles_per_half_rev )  mod W
 |---|---|---|---|---|
 | `SYNC` | pin 3 (GPIO out) | pin 3 (ext. interrupt in) | 3.3 V CMOS, active-high pulses, idle LOW | master → all |
 | `MASTER_EN` | pin 5 (drive LOW) | pin 5 (drive HIGH) | 3.3 V CMOS, gates the external sync-out buffer | per-board strap out |
-| `ID[1:0]` | pins 21–22 | pins 21–22 | active-low, internal pull-ups | strap (board identity) |
+| `ID` straps | pins 21–23 (ID0–ID2) | pins 21–23 (ID0–ID2) | active-low, internal pull-ups; `kIdStraps = log2(N)` read | strap (board identity) |
 
-`ID[1:0]` straps select the board: all-floating = `00` = master; the other three codes select arm/half.  `SYNC` is one shared pin 3 — the master drives it and downstream boards receive on its rising edge; `MASTER_EN` (pin 5) gates an external level shifter so only the master drives the shared bus.  The former column-clock wire is **deleted** and pin 4 is freed — `SYNC` is the only inter-board connection.  It is assumed physically reliable (a hard, soldered line); a severed wire is out of scope (boards free-run and precess apart at crystal rate, a slow smear, never an instant break).
+The ID straps select the board: the build reads `kIdStraps = log2(N)` of them (ID0/pin 21, ID1/pin 22, and — only for `N = 8` — ID2/pin 23), decoding `raw & (N-1)`.  For the 4-segment build, all-floating = `00` = master and the other three codes select arm/half.  `SYNC` is one shared pin 3 — the master drives it and downstream boards receive on its rising edge; `MASTER_EN` (pin 5) gates an external level shifter so only the master drives the shared bus.  The former column-clock wire is **deleted** and pin 4 is freed — `SYNC` is the only inter-board connection.  It is assumed physically reliable (a hard, soldered line); a severed wire is out of scope (boards free-run and precess apart at crystal rate, a slow smear, never an instant break).
 
 **Signal levels & symbol waveforms.** The wire idles LOW.  A **symbol** is a burst of short active-high pulses at a fixed pitch; **the meaning is the count of rising edges — pulse width carries no information.**  Each pulse is HIGH for one ISR body (pin set HIGH at ISR entry, LOW at exit; tens of µs) and the rising edge is the only timed event.  Pulses are drawn narrow, to scale against the ~868 µs pitch:
 
