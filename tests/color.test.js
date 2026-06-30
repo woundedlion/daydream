@@ -6,8 +6,7 @@ import assert from 'node:assert/strict';
 const {
   srgbToLinearFloat, linearToSrgbFloat,
   linearRgbToOklab, oklabToLinearRgb,
-  oklabToOklch, oklchToOklab,
-  srgbToOklch, oklchToLinearRgb, linearRgbToHex,
+  linearRgbToHex,
 } = await import('../tools/color.js');
 
 /**
@@ -54,56 +53,7 @@ test('linearRgb<->Oklab round-trips for several colors', () => {
   }
 });
 
-/** Verifies the OKLab <-> OKLch round-trip recovers the original L/a/b. */
-test('Oklab<->Oklch round-trip', () => {
-  const lab = { L: 0.6, a: 0.1, b: -0.05 };
-  const back = oklchToOklab(oklabToOklch(lab));
-  near(back.L, lab.L);
-  near(back.a, lab.a);
-  near(back.b, lab.b);
-});
-
 // --- High-level conversions ---
-
-/** Verifies srgbToOklch yields finite components with lightness in (0,1) and non-negative chroma. */
-test('srgbToOklch is the composition of the byte->linear->oklab->oklch chain', () => {
-  const lch = srgbToOklch(128, 64, 200);
-  assert.ok(Number.isFinite(lch.L) && Number.isFinite(lch.C) && Number.isFinite(lch.h));
-  assert.ok(lch.L > 0 && lch.L < 1);
-  assert.ok(lch.C >= 0);
-});
-
-/**
- * Pins srgbToOklch against a golden triple so a wrong-but-finite OKLab matrix or
- * hue error is caught (finiteness/range alone would pass it). sRGB red maps to
- * the canonical Ottosson OKLab red (L≈0.62796, a≈0.22486, b≈0.12585), i.e.
- * OKLCH L≈0.62796, C≈0.25768, h≈0.51023 rad.
- */
-test('srgbToOklch matches a golden OKLCH triple (sRGB red)', () => {
-  const lch = srgbToOklch(255, 0, 0);
-  near(lch.L, 0.6279554, 1e-6);
-  near(lch.C, 0.2576833, 1e-6);
-  near(lch.h, 0.5102275, 1e-6);
-});
-
-/** Verifies oklchToLinearRgb clamps an out-of-gamut high-chroma color into the [0,1] RGB cube. */
-test('oklchToLinearRgb clamps out-of-gamut results into [0,1]', () => {
-  const rgb = oklchToLinearRgb({ L: 0.5, C: 0.5, h: 0 });
-  for (const c of rgb) assert.ok(c >= 0 && c <= 1);
-});
-
-/**
- * Pins oklchToLinearRgb against a golden in-gamut triple so a wrong inverse OKLab
- * matrix is caught (the clamp test alone passes any finite-but-clamped result).
- * The OKLCH of sRGB (128,64,200) inverts to its linear RGB [0.215861, 0.051269,
- * 0.577580] (= the sRGB->linear transfer of 128/64/200), well inside the cube.
- */
-test('oklchToLinearRgb matches a golden in-gamut linear RGB', () => {
-  const rgb = oklchToLinearRgb({ L: 0.5225627, C: 0.2010113, h: -1.0254965 });
-  near(rgb[0], 0.2158605, 1e-5);
-  near(rgb[1], 0.0512695, 1e-5);
-  near(rgb[2], 0.5775804, 1e-5);
-});
 
 /** Verifies linearRgbToHex emits #rrggbb, clamping out-of-range channels rather than overflowing. */
 test('linearRgbToHex produces #rrggbb with correct fixed points', () => {

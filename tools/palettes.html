@@ -372,8 +372,7 @@
     // instead of a hand-ported JS reimplementation that can silently drift.
     import createHolosphereModule from '../holosphere_wasm.js';
     import {
-      srgbToLinearFloat, linearToSrgbFloat, srgbToOklch,
-      oklchToLinearRgb, linearRgbToHex,
+      srgbToLinearFloat, linearToSrgbFloat, linearRgbToHex,
     } from './color.js';
     // Pure palette math (ProceduralPalette/GenerativePalette + helpers and the
     // C++ export-string generators) lives in palette_math.js so it can be unit
