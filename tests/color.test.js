@@ -7,7 +7,7 @@ const {
   srgbToLinearFloat, linearToSrgbFloat,
   linearRgbToOklab, oklabToLinearRgb,
   oklabToOklch, oklchToOklab,
-  srgbToOklch, lerpOklch, oklchToLinearRgb, linearRgbToHex,
+  srgbToOklch, oklchToLinearRgb, linearRgbToHex,
 } = await import('../tools/color.js');
 
 /**
@@ -84,35 +84,6 @@ test('srgbToOklch matches a golden OKLCH triple (sRGB red)', () => {
   near(lch.L, 0.6279554, 1e-6);
   near(lch.C, 0.2576833, 1e-6);
   near(lch.h, 0.5102275, 1e-6);
-});
-
-/** Verifies lerpOklch returns the endpoints at t=0/1 and the linear midpoint of L/C/h at t=0.5. */
-test('lerpOklch endpoints and shortest-hue-arc midpoint', () => {
-  const a = { L: 0.3, C: 0.1, h: 0.2 };
-  const b = { L: 0.7, C: 0.2, h: 1.0 };
-  const at0 = lerpOklch(a, b, 0);
-  const at1 = lerpOklch(a, b, 1);
-  near(at0.L, a.L); near(at0.C, a.C); near(at0.h, a.h);
-  near(at1.L, b.L); near(at1.C, b.C);
-  const mid = lerpOklch(a, b, 0.5);
-  near(mid.L, 0.5); near(mid.C, 0.15); near(mid.h, 0.6);
-});
-
-/** Verifies lerpOklch interpolates hue along the short arc across the +/-pi seam, not the long way. */
-test('lerpOklch wraps the hue across the +/-pi seam by the short arc', () => {
-  const a = { L: 0.5, C: 0.2, h: Math.PI - 0.1 };
-  const b = { L: 0.5, C: 0.2, h: -Math.PI + 0.1 };
-  const mid = lerpOklch(a, b, 0.5);
-  assert.ok(Math.abs(Math.abs(mid.h) - Math.PI) < 0.15,
-    `hue ${mid.h} should sit near the seam, not interpolate the long way`);
-});
-
-/** Verifies lerpOklch treats near-zero-chroma endpoints as hueless, adopting the chromatic end's hue. */
-test('lerpOklch treats near-zero chroma endpoints as hueless', () => {
-  const gray = { L: 0.5, C: 0, h: 0 };
-  const blue = { L: 0.5, C: 0.2, h: 1.23 };
-  assert.equal(lerpOklch(gray, gray, 0.5).h, 0);
-  near(lerpOklch(gray, blue, 0.5).h, blue.h);
 });
 
 /** Verifies oklchToLinearRgb clamps an out-of-gamut high-chroma color into the [0,1] RGB cube. */

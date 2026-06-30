@@ -103,31 +103,6 @@ export function srgbToOklch(r, g, b) {
 }
 
 /**
- * Interpolates between two OKLCH colors, taking the shortest hue arc and treating
- * near-achromatic endpoints (chroma below 1e-4) as having no meaningful hue.
- * @param {{L:number, C:number, h:number}} a - Start OKLCH color (hue h in radians).
- * @param {{L:number, C:number, h:number}} b - End OKLCH color (hue h in radians).
- * @param {number} t - Interpolation factor in [0, 1] (0 yields a, 1 yields b).
- * @returns {{L:number, C:number, h:number}} The interpolated OKLCH color.
- */
-export function lerpOklch(a, b, t) {
-  let h;
-  if (a.C < 1e-4 && b.C < 1e-4) {
-    h = 0;
-  } else if (a.C < 1e-4) {
-    h = b.h;
-  } else if (b.C < 1e-4) {
-    h = a.h;
-  } else {
-    let dh = b.h - a.h;
-    if (dh > Math.PI) dh -= 2 * Math.PI;
-    if (dh < -Math.PI) dh += 2 * Math.PI;
-    h = a.h + dh * t;
-  }
-  return { L: a.L + (b.L - a.L) * t, C: a.C + (b.C - a.C) * t, h };
-}
-
-/**
  * Converts an OKLCH color to linear RGB, clamping each channel into [0, 1].
  * @param {{L:number, C:number, h:number}} lch - The OKLCH color (lightness L, chroma C, hue h in radians).
  * @returns {Array<number>} The clamped linear RGB color as [r, g, b], each in [0, 1].

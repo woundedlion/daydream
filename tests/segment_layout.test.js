@@ -1,7 +1,7 @@
 // @ts-check
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeSegmentRange } from '../segment_layout.js';
+import { computeSegmentRange, extractSegment, compositeSegment } from '../segment_layout.js';
 
 // The exactly-once tiling invariant holds for even widths only: the symmetric
 // floor(w/2) arm split drops an odd width's trailing column (see the odd-width
@@ -79,4 +79,35 @@ test('an out-of-range segment id fails fast instead of going off-canvas', () => 
   assert.throws(() => computeSegmentRange(4, 4, 288, 144), /segment id must be/);
   assert.throws(() => computeSegmentRange(-1, 4, 288, 144), /segment id must be/);
   assert.throws(() => computeSegmentRange(1.5, 4, 288, 144), /segment id must be/);
+});
+
+test('extract then composite round-trips a non-trivial rect through the shared blit', () => {
+  const canvasW = 8, canvasH = 6;
+  const src = new Uint16Array(canvasW * canvasH * 3);
+  for (let i = 0; i < src.length; i++) src[i] = i + 1; // distinct nonzero values
+  const rect = { x0: 2, x1: 6, y0: 1, y1: 5 }; // 4x4, offset on both axes
+  const qw = rect.x1 - rect.x0, qh = rect.y1 - rect.y0;
+
+  const compact = new Uint16Array(qw * qh * 3);
+  extractSegment(src, compact, canvasW, rect);
+  for (let y = 0; y < qh; y++)
+    for (let x = 0; x < qw; x++)
+      for (let c = 0; c < 3; c++) {
+        const ci = (y * qw + x) * 3 + c;
+        const si = ((y + rect.y0) * canvasW + (x + rect.x0)) * 3 + c;
+        assert.equal(compact[ci], src[si], `compact (${x},${y}) ch${c}`);
+      }
+
+  // gather=false path: composite the compact buffer back into a fresh canvas;
+  // the rect must land at its source offset and nothing outside it is touched.
+  const dst = new Uint16Array(canvasW * canvasH * 3);
+  compositeSegment(dst, compact, canvasW, rect);
+  for (let y = 0; y < canvasH; y++)
+    for (let x = 0; x < canvasW; x++) {
+      const inside = x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1;
+      for (let c = 0; c < 3; c++) {
+        const di = (y * canvasW + x) * 3 + c;
+        assert.equal(dst[di], inside ? src[di] : 0, `dst (${x},${y}) ch${c}`);
+      }
+    }
 });
