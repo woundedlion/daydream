@@ -851,6 +851,14 @@ test('setEffect drops the outgoing effect param values so the rebuilt GUI is not
     'stale values are cleared until segment 0 reports the new effect first frame');
 });
 
+test('setEffect bumps renderGen so an in-flight old-effect frame is fenced out', () => {
+  const c = readyController(2);
+  const before = c.renderGen;
+  c.setEffect('NewEffect');
+  assert.equal(c.renderGen, before + 1,
+    'a stale in-flight frame now fails inflightGen === renderGen');
+});
+
 test('setParameter broadcasts the name/value to every worker', () => {
   const c = readyController(2);
   c.setParameter('Speed', 0.75);
