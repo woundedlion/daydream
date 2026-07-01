@@ -865,6 +865,9 @@ export class Daydream {
 
     this.controls?.dispose();
     this.labelRenderer?.domElement?.remove();
+    // Stop the rAF callback before disposal so it never fires into the nulled
+    // dotMesh / disposed renderer on a real page discard.
+    this.renderer?.setAnimationLoop(null);
     this.renderer?.dispose();
   }
 }
