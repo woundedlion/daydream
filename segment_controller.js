@@ -36,6 +36,12 @@ const BOOT_WATCHDOG_MS = 4000;
 // above any legitimate frame (SLOW_FRAME_MS is the per-frame slow threshold).
 const RENDER_WATCHDOG_MS = 8 * SLOW_FRAME_MS;
 
+// Sentinel segIds for pool-wide faults with no single worker to blame: FAULT_POOL
+// for a module-load/init timeout, FAULT_RENDER for a render-watchdog timeout. The
+// overlay headline distinguishes them.
+const FAULT_POOL = -1;
+const FAULT_RENDER = -2;
+
 /** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
 /** @typedef {import('./worker_protocol.js').ControllerInboundMsg} ControllerInboundMsg */
 /** @typedef {import('./worker_protocol.js').SegArenaMetrics} SegArenaMetrics */
@@ -301,7 +307,7 @@ export class SegmentController {
       this.bootWatchdog = null;
       if (!this.ready && !this.faulted) {
         const stuck = missing(booted);
-        this.onWorkerFault(stuck.length === 1 ? stuck[0] : -1,
+        this.onWorkerFault(stuck.length === 1 ? stuck[0] : FAULT_POOL,
           `worker module load timed out after ${BOOT_WATCHDOG_MS} ms `
           + `(${bootedCount}/${numSegments} booted; never booted: `
           + `${stuck.join(', ')}) — a worker module likely `
@@ -315,7 +321,7 @@ export class SegmentController {
       this.initWatchdog = null;
       if (!this.ready && !this.faulted) {
         const stuck = missing(readied);
-        this.onWorkerFault(stuck.length === 1 ? stuck[0] : -1,
+        this.onWorkerFault(stuck.length === 1 ? stuck[0] : FAULT_POOL,
           `worker init timed out after ${INIT_WATCHDOG_MS} ms `
           + `(${readyCount}/${numSegments} ready; never ready: ${stuck.join(', ')}) `
           + `— a WASM module likely failed to load without throwing`);
@@ -528,7 +534,7 @@ export class SegmentController {
       this.renderWatchdog = setTimeout(() => {
         this.renderWatchdog = null;
         if (this.pending > 0 && !this.faulted) {
-          this.onWorkerFault(-1,
+          this.onWorkerFault(FAULT_RENDER,
             `render timed out after ${RENDER_WATCHDOG_MS} ms `
             + `(${this.workers.length - this.pending}/${this.workers.length} `
             + `segments responded) — a worker accepted 'render' but never replied`);
@@ -686,8 +692,12 @@ export class SegmentController {
       // and must never be parsed as markup.
       const box = this.doc.createElement('div');
       box.style.cssText = 'color:#ff5252;padding:6px;font-size:0.85em';
-      // segId < 0 is a pool-wide fault (e.g. the init watchdog), not one worker.
-      const who = !f ? 'worker ?' : (f.segId < 0 ? 'pool init' : `worker ${f.segId}`);
+      // segId < 0 is a pool-wide fault, not one worker; FAULT_RENDER is a render
+      // timeout, other negatives are pool init/module load.
+      const who = !f ? 'worker ?'
+        : f.segId === FAULT_RENDER ? 'render timeout'
+        : f.segId < 0 ? 'pool init'
+        : `worker ${f.segId}`;
       box.append(`⚠ Segment ${who} faulted — segmented render halted.`);
       box.appendChild(this.doc.createElement('br'));
       const msg = this.doc.createElement('span');

@@ -378,7 +378,8 @@ test('the render watchdog faults when a worker accepts render but never replies'
     assert.equal(c.faulted, true);
     assert.match(c.faultInfo.message, /render timed out/);
     assert.match(c.faultInfo.message, /1\/2 segments responded/);
-    assert.equal(c.faultInfo.segId, -1, 'pool-wide fault');
+    assert.equal(c.faultInfo.segId, -2,
+      'render-timeout sentinel, distinct from the pool-init -1');
     assert.equal(c.pending, 0, 'fault settles pending so the loop cannot deadlock');
     assert.equal(c.renderWatchdog, null);
     await done; // onWorkerFault resolved the in-flight frame
