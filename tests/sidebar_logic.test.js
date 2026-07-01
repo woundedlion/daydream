@@ -52,6 +52,13 @@ test('navTargetIndex returns -1 for non-navigation keys and empty lists', () => 
   assert.equal(navTargetIndex(0, 0, 'ArrowDown'), -1);  // empty list
 });
 
+test('navTargetIndex jumps to the first/last option for Home/End', () => {
+  assert.equal(navTargetIndex(2, 5, 'Home'), 0);
+  assert.equal(navTargetIndex(2, 5, 'End'), 4);
+  assert.equal(navTargetIndex(0, 0, 'Home'), -1);  // empty list
+  assert.equal(navTargetIndex(0, 0, 'End'), -1);
+});
+
 const RESO_EFFECTS = ['Voronoi', 'Comets', 'MobiusGrid'];
 
 test('resolveActiveEffect keeps an effect the resolution offers', () => {
