@@ -246,6 +246,7 @@ export class Daydream {
     this.mainViewport = { x: 0, y: 0, width: 1, height: 1 };
     this.pipViewport = { x: 0, y: 0, width: 0.25, height: 0.25 };
     this.isMobile = false;
+    this.canvasFitted = false;
     this.setCanvasSize();
 
     this.resizeObserver = new ResizeObserver(() => {
@@ -364,13 +365,18 @@ export class Daydream {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
 
-    const diameter = Daydream.SPHERE_RADIUS * 2;
-    const targetCoverage = 0.85;
-    const fovRad = THREE.MathUtils.degToRad(Daydream.CAMERA_FOV / 2);
-    const distForHeight = diameter / (2 * Math.tan(fovRad) * targetCoverage);
-    const distForWidth = distForHeight / this.camera.aspect;
+    // Fit the orbit radius to the sphere on the first sizing only; later resizes
+    // (DPR change, sidebar toggle, devtools) preserve the user's zoom.
     // setLength rescales only the orbit radius, leaving azimuth/polar intact.
-    this.camera.position.setLength(Math.max(distForHeight, distForWidth));
+    if (!this.canvasFitted) {
+      const diameter = Daydream.SPHERE_RADIUS * 2;
+      const targetCoverage = 0.85;
+      const fovRad = THREE.MathUtils.degToRad(Daydream.CAMERA_FOV / 2);
+      const distForHeight = diameter / (2 * Math.tan(fovRad) * targetCoverage);
+      const distForWidth = distForHeight / this.camera.aspect;
+      this.camera.position.setLength(Math.max(distForHeight, distForWidth));
+      this.canvasFitted = true;
+    }
 
     // Re-apply on resize so moving to a different-DPR monitor refreshes the ratio.
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
