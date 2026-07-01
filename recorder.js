@@ -410,7 +410,13 @@ export class VideoRecorder {
               console.error('VideoRecorder: streaming write failed mid-session; the saved file is truncated to the data written before the failure.');
               return;
             }
-            await writable.close();
+            // Streaming succeeded; a close() failure can still leave the file
+            // unflushed/truncated, so report it rather than claiming success.
+            try {
+              await writable.close();
+            } catch (err) {
+              console.error('VideoRecorder: finalizing the streamed file failed; it may be truncated or incomplete.', err);
+            }
           })
           .catch((err) => {
             console.warn('VideoRecorder: streaming save failed', err);
