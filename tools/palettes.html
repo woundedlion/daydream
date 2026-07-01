@@ -367,6 +367,9 @@
     // clipboard copy (tools/clipboard.js) and the OKLab/OKLCH/sRGB color math
     // (tools/color.js, which mirrors the engine's core/color.h pipeline).
     import { copyWithFeedback, COPY_FEEDBACK } from './clipboard.js';
+    // Fatal-error banner from the THREE-free banner module (not shared.js, which
+    // pulls in three.js — a dependency this tool otherwise doesn't have).
+    import { showFatalError } from './banner.js';
     // The engine module exports the real GenerativePalette color math via the
     // PaletteOps embind class, so the tool previews the device's exact colors
     // instead of a hand-ported JS reimplementation that can silently drift.
@@ -381,23 +384,6 @@
       ProceduralPalette, CPixel, PRNG, hsvToRgb, GenerativePalette,
       mapValue, proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
     } from './palette_math.js';
-
-    // Minimal fatal-error banner. Inlined rather than imported from shared.js,
-    // which pulls in three.js — a dependency this tool otherwise doesn't have
-    // (and has no import map for, so importing it breaks the page).
-    function showFatalError(message) {
-      const existing = document.getElementById('fatal-error-overlay');
-      const el = existing || document.createElement('div');
-      el.id = 'fatal-error-overlay';
-      el.textContent = `⚠ ${message}`; // textContent, not innerHTML — no injection
-      Object.assign(el.style, {
-        position: 'fixed', top: '0', left: '0', right: '0', zIndex: '9999',
-        padding: '12px 16px', background: '#7f1d1d', color: '#fff',
-        font: '14px/1.4 system-ui, sans-serif', textAlign: 'center',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
-      });
-      if (!existing && document.body) document.body.appendChild(el);
-    }
 
     // --- Palette Class and Data Structure ---
 
