@@ -214,6 +214,20 @@ test('render faults on a pixel buffer of the wrong length', async () => {
   assert.throws(() => captured[0](), /pixel buffer length/);
 });
 
+/** A protocol-drift message type fails fast (rethrown to onerror) instead of being silently dropped. */
+test('an unknown message type faults instead of being silently dropped', async () => {
+  const captured = [];
+  const realSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (fn) => { captured.push(fn); return 0; };
+  try {
+    await dispatch({ type: 'bogusProtocolDrift' });
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+  assert.equal(captured.length, 1, 'one rethrow task scheduled');
+  assert.throws(() => captured[0](), /unknown message type/);
+});
+
 /** Segment 0 mirrors its post-frame param values; other segments send null. */
 test('render streams param values from segment 0 only', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });

@@ -217,7 +217,10 @@ async function handleMessage(msg) {
     }
 
     default:
-      console.warn('segment_worker: unknown message type', msg.type);
+      // Fail fast on protocol drift: a state-changing message dropped here would
+      // leave the worker rendering stale under the current generation, invisible
+      // to the fence. Throwing reaches onerror -> the controller faults.
+      throw new Error(`segment_worker: unknown message type ${msg.type}`);
   }
 }
 
