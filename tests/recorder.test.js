@@ -517,3 +517,42 @@ test('the timed fallback primes the offscreen with one blit before start', () =>
     restore();
   }
 });
+
+/**
+ * Save picker cancelled after chunks are already flowing: with the File System
+ * Access API present but the picker rejected, every chunk (including ones that
+ * arrived before the rejection settled) falls back to the in-memory buffer and
+ * the whole blob is downloaded at stop — nothing is lost.
+ */
+test('a cancelled save picker buffers every chunk and downloads the whole blob', async () => {
+  const restore = installRecorderEnv();
+  const abort = new Error('user cancelled');
+  abort.name = 'AbortError';
+  globalThis.showSaveFilePicker = async () => { throw abort; };
+  const prevWarn = console.warn;
+  console.warn = () => {};
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    const downloads = [];
+    rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
+
+    rec.start('cancelled');
+    const recorder = rec.mediaRecorder;
+    // Chunks arrive before the picker's rejection has settled the open promise.
+    recorder.ondataavailable({ data: { size: 10 } });
+    recorder.ondataavailable({ data: { size: 20 } });
+    recorder.ondataavailable({ data: { size: 30 } });
+    rec.stop();
+    recorder.onstop();
+
+    await new Promise((r) => setTimeout(r));
+
+    assert.equal(downloads.length, 1, 'one blob download after the picker was cancelled');
+    assert.equal(downloads[0].name, 'cancelled');
+    assert.deepEqual(downloads[0].chunks, [{ size: 10 }, { size: 20 }, { size: 30 }],
+      'every buffered chunk is in the fallback blob, in order');
+  } finally {
+    console.warn = prevWarn;
+    restore();
+  }
+});
