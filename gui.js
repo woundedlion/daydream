@@ -62,7 +62,10 @@ const makeUrlParamWriter = () => {
     }
     pendingUrlWrites.clear();
     const qs = params.toString();
-    window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+    // Preserve any location.hash; rebuilding from pathname alone would drop it
+    // (mirrors URLSync.flush/reset in state.js).
+    const base = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState({}, '', base + window.location.hash);
   };
   const writer = (key, value) => {
     const sync = getActiveURLSync();
