@@ -408,7 +408,7 @@ export class Daydream {
     const advanced =
       (clockReady || this.stepFrames !== 0) && this.stepSimulation(effect);
 
-    // Must run every frame for damping/auto-rotate; emits 'change' (→ needsRender).
+    // Services live pointer interaction; emits 'change' (→ needsRender).
     this.controls.update();
 
     if (!advanced && !this.needsRender) return;
