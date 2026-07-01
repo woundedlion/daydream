@@ -157,6 +157,11 @@ export class VideoRecorder {
       return;
     }
 
+    // A track without requestFrame is the timed-fallback stream: it samples the
+    // offscreen on the wall clock from recorder.start(), so the offscreen must
+    // already hold a frame or the leading interval encodes a blank canvas.
+    const timedFallback = typeof track.requestFrame !== 'function';
+
     const mimeType = selectMimeType(this.format);
 
     // An explicitly-chosen container with no supported codec means we fall back
@@ -202,6 +207,8 @@ export class VideoRecorder {
       if (this.mediaRecorder === recorder) this.cleanup();
     };
 
+    if (timedFallback) this.blitToOffscreen();
+
     // Timeslice so ondataavailable delivers chunks incrementally; without it the
     // encoder buffers the whole recording in memory until stop().
     recorder.start(RECORDER_TIMESLICE_MS);
@@ -226,32 +233,36 @@ export class VideoRecorder {
    */
   captureFrame() {
     if (!this.isRecording || !this.track) return;
-
-    // Skip the blit at a transient 0x0 source (mid-resize): drawImage from a
-    // zero-sized source throws. The offscreen keeps its prior good frame.
-    if (this.offscreen && this.offCtx &&
-        this.canvas.width > 0 && this.canvas.height > 0) {
-      // Letterbox/pillarbox the source into the pinned offscreen.
-      const offW = this.offscreen.width, offH = this.offscreen.height;
-      const srcAspect = this.canvas.width / this.canvas.height;
-      const offAspect = offW / offH;
-      let destW, destH;
-      if (srcAspect > offAspect) {
-        destW = offW;
-        destH = Math.round(offW / srcAspect);
-      } else {
-        destH = offH;
-        destW = Math.round(offH * srcAspect);
-      }
-      const destX = Math.round((offW - destW) / 2);
-      const destY = Math.round((offH - destH) / 2);
-      this.offCtx.clearRect(0, 0, offW, offH);
-      this.offCtx.drawImage(this.canvas, destX, destY, destW, destH);
-    }
-
+    this.blitToOffscreen();
     // Timed-fallback tracks have no requestFrame; the stream samples on its own.
     if (typeof this.track.requestFrame === 'function') this.track.requestFrame();
     this.elapsedSeconds += this.frameInterval;
+  }
+
+  /**
+   * Letterbox/pillarbox-blits the source canvas into the pinned offscreen. No-op
+   * at a transient 0x0 source (mid-resize): drawImage from a zero-sized source
+   * throws, so the offscreen keeps its prior good frame.
+   * @returns {void}
+   */
+  blitToOffscreen() {
+    if (!this.offscreen || !this.offCtx ||
+        this.canvas.width <= 0 || this.canvas.height <= 0) return;
+    const offW = this.offscreen.width, offH = this.offscreen.height;
+    const srcAspect = this.canvas.width / this.canvas.height;
+    const offAspect = offW / offH;
+    let destW, destH;
+    if (srcAspect > offAspect) {
+      destW = offW;
+      destH = Math.round(offW / srcAspect);
+    } else {
+      destH = offH;
+      destW = Math.round(offH * srcAspect);
+    }
+    const destX = Math.round((offW - destW) / 2);
+    const destY = Math.round((offH - destH) / 2);
+    this.offCtx.clearRect(0, 0, offW, offH);
+    this.offCtx.drawImage(this.canvas, destX, destY, destW, destH);
   }
 
   /**
