@@ -195,7 +195,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 │   ├── generators.h            Universal generate() wrapper for procedural geometry
 │   ├── presets.h               Generic Presets<Params, Size> template
 │   ├── styles.h                Feedback::Style named presets + space/color transform functions
-│   ├── util.h                  wrap(), fast_wrap(), shortest/fwd_distance, apply_if_changed
+│   ├── util.h                  wrap(), fast_wrap(), shortest_distance, apply_if_changed
 │   ├── reaction_graph.h/.cpp   Precomputed Fibonacci-lattice K-NN graph (90 KiB / 92,160-byte table)
 │   ├── FastNoiseLite.h         Third-party: single-header noise library
 │   └── FastNoiseLite_config.h  FastNoiseLite build configuration
@@ -243,7 +243,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 ├── daydream.js                 App entry: WASM loader, state wiring, GUI/sidebar
 ├── driver.js                   Three.js scene: sphere mesh, dots, OrbitControls,
 │                                  axes overlay, picture-in-picture camera, resize
-├── geometry.js                 Sphere-pixel position math (pixelToVector, etc.)
+├── geometry.js                 Sphere-pixel position math (pixelToSpherical, etc.)
 ├── state.js                    AppState (pub/sub) + URLSync (query-string mirror)
 ├── gui.js                      lil-gui wrapper used by the main page and tools
 ├── sidebar.js                  Effect list + sort + keyboard navigation
@@ -1903,7 +1903,7 @@ The `Daydream` class owns the entire render side. Features:
 
 | Feature | Details |
 |---|---|
-| **Instanced dot mesh** | One `InstancedMesh` of `W × H` small spheres. Per-instance position is precomputed in `setupDots()` from `pixelToVector(x, y)`; per-instance color is updated each frame from the WASM pixel buffer. Single draw call per frame. |
+| **Instanced dot mesh** | One `InstancedMesh` of `W × H` small spheres. Per-instance position is precomputed in `setupDots()` from `pixelToSpherical(x, y)` (a `THREE.Spherical`, applied via `setFromSpherical`); per-instance color is updated each frame from the WASM pixel buffer. Single draw call per frame. |
 | **Linear color pipeline** | `THREE.ColorManagement.enabled = true` and `setPixelRatio(min(devicePixelRatio, 1))`. Colors arriving from WASM are already linear, so no extra conversion. |
 | **OrbitControls camera** | A normal `PerspectiveCamera` at `(0, 0, 220)` with FOV 20°, plus `OrbitControls` for mouse/touch navigation. |
 | **Picture-in-picture** | A clone of the main camera at a fixed orientation renders to a 30%-sized bottom-right viewport so the front and back of the sphere are visible simultaneously. Suppressed when `isMobile` or `navigator.webdriver` (§ headless capture). |
