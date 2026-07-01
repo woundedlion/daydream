@@ -353,7 +353,8 @@ export const resetGUI = (excludedKeys = []) => {
     }
   }
   const qs = params.toString();
-  window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+  const base = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+  window.history.replaceState({}, '', base + window.location.hash);
 };
 
 export { DeepLinkGUI as GUI };
