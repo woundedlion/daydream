@@ -23,29 +23,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // Re-exported from their dependency-free modules for scene-based pages.
 export { copyToClipboard, copyWithFeedback, COPY_FEEDBACK } from './clipboard.js';
 export { formatFloatCpp } from './cpp_format.js';
-
-/**
- * Render a visible error banner across the top of the page. Tool pages that
- * boot a WASM engine call this from their bootstrap catch so a missing or
- * failed-to-load artifact surfaces to the user, instead of leaving a blank
- * canvas with only a console line (mirrors the segmented view's fault overlay).
- * Idempotent — repeated calls update the single banner.
- *
- * @param {string} message - Human-readable failure description.
- */
-export function showFatalError(message) {
-  const existing = document.getElementById('fatal-error-overlay');
-  const el = existing || document.createElement('div');
-  el.id = 'fatal-error-overlay';
-  el.textContent = `⚠ ${message}`;
-  Object.assign(el.style, {
-    position: 'fixed', top: '0', left: '0', right: '0', zIndex: '9999',
-    padding: '12px 16px', background: '#7f1d1d', color: '#fff',
-    font: '14px/1.4 system-ui, sans-serif', textAlign: 'center',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
-  });
-  if (!existing && document.body) document.body.appendChild(el);
-}
+export { showFatalError } from './banner.js';
 
 /**
  * Build a ready-to-run Three.js scene (renderer, perspective camera,
