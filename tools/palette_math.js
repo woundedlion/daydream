@@ -247,10 +247,10 @@ export class GenerativePalette {
       case "ASCENDING":
         v1 = this.prng.nextInt(25, 76);
         v2 = this.prng.nextInt(127, 178);
-        v3 = this.prng.nextInt(204, 255);
+        v3 = this.prng.nextInt(204, 256);
         break;
       case "DESCENDING":
-        v1 = this.prng.nextInt(204, 255);
+        v1 = this.prng.nextInt(204, 256);
         v2 = this.prng.nextInt(127, 178);
         v3 = this.prng.nextInt(25, 76);
         break;
@@ -259,11 +259,11 @@ export class GenerativePalette {
         break;
       case "BELL":
         v1 = this.prng.nextInt(51, 127);
-        v2 = this.prng.nextInt(178, 255);
+        v2 = this.prng.nextInt(178, 256);
         v3 = v1;
         break;
       case "CUP":
-        v1 = this.prng.nextInt(178, 255);
+        v1 = this.prng.nextInt(178, 256);
         v2 = this.prng.nextInt(51, 127);
         v3 = v1;
         break;
