@@ -27,8 +27,10 @@ import { compositeSegment } from "./segment_layout.js";
 // of freezing black.
 const INIT_WATCHDOG_MS = 20000;
 
-// Deadline for the per-worker 'booted' ping (fetch+evaluate, not WASM instantiate).
-const BOOT_WATCHDOG_MS = 4000;
+// Deadline for the per-worker 'booted' ping (fetch+evaluate, not WASM
+// instantiate). Sized for a cold-cache/throttled module+glue fetch; a slow WASM
+// instantiate is separately bounded by INIT_WATCHDOG_MS.
+const BOOT_WATCHDOG_MS = 10000;
 
 // Deadline for a dispatched parallel render to report every 'frame'. A worker that
 // accepts 'render' but hangs without throwing fires no onerror and never settles
