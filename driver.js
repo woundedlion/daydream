@@ -181,6 +181,10 @@ export class Daydream {
     this.pipCamera = this.camera.clone();
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    // Keep the sphere between the near and far planes: closest zoom leaves the
+    // front surface outside CAMERA_NEAR, farthest keeps the back inside CAMERA_FAR.
+    this.controls.minDistance = Daydream.CAMERA_NEAR + Daydream.SPHERE_RADIUS;
+    this.controls.maxDistance = Daydream.CAMERA_FAR - Daydream.SPHERE_RADIUS;
     this.camera.position.set(
       Daydream.CAMERA_X,
       Daydream.CAMERA_Y,
