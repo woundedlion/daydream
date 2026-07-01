@@ -465,6 +465,11 @@ export class SegmentController {
     // Bump the fence so an in-flight old-effect frame fails inflightGen ===
     // renderGen and can't republish its stale-ordered paramValues.
     this.renderGen++;
+    // Drop settled/pending old-effect results too; otherwise a completed
+    // old-effect frame composites once or re-blits via the overrun branch,
+    // flashing the outgoing effect on switch.
+    this.results.fill(null);
+    this.pendingFrame = false;
     this.broadcast({ type: 'setEffect', name, params: this.snapshotParams() });
   }
 
