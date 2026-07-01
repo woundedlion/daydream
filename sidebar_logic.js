@@ -71,8 +71,9 @@ export function resolveActiveEffect(availableEffects, currentEffect) {
 /**
  * Decide which horizontal scroll arrows should be visible. When the content
  * fits (no overflow) neither arrow shows; otherwise the left arrow shows once
- * scrolled past a 4px deadzone from the start, and the right arrow shows until
- * within 4px of the end.
+ * scrolled past a deadzone from the start, and the right arrow shows until within
+ * the deadzone of the end. The deadzone is 4px but never more than half the
+ * scroll range, so a small overflow (0 < maxScroll ≤ 8) still surfaces an arrow.
  * @param {number} scrollLeft - Current horizontal scroll offset.
  * @param {number} scrollWidth - Total scrollable content width.
  * @param {number} clientWidth - Visible viewport width.
@@ -81,8 +82,9 @@ export function resolveActiveEffect(availableEffects, currentEffect) {
 export function scrollArrowState(scrollLeft, scrollWidth, clientWidth) {
   const maxScroll = scrollWidth - clientWidth;
   if (maxScroll <= 0) return { left: false, right: false };
+  const deadzone = Math.min(4, maxScroll / 2);
   return {
-    left: scrollLeft > 4,
-    right: scrollLeft < maxScroll - 4,
+    left: scrollLeft > deadzone,
+    right: scrollLeft < maxScroll - deadzone,
   };
 }
