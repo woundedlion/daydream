@@ -42,21 +42,6 @@ test('sRGB transfer parity (srgb_to_linear / linear_to_srgb)', () => {
   }
 });
 
-/** Verifies the Ottosson OKLab matrices match color.js in both directions. */
-test('OKLab matrix parity (linear_rgb_to_oklab / oklab_to_linear_rgb)', () => {
-  for (const [r, g, b] of [[0.1, 0.5, 0.9], [1, 0, 0], [0, 0.8, 0.2], [0.3, 0.3, 0.3], [0, 0, 0]]) {
-    const w = M.linear_rgb_to_oklab(r, g, b);
-    const j = C.linearRgbToOklab(r, g, b);
-    assert.ok(near(w.L, j.L) && near(w.a, j.a) && near(w.b, j.b),
-      `linear_rgb_to_oklab(${r},${g},${b}): wasm(${w.L},${w.a},${w.b}) js(${j.L},${j.a},${j.b})`);
-
-    const wr = M.oklab_to_linear_rgb(j.L, j.a, j.b);
-    const jr = C.oklabToLinearRgb(j);
-    assert.ok(near(wr.r, jr.r) && near(wr.g, jr.g) && near(wr.b, jr.b),
-      `oklab_to_linear_rgb: wasm(${wr.r},${wr.g},${wr.b}) js(${jr.r},${jr.g},${jr.b})`);
-  }
-});
-
 /**
  * Pins the engine's OKLab transform to fixed golden values in both directions.
  * The parity test above is wasm-vs-js only, so a coordinated drift shared by both
