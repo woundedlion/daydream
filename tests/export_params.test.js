@@ -4,10 +4,11 @@ import assert from 'node:assert/strict';
 
 const { formatExportParams } = await import('../tools/export_params.js');
 
-/** Each value renders as a 4-decimal float literal inside a brace-init list. */
+/** Each value renders through the shared formatFloatCpp (trailing zeros trimmed,
+ *  whole values keep one fractional digit) inside a brace-init list. */
 test('formatExportParams: emits a C++ float brace-init list', () => {
   const params = [{ name: 'A' }, { name: 'B' }];
-  assert.equal(formatExportParams(params, [0.85, 1]), '{ 0.8500f, 1.0000f }');
+  assert.equal(formatExportParams(params, [0.85, 1]), '{ 0.85f, 1.0f }');
 });
 
 /** Readonly params (e.g. MindSplatter's engine-written active_count) are dropped
@@ -22,11 +23,18 @@ test('formatExportParams: skips readonly params', () => {
   ];
   const values = [0.85, 1.0, 0.025, 0.2, 37];
   assert.equal(formatExportParams(params, values),
-    '{ 0.8500f, 1.0000f, 0.0250f, 0.2000f }');
+    '{ 0.85f, 1.0f, 0.025f, 0.2f }');
 });
 
 /** An all-readonly param set yields empty braces rather than a malformed list. */
 test('formatExportParams: all-readonly yields empty braces', () => {
   const params = [{ name: 'X', readonly: true }];
   assert.equal(formatExportParams(params, [1]), '{  }');
+});
+
+/** A tiny nonzero value keeps a meaningful significand instead of collapsing to
+ *  0.0000f the way the old fixed 4-decimal formatter did. */
+test('formatExportParams: preserves small-magnitude significand', () => {
+  const params = [{ name: 'Tiny' }];
+  assert.equal(formatExportParams(params, [0.00001]), '{ 0.00001f }');
 });
