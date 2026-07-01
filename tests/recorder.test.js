@@ -485,3 +485,35 @@ test('captureFrame advances elapsed when the track lacks requestFrame', () => {
     restore();
   }
 });
+
+/**
+ * On the timed-fallback path (a captured track with no requestFrame, which
+ * self-samples from recorder.start()), start() must prime the offscreen with one
+ * blit so the leading interval isn't a blank canvas.
+ */
+test('the timed fallback primes the offscreen with one blit before start', () => {
+  const restore = installRecorderEnv();
+  try {
+    const timedTrack = { stop() {} }; // no requestFrame -> forces the fps fallback
+    const draws = [];
+    // The offscreen (not the source) is the captured surface; make it report the
+    // timed-fallback track and spy on its blits.
+    const offscreen = {
+      width: 0, height: 0,
+      getContext: () => ({ clearRect() {}, drawImage(...a) { draws.push(a); } }),
+      captureStream: () => ({
+        getVideoTracks: () => [timedTrack],
+        getTracks: () => [timedTrack],
+      }),
+    };
+    globalThis.document = { createElement: () => offscreen };
+
+    const rec = new VideoRecorder(recordableCanvas(64, 32));
+    rec.download = () => {};
+    rec.start('e');
+
+    assert.equal(draws.length, 1, 'exactly one priming blit before recording starts');
+  } finally {
+    restore();
+  }
+});
