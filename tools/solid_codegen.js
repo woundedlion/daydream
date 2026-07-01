@@ -89,6 +89,10 @@ export function generateFuncAndRecipe(item) {
     throw new Error(`generateFuncAndRecipe: base "${item.base}" is not a valid C++ identifier`);
   }
 
+  if (!Array.isArray(item.ops)) {
+    throw new Error('generateFuncAndRecipe: item.ops must be an array');
+  }
+
   let nameParts = [item.base];
   let chain = '';
 
