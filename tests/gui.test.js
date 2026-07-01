@@ -84,7 +84,7 @@ const { GUI: DeepLinkGUI, makeUrlParamWriter } = await import('../gui.js');
  */
 function installWindow(search) {
   globalThis.window = {
-    location: { search, pathname: '/' },
+    location: { search, pathname: '/', hash: '' },
     history: { replaceState() {} },
   };
 }
@@ -170,7 +170,7 @@ test('DeepLinkGUI.add with no matching URL param keeps the default', () => {
 test('DeepLinkGUI.add clamps an out-of-range numeric URL value to the slider min/max', () => {
   let lastUrl = '/';
   globalThis.window = {
-    location: { search: '?speed=99', pathname: '/' },
+    location: { search: '?speed=99', pathname: '/', hash: '' },
     history: { replaceState(s, t, url) { lastUrl = url; } },
   };
   mock.timers.enable({ apis: ['setTimeout'] });
@@ -259,7 +259,7 @@ test('DeepLinkGUI.add maps boolean URL spellings for a checkbox', () => {
 test('makeUrlParamWriter merges multiple keys changed within the debounce window', () => {
   let lastUrl = '/';
   globalThis.window = {
-    location: { search: '?keep=1', pathname: '/' },
+    location: { search: '?keep=1', pathname: '/', hash: '' },
     history: { replaceState(s, t, url) { lastUrl = url; } },
   };
   const setUrlParam = makeUrlParamWriter();
@@ -275,4 +275,27 @@ test('makeUrlParamWriter merges multiple keys changed within the debounce window
   assert.equal(q.get('a'), '0.5');
   assert.equal(q.get('b'), 'two');
   assert.equal(q.get('keep'), '1');
+});
+
+/**
+ * The standalone-page fallback commit must preserve location.hash: a tool page
+ * using a fragment would otherwise lose it on the first GUI change (URLSync,
+ * used by the main app, already preserves it).
+ */
+test('makeUrlParamWriter preserves location.hash in the fallback commit', () => {
+  let lastUrl = '/';
+  globalThis.window = {
+    location: { search: '?keep=1', pathname: '/', hash: '#section' },
+    history: { replaceState(s, t, url) { lastUrl = url; } },
+  };
+  const setUrlParam = makeUrlParamWriter();
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    setUrlParam('a', 'one');
+    mock.timers.tick(200);
+  } finally {
+    mock.timers.reset();
+  }
+  assert.match(lastUrl, /#section$/, 'the fragment survives the URL rewrite');
+  assert.equal(new URL(lastUrl, 'http://x').searchParams.get('a'), 'one');
 });
