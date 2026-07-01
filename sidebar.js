@@ -74,10 +74,11 @@ export class EffectSidebar {
   }
 
   /**
-   * Release the resources this sidebar owns: the ResizeObserver and the
-   * keydown/scroll listeners on the list element. Mirrors Daydream.dispose();
-   * call before discarding the sidebar so no observer keeps firing into a dead
-   * DOM subtree.
+   * Release everything this sidebar owns and detach what it appended: the
+   * ResizeObserver, the keydown/scroll listeners, every button's click closure,
+   * and the nodes added to the container. Symmetric with the constructor so the
+   * container is left clean and reusable. Mirrors Daydream.dispose(); call before
+   * discarding the sidebar so no observer keeps firing into a dead DOM subtree.
    */
   dispose() {
     cancelAnimationFrame(this.scrollArrowsRaf);
@@ -85,6 +86,16 @@ export class EffectSidebar {
     this.resizeObs = null;
     this.listEl.removeEventListener('keydown', this.onKeyDownBound);
     this.listEl.removeEventListener('scroll', this.onScrollBound);
+    for (const btn of this.buttons.values()) btn.onclick = null;
+    this.buttons.clear();
+    this.nameBtn.onclick = null;
+    this.sizeBtn.onclick = null;
+    this.listEl.innerHTML = '';
+    this.heading.remove();
+    this.sortRow.remove();
+    this.listEl.remove();
+    this.arrowLeft.remove();
+    this.arrowRight.remove();
   }
 
   /**
