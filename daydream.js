@@ -485,6 +485,7 @@ appState.subscribe((key, value, old) => {
 // tear the Test-All ticker down.
 let testAllInterval = null;
 let testAllController = null;
+let testAllIndex = 0;
 
 createHolosphereModule().then(module => {
   host.module = module;
@@ -616,14 +617,17 @@ const sidebar = new EffectSidebar(
 
 testAllController = guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => {
   if (v) {
+    const startList = effectsByResolution[appState.get('resolution')] || HiResFavorites;
+    testAllIndex = startList.indexOf(appState.get('effect'));
     testAllInterval = setInterval(() => {
       if (!host.engine) return;
       const currentList = effectsByResolution[appState.get('resolution')] || HiResFavorites;
       if (currentList.length === 0) return;
-      const currentEffect = appState.get('effect');
-      const currentIndex = currentList.indexOf(currentEffect);
-      const nextIndex = (currentIndex + 1) % currentList.length;
-      appState.set('effect', currentList[nextIndex]);
+      // Advance a persistent index, not one re-derived from the live effect: a
+      // rejected setEffect reverts appState to the predecessor, so re-deriving
+      // would recompute the same rejected slot forever.
+      testAllIndex = (testAllIndex + 1) % currentList.length;
+      appState.set('effect', currentList[testAllIndex]);
     }, 1000);
   } else {
     clearInterval(testAllInterval);
