@@ -168,13 +168,24 @@
       font-size: 0.8rem;
     }
 
-    /* .btn / .btn-primary / .btn-secondary now live in tools.css (shared). */
+    /* .btn / .btn-primary / .btn-secondary now live in tools.css (shared).
+       The add-op grid packs 14 buttons into the sidebar, so it overrides the
+       shared padding with a tighter vertical profile. */
+    #addOpGrid .btn {
+      padding: 0.2rem 0.3rem;
+    }
+
+    /* Ops the validator proved would trap an engine invariant on the current
+       mesh (see chainIsValid). */
+    #addOpGrid .btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
 
     .op-item {
       background-color: var(--slate-800);
       border: 1px solid var(--slate-700);
-      padding: 0.4rem;
-      margin-bottom: 0.4rem;
+      padding: 0.25rem 0.4rem;
       border-radius: 0.25rem;
       display: flex;
       justify-content: space-between;
@@ -203,7 +214,7 @@
       align-items: center;
       justify-content: center;
       width: 1rem;
-      height: 1.5rem;
+      height: 1.25rem;
       margin-right: 0.25rem;
       color: var(--slate-500);
       flex-shrink: 0;
@@ -399,37 +410,34 @@
       <p class="text-xs text-indigo-300">Conway Mesh Operators</p>
     </div>
 
-    <!-- Base Solid Display -->
-    <div id="baseSolidDisplay" class="space-y-2">
-      <label class="text-xs uppercase font-semibold text-slate-400">Source Solid</label>
-      <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-3 flex items-center space-x-3">
-        <img id="baseThumb" src=""
-          class="w-12 h-12 object-contain bg-slate-900 rounded-md border border-slate-700 shadow-sm" />
-        <div class="flex flex-col min-w-0">
-          <div id="baseTitle" class="text-xs font-black text-white uppercase tracking-wider line-clamp-2">
+    <!-- Operations Queue. The source solid renders as the pinned first card of
+         the stack (not a draggable op row — it lives outside #opsList so the
+         drag/drop index math stays 1:1 with state.ops). -->
+    <div class="space-y-2 flex-1 overflow-hidden flex flex-col">
+      <div class="flex-1 min-h-[140px] overflow-y-auto pr-2">
+        <div class="flex items-center space-x-2 bg-slate-800 border border-slate-700 rounded px-1.5 py-1 mb-1">
+          <img id="baseThumb" src=""
+            class="w-8 h-8 object-contain bg-slate-900 rounded border border-slate-700 flex-shrink-0" />
+          <div id="baseTitle" class="text-[0.65rem] font-black text-white uppercase tracking-wider line-clamp-2 min-w-0">
           </div>
-          <span id="baseStats" class="text-[0.6rem] text-indigo-300/60 font-medium uppercase tracking-tight"></span>
+        </div>
+        <div id="opsList" class="relative space-y-1">
+          <!-- Operations go here -->
         </div>
       </div>
-    </div>
 
-    <!-- Operations Queue -->
-    <div class="space-y-2 flex-1 overflow-hidden flex flex-col">
       <div class="flex items-center justify-between">
-        <label class="text-xs uppercase font-semibold text-slate-400">Operations</label>
+        <label class="text-xs uppercase font-semibold text-slate-400">Add Operation</label>
         <button id="clearOpsBtn"
           class="text-[0.65rem] text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear
           All</button>
       </div>
-      <div id="opsList" class="relative flex-1 min-h-[140px] overflow-y-auto space-y-2 pr-2">
-        <!-- Operations go here -->
-      </div>
-
-      <label class="text-xs uppercase font-semibold text-slate-400 mt-4">Add Operation</label>
+      <!-- Gate feedback: why the last op/reorder/base change was rejected. -->
+      <div id="opGateMsg" class="text-[0.6rem] text-amber-400 h-3 leading-3"></div>
       <!-- Add-operation buttons carry the op name in data-op; a single delegated
            click listener (wired in init) dispatches to addOp, so no handler is
            pinned to window. -->
-      <div id="addOpGrid" class="grid grid-cols-2 gap-2 pt-1">
+      <div id="addOpGrid" class="grid grid-cols-3 gap-1 pt-1">
         <button data-op="kis" class="btn btn-secondary text-[0.65rem]">Kis</button>
         <button data-op="ambo" class="btn btn-secondary text-[0.65rem]">Ambo</button>
         <button data-op="gyro" class="btn btn-secondary text-[0.65rem]">Gyro</button>
@@ -966,12 +974,20 @@
         btn.className = `thumb-btn ${state.base === key ? 'active' : ''}`;
         btn.dataset.solid = key; // identify the base so restoreSolid can re-highlight it
         btn.onclick = () => {
-          state.base = key;
-          update();
-          renderBaseSolid();
-          // Update active state
-          document.querySelectorAll('.thumb-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
+          queueCommit(async () => {
+            // The op stack is kept across a base switch, so it must be valid
+            // on the new solid too.
+            if (state.ops.length && !(await chainIsValid(key, state.ops))) {
+              showGateMsg('rejected: op stack would exceed an engine mesh limit on this solid');
+              return;
+            }
+            state.base = key;
+            update();
+            renderBaseSolid();
+            // Update active state
+            document.querySelectorAll('.thumb-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+          });
         };
 
         const img = document.createElement('img');
@@ -1186,6 +1202,18 @@
     }
 
     function restoreSolid(item) {
+      queueCommit(async () => {
+        // Saved items were valid when saved, but the engine may have been
+        // rebuilt with different limits since; validate on the way back in.
+        if (!(await chainIsValid(item.base, item.ops))) {
+          showGateMsg(GATE_REASON);
+          return;
+        }
+        applyRestore(item);
+      });
+    }
+
+    function applyRestore(item) {
       state.base = item.base;
       state.ops = structuredClone(item.ops); // Deep copy (ops are plain data)
       state.showGeodesics = item.geodesics;
@@ -1211,17 +1239,38 @@
     function renderBaseSolid() {
       const thumb = baseThumbnails[state.base];
       const title = state.base.replace(/([A-Z])/g, ' $1').trim();
-      // We can't synchronously get stats unless we cache or have the mesh.
-      // currentMesh is updated after update() calls.
-
       document.getElementById('baseThumb').src = thumb || '';
       document.getElementById('baseTitle').innerText = title;
-      // defer stats update to after mesh generation logic in update()
     }
 
     function enableDrag(e) {
       const item = e.target.closest('.op-item');
       if (item) item.draggable = true;
+    }
+
+    function movedOps(ops, from, to) {
+      const next = structuredClone(ops);
+      const [m] = next.splice(from, 1);
+      next.splice(to, 0, m);
+      return next;
+    }
+
+    // Which raw drop slots (getDragTargetIndex values) yield an engine-valid
+    // chain for the op being dragged. Filled asynchronously from dragstart;
+    // slots still pending stay droppable — the drop re-validates
+    // authoritatively before committing.
+    let validDropSlots = new Map();
+    let dropSlotGen = 0;
+    async function precomputeDropSlots(fromIndex) {
+      const gen = ++dropSlotGen;
+      validDropSlots = new Map();
+      for (let t = 0; t <= state.ops.length; t++) {
+        const to = t > fromIndex ? t - 1 : t;
+        if (to === fromIndex) { validDropSlots.set(t, true); continue; }
+        const ok = await chainIsValid(state.base, movedOps(state.ops, fromIndex, to));
+        if (gen !== dropSlotGen) return;
+        validDropSlots.set(t, ok);
+      }
     }
 
     // Helper: Calculate insertion index based on static layout (ignoring transforms)
@@ -1261,8 +1310,17 @@
 
         if (!draggingItem) return;
 
-        // Amount to visual shift: height of item + gap (space-y-2 is 0.5rem = 8px)
-        const shiftAmount = draggingItem.offsetHeight + 8;
+        // An engine-invalid slot gets no insertion preview and no drop cursor.
+        if (validDropSlots.get(targetIndex) === false) {
+          e.dataTransfer.dropEffect = 'none';
+          items.forEach((item, idx) => {
+            if (idx !== draggingIndex) item.style.transform = '';
+          });
+          return;
+        }
+
+        // Amount to visual shift: height of item + gap (space-y-1 is 0.25rem = 4px)
+        const shiftAmount = draggingItem.offsetHeight + 4;
 
         items.forEach((item, idx) => {
           if (idx === draggingIndex) return;
@@ -1290,27 +1348,40 @@
         const fromIndex = draggingIndex;
         if (fromIndex === -1) return;
 
-        const list = document.getElementById('opsList');
-        let toIndex = getDragTargetIndex(e, list);
-
+        const rawTarget = getDragTargetIndex(e, list);
         // Adjust index: removing the item at fromIndex shifts subsequent indices down by 1
+        let toIndex = rawTarget;
         if (fromIndex < toIndex) {
           toIndex--;
         }
 
-        if (fromIndex !== toIndex) {
-          const [movedItem] = state.ops.splice(fromIndex, 1);
-          state.ops.splice(toIndex, 0, movedItem);
-          update();
-        }
-        renderOps();
         draggingIndex = -1;
+        if (fromIndex === toIndex) {
+          renderOps();
+          return;
+        }
+        if (validDropSlots.get(rawTarget) === false) {
+          showGateMsg(GATE_REASON);
+          renderOps();
+          return;
+        }
+        renderOps(); // snap the drag preview back now; the commit re-renders
+        queueCommit(async () => {
+          const candidate = movedOps(state.ops, fromIndex, toIndex);
+          if (!(await chainIsValid(state.base, candidate))) {
+            showGateMsg(GATE_REASON);
+            return;
+          }
+          state.ops = candidate;
+          renderOps();
+          update();
+        });
       };
 
       state.ops.forEach((o, i) => {
         const opDef = OP_DEFS[o.op];
         const el = document.createElement('div');
-        el.className = 'op-item flex-col items-stretch text-sm text-indigo-300';
+        el.className = 'op-item flex-col items-stretch text-xs text-indigo-300';
         el.draggable = false;
 
         // Item Drag Start/End
@@ -1318,6 +1389,7 @@
           draggingIndex = i;
           e.dataTransfer.effectAllowed = 'move';
           e.dataTransfer.setData('text/plain', i); // Required for Firefox
+          precomputeDropSlots(i);
           setTimeout(() => el.classList.add('dragging'), 0);
         });
 
@@ -1332,7 +1404,7 @@
 
         let controlsHtml = '';
         if (opDef.params && Object.keys(opDef.params).length > 0) {
-          controlsHtml = '<div class="mt-2 space-y-2">';
+          controlsHtml = '<div class="mt-1 space-y-1">';
           Object.keys(opDef.params).forEach(key => {
             const def = opDef.params[key];
             const val = o.params[key];
@@ -1417,10 +1489,28 @@
       scheduleUpdate();
     }
 
+    // Serializes validated state mutations: each commit sees the state its
+    // predecessors left, so two rapid clicks can't validate against the same
+    // snapshot and then both land.
+    let commitQueue = Promise.resolve();
+    function queueCommit(fn) {
+      commitQueue = commitQueue.then(fn).catch(console.error);
+      return commitQueue;
+    }
+
     function removeOp(index) {
-      state.ops.splice(index, 1);
-      renderOps();
-      update();
+      queueCommit(async () => {
+        // Removing an op can invalidate the remainder (e.g. deleting the ambo
+        // between two hankins), so removal validates like any other mutation.
+        const candidate = state.ops.filter((_, i) => i !== index);
+        if (!(await chainIsValid(state.base, candidate))) {
+          showGateMsg(GATE_REASON);
+          return;
+        }
+        state.ops = candidate;
+        renderOps();
+        update();
+      });
     }
 
     function addOp(opName) {
@@ -1438,9 +1528,17 @@
           newOp.params[k] = val;
         });
       }
-      state.ops.push(newOp);
-      renderOps();
-      update();
+      queueCommit(async () => {
+        // The grid button is usually grayed before an invalid op can be
+        // clicked, but gating is async — validate the exact candidate anyway.
+        if (!(await chainIsValid(state.base, [...state.ops, newOp]))) {
+          showGateMsg(GATE_REASON);
+          return;
+        }
+        state.ops.push(newOp);
+        renderOps();
+        update();
+      });
     }
 
     function resetOps() {
@@ -1452,6 +1550,181 @@
     function clearSavedSolids() {
       savedSolids.length = 0;
       renderSavedList();
+    }
+
+    // Apply one op of the state.ops encoding to a WASM mesh wrapper, returning
+    // the new mesh (or null for an unknown op name). Single source of truth for
+    // op dispatch: update() (live module) and chainIsValid() (validator module)
+    // must run byte-identical chains or validation proves the wrong thing.
+    function applyOp(mesh, o) {
+      const opName = typeof o === 'string' ? o : o.op;
+      if (opName === 'truncate') return mesh.truncate(o.params.t);
+      if (opName === 'chamfer') return mesh.chamfer(o.params.t);
+      if (opName === 'expand') return mesh.expand(o.params.t);
+      if (opName === 'bevel') return mesh.bevel(o.params.t);
+      if (opName === 'snub') return mesh.snub(o.params.t, o.params.twist);
+      if (opName === 'hankin') return mesh.hankin(o.params.angle * (Math.PI / 180));
+      if (opName === 'relax') return mesh.relax(o.params.iter);
+      if (mesh[opName]) return mesh[opName]();
+      return null;
+    }
+
+    // --- CHAIN VALIDATION ---
+    // The engine fail-fast contract (see the comment block in update()) means an
+    // op chain that outgrows an engine ceiling — 16-bit vertex/index ranges,
+    // hankin's compile bound, classifyFaces' range — traps and permanently
+    // wedges the module it ran on. Rather than mirror every ceiling in JS (the
+    // op set's growth rules are engine-specific and would drift), the tool
+    // proves each candidate chain on a SACRIFICIAL module instance before the
+    // live module ever sees it: a trap kills only the validator, which is
+    // respawned, and the mutation is rejected. The engine stays the single
+    // authority on its own invariants.
+    let validatorPromise = null;
+    // Serializes all validator use: tasks hold the single instance (and
+    // sometimes a live mesh wrapper) across awaits, and an interleaved
+    // clearToolingMemory from another task would invalidate that wrapper.
+    let validatorQueue = Promise.resolve();
+
+    function withValidator(task) {
+      const run = validatorQueue.then(async () => {
+        validatorPromise ||= createHolosphereModule();
+        const Mod = await validatorPromise.catch(() => null);
+        return task(Mod);
+      });
+      // Keep the queue alive past a rejected task.
+      validatorQueue = run.catch(() => { });
+      return run;
+    }
+
+    // A RuntimeError means the validator instance trapped and is wedged; drop
+    // it so the next task spawns a fresh one.
+    function noteValidatorDeath(e) {
+      if (e instanceof WebAssembly.RuntimeError) validatorPromise = null;
+    }
+
+    // Replay base+ops (plus the classifyFaces pass update() always runs) on the
+    // validator. Resolves true if the whole chain is safe for the live module.
+    // A missing validator (module failed to spawn) resolves true: prevention
+    // degrades to the old behavior rather than blocking the tool.
+    function chainIsValid(base, ops) {
+      return withValidator((Mod) => {
+        if (!Mod) return true;
+        const Ops = Mod.MeshOps;
+        let mesh = null;
+        try {
+          mesh = Ops.fromSolidName(base);
+          for (const o of ops) {
+            const next = applyOp(mesh, o);
+            if (next) { mesh.delete(); mesh = next; }
+          }
+          mesh.classifyFaces();
+          mesh.delete();
+          Ops.clearToolingMemory();
+          return true;
+        } catch (e) {
+          noteValidatorDeath(e);
+          if (!(e instanceof WebAssembly.RuntimeError)) {
+            try { if (mesh) mesh.delete(); Ops.clearToolingMemory(); } catch (_) { }
+          }
+          return false;
+        }
+      });
+    }
+
+    let gateMsgTimer = null;
+    function showGateMsg(text) {
+      const el = document.getElementById('opGateMsg');
+      if (!el) return;
+      el.innerText = text;
+      clearTimeout(gateMsgTimer);
+      gateMsgTimer = setTimeout(() => { el.innerText = ''; }, 3000);
+    }
+    const GATE_REASON = 'rejected: would exceed an engine mesh limit';
+
+    // Gray out add-op buttons whose op would trap on the CURRENT mesh. One
+    // chain build serves all 14 probes (ops never mutate their input); a probe
+    // trap kills the validator, so the chain is rebuilt on a fresh instance and
+    // probing continues with the next op.
+    let gateGen = 0;
+    let lastGateSig = null;
+    async function refreshOpGating() {
+      // Gating depends only on the mesh's topology, which op params never
+      // change — skip the probe pass when only a param slider moved.
+      const sig = state.base + '|' + state.ops.map(o => o.op).join(',');
+      if (sig === lastGateSig) return;
+      lastGateSig = sig;
+
+      const gen = ++gateGen;
+      const base = state.base;
+      const ops = structuredClone(state.ops);
+      const buttons = [...document.querySelectorAll('#addOpGrid [data-op]')];
+
+      const invalid = await withValidator(async (Mod) => {
+        if (!Mod) return new Set();
+        const bad = new Set();
+        const build = (M) => {
+          let mesh = M.MeshOps.fromSolidName(base);
+          for (const o of ops) {
+            const next = applyOp(mesh, o);
+            if (next) { mesh.delete(); mesh = next; }
+          }
+          return mesh;
+        };
+        let mesh;
+        try {
+          mesh = build(Mod); // current chain: valid by construction
+        } catch (e) {
+          noteValidatorDeath(e);
+          return bad;
+        }
+        for (const btn of buttons) {
+          const op = btn.dataset.op;
+          const candidate = { op, params: {} };
+          for (const [k, def] of Object.entries(OP_DEFS[op]?.params ?? {})) {
+            candidate.params[k] = def.val;
+          }
+          try {
+            const out = applyOp(mesh, candidate);
+            if (out) {
+              out.classifyFaces(); // committing would classify; probe that too
+              out.delete();
+            }
+          } catch (e) {
+            bad.add(op);
+            noteValidatorDeath(e);
+            if (e instanceof WebAssembly.RuntimeError) {
+              // Instance is wedged; respawn and rebuild for remaining probes.
+              validatorPromise ||= createHolosphereModule();
+              Mod = await validatorPromise.catch(() => null);
+              if (!Mod) return bad;
+              try { mesh = build(Mod); } catch (e2) { noteValidatorDeath(e2); return bad; }
+            }
+          }
+        }
+        try { mesh.delete(); Mod.MeshOps.clearToolingMemory(); } catch (e) { noteValidatorDeath(e); }
+        return bad;
+      });
+
+      if (gen !== gateGen) return; // state changed while probing
+      for (const btn of buttons) {
+        const blocked = invalid.has(btn.dataset.op);
+        btn.disabled = blocked;
+        if (blocked) btn.title = 'Would exceed an engine mesh limit on the current solid';
+        else btn.removeAttribute('title');
+      }
+    }
+
+    // The live module is unrecoverable after an engine trap (see update()); if
+    // one ever escapes the validator gate, fail loudly once instead of letting
+    // every later call trap the re-entrancy guard and spam the console.
+    function engineTrapped(e) {
+      if (!(e instanceof WebAssembly.RuntimeError)) return false;
+      MeshOpsWasm = null;
+      WasmModule = null;
+      showFatalError('The WASM engine hit an internal invariant and is halted — '
+        + 'reload the page. (The op that caused this slipped past validation; '
+        + 'please report the chain.)');
+      return true;
     }
 
     function update() {
@@ -1478,34 +1751,14 @@
         currentWasmMesh = MeshOpsWasm.fromSolidName(state.base);
       } catch (e) {
         console.error("Error creating base solid:", e);
+        engineTrapped(e);
         return;
       }
 
       // Apply Ops
       try {
         state.ops.forEach(o => {
-          const opName = typeof o === 'string' ? o : o.op;
-          let nextMesh = null;
-
-          if (opName === 'truncate') {
-            nextMesh = currentWasmMesh.truncate(o.params.t);
-          } else if (opName === 'chamfer') {
-            nextMesh = currentWasmMesh.chamfer(o.params.t);
-          } else if (opName === 'expand') {
-            nextMesh = currentWasmMesh.expand(o.params.t);
-          } else if (opName === 'bevel') {
-            nextMesh = currentWasmMesh.bevel(o.params.t);
-          } else if (opName === 'snub') {
-            nextMesh = currentWasmMesh.snub(o.params.t, o.params.twist);
-          } else if (opName === 'hankin') {
-            nextMesh = currentWasmMesh.hankin(o.params.angle * (Math.PI / 180));
-          } else if (opName === 'relax') {
-            nextMesh = currentWasmMesh.relax(o.params.iter);
-          } else if (currentWasmMesh[opName]) {
-            // Parameterless ops: dual, kis, ambo, gyro, meta, needle, zip
-            nextMesh = currentWasmMesh[opName]();
-          }
-
+          const nextMesh = applyOp(currentWasmMesh, o);
           if (nextMesh) {
             currentWasmMesh.delete();
             currentWasmMesh = nextMesh;
@@ -1513,6 +1766,7 @@
         });
       } catch (e) {
         console.error("WASM Op Error:", e);
+        if (engineTrapped(e)) return;
         // A mid-chain op failed: the partial mesh is meaningless, so surface the
         // error and skip the render rather than displaying a half-applied solid
         // with wrong stats. currentWasmMesh still points at the last valid op
@@ -1536,6 +1790,7 @@
         currentFaceClasses = currentWasmMesh.classifyFaces();
       } catch (e) {
         console.error("WASM classifyFaces error:", e);
+        if (engineTrapped(e)) return;
       }
 
       const meshData = wasmMeshToJs(currentWasmMesh);
@@ -1546,6 +1801,9 @@
       currentMesh = meshData;
 
       renderMesh();
+
+      // The mesh changed, so which ops would now overflow changed too.
+      refreshOpGating();
     }
 
     // Rebuild the THREE scene from the cached currentMesh + currentFaceClasses,
@@ -1588,6 +1846,73 @@
       const faceCenters = [];
       const faceNormals = [];
 
+      // Geodesic mode curves the faces onto the sphere: each fan triangle is
+      // split on a barycentric grid of geoN segments per side and every grid
+      // vertex normalized, so the surface itself is spherical instead of flat
+      // plateaus with ridges at the (curved) edge overlay. geoN must be
+      // UNIFORM across the whole mesh: any shared edge — polygon boundaries
+      // and the internal fan diagonals alike — is then split into identical
+      // points from both sides, so the tessellation is watertight. (A
+      // per-triangle level cracked along every count mismatch, which read as
+      // dark hairlines on the faces.) geoN targets ~3° of arc per segment on
+      // the largest face and is capped by a total-triangle budget so dense
+      // meshes, whose faces are sub-degree anyway, don't explode.
+      let geoN = 1;
+      if (state.showGeodesics) {
+        let triCount = 0;
+        let maxArc = 0;
+        meshData.faces.forEach(f => {
+          triCount += f.length - 2;
+          for (let i = 1; i < f.length - 1; i++) {
+            const a = meshData.vertices[f[0]];
+            const b = meshData.vertices[f[i]];
+            const c = meshData.vertices[f[i + 1]];
+            maxArc = Math.max(maxArc, a.angleTo(b), b.angleTo(c), c.angleTo(a));
+          }
+        });
+        const nArc = Math.ceil(maxArc / (Math.PI / 60));
+        const nBudget = Math.floor(Math.sqrt(400000 / Math.max(1, triCount)));
+        geoN = Math.max(1, Math.min(24, nArc, nBudget));
+      }
+
+      const pushVert = (v) => {
+        vertices.push(v.x, v.y, v.z);
+        if (faceClasses) {
+          faceColors.push(classColor.r, classColor.g, classColor.b);
+        }
+      };
+
+      // Emit one fan triangle as geoN² spherical sub-triangles. Grid point
+      // P(gi,gj) = normalize(a + (b-a)·gi/n + (c-a)·gj/n), rows shrinking
+      // toward the b corner (gi + gj <= n).
+      const emitSphericalTri = (a, b, c) => {
+        const n = geoN;
+        const P = [];
+        for (let gi = 0; gi <= n; gi++) {
+          const row = [];
+          for (let gj = 0; gj <= n - gi; gj++) {
+            row.push(new THREE.Vector3()
+              .addScaledVector(a, 1 - (gi + gj) / n)
+              .addScaledVector(b, gi / n)
+              .addScaledVector(c, gj / n)
+              .normalize());
+          }
+          P.push(row);
+        }
+        for (let gi = 0; gi < n; gi++) {
+          for (let gj = 0; gj < n - gi; gj++) {
+            pushVert(P[gi][gj]);
+            pushVert(P[gi + 1][gj]);
+            pushVert(P[gi][gj + 1]);
+            if (gj < n - gi - 1) {
+              pushVert(P[gi + 1][gj]);
+              pushVert(P[gi + 1][gj + 1]);
+              pushVert(P[gi][gj + 1]);
+            }
+          }
+        }
+      };
+
       meshData.faces.forEach((f, fi) => {
         if (faceClasses) {
           // Golden-ratio hue stride keeps consecutive class ids far apart on
@@ -1595,25 +1920,26 @@
           classColor.setHSL((faceClasses[fi] * 0.618034) % 1, 0.65, 0.55);
         }
         // Collect vertices for the triangulated face
-        for (let i = 1; i < f.length - 1; i++) {
-          let v0 = new THREE.Vector3().copy(meshData.vertices[f[0]]);
-          let v1 = new THREE.Vector3().copy(meshData.vertices[f[i]]);
-          let v2 = new THREE.Vector3().copy(meshData.vertices[f[i + 1]]);
-
-          if (state.showGeodesics) {
-            v0.normalize();
-            v1.normalize();
-            v2.normalize();
+        if (!state.showGeodesics) {
+          for (let i = 1; i < f.length - 1; i++) {
+            pushVert(meshData.vertices[f[0]]);
+            pushVert(meshData.vertices[f[i]]);
+            pushVert(meshData.vertices[f[i + 1]]);
           }
-
-          vertices.push(...v0.toArray());
-          vertices.push(...v1.toArray());
-          vertices.push(...v2.toArray());
-
-          if (faceClasses) {
-            for (let c = 0; c < 3; c++) {
-              faceColors.push(classColor.r, classColor.g, classColor.b);
-            }
+        } else {
+          // Geodesic mode fans from the CENTROID, not f[0]: Hankin star faces
+          // are non-convex, and a corner fan spills triangles outside the
+          // polygon — pressed onto the unit sphere, that spill z-fights the
+          // neighbouring faces as dark speckle. Every face the tool produces
+          // is star-shaped about its centroid, so a centroid fan tiles it
+          // exactly.
+          const centroid = new THREE.Vector3();
+          f.forEach(idx => centroid.add(meshData.vertices[idx]));
+          centroid.divideScalar(f.length);
+          for (let i = 0; i < f.length; i++) {
+            emitSphericalTri(centroid,
+              meshData.vertices[f[i]],
+              meshData.vertices[f[(i + 1) % f.length]]);
           }
         }
 
@@ -1636,9 +1962,27 @@
       });
 
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-      geometry.computeVertexNormals();
+      if (state.showGeodesics) {
+        // Every emitted vertex sits on the unit sphere, so its normal IS its
+        // position; computeVertexNormals on this non-indexed geometry would
+        // yield per-triangle normals and shade the tessellation as facets.
+        geometry.setAttribute('normal', new THREE.Float32BufferAttribute([...vertices], 3));
+      } else {
+        geometry.computeVertexNormals();
+      }
       if (faceClasses) {
         geometry.setAttribute('color', new THREE.Float32BufferAttribute(faceColors, 3));
+      }
+
+      // Flat shading reads face normals in-shader (ignoring the normal
+      // attribute), which is right for the polyhedral look but would facet the
+      // sphere; geodesic mode needs the smooth normals set above.
+      const wantFlat = !state.showGeodesics;
+      for (const m of [faceMaterial, faceColorizeMaterial]) {
+        if (m.flatShading !== wantFlat) {
+          m.flatShading = wantFlat;
+          m.needsUpdate = true;
+        }
       }
 
       mainMesh = new THREE.Mesh(geometry, faceClasses ? faceColorizeMaterial : faceMaterial);
