@@ -21,6 +21,7 @@
  */
 import { Daydream, SLOW_FRAME_MS } from "./driver.js";
 import { compositeSegment } from "./segment_layout.js";
+import { PROTOCOL_VERSION } from "./worker_protocol.js";
 
 // Deadline for all workers to report 'ready'. A non-throwing WASM load failure
 // fires no onerror and never sends 'ready', so this bound latches a fault instead
@@ -280,6 +281,11 @@ export class SegmentController {
             console.log(`[Segmented] All ${numSegments} workers ready`);
           }
         } else if (msg.type === 'booted') {
+          if (msg.version !== PROTOCOL_VERSION) {
+            this.onWorkerFault(i, `worker seg ${i} protocol version ${msg.version}`
+              + ` != controller ${PROTOCOL_VERSION} (stale cached worker or glue)`);
+            return;
+          }
           if (!booted[i]) { booted[i] = true; bootedCount++; }
           if (bootedCount === numSegments) this.clearBootWatchdog();
         } else if (msg.type === 'initFailed') {
@@ -358,6 +364,7 @@ export class SegmentController {
 
       this.post(worker, {
         type: 'init',
+        version: PROTOCOL_VERSION,
         segId: i,
         totalSegs: numSegments,
         w: res.w,

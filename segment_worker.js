@@ -12,6 +12,7 @@
 
 import createHolosphereModule from "./holosphere_wasm.js";
 import { computeSegmentRange, extractSegment } from "./segment_layout.js";
+import { PROTOCOL_VERSION } from "./worker_protocol.js";
 
 /** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
 /** @typedef {import('./worker_protocol.js').ControllerInboundMsg} ControllerInboundMsg */
@@ -32,7 +33,7 @@ const post = /** @type {(msg: ControllerInboundMsg, transfer?: Transferable[]) =
 
 // Sent before the WASM instantiate so the controller can fault fast on a
 // missing/renamed glue file; a failed module fetch never runs this line.
-post({ type: 'booted' });
+post({ type: 'booted', version: PROTOCOL_VERSION });
 
 let wasmModule = null;
 let engine = null;
@@ -70,6 +71,15 @@ async function handleMessage(msg) {
     case 'init': {
       segId = msg.segId;
       totalSegs = msg.totalSegs;
+
+      // A version mismatch means a stale-cached worker or controller: fault before
+      // touching WASM so the controller stops instead of drifting on reshaped fields.
+      if (msg.version !== PROTOCOL_VERSION) {
+        post({ type: 'initFailed', segId,
+               reason: `protocol version ${msg.version} != worker ${PROTOCOL_VERSION}`
+                       + ` (stale cached worker or controller)` });
+        break;
+      }
 
       wasmModule = await createHolosphereModule();
       engine = new wasmModule.HolosphereEngine();
