@@ -667,7 +667,7 @@ export class Daydream {
           #include <begin_vertex>
           #if defined(USE_INSTANCING_COLOR)
              // Hide black pixels
-             if (dot(instanceColor, instanceColor) < 0.00000001) {
+             if (dot(instanceColor, instanceColor) < 1e-10) {
                  transformed *= 0.0;
              }
              vec3 instPos = (instanceMatrix[3]).xyz;
