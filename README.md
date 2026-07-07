@@ -93,7 +93,7 @@ Two physical targets share the same rendering engine:
 | Virtual resolution | 288 × 144 |
 | Driver | `POVSegmented<288, 4, 480>` in `pov_segmented.h` |
 | Synchronization | 1-wire: count-coded sync symbols from segment 0 discipline a per-board flywheel timebase (`hardware/pov_sync.h`) |
-| Pin assignments | ID: pins 21–23 (pin 23 reserved for ID2, read only at N=8), Sync: pin 3 (shared — master drives, downstream receive), master-enable: pin 5, SPI: pins 11 + 13 |
+| Pin assignments | ID: pins 21–22, Sync: pin 3 (shared — master drives, downstream receive), master-enable: pin 5, SPI: pins 11 + 13 |
 
 The POV effect works because each revolution takes ~125 ms and a new column is painted every `1,000,000 / (RPM/60) / width` microseconds (on Holosphere the IntervalTimer ISR advances one column per fire; on Phantasm each board's flywheel ISR derives the column from the CPU cycle counter — see §7.10). The LED strip is mounted on both sides of a rotating arm: the top half of the strip handles one hemisphere and the bottom half handles the opposite hemisphere, so one full revolution paints a complete sphere.
 
@@ -1260,7 +1260,7 @@ Arm A                               Arm B (x offset by W/2)
 └──────────────────────────┘        └──────────────────────────┘
 ```
 
-**Hardware ID detection**: Each Teensy reads its segment ID from up to three GPIO straps — pin 21 (ID0), pin 22 (ID1), pin 23 (ID2), active-low with pull-ups.  The build reads `kIdStraps = log2(N)` of them and decodes the ID as `raw & (N-1)`, so a 4-segment build reads 2 straps (pins 21–22) while an 8-segment build adds pin 23 (ID2); the header permits any power-of-two `N ≤ 8`.  All-floating = ID 0 (sync master).  The ID determines which arm and which half this board owns.
+**Hardware ID detection**: Each Teensy reads its segment ID from two GPIO straps — pin 21 (ID0), pin 22 (ID1), active-low with pull-ups.  The build reads `kIdStraps = log2(N)` of them and decodes the ID as `raw & (N-1)`, so a 4-segment build reads both straps and a 2-segment build reads one; the header permits any power-of-two `N ≤ 4` (`segment_map()` distinguishes only a top and a bottom strip per arm).  All-floating = ID 0 (sync master).  The ID determines which arm and which half this board owns.
 
 **Branchless ISR**: All per-segment decisions are resolved at boot time into three precomputed values:
 
