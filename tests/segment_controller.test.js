@@ -13,7 +13,7 @@ mock.module('../driver.js', {
   namedExports: { Daydream, SLOW_FRAME_MS: 50 },
 });
 
-const { SegmentController } = await import('../segment_controller.js');
+const { SegmentController, MAX_BOOT_RETRIES } = await import('../segment_controller.js');
 
 // ---------------------------------------------------------------------------
 // Fakes
@@ -310,6 +310,61 @@ test('only the first fault of a session is recorded', () => {
   c.workers[0].onerror({ message: 'first', filename: '', lineno: 0, colno: 0 });
   c.workers[1].onerror({ message: 'second', filename: '', lineno: 0, colno: 0 });
   assert.deepEqual(c.faultInfo, { segId: 0, message: 'first' });
+});
+
+test('a bare-Event boot fault auto-rebuilds the pool instead of latching', () => {
+  const realSetTimeout = globalThis.setTimeout;
+  const timers = [];
+  globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
+  try {
+    const c = makeController();
+    c.active = true; // the app sets this before create(); the retry path checks it
+    c.create(2);
+    const firstPool = c.workers.slice();
+
+    // A module-graph load failure fires a message-less Event before ready.
+    c.workers[0].onerror({});
+    assert.equal(c.faulted, false, 'a transient module-load fault does not latch');
+
+    timers[timers.length - 1](); // drive the scheduled rebuild
+    assert.equal(c.bootAttempt, 1, 'retry index advanced');
+    assert.equal(c.faulted, false);
+    assert.equal(c.workers.length, 2, 'pool respawned at the same segment count');
+    assert.notEqual(c.workers[0], firstPool[0], 'rebuilt with fresh workers');
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+});
+
+test('a bare-Event boot fault latches once the retry budget is exhausted', () => {
+  const realSetTimeout = globalThis.setTimeout;
+  const timers = [];
+  globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
+  try {
+    const c = makeController();
+    c.active = true;
+    c.create(2);
+
+    for (let a = 0; a < MAX_BOOT_RETRIES; a++) {
+      c.workers[0].onerror({});
+      assert.equal(c.faulted, false, `attempt ${a + 1} retries rather than latching`);
+      timers[timers.length - 1](); // drive the rebuild
+      assert.equal(c.bootAttempt, a + 1);
+    }
+    // One failure past the budget must latch instead of retrying forever.
+    c.workers[0].onerror({});
+    assert.equal(c.faulted, true, 'a load fault past the retry budget latches');
+    assert.equal(c.faultInfo.segId, 0);
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+});
+
+test('a message-less error after the pool is ready still latches fast', () => {
+  // Post-ready there is no module to load, so a bare Event is a real worker fault.
+  const c = readyController(2);
+  c.workers[0].onerror({});
+  assert.equal(c.faulted, true);
 });
 
 test('the boot watchdog faults fast when a worker never sends booted', () => {

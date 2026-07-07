@@ -11,7 +11,7 @@ import { EffectSidebar } from "./sidebar.js";
 import { resolveActiveEffect } from "./sidebar_logic.js";
 import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
-import { SegmentController } from "./segment_controller.js";
+import { SegmentController, warmModules } from "./segment_controller.js";
 import { EngineHost } from "./engine_host.js";
 import { resolveParamSync } from "./param_sync.js";
 import { formatExportParams } from "./tools/export_params.js";
@@ -637,19 +637,23 @@ guiInstance.add(daydream, 'columnFillOverlap', 1.0, 2.0, 0.01).name('Column Fill
 const segFolder = guiInstance.addFolder('Segmented POV');
 segFolder.close();
 const segState = { segmented: segments.active, segments: segments.count, boundaries: segments.showBoundaries };
-segFolder.add(segState, 'segmented').name('Enabled').onChange(v => {
+segFolder.add(segState, 'segmented').name('Enabled').onChange(async v => {
   segments.active = v;
   if (v) {
-    segments.create(segments.count);
+    // Reopen the (idle-dropped) keep-alive connection and prime the module cache
+    // before the worker-spawn burst; re-check active in case of a toggle mid-warm.
+    await warmModules();
+    if (segments.active) segments.create(segments.count);
   } else {
     segments.destroy();
     segments.updateStats();
   }
 });
-segFolder.add(segState, 'segments', 2, 8, 2).name('Segments').onChange(v => {
+segFolder.add(segState, 'segments', 2, 8, 2).name('Segments').onChange(async v => {
   segments.count = v;
   if (segments.active) {
-    segments.create(segments.count);
+    await warmModules();
+    if (segments.active) segments.create(segments.count);
   }
 });
 segFolder.add(segState, 'boundaries').name('Show Boundaries').onChange(v => {
