@@ -365,7 +365,7 @@ test('a single missing segment is named directly in the watchdog fault', () => {
   }
 });
 
-test('the render watchdog faults when a worker accepts render but never replies', async () => {
+test('the render watchdog faults when a worker accepts render but stops progressing', async () => {
   const c = readyController(2);
   const realSetTimeout = globalThis.setTimeout;
   const timers = [];
@@ -374,15 +374,37 @@ test('the render watchdog faults when a worker accepts render but never replies'
     const done = c.renderParallel();
     deliverFrame(c, 0); // only seg 0 replies; seg 1 hangs
     assert.equal(c.pending, 1, 'one segment still outstanding');
-    timers[0](); // render watchdog fires
+    timers[timers.length - 1](); // the re-armed watchdog fires with seg 1 still hung
     assert.equal(c.faulted, true);
-    assert.match(c.faultInfo.message, /render timed out/);
+    assert.match(c.faultInfo.message, /render stalled/);
     assert.match(c.faultInfo.message, /1\/2 segments responded/);
     assert.equal(c.faultInfo.segId, -2,
       'render-timeout sentinel, distinct from the pool-init -1');
     assert.equal(c.pending, 0, 'fault settles pending so the loop cannot deadlock');
     assert.equal(c.renderWatchdog, null);
     await done; // onWorkerFault resolved the in-flight frame
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+});
+
+test('a progress frame re-arms the render watchdog so a slow render does not fault', async () => {
+  const c = readyController(2);
+  const realSetTimeout = globalThis.setTimeout;
+  const timers = [];
+  globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
+  try {
+    const done = c.renderParallel();
+    assert.equal(timers.length, 1, 'watchdog armed once at dispatch');
+    deliverFrame(c, 0); // one segment reports; the other is still rendering
+    assert.equal(c.pending, 1);
+    assert.equal(timers.length, 2, 'watchdog re-armed on the progress frame');
+    assert.notEqual(c.renderWatchdog, null);
+    deliverFrame(c, 1); // the slow segment finally reports
+    assert.equal(c.pending, 0);
+    assert.equal(c.renderWatchdog, null, 'watchdog cleared once the frame settles');
+    assert.equal(c.faulted, false);
+    await done;
   } finally {
     globalThis.setTimeout = realSetTimeout;
   }

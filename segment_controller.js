@@ -32,10 +32,14 @@ const INIT_WATCHDOG_MS = 20000;
 // instantiate is separately bounded by INIT_WATCHDOG_MS.
 const BOOT_WATCHDOG_MS = 10000;
 
-// Deadline for a dispatched parallel render to report every 'frame'. A worker that
+// Per-worker liveness deadline for a dispatched parallel render. A worker that
 // accepts 'render' but hangs without throwing fires no onerror and never settles
-// `pending`, freezing the pipeline; this bound latches a fault instead. Sized well
-// above any legitimate frame (SLOW_FRAME_MS is the per-frame slow threshold).
+// `pending`, freezing the pipeline; this bound latches a fault instead. It is
+// re-armed on every distinct segment 'frame' while `pending > 0`, so it bounds the
+// gap between reports rather than the whole render — a legitimately slow effect on
+// a throttled GPU keeps extending it as segments land, and only a true stall (no
+// segment reports for this long) faults. Sized well above any legitimate frame
+// (SLOW_FRAME_MS is the per-frame slow threshold).
 const RENDER_WATCHDOG_MS = 8 * SLOW_FRAME_MS;
 
 // Sentinel segIds for pool-wide faults with no single worker to blame: FAULT_POOL
@@ -275,6 +279,8 @@ export class SegmentController {
           if (this.pending === 0 && this.frameResolve) {
             this.frameResolve();
             this.frameResolve = null;
+          } else if (this.pending > 0) {
+            this.armRenderWatchdog();
           }
         }
       };
@@ -357,6 +363,25 @@ export class SegmentController {
       clearTimeout(this.renderWatchdog);
       this.renderWatchdog = null;
     }
+  }
+
+  /**
+   * (Re)arm the per-worker render-liveness deadline. Called at dispatch and on
+   * every distinct segment 'frame' while `pending > 0`, so the deadline bounds the
+   * gap between reports; a stall (no segment reports for RENDER_WATCHDOG_MS) faults.
+   */
+  armRenderWatchdog() {
+    this.clearRenderWatchdog();
+    this.renderWatchdog = setTimeout(() => {
+      this.renderWatchdog = null;
+      if (this.pending > 0 && !this.faulted) {
+        this.onWorkerFault(FAULT_RENDER,
+          `render stalled: no segment reported a frame for ${RENDER_WATCHDOG_MS} ms `
+          + `(${this.workers.length - this.pending}/${this.workers.length} `
+          + `segments responded) — a worker accepted 'render' but stopped progressing`);
+      }
+    }, RENDER_WATCHDOG_MS);
+    if (typeof this.renderWatchdog.unref === 'function') this.renderWatchdog.unref();
   }
 
   /**
@@ -538,16 +563,7 @@ export class SegmentController {
       };
       this.broadcast({ type: 'render' });
 
-      this.renderWatchdog = setTimeout(() => {
-        this.renderWatchdog = null;
-        if (this.pending > 0 && !this.faulted) {
-          this.onWorkerFault(FAULT_RENDER,
-            `render timed out after ${RENDER_WATCHDOG_MS} ms `
-            + `(${this.workers.length - this.pending}/${this.workers.length} `
-            + `segments responded) — a worker accepted 'render' but never replied`);
-        }
-      }, RENDER_WATCHDOG_MS);
-      if (typeof this.renderWatchdog.unref === 'function') this.renderWatchdog.unref();
+      this.armRenderWatchdog();
     });
   }
 
