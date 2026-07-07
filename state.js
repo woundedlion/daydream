@@ -151,7 +151,16 @@ export class URLSync {
       const raw = params.get(key);
       const validate = validators[key];
       if (validate && !validate(raw)) continue;
-      patch[key] = raw;
+      // Coerce to the seeded default's type so a numeric tracked key isn't left a
+      // raw string; a non-finite parse keeps the default rather than seeding NaN.
+      const current = state.get(key);
+      if (typeof current === 'number') {
+        const num = Number(raw);
+        if (!Number.isFinite(num)) continue;
+        patch[key] = num;
+      } else {
+        patch[key] = raw;
+      }
     }
     if (Object.keys(patch).length > 0) {
       state.update(patch);
