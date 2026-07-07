@@ -39,15 +39,8 @@ export class AppState {
   get(key) { return this.state[key]; }
 
   /**
-   * Sets one key, notifying subscribers only when the value actually changes.
-   * No-op (and no notification) if the value is unchanged.
-   *
-   * PRIMITIVES ONLY: change detection is strict `===`, which compares objects
-   * and arrays by reference, not by contents. Mutating an array/object in place
-   * and re-setting it (or setting a new object that is structurally equal) is
-   * therefore either dropped as "unchanged" or fires on every set regardless of
-   * content. All current keys hold primitives (strings/numbers/booleans); keep
-   * it that way, or this detection will silently misbehave for reference values.
+   * Sets one key, notifying subscribers only when the value changes (strict
+   * `===`, so keys must hold primitives — reference values mis-detect).
    * @param {string} key - The state key to write.
    * @param {*} value - The new value to store (intended to be a primitive).
    * @returns {void}
@@ -60,15 +53,9 @@ export class AppState {
   }
 
   /**
-   * Batch-sets multiple keys, firing one notification per changed key at the end.
-   *
-   * BATCH-THEN-NOTIFY: every key in the patch is written into the state FIRST,
-   * and only then are subscribers notified (one notification per changed key).
-   * This is deliberately unlike set(), which writes and notifies one key at a
-   * time — so a subscriber whose callback reads a *sibling* batched key here
-   * sees that sibling's fully-advanced (post-batch) value, not its pre-batch one.
-   * Keep callbacks that depend on cross-key ordering aware of this: the batch is
-   * an atomic snapshot, not a sequence of independent set()s.
+   * Batch-sets multiple keys: all keys are written FIRST, then subscribers are
+   * notified (one per changed key), so a callback reading a sibling batched key
+   * sees its post-batch value. Unlike set(), which writes+notifies per key.
    * @param {Object} patch - Key/value pairs to merge into the state.
    * @returns {void}
    */
@@ -264,11 +251,8 @@ export class URLSync {
 
   /**
    * Write a tracked key into a URLSearchParams, rounding numeric values via
-   * roundUrlNumber so the tracked-key path serializes numbers the same way the
-   * ad-hoc writer (setParam) does. Tracked keys are strings today, but without
-   * this a future numeric tracked key would land in the URL with full float
-   * noise (URLSearchParams.set just String()s it). Strings pass through
-   * unchanged (String(s) === s).
+   * roundUrlNumber so numbers serialize the same way setParam does. Strings
+   * pass through unchanged.
    * @param {URLSearchParams} params - The params object to mutate.
    * @param {string} key - The tracked key.
    * @param {*} val - The value to serialize.
