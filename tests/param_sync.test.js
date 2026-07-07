@@ -27,6 +27,7 @@ test('boolean: incoming is thresholded at 0.5 into a real boolean', () => {
   assert.equal(resolveParamSync(true, 0, true, false).value, false);
   assert.equal(resolveParamSync(false, 0.6, true, false).value, true);
   assert.equal(resolveParamSync(true, 0.4, true, false).value, false);
+  assert.equal(resolveParamSync(true, 0.5, true, false).value, false);
 });
 
 test('boolean: a flip updates; a matching state does not', () => {
