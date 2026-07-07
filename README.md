@@ -159,46 +159,60 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 
 ```
 ├── core/                       Rendering engine
-│   ├── platform.h              Arduino vs. WASM vs. Desktop abstraction layer
-│   ├── constants.h             MAX_W, MAX_H + ClipRegion segment clip rectangle
-│   ├── canvas.h                Effect base class + Canvas RAII write-buffer guard
-│   ├── engine.h                Engine API umbrella — included by every effect
-│   ├── effects.h               Effect roster (includes each effect + HS_EFFECT_LIST)
-│   ├── effects_legacy.h        Pre-engine effects (TheMatrix, Spirals, etc.)
-│   ├── effect_registry.h       Self-registering factory: REGISTER_EFFECT macro
-│   ├── led.h                   LED pin constants + color-correction RAII guards (driver in hardware/pov_single.h)
-│   │
-│   ├── 3dmath.h                Vector, Quaternion, Spherical, Complex, Möbius math
-│   ├── geometry.h              Fragment, Dots/Points, PhiLUT/TrigLUT, coord conversions
-│   ├── color.h                 Pixel16 (16-bit linear), Color4, blend helpers, palettes
-│   ├── palettes.h              Named ProceduralPalette instances + shared MeshPaletteBank
-│   ├── color_luts.h            Precomputed sRGB ↔ linear LUTs
-│   │
-│   ├── concepts.h              FunctionRef/Fn callable wrappers, PipelineRef type erasure, Tweenable concept
-│   ├── filter.h                Composable render pipeline + all Filter::World/Screen/Pix
-│   ├── sdf.h                   SDF shape primitives, CSG operations, distance queries
-│   ├── scan.h                  Rasterization primitives (Ring, Circle, Star, Mesh, etc.)
-│   ├── plot.h                  Line/curve rasterizer with geodesic/planar strategies
-│   ├── animation.h             Timeline, all Animation:: types, ParticleSystem
-│   ├── transformers.h          Ripple, Noise, Möbius warp geometry transformers
-│   ├── easing.h                Easing functions (cubic, sine, elastic, expo, etc.)
-│   ├── waves.h                 sin_wave / tri_wave / square_wave generators
-│   │
-│   ├── memory.h / memory.cpp   Arena allocator, ScratchScope, Persist<T>
-│   ├── mesh.h                  PolyMesh, HalfEdgeMesh, MeshOps (compile, clone, etc.)
-│   ├── conway.h                Conway operators (dual, kis, ambo, truncate, etc.)
-│   ├── hankin.h                Hankin pattern compilation and update system
-│   ├── solids.h                Platonic + Archimedean + Catalan + Islamic solid registry
-│   ├── spatial.h               KDTree, k-nearest-neighbor, MeshState (+ speculative AABB)
-│   ├── static_circular_buffer.h Fixed-capacity non-allocating circular buffer
-│   ├── rotate.h                Quaternion projection helpers
-│   ├── generators.h            Universal generate() wrapper for procedural geometry
-│   ├── presets.h               Generic Presets<Params, Size> template
-│   ├── styles.h                Feedback::Style named presets + space/color transform functions
-│   ├── util.h                  wrap(), fast_wrap(), shortest_distance, apply_if_changed
-│   ├── reaction_graph.h/.cpp   Precomputed Fibonacci-lattice K-NN graph (90 KiB / 92,160-byte table)
-│   ├── FastNoiseLite.h         Third-party: single-header noise library
-│   └── FastNoiseLite_config.h  FastNoiseLite build configuration
+│   ├── engine/                 Machinery: platform layer, memory, callables, rosters, effect support
+│   │   ├── platform.h              Arduino vs. WASM vs. Desktop abstraction layer
+│   │   ├── constants.h             MAX_W, MAX_H + ClipRegion segment clip rectangle
+│   │   ├── engine.h                Engine API umbrella — included by every effect
+│   │   ├── effects.h               Effect roster (includes each effect + HS_EFFECT_LIST)
+│   │   ├── effects_legacy.h        Pre-engine effects (TheMatrix, Spirals, etc.)
+│   │   ├── effect_registry.h       Self-registering factory: REGISTER_EFFECT macro
+│   │   ├── concepts.h              FunctionRef/Fn callable wrappers, PipelineRef type erasure, Tweenable concept
+│   │   ├── inplace_function.h      Fixed-capacity in-place callable storage behind Fn
+│   │   ├── memory.h / memory.cpp   Arena allocator, ScratchScope, Persist<T>
+│   │   ├── static_circular_buffer.h Fixed-capacity non-allocating circular buffer
+│   │   ├── generators.h            Universal generate() wrapper for procedural geometry
+│   │   ├── util.h                  wrap(), fast_wrap(), shortest_distance, apply_if_changed
+│   │   ├── transformers.h          Ripple, Noise, Möbius warp geometry transformers
+│   │   ├── styles.h                Feedback::Style named presets + space/color transform functions
+│   │   ├── presets.h               Generic Presets<Params, Size> template
+│   │   └── reaction_graph.h/.cpp   Precomputed Fibonacci-lattice K-NN graph (90 KiB / 92,160-byte table)
+│   ├── math/                   Vector/quaternion math and scalar curves
+│   │   ├── 3dmath.h                Vector, Quaternion, Spherical, Complex, Möbius math
+│   │   ├── rotate.h                Quaternion projection helpers
+│   │   ├── geometry.h              Dots/Points, PhiLUT/TrigLUT, coord conversions
+│   │   ├── easing.h                Easing functions (cubic, sine, elastic, expo, etc.)
+│   │   └── waves.h                 sin_wave / tri_wave / square_wave generators
+│   ├── mesh/                   Polyhedral meshes and their operators
+│   │   ├── mesh.h                  PolyMesh, HalfEdgeMesh, MeshOps (compile, clone, etc.)
+│   │   ├── mesh_classes.h          Congruence-class clustering + canonical distance-LUT bake
+│   │   ├── spatial.h               KDTree, k-nearest-neighbor, MeshState (+ speculative AABB)
+│   │   ├── conway.h                Conway operators (dual, kis, ambo, truncate, etc.)
+│   │   ├── hankin.h                Hankin pattern compilation and update system
+│   │   └── solids.h                Platonic + Archimedean + Catalan + Islamic solid registry
+│   ├── color/                  Color math and palettes
+│   │   ├── color.h                 Pixel16 (16-bit linear), Color4, blend helpers, palettes
+│   │   ├── color_luts.h            Precomputed sRGB ↔ linear LUTs
+│   │   └── palettes.h              Named ProceduralPalette instances + shared MeshPaletteBank
+│   ├── render/                 Canvas, rasterizers, and the filter pipeline
+│   │   ├── canvas.h                Effect base class + Canvas RAII write-buffer guard
+│   │   ├── scan.h                  Rasterization primitives (Ring, Circle, Star, Mesh, etc.)
+│   │   ├── plot.h                  Line/curve rasterizer with geodesic/planar strategies
+│   │   ├── filter.h                Composable render pipeline + all Filter::World/Screen/Pix
+│   │   ├── sdf.h                   SDF shape primitives, CSG operations, distance queries
+│   │   ├── shading.h               Fragment + mesh-topology shading helpers, null shaders
+│   │   └── led.h                   LED pin constants + color-correction RAII guards (driver in hardware/pov_single.h)
+│   ├── animation/              Timeline scheduler + the animation type families
+│   │   ├── animation.h             IAnimation/AnimationBase contract + umbrella over the fragments below
+│   │   ├── timers.h                RandomTimer / PeriodicTimer callback timers
+│   │   ├── params.h                Parameter-writing animations (Transition, Mutation, Driver, Lerp, ColorWipe, Mobius*, Ripple, Noise)
+│   │   ├── motion.h                Path/ProceduralPath + the Orientation drivers (Motion, Rotation, RandomWalk)
+│   │   ├── trails.h                OrientationTrail/VectorTrail history + tween/deep_tween traversal
+│   │   ├── sprites.h               Sprite draw envelope, Particle/ParticleSystem
+│   │   ├── timeline.h              TimelineEvent inline storage + the Timeline scheduler
+│   │   └── mesh.h                  Mesh-to-mesh transitions: MeshMorph, Segue policies, MeshCarousel
+│   └── vendor/                 Third-party code
+│       ├── FastNoiseLite.h         Single-header noise library
+│       └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
 ├── effects/                    27 effects (28 headers incl. the shared ReactionDiffusionBase.h):
 │                                BZReactionDiffusion.h, HopfFibration.h, IslamicStars.h,
@@ -224,7 +238,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 ├── CMakeLists.txt              Emscripten build (outputs holosphere_wasm.js + .wasm)
 ├── tests/                      Unit tests (CMake subdirectory)
 ├── scripts/                    Build + CI tooling
-│   ├── generate_luts.py        sRGB ↔ linear LUT generator of record (emits core/color_luts.h)
+│   ├── generate_luts.py        sRGB ↔ linear LUT generator of record (emits core/color/color_luts.h)
 │   ├── wasm_smoke.mjs          Runtime WASM smoke: drives every effect at both resolutions (CI)
 │   └── capture_screenshots.mjs Headless gallery capture for docs/screenshots/
 └── justfile                    Task runner: `just build` / `build-debug` / `test` / `install`
@@ -587,7 +601,7 @@ All rasterizers — SDF scanline, curve plotting, mesh, volumetric, and full-scr
 
 #### The Fragment
 
-A `Fragment` (`geometry.h`) is the data packet exchanged between rasterizers and shaders. It carries the pixel position, four general-purpose float registers, and the output color:
+A `Fragment` (`render/shading.h`) is the data packet exchanged between rasterizers and shaders. It carries the pixel position, four general-purpose float registers, and the output color:
 
 ```cpp
 struct Fragment {
@@ -770,6 +784,20 @@ All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<F
 
 The `Timeline` class manages a list of running `IAnimation` objects. Each frame, `timeline.step(canvas)` advances all active animations. Finished animations are removed; repeating animations are rewound. All animation types inherit from `AnimationBase` and support method chaining via `.then()` for sequencing.
 
+`animation.h` defines the contract every animation implements — `IAnimation`, the CRTP `AnimationBase`, and `Animation::Space` — and then includes seven fragment headers grouped by what they animate:
+
+| Header | Subject | Contents |
+|---|---|---|
+| `timers.h` | Callbacks on a clock | `RandomTimer`, `PeriodicTimer` |
+| `params.h` | A caller-owned parameter, written each frame | `Transition`, `Mutation`, `Driver`, `Lerp`, `ColorWipe`, the `Mobius*` family, `Ripple`, `Noise` |
+| `motion.h` | An `Orientation` driven through space | `Path`/`ProceduralPath`, `Motion`, `Rotation`, `RandomWalk` |
+| `trails.h` | Recorded history | `OrientationTrail`, `VectorTrail`, the `tween`/`deep_tween` traversals |
+| `sprites.h` | Visible things | `Sprite`, `Particle`/`ParticleSystem` |
+| `timeline.h` | Scheduling | `TimelineEvent`, `Timeline` |
+| `mesh.h` | Mesh-to-mesh transitions | `MeshMorph`, the `Segue` policies, `MeshCarousel` |
+
+The fragments compile only inside `animation.h` (a direct include fails with an `#error`); consumers include `animation.h` alone.
+
 #### Animation Types
 
 | Type | Description |
@@ -793,7 +821,7 @@ The `Timeline` class manages a list of running `IAnimation` objects. Each frame,
 | `MobiusFlow` | Animates `MobiusParams` for a continuous loxodromic flow |
 | `Noise` | Animates `NoiseParams` over time for flowing distortion fields |
 | `MeshMorph` | Morphs one `MeshState` into another by cloning both, building a nearest-vertex correspondence, and interpolating positions over a duration. The vertex-level primitive beneath `MeshCarousel`. |
-| `MeshCarousel<SegueT>` | Double-buffered mesh transition system, parameterized on a compile-time segue policy (`namespace Segue`) that owns the transition's animation scheduling via `schedule_segue()` and shapes its rendering through phase-driven hooks (`opacity`/`fill`/`grade`, plus optional `warp`, per-face sweep ordering, and `retarget` for per-transition anchors). Manages a pair of `MeshState` buffers and flips the front index eagerly so the segue's freshly-scheduled animation captures the new shape. `Segue::Crossfade` schedules one fading `Animation::Sprite` per transition and returns a next-transition delay that makes consecutive sprites **overlap**: each transition fades only its own incoming shape in (and back out), while the previous transition's sprite — still alive in its fade-out tail — keeps drawing the outgoing shape; no single call ever draws both meshes, but two are rasterized per overlap frame. Every other segue is **sequential** (one mesh per frame): `IrisBloom` (faces contract to glowing center points, then the new tessellation blooms out), `Lace` (fill drains to a glowing edge band and floods back), `TerminatorSweep` (a world-fixed day/night line extinguishes and re-ignites faces), `Shockwave` (an expanding wave erases outward from a point; its echo redraws), `Sparkle` (hashed per-face glitter dissolve), `Drain` (the polyhedron slerps into a vanishing point and unfurls from it), `Vortex` (latitude-sheared spiral wind/unwind), `SpinFlip` (rigid spin-up, swap hidden in POV motion blur), and `GoldConvergence` (palettes converge to molten gold around the swap). Used by IslamicStars (segue-templated, default `Segue::Crossfade`); MeshFeedback and HankinSolids reuse the buffered pair but drive vertex-level `MeshMorph` transitions over it instead. |
+| `MeshCarousel<SegueT>` | Double-buffered mesh transition system, parameterized on a compile-time segue policy (`namespace Segue`) that owns the transition's animation scheduling via `schedule_segue()` and shapes its rendering through phase-driven hooks (`opacity`/`fill`/`grade`, plus optional `warp`, per-face sweep ordering, and `retarget` for per-transition anchors). Manages a pair of `MeshState` buffers and flips the front index eagerly so the segue's freshly-scheduled animation captures the new shape. `Segue::Crossfade` schedules one fading `Animation::Sprite` per transition and returns a next-transition delay that makes consecutive sprites **overlap**: each transition fades only its own incoming shape in (and back out), while the previous transition's sprite — still alive in its fade-out tail — keeps drawing the outgoing shape; no single call ever draws both meshes, but two are rasterized per overlap frame. Every other segue is **sequential** (one mesh per frame): `IrisBloom` (faces contract to glowing center points, then the new tessellation blooms out), `Lace` (fill drains to a glowing edge band and floods back), `TerminatorSweep` (a world-fixed day/night line extinguishes and re-ignites faces), `Shockwave` (an expanding wave erases outward from a point; its echo redraws), `Breakdown` (the pattern breaks down one topology class at a time — every face of a color family fades together, classes in a random order reshuffled per swap, each fully gone before the next starts), `SpinFlip` (rigid spin-up, swap hidden in POV motion blur), and `GoldConvergence` (palettes converge to molten gold around the swap). Used by IslamicStars (segue-templated, default `Segue::Breakdown`); MeshFeedback and HankinSolids reuse the buffered pair but drive vertex-level `MeshMorph` transitions over it instead. |
 
 #### Orientation and Motion Blur
 
@@ -2052,7 +2080,7 @@ static constexpr int NUM_PIXELS = 40;
 static constexpr unsigned int RPM = 480;
 ```
 
-Pin assignments are in `core/led.h` (also included by `hardware/pov_single.h`):
+Pin assignments are in `core/render/led.h` (also included by `hardware/pov_single.h`):
 ```cpp
 static constexpr int PIN_DATA   = 11;
 static constexpr int PIN_CLOCK  = 13;
@@ -2072,7 +2100,7 @@ cmake --build  --preset wasm-release-install    # build + install into ../daydre
 Use `wasm-debug` for an unoptimized build with assertions (`-sASSERTIONS=1`). Build outputs go to `build/<preset>/`. The `justfile` provides cross-platform shortcuts that forward to these presets: `just build` (release), `just build-debug`, and `just install` (release + install into `../daydream`).
 
 The WASM target (`CMakeLists.txt`, `EMSCRIPTEN` branch) configures:
-- Source paths: `targets/wasm/wasm.cpp`, `core/memory.cpp`, `core/reaction_graph.cpp`
+- Source paths: `targets/wasm/wasm.cpp`, `core/engine/memory.cpp`, `core/engine/reaction_graph.cpp`
 - Include paths: project root (for `effects/`, `hardware/`) and `core/` (for engine headers)
 - `-sALLOW_MEMORY_GROWTH=1` — WASM heap can grow for large meshes
 - `-sMODULARIZE=1 -sEXPORT_ES6=1` — ES6 module output
