@@ -63,7 +63,7 @@ export async function copyToClipboard(text) {
  * @param {number} [opts.revertMs=1500] - How long the flashed label stays.
  * @param {string[]} [opts.copiedClasses=[]] - Classes added on success, removed on revert.
  * @param {string[]} [opts.failedClasses=[]] - Classes added on failure, removed on revert.
- * @param {string[]} [opts.idleClasses=[]] - Classes removed while flashed, restored on revert (only if there is text to restore).
+ * @param {string[]} [opts.idleClasses=[]] - Classes removed while flashed, restored on revert.
  * @returns {Promise<boolean>} Whether the copy succeeded.
  */
 export async function copyWithFeedback(text, opts = {}) {
@@ -97,7 +97,7 @@ export async function copyWithFeedback(text, opts = {}) {
     const timer = setTimeout(() => {
       element.textContent = original;
       if (flashClasses.length) element.classList.remove(...flashClasses);
-      if (idleClasses.length && original) element.classList.add(...idleClasses);
+      if (idleClasses.length) element.classList.add(...idleClasses);
       delete element.copyFeedback;
     }, revertMs);
     element.copyFeedback = { timer, original };

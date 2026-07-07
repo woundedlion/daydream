@@ -26,6 +26,25 @@ function fakeElement(label) {
   };
 }
 
+/**
+ * Like fakeElement but with a classList that records the live class set, so a
+ * test can assert which classes are present after a flash/revert cycle.
+ * @param {string} label - Initial idle text.
+ * @param {string[]} [initialClasses] - Classes present before the first copy.
+ * @returns {{textContent: string, classList: {add: Function, remove: Function, has: Function}}} A fake element with a tracking classList.
+ */
+function fakeElementTracking(label, initialClasses = []) {
+  const classes = new Set(initialClasses);
+  return {
+    textContent: label,
+    classList: {
+      add: (...c) => c.forEach((x) => classes.add(x)),
+      remove: (...c) => c.forEach((x) => classes.delete(x)),
+      has: (c) => classes.has(c),
+    },
+  };
+}
+
 beforeEach(() => {
   mock.timers.enable({ apis: ['setTimeout'] });
 });
@@ -47,6 +66,22 @@ test('a second copy within revertMs still reverts to the idle label', async () =
 
   mock.timers.tick(2000);
   assert.equal(el.textContent, 'Copy', 'element reverts to idle, not "Copied!"');
+});
+
+/** With an empty revertText (no idle label to restore), the idle class is still restored on revert. */
+test('revertText: "" still restores the idle class on revert', async () => {
+  const el = fakeElementTracking('Copy', ['text-gray-500']);
+
+  await copyWithFeedback('a', {
+    element: el, copiedText: 'Copied!', revertText: '', revertMs: 1500,
+    copiedClasses: ['text-green-400'], idleClasses: ['text-gray-500'],
+  });
+  assert.equal(el.textContent, 'Copied!');
+  assert.equal(el.classList.has('text-gray-500'), false, 'idle class removed while flashed');
+
+  mock.timers.tick(2000);
+  assert.equal(el.textContent, '');
+  assert.equal(el.classList.has('text-gray-500'), true, 'idle class restored after revert');
 });
 
 /** A rejected clipboard write flashes the failure label and reverts, never latching "Copied!". */
