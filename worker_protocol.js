@@ -6,8 +6,8 @@
  * messages exchanged between the main thread (segment_controller.js) and each
  * segment Web Worker (segment_worker.js).
  *
- * These are JSDoc `@typedef`s only — the file emits no runtime code. Both sides
- * import the relevant unions via `@typedef {import('./worker_protocol.js').X} X`
+ * Apart from the shared `PROTOCOL_VERSION` constant this file is JSDoc `@typedef`s
+ * only. Both sides import the relevant unions via `@typedef {import('./worker_protocol.js').X} X`
  * and run under `// @ts-check`, so a renamed field or a message shape that drifts
  * between sender and receiver is flagged in-editor instead of failing silently at
  * runtime (a malformed `postMessage` is otherwise only caught when a handler
@@ -17,6 +17,15 @@
  * what the controller sends and the worker receives; ControllerInboundMsg is what
  * the worker sends back.
  */
+
+/**
+ * Protocol version stamped on `init` (controller → worker) and `booted`
+ * (worker → controller). Each side faults on a mismatch, so a stale-cached worker
+ * or glue against updated peer code fails fast instead of drifting on a
+ * same-named but reshaped message. Bump on any breaking change to the messages below.
+ * @type {number}
+ */
+export const PROTOCOL_VERSION = 1;
 
 /**
  * One tuned effect parameter, flattened for structured-clone transport. Booleans
@@ -47,7 +56,8 @@
  * carries the host's current pause state so a pool re-created under a paused GUI
  * doesn't start animating.
  * @typedef {{
- *   type: 'init', segId: number, totalSegs: number, w: number, h: number,
+ *   type: 'init', version: number, segId: number, totalSegs: number,
+ *   w: number, h: number,
  *   effectName?: string, params?: SegParam[], paused?: boolean,
  * }} InitMsg
  */
@@ -90,8 +100,9 @@
  * glue ./holosphere_wasm.js) all resolved. Sent before the WASM instantiate so
  * the controller can detect a missing/renamed glue file fast, ahead of the
  * slower init watchdog. Carries no segId: the controller maps it to the worker
- * via the per-worker message handler.
- * @typedef {{ type: 'booted' }} BootedMsg */
+ * via the per-worker message handler. Carries the protocol version so the
+ * controller faults a stale-cached worker before init.
+ * @typedef {{ type: 'booted', version: number }} BootedMsg */
 
 /**
  * A rendered quadrant. `pixels` is the segment's RGB16 rectangle (qw*qh*3),
@@ -113,5 +124,3 @@
  * Every message a worker sends back to the controller.
  * @typedef {ReadyMsg | InitFailedMsg | FrameMsg | BootedMsg} ControllerInboundMsg
  */
-
-export {};

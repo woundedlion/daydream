@@ -14,6 +14,7 @@ mock.module('../driver.js', {
 });
 
 const { SegmentController, MAX_BOOT_RETRIES } = await import('../segment_controller.js');
+const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
 
 // ---------------------------------------------------------------------------
 // Fakes
@@ -108,7 +109,7 @@ function deliverReady(controller, segId) {
  * @returns {void}
  */
 function deliverBooted(controller, segId) {
-  controller.workers[segId].onmessage({ data: { type: 'booted' } });
+  controller.workers[segId].onmessage({ data: { type: 'booted', version: PROTOCOL_VERSION } });
 }
 
 /**
@@ -257,6 +258,25 @@ test('a worker fault latches, zeroes pending, and resolves the in-flight frame',
   assert.equal(c.renderInFlight, false);
   assert.equal(c.frameResolve, null);
   await done;
+});
+
+test('create posts init stamped with the protocol version', () => {
+  const c = makeController();
+  c.create(2);
+  for (const w of c.workers) {
+    const init = w.posted.find((m) => m.type === 'init');
+    assert.ok(init, 'init posted');
+    assert.equal(init.version, PROTOCOL_VERSION);
+  }
+});
+
+test('a booted ping with a mismatched protocol version faults fast', () => {
+  const c = makeController();
+  c.create(2);
+  c.workers[0].onmessage({ data: { type: 'booted', version: PROTOCOL_VERSION + 1 } });
+  assert.equal(c.faulted, true);
+  assert.equal(c.faultInfo.segId, 0);
+  assert.match(c.faultInfo.message, /protocol version/);
 });
 
 test('a worker onmessageerror latches the fault the same way onerror does', async () => {

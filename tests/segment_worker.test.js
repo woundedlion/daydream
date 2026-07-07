@@ -3,6 +3,7 @@
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
 import { test, mock, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { PROTOCOL_VERSION } from '../worker_protocol.js';
 
 // ---------------------------------------------------------------------------
 // Fakes — installed BEFORE importing the worker, which binds self.postMessage
@@ -99,6 +100,9 @@ const bootedAtLoad = posted.filter((p) => p.msg.type === 'booted');
  * @returns {Promise<void>}
  */
 async function dispatch(msg) {
+  // Stamp the current protocol version on init so per-test messages needn't
+  // repeat it; a test probing the mismatch path passes an explicit version.
+  if (msg.type === 'init') msg = { version: PROTOCOL_VERSION, ...msg };
   await fakeSelf.onmessage({ data: msg });
 }
 
@@ -111,6 +115,19 @@ beforeEach(() => {
 /** The worker posts 'booted' at module load; the controller's boot watchdog depends on this ping. */
 test('worker posts booted at module load', () => {
   assert.equal(bootedAtLoad.length, 1, 'exactly one booted ping emitted at load');
+  assert.equal(bootedAtLoad[0].msg.version, PROTOCOL_VERSION, 'booted carries the protocol version');
+});
+
+/** A version mismatch faults before any WASM work so the controller stops fast. */
+test('init faults on a protocol version mismatch', async () => {
+  await dispatch({ type: 'init', version: PROTOCOL_VERSION + 1,
+                   segId: 2, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
+
+  assert.equal(engineInstance, null, 'no engine constructed on version mismatch');
+  const failed = posted.find((p) => p.msg.type === 'initFailed');
+  assert.ok(failed, 'initFailed posted');
+  assert.equal(failed.msg.segId, 2);
+  assert.equal(posted.find((p) => p.msg.type === 'ready'), undefined, 'no ready posted');
 });
 
 /** init builds the segRange, drives the engine setup in order, and posts ready. */
