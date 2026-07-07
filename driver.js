@@ -566,7 +566,7 @@ export class Daydream {
    * Set the active effect's POV column-strobe mode (from the engine's
    * strobeColumns()). false (persist) fills the inter-column gaps so columns
    * merge into a continuous band; true (strobe) leaves discrete dots with dark
-   * gaps. Applied via uColumnFillScale in updateCullUniforms() each frame.
+   * gaps. Applied via uColumnFillArc in updateCullUniforms() each frame.
    * @param {boolean} strobe - true to strobe columns, false to persist/smear.
    */
   setStrobeColumns(strobe) {
