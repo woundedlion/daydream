@@ -43,7 +43,7 @@ export function linearRgbToHex(r, g, b) {
    */
   const toHex = (c) => {
     const i = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, c))) * 255);
-    const hex = Math.max(0, Math.min(255, i)).toString(16);
+    const hex = i.toString(16);
     return hex.length === 1 ? "0" + hex : hex;
   };
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
