@@ -95,6 +95,20 @@ test('URLSync validator rejects an invalid URL value and keeps the default', () 
   assert.equal(s.get('res'), 'low');
 });
 
+test('URLSync coerces a URL value to a numeric default key', () => {
+  installWindow('?count=42');
+  const s = new AppState({ count: 0 });
+  new URLSync(s, ['count']);
+  assert.strictEqual(s.get('count'), 42);
+});
+
+test('URLSync keeps a numeric default when the URL value is non-finite', () => {
+  installWindow('?count=abc');
+  const s = new AppState({ count: 7 });
+  new URLSync(s, ['count']);
+  assert.strictEqual(s.get('count'), 7);
+});
+
 test('URLSync validator admits a valid URL value', () => {
   installWindow('?res=high');
   const s = new AppState({ res: 'low' });
