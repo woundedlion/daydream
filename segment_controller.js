@@ -48,6 +48,37 @@ const RENDER_WATCHDOG_MS = 8 * SLOW_FRAME_MS;
 const FAULT_POOL = -1;
 const FAULT_RENDER = -2;
 
+// Bounded auto-retry for a transient worker module-load failure: a bare, message-
+// less error Event, which the browser fires when a `{type:'module'}` worker's
+// import graph fails to fetch — typically a burst of cold concurrent fetches of the
+// large WASM glue racing after the tab's keep-alive connection dropped during idle,
+// not a deterministic worker throw. The pool rebuilds a few times with a short
+// backoff (the refetch hits a re-warmed cache/connection) before latching a fault,
+// so the sim self-heals instead of needing a manual segmented-mode toggle.
+export const MAX_BOOT_RETRIES = 3;
+const BOOT_RETRY_DELAY_MS = 250;
+
+/**
+ * Best-effort prime of the worker module graph's HTTP cache and keep-alive
+ * connection before a pool spawn, so the burst of cold concurrent worker fetches
+ * after an idle period can't lose the race and abort one worker's load. Awaited on
+ * the interactive enable path (the primary trigger); a no-op outside a web origin
+ * (e.g. under the file://-based unit tests) and swallows all failures — the boot
+ * auto-retry is the actual guarantee, this only lowers the odds.
+ * @returns {Promise<void>}
+ */
+export function warmModules() {
+  if (typeof fetch !== 'function') return Promise.resolve();
+  let probe;
+  try { probe = new URL('./holosphere_wasm.js', import.meta.url); }
+  catch { return Promise.resolve(); }
+  if (probe.protocol !== 'http:' && probe.protocol !== 'https:') return Promise.resolve();
+  const urls = ['./segment_worker.js', './holosphere_wasm.js', './holosphere_wasm.wasm'];
+  return Promise.allSettled(
+    urls.map((u) => fetch(new URL(u, import.meta.url), { cache: 'force-cache' })),
+  ).then(() => {});
+}
+
 /** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
 /** @typedef {import('./worker_protocol.js').ControllerInboundMsg} ControllerInboundMsg */
 /** @typedef {import('./worker_protocol.js').SegArenaMetrics} SegArenaMetrics */
@@ -141,6 +172,13 @@ export class SegmentController {
     /** @type {ReturnType<typeof setTimeout> | null} */
     this.renderWatchdog = null;
 
+    // Bounded transient-module-load recovery; see MAX_BOOT_RETRIES. bootAttempt is
+    // this pool's retry index (0 for a user-driven create), carried into the next
+    // create() by the retry path.
+    this.bootAttempt = 0;
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    this.retryTimer = null;
+
     /** @type {HTMLTableElement | null} */
     this.statsTable = null;
     this.statsSegCount = 0;   // segment count the cached table was built for
@@ -192,9 +230,11 @@ export class SegmentController {
    * module and initialized with this engine's tuned params and paused state.
    * Aborts loudly (leaving an empty controller) if the resolution key is unknown.
    * @param {number} numSegments
+   * @param {number} [bootAttempt] - Retry index; 0 for a user-driven spawn, bumped by the transient-module-load auto-retry.
    */
-  create(numSegments) {
+  create(numSegments, bootAttempt = 0) {
     this.destroy();
+    this.bootAttempt = bootAttempt;
 
     const res = this.resolutionPresets[this.appState.get('resolution')];
     if (!res) {
@@ -286,6 +326,26 @@ export class SegmentController {
       };
 
       worker.onerror = (e) => {
+        // A message-less error Event before the pool is ready is a module-graph
+        // load failure (a plain Event, not an ErrorEvent) — transient, so rebuild
+        // a bounded number of times before latching. A messaged error is a real
+        // worker throw and still fails fast.
+        if (!this.ready && (e == null || e.message == null)
+            && this.bootAttempt < MAX_BOOT_RETRIES) {
+          const next = this.bootAttempt + 1;
+          console.warn(`[Segmented] seg ${i} module failed to load`
+            + ` (attempt ${next}/${MAX_BOOT_RETRIES}); rebuilding pool`);
+          this.clearBootWatchdog();
+          this.clearInitWatchdog();
+          this.clearRenderWatchdog();
+          this.clearRetryTimer();
+          this.retryTimer = setTimeout(() => {
+            this.retryTimer = null;
+            if (this.active) this.create(this.count, next);
+          }, BOOT_RETRY_DELAY_MS);
+          if (typeof this.retryTimer.unref === 'function') this.retryTimer.unref();
+          return;
+        }
         console.error(`[Segmented] Worker seg ${i} error: ${e.message}`
           + ` (${e.filename}:${e.lineno}:${e.colno})`, e);
         this.onWorkerFault(i, e.message);
@@ -357,6 +417,14 @@ export class SegmentController {
     }
   }
 
+  /** Cancel a pending transient-module-load rebuild if one is scheduled. Idempotent. */
+  clearRetryTimer() {
+    if (this.retryTimer !== null) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+  }
+
   /** Cancel the render watchdog if one is pending. Idempotent. */
   clearRenderWatchdog() {
     if (this.renderWatchdog !== null) {
@@ -399,6 +467,7 @@ export class SegmentController {
     this.clearBootWatchdog();
     this.clearInitWatchdog();
     this.clearRenderWatchdog();
+    this.clearRetryTimer();
     this.workers = [];
     this.results = [];
     this.timings = [];
