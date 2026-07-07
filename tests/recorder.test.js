@@ -212,9 +212,13 @@ test('toggle starts then stops, reporting the true state each time', () => {
     rec.download = () => {};
     assert.equal(rec.toggle('e'), true);
     assert.equal(rec.isRecording, true);
+    const stream = rec.stream;
+    const recorder = rec.mediaRecorder;
     assert.equal(rec.toggle('e'), false);
-    rec.mediaRecorder.onstop();
     assert.equal(rec.isRecording, false);
+    recorder.onstop();
+    assert.equal(rec.mediaRecorder, null, 'onstop clears the recorder');
+    assert.equal(stream.track.stopped, true, 'onstop stops the capture track');
   } finally {
     restore();
   }
