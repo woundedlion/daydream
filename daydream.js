@@ -16,8 +16,7 @@ import { EngineHost } from "./engine_host.js";
 import { resolveParamSync } from "./param_sync.js";
 import { formatExportParams } from "./tools/export_params.js";
 
-// This UI layer degrades gracefully (log, keep last good state, return) on
-// failures from user/config-dependent engine calls; the lower layers trap.
+// UI layer degrades gracefully (log + keep last good state); lower layers trap.
 
 const HiResFavorites = [
   "BZReactionDiffusion",
@@ -227,10 +226,8 @@ function applyEffect(preserveParams = false) {
   if (host.engine) {
     if (host.engine.setEffect(appState.get('effect')) === false) {
       console.error(`setEffect("${appState.get('effect')}") failed; effect unavailable.`);
-      // Engine is unchanged: sync strobe-column mode to the effect still loaded and
-      // signal failure so the subscriber reverts appState. Do NOT broadcast the
-      // failed name to the worker pool — that would diverge workers from the main
-      // engine, which rejected it.
+      // Engine unchanged; return false so the subscriber reverts appState. Do NOT
+      // broadcast the rejected name to the workers (would diverge them from main).
       daydream.setStrobeColumns(host.engine.strobeColumns());
       return false;
     }
@@ -403,13 +400,10 @@ function applyEffect(preserveParams = false) {
 
 /**
  * Apply a resolution change: resize geometry, refresh sidebar list, then re-apply effect.
- * @param {boolean} [preserveParams=false] - Forwarded to applyEffect() when the
- *   active effect is still offered at the new resolution; when true, preserve that
- *   effect's param URL entries through the re-apply. When the active/hydrated effect
- *   is NOT offered (off-list) it is corrected to the list's first entry, and only
- *   GLOBAL param URL entries (resolution, effect, and the global GUI's deep-link
- *   keys) carry over — the effect-specific entries are dropped regardless of this
- *   flag, since they target an effect this resolution can't run.
+ * @param {boolean} [preserveParams=false] - When true, keep the active effect's
+ *   param URL entries through the re-apply (only if the effect is still offered;
+ *   an off-list effect is corrected to the list's first entry, dropping its
+ *   effect-specific URL entries regardless).
  * @returns {boolean|void} false when the engine rejected the resolution (the
  *   caller must revert appState so UI/URL don't advertise an unapplied value);
  *   otherwise undefined.
@@ -510,9 +504,8 @@ createHolosphereModule().then(module => {
       } else {
         host.engine.drawFrame();
         host.refresh();
-        // All three aliases must point at the one WASM view. Throwing here would
-        // fault the animation loop every frame and halt rendering; instead log
-        // once and re-point the aliases so a future divergence self-heals.
+        // All three aliases must point at the one WASM view; log once and
+        // re-point rather than throw (throwing here halts the render loop).
         const view = host.view();
         if (Daydream.pixels !== view ||
             daydream.dotMesh.instanceColor.array !== view) {

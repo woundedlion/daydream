@@ -110,17 +110,12 @@ export class Daydream {
   static LABEL_VISIBILITY_FRAMING_RATIO = Daydream.SPHERE_RADIUS / Daydream.CAMERA_Z;
   static H = 20;
   static W = 96;
-  // Virtual-row padding the engine adds below the logical H (engine maps phi
-  // over H + H_OFFSET rows; core/platform.h). The WASM/sim build runs with 0;
-  // the device build uses 3. The sim stays at 0 (full-sphere mapping): the
-  // device's south-pole clipping is a compile-time engine fork the sim cannot
-  // reproduce by repositioning dots alone (see pixelToSpherical).
+  // Virtual-row padding over logical H (core/platform.h). Sim = 0 (full sphere);
+  // device = 3 (south-pole clip). See pixelToSpherical.
   static H_OFFSET = 0;
   static PIXEL_WIDTH = 2 * Math.PI / Daydream.W;
   static FPS = 16;
-  // Cap on accumulated real time: the clock consumes one interval per frame, so
-  // this bounds the post-stall backlog to a few frames instead of letting it grow
-  // unboundedly and step every frame until drained.
+  // Bounds the post-stall frame backlog (clock consumes one interval per frame).
   static MAX_FRAME_CATCHUP_SECONDS = 0.25;
   static DOT_SIZE = 2;
   static DOT_COLOR = 0x0000ff;
@@ -270,16 +265,8 @@ export class Daydream {
   }
 
   /**
-   * Wire WebGL context-loss / -restore handling on the canvas.
-   * @details On this project's typical hardware Chrome applies the
-   *          `exit_on_context_lost` workaround (the D3D device can't be reset
-   *          inside the GPU sandbox), so a lost context tears down the whole GPU
-   *          process and generally will NOT auto-restore — recovery is a page
-   *          reload. These handlers do not prevent the loss; they replace the
-   *          silent blank canvas (and the later uncaught throw on re-create) with
-   *          a logged reason plus a visible reload prompt, and they flip a flag so
-   *          render() stops pushing GL calls into a dead context. The restore
-   *          handler is wired for completeness on hardware that can recover.
+   * Wire WebGL context-loss / -restore handling on the canvas: on loss, flag
+   * contextLost (render() then stops issuing GL calls) and show a reload prompt.
    */
   setupContextLossHandling() {
     this.contextLost = false;
@@ -563,10 +550,8 @@ export class Daydream {
   }
 
   /**
-   * Set the active effect's POV column-strobe mode (from the engine's
-   * strobeColumns()). false (persist) fills the inter-column gaps so columns
-   * merge into a continuous band; true (strobe) leaves discrete dots with dark
-   * gaps. Applied via uColumnFillArc in updateCullUniforms() each frame.
+   * Set POV column-strobe mode: true = discrete dots, false = gap-filled band
+   * (applied via uColumnFillArc in updateCullUniforms()).
    * @param {boolean} strobe - true to strobe columns, false to persist/smear.
    */
   setStrobeColumns(strobe) {

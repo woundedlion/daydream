@@ -27,20 +27,12 @@ const optionValues = (options) => {
 };
 
 /**
- * Builds an independent debounced URL-param writer with its OWN pending-writes
- * buffer and timer. Each `DeepLinkGUI` owns one (shared down its folder subtree),
- * so two separate GUIs on a single tool page no longer share one module-global
- * debounce — a footgun where one GUI's flush could swallow or race the other's.
- *
- * The returned writer persists a single GUI control value to the URL query
- * params. When the app's single URLSync writer is present (the main simulator)
- * writes funnel through it so GUI param changes and effect/resolution changes
- * can't clobber each other; the per-instance fallback below is only reached on
- * standalone tool pages that have no URLSync.
- *
- * Pending writes are accumulated per key and merged in a single flush: a timer
- * that only remembered the last key would drop the first of two params changed
- * within the debounce window from the deep link.
+ * Builds an independent debounced URL-param writer with its own pending-writes
+ * buffer and timer, one per DeepLinkGUI subtree. When the app's single URLSync
+ * writer is present, writes funnel through it (so GUI and effect/resolution
+ * changes can't clobber each other); the per-instance fallback is reached only
+ * on standalone tool pages with no URLSync. Writes accumulate per key and merge
+ * in one flush.
  * @returns {(key: string, value: (string|number|boolean|null|undefined)) => void}
  *   A writer; `value` null/undefined deletes the key.
  */
