@@ -884,7 +884,15 @@
         vertices.push(new THREE.Vector3(vArray[i], vArray[i + 1], vArray[i + 2]));
       }
 
-      const faces = wasmMesh.getFaces(); // Returns Array<Array<number>> directly now!
+      const flat = wasmMesh.getFaces(); // { indices: Uint16Array, counts: Uint8Array }
+      const faces = [];
+      let k = 0;
+      for (let i = 0; i < flat.counts.length; i++) {
+        const n = flat.counts[i];
+        const face = new Array(n);
+        for (let c = 0; c < n; c++) face[c] = flat.indices[k++];
+        faces.push(face);
+      }
 
       return { vertices, faces };
     }
