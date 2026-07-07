@@ -301,6 +301,8 @@ export class Daydream {
       this.contextLost = false;
       console.warn("[daydream] WebGL context restored");
       overlay.style.display = "none";
+      // Repaint so instanceColor/instanceMatrix re-upload even while paused.
+      this.needsRender = true;
     };
 
     this.canvas.addEventListener("webglcontextlost", this.onContextLost, false);
