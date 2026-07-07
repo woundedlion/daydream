@@ -1,0 +1,26 @@
+# Run the simulator's JS unit suite on every pull request. deploy.yml gates the
+# same suite on push-to-master (the deploy path); this standalone workflow gives
+# PRs a pre-merge signal so a regression across the test files is caught before
+# merge rather than only at deploy time. Mirrors deploy.yml's js-tests job.
+name: JS unit tests
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  js-tests:
+    name: Simulator JS unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'      # package.json engines: node >=22.3.0
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
