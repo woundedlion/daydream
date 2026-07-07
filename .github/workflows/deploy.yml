@@ -139,10 +139,24 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
+      - name: Stage site (explicit allowlist)
+        # Publish only the runtime app, not the whole repo tree. The former
+        # path: '.' shipped .git/, tests/, scripts/, and dev tooling to Pages
+        # (node_modules/, three.js/, vendor/ are gitignored, so absent from this
+        # fresh checkout — but the tracked dev files were not). Copy the served
+        # set: index.html, README + its screenshot gallery, the root ES modules,
+        # styles/, tools/, and the WASM binary. three.js / lil-gui / Tailwind
+        # load from their CDNs (vendor-importmap.js + the tools' onerror
+        # fallback), so no vendored dirs are needed.
+        run: |
+          mkdir _site
+          cp index.html README.md *.js holosphere_wasm.wasm _site/
+          cp -r styles tools docs _site/
+
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
 
       - name: Deploy to Pages
         id: deployment
