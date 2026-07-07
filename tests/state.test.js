@@ -184,6 +184,26 @@ test('URLSync.reset preserves the excluded keys and clears the rest', () => {
   assert.equal(params.has('speed'), false, 'unexcluded, untracked key cleared');
 });
 
+test('URLSync auto-flushes a tracked-key change once after the debounce', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const calls = installWindow('?effect=Voronoi', '/sim');
+    const s = new AppState({ effect: 'Voronoi' });
+    new URLSync(s, ['effect']);
+
+    s.set('effect', 'Moire'); // arms the 200 ms debounce
+    assert.equal(calls.length, 0, 'no synchronous write on set');
+    mock.timers.tick(199);
+    assert.equal(calls.length, 0, 'nothing before the debounce elapses');
+    mock.timers.tick(1);
+    assert.equal(calls.length, 1, 'exactly one debounced write at 200 ms');
+    const params = new URLSearchParams(calls[0].split('?')[1]);
+    assert.equal(params.get('effect'), 'Moire', 'the new value is written');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
 test('URLSync.reset cancels a pending debounced flush', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
