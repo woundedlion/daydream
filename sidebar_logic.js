@@ -23,7 +23,7 @@ export function sortItems(items, key, dir) {
   const mul = dir === 'asc' ? 1 : -1;
   return [...items].sort((a, b) => {
     if (key === 'size') return (a.size - b.size) * mul;
-    return a.name.localeCompare(b.name) * mul;
+    return a.name.localeCompare(b.name, 'en') * mul;
   });
 }
 
