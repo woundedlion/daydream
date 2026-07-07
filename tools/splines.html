@@ -409,10 +409,11 @@
       raycaster = new THREE.Raycaster();
       mouse = new THREE.Vector2();
 
-      // Input
+      // Input. mouseup/mousemove on document so a drag released off-canvas
+      // still ends (mousedown stays on the canvas to hit-test the sphere).
       renderer.domElement.addEventListener('mousedown', onMouseDown);
-      renderer.domElement.addEventListener('mouseup', onMouseUp);
-      renderer.domElement.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      document.addEventListener('mousemove', onMouseMove);
 
       // Wire the scaffold's dispose() to teardown — it stops the render loop and
       // detaches the resize listener, which previously leaked on page unload.
