@@ -930,7 +930,7 @@
       colorStripCtx.drawImage(colorStripCache, 0, 0);
 
       // 2. Draw the sweeping line marker
-      const markerX = Math.round(t * width);
+      const markerX = Math.round(t * (width - 1));
 
       colorStripCtx.strokeStyle = '#FFFFFF'; // Bright white marker
       colorStripCtx.lineWidth = 2;
