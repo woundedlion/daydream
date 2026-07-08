@@ -115,6 +115,25 @@ export function splineExportCode(pts, format) {
 }
 
 /**
+ * Convert a flat vertex buffer ([x0,y0,z0, x1,y1,z1, ...]) into spline anchor
+ * points. Each vertex is normalized onto the unit sphere, since solid vertices
+ * are not guaranteed unit-radius but control points must lie on the sphere.
+ * @param {ArrayLike<number>} flatVerts - Flattened xyz triples (e.g. the Float32Array from MeshOps.getVertices()).
+ * @returns {Array<{x:number,y:number,z:number}>} One unit-length anchor point per vertex.
+ */
+export function solidVertexAnchors(flatVerts) {
+  if (flatVerts.length % 3 !== 0) {
+    throw new Error(`solidVertexAnchors: vertex buffer length ${flatVerts.length} ` +
+      `is not a multiple of 3`);
+  }
+  const pts = [];
+  for (let i = 0; i < flatVerts.length; i += 3) {
+    pts.push(vec3Normalize({ x: flatVerts[i], y: flatVerts[i + 1], z: flatVerts[i + 2] }));
+  }
+  return pts;
+}
+
+/**
  * Sample a point uniformly on the unit sphere via Marsaglia's method. The RNG
  * is injectable so the result is deterministic under test.
  * @param {Function} [rng] - Uniform [0,1) source; defaults to Math.random.
