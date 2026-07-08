@@ -15,7 +15,7 @@
 //     BakedPalette. The interpolation domain matches (linear), but the 8-bit
 //     source quantization can diverge by MORE than ~1 LSB, most in dark tones.
 
-import { srgbToLinearFloat } from './color.js';
+import { srgbToLinearFloat, linearToSrgbFloat } from './color.js';
 import { formatFloatCpp } from './cpp_format.js';
 
 const TWO_PI = 2 * Math.PI;
@@ -360,15 +360,16 @@ export class GenerativePalette {
   }
 
   /**
-   * One channel of the linear sample at t, for curve plotting. Recomputes the
-   * full triple via get(t) and discards two channels; cost is negligible at
-   * plot resolution.
+   * One channel of the sRGB sample at t, for curve plotting. Recomputes the full
+   * linear triple via get(t), discards two channels, and converts back to sRGB so
+   * the wave graph plots the same domain as ProceduralPalette (raw sRGB) and the
+   * 8-bit sRGB form the device bakes and exports.
    * @param {number} t - Time parameter in [0, 1].
    * @param {number} channelIndex - Channel to sample (0=R, 1=G, 2=B).
-   * @returns {number} Linear value for the channel.
+   * @returns {number} sRGB value for the channel.
    */
   getChannelValue(t, channelIndex) {
-    return this.get(t)[channelIndex];
+    return linearToSrgbFloat(this.get(t)[channelIndex]);
   }
 }
 
