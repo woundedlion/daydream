@@ -158,6 +158,11 @@ export class URLSync {
         const num = parseFloat(raw);
         if (!Number.isFinite(num)) continue;
         patch[key] = num;
+      } else if (typeof current === 'boolean') {
+        const t = raw.trim().toLowerCase();
+        if (t === 'true' || t === '1' || t === 'yes' || t === 'on') patch[key] = true;
+        else if (t === 'false' || t === '0' || t === 'no' || t === 'off') patch[key] = false;
+        else continue;
       } else {
         patch[key] = raw;
       }
