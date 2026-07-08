@@ -109,6 +109,13 @@ test('URLSync keeps a numeric default when the URL value is non-finite', () => {
   assert.strictEqual(s.get('count'), 7);
 });
 
+test('URLSync keeps a numeric default for an empty URL value', () => {
+  installWindow('?count=');
+  const s = new AppState({ count: 5 });
+  new URLSync(s, ['count']);
+  assert.strictEqual(s.get('count'), 5);
+});
+
 test('URLSync validator admits a valid URL value', () => {
   installWindow('?res=high');
   const s = new AppState({ res: 'low' });
