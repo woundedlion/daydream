@@ -35,6 +35,10 @@ class FakeEngine {
     this.paused = false;
     this.metricsThrows = false;
     this.calls = [];
+    // Reused view, like the real engine's getParamValues() into WASM memory, so
+    // the worker's Array.from() copy-out is load-bearing (a passthrough would
+    // send this live buffer, not a detached snapshot).
+    this.paramView = Uint16Array.of(5, 15, 25);
   }
   setResolution(w, h) {
     this.calls.push(['setResolution', w, h]);
@@ -51,7 +55,7 @@ class FakeEngine {
   setClip(x0, x1, y0, y1) { this.clip = { y0, y1, x0, x1 }; }
   drawFrame() { this.calls.push(['drawFrame']); }
   getRenderUs() { return 1234; }
-  getParamValues() { return [0.5, 1.5, 2.5]; }
+  getParamValues() { return this.paramView; }
   /** Each channel encodes its flat canvas index so extraction can be checked. */
   getPixels() {
     const buf = new Uint16Array(this.curW * this.curH * 3);
@@ -251,7 +255,12 @@ test('render streams param values from segment 0 only', async () => {
   posted.length = 0;
   await dispatch({ type: 'render' });
   const frame0 = posted.find((p) => p.msg.type === 'frame').msg;
-  assert.deepEqual(frame0.paramValues, [0.5, 1.5, 2.5], 'segment 0 carries params');
+  assert.ok(Array.isArray(frame0.paramValues), 'paramValues is a detached plain array');
+  assert.deepEqual(frame0.paramValues, [5, 15, 25], 'segment 0 carries params');
+  // Mutating the engine's reused view after the frame is posted must not disturb
+  // the sent values, proving the worker copied them out rather than forwarding.
+  engineInstance.paramView[0] = 999;
+  assert.deepEqual(frame0.paramValues, [5, 15, 25], 'sent values are a snapshot');
 
   await dispatch({ type: 'init', segId: 1, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
   posted.length = 0;
