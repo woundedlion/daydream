@@ -13,7 +13,8 @@
 /**
  * Order effect items by the given key and direction, returning a new array
  * (the input is not mutated). Name sorts lexicographically via localeCompare;
- * size sorts numerically. Direction 'asc' is ascending, anything else descending.
+ * size sorts numerically, with equal sizes broken by name (A->Z). Direction 'asc'
+ * is ascending, anything else descending.
  * @param {Array<{name: string, size: number}>} items - Items to order.
  * @param {'name'|'size'} key - Sort key.
  * @param {'asc'|'desc'} dir - Sort direction.
@@ -22,7 +23,10 @@
 export function sortItems(items, key, dir) {
   const mul = dir === 'asc' ? 1 : -1;
   return [...items].sort((a, b) => {
-    if (key === 'size') return (a.size - b.size) * mul;
+    if (key === 'size') {
+      const d = a.size - b.size;
+      return d ? d * mul : a.name.localeCompare(b.name, 'en');
+    }
     return a.name.localeCompare(b.name, 'en') * mul;
   });
 }
