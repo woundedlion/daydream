@@ -745,18 +745,17 @@
         return;
       }
 
-      // Start Memory Metrics Loop. Keep the timer handle so the self-
-      // rescheduling loop can be cancelled — previously it ran forever with no
-      // way to stop it.
+      // Start Memory Metrics Loop. Keep the timer handle so the pagehide handler
+      // can cancel the self-rescheduling loop.
       let arenaMetricsTimer = null;
       function updateArenaMetrics() {
-        if (MeshOpsWasm) {
-          const m = MeshOpsWasm.getArenaMetrics();
-          const fmt = (x) => `${(x.high_water_mark / 1024).toFixed(0)} / ${(x.capacity / 1024).toFixed(0)}KB`;
-          const statsEl = document.getElementById('arenaStats');
-          if (statsEl) {
-            statsEl.innerText = `${fmt(m.tooling_arena)}`;
-          }
+        // The engine nulls MeshOpsWasm on halt; stop rather than reschedule forever.
+        if (!MeshOpsWasm) return;
+        const m = MeshOpsWasm.getArenaMetrics();
+        const fmt = (x) => `${(x.high_water_mark / 1024).toFixed(0)} / ${(x.capacity / 1024).toFixed(0)}KB`;
+        const statsEl = document.getElementById('arenaStats');
+        if (statsEl) {
+          statsEl.innerText = `${fmt(m.tooling_arena)}`;
         }
         arenaMetricsTimer = setTimeout(updateArenaMetrics, 500); // 2fps update is enough
       }
