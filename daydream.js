@@ -264,8 +264,9 @@ function applyEffect(preserveParams = false) {
           setTimeout(() => exportCtrl.name('Export'), 1500);
           return;
         }
-        if (params.length !== values.length) {
-          console.warn(`Export: param/value length skew (${params.length} vs ${values.length}); skipping copy`);
+        const expected = activeEffect.paramNames.length;
+        if (expected !== values.length) {
+          console.warn(`Export: param/value length skew (${expected} vs ${values.length}); skipping copy`);
           exportCtrl.name('✗ Copy failed');
           setTimeout(() => exportCtrl.name('Export'), 1500);
           return;
