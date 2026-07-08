@@ -631,6 +631,11 @@ export class SegmentController {
       this.inflightGen = this.renderGen;
       this.pending = this.workers.length;
       this.frameSeen = new Array(this.workers.length).fill(false);
+      // Clear per-segment stats so a segment fenced out (or silent) this frame
+      // reports fresh 0/'-' rather than a prior generation's values.
+      this.timings.fill(0);
+      this.renderUs.fill(0);
+      this.arenas.fill(null);
       this.frameStart = performance.now();
       this.frameResolve = () => {
         this.clearRenderWatchdog();
