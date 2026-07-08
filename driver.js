@@ -116,7 +116,7 @@ export class Daydream {
   static PIXEL_WIDTH = 2 * Math.PI / Daydream.W;
   static FPS = 16;
   // Bounds the post-stall frame backlog (clock consumes one interval per frame).
-  static MAX_FRAME_CATCHUP_SECONDS = 0.25;
+  static MAX_FRAME_BACKLOG_SECONDS = 0.25;
   static DOT_SIZE = 2;
   static DOT_COLOR = 0x0000ff;
 
@@ -446,7 +446,8 @@ export class Daydream {
   /**
    * Fixed-timestep gate. Accumulates real elapsed time (clamped to avoid a
    * spiral-of-death after a stall) and consumes one frame interval only when
-   * enough has accrued to advance a frame.
+   * enough has accrued to advance a frame. Backlog beyond the clamp is dropped,
+   * not replayed: at most one frame advances per call.
    * @returns {boolean} True when a frame interval was consumed and the sim should advance.
    */
   advanceFrameClock() {
@@ -455,8 +456,8 @@ export class Daydream {
     // stalls on an emptied accumulator nor replays the paused span as backlog.
     if (this.paused) return false;
     this.timeAccumulator += delta;
-    if (this.timeAccumulator > Daydream.MAX_FRAME_CATCHUP_SECONDS)
-      this.timeAccumulator = Daydream.MAX_FRAME_CATCHUP_SECONDS;
+    if (this.timeAccumulator > Daydream.MAX_FRAME_BACKLOG_SECONDS)
+      this.timeAccumulator = Daydream.MAX_FRAME_BACKLOG_SECONDS;
     if (this.timeAccumulator < this.frameInterval) return false;
     this.timeAccumulator -= this.frameInterval;
     return true;
