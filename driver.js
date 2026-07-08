@@ -318,6 +318,7 @@ export class Daydream {
   keydown(e) {
     if (e.key === ' ') {
       this.paused = !this.paused;
+      if (!this.paused) this.stepFrames = 0;
     } else if (this.paused && e.key === "ArrowRight") {
       this.stepFrames++;
     }
