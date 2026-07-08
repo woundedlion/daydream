@@ -155,7 +155,7 @@ export class URLSync {
       // raw string; a non-finite parse keeps the default rather than seeding NaN.
       const current = state.get(key);
       if (typeof current === 'number') {
-        const num = Number(raw);
+        const num = parseFloat(raw);
         if (!Number.isFinite(num)) continue;
         patch[key] = num;
       } else {
