@@ -86,9 +86,9 @@ export function initScene(containerId, canvasId, opts = {}) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(background);
 
-  // max(1, h): a collapsed/hidden container reporting height 0 would make the
-  // aspect Infinity and the projection matrix non-finite.
-  const camera = new THREE.PerspectiveCamera(45, width / Math.max(1, height), near, far);
+  // max(1, ...): a collapsed/hidden container reporting a 0 dimension would make
+  // the aspect 0/Infinity and the projection matrix non-finite.
+  const camera = new THREE.PerspectiveCamera(45, Math.max(1, width) / Math.max(1, height), near, far);
   if (cameraPosition) {
     camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
   } else {
@@ -141,7 +141,7 @@ export function initScene(containerId, canvasId, opts = {}) {
   const defaultResize = () => {
     const w = container.clientWidth;
     const h = container.clientHeight;
-    camera.aspect = w / Math.max(1, h);
+    camera.aspect = Math.max(1, w) / Math.max(1, h);
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
   };
