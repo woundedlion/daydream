@@ -57,3 +57,18 @@ test('invalidateView() forces the next refresh() to re-fetch', () => {
   host.refresh();
   assert.equal(host.view(), second);
 });
+
+test('refresh() re-fetches and re-notifies when the held view has detached', () => {
+  const stale = new Uint16Array(4);
+  stale.buffer.transfer(); // Emscripten heap growth detaches the backing buffer in place
+  const fresh = new Uint16Array(4);
+  let notified = null;
+  const host = new EngineHost((view) => { notified = view; });
+  host.pixelView = stale;
+  host.engine = { getPixels: () => fresh };
+
+  host.refresh();
+
+  assert.equal(host.view(), fresh);
+  assert.equal(notified, fresh);
+});
