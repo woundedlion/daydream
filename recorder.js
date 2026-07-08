@@ -400,8 +400,13 @@ export class VideoRecorder {
         chain
           .then(async () => {
             await opened;
-            // Picker cancelled: every chunk was buffered, so the blob is whole.
-            if (!writable) { this.download(recorder, chunks, effectName); return; }
+            // Picker cancelled: every chunk was buffered, so the blob is whole
+            // (unless nothing was recorded, in which case there is nothing to save).
+            if (!writable) {
+              if (chunks.length) this.download(recorder, chunks, effectName);
+              else console.warn('VideoRecorder: session produced no data; nothing to download');
+              return;
+            }
             // Mid-stream write failed: only the on-disk prefix is contiguous.
             // Flush it and report truncation rather than downloading the
             // post-failure tail as if it were a complete video.
