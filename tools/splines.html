@@ -128,6 +128,9 @@
         <button id="btn-clear" class="btn btn-rose">Clear All</button>
         <button id="btn-random" class="btn btn-blue">Random Points</button>
       </div>
+      <select id="solid-select" class="w-full bg-slate-800 text-sm text-gray-300 p-2 rounded mt-2 border border-slate-600">
+        <option value="">Place on solid vertices…</option>
+      </select>
     </div>
 
     <div class="param-group">
@@ -154,6 +157,7 @@
       generateCatmullRomCurve,
       splineExportCode,
       randomPointOnSphere,
+      solidVertexAnchors,
     } from './spline_math.js';
     import createHolosphereModule from '../holosphere_wasm.js';
 
@@ -422,18 +426,20 @@
 
     // --- UI wiring ---
 
+    function setMode(mode) {
+      state.mode = mode;
+      document.getElementById('mode-bezier').classList.toggle('active', mode === 'bezier');
+      document.getElementById('mode-catmull').classList.toggle('active', mode === 'catmull');
+    }
+
     function initUI() {
       // Mode toggle
       document.getElementById('mode-bezier').addEventListener('click', () => {
-        state.mode = 'bezier';
-        document.getElementById('mode-bezier').classList.add('active');
-        document.getElementById('mode-catmull').classList.remove('active');
+        setMode('bezier');
         updateCurves();
       });
       document.getElementById('mode-catmull').addEventListener('click', () => {
-        state.mode = 'catmull';
-        document.getElementById('mode-catmull').classList.add('active');
-        document.getElementById('mode-bezier').classList.remove('active');
+        setMode('catmull');
         updateCurves();
       });
 
@@ -485,6 +491,33 @@
         for (let i = 0; i < n; i++) {
           state.controlPoints.push(randomPointOnSphere());
         }
+        updatePointMeshes();
+        updateCurves();
+      });
+
+      // Solid vertices: the select is an action menu — pick a registry solid to
+      // replace the control points with its vertices, then reset to the
+      // placeholder so the same solid can be re-placed after edits.
+      const solidSelect = document.getElementById('solid-select');
+      for (const { name } of WasmModule.MeshOps.getRegistry()) {
+        solidSelect.appendChild(new Option(name, name));
+      }
+      solidSelect.addEventListener('change', () => {
+        const name = solidSelect.value;
+        solidSelect.value = '';
+        if (!name) return;
+        const mesh = WasmModule.MeshOps.fromSolidName(name);
+        if (!mesh) return;
+        let anchors;
+        try {
+          anchors = solidVertexAnchors(mesh.getVertices());
+        } finally {
+          mesh.delete();
+          WasmModule.MeshOps.clearToolingMemory();
+        }
+        // Bézier holds exactly 4 control points; anything bigger needs Catmull-Rom.
+        if (state.mode === 'bezier' && anchors.length > 4) setMode('catmull');
+        state.controlPoints = anchors;
         updatePointMeshes();
         updateCurves();
       });

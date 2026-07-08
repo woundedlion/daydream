@@ -9,6 +9,7 @@ const {
   formatFloatCpp,
   splineExportCode,
   randomPointOnSphere,
+  solidVertexAnchors,
 } = await import('../tools/spline_math.js');
 const { formatFloatCpp: cppFormatFloatCpp } = await import('../tools/cpp_format.js');
 
@@ -151,6 +152,32 @@ test('splineExportCode: empty placeholder, and both export formats', () => {
   const frags = splineExportCode(pts, 'fragments');
   assert.ok(frags.startsWith('// 2 control point fragments'));
   assert.ok(frags.includes('f0.pos = Vector(1.0f, 0.0f, 0.0f);'));
+});
+
+/** Verifies a Float32Array of non-unit vertices yields one unit anchor per vertex, directions preserved. */
+test('solidVertexAnchors: one unit-length anchor per vertex triple', () => {
+  const verts = new Float32Array([2, 0, 0, 0, -3, 0, 1, 1, 1]);
+  const anchors = solidVertexAnchors(verts);
+  assert.equal(anchors.length, 3);
+  for (const p of anchors) {
+    assert.ok(Math.abs(mag(p) - 1) < 1e-6, `|p| = ${mag(p)}`);
+  }
+  assert.deepEqual(anchors[0], { x: 1, y: 0, z: 0 });
+  assert.deepEqual(anchors[1], { x: 0, y: -1, z: 0 });
+  const s = 1 / Math.sqrt(3);
+  assert.ok(Math.abs(anchors[2].x - s) < 1e-6);
+  assert.ok(Math.abs(anchors[2].y - s) < 1e-6);
+  assert.ok(Math.abs(anchors[2].z - s) < 1e-6);
+});
+
+/** Verifies an empty buffer yields no anchors. */
+test('solidVertexAnchors: empty buffer returns []', () => {
+  assert.deepEqual(solidVertexAnchors(new Float32Array(0)), []);
+});
+
+/** A buffer that is not whole xyz triples is a caller bug, not data to truncate. */
+test('solidVertexAnchors: length not a multiple of 3 throws', () => {
+  assert.throws(() => solidVertexAnchors(new Float32Array([1, 2, 3, 4])), /multiple of 3/);
 });
 
 /** Verifies that a deterministic RNG sequence produces a unit-length point on the sphere. */
