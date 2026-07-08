@@ -289,6 +289,7 @@ export class EffectSidebar {
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       if (focused && focused.dataset.effect) {
+        this.setRovingTabbable(focused);
         this.onSelect(focused.dataset.effect);
       }
     }
