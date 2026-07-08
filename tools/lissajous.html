@@ -158,7 +158,7 @@
 
       // Wire the scaffold's dispose() to teardown — it stops the render loop and
       // detaches the resize listener, which previously leaked on page unload.
-      window.addEventListener('pagehide', () => result.dispose(), { once: true });
+      window.addEventListener('pagehide', (e) => { if (!e.persisted) result.dispose(); }, { once: true });
 
       regenerateCurve();
     };

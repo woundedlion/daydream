@@ -1272,7 +1272,8 @@
 
       // Stop the RAF loop and detach the document-level drag listeners on
       // teardown — previously both leaked on page unload (no dispose path).
-      window.addEventListener('pagehide', () => {
+      window.addEventListener('pagehide', (e) => {
+        if (e.persisted) return; // bfcache freeze, not a real discard
         if (animationFrameId !== null) {
           cancelAnimationFrame(animationFrameId);
           animationFrameId = null;

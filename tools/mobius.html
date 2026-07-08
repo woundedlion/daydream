@@ -730,7 +730,8 @@
       // Dispose both spheres' GPU resources on teardown (the page otherwise kept
       // no handle to the wireframe and had no dispose path at all), and run the
       // scaffold's dispose() to stop its render loop and drop the resize listener.
-      window.addEventListener('pagehide', () => {
+      window.addEventListener('pagehide', (e) => {
+        if (e.persisted) return; // bfcache freeze, not a real discard
         for (const m of [sphereMesh, wireMesh]) {
           if (!m) continue;
           m.geometry.dispose();
