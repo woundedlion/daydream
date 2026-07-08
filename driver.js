@@ -370,7 +370,11 @@ export class Daydream {
       const fovRad = THREE.MathUtils.degToRad(Daydream.CAMERA_FOV / 2);
       const distForHeight = diameter / (2 * Math.tan(fovRad) * targetCoverage);
       const distForWidth = distForHeight / this.camera.aspect;
-      this.fittedDistance = Math.max(distForHeight, distForWidth);
+      this.fittedDistance = THREE.MathUtils.clamp(
+        Math.max(distForHeight, distForWidth),
+        this.controls.minDistance,
+        this.controls.maxDistance
+      );
       this.camera.position.setLength(this.fittedDistance);
     }
 
