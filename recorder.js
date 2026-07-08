@@ -354,7 +354,7 @@ export class VideoRecorder {
     if (typeof globalThis.showSaveFilePicker !== 'function') {
       return {
         write: (data) => { chunks.push(data); },
-        finish: () => { this.download(recorder, chunks, effectName); },
+        finish: () => { if (chunks.length) this.download(recorder, chunks, effectName); },
       };
     }
 
