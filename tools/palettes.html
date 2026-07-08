@@ -646,7 +646,7 @@
       // `clientX || touches[0].clientX` fallback both broke at the left edge
       // (clientX===0 is falsy → NaN) and never fired (no touch listeners).
       const x = event.clientX - rect.left;
-      return Math.max(0, Math.min(1, x / rect.width));
+      return rect.width > 0 ? Math.max(0, Math.min(1, x / rect.width)) : 0;
     }
 
     /**
