@@ -42,6 +42,7 @@ let totalSegs = 1;
 let canvasW = 0;
 let canvasH = 0;
 let segRange = null; // { x0, x1, y0, y1, w, h }
+let arenaMetricsWarned = false;
 
 /**
  * Apply the stored segment clip rectangle to the engine. Must be called after
@@ -208,7 +209,10 @@ async function handleMessage(msg) {
           },
         };
       } catch (e) {
-        console.warn('segment_worker: getArenaMetrics failed:', e);
+        if (!arenaMetricsWarned) {
+          console.warn('segment_worker: getArenaMetrics failed:', e);
+          arenaMetricsWarned = true;
+        }
         arenaMetrics = null;
       }
 
