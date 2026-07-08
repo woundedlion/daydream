@@ -100,6 +100,7 @@ let syncGuiSkewLogged = false;
  */
 function syncGUI() {
   if (!activeEffect || !activeEffect.controllerByName) return;
+  if (!activeEffect.hasLiveParams) return;
 
   // In segmented mode the main engine is never stepped, so its values are stale;
   // source animation-tracking values from segment 0's worker instead.
@@ -318,6 +319,9 @@ function applyEffect(preserveParams = false) {
     const state = {};
     activeEffect.paramNames = [];
     activeEffect.controllerByName = new Map();
+    // animated (animation-driven) and readonly (engine telemetry) are the only
+    // params the engine rewrites per frame; a set without them lets syncGUI skip.
+    activeEffect.hasLiveParams = params.some(p => p.animated || p.readonly);
 
     params.forEach(p => {
       state[p.name] = p.value;
