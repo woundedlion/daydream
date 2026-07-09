@@ -320,8 +320,10 @@ export class Daydream {
     if (e.key === ' ') {
       this.paused = !this.paused;
       if (!this.paused) this.stepFrames = 0;
+      e.preventDefault(); // else Space also scrolls the page on the mobile layout
     } else if (this.paused && e.key === "ArrowRight") {
       this.stepFrames++;
+      e.preventDefault();
     }
   }
 
