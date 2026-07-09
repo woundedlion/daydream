@@ -49,8 +49,8 @@ class FakeEngine {
   }
   // Clearing params models the engine rebuilding to defaults, so the
   // "params re-applied AFTER setEffect" ordering is observable.
-  setEffect(name) { this.calls.push(['setEffect', name]); this.effect = name; this.params = []; }
-  setParameter(name, value) { this.params.push([name, value]); }
+  setEffect(name) { this.calls.push(['setEffect', name]); this.effect = name; this.params = []; return true; }
+  setParameter(name, value) { this.params.push([name, value]); return true; }
   setAnimationsPaused(p) { this.paused = p; }
   setClip(x0, x1, y0, y1) { this.clip = { y0, y1, x0, x1 }; }
   drawFrame() { this.calls.push(['drawFrame']); }
