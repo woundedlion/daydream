@@ -668,8 +668,8 @@ export class SegmentController {
       if (!this.aliasDivergenceLogged) {
         console.error(
           "SegmentController.composite: display-buffer alias diverged " +
-          "(getMemoryView() !== Daydream.pixels) — re-pointing Daydream.pixels " +
-          "/ instanceColor.array at the composite target");
+          "(getMemoryView() !== Daydream.pixels) — re-pointing the display " +
+          "aliases at the composite target");
         this.aliasDivergenceLogged = true;
       }
       this.repointDisplayAliases(dst);
