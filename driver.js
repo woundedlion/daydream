@@ -152,6 +152,8 @@ export class Daydream {
       alpha: Daydream.SCENE_ALPHA,
     });
 
+    // Cap at CSS resolution: the sphere is coarse LED dots, so rendering above
+    // 1x device-pixel-ratio only costs fill rate without adding visible detail.
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
 
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
