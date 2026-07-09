@@ -159,14 +159,12 @@ let activeEffect;
 // Centralized State
 ///////////////////////////////////////////////////////////////////////////////
 
-const urlParams = new URLSearchParams(window.location.search);
-const initialEffect = urlParams.get('effect');
-const initialResolution = urlParams.get('resolution');
-
+// Seed plain defaults; URLSync is the single URL reader and hydrates these from
+// the query string through the same validators below.
 const knownEffects = new Set(Object.values(effectsByResolution).flat());
 const appState = new AppState({
-  effect: (initialEffect && knownEffects.has(initialEffect)) ? initialEffect : 'IslamicStars',
-  resolution: (initialResolution && resolutionPresets[initialResolution]) ? initialResolution : "Phantasm (144x288)",
+  effect: 'IslamicStars',
+  resolution: "Phantasm (144x288)",
 });
 const urlSync = new URLSync(appState, ['effect', 'resolution'], {
   resolution: (v) => Boolean(resolutionPresets[v]),
