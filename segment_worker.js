@@ -220,7 +220,6 @@ async function handleMessage(msg) {
         type: 'frame',
         segId,
         x0, x1, y0, y1,
-        quadW: qw, quadH: qh,
         pixels: pixelsCopy,
         elapsed,
         renderUs,
