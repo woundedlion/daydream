@@ -118,6 +118,16 @@ export class VideoRecorder {
     this.effectName = effectName;
     this.elapsedSeconds = 0;
 
+    // Each session pins its capture size at start. Drop an offscreen left by a
+    // prior session whose async onstop cleanup has not run yet, so a resolution
+    // change between stop and start re-sizes instead of encoding at stale dims.
+    if (this.offscreen) {
+      this.offscreen.width = 0;
+      this.offscreen.height = 0;
+      this.offscreen = null;
+      this.offCtx = null;
+    }
+
     const captureSource = this.targetHeight
       ? this.ensureOffscreen()
       : this.ensurePinnedOffscreen();
