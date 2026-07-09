@@ -34,8 +34,8 @@ export function vec3Normalize(v) {
  */
 export function generateBezierCurve(pts, numSamples, evalFn) {
   if (pts.length < 4) return [];
-  // Negated compare also rejects NaN; numSamples divides t = i / numSamples.
-  if (!(numSamples >= 1)) return [];
+  // Negated compare rejects NaN, isFinite rejects Infinity; numSamples divides t = i / numSamples.
+  if (!(numSamples >= 1) || !Number.isFinite(numSamples)) return [];
   const result = [];
   for (let i = 0; i <= numSamples; i++) {
     const t = i / numSamples;
@@ -59,8 +59,8 @@ export function generateBezierCurve(pts, numSamples, evalFn) {
 export function generateCatmullRomCurve(pts, tension, numSamplesPerSeg, tangentFn, evalFn, closed) {
   const n = pts.length;
   if (n < 2) return [];
-  // Negated compare also rejects NaN; numSamplesPerSeg divides t = j / numSamplesPerSeg.
-  if (!(numSamplesPerSeg >= 1)) return [];
+  // Negated compare rejects NaN, isFinite rejects Infinity; numSamplesPerSeg divides t = j / numSamplesPerSeg.
+  if (!(numSamplesPerSeg >= 1) || !Number.isFinite(numSamplesPerSeg)) return [];
   const result = [];
   const segCount = closed ? n : n - 1;
 
