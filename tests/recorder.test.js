@@ -412,6 +412,40 @@ test('a mid-stream streaming write failure closes the writable, skips download, 
   }
 });
 
+test('a streaming session that produces no data never opens the chosen file', async () => {
+  const restore = installRecorderEnv();
+  let createWritableCalls = 0;
+  let closed = false;
+  const writable = { write: async () => {}, close: async () => { closed = true; } };
+  globalThis.showSaveFilePicker = async () => ({
+    createWritable: async () => { createWritableCalls++; return writable; },
+  });
+  const warns = [];
+  const prevWarn = console.warn;
+  console.warn = (...a) => warns.push(a.join(' '));
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    let downloaded = false;
+    rec.download = () => { downloaded = true; };
+
+    rec.start('empty');
+    const recorder = rec.mediaRecorder;
+    // No ondataavailable: the session streams nothing.
+    rec.stop();
+    recorder.onstop();
+
+    await new Promise((r) => setTimeout(r));
+
+    assert.equal(createWritableCalls, 0, 'the file is never opened/truncated when no data streams');
+    assert.equal(closed, false, 'no empty writable is closed over the chosen file');
+    assert.equal(downloaded, false, 'nothing to download');
+    assert.ok(warns.some((w) => /no data/.test(w)), 'the empty session is reported');
+  } finally {
+    console.warn = prevWarn;
+    restore();
+  }
+});
+
 /**
  * Drives captureFrame once with a chosen source/offscreen size and returns the
  * drawImage destination rect the recorder computed. The offscreen and its
