@@ -249,6 +249,7 @@ export class SegmentController {
     this.timings = new Array(numSegments).fill(0);
     this.renderUs = new Array(numSegments).fill(0);
     this.arenas = new Array(numSegments).fill(null);
+    this.frameSeen = new Array(numSegments).fill(false);
     this.paramValues = null;
     this.ready = false;
 
@@ -479,6 +480,7 @@ export class SegmentController {
     this.timings = [];
     this.renderUs = [];
     this.arenas = [];
+    this.frameSeen = [];
     this.ready = false;
     this.pending = 0;
     // Open a new generation before settling: the in-flight render's `.then`
@@ -629,7 +631,7 @@ export class SegmentController {
     return new Promise((resolve) => {
       this.inflightGen = this.renderGen;
       this.pending = this.workers.length;
-      this.frameSeen = new Array(this.workers.length).fill(false);
+      this.frameSeen.fill(false);
       // Clear per-segment stats so a segment fenced out (or silent) this frame
       // reports fresh 0/'-' rather than a prior generation's values.
       this.timings.fill(0);
