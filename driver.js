@@ -249,7 +249,6 @@ export class Daydream {
     });
     this.resizeObserver.observe(this.canvasParent);
 
-    this.timeAccumulator = 0;
     this.labelAxes = false;
     this.cullBackSphere = false;
     // Persist column gap-fill overlap (see updateCullUniforms): 1.0 = pills meet
