@@ -137,9 +137,10 @@ export class PRNG {
     return this.state / 0x100000000;
   }
   /**
-   * Half-open [min, max) integer to match the engine's hs::rand_int, so a
-   * ported range produces exactly the values the device does. Call sites use
-   * the engine's own rand_int literals.
+   * Half-open [min, max) integer matching the engine's hs::rand_int range
+   * convention, so ported range literals line up with the engine's call sites.
+   * The stream itself is a tool-local LCG, not the device's PCG32, so the
+   * values do not reproduce the device's sequence.
    * @param {number} min - Inclusive lower bound.
    * @param {number} max - Exclusive upper bound.
    * @returns {number} Pseudo-random integer in [min, max).
