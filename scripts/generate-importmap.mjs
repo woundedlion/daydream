@@ -66,7 +66,7 @@ if (!re.test(src)) {
   console.error('generate-importmap: GENERATED VENDOR block not found in vendor-importmap.js');
   process.exit(1);
 }
-writeFileSync(TARGET, src.replace(re, block));
+writeFileSync(TARGET, src.replace(re, () => block));
 
 console.log(`vendor-importmap.js: three=${vendor.three}, lilGui=${vendor.lilGui}` +
   (local ? ' (local mode — do NOT commit a local block)' : ''));
