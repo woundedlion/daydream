@@ -93,6 +93,17 @@ const host = new EngineHost(repointDisplayAliases);
 let syncGuiSkewLogged = false;
 
 /**
+ * Live per-frame parameter values for the active effect. In segmented mode the
+ * main engine is never stepped, so its values are stale; source from segment 0's
+ * worker instead. May be null or zero-length if the WASM view detached on heap
+ * growth — callers must guard.
+ * @returns {Float32Array|number[]|null}
+ */
+function liveParamValues() {
+  return segments.active ? segments.getParamValues() : host.engine.getParamValues();
+}
+
+/**
  * Push the engine's per-frame parameter values back into the effect GUI so
  * animation-driven params track live, without clobbering controllers the user
  * is actively editing.
@@ -102,12 +113,7 @@ function syncGUI() {
   if (!activeEffect || !activeEffect.controllerByName) return;
   if (!activeEffect.hasLiveParams) return;
 
-  // In segmented mode the main engine is never stepped, so its values are stale;
-  // source animation-tracking values from segment 0's worker instead.
-  // Heap growth can detach the main view to zero length; guard rather than mis-read.
-  const values = segments.active
-    ? segments.getParamValues()
-    : host.engine.getParamValues();
+  const values = liveParamValues();
   if (!values || values.length === 0) return;
 
   const names = activeEffect.paramNames;
@@ -250,12 +256,7 @@ function applyEffect(preserveParams = false) {
        * @returns {void}
        */
       export() {
-        // In segmented mode the main engine is never stepped, so its values are
-        // stale; source from segment 0's worker as syncGUI does (null before the
-        // first frame).
-        const values = segments.active
-          ? segments.getParamValues()
-          : host.engine.getParamValues();
+        const values = liveParamValues();
         // A heap-growth detach leaves the view zero-length, and the segmented
         // source is null before the first frame; skip so we don't copy an
         // all-zero preset.
