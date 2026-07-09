@@ -33,6 +33,10 @@ for (const [lib, name] of [['three', 'three'], ['lilGui', 'lil-gui']]) {
     console.error(`generate-importmap: package.json dependencies.${name} is missing or empty`);
     process.exit(1);
   }
+  if (!/^\d+\.\d+\.\d+$/.test(versions[lib])) {
+    console.error(`generate-importmap: package.json dependencies.${name} must be an exact version, not a range (got "${versions[lib]}")`);
+    process.exit(1);
+  }
 }
 
 // Entry points that must exist for a library to count as locally vendored.
