@@ -566,6 +566,9 @@ export class SegmentController {
     // segment 0 reports the new effect's first frame; otherwise the synchronously
     // rebuilt GUI would bind the new effect's sliders to stale values by index.
     this.paramValues = null;
+    // A fresh effect starts running; clear a stale pause so workers spawned for
+    // the rebuilt pool don't init paused while the main sphere animates.
+    this.animationsPaused = false;
     // Bump the fence so an in-flight old-effect frame fails inflightGen ===
     // renderGen and can't republish its stale-ordered paramValues.
     this.renderGen++;
