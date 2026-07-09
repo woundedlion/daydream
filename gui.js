@@ -201,7 +201,11 @@ class DeepLinkGUI {
       const currentVal = object[prop];
       urlApplied = true;
       if (typeof currentVal === 'number') {
-        val = parseFloat(val);
+        // Number() (unlike parseFloat) rejects trailing garbage like "5px", so a
+        // partial-numeric param falls through to the warn path below instead of
+        // silently clamping to a valid-looking value the URL then keeps. An
+        // empty/whitespace param stays rejected rather than coercing to 0.
+        val = val.trim() === '' ? NaN : Number(val);
         if (!Number.isFinite(val)) {
           console.warn(`DeepLinkGUI: ignoring non-numeric URL value "${params.get(key)}" for "${key}"`);
           val = currentVal;
