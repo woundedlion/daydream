@@ -361,33 +361,44 @@ export class VideoRecorder {
     const ext = this.extension(recorder);
     const filename = this.timestampedName(effectName, ext);
 
+    let handle = null;
     let writable = null;
     let failed = false;
     const opened = globalThis.showSaveFilePicker({
       suggestedName: filename,
       types: [{ description: 'Video', accept: { [this.mimeForExt(ext)]: [`.${ext}`] } }],
     })
-      .then((handle) => handle.createWritable())
-      .then((w) => { writable = w; })
+      .then((h) => { handle = h; })
       .catch((err) => {
-        failed = true;
         if (err?.name !== 'AbortError')
           console.warn('VideoRecorder: streaming save unavailable, buffering in memory', err);
       });
 
     // One serialized chain; each link awaits the picker, so chunks that arrive
-    // before the file opens are written in order once it does. A chunk that
-    // cannot stream (picker cancelled/unavailable) falls back to the blob buffer.
+    // before the file opens are written in order once it does. The writable is
+    // created on the first chunk, not at pick time, so a session that streams no
+    // data never truncates the user's chosen file. A chunk that cannot stream
+    // (picker cancelled/unavailable) falls back to the blob buffer.
     let chain = Promise.resolve();
     return {
       write: (data) => {
         chain = chain.then(async () => {
           await opened;
-          // Picker cancelled/unavailable: no writable opened, so buffer every
-          // chunk for the blob-download fallback in finish().
-          if (!writable) { chunks.push(data); return; }
+          // No file handle (picker cancelled/unavailable, or createWritable
+          // failed): buffer every chunk for the blob-download fallback.
+          if (!handle) { chunks.push(data); return; }
           // A prior write errored the writable; stop feeding it.
           if (failed) return;
+          if (!writable) {
+            try {
+              writable = await handle.createWritable();
+            } catch (err) {
+              console.warn('VideoRecorder: streaming save unavailable, buffering in memory', err);
+              handle = null;
+              chunks.push(data);
+              return;
+            }
+          }
           try {
             await writable.write(data);
           } catch (err) {
@@ -400,8 +411,9 @@ export class VideoRecorder {
         chain
           .then(async () => {
             await opened;
-            // Picker cancelled: every chunk was buffered, so the blob is whole
-            // (unless nothing was recorded, in which case there is nothing to save).
+            // No writable opened — the picker was cancelled/unavailable (chunks
+            // buffered) or the session streamed no data (the chosen file was
+            // never truncated). Download the buffer if there is one.
             if (!writable) {
               if (chunks.length) this.download(recorder, chunks, effectName);
               else console.warn('VideoRecorder: session produced no data; nothing to download');
