@@ -142,7 +142,16 @@ class DeepLinkGUI {
     while (curr.parent) {
       // A positional fallback for an empty folder name keeps the level from
       // collapsing, so two deep links can't collide on a dropped segment.
-      keys.unshift(curr.folderName || `#${curr.folderIndex}`);
+      let seg = curr.folderName || `#${curr.folderIndex}`;
+      // Named siblings normally get a stable key from the name alone; append the
+      // index only when a genuine same-name sibling would otherwise collide, so
+      // unique-named folders keep their existing (shared-link-stable) keys.
+      if (curr.folderName &&
+          curr.parent.children.filter((c) => c.folderName === curr.folderName)
+            .length > 1) {
+        seg = `${curr.folderName}#${curr.folderIndex}`;
+      }
+      keys.unshift(seg);
       curr = curr.parent;
     }
     return keys.join('.');
