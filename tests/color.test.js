@@ -39,5 +39,5 @@ test('linearRgbToHex produces #rrggbb with correct fixed points', () => {
   assert.equal(linearRgbToHex(0, 0, 0), '#000000');
   assert.equal(linearRgbToHex(1, 1, 1), '#ffffff');
   assert.equal(linearRgbToHex(-1, 2, 0), '#00ff00');
-  assert.match(linearRgbToHex(0.5, 0.25, 0.75), /^#[0-9a-f]{6}$/);
+  assert.equal(linearRgbToHex(0.5, 0.25, 0.75), '#bc89e1');
 });
