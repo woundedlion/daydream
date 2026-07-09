@@ -86,11 +86,10 @@ export function warmModules() {
 
 /**
  * A composited frame result for one segment, kept across the one-frame pipeline.
- * `pixels` is the segment's RGB16 rectangle (quadW*quadH*3), null if absent.
+ * `pixels` is the segment's RGB16 rectangle ((x1-x0)*(y1-y0)*3), null if absent.
  * @typedef {{
  *   pixels: Uint16Array | null,
  *   x0: number, x1: number, y0: number, y1: number,
- *   quadW: number, quadH: number,
  * }} FrameResult
  */
 
@@ -311,7 +310,6 @@ export class SegmentController {
               pixels: msg.pixels,
               x0: msg.x0, x1: msg.x1,
               y0: msg.y0, y1: msg.y1,
-              quadW: msg.quadW, quadH: msg.quadH,
             };
             this.timings[msg.segId] = msg.elapsed;
             this.renderUs[msg.segId] = msg.renderUs || 0;

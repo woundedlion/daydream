@@ -105,7 +105,7 @@ export const PROTOCOL_VERSION = 1;
  * @typedef {{ type: 'booted', version: number }} BootedMsg */
 
 /**
- * A rendered quadrant. `pixels` is the segment's RGB16 rectangle (qw*qh*3),
+ * A rendered quadrant. `pixels` is the segment's RGB16 rectangle ((x1-x0)*(y1-y0)*3),
  * transferred (not copied) across the boundary. `paramValues` carries segment 0's
  * post-frame parameter values (ordered to match the effect's param list) so the
  * GUI can track animation-driven changes the un-stepped main engine cannot supply;
@@ -113,7 +113,6 @@ export const PROTOCOL_VERSION = 1;
  * @typedef {{
  *   type: 'frame', segId: number,
  *   x0: number, x1: number, y0: number, y1: number,
- *   quadW: number, quadH: number,
  *   pixels: Uint16Array, elapsed: number, renderUs: number,
  *   arenaMetrics: SegArenaMetrics | null,
  *   paramValues: number[] | null,

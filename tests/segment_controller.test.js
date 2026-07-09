@@ -136,8 +136,6 @@ const flush = () => new Promise((r) => setImmediate(r));
  * @param {SegmentController} controller - Controller owning the worker pool.
  * @param {number} segId - Index of the worker delivering the frame.
  * @param {Object} [overrides] - Per-field overrides for the frame payload.
- * @param {number} [overrides.quadW] - Quadrant width in pixels.
- * @param {number} [overrides.quadH] - Quadrant height in pixels.
  * @param {Uint16Array} [overrides.pixels] - RGB16 quadrant pixel buffer.
  * @param {number} [overrides.x0] - Inclusive left display-buffer column.
  * @param {number} [overrides.x1] - Exclusive right display-buffer column.
@@ -149,18 +147,17 @@ const flush = () => new Promise((r) => setImmediate(r));
  * @returns {void}
  */
 function deliverFrame(controller, segId, overrides = {}) {
-  const quadW = overrides.quadW ?? 2;
-  const quadH = overrides.quadH ?? 2;
-  const px = overrides.pixels ?? new Uint16Array(quadW * quadH * 3);
+  const defW = 2;
+  const defH = 2;
+  const px = overrides.pixels ?? new Uint16Array(defW * defH * 3);
   controller.workers[segId].onmessage({
     data: {
       type: 'frame', segId,
       // Must be the Uint16Array view, not a bare ArrayBuffer: composite() indexes
       // pixels element-wise.
       pixels: px,
-      x0: overrides.x0 ?? 0, x1: overrides.x1 ?? quadW,
-      y0: overrides.y0 ?? 0, y1: overrides.y1 ?? quadH,
-      quadW, quadH,
+      x0: overrides.x0 ?? 0, x1: overrides.x1 ?? defW,
+      y0: overrides.y0 ?? 0, y1: overrides.y1 ?? defH,
       elapsed: overrides.elapsed ?? 1,
       renderUs: overrides.renderUs ?? 0,
       arenaMetrics: overrides.arenaMetrics ?? null,
@@ -559,7 +556,7 @@ test('composite() blits each quadrant to its display-buffer offset', () => {
   const c = makeController();
   c.showBoundaries = false;
   const quad = new Uint16Array(2 * 2 * 3).fill(111);
-  c.results = [{ pixels: quad, x0: 2, x1: 4, y0: 0, y1: 2, quadW: 2, quadH: 2 }];
+  c.results = [{ pixels: quad, x0: 2, x1: 4, y0: 0, y1: 2 }];
 
   c.composite();
 
@@ -576,7 +573,7 @@ test('composite() faults on a rectangle that overflows the current display buffe
   const c = makeController();
   c.showBoundaries = false;
   const quad = new Uint16Array(2 * 2 * 3).fill(222);
-  c.results = [{ pixels: quad, x0: 0, x1: 99, y0: 0, y1: 2, quadW: 2, quadH: 2 }]; // x1=99 overshoots W=4
+  c.results = [{ pixels: quad, x0: 0, x1: 99, y0: 0, y1: 2 }]; // x1=99 overshoots W=4
 
   const blitted = c.composite();
   assert.equal(blitted, 0, 'a leading out-of-bounds rect blits nothing');
@@ -597,8 +594,8 @@ test('composite() faults atomically when a non-leading segment overflows', () =>
   const good = new Uint16Array(2 * 2 * 3).fill(111);
   const bad = new Uint16Array(2 * 2 * 3).fill(222);
   c.results = [
-    { pixels: good, x0: 0, x1: 2, y0: 0, y1: 2, quadW: 2, quadH: 2 },
-    { pixels: bad, x0: 2, x1: 99, y0: 0, y1: 2, quadW: 2, quadH: 2 }, // x1=99 overshoots W=4
+    { pixels: good, x0: 0, x1: 2, y0: 0, y1: 2 },
+    { pixels: bad, x0: 2, x1: 99, y0: 0, y1: 2 }, // x1=99 overshoots W=4
   ];
 
   const blitted = c.composite();
@@ -616,7 +613,7 @@ test('composite() faults on an empty/inverted segment rect', () => {
   const c = makeController();
   c.showBoundaries = false;
   const quad = new Uint16Array(2 * 2 * 3).fill(123);
-  c.results = [{ pixels: quad, x0: 2, x1: 2, y0: 0, y1: 2, quadW: 2, quadH: 2 }]; // x1 == x0
+  c.results = [{ pixels: quad, x0: 2, x1: 2, y0: 0, y1: 2 }]; // x1 == x0
 
   const blitted = c.composite();
   assert.equal(blitted, 0, 'an empty/inverted rect blits nothing');
@@ -633,7 +630,7 @@ test('composite() faults on a pixel buffer whose length disagrees with its rect'
   c.showBoundaries = false;
   // rect [0,0)-[2,2) expects 2 * 2 * 3 = 12 elements; supply 6.
   const short = new Uint16Array(6).fill(123);
-  c.results = [{ pixels: short, x0: 0, x1: 2, y0: 0, y1: 2, quadW: 2, quadH: 2 }];
+  c.results = [{ pixels: short, x0: 0, x1: 2, y0: 0, y1: 2 }];
 
   const blitted = c.composite();
   assert.equal(blitted, 0, 'a length-mismatched buffer blits nothing');
@@ -653,8 +650,8 @@ test('composite() marks both the internal split and the x=0 wrap seam', () => {
   const quadL = new Uint16Array(2 * 2 * 3).fill(111);
   const quadR = new Uint16Array(2 * 2 * 3).fill(222);
   c.results = [
-    { pixels: quadL, x0: 0, x1: 2, y0: 0, y1: 2, quadW: 2, quadH: 2 },
-    { pixels: quadR, x0: 2, x1: 4, y0: 0, y1: 2, quadW: 2, quadH: 2 },
+    { pixels: quadL, x0: 0, x1: 2, y0: 0, y1: 2 },
+    { pixels: quadR, x0: 2, x1: 4, y0: 0, y1: 2 },
   ];
 
   c.composite();
@@ -681,10 +678,10 @@ test('composite() marks every internal split plus the wrap seam for a 4-arm layo
   c.showBoundaries = true;
   const arm = (fill) => new Uint16Array(2 * 2 * 3).fill(fill);
   c.results = [
-    { pixels: arm(111), x0: 0, x1: 2, y0: 0, y1: 2, quadW: 2, quadH: 2 },
-    { pixels: arm(222), x0: 2, x1: 4, y0: 0, y1: 2, quadW: 2, quadH: 2 },
-    { pixels: arm(333), x0: 4, x1: 6, y0: 0, y1: 2, quadW: 2, quadH: 2 },
-    { pixels: arm(444), x0: 6, x1: 8, y0: 0, y1: 2, quadW: 2, quadH: 2 },
+    { pixels: arm(111), x0: 0, x1: 2, y0: 0, y1: 2 },
+    { pixels: arm(222), x0: 2, x1: 4, y0: 0, y1: 2 },
+    { pixels: arm(333), x0: 4, x1: 6, y0: 0, y1: 2 },
+    { pixels: arm(444), x0: 6, x1: 8, y0: 0, y1: 2 },
   ];
 
   c.composite();
@@ -711,7 +708,7 @@ test('composite() draws no x=0 line when the layout is not split in x', () => {
   const c = makeController();
   c.showBoundaries = true;
   const full = new Uint16Array(4 * 2 * 3).fill(123);
-  c.results = [{ pixels: full, x0: 0, x1: 4, y0: 0, y1: 2, quadW: 4, quadH: 2 }];
+  c.results = [{ pixels: full, x0: 0, x1: 4, y0: 0, y1: 2 }];
 
   c.composite();
   assert.ok(Daydream.pixels.every((v) => v === 123),
