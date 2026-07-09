@@ -267,7 +267,8 @@ export class SegmentController {
     const initialParams = this.snapshotParams();
 
     for (let i = 0; i < numSegments; i++) {
-      const worker = new Worker('./segment_worker.js', { type: 'module' });
+      const worker = new Worker(new URL('./segment_worker.js', import.meta.url),
+        { type: 'module' });
 
       worker.onmessage = (e) => {
         const msg = /** @type {ControllerInboundMsg} */ (e.data);
