@@ -67,3 +67,25 @@ test('the x=0 column maps to +X, not +Z', () => {
   assert.ok(v.x > 0.99, `x=0 should sit near +X, got x=${v.x}`);
   assert.ok(Math.abs(v.z) < 1e-9, `x=0 should have z~0, got z=${v.z}`);
 });
+
+/**
+ * Hardcoded golden vectors that do NOT re-run the engine formula, so the pin is
+ * independent of engineVector() above (which shares pixelToSpherical's own
+ * math). Row 0 is the +Y north pole and row H-1 the -Y south pole by geometry
+ * alone; the (72,36) triple is raw sin/cos of phi=36π/143 with column 72's
+ * azimuth landing on the +Z meridian (worldX == 0).
+ */
+test('pixelToSpherical hits independent golden vectors', () => {
+  const goldens = [
+    { x: 0, y: 0, v: [0, 1, 0] },                                    // north pole
+    { x: 0, y: 143, v: [0, -1, 0] },                                 // south pole
+    { x: 72, y: 36, v: [0, 0.7032124967615111, 0.7109797355751019] },
+  ];
+  const v = new THREE.Vector3();
+  for (const { x, y, v: g } of goldens) {
+    v.setFromSpherical(pixelToSpherical(x, y, Daydream));
+    assert.ok(
+      Math.abs(v.x - g[0]) < 1e-9 && Math.abs(v.y - g[1]) < 1e-9 && Math.abs(v.z - g[2]) < 1e-9,
+      `pixel (${x},${y}) -> (${v.x},${v.y},${v.z}); golden (${g})`);
+  }
+});
