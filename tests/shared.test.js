@@ -1,64 +1,34 @@
 // @ts-nocheck
 //
-// showFatalError renders the tool-page WASM-load-failure banner. Key invariant:
-// it is idempotent — repeat calls reuse the single #fatal-error-overlay element
-// and show the latest message, never stacking duplicate banners.
-import { test, beforeEach, afterEach } from 'node:test';
+// shared.js's own export is initScene; showFatalError et al. are re-exports
+// covered by their source modules' tests (banner.test.js, clipboard.test.js,
+// cpp_format.test.js). initScene statically imports three + three/addons
+// (resolved from node_modules in Node). Its element-lookup guards run before any
+// THREE object is constructed, so they are reachable with a document stub alone.
+import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-// shared.js statically imports three + three/addons (resolved from node_modules
-// in Node, an import map in the browser). showFatalError itself touches only
-// `document`, stubbed per-test below.
-const { showFatalError } = await import('../tools/shared.js');
+const { initScene } = await import('../tools/shared.js');
 
-/**
- * Build a minimal document stub backed by an id->element map, tracking how many
- * elements get appended to body so duplicate banners are observable.
- * @returns {{doc: object, appended: object[]}} The stub and the append log.
- */
-function makeDocStub() {
-  const byId = new Map();
-  const appended = [];
-  const makeEl = () => ({ id: '', textContent: '', style: {} });
-  const doc = {
-    getElementById: (id) => byId.get(id) || null,
-    createElement: () => makeEl(),
-    body: {
-      appendChild: (el) => {
-        appended.push(el);
-        if (el.id) byId.set(el.id, el);
-        return el;
-      },
-    },
-  };
-  return { doc, appended };
-}
-
-let savedDoc;
-beforeEach(() => { savedDoc = globalThis.document; });
-afterEach(() => { globalThis.document = savedDoc; });
-
-/** Verifies the first call appends one banner whose text carries the message. */
-test('showFatalError renders one banner showing the message', () => {
-  const { doc, appended } = makeDocStub();
-  globalThis.document = doc;
-
-  showFatalError('engine missing');
-
-  assert.equal(appended.length, 1, 'exactly one banner appended');
-  assert.equal(appended[0].id, 'fatal-error-overlay');
-  assert.match(appended[0].textContent, /engine missing/);
+const savedDocument = globalThis.document;
+afterEach(() => {
+  if (savedDocument === undefined) delete globalThis.document;
+  else globalThis.document = savedDocument;
 });
 
-/** Verifies repeat calls reuse the single banner and show the latest message. */
-test('showFatalError is idempotent and shows the latest message', () => {
-  const { doc, appended } = makeDocStub();
-  globalThis.document = doc;
+/** Stub document.getElementById against a fixed id->element map. */
+function stubDocument(byId) {
+  globalThis.document = { getElementById: (id) => byId[id] || null };
+}
 
-  showFatalError('first failure');
-  showFatalError('second failure');
+test('initScene throws when the container element is absent', () => {
+  stubDocument({});
+  assert.throws(() => initScene('viewport', 'gl'),
+    /container element #viewport not found/);
+});
 
-  assert.equal(appended.length, 1, 'no duplicate banner on the second call');
-  assert.match(appended[0].textContent, /second failure/);
-  assert.doesNotMatch(appended[0].textContent, /first failure/);
+test('initScene throws when the canvas element is absent', () => {
+  stubDocument({ viewport: { clientWidth: 640, clientHeight: 480 } });
+  assert.throws(() => initScene('viewport', 'gl'),
+    /canvas element #gl not found/);
 });
