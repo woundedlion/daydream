@@ -1132,7 +1132,7 @@ All Conway *geometry* operators (`dual` through `bevel` below) take `(const Poly
 
 #### Solids Library (`solids.h`)
 
-`solids.h` provides constexpr vertex/face data for all Platonic solids plus procedural generators for Archimedean, Catalan, and Islamic Star Pattern families. The solids are organized into three registries, accessed by name via `Solids::get_by_name(arena, a, b, name)` (the firmware entry point) or by registry index via `Solids::get(arena, a, b, index)` — the latter is compiled only for the WASM build (`#ifdef EMSCRIPTEN`), where the geometry tools drive solids by numeric index:
+`solids.h` provides constexpr vertex/face data for all Platonic solids plus procedural generators for Archimedean, Catalan, and Islamic Star Pattern families. The solids are organized into three registries. A solid is built by name via `Solids::get_by_name(arena, a, b, name)` (the shared firmware and WASM entry point); the WASM geometry tools enumerate the registries by index with `Solids::get_entry(index)` to populate the picker, then build the selected solid by name:
 
 | Registry | Count | Description |
 |---|---|---|
@@ -1469,14 +1469,11 @@ Every visual effect inherits from `Effect`:
 template <int W, int H>
 class MyEffect : public Effect {
 public:
-    MyEffect() : Effect(W, H), filters(...) {}
+    MyEffect() : Effect(W, H, {.strobe = true}), filters(...) {}
 
     void init() override {
-        registerParam("Speed", &speed, 0.0f, 10.0f);
-        persist_pixels = false;   // clear buffer each frame (this is the default)
+        register_param("Speed", &speed, 0.0f, 10.0f);
     }
-
-    bool strobe_columns() const override { return false; }
 
     void draw_frame() override {
         Canvas canvas(*this);       // acquire write buffer
@@ -1500,18 +1497,18 @@ Effects register themselves into a global registry using the `REGISTER_EFFECT(Cl
 
 ### Parameter Registration
 
-Effects expose live-adjustable parameters via `registerParam()`. These are reflected into the WASM bridge and auto-generate GUI controls in the simulator:
+Effects expose live-adjustable parameters via `register_param()`. These are reflected into the WASM bridge and auto-generate GUI controls in the simulator:
 
 ```cpp
-registerParam("Twist",   &params.twist, -5.0f, 5.0f);   // float slider (min, max)
-registerParam("Enabled", &params.enabled);              // boolean toggle (bool* overload takes no range)
+register_param("Twist",   &params.twist, -5.0f, 5.0f);   // float slider (min, max)
+register_param("Enabled", &params.enabled);              // boolean toggle (bool* overload takes no range)
 ```
 
 The parameter list (`ParamList` — a fixed `std::array<ParamDef, 32>`) is accessible via `getParameters()`, and `updateParameter(name, float)` sets values at runtime. Parameters support both `float*` and `bool*` targets via `std::variant`, with automatic bool threshold at 0.5. The animation system can also write to these parameters, allowing effects to animate their own exposed controls.
 
-### The `persist_pixels` Flag
+### The `EffectConfig` Flags
 
-When `persist_pixels = true`, `Canvas` copies the previous frame's buffer into the new write buffer before rendering. This enables trail/decay effects without explicit trail storage — each frame partially overwrites the last. When `false` (the default), the buffer is zeroed each frame.
+An effect passes construction-time flags to its base as `Effect(W, H, {.strobe = ..., .persist = ..., .full_frame = ...})`; all default to false. With `{.persist = true}`, `Canvas` copies the previous frame's buffer into the new write buffer before rendering, enabling trail/decay effects without explicit trail storage — each frame partially overwrites the last. When false (the default), the buffer is zeroed each frame. `.strobe` drives the POV column strobe (`strobe_columns()`) and `.full_frame` forces full-canvas rendering under segmented drivers (`needs_full_frame()`).
 
 ---
 
@@ -1967,7 +1964,7 @@ The left-edge effect list is a small custom widget:
 
 ### 10.6 GUI Auto-Generation
 
-The effect parameter panel is entirely driven by what C++ registers via `registerParam()`. When an effect is loaded, the simulator calls `getParameterDefinitions()` and builds `lil-gui` controls:
+The effect parameter panel is entirely driven by what C++ registers via `register_param()`. When an effect is loaded, the simulator calls `getParameterDefinitions()` and builds `lil-gui` controls:
 
 ```js
 params.forEach(p => {
