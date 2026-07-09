@@ -20,14 +20,24 @@ test('prettify names multiples of pi', () => {
   assert.equal(prettify(Math.PI), PI);
   assert.equal(prettify(-Math.PI), '-' + PI);
   assert.equal(prettify(Math.PI / 2), PI + '/2');
+  assert.equal(prettify(-Math.PI / 2), '-' + PI + '/2');
   assert.equal(prettify(Math.PI / 4), PI + '/4');
+  assert.equal(prettify(-Math.PI / 4), '-' + PI + '/4');
   assert.equal(prettify(3 * Math.PI / 2), '3' + PI + '/2');
+  assert.equal(prettify(-3 * Math.PI / 2), '-3' + PI + '/2');
 });
 
 test('prettify names the golden ratio and its inverse', () => {
   assert.equal(prettify(PHI), PHI_GLYPH);
+  assert.equal(prettify(-PHI), '-' + PHI_GLYPH);
   assert.equal(prettify(1 / PHI), PHI_GLYPH + INV);
+  assert.equal(prettify(-1 / PHI), '-' + PHI_GLYPH + INV);
   assert.equal(prettify(1 / Math.sqrt(3)), SQRT + '3' + INV);
+  assert.equal(prettify(-1 / Math.sqrt(3)), '-' + SQRT + '3' + INV);
+});
+
+test('prettify normalizes a negative rounding to -0.000 as 0.000', () => {
+  assert.equal(prettify(-0.0004), '0.000');
 });
 
 test('prettify snaps within the 1e-5 tolerance but not outside it', () => {
