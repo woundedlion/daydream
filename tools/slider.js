@@ -79,19 +79,21 @@ export function createSlider(containerId, cfg, onInput) {
   labelSpan.className = labelClass;
   labelSpan.textContent = `${label}:`;
 
+  const roundedValue = Math.round(clampedValue * scale);
+
   const slider = document.createElement('input');
   slider.type = 'range';
   slider.id = sliderId;
   slider.min = String(Math.round(min * scale));
   slider.max = String(Math.round(max * scale));
   slider.step = String(sliderStep);
-  slider.value = String(Math.round(clampedValue * scale));
+  slider.value = String(roundedValue);
   slider.className = sliderClass;
 
   const valueSpan = document.createElement('span');
   valueSpan.id = valueSpanId;
   valueSpan.className = valueClass;
-  valueSpan.textContent = clampedValue.toFixed(decimals);
+  valueSpan.textContent = (roundedValue / scale).toFixed(decimals);
 
   container.append(labelSpan, slider, valueSpan);
 
