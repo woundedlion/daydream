@@ -514,6 +514,7 @@ export class SegmentController {
     this.clearBootWatchdog();
     this.clearInitWatchdog();
     this.clearRenderWatchdog();
+    this.clearRetryTimer();
     if (!this.faulted) {
       // No auto-restart by design: stay latched until a user-driven resolution/mode
       // change rebuilds the pool, rather than retrying a deterministically-faulting render.
