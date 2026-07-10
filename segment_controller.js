@@ -352,9 +352,12 @@ export class SegmentController {
           if (typeof this.retryTimer.unref === 'function') this.retryTimer.unref();
           return;
         }
-        console.error(`[Segmented] Worker seg ${i} error: ${e.message}`
-          + ` (${e.filename}:${e.lineno}:${e.colno})`, e);
-        this.onWorkerFault(i, e.message);
+        const detail = e?.message
+          || `module load failed after ${MAX_BOOT_RETRIES} attempts`
+             + ` (commonly a missing or renamed holosphere_wasm.js)`;
+        console.error(`[Segmented] Worker seg ${i} error: ${detail}`
+          + ` (${e?.filename}:${e?.lineno}:${e?.colno})`, e);
+        this.onWorkerFault(i, detail);
       };
       worker.onmessageerror = (e) => {
         console.error(`[Segmented] Worker seg ${i} message deserialization`
