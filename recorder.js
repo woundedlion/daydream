@@ -395,8 +395,11 @@ export class VideoRecorder {
       write: (data) => {
         chain = chain.then(async () => {
           await opened;
-          // No file handle (picker cancelled/unavailable, or createWritable
-          // failed): buffer every chunk for the blob-download fallback.
+          // Save dialog cancelled: finish() discards the buffer, so drop chunks
+          // instead of hoarding a whole recording that will be thrown away.
+          if (aborted) return;
+          // No file handle (picker unavailable, or createWritable failed):
+          // buffer every chunk for the blob-download fallback.
           if (!handle) { chunks.push(data); return; }
           // A prior write errored the writable; stop feeding it.
           if (failed) return;
