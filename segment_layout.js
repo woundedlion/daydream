@@ -42,27 +42,27 @@ export function computeSegmentRange(id, total, w, h) {
   const NUM_ARMS = 2;
   if (!Number.isInteger(total) || total < NUM_ARMS || total % NUM_ARMS !== 0) {
     throw new Error(
-      `segment_worker: totalSegs must be a positive even number (got ${total})`);
+      `segment_layout: totalSegs must be a positive even number (got ${total})`);
   }
   if (!Number.isInteger(id) || id < 0 || id >= total) {
     throw new Error(
-      `segment_worker: segment id must be an integer in [0, ${total}) (got ${id})`);
+      `segment_layout: segment id must be an integer in [0, ${total}) (got ${id})`);
   }
   if (!Number.isInteger(w) || w <= 0 || !Number.isInteger(h) || h <= 0) {
     throw new Error(
-      `segment_worker: canvas dimensions must be positive integers (got ${w}x${h})`);
+      `segment_layout: canvas dimensions must be positive integers (got ${w}x${h})`);
   }
   const ySegsPerArm = Math.floor(total / NUM_ARMS);
   if (h < ySegsPerArm) {
     throw new Error(
-      `segment_worker: canvas height must be >= ${ySegsPerArm} y-segments per arm (got ${h})`);
+      `segment_layout: canvas height must be >= ${ySegsPerArm} y-segments per arm (got ${h})`);
   }
   const armId = Math.floor(id / ySegsPerArm);
   const ySegId = id % ySegsPerArm;
 
   if (w < NUM_ARMS) {
     throw new Error(
-      `segment_worker: canvas width must be >= ${NUM_ARMS} arms (got ${w})`);
+      `segment_layout: canvas width must be >= ${NUM_ARMS} arms (got ${w})`);
   }
 
   // Symmetric floor(w/2) split per arm, matching firmware's w/2 partition; odd w
