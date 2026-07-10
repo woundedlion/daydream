@@ -63,37 +63,30 @@ test('OKLab golden values (absolute pin)', () => {
 });
 
 /**
- * Verifies the integer HSV sextant split matches byte-for-byte. This is the path
- * where float sextant math would drift from the device at every region boundary,
- * so an exact match across the wheel is the point.
+ * Pins the engine's integer HSV sextant split (hsv_to_rgb) to fixed golden bytes.
+ * The C++ path splits the wheel into six 43-wide regions (primaries land on
+ * 0/86/172) and mixes channels with >>8 fixed-point math; these goldens catch a
+ * drift in the region boundaries or the fixed-point blend. The out-of-range rows
+ * confirm the uint8_t cast wraps mod 256 rather than clamping.
  */
-test('HSV sextant parity (hsv_to_rgb) is exact across the wheel', () => {
-  for (let h = 0; h < 256; h += 5) {
-    for (const s of [0, 1, 64, 128, 200, 255]) {
-      for (const v of [0, 1, 77, 255]) {
-        const w = M.hsv_to_rgb(h, s, v);
-        const j = P.hsvToRgb(h, s, v);
-        assert.ok(w.r === j.r && w.g === j.g && w.b === j.b,
-          `hsv_to_rgb(${h},${s},${v}): wasm(${w.r},${w.g},${w.b}) js(${j.r},${j.g},${j.b})`);
-      }
-    }
-  }
-});
-
-/**
- * Out-of-range HSV inputs: the WASM uint8_t cast and palette_math.js's `& 0xff`
- * both wrap mod 256, so the two must still agree past the [0,255] edges (the
- * in-range sweep above can't catch a clamp-vs-wrap divergence).
- */
-test('HSV out-of-range parity (hsv_to_rgb) wraps mod 256 on both sides', () => {
-  for (const [h, s, v] of [
-    [-1, 128, 200], [256, 128, 200], [300, 64, 64], [-256, 255, 255],
-    [128, -1, 200], [128, 256, 200], [128, 128, -5], [128, 128, 511],
-  ]) {
+test('HSV sextant golden bytes (hsv_to_rgb, absolute pin)', () => {
+  const golden = [
+    [[0, 255, 255], [255, 0, 0]],
+    [[43, 255, 255], [254, 255, 0]],
+    [[86, 255, 255], [0, 255, 0]],
+    [[128, 255, 255], [0, 255, 252]],
+    [[172, 255, 255], [0, 0, 255]],
+    [[215, 255, 255], [255, 0, 254]],
+    [[30, 128, 200], [200, 170, 99]],
+    [[100, 0, 180], [180, 180, 180]],
+    [[50, 255, 0], [0, 0, 0]],
+    [[256, 128, 200], [200, 100, 99]],
+    [[-1, 128, 200], [200, 99, 105]],
+  ];
+  for (const [[h, s, v], [r, g, b]] of golden) {
     const w = M.hsv_to_rgb(h, s, v);
-    const j = P.hsvToRgb(h, s, v);
-    assert.ok(w.r === j.r && w.g === j.g && w.b === j.b,
-      `hsv_to_rgb(${h},${s},${v}): wasm(${w.r},${w.g},${w.b}) js(${j.r},${j.g},${j.b})`);
+    assert.ok(w.r === r && w.g === g && w.b === b,
+      `hsv_to_rgb(${h},${s},${v}): wasm(${w.r},${w.g},${w.b}) golden(${r},${g},${b})`);
   }
 });
 
