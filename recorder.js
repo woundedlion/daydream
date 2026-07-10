@@ -374,14 +374,15 @@ export class VideoRecorder {
     let handle = null;
     let writable = null;
     let failed = false;
+    let aborted = false;
     const opened = globalThis.showSaveFilePicker({
       suggestedName: filename,
       types: [{ description: 'Video', accept: { [this.mimeForExt(ext)]: [`.${ext}`] } }],
     })
       .then((h) => { handle = h; })
       .catch((err) => {
-        if (err?.name !== 'AbortError')
-          console.warn('VideoRecorder: streaming save unavailable, buffering in memory', err);
+        if (err?.name === 'AbortError') aborted = true;
+        else console.warn('VideoRecorder: streaming save unavailable, buffering in memory', err);
       });
 
     // One serialized chain; each link awaits the picker, so chunks that arrive
@@ -421,9 +422,12 @@ export class VideoRecorder {
         chain
           .then(async () => {
             await opened;
-            // No writable opened — the picker was cancelled/unavailable (chunks
-            // buffered) or the session streamed no data (the chosen file was
-            // never truncated). Download the buffer if there is one.
+            // User cancelled the Save dialog: honor Cancel and discard the
+            // buffered chunks instead of writing to the default Downloads folder.
+            if (aborted) return;
+            // No writable opened — the picker was unavailable (chunks buffered)
+            // or the session streamed no data (the chosen file was never
+            // truncated). Download the buffer if there is one.
             if (!writable) {
               if (chunks.length) this.download(recorder, chunks, effectName);
               else console.warn('VideoRecorder: session produced no data; nothing to download');
