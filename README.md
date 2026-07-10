@@ -1136,9 +1136,9 @@ All Conway *geometry* operators (`dual` through `bevel` below) take `(const Poly
 |---|---|---|
 | `simple_registry` | 18 entries | 5 Platonic (tetrahedron through icosahedron) + 13 Archimedean solids |
 | `catalan_registry` | 13 entries | Duals of the Archimedean solids (triakisTetrahedron, rhombicDodecahedron, pentakisDodecahedron, etc.) |
-| `islamic_registry` | 23 entries | Complex multi-operator recipes producing Islamic star patterns from base solids |
+| `islamic_registry` | 24 entries | Complex multi-operator recipes producing Islamic star patterns from base solids |
 
-Total: **54 registered solids** (`Solids::NUM_ENTRIES`).
+Total: **55 registered solids** (`Solids::NUM_ENTRIES`).
 
 `Collections` namespace provides typed spans for iterating subsets: `get_platonic_solids()`, `get_archimedean_solids()`, `get_simple_solids()`, `get_catalan_solids()`, `get_islamic_solids()`.
 
