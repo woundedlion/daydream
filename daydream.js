@@ -8,7 +8,7 @@ import createHolosphereModule from "./holosphere_wasm.js";
 import { Daydream } from "./driver.js";
 import { GUI, resetGUI } from "gui";
 import { EffectSidebar } from "./sidebar.js";
-import { resolveActiveEffect } from "./sidebar_logic.js";
+import { planResolutionApply, paramValueSkew } from "./effect_sequencing.js";
 import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
 import { SegmentController, warmModules } from "./segment_controller.js";
@@ -122,7 +122,7 @@ function syncGUI() {
   // A names/values length skew means the cached param list drifted from the
   // engine's value stream (e.g. a stale list after an async effect change); skip
   // rather than silently mis-bind sliders by index, mirroring export()'s check.
-  if (names.length !== values.length) {
+  if (paramValueSkew(names.length, values.length)) {
     if (!syncGuiSkewLogged) {
       console.warn(`syncGUI: param/value length skew (${names.length} vs ${values.length}); skipping sync`);
       syncGuiSkewLogged = true;
@@ -267,7 +267,7 @@ function applyEffect(preserveParams = false) {
           return;
         }
         const expected = activeEffect.paramNames.length;
-        if (expected !== values.length) {
+        if (paramValueSkew(expected, values.length)) {
           console.warn(`Export: param/value length skew (${expected} vs ${values.length}); skipping copy`);
           exportCtrl.name('✗ Copy failed');
           setTimeout(() => exportCtrl.name('Export'), 1500);
@@ -445,14 +445,13 @@ function applyResolution(preserveParams = false) {
   // Done after updateResolution()/setEffects() because appState.set('effect',…)
   // synchronously fires applyEffect(), which would otherwise build against the
   // pre-resize dot mesh / stale sidebar.
-  let effectChanged = false;
-  const resolvedEffect = resolveActiveEffect(availableEffects, appState.get('effect'));
-  if (resolvedEffect !== appState.get('effect')) {
-    appState.set('effect', resolvedEffect);
-    effectChanged = true;
+  const { nextEffect, effectChanged, applyDirectly } =
+    planResolutionApply(availableEffects, appState.get('effect'));
+  if (effectChanged) {
+    appState.set('effect', nextEffect);
   }
 
-  if (!effectChanged) {
+  if (applyDirectly) {
     applyEffect(preserveParams);
   }
 
