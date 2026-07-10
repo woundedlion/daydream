@@ -2047,15 +2047,15 @@
     // the ~1000-label loop on frames where the camera is identical (autorotate
     // paused and no user input). During autorotation the camera changes every
     // frame, so the loop runs as before.
-    const _labelCam = { px: NaN, py: NaN, pz: NaN, qx: NaN, qy: NaN, qz: NaN, qw: NaN };
+    const labelCam = { px: NaN, py: NaN, pz: NaN, qx: NaN, qy: NaN, qz: NaN, qw: NaN };
     function labelCameraMoved() {
       const p = camera.position, q = camera.quaternion;
-      if (p.x === _labelCam.px && p.y === _labelCam.py && p.z === _labelCam.pz &&
-          q.x === _labelCam.qx && q.y === _labelCam.qy && q.z === _labelCam.qz && q.w === _labelCam.qw) {
+      if (p.x === labelCam.px && p.y === labelCam.py && p.z === labelCam.pz &&
+          q.x === labelCam.qx && q.y === labelCam.qy && q.z === labelCam.qz && q.w === labelCam.qw) {
         return false;
       }
-      _labelCam.px = p.x; _labelCam.py = p.y; _labelCam.pz = p.z;
-      _labelCam.qx = q.x; _labelCam.qy = q.y; _labelCam.qz = q.z; _labelCam.qw = q.w;
+      labelCam.px = p.x; labelCam.py = p.y; labelCam.pz = p.z;
+      labelCam.qx = q.x; labelCam.qy = q.y; labelCam.qz = q.z; labelCam.qw = q.w;
       return true;
     }
 
