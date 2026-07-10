@@ -557,12 +557,11 @@ test('the timed fallback primes the offscreen with one blit before start', () =>
 });
 
 /**
- * Save picker cancelled after chunks are already flowing: with the File System
- * Access API present but the picker rejected, every chunk (including ones that
- * arrived before the rejection settled) falls back to the in-memory buffer and
- * the whole blob is downloaded at stop — nothing is lost.
+ * Save picker cancelled after chunks are already flowing: cancelling the picker
+ * is a deliberate "don't save", so the buffered chunks are discarded and nothing
+ * is written to the default Downloads folder — Cancel means cancel.
  */
-test('a cancelled save picker buffers every chunk and downloads the whole blob', async () => {
+test('a cancelled save picker discards buffered chunks without downloading', async () => {
   const restore = installRecorderEnv();
   const abort = new Error('user cancelled');
   abort.name = 'AbortError';
@@ -585,10 +584,7 @@ test('a cancelled save picker buffers every chunk and downloads the whole blob',
 
     await new Promise((r) => setTimeout(r));
 
-    assert.equal(downloads.length, 1, 'one blob download after the picker was cancelled');
-    assert.equal(downloads[0].name, 'cancelled');
-    assert.deepEqual(downloads[0].chunks, [{ size: 10 }, { size: 20 }, { size: 30 }],
-      'every buffered chunk is in the fallback blob, in order');
+    assert.equal(downloads.length, 0, 'no download after the picker was cancelled');
   } finally {
     console.warn = prevWarn;
     restore();
