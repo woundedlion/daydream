@@ -764,9 +764,7 @@ All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<F
 
 | Primitive | Description |
 |---|---|
-| `Plot::Point` | Single plotted point |
 | `Plot::Line` | Geodesic line segment between two points |
-| `Plot::Vertices` | Vertex set rendering |
 | `Plot::Multiline` | Connected line strip from a sequence of fragments |
 | `Plot::Ring` | Circle rasterized as a plotted polyline |
 | `Plot::PlanarPolygon` | Regular N-gon in the tangent plane |
@@ -997,7 +995,7 @@ FastLED output ← CRGB(gamma encode) ← linear→sRGB ← Pixel16
 | Type | Description |
 |---|---|
 | `ProceduralPalette` | Cosine palette: `a + b*cos(2π*(c*t + d))` per channel. Defined by 4 vec3 coefficients. |
-| `Gradient` | Linear interpolation between a sorted list of (position, color) stops. |
+| `Gradient` | OKLCH interpolation between a sorted list of (position, color) stops. |
 | `GenerativePalette` | Procedurally generated palette from harmony rules (triadic, analogous, etc.) combined with brightness/saturation profiles. Supports snapshot/lerp for animated transitions. |
 | `SolidColorPalette` | Constant color, adapts to the `Palette` interface. |
 
@@ -1005,7 +1003,7 @@ Twenty-one named `ProceduralPalette` instances are pre-defined: `darkRainbow`, `
 
 #### OKLCH Perceptual Color
 
-All palette interpolation and procedural color generation is performed in the OKLCH perceptual color space. The pipeline:
+Palette interpolation is performed in the OKLCH perceptual color space: both `Gradient` (color-stop interpolation) and `GenerativePalette` (harmony-key interpolation and animated transitions) build their tables in OKLCH. The cosine `ProceduralPalette` is the exception — it evaluates its per-channel waveform directly in sRGB. The pipeline:
 
 ```
 Pixel (sRGB 16-bit) → linear RGB float → OKLab (L, a, b) → OKLCH (L, C, h)
@@ -1714,6 +1712,8 @@ A head traces a fixed 12:5 spherical Lissajous figure whose long trail is contin
 
 Platonic solid mesh faces rendered with `Plot::Mesh`, given a noise-distorted, feedback-loop appearance via `Filter::Pixel::Feedback`. Cycles through the Platonic solid library, crossfade-morphing between shapes with `Animation::MeshMorph`, while a `Presets` cycle hard-cuts the feedback/distortion style parameters.
 
+**Parameters**: Fade, Distort Amp, Distort Freq, Distort Speed, Noise Scale, Hue Shift, Feedback
+
 </td></tr></table>
 
 <table border="0"><tr>
@@ -1782,9 +1782,9 @@ A Fibonacci-spiral field of star-polygon SDFs, continuously deformed by an evolv
 
 #### Raymarch
 
-Volumetric raymarcher that renders twisted tori at the 20 vertices of a dodecahedron. Each torus is ray-marched with `Scan::Volume::draw` and lit with metallic Blinn-Phong shading (half-Lambert diffuse, specular highlights, Fresnel rim). A random-walk animation drives the camera orientation.
+Volumetric raymarcher that renders twisted tori at the 26 vertices of a disdyakis dodecahedron. Each torus is ray-marched with `Scan::Volume::draw` and lit with metallic Blinn-Phong shading (half-Lambert diffuse, specular highlights, Fresnel rim). A random-walk animation drives the camera orientation.
 
-**Parameters**: Pulse Speed, Core Size, Max Steps, Diffuse, Specular, Fresnel, Twist, AA Width
+**Parameters**: Pulse Speed, Fill, Max Steps, Diffuse, Specular, Fresnel, Twist, AA Width
 
 </td></tr></table>
 
@@ -1898,7 +1898,11 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 
 The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 330 KiB arena) for interactive solid manipulation.
 
+The bridge also exposes a `PaletteOps` class whose `bakeLut` method authors a three-key OKLCH gradient and returns a zero-copy `Uint8Array` view over a 256-entry sRGB LUT (same read-before-next-call memory-view contract as `getPixels`), used by the palette tool. It touches no global RNG, so calling it never perturbs a live engine's render stream.
+
 Alongside the classes, the bridge exports a few free spline-evaluation functions — `spline_cubic_fast`, `spline_cubic_slerp`, and `spline_catmull_rom_tangents` — used by the `splines.html` tool so its Bézier / Catmull-Rom curves are evaluated by the same engine code the firmware uses rather than a JavaScript reimplementation.
+
+It likewise exports the engine's color, palette, and lissajous math as free functions so the JavaScript tool ports can cross-check against the real implementation rather than a reimplementation: `srgb_to_linear_float`, `linear_to_srgb_float`, `srgb_to_linear_interp` (the interpolated sRGB→16-bit-linear LUT), `linear_rgb_to_oklab`, `oklab_to_linear_rgb`, `hsv_to_rgb` (the device `CHSV` sextant path), `procedural_palette_linear` (the cosine-palette formula), and `lissajous`.
 
 The WASM bridge includes stack high-water-mark instrumentation: `stack_paint_canary()` fills the stack with a known pattern at init time, and `stack_high_water_mark()` scans for the deepest overwrite. This is reported via `getArenaMetrics()` and logged on every effect switch to catch stack-hungry template instantiations early.
 
