@@ -554,6 +554,11 @@ createHolosphereModule().then(module => {
   // Construct the recorder now that daydream's canvas exists.
   host.recorder = new VideoRecorder(daydream.canvas);
   host.recorder.frameInterval = daydream.frameInterval;
+  // Push any Recording settings changed during the async WASM-load window; their
+  // setters no-op'd while host.recorder was null.
+  host.recorder.bitrateMbps = recSettings.quality;
+  host.recorder.targetHeight = REC_RESOLUTIONS[recSettings.resolution];
+  host.recorder.format = REC_FORMATS[recSettings.format];
   daydream.recorder = host.recorder;
 
   const loadingOverlay = document.getElementById('loading-overlay');
