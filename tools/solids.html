@@ -1449,6 +1449,9 @@
         val = state.ops[index].params[key];
       } else if (def) {
         val = Math.min(def.max, Math.max(def.min, val));
+        // Integral-step params (e.g. relax's iter) become count-typed C++ args;
+        // a fractional value throws in requireCount and silently fails export.
+        if (Number.isInteger(def.step)) val = Math.round(val);
       }
       state.ops[index].params[key] = val;
 
