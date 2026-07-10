@@ -50,7 +50,7 @@ test('generateFuncAndRecipe handles hankin (angle * D2R) and relax (iter)', () =
   assert.equal(recipe, 'SolidBuilder(cube(a, b), a, b).hankin(30.0f * D2R).relax(200).build()');
 });
 
-/** Verifies an explicit relax iter:0 is preserved (not coerced to the default 100). */
+/** Verifies an explicit relax iter:0 is preserved (not coerced to the default 8). */
 test('generateFuncAndRecipe preserves an explicit relax iter:0', () => {
   const item = { base: 'cube', ops: [{ op: 'relax', params: { iter: 0 } }] };
   const { funcName, recipe } = generateFuncAndRecipe(item);
