@@ -175,7 +175,7 @@ test('GLSL complex ops match the JS implementations', () => {
 
 /** The 1e-6 guard fires identically in both: |q|^2 just below the threshold yields 0. */
 test('GLSL and JS cdiv share the 1e-6 near-zero-denominator guard', () => {
-  // |q|^2 = 4e-7 < 1e-6 -> guarded to 0 in both.
+  // |q|^2 = 1.6e-7 < 1e-6 -> guarded to 0 in both.
   const q = { re: 4e-4, im: 0 };
   assert.ok(q.re * q.re < 1e-6);
   const a = cdiv({ re: 1, im: 1 }, q);
