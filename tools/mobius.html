@@ -658,8 +658,10 @@
         if (isAnimating) stopAnimation();
         let re = e.key === 'Home' ? 0 : paramObj.re + dRe;
         let im = e.key === 'Home' ? 0 : paramObj.im + dIm;
-        re = snapComplex(Math.max(-maxExtent, Math.min(maxExtent, re)));
-        im = snapComplex(Math.max(-maxExtent, Math.min(maxExtent, im)));
+        // Scale the snap band to the key step so a single nudge escapes the
+        // zero band (2*threshold) instead of latching back onto 0.
+        re = snapComplex(Math.max(-maxExtent, Math.min(maxExtent, re)), step / 4);
+        im = snapComplex(Math.max(-maxExtent, Math.min(maxExtent, im)), step / 4);
         paramObj.re = re;
         paramObj.im = im;
         updateUI();
