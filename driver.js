@@ -203,7 +203,6 @@ export class Daydream {
     this.frameInterval = 1 / Daydream.FPS; // seconds per simulation frame
     this.timeAccumulator = 0;
 
-    this.resources = [];
     this.labelPool = new LabelPool(this.scene);
     this.hadLabels = false;
 
