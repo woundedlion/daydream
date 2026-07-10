@@ -507,9 +507,10 @@
       const valueSpan = document.getElementById(`${def.param}_value`);
 
       // Seed the per-group start values a locked relative drag works from. Must
-      // fire on both mouse and touch press: touch drags emit `input` with no
-      // preceding `mousedown`, so without a touchstart seed the locked branch
-      // below sees an empty map and the Lock checkbox silently does nothing.
+      // fire on mouse, touch, and keyboard input: touch drags and arrow-key
+      // presses emit `input` with no preceding `mousedown`, so without a seed the
+      // locked branch below sees an empty map and the Lock checkbox silently does
+      // nothing.
       const seedLockedDrag = () => {
         const lockCheckbox = document.getElementById(`lock_${def.group}`);
         const isLocked = lockCheckbox ? lockCheckbox.checked : false;
@@ -528,6 +529,7 @@
       };
       slider.addEventListener('mousedown', seedLockedDrag);
       slider.addEventListener('touchstart', seedLockedDrag, { passive: true });
+      slider.addEventListener('keydown', seedLockedDrag);
 
       // input listener: applies relative movement to the whole locked group
       slider.addEventListener('input', () => {
