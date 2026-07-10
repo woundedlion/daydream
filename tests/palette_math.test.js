@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const {
-  ProceduralPalette, CPixel, PRNG, hsvToRgb, GenerativePalette,
+  ProceduralPalette, PRNG, GenerativePalette,
   mapValue, proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
 } = await import('../tools/palette_math.js');
 
@@ -71,20 +71,6 @@ test('PRNG seed 0 is reproducible', () => {
   for (let i = 0; i < 8; i++) {
     assert.equal(a.next(), b.next());
   }
-});
-
-/** Verifies hsvToRgb maps the region-boundary hues to pure primaries and returns a CPixel. */
-test('hsvToRgb on primary hues returns pure red/green/blue', () => {
-  // Six 43-wide regions (region = h/43): primaries land on 0/86/172, not 0/85/170.
-  const red = hsvToRgb(0, 255, 255);
-  assert.deepEqual([red.r, red.g, red.b], [255, 0, 0]);
-  assert.ok(red instanceof CPixel);
-
-  const green = hsvToRgb(86, 255, 255);
-  assert.deepEqual([green.r, green.g, green.b], [0, 255, 0]);
-
-  const blue = hsvToRgb(172, 255, 255);
-  assert.deepEqual([blue.r, blue.g, blue.b], [0, 0, 255]);
 });
 
 /** Verifies mapValue linearly remaps a value from one numeric range to another. */

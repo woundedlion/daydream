@@ -102,20 +102,6 @@ export class ProceduralPalette {
 // --- Generative Palette Implementation ---
 
 /**
- * An 8-bit RGB color (channels in 0..255), mirroring the engine's CRGB.
- */
-export class CPixel {
-  /**
-   * @param {number} r - Red channel in 0..255.
-   * @param {number} g - Green channel in 0..255.
-   * @param {number} b - Blue channel in 0..255.
-   */
-  constructor(r, g, b) {
-    this.r = r; this.g = g; this.b = b;
-  }
-}
-
-/**
  * Seeded linear-congruential PRNG for reproducible palette generation.
  */
 export class PRNG {
@@ -147,44 +133,6 @@ export class PRNG {
    */
   nextInt(min, max) {
     return Math.floor(this.next() * (max - min)) + min;
-  }
-}
-
-/**
- * HSV to RGB conversion, ported byte-for-byte from the engine's
- * CRGB(const CHSV&) path in core/platform.h: the hue wheel is split into six
- * 43-wide regions (region = h/43) and the channels are mixed with >>8
- * fixed-point math. Float sextant math drifts from the device near every region
- * boundary (e.g. pure green lands at h=86, not 85), so this mirrors the integer
- * path exactly to keep an exported palette's base color faithful.
- * @param {number} h - Hue in 0..255 (masked to a byte).
- * @param {number} s - Saturation in 0..255 (masked to a byte).
- * @param {number} v - Value/brightness in 0..255 (masked to a byte).
- * @returns {CPixel} RGB color with channels in 0..255.
- */
-export function hsvToRgb(h, s, v) {
-  h &= 0xff;
-  s &= 0xff;
-  v &= 0xff;
-
-  if (s === 0) {
-    return new CPixel(v, v, v);
-  }
-
-  const region = Math.floor(h / 43);
-  const remainder = (h - region * 43) * 6;
-
-  const p = (v * (255 - s)) >> 8;
-  const q = (v * (255 - ((s * remainder) >> 8))) >> 8;
-  const t = (v * (255 - ((s * (255 - remainder)) >> 8))) >> 8;
-
-  switch (region) {
-    case 0: return new CPixel(v, t, p);
-    case 1: return new CPixel(q, v, p);
-    case 2: return new CPixel(p, v, t);
-    case 3: return new CPixel(p, q, v);
-    case 4: return new CPixel(t, p, v);
-    default: return new CPixel(v, p, q);
   }
 }
 
