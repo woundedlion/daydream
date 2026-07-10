@@ -785,6 +785,7 @@ function disposeApp() {
   sidebar.dispose();
   daydream.dispose();
   segments.destroy();
+  durationEl.remove();
 }
 
 // pagehide (not unload) so bfcache is respected: e.persisted is false only on a
