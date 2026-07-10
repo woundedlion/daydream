@@ -612,7 +612,7 @@ struct Fragment {
   float v3 = 0.0f;        // Register 3: auxiliary
   float size = 1.0f;      // Size metric for normalization
   float age = 0.0f;       // Age (for trail decay / motion blur)
-  Color4 color = Color4(0, 0, 0, 0); // Output: shader writes RGBA here; defaults to transparent black (Color4()'s default is opaque)
+  Color4 color = Color4(0, 0, 0, 0); // Output: shader writes RGBA here; defaults to transparent black (alpha 0.0)
 };
 ```
 
@@ -1258,7 +1258,7 @@ Arm A                               Arm B (x offset by W/2)
 └──────────────────────────┘        └──────────────────────────┘
 ```
 
-**Hardware ID detection**: Each Teensy reads its segment ID from two GPIO straps — pin 21 (ID0), pin 22 (ID1), active-low with pull-ups.  The build reads `ID_STRAPS = log2(N)` of them and decodes the ID as `raw & (N-1)`, so a 4-segment build reads both straps and a 2-segment build reads one; the header permits any power-of-two `N ≤ 4` (`segment_map()` distinguishes only a top and a bottom strip per arm).  All-floating = ID 0 (sync master).  The ID determines which arm and which half this board owns.
+**Hardware ID detection**: Each Teensy reads its segment ID from two GPIO straps — pin 21 (ID0), pin 22 (ID1), active-low with pull-ups.  The build reads `ID_STRAPS = log2(N)` of them and decodes the ID as `(~raw) & (N-1)` (the straps are active-low, so the raw reading is inverted), so a 4-segment build reads both straps and a 2-segment build reads one; the header permits any power-of-two `N ≤ 4` (`segment_map()` distinguishes only a top and a bottom strip per arm).  All-floating = ID 0 (sync master).  The ID determines which arm and which half this board owns.
 
 **Branchless ISR**: All per-segment decisions are resolved at boot time into three precomputed values:
 
@@ -1312,7 +1312,7 @@ x = ( x_boundary + (now − epoch) · (W/2) / cycles_per_half_rev )  mod W
 | `MASTER_EN` | pin 5 (drive LOW) | pin 5 (drive HIGH) | 3.3 V CMOS, gates the external sync-out buffer | per-board strap out |
 | `ID` straps | pins 21–23 (ID0–ID2) | pins 21–23 (ID0–ID2) | active-low, internal pull-ups; `ID_STRAPS = log2(N)` read | strap (board identity) |
 
-The ID straps select the board: the build reads `ID_STRAPS = log2(N)` of them (ID0/pin 21, ID1/pin 22, and — only for `N = 8` — ID2/pin 23), decoding `raw & (N-1)`.  For the 4-segment build, all-floating = `00` = master and the other three codes select arm/half.  `SYNC` is one shared pin 3 — the master drives it and downstream boards receive on its rising edge; `MASTER_EN` (pin 5) gates an external level shifter so only the master drives the shared bus.  The former column-clock wire is **deleted** and pin 4 is freed — `SYNC` is the only inter-board connection.  It is assumed physically reliable (a hard, soldered line); a severed wire is out of scope (boards free-run and precess apart at crystal rate, a slow smear, never an instant break).
+The ID straps select the board: the build reads `ID_STRAPS = log2(N)` of them (ID0/pin 21, ID1/pin 22, and — only for `N = 8` — ID2/pin 23), decoding `(~raw) & (N-1)` (active-low straps, so the raw reading is inverted).  For the 4-segment build, all-floating = `00` = master and the other three codes select arm/half.  `SYNC` is one shared pin 3 — the master drives it and downstream boards receive on its rising edge; `MASTER_EN` (pin 5) gates an external level shifter so only the master drives the shared bus.  The former column-clock wire is **deleted** and pin 4 is freed — `SYNC` is the only inter-board connection.  It is assumed physically reliable (a hard, soldered line); a severed wire is out of scope (boards free-run and precess apart at crystal rate, a slow smear, never an instant break).
 
 **Signal levels & symbol waveforms.** The wire idles LOW.  A **symbol** is a burst of short active-high pulses at a fixed pitch; **the meaning is the count of rising edges — pulse width carries no information.**  Each pulse is HIGH for one ISR body (pin set HIGH at ISR entry, LOW at exit; tens of µs) and the rising edge is the only timed event.  Pulses are drawn narrow, to scale against the ~868 µs pitch:
 
@@ -1935,7 +1935,7 @@ The `Daydream` class owns the entire render side. Features:
 | **Instanced dot mesh** | One `InstancedMesh` of `W × H` small spheres. Per-instance position is precomputed in `setupDots()` from `pixelToSpherical(x, y)` (a `THREE.Spherical`, applied via `setFromSpherical`); per-instance color is updated each frame from the WASM pixel buffer. Single draw call per frame. |
 | **Linear color pipeline** | `THREE.ColorManagement.enabled = true` and `setPixelRatio(min(devicePixelRatio, 1))`. Colors arriving from WASM are already linear, so no extra conversion. |
 | **OrbitControls camera** | A normal `PerspectiveCamera` at `(0, 0, 220)` with FOV 20°, plus `OrbitControls` for mouse/touch navigation. |
-| **Picture-in-picture** | A clone of the main camera renders to a square 30%-sized bottom-right viewport, mirroring the main camera's orientation so the corner thumbnail previews the whole piece as it looks from afar. Suppressed when `isMobile` or `navigator.webdriver` (§ headless capture). |
+| **Picture-in-picture** | A clone of the main camera at a fixed orientation renders to a 30%-sized bottom-right viewport so the front and back of the sphere are visible simultaneously. Suppressed when `isMobile` or `navigator.webdriver` (§ headless capture). |
 | **Axes overlay** | Three `THREE.Line`s for X/Y/Z visible on toggle, plus a `CSS2DRenderer`-backed `LabelPool` for "+X / +Y / +Z" labels with zero allocation per frame. |
 | **Resize observer** | `ResizeObserver` on the canvas container recomputes camera aspect, viewport, and `isMobile` (width ≤ 900). |
 | **Fixed-rate stepping** | The simulation ticks at `1/FPS` seconds independent of the actual render rate, with a time accumulator to keep effects deterministic. |
