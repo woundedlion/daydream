@@ -433,7 +433,7 @@ function applyResolution(preserveParams = false) {
 
   const availableEffects = effectsByResolution[resolution] || HiResFavorites;
 
-  daydream.updateResolution(p.h, p.w, p.dotSize);
+  daydream.updateResolution(p.w, p.h, p.dotSize);
 
   let effectSizes = null;
   if (host.engine) {

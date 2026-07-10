@@ -817,15 +817,15 @@ export class Daydream {
   }
 
   /**
-   * Change the sphere's pixel grid to `h`x`w` with the given dot size, then
+   * Change the sphere's pixel grid to `w`x`h` with the given dot size, then
    * rebuild the dot mesh and its instance matrices/color buffer.
-   * @param {number} h - New grid height in pixels.
    * @param {number} w - New grid width in pixels.
+   * @param {number} h - New grid height in pixels.
    * @param {number} dotSize - New dot radius in scene units.
    */
-  updateResolution(h, w, dotSize) {
-    Daydream.H = h;
+  updateResolution(w, h, dotSize) {
     Daydream.W = w;
+    Daydream.H = h;
     Daydream.DOT_SIZE = dotSize;
 
     this.setupDots();
