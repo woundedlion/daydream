@@ -26,6 +26,13 @@ test('formatExportParams: skips readonly params', () => {
     '{ 0.85f, 1.0f, 0.025f, 0.2f }');
 });
 
+/** A readonly param in the middle must drop only its own value; the surviving
+ *  values stay indexed by their param position, not a filtered position. */
+test('formatExportParams: skips a middle readonly param', () => {
+  const params = [{ name: 'A' }, { name: 'B', readonly: true }, { name: 'C' }];
+  assert.equal(formatExportParams(params, [0.1, 0.2, 0.3]), '{ 0.1f, 0.3f }');
+});
+
 /** An all-readonly param set yields empty braces rather than a malformed list. */
 test('formatExportParams: all-readonly yields empty braces', () => {
   const params = [{ name: 'X', readonly: true }];
