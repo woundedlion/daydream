@@ -655,9 +655,11 @@ export class SegmentController {
   /**
    * Composite segment results into the display buffer (quadrant model).
    * @returns {number} How many segment rectangles were actually blitted this
-   *   call. 0 means every result was null/empty (a fully-fenced frame), so the
-   *   display buffer still holds only driver.render()'s fill(0) — the caller
-   *   uses this to avoid marking a black buffer as a real composited frame.
+   *   call. 0 means either every result was null/empty (a fully-fenced frame),
+   *   so the display buffer still holds only driver.render()'s fill(0), or the
+   *   pre-pass rejected a segment (out-of-bounds/empty/inverted rect or a
+   *   pixel-length mismatch) and latched a fault. The caller uses this to avoid
+   *   marking a black buffer as a real composited frame.
    */
   composite() {
     this.refreshPixelView();
