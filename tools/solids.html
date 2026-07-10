@@ -136,38 +136,6 @@
       color: #cbd5e1;
     }
 
-    #code-panel {
-      position: absolute;
-      bottom: var(--footer-height);
-      /* Sit above footer */
-      left: 0;
-      right: 0;
-      height: 200px;
-      background-color: var(--slate-800);
-      border-top: 1px solid var(--slate-700);
-      padding: 1rem;
-      transform: translateY(150%);
-      /* Hide fully */
-      transition: transform 0.3s ease;
-      z-index: 30;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-
-    #code-panel.open {
-      transform: translateY(0);
-    }
-
-    textarea {
-      font-family: 'JetBrains Mono', monospace;
-      background-color: var(--slate-900);
-      color: #a5b4fc;
-      border: 1px solid var(--slate-700);
-      resize: none;
-      font-size: 0.8rem;
-    }
-
     /* .btn / .btn-primary / .btn-secondary now live in tools.css (shared).
        The add-op grid packs 14 buttons into the sidebar, so it overrides the
        shared padding with a tighter vertical profile. */
