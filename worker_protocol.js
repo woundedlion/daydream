@@ -92,8 +92,10 @@ export const PROTOCOL_VERSION = 1;
 /** Worker has finished bootstrapping (engine instantiated) and can accept work.
  * @typedef {{ type: 'ready', segId: number }} ReadyMsg */
 
-/** Worker's engine rejected the init resolution; no usable geometry. Lets the
- * controller fault immediately instead of waiting out the init watchdog.
+/** Worker's engine rejected a resolution or effect — at init or on a later
+ * setResolution/setEffect; no usable geometry. Lets the controller fault
+ * immediately instead of rendering stale-geometry frames or waiting out the
+ * init watchdog.
  * @typedef {{ type: 'initFailed', segId: number, reason: string }} InitFailedMsg */
 
 /** Worker module body started executing — its static imports (incl. the WASM

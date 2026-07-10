@@ -113,7 +113,11 @@ async function handleMessage(msg) {
 
     case 'setEffect': {
       if (engine) {
-        engine.setEffect(msg.name);
+        if (engine.setEffect(msg.name) === false) {
+          post({ type: 'initFailed', segId,
+                 reason: `setEffect(${msg.name}) rejected` });
+          break;
+        }
         // Tuned params must follow setEffect, which rebuilds with defaults.
         if (msg.params) {
           for (const p of msg.params) engine.setParameter(p.name, p.value);
@@ -127,7 +131,11 @@ async function handleMessage(msg) {
       if (engine) {
         // `=== false` (not `!`) is load-bearing: only an explicit false rejection
         // keeps the current geometry; a non-boolean return must not count as one.
-        if (engine.setResolution(msg.w, msg.h) === false) break;
+        if (engine.setResolution(msg.w, msg.h) === false) {
+          post({ type: 'initFailed', segId,
+                 reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
+          break;
+        }
         canvasW = msg.w;
         canvasH = msg.h;
         segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
