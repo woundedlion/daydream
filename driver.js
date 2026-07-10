@@ -113,12 +113,10 @@ export class Daydream {
   // Virtual-row padding over logical H (core/platform.h). Sim = 0 (full sphere);
   // device = 3 (south-pole clip). See pixelToSpherical.
   static H_OFFSET = 0;
-  static PIXEL_WIDTH = 2 * Math.PI / Daydream.W;
   static FPS = 16;
   // Bounds the post-stall frame backlog (clock consumes one interval per frame).
   static MAX_FRAME_BACKLOG_SECONDS = 0.25;
   static DOT_SIZE = 2;
-  static DOT_COLOR = 0x0000ff;
 
   static pixels = null;
 
@@ -128,7 +126,6 @@ export class Daydream {
   static NEG_X_AXIS = new THREE.Vector3(-1, 0, 0);
   static NEG_Y_AXIS = new THREE.Vector3(0, -1, 0);
   static NEG_Z_AXIS = new THREE.Vector3(0, 0, -1);
-  static UP = Daydream.Y_AXIS;
 
   /**
    * Build the renderer, cameras, controls, scene, dot mesh, and axis lines, and
@@ -829,7 +826,6 @@ export class Daydream {
   updateResolution(h, w, dotSize) {
     Daydream.H = h;
     Daydream.W = w;
-    Daydream.PIXEL_WIDTH = 2 * Math.PI / Daydream.W;
     Daydream.DOT_SIZE = dotSize;
 
     this.setupDots();
