@@ -232,7 +232,11 @@ class DeepLinkGUI {
             if (typeof min === 'number' && val < min) val = min;
             if (typeof max === 'number' && val > max) val = max;
           }
-          valClamped = val !== raw;
+          // The snap multiply introduces float noise (0.3 -> 0.30000000000000004),
+          // so an already-on-grid value must not read as clamped; only a change
+          // larger than a fraction of the step counts.
+          const snapTol = Number.isFinite(step) && step > 0 ? Math.abs(step) * 1e-6 : 0;
+          valClamped = Math.abs(val - raw) > snapTol;
         }
       } else if (typeof currentVal === 'boolean') {
         const t = val.trim().toLowerCase();
