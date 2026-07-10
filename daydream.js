@@ -5,7 +5,7 @@
 
 
 import createHolosphereModule from "./holosphere_wasm.js";
-import { Daydream, SLOW_FRAME_MS } from "./driver.js";
+import { Daydream } from "./driver.js";
 import { GUI, resetGUI } from "gui";
 import { EffectSidebar } from "./sidebar.js";
 import { resolveActiveEffect } from "./sidebar_logic.js";
