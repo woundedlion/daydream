@@ -219,6 +219,7 @@ class DeepLinkGUI {
           console.warn(`DeepLinkGUI: ignoring non-numeric URL value "${params.get(key)}" for "${key}"`);
           val = currentVal;
           urlApplied = false;
+          valClamped = true;
         } else {
           // lil-gui numeric add() signature is add(obj, prop, min, max, step).
           const min = args[0], max = args[1], step = args[2];
@@ -248,6 +249,7 @@ class DeepLinkGUI {
           console.warn(`DeepLinkGUI: ignoring unrecognized boolean URL value "${params.get(key)}" for "${key}"`);
           val = currentVal;
           urlApplied = false;
+          valClamped = true;
         }
       }
       const allowed = optionValues(args[0]);
