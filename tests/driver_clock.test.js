@@ -12,14 +12,17 @@ import { Daydream } from '../driver.js';
 const FRAME_INTERVAL = 1 / Daydream.FPS;
 const MAX_BACKLOG = Daydream.MAX_FRAME_BACKLOG_SECONDS;
 
-/** Minimal `this` for advanceFrameClock: a one-shot clock plus the fields it reads. */
+/** Minimal `this` for advanceFrameClock: a drain-counting clock plus the fields
+ *  it reads. getDeltaCalls tracks that the clock is drained every call. */
 function fixture({ delta, paused = false, timeAccumulator = 0 }) {
-  return {
-    clock: { getDelta: () => delta },
+  const ctx = {
+    clock: { getDelta: () => { ctx.getDeltaCalls++; return delta; } },
     paused,
     timeAccumulator,
     frameInterval: FRAME_INTERVAL,
+    getDeltaCalls: 0,
   };
+  return ctx;
 }
 const advance = (ctx) => Daydream.prototype.advanceFrameClock.call(ctx);
 
@@ -27,6 +30,7 @@ test('paused clock neither advances nor accrues backlog', () => {
   const ctx = fixture({ delta: 1, paused: true });
   assert.equal(advance(ctx), false);
   assert.equal(ctx.timeAccumulator, 0);
+  assert.equal(ctx.getDeltaCalls, 1);
 });
 
 test('sub-interval elapsed accrues but does not advance', () => {
