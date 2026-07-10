@@ -189,3 +189,13 @@ test('randomPointOnSphere: deterministic RNG yields a unit-length point', () => 
   const p = randomPointOnSphere(rng);
   assert.ok(Math.abs(mag(p) - 1) < 1e-12, `|p| = ${mag(p)}`);
 });
+
+/** Exercises the rejection loop: s>=1 and s===0 pairs are rejected before an accepted pair. */
+test('randomPointOnSphere: rejects s>=1 and s===0 pairs before accepting', () => {
+  // (1,1) -> s=2 rejected; (0.5,0.5) -> v=(0,0), s=0 rejected; (0.75,0.25) accepted.
+  const seq = [1, 1, 0.5, 0.5, 0.75, 0.25];
+  let i = 0;
+  const rng = () => seq[i++];
+  const p = randomPointOnSphere(rng);
+  assert.ok(Math.abs(mag(p) - 1) < 1e-12, `|p| = ${mag(p)}`);
+});
