@@ -731,6 +731,9 @@
 
       } else {
         // --- This was a ZOOM (drag) ---
+        // zoomPalette() rewrites the Procedural C_R..D_B params; on other tabs
+        // the strip has no visible zoom, so skip it to avoid corrupting them.
+        if (activeTab !== 'procedural') return;
         zoomPalette(t_start, t_end);
         showResetZoomButton();
       }
