@@ -86,7 +86,7 @@ export function resolveActiveEffect(availableEffects, currentEffect) {
 export function scrollArrowState(scrollLeft, scrollWidth, clientWidth) {
   const maxScroll = scrollWidth - clientWidth;
   if (maxScroll <= 0) return { left: false, right: false };
-  const deadzone = Math.min(4, maxScroll / 2);
+  const deadzone = Math.min(4, (maxScroll - 1) / 2);
   return {
     left: scrollLeft > deadzone,
     right: scrollLeft < maxScroll - deadzone,
