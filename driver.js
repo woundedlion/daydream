@@ -481,7 +481,9 @@ export class Daydream {
     if (this.stepFrames !== 0) this.stepFrames--;
 
     // A WASM-detached Uint16Array is still truthy but fill() on it throws, so skip
-    // it (isViewLive checks byteLength); the next drawFrame heals the view.
+    // it (isViewLive checks byteLength); the next drawFrame heals the view. On the
+    // rare heap-growth (detach) frame the buffer is not cleared, so an additive/
+    // persist effect may blend one stale frame; it self-heals the next frame.
     if (isViewLive(Daydream.pixels))
       Daydream.pixels.fill(0);
 
