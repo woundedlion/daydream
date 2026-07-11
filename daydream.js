@@ -462,16 +462,26 @@ appState.subscribe((key, value, old) => {
   if (key === 'effect') {
     // A rejected effect leaves the engine on the old one; revert appState so the
     // re-fire re-applies the prior effect and keeps state/URL/engine coherent.
-    if (applyEffect() === false) {
-      appState.set('effect', old);
+    // A thrown switch (WASM abort/BindingError) must be contained here, not left
+    // to propagate through notify and abort every other subscriber half-updated.
+    try {
+      if (applyEffect() === false) {
+        appState.set('effect', old);
+      }
+    } catch (err) {
+      console.error('Effect switch failed:', err);
     }
   } else if (key === 'resolution') {
     // A rejected resolution leaves the engine on the old value; revert appState
     // and the dropdown to what actually applied (the controller is bound to its
     // own object literal, so it does not track appState on its own).
-    if (applyResolution() === false) {
-      appState.set('resolution', old);
-      resolutionController.setValue(old);
+    try {
+      if (applyResolution() === false) {
+        appState.set('resolution', old);
+        resolutionController.setValue(old);
+      }
+    } catch (err) {
+      console.error('Resolution switch failed:', err);
     }
   }
 });
