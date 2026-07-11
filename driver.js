@@ -201,6 +201,7 @@ export class Daydream {
     this.timeAccumulator = 0;
 
     this.labelPool = new LabelPool(this.scene);
+    this.labelScratch = [];
     this.hadLabels = false;
 
     this.setupDots();
@@ -510,7 +511,8 @@ export class Daydream {
    */
   refreshLabels(effect) {
     this.labelPool.reset();
-    let labels = [];
+    const labels = this.labelScratch;
+    labels.length = 0;
 
     if (this.labelAxes) {
       labels.push({ "position": Daydream.X_AXIS, "content": "X" });
