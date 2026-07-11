@@ -200,6 +200,19 @@ test('setActive toggles active/aria-selected on only the old and new buttons', (
   assert.ok(b.scrolledIntoView > 0);
 });
 
+test('setActive keeps the current selection when the name is off-list', () => {
+  const { sidebar } = makeSidebar();
+  sidebar.setEffects(['A', 'B'], {});
+  sidebar.setActive('A');
+  const a = sidebar.buttons.get('A');
+
+  sidebar.setActive('ZZZ'); // no such button
+
+  assert.equal(sidebar.activeName, 'A', 'activeName is not stripped by an off-list name');
+  assert.ok(a.classes.has('active'), 'the active button stays selected');
+  assert.equal(a.getAttribute('aria-selected'), 'true');
+});
+
 test('updateScrollArrows reflects scroll geometry', () => {
   const { sidebar } = makeSidebar();
   // No overflow: neither arrow visible.

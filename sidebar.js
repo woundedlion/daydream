@@ -154,6 +154,11 @@ export class EffectSidebar {
    * @param {string} name - Name of the effect to mark active.
    */
   setActive(name) {
+    const newBtn = this.buttons.get(name);
+    // An off-list name has no button: keep the current selection rather than
+    // deselecting it and pointing activeName at a missing entry.
+    if (!newBtn) return;
+
     const oldBtn = this.buttons.get(this.activeName);
     if (oldBtn) {
       oldBtn.classList.remove('active');
@@ -161,14 +166,10 @@ export class EffectSidebar {
     }
 
     this.activeName = name;
-
-    const newBtn = this.buttons.get(name);
-    if (newBtn) {
-      newBtn.classList.add('active');
-      newBtn.setAttribute('aria-selected', 'true');
-      this.setRovingTabbable(newBtn);
-      newBtn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
-    }
+    newBtn.classList.add('active');
+    newBtn.setAttribute('aria-selected', 'true');
+    this.setRovingTabbable(newBtn);
+    newBtn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
   }
 
   /**
