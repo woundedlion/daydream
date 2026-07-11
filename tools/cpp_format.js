@@ -40,6 +40,9 @@ export function formatFloatCpp(n, digits = 6) {
     s = n.toFixed(prec).replace(/(\.\d*?)0+$/, '$1');
     if (!s.includes('.')) s += '.0';
     else if (s.endsWith('.')) s += '0';
+    if (parseFloat(s) === 0) {
+      throw new Error(`formatFloatCpp: magnitude ${n} underflows to zero at max precision`);
+    }
   }
   return s + 'f';
 }
