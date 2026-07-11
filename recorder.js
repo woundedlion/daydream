@@ -384,8 +384,9 @@ export class VideoRecorder {
         if (err?.name === 'AbortError') {
           aborted = true;
           // Cancelling the Save dialog ends the session; without this the recorder
-          // keeps capturing frames that finish() will only discard.
-          this.stop();
+          // keeps capturing frames that finish() will only discard. Guard against a
+          // superseding session: only stop if this recorder is still the live one.
+          if (this.mediaRecorder === recorder) this.stop();
         } else {
           console.warn('VideoRecorder: streaming save unavailable, buffering in memory', err);
         }
