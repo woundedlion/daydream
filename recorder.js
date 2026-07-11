@@ -381,8 +381,14 @@ export class VideoRecorder {
     })
       .then((h) => { handle = h; })
       .catch((err) => {
-        if (err?.name === 'AbortError') aborted = true;
-        else console.warn('VideoRecorder: streaming save unavailable, buffering in memory', err);
+        if (err?.name === 'AbortError') {
+          aborted = true;
+          // Cancelling the Save dialog ends the session; without this the recorder
+          // keeps capturing frames that finish() will only discard.
+          this.stop();
+        } else {
+          console.warn('VideoRecorder: streaming save unavailable, buffering in memory', err);
+        }
       });
 
     // One serialized chain; each link awaits the picker, so chunks that arrive
