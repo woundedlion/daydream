@@ -824,6 +824,47 @@ test('tick() re-blits the last composite when a render overruns the tick (previe
     'a re-blit is not a new frame; the recorder must not capture a duplicate');
 });
 
+test('an overrun re-blit shows one whole generation, never a half-updated mix', async () => {
+  // While the next generation is only partially in, its quadrants live in
+  // `scratch`; an overrun re-blit must composite the last WHOLE generation from
+  // `results`, never a mix of the two.
+  Daydream.W = 4; Daydream.H = 2;
+  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+
+  const realSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = () => ({ unref() {} }); // stub the render watchdog
+  try {
+    const c = readyController(2);
+    c.showBoundaries = false;
+    c.tick(); // dispatch generation A
+
+    const genA = () => new Uint16Array(2 * 2 * 3).fill(111);
+    deliverFrame(c, 0, { pixels: genA(), x0: 0, x1: 2, y0: 0, y1: 2 });
+    deliverFrame(c, 1, { pixels: genA(), x0: 2, x1: 4, y0: 0, y1: 2 });
+    await flush();
+    c.tick(); // composite generation A, dispatch generation B (now in flight)
+    assert.equal(c.renderInFlight, true, 'generation B is in flight and will overrun');
+
+    // Generation B arrives only partially: seg 0 reports, seg 1 still rendering.
+    deliverFrame(c, 0, { pixels: new Uint16Array(2 * 2 * 3).fill(222), x0: 0, x1: 2, y0: 0, y1: 2 });
+    assert.equal(c.pending, 1, 'generation B still has one segment outstanding');
+    assert.ok(c.scratch[0] && c.scratch[0].pixels[0] === 222,
+      'the partial next generation is staged in scratch, not results');
+    assert.equal(c.renderInFlight, true, 'the swap has not run, so results is still generation A');
+
+    Daydream.pixels.fill(0); // driver.stepSimulation() clears before the overrun tick
+    c.tick(); // overrun: no new pendingFrame, so re-blit the last whole generation
+
+    assert.ok(!Daydream.pixels.some((v) => v === 222),
+      'the partially-arrived generation B never leaks into the re-blit');
+    assert.equal(Daydream.pixels[idx(0, 0, 4)], 111, 'quadrant 0 holds generation A');
+    assert.equal(Daydream.pixels[idx(2, 0, 4)], 111, 'quadrant 1 holds generation A');
+    assert.equal(c.frameComposited, false, 're-blit is not a new frame');
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+});
+
 test('a faulted pool keeps tick() from dispatching another doomed render', () => {
   const c = readyController(2);
   c.tick();
