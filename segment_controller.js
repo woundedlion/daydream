@@ -6,7 +6,7 @@
  * SegmentController — owns the segmented-POV worker pipeline.
  *
  * N Web Workers each load their own isolated WASM module instance and render a
- * quadrant of the canvas in parallel; results are composited into the display
+ * segment rectangle of the canvas in parallel; results are composited into the display
  * buffer. The pipeline is one-frame deep: frame N-1's results are displayed
  * while frame N renders on the workers (frame time = max(segment times), not
  * sum).
@@ -683,7 +683,7 @@ export class SegmentController {
   }
 
   /**
-   * Composite segment results into the display buffer (quadrant model).
+   * Composite segment results into the display buffer (segment-rectangle model).
    * @returns {number} How many segment rectangles were actually blitted this
    *   call. 0 means either every result was null/empty (a fully-fenced frame),
    *   so the display buffer still holds only driver.render()'s fill(0), or the
