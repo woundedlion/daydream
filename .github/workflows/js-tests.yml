@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: js-tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   js-tests:
     name: Simulator JS unit tests
