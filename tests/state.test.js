@@ -40,6 +40,22 @@ test('AppState.update batches and only fires for changed keys', () => {
   assert.deepEqual(events, [['b', 20, 2], ['c', 30, 3]]);
 });
 
+test('AppState.update skips a queued tuple a re-entrant set already superseded', () => {
+  const s = new AppState({ a: 0, b: 0 });
+  const events = [];
+  s.subscribe((key, value, old) => {
+    events.push([key, value, old]);
+    // While the batch drains on 'a', re-enter set() on the still-queued 'b'.
+    if (key === 'a') s.set('b', 99);
+  });
+
+  s.update({ a: 1, b: 2 }); // both change; 'a' fires first and supersedes 'b'
+
+  // 'b' is notified once with the live re-entrant value (99); the stale batch
+  // tuple ([b, 2, 0]) is skipped rather than firing a superseded notification.
+  assert.deepEqual(events, [['a', 1, 0], ['b', 99, 2]]);
+});
+
 test('AppState.subscribe returns an unsubscribe function', () => {
   const s = new AppState({ a: 1 });
   let count = 0;
