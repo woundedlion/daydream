@@ -32,5 +32,8 @@ export function showFatalError(message) {
     font: '14px/1.4 system-ui, sans-serif', textAlign: 'center',
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
   });
-  if (!existing) (document.body || document.documentElement).appendChild(el);
+  if (!existing) {
+    const parent = document.body || document.documentElement;
+    if (parent) parent.appendChild(el);
+  }
 }
