@@ -485,12 +485,6 @@ export class Daydream {
     if (isViewLive(Daydream.pixels))
       Daydream.pixels.fill(0);
 
-    if (this.labelAxes) {
-      this.xAxis.position.set(0, 0, 0);
-      this.yAxis.position.set(0, 0, 0);
-      this.zAxis.position.set(0, 0, 0);
-    }
-
     const start = performance.now();
     if (effect) {
       effect.drawFrame();
