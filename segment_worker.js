@@ -98,7 +98,11 @@ async function handleMessage(msg) {
       segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
 
       if (msg.effectName) {
-        engine.setEffect(msg.effectName);
+        if (engine.setEffect(msg.effectName) === false) {
+          post({ type: 'initFailed', segId,
+                 reason: `setEffect(${msg.effectName}) rejected` });
+          break;
+        }
       }
       // Tuned params must follow setEffect, which rebuilds with defaults.
       if (msg.params) {
