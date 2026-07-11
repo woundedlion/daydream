@@ -657,13 +657,18 @@ guiInstance.add(daydream, 'columnFillOverlap', 1.0, 2.0, 0.01).name('Column Fill
 const segFolder = guiInstance.addFolder('Segmented POV');
 segFolder.close();
 const segState = { segmented: segments.active, segments: segments.count, boundaries: segments.showBoundaries };
+// Bumped on every segmented enable/count change. An await'd handler captures the
+// epoch before warmModules() and bails if a later toggle superseded it, so an
+// on->off->on burst spawns the worker pool once, not twice.
+let segEpoch = 0;
 segFolder.add(segState, 'segmented').name('Enabled').onChange(async v => {
   segments.active = v;
+  const epoch = ++segEpoch;
   if (v) {
     // Reopen the (idle-dropped) keep-alive connection and prime the module cache
-    // before the worker-spawn burst; re-check active in case of a toggle mid-warm.
+    // before the worker-spawn burst.
     await warmModules();
-    if (segments.active) segments.create(segments.count);
+    if (epoch === segEpoch && segments.active) segments.create(segments.count);
   } else {
     segments.destroy();
     segments.updateStats();
@@ -671,9 +676,10 @@ segFolder.add(segState, 'segmented').name('Enabled').onChange(async v => {
 });
 segFolder.add(segState, 'segments', 2, 8, 2).name('Segments').onChange(async v => {
   segments.count = v;
+  const epoch = ++segEpoch;
   if (segments.active) {
     await warmModules();
-    if (segments.active) segments.create(segments.count);
+    if (epoch === segEpoch && segments.active) segments.create(segments.count);
   }
 });
 segFolder.add(segState, 'boundaries').name('Show Boundaries').onChange(v => {
