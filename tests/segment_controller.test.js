@@ -176,8 +176,8 @@ test('frame at the current generation is stored and settles the frame', async ()
   assert.equal(c.pending, 2);
 
   deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2 });
-  assert.ok(c.results[0], 'matching-generation frame is kept');
-  assert.equal(c.results[0].x1, 2);
+  assert.ok(c.scratch[0], 'matching-generation frame is staged');
+  assert.equal(c.scratch[0].x1, 2);
   assert.equal(c.pending, 1);
 
   deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2 });
@@ -192,14 +192,14 @@ test('frames delivered out of order within a generation land in their own slots'
   assert.equal(c.pending, 2);
 
   deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2 });
-  assert.ok(c.results[1], 'seg-1 frame stored despite arriving first');
-  assert.equal(c.results[1].x1, 4);
-  assert.equal(c.results[0], null, 'seg-0 slot still empty');
+  assert.ok(c.scratch[1], 'seg-1 frame staged despite arriving first');
+  assert.equal(c.scratch[1].x1, 4);
+  assert.equal(c.scratch[0], null, 'seg-0 slot still empty');
   assert.equal(c.pending, 1);
 
   deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2 });
-  assert.ok(c.results[0], 'seg-0 frame stored when it arrives');
-  assert.equal(c.results[0].x1, 2);
+  assert.ok(c.scratch[0], 'seg-0 frame staged when it arrives');
+  assert.equal(c.scratch[0].x1, 2);
   assert.equal(c.pending, 0);
   await done;
 });
@@ -213,11 +213,11 @@ test('a frame dispatched before a resolution change is dropped but still settles
   assert.notEqual(c.inflightGen, c.renderGen);
 
   deliverFrame(c, 0);
-  assert.equal(c.results[0], null, 'stale-generation result is discarded');
+  assert.equal(c.scratch[0], null, 'stale-generation result is discarded');
   assert.equal(c.pending, 1, 'but pending still decremented');
 
   deliverFrame(c, 1);
-  assert.equal(c.results[1], null);
+  assert.equal(c.scratch[1], null);
   assert.equal(c.pending, 0);
   await done;
 });
@@ -318,7 +318,7 @@ test('a surviving worker responding after a fault does not drive pending negativ
 
   deliverFrame(c, 1);
   assert.equal(c.pending, 0, 'post-fault frame leaves pending at 0, not negative');
-  assert.equal(c.results[1], null, 'no result is recorded for the halted pool');
+  assert.equal(c.scratch[1], null, 'no result is recorded for the halted pool');
 });
 
 test('only the first fault of a session is recorded', () => {
