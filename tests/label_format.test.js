@@ -49,3 +49,9 @@ test('prettify falls back to a 3-decimal string for arbitrary values', () => {
   assert.equal(prettify(0.333333), '0.333');
   assert.equal(prettify(2.5), '2.500');
 });
+
+test('prettify returns "0" for non-finite input rather than a raw NaN/Infinity label', () => {
+  assert.equal(prettify(NaN), '0');
+  assert.equal(prettify(Infinity), '0');
+  assert.equal(prettify(-Infinity), '0');
+});
