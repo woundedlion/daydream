@@ -971,9 +971,9 @@ export class SegmentController {
       // clear so the preview holds it instead of flashing black. `results` is only
       // ever swapped whole, so this composites one coherent generation. Not a new
       // frame, so frameComposited stays false — the recorder must not capture a
-      // duplicate.
+      // duplicate. Stats are left showing the last landed generation: the next
+      // render has already zeroed the per-segment arrays this tick.
       this.composite();
-      this.updateStats();
       this.frameComposited = false;
     } else {
       this.frameComposited = false;
