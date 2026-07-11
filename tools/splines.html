@@ -90,13 +90,13 @@
     <div class="param-group">
       <h3 class="text-lg font-semibold text-indigo-400 mb-2">Parameters</h3>
       <div class="flex items-center space-x-3 mt-2">
-        <span class="w-20 text-white text-sm font-medium">Tension:</span>
-        <input type="range" id="tension-slider" min="0" max="100" value="30" class="flex-grow">
+        <span id="tension-label" class="w-20 text-white text-sm font-medium">Tension:</span>
+        <input type="range" id="tension-slider" aria-labelledby="tension-label" min="0" max="100" value="30" class="flex-grow">
         <span id="tension-value" class="slider-label w-12 text-right">0.30</span>
       </div>
       <div class="flex items-center space-x-3 mt-2">
-        <span class="w-20 text-white text-sm font-medium">Samples:</span>
-        <input type="range" id="samples-slider" min="4" max="128" value="32" class="flex-grow">
+        <span id="samples-label" class="w-20 text-white text-sm font-medium">Samples:</span>
+        <input type="range" id="samples-slider" aria-labelledby="samples-label" min="4" max="128" value="32" class="flex-grow">
         <span id="samples-value" class="slider-label w-12 text-right">32</span>
       </div>
       <div class="flex items-center mt-3 space-x-3">
