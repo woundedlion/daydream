@@ -143,6 +143,7 @@ export function initScene(containerId, canvasId, opts = {}) {
     const h = container.clientHeight;
     camera.aspect = Math.max(1, w) / Math.max(1, h);
     camera.updateProjectionMatrix();
+    renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(w, h);
   };
   const resize = onResize
