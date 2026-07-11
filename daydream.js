@@ -629,7 +629,7 @@ const sidebar = new EffectSidebar(
   (name) => appState.set('effect', name)
 );
 
-testAllController = guiInstance.add({ testAll: false }, 'testAll').name('Test All').onChange((v) => {
+testAllController = guiInstance.addSession({ testAll: false }, 'testAll').name('Test All').onChange((v) => {
   if (v) {
     const startList = effectsByResolution[appState.get('resolution')] || HiResFavorites;
     testAllIndex = startList.indexOf(appState.get('effect'));
@@ -662,7 +662,7 @@ const segState = { segmented: segments.active, segments: segments.count, boundar
 // epoch before warmModules() and bails if a later toggle superseded it, so an
 // on->off->on burst spawns the worker pool once, not twice.
 let segEpoch = 0;
-segFolder.add(segState, 'segmented').name('Enabled').onChange(async v => {
+segFolder.addSession(segState, 'segmented').name('Enabled').onChange(async v => {
   segments.active = v;
   const epoch = ++segEpoch;
   if (v) {
@@ -675,7 +675,7 @@ segFolder.add(segState, 'segmented').name('Enabled').onChange(async v => {
     segments.updateStats();
   }
 });
-segFolder.add(segState, 'segments', 2, 8, 2).name('Segments').onChange(async v => {
+segFolder.addSession(segState, 'segments', 2, 8, 2).name('Segments').onChange(async v => {
   segments.count = v;
   const epoch = ++segEpoch;
   if (segments.active) {
@@ -683,7 +683,7 @@ segFolder.add(segState, 'segments', 2, 8, 2).name('Segments').onChange(async v =
     if (epoch === segEpoch && segments.active) segments.create(segments.count);
   }
 });
-segFolder.add(segState, 'boundaries').name('Show Boundaries').onChange(v => {
+segFolder.addSession(segState, 'boundaries').name('Show Boundaries').onChange(v => {
   segments.showBoundaries = v;
 });
 
@@ -747,9 +747,9 @@ const recordState = { record: () => {
 
 const recFolder = guiInstance.addFolder('Recording');
 recFolder.close();
-recFolder.add(recSettings, 'recQuality', 1, 20, 1).name('Rec Quality (Mbps)');
-recFolder.add(recSettings, 'recResolution', Object.keys(REC_RESOLUTIONS)).name('Rec Resolution');
-recFolder.add(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
+recFolder.addSession(recSettings, 'recQuality', 1, 20, 1).name('Rec Quality (Mbps)');
+recFolder.addSession(recSettings, 'recResolution', Object.keys(REC_RESOLUTIONS)).name('Rec Resolution');
+recFolder.addSession(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
 const recordCtrl = recFolder.add(recordState, 'record').name('\u25cf Record');
 const INTERACTIVE_KEY_TARGET =
   'input, textarea, select, button, [contenteditable], .lil-gui, .effect-sidebar';
