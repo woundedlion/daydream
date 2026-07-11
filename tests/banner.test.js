@@ -12,14 +12,17 @@ afterEach(() => {
 
 // Minimal fake DOM: getElementById resolves against whatever was appended, so
 // idempotent reuse can be observed. body defaults present; pass {body: null} to
-// exercise the no-body guard.
-function fakeDocument({ body = true } = {}) {
+// exercise the no-body guard, and {documentElement: true} to model the
+// pre-<body> parse state where <html> exists but <body> does not.
+function fakeDocument({ body = true, documentElement = false } = {}) {
   const byId = new Map();
   const created = [];
-  const bodyEl = body ? {
+  const makeParent = () => ({
     children: [],
     appendChild(el) { this.children.push(el); byId.set(el.id, el); },
-  } : null;
+  });
+  const bodyEl = body ? makeParent() : null;
+  const docEl = documentElement ? makeParent() : undefined;
   globalThis.document = {
     getElementById: (id) => byId.get(id) || null,
     createElement: () => {
@@ -28,8 +31,9 @@ function fakeDocument({ body = true } = {}) {
       return el;
     },
     body: bodyEl,
+    documentElement: docEl,
   };
-  return { created, bodyEl };
+  return { created, bodyEl, docEl };
 }
 
 test('showFatalError appends one banner carrying the message as textContent', () => {
@@ -62,7 +66,14 @@ test('showFatalError is idempotent — repeated calls reuse the single banner', 
   assert.equal(bodyEl.children[0].textContent, '⚠ second');
 });
 
-test('showFatalError does not throw or append when document.body is absent', () => {
+test('showFatalError falls back to documentElement when body is absent', () => {
+  const { docEl } = fakeDocument({ body: null, documentElement: true });
+  showFatalError('too early');
+  assert.equal(docEl.children.length, 1);
+  assert.equal(docEl.children[0].textContent, '⚠ too early');
+});
+
+test('showFatalError does not throw when neither body nor documentElement exists', () => {
   const { created } = fakeDocument({ body: null });
   assert.doesNotThrow(() => showFatalError('too early'));
   assert.equal(created[0].textContent, '⚠ too early');
