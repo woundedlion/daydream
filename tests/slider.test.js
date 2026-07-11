@@ -40,10 +40,11 @@ afterEach(() => {
 /** A valid config; tests override single fields to exercise one guard at a time. */
 const base = { id: 's', label: 'L', min: 0, max: 10, step: 1, value: 5 };
 
-/** Verifies a missing container short-circuits to null before any validation. */
-test('returns null when the container element is absent', () => {
+/** Verifies a missing container throws a named error before any validation. */
+test('throws when the container element is absent', () => {
   globalThis.document = { getElementById: () => null };
-  assert.equal(createSlider('missing', base, null), null);
+  assert.throws(() => createSlider('missing', base, null),
+                /container #missing not found/);
 });
 
 /** Verifies the `!(min < max)` guard rejects an inverted range and a NaN bound. */
