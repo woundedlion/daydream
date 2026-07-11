@@ -226,7 +226,7 @@
           <p class="text-xs text-gray-400">Base color (0-255).</p>
           <div class="flex items-center space-x-2">
             <span class="w-4 h-4 text-center font-bold text-blue-500">H</span>
-            <input type="range" id="gen_seed_slider" min="0" max="255" step="1" value="42" class="b-thumb">
+            <input type="range" id="gen_seed_slider" aria-label="Base hue" min="0" max="255" step="1" value="42" class="b-thumb">
             <span id="gen_seed_value" class="slider-label w-12 text-right">42</span>
           </div>
         </div>
@@ -323,8 +323,8 @@
           <div class="w-full sm:w-1/2 space-y-3">
             <h3 class="text-lg font-bold text-indigo-400">Global Phase Speed (Cycles/s)</h3>
             <div class="flex items-center space-x-2">
-              <span class="w-12 text-gray-400">Speed:</span>
-              <input type="range" id="speed_slider" min="0" max="2000" step="1" value="300" class="w-full speed-thumb">
+              <span id="speed-label" class="w-12 text-gray-400">Speed:</span>
+              <input type="range" id="speed_slider" aria-labelledby="speed-label" min="0" max="2000" step="1" value="300" class="w-full speed-thumb">
               <span id="speed_value" class="slider-label w-16 text-right">0.300</span>
             </div>
             <p class="text-sm text-gray-400">Current Phase (t): <span id="t_value"
