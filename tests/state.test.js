@@ -132,6 +132,44 @@ test('URLSync keeps a numeric default for an empty URL value', () => {
   assert.strictEqual(s.get('count'), 5);
 });
 
+test('URLSync coerces a boolean default tracked key from truthy URL tokens', () => {
+  for (const raw of ['true', '1', 'yes', 'on', 'TRUE', ' On ']) {
+    installWindow(`?flag=${encodeURIComponent(raw)}`);
+    const s = new AppState({ flag: false });
+    new URLSync(s, ['flag']);
+    assert.strictEqual(s.get('flag'), true, `"${raw}" coerces to true`);
+    getActiveURLSync().dispose();
+  }
+});
+
+test('URLSync coerces a boolean default tracked key from falsy URL tokens', () => {
+  for (const raw of ['false', '0', 'no', 'off', 'OFF']) {
+    installWindow(`?flag=${encodeURIComponent(raw)}`);
+    const s = new AppState({ flag: true });
+    new URLSync(s, ['flag']);
+    assert.strictEqual(s.get('flag'), false, `"${raw}" coerces to false`);
+    getActiveURLSync().dispose();
+  }
+});
+
+test('URLSync keeps a boolean default for an unrecognized URL token', () => {
+  installWindow('?flag=maybe');
+  const s = new AppState({ flag: true });
+  new URLSync(s, ['flag']);
+  assert.strictEqual(s.get('flag'), true, 'a garbage token keeps the default');
+});
+
+test('URLSync serializes a boolean tracked key through String(val)', () => {
+  installWindow('', '/sim');
+  const s = new AppState({ flag: true });
+  const sync = new URLSync(s, ['flag']);
+  const params = new URLSearchParams();
+  sync.setTrackedParam(params, 'flag', s.get('flag'));
+  assert.equal(params.get('flag'), 'true', 'true round-trips as the string "true"');
+  sync.setTrackedParam(params, 'flag', false);
+  assert.equal(params.get('flag'), 'false', 'false round-trips as the string "false"');
+});
+
 test('URLSync validator admits a valid URL value', () => {
   installWindow('?res=high');
   const s = new AppState({ res: 'low' });
