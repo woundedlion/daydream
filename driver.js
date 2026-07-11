@@ -17,7 +17,7 @@ export { prettify } from "./label_format.js";
  * rebuilt every frame without churning the DOM. acquire() hands out pooled
  * objects in order; cleanup() hides any left over from the previous frame.
  */
-class LabelPool {
+export class LabelPool {
   /**
    * @param {THREE.Scene} scene - Scene that pooled label objects are added to and removed from.
    */
