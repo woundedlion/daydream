@@ -126,6 +126,13 @@ export class SegmentController {
     this.workers = [];
     /** @type {Array<FrameResult | null>} */
     this.results = [];
+    /**
+     * Staging buffer workers fill during a generation; swapped into `results`
+     * only once every segment has reported, so `results` always holds one whole
+     * generation and an overrun re-blit never composites a half-updated mix.
+     * @type {Array<FrameResult | null>}
+     */
+    this.scratch = [];
     /** @type {number[]} */
     this.timings = [];        // ms per segment (worker-measured)
     /** @type {number[]} */
@@ -246,6 +253,7 @@ export class SegmentController {
     this.count = numSegments;
     this.workers = [];
     this.results = new Array(numSegments).fill(null);
+    this.scratch = new Array(numSegments).fill(null);
     this.timings = new Array(numSegments).fill(0);
     this.renderUs = new Array(numSegments).fill(0);
     this.arenas = new Array(numSegments).fill(null);
@@ -308,7 +316,7 @@ export class SegmentController {
             // 'frame' message can't re-publish.
             if (msg.segId === 0 && msg.paramValues && !this.frameSeen[0])
               this.paramValues = msg.paramValues;
-            this.results[msg.segId] = {
+            this.scratch[msg.segId] = {
               pixels: msg.pixels,
               x0: msg.x0, x1: msg.x1,
               y0: msg.y0, y1: msg.y1,
@@ -480,6 +488,7 @@ export class SegmentController {
     this.clearRetryTimer();
     this.workers = [];
     this.results = [];
+    this.scratch = [];
     this.timings = [];
     this.renderUs = [];
     this.arenas = [];
@@ -639,6 +648,9 @@ export class SegmentController {
       this.inflightGen = this.renderGen;
       this.pending = this.workers.length;
       this.frameSeen.fill(false);
+      // Clear the staging buffer so a slot left by a fenced-out prior generation
+      // can't survive into this one's published frame.
+      this.scratch.fill(null);
       // Clear per-segment stats so a segment fenced out (or silent) this frame
       // reports fresh 0/'-' rather than a prior generation's values.
       this.timings.fill(0);
@@ -941,10 +953,11 @@ export class SegmentController {
       this.pendingFrame = false;
       this.frameComposited = blitted > 0;
     } else if (this.results.some(r => r && r.pixels)) {
-      // Render overran this tick: re-blit the last composite over driver's clear so
-      // the preview holds the last frame instead of flashing black. The generation is
-      // unchanged, so the cached results stay valid. Not a new frame, so
-      // frameComposited stays false — the recorder must not capture a duplicate.
+      // Render overran this tick: re-blit the last published frame over driver's
+      // clear so the preview holds it instead of flashing black. `results` is only
+      // ever swapped whole, so this composites one coherent generation. Not a new
+      // frame, so frameComposited stays false — the recorder must not capture a
+      // duplicate.
       this.composite();
       this.frameComposited = false;
     } else {
@@ -958,10 +971,15 @@ export class SegmentController {
     if (!this.renderInFlight) {
       this.renderInFlight = true;
       this.renderParallel().then(() => {
-        // Arm the compositor only if this render's generation is still current: a
-        // mid-render setResolution() bumps renderGen, and arming anyway would
-        // composite a black frame next tick.
+        // Publish the fully-assembled generation only if it is still current: a
+        // mid-render setResolution() bumps renderGen, and publishing anyway would
+        // composite a black or stale-sized frame next tick. The swap makes the
+        // completed staging buffer the live one atomically between ticks; the
+        // old buffer becomes next generation's scratch.
         if (this.inflightGen === this.renderGen) {
+          const done = this.scratch;
+          this.scratch = this.results;
+          this.results = done;
           this.pendingFrame = true;
         }
         this.renderInFlight = false;
