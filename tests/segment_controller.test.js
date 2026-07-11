@@ -719,6 +719,34 @@ test('composite() marks every internal split plus the wrap seam for a 4-arm layo
   assert.equal(Daydream.pixels[idx(7, 0, 8)], 444, 'arm-3 interior untouched');
 });
 
+test('composite() marks a horizontal seam between two stacked Y-band segments', () => {
+  // One arm split in Y (top band y[0,2), bottom band y[2,4)) has a single
+  // horizontal boundary at y=2 and no vertical seam (both bands share x0=0).
+  Daydream.W = 2; Daydream.H = 4;
+  Daydream.pixels = new Uint16Array(2 * 4 * 3);
+
+  const c = makeController();
+  c.showBoundaries = true;
+  const top = new Uint16Array(2 * 2 * 3).fill(111);
+  const bottom = new Uint16Array(2 * 2 * 3).fill(222);
+  c.results = [
+    { pixels: top, x0: 0, x1: 2, y0: 0, y1: 2 },
+    { pixels: bottom, x0: 0, x1: 2, y0: 2, y1: 4 },
+  ];
+
+  c.composite();
+
+  const isCyan = (x, y) => {
+    const i = idx(x, y, 2);
+    return Daydream.pixels[i] === 0 && Daydream.pixels[i + 1] === 65535 &&
+           Daydream.pixels[i + 2] === 65535;
+  };
+  assert.ok(isCyan(0, 2) && isCyan(1, 2), 'horizontal band seam at y=2 marked across the row');
+  assert.equal(Daydream.pixels[idx(0, 0, 2)], 111, 'top-band interior untouched');
+  assert.equal(Daydream.pixels[idx(0, 3, 2)], 222, 'bottom-band interior untouched');
+  assert.ok(!isCyan(0, 0), 'no vertical x=0 seam when the layout is not split in x');
+});
+
 test('composite() draws no x=0 line when the layout is not split in x', () => {
   // A single full-width segment never splits in x, so x=0 is a same-segment wrap,
   // not a boundary.
