@@ -848,7 +848,7 @@ export class SegmentController {
       if (timing > maxTime) maxTime = timing;
       const c = cells.rows[s];
 
-      c.range.textContent = r ? `x[${r.x0}–${r.x1}] y[${r.y0}–${r.y1}]` : '?';
+      c.range.textContent = this.frameSeen[s] && r ? `x[${r.x0}–${r.x1}] y[${r.y0}–${r.y1}]` : '?';
       c.compute.textContent = `${timing.toFixed(1)} ms`;
       c.compute.className = timing > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
       c.render.textContent = `${((this.renderUs[s] || 0) / 1000).toFixed(1)} ms`;
