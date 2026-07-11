@@ -116,8 +116,9 @@ input[type=range]:disabled::-webkit-slider-thumb {
   transition: background-color 0.2s;
 }
 
-.toggle-switch:focus {
-  outline: none;
+.toggle-switch:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
 }
 
 .toggle-switch.is-on {
