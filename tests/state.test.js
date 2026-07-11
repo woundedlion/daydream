@@ -245,6 +245,23 @@ test('URLSync.setParam(k, null) drops the key from the URL on flush', () => {
   assert.equal(params.get('keep'), '1', 'unrelated params survive');
 });
 
+test('URLSync.setParam(k, NaN) drops the key from the URL on flush', () => {
+  const calls = installWindow('?keep=1', '/sim');
+  const s = new AppState({});
+  const sync = new URLSync(s, []);
+
+  sync.setParam('speed', 1.5); // first write the param
+  sync.flush();
+  let params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
+  assert.equal(params.get('speed'), '1.5');
+
+  sync.setParam('speed', NaN); // non-finite rounds to null: drop, don't serialize a 0
+  sync.flush();
+  params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
+  assert.equal(params.has('speed'), false, 'non-finite numeric drops the param');
+  assert.equal(params.get('keep'), '1', 'unrelated params survive');
+});
+
 test('URLSync.reset preserves the excluded keys and clears the rest', () => {
   const calls = installWindow('?effect=Voronoi&speed=2&junk=x', '/sim');
   const s = new AppState({ effect: 'Voronoi' });
