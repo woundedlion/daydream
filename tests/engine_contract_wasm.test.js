@@ -12,7 +12,7 @@ import createHolosphereModule from '../holosphere_wasm.js';
 const M = await createHolosphereModule({ print() {}, printErr() {} });
 
 // A resolution the WASM factory is built for (mirrors daydream.js's
-// "Holosphere (20x96)" preset). Used to pin getPixels()'s length below.
+// "Holosphere (96x20)" preset). Used to pin getPixels()'s length below.
 const W = 96, H = 20;
 
 // One shared engine: the engine owns a single global arena, so a second
