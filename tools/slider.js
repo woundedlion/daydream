@@ -28,11 +28,12 @@
  * @param {string} [cfg.sliderClass] - Classes for the input
  * @param {string} [cfg.valueClass] - Classes for the readout span
  * @param {Function} onInput - Called with the raw slider value on each input
- * @returns {{ slider: HTMLInputElement, valueSpan: HTMLElement } | null}
+ * @returns {{ slider: HTMLInputElement, valueSpan: HTMLElement }}
  */
 export function createSlider(containerId, cfg, onInput) {
   const container = document.getElementById(containerId);
-  if (!container) return null;
+  if (!container)
+    throw new Error(`createSlider: container #${containerId} not found`);
 
   const {
     id,
