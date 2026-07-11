@@ -71,13 +71,13 @@ const LoResFavorites = [
 ];
 
 const resolutionPresets = {
-  "Holosphere (20x96)": { h: 20, w: 96, dotSize: 2 },
-  "Phantasm (144x288)": { h: 144, w: 288, dotSize: 0.25 },
+  "Holosphere (96x20)": { h: 20, w: 96, dotSize: 2 },
+  "Phantasm (288x144)": { h: 144, w: 288, dotSize: 0.25 },
 };
 
 const effectsByResolution = {
-  "Holosphere (20x96)": LoResFavorites,
-  "Phantasm (144x288)": HiResFavorites,
+  "Holosphere (96x20)": LoResFavorites,
+  "Phantasm (288x144)": HiResFavorites,
 };
 
 // Re-point both display aliases (Three.js instanceColor + Daydream.pixels) so
@@ -164,7 +164,7 @@ let activeEffect;
 const knownEffects = new Set(Object.values(effectsByResolution).flat());
 const appState = new AppState({
   effect: 'IslamicStars',
-  resolution: "Phantasm (144x288)",
+  resolution: "Phantasm (288x144)",
 });
 const urlSync = new URLSync(appState, ['effect', 'resolution'], {
   resolution: (v) => Boolean(resolutionPresets[v]),
