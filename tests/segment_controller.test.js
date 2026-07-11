@@ -536,6 +536,26 @@ test('setResolution on a faulted active pool rebuilds it and clears the fault', 
   assert.equal(FakeWorker.instances.length, beforeCount + 2, 'new workers were spawned');
 });
 
+for (const [label, act] of [
+  ['setEffect', (c) => c.setEffect('NewEffect')],
+  ['setParameter', (c) => c.setParameter('Speed', 0.5)],
+  ['setAnimationsPaused', (c) => c.setAnimationsPaused(true)],
+]) {
+  test(`${label} on a faulted active pool rebuilds it and clears the fault`, () => {
+    const c = makeController();
+    c.active = true;
+    c.create(2);
+    const beforeCount = FakeWorker.instances.length;
+    c.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
+    assert.equal(c.faulted, true);
+
+    act(c);
+    assert.equal(c.faulted, false, 'recreating the pool cleared the fault latch');
+    assert.equal(c.workers.length, 2, 'a fresh pool of workers was built');
+    assert.equal(FakeWorker.instances.length, beforeCount + 2, 'new workers were spawned');
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Compositor
 // ---------------------------------------------------------------------------

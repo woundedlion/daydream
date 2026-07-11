@@ -582,6 +582,12 @@ export class SegmentController {
     // A fresh effect starts running; clear a stale pause so workers spawned for
     // the rebuilt pool don't init paused while the main sphere animates.
     this.animationsPaused = false;
+    // A faulted pool is broken until re-created; rebuild (active) re-reads the
+    // effect and params from appState rather than broadcasting to dead workers.
+    if (this.faulted) {
+      if (this.active) this.create(this.count);
+      return;
+    }
     // Bump the fence so an in-flight old-effect frame fails inflightGen ===
     // renderGen and can't republish its stale-ordered paramValues.
     this.renderGen++;
@@ -599,6 +605,10 @@ export class SegmentController {
    * @param {number} value
    */
   setParameter(name, value) {
+    if (this.faulted) {
+      if (this.active) this.create(this.count);
+      return;
+    }
     this.broadcast({ type: 'setParameter', name, value });
   }
 
@@ -608,6 +618,10 @@ export class SegmentController {
    */
   setAnimationsPaused(paused) {
     this.animationsPaused = paused;
+    if (this.faulted) {
+      if (this.active) this.create(this.count);
+      return;
+    }
     this.broadcast({ type: 'setAnimationsPaused', paused });
   }
 
