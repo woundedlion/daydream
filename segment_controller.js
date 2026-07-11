@@ -973,6 +973,7 @@ export class SegmentController {
       // frame, so frameComposited stays false — the recorder must not capture a
       // duplicate.
       this.composite();
+      this.updateStats();
       this.frameComposited = false;
     } else {
       this.frameComposited = false;
