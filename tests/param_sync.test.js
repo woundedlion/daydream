@@ -1,7 +1,7 @@
 // @ts-check
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveParamSync } from '../param_sync.js';
+import { resolveParamSync, enumChoices } from '../param_sync.js';
 
 // resolveParamSync is the DOM-free core of syncGUI()'s per-controller "fight-the-
 // slider" decision: coerce the engine's raw value, never clobber a controller the
@@ -54,4 +54,24 @@ test('boolean: a NaN engine value never flips the toggle', () => {
   // NaN coerces to false; without the guard a `true` toggle would write a spurious false every frame.
   assert.deepEqual(resolveParamSync(true, NaN, true, false),
     { update: false, value: false });
+});
+
+// enumChoices maps engine enum labels to the lil-gui choices object whose
+// values are the option indices setParameter expects.
+
+test('enum: labels map to their option indices in order', () => {
+  assert.deepEqual(enumChoices(['None', 'Warp', 'Sparkle']),
+    { None: 0, Warp: 1, Sparkle: 2 });
+});
+
+test('enum: a single option still yields a valid choices object', () => {
+  assert.deepEqual(enumChoices(['Only']), { Only: 0 });
+});
+
+test('enum: duplicate labels are disambiguated, never dropped', () => {
+  const choices = enumChoices(['Mode', 'Mode', 'Mode']);
+  const values = Object.values(choices).sort();
+  // All three indices remain selectable under distinct keys.
+  assert.deepEqual(values, [0, 1, 2]);
+  assert.equal(choices['Mode'], 0);
 });

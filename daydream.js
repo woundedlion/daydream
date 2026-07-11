@@ -13,7 +13,7 @@ import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
 import { SegmentController, warmModules } from "./segment_controller.js";
 import { EngineHost } from "./engine_host.js";
-import { resolveParamSync } from "./param_sync.js";
+import { resolveParamSync, enumChoices } from "./param_sync.js";
 import { formatExportParams } from "./tools/export_params.js";
 
 // UI layer degrades gracefully (log + keep last good state); lower layers trap.
@@ -332,6 +332,10 @@ function applyEffect(preserveParams = false) {
 
       if (isBool) {
         controller = activeEffect.gui.add(state, p.name);
+      } else if (Array.isArray(p.options) && p.options.length > 0) {
+        // Enumerated param: dropdown of labels whose values are the option
+        // indices the engine expects.
+        controller = activeEffect.gui.add(state, p.name, enumChoices(p.options));
       } else {
         controller = activeEffect.gui.add(state, p.name, p.min, p.max).decimals(3);
       }

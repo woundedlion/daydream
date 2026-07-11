@@ -40,3 +40,23 @@ export function resolveParamSync(current, incoming, isBoolean, isEditing) {
   if (Number.isNaN(incoming)) return { update: false, value };
   return { update: current !== value, value };
 }
+
+/**
+ * Build the lil-gui choices object for an enumerated engine parameter: option
+ * label -> option index, the float value the engine expects from setParameter.
+ *
+ * @param {string[]} options - Option labels from the parameter definition,
+ *   indexed by the engine-side option value.
+ * @returns {Object<string, number>} Choices object for lil-gui's add().
+ */
+export function enumChoices(options) {
+  const choices = {};
+  options.forEach((label, i) => {
+    // Duplicate labels would collapse to one object key, making the earlier
+    // index unselectable; disambiguate rather than drop it.
+    let key = label;
+    while (key in choices) key = `${key} (${i})`;
+    choices[key] = i;
+  });
+  return choices;
+}
