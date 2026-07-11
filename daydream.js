@@ -494,6 +494,7 @@ appState.subscribe((key, value, old) => {
 // tear the Test-All ticker down.
 let testAllInterval = null;
 let testAllController = null;
+let appDisposed = false;
 let testAllIndex = 0;
 
 createHolosphereModule().then(module => {
@@ -786,7 +787,10 @@ daydream.renderer.setAnimationLoop(() => {
  * @returns {void}
  */
 function disposeApp() {
+  if (appDisposed) return;
+  appDisposed = true;
   window.removeEventListener("keydown", onKeyDown);
+  window.removeEventListener("pagehide", onPageHide);
   if (testAllInterval !== null) {
     clearInterval(testAllInterval);
     testAllInterval = null;
@@ -806,6 +810,7 @@ function disposeApp() {
 
 // pagehide (not unload) so bfcache is respected: e.persisted is false only on a
 // real discard, true when merely frozen for back/forward cache.
-window.addEventListener("pagehide", (e) => {
+function onPageHide(e) {
   if (!e.persisted) disposeApp();
-});
+}
+window.addEventListener("pagehide", onPageHide);
