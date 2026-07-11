@@ -19,6 +19,7 @@ const INV_PHI = 1 / PHI;
  * @returns {string} The symbolic name or a 3-decimal string representation.
  */
 export const prettify = (r) => {
+  if (!Number.isFinite(r)) return "0";
   if (Math.abs(r) <= 0.00001) return "0";
   if (Math.abs(r - 1) <= 0.00001) return "1";
   if (Math.abs(r + 1) <= 0.00001) return "-1";
