@@ -118,7 +118,7 @@ export class SegmentController {
 
     this.active = false;
     this.count = 4;
-    this.showBoundaries = true;
+    this.showBoundaries = false;
     // Tracked so create() can carry it into a freshly-spawned pool.
     this.animationsPaused = false;
 
