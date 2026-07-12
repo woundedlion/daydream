@@ -73,8 +73,8 @@ input[type=range]:disabled::-webkit-slider-thumb {
 }
 
 /* Compact button base + primary/secondary fills. A page may still define its
- * own .btn color variants (e.g. splines' .btn-blue/.btn-emerald/.btn-rose) in
- * its own <style>, which override these via the cascade order. */
+ * own .btn color variants in its own <style>, which override these via the
+ * cascade order. */
 .btn {
   padding: 0.4rem 0.6rem;
   border-radius: 0.25rem;
@@ -143,8 +143,8 @@ input[type=range]:disabled::-webkit-slider-thumb {
 /*
  * Fixed-right-panel shell: a full-bleed canvas (`.tool-stage`) with a fixed
  * scrolling controls panel pinned to the right (`.tool-panel`), collapsing to
- * a bottom sheet on narrow screens. Shared by the single-panel geometry tools
- * (lissajous, splines). Apply the classes alongside whatever id the page's JS
+ * a bottom sheet on narrow screens. Used by the single-panel geometry tools
+ * (lissajous). Apply the classes alongside whatever id the page's JS
  * already queries.
  */
 .tool-stage {
