@@ -274,8 +274,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 │   ├── lissajous.html          Spherical Lissajous curve designer
 │   ├── mobius.html             Möbius transformation visualizer
 │   ├── palettes.html           Procedural palette tuner
-│   ├── solids.html             Conway operator playground (uses MeshOps bridge)
-│   └── splines.html            Catmull-Rom spline designer
+│   └── solids.html             Conway operator playground (uses MeshOps bridge)
 │
 ├── three.js/                   Optional vendored Three.js checkout
 ├── node_modules/lil-gui/       Optional local lil-gui (npm install)
@@ -422,7 +421,7 @@ A typical effect frame follows a four-stage pipeline. Not every effect uses ever
 
   Solids::get()      MeshOps::transform    Scan::Mesh::draw     Pipeline<W,H,
   MeshOps::hankin    RippleTransformer      Scan::Ring::draw       Orient,
-  generate(arena,fn) NoiseTransformer       Plot::SplineChain      AntiAlias,
+  generate(arena,fn) NoiseTransformer       Plot::Multiline        AntiAlias,
   ParticleSystem     OrientTransformer      Scan::Shader::draw     Feedback>
 ```
 
@@ -665,7 +664,7 @@ struct DistanceResult {
 };
 ```
 
-**Curve Plot Path** (`Plot::Line`, `Plot::Multiline`, `Plot::Ring`, `Plot::PlanarPolygon`, `Plot::SplineChain`, `Plot::Bezier`):
+**Curve Plot Path** (`Plot::Line`, `Plot::Multiline`, `Plot::Ring`, `Plot::PlanarPolygon`):
 
 | Register | Meaning |
 |---|---|
@@ -751,14 +750,12 @@ For drawing lines, curves, and paths, the `Plot` namespace provides a geodesic/p
 
 ```cpp
 Plot::Line::draw<W, H>(pipeline, canvas, start, end, fragment_shader);
-Plot::Bezier::draw<W, H>(pipeline, canvas, p0, p1, p2, p3, fragment_shader);
-Plot::SplineChain::draw<W, H>(pipeline, canvas, control_points, tension, shader);
+Plot::Multiline::draw<W, H>(pipeline, canvas, vertices, fragment_shader);
 ```
 
-All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<Fragment>`) where each fragment carries position, texture registers (v0–v3), age, and color. Two **independent** axes govern how a path is drawn — do not conflate them:
+All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<Fragment>`) where each fragment carries position, texture registers (v0–v3), age, and color.
 
-- **Edge interpolation** — how consecutive fragments are joined. *Geodesic* (the default) walks the great-circle arc between endpoints; *planar* interpolates along an azimuthal-equidistant straight line in a basis's tangent plane (for effects that live in a 2D local space). This is selected by whether a **planar basis** is supplied to the draw call (`null` ⇒ geodesic), **not** by `SplineMode`.
-- **Spline evaluation** (`SplineMode`, the spline primitives `Bezier`/`SplineChain` only) — `SplineMode::Geodesic` (the default) samples control points with spherical, slerp-based cubic interpolation; `SplineMode::Fast` uses a cheaper polynomial-then-normalize approximation that distorts on long arcs. `SplineMode` has only `Fast` and `Geodesic` — there is no `SplineMode::Planar`, and it does not control edge interpolation.
+- **Edge interpolation** — how consecutive fragments are joined. *Geodesic* (the default) walks the great-circle arc between endpoints; *planar* interpolates along an azimuthal-equidistant straight line in a basis's tangent plane (for effects that live in a 2D local space). This is selected by whether a **planar basis** is supplied to the draw call (`null` ⇒ geodesic).
 
 #### Plot Primitives
 
@@ -775,8 +772,6 @@ All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<F
 | `Plot::Flower` | N-petal flower shape |
 | `Plot::Mesh` | Wireframe mesh rendering with edge deduplication |
 | `Plot::ParticleSystem` | Particle trail rendering from `VectorTrail` history |
-| `Plot::Bezier` | Single cubic Bézier curve on the sphere |
-| `Plot::SplineChain` | Catmull-Rom spline chain through control points with configurable tension |
 
 ### 7.3 The Animation System (`animation.h`)
 
@@ -988,8 +983,6 @@ FastLED output ← CRGB(gamma encode) ← linear→sRGB ← Pixel16
 
 `Color4` wraps `Pixel` with a float alpha channel. The canvas sink composites with a single straight-alpha "over" operation — `blend_alpha(α)`, i.e. `dst = src * α + dst * (1-α)`, applied in 16-bit linear light (see `filter.h`). There is no selectable blend-mode tag.
 
-`color.h` additionally provides standalone compositing helpers — `blend_over`, `blend_under`, `blend_add` (with an ARM `uqadd16` saturating-add path), `blend_max`, and `blend_mean` — as building blocks for additive/max/mean mixing. They are not wired into the canvas sink; an effect calls them directly when blending its own intermediate buffers.
-
 #### Palette Types
 
 | Type | Description |
@@ -999,7 +992,7 @@ FastLED output ← CRGB(gamma encode) ← linear→sRGB ← Pixel16
 | `GenerativePalette` | Procedurally generated palette from harmony rules (triadic, analogous, etc.) combined with brightness/saturation profiles. Supports snapshot/lerp for animated transitions. |
 | `SolidColorPalette` | Constant color, adapts to the `Palette` interface. |
 
-Twenty-one named `ProceduralPalette` instances are pre-defined: `darkRainbow`, `bloodStream`, `vintageSunset`, `richSunset`, `undersea`, `lateSunset`, `mangoPeel`, `iceMelt`, `lemonLime`, `algae`, `embers`, `fireGlow`, `darkPrimary`, `mauveFade`, `lavenderLake`, `desertRose`, `bruisedMoss`, `bruisedBanana`, `brightSunrise`, `fireAndIce`, and `peachPop`.
+Twenty-one named `ProceduralPalette` instances are pre-defined in the `Palettes` namespace: `DARK_RAINBOW`, `BLOOD_STREAM`, `VINTAGE_SUNSET`, `RICH_SUNSET`, `UNDERSEA`, `LATE_SUNSET`, `MANGO_PEEL`, `ICE_MELT`, `LEMON_LIME`, `ALGAE`, `EMBERS`, `FIRE_GLOW`, `DARK_PRIMARY`, `MAUVE_FADE`, `LAVENDER_LAKE`, `DESERT_ROSE`, `BRUISED_MOSS`, `BRUISED_BANANA`, `BRIGHT_SUNRISE`, `FIRE_AND_ICE`, and `PEACH_POP`.
 
 #### OKLCH Perceptual Color
 
@@ -1049,6 +1042,8 @@ Coordinate modifiers (`modify(float) -> float`):
 | `ReverseModifier` | Mirrors the lookup parameter (1.0 - t) |
 | `MirrorModifier` | Maps [0,1] to [0,1,0] for a seamless symmetric loop |
 | `InsetModifier` | Compresses the source domain into an inset window, clamping outside |
+| `NoiseWarpModifier` | Displaces the lookup parameter with smooth value noise — the aperiodic counterpart to `RippleModifier` |
+| `DriftModifier` | Meanders the whole palette along a per-frame noise walk (wanders, hesitates, reverses) |
 
 Color modifiers (`shade(Color4, float) -> Color4`):
 
@@ -1057,6 +1052,21 @@ Color modifiers (`shade(Color4, float) -> Color4`):
 | `AlphaFalloffShade` | Scales alpha by a caller-supplied falloff curve over the coordinate |
 | `EdgeFadeShade` | Fades the sample color to black near the edges (opaque vignette) |
 | `EdgeAlphaShade` | Fades the sample alpha near the edges (transparent vignette) |
+| `HueSpinShade` | Rotates every sample's hue in OKLab by a driver amount (continuous hue cycling); the rotation folds into a per-frame memoized 3×3 |
+| `HueWobbleShade` | Rotates hue by an amount that varies along the domain (iridescent drift); per-sample cost suits bake-time sampling |
+| `SparkleShade` | Ignites sparse traveling glints where an evolving noise field exceeds a threshold |
+| `ChromaPulseShade` | Breathes OKLab chroma between pastel and vivid on a per-frame memoized pulse |
+| `LightnessGrainShade` | Grains brightness with evolving noise; uniform linear-RGB gain, so hue is preserved exactly |
+| `IridescentShade` | Adds a thin-film cosine sheen with per-channel phase offsets, saturating at white |
+
+The noise-driven modifiers sample the deterministic `value_noise_1d`/`value_noise_2d`
+hash lattice (`3dmath.h`) with a per-instance seed, so two modifiers on the same
+driver decorrelate by seed. Frame-constant work memoizes against the driver
+value (`HueSpinShade`'s rotation matrix, `ChromaPulseShade`'s pulse factor,
+`DriftModifier`'s walk offset). The OKLab shades still pay a per-sample
+conversion, so they pair well with `BakedPalette::rebake`, which re-samples a
+256-entry LUT once per frame; the noise and cosine shades are cheap enough for
+live per-pixel paths.
 
 ```cpp
 // Compose a baked palette with a breathing coordinate modifier
@@ -1065,6 +1075,11 @@ StaticPalette<BakedPalette, Coords<BreatheModifier>> palette;
 // A transparent vignette: inset the source, fade alpha at the edges
 StaticPalette<ProceduralPalette, Coords<InsetModifier>,
               Colors<EdgeAlphaShade>, /*Wrap=*/false> vignette;
+
+// Psychedelic composite: noise-warped coordinate, continuously spinning hue,
+// glints riding on top
+StaticPalette<ProceduralPalette, Coords<NoiseWarpModifier>,
+              Colors<HueSpinShade, SparkleShade>> lava;
 ```
 
 #### Additional Palette Types
@@ -1310,9 +1325,9 @@ x = ( x_boundary + (now − epoch) · (W/2) / cycles_per_half_rev )  mod W
 |---|---|---|---|---|
 | `SYNC` | pin 3 (GPIO out) | pin 3 (ext. interrupt in) | 3.3 V CMOS, active-high pulses, idle LOW | master → all |
 | `MASTER_EN` | pin 5 (drive LOW) | pin 5 (drive HIGH) | 3.3 V CMOS, gates the external sync-out buffer | per-board strap out |
-| `ID` straps | pins 21–23 (ID0–ID2) | pins 21–23 (ID0–ID2) | active-low, internal pull-ups; `ID_STRAPS = log2(N)` read | strap (board identity) |
+| `ID` straps | pins 21–22 (ID0–ID1) | pins 21–22 (ID0–ID1) | active-low, internal pull-ups; `ID_STRAPS = log2(N)` read | strap (board identity) |
 
-The ID straps select the board: the build reads `ID_STRAPS = log2(N)` of them (ID0/pin 21, ID1/pin 22, and — only for `N = 8` — ID2/pin 23), decoding `(~raw) & (N-1)` (active-low straps, so the raw reading is inverted).  For the 4-segment build, all-floating = `00` = master and the other three codes select arm/half.  `SYNC` is one shared pin 3 — the master drives it and downstream boards receive on its rising edge; `MASTER_EN` (pin 5) gates an external level shifter so only the master drives the shared bus.  The former column-clock wire is **deleted** and pin 4 is freed — `SYNC` is the only inter-board connection.  It is assumed physically reliable (a hard, soldered line); a severed wire is out of scope (boards free-run and precess apart at crystal rate, a slow smear, never an instant break).
+The ID straps select the board: the build reads `ID_STRAPS = log2(N)` of them (ID0/pin 21 and, for `N = 4`, ID1/pin 22), decoding `(~raw) & (N-1)` (active-low straps, so the raw reading is inverted).  The driver caps `N <= 4`, so at most two straps are read.  For the 4-segment build, all-floating = `00` = master and the other three codes select arm/half.  `SYNC` is one shared pin 3 — the master drives it and downstream boards receive on its rising edge; `MASTER_EN` (pin 5) gates an external level shifter so only the master drives the shared bus.  The former column-clock wire is **deleted** and pin 4 is freed — `SYNC` is the only inter-board connection.  It is assumed physically reliable (a hard, soldered line); a severed wire is out of scope (boards free-run and precess apart at crystal rate, a slow smear, never an instant break).
 
 **Signal levels & symbol waveforms.** The wire idles LOW.  A **symbol** is a burst of short active-high pulses at a fixed pitch; **the meaning is the count of rising edges — pulse width carries no information.**  Each pulse is HIGH for one ISR body (pin set HIGH at ISR entry, LOW at exit; tens of µs) and the rising edge is the only timed event.  Pulses are drawn narrow, to scale against the ~868 µs pitch:
 
@@ -1558,7 +1573,7 @@ Visualizes the Hopf fibration — a map from S³ to S². Points on S² (the base
 
 Procedurally generates Islamic geometric patterns using Hankin's method (pentagon-based subdivision of the Archimedean solids). Each face of a rotating solid is decorated with its characteristic star polygon, colored by face topology (triangles, pentagons, hexagons, etc.). Ripple waves periodically distort the geometry.
 
-**Parameters**: Duration, Fade, Burst, Ripp Amp, Ripp Decay, Ripp Dur, Debug BB
+**Parameters**: Fade, Face Fade Lo, Face Fade Hi, Burst, Ripp Amp, Ripp Decay, Ripp Dur, Debug BB
 
 </td></tr></table>
 
@@ -1801,18 +1816,6 @@ Stereographic-projection shader (extends `Effect` directly) with noise-driven wa
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=SplineFlow" target="_blank"><img src="docs/screenshots/SplineFlow.png" alt="SplineFlow" width="280"></a></td>
-<td valign="top">
-
-#### SplineFlow
-
-Catmull-Rom spline curves whose control points drift via independent random walks. Drawn with `Plot::SplineChain` in closed-loop mode through `World::Trails` for persistent trails, producing flowing organic ribbon paths.
-
-**Parameters**: Tension, Speed, Drift, Num Pts, Alpha
-
-</td></tr></table>
-
-<table border="0"><tr>
 <td width="300"><a href="https://woundedlion.github.io/daydream/?effect=DistortedRing" target="_blank"><img src="docs/screenshots/DistortedRing.png" alt="DistortedRing" width="280"></a></td>
 <td valign="top">
 
@@ -1821,6 +1824,18 @@ Catmull-Rom spline curves whose control points drift via independent random walk
 Concentric rings built from per-azimuth distorted ring SDFs, their radii oscillating via a sine-wave amplitude mutation while a random walk slowly reorients the stack.
 
 **Parameters**: Alpha, MaxAmplitude, Thickness, Rings, Show Bounding
+
+</td></tr></table>
+
+<table border="0"><tr>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=NoiseRings" target="_blank"><img src="docs/screenshots/NoiseRings.png" alt="NoiseRings" width="280"></a></td>
+<td valign="top">
+
+#### NoiseRings
+
+A stack of evenly spaced plotted rings (`Plot::DistortedRing`) sharing one axis, each vertex displaced along the stack axis by the product of two world-space OpenSimplex noise octaves (independent spatial scale per octave) — octave 1 envelopes octave 2, so perturbations turn sparse wherever the envelope runs near zero. The displacement is uniform in direction across the whole sphere and the field is anchored in space, so the random walk spins the stack through it while the field slowly flows; ring colors sweep a circular analogous palette across the stack, with each fragment's hue rotated by the local displacement magnitude, and the palette slowly wipes to a freshly generated one every ~3 seconds.
+
+**Parameters**: Alpha, Rings, Amplitude, Scale 1, Scale 2, Hue Rotate, Flow Speed
 
 </td></tr></table>
 
@@ -1900,8 +1915,6 @@ The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry
 
 The bridge also exposes a `PaletteOps` class whose `bakeLut` method authors a three-key OKLCH gradient and returns a zero-copy `Uint8Array` view over a 256-entry sRGB LUT (same read-before-next-call memory-view contract as `getPixels`), used by the palette tool. It touches no global RNG, so calling it never perturbs a live engine's render stream.
 
-Alongside the classes, the bridge exports a few free spline-evaluation functions — `spline_cubic_fast`, `spline_cubic_slerp`, and `spline_catmull_rom_tangents` — used by the `splines.html` tool so its Bézier / Catmull-Rom curves are evaluated by the same engine code the firmware uses rather than a JavaScript reimplementation.
-
 It likewise exports the engine's color, palette, and lissajous math as free functions so the JavaScript tool ports can cross-check against the real implementation rather than a reimplementation: `srgb_to_linear_float`, `linear_to_srgb_float`, `srgb_to_linear_interp` (the interpolated sRGB→16-bit-linear LUT), `linear_rgb_to_oklab`, `oklab_to_linear_rgb`, `hsv_to_rgb` (the device `CHSV` sextant path), `procedural_palette_linear` (the cosine-palette formula), and `lissajous`.
 
 The WASM bridge includes stack high-water-mark instrumentation: `stack_paint_canary()` fills the stack with a known pattern at init time, and `stack_high_water_mark()` scans for the deepest overwrite. This is reported via `getArenaMetrics()` and logged on every effect switch to catch stack-hungry template instantiations early.
@@ -1945,7 +1958,7 @@ The `Daydream` class owns the entire render side. Features:
 Daydream uses a tiny pub/sub state container plus a URL-syncing wrapper:
 
 ```js
-const appState = new AppState({ effect: 'IslamicStars', resolution: 'Phantasm (144x288)' });
+const appState = new AppState({ effect: 'IslamicStars', resolution: 'Phantasm (288x144)' });
 new URLSync(appState, ['effect', 'resolution']);  // mirrors keys to query string
 
 appState.subscribe((key, value, old) => {
@@ -1955,7 +1968,7 @@ appState.subscribe((key, value, old) => {
 ```
 
 - **`AppState`** — flat key→value store with a `subscribe(callback)` API. Setting a key fires the callback only if the value actually changed. The sidebar and lil-gui both write through `appState.set(...)`, so they stay in sync without explicit coupling.
-- **`URLSync`** — reads tracked keys from `window.location.search` on construction (URL beats default), then debounces writes back to the query string via `history.replaceState`. Shareable links like `?effect=Raymarch&resolution=Phantasm%20(144x288)` work out of the box.
+- **`URLSync`** — reads tracked keys from `window.location.search` on construction (URL beats default), then debounces writes back to the query string via `history.replaceState`. Shareable links like `?effect=Raymarch&resolution=Phantasm%20(288x144)` work out of the box.
 
 ### 10.5 The Effect Sidebar (`sidebar.js`)
 
@@ -1997,7 +2010,7 @@ drawFrame() {                postMessage({type:'render'})
 Key properties:
 - **Isolated WASM instances per worker** — each segment has its own arena, its own random seed (`Pcg32(1337)` is deterministic, so all workers produce the same result), and its own effect state.
 - **`setClip(x0, x1, y0, y1)`** — for a non-stateful effect the WASM engine restricts *rendering* to the worker's quadrant: the rasterizer's scanline culling skips out-of-clip rows and columns, so out-of-band pixels are never shaded. The pixel readback in `drawFrame()` still copies the full canvas buffer; `segment_worker.js` then extracts just the quadrant rectangle from it (the `pixelsCopy` loop in the render handler) before transferring the result back, so only the quadrant crosses the worker boundary.
-- **Cross-segment stateful effects render full-frame** — an effect whose per-frame state reads pixels *outside* the worker's band (`MeshFeedback`'s feedback warp samples the previous frame at unbounded offsets; `Dynamo`/`SplineFlow` reproject `World::Trails` under rotation) cannot be band-clipped: a clipped worker would have stale/zero history outside its band, so cross-band trails read as black and seams appear. Those effects report `Effect::needs_full_frame()` (derived from a compile-time `any_crosses_segments` filter-pipeline trait), and `setClip` leaves their clip at the full canvas — every worker computes the bit-identical full frame and `segment_worker.js` slices its quadrant from the full readback. This mirrors the device exactly, where each board independently renders the whole canvas; only non-stateful effects keep segmented rendering's clipping win. Design: `docs/segmented_stateful_effects_spec.md`.
+- **Cross-segment stateful effects render full-frame** — an effect whose per-frame state reads pixels *outside* the worker's band (`MeshFeedback`'s feedback warp samples the previous frame at unbounded offsets; `Dynamo` reprojects `World::Trails` under rotation) cannot be band-clipped: a clipped worker would have stale/zero history outside its band, so cross-band trails read as black and seams appear. Those effects report `Effect::needs_full_frame()` (derived from a compile-time `any_crosses_segments` filter-pipeline trait), and `setClip` leaves their clip at the full canvas — every worker computes the bit-identical full frame and `segment_worker.js` slices its quadrant from the full readback. This mirrors the device exactly, where each board independently renders the whole canvas; only non-stateful effects keep segmented rendering's clipping win. Design: `docs/segmented_stateful_effects_spec.md`.
 - **One-frame pipeline** — frame N's render is dispatched fire-and-forget; frame N-1's results are composited synchronously when they arrive. Wall-clock time is measured against the slowest worker — exactly what the multi-Teensy hardware sees.
 - **Boundary overlay** — a "Show Boundaries" toggle paints cyan markers on the segment edges in the composite buffer to make the partition visible.
 
@@ -2024,14 +2037,14 @@ Codec priority is MP4/H.264 → WebM/VP9 → WebM/VP8, with optional offscreen-c
 
 | Name | Width × Height | Notes |
 |---|---|---|
-| `Holosphere (20x96)` | 96 × 20 | Matches the original Holosphere hardware |
-| `Phantasm (144x288)` | 288 × 144 | Matches Phantasm; default in the web simulator |
+| `Holosphere (96x20)` | 96 × 20 | Matches the original Holosphere hardware |
+| `Phantasm (288x144)` | 288 × 144 | Matches Phantasm; default in the web simulator |
 
 Switching presets does a full WASM reset: `setResolution(w, h)` updates the active width/height and drops the current effect — the pixel buffer is pre-sized to `MAX_W × MAX_H` and deliberately never resized (a realloc could move its backing store under `ALLOW_MEMORY_GROWTH` and detach every outstanding `getPixels()` view), so `getPixels()` returns a view over just the active prefix. `setEffect(name)` then rebuilds the effect at the new template instantiation. The sidebar swaps to the matching favorites list (§10.5).
 
 ### 10.11 Geometry Tools (`daydream/tools/`)
 
-Five standalone HTML pages. Four render with their own Three.js scene; `palettes.html` renders with 2D canvas contexts. `solids.html` and `splines.html` are backed by the engine's WASM build so their geometry stays identical to the C++ engine — `solids.html` via the `MeshOps` class, `splines.html` via the exported spline evaluators (`spline_cubic_fast` / `spline_cubic_slerp` / `spline_catmull_rom_tangents`); the other three implement their geometry math directly in JavaScript:
+Four standalone HTML pages. Three render with their own Three.js scene; `palettes.html` renders with 2D canvas contexts. `solids.html` is backed by the engine's WASM build so its geometry stays identical to the C++ engine — via the `MeshOps` class; the other three implement their geometry math directly in JavaScript:
 
 | Tool | What it does |
 |---|---|
@@ -2039,9 +2052,8 @@ Five standalone HTML pages. Four render with their own Three.js scene; `palettes
 | `mobius.html` | Visualizes Möbius transformations on the sphere via stereographic projection; lets you sweep the four complex coefficients and see the warp on a latitude-longitude grid. |
 | `palettes.html` | Tunes `ProceduralPalette` cosine coefficients and `GenerativePalette` harmony rules and exports the C++ initializer; renders its swatches and graphs on 2D canvas contexts rather than a Three.js scene. |
 | `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated tooling arenas (16 MB, separate from the engine's 330 KiB arena). |
-| `splines.html` | Dual-mode (Bézier / Catmull-Rom) spherical spline designer with closed-loop and open-chain modes; click to add control points, drag to edit, export the control points as a `constexpr std::array<Vector>` or as `Fragment` positions. Spline evaluation runs through the engine's exported WASM spline functions (the tool's single source of truth). |
 
-All five reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`.
+All four reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`.
 
 ---
 
@@ -2143,7 +2155,7 @@ python3 -m http.server 8080
 
 URL parameters control the initial state (mirrored back by `URLSync`, §10.4):
 ```
-?effect=IslamicStars&resolution=Phantasm%20(144x288)
+?effect=IslamicStars&resolution=Phantasm%20(288x144)
 ```
 
 **Optional local vendor checkout.** The simulator runs against jsdelivr CDN by default. To work offline (and to get the WebGPU renderer file, which isn't in npm), populate the local vendor dirs:
