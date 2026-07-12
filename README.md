@@ -856,7 +856,7 @@ Animations do not render directly — they mutate external state that the render
 | `Mutation` | `float*` | Applies an arbitrary scalar function `f(t)` to a float over time (more general than `Transition`) |
 | `Driver` | `float*` | Continuously increments a float each frame, wrapping at 0..1 — used for phase accumulators |
 | `Lerp` | `T*` (type-erased) | Interpolates any type with a `lerp()` function — `MeshState`, params structs, etc. The caller owns start, subject, and target; Lerp holds pointers |
-| `ColorWipe` | `GenerativePalette*` | Interpolates palette coefficients toward a target palette using `lerp_oklch_srgb` |
+| `ColorWipe` | `GenerativePalette*` | Interpolates palette keys toward a target palette in OKLCH along coherent hue arcs |
 | `Ripple`, `MobiusWarp`, `Noise` | `TransformerParams` | Animate transformer parameters (expansion radius, warp strength, noise scale) which the transformer pool reads during `MeshOps::transform()` |
 | `ParticleSystem` | `Vector[]` positions | Physics simulation updates particle positions; `VectorTrail` records history for trail rendering |
 
@@ -1013,7 +1013,6 @@ Pixel (sRGB 16-bit) → linear RGB float → OKLab (L, a, b) → OKLCH (L, C, h)
 | `linear_rgb_to_oklab()` | Convert linear RGB to the OKLab perceptual space |
 | `oklab_to_oklch()` | Convert OKLab (rectangular) to OKLCH (polar: Lightness, Chroma, Hue) |
 | `lerp_oklch()` | Interpolate two OKLCH values with shortest-arc hue (avoids the red→green→blue detour) |
-| `lerp_oklch_srgb()` | Same as above but returns an sRGB `CPixel` (used by `GenerativePalette` transitions) |
 | `gamut_clip_preserve_chroma()` | Maps an out-of-gamut OKLab color back into the sRGB cube by reducing chroma while holding hue and lightness (binary search on the chroma scale). The hue-preserving alternative to a per-channel RGB clip. Gated behind an in-gamut test (`oklab_to_linear_rgb_gamut`), so in-gamut colors — the vast majority — pay only the test and skip the search. |
 | `hue_rotate()` | Perceptual hue rotation — rotates the (a,b) chroma plane in OKLab, preserving lightness and chroma. Forward nonlinearity uses `fast_cbrt` (hot per-pixel path); inverse is exact. Out-of-gamut results are chroma-reduced rather than per-channel clipped, which holds hue and stabilizes the feedback loop against saturated-color drift. Used by the feedback `hue_fade` transform and `Flyby`'s displacement-driven hue shift. |
 
@@ -1816,14 +1815,14 @@ Concentric rings built from per-azimuth distorted ring SDFs, their radii oscilla
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=NoiseRings" target="_blank"><img src="docs/screenshots/NoiseRings.png" alt="NoiseRings" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=DisplacementField" target="_blank"><img src="docs/screenshots/DisplacementField.png" alt="DisplacementField" width="280"></a></td>
 <td valign="top">
 
-#### NoiseRings
+#### DisplacementField
 
-A stack of evenly spaced plotted rings (`Plot::DistortedRing`) sharing one axis, each vertex displaced along the stack axis by the product of two world-space OpenSimplex noise octaves (independent spatial scale per octave) — octave 1 envelopes octave 2, so perturbations turn sparse wherever the envelope runs near zero. The displacement is uniform in direction across the whole sphere and the field is anchored in space, so the random walk spins the stack through it while the field slowly flows; ring colors sweep a circular analogous palette across the stack, with each fragment's hue rotated by the local displacement magnitude, and the palette slowly wipes to a freshly generated one every ~3 seconds.
+A stack of evenly spaced soft-stroked rings (`Scan::DistortedRing`) sharing one axis, each vertex displaced along the stack axis by a stack of displacement fields that alternate between two phases. In the ball phase, cap-shaped bumps spawn at the pole on random meridians and fall to the opposite pole at varying speeds, bowing the rings away from each falling ball; once the last ball lands, a two-octave world-space OpenSimplex noise field (octave 1 envelopes octave 2, so perturbations turn sparse wherever the envelope runs near zero) fades in from zero, dwells at full strength, then fades back out into the next ball phase. Ring colors sweep a circular analogous palette across the stack, with each fragment's hue rotated by the local displacement magnitude, and the palette slowly wipes to a freshly generated one every ~3 seconds.
 
-**Parameters**: Alpha, Rings, Amplitude, Scale 1, Scale 2, Hue Rotate, Flow Speed
+**Parameters**: Alpha, Rings, Thickness, Ball Amp, Noise Amp, Scale 1, Scale 2, Hue Rotate, Flow Speed, Ball Min, Ball Max, Ball Rate, Speed Min, Speed Max
 
 </td></tr></table>
 
