@@ -214,7 +214,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 │       ├── FastNoiseLite.h         Single-header noise library
 │       └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
-├── effects/                    27 effects (28 headers incl. the shared ReactionDiffusionBase.h):
+├── effects/                    26 effects (27 headers incl. the shared ReactionDiffusionBase.h):
 │                                BZReactionDiffusion.h, HopfFibration.h, IslamicStars.h,
 │                                Raymarch.h, … — see §9 Effects Reference
 │
@@ -299,7 +299,7 @@ Three build targets share a common engine:
 │  │ Holosphere/  │   │  Effects → Canvas → Filter Pipeline          │    │
 │  │  .ino        │   │      → SDF/Plot → Pixel Buffer               │    │
 │  │              │   │                                              │    │
-│  │ Phantasm/    │   │  effects/  (27 visual algorithms)            │    │
+│  │ Phantasm/    │   │  effects/  (26 visual algorithms)            │    │
 │  │  .ino        │   │                                              │    │
 │  │              │   ├──────────────────────────────────────────────┤    │
 │  │ wasm/        │   │          hardware/  (Drivers)                │    │
@@ -1608,18 +1608,6 @@ Visualizes the real spherical harmonics Yˡₘ(θ, φ) as a colored scalar field
 A latitude-longitude grid that undergoes live Möbius transformation animation via `MobiusWarpCircularTransformer`.
 
 **Parameters**: Rings, Lines, Alpha
-
-</td></tr></table>
-
-<table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=Moire" target="_blank"><img src="docs/screenshots/Moire.png" alt="Moire" width="280"></a></td>
-<td valign="top">
-
-#### Moire
-
-Two counter-rotating families of concentric rings that beat against each other into a shifting moiré interference pattern, driven by an animated ring-distortion amplitude.
-
-**Parameters**: Alpha, Density, Amp
 
 </td></tr></table>
 
