@@ -192,6 +192,17 @@
   to { transform: rotate(360deg); }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .canvas-container.recording::after {
+    animation: none;
+  }
+
+  .spinner {
+    animation: none;
+    border-color: #48f;
+  }
+}
+
 /* Error state when the WASM engine fails to load (see daydream.js init catch). */
 .loading-overlay.error {
   color: #e66;
