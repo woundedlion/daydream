@@ -2035,7 +2035,7 @@ Four standalone HTML pages. Three render with their own Three.js scene; `palette
 
 | Tool | What it does |
 |---|---|
-| `lissajous.html` | Designs spherical Lissajous curves with live frequency / phase / amplitude sliders; outputs a C++ `LissajousParams` initializer for the engine's Lissajous effects (`ChaoticStrings`, `Comets`). |
+| `lissajous.html` | Designs spherical Lissajous curves with live frequency / phase sliders; outputs a C++ `LissajousParams` initializer for the engine's Lissajous effects (`ChaoticStrings`, `Comets`). |
 | `mobius.html` | Visualizes Möbius transformations on the sphere via stereographic projection; lets you sweep the four complex coefficients and see the warp on a latitude-longitude grid. |
 | `palettes.html` | Tunes `ProceduralPalette` cosine coefficients and `GenerativePalette` harmony rules and exports the C++ initializer; renders its swatches and graphs on 2D canvas contexts rather than a Three.js scene. |
 | `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated tooling arenas (16 MB, separate from the engine's 330 KiB arena). |
@@ -2071,7 +2071,7 @@ Each hardware target has its own `.ino` entry point in `targets/`:
 > against committed budgets — closing the device-only `#ifdef ARDUINO`
 > compile/size blind spot VMicro alone leaves uncovered. It coexists with VMicro
 > (it owns `.pio/`, never `__vm/`) and asserts the images *fit*, not byte-identity
-> with the bench build. See [`docs/teensy_ci_gate_spec.md`](docs/teensy_ci_gate_spec.md).
+> with the bench build. See [`docs/teensy_ci_gate_spec.md`](https://github.com/woundedlion/pov/blob/master/docs/teensy_ci_gate_spec.md).
 
 Target-specific constants are defined in each `.ino` file (not a global `constants.h`):
 ```cpp
@@ -2089,7 +2089,7 @@ static constexpr int PIN_RANDOM = 15;
 
 ### WASM Build — Holosphere repo (installs into daydream)
 
-The build is driven by **CMake presets** ([`CMakePresets.json`](CMakePresets.json)) so the same commands work on any platform with CMake ≥ 3.29, Ninja, and [Emscripten](https://emscripten.org/). Set up the Emscripten environment once (`emsdk_env`, which exports `EMSDK`), then:
+The build is driven by **CMake presets** ([`CMakePresets.json`](https://github.com/woundedlion/pov/blob/master/CMakePresets.json)) so the same commands work on any platform with CMake ≥ 3.29, Ninja, and [Emscripten](https://emscripten.org/). Set up the Emscripten environment once (`emsdk_env`, which exports `EMSDK`), then:
 
 ```bash
 cmake --preset wasm-release                     # configure (Emscripten toolchain)
@@ -2119,7 +2119,7 @@ cmake --build --preset tests  # build the run_tests executable
 ctest --preset tests          # run the suite (or: just test)
 ```
 
-The suite must use Clang — the engine relies on GCC/Clang `__attribute__` extensions MSVC rejects. The native toolchain file ([`cmake/toolchain-native-clang.cmake`](cmake/toolchain-native-clang.cmake)) locates Clang via `EMSDK` (or a sibling `../emsdk`) and, on Windows, transparently handles the resource compiler and `lld-link` so no Visual Studio Developer Prompt is required. Tests build with `-DHS_TEST_BUILD`, which only widens a couple of test-build buffer budgets (MSVC-STL `std::function` is larger than the device's `inplace_function`) — the firmware/WASM footprint is unchanged.
+The suite must use Clang — the engine relies on GCC/Clang `__attribute__` extensions MSVC rejects. The native toolchain file ([`cmake/toolchain-native-clang.cmake`](https://github.com/woundedlion/pov/blob/master/cmake/toolchain-native-clang.cmake)) locates Clang via `EMSDK` (or a sibling `../emsdk`) and, on Windows, transparently handles the resource compiler and `lld-link` so no Visual Studio Developer Prompt is required. Tests build with `-DHS_TEST_BUILD`, which only widens a couple of test-build buffer budgets (MSVC-STL `std::function` is larger than the device's `inplace_function`) — the firmware/WASM footprint is unchanged.
 
 Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-diffusion graph integrity, filters, the plot samplers and the Scan/mesh rasterizer, solids-registry invariants, the Conway/Hankin mesh operators, and animation. Beyond those unit checks the suite also runs: an effect smoke harness that constructs and renders every effect at 288×144 with asserts on, plus a cross-run determinism pass that re-renders each effect under a fixed clock and diffs the frames; a death harness that spawns subprocesses to confirm each `HS_CHECK` invariant traps; the Phantasm multi-board sync core (`hardware/pov_sync.h`, spec §12); the HD107S SPI wire-format and color-correction tests; the POV driver tiling proofs (each LED write covers the canvas exactly once); and the WASM param-marshaling coverage (the JS definition/value streams stay index-aligned). `tests/run_tests.cpp` is the driver; add a `tests/test_<module>.h`, then `#include` it and call its entry point there (two lines) to extend it.
 
@@ -2127,8 +2127,8 @@ Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-
 
 Three layers run the same suite so a regression can't reach the live demo:
 
-- **Local pre-commit hook** ([`.githooks/pre-commit`](.githooks/pre-commit)) — builds + runs the suite before each commit. **On by default (opt-out):** configuring the `tests` preset points `core.hooksPath` at `.githooks` automatically. Skip a single commit with `HS_SKIP_TESTS=1 git commit …` (or `--no-verify`); disable the auto-enable with `-DHS_INSTALL_GIT_HOOKS=OFF`. Doc-only commits skip the suite.
-- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on every push and pull request, runs the native suite on both Linux (clang-18) and Windows (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell), and builds the WASM module. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](scripts/wasm_smoke.mjs)) — instantiating the module the way the browser does and driving every registered effect at every enumerated resolution, so a SIMD-codegen fault, an embind signature mismatch, a stack overflow, or an `ALLOW_MEMORY_GROWTH` detachment fails here rather than riding a green build to deploy — and **verifies the install provenance trio** (`holosphere_wasm.wasm` + `.sha` + `.wasm.sha256`, the same artifacts the daydream deploy gate consumes), asserting the recorded `sha256` verifies and a clean checkout records no `-dirty` marker. The native suite there runs with `HS_SMOKE_FRAMES=120` to reach effect-lifecycle transitions the default short run skips.
+- **Local pre-commit hook** ([`.githooks/pre-commit`](https://github.com/woundedlion/pov/blob/master/.githooks/pre-commit)) — builds + runs the suite before each commit. **On by default (opt-out):** configuring the `tests` preset points `core.hooksPath` at `.githooks` automatically. Skip a single commit with `HS_SKIP_TESTS=1 git commit …` (or `--no-verify`); disable the auto-enable with `-DHS_INSTALL_GIT_HOOKS=OFF`. Doc-only commits skip the suite.
+- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on every push and pull request, runs the native suite on both Linux (clang-18) and Windows (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell), and builds the WASM module. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) — instantiating the module the way the browser does and driving every registered effect at every enumerated resolution, so a SIMD-codegen fault, an embind signature mismatch, a stack overflow, or an `ALLOW_MEMORY_GROWTH` detachment fails here rather than riding a green build to deploy — and **verifies the install provenance trio** (`holosphere_wasm.wasm` + `.sha` + `.wasm.sha256`, the same artifacts the daydream deploy gate consumes), asserting the recorded `sha256` verifies and a clean checkout records no `-dirty` marker. The native suite there runs with `HS_SMOKE_FRAMES=120` to reach effect-lifecycle transitions the default short run skips.
 - **Gated deploy** (`.github/workflows/deploy.yml`, **daydream repo**) — daydream's GitHub Pages source is *GitHub Actions*. On a push to daydream's `master` (or manual dispatch), the engine's native unit suite runs as a **gate** (`deploy` `needs: gate`, checking out the engine repo); only if it passes does the workflow publish the simulator to Pages. The engine's WASM is whatever is committed in daydream (built + installed from Holosphere). If the engine repo is private, add a `POV_TOKEN` secret (a read-access PAT) for the gate's checkout.
 
 ### Running the Simulator — daydream repo
