@@ -25,6 +25,11 @@ export { copyToClipboard, copyWithFeedback, COPY_FEEDBACK } from './clipboard.js
 export { formatFloatCpp } from './cpp_format.js';
 export { showFatalError } from './banner.js';
 
+/** @param {number} ratio @returns {number} */
+export function capPixelRatio(ratio) {
+  return Math.min(ratio, 1);
+}
+
 /**
  * Build a ready-to-run Three.js scene (renderer, perspective camera,
  * OrbitControls, optional reference sphere / light rig) wired into the given
@@ -97,7 +102,7 @@ export function initScene(containerId, canvasId, opts = {}) {
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha });
   renderer.setSize(width, height);
-  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setPixelRatio(capPixelRatio(window.devicePixelRatio));
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.minDistance = minDistance;
@@ -143,7 +148,7 @@ export function initScene(containerId, canvasId, opts = {}) {
     const h = container.clientHeight;
     camera.aspect = Math.max(1, w) / Math.max(1, h);
     camera.updateProjectionMatrix();
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(capPixelRatio(window.devicePixelRatio));
     renderer.setSize(w, h);
   };
   const resize = onResize
