@@ -8,7 +8,7 @@
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { initScene } = await import('../tools/shared.js');
+const { capPixelRatio, initScene } = await import('../tools/shared.js');
 
 const savedDocument = globalThis.document;
 afterEach(() => {
@@ -20,6 +20,12 @@ afterEach(() => {
 function stubDocument(byId) {
   globalThis.document = { getElementById: (id) => byId[id] || null };
 }
+
+test('capPixelRatio preserves low-density displays and caps high-density displays', () => {
+  assert.equal(capPixelRatio(0.75), 0.75);
+  assert.equal(capPixelRatio(1), 1);
+  assert.equal(capPixelRatio(3), 1);
+});
 
 test('initScene throws when the container element is absent', () => {
   stubDocument({});
