@@ -6,7 +6,101 @@ import {
   paramValueSkew,
   runSwitchTransaction,
   applyInitialState,
+  snapshotEffectControlState,
+  restoreEffectControlState,
 } from '../effect_sequencing.js';
+
+function makeEffectControls(values, paused = false, sinks = null) {
+  const state = { ...values };
+  const animationState = { pause: paused };
+  const controllerByName = new Map();
+  for (const name of Object.keys(values)) {
+    controllerByName.set(name, {
+      getValue: () => state[name],
+      setValue: (value) => {
+        state[name] = value;
+        if (sinks) {
+          sinks.engine[name] = value;
+          sinks.workers[name] = value;
+          sinks.url[name] = value;
+          sinks.events.push(`param:${name}`);
+        }
+      },
+    });
+  }
+  const pauseController = {
+    setValue: (value) => {
+      animationState.pause = value;
+      if (sinks) {
+        sinks.engine.paused = value;
+        sinks.workers.paused = value;
+        sinks.url.paused = value;
+        sinks.events.push(`pause:${value}`);
+      }
+    },
+  };
+  return {
+    state,
+    animationState,
+    pauseController,
+    controllerByName,
+    writableParamNames: Object.keys(values).filter((name) => name !== 'Telemetry'),
+  };
+}
+
+function makeSinks() {
+  return { engine: {}, workers: {}, url: {}, events: [] };
+}
+
+test('effect state snapshot copies writable controls and pause state', () => {
+  const effect = makeEffectControls({ Speed: 0.75, Glow: true, Telemetry: 42 }, true);
+  const snapshot = snapshotEffectControlState(effect);
+
+  effect.state.Speed = 0.1;
+  effect.animationState.pause = false;
+
+  assert.deepEqual(snapshot, {
+    paramValues: [['Speed', 0.75], ['Glow', true]],
+    animationsPaused: true,
+  });
+});
+
+test('effect state restoration updates controls, engine, workers, and URL together', () => {
+  const snapshot = snapshotEffectControlState(
+    makeEffectControls({ Speed: 0.75, Glow: true }, true));
+  const sinks = makeSinks();
+  const rebuilt = makeEffectControls({ Speed: 0.1, Glow: false }, false, sinks);
+
+  restoreEffectControlState(rebuilt, snapshot);
+
+  const expected = { Speed: 0.75, Glow: true, paused: true };
+  assert.deepEqual({ ...rebuilt.state, paused: rebuilt.animationState.pause }, expected);
+  assert.deepEqual(sinks.engine, expected);
+  assert.deepEqual(sinks.workers, expected);
+  assert.deepEqual(sinks.url, expected);
+  assert.equal(sinks.events[0], 'pause:true');
+});
+
+test('one effect snapshot survives nested effect and resolution rollback', () => {
+  const snapshot = snapshotEffectControlState(
+    makeEffectControls({ Speed: 0.9, Glow: true }, false));
+  const effectSinks = makeSinks();
+  const resolutionSinks = makeSinks();
+  const effectRollback = makeEffectControls({ Speed: 0.1, Glow: false }, true, effectSinks);
+  const resolutionRollback = makeEffectControls(
+    { Speed: 0.2, Glow: false }, true, resolutionSinks);
+
+  restoreEffectControlState(effectRollback, snapshot);
+  restoreEffectControlState(resolutionRollback, snapshot);
+
+  const expected = { Speed: 0.9, Glow: true, paused: false };
+  assert.deepEqual(effectSinks.engine, expected);
+  assert.deepEqual(effectSinks.workers, expected);
+  assert.deepEqual(effectSinks.url, expected);
+  assert.deepEqual(resolutionSinks.engine, expected);
+  assert.deepEqual(resolutionSinks.workers, expected);
+  assert.deepEqual(resolutionSinks.url, expected);
+});
 
 test('initial state dismisses the loader only after a successful apply', () => {
   const events = [];

@@ -13,6 +13,8 @@ import {
   paramValueSkew,
   runSwitchTransaction,
   applyInitialState,
+  snapshotEffectControlState,
+  restoreEffectControlState,
 } from "./effect_sequencing.js";
 import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
@@ -320,11 +322,14 @@ function applyEffect(preserveParams = false) {
       pauseController = activeEffect.gui.add(animState, 'pause').name('Pause Animation');
       pauseController.onChange(setPaused);
     }
+    activeEffect.animationState = animState;
+    activeEffect.pauseController = pauseController;
 
     // paramNames records the value-stream order; syncGUI() binds by name, not
     // index, so a C++ param reorder can't mis-bind sliders.
     const state = {};
     activeEffect.paramNames = [];
+    activeEffect.writableParamNames = [];
     activeEffect.controllerByName = new Map();
     // animated (animation-driven) and readonly (engine telemetry) are the only
     // params the engine rewrites per frame; a set without them lets syncGUI skip.
@@ -352,6 +357,7 @@ function applyEffect(preserveParams = false) {
       if (p.readonly) {
         if (typeof controller.disable === 'function') controller.disable();
       } else {
+        activeEffect.writableParamNames.push(p.name);
         // Flag dragging so syncGUI's value stream doesn't fight a drag. The window
         // listeners go on activeDragEnds so a GUI destroyed mid-drag removes them.
         controller.domElement.addEventListener('pointerdown', () => {
@@ -482,18 +488,19 @@ function restoreUrl(url) {
   window.history.replaceState({}, '', url);
 }
 
-function restoreEffect(effect, url) {
+function restoreEffect(effect, url, effectState) {
   restoringSwitch = true;
   try {
     appState.set('effect', effect);
     restoreUrl(url);
     if (applyEffect(true) === false) throw new Error(`Effect rollback to "${effect}" was rejected.`);
+    restoreEffectControlState(activeEffect, effectState);
   } finally {
     restoringSwitch = false;
   }
 }
 
-function restoreResolution(resolution, effect, url) {
+function restoreResolution(resolution, effect, url, effectState) {
   restoringSwitch = true;
   try {
     appState.update({ resolution, effect });
@@ -501,6 +508,7 @@ function restoreResolution(resolution, effect, url) {
     restoreUrl(url);
     if (applyResolution(true) === false)
       throw new Error(`Resolution rollback to "${resolution}" was rejected.`);
+    restoreEffectControlState(activeEffect, effectState);
   } finally {
     restoringSwitch = false;
   }
@@ -510,17 +518,19 @@ appState.subscribe((key, value, old) => {
   if (restoringSwitch) return;
   if (key === 'effect') {
     const previousUrl = window.location.pathname + window.location.search + window.location.hash;
+    const previousEffectState = snapshotEffectControlState(activeEffect);
     const result = runSwitchTransaction(
       () => applyEffect(),
-      () => restoreEffect(old, previousUrl),
+      () => restoreEffect(old, previousUrl, previousEffectState),
     );
     reportSwitchFailure('Effect', result);
   } else if (key === 'resolution') {
     const previousEffect = appState.get('effect');
     const previousUrl = window.location.pathname + window.location.search + window.location.hash;
+    const previousEffectState = snapshotEffectControlState(activeEffect);
     const result = runSwitchTransaction(
       () => applyResolution(),
-      () => restoreResolution(old, previousEffect, previousUrl),
+      () => restoreResolution(old, previousEffect, previousUrl, previousEffectState),
     );
     if (!result.applied) {
       queueMicrotask(() => urlSync.setParam('resolution', appState.get('resolution')));

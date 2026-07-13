@@ -40,6 +40,41 @@ export function runSwitchTransaction(apply, rollback) {
 }
 
 /**
+ * Copy the writable values and animation state from an applied effect GUI.
+ * @param {Object|null|undefined} effect - Active effect control state.
+ * @returns {{paramValues: Array<[string, any]>, animationsPaused: boolean}|null}
+ */
+export function snapshotEffectControlState(effect) {
+  if (!effect?.controllerByName) return null;
+  const paramValues = [];
+  for (const name of effect.writableParamNames || []) {
+    const controller = effect.controllerByName.get(name);
+    if (controller) paramValues.push([name, controller.getValue()]);
+  }
+  return {
+    paramValues,
+    animationsPaused: Boolean(effect.animationState?.pause),
+  };
+}
+
+/**
+ * Restore a copied effect state through the rebuilt GUI controllers.
+ * @param {Object|null|undefined} effect - Rebuilt effect control state.
+ * @param {{paramValues: Array<[string, any]>, animationsPaused: boolean}|null} snapshot
+ * @returns {void}
+ */
+export function restoreEffectControlState(effect, snapshot) {
+  if (!effect?.controllerByName || !snapshot) return;
+  const pauseController = effect.pauseController;
+  if (snapshot.animationsPaused && pauseController) pauseController.setValue(true);
+  for (const [name, value] of snapshot.paramValues) {
+    const controller = effect.controllerByName.get(name);
+    if (controller) controller.setValue(value);
+  }
+  if (!snapshot.animationsPaused && pauseController) pauseController.setValue(false);
+}
+
+/**
  * Apply the initial resolution/effect state before dismissing the loader.
  * @param {Function} apply - Applies initial state; false means rejected.
  * @param {Function} onSuccess - Runs only after the initial state applies.

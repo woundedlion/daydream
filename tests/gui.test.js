@@ -2,10 +2,16 @@
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { URL } from 'node:url';
+import { AppState, URLSync, getActiveURLSync } from '../state.js';
+import {
+  snapshotEffectControlState,
+  restoreEffectControlState,
+} from '../effect_sequencing.js';
 
 // Restore globalThis.window after each test so the stub never leaks to another suite.
 const savedWindow = globalThis.window;
 afterEach(() => {
+  getActiveURLSync()?.dispose();
   if (savedWindow === undefined) delete globalThis.window;
   else globalThis.window = savedWindow;
 });
@@ -90,6 +96,58 @@ function installWindow(search) {
 }
 
 const RES = ['Phantasm (144x288)', 'Crystal (192x384)'];
+
+test('rollback restores an unflushed control value to runtime sinks and URL', () => {
+  let lastUrl = '/?Speed=0.1';
+  globalThis.window = {
+    location: { search: '?Speed=0.1', pathname: '/', hash: '' },
+    history: {
+      replaceState(state, title, url) {
+        lastUrl = url;
+        globalThis.window.location.search = new URL(url, 'http://x').search;
+      },
+    },
+  };
+  new URLSync(new AppState({ effect: 'Old' }), ['effect']);
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const makeEffect = () => {
+      const model = { Speed: 0 };
+      const runtime = { engine: 0, workers: 0 };
+      const controller = new DeepLinkGUI({ autoPlace: false })
+        .add(model, 'Speed', 0, 1)
+        .onChange((value) => {
+          runtime.engine = value;
+          runtime.workers = value;
+        });
+      return {
+        model,
+        runtime,
+        effect: {
+          controllerByName: new Map([['Speed', controller]]),
+          writableParamNames: ['Speed'],
+          animationState: { pause: false },
+          pauseController: null,
+        },
+      };
+    };
+
+    const previous = makeEffect();
+    previous.effect.controllerByName.get('Speed').setValue(0.75);
+    const snapshot = snapshotEffectControlState(previous.effect);
+    assert.equal(new URL(lastUrl, 'http://x').searchParams.get('Speed'), '0.1');
+
+    const rebuilt = makeEffect();
+    restoreEffectControlState(rebuilt.effect, snapshot);
+    mock.timers.tick(200);
+
+    assert.equal(rebuilt.model.Speed, 0.75);
+    assert.deepEqual(rebuilt.runtime, { engine: 0.75, workers: 0.75 });
+    assert.equal(new URL(lastUrl, 'http://x').searchParams.get('Speed'), '0.75');
+  } finally {
+    mock.timers.reset();
+  }
+});
 
 /**
  * Verifies a garbage ?resolution= does not survive DeepLinkGUI hydration. add()
