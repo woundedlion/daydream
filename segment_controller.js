@@ -852,10 +852,13 @@ export class SegmentController {
     el.style.display = '';
 
     if (this.faulted) {
+      if (el.firstElementChild?.getAttribute('role') === 'alert') return;
       const f = this.faultInfo;
       // Build via text nodes, not innerHTML: the fault message is arbitrary text
       // and must never be parsed as markup.
       const box = this.doc.createElement('div');
+      box.setAttribute('role', 'alert');
+      box.tabIndex = -1;
       box.style.cssText = 'color:#ff5252;padding:6px;font-size:0.85em';
       // segId < 0 is a pool-wide fault, not one worker; FAULT_RENDER is a render
       // timeout, other negatives are pool init/module load.
@@ -876,6 +879,7 @@ export class SegmentController {
       box.appendChild(hint);
       el.replaceChildren(box);
       this.statsTable = null; // force a rebuild on recovery
+      box.focus({ preventScroll: true });
       return;
     }
 
