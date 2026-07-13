@@ -2,7 +2,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { findBestRationalRatio, snapToRationalRatio, lissajous, lissajousCodeString } =
+const {
+  MAX_RATIONAL_TERM,
+  findBestRationalRatio,
+  snapToRationalRatio,
+  lissajous,
+  lissajousCodeString,
+} =
   await import('../tools/lissajous_math.js');
 
 const TWO_PI = 2 * Math.PI;
@@ -124,6 +130,19 @@ test('snapToRationalRatio: closing period equals 2π·n/passiveC for a known rat
   assert.equal(n, 2);
   assert.equal(snappedActiveC, passiveC * (m / n));
   assert.equal(closingPeriod, (TWO_PI * n) / passiveC);
+});
+
+test('snapToRationalRatio: 8/7 closure fits the closed-curve domain', () => {
+  const phase = 0.7;
+  const { m, n, snappedActiveC, closingPeriod } = snapToRationalRatio(8 / 7, 1);
+  assert.equal(m, 8);
+  assert.equal(n, 7);
+  assert.equal(closingPeriod, 7 * TWO_PI);
+  assert.ok(closingPeriod <= MAX_RATIONAL_TERM * TWO_PI);
+
+  const start = lissajous(snappedActiveC, 1, phase, 0);
+  const end = lissajous(snappedActiveC, 1, phase, closingPeriod);
+  assert.ok(start.distanceTo(end) < 1e-12);
 });
 
 /** Verifies an equal active/passive frequency closes after one 2π/passiveC period. */

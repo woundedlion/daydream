@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { formatFloatCpp } from './cpp_format.js';
 
 const TWO_PI = 2 * Math.PI;
+export const MAX_RATIONAL_TERM = 8;
 
 /**
  * Greatest common divisor of two non-negative integers (Euclid). Used to reduce
@@ -49,7 +50,7 @@ export const lissajous = (m1, m2, a, t) => {
  *   denominator (the search grid is square: M, N each range over [1, maxTerm]).
  * @returns {{ M: number, N: number }} The best simple rational ratio.
  */
-export const findBestRationalRatio = (value, maxTerm = 8) => {
+export const findBestRationalRatio = (value, maxTerm = MAX_RATIONAL_TERM) => {
   if (value === 0) return { M: 0, N: 1 };
 
   const sign = value < 0 ? -1 : 1;
@@ -87,7 +88,7 @@ export const findBestRationalRatio = (value, maxTerm = 8) => {
  * @returns {{ snappedActiveC: number, m: number, n: number, closingPeriod: number }} The
  *   snapped active frequency, the rational ratio m/n, and the curve's closing period T.
  */
-export const snapToRationalRatio = (activeC, passiveC, maxTerm = 8) => {
+export const snapToRationalRatio = (activeC, passiveC, maxTerm = MAX_RATIONAL_TERM) => {
   if (passiveC === 0) {
     return { snappedActiveC: activeC, m: 1, n: 1, closingPeriod: 0 };
   }

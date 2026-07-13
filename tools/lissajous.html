@@ -104,6 +104,7 @@
     import { initScene, copyWithFeedback, showFatalError, COPY_FEEDBACK } from './shared.js';
     import { createSlider as buildSlider } from './slider.js';
     import {
+      MAX_RATIONAL_TERM,
       lissajous,
       snapToRationalRatio,
       lissajousCodeString,
@@ -123,7 +124,7 @@
       C1: { min: 1, max: 100, step: 0.01, default: 12, scale: 100, label: "C₁" },
       C2: { min: 1, max: 100, step: 0.01, default: 5, scale: 100, label: "C₂" },
       A: { min: 0, max: TWO_PI, step: TWO_PI / 1000, default: 0, scale: 1000 / TWO_PI, label: "A (rad)" },
-      Duration: { min: 0, max: (4 * TWO_PI), step: TWO_PI / 500, default: TWO_PI, scale: 1000 / TWO_PI, label: "Domain" },
+      Duration: { min: 0, max: (MAX_RATIONAL_TERM * TWO_PI), step: TWO_PI / 500, default: TWO_PI, scale: 1000 / TWO_PI, label: "Domain" },
       // scale: 1 — Samples is a raw integer count, not a scaled fixed-point value
       Samples: { min: 200, max: 10000, step: 1, default: 4000, scale: 1, label: "Samples" }
     };
