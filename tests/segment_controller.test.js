@@ -28,11 +28,17 @@ const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
 class FakeWorker {
   /** @type {Array<FakeWorker>} Every instance constructed since the last reset. */
   static instances = [];
+  static constructionCount = 0;
+  static failConstructionAt = -1;
+  static failInitialPostAt = -1;
   /**
    * @param {string} url - Worker script URL the controller requested.
    * @param {Object} opts - Worker options bag (e.g. `{ type: 'module' }`).
    */
   constructor(url, opts) {
+    this.index = FakeWorker.constructionCount++;
+    if (this.index === FakeWorker.failConstructionAt)
+      throw new DOMException('worker blocked', 'SecurityError');
     this.url = url;
     this.opts = opts;
     this.posted = [];
@@ -47,7 +53,11 @@ class FakeWorker {
    * @param {Object} msg - Protocol message the controller sent.
    * @returns {void}
    */
-  postMessage(msg) { this.posted.push(msg); }
+  postMessage(msg) {
+    if (msg.type === 'init' && this.index === FakeWorker.failInitialPostAt)
+      throw new DOMException('message rejected', 'DataCloneError');
+    this.posted.push(msg);
+  }
   /**
    * Marks this fake worker as terminated.
    * @returns {void}
@@ -75,7 +85,12 @@ function makeController({ resolution = 'lo', effect = 'TestEffect',
   });
 }
 
-beforeEach(() => { FakeWorker.instances = []; });
+beforeEach(() => {
+  FakeWorker.instances = [];
+  FakeWorker.constructionCount = 0;
+  FakeWorker.failConstructionAt = -1;
+  FakeWorker.failInitialPostAt = -1;
+});
 
 const savedGlobals = { Worker: globalThis.Worker, document: globalThis.document };
 const restoreGlobal = (key, val) => {
@@ -265,6 +280,38 @@ test('create posts init stamped with the protocol version', () => {
     assert.ok(init, 'init posted');
     assert.equal(init.version, PROTOCOL_VERSION);
   }
+});
+
+test('a synchronous worker-N construction failure terminates the partial pool', () => {
+  FakeWorker.failConstructionAt = 1;
+  const c = makeController();
+
+  assert.doesNotThrow(() => c.create(3));
+
+  assert.equal(FakeWorker.instances.length, 1);
+  assert.equal(FakeWorker.instances[0].terminated, true);
+  assert.deepEqual(c.workers, []);
+  assert.equal(c.faulted, true);
+  assert.equal(c.faultInfo.segId, 1);
+  assert.match(c.faultInfo.message, /construction failed: SecurityError: worker blocked/);
+  assert.equal(c.bootWatchdog, null);
+  assert.equal(c.initWatchdog, null);
+});
+
+test('a synchronous worker-N init post failure terminates the partial pool', () => {
+  FakeWorker.failInitialPostAt = 1;
+  const c = makeController();
+
+  assert.doesNotThrow(() => c.create(3));
+
+  assert.equal(FakeWorker.instances.length, 2);
+  assert.ok(FakeWorker.instances.every((worker) => worker.terminated));
+  assert.deepEqual(c.workers, []);
+  assert.equal(c.faulted, true);
+  assert.equal(c.faultInfo.segId, 1);
+  assert.match(c.faultInfo.message, /initialization failed: DataCloneError: message rejected/);
+  assert.equal(c.bootWatchdog, null);
+  assert.equal(c.initWatchdog, null);
 });
 
 test('a booted ping with a mismatched protocol version faults fast', () => {
