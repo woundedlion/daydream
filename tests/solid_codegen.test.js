@@ -2,7 +2,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { formatFloat, pctSuffix, generateFuncAndRecipe, generateRecipeCpp, computeInternalAngle } =
+const {
+  formatFloat,
+  pctSuffix,
+  generateFuncAndRecipe,
+  generateRecipeCpp,
+  computeInternalAngle,
+  isConvexFace,
+} =
   await import('../tools/solid_codegen.js');
 const { formatFloatCpp } = await import('../tools/cpp_format.js');
 
@@ -140,6 +147,25 @@ test('computeInternalAngle guards degenerate input', () => {
   assert.equal(computeInternalAngle(null), 0);
   assert.equal(computeInternalAngle({ faces: [] }), 0);
   assert.equal(computeInternalAngle({ vertices: [], faces: [[0, 1]] }), 0);
+});
+
+test('isConvexFace accepts a convex face', () => {
+  const vertices = [
+    { x: 0, y: 0, z: 0 },
+    { x: 2, y: 0, z: 0 },
+    { x: 2, y: 2, z: 0 },
+    { x: 0, y: 2, z: 0 },
+  ];
+  assert.equal(isConvexFace(vertices, [0, 1, 2, 3]), true);
+});
+
+test('isConvexFace rejects a concave star face', () => {
+  const vertices = Array.from({ length: 10 }, (_, i) => {
+    const angle = i * Math.PI / 5;
+    const radius = i % 2 === 0 ? 2 : 0.8;
+    return { x: radius * Math.cos(angle), y: radius * Math.sin(angle), z: 0 };
+  });
+  assert.equal(isConvexFace(vertices, vertices.map((_, i) => i)), false);
 });
 
 /** Verifies generateFuncAndRecipe rejects a base or op that would emit non-compiling C++. */

@@ -527,9 +527,16 @@
     import * as THREE from 'three';
     import { initScene, copyWithFeedback, showFatalError } from './shared.js';
     // Pure C++ export-string codegen (formatFloat/pctSuffix/recipe builders) and
-    // the internal-angle geometry helper live in solid_codegen.js so they can be
+    // the pure face-geometry helpers live in solid_codegen.js so they can be
     // unit tested without a DOM or the WASM module. DOM/WASM wiring stays inline.
-    import { formatFloat, pctSuffix, generateFuncAndRecipe, generateRecipeCpp, computeInternalAngle } from './solid_codegen.js';
+    import {
+      formatFloat,
+      pctSuffix,
+      generateFuncAndRecipe,
+      generateRecipeCpp,
+      computeInternalAngle,
+      isConvexFace,
+    } from './solid_codegen.js';
     import createHolosphereModule from '../holosphere_wasm.js';
 
     let camera, scene, renderer, controls;
@@ -920,10 +927,21 @@
         // Triangulate
         const vertices = [];
         meshData.faces.forEach(f => {
-          for (let i = 1; i < f.length - 1; i++) {
-            vertices.push(...meshData.vertices[f[0]].toArray());
-            vertices.push(...meshData.vertices[f[i]].toArray());
-            vertices.push(...meshData.vertices[f[i + 1]].toArray());
+          if (isConvexFace(meshData.vertices, f)) {
+            for (let i = 1; i < f.length - 1; i++) {
+              vertices.push(...meshData.vertices[f[0]].toArray());
+              vertices.push(...meshData.vertices[f[i]].toArray());
+              vertices.push(...meshData.vertices[f[i + 1]].toArray());
+            }
+          } else {
+            const centroid = new THREE.Vector3();
+            f.forEach(idx => centroid.add(meshData.vertices[idx]));
+            centroid.divideScalar(f.length);
+            for (let i = 0; i < f.length; i++) {
+              vertices.push(...centroid.toArray());
+              vertices.push(...meshData.vertices[f[i]].toArray());
+              vertices.push(...meshData.vertices[f[(i + 1) % f.length]].toArray());
+            }
           }
         });
         const geo = new THREE.BufferGeometry();
@@ -1899,26 +1917,29 @@
           classColor.setHSL((faceClasses[fi] * 0.618034) % 1, 0.65, 0.55);
         }
         // Collect vertices for the triangulated face
-        if (!state.showGeodesics) {
+        if (!state.showGeodesics && isConvexFace(meshData.vertices, f)) {
           for (let i = 1; i < f.length - 1; i++) {
             pushVert(meshData.vertices[f[0]]);
             pushVert(meshData.vertices[f[i]]);
             pushVert(meshData.vertices[f[i + 1]]);
           }
         } else {
-          // Geodesic mode fans from the CENTROID, not f[0]: Hankin star faces
-          // are non-convex, and a corner fan spills triangles outside the
-          // polygon — pressed onto the unit sphere, that spill z-fights the
-          // neighbouring faces as dark speckle. Every face the tool produces
-          // is star-shaped about its centroid, so a centroid fan tiles it
-          // exactly.
           const centroid = new THREE.Vector3();
           f.forEach(idx => centroid.add(meshData.vertices[idx]));
           centroid.divideScalar(f.length);
-          for (let i = 0; i < f.length; i++) {
-            emitSphericalTri(centroid,
-              meshData.vertices[f[i]],
-              meshData.vertices[f[(i + 1) % f.length]]);
+          if (!state.showGeodesics) {
+            for (let i = 0; i < f.length; i++) {
+              pushVert(centroid);
+              pushVert(meshData.vertices[f[i]]);
+              pushVert(meshData.vertices[f[(i + 1) % f.length]]);
+            }
+          } else {
+            // A corner fan spills outside non-convex star faces.
+            for (let i = 0; i < f.length; i++) {
+              emitSphericalTri(centroid,
+                meshData.vertices[f[i]],
+                meshData.vertices[f[(i + 1) % f.length]]);
+            }
           }
         }
 
