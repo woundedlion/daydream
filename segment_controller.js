@@ -59,6 +59,13 @@ const FAULT_RENDER = -2;
 export const MAX_BOOT_RETRIES = 3;
 const BOOT_RETRY_DELAY_MS = 250;
 
+/** @param {ReturnType<typeof setTimeout>} timer */
+function unrefTimer(timer) {
+  const nodeTimer = /** @type {{unref?: () => void}} */ (
+    /** @type {unknown} */ (timer));
+  nodeTimer.unref?.();
+}
+
 /**
  * Best-effort prime of the worker module graph's HTTP cache and keep-alive
  * connection before a pool spawn, so the burst of cold concurrent worker fetches
@@ -98,11 +105,11 @@ export class SegmentController {
    * Wire the controller to the host's reassignable engine/view via lazy getters.
    * @param {Object} deps - Host-injected dependencies.
    * @param {Object<string, {w:number, h:number}>} deps.resolutionPresets - Resolution table mapping a preset name to its pixel dimensions.
-   * @param {Object} deps.appState - Pub/sub state; reads the 'resolution' and 'effect' keys.
-   * @param {function(): (Object|null)} deps.getWasmEngine - Returns the current main-thread HolosphereEngine, or null when none is bound.
-   * @param {Function} deps.refreshPixelView - Re-fetches the (possibly detached) WASM pixel view.
-   * @param {function(): (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
-   * @param {function(Uint16Array): void} [deps.repointDisplayAliases] - Re-points both display aliases (Three.js instanceColor + Daydream.pixels) at the given view; defaults to re-pointing Daydream.pixels only.
+   * @param {{get: (key: string) => any, set: (key: string, value: any) => void}} deps.appState - Pub/sub state; reads the 'resolution' and 'effect' keys.
+   * @param {() => ({getParameterDefinitions: () => Array<{name: string, value: number|boolean}>}|null)} deps.getWasmEngine - Returns the current main-thread HolosphereEngine, or null when none is bound.
+   * @param {() => unknown} deps.refreshPixelView - Re-fetches the (possibly detached) WASM pixel view.
+   * @param {() => (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
+   * @param {(view: Uint16Array) => void} [deps.repointDisplayAliases] - Re-points both display aliases (Three.js instanceColor + Daydream.pixels) at the given view; defaults to re-pointing Daydream.pixels only.
    * @param {Document} [deps.statsDoc] - DOM document the stats overlay renders into; defaults to the global `document`.
    */
   constructor({ resolutionPresets, appState, getWasmEngine, refreshPixelView,
@@ -363,7 +370,7 @@ export class SegmentController {
             this.retryTimer = null;
             if (this.active) this.create(this.count, next);
           }, BOOT_RETRY_DELAY_MS);
-          if (typeof this.retryTimer.unref === 'function') this.retryTimer.unref();
+          unrefTimer(this.retryTimer);
           return;
         }
         const detail = e?.message
@@ -410,7 +417,7 @@ export class SegmentController {
           + `failed to load (commonly a missing or renamed holosphere_wasm.js)`);
       }
     }, BOOT_WATCHDOG_MS);
-    if (typeof this.bootWatchdog.unref === 'function') this.bootWatchdog.unref();
+    unrefTimer(this.bootWatchdog);
 
     this.clearInitWatchdog();
     this.initWatchdog = setTimeout(() => {
@@ -423,8 +430,7 @@ export class SegmentController {
           + `— a WASM module likely failed to load without throwing`);
       }
     }, INIT_WATCHDOG_MS);
-    // unref() exists under Node (keep the test process from hanging), not the browser.
-    if (typeof this.initWatchdog.unref === 'function') this.initWatchdog.unref();
+    unrefTimer(this.initWatchdog);
 
     console.log(`[Segmented] Spawning ${numSegments} workers...`);
   }
@@ -492,7 +498,7 @@ export class SegmentController {
           + `segments responded) — a worker accepted 'render' but stopped progressing`);
       }
     }, RENDER_WATCHDOG_MS);
-    if (typeof this.renderWatchdog.unref === 'function') this.renderWatchdog.unref();
+    unrefTimer(this.renderWatchdog);
   }
 
   /**

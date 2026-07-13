@@ -245,7 +245,8 @@ async function handleMessage(msg) {
       // Fail fast on protocol drift: a state-changing message dropped here would
       // leave the worker rendering stale under the current generation, invisible
       // to the fence. Throwing reaches onerror -> the controller faults.
-      throw new Error(`segment_worker: unknown message type ${msg.type}`);
+      throw new Error(`segment_worker: unknown message type ${
+        (/** @type {{type?: unknown}} */ (msg)).type}`);
   }
 }
 
