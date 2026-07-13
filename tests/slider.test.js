@@ -14,7 +14,9 @@ const fakeInput = () => ({
 });
 
 /** A fake span element. */
-const fakeSpan = () => ({ id: '', className: '', textContent: '' });
+const fakeElement = (tag) => ({
+  tagName: tag.toUpperCase(), id: '', htmlFor: '', className: '', textContent: '',
+});
 
 /** A fake container collecting appended children. */
 const fakeContainer = () => ({
@@ -29,7 +31,7 @@ beforeEach(() => {
   container = fakeContainer();
   globalThis.document = {
     getElementById: () => container,
-    createElement: (tag) => (tag === 'input' ? fakeInput() : fakeSpan()),
+    createElement: (tag) => (tag === 'input' ? fakeInput() : fakeElement(tag)),
   };
 });
 
@@ -90,4 +92,6 @@ test('builds a slider, scaling bounds and rounding the step to integer units', (
   assert.equal(slider.value, '50');
   assert.equal(valueSpan.textContent, '5.0');
   assert.equal(container.children.length, 3);
+  assert.equal(container.children[0].tagName, 'LABEL');
+  assert.equal(container.children[0].htmlFor, slider.id);
 });

@@ -122,6 +122,13 @@
       box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
     }
 
+    .thumb-btn:focus-visible,
+    .saved-restore:focus-visible,
+    .move-op-btn:focus-visible {
+      outline: 2px solid var(--blue-500);
+      outline-offset: 2px;
+    }
+
     .thumb-btn img {
       height: 60%;
       object-fit: contain;
@@ -177,6 +184,9 @@
     }
 
     .drag-handle {
+      border: 0;
+      padding: 0;
+      background: transparent;
       cursor: grab;
       display: flex;
       align-items: center;
@@ -202,6 +212,17 @@
       width: 0.8rem;
       height: 0.8rem;
       fill: currentColor;
+    }
+
+    .move-op-btn {
+      color: var(--slate-500);
+      font-size: 0.7rem;
+      line-height: 1;
+      padding: 0.15rem;
+    }
+
+    .move-op-btn:disabled {
+      opacity: 0.3;
     }
 
     #saveBtn {
@@ -275,9 +296,14 @@
       border-radius: 0.5rem;
       padding: 0.5rem;
       margin-bottom: 0.75rem;
-      cursor: pointer;
       transition: all 0.2s;
       position: relative;
+    }
+
+    .saved-restore {
+      display: block;
+      width: 100%;
+      text-align: left;
     }
 
     .saved-item:hover {
@@ -401,7 +427,8 @@
           All</button>
       </div>
       <!-- Gate feedback: why the last op/reorder/base change was rejected. -->
-      <div id="opGateMsg" class="text-[0.6rem] text-amber-400 h-3 leading-3"></div>
+      <div id="opGateMsg" class="text-[0.6rem] text-amber-400 h-3 leading-3"
+        role="status" aria-atomic="true"></div>
       <!-- Add-operation buttons carry the op name in data-op; a single delegated
            click listener (wired in init) dispatches to addOp, so no handler is
            pinned to window. -->
@@ -459,7 +486,7 @@
             class="hidden md:block font-mono text-[0.6rem] text-slate-500 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700 whitespace-nowrap">
           </div>
         </div>
-        <button id="saveBtn" title="Save to Collection">
+        <button id="saveBtn" type="button" title="Save to Collection" aria-label="Save solid to collection">
           <!-- Star Icon -->
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
             <polygon
@@ -471,7 +498,7 @@
       <canvas id="canvas" class="w-full h-full block" role="img" aria-label="Real-time 3D preview of the polyhedral solid"></canvas>
     </div>
 
-    <div id="footer">
+    <div id="footer" role="group" aria-label="Base solids">
       <!-- Dynamic Thumbnails -->
     </div>
   </div>
@@ -482,7 +509,7 @@
       <button id="clearSavedBtn"
         class="text-xs text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear All</button>
     </div>
-    <div id="savedList" class="flex-1 overflow-y-auto">
+    <div id="savedList" class="flex-1 overflow-y-auto" role="region" aria-label="Saved solids">
       <!-- Saved items go here -->
     </div>
 
@@ -492,33 +519,33 @@
       <label class="text-xs uppercase font-semibold text-slate-400">Visualization</label>
 
       <div class="flex items-center justify-between">
-        <span class="text-sm">Geodesic Edges</span>
-        <button id="toggleGeo" class="toggle-switch is-on" role="switch" aria-checked="true" aria-label="Geodesic Edges"><div class="toggle-knob"></div></button>
+        <label for="toggleGeo" class="text-sm">Geodesic Edges</label>
+        <button id="toggleGeo" type="button" class="toggle-switch is-on" role="switch" aria-checked="true"><div class="toggle-knob"></div></button>
       </div>
 
       <div class="flex items-center justify-between">
-        <span class="text-sm">Show Faces</span>
-        <button id="toggleFaces" class="toggle-switch is-on" role="switch" aria-checked="true" aria-label="Show Faces"><div class="toggle-knob"></div></button>
+        <label for="toggleFaces" class="text-sm">Show Faces</label>
+        <button id="toggleFaces" type="button" class="toggle-switch is-on" role="switch" aria-checked="true"><div class="toggle-knob"></div></button>
       </div>
 
       <div class="flex items-center justify-between">
-        <span class="text-sm">Colorize Faces</span>
-        <button id="toggleColorize" class="toggle-switch" role="switch" aria-checked="false" aria-label="Colorize Faces"><div class="toggle-knob"></div></button>
+        <label for="toggleColorize" class="text-sm">Colorize Faces</label>
+        <button id="toggleColorize" type="button" class="toggle-switch" role="switch" aria-checked="false"><div class="toggle-knob"></div></button>
       </div>
 
       <div class="flex items-center justify-between">
-        <span class="text-sm">Show Vertices</span>
-        <button id="toggleVerts" class="toggle-switch" role="switch" aria-checked="false" aria-label="Show Vertices"><div class="toggle-knob"></div></button>
+        <label for="toggleVerts" class="text-sm">Show Vertices</label>
+        <button id="toggleVerts" type="button" class="toggle-switch" role="switch" aria-checked="false"><div class="toggle-knob"></div></button>
       </div>
 
       <div class="flex items-center justify-between">
-        <span class="text-sm">Show Normals</span>
-        <button id="toggleNormals" class="toggle-switch" role="switch" aria-checked="false" aria-label="Show Normals"><div class="toggle-knob"></div></button>
+        <label for="toggleNormals" class="text-sm">Show Normals</label>
+        <button id="toggleNormals" type="button" class="toggle-switch" role="switch" aria-checked="false"><div class="toggle-knob"></div></button>
       </div>
 
       <div class="flex items-center justify-between">
-        <span class="text-sm">Show Indices</span>
-        <button id="toggleIndices" class="toggle-switch" role="switch" aria-checked="false" aria-label="Show Indices"><div class="toggle-knob"></div></button>
+        <label for="toggleIndices" class="text-sm">Show Indices</label>
+        <button id="toggleIndices" type="button" class="toggle-switch" role="switch" aria-checked="false"><div class="toggle-knob"></div></button>
       </div>
     </div>
   </div>
@@ -771,32 +798,32 @@
       // Toggles
       // These toggles change only how the cached mesh is presented, so they
       // redraw via renderMesh() instead of update() — no WASM op-chain replay.
-      document.getElementById('toggleGeo').parentElement.addEventListener('click', () => {
+      document.getElementById('toggleGeo').addEventListener('click', () => {
         state.showGeodesics = !state.showGeodesics;
         updateToggles();
         renderMesh();
       });
-      document.getElementById('toggleFaces').parentElement.addEventListener('click', () => {
+      document.getElementById('toggleFaces').addEventListener('click', () => {
         state.showFaces = !state.showFaces;
         updateToggles();
         renderMesh();
       });
-      document.getElementById('toggleColorize').parentElement.addEventListener('click', () => {
+      document.getElementById('toggleColorize').addEventListener('click', () => {
         state.colorizeFaces = !state.colorizeFaces;
         updateToggles();
         renderMesh();
       });
-      document.getElementById('toggleVerts').parentElement.addEventListener('click', () => {
+      document.getElementById('toggleVerts').addEventListener('click', () => {
         state.showVertices = !state.showVertices;
         updateToggles();
         renderMesh();
       });
-      document.getElementById('toggleNormals').parentElement.addEventListener('click', () => {
+      document.getElementById('toggleNormals').addEventListener('click', () => {
         state.showNormals = !state.showNormals;
         updateToggles();
         renderMesh();
       });
-      document.getElementById('toggleIndices').parentElement.addEventListener('click', () => {
+      document.getElementById('toggleIndices').addEventListener('click', () => {
         state.showIndices = !state.showIndices;
         updateToggles();
         renderMesh();
@@ -964,8 +991,10 @@
         offRenderer.render(offScene, offCamera);
 
         // Create Button
-        const btn = document.createElement('div');
+        const btn = document.createElement('button');
+        btn.type = 'button';
         btn.className = `thumb-btn ${state.base === key ? 'active' : ''}`;
+        btn.setAttribute('aria-pressed', state.base === key ? 'true' : 'false');
         btn.dataset.solid = key; // identify the base so restoreSolid can re-highlight it
         btn.onclick = () => {
           queueCommit(async () => {
@@ -979,12 +1008,16 @@
             update();
             renderBaseSolid();
             // Update active state
-            document.querySelectorAll('.thumb-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+            document.querySelectorAll('.thumb-btn').forEach(b => {
+              const selected = b === btn;
+              b.classList.toggle('active', selected);
+              b.setAttribute('aria-pressed', selected ? 'true' : 'false');
+            });
           });
         };
 
         const img = document.createElement('img');
+        img.alt = '';
         const dataURL = offRenderer.domElement.toDataURL();
         img.src = dataURL;
         baseThumbnails[key] = dataURL;
@@ -1117,38 +1150,36 @@
         // wired below via addEventListener so deleteSolid/copyCode stay module-
         // scoped (no window.* globals) and no handler-bearing string is parsed.
         el.innerHTML = `
-          <button class="action-btn del-btn absolute top-2 right-2 flex items-center justify-center w-5 h-5 text-sm">&times;</button>
-          <img src="${item.thumb}" alt="${item.title}" />
-          <div class="flex justify-between items-start mt-1">
-            <div class="title capitalize">${item.title}</div>
-            <div class="text-[0.55rem] font-mono text-indigo-400 opacity-60">${item.stats}</div>
-          </div>
-          <div class="details uppercase opacity-70">${item.desc}</div>
+          <button type="button" class="action-btn del-btn absolute top-2 right-2 flex items-center justify-center w-5 h-5 text-sm">&times;</button>
+          <button type="button" class="saved-restore">
+            <img src="${item.thumb}" alt="" />
+            <span class="flex justify-between items-start mt-1">
+              <span class="title capitalize">${item.title}</span>
+              <span class="text-[0.55rem] font-mono text-indigo-400 opacity-60">${item.stats}</span>
+            </span>
+            <span class="details block uppercase opacity-70">${item.desc}</span>
+          </button>
           <div class="saved-actions">
             <div class="flex flex-col gap-1 w-full">
               <div class="flex gap-1 justify-end">
                 <span class="text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1">Recipe</span>
-                <button class="action-btn" data-copy="recipe_cpp">C++</button>
+                <button type="button" class="action-btn" data-copy="recipe_cpp" aria-label="Copy recipe C++">C++</button>
               </div>
               <div class="flex gap-1 justify-end">
                 <span class="text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1">Registry</span>
-                <button class="action-btn" data-copy="registry">C++</button>
+                <button type="button" class="action-btn" data-copy="registry" aria-label="Copy registry C++">C++</button>
               </div>
             </div>
           </div>
         `;
-        el.onclick = () => restoreSolid(item);
-
-        // stopPropagation on the action controls so they don't also trigger the
-        // card's restore click (previously inline `event.stopPropagation()`).
-        el.querySelector('.del-btn').addEventListener('click', (e) => {
-          e.stopPropagation();
+        el.querySelector('.saved-restore').addEventListener('click', () => restoreSolid(item));
+        const deleteButton = el.querySelector('.del-btn');
+        deleteButton.setAttribute('aria-label', `Delete ${item.title}`);
+        deleteButton.addEventListener('click', () => {
           deleteSolid(index);
         });
-        el.querySelector('.saved-actions').addEventListener('click', (e) => e.stopPropagation());
         el.querySelectorAll('[data-copy]').forEach((btn) => {
-          btn.addEventListener('click', (e) => {
-            e.stopPropagation();
+          btn.addEventListener('click', () => {
             copyCode(index, btn.dataset.copy, btn);
           });
         });
@@ -1223,7 +1254,9 @@
 
       // Highlight active base in footer
       document.querySelectorAll('.thumb-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.solid === state.base);
+        const selected = b.dataset.solid === state.base;
+        b.classList.toggle('active', selected);
+        b.setAttribute('aria-pressed', selected ? 'true' : 'false');
       });
 
       update();
@@ -1247,6 +1280,26 @@
       const [m] = next.splice(from, 1);
       next.splice(to, 0, m);
       return next;
+    }
+
+    function reorderOp(from, to) {
+      if (to < 0 || to >= state.ops.length || from === to) return;
+      const opName = state.ops[from].op;
+      queueCommit(async () => {
+        const candidate = movedOps(state.ops, from, to);
+        if (!(await chainIsValid(state.base, candidate))) {
+          showGateMsg(GATE_REASON);
+          return;
+        }
+        state.ops = candidate;
+        renderOps();
+        update();
+        showGateMsg(`moved ${opName} to position ${to + 1}`);
+        const movedItem = document.getElementById('opsList').children[to];
+        const focusTarget = [...movedItem.querySelectorAll('.move-op-btn')]
+          .find(button => !button.disabled);
+        focusTarget?.focus();
+      });
     }
 
     // Which raw drop slots (getDragTargetIndex values) yield an engine-valid
@@ -1402,19 +1455,21 @@
           Object.keys(opDef.params).forEach(key => {
             const def = opDef.params[key];
             const val = o.params[key];
+            const controlId = `op-${i}-${key}`;
             // data-key tags the row; the inputs are wired via addEventListener
             // after innerHTML (no inline oninput/onchange/onmousedown attrs).
             controlsHtml += `
               <div class="op-param flex items-center text-[0.6rem] space-x-1" data-key="${key}" draggable="false">
-                <span class="w-12 text-slate-400 capitalize truncate">${key}</span>
-                <input type="range"
+                <label for="${controlId}-range" class="w-12 text-slate-400 capitalize truncate">${key}</label>
+                <input type="range" id="${controlId}-range"
                   min="${def.min}" max="${def.max}" step="${def.step}" value="${val}"
                   class="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer min-w-0"
                 />
-                <input type="number" min="${def.min}" max="${def.max}" step="${def.step}" value="${Number(val).toFixed(2)}"
+                <input type="number" aria-label="${o.op} ${key} value"
+                  min="${def.min}" max="${def.max}" step="${def.step}" value="${Number(val).toFixed(2)}"
                   class="w-12 bg-transparent text-right font-mono text-slate-500 focus:outline-none focus:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
-                <span class="text-[0.5rem] text-slate-600 ml-0.5">${key === 'angle' ? 'deg' : ''}</span>
+                <span class="text-[0.5rem] text-slate-600 ml-0.5" aria-hidden="true">${key === 'angle' ? 'deg' : ''}</span>
               </div>
                          `;
           });
@@ -1427,9 +1482,12 @@
             <div class="drag-handle">
               <svg viewBox="0 0 24 24"><path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
             </div>
+            <button type="button" class="move-op-btn move-op-up" aria-label="Move ${o.op} up" ${i === 0 ? 'disabled' : ''}>↑</button>
+            <button type="button" class="move-op-btn move-op-down" aria-label="Move ${o.op} down" ${i === state.ops.length - 1 ? 'disabled' : ''}>↓</button>
             <span class="font-bold">${i + 1}. ${o.op.toUpperCase()}</span>
           </div>
-          <button class="remove-op-btn text-slate-500 hover:text-white" draggable="false">&times;</button>
+          <button type="button" class="remove-op-btn text-slate-500 hover:text-white"
+            aria-label="Remove ${o.op} at position ${i + 1}" draggable="false">&times;</button>
         </div>
         ${controlsHtml}
       `;
@@ -1439,6 +1497,8 @@
         const handle = el.querySelector('.drag-handle');
         handle.addEventListener('mousedown', enableDrag);
         handle.addEventListener('touchstart', enableDrag);
+        el.querySelector('.move-op-up').addEventListener('click', () => reorderOp(i, i - 1));
+        el.querySelector('.move-op-down').addEventListener('click', () => reorderOp(i, i + 1));
         el.querySelector('.remove-op-btn').addEventListener('click', () => removeOp(i));
         el.querySelectorAll('.op-param').forEach((row) => {
           const key = row.dataset.key;

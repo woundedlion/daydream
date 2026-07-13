@@ -223,18 +223,18 @@
 
         <!-- Base Hue -->
         <div class="param-group space-y-4 col-span-1">
-          <h3 class="text-lg font-bold text-blue-400">Base Hue</h3>
+          <label for="gen_seed_slider" class="block text-lg font-bold text-blue-400">Base Hue</label>
           <p class="text-xs text-gray-400">Base color (0-255).</p>
           <div class="flex items-center space-x-2">
-            <span class="w-4 h-4 text-center font-bold text-blue-500">H</span>
-            <input type="range" id="gen_seed_slider" aria-label="Base hue" min="0" max="255" step="1" value="42" class="b-thumb">
+            <span class="w-4 h-4 text-center font-bold text-blue-500" aria-hidden="true">H</span>
+            <input type="range" id="gen_seed_slider" min="0" max="255" step="1" value="42" class="b-thumb">
             <span id="gen_seed_value" class="slider-label w-12 text-right">42</span>
           </div>
         </div>
 
         <!-- Harmony Type -->
         <div class="param-group space-y-4 col-span-1">
-          <h3 class="text-lg font-bold text-green-400">Harmony Type</h3>
+          <label for="gen_harmony" class="block text-lg font-bold text-green-400">Harmony Type</label>
           <p class="text-xs text-gray-400">Color relationship.</p>
           <select id="gen_harmony" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
             <option value="ANALOGOUS">Analogous</option>
@@ -246,7 +246,7 @@
 
         <!-- Saturation Profile -->
         <div class="param-group space-y-4 col-span-1">
-          <h3 class="text-lg font-bold text-yellow-400">Saturation</h3>
+          <label for="gen_saturation" class="block text-lg font-bold text-yellow-400">Saturation</label>
           <p class="text-xs text-gray-400">Color intensity.</p>
           <select id="gen_saturation" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
             <option value="MID">Mid</option>
@@ -257,7 +257,7 @@
 
         <!-- Brightness Profile -->
         <div class="param-group space-y-4 col-span-1">
-          <h3 class="text-lg font-bold text-red-400">Brightness</h3>
+          <label for="gen_brightness" class="block text-lg font-bold text-red-400">Brightness</label>
           <p class="text-xs text-gray-400">Luminance distribution.</p>
           <select id="gen_brightness" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
             <option value="FLAT">Flat</option>
@@ -270,7 +270,7 @@
 
         <!-- Gradient Shape -->
         <div class="param-group space-y-4 col-span-1">
-          <h3 class="text-lg font-bold text-purple-400">Gradient Shape</h3>
+          <label for="gen_shape" class="block text-lg font-bold text-purple-400">Gradient Shape</label>
           <p class="text-xs text-gray-400">Spatial distribution.</p>
           <select id="gen_shape" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
             <option value="STRAIGHT">Straight</option>
@@ -315,24 +315,26 @@
         <!-- This flex container puts swatch and controls side-by-side -->
         <div class="flex flex-col sm:flex-row gap-4">
           <!-- Swatch -->
-          <div id="colorSwatch" class="w-full sm:w-1/2 h-32 rounded-lg border-4 border-slate-700 shadow-inner"
+          <button type="button" id="colorSwatch"
+            class="w-full sm:w-1/2 h-32 rounded-lg border-4 border-slate-700 shadow-inner"
+            aria-label="Copy current color as hexadecimal" aria-describedby="hex_value copy_prompt"
             title="Click to copy Hex code">
             <!-- Background color is set by JS -->
-          </div>
+          </button>
 
           <!-- Animation Controls -->
           <div class="w-full sm:w-1/2 space-y-3">
             <h3 class="text-lg font-bold text-indigo-400">Global Phase Speed (Cycles/s)</h3>
             <div class="flex items-center space-x-2">
-              <span id="speed-label" class="w-12 text-gray-400">Speed:</span>
-              <input type="range" id="speed_slider" aria-labelledby="speed-label" min="0" max="2000" step="1" value="300" class="w-full speed-thumb">
+              <label for="speed_slider" id="speed-label" class="w-12 text-gray-400">Speed:</label>
+              <input type="range" id="speed_slider" min="0" max="2000" step="1" value="300" class="w-full speed-thumb">
               <span id="speed_value" class="slider-label w-16 text-right">0.300</span>
             </div>
             <p class="text-sm text-gray-400">Current Phase (t): <span id="t_value"
                 class="font-mono text-white">0.000</span></p>
             <p class="text-sm text-gray-400">Current Color:
               <span id="hex_value" class="font-mono text-white">#000000</span>
-              <span id="copy_prompt" class="ml-2 text-gray-500 transition-colors duration-300">(Click
+              <span id="copy_prompt" class="ml-2 text-gray-500 transition-colors duration-300" role="status">(Click
                 swatch to copy)</span>
             </p>
           </div>
@@ -349,7 +351,7 @@
           </button>
         </div>
         <p class="text-sm text-gray-400">Copy the parameter vectors for use in other tools or scripts.
-          <span id="copy_code_prompt" class="ml-2 text-sm text-gray-500 transition-colors duration-300"></span>
+          <span id="copy_code_prompt" class="ml-2 text-sm text-gray-500 transition-colors duration-300" role="status"></span>
         </p>
         <pre class="bg-slate-900 p-4 rounded-lg border border-slate-700 overflow-x-auto">
 <code id="palette_code_output" class="font-mono text-sm text-slate-300 whitespace-pre">
@@ -499,7 +501,7 @@
 
       container.innerHTML = `
       <div class="flex items-center space-x-2">
-        <span class="w-4 h-4 text-center font-bold text-${def.color}">${def.label}</span>
+        <label for="${def.param}_slider" class="w-4 h-4 text-center font-bold text-${def.color}">${def.label}</label>
         <input type="range" id="${def.param}_slider" min="${def.min}" max="${def.max}" step="${def.step}" value="${value}" class="${def.thumb}">
         <span id="${def.param}_value" class="slider-label w-16 text-right">${parameters[def.param].toFixed(3)}</span>
       </div>

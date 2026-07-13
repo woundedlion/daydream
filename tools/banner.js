@@ -25,6 +25,7 @@ export function showFatalError(message) {
   const existing = document.getElementById('fatal-error-overlay');
   const el = existing || document.createElement('div');
   el.id = 'fatal-error-overlay';
+  el.setAttribute('role', 'alert');
   el.textContent = `⚠ ${message}`; // textContent, not innerHTML — no injection
   Object.assign(el.style, {
     position: 'fixed', top: '0', left: '0', right: '0', zIndex: '9999',
