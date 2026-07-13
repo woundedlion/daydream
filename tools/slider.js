@@ -76,9 +76,10 @@ export function createSlider(containerId, cfg, onInput) {
 
   container.replaceChildren();
 
-  const labelSpan = document.createElement('span');
-  labelSpan.className = labelClass;
-  labelSpan.textContent = `${label}:`;
+  const labelElement = document.createElement('label');
+  labelElement.htmlFor = sliderId;
+  labelElement.className = labelClass;
+  labelElement.textContent = `${label}:`;
 
   const roundedValue = Math.round(clampedValue * scale);
 
@@ -96,7 +97,7 @@ export function createSlider(containerId, cfg, onInput) {
   valueSpan.className = valueClass;
   valueSpan.textContent = (roundedValue / scale).toFixed(decimals);
 
-  container.append(labelSpan, slider, valueSpan);
+  container.append(labelElement, slider, valueSpan);
 
   if (onInput) {
     slider.addEventListener('input', () => {

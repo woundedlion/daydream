@@ -26,7 +26,10 @@ function fakeDocument({ body = true, documentElement = false } = {}) {
   globalThis.document = {
     getElementById: (id) => byId.get(id) || null,
     createElement: () => {
-      const el = { id: '', textContent: '', style: {} };
+      const el = {
+        id: '', textContent: '', style: {}, attributes: {},
+        setAttribute(name, value) { this.attributes[name] = value; },
+      };
       created.push(el);
       return el;
     },
@@ -44,6 +47,7 @@ test('showFatalError appends one banner carrying the message as textContent', ()
   assert.equal(bodyEl.children.length, 1);
   const el = bodyEl.children[0];
   assert.equal(el.id, 'fatal-error-overlay');
+  assert.equal(el.attributes.role, 'alert');
   assert.equal(el.textContent, '⚠ engine failed to load');
 });
 
