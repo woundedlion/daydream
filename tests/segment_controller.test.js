@@ -16,6 +16,37 @@ mock.module('../driver.js', {
 const { SegmentController, MAX_BOOT_RETRIES } = await import('../segment_controller.js');
 const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
 
+const EXPECTED_CONSOLE_MESSAGES = {
+  log: [
+    /^\[Segmented\] Spawning \d+ workers\.\.\.$/,
+    /^\[Segmented\] All \d+ workers ready$/,
+  ],
+  warn: [
+    /^\[Segmented\] seg \d+ module failed to load \(attempt \d+\/\d+\); rebuilding pool$/,
+    /^\[Segmented\] additional worker fault \(seg -?\d+\): /,
+  ],
+  error: [
+    /^\[Segmented\] Worker seg \d+ error:/,
+    /^\[Segmented\] Worker seg \d+ message deserialization failed$/,
+    /^SegmentController\.composite: display-buffer alias diverged /,
+  ],
+};
+const PASSTHROUGH_CONSOLE_MESSAGES = {
+  error: [/^\(node:\d+\) ExperimentalWarning: Module mocking is an experimental feature/],
+};
+const originalConsole = Object.fromEntries(
+  Object.keys(EXPECTED_CONSOLE_MESSAGES)
+    .map((method) => [method, console[method].bind(console)]),
+);
+const capturedConsole = [];
+const consoleMocks = Object.keys(EXPECTED_CONSOLE_MESSAGES)
+  .map((method) => mock.method(console, method, (...args) => {
+    capturedConsole.push({ method, args });
+    const expected = EXPECTED_CONSOLE_MESSAGES[method]
+      .some((pattern) => pattern.test(String(args[0])));
+    if (!expected) originalConsole[method](...args);
+  }));
+
 // ---------------------------------------------------------------------------
 // Fakes
 // ---------------------------------------------------------------------------
@@ -98,8 +129,21 @@ const restoreGlobal = (key, val) => {
   else globalThis[key] = val;
 };
 after(() => {
+  for (const stub of consoleMocks) stub.mock.restore();
   restoreGlobal('Worker', savedGlobals.Worker);
   restoreGlobal('document', savedGlobals.document);
+
+  const unexpected = capturedConsole.filter(({ method, args }) => {
+    const message = String(args[0]);
+    return !EXPECTED_CONSOLE_MESSAGES[method].some((pattern) => pattern.test(message))
+      && !(PASSTHROUGH_CONSOLE_MESSAGES[method] ?? [])
+        .some((pattern) => pattern.test(message));
+  });
+  assert.deepEqual(
+    unexpected.map(({ method, args }) => `${method}: ${args.map(String).join(' ')}`),
+    [],
+    'unexpected console diagnostics',
+  );
 });
 
 globalThis.Worker = FakeWorker;
