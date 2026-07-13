@@ -276,8 +276,14 @@ export class SegmentController {
     const initialParams = this.snapshotParams();
 
     for (let i = 0; i < numSegments; i++) {
-      const worker = new Worker(new URL('./segment_worker.js', import.meta.url),
-        { type: 'module' });
+      let worker;
+      try {
+        worker = new Worker(new URL('./segment_worker.js', import.meta.url),
+          { type: 'module' });
+      } catch (error) {
+        this.abortWorkerStartup(i, 'construction', error);
+        return;
+      }
 
       worker.onmessage = (e) => {
         const msg = /** @type {ControllerInboundMsg} */ (e.data);
@@ -373,19 +379,23 @@ export class SegmentController {
         this.onWorkerFault(i, 'message deserialization failed');
       };
 
-      this.post(worker, {
-        type: 'init',
-        version: PROTOCOL_VERSION,
-        segId: i,
-        totalSegs: numSegments,
-        w: res.w,
-        h: res.h,
-        effectName: this.appState.get('effect'),
-        params: initialParams,
-        paused: this.animationsPaused,
-      });
-
       this.workers.push(worker);
+      try {
+        this.post(worker, {
+          type: 'init',
+          version: PROTOCOL_VERSION,
+          segId: i,
+          totalSegs: numSegments,
+          w: res.w,
+          h: res.h,
+          effectName: this.appState.get('effect'),
+          params: initialParams,
+          paused: this.animationsPaused,
+        });
+      } catch (error) {
+        this.abortWorkerStartup(i, 'initialization', error);
+        return;
+      }
     }
 
     this.clearBootWatchdog();
@@ -417,6 +427,21 @@ export class SegmentController {
     if (typeof this.initWatchdog.unref === 'function') this.initWatchdog.unref();
 
     console.log(`[Segmented] Spawning ${numSegments} workers...`);
+  }
+
+  /** Terminate a partially-created pool and latch its synchronous startup failure. */
+  abortWorkerStartup(segId, phase, error) {
+    for (const worker of this.workers) {
+      worker.onmessage = null;
+      worker.onerror = null;
+      worker.onmessageerror = null;
+      worker.terminate();
+    }
+    this.workers = [];
+    const detail = error instanceof Error
+      ? `${error.name}: ${error.message}`
+      : String(error);
+    this.onWorkerFault(segId, `worker ${phase} failed: ${detail}`);
   }
 
   /** Cancel the init watchdog if one is pending. Idempotent. */
