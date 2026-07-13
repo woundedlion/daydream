@@ -40,6 +40,19 @@ export function runSwitchTransaction(apply, rollback) {
 }
 
 /**
+ * Apply the initial resolution/effect state before dismissing the loader.
+ * @param {Function} apply - Applies initial state; false means rejected.
+ * @param {Function} onSuccess - Runs only after the initial state applies.
+ * @returns {void}
+ */
+export function applyInitialState(apply, onSuccess) {
+  if (apply() === false) {
+    throw new Error('Initial resolution/effect initialization was rejected.');
+  }
+  onSuccess();
+}
+
+/**
  * Plan how applyResolution() should re-apply the effect after a resolution
  * change. The requested effect is kept when the new resolution offers it, else
  * corrected to the list's first entry (resolveActiveEffect). When that correction
