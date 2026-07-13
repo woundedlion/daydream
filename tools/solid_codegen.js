@@ -204,3 +204,51 @@ export function computeInternalAngle(mesh) {
   const cos = Math.min(1, Math.max(-1, dot / (len1 * len2)));
   return Math.acos(cos);
 }
+
+/**
+ * Tests whether an ordered planar face has a consistent turn direction.
+ *
+ * @param {Array<{x:number, y:number, z:number}>} vertices - Mesh vertices.
+ * @param {Array<number>} face - Ordered vertex indices for one face.
+ * @returns {boolean} True when the face is convex or has fewer than four vertices.
+ */
+export function isConvexFace(vertices, face) {
+  if (face.length < 4) return true;
+
+  let nx = 0;
+  let ny = 0;
+  let nz = 0;
+  for (let i = 0; i < face.length; i++) {
+    const a = vertices[face[i]];
+    const b = vertices[face[(i + 1) % face.length]];
+    nx += (a.y - b.y) * (a.z + b.z);
+    ny += (a.z - b.z) * (a.x + b.x);
+    nz += (a.x - b.x) * (a.y + b.y);
+  }
+
+  const normalLengthSquared = nx * nx + ny * ny + nz * nz;
+  if (normalLengthSquared === 0) return true;
+  const tolerance = normalLengthSquared * 1e-12;
+  let turnSign = 0;
+
+  for (let i = 0; i < face.length; i++) {
+    const a = vertices[face[i]];
+    const b = vertices[face[(i + 1) % face.length]];
+    const c = vertices[face[(i + 2) % face.length]];
+    const abx = b.x - a.x;
+    const aby = b.y - a.y;
+    const abz = b.z - a.z;
+    const bcx = c.x - b.x;
+    const bcy = c.y - b.y;
+    const bcz = c.z - b.z;
+    const turn = (aby * bcz - abz * bcy) * nx
+      + (abz * bcx - abx * bcz) * ny
+      + (abx * bcy - aby * bcx) * nz;
+    if (Math.abs(turn) <= tolerance) continue;
+    const sign = Math.sign(turn);
+    if (turnSign !== 0 && sign !== turnSign) return false;
+    turnSign = sign;
+  }
+
+  return true;
+}
