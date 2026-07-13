@@ -79,6 +79,7 @@
       width: 100%;
       height: 100px;
       cursor: pointer;
+      touch-action: none;
       /* Indicate it's clickable */
     }
 
@@ -434,6 +435,7 @@
 
     // Drag-to-zoom state
     let isDragging = false;
+    let activePointerId = null;
     let isSelectionActive = false; // Tracks if drag is active AND within Y-bounds
     let dragStartTime = 0.0;
     let dragEndTime = 0.0;
@@ -638,15 +640,11 @@
     }
 
     /**
-         * Helper function to get the normalized (0-1) X coordinate from a mouse event.
+         * Helper function to get the normalized (0-1) X coordinate from a pointer event.
          */
     function getNormalizedX(event) {
       if (!colorStripCanvas) return 0; // Safety check
       const rect = colorStripCanvas.getBoundingClientRect();
-      // The strip is driven by mouse events only (the drag handlers reject
-      // anything without button===0), so read clientX directly. The old
-      // `clientX || touches[0].clientX` fallback both broke at the left edge
-      // (clientX===0 is falsy → NaN) and never fired (no touch listeners).
       const x = event.clientX - rect.left;
       return rect.width > 0 ? Math.max(0, Math.min(1, x / rect.width)) : 0;
     }
@@ -655,39 +653,41 @@
          * Handles the start of a drag or click on the color strip.
          */
     function handleDragStart(event) {
-      // Only trigger on left mouse button
-      if (event.button !== 0 || !colorStripCanvas) return;
+      if (!event.isPrimary || event.button !== 0 || activePointerId !== null || !colorStripCanvas) return;
 
+      activePointerId = event.pointerId;
       isDragging = true;
       isSelectionActive = true; // Selection is active on start
       dragStartTime = getNormalizedX(event);
       dragEndTime = dragStartTime;
       colorStripCanvas.style.cursor = 'crosshair';
+      colorStripCanvas.setPointerCapture(event.pointerId);
+      event.preventDefault();
 
       // Draw the initial state (strip + marker)
       drawColorStrip(animationTime);
     }
 
     /**
-         * Handles mouse movement during a drag.
-         * Cancels drag if the mouse moves above or below the canvas.
+         * Handles pointer movement during a drag.
+         * Cancels selection if the pointer moves above or below the canvas.
          */
     function handleDragMove(event) {
-      if (!isDragging) return;
+      if (!isDragging || event.pointerId !== activePointerId) return;
 
       // Always update the end time, even if off-canvas (for left/right)
       dragEndTime = getNormalizedX(event);
 
-      // Check if mouse is outside the canvas's Y-bounds to deactivate selection
+      // Check if the pointer is outside the canvas's Y-bounds to deactivate selection
       if (colorStripCanvas) { // Safety check
         const rect = colorStripCanvas.getBoundingClientRect();
         const y = event.clientY;
 
         if (y < rect.top || y > rect.bottom) {
-          // Mouse is above or below the canvas, deactivate selection
+          // Pointer is above or below the canvas, deactivate selection
           isSelectionActive = false;
         } else {
-          // Mouse is back inside, reactivate selection
+          // Pointer is back inside, reactivate selection
           isSelectionActive = true;
         }
       }
@@ -700,22 +700,25 @@
          * Handles the end of a drag (zoom) or a simple click (set phase).
          */
     function handleDragEnd(event) {
-      if (!isDragging || !colorStripCanvas) return;
+      if (!isDragging || event.pointerId !== activePointerId || !colorStripCanvas) return;
+
+      handleDragMove(event);
 
       const wasSelectionActive = isSelectionActive; // Store state before reset
 
+      if (colorStripCanvas.hasPointerCapture(event.pointerId)) {
+        colorStripCanvas.releasePointerCapture(event.pointerId);
+      }
+      activePointerId = null;
       isDragging = false;
       isSelectionActive = false; // Reset selection state
       colorStripCanvas.style.cursor = 'pointer';
 
-      // If mouse was released outside Y-bounds, do nothing.
+      // If the pointer was released outside Y-bounds, do nothing.
       if (!wasSelectionActive) {
         drawColorStrip(animationTime); // Redraw to be safe
         return;
       }
-
-      // Use the last known drag position if mouseup is outside canvas
-      // (handleDragMove updates dragEndTime)
 
       const t_start = Math.min(dragStartTime, dragEndTime);
       const t_end = Math.max(dragStartTime, dragEndTime);
@@ -739,6 +742,15 @@
         zoomPalette(t_start, t_end);
         showResetZoomButton();
       }
+    }
+
+    function handleDragCancel(event) {
+      if (!isDragging || event.pointerId !== activePointerId || !colorStripCanvas) return;
+      activePointerId = null;
+      isDragging = false;
+      isSelectionActive = false;
+      colorStripCanvas.style.cursor = 'pointer';
+      drawColorStrip(animationTime);
     }
 
     /**
@@ -1237,9 +1249,10 @@
       });
 
       // 3. Add drag-and-drop listeners
-      colorStripCanvas.addEventListener('mousedown', handleDragStart);
-      document.addEventListener('mousemove', handleDragMove); // Listen on document to drag outside
-      document.addEventListener('mouseup', handleDragEnd); // Listen on document to release outside
+      colorStripCanvas.addEventListener('pointerdown', handleDragStart);
+      colorStripCanvas.addEventListener('pointermove', handleDragMove);
+      colorStripCanvas.addEventListener('pointerup', handleDragEnd);
+      colorStripCanvas.addEventListener('pointercancel', handleDragCancel);
       colorStripCanvas.addEventListener('keydown', handleStripKeyDown); // keyboard parity (a11y)
       updateStripAria(); // seed aria-valuenow
 
@@ -1278,16 +1291,17 @@
         animate(0); // Start the animation loop
       }
 
-      // Stop the RAF loop and detach the document-level drag listeners on
-      // teardown — previously both leaked on page unload (no dispose path).
+      // Stop the RAF loop and detach the strip listeners on teardown.
       window.addEventListener('pagehide', (e) => {
         if (e.persisted) return; // bfcache freeze, not a real discard
         if (animationFrameId !== null) {
           cancelAnimationFrame(animationFrameId);
           animationFrameId = null;
         }
-        document.removeEventListener('mousemove', handleDragMove);
-        document.removeEventListener('mouseup', handleDragEnd);
+        colorStripCanvas.removeEventListener('pointerdown', handleDragStart);
+        colorStripCanvas.removeEventListener('pointermove', handleDragMove);
+        colorStripCanvas.removeEventListener('pointerup', handleDragEnd);
+        colorStripCanvas.removeEventListener('pointercancel', handleDragCancel);
       }, { once: true });
     }
 
