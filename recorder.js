@@ -199,7 +199,7 @@ export class VideoRecorder {
     // session, so the closures bind the per-session chunks/stream/recorder/sink
     // rather than read this.*.
     const chunks = [];
-    const sink = this.openSink(recorder, effectName, chunks);
+    let sink = null;
 
     this.mediaRecorder = recorder;
     this.stream = stream;
@@ -221,7 +221,25 @@ export class VideoRecorder {
 
     // Timeslice so ondataavailable delivers chunks incrementally; without it the
     // encoder buffers the whole recording in memory until stop().
-    recorder.start(RECORDER_TIMESLICE_MS);
+    try {
+      recorder.start(RECORDER_TIMESLICE_MS);
+    } catch (err) {
+      recorder.ondataavailable = null;
+      recorder.onstop = null;
+      this.cleanup();
+      console.error('VideoRecorder: MediaRecorder start failed.', err);
+      return;
+    }
+
+    try {
+      sink = this.openSink(recorder, effectName, chunks);
+    } catch (err) {
+      recorder.ondataavailable = null;
+      recorder.onstop = null;
+      recorder.stop();
+      this.cleanup();
+      console.error('VideoRecorder: output setup failed.', err);
+    }
   }
 
   /**

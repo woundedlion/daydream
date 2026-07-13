@@ -164,6 +164,7 @@ const recordableCanvas = (w = 64, h = 32) => ({
  */
 class FakeMediaRecorder {
   static instances = [];
+  static startError = null;
   static isTypeSupported() { return true; }
   constructor(stream, options) {
     this.stream = stream;
@@ -173,7 +174,10 @@ class FakeMediaRecorder {
     this.onstop = null;
     FakeMediaRecorder.instances.push(this);
   }
-  start() { this.state = 'recording'; }
+  start() {
+    if (FakeMediaRecorder.startError) throw FakeMediaRecorder.startError;
+    this.state = 'recording';
+  }
   stop() { this.state = 'inactive'; }
 }
 
@@ -192,6 +196,7 @@ const installRecorderEnv = () => {
     showSaveFilePicker: globalThis.showSaveFilePicker,
   };
   FakeMediaRecorder.instances = [];
+  FakeMediaRecorder.startError = null;
   globalThis.MediaRecorder = FakeMediaRecorder;
   globalThis.HTMLCanvasElement = class { captureStream() {} };
   globalThis.document = { createElement: () => recordableCanvas() };
@@ -239,6 +244,47 @@ test('start refuses and stays idle when recording is unsupported', () => {
     assert.equal(errs.length, 1);
   } finally {
     console.error = prevErr;
+    restore();
+  }
+});
+
+test('a MediaRecorder start failure releases the entire capture session', () => {
+  const restore = installRecorderEnv();
+  const errors = [];
+  const previousError = console.error;
+  console.error = (...args) => errors.push(args);
+  try {
+    const failure = new Error('codec start rejected');
+    failure.name = 'NotSupportedError';
+    FakeMediaRecorder.startError = failure;
+
+    const rec = new VideoRecorder(recordableCanvas());
+    let sinkOpened = false;
+    rec.openSink = () => { sinkOpened = true; };
+
+    assert.doesNotThrow(() => rec.start('e'));
+
+    const recorder = FakeMediaRecorder.instances[0];
+    assert.equal(recorder.stream.track.stopped, true);
+    assert.equal(recorder.ondataavailable, null);
+    assert.equal(recorder.onstop, null);
+    assert.equal(rec.mediaRecorder, null);
+    assert.equal(rec.stream, null);
+    assert.equal(rec.track, null);
+    assert.deepEqual(rec.chunks, []);
+    assert.equal(rec.offscreen, null);
+    assert.equal(rec.offCtx, null);
+    assert.equal(rec.isRecording, false);
+    assert.equal(sinkOpened, false);
+    assert.ok(errors.some((args) => args.includes(failure)));
+
+    FakeMediaRecorder.startError = null;
+    rec.openSink = () => ({ write() {}, finish() {} });
+    rec.start('retry');
+    assert.equal(rec.isRecording, true);
+    rec.dispose();
+  } finally {
+    console.error = previousError;
     restore();
   }
 });
