@@ -1020,6 +1020,46 @@ test('an init-phase fault still reaches the fault overlay (faulted checked befor
   assert.equal(c.renderInFlight, false, 'no doomed render dispatched');
 });
 
+test('the fault overlay is an alert focused once for recovery', () => {
+  const makeElement = () => {
+    const attributes = new Map();
+    return {
+      style: {},
+      children: [],
+      focusCount: 0,
+      setAttribute(name, value) { attributes.set(name, String(value)); },
+      getAttribute(name) { return attributes.get(name) || null; },
+      append(...children) { this.children.push(...children); },
+      appendChild(child) { this.children.push(child); return child; },
+      replaceChildren(...children) { this.children = children; },
+      focus() { this.focusCount++; },
+      get firstElementChild() {
+        return this.children.find((child) => typeof child === 'object') || null;
+      },
+    };
+  };
+  const stats = makeElement();
+  const c = makeController();
+  c.doc = {
+    getElementById: (id) => id === 'segment-stats' ? stats : null,
+    createElement: makeElement,
+  };
+  c.active = true;
+  c.faulted = true;
+  c.faultInfo = { segId: 0, message: 'boom' };
+
+  c.updateStats();
+
+  const alert = stats.firstElementChild;
+  assert.equal(alert.getAttribute('role'), 'alert');
+  assert.equal(alert.tabIndex, -1);
+  assert.equal(alert.focusCount, 1);
+
+  c.updateStats();
+  assert.equal(stats.firstElementChild, alert);
+  assert.equal(alert.focusCount, 1);
+});
+
 // ---------------------------------------------------------------------------
 // Broadcast paths — setEffect / setParameter / setAnimationsPaused / snapshotParams
 // ---------------------------------------------------------------------------
