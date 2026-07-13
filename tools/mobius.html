@@ -367,8 +367,8 @@
 
           CNum w_prime;
           if (isInfinity) {
-            float c_mag = length(vec2(u_c.re, u_c.im));
-            if (c_mag < 1e-6) w_prime = CNum(100.0, 100.0);
+            float c_mag_sq = u_c.re*u_c.re + u_c.im*u_c.im;
+            if (c_mag_sq < 1e-6) w_prime = CNum(100.0, 100.0);
             else w_prime = cdiv(u_a, u_c);
           } else {
             CNum aw = cmult(u_a, w);
