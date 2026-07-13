@@ -8,13 +8,18 @@ import createHolosphereModule from "./holosphere_wasm.js";
 import { Daydream } from "./driver.js";
 import { GUI, resetGUI } from "gui";
 import { EffectSidebar } from "./sidebar.js";
-import { planResolutionApply, paramValueSkew } from "./effect_sequencing.js";
+import {
+  planResolutionApply,
+  paramValueSkew,
+  runSwitchTransaction,
+} from "./effect_sequencing.js";
 import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
 import { SegmentController, warmModules } from "./segment_controller.js";
 import { EngineHost } from "./engine_host.js";
 import { resolveParamSync, enumChoices } from "./param_sync.js";
 import { formatExportParams } from "./tools/export_params.js";
+import { showFatalError } from "./tools/banner.js";
 
 // UI layer degrades gracefully (log + keep last good state); lower layers trap.
 
@@ -221,13 +226,6 @@ function destroyActiveEffectGui() {
  *   undefined.
  */
 function applyEffect(preserveParams = false) {
-  destroyActiveEffectGui();
-
-  // Clear the old effect's param URL entries but keep the global GUI's keys.
-  if (!preserveParams) {
-    resetGUI(['resolution', 'effect', ...guiInstance.collectUrlKeys()]);
-  }
-
   if (host.engine) {
     if (host.engine.setEffect(appState.get('effect')) === false) {
       console.error(`setEffect("${appState.get('effect')}") failed; effect unavailable.`);
@@ -237,7 +235,16 @@ function applyEffect(preserveParams = false) {
       return false;
     }
     daydream.setStrobeColumns(host.engine.strobeColumns());
+  }
 
+  destroyActiveEffectGui();
+
+  // Clear the old effect's param URL entries but keep the global GUI's keys.
+  if (!preserveParams) {
+    resetGUI(['resolution', 'effect', ...guiInstance.collectUrlKeys()]);
+  }
+
+  if (host.engine) {
     activeEffect = { gui: new GUI({ autoPlace: false }), activeDragEnds: new Set() };
 
     const params = host.engine.getParameterDefinitions();
@@ -451,40 +458,73 @@ function applyResolution(preserveParams = false) {
     planResolutionApply(availableEffects, appState.get('effect'));
   if (effectChanged) {
     appState.set('effect', nextEffect);
+    if (appState.get('effect') !== nextEffect) return false;
   }
 
   if (applyDirectly) {
-    applyEffect(preserveParams);
+    if (applyEffect(preserveParams) === false) return false;
   }
 
   daydream.invalidate();
 }
 
+let restoringSwitch = false;
+
+function reportSwitchFailure(label, result) {
+  if (result.failure) console.error(`${label} switch failed:`, result.failure);
+  if (!result.recoveryFailure) return;
+  console.error(`${label} rollback failed:`, result.recoveryFailure);
+  showFatalError(`${label} change failed and the previous state could not be restored. Reload the page.`);
+}
+
+function restoreUrl(url) {
+  window.history.replaceState({}, '', url);
+}
+
+function restoreEffect(effect, url) {
+  restoringSwitch = true;
+  try {
+    appState.set('effect', effect);
+    restoreUrl(url);
+    if (applyEffect(true) === false) throw new Error(`Effect rollback to "${effect}" was rejected.`);
+  } finally {
+    restoringSwitch = false;
+  }
+}
+
+function restoreResolution(resolution, effect, url) {
+  restoringSwitch = true;
+  try {
+    appState.update({ resolution, effect });
+    resolutionController.setValue(resolution);
+    restoreUrl(url);
+    if (applyResolution(true) === false)
+      throw new Error(`Resolution rollback to "${resolution}" was rejected.`);
+  } finally {
+    restoringSwitch = false;
+  }
+}
+
 appState.subscribe((key, value, old) => {
+  if (restoringSwitch) return;
   if (key === 'effect') {
-    // A rejected effect leaves the engine on the old one; revert appState so the
-    // re-fire re-applies the prior effect and keeps state/URL/engine coherent.
-    // A thrown switch (WASM abort/BindingError) must be contained here, not left
-    // to propagate through notify and abort every other subscriber half-updated.
-    try {
-      if (applyEffect() === false) {
-        appState.set('effect', old);
-      }
-    } catch (err) {
-      console.error('Effect switch failed:', err);
-    }
+    const previousUrl = window.location.pathname + window.location.search + window.location.hash;
+    const result = runSwitchTransaction(
+      () => applyEffect(),
+      () => restoreEffect(old, previousUrl),
+    );
+    reportSwitchFailure('Effect', result);
   } else if (key === 'resolution') {
-    // A rejected resolution leaves the engine on the old value; revert appState
-    // and the dropdown to what actually applied (the controller is bound to its
-    // own object literal, so it does not track appState on its own).
-    try {
-      if (applyResolution() === false) {
-        appState.set('resolution', old);
-        resolutionController.setValue(old);
-      }
-    } catch (err) {
-      console.error('Resolution switch failed:', err);
+    const previousEffect = appState.get('effect');
+    const previousUrl = window.location.pathname + window.location.search + window.location.hash;
+    const result = runSwitchTransaction(
+      () => applyResolution(),
+      () => restoreResolution(old, previousEffect, previousUrl),
+    );
+    if (!result.applied) {
+      queueMicrotask(() => urlSync.setParam('resolution', appState.get('resolution')));
     }
+    reportSwitchFailure('Resolution', result);
   }
 });
 
