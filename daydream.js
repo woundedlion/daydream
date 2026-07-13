@@ -30,6 +30,7 @@ const HiResFavorites = [
   "BZReactionDiffusion",
   "ChaoticStrings",
   "Comets",
+  "Dynamo",
   "DreamBalls",
   "MeshFeedback",
   "FlowField",
