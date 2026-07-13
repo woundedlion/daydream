@@ -15,6 +15,31 @@
 import { resolveActiveEffect } from "./sidebar_logic.js";
 
 /**
+ * Apply a synchronous state switch and restore the previous applied state when
+ * it rejects or throws.
+ * @param {Function} apply - Applies the requested state; false means rejected.
+ * @param {Function} rollback - Restores the previous applied state.
+ * @returns {{applied: boolean, failure: any|null, recoveryFailure: any|null}}
+ */
+export function runSwitchTransaction(apply, rollback) {
+  let failure = null;
+  try {
+    if (apply() !== false) {
+      return { applied: true, failure: null, recoveryFailure: null };
+    }
+  } catch (error) {
+    failure = error;
+  }
+
+  try {
+    rollback();
+    return { applied: false, failure, recoveryFailure: null };
+  } catch (error) {
+    return { applied: false, failure, recoveryFailure: error };
+  }
+}
+
+/**
  * Plan how applyResolution() should re-apply the effect after a resolution
  * change. The requested effect is kept when the new resolution offers it, else
  * corrected to the list's first entry (resolveActiveEffect). When that correction

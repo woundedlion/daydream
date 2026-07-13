@@ -1,7 +1,54 @@
 // @ts-check
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planResolutionApply, paramValueSkew } from '../effect_sequencing.js';
+import {
+  planResolutionApply,
+  paramValueSkew,
+  runSwitchTransaction,
+} from '../effect_sequencing.js';
+
+test('a successful switch leaves the previous applied state untouched', () => {
+  let rollbacks = 0;
+  const result = runSwitchTransaction(() => true, () => { rollbacks++; });
+
+  assert.deepEqual(result, { applied: true, failure: null, recoveryFailure: null });
+  assert.equal(rollbacks, 0);
+});
+
+test('a rejected switch restores the previous applied state', () => {
+  let restored = false;
+  const result = runSwitchTransaction(() => false, () => { restored = true; });
+
+  assert.deepEqual(result, { applied: false, failure: null, recoveryFailure: null });
+  assert.equal(restored, true);
+});
+
+test('a thrown switch restores the previous applied state and reports the failure', () => {
+  const failure = new Error('switch failed');
+  let restored = false;
+  const result = runSwitchTransaction(
+    () => { throw failure; },
+    () => { restored = true; },
+  );
+
+  assert.equal(result.applied, false);
+  assert.equal(result.failure, failure);
+  assert.equal(result.recoveryFailure, null);
+  assert.equal(restored, true);
+});
+
+test('a rollback failure is surfaced separately from the switch failure', () => {
+  const failure = new Error('switch failed');
+  const recoveryFailure = new Error('rollback failed');
+  const result = runSwitchTransaction(
+    () => { throw failure; },
+    () => { throw recoveryFailure; },
+  );
+
+  assert.equal(result.applied, false);
+  assert.equal(result.failure, failure);
+  assert.equal(result.recoveryFailure, recoveryFailure);
+});
 
 // planResolutionApply is the DOM/engine-free core of applyResolution()'s
 // re-apply decision: keep the requested effect when the resolution offers it,
