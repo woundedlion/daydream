@@ -125,6 +125,10 @@ jobs:
 
       - run: npm ci
       - run: npm run typecheck
+      - name: Verify committed import map
+        run: |
+          npm run importmap
+          git diff --exit-code
       - run: npm test
 
   deploy:
