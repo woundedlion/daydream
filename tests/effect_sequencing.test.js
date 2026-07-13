@@ -5,7 +5,40 @@ import {
   planResolutionApply,
   paramValueSkew,
   runSwitchTransaction,
+  applyInitialState,
 } from '../effect_sequencing.js';
+
+test('initial state dismisses the loader only after a successful apply', () => {
+  const events = [];
+
+  applyInitialState(
+    () => { events.push('apply'); },
+    () => { events.push('dismiss'); },
+  );
+
+  assert.deepEqual(events, ['apply', 'dismiss']);
+});
+
+test('a rejected initial state keeps the loader visible and throws', () => {
+  let dismissed = false;
+
+  assert.throws(
+    () => applyInitialState(() => false, () => { dismissed = true; }),
+    /initialization was rejected/,
+  );
+  assert.equal(dismissed, false);
+});
+
+test('a thrown initial state keeps the loader visible and propagates the error', () => {
+  const failure = new Error('initial apply failed');
+  let dismissed = false;
+
+  assert.throws(
+    () => applyInitialState(() => { throw failure; }, () => { dismissed = true; }),
+    failure,
+  );
+  assert.equal(dismissed, false);
+});
 
 test('a successful switch leaves the previous applied state untouched', () => {
   let rollbacks = 0;

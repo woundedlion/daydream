@@ -12,6 +12,7 @@ import {
   planResolutionApply,
   paramValueSkew,
   runSwitchTransaction,
+  applyInitialState,
 } from "./effect_sequencing.js";
 import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
@@ -615,15 +616,12 @@ createHolosphereModule().then(module => {
   daydream.recorder = host.recorder;
 
   const loadingOverlay = document.getElementById('loading-overlay');
-  if (loadingOverlay) loadingOverlay.remove();
-
-  try {
-    applyResolution(true);
-  } catch (err) {
-    console.error('Initial resolution/effect render failed:', err);
-  }
+  applyInitialState(
+    () => applyResolution(true),
+    () => loadingOverlay?.remove(),
+  );
 }).catch(err => {
-  console.error('Failed to load the Holosphere WASM engine:', err);
+  console.error('Failed to initialize the Holosphere renderer:', err);
   // No engine: the Test All ticker would spin uselessly for the page lifetime.
   if (testAllInterval !== null) {
     clearInterval(testAllInterval);
@@ -634,6 +632,7 @@ createHolosphereModule().then(module => {
     testAllController.disable();
   }
   const loadingOverlay = document.getElementById('loading-overlay');
+  const detailText = (err && err.message) ? err.message : String(err);
   if (loadingOverlay) {
     loadingOverlay.classList.add('error');
     loadingOverlay.innerHTML =
@@ -641,7 +640,9 @@ createHolosphereModule().then(module => {
       '<span class="load-error-detail"></span>';
     const detail = loadingOverlay.querySelector('.load-error-detail');
     // textContent (not innerHTML) so an arbitrary error message can't inject markup.
-    if (detail) detail.textContent = (err && err.message) ? err.message : String(err);
+    if (detail) detail.textContent = detailText;
+  } else {
+    showFatalError(`Failed to initialize the rendering engine. ${detailText}`);
   }
 });
 
