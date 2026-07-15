@@ -49,6 +49,21 @@ function requireCount(opName, param, val) {
 export const formatFloat = formatFloatCpp;
 
 /**
+ * Formats a registry solid name for display: splits camelCase and underscore
+ * segments into words and capitalizes each, so
+ * "truncatedIcosahedron_hk58_chamfer63" -> "Truncated Icosahedron Hk58 Chamfer63".
+ * @param {string} name - The registry solid name.
+ * @returns {string} The human-readable title.
+ */
+export function formatSolidName(name) {
+  return name
+    .split('_')
+    .map(part => part.replace(/([A-Z])/g, ' $1').trim())
+    .join(' ')
+    .replace(/(^|\s)[a-z]/g, c => c.toUpperCase());
+}
+
+/**
  * Builds a stable, unambiguous suffix for a fractional op parameter (0..1+).
  * Quantizes to hundredths and pads to two digits so 0.05 -> "05" and 0.5 -> "50"
  * stay distinct and self-describing in generated funcNames.

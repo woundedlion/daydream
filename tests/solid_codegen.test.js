@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 
 const {
   formatFloat,
+  formatSolidName,
   pctSuffix,
   generateFuncAndRecipe,
   generateRecipeCpp,
@@ -16,6 +17,19 @@ const { formatFloatCpp } = await import('../tools/cpp_format.js');
 /** formatFloat re-exports cpp_format's formatter; its behavior is pinned in cpp_format.test.js. */
 test('formatFloat is wired to the authoritative formatFloatCpp', () => {
   assert.equal(formatFloat, formatFloatCpp);
+});
+
+/** Verifies formatSolidName splits camelCase and underscore segments into capitalized words. */
+test('formatSolidName produces readable titles from registry names', () => {
+  assert.equal(formatSolidName('cube'), 'Cube');
+  assert.equal(formatSolidName('truncatedIcosahedron'), 'Truncated Icosahedron');
+  assert.equal(formatSolidName('disdyakisTriacontahedron'), 'Disdyakis Triacontahedron');
+  assert.equal(
+    formatSolidName('truncatedIcosidodecahedron_truncate50d_ambo_dual'),
+    'Truncated Icosidodecahedron Truncate50d Ambo Dual');
+  assert.equal(
+    formatSolidName('dodecahedron_hk35_ambo_hk62_ambo_relax_hk42'),
+    'Dodecahedron Hk35 Ambo Hk62 Ambo Relax Hk42');
 });
 
 /** Verifies pctSuffix rounds a fraction to hundredths and emits a zero-padded two-or-three-digit string, snapping float error. */
