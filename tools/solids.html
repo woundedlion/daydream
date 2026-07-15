@@ -136,11 +136,41 @@
       filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
     }
 
-    .thumb-btn span {
+    .thumb-btn .thumb-label {
       font-size: clamp(0.55rem, (100vw - 474px) * 0.008, 0.85rem);
       text-align: center;
       line-height: 1.1;
       color: #cbd5e1;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+      overflow-wrap: anywhere;
+    }
+
+    /* Full name at readable size, shown over the tile on hover/focus; the
+       resting label above is clamped to two lines and ellipsizes long names. */
+    .thumb-name-full {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0.3rem;
+      background: rgba(15, 23, 42, 0.92);
+      border-radius: 0.6rem;
+      font-size: clamp(0.65rem, (100vw - 474px) * 0.01, 0.9rem);
+      line-height: 1.25;
+      color: #e2e8f0;
+      overflow-wrap: anywhere;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .thumb-btn:hover .thumb-name-full,
+    .thumb-btn:focus-visible .thumb-name-full {
+      display: flex;
     }
 
     /* .btn / .btn-primary / .btn-secondary now live in tools.css (shared).
@@ -558,6 +588,7 @@
     // unit tested without a DOM or the WASM module. DOM/WASM wiring stays inline.
     import {
       formatFloat,
+      formatSolidName,
       pctSuffix,
       generateFuncAndRecipe,
       generateRecipeCpp,
@@ -1029,15 +1060,18 @@
           document.getElementById('baseThumb').src = dataURL;
         }
 
+        const title = formatSolidName(key);
+        btn.title = title;
         const span = document.createElement('span');
-        // Format Name: truncatedIcosahedron -> Truncated Icosahedron -> Truncated\nIcosahedron?
-        // Split camel case
-        const title = key.replace(/([A-Z])/g, ' $1').trim();
-        const parts = title.split(' ');
-        span.innerHTML = parts.join('<br>');
+        span.className = 'thumb-label';
+        span.textContent = title;
+        const fullName = document.createElement('span');
+        fullName.className = 'thumb-name-full';
+        fullName.textContent = title;
 
         btn.appendChild(img);
         btn.appendChild(span);
+        btn.appendChild(fullName);
         footer.appendChild(btn);
 
         // Free the per-iteration geometry GPU buffers; the thumbnail image is
@@ -1083,7 +1117,7 @@
       renderer.render(scene, camera);
       const dataURL = renderer.domElement.toDataURL('image/png');
 
-      const title = state.base.replace(/([A-Z])/g, ' $1').trim();
+      const title = formatSolidName(state.base);
 
       // Get current counts from currentMesh. Derive the edge count directly from
       // the faces (not currentMesh.edgeCount, which is only set on a successful
@@ -1265,9 +1299,11 @@
 
     function renderBaseSolid() {
       const thumb = baseThumbnails[state.base];
-      const title = state.base.replace(/([A-Z])/g, ' $1').trim();
+      const title = formatSolidName(state.base);
       document.getElementById('baseThumb').src = thumb || '';
-      document.getElementById('baseTitle').innerText = title;
+      const titleEl = document.getElementById('baseTitle');
+      titleEl.innerText = title;
+      titleEl.title = title;
     }
 
     function enableDrag(e) {
