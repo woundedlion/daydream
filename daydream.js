@@ -30,7 +30,6 @@ const HiResFavorites = [
   "BZReactionDiffusion",
   "ChaoticStrings",
   "Comets",
-  "Dynamo",
   "DreamBalls",
   "MeshFeedback",
   "FlowField",
@@ -50,7 +49,6 @@ const HiResFavorites = [
   "DistortedRing",
   "DisplacementField",
   "ShapeShifter",
-  "Thrusters",
   "Voronoi",
 ];
 
