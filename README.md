@@ -86,14 +86,14 @@ Two physical targets share the same rendering engine:
 
 | Component | Detail |
 |---|---|
-| Controllers | 4× Teensy 4.0 (600 MHz ARM Cortex-M7) |
-| LEDs | 2 × 144-pixel strips (288 total, 72 per segment) |
+| Controllers | 4× Teensy 4.0 by default; optional 8× firmware profile (600 MHz ARM Cortex-M7) |
+| LEDs | 288 total: 72 per segment at N=4, 36 per segment at N=8 |
 | Protocol | DMA (HD107S at 24 MHz) |
 | Rotation | 480 RPM (8 revolutions/second), 16 FPS from 2 sides of the ring |
 | Virtual resolution | 288 × 144 |
-| Driver | `POVSegmented<288, 4, 480>` in `pov_segmented.h` |
+| Driver | `POVSegmented<288, N, 480>` in `pov_segmented.h`, power-of-two `N ≤ 8` |
 | Synchronization | 1-wire: count-coded sync symbols from segment 0 discipline a per-board flywheel timebase (`hardware/pov_sync.h`) |
-| Pin assignments | ID: pins 21–22, Sync: pin 3 (shared — master drives, downstream receive), master-enable: pin 5, SPI: pins 11 + 13 |
+| Pin assignments | ID: pins 21–22 at N=4, plus pin 23 at N=8; Sync: pin 3 (shared — master drives, downstream receive), master-enable: pin 5, SPI: pins 11 + 13 |
 
 The POV effect works because each revolution takes ~125 ms and a new column is painted every `1,000,000 / (RPM/60) / width` microseconds (on Holosphere the IntervalTimer ISR advances one column per fire; on Phantasm each board's flywheel ISR derives the column from the CPU cycle counter — see §7.10). The LED strip is mounted on both sides of a rotating arm: the top half of the strip handles one hemisphere and the bottom half handles the opposite hemisphere, so one full revolution paints a complete sphere.
 
@@ -607,7 +607,7 @@ struct Fragment {
   Vector pos;              // Position (typically a unit vector on the sphere)
   float v0 = 0.0f;        // Register 0: normalized progress t (0–1)
   float v1 = 0.0f;        // Register 1: arc length / distance
-  float v2 = 0.0f;        // Register 2: index / face ID
+  float v2 = 0.0f;        // Register 2: stroke coverage / face ID
   float v3 = 0.0f;        // Register 3: auxiliary
   float size = 1.0f;      // Size metric for normalization
   float age = 0.0f;       // Age (for trail decay / motion blur)
@@ -648,7 +648,7 @@ Each rasterizer family populates the Fragment registers with a consistent conven
 |---|---|---|
 | `v0` | `DistanceResult.t` | Normalized parameter (0–1) — azimuthal angle for rings, perimeter progress for polygons |
 | `v1` | `DistanceResult.raw_dist` | Unsigned distance to shape centerline (for distance-based effects) |
-| `v2` | Set by rasterizer | Face index for `Scan::Mesh` (0 otherwise) |
+| `v2` | Set by rasterizer | Stroke AA coverage (0–1, also applied by Scan at plot time), 0 for solid shapes, or face index for `Scan::Mesh` |
 | `v3` | `DistanceResult.aux` | Auxiliary — shape-dependent secondary parameter (0 when unused, including faces) |
 | `size` | `DistanceResult.size` | Shape radius or apothem for normalization (mesh `Face` floors it to ≥0.25× circumradius on sliver faces, so a normalized shader can see up to a 4× overstated inradius there) |
 
@@ -1255,7 +1255,7 @@ The top arm's physical LED ordering is reversed (LED 0 at the tip, descending in
 
 #### Multi-Teensy Segmented POV Driver (`pov_segmented.h`)
 
-`POVSegmented<S, N, RPM>` drives Phantasm — N Teensys (typically 4) each control a contiguous Y-segment of the LED strip on a single arm.  Two Teensys sit on each arm: one at the N pole (top), one at the S pole (bottom).
+`POVSegmented<S, N, RPM>` drives Phantasm — N Teensys (4 by default, up to 8) each control a contiguous Y-segment on one arm. IDs `[0, N/2)` map to arm A and `[N/2, N)` to arm B. Within an arm, northern bands advance in +Y and southern bands run from the S pole toward the junction in -Y.
 
 **Physical strip layout (N=4, S=288):**
 
@@ -1272,14 +1272,20 @@ Arm A                               Arm B (x offset by W/2)
 └──────────────────────────┘        └──────────────────────────┘
 ```
 
-**Hardware ID detection**: Each Teensy reads its segment ID from two GPIO straps — pin 21 (ID0), pin 22 (ID1), active-low with pull-ups.  The build reads `ID_STRAPS = log2(N)` of them and decodes the ID as `(~raw) & (N-1)` (the straps are active-low, so the raw reading is inverted), so a 4-segment build reads both straps and a 2-segment build reads one; the header permits any power-of-two `N ≤ 4` (`segment_map()` distinguishes only a top and a bottom strip per arm).  All-floating = ID 0 (sync master).  The ID determines which arm and which half this board owns.
+At N=8, each arm has four 36-pixel bands: north outer `0–35`, north inner
+`36–71`, south outer `143–108`, and south inner `107–72`. Arm A uses IDs 0–3;
+arm B uses IDs 4–7. The firmware profile is compile-tested, but an eight-board
+480-RPM rotor requires a separately qualified mounting, balance, cable, and
+swept-envelope design before operation.
+
+**Hardware ID detection**: Each Teensy reads `log2(N)` active-low GPIO straps: pin 21 (ID0), pin 22 (ID1), and pin 23 (ID2, N=8 only). The ID is `(~raw) & (N-1)`, so grounding a strap sets its bit and all-floating selects ID 0 (sync master). The header supports power-of-two `N ≤ 8`.
 
 **Branchless ISR**: All per-segment decisions are resolved at boot time into three precomputed values:
 
 | Value | Description |
 |---|---|
-| `y_base_` | Starting Y index for LED 0 (0 for top segments, ROWS-1 for bottom) |
-| `y_step_` | +1 (top, forward) or -1 (bottom, reversed) |
+| `y_base_` | Starting Y index for this segment's row band |
+| `y_step_` | +1 for northern bands, -1 for reversed southern bands |
 | `arm_b_` | Whether this segment is on arm B (x offset by W/2) |
 
 The ISR loop has no branches:
@@ -1292,22 +1298,22 @@ for (int i = 0; i < PPS; ++i, y += y_step_) {
 }
 ```
 
-**Effect transparency**: Effects are written against the full 288×144 canvas with no per-segment code.  Each board clips rendering to the quadrant it paints this frame (`clip_to_segment`), except stateful effects (`needs_full_frame()` / `persists_pixels()`), which render the full canvas; the ISR then packs this board's LEDs.  All 4 boards share the same deterministic random seed (`Pcg32(1337)` in `platform.h`), so identical effect sequences produce identical canvases.
+**Effect transparency**: Effects are written against the full 288×144 canvas with no per-segment code. Each board clips rendering to its half-width segment band for the current display window (`clip_to_segment`), except stateful effects (`needs_full_frame()` / `persists_pixels()`), which render the full canvas; the ISR then packs this board's LEDs. Every board shares the same deterministic random seed (`Pcg32(1337)` in `platform.h`), so identical effect sequences produce identical canvases.
 
-| Parameter | Value (Phantasm) |
+| Parameter | Value (qualified N=4 default unless noted) |
 |---|---|
 | S (total pixels) | 288 |
-| N (segments) | 4 |
-| PPS (pixels per segment) | 72 |
+| N (segments) | 4 qualified default; 8 compile-tested firmware profile |
+| PPS (pixels per segment) | 72 at N=4; 36 at N=8 |
 | RPM | 480 (8 rev/s, ~125 ms/rev) |
 | Frame rate | 16 FPS (2 frames/rev — one per side; each side draws W/2 = 144 cols per 62.5 ms frame) |
 | Column frequency | 2304 Hz |
 | Column interval | ~434 µs (= 125 ms / 288 = 62.5 ms / 144) |
-| ISR duration (72px pack + DMA trigger) | ~96 µs worst case |
+| ISR duration (N=4 72px pack + DMA trigger) | ~96 µs worst case |
 
 #### Frame Sync Protocol: 1-Wire Signal Datasheet
 
-Phantasm's four boards stay coherent over **one wire**.  Segment 0 (the **master**) is the conductor; segments 1–3 (**downstream**) listen.  Each board generates its own columns from a local **flywheel timebase** and snaps that timebase to count-coded pulse bursts the master broadcasts on the wire.  Full design: `docs/phantasm_frame_sync_spec.md`; host-tested protocol core: `hardware/pov_sync.h`.
+Phantasm's boards stay coherent over **one wire**. Segment 0 (the **master**) is the conductor; segments 1 through N−1 (**downstream**) listen. Each board generates its own columns from a local **flywheel timebase** and snaps that timebase to count-coded pulse bursts the master broadcasts on the wire. Full design: `docs/phantasm_frame_sync_spec.md`; host-tested protocol core: `hardware/pov_sync.h`.
 
 The flywheel derives the column index from the free-running CPU cycle counter, never from counting timer interrupts:
 
@@ -1320,13 +1326,13 @@ x = ( x_boundary + (now − epoch) · (W/2) / cycles_per_half_rev )  mod W
 
 **Pin / signal description.**
 
-| Signal | Master (seg 0) | Downstream (seg 1–3) | Electrical | Direction |
+| Signal | Master (seg 0) | Downstream (segments 1–N−1) | Electrical | Direction |
 |---|---|---|---|---|
 | `SYNC` | pin 3 (GPIO out) | pin 3 (ext. interrupt in) | 3.3 V CMOS, active-high pulses, idle LOW | master → all |
 | `MASTER_EN` | pin 5 (drive LOW) | pin 5 (drive HIGH) | 3.3 V CMOS, gates the external sync-out buffer | per-board strap out |
-| `ID` straps | pins 21–22 (ID0–ID1) | pins 21–22 (ID0–ID1) | active-low, internal pull-ups; `ID_STRAPS = log2(N)` read | strap (board identity) |
+| `ID` straps | pins 21–23 (ID0–ID2 as required) | pins 21–23 (ID0–ID2 as required) | active-low, internal pull-ups; `ID_STRAPS = log2(N)` read | strap (board identity) |
 
-The ID straps select the board: the build reads `ID_STRAPS = log2(N)` of them (ID0/pin 21 and, for `N = 4`, ID1/pin 22), decoding `(~raw) & (N-1)` (active-low straps, so the raw reading is inverted).  The driver caps `N <= 4`, so at most two straps are read.  For the 4-segment build, all-floating = `00` = master and the other three codes select arm/half.  `SYNC` is one shared pin 3 — the master drives it and downstream boards receive on its rising edge; `MASTER_EN` (pin 5) gates an external level shifter so only the master drives the shared bus.  The former column-clock wire is **deleted** and pin 4 is freed — `SYNC` is the only inter-board connection.  It is assumed physically reliable (a hard, soldered line); a severed wire is out of scope (boards free-run and precess apart at crystal rate, a slow smear, never an instant break).
+The ID straps select the board: the build reads `ID_STRAPS = log2(N)` active-low bits and decodes `(~raw) & (N-1)`. N=4 reads ID0/pin 21 and ID1/pin 22; N=8 also reads ID2/pin 23. All-floating selects segment 0/master. `SYNC` is one shared pin 3 — the master drives it and downstream boards receive on its rising edge; `MASTER_EN` (pin 5) gates an external level shifter so only the master drives the shared bus. The former column-clock wire is **deleted** and pin 4 is freed — `SYNC` is the only inter-board connection. It is assumed physically reliable (a hard, soldered line); a severed wire is out of scope (boards free-run and precess apart at crystal rate, a slow smear, never an instant break).
 
 **Signal levels & symbol waveforms.** The wire idles LOW.  A **symbol** is a burst of short active-high pulses at a fixed pitch; **the meaning is the count of rising edges — pulse width carries no information.**  Each pulse is HIGH for one ISR body (pin set HIGH at ISR entry, LOW at exit; tens of µs) and the rising edge is the only timed event.  Pulses are drawn narrow, to scale against the ~868 µs pitch:
 
@@ -1611,18 +1617,6 @@ A latitude-longitude grid that undergoes live Möbius transformation animation v
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=FlowField" target="_blank"><img src="docs/screenshots/FlowField.png" alt="FlowField" width="280"></a></td>
-<td valign="top">
-
-#### FlowField
-
-FastNoiseLite-driven flow field. Three independently offset 3D-noise channels form a per-particle force vector that is added to each particle's velocity (not curl noise, not a scalar gradient).
-
-**Parameters**: Scale, Force, Max Spd, Alpha, Time Spd
-
-</td></tr></table>
-
-<table border="0"><tr>
 <td width="300"><a href="https://woundedlion.github.io/daydream/?effect=Voronoi" target="_blank"><img src="docs/screenshots/Voronoi.png" alt="Voronoi" width="280"></a></td>
 <td valign="top">
 
@@ -1803,18 +1797,6 @@ Stereographic-projection shader (extends `Effect` directly) with noise-driven wa
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=DistortedRing" target="_blank"><img src="docs/screenshots/DistortedRing.png" alt="DistortedRing" width="280"></a></td>
-<td valign="top">
-
-#### DistortedRing
-
-Concentric rings built from per-azimuth distorted ring SDFs, their radii oscillating via a sine-wave amplitude mutation while a random walk slowly reorients the stack.
-
-**Parameters**: Alpha, MaxAmplitude, Thickness, Rings, Show Bounding
-
-</td></tr></table>
-
-<table border="0"><tr>
 <td width="300"><a href="https://woundedlion.github.io/daydream/?effect=DisplacementField" target="_blank"><img src="docs/screenshots/DisplacementField.png" alt="DisplacementField" width="280"></a></td>
 <td valign="top">
 
@@ -1981,7 +1963,7 @@ params.forEach(p => {
 
 ### 10.7 Segmented POV Workers (`segment_worker.js`)
 
-Phantasm in hardware is four Teensys each rendering a quadrant of the canvas — one arm's half-width crossed with a Y-band, computed by the engine's `segment_map()`/`segment_x_col()` (`pov_segment_map.h`). Daydream reproduces the *partitioning* in software — its `computeSegmentRange()` (`segment_layout.js`) mirrors the engine's arm/Y-band split (a general even-N tiler that also drives the 2–8-way preview), though it does not model the bottom segment's reversed strip direction (`y_step = -1`) or the hardware's power-of-two segment-count constraint — so the band partition, not the full strip wiring, is exercised before fabrication. A `SegmentController` (`segment_controller.js`) owns the worker pool — dispatching renders (`renderParallel()`), fencing stale frames by generation, and compositing results (`composite()`) — while each `segment_worker.js` hosts one WASM instance:
+Phantasm hardware uses N Teensys, each rendering one segment rectangle: an arm's half-width crossed with a Y-band computed by the engine's `segment_map()`/`segment_x_col()` (`pov_segment_map.h`). N=4 is the qualified default; N=8 is the compile-tested firmware profile. Daydream reproduces the *partitioning* in software — its `computeSegmentRange()` (`segment_layout.js`) mirrors the engine's arm/Y-band split (a general even-N tiler that also drives the 2–8-way preview), though it does not model southern segments' reversed strip direction (`y_step = -1`) or the hardware's power-of-two segment-count constraint — so the band partition, not the full strip wiring, is exercised before fabrication. A `SegmentController` (`segment_controller.js`) owns the worker pool — dispatching renders (`renderParallel()`), fencing stale frames by generation, and compositing results (`composite()`) — while each `segment_worker.js` hosts one WASM instance:
 
 ```
 Main thread                  Workers (one WASM each)
@@ -1996,8 +1978,8 @@ drawFrame() {                postMessage({type:'render'})
 
 Key properties:
 - **Isolated WASM instances per worker** — each segment has its own arena, its own random seed (`Pcg32(1337)` is deterministic, so all workers produce the same result), and its own effect state.
-- **`setClip(x0, x1, y0, y1)`** — for a non-stateful effect the WASM engine restricts *rendering* to the worker's quadrant: the rasterizer's scanline culling skips out-of-clip rows and columns, so out-of-band pixels are never shaded. The pixel readback in `drawFrame()` still copies the full canvas buffer; `segment_worker.js` then extracts just the quadrant rectangle from it (the `pixelsCopy` loop in the render handler) before transferring the result back, so only the quadrant crosses the worker boundary.
-- **Cross-segment stateful effects render full-frame** — an effect whose per-frame state reads pixels *outside* the worker's band (`MeshFeedback`'s feedback warp samples the previous frame at unbounded offsets; `Dynamo` reprojects `World::Trails` under rotation) cannot be band-clipped: a clipped worker would have stale/zero history outside its band, so cross-band trails read as black and seams appear. Those effects report `Effect::needs_full_frame()` (derived from a compile-time `any_crosses_segments` filter-pipeline trait), and `setClip` leaves their clip at the full canvas — every worker computes the bit-identical full frame and `segment_worker.js` slices its quadrant from the full readback. This mirrors the device exactly, where each board independently renders the whole canvas; only non-stateful effects keep segmented rendering's clipping win. Design: `docs/segmented_stateful_effects_spec.md`.
+- **`setClip(x0, x1, y0, y1)`** — for a non-stateful effect the WASM engine restricts *rendering* to the worker's segment rectangle: the rasterizer's scanline culling skips out-of-clip rows and columns, so out-of-band pixels are never shaded. The pixel readback in `drawFrame()` still copies the full canvas buffer; `segment_worker.js` then extracts that rectangle (the `pixelsCopy` loop in the render handler) before transferring the result back, so only the segment crosses the worker boundary.
+- **Cross-segment stateful effects render full-frame** — an effect whose per-frame state reads pixels *outside* the worker's band (`MeshFeedback`'s feedback warp samples the previous frame at unbounded offsets; `Dynamo` reprojects `World::Trails` under rotation) cannot be band-clipped: a clipped worker would have stale/zero history outside its band, so cross-band trails read as black and seams appear. Those effects report `Effect::needs_full_frame()` (derived from a compile-time `any_crosses_segments` filter-pipeline trait), and `setClip` leaves their clip at the full canvas — every worker computes the bit-identical full frame and `segment_worker.js` slices its segment rectangle from the full readback. This mirrors the device exactly, where each board independently renders the whole canvas; only non-stateful effects keep segmented rendering's clipping win. Design: `docs/segmented_stateful_effects_spec.md`.
 - **One-frame pipeline** — frame N's render is dispatched fire-and-forget; frame N-1's results are composited synchronously when they arrive. Wall-clock time is measured against the slowest worker — exactly what the multi-Teensy hardware sees.
 - **Boundary overlay** — a "Show Boundaries" toggle paints cyan markers on the segment edges in the composite buffer to make the partition visible.
 
@@ -2066,9 +2048,10 @@ Each hardware target has its own `.ino` entry point in `targets/`:
 6. Upload.
 
 > **Optional — headless size/layout gate (CI parity).** A PlatformIO build
-> (`just teensy-size`, needs `pip install platformio`) compiles both firmware
-> images on a stock machine and checks image size and memory-region layout
-> against committed budgets — closing the device-only `#ifdef ARDUINO`
+> (`just teensy-size`, needs `pip install platformio`) builds the two budgeted
+> shipping images plus the `holosphere_dma` and `phantasm8` compile/link profiles
+> on a stock machine. It checks shipping-image size and memory-region layout
+> against committed budgets while closing the device-only `#ifdef ARDUINO`
 > compile/size blind spot VMicro alone leaves uncovered. It coexists with VMicro
 > (it owns `.pio/`, never `__vm/`) and asserts the images *fit*, not byte-identity
 > with the bench build. See [`docs/teensy_ci_gate_spec.md`](https://github.com/woundedlion/pov/blob/master/docs/teensy_ci_gate_spec.md).

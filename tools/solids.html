@@ -2157,7 +2157,7 @@
 
       // Update Stats
       renderBaseSolid();
-      document.getElementById('meshStats').innerText = `${meshData.vertices.length}V / ${edges.length}E / ${meshData.faces.length}F`;
+      document.getElementById('meshStats').innerText = `${meshData.vertices.length}V / ${edges.length}E / ${meshData.faces.length}F / ${meshData.faces.reduce((sum, f) => sum + f.length, 0)}I`;
     }
 
     // Set true whenever the label set is (re)built, so updateLabels re-projects
