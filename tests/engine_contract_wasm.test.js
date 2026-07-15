@@ -36,8 +36,8 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
   assert.equal(typeof ok, 'boolean', 'setResolution must return a boolean');
   assert.equal(ok, true, `the ${W}x${H} preset must be a buildable resolution`);
 
-  // DistortedRing is the C++ bootstrap default, so it is guaranteed registered.
-  const effectOk = engine.setEffect('DistortedRing');
+  // DisplacementField is the C++ bootstrap default, so it is guaranteed registered.
+  const effectOk = engine.setEffect('DisplacementField');
   assert.equal(typeof effectOk, 'boolean', 'setEffect must return a boolean');
   assert.equal(effectOk, true, 'setEffect must succeed for a registered effect');
 
@@ -45,7 +45,7 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
   assert.equal(typeof defs.length, 'number',
     'getParameterDefinitions must return an array-like value');
   assert.ok(defs.length > 0,
-    'the bootstrap effect (DistortedRing) must expose at least one parameter');
+    'the bootstrap effect (DisplacementField) must expose at least one parameter');
   const p = defs[0];
   assert.equal(typeof p.name, 'string', 'param def must carry a string name');
   assert.ok(typeof p.value === 'number' || typeof p.value === 'boolean',
