@@ -710,7 +710,7 @@ const segState = { segmented: segments.active, segments: segments.count, boundar
 // epoch before warmModules() and bails if a later toggle superseded it, so an
 // on->off->on burst spawns the worker pool once, not twice.
 let segEpoch = 0;
-segFolder.addSession(segState, 'segmented').name('Enabled').onChange(async v => {
+segFolder.add(segState, 'segmented').name('Enabled').onChange(async v => {
   segments.active = v;
   const epoch = ++segEpoch;
   if (v) {
@@ -723,7 +723,7 @@ segFolder.addSession(segState, 'segmented').name('Enabled').onChange(async v => 
     segments.updateStats();
   }
 });
-segFolder.addSession(segState, 'segments', 2, 8, 2).name('Segments').onChange(async v => {
+segFolder.add(segState, 'segments', 2, 8, 2).name('Segments').onChange(async v => {
   segments.count = v;
   const epoch = ++segEpoch;
   if (segments.active) {
