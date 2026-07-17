@@ -83,9 +83,9 @@ async function handleMessage(msg) {
       }
 
       // Every segment runs a full engine replica, so engine logs would print
-      // once per worker; only segment 0 logs at console.log visibility.
+      // once per worker; only segment 0 logs. printErr stays live everywhere.
       wasmModule = await createHolosphereModule(segId === 0 ? {} : {
-        print: console.debug.bind(console),
+        print: () => {},
       });
       engine = new wasmModule.HolosphereEngine();
       // A rejected resolution leaves no usable geometry: skip the canvasW/canvasH
