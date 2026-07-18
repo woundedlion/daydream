@@ -113,7 +113,7 @@ Templating on `<W, H>` means every pixel coordinate transform, bounding box comp
 
 ### Why Arena Allocation?
 
-The Teensy heap fragments under heavy mesh subdivision. The single-block partitioned arena design (persistent + scratch A + scratch B, 330 KiB total) gives deterministic memory behavior: persistent data allocated once and kept; scratch data RAII-scoped to the function that needed it. The `configure_arenas()` function allows effects to repartition the fixed block based on their needs — mesh-heavy effects can claim more persistent space, while subdivision-heavy effects can expand their scratch pools. All functions take explicit `Arena&` parameters — Conway operators take `(Arena& target, Arena& temp)`, generators take `(Arena& a, Arena& b)` — so the memory layout during heavy geometric operations is explicit at every call site, with no hidden state or implicit arena references.
+The Teensy heap fragments under heavy mesh subdivision. The single-block partitioned arena design (persistent + scratch A + scratch B, 298 KiB total) gives deterministic memory behavior: persistent data allocated once and kept; scratch data RAII-scoped to the function that needed it. The `configure_arenas()` function allows effects to repartition the fixed block based on their needs — mesh-heavy effects can claim more persistent space, while subdivision-heavy effects can expand their scratch pools. All functions take explicit `Arena&` parameters — Conway operators take `(Arena& target, Arena& temp)`, generators take `(Arena& a, Arena& b)` — so the memory layout during heavy geometric operations is explicit at every call site, with no hidden state or implicit arena references.
 
 ### Why the ISR Double Buffer?
 
@@ -814,7 +814,7 @@ The fragments compile only inside `animation.h` (a direct include fails with an 
 | `MobiusFlow` | Animates `MobiusParams` for a continuous loxodromic flow |
 | `Noise` | Animates `NoiseParams` over time for flowing distortion fields |
 | `MeshMorph` | Morphs one `MeshState` into another by cloning both, building a nearest-vertex correspondence, and interpolating positions over a duration. The vertex-level primitive beneath `MeshCarousel`. |
-| `MeshCarousel<SegueT>` | Double-buffered mesh transition system, parameterized on a compile-time segue policy (`namespace Segue`) that owns the transition's animation scheduling via `schedule_segue()` and shapes its rendering through phase-driven hooks (`opacity`/`fill`/`grade`, plus optional `warp`, per-face sweep ordering, and `retarget` for per-transition anchors). Manages a pair of `MeshState` buffers and flips the front index eagerly so the segue's freshly-scheduled animation captures the new shape. `Segue::Crossfade` schedules one fading `Animation::Sprite` per transition and returns a next-transition delay that makes consecutive sprites **overlap**: each transition fades only its own incoming shape in (and back out), while the previous transition's sprite — still alive in its fade-out tail — keeps drawing the outgoing shape; no single call ever draws both meshes, but two are rasterized per overlap frame. Every other segue is **sequential** (one mesh per frame): `IrisBloom` (faces contract to glowing center points, then the new tessellation blooms out), `Lace` (fill drains to a glowing edge band and floods back), `TerminatorSweep` (a day/night line pinned to the mesh sweeps across it at constant speed; each face fades over a fixed frame count once the line reaches it), `Shockwave` (an expanding wave erases outward from a point; its echo redraws), `Breakdown` (the pattern breaks down one topology class at a time — every face of a color family fades together, classes in a random order reshuffled per swap, each fully gone before the next starts), `SpinFlip` (rigid spin-up, swap hidden in POV motion blur), and `GoldConvergence` (palettes converge to molten gold around the swap). Used by IslamicStars (fixed to `Segue::TerminatorSweep`); MeshFeedback and HankinSolids reuse the buffered pair but drive vertex-level `MeshMorph` transitions over it instead. |
+| `MeshCarousel<SegueT>` | Double-buffered mesh transition system, parameterized on a compile-time segue policy (`namespace Segue`) that owns the transition's animation scheduling via `schedule_segue()` and shapes its rendering through phase-driven hooks (`opacity`/`fill`/`grade`, plus optional `warp`, per-face sweep ordering, and `retarget` for per-transition anchors). Manages a pair of `MeshState` buffers and flips the front index eagerly so the segue's freshly-scheduled animation captures the new shape. `Segue::Crossfade` schedules one fading `Animation::Sprite` per transition and returns a next-transition delay that makes consecutive sprites **overlap**: each transition fades only its own incoming shape in (and back out), while the previous transition's sprite — still alive in its fade-out tail — keeps drawing the outgoing shape; no single call ever draws both meshes, but two are rasterized per overlap frame. Every other segue is **sequential** (one mesh per frame): `IrisBloom` (faces contract to glowing center points, then the new tessellation blooms out), `Lace` (fill drains to a glowing edge band and floods back), `TerminatorSweep` (a day/night line pinned to the mesh sweeps across it at constant speed; each face fades over a fixed frame count once the line reaches it), `Shockwave` (an expanding wave erases outward from a point; its echo redraws), `Breakdown` (the pattern breaks down one topology class at a time — every face of a color family fades together, classes in a random order reshuffled per swap, each fully gone before the next starts), `SpinFlip` (rigid spin-up, swap hidden in POV motion blur), and `GoldConvergence` (palettes converge to molten gold around the swap). Used by IslamicStars (fixed to `Segue::TerminatorSweep`); HankinSolids reuses the buffered pair but drives its own vertex-level transitions over it instead. |
 
 #### Orientation and Motion Blur
 
@@ -911,23 +911,23 @@ Transformers integrate with the `MeshOps::transform()` pipeline and can be chain
 
 ### 7.5 Memory Architecture (`memory.h`, `memory.cpp`)
 
-A single contiguous memory block (`GLOBAL_ARENA_SIZE = 330 KiB`) is partitioned into three arena allocators. This block is the same size on both Teensy and WASM targets. Individual effects can call `configure_arenas()` to repartition the block at runtime.
+A single contiguous memory block (`GLOBAL_ARENA_SIZE = 298 KiB`) is partitioned into three arena allocators. This block is the same size on both Teensy and WASM targets. Individual effects can call `configure_arenas()` to repartition the block at runtime.
 
 | Arena | Default Size | Purpose |
 |---|---|---|
-| `persistent_arena` | 298 KiB | Long-lived compiled mesh data, persists across frames |
+| `persistent_arena` | 266 KiB | Long-lived compiled mesh data, persists across frames |
 | `scratch_arena_a` | 16 KB | Short-lived intermediate geometry (RAII scoped) |
 | `scratch_arena_b` | 16 KB | Secondary scratch for ping-pong subdivision passes |
 
 Effects that need more scratch memory can repartition at init time:
 
 ```cpp
-// The three sizes must not exceed GLOBAL_ARENA_SIZE (330 KiB on device); an
+// The three sizes must not exceed GLOBAL_ARENA_SIZE (298 KiB on device); an
 // over-subscribed partition traps at init() via HS_CHECK rather than silently
 // scaling down. Under-subscription is allowed (the surplus is just unused),
 // but partitioning the full budget is the norm. Here scratch is doubled at the
 // expense of persistent space:
-configure_arenas(266 * 1024, 32 * 1024, 32 * 1024);  // 266 + 32 + 32 = 330 KiB
+configure_arenas(234 * 1024, 32 * 1024, 32 * 1024);  // 234 + 32 + 32 = 298 KiB
 ```
 
 `ScratchScope` provides stack-like RAII lifetime:
@@ -1460,7 +1460,7 @@ Any checksum mismatch, wrong digit count, out-of-range digit, or stale partial f
  all boards:     ─────── outgoing effect ──────────░build/dark░── new effect
 ```
 
-The dark window is identical (K revolutions) on every board because construction can't begin before B+R — only then is the window's start common knowledge regardless of which copy each board heard.  An effect that can't construct inside K revolutions trips `HS_CHECK` (fail-fast).  All boards reseed `hs::random()` (1337) per effect build, so the new instance is bit-identical no matter what each board rendered — or whether it even existed — before the epoch.
+The dark window is identical (K revolutions) on every board because construction can't begin before B+R — only then is the window's start common knowledge regardless of which copy each board heard.  An effect that can't construct inside K revolutions trips `HS_CHECK` (fail-fast).  All boards reseed `hs::random()` with `hs::epoch_seed(effect index)` per effect build (epoch 0 is the identity seed 1337), so each visit gets a fresh stream and the new instance is bit-identical across boards no matter what each board rendered — or whether it even existed — before the epoch.
 
 **Concurrency & failure modes.** Two ISRs per board, **single-writer** by construction.  The sync-wire RISING ISR is a pure *publisher* — glitch filter, edge count, first-edge timestamp into a small mailbox, nothing else.  The flywheel ISR (waking ~8× per column) is the sole *consumer/owner* of all sync state: it claims terminated bursts, classifies, gates, snaps, flips, and runs epoch scheduling.  The hot path is ~7-of-8 wakes doing one cycle-counter read and a 64-bit position compute (≈1 % CPU at 600 MHz); only a column change packs pixels and submits DMA.
 
@@ -1706,7 +1706,7 @@ A head traces a fixed 12:5 spherical Lissajous figure whose long trail is contin
 
 #### MeshFeedback
 
-Platonic solid mesh faces rendered with `Plot::Mesh`, given a noise-distorted, feedback-loop appearance via `Filter::Pixel::Feedback`. Cycles through the Platonic solid library, crossfade-morphing between shapes with `Animation::MeshMorph`, while a `Presets` cycle hard-cuts the feedback/distortion style parameters.
+A fixed icosahedron's wireframe rendered with `Plot::Mesh`, given a noise-distorted, feedback-loop appearance via `Filter::Pixel::Feedback`. An orientation random-walk tumbles the solid while a `Presets` cycle hard-cuts the feedback/distortion style parameters.
 
 **Parameters**: Fade, Distort Amp, Distort Freq, Distort Speed, Noise Scale, Hue Shift, Feedback
 
@@ -1880,7 +1880,7 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `getRenderUs()` → `double` | Last frame's rasterization time in microseconds (per-frame profiling) |
 | `strobeColumns()` → `bool` | Whether the current effect renders as discrete strobed columns (dark inter-column gaps) rather than a continuous smeared band; `false` when no effect is set. Daydream reads it to decide whether to fill the inter-column gap |
 
-The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 330 KiB arena) for interactive solid manipulation.
+The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 298 KiB arena) for interactive solid manipulation.
 
 The bridge also exposes a `PaletteOps` class whose `bakeLut` method authors a three-key OKLCH gradient and returns a zero-copy `Uint8Array` view over a 256-entry sRGB LUT (same read-before-next-call memory-view contract as `getPixels`), used by the palette tool. It touches no global RNG, so calling it never perturbs a live engine's render stream.
 
@@ -2020,7 +2020,7 @@ Four standalone HTML pages. Three render with their own Three.js scene; `palette
 | `lissajous.html` | Designs spherical Lissajous curves with live frequency / phase sliders; outputs a C++ `LissajousParams` initializer for the engine's Lissajous effects (`ChaoticStrings`, `Comets`). |
 | `mobius.html` | Visualizes Möbius transformations on the sphere via stereographic projection; lets you sweep the four complex coefficients and see the warp on a latitude-longitude grid. |
 | `palettes.html` | Tunes `ProceduralPalette` cosine coefficients and `GenerativePalette` harmony rules and exports the C++ initializer; renders its swatches and graphs on 2D canvas contexts rather than a Three.js scene. |
-| `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated tooling arenas (16 MB, separate from the engine's 330 KiB arena). |
+| `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated tooling arenas (16 MB, separate from the engine's 298 KiB arena). |
 
 All four reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`.
 
