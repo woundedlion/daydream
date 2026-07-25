@@ -545,9 +545,16 @@ The Filter auto-syncs from the Style every frame — when the Style lerps betwee
 
 | Preset | Description |
 |---|---|
+| `Style::ArcingLightning()` | Branching, fast-moving distortion with pronounced hue rotation. |
+| `Style::SlowFire()` | Broad, slowly evolving turbulence with gentle color drift. |
+| `Style::EnergeticFire()` | Broad, quickly evolving turbulence with gentle color drift. |
 | `Style::SlowTwist()` | Static fine-grain turbulence — high amplitude over a tight scale, no temporal drift. Frozen, twisted distortion. |
 | `Style::Churn()` | Dense fine-grain turbulence with strong hue shift. Tight scale, slow drift. |
 | `Style::Smoke()` | Gentle drifting haze with slow noise. Classic smoke look. |
+| `Style::SlowDust()` | Fine, slowly drifting turbulence with gentle color rotation. |
+| `Style::WavyTrails()` | Fine, rapidly moving distortion with pronounced color trails. |
+| `Style::MeltingHi()` | Strong downward melt with slow drift and pronounced hue rotation. |
+| `Style::MeltingLo()` | Gentle downward melt with slow drift and pronounced hue rotation. |
 | `Style::Frozen()` | Static frozen distortion — no temporal movement. |
 | `Style::Shatter()` | Extreme static warping with fast decay. Shattering glass look. |
 | `Style::Drift()` | Flowing medium-strength distortion. Gentle liquid drift. |
@@ -564,7 +571,7 @@ Available transform functions:
 
 | Color Transform | Description |
 |---|---|
-| `Feedback::hue_fade` (default) | Multiplies by fade, then rotates hue by `style.hue_shift` |
+| `Feedback::hue_fade` (default) | Multiplies by fade, then rotates hue by `style.hue_shift * -log(style.fade)` per frame. `hue_shift` is the rotation per e-fold decrease in feedback brightness, so equal brightness levels have equal hues at any fade. |
 | `Feedback::plain_fade` | Multiplies by fade only — no color shift |
 
 Custom presets can use any function matching the `Feedback::SpaceFn` / `Feedback::ColorFn` signatures.
