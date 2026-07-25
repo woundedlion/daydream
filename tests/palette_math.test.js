@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 const {
   ProceduralPalette, PRNG, GenerativePalette,
   mapValue, proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
+  NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
 } = await import('../tools/palette_math.js');
 
 // Mock bakeLut (smooth in-range sRGB ramp) records its last args so the
@@ -47,6 +48,36 @@ test('ProceduralPalette.get at t=0 and t=0.5 for a known coefficient set', () =>
 
   assert.ok(Math.abs(p.getChannelValue(0, 0) - 1.0) < NEAR);
   assert.ok(Math.abs(p.getChannelValue(0.5, 0) - 0.0) < NEAR);
+});
+
+/** Verifies the named-palette table is a non-empty set of uniquely named {name, a,b,c,d} vec3 entries. */
+test('NAMED_PROCEDURAL_PALETTES is a well-formed table of coefficient vec3s', () => {
+  assert.ok(Array.isArray(NAMED_PROCEDURAL_PALETTES) && NAMED_PROCEDURAL_PALETTES.length > 0);
+  const names = new Set();
+  for (const entry of NAMED_PROCEDURAL_PALETTES) {
+    assert.equal(typeof entry.name, 'string');
+    assert.ok(entry.name.length > 0);
+    assert.ok(!names.has(entry.name), `duplicate palette name ${entry.name}`);
+    names.add(entry.name);
+    for (const key of ['a', 'b', 'c', 'd']) {
+      assert.ok(Array.isArray(entry[key]) && entry[key].length === 3, `${entry.name}.${key} is a vec3`);
+      for (const ch of entry[key]) assert.ok(Number.isFinite(ch), `${entry.name}.${key} channel finite`);
+    }
+  }
+  assert.ok(names.has('DARK_RAINBOW'));
+});
+
+/** Verifies proceduralPaletteParams flattens a/b/c/d vec3s into the 12-key parameters object in channel order. */
+test('proceduralPaletteParams flattens a coefficient set into A_R..D_B', () => {
+  const params = proceduralPaletteParams({
+    a: [0.1, 0.2, 0.3], b: [0.4, 0.5, 0.6], c: [1.1, 1.2, 1.3], d: [0.7, 0.8, 0.9],
+  });
+  assert.deepEqual(params, {
+    A_R: 0.1, A_G: 0.2, A_B: 0.3,
+    B_R: 0.4, B_G: 0.5, B_B: 0.6,
+    C_R: 1.1, C_G: 1.2, C_B: 1.3,
+    D_R: 0.7, D_G: 0.8, D_B: 0.9,
+  });
 });
 
 /** Verifies the PRNG yields identical sequences for equal seeds (via next and nextInt) and diverges for different seeds. */
