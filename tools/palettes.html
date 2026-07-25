@@ -104,15 +104,36 @@
       /* Indicate it's clickable for copying */
     }
 
+    #palette_gallery {
+      max-height: 26rem;
+      overflow-y: auto;
+      padding-right: 0.25rem;
+    }
+
+    @media (min-width: 1024px) {
+      .palette-panel {
+        width: 18rem;
+        flex-shrink: 0;
+        align-self: flex-start;
+        position: sticky;
+        top: 1rem;
+      }
+
+      #palette_gallery {
+        max-height: calc(100vh - 9rem);
+      }
+    }
+
     .palette-swatch {
       display: flex;
-      flex-direction: column;
+      align-items: stretch;
       padding: 0;
       border: 2px solid #475569;
       border-radius: 0.5rem;
       overflow: hidden;
       cursor: pointer;
       background: transparent;
+      text-align: left;
       transition: border-color 0.15s, transform 0.05s;
     }
 
@@ -121,7 +142,7 @@
     }
 
     .palette-swatch:active {
-      transform: scale(0.97);
+      transform: scale(0.98);
     }
 
     .palette-swatch:focus-visible {
@@ -130,15 +151,17 @@
     }
 
     .palette-swatch-strip {
-      width: 100%;
-      height: 2.75rem;
+      flex-shrink: 0;
+      width: 3rem;
     }
 
     .palette-swatch-label {
-      padding: 0.375rem 0.5rem;
-      font-size: 0.75rem;
+      flex: 1;
+      min-width: 0;
+      align-self: center;
+      padding: 0.5rem 0.625rem;
+      font-size: 0.8125rem;
       color: #CBD5E1;
-      text-align: center;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -191,76 +214,74 @@
     </div>
 
     <div id="tab-content-procedural" class="tab-content active mb-6">
-      <h2 class="text-2xl font-semibold text-white mb-4">Palette Parameters: C(t) = A + B &middot; cos(2 &pi; (Ct + D))
-      </h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="flex flex-col lg:flex-row gap-6">
 
-        <!-- PARAMETER A: BASE / OFFSET -->
-        <div class="param-group space-y-4">
-          <h3 class="text-lg font-bold text-blue-400">Vector A (Base Value)</h3>
-          <p class="text-xs text-gray-400">Sets the center value of the color oscillation.</p>
-          <!-- Lock Checkbox for A -->
-          <div class="flex items-center space-x-2 text-sm text-gray-300">
-            <input type="checkbox" id="lock_A"
-              class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
-            <label for="lock_A">Lock R, G, B</label>
+        <!-- Left column: parameter controls -->
+        <div class="flex-1 min-w-0 space-y-4">
+          <h2 class="text-2xl font-semibold text-white mb-4">Palette Parameters: C(t) = A + B &middot; cos(2 &pi; (Ct + D))
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <!-- PARAMETER A: BASE / OFFSET -->
+            <div class="param-group space-y-2">
+              <h3 class="text-lg font-bold text-blue-400">Vector A (Base Value)</h3>
+              <div class="flex items-center space-x-2 text-sm text-gray-300">
+                <input type="checkbox" id="lock_A"
+                  class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
+                <label for="lock_A">Lock R, G, B</label>
+              </div>
+              <div id="A_R_container"></div>
+              <div id="A_G_container"></div>
+              <div id="A_B_container"></div>
+            </div>
+
+            <!-- PARAMETER B: AMPLITUDE -->
+            <div class="param-group space-y-2">
+              <h3 class="text-lg font-bold text-green-400">Vector B (Amplitude)</h3>
+              <div class="flex items-center space-x-2 text-sm text-gray-300">
+                <input type="checkbox" id="lock_B"
+                  class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
+                <label for="lock_B">Lock R, G, B</label>
+              </div>
+              <div id="B_R_container"></div>
+              <div id="B_G_container"></div>
+              <div id="B_B_container"></div>
+            </div>
+
+            <!-- PARAMETER C: FREQUENCY -->
+            <div class="param-group space-y-2">
+              <h3 class="text-lg font-bold text-red-400">Vector C (Frequency)</h3>
+              <div class="flex items-center space-x-2 text-sm text-gray-300">
+                <input type="checkbox" id="lock_C"
+                  class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
+                <label for="lock_C">Lock R, G, B</label>
+              </div>
+              <div id="C_R_container"></div>
+              <div id="C_G_container"></div>
+              <div id="C_B_container"></div>
+            </div>
+
+            <!-- PARAMETER D: PHASE -->
+            <div class="param-group space-y-2">
+              <h3 class="text-lg font-bold text-yellow-400">Vector D (Phase Shift)</h3>
+              <div class="flex items-center space-x-2 text-sm text-gray-300">
+                <input type="checkbox" id="lock_D"
+                  class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
+                <label for="lock_D">Lock R, G, B</label>
+              </div>
+              <div id="D_R_container"></div>
+              <div id="D_G_container"></div>
+              <div id="D_B_container"></div>
+            </div>
           </div>
-          <div id="A_R_container"></div>
-          <div id="A_G_container"></div>
-          <div id="A_B_container"></div>
         </div>
 
-        <!-- PARAMETER B: AMPLITUDE -->
-        <div class="param-group space-y-4">
-          <h3 class="text-lg font-bold text-green-400">Vector B (Amplitude)</h3>
-          <p class="text-xs text-gray-400">Controls the range/intensity of the oscillation.</p>
-          <!-- Lock Checkbox for B -->
-          <div class="flex items-center space-x-2 text-sm text-gray-300">
-            <input type="checkbox" id="lock_B"
-              class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
-            <label for="lock_B">Lock R, G, B</label>
-          </div>
-          <div id="B_R_container"></div>
-          <div id="B_G_container"></div>
-          <div id="B_B_container"></div>
+        <!-- Right column: named-palette side panel. Each swatch loads its
+             coefficients on click. -->
+        <div class="param-group palette-panel space-y-3">
+          <h3 class="text-lg font-bold text-white">Named Palettes</h3>
+          <div id="palette_gallery" class="grid grid-cols-1 gap-2"></div>
         </div>
-
-        <!-- PARAMETER C: FREQUENCY -->
-        <div class="param-group space-y-4">
-          <h3 class="text-lg font-bold text-red-400">Vector C (Frequency)</h3>
-          <p class="text-xs text-gray-400">Determines the number of cycles across the palette (0 to 5).</p>
-          <!-- Lock Checkbox for C -->
-          <div class="flex items-center space-x-2 text-sm text-gray-300">
-            <input type="checkbox" id="lock_C"
-              class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
-            <label for="lock_C">Lock R, G, B</label>
-          </div>
-          <div id="C_R_container"></div>
-          <div id="C_G_container"></div>
-          <div id="C_B_container"></div>
-        </div>
-
-        <!-- PARAMETER D: PHASE -->
-        <div class="param-group space-y-4">
-          <h3 class="text-lg font-bold text-yellow-400">Vector D (Phase Shift)</h3>
-          <p class="text-xs text-gray-400">Shifts the starting point of the wave (0 to 1).</p>
-          <!-- Lock Checkbox for D -->
-          <div class="flex items-center space-x-2 text-sm text-gray-300">
-            <input type="checkbox" id="lock_D"
-              class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
-            <label for="lock_D">Lock R, G, B</label>
-          </div>
-          <div id="D_R_container"></div>
-          <div id="D_G_container"></div>
-          <div id="D_B_container"></div>
-        </div>
-      </div>
-
-      <!-- Named-palette gallery: each swatch loads its coefficients on click. -->
-      <div class="mt-8 space-y-3">
-        <h3 class="text-lg font-bold text-white">Named Palettes</h3>
-        <p class="text-xs text-gray-400">Click a swatch to load its parameters into the controls above.</p>
-        <div id="palette_gallery" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"></div>
       </div>
     </div> <!-- End Procedural Tab -->
 
