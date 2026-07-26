@@ -111,23 +111,17 @@
     }
 
     @media (min-width: 1024px) {
+      /* The panel stretches to the content column's full height (the flex row's
+         default align-items: stretch), so the card runs the whole way down the
+         side alongside every content card. */
       .palette-panel {
-        position: relative;
         width: 18rem;
         flex-shrink: 0;
       }
 
-      /* Out of flow so the panel's height comes from the controls column (via
-         the row's align-items: stretch) instead of the long swatch list; the
-         gallery then fills the whole side and scrolls within it. top clears the
-         panel heading. */
       #palette_gallery {
-        position: absolute;
-        top: 3.5rem;
-        left: 1rem;
-        right: 1rem;
-        bottom: 1rem;
         max-height: none;
+        overflow-y: visible;
       }
     }
 
@@ -205,6 +199,10 @@
 
       .tab-content {
         display: none;
+        background-color: #1E293B;
+        border: 1px solid #475569;
+        border-radius: 0 0.5rem 0.5rem 0.5rem;
+        padding: 1.5rem;
       }
 
       .tab-content.active {
@@ -218,11 +216,12 @@
       <button id="tab-btn-generative" class="tab-btn" data-tab="generative">Generative</button>
     </div>
 
-    <div id="tab-content-procedural" class="tab-content active mb-6">
-      <div class="flex flex-col lg:flex-row gap-6">
+    <!-- Page body: stacked content cards on the left, the Named Palettes card
+         stretching the full height down the right. -->
+    <div class="flex flex-col lg:flex-row gap-6">
+      <div class="flex-1 min-w-0 space-y-8">
 
-        <!-- Left column: parameter controls -->
-        <div class="flex-1 min-w-0 space-y-4">
+        <div id="tab-content-procedural" class="tab-content active">
           <h2 class="text-2xl font-semibold text-white mb-4">Palette Parameters: C(t) = A + B &middot; cos(2 &pi; (Ct + D))
           </h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -279,18 +278,9 @@
               <div id="D_B_container"></div>
             </div>
           </div>
-        </div>
+        </div> <!-- End Procedural Tab -->
 
-        <!-- Right column: named-palette side panel. Each swatch loads its
-             coefficients on click. -->
-        <div class="param-group palette-panel space-y-3">
-          <h3 class="text-lg font-bold text-white">Named Palettes</h3>
-          <div id="palette_gallery" class="flex flex-col gap-2"></div>
-        </div>
-      </div>
-    </div> <!-- End Procedural Tab -->
-
-    <div id="tab-content-generative" class="tab-content mb-6">
+    <div id="tab-content-generative" class="tab-content">
       <h2 class="text-2xl font-semibold text-white mb-4">Generative Palette Parameters</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
 
@@ -437,6 +427,15 @@
       </div>
 
     </div> <!-- This closes the grid wrapper for Animated Preview and Export Palette Code -->
+
+      </div> <!-- end left content column -->
+
+      <!-- Named Palettes: its own card stretching the full height down the side. -->
+      <div id="named_palettes_panel" class="param-group palette-panel space-y-3">
+        <h3 class="text-lg font-bold text-white">Named Palettes</h3>
+        <div id="palette_gallery" class="flex flex-col gap-2"></div>
+      </div>
+    </div> <!-- end page-body row -->
   </div> <!-- This closes .container -->
   <script type="module">
     // Shared primitives, imported rather than re-implemented inline: the
@@ -478,6 +477,10 @@
       document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
       const activeContent = document.getElementById(`tab-content-${tabName}`);
       if (activeContent) activeContent.classList.add('active');
+
+      // Named Palettes loads procedural coefficients, so it only applies here.
+      const palettesPanel = document.getElementById('named_palettes_panel');
+      if (palettesPanel) palettesPanel.style.display = (tabName === 'procedural') ? '' : 'none';
 
       // Update palette based on visible tab
       updatePalette();
