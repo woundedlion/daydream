@@ -224,11 +224,11 @@
         <div id="tab-content-procedural" class="tab-content active">
           <h2 class="text-2xl font-semibold text-white mb-4">Palette Parameters: C(t) = A + B &middot; cos(2 &pi; (Ct + D))
           </h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
             <!-- PARAMETER A: BASE / OFFSET -->
             <div class="param-group space-y-2">
-              <h3 class="text-lg font-bold text-blue-400">Vector A (Base Value)</h3>
+              <h3 class="text-lg font-bold text-blue-400">Base</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
                 <input type="checkbox" id="lock_A"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
@@ -241,7 +241,7 @@
 
             <!-- PARAMETER B: AMPLITUDE -->
             <div class="param-group space-y-2">
-              <h3 class="text-lg font-bold text-green-400">Vector B (Amplitude)</h3>
+              <h3 class="text-lg font-bold text-green-400">Amp</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
                 <input type="checkbox" id="lock_B"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
@@ -254,7 +254,7 @@
 
             <!-- PARAMETER C: FREQUENCY -->
             <div class="param-group space-y-2">
-              <h3 class="text-lg font-bold text-red-400">Vector C (Frequency)</h3>
+              <h3 class="text-lg font-bold text-red-400">Freq</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
                 <input type="checkbox" id="lock_C"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
@@ -267,7 +267,7 @@
 
             <!-- PARAMETER D: PHASE -->
             <div class="param-group space-y-2">
-              <h3 class="text-lg font-bold text-yellow-400">Vector D (Phase Shift)</h3>
+              <h3 class="text-lg font-bold text-yellow-400">Phase</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
                 <input type="checkbox" id="lock_D"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
