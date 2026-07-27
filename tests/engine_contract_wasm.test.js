@@ -30,6 +30,25 @@ test('HolosphereEngine exposes the method surface the FakeEngines mock', () => {
   }
 });
 
+test('getSupportedResolutions reports buildable [w, h] rows', () => {
+  const rows = M.HolosphereEngine.getSupportedResolutions();
+  assert.ok(Array.isArray(rows), 'getSupportedResolutions must return an array');
+  assert.ok(rows.length > 0, 'the engine must report at least one resolution');
+  for (const row of rows) {
+    assert.ok(Array.isArray(row) && row.length === 2,
+      'each reported resolution must be a [w, h] pair');
+    const [w, h] = row;
+    assert.equal(typeof w, 'number', 'reported width must be a number');
+    assert.equal(typeof h, 'number', 'reported height must be a number');
+    assert.equal(engine.setResolution(w, h), true,
+      `the engine must build the ${w}x${h} row it reports`);
+  }
+  // daydream.js narrows its preset table to these rows; a preset it offers must
+  // stay reachable.
+  assert.ok(rows.some(([w, h]) => w === W && h === H),
+    `the ${W}x${H} preset must be a reported resolution`);
+});
+
 test('HolosphereEngine return shapes match what the segmented path consumes', () => {
   // Strict boolean: segment_worker gates on `=== false`.
   const ok = engine.setResolution(W, H);

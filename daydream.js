@@ -15,6 +15,7 @@ import {
   applyInitialState,
   snapshotEffectControlState,
   restoreEffectControlState,
+  offeredResolutions,
 } from "./effect_sequencing.js";
 import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
@@ -71,6 +72,8 @@ const LoResFavorites = [
   "Voronoi",
 ];
 
+// Display metadata (label, dot size) per resolution. The dropdown offers only
+// the subset the engine reports through getSupportedResolutions().
 const resolutionPresets = {
   "Holosphere (96x20)": { h: 20, w: 96, dotSize: 2 },
   "Phantasm (288x144)": { h: 144, w: 288, dotSize: 0.25 },
@@ -470,6 +473,31 @@ function applyResolution(preserveParams = false) {
   daydream.invalidate();
 }
 
+/**
+ * Narrow the resolution dropdown to the rows the engine reports it can build,
+ * correcting the active resolution when the hydrated one is not among them.
+ * @param {Object} module - The loaded WASM module.
+ * @returns {void}
+ */
+function syncResolutionOptions(module) {
+  let supported = null;
+  try { supported = module.HolosphereEngine.getSupportedResolutions(); }
+  catch (e) { console.warn('getSupportedResolutions failed (offering every preset):', e); }
+
+  const { labels, unlabeled } = offeredResolutions(resolutionPresets, supported);
+  if (unlabeled.length > 0) {
+    console.warn(`Engine resolutions with no preset (not offered): ${unlabeled.join(', ')}`);
+  }
+  resolutionController.options(labels);
+
+  const current = appState.get('resolution');
+  if (!labels.includes(current)) {
+    console.warn(`Resolution "${current}" is not supported by the engine; using "${labels[0]}".`);
+    // Fires the controller's onChange, so appState and the URL both follow.
+    resolutionController.setValue(labels[0]);
+  }
+}
+
 let restoringSwitch = false;
 
 function reportSwitchFailure(label, result) {
@@ -548,6 +576,8 @@ let testAllIndex = 0;
 createHolosphereModule().then(module => {
   host.module = module;
   host.engine = new module.HolosphereEngine();
+
+  syncResolutionOptions(module);
 
   // Resolution and effect are both applied once via applyResolution(true) below,
   // before first paint: it sets the hydrated resolution and validates the hydrated

@@ -8,6 +8,7 @@ import {
   applyInitialState,
   snapshotEffectControlState,
   restoreEffectControlState,
+  offeredResolutions,
 } from '../effect_sequencing.js';
 
 function makeEffectControls(values, paused = false, sinks = null) {
@@ -220,4 +221,40 @@ test('unequal lengths skew (either direction)', () => {
   assert.equal(paramValueSkew(3, 4), true);
   assert.equal(paramValueSkew(4, 3), true);
   assert.equal(paramValueSkew(0, 1), true);
+});
+
+// offeredResolutions keeps the resolution dropdown to the rows the engine
+// reports through getSupportedResolutions().
+
+const PRESETS = {
+  'Holosphere (96x20)': { h: 20, w: 96, dotSize: 2 },
+  'Phantasm (288x144)': { h: 144, w: 288, dotSize: 0.25 },
+};
+
+test('every preset is offered when the engine reports nothing', () => {
+  const all = Object.keys(PRESETS);
+  for (const supported of [null, undefined, []]) {
+    assert.deepEqual(offeredResolutions(PRESETS, supported),
+      { labels: all, unlabeled: [] });
+  }
+});
+
+test('a preset the engine no longer builds is dropped', () => {
+  assert.deepEqual(offeredResolutions(PRESETS, [[96, 20]]),
+    { labels: ['Holosphere (96x20)'], unlabeled: [] });
+});
+
+test('offered labels keep the preset table order', () => {
+  assert.deepEqual(offeredResolutions(PRESETS, [[288, 144], [96, 20]]).labels,
+    ['Holosphere (96x20)', 'Phantasm (288x144)']);
+});
+
+test('an engine row no preset covers is reported, not offered', () => {
+  assert.deepEqual(offeredResolutions(PRESETS, [[96, 20], [64, 32]]),
+    { labels: ['Holosphere (96x20)'], unlabeled: ['64x32'] });
+});
+
+test('a wholly unmatched engine list leaves every preset offered', () => {
+  assert.deepEqual(offeredResolutions(PRESETS, [[64, 32]]),
+    { labels: Object.keys(PRESETS), unlabeled: [] });
 });
