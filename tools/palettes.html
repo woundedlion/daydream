@@ -169,6 +169,37 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+
+    /* Tab Styles */
+    .tab-btn {
+      padding: 0.5rem 1.5rem;
+      background-color: #334155;
+      color: #94A3B8;
+      border-radius: 0.5rem 0.5rem 0 0;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+      border-bottom: none;
+    }
+
+    .tab-btn.active {
+      background-color: #1E293B;
+      color: #3B82F6;
+      border-color: #475569;
+    }
+
+    .tab-content {
+      display: none;
+      background-color: #1E293B;
+      border: 1px solid #475569;
+      border-radius: 0 0.5rem 0.5rem 0.5rem;
+      padding: 1.5rem;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
   </style>
 </head>
 
@@ -177,38 +208,6 @@
   <div class="container space-y-8">
     <h1 class="text-3xl font-bold text-center text-white pt-4">Procedural Color Palette Generator</h1>
 
-    <style>
-      /* Tab Styles */
-      .tab-btn {
-        padding: 0.5rem 1.5rem;
-        background-color: #334155;
-        color: #94A3B8;
-        border-radius: 0.5rem 0.5rem 0 0;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-        border: 1px solid transparent;
-        border-bottom: none;
-      }
-
-      .tab-btn.active {
-        background-color: #1E293B;
-        color: #3B82F6;
-        border-color: #475569;
-      }
-
-      .tab-content {
-        display: none;
-        background-color: #1E293B;
-        border: 1px solid #475569;
-        border-radius: 0 0.5rem 0.5rem 0.5rem;
-        padding: 1.5rem;
-      }
-
-      .tab-content.active {
-        display: block;
-      }
-    </style>
     <!-- 1. PALETTE PARAMETERS (CONTROLS) -->
     <div class="flex border-b border-slate-600 mb-0">
       <button id="tab-btn-procedural" class="tab-btn active" data-tab="procedural">Procedural
@@ -439,8 +438,8 @@
   </div> <!-- This closes .container -->
   <script type="module">
     // Shared primitives, imported rather than re-implemented inline: the
-    // clipboard copy (tools/clipboard.js) and the OKLab/OKLCH/sRGB color math
-    // (tools/color.js, which mirrors the engine's core/color.h pipeline).
+    // clipboard copy (tools/clipboard.js) and the sRGB/linear-RGB transfer
+    // functions (tools/color.js, which mirrors core/color/color.h's).
     import { copyWithFeedback, COPY_FEEDBACK } from './clipboard.js';
     // Labelled range slider + readout, shared with the other tool pages.
     import { createSlider as buildSlider } from './slider.js';
@@ -451,14 +450,12 @@
     // PaletteOps embind class, so the tool previews the device's exact colors
     // instead of a hand-ported JS reimplementation that can silently drift.
     import createHolosphereModule from '../holosphere_wasm.js';
-    import {
-      srgbToLinearFloat, linearToSrgbFloat, linearRgbToHex,
-    } from './color.js';
+    import { linearToSrgbFloat, linearRgbToHex } from './color.js';
     // Pure palette math (ProceduralPalette/GenerativePalette + helpers and the
     // C++ export-string generators) lives in palette_math.js so it can be unit
     // tested without a DOM. DOM-coupled wiring stays inline below.
     import {
-      ProceduralPalette, PRNG, GenerativePalette,
+      ProceduralPalette, GenerativePalette,
       mapValue, proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
       NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
     } from './palette_math.js';
@@ -487,13 +484,6 @@
       // Update palette based on visible tab
       updatePalette();
     }
-
-    // --- Generative Palette Implementation ---
-    // ProceduralPalette, GenerativePalette, PRNG,
-    // mapValue and the C++ export-string generators are imported from
-    // palette_math.js (top of this module). The sRGB / linear-RGB / OKLab /
-    // OKLCH math lives in tools/color.js so the tools and the engine share one
-    // perceptual pipeline instead of drifting inline copies.
 
     // --- State and UI Elements ---
 
