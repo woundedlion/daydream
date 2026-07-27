@@ -234,9 +234,9 @@
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
                 <label for="lock_A">Lock R, G, B</label>
               </div>
-              <div id="A_R_container"></div>
-              <div id="A_G_container"></div>
-              <div id="A_B_container"></div>
+              <div id="A_R_container" class="flex items-center space-x-2"></div>
+              <div id="A_G_container" class="flex items-center space-x-2"></div>
+              <div id="A_B_container" class="flex items-center space-x-2"></div>
             </div>
 
             <!-- PARAMETER B: AMPLITUDE -->
@@ -247,9 +247,9 @@
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
                 <label for="lock_B">Lock R, G, B</label>
               </div>
-              <div id="B_R_container"></div>
-              <div id="B_G_container"></div>
-              <div id="B_B_container"></div>
+              <div id="B_R_container" class="flex items-center space-x-2"></div>
+              <div id="B_G_container" class="flex items-center space-x-2"></div>
+              <div id="B_B_container" class="flex items-center space-x-2"></div>
             </div>
 
             <!-- PARAMETER C: FREQUENCY -->
@@ -260,9 +260,9 @@
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
                 <label for="lock_C">Lock R, G, B</label>
               </div>
-              <div id="C_R_container"></div>
-              <div id="C_G_container"></div>
-              <div id="C_B_container"></div>
+              <div id="C_R_container" class="flex items-center space-x-2"></div>
+              <div id="C_G_container" class="flex items-center space-x-2"></div>
+              <div id="C_B_container" class="flex items-center space-x-2"></div>
             </div>
 
             <!-- PARAMETER D: PHASE -->
@@ -273,9 +273,9 @@
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
                 <label for="lock_D">Lock R, G, B</label>
               </div>
-              <div id="D_R_container"></div>
-              <div id="D_G_container"></div>
-              <div id="D_B_container"></div>
+              <div id="D_R_container" class="flex items-center space-x-2"></div>
+              <div id="D_G_container" class="flex items-center space-x-2"></div>
+              <div id="D_B_container" class="flex items-center space-x-2"></div>
             </div>
           </div>
         </div> <!-- End Procedural Tab -->
@@ -442,6 +442,8 @@
     // clipboard copy (tools/clipboard.js) and the OKLab/OKLCH/sRGB color math
     // (tools/color.js, which mirrors the engine's core/color.h pipeline).
     import { copyWithFeedback, COPY_FEEDBACK } from './clipboard.js';
+    // Labelled range slider + readout, shared with the other tool pages.
+    import { createSlider as buildSlider } from './slider.js';
     // Fatal-error banner from the THREE-free banner module (not shared.js, which
     // pulls in three.js — a dependency this tool otherwise doesn't have).
     import { showFatalError } from './banner.js';
@@ -539,23 +541,23 @@
     // Each entry carries a 'group' property.
     const sliderDefinitions = [
       // A (Base): Range [0, 1]
-      { param: 'A_R', container: 'A_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'A' },
-      { param: 'A_G', container: 'A_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'A' },
-      { param: 'A_B', container: 'A_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'A' },
+      { param: 'A_R', container: 'A_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'A' },
+      { param: 'A_G', container: 'A_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'A' },
+      { param: 'A_B', container: 'A_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'A' },
       // B (Amplitude): Range [0, 1]
-      { param: 'B_R', container: 'B_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'B' },
-      { param: 'B_G', container: 'B_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'B' },
-      { param: 'B_B', container: 'B_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'B' },
+      { param: 'B_R', container: 'B_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'B' },
+      { param: 'B_G', container: 'B_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'B' },
+      { param: 'B_B', container: 'B_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 1, step: 0.001, scale: 1000, group: 'B' },
       // C (Frequency): Range [-5, 5] — engine palettes run the cosine backwards
       // with negative frequencies.
-      { param: 'C_R', container: 'C_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: -5000, max: 5000, step: 1, scale: 1000, group: 'C' },
-      { param: 'C_G', container: 'C_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: -5000, max: 5000, step: 1, scale: 1000, group: 'C' },
-      { param: 'C_B', container: 'C_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: -5000, max: 5000, step: 1, scale: 1000, group: 'C' },
+      { param: 'C_R', container: 'C_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
+      { param: 'C_G', container: 'C_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
+      { param: 'C_B', container: 'C_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: -5, max: 5, step: 0.001, scale: 1000, group: 'C' },
       // D (Phase): Range [-1, 2] — a full period either side of [0, 1], so an
       // engine phase past 1 (or a zoom-derived negative one) stays representable.
-      { param: 'D_R', container: 'D_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: -1000, max: 2000, step: 1, scale: 1000, group: 'D' },
-      { param: 'D_G', container: 'D_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: -1000, max: 2000, step: 1, scale: 1000, group: 'D' },
-      { param: 'D_B', container: 'D_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: -1000, max: 2000, step: 1, scale: 1000, group: 'D' }
+      { param: 'D_R', container: 'D_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' },
+      { param: 'D_G', container: 'D_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' },
+      { param: 'D_B', container: 'D_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: -1, max: 2, step: 0.001, scale: 1000, group: 'D' }
     ];
 
     // --- Helper Functions ---
@@ -570,52 +572,20 @@
          * Creates the HTML structure for a single parameter slider.
          */
     function createSlider(def) {
-      const container = document.getElementById(def.container);
-      // Safety check if container doesn't exist
-      if (!container) {
-        console.error(`Slider container not found: ${def.container}`);
-        return;
-      }
-      const value = parameters[def.param] * def.scale;
-
-      container.innerHTML = `
-      <div class="flex items-center space-x-2">
-        <label for="${def.param}_slider" class="w-4 h-4 text-center font-bold text-${def.color}">${def.label}</label>
-        <input type="range" id="${def.param}_slider" min="${def.min}" max="${def.max}" step="${def.step}" value="${value}" class="${def.thumb}">
-        <span id="${def.param}_value" class="slider-label w-16 text-right">${parameters[def.param].toFixed(3)}</span>
-      </div>
-    `;
-
-      const slider = document.getElementById(`${def.param}_slider`);
-      const valueSpan = document.getElementById(`${def.param}_value`);
-
-      // Seed the per-group start values a locked relative drag works from. Must
-      // fire on mouse, touch, and keyboard input: touch drags and arrow-key
-      // presses emit `input` with no preceding `mousedown`, so without a seed the
-      // locked branch below sees an empty map and the Lock checkbox silently does
-      // nothing.
-      const seedLockedDrag = () => {
-        const lockCheckbox = document.getElementById(`lock_${def.group}`);
-        const isLocked = lockCheckbox ? lockCheckbox.checked : false;
-
-        if (isLocked) {
-          lockedDragStartValues = {}; // Clear previous drag values
-          sliderDefinitions.forEach(groupDef => {
-            if (groupDef.group === def.group) {
-              const groupSlider = document.getElementById(`${groupDef.param}_slider`);
-              if (groupSlider) { // Safety check
-                lockedDragStartValues[groupDef.param] = parseFloat(groupSlider.value);
-              }
-            }
-          });
-        }
-      };
-      slider.addEventListener('mousedown', seedLockedDrag);
-      slider.addEventListener('touchstart', seedLockedDrag, { passive: true });
-      slider.addEventListener('keydown', seedLockedDrag);
-
-      // input listener: applies relative movement to the whole locked group
-      slider.addEventListener('input', () => {
+      const { slider } = buildSlider(def.container, {
+        id: def.param,
+        label: def.label,
+        min: def.min,
+        max: def.max,
+        step: def.step,
+        value: parameters[def.param],
+        scale: def.scale,
+        decimals: 3,
+        labelSuffix: '',
+        labelClass: `w-4 h-4 text-center font-bold text-${def.color}`,
+        sliderClass: def.thumb,
+        valueClass: 'slider-label w-16 text-right',
+      }, (rawValue) => {
         const lockCheckbox = document.getElementById(`lock_${def.group}`);
         const isLocked = lockCheckbox ? lockCheckbox.checked : false;
 
@@ -623,11 +593,10 @@
           // --- LOCKED RELATIVE MOVEMENT ---
 
           // 1. Get delta from the slider being moved
-          const currentRawValue = parseFloat(slider.value);
           const startRawValue = lockedDragStartValues[def.param];
           if (startRawValue === undefined) return; // Should not happen if mousedown fired
 
-          let rawDelta = currentRawValue - startRawValue;
+          let rawDelta = rawValue - startRawValue;
           let cappedRawDelta = rawDelta;
 
           // 2. Validate and cap delta against all sliders in the group
@@ -677,10 +646,8 @@
           });
 
         } else {
-          // --- UNLOCKED MOVEMENT ---
-          const newValue = parseFloat(slider.value) / def.scale;
-          parameters[def.param] = newValue;
-          valueSpan.textContent = newValue.toFixed(3);
+          // --- UNLOCKED MOVEMENT --- (the factory already wrote the readout)
+          parameters[def.param] = rawValue / def.scale;
         }
 
         // Any manual slider change invalidates the zoom history
@@ -690,6 +657,31 @@
 
         updatePalette();
       });
+
+      // Seed the per-group start values a locked relative drag works from. Must
+      // fire on mouse, touch, and keyboard input: touch drags and arrow-key
+      // presses emit `input` with no preceding `mousedown`, so without a seed the
+      // locked branch above sees an empty map and the Lock checkbox silently does
+      // nothing.
+      const seedLockedDrag = () => {
+        const lockCheckbox = document.getElementById(`lock_${def.group}`);
+        const isLocked = lockCheckbox ? lockCheckbox.checked : false;
+
+        if (isLocked) {
+          lockedDragStartValues = {}; // Clear previous drag values
+          sliderDefinitions.forEach(groupDef => {
+            if (groupDef.group === def.group) {
+              const groupSlider = document.getElementById(`${groupDef.param}_slider`);
+              if (groupSlider) { // Safety check
+                lockedDragStartValues[groupDef.param] = parseFloat(groupSlider.value);
+              }
+            }
+          });
+        }
+      };
+      slider.addEventListener('mousedown', seedLockedDrag);
+      slider.addEventListener('touchstart', seedLockedDrag, { passive: true });
+      slider.addEventListener('keydown', seedLockedDrag);
 
       // Clear locked values on mouseup
       slider.addEventListener('mouseup', () => {
