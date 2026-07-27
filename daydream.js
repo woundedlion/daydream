@@ -710,6 +710,9 @@ const segState = { segmented: segments.active, segments: segments.count, boundar
 // handler captures the epoch before warmModules() and bails if a later toggle
 // superseded it, so an on->off->on burst spawns the worker pool once, not twice.
 let segEpoch = 0;
+// Requested size; segments.count follows the live pool and lags this across
+// the warmModules() await.
+let segCount = segments.count;
 segFolder.add(segState, 'segmented').name('Enabled').onChange(async v => {
   segments.active = v;
   const epoch = ++segEpoch;
@@ -717,18 +720,18 @@ segFolder.add(segState, 'segmented').name('Enabled').onChange(async v => {
     // Reopen the (idle-dropped) keep-alive connection and prime the module cache
     // before the worker-spawn burst.
     await warmModules();
-    if (epoch === segEpoch && segments.active) segments.create(segments.count);
+    if (epoch === segEpoch && segments.active) segments.create(segCount);
   } else {
     segments.destroy();
     segments.updateStats();
   }
 });
 segFolder.add(segState, 'segments', 2, 8, 2).name('Segments').onChange(async v => {
-  segments.count = v;
+  segCount = v;
   const epoch = ++segEpoch;
   if (segments.active) {
     await warmModules();
-    if (epoch === segEpoch && segments.active) segments.create(segments.count);
+    if (epoch === segEpoch && segments.active) segments.create(segCount);
   }
 });
 segFolder.addSession(segState, 'boundaries').name('Show Boundaries').onChange(v => {
