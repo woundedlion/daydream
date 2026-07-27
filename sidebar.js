@@ -309,9 +309,7 @@ export class EffectSidebar {
     if (!btns.length) return;
 
     const focused = document.activeElement;
-    let idx = btns.indexOf(focused);
-    // Focus on the container (not a button): navigate relative to the roving tab stop.
-    if (idx === -1) idx = btns.indexOf(this.tabbableBtn);
+    const idx = btns.indexOf(focused);
 
     const target = navTargetIndex(idx, btns.length, e.key);
     if (target !== -1) {
