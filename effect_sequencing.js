@@ -108,6 +108,31 @@ export function planResolutionApply(availableEffects, currentEffect) {
 }
 
 /**
+ * Select the resolution presets the engine reports it can build.
+ * @param {Object<string, {w: number, h: number}>} presets - Preset label to its
+ *   pixel dimensions.
+ * @param {Array<Array<number>>|null|undefined} supported - `[w, h]` rows the
+ *   engine reports; null/empty when it does not report them.
+ * @returns {{labels: string[], unlabeled: string[]}} The preset labels to offer,
+ *   in table order, and any engine row (as `WxH`) no preset covers. Every preset
+ *   is offered when the engine reports nothing, or when no preset matches a
+ *   reported row — an unusable list must not empty the dropdown.
+ */
+export function offeredResolutions(presets, supported) {
+  const labels = Object.keys(presets);
+  if (!supported || supported.length === 0) return { labels, unlabeled: [] };
+  const rows = new Set(Array.from(supported, ([w, h]) => `${w}x${h}`));
+  const key = (label) => `${presets[label].w}x${presets[label].h}`;
+  const offered = labels.filter((label) => rows.has(key(label)));
+  if (offered.length === 0) return { labels, unlabeled: [] };
+  const covered = new Set(offered.map(key));
+  return {
+    labels: offered,
+    unlabeled: Array.from(rows).filter((row) => !covered.has(row)),
+  };
+}
+
+/**
  * Whether the cached param-name list has drifted out of length with the engine's
  * per-frame value stream. A skew means the two can no longer be paired by index,
  * so syncGUI() and export() must skip rather than mis-bind sliders.
