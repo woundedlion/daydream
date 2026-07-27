@@ -1646,9 +1646,10 @@
     }
 
     // Apply one op of the state.ops encoding to a WASM mesh wrapper, returning
-    // the new mesh (or null for an unknown op name). Single source of truth for
-    // op dispatch: update() (live module) and chainIsValid() (validator module)
-    // must run byte-identical chains or validation proves the wrong thing.
+    // the new mesh; throws on an op name the module does not bind. Single source
+    // of truth for op dispatch: update() (live module) and chainIsValid()
+    // (validator module) must run byte-identical chains or validation proves the
+    // wrong thing.
     function applyOp(mesh, o) {
       const opName = typeof o === 'string' ? o : o.op;
       if (opName === 'truncate') return mesh.truncate(o.params.t);
@@ -1659,7 +1660,7 @@
       if (opName === 'hankin') return mesh.hankin(o.params.angle * (Math.PI / 180));
       if (opName === 'relax') return mesh.relax(o.params.iter);
       if (mesh[opName]) return mesh[opName]();
-      return null;
+      throw new Error(`unknown op "${opName}" — not bound by the WASM MeshOps module`);
     }
 
     // --- CHAIN VALIDATION ---
@@ -1708,7 +1709,8 @@
           mesh = Ops.fromSolidName(base);
           for (const o of ops) {
             const next = applyOp(mesh, o);
-            if (next) { mesh.delete(); mesh = next; }
+            mesh.delete();
+            mesh = next;
           }
           mesh.classifyFaces();
           mesh.delete();
@@ -1759,7 +1761,8 @@
           let mesh = M.MeshOps.fromSolidName(base);
           for (const o of ops) {
             const next = applyOp(mesh, o);
-            if (next) { mesh.delete(); mesh = next; }
+            mesh.delete();
+            mesh = next;
           }
           return mesh;
         };
@@ -1778,10 +1781,8 @@
           }
           try {
             const out = applyOp(mesh, candidate);
-            if (out) {
-              out.classifyFaces(); // committing would classify; probe that too
-              out.delete();
-            }
+            out.classifyFaces(); // committing would classify; probe that too
+            out.delete();
           } catch (e) {
             bad.add(op);
             noteValidatorDeath(e);
@@ -1852,10 +1853,8 @@
       try {
         state.ops.forEach(o => {
           const nextMesh = applyOp(currentWasmMesh, o);
-          if (nextMesh) {
-            currentWasmMesh.delete();
-            currentWasmMesh = nextMesh;
-          }
+          currentWasmMesh.delete();
+          currentWasmMesh = nextMesh;
         });
       } catch (e) {
         console.error("WASM Op Error:", e);
