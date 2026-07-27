@@ -706,9 +706,9 @@ guiInstance.add(daydream, 'columnFillOverlap', 1.0, 2.0, 0.01).name('Column Fill
 const segFolder = guiInstance.addFolder('Segmented POV');
 segFolder.close();
 const segState = { segmented: segments.active, segments: segments.count, boundaries: segments.showBoundaries };
-// Bumped on every segmented enable/count change. An await'd handler captures the
-// epoch before warmModules() and bails if a later toggle superseded it, so an
-// on->off->on burst spawns the worker pool once, not twice.
+// Bumped on every segmented enable/count change and on teardown. An await'd
+// handler captures the epoch before warmModules() and bails if a later toggle
+// superseded it, so an on->off->on burst spawns the worker pool once, not twice.
 let segEpoch = 0;
 segFolder.add(segState, 'segmented').name('Enabled').onChange(async v => {
   segments.active = v;
@@ -852,6 +852,10 @@ function disposeApp() {
   urlSync.dispose();
   sidebar.dispose();
   daydream.dispose();
+  // Strand any in-flight warmModules() continuation: its post-await guard reads
+  // both, so without this it spawns a worker pool into the discarded page.
+  segments.active = false;
+  segEpoch++;
   segments.destroy();
   durationEl.remove();
 }
