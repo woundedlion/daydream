@@ -4,7 +4,7 @@
  */
 
 // Shared sRGB / linear-RGB color-space math, mirroring the engine's perceptual
-// pipeline (core/color.h: same sRGB transfer function) so the tools predict what
+// pipeline (core/color/color.h: same sRGB transfer function) so the tools predict what
 // the device renders.
 
 // --- sRGB transfer function (gamma) ---

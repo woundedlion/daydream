@@ -20,7 +20,7 @@ import { formatFloatCpp } from './cpp_format.js';
 
 const TWO_PI = 2 * Math.PI;
 
-// Mirror of the engine's fast_cosf (core/3dmath.h): a Bhaskara I sine
+// Mirror of the engine's fast_cosf (core/math/3dmath.h): a Bhaskara I sine
 // approximation, range-reduced to [0, 2π). ProceduralPalette::get evaluates its
 // cosine this way on the per-sample path, so the browser preview must use the
 // same approximation (not Math.cos) to predict device colors.
@@ -329,7 +329,7 @@ export class GenerativePalette {
   /**
    * Samples the engine-baked gradient LUT at t, interpolating between adjacent
    * entries in linear light. Domain-verified against the engine: BakedPalette::get
-   * (core/color/color.h) lerps between two linear-light Color4 LUT entries (lerp16), so
+   * (core/color/composition.h) lerps between two linear-light Color4 LUT entries (lerp16), so
    * converting each sRGB-8bit entry here to linear first and lerping in linear
    * matches the engine's interpolation DOMAIN (linear, not sRGB). Note the
    * SOURCE precision does not match: `this.lut` is the bridge's 8-bit sRGB LUT,
