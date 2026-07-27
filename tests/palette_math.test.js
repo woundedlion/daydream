@@ -215,7 +215,7 @@ test('GenerativePalette delegates resolved (shape, h,s,v x3) to bakeLut', () => 
   lastBakeArgs = null;
   new GenerativePalette('VIGNETTE', 'TRIADIC', 'FLAT', 'VIBRANT', 100);
   assert.ok(Array.isArray(lastBakeArgs) && lastBakeArgs.length === 10, 'bakeLut called with 10 args');
-  // VIGNETTE is index 2 in core/color.h GradientShape order.
+  // VIGNETTE is index 2 in core/color/color.h GradientShape order.
   assert.equal(lastBakeArgs[0], 2, 'shape enum int');
   for (let i = 1; i < 10; i++) {
     assert.ok(Number.isInteger(lastBakeArgs[i]), `arg ${i} integer`);
@@ -224,6 +224,83 @@ test('GenerativePalette delegates resolved (shape, h,s,v x3) to bakeLut', () => 
   // FLAT/VIBRANT are RNG-free: value and saturation pin to 255 on all three keys.
   assert.deepEqual([lastBakeArgs[3], lastBakeArgs[6], lastBakeArgs[9]], [255, 255, 255], 'FLAT values');
   assert.deepEqual([lastBakeArgs[2], lastBakeArgs[5], lastBakeArgs[8]], [255, 255, 255], 'VIBRANT saturations');
+});
+
+/**
+ * Records the [min, max) ranges GenerativePalette samples while `build` runs.
+ * The RNG-driven profile and harmony constants never reach bakeLut as literals,
+ * so the draw ranges are the only place they are observable.
+ * @param {() => void} build - Callback constructing the palette under test.
+ * @returns {number[][]} Every nextInt range drawn, in call order.
+ */
+function recordIntDraws(build) {
+  const ranges = [];
+  const nextInt = PRNG.prototype.nextInt;
+  PRNG.prototype.nextInt = function record(min, max) {
+    ranges.push([min, max]);
+    return nextInt.call(this, min, max);
+  };
+  try {
+    build();
+  } finally {
+    PRNG.prototype.nextInt = nextInt;
+  }
+  return ranges;
+}
+
+/**
+ * Pins the exact saturation/brightness key values of core/color/color.h
+ * GenerativePalette: the fixed profiles by their resolved bakeLut arguments, the
+ * randomized ones by the [min, max) range each key is drawn from. Draw order is
+ * the C++ constructor's: harmony hues (none for TRIADIC), then s1..s3, then
+ * v1..v3.
+ */
+test('GenerativePalette profile constants match core/color/color.h', () => {
+  const build = (brightness, sat) => () =>
+    new GenerativePalette('STRAIGHT', 'TRIADIC', brightness, sat, 0);
+
+  assert.deepEqual(recordIntDraws(build('FLAT', 'PASTEL')), [], 'PASTEL/FLAT draw nothing');
+  assert.deepEqual([lastBakeArgs[2], lastBakeArgs[5], lastBakeArgs[8]], [100, 100, 100], 'PASTEL saturations');
+  assert.deepEqual([lastBakeArgs[3], lastBakeArgs[6], lastBakeArgs[9]], [255, 255, 255], 'FLAT values');
+
+  recordIntDraws(build('FLAT', 'VIBRANT'));
+  assert.deepEqual([lastBakeArgs[2], lastBakeArgs[5], lastBakeArgs[8]], [255, 255, 255], 'VIBRANT saturations');
+
+  assert.deepEqual(recordIntDraws(build('FLAT', 'MID')),
+    [[153, 204], [153, 204], [153, 204]], 'MID saturations');
+  assert.deepEqual(recordIntDraws(build('ASCENDING', 'PASTEL')),
+    [[25, 76], [127, 178], [204, 256]], 'ASCENDING values');
+  assert.deepEqual(recordIntDraws(build('DESCENDING', 'PASTEL')),
+    [[204, 256], [127, 178], [25, 76]], 'DESCENDING values');
+  assert.deepEqual(recordIntDraws(build('BELL', 'PASTEL')),
+    [[51, 127], [178, 256]], 'BELL values');
+  assert.deepEqual(recordIntDraws(build('CUP', 'PASTEL')),
+    [[178, 256], [51, 127]], 'CUP values');
+});
+
+/**
+ * Pins the exact harmony hue offsets of core/color/color.h calc_hues: the
+ * deterministic companions by value (including the 256 wrap), the jittered ones
+ * by the range they are drawn from.
+ */
+test('GenerativePalette harmony offsets match core/color/color.h', () => {
+  const hues = (harmony, hueValue) => {
+    new GenerativePalette('STRAIGHT', harmony, 'FLAT', 'VIBRANT', hueValue);
+    return [lastBakeArgs[1], lastBakeArgs[4], lastBakeArgs[7]];
+  };
+
+  assert.deepEqual(hues('TRIADIC', 10), [10, 95, 180], 'TRIADIC is +85/+170');
+  assert.deepEqual(hues('TRIADIC', 200), [200, 29, 114], 'TRIADIC wraps at 256');
+  assert.deepEqual(hues('SPLIT_COMPLEMENTARY', 10), [10, 117, 159], 'SPLIT_COMPLEMENTARY is +128 -+21');
+  assert.deepEqual(hues('SPLIT_COMPLEMENTARY', 200), [200, 51, 93], 'SPLIT_COMPLEMENTARY wraps at 256');
+  assert.equal(hues('COMPLEMENTARY', 10)[1], 138, 'COMPLEMENTARY is +128');
+
+  assert.deepEqual(
+    recordIntDraws(() => new GenerativePalette('STRAIGHT', 'COMPLEMENTARY', 'FLAT', 'VIBRANT', 10)),
+    [[-7, 8]], 'COMPLEMENTARY jitter range');
+  assert.deepEqual(
+    recordIntDraws(() => new GenerativePalette('STRAIGHT', 'ANALOGOUS', 'FLAT', 'VIBRANT', 10)),
+    [[0, 2], [11, 22], [11, 22]], 'ANALOGOUS direction and step ranges');
 });
 
 /** Verifies GenerativePalette rejects an unknown gradient shape before reaching bakeLut. */
