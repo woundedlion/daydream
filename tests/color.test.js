@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-// tools/color.js mirrors the engine's perceptual pipeline (core/color.h).
+// tools/color.js mirrors the engine's perceptual pipeline (core/color/color.h).
 const {
   srgbToLinearFloat, linearToSrgbFloat,
   linearRgbToHex,
