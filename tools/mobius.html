@@ -130,6 +130,13 @@
       align-items: center;
     }
 
+    /* The export panel holds a code block rather than a square pad, so it opts
+       out of .param-group's fixed width and centered column. */
+    #export_group {
+      width: 300px;
+      align-items: stretch;
+    }
+
     .complex-plane-control {
       position: relative;
       width: 100%;
@@ -242,6 +249,10 @@
         width: 130px;
       }
 
+      #export_group {
+        width: 240px;
+      }
+
       #parameters {
         justify-content: flex-start;
       }
@@ -300,16 +311,31 @@
         <h3 class="text-xs uppercase tracking-wider font-semibold text-indigo-400">Param D</h3>
         <div id="D_control_container" class="w-full"></div>
       </div>
+      <div id="export_group" class="param-group">
+        <div class="flex justify-between items-center w-full mb-1">
+          <h3 class="text-xs uppercase tracking-wider font-semibold text-indigo-400">Export Code</h3>
+          <button id="copy_code_button"
+            class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-xs font-medium transition-all shadow-lg text-white">
+            Copy Snippet
+          </button>
+        </div>
+        <p class="text-xs text-gray-400 mb-1">
+          C++ <span class="font-mono text-indigo-300">MobiusParams</span> initializer:
+          <span id="copy_code_prompt" class="ml-2 text-gray-500 transition-colors duration-300" role="status"></span>
+        </p>
+        <pre class="bg-slate-900 p-2 rounded-lg border border-slate-700 overflow-x-auto cursor-pointer"
+          id="code_pre_block"><code id="mobius_code_output" class="font-mono text-xs text-slate-300 whitespace-pre-wrap"></code></pre>
+      </div>
     </div>
   </div>
 
   <script type="module">
     import * as THREE from 'three';
-    import { initScene, showFatalError } from './shared.js';
+    import { initScene, showFatalError, copyWithFeedback, COPY_FEEDBACK } from './shared.js';
     import {
       elliptic, hyperbolic, loxodromic, parabolic,
       inversion, tumble, cayley, snapComplex,
-      glslComplexFunctions,
+      glslComplexFunctions, mobiusCodeString,
     } from './mobius_transforms.js';
 
     const config = {
@@ -358,12 +384,14 @@
 
         void main() {
           vec3 p = normalize(vPosition);
-          float denom = 1.0 - p.z;
+          // Mirror of the engine's stereographic projection (core/math/3dmath.h):
+          // pole at +y, real axis x, imaginary axis z.
+          float denom = 1.0 - p.y;
           CNum w;
           bool isInfinity = false;
 
           if (denom < 1e-4) { isInfinity = true; }
-          else { w.re = p.x / denom; w.im = p.y / denom; }
+          else { w.re = p.x / denom; w.im = p.z / denom; }
 
           CNum w_prime;
           if (isInfinity) {
@@ -407,6 +435,19 @@
       u.u_c.value.re = config.C.re; u.u_c.value.im = config.C.im;
       u.u_d.value.re = config.D.re; u.u_d.value.im = config.D.im;
       updateDegenerateWarning();
+      updateCodeSnippet();
+    };
+
+    // Cached so an animating preset (which re-enters every frame) only writes
+    // the DOM when the formatted snippet actually changes.
+    let lastCode = null;
+    const updateCodeSnippet = () => {
+      const codeOutput = document.getElementById('mobius_code_output');
+      if (!codeOutput) return;
+      const code = mobiusCodeString(config.A, config.B, config.C, config.D);
+      if (code === lastCode) return;
+      codeOutput.textContent = code;
+      lastCode = code;
     };
 
     // A Möbius transform (az+b)/(cz+d) is invertible only when its complex
@@ -781,6 +822,22 @@
         applyConfig({ A: { re: 1, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 }, D: { re: 1, im: 0 } });
       });
 
+      const copyButton = document.getElementById('copy_code_button');
+      const codeOutput = document.getElementById('mobius_code_output');
+      const prompt = document.getElementById('copy_code_prompt');
+      const preBlock = document.getElementById('code_pre_block');
+
+      if (copyButton && codeOutput) {
+        const handleCopy = () => {
+          copyWithFeedback(codeOutput.textContent,
+            { element: prompt, revertText: "", ...COPY_FEEDBACK });
+        };
+
+        copyButton.addEventListener('click', handleCopy);
+        preBlock.addEventListener('click', handleCopy);
+      }
+
+      updateCodeSnippet();
       initThree();
     };
 
