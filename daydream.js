@@ -509,7 +509,7 @@ function restoreResolution(resolution, effect, url, effectState) {
   }
 }
 
-appState.subscribe((key, value, old) => {
+const unsubscribeAppState = appState.subscribe((key, value, old) => {
   if (restoringSwitch) return;
   if (key === 'effect') {
     const previousUrl = window.location.pathname + window.location.search + window.location.hash;
@@ -854,6 +854,9 @@ function disposeApp() {
   appDisposed = true;
   window.removeEventListener("keydown", onKeyDown);
   window.removeEventListener("pagehide", onPageHide);
+  // Released before the GUI/scene teardown below: a later set() would otherwise
+  // re-enter applyEffect()/applyResolution() against a disposed renderer.
+  unsubscribeAppState();
   if (testAllInterval !== null) {
     clearInterval(testAllInterval);
     testAllInterval = null;
