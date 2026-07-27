@@ -82,8 +82,10 @@ export function warmModules() {
   catch { return Promise.resolve(); }
   if (probe.protocol !== 'http:' && probe.protocol !== 'https:') return Promise.resolve();
   const urls = ['./segment_worker.js', './holosphere_wasm.js', './holosphere_wasm.wasm'];
+  // fetch resolves at the headers; the body must be drained or nothing is cached.
   return Promise.allSettled(
-    urls.map((u) => fetch(new URL(u, import.meta.url), { cache: 'force-cache' })),
+    urls.map((u) => fetch(new URL(u, import.meta.url), { cache: 'force-cache' })
+      .then((r) => r.arrayBuffer())),
   ).then(() => {});
 }
 
