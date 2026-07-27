@@ -24,6 +24,7 @@
  * @param {number} cfg.value - Initial value (display space)
  * @param {number} [cfg.scale=1] - Display-to-raw multiplier
  * @param {number} [cfg.decimals=2] - Decimals for the readout
+ * @param {string} [cfg.labelSuffix=':'] - Text appended to the label
  * @param {string} [cfg.labelClass] - Classes for the label span
  * @param {string} [cfg.sliderClass] - Classes for the input
  * @param {string} [cfg.valueClass] - Classes for the readout span
@@ -44,6 +45,7 @@ export function createSlider(containerId, cfg, onInput) {
     value,
     scale = 1,
     decimals = 2,
+    labelSuffix = ':',
     labelClass = 'w-20 text-center font-bold text-white text-lg',
     sliderClass = 'flex-grow',
     valueClass = 'slider-label w-24 text-right',
@@ -79,7 +81,7 @@ export function createSlider(containerId, cfg, onInput) {
   const labelElement = document.createElement('label');
   labelElement.htmlFor = sliderId;
   labelElement.className = labelClass;
-  labelElement.textContent = `${label}:`;
+  labelElement.textContent = `${label}${labelSuffix}`;
 
   const roundedValue = Math.round(clampedValue * scale);
 
