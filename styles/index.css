@@ -368,6 +368,10 @@
   border-color: rgba(60, 120, 240, 0.3);
 }
 
+.sort-glyph {
+  margin-left: 4px;
+}
+
 .effect-button:hover {
   background: rgba(255, 255, 255, 0.05);
   color: #ddd;
