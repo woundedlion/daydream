@@ -424,14 +424,17 @@ function applyEffect(preserveParams = false) {
  *   param URL entries through the re-apply (only if the effect is still offered;
  *   an off-list effect is corrected to the list's first entry, dropping its
  *   effect-specific URL entries regardless).
- * @returns {boolean|void} false when the engine rejected the resolution (the
- *   caller must revert appState so UI/URL don't advertise an unapplied value);
- *   otherwise undefined.
+ * @returns {boolean|void} false when the resolution was not applied — an unknown
+ *   preset name, or an engine rejection — so the caller must revert appState and
+ *   UI/URL don't advertise an unapplied value; otherwise undefined.
  */
 function applyResolution(preserveParams = false) {
   const resolution = appState.get('resolution');
   const p = resolutionPresets[resolution];
-  if (!p) return;
+  if (!p) {
+    console.error(`Unknown resolution preset "${resolution}"; keeping current.`);
+    return false;
+  }
 
   if (host.engine) {
     if (host.engine.setResolution(p.w, p.h) === false) {
