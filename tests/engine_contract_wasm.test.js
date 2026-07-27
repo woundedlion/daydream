@@ -1,13 +1,15 @@
 // @ts-nocheck
 //
-// Real-engine contract pin for the segmented-render path. segment_worker and
+// Real-engine contract pin for the WASM surface. segment_worker and
 // segment_controller run against a hand-written FakeEngine; this test loads the
 // REAL shipped module and exercises exactly the methods and return shapes the
 // worker/controller rely on, so a divergence between the FakeEngine contract and
-// the engine fails here.
+// the engine fails here. It also pins MeshOps and PaletteOps, the classes the
+// standalone tools (solids.html, palettes.html) run on.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import createHolosphereModule from '../holosphere_wasm.js';
+import { KNOWN_OPS } from '../tools/solid_codegen.js';
 
 const M = await createHolosphereModule({ print() {}, printErr() {} });
 
@@ -103,5 +105,54 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
     assert.ok(m[arena].capacity > 0, `${arena}.capacity must be > 0`);
     assert.ok(m[arena].usage <= m[arena].capacity,
       `${arena}.usage must not exceed capacity`);
+  }
+});
+
+// Everything MeshOps binds that is not a Conway/SolidBuilder operator. The
+// remainder of MeshOps.prototype is the op set the C++ MESHOP lists generate.
+const MESH_OPS_NON_OPS = new Set([
+  'constructor', 'getVertices', 'getFaces', 'classifyFaces',
+]);
+
+const meshOpNames = () =>
+  Object.getOwnPropertyNames(M.MeshOps.prototype)
+    .filter(name => !MESH_OPS_NON_OPS.has(name)).sort();
+
+test('MeshOps exposes the method surface the solids tool drives', () => {
+  assert.equal(typeof M.MeshOps, 'function', 'the module must export MeshOps');
+  for (const name of [
+    'clearToolingMemory', 'fromSolidName', 'getRegistry', 'getRecipe',
+    'getArenaMetrics',
+  ]) {
+    assert.equal(typeof M.MeshOps[name], 'function',
+      `MeshOps is missing class function ${name} (solids.html calls it)`);
+  }
+  for (const name of ['getVertices', 'getFaces', 'classifyFaces']) {
+    assert.equal(typeof M.MeshOps.prototype[name], 'function',
+      `MeshOps is missing method ${name} (solids.html calls it)`);
+  }
+  assert.ok(meshOpNames().length > 0,
+    'MeshOps must bind at least one Conway operator');
+});
+
+test('solid_codegen KNOWN_OPS matches the operators MeshOps binds', () => {
+  assert.deepEqual([...KNOWN_OPS].sort(), meshOpNames(),
+    'the codegen op list and the ops bound by the WASM module must agree; ' +
+    'update tools/solid_codegen.js KNOWN_OPS to match the engine');
+});
+
+test('PaletteOps exposes the method surface the palette tool drives', () => {
+  assert.equal(typeof M.PaletteOps, 'function',
+    'the module must export PaletteOps');
+  const ops = new M.PaletteOps();
+  try {
+    assert.equal(typeof ops.bakeLut, 'function',
+      'PaletteOps is missing bakeLut (palettes.html calls it)');
+    // STRAIGHT gradient over three in-range HSV keys.
+    const lut = ops.bakeLut(0, 0, 255, 255, 85, 255, 255, 170, 255, 255);
+    assert.ok(lut instanceof Uint8Array, 'bakeLut must return a Uint8Array');
+    assert.equal(lut.length, 256 * 3, 'bakeLut length must be 256*3');
+  } finally {
+    ops.delete();
   }
 });

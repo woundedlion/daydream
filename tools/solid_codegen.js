@@ -14,8 +14,9 @@
 
 import { formatFloatCpp } from './cpp_format.js';
 
-// The Conway/SolidBuilder operators this generator can emit.
-const KNOWN_OPS = new Set([
+// The Conway/SolidBuilder operators this generator can emit. Must match the ops
+// the WASM MeshOps class binds; engine_contract_wasm.test.js pins the agreement.
+export const KNOWN_OPS = new Set([
   'truncate', 'expand', 'chamfer', 'hankin', 'snub', 'relax', 'bevel',
   'dual', 'kis', 'ambo', 'gyro', 'meta', 'needle', 'zip',
 ]);
