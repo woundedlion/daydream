@@ -67,6 +67,50 @@ test('NAMED_PROCEDURAL_PALETTES is a well-formed table of coefficient vec3s', ()
   assert.ok(names.has('DARK_RAINBOW'));
 });
 
+/** Verifies the mirror carries the engine's whole named-palette roster, in core/color/palettes.h declaration order. */
+test('NAMED_PROCEDURAL_PALETTES mirrors the engine roster', () => {
+  assert.deepEqual(NAMED_PROCEDURAL_PALETTES.map(entry => entry.name), [
+    'DARK_RAINBOW', 'BLOOD_STREAM', 'VINTAGE_SUNSET', 'RICH_SUNSET', 'UNDERSEA',
+    'LATE_SUNSET', 'MANGO_PEEL', 'ICE_MELT', 'LEMON_LIME', 'ALGAE', 'EMBERS',
+    'FIRE_GLOW', 'DARK_PRIMARY', 'MAUVE_FADE', 'LAVENDER_LAKE', 'DESERT_ROSE',
+    'BRUISED_MOSS', 'BRUISED_BANANA', 'BRIGHT_SUNRISE', 'FIRE_AND_ICE',
+    'PEACH_POP', 'POPPED_PEACH', 'BLUE_LAGOON', 'ORANGE_CRUSH', 'PLUM_SUNRISE',
+  ]);
+});
+
+/** Verifies every named palette, including the negative-frequency entries, renders finite in-range linear color across the domain. */
+test('NAMED_PROCEDURAL_PALETTES all render across the domain', () => {
+  for (const entry of NAMED_PROCEDURAL_PALETTES) {
+    const pal = new ProceduralPalette(entry.a, entry.b, entry.c, entry.d);
+    for (let i = 0; i <= 32; i++) {
+      for (const ch of pal.get(i / 32)) {
+        assert.ok(Number.isFinite(ch) && ch >= 0 && ch <= 1, `${entry.name} at t=${i / 32}: ${ch}`);
+      }
+    }
+  }
+});
+
+/**
+ * Verifies the cosine's range reduction handles negative frequencies: POPPED_PEACH
+ * is PEACH_POP with C negated and D advanced by C, i.e. the same sweep reversed,
+ * so it must equal PEACH_POP sampled at 1 - t.
+ */
+test('ProceduralPalette negative frequency reverses the positive-frequency twin', () => {
+  const byName = (name) => NAMED_PROCEDURAL_PALETTES.find(entry => entry.name === name);
+  const forward = byName('PEACH_POP');
+  const reverse = byName('POPPED_PEACH');
+  const fwd = new ProceduralPalette(forward.a, forward.b, forward.c, forward.d);
+  const rev = new ProceduralPalette(reverse.a, reverse.b, reverse.c, reverse.d);
+  for (let i = 0; i <= 16; i++) {
+    const t = i / 16;
+    const a = rev.get(t);
+    const b = fwd.get(1 - t);
+    for (let ch = 0; ch < 3; ch++) {
+      assert.ok(Math.abs(a[ch] - b[ch]) < NEAR, `channel ${ch} at t=${t}: ${a[ch]} vs ${b[ch]}`);
+    }
+  }
+});
+
 /** Verifies proceduralPaletteParams flattens a/b/c/d vec3s into the 12-key parameters object in channel order. */
 test('proceduralPaletteParams flattens a coefficient set into A_R..D_B', () => {
   const params = proceduralPaletteParams({
