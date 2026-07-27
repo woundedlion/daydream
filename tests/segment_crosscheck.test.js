@@ -33,9 +33,10 @@ import { computeSegmentRange } from '../segment_layout.js';
 /**
  * Reference port of hardware/pov_segment_map.h::segment_map. Kept in lockstep
  * with the C++ (whose authoritative host tests live in test_pov_segmented.h):
- * segments [0, N/2) are arm A, [N/2, N) arm B; within an arm the even slot is
- * the top strip (y_base 0, +1) and the odd slot the bottom strip (y_base
- * ROWS-1, -1, reversed).
+ * segments [0, N/2) are arm A, [N/2, N) arm B; within an arm the first
+ * floor(segsPerArm/2) slots are northern strips (y_base armSeg*PPS, +1) and the
+ * rest are southern strips reversed from the S pole inward (y_base
+ * ROWS-1-southSeg*PPS, -1). A single-band arm is one forward strip.
  *
  * This is a hand port, so on its own it could drift from the C++ in lockstep
  * with `computeSegmentRange` and keep the cross-check green. To prevent that,
@@ -46,22 +47,24 @@ import { computeSegmentRange } from '../segment_layout.js';
  * `computeSegmentRange` changes.
  * @param {number} segmentId - Hardware segment id in [0, N).
  * @param {number} S - Total LEDs across both arms (ROWS = S/2).
- * @param {number} N - Segment count (even; N/2 per arm).
+ * @param {number} N - Segment count (power of two <= 8; N/2 per arm).
  * @returns {CppSegmentMap}
  */
 function cppSegmentMap(segmentId, S, N) {
   const segsPerArm = N / 2;
   const rows = S / 2;
-  // The armSeg===0 vs else split collapses every non-top slot onto the single
-  // reversed bottom strip; that holds only with <=2 bands per arm (armSeg in
-  // {0,1}). A wider arm needs a per-band offset, so assert the precondition.
-  assert.ok(segsPerArm <= 2,
-    `cppSegmentMap only models <=2 bands per arm (got segsPerArm=${segsPerArm} for N=${N})`);
-  const armSeg = segmentId % segsPerArm; // C++ masks (power-of-two segsPerArm)
+  const pps = S / N;
+  // The C++ masks with (segsPerArm - 1) and static_asserts N is a power of two
+  // <= 8, so anything else has no firmware counterpart to port.
+  assert.ok(N >= 2 && N <= 8 && (N & (N - 1)) === 0,
+    `pov_segment_map is defined for power-of-two N <= 8 (got N=${N})`);
+  const armSeg = segmentId & (segsPerArm - 1);
   const armB = segmentId >= segsPerArm;
-  return armSeg === 0
-    ? { armB, yBase: 0, yStep: 1 }
-    : { armB, yBase: rows - 1, yStep: -1 };
+  const northSegs = Math.floor(segsPerArm / 2);
+  if (segsPerArm === 1 || armSeg < northSegs) {
+    return { armB, yBase: armSeg * pps, yStep: 1 };
+  }
+  return { armB, yBase: rows - 1 - (armSeg - northSegs) * pps, yStep: -1 };
 }
 
 /**
@@ -155,13 +158,46 @@ test('segment layout ↔ pov_segment_map: canonical N=4/S=288 fixture agrees', (
 });
 
 /**
+ * Locks the 8-board config (S=288, N=8 → ROWS=144, PPS=36) against the y_base
+ * values the C++ side pins as static_asserts in test_pov_segmented.h. Four bands
+ * per arm are where the northern/southern split becomes visible: the two
+ * southern segments tile from the S pole inward, so within-arm slots 2 and 3
+ * take the BOTTOM and second-from-bottom bands respectively.
+ */
+test('segment layout ↔ pov_segment_map: 8-board N=8/S=288 fixture agrees', () => {
+  const fixture = [
+    { id: 0, armB: false, yBase: 0, rows: [0, 36] },
+    { id: 1, armB: false, yBase: 36, rows: [36, 72] },
+    { id: 2, armB: false, yBase: 143, rows: [108, 144] },
+    { id: 3, armB: false, yBase: 107, rows: [72, 108] },
+    { id: 4, armB: true, yBase: 0, rows: [0, 36] },
+    { id: 5, armB: true, yBase: 36, rows: [36, 72] },
+    { id: 6, armB: true, yBase: 143, rows: [108, 144] },
+    { id: 7, armB: true, yBase: 107, rows: [72, 108] },
+  ];
+  for (const f of fixture) {
+    const m = cppSegmentMap(f.id, 288, 8);
+    assert.equal(m.armB, f.armB, `firmware arm side for id=${f.id}`);
+    assert.equal(m.yBase, f.yBase, `firmware y_base for id=${f.id}`);
+
+    const rect = computeSegmentRange(f.id, 8, 288, 144);
+    assert.equal(rect.x0 === 144, f.armB, `arm side for id=${f.id}`);
+    assert.equal(rect.y0, f.rows[0], `y0 for id=${f.id}`);
+    assert.equal(rect.y1, f.rows[1], `y1 for id=${f.id}`);
+  }
+});
+
+/**
  * Sweeps several even configs to prove the arm/offset/row-coverage correspondence
- * holds beyond the canonical fixture, including the N=2 single-band-per-arm case.
+ * holds beyond the canonical fixture, including the N=2 single-band-per-arm case
+ * and the N=8 four-band-per-arm case.
  */
 test('segment layout ↔ pov_segment_map: correspondence holds across configs', () => {
   crossCheck(/*S=*/288, /*N=*/4, /*w=*/288);
   crossCheck(/*S=*/288, /*N=*/2, /*w=*/96);
+  crossCheck(/*S=*/288, /*N=*/8, /*w=*/288);
   crossCheck(/*S=*/8, /*N=*/4, /*w=*/8);
+  crossCheck(/*S=*/8, /*N=*/8, /*w=*/8);
 });
 
 /**
@@ -169,10 +205,10 @@ test('segment layout ↔ pov_segment_map: correspondence holds across configs', 
  * EVERY config the sweep above exercises. Without this the port (a hand
  * reimplementation of the C++) and computeSegmentRange could drift together and
  * keep the cross-check green; here the firmware side is independent literals
- * derived from pov_segment_map.h's rule (arm A = [0,N/2), top slot y_base 0 +1,
- * bottom slot y_base ROWS-1 -1), so a convention change in the port fails
- * regardless of how computeSegmentRange changes. The canonical N=4/S=288 case is
- * additionally pinned in the fixture test above.
+ * derived from pov_segment_map.h's rule (arm A = [0,N/2); northern slot k has
+ * y_base k*PPS +1; southern slot k has y_base ROWS-1-k*PPS -1), so a convention
+ * change in the port fails regardless of how computeSegmentRange changes. The canonical N=4/S=288 and
+ * 8-board N=8/S=288 cases are additionally pinned in the fixture tests above.
  */
 test('pov_segment_map port matches independent goldens', () => {
   /** @type {Array<{S:number, N:number, golden: CppSegmentMap[]}>} */
@@ -195,6 +231,29 @@ test('pov_segment_map port matches independent goldens', () => {
       { armB: false, yBase: 3, yStep: -1 },
       { armB: true, yBase: 0, yStep: 1 },
       { armB: true, yBase: 3, yStep: -1 },
+    ] },
+    // S=288, N=8 → ROWS=144, PPS=36, four bands per arm: two northern slots
+    // counting down, then two southern slots counting back from the S pole.
+    { S: 288, N: 8, golden: [
+      { armB: false, yBase: 0, yStep: 1 },
+      { armB: false, yBase: 36, yStep: 1 },
+      { armB: false, yBase: 143, yStep: -1 },
+      { armB: false, yBase: 107, yStep: -1 },
+      { armB: true, yBase: 0, yStep: 1 },
+      { armB: true, yBase: 36, yStep: 1 },
+      { armB: true, yBase: 143, yStep: -1 },
+      { armB: true, yBase: 107, yStep: -1 },
+    ] },
+    // S=8, N=8 → ROWS=4, PPS=1: one row per segment at the small extreme.
+    { S: 8, N: 8, golden: [
+      { armB: false, yBase: 0, yStep: 1 },
+      { armB: false, yBase: 1, yStep: 1 },
+      { armB: false, yBase: 3, yStep: -1 },
+      { armB: false, yBase: 2, yStep: -1 },
+      { armB: true, yBase: 0, yStep: 1 },
+      { armB: true, yBase: 1, yStep: 1 },
+      { armB: true, yBase: 3, yStep: -1 },
+      { armB: true, yBase: 2, yStep: -1 },
     ] },
   ];
   for (const { S, N, golden } of cases) {
