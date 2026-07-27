@@ -498,8 +498,8 @@
     const defaultParams = {
       A_R: 0.500, A_G: 0.500, A_B: 0.500, // Base (0.0 to 1.0)
       B_R: 0.500, B_G: 0.500, B_B: 0.500, // Amplitude (0.0 to 1.0)
-      C_R: 1.000, C_G: 1.000, C_B: 1.000, // Frequency (0.0 to 5.0)
-      D_R: 0.000, D_G: 0.330, D_B: 0.670  // Phase (0.0 to 1.0)
+      C_R: 1.000, C_G: 1.000, C_B: 1.000, // Frequency (-5.0 to 5.0)
+      D_R: 0.000, D_G: 0.330, D_B: 0.670  // Phase (-1.0 to 2.0)
     };
 
     let parameters = { ...defaultParams };
@@ -546,14 +546,16 @@
       { param: 'B_R', container: 'B_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'B' },
       { param: 'B_G', container: 'B_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'B' },
       { param: 'B_B', container: 'B_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'B' },
-      // C (Frequency): Range [0, 5]
-      { param: 'C_R', container: 'C_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 5000, step: 1, scale: 1000, group: 'C' },
-      { param: 'C_G', container: 'C_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 5000, step: 1, scale: 1000, group: 'C' },
-      { param: 'C_B', container: 'C_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 5000, step: 1, scale: 1000, group: 'C' },
-      // D (Phase): Range [0, 1]
-      { param: 'D_R', container: 'D_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'D' },
-      { param: 'D_G', container: 'D_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'D' },
-      { param: 'D_B', container: 'D_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: 0, max: 1000, step: 1, scale: 1000, group: 'D' }
+      // C (Frequency): Range [-5, 5] — engine palettes run the cosine backwards
+      // with negative frequencies.
+      { param: 'C_R', container: 'C_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: -5000, max: 5000, step: 1, scale: 1000, group: 'C' },
+      { param: 'C_G', container: 'C_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: -5000, max: 5000, step: 1, scale: 1000, group: 'C' },
+      { param: 'C_B', container: 'C_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: -5000, max: 5000, step: 1, scale: 1000, group: 'C' },
+      // D (Phase): Range [-1, 2] — a full period either side of [0, 1], so an
+      // engine phase past 1 (or a zoom-derived negative one) stays representable.
+      { param: 'D_R', container: 'D_R_container', label: 'R', color: 'red-500', thumb: 'r-thumb', min: -1000, max: 2000, step: 1, scale: 1000, group: 'D' },
+      { param: 'D_G', container: 'D_G_container', label: 'G', color: 'green-500', thumb: 'g-thumb', min: -1000, max: 2000, step: 1, scale: 1000, group: 'D' },
+      { param: 'D_B', container: 'D_B_container', label: 'B', color: 'blue-500', thumb: 'b-thumb', min: -1000, max: 2000, step: 1, scale: 1000, group: 'D' }
     ];
 
     // --- Helper Functions ---
