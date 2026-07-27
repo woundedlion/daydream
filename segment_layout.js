@@ -12,24 +12,27 @@
  */
 
 /**
- * Compute the canvas sub-rectangle a segment renders. This is the SIMULATOR's
- * own render tiler, not a 1:1 port of the firmware map.
+ * Compute the canvas sub-rectangle a segment renders.
  *
- * Relationship to the firmware (hardware/pov_segment_map.h, no shared source of
- * truth — there is no codegen bridging C++ and JS, and the device does not build
- * in CI):
- *  - For `total` in {2, 4} this tiling corresponds to the physical segment→
- *    canvas mapping the firmware uses (arm partition, the w/2 arm-B offset, and
- *    per-segment row coverage). That correspondence is pinned by
- *    tests/segment_crosscheck.test.js against the same fixture the C++ host
- *    tests (test_pov_segmented.h) lock down, so a convention change on either
- *    side trips a test.
- *  - For `total` in {6, 8} this is SIMULATOR-ONLY: extra Y-bands per arm spread
- *    the browser render across more Web Workers for parallelism. The firmware
- *    `segment_map()` rejects N > 4 (even, power-of-two, <= 4), so these counts
- *    have no device counterpart and intentionally do not mirror any C++ map.
- * The shared invariant in every case is NUM_ARMS = 2 vertical halves (arm A =
- * left, arm B = the w/2-shifted right half), each split into equal Y-bands.
+ * The assignment mirrors the firmware's physical segment→canvas map
+ * (hardware/pov_segment_map.h::segment_map), so a per-segment overlay in the
+ * simulator names the same board the hardware ID straps select. There is no
+ * codegen bridging C++ and JS, so the correspondence is pinned by
+ * tests/segment_crosscheck.test.js against the same fixture the C++ host tests
+ * (test_pov_segmented.h) lock down; a convention change on either side trips a
+ * test.
+ *
+ * Layout: NUM_ARMS = 2 vertical halves — arm A is the left half, arm B the
+ * floor(w/2)-shifted right half — with segments [0, total/2) on arm A and the
+ * rest on arm B. Each arm splits into total/2 equal Y-bands. Within an arm the
+ * first floor(bands/2) segments tile the northern bands top-down and the
+ * remainder tile the southern bands from the S pole inward, so four bands per
+ * arm run 0, 1, 3, 2. The firmware walks a southern band's LEDs in decreasing y;
+ * a render rectangle has no direction, so only the row set matters here.
+ *
+ * The firmware takes a power-of-two segment count <= 8, making `total` in
+ * {2, 4, 8} the device-backed counts. `total` = 6 is simulator-only extra worker
+ * parallelism and follows the same band rule.
  *
  * @param {number} id - segment index in [0, total)
  * @param {number} total - total segment count (positive even number; the GUI
@@ -58,7 +61,7 @@ export function computeSegmentRange(id, total, w, h) {
       `segment_layout: canvas height must be >= ${ySegsPerArm} y-segments per arm (got ${h})`);
   }
   const armId = Math.floor(id / ySegsPerArm);
-  const ySegId = id % ySegsPerArm;
+  const armSeg = id % ySegsPerArm;
 
   if (w < NUM_ARMS) {
     throw new Error(
@@ -71,9 +74,16 @@ export function computeSegmentRange(id, total, w, h) {
   const x0 = armId * armW;
   const x1 = x0 + armW;
 
+  // Northern half of an arm counts bands down from the N pole; the southern half
+  // counts back up from the S pole, matching segment_map()'s reversed strips.
+  const northBands = Math.floor(ySegsPerArm / 2);
+  const bandId = armSeg < northBands
+    ? armSeg
+    : ySegsPerArm - 1 - (armSeg - northBands);
+
   const segH = Math.floor(h / ySegsPerArm);
-  const y0 = ySegId * segH;
-  const y1 = (ySegId === ySegsPerArm - 1) ? h : y0 + segH;
+  const y0 = bandId * segH;
+  const y1 = (bandId === ySegsPerArm - 1) ? h : y0 + segH;
 
   return { x0, x1, y0, y1, w: x1 - x0, h: y1 - y0 };
 }

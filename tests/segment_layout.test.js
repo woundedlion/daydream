@@ -62,6 +62,29 @@ test('the last band absorbs an uneven height remainder', () => {
   assert.equal(bottom.y1, 21); // remainder absorbed, not 20
 });
 
+// Four bands per arm is where the firmware's northern/southern split becomes
+// observable; the goldens are cross-checked against pov_segment_map.h in
+// tests/segment_crosscheck.test.js.
+test('four bands per arm tile north top-down then south from the pole inward', () => {
+  const slotRows = [[0, 36], [36, 72], [108, 144], [72, 108]];
+  for (let arm = 0; arm < 2; arm++) {
+    for (let slot = 0; slot < 4; slot++) {
+      const r = computeSegmentRange(arm * 4 + slot, 8, 288, 144);
+      assert.equal(r.x0, arm * 144, `arm side for arm=${arm} slot=${slot}`);
+      assert.deepEqual([r.y0, r.y1], slotRows[slot], `rows for arm=${arm} slot=${slot}`);
+    }
+  }
+});
+
+test('the bottom band absorbs an uneven height remainder at four bands per arm', () => {
+  // total=8 → 4 bands per arm; h=15 → segH=3, and the bottom band [9,15) belongs
+  // to within-arm slot 2, not slot 3.
+  const slot2 = computeSegmentRange(2, 8, 96, 15);
+  const slot3 = computeSegmentRange(3, 8, 96, 15);
+  assert.deepEqual([slot2.y0, slot2.y1], [9, 15]);
+  assert.deepEqual([slot3.y0, slot3.y1], [6, 9]);
+});
+
 test('an odd or too-small segment count fails fast', () => {
   assert.throws(() => computeSegmentRange(0, 3, 96, 20), /positive even number/);
   assert.throws(() => computeSegmentRange(0, 0, 96, 20), /positive even number/);
