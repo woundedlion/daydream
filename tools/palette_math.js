@@ -47,7 +47,7 @@ export function setPaletteOps(fn) {
   bakeLut = fn;
 }
 
-// GradientShape enum order, mirrored from core/color.h (STRAIGHT=0 .. FALLOFF=3).
+// GradientShape enum order, mirrored from core/color/color.h (STRAIGHT=0 .. FALLOFF=3).
 const GRADIENT_SHAPE_INDEX = { STRAIGHT: 0, CIRCULAR: 1, VIGNETTE: 2, FALLOFF: 3 };
 
 /**
@@ -329,7 +329,7 @@ export class GenerativePalette {
   /**
    * Samples the engine-baked gradient LUT at t, interpolating between adjacent
    * entries in linear light. Domain-verified against the engine: BakedPalette::get
-   * (core/color.h) lerps between two linear-light Color4 LUT entries (lerp16), so
+   * (core/color/color.h) lerps between two linear-light Color4 LUT entries (lerp16), so
    * converting each sRGB-8bit entry here to linear first and lerping in linear
    * matches the engine's interpolation DOMAIN (linear, not sRGB). Note the
    * SOURCE precision does not match: `this.lut` is the bridge's 8-bit sRGB LUT,
@@ -404,7 +404,7 @@ export function proceduralPaletteCpp(parameters) {
                           ${v(parameters.D_R, parameters.D_G, parameters.D_B)}); // D`;
 }
 
-// The four GenerativePalette enum sets, mirrored from core/color.h. A token
+// The four GenerativePalette enum sets, mirrored from core/color/color.h. A token
 // outside these sets would paste a nonexistent enumerator into the emitted C++,
 // so generativePaletteCpp rejects it at the source.
 export const GRADIENT_SHAPES = new Set(Object.keys(GRADIENT_SHAPE_INDEX));
