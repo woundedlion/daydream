@@ -300,8 +300,10 @@ class DeepLinkGUI {
 
   /**
    * Adds a control that is NOT deep-linked: its value is neither seeded from nor
-   * written to the URL. Use for session/action controls (cyclers, worker-pool
-   * toggles, recording settings) that must not auto-activate from a copied link.
+   * written to the URL. Use for session/action controls (cyclers, recording
+   * settings) that must not auto-activate from a copied link. Render-mode
+   * controls, including the segmented worker pool, are deep-linked so a shared
+   * link reproduces the sender's view.
    * @param {Object} object - The object holding the bound property.
    * @param {string} prop - The property name to control.
    * @param {...*} args - Forwarded to lil-gui's add().
