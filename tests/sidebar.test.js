@@ -234,6 +234,30 @@ test('updateScrollArrows reflects scroll geometry', () => {
   assert.ok(!sidebar.arrowRight.classes.has('visible'));
 });
 
+test('sort controls keep a stable name and expose the current order', () => {
+  const { sidebar } = makeSidebar();
+  const glyph = (btn) => btn.querySelector('.sort-glyph');
+
+  assert.equal(sidebar.nameBtn.getAttribute('aria-label'), 'Sort by name');
+  assert.equal(sidebar.sizeBtn.getAttribute('aria-label'), 'Sort by size');
+  // The direction arrow is presentational, never part of the accessible name.
+  assert.equal(glyph(sidebar.nameBtn).getAttribute('aria-hidden'), 'true');
+  assert.equal(glyph(sidebar.nameBtn).textContent, '▲');
+  assert.equal(sidebar.nameBtn.getAttribute('aria-pressed'), 'true');
+  assert.equal(sidebar.sizeBtn.getAttribute('aria-pressed'), 'false');
+  assert.equal(sidebar.listEl.getAttribute('aria-label'), 'Effects, sorted by name ascending');
+
+  sidebar.sortBy('size', 'desc');
+
+  assert.equal(sidebar.nameBtn.getAttribute('aria-label'), 'Sort by name');
+  assert.equal(sidebar.sizeBtn.getAttribute('aria-label'), 'Sort by size');
+  assert.equal(sidebar.nameBtn.getAttribute('aria-pressed'), 'false');
+  assert.equal(sidebar.sizeBtn.getAttribute('aria-pressed'), 'true');
+  assert.equal(glyph(sidebar.nameBtn).textContent, '⇅');
+  assert.equal(glyph(sidebar.sizeBtn).textContent, '▼');
+  assert.equal(sidebar.listEl.getAttribute('aria-label'), 'Effects, sorted by size descending');
+});
+
 test('dispose detaches every listener/observer and clears refs', () => {
   const { sidebar, container } = makeSidebar();
   sidebar.setEffects(['A', 'B'], { A: 1024 });

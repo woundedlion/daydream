@@ -43,7 +43,7 @@ export class EffectSidebar {
     // Roving tabindex: exactly one option carries tabindex=0 (see setRovingTabbable).
     this.listEl = document.createElement('div');
     this.listEl.setAttribute('role', 'listbox');
-    this.listEl.setAttribute('aria-label', 'Effects');
+    this.listEl.setAttribute('aria-label', this.listLabel());
     this.listEl.className = 'effect-list';
     this.tabbableBtn = null; // option currently holding tabindex=0
     this.onKeyDownBound = (e) => this.onKeyDown(e);
@@ -200,17 +200,36 @@ export class EffectSidebar {
   }
 
   /**
+   * Accessible name for the option list, naming the order it is currently in.
+   * @returns {string} e.g. 'Effects, sorted by name ascending'.
+   */
+  listLabel() {
+    return `Effects, sorted by ${this.sort.key} ${this.sort.dir === 'asc' ? 'ascending' : 'descending'}`;
+  }
+
+  /**
    * Build a sort-control button for `key` labelled `label`. Clicking toggles
    * direction when this key is already active, else activates it (size defaults
-   * to descending, others to ascending).
+   * to descending, others to ascending). The label and the glyph are separate
+   * children so the direction arrow can stay presentational.
    * @param {string} key - Sort key this button controls ('name' or 'size').
    * @param {string} label - Human-readable button label.
    * @returns {HTMLElement} The created sort-control button.
    */
   createSortBtn(key, label) {
     const btn = document.createElement('button');
-    btn.className = 'sort-btn' + (this.sort.key === key ? ' active' : '');
-    btn.innerText = label + ' ' + this.sortGlyph(key);
+    btn.setAttribute('aria-label', `Sort by ${label.toLowerCase()}`);
+
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = label;
+    btn.appendChild(labelSpan);
+
+    const glyphSpan = document.createElement('span');
+    glyphSpan.className = 'sort-glyph';
+    glyphSpan.setAttribute('aria-hidden', 'true');
+    btn.appendChild(glyphSpan);
+
+    this.syncSortBtn(btn, key);
     btn.onclick = () => {
       if (this.sort.key === key) {
         this.sortBy(key, this.sort.dir === 'asc' ? 'desc' : 'asc');
@@ -221,12 +240,24 @@ export class EffectSidebar {
     return btn;
   }
 
-  /** Sync the sort buttons' active state and direction arrow to this.sort. */
+  /**
+   * Apply this.sort to one sort control: active class, pressed state, and the
+   * presentational direction glyph.
+   * @param {HTMLElement} btn - Sort-control button to sync.
+   * @param {string} key - Sort key this button controls ('name' or 'size').
+   */
+  syncSortBtn(btn, key) {
+    const active = this.sort.key === key;
+    btn.className = 'sort-btn' + (active ? ' active' : '');
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    btn.querySelector('.sort-glyph').textContent = this.sortGlyph(key);
+  }
+
+  /** Sync the sort buttons and the list's announced order to this.sort. */
   updateSortBtnUI() {
-    this.nameBtn.className = 'sort-btn' + (this.sort.key === 'name' ? ' active' : '');
-    this.nameBtn.innerText = 'Name ' + this.sortGlyph('name');
-    this.sizeBtn.className = 'sort-btn' + (this.sort.key === 'size' ? ' active' : '');
-    this.sizeBtn.innerText = 'Size ' + this.sortGlyph('size');
+    this.syncSortBtn(this.nameBtn, 'name');
+    this.syncSortBtn(this.sizeBtn, 'size');
+    this.listEl.setAttribute('aria-label', this.listLabel());
   }
 
   /**
