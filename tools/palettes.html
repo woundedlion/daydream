@@ -1450,7 +1450,7 @@
         colorStripCanvas.removeEventListener('pointermove', handleDragMove);
         colorStripCanvas.removeEventListener('pointerup', handleDragEnd);
         colorStripCanvas.removeEventListener('pointercancel', handleDragCancel);
-      }, { once: true });
+      });
     }
 
     // Start the application. addEventListener (not window.onload =) avoids
