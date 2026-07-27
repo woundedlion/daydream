@@ -24,6 +24,7 @@ import { EngineHost } from "./engine_host.js";
 import { resolveParamSync, enumChoices } from "./param_sync.js";
 import { formatExportParams } from "./tools/export_params.js";
 import { showFatalError } from "./tools/banner.js";
+import { showBootstrapFailure } from "./bootstrap.js";
 
 // UI layer degrades gracefully (log + keep last good state); lower layers trap.
 
@@ -675,13 +676,7 @@ createHolosphereModule().then(module => {
   const loadingOverlay = document.getElementById('loading-overlay');
   const detailText = (err && err.message) ? err.message : String(err);
   if (loadingOverlay) {
-    loadingOverlay.classList.add('error');
-    loadingOverlay.innerHTML =
-      '<span class="load-error-title">Failed to load the rendering engine.</span>' +
-      '<span class="load-error-detail"></span>';
-    const detail = loadingOverlay.querySelector('.load-error-detail');
-    // textContent (not innerHTML) so an arbitrary error message can't inject markup.
-    if (detail) detail.textContent = detailText;
+    showBootstrapFailure(err, { title: 'Failed to load the rendering engine.' });
   } else {
     showFatalError(`Failed to initialize the rendering engine. ${detailText}`);
   }
