@@ -124,6 +124,8 @@ export class SegmentController {
     this.doc = statsDoc;
 
     this.active = false;
+    // Live pool size, set only by create() so it always matches the length of the
+    // per-segment arrays composite() and updateStats() index.
     this.count = 4;
     this.showBoundaries = false;
     // Tracked so create() can carry it into a freshly-spawned pool.

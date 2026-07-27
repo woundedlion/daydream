@@ -326,6 +326,17 @@ test('create posts init stamped with the protocol version', () => {
   }
 });
 
+test('create() is the sole writer of count, so it matches the pool it describes', () => {
+  const c = readyController(4);
+  assert.equal(c.count, 4);
+  assert.equal(c.results.length, 4);
+
+  c.create(2);
+  assert.equal(c.count, 2, 'count follows the rebuilt pool, never leads it');
+  assert.equal(c.results.length, 2);
+  assert.equal(c.frameSeen.length, 2);
+});
+
 test('a synchronous worker-N construction failure terminates the partial pool', () => {
   FakeWorker.failConstructionAt = 1;
   const c = makeController();
