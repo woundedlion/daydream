@@ -526,6 +526,9 @@ export class SegmentController {
     this.frameSeen = [];
     this.ready = false;
     this.pending = 0;
+    // tick() returns on the !ready guard while the pool respawns, so a stale
+    // true here would keep captureReady() green over cleared black frames.
+    this.frameComposited = false;
     // Open a new generation before settling: the in-flight render's `.then`
     // resolves on a later microtask, after a fresh pool may exist; bumping here
     // fails its `inflightGen === renderGen` guard so it can't arm the new pool.

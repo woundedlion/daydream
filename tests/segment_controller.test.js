@@ -1004,6 +1004,28 @@ test('an overrun re-blit shows one whole generation, never a half-updated mix', 
   }
 });
 
+test('destroy() clears frameComposited so a respawning pool cannot capture black frames', async () => {
+  Daydream.W = 4; Daydream.H = 2;
+  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+
+  const c = readyController(2);
+  c.showBoundaries = false;
+  c.tick();
+
+  const quad = () => new Uint16Array(2 * 2 * 3).fill(111);
+  deliverFrame(c, 0, { pixels: quad(), x0: 0, x1: 2, y0: 0, y1: 2 });
+  deliverFrame(c, 1, { pixels: quad(), x0: 2, x1: 4, y0: 0, y1: 2 });
+  await flush();
+  c.tick();
+  assert.equal(c.frameComposited, true, 'a real composite latched the flag');
+
+  c.destroy();
+  assert.equal(c.frameComposited, false, 'destroy() cleared the latch');
+
+  c.tick(); // pool not ready yet: tick() returns before touching the flag
+  assert.equal(c.frameComposited, false, 'the flag stays clear while the pool respawns');
+});
+
 test('a faulted pool keeps tick() from dispatching another doomed render', () => {
   const c = readyController(2);
   c.tick();
