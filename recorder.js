@@ -68,6 +68,10 @@ export class VideoRecorder {
     this.targetHeight = null;
     this.offscreen = null;
     this.offCtx = null;
+    // Host hook fired with the error when a session ends on an encoder fault, so
+    // the UI can drop its recording state; the record button's label is set on
+    // click and would otherwise keep reading "Stop" over a dead session.
+    this.onError = null;
   }
 
   /**
@@ -195,11 +199,23 @@ export class VideoRecorder {
       return;
     }
 
-    // ondataavailable/onstop fire after a fast stop→start may have installed a new
-    // session, so the closures bind the per-session chunks/stream/recorder/sink
+    // ondataavailable/onstop/onerror fire after a fast stop→start may have installed
+    // a new session, so the closures bind the per-session chunks/stream/recorder/sink
     // rather than read this.*.
     const chunks = [];
     let sink = null;
+    let ended = false;
+
+    // Finalizes the output and releases the capture tracks; runs once per session
+    // whether it ended normally or on an encoder fault.
+    const endSession = () => {
+      if (ended) return;
+      ended = true;
+      sink?.finish();
+      stream.getTracks().forEach(t => t.stop());
+      // Only clean up if a rapid stop→start hasn't already replaced this session.
+      if (this.mediaRecorder === recorder) this.cleanup();
+    };
 
     this.mediaRecorder = recorder;
     this.stream = stream;
@@ -210,11 +226,18 @@ export class VideoRecorder {
       if (e.data.size > 0) sink.write(e.data);
     };
 
-    recorder.onstop = () => {
-      sink.finish();
-      stream.getTracks().forEach(t => t.stop());
-      // Only clean up if a rapid stop→start hasn't already replaced this session.
-      if (this.mediaRecorder === recorder) this.cleanup();
+    recorder.onstop = endSession;
+
+    // A fatal encoder fault ends the session without a guaranteed stop event, so
+    // finalize here rather than leaving a dead recorder installed.
+    recorder.onerror = (e) => {
+      const live = this.mediaRecorder === recorder;
+      recorder.ondataavailable = null;
+      if (recorder.state !== 'inactive') recorder.stop();
+      endSession();
+      console.error('VideoRecorder: recording failed; the saved file may be truncated or incomplete.',
+        e?.error ?? e);
+      if (live) this.onError?.(e?.error ?? e);
     };
 
     if (timedFallback) this.blitToOffscreen();
@@ -226,6 +249,7 @@ export class VideoRecorder {
     } catch (err) {
       recorder.ondataavailable = null;
       recorder.onstop = null;
+      recorder.onerror = null;
       this.cleanup();
       console.error('VideoRecorder: MediaRecorder start failed.', err);
       return;
@@ -236,6 +260,7 @@ export class VideoRecorder {
     } catch (err) {
       recorder.ondataavailable = null;
       recorder.onstop = null;
+      recorder.onerror = null;
       recorder.stop();
       this.cleanup();
       console.error('VideoRecorder: output setup failed.', err);

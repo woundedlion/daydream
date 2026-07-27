@@ -618,6 +618,9 @@ createHolosphereModule().then(module => {
   host.recorder.bitrateMbps = recSettings.quality;
   host.recorder.targetHeight = REC_RESOLUTIONS[recSettings.resolution];
   host.recorder.format = REC_FORMATS[recSettings.format];
+  // An encoder fault ends the session on its own; drop the recording UI so the
+  // button doesn't keep offering to stop a session that is already gone.
+  host.recorder.onError = () => showRecording(false);
   daydream.recorder = host.recorder;
 
   const loadingOverlay = document.getElementById('loading-overlay');
@@ -781,11 +784,15 @@ durationEl.className = 'rec-duration';
 durationEl.style.display = 'none';
 document.getElementById('canvas-container')?.appendChild(durationEl);
 
-const recordState = { record: () => {
-  if (!host.recorder) return;
+/**
+ * Reflects the session state in the canvas styling, duration readout, and record
+ * button label.
+ * @param {boolean} recording - Whether a recording session is now active.
+ * @returns {void}
+ */
+const showRecording = (recording) => {
   const canvasEl = document.getElementById('canvas-container');
-  const nowRecording = host.recorder.toggle(appState.get('effect'));
-  if (nowRecording) {
+  if (recording) {
     canvasEl?.classList.add('recording');
     durationEl.style.display = '';
     recordCtrl.name('\u25a0 Stop');
@@ -794,6 +801,11 @@ const recordState = { record: () => {
     durationEl.style.display = 'none';
     recordCtrl.name('\u25cf Record');
   }
+};
+
+const recordState = { record: () => {
+  if (!host.recorder) return;
+  showRecording(host.recorder.toggle(appState.get('effect')));
 }};
 
 const recFolder = guiInstance.addFolder('Recording');
