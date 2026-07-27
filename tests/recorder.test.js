@@ -172,6 +172,7 @@ class FakeMediaRecorder {
     this.state = 'inactive';
     this.ondataavailable = null;
     this.onstop = null;
+    this.onerror = null;
     FakeMediaRecorder.instances.push(this);
   }
   start() {
@@ -310,6 +311,97 @@ test('a stopped session downloads its own chunks and clears instance state', () 
     assert.equal(rec.mediaRecorder, null);
     assert.equal(stream.track.stopped, true);
   } finally {
+    restore();
+  }
+});
+
+/**
+ * An encoder fault ends the session on its own: the recorder must finalize the
+ * output once, report the failure, notify the host so the UI can drop its
+ * recording state, and clear itself so the next click starts a fresh session
+ * instead of a second one.
+ */
+test('an encoder error finalizes the session, reports it, and clears the recorder', () => {
+  const restore = installRecorderEnv();
+  const errs = [];
+  const prevErr = console.error;
+  console.error = (...a) => errs.push(a);
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    const downloads = [];
+    rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
+    const notified = [];
+    rec.onError = (err) => notified.push(err);
+
+    rec.start('faulted');
+    const recorder = rec.mediaRecorder;
+    const stream = rec.stream;
+    recorder.ondataavailable({ data: { size: 10 } });
+
+    const failure = new Error('encoder died');
+    recorder.onerror({ error: failure });
+
+    assert.equal(downloads.length, 1, 'the partial capture is still finalized');
+    assert.deepEqual(downloads[0].chunks, [{ size: 10 }]);
+    assert.equal(recorder.state, 'inactive', 'the faulted recorder is stopped');
+    assert.equal(stream.track.stopped, true, 'the capture track is released');
+    assert.equal(rec.mediaRecorder, null);
+    assert.equal(rec.stream, null);
+    assert.equal(rec.track, null);
+    assert.equal(rec.offscreen, null);
+    assert.equal(rec.isRecording, false);
+    assert.deepEqual(notified, [failure], 'the host is told the session ended');
+    assert.ok(errs.some((args) => args.includes(failure)), 'the failure is reported');
+
+    // The UA may still deliver a stop event after the error; it must not finalize twice.
+    recorder.onstop();
+    assert.equal(downloads.length, 1);
+
+    rec.start('retry');
+    assert.equal(rec.isRecording, true);
+    assert.notEqual(rec.mediaRecorder, recorder, 'the next start is a fresh session');
+    rec.dispose();
+  } finally {
+    console.error = prevErr;
+    restore();
+  }
+});
+
+/**
+ * The stop->start race applied to errors: a stale session's fault must finalize
+ * only its own output and must neither tear down nor report against the newer
+ * session that replaced it.
+ */
+test('a stale session error does not clobber the session that replaced it', () => {
+  const restore = installRecorderEnv();
+  const prevErr = console.error;
+  console.error = () => {};
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    const downloads = [];
+    rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
+    const notified = [];
+    rec.onError = (err) => notified.push(err);
+
+    rec.start('first');
+    const recorderA = rec.mediaRecorder;
+    recorderA.ondataavailable({ data: { size: 10 } });
+    rec.stop();
+
+    rec.start('second');
+    const recorderB = rec.mediaRecorder;
+    recorderB.ondataavailable({ data: { size: 20 } });
+
+    recorderA.onerror({ error: new Error('late encoder fault') });
+
+    assert.equal(downloads.length, 1);
+    assert.equal(downloads[0].name, 'first');
+    assert.equal(notified.length, 0, 'the live session is not reported as failed');
+    assert.equal(rec.mediaRecorder, recorderB);
+    assert.equal(rec.isRecording, true);
+    assert.equal(rec.stream.track.stopped, false);
+  } finally {
+    console.error = prevErr;
     restore();
   }
 });
