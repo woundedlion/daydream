@@ -17,19 +17,20 @@ function errorDetail(error) {
 
 /**
  * @param {unknown} error Bootstrap failure.
- * @param {{document?: Document, location?: Location}} [dependencies]
+ * @param {{document?: Document, location?: Location, title?: string}} [dependencies]
  * @returns {void}
  */
 export function showBootstrapFailure(error, {
   document: doc = globalThis.document,
   location: pageLocation = globalThis.location,
+  title: titleText = 'Failed to start the simulator.',
 } = {}) {
   const overlay = doc?.getElementById('loading-overlay');
   if (!overlay) return;
 
   const title = doc.createElement('span');
   title.className = 'load-error-title';
-  title.textContent = 'Failed to start the simulator.';
+  title.textContent = titleText;
 
   const detail = doc.createElement('span');
   detail.className = 'load-error-detail';
