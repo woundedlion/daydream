@@ -11,6 +11,8 @@
  * shader expects.
  */
 
+import { formatFloatCpp } from './cpp_format.js';
+
 // --- Complex arithmetic ---------------------------------------------------
 // Complex numbers are plain { re, im } objects.
 
@@ -203,4 +205,23 @@ export function cayley(t) {
     C: { re: p, im: 0 },
     D: { re: 1 - p, im: p },
   };
+}
+
+// --- C++ export -----------------------------------------------------------
+
+/**
+ * Formats the four coefficients as a C++ MobiusParams initializer, using the
+ * struct's eight-float constructor order (real/imaginary pair per coefficient).
+ * @param {{re:number, im:number}} a - Coefficient a.
+ * @param {{re:number, im:number}} b - Coefficient b.
+ * @param {{re:number, im:number}} c - Coefficient c.
+ * @param {{re:number, im:number}} d - Coefficient d.
+ * @returns {string} e.g. "MobiusParams{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f}".
+ */
+export function mobiusCodeString(a, b, c, d) {
+  const parts = [];
+  for (const z of [a, b, c, d]) {
+    parts.push(formatFloatCpp(z.re), formatFloatCpp(z.im));
+  }
+  return `MobiusParams{${parts.join(', ')}}`;
 }
