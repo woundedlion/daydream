@@ -8,12 +8,12 @@ const SRC = readFileSync(new URL('../vendor-importmap.js', import.meta.url), 'ut
 
 /**
  * Evaluates the runtime importmap IIFE against a stubbed DOM and returns the
- * `imports` map it injects. The baked VENDOR block is rewritten to exercise the
- * 'local' variant (the committed default is all-CDN).
+ * whole importmap it injects. The baked VENDOR block is rewritten to exercise
+ * the 'local' variant (the committed default is all-CDN).
  * @param {{vendor?: 'cdn'|'local', selfSrc?: string, extra?: Object}} [opts]
- * @returns {Object} The parsed importmap imports map.
+ * @returns {Object} The parsed importmap.
  */
-const evalImportmap = ({ vendor = 'cdn', selfSrc = 'https://example.test/app/vendor-importmap.js', extra } = {}) => {
+const evalImportmapJson = ({ vendor = 'cdn', selfSrc = 'https://example.test/app/vendor-importmap.js', extra } = {}) => {
   let source = SRC;
   if (vendor === 'local') {
     source = source.replace(/const VENDOR = \{[^}]*\};/,
@@ -33,8 +33,15 @@ const evalImportmap = ({ vendor = 'cdn', selfSrc = 'https://example.test/app/ven
   vm.runInNewContext(source, sandbox);
   assert.ok(injected, 'an importmap <script> was injected');
   assert.equal(injected.type, 'importmap');
-  return JSON.parse(injected.textContent).imports;
+  return JSON.parse(injected.textContent);
 };
+
+/**
+ * The injected importmap's `imports` map.
+ * @param {{vendor?: 'cdn'|'local', selfSrc?: string, extra?: Object}} [opts]
+ * @returns {Object} The parsed importmap imports map.
+ */
+const evalImportmap = (opts) => evalImportmapJson(opts).imports;
 
 test('throws a named error when document.currentScript is null', () => {
   const sandbox = { URL, console, window: {}, document: { currentScript: null } };
@@ -60,6 +67,32 @@ test('local variant resolves three and lil-gui relative to the script path', () 
 test('self-path detection resolves gui.js against the script directory', () => {
   const imports = evalImportmap({ selfSrc: 'https://cdn.example/deep/tools/vendor-importmap.js' });
   assert.equal(imports['gui'], 'https://cdn.example/deep/tools/gui.js');
+});
+
+test('cdn variant pins every CDN module with a sha384 integrity entry', () => {
+  const map = evalImportmapJson({ vendor: 'cdn' });
+  const { imports, integrity } = map;
+  assert.ok(integrity, 'an integrity map is emitted alongside imports');
+
+  // The prefix mapping cannot be pinned as a prefix: each addon the app imports
+  // needs its own resolved-URL entry.
+  const addonBase = imports['three/addons/'];
+  const addonKeys = Object.keys(integrity).filter((u) => u.startsWith(addonBase));
+  assert.ok(addonKeys.length > 0, 'the three/addons/ modules in use are pinned individually');
+  assert.equal(integrity[addonBase], undefined, 'the prefix itself is not a valid integrity key');
+
+  for (const url of [imports['three'], imports['lil-gui'], ...addonKeys]) {
+    assert.match(integrity[url], /^sha384-[A-Za-z0-9+/]+=*$/, `${url} carries a sha384 hash`);
+  }
+  assert.equal(Object.keys(integrity).length, 2 + addonKeys.length,
+    'only the CDN modules are pinned');
+  assert.equal(integrity[imports['gui']], undefined, 'same-origin gui.js is not pinned');
+});
+
+test('local variant emits no integrity map', () => {
+  const map = evalImportmapJson({ vendor: 'local' });
+  assert.equal(map.integrity, undefined,
+    'same-origin vendored modules gain nothing from SRI');
 });
 
 test('EXTRA imports are merged but core keys win', () => {

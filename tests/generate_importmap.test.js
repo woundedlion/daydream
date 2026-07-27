@@ -4,10 +4,11 @@
 // vendor-importmap.js. Driven as a subprocess against a temp fixture so the
 // real repo files are never touched: the script resolves ROOT as <scriptdir>/..
 // and reads package.json + vendor-importmap.js from there.
-import { test, before, after } from 'node:test';
+import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, copyFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,16 +32,28 @@ const IMPORTMAP = [
   '',
 ].join('\n');
 
+// Stand-in module bodies; the test asserts the baked hash is of exactly these.
+const THREE_BODY = '// fixture three.module.js\n';
+const ORBIT_BODY = '// fixture OrbitControls.js\n';
+const LIL_BODY = '// fixture lil-gui.esm.min.js\n';
+const sri = (body) => `sha384-${createHash('sha384').update(body).digest('base64')}`;
+
 let root;
 
-/** Builds a fixture repo: the script under scripts/, plus package.json and vendor-importmap.js at ROOT. */
-before(() => {
-  root = mkdtempSync(join(tmpdir(), 'importmap-'));
-  mkdirSync(join(root, 'scripts'));
+/** Recreates the fixture repo: the script under scripts/, plus package.json and vendor-importmap.js at ROOT. */
+const buildRoot = () => {
+  rmSync(root, { recursive: true, force: true });
+  mkdirSync(join(root, 'scripts'), { recursive: true });
   copyFileSync(SCRIPT_SRC, join(root, 'scripts', 'generate-importmap.mjs'));
   writeFileSync(join(root, 'package.json'), PKG);
   writeFileSync(join(root, 'vendor-importmap.js'), IMPORTMAP);
+};
+
+before(() => {
+  root = mkdtempSync(join(tmpdir(), 'importmap-'));
 });
+
+beforeEach(buildRoot);
 
 after(() => {
   rmSync(root, { recursive: true, force: true });
@@ -53,6 +66,40 @@ const run = (...args) => {
   return readFileSync(join(root, 'vendor-importmap.js'), 'utf8');
 };
 
+/** Runs the fixture's script expecting failure and returns its stderr. */
+const runExpectingFailure = (...args) => {
+  writeFileSync(join(root, 'vendor-importmap.js'), IMPORTMAP);
+  try {
+    execFileSync(process.execPath, [join(root, 'scripts', 'generate-importmap.mjs'), ...args],
+      { stdio: ['ignore', 'ignore', 'pipe'] });
+  } catch (e) {
+    return String(e.stderr);
+  }
+  assert.fail('the script was expected to exit non-zero');
+};
+
+/**
+ * Installs the node_modules copies the CDN integrity hashes are computed from,
+ * plus a source file importing an addon so the addon scan has something to find.
+ * @param {{threeVersion?: string, lilGuiVersion?: string}} [opts] - Installed versions.
+ */
+const installModules = ({ threeVersion = '0.183.1', lilGuiVersion = '0.21.0' } = {}) => {
+  const three = join(root, 'node_modules', 'three');
+  mkdirSync(join(three, 'build'), { recursive: true });
+  mkdirSync(join(three, 'examples', 'jsm', 'controls'), { recursive: true });
+  writeFileSync(join(three, 'package.json'), JSON.stringify({ version: threeVersion }));
+  writeFileSync(join(three, 'build', 'three.module.js'), THREE_BODY);
+  writeFileSync(join(three, 'examples', 'jsm', 'controls', 'OrbitControls.js'), ORBIT_BODY);
+
+  const lil = join(root, 'node_modules', 'lil-gui');
+  mkdirSync(join(lil, 'dist'), { recursive: true });
+  writeFileSync(join(lil, 'package.json'), JSON.stringify({ version: lilGuiVersion }));
+  writeFileSync(join(lil, 'dist', 'lil-gui.esm.min.js'), LIL_BODY);
+
+  writeFileSync(join(root, 'driver.js'),
+    "import { OrbitControls } from 'three/addons/controls/OrbitControls.js';\n");
+};
+
 /** Places the vendored entry points the --local probes require under ROOT. */
 const vendorLocal = () => {
   mkdirSync(join(root, 'three.js', 'build'), { recursive: true });
@@ -63,6 +110,7 @@ const vendorLocal = () => {
 
 /** Verifies the default (no-flag) run bakes an all-CDN VENDOR block with the package.json versions. */
 test('default mode rewrites the VENDOR block to all-cdn with pinned versions', () => {
+  installModules();
   const out = run();
   assert.match(out, /const VENDOR = \{ three: 'cdn', lilGui: 'cdn' \};/);
   assert.match(out, /const THREE_VERSION = '0\.183\.1';/);
@@ -71,21 +119,55 @@ test('default mode rewrites the VENDOR block to all-cdn with pinned versions', (
   assert.ok(out.includes('const tail = true;'));
 });
 
+/** Verifies each CDN module's hash is the sha384 of the installed node_modules bytes. */
+test('default mode bakes sha384 hashes of the installed modules', () => {
+  installModules();
+  const out = run();
+  assert.ok(out.includes(`three: '${sri(THREE_BODY)}'`), 'three is hashed');
+  assert.ok(out.includes(`lilGui: '${sri(LIL_BODY)}'`), 'lil-gui is hashed');
+  assert.ok(out.includes(`'controls/OrbitControls.js': '${sri(ORBIT_BODY)}'`),
+    'the addon found by the source scan is hashed');
+});
+
+/** Verifies only the addons the sources actually import are pinned (integrity keys are exact URLs). */
+test('the addon scan pins only the addons the sources import', () => {
+  installModules();
+  mkdirSync(join(root, 'node_modules', 'three', 'examples', 'jsm', 'renderers'), { recursive: true });
+  writeFileSync(join(root, 'node_modules', 'three', 'examples', 'jsm', 'renderers', 'CSS2DRenderer.js'), '');
+  const out = run();
+  assert.ok(out.includes("'controls/OrbitControls.js'"));
+  assert.ok(!out.includes("'renderers/CSS2DRenderer.js'"),
+    'an installed but unimported addon is not pinned');
+});
+
+/** Verifies a node_modules that does not match the pinned version is refused, not hashed. */
+test('a node_modules version mismatch fails instead of baking an unservable hash', () => {
+  installModules({ threeVersion: '0.182.0' });
+  const err = runExpectingFailure();
+  assert.match(err, /node_modules\/three is 0\.182\.0 but package\.json pins 0\.183\.1/);
+});
+
+/** Verifies a missing node_modules fails rather than emitting a hash-free import map. */
+test('a missing node_modules fails with an npm ci hint', () => {
+  const err = runExpectingFailure();
+  assert.match(err, /node_modules\/three is missing/);
+  assert.match(err, /npm ci/);
+});
+
 /** Verifies --local resolves each library to 'local' only when its vendored entry point exists. */
 test('--local mode bakes local resolution when the entry points are present', () => {
   vendorLocal();
   const out = run('--local');
   assert.match(out, /const VENDOR = \{ three: 'local', lilGui: 'local' \};/);
+  assert.match(out, /three: '',/, 'a same-origin module carries no integrity hash');
+  assert.match(out, /lilGui: '',/);
 });
 
 /** Verifies --local falls back to cdn for a library whose entry point is missing. */
 test('--local falls back to cdn when an entry point is absent', () => {
-  // No vendored files placed for this fresh run (after() of the prior test left
-  // them, so rebuild the fixture root clean here).
-  rmSync(root, { recursive: true, force: true });
-  mkdirSync(join(root, 'scripts'), { recursive: true });
-  copyFileSync(SCRIPT_SRC, join(root, 'scripts', 'generate-importmap.mjs'));
-  writeFileSync(join(root, 'package.json'), PKG);
+  installModules();
   const out = run('--local');
-  assert.match(out, /const VENDOR = \{ three: 'cdn', lilGui: 'cdn' \};/);
+  assert.match(out, /const VENDOR = \{ three: 'cdn', lilGui: 'local' \};/);
+  assert.ok(out.includes(`three: '${sri(THREE_BODY)}'`), 'the cdn-resolved library is still hashed');
+  assert.match(out, /lilGui: '',/, 'the locally vendored one is not');
 });
