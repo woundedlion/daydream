@@ -397,6 +397,16 @@ test('an initFailed worker message faults the pool with the reason and segId', (
   assert.match(c.faultInfo.message, /9000x9000 exceeds the worker arena/);
 });
 
+test('an unknown worker message faults instead of being silently dropped', () => {
+  const c = makeController();
+  c.create(2);
+  c.workers[1].onmessage({ data: { type: 'readyish', segId: 1 } });
+
+  assert.equal(c.faulted, true, 'protocol drift faults rather than waiting out a watchdog');
+  assert.equal(c.faultInfo.segId, 1);
+  assert.match(c.faultInfo.message, /unknown message type readyish/);
+});
+
 test('a surviving worker responding after a fault does not drive pending negative', async () => {
   const c = makeController();
   c.create(2);

@@ -349,6 +349,9 @@ export class SegmentController {
           } else if (this.pending > 0) {
             this.armRenderWatchdog();
           }
+        } else {
+          this.onWorkerFault(i, `worker seg ${i} sent unknown message type `
+            + `${String((/** @type {{type?: unknown}} */ (msg)).type)}`);
         }
       };
 
