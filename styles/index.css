@@ -567,6 +567,9 @@
     width: auto;
     --spacing: 4px;
     --padding: 4px;
+    /* lil-gui's own .lil-children already scrolls; only its height cap is
+       missing, since that ships on .autoPlace and the panels use autoPlace:false. */
+    max-height: 100vh;
   }
 
   /* Grid layout: labels auto-size to widest, controls fill the rest */
