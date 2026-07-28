@@ -4,12 +4,13 @@
  */
 
 /**
- * Op dispatch plus the pure code-generation and geometry helpers of the solids
- * tool page (tools/solids.html), unit-testable without a DOM or WASM runtime.
- * The C++ source strings are pasted verbatim into the engine (SolidBuilder
- * recipes, FLASHMEM functions), so their output formatting must stay
- * byte-for-byte stable. computeInternalAngle uses plain {x, y, z} vector math (a
- * THREE.Vector3 satisfies that shape) to avoid a three.js dependency.
+ * Op dispatch plus the pure code-generation, geometry, and op-chain sequencing
+ * helpers of the solids tool page (tools/solids.html), unit-testable without a
+ * DOM or WASM runtime. The C++ source strings are pasted verbatim into the
+ * engine (SolidBuilder recipes, FLASHMEM functions), so their output formatting
+ * must stay byte-for-byte stable. computeInternalAngle uses plain {x, y, z}
+ * vector math (a THREE.Vector3 satisfies that shape) to avoid a three.js
+ * dependency; the chain validator takes the WASM module factory by injection.
  */
 
 import { formatFloatCpp } from './cpp_format.js';
@@ -313,4 +314,165 @@ export function isConvexFace(vertices, face) {
   }
 
   return true;
+}
+
+/**
+ * Extracts the unique undirected edges of a polygon-face mesh as [lo, hi] vertex
+ * index pairs.
+ * @param {Array<Array<number>>} faces - Ordered vertex indices per face.
+ * @param {number} vertexCount - Vertex count of the mesh, used as the key radix.
+ * @returns {Array<[number, number]>} One [lo, hi] pair per undirected edge, in first-seen order.
+ * @details Keys are numeric (lo * vertexCount + hi) rather than `${a}_${b}`
+ * template strings, so no per-half-edge string is allocated.
+ */
+export function uniqueEdges(faces, vertexCount) {
+  const seen = new Set();
+  const edges = [];
+  for (const f of faces) {
+    for (let i = 0; i < f.length; i++) {
+      const a = f[i];
+      const b = f[(i + 1) % f.length];
+      const lo = a < b ? a : b;
+      const hi = a < b ? b : a;
+      const key = lo * vertexCount + hi;
+      if (!seen.has(key)) { seen.add(key); edges.push([lo, hi]); }
+    }
+  }
+  return edges;
+}
+
+/**
+ * Chooses the barycentric subdivision level for the geodesic (sphere-curved)
+ * face tessellation: ~3° of arc per segment on the largest face, capped by a
+ * total-triangle budget so dense meshes don't explode, and clamped to [1, 24].
+ * @param {number} maxArc - Largest edge arc in radians over all fan triangles.
+ * @param {number} triCount - Total fan triangles the mesh would emit unsubdivided.
+ * @returns {number} Segments per triangle side, uniform across the whole mesh.
+ * @details The level must be UNIFORM across the mesh: any shared edge — polygon
+ * boundaries and internal fan diagonals alike — is then split into identical
+ * points from both sides, so the tessellation is watertight. A per-triangle
+ * level cracks along every count mismatch.
+ */
+export function geodesicSegments(maxArc, triCount) {
+  const nArc = Math.ceil(maxArc / (Math.PI / 60));
+  const nBudget = Math.floor(Math.sqrt(400000 / Math.max(1, triCount)));
+  return Math.max(1, Math.min(24, nArc, nBudget));
+}
+
+/**
+ * Returns a copy of an op chain with the op at `from` moved to index `to`.
+ * @param {Array<Object>} ops - The op chain.
+ * @param {number} from - Index of the op to move.
+ * @param {number} to - Destination index, in post-removal coordinates.
+ * @returns {Array<Object>} A deep copy of the chain in the new order.
+ */
+export function movedOps(ops, from, to) {
+  const next = structuredClone(ops);
+  const [m] = next.splice(from, 1);
+  next.splice(to, 0, m);
+  return next;
+}
+
+/**
+ * Builds a serializer for validated state mutations: each commit sees the state
+ * its predecessors left, so two rapid clicks can't validate against the same
+ * snapshot and then both land.
+ * @param {Function} [onError] - Handler for a rejected commit; defaults to console.error.
+ * @returns {function(Function): Promise<void>} Enqueues a commit and resolves once it (or its error handler) has run.
+ */
+export function createCommitQueue(onError = console.error) {
+  let tail = Promise.resolve();
+  return function queueCommit(fn) {
+    tail = tail.then(fn).catch(onError);
+    return tail;
+  };
+}
+
+/**
+ * Builds the sacrificial-module chain validator.
+ *
+ * The engine fail-fast contract means an op chain that outgrows an engine
+ * ceiling — 16-bit vertex/index ranges, hankin's compile bound, classifyFaces'
+ * range — traps and permanently wedges the module it ran on. Rather than mirror
+ * every ceiling in JS (the op set's growth rules are engine-specific and would
+ * drift), each candidate chain is proven on a SACRIFICIAL module instance before
+ * the live module ever sees it: a trap kills only the validator, which is
+ * respawned, and the mutation is rejected. The engine stays the single authority
+ * on its own invariants.
+ * @param {function(): Promise<Object>} createModule - Spawns a fresh WASM module instance.
+ * @returns {{acquire: function(): Promise<?Object>, noteDeath: function(*): void, withValidator: function(Function): Promise<*>, chainIsValid: function(string, Array<Object>): Promise<boolean>}} The validator handle.
+ */
+export function createChainValidator(createModule) {
+  let modulePromise = null;
+  // Serializes all validator use: tasks hold the single instance (and sometimes
+  // a live mesh wrapper) across awaits, and an interleaved clearToolingMemory
+  // from another task would invalidate that wrapper.
+  let queue = Promise.resolve();
+
+  /**
+   * Resolves the current validator instance, spawning one if needed.
+   * @returns {Promise<?Object>} The module, or null when it failed to spawn.
+   */
+  function acquire() {
+    modulePromise ||= createModule();
+    return modulePromise.catch(() => null);
+  }
+
+  /**
+   * Drops a wedged instance so the next task spawns a fresh one.
+   * @param {*} e - The error a validator call threw.
+   * @returns {void}
+   */
+  function noteDeath(e) {
+    if (e instanceof WebAssembly.RuntimeError) modulePromise = null;
+  }
+
+  /**
+   * Runs a task against the validator instance, serialized behind prior tasks.
+   * @param {function(?Object): *} task - Receives the module, or null when it failed to spawn.
+   * @returns {Promise<*>} The task's result.
+   */
+  function withValidator(task) {
+    const run = queue.then(async () => task(await acquire()));
+    // Keep the queue alive past a rejected task.
+    queue = run.catch(() => { });
+    return run;
+  }
+
+  /**
+   * Replays base+ops (plus the classifyFaces pass the tool always runs) on the
+   * validator.
+   * @param {string} base - Registry name of the seed solid.
+   * @param {Array<(string|{op:string, params:Object})>} ops - The candidate op chain.
+   * @returns {Promise<boolean>} True when the whole chain is safe for the live module.
+   * @details A missing validator (module failed to spawn) resolves true:
+   * prevention degrades to the old behavior rather than blocking the tool.
+   */
+  function chainIsValid(base, ops) {
+    return withValidator((Mod) => {
+      if (!Mod) return true;
+      const Ops = Mod.MeshOps;
+      let mesh = null;
+      try {
+        mesh = Ops.fromSolidName(base);
+        for (const o of ops) {
+          const next = applyOp(mesh, o);
+          mesh.delete();
+          mesh = next;
+        }
+        mesh.classifyFaces();
+        mesh.delete();
+        Ops.clearToolingMemory();
+        return true;
+      } catch (e) {
+        noteDeath(e);
+        if (!(e instanceof WebAssembly.RuntimeError)) {
+          try { if (mesh) mesh.delete(); Ops.clearToolingMemory(); } catch (_) { }
+        }
+        return false;
+      }
+    });
+  }
+
+  return { acquire, noteDeath, withValidator, chainIsValid };
 }

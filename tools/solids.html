@@ -584,9 +584,10 @@
     import * as THREE from 'three';
     import { initScene, copyWithFeedback, showFatalError } from './shared.js';
     // The shared op table and dispatch, the pure C++ export-string codegen
-    // (formatFloat/pctSuffix/recipe builders) and the pure face-geometry helpers
-    // live in solid_codegen.js so they can be unit tested without a DOM or the
-    // WASM module. DOM/WASM wiring stays inline.
+    // (formatFloat/pctSuffix/recipe builders), the pure face-geometry helpers and
+    // the op-chain queue/validator machinery live in solid_codegen.js so they can
+    // be unit tested without a DOM or the WASM module. DOM/WASM wiring stays
+    // inline.
     import {
       OP_DEFS,
       applyOp,
@@ -597,6 +598,11 @@
       generateRecipeCpp,
       computeInternalAngle,
       isConvexFace,
+      uniqueEdges,
+      geodesicSegments,
+      movedOps,
+      createCommitQueue,
+      createChainValidator,
     } from './solid_codegen.js';
     import createHolosphereModule from '../holosphere_wasm.js';
 
@@ -649,27 +655,6 @@
         pendingUpdate = 0;
         update();
       });
-    }
-
-    // Extract the unique undirected edges of a polygon-face mesh as [lo, hi]
-    // vertex-index pairs. Shared by renderMesh() and generateThumbnails(), which
-    // previously duplicated this block verbatim. Keys are numeric (lo*N + hi)
-    // rather than `${a}_${b}` template strings, so no per-half-edge string is
-    // allocated.
-    function uniqueEdges(faces, vertexCount) {
-      const seen = new Set();
-      const edges = [];
-      for (const f of faces) {
-        for (let i = 0; i < f.length; i++) {
-          const a = f[i];
-          const b = f[(i + 1) % f.length];
-          const lo = a < b ? a : b;
-          const hi = a < b ? b : a;
-          const key = lo * vertexCount + hi;
-          if (!seen.has(key)) { seen.add(key); edges.push([lo, hi]); }
-        }
-      }
-      return edges;
     }
 
     // WASM Module
@@ -1297,13 +1282,6 @@
       if (item) item.draggable = true;
     }
 
-    function movedOps(ops, from, to) {
-      const next = structuredClone(ops);
-      const [m] = next.splice(from, 1);
-      next.splice(to, 0, m);
-      return next;
-    }
-
     function reorderOp(from, to) {
       if (to < 0 || to >= state.ops.length || from === to) return;
       const opName = state.ops[from].op;
@@ -1568,14 +1546,7 @@
       scheduleUpdate();
     }
 
-    // Serializes validated state mutations: each commit sees the state its
-    // predecessors left, so two rapid clicks can't validate against the same
-    // snapshot and then both land.
-    let commitQueue = Promise.resolve();
-    function queueCommit(fn) {
-      commitQueue = commitQueue.then(fn).catch(console.error);
-      return commitQueue;
-    }
+    const queueCommit = createCommitQueue();
 
     function removeOp(index) {
       queueCommit(async () => {
@@ -1632,67 +1603,10 @@
     }
 
     // --- CHAIN VALIDATION ---
-    // The engine fail-fast contract (see the comment block in update()) means an
-    // op chain that outgrows an engine ceiling — 16-bit vertex/index ranges,
-    // hankin's compile bound, classifyFaces' range — traps and permanently
-    // wedges the module it ran on. Rather than mirror every ceiling in JS (the
-    // op set's growth rules are engine-specific and would drift), the tool
-    // proves each candidate chain on a SACRIFICIAL module instance before the
-    // live module ever sees it: a trap kills only the validator, which is
-    // respawned, and the mutation is rejected. The engine stays the single
-    // authority on its own invariants.
-    let validatorPromise = null;
-    // Serializes all validator use: tasks hold the single instance (and
-    // sometimes a live mesh wrapper) across awaits, and an interleaved
-    // clearToolingMemory from another task would invalidate that wrapper.
-    let validatorQueue = Promise.resolve();
-
-    function withValidator(task) {
-      const run = validatorQueue.then(async () => {
-        validatorPromise ||= createHolosphereModule();
-        const Mod = await validatorPromise.catch(() => null);
-        return task(Mod);
-      });
-      // Keep the queue alive past a rejected task.
-      validatorQueue = run.catch(() => { });
-      return run;
-    }
-
-    // A RuntimeError means the validator instance trapped and is wedged; drop
-    // it so the next task spawns a fresh one.
-    function noteValidatorDeath(e) {
-      if (e instanceof WebAssembly.RuntimeError) validatorPromise = null;
-    }
-
-    // Replay base+ops (plus the classifyFaces pass update() always runs) on the
-    // validator. Resolves true if the whole chain is safe for the live module.
-    // A missing validator (module failed to spawn) resolves true: prevention
-    // degrades to the old behavior rather than blocking the tool.
-    function chainIsValid(base, ops) {
-      return withValidator((Mod) => {
-        if (!Mod) return true;
-        const Ops = Mod.MeshOps;
-        let mesh = null;
-        try {
-          mesh = Ops.fromSolidName(base);
-          for (const o of ops) {
-            const next = applyOp(mesh, o);
-            mesh.delete();
-            mesh = next;
-          }
-          mesh.classifyFaces();
-          mesh.delete();
-          Ops.clearToolingMemory();
-          return true;
-        } catch (e) {
-          noteValidatorDeath(e);
-          if (!(e instanceof WebAssembly.RuntimeError)) {
-            try { if (mesh) mesh.delete(); Ops.clearToolingMemory(); } catch (_) { }
-          }
-          return false;
-        }
-      });
-    }
+    // Candidate chains are proven on a sacrificial module instance before the
+    // live module runs them; see createChainValidator in solid_codegen.js.
+    const { withValidator, chainIsValid, acquire: acquireValidator, noteDeath: noteValidatorDeath } =
+      createChainValidator(createHolosphereModule);
 
     let gateMsgTimer = null;
     function showGateMsg(text) {
@@ -1756,8 +1670,7 @@
             noteValidatorDeath(e);
             if (e instanceof WebAssembly.RuntimeError) {
               // Instance is wedged; respawn and rebuild for remaining probes.
-              validatorPromise ||= createHolosphereModule();
-              Mod = await validatorPromise.catch(() => null);
+              Mod = await acquireValidator();
               if (!Mod) return bad;
               try { mesh = build(Mod); } catch (e2) { noteValidatorDeath(e2); return bad; }
             }
@@ -1909,14 +1822,8 @@
       // Geodesic mode curves the faces onto the sphere: each fan triangle is
       // split on a barycentric grid of geoN segments per side and every grid
       // vertex normalized, so the surface itself is spherical instead of flat
-      // plateaus with ridges at the (curved) edge overlay. geoN must be
-      // UNIFORM across the whole mesh: any shared edge — polygon boundaries
-      // and the internal fan diagonals alike — is then split into identical
-      // points from both sides, so the tessellation is watertight. (A
-      // per-triangle level cracked along every count mismatch, which read as
-      // dark hairlines on the faces.) geoN targets ~3° of arc per segment on
-      // the largest face and is capped by a total-triangle budget so dense
-      // meshes, whose faces are sub-degree anyway, don't explode.
+      // plateaus with ridges at the (curved) edge overlay. geodesicSegments()
+      // picks geoN from the mesh's widest arc and its triangle count.
       let geoN = 1;
       if (state.showGeodesics) {
         let triCount = 0;
@@ -1930,9 +1837,7 @@
             maxArc = Math.max(maxArc, a.angleTo(b), b.angleTo(c), c.angleTo(a));
           }
         });
-        const nArc = Math.ceil(maxArc / (Math.PI / 60));
-        const nBudget = Math.floor(Math.sqrt(400000 / Math.max(1, triCount)));
-        geoN = Math.max(1, Math.min(24, nArc, nBudget));
+        geoN = geodesicSegments(maxArc, triCount);
       }
 
       const pushVert = (v) => {
