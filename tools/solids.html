@@ -911,8 +911,9 @@
 
       const light = new THREE.DirectionalLight(0xffffff, 1.5);
       light.position.set(2, 5, 3);
+      const ambient = new THREE.AmbientLight(0xffffff, 0.5);
       offScene.add(light);
-      offScene.add(new THREE.AmbientLight(0xffffff, 0.5));
+      offScene.add(ambient);
 
       // Material for thumbnails
       const mat = new THREE.MeshPhongMaterial({
@@ -936,7 +937,7 @@
         // detached here and their GPU buffers freed at the end of the loop body.
         offScene.clear();
         offScene.add(light);
-        offScene.add(new THREE.AmbientLight(0xffffff, 0.5));
+        offScene.add(ambient);
 
         const wasmMesh = MeshOpsWasm.fromSolidName(key);
         const meshData = wasmMeshToJs(wasmMesh);
