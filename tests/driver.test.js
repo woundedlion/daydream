@@ -150,7 +150,8 @@ test('setupDots sizes the rebuilt mesh from the instance grid', () => {
   const ctx = setupCtx(fakeMesh(log), log);
   Daydream.prototype.setupDots.call(ctx);
 
-  assert.ok(ctx.dotMesh instanceof THREE.InstancedMesh);
+  // node --test loads three twice, so instanceof across the driver boundary never holds
+  assert.equal(ctx.dotMesh.isInstancedMesh, true);
   assert.equal(ctx.dotMesh.count, 8 * 4);
   assert.equal(ctx.dotMesh.frustumCulled, false);
   assert.equal(ctx.dotGeometry.parameters.radius, 3);
