@@ -8,9 +8,6 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { pixelToSpherical } from "./geometry.js";
 import { isViewLive } from "./pixel_view.js";
-import { prettify } from "./label_format.js";
-
-export { prettify } from "./label_format.js";
 
 /**
  * Reuses CSS2DObject label sprites across frames so axis/effect labels can be
@@ -133,6 +130,16 @@ export class Daydream {
   static NEG_Y_AXIS = new THREE.Vector3(0, -1, 0);
   static NEG_Z_AXIS = new THREE.Vector3(0, 0, -1);
 
+  /** Floating labels drawn at the axis poles while labelAxes is on. */
+  static AXIS_LABELS = [
+    { position: Daydream.X_AXIS, content: "X" },
+    { position: Daydream.Y_AXIS, content: "Y" },
+    { position: Daydream.Z_AXIS, content: "Z" },
+    { position: Daydream.NEG_X_AXIS, content: "-X" },
+    { position: Daydream.NEG_Y_AXIS, content: "-Y" },
+    { position: Daydream.NEG_Z_AXIS, content: "-Z" },
+  ];
+
   /**
    * Build the renderer, cameras, controls, scene, dot mesh, and axis lines, and
    * wire up resize/camera-change observers. Leaves the sim paused-capable and
@@ -219,7 +226,6 @@ export class Daydream {
     this.timeAccumulator = 0;
 
     this.labelPool = new LabelPool(this.scene);
-    this.labelScratch = [];
     this.hadLabels = false;
 
     this.setupDots();
@@ -476,7 +482,7 @@ export class Daydream {
    * effect. Advances the fixed-timestep simulation if an interval has accrued,
    * updates controls, and repaints the main view, labels, and PiP — but only
    * when the sim stepped, the camera moved, or invalidate() was called.
-   * @param {Object} effect - Active effect; its drawFrame()/getLabels()/getArenaMetrics() drive the painted frame.
+   * @param {Object} effect - Active effect; its drawFrame()/getArenaMetrics() drive the painted frame.
    */
   render(effect) {
     if (this.contextLost) return;
@@ -509,7 +515,7 @@ export class Daydream {
         (typeof effect.captureReady !== 'function' || effect.captureReady()))
       this.recorder.captureFrame();
 
-    this.refreshLabels(effect);
+    this.refreshLabels();
     // CSS2DRenderer hides label <div>s only during a render pass, so render one
     // extra frame when the count falls to zero to let that pass hide them.
     const hasLabels = this.labelPool.activeCount > 0;
@@ -575,35 +581,21 @@ export class Daydream {
   }
 
   /**
-   * Rebuild the floating label set (axis labels + effect-supplied labels),
-   * acquiring pooled sprites only for labels on the camera-facing hemisphere.
-   * @param {Object} effect - Active effect; its getLabels() supplies extra labels when present.
+   * Rebuild the floating axis labels, acquiring pooled sprites only for those on
+   * the camera-facing hemisphere.
    */
-  refreshLabels(effect) {
+  refreshLabels() {
     this.labelPool.reset();
-    const labels = this.labelScratch;
-    labels.length = 0;
 
     if (this.labelAxes) {
-      labels.push({ "position": Daydream.X_AXIS, "content": "X" });
-      labels.push({ "position": Daydream.Y_AXIS, "content": "Y" });
-      labels.push({ "position": Daydream.Z_AXIS, "content": "Z" });
-      labels.push({ "position": Daydream.NEG_X_AXIS, "content": "-X" });
-      labels.push({ "position": Daydream.NEG_Y_AXIS, "content": "-Y" });
-      labels.push({ "position": Daydream.NEG_Z_AXIS, "content": "-Z" });
-    }
-
-    if (effect && typeof effect.getLabels === 'function') {
-      labels.push(...effect.getLabels());
-    }
-
-    // position is a unit direction, so position·cameraPos == |cameraPos|·cos(angle);
-    // scaling the cutoff by the live distance keeps the visible set zoom-independent.
-    const facingThreshold =
-      Daydream.LABEL_VISIBILITY_FRAMING_RATIO * this.camera.position.length();
-    for (const label of labels) {
-      if (label.position.dot(this.camera.position) > facingThreshold) {
-        this.labelPool.acquire(label.position, label.content);
+      // position is a unit direction, so position·cameraPos == |cameraPos|·cos(angle);
+      // scaling the cutoff by the live distance keeps the visible set zoom-independent.
+      const facingThreshold =
+        Daydream.LABEL_VISIBILITY_FRAMING_RATIO * this.camera.position.length();
+      for (const label of Daydream.AXIS_LABELS) {
+        if (label.position.dot(this.camera.position) > facingThreshold) {
+          this.labelPool.acquire(label.position, label.content);
+        }
       }
     }
 
@@ -986,27 +978,3 @@ export const fitDistance = (aspect, minDistance, maxDistance) => {
   return THREE.MathUtils.clamp(
     Math.max(distForHeight, distForWidth), minDistance, maxDistance);
 };
-
-// Reused scratch for coordsLabel's transient conversions (synchronous, no overlap).
-const coordsScratchSph = new THREE.Spherical();
-const coordsScratchVec = new THREE.Vector3();
-
-/**
- * Build a label for a Cartesian point `c` ([x,y,z]): its position is `c`'s
- * direction as a unit vector (the getLabels contract — LabelPool.acquire scales
- * it to the sphere surface and refreshLabels' facing test assumes unit length),
- * and its content lists the spherical angles, raw coordinates, and normalized
- * direction (each via prettify()).
- * @param {Array<number>} c - Cartesian point as [x, y, z].
- * @returns {{position: THREE.Vector3, content: string}} Unit-direction label placement and its multi-line text.
- */
-export const coordsLabel = (c) => {
-  const s = coordsScratchSph.setFromCartesianCoords(c[0], c[1], c[2]);
-  const n = coordsScratchVec.set(c[0], c[1], c[2]).normalize();
-  return {
-    position: new THREE.Vector3()
-      .setFromSphericalCoords(1, s.phi, s.theta),
-    content:
-      `\u03B8, \u03A6 : ${prettify(s.theta)}, ${prettify(s.phi)}\nx, y, z : ${prettify(c[0])}, ${prettify(c[1])}, ${prettify(c[2])}\nx\u0302, y\u0302, z\u0302 : ${prettify(n.x)}, ${prettify(n.y)}, ${prettify(n.z)}`
-  };
-}
