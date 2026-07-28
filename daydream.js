@@ -87,7 +87,8 @@ const effectsByResolution = {
 
 // Re-point both display aliases (Three.js instanceColor + daydream.pixels) so
 // source, displayed attribute, and daydream.pixels all reference the same WASM
-// view. Shared by EngineHost.refresh() and SegmentController's composite heal.
+// view. Shared by EngineHost.refresh(), drawFrame's alias heal, and
+// SegmentController's composite heal.
 function repointDisplayAliases(view) {
   daydream.dotMesh.instanceColor.array = view;
   daydream.dotMesh.instanceColor.needsUpdate = true;
@@ -617,8 +618,7 @@ createHolosphereModule().then(module => {
               "re-pointing daydream.pixels / instanceColor.array at the WASM view");
             aliasDivergenceLogged = true;
           }
-          daydream.pixels = view;
-          daydream.dotMesh.instanceColor.array = view;
+          repointDisplayAliases(view);
         }
         daydream.dotMesh.instanceColor.needsUpdate = true;
       }
