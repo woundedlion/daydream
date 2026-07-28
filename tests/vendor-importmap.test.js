@@ -1,24 +1,55 @@
 // @ts-check
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
-const SRC = readFileSync(new URL('../vendor-importmap.js', import.meta.url), 'utf8');
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const SRC = readFileSync(join(REPO, 'vendor-importmap.js'), 'utf8');
+
+// The committed VENDOR block is all-CDN, so the 'local' variant has to be
+// generated. scripts/generate-importmap.mjs is run for real against a throwaway
+// fixture repo — rewriting the block here with a regex would silently no-op the
+// day the generated block changes shape, misattributing the resulting failures.
+const FIXTURE = mkdtempSync(join(tmpdir(), 'vendor-importmap-'));
+after(() => rmSync(FIXTURE, { recursive: true, force: true }));
+
+/**
+ * Runs the real generator in --local mode against a fixture repo and returns the
+ * vendor-importmap.js it produces.
+ * @returns {string} The rewritten source, with a locally-resolved VENDOR block.
+ */
+const generateLocalSrc = () => {
+  mkdirSync(join(FIXTURE, 'scripts'), { recursive: true });
+  copyFileSync(join(REPO, 'scripts', 'generate-importmap.mjs'),
+    join(FIXTURE, 'scripts', 'generate-importmap.mjs'));
+  copyFileSync(join(REPO, 'package.json'), join(FIXTURE, 'package.json'));
+  copyFileSync(join(REPO, 'vendor-importmap.js'), join(FIXTURE, 'vendor-importmap.js'));
+  // --local resolves a library locally only where its vendored entry point exists.
+  mkdirSync(join(FIXTURE, 'three.js', 'build'), { recursive: true });
+  writeFileSync(join(FIXTURE, 'three.js', 'build', 'three.module.js'), '');
+  mkdirSync(join(FIXTURE, 'node_modules', 'lil-gui', 'dist'), { recursive: true });
+  writeFileSync(join(FIXTURE, 'node_modules', 'lil-gui', 'dist', 'lil-gui.esm.min.js'), '');
+  execFileSync(process.execPath, [join(FIXTURE, 'scripts', 'generate-importmap.mjs'), '--local'],
+    { stdio: ['ignore', 'ignore', 'inherit'] });
+  return readFileSync(join(FIXTURE, 'vendor-importmap.js'), 'utf8');
+};
+
+const LOCAL_SRC = generateLocalSrc();
 
 /**
  * Evaluates the runtime importmap IIFE against a stubbed DOM and returns the
- * whole importmap it injects. The baked VENDOR block is rewritten to exercise
- * the 'local' variant (the committed default is all-CDN).
+ * whole importmap it injects, from either the committed CDN source or the
+ * generated 'local' one.
  * @param {{vendor?: 'cdn'|'local', selfSrc?: string, extra?: Object}} [opts]
  * @returns {Object} The parsed importmap.
  */
 const evalImportmapJson = ({ vendor = 'cdn', selfSrc = 'https://example.test/app/vendor-importmap.js', extra } = {}) => {
-  let source = SRC;
-  if (vendor === 'local') {
-    source = source.replace(/const VENDOR = \{[^}]*\};/,
-      "const VENDOR = { three: 'local', lilGui: 'local' };");
-  }
+  const source = vendor === 'local' ? LOCAL_SRC : SRC;
   let injected = null;
   const sandbox = {
     URL,
