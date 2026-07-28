@@ -2,106 +2,23 @@
 //
 // shared.js's own export is initScene; showFatalError et al. are re-exports
 // covered by their source modules' tests (banner.test.js, clipboard.test.js,
-// cpp_format.test.js). three + three/addons are mocked, so initScene builds a
-// whole scene here without a WebGL context and dispose() can be checked step by
-// step. dispose() carries an ordering invariant: the frame loop and the resize
-// listener must both be stopped before any GPU object is released, or a queued
-// frame renders against disposed resources.
-import { test, mock, afterEach } from 'node:test';
+// cpp_format.test.js). three + three/addons are redirected onto fake_three.js
+// by loader hooks, so initScene builds a whole scene here without a WebGL
+// context and dispose() can be checked step by step. dispose() carries an
+// ordering invariant: the frame loop and the resize listener must both be
+// stopped before any GPU object is released, or a queued frame renders against
+// disposed resources.
+import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { register } from 'node:module';
+import {
+  log, Mesh, PerspectiveCamera, Scene, WebGLRenderer, OrbitControls,
+} from './fake_three.js';
 
-// Ordered teardown sink. Only dispose() writes to it.
-let log = [];
-
-class FakeVector3 {
-  /** @param {number} x @param {number} y @param {number} z @returns {FakeVector3} */
-  set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; }
-}
-
-class FakeObject3D {
-  constructor() { this.position = new FakeVector3(); }
-}
-
-class FakeScene {
-  constructor() { this.children = []; }
-  /** @param {Object} obj */
-  add(obj) { this.children.push(obj); }
-  clear() { this.children.length = 0; log.push('scene.clear'); }
-}
-
-class FakeGeometry {
-  dispose() { log.push('geometry.dispose'); }
-}
-
-class FakeMaterial {
-  /** @param {Object} opts */
-  constructor(opts) { this.opts = opts; }
-  dispose() { log.push('material.dispose'); }
-}
-
-class FakeMesh extends FakeObject3D {
-  /** @param {FakeGeometry} geometry @param {FakeMaterial} material */
-  constructor(geometry, material) {
-    super();
-    this.geometry = geometry;
-    this.material = material;
-  }
-}
-
-class FakeCamera extends FakeObject3D {
-  /** @param {number} fov @param {number} aspect @param {number} near @param {number} far */
-  constructor(fov, aspect, near, far) {
-    super();
-    Object.assign(this, { fov, aspect, near, far });
-    this.projectionUpdates = 0;
-  }
-  updateProjectionMatrix() { this.projectionUpdates += 1; }
-}
-
-class FakeRenderer {
-  /** @param {Object} params - The {canvas, antialias, alpha} bag initScene passes. */
-  constructor(params) {
-    this.params = params;
-    this.domElement = params.canvas;
-    this.size = null;
-    this.pixelRatio = 0;
-    this.renders = 0;
-  }
-  /** @param {number} w @param {number} h */
-  setSize(w, h) { this.size = [w, h]; }
-  /** @param {number} ratio */
-  setPixelRatio(ratio) { this.pixelRatio = ratio; }
-  render() { this.renders += 1; }
-  dispose() { log.push('renderer.dispose'); }
-}
-
-class FakeControls {
-  /** @param {FakeCamera} camera @param {Object} domElement */
-  constructor(camera, domElement) {
-    this.camera = camera;
-    this.domElement = domElement;
-    this.updates = 0;
-  }
-  update() { this.updates += 1; }
-  dispose() { log.push('controls.dispose'); }
-}
-
-mock.module('three', {
-  namedExports: {
-    Scene: FakeScene,
-    Color: class { constructor(hex) { this.hex = hex; } },
-    PerspectiveCamera: FakeCamera,
-    WebGLRenderer: FakeRenderer,
-    SphereGeometry: FakeGeometry,
-    MeshBasicMaterial: FakeMaterial,
-    Mesh: FakeMesh,
-    AmbientLight: class extends FakeObject3D {},
-    DirectionalLight: class extends FakeObject3D {},
-    SpotLight: class extends FakeObject3D {},
-  },
-});
-mock.module('three/addons/controls/OrbitControls.js', {
-  namedExports: { OrbitControls: FakeControls },
+// Same URL this file's static import above resolved, so shared.js and the
+// assertions below share one module instance — and one `log`.
+register('./three_loader_hooks.js', import.meta.url, {
+  data: { fakeThreeUrl: import.meta.resolve('./fake_three.js') },
 });
 
 const { capPixelRatio, initScene } = await import('../tools/shared.js');
@@ -119,7 +36,7 @@ afterEach(() => {
     if (value === undefined) delete globalThis[key];
     else globalThis[key] = value;
   }
-  log = [];
+  log.length = 0;
 });
 
 /** Stub document.getElementById against a fixed id->element map. */
@@ -133,7 +50,7 @@ function stubDocument(byId) {
  * so the loop advances exactly one frame.
  * @param {Object} [opts] - Options forwarded to initScene.
  * @returns {Object} initScene's handles plus the canvas, the listener record and
- *          the id passed to cancelAnimationFrame.
+ *          the ids passed to cancelAnimationFrame.
  */
 function mountScene(opts = {}) {
   const canvas = {};
@@ -177,11 +94,11 @@ test('initScene throws when the canvas element is absent', () => {
 test('initScene returns the handles the tool pages destructure', () => {
   const s = mountScene();
 
-  assert.ok(s.scene instanceof FakeScene);
-  assert.ok(s.camera instanceof FakeCamera);
-  assert.ok(s.renderer instanceof FakeRenderer);
-  assert.ok(s.controls instanceof FakeControls);
-  assert.ok(s.sphere instanceof FakeMesh);
+  assert.ok(s.scene instanceof Scene);
+  assert.ok(s.camera instanceof PerspectiveCamera);
+  assert.ok(s.renderer instanceof WebGLRenderer);
+  assert.ok(s.controls instanceof OrbitControls);
+  assert.ok(s.sphere instanceof Mesh);
   assert.deepEqual(s.lights, []);
   assert.equal(typeof s.resize, 'function');
   assert.equal(typeof s.dispose, 'function');
