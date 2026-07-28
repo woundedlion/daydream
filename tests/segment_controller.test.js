@@ -30,6 +30,7 @@ const EXPECTED_CONSOLE_MESSAGES = {
   error: [
     /^\[Segmented\] Worker seg \d+ error:/,
     /^\[Segmented\] Worker seg \d+ message deserialization failed$/,
+    /^\[Segmented\] frame from invalid segId /,
     /^SegmentController\.composite: display-buffer alias diverged /,
   ],
 };
@@ -430,6 +431,49 @@ test('an unknown worker message faults instead of being silently dropped', () =>
   assert.equal(c.faulted, true, 'protocol drift faults rather than waiting out a watchdog');
   assert.equal(c.faultInfo.segId, 1);
   assert.match(c.faultInfo.message, /unknown message type readyish/);
+});
+
+/**
+ * Deliver a raw 'frame' payload with an arbitrary segId, bypassing deliverFrame's
+ * number-typed parameter, so the controller's own validation is what is tested.
+ * @param {SegmentController} controller - Controller owning the worker pool.
+ * @param {number} worker - Index of the worker delivering the frame.
+ * @param {unknown} segId - segId field to put on the wire.
+ * @returns {void}
+ */
+function deliverFrameWithSegId(controller, worker, segId) {
+  controller.workers[worker].onmessage({
+    data: {
+      type: 'frame', segId,
+      pixels: new Uint16Array(2 * 2 * 3),
+      x0: 0, x1: 2, y0: 0, y1: 2,
+      elapsed: 1, renderUs: 0, arenaMetrics: null,
+    },
+  });
+}
+
+test('a frame with a non-integer segId is dropped without settling the barrier', async () => {
+  const c = makeController();
+  c.create(2);
+  const done = c.renderParallel();
+
+  // Each of these fails both range comparisons, so a range-only guard would let
+  // it index by string key and decrement `pending` for an absent segment.
+  for (const segId of [undefined, NaN, null, '1', 1.5]) {
+    deliverFrameWithSegId(c, 0, segId);
+    assert.equal(c.pending, 2, `segId ${String(segId)} must not settle the barrier`);
+    assert.deepEqual(c.scratch, [null, null],
+      `segId ${String(segId)} must not write a staging slot`);
+    assert.deepEqual(c.frameSeen, [false, false],
+      `segId ${String(segId)} must not mark a segment seen`);
+  }
+  assert.equal(c.faulted, false, 'a malformed segId is a loud drop, not a pool fault');
+
+  // The real segments still complete the generation.
+  deliverFrame(c, 0);
+  deliverFrame(c, 1);
+  assert.equal(c.pending, 0);
+  await done;
 });
 
 test('a surviving worker responding after a fault does not drive pending negative', async () => {
