@@ -84,6 +84,22 @@ test('AppState.subscribe returns an unsubscribe function', () => {
   assert.equal(count, 1);
 });
 
+test('AppState.subscribe unsubscribes one registration of a shared callback', () => {
+  const s = new AppState({ a: 1 });
+  let count = 0;
+  const shared = () => count++;
+  const offFirst = s.subscribe(shared);
+  s.subscribe(shared);
+
+  offFirst();
+  s.set('a', 2);
+  assert.equal(count, 1, 'the second registration survives');
+
+  offFirst(); // double invoke must not drop the survivor
+  s.set('a', 3);
+  assert.equal(count, 2);
+});
+
 test('AppState.snapshot is a detached copy', () => {
   const s = new AppState({ a: 1 });
   const snap = s.snapshot();
