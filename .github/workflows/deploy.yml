@@ -32,10 +32,9 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# Default every job to source read-only. Deploy grants its publish capabilities.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # One deploy at a time; let an in-progress deploy finish rather than cancel it.
 concurrency:
@@ -45,6 +44,9 @@ concurrency:
 jobs:
   gate:
     name: Engine unit tests (deploy gate)
+    # Checks out and runs a second repository's build; never holds the Pages token.
+    permissions:
+      contents: read
     runs-on: ubuntu-24.04   # pinned image: deterministic apt clang version
     steps:
       - name: Checkout daydream (for the pinned engine SHA)
@@ -114,6 +116,8 @@ jobs:
 
   js-tests:
     name: Simulator JS unit tests (deploy gate)
+    permissions:
+      contents: read
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -134,6 +138,10 @@ jobs:
   deploy:
     name: Deploy to Pages
     needs: [gate, js-tests]       # ← only deploys if both suites pass
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     runs-on: ubuntu-24.04
     environment:
       name: github-pages
