@@ -4,8 +4,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 
 // Derive the directory and suffix from package.json's `test` script glob so this
 // guard tracks the pattern node --test actually runs instead of restating it.
-const testScript =
-  JSON.parse(readFileSync('package.json', 'utf8')).scripts?.test ?? '';
+const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+const testScript = pkg.scripts?.test ?? '';
 const glob =
   testScript.match(/["']([^"']*\*[^"']*)["']/)?.[1] ??
   testScript.split(/\s+/).find((t) => t.includes('*'));
@@ -15,34 +15,76 @@ if (!glob) {
   );
   process.exit(1);
 }
-const slash = glob.lastIndexOf('/');
-const dir = slash === -1 ? '.' : glob.slice(0, slash);
+// Base directory is the path before the first globbed segment; only a `**`
+// segment descends, so anything deeper is out of the pattern's reach.
+const parts = glob.split('/');
+const globAt = parts.findIndex((p) => p.includes('*'));
+const dir = globAt <= 0 ? '.' : parts.slice(0, globAt).join('/');
 const suffix = glob.slice(glob.lastIndexOf('*') + 1);
+const recursive = glob.includes('**');
 
 let files = [];
+// A node_modules at or below the test dir shadows the pinned root install for
+// every test file, so local runs and CI resolve different copies of a
+// dependency. Junctions and symlinks report as neither file nor directory, so
+// match the name before the type.
+const strays = [];
+// Test files the glob cannot reach: they are committed, look like tests, and
+// never run.
+const unreachable = [];
+const scan = (d, depth) => {
+  for (const entry of readdirSync(d, { withFileTypes: true })) {
+    const path = `${d}/${entry.name}`;
+    if (entry.name === 'node_modules') strays.push(path);
+    else if (entry.isDirectory()) scan(path, depth + 1);
+    else if (!entry.name.endsWith(suffix)) continue;
+    else if (depth === 0 || recursive) files.push(path);
+    else unreachable.push(path);
+  }
+};
 try {
-  files = readdirSync(dir).filter((f) => f.endsWith(suffix));
+  // An unrooted glob: `.` is the root install, and a full-tree walk from there
+  // would cross node_modules and .git, so match its own entries only.
+  if (dir === '.') files = readdirSync('.').filter((f) => f.endsWith(suffix));
+  else scan(dir, 0);
 } catch (e) {
   if (e.code !== 'ENOENT') throw e;
 }
+
 if (files.length === 0) {
   console.error(`No files matched ${glob} — refusing to report a green run.`);
   process.exit(1);
 }
 
-// A node_modules at or below the test dir shadows the pinned root install for
-// every test file, so local runs and CI resolve different copies of a
-// dependency. Skipped when the glob is unrooted: `.` is the root install.
-const strays = [];
-const findModules = (d) => {
-  for (const entry of readdirSync(d, { withFileTypes: true })) {
-    const path = `${d}/${entry.name}`;
-    // Junctions and symlinks report as neither, so match the name first.
-    if (entry.name === 'node_modules') strays.push(path);
-    else if (entry.isDirectory()) findModules(path);
-  }
-};
-if (dir !== '.') findModules(dir);
+// Ratchet: a match count alone still reports green after all but one test file
+// is deleted or renamed out of the glob. The floor is committed in package.json
+// and raised as test files land; lower it only alongside a deliberate removal.
+const floor = pkg.testFileFloor;
+if (!Number.isInteger(floor) || floor < 0) {
+  console.error(
+    'require-tests: package.json needs a "testFileFloor" (non-negative ' +
+      'integer) — the committed count of files the test glob must match.',
+  );
+  process.exit(1);
+}
+if (files.length < floor) {
+  console.error(
+    `Only ${files.length} files matched ${glob}; the committed floor is ` +
+      `${floor}. Restore the missing tests, or lower "testFileFloor" in ` +
+      'package.json if the removal was intended.',
+  );
+  process.exit(1);
+}
+
+if (unreachable.length > 0) {
+  console.error(
+    `require-tests: ${glob} does not reach:\n` +
+      `${unreachable.map((p) => `  ${p}`).join('\n')}\n` +
+      `Move them directly into ${dir}/, or widen the glob to ${dir}/**/*${suffix}.`,
+  );
+  process.exit(1);
+}
+
 if (strays.length > 0) {
   console.error(
     `require-tests: node_modules under ${dir}/ shadows the pinned root ` +
