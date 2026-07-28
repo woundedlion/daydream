@@ -234,13 +234,14 @@ test('updateScrollArrows reflects scroll geometry', () => {
   assert.ok(!sidebar.arrowRight.classes.has('visible'));
 });
 
-test('sort controls keep a stable name and expose the current order', () => {
+test('sort controls expose the current order in their accessible name', () => {
   const { sidebar } = makeSidebar();
   const glyph = (btn) => btn.querySelector('.sort-glyph');
 
-  assert.equal(sidebar.nameBtn.getAttribute('aria-label'), 'Sort by name');
+  // Only the active control carries a direction; the inactive one has none yet.
+  assert.equal(sidebar.nameBtn.getAttribute('aria-label'), 'Sort by name, ascending');
   assert.equal(sidebar.sizeBtn.getAttribute('aria-label'), 'Sort by size');
-  // The direction arrow is presentational, never part of the accessible name.
+  // The direction arrow is presentational; the name carries the direction.
   assert.equal(glyph(sidebar.nameBtn).getAttribute('aria-hidden'), 'true');
   assert.equal(glyph(sidebar.nameBtn).textContent, '▲');
   assert.equal(sidebar.nameBtn.getAttribute('aria-pressed'), 'true');
@@ -250,7 +251,7 @@ test('sort controls keep a stable name and expose the current order', () => {
   sidebar.sortBy('size', 'desc');
 
   assert.equal(sidebar.nameBtn.getAttribute('aria-label'), 'Sort by name');
-  assert.equal(sidebar.sizeBtn.getAttribute('aria-label'), 'Sort by size');
+  assert.equal(sidebar.sizeBtn.getAttribute('aria-label'), 'Sort by size, descending');
   assert.equal(sidebar.nameBtn.getAttribute('aria-pressed'), 'false');
   assert.equal(sidebar.sizeBtn.getAttribute('aria-pressed'), 'true');
   assert.equal(glyph(sidebar.nameBtn).textContent, '⇅');
