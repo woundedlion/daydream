@@ -103,12 +103,12 @@ export class AppState {
    *   one twice is a no-op.
    */
   subscribe(callback) {
-    this.listeners.push(callback);
-    let live = true;
+    // Registrations are wrapped so duplicates of one callback stay distinguishable:
+    // both disposal and notify's mid-dispatch recheck key off this object.
+    const registration = { fn: callback };
+    this.listeners.push(registration);
     return () => {
-      if (!live) return;
-      live = false;
-      const i = this.listeners.indexOf(callback);
+      const i = this.listeners.indexOf(registration);
       if (i !== -1) this.listeners.splice(i, 1);
     };
   }
@@ -125,8 +125,8 @@ export class AppState {
     // Dispatch over a snapshot so a subscriber added during dispatch is not
     // invoked for the current event; membership is re-checked per call so one
     // removed during dispatch is not invoked either.
-    for (const cb of this.listeners.slice()) {
-      if (this.listeners.includes(cb)) cb(key, value, old);
+    for (const reg of this.listeners.slice()) {
+      if (this.listeners.includes(reg)) reg.fn(key, value, old);
     }
   }
 
