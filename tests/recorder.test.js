@@ -230,6 +230,39 @@ test('toggle starts then stops, reporting the true state each time', () => {
   }
 });
 
+/**
+ * Verifies abort() ends a live session the way an external fault (a lost canvas
+ * context) needs: the stop path still finalizes the output and the host hook
+ * fires, while an idle recorder reports nothing.
+ */
+test('abort stops a live session and tells the host', () => {
+  const restore = installRecorderEnv();
+  const errs = [];
+  const prevErr = console.error;
+  console.error = (...a) => errs.push(a.join(' '));
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    rec.download = () => {};
+    const notified = [];
+    rec.onError = (err) => notified.push(err);
+    rec.start('e');
+    const recorder = rec.mediaRecorder;
+
+    rec.abort('context lost');
+    assert.equal(rec.isRecording, false);
+    assert.equal(notified.length, 1, 'the host is told the session ended');
+    assert.match(notified[0].message, /context lost/);
+    recorder.onstop();
+    assert.equal(rec.mediaRecorder, null, 'the stop path still finalizes the session');
+
+    rec.abort('context lost');
+    assert.equal(notified.length, 1, 'an idle recorder has nothing to abort');
+  } finally {
+    console.error = prevErr;
+    restore();
+  }
+});
+
 /** Verifies start() refuses (no phantom session) when the browser is unsupported. */
 test('start refuses and stays idle when recording is unsupported', () => {
   const restore = installRecorderEnv();

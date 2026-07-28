@@ -278,7 +278,8 @@ export class Daydream {
 
   /**
    * Wire WebGL context-loss / -restore handling on the canvas: on loss, flag
-   * contextLost (render() then stops issuing GL calls) and show a reload prompt.
+   * contextLost (render() then stops issuing GL calls), end any recording, and
+   * show a reload prompt.
    */
   setupContextLossHandling() {
     this.contextLost = false;
@@ -307,6 +308,9 @@ export class Daydream {
       this.contextLostDetail.textContent =
         `${reason}. The GPU process was likely reset — reload to recover.`;
       overlay.style.display = "flex";
+      // The canvas feeds no more frames into the capture stream, so end any
+      // session rather than leaving it silently frozen.
+      this.recorder?.abort(`WebGL context lost (${reason}); recording stopped.`);
     };
 
     this.onContextRestored = () => {
