@@ -3,9 +3,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 
-// pixelToSpherical takes the sphere resolution as a parameter; pass a plain
-// stand-in for the Daydream driver so the test stays free of the browser graph.
-const Daydream = { W: 288, H: 144, H_OFFSET: 0 };
+/**
+ * Builds the sphere-resolution stand-in pixelToSpherical takes in place of the
+ * Daydream driver, keeping the tests free of the browser graph. A fresh object
+ * per call so no test observes another's H_OFFSET.
+ * @param {number} [hOffset=0] - Virtual rows past the panel (the device uses 3).
+ * @returns {{W:number, H:number, H_OFFSET:number}} The driver stand-in.
+ */
+const makeDaydream = (hOffset = 0) => ({ W: 288, H: 144, H_OFFSET: hOffset });
 
 const { pixelToSpherical } = await import('../geometry.js');
 
@@ -31,10 +36,11 @@ function engineVector(x, y) {
  * its x<->z mirror).
  */
 test('pixelToSpherical matches the engine convention (theta from +X)', () => {
+  const daydream = makeDaydream();
   const v = new THREE.Vector3();
   for (const x of [0, 1, 72, 144, 216, 287]) {
     for (const y of [0, 1, 72, 143]) {
-      v.setFromSpherical(pixelToSpherical(x, y, Daydream));
+      v.setFromSpherical(pixelToSpherical(x, y, daydream));
       const [ex, ey, ez] = engineVector(x, y);
       assert.ok(
         Math.abs(v.x - ex) < 1e-12 && Math.abs(v.y - ey) < 1e-12 && Math.abs(v.z - ez) < 1e-12,
@@ -48,14 +54,9 @@ test('pixelToSpherical matches the engine convention (theta from +X)', () => {
  * sim can preview the device's row->latitude mapping (device H_OFFSET == 3).
  */
 test('H_OFFSET widens the latitude denominator to H + H_OFFSET - 1', () => {
-  try {
-    Daydream.H_OFFSET = 3;
-    const phi = pixelToSpherical(0, 50, Daydream).phi;
-    assert.ok(Math.abs(phi - (50 * Math.PI) / (H + 3 - 1)) < 1e-12,
-      `phi should use H + H_OFFSET - 1, got ${phi}`);
-  } finally {
-    Daydream.H_OFFSET = 0;
-  }
+  const phi = pixelToSpherical(0, 50, makeDaydream(3)).phi;
+  assert.ok(Math.abs(phi - (50 * Math.PI) / (H + 3 - 1)) < 1e-12,
+    `phi should use H + H_OFFSET - 1, got ${phi}`);
 });
 
 /**
@@ -63,7 +64,7 @@ test('H_OFFSET widens the latitude denominator to H + H_OFFSET - 1', () => {
  * guarding against an x<->z swap that would put it at +Z.
  */
 test('the x=0 column maps to +X, not +Z', () => {
-  const v = new THREE.Vector3().setFromSpherical(pixelToSpherical(0, 72, Daydream));
+  const v = new THREE.Vector3().setFromSpherical(pixelToSpherical(0, 72, makeDaydream()));
   assert.ok(v.x > 0.99, `x=0 should sit near +X, got x=${v.x}`);
   assert.ok(Math.abs(v.z) < 1e-9, `x=0 should have z~0, got z=${v.z}`);
 });
@@ -81,9 +82,10 @@ test('pixelToSpherical hits independent golden vectors', () => {
     { x: 0, y: 143, v: [0, -1, 0] },                                 // south pole
     { x: 72, y: 36, v: [0, 0.7032124967615111, 0.7109797355751019] },
   ];
+  const daydream = makeDaydream();
   const v = new THREE.Vector3();
   for (const { x, y, v: g } of goldens) {
-    v.setFromSpherical(pixelToSpherical(x, y, Daydream));
+    v.setFromSpherical(pixelToSpherical(x, y, daydream));
     assert.ok(
       Math.abs(v.x - g[0]) < 1e-9 && Math.abs(v.y - g[1]) < 1e-9 && Math.abs(v.z - g[2]) < 1e-9,
       `pixel (${x},${y}) -> (${v.x},${v.y},${v.z}); golden (${g})`);
