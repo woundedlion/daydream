@@ -778,25 +778,50 @@ let segEpoch = 0;
 // Requested size; segments.count follows the live pool and lags this across
 // the warmModules() await.
 let segCount = segments.count;
-segFolder.add(segState, 'segmented').name('Enabled').onChange(async v => {
-  segments.active = v;
-  const epoch = ++segEpoch;
-  if (v) {
-    // Reopen the (idle-dropped) keep-alive connection and prime the module cache
-    // before the worker-spawn burst.
-    await warmModules();
-    if (epoch === segEpoch && segments.active) segments.create(segCount);
-  } else {
-    segments.destroy();
-    segments.updateStats();
+/**
+ * Fall back to the single-thread engine after a segmented-pool failure, leaving
+ * the toggle showing the state the app is actually in.
+ * @param {string} label - What failed, for the log line.
+ * @param {*} err - The thrown value.
+ * @returns {void}
+ */
+function segmentedFailed(label, err) {
+  console.error(`Segmented POV: ${label} failed; falling back to the single engine.`, err);
+  segments.active = false;
+  // Strand any continuation still awaiting warmModules().
+  segEpoch++;
+  segments.destroy();
+  segments.updateStats();
+  segState.segmented = false;
+  segEnabledCtrl.updateDisplay();
+}
+const segEnabledCtrl = segFolder.add(segState, 'segmented').name('Enabled').onChange(async v => {
+  try {
+    segments.active = v;
+    const epoch = ++segEpoch;
+    if (v) {
+      // Reopen the (idle-dropped) keep-alive connection and prime the module cache
+      // before the worker-spawn burst.
+      await warmModules();
+      if (epoch === segEpoch && segments.active) segments.create(segCount);
+    } else {
+      segments.destroy();
+      segments.updateStats();
+    }
+  } catch (e) {
+    segmentedFailed(v ? 'enable' : 'teardown', e);
   }
 });
 segFolder.add(segState, 'segments', 2, 8, 2).name('Segments').onChange(async v => {
-  segCount = v;
-  const epoch = ++segEpoch;
-  if (segments.active) {
-    await warmModules();
-    if (epoch === segEpoch && segments.active) segments.create(segCount);
+  try {
+    segCount = v;
+    const epoch = ++segEpoch;
+    if (segments.active) {
+      await warmModules();
+      if (epoch === segEpoch && segments.active) segments.create(segCount);
+    }
+  } catch (e) {
+    segmentedFailed('resize', e);
   }
 });
 segFolder.addSession(segState, 'boundaries').name('Show Boundaries').onChange(v => {
@@ -892,6 +917,19 @@ const onKeyDown = (e) => {
 };
 window.addEventListener("keydown", onKeyDown);
 
+/**
+ * Surface a rejection nothing awaited. Async failures after boot would
+ * otherwise reach only the console, leaving a frozen page with no explanation.
+ * @param {PromiseRejectionEvent} e - The rejection event.
+ * @returns {void}
+ */
+const onUnhandledRejection = (e) => {
+  console.error('Unhandled promise rejection:', e.reason);
+  const detail = e.reason?.message ?? String(e.reason);
+  showFatalError(`Something went wrong. ${detail}`);
+};
+window.addEventListener("unhandledrejection", onUnhandledRejection);
+
 daydream.renderer.setAnimationLoop(() => {
   if (host.adapter) {
     daydream.render(host.adapter);
@@ -915,6 +953,7 @@ function disposeApp() {
   if (appDisposed) return;
   appDisposed = true;
   window.removeEventListener("keydown", onKeyDown);
+  window.removeEventListener("unhandledrejection", onUnhandledRejection);
   window.removeEventListener("pagehide", onPageHide);
   // Released before the GUI/scene teardown below: a later set() would otherwise
   // re-enter applyEffect()/applyResolution() against a disposed renderer.
