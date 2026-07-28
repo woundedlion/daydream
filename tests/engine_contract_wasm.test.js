@@ -105,6 +105,21 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
   }
 });
 
+// getBufferLength has no daydream call site; it is pinned here as intended API.
+test('getBufferLength reports the active resolution buffer length', () => {
+  for (const [w, h] of M.HolosphereEngine.getSupportedResolutions()) {
+    assert.equal(engine.setResolution(w, h), true,
+      `the engine must build the ${w}x${h} row it reports`);
+    assert.equal(engine.getBufferLength(), w * h * 3,
+      `getBufferLength must report w*h*3 at ${w}x${h}`);
+  }
+  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), true,
+    'setEffect must succeed after a resolution change');
+  assert.equal(engine.getBufferLength(), engine.getPixels().length,
+    'getBufferLength must equal the getPixels view length');
+});
+
 // Everything MeshOps binds that is not a Conway/SolidBuilder operator. The
 // remainder of MeshOps.prototype is the op set the C++ MESHOP lists generate.
 const MESH_OPS_NON_OPS = new Set([
@@ -152,6 +167,38 @@ test('the Platonic and Catalan seed lists name registered Simple solids', () => 
     assert.ok(!CATALAN_BASES.has(name),
       `"${name}" is in both seed lists; the namespace qualifier would be ambiguous`);
   }
+});
+
+// MeshOps.getRecipe has no daydream call site; it is pinned here as intended API.
+test('MeshOps.getRecipe returns an authored chain for every Complex solid', () => {
+  assert.equal(typeof M.MeshOps.getRecipe, 'function',
+    'MeshOps is missing class function getRecipe');
+  const registry = M.MeshOps.getRegistry();
+  const simple = new Set();
+  const complex = [];
+  for (let i = 0; i < registry.length; i++) {
+    if (registry[i].category === 'Simple') simple.add(registry[i].name);
+    else if (registry[i].category === 'Complex') complex.push(registry[i].name);
+  }
+  assert.ok(complex.length > 0, 'the registry must expose at least one Complex solid');
+  for (const name of complex) {
+    const recipe = M.MeshOps.getRecipe(name);
+    assert.ok(recipe, `Complex solid "${name}" must carry an authored recipe`);
+    assert.ok(simple.has(recipe.seed),
+      `recipe seed "${recipe.seed}" of "${name}" must name a registered Simple solid`);
+    assert.ok(Array.isArray(recipe.ops) && recipe.ops.length > 0,
+      `recipe of "${name}" must carry a non-empty ops array`);
+    for (const step of recipe.ops) {
+      assert.ok(KNOWN_OPS.has(step.op),
+        `recipe of "${name}" uses op "${step.op}", which MeshOps does not bind`);
+      assert.equal(typeof step.param, 'number',
+        `recipe step "${step.op}" of "${name}" must carry a numeric param`);
+      assert.equal(typeof step.twist, 'number',
+        `recipe step "${step.op}" of "${name}" must carry a numeric twist`);
+    }
+  }
+  assert.equal(M.MeshOps.getRecipe('NoSuchSolid'), null,
+    'getRecipe must return null for an unknown name');
 });
 
 test('PaletteOps exposes the method surface the palette tool drives', () => {
