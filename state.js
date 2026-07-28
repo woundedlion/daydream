@@ -16,6 +16,10 @@ export function roundUrlNumber(value) {
   return Number.isFinite(value) ? parseFloat(value.toFixed(4)) : null;
 }
 
+// A URL number must be wholly numeric: parseFloat would take the leading digits
+// of "42abc" and read "0x10" as 0.
+const URL_NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+
 /**
  * Centralized application state with subscriber pattern and URL synchronization.
  * Separates state management from DOM manipulation — subscribers react to changes
@@ -171,7 +175,9 @@ export class URLSync {
       // raw string; a non-finite parse keeps the default rather than seeding NaN.
       const current = state.get(key);
       if (typeof current === 'number') {
-        const num = parseFloat(raw);
+        const t = raw.trim();
+        if (!URL_NUMBER.test(t)) continue;
+        const num = Number(t);
         if (!Number.isFinite(num)) continue;
         patch[key] = num;
       } else if (typeof current === 'boolean') {
