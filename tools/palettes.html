@@ -629,8 +629,10 @@
                 // Update parameter state
                 parameters[groupDef.param] = finalNewValue;
                 // Update UI
+                const display = finalNewValue.toFixed(3);
                 groupSlider.value = finalRawValue;
-                groupValueSpan.textContent = finalNewValue.toFixed(3);
+                groupValueSpan.textContent = display;
+                groupSlider.setAttribute('aria-valuetext', display);
               }
             }
           });
@@ -698,6 +700,7 @@
           // Clamp value to slider min/max before setting
           slider.value = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), scaledValue));
           valueSpan.textContent = newValue.toFixed(3);
+          slider.setAttribute('aria-valuetext', valueSpan.textContent);
         }
       });
     }

@@ -93,6 +93,8 @@ export function createSlider(containerId, cfg, onInput) {
   slider.step = String(sliderStep);
   slider.value = String(roundedValue);
   slider.className = sliderClass;
+  // The input's value is the scaled integer; announce the display value instead.
+  slider.setAttribute('aria-valuetext', (roundedValue / scale).toFixed(decimals));
 
   const valueSpan = document.createElement('span');
   valueSpan.id = valueSpanId;
@@ -106,7 +108,9 @@ export function createSlider(containerId, cfg, onInput) {
       const raw = parseFloat(slider.value);
       // Set the readout before onInput so a caller can overwrite it with a
       // custom (e.g. snapped) value.
-      valueSpan.textContent = (raw / scale).toFixed(decimals);
+      const display = (raw / scale).toFixed(decimals);
+      valueSpan.textContent = display;
+      slider.setAttribute('aria-valuetext', display);
       onInput(raw);
     });
   }
