@@ -14,17 +14,27 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(HERE, '../scripts/require-tests.mjs');
 
-const PKG = JSON.stringify({
-  scripts: { test: 'node --test "tests/*.test.js"' },
-}, null, 2);
-
 let root;
+
+/**
+ * Writes the fixture package.json, merging overrides over a non-recursive glob
+ * and a floor of one.
+ * @param {Object} [overrides] - Fields replacing the defaults.
+ */
+const writePkg = (overrides = {}) => {
+  const pkg = {
+    scripts: { test: 'node --test "tests/*.test.js"' },
+    testFileFloor: 1,
+    ...overrides,
+  };
+  writeFileSync(join(root, 'package.json'), JSON.stringify(pkg, null, 2));
+};
 
 /** Recreates the fixture repo: a package.json with a test glob and one matching test file. */
 const buildRoot = () => {
   rmSync(root, { recursive: true, force: true });
   mkdirSync(join(root, 'tests'), { recursive: true });
-  writeFileSync(join(root, 'package.json'), PKG);
+  writePkg();
   writeFileSync(join(root, 'tests', 'sample.test.js'), '');
 };
 
@@ -64,6 +74,41 @@ test('a test dir with no matching files fails', () => {
   rmSync(join(root, 'tests', 'sample.test.js'));
   const err = runExpectingFailure();
   assert.match(err, /No files matched tests\/\*\.test\.js/);
+});
+
+/** Verifies a surviving file is not enough once the committed floor is higher. */
+test('a match count below the committed floor fails', () => {
+  writePkg({ testFileFloor: 2 });
+  const err = runExpectingFailure();
+  assert.match(err, /Only 1 files matched/);
+  assert.match(err, /floor is 2/);
+});
+
+/** Verifies the floor cannot be dropped to disable the ratchet. */
+test('a missing floor fails', () => {
+  writePkg({ testFileFloor: undefined });
+  const err = runExpectingFailure();
+  assert.match(err, /testFileFloor/);
+});
+
+/** Verifies a test file the non-recursive glob cannot reach is refused. */
+test('a test file below the glob depth fails', () => {
+  mkdirSync(join(root, 'tests', 'sub'));
+  writeFileSync(join(root, 'tests', 'sub', 'nested.test.js'), '');
+  const err = runExpectingFailure();
+  assert.match(err, /does not reach/);
+  assert.match(err, /tests\/sub\/nested\.test\.js/);
+});
+
+/** Verifies a `**` glob counts the nested file instead of refusing it. */
+test('a recursive glob reaches a nested test file', () => {
+  mkdirSync(join(root, 'tests', 'sub'));
+  writeFileSync(join(root, 'tests', 'sub', 'nested.test.js'), '');
+  writePkg({
+    scripts: { test: 'node --test "tests/**/*.test.js"' },
+    testFileFloor: 2,
+  });
+  assert.doesNotThrow(run);
 });
 
 /** Verifies a node_modules directly under the test dir is refused. */
