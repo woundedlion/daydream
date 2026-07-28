@@ -114,3 +114,25 @@ export const COPY_FEEDBACK = {
   copiedClasses: ['text-green-400'],
   idleClasses: ['text-gray-500'],
 };
+
+/**
+ * Wire a tool page's export block: clicking the copy button — or the block
+ * itself, where the page offers that — copies the block's text and flashes the
+ * shared COPY_FEEDBACK prompt.
+ *
+ * @param {Object} opts
+ * @param {HTMLElement} opts.source - Element whose textContent is copied.
+ * @param {HTMLElement} [opts.button] - Button that triggers the copy.
+ * @param {HTMLElement} [opts.prompt] - Element whose label flashes on copy.
+ * @param {HTMLElement} [opts.block] - Element (e.g. the <pre>) that also copies on click.
+ * @returns {void}
+ */
+export function wireCopyBlock({ source, button, prompt, block }) {
+  if (!source) return;
+  const handleCopy = () => {
+    copyWithFeedback(source.textContent,
+      { element: prompt, revertText: '', ...COPY_FEEDBACK });
+  };
+  button?.addEventListener('click', handleCopy);
+  block?.addEventListener('click', handleCopy);
+}
