@@ -288,8 +288,8 @@
     // --- UI Setup ---
 
     const createSlider = (id, params) => {
-      // C1/C2 show 2 decimals; A and Duration show 3.
-      const decimals = (id === 'A' || id === 'Duration') ? 3 : 2;
+      // C1/C2 show 2 decimals; A and Duration show 3; Samples is a whole count.
+      const decimals = id === 'Samples' ? 0 : (id === 'A' || id === 'Duration') ? 3 : 2;
       const scale = params.scale || 1;
 
       const handles = buildSlider(`${id}_container`, {
@@ -312,8 +312,7 @@
           snapFrequencies(id, rawValue);
         } else {
           // 3. For unlocked controls, update UI and re-render normally.
-          // Samples is always displayed as a whole number.
-          handles.valueSpan.textContent = id === 'Samples' ? Math.round(state[id]).toFixed(0) : state[id].toFixed(decimals);
+          handles.valueSpan.textContent = state[id].toFixed(decimals);
           regenerateCurve();
           updateCodeSnippet();
         }
