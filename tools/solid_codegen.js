@@ -4,22 +4,68 @@
  */
 
 /**
- * Pure code-generation and geometry helpers from the solids tool page
- * (tools/solids.html), unit-testable without a DOM or WASM runtime. The C++
- * source strings are pasted verbatim into the engine (SolidBuilder recipes,
- * FLASHMEM functions), so their output formatting must stay byte-for-byte
- * stable. computeInternalAngle uses plain {x, y, z} vector math (a
+ * Op dispatch plus the pure code-generation and geometry helpers of the solids
+ * tool page (tools/solids.html), unit-testable without a DOM or WASM runtime.
+ * The C++ source strings are pasted verbatim into the engine (SolidBuilder
+ * recipes, FLASHMEM functions), so their output formatting must stay
+ * byte-for-byte stable. computeInternalAngle uses plain {x, y, z} vector math (a
  * THREE.Vector3 satisfies that shape) to avoid a three.js dependency.
  */
 
 import { formatFloatCpp } from './cpp_format.js';
 
-// The Conway/SolidBuilder operators this generator can emit. Must match the ops
-// the WASM MeshOps class binds; engine_contract_wasm.test.js pins the agreement.
-export const KNOWN_OPS = new Set([
-  'truncate', 'expand', 'chamfer', 'hankin', 'snub', 'relax', 'bevel',
-  'dual', 'kis', 'ambo', 'gyro', 'meta', 'needle', 'zip',
-]);
+/**
+ * Per-op parameter table for the Conway/SolidBuilder operators, shared by the
+ * live preview (applyOp) and the C++ generator (generateFuncAndRecipe) so the
+ * two cannot drift. Each params entry names a parameter both paths consume, in
+ * call-argument order, and carries the tool's slider default and range;
+ * solid_codegen.test.js pins both paths against these key sequences. The op set
+ * must match what the WASM MeshOps class binds; engine_contract_wasm.test.js
+ * pins that agreement.
+ */
+export const OP_DEFS = {
+  kis: { params: {} },
+  ambo: { params: {} },
+  gyro: { params: {} },
+  snub: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 }, twist: { val: 0.0, min: 0, max: 1.0, step: 0.01 } } },
+  dual: { params: {} },
+  truncate: { params: { t: { val: 0.33, min: 0.01, max: 0.5, step: 0.01 } } },
+  chamfer: { params: { t: { val: 0.5, min: 0.01, max: 1.0, step: 0.01 } } },
+  expand: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 } } },
+  hankin: { params: { angle: { val: 54, min: 0, max: 90, step: 1 } } },
+  relax: { params: { iter: { val: 100, min: 1, max: 500, step: 1 } } },
+  meta: { params: {} },
+  needle: { params: {} },
+  zip: { params: {} },
+  bevel: { params: { t: { val: 0.25, min: 0.01, max: 0.5, step: 0.01 } } },
+};
+
+/** The operators this generator can emit, derived from the shared op table. */
+export const KNOWN_OPS = new Set(Object.keys(OP_DEFS));
+
+/**
+ * Applies one op of the {op, params} encoding to a WASM mesh wrapper, returning
+ * the resulting mesh.
+ * @param {Object} mesh - A live WASM MeshOps mesh wrapper.
+ * @param {(string|{op:string, params:Object})} o - The op to apply, as a bare op name or an {op, params} object.
+ * @returns {Object} The new mesh wrapper.
+ * @throws {Error} When the module binds no method for the op name.
+ * @details Single source of truth for op dispatch: the live-preview module and
+ * the sacrificial validator module must run byte-identical chains or validation
+ * proves the wrong thing.
+ */
+export function applyOp(mesh, o) {
+  const opName = typeof o === 'string' ? o : o.op;
+  if (opName === 'truncate') return mesh.truncate(o.params.t);
+  if (opName === 'chamfer') return mesh.chamfer(o.params.t);
+  if (opName === 'expand') return mesh.expand(o.params.t);
+  if (opName === 'bevel') return mesh.bevel(o.params.t);
+  if (opName === 'snub') return mesh.snub(o.params.t, o.params.twist);
+  if (opName === 'hankin') return mesh.hankin(o.params.angle * (Math.PI / 180));
+  if (opName === 'relax') return mesh.relax(o.params.iter);
+  if (mesh[opName]) return mesh[opName]();
+  throw new Error(`unknown op "${opName}" — not bound by the WASM MeshOps module`);
+}
 
 // Ops that read a params object. The string|object op contract permits a bare
 // string, but for these that leaves o.params undefined, so reject it with a
