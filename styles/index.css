@@ -324,9 +324,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 2px 6px 2px 1px;
+  padding: 2px 6px 2px 0;
   background: transparent;
   border: 1px solid transparent;
+  /* Selection marker gutter, reserved at full width so activating a button
+     recolors it instead of shifting the label. */
+  border-left: 3px solid transparent;
   color: #888;
   text-align: left;
   cursor: pointer;
@@ -405,7 +408,7 @@
   border-color: rgba(60, 120, 240, 0.4);
   font-weight: 600;
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
-  border-left: 3px solid #48f;
+  border-left-color: #48f;
 }
 
 #canvas {
@@ -548,7 +551,8 @@
   }
 
   .effect-button {
-    padding: 6px 10px;
+    /* Left padding is short by the 3px marker gutter, keeping the label centered. */
+    padding: 6px 10px 6px 7px;
     font-size: 12px;
     text-align: center;
     width: auto;
