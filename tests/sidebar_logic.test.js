@@ -92,6 +92,14 @@ test('scrollArrowState surfaces an arrow for a sub-deadzone overflow', () => {
   assert.deepEqual(scrollArrowState(4, 104, 100), { left: true, right: false });
 });
 
+test('scrollArrowState keeps the left arrow hidden for a sub-pixel overflow', () => {
+  // Fractional scrollWidth (browser zoom / fractional DPI) drives maxScroll below
+  // 1, where (maxScroll - 1) / 2 is negative and must clamp to a 0 deadzone.
+  assert.deepEqual(scrollArrowState(0, 100.5, 100), { left: false, right: true });
+  assert.deepEqual(scrollArrowState(0.5, 100.5, 100), { left: true, right: false });
+  assert.deepEqual(scrollArrowState(0, 100.25, 100), { left: false, right: true });
+});
+
 test('scrollArrowState shows both arrows at the midpoint of a small overflow', () => {
   // maxScroll = 4, scrollLeft = 2 overflows both directions; the deadzone must
   // stay strictly below maxScroll/2 so neither arrow is hidden here.

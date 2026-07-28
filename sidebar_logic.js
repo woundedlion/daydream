@@ -77,7 +77,9 @@ export function resolveActiveEffect(availableEffects, currentEffect) {
  * fits (no overflow) neither arrow shows; otherwise the left arrow shows once
  * scrolled past a deadzone from the start, and the right arrow shows until within
  * the deadzone of the end. The deadzone is 4px but never more than half the
- * scroll range, so a small overflow (0 < maxScroll ≤ 8) still surfaces an arrow.
+ * scroll range, so a small overflow (0 < maxScroll ≤ 8) still surfaces an arrow;
+ * it is clamped at zero so a sub-pixel overflow (maxScroll < 1) does not invert
+ * it and show the left arrow while pinned to the start.
  * @param {number} scrollLeft - Current horizontal scroll offset.
  * @param {number} scrollWidth - Total scrollable content width.
  * @param {number} clientWidth - Visible viewport width.
@@ -86,7 +88,7 @@ export function resolveActiveEffect(availableEffects, currentEffect) {
 export function scrollArrowState(scrollLeft, scrollWidth, clientWidth) {
   const maxScroll = scrollWidth - clientWidth;
   if (maxScroll <= 0) return { left: false, right: false };
-  const deadzone = Math.min(4, (maxScroll - 1) / 2);
+  const deadzone = Math.max(0, Math.min(4, (maxScroll - 1) / 2));
   return {
     left: scrollLeft > deadzone,
     right: scrollLeft < maxScroll - deadzone,
