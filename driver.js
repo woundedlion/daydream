@@ -86,6 +86,10 @@ export class LabelPool {
 /** Per-frame time (ms) above which a frame/segment is flagged "slow" in stats. */
 export const SLOW_FRAME_MS = 62;
 
+/** Container width (px) at and below which the layout is mobile. Mirrored by the
+ *  media-query breakpoints in styles/index.css. */
+export const MOBILE_BREAKPOINT_PX = 900;
+
 /**
  * Browser-side simulator: drives the three.js scene that renders the LED
  * sphere as instanced dots, on a fixed-timestep sim clock with on-demand
@@ -401,7 +405,7 @@ export class Daydream {
 
   /**
    * Fit renderer, label layer, and both cameras to the container size. Switches
-   * to mobile layout at <=900px wide, sizes the square PiP viewport to 30% of
+   * to mobile layout at MOBILE_BREAKPOINT_PX, sizes the square PiP viewport to 30% of
    * the smaller dimension, and re-fits the camera distance so the sphere fills
    * ~85% of the view.
    */
@@ -412,7 +416,7 @@ export class Daydream {
     // Skip a 0×0 container: aspect = 0/0 = NaN would poison the projection matrix.
     // The ResizeObserver re-invokes once laid out.
     if (width <= 0 || height <= 0) return;
-    this.isMobile = width <= 900;
+    this.isMobile = width <= MOBILE_BREAKPOINT_PX;
     this.mainViewport.x = 0;
     this.mainViewport.y = 0;
     this.mainViewport.width = width;
