@@ -590,6 +590,8 @@
     // inline.
     import {
       OP_DEFS,
+      PLATONIC_SOLIDS,
+      CATALAN_BASES,
       applyOp,
       formatFloat,
       formatSolidName,
@@ -691,20 +693,6 @@
     let ArchimedeanSolids = [];
     let IslamicStarPatterns = [];
 
-    // Catalan solids live in `namespace Catalan` in solids.h, which sees
-    // Archimedean/Platonic via using-directives but is NOT itself visible from
-    // them. The WASM registry only reports Simple/Complex, so — like the
-    // hardcoded Platonic list below — we keep the known Catalan base names here
-    // to qualify a generated registry entry with the right namespace. Emitting
-    // `Archimedean::<catalan base>...` would not compile.
-    const CATALAN_BASES = new Set([
-      'triakisTetrahedron', 'rhombicDodecahedron', 'triakisOctahedron',
-      'tetrakisHexahedron', 'deltoidalIcositetrahedron', 'disdyakisDodecahedron',
-      'pentagonalIcositetrahedron', 'rhombicTriacontahedron', 'triakisIcosahedron',
-      'pentakisDodecahedron', 'deltoidalHexecontahedron', 'disdyakisTriacontahedron',
-      'pentagonalHexecontahedron',
-    ]);
-
     // Initialize
     async function init() {
       // Load WASM
@@ -721,9 +709,6 @@
         ArchimedeanSolids = [];
         IslamicStarPatterns = [];
 
-        // Hardcoded knowledge of Platonic for ordering if desired, or just push
-        const platonics = ['tetrahedron', 'cube', 'octahedron', 'dodecahedron', 'icosahedron'];
-
         for (let i = 0; i < registry.length; i++) {
           const item = registry[i];
           const name = item.name;
@@ -733,7 +718,7 @@
             IslamicStarPatterns.push(name);
           } else {
             // Simple: Platonic or Archimedean
-            if (platonics.includes(name)) {
+            if (PLATONIC_SOLIDS.includes(name)) {
               PlatonicSolids.push(name);
             } else {
               ArchimedeanSolids.push(name);
@@ -1212,10 +1197,8 @@
         const { funcName } = generateFuncAndRecipe(item);
 
         const isComplex = IslamicStarPatterns.includes(item.base);
-        // Catalan bases must qualify with `Catalan::` — `Archimedean::` cannot
-        // resolve a name defined in `namespace Catalan`. Archimedean and
-        // Platonic bases both resolve under `Archimedean::` (it `using`s
-        // Platonic), so they share that qualifier.
+        // Archimedean and Platonic bases share the `Archimedean::` qualifier
+        // (it `using`s Platonic); Catalan bases need their own.
         const nsName = isComplex
           ? "IslamicStarPatterns"
           : (CATALAN_BASES.has(item.base) ? "Catalan" : "Archimedean");

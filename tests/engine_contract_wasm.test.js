@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import createHolosphereModule from '../holosphere_wasm.js';
-import { KNOWN_OPS } from '../tools/solid_codegen.js';
+import { KNOWN_OPS, PLATONIC_SOLIDS, CATALAN_BASES } from '../tools/solid_codegen.js';
 
 const M = await createHolosphereModule({ print() {}, printErr() {} });
 
@@ -138,6 +138,23 @@ test('solid_codegen KNOWN_OPS matches the operators MeshOps binds', () => {
   assert.deepEqual([...KNOWN_OPS].sort(), meshOpNames(),
     'the codegen op list and the ops bound by the WASM module must agree; ' +
     'update tools/solid_codegen.js KNOWN_OPS to match the engine');
+});
+
+test('the Platonic and Catalan seed lists name registered Simple solids', () => {
+  const registry = M.MeshOps.getRegistry();
+  const simple = new Set();
+  for (let i = 0; i < registry.length; i++) {
+    if (registry[i].category === 'Simple') simple.add(registry[i].name);
+  }
+  for (const name of [...PLATONIC_SOLIDS, ...CATALAN_BASES]) {
+    assert.ok(simple.has(name),
+      `solid_codegen.js lists "${name}" but the engine registers no Simple solid ` +
+      'by that name; update tools/solid_codegen.js to match solids.h');
+  }
+  for (const name of PLATONIC_SOLIDS) {
+    assert.ok(!CATALAN_BASES.has(name),
+      `"${name}" is in both seed lists; the namespace qualifier would be ambiguous`);
+  }
 });
 
 test('PaletteOps exposes the method surface the palette tool drives', () => {
