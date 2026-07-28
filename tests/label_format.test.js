@@ -25,6 +25,8 @@ test('prettify names multiples of pi', () => {
   assert.equal(prettify(-Math.PI / 4), '-' + PI + '/4');
   assert.equal(prettify(3 * Math.PI / 2), '3' + PI + '/2');
   assert.equal(prettify(-3 * Math.PI / 2), '-3' + PI + '/2');
+  assert.equal(prettify(2 * Math.PI), '2' + PI);
+  assert.equal(prettify(-2 * Math.PI), '-2' + PI);
 });
 
 test('prettify names the golden ratio and its inverse', () => {
@@ -48,6 +50,13 @@ test('prettify snaps within the 1e-5 tolerance but not outside it', () => {
 test('prettify falls back to a 3-decimal string for arbitrary values', () => {
   assert.equal(prettify(0.333333), '0.333');
   assert.equal(prettify(2.5), '2.500');
+});
+
+test('prettify keeps large magnitudes short instead of a long fixed-point label', () => {
+  assert.equal(prettify(999999), '999999.000');
+  assert.equal(prettify(1e6), '1.000e+6');
+  assert.equal(prettify(-1.2345e20), '-1.235e+20');
+  assert.ok(prettify(Number.MAX_VALUE).length <= 11);
 });
 
 test('prettify returns "0" for non-finite input rather than a raw NaN/Infinity label', () => {
