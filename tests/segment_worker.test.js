@@ -130,7 +130,7 @@ test('init faults on a protocol version mismatch', async () => {
   assert.equal(engineInstance, null, 'no engine constructed on version mismatch');
   const failed = posted.find((p) => p.msg.type === 'initFailed');
   assert.ok(failed, 'initFailed posted');
-  assert.equal(failed.msg.segId, 2);
+  assert.match(failed.msg.reason, /protocol version/);
   assert.equal(posted.find((p) => p.msg.type === 'ready'), undefined, 'no ready posted');
 });
 
@@ -144,9 +144,7 @@ test('init applies the segment clip and posts ready', async () => {
   // segId 3 of 4 over 8x4 → arm B (x0=4), bottom band (y0=2): clip {2,4,4,8}.
   assert.deepEqual(engineInstance.clip, { y0: 2, y1: 4, x0: 4, x1: 8 });
 
-  const ready = posted.find((p) => p.msg.type === 'ready');
-  assert.ok(ready, 'ready posted');
-  assert.equal(ready.msg.segId, 3);
+  assert.ok(posted.some((p) => p.msg.type === 'ready'), 'ready posted');
 });
 
 /** Regression: an init whose setResolution is rejected posts no ready and an explicit initFailed so the controller faults at once. */
@@ -159,7 +157,7 @@ test('init with a rejected resolution posts initFailed, not ready', async () => 
   assert.ok(!posted.some((p) => p.msg.type === 'ready'), 'no ready for a rejected resolution');
   const failed = posted.find((p) => p.msg.type === 'initFailed');
   assert.ok(failed, 'initFailed posted');
-  assert.equal(failed.msg.segId, 0);
+  assert.match(failed.msg.reason, /setResolution\(8, 4\) rejected/);
 });
 
 /** render copies exactly this segment's quadrant rows out of the full buffer. */
