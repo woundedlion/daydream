@@ -23,6 +23,10 @@ export function roundUrlNumber(value) {
 // of "42abc" and read "0x10" as 0.
 const URL_NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
 
+// Debounce window collapsing a burst of URL writes into one replaceState. Long
+// enough to swallow a slider drag, short enough that a copied link is current.
+const URL_FLUSH_DEBOUNCE_MS = 200;
+
 /**
  * Centralized application state with subscriber pattern and URL synchronization.
  * Separates state management from DOM manipulation — subscribers react to changes
@@ -230,7 +234,7 @@ export class URLSync {
   /**
    * Tear down the URLSync: drop the AppState subscription, cancel any pending
    * debounced flush, and clear the app-wide writer slot if it still points here.
-   * Without this, a pagehide discard can leave the 200 ms timer firing
+   * Without this, a pagehide discard can leave the debounce timer firing
    * history.replaceState into a dead page. Symmetric with disposeApp().
    * Latches: schedule() and setParam() become no-ops afterwards, so a holder of
    * a direct reference cannot re-arm the debounce into a discarded page.
@@ -248,14 +252,14 @@ export class URLSync {
   }
 
   /**
-   * Debounces a URL write, collapsing bursts into one flush after 200 ms.
-   * A no-op once disposed.
+   * Debounces a URL write, collapsing bursts into one flush after
+   * URL_FLUSH_DEBOUNCE_MS. A no-op once disposed.
    * @returns {void}
    */
   schedule() {
     if (this.disposed) return;
     clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.flush(), 200);
+    this.timer = setTimeout(() => this.flush(), URL_FLUSH_DEBOUNCE_MS);
   }
 
   /**
