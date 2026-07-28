@@ -908,6 +908,11 @@ function disposeApp() {
   segEpoch++;
   segments.destroy();
   durationEl.remove();
+  // Null first: the animation-loop guard reads it, so a frame outliving
+  // setAnimationLoop(null) cannot reach the deleted handle.
+  host.adapter = null;
+  host.engine?.delete();
+  host.engine = null;
 }
 
 // pagehide (not unload) so bfcache is respected: e.persisted is false only on a
