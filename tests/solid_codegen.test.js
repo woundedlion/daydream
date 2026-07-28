@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 const {
   OP_DEFS,
   KNOWN_OPS,
+  PARAMETERIZED_OPS,
   applyOp,
   formatFloat,
   formatSolidName,
@@ -139,13 +140,6 @@ test('generateFuncAndRecipe preserves an explicit relax iter:0', () => {
   assert.equal(recipe, 'SolidBuilder(cube(a, b), a, b).relax(0).build()');
 });
 
-/** Verifies an absent relax iter falls back to SolidBuilder's C++ default of 8. */
-test('generateFuncAndRecipe defaults an absent relax iter to 8', () => {
-  const item = { base: 'cube', ops: [{ op: 'relax', params: {} }] };
-  const { funcName } = generateFuncAndRecipe(item);
-  assert.equal(funcName, 'cube_relax8');
-});
-
 /** Verifies snub emits both t and twist params (matching the live preview) and encodes each in the funcName. */
 test('generateFuncAndRecipe emits snub t and twist', () => {
   const item = { base: 'icosahedron', ops: [{ op: 'snub', params: { t: 0.33, twist: 0.28 } }] };
@@ -154,13 +148,36 @@ test('generateFuncAndRecipe emits snub t and twist', () => {
   assert.equal(recipe, 'SolidBuilder(icosahedron(a, b), a, b).snub(0.33f, 0.28f).build()');
 });
 
-/** Verifies snub falls back to SolidBuilder's own defaults (t=0.5, twist=0.0) when params are unset. */
-test('generateFuncAndRecipe defaults snub t/twist', () => {
-  for (const ops of [['snub'], [{ op: 'snub', params: {} }]]) {
-    const { funcName, recipe } = generateFuncAndRecipe({ base: 'cube', ops });
-    assert.equal(funcName, 'cube_snub50_tw00');
-    assert.equal(recipe, 'SolidBuilder(cube(a, b), a, b).snub(0.5f, 0.0f).build()');
+/**
+ * PARAMETERIZED_OPS is derived from OP_DEFS, so every op declaring a param —
+ * snub and relax included — is rejected in the bare-string form by both dispatch
+ * paths rather than one silently substituting a default the other cannot.
+ */
+test('applyOp and generateFuncAndRecipe share one parameterized-op vocabulary', () => {
+  assert.deepEqual([...PARAMETERIZED_OPS].sort(),
+    [...KNOWN_OPS].filter(op => Object.keys(OP_DEFS[op].params).length > 0).sort());
+  assert.ok(PARAMETERIZED_OPS.has('snub') && PARAMETERIZED_OPS.has('relax'));
+
+  for (const op of PARAMETERIZED_OPS) {
+    assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [op] }),
+      new RegExp(`generateFuncAndRecipe: op "${op}" requires a params object`));
+    assert.throws(() => applyOp(stubMesh(), op),
+      new RegExp(`applyOp: op "${op}" requires a params object`));
   }
+
+  for (const op of KNOWN_OPS) {
+    if (PARAMETERIZED_OPS.has(op)) continue;
+    generateFuncAndRecipe({ base: 'cube', ops: [op] });
+    applyOp(stubMesh(), op);
+  }
+});
+
+/** Verifies an op declaring params rejects an empty params object on both paths. */
+test('a parameterized op with empty params is rejected, not defaulted', () => {
+  assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'snub', params: {} }] }),
+    /snub param "t" must be a finite number/);
+  assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'relax', params: {} }] }),
+    /relax param "iter" must be a non-negative integer/);
 });
 
 /** Verifies generateRecipeCpp emits the full FLASHMEM function source, prefixed by the V/F/I count comment, byte-for-byte. */

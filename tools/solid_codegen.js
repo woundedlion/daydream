@@ -45,6 +45,28 @@ export const OP_DEFS = {
 export const KNOWN_OPS = new Set(Object.keys(OP_DEFS));
 
 /**
+ * Ops that read a params object, derived from the shared op table. The
+ * string|object op contract permits a bare string, but for these that leaves
+ * o.params undefined, so both applyOp and generateFuncAndRecipe reject it.
+ */
+export const PARAMETERIZED_OPS = new Set(
+  Object.keys(OP_DEFS).filter(op => Object.keys(OP_DEFS[op].params).length > 0));
+
+/**
+ * Rejects an op whose params object is missing on either dispatch path.
+ * @param {string} where - Caller name used in the error message.
+ * @param {string} opName - The op being dispatched.
+ * @param {(string|{op:string, params:Object})} o - The op as supplied.
+ * @returns {void}
+ * @throws {Error} When a parameterized op arrives without a params object.
+ */
+function requireParams(where, opName, o) {
+  if (PARAMETERIZED_OPS.has(opName) && (typeof o === 'string' || !o.params)) {
+    throw new Error(`${where}: op "${opName}" requires a params object`);
+  }
+}
+
+/**
  * The Platonic seeds, mirrored from solids.h. The WASM registry reports only
  * Simple/Complex, so the page splits its Simple entries into Platonic and
  * Archimedean against this list.
@@ -81,6 +103,7 @@ export const CATALAN_BASES = new Set([
  */
 export function applyOp(mesh, o) {
   const opName = typeof o === 'string' ? o : o.op;
+  requireParams('applyOp', opName, o);
   if (opName === 'truncate') return mesh.truncate(o.params.t);
   if (opName === 'chamfer') return mesh.chamfer(o.params.t);
   if (opName === 'expand') return mesh.expand(o.params.t);
@@ -91,13 +114,6 @@ export function applyOp(mesh, o) {
   if (mesh[opName]) return mesh[opName]();
   throw new Error(`unknown op "${opName}" — not bound by the WASM MeshOps module`);
 }
-
-// Ops that read a params object. The string|object op contract permits a bare
-// string, but for these that leaves o.params undefined, so reject it with a
-// clear message instead of an opaque TypeError on the param read.
-const PARAMETERIZED_OPS = new Set([
-  'truncate', 'expand', 'chamfer', 'hankin', 'bevel',
-]);
 
 // A base seed-solid name is pasted as a C++ function call (`base(a, b)`), so
 // guard its shape against the valid-identifier pattern.
@@ -196,9 +212,7 @@ export function generateFuncAndRecipe(item) {
       throw new Error(`generateFuncAndRecipe: unknown op "${opName}" ` +
         `(expected one of ${[...KNOWN_OPS].join(', ')})`);
     }
-    if (PARAMETERIZED_OPS.has(opName) && (typeof o === 'string' || !o.params)) {
-      throw new Error(`generateFuncAndRecipe: op "${opName}" requires a params object`);
-    }
+    requireParams('generateFuncAndRecipe', opName, o);
 
     if (opName === 'truncate') {
       requireFinite(opName, 't', o.params.t);
@@ -220,25 +234,16 @@ export function generateFuncAndRecipe(item) {
       chain += `.hankin(${formatFloat(o.params.angle)} * D2R)`;
       nameParts.push(`_hk${Math.round(o.params.angle)}`);
     } else if (opName === 'snub') {
-      // snub(t, twist): emit both so the generated recipe matches the live
-      // preview (currentWasmMesh.snub(t, twist)); fall back to SolidBuilder's
-      // own defaults when a param is unset. The twist suffix keeps two snubs
-      // that share a `t` but differ in twist from colliding on one funcName.
-      const params = (typeof o === 'object' && o.params) ? o.params : {};
-      const t = params.t ?? 0.5;
-      const twist = params.twist ?? 0.0;
-      requireFinite(opName, 't', t);
-      requireFinite(opName, 'twist', twist);
-      chain += `.snub(${formatFloat(t)}, ${formatFloat(twist)})`;
-      nameParts.push(`_snub${pctSuffix(t)}_tw${pctSuffix(twist)}`);
+      // The twist suffix keeps two snubs that share a `t` but differ in twist
+      // from colliding on one funcName.
+      requireFinite(opName, 't', o.params.t);
+      requireFinite(opName, 'twist', o.params.twist);
+      chain += `.snub(${formatFloat(o.params.t)}, ${formatFloat(o.params.twist)})`;
+      nameParts.push(`_snub${pctSuffix(o.params.t)}_tw${pctSuffix(o.params.twist)}`);
     } else if (opName === 'relax') {
-      // `??` not `||`: an explicit iter:0 is a valid no-op relax count and must
-      // not fall back to the default. 8 matches SolidBuilder's C++ relax default.
-      const params = (typeof o === 'object' && o.params) ? o.params : {};
-      const iter = params.iter ?? 8;
-      requireCount(opName, 'iter', iter);
-      chain += `.relax(${iter})`;
-      nameParts.push(`_relax${iter}`);
+      requireCount(opName, 'iter', o.params.iter);
+      chain += `.relax(${o.params.iter})`;
+      nameParts.push(`_relax${o.params.iter}`);
     } else if (opName === 'bevel') {
       requireFinite(opName, 't', o.params.t);
       chain += `.bevel(${formatFloat(o.params.t)})`;
