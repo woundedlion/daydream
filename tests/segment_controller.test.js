@@ -419,16 +419,18 @@ test('a worker onmessageerror latches the fault the same way onerror does', asyn
   await done;
 });
 
-test('an initFailed worker message faults the pool with the reason and segId', () => {
+test('an engineRejected worker message faults the pool with the reason and segId', () => {
   const c = makeController();
   c.create(2);
   c.workers[1].onmessage({
-    data: { type: 'initFailed', reason: 'resolution 9000x9000 exceeds the worker arena' },
+    data: { type: 'engineRejected', reason: 'resolution 9000x9000 exceeds the worker arena' },
   });
 
   assert.equal(c.faulted, true, 'an unbuildable resolution faults fast rather than deadlocking');
   assert.equal(c.faultInfo.segId, 1, 'the fault carries the reporting segment index');
-  assert.match(c.faultInfo.message, /init failed/);
+  assert.match(c.faultInfo.message, /engine rejected/);
+  assert.doesNotMatch(c.faultInfo.message, /init failed/,
+    'a post-init rejection is never reported as an init failure');
   assert.match(c.faultInfo.message, /9000x9000 exceeds the worker arena/);
 });
 
