@@ -143,3 +143,20 @@ export function offeredResolutions(presets, supported) {
 export function paramValueSkew(namesLength, valuesLength) {
   return namesLength !== valuesLength;
 }
+
+/**
+ * Whether the engine's live value stream still describes the effect the GUI's
+ * parameter-definition snapshot was taken from. The engine bumps a generation
+ * counter on every effect load, so an unequal pair means a load landed between
+ * the snapshot and this read and the values must not be bound by index. Length
+ * alone cannot decide it: equal parameter counts are common across the roster,
+ * so a switch between two same-sized effects passes paramValueSkew() while
+ * describing different parameters.
+ * @param {number|undefined} snapshotGeneration - Generation recorded when the
+ *   parameter definitions were read.
+ * @param {number|undefined} streamGeneration - Generation read alongside the values.
+ * @returns {boolean} True when the two describe different effect loads.
+ */
+export function paramGenerationStale(snapshotGeneration, streamGeneration) {
+  return snapshotGeneration !== streamGeneration;
+}

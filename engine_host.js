@@ -30,6 +30,18 @@ export class EngineHost {
     return this.pixelView;
   }
 
+  /**
+   * Identity of the effect the engine currently has loaded, bumped on every
+   * setEffect. A parameter-definition snapshot and a value-stream read reporting
+   * the same generation describe the same effect.
+   * @returns {number|undefined} The engine's generation counter; undefined when
+   *   the loaded WASM module does not expose one, which pins every read to the
+   *   same value and leaves the length guard as the only pairing check.
+   */
+  paramGeneration() {
+    return this.engine.getParamGeneration?.();
+  }
+
   /** Drop the cached view so the next refresh() re-fetches it (used after a resize). */
   invalidateView() {
     this.pixelView = null;

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   planResolutionApply,
   paramValueSkew,
+  paramGenerationStale,
   runSwitchTransaction,
   applyInitialState,
   snapshotEffectControlState,
@@ -221,6 +222,24 @@ test('unequal lengths skew (either direction)', () => {
   assert.equal(paramValueSkew(3, 4), true);
   assert.equal(paramValueSkew(4, 3), true);
   assert.equal(paramValueSkew(0, 1), true);
+});
+
+// paramGenerationStale is the identity half of the same guard: it catches an
+// effect switch the length comparison cannot see.
+
+test('a snapshot read at the engine\'s current generation is not stale', () => {
+  assert.equal(paramGenerationStale(0, 0), false);
+  assert.equal(paramGenerationStale(7, 7), false);
+});
+
+test('any generation move makes the snapshot stale', () => {
+  assert.equal(paramGenerationStale(7, 8), true);
+  assert.equal(paramGenerationStale(8, 7), true);
+  assert.equal(paramGenerationStale(0, 1), true);
+});
+
+test('an engine reporting no generation is never stale', () => {
+  assert.equal(paramGenerationStale(undefined, undefined), false);
 });
 
 // offeredResolutions keeps the resolution dropdown to the rows the engine
