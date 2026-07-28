@@ -12,8 +12,9 @@
 
 <body>
     <div class="page">
+        <h1 class="visually-hidden">Holosphere POV LED sphere simulator</h1>
         <div id="layout-container" class="layout-container">
-            <div class="nav-tabs">
+            <nav class="nav-tabs">
                 <span class="nav-label">Tools:</span>
                 <a href="tools/lissajous.html" target="_blank" class="tab">Lissajous</a>
                 <a href="tools/mobius.html" target="_blank" class="tab">Mobius</a>
@@ -37,8 +38,8 @@
                         </tr>
                     </table>
                 </div>
-            </div>
-            <div class="main-area">
+            </nav>
+            <main class="main-area">
                 <div id="effect-sidebar" class="effect-sidebar"></div>
                 <div id="stats-bar" class="stats-bar">
                     <table class="global-stats global-stats--mobile">
@@ -64,9 +65,10 @@
                         <span>Loading engine...</span>
                     </div>
                     <div id="segment-stats" class="segment-stats" style="display:none;"></div>
-                    <canvas id="canvas" role="img" aria-label="Real-time 3D simulation of the LED sphere"></canvas>
+                    <canvas id="canvas" tabindex="0"
+                        aria-label="Real-time 3D simulation of the LED sphere. Arrow keys orbit the view, plus and minus zoom."></canvas>
                 </div>
-            </div>
+            </main>
             <div id="gui-container" class="gui-container"></div>
         </div>
     </div>
