@@ -45,6 +45,30 @@ export const OP_DEFS = {
 export const KNOWN_OPS = new Set(Object.keys(OP_DEFS));
 
 /**
+ * The Platonic seeds, mirrored from solids.h. The WASM registry reports only
+ * Simple/Complex, so the page splits its Simple entries into Platonic and
+ * Archimedean against this list.
+ */
+export const PLATONIC_SOLIDS = [
+  'tetrahedron', 'cube', 'octahedron', 'dodecahedron', 'icosahedron',
+];
+
+/**
+ * The Catalan seeds, mirrored from `namespace Catalan` in solids.h. That
+ * namespace sees Archimedean/Platonic via using-directives but is NOT itself
+ * visible from them, so a generated registry entry on a Catalan base must
+ * qualify with `Catalan::`; `Archimedean::<catalan base>` would not compile.
+ * engine_contract_wasm.test.js pins both lists against the registry.
+ */
+export const CATALAN_BASES = new Set([
+  'triakisTetrahedron', 'rhombicDodecahedron', 'triakisOctahedron',
+  'tetrakisHexahedron', 'deltoidalIcositetrahedron', 'disdyakisDodecahedron',
+  'pentagonalIcositetrahedron', 'rhombicTriacontahedron', 'triakisIcosahedron',
+  'pentakisDodecahedron', 'deltoidalHexecontahedron', 'disdyakisTriacontahedron',
+  'pentagonalHexecontahedron',
+]);
+
+/**
  * Applies one op of the {op, params} encoding to a WASM mesh wrapper, returning
  * the resulting mesh.
  * @param {Object} mesh - A live WASM MeshOps mesh wrapper.
