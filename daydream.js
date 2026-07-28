@@ -85,13 +85,13 @@ const effectsByResolution = {
   "Phantasm (288x144)": HiResFavorites,
 };
 
-// Re-point both display aliases (Three.js instanceColor + Daydream.pixels) so
-// source, displayed attribute, and Daydream.pixels all reference the same WASM
+// Re-point both display aliases (Three.js instanceColor + daydream.pixels) so
+// source, displayed attribute, and daydream.pixels all reference the same WASM
 // view. Shared by EngineHost.refresh() and SegmentController's composite heal.
 function repointDisplayAliases(view) {
   daydream.dotMesh.instanceColor.array = view;
   daydream.dotMesh.instanceColor.needsUpdate = true;
-  Daydream.pixels = view;
+  daydream.pixels = view;
 }
 
 const host = new EngineHost(repointDisplayAliases);
@@ -179,6 +179,7 @@ const urlSync = new URLSync(appState, ['effect', 'resolution'], {
 const segments = new SegmentController({
   resolutionPresets,
   appState,
+  driver: daydream,
   getWasmEngine: () => host.engine,
   refreshPixelView: () => host.refresh(),
   getMemoryView: () => host.view(),
@@ -608,15 +609,15 @@ createHolosphereModule().then(module => {
         // All three aliases must point at the one WASM view; log once and
         // re-point rather than throw (throwing here halts the render loop).
         const view = host.view();
-        if (Daydream.pixels !== view ||
+        if (daydream.pixels !== view ||
             daydream.dotMesh.instanceColor.array !== view) {
           if (!aliasDivergenceLogged) {
             console.error(
               "drawFrame: display-buffer alias diverged after host.refresh() — " +
-              "re-pointing Daydream.pixels / instanceColor.array at the WASM view");
+              "re-pointing daydream.pixels / instanceColor.array at the WASM view");
             aliasDivergenceLogged = true;
           }
-          Daydream.pixels = view;
+          daydream.pixels = view;
           daydream.dotMesh.instanceColor.array = view;
         }
         daydream.dotMesh.instanceColor.needsUpdate = true;
