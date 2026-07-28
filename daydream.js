@@ -245,14 +245,14 @@ function destroyActiveEffectGui() {
  */
 function applyEffect(preserveParams = false) {
   if (host.engine) {
-    if (host.engine.setEffect(appState.get('effect')) === false) {
+    const applied = host.engine.setEffect(appState.get('effect')) !== false;
+    daydream.setStrobeColumns(host.engine.strobeColumns());
+    if (!applied) {
       console.error(`setEffect("${appState.get('effect')}") failed; effect unavailable.`);
       // Engine unchanged; return false so the subscriber reverts appState. Do NOT
       // broadcast the rejected name to the workers (would diverge them from main).
-      daydream.setStrobeColumns(host.engine.strobeColumns());
       return false;
     }
-    daydream.setStrobeColumns(host.engine.strobeColumns());
   }
 
   destroyActiveEffectGui();
