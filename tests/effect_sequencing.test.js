@@ -182,8 +182,8 @@ test('a rollback failure is surfaced separately from the switch failure', () => 
 // planResolutionApply is the DOM/engine-free core of applyResolution()'s
 // re-apply decision: keep the requested effect when the resolution offers it,
 // else fall back to the list head, and report whether the caller must call
-// applyEffect() itself (only when the effect did not change, since a change
-// fires applyEffect via the appState subscription).
+// applyEffect() itself — a change fires applyEffect via the appState
+// subscription, unless that subscription is muted.
 
 test('offered effect is kept and applied directly (no subscription fire)', () => {
   assert.deepEqual(
@@ -203,10 +203,22 @@ test('the first entry itself is kept and applied directly', () => {
     { nextEffect: 'A', effectChanged: false, applyDirectly: true });
 });
 
-test('effectChanged and applyDirectly are always complements', () => {
+test('effectChanged and applyDirectly are complements while the subscription is live', () => {
   for (const cur of ['A', 'Z', 'C']) {
     const r = planResolutionApply(['A', 'B', 'C'], cur);
     assert.equal(r.applyDirectly, !r.effectChanged);
+  }
+});
+
+test('a muted subscription makes the caller apply an off-list correction', () => {
+  assert.deepEqual(
+    planResolutionApply(['A', 'B', 'C'], 'Z', true),
+    { nextEffect: 'A', effectChanged: true, applyDirectly: true });
+});
+
+test('a muted subscription still applies directly when the effect is unchanged', () => {
+  for (const cur of ['A', 'B', 'C']) {
+    assert.equal(planResolutionApply(['A', 'B', 'C'], cur, true).applyDirectly, true);
   }
 });
 

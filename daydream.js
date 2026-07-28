@@ -480,7 +480,7 @@ function applyResolution(preserveParams = false) {
   // synchronously fires applyEffect(), which would otherwise build against the
   // pre-resize dot mesh / stale sidebar.
   const { nextEffect, effectChanged, applyDirectly } =
-    planResolutionApply(availableEffects, appState.get('effect'));
+    planResolutionApply(availableEffects, appState.get('effect'), restoringSwitch);
   if (effectChanged) {
     appState.set('effect', nextEffect);
     if (appState.get('effect') !== nextEffect) return false;

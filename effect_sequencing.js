@@ -90,21 +90,27 @@ export function applyInitialState(apply, onSuccess) {
 /**
  * Plan how applyResolution() should re-apply the effect after a resolution
  * change. The requested effect is kept when the new resolution offers it, else
- * corrected to the list's first entry (resolveActiveEffect). When that correction
- * changes the effect, appState.set('effect', …) synchronously fires applyEffect()
- * through its subscription, so the caller must NOT also call applyEffect()
- * directly — doing both double-applies. applyDirectly captures that: build the
- * GUI directly only when the effect did not change.
+ * corrected to the list's first entry (resolveActiveEffect). A correction runs
+ * appState.set('effect', …), which synchronously fires applyEffect() through its
+ * subscription, so calling applyEffect() as well would double-apply. A muted
+ * subscription applies nothing, so the caller must then do it itself.
  * @param {Array<string>} availableEffects - Effects offered at the new resolution.
  * @param {string} currentEffect - The requested/active effect name.
+ * @param {boolean} [subscriberMuted=false] - True while the effect subscription is
+ *   suppressed (rollback), so a correction cannot re-apply the effect.
  * @returns {{nextEffect: string, effectChanged: boolean, applyDirectly: boolean}}
  *   The effect to activate, whether it differs from currentEffect, and whether the
- *   caller must call applyEffect() itself (true only when the effect is unchanged).
+ *   caller must call applyEffect() itself.
  */
-export function planResolutionApply(availableEffects, currentEffect) {
+export function planResolutionApply(availableEffects, currentEffect,
+                                    subscriberMuted = false) {
   const nextEffect = resolveActiveEffect(availableEffects, currentEffect);
   const effectChanged = nextEffect !== currentEffect;
-  return { nextEffect, effectChanged, applyDirectly: !effectChanged };
+  return {
+    nextEffect,
+    effectChanged,
+    applyDirectly: !effectChanged || subscriberMuted,
+  };
 }
 
 /**
