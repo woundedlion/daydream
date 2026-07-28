@@ -146,9 +146,7 @@ export class VideoRecorder {
       this.offCtx = null;
     }
 
-    const captureSource = this.targetHeight
-      ? this.ensureOffscreen()
-      : this.ensurePinnedOffscreen();
+    const captureSource = this.ensureOffscreen();
 
     if (!this.offCtx) {
       this.cleanup();
@@ -347,22 +345,28 @@ export class VideoRecorder {
   }
 
   /**
-   * Creates the offscreen scaling canvas at the target height and the source
-   * canvas's start-time aspect ratio, rounding both dimensions up to even values
-   * (required by video codecs). Like ensurePinnedOffscreen, it sizes only on
-   * creation and never tracks a later source resize: the captured track's frame
-   * size must stay fixed for the whole session, so a resized source scales into
-   * this fixed buffer (captureFrame) rather than changing the track size.
-   * @returns {HTMLCanvasElement} The offscreen canvas pinned to the target height.
+   * Creates the offscreen capture canvas, at the target height and the source
+   * canvas's start-time aspect ratio when a targetHeight is set, otherwise at the
+   * source's start-time native size; both dimensions round up to even values
+   * (required by video codecs). It sizes only on creation and never tracks a later
+   * source resize: the captured track's frame size must stay fixed for the whole
+   * session, so a resized source scales into this fixed buffer (captureFrame)
+   * rather than changing the track size.
+   * @returns {HTMLCanvasElement} The offscreen canvas pinned to its start-time size.
    */
   ensureOffscreen() {
     if (!this.offscreen) {
-      // Clamp a non-finite aspect (0 → Infinity, 0/0 → NaN) from a zero-size source.
-      const rawAspect = this.canvas.width / this.canvas.height;
-      const aspect = Number.isFinite(rawAspect) && rawAspect > 0 ? rawAspect : 1;
-      const w = Math.round(this.targetHeight * aspect);
-      const evenW = w % 2 === 0 ? w : w + 1;
-      const evenH = this.targetHeight % 2 === 0 ? this.targetHeight : this.targetHeight + 1;
+      let w, h;
+      if (this.targetHeight) {
+        // Clamp a non-finite aspect (0 → Infinity, 0/0 → NaN) from a zero-size source.
+        const rawAspect = this.canvas.width / this.canvas.height;
+        const aspect = Number.isFinite(rawAspect) && rawAspect > 0 ? rawAspect : 1;
+        w = Math.round(this.targetHeight * aspect);
+        h = this.targetHeight;
+      } else {
+        w = this.canvas.width > 0 ? this.canvas.width : 1;
+        h = this.canvas.height > 0 ? this.canvas.height : 1;
+      }
       this.offscreen = document.createElement('canvas');
       this.offCtx = this.offscreen.getContext('2d');
       // A null 2d context must not latch the canvas; drop it so a later start()
@@ -371,36 +375,8 @@ export class VideoRecorder {
         this.offscreen = null;
         return null;
       }
-      this.offscreen.width = evenW;
-      this.offscreen.height = evenH;
-    }
-    return this.offscreen;
-  }
-
-  /**
-   * Creates the native-resolution offscreen capture canvas, pinned to the source
-   * canvas's dimensions at the moment of call (start of recording), rounded up to
-   * even values (codecs require it). Like ensureOffscreen this sizes once and
-   * never tracks a later source resize, but at the native source size rather than
-   * a scaled target height: the buffer keeps its start dimensions for the whole
-   * session so the captured track's frame size stays fixed, and captureFrame
-   * scales a resized source into it instead of changing the track size.
-   * @returns {HTMLCanvasElement} The offscreen canvas pinned to the start-time source size.
-   */
-  ensurePinnedOffscreen() {
-    if (!this.offscreen) {
-      const srcW = this.canvas.width > 0 ? this.canvas.width : 1;
-      const srcH = this.canvas.height > 0 ? this.canvas.height : 1;
-      this.offscreen = document.createElement('canvas');
-      this.offCtx = this.offscreen.getContext('2d');
-      // A null 2d context must not latch the canvas; drop it so a later start()
-      // retries creation rather than reusing a context-less buffer forever.
-      if (!this.offCtx) {
-        this.offscreen = null;
-        return null;
-      }
-      this.offscreen.width = srcW % 2 === 0 ? srcW : srcW + 1;
-      this.offscreen.height = srcH % 2 === 0 ? srcH : srcH + 1;
+      this.offscreen.width = w % 2 === 0 ? w : w + 1;
+      this.offscreen.height = h % 2 === 0 ? h : h + 1;
     }
     return this.offscreen;
   }
