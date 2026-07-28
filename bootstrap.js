@@ -16,14 +16,43 @@ function errorDetail(error) {
 }
 
 /**
+ * Re-fetch every same-origin script the page has already loaded, bypassing the
+ * HTTP cache and replacing each cache entry with the server's current copy.
+ * A plain reload only revalidates the top-level document, so a module held in
+ * cache from an earlier deploy stays stale and keeps failing to link against
+ * its freshly fetched importers.
+ * @param {{performance?: Performance, fetch?: typeof globalThis.fetch,
+ *   origin?: string}} [dependencies]
+ * @returns {Promise<void>} Resolves once every re-fetch has settled.
+ */
+export async function refreshModuleCache({
+  performance: timeline = globalThis.performance,
+  fetch: fetchResource = globalThis.fetch,
+  origin = globalThis.location?.origin,
+} = {}) {
+  if (!origin || typeof fetchResource !== 'function') return;
+  const scripts = new Set();
+  for (const { name } of timeline?.getEntriesByType?.('resource') ?? []) {
+    if (typeof name === 'string' && name.startsWith(`${origin}/`) &&
+        name.split(/[?#]/)[0].endsWith('.js')) {
+      scripts.add(name);
+    }
+  }
+  await Promise.allSettled(
+    Array.from(scripts, (url) => fetchResource(url, { cache: 'reload' })));
+}
+
+/**
  * @param {unknown} error Bootstrap failure.
- * @param {{document?: Document, location?: Location, title?: string}} [dependencies]
+ * @param {{document?: Document, location?: Location, title?: string,
+ *   refresh?: () => Promise<void>}} [dependencies]
  * @returns {void}
  */
 export function showBootstrapFailure(error, {
   document: doc = globalThis.document,
   location: pageLocation = globalThis.location,
   title: titleText = 'Failed to start the simulator.',
+  refresh = refreshModuleCache,
 } = {}) {
   const overlay = doc?.getElementById('loading-overlay');
   if (!overlay) return;
@@ -40,7 +69,8 @@ export function showBootstrapFailure(error, {
   reload.type = 'button';
   reload.className = 'context-lost-reload';
   reload.textContent = 'Reload';
-  reload.addEventListener('click', () => pageLocation?.reload());
+  reload.addEventListener('click', () =>
+    refresh().catch(() => {}).then(() => pageLocation?.reload()));
 
   overlay.classList.add('error');
   overlay.replaceChildren(title, detail, reload);
