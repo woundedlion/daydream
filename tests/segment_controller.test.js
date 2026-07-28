@@ -121,6 +121,9 @@ function makeController({ resolution = 'lo', effect = 'TestEffect',
 }
 
 beforeEach(() => {
+  driver.W = 0;
+  driver.H = 0;
+  driver.pixels = null;
   FakeWorker.instances = [];
   FakeWorker.constructionCount = 0;
   FakeWorker.failConstructionAt = -1;
