@@ -8,6 +8,8 @@ const {
   snapToRationalRatio,
   lissajous,
   lissajousCodeString,
+  closingDomain,
+  domainClosureWarning,
 } =
   await import('../tools/lissajous_math.js');
 
@@ -206,4 +208,47 @@ test('lissajousCodeString emits a C++ LissajousParams initializer', () => {
   assert.equal(
     lissajousCodeString(1.06, 1.06, 0, 5.909),
     'LissajousParams{1.06f, 1.06f, 0.0f, 5.909f}');
+});
+
+/**
+ * Verifies closingDomain reproduces Comets::closing_domain: 2π·round(m2·domain/2π)/m2
+ * with the cycle count floored at 1, and that the returned domain actually
+ * returns the curve to its t=0 start.
+ */
+test('closingDomain mirrors the engine snap and lands back on the start point', () => {
+  assert.equal(closingDomain(1, 2 * TWO_PI), 2 * TWO_PI);
+  // 1.06 · 5.909 / 2π rounds to one cycle (the Comets table's first row).
+  assert.ok(Math.abs(closingDomain(1.06, 5.909) - TWO_PI / 1.06) < 1e-12);
+  // Under half a cycle floors to 1 rather than freezing the traversal at 0.
+  assert.equal(closingDomain(1, 1), TWO_PI);
+  assert.equal(closingDomain(0, 3), 0);
+  assert.equal(closingDomain(-2, 3), 0);
+
+  const closed = closingDomain(1.06, 5.909);
+  const start = lissajous(1.06, 1.06, 0, 0);
+  const end = lissajous(1.06, 1.06, 0, closed);
+  assert.ok(start.distanceTo(end) < 1e-12);
+});
+
+/** Verifies the snap is idempotent, so re-exporting a closed domain stays put. */
+test('closingDomain is idempotent', () => {
+  for (const [m2, domain] of [[1.06, 5.909], [4.01, 3.132], [62.16, 0.404], [8.75, 2.872]]) {
+    const once = closingDomain(m2, domain);
+    assert.ok(Math.abs(closingDomain(m2, once) - once) < 1e-12);
+  }
+});
+
+/**
+ * Verifies the export warning fires exactly when the authored domain differs
+ * from the one Comets will traverse.
+ */
+test('domainClosureWarning flags only domains that do not close', () => {
+  // ChaoticStrings' built-in config: m2 · domain = 5 · 2π, already closed.
+  assert.equal(domainClosureWarning(5, TWO_PI), null);
+  assert.equal(domainClosureWarning(1.06, TWO_PI / 1.06), null);
+  assert.equal(domainClosureWarning(0, 3), null);
+
+  const warning = domainClosureWarning(1.06, 5.909);
+  assert.ok(warning, 'authored 5.909 domain does not close at C₂ = 1.06');
+  assert.match(warning, /5\.928/);
 });
