@@ -105,6 +105,94 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
   }
 });
 
+const paramNames = (defs) => Array.from(defs, (d) => d.name);
+
+test('an unknown effect name is rejected and leaves the prior effect renderable', () => {
+  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), true,
+    'setEffect must succeed for a registered effect');
+  const before = paramNames(engine.getParameterDefinitions());
+
+  assert.equal(engine.setEffect('NoSuchEffect'), false,
+    'setEffect must return false for an unregistered effect name');
+  assert.deepEqual(paramNames(engine.getParameterDefinitions()), before,
+    'a rejected setEffect must keep the prior effect installed');
+
+  assert.equal(engine.setClip(0, W, 0, H), true,
+    'the prior effect must still accept a full-canvas clip');
+  engine.drawFrame();
+  assert.equal(engine.getPixels().length, W * H * 3,
+    'the prior effect must still render into the full buffer');
+});
+
+test('an unsupported resolution is rejected and keeps the prior one active', () => {
+  const supported = M.HolosphereEngine.getSupportedResolutions()
+    .map(([w, h]) => `${w}x${h}`);
+  assert.ok(!supported.includes('97x21'),
+    '97x21 must stay unsupported for this test to exercise the reject path');
+
+  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
+  assert.equal(engine.setResolution(97, 21), false,
+    'setResolution must return false for an unsupported size');
+  assert.equal(engine.getBufferLength(), W * H * 3,
+    'a rejected resolution must leave the prior one active');
+});
+
+test('malformed clip bounds are rejected', () => {
+  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), true,
+    'setEffect must succeed after a resolution change');
+  for (const bounds of [
+    [-1, W, 0, H], [0, W + 1, 0, H], [0, W, -1, H], [0, W, 0, H + 1],
+    [W, 0, 0, H], [0, W, H, 0],
+  ]) {
+    assert.equal(engine.setClip(...bounds), false,
+      `setClip(${bounds.join(', ')}) must be rejected`);
+  }
+  assert.equal(engine.setClip(0, W, 0, H), true,
+    'a full-canvas clip must still be accepted after the rejects');
+});
+
+test('a readonly parameter write is rejected', () => {
+  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
+  let found = null;
+  for (const name of Object.keys(engine.getEffectSizes())) {
+    assert.equal(engine.setEffect(name), true, `setEffect must succeed for ${name}`);
+    const defs = engine.getParameterDefinitions();
+    for (let i = 0; i < defs.length; i++) {
+      assert.equal(typeof defs[i].readonly, 'boolean',
+        `${name}.${defs[i].name} must carry a boolean readonly flag`);
+      if (defs[i].readonly && !found) found = { effect: name, def: defs[i] };
+    }
+    if (found) break;
+  }
+  assert.ok(found,
+    'no effect exposes a readonly parameter, so the reject path is unreachable');
+  assert.equal(engine.setParameter(found.def.name, found.def.value), false,
+    `setParameter must reject a write to readonly ${found.effect}.${found.def.name}`);
+  assert.equal(engine.setParameter('NoSuchParameter', 0), false,
+    'setParameter must reject an unknown parameter name');
+});
+
+test('strobeColumns and getEffectSizes return the shapes daydream consumes', () => {
+  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), true,
+    'setEffect must succeed after the readonly scan');
+  // driver.js gates the column-fill arc on `=== false`.
+  assert.equal(typeof engine.strobeColumns(), 'boolean',
+    'strobeColumns must return a boolean');
+
+  // daydream.js reads this map to label sidebar entries.
+  const sizes = engine.getEffectSizes();
+  const names = Object.keys(sizes);
+  assert.ok(names.includes('DisplacementField'),
+    'getEffectSizes must name the effects the factory builds');
+  for (const name of names) {
+    assert.equal(typeof sizes[name], 'number',
+      `getEffectSizes().${name} must be a number`);
+  }
+});
+
 // getBufferLength has no daydream call site; it is pinned here as intended API.
 test('getBufferLength reports the active resolution buffer length', () => {
   for (const [w, h] of M.HolosphereEngine.getSupportedResolutions()) {
