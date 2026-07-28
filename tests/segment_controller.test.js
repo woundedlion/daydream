@@ -648,25 +648,57 @@ test('setResolution on a faulted active pool rebuilds it and clears the fault', 
   assert.equal(FakeWorker.instances.length, beforeCount + 2, 'new workers were spawned');
 });
 
+test('setEffect on a faulted active pool rebuilds it and clears the fault', () => {
+  const c = makeController();
+  c.active = true;
+  c.create(2);
+  const beforeCount = FakeWorker.instances.length;
+  c.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
+  assert.equal(c.faulted, true);
+
+  c.setEffect('NewEffect');
+  assert.equal(c.faulted, false, 'recreating the pool cleared the fault latch');
+  assert.equal(c.workers.length, 2, 'a fresh pool of workers was built');
+  assert.equal(FakeWorker.instances.length, beforeCount + 2, 'new workers were spawned');
+});
+
+// A slider drag fires setParameter per pointer move; a rebuild there would
+// respawn the whole pool (a multi-MB WASM load each) on every event.
 for (const [label, act] of [
-  ['setEffect', (c) => c.setEffect('NewEffect')],
   ['setParameter', (c) => c.setParameter('Speed', 0.5)],
   ['setAnimationsPaused', (c) => c.setAnimationsPaused(true)],
 ]) {
-  test(`${label} on a faulted active pool rebuilds it and clears the fault`, () => {
+  test(`${label} on a faulted active pool stays latched`, () => {
     const c = makeController();
     c.active = true;
     c.create(2);
     const beforeCount = FakeWorker.instances.length;
-    c.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
+    const worker = c.workers[0];
+    worker.onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
     assert.equal(c.faulted, true);
+    const postedBefore = worker.posted.length;
 
     act(c);
-    assert.equal(c.faulted, false, 'recreating the pool cleared the fault latch');
-    assert.equal(c.workers.length, 2, 'a fresh pool of workers was built');
-    assert.equal(FakeWorker.instances.length, beforeCount + 2, 'new workers were spawned');
+    assert.equal(c.faulted, true, 'the fault latch is held');
+    assert.equal(FakeWorker.instances.length, beforeCount, 'no workers were respawned');
+    assert.equal(worker.posted.length, postedBefore, 'nothing is broadcast to dead workers');
   });
 }
+
+test('a pause toggled on a faulted pool is carried into the rebuilt one', () => {
+  const c = makeController();
+  c.active = true;
+  c.create(2);
+  c.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
+
+  c.setAnimationsPaused(true);
+  c.setResolution(8, 8);
+
+  for (const w of c.workers) {
+    const init = w.posted.find((m) => m.type === 'init');
+    assert.equal(init.paused, true, 'the rebuilt pool starts paused');
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Compositor
