@@ -1246,6 +1246,35 @@ test('a fault latched by composite() mid-tick() does not re-dispatch a doomed re
     assert.equal(w.posted.length, before[i], 'no new render broadcast'));
 });
 
+test('a fault latched by the overrun re-blit paints the overlay on the same tick', async () => {
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
+
+  const realSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = () => ({ unref() {} }); // stub the render watchdog
+  try {
+    const c = readyController(2);
+    c.showBoundaries = false;
+    c.tick(); // dispatch generation A
+
+    deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2 });
+    deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2 });
+    await flush();
+    c.tick(); // composite A, dispatch B (in flight, so the next tick overruns)
+
+    // Corrupt the published generation so the overrun re-blit's pre-pass faults.
+    c.results[1] = { ...c.results[1], x1: 99 };
+    let statsShown = 0;
+    c.updateStats = () => { statsShown++; };
+
+    c.tick(); // overrun branch: composite() latches the fault mid-tick
+    assert.equal(c.faulted, true, 'the re-blit pre-pass latched the fault');
+    assert.equal(statsShown, 1, 'the overlay painted on the faulting tick, not the next one');
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+});
+
 test('an init-phase fault still reaches the fault overlay (faulted checked before ready guard)', () => {
   // A startup trap latches `faulted` but never sends 'ready'; a ready-first guard
   // would return before the fault overlay ever painted.
