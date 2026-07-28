@@ -249,20 +249,14 @@ export class SegmentController {
    * (Re)build the worker pool at the current resolution: destroy any existing
    * pool, then spawn `numSegments` fresh workers, each loading its own WASM
    * module and initialized with this engine's tuned params and paused state.
-   * Aborts loudly (leaving an empty controller) if the resolution key is unknown.
+   * Latches a pool fault (leaving an empty controller) if the resolution key is
+   * unknown.
    * @param {number} numSegments
    * @param {number} [bootAttempt] - Retry index; 0 for a user-driven spawn, bumped by the transient-module-load auto-retry.
    */
   create(numSegments, bootAttempt = 0) {
     this.destroy();
     this.bootAttempt = bootAttempt;
-
-    const res = this.resolutionPresets[this.appState.get('resolution')];
-    if (!res) {
-      console.error(`[Segmented] create(${numSegments}) aborted: unknown`
-        + ` resolution "${this.appState.get('resolution')}"; controller is now empty.`);
-      return;
-    }
 
     this.count = numSegments;
     this.workers = [];
@@ -274,6 +268,14 @@ export class SegmentController {
     this.frameSeen = new Array(numSegments).fill(false);
     this.paramValues = null;
     this.ready = false;
+
+    const res = this.resolutionPresets[this.appState.get('resolution')];
+    if (!res) {
+      this.onWorkerFault(FAULT_POOL,
+        `unknown resolution "${this.appState.get('resolution')}"; `
+        + 'no workers were spawned');
+      return;
+    }
 
     // Per-index boot/ready state so a watchdog fault names the segments that
     // never reported, not just a count.

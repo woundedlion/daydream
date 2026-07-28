@@ -1363,3 +1363,19 @@ test('setAnimationsPaused records the flag and broadcasts it to every worker', (
     assert.equal(msgs[0].paused, true);
   }
 });
+
+test('create with an unknown resolution latches a pool fault', () => {
+  const c = makeController({ resolution: 'nope' });
+  c.active = true;
+  c.create(3);
+
+  assert.equal(c.faulted, true);
+  assert.equal(c.faultInfo.segId, -1, 'no single worker to blame');
+  assert.match(c.faultInfo.message, /unknown resolution "nope"/);
+  assert.equal(c.ownsDisplay, true, 'the fault overlay owns the display');
+  assert.deepEqual(c.workers, [], 'no workers were spawned');
+  assert.equal(c.count, 3);
+  for (const arr of [c.results, c.scratch, c.timings, c.renderUs, c.arenas, c.frameSeen]) {
+    assert.equal(arr.length, c.count, 'count matches the per-segment array lengths');
+  }
+});
