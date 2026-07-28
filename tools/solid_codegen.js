@@ -168,8 +168,9 @@ export function pctSuffix(val) {
  * conventions.
  * @param {Object} item - The solid spec.
  * @param {string} item.base - The base solid name.
- * @param {Array<(string|{op:string, params:Object})>} item.ops - Ops to apply, each a bare op name or an {op, params} object.
+ * @param {Array<(string|{op:string, params:Object})>} item.ops - Ops to apply, each a bare op name or an {op, params} object; must be non-empty.
  * @returns {{funcName: string, recipe: string}} The generated C++ function name and SolidBuilder recipe expression.
+ * @throws {Error} When the base is not a valid C++ identifier, the op chain is empty, or an op or its params are invalid.
  */
 export function generateFuncAndRecipe(item) {
   if (typeof item.base !== 'string' || !CPP_IDENTIFIER.test(item.base)) {
@@ -178,6 +179,12 @@ export function generateFuncAndRecipe(item) {
 
   if (!Array.isArray(item.ops)) {
     throw new Error('generateFuncAndRecipe: item.ops must be an array');
+  }
+
+  // An empty chain leaves funcName === base, so the emitted function redefines
+  // the seed and its body calls itself.
+  if (item.ops.length === 0) {
+    throw new Error(`generateFuncAndRecipe: op chain is empty; the emitted function would redefine the seed "${item.base}" and recurse into itself`);
   }
 
   let nameParts = [item.base];

@@ -183,8 +183,26 @@ test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comme
 
 /** Verifies generateRecipeCpp falls back to zero vertex/face/internal counts when the item omits them. */
 test('generateRecipeCpp defaults missing V/F/I counts to 0', () => {
-  const cpp = generateRecipeCpp({ base: 'cube', ops: [] });
+  const cpp = generateRecipeCpp({ base: 'cube', ops: ['dual'] });
   assert.ok(cpp.startsWith('// V=0, F=0, I=0\n'));
+});
+
+/** Verifies the emitted function body never calls the function it defines, which would recurse forever. */
+test('generateRecipeCpp never emits a body that calls its own function', () => {
+  const chains = [
+    ['dual'],
+    ['kis', 'ambo'],
+    [{ op: 'truncate', params: { t: 0.33 } }],
+    [{ op: 'hankin', params: { angle: 54 } }, { op: 'relax', params: { iter: 100 } }],
+  ];
+  for (const ops of chains) {
+    for (const base of ['cube', 'truncatedIcosahedron']) {
+      const { funcName } = generateFuncAndRecipe({ base, ops });
+      const body = generateRecipeCpp({ base, ops }).split('\n')[2];
+      assert.ok(!body.includes(`${funcName}(`),
+        `body of ${funcName} calls itself: ${body}`);
+    }
+  }
 });
 
 /** Verifies computeInternalAngle yields ~90deg (radians) for a unit-square face. */
@@ -254,6 +272,12 @@ test('generateFuncAndRecipe rejects an unknown op or a malformed base', () => {
   // A parameterized op given as a bare string has no params: descriptive throw, not an opaque TypeError.
   assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: ['truncate'] }),
     /op "truncate" requires a params object/);
+});
+
+/** Verifies an empty op chain is rejected: its funcName would equal the base, redefining the seed and recursing. */
+test('generateFuncAndRecipe rejects an empty op chain', () => {
+  assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [] }), /op chain is empty/);
+  assert.throws(() => generateRecipeCpp({ base: 'cube', ops: [] }), /op chain is empty/);
 });
 
 /** Verifies generateFuncAndRecipe rejects non-finite fractional params and non-integer/negative relax counts. */
