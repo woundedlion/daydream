@@ -79,17 +79,28 @@ const LoResFavorites = [
   "Voronoi",
 ];
 
-// Display metadata (label, dot size) per resolution. The dropdown offers only
-// the subset the engine reports through getSupportedResolutions().
+// Display metadata (dot size), geometry, and the effect list offered per
+// resolution. The dropdown offers only the subset the engine reports through
+// getSupportedResolutions().
 const resolutionPresets = {
-  "Holosphere (96x20)": { h: 20, w: 96, dotSize: 2 },
-  "Phantasm (288x144)": { h: 144, w: 288, dotSize: 0.25 },
+  "Holosphere (96x20)": { h: 20, w: 96, dotSize: 2, favorites: LoResFavorites },
+  "Phantasm (288x144)": { h: 144, w: 288, dotSize: 0.25, favorites: HiResFavorites },
 };
 
-const effectsByResolution = {
-  "Holosphere (96x20)": LoResFavorites,
-  "Phantasm (288x144)": HiResFavorites,
-};
+/**
+ * The effect list offered at a resolution.
+ * @param {string} resolution - A resolutionPresets key.
+ * @returns {string[]} That preset's favorites, or the high-res list when the
+ *   preset is unknown or carries none.
+ */
+function favoritesFor(resolution) {
+  const favorites = resolutionPresets[resolution]?.favorites;
+  if (!favorites) {
+    console.error(`No effect list for resolution "${resolution}"; offering the high-res list.`);
+    return HiResFavorites;
+  }
+  return favorites;
+}
 
 // Re-point both display aliases (Three.js instanceColor + daydream.pixels) so
 // source, displayed attribute, and daydream.pixels all reference the same WASM
@@ -183,7 +194,8 @@ let activeEffect;
 
 // Seed plain defaults; URLSync is the single URL reader and hydrates these from
 // the query string through the same validators below.
-const knownEffects = new Set(Object.values(effectsByResolution).flat());
+const knownEffects = new Set(
+  Object.values(resolutionPresets).flatMap((preset) => preset.favorites));
 const appState = new AppState({
   effect: 'IslamicStars',
   resolution: "Phantasm (288x144)",
@@ -486,7 +498,7 @@ function applyResolution(preserveParams = false) {
     segments.setResolution(p.w, p.h);
   }
 
-  const availableEffects = effectsByResolution[resolution] || HiResFavorites;
+  const availableEffects = favoritesFor(resolution);
 
   daydream.updateResolution(p.w, p.h, p.dotSize);
 
@@ -749,11 +761,11 @@ const sidebar = new EffectSidebar(
 
 testAllController = guiInstance.addSession({ testAll: false }, 'testAll').name('Test All').onChange((v) => {
   if (v) {
-    const startList = effectsByResolution[appState.get('resolution')] || HiResFavorites;
+    const startList = favoritesFor(appState.get('resolution'));
     testAllIndex = startList.indexOf(appState.get('effect'));
     testAllInterval = setInterval(() => {
       if (!host.engine) return;
-      const currentList = effectsByResolution[appState.get('resolution')] || HiResFavorites;
+      const currentList = favoritesFor(appState.get('resolution'));
       if (currentList.length === 0) return;
       // Advance a persistent index, not one re-derived from the live effect: a
       // rejected setEffect reverts appState to the predecessor, so re-deriving
