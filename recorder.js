@@ -68,9 +68,10 @@ export class VideoRecorder {
     this.targetHeight = null;
     this.offscreen = null;
     this.offCtx = null;
-    // Host hook fired with the error when a session ends on an encoder fault, so
-    // the UI can drop its recording state; the record button's label is set on
-    // click and would otherwise keep reading "Stop" over a dead session.
+    // Host hook fired with the error whenever a session fails to start or ends on
+    // an encoder fault, so the UI can drop its recording state and report why;
+    // the record button's label is set on click and would otherwise keep reading
+    // "Stop" over a dead session.
     this.onError = null;
   }
 
@@ -107,6 +108,19 @@ export class VideoRecorder {
   }
 
   /**
+   * Reports a failure that ends a session before it produces video: logs it and
+   * notifies the host hook, so an abort is not console-only.
+   * @param {string} message - Failure description, logged with the class prefix.
+   * @param {*} [cause] - Underlying error, when the failure came from a throw.
+   * @returns {void}
+   */
+  reportFailure(message, cause) {
+    if (cause === undefined) console.error(`VideoRecorder: ${message}`);
+    else console.error(`VideoRecorder: ${message}`, cause);
+    this.onError?.(cause instanceof Error ? cause : new Error(message));
+  }
+
+  /**
    * Begins a recording session. No-op if already recording or unsupported.
    * @param {string} effectName - Base name used for the downloaded file.
    * @returns {void}
@@ -115,7 +129,7 @@ export class VideoRecorder {
     if (this.isRecording) return;
 
     if (!VideoRecorder.isSupported()) {
-      console.error('VideoRecorder: captureStream or MediaRecorder is not supported in this browser.');
+      this.reportFailure('captureStream or MediaRecorder is not supported in this browser.');
       return;
     }
 
@@ -137,8 +151,8 @@ export class VideoRecorder {
       : this.ensurePinnedOffscreen();
 
     if (!this.offCtx) {
-      console.error('VideoRecorder: failed to acquire a 2D drawing context for the capture canvas; recording aborted.');
       this.cleanup();
+      this.reportFailure('failed to acquire a 2D drawing context for the capture canvas; recording aborted.');
       return;
     }
 
@@ -157,8 +171,8 @@ export class VideoRecorder {
       }
     } catch (err) {
       if (stream) stream.getTracks().forEach(t => t.stop());
-      console.error('VideoRecorder: captureStream failed; recording aborted.', err);
       this.cleanup();
+      this.reportFailure('captureStream failed; recording aborted.', err);
       return;
     }
 
@@ -166,8 +180,8 @@ export class VideoRecorder {
     // (it guards on !this.track); surface it instead of recording nothing.
     if (!track) {
       stream.getTracks().forEach(t => t.stop());
-      console.error('VideoRecorder: capture stream produced no video track; recording aborted.');
       this.cleanup();
+      this.reportFailure('capture stream produced no video track; recording aborted.');
       return;
     }
 
@@ -194,8 +208,8 @@ export class VideoRecorder {
       // Construction can throw on unsupported options; stop the live capture
       // tracks so the stream doesn't leak.
       stream.getTracks().forEach(t => t.stop());
-      console.error('VideoRecorder: MediaRecorder construction failed.', err);
       this.cleanup();
+      this.reportFailure('MediaRecorder construction failed.', err);
       return;
     }
 
@@ -251,7 +265,7 @@ export class VideoRecorder {
       recorder.onstop = null;
       recorder.onerror = null;
       this.cleanup();
-      console.error('VideoRecorder: MediaRecorder start failed.', err);
+      this.reportFailure('MediaRecorder start failed.', err);
       return;
     }
 
@@ -263,7 +277,7 @@ export class VideoRecorder {
       recorder.onerror = null;
       recorder.stop();
       this.cleanup();
-      console.error('VideoRecorder: output setup failed.', err);
+      this.reportFailure('output setup failed.', err);
     }
   }
 

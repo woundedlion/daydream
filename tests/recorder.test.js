@@ -239,10 +239,14 @@ test('start refuses and stays idle when recording is unsupported', () => {
   try {
     delete globalThis.MediaRecorder;
     const rec = new VideoRecorder(recordableCanvas());
+    const notified = [];
+    rec.onError = (err) => notified.push(err);
     rec.start('e');
     assert.equal(rec.mediaRecorder, null);
     assert.equal(rec.isRecording, false);
     assert.equal(errs.length, 1);
+    assert.equal(notified.length, 1, 'the host is told the session never started');
+    assert.match(notified[0].message, /not supported/);
   } finally {
     console.error = prevErr;
     restore();
@@ -262,6 +266,8 @@ test('a MediaRecorder start failure releases the entire capture session', () => 
     const rec = new VideoRecorder(recordableCanvas());
     let sinkOpened = false;
     rec.openSink = () => { sinkOpened = true; };
+    const notified = [];
+    rec.onError = (err) => notified.push(err);
 
     assert.doesNotThrow(() => rec.start('e'));
 
@@ -278,9 +284,11 @@ test('a MediaRecorder start failure releases the entire capture session', () => 
     assert.equal(rec.isRecording, false);
     assert.equal(sinkOpened, false);
     assert.ok(errors.some((args) => args.includes(failure)));
+    assert.deepEqual(notified, [failure], 'the host is told the session never started');
 
     FakeMediaRecorder.startError = null;
     rec.openSink = () => ({ write() {}, finish() {} });
+    notified.length = 0;
     rec.start('retry');
     assert.equal(rec.isRecording, true);
     rec.dispose();
