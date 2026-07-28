@@ -10,10 +10,13 @@
  * 0.5000 collapses back to 0.5.
  * @param {number} value - The numeric value to serialize.
  * @returns {number|null} The value rounded to 4 decimal places, or null for a
- *   non-finite input so callers drop the key rather than emit a misleading 0.
+ *   non-finite input or a non-zero magnitude that rounds to 0, so callers drop
+ *   the key rather than emit a misleading 0. An exact 0 still round-trips.
  */
 export function roundUrlNumber(value) {
-  return Number.isFinite(value) ? parseFloat(value.toFixed(4)) : null;
+  if (!Number.isFinite(value)) return null;
+  const rounded = parseFloat(value.toFixed(4));
+  return rounded === 0 && value !== 0 ? null : rounded;
 }
 
 // A URL number must be wholly numeric: parseFloat would take the leading digits
@@ -246,8 +249,8 @@ export class URLSync {
       this.adhoc.set(key, null);
     } else if (typeof value === 'number') {
       const rounded = roundUrlNumber(value);
-      // Non-finite rounds to null: drop the key rather than serialize a 0 the
-      // engine never rendered.
+      // A null rounding (non-finite, or too small to survive 4 dp) drops the key
+      // rather than serializing a 0 the engine never rendered.
       this.adhoc.set(key, rounded === null ? null : String(rounded));
     } else {
       this.adhoc.set(key, String(value));
