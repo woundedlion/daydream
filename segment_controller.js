@@ -1015,6 +1015,15 @@ export class SegmentController {
   }
 
   /**
+   * Whether any worker is spawned, ready or not. Callers use it to decide
+   * whether a broadcast has anyone to reach.
+   * @returns {boolean}
+   */
+  get hasPool() {
+    return this.workers.length > 0;
+  }
+
+  /**
    * Whether the worker pool owns the display buffer: it is either rendering
    * (ready) or holding the fault overlay. False while a pool spawns, when the
    * host keeps painting with the main-thread engine instead of leaving the

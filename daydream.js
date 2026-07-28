@@ -444,7 +444,7 @@ function applyEffect(preserveParams = false) {
     }
   }
 
-  if (segments.workers.length > 0) {
+  if (segments.hasPool) {
     segments.setEffect(appState.get('effect'));
   }
 
@@ -477,7 +477,7 @@ function applyResolution(preserveParams = false) {
     host.invalidateView(); // force host.refresh() to re-fetch after resize
   }
 
-  if (segments.workers.length > 0) {
+  if (segments.hasPool) {
     segments.setResolution(p.w, p.h);
   }
 
