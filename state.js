@@ -151,7 +151,8 @@ export const getActiveURLSync = () => activeURLSync;
 export class URLSync {
   /**
    * Wires a URLSync to an AppState: reads initial values from the URL, subscribes
-   * to tracked-key changes, and registers itself as the app-wide URL writer.
+   * to tracked-key changes, and registers itself as the app-wide URL writer,
+   * disposing any previously registered one.
    * @param {AppState} state - The app state to sync.
    * @param {string[]} trackedKeys - Which state keys to sync to the URL.
    * @param {Object<string, (raw: string) => boolean>} [validators] - Optional
@@ -162,6 +163,9 @@ export class URLSync {
    *   the URLSync — callers no longer have to re-validate after construction.
    */
   constructor(state, trackedKeys, validators = {}) {
+    // Retire the previous writer: orphaned, it would keep its subscription and
+    // could still arm a replaceState timer with no handle left to tear it down.
+    if (activeURLSync) activeURLSync.dispose();
     this.state = state;
     this.trackedKeys = new Set(trackedKeys);
     this.timer = null;
