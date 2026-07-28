@@ -183,11 +183,6 @@ export class VideoRecorder {
       return;
     }
 
-    // A track without requestFrame is the timed-fallback stream: it samples the
-    // offscreen on the wall clock from recorder.start(), so the offscreen must
-    // already hold a frame or the leading interval encodes a blank canvas.
-    const timedFallback = typeof track.requestFrame !== 'function';
-
     const mimeType = selectMimeType(this.format);
 
     // An explicitly-chosen container with no supported codec means we fall back
@@ -252,8 +247,6 @@ export class VideoRecorder {
       if (live) this.onError?.(e?.error ?? e);
     };
 
-    if (timedFallback) this.blitToOffscreen();
-
     // Timeslice so ondataavailable delivers chunks incrementally; without it the
     // encoder buffers the whole recording in memory until stop().
     try {
@@ -304,10 +297,12 @@ export class VideoRecorder {
   }
 
   /**
-   * Requests a single video frame; call once per simulation frame. When an
-   * offscreen scaling canvas is in use, blits the source canvas into it (scaled
-   * to the target resolution) before requesting the frame, and advances the
-   * elapsed-time counter by one frame interval.
+   * Requests a single video frame; call once per simulation frame, from the same
+   * task that rendered it — the source is a WebGL canvas without
+   * preserveDrawingBuffer, so a blit after compositing reads transparent black.
+   * When an offscreen scaling canvas is in use, blits the source canvas into it
+   * (scaled to the target resolution) before requesting the frame, and advances
+   * the elapsed-time counter by one frame interval.
    * @returns {void}
    */
   captureFrame() {

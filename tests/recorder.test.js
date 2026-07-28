@@ -704,11 +704,12 @@ test('captureFrame advances elapsed when the track lacks requestFrame', () => {
 });
 
 /**
- * On the timed-fallback path (a captured track with no requestFrame, which
- * self-samples from recorder.start()), start() must prime the offscreen with one
- * blit so the leading interval isn't a blank canvas.
+ * start() never blits: the source is a WebGL canvas whose drawing buffer is
+ * cleared once composited, so a blit outside the render task would write
+ * transparent black. Only captureFrame(), called from the render task, fills the
+ * offscreen — on the timed-fallback path too.
  */
-test('the timed fallback primes the offscreen with one blit before start', () => {
+test('start does not blit; the timed fallback fills the offscreen on captureFrame', () => {
   const restore = installRecorderEnv();
   try {
     const timedTrack = { stop() {} }; // no requestFrame -> forces the fps fallback
@@ -729,7 +730,10 @@ test('the timed fallback primes the offscreen with one blit before start', () =>
     rec.download = () => {};
     rec.start('e');
 
-    assert.equal(draws.length, 1, 'exactly one priming blit before recording starts');
+    assert.equal(draws.length, 0, 'no blit from the click-handler task');
+
+    rec.captureFrame();
+    assert.equal(draws.length, 1, 'the render-task capture fills the offscreen');
   } finally {
     restore();
   }
