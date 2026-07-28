@@ -939,8 +939,13 @@ export class SegmentController {
     }
 
     // composite() can latch a fault via its bounds/length pre-pass; bail before
-    // dispatching a render to the just-halted pool.
-    if (this.faulted) return;
+    // dispatching a render to the just-halted pool. The overrun branch skips the
+    // updateStats() its sibling runs, so paint the overlay here rather than a
+    // tick late.
+    if (this.faulted) {
+      this.updateStats();
+      return;
+    }
 
     if (!this.renderInFlight) {
       this.renderInFlight = true;
