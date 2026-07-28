@@ -13,6 +13,11 @@ const {
   generateRecipeCpp,
   computeInternalAngle,
   isConvexFace,
+  uniqueEdges,
+  geodesicSegments,
+  movedOps,
+  createCommitQueue,
+  createChainValidator,
 } =
   await import('../tools/solid_codegen.js');
 const { formatFloatCpp } = await import('../tools/cpp_format.js');
@@ -268,4 +273,182 @@ test('pctSuffix and generateFuncAndRecipe reject negative fractional params', ()
   assert.throws(() => pctSuffix(-0.5), /negative/);
   assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'truncate', params: { t: -0.5 } }] }),
     /negative/);
+});
+
+/** Verifies uniqueEdges returns each undirected edge once, in first-seen order. */
+test('uniqueEdges deduplicates shared edges across faces', () => {
+  // Two triangles sharing edge 1-2: 5 distinct undirected edges.
+  const edges = uniqueEdges([[0, 1, 2], [2, 1, 3]], 4);
+  assert.deepEqual(edges, [[0, 1], [1, 2], [0, 2], [1, 3], [2, 3]]);
+});
+
+/** Verifies the lo*vertexCount+hi edge key never aliases two distinct edges. */
+test('uniqueEdges keys stay unique at the vertex-count radix', () => {
+  // (lo,hi) = (0,5) and (1,0) would collide on a radix below 6.
+  const edges = uniqueEdges([[0, 5], [1, 0]], 6);
+  assert.deepEqual(edges, [[0, 5], [0, 1]]);
+});
+
+/** Verifies a degenerate 2-gon face yields one edge rather than a self-pair. */
+test('uniqueEdges collapses the two half-edges of a 2-gon', () => {
+  assert.deepEqual(uniqueEdges([[0, 1]], 2), [[0, 1]]);
+});
+
+/** Verifies the geodesic level rounds the arc up to whole ~3-degree segments when the budget is slack. */
+test('geodesicSegments targets three degrees of arc per segment', () => {
+  const seg = Math.PI / 60;
+  assert.equal(geodesicSegments(3.2 * seg, 4), 4);
+  assert.equal(geodesicSegments(4.5 * seg, 4), 5);
+});
+
+/** Verifies the total-triangle budget caps the level on dense meshes. */
+test('geodesicSegments caps dense meshes on the triangle budget', () => {
+  // sqrt(400000 / 40000) = 3.16 -> 3, below the arc target for a 90-degree face.
+  assert.equal(geodesicSegments(Math.PI / 2, 40000), 3);
+  // 400000 triangles leave no subdivision headroom at all.
+  assert.equal(geodesicSegments(Math.PI / 2, 400000), 1);
+});
+
+/** Verifies the level stays within [1, 24] for degenerate and huge arcs. */
+test('geodesicSegments clamps to the [1, 24] range', () => {
+  assert.equal(geodesicSegments(0, 1), 1);
+  assert.equal(geodesicSegments(Math.PI, 1), 24);
+});
+
+/** Verifies movedOps reorders without aliasing or mutating the input chain. */
+test('movedOps returns a reordered deep copy', () => {
+  const ops = [
+    { op: 'dual', params: {} },
+    { op: 'truncate', params: { t: 0.3 } },
+    { op: 'ambo', params: {} },
+  ];
+  const moved = movedOps(ops, 0, 2);
+  assert.deepEqual(moved.map(o => o.op), ['truncate', 'ambo', 'dual']);
+  assert.deepEqual(ops.map(o => o.op), ['dual', 'truncate', 'ambo']);
+  moved[0].params.t = 0.9;
+  assert.equal(ops[1].params.t, 0.3);
+});
+
+/** Verifies queued commits run one at a time, in order, each seeing its predecessor's writes. */
+test('createCommitQueue serializes commits in enqueue order', async () => {
+  const queueCommit = createCommitQueue();
+  const log = [];
+  let inFlight = 0;
+  const commit = (tag) => async () => {
+    assert.equal(inFlight, 0, `${tag} overlapped a pending commit`);
+    inFlight++;
+    await Promise.resolve();
+    log.push(tag);
+    inFlight--;
+  };
+  queueCommit(commit('a'));
+  queueCommit(commit('b'));
+  await queueCommit(commit('c'));
+  assert.deepEqual(log, ['a', 'b', 'c']);
+});
+
+/** Verifies a rejected commit is reported and leaves the queue usable. */
+test('createCommitQueue survives a rejected commit', async () => {
+  const errors = [];
+  const queueCommit = createCommitQueue((e) => errors.push(e));
+  const boom = new Error('boom');
+  await queueCommit(async () => { throw boom; });
+  const log = [];
+  await queueCommit(async () => { log.push('after'); });
+  assert.deepEqual(errors, [boom]);
+  assert.deepEqual(log, ['after']);
+});
+
+/**
+ * Builds a fake WASM module whose meshes track their own deletion, with a hook
+ * to make a chosen op throw.
+ */
+function fakeModule(onOp = () => { }) {
+  const state = { live: 0, cleared: 0 };
+  const makeMesh = () => {
+    state.live++;
+    const mesh = {
+      deleted: false,
+      delete() { this.deleted = true; state.live--; },
+      classifyFaces() { onOp('classifyFaces'); },
+    };
+    for (const op of KNOWN_OPS) {
+      mesh[op] = () => { onOp(op); return makeMesh(); };
+    }
+    return mesh;
+  };
+  const Mod = {
+    MeshOps: {
+      fromSolidName(name) { onOp(`base:${name}`); return makeMesh(); },
+      clearToolingMemory() { state.cleared++; },
+    },
+  };
+  return { Mod, state };
+}
+
+/** Verifies a chain that replays cleanly is accepted and leaves no live meshes. */
+test('createChainValidator accepts a chain that replays cleanly', async () => {
+  const { Mod, state } = fakeModule();
+  const validator = createChainValidator(async () => Mod);
+  assert.equal(await validator.chainIsValid('cube', ['dual', { op: 'truncate', params: { t: 0.3 } }]), true);
+  assert.equal(state.live, 0);
+  assert.equal(state.cleared, 1);
+});
+
+/** Verifies a plain (non-trap) failure rejects the chain and still frees the mesh. */
+test('createChainValidator rejects a chain that throws, freeing its mesh', async () => {
+  const { Mod, state } = fakeModule((op) => {
+    if (op === 'kis') throw new Error('op refused');
+  });
+  const validator = createChainValidator(async () => Mod);
+  assert.equal(await validator.chainIsValid('cube', ['kis']), false);
+  assert.equal(state.live, 0);
+  assert.equal(state.cleared, 1);
+});
+
+/** Verifies an engine trap wedges the instance, so the next chain runs on a fresh one. */
+test('createChainValidator respawns after a WebAssembly trap', async () => {
+  let spawns = 0;
+  const modules = [
+    fakeModule(() => { throw new WebAssembly.RuntimeError('trap'); }).Mod,
+    fakeModule().Mod,
+  ];
+  const validator = createChainValidator(async () => modules[spawns++]);
+  assert.equal(await validator.chainIsValid('cube', ['kis']), false);
+  assert.equal(spawns, 1);
+  assert.equal(await validator.chainIsValid('cube', ['dual']), true);
+  assert.equal(spawns, 2);
+});
+
+/** Verifies a healthy instance is reused across chains rather than respawned. */
+test('createChainValidator reuses a healthy instance', async () => {
+  let spawns = 0;
+  const { Mod } = fakeModule();
+  const validator = createChainValidator(async () => { spawns++; return Mod; });
+  await validator.chainIsValid('cube', ['dual']);
+  await validator.chainIsValid('cube', ['ambo']);
+  assert.equal(spawns, 1);
+});
+
+/** Verifies a module that fails to spawn degrades to permissive rather than blocking the tool. */
+test('createChainValidator accepts everything when the module cannot spawn', async () => {
+  const validator = createChainValidator(async () => { throw new Error('no wasm'); });
+  assert.equal(await validator.chainIsValid('cube', ['kis']), true);
+  assert.equal(await validator.withValidator((Mod) => Mod), null);
+});
+
+/** Verifies validator tasks never interleave, so one task's mesh survives another's cleanup. */
+test('createChainValidator serializes overlapping tasks', async () => {
+  const { Mod } = fakeModule();
+  const validator = createChainValidator(async () => Mod);
+  const log = [];
+  const task = (tag) => async () => {
+    log.push(`${tag}:in`);
+    await Promise.resolve();
+    log.push(`${tag}:out`);
+  };
+  const a = validator.withValidator(task('a'));
+  const b = validator.withValidator(task('b'));
+  await Promise.all([a, b]);
+  assert.deepEqual(log, ['a:in', 'a:out', 'b:in', 'b:out']);
 });

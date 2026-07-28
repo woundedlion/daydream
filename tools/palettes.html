@@ -457,7 +457,7 @@
     import {
       ProceduralPalette, GenerativePalette,
       mapValue, proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
-      NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
+      NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams, zoomedProceduralParams,
     } from './palette_math.js';
 
     // --- Palette Class and Data Structure ---
@@ -872,46 +872,16 @@
          * to zoom the palette from t_start to t_end.
          */
     function zoomPalette(t_start, t_end) {
-      // 1. Store the "before" state
-      if (!previousParams) { // Only store the *first* pre-zoom state
+      // Only store the *first* pre-zoom state, so reset always returns there.
+      if (!previousParams) {
         previousParams = {
           C_R: parameters.C_R, C_G: parameters.C_G, C_B: parameters.C_B,
           D_R: parameters.D_R, D_G: parameters.D_G, D_B: parameters.D_B
         };
       }
 
-      const range = t_end - t_start;
+      Object.assign(parameters, zoomedProceduralParams(parameters, t_start, t_end));
 
-      // 2. Calculate new parameters based on the zoom formula
-      // C_new = C_old * range
-      // D_new = (D_old + C_old * t_start) % 1.0
-
-      // Re-calculate C_new and D_new based on the *current* state
-      const current_C_R = parameters.C_R;
-      const current_D_R = parameters.D_R;
-      const current_C_G = parameters.C_G;
-      const current_D_G = parameters.D_G;
-      const current_C_B = parameters.C_B;
-      const current_D_B = parameters.D_B;
-
-      const new_C_R = current_C_R * range;
-      const new_D_R = (current_D_R + current_C_R * t_start) % 1.0;
-
-      const new_C_G = current_C_G * range;
-      const new_D_G = (current_D_G + current_C_G * t_start) % 1.0;
-
-      const new_C_B = current_C_B * range;
-      const new_D_B = (current_D_B + current_C_B * t_start) % 1.0;
-
-      // 3. Set new parameters
-      parameters.C_R = new_C_R;
-      parameters.D_R = new_D_R;
-      parameters.C_G = new_C_G;
-      parameters.D_G = new_D_G;
-      parameters.C_B = new_C_B;
-      parameters.D_B = new_D_B;
-
-      // 4. Update UI
       updateAllSliders();
       updatePalette();
     }

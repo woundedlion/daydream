@@ -388,6 +388,27 @@ export function mapValue(value, fromMin, fromMax, toMin, toMax) {
 }
 
 /**
+ * Rescales the procedural cosine-formula frequency (C) and phase (D) triples so
+ * the window [tStart, tEnd] of the current palette fills the whole [0, 1] strip.
+ * @param {{C_R:number,C_G:number,C_B:number,D_R:number,D_G:number,D_B:number}} parameters - The current frequency/phase coefficients.
+ * @param {number} tStart - Start of the zoom window, in current-palette phase.
+ * @param {number} tEnd - End of the zoom window, in current-palette phase.
+ * @returns {{C_R:number,C_G:number,C_B:number,D_R:number,D_G:number,D_B:number}} The zoomed coefficients; the A/B triples are unaffected.
+ * @details Per channel C' = C * (tEnd - tStart) and D' = (D + C * tStart) % 1.
+ */
+export function zoomedProceduralParams(parameters, tStart, tEnd) {
+  const range = tEnd - tStart;
+  return {
+    C_R: parameters.C_R * range,
+    D_R: (parameters.D_R + parameters.C_R * tStart) % 1.0,
+    C_G: parameters.C_G * range,
+    D_G: (parameters.D_G + parameters.C_G * tStart) % 1.0,
+    C_B: parameters.C_B * range,
+    D_B: (parameters.D_B + parameters.C_B * tStart) % 1.0,
+  };
+}
+
+/**
  * Emit the C++ initializer the engine actually consumes —
  * `ProceduralPalette name({r,g,b}f, ...)` — not bare JS arrays. Brace-init
  * each vec3 with `f`-suffixed floats so the output pastes straight into
