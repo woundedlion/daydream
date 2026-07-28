@@ -292,6 +292,24 @@ test('URLSync construction disposes the previous writer', () => {
   }
 });
 
+test('URLSync.dispose stops a later setParam from re-arming the flush', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const calls = installWindow('?effect=Voronoi', '/sim');
+    const s = new AppState({ effect: 'Voronoi' });
+    const sync = new URLSync(s, ['effect']);
+
+    sync.dispose();
+    sync.setParam('resolution', 'high'); // a stale reference writing into a discarded page
+    sync.schedule();
+    mock.timers.tick(200);
+
+    assert.equal(calls.length, 0, 'a disposed writer never touches history');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
 test('URLSync.flush writes tracked state and ad-hoc params to the URL', () => {
   const calls = installWindow('', '/sim');
   const s = new AppState({ effect: 'Voronoi' });
