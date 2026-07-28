@@ -647,8 +647,8 @@ export class Daydream {
       this.mainViewport.height
     );
 
-    this.renderer.setClearColor(this.scene.background, Daydream.SCENE_ALPHA ? 0 : 1);
-    this.renderer.clear();
+    // render() clears the scissored viewport itself: a THREE.Color scene
+    // background forces a clear to that color before the pass.
     this.renderer.render(this.scene, this.camera);
   }
 
