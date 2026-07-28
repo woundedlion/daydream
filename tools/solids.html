@@ -341,6 +341,11 @@
       transform: translateY(-2px);
     }
 
+    /* Saved solid whose generated funcName is shared with another card. */
+    .saved-item.name-clash {
+      border-color: #f59e0b;
+    }
+
     .saved-item img {
       width: 100%;
       height: 120px;
@@ -1115,34 +1120,51 @@
         vCount, fCount, iCount
       };
 
-      // Warn on a funcName collision rather than letting it overwrite silently:
+      // Report a funcName collision rather than letting it overwrite silently:
       // generateFuncAndRecipe encodes op params at coarse granularity (pctSuffix
       // to 0.01, hankin to 1 deg), so two near-identical solids can share a
       // funcName and the later C++ paste would clobber the earlier definition.
-      try {
-        const { funcName } = generateFuncAndRecipe(item);
-        const clash = savedSolids.some(s => generateFuncAndRecipe(s).funcName === funcName);
-        if (clash) {
-          console.warn(`Saved solid generates funcName "${funcName}", which collides with an `
-            + `existing saved solid — their exported C++ would overwrite each other. `
-            + `Vary an op parameter by at least the suffix granularity to keep names unique.`);
-        }
-      } catch (e) {
-        // generateFuncAndRecipe only throws on an invalid base/op, which the
-        // registry-backed state should never produce; ignore so a save still works.
+      const funcName = savedFuncName(item);
+      if (funcName && savedSolids.some(s => savedFuncName(s) === funcName)) {
+        showGateMsg(`saved: "${funcName}" collides with another saved solid — `
+          + `vary an op parameter to keep the exported C++ names unique`);
       }
 
       savedSolids.push(item);
       renderSavedList();
     }
 
+    // The C++ function name a saved item exports as, or null when it can't be
+    // generated — generateFuncAndRecipe only throws on an invalid base/op, which
+    // the registry-backed state should never produce.
+    function savedFuncName(item) {
+      try {
+        return generateFuncAndRecipe(item).funcName;
+      } catch {
+        return null;
+      }
+    }
+
     function renderSavedList() {
       const list = document.getElementById('savedList');
       list.innerHTML = '';
 
+      // Two cards with the same funcName export definitions that overwrite each
+      // other, so flag every member of a colliding set, not just the newest.
+      const nameCounts = new Map();
+      savedSolids.forEach(item => {
+        const name = savedFuncName(item);
+        if (name) nameCounts.set(name, (nameCounts.get(name) || 0) + 1);
+      });
+
       savedSolids.forEach((item, index) => {
         const el = document.createElement('div');
         el.className = 'saved-item relative pr-6'; // Added relative + right padding space
+        const funcName = savedFuncName(item);
+        if (funcName && nameCounts.get(funcName) > 1) {
+          el.classList.add('name-clash');
+          el.title = `Exports as ${funcName}, which another saved solid also exports`;
+        }
         // The card markup carries no inline handlers; the action buttons are
         // wired below via addEventListener so deleteSolid/copyCode stay module-
         // scoped (no window.* globals) and no handler-bearing string is parsed.
