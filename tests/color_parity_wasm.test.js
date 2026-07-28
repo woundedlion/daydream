@@ -13,6 +13,7 @@ import createHolosphereModule from '../holosphere_wasm.js';
 import * as C from '../tools/color.js';
 import * as P from '../tools/palette_math.js';
 import * as L from '../tools/lissajous_math.js';
+import * as MB from '../tools/mobius_transforms.js';
 
 // Top-level await fails this file loudly if the module can't instantiate,
 // rather than silently skipping the parity checks.
@@ -23,6 +24,7 @@ test('WASM parity module is present with the exports this suite pins', () => {
     'srgb_to_linear_float', 'linear_to_srgb_float', 'srgb_to_linear_interp',
     'linear_rgb_to_oklab', 'oklab_to_linear_rgb', 'hsv_to_rgb',
     'procedural_palette_linear', 'named_procedural_palettes', 'lissajous',
+    'mobius_transform',
   ]) {
     assert.equal(typeof M[name], 'function',
       `holosphere_wasm.js is missing export ${name} — parity check would not run`);
@@ -175,5 +177,107 @@ test('lissajous golden points (absolute pin)', () => {
   for (const p of [p1, p2]) {
     assert.ok(near(Math.hypot(p.x, p.y, p.z), 1, 1e-3),
       `lissajous point off the unit sphere: (${p.x},${p.y},${p.z})`);
+  }
+});
+
+/**
+ * Stereographic projection in the convention the mobius.html fragment shader
+ * uses: pole at +y, real axis x, imaginary axis z.
+ * @param {number[]} p - Unit sphere point as [x, y, z].
+ * @returns {{re:number, im:number}} The projected complex-plane coordinate.
+ */
+function stereo([x, y, z]) {
+  const denom = 1 - y;
+  return { re: x / denom, im: z / denom };
+}
+
+/**
+ * Inverse stereographic projection back onto the unit sphere.
+ * @param {{re:number, im:number}} w - Complex-plane coordinate.
+ * @returns {{x:number, y:number, z:number}} The corresponding sphere point.
+ */
+function invStereo(w) {
+  const r2 = w.re * w.re + w.im * w.im;
+  return { x: (2 * w.re) / (r2 + 1), y: (r2 - 1) / (r2 + 1), z: (2 * w.im) / (r2 + 1) };
+}
+
+/**
+ * Maps a sphere point through the tool's own complex arithmetic: project, apply
+ * f(z) = (Az + B) / (Cz + D), unproject. This is the reference the engine's
+ * fused mobius_transform must reproduce.
+ * @param {number[]} p - Unit sphere point as [x, y, z].
+ * @param {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} coeffs - The Mobius coefficients.
+ * @returns {{x:number, y:number, z:number}} The transformed sphere point.
+ */
+function mobiusSphereJs(p, { A, B, C, D }) {
+  const w = stereo(p);
+  return invStereo(MB.cdiv(MB.cadd(MB.cmult(A, w), B), MB.cadd(MB.cmult(C, w), D)));
+}
+
+/**
+ * Splits mobiusCodeString's C++ initializer back into its eight floats, so the
+ * WASM call is fed in exactly the order the generated MobiusParams literal uses.
+ * The values are the tool's 6-digit rounding of the coefficients, which is the
+ * only difference between the two sides of the comparison.
+ * @param {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} coeffs - The Mobius coefficients.
+ * @returns {number[]} The eight floats, in emission order.
+ */
+function mobiusArgs({ A, B, C, D }) {
+  const body = MB.mobiusCodeString(A, B, C, D).replace(/^MobiusParams\{|\}$/g, '');
+  const floats = body.split(',').map((s) => parseFloat(s));
+  assert.equal(floats.length, 8, `mobiusCodeString emitted ${floats.length} floats, want 8`);
+  for (const f of floats) assert.ok(Number.isFinite(f), `mobiusCodeString emitted ${body}`);
+  return floats;
+}
+
+const MOBIUS_POINTS = [
+  [0.48, 0.6, 0.64], [0.6, -0.8, 0], [-0.36, 0.48, -0.8],
+  [0.8, 0, 0.6], [0, -0.6, 0.8],
+];
+
+/**
+ * Pins every preset generator's coefficients against the engine's Mobius map.
+ * The WASM side is fed through mobiusCodeString, so this covers both the
+ * eight-float MobiusParams ordering the tool emits and the stereographic
+ * convention (pole +y, real axis x, imaginary axis z) the two share. Sample
+ * points stay clear of the pole, where the engine's fused form and the tool's
+ * guarded division diverge by design.
+ */
+test('mobius preset parity (mobius_transform)', () => {
+  const presets = [
+    ['elliptic', MB.elliptic, 0.7], ['hyperbolic', MB.hyperbolic, 1.3],
+    ['loxodromic', MB.loxodromic, 2.1], ['parabolic', MB.parabolic, 0.9],
+    ['inversion', MB.inversion, 1.6], ['tumble', MB.tumble, 2.4],
+    ['cayley', MB.cayley, 3.0],
+  ];
+  for (const [name, gen, t] of presets) {
+    const coeffs = gen(t);
+    const args = mobiusArgs(coeffs);
+    for (const p of MOBIUS_POINTS) {
+      const w = M.mobius_transform(p[0], p[1], p[2], ...args);
+      const j = mobiusSphereJs(p, coeffs);
+      assert.ok(near(w.x, j.x) && near(w.y, j.y) && near(w.z, j.z),
+        `${name}(t=${t}) at (${p}): wasm(${w.x},${w.y},${w.z}) js(${j.x},${j.y},${j.z})`);
+      assert.ok(near(Math.hypot(w.x, w.y, w.z), 1, 1e-3),
+        `${name}(t=${t}) at (${p}) left the unit sphere`);
+    }
+  }
+});
+
+/**
+ * Pins the Mobius map to analytically derived images, so a drift copied into
+ * both ports cannot pass. Identity fixes every point; f(z) = 1/z is a 180°
+ * rotation about x under this stereographic convention, and its coefficients
+ * (a=0, b=1, c=1, d=0) are asymmetric in every adjacent argument pair, so a
+ * transposed eight-float ordering fails here.
+ */
+test('mobius golden images (absolute pin)', () => {
+  for (const [x, y, z] of MOBIUS_POINTS) {
+    const id = M.mobius_transform(x, y, z, 1, 0, 0, 0, 0, 0, 1, 0);
+    assert.ok(near(id.x, x) && near(id.y, y) && near(id.z, z),
+      `identity moved (${x},${y},${z}) to (${id.x},${id.y},${id.z})`);
+    const inv = M.mobius_transform(x, y, z, 0, 0, 1, 0, 1, 0, 0, 0);
+    assert.ok(near(inv.x, x) && near(inv.y, -y) && near(inv.z, -z),
+      `1/z mapped (${x},${y},${z}) to (${inv.x},${inv.y},${inv.z}), want (${x},${-y},${-z})`);
   }
 });
