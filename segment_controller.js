@@ -569,9 +569,12 @@ export class SegmentController {
    * its promise, zero `pending`) to release `renderInFlight`; `faulted` then stops
    * `tick()` from dispatching another doomed render. The pool is terminated here
    * so its per-worker WASM heaps are released rather than sitting idle until the
-   * rebuild. Recovery is by re-creating the pool (effect switch / resolution
-   * change / mode toggle), which clears the latch via destroy(). Only the first
-   * fault per session is recorded for the UI.
+   * rebuild, and its handlers are detached so a message already queued from a
+   * surviving worker cannot report progress under the fault overlay. `workers`
+   * stays populated: recovery and the render watchdog gate on its length.
+   * Recovery is by re-creating the pool (effect switch / resolution change /
+   * mode toggle), which clears the latch via destroy(). Only the first fault per
+   * session is recorded for the UI.
    * @param {number} segId - Index of the worker segment that faulted.
    * @param {string} message - Human-readable fault message for the UI/console.
    */
@@ -590,6 +593,9 @@ export class SegmentController {
         + `— first fault already latched, UI shows that one`);
     }
     for (const w of this.workers) {
+      w.onmessage = null;
+      w.onerror = null;
+      w.onmessageerror = null;
       w.terminate();
     }
     this.pending = 0;
