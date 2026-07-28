@@ -97,6 +97,20 @@ function installWindow(search) {
 
 const RES = ['Phantasm (144x288)', 'Crystal (192x384)'];
 
+/**
+ * Runs `body` with console.warn captured so a rejection path's diagnostic is
+ * asserted instead of printed into the suite output.
+ * @param {Function} body - Code to run under the capture.
+ * @returns {Array<string>} One joined message per console.warn call.
+ */
+function captureWarnings(body) {
+  const warnings = [];
+  const stub = mock.method(console, 'warn',
+    (...args) => { warnings.push(args.map(String).join(' ')); });
+  try { body(); } finally { stub.mock.restore(); }
+  return warnings;
+}
+
 test('rollback restores an unflushed control value to runtime sinks and URL', () => {
   let lastUrl = '/?Speed=0.1';
   globalThis.window = {
@@ -164,13 +178,17 @@ test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
   // under mock timers so the pending write can't fire after afterEach drops window.
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const gui = new DeepLinkGUI({ autoPlace: false });
     const obj = { resolution: 'Phantasm (144x288)' };
     const replayed = [];
-    gui.add(obj, 'resolution', RES).onChange((v) => replayed.push(v));
+    const warnings = captureWarnings(() => {
+      const gui = new DeepLinkGUI({ autoPlace: false });
+      gui.add(obj, 'resolution', RES).onChange((v) => replayed.push(v));
+    });
 
     assert.equal(obj.resolution, 'Phantasm (144x288)');
     assert.deepEqual(replayed, []);
+    assert.equal(warnings.length, 1, 'the rejection is reported exactly once');
+    assert.match(warnings[0], /ignoring out-of-range URL value "GARBAGE" for "resolution"/);
   } finally {
     mock.timers.reset();
   }
@@ -270,12 +288,16 @@ test('DeepLinkGUI.add rejects a non-numeric URL value for a slider', () => {
   // it under mock timers so the pending write can't fire after afterEach drops window.
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const gui = new DeepLinkGUI({ autoPlace: false });
     const obj = { speed: 1.0 };
     const replayed = [];
-    gui.add(obj, 'speed', 0, 10).onChange((v) => replayed.push(v));
+    const warnings = captureWarnings(() => {
+      const gui = new DeepLinkGUI({ autoPlace: false });
+      gui.add(obj, 'speed', 0, 10).onChange((v) => replayed.push(v));
+    });
     assert.equal(obj.speed, 1.0, 'NaN URL value falls back to the bound default');
     assert.deepEqual(replayed, []);
+    assert.equal(warnings.length, 1, 'the rejection is reported exactly once');
+    assert.match(warnings[0], /ignoring non-numeric URL value "fast" for "speed"/);
   } finally {
     mock.timers.reset();
   }
@@ -292,31 +314,35 @@ test('DeepLinkGUI.add maps boolean URL spellings for a checkbox', () => {
   // debounce; drive all writes under mock timers so none fire after afterEach.
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    for (const truthy of ['true', '1', 'yes', 'on']) {
-      installWindow(`?glow=${truthy}`);
+    const warnings = captureWarnings(() => {
+      for (const truthy of ['true', '1', 'yes', 'on']) {
+        installWindow(`?glow=${truthy}`);
+        const gui = new DeepLinkGUI({ autoPlace: false });
+        const obj = { glow: false };
+        const replayed = [];
+        gui.add(obj, 'glow').onChange((v) => replayed.push(v));
+        assert.equal(obj.glow, true, `"${truthy}" adopted as true`);
+        assert.deepEqual(replayed, [true]);
+      }
+      for (const falsy of ['false', '0', 'no', 'off']) {
+        installWindow(`?glow=${falsy}`);
+        const gui = new DeepLinkGUI({ autoPlace: false });
+        const obj = { glow: true };
+        const replayed = [];
+        gui.add(obj, 'glow').onChange((v) => replayed.push(v));
+        assert.equal(obj.glow, false, `"${falsy}" adopted as false`);
+        assert.deepEqual(replayed, [false]);
+      }
+      installWindow('?glow=maybe');
       const gui = new DeepLinkGUI({ autoPlace: false });
       const obj = { glow: false };
       const replayed = [];
       gui.add(obj, 'glow').onChange((v) => replayed.push(v));
-      assert.equal(obj.glow, true, `"${truthy}" adopted as true`);
-      assert.deepEqual(replayed, [true]);
-    }
-    for (const falsy of ['false', '0', 'no', 'off']) {
-      installWindow(`?glow=${falsy}`);
-      const gui = new DeepLinkGUI({ autoPlace: false });
-      const obj = { glow: true };
-      const replayed = [];
-      gui.add(obj, 'glow').onChange((v) => replayed.push(v));
-      assert.equal(obj.glow, false, `"${falsy}" adopted as false`);
-      assert.deepEqual(replayed, [false]);
-    }
-    installWindow('?glow=maybe');
-    const gui = new DeepLinkGUI({ autoPlace: false });
-    const obj = { glow: false };
-    const replayed = [];
-    gui.add(obj, 'glow').onChange((v) => replayed.push(v));
-    assert.equal(obj.glow, false, 'unrecognized boolean keeps the default');
-    assert.deepEqual(replayed, []);
+      assert.equal(obj.glow, false, 'unrecognized boolean keeps the default');
+      assert.deepEqual(replayed, []);
+    });
+    assert.equal(warnings.length, 1, 'only the unrecognized token warns');
+    assert.match(warnings[0], /ignoring unrecognized boolean URL value "maybe" for "glow"/);
   } finally {
     mock.timers.reset();
   }
