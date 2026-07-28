@@ -112,17 +112,15 @@ export class Daydream {
   // The use site rescales this by the live camera distance so the visible label
   // set doesn't drift with orbit distance.
   static LABEL_VISIBILITY_FRAMING_RATIO = Daydream.SPHERE_RADIUS / Daydream.CAMERA_Z;
-  static H = 20;
-  static W = 96;
+  static DEFAULT_H = 20;
+  static DEFAULT_W = 96;
   // Virtual-row padding over logical H (core/platform.h). Sim = 0 (full sphere);
   // device = 3 (south-pole clip). See pixelToSpherical.
   static H_OFFSET = 0;
   static FPS = 16;
   // Bounds the post-stall frame backlog (clock consumes one interval per frame).
   static MAX_FRAME_BACKLOG_SECONDS = 0.25;
-  static DOT_SIZE = 2;
-
-  static pixels = null;
+  static DEFAULT_DOT_SIZE = 2;
 
   static X_AXIS = new THREE.Vector3(1, 0, 0);
   static Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -138,6 +136,16 @@ export class Daydream {
    */
   constructor() {
     THREE.ColorManagement.enabled = true;
+
+    // Pixel grid, virtual-row padding, and dot radius. H_OFFSET is mirrored from
+    // the class default so `this` satisfies pixelToSpherical's dims contract.
+    this.W = Daydream.DEFAULT_W;
+    this.H = Daydream.DEFAULT_H;
+    this.H_OFFSET = Daydream.H_OFFSET;
+    this.DOT_SIZE = Daydream.DEFAULT_DOT_SIZE;
+    // Shared RGB16 color buffer effects draw into; allocated by precomputeMatrices().
+    this.pixels = null;
+
     this.canvas = document.querySelector("#canvas");
 
     this.canvasParent = this.canvas?.parentElement;
@@ -547,8 +555,8 @@ export class Daydream {
     // it (isViewLive checks byteLength); the next drawFrame heals the view. On the
     // rare heap-growth (detach) frame the buffer is not cleared, so an additive/
     // persist effect may blend one stale frame; it self-heals the next frame.
-    if (isViewLive(Daydream.pixels))
-      Daydream.pixels.fill(0);
+    if (isViewLive(this.pixels))
+      this.pixels.fill(0);
 
     const start = performance.now();
     if (effect) {
@@ -607,12 +615,12 @@ export class Daydream {
     if (this.cullUniforms) {
       this.cullUniforms.uCameraPos.value.copy(this.camera.position);
       this.cullUniforms.uCullThreshold.value = this.cullBackSphere
-        ? -Daydream.DOT_SIZE / Daydream.SPHERE_RADIUS
+        ? -this.DOT_SIZE / Daydream.SPHERE_RADIUS
         : -2.0;
       // Persist effects pass the equator half-arc (PI*R/W) so the shader fills the
       // inter-column gaps; strobe and the pre-effect default pass 0 (round dots).
       this.cullUniforms.uColumnFillArc.value = this.strobeColumns === false
-        ? this.columnFillOverlap * Math.PI * Daydream.SPHERE_RADIUS / Daydream.W
+        ? this.columnFillOverlap * Math.PI * Daydream.SPHERE_RADIUS / this.W
         : 0;
     }
   }
@@ -758,13 +766,13 @@ export class Daydream {
     const MAX_DOT_SEGMENTS = 30;
     const LOD_DECAY_PIXELS = 30000;
     const MIN_DOT_SEGMENTS = 3;
-    const totalPixels = Daydream.W * Daydream.H;
+    const totalPixels = this.W * this.H;
     const detail = Math.max(
       MIN_DOT_SEGMENTS,
       Math.round(MAX_DOT_SEGMENTS * Math.exp(-totalPixels / LOD_DECAY_PIXELS)));
 
     this.dotGeometry = new THREE.SphereGeometry(
-      Daydream.DOT_SIZE,
+      this.DOT_SIZE,
       detail,
       detail,
       0,
@@ -774,11 +782,11 @@ export class Daydream {
     this.dotMesh = new THREE.InstancedMesh(
       this.dotGeometry,
       this.dotMaterial,
-      Daydream.W * Daydream.H
+      totalPixels
     );
 
     this.dotMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-    this.dotMesh.count = Daydream.W * Daydream.H;
+    this.dotMesh.count = totalPixels;
     this.dotMesh.frustumCulled = false;
     this.scene.add(this.dotMesh);
   }
@@ -786,19 +794,19 @@ export class Daydream {
   /**
    * Compute each dot's instance matrix: map its pixel (x,y) to a point on the
    * sphere and orient the dot to face outward from the center. Also allocates
-   * the shared instanceColor buffer (exposed as Daydream.pixels) that effects
-   * write pixel colors into.
+   * the shared instanceColor buffer (exposed as this.pixels) that effects write
+   * pixel colors into.
    */
   precomputeMatrices() {
     const vector = new THREE.Vector3();
     const dummy = new THREE.Object3D();
     const sph = new THREE.Spherical(); // reused scratch out-param
 
-    for (let i = 0; i < Daydream.W * Daydream.H; i++) {
-      const x = i % Daydream.W;
-      const y = Math.floor(i / Daydream.W);
+    for (let i = 0; i < this.W * this.H; i++) {
+      const x = i % this.W;
+      const y = Math.floor(i / this.W);
 
-      vector.setFromSpherical(pixelToSpherical(x, y, Daydream, sph));
+      vector.setFromSpherical(pixelToSpherical(x, y, this, sph));
       vector.multiplyScalar(Daydream.SPHERE_RADIUS);
 
       dummy.position.set(0, 0, 0);
@@ -825,8 +833,8 @@ export class Daydream {
       }
       // A fresh JS-owned buffer, not WASM memory; the next refreshPixelView()
       // re-fetches the WASM view and re-points all three aliases.
-      Daydream.pixels = this.dotMesh.instanceColor.array;
-      Daydream.pixels.fill(0);
+      this.pixels = this.dotMesh.instanceColor.array;
+      this.pixels.fill(0);
 
       this.dotMesh.instanceMatrix.needsUpdate = true;
       this.dotMesh.instanceColor.needsUpdate = true;
@@ -885,9 +893,9 @@ export class Daydream {
    * @param {number} dotSize - New dot radius in scene units.
    */
   updateResolution(w, h, dotSize) {
-    Daydream.W = w;
-    Daydream.H = h;
-    Daydream.DOT_SIZE = dotSize;
+    this.W = w;
+    this.H = h;
+    this.DOT_SIZE = dotSize;
 
     this.setupDots();
 
@@ -925,6 +933,7 @@ export class Daydream {
       this.dotMesh.dispose();
       this.dotMesh = null;
     }
+    this.pixels = null;
     this.dotMaterial?.dispose();
     this.dotMaterial = null;
 

@@ -15,11 +15,12 @@
  * reassignable), so those are injected as lazy getters:
  *   - resolutionPresets:  { name -> {w,h} } resolution table
  *   - appState:           pub/sub state (reads 'resolution' and 'effect')
+ *   - driver:             Daydream renderer instance (live grid + display buffer)
  *   - getWasmEngine():    current main-thread HolosphereEngine (or null)
  *   - refreshPixelView(): re-fetch the (possibly detached) WASM pixel view
  *   - getMemoryView():    current Uint16Array view of the display buffer
  */
-import { Daydream, SLOW_FRAME_MS } from "./driver.js";
+import { SLOW_FRAME_MS } from "./driver.js";
 import { compositeSegment } from "./segment_layout.js";
 import { PROTOCOL_VERSION } from "./worker_protocol.js";
 
@@ -108,21 +109,23 @@ export class SegmentController {
    * @param {Object} deps - Host-injected dependencies.
    * @param {Object<string, {w:number, h:number}>} deps.resolutionPresets - Resolution table mapping a preset name to its pixel dimensions.
    * @param {{get: (key: string) => any, set: (key: string, value: any) => void}} deps.appState - Pub/sub state; reads the 'resolution' and 'effect' keys.
+   * @param {{W: number, H: number, pixels: Uint16Array|null}} deps.driver - Renderer instance owning the live pixel grid (W/H) and the display buffer the compositor blits into.
    * @param {() => ({getParameterDefinitions: () => Array<{name: string, value: number|boolean}>}|null)} deps.getWasmEngine - Returns the current main-thread HolosphereEngine, or null when none is bound.
    * @param {() => unknown} deps.refreshPixelView - Re-fetches the (possibly detached) WASM pixel view.
    * @param {() => (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
-   * @param {(view: Uint16Array) => void} [deps.repointDisplayAliases] - Re-points both display aliases (Three.js instanceColor + Daydream.pixels) at the given view; defaults to re-pointing Daydream.pixels only.
+   * @param {(view: Uint16Array) => void} [deps.repointDisplayAliases] - Re-points both display aliases (Three.js instanceColor + driver.pixels) at the given view; defaults to re-pointing driver.pixels only.
    * @param {Document} [deps.statsDoc] - DOM document the stats overlay renders into; defaults to the global `document`.
    */
-  constructor({ resolutionPresets, appState, getWasmEngine, refreshPixelView,
+  constructor({ resolutionPresets, appState, driver, getWasmEngine, refreshPixelView,
                 getMemoryView, repointDisplayAliases, statsDoc = globalThis.document }) {
     this.resolutionPresets = resolutionPresets;
     this.appState = appState;
+    this.driver = driver;
     this.getWasmEngine = getWasmEngine;
     this.refreshPixelView = refreshPixelView;
     this.getMemoryView = getMemoryView;
     this.repointDisplayAliases =
-      repointDisplayAliases || ((view) => { Daydream.pixels = view; });
+      repointDisplayAliases || ((view) => { this.driver.pixels = view; });
     this.doc = statsDoc;
 
     this.active = false;
@@ -739,20 +742,20 @@ export class SegmentController {
     // That elision holds only while dst aliases the buffer render() clears. On a
     // divergence, self-heal rather than fault the render loop (mirrors the
     // single-engine path): re-point both display aliases at the composite target.
-    // driver.render() re-clears Daydream.pixels next frame, restoring the elision.
-    if (dst !== Daydream.pixels) {
+    // driver.render() re-clears driver.pixels next frame, restoring the elision.
+    if (dst !== this.driver.pixels) {
       if (!this.aliasDivergenceLogged) {
         console.error(
           "SegmentController.composite: display-buffer alias diverged " +
-          "(getMemoryView() !== Daydream.pixels) — re-pointing the display " +
+          "(getMemoryView() !== driver.pixels) — re-pointing the display " +
           "aliases at the composite target");
         this.aliasDivergenceLogged = true;
       }
       this.repointDisplayAliases(dst);
     }
 
-    const w = Daydream.W;
-    const h = Daydream.H;
+    const w = this.driver.W;
+    const h = this.driver.H;
 
     // Iterate the configured segment count (the same source updateStats reads),
     // not results.length, so the two can't drift after a teardown reset.

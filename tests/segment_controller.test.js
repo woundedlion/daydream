@@ -2,15 +2,17 @@
 //
 // SegmentController — unit coverage for the generation-fence drop, the
 // worker-fault deadlock-break latch, and the quadrant compositor. Driven by a
-// fake Worker and a mocked ./driver.js.
+// fake Worker, a fake driver, and a mocked ./driver.js.
 //
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
 import { test, mock, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 
-const Daydream = { W: 0, H: 0, pixels: null };
+// Stand-in for the injected Daydream renderer: only the grid and display buffer
+// the compositor reads.
+const driver = { W: 0, H: 0, pixels: null };
 mock.module('../driver.js', {
-  namedExports: { Daydream, SLOW_FRAME_MS: 50 },
+  namedExports: { SLOW_FRAME_MS: 50 },
 });
 
 const { SegmentController, MAX_BOOT_RETRIES } = await import('../segment_controller.js');
@@ -110,9 +112,10 @@ function makeController({ resolution = 'lo', effect = 'TestEffect',
   return new SegmentController({
     resolutionPresets: presets,
     appState: { get: (k) => state[k], set: (k, v) => { state[k] = v; } },
+    driver,
     getWasmEngine: () => null,
     refreshPixelView: () => {},
-    getMemoryView: () => Daydream.pixels,
+    getMemoryView: () => driver.pixels,
   });
 }
 
@@ -714,8 +717,8 @@ test('a pause toggled on a faulted pool is carried into the rebuilt one', () => 
 const idx = (x, y, w) => (y * w + x) * 3;
 
 test('composite() blits each quadrant to its display-buffer offset', () => {
-  Daydream.W = 4; Daydream.H = 2;
-  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
   c.showBoundaries = false;
@@ -724,15 +727,15 @@ test('composite() blits each quadrant to its display-buffer offset', () => {
 
   c.composite();
 
-  assert.equal(Daydream.pixels[idx(2, 0, 4)], 111);
-  assert.equal(Daydream.pixels[idx(3, 1, 4)], 111);
-  assert.equal(Daydream.pixels[idx(0, 0, 4)], 0);
-  assert.equal(Daydream.pixels[idx(1, 1, 4)], 0);
+  assert.equal(driver.pixels[idx(2, 0, 4)], 111);
+  assert.equal(driver.pixels[idx(3, 1, 4)], 111);
+  assert.equal(driver.pixels[idx(0, 0, 4)], 0);
+  assert.equal(driver.pixels[idx(1, 1, 4)], 0);
 });
 
 test('composite() faults on a rectangle that overflows the current display buffer', () => {
-  Daydream.W = 4; Daydream.H = 2;
-  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
   c.showBoundaries = false;
@@ -743,15 +746,15 @@ test('composite() faults on a rectangle that overflows the current display buffe
   assert.equal(blitted, 0, 'a leading out-of-bounds rect blits nothing');
   assert.equal(c.faulted, true, 'an overflow latches a fault instead of throwing');
   assert.match(c.faultInfo.message, /out of bounds/);
-  assert.ok(Daydream.pixels.every((v) => v === 0),
+  assert.ok(driver.pixels.every((v) => v === 0),
     'a leading out-of-bounds rect is never partially blitted');
 });
 
 test('composite() faults atomically when a non-leading segment overflows', () => {
   // The bounds pre-pass validates every result before any blit, so a good
   // segment ahead of the overflowing one is never composited — no partial frame.
-  Daydream.W = 4; Daydream.H = 2;
-  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
   c.showBoundaries = false;
@@ -766,13 +769,13 @@ test('composite() faults atomically when a non-leading segment overflows', () =>
   assert.equal(blitted, 0, 'a later out-of-bounds rect blits nothing');
   assert.equal(c.faulted, true);
   assert.match(c.faultInfo.message, /segment 1 .* out of bounds/);
-  assert.ok(Daydream.pixels.every((v) => v === 0),
+  assert.ok(driver.pixels.every((v) => v === 0),
     'the good leading segment is not blitted when a later segment overflows');
 });
 
 test('composite() faults on an empty/inverted segment rect', () => {
-  Daydream.W = 4; Daydream.H = 2;
-  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
   c.showBoundaries = false;
@@ -783,12 +786,12 @@ test('composite() faults on an empty/inverted segment rect', () => {
   assert.equal(blitted, 0, 'an empty/inverted rect blits nothing');
   assert.equal(c.faulted, true, 'a zero-area rect latches a fault instead of masking corruption');
   assert.match(c.faultInfo.message, /empty\/inverted/);
-  assert.ok(Daydream.pixels.every((v) => v === 0), 'nothing is blitted on an empty/inverted rect');
+  assert.ok(driver.pixels.every((v) => v === 0), 'nothing is blitted on an empty/inverted rect');
 });
 
 test('composite() faults on a pixel buffer whose length disagrees with its rect', () => {
-  Daydream.W = 4; Daydream.H = 2;
-  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
   c.showBoundaries = false;
@@ -800,14 +803,14 @@ test('composite() faults on a pixel buffer whose length disagrees with its rect'
   assert.equal(blitted, 0, 'a length-mismatched buffer blits nothing');
   assert.equal(c.faulted, true, 'a rect/buffer mismatch latches a fault instead of blitting a truncated row');
   assert.match(c.faultInfo.message, /pixel buffer length/);
-  assert.ok(Daydream.pixels.every((v) => v === 0), 'nothing is blitted on a buffer-length mismatch');
+  assert.ok(driver.pixels.every((v) => v === 0), 'nothing is blitted on a buffer-length mismatch');
 });
 
 test('composite() marks both the internal split and the x=0 wrap seam', () => {
   // On the wrapped cylinder a 2-arm split has two boundaries: the internal split
   // at x=2 and the wrap seam at x=0 where arm 1 meets arm 0.
-  Daydream.W = 4; Daydream.H = 2;
-  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
   c.showBoundaries = true;
@@ -822,21 +825,21 @@ test('composite() marks both the internal split and the x=0 wrap seam', () => {
 
   const isCyan = (x, y) => {
     const i = idx(x, y, 4);
-    return Daydream.pixels[i] === 0 && Daydream.pixels[i + 1] === 65535 &&
-           Daydream.pixels[i + 2] === 65535;
+    return driver.pixels[i] === 0 && driver.pixels[i + 1] === 65535 &&
+           driver.pixels[i + 2] === 65535;
   };
   assert.ok(isCyan(2, 0) && isCyan(2, 1), 'internal arm split at x=2 marked');
   assert.ok(isCyan(0, 0) && isCyan(0, 1), 'wrap-seam boundary at x=0 marked');
-  assert.equal(Daydream.pixels[idx(1, 0, 4)], 111, 'arm-0 interior untouched');
-  assert.equal(Daydream.pixels[idx(3, 0, 4)], 222, 'arm-1 interior untouched');
+  assert.equal(driver.pixels[idx(1, 0, 4)], 111, 'arm-0 interior untouched');
+  assert.equal(driver.pixels[idx(3, 0, 4)], 222, 'arm-1 interior untouched');
 });
 
 test('composite() marks every internal split plus the wrap seam for a 4-arm layout', () => {
   // A 4-arm split over W=8 has internal boundaries at x=2,4,6 and the wrap seam
   // at x=0; the >2-arm case exercises production row-seam handling the 2-arm
   // test cannot.
-  Daydream.W = 8; Daydream.H = 2;
-  Daydream.pixels = new Uint16Array(8 * 2 * 3);
+  driver.W = 8; driver.H = 2;
+  driver.pixels = new Uint16Array(8 * 2 * 3);
 
   const c = makeController();
   c.showBoundaries = true;
@@ -852,22 +855,22 @@ test('composite() marks every internal split plus the wrap seam for a 4-arm layo
 
   const isCyan = (x, y) => {
     const i = idx(x, y, 8);
-    return Daydream.pixels[i] === 0 && Daydream.pixels[i + 1] === 65535 &&
-           Daydream.pixels[i + 2] === 65535;
+    return driver.pixels[i] === 0 && driver.pixels[i + 1] === 65535 &&
+           driver.pixels[i + 2] === 65535;
   };
   for (const x of [0, 2, 4, 6])
     assert.ok(isCyan(x, 0) && isCyan(x, 1), `boundary at x=${x} marked`);
-  assert.equal(Daydream.pixels[idx(1, 0, 8)], 111, 'arm-0 interior untouched');
-  assert.equal(Daydream.pixels[idx(3, 0, 8)], 222, 'arm-1 interior untouched');
-  assert.equal(Daydream.pixels[idx(5, 0, 8)], 333, 'arm-2 interior untouched');
-  assert.equal(Daydream.pixels[idx(7, 0, 8)], 444, 'arm-3 interior untouched');
+  assert.equal(driver.pixels[idx(1, 0, 8)], 111, 'arm-0 interior untouched');
+  assert.equal(driver.pixels[idx(3, 0, 8)], 222, 'arm-1 interior untouched');
+  assert.equal(driver.pixels[idx(5, 0, 8)], 333, 'arm-2 interior untouched');
+  assert.equal(driver.pixels[idx(7, 0, 8)], 444, 'arm-3 interior untouched');
 });
 
 test('composite() marks a horizontal seam between two stacked Y-band segments', () => {
   // One arm split in Y (top band y[0,2), bottom band y[2,4)) has a single
   // horizontal boundary at y=2 and no vertical seam (both bands share x0=0).
-  Daydream.W = 2; Daydream.H = 4;
-  Daydream.pixels = new Uint16Array(2 * 4 * 3);
+  driver.W = 2; driver.H = 4;
+  driver.pixels = new Uint16Array(2 * 4 * 3);
 
   const c = makeController();
   c.showBoundaries = true;
@@ -882,20 +885,20 @@ test('composite() marks a horizontal seam between two stacked Y-band segments', 
 
   const isCyan = (x, y) => {
     const i = idx(x, y, 2);
-    return Daydream.pixels[i] === 0 && Daydream.pixels[i + 1] === 65535 &&
-           Daydream.pixels[i + 2] === 65535;
+    return driver.pixels[i] === 0 && driver.pixels[i + 1] === 65535 &&
+           driver.pixels[i + 2] === 65535;
   };
   assert.ok(isCyan(0, 2) && isCyan(1, 2), 'horizontal band seam at y=2 marked across the row');
-  assert.equal(Daydream.pixels[idx(0, 0, 2)], 111, 'top-band interior untouched');
-  assert.equal(Daydream.pixels[idx(0, 3, 2)], 222, 'bottom-band interior untouched');
+  assert.equal(driver.pixels[idx(0, 0, 2)], 111, 'top-band interior untouched');
+  assert.equal(driver.pixels[idx(0, 3, 2)], 222, 'bottom-band interior untouched');
   assert.ok(!isCyan(0, 0), 'no vertical x=0 seam when the layout is not split in x');
 });
 
 test('composite() draws no x=0 line when the layout is not split in x', () => {
   // A single full-width segment never splits in x, so x=0 is a same-segment wrap,
   // not a boundary.
-  Daydream.W = 4; Daydream.H = 2;
-  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
   c.showBoundaries = true;
@@ -903,13 +906,13 @@ test('composite() draws no x=0 line when the layout is not split in x', () => {
   c.results = [{ pixels: full, x0: 0, x1: 4, y0: 0, y1: 2 }];
 
   c.composite();
-  assert.ok(Daydream.pixels.every((v) => v === 123),
+  assert.ok(driver.pixels.every((v) => v === 123),
     'full-width segment leaves no boundary overlay');
 });
 
 test('composite() self-heals a broken display-buffer alias instead of throwing', () => {
-  Daydream.W = 4; Daydream.H = 2;
-  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
   const target = new Uint16Array(4 * 2 * 3);
@@ -917,8 +920,8 @@ test('composite() self-heals a broken display-buffer alias instead of throwing',
   c.results = [];
 
   assert.doesNotThrow(() => c.composite());
-  assert.equal(Daydream.pixels, target,
-    'Daydream.pixels re-pointed at the composite target');
+  assert.equal(driver.pixels, target,
+    'driver.pixels re-pointed at the composite target');
 });
 
 // ---------------------------------------------------------------------------
@@ -967,8 +970,8 @@ test('a completed render arms pendingFrame and frees the in-flight slot', async 
 });
 
 test('the next tick() composites the armed frame and dispatches the following one', async () => {
-  Daydream.W = 4; Daydream.H = 2;
-  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = readyController(2);
   c.showBoundaries = false;
@@ -983,15 +986,15 @@ test('the next tick() composites the armed frame and dispatches the following on
   c.tick();
 
   assert.equal(c.pendingFrame, false, 'pending frame was composited and cleared');
-  assert.ok(Daydream.pixels.some((v) => v === 111),
+  assert.ok(driver.pixels.some((v) => v === 111),
     'the composited quadrants reached the display buffer');
   assert.equal(c.renderInFlight, true, 'the following frame was dispatched');
   assert.equal(c.pending, 2);
 });
 
 test('tick() re-blits the last composite when a render overruns the tick (preview holds, not black)', async () => {
-  Daydream.W = 4; Daydream.H = 2;
-  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = readyController(2);
   c.showBoundaries = false;
@@ -1006,11 +1009,11 @@ test('tick() re-blits the last composite when a render overruns the tick (previe
   assert.equal(c.renderInFlight, true, 'the next render is in flight and will overrun');
 
   // driver.stepSimulation() clears the buffer before each tick.
-  Daydream.pixels.fill(0);
+  driver.pixels.fill(0);
   // Overrun tick: render still in flight, no new pendingFrame.
   c.tick();
 
-  assert.ok(Daydream.pixels.some((v) => v === 111),
+  assert.ok(driver.pixels.some((v) => v === 111),
     'the last composite is re-blitted so the preview holds instead of flashing black');
   assert.equal(c.frameComposited, false,
     'a re-blit is not a new frame; the recorder must not capture a duplicate');
@@ -1020,8 +1023,8 @@ test('an overrun re-blit shows one whole generation, never a half-updated mix', 
   // While the next generation is only partially in, its quadrants live in
   // `scratch`; an overrun re-blit must composite the last WHOLE generation from
   // `results`, never a mix of the two.
-  Daydream.W = 4; Daydream.H = 2;
-  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const realSetTimeout = globalThis.setTimeout;
   globalThis.setTimeout = () => ({ unref() {} }); // stub the render watchdog
@@ -1044,13 +1047,13 @@ test('an overrun re-blit shows one whole generation, never a half-updated mix', 
       'the partial next generation is staged in scratch, not results');
     assert.equal(c.renderInFlight, true, 'the swap has not run, so results is still generation A');
 
-    Daydream.pixels.fill(0); // driver.stepSimulation() clears before the overrun tick
+    driver.pixels.fill(0); // driver.stepSimulation() clears before the overrun tick
     c.tick(); // overrun: no new pendingFrame, so re-blit the last whole generation
 
-    assert.ok(!Daydream.pixels.some((v) => v === 222),
+    assert.ok(!driver.pixels.some((v) => v === 222),
       'the partially-arrived generation B never leaks into the re-blit');
-    assert.equal(Daydream.pixels[idx(0, 0, 4)], 111, 'quadrant 0 holds generation A');
-    assert.equal(Daydream.pixels[idx(2, 0, 4)], 111, 'quadrant 1 holds generation A');
+    assert.equal(driver.pixels[idx(0, 0, 4)], 111, 'quadrant 0 holds generation A');
+    assert.equal(driver.pixels[idx(2, 0, 4)], 111, 'quadrant 1 holds generation A');
     assert.equal(c.frameComposited, false, 're-blit is not a new frame');
   } finally {
     globalThis.setTimeout = realSetTimeout;
@@ -1058,8 +1061,8 @@ test('an overrun re-blit shows one whole generation, never a half-updated mix', 
 });
 
 test('destroy() clears frameComposited so a respawning pool cannot capture black frames', async () => {
-  Daydream.W = 4; Daydream.H = 2;
-  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = readyController(2);
   c.showBoundaries = false;
@@ -1099,8 +1102,8 @@ test('a fault latched by composite() mid-tick() does not re-dispatch a doomed re
   // The fence-escaping out-of-bounds result faults inside composite(), so the pool
   // is clean at tick() entry and only latches partway through — the post-composite
   // faulted re-check is what stops the second render.
-  Daydream.W = 4; Daydream.H = 2;
-  Daydream.pixels = new Uint16Array(4 * 2 * 3);
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = readyController(2);
   c.showBoundaries = false;
