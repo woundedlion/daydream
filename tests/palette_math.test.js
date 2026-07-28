@@ -249,13 +249,16 @@ function recordIntDraws(build) {
 }
 
 /**
- * Pins the exact saturation/brightness key values of core/color/color.h
- * GenerativePalette: the fixed profiles by their resolved bakeLut arguments, the
- * randomized ones by the [min, max) range each key is drawn from. Draw order is
- * the C++ constructor's: harmony hues (none for TRIADIC), then s1..s3, then
- * v1..v3.
+ * Pins palette_math.js's saturation/brightness constants — the fixed profiles by
+ * their resolved bakeLut arguments, the randomized ones by the [min, max) range
+ * each key is drawn from — against the values transcribed here from
+ * core/color/color.h GenerativePalette. This compares two hand-copies of that
+ * header: the bridge takes already-resolved h/s/v, so the engine's own
+ * derivation never runs and drift on the C++ side is caught only by re-reading
+ * it. Draw order is the C++ constructor's: harmony hues (none for TRIADIC), then
+ * s1..s3, then v1..v3.
  */
-test('GenerativePalette profile constants match core/color/color.h', () => {
+test('GenerativePalette profile constants hold the values transcribed from core/color/color.h', () => {
   const build = (brightness, sat) => () =>
     new GenerativePalette('STRAIGHT', 'TRIADIC', brightness, sat, 0);
 
@@ -279,11 +282,12 @@ test('GenerativePalette profile constants match core/color/color.h', () => {
 });
 
 /**
- * Pins the exact harmony hue offsets of core/color/color.h calc_hues: the
- * deterministic companions by value (including the 256 wrap), the jittered ones
- * by the range they are drawn from.
+ * Pins palette_math.js's harmony hue offsets — deterministic companions by value
+ * (including the 256 wrap), jittered ones by their draw range — against the
+ * values transcribed here from core/color/color.h calc_hues. As above, both
+ * sides are hand-copies; the engine's calc_hues is never executed.
  */
-test('GenerativePalette harmony offsets match core/color/color.h', () => {
+test('GenerativePalette harmony offsets hold the values transcribed from core/color/color.h', () => {
   const hues = (harmony, hueValue) => {
     new GenerativePalette('STRAIGHT', harmony, 'FLAT', 'VIBRANT', hueValue);
     return [lastBakeArgs[1], lastBakeArgs[4], lastBakeArgs[7]];
