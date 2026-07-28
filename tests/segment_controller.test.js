@@ -1107,24 +1107,29 @@ test('an init-phase fault still reaches the fault overlay (faulted checked befor
   assert.equal(c.renderInFlight, false, 'no doomed render dispatched');
 });
 
-test('the fault overlay is an alert focused once for recovery', () => {
-  const makeElement = () => {
-    const attributes = new Map();
-    return {
-      style: {},
-      children: [],
-      focusCount: 0,
-      setAttribute(name, value) { attributes.set(name, String(value)); },
-      getAttribute(name) { return attributes.get(name) || null; },
-      append(...children) { this.children.push(...children); },
-      appendChild(child) { this.children.push(child); return child; },
-      replaceChildren(...children) { this.children = children; },
-      focus() { this.focusCount++; },
-      get firstElementChild() {
-        return this.children.find((child) => typeof child === 'object') || null;
-      },
-    };
+/**
+ * Minimal DOM element stand-in covering the overlay surface updateStats() uses.
+ * @returns {Object} A fake element recording attributes, children, and focus calls.
+ */
+const makeElement = () => {
+  const attributes = new Map();
+  return {
+    style: {},
+    children: [],
+    focusCount: 0,
+    setAttribute(name, value) { attributes.set(name, String(value)); },
+    getAttribute(name) { return attributes.get(name) || null; },
+    append(...children) { this.children.push(...children); },
+    appendChild(child) { this.children.push(child); return child; },
+    replaceChildren(...children) { this.children = children; },
+    focus() { this.focusCount++; },
+    get firstElementChild() {
+      return this.children.find((child) => typeof child === 'object') || null;
+    },
   };
+};
+
+test('the fault overlay is an alert focused once for recovery', () => {
   const stats = makeElement();
   const c = makeController();
   c.doc = {
@@ -1145,6 +1150,33 @@ test('the fault overlay is an alert focused once for recovery', () => {
   c.updateStats();
   assert.equal(stats.firstElementChild, alert);
   assert.equal(alert.focusCount, 1);
+});
+
+test('a spawning pool reports the spawn and does not own the display', () => {
+  const stats = makeElement();
+  const c = makeController();
+  c.doc = {
+    getElementById: (id) => id === 'segment-stats' ? stats : null,
+    createElement: makeElement,
+  };
+  c.active = true;
+  c.count = 4;
+
+  assert.equal(c.ownsDisplay, false, 'a spawning pool leaves the frame to the main engine');
+
+  c.updateStats();
+  const status = stats.firstElementChild;
+  assert.equal(status.getAttribute('role'), 'status');
+  assert.match(status.children.join(''), /4 workers/);
+
+  c.updateStats();
+  assert.equal(stats.firstElementChild, status, 'the status row is not rebuilt every frame');
+
+  c.ready = true;
+  assert.equal(c.ownsDisplay, true, 'a ready pool owns the display');
+  c.ready = false;
+  c.faulted = true;
+  assert.equal(c.ownsDisplay, true, 'a faulted pool keeps the display for its overlay');
 });
 
 // ---------------------------------------------------------------------------

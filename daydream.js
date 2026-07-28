@@ -100,14 +100,14 @@ const host = new EngineHost(repointDisplayAliases);
 let syncGuiSkewLogged = false;
 
 /**
- * Live per-frame parameter values for the active effect. In segmented mode the
- * main engine is never stepped, so its values are stale; source from segment 0's
- * worker instead. May be null or zero-length if the WASM view detached on heap
- * growth — callers must guard.
+ * Live per-frame parameter values for the active effect. Once the worker pool
+ * owns the display the main engine is no longer stepped, so its values are
+ * stale; source from segment 0's worker instead. May be null or zero-length if
+ * the WASM view detached on heap growth — callers must guard.
  * @returns {Float32Array|number[]|null}
  */
 function liveParamValues() {
-  return segments.active ? segments.getParamValues() : host.engine.getParamValues();
+  return segments.ownsDisplay ? segments.getParamValues() : host.engine.getParamValues();
 }
 
 /**
@@ -595,11 +595,14 @@ createHolosphereModule().then(module => {
      * @returns {void}
      */
     drawFrame() {
-      if (segments.active) {
+      if (segments.ownsDisplay) {
         // Composite the previous frame (overwriting driver.render()'s cleared
         // buffer) and dispatch the next.
         segments.tick();
       } else {
+        // A pool that is still spawning paints nothing; keep rendering here so
+        // the sphere stays live, and report the spawn in the segment overlay.
+        if (segments.active) segments.updateStats();
         host.engine.drawFrame();
         host.refresh();
         // All three aliases must point at the one WASM view; log once and
@@ -622,23 +625,23 @@ createHolosphereModule().then(module => {
     },
     /**
      * Report the engine's current arena allocation metrics for the driver's HUD.
-     * @returns {?Object} The main engine's arena metrics, or null in segmented
-     *   mode where the main engine is idle and the HUD reads per-segment worker
-     *   stats instead.
+     * @returns {?Object} The main engine's arena metrics, or null once the
+     *   worker pool owns the display and the main engine is idle, where the HUD
+     *   reads per-segment worker stats instead.
      */
     getArenaMetrics() {
-      return segments.active ? null : host.engine.getArenaMetrics();
+      return segments.ownsDisplay ? null : host.engine.getArenaMetrics();
     },
     /**
      * Whether the buffer holds a real frame the recorder may capture this tick.
-     * Single-engine mode always renders the full canvas in drawFrame(); segmented
-     * mode composites a frame late, so report false until (and on any tick where)
-     * a composite has not landed — otherwise the recorder captures the cleared
-     * (black) buffer left by driver.render()'s fill(0).
+     * The single-engine path always renders the full canvas in drawFrame();
+     * a pool that owns the display composites a frame late, so report false until
+     * (and on any tick where) a composite has not landed — otherwise the recorder
+     * captures the cleared (black) buffer left by driver.render()'s fill(0).
      * @returns {boolean} True when the displayed buffer is a real rendered frame.
      */
     captureReady() {
-      return segments.active ? segments.frameComposited : true;
+      return segments.ownsDisplay ? segments.frameComposited : true;
     }
   };
 

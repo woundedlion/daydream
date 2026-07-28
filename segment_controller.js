@@ -899,6 +899,19 @@ export class SegmentController {
       return;
     }
 
+    // Spawning: the pool has no timings to show yet, and the warm + per-worker
+    // WASM instantiate window runs to INIT_WATCHDOG_MS.
+    if (!this.ready) {
+      if (el.firstElementChild?.getAttribute('role') === 'status') return;
+      const box = this.doc.createElement('div');
+      box.setAttribute('role', 'status');
+      box.style.cssText = 'color:#999;padding:6px;font-size:0.85em';
+      box.append(`Spawning ${this.count} workers…`);
+      el.replaceChildren(box);
+      this.statsTable = null; // force a rebuild once the pool reports ready
+      return;
+    }
+
     const fmtKB = (x) => (x / 1024).toFixed(1);
     const numSegs = this.count;
 
@@ -986,6 +999,17 @@ export class SegmentController {
     this.statsTable = table;
     this.statsSegCount = numSegs;
     this.statsCells = { rows, maxTime, wallTime };
+  }
+
+  /**
+   * Whether the worker pool owns the display buffer: it is either rendering
+   * (ready) or holding the fault overlay. False while a pool spawns, when the
+   * host keeps painting with the main-thread engine instead of leaving the
+   * driver's cleared buffer on screen for the whole warm + spawn window.
+   * @returns {boolean}
+   */
+  get ownsDisplay() {
+    return this.active && (this.ready || this.faulted);
   }
 
   /**
