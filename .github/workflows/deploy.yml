@@ -89,6 +89,13 @@ jobs:
             exit 1
           fi
           sha="$(tr -d '[:space:]' < holosphere_wasm.sha)"
+          # A ref actions/checkout can't resolve (a `-dirty` marker, an
+          # abbreviated SHA, a branch name) surfaces only as an opaque
+          # "ref not found" several steps later.
+          if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::holosphere_wasm.sha does not hold a bare 40-hex engine SHA (got '$sha') — rebuild from a clean Holosphere checkout and re-commit the provenance trio."
+            exit 1
+          fi
           echo "Pinning engine checkout to $sha (from holosphere_wasm.sha)"
           echo "ref=$sha" >> "$GITHUB_OUTPUT"
 
