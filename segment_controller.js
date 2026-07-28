@@ -558,8 +558,8 @@ export class SegmentController {
    * will never send its 'frame', so we settle the in-flight frame here (resolve
    * its promise, zero `pending`) to release `renderInFlight`; `faulted` then stops
    * `tick()` from dispatching another doomed render. Recovery is by re-creating
-   * the pool (resolution change / mode toggle), which clears the latch via
-   * destroy(). Only the first fault per session is recorded for the UI.
+   * the pool (effect switch / resolution change / mode toggle), which clears the
+   * latch via destroy(). Only the first fault per session is recorded for the UI.
    * @param {number} segId - Index of the worker segment that faulted.
    * @param {string} message - Human-readable fault message for the UI/console.
    */
@@ -646,10 +646,10 @@ export class SegmentController {
    * @param {number} value
    */
   setParameter(name, value) {
-    if (this.faulted) {
-      if (this.active) this.create(this.count);
-      return;
-    }
+    // A faulted pool stays latched: this fires continuously during a slider drag,
+    // so rebuilding here would respawn the pool per drag event. Recovery is a
+    // resolution/effect change or a mode toggle.
+    if (this.faulted) return;
     this.broadcast({ type: 'setParameter', name, value });
   }
 
@@ -658,11 +658,9 @@ export class SegmentController {
    * @param {boolean} paused
    */
   setAnimationsPaused(paused) {
+    // Recorded before the fault gate so a later rebuild carries the pause state.
     this.animationsPaused = paused;
-    if (this.faulted) {
-      if (this.active) this.create(this.count);
-      return;
-    }
+    if (this.faulted) return;
     this.broadcast({ type: 'setAnimationsPaused', paused });
   }
 
