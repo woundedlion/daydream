@@ -290,6 +290,20 @@ export class VideoRecorder {
   }
 
   /**
+   * Ends an active session on an external fault (e.g. a lost WebGL context, after
+   * which the source canvas produces no more frames): the onstop handler still
+   * flushes the partial file, and the host hook fires so the UI drops its
+   * recording state instead of offering to stop a session that is frozen.
+   * @param {string} message - Failure description, logged and sent to the host hook.
+   * @returns {void}
+   */
+  abort(message) {
+    if (!this.isRecording) return;
+    this.stop();
+    this.reportFailure(message);
+  }
+
+  /**
    * Requests a single video frame; call once per simulation frame. When an
    * offscreen scaling canvas is in use, blits the source canvas into it (scaled
    * to the target resolution) before requesting the frame, and advances the
