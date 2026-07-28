@@ -78,8 +78,12 @@ export const PROTOCOL_VERSION = 2;
 /** Toggle whether the worker's effect advances its animation clock.
  * @typedef {{ type: 'setAnimationsPaused', paused: boolean }} SetAnimationsPausedMsg */
 
-/** Request one frame; the worker replies with a FrameMsg.
- * @typedef {{ type: 'render' }} RenderMsg */
+/** Request one frame; the worker replies with a FrameMsg. `recycle` hands back
+ * the retired generation's segment buffer (transferred, so the controller gives
+ * up ownership) for the worker to refill in place instead of allocating and
+ * detaching a fresh one every frame. The worker allocates when it is absent or
+ * sized for a different rect, so a resolution change needs no coordination.
+ * @typedef {{ type: 'render', recycle?: Uint16Array }} RenderMsg */
 
 /**
  * Every message the controller sends to a worker.

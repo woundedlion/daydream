@@ -196,7 +196,13 @@ async function handleMessage(msg) {
           `segment_worker: segment rect [${x0},${y0})-[${x1},${y1}) out of ` +
           `bounds for the ${canvasW}x${canvasH} canvas`);
       }
-      const pixelsCopy = new Uint16Array(qw * qh * 3);
+      // The controller transfers the retired generation's buffer back for reuse;
+      // a missing or differently-sized one (first frame, resolution change)
+      // allocates. extractSegment overwrites every element, so nothing of the
+      // previous generation survives in a reused buffer.
+      const segLen = qw * qh * 3;
+      const pixelsCopy = (msg.recycle && msg.recycle.length === segLen)
+        ? msg.recycle : new Uint16Array(segLen);
       extractSegment(allPixels, pixelsCopy, canvasW, segRange);
 
       /** @type {SegArenaMetrics | null} */

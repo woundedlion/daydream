@@ -220,9 +220,11 @@ export class SegmentController {
    * worker accepts (`WorkerInboundMsg`).
    * @param {Worker} worker
    * @param {WorkerInboundMsg} msg
+   * @param {Transferable[]} [transfer] - Objects to hand ownership of to the worker (zero-copy).
    */
-  post(worker, msg) {
-    worker.postMessage(msg);
+  post(worker, msg, transfer) {
+    if (transfer) worker.postMessage(msg, transfer);
+    else worker.postMessage(msg);
   }
 
   /**
@@ -722,9 +724,6 @@ export class SegmentController {
       this.inflightGen = this.renderGen;
       this.pending = this.workers.length;
       this.frameSeen.fill(false);
-      // Clear the staging buffer so a slot left by a fenced-out prior generation
-      // can't survive into this one's published frame.
-      this.scratch.fill(null);
       // Clear per-segment stats so a segment fenced out (or silent) this frame
       // reports fresh 0/'-' rather than a prior generation's values.
       this.timings.fill(0);
@@ -736,7 +735,25 @@ export class SegmentController {
         this.wallTime = performance.now() - this.frameStart;
         resolve();
       };
-      this.broadcast({ type: 'render' });
+
+      // Dispatched per worker rather than broadcast: each carries back its own
+      // retired pixel buffer. `results` holds the live generation and is the only
+      // buffer composite() reads, so a `scratch` slot here is two generations old
+      // and unreferenced — transferring it away cannot detach a displayed frame.
+      // Clearing each slot as it is consumed also keeps a slot left by a
+      // fenced-out prior generation out of this one's published frame.
+      for (let s = 0; s < this.workers.length; s++) {
+        const retired = this.scratch[s];
+        this.scratch[s] = null;
+        const recycle = retired && retired.pixels && retired.pixels.length > 0
+          ? retired.pixels : null;
+        if (recycle) {
+          this.post(this.workers[s], { type: 'render', recycle }, [recycle.buffer]);
+        } else {
+          this.post(this.workers[s], { type: 'render' });
+        }
+      }
+      this.scratch.fill(null);
 
       this.armRenderWatchdog();
     });

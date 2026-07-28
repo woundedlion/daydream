@@ -193,6 +193,31 @@ test('render extracts only this segment quadrant from the canvas buffer', async 
   }
 });
 
+/** A returned buffer of the right size is refilled in place; anything else allocates. */
+test('render refills a recycled buffer and allocates on a size mismatch', async () => {
+  await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
+
+  posted.length = 0;
+  const recycle = new Uint16Array(4 * 2 * 3);
+  await dispatch({ type: 'render', recycle });
+  const reused = posted.find((p) => p.msg.type === 'frame');
+  assert.equal(reused.msg.pixels, recycle, 'the returned buffer was refilled, not replaced');
+  assert.deepEqual(reused.transfer, [recycle.buffer], 'and transferred straight back');
+  assert.ok(recycle.some((v) => v !== 0), 'every element is overwritten by the extraction');
+
+  posted.length = 0;
+  const wrongSize = new Uint16Array(4);
+  await dispatch({ type: 'render', recycle: wrongSize });
+  const fresh = posted.find((p) => p.msg.type === 'frame').msg;
+  assert.notEqual(fresh.pixels, wrongSize, 'a size mismatch falls back to allocation');
+  assert.equal(fresh.pixels.length, 4 * 2 * 3);
+
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  const none = posted.find((p) => p.msg.type === 'frame').msg;
+  assert.equal(none.pixels.length, 4 * 2 * 3, 'a render with no recycle still allocates');
+});
+
 /** Arena metrics are marshalled into a plain, transfer-safe object. */
 test('render marshals arena metrics into a plain object', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
