@@ -1782,26 +1782,31 @@
       // color attribute would be built for hidden geometry.
       const faceClasses = (state.colorizeFaces && state.showFaces) ? currentFaceClasses : null;
 
+      // Null each handle after disposal: a toggle that leaves its object
+      // unbuilt would otherwise re-dispose the same geometry on every recompute.
       if (mainMesh) {
         mainMesh.geometry.dispose();
         scene.remove(mainMesh);
+        mainMesh = null;
       }
       if (edgeLines) {
         edgeLines.geometry.dispose();
         scene.remove(edgeLines);
+        edgeLines = null;
       }
       if (vertPoints) {
         vertPoints.geometry.dispose();
         scene.remove(vertPoints);
+        vertPoints = null;
       }
       if (normalLines) {
         normalLines.geometry.dispose();
         scene.remove(normalLines);
+        normalLines = null;
       }
       if (labelsContainer) labelsContainer.innerHTML = '';
 
       // Faces
-      const geometry = new THREE.BufferGeometry();
       const vertices = [];
       const faceColors = []; // per-vertex RGB, filled only when colorizing
       const classColor = new THREE.Color();
@@ -1815,7 +1820,7 @@
       // plateaus with ridges at the (curved) edge overlay. geodesicSegments()
       // picks geoN from the mesh's widest arc and its triangle count.
       let geoN = 1;
-      if (state.showGeodesics) {
+      if (state.showFaces && state.showGeodesics) {
         let triCount = 0;
         let maxArc = 0;
         meshData.faces.forEach(f => {
@@ -1869,37 +1874,41 @@
       };
 
       meshData.faces.forEach((f, fi) => {
-        if (faceClasses) {
-          // Golden-ratio hue stride keeps consecutive class ids far apart on
-          // the color wheel, so adjacent face groups stay distinguishable.
-          classColor.setHSL((faceClasses[fi] * 0.618034) % 1, 0.65, 0.55);
-        }
-        // Collect vertices for the triangulated face
-        if (!state.showGeodesics && isConvexFace(meshData.vertices, f)) {
-          for (let i = 1; i < f.length - 1; i++) {
-            pushVert(meshData.vertices[f[0]]);
-            pushVert(meshData.vertices[f[i]]);
-            pushVert(meshData.vertices[f[i + 1]]);
+        if (state.showFaces) {
+          if (faceClasses) {
+            // Golden-ratio hue stride keeps consecutive class ids far apart on
+            // the color wheel, so adjacent face groups stay distinguishable.
+            classColor.setHSL((faceClasses[fi] * 0.618034) % 1, 0.65, 0.55);
           }
-        } else {
-          const centroid = new THREE.Vector3();
-          f.forEach(idx => centroid.add(meshData.vertices[idx]));
-          centroid.divideScalar(f.length);
-          if (!state.showGeodesics) {
-            for (let i = 0; i < f.length; i++) {
-              pushVert(centroid);
+          // Collect vertices for the triangulated face
+          if (!state.showGeodesics && isConvexFace(meshData.vertices, f)) {
+            for (let i = 1; i < f.length - 1; i++) {
+              pushVert(meshData.vertices[f[0]]);
               pushVert(meshData.vertices[f[i]]);
-              pushVert(meshData.vertices[f[(i + 1) % f.length]]);
+              pushVert(meshData.vertices[f[i + 1]]);
             }
           } else {
-            // A corner fan spills outside non-convex star faces.
-            for (let i = 0; i < f.length; i++) {
-              emitSphericalTri(centroid,
-                meshData.vertices[f[i]],
-                meshData.vertices[f[(i + 1) % f.length]]);
+            const centroid = new THREE.Vector3();
+            f.forEach(idx => centroid.add(meshData.vertices[idx]));
+            centroid.divideScalar(f.length);
+            if (!state.showGeodesics) {
+              for (let i = 0; i < f.length; i++) {
+                pushVert(centroid);
+                pushVert(meshData.vertices[f[i]]);
+                pushVert(meshData.vertices[f[(i + 1) % f.length]]);
+              }
+            } else {
+              // A corner fan spills outside non-convex star faces.
+              for (let i = 0; i < f.length; i++) {
+                emitSphericalTri(centroid,
+                  meshData.vertices[f[i]],
+                  meshData.vertices[f[(i + 1) % f.length]]);
+              }
             }
           }
         }
+
+        if (!state.showNormals) return;
 
         // Center/Normal for other viz
         const center = new THREE.Vector3();
@@ -1919,32 +1928,35 @@
         faceNormals.push(n);
       });
 
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-      if (state.showGeodesics) {
-        // Every emitted vertex sits on the unit sphere, so its normal IS its
-        // position; computeVertexNormals on this non-indexed geometry would
-        // yield per-triangle normals and shade the tessellation as facets.
-        geometry.setAttribute('normal', new THREE.Float32BufferAttribute([...vertices], 3));
-      } else {
-        geometry.computeVertexNormals();
-      }
-      if (faceClasses) {
-        geometry.setAttribute('color', new THREE.Float32BufferAttribute(faceColors, 3));
-      }
-
-      // Flat shading reads face normals in-shader (ignoring the normal
-      // attribute), which is right for the polyhedral look but would facet the
-      // sphere; geodesic mode needs the smooth normals set above.
-      const wantFlat = !state.showGeodesics;
-      for (const m of [faceMaterial, faceColorizeMaterial]) {
-        if (m.flatShading !== wantFlat) {
-          m.flatShading = wantFlat;
-          m.needsUpdate = true;
+      if (state.showFaces) {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        if (state.showGeodesics) {
+          // Every emitted vertex sits on the unit sphere, so its normal IS its
+          // position; computeVertexNormals on this non-indexed geometry would
+          // yield per-triangle normals and shade the tessellation as facets.
+          geometry.setAttribute('normal', new THREE.Float32BufferAttribute([...vertices], 3));
+        } else {
+          geometry.computeVertexNormals();
         }
-      }
+        if (faceClasses) {
+          geometry.setAttribute('color', new THREE.Float32BufferAttribute(faceColors, 3));
+        }
 
-      mainMesh = new THREE.Mesh(geometry, faceClasses ? faceColorizeMaterial : faceMaterial);
-      if (state.showFaces) scene.add(mainMesh);
+        // Flat shading reads face normals in-shader (ignoring the normal
+        // attribute), which is right for the polyhedral look but would facet the
+        // sphere; geodesic mode needs the smooth normals set above.
+        const wantFlat = !state.showGeodesics;
+        for (const m of [faceMaterial, faceColorizeMaterial]) {
+          if (m.flatShading !== wantFlat) {
+            m.flatShading = wantFlat;
+            m.needsUpdate = true;
+          }
+        }
+
+        mainMesh = new THREE.Mesh(geometry, faceClasses ? faceColorizeMaterial : faceMaterial);
+        scene.add(mainMesh);
+      }
 
       // Vertices
       if (state.showVertices) {
