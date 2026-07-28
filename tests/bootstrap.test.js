@@ -185,6 +185,41 @@ test('refreshModuleCache survives a rejected re-fetch and a missing timeline', a
   }));
 });
 
+test('showBootstrapFailure reports whether an overlay carried the failure', () => {
+  const { doc } = fakeDocument();
+  assert.equal(showBootstrapFailure(new Error('failed'), { document: doc }), true);
+  assert.equal(showBootstrapFailure(new Error('failed'), {
+    document: { getElementById: () => null },
+  }), false);
+});
+
+test('bootstrap falls back to a fatal banner when there is no overlay', async () => {
+  const messages = [];
+  const loaded = await bootstrap({
+    loader: () => { throw new Error('offline'); },
+    document: { getElementById: () => null },
+    logger: quietLogger,
+    fatal: (message) => messages.push(message),
+  });
+
+  assert.equal(loaded, false);
+  assert.deepEqual(messages, ['Failed to start the simulator. offline']);
+});
+
+test('bootstrap leaves the fatal banner alone when the overlay renders', async () => {
+  const { doc, overlay } = fakeDocument();
+  let fatals = 0;
+  await bootstrap({
+    loader: () => Promise.reject(new Error('boom')),
+    document: doc,
+    logger: quietLogger,
+    fatal: () => { fatals += 1; },
+  });
+
+  assert.equal(fatals, 0);
+  assert.equal(childWithClass(overlay, 'load-error-detail').textContent, 'boom');
+});
+
 test('index loads bootstrap instead of the application module directly', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /<script type="module" src="bootstrap\.js"><\/script>/);
