@@ -512,6 +512,26 @@ test('a stale onstop does not clobber the session that replaced it', () => {
 });
 
 /**
+ * Wraps a recorder's sink factory so a test can await the session's async
+ * finish() chain directly, rather than guessing how many task turns it takes.
+ * @param {VideoRecorder} rec - Recorder whose next session is instrumented.
+ * @returns {() => Promise<void>} Resolves once finish() has run to completion.
+ */
+const trackSinkFinish = (rec) => {
+  const openSink = rec.openSink.bind(rec);
+  let finished = null;
+  rec.openSink = (...args) => {
+    const sink = openSink(...args);
+    return { ...sink, finish: () => { finished = sink.finish(); } };
+  };
+  return async () => {
+    assert.ok(typeof finished?.then === 'function',
+      'the session sink finished and handed back its completion promise');
+    await finished;
+  };
+};
+
+/**
  * With the File System Access API present, each chunk streams straight to the
  * writable as it arrives and the file is closed at stop — nothing is buffered in
  * RAM and no blob download is assembled.
@@ -524,6 +544,7 @@ test('streams chunks to disk when the File System Access API is present', async 
   globalThis.showSaveFilePicker = async () => ({ createWritable: async () => writable });
   try {
     const rec = new VideoRecorder(recordableCanvas());
+    const sinkFinished = trackSinkFinish(rec);
     let downloaded = false;
     rec.download = () => { downloaded = true; };
 
@@ -535,7 +556,7 @@ test('streams chunks to disk when the File System Access API is present', async 
     rec.stop();
     recorder.onstop();
 
-    await new Promise((r) => setTimeout(r));
+    await sinkFinished();
 
     assert.deepEqual(writes, [{ size: 10 }, { size: 20 }], 'each chunk written to disk in order');
     assert.equal(closed, true, 'writable closed at stop');
@@ -567,6 +588,7 @@ test('a mid-stream streaming write failure closes the writable, skips download, 
   console.warn = () => {};
   try {
     const rec = new VideoRecorder(recordableCanvas());
+    const sinkFinished = trackSinkFinish(rec);
     let downloaded = false;
     rec.download = () => { downloaded = true; };
 
@@ -578,7 +600,7 @@ test('a mid-stream streaming write failure closes the writable, skips download, 
     rec.stop();
     recorder.onstop();
 
-    await new Promise((r) => setTimeout(r));
+    await sinkFinished();
 
     assert.deepEqual(writes, [{ size: 10 }], 'only the pre-failure chunk reached disk');
     assert.equal(closed, true, 'the writable is closed to flush the on-disk prefix');
@@ -604,6 +626,7 @@ test('a streaming session that produces no data never opens the chosen file', as
   console.warn = (...a) => warns.push(a.join(' '));
   try {
     const rec = new VideoRecorder(recordableCanvas());
+    const sinkFinished = trackSinkFinish(rec);
     let downloaded = false;
     rec.download = () => { downloaded = true; };
 
@@ -613,7 +636,7 @@ test('a streaming session that produces no data never opens the chosen file', as
     rec.stop();
     recorder.onstop();
 
-    await new Promise((r) => setTimeout(r));
+    await sinkFinished();
 
     assert.equal(createWritableCalls, 0, 'the file is never opened/truncated when no data streams');
     assert.equal(closed, false, 'no empty writable is closed over the chosen file');
@@ -753,6 +776,7 @@ test('a cancelled save picker discards buffered chunks without downloading', asy
   console.warn = () => {};
   try {
     const rec = new VideoRecorder(recordableCanvas());
+    const sinkFinished = trackSinkFinish(rec);
     const downloads = [];
     rec.download = (recorder, chunks, name) => downloads.push({ chunks, name });
 
@@ -765,7 +789,7 @@ test('a cancelled save picker discards buffered chunks without downloading', asy
     rec.stop();
     recorder.onstop();
 
-    await new Promise((r) => setTimeout(r));
+    await sinkFinished();
 
     assert.equal(downloads.length, 0, 'no download after the picker was cancelled');
   } finally {

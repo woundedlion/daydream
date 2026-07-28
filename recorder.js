@@ -404,7 +404,9 @@ export class VideoRecorder {
    * @param {string} effectName - Base name for the suggested file.
    * @param {Blob[]} chunks - Per-session buffer; the fallback path fills it, the
    *   streaming path leaves it empty (each chunk is released after its disk write).
-   * @returns {{write: (data: Blob) => void, finish: () => void}} The session sink.
+   * @returns {{write: (data: Blob) => void, finish: () => (void|Promise<void>)}} The
+   *   session sink. The streaming variant's finish() returns the promise that
+   *   settles once the file is flushed and closed; callers may ignore it.
    */
   openSink(recorder, effectName, chunks) {
     if (typeof globalThis.showSaveFilePicker !== 'function') {
@@ -475,7 +477,7 @@ export class VideoRecorder {
         });
       },
       finish: () => {
-        chain
+        return chain
           .then(async () => {
             await opened;
             // User cancelled the Save dialog: honor Cancel and discard the
