@@ -4,6 +4,7 @@
 // revertMs must not latch the element on "Copied!".
 import { test, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 
 // copyToClipboard prefers navigator.clipboard.writeText; stub it to succeed.
 // Node exposes a read-only `navigator`, so override it via defineProperty.
@@ -14,35 +15,21 @@ Object.defineProperty(globalThis, 'navigator', {
 
 const { copyWithFeedback } = await import('../tools/clipboard.js');
 
-/**
- * Builds a minimal stand-in for the button element copyWithFeedback mutates.
- * @param {string} label - Initial idle text for the element's textContent.
- * @returns {{textContent: string, classList: {add: Function, remove: Function}}} A fake element with a no-op classList.
- */
-function fakeElement(label) {
-  return {
-    textContent: label,
-    classList: { add() {}, remove() {} },
-  };
-}
+restoreDocumentAfterEach();
 
 /**
- * Like fakeElement but with a classList that records the live class set, so a
- * test can assert which classes are present after a flash/revert cycle.
- * @param {string} label - Initial idle text.
+ * Stand-in for the button element copyWithFeedback mutates. Its classList
+ * records the live class set, so a test can assert which classes are present
+ * after a flash/revert cycle.
+ * @param {string} label - Initial idle text for the element's textContent.
  * @param {string[]} [initialClasses] - Classes present before the first copy.
- * @returns {{textContent: string, classList: {add: Function, remove: Function, has: Function}}} A fake element with a tracking classList.
+ * @returns {Object} A fake button element.
  */
-function fakeElementTracking(label, initialClasses = []) {
-  const classes = new Set(initialClasses);
-  return {
-    textContent: label,
-    classList: {
-      add: (...c) => c.forEach((x) => classes.add(x)),
-      remove: (...c) => c.forEach((x) => classes.delete(x)),
-      has: (c) => classes.has(c),
-    },
-  };
+function fakeButton(label, initialClasses = []) {
+  const el = fakeElement('button');
+  el.textContent = label;
+  el.classList.add(...initialClasses);
+  return el;
 }
 
 beforeEach(() => {
@@ -55,7 +42,7 @@ afterEach(() => {
 
 /** Verifies a second copy before the first revert timer still restores the real idle label, not "Copied!". */
 test('a second copy within revertMs still reverts to the idle label', async () => {
-  const el = fakeElement('Copy');
+  const el = fakeButton('Copy');
 
   await copyWithFeedback('a', { element: el, copiedText: 'Copied!', revertMs: 1500 });
   assert.equal(el.textContent, 'Copied!', 'first copy shows the copied label');
@@ -70,7 +57,7 @@ test('a second copy within revertMs still reverts to the idle label', async () =
 
 /** With an empty revertText (no idle label to restore), the idle class is still restored on revert. */
 test('revertText: "" still restores the idle class on revert', async () => {
-  const el = fakeElementTracking('Copy', ['text-gray-500']);
+  const el = fakeButton('Copy', ['text-gray-500']);
 
   await copyWithFeedback('a', {
     element: el, copiedText: 'Copied!', revertText: '', revertMs: 1500,
@@ -92,14 +79,14 @@ test('a rejected clipboard write flashes the failure label, not "Copied!"', asyn
     value: { clipboard: { writeText: async () => { throw new Error('denied'); } } },
     configurable: true,
   });
-  globalThis.document = {
-    createElement: () => ({ style: {}, focus() {}, select() {} }),
-    body: { appendChild() {}, removeChild() {} },
+  installDocument({
+    createElement: fakeElement,
+    body: fakeElement('body'),
     execCommand: () => false,
-  };
+  });
 
   try {
-    const el = fakeElement('Copy');
+    const el = fakeButton('Copy');
     const ok = await copyWithFeedback('x', {
       element: el, copiedText: 'Copied!', failedText: 'Copy failed', revertMs: 1500,
     });
@@ -109,7 +96,6 @@ test('a rejected clipboard write flashes the failure label, not "Copied!"', asyn
     mock.timers.tick(2000);
     assert.equal(el.textContent, 'Copy', 'element reverts to idle');
   } finally {
-    delete globalThis.document;
     Object.defineProperty(globalThis, 'navigator', restore);
   }
 });

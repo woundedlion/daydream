@@ -1,14 +1,10 @@
 // @ts-check
-import { test, afterEach } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { showFatalError } from '../tools/banner.js';
+import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 
-// Restore any globalThis.document stub after each test so it never leaks.
-const savedDocument = globalThis.document;
-afterEach(() => {
-  if (savedDocument === undefined) delete globalThis.document;
-  else globalThis.document = savedDocument;
-});
+restoreDocumentAfterEach();
 
 // Minimal fake DOM: getElementById resolves against whatever was appended, so
 // idempotent reuse can be observed. body defaults present; pass {body: null} to
@@ -17,25 +13,23 @@ afterEach(() => {
 function fakeDocument({ body = true, documentElement = false } = {}) {
   const byId = new Map();
   const created = [];
-  const makeParent = () => ({
-    children: [],
-    appendChild(el) { this.children.push(el); byId.set(el.id, el); },
-  });
+  const makeParent = () => {
+    const parent = fakeElement('div');
+    parent.appendChild = (el) => { parent.children.push(el); byId.set(el.id, el); return el; };
+    return parent;
+  };
   const bodyEl = body ? makeParent() : null;
   const docEl = documentElement ? makeParent() : undefined;
-  globalThis.document = {
+  installDocument({
     getElementById: (id) => byId.get(id) || null,
-    createElement: () => {
-      const el = {
-        id: '', textContent: '', style: {}, attributes: {},
-        setAttribute(name, value) { this.attributes[name] = value; },
-      };
+    createElement: (tag) => {
+      const el = fakeElement(tag);
       created.push(el);
       return el;
     },
     body: bodyEl,
     documentElement: docEl,
-  };
+  });
   return { created, bodyEl, docEl };
 }
 

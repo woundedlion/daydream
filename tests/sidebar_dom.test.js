@@ -1,14 +1,10 @@
 // @ts-check
-import { test, afterEach } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EffectSidebar } from '../sidebar.js';
+import { installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 
-// Restore any globalThis.document stub after each test so it never leaks.
-const savedDocument = globalThis.document;
-afterEach(() => {
-  if (savedDocument === undefined) delete globalThis.document;
-  else globalThis.document = savedDocument;
-});
+restoreDocumentAfterEach();
 
 // Drives EffectSidebar.onKeyDown against a minimal fake button/list so no real
 // DOM is needed; the handler only touches the DOM through these hooks.
@@ -24,7 +20,7 @@ function driveKey(key) {
       state.selectedName = name;
     },
   };
-  globalThis.document = { activeElement: focused };
+  installDocument({ activeElement: focused });
   const e = {
     key,
     preventDefault() {
@@ -66,7 +62,7 @@ function driveNav(key, startIdx = 0, count = 3) {
     setRovingTabbable(b) { rovingLog.push(btns.indexOf(b)); },
     onSelect() {},
   };
-  globalThis.document = { activeElement: btns[startIdx] };
+  installDocument({ activeElement: btns[startIdx] });
   const e = { key, preventDefault() { state.prevented++; } };
   EffectSidebar.prototype.onKeyDown.call(self, e);
   return { focusLog, rovingLog, prevented: state.prevented };
