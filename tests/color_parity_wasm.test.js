@@ -22,7 +22,7 @@ test('WASM parity module is present with the exports this suite pins', () => {
   for (const name of [
     'srgb_to_linear_float', 'linear_to_srgb_float', 'srgb_to_linear_interp',
     'linear_rgb_to_oklab', 'oklab_to_linear_rgb', 'hsv_to_rgb',
-    'procedural_palette_linear', 'lissajous',
+    'procedural_palette_linear', 'named_procedural_palettes', 'lissajous',
   ]) {
     assert.equal(typeof M[name], 'function',
       `holosphere_wasm.js is missing export ${name} — parity check would not run`);
@@ -129,6 +129,23 @@ test('ProceduralPalette golden linear values (absolute pin)', () => {
   };
   assert.deepEqual(at(0.5), [0, 33327, 33327]);
   assert.deepEqual(at(0.25), [14028, 338, 56614]);
+});
+
+/**
+ * Pins palette_math.js's NAMED_PROCEDURAL_PALETTES table to the engine's own
+ * roster: name, order and all twelve a/b/c/d coefficients. The tool transcribes
+ * core/color/palettes.h so the gallery preview and the C++ it tells you to paste
+ * back match the device, and nothing but this comparison enforces it. The engine
+ * returns float32, so each mirrored coefficient is rounded through Math.fround
+ * before the comparison — an exact equality, not a tolerance.
+ */
+test('NAMED_PROCEDURAL_PALETTES matches the engine table (named_procedural_palettes)', () => {
+  const toFloat32 = (vec3) => vec3.map((v) => Math.fround(v));
+  const mirror = P.NAMED_PROCEDURAL_PALETTES.map(({ name, a, b, c, d }) => ({
+    name,
+    a: toFloat32(a), b: toFloat32(b), c: toFloat32(c), d: toFloat32(d),
+  }));
+  assert.deepEqual(M.named_procedural_palettes(), mirror);
 });
 
 /** Verifies the lissajous curve matches lissajous_math.js. */
