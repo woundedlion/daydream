@@ -273,6 +273,19 @@ function applyEffect(preserveParams = false) {
     // value read can prove it describes these definitions.
     activeEffect.paramGeneration = host.paramGeneration();
 
+    /**
+     * Flash a transient status label on the Export button, restoring the
+     * default label after the flash window. Supersedes any flash still
+     * pending for this GUI.
+     * @param {string} label - The transient button label to show.
+     * @returns {void}
+     */
+    const flashExport = (label) => {
+      clearTimeout(fx.exportFlashTimer);
+      exportCtrl.name(label);
+      fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), 1500);
+    };
+
     const effectActions = {
       /**
        * Rebuild the effect GUI from the engine's current state, discarding edits.
@@ -291,17 +304,13 @@ function applyEffect(preserveParams = false) {
         // GUI's snapshot. Skip so we don't copy an all-zero or foreign preset.
         if (!values || values.length === 0) {
           console.warn('Export: no parameter values matching the current effect; skipping copy');
-          clearTimeout(fx.exportFlashTimer);
-          exportCtrl.name('✗ Copy failed');
-          fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), 1500);
+          flashExport('\u2717 Copy failed');
           return;
         }
         const expected = activeEffect.paramNames.length;
         if (paramValueSkew(expected, values.length)) {
           console.warn(`Export: param/value length skew (${expected} vs ${values.length}); skipping copy`);
-          clearTimeout(fx.exportFlashTimer);
-          exportCtrl.name('✗ Copy failed');
-          fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), 1500);
+          flashExport('\u2717 Copy failed');
           return;
         }
         const cpp = formatExportParams(params, values);
@@ -309,22 +318,16 @@ function applyEffect(preserveParams = false) {
         // the same flash so writeText access never throws synchronously.
         if (!navigator.clipboard) {
           console.warn('Export: clipboard API unavailable (insecure context?)');
-          clearTimeout(fx.exportFlashTimer);
-          exportCtrl.name('✗ Copy failed');
-          fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), 1500);
+          flashExport('\u2717 Copy failed');
           return;
         }
         navigator.clipboard.writeText(cpp).then(() => {
           if (activeEffect !== fx) return;
-          clearTimeout(fx.exportFlashTimer);
-          exportCtrl.name('\u2713 Copied!');
-          fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), 1500);
+          flashExport('\u2713 Copied!');
         }).catch((err) => {
           console.warn('Export: clipboard write failed', err);
           if (activeEffect !== fx) return;
-          clearTimeout(fx.exportFlashTimer);
-          exportCtrl.name('\u2717 Copy failed');
-          fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), 1500);
+          flashExport('\u2717 Copy failed');
         });
       }
     };
