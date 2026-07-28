@@ -94,13 +94,17 @@ class DeepLinkGUI {
   /**
    * @param {(Object|LilGUI)} options - Either lil-gui constructor options or an
    *   existing lil-gui instance to wrap (detected by its domElement/addFolder members).
+   * @param {string} [rootNamespace] - Prefix segment for every deep-link key in
+   *   this root's subtree (e.g. 'fx', 'view'), keeping independent GUI roots out
+   *   of one flat key namespace. Omitted for an unnamespaced (tool-page) root.
    */
-  constructor(options) {
+  constructor(options, rootNamespace = null) {
     if (options && options.domElement && options.addFolder) {
       this.gui = options;
     } else {
       this.gui = new LilGUI(options);
     }
+    this.rootNamespace = rootNamespace;
     this.parent = null;
     this.folderName = null;
     this.folderIndex = 0;
@@ -131,8 +135,9 @@ class DeepLinkGUI {
   get width() { return this.gui.width; }
 
   /**
-   * Builds a control's URL param key by joining its enclosing folder names with
-   * the property, e.g. "Effects.Speed", so nested controls get distinct keys.
+   * Builds a control's URL param key by joining the root's namespace (when it has
+   * one) and its enclosing folder names with the property, e.g.
+   * "fx.Effects.Speed", so nested controls and separate GUI roots get distinct keys.
    * @param {string} prop - The control's property name.
    * @returns {string} The dot-joined param key.
    */
@@ -154,6 +159,7 @@ class DeepLinkGUI {
       keys.unshift(seg);
       curr = curr.parent;
     }
+    if (curr.rootNamespace) keys.unshift(curr.rootNamespace);
     return keys.join('.');
   }
 
@@ -301,9 +307,10 @@ class DeepLinkGUI {
   /**
    * Adds a control that is NOT deep-linked: its value is neither seeded from nor
    * written to the URL. Use for session/action controls (cyclers, recording
-   * settings) that must not auto-activate from a copied link. Render-mode
-   * controls, including the segmented worker pool, are deep-linked so a shared
-   * link reproduces the sender's view.
+   * settings) that must not auto-activate from a copied link, and for controls
+   * mirroring a key URLSync already owns. Render-mode controls, including the
+   * segmented worker pool, are deep-linked so a shared link reproduces the
+   * sender's view.
    * @param {Object} object - The object holding the bound property.
    * @param {string} prop - The property name to control.
    * @param {...*} args - Forwarded to lil-gui's add().

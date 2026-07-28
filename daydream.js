@@ -280,7 +280,7 @@ function applyEffect(preserveParams = false) {
   }
 
   if (host.engine) {
-    activeEffect = { gui: new GUI({ autoPlace: false }), activeDragEnds: new Set() };
+    activeEffect = { gui: new GUI({ autoPlace: false }, 'fx'), activeDragEnds: new Set() };
     // Identity of this GUI's effect record, so async continuations below can tell
     // whether a switch has since replaced it.
     const fx = activeEffect;
@@ -737,7 +737,9 @@ createHolosphereModule().then(module => {
 // GUI + Sidebar Setup
 ///////////////////////////////////////////////////////////////////////////////
 
-const guiInstance = new GUI({ autoPlace: false });
+// Namespaced roots: 'fx' keys come from C++ register_param() names, 'view' keys
+// from the app's own controls, so the two can never collide in the URL.
+const guiInstance = new GUI({ autoPlace: false }, 'view');
 guiInstance.domElement.classList.add('global-gui');
 if (daydream.isMobile) {
   guiInstance.close();
@@ -749,8 +751,10 @@ if (guiContainer) {
   console.warn('daydream: #gui-container not found; skipping global GUI mount.');
 }
 
+// Not deep-linked here: urlSync owns the `resolution` param, so a second writer
+// under the 'view' namespace would give the URL two authorities for one setting.
 const resolutionController = guiInstance
-  .add({ resolution: appState.get('resolution') }, 'resolution', Object.keys(resolutionPresets))
+  .addSession({ resolution: appState.get('resolution') }, 'resolution', Object.keys(resolutionPresets))
   .name('Resolution')
   .onChange((v) => appState.set('resolution', v));
 

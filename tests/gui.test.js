@@ -349,6 +349,30 @@ test('DeepLinkGUI.add maps boolean URL spellings for a checkbox', () => {
 });
 
 /**
+ * Verifies a root namespace prefixes every deep-link key in that root's subtree,
+ * so two independent GUI roots binding the same property name address different
+ * URL params instead of clobbering one another.
+ */
+test('DeepLinkGUI namespaces deep-link keys per root', () => {
+  installWindow('?fx.pause=true&view.pause=false');
+  const fx = new DeepLinkGUI({ autoPlace: false }, 'fx');
+  const view = new DeepLinkGUI({ autoPlace: false }, 'view');
+  const fxObj = { pause: false };
+  const viewObj = { pause: true };
+  fx.add(fxObj, 'pause');
+  view.add(viewObj, 'pause');
+
+  assert.equal(fxObj.pause, true);
+  assert.equal(viewObj.pause, false);
+  assert.deepEqual(fx.collectUrlKeys(), ['fx.pause']);
+  assert.deepEqual(view.collectUrlKeys(), ['view.pause']);
+
+  const folder = fx.addFolder('Shape');
+  folder.add({ sides: 3 }, 'sides', 0, 10);
+  assert.deepEqual(folder.collectUrlKeys(), ['fx.Shape.sides']);
+});
+
+/**
  * Verifies the tool-page fallback writer (no active URLSync) merges, not
  * overwrites, params changed within the debounce window: two keys set before
  * the shared timer fires must both reach the URL so neither is lost from the
