@@ -379,10 +379,10 @@ export class SegmentController {
           const next = this.bootAttempt + 1;
           console.warn(`[Segmented] seg ${i} module failed to load`
             + ` (attempt ${next}/${MAX_BOOT_RETRIES}); rebuilding pool`);
-          this.clearBootWatchdog();
-          this.clearInitWatchdog();
-          this.clearRenderWatchdog();
-          this.clearRetryTimer();
+          // Tear the failing pool down before the backoff window rather than
+          // leaving its survivors instantiating WASM and able to re-enter this
+          // path; create() re-destroying is idempotent.
+          this.destroy();
           this.retryTimer = setTimeout(() => {
             this.retryTimer = null;
             if (this.active) this.create(this.count, next);

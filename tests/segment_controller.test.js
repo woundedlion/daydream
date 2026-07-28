@@ -533,6 +533,9 @@ test('a bare-Event boot fault auto-rebuilds the pool instead of latching', () =>
     // A module-graph load failure fires a message-less Event before ready.
     c.workers[0].onerror({});
     assert.equal(c.faulted, false, 'a transient module-load fault does not latch');
+    assert.ok(firstPool.every((w) => w.terminated),
+      'the failing pool is torn down before the backoff window, not left instantiating WASM');
+    assert.deepEqual(c.workers, [], 'no survivor can re-enter the fault path during the backoff');
 
     timers[timers.length - 1](); // drive the scheduled rebuild
     assert.equal(c.bootAttempt, 1, 'retry index advanced');
