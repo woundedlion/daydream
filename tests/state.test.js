@@ -273,6 +273,25 @@ test('URLSync registers itself as the active URL writer', () => {
   assert.equal(getActiveURLSync(), sync);
 });
 
+test('URLSync construction disposes the previous writer', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const calls = installWindow('?effect=Voronoi', '/sim');
+    const s = new AppState({ effect: 'Voronoi' });
+    const first = new URLSync(s, ['effect']);
+    const second = new URLSync(s, ['effect']);
+
+    assert.equal(getActiveURLSync(), second);
+    assert.equal(first.unsubscribe, null, 'the orphan dropped its subscription');
+
+    s.set('effect', 'Moire');
+    mock.timers.tick(200);
+    assert.equal(calls.length, 1, 'only the live writer flushes');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
 test('URLSync.flush writes tracked state and ad-hoc params to the URL', () => {
   const calls = installWindow('', '/sim');
   const s = new AppState({ effect: 'Voronoi' });
