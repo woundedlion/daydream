@@ -35,7 +35,6 @@ const post = /** @type {(msg: ControllerInboundMsg, transfer?: Transferable[]) =
 // missing/renamed glue file; a failed module fetch never runs this line.
 post({ type: 'booted', version: PROTOCOL_VERSION });
 
-let wasmModule = null;
 let engine = null;
 let segId = 0;
 let totalSegs = 1;
@@ -84,7 +83,7 @@ async function handleMessage(msg) {
 
       // Every segment runs a full engine replica, so engine logs would print
       // once per worker; only segment 0 logs. printErr stays live everywhere.
-      wasmModule = await createHolosphereModule(segId === 0 ? {} : {
+      const wasmModule = await createHolosphereModule(segId === 0 ? {} : {
         print: () => {},
       });
       engine = new wasmModule.HolosphereEngine();
