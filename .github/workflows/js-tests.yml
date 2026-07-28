@@ -1,7 +1,7 @@
 # Run the simulator's JS unit suite on every pull request. deploy.yml gates the
 # same suite on push-to-master (the deploy path); this standalone workflow gives
 # PRs a pre-merge signal so a regression across the test files is caught before
-# merge rather than only at deploy time. Mirrors deploy.yml's js-tests job.
+# merge rather than only at deploy time. Both call js-unit-suite.yml.
 name: JS unit tests
 
 on:
@@ -17,19 +17,6 @@ concurrency:
 jobs:
   js-tests:
     name: Simulator JS unit tests
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: '22'      # package.json engines: node >=22.3.0
-          cache: npm
-
-      - run: npm ci
-      - run: npm run typecheck
-      - name: Verify committed import map
-        run: |
-          npm run importmap
-          git diff --exit-code
-      - run: npm test
+    permissions:
+      contents: read
+    uses: ./.github/workflows/js-unit-suite.yml
