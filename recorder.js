@@ -230,7 +230,11 @@ export class VideoRecorder {
     this.chunks = chunks;
 
     recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) sink.write(e.data);
+      if (e.data.size === 0) return;
+      // sink is assigned below, after start(); a chunk arriving before that goes
+      // to the fallback buffer, which every sink's finish() drains.
+      if (sink) sink.write(e.data);
+      else chunks.push(e.data);
     };
 
     recorder.onstop = endSession;
