@@ -7,6 +7,7 @@
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
 import { test, mock, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { unpinnedEngineMethods } from './fake_engine.js';
 
 // Stand-in for the injected Daydream renderer: only the grid and display buffer
 // the compositor reads.
@@ -1284,6 +1285,11 @@ test('a spawning pool reports the spawn and does not own the display', () => {
 function fakeEngine(defs) {
   return { getParameterDefinitions: () => defs };
 }
+
+test('fakeEngine mocks only methods the real engine surface pins', () => {
+  assert.deepEqual(unpinnedEngineMethods(fakeEngine([])), [],
+    'engine_contract_wasm.test.js never checks these against the real module');
+});
 
 test('snapshotParams() flattens param defs (bool -> 1/0, number passthrough)', () => {
   const c = makeController();
