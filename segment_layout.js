@@ -55,18 +55,18 @@ export function computeSegmentRange(id, total, w, h) {
     throw new Error(
       `segment_layout: canvas dimensions must be positive integers (got ${w}x${h})`);
   }
+  if (w < NUM_ARMS) {
+    throw new Error(
+      `segment_layout: canvas width must be >= ${NUM_ARMS} arms (got ${w})`);
+  }
   const ySegsPerArm = Math.floor(total / NUM_ARMS);
   if (h < ySegsPerArm) {
     throw new Error(
       `segment_layout: canvas height must be >= ${ySegsPerArm} y-segments per arm (got ${h})`);
   }
+
   const armId = Math.floor(id / ySegsPerArm);
   const armSeg = id % ySegsPerArm;
-
-  if (w < NUM_ARMS) {
-    throw new Error(
-      `segment_layout: canvas width must be >= ${NUM_ARMS} arms (got ${w})`);
-  }
 
   // Symmetric floor(w/2) split per arm, matching firmware's w/2 partition; odd w
   // drops its trailing column rather than widening arm B.
