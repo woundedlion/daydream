@@ -211,6 +211,9 @@ const segments = new SegmentController({
  */
 function destroyActiveEffectGui() {
   if (activeEffect && activeEffect.gui) {
+    // A pending Export flash would otherwise fire into a destroyed controller.
+    clearTimeout(activeEffect.exportFlashTimer);
+    activeEffect.exportFlashTimer = null;
     if (activeEffect.activeDragEnds) {
       for (const end of activeEffect.activeDragEnds) {
         window.removeEventListener('pointerup', end);
@@ -261,6 +264,9 @@ function applyEffect(preserveParams = false) {
 
   if (host.engine) {
     activeEffect = { gui: new GUI({ autoPlace: false }), activeDragEnds: new Set() };
+    // Identity of this GUI's effect record, so async continuations below can tell
+    // whether a switch has since replaced it.
+    const fx = activeEffect;
 
     const params = host.engine.getParameterDefinitions();
     // Stamp the snapshot with the engine's effect-load generation so a later
@@ -285,15 +291,17 @@ function applyEffect(preserveParams = false) {
         // GUI's snapshot. Skip so we don't copy an all-zero or foreign preset.
         if (!values || values.length === 0) {
           console.warn('Export: no parameter values matching the current effect; skipping copy');
+          clearTimeout(fx.exportFlashTimer);
           exportCtrl.name('✗ Copy failed');
-          setTimeout(() => exportCtrl.name('Export'), 1500);
+          fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), 1500);
           return;
         }
         const expected = activeEffect.paramNames.length;
         if (paramValueSkew(expected, values.length)) {
           console.warn(`Export: param/value length skew (${expected} vs ${values.length}); skipping copy`);
+          clearTimeout(fx.exportFlashTimer);
           exportCtrl.name('✗ Copy failed');
-          setTimeout(() => exportCtrl.name('Export'), 1500);
+          fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), 1500);
           return;
         }
         const cpp = formatExportParams(params, values);
@@ -301,17 +309,22 @@ function applyEffect(preserveParams = false) {
         // the same flash so writeText access never throws synchronously.
         if (!navigator.clipboard) {
           console.warn('Export: clipboard API unavailable (insecure context?)');
+          clearTimeout(fx.exportFlashTimer);
           exportCtrl.name('✗ Copy failed');
-          setTimeout(() => exportCtrl.name('Export'), 1500);
+          fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), 1500);
           return;
         }
         navigator.clipboard.writeText(cpp).then(() => {
+          if (activeEffect !== fx) return;
+          clearTimeout(fx.exportFlashTimer);
           exportCtrl.name('\u2713 Copied!');
-          setTimeout(() => exportCtrl.name('Export'), 1500);
+          fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), 1500);
         }).catch((err) => {
           console.warn('Export: clipboard write failed', err);
+          if (activeEffect !== fx) return;
+          clearTimeout(fx.exportFlashTimer);
           exportCtrl.name('\u2717 Copy failed');
-          setTimeout(() => exportCtrl.name('Export'), 1500);
+          fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), 1500);
         });
       }
     };
