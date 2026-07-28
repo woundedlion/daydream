@@ -111,6 +111,19 @@ test('AppState.notify skips a listener unsubscribed earlier in the same dispatch
   assert.deepEqual(seen, [], 'a listener torn down mid-dispatch gets no callback');
 });
 
+test('AppState.notify still calls the surviving duplicate of a callback disposed mid-dispatch', () => {
+  const s = new AppState({ a: 1 });
+  const seen = [];
+  const shared = (key, value) => seen.push(value);
+  let offFirst;
+  s.subscribe(() => { offFirst(); });
+  offFirst = s.subscribe(shared);
+  s.subscribe(shared);
+
+  s.set('a', 2);
+  assert.deepEqual(seen, [2], 'the disposed registration is skipped, its twin is not');
+});
+
 test('AppState.notify skips a listener added during the same dispatch', () => {
   const s = new AppState({ a: 1 });
   const seen = [];
