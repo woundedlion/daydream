@@ -241,7 +241,9 @@
         slider.value = Math.round(clampedActiveC * activeConfig.scale);
 
         // Determine decimals for display (2 for C1/C2)
-        valueSpan.textContent = clampedActiveC.toFixed(2);
+        const display = clampedActiveC.toFixed(2);
+        valueSpan.textContent = display;
+        slider.setAttribute('aria-valuetext', display);
       }
 
       state.Duration = newDomain;
@@ -264,10 +266,9 @@
         // Also update state.Duration if we clamped
         if (scaledDomain !== clampedScaledDomain) {
           state.Duration = clampedScaledDomain / durationConfig.scale;
-          durationValueSpan.textContent = state.Duration.toFixed(3);
-        } else {
-          durationValueSpan.textContent = newDomain.toFixed(3);
         }
+        durationValueSpan.textContent = state.Duration.toFixed(3);
+        durationSlider.setAttribute('aria-valuetext', durationValueSpan.textContent);
       }
 
       // 6. Re-render the curve and update the code snippet
