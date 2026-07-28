@@ -169,6 +169,7 @@ export class URLSync {
     this.state = state;
     this.trackedKeys = new Set(trackedKeys);
     this.timer = null;
+    this.disposed = false;
     this.adhoc = new Map(); // GUI-set params (key -> string), merged on flush
 
     const params = new URLSearchParams(window.location.search);
@@ -219,9 +220,12 @@ export class URLSync {
    * debounced flush, and clear the app-wide writer slot if it still points here.
    * Without this, a pagehide discard can leave the 200 ms timer firing
    * history.replaceState into a dead page. Symmetric with disposeApp().
+   * Latches: schedule() and setParam() become no-ops afterwards, so a holder of
+   * a direct reference cannot re-arm the debounce into a discarded page.
    * @returns {void}
    */
   dispose() {
+    this.disposed = true;
     if (this.unsubscribe) {
       this.unsubscribe();
       this.unsubscribe = null;
@@ -233,21 +237,25 @@ export class URLSync {
 
   /**
    * Debounces a URL write, collapsing bursts into one flush after 200 ms.
+   * A no-op once disposed.
    * @returns {void}
    */
   schedule() {
+    if (this.disposed) return;
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.flush(), 200);
   }
 
   /**
    * Records an ad-hoc param write from the GUI layer, merged into the single flush.
+   * A no-op once disposed.
    * @param {string} key - The URL param name to write.
    * @param {*} value - The value to set; null/undefined records a deletion marker.
    *   Numbers are rounded to 4 decimals to save space and avoid float jitter.
    * @returns {void}
    */
   setParam(key, value) {
+    if (this.disposed) return;
     if (value === null || value === undefined) {
       // null is a deletion marker (drop the param on flush), not a forget.
       this.adhoc.set(key, null);
