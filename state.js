@@ -29,6 +29,8 @@ export class AppState {
   constructor(defaults = {}) {
     this.state = { ...defaults };
     this.listeners = [];
+    this.batchDepth = 0;
+    this.dispatchedKeys = new Set();
   }
 
   /**
@@ -68,14 +70,18 @@ export class AppState {
         changes.push([key, value, old]);
       }
     }
-    // A subscriber may re-enter set()/update() while this batch drains, changing
-    // a key still queued below. Skip a queued tuple whose value is no longer
-    // current — the re-entrant write already notified with the live value, so
-    // firing the stale tuple would interleave a superseded notification.
-    changes.forEach(([key, value, old]) => {
-      if (this.state[key] !== value) return;
-      this.notify(key, value, old);
-    });
+    // A subscriber may re-enter set()/update() while this batch drains and notify
+    // a key still queued below. Skip a queued tuple whose key already went out:
+    // its `old` no longer describes a transition that happened.
+    this.batchDepth++;
+    try {
+      for (const [key, value, old] of changes) {
+        if (this.dispatchedKeys.has(key)) continue;
+        this.notify(key, value, old);
+      }
+    } finally {
+      if (--this.batchDepth === 0) this.dispatchedKeys.clear();
+    }
   }
 
   /**
@@ -98,6 +104,7 @@ export class AppState {
    * @returns {void}
    */
   notify(key, value, old) {
+    if (this.batchDepth > 0) this.dispatchedKeys.add(key);
     // Snapshot so a subscriber added during dispatch is not invoked for the
     // current event (and an unsubscribe mid-dispatch stays safe).
     this.listeners.slice().forEach(cb => cb(key, value, old));

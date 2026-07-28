@@ -56,6 +56,24 @@ test('AppState.update skips a queued tuple a re-entrant set already superseded',
   assert.deepEqual(events, [['a', 1, 0], ['b', 99, 2]]);
 });
 
+test('AppState.update does not re-announce a key a re-entrant write restored', () => {
+  const s = new AppState({ a: 0, b: 0 });
+  const events = [];
+  s.subscribe((key, value, old) => {
+    events.push([key, value, old]);
+    // While the batch drains on 'a', drive the still-queued 'b' away and back to
+    // the value the batch queued.
+    if (key === 'a') { s.set('b', 9); s.set('b', 2); }
+  });
+
+  s.update({ a: 1, b: 2 });
+
+  // 'b' ends at the queued value, but it was already dispatched: firing the batch
+  // tuple would announce b=2 twice, the second time as a 0 -> 2 transition that
+  // never happened.
+  assert.deepEqual(events, [['a', 1, 0], ['b', 9, 2], ['b', 2, 9]]);
+});
+
 test('AppState.subscribe returns an unsubscribe function', () => {
   const s = new AppState({ a: 1 });
   let count = 0;
