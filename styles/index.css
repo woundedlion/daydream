@@ -8,6 +8,15 @@
   margin: 0;
 }
 
+/* Keyboard focus ring; the UA default is near-invisible over the dark theme. */
+.effect-button:focus-visible,
+.sort-btn:focus-visible,
+.tab:focus-visible,
+.context-lost-reload:focus-visible {
+  outline: 2px solid #8af;
+  outline-offset: 2px;
+}
+
 /* Navigation Tabs */
 .nav-tabs {
   position: relative;
