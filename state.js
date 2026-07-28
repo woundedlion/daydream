@@ -87,12 +87,18 @@ export class AppState {
   /**
    * Subscribes to state changes.
    * @param {Function} callback - Invoked as (key, newValue, oldValue) on each change.
-   * @returns {Function} An unsubscribe function that removes the callback.
+   * @returns {Function} An unsubscribe function that removes this registration
+   *   only; the same callback registered twice needs both disposers, and calling
+   *   one twice is a no-op.
    */
   subscribe(callback) {
     this.listeners.push(callback);
+    let live = true;
     return () => {
-      this.listeners = this.listeners.filter(l => l !== callback);
+      if (!live) return;
+      live = false;
+      const i = this.listeners.indexOf(callback);
+      if (i !== -1) this.listeners.splice(i, 1);
     };
   }
 
