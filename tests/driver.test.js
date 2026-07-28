@@ -121,6 +121,8 @@ function disposeCtx(mesh, log) {
     onContextLost: () => {},
     onContextRestored: () => {},
     onCanvasKeyDown: () => {},
+    onCanvasFocus: () => {},
+    onCanvasBlur: () => {},
     contextLostOverlay: { remove: () => log.push('overlay.remove') },
     scene: { remove: (obj) => log.push(`scene.remove:${obj?.name ?? 'dotMesh'}`) },
     dotMesh: mesh,
@@ -194,6 +196,7 @@ test('dispose releases the observer, listeners, and GPU resources', () => {
 
   for (const step of ['observer.disconnect', 'canvas.off:webglcontextlost',
                       'canvas.off:webglcontextrestored', 'canvas.off:keydown',
+                      'canvas.off:focus', 'canvas.off:blur',
                       'overlay.remove', 'material.dispose', 'axisMaterial.dispose',
                       'controls.dispose', 'labelLayer.remove',
                       'renderer.dispose']) {
@@ -221,4 +224,75 @@ test('dispose leaves no dangling mesh or pixel buffer', () => {
   assert.equal(ctx.dotMesh, null);
   assert.equal(ctx.dotMaterial, null);
   assert.equal(ctx.pixels, null);
+});
+
+// ---------------------------------------------------------------------------
+// setupKeyboardOrbit
+// ---------------------------------------------------------------------------
+
+/** Minimal `this` for setupKeyboardOrbit: a canvas recording its class list.
+ * @param {Object} state - Mutable `{ focusVisible }` the fake `matches` reads.
+ * @returns {Object} Context object exposing `handlers` and `classes`.
+ */
+function orbitCtx(state) {
+  const handlers = {};
+  const classes = new Set();
+  return {
+    handlers,
+    classes,
+    canvas: {
+      classList: {
+        toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)),
+        contains: (c) => classes.has(c),
+        remove: (c) => classes.delete(c),
+      },
+      matches: () => state.focusVisible,
+      addEventListener: (type, fn) => { handlers[type] = fn; },
+    },
+  };
+}
+
+test('a pointer-focused canvas stays unringed when a later keypress promotes it', () => {
+  const state = { focusVisible: false };
+  const ctx = orbitCtx(state);
+  Daydream.prototype.setupKeyboardOrbit.call(ctx);
+
+  ctx.handlers.focus();
+  state.focusVisible = true; // any keydown promotes :focus-visible
+
+  let defaultPrevented = false;
+  ctx.handlers.keydown({
+    key: 'ArrowLeft', preventDefault: () => { defaultPrevented = true; },
+  });
+
+  assert.equal(ctx.classes.has('keyboard-focus'), false);
+  assert.equal(defaultPrevented, false, 'arrow key was stolen from the frame step');
+});
+
+test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
+  const state = { focusVisible: true };
+  const ctx = orbitCtx(state);
+  ctx.camera = new THREE.PerspectiveCamera();
+  ctx.camera.position.set(0, 0, 100);
+  ctx.controls = {
+    target: new THREE.Vector3(),
+    minPolarAngle: 0,
+    maxPolarAngle: Math.PI,
+    minDistance: 1,
+    maxDistance: 1000,
+    update: () => {},
+  };
+  Daydream.prototype.setupKeyboardOrbit.call(ctx);
+
+  ctx.handlers.focus();
+  assert.equal(ctx.classes.has('keyboard-focus'), true);
+
+  ctx.handlers.keydown({
+    key: 'ArrowLeft', preventDefault: () => {}, stopPropagation: () => {},
+  });
+  assert.ok(Math.abs(ctx.camera.position.x) > 1e-6, 'arrow key did not orbit');
+  assert.equal(ctx.needsRender, true);
+
+  ctx.handlers.blur();
+  assert.equal(ctx.classes.has('keyboard-focus'), false);
 });

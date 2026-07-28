@@ -12,8 +12,9 @@
   outline-offset: 2px;
 }
 
-/* Inset: the canvas fills its container, so an outset ring would be clipped. */
-#canvas:focus-visible {
+/* Inset: the canvas fills its container, so an outset ring would be clipped.
+   Class, not :focus-visible — see Daydream.setupKeyboardOrbit. */
+#canvas.keyboard-focus {
   outline: 2px solid #8af;
   outline-offset: -2px;
 }
