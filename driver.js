@@ -104,6 +104,10 @@ export class Daydream {
   static CAMERA_Y = 0;
   static CAMERA_Z = 220;
 
+  // Keyboard orbit: radians of rotation per arrow press, dolly factor per +/-.
+  static KEY_ORBIT_STEP = Math.PI / 36;
+  static KEY_ZOOM_STEP = 1.1;
+
   static SPHERE_RADIUS = 30;
   // The use site rescales this by the live camera distance so the visible label
   // set doesn't drift with orbit distance.
@@ -189,6 +193,8 @@ export class Daydream {
     // scene does no GPU work. Starts dirty so the first frame always paints.
     this.needsRender = true;
     this.controls.addEventListener('change', () => { this.needsRender = true; });
+
+    this.setupKeyboardOrbit();
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(Daydream.SCENE_BACKGROUND_COLOR);
@@ -306,6 +312,63 @@ export class Daydream {
     this.canvas.addEventListener("webglcontextlost", this.onContextLost, false);
     this.canvas.addEventListener(
       "webglcontextrestored", this.onContextRestored, false);
+  }
+
+  /**
+   * Give the canvas a keyboard route to the orbit controls, which OrbitControls
+   * itself exposes only to pointer input: arrow keys rotate about the orbit
+   * target, +/- dolly in and out.
+   */
+  setupKeyboardOrbit() {
+    const offset = new THREE.Vector3();
+    const spherical = new THREE.Spherical();
+
+    this.onCanvasKeyDown = (e) => {
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      // A pointer press focuses the canvas too, but does not match
+      // :focus-visible, so mouse users keep the global arrow-key frame step.
+      if (!this.canvas.matches(":focus-visible")) return;
+
+      let dTheta = 0;
+      let dPhi = 0;
+      let dolly = 1;
+      switch (e.key) {
+        case "ArrowLeft": dTheta = -Daydream.KEY_ORBIT_STEP; break;
+        case "ArrowRight": dTheta = Daydream.KEY_ORBIT_STEP; break;
+        case "ArrowUp": dPhi = -Daydream.KEY_ORBIT_STEP; break;
+        case "ArrowDown": dPhi = Daydream.KEY_ORBIT_STEP; break;
+        case "+": case "=": dolly = 1 / Daydream.KEY_ZOOM_STEP; break;
+        case "-": case "_": dolly = Daydream.KEY_ZOOM_STEP; break;
+        default: return;
+      }
+
+      offset.copy(this.camera.position).sub(this.controls.target);
+      spherical.setFromVector3(offset);
+      spherical.theta += dTheta;
+      spherical.phi = THREE.MathUtils.clamp(
+        spherical.phi + dPhi,
+        this.controls.minPolarAngle,
+        this.controls.maxPolarAngle
+      );
+      spherical.radius = THREE.MathUtils.clamp(
+        spherical.radius * dolly,
+        this.controls.minDistance,
+        this.controls.maxDistance
+      );
+      spherical.makeSafe(); // keeps phi off the poles, where the orbit basis degenerates
+      this.camera.position
+        .copy(this.controls.target)
+        .add(offset.setFromSpherical(spherical));
+      this.camera.lookAt(this.controls.target);
+      this.controls.update();
+      this.needsRender = true;
+
+      e.preventDefault();
+      // Else the window handler also reads ArrowRight as a paused frame step.
+      e.stopPropagation();
+    };
+
+    this.canvas.addEventListener("keydown", this.onCanvasKeyDown);
   }
 
   /**
@@ -848,6 +911,10 @@ export class Daydream {
         "webglcontextrestored", this.onContextRestored, false);
     }
     this.contextLostOverlay?.remove();
+
+    if (this.onCanvasKeyDown) {
+      this.canvas.removeEventListener("keydown", this.onCanvasKeyDown);
+    }
 
     if (this.dotMesh) {
       this.scene.remove(this.dotMesh);
