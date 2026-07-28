@@ -834,19 +834,25 @@ export class Daydream {
    * @param {Object} effect - Active effect; its getArenaMetrics() supplies arena usage when present.
    */
   updateStats(duration, effect) {
-    if (!this.statsGroup) {
-      this.statsGroup = {
+    let stats = this.statsGroup;
+    if (!stats) {
+      stats = {
         perf: [document.getElementById("perf-stats"), document.getElementById("perf-stats-mobile")],
         scratchA: [document.getElementById("stat-scratch-a"), document.getElementById("stat-scratch-a-m")],
         scratchB: [document.getElementById("stat-scratch-b"), document.getElementById("stat-scratch-b-m")],
         persist: [document.getElementById("stat-persistent"), document.getElementById("stat-persistent-m")],
         stack: [document.getElementById("stat-stack"), document.getElementById("stat-stack-m")]
       };
+      // Latch only once every row resolved; a row still missing this tick would
+      // otherwise stay dead for the session.
+      if (Object.values(stats).every(row => row.every(el => el))) {
+        this.statsGroup = stats;
+      }
     }
 
     const perfText = `${duration.toFixed(3)} ms`;
     const perfColor = duration > SLOW_FRAME_MS ? 'red' : 'grey';
-    this.statsGroup.perf.forEach(el => {
+    stats.perf.forEach(el => {
       if (el) { el.innerText = perfText; el.style.color = perfColor; }
     });
 
@@ -860,12 +866,12 @@ export class Daydream {
         elements.forEach(el => { if (el) el.textContent = text; });
       };
 
-      updateRow(this.statsGroup.scratchA, m.scratch_arena_a);
-      updateRow(this.statsGroup.scratchB, m.scratch_arena_b);
-      updateRow(this.statsGroup.persist, m.persistent_arena);
+      updateRow(stats.scratchA, m.scratch_arena_a);
+      updateRow(stats.scratchB, m.scratch_arena_b);
+      updateRow(stats.persist, m.persistent_arena);
       if (m.stack) {
         const stackText = `${(m.stack.high_water_mark / 1024).toFixed(1)}|${(m.stack.capacity / 1024).toFixed(0)}`;
-        this.statsGroup.stack.forEach(el => { if (el) el.textContent = stackText; });
+        stats.stack.forEach(el => { if (el) el.textContent = stackText; });
       }
     }
   }
