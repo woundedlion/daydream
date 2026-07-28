@@ -29,6 +29,11 @@ import { showBootstrapFailure } from "./bootstrap.js";
 
 // UI layer degrades gracefully (log + keep last good state); lower layers trap.
 
+// How long a transient button label (Export status) stays before reverting.
+const FLASH_MS = 1500;
+// Dwell time per effect while "Test All" cycles the favorites list.
+const TEST_ALL_INTERVAL_MS = 1000;
+
 const HiResFavorites = [
   "BZReactionDiffusion",
   "ChaoticStrings",
@@ -283,7 +288,7 @@ function applyEffect(preserveParams = false) {
     const flashExport = (label) => {
       clearTimeout(fx.exportFlashTimer);
       exportCtrl.name(label);
-      fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), 1500);
+      fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), FLASH_MS);
     };
 
     const effectActions = {
@@ -755,7 +760,7 @@ testAllController = guiInstance.addSession({ testAll: false }, 'testAll').name('
       // would recompute the same rejected slot forever.
       testAllIndex = (testAllIndex + 1) % currentList.length;
       appState.set('effect', currentList[testAllIndex]);
-    }, 1000);
+    }, TEST_ALL_INTERVAL_MS);
   } else {
     clearInterval(testAllInterval);
     testAllInterval = null;
