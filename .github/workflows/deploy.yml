@@ -111,7 +111,15 @@ jobs:
         working-directory: engine
       - run: cmake --build --preset tests
         working-directory: engine
-      - run: ctest --preset tests --output-on-failure
+      - name: Test
+        # Same tier as the engine's own presubmit (Holosphere .github/workflows/ci.yml).
+        # The defaults are the QUICK tier: an 8-frame smoke at device resolution
+        # only, which never reaches the effect-lifecycle transitions nor the
+        # 288x144 production-resolution roster passes.
+        env:
+          HS_SMOKE_FRAMES: 120
+          HS_EFFECTS_FULL: 1
+        run: ctest --preset tests --output-on-failure
         working-directory: engine
 
   js-tests:
