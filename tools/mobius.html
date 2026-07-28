@@ -331,7 +331,7 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { initScene, showFatalError, copyWithFeedback, COPY_FEEDBACK } from './shared.js';
+    import { initScene, bootstrapTool, wireCopyBlock } from './shared.js';
     import {
       elliptic, hyperbolic, loxodromic, parabolic,
       inversion, tumble, cayley, snapComplex,
@@ -822,35 +822,18 @@
         applyConfig({ A: { re: 1, im: 0 }, B: { re: 0, im: 0 }, C: { re: 0, im: 0 }, D: { re: 1, im: 0 } });
       });
 
-      const copyButton = document.getElementById('copy_code_button');
-      const codeOutput = document.getElementById('mobius_code_output');
-      const prompt = document.getElementById('copy_code_prompt');
-      const preBlock = document.getElementById('code_pre_block');
-
-      if (copyButton && codeOutput) {
-        const handleCopy = () => {
-          copyWithFeedback(codeOutput.textContent,
-            { element: prompt, revertText: "", ...COPY_FEEDBACK });
-        };
-
-        copyButton.addEventListener('click', handleCopy);
-        preBlock.addEventListener('click', handleCopy);
-      }
+      wireCopyBlock({
+        source: document.getElementById('mobius_code_output'),
+        button: document.getElementById('copy_code_button'),
+        prompt: document.getElementById('copy_code_prompt'),
+        block: document.getElementById('code_pre_block'),
+      });
 
       updateCodeSnippet();
       initThree();
     };
 
-    // addEventListener (not window.onload =) avoids clobbering any other load
-    // handler, and the try/catch surfaces a synchronous init failure.
-    window.addEventListener('load', () => {
-      try {
-        init();
-      } catch (e) {
-        console.error('Möbius tool failed to initialize:', e);
-        showFatalError('The Möbius tool failed to initialize — see the browser console for details.');
-      }
-    });
+    bootstrapTool(init, 'Möbius tool');
 
   </script>
 </body>

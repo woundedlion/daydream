@@ -102,7 +102,7 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { initScene, copyWithFeedback, showFatalError, COPY_FEEDBACK } from './shared.js';
+    import { initScene, bootstrapTool, wireCopyBlock } from './shared.js';
     import { createSlider as buildSlider } from './slider.js';
     import {
       MAX_RATIONAL_TERM,
@@ -278,9 +278,6 @@
 
     // --- End RATIONAL CONSTRAINT LOGIC ---
 
-    // COPY_FEEDBACK (the green/gray prompt color classes) is imported from
-    // shared.js — see the import above.
-
     // --- Code Snippet Updater ---
     const updateCodeSnippet = () => {
       const codeOutput = document.getElementById('lissajous_code_output');
@@ -372,36 +369,18 @@
 
 
       // Initialize Copy Button logic
-      const copyButton = document.getElementById('copy_code_button');
-      const codeOutput = document.getElementById('lissajous_code_output');
-      const prompt = document.getElementById('copy_code_prompt');
-      const preBlock = document.getElementById('code_pre_block');
-
-      if (copyButton && codeOutput) {
-        const handleCopy = () => {
-          copyWithFeedback(codeOutput.textContent,
-            { element: prompt, revertText: "", ...COPY_FEEDBACK });
-        };
-
-        copyButton.addEventListener('click', handleCopy);
-        preBlock.addEventListener('click', handleCopy);
-      }
+      wireCopyBlock({
+        source: document.getElementById('lissajous_code_output'),
+        button: document.getElementById('copy_code_button'),
+        prompt: document.getElementById('copy_code_prompt'),
+        block: document.getElementById('code_pre_block'),
+      });
 
       updateCodeSnippet();
       initThree();
     };
 
-    // Start everything when the window is fully loaded. addEventListener (not
-    // window.onload =) avoids clobbering any other load handler, and the
-    // try/catch surfaces a synchronous init failure instead of swallowing it.
-    window.addEventListener('load', () => {
-      try {
-        init();
-      } catch (e) {
-        console.error('Lissajous tool failed to initialize:', e);
-        showFatalError('The Lissajous tool failed to initialize — see the browser console for details.');
-      }
-    });
+    bootstrapTool(init, 'Lissajous tool');
 
   </script>
 </body>

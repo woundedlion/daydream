@@ -434,12 +434,13 @@
     // Shared primitives, imported rather than re-implemented inline: the
     // clipboard copy (tools/clipboard.js) and the sRGB/linear-RGB transfer
     // functions (tools/color.js, which mirrors core/color/color.h's).
-    import { copyWithFeedback, COPY_FEEDBACK } from './clipboard.js';
+    import { copyWithFeedback, COPY_FEEDBACK, wireCopyBlock } from './clipboard.js';
     // Labelled range slider + readout, shared with the other tool pages.
     import { createSlider as buildSlider } from './slider.js';
-    // Fatal-error banner from the THREE-free banner module (not shared.js, which
-    // pulls in three.js — a dependency this tool otherwise doesn't have).
-    import { showFatalError } from './banner.js';
+    // Fatal-error banner and load bootstrap from the THREE-free banner module
+    // (not shared.js, which pulls in three.js — a dependency this tool
+    // otherwise doesn't have).
+    import { showFatalError, bootstrapTool } from './banner.js';
     // The engine module exports the real GenerativePalette color math via the
     // PaletteOps embind class, so the tool previews the device's exact colors
     // instead of a hand-ported JS reimplementation that can silently drift.
@@ -1380,17 +1381,11 @@
       }
 
       // 6. Add listener for the copy code button
-      const copyCodeButton = document.getElementById('copy_code_button');
-      const copyCodePrompt = document.getElementById('copy_code_prompt');
-      const codeOutput = document.getElementById('palette_code_output');
-
-      if (copyCodeButton && codeOutput && copyCodePrompt) {
-        copyCodeButton.addEventListener('click', () => {
-          // Get the text content, preserving line breaks
-          copyWithFeedback(codeOutput.textContent,
-            { element: copyCodePrompt, revertText: "", ...COPY_FEEDBACK });
-        });
-      }
+      wireCopyBlock({
+        source: document.getElementById('palette_code_output'),
+        button: document.getElementById('copy_code_button'),
+        prompt: document.getElementById('copy_code_prompt'),
+      });
 
       // 7. Set up the initial state and start the animation
       updatePalette(); // This will now also call updatePaletteCodeOutput()
@@ -1412,15 +1407,7 @@
       });
     }
 
-    // Start the application. addEventListener (not window.onload =) avoids
-    // clobbering any other load handler; .catch surfaces an init failure
-    // (init() returns a promise) that a bare assignment would swallow.
-    window.addEventListener('load', () => {
-      init().catch((e) => {
-        console.error('Palette tool failed to initialize:', e);
-        showFatalError('The palette tool failed to initialize — see the browser console for details.');
-      });
-    });
+    bootstrapTool(init, 'palette tool');
 
   </script>
 </body>

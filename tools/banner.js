@@ -4,7 +4,7 @@
  */
 
 /**
- * Dependency-free page-level banner helpers for the tool pages.
+ * Dependency-free page-level banner and bootstrap helpers for the tool pages.
  *
  * Kept separate from shared.js (the Three.js scene setup) so non-3D pages —
  * e.g. palettes.html — can surface a fatal error without pulling Three.js into
@@ -37,4 +37,31 @@ export function showFatalError(message) {
     const parent = document.body || document.documentElement;
     if (parent) parent.appendChild(el);
   }
+}
+
+/**
+ * Run a tool page's initializer on window load and route any failure to the
+ * console plus a fatal banner. Accepts a synchronous or an async init: a thrown
+ * error and a rejected promise take the same path.
+ *
+ * addEventListener (not `window.onload =`) avoids clobbering any other load
+ * handler.
+ *
+ * @param {Function} init - The page's initializer; may return a promise.
+ * @param {string} label - Page name used in both messages, e.g. 'Lissajous tool'.
+ * @returns {void}
+ */
+export function bootstrapTool(init, label) {
+  window.addEventListener('load', () => {
+    const fail = (e) => {
+      console.error(`${label} failed to initialize:`, e);
+      showFatalError(`The ${label} failed to initialize — see the browser console for details.`);
+    };
+    try {
+      const started = init();
+      if (started && typeof started.catch === 'function') started.catch(fail);
+    } catch (e) {
+      fail(e);
+    }
+  });
 }

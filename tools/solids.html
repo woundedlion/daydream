@@ -582,7 +582,7 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { initScene, copyWithFeedback, showFatalError } from './shared.js';
+    import { initScene, copyWithFeedback, showFatalError, bootstrapTool } from './shared.js';
     // The shared op table and dispatch, the pure C++ export-string codegen
     // (formatFloat/pctSuffix/recipe builders), the pure face-geometry helpers and
     // the op-chain queue/validator machinery live in solid_codegen.js so they can
@@ -2101,15 +2101,7 @@
 
 
 
-    // addEventListener (not window.onload =) avoids clobbering any other load
-    // handler; .catch surfaces an init failure (init() returns a promise) that a
-    // bare assignment would otherwise swallow.
-    window.addEventListener('load', () => {
-      init().catch((e) => {
-        console.error('Solids tool failed to initialize:', e);
-        showFatalError('The solids tool failed to initialize — see the browser console for details.');
-      });
-    });
+    bootstrapTool(init, 'solids tool');
 
   </script>
 </body>
