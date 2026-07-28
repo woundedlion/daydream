@@ -74,13 +74,13 @@ test('native-resolution capture pins the offscreen to the source size at start',
     const rec = new VideoRecorder(source);
     assert.equal(rec.targetHeight, null);
 
-    const off = rec.ensurePinnedOffscreen();
+    const off = rec.ensureOffscreen();
     assert.equal(off.width, 202);
     assert.equal(off.height, 102);
 
     source.width = 640;
     source.height = 480;
-    const off2 = rec.ensurePinnedOffscreen();
+    const off2 = rec.ensureOffscreen();
     assert.equal(off2, off);
     assert.equal(off2.width, 202);
     assert.equal(off2.height, 102);
