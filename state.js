@@ -111,9 +111,12 @@ export class AppState {
    */
   notify(key, value, old) {
     if (this.batchDepth > 0) this.dispatchedKeys.add(key);
-    // Snapshot so a subscriber added during dispatch is not invoked for the
-    // current event (and an unsubscribe mid-dispatch stays safe).
-    this.listeners.slice().forEach(cb => cb(key, value, old));
+    // Dispatch over a snapshot so a subscriber added during dispatch is not
+    // invoked for the current event; membership is re-checked per call so one
+    // removed during dispatch is not invoked either.
+    for (const cb of this.listeners.slice()) {
+      if (this.listeners.includes(cb)) cb(key, value, old);
+    }
   }
 
   /**

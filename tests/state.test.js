@@ -100,6 +100,28 @@ test('AppState.subscribe unsubscribes one registration of a shared callback', ()
   assert.equal(count, 2);
 });
 
+test('AppState.notify skips a listener unsubscribed earlier in the same dispatch', () => {
+  const s = new AppState({ a: 1 });
+  const seen = [];
+  let offSecond;
+  s.subscribe(() => { offSecond(); });
+  offSecond = s.subscribe((key, value) => seen.push(value));
+
+  s.set('a', 2);
+  assert.deepEqual(seen, [], 'a listener torn down mid-dispatch gets no callback');
+});
+
+test('AppState.notify skips a listener added during the same dispatch', () => {
+  const s = new AppState({ a: 1 });
+  const seen = [];
+  s.subscribe(() => { s.subscribe((key, value) => seen.push(value)); });
+
+  s.set('a', 2);
+  assert.deepEqual(seen, [], 'a listener added mid-dispatch waits for the next event');
+  s.set('a', 3);
+  assert.deepEqual(seen, [3]);
+});
+
 test('AppState.snapshot is a detached copy', () => {
   const s = new AppState({ a: 1 });
   const snap = s.snapshot();
