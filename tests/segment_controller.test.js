@@ -331,6 +331,11 @@ test('a latched fault terminates the pool so no worker heap stays resident', () 
   c.workers[0].onerror({ message: 'boom', filename: 'w.js', lineno: 1, colno: 2 });
 
   assert.ok(c.workers.every((w) => w.terminated), 'every worker was terminated');
+  assert.ok(
+    c.workers.every((w) => w.onmessage === null && w.onerror === null
+      && w.onmessageerror === null),
+    'handlers detached so a late report cannot log success under the overlay');
+  assert.equal(c.workers.length, 2, 'the pool array stays populated for the recovery gate');
   assert.equal(c.faulted, true, 'the latch is held so the UI still reports the fault');
   assert.deepEqual(c.faultInfo, { segId: 0, message: 'boom' });
 });
@@ -485,12 +490,22 @@ test('a surviving worker responding after a fault does not drive pending negativ
   c.create(2);
   c.renderInFlight = true;
   const done = c.renderParallel();
+  // The fault detaches every handler, so a post-fault report can only arrive
+  // from an event already dispatched when the latch closed; hold that handler.
+  const seg1 = c.workers[1].onmessage;
 
   c.workers[0].onerror({ message: 'boom', filename: 'w.js', lineno: 1, colno: 1 });
   assert.equal(c.pending, 0);
   await done;
 
-  deliverFrame(c, 1);
+  seg1({
+    data: {
+      type: 'frame', segId: 1,
+      pixels: new Uint16Array(2 * 2 * 3),
+      x0: 0, x1: 2, y0: 0, y1: 2,
+      elapsed: 1, renderUs: 0, arenaMetrics: null,
+    },
+  });
   assert.equal(c.pending, 0, 'post-fault frame leaves pending at 0, not negative');
   assert.equal(c.scratch[1], null, 'no result is recorded for the halted pool');
 });
@@ -498,8 +513,10 @@ test('a surviving worker responding after a fault does not drive pending negativ
 test('only the first fault of a session is recorded', () => {
   const c = makeController();
   c.create(2);
+  // Held before the latch closes: the first fault detaches every handler.
+  const seg1 = c.workers[1].onerror;
   c.workers[0].onerror({ message: 'first', filename: '', lineno: 0, colno: 0 });
-  c.workers[1].onerror({ message: 'second', filename: '', lineno: 0, colno: 0 });
+  seg1({ message: 'second', filename: '', lineno: 0, colno: 0 });
   assert.deepEqual(c.faultInfo, { segId: 0, message: 'first' });
 });
 
