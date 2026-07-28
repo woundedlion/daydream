@@ -76,7 +76,7 @@ async function handleMessage(msg) {
       // A version mismatch means a stale-cached worker or controller: fault before
       // touching WASM so the controller stops instead of drifting on reshaped fields.
       if (msg.version !== PROTOCOL_VERSION) {
-        post({ type: 'initFailed',
+        post({ type: 'engineRejected',
                reason: `protocol version ${msg.version} != worker ${PROTOCOL_VERSION}`
                        + ` (stale cached worker or controller)` });
         break;
@@ -90,10 +90,10 @@ async function handleMessage(msg) {
       engine = new wasmModule.HolosphereEngine();
       // A rejected resolution leaves no usable geometry: skip the canvasW/canvasH
       // commit, segRange, and ready (symmetric with the setResolution handler's
-      // `=== false` guard), and post initFailed so the controller faults at once
+      // `=== false` guard), and post engineRejected so the controller faults at once
       // instead of waiting out the full init watchdog.
       if (engine.setResolution(msg.w, msg.h) === false) {
-        post({ type: 'initFailed',
+        post({ type: 'engineRejected',
                reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
         break;
       }
@@ -103,7 +103,7 @@ async function handleMessage(msg) {
 
       if (msg.effectName) {
         if (engine.setEffect(msg.effectName) === false) {
-          post({ type: 'initFailed',
+          post({ type: 'engineRejected',
                  reason: `setEffect(${msg.effectName}) rejected` });
           break;
         }
@@ -122,7 +122,7 @@ async function handleMessage(msg) {
     case 'setEffect': {
       if (engine) {
         if (engine.setEffect(msg.name) === false) {
-          post({ type: 'initFailed',
+          post({ type: 'engineRejected',
                  reason: `setEffect(${msg.name}) rejected` });
           break;
         }
@@ -140,7 +140,7 @@ async function handleMessage(msg) {
         // `=== false` (not `!`) is load-bearing: only an explicit false rejection
         // keeps the current geometry; a non-boolean return must not count as one.
         if (engine.setResolution(msg.w, msg.h) === false) {
-          post({ type: 'initFailed',
+          post({ type: 'engineRejected',
                  reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
           break;
         }

@@ -25,7 +25,7 @@
  * same-named but reshaped message. Bump on any breaking change to the messages below.
  * @type {number}
  */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 /**
  * One tuned effect parameter, flattened for structured-clone transport. Booleans
@@ -98,7 +98,7 @@ export const PROTOCOL_VERSION = 1;
  * setResolution/setEffect; no usable geometry. Lets the controller fault
  * immediately instead of rendering stale-geometry frames or waiting out the
  * init watchdog. Carries no segId, for the same reason as 'ready'.
- * @typedef {{ type: 'initFailed', reason: string }} InitFailedMsg */
+ * @typedef {{ type: 'engineRejected', reason: string }} EngineRejectedMsg */
 
 /** Worker module body started executing — its static imports (incl. the WASM
  * glue ./holosphere_wasm.js) all resolved. Sent before the WASM instantiate so
@@ -125,5 +125,5 @@ export const PROTOCOL_VERSION = 1;
 
 /**
  * Every message a worker sends back to the controller.
- * @typedef {ReadyMsg | InitFailedMsg | FrameMsg | BootedMsg} ControllerInboundMsg
+ * @typedef {ReadyMsg | EngineRejectedMsg | FrameMsg | BootedMsg} ControllerInboundMsg
  */

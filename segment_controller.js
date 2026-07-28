@@ -319,8 +319,8 @@ export class SegmentController {
           }
           if (!booted[i]) { booted[i] = true; bootedCount++; }
           if (bootedCount === numSegments) this.clearBootWatchdog();
-        } else if (msg.type === 'initFailed') {
-          this.onWorkerFault(i, `worker seg ${i} init failed: ${msg.reason}`);
+        } else if (msg.type === 'engineRejected') {
+          this.onWorkerFault(i, `worker seg ${i} engine rejected: ${msg.reason}`);
         } else if (msg.type === 'frame') {
           // A halted pool zeroed `pending`; ignore late frames so it can't go negative.
           if (this.faulted) return;

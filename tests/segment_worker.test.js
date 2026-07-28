@@ -134,8 +134,8 @@ test('init faults on a protocol version mismatch', async () => {
                    segId: 2, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
 
   assert.equal(engineInstance, null, 'no engine constructed on version mismatch');
-  const failed = posted.find((p) => p.msg.type === 'initFailed');
-  assert.ok(failed, 'initFailed posted');
+  const failed = posted.find((p) => p.msg.type === 'engineRejected');
+  assert.ok(failed, 'engineRejected posted');
   assert.match(failed.msg.reason, /protocol version/);
   assert.equal(posted.find((p) => p.msg.type === 'ready'), undefined, 'no ready posted');
 });
@@ -153,16 +153,16 @@ test('init applies the segment clip and posts ready', async () => {
   assert.ok(posted.some((p) => p.msg.type === 'ready'), 'ready posted');
 });
 
-/** Regression: an init whose setResolution is rejected posts no ready and an explicit initFailed so the controller faults at once. */
-test('init with a rejected resolution posts initFailed, not ready', async () => {
+/** Regression: an init whose setResolution is rejected posts no ready and an explicit engineRejected so the controller faults at once. */
+test('init with a rejected resolution posts engineRejected, not ready', async () => {
   nextResolutionOk = false;
   await dispatch({ type: 'init', segId: 0, totalSegs: 1, w: 8, h: 4, effectName: 'Plasma' });
 
   assert.ok(engineInstance, 'engine constructed');
   assert.deepEqual(engineInstance.calls[0], ['setResolution', 8, 4], 'setResolution attempted');
   assert.ok(!posted.some((p) => p.msg.type === 'ready'), 'no ready for a rejected resolution');
-  const failed = posted.find((p) => p.msg.type === 'initFailed');
-  assert.ok(failed, 'initFailed posted');
+  const failed = posted.find((p) => p.msg.type === 'engineRejected');
+  assert.ok(failed, 'engineRejected posted');
   assert.match(failed.msg.reason, /setResolution\(8, 4\) rejected/);
 });
 
