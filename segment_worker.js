@@ -76,7 +76,7 @@ async function handleMessage(msg) {
       // A version mismatch means a stale-cached worker or controller: fault before
       // touching WASM so the controller stops instead of drifting on reshaped fields.
       if (msg.version !== PROTOCOL_VERSION) {
-        post({ type: 'initFailed', segId,
+        post({ type: 'initFailed',
                reason: `protocol version ${msg.version} != worker ${PROTOCOL_VERSION}`
                        + ` (stale cached worker or controller)` });
         break;
@@ -93,7 +93,7 @@ async function handleMessage(msg) {
       // `=== false` guard), and post initFailed so the controller faults at once
       // instead of waiting out the full init watchdog.
       if (engine.setResolution(msg.w, msg.h) === false) {
-        post({ type: 'initFailed', segId,
+        post({ type: 'initFailed',
                reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
         break;
       }
@@ -103,7 +103,7 @@ async function handleMessage(msg) {
 
       if (msg.effectName) {
         if (engine.setEffect(msg.effectName) === false) {
-          post({ type: 'initFailed', segId,
+          post({ type: 'initFailed',
                  reason: `setEffect(${msg.effectName}) rejected` });
           break;
         }
@@ -115,14 +115,14 @@ async function handleMessage(msg) {
       if (typeof msg.paused === 'boolean') engine.setAnimationsPaused(msg.paused);
       applyClip();
 
-      post({ type: 'ready', segId });
+      post({ type: 'ready' });
       break;
     }
 
     case 'setEffect': {
       if (engine) {
         if (engine.setEffect(msg.name) === false) {
-          post({ type: 'initFailed', segId,
+          post({ type: 'initFailed',
                  reason: `setEffect(${msg.name}) rejected` });
           break;
         }
@@ -140,7 +140,7 @@ async function handleMessage(msg) {
         // `=== false` (not `!`) is load-bearing: only an explicit false rejection
         // keeps the current geometry; a non-boolean return must not count as one.
         if (engine.setResolution(msg.w, msg.h) === false) {
-          post({ type: 'initFailed', segId,
+          post({ type: 'initFailed',
                  reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
           break;
         }
