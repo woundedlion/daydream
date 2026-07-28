@@ -894,6 +894,10 @@ export class Daydream {
     this.setupDots();
 
     this.precomputeMatrices();
+
+    // The rebuilt color buffer is zeroed; without a repaint the pre-resize image
+    // stays on screen while paused.
+    this.invalidate();
   }
 
   /**
