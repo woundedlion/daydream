@@ -105,25 +105,30 @@ function setupCtx(mesh, log) {
   };
 }
 
-/** Minimal `this` for dispose: everything it touches, nulled where optional.
+/** Minimal `this` for dispose: every field a dispose branch guards on is populated.
  * @param {Object} mesh - Dot mesh to release.
  * @param {Array<string>} log - Ordered event sink.
  * @returns {Object} Context object for prototype.call.
  */
 function disposeCtx(mesh, log) {
+  const axis = (name) => ({
+    name,
+    geometry: { dispose: () => log.push(`${name}.geometry.dispose`) },
+  });
   return {
     resizeObserver: { disconnect: () => log.push('observer.disconnect') },
-    canvas: { removeEventListener: () => log.push('canvas.off') },
+    canvas: { removeEventListener: (type) => log.push(`canvas.off:${type}`) },
     onContextLost: () => {},
     onContextRestored: () => {},
+    onCanvasKeyDown: () => {},
     contextLostOverlay: { remove: () => log.push('overlay.remove') },
-    scene: { remove: () => log.push('scene.remove') },
+    scene: { remove: (obj) => log.push(`scene.remove:${obj?.name ?? 'dotMesh'}`) },
     dotMesh: mesh,
     pixels: mesh.instanceColor.array,
     dotMaterial: { dispose: () => log.push('material.dispose') },
-    xAxis: null,
-    yAxis: null,
-    zAxis: null,
+    xAxis: axis('xAxis'),
+    yAxis: axis('yAxis'),
+    zAxis: axis('zAxis'),
     axisMaterial: { dispose: () => log.push('axisMaterial.dispose') },
     controls: { dispose: () => log.push('controls.dispose') },
     labelRenderer: { domElement: { remove: () => log.push('labelLayer.remove') } },
@@ -187,13 +192,25 @@ test('dispose releases the observer, listeners, and GPU resources', () => {
   const ctx = disposeCtx(fakeMesh(log), log);
   Daydream.prototype.dispose.call(ctx);
 
-  for (const step of ['observer.disconnect', 'canvas.off', 'overlay.remove',
-                      'material.dispose', 'axisMaterial.dispose',
+  for (const step of ['observer.disconnect', 'canvas.off:webglcontextlost',
+                      'canvas.off:webglcontextrestored', 'canvas.off:keydown',
+                      'overlay.remove', 'material.dispose', 'axisMaterial.dispose',
                       'controls.dispose', 'labelLayer.remove',
                       'renderer.dispose']) {
     assert.ok(log.includes(step), `dispose skipped ${step}`);
   }
   assert.ok(log.indexOf('renderer.stopLoop') < log.indexOf('renderer.dispose'));
+});
+
+test('dispose removes each axis from the scene and frees its geometry', () => {
+  const log = [];
+  const ctx = disposeCtx(fakeMesh(log), log);
+  Daydream.prototype.dispose.call(ctx);
+
+  for (const name of ['xAxis', 'yAxis', 'zAxis']) {
+    assert.ok(log.includes(`scene.remove:${name}`), `${name} left in the scene`);
+    assert.ok(log.includes(`${name}.geometry.dispose`), `${name} geometry leaked`);
+  }
 });
 
 test('dispose leaves no dangling mesh or pixel buffer', () => {
