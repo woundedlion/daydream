@@ -13,6 +13,9 @@ function fakeDocument() {
       className: '',
       textContent: '',
       children: [],
+      attributes: {},
+      setAttribute(name, value) { this.attributes[name] = value; },
+      getAttribute(name) { return this.attributes[name] ?? null; },
       classList: {
         values: new Set(),
         add(value) { this.values.add(value); },
@@ -61,6 +64,8 @@ test('bootstrap catches a synchronous loader throw', async () => {
 
   assert.equal(loaded, false);
   assert.equal(overlay.classList.contains('error'), true);
+  assert.equal(overlay.getAttribute('role'), 'alert',
+    'the polite loading status is promoted to an assertive alert');
   assert.equal(childWithClass(overlay, 'spinner'), undefined);
   assert.equal(childWithClass(overlay, 'load-error-detail').textContent,
     'WebGL unavailable');
