@@ -87,15 +87,28 @@ export class ProceduralPalette {
   }
 
   /**
-   * Raw (unclamped, sRGB) cosine value for one channel at t, used to plot the
-   * underlying curves where over/undershoot past [0, 1] is visible.
+   * Raw (unclamped, sRGB) cosine values for all three channels at t, used to
+   * plot the underlying curves where over/undershoot past [0, 1] is visible.
+   * @param {number} t - Time parameter in [0, 1].
+   * @returns {number[]} Unclamped sRGB cosine values as [R, G, B].
+   */
+  getChannelValues(t) {
+    const PI2 = TWO_PI;
+    return [
+      this.a[0] + this.b[0] * fastCos(PI2 * (this.c[0] * t + this.d[0])),
+      this.a[1] + this.b[1] * fastCos(PI2 * (this.c[1] * t + this.d[1])),
+      this.a[2] + this.b[2] * fastCos(PI2 * (this.c[2] * t + this.d[2])),
+    ];
+  }
+
+  /**
+   * One channel of the raw (unclamped, sRGB) cosine sample at t.
    * @param {number} t - Time parameter in [0, 1].
    * @param {number} channelIndex - Channel to sample (0=R, 1=G, 2=B).
    * @returns {number} Unclamped sRGB cosine value for the channel.
    */
   getChannelValue(t, channelIndex) {
-    const PI2 = TWO_PI;
-    return this.a[channelIndex] + this.b[channelIndex] * fastCos(PI2 * (this.c[channelIndex] * t + this.d[channelIndex]));
+    return this.getChannelValues(t)[channelIndex];
   }
 }
 
@@ -359,16 +372,26 @@ export class GenerativePalette {
   }
 
   /**
-   * One channel of the sRGB sample at t, for curve plotting. Recomputes the full
-   * linear triple via get(t), discards two channels, and converts back to sRGB so
-   * the wave graph plots the same domain as ProceduralPalette (raw sRGB) and the
-   * 8-bit sRGB form the device bakes and exports.
+   * The sRGB sample at t, for curve plotting. Takes the linear triple from
+   * get(t) back to sRGB so the wave graph plots the same domain as
+   * ProceduralPalette (raw sRGB) and the 8-bit sRGB form the device bakes and
+   * exports.
+   * @param {number} t - Time parameter in [0, 1].
+   * @returns {number[]} sRGB values as [R, G, B].
+   */
+  getChannelValues(t) {
+    const [r, g, b] = this.get(t);
+    return [linearToSrgbFloat(r), linearToSrgbFloat(g), linearToSrgbFloat(b)];
+  }
+
+  /**
+   * One channel of the sRGB sample at t.
    * @param {number} t - Time parameter in [0, 1].
    * @param {number} channelIndex - Channel to sample (0=R, 1=G, 2=B).
    * @returns {number} sRGB value for the channel.
    */
   getChannelValue(t, channelIndex) {
-    return linearToSrgbFloat(this.get(t)[channelIndex]);
+    return this.getChannelValues(t)[channelIndex];
   }
 }
 

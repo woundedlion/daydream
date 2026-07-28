@@ -1060,16 +1060,21 @@
       const colors = ['#EF4444', '#22C55E', '#3B82F6']; // Red, Green, Blue
       const channels = [0, 1, 2];
 
+      // Sample all three channels per column up front: a generative palette
+      // reconstructs its whole LUT entry per sample, so asking one channel at a
+      // time would redo that (and its pows) three times over.
+      const samples = new Array(width);
+      for (let x = 0; x < width; x++) {
+        samples[x] = palette.getChannelValues(x / (width - 1));
+      }
+
       channels.forEach((channelIndex) => {
         waveGraphCtx.beginPath();
         waveGraphCtx.strokeStyle = colors[channelIndex];
         waveGraphCtx.lineWidth = 3;
 
         for (let x = 0; x < width; x++) {
-          const t = x / (width - 1);
-          const value = palette.getChannelValue(t, channelIndex);
-
-          const mappedY = toY(value);
+          const mappedY = toY(samples[x][channelIndex]);
 
           if (x === 0) {
             waveGraphCtx.moveTo(x, mappedY);
