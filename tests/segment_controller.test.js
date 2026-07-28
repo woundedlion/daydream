@@ -77,6 +77,8 @@ class FakeWorker {
     this.url = url;
     this.opts = opts;
     this.posted = [];
+    /** @type {Array<Transferable[]|null>} Transfer list per posted message. */
+    this.transfers = [];
     this.terminated = false;
     this.onmessage = null;
     this.onerror = null;
@@ -86,12 +88,14 @@ class FakeWorker {
   /**
    * Records a posted message instead of dispatching it to a real worker.
    * @param {Object} msg - Protocol message the controller sent.
+   * @param {Transferable[]} [transfer] - Transfer list the controller supplied.
    * @returns {void}
    */
-  postMessage(msg) {
+  postMessage(msg, transfer) {
     if (msg.type === 'init' && this.index === FakeWorker.failInitialPostAt)
       throw new DOMException('message rejected', 'DataCloneError');
     this.posted.push(msg);
+    this.transfers.push(transfer ?? null);
   }
   /**
    * Marks this fake worker as terminated.
@@ -1071,6 +1075,43 @@ test('the next tick() composites the armed frame and dispatches the following on
     'the composited quadrants reached the display buffer');
   assert.equal(c.renderInFlight, true, 'the following frame was dispatched');
   assert.equal(c.pending, 2);
+});
+
+test('each render dispatch hands the retired generation buffer back for reuse', async () => {
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
+
+  const c = readyController(2);
+  c.showBoundaries = false;
+  const lastRender = (w) => w.posted.filter((m) => m.type === 'render').at(-1);
+
+  c.tick(); // dispatch generation A
+  assert.ok(c.workers.every((w) => lastRender(w).recycle === undefined),
+    'nothing is retired yet, so the first dispatch leaves the worker to allocate');
+
+  const genA = [new Uint16Array(2 * 2 * 3).fill(111), new Uint16Array(2 * 2 * 3).fill(111)];
+  deliverFrame(c, 0, { pixels: genA[0], x0: 0, x1: 2, y0: 0, y1: 2 });
+  deliverFrame(c, 1, { pixels: genA[1], x0: 2, x1: 4, y0: 0, y1: 2 });
+  await flush();
+  c.tick(); // composite A, dispatch B: A is the live generation, not retired
+  assert.ok(c.workers.every((w) => lastRender(w).recycle === undefined),
+    'the generation the compositor is displaying is never handed back');
+
+  const genB = () => new Uint16Array(2 * 2 * 3).fill(222);
+  deliverFrame(c, 0, { pixels: genB(), x0: 0, x1: 2, y0: 0, y1: 2 });
+  deliverFrame(c, 1, { pixels: genB(), x0: 2, x1: 4, y0: 0, y1: 2 });
+  await flush();
+  c.tick(); // composite B, dispatch C carrying generation A's retired buffers
+
+  c.workers.forEach((w, s) => {
+    assert.equal(lastRender(w).recycle, genA[s], `seg ${s} gets its own retired buffer back`);
+    assert.deepEqual(w.transfers.at(-1), [genA[s].buffer],
+      'the buffer is transferred, not structured-cloned');
+  });
+  assert.ok(c.results.every((r) => r.pixels[0] === 222),
+    'the displayed generation is untouched by the recycle');
+  assert.ok(c.scratch.every((slot) => slot === null),
+    'every staging slot is cleared as its buffer is consumed');
 });
 
 test('tick() re-blits the last composite when a render overruns the tick (preview holds, not black)', async () => {
