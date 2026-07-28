@@ -462,6 +462,62 @@ test('URLSync auto-flushes a tracked-key change once after the debounce', () => 
   }
 });
 
+test('URLSync corrects a URL advertising a rejected value, and converges', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const calls = installWindow('?effect=Bogus&keep=1', '/sim');
+    const s = new AppState({ effect: 'Voronoi' });
+    new URLSync(s, ['effect'], { effect: (v) => v === 'Voronoi' });
+
+    assert.equal(calls.length, 0, 'no synchronous write on construction');
+    mock.timers.tick(200);
+    assert.equal(calls.length, 1, 'exactly one corrective write');
+    const search = `?${calls[0].split('?')[1]}`;
+    const params = new URLSearchParams(search);
+    assert.equal(params.get('effect'), 'Voronoi', 'the URL advertises what renders');
+    assert.equal(params.get('keep'), '1', 'unrelated params survive');
+
+    getActiveURLSync().dispose();
+    const reloaded = installWindow(search, '/sim');
+    new URLSync(new AppState({ effect: 'Voronoi' }), ['effect'], { effect: (v) => v === 'Voronoi' });
+    mock.timers.tick(200);
+    assert.equal(reloaded.length, 0, 'the corrected URL rewrites nothing on reload');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test('URLSync rewrites a URL value it accepted in a non-canonical form', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const calls = installWindow('?flag=on&count=%208%20', '/sim');
+    const s = new AppState({ flag: false, count: 0 });
+    new URLSync(s, ['flag', 'count']);
+
+    mock.timers.tick(200);
+    assert.equal(calls.length, 1, 'exactly one corrective write');
+    const params = new URLSearchParams(calls[0].split('?')[1]);
+    assert.equal(params.get('flag'), 'true');
+    assert.equal(params.get('count'), '8');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test('URLSync writes nothing when the URL already matches state', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const calls = installWindow('?effect=Voronoi&count=8&untracked=x', '/sim');
+    const s = new AppState({ effect: 'Voronoi', count: 0 });
+    new URLSync(s, ['effect', 'count']);
+
+    mock.timers.tick(200);
+    assert.equal(calls.length, 0, 'a faithful URL is left alone');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
 test('URLSync.reset cancels a pending debounced flush', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {

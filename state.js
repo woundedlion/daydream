@@ -207,6 +207,18 @@ export class URLSync {
       state.update(patch);
     }
 
+    // Correct a URL that advertises something the app did not adopt: a rejected
+    // or unseeded value, or an accepted one that serializes differently ("on" ->
+    // "true", " 8 " -> "8"). Flushing writes the canonical form, so the next load
+    // finds no mismatch and schedules nothing.
+    for (const key of this.trackedKeys) {
+      if (!params.has(key)) continue;
+      if (params.get(key) !== this.canonicalParam(state.get(key))) {
+        this.schedule();
+        break;
+      }
+    }
+
     this.unsubscribe = state.subscribe((key, value) => {
       if (!this.trackedKeys.has(key)) return;
       this.schedule();
@@ -307,22 +319,33 @@ export class URLSync {
   }
 
   /**
-   * Write a tracked key into a URLSearchParams, rounding numeric values via
-   * roundUrlNumber so numbers serialize the same way setParam does. Strings
-   * pass through unchanged.
+   * Serialize a tracked value the way the URL stores it, rounding numbers via
+   * roundUrlNumber so they match setParam. Strings pass through unchanged.
+   * @param {*} val - The value to serialize.
+   * @returns {string|null} The param string, or null when the value has no URL
+   *   representation and the key is dropped instead.
+   */
+  canonicalParam(val) {
+    if (val === null || val === undefined) return null;
+    if (typeof val === 'number') {
+      const rounded = roundUrlNumber(val);
+      return rounded === null ? null : String(rounded);
+    }
+    return String(val);
+  }
+
+  /**
+   * Write a tracked key into a URLSearchParams using its canonical serialization,
+   * deleting the key when the value has none.
    * @param {URLSearchParams} params - The params object to mutate.
    * @param {string} key - The tracked key.
    * @param {*} val - The value to serialize.
    * @returns {void}
    */
   setTrackedParam(params, key, val) {
-    if (typeof val === 'number') {
-      const rounded = roundUrlNumber(val);
-      if (rounded === null) params.delete(key);
-      else params.set(key, String(rounded));
-    } else {
-      params.set(key, String(val));
-    }
+    const str = this.canonicalParam(val);
+    if (str === null) params.delete(key);
+    else params.set(key, str);
   }
 
   /**
