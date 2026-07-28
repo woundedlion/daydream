@@ -225,8 +225,12 @@
       const { snappedActiveC: newActiveC_Snapped, closingPeriod: newDomain } =
         snapToRationalRatio(newActiveC_Raw, passiveC);
 
-      // 4. Update the actual state
-      state[activeId] = newActiveC_Snapped;
+      // 4. Update the actual state. The snapped value scales the passive
+      // frequency by up to MAX_RATIONAL_TERM, so it can land outside the
+      // slider's range; clamp before the readout and the export snippet read it.
+      const clampedActiveC = Math.min(activeConfig.max,
+        Math.max(activeConfig.min, newActiveC_Snapped));
+      state[activeId] = clampedActiveC;
 
       // 5. Update the slider UI (force the thumb to jump to the snapped position)
       const slider = document.getElementById(`${activeId}_slider`);
@@ -234,11 +238,10 @@
 
       if (slider && valueSpan) {
         // Round the snapped value for setting the slider UI element
-        const roundedValue = Math.round(newActiveC_Snapped * activeConfig.scale);
-        slider.value = roundedValue;
+        slider.value = Math.round(clampedActiveC * activeConfig.scale);
 
         // Determine decimals for display (2 for C1/C2)
-        valueSpan.textContent = newActiveC_Snapped.toFixed(2);
+        valueSpan.textContent = clampedActiveC.toFixed(2);
       }
 
       state.Duration = newDomain;
