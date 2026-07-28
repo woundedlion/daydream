@@ -6,7 +6,7 @@
 
 import createHolosphereModule from "./holosphere_wasm.js";
 import { Daydream } from "./driver.js";
-import { GUI, resetGUI } from "gui";
+import { GUI, resetGUI } from "./gui.js";
 import { EffectSidebar } from "./sidebar.js";
 import {
   planResolutionApply,
