@@ -87,6 +87,15 @@ export const SLOW_FRAME_MS = 62;
  *  media-query breakpoints in styles/index.css. */
 export const MOBILE_BREAKPOINT_PX = 900;
 
+/** Stats-panel cell element IDs per row, ordered [desktop, mobile]. */
+export const STATS_CELL_IDS = {
+  perf: ["perf-stats", "perf-stats-mobile"],
+  scratchA: ["stat-scratch-a", "stat-scratch-a-m"],
+  scratchB: ["stat-scratch-b", "stat-scratch-b-m"],
+  persist: ["stat-persistent", "stat-persistent-m"],
+  stack: ["stat-stack", "stat-stack-m"],
+};
+
 /**
  * Browser-side simulator: drives the three.js scene that renders the LED
  * sphere as instanced dots, on a fixed-timestep sim clock with on-demand
@@ -282,6 +291,7 @@ export class Daydream {
     this.strobeColumns = true;
 
     this.statsGroup = null;
+    this.statsMissLogged = false;
 
     this.precomputeMatrices();
   }
@@ -836,24 +846,31 @@ export class Daydream {
   updateStats(duration, effect) {
     let stats = this.statsGroup;
     if (!stats) {
-      stats = {
-        perf: [document.getElementById("perf-stats"), document.getElementById("perf-stats-mobile")],
-        scratchA: [document.getElementById("stat-scratch-a"), document.getElementById("stat-scratch-a-m")],
-        scratchB: [document.getElementById("stat-scratch-b"), document.getElementById("stat-scratch-b-m")],
-        persist: [document.getElementById("stat-persistent"), document.getElementById("stat-persistent-m")],
-        stack: [document.getElementById("stat-stack"), document.getElementById("stat-stack-m")]
-      };
+      stats = {};
+      const missing = [];
+      for (const [row, ids] of Object.entries(STATS_CELL_IDS)) {
+        stats[row] = ids.map(id => {
+          const el = document.getElementById(id);
+          if (!el) missing.push(id);
+          return el;
+        });
+      }
       // Latch only once every row resolved; a row still missing this tick would
       // otherwise stay dead for the session.
-      if (Object.values(stats).every(row => row.every(el => el))) {
+      if (missing.length === 0) {
         this.statsGroup = stats;
+      } else if (!this.statsMissLogged) {
+        this.statsMissLogged = true;
+        console.warn(
+          `Stats cells absent from the document (${missing.join(', ')}); ` +
+          `the panel re-queries every frame until they appear.`);
       }
     }
 
     const perfText = `${duration.toFixed(3)} ms`;
     const perfColor = duration > SLOW_FRAME_MS ? 'red' : 'grey';
     stats.perf.forEach(el => {
-      if (el) { el.innerText = perfText; el.style.color = perfColor; }
+      if (el) { el.textContent = perfText; el.style.color = perfColor; }
     });
 
     if (effect && effect.getArenaMetrics) {
