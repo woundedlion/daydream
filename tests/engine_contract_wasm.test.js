@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import createHolosphereModule from '../holosphere_wasm.js';
 import { KNOWN_OPS, PLATONIC_SOLIDS, CATALAN_BASES } from '../tools/solid_codegen.js';
+import { ENGINE_METHODS } from './fake_engine.js';
 
 const M = await createHolosphereModule({ print() {}, printErr() {} });
 
@@ -22,11 +23,7 @@ const W = 96, H = 20;
 const engine = new M.HolosphereEngine();
 
 test('HolosphereEngine exposes the method surface the FakeEngines mock', () => {
-  for (const name of [
-    'setResolution', 'setEffect', 'setParameter', 'setAnimationsPaused',
-    'setClip', 'drawFrame', 'getRenderUs', 'getPixels', 'getArenaMetrics',
-    'getParameterDefinitions', 'getParamValues',
-  ]) {
+  for (const name of ENGINE_METHODS) {
     assert.equal(typeof engine[name], 'function',
       `HolosphereEngine is missing method ${name} (FakeEngine implements it)`);
   }

@@ -4,6 +4,7 @@
 import { test, mock, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { PROTOCOL_VERSION } from '../worker_protocol.js';
+import { unpinnedEngineMethods } from './fake_engine.js';
 
 // ---------------------------------------------------------------------------
 // Fakes — installed BEFORE importing the worker, which binds self.postMessage
@@ -72,6 +73,11 @@ class FakeEngine {
     };
   }
 }
+
+test('FakeEngine mocks only methods the real engine surface pins', () => {
+  assert.deepEqual(unpinnedEngineMethods(FakeEngine.prototype), [],
+    'engine_contract_wasm.test.js never checks these against the real module');
+});
 
 /** The single engine the mocked factory hands back, so tests can configure it. */
 let engineInstance = null;
