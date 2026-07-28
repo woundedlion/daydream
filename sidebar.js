@@ -46,8 +46,9 @@ export class EffectSidebar {
     this.listEl.setAttribute('aria-label', this.listLabel());
     this.listEl.className = 'effect-list';
     this.tabbableBtn = null; // option currently holding tabindex=0
+    this.scrollArrowsRaf = 0;
     this.onKeyDownBound = (e) => this.onKeyDown(e);
-    this.onScrollBound = () => this.updateScrollArrows();
+    this.onScrollBound = () => this.scheduleScrollArrows();
     this.listEl.addEventListener('keydown', this.onKeyDownBound);
 
     // Decorative scroll-arrow glyphs — hidden from assistive tech.
@@ -62,7 +63,6 @@ export class EffectSidebar {
     this.arrowRight.setAttribute('aria-hidden', 'true');
 
     this.listEl.addEventListener('scroll', this.onScrollBound, { passive: true });
-    this.scrollArrowsRaf = 0;
     this.resizeObs = new ResizeObserver(this.onScrollBound);
     this.resizeObs.observe(this.listEl);
 
@@ -143,8 +143,7 @@ export class EffectSidebar {
       this.buttons.get(this.activeName) || this.listEl.querySelector('.effect-button')
     );
     // Defer until the grid has laid out before measuring scroll extents.
-    cancelAnimationFrame(this.scrollArrowsRaf);
-    this.scrollArrowsRaf = requestAnimationFrame(() => this.updateScrollArrows());
+    this.scheduleScrollArrows();
   }
 
   /**
@@ -323,6 +322,18 @@ export class EffectSidebar {
         this.onSelect(focused.dataset.effect);
       }
     }
+  }
+
+  /**
+   * Queue a scroll-arrow refresh on the next frame, replacing any pending one.
+   * Scroll and resize bursts then force layout once per frame instead of per event.
+   */
+  scheduleScrollArrows() {
+    cancelAnimationFrame(this.scrollArrowsRaf);
+    this.scrollArrowsRaf = requestAnimationFrame(() => {
+      this.scrollArrowsRaf = 0;
+      this.updateScrollArrows();
+    });
   }
 
   /** Show/hide scroll arrows based on current scroll position. */
