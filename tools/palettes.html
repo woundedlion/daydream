@@ -642,7 +642,7 @@
           hideResetZoomButton();
         }
 
-        updatePalette();
+        scheduleUpdate();
       });
 
       // Seed the per-group start values a locked relative drag works from. Must
@@ -1278,6 +1278,19 @@
       updatePaletteCodeOutput();
     }
 
+    // Coalesce updatePalette() into one recompute per animation frame. Slider
+    // oninput fires on every pointer tick during a drag; without this each tick
+    // re-bakes the generative palette's 256-entry LUT and redraws the wave graph
+    // (three channels reconstructed per canvas column) on the main thread.
+    let pendingUpdate = 0;
+    function scheduleUpdate() {
+      if (pendingUpdate) return;
+      pendingUpdate = requestAnimationFrame(() => {
+        pendingUpdate = 0;
+        updatePalette();
+      });
+    }
+
     /**
          * Initialize the sliders and the first visualization.
          */
@@ -1346,7 +1359,7 @@
       if (genSeedSlider && genSeedValue) {
         genSeedSlider.addEventListener('input', () => {
           genSeedValue.textContent = genSeedSlider.value;
-          updatePalette();
+          scheduleUpdate();
         });
       }
 

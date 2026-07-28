@@ -142,6 +142,16 @@
 
     let scene, camera, renderer, controls, line;
 
+    // The curve's appearance never varies, so one material serves every rebuild.
+    const lineMaterial = new THREE.LineBasicMaterial({
+      color: 0x818cf8,
+      // linewidth is a no-op in the WebGL renderer (always 1px); omitted.
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+      depthTest: false // Always on top effect
+    });
+
     // --- Lissajous Function ---
     // lissajous(m1, m2, a, t) lives in ./lissajous_math.js (imported above); the
     // preview and the engine share its m1/m2/a/t argument order, and the
@@ -170,7 +180,6 @@
       if (line) {
         scene.remove(line);
         line.geometry.dispose();
-        line.material.dispose();
       }
 
       const points = [];
@@ -186,17 +195,22 @@
       }
 
       const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      const material = new THREE.LineBasicMaterial({
-        color: 0x818cf8,
-        // linewidth is a no-op in the WebGL renderer (always 1px); omitted.
-        transparent: true,
-        opacity: 0.9,
-        depthWrite: false,
-        depthTest: false // Always on top effect
-      });
-      line = new THREE.Line(geometry, material);
+      line = new THREE.Line(geometry, lineMaterial);
       line.renderOrder = 1;
       scene.add(line);
+    };
+
+    // Coalesce rebuilds into one per animation frame: slider oninput fires on
+    // every pointer tick during a drag, and each rebuild resamples up to
+    // config.Samples.max curve points.
+    let pendingUpdate = 0;
+    const scheduleUpdate = () => {
+      if (pendingUpdate) return;
+      pendingUpdate = requestAnimationFrame(() => {
+        pendingUpdate = 0;
+        regenerateCurve();
+        updateCodeSnippet();
+      });
     };
 
     // --- RATIONAL CONSTRAINT LOGIC ---
@@ -272,8 +286,7 @@
       }
 
       // 6. Re-render the curve and update the code snippet
-      regenerateCurve();
-      updateCodeSnippet();
+      scheduleUpdate();
     };
 
     // --- End RATIONAL CONSTRAINT LOGIC ---
@@ -322,8 +335,7 @@
         } else {
           // 3. For unlocked controls, update UI and re-render normally.
           handles.valueSpan.textContent = state[id].toFixed(decimals);
-          regenerateCurve();
-          updateCodeSnippet();
+          scheduleUpdate();
         }
       });
     };
@@ -361,8 +373,7 @@
             durationContainer.classList.remove('opacity-50');
 
             // Re-render, just in case
-            regenerateCurve();
-            updateCodeSnippet();
+            scheduleUpdate();
           }
         });
       }
