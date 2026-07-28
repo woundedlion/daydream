@@ -93,8 +93,10 @@ function requireInstalledVersion(name, want) {
 
 // Source files the browser loads, scanned for the three/addons/ modules that
 // resolve through the prefix mapping: an integrity map is keyed by exact URL, so
-// each addon the app imports needs its own entry.
-const SKIP_DIRS = new Set(['node_modules', 'three.js', 'scripts', 'tests', '.git', '.github']);
+// each addon the app imports needs its own entry. The gitignored vendored dirs
+// are skipped: they hold third-party bytes that import nothing through the map,
+// and letting them steer the output would make it depend on a local checkout.
+const SKIP_DIRS = new Set(['node_modules', 'three.js', 'vendor', 'scripts', 'tests', '.git', '.github']);
 
 /**
  * Collect every browser-loaded source file under a directory.
