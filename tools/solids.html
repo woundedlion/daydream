@@ -583,10 +583,13 @@
   <script type="module">
     import * as THREE from 'three';
     import { initScene, copyWithFeedback, showFatalError } from './shared.js';
-    // Pure C++ export-string codegen (formatFloat/pctSuffix/recipe builders) and
-    // the pure face-geometry helpers live in solid_codegen.js so they can be
-    // unit tested without a DOM or the WASM module. DOM/WASM wiring stays inline.
+    // The shared op table and dispatch, the pure C++ export-string codegen
+    // (formatFloat/pctSuffix/recipe builders) and the pure face-geometry helpers
+    // live in solid_codegen.js so they can be unit tested without a DOM or the
+    // WASM module. DOM/WASM wiring stays inline.
     import {
+      OP_DEFS,
+      applyOp,
       formatFloat,
       formatSolidName,
       pctSuffix,
@@ -716,23 +719,6 @@
       'pentakisDodecahedron', 'deltoidalHexecontahedron', 'disdyakisTriacontahedron',
       'pentagonalHexecontahedron',
     ]);
-
-    const OP_DEFS = {
-      kis: { params: {} },
-      ambo: { params: {} },
-      gyro: { params: {} },
-      snub: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 }, twist: { val: 0.0, min: 0, max: 1.0, step: 0.01 } } },
-      dual: { params: {} },
-      truncate: { params: { t: { val: 0.33, min: 0.01, max: 0.5, step: 0.01 } } },
-      chamfer: { params: { t: { val: 0.5, min: 0.01, max: 1.0, step: 0.01 } } },
-      expand: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 } } },
-      hankin: { params: { angle: { val: 54, min: 0, max: 90, step: 1 } } },
-      relax: { params: { iter: { val: 100, min: 1, max: 500, step: 1 } } },
-      meta: { params: {} },
-      needle: { params: {} },
-      zip: { params: {} },
-      bevel: { params: { t: { val: 0.25, min: 0.01, max: 0.5, step: 0.01 } } }
-    };
 
     // Initialize
     async function init() {
@@ -1643,24 +1629,6 @@
     function clearSavedSolids() {
       savedSolids.length = 0;
       renderSavedList();
-    }
-
-    // Apply one op of the state.ops encoding to a WASM mesh wrapper, returning
-    // the new mesh; throws on an op name the module does not bind. Single source
-    // of truth for op dispatch: update() (live module) and chainIsValid()
-    // (validator module) must run byte-identical chains or validation proves the
-    // wrong thing.
-    function applyOp(mesh, o) {
-      const opName = typeof o === 'string' ? o : o.op;
-      if (opName === 'truncate') return mesh.truncate(o.params.t);
-      if (opName === 'chamfer') return mesh.chamfer(o.params.t);
-      if (opName === 'expand') return mesh.expand(o.params.t);
-      if (opName === 'bevel') return mesh.bevel(o.params.t);
-      if (opName === 'snub') return mesh.snub(o.params.t, o.params.twist);
-      if (opName === 'hankin') return mesh.hankin(o.params.angle * (Math.PI / 180));
-      if (opName === 'relax') return mesh.relax(o.params.iter);
-      if (mesh[opName]) return mesh[opName]();
-      throw new Error(`unknown op "${opName}" — not bound by the WASM MeshOps module`);
     }
 
     // --- CHAIN VALIDATION ---

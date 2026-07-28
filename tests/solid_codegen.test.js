@@ -3,6 +3,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const {
+  OP_DEFS,
+  KNOWN_OPS,
+  applyOp,
   formatFloat,
   formatSolidName,
   pctSuffix,
@@ -13,6 +16,58 @@ const {
 } =
   await import('../tools/solid_codegen.js');
 const { formatFloatCpp } = await import('../tools/cpp_format.js');
+
+/**
+ * Builds an op whose params object records every key a code path reads, in read
+ * order, seeded with the OP_DEFS defaults.
+ */
+function recordingOp(op) {
+  const seen = new Set();
+  const values = {};
+  for (const [key, def] of Object.entries(OP_DEFS[op].params)) values[key] = def.val;
+  const params = new Proxy(values, {
+    get(target, key) {
+      if (typeof key === 'string') seen.add(key);
+      return target[key];
+    },
+  });
+  return { spec: { op, params }, seen };
+}
+
+/** A mesh wrapper whose every method returns another such wrapper, so applyOp runs without WASM. */
+function stubMesh() {
+  const mesh = new Proxy({}, { get: () => () => mesh });
+  return mesh;
+}
+
+/**
+ * Verifies the live-preview dispatch and the C++ generator read exactly the
+ * params OP_DEFS declares for every known op, in the same order — so an op that
+ * gains or reorders a parameter cannot diverge silently between what the tool
+ * previews and what it pastes.
+ */
+test('applyOp and generateFuncAndRecipe consume the OP_DEFS params of every known op', () => {
+  assert.ok(KNOWN_OPS.size > 0);
+  for (const op of KNOWN_OPS) {
+    const expected = Object.keys(OP_DEFS[op].params);
+
+    const generated = recordingOp(op);
+    generateFuncAndRecipe({ base: 'cube', ops: [generated.spec] });
+    assert.deepEqual([...generated.seen], expected,
+      `generateFuncAndRecipe reads different params than OP_DEFS declares for "${op}"`);
+
+    const previewed = recordingOp(op);
+    applyOp(stubMesh(), previewed.spec);
+    assert.deepEqual([...previewed.seen], expected,
+      `applyOp reads different params than OP_DEFS declares for "${op}"`);
+  }
+});
+
+/** Verifies applyOp rejects an op the mesh wrapper binds no method for. */
+test('applyOp throws on an op the module does not bind', () => {
+  assert.throws(() => applyOp({}, { op: 'frobnicate', params: {} }),
+    /unknown op "frobnicate"/);
+});
 
 /** formatFloat re-exports cpp_format's formatter; its behavior is pinned in cpp_format.test.js. */
 test('formatFloat is wired to the authoritative formatFloatCpp', () => {
