@@ -1289,7 +1289,7 @@ const makeElement = () => {
 test('the fault overlay is an alert focused once for recovery', () => {
   const stats = makeElement();
   const c = makeController();
-  c.doc = {
+  c.statsView.doc = {
     getElementById: (id) => id === 'segment-stats' ? stats : null,
     createElement: makeElement,
   };
@@ -1312,7 +1312,7 @@ test('the fault overlay is an alert focused once for recovery', () => {
 test('a spawning pool reports the spawn and does not own the display', () => {
   const stats = makeElement();
   const c = makeController();
-  c.doc = {
+  c.statsView.doc = {
     getElementById: (id) => id === 'segment-stats' ? stats : null,
     createElement: makeElement,
   };
