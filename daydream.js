@@ -11,6 +11,7 @@ import { EffectSidebar } from "./sidebar.js";
 import {
   planResolutionApply,
   paramValueSkew,
+  paramGenerationStale,
   runSwitchTransaction,
   applyInitialState,
   snapshotEffectControlState,
@@ -103,12 +104,22 @@ let syncGuiSkewLogged = false;
 /**
  * Live per-frame parameter values for the active effect. Once the worker pool
  * owns the display the main engine is no longer stepped, so its values are
- * stale; source from segment 0's worker instead. May be null or zero-length if
- * the WASM view detached on heap growth — callers must guard.
- * @returns {Float32Array|number[]|null}
+ * stale; source from segment 0's worker instead (the pool drops its values on an
+ * effect switch and fences the stream on renderGen). May be null or zero-length
+ * if the WASM view detached on heap growth — callers must guard.
+ * @returns {Float32Array|number[]|null} Null when no stream describes the GUI's
+ *   current parameter snapshot.
  */
 function liveParamValues() {
-  return segments.ownsDisplay ? segments.getParamValues() : host.engine.getParamValues();
+  if (segments.ownsDisplay) return segments.getParamValues();
+  // The main engine's value stream describes whatever effect it last loaded;
+  // pairing it with a snapshot from an earlier load binds sliders to another
+  // effect's values, which equal parameter counts would hide.
+  if (activeEffect
+      && paramGenerationStale(activeEffect.paramGeneration, host.paramGeneration())) {
+    return null;
+  }
+  return host.engine.getParamValues();
 }
 
 /**
@@ -252,6 +263,9 @@ function applyEffect(preserveParams = false) {
     activeEffect = { gui: new GUI({ autoPlace: false }), activeDragEnds: new Set() };
 
     const params = host.engine.getParameterDefinitions();
+    // Stamp the snapshot with the engine's effect-load generation so a later
+    // value read can prove it describes these definitions.
+    activeEffect.paramGeneration = host.paramGeneration();
 
     const effectActions = {
       /**
@@ -266,11 +280,11 @@ function applyEffect(preserveParams = false) {
        */
       export() {
         const values = liveParamValues();
-        // A heap-growth detach leaves the view zero-length, and the segmented
-        // source is null before the first frame; skip so we don't copy an
-        // all-zero preset.
+        // A heap-growth detach leaves the view zero-length; the segmented source
+        // is null before the first frame, as is a read that no longer matches the
+        // GUI's snapshot. Skip so we don't copy an all-zero or foreign preset.
         if (!values || values.length === 0) {
-          console.warn('Export: parameter view detached (zero-length); skipping copy');
+          console.warn('Export: no parameter values matching the current effect; skipping copy');
           exportCtrl.name('✗ Copy failed');
           setTimeout(() => exportCtrl.name('Export'), 1500);
           return;

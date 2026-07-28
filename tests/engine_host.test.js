@@ -58,6 +58,23 @@ test('invalidateView() forces the next refresh() to re-fetch', () => {
   assert.equal(host.view(), second);
 });
 
+test('paramGeneration() reports the engine\'s effect-load counter', () => {
+  const host = new EngineHost();
+  let loads = 3;
+  host.engine = { getParamGeneration: () => loads };
+
+  assert.equal(host.paramGeneration(), 3);
+  loads = 4;
+  assert.equal(host.paramGeneration(), 4);
+});
+
+test('paramGeneration() is undefined on a module without the accessor', () => {
+  const host = new EngineHost();
+  host.engine = { getPixels: () => new Uint16Array(4) };
+
+  assert.equal(host.paramGeneration(), undefined);
+});
+
 test('refresh() re-fetches and re-notifies when the held view has detached', () => {
   const stale = new Uint16Array(4);
   stale.buffer.transfer(); // Emscripten heap growth detaches the backing buffer in place
