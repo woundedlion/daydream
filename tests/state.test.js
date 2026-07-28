@@ -188,6 +188,26 @@ test('URLSync keeps a numeric default for an empty URL value', () => {
   assert.strictEqual(s.get('count'), 5);
 });
 
+test('URLSync keeps a numeric default when the URL value has trailing garbage', () => {
+  for (const raw of ['42abc', '0x10', '1,5', '4 2', 'Infinity', '1.2.3']) {
+    installWindow(`?count=${encodeURIComponent(raw)}`);
+    const s = new AppState({ count: 7 });
+    new URLSync(s, ['count']);
+    assert.strictEqual(s.get('count'), 7, `"${raw}" is rejected whole`);
+    getActiveURLSync().dispose();
+  }
+});
+
+test('URLSync coerces well-formed numeric URL values', () => {
+  for (const [raw, want] of [['42', 42], ['-3.5', -3.5], ['.25', 0.25], ['1e3', 1000], [' 8 ', 8]]) {
+    installWindow(`?count=${encodeURIComponent(raw)}`);
+    const s = new AppState({ count: 7 });
+    new URLSync(s, ['count']);
+    assert.strictEqual(s.get('count'), want, `"${raw}" coerces to ${want}`);
+    getActiveURLSync().dispose();
+  }
+});
+
 test('URLSync coerces a boolean default tracked key from truthy URL tokens', () => {
   for (const raw of ['true', '1', 'yes', 'on', 'TRUE', ' On ']) {
     installWindow(`?flag=${encodeURIComponent(raw)}`);
