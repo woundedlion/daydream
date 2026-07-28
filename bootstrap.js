@@ -76,6 +76,9 @@ export function showBootstrapFailure(error, {
     refresh().catch(() => {}).then(() => pageLocation?.reload()));
 
   overlay.classList.add('error');
+  // The markup ships role="status" for the polite loading message; a boot
+  // failure is assertive.
+  overlay.setAttribute('role', 'alert');
   overlay.replaceChildren(title, detail, reload);
   return true;
 }
