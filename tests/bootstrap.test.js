@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { bootstrap, showBootstrapFailure } from '../bootstrap.js';
+import { bootstrap, refreshModuleCache, showBootstrapFailure } from '../bootstrap.js';
 
 function fakeDocument() {
   const listeners = new WeakMap();
@@ -103,18 +103,86 @@ test('failure detail is assigned as text without interpreting markup', () => {
   assert.equal(childWithClass(overlay, 'load-error-detail').textContent, markup);
 });
 
-test('reload button invokes the injected page location', () => {
+test('reload button refreshes the module cache before reloading', async () => {
+  const { doc, overlay, click } = fakeDocument();
+  const order = [];
+  showBootstrapFailure(new Error('failed'), {
+    document: doc,
+    location: { reload() { order.push('reload'); } },
+    refresh: async () => { order.push('refresh'); },
+  });
+
+  const reload = childWithClass(overlay, 'context-lost-reload');
+  assert.equal(reload.textContent, 'Reload');
+  await click(reload);
+  assert.deepEqual(order, ['refresh', 'reload']);
+});
+
+test('reload button still reloads when the cache refresh fails', async () => {
   const { doc, overlay, click } = fakeDocument();
   let reloads = 0;
   showBootstrapFailure(new Error('failed'), {
     document: doc,
     location: { reload() { reloads += 1; } },
+    refresh: () => Promise.reject(new TypeError('offline')),
   });
 
-  const reload = childWithClass(overlay, 'context-lost-reload');
-  assert.equal(reload.textContent, 'Reload');
-  click(reload);
+  await click(childWithClass(overlay, 'context-lost-reload'));
   assert.equal(reloads, 1);
+});
+
+const fakeTimeline = (...names) => ({
+  getEntriesByType: (type) => type === 'resource' ? names.map((name) => ({ name })) : [],
+});
+
+test('refreshModuleCache re-fetches same-origin scripts past the cache', async () => {
+  const calls = [];
+  await refreshModuleCache({
+    origin: 'http://localhost:8000',
+    performance: fakeTimeline(
+      'http://localhost:8000/daydream.js',
+      'http://localhost:8000/effect_sequencing.js',
+      'http://localhost:8000/effect_sequencing.js',
+      'http://localhost:8000/tools/shared.js?v=2',
+    ),
+    fetch: (url, options) => { calls.push([url, options]); return Promise.resolve(); },
+  });
+
+  assert.deepEqual(calls.map(([url]) => url), [
+    'http://localhost:8000/daydream.js',
+    'http://localhost:8000/effect_sequencing.js',
+    'http://localhost:8000/tools/shared.js?v=2',
+  ]);
+  for (const [, options] of calls) assert.deepEqual(options, { cache: 'reload' });
+});
+
+test('refreshModuleCache skips cross-origin and non-script resources', async () => {
+  const calls = [];
+  await refreshModuleCache({
+    origin: 'http://localhost:8000',
+    performance: fakeTimeline(
+      'https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.module.js',
+      'http://localhost:8000/holosphere_wasm.wasm',
+      'http://localhost:8000/styles/index.css',
+      'http://localhost:8000/bootstrap.js',
+    ),
+    fetch: (url) => { calls.push(url); return Promise.resolve(); },
+  });
+
+  assert.deepEqual(calls, ['http://localhost:8000/bootstrap.js']);
+});
+
+test('refreshModuleCache survives a rejected re-fetch and a missing timeline', async () => {
+  await assert.doesNotReject(() => refreshModuleCache({
+    origin: 'http://localhost:8000',
+    performance: fakeTimeline('http://localhost:8000/daydream.js'),
+    fetch: () => Promise.reject(new TypeError('network down')),
+  }));
+  await assert.doesNotReject(() => refreshModuleCache({
+    origin: 'http://localhost:8000',
+    performance: undefined,
+    fetch: () => assert.fail('no resource timeline: nothing to re-fetch'),
+  }));
 });
 
 test('index loads bootstrap instead of the application module directly', () => {
