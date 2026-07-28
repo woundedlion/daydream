@@ -817,7 +817,6 @@ export class Daydream {
         this.dotMesh.instanceColor = new THREE.InstancedBufferAttribute(
           new Uint16Array(needed), 3, true
         );
-        this.dotMesh.instanceColor.colorSpace = THREE.LinearSRGBColorSpace;
         this.dotMesh.instanceColor.setUsage(THREE.StreamDrawUsage);
       }
       // A fresh JS-owned buffer, not WASM memory; the next refreshPixelView()
