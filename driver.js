@@ -627,6 +627,7 @@ export class Daydream {
    */
   setStrobeColumns(strobe) {
     this.strobeColumns = strobe;
+    this.invalidate();
   }
 
   /**
