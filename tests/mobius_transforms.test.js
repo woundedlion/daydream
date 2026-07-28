@@ -222,29 +222,22 @@ test('hyperbolic at t=0 is the identity transform (scale 1)', () => {
   assertComplex(c.D, 1, 0, 'D');
 });
 
-/** parabolic(0) is the identity, and its B coefficient grows linearly (B.re = t * 0.8). */
-test('parabolic at t=0 is the identity, and B drifts linearly', () => {
-  const c0 = parabolic(0);
-  assertComplex(c0.A, 1, 0, 'A');
-  assertComplex(c0.B, 0, 0, 'B');
-  assertComplex(c0.C, 0, 0, 'C');
-  assertComplex(c0.D, 1, 0, 'D');
-  // B.re = t * 0.8
-  assertComplex(parabolic(2.5).B, 2.0, 0, 'B@2.5');
+/** parabolic(0) yields the identity coefficients. */
+test('parabolic at t=0 is the identity transform', () => {
+  const c = parabolic(0);
+  assertComplex(c.A, 1, 0, 'A');
+  assertComplex(c.B, 0, 0, 'B');
+  assertComplex(c.C, 0, 0, 'C');
+  assertComplex(c.D, 1, 0, 'D');
 });
 
-/** cayley(0) is the identity; for t >= 2 the blend saturates to the Cayley map (1, -i, 1, i). */
-test('cayley at t=0 is the identity and saturates to Cayley (1,-i,1,i)', () => {
-  assertComplex(cayley(0).A, 1, 0, 'A@0');
-  assertComplex(cayley(0).B, 0, 0, 'B@0');
-  assertComplex(cayley(0).C, 0, 0, 'C@0');
-  assertComplex(cayley(0).D, 1, 0, 'D@0');
-  // p saturates at 1 for t >= 2 -> A=1, B=-i, C=1, D=i
-  const sat = cayley(10);
-  assertComplex(sat.A, 1, 0, 'A_sat');
-  assertComplex(sat.B, 0, -1, 'B_sat');
-  assertComplex(sat.C, 1, 0, 'C_sat');
-  assertComplex(sat.D, 0, 1, 'D_sat');
+/** cayley(0) yields the identity coefficients. */
+test('cayley at t=0 is the identity transform', () => {
+  const c = cayley(0);
+  assertComplex(c.A, 1, 0, 'A');
+  assertComplex(c.B, 0, 0, 'B');
+  assertComplex(c.C, 0, 0, 'C');
+  assertComplex(c.D, 1, 0, 'D');
 });
 
 /** loxodromic(0) yields the identity coefficients. */
@@ -303,6 +296,33 @@ test('tumble at theta=pi/2 gives B=-1, C=1', () => {
   assertComplex(c.B, -1, 0, 'B');
   assertComplex(c.C, 1, 0, 'C');
   assertComplex(c.D, 0, 0, 'D');
+});
+
+/** parabolic(2.5): B.re = t * 0.8 = 2; A, C and D stay at the identity. */
+test('parabolic at t=2.5 translates by 2 along the real axis', () => {
+  const c = parabolic(2.5);
+  assertComplex(c.A, 1, 0, 'A');
+  assertComplex(c.B, 2, 0, 'B');
+  assertComplex(c.C, 0, 0, 'C');
+  assertComplex(c.D, 1, 0, 'D');
+});
+
+/** cayley(1): p = t * 0.5 = 0.5, the half-blend of identity toward (1,-i,1,i). */
+test('cayley at t=1 is the half-blend toward the Cayley map', () => {
+  const c = cayley(1);
+  assertComplex(c.A, 1, 0, 'A');
+  assertComplex(c.B, 0, -0.5, 'B');
+  assertComplex(c.C, 0.5, 0, 'C');
+  assertComplex(c.D, 0.5, 0.5, 'D');
+});
+
+/** cayley saturates the blend at p = 1 for t >= 2: A=1, B=-i, C=1, D=i. */
+test('cayley saturates to the Cayley map (1,-i,1,i) for t >= 2', () => {
+  const c = cayley(10);
+  assertComplex(c.A, 1, 0, 'A');
+  assertComplex(c.B, 0, -1, 'B');
+  assertComplex(c.C, 1, 0, 'C');
+  assertComplex(c.D, 0, 1, 'D');
 });
 
 // --- mobiusCodeString -----------------------------------------------------
