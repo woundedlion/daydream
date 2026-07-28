@@ -199,25 +199,34 @@ export class EffectSidebar {
   }
 
   /**
+   * Spoken form of the current sort direction.
+   * @returns {string} 'ascending' or 'descending'.
+   */
+  dirWord() {
+    return this.sort.dir === 'asc' ? 'ascending' : 'descending';
+  }
+
+  /**
    * Accessible name for the option list, naming the order it is currently in.
    * @returns {string} e.g. 'Effects, sorted by name ascending'.
    */
   listLabel() {
-    return `Effects, sorted by ${this.sort.key} ${this.sort.dir === 'asc' ? 'ascending' : 'descending'}`;
+    return `Effects, sorted by ${this.sort.key} ${this.dirWord()}`;
   }
 
   /**
    * Build a sort-control button for `key` labelled `label`. Clicking toggles
    * direction when this key is already active, else activates it (size defaults
    * to descending, others to ascending). The label and the glyph are separate
-   * children so the direction arrow can stay presentational.
+   * children so the direction arrow can stay presentational; the direction
+   * itself reaches assistive tech through the accessible name (syncSortBtn).
    * @param {string} key - Sort key this button controls ('name' or 'size').
    * @param {string} label - Human-readable button label.
    * @returns {HTMLElement} The created sort-control button.
    */
   createSortBtn(key, label) {
     const btn = document.createElement('button');
-    btn.setAttribute('aria-label', `Sort by ${label.toLowerCase()}`);
+    btn.dataset.sortLabel = label.toLowerCase();
 
     const labelSpan = document.createElement('span');
     labelSpan.textContent = label;
@@ -240,8 +249,9 @@ export class EffectSidebar {
   }
 
   /**
-   * Apply this.sort to one sort control: active class, pressed state, and the
-   * presentational direction glyph.
+   * Apply this.sort to one sort control: active class, pressed state, the
+   * presentational direction glyph, and the accessible name. The active button
+   * names the direction it sorted in, which the aria-hidden glyph cannot convey.
    * @param {HTMLElement} btn - Sort-control button to sync.
    * @param {string} key - Sort key this button controls ('name' or 'size').
    */
@@ -250,6 +260,8 @@ export class EffectSidebar {
     btn.className = 'sort-btn' + (active ? ' active' : '');
     btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     btn.querySelector('.sort-glyph').textContent = this.sortGlyph(key);
+    const name = `Sort by ${btn.dataset.sortLabel}`;
+    btn.setAttribute('aria-label', active ? `${name}, ${this.dirWord()}` : name);
   }
 
   /** Sync the sort buttons and the list's announced order to this.sort. */
