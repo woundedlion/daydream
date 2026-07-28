@@ -351,6 +351,33 @@ test('URLSync.setParam(k, NaN) drops the key from the URL on flush', () => {
   assert.equal(params.get('keep'), '1', 'unrelated params survive');
 });
 
+test('URLSync.setParam drops a non-zero value too small to survive rounding', () => {
+  const calls = installWindow('?keep=1', '/sim');
+  const s = new AppState({});
+  const sync = new URLSync(s, []);
+
+  sync.setParam('speed', 1.5);
+  sync.flush();
+  let params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
+  assert.equal(params.get('speed'), '1.5');
+
+  sync.setParam('speed', 1e-6); // rounds to 0: drop rather than claim an exact zero
+  sync.flush();
+  params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
+  assert.equal(params.has('speed'), false, 'a value that rounds to 0 drops the param');
+  assert.equal(params.get('keep'), '1', 'unrelated params survive');
+});
+
+test('URLSync serializes an exact zero rather than dropping it', () => {
+  const calls = installWindow('', '/sim');
+  const s = new AppState({ speed: 0 });
+  const sync = new URLSync(s, ['speed']);
+
+  sync.flush();
+  const params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
+  assert.equal(params.get('speed'), '0', 'a legitimate 0 round-trips');
+});
+
 test('URLSync.flush drops a tracked key cleared to null', () => {
   const calls = installWindow('?effect=Voronoi&keep=1', '/sim');
   const s = new AppState({ effect: 'Voronoi' });
