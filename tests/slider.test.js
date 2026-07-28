@@ -2,41 +2,28 @@
 //
 // createSlider's validation branches: NaN/order guards on min/max/step/scale,
 // and the scaled-step rounding guard that rejects a step that collapses to 0.
-import { test, beforeEach, afterEach } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 
 const { createSlider } = await import('../tools/slider.js');
 
-/** A fake range input recording the attributes createSlider sets. */
-const fakeInput = () => ({
-  type: '', id: '', min: '', max: '', step: '', value: '', className: '',
-  addEventListener() {},
-});
+restoreDocumentAfterEach();
 
-/** A fake span element. */
-const fakeElement = (tag) => ({
-  tagName: tag.toUpperCase(), id: '', htmlFor: '', className: '', textContent: '',
-});
-
-/** A fake container collecting appended children. */
-const fakeContainer = () => ({
-  children: [],
-  replaceChildren() { this.children = []; },
-  append(...nodes) { this.children.push(...nodes); },
-});
+/** A fake range input recording the attributes createSlider sets.
+ * @returns {Object} Fake input element.
+ */
+const fakeInput = () =>
+  Object.assign(fakeElement('input'), { type: '', min: '', max: '', step: '', value: '' });
 
 let container;
 
 beforeEach(() => {
-  container = fakeContainer();
-  globalThis.document = {
+  container = fakeElement('div');
+  installDocument({
     getElementById: () => container,
     createElement: (tag) => (tag === 'input' ? fakeInput() : fakeElement(tag)),
-  };
-});
-
-afterEach(() => {
-  delete globalThis.document;
+  });
 });
 
 /** A valid config; tests override single fields to exercise one guard at a time. */
@@ -44,7 +31,7 @@ const base = { id: 's', label: 'L', min: 0, max: 10, step: 1, value: 5 };
 
 /** Verifies a missing container throws a named error before any validation. */
 test('throws when the container element is absent', () => {
-  globalThis.document = { getElementById: () => null };
+  installDocument({ getElementById: () => null });
   assert.throws(() => createSlider('missing', base, null),
                 /container #missing not found/);
 });
