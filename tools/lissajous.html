@@ -93,6 +93,7 @@
         </p>
         <pre class="bg-slate-900 p-4 rounded-lg border border-slate-700 overflow-x-auto cursor-pointer"
           id="code_pre_block"><code id="lissajous_code_output" class="font-mono text-sm text-slate-300 whitespace-pre"></code></pre>
+        <p id="domain_closure_warning" class="hidden mt-2 text-sm text-amber-400" role="status"></p>
       </div>
     </div>
 
@@ -108,6 +109,7 @@
       lissajous,
       snapToRationalRatio,
       lissajousCodeString,
+      domainClosureWarning,
     } from './lissajous_math.js';
 
     // Utility to get CSS variable color and convert to numeric hex
@@ -283,6 +285,12 @@
       // Pure string building lives in lissajous_math.js; this stays DOM-only.
       codeOutput.textContent =
         lissajousCodeString(state.C1, state.C2, state.A, state.Duration);
+
+      const warning = document.getElementById('domain_closure_warning');
+      if (!warning) return;
+      const text = domainClosureWarning(state.C2, state.Duration);
+      warning.textContent = text ?? '';
+      warning.classList.toggle('hidden', text === null);
     };
 
     // --- UI Setup ---

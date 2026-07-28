@@ -104,6 +104,39 @@ export const snapToRationalRatio = (activeC, passiveC, maxTerm = MAX_RATIONAL_TE
 };
 
 /**
+ * The traversal length at which a spherical Lissajous curve returns to its t=0
+ * start (0, 1, 0), which happens only when m2·domain is an exact multiple of 2π.
+ * Mirror of the engine's Comets::closing_domain (effects/Comets.h), including its
+ * floor of one cycle.
+ * @param {number} m2 - Orbital frequency C₂.
+ * @param {number} domain - The authored traversal length.
+ * @returns {number} The nearest closing domain, or 0 when m2 is not positive.
+ */
+export const closingDomain = (m2, domain) => {
+  if (!(m2 > 0)) return 0;
+  const cycles = Math.max(1, Math.round((m2 * domain) / TWO_PI));
+  return (TWO_PI * cycles) / m2;
+};
+
+/**
+ * Describes the gap between an authored domain and what the engine traverses.
+ * Comets re-snaps the exported domain to closingDomain(), so an unclosed domain
+ * previews a different arc than it renders; ChaoticStrings does not snap and
+ * pinches at the seam instead.
+ * @param {number} c2 - Frequency C₂ (m2).
+ * @param {number} domain - The authored domain.
+ * @param {number} [tol] - Relative tolerance below which the domain counts as closed.
+ * @returns {?string} Warning text, or null when the domain already closes.
+ */
+export const domainClosureWarning = (c2, domain, tol = 1e-4) => {
+  const closed = closingDomain(c2, domain);
+  if (closed === 0 || Math.abs(domain - closed) <= tol * closed) return null;
+  return `Domain ${domain.toFixed(3)} does not close the curve. Comets snaps it to ` +
+    `${closed.toFixed(3)} (2π·${Math.round((c2 * closed) / TWO_PI)}/C₂), so the preview above ` +
+    `is not the arc it renders; ChaoticStrings keeps ${domain.toFixed(3)} and pinches at the seam.`;
+};
+
+/**
  * Builds the export snippet string for the current curve parameters. Pure: it
  * takes plain numbers and returns the string the page writes into the DOM.
  *
