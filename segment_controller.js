@@ -560,9 +560,11 @@ export class SegmentController {
    * Latch a worker fault and break the render-loop deadlock. The faulting worker
    * will never send its 'frame', so we settle the in-flight frame here (resolve
    * its promise, zero `pending`) to release `renderInFlight`; `faulted` then stops
-   * `tick()` from dispatching another doomed render. Recovery is by re-creating
-   * the pool (effect switch / resolution change / mode toggle), which clears the
-   * latch via destroy(). Only the first fault per session is recorded for the UI.
+   * `tick()` from dispatching another doomed render. The pool is terminated here
+   * so its per-worker WASM heaps are released rather than sitting idle until the
+   * rebuild. Recovery is by re-creating the pool (effect switch / resolution
+   * change / mode toggle), which clears the latch via destroy(). Only the first
+   * fault per session is recorded for the UI.
    * @param {number} segId - Index of the worker segment that faulted.
    * @param {string} message - Human-readable fault message for the UI/console.
    */
@@ -579,6 +581,9 @@ export class SegmentController {
     } else {
       console.warn(`[Segmented] additional worker fault (seg ${segId}): ${message} `
         + `— first fault already latched, UI shows that one`);
+    }
+    for (const w of this.workers) {
+      w.terminate();
     }
     this.pending = 0;
     this.renderInFlight = false;

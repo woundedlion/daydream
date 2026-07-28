@@ -319,6 +319,17 @@ test('a worker fault latches, zeroes pending, and resolves the in-flight frame',
   await done;
 });
 
+test('a latched fault terminates the pool so no worker heap stays resident', () => {
+  const c = makeController();
+  c.create(2);
+
+  c.workers[0].onerror({ message: 'boom', filename: 'w.js', lineno: 1, colno: 2 });
+
+  assert.ok(c.workers.every((w) => w.terminated), 'every worker was terminated');
+  assert.equal(c.faulted, true, 'the latch is held so the UI still reports the fault');
+  assert.deepEqual(c.faultInfo, { segId: 0, message: 'boom' });
+});
+
 test('create posts init stamped with the protocol version', () => {
   const c = makeController();
   c.create(2);
