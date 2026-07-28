@@ -436,13 +436,8 @@ export class Daydream {
       this.fittedDistance === 0 ||
       Math.abs(orbitRadius - this.fittedDistance) < 1e-3 * this.fittedDistance
     ) {
-      const diameter = Daydream.SPHERE_RADIUS * 2;
-      const targetCoverage = 0.85;
-      const fovRad = THREE.MathUtils.degToRad(Daydream.CAMERA_FOV / 2);
-      const distForHeight = diameter / (2 * Math.tan(fovRad) * targetCoverage);
-      const distForWidth = distForHeight / this.camera.aspect;
-      this.fittedDistance = THREE.MathUtils.clamp(
-        Math.max(distForHeight, distForWidth),
+      this.fittedDistance = fitDistance(
+        this.camera.aspect,
         this.controls.minDistance,
         this.controls.maxDistance
       );
@@ -761,15 +756,8 @@ export class Daydream {
       };
     }
 
-    // Per-dot sphere LOD: segment count decays exponentially as pixel count rises
-    // so the triangle budget stays bounded.
-    const MAX_DOT_SEGMENTS = 30;
-    const LOD_DECAY_PIXELS = 30000;
-    const MIN_DOT_SEGMENTS = 3;
     const totalPixels = this.W * this.H;
-    const detail = Math.max(
-      MIN_DOT_SEGMENTS,
-      Math.round(MAX_DOT_SEGMENTS * Math.exp(-totalPixels / LOD_DECAY_PIXELS)));
+    const detail = dotDetailFor(totalPixels);
 
     this.dotGeometry = new THREE.SphereGeometry(
       this.DOT_SIZE,
@@ -952,6 +940,38 @@ export class Daydream {
     this.renderer?.dispose();
   }
 }
+
+/** Per-dot sphere LOD: segment count decays exponentially as pixel count rises
+ *  so the triangle budget stays bounded.
+ * @param {number} totalPixels - Instance count of the dot mesh (W*H).
+ * @returns {number} Sphere width/height segment count, floored at 3.
+ */
+export const dotDetailFor = (totalPixels) => {
+  const MAX_DOT_SEGMENTS = 30;
+  const LOD_DECAY_PIXELS = 30000;
+  const MIN_DOT_SEGMENTS = 3;
+  return Math.max(
+    MIN_DOT_SEGMENTS,
+    Math.round(MAX_DOT_SEGMENTS * Math.exp(-totalPixels / LOD_DECAY_PIXELS)));
+};
+
+/**
+ * Orbit radius at which the sphere fills ~85% of the smaller view dimension,
+ * clamped into the orbit-control range.
+ * @param {number} aspect - Viewport aspect ratio (width / height).
+ * @param {number} minDistance - Closest orbit radius the controls allow.
+ * @param {number} maxDistance - Farthest orbit radius the controls allow.
+ * @returns {number} Clamped camera distance from the sphere center.
+ */
+export const fitDistance = (aspect, minDistance, maxDistance) => {
+  const diameter = Daydream.SPHERE_RADIUS * 2;
+  const targetCoverage = 0.85;
+  const fovRad = THREE.MathUtils.degToRad(Daydream.CAMERA_FOV / 2);
+  const distForHeight = diameter / (2 * Math.tan(fovRad) * targetCoverage);
+  const distForWidth = distForHeight / aspect;
+  return THREE.MathUtils.clamp(
+    Math.max(distForHeight, distForWidth), minDistance, maxDistance);
+};
 
 // Reused scratch for coordsLabel's transient conversions (synchronous, no overlap).
 const coordsScratchSph = new THREE.Spherical();
