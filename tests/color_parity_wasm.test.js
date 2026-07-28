@@ -24,7 +24,7 @@ test('WASM parity module is present with the exports this suite pins', () => {
     'srgb_to_linear_float', 'linear_to_srgb_float', 'srgb_to_linear_interp',
     'linear_rgb_to_oklab', 'oklab_to_linear_rgb', 'hsv_to_rgb',
     'procedural_palette_linear', 'named_procedural_palettes', 'lissajous',
-    'mobius_transform',
+    'mobius_transform', 'PaletteOps',
   ]) {
     assert.equal(typeof M[name], 'function',
       `holosphere_wasm.js is missing export ${name} — parity check would not run`);
@@ -148,6 +148,85 @@ test('NAMED_PROCEDURAL_PALETTES matches the engine table (named_procedural_palet
     a: toFloat32(a), b: toFloat32(b), c: toFloat32(c), d: toFloat32(d),
   }));
   assert.deepEqual(M.named_procedural_palettes(), mirror);
+});
+
+// Entries of the 256-stop LUT the bakeLut goldens below pin.
+const LUT_SAMPLES = [0, 32, 64, 96, 128, 160, 192, 224, 255];
+
+// Three fully saturated keys on the TRIADIC hues, i.e. what
+// GenerativePalette(shape, 'TRIADIC', 'FLAT', 'VIBRANT', 0) resolves to.
+const TRIADIC_KEYS = [0, 255, 255, 85, 255, 255, 170, 255, 255];
+
+// Off-primary hues with partial saturation and value, exercising the s/v path
+// the saturated keys above hold constant.
+const MIXED_KEYS = [30, 200, 180, 128, 120, 240, 210, 255, 90];
+
+/**
+ * Reads the sampled entries of a baked LUT as [r, g, b] triples.
+ * @param {Uint8Array|number[]} lut - A 256*3 sRGB LUT from PaletteOps.bakeLut.
+ * @returns {number[][]} One triple per LUT_SAMPLES index, in order.
+ */
+function sampleLut(lut) {
+  assert.equal(lut.length, 256 * 3, `bakeLut returned ${lut.length} bytes, want 768`);
+  return LUT_SAMPLES.map((i) => [lut[3 * i], lut[3 * i + 1], lut[3 * i + 2]]);
+}
+
+// Sampled goldens for the four GradientShape values (STRAIGHT, CIRCULAR,
+// VIGNETTE, FALLOFF) baked from TRIADIC_KEYS, plus STRAIGHT from MIXED_KEYS.
+// Captured from the engine bake; the LUT is 8-bit integer output of integer
+// inputs, so these compare exactly.
+const BAKE_GOLDEN = {
+  STRAIGHT: [[241, 83, 136], [242, 94, 64], [213, 125, 0], [178, 146, 0], [131, 164, 24],
+    [43, 176, 102], [0, 172, 157], [0, 167, 192], [33, 158, 233]],
+  CIRCULAR: [[241, 83, 136], [233, 107, 0], [177, 147, 0], [92, 172, 72], [0, 172, 159],
+    [0, 163, 216], [123, 137, 248], [197, 106, 217], [241, 83, 136]],
+  VIGNETTE: [[0, 0, 0], [244, 84, 119], [234, 106, 0], [186, 142, 0], [130, 164, 25],
+    [0, 176, 119], [0, 170, 175], [0, 161, 225], [0, 0, 0]],
+  FALLOFF: [[241, 83, 136], [233, 107, 0], [177, 147, 0], [92, 172, 72], [0, 172, 159],
+    [0, 163, 216], [0, 80, 117], [1, 1, 1], [0, 0, 0]],
+  STRAIGHT_MIXED: [[169, 62, 0], [147, 101, 0], [122, 127, 2], [78, 148, 90], [50, 158, 145],
+    [0, 130, 146], [0, 99, 143], [23, 56, 160], [57, 4, 127]],
+};
+
+/**
+ * Pins the engine's generative-palette bake to fixed golden bytes. palette_math.js
+ * hands bakeLut already-resolved h/s/v keys and keeps only the JS-side profile
+ * PRNG, so the gradient interpolation itself lives entirely in the engine and this
+ * is the only place its output values are checked — the module contract test pins
+ * bakeLut's type and length, and palette_math.test.js substitutes a synthetic ramp.
+ * Baking all four shapes from one key set also pins the GradientShape enum order
+ * palette_math.js mirrors: a shifted mapping lands on another shape's golden.
+ */
+test('PaletteOps.bakeLut golden LUT entries (absolute pin)', () => {
+  const ops = new M.PaletteOps();
+  try {
+    const shapes = ['STRAIGHT', 'CIRCULAR', 'VIGNETTE', 'FALLOFF'];
+    shapes.forEach((name, shape) => {
+      assert.deepEqual(sampleLut(ops.bakeLut(shape, ...TRIADIC_KEYS)), BAKE_GOLDEN[name],
+        `bakeLut(${name}) drifted from the golden LUT`);
+    });
+    assert.deepEqual(sampleLut(ops.bakeLut(0, ...MIXED_KEYS)), BAKE_GOLDEN.STRAIGHT_MIXED,
+      'bakeLut(STRAIGHT) on partial saturation/value drifted from the golden LUT');
+  } finally {
+    ops.delete();
+  }
+});
+
+/**
+ * Verifies GenerativePalette drives the real bridge to the same bytes: the
+ * profiles it resolves (TRIADIC hues off base 0, VIBRANT saturation, FLAT value)
+ * are the RNG-free combination, so the whole tool path is pinned to the goldens
+ * above without a seeded PRNG in the loop.
+ */
+test('GenerativePalette bakes the golden LUT through the engine bridge', () => {
+  const ops = new M.PaletteOps();
+  try {
+    P.setPaletteOps((...args) => ops.bakeLut(...args));
+    const pal = new P.GenerativePalette('VIGNETTE', 'TRIADIC', 'FLAT', 'VIBRANT', 0);
+    assert.deepEqual(sampleLut(pal.lut), BAKE_GOLDEN.VIGNETTE);
+  } finally {
+    ops.delete();
+  }
 });
 
 /** Verifies the lissajous curve matches lissajous_math.js. */
