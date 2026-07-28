@@ -308,9 +308,10 @@ export class URLSync {
     const params = new URLSearchParams(window.location.search);
     for (const key of this.trackedKeys) {
       const val = this.state.get(key);
-      if (val !== null && val !== undefined) {
-        this.setTrackedParam(params, key, val);
-      }
+      // A cleared tracked key drops its param; leaving it would re-seed the
+      // stale value into state on the next load.
+      if (val === null || val === undefined) params.delete(key);
+      else this.setTrackedParam(params, key, val);
     }
     for (const [key, val] of this.adhoc) {
       if (val === null) params.delete(key);

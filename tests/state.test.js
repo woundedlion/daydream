@@ -318,6 +318,19 @@ test('URLSync.setParam(k, NaN) drops the key from the URL on flush', () => {
   assert.equal(params.get('keep'), '1', 'unrelated params survive');
 });
 
+test('URLSync.flush drops a tracked key cleared to null', () => {
+  const calls = installWindow('?effect=Voronoi&keep=1', '/sim');
+  const s = new AppState({ effect: 'Voronoi' });
+  const sync = new URLSync(s, ['effect']);
+
+  s.set('effect', null);
+  sync.flush();
+
+  const params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
+  assert.equal(params.has('effect'), false, 'the stale value cannot re-seed state on reload');
+  assert.equal(params.get('keep'), '1', 'unrelated params survive');
+});
+
 test('URLSync.reset preserves the excluded keys and clears the rest', () => {
   const calls = installWindow('?effect=Voronoi&speed=2&junk=x', '/sim');
   const s = new AppState({ effect: 'Voronoi' });
