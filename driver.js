@@ -355,11 +355,21 @@ export class Daydream {
     const offset = new THREE.Vector3();
     const spherical = new THREE.Spherical();
 
+    // :focus-visible promotes a pointer-focused element the moment any key is
+    // pressed, so a global shortcut (space) would ring the whole viewport.
+    // Latch the arrival modality instead: keyboard focus rings and orbits,
+    // pointer focus does neither, keeping the global arrow-key frame step.
+    this.onCanvasFocus = () => {
+      this.canvas.classList.toggle(
+        "keyboard-focus", this.canvas.matches(":focus-visible"));
+    };
+    this.onCanvasBlur = () => {
+      this.canvas.classList.remove("keyboard-focus");
+    };
+
     this.onCanvasKeyDown = (e) => {
       if (e.altKey || e.ctrlKey || e.metaKey) return;
-      // A pointer press focuses the canvas too, but does not match
-      // :focus-visible, so mouse users keep the global arrow-key frame step.
-      if (!this.canvas.matches(":focus-visible")) return;
+      if (!this.canvas.classList.contains("keyboard-focus")) return;
 
       let dTheta = 0;
       let dPhi = 0;
@@ -401,6 +411,8 @@ export class Daydream {
     };
 
     this.canvas.addEventListener("keydown", this.onCanvasKeyDown);
+    this.canvas.addEventListener("focus", this.onCanvasFocus);
+    this.canvas.addEventListener("blur", this.onCanvasBlur);
   }
 
   /**
@@ -934,6 +946,8 @@ export class Daydream {
 
     if (this.onCanvasKeyDown) {
       this.canvas.removeEventListener("keydown", this.onCanvasKeyDown);
+      this.canvas.removeEventListener("focus", this.onCanvasFocus);
+      this.canvas.removeEventListener("blur", this.onCanvasBlur);
     }
 
     if (this.dotMesh) {
