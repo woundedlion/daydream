@@ -322,9 +322,14 @@ export class SegmentController {
         } else if (msg.type === 'frame') {
           // A halted pool zeroed `pending`; ignore late frames so it can't go negative.
           if (this.faulted) return;
-          if (msg.segId < 0 || msg.segId >= numSegments) {
-            console.error(`[Segmented] frame from out-of-range segId ${msg.segId} `
-              + `(expected 0..${numSegments - 1}); dropping`);
+          // Integer-checked, not just range-checked: NaN/undefined fail both range
+          // comparisons, so a bare range guard would let them through to index
+          // `scratch`/`frameSeen` by string key and settle the barrier with a
+          // segment absent — publishing a torn frame the recorder counts as real.
+          if (!Number.isInteger(msg.segId)
+              || msg.segId < 0 || msg.segId >= numSegments) {
+            console.error(`[Segmented] frame from invalid segId ${msg.segId} `
+              + `(expected an integer 0..${numSegments - 1}); dropping`);
             return;
           }
           // Generation fence: keep only results from the current resolution; still
