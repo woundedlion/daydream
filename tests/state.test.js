@@ -235,6 +235,19 @@ test('URLSync keeps a boolean default for an unrecognized URL token', () => {
   assert.strictEqual(s.get('flag'), true, 'a garbage token keeps the default');
 });
 
+test('URLSync skips an unseeded tracked key rather than seeding the raw string', () => {
+  installWindow('?flag=false');
+  const errors = mock.method(console, 'error', () => {});
+  try {
+    const s = new AppState({});
+    new URLSync(s, ['flag']);
+    assert.strictEqual(s.get('flag'), undefined, 'no target type: the key stays unset');
+    assert.equal(errors.mock.callCount(), 1, 'the misconfiguration is reported');
+  } finally {
+    errors.mock.restore();
+  }
+});
+
 test('URLSync serializes a boolean tracked key through String(val)', () => {
   installWindow('', '/sim');
   const s = new AppState({ flag: true });

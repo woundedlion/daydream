@@ -174,6 +174,12 @@ export class URLSync {
       // Coerce to the seeded default's type so a numeric tracked key isn't left a
       // raw string; a non-finite parse keeps the default rather than seeding NaN.
       const current = state.get(key);
+      if (current === undefined) {
+        // No seeded default means no target type; seeding the raw string would
+        // make "?flag=false" a truthy value.
+        console.error(`URLSync: tracked key "${key}" has no seeded default; ignoring its URL value`);
+        continue;
+      }
       if (typeof current === 'number') {
         const t = raw.trim();
         if (!URL_NUMBER.test(t)) continue;
