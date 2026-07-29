@@ -12,11 +12,11 @@ import {
   planResolutionApply,
   paramValueSkew,
   paramGenerationStale,
-  runSwitchTransaction,
   applyInitialState,
-  snapshotEffectControlState,
-  restoreEffectControlState,
+  createSwitchCoordinator,
   offeredResolutions,
+  resolutionCorrection,
+  resolutionEffects,
 } from "./effect_sequencing.js";
 import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
@@ -94,7 +94,7 @@ const resolutionPresets = {
  *   preset is unknown or carries none.
  */
 function favoritesFor(resolution) {
-  const favorites = resolutionPresets[resolution]?.favorites;
+  const favorites = resolutionEffects(resolutionPresets, resolution);
   if (!favorites) {
     console.error(`No effect list for resolution "${resolution}"; offering the high-res list.`);
     return HiResFavorites;
@@ -513,7 +513,7 @@ function applyResolution(preserveParams = false) {
   // synchronously fires applyEffect(), which would otherwise build against the
   // pre-resize dot mesh / stale sidebar.
   const { nextEffect, effectChanged, applyDirectly } =
-    planResolutionApply(availableEffects, appState.get('effect'), restoringSwitch);
+    planResolutionApply(availableEffects, appState.get('effect'), switches.isRestoring());
   if (effectChanged) {
     appState.set('effect', nextEffect);
     if (appState.get('effect') !== nextEffect) return false;
@@ -544,75 +544,26 @@ function syncResolutionOptions(module) {
   resolutionController.options(labels);
 
   const current = appState.get('resolution');
-  if (!labels.includes(current)) {
-    console.warn(`Resolution "${current}" is not supported by the engine; using "${labels[0]}".`);
+  const corrected = resolutionCorrection(labels, current);
+  if (corrected !== null) {
+    console.warn(`Resolution "${current}" is not supported by the engine; using "${corrected}".`);
     // Fires the controller's onChange, so appState and the URL both follow.
-    resolutionController.setValue(labels[0]);
+    resolutionController.setValue(corrected);
   }
 }
 
-let restoringSwitch = false;
-
-function reportSwitchFailure(label, result) {
-  if (result.failure) console.error(`${label} switch failed:`, result.failure);
-  if (!result.recoveryFailure) return;
-  console.error(`${label} rollback failed:`, result.recoveryFailure);
-  showFatalError(`${label} change failed and the previous state could not be restored. Reload the page.`);
-}
-
-function restoreUrl(url) {
-  window.history.replaceState({}, '', url);
-}
-
-function restoreEffect(effect, url, effectState) {
-  restoringSwitch = true;
-  try {
-    appState.set('effect', effect);
-    restoreUrl(url);
-    if (applyEffect(true) === false) throw new Error(`Effect rollback to "${effect}" was rejected.`);
-    restoreEffectControlState(activeEffect, effectState);
-  } finally {
-    restoringSwitch = false;
-  }
-}
-
-function restoreResolution(resolution, effect, url, effectState) {
-  restoringSwitch = true;
-  try {
-    appState.update({ resolution, effect });
-    resolutionController.setValue(resolution);
-    restoreUrl(url);
-    if (applyResolution(true) === false)
-      throw new Error(`Resolution rollback to "${resolution}" was rejected.`);
-    restoreEffectControlState(activeEffect, effectState);
-  } finally {
-    restoringSwitch = false;
-  }
-}
-
-const unsubscribeAppState = appState.subscribe((key, value, old) => {
-  if (restoringSwitch) return;
-  if (key === 'effect') {
-    const previousUrl = window.location.pathname + window.location.search + window.location.hash;
-    const previousEffectState = snapshotEffectControlState(activeEffect);
-    const result = runSwitchTransaction(
-      () => applyEffect(),
-      () => restoreEffect(old, previousUrl, previousEffectState),
-    );
-    reportSwitchFailure('Effect', result);
-  } else if (key === 'resolution') {
-    const previousEffect = appState.get('effect');
-    const previousUrl = window.location.pathname + window.location.search + window.location.hash;
-    const previousEffectState = snapshotEffectControlState(activeEffect);
-    const result = runSwitchTransaction(
-      () => applyResolution(),
-      () => restoreResolution(old, previousEffect, previousUrl, previousEffectState),
-    );
-    if (!result.applied) {
-      queueMicrotask(() => urlSync.setParam('resolution', appState.get('resolution')));
-    }
-    reportSwitchFailure('Resolution', result);
-  }
+const switches = createSwitchCoordinator({
+  appState,
+  getActiveEffect: () => activeEffect,
+  applyEffect,
+  applyResolution,
+  currentUrl: () =>
+    window.location.pathname + window.location.search + window.location.hash,
+  restoreUrl: (url) => window.history.replaceState({}, '', url),
+  showResolution: (resolution) => resolutionController.setValue(resolution),
+  syncResolutionUrl: () => urlSync.setParam('resolution', appState.get('resolution')),
+  logError: (message, error) => console.error(message, error),
+  showFatal: showFatalError,
 });
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -978,7 +929,7 @@ function disposeApp() {
   window.removeEventListener("pagehide", onPageHide);
   // Released before the GUI/scene teardown below: a later set() would otherwise
   // re-enter applyEffect()/applyResolution() against a disposed renderer.
-  unsubscribeAppState();
+  switches.dispose();
   if (testAllInterval !== null) {
     clearInterval(testAllInterval);
     testAllInterval = null;
