@@ -7,6 +7,17 @@
 import { afterEach } from 'node:test';
 
 /**
+ * Links appended element nodes back to their parent. Strings (text nodes) carry
+ * no parent and are skipped.
+ * @param {Array<any>} nodes - Nodes just inserted.
+ * @param {Object|null} parent - New parent, or null on removal.
+ * @returns {void}
+ */
+function reparent(nodes, parent) {
+  for (const node of nodes) if (node && typeof node === 'object') node.parentNode = parent;
+}
+
+/**
  * Element stand-in carrying the attribute, class, child, and listener surface
  * the daydream modules read and write. innerHTML is absent, so a test can assert
  * markup was never assigned.
@@ -23,6 +34,10 @@ export function fakeElement(tag = 'div') {
     style: {},
     attributes: {},
     children: [],
+    parentNode: null,
+    get firstElementChild() {
+      return this.children.find((node) => node && typeof node === 'object') || null;
+    },
     classList: {
       add: (...names) => { for (const name of names) classes.add(name); },
       remove: (...names) => { for (const name of names) classes.delete(name); },
@@ -31,14 +46,19 @@ export function fakeElement(tag = 'div') {
     },
     setAttribute(name, value) { this.attributes[name] = value; },
     getAttribute(name) { return name in this.attributes ? this.attributes[name] : null; },
-    append(...nodes) { this.children.push(...nodes); },
-    appendChild(node) { this.children.push(node); return node; },
+    append(...nodes) { reparent(nodes, this); this.children.push(...nodes); },
+    appendChild(node) { reparent([node], this); this.children.push(node); return node; },
     removeChild(node) {
       const at = this.children.indexOf(node);
       if (at >= 0) this.children.splice(at, 1);
+      reparent([node], null);
       return node;
     },
-    replaceChildren(...nodes) { this.children = nodes; },
+    replaceChildren(...nodes) {
+      reparent(this.children, null);
+      reparent(nodes, this);
+      this.children = nodes;
+    },
     addEventListener() {},
     removeEventListener() {},
     focus() {},
