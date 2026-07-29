@@ -155,8 +155,10 @@ export const domainClosureWarning = (c2, domain, tol = 1e-4) => {
 export const lissajousCodeString = (c1, c2, a, domain) => {
   const f = formatFloatCpp;
 
-  const c1Str = f(c1, 2);
-  const c2Str = f(c2, 2);
+  // Full precision: a rational lock like 8/7 has no exact short decimal, and a
+  // rounded frequency reopens the curve the tool just closed.
+  const c1Str = f(c1);
+  const c2Str = f(c2);
   const aStr = f(a, 3);
 
   // Emit exact 2π multiples against PI_F to match the engine's source form.
