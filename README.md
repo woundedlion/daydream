@@ -123,13 +123,14 @@ POV display requires pixel data to be ready before each column interval fires �
 
 On hardware there is no debugger attached and no console to read — a corrupted arena that ships garbage to the LEDs is the worst possible outcome, because the failure is silent and the cause is already gone by the time it shows on the sphere. So invariant violations *trap at the violation site* rather than being masked by bounded fallbacks. `HS_CHECK(cond)` (`platform.h`) compiles to a single predicted-not-taken branch to `__builtin_trap()` and, unlike `assert()`, is **not** stripped by `NDEBUG` — it still fires in the optimized device build, where `NDEBUG` is defined only to keep newlib's `__assert_func`→`fprintf` (and all of stdio) out of the image. It pulls in no stdio of its own.
 
-The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths only — container growth, arena OOM, capacity and bounds guards at allocation/registration/config seams — where a violation is a logic or sizing bug with no valid recovery. It is never placed in the per-pixel hot loop; hot paths that need a check use a stripped `assert` backed by a cold trap at the corresponding bind/setup site. Genuinely *transient* conditions (a DMA overrun, a dropped frame) are not invariant violations and get bounded/soft handling instead. The native test suite includes a death harness that asserts these traps actually fire (`SIGILL` / `STATUS_ILLEGAL_INSTRUCTION`), so the safety net is verified rather than assumed.
+The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a violation is a logic or sizing bug with no valid recovery — container growth, arena OOM, capacity and bounds guards at allocation/registration/config sites, plus checked accessors like `StaticCircularBuffer::operator[]`, which runs **per control point** (a trail snapshot, a scanline span), not per pixel. It is never placed in the per-pixel loop, which indexes the raw storage directly — `sdf.h` takes `&buf[0]` once per row and walks the array — and hot paths that need a check use a stripped `assert` backed by a cold trap at the corresponding bind/setup site. Genuinely *transient* conditions (a DMA overrun, a dropped frame) are not invariant violations and get bounded/soft handling instead. The native test suite includes a death harness that asserts these traps actually fire (`SIGILL` / `STATUS_ILLEGAL_INSTRUCTION`), so the safety net is verified rather than assumed.
 
 ### Coordinate Conventions
 
 - **Y-up Cartesian**: `Vector(x, y, z)` — `y` is the vertical axis
 - **Spherical**: `theta` = azimuth (longitude), `phi` = polar angle from +Y (co-latitude)
-- **Pixel mapping**: `x ∈ [0, W)` → `theta ∈ [0, 2π)`, `y ∈ [0, H)` → `phi ∈ [0, π]`
+- **Pixel mapping**: `x ∈ [0, W)` → `theta ∈ [0, 2π)`, `y ∈ [0, H)` → `phi = y·π / (H + H_OFFSET − 1)`
+- **`hs::H_OFFSET`** (`platform.h`): virtual rows below the physical LED ring. It is 3 on device, so the bottom physical row lands short of π — the image is clipped, not stretched, where the LEDs stop short of the south pole — and 0 on the host/sim build, which maps the full `[0, π]`. Callers pass the logical `H`; `y_to_phi<H>()` / `phi_to_y<H>()` add the offset internally. `tests/h_offset_renorm_check.cpp` recompiles the engine with the hardware value so the device path is exercised on host
 - **SDF distances**: in radians on the unit sphere (matching `angle_between()`)
 - All geometry LUTs (`PhiLUT<H>`, `TrigLUT<W,H>`) are pre-computed eagerly via `init_geometry_luts()` at engine setup
 
@@ -180,6 +181,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 │   │   ├── 3dmath.h                Vector, Quaternion, Spherical, Complex, Möbius math
 │   │   ├── rotate.h                Quaternion projection helpers
 │   │   ├── geometry.h              Dots/Points, PhiLUT/TrigLUT, coord conversions
+│   │   ├── spherical_field.h       Latitude-ring field layout + bilinear sphere sampling
 │   │   ├── easing.h                Easing functions (cubic, sine, elastic, expo, etc.)
 │   │   └── waves.h                 sin_wave / tri_wave / square_wave generators
 │   ├── mesh/                   Polyhedral meshes and their operators
@@ -187,11 +189,18 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 │   │   ├── mesh_classes.h          Congruence-class clustering + canonical distance-LUT bake
 │   │   ├── spatial.h               KDTree, k-nearest-neighbor, MeshState (+ speculative AABB)
 │   │   ├── conway.h                Conway operators (dual, kis, ambo, truncate, etc.)
+│   │   ├── conway_graph.h          Constexpr solid-to-solid operator edge graph + walk helpers
+│   │   ├── recipe.h                Recipe lowering to primitive Conway steps + replay
 │   │   ├── hankin.h                Hankin pattern compilation and update system
-│   │   └── solids.h                Platonic + Archimedean + Catalan + Islamic solid registry
+│   │   ├── solids.h                Platonic + Archimedean + Catalan + Islamic solid registry
+│   │   └── relax_bakes_generated.h Baked relaxed-mesh vertices (from tools/relax_bakes.py)
 │   ├── color/                  Color math and palettes
 │   │   ├── color.h                 Pixel16 (16-bit linear), Color4, blend helpers, palettes
+│   │   ├── composition.h           Palette modifiers + StaticPalette composition (via color.h)
 │   │   ├── color_luts.h            Precomputed sRGB ↔ linear LUTs
+│   │   ├── srgb_decode.h           Branchless linear16 → sRGB8 encode from DTCM split tables
+│   │   ├── srgb_decode_lut.h       Generated split-decode tables behind srgb_decode.h
+│   │   ├── gamut_lut.h             Generated sRGB gamut-boundary chroma table for OKLab clipping
 │   │   └── palettes.h              Named ProceduralPalette instances + shared MeshPaletteBank
 │   ├── render/                 Canvas, rasterizers, and the filter pipeline
 │   │   ├── canvas.h                Effect base class + Canvas RAII write-buffer guard
@@ -206,42 +215,88 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 │   │   ├── timers.h                RandomTimer / PeriodicTimer callback timers
 │   │   ├── params.h                Parameter-writing animations (Transition, Mutation, Driver, Lerp, ColorWipe, Mobius*, Ripple, Noise)
 │   │   ├── motion.h                Path/ProceduralPath + the Orientation drivers (Motion, Rotation, RandomWalk)
-│   │   ├── trails.h                OrientationTrail/VectorTrail history + tween/deep_tween traversal
+│   │   ├── trails.h                OrientationTrail/VectorTrail/QuantizedVectorTrail history + tween/deep_tween traversal
 │   │   ├── sprites.h               Sprite draw envelope, Particle/ParticleSystem
 │   │   ├── timeline.h              TimelineEvent inline storage + the Timeline scheduler
-│   │   └── mesh.h                  Mesh-to-mesh transitions: MeshMorph, Segue policies, MeshCarousel
+│   │   └── mesh.h                  Mesh-to-mesh transitions: OpLeg, Segue policies, MeshCarousel
 │   └── vendor/                 Third-party code
 │       ├── FastNoiseLite.h         Single-header noise library
 │       └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
-├── effects/                    26 effects (27 headers incl. the shared ReactionDiffusionBase.h):
+├── effects/                    24 effects (25 headers incl. the shared ReactionDiffusionBase.h):
 │                                BZReactionDiffusion.h, HopfFibration.h, IslamicStars.h,
 │                                Raymarch.h, … — see §9 Effects Reference
 │
 ├── hardware/                   Hardware drivers
 │   ├── dma_led.h               Non-blocking DMA LED controller for HD107S (Teensy 4.x)
+│   ├── dma_led_controller.h    Double-buffered controller templated on its transport (host-testable)
+│   ├── dma_led_core.h          Pure double-buffer / transfer-length / stale-transfer math (host-testable)
 │   ├── hd107s_frame.h          HD107S protocol buffer + inline color correction (host-testable)
 │   ├── pov_segment_map.h       Pure segment index math (host-testable)
 │   ├── pov_single.h            Single-Teensy POV driver (Holosphere)
+│   ├── pov_single_map.h        Pure single-board strip index math (host-testable)
 │   ├── pov_sync.h              Phantasm sync protocol core: flywheel timebase, symbol codec, epoch/beacon (host-testable)
-│   └── pov_segmented.h         Multi-Teensy segmented POV driver (Phantasm)
+│   ├── pov_handoff.h           Pure effect-handoff state machine for POVSegmented (host-testable)
+│   ├── pov_submit_gate.h       Pure LED-submit accept/drop decision for the POVSegmented ISR (host-testable)
+│   ├── pov_segmented.h         Multi-Teensy segmented POV driver (Phantasm)
+│   └── phantasm/               KiCad 10 project for the per-segment carrier board
+│       ├── phantasm.kicad_sch      Schematic — parts, values, footprints, full connectivity
+│       ├── phantasm.kicad_pcb      Routed PCB (fabrication source of truth)
+│       ├── unplaced/               Net-assigned, unrouted board staged for an autoplacer
+│       └── gen/                    Python schematic/PCB/fabrication generators (`just pcb`)
 │
 ├── targets/                    Per-target entry points
+│   ├── common/
+│   │   └── phantasm_target.h   Shared Phantasm-class boilerplate — LED transport, geometry, effect construction
 │   ├── Holosphere/
 │   │   └── Holosphere.ino      Holosphere entry — NUM_PIXELS=40, RPM=480
 │   ├── Phantasm/
 │   │   └── Phantasm.ino        Phantasm entry — 4×Teensy, TOTAL_PIXELS=288, RPM=480
+│   ├── Profile/
+│   │   └── Profile.ino         Single-effect HS_PROFILE harness on segment 0 of the segmented rig
 │   └── wasm/
 │       ├── wasm.cpp            Emscripten bindings — HolosphereEngine JS class
-│       └── param_marshal.h     Pure parameter definition/value marshaling, single ordering source (host-testable)
+│       ├── param_marshal.h     Pure parameter definition/value marshaling, single ordering source (host-testable)
+│       └── wasm_predicates.h   Pure embind boundary validation/clamping predicates (host-testable)
 │
 ├── CMakeLists.txt              Emscripten build (outputs holosphere_wasm.js + .wasm)
+├── CMakePresets.json           Canonical presets: wasm-release, wasm-debug, tests
+├── cmake/
+│   └── toolchain-native-clang.cmake  Native Clang toolchain behind the tests preset
+├── platformio.ini              Teensy envs: the two shipping images plus the compile/profiling profiles
 ├── tests/                      Unit tests (CMake subdirectory)
 ├── scripts/                    Build + CI tooling
 │   ├── generate_luts.py        sRGB ↔ linear LUT generator of record (emits core/color/color_luts.h)
+│   ├── generate_reaction_graph.py K-NN lattice generator of record (emits core/engine/reaction_graph.cpp)
+│   ├── generate_srgb_decode.cpp Split-decode generator of record (emits core/color/srgb_decode_lut.h)
+│   ├── effect_roster.mjs       Shared HS_EFFECT_LIST / REGISTER_EFFECT parser for the roster tools
+│   ├── check_effect_roster.mjs Cross-checks HS_EFFECT_LIST against the REGISTER_EFFECT calls (CI)
 │   ├── wasm_smoke.mjs          Runtime WASM smoke: drives every effect at both resolutions (CI)
-│   └── capture_screenshots.mjs Headless gallery capture for docs/screenshots/
-└── justfile                    Task runner: `just build` / `build-debug` / `test` / `install`
+│   ├── capture_screenshots.mjs Headless gallery capture for docs/screenshots/
+│   ├── screenshot_capture_config.mjs Per-effect capture offsets shared by capture and the CI gate
+│   ├── screenshot_capture_config.test.mjs Node unit test for the capture-offset table
+│   └── check_screenshots.mjs   Asserts docs/screenshots/ matches the effect roster (CI)
+├── tools/                      Firmware gates, device profiling, and asset bakes
+│   ├── teensy_gate.py          Size + memory-layout gate parser/classifier (toolchain-free)
+│   ├── teensy_gate_extra.py    PlatformIO post-build glue that runs the gate on every link
+│   ├── teensy_budgets.json     Per-env FLASH/RAM1/RAM2 budgets the gate enforces
+│   ├── teensy_size_table.py    `just teensy-size` wrapper: builds every env + prints the region table
+│   ├── teensy_warnings.py      Warning-hygiene ratchet against teensy_warning_baseline.txt
+│   ├── teensy_pre.py / teensy_isystem.py / teensy_map.py / teensy_nano.py  PlatformIO build hooks
+│   ├── phantasm.ld             Phantasm linker script (memory-region layout)
+│   ├── profile_one.sh / profile_sweep.sh  On-device HS_PROFILE flash + capture runs
+│   ├── profile_capture.py      Serial capture of the profiling image's readout
+│   ├── parse_profile.py        Capture-log parser behind the per-window/per-preset reports
+│   ├── device_lock.sh          Host-global per-board lock every device path takes
+│   ├── relax_bakes.py / relax_bake_harness.cpp  Relaxed-mesh bake generator of record
+│   ├── gen_gamut_lut.py        sRGB gamut-boundary generator of record (emits core/color/gamut_lut.h)
+│   ├── docs_check.py           Markdown fence/link/anchor/path validator (CI)
+│   └── *_tests/                Host unit tests for the gate, hooks, profile parser, bakes, docs check
+├── docs/                       Design specs, perf ledgers, and the docs/screenshots/ gallery
+├── Doxyfile                    Doxygen config for the published API reference
+├── package.json                npm entry points for the scripts/*.mjs tools
+├── .github/workflows/          ci.yml (native, WASM, format, Teensy, provenance), docs.yml (Doxygen → Pages)
+└── justfile                    Task runner: `just build` / `test` / `smoke` / `docs` / `install` (`just --list` for the rest)
 ```
 
 ### daydream (web simulator)
@@ -251,16 +306,25 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 ├── vendor-importmap.js         Local-first / CDN-fallback importmap helper
 ├── holosphere_wasm.js          Installed from Holosphere's WASM build
 ├── holosphere_wasm.wasm        Installed from Holosphere's WASM build
+├── holosphere_wasm.sha         Engine commit + tree state the module was built from
+├── holosphere_wasm.wasm.sha256 Digest of the installed module — the trio the deploy gate verifies
 ├── README.md                   Installed from Holosphere (this file)
 ├── docs/screenshots/           Installed from Holosphere
 │
+├── bootstrap.js                Dynamic-import boot of daydream.js + failure overlay
 ├── daydream.js                 App entry: WASM loader, state wiring, GUI/sidebar
+├── engine_host.js              Owns the main-thread WASM engine + its reassignable display state
+├── effect_sequencing.js        DOM-free effect/resolution apply-order and skew-guard rules
+├── param_sync.js               DOM-free "should this slider adopt the engine value?" rule
+├── pixel_view.js               DOM-free zero-copy pixel-view detach/re-fetch contract
 ├── driver.js                   Three.js scene: sphere mesh, dots, OrbitControls,
 │                                  axes overlay, picture-in-picture camera, resize
+├── label_format.js             DOM-free label number formatting with symbolic snapping
 ├── geometry.js                 Sphere-pixel position math (pixelToSpherical, etc.)
 ├── state.js                    AppState (pub/sub) + URLSync (query-string mirror)
 ├── gui.js                      lil-gui wrapper used by the main page and tools
 ├── sidebar.js                  Effect list + sort + keyboard navigation
+├── sidebar_logic.js            DOM-free sidebar sort, keyboard-index and scroll-arrow math
 ├── recorder.js                 MediaRecorder pipeline (mp4 / webm), sim-synced
 ├── segment_controller.js       Orchestrates the segmented-POV worker pool:
 │                                  dispatch, generation fence, and compositing
@@ -274,14 +338,77 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards **cold** paths o
 │   ├── lissajous.html          Spherical Lissajous curve designer
 │   ├── mobius.html             Möbius transformation visualizer
 │   ├── palettes.html           Procedural palette tuner
-│   └── solids.html             Conway operator playground (uses MeshOps bridge)
+│   ├── solids.html             Conway operator playground (uses MeshOps bridge)
+│   ├── shared.js               Three.js scene boilerplate for the 3D tool pages
+│   ├── banner.js               Dependency-free page + fatal-error banners (no Three.js)
+│   ├── clipboard.js            Dependency-free copy-to-clipboard helpers
+│   ├── slider.js               Labelled range-slider factory with a live readout
+│   ├── color.js                sRGB ↔ linear math mirroring the engine's transfer function
+│   ├── cpp_format.js           C++ float-literal formatter shared by the code generators
+│   ├── export_params.js        Formatter behind the GUI's Export action
+│   ├── lissajous_math.js       Pure Lissajous curve math from lissajous.html
+│   ├── mobius_transforms.js    Pure Möbius coefficient presets from mobius.html
+│   ├── palette_math.js         ProceduralPalette / GenerativePalette mirror + the PaletteOps bridge
+│   ├── solid_codegen.js        Op dispatch, codegen, and op-chain sequencing for solids.html
+│   └── tools.css               Shared design tokens and control styling for the tool pages
+│
+├── scripts/
+│   ├── generate-importmap.mjs  Bakes the local-vs-CDN decision into vendor-importmap.js
+│   └── require-tests.mjs       `pretest` guard: fails when the test glob matches nothing
+│
+├── tests/                      Node unit tests (`npm test`)
+├── tsconfig.json               checkJs settings for the worker-protocol module set
 │
 ├── three.js/                   Optional vendored Three.js checkout
+├── vendor/                     Optional vendored Tailwind build + self-hosted fonts (CDN fallback)
 ├── node_modules/lil-gui/       Optional local lil-gui (npm install)
 └── package.json
 ```
 
 When the local `three.js/` and `node_modules/lil-gui/` directories are absent (e.g. on the GitHub Pages deploy, and by default), [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) resolves libraries from jsdelivr; `npm run importmap:local` switches it to the vendored copies for offline dev. See [§10.8](#108-vendor-importmap-local-first--cdn-fallback).
+
+### Design Docs (`docs/`)
+
+Every document carries its own status banner; the summaries below repeat it. A
+banner that says REJECTED or SUPERSEDED is load-bearing — the document is kept
+so a successor does not re-attempt what was already measured and refuted.
+
+**Design specs**
+
+| Document | Status |
+|---|---|
+| `docs/phantasm_pcb_spec.md` | Source of truth for the KiCad schematic and layout of the per-segment carrier board — `hardware/phantasm/`, regenerated by `just pcb`. One identical PCB ×4 qualified; ×8 compile-tested only |
+| `docs/phantasm_frame_sync_spec.md` | IMPLEMENTED, and describes the implementation. 1-wire flywheel sync; protocol core `hardware/pov_sync.h`, device shell `hardware/pov_segmented.h` |
+| `docs/opchain_morph_spec.md` | LANDED. Op-by-op Conway-chain morphing generation of solids; design of record for `effects/IslamicStars.h` + `core/animation/mesh.h` |
+| `docs/conway_morph_spec.md` | SUPERSEDED by `docs/opchain_morph_spec.md`; records the design as it landed and no longer tracks the tree |
+| `docs/segmented_stateful_effects_spec.md` | IMPLEMENTED. History-reading pixel effects (`Pixel::Feedback`) under segmented mode, gated on `needs_full_frame()` |
+| `docs/selective_o3_spec.md` | Implemented 2026-07-15, minimal region set; the full R1–R6 set is measured-unaffordable |
+| `docs/teensy_ci_gate_spec.md` | Active and green. The `teensy-size` / `teensy-warnings` CI jobs, region budgets, and ELF layout invariants |
+| `docs/congruence_class_lut_spec.md` | FACILITY ONLY — landed, tested, gate-green, and used by no effect. §11–12 record why IslamicStars was unwired |
+| `docs/single_pass_mesh_raster_spec.md` | REJECTED, measured 2026-07-18. Do not build it; the refutation bounds what a successor may attempt |
+
+**Ledgers and audits**
+
+| Document | Status |
+|---|---|
+| `docs/device_host_divergence_ledger.md` | Tracked inventory of every fork on a device-only constant, tagged with whether an automated device-value test build reaches it |
+| `docs/itcm_ledger.md` | Per-commit `.text.itcm` accounting on the phantasm image across the window the arena cut opened |
+| `docs/strobe_columns_audit.md` | Historical audit (June 2026); the renderer follow-up is implemented |
+
+**Optimization briefs and analyses**
+
+| Document | Status |
+|---|---|
+| `docs/meshfeedback_smoke_optimization.md` | RESOLVED 2026-07-19. Smoke peaks at 61.86 ms with zero spilled frames; all eight styles hold 16 fps |
+| `docs/islamicstars_palette_crossfade_plan.md` | LANDED 2026-07-26. Per-leg fresh palette classification with a smooth crossfade |
+| `docs/dreamballs_perf_analysis.md` | Device phase split and M7 codegen audit (2026-07-20): two levers landed, five killed or blocked, each with a measurement |
+| `docs/probe_path_open_items.md` | IslamicStars probe path: the stall pass is done (23 green / 0 yellow / 1 red); two items remain open |
+| `docs/islamicstars_next_levers.md` | Remaining IslamicStars levers, sized against the one solid that misses the 62.5 ms window |
+| `docs/islamicstars_sub60_optimization_brief.md` | Brief: drive the IslamicStars render chain to peak < 60 ms on every shape, in both the shipping and global-`-O3` images |
+| `docs/mindsplatter_optimization.md` | Plan (2026-07-25) for a MindSplatter-specific streaming renderer to hold every frame under 59 ms |
+| `docs/MINDSPLATTER_PARTICLE_SCALING_ANALYSIS.md` | Analysis (2026-07-22): 2,048 full particles cannot be reached by raising `NUM_PARTICLES` — it fails on both arena and CPU |
+| `docs/feedback_pole_isotropy_plan.md` | Analysis and plan for an isotropic MeshFeedback pole warp; the D1 tangent-warp variant was measured and rejected 2026-07-23 |
+| `docs/lut_compression_next.md` | Brief: find the next hot-path LUT worth compressing, if any. §2 is the screen — most LUTs are not candidates |
 
 ---
 
@@ -299,7 +426,7 @@ Three build targets share a common engine:
 │  │ Holosphere/  │   │  Effects → Canvas → Filter Pipeline          │    │
 │  │  .ino        │   │      → SDF/Plot → Pixel Buffer               │    │
 │  │              │   │                                              │    │
-│  │ Phantasm/    │   │  effects/  (26 visual algorithms)            │    │
+│  │ Phantasm/    │   │  effects/  (24 visual algorithms)            │    │
 │  │  .ino        │   │                                              │    │
 │  │              │   ├──────────────────────────────────────────────┤    │
 │  │ wasm/        │   │          hardware/  (Drivers)                │    │
@@ -355,16 +482,16 @@ POVDisplay<S,RPM>::show<Effect>()
   IntervalTimer::begin(show_col, interval)
 
   effect->draw_frame():
-    Canvas canvas(*effect)               ISR reads from bufs_[prev_]
+    Canvas canvas(*effect)               ISR reads from bufs[prev]
       ↓ advance_buffer()                 for y in 0..S/2:
       ↓ (copies prev if persist_pixels)    leds[S/2 - y - 1] = get_pixel(x, y)
       ↓                                    leds[S/2 + y]     = get_pixel(x±W/2, y)
-    [effect renders to bufs_[cur_]]
+    [effect renders to bufs[cur]]
       ↓                                  FastLED.show()
     ~Canvas():                           if strobe_columns(): FastLED.showColor(black)
       queue_frame()                      x = (x+1) % width
-      ↓ next_ = cur_ (interrupt-safe)    if x==0 || x==width/2:
-                                           advance_display()  (prev_ = next_)
+      ↓ next = cur (interrupt-safe)      if x==0 || x==width/2:
+                                           advance_display()  (prev = next)
                                            [new frame begins displaying]
 ```
 
@@ -372,13 +499,13 @@ Three `std::atomic<int>` indices manage the double buffer:
 
 | Index | Role |
 |---|---|
-| `cur_` | Which buffer the main loop is currently writing |
-| `next_` | The last completed frame (queued by `queue_frame()`) |
-| `prev_` | The frame the ISR is currently reading |
+| `cur` | Which buffer the main loop is currently writing |
+| `next` | The last completed frame (queued by `queue_frame()`) |
+| `prev` | The frame the ISR is currently reading |
 
-The ISR never touches `cur_`. The main loop atomically updates `next_` inside `queue_frame()` with interrupts disabled. `advance_display()` is called by the ISR at every half-revolution to flip `prev_` to `next_`.
+The ISR never touches `cur`. The main loop atomically updates `next` inside `queue_frame()` with interrupts disabled. `advance_display()` is called by the ISR at every half-revolution to flip `prev` to `next`.
 
-The two framebuffers are placed in Teensy DMAMEM (OCRAM) for capacity — at `MAX_W * MAX_H` 16-bit pixels they are far too large for the tightly-coupled DTCM that holds the stack and hot data. They are software render targets, read by the ISR and packed into the LED controller's protocol frame; they are never DMA'd themselves (the eDMA TX buffer is `HD107SFrame::buffer_`, in the controller, which is the buffer that actually clocks out over SPI):
+The two framebuffers are placed in Teensy DMAMEM (OCRAM) for capacity — at `MAX_W * MAX_H` 16-bit pixels they are far too large for the tightly-coupled DTCM that holds the stack and hot data. They are software render targets, read by the ISR and packed into the LED controller's protocol frame; they are never DMA'd themselves (the eDMA TX buffer is `HD107SFrame::buffer`, in the controller, which is the buffer that actually clocks out over SPI):
 
 ```cpp
 static DMAMEM Pixel buffer_a[MAX_W * MAX_H];
@@ -476,7 +603,13 @@ void MyEffect::draw_frame() override {
 }                           // ~Canvas() — queue_frame()
 ```
 
-`canvas(x, y)` is a direct array subscript into the write buffer (`bufs_[cur_][y * width + x]`). No bounds checking, no virtual dispatch.
+The clear covers only the current display clip unless the effect declares
+`needs_full_frame`, since a band-clippable effect never reads outside its
+display clip. It does draw into the margin-expanded render bounds, but that band
+is write-only scratch: nothing samples or displays it. Nothing to opt into: the
+constructor reads both flags off the effect.
+
+`canvas(x, y)` is a direct array subscript into the write buffer (`bufs[cur][y * width + x]`). No bounds checking, no virtual dispatch.
 
 ### The Filter Pipeline
 
@@ -484,8 +617,8 @@ The **filter pipeline** is a variadic template that chains filter stages:
 
 ```cpp
 Pipeline<W, H,
-    Filter::World::Trails<W, MAX_ITEMS>,   // 3D world-space trail decay
-    Filter::World::Orient<W>,              // quaternion rotation + motion blur
+    Filter::World::Trails<MAX_ITEMS>,   // 3D world-space trail decay
+    Filter::World::Orient,              // quaternion rotation + motion blur
     Filter::Screen::AntiAlias<W, H>        // quintic-eased 2×2 splat AA
 > filters;
 ```
@@ -506,13 +639,13 @@ The pipeline handles the 3D/2D coordinate mismatch automatically at compile time
 
 | Filter | Effect |
 |---|---|
-| `World::Orient<W>` | Rotates every incoming 3D point by the current `Orientation` quaternion. Uses the orientation history to distribute motion-blur age values across a SLERP-interpolated sweep. |
-| `World::Trails<W, Capacity>` | Stores world-space points in an arena-allocated ring buffer with a TTL countdown. On `flush()`, re-draws aged points through a `TrailFn` color function. Trail items are quantized to 8 bytes each (int16 xyz + uint8 TTL). |
+| `World::Orient` | Rotates every incoming 3D point by the current `Orientation` quaternion. Uses the orientation history to distribute motion-blur age values across a SLERP-interpolated sweep. |
+| `World::Trails<Capacity>` | Stores world-space points in an arena-allocated ring buffer with a TTL countdown. On `flush()`, re-draws aged points through a `TrailFn` color function. Trail items are quantized to 8 bytes each (int16 xyz + uint8 TTL). |
 | `World::Replicate<W>` | Clones geometry N times around the Y-axis by re-plotting each point rotated by `2π/N`. |
-| `World::VertexReplicate<W, N>` | Replicates geometry onto the N vertices of a solid by precomputing rotation quaternions from vertex[0] to each other vertex. |
-| `World::Mobius<W>` | Applies a Möbius transformation via stereographic projection: sphere → complex plane → Möbius(z) → back to sphere. |
-| `World::Hole<W>` | Masks out a spherical cap by attenuating points within a radius via quintic falloff. Supports both by-value and by-reference origin (`HoleRef<W>`). |
-| `World::OrientSlice<W>` | Selects from a list of orientations based on each point's projection along an axis — enables per-hemisphere rotation effects. |
+| `World::VertexReplicate<N>` | Replicates geometry onto the N vertices of a solid by precomputing rotation quaternions from vertex[0] to each other vertex. |
+| `World::Mobius` | Applies a Möbius transformation via stereographic projection: sphere → complex plane → Möbius(z) → back to sphere. |
+| `World::Hole<OriginT>` | Masks out a spherical cap by attenuating points within a radius via quintic falloff. Supports both by-value and by-reference origin (`HoleRef`). |
+| `World::OrientSlice` | Selects from a list of orientations based on each point's projection along an axis — enables per-hemisphere rotation effects. |
 
 #### Screen-Space Filters
 
@@ -520,14 +653,15 @@ The pipeline handles the 3D/2D coordinate mismatch automatically at compile time
 |---|---|
 | `Screen::AntiAlias<W,H>` | Distributes a sub-pixel coordinate to its 4 nearest integer pixels as a `quintic_kernel`-eased 2×2 splat, applied uniformly on both axes in framebuffer space — no `sin(φ)` density compensation, because anti-aliasing is a property of the pixel grid, not of where the columns map on the sphere. |
 | `Screen::Blur<W, H>` | Applies a parameterized 3×3 Gaussian convolution kernel at plot time. |
-| `Screen::Trails<W, MAX_PIXELS>` | Screen-space variant of trail decay; stores 2D coordinates with TTL and redraws via a trail color function. Uses arena-allocated storage (`MAX_PIXELS` capacity, default 1024). |
+| `Screen::Trails<MAX_PIXELS>` | Screen-space variant of trail decay; stores 2D coordinates with TTL and redraws via a trail color function. Uses arena-allocated storage (`MAX_PIXELS` capacity, default 1024). |
+| `Screen::DirectAntiAliasSink<W, H>` | Terminal stand-in for `Pipeline<W, H, AntiAlias<W, H>>` when no downstream filter is needed: the same four-tap splat and q16 source-over blend, written straight into the framebuffer with row, column and clip resolution hoisted out of the per-sample path. Call `prepare(canvas)` once per frame before the first plot — it caches the framebuffer base and the clip's visible row/column masks. |
 
 #### Pixel-Space Filters
 
 | Filter | Effect |
 |---|---|
-| `Pixel::Feedback<W, H>` | Style-driven full-screen feedback loop. During `flush()` iterates the full canvas, samples the previous frame from the Canvas front buffer with bilinear interpolation, applies the bound `Feedback::Style`'s spatial transform and color transform with fade, then blends into the back buffer. Stateless — uses Canvas double-buffering, no internal frame storage. The warp field is computed on a coarse `W/DS × H/DS` grid (scratch-arena allocated) and bilinearly upsampled; `DS = style.downsample`. See `Feedback::Style` below for preset selection. |
-| `Pixel::ChromaticShift<W>` | Splits a pixel into R, G, B channels and offsets them by 1–3 pixels horizontally to simulate chromatic aberration. |
+| `Pixel::Feedback<W, H>` | Style-driven full-screen feedback loop. During `flush()` iterates the full canvas, samples the previous frame from the Canvas front buffer with bilinear interpolation, applies the bound `Feedback::Style`'s spatial transform and color transform with fade, then blends into the back buffer. Frames come from Canvas double-buffering, so the filter holds no frame storage of its own, but it does keep a persistent warp cache: call `init_storage(Arena&)` from the effect's `init()` to reserve `STORAGE_BYTES` from the persistent arena — without it every `flush()` rebuilds the whole control field. The spatial transform is evaluated on a spherical control lattice — latitude rings spaced `DS = style.downsample` rows apart, each carrying a `sin(φ)`-scaled sample count (`W/DS` at the equator) — then expanded by longitude interpolation into a `W/DS`-column offset field, one row per ring, and bilinearly upsampled while compositing. See `Feedback::Style` below for preset selection. |
+| `Pixel::ChromaticShift<W>` | Emits four taps to simulate chromatic aberration: the unmodified source pixel at its sub-pixel `x`, plus single-channel R, G and B copies offset by 1, 2 and 3 columns. Roughly doubles emitted energy — the source tap is kept, not replaced. The three fringe taps are snapped to the rounded integer column while the source tap keeps its sub-pixel `x`. Requires `W >= 4`. |
 
 #### Feedback Styles (`styles.h`)
 
@@ -536,7 +670,7 @@ The pipeline handles the 3D/2D coordinate mismatch automatically at compile time
 ```cpp
 // Declare a style member and use it in the pipeline:
 Feedback::Style style = Feedback::Style::Smoke();
-Pipeline<W, H, Filter::World::Orient<W>, Filter::Screen::AntiAlias<W, H>,
+Pipeline<W, H, Filter::World::Orient, Filter::Screen::AntiAlias<W, H>,
          Filter::Pixel::Feedback<W, H>> filters(
     ..., Filter::Pixel::Feedback<W, H>(style));
 ```
@@ -548,8 +682,6 @@ The Filter auto-syncs from the Style every frame — when the Style lerps betwee
 | `Style::ArcingLightning()` | Branching, fast-moving distortion with pronounced hue rotation. |
 | `Style::SlowFire()` | Broad, slowly evolving turbulence with gentle color drift. |
 | `Style::EnergeticFire()` | Broad, quickly evolving turbulence with gentle color drift. |
-| `Style::SlowTwist()` | Static fine-grain turbulence — high amplitude over a tight scale, no temporal drift. Frozen, twisted distortion. |
-| `Style::Churn()` | Dense fine-grain turbulence with strong hue shift. Tight scale, slow drift. |
 | `Style::Smoke()` | Gentle drifting haze with slow noise. Classic smoke look. |
 | `Style::SlowDust()` | Fine, slowly drifting turbulence with gentle color rotation. |
 | `Style::WavyTrails()` | Fine, rapidly moving distortion with pronounced color trails. |
@@ -559,11 +691,6 @@ The Filter auto-syncs from the Style every frame — when the Style lerps betwee
 | `Style::LooseWormhole()` | Static high-amplitude twist over a medium scale — a loose swirling tunnel, no drift. |
 | `Style::TightWormhole()` | Static high-amplitude twist over a tight scale — a tight swirling tunnel, no drift. |
 | `Style::WigglingWormhole()` | Static twist over a broad scale — a wide wormhole with wandering arms, no drift. |
-| `Style::Frozen()` | Static frozen distortion — no temporal movement. |
-| `Style::Shatter()` | Extreme static warping with fast decay. Shattering glass look. |
-| `Style::Drift()` | Flowing medium-strength distortion. Gentle liquid drift. |
-| `Style::Melting()` | Image melts and drips downward off the sphere. |
-| `Style::Swirling()` | Fast downward swirl with strong distortion, no hue shift. |
 
 Available transform functions:
 
@@ -571,12 +698,10 @@ Available transform functions:
 |---|---|
 | `Feedback::noise_warp` (default) | 3D simplex noise distortion via `noise_transform()` |
 | `Feedback::melt_warp` | Downward melt — slerps samples toward the north pole (image drips south) plus noise wobble |
-| `Feedback::identity_warp` | No spatial distortion (pass-through) |
 
 | Color Transform | Description |
 |---|---|
 | `Feedback::hue_fade` (default) | Multiplies by fade, then rotates hue by `style.hue_shift * -log(style.fade)` per frame. `hue_shift` is the rotation per e-fold decrease in feedback brightness, so equal brightness levels have equal hues at any fade. |
-| `Feedback::plain_fade` | Multiplies by fade only — no color shift |
 
 Custom presets can use any function matching the `Feedback::SpaceFn` / `Feedback::ColorFn` signatures.
 
@@ -586,17 +711,17 @@ Filters compose freely. The order matters — world-space filters must precede s
 
 ```cpp
 // Rotating geometry with anti-aliasing
-Pipeline<W, H, Filter::World::Orient<W>, Filter::Screen::AntiAlias<W, H>>
+Pipeline<W, H, Filter::World::Orient, Filter::Screen::AntiAlias<W, H>>
 
 // Particle trails in world space with orientation
 Pipeline<W, H,
-    Filter::World::Trails<W, 50000>,
-    Filter::World::Orient<W>,
+    Filter::World::Trails<50000>,
+    Filter::World::Orient,
     Filter::Screen::AntiAlias<W, H>>
 
 // Orientation + anti-aliasing + feedback with Smoke style
 Pipeline<W, H,
-    Filter::World::Orient<W>,
+    Filter::World::Orient,
     Filter::Screen::AntiAlias<W, H>,
     Filter::Pixel::Feedback<W, H>>
 ```
@@ -635,7 +760,7 @@ Two shader types are defined as zero-allocation `FunctionRef` callables (`concep
 | Signature | Type | Role |
 |---|---|---|
 | `FragmentShaderFn` | `void(const Vector &, Fragment &)` | Per-pixel/per-sample shader. Receives the world position and a pre-populated Fragment; writes `color`. Called for every rasterized point. |
-| `VertexShaderFn` | `void(Fragment &)` | Per-vertex or per-pixel-center shader. Runs once before sub-sampling to set up expensive shared state in the Fragment registers. Optional. |
+| `VertexShaderFn` | `void(Fragment &)` | Per-vertex or per-pixel-center shader. Runs once before sub-sampling to set up expensive shared state in the Fragment registers. Optional on the `Plot::` primitives (a null callable is skipped); required by `Scan::Shader::draw`'s split vertex/fragment overload, which traps on a null one. |
 
 `FunctionRef` is a non-owning, non-allocating type-erased callable (similar to `std::function_ref` from C++26). It captures a pointer to any lambda, functor, or function pointer with zero heap allocation — critical for ISR-safe code on Teensy.
 
@@ -657,11 +782,11 @@ Each rasterizer family populates the Fragment registers with a consistent conven
 
 | Register | Source | Meaning |
 |---|---|---|
-| `v0` | `DistanceResult.t` | Normalized parameter (0–1) — azimuthal angle for rings, perimeter progress for polygons |
-| `v1` | `DistanceResult.raw_dist` | Unsigned distance to shape centerline (for distance-based effects) |
+| `v0` | `DistanceResult.t` | Normalized azimuth (0–1) for `Scan::Ring` and `Scan::Star`; normalized radial position for `Scan::PlanarPolygon`, `Scan::SphericalPolygon` and `Scan::Flower` (polar angle over the shape radius, so it passes 1 outside the body); unused (0) for `Scan::Line` and `Scan::Mesh` faces |
+| `v1` | `DistanceResult.raw_dist` | Unsigned distance to shape centerline (for distance-based effects); `Scan::Mesh` faces carry the signed edge distance instead — negative inside the face, in gnomonic plane units — which `fragment_edge_dist()` turns into normalized inward depth as `-v1 / size` |
 | `v2` | Set by rasterizer | Stroke AA coverage (0–1, also applied by Scan at plot time), 0 for solid shapes, or face index for `Scan::Mesh` |
 | `v3` | `DistanceResult.aux` | Auxiliary — shape-dependent secondary parameter (0 when unused, including faces) |
-| `size` | `DistanceResult.size` | Shape radius or apothem for normalization (mesh `Face` floors it to ≥0.25× circumradius on sliver faces, so a normalized shader can see up to a 4× overstated inradius there) |
+| `size` | `DistanceResult.size` | Shape radius or apothem for normalization (mesh `Face` floors it at 0.25× the face circumradius, so on a sliver face — whose true inradius approaches zero — the reported size overstates it without bound) |
 
 The `DistanceResult` struct is returned by each SDF shape's `distance<ComputeUVs>()` method:
 
@@ -681,7 +806,7 @@ struct DistanceResult {
 |---|---|
 | `v0` | Path progress (0.0 → 1.0 along the full curve) |
 | `v1` | Cumulative arc length in radians |
-| `v2` | Vertex index (integer cast to float) |
+| `v2` | Index of the segment's start vertex, interpolated toward the next index across the segment — only the control points land on whole numbers, interior samples are fractional; `Plot::Line` has no interior vertices and writes 0 on every sample, and `Plot::Mesh` writes a constant edge index instead |
 | `v3` | Inherited from control-point Fragment (user-defined) |
 
 Plot primitives interpolate registers between control-point Fragments via `Fragment::lerp()`. The vertex shader, if provided, runs once per control point before rasterization. For the always-planar primitives (`Plot::PlanarPolygon`, `Plot::Star`, `Plot::Flower`) the rasterizer re-derives `v0`/`v1` from the rendered azimuthal-equidistant arc — which bows longer than the great-circle chord between vertices — so both stay consistent with the drawn position.
@@ -705,7 +830,7 @@ The rendering pipeline splits shape definitions from rasterization. `sdf.h` defi
 `scan.h` contains `Scan::rasterize()`, which drives the scanline loop and anti-aliasing, plus convenience wrappers that pair SDF shapes with the rasterizer.
 
 The `process_pixel` function applies anti-aliasing based on shape type:
-- **Solid shapes**: quintic smoothstep over a 2-pixel AA band centered on the edge (`-pixel_width <= d <= pixel_width`). Full interior pixels (`d < -pixel_width`) skip AA math entirely.
+- **Solid shapes**: quintic smoothstep over a 2-pixel AA band centered on the edge (`-pixel_width <= d <= pixel_width`). Full interior pixels (`d < -pixel_width`) skip AA math entirely. `pixel_width` is the compile-time constant `2π/W` — the angular width of one *equatorial* pixel — so the band is a fixed angular thickness at every latitude, and near the poles (where columns converge) it spans more than two columns.
 - **Strokes**: opacity falloff across the full stroke thickness.
 
 #### SDF Shape Primitives (`sdf.h`)
@@ -723,17 +848,24 @@ The `process_pixel` function applies anti-aliasing based on shape type:
 | `SDF::Torus` | 3D volumetric torus SDF with configurable major/minor radii (Cartesian ray-space, not a 2D sphere-surface shape) |
 | `SDF::Warp::Twist` | Domain warp composed with a volumetric SDF via `SDF::WarpedVolume<Shape, Warp>` — e.g. `WarpedVolume<Torus, Warp::Twist>` twists a torus by oscillating Y around the ring azimuth, with an analytic Lipschitz bound for safe sphere-tracing (used by Raymarch) |
 
+The table covers the effect-facing shapes. `sdf.h` also holds internal specializations that only the matching `scan.h` wrapper constructs — `SDF::FlatDistortedRing`, an undisplaced `DistortedRing` with an exact polar centerline distance, is instantiated by `Scan::DistortedRing::draw_flat` and never named by an effect.
+
 #### CSG Operations (`sdf.h`)
 
 Shapes can be combined using Constructive Solid Geometry:
 
 ```cpp
-SDF::Union<Ring, PlanarPolygon>        // min(d_A, d_B)
-SDF::SmoothUnion<Ring, PlanarPolygon>  // smooth minimum with blending radius
-SDF::Subtract<Ring, PlanarPolygon>     // max(d_A, -d_B)
-SDF::Intersection<Ring, PlanarPolygon> // max(d_A, d_B) with interval intersection
+SDF::Union<Ring, Line>           // min(d_A, d_B)
+SDF::SmoothUnion<Ring, Line>     // smooth minimum with blending radius
+SDF::Subtract<Ring, PlanarPolygon> // max(d_A, -d_B)
+SDF::Intersection<Ring, Line>    // max(d_A, d_B) with interval intersection
 SDF::AngularRepeat<Shape>        // N-fold angular repetition around an axis
 ```
+
+`Union`, `SmoothUnion` and `Intersection` require both children to share
+`is_solid`; a solid+stroke mix routes one winner through the wrong AA branch and
+is rejected at compile time. `Subtract` tracks the minuend's solidity, so a
+solid carved by a stroke (or the reverse) is legal.
 
 #### Scan Rasterization Primitives (`scan.h`)
 
@@ -742,16 +874,18 @@ Convenience structs that construct an SDF shape and rasterize in a single `draw(
 | Primitive | Description |
 |---|---|
 | `Scan::Ring` | Rasterizes a ring (from `SDF::Ring`) |
-| `Scan::Circle` | Filled circle (ring with radius-wide thickness) |
-| `Scan::Point` | Thick dot at a sphere-surface position |
+| `Scan::RingGroup` | Fused single-pass rasterizer for a small group of rings — one scan over the union band paints every member in slot order, so the per-row interval math runs once instead of per ring. Fragments carry position, stroke coverage and size only (no UVs, no raw distance) |
+| `Scan::Circle` | Disc (ring with radius-wide thickness) — stroke coverage ramps quintically from center to rim, and the shader styles it from register 2 |
+| `Scan::Point` | Dot at a sphere-surface position, with the same center-to-rim coverage ramp |
 | `Scan::Line` | Geodesic line segment between two points |
 | `Scan::Star` | N-pointed star shape |
 | `Scan::Flower` | N-petal flower shape |
 | `Scan::DistortedRing` | Ring with per-azimuth radius perturbation |
+| `Scan::DistortedRingStack` | Fused single-pass rasterizer for an evenly spaced same-axis stack of distorted rings — the per-pixel frame every ring shares is computed once and the candidate rings fall out of its polar angle by arithmetic; the shader takes a ring slot alongside the fragment |
 | `Scan::PlanarPolygon` | Regular N-gon in the tangent plane |
 | `Scan::SphericalPolygon` | Regular N-gon with geodesic (great-circle) edges |
 | `Scan::Mesh` | Rasterizes all faces of a `MeshState` or `PolyMesh` |
-| `Scan::Shader` | Full-screen per-pixel shader with configurable SSAA (super-sample anti-aliasing). The single-callback overload accepts a fragment shader. The two-callback overload separates a per-pixel vertex shader (called once at pixel center) from a per-subsample fragment shader (called SAMPLES×) — enabling efficient SSAA with expensive per-pixel work computed once (used by BZReactionDiffusion for 4× SSAA). |
+| `Scan::Shader` | Full-screen per-pixel shaders with configurable SSAA (super-sample anti-aliasing), across three entry points. `draw(canvas, shader)` takes a single fragment shader. `draw(canvas, fragment_shader, vertex_shader)` separates a per-pixel vertex shader (called once at pixel center) from a per-subsample fragment shader (called SAMPLES×), so expensive per-pixel work is computed once — both callables are required, and a null one traps (used by GSReactionDiffusion for 4× SSAA). `draw_grid(canvas, vertex_shader, pixel_shader)` hands the seeded fragment and the row's sub-pixel grid to a templated pixel shader that owns the sampling and returns the finished pixel (used by BZReactionDiffusion). |
 | `Scan::TransformedVolume` | Wraps an SDF shape with a world-space position and orientation quaternion for volumetric rendering |
 | `Scan::Volume` | Volumetric ray-marcher that steps along the view direction through a `TransformedVolume`, applying a fragment shader at the hit point with configurable step count and AA width |
 
@@ -782,7 +916,7 @@ All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<F
 | `Plot::Star` | N-pointed star shape (alternating inner/outer radii) |
 | `Plot::Flower` | N-petal flower shape |
 | `Plot::Mesh` | Wireframe mesh rendering with edge deduplication |
-| `Plot::ParticleSystem` | Particle trail rendering from `VectorTrail` history |
+| `Plot::ParticleSystem` | Particle trail rendering from `QuantizedVectorTrail` history |
 
 ### 7.3 The Animation System (`animation.h`)
 
@@ -793,12 +927,12 @@ The `Timeline` class manages a list of running `IAnimation` objects. Each frame,
 | Header | Subject | Contents |
 |---|---|---|
 | `timers.h` | Callbacks on a clock | `RandomTimer`, `PeriodicTimer` |
-| `params.h` | A caller-owned parameter, written each frame | `Transition`, `Mutation`, `Driver`, `Lerp`, `ColorWipe`, the `Mobius*` family, `Ripple`, `Noise` |
+| `params.h` | A caller-owned parameter, written each frame | `Transition`, `Mutation`, `Driver`, `Lerp`, `ColorWipe`, the `Mobius*` family, `Ripple`, `Noise`, `BallDrop`, `NoiseProduct` |
 | `motion.h` | An `Orientation` driven through space | `Path`/`ProceduralPath`, `Motion`, `Rotation`, `RandomWalk` |
-| `trails.h` | Recorded history | `OrientationTrail`, `VectorTrail`, the `tween`/`deep_tween` traversals |
+| `trails.h` | Recorded history | `OrientationTrail`, `VectorTrail`, `QuantizedVectorTrail`, the `tween`/`deep_tween` traversals |
 | `sprites.h` | Visible things | `Sprite`, `Particle`/`ParticleSystem` |
 | `timeline.h` | Scheduling | `TimelineEvent`, `Timeline` |
-| `mesh.h` | Mesh-to-mesh transitions | `MeshMorph`, the `Segue` policies, `MeshCarousel` |
+| `mesh.h` | Mesh-to-mesh transitions | `OpLeg`, the `Segue` policies, `MeshCarousel` |
 
 The fragments compile only inside `animation.h` (a direct include fails with an `#error`); consumers include `animation.h` alone.
 
@@ -817,15 +951,17 @@ The fragments compile only inside `animation.h` (a direct include fails with an 
 | `Driver` | Continuously increments a float variable each frame (wraps at 0..1) |
 | `Lerp` | Type-erased interpolation between any `T` that implements `lerp(start, target, t)`. The caller owns start, subject, and target data; Lerp holds pointers and a type-erased lerp function. |
 | `ColorWipe` | Smoothly interpolates a `GenerativePalette` toward a target palette |
-| `ParticleSystem<W>` | Physics simulation with emitters, attractors, friction, gravity. Particles have `VectorTrail` history for trail rendering. |
+| `ParticleSystem<W>` | Physics simulation with emitters, attractors, friction, gravity. Particles have `QuantizedVectorTrail` history for trail rendering. |
 | `Ripple` | Animates a `RippleParams` to expand a Ricker wavelet across the sphere |
 | `MobiusWarp` | Animates `MobiusParams` to apply and release a Möbius transformation |
 | `MobiusWarpCircular` | Animates `MobiusParams` for a circular warp that stays warped throughout, suitable for repeating effects |
 | `MobiusWarpEvolving` | Continuously modulates `MobiusParams` over multiple frequencies for a non-repeating, evolving warp |
 | `MobiusFlow` | Animates `MobiusParams` for a continuous loxodromic flow |
 | `Noise` | Animates `NoiseParams` over time for flowing distortion fields |
-| `MeshMorph` | Morphs one `MeshState` into another by cloning both, building a nearest-vertex correspondence, and interpolating positions over a duration. The vertex-level primitive beneath `MeshCarousel`. |
-| `MeshCarousel<SegueT>` | Double-buffered mesh transition system, parameterized on a compile-time segue policy (`namespace Segue`) that owns the transition's animation scheduling via `schedule_segue()` and shapes its rendering through phase-driven hooks (`opacity`/`fill`/`grade`, plus optional `warp`, per-face sweep ordering, and `retarget` for per-transition anchors). Manages a pair of `MeshState` buffers and flips the front index eagerly so the segue's freshly-scheduled animation captures the new shape. `Segue::Crossfade` schedules one fading `Animation::Sprite` per transition and returns a next-transition delay that makes consecutive sprites **overlap**: each transition fades only its own incoming shape in (and back out), while the previous transition's sprite — still alive in its fade-out tail — keeps drawing the outgoing shape; no single call ever draws both meshes, but two are rasterized per overlap frame. The overlap length is configurable via the policy's `overlap` member (frames, clamped to the fade window; negative — the default — selects the full window, and `0` makes the schedule sequential so a single mesh renders per frame). `Segue::Dissolve` overlaps the same way but hands the two draws complementary `PixelMask`s (same threshold and salt, opposite `invert`), so they partition the canvas and the overlap frame still costs one mesh's scan; it is the only policy that partitions pixels in the scan rather than fragments in the shader, so effects pass its masks to `Scan::Mesh::draw` themselves. Every other segue is **sequential** (one mesh per frame): `IrisBloom` (faces contract to glowing center points, then the new tessellation blooms out), `Lace` (fill drains to a glowing edge band and floods back), `TerminatorSweep` (a day/night line pinned to the mesh sweeps across it at constant speed; each face fades over a fixed frame count once the line reaches it), `Shockwave` (an expanding wave erases outward from a point; its echo redraws), `Breakdown` (the pattern breaks down one topology class at a time — every face of a color family fades together, classes in a random order reshuffled per swap, each fully gone before the next starts), `SpinFlip` (rigid spin-up, swap hidden in POV motion blur), and `GoldConvergence` (palettes converge to molten gold around the swap). Used by IslamicStars (fixed to `Segue::TerminatorSweep`); HankinSolids reuses the buffered pair but drives its own vertex-level transitions over it instead. |
+| `BallDrop` | Animates a `BumpParams` to drop one spherical-cap bump from the north pole to the south along a fixed meridian, ramping the footprint envelope so the bump emerges from and vanishes into the poles |
+| `NoiseProduct` | Integrates the time axis of a `NoiseProductParams` (`time += speed` per frame) to flow a two-octave product-noise field; perpetual |
+| `OpLeg` | Animates one leg of a mesh operator chain: a Conway-operator parameter sweep along a `ConwayGraph` edge or recipe step, a hankin contact-angle sweep on a fixed seed, a relax or medial slerp, or a gated partition swap. Each frame it rebuilds the swept mesh in scratch, compiles it, attaches the leg's hoisted congruence classification, pre-blends the (from, to) palette ramps at the leg's crossfade weight, and hands the mesh to a draw callback — exactly one mesh drawn per frame. Each leg's `.then()` completion handler schedules the next, so a run of legs walks a whole morph path. |
+| `MeshCarousel<SegueT>` | Double-buffered mesh transition system, parameterized on a compile-time segue policy (`namespace Segue`) that owns the transition's animation scheduling via `schedule_segue()` and shapes its rendering through phase-driven hooks (`opacity`/`fill`/`grade`, plus optional `warp`, per-face sweep ordering, and `retarget` for per-transition anchors). Manages a pair of `MeshState` buffers and exposes the front index (`front_index`/`set_front`); the flip itself belongs to the effect, which builds the incoming mesh into the back slot, calls `set_front` on it, and only then calls `schedule_segue` — so the sprite's captured slot index already names the new shape. `schedule_segue` assumes that ordering rather than enforcing it. `Segue::Crossfade` schedules one fading `Animation::Sprite` per transition and returns a next-transition delay that makes consecutive sprites **overlap**: each transition fades only its own incoming shape in (and back out), while the previous transition's sprite — still alive in its fade-out tail — keeps drawing the outgoing shape; no single call ever draws both meshes, but two are rasterized per overlap frame. The overlap length is configurable via the policy's `overlap` member (frames, clamped to the fade window; negative — the default — selects the full window, and `0` makes the schedule sequential so a single mesh renders per frame). `Segue::Dissolve` overlaps the same way but hands the two draws complementary `PixelMask`s (same threshold and salt, opposite `invert`), so they partition the canvas and the overlap frame still costs one mesh's scan; it is the only policy that partitions pixels in the scan rather than fragments in the shader, so effects pass its masks to `Scan::Mesh::draw` themselves. Every other segue is **sequential** (one mesh per frame): `IrisBloom` (faces contract to glowing center points, then the new tessellation blooms out), `Lace` (fill drains to a glowing edge band and floods back), `TerminatorSweep` (a day/night line pinned to the mesh sweeps across it at constant speed; each face fades over a fixed frame count once the line reaches it), `Shockwave` (an expanding wave erases outward from a point; its echo redraws), `Breakdown` (the pattern breaks down one topology class at a time — every face of a color family fades together, classes in a random order reshuffled per swap, each fully gone before the next starts), `SpinFlip` (rigid spin-up, swap hidden in POV motion blur), and `GoldConvergence` (palettes converge to molten gold around the swap). Used by IslamicStars (fixed to `Segue::TerminatorSweep`); HankinSolids keeps a single mesh and drives `OpLeg` directly instead, and DreamBalls uses `Segue::Crossfade` standalone to overlap its sprite hand-off with no carousel. |
 
 #### Orientation and Motion Blur
 
@@ -843,9 +979,11 @@ timeline.add(0, Animation::Rotation<W>(orientation, Y_AXIS, 2 * PI_F, 600, ease_
 
 `OrientationTrail<OrientationType, CAPACITY>` maintains a circular buffer of past `Orientation` snapshots, allowing effects to recall where an object was over previous frames. Each snapshot is a full `Orientation` (with its own sub-frame history).
 
-#### VectorTrail
+#### VectorTrail and QuantizedVectorTrail
 
-`VectorTrail<CAPACITY>` maintains a circular buffer of past world-space `Vector` positions. Used by `ParticleSystem` to record per-particle trajectories for trail rendering.
+`VectorTrail<CAPACITY>` maintains a circular buffer of past world-space `Vector` positions — 12 B per sample, stored exactly. Used by HopfFibration for its per-fiber trails.
+
+`QuantizedVectorTrail<CAPACITY>` is the unit-sphere variant: each sample is three snorm16 components (6 B, half of `Vector`), clamped to [-1, 1] on record and decoded by value on `get()`, so the round-trip error is at most 1/65534 per component. Used by `ParticleSystem` to record per-particle trajectories for trail rendering.
 
 #### `tween` and `deep_tween`
 
@@ -853,8 +991,8 @@ Two traversal helpers linearize multi-level orientation history into a single ca
 
 | Function | Input | Description |
 |---|---|---|
-| `tween(orientation, callback)` | `Orientation<CAP>` | Iterates over the sub-frame quaternion history of a single orientation, calling `callback(quaternion, t)` for each step with `t ∈ [0, 1]`. Used by `World::Orient` to distribute motion blur. |
-| `deep_tween(trail, callback)` | Any `Tweenable` (`Orientation` or `OrientationTrail`) | Flattens a trail of orientations into a single continuous traversal, calling `callback(quaternion, t)` with a global `t` spanning all frames and sub-frames. Used by the orientation-trail effects (Comets, ChaoticStrings, RingSpin) for rendering trails with full sub-frame accuracy. |
+| `tween(orientation, callback)` | `Orientation<CAP>` | Iterates over the sub-frame quaternion history of a single orientation, calling `callback(quaternion, t)` for each step with `t ∈ (0, 1]`. Sub-frame 0 is the pose carried over from the previous frame's end and is skipped unless it is the only snapshot (which reads `t = 1`, age-neutral). Used by `World::Orient` to distribute motion blur. |
+| `deep_tween(trail, callback)` | `OrientationTrail` (any `Tweenable`) | Flattens a trail of orientations into a single continuous traversal, calling `callback(quaternion, t)` with a global `t` spanning all frames and sub-frames. Used by the orientation-trail effects (Comets, ChaoticStrings, RingSpin) for rendering trails with full sub-frame accuracy. A bare `Orientation` has no per-frame structure to flatten and is rejected by the `Tweenable` concept — use `tween` for that. |
 
 #### Animations and Mutable State
 
@@ -869,7 +1007,9 @@ Animations do not render directly — they mutate external state that the render
 | `Lerp` | `T*` (type-erased) | Interpolates any type with a `lerp()` function — `MeshState`, params structs, etc. The caller owns start, subject, and target; Lerp holds pointers |
 | `ColorWipe` | `GenerativePalette*` | Interpolates palette keys toward a target palette in OKLCH along coherent hue arcs |
 | `Ripple`, `MobiusWarp`, `Noise` | `TransformerParams` | Animate transformer parameters (expansion radius, warp strength, noise scale) which the transformer pool reads during `MeshOps::transform()` |
-| `ParticleSystem` | `Vector[]` positions | Physics simulation updates particle positions; `VectorTrail` records history for trail rendering |
+| `BallDrop` | `BumpParams` | Walks the bump center down a meridian and re-derives the push axis from the stack's orientation, ramping the footprint envelope; the field pool sums the caps during `field()` |
+| `NoiseProduct` | `NoiseProductParams` | Advances the field time axis so the two-octave product noise keeps flowing under live speed edits; the field pool reads it during `field()` |
+| `ParticleSystem` | `Vector[]` positions | Physics simulation updates particle positions; `QuantizedVectorTrail` records history for trail rendering |
 
 This separation means effects declare *what state exists* (orientations, floats, palettes) and *what animations drive that state* (rotations, transitions, drivers), but never manually interpolate or update values per-frame. The `Timeline` handles all timing, easing, sequencing, and cleanup:
 
@@ -915,6 +1055,25 @@ Available transformers:
 | `OrientTransformer` | Applies an `Orientation` quaternion rotation to all vertices |
 
 Transformers integrate with the `MeshOps::transform()` pipeline and can be chained: `MeshOps::transform(input, output, arena, ripple_transformer, orient_transformer)`.
+
+#### Displacement Fields
+
+`FieldTransformer<ParamsT, AnimT, FieldFunc, CAPACITY>` is the scalar counterpart: entities superpose by summation instead of composing as warps, so an effect can feed the summed field into a displacement path (e.g. a `DistortedRing` shift LUT). `field(p)` sums the active entities; `field_dominant(p)` blends them magnitude-weighted (`sum(s³)/sum(s²)`) so overlapping bodies dominate instead of stacking; `field_bound()` returns a per-frame upper bound on `|field()|` for sizing conservative culls.
+
+| Field | Effect |
+|---|---|
+| `BallDropTransformer` | Spherical-cap bumps that fall pole-to-pole through a frame, bowing the surface away from each cap |
+| `NoiseProductTransformer` | Two-octave product noise where octave 1 envelopes octave 2, so perturbations bunch where the envelope runs strong |
+
+#### Pool Lifecycle
+
+Both classes derive from `TransformerPool`, which fixes the call order:
+
+1. `init_storage(Arena&)` — from the effect's `init()`, after any `configure_arenas()` and before the first spawn.
+2. `spawn(in_frames, args...)` — the returned pointer is transient; use it at the call site, not across frames.
+3. `spawn_pinned(in_frames, args...)` — same, but the pointer may be retained (e.g. registered as a live GUI param). Valid only for an animation that never completes on its own and is added before any finite timeline event, so compaction cannot shift it.
+4. `prepare_frame()` — each frame before `transform()` / `field()`, whenever active params changed through animation or live config. The composition reads that prepared state but cannot verify it is current.
+5. `reclaim_storage(Arena&)` — from the after-reset callback of an arena that is compacted mid-effect (e.g. a mesh carousel). Spawned animations hold `Params` references into the slots, so the caller must replay the same allocation order after the reset as after `init_storage()`; the re-claimed blocks must land at their original addresses (asserted). A reset only rewinds the offset, so the untouched bytes carry live entities through.
 
 #### Standalone Utilities
 
@@ -1003,7 +1162,7 @@ FastLED output ← CRGB(gamma encode) ← linear→sRGB ← Pixel16
 | `GenerativePalette` | Procedurally generated palette from harmony rules (triadic, analogous, etc.) combined with brightness/saturation profiles. Supports snapshot/lerp for animated transitions. |
 | `SolidColorPalette` | Constant color, adapts to the `Palette` interface. |
 
-Twenty-one named `ProceduralPalette` instances are pre-defined in the `Palettes` namespace: `DARK_RAINBOW`, `BLOOD_STREAM`, `VINTAGE_SUNSET`, `RICH_SUNSET`, `UNDERSEA`, `LATE_SUNSET`, `MANGO_PEEL`, `ICE_MELT`, `LEMON_LIME`, `ALGAE`, `EMBERS`, `FIRE_GLOW`, `DARK_PRIMARY`, `MAUVE_FADE`, `LAVENDER_LAKE`, `DESERT_ROSE`, `BRUISED_MOSS`, `BRUISED_BANANA`, `BRIGHT_SUNRISE`, `FIRE_AND_ICE`, and `PEACH_POP`.
+Twenty-five named `ProceduralPalette` instances are pre-defined in the `Palettes` namespace: `DARK_RAINBOW`, `BLOOD_STREAM`, `VINTAGE_SUNSET`, `RICH_SUNSET`, `UNDERSEA`, `LATE_SUNSET`, `MANGO_PEEL`, `ICE_MELT`, `LEMON_LIME`, `ALGAE`, `EMBERS`, `FIRE_GLOW`, `DARK_PRIMARY`, `MAUVE_FADE`, `LAVENDER_LAKE`, `DESERT_ROSE`, `BRUISED_MOSS`, `BRUISED_BANANA`, `BRIGHT_SUNRISE`, `FIRE_AND_ICE`, `PEACH_POP`, `POPPED_PEACH`, `BLUE_LAGOON`, `ORANGE_CRUSH`, and `PLUM_SUNRISE`. Six of them — `EMBERS`, `RICH_SUNSET`, `BRIGHT_SUNRISE`, `BRUISED_MOSS`, `LAVENDER_LAKE`, `POPPED_PEACH` — are the slots of `MeshPaletteBank`, the shared baked bank the mesh effects draw from.
 
 #### OKLCH Perceptual Color
 
@@ -1024,7 +1183,7 @@ Pixel (sRGB 16-bit) → linear RGB float → OKLab (L, a, b) → OKLCH (L, C, h)
 | `linear_rgb_to_oklab()` | Convert linear RGB to the OKLab perceptual space |
 | `oklab_to_oklch()` | Convert OKLab (rectangular) to OKLCH (polar: Lightness, Chroma, Hue) |
 | `lerp_oklch()` | Interpolate two OKLCH values with shortest-arc hue (avoids the red→green→blue detour) |
-| `gamut_clip_preserve_chroma()` | Maps an out-of-gamut OKLab color back into the sRGB cube by reducing chroma while holding hue and lightness (binary search on the chroma scale). The hue-preserving alternative to a per-channel RGB clip. Gated behind an in-gamut test (`oklab_to_linear_rgb_gamut`), so in-gamut colors — the vast majority — pay only the test and skip the search. |
+| `gamut_clip_preserve_chroma()` | Maps an out-of-gamut OKLab color back into the sRGB cube by reducing chroma while holding hue and lightness (walk-then-bisect on the chroma scale). The hue-preserving alternative to a per-channel RGB clip. Gated behind an in-gamut test (`oklab_to_linear_rgb_gamut`), so in-gamut colors — the vast majority — pay only the test and skip the search. |
 | `hue_rotate()` | Perceptual hue rotation — rotates the (a,b) chroma plane in OKLab, preserving lightness and chroma. Forward nonlinearity uses `fast_cbrt` (hot per-pixel path); inverse is exact. Out-of-gamut results are chroma-reduced rather than per-channel clipped, which holds hue and stabilizes the feedback loop against saturated-color drift. Used by the feedback `hue_fade` transform and `Flyby`'s displacement-driven hue shift. |
 
 #### Palette Modifiers
@@ -1066,7 +1225,7 @@ Color modifiers (`shade(Color4, float) -> Color4`):
 | `HueWobbleShade` | Rotates hue by an amount that varies along the domain (iridescent drift); per-sample cost suits bake-time sampling |
 | `SparkleShade` | Ignites sparse traveling glints where an evolving noise field exceeds a threshold |
 | `ChromaPulseShade` | Breathes OKLab chroma between pastel and vivid on a per-frame memoized pulse |
-| `LightnessGrainShade` | Grains brightness with evolving noise; uniform linear-RGB gain, so hue is preserved exactly |
+| `LightnessGrainShade` | Grains brightness with evolving noise; uniform linear-RGB gain, so hue is exact below the saturation point (a gain above 1 clips bright channels) |
 | `IridescentShade` | Adds a thin-film cosine sheen with per-channel phase offsets, saturating at white |
 
 The noise-driven modifiers sample the deterministic `value_noise_1d`/`value_noise_2d`
@@ -1123,11 +1282,12 @@ The mesh system is split across several files:
 
 #### Conway Operators (`conway.h`)
 
-All Conway *geometry* operators (`dual` through `bevel` below) take `(const PolyMesh& mesh, Arena& target, Arena& temp)`; `transform`, `relax`, and `normalize` are listed in the same table but are mesh utilities with their own signatures. **Primitive** operators produce their `PolyMesh` into `target` and use `temp` for intermediate computation. **Composed** operators (`gyro`, `meta`, `needle`, `zip`, `bevel`) reuse the same internal ping-pong as their two constituent ops, so they return their output in `temp` — the *opposite* arena from a primitive (see the load-bearing COMPOSITION POLARITY note in `conway.h`). Plan arena lifetimes accordingly when invoking a composed operator directly rather than through `SolidBuilder`:
+All Conway *geometry* operators (`dual` through `bevel` below) take `(const PolyMesh& mesh, Arena& target, Arena& temp)` and return a `PolyMesh`; `medial` takes the same two arenas but writes its two outputs through reference parameters — `(const PolyMesh& mesh, PolyMesh& out_a, ArenaVector<Vector>& out_b, Arena& target, Arena& temp)`. `transform`, `transform_in_place`, `relax`, `relax_baked`, and `normalize` are listed in the same table but are mesh utilities with their own signatures. **Primitive** operators produce their `PolyMesh` into `target` and use `temp` for intermediate computation. **Composed** operators (`gyro`, `meta`, `needle`, `zip`, `bevel`) reuse the same internal ping-pong as their constituent ops, so their output lands in the arena that backed the last step's `target`: `temp` for an even-length composition (`gyro`, `needle`, `zip`, `bevel`) — the *opposite* arena from a primitive — and back in `target` for the odd-length `meta` (three steps), like a primitive (see the load-bearing COMPOSITION POLARITY note in `conway.h`). Plan arena lifetimes accordingly when invoking a composed operator directly rather than through `SolidBuilder`:
 
 | Operation | Description |
 |---|---|
 | `MeshOps::transform` | Apply a chain of vertex transformers to produce a new `MeshState` |
+| `MeshOps::transform_in_place` | Apply a chain of vertex transformers to a `MeshState`'s own vertices, leaving topology untouched |
 | `MeshOps::dual` | Dual mesh (faces ↔ vertices) |
 | `MeshOps::kis` | Raise a pyramid on each face |
 | `MeshOps::ambo` | Truncate vertices to edge midpoints |
@@ -1136,11 +1296,13 @@ All Conway *geometry* operators (`dual` through `bevel` below) take `(const Poly
 | `MeshOps::chamfer` | Bevel edges (hexagonal expansion) |
 | `MeshOps::snub` | Chiral semi-regular polyhedron with twist (Newell-method face normals) |
 | `MeshOps::gyro` | Gyro operator (= dual ∘ snub) |
-| `MeshOps::meta` | Meta operator = kis ∘ ambo |
+| `MeshOps::meta` | Meta operator = kis ∘ dual ∘ ambo |
 | `MeshOps::needle` | Needle operator = kis ∘ dual |
 | `MeshOps::zip` | Zip operator = dual ∘ kis |
 | `MeshOps::bevel` | Bevel operator = truncate ∘ ambo |
+| `MeshOps::medial` | Both endpoint vertex sets of the dual morph on one shared medial (rectified) connectivity: `out_a` is `ambo(mesh)`, `out_b` the matching `ambo(dual(mesh))` positions |
 | `MeshOps::relax` | Edge-length relaxation by spring forces on the unit sphere. |
+| `MeshOps::relax_baked` | Substitute a flash-baked relax result for the pass. Its runtime checks catch a source/bake mismatch (dimensions, topology hash) and payload corruption (output hash, re-derived from the bake's own vertex bits) — they say nothing about freshness, since a positional retune that leaves connectivity intact passes every one of them. Freshness is the `relax_bake_verify` ctest's job: it re-runs the live `relax` and asserts bit-exact equality with the committed payload |
 | `MeshOps::normalize` | Project all vertices onto the unit sphere |
 
 #### Hankin Pattern System (`hankin.h`)
@@ -1159,11 +1321,11 @@ All Conway *geometry* operators (`dual` through `bevel` below) take `(const Poly
 
 | Registry | Count | Description |
 |---|---|---|
-| `simple_registry` | 18 entries | 5 Platonic (tetrahedron through icosahedron) + 13 Archimedean solids |
-| `catalan_registry` | 13 entries | Duals of the Archimedean solids (triakisTetrahedron, rhombicDodecahedron, pentakisDodecahedron, etc.) |
-| `islamic_registry` | 24 entries | Complex multi-operator recipes producing Islamic star patterns from base solids |
+| `simple_registry` | `PLATONIC_COUNT + ARCHIMEDEAN_COUNT` | 5 Platonic (tetrahedron through icosahedron) + 13 Archimedean solids |
+| `catalan_registry` | `CATALAN_COUNT` | Duals of the Archimedean solids (triakisTetrahedron, rhombicDodecahedron, pentakisDodecahedron, etc.) |
+| `islamic_registry` | `ISLAMIC_COUNT` | Complex multi-operator recipes producing Islamic star patterns from base solids |
 
-Total: **55 registered solids** (`Solids::NUM_ENTRIES`).
+Total: `Solids::NUM_ENTRIES`. Each count is a named constant in `solids.h`, `static_assert`ed against its registry's size (and their sum against `NUM_ENTRIES`), so the values live there rather than being restated here.
 
 `Collections` namespace provides typed spans for iterating subsets: `get_platonic_solids()`, `get_archimedean_solids()`, `get_simple_solids()`, `get_catalan_solids()`, `get_islamic_solids()`.
 
@@ -1202,7 +1364,7 @@ One deliberate exception: `SolidBuilder`'s fluent Conway chain (`solids.h`) owns
 
 ### 7.9 The Preset System (`presets.h`)
 
-`Presets<Params, Size>` is a generic template for managing parameter presets. It stores a fixed-size array of `PresetEntry<Params>` (each containing only a `Params` struct — no name field) and provides navigation and interpolation support:
+`Presets<Params, Size>` is a generic template for managing parameter presets. It stores a fixed-size array of `PresetEntry<Params>` (each containing only a `Params` struct — no name field) and provides cyclic navigation. It interpolates nothing itself: it tracks the entry active before the last move, and the caller drives the crossfade with an `Animation::Lerp` from `prev_get()` to `get()` (the `Params` type supplies the `lerp()` the animation calls).
 
 ```cpp
 Presets<MeshFeedbackParams, 4> presets = {{
@@ -1212,6 +1374,8 @@ Presets<MeshFeedbackParams, 4> presets = {{
 }};
 presets.next();  // advance to next preset
 presets.apply(current_params);  // copy current preset into live params
+// or crossfade into it over 48 frames instead of snapping:
+timeline.add(0, Animation::Lerp(current_params, presets.prev_get(), presets.get(), 48, ease_linear));
 ```
 
 ### 7.10 Hardware Drivers (`dma_led.h`, `pov_single.h`, `pov_segmented.h`)
@@ -1220,7 +1384,7 @@ Three hardware drivers form a layered stack.  `dma_led.h` handles the SPI wire p
 
 #### DMA LED Controller (`dma_led.h`)
 
-Non-blocking DMA-based LED output for HD107S (APA102-compatible) LEDs on Teensy 4.x.  Enabled by `#define USE_DMA_LEDS` in the target sketch (e.g. `targets/Phantasm/Phantasm.ino`) before it includes the driver; `led.h` stays neutral (the define is commented out there) and the default FastLED/WS2801 path remains as fallback. The FastLED fallback applies only to the single-board `POVDisplay`; the segmented `POVSegmented` driver `#error`s without `USE_DMA_LEDS` (the FastLED path cannot honor the master sync pulse-width contract), so DMA LEDs are mandatory on Phantasm.
+Non-blocking DMA-based LED output for HD107S (APA102-compatible) LEDs on Teensy 4.x.  Enabled by `#define USE_DMA_LEDS` in the target's boilerplate header (`targets/common/phantasm_target.h`) before it includes the driver; `led.h` stays neutral (the define is commented out there) and the default FastLED/WS2801 path remains as fallback. The FastLED fallback applies only to the single-board `POVDisplay`; the segmented `POVSegmented` driver `#error`s without `USE_DMA_LEDS` (the FastLED path cannot honor the master sync pulse-width contract), so DMA LEDs are mandatory on Phantasm.
 
 | Class | Role |
 |---|---|
@@ -1232,11 +1396,11 @@ The 16-bit linear pipeline reaches from the canvas all the way to the SPI wire w
 
 ```cpp
 // ISR path (per column): fetch the display buffer once, index it directly
-const Pixel* buf = effect_->display_buffer();              // 16-bit linear pixels
+const Pixel* buf = effect->display_buffer();               // 16-bit linear pixels
 // Physical LED index comes from the single-source-of-truth map (pov_single_map.h),
 // which applies the top-arm reversal / bottom-arm offset — never the raw row index.
 frame.packPixel(pov::strip_top_led(y, S), buf[y * width + x]); // Pixel16 → HD107S frame
-ledController_.submitFrame();                               // non-blocking DMA, drops on overrun
+ledController.submitFrame();                                // non-blocking DMA, drops on overrun
 ```
 
 #### Single-Teensy POV Driver (`pov_single.h`)
@@ -1248,7 +1412,7 @@ Main Loop                              ISR (IntervalTimer)
 ──────────                             ───────────────────
 effect->draw_frame()                   show_col() fires every N µs
   Canvas canvas(*this)                   for y in 0..S/2:
-    render to bufs_[cur_]                  packPixel(strip_top_led(y,S),    get_pixel(x, y))                      // top arm
+    render to bufs[cur]                    packPixel(strip_top_led(y,S),    get_pixel(x, y))                      // top arm
   ~Canvas → queue_frame()                  packPixel(strip_bottom_led(y,S), get_pixel(strip_opposite_col(x,W), y)) // bottom arm
                                          submitFrame() → async DMA
                                          x = (x+1) % width
@@ -1295,16 +1459,16 @@ swept-envelope design before operation.
 
 | Value | Description |
 |---|---|
-| `y_base_` | Starting Y index for this segment's row band |
-| `y_step_` | +1 for northern bands, -1 for reversed southern bands |
-| `arm_b_` | Whether this segment is on arm B (x offset by W/2) |
+| `y_base` | Starting Y index for this segment's row band |
+| `y_step` | +1 for northern bands, -1 for reversed southern bands |
+| `arm_b` | Whether this segment is on arm B (x offset by W/2) |
 
 The ISR loop has no branches:
 
 ```cpp
-const Pixel* buf = effect_->display_buffer();   // fast path: no per-pixel virtual dispatch
-int y = y_base_;
-for (int i = 0; i < PPS; ++i, y += y_step_) {
+const Pixel* buf = effect->display_buffer();    // fast path: no per-pixel virtual dispatch
+int y = y_base;
+for (int i = 0; i < PPS; ++i, y += y_step) {
     frame.packPixel(i, buf[y * width + x_col]);
 }
 ```
@@ -1320,7 +1484,8 @@ for (int i = 0; i < PPS; ++i, y += y_step_) {
 | Frame rate | 16 FPS (2 frames/rev — one per side; each side draws W/2 = 144 cols per 62.5 ms frame) |
 | Column frequency | 2304 Hz |
 | Column interval | ~434 µs (= 125 ms / 288 = 62.5 ms / 144) |
-| ISR duration (N=4 72px pack + DMA trigger) | ~96 µs worst case |
+| Flywheel wake period | ~54.25 µs (= column interval / `OVERSAMPLE` = 8) |
+| ISR duration (N=4 72px pack + DMA trigger) | Read per build from the `HS_ISR_PROFILE` accumulators (`g_flywheel_wake_cycles`, `g_column_pack_cycles`, `g_dma_submit_cycles`) that the `Profile` target dumps. A column-boundary ISR outrunning the wake period coalesces the wakes it overruns; the column index is derived from the cycle counter, so the next wake resumes at the time-correct column |
 
 #### Frame Sync Protocol: 1-Wire Signal Datasheet
 
@@ -1448,8 +1613,12 @@ Any checksum mismatch, wrong digit count, out-of-range digit, or stale partial f
 
  ACQUIRE : accept any *valid* symbol unconditionally (hard snap), but only
            on a burst preceded by ≥ t_QB (16 col) of wire silence — so a
-           beacon digit train can't capture a just-rebooted board. Renders
-           black until it has BOTH phase (a snap) AND identity (epoch/beacon).
+           beacon digit train can't capture a just-rebooted board mid-frame.
+           The train's FIRST digit is preceded by silence exactly as a
+           boundary symbol is, so it can still be mistaken once; the
+           R-rejection fallback bounds the recovery (§9.1 mis-snap row).
+           Renders black until it has BOTH phase (a snap) AND identity
+           (epoch/beacon).
  LOCKED  : accept a valid symbol only if implied correction ≤ G (4 col) AND
            boundary identity matches the prediction. Else reject (telemetry,
            no snap, no flip). After R rejections the board concludes its OWN
@@ -1529,9 +1698,14 @@ Effects register themselves into a global registry using the `REGISTER_EFFECT(Cl
 Effects expose live-adjustable parameters via `register_param()`. These are reflected into the WASM bridge and auto-generate GUI controls in the simulator:
 
 ```cpp
-register_param("Twist",   &params.twist, -5.0f, 5.0f);   // float slider (min, max)
-register_param("Enabled", &params.enabled);              // boolean toggle (bool* overload takes no range)
+register_param("Twist",   &params.twist, -5.0f, 5.0f);        // float slider (min, max)
+register_param("Enabled", &params.enabled);                   // boolean toggle (bool* overload takes no range)
+register_param("Shape",   &params.shape, SHAPE_NAMES, 4);     // dropdown; float* index over [0, count-1]
+register_animated_param("Speed", &params.speed, 0.0f, 2.0f);  // animation-driven slider
+register_readonly_param("Particles", &params.active_count, 0.0f, 1024.0f);  // engine-written telemetry
 ```
+
+The enum overload takes an array of option labels that must outlive the effect (string literals). `register_animated_param` marks the param as written by the animation system, so the GUI renders it as an auto-pausing slider that engages "Pause Animation" when touched; `register_readonly_param` marks it engine-written, so the GUI shows the live value but disables editing. Both flags can also be applied to an already-registered param via `mark_animated(name)` and `markReadonly(name)`.
 
 The parameter list (`ParamList` — a fixed `std::array<ParamDef, 32>`) is accessible via `getParameters()`, and `updateParameter(name, float)` sets values at runtime. Parameters support both `float*` and `bool*` targets via `std::variant`, with automatic bool threshold at 0.5. The animation system can also write to these parameters, allowing effects to animate their own exposed controls.
 
@@ -1543,7 +1717,9 @@ An effect passes construction-time flags to its base as `Effect(W, H, {.strobe =
 
 ## 9. Effects Reference
 
-All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) at each effect's highest available resolution — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for effects only registered there (RingShower, Dynamo).
+All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for RingShower and Dynamo.
+
+The simulator, the effect registry, and the tests carry the full roster. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) is a 22-effect subset of it, excluding the two Holosphere-96×20-only effects, Dynamo and Thrusters.
 
 ### Core Effects (Modern Engine)
 
@@ -1553,7 +1729,7 @@ All screenshots below were captured from the [live WebAssembly simulator](https:
 
 #### BZReactionDiffusion
 
-Simulates the Belousov-Zhabotinsky reaction — a 3-species cyclic competition (A beats B, B beats C, C beats A) producing rotating spiral waves. The simulation runs on a spherical k-nearest-neighbor graph (`ReactionGraph`: 7680 nodes, 6 neighbors each, precomputed Fibonacci lattice) with configurable diffusion rate and time step. Spiral waves are seeded periodically and evolve continuously.
+Simulates the Belousov-Zhabotinsky reaction — a 3-species cyclic competition (A beats B, B beats C, C beats A) producing rotating spiral waves. The simulation runs on a spherical k-nearest-neighbor graph (`ReactionGraph`: 7680 nodes, 6 neighbors each, precomputed Fibonacci lattice) with configurable diffusion rate and time step. Spiral nuclei are seeded once at init; a stochastic nudge to a handful of nodes on every physics substep keeps the dynamics off the closed manifold so the waves sustain.
 
 **Parameters**: Compete (cyclic-competition/predation coefficient), Diff (diffusion rate), Speed (time step)
 
@@ -1565,7 +1741,9 @@ Simulates the Belousov-Zhabotinsky reaction — a 3-species cyclic competition (
 
 #### GSReactionDiffusion
 
-Gray-Scott reaction-diffusion system (U + 2V → 3V, V → P) on a spherical mesh. Produces spots, stripes, and labyrinthine patterns depending on feed/kill rates.
+Gray-Scott reaction-diffusion system (U + 2V → 3V, V → P) on a spherical mesh. Produces spots, stripes, and labyrinthine patterns depending on feed/kill rates. A reaction runs until its field has all but stopped moving, then dissolves off the sphere and reseeds at fresh cluster sites, so every cycle grows a different form from the same constants; editing the constants dissolves the current field too.
+
+**Parameters**: Feed, Kill, dA, dB, Speed
 
 </td></tr></table>
 
@@ -1587,9 +1765,9 @@ Visualizes the Hopf fibration — a map from S³ to S². Points on S² (the base
 
 #### IslamicStars
 
-Procedurally generates Islamic geometric patterns using Hankin's method (pentagon-based subdivision of the Archimedean solids). Each face of a rotating solid is decorated with its characteristic star polygon, colored by face topology (triangles, pentagons, hexagons, etc.). Ripple waves periodically distort the geometry.
+Procedurally generates Islamic geometric patterns using Hankin's method (pentagon-based subdivision of the Archimedean solids). Each face of a rotating solid is decorated with its characteristic star polygon, colored by face topology (triangles, pentagons, hexagons, etc.), with topology classes folded modulo the six-slot `MeshPaletteBank` so a mesh carrying more than six classes aliases two distinct classes onto one color. Shapes carrying a recipe are built on screen op by op: the seed solid segues in, then one animated leg per lowered Conway step (ambo, truncate, snub, chamfer, dual, relax) sweeps it into the finished pattern. Each shape then holds still, ripple waves distort the geometry, and it segues out into the next.
 
-**Parameters**: Fade, Face Fade Lo, Face Fade Hi, Burst, Ripp Amp, Ripp Decay, Ripp Dur, Debug BB
+**Parameters**: Face Fade Lo, Face Fade Hi, Burst, Ripp Amp, Ripp Decay, Ripp Dur, Trans Speed
 
 </td></tr></table>
 
@@ -1599,7 +1777,9 @@ Procedurally generates Islamic geometric patterns using Hankin's method (pentago
 
 #### HankinSolids
 
-Similar to IslamicStars but sequences through the Platonic and Archimedean solids with animated palette transitions.
+Hankin interlace patterns over the Platonic and Archimedean solids. The interlace angle sweeps continuously over the held solid, then a random walk along the Conway edge graph picks the next one: each leg sweeps the destination solid's own operator parameter, so faces visibly truncate, expand, and twist into it. Exactly one mesh is on screen at all times; faces are colored by topology class from shuffled mesh palettes that crossfade per leg.
+
+**Parameters**: Intensity, Angle
 
 </td></tr></table>
 
@@ -1612,6 +1792,8 @@ Similar to IslamicStars but sequences through the Platonic and Archimedean solid
 #### SphericalHarmonics
 
 Visualizes the real spherical harmonics Yˡₘ(θ, φ) as a colored scalar field over the sphere: the harmonic value drives a perceptual positive/negative palette split with ambient-occlusion shading. Continuously morphs between (l, m) modes.
+
+**Parameters**: Amplitude, Debug BB
 
 </td></tr></table>
 
@@ -1657,7 +1839,7 @@ Polyline rings drift pole-to-pole through an inverse stereographic projection, e
 
 #### DreamBalls
 
-Draws twisting wireframe knotted structures derived from Archimedean solids. Mesh vertices are displaced along per-vertex tangent frames to create orbiting knot patterns, and a Möbius warp is applied to the geometry. Multiple copies orbit simultaneously while the whole structure tumbles under a slow Languid random-walk view orientation punctuated by periodic full-sphere spins.
+Draws twisting wireframe knotted structures derived from Archimedean solids. Mesh vertices are displaced along per-vertex tangent frames to create orbiting knot patterns, and a Möbius warp is applied to the geometry. Multiple copies orbit simultaneously while the whole structure tumbles under a slow Languid random-walk view orientation punctuated by periodic full-sphere spins. Four presets cycle every 320 frames, each carrying its own solid (rhombicuboctahedron, rhombicosidodecahedron, truncated cuboctahedron, icosidodecahedron), palette, and displacement settings; the outgoing and incoming sprites overlap so geometry and color crossfade across the change.
 
 **Parameters**: Copies (number of knot copies), Radius (displacement), Speed (orbit speed), Warp (Möbius warp scale), Alpha
 
@@ -1681,9 +1863,9 @@ A single head traces spherical Lissajous curves, cycling through a dozen configu
 
 #### RingSpin
 
-Four great-circle rings tumble continuously under energetic random-walk rotation, each leaving a fading motion-blur trail of its recent orientations (drawn with `Scan::Ring`, head and tail of the trail thickened). Each ring is colored by a baked vignette palette.
+Four great-circle rings tumble continuously under energetic random-walk rotation, each leaving a fading motion-blur trail of its recent orientations (drawn with `Scan::RingGroup`, which fuses a frame's near-coincident sub-rings into one scan pass; head and tail of the trail thickened). Each ring is colored by a baked vignette palette.
 
-**Parameters**: Alpha, Thickness, Show Bounding
+**Parameters**: Alpha, Thickness, Debug BB
 
 </td></tr></table>
 
@@ -1741,7 +1923,7 @@ Stereographic-projection shader (extends `Effect` directly) that samples world-s
 
 #### MindSplatter
 
-Random-walk particle system with Möbius warp bursts.
+Particles spray from emitters at the eight cube vertices — each sweeping its own tangent-plane emission angle — and fall toward attractor wells at the six octahedron vertices, where an event-horizon kernel around each signed axis punches them out as holes. A random walk tumbles the view, periodic Möbius warp bursts distort the whole field, and a preset timer lerps friction, well strength and speeds between four presets.
 
 **Parameters**: Friction, Well Str, Init Spd, Ang Spd, Particles
 
@@ -1765,7 +1947,7 @@ A vertical strand of points — one per latitude row — drifts horizontally aro
 
 #### Thrusters
 
-A central distorted ring (`Plot::DistortedRing`) warps and spins; periodic random "fires" kick it onto a new axis and bloom a pair of opposed thrust rings (`Plot::Ring`) that expand from zero and fade out.
+A central distorted ring (`Plot::DistortedRing`) warps and spins; periodic random "fires" kick it onto a new axis and bloom a pair of opposed thrust rings (`Plot::Ring`) that expand from a sub-pixel seed and fade out.
 
 **Parameters**: Radius, Alpha
 
@@ -1801,7 +1983,7 @@ Volumetric raymarcher that renders twisted tori at the 26 vertices of a disdyaki
 
 #### Flyby
 
-Stereographic-projection shader (extends `Effect` directly) with noise-driven warp distortion. A single `Rotation` animation continuously rotates the tangent plane around the Y-axis, producing a fly-through effect on the sphere surface. Uses `Scan::Shader::draw` for full-screen pixel shading with a baked palette.
+Stereographic-projection shader (extends `Effect` directly) with noise-driven warp distortion. A single `Rotation` animation continuously rotates the tangent plane around the Y-axis, producing a fly-through effect on the sphere surface. Uses `Scan::Shader::draw` for full-screen pixel shading with a baked palette. Five camera/warp presets chain forever: `next_preset()` schedules a 480-frame lerp into the next preset and re-arms itself on completion, so every slider except Drift is continuously rewritten.
 
 **Parameters**: Warp Scale, Warp Strength, Pattern Freq, Speed, Pole Fade, Drift, Hue Shift
 
@@ -1844,7 +2026,7 @@ The [`daydream`](https://github.com/woundedlion/daydream) repo is a static web a
 1. Drive the WASM engine one frame at a time at a fixed cadence.
 2. Map each `(x, y, color)` pixel to a position on a 3D sphere and render it as an instanced dot mesh.
 3. Provide a UI for switching effects, tuning parameters, sweeping resolutions, recording video, and exercising the segmented-POV multi-board mode.
-4. Host five standalone geometry tools that reuse the engine's `MeshOps` for interactive design work.
+4. Host four standalone geometry tools for interactive design work, one of which (`solids.html`) drives the engine's own `MeshOps` through WASM.
 
 ### 10.1 Process and Threading Model
 
@@ -1867,7 +2049,7 @@ index.html → vendor-importmap.js           segment_worker.js × N
               └─ VideoRecorder (MediaRecorder)
 ```
 
-A normal page load creates one WASM instance on the main thread. The dot mesh has one instance per LED pixel; the per-frame work is `instanceColor.needsUpdate = true` after the WASM buffer view is refreshed. When the user enables Segmented POV (§10.5), `daydream.js` spawns N Web Workers, each holding its own WASM module so the four-Teensy Phantasm layout can be exercised in software.
+A normal page load creates one WASM instance on the main thread. The dot mesh has one instance per LED pixel; the per-frame work is `instanceColor.needsUpdate = true` after the WASM buffer view is refreshed. When the user enables Segmented POV (§10.7), `daydream.js` spawns N Web Workers, each holding its own WASM module so the four-Teensy Phantasm layout can be exercised in software.
 
 ### 10.2 The WASM Bridge
 
@@ -1882,8 +2064,9 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `getBufferLength()` → `int` | Length of the pixel buffer (`W × H × 3`) for sizing the view |
 | `setParameter(name, value)` → `bool` | Update a live effect parameter; returns `false` if the write was not applied (no active effect, unknown name, read-only param, or non-finite value) |
 | `setAnimationsPaused(paused)` | Freeze/resume the current effect's animation drivers (the GUI "Pause Animation" toggle) |
-| `getParameterDefinitions()` | Return the parameter list; each entry is `{name, value, animated, readonly}`, and float params additionally carry `{min, max}` (bool params omit `min`/`max` and return `value` as a JS boolean) |
+| `getParameterDefinitions()` | Return the parameter list; each entry is `{name, value, animated, readonly}`, and float params additionally carry `{min, max}` (bool params omit `min`/`max` and return `value` as a JS boolean). Enum params (registered with option labels) also carry `options`, an array of label strings indexed by the param's value, which the GUI renders as a dropdown |
 | `getParamValues()` | Return current parameter values (including animation-driven updates) |
+| `getParamGeneration()` → `int` | Effect-load counter identifying which effect the definition and value streams describe. Pin it beside a `getParameterDefinitions()` snapshot and re-read it with each `getParamValues()` call; a changed value means the snapshot is stale (parameter counts repeat across the roster, so a length check alone cannot detect the switch) |
 | `getArenaMetrics()` | Memory usage stats for geometry, scratch, and tooling arenas, plus the stack high-water mark (see below) |
 | `getEffectSizes()` | Return `sizeof` for every registered effect at the current resolution |
 | `getSupportedResolutions()` → `[[w, h], …]` | *(static)* List the resolutions the build supports, as `[width, height]` pairs |
@@ -1895,7 +2078,7 @@ The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry
 
 The bridge also exposes a `PaletteOps` class whose `bakeLut` method authors a three-key OKLCH gradient and returns a zero-copy `Uint8Array` view over a 256-entry sRGB LUT (same read-before-next-call memory-view contract as `getPixels`), used by the palette tool. It touches no global RNG, so calling it never perturbs a live engine's render stream.
 
-It likewise exports the engine's color, palette, and lissajous math as free functions so the JavaScript tool ports can cross-check against the real implementation rather than a reimplementation: `srgb_to_linear_float`, `linear_to_srgb_float`, `srgb_to_linear_interp` (the interpolated sRGB→16-bit-linear LUT), `linear_rgb_to_oklab`, `oklab_to_linear_rgb`, `hsv_to_rgb` (the device `CHSV` sextant path), `procedural_palette_linear` (the cosine-palette formula), and `lissajous`.
+It likewise exports the engine's color, palette, and geometry math as free functions so the JavaScript tool ports can cross-check against the real implementation rather than a reimplementation: `srgb_to_linear_float`, `linear_to_srgb_float`, `srgb_to_linear_interp` (the interpolated sRGB→16-bit-linear LUT), `linear_rgb_to_oklab`, `oklab_to_linear_rgb`, `hsv_to_rgb` (the device `CHSV` sextant path), `procedural_palette_linear` (the cosine-palette formula), `named_procedural_palettes` (the engine's named cosine-palette coefficient table), `lissajous`, and `mobius_transform` (the stereographic Möbius sphere map).
 
 The WASM bridge includes stack high-water-mark instrumentation: `stack_paint_canary()` fills the stack with a known pattern at init time, and `stack_high_water_mark()` scans for the deepest overwrite. This is reported via `getArenaMetrics()` and logged on every effect switch to catch stack-hungry template instantiations early.
 
@@ -1928,8 +2111,8 @@ The `Daydream` class owns the entire render side. Features:
 | **Instanced dot mesh** | One `InstancedMesh` of `W × H` small spheres. Per-instance position is precomputed in `setupDots()` from `pixelToSpherical(x, y)` (a `THREE.Spherical`, applied via `setFromSpherical`); per-instance color is updated each frame from the WASM pixel buffer. Single draw call per frame. |
 | **Linear color pipeline** | `THREE.ColorManagement.enabled = true` and `setPixelRatio(min(devicePixelRatio, 1))`. Colors arriving from WASM are already linear, so no extra conversion. |
 | **OrbitControls camera** | A normal `PerspectiveCamera` at `(0, 0, 220)` with FOV 20°, plus `OrbitControls` for mouse/touch navigation. |
-| **Picture-in-picture** | A clone of the main camera at a fixed orientation renders to a 30%-sized bottom-right viewport so the front and back of the sphere are visible simultaneously. Suppressed when `isMobile` or `navigator.webdriver` (§ headless capture). |
-| **Axes overlay** | Three `THREE.Line`s for X/Y/Z visible on toggle, plus a `CSS2DRenderer`-backed `LabelPool` for "+X / +Y / +Z" labels with zero allocation per frame. |
+| **Picture-in-picture** | A clone of the main camera, tracking its position and orientation each frame, renders the same view into a square 30%-sized bottom-right viewport. Suppressed when `isMobile`, under `navigator.webdriver` (§ headless capture), and while recording. |
+| **Axes overlay** | Three `THREE.Line`s for X/Y/Z visible on toggle, plus a `CSS2DRenderer`-backed `LabelPool` for the six axis-direction labels ("X / Y / Z" and "-X / -Y / -Z") with zero allocation per frame. |
 | **Resize observer** | `ResizeObserver` on the canvas container recomputes camera aspect, viewport, and `isMobile` (width ≤ 900). |
 | **Fixed-rate stepping** | The simulation ticks at `1/FPS` seconds independent of the actual render rate, with a time accumulator to keep effects deterministic. |
 
@@ -1939,7 +2122,10 @@ Daydream uses a tiny pub/sub state container plus a URL-syncing wrapper:
 
 ```js
 const appState = new AppState({ effect: 'IslamicStars', resolution: 'Phantasm (288x144)' });
-new URLSync(appState, ['effect', 'resolution']);  // mirrors keys to query string
+const urlSync = new URLSync(appState, ['effect', 'resolution'], {
+  effect: (v) => knownEffects.has(v),                 // per-key validators gate
+  resolution: (v) => Boolean(resolutionPresets[v]),   // the initial URL read
+});
 
 appState.subscribe((key, value, old) => {
   if (key === 'effect') applyEffect();
@@ -1947,15 +2133,16 @@ appState.subscribe((key, value, old) => {
 });
 ```
 
-- **`AppState`** — flat key→value store with a `subscribe(callback)` API. Setting a key fires the callback only if the value actually changed. The sidebar and lil-gui both write through `appState.set(...)`, so they stay in sync without explicit coupling.
-- **`URLSync`** — reads tracked keys from `window.location.search` on construction (URL beats default), then debounces writes back to the query string via `history.replaceState`. Shareable links like `?effect=Raymarch&resolution=Phantasm%20(288x144)` work out of the box.
+- **`AppState`** — flat key→value store with a `subscribe(callback)` API. Setting a key fires the callback only if the value actually changed. The sidebar and lil-gui both write through `appState.set(...)`, so they stay in sync without explicit coupling. `update(patch)` batches: every key in the patch is written first and only then are subscribers notified, one event per changed key, so a callback that reads a sibling batched key sees its post-batch value instead of a half-applied state.
+- **`URLSync`** — reads tracked keys from `window.location.search` on construction (URL beats default), coercing each raw string to the seeded default's type. The third constructor argument is a per-key validator map applied to that raw string; a key whose predicate rejects keeps the validated default, so a hand-edited link cannot poison state and no consumer has to re-validate afterwards. Writes back to the query string are debounced 200 ms through `history.replaceState`. Shareable links like `?effect=Raymarch&resolution=Phantasm%20(288x144)` work out of the box.
+- **URL write ownership** — `URLSync` is the app-wide single owner of URL writes, reachable as `getActiveURLSync()`; constructing a new one disposes the previous. `gui.js` routes each parameter change through `setParam(key, value)`, which buffers an ad-hoc entry (numbers rounded to 4 decimals, `null` marking a deletion) rather than writing directly. The debounced flush is a read-modify-write at fire time: it re-reads the live query string, overlays the tracked state keys, then overlays the ad-hoc buffer — so concurrent state and GUI updates merge into one `replaceState` instead of clobbering each other. `reset(excludedKeys)` drops every param outside the exclusion set and writes immediately, re-asserting tracked state and surviving ad-hoc entries so a change still inside the debounce window is not lost.
 
 ### 10.5 The Effect Sidebar (`sidebar.js`)
 
 The left-edge effect list is a small custom widget:
 
 - **Persistent button references**: re-sorting by name or size (live `sizeof` from `getEffectSizes()`) re-appends the existing button nodes in the new order without recreating them; `setEffects()` itself rebuilds the list from scratch.
-- **Keyboard navigation**: arrow keys move the focused button; Enter or Space selects.
+- **Keyboard navigation**: arrow keys move the focused button (wrapping at the ends), Home and End jump to the first and last; Enter or Space selects.
 - **Mobile horizontal scroll**: when laid out as a horizontal strip, scroll arrows fade in/out based on scroll position via a `ResizeObserver` + scroll listener.
 - **Per-resolution filtering**: each resolution has its own curated effect list, shown in the sidebar. An effect that is not in the active resolution's list — including one hydrated from a `?effect=…` link — is replaced with that list's first effect, so only curated effects load at a given resolution.
 
@@ -1993,6 +2180,8 @@ Key properties:
 - **Cross-segment stateful effects render full-frame** — an effect whose per-frame state reads pixels *outside* the worker's band (`MeshFeedback`'s feedback warp samples the previous frame at unbounded offsets; `Dynamo` reprojects `World::Trails` under rotation) cannot be band-clipped: a clipped worker would have stale/zero history outside its band, so cross-band trails read as black and seams appear. Those effects report `Effect::needs_full_frame()` (derived from a compile-time `any_crosses_segments` filter-pipeline trait), and `setClip` leaves their clip at the full canvas — every worker computes the bit-identical full frame and `segment_worker.js` slices its segment rectangle from the full readback. This mirrors the device exactly, where each board independently renders the whole canvas; only non-stateful effects keep segmented rendering's clipping win. Design: `docs/segmented_stateful_effects_spec.md`.
 - **One-frame pipeline** — frame N's render is dispatched fire-and-forget; frame N-1's results are composited synchronously when they arrive. Wall-clock time is measured against the slowest worker — exactly what the multi-Teensy hardware sees.
 - **Boundary overlay** — a "Show Boundaries" toggle paints cyan markers on the segment edges in the composite buffer to make the partition visible.
+- **Protocol version handshake** — `worker_protocol.js` exports a `PROTOCOL_VERSION` that both ends stamp and check. Each worker posts a `booted` ping carrying it *before* instantiating WASM, and the controller's `init` message carries it back; either side faults on a mismatch — a stale cached worker or glue file against a newer peer — instead of drifting on reshaped message fields.
+- **Watchdogs, bounded boot retry, and a latched fault** — a worker that hangs or fails to load without throwing fires no `onerror`, so three deadlines bound the pipeline: the `booted` ping (module fetch + evaluate), pool readiness (WASM instantiate), and render liveness. The render deadline is re-armed on every distinct segment frame, so a slow effect keeps extending it while a true stall still faults. A message-less `error` event before the pool is ready is a transient module-fetch failure and rebuilds the pool a bounded number of times with a short backoff; anything else latches. Latching terminates every worker and halts the pool with no auto-restart, replacing the per-segment stats table with a fault banner naming the segment and the reason — it stays down until a user-driven resolution or segmented-mode change rebuilds the pool.
 
 ### 10.8 Vendor Importmap (Local-First / CDN Fallback)
 
@@ -2009,9 +2198,9 @@ A page-specific local import (e.g. `solids.html` referencing `../solids.js`) is 
 
 ### 10.9 Video Recording (`recorder.js`)
 
-A `VideoRecorder` wraps `MediaRecorder` over `canvas.captureStream(0)` — the manual-frame-request mode where frames are taken on demand instead of on wall-clock. After every simulation tick, `recorder.captureFrame()` requests a frame from the stream; this means recorded video is locked to the effect's simulation rate (16 FPS by default) regardless of how fast the browser actually renders. The result is byte-perfect repeatability between recordings. This holds only where the captured track exposes `requestFrame`; on browsers lacking it the recorder falls back to a wall-clock timer, so the rate-lock and repeatability guarantees do not apply.
+A `VideoRecorder` wraps `MediaRecorder` over an offscreen capture canvas's `captureStream(0)` — the manual-frame-request mode where frames are taken on demand instead of on wall-clock. After every simulation tick, `recorder.captureFrame()` blits the source canvas into the offscreen and requests a frame from the stream; this means recorded video is locked to the effect's simulation rate (16 FPS by default) regardless of how fast the browser actually renders. The result is byte-perfect repeatability between recordings. This holds only where the captured track exposes `requestFrame`; on browsers lacking it the recorder falls back to a wall-clock timer, so the rate-lock and repeatability guarantees do not apply.
 
-Codec priority is MP4/H.264 → WebM/VP9 → WebM/VP8, with optional offscreen-canvas downscaling to a target height for size-controlled exports.
+Codec priority is MP4/H.264 → WebM/VP9 → WebM/VP8. Capture always goes through the offscreen canvas: it is either scaled to a target height for size-controlled exports, or pinned to the source's start-time size at native resolution. Either way the recorded track's frame size is fixed for the whole session, so a mid-recording resolution change cannot alter the encoded dimensions.
 
 ### 10.10 Resolution Presets
 
@@ -2024,13 +2213,13 @@ Switching presets does a full WASM reset: `setResolution(w, h)` updates the acti
 
 ### 10.11 Geometry Tools (`daydream/tools/`)
 
-Four standalone HTML pages. Three render with their own Three.js scene; `palettes.html` renders with 2D canvas contexts. `solids.html` is backed by the engine's WASM build so its geometry stays identical to the C++ engine — via the `MeshOps` class; the other three implement their geometry math directly in JavaScript:
+Four standalone HTML pages. Three render with their own Three.js scene; `palettes.html` renders with 2D canvas contexts. Two are backed by the engine's WASM build so their math stays identical to the C++ engine — `solids.html` via the `MeshOps` class and `palettes.html` via `PaletteOps` — and both hard-require it: a failed module load raises a fatal banner instead of falling back. `lissajous.html` and `mobius.html` implement their geometry math directly in JavaScript:
 
 | Tool | What it does |
 |---|---|
 | `lissajous.html` | Designs spherical Lissajous curves with live frequency / phase sliders; outputs a C++ `LissajousParams` initializer for the engine's Lissajous effects (`ChaoticStrings`, `Comets`). |
-| `mobius.html` | Visualizes Möbius transformations on the sphere via stereographic projection; lets you sweep the four complex coefficients and see the warp on a latitude-longitude grid. |
-| `palettes.html` | Tunes `ProceduralPalette` cosine coefficients and `GenerativePalette` harmony rules and exports the C++ initializer; renders its swatches and graphs on 2D canvas contexts rather than a Three.js scene. |
+| `mobius.html` | Visualizes Möbius transformations on the sphere via the engine's stereographic projection; lets you sweep the four complex coefficients, see the warp on a latitude-longitude grid, and copy a C++ `MobiusParams` initializer. |
+| `palettes.html` | Tunes `ProceduralPalette` cosine coefficients and `GenerativePalette` harmony rules and exports the C++ initializer; renders its swatches and graphs on 2D canvas contexts rather than a Three.js scene. `GenerativePalette` LUTs are baked through the WASM `PaletteOps.bakeLut` bridge, so its harmony colors are the engine's own. |
 | `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated tooling arenas (16 MB, separate from the engine's 298 KiB arena). |
 
 All four reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`.
@@ -2091,7 +2280,7 @@ cmake --build  --preset wasm-release            # build holosphere_wasm.{js,wasm
 cmake --build  --preset wasm-release-install    # build + install into ../daydream/
 ```
 
-Use `wasm-debug` for an unoptimized build with assertions (`-sASSERTIONS=1`). Build outputs go to `build/<preset>/`. The `justfile` provides cross-platform shortcuts that forward to these presets: `just build` (release), `just build-debug`, and `just install` (release + install into `../daydream`).
+Use `wasm-debug` for an unoptimized build with assertions (`-sASSERTIONS=1`). Build outputs go to `build/<preset>/`. The `justfile` provides cross-platform shortcuts that forward to these presets: `just build` (release), `just build-debug`, and `just install` (release + install into `../daydream`). `just smoke` rebuilds and then drives the shipped module through [`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs) under Node — the same runtime gate CI's `wasm` job runs, so a release build is never shipped un-exercised.
 
 The WASM target (`CMakeLists.txt`, `EMSCRIPTEN` branch) configures:
 - Source paths: `targets/wasm/wasm.cpp`, `core/engine/memory.cpp`, `core/engine/reaction_graph.cpp`
@@ -2115,15 +2304,26 @@ ctest --preset tests          # run the suite (or: just test)
 
 The suite must use Clang — the engine relies on GCC/Clang `__attribute__` extensions MSVC rejects. The native toolchain file ([`cmake/toolchain-native-clang.cmake`](https://github.com/woundedlion/pov/blob/master/cmake/toolchain-native-clang.cmake)) locates Clang via `EMSDK` (or a sibling `../emsdk`) and, on Windows, transparently handles the resource compiler and `lld-link` so no Visual Studio Developer Prompt is required. Tests build with `-DHS_TEST_BUILD`, which only widens a couple of test-build buffer budgets (MSVC-STL `std::function` is larger than the device's `inplace_function`) — the firmware/WASM footprint is unchanged.
 
-Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-diffusion graph integrity, filters, the plot samplers and the Scan/mesh rasterizer, solids-registry invariants, the Conway/Hankin mesh operators, and animation. Beyond those unit checks the suite also runs: an effect smoke harness that constructs and renders every effect at 288×144 with asserts on, plus a cross-run determinism pass that re-renders each effect under a fixed clock and diffs the frames; a death harness that spawns subprocesses to confirm each `HS_CHECK` invariant traps; the Phantasm multi-board sync core (`hardware/pov_sync.h`, spec §12); the HD107S SPI wire-format and color-correction tests; the POV driver tiling proofs (each LED write covers the canvas exactly once); and the WASM param-marshaling coverage (the JS definition/value streams stay index-aligned). `tests/run_tests.cpp` is the driver; add a `tests/test_<module>.h`, then `#include` it and call its entry point there (two lines) to extend it.
+Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-diffusion graph integrity, filters, the plot samplers and the Scan/mesh rasterizer, solids-registry invariants, the Conway/Hankin mesh operators, and animation. Beyond those unit checks the suite also runs: an effect smoke harness that constructs and renders every effect with asserts on, plus a cross-run determinism pass that re-renders each effect under a fixed clock and diffs the frames — at the device 96×20 resolution by default, and additionally at the production 288×144 alongside a white-box correctness block when `HS_EFFECTS_FULL=1` is set, which CI does on every push and pull request; a death harness that spawns subprocesses to confirm each `HS_CHECK` invariant traps; the Phantasm multi-board sync core (`hardware/pov_sync.h`, spec §12); the HD107S SPI wire-format and color-correction tests; the POV driver tiling proofs (each LED write covers the canvas exactly once); and the WASM param-marshaling coverage (the JS definition/value streams stay index-aligned). `tests/run_tests.cpp` is the driver; add a `tests/test_<module>.h`, then `#include` it and call its entry point there (two lines) to extend it.
 
 #### Continuous testing
 
 Three layers run the same suite so a regression can't reach the live demo:
 
-- **Local pre-commit hook** ([`.githooks/pre-commit`](https://github.com/woundedlion/pov/blob/master/.githooks/pre-commit)) — builds + runs the suite before each commit. **On by default (opt-out):** configuring the `tests` preset points `core.hooksPath` at `.githooks` automatically. Skip a single commit with `HS_SKIP_TESTS=1 git commit …` (or `--no-verify`); disable the auto-enable with `-DHS_INSTALL_GIT_HOOKS=OFF`. Doc-only commits skip the suite.
-- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on every push and pull request, runs the native suite on both Linux (clang-18) and Windows (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell), and builds the WASM module. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) — instantiating the module the way the browser does and driving every registered effect at every enumerated resolution, so a SIMD-codegen fault, an embind signature mismatch, a stack overflow, or an `ALLOW_MEMORY_GROWTH` detachment fails here rather than riding a green build to deploy — and **verifies the install provenance trio** (`holosphere_wasm.wasm` + `.sha` + `.wasm.sha256`, the same artifacts the daydream deploy gate consumes), asserting the recorded `sha256` verifies and a clean checkout records no `-dirty` marker. The native suite there runs with `HS_SMOKE_FRAMES=120` to reach effect-lifecycle transitions the default short run skips.
-- **Gated deploy** (`.github/workflows/deploy.yml`, **daydream repo**) — daydream's GitHub Pages source is *GitHub Actions*. On a push to daydream's `master` (or manual dispatch), the engine's native unit suite runs as a **gate** (`deploy` `needs: gate`, checking out the engine repo); only if it passes does the workflow publish the simulator to Pages. The engine's WASM is whatever is committed in daydream (built + installed from Holosphere). If the engine repo is private, add a `POV_TOKEN` secret (a read-access PAT) for the gate's checkout.
+- **Local pre-commit hook** ([`.githooks/pre-commit`](https://github.com/woundedlion/pov/blob/master/.githooks/pre-commit)) — with C++/CMake changes staged it runs three gates: a `clang-format` check over the staged first-party sources, a build + run of the native suite, and the Teensy 4 size/layout gate (`pio run -e holosphere -e phantasm -e holosphere_dma`, enforcing the budgets in `tools/teensy_budgets.json`) — several minutes on a cold tree. The format and Teensy gates are skipped when `clang-format` / PlatformIO are absent, so CI re-runs both as its own jobs. **On by default (opt-out):** configuring the `tests` preset points `core.hooksPath` at `.githooks` automatically. Skip one gate with `HS_SKIP_FORMAT=1` / `HS_SKIP_TEENSY=1`, or the whole hook with `HS_SKIP_TESTS=1 git commit …` (or `--no-verify`); disable the auto-enable with `-DHS_INSTALL_GIT_HOOKS=OFF`. Doc-only commits skip all three. The effects module runs its QUICK tier here, so a green hook is not authoritative for the full-resolution passes.
+- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on every push and pull request, runs the native suite on both Linux (clang-18) and Windows (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell), and builds the WASM module. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) — instantiating the module the way the browser does and driving every registered effect at every enumerated resolution, so a SIMD-codegen fault, an embind signature mismatch, a stack overflow, or an `ALLOW_MEMORY_GROWTH` detachment fails here rather than riding a green build to deploy — and **verifies the install provenance trio** (`holosphere_wasm.wasm` + `.sha` + `.wasm.sha256`, the same artifacts the daydream deploy gate consumes), asserting the recorded `sha256` verifies and a clean checkout records no `-dirty` marker. The native suite there runs with `HS_SMOKE_FRAMES=120` to reach effect-lifecycle transitions the default short run skips, and runs a second time at `-O2` (the `tests` preset pins `Debug`, so UB the optimizer acts on and FP results that move under contraction are invisible to the Debug shards; `NDEBUG` is left undefined there so assertions and the arena guards stay live).
+- **Gated deploy** (`.github/workflows/deploy.yml`, **daydream repo**) — daydream's GitHub Pages source is *GitHub Actions*. On a push to daydream's `master` (or manual dispatch), the engine's native unit suite runs as a **gate** (checking out the engine repo) alongside daydream's own JS suite; `deploy` `needs: [gate, js-tests]`, so only if both pass does the workflow publish the simulator to Pages. The engine's WASM is whatever is committed in daydream (built + installed from Holosphere). If the engine repo is private, add a `POV_TOKEN` secret (a read-access PAT) for the gate's checkout.
+
+The simulator's JavaScript lives in the daydream repo and carries its own suite there: `tests/*.test.js`, run by `npm test` (`node --test`), covering the driver and clock, the sidebar and GUI, the segment workers and layout, param marshaling, color/palette math, and the geometry tools' math modules. A `pretest` guard (`scripts/require-tests.mjs`) fails the run if the test glob matches nothing, so a rename can't empty the suite silently. It runs on every daydream pull request (`.github/workflows/js-tests.yml`, alongside `npm run typecheck` and an import-map freshness check) and again as the `js-tests` job in `deploy.yml`.
+
+### Documentation — Holosphere repo
+
+```bash
+just docs-check   # validate tracked Markdown (the ci.yml docs-markdown job)
+just docs         # docs-check, then build the Doxygen reference into build/docs/html/
+```
+
+`just docs-check` runs [`tools/docs_check.py`](https://github.com/woundedlion/pov/blob/master/tools/docs_check.py) and its own unit tests: it checks fence balance, link and anchor targets, and backticked repo paths across every tracked Markdown file. `just docs` needs `doxygen` on `PATH`; it clones the pinned doxygen-awesome theme into `.doxygen-awesome/` on first run and synthesizes `Doxyfile.local` from `Doxyfile` plus [`docs/doxygen-theme.cfg`](docs/doxygen-theme.cfg) — the same combination `.github/workflows/docs.yml` publishes to <https://woundedlion.github.io/pov/>.
 
 ### Running the Simulator — daydream repo
 
