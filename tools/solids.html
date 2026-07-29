@@ -1219,19 +1219,20 @@
     function copyCode(index, lang, btn) {
       const item = savedSolids[index];
 
+      const isComplex = IslamicStarPatterns.includes(item.base);
+      // Archimedean and Platonic bases share the `Archimedean::` qualifier
+      // (it `using`s Platonic); Catalan bases need their own.
+      const nsName = isComplex
+        ? "IslamicStarPatterns"
+        : (CATALAN_BASES.has(item.base) ? "Catalan" : "Archimedean");
+
       let code = '';
 
       if (lang === 'recipe_cpp') {
-        code = generateRecipeCpp(item);
+        code = generateRecipeCpp(item, nsName);
       } else if (lang === 'registry') {
         const { funcName } = generateFuncAndRecipe(item);
 
-        const isComplex = IslamicStarPatterns.includes(item.base);
-        // Archimedean and Platonic bases share the `Archimedean::` qualifier
-        // (it `using`s Platonic); Catalan bases need their own.
-        const nsName = isComplex
-          ? "IslamicStarPatterns"
-          : (CATALAN_BASES.has(item.base) ? "Catalan" : "Archimedean");
         const catName = isComplex ? "Complex" : "Simple";
 
         code = `    {"${funcName}",\n     ${nsName}::${funcName},\n     Category::${catName}},`;
