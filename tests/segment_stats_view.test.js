@@ -1,0 +1,268 @@
+// @ts-nocheck
+//
+// SegmentStatsView — the segmented-POV overlay: which column each per-segment
+// metric lands in, which source each fault code names, and the text-node-only
+// fault message. ../driver.js is mocked so the suite runs without three.
+//
+// Run: node --test --experimental-test-module-mocks "tests/*.test.js"
+import { test, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { fakeElement } from './fake_dom.js';
+
+const SLOW_FRAME_MS = 50;
+mock.module('../driver.js', { namedExports: { SLOW_FRAME_MS } });
+
+const { SegmentStatsView, FAULT_POOL, FAULT_RENDER } =
+  await import('../segment_stats_view.js');
+
+/**
+ * Overlay document stand-in: the stats container plus the two global stat bars
+ * the overlay hides. Every element it creates throws on an innerHTML write, so
+ * a regression from text nodes to markup assignment fails the test rather than
+ * passing silently.
+ * @returns {{doc: Object, stats: Object, desktop: Object, mobile: Object}} Document and its elements.
+ */
+function makeDoc() {
+  const createElement = (tag) => {
+    const el = fakeElement(tag);
+    Object.defineProperty(el, 'innerHTML', {
+      set() { throw new Error('innerHTML assigned'); },
+      get() { return undefined; },
+      configurable: true,
+    });
+    el.focusCount = 0;
+    el.focus = () => { el.focusCount++; };
+    return el;
+  };
+  const stats = createElement('div');
+  const desktop = createElement('div');
+  const mobile = createElement('div');
+  const byId = {
+    'segment-stats': stats,
+    'global-stats-desktop': desktop,
+    'stats-bar': mobile,
+  };
+  return {
+    doc: { getElementById: (id) => byId[id] || null, createElement },
+    stats,
+    desktop,
+    mobile,
+  };
+}
+
+/**
+ * A ready, active state whose per-segment values are pairwise distinct, so a
+ * metric written into a neighbouring column is visible.
+ * @param {number} n - Segment count.
+ * @param {Object} [over] - Fields to override.
+ * @returns {Object} Snapshot for update().
+ */
+function readyState(n, over = {}) {
+  const results = [];
+  const timings = [];
+  const renderUs = [];
+  const arenas = [];
+  const frameSeen = [];
+  for (let s = 0; s < n; s++) {
+    results.push({ x0: s * 10, x1: s * 10 + 9, y0: 100 + s, y1: 200 + s });
+    timings.push(s + 1);
+    renderUs.push((s + 1) * 7000);
+    arenas.push({
+      scratch_arena_a: { high_water_mark: 1024 * (s + 1) },
+      scratch_arena_b: { high_water_mark: 2048 * (s + 1) },
+      persistent_arena: { usage: 4096 * (s + 1) },
+    });
+    frameSeen.push(true);
+  }
+  return {
+    active: true,
+    ready: true,
+    faulted: false,
+    faultInfo: null,
+    count: n,
+    results,
+    timings,
+    renderUs,
+    arenas,
+    frameSeen,
+    wallTime: 12.5,
+    ...over,
+  };
+}
+
+/**
+ * Resolves table cells by header text rather than by index, so an assertion
+ * pins the column a value is rendered into.
+ * @param {Object} stats - The stats container element.
+ * @returns {{table: Object, head: string[], cell: (row: number, column: string) => Object}} Table accessors.
+ */
+function grid(stats) {
+  const table = stats.firstElementChild;
+  const head = table.children[0].children.map((c) => c.textContent);
+  return {
+    table,
+    head,
+    cell: (row, column) => table.children[row].children[head.indexOf(column)],
+  };
+}
+
+test('every per-segment metric renders under its own column header', () => {
+  const { doc, stats } = makeDoc();
+  new SegmentStatsView(doc).update(readyState(3));
+
+  const { head, cell } = grid(stats);
+  assert.deepEqual(head, ['', 'Range', 'Compute', 'Render', 'Scr A', 'Scr B', 'Persist']);
+
+  for (let s = 0; s < 3; s++) {
+    const row = s + 1; // row 0 is the header
+    assert.equal(cell(row, '').textContent, `Seg ${s}`);
+    assert.equal(cell(row, 'Range').textContent,
+      `x[${s * 10}–${s * 10 + 9}] y[${100 + s}–${200 + s}]`);
+    assert.equal(cell(row, 'Compute').textContent, `${(s + 1).toFixed(1)} ms`);
+    assert.equal(cell(row, 'Render').textContent, `${((s + 1) * 7).toFixed(1)} ms`);
+    assert.equal(cell(row, 'Scr A').textContent, `${(s + 1).toFixed(1)}`);
+    assert.equal(cell(row, 'Scr B').textContent, `${(2 * (s + 1)).toFixed(1)}`);
+    assert.equal(cell(row, 'Persist').textContent, `${(4 * (s + 1)).toFixed(1)}`);
+  }
+
+  assert.equal(cell(4, '').textContent, 'max');
+  assert.equal(cell(4, 'Compute').textContent, '3.0 ms');
+  assert.equal(cell(5, '').textContent, 'wall');
+  assert.equal(cell(5, 'Compute').textContent, '12.5 ms');
+});
+
+test('a segment with no frame yet shows ? for its range and - for its arenas', () => {
+  const { doc, stats } = makeDoc();
+  const state = readyState(2);
+  state.frameSeen[1] = false;
+  state.arenas[1] = null;
+  new SegmentStatsView(doc).update(state);
+
+  const { cell } = grid(stats);
+  assert.equal(cell(2, 'Range').textContent, '?');
+  assert.equal(cell(2, 'Scr A').textContent, '-');
+  assert.equal(cell(2, 'Scr B').textContent, '-');
+  assert.equal(cell(2, 'Persist').textContent, '-');
+});
+
+test('max time covers the live segments only, ignoring a stale tail entry', () => {
+  const { doc, stats } = makeDoc();
+  const state = readyState(2);
+  state.timings.push(999); // left over from a larger pool
+  new SegmentStatsView(doc).update(state);
+
+  assert.equal(grid(stats).cell(3, 'Compute').textContent, '2.0 ms');
+});
+
+test('only times past the slow threshold take the slow class', () => {
+  const { doc, stats } = makeDoc();
+  const state = readyState(2);
+  state.timings = [SLOW_FRAME_MS, SLOW_FRAME_MS + 1];
+  state.wallTime = SLOW_FRAME_MS + 1;
+  new SegmentStatsView(doc).update(state);
+
+  const { cell } = grid(stats);
+  assert.equal(cell(1, 'Compute').className, 'seg-time');
+  assert.equal(cell(2, 'Compute').className, 'seg-time slow');
+  assert.equal(cell(3, 'Compute').className, 'seg-time');   // max is never reclassed
+  assert.equal(cell(4, 'Compute').className, 'seg-time slow'); // wall is
+});
+
+test('the table is mutated in place and rebuilt only on a segment-count change', () => {
+  const { doc, stats } = makeDoc();
+  const view = new SegmentStatsView(doc);
+  view.update(readyState(2));
+  const first = stats.firstElementChild;
+
+  view.update(readyState(2, { timings: [9, 9] }));
+  assert.equal(stats.firstElementChild, first, 'the steady-state repaint reuses the table');
+  assert.equal(grid(stats).cell(1, 'Compute').textContent, '9.0 ms');
+
+  view.update(readyState(3));
+  const rebuilt = stats.firstElementChild;
+  assert.notEqual(rebuilt, first, 'a segment-count change rebuilds the table');
+  assert.equal(rebuilt.children.length, 3 + 3); // header + 3 segments + max + wall
+});
+
+test('an inactive pool hides the overlay and hands the stat bars back', () => {
+  const { doc, stats, desktop, mobile } = makeDoc();
+  const view = new SegmentStatsView(doc);
+
+  view.update(readyState(2));
+  assert.equal(stats.style.display, '');
+  assert.equal(desktop.style.display, 'none');
+  assert.equal(mobile.style.display, 'none');
+
+  view.update(readyState(2, { active: false }));
+  assert.equal(stats.style.display, 'none');
+  assert.equal(desktop.style.display, '');
+  assert.equal(mobile.style.display, '');
+});
+
+test('a spawning pool reports the worker count instead of a table', () => {
+  const { doc, stats } = makeDoc();
+  new SegmentStatsView(doc).update(readyState(4, { ready: false }));
+
+  const box = stats.firstElementChild;
+  assert.equal(box.getAttribute('role'), 'status');
+  assert.deepEqual(box.children, ['Spawning 4 workers…']);
+});
+
+test('each fault code names its own source in the headline', () => {
+  const cases = [
+    [{ segId: 0, message: 'boom' }, 'worker 0'],
+    [{ segId: 3, message: 'boom' }, 'worker 3'],
+    [{ segId: FAULT_POOL, message: 'boom' }, 'pool init'],
+    [{ segId: FAULT_RENDER, message: 'boom' }, 'render timeout'],
+    [{ segId: -7, message: 'boom' }, 'pool init'],
+    [null, 'worker ?'],
+  ];
+  for (const [faultInfo, who] of cases) {
+    const { doc, stats } = makeDoc();
+    new SegmentStatsView(doc).update(readyState(2, { faulted: true, faultInfo }));
+
+    const box = stats.firstElementChild;
+    assert.equal(box.getAttribute('role'), 'alert');
+    assert.equal(box.tabIndex, -1);
+    assert.equal(box.focusCount, 1);
+    assert.equal(box.children[0],
+      `⚠ Segment ${who} faulted — segmented render halted.`);
+    assert.equal(box.children[2].textContent, faultInfo ? 'boom' : 'see console');
+    assert.equal(box.children[4].textContent,
+      'Change resolution or toggle segmented mode to restart.');
+  }
+});
+
+test('the fault message is a text node, never markup', () => {
+  const hostile = '<img src=x onerror="alert(1)"><script>steal()</script>';
+  const { doc, stats } = makeDoc();
+  new SegmentStatsView(doc).update(
+    readyState(2, { faulted: true, faultInfo: { segId: 1, message: hostile } }));
+
+  const box = stats.firstElementChild;
+  const msg = box.children[2];
+  assert.equal(msg.tagName, 'SPAN');
+  assert.equal(msg.textContent, hostile, 'the message is carried verbatim as text');
+  assert.deepEqual(msg.children, [], 'nothing was parsed out of the message');
+  // The headline is appended as a string, so it too becomes a text node.
+  assert.equal(typeof box.children[0], 'string');
+  assert.deepEqual(box.children.map((c) => typeof c === 'string' ? 'text' : c.tagName),
+    ['text', 'BR', 'SPAN', 'BR', 'SPAN']);
+});
+
+test('the fault overlay is painted once and torn down on recovery', () => {
+  const { doc, stats } = makeDoc();
+  const view = new SegmentStatsView(doc);
+  const faulted = readyState(2, { faulted: true, faultInfo: { segId: 1, message: 'boom' } });
+
+  view.update(faulted);
+  const box = stats.firstElementChild;
+  view.update(faulted);
+  assert.equal(stats.firstElementChild, box, 'a standing fault is not repainted');
+  assert.equal(box.focusCount, 1, 'focus is not stolen every frame');
+
+  view.update(readyState(2));
+  const table = stats.firstElementChild;
+  assert.equal(table.tagName, 'TABLE', 'recovery rebuilds the table the fault tore down');
+  assert.equal(grid(stats).cell(1, 'Compute').textContent, '1.0 ms');
+});
