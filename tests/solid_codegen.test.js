@@ -189,19 +189,42 @@ test('generateRecipeCpp wraps the recipe in a FLASHMEM function with V/F/I comme
     fCount: 12,
     iCount: 4,
   };
-  const cpp = generateRecipeCpp(item);
+  const cpp = generateRecipeCpp(item, 'Archimedean');
   const expected =
     '// V=8, F=12, I=4\n' +
     'FLASHMEM static PolyMesh tetrahedron_kis(Arena &a, Arena &b) {\n' +
-    '  return SolidBuilder(tetrahedron(a, b), a, b).kis().build();\n' +
+    '  return SolidBuilder(Archimedean::tetrahedron(a, b), a, b).kis().build();\n' +
     '}';
   assert.equal(cpp, expected);
 });
 
 /** Verifies generateRecipeCpp falls back to zero vertex/face/internal counts when the item omits them. */
 test('generateRecipeCpp defaults missing V/F/I counts to 0', () => {
-  const cpp = generateRecipeCpp({ base: 'cube', ops: ['dual'] });
+  const cpp = generateRecipeCpp({ base: 'cube', ops: ['dual'] }, 'Archimedean');
   assert.ok(cpp.startsWith('// V=0, F=0, I=0\n'));
+});
+
+/**
+ * The generated function is pasted into `namespace IslamicStarPatterns`, which
+ * carries no using-directive, so an unqualified seed call would not compile.
+ */
+test('the seed call is qualified with the base namespace', () => {
+  const item = { base: 'rhombicTriacontahedron', ops: ['ambo'] };
+  const { recipe } = generateFuncAndRecipe(item, 'Catalan');
+  assert.equal(recipe, 'SolidBuilder(Catalan::rhombicTriacontahedron(a, b), a, b).ambo().build()');
+  assert.ok(generateRecipeCpp(item, 'Catalan')
+    .includes('SolidBuilder(Catalan::rhombicTriacontahedron(a, b), a, b)'));
+});
+
+/** Verifies a pasteable function is never emitted without a valid namespace for its seed. */
+test('generateRecipeCpp requires a valid base namespace', () => {
+  const item = { base: 'cube', ops: ['dual'] };
+  assert.throws(() => generateRecipeCpp(item),
+    /base namespace "undefined" is not a valid C\+\+ identifier/);
+  assert.throws(() => generateRecipeCpp(item, ''),
+    /base namespace "" is not a valid C\+\+ identifier/);
+  assert.throws(() => generateFuncAndRecipe(item, 'Archimedean::evil()'),
+    /base namespace "Archimedean::evil\(\)" is not a valid C\+\+ identifier/);
 });
 
 /** Verifies the emitted function body never calls the function it defines, which would recurse forever. */
@@ -215,7 +238,7 @@ test('generateRecipeCpp never emits a body that calls its own function', () => {
   for (const ops of chains) {
     for (const base of ['cube', 'truncatedIcosahedron']) {
       const { funcName } = generateFuncAndRecipe({ base, ops });
-      const body = generateRecipeCpp({ base, ops }).split('\n')[2];
+      const body = generateRecipeCpp({ base, ops }, 'Archimedean').split('\n')[2];
       assert.ok(!body.includes(`${funcName}(`),
         `body of ${funcName} calls itself: ${body}`);
     }
@@ -294,7 +317,7 @@ test('generateFuncAndRecipe rejects an unknown op or a malformed base', () => {
 /** Verifies an empty op chain is rejected: its funcName would equal the base, redefining the seed and recursing. */
 test('generateFuncAndRecipe rejects an empty op chain', () => {
   assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [] }), /op chain is empty/);
-  assert.throws(() => generateRecipeCpp({ base: 'cube', ops: [] }), /op chain is empty/);
+  assert.throws(() => generateRecipeCpp({ base: 'cube', ops: [] }, 'Archimedean'), /op chain is empty/);
 });
 
 /** Verifies generateFuncAndRecipe rejects non-finite fractional params and non-integer/negative relax counts. */

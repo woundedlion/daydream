@@ -134,6 +134,14 @@ function requireCount(opName, param, val) {
   }
 }
 
+// Generated functions are pasted into `namespace IslamicStarPatterns`, which
+// carries no using-directive, so the seed call must name its own namespace.
+function requireNamespace(where, ns) {
+  if (typeof ns !== 'string' || !CPP_IDENTIFIER.test(ns)) {
+    throw new Error(`${where}: base namespace "${ns}" is not a valid C++ identifier`);
+  }
+}
+
 export const formatFloat = formatFloatCpp;
 
 /**
@@ -185,13 +193,16 @@ export function pctSuffix(val) {
  * @param {Object} item - The solid spec.
  * @param {string} item.base - The base solid name.
  * @param {Array<(string|{op:string, params:Object})>} item.ops - Ops to apply, each a bare op name or an {op, params} object; must be non-empty.
+ * @param {string} [baseNamespace] - Namespace qualifying the seed call (e.g. "Archimedean"). Omit only when the caller wants the funcName alone; a recipe pasted into the engine must carry it.
  * @returns {{funcName: string, recipe: string}} The generated C++ function name and SolidBuilder recipe expression.
- * @throws {Error} When the base is not a valid C++ identifier, the op chain is empty, or an op or its params are invalid.
+ * @throws {Error} When the base or namespace is not a valid C++ identifier, the op chain is empty, or an op or its params are invalid.
  */
-export function generateFuncAndRecipe(item) {
+export function generateFuncAndRecipe(item, baseNamespace = '') {
   if (typeof item.base !== 'string' || !CPP_IDENTIFIER.test(item.base)) {
     throw new Error(`generateFuncAndRecipe: base "${item.base}" is not a valid C++ identifier`);
   }
+
+  if (baseNamespace !== '') requireNamespace('generateFuncAndRecipe', baseNamespace);
 
   if (!Array.isArray(item.ops)) {
     throw new Error('generateFuncAndRecipe: item.ops must be an array');
@@ -256,7 +267,8 @@ export function generateFuncAndRecipe(item) {
   });
 
   const funcName = nameParts.join('');
-  const recipe = `SolidBuilder(${item.base}(a, b), a, b)${chain}.build()`;
+  const seed = baseNamespace === '' ? item.base : `${baseNamespace}::${item.base}`;
+  const recipe = `SolidBuilder(${seed}(a, b), a, b)${chain}.build()`;
 
   return { funcName, recipe };
 }
@@ -266,10 +278,13 @@ export function generateFuncAndRecipe(item) {
  * recording its vertex/face/index counts. Output is pasted verbatim into the
  * engine, so the exact text and formatting are byte-for-byte significant.
  * @param {Object} item - The solid spec (see generateFuncAndRecipe), optionally with vCount, fCount, and iCount counts.
+ * @param {string} baseNamespace - Namespace qualifying the seed call (e.g. "Archimedean"); required, since the emitted function is pasted where the seed is not visible unqualified.
  * @returns {string} The complete C++ function source including its leading count comment.
+ * @throws {Error} When the namespace is not a valid C++ identifier, or generateFuncAndRecipe rejects the spec.
  */
-export function generateRecipeCpp(item) {
-  const { funcName, recipe } = generateFuncAndRecipe(item);
+export function generateRecipeCpp(item, baseNamespace) {
+  requireNamespace('generateRecipeCpp', baseNamespace);
+  const { funcName, recipe } = generateFuncAndRecipe(item, baseNamespace);
   const comment = `// V=${item.vCount || 0}, F=${item.fCount || 0}, I=${item.iCount || 0}`;
   return `${comment}\nFLASHMEM static PolyMesh ${funcName}(Arena &a, Arena &b) {\n  return ${recipe};\n}`;
 }
