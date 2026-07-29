@@ -739,6 +739,15 @@ guiInstance.add(daydream, 'labelAxes').name('Show Axes').onChange(() => daydream
 guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());
 guiInstance.add(daydream, 'columnFillOverlap', 1.0, 2.0, 0.01).name('Column Fill Overlap').onChange(() => daydream.invalidate());
 
+// Near-pole azimuthal shading decimation. 1.0 is the physically-neutral
+// setting: one shade per run of columns sharing an LED footprint. Higher
+// trades fidelity for render time; 0 disables.
+const poleLodState = { poleLod: 0 };
+guiInstance.add(poleLodState, 'poleLod', 0, 2, 0.05).name('Pole LOD').onChange(v => {
+  host.engine?.setPoleLod(v);
+  daydream.invalidate();
+});
+
 // ── Segmented POV controls ──────────────────────────────────────────────────
 const segFolder = guiInstance.addFolder('Segmented POV');
 segFolder.close();
