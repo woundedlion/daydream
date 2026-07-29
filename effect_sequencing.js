@@ -6,9 +6,10 @@
 /**
  * DOM/engine-free sequencing helpers for daydream.js's effect and resolution
  * apply path, extracted so the "apply the effect directly vs let the
- * effect-change subscription fire it" decision and the param/value skew guard can
- * be unit-tested without a WASM engine, lil-gui, or a browser. applyResolution()
- * and syncGUI()/export() route through here so those rules live in one tested
+ * effect-change subscription fire it" decision, the switch/rollback transaction
+ * that drives it, and the param/value skew guard can be unit-tested without a
+ * WASM engine, lil-gui, or a browser. applyResolution(), syncGUI()/export() and
+ * the appState subscription route through here so those rules live in one tested
  * place, mirroring resolveParamSync().
  */
 
@@ -88,6 +89,148 @@ export function applyInitialState(apply, onSuccess) {
 }
 
 /**
+ * Classify a switch transaction's outcome into what the app should report. A
+ * rejected switch whose rollback succeeded is logged only — the previous state
+ * is back and the page is usable. A failed rollback leaves state, URL, and
+ * engine possibly disagreeing, so it additionally earns the fatal banner.
+ * @param {string} label - What switched, for the log lines ("Effect"/"Resolution").
+ * @param {{applied: boolean, failure: any, recoveryFailure: any}} result - A
+ *   runSwitchTransaction() outcome.
+ * @returns {{logs: Array<{message: string, error: any}>, fatal: string|null}}
+ *   Console lines to emit in order, and the fatal-banner text when there is one.
+ */
+export function switchFailureReport(label, result) {
+  const logs = [];
+  if (result.failure) {
+    logs.push({ message: `${label} switch failed:`, error: result.failure });
+  }
+  if (!result.recoveryFailure) return { logs, fatal: null };
+  logs.push({ message: `${label} rollback failed:`, error: result.recoveryFailure });
+  return {
+    logs,
+    fatal: `${label} change failed and the previous state could not be restored. `
+      + 'Reload the page.',
+  };
+}
+
+/**
+ * Subscribe the effect and resolution switch transactions to an app state.
+ *
+ * Every effect/resolution change runs as a transaction: apply it, and on
+ * rejection put the previous effect, resolution, URL, and effect control values
+ * back. Rollback re-enters appState, so the subscription mutes itself for the
+ * duration — isRestoring() exposes that window to applyResolution(), which feeds
+ * it to planResolutionApply() to decide whether an effect correction can reach
+ * applyEffect() through the subscription or must be applied by hand.
+ *
+ * A rejected resolution switch also re-asserts the URL after the current task,
+ * because the rollback's appState write lands before the URL writer has flushed
+ * the rejected value.
+ *
+ * @param {Object} deps - Injected app collaborators.
+ * @param {{get: Function, set: Function, update: Function, subscribe: Function}}
+ *   deps.appState - The state to subscribe to and roll back.
+ * @param {() => any} deps.getActiveEffect - Reads the live effect control record;
+ *   called again after each rollback apply, which rebuilds it.
+ * @param {(preserveParams?: boolean) => boolean|void} deps.applyEffect - Applies
+ *   the state's effect; false means rejected.
+ * @param {(preserveParams?: boolean) => boolean|void} deps.applyResolution -
+ *   Applies the state's resolution; false means rejected.
+ * @param {() => string} deps.currentUrl - Snapshots the URL to restore.
+ * @param {(url: string) => void} deps.restoreUrl - Puts a snapshotted URL back.
+ * @param {(resolution: string) => void} deps.showResolution - Points the
+ *   resolution control at a rolled-back value.
+ * @param {() => void} deps.syncResolutionUrl - Re-asserts the applied resolution
+ *   in the URL.
+ * @param {(message: string, error: any) => void} deps.logError - Console sink.
+ * @param {(message: string) => void} deps.showFatal - Fatal-banner sink.
+ * @returns {{isRestoring: () => boolean, dispose: () => void}} The mute-window
+ *   query, and an idempotent unsubscribe.
+ */
+export function createSwitchCoordinator({
+  appState,
+  getActiveEffect,
+  applyEffect,
+  applyResolution,
+  currentUrl,
+  restoreUrl,
+  showResolution,
+  syncResolutionUrl,
+  logError,
+  showFatal,
+}) {
+  let restoring = false;
+
+  // Rollback writes appState, so mute the subscription for its duration or the
+  // restore would be handled as a fresh switch.
+  const runMuted = (restore) => {
+    restoring = true;
+    try {
+      restore();
+    } finally {
+      restoring = false;
+    }
+  };
+
+  const restoreEffect = (effect, url, effectState) => runMuted(() => {
+    appState.set('effect', effect);
+    restoreUrl(url);
+    if (applyEffect(true) === false) {
+      throw new Error(`Effect rollback to "${effect}" was rejected.`);
+    }
+    restoreEffectControlState(getActiveEffect(), effectState);
+  });
+
+  const restoreResolution = (resolution, effect, url, effectState) => runMuted(() => {
+    appState.update({ resolution, effect });
+    showResolution(resolution);
+    restoreUrl(url);
+    if (applyResolution(true) === false) {
+      throw new Error(`Resolution rollback to "${resolution}" was rejected.`);
+    }
+    restoreEffectControlState(getActiveEffect(), effectState);
+  });
+
+  const report = (label, result) => {
+    const { logs, fatal } = switchFailureReport(label, result);
+    for (const { message, error } of logs) logError(message, error);
+    if (fatal) showFatal(fatal);
+  };
+
+  const onChange = (key, value, old) => {
+    if (restoring) return;
+    if (key === 'effect') {
+      const previousUrl = currentUrl();
+      const previousEffectState = snapshotEffectControlState(getActiveEffect());
+      report('Effect', runSwitchTransaction(
+        () => applyEffect(),
+        () => restoreEffect(old, previousUrl, previousEffectState),
+      ));
+    } else if (key === 'resolution') {
+      const previousEffect = appState.get('effect');
+      const previousUrl = currentUrl();
+      const previousEffectState = snapshotEffectControlState(getActiveEffect());
+      const result = runSwitchTransaction(
+        () => applyResolution(),
+        () => restoreResolution(old, previousEffect, previousUrl, previousEffectState),
+      );
+      if (!result.applied) queueMicrotask(syncResolutionUrl);
+      report('Resolution', result);
+    }
+  };
+
+  let unsubscribe = appState.subscribe(onChange);
+  return {
+    isRestoring: () => restoring,
+    dispose() {
+      if (!unsubscribe) return;
+      unsubscribe();
+      unsubscribe = null;
+    },
+  };
+}
+
+/**
  * Plan how applyResolution() should re-apply the effect after a resolution
  * change. The requested effect is kept when the new resolution offers it, else
  * corrected to the list's first entry (resolveActiveEffect). A correction runs
@@ -136,6 +279,33 @@ export function offeredResolutions(presets, supported) {
     labels: offered,
     unlabeled: Array.from(rows).filter((row) => !covered.has(row)),
   };
+}
+
+/**
+ * The effect list a resolution preset offers.
+ * @param {Object<string, {favorites?: Array<string>}>} presets - Preset label to
+ *   its definition.
+ * @param {string} resolution - A preset label.
+ * @returns {Array<string>|null} That preset's list, or null when the preset is
+ *   unknown or carries none — the caller substitutes a default list rather than
+ *   leaving the sidebar and the effect switch with nothing to offer.
+ */
+export function resolutionEffects(presets, resolution) {
+  return presets[resolution]?.favorites ?? null;
+}
+
+/**
+ * Correct a resolution the engine turned out not to offer. The hydrated value
+ * comes from the URL or the seeded default, both chosen before the engine
+ * reported which presets it can build.
+ * @param {Array<string>} labels - The offered preset labels, in table order.
+ * @param {string} current - The hydrated/active resolution.
+ * @returns {string|null} The label to switch to, or null when current is offered
+ *   (nothing to correct) and when nothing at all is offered (no better value).
+ */
+export function resolutionCorrection(labels, current) {
+  if (labels.length === 0 || labels.includes(current)) return null;
+  return labels[0];
 }
 
 /**

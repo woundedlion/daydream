@@ -10,6 +10,9 @@ import {
   snapshotEffectControlState,
   restoreEffectControlState,
   offeredResolutions,
+  resolutionCorrection,
+  resolutionEffects,
+  switchFailureReport,
 } from '../effect_sequencing.js';
 
 function makeEffectControls(values, paused = false, sinks = null) {
@@ -288,4 +291,86 @@ test('an engine row no preset covers is reported, not offered', () => {
 test('a wholly unmatched engine list leaves every preset offered', () => {
   assert.deepEqual(offeredResolutions(PRESETS, [[64, 32]]),
     { labels: Object.keys(PRESETS), unlabeled: [] });
+});
+
+// resolutionCorrection decides whether syncResolutionOptions() must move the
+// hydrated resolution onto the offered list.
+
+test('an offered resolution needs no correction', () => {
+  for (const label of Object.keys(PRESETS)) {
+    assert.equal(resolutionCorrection(Object.keys(PRESETS), label), null);
+  }
+});
+
+test('a resolution the engine dropped is corrected to the first offered label', () => {
+  assert.equal(
+    resolutionCorrection(['Holosphere (96x20)'], 'Phantasm (288x144)'),
+    'Holosphere (96x20)');
+});
+
+test('an empty offer list yields no correction', () => {
+  assert.equal(resolutionCorrection([], 'Phantasm (288x144)'), null);
+});
+
+// resolutionEffects is applyResolution()/Test All's per-resolution effect list.
+
+test('a preset reports its own effect list', () => {
+  const presets = { Lo: { favorites: ['A', 'B'] }, Hi: { favorites: ['C'] } };
+  assert.deepEqual(resolutionEffects(presets, 'Lo'), ['A', 'B']);
+  assert.deepEqual(resolutionEffects(presets, 'Hi'), ['C']);
+});
+
+test('an unknown preset, or one carrying no list, reports none', () => {
+  assert.equal(resolutionEffects({ Lo: { favorites: ['A'] } }, 'Mid'), null);
+  assert.equal(resolutionEffects({ Lo: { dotSize: 2 } }, 'Lo'), null);
+});
+
+// switchFailureReport turns a runSwitchTransaction outcome into console lines
+// and, only when the rollback also failed, a fatal banner.
+
+test('a successful switch reports nothing', () => {
+  assert.deepEqual(
+    switchFailureReport('Effect',
+      { applied: true, failure: null, recoveryFailure: null }),
+    { logs: [], fatal: null });
+});
+
+test('a rejection with no thrown value reports nothing', () => {
+  assert.deepEqual(
+    switchFailureReport('Effect',
+      { applied: false, failure: null, recoveryFailure: null }),
+    { logs: [], fatal: null });
+});
+
+test('a recovered failure is logged but is not fatal', () => {
+  const failure = new Error('setEffect threw');
+  assert.deepEqual(
+    switchFailureReport('Effect',
+      { applied: false, failure, recoveryFailure: null }),
+    { logs: [{ message: 'Effect switch failed:', error: failure }], fatal: null });
+});
+
+test('a failed rollback logs both errors and is fatal', () => {
+  const failure = new Error('setResolution threw');
+  const recoveryFailure = new Error('rollback threw');
+  assert.deepEqual(
+    switchFailureReport('Resolution', { applied: false, failure, recoveryFailure }),
+    {
+      logs: [
+        { message: 'Resolution switch failed:', error: failure },
+        { message: 'Resolution rollback failed:', error: recoveryFailure },
+      ],
+      fatal: 'Resolution change failed and the previous state could not be '
+        + 'restored. Reload the page.',
+    });
+});
+
+test('a rejected switch whose rollback failed still raises the banner', () => {
+  const recoveryFailure = new Error('rollback threw');
+  const report = switchFailureReport('Effect',
+    { applied: false, failure: null, recoveryFailure });
+
+  assert.deepEqual(report.logs,
+    [{ message: 'Effect rollback failed:', error: recoveryFailure }]);
+  assert.match(report.fatal, /^Effect change failed/);
 });
