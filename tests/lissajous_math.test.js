@@ -208,6 +208,12 @@ test('lissajousCodeString emits a C++ LissajousParams initializer', () => {
   assert.equal(
     lissajousCodeString(1.06, 1.06, 0, 5.909),
     'LissajousParams{1.06f, 1.06f, 0.0f, 5.909f}');
+
+  // An 8/7 rational lock has no exact short decimal; the frequencies keep full
+  // precision so the exported curve still closes.
+  assert.equal(
+    lissajousCodeString(5 * (8 / 7), 5, 0, 7 * TWO_PI),
+    'LissajousParams{5.714286f, 5.0f, 0.0f, 14 * PI_F}');
 });
 
 /**
