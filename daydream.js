@@ -751,6 +751,7 @@ createHolosphereModule().then(module => {
   // button doesn't keep offering to stop a session that is already gone.
   host.recorder.onError = () => showRecording(false);
   daydream.recorder = host.recorder;
+  recordCtrl.enable();
 
   const loadingOverlay = document.getElementById('loading-overlay');
   applyInitialState(
@@ -967,7 +968,10 @@ const showRecording = (recording) => {
 };
 
 const recordState = { record: () => {
-  if (!host.recorder) return;
+  if (!host.recorder) {
+    console.warn('Recording is unavailable until the rendering engine finishes loading.');
+    return;
+  }
   showRecording(host.recorder.toggle(appState.get('effect')));
 }};
 
@@ -978,6 +982,7 @@ recFolder.addSession(recSettings, 'recResolution', Object.keys(REC_RESOLUTIONS))
 const recFormatCtrl =
   recFolder.addSession(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
 const recordCtrl = recFolder.add(recordState, 'record').name('\u25cf Record');
+recordCtrl.disable();
 const INTERACTIVE_KEY_TARGET =
   'input, textarea, select, button, [contenteditable], .lil-gui, .effect-sidebar';
 /**
