@@ -1699,9 +1699,11 @@
     }
 
     function resetOps() {
-      state.ops = [];
-      renderOps();
-      update();
+      queueCommit(async () => {
+        state.ops = [];
+        renderOps();
+        update();
+      });
     }
 
     function clearSavedSolids() {
