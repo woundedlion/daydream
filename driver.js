@@ -268,8 +268,8 @@ export class Daydream {
     this.scene.add(this.yAxis);
     this.scene.add(this.zAxis);
 
-    this.mainViewport = { x: 0, y: 0, width: 1, height: 1 };
-    this.pipViewport = { x: 0, y: 0, width: 0.25, height: 0.25 };
+    this.mainViewport = { x: 0, y: 0, width: 0, height: 0 };
+    this.pipViewport = { x: 0, y: 0, width: 0, height: 0 };
     this.isMobile = false;
     this.fittedDistance = 0;
     this.setCanvasSize();
