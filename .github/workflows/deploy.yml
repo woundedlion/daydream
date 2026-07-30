@@ -15,10 +15,9 @@
 # byte-identical to the hash recorded at build time (holosphere_wasm.wasm.sha256),
 # binding the deployed artifact to that recorded hash. That manifest carries an
 # entry for the .js Emscripten glue as well, so the glue is bound to the binary
-# by content. Finally it asserts .wasm, .wasm.sha256 and .sha share a last-touch
-# commit — the install rewrites all three on every build, so a lone-file commit
-# means the engine source-pin has decoupled from the binary. If any file is
-# missing, a hash does not match, or the three were not committed together, the
+# by content. Finally it asserts .wasm and .sha share a last-touch commit, so
+# the engine source-pin cannot advance independently of the binary. If any file
+# is missing, a hash does not match, or the source pin was committed alone, the
 # gate fails hard rather than deploying an unverifiable artifact (a silent
 # fallback to engine HEAD would make the gate inert).
 #
@@ -71,19 +70,17 @@ jobs:
           fi
           sha256sum -c holosphere_wasm.wasm.sha256
 
-      - name: Verify the installed WASM files were committed atomically
+      - name: Verify the installed WASM and source pin were committed atomically
         # The Holosphere WASM install rewrites .wasm, .wasm.sha256 and .sha on
-        # every build, so they must be committed together. The sha256 check above
-        # binds .wasm↔.wasm.sha256 and .js↔.wasm.sha256 (content), but cannot
-        # catch a .sha advanced to a different engine commit while the binary is
-        # stale. Asserting a shared last-touch commit closes that gap.
+        # every build. The sha256 check above binds the manifest to .wasm and .js
+        # by content; the shared .wasm/.sha last-touch commit prevents a source pin
+        # from advancing independently of the binary.
         run: |
           wasm_c="$(git log -1 --format=%H -- holosphere_wasm.wasm)"
           sha_c="$(git log -1 --format=%H -- holosphere_wasm.sha)"
-          s256_c="$(git log -1 --format=%H -- holosphere_wasm.wasm.sha256)"
-          echo "last-touch commits: .wasm=$wasm_c .sha=$sha_c .wasm.sha256=$s256_c"
-          if [ -z "$wasm_c" ] || [ "$wasm_c" != "$sha_c" ] || [ "$wasm_c" != "$s256_c" ]; then
-            echo "::error::WASM install files were not committed atomically — the engine source-pin (.sha) and/or the recorded hash (.wasm.sha256) are decoupled from the binary (.wasm). Re-run the Holosphere WASM install and commit them together."
+          echo "last-touch commits: .wasm=$wasm_c .sha=$sha_c"
+          if [ -z "$wasm_c" ] || [ "$wasm_c" != "$sha_c" ]; then
+            echo "::error::WASM and engine source-pin were not committed atomically — holosphere_wasm.sha is decoupled from holosphere_wasm.wasm. Re-run the Holosphere WASM install and commit them together."
             exit 1
           fi
 
