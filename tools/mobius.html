@@ -629,9 +629,10 @@
       uiUpdaters[id] = updateUI;
 
       const handleInput = (clientX, clientY) => {
+        const rect = planeElement.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
         if (isAnimating) stopAnimation();
 
-        const rect = planeElement.getBoundingClientRect();
         const width = rect.width;
         const height = rect.height;
         let x = clientX - rect.left;
