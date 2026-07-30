@@ -68,11 +68,11 @@ test('revertText: "" still restores the idle class on revert', async () => {
     copiedClasses: ['text-green-400'], idleClasses: ['text-gray-500'],
   });
   assert.equal(el.textContent, 'Copied!');
-  assert.equal(el.classList.has('text-gray-500'), false, 'idle class removed while flashed');
+  assert.equal(el.classList.contains('text-gray-500'), false, 'idle class removed while flashed');
 
   mock.timers.tick(2000);
   assert.equal(el.textContent, '');
-  assert.equal(el.classList.has('text-gray-500'), true, 'idle class restored after revert');
+  assert.equal(el.classList.contains('text-gray-500'), true, 'idle class restored after revert');
 });
 
 /** A rejected clipboard write flashes the failure label and reverts, never latching "Copied!". */
