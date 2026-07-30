@@ -419,9 +419,10 @@
 }
 
 /* --- Mobile Styles --- */
-/* 900px is MOBILE_BREAKPOINT_PX in driver.js. The desktop query below resumes at
-   900.02px so a fractional width (page zoom, fractional DPR) still lands in
-   exactly one of the two ranges. */
+/* Page layout follows viewport width. The renderer separately measures its
+   canvas container, so its compact layout may switch at a different time. The
+   desktop query below resumes at 900.02px so a fractional width (page zoom,
+   fractional DPR) still lands in exactly one of the two ranges. */
 @media only screen and (max-width: 900px) {
   /* Hide entire nav-tabs header on mobile */
   .nav-tabs {
