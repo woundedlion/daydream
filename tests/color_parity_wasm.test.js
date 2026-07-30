@@ -190,9 +190,9 @@ const BAKE_GOLDEN = {
 
 /**
  * Pins the engine's generative-palette bake to fixed golden bytes. palette_math.js
- * hands bakeLut already-resolved h/s/v keys and keeps only the JS-side profile
- * PRNG, so the gradient interpolation itself lives entirely in the engine and this
- * is the only place its output values are checked — the module contract test pins
+ * hands bakeLut already-resolved h/s/v keys, so the gradient interpolation itself
+ * lives entirely in the engine and this is the only place its output values are
+ * checked — the module contract test pins
  * bakeLut's type and length, and palette_math.test.js substitutes a synthetic ramp.
  * Baking all four shapes from one key set also pins the GradientShape enum order
  * palette_math.js mirrors: a shifted mapping lands on another shape's golden.
@@ -215,8 +215,8 @@ test('PaletteOps.bakeLut golden LUT entries (absolute pin)', () => {
 /**
  * Verifies GenerativePalette drives the real bridge to the same bytes: the
  * profiles it resolves (TRIADIC hues off base 0, VIBRANT saturation, FLAT value)
- * are the RNG-free combination, so the whole tool path is pinned to the goldens
- * above without a seeded PRNG in the loop.
+ * are the draw-free combination, so the whole tool path is pinned to the goldens
+ * above without a seeded draw in the loop.
  */
 test('GenerativePalette bakes the golden LUT through the engine bridge', () => {
   const ops = new M.PaletteOps();

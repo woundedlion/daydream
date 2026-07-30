@@ -1154,8 +1154,8 @@
         const sat = document.getElementById('gen_saturation').value;
         const hueValue = parseInt(document.getElementById('gen_seed_slider').value);
 
-        // Pure generativePaletteCpp (palette_math.js) emits the block plus the
-        // reproducibility caveat; this function just supplies the DOM inputs.
+        // Pure generativePaletteCpp (palette_math.js) emits the block; this
+        // function just supplies the DOM inputs.
         codeOutput.textContent = generativePaletteCpp({ shape, harmony, brightness, sat, hueValue });
       }
     }

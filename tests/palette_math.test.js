@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const {
-  ProceduralPalette, PRNG, GenerativePalette,
+  ProceduralPalette, seededRandInt, GenerativePalette,
   mapValue, waveGraphBand, WAVE_GRAPH_VALUE_RANGE,
   proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams, zoomedProceduralParams,
@@ -125,28 +125,51 @@ test('proceduralPaletteParams flattens a coefficient set into A_R..D_B', () => {
   });
 });
 
-/** Verifies the PRNG yields identical sequences for equal seeds (via next and nextInt) and diverges for different seeds. */
-test('PRNG is deterministic: same seed -> same sequence', () => {
-  const a = new PRNG(12345);
-  const b = new PRNG(12345);
-  for (let i = 0; i < 16; i++) {
-    assert.equal(a.next(), b.next());
+/**
+ * Pins seededRandInt to the values GenerativePalette::seeded_rand_int
+ * (core/color/color.h) produces for the same arguments. The expected column was
+ * evaluated independently from the C++ source — hash01's 32-bit unsigned mix
+ * (core/math/3dmath.h), then the single-precision `min + int(u * (max - min))`
+ * scale — so a JS mirror that drifts from the header fails here, and the
+ * exported palette no longer matches the preview.
+ */
+test('seededRandInt reproduces the engine draws for known (seed, site, range)', () => {
+  const cases = [
+    [0, 0, -7, 8, -7],
+    [0, 1, 0, 2, 0],
+    [0, 4, 153, 204, 183],
+    [10, 0, -7, 8, -1],
+    [10, 2, 11, 22, 12],
+    [10, 3, 11, 22, 21],
+    [128, 7, 25, 76, 26],
+    [128, 8, 127, 178, 149],
+    [128, 9, 204, 256, 248],
+    [200, 4, 153, 204, 170],
+    [200, 5, 153, 204, 165],
+    [200, 6, 153, 204, 202],
+    [255, 7, 178, 256, 213],
+    [255, 8, 51, 127, 75],
+  ];
+  for (const [seed, site, min, max, expected] of cases) {
+    assert.equal(seededRandInt(seed, site, min, max), expected,
+      `seededRandInt(${seed}, ${site}, ${min}, ${max})`);
   }
-  const c = new PRNG(12345);
-  const d = new PRNG(12345);
-  for (let i = 0; i < 16; i++) {
-    assert.equal(c.nextInt(0, 100), d.nextInt(0, 100));
-  }
-  assert.notEqual(new PRNG(1).next(), new PRNG(2).next());
 });
 
-/** Verifies seed 0 is a valid, reproducible seed (not silently randomized). */
-test('PRNG seed 0 is reproducible', () => {
-  const a = new PRNG(0);
-  const b = new PRNG(0);
-  for (let i = 0; i < 8; i++) {
-    assert.equal(a.next(), b.next());
+/**
+ * Verifies seededRandInt's range contract over every hue the tool can pass and
+ * every site the palette draws from: an integer in [min, max), and min for an
+ * empty range (the C++ guard against max <= min).
+ */
+test('seededRandInt stays in [min, max) for every seed and site', () => {
+  for (let seed = 0; seed < 256; seed++) {
+    for (let site = 0; site < 10; site++) {
+      const v = seededRandInt(seed, site, 153, 204);
+      assert.ok(Number.isInteger(v) && v >= 153 && v < 204, `seed ${seed} site ${site}`);
+    }
   }
+  assert.equal(seededRandInt(7, 0, 42, 42), 42);
+  assert.equal(seededRandInt(7, 0, 42, 10), 42);
 });
 
 /** Verifies mapValue linearly remaps a value from one numeric range to another. */
@@ -200,7 +223,7 @@ test('proceduralPaletteCpp emits a valid C++ initializer', () => {
   assert.ok(s.includes('{0.5f, 0.5f, 0.5f}'));
 });
 
-/** Verifies generativePaletteCpp emits the GenerativePalette block with the chosen enum tokens, base hue, and caveat comment. */
+/** Verifies generativePaletteCpp emits the GenerativePalette block with the chosen enum tokens and base hue. */
 test('generativePaletteCpp emits the block with the chosen enum tokens', () => {
   const s = generativePaletteCpp({
     shape: 'VIGNETTE',
@@ -215,7 +238,7 @@ test('generativePaletteCpp emits the block with the chosen enum tokens', () => {
   assert.ok(s.includes('BrightnessProfile::ASCENDING'));
   assert.ok(s.includes('SaturationProfile::VIBRANT'));
   assert.ok(s.includes('42}'));
-  assert.ok(s.includes('// Reproduces the profiles + base hue exactly'));
+  assert.ok(!s.includes('//'), 'no caveat comment: the pinned hue reproduces the preview');
 });
 
 /** Verifies generativePaletteCpp rejects an enum token that would emit a nonexistent C++ enumerator. */
@@ -255,71 +278,62 @@ test('GenerativePalette delegates resolved (shape, h,s,v x3) to bakeLut', () => 
 });
 
 /**
- * Records the [min, max) ranges GenerativePalette samples while `build` runs.
- * The RNG-driven profile and harmony constants never reach bakeLut as literals,
- * so the draw ranges are the only place they are observable.
- * @param {() => void} build - Callback constructing the palette under test.
- * @returns {number[][]} Every nextInt range drawn, in call order.
+ * Resolves a palette and returns the (s1,s2,s3) and (v1,v2,v3) bakeLut carries.
+ * @param {string} brightness - Brightness profile under test.
+ * @param {string} sat - Saturation profile under test.
+ * @param {number} hueValue - Base hue, which is also the draw seed.
+ * @returns {{sats:number[], values:number[]}} The resolved saturations and values.
  */
-function recordIntDraws(build) {
-  const ranges = [];
-  const nextInt = PRNG.prototype.nextInt;
-  PRNG.prototype.nextInt = function record(min, max) {
-    ranges.push([min, max]);
-    return nextInt.call(this, min, max);
+function resolveKeys(brightness, sat, hueValue) {
+  new GenerativePalette('STRAIGHT', 'TRIADIC', brightness, sat, hueValue);
+  return {
+    sats: [lastBakeArgs[2], lastBakeArgs[5], lastBakeArgs[8]],
+    values: [lastBakeArgs[3], lastBakeArgs[6], lastBakeArgs[9]],
   };
-  try {
-    build();
-  } finally {
-    PRNG.prototype.nextInt = nextInt;
-  }
-  return ranges;
 }
 
 /**
- * Pins palette_math.js's saturation/brightness constants — the fixed profiles by
- * their resolved bakeLut arguments, the randomized ones by the [min, max) range
- * each key is drawn from — against the values transcribed here from
+ * Pins palette_math.js's saturation/brightness draws — the fixed profiles by
+ * their resolved bakeLut arguments, the seeded ones by the (site, min, max)
+ * triple each key is drawn from — against the values transcribed here from
  * core/color/color.h GenerativePalette. This compares two hand-copies of that
  * header: the bridge takes already-resolved h/s/v, so the engine's own
  * derivation never runs and drift on the C++ side is caught only by re-reading
- * it. Draw order is the C++ constructor's: harmony hues (none for TRIADIC), then
- * s1..s3, then v1..v3.
+ * it. The site indices are load-bearing: they select the hash stream, so a
+ * shifted index reproduces the range but not the engine's value.
  */
-test('GenerativePalette profile constants hold the values transcribed from core/color/color.h', () => {
-  const build = (brightness, sat) => () =>
-    new GenerativePalette('STRAIGHT', 'TRIADIC', brightness, sat, 0);
+test('GenerativePalette profile draws hold the sites and ranges transcribed from core/color/color.h', () => {
+  const seed = 137;
+  const draw = (site, min, max) => seededRandInt(seed, site, min, max);
 
-  assert.deepEqual(recordIntDraws(build('FLAT', 'PASTEL')), [], 'PASTEL/FLAT draw nothing');
-  assert.deepEqual([lastBakeArgs[2], lastBakeArgs[5], lastBakeArgs[8]], [100, 100, 100], 'PASTEL saturations');
-  assert.deepEqual([lastBakeArgs[3], lastBakeArgs[6], lastBakeArgs[9]], [255, 255, 255], 'FLAT values');
+  assert.deepEqual(resolveKeys('FLAT', 'PASTEL', seed),
+    { sats: [100, 100, 100], values: [255, 255, 255] });
+  assert.deepEqual(resolveKeys('FLAT', 'VIBRANT', seed).sats, [255, 255, 255]);
 
-  recordIntDraws(build('FLAT', 'VIBRANT'));
-  assert.deepEqual([lastBakeArgs[2], lastBakeArgs[5], lastBakeArgs[8]], [255, 255, 255], 'VIBRANT saturations');
-
-  assert.deepEqual(recordIntDraws(build('FLAT', 'MID')),
-    [[153, 204], [153, 204], [153, 204]], 'MID saturations');
-  assert.deepEqual(recordIntDraws(build('ASCENDING', 'PASTEL')),
-    [[25, 76], [127, 178], [204, 256]], 'ASCENDING values');
-  assert.deepEqual(recordIntDraws(build('DESCENDING', 'PASTEL')),
-    [[204, 256], [127, 178], [25, 76]], 'DESCENDING values');
-  assert.deepEqual(recordIntDraws(build('BELL', 'PASTEL')),
-    [[51, 127], [178, 256]], 'BELL values');
-  assert.deepEqual(recordIntDraws(build('CUP', 'PASTEL')),
-    [[178, 256], [51, 127]], 'CUP values');
+  assert.deepEqual(resolveKeys('FLAT', 'MID', seed).sats,
+    [draw(4, 153, 204), draw(5, 153, 204), draw(6, 153, 204)], 'MID saturations');
+  assert.deepEqual(resolveKeys('ASCENDING', 'PASTEL', seed).values,
+    [draw(7, 25, 76), draw(8, 127, 178), draw(9, 204, 256)], 'ASCENDING values');
+  assert.deepEqual(resolveKeys('DESCENDING', 'PASTEL', seed).values,
+    [draw(7, 204, 256), draw(8, 127, 178), draw(9, 25, 76)], 'DESCENDING values');
+  const bell = resolveKeys('BELL', 'PASTEL', seed).values;
+  assert.deepEqual(bell, [draw(7, 51, 127), draw(8, 178, 256), draw(7, 51, 127)], 'BELL values');
+  const cup = resolveKeys('CUP', 'PASTEL', seed).values;
+  assert.deepEqual(cup, [draw(7, 178, 256), draw(8, 51, 127), draw(7, 178, 256)], 'CUP values');
 });
 
 /**
  * Pins palette_math.js's harmony hue offsets — deterministic companions by value
- * (including the 256 wrap), jittered ones by their draw range — against the
- * values transcribed here from core/color/color.h calc_hues. As above, both
- * sides are hand-copies; the engine's calc_hues is never executed.
+ * (including the 256 wrap), jittered ones by the seeded draw feeding them —
+ * against the values transcribed here from core/color/color.h calc_hues. As
+ * above, both sides are hand-copies; the engine's calc_hues is never executed.
  */
 test('GenerativePalette harmony offsets hold the values transcribed from core/color/color.h', () => {
   const hues = (harmony, hueValue) => {
     new GenerativePalette('STRAIGHT', harmony, 'FLAT', 'VIBRANT', hueValue);
     return [lastBakeArgs[1], lastBakeArgs[4], lastBakeArgs[7]];
   };
+  const wrap = (h) => ((h % 256) + 256) % 256;
 
   assert.deepEqual(hues('TRIADIC', 10), [10, 95, 180], 'TRIADIC is +85/+170');
   assert.deepEqual(hues('TRIADIC', 200), [200, 29, 114], 'TRIADIC wraps at 256');
@@ -327,12 +341,29 @@ test('GenerativePalette harmony offsets hold the values transcribed from core/co
   assert.deepEqual(hues('SPLIT_COMPLEMENTARY', 200), [200, 51, 93], 'SPLIT_COMPLEMENTARY wraps at 256');
   assert.equal(hues('COMPLEMENTARY', 10)[1], 138, 'COMPLEMENTARY is +128');
 
-  assert.deepEqual(
-    recordIntDraws(() => new GenerativePalette('STRAIGHT', 'COMPLEMENTARY', 'FLAT', 'VIBRANT', 10)),
-    [[-7, 8]], 'COMPLEMENTARY jitter range');
-  assert.deepEqual(
-    recordIntDraws(() => new GenerativePalette('STRAIGHT', 'ANALOGOUS', 'FLAT', 'VIBRANT', 10)),
-    [[0, 2], [11, 22], [11, 22]], 'ANALOGOUS direction and step ranges');
+  for (const hue of [10, 137, 200]) {
+    assert.equal(hues('COMPLEMENTARY', hue)[2], wrap(hue + seededRandInt(hue, 0, -7, 8)),
+      'COMPLEMENTARY jitter');
+
+    const dir = (seededRandInt(hue, 1, 0, 2) === 0) ? 1 : -1;
+    const h2 = wrap(hue + dir * seededRandInt(hue, 2, 11, 22));
+    const h3 = wrap(h2 + dir * seededRandInt(hue, 3, 11, 22));
+    assert.deepEqual(hues('ANALOGOUS', hue), [hue, h2, h3], 'ANALOGOUS direction and steps');
+  }
+});
+
+/**
+ * Verifies the preview tracks the base hue the export pins: the engine derives
+ * every draw from that hue, so two hues must resolve different key triples
+ * rather than sharing one profile-string-seeded structure.
+ */
+test('GenerativePalette key draws move with the base hue', () => {
+  const keys = (hueValue) => {
+    const { sats, values } = resolveKeys('ASCENDING', 'MID', hueValue);
+    return [...sats, ...values];
+  };
+  assert.notDeepEqual(keys(10), keys(11));
+  assert.deepEqual(keys(10), keys(10));
 });
 
 /** Verifies GenerativePalette rejects an unknown gradient shape before reaching bakeLut. */
