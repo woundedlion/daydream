@@ -3,6 +3,7 @@ import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { URL } from 'node:url';
 import { AppState, URLSync, getActiveURLSync } from '../state.js';
+import { engineParamValue } from '../param_sync.js';
 import {
   snapshotEffectControlState,
   restoreEffectControlState,
@@ -348,6 +349,30 @@ test('DeepLinkGUI.add maps boolean URL spellings for a checkbox', () => {
     });
     assert.equal(warnings.length, 1, 'only the unrecognized token warns');
     assert.match(warnings[0], /ignoring unrecognized boolean URL value "maybe" for "glow"/);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+/**
+ * Pins the deep-link path an effect GUI relies on: addParamControllers() adds a
+ * control and only then registers the onChange that writes the engine, so the
+ * URL value reaches the engine solely through the load-time replay. Mirrors that
+ * wiring — 'fx' root, add() then onChange() — for a slider and a checkbox.
+ */
+test('a ?param=value deep link reaches the engine through the replayed handler', () => {
+  installWindow('?fx.Speed=0.7&fx.Glow=on');
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
+    const state = { Speed: 0.2, Glow: false };
+    const engine = {};
+    for (const [name, args] of [['Speed', [0, 1]], ['Glow', []]]) {
+      gui.add(state, name, ...args)
+        .onChange((v) => { engine[name] = engineParamValue(v); });
+    }
+
+    assert.deepEqual(engine, { Speed: 0.7, Glow: 1.0 });
   } finally {
     mock.timers.reset();
   }
