@@ -102,7 +102,7 @@ export function computeSegmentRange(id, total, w, h) {
  *   false copies compact->canvas (composite a segment back).
  * @returns {void}
  */
-export function blitSegmentRect(canvas, compact, canvasW, rect, gather) {
+function blitSegmentRect(canvas, compact, canvasW, rect, gather) {
   const { x0, x1, y0, y1 } = rect;
   const rowLen = (x1 - x0) * 3;
   let compactIdx = 0;
