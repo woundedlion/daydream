@@ -3,35 +3,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { bootstrap, refreshModuleCache, showBootstrapFailure } from '../bootstrap.js';
+import { fakeElement } from './fake_dom.js';
 
 function fakeDocument() {
   const listeners = new WeakMap();
   const createElement = (tagName) => {
-    const element = {
-      tagName,
-      type: '',
-      className: '',
-      textContent: '',
-      children: [],
-      attributes: {},
-      setAttribute(name, value) { this.attributes[name] = value; },
-      getAttribute(name) { return this.attributes[name] ?? null; },
-      classList: {
-        values: new Set(),
-        add(value) { this.values.add(value); },
-        contains(value) { return this.values.has(value); },
-      },
-      addEventListener(type, callback) {
-        const handlers = listeners.get(this) || {};
-        handlers[type] = callback;
-        listeners.set(this, handlers);
-      },
-      append(...children) { this.children.push(...children); },
-      replaceChildren(...children) { this.children = children; },
+    const element = fakeElement(tagName);
+    element.addEventListener = function (type, callback) {
+      const handlers = listeners.get(this) || {};
+      handlers[type] = callback;
+      listeners.set(this, handlers);
     };
-    Object.defineProperty(element, 'innerHTML', {
-      set() { throw new Error('innerHTML must not be used'); },
-    });
     return element;
   };
 

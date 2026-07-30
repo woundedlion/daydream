@@ -19,14 +19,14 @@ function reparent(nodes, parent) {
 
 /**
  * Element stand-in carrying the attribute, class, child, and listener surface
- * the daydream modules read and write. innerHTML is absent, so a test can assert
- * markup was never assigned.
+ * the daydream modules read and write. Non-empty innerHTML assignments throw so
+ * tests cannot silently accept markup construction that a browser would parse.
  * @param {string} [tag] - Tag name.
  * @returns {Object} Fake element.
  */
 export function fakeElement(tag = 'div') {
   const classes = new Set();
-  return {
+  const element = {
     tagName: String(tag).toUpperCase(),
     id: '',
     className: '',
@@ -63,6 +63,13 @@ export function fakeElement(tag = 'div') {
     focus() {},
     select() {},
   };
+  Object.defineProperty(element, 'innerHTML', {
+    set(value) {
+      if (value !== '') throw new Error('innerHTML must not be used');
+      element.replaceChildren();
+    },
+  });
+  return element;
 }
 
 /**
