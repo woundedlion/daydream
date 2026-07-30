@@ -80,6 +80,15 @@ test('applyOp throws on an op the module does not bind', () => {
     /unknown op "frobnicate"/);
 });
 
+/** Verifies applyOp surfaces the bridge's null soft-reject as an error instead of passing null on as a mesh. */
+test('applyOp throws when the module soft-rejects an op', () => {
+  assert.throws(() => applyOp({ ambo: () => null }, 'ambo'),
+    /applyOp: op "ambo" was rejected/);
+  assert.throws(
+    () => applyOp({ hankin: () => null }, { op: 'hankin', params: { angle: 54 } }),
+    /applyOp: op "hankin" was rejected/);
+});
+
 /** formatFloat re-exports cpp_format's formatter; its behavior is pinned in cpp_format.test.js. */
 test('formatFloat is wired to the authoritative formatFloatCpp', () => {
   assert.equal(formatFloat, formatFloatCpp);
