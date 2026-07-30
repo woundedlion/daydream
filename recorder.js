@@ -638,9 +638,7 @@ export class VideoRecorder {
    * @returns {void}
    */
   dispose() {
-    if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-      this.mediaRecorder.stop();
-    }
+    this.stop();
     this.cleanup();
   }
 }
