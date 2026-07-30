@@ -48,9 +48,13 @@ export const lissajous = (m1, m2, a, t) => {
  * @param {number} value - The ratio to approximate (e.g., C1/C2), may be negative.
  * @param {number} [maxTerm] - Maximum value for both the numerator and the
  *   denominator (the search grid is square: M, N each range over [1, maxTerm]).
+ * @param {?function(number): boolean} [accept] - Optional test on the signed
+ *   candidate ratio. Candidates it rejects rank behind every accepted one, so a
+ *   ratio it admits always wins and an empty admissible set still returns the
+ *   closest fraction.
  * @returns {{ M: number, N: number }} The best simple rational ratio.
  */
-export const findBestRationalRatio = (value, maxTerm = MAX_RATIONAL_TERM) => {
+export const findBestRationalRatio = (value, maxTerm = MAX_RATIONAL_TERM, accept = null) => {
   if (value === 0) return { M: 0, N: 1 };
 
   const sign = value < 0 ? -1 : 1;
@@ -58,14 +62,20 @@ export const findBestRationalRatio = (value, maxTerm = MAX_RATIONAL_TERM) => {
 
   let bestM = 1;
   let bestN = 1;
+  let bestAccepted = false;
   let minDiff = Infinity;
 
   for (let N = 1; N <= maxTerm; N++) {
     for (let M = 1; M <= maxTerm; M++) {
       const ratio = M / N;
+      const accepted = !accept || accept(sign * ratio);
       const diff = Math.abs(absValue - ratio);
 
-      if (diff < minDiff || (diff === minDiff && (M + N) < (bestM + bestN))) {
+      const better = accepted !== bestAccepted
+        ? accepted
+        : (diff < minDiff || (diff === minDiff && (M + N) < (bestM + bestN)));
+      if (better) {
+        bestAccepted = accepted;
         minDiff = diff;
         bestM = M;
         bestN = N;
@@ -85,16 +95,23 @@ export const findBestRationalRatio = (value, maxTerm = MAX_RATIONAL_TERM) => {
  * @param {number} activeC - The intended (raw) active frequency value.
  * @param {number} passiveC - The passive (held) frequency value.
  * @param {number} [maxTerm] - Max numerator/denominator for the ratio.
+ * @param {?{min: number, max: number}} [range] - Optional inclusive bounds on the
+ *   snapped active frequency. The ratio search then prefers ratios landing inside
+ *   them, so a caller that has to keep the value in a control's range does not
+ *   clamp the ratio back open afterwards.
  * @returns {{ snappedActiveC: number, m: number, n: number, closingPeriod: number }} The
  *   snapped active frequency, the rational ratio m/n, and the curve's closing period T.
  */
-export const snapToRationalRatio = (activeC, passiveC, maxTerm = MAX_RATIONAL_TERM) => {
+export const snapToRationalRatio = (activeC, passiveC, maxTerm = MAX_RATIONAL_TERM, range = null) => {
   if (passiveC === 0) {
     return { snappedActiveC: activeC, m: 1, n: 1, closingPeriod: 0 };
   }
 
   const targetRatio = activeC / passiveC;
-  const { M, N } = findBestRationalRatio(targetRatio, maxTerm);
+  const inRange = range
+    ? (ratio) => passiveC * ratio >= range.min && passiveC * ratio <= range.max
+    : null;
+  const { M, N } = findBestRationalRatio(targetRatio, maxTerm, inRange);
 
   const snappedActiveC = passiveC * (M / N);
 

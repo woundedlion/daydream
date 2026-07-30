@@ -235,16 +235,17 @@
 
       // 2-3. Snap to the closest simple rational ratio and compute the closing
       // domain. The pure core (lissajous_math.js) handles the math; the DOM
-      // read/write below stays inline.
-      const { snappedActiveC: newActiveC_Snapped, closingPeriod: newDomain } =
-        snapToRationalRatio(newActiveC_Raw, passiveC);
+      // read/write below stays inline. The snapped value scales the passive
+      // frequency by up to MAX_RATIONAL_TERM, so the search is confined to the
+      // slider's range: clamping its result afterwards would reopen the very
+      // curve this just closed, while the domain below, the lock checkbox and
+      // the closure warning all kept describing the unclamped ratio.
+      const { snappedActiveC, closingPeriod: newDomain } = snapToRationalRatio(
+        newActiveC_Raw, passiveC, MAX_RATIONAL_TERM,
+        { min: activeConfig.min, max: activeConfig.max });
 
-      // 4. Update the actual state. The snapped value scales the passive
-      // frequency by up to MAX_RATIONAL_TERM, so it can land outside the
-      // slider's range; clamp before the readout and the export snippet read it.
-      const clampedActiveC = Math.min(activeConfig.max,
-        Math.max(activeConfig.min, newActiveC_Snapped));
-      state[activeId] = clampedActiveC;
+      // 4. Update the actual state.
+      state[activeId] = snappedActiveC;
 
       // 5. Update the slider UI (force the thumb to jump to the snapped position)
       const slider = document.getElementById(`${activeId}_slider`);
@@ -252,10 +253,10 @@
 
       if (slider && valueSpan) {
         // Round the snapped value for setting the slider UI element
-        slider.value = Math.round(clampedActiveC * activeConfig.scale);
+        slider.value = Math.round(snappedActiveC * activeConfig.scale);
 
         // Determine decimals for display (2 for C1/C2)
-        const display = clampedActiveC.toFixed(2);
+        const display = snappedActiveC.toFixed(2);
         valueSpan.textContent = display;
         slider.setAttribute('aria-valuetext', display);
       }
