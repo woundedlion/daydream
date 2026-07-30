@@ -615,6 +615,7 @@
       createCommitQueue,
       createChainValidator,
     } from './solid_codegen.js';
+    import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
     import createHolosphereModule from '../holosphere_wasm.js';
 
     let camera, scene, renderer, controls;
@@ -655,18 +656,10 @@
     const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
     const normalMaterial = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.8 });
 
-    // Coalesce update() calls into one recompute per animation frame. Op-slider
-    // oninput fires on every pointer tick during a drag; without this each tick
-    // replays the entire WASM op chain (relax alone is up to 500 iterations) on
-    // the main thread. scheduleUpdate keeps at most one recompute pending.
-    let pendingUpdate = 0;
-    function scheduleUpdate() {
-      if (pendingUpdate) return;
-      pendingUpdate = requestAnimationFrame(() => {
-        pendingUpdate = 0;
-        update();
-      });
-    }
+    // Coalesce update() calls into one recompute per animation frame: without
+    // this, every op-slider pointer tick replays the entire WASM op chain (relax
+    // alone is up to 500 iterations) on the main thread.
+    const scheduleUpdate = createFrameScheduler(update);
 
     // WASM Module
     let WasmModule = null;
@@ -743,8 +736,8 @@
         return;
       }
 
-      // Start Memory Metrics Loop. Keep the timer handle so the pagehide handler
-      // can cancel the self-rescheduling loop.
+      // Start Memory Metrics Loop. Keep the timer handle so teardown can cancel
+      // the self-rescheduling loop.
       let arenaMetricsTimer = null;
       function updateArenaMetrics() {
         // The engine nulls MeshOpsWasm on halt; stop rather than reschedule forever.
@@ -757,8 +750,7 @@
         }
         arenaMetricsTimer = setTimeout(updateArenaMetrics, 500); // 2fps update is enough
       }
-      window.addEventListener('pagehide', (e) => {
-        if (e.persisted) return; // bfcache freeze, not a real discard
+      onPageTeardown(() => {
         if (arenaMetricsTimer !== null) { clearTimeout(arenaMetricsTimer); arenaMetricsTimer = null; }
       });
       updateArenaMetrics();
@@ -787,9 +779,13 @@
       renderer = result.renderer;
       controls = result.controls;
 
-      // Wire the scaffold's dispose() to teardown — it stops the render loop and
-      // detaches the resize listener, which previously leaked on page unload.
-      window.addEventListener('pagehide', (e) => { if (!e.persisted) result.dispose(); });
+      // The scaffold's dispose() stops the render loop and detaches the resize
+      // listener; cancelling the pending frame keeps a queued recompute from
+      // running against the disposed scene.
+      onPageTeardown(() => {
+        scheduleUpdate.cancel();
+        result.dispose();
+      });
 
       // Toggles
       // These toggles change only how the cached mesh is presented, so they

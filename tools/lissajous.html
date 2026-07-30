@@ -104,6 +104,7 @@
     import * as THREE from 'three';
     import { initScene, bootstrapTool, wireCopyBlock } from './shared.js';
     import { createSlider as buildSlider } from './slider.js';
+    import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
     import {
       MAX_RATIONAL_TERM,
       lissajous,
@@ -169,9 +170,13 @@
       renderer = result.renderer;
       controls = result.controls;
 
-      // Wire the scaffold's dispose() to teardown — it stops the render loop and
-      // detaches the resize listener, which previously leaked on page unload.
-      window.addEventListener('pagehide', (e) => { if (!e.persisted) result.dispose(); });
+      // The scaffold's dispose() stops the render loop and detaches the resize
+      // listener; cancelling the pending frame keeps a queued rebuild from
+      // running against the disposed scene.
+      onPageTeardown(() => {
+        scheduleUpdate.cancel();
+        result.dispose();
+      });
 
       regenerateCurve();
     };
@@ -203,15 +208,10 @@
     // Coalesce rebuilds into one per animation frame: slider oninput fires on
     // every pointer tick during a drag, and each rebuild resamples up to
     // config.Samples.max curve points.
-    let pendingUpdate = 0;
-    const scheduleUpdate = () => {
-      if (pendingUpdate) return;
-      pendingUpdate = requestAnimationFrame(() => {
-        pendingUpdate = 0;
-        regenerateCurve();
-        updateCodeSnippet();
-      });
-    };
+    const scheduleUpdate = createFrameScheduler(() => {
+      regenerateCurve();
+      updateCodeSnippet();
+    });
 
     // --- RATIONAL CONSTRAINT LOGIC ---
     // findBestRationalRatio and the snapToRationalRatio closing-domain core live
