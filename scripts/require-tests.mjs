@@ -23,40 +23,36 @@ const dir = globAt <= 0 ? '.' : parts.slice(0, globAt).join('/');
 const suffix = glob.slice(glob.lastIndexOf('*') + 1);
 const recursive = glob.includes('**');
 
-let files = [];
+const files = [];
 // A node_modules at or below the test dir shadows the pinned root install for
 // every test file, so local runs and CI resolve different copies of a
 // dependency. Junctions and symlinks report as neither file nor directory, so
-// match the name before the type.
+// match the name before the type. The root install is the one the tests are
+// supposed to resolve to, so it is skipped rather than flagged.
 const strays = [];
 // Test files the glob cannot reach: they are committed, look like tests, and
-// never run.
+// never run. The sweep starts at the repo root, so a sibling directory hides
+// one no better than a subdirectory of the test dir does.
 const unreachable = [];
+// Never entered: git metadata and the vendored third-party drops the page
+// serves, both of which carry test files of their own.
+const skipDirs = new Set(['.git', 'three.js', 'vendor']);
+// `depth` is the distance below the glob's base dir, or null outside it. The
+// root is scanned as `null` so paths read as they do in the repo.
 const scan = (d, depth) => {
-  for (const entry of readdirSync(d, { withFileTypes: true })) {
-    const path = `${d}/${entry.name}`;
-    if (entry.name === 'node_modules') strays.push(path);
-    else if (entry.isDirectory()) scan(path, depth + 1);
-    else if (!entry.name.endsWith(suffix)) continue;
-    else if (depth === 0 || recursive) files.push(path);
+  for (const entry of readdirSync(d ?? '.', { withFileTypes: true })) {
+    const path = d === null ? entry.name : `${d}/${entry.name}`;
+    if (entry.name === 'node_modules') {
+      if (d !== null && depth !== null) strays.push(path);
+    } else if (entry.isDirectory()) {
+      if (skipDirs.has(entry.name)) continue;
+      scan(path, depth === null ? (path === dir ? 0 : null) : depth + 1);
+    } else if (!entry.name.endsWith(suffix)) continue;
+    else if (depth === 0 || (recursive && depth !== null)) files.push(path);
     else unreachable.push(path);
   }
 };
-try {
-  // An unrooted glob: `.` is the root install, and a full-tree walk from there
-  // would cross node_modules and .git, so match its own entries only.
-  if (dir === '.') files = readdirSync('.').filter((f) => f.endsWith(suffix));
-  else {
-    scan(dir, 0);
-    for (const entry of readdirSync('.', { withFileTypes: true })) {
-      if (entry.isFile() && entry.name.endsWith(suffix)) {
-        unreachable.push(entry.name);
-      }
-    }
-  }
-} catch (e) {
-  if (e.code !== 'ENOENT') throw e;
-}
+scan(null, dir === '.' ? 0 : null);
 
 if (files.length === 0) {
   console.error(`No files matched ${glob} — refusing to report a green run.`);

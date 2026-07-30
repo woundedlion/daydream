@@ -108,6 +108,24 @@ test('a root-level test file fails as unreachable', () => {
   assert.match(err, /stray\.test\.js/);
 });
 
+/** Verifies a test file in a directory beside the test dir is refused. */
+test('a test file in a sibling directory fails as unreachable', () => {
+  mkdirSync(join(root, 'tools', 'nested'), { recursive: true });
+  writeFileSync(join(root, 'tools', 'nested', 'stray.test.js'), '');
+  const err = runExpectingFailure();
+  assert.match(err, /does not reach/);
+  assert.match(err, /tools\/nested\/stray\.test\.js/);
+});
+
+/** Verifies the sweep does not enter git metadata or the vendored drops. */
+test('test files under skipped directories are not flagged', () => {
+  for (const dir of ['.git', 'three.js', 'vendor', 'node_modules']) {
+    mkdirSync(join(root, dir, 'nested'), { recursive: true });
+    writeFileSync(join(root, dir, 'nested', 'vendored.test.js'), '');
+  }
+  assert.doesNotThrow(run);
+});
+
 /** Verifies a `**` glob counts the nested file instead of refusing it. */
 test('a recursive glob reaches a nested test file', () => {
   mkdirSync(join(root, 'tests', 'sub'));
