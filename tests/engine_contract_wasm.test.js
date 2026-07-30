@@ -208,6 +208,29 @@ test('getBufferLength reports the active resolution buffer length', () => {
     'getBufferLength must equal the getPixels view length');
 });
 
+// engine_host.js calls getParamGeneration through an optional-call guard and
+// daydream.js's Pole LOD slider calls setPoleLod on an optional chain, so a
+// dropped export is silent on both call sites.
+test('getParamGeneration and setPoleLod stay exported', () => {
+  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), true,
+    'setEffect must succeed for a registered effect');
+
+  const generation = engine.getParamGeneration();
+  assert.equal(typeof generation, 'number', 'getParamGeneration must return a number');
+  assert.equal(engine.setEffect('DisplacementField'), true,
+    'setEffect must succeed on a reload');
+  assert.notEqual(engine.getParamGeneration(), generation,
+    'getParamGeneration must change across a setEffect, or a stale param snapshot ' +
+    'cannot be detected');
+
+  assert.equal(typeof engine.setPoleLod, 'function',
+    'setPoleLod must stay callable (daydream.js binds the Pole LOD slider to it)');
+  // daydream.js's slider spans [0, 2].
+  for (const v of [0, 1, 2]) engine.setPoleLod(v);
+  engine.setPoleLod(0);
+});
+
 // Everything MeshOps binds that is not a Conway/SolidBuilder operator. The
 // remainder of MeshOps.prototype is the op set the C++ MESHOP lists generate.
 const MESH_OPS_NON_OPS = new Set([
