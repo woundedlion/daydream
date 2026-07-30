@@ -2,13 +2,17 @@
 //
 // driver.js's three.js lifecycle: the DOM-free sizing/LOD helpers, plus the
 // rebuild (setupDots) and teardown (dispose) paths driven over a fake mesh via
-// prototype.call, so no WebGL context or DOM is needed. Both paths carry an
+// prototype.call, so no WebGL context is needed. Both paths carry an
 // ordering invariant — instanceColor.array must be nulled before
-// InstancedMesh.dispose(), because that array may alias WASM memory.
-import { test } from 'node:test';
+// InstancedMesh.dispose(), because that array may alias WASM memory. The
+// context-loss handlers run against the shared fake DOM.
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Daydream, dotDetailFor, fitDistance } from '../driver.js';
+import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
+
+restoreDocumentAfterEach();
 
 // ---------------------------------------------------------------------------
 // dotDetailFor
@@ -342,6 +346,100 @@ test('render holds the repaint while instanceColor aliases a detached view', () 
   assert.ok(!log.includes('renderMainView'), 'rendered from a detached array');
   assert.ok(!log.includes('scissor:true'));
   assert.equal(ctx.needsRender, true, 'repaint was dropped instead of deferred');
+});
+
+// ---------------------------------------------------------------------------
+// setupContextLossHandling
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal `this` for setupContextLossHandling, with a fake document installed so
+ * the overlay can be built. Registered listeners land in `handlers`.
+ * @param {Object} [recorder] - Recorder stand-in, or null/omitted for no session.
+ * @returns {Object} Context object for prototype.call.
+ */
+function contextLossCtx(recorder = null) {
+  installDocument({ createElement: (tag) => fakeElement(tag) });
+  const handlers = {};
+  return {
+    handlers,
+    recorder,
+    canvasParent: fakeElement(),
+    canvas: { addEventListener: (type, fn) => { handlers[type] = fn; } },
+  };
+}
+
+/**
+ * Runs `body` with console.error/warn captured, so the handlers' diagnostics are
+ * asserted instead of printed into the suite output.
+ * @param {Function} body - Code to run under the capture.
+ * @returns {Array<string>} One joined message per call.
+ */
+function captureConsole(body) {
+  const messages = [];
+  const record = (...args) => messages.push(args.map(String).join(' '));
+  const err = mock.method(console, 'error', record);
+  const warn = mock.method(console, 'warn', record);
+  try { body(); } finally { err.mock.restore(); warn.mock.restore(); }
+  return messages;
+}
+
+test('setupContextLossHandling starts unlost behind a hidden overlay', () => {
+  const ctx = contextLossCtx();
+  Daydream.prototype.setupContextLossHandling.call(ctx);
+
+  assert.equal(ctx.contextLost, false);
+  assert.equal(typeof ctx.handlers.webglcontextlost, 'function');
+  assert.equal(typeof ctx.handlers.webglcontextrestored, 'function');
+  assert.ok(ctx.canvasParent.children.includes(ctx.contextLostOverlay),
+    'the overlay never reached the canvas parent');
+  assert.equal(ctx.contextLostOverlay.style.display, 'none');
+});
+
+test('a lost context claims the restore, shows the reason, and aborts the recording', () => {
+  const aborted = [];
+  const ctx = contextLossCtx({ abort: (message) => aborted.push(message) });
+  Daydream.prototype.setupContextLossHandling.call(ctx);
+
+  let prevented = false;
+  const messages = captureConsole(() => ctx.handlers.webglcontextlost({
+    preventDefault: () => { prevented = true; },
+    statusMessage: 'GPU process reset',
+  }));
+
+  assert.equal(prevented, true, 'the browser only restores a context the page claimed');
+  assert.equal(ctx.contextLost, true);
+  assert.equal(ctx.contextLostOverlay.style.display, 'flex');
+  assert.match(ctx.contextLostDetail.textContent, /GPU process reset/);
+  assert.equal(aborted.length, 1, 'the frozen recording was left running');
+  assert.match(aborted[0], /GPU process reset/);
+  assert.match(messages.join('\n'), /WebGL context lost: GPU process reset/);
+});
+
+test('a lost context with no recorder or reason still reports the loss', () => {
+  const ctx = contextLossCtx();
+  Daydream.prototype.setupContextLossHandling.call(ctx);
+
+  const messages = captureConsole(
+    () => ctx.handlers.webglcontextlost({ preventDefault: () => {} }));
+
+  assert.equal(ctx.contextLost, true);
+  assert.match(ctx.contextLostDetail.textContent, /no reason reported/);
+  assert.match(messages.join('\n'), /no reason reported/);
+});
+
+test('a restored context clears the flag and forces a repaint', () => {
+  const ctx = contextLossCtx();
+  Daydream.prototype.setupContextLossHandling.call(ctx);
+
+  captureConsole(() => {
+    ctx.handlers.webglcontextlost({ preventDefault: () => {} });
+    ctx.handlers.webglcontextrestored();
+  });
+
+  assert.equal(ctx.contextLost, false);
+  assert.equal(ctx.contextLostOverlay.style.display, 'none');
+  assert.equal(ctx.needsRender, true, 'the canvas would stay dark while paused');
 });
 
 // ---------------------------------------------------------------------------
