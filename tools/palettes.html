@@ -451,9 +451,13 @@
     // tested without a DOM. DOM-coupled wiring stays inline below.
     import {
       ProceduralPalette, GenerativePalette,
-      mapValue, proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
+      waveGraphBand, proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
       NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams, zoomedProceduralParams,
     } from './palette_math.js';
+    // The zoom history and the locked-group delta capping are DOM-free state
+    // machines, kept in their own module so both are unit tested; the reads and
+    // writes against the sliders and the Reset Zoom button stay inline.
+    import { createZoomHistory, lockedGroupMove } from './palette_controls.js';
 
     // --- Palette Class and Data Structure ---
 
@@ -491,7 +495,7 @@
 
     let parameters = { ...defaultParams };
     let palette;
-    let previousParams = null; // For zoom history
+    const zoomHistory = createZoomHistory();
 
     // Animation state
     let animationSpeed = 0.3; // Cycles per second (Default: 0.3 cycles/s)
@@ -576,61 +580,40 @@
 
         if (isLocked && Object.keys(lockedDragStartValues).length > 0) {
           // --- LOCKED RELATIVE MOVEMENT ---
-
-          // 1. Get delta from the slider being moved
           const startRawValue = lockedDragStartValues[def.param];
           if (startRawValue === undefined) return; // Should not happen if mousedown fired
 
-          let rawDelta = rawValue - startRawValue;
-          let cappedRawDelta = rawDelta;
+          // Read the group's raw bounds off the live sliders, cap the shared
+          // delta so no channel leaves its range (lockedGroupMove), then write
+          // the results back to state and the readouts.
+          const group = sliderDefinitions.filter(groupDef => groupDef.group === def.group);
+          const members = [];
+          for (const groupDef of group) {
+            const groupSlider = document.getElementById(`${groupDef.param}_slider`);
+            if (!groupSlider) continue;
+            members.push({
+              param: groupDef.param,
+              start: lockedDragStartValues[groupDef.param],
+              min: parseFloat(groupSlider.min),
+              max: parseFloat(groupSlider.max),
+            });
+          }
+          const { values } = lockedGroupMove(rawValue - startRawValue, members);
 
-          // 2. Validate and cap delta against all sliders in the group
-          sliderDefinitions.forEach(groupDef => {
-            if (groupDef.group === def.group) {
-              const otherStartRawValue = lockedDragStartValues[groupDef.param];
-              if (otherStartRawValue === undefined) return; // Safety check
+          for (const groupDef of group) {
+            const finalRawValue = values[groupDef.param];
+            if (finalRawValue === undefined) continue;
+            const groupSlider = document.getElementById(`${groupDef.param}_slider`);
+            const groupValueSpan = document.getElementById(`${groupDef.param}_value`);
+            if (!groupSlider || !groupValueSpan) continue;
 
-              const groupSlider = document.getElementById(`${groupDef.param}_slider`);
-              if (!groupSlider) return; // Safety check
-
-              const proposedRawValue = otherStartRawValue + rawDelta;
-
-              const min = parseFloat(groupSlider.min);
-              const max = parseFloat(groupSlider.max);
-
-              if (proposedRawValue < min) {
-                // Delta is too negative. Find the max negative delta allowed.
-                cappedRawDelta = Math.max(cappedRawDelta, min - otherStartRawValue);
-              }
-              if (proposedRawValue > max) {
-                // Delta is too positive. Find the max positive delta allowed.
-                cappedRawDelta = Math.min(cappedRawDelta, max - otherStartRawValue);
-              }
-            }
-          });
-
-          // 3. Apply the final capped delta to all sliders in the group
-          sliderDefinitions.forEach(groupDef => {
-            if (groupDef.group === def.group) {
-              const groupSlider = document.getElementById(`${groupDef.param}_slider`);
-              const groupValueSpan = document.getElementById(`${groupDef.param}_value`);
-              const groupStartRawValue = lockedDragStartValues[groupDef.param];
-
-              // Ensure start value is valid before calculating final
-              if (groupStartRawValue !== undefined && groupSlider && groupValueSpan) {
-                const finalRawValue = groupStartRawValue + cappedRawDelta;
-                const finalNewValue = finalRawValue / groupDef.scale;
-
-                // Update parameter state
-                parameters[groupDef.param] = finalNewValue;
-                // Update UI
-                const display = finalNewValue.toFixed(3);
-                groupSlider.value = finalRawValue;
-                groupValueSpan.textContent = display;
-                groupSlider.setAttribute('aria-valuetext', display);
-              }
-            }
-          });
+            const finalNewValue = finalRawValue / groupDef.scale;
+            parameters[groupDef.param] = finalNewValue;
+            const display = finalNewValue.toFixed(3);
+            groupSlider.value = finalRawValue;
+            groupValueSpan.textContent = display;
+            groupSlider.setAttribute('aria-valuetext', display);
+          }
 
         } else {
           // --- UNLOCKED MOVEMENT --- (the factory already wrote the readout)
@@ -639,7 +622,7 @@
 
         // Any manual slider change invalidates the zoom history
         if (def.group === 'C' || def.group === 'D') {
-          hideResetZoomButton();
+          clearZoomHistory();
         }
 
         scheduleUpdate();
@@ -804,7 +787,7 @@
           return;
         }
         zoomPalette(t_start, t_end);
-        showResetZoomButton();
+        syncResetZoomButton();
       }
     }
 
@@ -849,7 +832,7 @@
       const t1 = Math.min(1, animationTime + half);
       if (t1 - t0 < DRAG_THRESHOLD) return;
       zoomPalette(t0, t1);
-      showResetZoomButton();
+      syncResetZoomButton();
     }
 
     function handleStripKeyDown(event) {
@@ -873,14 +856,7 @@
          * to zoom the palette from t_start to t_end.
          */
     function zoomPalette(t_start, t_end) {
-      // Only store the *first* pre-zoom state, so reset always returns there.
-      if (!previousParams) {
-        previousParams = {
-          C_R: parameters.C_R, C_G: parameters.C_G, C_B: parameters.C_B,
-          D_R: parameters.D_R, D_G: parameters.D_G, D_B: parameters.D_B
-        };
-      }
-
+      zoomHistory.capture(parameters);
       Object.assign(parameters, zoomedProceduralParams(parameters, t_start, t_end));
 
       updateAllSliders();
@@ -891,40 +867,31 @@
          * Restores the parameters from before the zoom.
          */
     function handleResetZoom() {
-      if (!previousParams) return;
+      const restored = zoomHistory.restore();
+      if (!restored) return;
 
-      // 1. Restore parameters
-      parameters.C_R = previousParams.C_R;
-      parameters.C_G = previousParams.C_G;
-      parameters.C_B = previousParams.C_B;
-      parameters.D_R = previousParams.D_R;
-      parameters.D_G = previousParams.D_G;
-      parameters.D_B = previousParams.D_B;
+      Object.assign(parameters, restored);
+      syncResetZoomButton();
 
-      // 2. Clear history and hide button
-      hideResetZoomButton();
-
-      // 3. Update UI
       updateAllSliders();
       updatePalette();
     }
 
     /**
-         * Hides the reset button and clears the zoom history.
+         * Drops the zoom history, so the palette's current C/D become the new
+         * baseline and there is nothing to reset to.
          */
-    function hideResetZoomButton() {
-      if (resetZoomButton) {
-        resetZoomButton.classList.add('hidden');
-      }
-      previousParams = null; // Invalidate history
+    function clearZoomHistory() {
+      zoomHistory.clear();
+      syncResetZoomButton();
     }
 
     /**
-         * Shows the reset button.
+         * Shows the reset button exactly while a pre-zoom state is held.
          */
-    function showResetZoomButton() {
+    function syncResetZoomButton() {
       if (resetZoomButton) {
-        resetZoomButton.classList.remove('hidden');
+        resetZoomButton.classList.toggle('hidden', !zoomHistory.zoomed);
       }
     }
 
@@ -1024,14 +991,9 @@
       const height = waveGraphCanvas.height;
       waveGraphCtx.clearRect(0, 0, width, height);
 
-      // The graph maps the conceptual value range [VALUE_MIN, VALUE_MAX] — wider
-      // than [0, 1] so out-of-range excursions are visible — onto the canvas band
-      // between yTop (10%) and yBottom (90%) of the height. toY() is the single
-      // place that mapping lives, replacing the inline magic constants that were
-      // repeated (and recomputed) across the wave and overlay draws.
-      const VALUE_MIN = -0.5, VALUE_MAX = 1.5;
-      const yTop = height * 0.1, yBottom = height * 0.9;
-      const toY = (value) => mapValue(value, VALUE_MIN, VALUE_MAX, yBottom, yTop);
+      // toY() is the single place the value-to-canvas-y mapping lives; every
+      // wave and overlay draw below goes through it or the band edges.
+      const { yTop, yBottom, toY } = waveGraphBand(height);
 
       // Background grid and center line
       waveGraphCtx.fillStyle = '#1E293B';
@@ -1210,7 +1172,7 @@
      */
     function loadNamedPalette(entry) {
       parameters = { ...proceduralPaletteParams(entry) };
-      hideResetZoomButton();
+      clearZoomHistory();
       updateAllSliders();
       updatePalette();
     }

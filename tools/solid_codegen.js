@@ -411,6 +411,120 @@ export function geodesicSegments(maxArc, triCount) {
 }
 
 /**
+ * Normalizes a barycentric mix of three points onto the unit sphere.
+ * @param {{x:number, y:number, z:number}} a - First corner.
+ * @param {{x:number, y:number, z:number}} b - Second corner.
+ * @param {{x:number, y:number, z:number}} c - Third corner.
+ * @param {number} wa - Weight on a.
+ * @param {number} wb - Weight on b.
+ * @param {number} wc - Weight on c.
+ * @returns {[number, number, number]} The normalized point's coordinates.
+ * @details Scales by the reciprocal length, matching THREE.Vector3.normalize()
+ * (divideScalar -> multiplyScalar(1/s)), so the tessellation is bit-identical to
+ * the same grid built out of Vector3s. A zero-length mix keeps its coordinates.
+ */
+function normalizedBarycentric(a, b, c, wa, wb, wc) {
+  let x = a.x * wa;
+  let y = a.y * wa;
+  let z = a.z * wa;
+  x += b.x * wb;
+  y += b.y * wb;
+  z += b.z * wb;
+  x += c.x * wc;
+  y += c.y * wc;
+  z += c.z * wc;
+  const inv = 1 / (Math.sqrt(x * x + y * y + z * z) || 1);
+  return [x * inv, y * inv, z * inv];
+}
+
+/**
+ * Tessellates one fan triangle into n² spherical sub-triangles: the triangle is
+ * split on a barycentric grid of n segments per side and every grid point is
+ * projected onto the unit sphere, so the rendered surface curves instead of
+ * showing flat plateaus with ridges along the (curved) edge overlay.
+ *
+ * Grid point P(gi, gj) = normalize(a·(1 − (gi+gj)/n) + b·(gi/n) + c·(gj/n)), rows
+ * shrinking toward the b corner (gi + gj <= n). Pick n with geodesicSegments():
+ * it must be uniform across the mesh or shared edges crack.
+ *
+ * @param {{x:number, y:number, z:number}} a - Fan apex (typically the face centroid).
+ * @param {{x:number, y:number, z:number}} b - Second corner.
+ * @param {{x:number, y:number, z:number}} c - Third corner.
+ * @param {number} n - Segments per triangle side; n = 1 emits the single unsubdivided triangle.
+ * @returns {number[]} Flat x/y/z triples in triangle-list order, 9n² entries long.
+ */
+export function geodesicTriangleVertices(a, b, c, n) {
+  const grid = [];
+  for (let gi = 0; gi <= n; gi++) {
+    const row = [];
+    for (let gj = 0; gj <= n - gi; gj++) {
+      row.push(normalizedBarycentric(a, b, c, 1 - (gi + gj) / n, gi / n, gj / n));
+    }
+    grid.push(row);
+  }
+
+  const out = [];
+  const emit = (p) => out.push(p[0], p[1], p[2]);
+  for (let gi = 0; gi < n; gi++) {
+    for (let gj = 0; gj < n - gi; gj++) {
+      emit(grid[gi][gj]);
+      emit(grid[gi + 1][gj]);
+      emit(grid[gi][gj + 1]);
+      // The last cell of a row is a lone corner triangle with no upper partner.
+      if (gj < n - gi - 1) {
+        emit(grid[gi + 1][gj]);
+        emit(grid[gi + 1][gj + 1]);
+        emit(grid[gi][gj + 1]);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * The drop slot a pointer is over: the number of list items whose midpoint it has
+ * passed. Slots run 0..items.length, one more than the item count, since the
+ * pointer can sit past the last item.
+ * @param {number} pointerY - Pointer y in the list's own coordinate space (client y minus the list's top, plus its scrollTop).
+ * @param {Array<{offsetTop: number, offsetHeight: number}>} items - The list's item elements, in document order.
+ * @returns {number} The slot index.
+ * @details Reads the STATIC layout (offsetTop/offsetHeight), so the drag
+ * preview's translateY transforms do not feed back into the target it computes.
+ */
+export function dropSlotIndex(pointerY, items) {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (pointerY < item.offsetTop + item.offsetHeight / 2) return i;
+  }
+  return items.length;
+}
+
+/**
+ * Converts a drop slot into the destination index movedOps() takes: removing the
+ * dragged op first shifts every later index down by one.
+ * @param {number} slot - A dropSlotIndex() value.
+ * @param {number} fromIndex - Index the dragged op currently occupies.
+ * @returns {number} The destination index in post-removal coordinates; equals fromIndex when the drop is a no-op.
+ */
+export function dropTargetIndex(slot, fromIndex) {
+  return fromIndex < slot ? slot - 1 : slot;
+}
+
+/**
+ * How far an item shifts in the drag preview, in whole item slots: the items
+ * between the dragged op and the drop slot move to open the gap.
+ * @param {number} fromIndex - Index the dragged op currently occupies.
+ * @param {number} slot - A dropSlotIndex() value.
+ * @param {number} index - Index of the item being positioned.
+ * @returns {number} -1 (up one slot), 1 (down one slot), or 0 (unmoved, including the dragged item itself).
+ */
+export function reorderPreviewShift(fromIndex, slot, index) {
+  if (index === fromIndex) return 0;
+  if (fromIndex < slot) return index > fromIndex && index < slot ? -1 : 0;
+  return index >= slot && index < fromIndex ? 1 : 0;
+}
+
+/**
  * Returns a copy of an op chain with the op at `from` moved to index `to`.
  * @param {Array<Object>} ops - The op chain.
  * @param {number} from - Index of the op to move.

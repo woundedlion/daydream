@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 
 const {
   ProceduralPalette, PRNG, GenerativePalette,
-  mapValue, proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
+  mapValue, waveGraphBand, WAVE_GRAPH_VALUE_RANGE,
+  proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams, zoomedProceduralParams,
 } = await import('../tools/palette_math.js');
 
@@ -152,6 +153,33 @@ test('PRNG seed 0 is reproducible', () => {
 test('mapValue computes the expected interpolations', () => {
   assert.equal(mapValue(0.5, 0, 1, 0, 100), 50);
   assert.equal(mapValue(2, 0, 4, 10, 20), 15);
+});
+
+/** Verifies the wave graph's band sits at 10%/90% of the canvas height with the range's ends at its edges. */
+test('waveGraphBand puts the value range on the 10%-90% band, value up', () => {
+  const { yTop, yBottom, toY } = waveGraphBand(300);
+  assert.equal(yTop, 30);
+  assert.equal(yBottom, 270);
+  assert.equal(toY(WAVE_GRAPH_VALUE_RANGE.max), yTop);
+  assert.equal(toY(WAVE_GRAPH_VALUE_RANGE.min), yBottom);
+  // Canvas y grows downward, so a larger value maps higher up the canvas.
+  assert.ok(toY(1) < toY(0));
+});
+
+/** Verifies the plotted range brackets the [0, 1] output range, so clamped excursions stay on-canvas. */
+test('waveGraphBand plots the clamped [0, 1] output range strictly inside the band', () => {
+  const { yTop, yBottom, toY } = waveGraphBand(300);
+  assert.ok(WAVE_GRAPH_VALUE_RANGE.min < 0 && WAVE_GRAPH_VALUE_RANGE.max > 1);
+  assert.equal(toY(0.5), 150); // the band's midpoint, matching the graph's centre line
+  for (const value of [0, 1]) {
+    assert.ok(toY(value) > yTop && toY(value) < yBottom);
+  }
+});
+
+/** Verifies the mapping scales with the canvas, so a resized graph stays proportional. */
+test('waveGraphBand scales with the canvas height', () => {
+  assert.equal(waveGraphBand(600).toY(0.5), 300);
+  assert.equal(waveGraphBand(0).toY(0.5), 0);
 });
 
 /** Verifies proceduralPaletteCpp emits the ProceduralPalette initializer with f-suffixed floats and per-vector comments. */
