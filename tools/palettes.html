@@ -226,10 +226,10 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
             <!-- PARAMETER A: BASE / OFFSET -->
-            <div class="param-group space-y-2">
-              <h3 class="text-lg font-bold text-blue-400">Base</h3>
+            <div class="param-group space-y-2" role="group" aria-labelledby="group_A_heading">
+              <h3 id="group_A_heading" class="text-lg font-bold text-blue-400">Base</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
-                <input type="checkbox" id="lock_A"
+                <input type="checkbox" id="lock_A" aria-label="Lock R, G, B (Base)"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
                 <label for="lock_A">Lock R, G, B</label>
               </div>
@@ -239,10 +239,10 @@
             </div>
 
             <!-- PARAMETER B: AMPLITUDE -->
-            <div class="param-group space-y-2">
-              <h3 class="text-lg font-bold text-green-400">Amp</h3>
+            <div class="param-group space-y-2" role="group" aria-labelledby="group_B_heading">
+              <h3 id="group_B_heading" class="text-lg font-bold text-green-400">Amp</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
-                <input type="checkbox" id="lock_B"
+                <input type="checkbox" id="lock_B" aria-label="Lock R, G, B (Amplitude)"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
                 <label for="lock_B">Lock R, G, B</label>
               </div>
@@ -252,10 +252,10 @@
             </div>
 
             <!-- PARAMETER C: FREQUENCY -->
-            <div class="param-group space-y-2">
-              <h3 class="text-lg font-bold text-red-400">Freq</h3>
+            <div class="param-group space-y-2" role="group" aria-labelledby="group_C_heading">
+              <h3 id="group_C_heading" class="text-lg font-bold text-red-400">Freq</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
-                <input type="checkbox" id="lock_C"
+                <input type="checkbox" id="lock_C" aria-label="Lock R, G, B (Frequency)"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
                 <label for="lock_C">Lock R, G, B</label>
               </div>
@@ -265,10 +265,10 @@
             </div>
 
             <!-- PARAMETER D: PHASE -->
-            <div class="param-group space-y-2">
-              <h3 class="text-lg font-bold text-yellow-400">Phase</h3>
+            <div class="param-group space-y-2" role="group" aria-labelledby="group_D_heading">
+              <h3 id="group_D_heading" class="text-lg font-bold text-yellow-400">Phase</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
-                <input type="checkbox" id="lock_D"
+                <input type="checkbox" id="lock_D" aria-label="Lock R, G, B (Phase)"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
                 <label for="lock_D">Lock R, G, B</label>
               </div>
@@ -528,6 +528,23 @@
     let colorStripCache = null;
     let colorStripDirty = true;
 
+    // Spoken names for the coefficient groups and the RGB channels. The visible
+    // slider labels are single letters repeated across all four groups, so each
+    // control's accessible name is built from its group and channel instead —
+    // "Base red" rather than a fourth control called "R". The group names match
+    // the <h3> each group's role="group" is labelled by.
+    const GROUP_NAMES = { A: 'Base', B: 'Amplitude', C: 'Frequency', D: 'Phase' };
+    const CHANNEL_NAMES = { R: 'red', G: 'green', B: 'blue' };
+
+    /**
+     * The accessible name for one procedural slider.
+     * @param {{param: string, group: string}} def - A sliderDefinitions entry; its param is `<group>_<channel>`.
+     * @returns {string} The group and channel name, e.g. "Base red".
+     */
+    function sliderAriaLabel(def) {
+      return `${GROUP_NAMES[def.group]} ${CHANNEL_NAMES[def.param.split('_')[1]]}`;
+    }
+
     // Each entry carries a 'group' property.
     const sliderDefinitions = [
       // A (Base): Range [0, 1]
@@ -571,6 +588,7 @@
         value: parameters[def.param],
         scale: def.scale,
         decimals: 3,
+        ariaLabel: sliderAriaLabel(def),
         labelSuffix: '',
         labelClass: `w-4 h-4 text-center font-bold text-${def.color}`,
         sliderClass: def.thumb,
