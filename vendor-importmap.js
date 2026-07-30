@@ -16,10 +16,10 @@
  *
  * Do NOT commit a `local` VENDOR block — it would break the live deploy.
  *
- * The generator also bakes an INTEGRITY block of sha384 hashes, emitted as the
- * importmap's `integrity` map so a tampered CDN response is refused. The hashes
- * come from the installed node_modules copy of each pinned version, which is the
- * same tarball jsDelivr serves, and CI regenerates and diffs this file.
+ * The generator also bakes sha384 hashes for the top-level libraries and the
+ * addons statically imported by the app. Relative sub-imports inside those
+ * modules do not pass through the import map, so the exact CDN version pin is
+ * the primary supply-chain boundary. CI regenerates and diffs this file.
  *
  * If a page needs page-specific local imports (e.g. tool helpers), assign
  * window.__DAYDREAM_EXTRA_IMPORTS = { name: '...' } before this script.

@@ -2194,6 +2194,11 @@ Key properties:
 
 The local-vs-CDN choice is **baked at build time**, not probed at runtime — there is no main-thread-blocking synchronous XHR and nothing 404s on the CDN-only Pages deploy. The committed default is all-CDN, which is what the deploy and a fresh checkout serve. For offline / local dev with a populated `three.js/` and `node_modules/`, run `npm run importmap:local` (detects vendored dirs and rewrites the `VENDOR` block); `npm run importmap` reverts to all-CDN. The generated `local` block must not be committed — it would break the live deploy.
 
+The generated integrity map covers the top-level libraries and the two addons
+the app imports directly. Relative sub-imports inside those modules bypass the
+import map, so the exact package-version pin is the primary defense; the
+available SRI entries are additional partial coverage.
+
 A page-specific local import (e.g. `solids.html` referencing `../solids.js`) is added by setting `window.__DAYDREAM_EXTRA_IMPORTS` before the helper script.
 
 ### 10.9 Video Recording (`recorder.js`)
