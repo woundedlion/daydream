@@ -20,7 +20,6 @@
  *   - refreshPixelView(): re-fetch the (possibly detached) WASM pixel view
  *   - getMemoryView():    current Uint16Array view of the display buffer
  */
-import { SLOW_FRAME_MS } from "./driver.js";
 import { compositeSegment } from "./segment_layout.js";
 import { FAULT_POOL, FAULT_RENDER, SegmentStatsView } from "./segment_stats_view.js";
 import { PROTOCOL_VERSION } from "./worker_protocol.js";
@@ -41,9 +40,13 @@ const BOOT_WATCHDOG_MS = 10000;
 // re-armed on every distinct segment 'frame' while `pending > 0`, so it bounds the
 // gap between reports rather than the whole render — a legitimately slow effect on
 // a throttled GPU keeps extending it as segments land, and only a true stall (no
-// segment reports for this long) faults. Sized well above any legitimate frame
-// (SLOW_FRAME_MS is the per-frame slow threshold).
-const RENDER_WATCHDOG_MS = 8 * SLOW_FRAME_MS;
+// segment reports for this long) faults. Absolute rather than a multiple of the
+// display cadence: the fault is unrecoverable without a user-driven rebuild, and
+// the widest gap it legitimately sees is the first frame after an effect switch
+// (a cold effect build plus a full segment render of at most half of 288x144 on a
+// throttled machine), so it is sized against a hung worker, not a slow one. Peer
+// to the boot/init deadlines above.
+const RENDER_WATCHDOG_MS = 5000;
 
 // Bounded auto-retry for a transient worker module-load failure: a bare, message-
 // less error Event, which the browser fires when a `{type:'module'}` worker's
