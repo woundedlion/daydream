@@ -96,14 +96,32 @@ export const CATALAN_BASES = new Set([
  * @param {Object} mesh - A live WASM MeshOps mesh wrapper.
  * @param {(string|{op:string, params:Object})} o - The op to apply, as a bare op name or an {op, params} object.
  * @returns {Object} The new mesh wrapper.
- * @throws {Error} When the module binds no method for the op name.
+ * @throws {Error} When the module binds no method for the op name, or the op soft-rejects.
  * @details Single source of truth for op dispatch: the live-preview module and
  * the sacrificial validator module must run byte-identical chains or validation
- * proves the wrong thing.
+ * proves the wrong thing. The bridge answers a soft reject — an out-of-bounds
+ * result, or a non-finite/out-of-domain argument — with null rather than a mesh,
+ * which throws before the caller swaps its live wrapper.
  */
 export function applyOp(mesh, o) {
   const opName = typeof o === 'string' ? o : o.op;
   requireParams('applyOp', opName, o);
+  const next = dispatchOp(mesh, o, opName);
+  if (!next) {
+    throw new Error(`applyOp: op "${opName}" was rejected by the WASM MeshOps module`);
+  }
+  return next;
+}
+
+/**
+ * Calls the bound method for one op.
+ * @param {Object} mesh - A live WASM MeshOps mesh wrapper.
+ * @param {(string|{op:string, params:Object})} o - The op to apply.
+ * @param {string} opName - The op's name.
+ * @returns {?Object} The new mesh wrapper, or null when the module soft-rejects the op.
+ * @throws {Error} When the module binds no method for the op name.
+ */
+function dispatchOp(mesh, o, opName) {
   if (opName === 'truncate') return mesh.truncate(o.params.t);
   if (opName === 'chamfer') return mesh.chamfer(o.params.t);
   if (opName === 'expand') return mesh.expand(o.params.t);
