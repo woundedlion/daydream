@@ -3,11 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "testFileFloor": 37,
+  "testFileFloor": 39,
+  "testCountFloor": 566,
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
     "pretest": "node scripts/require-tests.mjs",
-    "test": "node --test --experimental-test-module-mocks \"tests/*.test.js\"",
+    "test": "node scripts/run-tests.mjs --experimental-test-module-mocks \"tests/*.test.js\"",
     "typecheck": "tsc --noEmit",
     "importmap": "node scripts/generate-importmap.mjs",
     "importmap:local": "node scripts/generate-importmap.mjs --local"
