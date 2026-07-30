@@ -148,8 +148,6 @@ export class SegmentController {
     this.scratch = [];
     /** @type {number[]} */
     this.timings = [];        // ms per segment (worker-measured)
-    /** @type {number[]} */
-    this.renderUs = [];       // µs rasterization time per segment
     /** @type {Array<SegArenaMetrics | null>} */
     this.arenas = [];
 
@@ -258,7 +256,6 @@ export class SegmentController {
     this.results = new Array(numSegments).fill(null);
     this.scratch = new Array(numSegments).fill(null);
     this.timings = new Array(numSegments).fill(0);
-    this.renderUs = new Array(numSegments).fill(0);
     this.arenas = new Array(numSegments).fill(null);
     this.frameSeen = new Array(numSegments).fill(false);
     this.paramValues = null;
@@ -344,7 +341,6 @@ export class SegmentController {
               y0: msg.y0, y1: msg.y1,
             };
             this.timings[msg.segId] = msg.elapsed;
-            this.renderUs[msg.segId] = msg.renderUs || 0;
             this.arenas[msg.segId] = msg.arenaMetrics;
           }
           // Count distinct segments: a worker emitting two 'frame' messages in
@@ -538,7 +534,6 @@ export class SegmentController {
     this.results = [];
     this.scratch = [];
     this.timings = [];
-    this.renderUs = [];
     this.arenas = [];
     this.frameSeen = [];
     this.ready = false;
@@ -725,7 +720,6 @@ export class SegmentController {
       // Clear per-segment stats so a segment fenced out (or silent) this frame
       // reports fresh 0/'-' rather than a prior generation's values.
       this.timings.fill(0);
-      this.renderUs.fill(0);
       this.arenas.fill(null);
       this.frameStart = performance.now();
       this.frameResolve = () => {

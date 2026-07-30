@@ -174,12 +174,10 @@ async function handleMessage(msg) {
     case 'render': {
       if (!engine || !segRange) break;
 
-      // elapsed: JS wall time (ms) incl. embind overhead. renderUs: engine-internal
-      // render timer (µs), excluding JS<->WASM overhead.
+      // elapsed: JS wall time (ms) incl. embind overhead.
       const t0 = performance.now();
       engine.drawFrame();
       const elapsed = performance.now() - t0;
-      const renderUs = engine.getRenderUs();
 
       // Segment 0 mirrors its post-frame param values back so the GUI can track
       // animation-driven params; the main engine is never stepped in this mode.
@@ -249,7 +247,6 @@ async function handleMessage(msg) {
         x0, x1, y0, y1,
         pixels: pixelsCopy,
         elapsed,
-        renderUs,
         arenaMetrics,
         paramValues,
       }, [pixelsCopy.buffer]);

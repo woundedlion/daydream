@@ -63,7 +63,6 @@ class FakeEngine {
     return true;
   }
   drawFrame() { this.calls.push(['drawFrame']); }
-  getRenderUs() { return 1234; }
   getParamValues() { return this.paramView; }
   /** Each channel encodes its flat canvas index so extraction can be checked. */
   getPixels() {
@@ -238,7 +237,6 @@ test('render marshals arena metrics into a plain object', async () => {
     scratch_arena_b: { usage: 4, high_water_mark: 5, capacity: 6 },
     persistent_arena: { usage: 7, high_water_mark: 8, capacity: 9 },
   });
-  assert.equal(frame.renderUs, 1234);
 });
 
 /** A failing getArenaMetrics is surfaced as null without dropping the frame. */

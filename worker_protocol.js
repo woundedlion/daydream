@@ -124,7 +124,7 @@ export const PROTOCOL_VERSION = 2;
  * @typedef {{
  *   type: 'frame', segId: number,
  *   x0: number, x1: number, y0: number, y1: number,
- *   pixels: Uint16Array, elapsed: number, renderUs: number,
+ *   pixels: Uint16Array, elapsed: number,
  *   arenaMetrics: SegArenaMetrics | null,
  *   paramValues: number[] | null,
  * }} FrameMsg
