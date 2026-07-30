@@ -427,6 +427,25 @@ test('an encoder error finalizes the session, reports it, and clears the recorde
   }
 });
 
+test('an encoder error event without an Error cause is normalized', () => {
+  const restore = installRecorderEnv();
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    const notified = [];
+    rec.download = () => {};
+    rec.onError = (err) => notified.push(err);
+    rec.start('e');
+
+    rec.mediaRecorder.onerror({ type: 'error' });
+
+    assert.equal(notified.length, 1);
+    assert.ok(notified[0] instanceof Error);
+    assert.match(notified[0].message, /recording failed/);
+  } finally {
+    restore();
+  }
+});
+
 /**
  * The stop->start race applied to errors: a stale session's fault must finalize
  * only its own output and must neither tear down nor report against the newer
