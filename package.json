@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "testFileFloor": 41,
-  "testCountFloor": 622,
+  "testCountFloor": 625,
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
     "pretest": "node scripts/require-tests.mjs",

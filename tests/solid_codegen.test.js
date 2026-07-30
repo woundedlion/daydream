@@ -13,6 +13,7 @@ const {
   generateFuncAndRecipe,
   generateRecipeCpp,
   computeInternalAngle,
+  snapToStep,
   isConvexFace,
   uniqueEdges,
   geodesicSegments,
@@ -283,6 +284,63 @@ test('computeInternalAngle guards degenerate input', () => {
   assert.equal(computeInternalAngle(null), 0);
   assert.equal(computeInternalAngle({ faces: [] }), 0);
   assert.equal(computeInternalAngle({ vertices: [], faces: [[0, 1]] }), 0);
+});
+
+/** Verifies snapToStep lands on the step grid measured from min, and clamps to the range. */
+test('snapToStep snaps to the nearest step from min and clamps', () => {
+  const def = { min: 0, max: 90, step: 1 };
+  assert.equal(snapToStep(54.7356, def), 55);
+  assert.equal(snapToStep(54.4, def), 54);
+  assert.equal(snapToStep(-10, def), 0);
+  assert.equal(snapToStep(1000, def), 90);
+  // The grid starts at min, not at 0.
+  assert.equal(snapToStep(7.4, { min: 1, max: 20, step: 5 }), 6);
+});
+
+/** Verifies a value already on the grid is returned unchanged. */
+test('snapToStep leaves an on-grid value alone', () => {
+  const def = OP_DEFS.hankin.params.angle;
+  for (const angle of [0, 17, 54, 90]) assert.equal(snapToStep(angle, def), angle);
+});
+
+/**
+ * Verifies the hankin angle the tool seeds from the mesh is single-valued: the
+ * value in state, the range input, the number box, the generated funcName suffix
+ * and the emitted recipe literal all describe the same angle.
+ */
+test('a seeded hankin angle agrees across the control, the funcName and the recipe', () => {
+  // A face whose interior angle at its second vertex is arccos(-1/3) = 109.4712
+  // degrees, so the tool's half-internal-angle seed is 54.7356 — the unsnapped
+  // value that showed one angle in state, another on the thumb, and a third in
+  // the name.
+  const s = Math.sqrt(8) / 3;
+  const mesh = {
+    vertices: [{ x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, { x: -1 / 3, y: s, z: 0 }],
+    faces: [[0, 1, 2]],
+  };
+  const def = OP_DEFS.hankin.params.angle;
+  const derived = (computeInternalAngle(mesh) / 2) * (180 / Math.PI);
+  assert.ok(Math.abs(derived - 54.7356) < 1e-3);
+  assert.notEqual(derived, Math.round(derived)); // the seed is off the control's grid
+
+  const angle = snapToStep(derived, def);
+  assert.equal(angle, 55);
+
+  // The range input: exactly on the step grid, so the thumb reads the state value.
+  assert.equal((angle - def.min) % def.step, 0);
+  assert.ok(angle >= def.min && angle <= def.max);
+  // The number box, which the page renders with toFixed(2).
+  assert.equal(Number(angle.toFixed(2)), angle);
+
+  const { funcName, recipe } = generateFuncAndRecipe(
+    { base: 'icosahedron', ops: [{ op: 'hankin', params: { angle } }] }, 'Archimedean');
+  // The funcName suffix rounds the angle; on the grid, that IS the angle.
+  assert.equal(funcName, `icosahedron_hk${angle}`);
+  assert.equal(Math.round(angle), angle);
+  // The emitted recipe literal parses back to the same angle.
+  const literal = recipe.match(/\.hankin\((-?[\d.]+)f \* D2R\)/);
+  assert.ok(literal, `no hankin literal in ${recipe}`);
+  assert.equal(Number(literal[1]), angle);
 });
 
 test('isConvexFace accepts a convex face', () => {
