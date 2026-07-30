@@ -9,7 +9,7 @@
  * publishes each frame and owns nothing of the pipeline, so the overlay is
  * testable without a Worker and the controller without a DOM.
  */
-import { SLOW_FRAME_MS } from "./driver.js";
+import { SLOW_FRAME_MS } from "./frame_constants.js";
 
 // Sentinel segIds for pool-wide faults with no single worker to blame:
 // FAULT_POOL for a module-load/init timeout, FAULT_RENDER for a render-watchdog
