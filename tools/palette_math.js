@@ -411,6 +411,28 @@ export function mapValue(value, fromMin, fromMax, toMin, toMax) {
 }
 
 /**
+ * The value range the RGB wave graph plots. Wider than the [0, 1] output range
+ * so a channel's out-of-range excursions — which the device clamps — stay
+ * visible rather than flattening against the top or bottom of the canvas.
+ * @type {{min: number, max: number}}
+ */
+export const WAVE_GRAPH_VALUE_RANGE = { min: -0.5, max: 1.5 };
+
+/**
+ * Maps WAVE_GRAPH_VALUE_RANGE onto a wave-graph canvas of the given height: the
+ * band between 10% and 90% of the height, value increasing upward. The 10%
+ * margins leave the range-boundary lines drawable inside the canvas.
+ * @param {number} height - Canvas height in pixels.
+ * @returns {{yTop: number, yBottom: number, toY: function(number): number}} The band's canvas-y edges (yTop is the max-value edge) and the value-to-canvas-y map.
+ */
+export function waveGraphBand(height) {
+  const yTop = height * 0.1;
+  const yBottom = height * 0.9;
+  const { min, max } = WAVE_GRAPH_VALUE_RANGE;
+  return { yTop, yBottom, toY: (value) => mapValue(value, min, max, yBottom, yTop) };
+}
+
+/**
  * Rescales the procedural cosine-formula frequency (C) and phase (D) triples so
  * the window [tStart, tEnd] of the current palette fills the whole [0, 1] strip.
  * @param {{C_R:number,C_G:number,C_B:number,D_R:number,D_G:number,D_B:number}} parameters - The current frequency/phase coefficients.

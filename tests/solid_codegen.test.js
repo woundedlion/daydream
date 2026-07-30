@@ -16,6 +16,10 @@ const {
   isConvexFace,
   uniqueEdges,
   geodesicSegments,
+  geodesicTriangleVertices,
+  dropSlotIndex,
+  dropTargetIndex,
+  reorderPreviewShift,
   movedOps,
   createCommitQueue,
   createChainValidator,
@@ -377,6 +381,157 @@ test('geodesicSegments caps dense meshes on the triangle budget', () => {
 test('geodesicSegments clamps to the [1, 24] range', () => {
   assert.equal(geodesicSegments(0, 1), 1);
   assert.equal(geodesicSegments(Math.PI, 1), 24);
+});
+
+/** Corners of a spherical octant, the fan triangle the tessellation tests subdivide. */
+const OCTANT = [{ x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, { x: 0, y: 0, z: 1 }];
+
+/** Reads the flat tessellation output back as {x, y, z} points. */
+function points(flat) {
+  const out = [];
+  for (let i = 0; i < flat.length; i += 3) out.push({ x: flat[i], y: flat[i + 1], z: flat[i + 2] });
+  return out;
+}
+
+/** Verifies n = 1 emits the untouched triangle, so an unsubdivided mesh is unchanged. */
+test('geodesicTriangleVertices at n=1 emits the single input triangle', () => {
+  const flat = geodesicTriangleVertices(...OCTANT, 1);
+  assert.equal(flat.length, 9);
+  assert.deepEqual(points(flat), OCTANT);
+});
+
+/** Verifies the emitted triangle count is n squared, the watertight subdivision of one fan triangle. */
+test('geodesicTriangleVertices emits n^2 triangles', () => {
+  for (const n of [1, 2, 3, 7]) {
+    assert.equal(geodesicTriangleVertices(...OCTANT, n).length, 9 * n * n);
+  }
+});
+
+/** Verifies every emitted vertex is projected onto the unit sphere, which is what curves the face. */
+test('geodesicTriangleVertices projects every vertex onto the unit sphere', () => {
+  for (const p of points(geodesicTriangleVertices(...OCTANT, 4))) {
+    assert.ok(Math.abs(Math.hypot(p.x, p.y, p.z) - 1) < 1e-12);
+  }
+});
+
+/**
+ * Verifies the subdivision is watertight: the points along a triangle side are
+ * shared by the sub-triangles either side of them, so no crack opens. Each
+ * interior grid point must therefore appear in more than one emitted triangle,
+ * and the three corners must each appear exactly once.
+ */
+test('geodesicTriangleVertices reuses grid points across sub-triangles', () => {
+  const counts = new Map();
+  for (const p of points(geodesicTriangleVertices(...OCTANT, 3))) {
+    const key = `${p.x},${p.y},${p.z}`;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  // A grid of n=3 has 10 distinct points; the 3 corners belong to one triangle each.
+  assert.equal(counts.size, 10);
+  const once = [...counts.values()].filter(c => c === 1);
+  assert.equal(once.length, 3);
+});
+
+/** Verifies a degenerate (zero-length) mix keeps its coordinates instead of dividing by zero. */
+test('geodesicTriangleVertices survives a triangle collapsed on the origin', () => {
+  const origin = { x: 0, y: 0, z: 0 };
+  const flat = geodesicTriangleVertices(origin, origin, origin, 2);
+  assert.ok(flat.every(Number.isFinite));
+});
+
+/** A list of uniform 20px rows, the layout the op-chain reorder math reads. */
+const rows = (count, height = 20) =>
+  Array.from({ length: count }, (_, i) => ({ offsetTop: i * height, offsetHeight: height }));
+
+/** Verifies the drop slot counts the item midpoints the pointer has passed. */
+test('dropSlotIndex splits on each item midpoint', () => {
+  const items = rows(3);
+  assert.equal(dropSlotIndex(0, items), 0);
+  assert.equal(dropSlotIndex(9, items), 0);
+  assert.equal(dropSlotIndex(10, items), 1); // exactly on the first midpoint
+  assert.equal(dropSlotIndex(29, items), 1);
+  assert.equal(dropSlotIndex(30, items), 2);
+  assert.equal(dropSlotIndex(1000, items), 3); // past the last item
+});
+
+/** Verifies an empty list offers only the single slot 0, so the first op can be dropped. */
+test('dropSlotIndex reports slot 0 for an empty list', () => {
+  assert.equal(dropSlotIndex(0, []), 0);
+  assert.equal(dropSlotIndex(500, []), 0);
+});
+
+/** Verifies rows of differing heights split on their own midpoints, not a uniform pitch. */
+test('dropSlotIndex handles rows of unequal height', () => {
+  const items = [
+    { offsetTop: 0, offsetHeight: 40 },
+    { offsetTop: 40, offsetHeight: 10 },
+  ];
+  assert.equal(dropSlotIndex(19, items), 0);
+  assert.equal(dropSlotIndex(20, items), 1);
+  assert.equal(dropSlotIndex(45, items), 2);
+});
+
+/** Verifies a slot below the dragged op maps straight through, since removal shifts nothing before it. */
+test('dropTargetIndex passes slots at or above the drag source through', () => {
+  assert.equal(dropTargetIndex(0, 2), 0);
+  assert.equal(dropTargetIndex(2, 2), 2);
+});
+
+/** Verifies a slot past the dragged op loses the one index the removal frees. */
+test('dropTargetIndex decrements slots past the drag source', () => {
+  assert.equal(dropTargetIndex(3, 2), 2); // dropping just below itself is a no-op
+  assert.equal(dropTargetIndex(4, 2), 3);
+});
+
+/**
+ * Verifies the slot pair that means "leave it where it is" both resolve to the
+ * source index, which is how the page detects a no-op drop.
+ */
+test('dropTargetIndex resolves both no-op slots to the source index', () => {
+  for (const from of [0, 1, 4]) {
+    assert.equal(dropTargetIndex(from, from), from);
+    assert.equal(dropTargetIndex(from + 1, from), from);
+  }
+});
+
+/** Verifies dragging down shifts only the ops the dragged one passes, each up one slot. */
+test('reorderPreviewShift lifts the ops a downward drag passes', () => {
+  // Dragging op 0 to slot 3: ops 1 and 2 move up, op 3 stays.
+  assert.deepEqual([0, 1, 2, 3].map(i => reorderPreviewShift(0, 3, i)), [0, -1, -1, 0]);
+});
+
+/** Verifies dragging up shifts only the ops the dragged one passes, each down one slot. */
+test('reorderPreviewShift pushes down the ops an upward drag passes', () => {
+  // Dragging op 3 to slot 1: ops 1 and 2 move down, op 0 stays.
+  assert.deepEqual([0, 1, 2, 3].map(i => reorderPreviewShift(3, 1, i)), [0, 1, 1, 0]);
+});
+
+/** Verifies the dragged item itself is never shifted, and a no-op drop moves nothing. */
+test('reorderPreviewShift leaves the dragged item and no-op drops alone', () => {
+  assert.equal(reorderPreviewShift(2, 5, 2), 0);
+  assert.equal(reorderPreviewShift(2, 0, 2), 0);
+  for (const slot of [2, 3]) {
+    assert.deepEqual([0, 1, 2, 3].map(i => reorderPreviewShift(2, slot, i)), [0, 0, 0, 0]);
+  }
+});
+
+/**
+ * Verifies the preview agrees with the commit: an op previewed as shifting by one
+ * slot lands exactly one place from where it started in the reordered chain.
+ */
+test('reorderPreviewShift matches where movedOps actually puts each op', () => {
+  const ops = [0, 1, 2, 3].map(i => ({ op: `op${i}`, params: {} }));
+  for (let from = 0; from < ops.length; from++) {
+    for (let slot = 0; slot <= ops.length; slot++) {
+      const moved = movedOps(ops, from, dropTargetIndex(slot, from));
+      for (let i = 0; i < ops.length; i++) {
+        if (i === from) continue;
+        const landed = moved.findIndex(o => o.op === `op${i}`);
+        assert.equal(landed - i, reorderPreviewShift(from, slot, i),
+          `op${i} preview disagrees with the commit for from=${from} slot=${slot}`);
+      }
+    }
+  }
 });
 
 /** Verifies movedOps reorders without aliasing or mutating the input chain. */
