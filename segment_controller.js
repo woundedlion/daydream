@@ -444,15 +444,11 @@ export class SegmentController {
     console.log(`[Segmented] Spawning ${numSegments} workers...`);
   }
 
-  /** Terminate a partially-created pool and latch its synchronous startup failure. */
+  /**
+   * Latch a synchronous startup failure of worker `segId`; onWorkerFault
+   * terminates and detaches the partially-created pool.
+   */
   abortWorkerStartup(segId, phase, error) {
-    for (const worker of this.workers) {
-      worker.onmessage = null;
-      worker.onerror = null;
-      worker.onmessageerror = null;
-      worker.terminate();
-    }
-    this.workers = [];
     const detail = error instanceof Error
       ? `${error.name}: ${error.message}`
       : String(error);
@@ -563,7 +559,8 @@ export class SegmentController {
    * so its per-worker WASM heaps are released rather than sitting idle until the
    * rebuild, and its handlers are detached so a message already queued from a
    * surviving worker cannot report progress under the fault overlay. `workers`
-   * stays populated: recovery and the render watchdog gate on its length.
+   * is left populated rather than cleared, so a fault message still reports
+   * against the pool that was dispatched to; destroy() clears it on the rebuild.
    * Recovery is by re-creating the pool (effect switch / resolution change /
    * mode toggle), which clears the latch via destroy(). Only the first fault per
    * session is recorded for the UI.
@@ -880,15 +877,6 @@ export class SegmentController {
    */
   updateStats() {
     this.statsView.update(this);
-  }
-
-  /**
-   * Whether any worker is spawned, ready or not. Callers use it to decide
-   * whether a broadcast has anyone to reach.
-   * @returns {boolean}
-   */
-  get hasPool() {
-    return this.workers.length > 0;
   }
 
   /**

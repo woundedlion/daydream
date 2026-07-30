@@ -461,7 +461,9 @@ function applyEffect(preserveParams = false) {
     }
   }
 
-  if (segments.hasPool) {
+  // Gated on segmented mode, not on a live pool: a faulted pool can hold no
+  // workers, and setEffect() is the trigger that rebuilds it from appState.
+  if (segments.active) {
     segments.setEffect(appState.get('effect'));
   }
 
@@ -494,7 +496,9 @@ function applyResolution(preserveParams = false) {
     host.invalidateView(); // force host.refresh() to re-fetch after resize
   }
 
-  if (segments.hasPool) {
+  // Gated on segmented mode, not on a live pool: a faulted pool can hold no
+  // workers, and setResolution() is the trigger that rebuilds it from appState.
+  if (segments.active) {
     segments.setResolution(p.w, p.h);
   }
 

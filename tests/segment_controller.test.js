@@ -373,7 +373,9 @@ test('a synchronous worker-N construction failure terminates the partial pool', 
 
   assert.equal(FakeWorker.instances.length, 1);
   assert.equal(FakeWorker.instances[0].terminated, true);
-  assert.deepEqual(c.workers, []);
+  assert.equal(c.workers.length, 1, 'the terminated partial pool stays populated');
+  assert.ok(c.workers.every((w) => w.onmessage === null && w.onerror === null
+    && w.onmessageerror === null), 'handlers detached');
   assert.equal(c.faulted, true);
   assert.equal(c.faultInfo.segId, 1);
   assert.match(c.faultInfo.message, /construction failed: SecurityError: worker blocked/);
@@ -389,12 +391,30 @@ test('a synchronous worker-N init post failure terminates the partial pool', () 
 
   assert.equal(FakeWorker.instances.length, 2);
   assert.ok(FakeWorker.instances.every((worker) => worker.terminated));
-  assert.deepEqual(c.workers, []);
+  assert.equal(c.workers.length, 2, 'the terminated partial pool stays populated');
+  assert.ok(c.workers.every((w) => w.onmessage === null && w.onerror === null
+    && w.onmessageerror === null), 'handlers detached');
   assert.equal(c.faulted, true);
   assert.equal(c.faultInfo.segId, 1);
   assert.match(c.faultInfo.message, /initialization failed: DataCloneError: message rejected/);
   assert.equal(c.bootWatchdog, null);
   assert.equal(c.initWatchdog, null);
+});
+
+// A construction failure at segment 0 latches with `workers` empty, so no
+// recovery trigger may gate on the pool's length.
+test('a startup abort with nothing constructed still recovers on a rebuild', () => {
+  FakeWorker.failConstructionAt = 0;
+  const c = makeController();
+  c.active = true;
+  c.create(2);
+  assert.equal(c.faulted, true);
+  assert.equal(c.workers.length, 0);
+
+  FakeWorker.failConstructionAt = -1;
+  c.setResolution(4, 4);
+  assert.equal(c.faulted, false, 'recreating the pool cleared the fault latch');
+  assert.equal(c.workers.length, 2, 'a fresh pool of workers was built');
 });
 
 test('a booted ping with a mismatched protocol version faults fast', () => {
