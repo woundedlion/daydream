@@ -47,6 +47,9 @@ const buildRoot = () => {
   copyFileSync(SCRIPT_SRC, join(root, 'scripts', 'generate-importmap.mjs'));
   writeFileSync(join(root, 'package.json'), PKG);
   writeFileSync(join(root, 'vendor-importmap.js'), IMPORTMAP);
+  execFileSync('git', ['init', '-q'], { cwd: root });
+  execFileSync('git', ['add', 'scripts/generate-importmap.mjs', 'package.json',
+    'vendor-importmap.js'], { cwd: root });
 };
 
 before(() => {
@@ -98,6 +101,7 @@ const installModules = ({ threeVersion = '0.183.1', lilGuiVersion = '0.21.0' } =
 
   writeFileSync(join(root, 'driver.js'),
     "import { OrbitControls } from 'three/addons/controls/OrbitControls.js';\n");
+  execFileSync('git', ['add', 'driver.js'], { cwd: root });
 };
 
 /** Places the vendored entry points the --local probes require under ROOT. */
@@ -138,6 +142,16 @@ test('the addon scan pins only the addons the sources import', () => {
   assert.ok(out.includes("'controls/OrbitControls.js'"));
   assert.ok(!out.includes("'renderers/CSS2DRenderer.js'"),
     'an installed but unimported addon is not pinned');
+});
+
+/** Verifies ignored or otherwise untracked sources cannot steer generated entries. */
+test('the addon scan ignores untracked working-tree files', () => {
+  installModules();
+  mkdirSync(join(root, 'prompts'), { recursive: true });
+  writeFileSync(join(root, 'prompts', 'draft.html'),
+    "import 'three/addons/renderers/UntrackedRenderer.js';\n");
+  const out = run();
+  assert.ok(!out.includes('UntrackedRenderer.js'));
 });
 
 /** Verifies a node_modules that does not match the pinned version is refused, not hashed. */
