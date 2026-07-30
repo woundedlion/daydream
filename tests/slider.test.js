@@ -82,3 +82,27 @@ test('builds a slider, scaling bounds and rounding the step to integer units', (
   assert.equal(container.children[0].tagName, 'LABEL');
   assert.equal(container.children[0].htmlFor, slider.id);
 });
+
+/** Verifies the visible label is the accessible name when no override is supplied. */
+test('omitting ariaLabel leaves the visible label as the accessible name', () => {
+  const { slider } = createSlider('c', base, null);
+  assert.equal(slider.getAttribute('aria-label'), null);
+  assert.equal(container.children[0].textContent, 'L:');
+});
+
+/**
+ * Verifies ariaLabel names the input without touching the visible label, which is
+ * how a grid of sliders labelled only R/G/B gets one distinct name per control.
+ */
+test('ariaLabel names the input and leaves the visible label short', () => {
+  const { slider } = createSlider('c',
+    { ...base, label: 'R', labelSuffix: '', ariaLabel: 'Base red' }, null);
+  assert.equal(slider.getAttribute('aria-label'), 'Base red');
+  assert.equal(container.children[0].textContent, 'R');
+});
+
+/** Verifies an empty ariaLabel is treated as absent rather than set as a blank name. */
+test('an empty ariaLabel sets no attribute', () => {
+  const { slider } = createSlider('c', { ...base, ariaLabel: '' }, null);
+  assert.equal(slider.getAttribute('aria-label'), null);
+});

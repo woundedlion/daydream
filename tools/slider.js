@@ -24,6 +24,7 @@
  * @param {number} cfg.value - Initial value (display space)
  * @param {number} [cfg.scale=1] - Display-to-raw multiplier
  * @param {number} [cfg.decimals=2] - Decimals for the readout
+ * @param {string} [cfg.ariaLabel] - Accessible name for the input, for pages whose visible label is too short to identify the control on its own (a grid of sliders labelled only R/G/B). Overrides the visible label as the accessible name; omit it where the visible label already names the control.
  * @param {string} [cfg.labelSuffix=':'] - Text appended to the label
  * @param {string} [cfg.labelClass] - Classes for the label span
  * @param {string} [cfg.sliderClass] - Classes for the input
@@ -45,6 +46,7 @@ export function createSlider(containerId, cfg, onInput) {
     value,
     scale = 1,
     decimals = 2,
+    ariaLabel = '',
     labelSuffix = ':',
     labelClass = 'w-20 text-center font-bold text-white text-lg',
     sliderClass = 'flex-grow',
@@ -93,6 +95,7 @@ export function createSlider(containerId, cfg, onInput) {
   slider.step = String(sliderStep);
   slider.value = String(roundedValue);
   slider.className = sliderClass;
+  if (ariaLabel) slider.setAttribute('aria-label', ariaLabel);
   // The input's value is the scaled integer; announce the display value instead.
   slider.setAttribute('aria-valuetext', (roundedValue / scale).toFixed(decimals));
 
