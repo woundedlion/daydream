@@ -592,6 +592,10 @@ export class SegmentController {
     }
     this.pending = 0;
     this.renderInFlight = false;
+    // Open a new generation before settling: the in-flight render's `.then` would
+    // otherwise pass its `inflightGen === renderGen` guard and publish the frame
+    // the faulting worker never completed.
+    this.renderGen++;
     if (this.frameResolve) {
       const resolve = this.frameResolve;
       this.frameResolve = null;
