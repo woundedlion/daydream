@@ -20,8 +20,38 @@ export function roundUrlNumber(value) {
 }
 
 // A URL number must be wholly numeric: parseFloat would take the leading digits
-// of "42abc" and read "0x10" as 0.
+// of "42abc" and read "0x10" as 0, and Number() accepts "0x10" as 16.
 const URL_NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+
+const URL_TRUE = new Set(['true', '1', 'yes', 'on']);
+const URL_FALSE = new Set(['false', '0', 'no', 'off']);
+
+/**
+ * Parse a URL param string as a number under the one URL scalar grammar shared
+ * by every deep-link reader: surrounding whitespace is allowed, the rest must be
+ * a plain decimal (optionally signed, optionally exponent) and finite.
+ * @param {string} raw - The raw URL param string.
+ * @returns {number|null} The parsed number, or null when the string is not one.
+ */
+export function parseUrlNumber(raw) {
+  const t = raw.trim();
+  if (!URL_NUMBER.test(t)) return null;
+  const num = Number(t);
+  return Number.isFinite(num) ? num : null;
+}
+
+/**
+ * Parse a URL param string as a boolean under the one token table shared by
+ * every deep-link reader; case- and whitespace-insensitive.
+ * @param {string} raw - The raw URL param string.
+ * @returns {boolean|null} The parsed boolean, or null for an unrecognized token.
+ */
+export function parseUrlBoolean(raw) {
+  const t = raw.trim().toLowerCase();
+  if (URL_TRUE.has(t)) return true;
+  if (URL_FALSE.has(t)) return false;
+  return null;
+}
 
 // Debounce window collapsing a burst of URL writes into one replaceState. Long
 // enough to swallow a slider drag, short enough that a copied link is current.
@@ -193,16 +223,13 @@ export class URLSync {
         continue;
       }
       if (typeof current === 'number') {
-        const t = raw.trim();
-        if (!URL_NUMBER.test(t)) continue;
-        const num = Number(t);
-        if (!Number.isFinite(num)) continue;
+        const num = parseUrlNumber(raw);
+        if (num === null) continue;
         patch[key] = num;
       } else if (typeof current === 'boolean') {
-        const t = raw.trim().toLowerCase();
-        if (t === 'true' || t === '1' || t === 'yes' || t === 'on') patch[key] = true;
-        else if (t === 'false' || t === '0' || t === 'no' || t === 'off') patch[key] = false;
-        else continue;
+        const flag = parseUrlBoolean(raw);
+        if (flag === null) continue;
+        patch[key] = flag;
       } else {
         patch[key] = raw;
       }
