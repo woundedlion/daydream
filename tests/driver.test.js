@@ -227,6 +227,124 @@ test('dispose leaves no dangling mesh or pixel buffer', () => {
 });
 
 // ---------------------------------------------------------------------------
+// stepSimulation / render: the detached-pixel-view contract
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds a typed-array view whose backing ArrayBuffer has been detached, as
+ * Emscripten heap growth leaves a previously-fetched pixel view.
+ * @returns {Uint16Array} A view over a detached buffer.
+ */
+function detachedView() {
+  const buf = new ArrayBuffer(8);
+  const view = new Uint16Array(buf);
+  buf.transfer();
+  return view;
+}
+
+/**
+ * Stand-in for an InstancedBufferAttribute with three.js's real upload
+ * semantics: needsUpdate is write-only and only ever bumps version, so once an
+ * upload is flagged nothing can unflag it. `version` is what WebGLAttributes
+ * compares, so tests assert on it rather than on a readable flag.
+ * @param {Uint16Array} array - Backing color array.
+ * @returns {Object} Attribute stub exposing array/version/needsUpdate.
+ */
+function fakeColorAttribute(array) {
+  return {
+    array,
+    version: 0,
+    set needsUpdate(value) { if (value === true) this.version++; },
+  };
+}
+
+/** Minimal `this` for stepSimulation: a running sim over the given color array.
+ * @param {Uint16Array} colors - Array the dot mesh's instanceColor aliases.
+ * @returns {Object} Context object for prototype.call.
+ */
+function stepCtx(colors) {
+  return {
+    paused: false,
+    stepFrames: 0,
+    pixels: colors,
+    dotMesh: { instanceColor: fakeColorAttribute(colors) },
+    updateStats: () => {},
+  };
+}
+
+test('stepSimulation flags the color upload on a normal frame', () => {
+  const ctx = stepCtx(new Uint16Array(4));
+  assert.equal(Daydream.prototype.stepSimulation.call(ctx, { drawFrame: () => {} }), true);
+  assert.equal(ctx.dotMesh.instanceColor.version, 1);
+});
+
+test('stepSimulation adds no upload flag when a mid-frame heap growth detached the view', () => {
+  const ctx = stepCtx(new Uint16Array(4));
+  // daydream.js's adapter flags the upload, then syncGUI() -> getParamValues()
+  // grows the heap and detaches the view it just flagged.
+  const effect = {
+    drawFrame: () => {
+      ctx.dotMesh.instanceColor.needsUpdate = true;
+      ctx.dotMesh.instanceColor.array = detachedView();
+    },
+  };
+
+  assert.equal(Daydream.prototype.stepSimulation.call(ctx, effect), true);
+  assert.equal(ctx.dotMesh.instanceColor.version, 1, 'driver flagged a detached array');
+});
+
+/** Minimal `this` for render(): a paused sim with a pending repaint.
+ * @param {Uint16Array} colors - Array the dot mesh's instanceColor aliases.
+ * @param {Array<string>} log - Ordered event sink.
+ * @returns {Object} Context object for prototype.call.
+ */
+function renderCtx(colors, log) {
+  return {
+    contextLost: false,
+    paused: true,
+    stepFrames: 0,
+    timeAccumulator: 0,
+    frameInterval: 1 / 30,
+    needsRender: true,
+    labelAxes: false,
+    hadLabels: false,
+    recorder: null,
+    clock: { getDelta: () => 0 },
+    advanceFrameClock: Daydream.prototype.advanceFrameClock,
+    controls: { update: () => log.push('controls.update') },
+    dotMesh: { instanceColor: fakeColorAttribute(colors) },
+    xAxis: {}, yAxis: {}, zAxis: {},
+    labelPool: { activeCount: 0 },
+    labelRenderer: { render: () => log.push('labelRenderer.render') },
+    renderer: { setScissorTest: (on) => log.push(`scissor:${on}`) },
+    updateCullUniforms: () => log.push('updateCullUniforms'),
+    renderMainView: () => log.push('renderMainView'),
+    refreshLabels: () => log.push('refreshLabels'),
+    renderPip: () => log.push('renderPip'),
+  };
+}
+
+test('render repaints a pending frame while paused', () => {
+  const log = [];
+  const ctx = renderCtx(new Uint16Array(4), log);
+  Daydream.prototype.render.call(ctx, null);
+
+  assert.ok(log.includes('renderMainView'));
+  assert.equal(ctx.needsRender, false);
+});
+
+test('render holds the repaint while instanceColor aliases a detached view', () => {
+  const log = [];
+  const ctx = renderCtx(detachedView(), log);
+  Daydream.prototype.render.call(ctx, null);
+
+  // renderer.render() would throw on the attribute size check.
+  assert.ok(!log.includes('renderMainView'), 'rendered from a detached array');
+  assert.ok(!log.includes('scissor:true'));
+  assert.equal(ctx.needsRender, true, 'repaint was dropped instead of deferred');
+});
+
+// ---------------------------------------------------------------------------
 // setupKeyboardOrbit
 // ---------------------------------------------------------------------------
 
