@@ -68,10 +68,11 @@ export class VideoRecorder {
     this.targetHeight = null;
     this.offscreen = null;
     this.offCtx = null;
-    // Host hook fired with the error whenever a session fails to start or ends on
-    // an encoder fault, so the UI can drop its recording state and report why;
-    // the record button's label is set on click and would otherwise keep reading
-    // "Stop" over a dead session.
+    // Host hook fired whenever a session ends without the host asking for it: a
+    // failure to start, an encoder fault, or a cancelled Save dialog. The reason is
+    // passed so the UI can report it, and the UI drops its recording state; the
+    // record button's label is set on click and would otherwise keep reading "Stop"
+    // over a dead session.
     this.onError = null;
   }
 
@@ -434,7 +435,12 @@ export class VideoRecorder {
           // Cancelling the Save dialog ends the session; without this the recorder
           // keeps capturing frames that finish() will only discard. Guard against a
           // superseding session: only stop if this recorder is still the live one.
-          if (this.mediaRecorder === recorder) this.stop();
+          // The host hook fires too, or the UI stays latched on a dead session and
+          // the next click starts a second recording instead of stopping this one.
+          if (this.mediaRecorder === recorder) {
+            this.stop();
+            this.onError?.(err);
+          }
         } else {
           console.warn('VideoRecorder: streaming save unavailable, buffering in memory', err);
         }

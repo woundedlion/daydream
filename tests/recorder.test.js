@@ -797,3 +797,35 @@ test('a cancelled save picker discards buffered chunks without downloading', asy
     restore();
   }
 });
+
+/**
+ * Save picker cancelled while the session is still live: the recorder stops, and
+ * the host hook must fire or the UI stays latched on a dead session and the next
+ * click starts a second recording instead of stopping the first.
+ */
+test('a cancelled save picker tells the host the session ended', async () => {
+  const restore = installRecorderEnv();
+  const abort = new Error('user cancelled');
+  abort.name = 'AbortError';
+  globalThis.showSaveFilePicker = async () => { throw abort; };
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    rec.download = () => {};
+    const notified = [];
+    rec.onError = (err) => notified.push(err);
+
+    rec.start('cancelled');
+    const recorder = rec.mediaRecorder;
+    // Let the picker's rejection settle while the session is still installed.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.equal(notified.length, 1, 'the host is told the session ended');
+    assert.equal(notified[0], abort, 'the cancellation itself is passed through');
+    assert.equal(rec.isRecording, false, 'the cancelled session is stopped');
+
+    recorder.onstop();
+    assert.equal(rec.mediaRecorder, null, 'the stop path still finalizes the session');
+  } finally {
+    restore();
+  }
+});
