@@ -57,7 +57,7 @@ class StubGUI {
   /**
    * Creates the root stub with a placeholder DOM element.
    */
-  constructor() { this.domElement = {}; }
+  constructor() { this.domElement = {}; this.destroyed = false; }
   /**
    * Creates a controller bound to a target property.
    * @param {Object} object - The object whose property the controller edits.
@@ -77,11 +77,16 @@ class StubGUI {
    * @returns {StubGUI} A fresh nested GUI stub.
    */
   addFolder() { return new StubGUI(); }
+  /**
+   * Records that the wrapper tore this panel down.
+   * @returns {void}
+   */
+  destroy() { this.destroyed = true; }
 }
 
 mock.module('lil-gui', { namedExports: { GUI: StubGUI } });
 
-const { GUI: DeepLinkGUI, makeUrlParamWriter } = await import('../gui.js');
+const { GUI: DeepLinkGUI, makeUrlParamWriter, resetGUI } = await import('../gui.js');
 
 /**
  * Installs a minimal global window so gui.js can read location.search and call
@@ -420,4 +425,104 @@ test('makeUrlParamWriter preserves location.hash in the fallback commit', () => 
   }
   assert.match(lastUrl, /#section$/, 'the fragment survives the URL rewrite');
   assert.equal(new URL(lastUrl, 'http://x').searchParams.get('a'), 'one');
+});
+
+/**
+ * Installs a window whose replaceState records the written URL.
+ * @param {string} search - The raw query string, including the leading '?'.
+ * @param {string} [hash] - The location fragment, including the leading '#'.
+ * @returns {{written: () => string}} Accessor for the last URL written.
+ */
+function installRecordingWindow(search, hash = '') {
+  let lastUrl = '/';
+  globalThis.window = {
+    location: { search, pathname: '/', hash },
+    history: { replaceState(state, title, url) { lastUrl = url; } },
+  };
+  return { written: () => lastUrl };
+}
+
+/**
+ * The URL writer is shared root→children, so a child folder's destroy() must not
+ * cancel a write the surviving root still owes: tearing down one folder of a
+ * rebuilt panel would otherwise drop the pending deep link.
+ */
+test('destroying a child folder leaves the shared root URL writer armed', () => {
+  const url = installRecordingWindow('');
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const root = new DeepLinkGUI({ autoPlace: false });
+    const folder = root.addFolder('Shape');
+    folder.add({ sides: 3 }, 'sides', 0, 10).setValue(5);
+
+    folder.destroy();
+    assert.equal(folder.gui.destroyed, true, 'the folder panel was left in the DOM');
+    assert.equal(root.gui.destroyed, false, 'a child destroy took the root panel down');
+
+    mock.timers.tick(200);
+    assert.equal(new URL(url.written(), 'http://x').searchParams.get('Shape.sides'), '5',
+      'the child destroy cancelled the root writer');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+/**
+ * A discarded root must leave no armed timer: the 200 ms write would otherwise
+ * fire history.replaceState into a page the GUI no longer belongs to.
+ */
+test('destroying the root cancels its pending URL write', () => {
+  const url = installRecordingWindow('');
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const root = new DeepLinkGUI({ autoPlace: false });
+    root.add({ speed: 1 }, 'speed', 0, 10).setValue(5);
+
+    root.destroy();
+    assert.equal(root.gui.destroyed, true, 'the root panel was left in the DOM');
+
+    mock.timers.tick(200);
+    assert.equal(url.written(), '/', 'the discarded GUI still wrote to the URL');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+/**
+ * The no-URLSync fallback — the branch every standalone tool page takes — clears
+ * deep-link params, keeps the excluded ones, and preserves the fragment.
+ */
+test('resetGUI clears deep-link params except the excluded ones on a tool page', () => {
+  const url = installRecordingWindow('?Speed=0.5&Sides=7&keep=1', '#tool');
+  resetGUI(['keep']);
+
+  const q = new URL(url.written(), 'http://x').searchParams;
+  assert.equal(q.get('keep'), '1');
+  assert.equal(q.get('Speed'), null);
+  assert.equal(q.get('Sides'), null);
+  assert.match(url.written(), /#tool$/, 'the fragment survives the reset');
+});
+
+/** Verifies the fallback drops the query string entirely when nothing is excluded. */
+test('resetGUI with no exclusions leaves a bare path on a tool page', () => {
+  const url = installRecordingWindow('?Speed=0.5', '#tool');
+  resetGUI();
+  assert.equal(url.written(), '/#tool');
+});
+
+/**
+ * GUI.reset delegates to the app's URLSync when one is registered, so tracked
+ * state is re-asserted rather than cleared with the deep-link params.
+ */
+test('GUI.reset routes through the active URLSync', () => {
+  const url = installRecordingWindow('?Speed=0.5&keep=1&effect=Old', '#tool');
+  new URLSync(new AppState({ effect: 'Old' }), ['effect']);
+
+  DeepLinkGUI.reset(['keep']);
+
+  const q = new URL(url.written(), 'http://x').searchParams;
+  assert.equal(q.get('Speed'), null);
+  assert.equal(q.get('keep'), '1');
+  assert.equal(q.get('effect'), 'Old', 'tracked state was not re-asserted');
+  assert.match(url.written(), /#tool$/);
 });
