@@ -195,11 +195,16 @@ test('an inactive pool hides the overlay and hands the stat bars back', () => {
 
 test('a spawning pool reports the worker count instead of a table', () => {
   const { doc, stats } = makeDoc();
-  new SegmentStatsView(doc).update(readyState(4, { ready: false }));
+  const view = new SegmentStatsView(doc);
+  view.update(readyState(4, { ready: false }));
 
   const box = stats.firstElementChild;
   assert.equal(box.getAttribute('role'), 'status');
   assert.deepEqual(box.children, ['Spawning 4 workers…']);
+
+  view.update(readyState(8, { ready: false }));
+  assert.equal(stats.firstElementChild, box);
+  assert.deepEqual(box.children, ['Spawning 8 workers…']);
 });
 
 test('each fault code names its own source in the headline', () => {

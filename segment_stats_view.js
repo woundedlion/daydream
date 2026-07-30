@@ -106,11 +106,15 @@ export class SegmentStatsView {
     // Spawning: the pool has no timings to show yet, and the warm + per-worker
     // WASM instantiate window runs to the controller's init watchdog.
     if (!state.ready) {
-      if (el.firstElementChild?.getAttribute('role') === 'status') return;
+      const message = `Spawning ${state.count} workers…`;
+      if (el.firstElementChild?.getAttribute('role') === 'status') {
+        el.firstElementChild.replaceChildren(message);
+        return;
+      }
       const box = this.doc.createElement('div');
       box.setAttribute('role', 'status');
       box.style.cssText = 'color:#999;padding:6px;font-size:0.85em';
-      box.append(`Spawning ${state.count} workers…`);
+      box.append(message);
       el.replaceChildren(box);
       this.statsTable = null; // force a rebuild once the pool reports ready
       return;
