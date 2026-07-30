@@ -304,6 +304,8 @@ export class Daydream {
 
     const overlay = document.createElement("div");
     overlay.className = "loading-overlay error context-lost-overlay";
+    overlay.setAttribute("role", "alert");
+    overlay.tabIndex = -1;
     overlay.style.display = "none";
     const title = document.createElement("div");
     title.className = "load-error-title";
@@ -326,6 +328,7 @@ export class Daydream {
       this.contextLostDetail.textContent =
         `${reason}. The GPU process was likely reset — reload to recover.`;
       overlay.style.display = "flex";
+      overlay.focus({ preventScroll: true });
       // The canvas feeds no more frames into the capture stream, so end any
       // session rather than leaving it silently frozen.
       this.recorder?.abort(`WebGL context lost (${reason}); recording stopped.`);
