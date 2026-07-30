@@ -21,10 +21,11 @@
  * the script refuses to run against a missing or mismatched node_modules rather
  * than baking a hash that would block the module on the deployed site.
  */
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve, join } from 'node:path';
+import { dirname, resolve } from 'node:path';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TARGET = resolve(ROOT, 'vendor-importmap.js');
@@ -93,25 +94,28 @@ function requireInstalledVersion(name, want) {
 
 // Source files the browser loads, scanned for the three/addons/ modules that
 // resolve through the prefix mapping: an integrity map is keyed by exact URL, so
-// each addon the app imports needs its own entry. The gitignored vendored dirs
-// are skipped: they hold third-party bytes that import nothing through the map,
-// and letting them steer the output would make it depend on a local checkout.
-const SKIP_DIRS = new Set(['node_modules', 'three.js', 'vendor', 'scripts', 'tests', '.git', '.github']);
+// each addon the app imports needs its own entry.
+const SKIP_DIRS = new Set(['node_modules', 'three.js', 'vendor', 'scripts', 'tests', '.github']);
 
 /**
- * Collect every browser-loaded source file under a directory.
- * @param {string} dir - Absolute directory to walk.
- * @param {string[]} [out] - Accumulator for absolute file paths.
+ * Collect every tracked browser-loaded source file.
  * @returns {string[]} Absolute paths of the .js/.html files found.
  */
-function collectSources(dir, out = []) {
-  for (const entry of readdirSync(dir)) {
-    if (SKIP_DIRS.has(entry)) continue;
-    const path = join(dir, entry);
-    if (statSync(path).isDirectory()) collectSources(path, out);
-    else if (/\.(js|html)$/.test(entry)) out.push(path);
+function collectSources() {
+  let listed;
+  try {
+    listed = execFileSync(
+      'git',
+      ['-C', ROOT, 'ls-files', '-z', '--', ':(glob)**/*.js', ':(glob)**/*.html'],
+      { encoding: 'utf8' },
+    );
+  } catch {
+    fail('git ls-files failed while enumerating browser sources');
   }
-  return out;
+  return listed.split('\0')
+    .filter(Boolean)
+    .filter((path) => !SKIP_DIRS.has(path.split('/')[0]))
+    .map((path) => resolve(ROOT, path));
 }
 
 /**
@@ -120,7 +124,7 @@ function collectSources(dir, out = []) {
  */
 function usedThreeAddons() {
   const found = new Set();
-  for (const file of collectSources(ROOT)) {
+  for (const file of collectSources()) {
     const src = readFileSync(file, 'utf8');
     for (const m of src.matchAll(/three\/addons\/([\w./-]+\.js)/g)) found.add(m[1]);
   }
