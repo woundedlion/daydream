@@ -13,7 +13,11 @@ Object.defineProperty(globalThis, 'navigator', {
   configurable: true,
 });
 
-const { copyWithFeedback } = await import('../tools/clipboard.js');
+const {
+  copyToClipboard,
+  copyWithFeedback,
+  wireCopyBlock,
+} = await import('../tools/clipboard.js');
 
 restoreDocumentAfterEach();
 
@@ -95,6 +99,80 @@ test('a rejected clipboard write flashes the failure label, not "Copied!"', asyn
 
     mock.timers.tick(2000);
     assert.equal(el.textContent, 'Copy', 'element reverts to idle');
+  } finally {
+    Object.defineProperty(globalThis, 'navigator', restore);
+  }
+});
+
+/** Verifies the legacy textarea path copies and removes its temporary node. */
+test('copyToClipboard falls back to execCommand', async () => {
+  const restore = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', {
+    value: {},
+    configurable: true,
+  });
+  const body = fakeElement('body');
+  let textarea;
+  let command;
+  installDocument({
+    body,
+    createElement: (tag) => {
+      textarea = fakeElement(tag);
+      textarea.focus = () => { textarea.focused = true; };
+      textarea.select = () => { textarea.selected = true; };
+      return textarea;
+    },
+    execCommand: (name) => {
+      command = name;
+      assert.equal(body.children[0], textarea);
+      return true;
+    },
+  });
+
+  try {
+    assert.equal(await copyToClipboard('legacy text'), true);
+    assert.equal(command, 'copy');
+    assert.equal(textarea.value, 'legacy text');
+    assert.equal(textarea.focused, true);
+    assert.equal(textarea.selected, true);
+    assert.equal(body.children.length, 0);
+  } finally {
+    Object.defineProperty(globalThis, 'navigator', restore);
+  }
+});
+
+/** Verifies both wireCopyBlock triggers copy the source and flash the prompt. */
+test('wireCopyBlock wires the button and block triggers', async () => {
+  const writes = [];
+  const restore = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', {
+    value: { clipboard: { writeText: async (text) => { writes.push(text); } } },
+    configurable: true,
+  });
+  const clickable = () => {
+    const element = fakeElement('button');
+    let click;
+    element.addEventListener = (type, listener) => {
+      if (type === 'click') click = listener;
+    };
+    element.click = () => click?.();
+    return element;
+  };
+  const source = fakeElement('code');
+  source.textContent = 'generated output';
+  const button = clickable();
+  const block = clickable();
+  const prompt = fakeElement('span');
+
+  try {
+    wireCopyBlock({ source, button, prompt, block });
+    button.click();
+    await Promise.resolve();
+    block.click();
+    await Promise.resolve();
+
+    assert.deepEqual(writes, ['generated output', 'generated output']);
+    assert.equal(prompt.textContent, 'Copied!');
   } finally {
     Object.defineProperty(globalThis, 'navigator', restore);
   }

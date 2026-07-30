@@ -13,8 +13,14 @@ restoreDocumentAfterEach();
 /** A fake range input recording the attributes createSlider sets.
  * @returns {Object} Fake input element.
  */
-const fakeInput = () =>
-  Object.assign(fakeElement('input'), { type: '', min: '', max: '', step: '', value: '' });
+const fakeInput = () => {
+  const listeners = new Map();
+  return Object.assign(fakeElement('input'), {
+    type: '', min: '', max: '', step: '', value: '',
+    addEventListener: (type, listener) => listeners.set(type, listener),
+    dispatch: (type) => listeners.get(type)?.(),
+  });
+};
 
 let container;
 
@@ -81,6 +87,27 @@ test('builds a slider, scaling bounds and rounding the step to integer units', (
   assert.equal(container.children.length, 3);
   assert.equal(container.children[0].tagName, 'LABEL');
   assert.equal(container.children[0].htmlFor, slider.id);
+});
+
+/** Verifies input synchronizes both readouts before invoking the caller. */
+test('input updates the readout and aria-valuetext before onInput', () => {
+  let observed;
+  const { slider, valueSpan } = createSlider(
+    'c',
+    { ...base, scale: 10, decimals: 1 },
+    (raw) => {
+      observed = {
+        raw,
+        text: valueSpan.textContent,
+        aria: slider.getAttribute('aria-valuetext'),
+      };
+    },
+  );
+
+  slider.value = '73';
+  slider.dispatch('input');
+
+  assert.deepEqual(observed, { raw: 73, text: '7.3', aria: '7.3' });
 });
 
 /** Verifies the visible label is the accessible name when no override is supplied. */
