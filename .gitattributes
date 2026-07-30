@@ -2,6 +2,7 @@
 # look for a filename with a trailing CR and break provenance verification.
 holosphere_wasm.sha        text eol=lf
 holosphere_wasm.wasm.sha256 text eol=lf
+holosphere_wasm.toolchain  text eol=lf
 *.yml                      text eol=lf
 holosphere_wasm.wasm       binary
 
