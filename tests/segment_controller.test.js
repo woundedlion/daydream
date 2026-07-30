@@ -7,14 +7,23 @@
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
 import { test, mock, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { unpinnedEngineMethods } from './fake_engine.js';
 
 // Stand-in for the injected Daydream renderer: only the grid and display buffer
 // the compositor reads.
 const driver = { W: 0, H: 0, pixels: null };
-mock.module('../driver.js', {
-  namedExports: { SLOW_FRAME_MS: 50 },
-});
+
+// driver.js drags in three.js and the DOM, so it is mocked — including for this
+// file, which is why the threshold is read out of its source instead of
+// imported. A hand-copied number would test a watchdog window the app never arms.
+const SLOW_FRAME_MS = Number(
+  /^export const SLOW_FRAME_MS = (\d+(?:\.\d+)?);$/m
+    .exec(readFileSync(new URL('../driver.js', import.meta.url), 'utf8'))?.[1],
+);
+if (!Number.isFinite(SLOW_FRAME_MS))
+  throw new Error('driver.js no longer exports SLOW_FRAME_MS as a numeric literal');
+mock.module('../driver.js', { namedExports: { SLOW_FRAME_MS } });
 
 const { SegmentController, MAX_BOOT_RETRIES } = await import('../segment_controller.js');
 const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
