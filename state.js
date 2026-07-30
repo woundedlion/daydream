@@ -25,7 +25,7 @@ const URL_NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
 
 // Debounce window collapsing a burst of URL writes into one replaceState. Long
 // enough to swallow a slider drag, short enough that a copied link is current.
-const URL_FLUSH_DEBOUNCE_MS = 200;
+export const URL_FLUSH_DEBOUNCE_MS = 200;
 
 /**
  * Centralized application state with subscriber pattern and URL synchronization.

@@ -4,7 +4,11 @@
  */
 
 import { GUI as LilGUI } from "lil-gui";
-import { getActiveURLSync, roundUrlNumber } from "./state.js";
+import {
+  getActiveURLSync,
+  roundUrlNumber,
+  URL_FLUSH_DEBOUNCE_MS,
+} from "./state.js";
 
 /**
  * Reads the current URL query string into a parsed params object.
@@ -75,10 +79,10 @@ const makeUrlParamWriter = () => {
     }
     pendingUrlWrites.set(key, value);
     clearTimeout(urlTimer);
-    urlTimer = setTimeout(commit, 200);
+    urlTimer = setTimeout(commit, URL_FLUSH_DEBOUNCE_MS);
   };
-  // Symmetric with URLSync.dispose(): a discarded GUI must not leave the 200 ms
-  // timer firing history.replaceState into a dead page.
+  // Symmetric with URLSync.dispose(): a discarded GUI must not leave the
+  // debounced timer firing history.replaceState into a dead page.
   writer.cancel = () => { clearTimeout(urlTimer); urlTimer = null; pendingUrlWrites.clear(); };
   return writer;
 };
