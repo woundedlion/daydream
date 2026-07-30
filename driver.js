@@ -522,6 +522,15 @@ export class Daydream {
     if (!advanced && !this.needsRender) return;
     this.needsRender = false;
 
+    // Three throws if an attribute's array byteLength differs from the size it gave
+    // the GPU buffer, and a mid-frame heap growth detaches the aliased instanceColor
+    // array (byteLength 0). needsUpdate only ever bumps version, so a flagged upload
+    // cannot be cancelled — hold the repaint until the next drawFrame re-points it.
+    if (this.dotMesh?.instanceColor && !isViewLive(this.dotMesh.instanceColor.array)) {
+      this.needsRender = true;
+      return;
+    }
+
     this.xAxis.visible = this.labelAxes;
     this.yAxis.visible = this.labelAxes;
     this.zAxis.visible = this.labelAxes;
@@ -597,7 +606,10 @@ export class Daydream {
 
     this.updateStats(duration, effect);
 
-    this.dotMesh.instanceColor.needsUpdate = true;
+    // drawFrame() and updateStats() both call into WASM after the view heal, so a
+    // heap growth can detach the array instanceColor aliases.
+    if (isViewLive(this.dotMesh.instanceColor.array))
+      this.dotMesh.instanceColor.needsUpdate = true;
 
     return true;
   }
