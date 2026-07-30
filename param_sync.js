@@ -42,6 +42,30 @@ export function resolveParamSync(current, incoming, isBoolean, isEditing) {
 }
 
 /**
+ * Which lil-gui control an engine parameter definition maps to. A boolean value
+ * outranks an options list, so a flag that also carries labels stays a toggle.
+ *
+ * @param {{value: any, options?: any}} param - An engine parameter definition.
+ * @returns {'boolean'|'enum'|'number'} The control kind to build.
+ */
+export function paramControlKind(param) {
+  if (typeof param.value === 'boolean') return 'boolean';
+  if (Array.isArray(param.options) && param.options.length > 0) return 'enum';
+  return 'number';
+}
+
+/**
+ * Coerce a GUI value to the float setParameter expects. The engine takes every
+ * parameter as a float, so a toggle's boolean becomes 1.0/0.0.
+ *
+ * @param {number|boolean} value - A controller value, or a URL-hydrated one.
+ * @returns {number} The float to write.
+ */
+export function engineParamValue(value) {
+  return (typeof value === 'boolean') ? (value ? 1.0 : 0.0) : value;
+}
+
+/**
  * Build the lil-gui choices object for an enumerated engine parameter: option
  * label -> option index, the float value the engine expects from setParameter.
  *

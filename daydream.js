@@ -11,6 +11,7 @@ import { EffectSidebar } from "./sidebar.js";
 import {
   planResolutionApply,
   paramValueSkew,
+  paramExportBlocker,
   paramGenerationStale,
   applyInitialState,
   createSwitchCoordinator,
@@ -22,7 +23,12 @@ import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
 import { SegmentController, warmModules } from "./segment_controller.js";
 import { EngineHost } from "./engine_host.js";
-import { resolveParamSync, enumChoices } from "./param_sync.js";
+import {
+  resolveParamSync,
+  enumChoices,
+  paramControlKind,
+  engineParamValue,
+} from "./param_sync.js";
 import { formatExportParams } from "./tools/export_params.js";
 import { showFatalError } from "./tools/banner.js";
 import { showBootstrapFailure } from "./bootstrap.js";
@@ -31,6 +37,9 @@ import { showBootstrapFailure } from "./bootstrap.js";
 
 // How long a transient button label (Export status) stays before reverting.
 const FLASH_MS = 1500;
+// Transient Export button labels.
+const EXPORT_COPIED = '\u2713 Copied!';
+const EXPORT_FAILED = '\u2717 Copy failed';
 // Dwell time per effect while "Test All" cycles the favorites list.
 const TEST_ALL_INTERVAL_MS = 1000;
 
@@ -261,205 +270,14 @@ function destroyActiveEffectGui() {
  *   undefined.
  */
 function applyEffect(preserveParams = false) {
-  if (host.engine) {
-    const applied = host.engine.setEffect(appState.get('effect')) !== false;
-    daydream.setStrobeColumns(host.engine.strobeColumns());
-    if (!applied) {
-      console.error(`setEffect("${appState.get('effect')}") failed; effect unavailable.`);
-      // Engine unchanged; return false so the subscriber reverts appState. Do NOT
-      // broadcast the rejected name to the workers (would diverge them from main).
-      return false;
-    }
-  }
+  // A rejected effect leaves the engine unchanged, so return before the worker
+  // broadcast below: sending the rejected name would diverge them from main.
+  if (host.engine && !selectEngineEffect()) return false;
 
   destroyActiveEffectGui();
-
-  // Clear the old effect's param URL entries but keep the global GUI's keys.
-  if (!preserveParams) {
-    resetGUI(['resolution', 'effect', ...guiInstance.collectUrlKeys()]);
-  }
-
-  if (host.engine) {
-    activeEffect = { gui: new GUI({ autoPlace: false }, 'fx'), activeDragEnds: new Set() };
-    // Identity of this GUI's effect record, so async continuations below can tell
-    // whether a switch has since replaced it.
-    const fx = activeEffect;
-
-    const params = host.engine.getParameterDefinitions();
-    // Stamp the snapshot with the engine's effect-load generation so a later
-    // value read can prove it describes these definitions.
-    activeEffect.paramGeneration = host.paramGeneration();
-
-    /**
-     * Flash a transient status label on the Export button, restoring the
-     * default label after the flash window. Supersedes any flash still
-     * pending for this GUI.
-     * @param {string} label - The transient button label to show.
-     * @returns {void}
-     */
-    const flashExport = (label) => {
-      clearTimeout(fx.exportFlashTimer);
-      exportCtrl.name(label);
-      fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), FLASH_MS);
-    };
-
-    const effectActions = {
-      /**
-       * Rebuild the effect GUI from the engine's current state, discarding edits.
-       * @returns {void}
-       */
-      reset() { applyEffect(); },
-      /**
-       * Copy the current parameter values to the clipboard as a C++ brace-init
-       * list of float literals, then flash the Export button to confirm.
-       * @returns {void}
-       */
-      export() {
-        const values = liveParamValues();
-        // A heap-growth detach leaves the view zero-length; the segmented source
-        // is null before the first frame, as is a read that no longer matches the
-        // GUI's snapshot. Skip so we don't copy an all-zero or foreign preset.
-        if (!values || values.length === 0) {
-          console.warn('Export: no parameter values matching the current effect; skipping copy');
-          flashExport('\u2717 Copy failed');
-          return;
-        }
-        const expected = activeEffect.paramNames.length;
-        if (paramValueSkew(expected, values.length)) {
-          console.warn(`Export: param/value length skew (${expected} vs ${values.length}); skipping copy`);
-          flashExport('\u2717 Copy failed');
-          return;
-        }
-        const cpp = formatExportParams(params, values);
-        // navigator.clipboard is undefined on insecure/older contexts; bail through
-        // the same flash so writeText access never throws synchronously.
-        if (!navigator.clipboard) {
-          console.warn('Export: clipboard API unavailable (insecure context?)');
-          flashExport('\u2717 Copy failed');
-          return;
-        }
-        navigator.clipboard.writeText(cpp).then(() => {
-          if (activeEffect !== fx) return;
-          flashExport('\u2713 Copied!');
-        }).catch((err) => {
-          console.warn('Export: clipboard write failed', err);
-          if (activeEffect !== fx) return;
-          flashExport('\u2717 Copy failed');
-        });
-      }
-    };
-    activeEffect.gui.add(effectActions, 'reset').name('Reset');
-    const exportCtrl = activeEffect.gui.add(effectActions, 'export').name('Export');
-
-    // "Pause Animation" toggle, shown only when the effect has an animated param.
-    const hasAnimated = params.some(p => p.animated);
-    const animState = { pause: false };
-    let pauseController = null;
-    /**
-     * Pause or resume animation-driven params on both the main engine and the
-     * segment-worker pool, keeping the local toggle state in sync.
-     * @param {boolean} v - True to freeze animations, false to resume.
-     * @returns {void}
-     */
-    const setPaused = (v) => {
-      animState.pause = v;
-      host.engine.setAnimationsPaused(v);
-      segments.setAnimationsPaused(v);
-    };
-    if (hasAnimated) {
-      pauseController = activeEffect.gui.add(animState, 'pause').name('Pause Animation');
-      pauseController.onChange(setPaused);
-    }
-    activeEffect.animationState = animState;
-    activeEffect.pauseController = pauseController;
-
-    // paramNames records the value-stream order; syncGUI() binds by name, not
-    // index, so a C++ param reorder can't mis-bind sliders.
-    const state = {};
-    activeEffect.paramNames = [];
-    activeEffect.writableParamNames = [];
-    activeEffect.controllerByName = new Map();
-    // animated (animation-driven) and readonly (engine telemetry) are the only
-    // params the engine rewrites per frame; a set without them lets syncGUI skip.
-    activeEffect.hasLiveParams = params.some(p => p.animated || p.readonly);
-
-    params.forEach(p => {
-      state[p.name] = p.value;
-
-      let controller;
-      const isBool = (typeof p.value === 'boolean');
-
-      if (isBool) {
-        controller = activeEffect.gui.add(state, p.name);
-      } else if (Array.isArray(p.options) && p.options.length > 0) {
-        // Enumerated param: dropdown of labels whose values are the option
-        // indices the engine expects.
-        controller = activeEffect.gui.add(state, p.name, enumChoices(p.options));
-      } else {
-        controller = activeEffect.gui.add(state, p.name, p.min, p.max).decimals(3);
-      }
-      controller.isBoolean = isBool;
-      activeEffect.paramNames.push(p.name);
-      activeEffect.controllerByName.set(p.name, controller);
-
-      if (p.readonly) {
-        if (typeof controller.disable === 'function') controller.disable();
-      } else {
-        activeEffect.writableParamNames.push(p.name);
-        // Flag dragging so syncGUI's value stream doesn't fight a drag. The window
-        // listeners go on activeDragEnds so a GUI destroyed mid-drag removes them.
-        controller.domElement.addEventListener('pointerdown', () => {
-          controller.dragging = true;
-          const fx = activeEffect;
-          const end = () => {
-            controller.dragging = false;
-            window.removeEventListener('pointerup', end);
-            window.removeEventListener('pointercancel', end);
-            if (fx && fx.activeDragEnds) fx.activeDragEnds.delete(end);
-          };
-          if (fx && fx.activeDragEnds) fx.activeDragEnds.add(end);
-          window.addEventListener('pointerup', end);
-          window.addEventListener('pointercancel', end);
-        });
-      }
-
-      // Push the GUI's initial value into the engine: a ?param=value deep link
-      // sets state[p.name] but fires no onChange, so the engine would otherwise
-      // render the default while the slider shows the URL value.
-      if (!p.readonly) {
-        const initVal = isBool ? (state[p.name] ? 1.0 : 0.0) : state[p.name];
-        if (host.engine.setParameter(p.name, initVal) === false)
-          console.warn(`setParameter("${p.name}") rejected as unknown.`);
-      }
-
-      controller.onChange(v => {
-        const floatVal = (typeof v === 'boolean') ? (v ? 1.0 : 0.0) : v;
-        if (host.engine.setParameter(p.name, floatVal) === false)
-          console.warn(`setParameter("${p.name}") rejected as unknown.`);
-        segments.setParameter(p.name, floatVal);
-        // Touching an animated slider takes over from the animation.
-        if (p.animated && pauseController && !animState.pause) {
-          setPaused(true);
-          pauseController.updateDisplay();
-        }
-      });
-    });
-  }
-
-  // Driver's container-width isMobile, not window.innerWidth (differs for a
-  // narrow container in a wide window).
-  if (activeEffect && activeEffect.gui && daydream.isMobile) {
-    activeEffect.gui.close();
-  }
-
-  if (activeEffect && activeEffect.gui) {
-    const guiContainer = document.getElementById('gui-container');
-    if (guiContainer) {
-      activeEffect.gui.domElement.classList.add('effect-gui');
-      activeEffect.gui.domElement.classList.remove('global-gui');
-      guiContainer.appendChild(activeEffect.gui.domElement);
-    }
-  }
+  if (!preserveParams) clearEffectParamUrl();
+  if (host.engine) buildActiveEffectGui();
+  mountActiveEffectGui();
 
   // Gated on segmented mode, not on a live pool: a faulted pool can hold no
   // workers, and setEffect() is the trigger that rebuilds it from appState.
@@ -468,6 +286,272 @@ function applyEffect(preserveParams = false) {
   }
 
   sidebar.setActive(appState.get('effect'));
+}
+
+/**
+ * Point the engine at the state's effect and mirror its strobe layout onto the
+ * driver.
+ * @returns {boolean} False when the engine rejected the effect.
+ */
+function selectEngineEffect() {
+  const effect = appState.get('effect');
+  const applied = host.engine.setEffect(effect) !== false;
+  daydream.setStrobeColumns(host.engine.strobeColumns());
+  if (!applied) {
+    console.error(`setEffect("${effect}") failed; effect unavailable.`);
+  }
+  return applied;
+}
+
+/**
+ * Drop the outgoing effect's param URL entries, keeping the global GUI's keys.
+ * @returns {void}
+ */
+function clearEffectParamUrl() {
+  resetGUI(['resolution', 'effect', ...guiInstance.collectUrlKeys()]);
+}
+
+/**
+ * Build the effect GUI for the engine's current effect and install it as the
+ * active effect record.
+ * @returns {void}
+ */
+function buildActiveEffectGui() {
+  activeEffect = { gui: new GUI({ autoPlace: false }, 'fx'), activeDragEnds: new Set() };
+  // Identity of this GUI's effect record, so async continuations can tell whether
+  // a switch has since replaced it.
+  const fx = activeEffect;
+
+  const params = host.engine.getParameterDefinitions();
+  // Stamp the snapshot with the engine's effect-load generation so a later value
+  // read can prove it describes these definitions.
+  fx.paramGeneration = host.paramGeneration();
+
+  addEffectActions(fx, params);
+  const pause = addPauseToggle(fx, params);
+  addParamControllers(fx, params, pause);
+}
+
+/**
+ * Add the effect GUI's Reset and Export buttons.
+ * @param {Object} fx - The effect record being built.
+ * @param {Array<Object>} params - The engine's parameter definitions.
+ * @returns {void}
+ */
+function addEffectActions(fx, params) {
+  /**
+   * Flash a transient status label on the Export button, restoring the default
+   * label after the flash window. Supersedes any flash still pending for this GUI.
+   * @param {string} label - The transient button label to show.
+   * @returns {void}
+   */
+  const flashExport = (label) => {
+    clearTimeout(fx.exportFlashTimer);
+    exportCtrl.name(label);
+    fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), FLASH_MS);
+  };
+
+  const effectActions = {
+    /**
+     * Rebuild the effect GUI from the engine's current state, discarding edits.
+     * @returns {void}
+     */
+    reset() { applyEffect(); },
+    /**
+     * Copy the current parameter values to the clipboard as a C++ brace-init
+     * list of float literals, then flash the outcome on the Export button.
+     * @returns {void}
+     */
+    export() { exportParams(fx, params, flashExport); }
+  };
+  fx.gui.add(effectActions, 'reset').name('Reset');
+  const exportCtrl = fx.gui.add(effectActions, 'export').name('Export');
+}
+
+/**
+ * Write the live parameter values to the clipboard as a C++ brace-init list.
+ * @param {Object} fx - The effect record owning the Export button.
+ * @param {Array<Object>} params - The engine's parameter definitions.
+ * @param {(label: string) => void} flashExport - Shows a transient Export label.
+ * @returns {void}
+ */
+function exportParams(fx, params, flashExport) {
+  const values = liveParamValues();
+  const blocked = paramExportBlocker(
+    values, fx.paramNames.length, Boolean(navigator.clipboard));
+  if (blocked) {
+    console.warn(blocked);
+    flashExport(EXPORT_FAILED);
+    return;
+  }
+
+  navigator.clipboard.writeText(formatExportParams(params, values)).then(() => {
+    if (activeEffect !== fx) return;
+    flashExport(EXPORT_COPIED);
+  }).catch((err) => {
+    console.warn('Export: clipboard write failed', err);
+    if (activeEffect !== fx) return;
+    flashExport(EXPORT_FAILED);
+  });
+}
+
+/**
+ * Add the "Pause Animation" toggle, offered only when the effect has an animated
+ * param.
+ * @param {Object} fx - The effect record being built.
+ * @param {Array<Object>} params - The engine's parameter definitions.
+ * @returns {{animationState: {pause: boolean}, controller: Object|null,
+ *   setPaused: (v: boolean) => void}} The toggle's state, its controller (null
+ *   when no param animates), and the writer that pauses both engines.
+ */
+function addPauseToggle(fx, params) {
+  const animationState = { pause: false };
+  /**
+   * Pause or resume animation-driven params on both the main engine and the
+   * segment-worker pool, keeping the local toggle state in sync.
+   * @param {boolean} v - True to freeze animations, false to resume.
+   * @returns {void}
+   */
+  const setPaused = (v) => {
+    animationState.pause = v;
+    host.engine.setAnimationsPaused(v);
+    segments.setAnimationsPaused(v);
+  };
+
+  let controller = null;
+  if (params.some(p => p.animated)) {
+    controller = fx.gui.add(animationState, 'pause').name('Pause Animation');
+    controller.onChange(setPaused);
+  }
+  fx.animationState = animationState;
+  fx.pauseController = controller;
+  return { animationState, controller, setPaused };
+}
+
+/**
+ * Build one controller per engine parameter, recording the value-stream order
+ * and seeding the engine with each initial value.
+ * @param {Object} fx - The effect record being built.
+ * @param {Array<Object>} params - The engine's parameter definitions.
+ * @param {{animationState: Object, controller: Object|null, setPaused: Function}}
+ *   pause - The effect's pause toggle.
+ * @returns {void}
+ */
+function addParamControllers(fx, params, pause) {
+  // paramNames records the value-stream order; syncGUI() binds by name, not
+  // index, so a C++ param reorder can't mis-bind sliders.
+  const state = {};
+  fx.paramNames = [];
+  fx.writableParamNames = [];
+  fx.controllerByName = new Map();
+  // animated (animation-driven) and readonly (engine telemetry) are the only
+  // params the engine rewrites per frame; a set without them lets syncGUI skip.
+  fx.hasLiveParams = params.some(p => p.animated || p.readonly);
+
+  params.forEach(p => {
+    state[p.name] = p.value;
+
+    const controller = addParamControl(fx.gui, state, p);
+    fx.paramNames.push(p.name);
+    fx.controllerByName.set(p.name, controller);
+
+    if (p.readonly) {
+      if (typeof controller.disable === 'function') controller.disable();
+    } else {
+      fx.writableParamNames.push(p.name);
+      trackDragState(fx, controller);
+      // Push the GUI's initial value into the engine: a ?param=value deep link
+      // sets state[p.name] but fires no onChange, so the engine would otherwise
+      // render the default while the slider shows the URL value.
+      setEngineParam(p.name, engineParamValue(state[p.name]));
+    }
+
+    controller.onChange(v => {
+      const value = engineParamValue(v);
+      setEngineParam(p.name, value);
+      segments.setParameter(p.name, value);
+      // Touching an animated slider takes over from the animation.
+      if (p.animated && pause.controller && !pause.animationState.pause) {
+        pause.setPaused(true);
+        pause.controller.updateDisplay();
+      }
+    });
+  });
+}
+
+/**
+ * Add the lil-gui control one engine parameter definition calls for.
+ * @param {Object} gui - The effect GUI to add to.
+ * @param {Object} state - The GUI-bound value object.
+ * @param {Object} p - The parameter definition.
+ * @returns {Object} The created controller.
+ */
+function addParamControl(gui, state, p) {
+  const kind = paramControlKind(p);
+  let controller;
+  if (kind === 'boolean') {
+    controller = gui.add(state, p.name);
+  } else if (kind === 'enum') {
+    // Dropdown of labels whose values are the option indices the engine expects.
+    controller = gui.add(state, p.name, enumChoices(p.options));
+  } else {
+    controller = gui.add(state, p.name, p.min, p.max).decimals(3);
+  }
+  controller.isBoolean = (kind === 'boolean');
+  return controller;
+}
+
+/**
+ * Write one parameter value to the main engine.
+ * @param {string} name - The engine parameter name.
+ * @param {number} value - The float value to write.
+ * @returns {void}
+ */
+function setEngineParam(name, value) {
+  if (host.engine.setParameter(name, value) === false)
+    console.warn(`setParameter("${name}") rejected as unknown.`);
+}
+
+/**
+ * Flag a controller as dragging until the pointer is released, so syncGUI()'s
+ * value stream doesn't fight the drag. The drag-end listeners live on `window`,
+ * so they join the effect record's set for a GUI destroyed mid-drag to drain.
+ * @param {Object} fx - The effect record owning the controller.
+ * @param {Object} controller - The controller to track.
+ * @returns {void}
+ */
+function trackDragState(fx, controller) {
+  controller.domElement.addEventListener('pointerdown', () => {
+    controller.dragging = true;
+    const end = () => {
+      controller.dragging = false;
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      fx.activeDragEnds.delete(end);
+    };
+    fx.activeDragEnds.add(end);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  });
+}
+
+/**
+ * Mount the active effect GUI in the page's GUI container.
+ * @returns {void}
+ */
+function mountActiveEffectGui() {
+  if (!activeEffect || !activeEffect.gui) return;
+
+  // Driver's container-width isMobile, not window.innerWidth (differs for a
+  // narrow container in a wide window).
+  if (daydream.isMobile) activeEffect.gui.close();
+
+  const container = document.getElementById('gui-container');
+  if (!container) return;
+  const dom = activeEffect.gui.domElement;
+  dom.classList.add('effect-gui');
+  dom.classList.remove('global-gui');
+  container.appendChild(dom);
 }
 
 /**

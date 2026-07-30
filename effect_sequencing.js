@@ -321,6 +321,28 @@ export function paramValueSkew(namesLength, valuesLength) {
 }
 
 /**
+ * Why the Export action cannot copy the live parameter values, if it cannot. A
+ * heap-growth detach leaves the value view zero-length, the segmented source is
+ * null before the first frame, as is a read that no longer matches the GUI's
+ * snapshot, and the clipboard API is absent on insecure/older contexts. Any of
+ * those would copy an all-zero, foreign, or unwritable preset.
+ * @param {ArrayLike<number>|null|undefined} values - The live value stream.
+ * @param {number} expectedLength - Length of the effect's cached paramNames list.
+ * @param {boolean} hasClipboard - Whether the clipboard API is available.
+ * @returns {string|null} The warning to log, or null when the copy may proceed.
+ */
+export function paramExportBlocker(values, expectedLength, hasClipboard) {
+  if (!values || values.length === 0) {
+    return 'Export: no parameter values matching the current effect; skipping copy';
+  }
+  if (paramValueSkew(expectedLength, values.length)) {
+    return `Export: param/value length skew (${expectedLength} vs ${values.length}); skipping copy`;
+  }
+  if (!hasClipboard) return 'Export: clipboard API unavailable (insecure context?)';
+  return null;
+}
+
+/**
  * Whether the engine's live value stream still describes the effect the GUI's
  * parameter-definition snapshot was taken from. The engine bumps a generation
  * counter on every effect load, so an unequal pair means a load landed between

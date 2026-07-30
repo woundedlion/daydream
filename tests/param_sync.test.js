@@ -1,7 +1,12 @@
 // @ts-check
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveParamSync, enumChoices } from '../param_sync.js';
+import {
+  resolveParamSync,
+  enumChoices,
+  paramControlKind,
+  engineParamValue,
+} from '../param_sync.js';
 
 // resolveParamSync is the DOM-free core of syncGUI()'s per-controller "fight-the-
 // slider" decision: coerce the engine's raw value, never clobber a controller the
@@ -74,4 +79,46 @@ test('enum: duplicate labels are disambiguated, never dropped', () => {
   // All three indices remain selectable under distinct keys.
   assert.deepEqual(values, [0, 1, 2]);
   assert.equal(choices['Mode'], 0);
+});
+
+// paramControlKind picks the lil-gui control the effect GUI builds for one
+// engine parameter definition.
+
+test('a boolean value is a toggle', () => {
+  assert.equal(paramControlKind({ value: true }), 'boolean');
+  assert.equal(paramControlKind({ value: false }), 'boolean');
+});
+
+test('an options list is a dropdown', () => {
+  assert.equal(paramControlKind({ value: 0, options: ['A', 'B'] }), 'enum');
+});
+
+test('anything else is a slider', () => {
+  assert.equal(paramControlKind({ value: 0.5, min: 0, max: 1 }), 'number');
+  // An empty or absent options list carries no labels to offer.
+  assert.equal(paramControlKind({ value: 0, options: [] }), 'number');
+  assert.equal(paramControlKind({ value: 0, options: null }), 'number');
+});
+
+test('a boolean carrying labels stays a toggle', () => {
+  // A dropdown would write the option index, not the 0/1 the flag expects.
+  assert.equal(paramControlKind({ value: true, options: ['Off', 'On'] }), 'boolean');
+});
+
+// engineParamValue coerces a GUI value to the float setParameter takes, for both
+// the deep-link seeding pass and the per-change write.
+
+test('a boolean becomes 1.0/0.0', () => {
+  assert.equal(engineParamValue(true), 1.0);
+  assert.equal(engineParamValue(false), 0.0);
+});
+
+test('a number passes through unchanged', () => {
+  assert.equal(engineParamValue(0.375), 0.375);
+  assert.equal(engineParamValue(0), 0);
+  assert.equal(engineParamValue(-2.5), -2.5);
+});
+
+test('an enum index passes through as its own float', () => {
+  assert.equal(engineParamValue(2), 2);
 });
