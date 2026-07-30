@@ -1161,40 +1161,64 @@
 
       savedSolids.forEach((item, index) => {
         const el = document.createElement('div');
-        el.className = 'saved-item relative pr-6'; // Added relative + right padding space
+        el.className = 'saved-item relative pr-6';
         const funcName = savedFuncName(item);
         if (funcName && nameCounts.get(funcName) > 1) {
           el.classList.add('name-clash');
           el.title = `Exports as ${funcName}, which another saved solid also exports`;
         }
-        // The card markup carries no inline handlers; the action buttons are
-        // wired below via addEventListener so deleteSolid/copyCode stay module-
-        // scoped (no window.* globals) and no handler-bearing string is parsed.
-        el.innerHTML = `
-          <button type="button" class="action-btn del-btn absolute top-2 right-2 flex items-center justify-center w-5 h-5 text-sm">&times;</button>
-          <button type="button" class="saved-restore">
-            <img src="${item.thumb}" alt="" />
-            <span class="flex justify-between items-start mt-1">
-              <span class="title capitalize">${item.title}</span>
-              <span class="text-[0.55rem] font-mono text-indigo-400 opacity-60">${item.stats}</span>
-            </span>
-            <span class="details block uppercase opacity-70">${item.desc}</span>
-          </button>
-          <div class="saved-actions">
-            <div class="flex flex-col gap-1 w-full">
-              <div class="flex gap-1 justify-end">
-                <span class="text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1">Recipe</span>
-                <button type="button" class="action-btn" data-copy="recipe_cpp" aria-label="Copy recipe C++">C++</button>
-              </div>
-              <div class="flex gap-1 justify-end">
-                <span class="text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1">Registry</span>
-                <button type="button" class="action-btn" data-copy="registry" aria-label="Copy registry C++">C++</button>
-              </div>
-            </div>
-          </div>
-        `;
-        el.querySelector('.saved-restore').addEventListener('click', () => restoreSolid(item));
-        const deleteButton = el.querySelector('.del-btn');
+
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'action-btn del-btn absolute top-2 right-2 flex items-center justify-center w-5 h-5 text-sm';
+        deleteButton.textContent = '×';
+
+        const restoreButton = document.createElement('button');
+        restoreButton.type = 'button';
+        restoreButton.className = 'saved-restore';
+        const image = document.createElement('img');
+        image.src = item.thumb;
+        image.alt = '';
+        const summary = document.createElement('span');
+        summary.className = 'flex justify-between items-start mt-1';
+        const title = document.createElement('span');
+        title.className = 'title capitalize';
+        title.textContent = item.title;
+        const stats = document.createElement('span');
+        stats.className = 'text-[0.55rem] font-mono text-indigo-400 opacity-60';
+        stats.textContent = item.stats;
+        summary.append(title, stats);
+        const details = document.createElement('span');
+        details.className = 'details block uppercase opacity-70';
+        details.textContent = item.desc;
+        restoreButton.append(image, summary, details);
+
+        const actions = document.createElement('div');
+        actions.className = 'saved-actions';
+        const actionStack = document.createElement('div');
+        actionStack.className = 'flex flex-col gap-1 w-full';
+        for (const [label, kind, ariaLabel] of [
+          ['Recipe', 'recipe_cpp', 'Copy recipe C++'],
+          ['Registry', 'registry', 'Copy registry C++'],
+        ]) {
+          const row = document.createElement('div');
+          row.className = 'flex gap-1 justify-end';
+          const rowLabel = document.createElement('span');
+          rowLabel.className = 'text-[0.5rem] uppercase text-slate-500 font-bold self-center mr-1';
+          rowLabel.textContent = label;
+          const copyButton = document.createElement('button');
+          copyButton.type = 'button';
+          copyButton.className = 'action-btn';
+          copyButton.dataset.copy = kind;
+          copyButton.setAttribute('aria-label', ariaLabel);
+          copyButton.textContent = 'C++';
+          row.append(rowLabel, copyButton);
+          actionStack.appendChild(row);
+        }
+        actions.appendChild(actionStack);
+        el.append(deleteButton, restoreButton, actions);
+
+        restoreButton.addEventListener('click', () => restoreSolid(item));
         deleteButton.setAttribute('aria-label', `Delete ${item.title}`);
         deleteButton.addEventListener('click', () => {
           deleteSolid(index);
