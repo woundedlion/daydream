@@ -1007,17 +1007,17 @@ test('the buffered save maps each container to its extension and blob type', () 
   }
 });
 
-/** Verifies download() with no arguments saves the active session's own state. */
-test('download defaults to the active recorder, chunks, and effect name', () => {
+/** Verifies download() saves the chunks it is handed under the given name. */
+test('download saves the supplied recorder, chunks, and effect name', () => {
   const save = installSavePath();
   mock.timers.enable({ apis: ['setTimeout', 'Date'], now: SAVE_CLOCK });
   try {
     const rec = new VideoRecorder(recordableCanvas());
-    rec.mediaRecorder = /** @type {any} */ ({ mimeType: 'video/webm;codecs=vp9' });
-    rec.chunks = /** @type {any} */ ([{ size: 7 }]);
-    rec.effectName = 'live';
 
-    rec.download();
+    rec.download(
+      /** @type {any} */ ({ mimeType: 'video/webm;codecs=vp9' }),
+      /** @type {any} */ ([{ size: 7 }]),
+      'live');
 
     assert.deepEqual(save.blobs[0].parts, [{ size: 7 }]);
     assert.equal(save.blobs[0].type, 'video/webm');
