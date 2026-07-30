@@ -85,7 +85,8 @@ class FakeWorker {
     FakeWorker.instances.push(this);
   }
   /**
-   * Records a posted message instead of dispatching it to a real worker.
+   * Records a posted message instead of dispatching it to a real worker, and
+   * detaches every transferred buffer the way structured-clone transfer does.
    * @param {Object} msg - Protocol message the controller sent.
    * @param {Transferable[]} [transfer] - Transfer list the controller supplied.
    * @returns {void}
@@ -95,6 +96,7 @@ class FakeWorker {
       throw new DOMException('message rejected', 'DataCloneError');
     this.posted.push(msg);
     this.transfers.push(transfer ?? null);
+    for (const buffer of transfer ?? []) buffer.transfer();
   }
   /**
    * Marks this fake worker as terminated.
@@ -1194,9 +1196,11 @@ test('each render dispatch hands the retired generation buffer back for reuse', 
     assert.equal(lastRender(w).recycle, genA[s], `seg ${s} gets its own retired buffer back`);
     assert.deepEqual(w.transfers.at(-1), [genA[s].buffer],
       'the buffer is transferred, not structured-cloned');
+    assert.equal(genA[s].buffer.byteLength, 0,
+      `seg ${s}'s retired buffer is detached on the controller side`);
   });
-  assert.ok(c.results.every((r) => r.pixels[0] === 222),
-    'the displayed generation is untouched by the recycle');
+  assert.ok(c.results.every((r) => r.pixels.byteLength > 0 && r.pixels[0] === 222),
+    'the displayed generation is still attached and untouched by the recycle');
   assert.ok(c.scratch.every((slot) => slot === null),
     'every staging slot is cleared as its buffer is consumed');
 });
