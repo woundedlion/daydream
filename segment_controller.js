@@ -510,17 +510,26 @@ export class SegmentController {
   }
 
   /**
-   * Terminate all workers and reset per-segment, frame-lifecycle, and fault
-   * state to empty. Clears the fault latch, so it doubles as the recovery reset
-   * create() runs before rebuilding the pool.
+   * Terminate every worker in the pool, leaving `workers` populated.
+   * @details Handlers are detached before terminate() so a message already queued
+   * from a surviving worker cannot run against the torn-down pool.
    */
-  destroy() {
+  terminateWorkers() {
     for (const w of this.workers) {
       w.onmessage = null;
       w.onerror = null;
       w.onmessageerror = null;
       w.terminate();
     }
+  }
+
+  /**
+   * Terminate all workers and reset per-segment, frame-lifecycle, and fault
+   * state to empty. Clears the fault latch, so it doubles as the recovery reset
+   * create() runs before rebuilding the pool.
+   */
+  destroy() {
+    this.terminateWorkers();
     this.clearBootWatchdog();
     this.clearInitWatchdog();
     this.clearRenderWatchdog();
@@ -584,12 +593,7 @@ export class SegmentController {
       console.warn(`[Segmented] additional worker fault (seg ${segId}): ${message} `
         + `— first fault already latched, UI shows that one`);
     }
-    for (const w of this.workers) {
-      w.onmessage = null;
-      w.onerror = null;
-      w.onmessageerror = null;
-      w.terminate();
-    }
+    this.terminateWorkers();
     this.pending = 0;
     this.renderInFlight = false;
     // Open a new generation before settling: the in-flight render's `.then` would
