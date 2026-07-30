@@ -59,7 +59,6 @@ export class VideoRecorder {
     this.chunks = [];
     this.stream = null;
     this.track = null;
-    this.effectName = 'effect';
     this.frameInterval = frameInterval;
     this.elapsedSeconds = 0;
     // bitrateMbps, format, and targetHeight are latched at start().
@@ -137,7 +136,6 @@ export class VideoRecorder {
       return;
     }
 
-    this.effectName = effectName;
     this.elapsedSeconds = 0;
 
     // Each session pins its capture size at start. Drop an offscreen left by a
@@ -580,13 +578,12 @@ export class VideoRecorder {
    * Buffered fallback save: assembles captured chunks into a blob and downloads
    * it under a timestamped name via an anchor click. Used when the File System
    * Access API is unavailable; the streaming sink handles the file otherwise.
-   * @param {MediaRecorder} [recorder] - Recorder used to derive the extension;
-   *   defaults to the active recorder.
-   * @param {Blob[]} [chunks] - Captured data chunks; defaults to the active chunks.
-   * @param {string} [effectName] - Base name for the file; defaults to the stored name.
+   * @param {MediaRecorder} recorder - Recorder used to derive the extension.
+   * @param {Blob[]} chunks - Captured data chunks.
+   * @param {string} effectName - Base name for the file.
    * @returns {void}
    */
-  download(recorder = this.mediaRecorder, chunks = this.chunks, effectName = this.effectName) {
+  download(recorder, chunks, effectName) {
     const ext = this.extension(recorder);
     const blob = new Blob(chunks, { type: this.mimeForExt(ext) });
     this.saveWithAnchor(blob, this.timestampedName(effectName, ext));
