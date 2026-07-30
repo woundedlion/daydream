@@ -458,6 +458,7 @@
     // machines, kept in their own module so both are unit tested; the reads and
     // writes against the sliders and the Reset Zoom button stay inline.
     import { createZoomHistory, lockedGroupMove } from './palette_controls.js';
+    import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
 
     // --- Palette Class and Data Structure ---
 
@@ -1240,18 +1241,11 @@
       updatePaletteCodeOutput();
     }
 
-    // Coalesce updatePalette() into one recompute per animation frame. Slider
-    // oninput fires on every pointer tick during a drag; without this each tick
-    // re-bakes the generative palette's 256-entry LUT and redraws the wave graph
-    // (three channels reconstructed per canvas column) on the main thread.
-    let pendingUpdate = 0;
-    function scheduleUpdate() {
-      if (pendingUpdate) return;
-      pendingUpdate = requestAnimationFrame(() => {
-        pendingUpdate = 0;
-        updatePalette();
-      });
-    }
+    // Coalesce updatePalette() into one recompute per animation frame: without
+    // this, every slider pointer tick re-bakes the generative palette's
+    // 256-entry LUT and redraws the wave graph (three channels reconstructed per
+    // canvas column) on the main thread.
+    const scheduleUpdate = createFrameScheduler(updatePalette);
 
     /**
          * Initialize the sliders and the first visualization.
@@ -1368,9 +1362,10 @@
         animate(0); // Start the animation loop
       }
 
-      // Stop the RAF loop and detach the strip listeners on teardown.
-      window.addEventListener('pagehide', (e) => {
-        if (e.persisted) return; // bfcache freeze, not a real discard
+      // Stop the RAF loop, drop any queued recompute, and detach the strip
+      // listeners on teardown.
+      onPageTeardown(() => {
+        scheduleUpdate.cancel();
         if (animationFrameId !== null) {
           cancelAnimationFrame(animationFrameId);
           animationFrameId = null;
