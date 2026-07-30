@@ -30,6 +30,7 @@ class FakeEngine {
     this.curW = 0;
     this.curH = 0;
     this.resolutionOk = true;
+    this.clipOk = true;
     this.clip = null;
     this.effect = null;
     this.params = [];
@@ -46,6 +47,8 @@ class FakeEngine {
     if (!this.resolutionOk) return false;
     this.curW = w;
     this.curH = h;
+    this.effect = null;
+    this.clip = null;
     return true;
   }
   // Clearing params models the engine rebuilding to defaults, so the
@@ -53,7 +56,11 @@ class FakeEngine {
   setEffect(name) { this.calls.push(['setEffect', name]); this.effect = name; this.params = []; return true; }
   setParameter(name, value) { this.params.push([name, value]); return true; }
   setAnimationsPaused(p) { this.paused = p; }
-  setClip(x0, x1, y0, y1) { this.clip = { y0, y1, x0, x1 }; }
+  setClip(x0, x1, y0, y1) {
+    if (!this.clipOk || !this.effect) return false;
+    this.clip = { y0, y1, x0, x1 };
+    return true;
+  }
   drawFrame() { this.calls.push(['drawFrame']); }
   getRenderUs() { return 1234; }
   getParamValues() { return this.paramView; }
@@ -317,10 +324,15 @@ test('a rejected setResolution leaves segRange and clip untouched', async () => 
   assert.deepEqual([frame.x0, frame.x1, frame.y0, frame.y1], [4, 8, 2, 4]);
 });
 
-/** A successful setResolution recomputes the segRange and re-applies the clip. */
-test('an accepted setResolution recomputes segRange and clip', async () => {
+/** A successful resize defers clipping until the following effect rebuild. */
+test('an accepted setResolution defers the clip until setEffect', async () => {
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
+  posted.length = 0;
   await dispatch({ type: 'setResolution', w: 16, h: 8 });
+  assert.equal(engineInstance.clip, null, 'the effectless engine is not clipped');
+  assert.equal(posted.find((p) => p.msg.type === 'engineRejected'), undefined);
+
+  await dispatch({ type: 'setEffect', name: 'Plasma' });
   // segId 3 of 4 over 16x8 → arm B (x0=8), bottom band (y0=4): clip {4,8,8,16}.
   assert.deepEqual(engineInstance.clip, { y0: 4, y1: 8, x0: 8, x1: 16 });
 
@@ -328,6 +340,19 @@ test('an accepted setResolution recomputes segRange and clip', async () => {
   await dispatch({ type: 'render' });
   const frame = posted.find((p) => p.msg.type === 'frame').msg;
   assert.deepEqual([frame.x0, frame.x1, frame.y0, frame.y1], [8, 16, 4, 8]);
+});
+
+/** A clip rejection is surfaced immediately instead of rendering full-canvas. */
+test('a rejected clip posts engineRejected', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  posted.length = 0;
+  engineInstance.clipOk = false;
+
+  await dispatch({ type: 'setEffect', name: 'Waves' });
+
+  const failed = posted.find((p) => p.msg.type === 'engineRejected');
+  assert.ok(failed);
+  assert.match(failed.msg.reason, /setClip\(0, 4, 0, 4\) rejected/);
 });
 
 /**
