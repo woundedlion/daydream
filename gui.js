@@ -6,6 +6,8 @@
 import { GUI as LilGUI } from "lil-gui";
 import {
   getActiveURLSync,
+  parseUrlBoolean,
+  parseUrlNumber,
   roundUrlNumber,
   URL_FLUSH_DEBOUNCE_MS,
 } from "./state.js";
@@ -220,17 +222,14 @@ class DeepLinkGUI {
       const currentVal = object[prop];
       urlApplied = true;
       if (typeof currentVal === 'number') {
-        // Number() (unlike parseFloat) rejects trailing garbage like "5px", so a
-        // partial-numeric param falls through to the warn path below instead of
-        // silently clamping to a valid-looking value the URL then keeps. An
-        // empty/whitespace param stays rejected rather than coercing to 0.
-        val = val.trim() === '' ? NaN : Number(val);
-        if (!Number.isFinite(val)) {
+        const num = parseUrlNumber(val);
+        if (num === null) {
           console.warn(`DeepLinkGUI: ignoring non-numeric URL value "${params.get(key)}" for "${key}"`);
           val = currentVal;
           urlApplied = false;
           valClamped = true;
         } else {
+          val = num;
           // lil-gui numeric add() signature is add(obj, prop, min, max, step).
           const min = args[0], max = args[1], step = args[2];
           const raw = val;
@@ -250,16 +249,14 @@ class DeepLinkGUI {
           valClamped = Math.abs(val - raw) > snapTol;
         }
       } else if (typeof currentVal === 'boolean') {
-        const t = val.trim().toLowerCase();
-        if (t === 'true' || t === '1' || t === 'yes' || t === 'on') {
-          val = true;
-        } else if (t === 'false' || t === '0' || t === 'no' || t === 'off') {
-          val = false;
-        } else {
+        const flag = parseUrlBoolean(val);
+        if (flag === null) {
           console.warn(`DeepLinkGUI: ignoring unrecognized boolean URL value "${params.get(key)}" for "${key}"`);
           val = currentVal;
           urlApplied = false;
           valClamped = true;
+        } else {
+          val = flag;
         }
       }
       const allowed = optionValues(args[0]);
