@@ -100,6 +100,14 @@ test('a test file below the glob depth fails', () => {
   assert.match(err, /tests\/sub\/nested\.test\.js/);
 });
 
+/** Verifies a root-level test outside the tests/ glob is refused. */
+test('a root-level test file fails as unreachable', () => {
+  writeFileSync(join(root, 'stray.test.js'), '');
+  const err = runExpectingFailure();
+  assert.match(err, /does not reach/);
+  assert.match(err, /stray\.test\.js/);
+});
+
 /** Verifies a `**` glob counts the nested file instead of refusing it. */
 test('a recursive glob reaches a nested test file', () => {
   mkdirSync(join(root, 'tests', 'sub'));
