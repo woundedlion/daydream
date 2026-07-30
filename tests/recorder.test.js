@@ -1027,3 +1027,141 @@ test('download defaults to the active recorder, chunks, and effect name', () => 
     save.restore();
   }
 });
+
+// ---------------------------------------------------------------------------
+// start() aborts: every path that gives up before a session exists must leave no
+// live capture behind.
+// ---------------------------------------------------------------------------
+
+/**
+ * Drives start() against a chosen offscreen capture canvas — the offscreen is
+ * the capture source, so a stand-in here controls getContext and captureStream —
+ * and hands back what the aborted start left behind.
+ * @param {any} offscreen - Stand-in returned by document.createElement.
+ * @returns {{rec: VideoRecorder, notified: Error[], recorders: any[]}} The
+ *   recorder, the errors sent to the host hook, and every MediaRecorder built.
+ */
+const startAborted = (offscreen) => {
+  const restore = installRecorderEnv();
+  const previousError = console.error;
+  console.error = () => {};
+  try {
+    globalThis.document = /** @type {any} */ ({ createElement: () => offscreen });
+    const rec = new VideoRecorder(/** @type {any} */ (recordableCanvas()));
+    /** @type {Error[]} */
+    const notified = [];
+    rec.onError = (err) => notified.push(err);
+    const recorders = FakeMediaRecorder.instances;
+    rec.start('aborted');
+    return { rec, notified, recorders };
+  } finally {
+    console.error = previousError;
+    restore();
+  }
+};
+
+/**
+ * A canvas whose 2D context is unavailable (memory pressure, a context-count
+ * cap) cannot be blitted into, so start() gives up before opening any capture at
+ * all and does not latch the useless buffer.
+ */
+test('start aborts without capturing when the offscreen has no 2D context', () => {
+  const captures = [];
+  const rec = startAborted({
+    width: 0, height: 0,
+    getContext: () => null,
+    captureStream: (fps) => { captures.push(fps); return makeFakeStream(); },
+  });
+
+  assert.deepEqual(captures, [], 'no capture stream is opened without a drawing context');
+  assert.equal(rec.recorders.length, 0, 'no recorder is constructed');
+  assert.equal(rec.rec.isRecording, false);
+  assert.equal(rec.rec.mediaRecorder, null);
+  assert.equal(rec.rec.stream, null);
+  assert.equal(rec.rec.track, null);
+  assert.equal(rec.rec.offscreen, null, 'the context-less buffer is not latched');
+  assert.equal(rec.notified.length, 1, 'the host is told the session never started');
+  assert.match(rec.notified[0].message, /2D drawing context/);
+});
+
+/** Verifies a captureStream that throws outright leaves no session behind. */
+test('start aborts and stays idle when captureStream throws', () => {
+  const failure = new Error('capture unavailable');
+  const rec = startAborted({
+    width: 0, height: 0,
+    getContext: () => ({ clearRect() {}, drawImage() {} }),
+    captureStream: () => { throw failure; },
+  });
+
+  assert.equal(rec.recorders.length, 0, 'no recorder is constructed');
+  assert.equal(rec.rec.isRecording, false);
+  assert.equal(rec.rec.mediaRecorder, null);
+  assert.equal(rec.rec.stream, null);
+  assert.equal(rec.rec.track, null);
+  assert.equal(rec.rec.offscreen, null, 'the capture buffer is released');
+  assert.deepEqual(rec.notified, [failure], 'the host is told the session never started');
+});
+
+/**
+ * The manual-frame stream opens, its track turns out to have no requestFrame, and
+ * the timed-fallback capture then fails with its stream already in hand: both the
+ * manual-mode track and the half-opened fallback stream must be released rather
+ * than left capturing for the rest of the page's life.
+ */
+test('a failed timed-fallback capture releases every stream it opened', () => {
+  const failure = new Error('capture unavailable');
+  const timedTrack = { stopped: false, stop() { this.stopped = true; } };
+  const manualMode = { getVideoTracks: () => [timedTrack], getTracks: () => [timedTrack] };
+  const fallbackTrack = { stopped: false, stop() { this.stopped = true; } };
+  const fallback = {
+    getVideoTracks: () => { throw failure; },
+    getTracks: () => [fallbackTrack],
+  };
+  const fps = [];
+  const rec = startAborted({
+    width: 0, height: 0,
+    getContext: () => ({ clearRect() {}, drawImage() {} }),
+    // The first track has no requestFrame, which forces the timed fallback.
+    captureStream: (rate) => { fps.push(rate); return fps.length === 1 ? manualMode : fallback; },
+  });
+
+  assert.deepEqual(fps, [0, 16], 'the timed fallback is attempted at the frame rate');
+  assert.equal(timedTrack.stopped, true, 'the manual-mode track is stopped');
+  assert.equal(fallbackTrack.stopped, true, 'the half-opened fallback stream is released');
+  assert.equal(rec.recorders.length, 0, 'no recorder is constructed');
+  assert.equal(rec.rec.isRecording, false);
+  assert.equal(rec.rec.stream, null);
+  assert.equal(rec.rec.offscreen, null, 'the capture buffer is released');
+  assert.deepEqual(rec.notified, [failure], 'the host is told the session never started');
+});
+
+/**
+ * A capture stream carrying no video track would record nothing at all, so
+ * start() surfaces it instead — after stopping the tracks the streams do carry,
+ * on both the manual-frame and timed-fallback attempts.
+ */
+test('start aborts and releases both streams when no video track is produced', () => {
+  const opened = [];
+  const trackless = () => {
+    const stray = { stopped: false, stop() { this.stopped = true; } };
+    opened.push(stray);
+    return { getVideoTracks: () => [], getTracks: () => [stray] };
+  };
+  const rec = startAborted({
+    width: 0, height: 0,
+    getContext: () => ({ clearRect() {}, drawImage() {} }),
+    captureStream: trackless,
+  });
+
+  assert.equal(opened.length, 2, 'both the manual-frame and timed-fallback streams opened');
+  assert.deepEqual(opened.map((t) => t.stopped), [true, true],
+    'neither trackless stream is left capturing');
+  assert.equal(rec.recorders.length, 0, 'no recorder is constructed');
+  assert.equal(rec.rec.isRecording, false);
+  assert.equal(rec.rec.mediaRecorder, null);
+  assert.equal(rec.rec.stream, null);
+  assert.equal(rec.rec.track, null);
+  assert.equal(rec.rec.offscreen, null, 'the capture buffer is released');
+  assert.equal(rec.notified.length, 1, 'the host is told the session never started');
+  assert.match(rec.notified[0].message, /no video track/);
+});
