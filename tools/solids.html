@@ -859,8 +859,7 @@
         if (btn) addOp(btn.dataset.op);
       });
 
-      // Generate Thumbnails
-      generateThumbnails();
+      generateThumbnails().catch(e => console.error('Thumbnail generation failed:', e));
 
       renderSavedList();
       updateToggles();
@@ -930,129 +929,130 @@
       });
       const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
 
-      for (const key of thumbKeys) {
-        // Yield to the event loop before each solid. Each iteration is a full
-        // WASM build + triangulation + WebGL render + toDataURL — heavy enough
-        // that running the whole list synchronously froze first paint and input
-        // during init(). Deferring each to its own macrotask lets the page paint
-        // and stay responsive while the footer fills in progressively; this is
-        // why generateThumbnails() is async and init() deliberately does not
-        // await it.
-        await new Promise(resolve => setTimeout(resolve));
+      try {
+        for (const key of thumbKeys) {
+          // Yield to the event loop before each solid. Each iteration is a full
+          // WASM build + triangulation + WebGL render + toDataURL — heavy enough
+          // that running the whole list synchronously froze first paint and input
+          // during init(). Deferring each to its own macrotask lets the page paint
+          // and stay responsive while the footer fills in progressively; this is
+          // why generateThumbnails() is async and init() deliberately does not
+          // await it.
+          await new Promise(resolve => setTimeout(resolve));
 
-        // Reset to just the lights; the previous iteration's mesh/lines are
-        // detached here and their GPU buffers freed at the end of the loop body.
-        offScene.clear();
-        offScene.add(light);
-        offScene.add(ambient);
+          // Reset to just the lights; the previous iteration's mesh/lines are
+          // detached here and their GPU buffers freed at the end of the loop body.
+          offScene.clear();
+          offScene.add(light);
+          offScene.add(ambient);
 
-        const wasmMesh = MeshOpsWasm.fromSolidName(key);
-        const meshData = wasmMeshToJs(wasmMesh);
-        wasmMesh.delete();
-        MeshOpsWasm.clearToolingMemory();
+          const wasmMesh = MeshOpsWasm.fromSolidName(key);
+          const meshData = wasmMeshToJs(wasmMesh);
+          wasmMesh.delete();
+          MeshOpsWasm.clearToolingMemory();
 
-        // Triangulate
-        const vertices = [];
-        meshData.faces.forEach(f => {
-          if (isConvexFace(meshData.vertices, f)) {
-            for (let i = 1; i < f.length - 1; i++) {
-              vertices.push(...meshData.vertices[f[0]].toArray());
-              vertices.push(...meshData.vertices[f[i]].toArray());
-              vertices.push(...meshData.vertices[f[i + 1]].toArray());
+          // Triangulate
+          const vertices = [];
+          meshData.faces.forEach(f => {
+            if (isConvexFace(meshData.vertices, f)) {
+              for (let i = 1; i < f.length - 1; i++) {
+                vertices.push(...meshData.vertices[f[0]].toArray());
+                vertices.push(...meshData.vertices[f[i]].toArray());
+                vertices.push(...meshData.vertices[f[i + 1]].toArray());
+              }
+            } else {
+              const centroid = new THREE.Vector3();
+              f.forEach(idx => centroid.add(meshData.vertices[idx]));
+              centroid.divideScalar(f.length);
+              for (let i = 0; i < f.length; i++) {
+                vertices.push(...centroid.toArray());
+                vertices.push(...meshData.vertices[f[i]].toArray());
+                vertices.push(...meshData.vertices[f[(i + 1) % f.length]].toArray());
+              }
             }
-          } else {
-            const centroid = new THREE.Vector3();
-            f.forEach(idx => centroid.add(meshData.vertices[idx]));
-            centroid.divideScalar(f.length);
-            for (let i = 0; i < f.length; i++) {
-              vertices.push(...centroid.toArray());
-              vertices.push(...meshData.vertices[f[i]].toArray());
-              vertices.push(...meshData.vertices[f[(i + 1) % f.length]].toArray());
-            }
-          }
-        });
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        geo.computeVertexNormals();
-
-        const mesh = new THREE.Mesh(geo, mat);
-        offScene.add(mesh);
-
-        // Edges (optional, but looks nice)
-        const linePoints = [];
-        for (const [ai, bi] of uniqueEdges(meshData.faces, meshData.vertices.length)) {
-          linePoints.push(meshData.vertices[ai], meshData.vertices[bi]);
-        }
-        const lineGeo = new THREE.BufferGeometry().setFromPoints(linePoints);
-        const lines = new THREE.LineSegments(lineGeo, lineMat);
-        offScene.add(lines);
-
-        // Render
-        offRenderer.render(offScene, offCamera);
-
-        // Create Button
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `thumb-btn ${state.base === key ? 'active' : ''}`;
-        btn.setAttribute('aria-pressed', state.base === key ? 'true' : 'false');
-        btn.dataset.solid = key; // identify the base so restoreSolid can re-highlight it
-        btn.onclick = () => {
-          queueCommit(async () => {
-            // The op stack is kept across a base switch, so it must be valid
-            // on the new solid too.
-            if (state.ops.length && !(await chainIsValid(key, state.ops))) {
-              showGateMsg('rejected: op stack would exceed an engine mesh limit on this solid');
-              return;
-            }
-            state.base = key;
-            update();
-            renderBaseSolid();
-            // Update active state
-            document.querySelectorAll('.thumb-btn').forEach(b => {
-              const selected = b === btn;
-              b.classList.toggle('active', selected);
-              b.setAttribute('aria-pressed', selected ? 'true' : 'false');
-            });
           });
-        };
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+          geo.computeVertexNormals();
 
-        const img = document.createElement('img');
-        img.alt = '';
-        const dataURL = offRenderer.domElement.toDataURL();
-        img.src = dataURL;
-        baseThumbnails[key] = dataURL;
+          const mesh = new THREE.Mesh(geo, mat);
+          offScene.add(mesh);
 
-        // init() now renders the base preview before this (deferred) loop has
-        // produced its thumbnail, so refresh it the moment its own thumb exists
-        // rather than leaving the preview blank until the next selection.
-        if (key === state.base) {
-          document.getElementById('baseThumb').src = dataURL;
+          // Edges (optional, but looks nice)
+          const linePoints = [];
+          for (const [ai, bi] of uniqueEdges(meshData.faces, meshData.vertices.length)) {
+            linePoints.push(meshData.vertices[ai], meshData.vertices[bi]);
+          }
+          const lineGeo = new THREE.BufferGeometry().setFromPoints(linePoints);
+          const lines = new THREE.LineSegments(lineGeo, lineMat);
+          offScene.add(lines);
+
+          // Render
+          offRenderer.render(offScene, offCamera);
+
+          // Create Button
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `thumb-btn ${state.base === key ? 'active' : ''}`;
+          btn.setAttribute('aria-pressed', state.base === key ? 'true' : 'false');
+          btn.dataset.solid = key; // identify the base so restoreSolid can re-highlight it
+          btn.onclick = () => {
+            queueCommit(async () => {
+              // The op stack is kept across a base switch, so it must be valid
+              // on the new solid too.
+              if (state.ops.length && !(await chainIsValid(key, state.ops))) {
+                showGateMsg('rejected: op stack would exceed an engine mesh limit on this solid');
+                return;
+              }
+              state.base = key;
+              update();
+              renderBaseSolid();
+              // Update active state
+              document.querySelectorAll('.thumb-btn').forEach(b => {
+                const selected = b === btn;
+                b.classList.toggle('active', selected);
+                b.setAttribute('aria-pressed', selected ? 'true' : 'false');
+              });
+            });
+          };
+
+          const img = document.createElement('img');
+          img.alt = '';
+          const dataURL = offRenderer.domElement.toDataURL();
+          img.src = dataURL;
+          baseThumbnails[key] = dataURL;
+
+          // init() now renders the base preview before this (deferred) loop has
+          // produced its thumbnail, so refresh it the moment its own thumb exists
+          // rather than leaving the preview blank until the next selection.
+          if (key === state.base) {
+            document.getElementById('baseThumb').src = dataURL;
+          }
+
+          const title = formatSolidName(key);
+          btn.title = title;
+          const span = document.createElement('span');
+          span.className = 'thumb-label';
+          span.textContent = title;
+          const fullName = document.createElement('span');
+          fullName.className = 'thumb-name-full';
+          fullName.textContent = title;
+
+          btn.appendChild(img);
+          btn.appendChild(span);
+          btn.appendChild(fullName);
+          footer.appendChild(btn);
+
+          // Free the per-iteration geometry GPU buffers; the thumbnail image is
+          // already captured into dataURL above.
+          geo.dispose();
+          lineGeo.dispose();
         }
-
-        const title = formatSolidName(key);
-        btn.title = title;
-        const span = document.createElement('span');
-        span.className = 'thumb-label';
-        span.textContent = title;
-        const fullName = document.createElement('span');
-        fullName.className = 'thumb-name-full';
-        fullName.textContent = title;
-
-        btn.appendChild(img);
-        btn.appendChild(span);
-        btn.appendChild(fullName);
-        footer.appendChild(btn);
-
-        // Free the per-iteration geometry GPU buffers; the thumbnail image is
-        // already captured into dataURL above.
-        geo.dispose();
-        lineGeo.dispose();
+      } finally {
+        mat.dispose();
+        lineMat.dispose();
+        offRenderer.dispose();
       }
-
-      // Cleanup
-      mat.dispose();
-      lineMat.dispose();
-      offRenderer.dispose();
     }
 
     function updateToggles() {
