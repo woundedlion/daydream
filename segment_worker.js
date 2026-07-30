@@ -46,12 +46,19 @@ let arenaMetricsWarned = false;
 /**
  * Apply the stored segment clip rectangle to the engine. Must be called after
  * every setEffect, since rebuilding the effect resets the clip.
- * @returns {void}
+ * @returns {boolean} Whether the clip was accepted.
  */
 function applyClip() {
-  if (engine && segRange) {
-    engine.setClip(segRange.x0, segRange.x1, segRange.y0, segRange.y1);
+  if (!engine || !segRange) return false;
+  if (engine.setClip(segRange.x0, segRange.x1, segRange.y0, segRange.y1) === false) {
+    post({
+      type: 'engineRejected',
+      reason: `setClip(${segRange.x0}, ${segRange.x1}, `
+        + `${segRange.y0}, ${segRange.y1}) rejected`,
+    });
+    return false;
   }
+  return true;
 }
 
 /**
@@ -146,7 +153,6 @@ async function handleMessage(msg) {
         canvasW = msg.w;
         canvasH = msg.h;
         segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
-        applyClip();
       }
       break;
     }
