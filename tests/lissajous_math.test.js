@@ -172,6 +172,36 @@ test('snapToRationalRatio: zero passive frequency yields finite values, not NaN/
   assert.ok(Number.isFinite(closingPeriod), 'closing period is finite');
 });
 
+/**
+ * Verifies a range confines the snap to ratios reachable by the control: the
+ * unbounded snap of 100 against 13 overshoots to 8·13 = 104, which a caller
+ * could only clamp — reopening the curve the snap just closed.
+ */
+test('snapToRationalRatio: a range keeps the snapped frequency reachable', () => {
+  const passiveC = 13;
+  const bare = snapToRationalRatio(100, passiveC);
+  assert.equal(bare.snappedActiveC, 104);
+
+  const { m, n, snappedActiveC, closingPeriod } =
+    snapToRationalRatio(100, passiveC, MAX_RATIONAL_TERM, { min: 1, max: 100 });
+  assert.equal(snappedActiveC, 91);
+  assert.equal(m, 7);
+  assert.equal(n, 1);
+  assert.equal(snappedActiveC, passiveC * (m / n));
+  assert.equal(closingPeriod, (TWO_PI * n) / passiveC);
+  assert.equal(domainClosureWarning(passiveC, closingPeriod), null);
+});
+
+/**
+ * Verifies a range no ratio can satisfy still returns the closest fraction
+ * rather than nothing, so the caller keeps a usable frequency.
+ */
+test('snapToRationalRatio: an unsatisfiable range falls back to the closest ratio', () => {
+  const { snappedActiveC } =
+    snapToRationalRatio(6, 4, MAX_RATIONAL_TERM, { min: 1000, max: 2000 });
+  assert.equal(snappedActiveC, 6);
+});
+
 /** Verifies the curve starts at (0, 1, 0) when t=0 (sin(0)=0, cos(0)=1). */
 test('lissajous: at t=0 returns the expected point (0, 1, 0)', () => {
   const p = lissajous(12, 5, 0, 0);
