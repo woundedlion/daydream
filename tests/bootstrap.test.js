@@ -212,3 +212,15 @@ test('index loads bootstrap instead of the application module directly', () => {
   assert.match(html, /<script type="module" src="bootstrap\.js"><\/script>/);
   assert.doesNotMatch(html, /<script type="module" src="daydream\.js"><\/script>/);
 });
+
+test('index identifies new-window tool links and associates stats headers', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const toolLinks = [...html.matchAll(/<a href="tools\/[^"]+"[^>]+>.*?<\/a>/g)];
+  assert.equal(toolLinks.length, 4);
+  for (const [link] of toolLinks) {
+    assert.match(link, /target="_blank"/);
+    assert.match(link, /rel="noopener"/);
+    assert.match(link, /opens in a new window/);
+  }
+  assert.equal([...html.matchAll(/<th scope="col">/g)].length, 10);
+});
