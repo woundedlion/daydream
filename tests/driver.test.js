@@ -393,6 +393,8 @@ test('setupContextLossHandling starts unlost behind a hidden overlay', () => {
   assert.equal(typeof ctx.handlers.webglcontextrestored, 'function');
   assert.ok(ctx.canvasParent.children.includes(ctx.contextLostOverlay),
     'the overlay never reached the canvas parent');
+  assert.equal(ctx.contextLostOverlay.getAttribute('role'), 'alert');
+  assert.equal(ctx.contextLostOverlay.tabIndex, -1);
   assert.equal(ctx.contextLostOverlay.style.display, 'none');
 });
 
@@ -400,6 +402,8 @@ test('a lost context claims the restore, shows the reason, and aborts the record
   const aborted = [];
   const ctx = contextLossCtx({ abort: (message) => aborted.push(message) });
   Daydream.prototype.setupContextLossHandling.call(ctx);
+  const focusCalls = [];
+  ctx.contextLostOverlay.focus = (options) => focusCalls.push(options);
 
   let prevented = false;
   const messages = captureConsole(() => ctx.handlers.webglcontextlost({
@@ -410,6 +414,7 @@ test('a lost context claims the restore, shows the reason, and aborts the record
   assert.equal(prevented, true, 'the browser only restores a context the page claimed');
   assert.equal(ctx.contextLost, true);
   assert.equal(ctx.contextLostOverlay.style.display, 'flex');
+  assert.deepEqual(focusCalls, [{ preventScroll: true }]);
   assert.match(ctx.contextLostDetail.textContent, /GPU process reset/);
   assert.equal(aborted.length, 1, 'the frozen recording was left running');
   assert.match(aborted[0], /GPU process reset/);
