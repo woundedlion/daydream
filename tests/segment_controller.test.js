@@ -214,6 +214,7 @@ const flush = () => new Promise((r) => setImmediate(r));
  * @param {number} [overrides.elapsed] - Simulated elapsed time for the frame.
  * @param {number} [overrides.renderUs] - Reported render time in microseconds.
  * @param {Object} [overrides.arenaMetrics] - Optional arena-metrics payload.
+ * @param {number[]} [overrides.paramValues] - Post-frame param values the worker reports.
  * @returns {void}
  */
 function deliverFrame(controller, segId, overrides = {}) {
@@ -231,6 +232,7 @@ function deliverFrame(controller, segId, overrides = {}) {
       elapsed: overrides.elapsed ?? 1,
       renderUs: overrides.renderUs ?? 0,
       arenaMetrics: overrides.arenaMetrics ?? null,
+      paramValues: overrides.paramValues ?? null,
     },
   });
 }
@@ -305,6 +307,72 @@ test('destroy() bumps the generation so a stale in-flight .then cannot arm a new
   // The stale .then's guard (inflightGen === renderGen) must fail.
   assert.equal(c.inflightGen, dispatchGen, 'inflight snapshot is unchanged');
   assert.notEqual(c.inflightGen, c.renderGen, 'generation moved on under it');
+});
+
+// ---------------------------------------------------------------------------
+// Segment-0 parameter publish — the GUI's only live param source in segmented
+// mode, since the main-thread engine is never stepped.
+// ---------------------------------------------------------------------------
+
+test('a segment-0 frame publishes its param values for the GUI to read', async () => {
+  const c = makeController();
+  c.create(2);
+  const done = c.renderParallel();
+  assert.equal(c.getParamValues(), null, 'nothing published before the first frame');
+
+  deliverFrame(c, 0, { paramValues: [0.25, 1] });
+  assert.deepEqual(c.getParamValues(), [0.25, 1],
+    'segment 0 mirrors its post-frame params into the controller');
+
+  deliverFrame(c, 1);
+  await done;
+});
+
+test('a frame from a non-zero segment never publishes param values', async () => {
+  const c = makeController();
+  c.create(2);
+  const done = c.renderParallel();
+
+  deliverFrame(c, 1, { paramValues: [9, 9] });
+  assert.equal(c.getParamValues(), null,
+    'only segment 0 is the GUI parameter source; another arm cannot bind the sliders');
+
+  deliverFrame(c, 0);
+  await done;
+});
+
+test('a frame carrying no param values leaves the published set intact', async () => {
+  const c = makeController();
+  c.create(2);
+
+  let done = c.renderParallel();
+  deliverFrame(c, 0, { paramValues: [0.25, 1] });
+  deliverFrame(c, 1);
+  await done;
+
+  done = c.renderParallel();
+  deliverFrame(c, 0);
+  assert.deepEqual(c.getParamValues(), [0.25, 1],
+    'a params-less frame is not a publish; the GUI keeps its last real values');
+
+  deliverFrame(c, 1);
+  await done;
+});
+
+test('a doubled segment-0 frame cannot republish over the generation first frame', async () => {
+  const c = makeController();
+  c.create(2);
+  const done = c.renderParallel();
+
+  deliverFrame(c, 0, { paramValues: [0.25, 1] });
+  deliverFrame(c, 0, { paramValues: [9, 9] });
+
+  assert.deepEqual(c.getParamValues(), [0.25, 1],
+    "segment 0's first frame this generation is the only publish");
+  assert.equal(c.pending, 1, 'the duplicate settles nothing');
+
+  deliverFrame(c, 1);
+  await done;
 });
 
 // ---------------------------------------------------------------------------
