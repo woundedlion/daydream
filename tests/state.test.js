@@ -1,7 +1,7 @@
 // @ts-check
 import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { AppState, URLSync, getActiveURLSync } from '../state.js';
+import { AppState, URLSync, getActiveURLSync, writeUrl } from '../state.js';
 
 // Dispose the active URLSync before restoring window: a debounced flush() would
 // otherwise fire into a deleted window after teardown.
@@ -163,6 +163,27 @@ function installWindow(search = '', pathname = '/', hash = '') {
   };
   return calls;
 }
+
+test('writeUrl assembles pathname, query and hash', () => {
+  const calls = installWindow('', '/sim', '#frag');
+  writeUrl(new URLSearchParams('effect=Voronoi&speed=2'));
+  assert.deepEqual(calls, ['/sim?effect=Voronoi&speed=2#frag']);
+});
+
+test('writeUrl drops the query separator when no params survive', () => {
+  const calls = installWindow('?effect=Voronoi', '/sim', '#frag');
+  writeUrl(new URLSearchParams());
+  assert.deepEqual(calls, ['/sim#frag']);
+});
+
+test('URLSync.reset leaves a bare path when nothing survives', () => {
+  const calls = installWindow('?effect=Voronoi&speed=2', '/sim', '#frag');
+  const sync = new URLSync(new AppState({ effect: 'Voronoi' }), []);
+
+  sync.reset();
+
+  assert.deepEqual(calls, ['/sim#frag']);
+});
 
 test('URLSync reads initial tracked keys from the URL into state', () => {
   installWindow('?effect=Voronoi&res=high&untracked=1');

@@ -58,6 +58,19 @@ export function parseUrlBoolean(raw) {
 export const URL_FLUSH_DEBOUNCE_MS = 200;
 
 /**
+ * The single assembly point for every deep-link URL write: replaceState with
+ * pathname + query + the existing location.hash, which rebuilding from pathname
+ * alone would drop.
+ * @param {URLSearchParams} params - The query params to write; empty writes a bare path.
+ * @returns {void}
+ */
+export function writeUrl(params) {
+  const qs = params.toString();
+  const base = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+  window.history.replaceState({}, '', base + window.location.hash);
+}
+
+/**
  * Centralized application state with subscriber pattern and URL synchronization.
  * Separates state management from DOM manipulation — subscribers react to changes
  * independently rather than being orchestrated imperatively.
@@ -341,11 +354,7 @@ export class URLSync {
       if (val === null) params.delete(key);
       else params.set(key, val);
     }
-    const qs = params.toString();
-    // Preserve any location.hash: rebuilding from pathname alone would drop a
-    // fragment a consumer relies on (URLSync is the single owner of URL writes).
-    const base = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-    window.history.replaceState({}, '', base + window.location.hash);
+    writeUrl(params);
     this.adhoc.clear();
   }
 
@@ -398,10 +407,7 @@ export class URLSync {
       if (val === null) params.delete(key);
       else params.set(key, val);
     }
-    const qs = params.toString();
-    // Preserve any location.hash; rebuilding from pathname alone would drop it.
-    const base = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-    window.history.replaceState({}, '', base + window.location.hash);
+    writeUrl(params);
     // The URL is now the store of record; clear the buffer so a stale ad-hoc entry
     // can't re-apply on every flush.
     this.adhoc.clear();
