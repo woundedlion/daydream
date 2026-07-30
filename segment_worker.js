@@ -279,3 +279,8 @@ self.onmessage = (e) => {
   // settle point of the serialized queue.
   return messageQueue;
 };
+
+self.onmessageerror = (e) => {
+  console.error('segment_worker: message deserialization failed', e);
+  post({ type: 'engineRejected', reason: 'message deserialization failed' });
+};
