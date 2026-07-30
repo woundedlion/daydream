@@ -35,7 +35,7 @@ function fastCos(x) { return fastSin(x + Math.PI * 0.5); }
 
 // --- WASM color-math bridge -------------------------------------------------
 // The engine's PaletteOps.bakeLut is injected via setPaletteOps; this module
-// calls it for the exact colors and keeps only the JS-side profile PRNG.
+// calls it for the exact colors and mirrors the engine's seeded profile draws.
 let bakeLut = null;
 
 /**
@@ -164,39 +164,31 @@ export function proceduralPaletteParams({ a, b, c, d }) {
 
 // --- Generative Palette Implementation ---
 
+// Mirror of the engine's hash01 (core/math/3dmath.h): the PCG RXS-M-XS output
+// hash, in 32-bit unsigned arithmetic.
+function hash01(i, seed) {
+  seed >>>= 0;
+  let h = (Math.imul((i ^ seed) >>> 0, 747796405) + 2891336453) >>> 0;
+  h = Math.imul(((h >>> ((h >>> 28) + 4)) ^ h ^ seed) >>> 0, 277803737) >>> 0;
+  h = ((h >>> 22) ^ h) >>> 0;
+  return (h >>> 8) / 16777216;
+}
+
 /**
- * Seeded linear-congruential PRNG for reproducible palette generation.
+ * Mirror of GenerativePalette::seeded_rand_int (core/color/color.h): the
+ * seed-hashed setup draw the engine makes when the palette pins its base hue,
+ * so a preview reproduces the exported palette rather than merely its ranges.
+ * @param {number} seed - Palette seed, i.e. the base hue in 0..255.
+ * @param {number} site - Draw-site index, distinct per engine call site.
+ * @param {number} min - Inclusive lower bound.
+ * @param {number} max - Exclusive upper bound.
+ * @returns {number} The drawn integer in [min, max).
  */
-export class PRNG {
-  /**
-   * @param {number} seed - Initial state. A non-finite seed (undefined/null/NaN)
-   *   falls back to a random one so the tool still works without an explicit
-   *   seed. Note 0 is a VALID seed and stays reproducible — the old `seed ? ...`
-   *   test treated 0 as "unset" and silently randomized it.
-   */
-  constructor(seed) {
-    this.state = Number.isFinite(seed) ? seed : Math.floor(Math.random() * 0xFFFFFFFF);
-  }
-  /**
-   * Advances the state and returns the next float.
-   * @returns {number} Pseudo-random float in [0, 1).
-   */
-  next() {
-    this.state = (this.state * 1664525 + 1013904223) >>> 0;
-    return this.state / 0x100000000;
-  }
-  /**
-   * Half-open [min, max) integer matching the engine's hs::rand_int range
-   * convention, so ported range literals line up with the engine's call sites.
-   * The stream itself is a tool-local LCG, not the device's PCG32, so the
-   * values do not reproduce the device's sequence.
-   * @param {number} min - Inclusive lower bound.
-   * @param {number} max - Exclusive upper bound.
-   * @returns {number} Pseudo-random integer in [min, max).
-   */
-  nextInt(min, max) {
-    return Math.floor(this.next() * (max - min)) + min;
-  }
+export function seededRandInt(seed, site, min, max) {
+  if (max <= min) return min;
+  const u = hash01(seed, Math.imul(site, 0x9E3779B9) >>> 0);
+  // fround: the engine scales the draw in single precision before truncating.
+  return min + Math.trunc(Math.fround(u * (max - min)));
 }
 
 /**
@@ -207,7 +199,7 @@ export class PRNG {
 export class GenerativePalette {
   /**
    * Resolves the profile strings into three anchor colors and gradient stops.
-   * satProfile/brightnessProfile values pick fixed or PRNG-sampled HSV ranges
+   * satProfile/brightnessProfile values pick fixed or seed-hashed HSV ranges
    * (h, s, v in 0..255) for the three anchor colors a/b/c.
    * @param {string} gradientShape - Gradient-shape profile (e.g. "VIGNETTE", "STRAIGHT").
    * @param {string} harmonyType - Color-harmony rule (e.g. "TRIADIC", "ANALOGOUS").
@@ -224,20 +216,8 @@ export class GenerativePalette {
     assertMember('BrightnessProfile', brightnessProfile, BRIGHTNESS_PROFILES);
     assertMember('SaturationProfile', satProfile, SATURATION_PROFILES);
 
-    // Seed from the profile strings (not the hue) so scrubbing the hue keeps the
-    // randomized saturation/brightness structure stable.
-    const hashStr = gradientShape + harmonyType + brightnessProfile + satProfile;
-    let stableSeed = 0;
-    for (let i = 0; i < hashStr.length; i++) {
-      stableSeed = ((stableSeed << 5) - stableSeed) + hashStr.charCodeAt(i);
-      stableSeed |= 0;
-    }
-    this.prng = new PRNG(Math.abs(stableSeed) || 1337);
-
-    let h1 = hueValue;
-    let hues = this.calcHues(h1, harmonyType);
-    let h2 = hues.h2;
-    let h3 = hues.h3;
+    const h1 = hueValue;
+    const { h2, h3 } = this.calcHues(h1, harmonyType, hueValue);
 
     let s1 = 0, s2 = 0, s3 = 0;
     switch (satProfile) {
@@ -245,9 +225,9 @@ export class GenerativePalette {
         s1 = s2 = s3 = 100;
         break;
       case "MID":
-        s1 = this.prng.nextInt(153, 204);
-        s2 = this.prng.nextInt(153, 204);
-        s3 = this.prng.nextInt(153, 204);
+        s1 = seededRandInt(hueValue, 4, 153, 204);
+        s2 = seededRandInt(hueValue, 5, 153, 204);
+        s3 = seededRandInt(hueValue, 6, 153, 204);
         break;
       case "VIBRANT":
         s1 = s2 = s3 = 255;
@@ -257,26 +237,26 @@ export class GenerativePalette {
     let v1 = 0, v2 = 0, v3 = 0;
     switch (brightnessProfile) {
       case "ASCENDING":
-        v1 = this.prng.nextInt(25, 76);
-        v2 = this.prng.nextInt(127, 178);
-        v3 = this.prng.nextInt(204, 256);
+        v1 = seededRandInt(hueValue, 7, 25, 76);
+        v2 = seededRandInt(hueValue, 8, 127, 178);
+        v3 = seededRandInt(hueValue, 9, 204, 256);
         break;
       case "DESCENDING":
-        v1 = this.prng.nextInt(204, 256);
-        v2 = this.prng.nextInt(127, 178);
-        v3 = this.prng.nextInt(25, 76);
+        v1 = seededRandInt(hueValue, 7, 204, 256);
+        v2 = seededRandInt(hueValue, 8, 127, 178);
+        v3 = seededRandInt(hueValue, 9, 25, 76);
         break;
       case "FLAT":
         v1 = v2 = v3 = 255;
         break;
       case "BELL":
-        v1 = this.prng.nextInt(51, 127);
-        v2 = this.prng.nextInt(178, 256);
+        v1 = seededRandInt(hueValue, 7, 51, 127);
+        v2 = seededRandInt(hueValue, 8, 178, 256);
         v3 = v1;
         break;
       case "CUP":
-        v1 = this.prng.nextInt(178, 256);
-        v2 = this.prng.nextInt(51, 127);
+        v1 = seededRandInt(hueValue, 7, 178, 256);
+        v2 = seededRandInt(hueValue, 8, 51, 127);
         v3 = v1;
         break;
     }
@@ -307,9 +287,10 @@ export class GenerativePalette {
    * rule. Offsets are in the 0..255 hue space (85 ≈ 120°, 128 ≈ 180°).
    * @param {number} h1 - Base hue in 0..255.
    * @param {string} harmonyType - Color-harmony rule (e.g. "TRIADIC", "ANALOGOUS").
+   * @param {number} seed - Palette seed for the jittered harmonies' draws.
    * @returns {{h2:number, h3:number}} The two companion hues in 0..255.
    */
-  calcHues(h1, harmonyType) {
+  calcHues(h1, harmonyType, seed) {
     let h2, h3;
     switch (harmonyType) {
       case "TRIADIC":
@@ -324,12 +305,12 @@ export class GenerativePalette {
       }
       case "COMPLEMENTARY":
         h2 = this.wrapHue(h1 + 128);
-        h3 = this.wrapHue(h1 + this.prng.nextInt(-7, 8));
+        h3 = this.wrapHue(h1 + seededRandInt(seed, 0, -7, 8));
         break;
       case "ANALOGOUS": {
-        const dir = (this.prng.nextInt(0, 2) === 0) ? 1 : -1;
-        h2 = this.wrapHue(h1 + dir * this.prng.nextInt(11, 22));
-        h3 = this.wrapHue(h2 + dir * this.prng.nextInt(11, 22));
+        const dir = (seededRandInt(seed, 1, 0, 2) === 0) ? 1 : -1;
+        h2 = this.wrapHue(h1 + dir * seededRandInt(seed, 2, 11, 22));
+        h3 = this.wrapHue(h2 + dir * seededRandInt(seed, 3, 11, 22));
         break;
       }
       default:
@@ -494,17 +475,11 @@ function assertMember(label, token, allowed) {
 }
 
 /**
- * Emit the generative-tab C++ initializer.
- *
- * Reproducibility caveat: this tool draws the per-palette saturation,
- * brightness and harmony hue offsets from a PRNG seeded by the profile
- * strings, but the engine's GenerativePalette draws them from its global
- * RNG. So the export reproduces the gradient shape, harmony, profiles and
- * base hue exactly, but its randomized structure will differ from this
- * preview. The caveat is stated in the emitted comment so the export isn't
- * mistaken for a pixel-faithful reproduction.
+ * Emit the generative-tab C++ initializer. Passing the base hue pins the
+ * engine's setup draws to the seed-hashed path, so the emitted palette
+ * reproduces the preview rather than only its profiles.
  * @param {{shape:string,harmony:string,brightness:string,sat:string,hueValue:number}} opts - Gradient shape, harmony, brightness/saturation profiles and base hue.
- * @returns {string} The C++ GenerativePalette initializer source, prefixed with the reproducibility caveat comment.
+ * @returns {string} The C++ GenerativePalette initializer source.
  */
 export function generativePaletteCpp({ shape, harmony, brightness, sat, hueValue }) {
   assertMember('GradientShape', shape, GRADIENT_SHAPES);
@@ -515,5 +490,5 @@ export function generativePaletteCpp({ shape, harmony, brightness, sat, hueValue
     throw new Error(`generativePaletteCpp: hueValue ${hueValue} must be an ` +
       `integer in 0..255`);
   }
-  return `// Reproduces the profiles + base hue exactly; the randomized\n// saturation/brightness/hue-offset structure is drawn from the\n// engine's global RNG and will differ from the tool preview.\nGenerativePalette palette{\n    GradientShape::${shape}, HarmonyType::${harmony},\n    BrightnessProfile::${brightness}, SaturationProfile::${sat}, ${hueValue}};`;
+  return `GenerativePalette palette{\n    GradientShape::${shape}, HarmonyType::${harmony},\n    BrightnessProfile::${brightness}, SaturationProfile::${sat}, ${hueValue}};`;
 }
