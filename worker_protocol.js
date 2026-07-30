@@ -69,7 +69,10 @@ export const PROTOCOL_VERSION = 2;
  * @typedef {{ type: 'setEffect', name: string, params?: SegParam[] }} SetEffectMsg
  */
 
-/** Resize the worker's canvas; the worker re-derives its segment clip from w/h.
+/** Resize the worker's canvas; the worker recomputes its segment rectangle from
+ * w/h but does not push it to the engine: a size change tears the effect down,
+ * and the engine rejects a clip with no effect. The controller must follow with
+ * a setEffect, which rebuilds the effect and applies the new clip.
  * @typedef {{ type: 'setResolution', w: number, h: number }} SetResolutionMsg */
 
 /** Push one live tuned-parameter value to the worker's bound effect.
