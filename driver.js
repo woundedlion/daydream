@@ -544,7 +544,7 @@ export class Daydream {
     // Capture only when the sim advanced. In segmented mode the composite lands a
     // frame late, so captureReady() gates out the leading cleared black frames.
     if (this.recorder && advanced &&
-        (typeof effect.captureReady !== 'function' || effect.captureReady()))
+        (typeof effect?.captureReady !== 'function' || effect.captureReady()))
       this.recorder.captureFrame();
 
     this.refreshLabels();
