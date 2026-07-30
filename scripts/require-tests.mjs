@@ -46,7 +46,14 @@ try {
   // An unrooted glob: `.` is the root install, and a full-tree walk from there
   // would cross node_modules and .git, so match its own entries only.
   if (dir === '.') files = readdirSync('.').filter((f) => f.endsWith(suffix));
-  else scan(dir, 0);
+  else {
+    scan(dir, 0);
+    for (const entry of readdirSync('.', { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith(suffix)) {
+        unreachable.push(entry.name);
+      }
+    }
+  }
 } catch (e) {
   if (e.code !== 'ENOENT') throw e;
 }
