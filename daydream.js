@@ -429,8 +429,9 @@ function addPauseToggle(fx, params) {
 }
 
 /**
- * Build one controller per engine parameter, recording the value-stream order
- * and seeding the engine with each initial value.
+ * Build one controller per engine parameter, recording the value-stream order.
+ * A ?param=value deep link reaches the engine through the GUI's load-time
+ * onChange replay.
  * @param {Object} fx - The effect record being built.
  * @param {Array<Object>} params - The engine's parameter definitions.
  * @param {{animationState: Object, controller: Object|null, setPaused: Function}}
@@ -460,10 +461,6 @@ function addParamControllers(fx, params, pause) {
     } else {
       fx.writableParamNames.push(p.name);
       trackDragState(fx, controller);
-      // Push the GUI's initial value into the engine: a ?param=value deep link
-      // sets state[p.name] but fires no onChange, so the engine would otherwise
-      // render the default while the slider shows the URL value.
-      setEngineParam(p.name, engineParamValue(state[p.name]));
     }
 
     controller.onChange(v => {
