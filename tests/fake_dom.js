@@ -41,7 +41,6 @@ export function fakeElement(tag = 'div') {
     classList: {
       add: (...names) => { for (const name of names) classes.add(name); },
       remove: (...names) => { for (const name of names) classes.delete(name); },
-      has: (name) => classes.has(name),
       contains: (name) => classes.has(name),
     },
     setAttribute(name, value) { this.attributes[name] = value; },
