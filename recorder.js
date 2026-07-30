@@ -74,6 +74,9 @@ export class VideoRecorder {
     // record button's label is set on click and would otherwise keep reading "Stop"
     // over a dead session.
     this.onError = null;
+    // Host hook fired when an explicit format falls back to the browser's
+    // default container. Receives the actual file extension.
+    this.onFormatFallback = null;
   }
 
   /**
@@ -205,6 +208,9 @@ export class VideoRecorder {
       this.cleanup();
       this.reportFailure('MediaRecorder construction failed.', err);
       return;
+    }
+    if (!mimeType && this.format !== 'auto') {
+      this.onFormatFallback?.(this.extension(recorder));
     }
 
     // ondataavailable/onstop/onerror fire after a fast stop→start may have installed

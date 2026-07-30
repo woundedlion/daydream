@@ -742,6 +742,11 @@ createHolosphereModule().then(module => {
   host.recorder.bitrateMbps = recSettings.quality;
   host.recorder.targetHeight = REC_RESOLUTIONS[recSettings.resolution];
   host.recorder.format = REC_FORMATS[recSettings.format];
+  host.recorder.onFormatFallback = (extension) => {
+    const label = Object.keys(REC_FORMATS)
+      .find(key => REC_FORMATS[key] === extension) ?? 'Auto';
+    recFormatCtrl.setValue(label);
+  };
   // An encoder fault ends the session on its own; drop the recording UI so the
   // button doesn't keep offering to stop a session that is already gone.
   host.recorder.onError = () => showRecording(false);
@@ -970,7 +975,8 @@ const recFolder = guiInstance.addFolder('Recording');
 recFolder.close();
 recFolder.addSession(recSettings, 'recQuality', 1, 20, 1).name('Rec Quality (Mbps)');
 recFolder.addSession(recSettings, 'recResolution', Object.keys(REC_RESOLUTIONS)).name('Rec Resolution');
-recFolder.addSession(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
+const recFormatCtrl =
+  recFolder.addSession(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
 const recordCtrl = recFolder.add(recordState, 'record').name('\u25cf Record');
 const INTERACTIVE_KEY_TARGET =
   'input, textarea, select, button, [contenteditable], .lil-gui, .effect-sidebar';
