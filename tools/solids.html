@@ -541,8 +541,12 @@
   <div id="right-sidebar">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-bold text-white">Saved Solids</h2>
-      <button id="clearSavedBtn"
-        class="text-xs text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear All</button>
+      <div class="flex gap-3">
+        <button id="exportSavedBtn"
+          class="text-xs text-indigo-300 hover:text-white uppercase font-bold tracking-wider">Export JSON</button>
+        <button id="clearSavedBtn"
+          class="text-xs text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">Clear All</button>
+      </div>
     </div>
     <div id="savedList" class="flex-1 overflow-y-auto" role="region" aria-label="Saved solids">
       <!-- Saved items go here -->
@@ -848,6 +852,7 @@
       // uses one delegated listener that reads the clicked button's data-op
       // (closest() so a click on a tooltip span still resolves the button).
       document.getElementById('clearOpsBtn').addEventListener('click', resetOps);
+      document.getElementById('exportSavedBtn').addEventListener('click', exportSavedSolids);
       document.getElementById('clearSavedBtn').addEventListener('click', clearSavedSolids);
       document.getElementById('addOpGrid').addEventListener('click', (e) => {
         const btn = e.target.closest('[data-op]');
@@ -857,6 +862,7 @@
       // Generate Thumbnails
       generateThumbnails();
 
+      renderSavedList();
       updateToggles();
       result.resize(); // re-fit the canvas after the sidebars' content settled
       update();
@@ -1069,7 +1075,40 @@
     }
 
     // --- SAVED ITEMS ---
-    const savedSolids = [];
+    const SAVED_SOLIDS_KEY = 'daydream.savedSolids.v1';
+
+    function loadSavedSolids() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(SAVED_SOLIDS_KEY) || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        console.warn('Could not restore saved solids:', error);
+        return [];
+      }
+    }
+
+    const savedSolids = loadSavedSolids();
+
+    function persistSavedSolids() {
+      try {
+        localStorage.setItem(SAVED_SOLIDS_KEY, JSON.stringify(savedSolids));
+      } catch (error) {
+        console.warn('Could not persist saved solids:', error);
+        showGateMsg('saved for this session only: browser storage is unavailable');
+      }
+    }
+
+    function exportSavedSolids() {
+      const blob = new Blob([JSON.stringify(savedSolids, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'daydream-solids.json';
+      link.click();
+      URL.revokeObjectURL(url);
+    }
 
     function saveSolid() {
       // Nothing to save until the first successful update() has produced a mesh
@@ -1133,6 +1172,7 @@
       }
 
       savedSolids.push(item);
+      persistSavedSolids();
       renderSavedList();
     }
 
@@ -1238,6 +1278,7 @@
     // function is pinned to window. Keep new handlers wired the same way.
     function deleteSolid(index) {
       savedSolids.splice(index, 1);
+      persistSavedSolids();
       renderSavedList();
     }
 
@@ -1664,6 +1705,7 @@
 
     function clearSavedSolids() {
       savedSolids.length = 0;
+      persistSavedSolids();
       renderSavedList();
     }
 
