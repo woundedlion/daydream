@@ -513,6 +513,10 @@
     const DRAG_THRESHOLD = 0.01; // Minimum drag distance (as %) to be considered a zoom
     let lockedDragStartValues = {}; // For locked slider relative movement
 
+    // Slider handles by param, so a value computed elsewhere (a locked group
+    // drag, a zoom) can drive the control it belongs to.
+    const sliderHandles = {};
+
     // DOM Elements
     // Declared inside init() after the window load handler.
     // to ensure elements exist.
@@ -579,7 +583,7 @@
          * Creates the HTML structure for a single parameter slider.
          */
     function createSlider(def) {
-      const { slider } = buildSlider(def.container, {
+      const handles = buildSlider(def.container, {
         id: def.param,
         label: def.label,
         min: def.min,
@@ -622,16 +626,10 @@
           for (const groupDef of group) {
             const finalRawValue = values[groupDef.param];
             if (finalRawValue === undefined) continue;
-            const groupSlider = document.getElementById(`${groupDef.param}_slider`);
-            const groupValueSpan = document.getElementById(`${groupDef.param}_value`);
-            if (!groupSlider || !groupValueSpan) continue;
 
             const finalNewValue = finalRawValue / groupDef.scale;
             parameters[groupDef.param] = finalNewValue;
-            const display = finalNewValue.toFixed(3);
-            groupSlider.value = finalRawValue;
-            groupValueSpan.textContent = display;
-            groupSlider.setAttribute('aria-valuetext', display);
+            sliderHandles[groupDef.param].setValue(finalNewValue);
           }
 
         } else {
@@ -646,6 +644,9 @@
 
         scheduleUpdate();
       });
+
+      sliderHandles[def.param] = handles;
+      const { slider } = handles;
 
       // Seed the per-group start values a locked relative drag works from. Must
       // fire on mouse, touch, and keyboard input: touch drags and arrow-key
@@ -687,18 +688,7 @@
          */
     function updateAllSliders() {
       sliderDefinitions.forEach(def => {
-        const slider = document.getElementById(`${def.param}_slider`);
-        const valueSpan = document.getElementById(`${def.param}_value`);
-
-        if (slider && valueSpan) {
-          const newValue = parameters[def.param];
-          const scaledValue = newValue * def.scale;
-
-          // Clamp value to slider min/max before setting
-          slider.value = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), scaledValue));
-          valueSpan.textContent = newValue.toFixed(3);
-          slider.setAttribute('aria-valuetext', valueSpan.textContent);
-        }
+        sliderHandles[def.param].setValue(parameters[def.param]);
       });
     }
 

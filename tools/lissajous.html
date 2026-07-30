@@ -247,44 +247,17 @@
       // 4. Update the actual state.
       state[activeId] = snappedActiveC;
 
-      // 5. Update the slider UI (force the thumb to jump to the snapped position)
-      const slider = document.getElementById(`${activeId}_slider`);
-      const valueSpan = document.getElementById(`${activeId}_value`);
+      // 5. Force the thumb to jump to the snapped position
+      sliderHandles[activeId].setValue(snappedActiveC);
 
-      if (slider && valueSpan) {
-        // Round the snapped value for setting the slider UI element
-        slider.value = Math.round(snappedActiveC * activeConfig.scale);
-
-        // Determine decimals for display (2 for C1/C2)
-        const display = snappedActiveC.toFixed(2);
-        valueSpan.textContent = display;
-        slider.setAttribute('aria-valuetext', display);
-      }
-
-      state.Duration = newDomain;
-
-      // Update the Domain slider UI to reflect the new calculated domain
-      const durationSlider = document.getElementById('Duration_slider');
-      const durationValueSpan = document.getElementById('Duration_value');
+      // Update the Domain slider UI to reflect the new calculated domain. An
+      // extreme ratio can put the closing period past the slider's range, and
+      // then the value the control lands on is the domain in effect.
       const durationConfig = config.Duration;
-
-      if (durationSlider && durationValueSpan) {
-        const scaledDomain = Math.round(newDomain * durationConfig.scale);
-        // Clamp value to slider min/max in case of extreme ratios
-        const clampedScaledDomain = Math.max(
-          Math.round(durationConfig.min * durationConfig.scale),
-          Math.min(Math.round(durationConfig.max * durationConfig.scale), scaledDomain)
-        );
-
-        durationSlider.value = clampedScaledDomain;
-
-        // Also update state.Duration if we clamped
-        if (scaledDomain !== clampedScaledDomain) {
-          state.Duration = clampedScaledDomain / durationConfig.scale;
-        }
-        durationValueSpan.textContent = state.Duration.toFixed(3);
-        durationSlider.setAttribute('aria-valuetext', durationValueSpan.textContent);
-      }
+      const shownDomain = sliderHandles.Duration.setValue(newDomain);
+      state.Duration = newDomain < durationConfig.min || newDomain > durationConfig.max
+        ? shownDomain
+        : newDomain;
 
       // 6. Re-render the curve and update the code snippet
       scheduleUpdate();
@@ -310,12 +283,16 @@
 
     // --- UI Setup ---
 
+    // Slider handles by config id, so code that computes a value (the rational
+    // snap) can drive the control it belongs to.
+    const sliderHandles = {};
+
     const createSlider = (id, params) => {
       // C1/C2 show 2 decimals; A and Duration show 3; Samples is a whole count.
       const decimals = id === 'Samples' ? 0 : (id === 'A' || id === 'Duration') ? 3 : 2;
       const scale = params.scale || 1;
 
-      const handles = buildSlider(`${id}_container`, {
+      sliderHandles[id] = buildSlider(`${id}_container`, {
         id,
         label: params.label,
         min: params.min,
@@ -335,7 +312,7 @@
           snapFrequencies(id, rawValue);
         } else {
           // 3. For unlocked controls, update UI and re-render normally.
-          handles.valueSpan.textContent = state[id].toFixed(decimals);
+          sliderHandles[id].setValue(state[id]);
           scheduleUpdate();
         }
       });

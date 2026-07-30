@@ -110,6 +110,36 @@ test('input updates the readout and aria-valuetext before onInput', () => {
   assert.deepEqual(observed, { raw: 73, text: '7.3', aria: '7.3' });
 });
 
+/**
+ * Verifies setValue writes all three parts of the control at once — thumb,
+ * readout, and aria-valuetext — without firing onInput, since the caller
+ * already holds the value it is pushing.
+ */
+test('setValue drives thumb, readout and aria-valuetext without firing onInput', () => {
+  let calls = 0;
+  const { slider, valueSpan, setValue } = createSlider(
+    'c', { ...base, scale: 10, decimals: 1 }, () => { calls += 1; });
+
+  assert.equal(setValue(7.26), 7.3);
+  assert.equal(slider.value, '73');
+  assert.equal(valueSpan.textContent, '7.3');
+  assert.equal(slider.getAttribute('aria-valuetext'), '7.3');
+  assert.equal(calls, 0);
+});
+
+/** Verifies setValue clamps to the configured range instead of moving the thumb off it. */
+test('setValue clamps to the slider range', () => {
+  const { slider, valueSpan, setValue } = createSlider(
+    'c', { ...base, scale: 10, decimals: 1 }, null);
+
+  assert.equal(setValue(42), 10);
+  assert.equal(slider.value, '100');
+  assert.equal(valueSpan.textContent, '10.0');
+  assert.equal(setValue(-3), 0);
+  assert.equal(slider.value, '0');
+  assert.equal(valueSpan.textContent, '0.0');
+});
+
 /** Verifies the visible label is the accessible name when no override is supplied. */
 test('omitting ariaLabel leaves the visible label as the accessible name', () => {
   const { slider } = createSlider('c', base, null);

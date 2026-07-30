@@ -30,7 +30,7 @@
  * @param {string} [cfg.sliderClass] - Classes for the input
  * @param {string} [cfg.valueClass] - Classes for the readout span
  * @param {Function} onInput - Called with the raw slider value on each input
- * @returns {{ slider: HTMLInputElement, valueSpan: HTMLElement }}
+ * @returns {{ slider: HTMLInputElement, valueSpan: HTMLElement, setValue: function(number): number }}
  */
 export function createSlider(containerId, cfg, onInput) {
   const container = document.getElementById(containerId);
@@ -118,5 +118,22 @@ export function createSlider(containerId, cfg, onInput) {
     });
   }
 
-  return { slider, valueSpan };
+  /**
+   * Drives the control from code: thumb, readout, and `aria-valuetext` all move
+   * together, so a page that computes a value elsewhere cannot leave one of the
+   * three behind. Fires no `input` event — the caller owns its own state.
+   * @param {number} display - The value in display space; clamped to [min, max].
+   * @returns {number} The value now shown, clamped and rounded to the scaled grid.
+   */
+  const setValue = (display) => {
+    const scaled = Math.round(Math.min(max, Math.max(min, display)) * scale);
+    const shown = scaled / scale;
+    const text = shown.toFixed(decimals);
+    slider.value = String(scaled);
+    valueSpan.textContent = text;
+    slider.setAttribute('aria-valuetext', text);
+    return shown;
+  };
+
+  return { slider, valueSpan, setValue };
 }
