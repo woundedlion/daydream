@@ -1,6 +1,7 @@
 // @ts-check
-import { test } from 'node:test';
+import { mock, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { fakeElement } from './fake_dom.js';
 import { selectMimeType, VideoRecorder } from '../recorder.js';
 
 /**
@@ -865,5 +866,164 @@ test('a cancelled save picker tells the host the session ended', async () => {
     assert.equal(rec.mediaRecorder, null, 'the stop path still finalizes the session');
   } finally {
     restore();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// The anchor-click save path, taken whenever the File System Access API is
+// absent (Firefox, Safari).
+// ---------------------------------------------------------------------------
+
+/**
+ * Installs the globals the buffered save path drives — Blob, the object-URL
+ * registry, and a document whose anchors record their click — over whatever
+ * document is already installed; canvas creation falls through to it.
+ * @returns {any} The recorded blobs, object URLs, anchors and clicks, the body
+ *   the anchor is attached to, and a restore() for every installed global.
+ */
+const installSavePath = () => {
+  const savedDocument = globalThis.document;
+  const savedBlob = globalThis.Blob;
+  const savedCreateObjectURL = URL.createObjectURL;
+  const savedRevokeObjectURL = URL.revokeObjectURL;
+  /** @type {any} */
+  const spy = { blobs: [], created: [], revoked: [], anchors: [], clicks: [] };
+
+  globalThis.Blob = /** @type {any} */ (class {
+    constructor(parts, options) {
+      this.parts = parts;
+      this.type = options?.type;
+      spy.blobs.push(this);
+    }
+  });
+  URL.createObjectURL = (blob) => {
+    const url = `blob:recorder/${spy.created.length}`;
+    spy.created.push({ blob, url });
+    return url;
+  };
+  URL.revokeObjectURL = (url) => { spy.revoked.push(url); };
+
+  const body = fakeElement('body');
+  const createOther = savedDocument?.createElement;
+  spy.body = body;
+  globalThis.document = /** @type {any} */ ({
+    body,
+    createElement: (tag) => {
+      if (tag !== 'a') return createOther(tag);
+      const anchor = fakeElement('a');
+      // The anchor is detached right after the click, so record the attachment
+      // state at click time rather than reading it afterwards.
+      anchor.click = () => spy.clicks.push(
+        { href: anchor.href, download: anchor.download, parent: anchor.parentNode });
+      spy.anchors.push(anchor);
+      return anchor;
+    },
+  });
+  spy.restore = () => {
+    globalThis.document = savedDocument;
+    globalThis.Blob = savedBlob;
+    URL.createObjectURL = savedCreateObjectURL;
+    URL.revokeObjectURL = savedRevokeObjectURL;
+  };
+  return spy;
+};
+
+/** Fixed local wall-clock time so the timestamped file name is exact. */
+const SAVE_CLOCK = new Date(2026, 0, 2, 3, 4, 5);
+
+/**
+ * Without the File System Access API a stopped session buffers its chunks, packs
+ * them into one blob of the container's MIME type, and hands it to the browser
+ * through a timestamped, attached-then-detached anchor whose object URL is
+ * revoked once the click has consumed it.
+ */
+test('the buffered save path downloads one blob through an anchor click', () => {
+  const restore = installRecorderEnv();
+  const save = installSavePath();
+  mock.timers.enable({ apis: ['setTimeout', 'Date'], now: SAVE_CLOCK });
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    rec.format = 'mp4';
+
+    rec.start('swirl');
+    const recorder = rec.mediaRecorder;
+    recorder.ondataavailable({ data: { size: 10 } });
+    recorder.ondataavailable({ data: { size: 20 } });
+    rec.stop();
+    recorder.onstop();
+
+    assert.equal(save.blobs.length, 1, 'the session assembles exactly one blob');
+    assert.deepEqual(save.blobs[0].parts, [{ size: 10 }, { size: 20 }],
+      'every captured chunk, in capture order');
+    assert.equal(save.blobs[0].type, 'video/mp4', 'the blob carries the container MIME type');
+    assert.deepEqual(save.created.map((c) => c.blob), [save.blobs[0]],
+      'one object URL, minted for that blob');
+
+    assert.equal(save.clicks.length, 1, 'the download is triggered by a single anchor click');
+    assert.equal(save.clicks[0].href, save.created[0].url);
+    assert.equal(save.clicks[0].download, 'swirl_20260102_030405.mp4');
+    assert.equal(save.clicks[0].parent, save.body, 'the anchor is in the document when clicked');
+    assert.deepEqual(save.body.children, [], 'and detached again afterwards');
+
+    assert.deepEqual(save.revoked, [], 'the object URL outlives the click');
+    mock.timers.tick(1000);
+    assert.deepEqual(save.revoked, [save.created[0].url], 'then it is revoked');
+  } finally {
+    mock.timers.reset();
+    save.restore();
+    restore();
+  }
+});
+
+/**
+ * The blob type and the file extension are both derived from the container the
+ * browser actually chose, so they can never disagree; an unknown or empty type
+ * falls back to WebM.
+ */
+test('the buffered save maps each container to its extension and blob type', () => {
+  const save = installSavePath();
+  mock.timers.enable({ apis: ['setTimeout', 'Date'], now: SAVE_CLOCK });
+  try {
+    const cases = [
+      ['video/mp4;codecs=avc1', 'clip_20260102_030405.mp4', 'video/mp4'],
+      ['video/webm;codecs=vp9', 'clip_20260102_030405.webm', 'video/webm'],
+      ['video/x-matroska;codecs=avc1', 'clip_20260102_030405.mkv', 'video/x-matroska'],
+      ['video/ogg', 'clip_20260102_030405.ogv', 'video/ogg'],
+      ['', 'clip_20260102_030405.webm', 'video/webm'],
+    ];
+    const rec = new VideoRecorder(recordableCanvas());
+    for (const [mimeType, filename, blobType] of cases) {
+      save.blobs.length = 0;
+      save.clicks.length = 0;
+      rec.download(/** @type {any} */ ({ mimeType }), [{ size: 1 }], 'clip');
+      assert.equal(save.blobs[0].type, blobType, `blob type for "${mimeType}"`);
+      assert.equal(save.clicks[0].download, filename, `file name for "${mimeType}"`);
+    }
+    mock.timers.tick(1000);
+    assert.equal(save.revoked.length, cases.length, 'every minted URL is revoked');
+  } finally {
+    mock.timers.reset();
+    save.restore();
+  }
+});
+
+/** Verifies download() with no arguments saves the active session's own state. */
+test('download defaults to the active recorder, chunks, and effect name', () => {
+  const save = installSavePath();
+  mock.timers.enable({ apis: ['setTimeout', 'Date'], now: SAVE_CLOCK });
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    rec.mediaRecorder = /** @type {any} */ ({ mimeType: 'video/webm;codecs=vp9' });
+    rec.chunks = /** @type {any} */ ([{ size: 7 }]);
+    rec.effectName = 'live';
+
+    rec.download();
+
+    assert.deepEqual(save.blobs[0].parts, [{ size: 7 }]);
+    assert.equal(save.blobs[0].type, 'video/webm');
+    assert.equal(save.clicks[0].download, 'live_20260102_030405.webm');
+  } finally {
+    mock.timers.reset();
+    save.restore();
   }
 });
