@@ -773,8 +773,10 @@ function segmentedFailed(label, err) {
   segEpoch++;
   segments.destroy();
   segments.updateStats();
-  segState.segmented = false;
-  segEnabledCtrl.updateDisplay();
+  // setValue (not updateDisplay) so the deep-link writer drops segmented=true
+  // from the URL; it no-ops when the toggle is already false. Its onChange
+  // re-runs the teardown, which is idempotent.
+  segEnabledCtrl.setValue(false);
 }
 const segEnabledCtrl = segFolder.add(segState, 'segmented').name('Enabled').onChange(async v => {
   try {
