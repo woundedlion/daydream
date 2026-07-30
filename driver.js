@@ -81,8 +81,8 @@ export class LabelPool {
 
 
 
-/** Container width (px) at and below which the layout is mobile. Mirrored by the
- *  media-query breakpoints in styles/index.css. */
+/** Canvas-container width (px) at and below which rendering uses its compact layout.
+ *  CSS rearranges the surrounding page independently based on viewport width. */
 export const MOBILE_BREAKPOINT_PX = 900;
 
 /** Stats-panel cell element IDs per row, ordered [desktop, mobile]. */
