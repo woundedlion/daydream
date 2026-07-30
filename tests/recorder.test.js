@@ -286,6 +286,25 @@ test('start refuses and stays idle when recording is unsupported', () => {
   }
 });
 
+test('an unsupported explicit format reports the browser-selected container', () => {
+  const restore = installRecorderEnv();
+  try {
+    FakeMediaRecorder.isTypeSupported = () => false;
+    const rec = new VideoRecorder(recordableCanvas());
+    const fallbacks = [];
+    rec.format = 'mp4';
+    rec.onFormatFallback = (extension) => fallbacks.push(extension);
+    rec.download = () => {};
+
+    rec.start('e');
+
+    assert.deepEqual(fallbacks, ['webm']);
+  } finally {
+    FakeMediaRecorder.isTypeSupported = () => true;
+    restore();
+  }
+});
+
 test('a MediaRecorder start failure releases the entire capture session', () => {
   const restore = installRecorderEnv();
   const errors = [];
