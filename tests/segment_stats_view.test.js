@@ -54,13 +54,11 @@ function makeDoc() {
 function readyState(n, over = {}) {
   const results = [];
   const timings = [];
-  const renderUs = [];
   const arenas = [];
   const frameSeen = [];
   for (let s = 0; s < n; s++) {
     results.push({ x0: s * 10, x1: s * 10 + 9, y0: 100 + s, y1: 200 + s });
     timings.push(s + 1);
-    renderUs.push((s + 1) * 7000);
     arenas.push({
       scratch_arena_a: { high_water_mark: 1024 * (s + 1) },
       scratch_arena_b: { high_water_mark: 2048 * (s + 1) },
@@ -76,7 +74,6 @@ function readyState(n, over = {}) {
     count: n,
     results,
     timings,
-    renderUs,
     arenas,
     frameSeen,
     wallTime: 12.5,
@@ -105,7 +102,7 @@ test('every per-segment metric renders under its own column header', () => {
   new SegmentStatsView(doc).update(readyState(3));
 
   const { head, cell } = grid(stats);
-  assert.deepEqual(head, ['', 'Range', 'Compute', 'Render', 'Scr A', 'Scr B', 'Persist']);
+  assert.deepEqual(head, ['', 'Range', 'Compute', 'Scr A', 'Scr B', 'Persist']);
 
   for (let s = 0; s < 3; s++) {
     const row = s + 1; // row 0 is the header
@@ -113,7 +110,6 @@ test('every per-segment metric renders under its own column header', () => {
     assert.equal(cell(row, 'Range').textContent,
       `x[${s * 10}–${s * 10 + 9}] y[${100 + s}–${200 + s}]`);
     assert.equal(cell(row, 'Compute').textContent, `${(s + 1).toFixed(1)} ms`);
-    assert.equal(cell(row, 'Render').textContent, `${((s + 1) * 7).toFixed(1)} ms`);
     assert.equal(cell(row, 'Scr A').textContent, `${(s + 1).toFixed(1)}`);
     assert.equal(cell(row, 'Scr B').textContent, `${(2 * (s + 1)).toFixed(1)}`);
     assert.equal(cell(row, 'Persist').textContent, `${(4 * (s + 1)).toFixed(1)}`);

@@ -90,8 +90,6 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
     assert.equal(typeof v, 'number', 'getParamValues elements must be numbers');
   }
 
-  assert.equal(typeof engine.getRenderUs(), 'number', 'getRenderUs must return a number');
-
   const m = engine.getArenaMetrics();
   for (const arena of ['scratch_arena_a', 'scratch_arena_b', 'persistent_arena']) {
     assert.ok(m[arena], `getArenaMetrics must expose ${arena}`);

@@ -214,7 +214,6 @@ const flush = () => new Promise((r) => setImmediate(r));
  * @param {number} [overrides.y0] - Inclusive top display-buffer row.
  * @param {number} [overrides.y1] - Exclusive bottom display-buffer row.
  * @param {number} [overrides.elapsed] - Simulated elapsed time for the frame.
- * @param {number} [overrides.renderUs] - Reported render time in microseconds.
  * @param {Object} [overrides.arenaMetrics] - Optional arena-metrics payload.
  * @param {number[]} [overrides.paramValues] - Post-frame param values the worker reports.
  * @returns {void}
@@ -232,7 +231,6 @@ function deliverFrame(controller, segId, overrides = {}) {
       x0: overrides.x0 ?? 0, x1: overrides.x1 ?? defW,
       y0: overrides.y0 ?? 0, y1: overrides.y1 ?? defH,
       elapsed: overrides.elapsed ?? 1,
-      renderUs: overrides.renderUs ?? 0,
       arenaMetrics: overrides.arenaMetrics ?? null,
       paramValues: overrides.paramValues ?? null,
     },
@@ -551,7 +549,7 @@ function deliverFrameWithSegId(controller, worker, segId) {
       type: 'frame', segId,
       pixels: new Uint16Array(2 * 2 * 3),
       x0: 0, x1: 2, y0: 0, y1: 2,
-      elapsed: 1, renderUs: 0, arenaMetrics: null,
+      elapsed: 1, arenaMetrics: null,
     },
   });
 }
@@ -598,7 +596,7 @@ test('a surviving worker responding after a fault does not drive pending negativ
       type: 'frame', segId: 1,
       pixels: new Uint16Array(2 * 2 * 3),
       x0: 0, x1: 2, y0: 0, y1: 2,
-      elapsed: 1, renderUs: 0, arenaMetrics: null,
+      elapsed: 1, arenaMetrics: null,
     },
   });
   assert.equal(c.pending, 0, 'post-fault frame leaves pending at 0, not negative');
@@ -1567,7 +1565,7 @@ test('create with an unknown resolution latches a pool fault', () => {
   assert.equal(c.ownsDisplay, true, 'the fault overlay owns the display');
   assert.deepEqual(c.workers, [], 'no workers were spawned');
   assert.equal(c.count, 3);
-  for (const arr of [c.results, c.scratch, c.timings, c.renderUs, c.arenas, c.frameSeen]) {
+  for (const arr of [c.results, c.scratch, c.timings, c.arenas, c.frameSeen]) {
     assert.equal(arr.length, c.count, 'count matches the per-segment array lengths');
   }
 });

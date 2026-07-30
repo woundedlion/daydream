@@ -4,7 +4,7 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  *
  * SegmentStatsView — the segmented-POV stats overlay: a per-segment table of
- * compute/render times and arena high-water marks, plus the spawn and fault
+ * compute times and arena high-water marks, plus the spawn and fault
  * states that replace it. Reads the per-segment arrays SegmentController
  * publishes each frame and owns nothing of the pipeline, so the overlay is
  * testable without a Worker and the controller without a DOM.
@@ -28,7 +28,6 @@ export const FAULT_RENDER = -2;
  *   count: number,
  *   results: Array<{x0: number, x1: number, y0: number, y1: number} | null>,
  *   timings: number[],
- *   renderUs: number[],
  *   arenas: Array<import('./worker_protocol.js').SegArenaMetrics | null>,
  *   frameSeen: boolean[],
  *   wallTime: number,
@@ -143,7 +142,6 @@ export class SegmentStatsView {
       c.range.textContent = state.frameSeen[s] && r ? `x[${r.x0}–${r.x1}] y[${r.y0}–${r.y1}]` : '?';
       c.compute.textContent = `${timing.toFixed(1)} ms`;
       c.compute.className = timing > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
-      c.render.textContent = `${((state.renderUs[s] || 0) / 1000).toFixed(1)} ms`;
 
       const a = state.arenas[s];
       c.scrA.textContent = a ? fmtKB(a.scratch_arena_a.high_water_mark) : '-';
@@ -181,7 +179,7 @@ export class SegmentStatsView {
     };
     const spanCell = () => { const e = td(''); e.colSpan = 3; return e; };
 
-    mkRow([th(''), th('Range'), th('Compute'), th('Render'),
+    mkRow([th(''), th('Range'), th('Compute'),
            th('Scr A'), th('Scr B'), th('Persist')]);
 
     const rows = [];
@@ -189,20 +187,19 @@ export class SegmentStatsView {
       const range = td('');
       range.style.cssText = 'color:#555;font-size:0.8em';
       const compute = td('', 'seg-time');
-      const render = td('', 'seg-time');
       const scrA = td('-');
       const scrB = td('-');
       const persist = td('-');
-      mkRow([td(`Seg ${s}`, 'seg-label'), range, compute, render, scrA, scrB, persist]);
-      rows.push({ range, compute, render, scrA, scrB, persist });
+      mkRow([td(`Seg ${s}`, 'seg-label'), range, compute, scrA, scrB, persist]);
+      rows.push({ range, compute, scrA, scrB, persist });
     }
 
     const maxTime = td('', 'seg-time');
-    const maxRow = mkRow([td('max', 'seg-label'), td(''), maxTime, td(''), spanCell()]);
+    const maxRow = mkRow([td('max', 'seg-label'), td(''), maxTime, spanCell()]);
     maxRow.style.borderTop = '1px solid #333';
 
     const wallTime = td('', 'seg-time');
-    mkRow([td('wall', 'seg-label'), td(''), wallTime, td(''), spanCell()]);
+    mkRow([td('wall', 'seg-label'), td(''), wallTime, spanCell()]);
 
     el.replaceChildren(table);
     this.statsTable = table;
