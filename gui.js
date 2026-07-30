@@ -10,6 +10,7 @@ import {
   parseUrlNumber,
   roundUrlNumber,
   URL_FLUSH_DEBOUNCE_MS,
+  writeUrl,
 } from "./state.js";
 
 /**
@@ -59,11 +60,7 @@ const makeUrlParamWriter = () => {
       }
     }
     pendingUrlWrites.clear();
-    const qs = params.toString();
-    // Preserve any location.hash; rebuilding from pathname alone would drop it
-    // (mirrors URLSync.flush/reset in state.js).
-    const base = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-    window.history.replaceState({}, '', base + window.location.hash);
+    writeUrl(params);
   };
   const writer = (key, value) => {
     const sync = getActiveURLSync();
@@ -386,9 +383,7 @@ export const resetGUI = (excludedKeys = []) => {
       params.delete(key);
     }
   }
-  const qs = params.toString();
-  const base = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-  window.history.replaceState({}, '', base + window.location.hash);
+  writeUrl(params);
 };
 
 export { DeepLinkGUI as GUI };
