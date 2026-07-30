@@ -16,11 +16,10 @@
  *
  * The assignment mirrors the firmware's physical segment→canvas map
  * (hardware/pov_segment_map.h::segment_map), so a per-segment overlay in the
- * simulator names the same board the hardware ID straps select. There is no
- * codegen bridging C++ and JS, so the correspondence is pinned by
- * tests/segment_crosscheck.test.js against the same fixture the C++ host tests
- * (test_pov_segmented.h) lock down; a convention change on either side trips a
- * test.
+ * simulator names the same board the hardware ID straps select. The
+ * correspondence is pinned by tests/segment_crosscheck.test.js against
+ * pov_segment_map.json — the mapping emitted from that header by the engine build
+ * and installed here — so a convention change on either side trips a test.
  *
  * Layout: NUM_ARMS = 2 vertical halves — arm A is the left half, arm B the
  * floor(w/2)-shifted right half — with segments [0, total/2) on arm A and the

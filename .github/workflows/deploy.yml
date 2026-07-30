@@ -26,6 +26,11 @@
 # most engine builds, so git has nothing to commit for it and its last-touch
 # commit legitimately trails the binary's. Its hash entry is the binding.
 #
+# The same install drops the engine's segment-map golden (pov_segment_map.json)
+# here. The gate diffs the committed copy against the pinned engine checkout, so
+# the segment cross-check in the JS suite cannot measure the web tiling against a
+# firmware table that has drifted from the engine's header.
+#
 # If the engine repo (woundedlion/pov) is PRIVATE, add a repository secret
 # POV_TOKEN = a PAT with read access. For a public engine repo the default
 # workflow token is sufficient.
@@ -107,6 +112,23 @@ jobs:
           ref: ${{ steps.engine.outputs.ref }}
           token: ${{ secrets.POV_TOKEN || github.token }}
           path: engine
+
+      - name: Verify the committed segment-map golden matches the pinned engine
+        # pov_segment_map.json is the firmware segment→canvas table
+        # tests/segment_crosscheck.test.js measures the web tiling against. The
+        # engine emits it from hardware/pov_segment_map.h and its
+        # unit_pov_segment_map_golden CTest (run below) pins it to that header, so
+        # requiring this copy to equal the engine's at the pinned SHA is what keeps
+        # a segment convention change from riding green here on a stale table.
+        run: |
+          if [ ! -f pov_segment_map.json ]; then
+            echo "::error::pov_segment_map.json not found — the segment cross-check has no firmware reference. The Holosphere WASM install writes it next to the module; commit it with the .wasm."
+            exit 1
+          fi
+          if ! diff -u engine/hardware/pov_segment_map.json pov_segment_map.json; then
+            echo "::error::pov_segment_map.json is stale relative to the pinned engine ($(cat holosphere_wasm.sha)) — re-run the Holosphere WASM install and commit the refreshed golden."
+            exit 1
+          fi
 
       - name: Install Clang + Ninja
         # Pin the compiler version (clang-18 = Ubuntu 24.04 default) to match CI
