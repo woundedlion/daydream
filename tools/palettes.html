@@ -387,11 +387,7 @@
           <!-- Animation Controls -->
           <div class="w-full sm:w-1/2 space-y-3">
             <h3 class="text-lg font-bold text-indigo-400">Global Phase Speed (Cycles/s)</h3>
-            <div class="flex items-center space-x-2">
-              <label for="speed_slider" id="speed-label" class="w-12 text-gray-400">Speed:</label>
-              <input type="range" id="speed_slider" min="0" max="2000" step="1" value="300" class="w-full speed-thumb">
-              <span id="speed_value" class="slider-label w-16 text-right">0.300</span>
-            </div>
+            <div id="speed_control" class="flex items-center space-x-2"></div>
             <p class="text-sm text-gray-400">Current Phase (t): <span id="t_value"
                 class="font-mono text-white">0.000</span></p>
             <p class="text-sm text-gray-400">Current Color:
@@ -521,7 +517,7 @@
     // Declared inside init() after the window load handler.
     // to ensure elements exist.
     let colorStripCanvas, colorStripCtx, waveGraphCanvas, waveGraphCtx,
-      colorSwatch, tValueSpan, speedSlider, speedValueSpan,
+      colorSwatch, tValueSpan,
       hexValueSpan, copyPromptSpan, resetZoomButton;
 
     // The color strip is static between palette changes; only the sweeping
@@ -1282,8 +1278,6 @@
       waveGraphCtx = waveGraphCanvas ? waveGraphCanvas.getContext('2d') : null;
       colorSwatch = document.getElementById('colorSwatch');
       tValueSpan = document.getElementById('t_value');
-      speedSlider = document.getElementById('speed_slider');
-      speedValueSpan = document.getElementById('speed_value');
       hexValueSpan = document.getElementById('hex_value');
       copyPromptSpan = document.getElementById('copy_prompt');
       resetZoomButton = document.getElementById('resetZoomButton');
@@ -1308,14 +1302,21 @@
       buildPaletteGallery();
 
       // 2. Initialize Speed slider
-      if (speedSlider) {
-        speedSlider.addEventListener('input', () => {
-          animationSpeed = parseFloat(speedSlider.value) / 1000; // Slider range 0-2000 -> Speed 0-2.000
-          if (speedValueSpan) {
-            speedValueSpan.textContent = animationSpeed.toFixed(3);
-          }
-        });
-      }
+      buildSlider('speed_control', {
+        id: 'speed',
+        label: 'Speed',
+        min: 0,
+        max: 2,
+        step: 0.001,
+        value: animationSpeed,
+        scale: 1000,
+        decimals: 3,
+        labelClass: 'w-12 text-gray-400',
+        sliderClass: 'w-full speed-thumb',
+        valueClass: 'slider-label w-16 text-right',
+      }, (rawValue) => {
+        animationSpeed = rawValue / 1000;
+      });
 
       // 2.5 Initialize Generative Palette UI Controls
       const genSeedSlider = document.getElementById('gen_seed_slider');
