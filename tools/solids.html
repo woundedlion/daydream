@@ -1618,20 +1618,21 @@
     }
 
     function updateOpParam(index, key, value) {
-      // Clamp to the op's declared range and reject non-numeric input before it
-      // reaches state — the number box has no inherent bounds and the WASM mesh
-      // boundary is deliberately fail-fast, so an out-of-range or NaN value
-      // typed here could kill the page or produce garbage geometry. On a bad
-      // value, fall back to the current value (the sync below restores the UI).
+      // Snap onto the op's step grid (which also clamps to its range) and reject
+      // non-numeric input before it reaches state — the number box carries
+      // neither bounds nor grid, and the WASM mesh boundary is deliberately
+      // fail-fast, so an out-of-range or NaN value typed here could kill the
+      // page or produce garbage geometry, and an off-grid one would export a
+      // coefficient no control ever shows. The grid also keeps integral-step
+      // params (e.g. relax's iter) whole, as their count-typed C++ args demand.
+      // On a bad value, fall back to the current value (the sync below restores
+      // the UI).
       const def = OP_DEFS[state.ops[index].op]?.params?.[key];
       let val = parseFloat(value);
       if (Number.isNaN(val)) {
         val = state.ops[index].params[key];
       } else if (def) {
-        val = Math.min(def.max, Math.max(def.min, val));
-        // Integral-step params (e.g. relax's iter) become count-typed C++ args;
-        // a fractional value throws in requireCount and silently fails export.
-        if (Number.isInteger(def.step)) val = Math.round(val);
+        val = snapToStep(val, def);
       }
       state.ops[index].params[key] = val;
 
