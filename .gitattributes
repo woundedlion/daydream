@@ -6,5 +6,9 @@ holosphere_wasm.toolchain  text eol=lf
 *.yml                      text eol=lf
 holosphere_wasm.wasm       binary
 
+# The segment-map golden is diffed against the engine checkout's copy on the same
+# runner, so its bytes must match the engine's LF-pinned file exactly.
+pov_segment_map.json       text eol=lf
+
 # Git hooks are sourced by /bin/sh; CRLF would break the shebang on checkout.
 .githooks/**               text eol=lf
