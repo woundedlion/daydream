@@ -290,6 +290,24 @@ export function generateRecipeCpp(item, baseNamespace) {
 }
 
 /**
+ * Snaps a computed value onto an op parameter's step grid and clamps it into
+ * range, so it is exactly representable by the control that edits it.
+ *
+ * A parameter is single-valued only if every view of it agrees: an unsnapped
+ * value leaves the range input on the nearest step, the number box on its own
+ * rounding, and the generated funcName suffix on a third. Snapping at the source
+ * — where a value is derived rather than typed — keeps all of them equal.
+ *
+ * @param {number} value - The unsnapped value.
+ * @param {{min: number, max: number, step: number}} def - The parameter's OP_DEFS range.
+ * @returns {number} The nearest step from `min`, clamped to [min, max].
+ */
+export function snapToStep(value, def) {
+  const snapped = def.min + Math.round((value - def.min) / def.step) * def.step;
+  return Math.min(def.max, Math.max(def.min, snapped));
+}
+
+/**
  * Computes the interior angle (in radians) at the second vertex of the mesh's
  * first face, used to characterize a solid's face shape. Returns 0 for
  * degenerate input (no faces, a face with fewer than 3 vertices, or a

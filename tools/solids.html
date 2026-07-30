@@ -604,6 +604,7 @@
       generateFuncAndRecipe,
       generateRecipeCpp,
       computeInternalAngle,
+      snapToStep,
       isConvexFace,
       uniqueEdges,
       geodesicSegments,
@@ -1608,8 +1609,12 @@
           if (opName === 'hankin' && k === 'angle') {
             // computeInternalAngle returns 0 for a null/load-failed mesh; keep
             // the OP_DEFS default rather than seeding a degenerate 0deg angle.
+            // The half-internal angle is snapped to the control's whole-degree
+            // step so the slider, the number box, the _hk suffix and the emitted
+            // recipe all carry one value; the shift is under 2% of an edge and
+            // never changes the pattern's topology.
             const derived = (computeInternalAngle(currentMesh) / 2) * (180 / Math.PI);
-            if (derived > 0) val = derived;
+            if (derived > 0) val = snapToStep(derived, def.params[k]);
           }
           newOp.params[k] = val;
         });
