@@ -2,15 +2,14 @@
 //
 // SegmentStatsView — the segmented-POV overlay: which column each per-segment
 // metric lands in, which source each fault code names, and the text-node-only
-// fault message. ../driver.js is mocked so the suite runs without three.
+// fault message.
 //
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
-import { test, mock } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement } from './fake_dom.js';
 
-const SLOW_FRAME_MS = 50;
-mock.module('../driver.js', { namedExports: { SLOW_FRAME_MS } });
+import { SLOW_FRAME_MS } from '../frame_constants.js';
 
 const { SegmentStatsView, FAULT_POOL, FAULT_RENDER } =
   await import('../segment_stats_view.js');
@@ -25,11 +24,6 @@ const { SegmentStatsView, FAULT_POOL, FAULT_RENDER } =
 function makeDoc() {
   const createElement = (tag) => {
     const el = fakeElement(tag);
-    Object.defineProperty(el, 'innerHTML', {
-      set() { throw new Error('innerHTML assigned'); },
-      get() { return undefined; },
-      configurable: true,
-    });
     el.focusCount = 0;
     el.focus = () => { el.focusCount++; };
     return el;

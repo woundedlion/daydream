@@ -8,6 +8,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { pixelToSpherical } from "./geometry.js";
 import { isViewLive } from "./pixel_view.js";
+import { FPS, SLOW_FRAME_MS } from "./frame_constants.js";
 
 /**
  * Reuses CSS2DObject label sprites across frames so axis/effect labels can be
@@ -80,9 +81,6 @@ export class LabelPool {
 
 
 
-/** Per-frame time (ms) above which a frame/segment is flagged "slow" in stats. */
-export const SLOW_FRAME_MS = 62;
-
 /** Container width (px) at and below which the layout is mobile. Mirrored by the
  *  media-query breakpoints in styles/index.css. */
 export const MOBILE_BREAKPOINT_PX = 900;
@@ -127,7 +125,7 @@ export class Daydream {
   // Virtual-row padding over logical H (core/platform.h). Sim = 0 (full sphere);
   // device = 3 (south-pole clip). See pixelToSpherical.
   static H_OFFSET = 0;
-  static FPS = 16;
+  static FPS = FPS;
   // Bounds the post-stall frame backlog (clock consumes one interval per frame).
   static MAX_FRAME_BACKLOG_SECONDS = 0.25;
   static DEFAULT_DOT_SIZE = 2;
