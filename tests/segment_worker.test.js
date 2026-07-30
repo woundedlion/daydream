@@ -12,10 +12,11 @@ import { unpinnedEngineMethods } from './fake_engine.js';
 // ---------------------------------------------------------------------------
 
 const posted = [];
-/** @type {{ postMessage: Function, onmessage: ?Function }} */
+/** @type {{ postMessage: Function, onmessage: ?Function, onmessageerror: ?Function }} */
 const fakeSelf = {
   postMessage(msg, transfer) { posted.push({ msg, transfer }); },
   onmessage: null,
+  onmessageerror: null,
 };
 globalThis.self = fakeSelf;
 
@@ -340,6 +341,20 @@ test('an accepted setResolution defers the clip until setEffect', async () => {
   await dispatch({ type: 'render' });
   const frame = posted.find((p) => p.msg.type === 'frame').msg;
   assert.deepEqual([frame.x0, frame.x1, frame.y0, frame.y1], [8, 16, 4, 8]);
+});
+
+/** A structured-clone failure is reported immediately to the controller. */
+test('worker reports inbound message deserialization failures', () => {
+  const error = { type: 'messageerror' };
+  const logged = mock.method(console, 'error', () => {});
+
+  fakeSelf.onmessageerror(error);
+
+  logged.mock.restore();
+  assert.deepEqual(posted.at(-1).msg, {
+    type: 'engineRejected',
+    reason: 'message deserialization failed',
+  });
 });
 
 /** A clip rejection is surfaced immediately instead of rendering full-canvas. */
