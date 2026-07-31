@@ -9,10 +9,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import createHolosphereModule from '../holosphere_wasm.js';
-import { KNOWN_OPS, PLATONIC_SOLIDS, CATALAN_BASES } from '../tools/solid_codegen.js';
+import { KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, applyOp } from '../tools/solid_codegen.js';
 import { ENGINE_METHODS, ParamSetResult } from './fake_engine.js';
 
-const M = await createHolosphereModule({ print() {}, printErr() {} });
+// The module's stdout, captured rather than dropped: the WASM bridge answers an
+// out-of-domain op argument by clamping it and logging, so this is the only
+// channel that reports one.
+const moduleLogs = [];
+const sink = (line) => moduleLogs.push(line);
+const M = await createHolosphereModule({ print: sink, printErr: sink });
 
 // A resolution the WASM factory is built for (mirrors daydream.js's
 // "Holosphere (96x20)" preset). Used to pin getPixels()'s length below.
@@ -282,6 +287,48 @@ test('solid_codegen KNOWN_OPS matches the operators MeshOps binds', () => {
   assert.deepEqual([...KNOWN_OPS].sort(), meshOpNames(),
     'the codegen op list and the ops bound by the WASM module must agree; ' +
     'update tools/solid_codegen.js KNOWN_OPS to match the engine');
+});
+
+// One case per OP_DEFS slider endpoint: the named param at that edge, every
+// other param of the op at its default.
+function opBoundCases(def) {
+  const names = Object.keys(def.params);
+  if (names.length === 0) return [{ label: 'no params', params: {} }];
+  return names.flatMap((name) => ['min', 'val', 'max'].map((edge) => {
+    const params = Object.fromEntries(names.map((k) => [k, def.params[k].val]));
+    params[name] = def.params[name][edge];
+    return { label: `${name}=${edge} (${params[name]})`, params };
+  }));
+}
+
+// A bound outside the engine's domain for its operator is invisible in the
+// preview — the bridge clamps the argument and logs — while
+// generateFuncAndRecipe emits the authored value, so the exported C++ trips an
+// always-on engine assert once compiled into firmware. Replaying each endpoint
+// on the live bridge and requiring a silent, accepted call is what makes the
+// engine, not a JS mirror of it, the authority on those bounds.
+test('every OP_DEFS bound sits inside the engine domain the WASM bridge enforces', () => {
+  const seed = 'cube';
+  for (const [op, def] of Object.entries(OP_DEFS)) {
+    for (const { label, params } of opBoundCases(def)) {
+      moduleLogs.length = 0;
+      const mesh = M.MeshOps.fromSolidName(seed);
+      let out = null;
+      try {
+        // applyOp throws on a soft reject (bridge returned null).
+        out = applyOp(mesh, { op, params });
+      } finally {
+        if (out) out.delete();
+        mesh.delete();
+        M.MeshOps.clearToolingMemory();
+      }
+      assert.deepEqual(moduleLogs, [],
+        `${op} ${label} on a ${seed} made the WASM bridge log; the OP_DEFS ` +
+        'range reaches outside the engine domain for that operator, so the ' +
+        'preview silently clamps while the generated C++ carries the authored ' +
+        'value into an engine assert. Narrow the range in tools/solid_codegen.js');
+    }
+  }
 });
 
 test('the Platonic and Catalan seed lists name registered Simple solids', () => {
