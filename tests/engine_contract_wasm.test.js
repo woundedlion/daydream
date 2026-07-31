@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import createHolosphereModule from '../holosphere_wasm.js';
 import { KNOWN_OPS, PLATONIC_SOLIDS, CATALAN_BASES } from '../tools/solid_codegen.js';
-import { ENGINE_METHODS } from './fake_engine.js';
+import { ENGINE_METHODS, ParamSetResult } from './fake_engine.js';
 
 const M = await createHolosphereModule({ print() {}, printErr() {} });
 
@@ -26,6 +26,21 @@ test('HolosphereEngine exposes the method surface the FakeEngines mock', () => {
   for (const name of ENGINE_METHODS) {
     assert.equal(typeof engine[name], 'function',
       `HolosphereEngine is missing method ${name} (FakeEngine implements it)`);
+  }
+});
+
+test('the module ParamSetResult enum matches the fake_engine.js mirror', () => {
+  assert.ok(M.ParamSetResult, 'the module must export ParamSetResult');
+  // Embind exposes the enum as a constructor whose value names sit beside
+  // plumbing properties (values, argCount); the values themselves are the
+  // instanceof-filtered keys.
+  const moduleNames = Object.keys(M.ParamSetResult)
+    .filter((k) => M.ParamSetResult[k] instanceof M.ParamSetResult);
+  assert.deepEqual(moduleNames.sort(), Object.keys(ParamSetResult).sort(),
+    'fake_engine.js ParamSetResult must mirror the module enum roster');
+  for (const name of Object.keys(ParamSetResult)) {
+    assert.equal(M.ParamSetResult[name].value, ParamSetResult[name].value,
+      `fake_engine.js ParamSetResult.${name}.value must match the module`);
   }
 });
 
@@ -69,10 +84,10 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
   assert.ok(typeof p.value === 'number' || typeof p.value === 'boolean',
     'param def value must be a number or boolean');
   // Controller flattens bools to 1/0 before calling setParameter.
-  const paramOk = engine.setParameter(
+  const paramResult = engine.setParameter(
     p.name, typeof p.value === 'boolean' ? (p.value ? 1 : 0) : p.value);
-  assert.equal(typeof paramOk, 'boolean', 'setParameter must return a boolean');
-  assert.equal(paramOk, true, 'setParameter must succeed for a known param name');
+  assert.equal(paramResult, M.ParamSetResult.APPLIED,
+    'setParameter must report APPLIED for a known param name');
 
   engine.setAnimationsPaused(false);
   engine.setClip(0, W, 0, H);
@@ -151,7 +166,7 @@ test('malformed clip bounds are rejected', () => {
     'a full-canvas clip must still be accepted after the rejects');
 });
 
-test('a readonly parameter write is rejected', () => {
+test('a rejected parameter write names its reason', () => {
   assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
   let found = null;
   for (const name of Object.keys(engine.getEffectSizes())) {
@@ -166,10 +181,18 @@ test('a readonly parameter write is rejected', () => {
   }
   assert.ok(found,
     'no effect exposes a readonly parameter, so the reject path is unreachable');
-  assert.equal(engine.setParameter(found.def.name, found.def.value), false,
-    `setParameter must reject a write to readonly ${found.effect}.${found.def.name}`);
-  assert.equal(engine.setParameter('NoSuchParameter', 0), false,
-    'setParameter must reject an unknown parameter name');
+  assert.equal(engine.setParameter(found.def.name, found.def.value),
+    M.ParamSetResult.READONLY,
+    `setParameter must report READONLY for ${found.effect}.${found.def.name}`);
+  assert.equal(engine.setParameter('NoSuchParameter', 0),
+    M.ParamSetResult.UNKNOWN_PARAM,
+    'setParameter must report UNKNOWN_PARAM for an unknown parameter name');
+  const editable = engine.getParameterDefinitions()
+    .find((d) => !d.readonly && typeof d.value === 'number');
+  assert.ok(editable, `${found.effect} must expose an editable float param`);
+  assert.equal(engine.setParameter(editable.name, NaN),
+    M.ParamSetResult.NON_FINITE,
+    'setParameter must report NON_FINITE for a NaN value');
 });
 
 test('strobeColumns and getEffectSizes return the shapes daydream consumes', () => {

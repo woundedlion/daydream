@@ -4,7 +4,7 @@
 import { test, mock, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { PROTOCOL_VERSION } from '../worker_protocol.js';
-import { unpinnedEngineMethods } from './fake_engine.js';
+import { unpinnedEngineMethods, ParamSetResult } from './fake_engine.js';
 
 // ---------------------------------------------------------------------------
 // Fakes — installed BEFORE importing the worker, which binds self.postMessage
@@ -55,7 +55,10 @@ class FakeEngine {
   // Clearing params models the engine rebuilding to defaults, so the
   // "params re-applied AFTER setEffect" ordering is observable.
   setEffect(name) { this.calls.push(['setEffect', name]); this.effect = name; this.params = []; return true; }
-  setParameter(name, value) { this.params.push([name, value]); return true; }
+  setParameter(name, value) {
+    this.params.push([name, value]);
+    return ParamSetResult.APPLIED;
+  }
   setAnimationsPaused(p) { this.paused = p; }
   setClip(x0, x1, y0, y1) {
     if (!this.clipOk || !this.effect) return false;
@@ -92,6 +95,7 @@ let engineInstance = null;
 let nextResolutionOk = true;
 mock.module('../holosphere_wasm.js', {
   defaultExport: async () => ({
+    ParamSetResult,
     HolosphereEngine: class {
       constructor() {
         engineInstance = new FakeEngine();

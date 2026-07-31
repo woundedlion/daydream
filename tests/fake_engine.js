@@ -12,6 +12,22 @@ export const ENGINE_METHODS = [
 ];
 
 /**
+ * Mirror of the module-level ParamSetResult embind enum (targets/wasm/wasm.cpp)
+ * that setParameter returns. Values are distinct frozen objects so identity
+ * comparison behaves like embind's cached enum instances; consumers must
+ * compare against these values, never by truthiness (every value is a truthy
+ * object). engine_contract_wasm.test.js pins the name roster against the real
+ * module.
+ */
+export const ParamSetResult = Object.freeze({
+  APPLIED: Object.freeze({ value: 0 }),
+  NO_EFFECT: Object.freeze({ value: 1 }),
+  UNKNOWN_PARAM: Object.freeze({ value: 2 }),
+  READONLY: Object.freeze({ value: 3 }),
+  NON_FINITE: Object.freeze({ value: 4 }),
+});
+
+/**
  * Method names an object exposes that ENGINE_METHODS does not pin — a fake
  * mocking one of these would pass its own tests against a method the real
  * engine never had.
