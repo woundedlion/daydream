@@ -429,6 +429,38 @@ test('GenerativePalette.get returns finite linear RGB in range', () => {
 });
 
 /**
+ * Pins GenerativePalette.get's interpolation DOMAIN, which is the whole point of
+ * the reconstruction: BakedPalette::get (core/color/composition.h) lerps
+ * linear-light entries, so a sample between two LUT stops must be the linear-light
+ * blend of them, not the sRGB blend.
+ */
+test('GenerativePalette.get blends adjacent LUT entries in linear light', () => {
+  // Entry 0 black, every later entry mid grey: the 0->1 step is a wide gap, where
+  // the linear and sRGB domains disagree by ~0.14 rather than by rounding.
+  setPaletteOps(() => {
+    const lut = new Uint8Array(256 * 3);
+    lut.fill(128, 3);
+    return lut;
+  });
+  try {
+    const pal = new GenerativePalette('STRAIGHT', 'TRIADIC', 'FLAT', 'VIBRANT', 0);
+    const grey = srgbToLinear(128 / 255);
+
+    for (const [t, frac] of [[0.5 / 255, 0.5], [0.25 / 255, 0.25], [0.75 / 255, 0.75]]) {
+      for (const ch of pal.get(t)) {
+        assert.ok(Math.abs(ch - grey * frac) < NEAR, `linear blend at frac ${frac}: ${ch}`);
+        assert.ok(Math.abs(ch - (128 / 255) * frac) > 0.05, `not the sRGB blend: ${ch}`);
+      }
+    }
+
+    for (const ch of pal.get(0)) assert.ok(Math.abs(ch) < NEAR, 'entry 0 is black');
+    for (const ch of pal.get(1)) assert.ok(Math.abs(ch - grey) < NEAR, 'entry 255 is linearized grey');
+  } finally {
+    setPaletteOps(mockBakeLut);
+  }
+});
+
+/**
  * Verifies the zoom window maps onto the whole strip: the color at phase p of
  * the zoomed palette equals the color at t_start + p*(t_end - t_start) of the
  * original, for every channel.
