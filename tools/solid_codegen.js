@@ -21,8 +21,11 @@ import { formatFloatCpp } from './cpp_format.js';
  * two cannot drift. Each params entry names a parameter both paths consume, in
  * call-argument order, and carries the tool's slider default and range;
  * solid_codegen.test.js pins both paths against these key sequences. The op set
- * must match what the WASM MeshOps class binds; engine_contract_wasm.test.js
- * pins that agreement.
+ * must match what the WASM MeshOps class binds, and every range must stay inside
+ * the engine's domain for that operator — the bridge clamps an out-of-domain
+ * argument and only logs, so the preview would hide a bound the generated C++
+ * carries into an always-on engine assert. engine_contract_wasm.test.js pins
+ * both.
  */
 export const OP_DEFS = {
   kis: { params: {} },
@@ -31,7 +34,7 @@ export const OP_DEFS = {
   snub: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 }, twist: { val: 0.0, min: 0, max: 1.0, step: 0.01 } } },
   dual: { params: {} },
   truncate: { params: { t: { val: 0.33, min: 0.01, max: 0.5, step: 0.01 } } },
-  chamfer: { params: { t: { val: 0.5, min: 0.01, max: 1.0, step: 0.01 } } },
+  chamfer: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 } } },
   expand: { params: { t: { val: 0.5, min: 0.01, max: 0.99, step: 0.01 } } },
   hankin: { params: { angle: { val: 54, min: 0, max: 90, step: 1 } } },
   relax: { params: { iter: { val: 100, min: 1, max: 500, step: 1 } } },
