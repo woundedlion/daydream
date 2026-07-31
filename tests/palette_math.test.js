@@ -35,8 +35,13 @@ function srgbToLinear(s) {
 
 const NEAR = 1e-6;
 
-/** Verifies ProceduralPalette.get clamps and linearizes the cosine output, and that getChannelValue exposes the raw cosine. */
-test('ProceduralPalette.get at t=0 and t=0.5 for a known coefficient set', () => {
+/**
+ * Verifies ProceduralPalette.get clamps and linearizes the cosine output, and
+ * that getChannelValue exposes the raw cosine. t=0 and t=0.5 land on the sRGB
+ * transfer's fixpoints, where it is the identity; t=0.25 samples the mid-range,
+ * where dropping the linearization changes the result.
+ */
+test('ProceduralPalette.get at t=0, t=0.25 and t=0.5 for a known coefficient set', () => {
   const p = new ProceduralPalette([0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [1, 1, 1], [0, 0, 0]);
 
   const at0 = p.get(0);
@@ -46,6 +51,14 @@ test('ProceduralPalette.get at t=0 and t=0.5 for a known coefficient set', () =>
   const at05 = p.get(0.5);
   for (const ch of at05) assert.ok(Math.abs(ch - srgbToLinear(0.0)) < NEAR);
   assert.ok(Math.abs(at05[0] - 0.0) < NEAR);
+
+  const at025 = p.get(0.25);
+  for (let ch = 0; ch < 3; ch++) {
+    assert.ok(Math.abs(at025[ch] - srgbToLinear(p.getChannelValue(0.25, ch))) < NEAR,
+      `channel ${ch} linearized at t=0.25: ${at025[ch]}`);
+  }
+  assert.ok(Math.abs(p.getChannelValue(0.25, 0) - 0.5) < NEAR, 'raw cosine at t=0.25');
+  assert.ok(Math.abs(at025[0] - 0.21404114) < NEAR, `linear at t=0.25: ${at025[0]}`);
 
   assert.ok(Math.abs(p.getChannelValue(0, 0) - 1.0) < NEAR);
   assert.ok(Math.abs(p.getChannelValue(0.5, 0) - 0.0) < NEAR);
