@@ -499,14 +499,28 @@ function addParamControl(gui, state, p) {
 }
 
 /**
- * Write one parameter value to the main engine.
+ * Write one parameter value to the main engine. setParameter returns a
+ * Module.ParamSetResult enum value; compare against the enum, never by
+ * truthiness (every enum value is a truthy object).
  * @param {string} name - The engine parameter name.
  * @param {number} value - The float value to write.
  * @returns {void}
  */
 function setEngineParam(name, value) {
-  if (host.engine.setParameter(name, value) === false)
-    console.warn(`setParameter("${name}") rejected as unknown.`);
+  const result = host.engine.setParameter(name, value);
+  if (result !== host.module.ParamSetResult.APPLIED)
+    console.warn(`setParameter("${name}") rejected: ${paramSetResultName(result)}.`);
+}
+
+/**
+ * Name a ParamSetResult enum value for logging.
+ * @param {Object} result - A Module.ParamSetResult value.
+ * @returns {string} The enum constant's name, e.g. "READONLY".
+ */
+function paramSetResultName(result) {
+  const names = Object.keys(host.module.ParamSetResult);
+  return names.find((n) => host.module.ParamSetResult[n] === result)
+    ?? 'unrecognized result';
 }
 
 /**
