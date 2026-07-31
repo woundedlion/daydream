@@ -377,6 +377,12 @@ Every document carries its own status banner; the summaries below repeat it. A
 banner that says REJECTED or SUPERSEDED is load-bearing — the document is kept
 so a successor does not re-attempt what was already measured and refuted.
 
+**Contributor guide**
+
+| Document | Status |
+|---|---|
+| `docs/agent_workflow.md` | The non-negotiable session rules every brief assumes: worktree and landing discipline, shared-device access, style, and the per-commit gates |
+
 **Design specs**
 
 | Document | Status |
@@ -611,8 +617,10 @@ The clear covers only the current display clip unless a filter declares
 `reads_outside_band`. Rendering a full frame and sampling old framebuffer
 contents outside the band are separate properties: `World::Trails` needs the
 former, while `Pixel::Feedback` needs both. The margin-expanded render band is
-otherwise write-only scratch. Filtered effects derive both flags from their
-pipelines.
+otherwise write-only scratch; its width comes from the pipeline's
+`max_segment_margin` fold over each filter's `segment_margin` (how far the
+stage's output lands from the plotted position), floored at 1. Filtered effects
+derive all three from their pipelines.
 
 `canvas(x, y)` is a direct array subscript into the write buffer (`bufs[cur][y * width + x]`). No bounds checking, no virtual dispatch.
 
@@ -1062,7 +1070,7 @@ Transformers integrate with the `MeshOps::transform()` pipeline and can be chain
 
 #### Displacement Fields
 
-`FieldTransformer<ParamsT, AnimT, FieldFunc, CAPACITY>` is the scalar counterpart: entities superpose by summation instead of composing as warps, so an effect can feed the summed field into a displacement path (e.g. a `DistortedRing` shift LUT). `field(p)` sums the active entities; `field_dominant(p)` blends them magnitude-weighted (`sum(s³)/sum(s²)`) so overlapping bodies dominate instead of stacking; `field_bound()` returns a per-frame upper bound on `|field()|` for sizing conservative culls.
+`FieldTransformer<ParamsT, AnimT, FieldFunc, CAPACITY>` is the scalar counterpart: entities superpose by summation instead of composing as warps, so an effect can feed the summed field into a displacement path (e.g. a `DistortedRing` shift LUT). `field(p)` sums the active entities; `field_bound()` returns a per-frame upper bound on `|field()|` for sizing conservative culls. Where overlapping bodies must dominate instead of stacking, feed the per-entity values through `DominantFieldAccumulator`, which blends them magnitude-weighted (`sum(s³)/sum(s²)`).
 
 | Field | Effect |
 |---|---|
@@ -1202,7 +1210,10 @@ zero runtime overhead. `Wrap` (default `true`) wraps the final coordinate into
 range; set it `false` for bounded remaps that must reach the source endpoints.
 Both directions are `static_assert`ed: an unbounded modifier rejects
 `Wrap=false`, and a bounded final modifier rejects `Wrap=true` (wrapping would
-fold its 1.0 output to 0.0 and destroy the top endpoint).
+fold its 1.0 output to 0.0 and destroy the top endpoint). Only a modifier that
+re-bounds *arbitrary* input (`FoldModifier`'s triangle wave, `InsetModifier`'s
+clamp) clears an unbounded predecessor; `ReverseModifier` and `MirrorModifier`
+are bounded on `[0,1]` but pass an out-of-range coordinate straight through.
 
 Coordinate modifiers (`modify(float) -> float`):
 
@@ -1712,7 +1723,7 @@ register_animated_param("Speed", &params.speed, 0.0f, 2.0f);  // animation-drive
 register_readonly_param("Particles", &params.active_count, 0.0f, 1024.0f);  // engine-written telemetry
 ```
 
-The enum overload takes an array of option labels that must outlive the effect (string literals). `register_animated_param` marks the param as written by the animation system, so the GUI renders it as an auto-pausing slider that engages "Pause Animation" when touched; `register_readonly_param` marks it engine-written, so the GUI shows the live value but disables editing. Both flags can also be applied to an already-registered param via `mark_animated(name)` and `markReadonly(name)`.
+The enum overload takes an array of option labels that must outlive the effect (string literals). `register_animated_param` marks the param as written by the animation system, so the GUI renders it as an auto-pausing slider that engages "Pause Animation" when touched; `register_readonly_param` marks it engine-written, so the GUI shows the live value but disables editing. The readonly flag can also be applied to an already-registered param via `mark_readonly(name)`.
 
 The parameter list (`ParamList` — a fixed `std::array<ParamDef, 32>`) is accessible via `getParameters()`, and `updateParameter(name, float)` sets values at runtime. Parameters support both `float*` and `bool*` targets via `std::variant`, with automatic bool threshold at 0.5. The animation system can also write to these parameters, allowing effects to animate their own exposed controls.
 
@@ -1846,7 +1857,7 @@ Polyline rings drift pole-to-pole through an inverse stereographic projection, e
 
 #### DreamBalls
 
-Draws twisting wireframe knotted structures derived from Archimedean solids. Mesh vertices are displaced along per-vertex tangent frames to create orbiting knot patterns, and a Möbius warp is applied to the geometry. Multiple copies orbit simultaneously while the whole structure tumbles under a slow Languid random-walk view orientation punctuated by periodic full-sphere spins. Four presets cycle every 320 frames, each carrying its own solid (rhombicuboctahedron, rhombicosidodecahedron, truncated cuboctahedron, icosidodecahedron), palette, and displacement settings; the outgoing and incoming sprites overlap so geometry and color crossfade across the change.
+Draws twisting wireframe knotted structures derived from Archimedean solids. Mesh vertices are displaced along per-vertex tangent frames to create orbiting knot patterns, and a Möbius warp is applied to the geometry. Multiple copies orbit simultaneously while the whole structure tumbles under a slow Languid random-walk view orientation punctuated by periodic full-sphere spins. Four presets cycle every 320 frames, each carrying its own solid (rhombicuboctahedron, rhombicosidodecahedron, truncated cuboctahedron, icosidodecahedron), palette, and displacement settings; the outgoing sprite fades out before the incoming one fades in, so exactly one mesh renders per frame.
 
 **Parameters**: Copies (number of knot copies), Radius (displacement), Speed (orbit speed), Warp (Möbius warp scale), Alpha
 
@@ -2078,7 +2089,6 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `getEffectSizes()` | Return `sizeof` for every registered effect at the current resolution |
 | `getSupportedResolutions()` → `[[w, h], …]` | *(static)* List the resolutions the build supports, as `[width, height]` pairs |
 | `setClip(x0, x1, y0, y1)` → `bool` | Restrict rendering to a sub-rectangle (used by segment workers) |
-| `getRenderUs()` → `double` | Last frame's rasterization time in microseconds (per-frame profiling) |
 | `strobeColumns()` → `bool` | Whether the current effect renders as discrete strobed columns (dark inter-column gaps) rather than a continuous smeared band; `false` when no effect is set. Daydream reads it to decide whether to fill the inter-column gap |
 
 The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 298 KiB arena) for interactive solid manipulation.
@@ -2142,7 +2152,7 @@ appState.subscribe((key, value, old) => {
 
 - **`AppState`** — flat key→value store with a `subscribe(callback)` API. Setting a key fires the callback only if the value actually changed. The sidebar and lil-gui both write through `appState.set(...)`, so they stay in sync without explicit coupling. `update(patch)` batches: every key in the patch is written first and only then are subscribers notified, one event per changed key, so a callback that reads a sibling batched key sees its post-batch value instead of a half-applied state.
 - **`URLSync`** — reads tracked keys from `window.location.search` on construction (URL beats default), coercing each raw string to the seeded default's type. The third constructor argument is a per-key validator map applied to that raw string; a key whose predicate rejects keeps the validated default, so a hand-edited link cannot poison state and no consumer has to re-validate afterwards. Writes back to the query string are debounced 200 ms through `history.replaceState`. Shareable links like `?effect=Raymarch&resolution=Phantasm%20(288x144)` work out of the box.
-- **URL write ownership** — `URLSync` is the app-wide single owner of URL writes, reachable as `getActiveURLSync()`; constructing a new one disposes the previous. `gui.js` routes each parameter change through `setParam(key, value)`, which buffers an ad-hoc entry (numbers rounded to 4 decimals, `null` marking a deletion) rather than writing directly. The debounced flush is a read-modify-write at fire time: it re-reads the live query string, overlays the tracked state keys, then overlays the ad-hoc buffer — so concurrent state and GUI updates merge into one `replaceState` instead of clobbering each other. `reset(excludedKeys)` drops every param outside the exclusion set and writes immediately, re-asserting tracked state and surviving ad-hoc entries so a change still inside the debounce window is not lost.
+- **URL write ownership** — `URLSync` is the app-wide single owner of URL writes, reachable as `getActiveURLSync()`; constructing a new one disposes the previous. `gui.js` routes each parameter change through `setParam(key, value)`, which buffers an ad-hoc entry (numbers rounded to 4 decimals, `null` marking a deletion) rather than writing directly. The debounced flush is a read-modify-write at fire time: it re-reads the live query string, overlays the tracked state keys, then overlays the ad-hoc buffer — so concurrent state and GUI updates merge into one `replaceState` instead of clobbering each other. `reset(excludedKeys)` drops every param outside the exclusion set and writes immediately, re-asserting tracked state and surviving ad-hoc entries so a change still inside the debounce window is not lost. Every writer — both `URLSync` paths and the two standalone-page fallbacks in `gui.js` — emits through the exported `writeUrl(params)`, which assembles `pathname + ?query + location.hash` and calls `replaceState`, so no path can drop the fragment.
 
 ### 10.5 The Effect Sidebar (`sidebar.js`)
 
