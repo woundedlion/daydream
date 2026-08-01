@@ -19,13 +19,14 @@ const near = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) <= eps,
 
 // --- sRGB transfer function ---
 
-/** Verifies the sRGB<->linear transfer endpoints, the 0.04045 knee continuity, and the round-trip. */
+/** Verifies the sRGB<->linear transfer endpoints, knee, and round-trip. */
 test('srgb<->linear fixed points and round-trip', () => {
   near(srgbToLinearFloat(0), 0);
   near(srgbToLinearFloat(1), 1);
   near(linearToSrgbFloat(0), 0);
   near(linearToSrgbFloat(1), 1);
-  near(srgbToLinearFloat(0.04045), 0.04045 / 12.92);
+  near(srgbToLinearFloat(0.04), 0.0030959752321981426, 1e-12);
+  near(srgbToLinearFloat(0.04046), 0.003131594552688991, 1e-12);
   for (const s of [0.02, 0.1, 0.25, 0.5, 0.9]) {
     near(linearToSrgbFloat(srgbToLinearFloat(s)), s, 1e-6);
   }

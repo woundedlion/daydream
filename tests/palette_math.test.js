@@ -23,15 +23,6 @@ function mockBakeLut(...args) {
 }
 setPaletteOps(mockBakeLut);
 
-/**
- * Converts an sRGB channel value to linear light, the same transfer the module applies on output.
- * @param {number} s - sRGB channel value in [0, 1].
- * @returns {number} The linearized channel value in [0, 1].
- */
-function srgbToLinear(s) {
-  return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-}
-
 const NEAR = 1e-6;
 
 /**
@@ -44,16 +35,16 @@ test('ProceduralPalette.get at t=0, t=0.25 and t=0.5 for a known coefficient set
   const p = new ProceduralPalette([0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [1, 1, 1], [0, 0, 0]);
 
   const at0 = p.get(0);
-  for (const ch of at0) assert.ok(Math.abs(ch - srgbToLinear(1.0)) < NEAR);
+  for (const ch of at0) assert.ok(Math.abs(ch - 1) < NEAR);
   assert.ok(Math.abs(at0[0] - 1.0) < NEAR);
 
   const at05 = p.get(0.5);
-  for (const ch of at05) assert.ok(Math.abs(ch - srgbToLinear(0.0)) < NEAR);
+  for (const ch of at05) assert.ok(Math.abs(ch) < NEAR);
   assert.ok(Math.abs(at05[0] - 0.0) < NEAR);
 
   const at025 = p.get(0.25);
   for (let ch = 0; ch < 3; ch++) {
-    assert.ok(Math.abs(at025[ch] - srgbToLinear(p.getChannelValue(0.25, ch))) < NEAR,
+    assert.ok(Math.abs(at025[ch] - 0.21404114048223255) < NEAR,
       `channel ${ch} linearized at t=0.25: ${at025[ch]}`);
   }
   assert.ok(Math.abs(p.getChannelValue(0.25, 0) - 0.5) < NEAR, 'raw cosine at t=0.25');
@@ -450,7 +441,7 @@ test('GenerativePalette.get blends adjacent LUT entries in linear light', () => 
   });
   try {
     const pal = new GenerativePalette('STRAIGHT', 'TRIADIC', 'FLAT', 'VIBRANT', 0);
-    const grey = srgbToLinear(128 / 255);
+    const grey = 0.21586050011389926;
 
     for (const [t, frac] of [[0.5 / 255, 0.5], [0.25 / 255, 0.25], [0.75 / 255, 0.75]]) {
       for (const ch of pal.get(t)) {
