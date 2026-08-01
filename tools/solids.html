@@ -1088,6 +1088,7 @@
 
     // --- SAVED ITEMS ---
     const SAVED_SOLIDS_KEY = 'daydream.savedSolids.v1';
+    const SAVED_THUMB_SIZE = 256;
 
     function loadSavedSolids() {
       try {
@@ -1122,6 +1123,21 @@
       URL.revokeObjectURL(url);
     }
 
+    function captureSavedThumbnail() {
+      renderer.render(scene, camera);
+      const source = renderer.domElement;
+      const canvas = document.createElement('canvas');
+      canvas.width = SAVED_THUMB_SIZE;
+      canvas.height = SAVED_THUMB_SIZE;
+      const context = canvas.getContext('2d');
+      const scale = Math.min(canvas.width / source.width, canvas.height / source.height);
+      const width = source.width * scale;
+      const height = source.height * scale;
+      context.drawImage(source, (canvas.width - width) / 2, (canvas.height - height) / 2,
+        width, height);
+      return canvas.toDataURL('image/png');
+    }
+
     function saveSolid() {
       // Nothing to save until the first successful update() has produced a mesh
       // (clicking save before then would dereference an undefined currentMesh).
@@ -1134,9 +1150,7 @@
         return;
       }
 
-      // Capture thumbnail
-      renderer.render(scene, camera);
-      const dataURL = renderer.domElement.toDataURL('image/png');
+      const dataURL = captureSavedThumbnail();
 
       const title = formatSolidName(state.base);
 
