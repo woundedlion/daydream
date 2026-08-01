@@ -1,7 +1,7 @@
 // @ts-check
 import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { AppState, URLSync, getActiveURLSync, writeUrl } from '../state.js';
+import { AppState, URLSync, getActiveURLSync, roundUrlNumber, writeUrl } from '../state.js';
 
 // Dispose the active URLSync before restoring window: a debounced flush() would
 // otherwise fire into a deleted window after teardown.
@@ -349,7 +349,7 @@ test('URLSync.flush writes tracked state and ad-hoc params to the URL', () => {
   const s = new AppState({ effect: 'Voronoi' });
   const sync = new URLSync(s, ['effect']);
 
-  sync.setParam('speed', 1.23456); // rounded to 4 dp
+  sync.setParam('speed', 1.23456); // rounded to 5 significant digits
   sync.flush();
 
   assert.equal(calls.length, 1);
@@ -422,7 +422,7 @@ test('URLSync.setParam(k, NaN) drops the key from the URL on flush', () => {
   assert.equal(params.get('keep'), '1', 'unrelated params survive');
 });
 
-test('URLSync.setParam drops a non-zero value too small to survive rounding', () => {
+test('URLSync.setParam keeps a small non-zero value instead of collapsing it to 0', () => {
   const calls = installWindow('?keep=1', '/sim');
   const s = new AppState({});
   const sync = new URLSync(s, []);
@@ -432,11 +432,34 @@ test('URLSync.setParam drops a non-zero value too small to survive rounding', ()
   let params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
   assert.equal(params.get('speed'), '1.5');
 
-  sync.setParam('speed', 1e-6); // rounds to 0: drop rather than claim an exact zero
+  sync.setParam('speed', 1e-6);
   sync.flush();
   params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
-  assert.equal(params.has('speed'), false, 'a value that rounds to 0 drops the param');
+  assert.equal(params.get('speed'), '0.000001', 'a small magnitude survives the link');
   assert.equal(params.get('keep'), '1', 'unrelated params survive');
+});
+
+/**
+ * The engine's tightest slider ranges (GSReactionDiffusion's dA/dB are [0, 0.05])
+ * carry a lil-gui implicit step of a thousandth of the range. Every step must
+ * reach the URL as a distinct value, or a shared link silently snaps elsewhere.
+ */
+test('roundUrlNumber resolves every step of the engine\'s tightest param range', () => {
+  const min = 0, max = 0.05, step = (max - min) / 1000;
+  const seen = new Set();
+  for (let k = 0; k <= 1000; k++) {
+    const rounded = roundUrlNumber(min + k * step);
+    assert.notEqual(rounded, null, `step ${k} has no URL representation`);
+    seen.add(String(rounded));
+  }
+  assert.equal(seen.size, 1001, 'adjacent slider steps must not share a URL value');
+});
+
+test('roundUrlNumber is a fixed point under re-serialization', () => {
+  for (const v of [1.23456, 0.000012345, 5e-5, 1234.5678, 0.30000000000000004, 0, 2000]) {
+    const once = roundUrlNumber(v);
+    assert.equal(roundUrlNumber(Number(String(once))), once, `${v} is not stable`);
+  }
 });
 
 test('URLSync serializes an exact zero rather than dropping it', () => {

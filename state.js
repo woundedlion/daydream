@@ -3,20 +3,24 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+// Significant digits kept by roundUrlNumber. A lil-gui slider's implicit step is
+// a thousandth of its range, so 5 digits resolve every step of a param at any
+// magnitude, including one whose whole range is a small fraction of 1.
+const URL_SIGNIFICANT_DIGITS = 5;
+
 /**
- * Round a numeric URL-param value to 4 decimals, dropping trailing-zero noise.
- * Shared by URLSync.setParam and gui.js's ad-hoc writer so the two URL
- * serializers cannot drift. parseFloat re-parses the fixed-decimal string so
- * 0.5000 collapses back to 0.5.
+ * Round a numeric URL-param value to URL_SIGNIFICANT_DIGITS significant digits,
+ * dropping trailing-zero noise. Shared by URLSync.setParam and gui.js's ad-hoc
+ * writer so the two URL serializers cannot drift. Number() re-parses the rounded
+ * string so 0.50000 collapses back to 0.5.
  * @param {number} value - The numeric value to serialize.
- * @returns {number|null} The value rounded to 4 decimal places, or null for a
- *   non-finite input or a non-zero magnitude that rounds to 0, so callers drop
- *   the key rather than emit a misleading 0. An exact 0 still round-trips.
+ * @returns {number|null} The rounded value, or null for a non-finite input so
+ *   callers drop the key rather than emit a misleading 0. Rounding preserves
+ *   magnitude, so only an exact 0 serializes as 0.
  */
 export function roundUrlNumber(value) {
   if (!Number.isFinite(value)) return null;
-  const rounded = parseFloat(value.toFixed(4));
-  return rounded === 0 && value !== 0 ? null : rounded;
+  return Number(value.toPrecision(URL_SIGNIFICANT_DIGITS));
 }
 
 // A URL number must be wholly numeric: parseFloat would take the leading digits
@@ -307,7 +311,7 @@ export class URLSync {
    * A no-op once disposed.
    * @param {string} key - The URL param name to write.
    * @param {*} value - The value to set; null/undefined records a deletion marker.
-   *   Numbers are rounded to 4 decimals to save space and avoid float jitter.
+   *   Numbers are rounded to significant digits to save space and avoid float jitter.
    * @returns {void}
    */
   setParam(key, value) {
@@ -317,8 +321,8 @@ export class URLSync {
       this.adhoc.set(key, null);
     } else if (typeof value === 'number') {
       const rounded = roundUrlNumber(value);
-      // A null rounding (non-finite, or too small to survive 4 dp) drops the key
-      // rather than serializing a 0 the engine never rendered.
+      // A null rounding (non-finite) drops the key rather than serializing a 0
+      // the engine never rendered.
       this.adhoc.set(key, rounded === null ? null : String(rounded));
     } else {
       this.adhoc.set(key, String(value));
