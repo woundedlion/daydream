@@ -671,7 +671,7 @@ export function createChainValidator(createModule) {
       } catch (e) {
         noteDeath(e);
         if (!(e instanceof WebAssembly.RuntimeError)) {
-          try { if (mesh) mesh.delete(); Ops.clearToolingMemory(); } catch (_) { }
+          try { if (mesh) mesh.delete(); Ops.clearToolingMemory(); } catch { }
         }
         return false;
       }
