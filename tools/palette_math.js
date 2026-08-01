@@ -40,7 +40,7 @@ let bakeLut = null;
 
 /**
  * Injects the WASM PaletteOps bridge GenerativePalette uses to bake its LUT.
- * @param {(shape:number, h1:number, s1:number, v1:number, h2:number, s2:number, v2:number, h3:number, s3:number, v3:number) => (Uint8Array|number[])} fn
+ * @param {((shape:number, h1:number, s1:number, v1:number, h2:number, s2:number, v2:number, h3:number, s3:number, v3:number) => (Uint8Array|number[])) | null} fn
  *   Returns a 256*3 sRGB LUT; entry i is the palette sampled at t = i/255.
  */
 export function setPaletteOps(fn) {

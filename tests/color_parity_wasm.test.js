@@ -227,6 +227,7 @@ test('GenerativePalette bakes the golden LUT through the engine bridge', () => {
     const pal = new P.GenerativePalette('VIGNETTE', 'TRIADIC', 'FLAT', 'VIBRANT', 0);
     assert.deepEqual(sampleLut(pal.lut), BAKE_GOLDEN.VIGNETTE);
   } finally {
+    P.setPaletteOps(null);
     ops.delete();
   }
 });
@@ -273,6 +274,7 @@ test('GenerativePalette seeded profiles bake the engine LUT', () => {
         `${shape}/${harmony}/${brightness}/${sat} at hue ${hue} drifted from the engine LUT`);
     }
   } finally {
+    P.setPaletteOps(null);
     ops.delete();
   }
 });
