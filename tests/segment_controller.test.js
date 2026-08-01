@@ -65,6 +65,10 @@ class FakeWorker {
   static constructionCount = 0;
   static failConstructionAt = -1;
   static failInitialPostAt = -1;
+  /** @type {number} Index whose postMessage throws for `failPostType`. */
+  static failPostAt = -1;
+  /** @type {string|null} Message type postMessage throws on at `failPostAt`. */
+  static failPostType = null;
   /**
    * @param {string} url - Worker script URL the controller requested.
    * @param {Object} opts - Worker options bag (e.g. `{ type: 'module' }`).
@@ -93,6 +97,8 @@ class FakeWorker {
    */
   postMessage(msg, transfer) {
     if (msg.type === 'init' && this.index === FakeWorker.failInitialPostAt)
+      throw new DOMException('message rejected', 'DataCloneError');
+    if (msg.type === FakeWorker.failPostType && this.index === FakeWorker.failPostAt)
       throw new DOMException('message rejected', 'DataCloneError');
     this.posted.push(msg);
     this.transfers.push(transfer ?? null);
@@ -134,6 +140,8 @@ beforeEach(() => {
   FakeWorker.constructionCount = 0;
   FakeWorker.failConstructionAt = -1;
   FakeWorker.failInitialPostAt = -1;
+  FakeWorker.failPostAt = -1;
+  FakeWorker.failPostType = null;
 });
 
 const savedGlobals = { Worker: globalThis.Worker, document: globalThis.document };
@@ -466,6 +474,37 @@ test('a synchronous worker-N init post failure terminates the partial pool', () 
   assert.match(c.faultInfo.message, /initialization failed: DataCloneError: message rejected/);
   assert.equal(c.bootWatchdog, null);
   assert.equal(c.initWatchdog, null);
+});
+
+// A postMessage that throws part-way through a dispatch leaves the un-posted
+// workers silent: `pending` never drains and no watchdog has been armed yet.
+test('a throwing render dispatch faults instead of wedging the pipeline', async () => {
+  const c = readyController(2);
+  FakeWorker.failPostAt = 1;
+  FakeWorker.failPostType = 'render';
+
+  c.tick();
+  await flush();
+
+  assert.equal(c.faulted, true, 'a mid-dispatch throw latches a fault');
+  assert.equal(c.faultInfo.segId, 1);
+  assert.match(c.faultInfo.message, /render dispatch to seg 1 failed: DataCloneError/);
+  assert.equal(c.renderInFlight, false, 'the in-flight latch is released');
+  assert.equal(c.pending, 0, 'the barrier cannot deadlock on the un-posted workers');
+});
+
+test('a throwing broadcast faults instead of escaping to the GUI caller', () => {
+  const c = readyController(2);
+  FakeWorker.failPostAt = 0;
+  FakeWorker.failPostType = 'setParameter';
+
+  assert.doesNotThrow(() => c.setParameter('Speed', 0.5));
+
+  assert.equal(c.faulted, true, 'a failed broadcast latches a fault');
+  assert.equal(c.faultInfo.segId, 0);
+  assert.match(c.faultInfo.message, /broadcast of 'setParameter' to seg 0 failed/);
+  assert.equal(c.workers[1].posted.some((m) => m.type === 'setParameter'), false,
+    'the broadcast stops at the faulting worker');
 });
 
 // A construction failure at segment 0 latches with `workers` empty, so no
