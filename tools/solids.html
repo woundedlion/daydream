@@ -596,15 +596,14 @@
     import { initScene, copyWithFeedback, showFatalError, bootstrapTool } from './shared.js';
     // The shared op table and dispatch, the pure C++ export-string codegen
     // (formatFloat/pctSuffix/recipe builders), the pure face-geometry helpers and
-    // the op-chain queue/validator machinery live in solid_codegen.js so they can
-    // be unit tested without a DOM or the WASM module. DOM/WASM wiring stays
-    // inline.
+    // the op-chain queue/validator machinery live in solid_codegen.js, and the
+    // registry-paste generator in solid_registry_codegen.js, so they can be unit
+    // tested without a DOM or the WASM module. DOM/WASM wiring stays inline.
     import {
       OP_DEFS,
       PLATONIC_SOLIDS,
       CATALAN_BASES,
       applyOp,
-      formatFloat,
       formatSolidName,
       pctSuffix,
       generateFuncAndRecipe,
@@ -622,6 +621,7 @@
       createCommitQueue,
       createChainValidator,
     } from './solid_codegen.js';
+    import { generateRegistryCpp } from './solid_registry_codegen.js';
     import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
     import createHolosphereModule from '../holosphere_wasm.js';
 
@@ -1284,78 +1284,31 @@
       renderSavedList();
     }
 
-    // solids.h names a recipe's tables after the generator, camelCase segments
-    // split into UPPER_SNAKE: truncatedIcosahedron_hk58_chamfer63 ->
-    // TRUNCATED_ICOSAHEDRON_HK58_CHAMFER63.
-    function upperSnake(name) {
-      return name.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toUpperCase();
-    }
-
-    // One solids.h OpStep initializer. HANKIN carries radians, SNUB a (t, twist)
-    // pair, RELAX a live iteration count (the engine's shipped chains swap that
-    // for a `.bake =` designator once a bake exists).
-    function opStepCpp(o) {
-      const opName = typeof o === 'string' ? o : o.op;
-      const params = o.params || {};
-      if (opName === 'hankin') {
-        return `{Op::HANKIN, ${formatFloat(params.angle)} * IslamicStarPatterns::D2R}`;
-      }
-      if (opName === 'snub') {
-        return `{Op::SNUB, ${formatFloat(params.t)}, ${formatFloat(params.twist)}}`;
-      }
-      if (opName === 'relax') return `{Op::RELAX, ${formatFloat(params.iter)}}`;
-      if (OP_DEFS[opName].params.t) {
-        return `{Op::${opName.toUpperCase()}, ${formatFloat(params.t)}}`;
-      }
-      return `{Op::${opName.toUpperCase()}}`;
-    }
-
     function copyCode(index, lang, btn) {
       const item = savedSolids[index];
+      const baseIsStar = IslamicStarPatterns.includes(item.base);
 
       // Namespace of the seed, which the emitted recipe calls. Archimedean and
       // Platonic bases share the `Archimedean::` qualifier (it `using`s
       // Platonic); Catalan bases need their own. The result can land in a
       // different namespace than its seed, so this qualifies the seed only.
-      const seedNs = IslamicStarPatterns.includes(item.base)
+      const seedNs = baseIsStar
         ? "IslamicStarPatterns"
         : (CATALAN_BASES.has(item.base) ? "Catalan" : "Archimedean");
 
       let code = '';
 
-      if (lang === 'recipe_cpp') {
-        code = generateRecipeCpp(item, seedNs);
-      } else if (lang === 'registry') {
-        const { funcName } = generateFuncAndRecipe(item);
-
-        // Complexity is a property of the result, not the base: a hankin step
-        // lands the solid in islamic_registry (uniformly Category::Complex), as
-        // does starting from a star pattern.
-        const isComplex = IslamicStarPatterns.includes(item.base)
-          || item.ops.some(o => (typeof o === 'string' ? o : o.op) === 'hankin');
-
-        if (isComplex) {
-          // islamic_registry entries carry a Recipe mirror; Entry's fourth field
-          // defaults to nullptr, which fails the engine's every-Complex-solid-
-          // has-a-chain contract. SEED_<base> indexes simple_registry, so a base
-          // with no such constant needs one added alongside this paste.
-          const stepsName = `${upperSnake(funcName)}_STEPS`;
-          const recipeName = `${upperSnake(funcName)}_RECIPE`;
-          const steps = item.ops.map(opStepCpp).join(',\n    ');
-          code = `/** Step table for ${funcName}. */\n`
-            + `inline constexpr OpStep ${stepsName}[] = {\n    ${steps}};\n`
-            + `/** Recipe mirror of IslamicStarPatterns::${funcName}. */\n`
-            + `inline constexpr Recipe ${recipeName} = {\n`
-            + `    SEED_${upperSnake(item.base)}, ${stepsName},\n`
-            + `    static_cast<uint8_t>(std::size(${stepsName}))};\n\n`
-            + `    {"${funcName}",\n     IslamicStarPatterns::${funcName}, Category::Complex,\n`
-            + `     &${recipeName}},`;
+      try {
+        if (lang === 'recipe_cpp') {
+          code = generateRecipeCpp(item, seedNs);
+        } else if (lang === 'registry') {
+          code = generateRegistryCpp(item, seedNs, baseIsStar);
         } else {
-          // A Simple result never leaves its seed's namespace.
-          code = `    {"${funcName}",\n     ${seedNs}::${funcName},\n     Category::Simple},`;
+          console.warn("Unsupported export type.");
+          return;
         }
-      } else {
-        console.warn("Unsupported export type.");
+      } catch (e) {
+        showGateMsg(`export failed: ${e.message}`);
         return;
       }
 
