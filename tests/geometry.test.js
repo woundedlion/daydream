@@ -68,6 +68,14 @@ test('the x=0 column maps to +X, not +Z', () => {
   assert.ok(Math.abs(v.z) < 1e-9, `x=0 should have z~0, got z=${v.z}`);
 });
 
+test('degenerate dimensions keep spherical coordinates finite', () => {
+  const spherical = pixelToSpherical(2, 1, { W: 0, H: 1 });
+  assert.ok(Number.isFinite(spherical.phi));
+  assert.ok(Number.isFinite(spherical.theta));
+  assert.equal(spherical.phi, Math.PI);
+  assert.equal(spherical.theta, Math.PI / 2 - 4 * Math.PI);
+});
+
 /**
  * Hardcoded golden vectors that do NOT re-run the engine formula, so the pin is
  * independent of engineVector() above (which shares pixelToSpherical's own

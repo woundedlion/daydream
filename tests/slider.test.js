@@ -88,6 +88,26 @@ test('builds a slider, scaling bounds and rounding the step to integer units', (
   assert.equal(container.children[0].htmlFor, slider.id);
 });
 
+test('initial value is clamped to the slider range', () => {
+  const high = createSlider('c', { ...base, value: 42 }, null);
+  assert.equal(high.slider.value, '10');
+  assert.equal(high.valueSpan.textContent, '10.00');
+
+  const low = createSlider('c', { ...base, value: -3 }, null);
+  assert.equal(low.slider.value, '0');
+  assert.equal(low.valueSpan.textContent, '0.00');
+});
+
+test('building a slider replaces existing container content', () => {
+  const stale = fakeElement('span');
+  container.appendChild(stale);
+
+  createSlider('c', base, null);
+
+  assert.equal(stale.parentNode, null);
+  assert.equal(container.children.length, 3);
+});
+
 /** Verifies input synchronizes both readouts before invoking the caller. */
 test('input updates the readout and aria-valuetext before onInput', () => {
   let observed;
