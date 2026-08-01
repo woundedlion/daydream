@@ -446,10 +446,6 @@
     // (not shared.js, which pulls in three.js — a dependency this tool
     // otherwise doesn't have).
     import { showFatalError, bootstrapTool } from './banner.js';
-    // The engine module exports the real GenerativePalette color math via the
-    // PaletteOps embind class, so the tool previews the device's exact colors
-    // instead of a hand-ported JS reimplementation that can silently drift.
-    import createHolosphereModule from '../holosphere_wasm.js';
     import { linearToSrgbFloat, linearRgbToHex } from './color.js';
     // Pure palette math (ProceduralPalette/GenerativePalette + helpers and the
     // C++ export-string generators) lives in palette_math.js so it can be unit
@@ -1273,6 +1269,7 @@
       // the exact C++ color math (PaletteOps). The generative tab can't render
       // without it, so fail loudly rather than silently fall back.
       try {
+        const { default: createHolosphereModule } = await import('../holosphere_wasm.js');
         const wasm = await createHolosphereModule();
         const paletteOps = new wasm.PaletteOps();
         setPaletteOps((shape, h1, s1, v1, h2, s2, v2, h3, s3, v3) =>
