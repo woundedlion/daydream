@@ -58,6 +58,15 @@ const RENDER_WATCHDOG_MS = 5000;
 export const MAX_BOOT_RETRIES = 3;
 const BOOT_RETRY_DELAY_MS = 250;
 
+/**
+ * Render a thrown value as a fault message detail.
+ * @param {unknown} error - The caught value.
+ * @returns {string} `Name: message` for an Error, else its string form.
+ */
+function errorDetail(error) {
+  return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+}
+
 /** @param {ReturnType<typeof setTimeout>} timer */
 function unrefTimer(timer) {
   const nodeTimer = /** @type {{unref?: () => void}} */ (
@@ -238,11 +247,20 @@ export class SegmentController {
 
   /**
    * Post the same protocol message to every worker.
+   * @details A postMessage that throws (an unclonable payload, a worker the agent
+   * already tore down) latches a fault instead of escaping to the GUI handler that
+   * triggered the broadcast, which would leave the pool half-updated and unreported.
    * @param {WorkerInboundMsg} msg
    */
   broadcast(msg) {
-    for (const w of this.workers) {
-      this.post(w, msg);
+    for (let s = 0; s < this.workers.length; s++) {
+      try {
+        this.post(this.workers[s], msg);
+      } catch (error) {
+        this.onWorkerFault(s, `broadcast of '${msg.type}' to seg ${s} failed: `
+          + errorDetail(error));
+        return;
+      }
     }
   }
 
@@ -466,10 +484,7 @@ export class SegmentController {
    * terminates and detaches the partially-created pool.
    */
   abortWorkerStartup(segId, phase, error) {
-    const detail = error instanceof Error
-      ? `${error.name}: ${error.message}`
-      : String(error);
-    this.onWorkerFault(segId, `worker ${phase} failed: ${detail}`);
+    this.onWorkerFault(segId, `worker ${phase} failed: ${errorDetail(error)}`);
   }
 
   /** Cancel the init watchdog if one is pending. Idempotent. */
@@ -757,10 +772,20 @@ export class SegmentController {
         this.scratch[s] = null;
         const recycle = retired && retired.pixels && retired.pixels.length > 0
           ? retired.pixels : null;
-        if (recycle) {
-          this.post(this.workers[s], { type: 'render', recycle }, [recycle.buffer]);
-        } else {
-          this.post(this.workers[s], { type: 'render' });
+        try {
+          if (recycle) {
+            this.post(this.workers[s], { type: 'render', recycle }, [recycle.buffer]);
+          } else {
+            this.post(this.workers[s], { type: 'render' });
+          }
+        } catch (error) {
+          // Mid-dispatch: the un-posted workers never reply, so `pending` never
+          // reaches 0 and no watchdog is armed yet. Fault, which settles the
+          // promise and releases the in-flight latch.
+          this.scratch.fill(null);
+          this.onWorkerFault(s, `render dispatch to seg ${s} failed: `
+            + errorDetail(error));
+          return;
         }
       }
       this.scratch.fill(null);
@@ -973,6 +998,10 @@ export class SegmentController {
           this.pendingFrame = true;
         }
         this.renderInFlight = false;
+      }).catch((error) => {
+        // A rejected chain would skip the `.then` above and strand renderInFlight
+        // latched true with no watchdog armed, wedging the pipeline silently.
+        this.onWorkerFault(FAULT_RENDER, `render failed: ${errorDetail(error)}`);
       });
     }
   }
