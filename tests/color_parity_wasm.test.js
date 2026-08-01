@@ -31,7 +31,10 @@ test('WASM parity module is present with the exports this suite pins', () => {
   }
 });
 
-const FLOAT_EPS = 1e-4;
+// Largest divergence observed over the inputs below is 6.1e-7, on the Mobius
+// presets, whose coefficients also carry mobiusCodeString's 6-digit rounding;
+// the golden literals are themselves written to 6 decimals, a 5e-7 floor.
+const FLOAT_EPS = 5e-6;
 const near = (a, b, eps = FLOAT_EPS) => Math.abs(a - b) <= eps;
 
 /** Verifies the sRGB transfer function and its inverse match color.js. */
@@ -254,7 +257,7 @@ test('lissajous golden points (absolute pin)', () => {
   assert.ok(near(p2.x, -0.705952) && near(p2.y, 0.087499) && near(p2.z, 0.702834),
     `lissajous(5,4,0.5,1.2): (${p2.x},${p2.y},${p2.z})`);
   for (const p of [p1, p2]) {
-    assert.ok(near(Math.hypot(p.x, p.y, p.z), 1, 1e-3),
+    assert.ok(near(Math.hypot(p.x, p.y, p.z), 1),
       `lissajous point off the unit sphere: (${p.x},${p.y},${p.z})`);
   }
 });
@@ -337,7 +340,7 @@ test('mobius preset parity (mobius_transform)', () => {
       const j = mobiusSphereJs(p, coeffs);
       assert.ok(near(w.x, j.x) && near(w.y, j.y) && near(w.z, j.z),
         `${name}(t=${t}) at (${p}): wasm(${w.x},${w.y},${w.z}) js(${j.x},${j.y},${j.z})`);
-      assert.ok(near(Math.hypot(w.x, w.y, w.z), 1, 1e-3),
+      assert.ok(near(Math.hypot(w.x, w.y, w.z), 1),
         `${name}(t=${t}) at (${p}) left the unit sphere`);
     }
   }
