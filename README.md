@@ -123,7 +123,7 @@ POV display requires pixel data to be ready before each column interval fires �
 
 On hardware there is no debugger attached and no console to read — a corrupted arena that ships garbage to the LEDs is the worst possible outcome, because the failure is silent and the cause is already gone by the time it shows on the sphere. So invariant violations *trap at the violation site* rather than being masked by bounded fallbacks. `HS_CHECK(cond)` (`platform.h`) compiles to a single predicted-not-taken branch to `__builtin_trap()` and, unlike `assert()`, is **not** stripped by `NDEBUG` — it still fires in the optimized device build, where `NDEBUG` is defined only to keep newlib's `__assert_func`→`fprintf` (and all of stdio) out of the image. It pulls in no stdio of its own.
 
-The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a violation is a logic or sizing bug with no valid recovery — container growth, arena OOM, capacity and bounds guards at allocation/registration/config sites, plus checked accessors like `StaticCircularBuffer::operator[]`, which runs **per control point** (a trail snapshot, a scanline span), not per pixel. It is never placed in the per-pixel loop, which indexes the raw storage directly — `sdf.h` takes `&buf[0]` once per row and walks the array — and hot paths that need a check use a stripped `assert` backed by a cold trap at the corresponding bind/setup site. Genuinely *transient* conditions (a DMA overrun, a dropped frame) are not invariant violations and get bounded/soft handling instead. The native test suite includes a death harness that asserts these traps actually fire (`SIGILL` / `STATUS_ILLEGAL_INSTRUCTION`), so the safety net is verified rather than assumed.
+The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a violation is a logic or sizing bug with no valid recovery — container growth, arena OOM, capacity and bounds guards at allocation/registration/config sites, plus checked accessors like `StaticCircularBuffer::operator[]`, which runs **per control point** (a trail snapshot, a scanline span), not per pixel. It is kept out of the per-pixel loop, which indexes the raw storage directly — `sdf.h` takes `&buf[0]` once per row and walks the array — and hot paths that need a check use a stripped `assert` backed by a cold trap at the corresponding bind/setup site. One exception is named and deliberate: `angle_between()` (`3dmath.h`) checks both input lengths on every call, and it is reached per pixel — up to four times — from `SDF::Line::distance`, and once per plotted point from `Filter::World::Hole::plot`. The check guards the `sqrtf(m1 * m2)` it immediately divides by, and neither call site has a bind seam that could carry it instead: `Line`'s endpoints are public fields and `Hole::set_origin` does not renormalize, so an effect can move either between frames. Dropping the check would turn a degenerate input into a NaN angle that clamps silently to 0 — a soft degrade, which is the outcome the rule exists to prevent. Genuinely *transient* conditions (a DMA overrun, a dropped frame) are not invariant violations and get bounded/soft handling instead. The native test suite includes a death harness that asserts these traps actually fire (`SIGILL` / `STATUS_ILLEGAL_INSTRUCTION`), so the safety net is verified rather than assumed.
 
 ### Coordinate Conventions
 
@@ -162,6 +162,8 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 ├── core/                       Rendering engine
 │   ├── engine/                 Machinery: platform layer, memory, callables, rosters, effect support
 │   │   ├── platform.h              Arduino vs. WASM vs. Desktop abstraction layer
+│   │   ├── platform_arduino_mocks.h Off-device emulation of the Arduino/FastLED API
+│   │   ├── profiling.h             Cycle counters + HS_PROFILE / scan-metric macros
 │   │   ├── constants.h             MAX_W, MAX_H + ClipRegion segment clip rectangle
 │   │   ├── engine.h                Engine API umbrella — included by every effect
 │   │   ├── effects.h               Effect roster (includes each effect + HS_EFFECT_LIST)
@@ -187,7 +189,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   ├── mesh/                   Polyhedral meshes and their operators
 │   │   ├── mesh.h                  PolyMesh, HalfEdgeMesh, MeshOps (compile, clone, etc.)
 │   │   ├── mesh_classes.h          Congruence-class clustering + canonical distance-LUT bake
-│   │   ├── spatial.h               KDTree, k-nearest-neighbor, MeshState (+ speculative AABB)
+│   │   ├── spatial.h               KDTree k-nearest-neighbor search, arena-backed MeshState
 │   │   ├── conway.h                Conway operators (dual, kis, ambo, truncate, etc.)
 │   │   ├── conway_graph.h          Constexpr solid-to-solid operator edge graph + walk helpers
 │   │   ├── recipe.h                Recipe lowering to primitive Conway steps + replay
@@ -195,7 +197,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   │   ├── solids.h                Platonic + Archimedean + Catalan + Islamic solid registry
 │   │   └── relax_bakes_generated.h Baked relaxed-mesh vertices (from tools/relax_bakes.py)
 │   ├── color/                  Color math and palettes
-│   │   ├── color.h                 Pixel16 (16-bit linear), Color4, blend helpers, palettes
+│   │   ├── color.h                 Pixel (16-bit linear), Color4, blend helpers, palettes
 │   │   ├── composition.h           Palette modifiers + StaticPalette composition (via color.h)
 │   │   ├── color_luts.h            Precomputed sRGB ↔ linear LUTs
 │   │   ├── srgb_decode.h           Branchless linear16 → sRGB8 encode from DTCM split tables
@@ -218,7 +220,9 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   │   ├── trails.h                OrientationTrail/VectorTrail/QuantizedVectorTrail history + tween/deep_tween traversal
 │   │   ├── sprites.h               Sprite draw envelope, Particle/ParticleSystem
 │   │   ├── timeline.h              TimelineEvent inline storage + the Timeline scheduler
-│   │   └── mesh.h                  Mesh-to-mesh transitions: OpLeg, Segue policies, MeshCarousel
+│   │   ├── opleg.h                 Conway-chain morph legs: OpLeg
+│   │   ├── segue.h                 Mesh-to-mesh transition policies: the Segue library
+│   │   └── carousel.h              Double-buffered mesh slot pair: MeshCarousel
 │   └── vendor/                 Third-party code
 │       ├── FastNoiseLite.h         Single-header noise library
 │       └── FastNoiseLite_config.h  FastNoiseLite build configuration
@@ -304,6 +308,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 
 ```
 ├── index.html                  Main simulator page
+├── LICENSE                     PolyForm Noncommercial 1.0.0 (engine); effects reserved
 ├── vendor-importmap.js         Local-first / CDN-fallback importmap helper
 ├── holosphere_wasm.js          Installed from Holosphere's WASM build
 ├── holosphere_wasm.wasm        Installed from Holosphere's WASM build
@@ -316,10 +321,13 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │
 ├── bootstrap.js                Dynamic-import boot of daydream.js + failure overlay
 ├── daydream.js                 App entry: WASM loader, state wiring, GUI/sidebar
+├── app_lifecycle.js            Composition-root frame adapter, display-alias heal, and teardown
 ├── engine_host.js              Owns the main-thread WASM engine + its reassignable display state
+├── effect_gui.js               Effect panel lifecycle: build, mount, value sync, Export, teardown
 ├── effect_sequencing.js        DOM-free effect/resolution apply-order and skew-guard rules
 ├── param_sync.js               DOM-free "should this slider adopt the engine value?" rule
 ├── pixel_view.js               DOM-free zero-copy pixel-view detach/re-fetch contract
+├── frame_constants.js          Simulation FPS and the slow-frame threshold derived from it
 ├── driver.js                   Three.js scene: sphere mesh, dots, OrbitControls,
 │                                  axes overlay, picture-in-picture camera, resize
 ├── label_format.js             DOM-free label number formatting with symbolic snapping
@@ -334,6 +342,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 ├── segment_worker.js           Web Worker that hosts one WASM instance per
 │                                  Phantasm hardware segment (parallel render)
 ├── segment_layout.js           Pure segment-layout math (Node-unit-testable, no WASM/Worker)
+├── segment_stats_view.js       Per-segment timing/arena stats overlay + spawn and fault states
 ├── worker_protocol.js          JSDoc @typedef contract for main↔worker messages (no runtime code)
 ├── styles/                     CSS for the main page and tools
 │
@@ -351,6 +360,8 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   ├── export_params.js        Formatter behind the GUI's Export action
 │   ├── lissajous_math.js       Pure Lissajous curve math from lissajous.html
 │   ├── mobius_transforms.js    Pure Möbius coefficient presets from mobius.html
+│   ├── page_lifecycle.js       Animation-frame recompute coalescer + bfcache-aware teardown hook
+│   ├── palette_controls.js     DOM-free zoom history and locked-slider delta capping for palettes.html
 │   ├── palette_math.js         ProceduralPalette / GenerativePalette mirror + the PaletteOps bridge
 │   ├── solid_codegen.js        Op dispatch, codegen, and op-chain sequencing for solids.html
 │   └── tools.css               Shared design tokens and control styling for the tool pages
@@ -370,55 +381,6 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 ```
 
 When the local `three.js/` and `node_modules/lil-gui/` directories are absent (e.g. on the GitHub Pages deploy, and by default), [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) resolves libraries from jsdelivr; `npm run importmap:local` switches it to the vendored copies for offline dev. See [§10.8](#108-vendor-importmap-local-first--cdn-fallback).
-
-### Design Docs (`docs/`)
-
-Every document carries its own status banner; the summaries below repeat it. A
-banner that says REJECTED or SUPERSEDED is load-bearing — the document is kept
-so a successor does not re-attempt what was already measured and refuted.
-
-**Contributor guide**
-
-| Document | Status |
-|---|---|
-| `docs/agent_workflow.md` | The non-negotiable session rules every brief assumes: worktree and landing discipline, shared-device access, style, and the per-commit gates |
-
-**Design specs**
-
-| Document | Status |
-|---|---|
-| `docs/phantasm_pcb_spec.md` | Source of truth for the KiCad schematic and layout of the per-segment carrier board — `hardware/phantasm/`. `just pcb` runs `gen/fab.py` against the committed board; `board.py`/`pcb.py` are opt-in generators that rewrite design sources. One identical PCB ×4 qualified; ×8 compile-tested only |
-| `docs/phantasm_frame_sync_spec.md` | IMPLEMENTED, and describes the implementation. 1-wire flywheel sync; protocol core `hardware/pov_sync.h`, device shell `hardware/pov_segmented.h` |
-| `docs/opchain_morph_spec.md` | LANDED. Op-by-op Conway-chain morphing generation of solids; design of record for `effects/IslamicStars.h` + `core/animation/mesh.h` |
-| `docs/conway_morph_spec.md` | SUPERSEDED by `docs/opchain_morph_spec.md`; records the design as it landed and no longer tracks the tree |
-| `docs/segmented_stateful_effects_spec.md` | IMPLEMENTED. History-reading pixel effects (`Pixel::Feedback`) under segmented mode, gated on `needs_full_frame()` |
-| `docs/selective_o3_spec.md` | Implemented 2026-07-15, minimal region set; the full R1–R6 set is measured-unaffordable |
-| `docs/teensy_ci_gate_spec.md` | Active and green. The `teensy-size` / `teensy-warnings` CI jobs, region budgets, and ELF layout invariants |
-| `docs/congruence_class_lut_spec.md` | FACILITY ONLY — landed, tested, gate-green, and used by no effect. §11–12 record why IslamicStars was unwired |
-| `docs/single_pass_mesh_raster_spec.md` | REJECTED, measured 2026-07-18. Do not build it; the refutation bounds what a successor may attempt |
-
-**Ledgers and audits**
-
-| Document | Status |
-|---|---|
-| `docs/device_host_divergence_ledger.md` | Tracked inventory of every fork on a device-only constant, tagged with whether an automated device-value test build reaches it |
-| `docs/itcm_ledger.md` | Per-commit `.text.itcm` accounting on the phantasm image across the window the arena cut opened |
-| `docs/strobe_columns_audit.md` | Historical audit (June 2026); the renderer follow-up is implemented |
-
-**Optimization briefs and analyses**
-
-| Document | Status |
-|---|---|
-| `docs/meshfeedback_smoke_optimization.md` | RESOLVED 2026-07-19. Smoke peaks at 61.86 ms with zero spilled frames; all eight styles hold 16 fps |
-| `docs/islamicstars_palette_crossfade_plan.md` | LANDED 2026-07-26. Per-leg fresh palette classification with a smooth crossfade |
-| `docs/dreamballs_perf_analysis.md` | Device phase split and M7 codegen audit (2026-07-20): two levers landed, five killed or blocked, each with a measurement |
-| `docs/probe_path_open_items.md` | IslamicStars probe path: the stall pass is done (23 green / 0 yellow / 1 red); two items remain open |
-| `docs/islamicstars_next_levers.md` | Remaining IslamicStars levers, sized against the one solid that misses the 62.5 ms window |
-| `docs/islamicstars_sub60_optimization_brief.md` | Brief: drive the IslamicStars render chain to peak < 60 ms on every shape, in both the shipping and global-`-O3` images |
-| `docs/mindsplatter_optimization.md` | Plan (2026-07-25) for a MindSplatter-specific streaming renderer to hold every frame under 59 ms |
-| `docs/MINDSPLATTER_PARTICLE_SCALING_ANALYSIS.md` | Analysis (2026-07-22): 2,048 full particles cannot be reached by raising `NUM_PARTICLES` — it fails on both arena and CPU |
-| `docs/feedback_pole_isotropy_plan.md` | Analysis and plan for an isotropic MeshFeedback pole warp; the D1 tangent-warp variant was measured and rejected 2026-07-23 |
-| `docs/lut_compression_next.md` | Brief: find the next hot-path LUT worth compressing, if any. §2 is the screen — most LUTs are not candidates |
 
 ---
 
@@ -477,6 +439,8 @@ The `platform.h` header abstracts all target-specific differences:
 | `hs::rand_f()` | `Pcg32(1337)` | `Pcg32(1337)` |
 | `hs::disable_interrupts()` | `noInterrupts()` | No-op |
 | `CRGB`, `CHSV` | FastLED types | Struct mocks |
+
+The host-side mock implementations — the `CRGB`/`CHSV` structs plus the rest of the emulated Arduino/FastLED surface (`random8`, `beatsin8`, `SerialMock`, …) — live in `platform_arduino_mocks.h`, included from `platform.h`'s non-Arduino branch.
 
 ---
 
@@ -902,6 +866,12 @@ Convenience structs that construct an SDF shape and rasterize in a single `draw(
 | `Scan::TransformedVolume` | Wraps an SDF shape with a world-space position and orientation quaternion for volumetric rendering |
 | `Scan::Volume` | Volumetric ray-marcher that steps along the view direction through a `TransformedVolume`, applying a fragment shader at the hit point with configurable step count and AA width |
 
+#### Near-Pole Azimuthal LOD
+
+A row at colatitude φ has horizontal pixel pitch `sin(φ)` times the vertical, so `1/sin(φ)` columns share one physical LED footprint and need only one shade between them. The scan walk offers those columns as a block of `pole_lod_aggressiveness / sin(φ)` (`constants.h`, clamped to `POLE_LOD_MAX_RUN = 32`), and the sink settles the whole block from one probe wherever the probe can vouch for it. Only full canvas-aligned blocks are offered — partial blocks at clip or span edges go per column — so a column shades identically whichever segment renders it.
+
+`pole_lod_aggressiveness` is a hardware-calibrated knob, not a derived constant: the true masking width depends on the LED's angular size and the per-column exposure. 1.0 tracks the footprint exactly; smaller values stay inside it; 0 makes every offer one column and the walk bit-identical to an undecimated one. It defaults to 0 (`HS_POLE_LOD_DEFAULT`). Firmware compiles it in as a `constexpr` with no setter — at the default, the decimation branches fold away entirely — while host and WASM builds keep it mutable so it can be tuned live (§10.2 `setPoleLod`).
+
 ### 7.2 The Curve Rasterizer (`plot.h`)
 
 For drawing lines, curves, and paths, the `Plot` namespace provides a geodesic/planar rasterizer with adaptive step size. Each sub-step is sized from the curve's full 2-D screen-space speed (`sqrt(vx² + vy²)`, combining longitudinal and latitudinal motion), so samples land roughly one pixel apart everywhere on the curve regardless of latitude. The step is clamped to keep the equator near one sample per column and floored near the poles — where screen speed diverges — so pole oversampling stays bounded.
@@ -944,7 +914,9 @@ The `Timeline` class manages a list of running `IAnimation` objects. Each frame,
 | `trails.h` | Recorded history | `OrientationTrail`, `VectorTrail`, `QuantizedVectorTrail`, the `tween`/`deep_tween` traversals |
 | `sprites.h` | Visible things | `Sprite`, `Particle`/`ParticleSystem` |
 | `timeline.h` | Scheduling | `TimelineEvent`, `Timeline` |
-| `mesh.h` | Mesh-to-mesh transitions | `OpLeg`, the `Segue` policies, `MeshCarousel` |
+| `opleg.h` | One Conway-chain morph leg, swept per frame | `OpLeg` |
+| `segue.h` | How one mesh hands the sphere to the next | the `Segue` policies |
+| `carousel.h` | Two persistent mesh slots + arena compaction | `MeshCarousel` |
 
 The fragments compile only inside `animation.h` (a direct include fails with an `#error`); consumers include `animation.h` alone.
 
@@ -1101,6 +1073,8 @@ A single contiguous memory block (`GLOBAL_ARENA_SIZE = 298 KiB`) is partitioned 
 | `scratch_arena_a` | 16 KB | Short-lived intermediate geometry (RAII scoped) |
 | `scratch_arena_b` | 16 KB | Secondary scratch for ping-pong subdivision passes |
 
+The native unit-test build (`-DHS_TEST_BUILD`, §11) is the one exception: it raises `GLOBAL_ARENA_SIZE` to 8 MiB — and with it the persistent default, which is whatever the two 16 KB scratch arenas leave — so the smoke harness can render every effect without OOMing. The device budget stays reachable as `DEVICE_GLOBAL_ARENA_SIZE` / `DEVICE_PERSISTENT_BUDGET`, which the per-effect footprint `static_assert`s check against instead, so an effect that outgrows the device still fails in the host suite.
+
 Effects that need more scratch memory can repartition at init time:
 
 ```cpp
@@ -1158,9 +1132,9 @@ All internal color data is **16-bit linear light** (`uint16_t r, g, b` in range 
 
 The conversion pipeline:
 ```
-Input (sRGB 8-bit) → sRGB→linear LUT → Pixel16 (linear 16-bit) → blend ops
+Input (sRGB 8-bit) → sRGB→linear LUT → Pixel (linear 16-bit) → blend ops
                                                                       ↓
-FastLED output ← CRGB(gamma encode) ← linear→sRGB ← Pixel16
+FastLED output ← CRGB(gamma encode) ← linear→sRGB ← Pixel
 ```
 
 `Color4` wraps `Pixel` with a float alpha channel. The canvas sink composites with a single straight-alpha "over" operation — `blend_alpha(α)`, i.e. `dst = src * α + dst * (1-α)`, applied in 16-bit linear light (see `filter.h`). There is no selectable blend-mode tag.
@@ -1300,7 +1274,7 @@ The mesh system is split across several files:
 
 #### Conway Operators (`conway.h`)
 
-All Conway *geometry* operators (`dual` through `bevel` below) take `(const PolyMesh& mesh, Arena& target, Arena& temp)` and return a `PolyMesh`; `medial` takes the same two arenas but writes its two outputs through reference parameters — `(const PolyMesh& mesh, PolyMesh& out_a, ArenaVector<Vector>& out_b, Arena& target, Arena& temp)`. `transform`, `transform_in_place`, `relax`, `relax_baked`, and `normalize` are listed in the same table but are mesh utilities with their own signatures. **Primitive** operators produce their `PolyMesh` into `target` and use `temp` for intermediate computation. **Composed** operators (`gyro`, `meta`, `needle`, `zip`, `bevel`) reuse the same internal ping-pong as their constituent ops, so their output lands in the arena that backed the last step's `target`: `temp` for an even-length composition (`gyro`, `needle`, `zip`, `bevel`) — the *opposite* arena from a primitive — and back in `target` for the odd-length `meta` (three steps), like a primitive (see the load-bearing COMPOSITION POLARITY note in `conway.h`). Plan arena lifetimes accordingly when invoking a composed operator directly rather than through `SolidBuilder`:
+All Conway *geometry* operators (`dual` through `bevel` below) take `(const PolyMesh& mesh, Arena& target, Arena& temp)` and return a `PolyMesh`; `medial` takes the same two arenas but writes its two outputs through reference parameters — `(const PolyMesh& mesh, PolyMesh& out_a, ArenaVector<Vector>& out_b, Arena& target, Arena& temp)`. `transform`, `transform_in_place`, `relax`, `relax_baked`, and `normalize` are listed in the same table but are mesh utilities with their own signatures. Every operator, primitive or composed, produces its `PolyMesh` into `target` and uses `temp` for intermediate computation; composed operators (`gyro`, `meta`, `needle`, `zip`, `bevel`) reuse the same internal ping-pong as their constituent ops, with an even-length composition starting its first step in `temp` so the last one lands in `target` (see the COMPOSITION POLARITY note in `conway.h`):
 
 | Operation | Description |
 |---|---|
@@ -1402,11 +1376,11 @@ Three hardware drivers form a layered stack.  `dma_led.h` handles the SPI wire p
 
 #### DMA LED Controller (`dma_led.h`)
 
-Non-blocking DMA-based LED output for HD107S (APA102-compatible) LEDs on Teensy 4.x.  Enabled by `#define USE_DMA_LEDS` in the target's boilerplate header (`targets/common/phantasm_target.h`) before it includes the driver; `led.h` stays neutral (the define is commented out there) and the default FastLED/WS2801 path remains as fallback. The FastLED fallback applies only to the single-board `POVDisplay`; the segmented `POVSegmented` driver `#error`s without `USE_DMA_LEDS` (the FastLED path cannot honor the master sync pulse-width contract), so DMA LEDs are mandatory on Phantasm.
+Non-blocking DMA-based LED output for HD107S (APA102-compatible) LEDs on Teensy 4.x.  Enabled by `#define USE_DMA_LEDS` in the target's boilerplate header (`targets/common/phantasm_target.h`) before it includes the driver; `led.h` stays neutral (the define is commented out there) and the default FastLED/WS2801 path remains as fallback. The FastLED fallback applies only to the single-board `POVDisplay`; the segmented `POVSegmented` driver `#error`s without `USE_DMA_LEDS` (FastLED's bit-bang `show()` masks IRQs for windows that break the sync symbol margins, which are derived from a mask window M ≈ 0), so DMA LEDs are mandatory on Phantasm.
 
 | Class | Role |
 |---|---|
-| `HD107SFrame<N>` | Pre-formatted DMA buffer for the HD107S protocol. `packPixel()` writes `Pixel16` values directly into the frame buffer with inline color correction (color correction → temperature → brightness), bypassing the CRGB intermediate. The buffer is 32-byte-aligned (`__attribute__((aligned(32)))`) and cleaned with `arm_dcache_flush()` (clean, no invalidate — the buffer is TX-only) for cache coherency. |
+| `HD107SFrame<N>` | Pre-formatted DMA buffer for the HD107S protocol. `packPixel()` writes `Pixel` values directly into the frame buffer with inline color correction (color correction → temperature → brightness), bypassing the CRGB intermediate. The buffer is 32-byte-aligned (`__attribute__((aligned(32)))`) and cleaned with `arm_dcache_flush()` (clean, no invalidate — the buffer is TX-only) for cache coherency. |
 | `TeensySPIDMA` | Low-level DMA+SPI driver wired to LPSPI4. Configures a `DMAChannel` with completion interrupt for fully async byte-stream transmission. |
 | `DMALEDController<N>` | Double-buffered high-level controller. The ISR packs pixels into `backFrame()`, then `submitFrame()` flushes it and triggers async DMA, returning immediately. If the previous transfer is still in flight, `submitFrame()` **drops** the new frame (bumping `getOverrunCount()`) rather than spinning — the in-flight DMA keeps showing the previous column; a transfer that never completes is surfaced as a wedged-channel fault. |
 
@@ -1417,7 +1391,7 @@ The 16-bit linear pipeline reaches from the canvas all the way to the SPI wire w
 const Pixel* buf = effect->display_buffer();               // 16-bit linear pixels
 // Physical LED index comes from the single-source-of-truth map (pov_single_map.h),
 // which applies the top-arm reversal / bottom-arm offset — never the raw row index.
-frame.packPixel(pov::strip_top_led(y, S), buf[y * width + x]); // Pixel16 → HD107S frame
+frame.packPixel(pov::strip_top_led(y, S), buf[y * width + x]); // Pixel → HD107S frame
 ledController.submitFrame();                                // non-blocking DMA, drops on overrun
 ```
 
@@ -1735,7 +1709,7 @@ An effect passes construction-time flags to its base as `Effect(W, H, {.strobe =
 
 ## 9. Effects Reference
 
-All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for RingShower and Dynamo.
+All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for RingShower, Dynamo and Thrusters.
 
 The simulator, the effect registry, and the tests carry the full roster. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) is a 22-effect subset of it, excluding the two Holosphere-96×20-only effects, Dynamo and Thrusters.
 
@@ -1888,7 +1862,7 @@ Four great-circle rings tumble continuously under energetic random-walk rotation
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=RingShower" target="_blank"><img src="docs/screenshots/RingShower.png" alt="RingShower" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=RingShower&resolution=Holosphere%20(96x20)" target="_blank"><img src="docs/screenshots/RingShower.png" alt="RingShower" width="280"></a></td>
 <td valign="top">
 
 #### RingShower
@@ -1948,7 +1922,7 @@ Particles spray from emitters at the eight cube vertices — each sweeping its o
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=Dynamo" target="_blank"><img src="docs/screenshots/Dynamo.png" alt="Dynamo" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=Dynamo&resolution=Holosphere%20(96x20)" target="_blank"><img src="docs/screenshots/Dynamo.png" alt="Dynamo" width="280"></a></td>
 <td valign="top">
 
 #### Dynamo
@@ -1960,7 +1934,7 @@ A vertical strand of points — one per latitude row — drifts horizontally aro
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=Thrusters" target="_blank"><img src="docs/screenshots/Thrusters.png" alt="Thrusters" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=Thrusters&resolution=Holosphere%20(96x20)" target="_blank"><img src="docs/screenshots/Thrusters.png" alt="Thrusters" width="280"></a></td>
 <td valign="top">
 
 #### Thrusters
@@ -2025,9 +1999,9 @@ A stack of evenly spaced soft-stroked rings (`Scan::DistortedRing`) sharing one 
 
 #### ShapeShifter
 
-Layered polygon, star, and flower rings (planar and spherical polygon variants) drawn through both the `Plot` and `Scan` rasterizers at once. The shape type hard-cuts to the next of four (planar polygon, spherical polygon, flower, star) every 48 frames while a twist Mutation shears the layers. All `Plot` rings share one tumbling orientation and all `Scan` rings share another, so layer Count scales with the raster budget rather than the timeline.
+Concentric polygon, star, or flower outlines drawn exclusively through the `Plot` rasterizer. The rings are evenly spaced across the full sphere radius, and a selectable animated waveform offsets each ring's phase to twist the stack back and forth while a global random walk reorients the stack. Six presets continuously blend among spherical polygons, flowers, and stars.
 
-**Parameters**: Alpha, Count, Radius, Sides, Twist, Debug BB
+**Parameters**: Alpha, Shape, Count, Sides, Function, Amplitude, Speed, Opposite
 
 </td></tr></table>
 
@@ -2039,7 +2013,7 @@ TheMatrix, ChainWiggle, RingRotate, RingTwist, Curves, Kaleidoscope, StarsFade, 
 
 ## 10. The Web Simulator (Daydream)
 
-The [`daydream`](https://github.com/woundedlion/daydream) repo is a static web app that wraps the WASM build from this repo in a Three.js scene. The C++ rendering engine is unchanged — the same effect classes, the same arenas, the same per-frame `Pixel16[]` buffer. Daydream's job is to:
+The [`daydream`](https://github.com/woundedlion/daydream) repo is a static web app that wraps the WASM build from this repo in a Three.js scene. The C++ rendering engine is unchanged — the same effect classes, the same arenas, the same per-frame `Pixel[]` buffer. Daydream's job is to:
 
 1. Drive the WASM engine one frame at a time at a fixed cadence.
 2. Map each `(x, y, color)` pixel to a position on a 3D sphere and render it as an instanced dot mesh.
@@ -2071,7 +2045,7 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 
 ### 10.2 The WASM Bridge
 
-`wasm.cpp` compiles to `holosphere_wasm.js` + `.wasm` and exposes a single `HolosphereEngine` class:
+`wasm.cpp` compiles to `holosphere_wasm.js` + `.wasm` and exposes a single `HolosphereEngine` class. At most one instance may be live per module — its effect and arenas are shared module-global storage — so `delete()` the current engine before constructing another; the constructor traps otherwise.
 
 | Method | Description |
 |---|---|
@@ -2082,6 +2056,8 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `getBufferLength()` → `int` | Length of the pixel buffer (`W × H × 3`) for sizing the view |
 | `setParameter(name, value)` → `ParamSetResult` | Update a live effect parameter; returns `Module.ParamSetResult.APPLIED` on success, else the rejection reason (`NO_EFFECT`, `UNKNOWN_PARAM`, `READONLY`, or `NON_FINITE`). Compare against the enum values — never by truthiness. An `APPLIED` float may still have been clamped to the param's `[min, max]`; read the effective value back via `getParamValues()` |
 | `setAnimationsPaused(paused)` | Freeze/resume the current effect's animation drivers (the GUI "Pause Animation" toggle) |
+| `setPoleLod(aggressiveness)` | Set near-pole azimuthal shading decimation (the GUI "Pole LOD" slider, `[0, 2]`); non-finite and negative inputs clamp to 0, and the value saturates at 8 |
+| `getPoleLod()` → `float` | Current decimation aggressiveness |
 | `getParameterDefinitions()` | Return the parameter list; each entry is `{name, value, animated, readonly}`, and float params additionally carry `{min, max}` (bool params omit `min`/`max` and return `value` as a JS boolean). Enum params (registered with option labels) also carry `options`, an array of label strings indexed by the param's value, which the GUI renders as a dropdown |
 | `getParamValues()` | Return current parameter values (including animation-driven updates) |
 | `getParamGeneration()` → `int` | Generation identifying which loaded-effect or no-effect state the definition and value streams describe. Pin it beside a `getParameterDefinitions()` snapshot and re-read it with each `getParamValues()` call; a changed value means the snapshot is stale (parameter counts repeat across the roster, so a length check alone cannot detect the switch or teardown) |
@@ -2091,7 +2067,7 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `setClip(x0, x1, y0, y1)` → `bool` | Restrict rendering to a sub-rectangle (used by segment workers) |
 | `strobeColumns()` → `bool` | Whether the current effect renders as discrete strobed columns (dark inter-column gaps) rather than a continuous smeared band; `false` when no effect is set. Daydream reads it to decide whether to fill the inter-column gap |
 
-The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 298 KiB arena) for interactive solid manipulation.
+The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 298 KiB arena) for interactive solid manipulation. `fromSolidName`, `classifyFaces` and the operator methods answer a rejected call with `null`; `MeshOps.getLastResult()` then names the reason as a `Module.MeshOpResult` value (`OK`, `UNKNOWN_NAME`, `CONNECTIVITY_OVERFLOW`, `FACE_DEGREE_OVERFLOW`, `ARENA_EXHAUSTED`, `NON_FINITE_ARG`, or `ANGLE_OUT_OF_DOMAIN`). Compare against the enum values — never by truthiness — and read it before the next such call, which overwrites it. The reasons demand opposite responses: an overflow means shrinking the op chain, `ARENA_EXHAUSTED` means calling `clearToolingMemory()`.
 
 The bridge also exposes a `PaletteOps` class whose `bakeLut` method authors a three-key OKLCH gradient and returns a zero-copy `Uint8Array` view over a 256-entry sRGB LUT (same read-before-next-call memory-view contract as `getPixels`), used by the palette tool. It touches no global RNG, so calling it never perturbs a live engine's render stream.
 
@@ -2214,7 +2190,15 @@ The local-vs-CDN choice is **baked at build time**, not probed at runtime — th
 The generated integrity map covers the top-level libraries and the two addons
 the app imports directly. Relative sub-imports inside those modules bypass the
 import map, so the exact package-version pin is the primary defense; the
-available SRI entries are additional partial coverage.
+available SRI entries are additional partial coverage. Import-map `integrity`
+is Chromium-only — Firefox and Safari ignore the key entirely, so SRI is no
+coverage at all there. The second boundary on every browser is a
+`Content-Security-Policy` meta tag, carried by `index.html` and each of the
+four tool pages, which restricts script loads to `'self'` plus the CDN origins
+that page actually uses. `'unsafe-eval'` is required wherever the WASM engine
+loads: Emscripten's embind builds its invokers with `new Function`, which
+`'wasm-unsafe-eval'` does not permit. `font-src` allows `data:` for the woff2
+lil-gui inlines in its stylesheet.
 
 A page-specific local import (e.g. `solids.html` referencing `../solids.js`) is added by setting `window.__DAYDREAM_EXTRA_IMPORTS` before the helper script.
 
@@ -2324,15 +2308,19 @@ cmake --build --preset tests  # build the run_tests executable
 ctest --preset tests          # run the suite (or: just test)
 ```
 
-The suite must use Clang — the engine relies on GCC/Clang `__attribute__` extensions MSVC rejects. The native toolchain file ([`cmake/toolchain-native-clang.cmake`](https://github.com/woundedlion/pov/blob/master/cmake/toolchain-native-clang.cmake)) locates Clang via `EMSDK` (or a sibling `../emsdk`) and, on Windows, transparently handles the resource compiler and `lld-link` so no Visual Studio Developer Prompt is required. Tests build with `-DHS_TEST_BUILD`, which only widens a couple of test-build buffer budgets (MSVC-STL `std::function` is larger than the device's `inplace_function`) — the firmware/WASM footprint is unchanged.
+The suite must use Clang — the engine relies on GCC/Clang `__attribute__` extensions MSVC rejects. The native toolchain file ([`cmake/toolchain-native-clang.cmake`](https://github.com/woundedlion/pov/blob/master/cmake/toolchain-native-clang.cmake)) locates Clang via `EMSDK` (or a sibling `../emsdk`) and, on Windows, transparently handles the resource compiler and `lld-link` so no Visual Studio Developer Prompt is required. Tests build with `-DHS_TEST_BUILD`, which widens the host-only budgets: the inline type-erased animation slot (the 64-bit host inflates every embedded pointer past the 32-bit device footprint) and, most significantly, `GLOBAL_ARENA_SIZE` — **8 MiB under the flag against the device's 298 KiB**, so the effect smoke harness can render every effect without OOMing mid-run. The firmware/WASM footprint is unchanged: the real budget stays available as `DEVICE_GLOBAL_ARENA_SIZE`, which the device-budget `static_assert`s check even in the host suite. A high-water mark measured in the native suite is therefore *not* a device figure — it is a 64-bit measurement against an inflated ceiling.
 
-Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-diffusion graph integrity, filters, the plot samplers and the Scan/mesh rasterizer, solids-registry invariants, the Conway/Hankin mesh operators, and animation. Beyond those unit checks the suite also runs: an effect smoke harness that constructs and renders every effect with asserts on, plus a cross-run determinism pass that re-renders each effect under a fixed clock and diffs the frames — at the device 96×20 resolution by default, and additionally at the production 288×144 alongside a white-box correctness block when `HS_EFFECTS_FULL=1` is set, which CI does on every push and pull request; a death harness that spawns subprocesses to confirm each `HS_CHECK` invariant traps; the Phantasm multi-board sync core (`hardware/pov_sync.h`, spec §12); the HD107S SPI wire-format and color-correction tests; the POV driver tiling proofs (each LED write covers the canvas exactly once); and the WASM param-marshaling coverage (the JS definition/value streams stay index-aligned). `tests/run_tests.cpp` is the driver; add a `tests/test_<module>.h`, then `#include` it and call its entry point there (two lines) to extend it.
+Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-diffusion graph integrity, filters, the plot samplers and the Scan/mesh rasterizer, solids-registry invariants, the Conway/Hankin mesh operators, and animation. Beyond those unit checks the suite also runs: an effect smoke harness that constructs and renders every effect with asserts on, plus a cross-run determinism pass that re-renders each effect under a fixed clock and diffs the frames — at the device 96×20 resolution by default, and additionally at the production 288×144 alongside a white-box correctness block when `HS_EFFECTS_FULL=1` is set, which CI does on every push and pull request; a death harness that spawns subprocesses to confirm each `HS_CHECK` invariant traps; the Phantasm multi-board sync core (`hardware/pov_sync.h`, spec §12); the HD107S SPI wire-format and color-correction tests; the POV driver tiling proofs (each LED write covers the canvas exactly once); and the WASM param-marshaling coverage (the JS definition/value streams stay index-aligned). `tests/run_tests.cpp` is the driver. Extending it with a `tests/test_<module>.h` takes three edits, each pinned by its own CTest case:
+
+1. `#include` the header in `run_tests.cpp`'s include block. The `unit_module_includes` test balances that block's size against the roster row count and requires every header in `tests/` outside a small non-module list to be included by name — so neither an orphaned include nor a test file nothing compiles survives.
+2. Add an `X(name, entry_point, min_assertions)` row to `HS_TEST_MODULE_LIST`, the X-macro that expands into `MODULES[]`. The third column is a **measured** assertion floor — the minimum over the configurations that move a module's count (the `HS_SMOKE_FRAMES` window, Debug `-O0` vs `RelWithDebInfo -O2`, and any `NDEBUG`-gated cases) — enforced by `end_module()`, so a case defined and never called turns the module red instead of compiling clean. `0` leaves a module unfloored.
+3. Add the module name to `_hs_test_modules` in [`tests/CMakeLists.txt`](https://github.com/woundedlion/pov/blob/master/tests/CMakeLists.txt), which generates the one-CTest-test-per-module the CI shards target. `run_tests --check-modules` (the `unit_module_roster` test) fails if the CMake list and the roster diverge either way, so a module added to one but not the other can never run silently.
 
 #### Continuous testing
 
 Three layers run the same suite so a regression can't reach the live demo:
 
-- **Local pre-commit hook** ([`.githooks/pre-commit`](https://github.com/woundedlion/pov/blob/master/.githooks/pre-commit)) — with C++/CMake changes staged it runs three gates: a `clang-format` check over the staged first-party sources, a build + run of the native suite, and the Teensy 4 size/layout gate (`pio run -e holosphere -e phantasm -e holosphere_dma`, enforcing the budgets in `tools/teensy_budgets.json`) — several minutes on a cold tree. The format and Teensy gates are skipped when `clang-format` / PlatformIO are absent, so CI re-runs both as its own jobs. **On by default (opt-out):** configuring the `tests` preset points `core.hooksPath` at `.githooks` automatically. Skip one gate with `HS_SKIP_FORMAT=1` / `HS_SKIP_TEENSY=1`, or the whole hook with `HS_SKIP_TESTS=1 git commit …` (or `--no-verify`); disable the auto-enable with `-DHS_INSTALL_GIT_HOOKS=OFF`. Doc-only commits skip all three. The effects module runs its QUICK tier here, so a green hook is not authoritative for the full-resolution passes.
+- **Local pre-commit hook** ([`.githooks/pre-commit`](https://github.com/woundedlion/pov/blob/master/.githooks/pre-commit)) — with C++/CMake changes staged it runs three gates: a `clang-format` check over the staged first-party sources, a build + run of the native suite, and the Teensy 4 size/layout gate (`pio run -e holosphere -e phantasm -e holosphere_dma`, enforcing the budgets in `tools/teensy_budgets.json`) — several minutes on a cold tree. The format and Teensy gates are skipped when `clang-format` / PlatformIO are absent, so CI re-runs both as its own jobs. The format check also blocks only when `clang-format`'s major matches CI's pinned 18 — any other major reflows differently, so its verdict is reported but never aborts the commit; point `CLANG_FORMAT` at a `clang-format-18` binary to enforce it locally. **On by default (opt-out):** configuring the `tests` preset points `core.hooksPath` at `.githooks` automatically. Skip one gate with `HS_SKIP_FORMAT=1` / `HS_SKIP_TEENSY=1`; `HS_SKIP_TESTS=1 git commit …` stands down the native suite *and* the Teensy gate but not the format check, which runs ahead of it — only `--no-verify` bypasses the whole hook. Disable the auto-enable with `-DHS_INSTALL_GIT_HOOKS=OFF`. Doc-only commits skip all three. The effects module runs its QUICK tier here, so a green hook is not authoritative for the full-resolution passes.
 - **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on every push and pull request, runs the native suite on both Linux (clang-18) and Windows (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell), and builds the WASM module. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) — instantiating the module the way the browser does and driving every registered effect at every enumerated resolution, so a SIMD-codegen fault, an embind signature mismatch, a stack overflow, or an `ALLOW_MEMORY_GROWTH` detachment fails here rather than riding a green build to deploy — and **verifies the install provenance set** (`holosphere_wasm.wasm` + `.js` + `.sha` + `.wasm.sha256`, the same artifacts the daydream deploy gate consumes), asserting the recorded `sha256` of both the binary and the Emscripten glue verifies and a clean checkout records no `-dirty` marker. The native suite there runs with `HS_SMOKE_FRAMES=120` to reach effect-lifecycle transitions the default short run skips, and runs a second time at `-O2` (the `tests` preset pins `Debug`, so UB the optimizer acts on and FP results that move under contraction are invisible to the Debug shards; `NDEBUG` is left undefined there so assertions and the arena guards stay live).
 - **Gated deploy** (`.github/workflows/deploy.yml`, **daydream repo**) — daydream's GitHub Pages source is *GitHub Actions*. On a push to daydream's `master` (or manual dispatch), the engine's native unit suite runs as a **gate** (checking out the engine repo) alongside daydream's own JS suite; `deploy` `needs: [gate, js-tests]`, so only if both pass does the workflow publish the simulator to Pages. The engine's WASM is whatever is committed in daydream (built + installed from Holosphere). If the engine repo is private, add a `POV_TOKEN` secret (a read-access PAT) for the gate's checkout.
 
@@ -2383,4 +2371,4 @@ This project is split-licensed: the rendering engine and the visual effects carr
 
 **Effects — proprietary.** The visual effects in `effects/` are Copyright 2025 Gabriel Levy. All rights reserved. They are not covered by the PolyForm license — no rights to use, copy, modify, or distribute them are granted.
 
-**Third-party.** `FastNoiseLite.h` is under the MIT License (Auburn / Jordan Peck).
+**Third-party.** The engine vendors `core/vendor/FastNoiseLite.h` under the MIT License (Auburn / Jordan Peck). The simulator vendors nothing — it loads [three.js](https://github.com/mrdoob/three.js) (MIT, three.js authors) and [lil-gui](https://github.com/georgealways/lil-gui) (MIT, George Michael Brower) from the jsdelivr CDN at the versions pinned in `daydream/package.json` (currently three 0.183.1, lil-gui 0.21.0). The optional self-hosted fonts under `daydream/vendor/fonts/` (Inter and JetBrains Mono, both SIL OFL 1.1) are gitignored and distributed by neither repo.
