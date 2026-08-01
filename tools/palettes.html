@@ -45,16 +45,16 @@
 
     /* Custom checkbox style */
     input[type=checkbox] {
-      background-color: #475569;
+      background-color: var(--slate-600);
       /* Slate 600 */
-      border-color: #64748B;
+      border-color: var(--slate-500);
       /* Slate 500 */
     }
 
     input[type=checkbox]:checked {
-      background-color: #3B82F6;
+      background-color: var(--blue-500);
       /* Blue 500 */
-      border-color: #3B82F6;
+      border-color: var(--blue-500);
     }
 
     .r-thumb::-webkit-slider-thumb {
@@ -66,7 +66,7 @@
     }
 
     .b-thumb::-webkit-slider-thumb {
-      background: #3B82F6; /* Blue */
+      background: var(--blue-500); /* Blue */
     }
 
     .speed-thumb::-webkit-slider-thumb {
@@ -75,7 +75,7 @@
 
     /* Canvas Styles */
     #colorStripCanvas {
-      border: 1px solid #475569;
+      border: 1px solid var(--slate-600);
       border-radius: 0.5rem;
       width: 100%;
       height: 100px;
@@ -91,7 +91,7 @@
     }
 
     #waveGraphCanvas {
-      border: 1px solid #475569;
+      border: 1px solid var(--slate-600);
       border-radius: 0.5rem;
       width: 100%;
       height: 150px;
@@ -132,7 +132,7 @@
       flex-shrink: 0;
       height: 2.75rem;
       padding: 0;
-      border: 2px solid #475569;
+      border: 2px solid var(--slate-600);
       border-radius: 0.5rem;
       overflow: hidden;
       cursor: pointer;
@@ -142,7 +142,7 @@
     }
 
     .palette-swatch:hover {
-      border-color: #3B82F6;
+      border-color: var(--blue-500);
     }
 
     .palette-swatch:active {
@@ -174,7 +174,7 @@
     /* Tab Styles */
     .tab-btn {
       padding: 0.5rem 1.5rem;
-      background-color: #334155;
+      background-color: var(--slate-700);
       color: #94A3B8;
       border-radius: 0.5rem 0.5rem 0 0;
       font-weight: 600;
@@ -185,15 +185,15 @@
     }
 
     .tab-btn.active {
-      background-color: #1E293B;
-      color: #3B82F6;
-      border-color: #475569;
+      background-color: var(--slate-800);
+      color: var(--blue-500);
+      border-color: var(--slate-600);
     }
 
     .tab-content {
       display: none;
-      background-color: #1E293B;
-      border: 1px solid #475569;
+      background-color: var(--slate-800);
+      border: 1px solid var(--slate-600);
       border-radius: 0 0.5rem 0.5rem 0.5rem;
       padding: 1.5rem;
     }
