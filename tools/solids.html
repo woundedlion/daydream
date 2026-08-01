@@ -792,6 +792,15 @@
       // running against the disposed scene.
       onPageTeardown(() => {
         scheduleUpdate.cancel();
+        mainMesh?.geometry.dispose();
+        edgeLines?.geometry.dispose();
+        vertPoints?.geometry.dispose();
+        normalLines?.geometry.dispose();
+        faceMaterial.dispose();
+        faceColorizeMaterial.dispose();
+        vertMaterial.dispose();
+        edgeMaterial.dispose();
+        normalMaterial.dispose();
         result.dispose();
       });
 
