@@ -8,7 +8,8 @@ restoreDocumentAfterEach();
 
 // Drives EffectSidebar.onKeyDown against a minimal fake button/list so no real
 // DOM is needed; the handler only touches the DOM through these hooks.
-function driveKey(key) {
+// `activeFor` picks what document.activeElement is, defaulting to the option.
+function driveKey(key, activeFor = (btn) => btn) {
   const state = { selected: 0, selectedName: null, prevented: 0 };
   const focused = { dataset: { effect: 'Voronoi' }, focus() {} };
   const self = {
@@ -20,7 +21,7 @@ function driveKey(key) {
       state.selectedName = name;
     },
   };
-  installDocument({ activeElement: focused });
+  installDocument({ activeElement: activeFor(focused) });
   const e = {
     key,
     preventDefault() {
@@ -43,6 +44,18 @@ test('onKeyDown: Space selects the focused effect exactly once', () => {
   assert.equal(r.selected, 1);
   assert.equal(r.selectedName, 'Voronoi');
   assert.equal(r.prevented, 1);
+});
+
+test('onKeyDown: Enter selects nothing when focus is not on an option', () => {
+  // Keydown reaches the list from a focused non-option (a scrollbar drag, or a
+  // child the list wraps): there is no effect name to select.
+  const bare = driveKey('Enter', () => ({ dataset: {}, focus() {} }));
+  assert.equal(bare.selected, 0);
+  assert.equal(bare.prevented, 1);
+
+  const none = driveKey('Enter', () => null);
+  assert.equal(none.selected, 0);
+  assert.equal(none.prevented, 1);
 });
 
 // Drives onKeyDown against a multi-button fake so the DOM focus wiring (which
