@@ -166,6 +166,7 @@ const recordableCanvas = (w = 64, h = 32) => ({
 class FakeMediaRecorder {
   static instances = [];
   static startError = null;
+  static startData = null;
   static isTypeSupported() { return true; }
   constructor(stream, options) {
     this.stream = stream;
@@ -179,6 +180,9 @@ class FakeMediaRecorder {
   start() {
     if (FakeMediaRecorder.startError) throw FakeMediaRecorder.startError;
     this.state = 'recording';
+    if (FakeMediaRecorder.startData) {
+      this.ondataavailable({ data: FakeMediaRecorder.startData });
+    }
   }
   stop() { this.state = 'inactive'; }
 }
@@ -199,6 +203,7 @@ const installRecorderEnv = () => {
   };
   FakeMediaRecorder.instances = [];
   FakeMediaRecorder.startError = null;
+  FakeMediaRecorder.startData = null;
   globalThis.MediaRecorder = FakeMediaRecorder;
   globalThis.HTMLCanvasElement = class { captureStream() {} };
   globalThis.document = { createElement: () => recordableCanvas() };
@@ -371,6 +376,24 @@ test('a stopped session downloads its own chunks and clears instance state', () 
     assert.deepEqual(downloads[0].chunks, [{ size: 10 }]);
     assert.equal(rec.mediaRecorder, null);
     assert.equal(stream.track.stopped, true);
+  } finally {
+    restore();
+  }
+});
+
+test('a chunk emitted synchronously by start reaches the installed sink', () => {
+  const restore = installRecorderEnv();
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    const writes = [];
+    rec.openSink = () => ({ write: (chunk) => writes.push(chunk), finish() {} });
+    FakeMediaRecorder.startData = { size: 10 };
+
+    rec.start('sync');
+
+    assert.deepEqual(writes, [{ size: 10 }]);
+    assert.deepEqual(rec.chunks, []);
+    rec.dispose();
   } finally {
     restore();
   }
