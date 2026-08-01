@@ -190,6 +190,7 @@ test('setActive toggles active/aria-selected on only the old and new buttons', (
   assert.ok(a.classes.has('active'));
   assert.equal(a.getAttribute('aria-selected'), 'true');
   assert.equal(sidebar.tabbableBtn, a);
+  assert.equal(a.tabIndex, 0);
 
   sidebar.setActive('B');
   assert.ok(!a.classes.has('active'));
@@ -198,6 +199,25 @@ test('setActive toggles active/aria-selected on only the old and new buttons', (
   assert.equal(b.getAttribute('aria-selected'), 'true');
   assert.equal(sidebar.activeName, 'B');
   assert.ok(b.scrolledIntoView > 0);
+  // Exactly one tab stop: the old anchor is demoted as the new one is promoted.
+  assert.equal(a.tabIndex, -1);
+  assert.equal(b.tabIndex, 0);
+});
+
+test('setEffects re-marks the active effect on its rebuilt button', () => {
+  const { sidebar } = makeSidebar();
+  sidebar.setEffects(['A', 'B'], {});
+  sidebar.setActive('B');
+
+  sidebar.setEffects(['A', 'B', 'C'], {}); // fresh nodes, same active name
+  const b = sidebar.buttons.get('B');
+
+  assert.ok(b.classes.has('active'), 'the rebuilt button carries the active class');
+  assert.equal(b.getAttribute('aria-selected'), 'true');
+  // The roving tab stop follows the active effect, not the first option.
+  assert.equal(sidebar.tabbableBtn, b);
+  assert.equal(b.tabIndex, 0);
+  assert.equal(sidebar.buttons.get('A').tabIndex, -1);
 });
 
 test('setActive keeps the current selection when the name is off-list', () => {

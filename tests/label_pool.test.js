@@ -51,6 +51,8 @@ test('LabelPool reuses pooled objects after reset without allocating', () => {
   pool.acquire(UNIT_X, 'a');
   pool.acquire(UNIT_X, 'b');
   const [first, second] = pool.pool;
+  // A hidden pooled object must come back shown, not carry its old state.
+  first.visible = false;
 
   pool.reset();
   assert.equal(pool.activeCount, 0);
@@ -60,6 +62,7 @@ test('LabelPool reuses pooled objects after reset without allocating', () => {
   assert.equal(pool.pool[0], first, 'the same pooled object is handed back');
   assert.equal(pool.pool[1], second);
   assert.equal(first.element.textContent, 'x', 'reused label content is refreshed');
+  assert.equal(first.visible, true, 'reused label is shown again');
 });
 
 test('LabelPool.acquire scales placement to the sphere and shows the label', () => {
