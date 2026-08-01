@@ -14,9 +14,8 @@
   },
   // Deliberately narrow: only the segment/worker pipeline, whose message shapes
   // must agree across the postMessage boundary with no runtime to catch a
-  // mismatch. The rest of the app and every tests/ file are out of scope, so
-  // the @ts-check / @ts-nocheck pragmas they carry are inert here. `noResolve`
-  // also means imports are not followed even for the four files listed below.
+  // mismatch. The rest of the app and every tests/ file are out of scope.
+  // `noResolve` also means imports are not followed even for the files below.
   "files": [
     "worker_protocol.js",
     "segment_controller.js",

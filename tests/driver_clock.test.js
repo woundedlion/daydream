@@ -1,4 +1,3 @@
-// @ts-check
 //
 // Daydream.advanceFrameClock is the fixed-timestep gate for the main (non-
 // segmented) render loop: it accrues real elapsed time, clamps the backlog to

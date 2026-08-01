@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // SegmentController — unit coverage for the generation-fence drop, the
 // worker-fault deadlock-break latch, and the quadrant compositor. Driven by a

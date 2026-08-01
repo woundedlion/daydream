@@ -1,4 +1,3 @@
-// @ts-check
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

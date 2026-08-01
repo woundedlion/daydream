@@ -1,4 +1,3 @@
-// @ts-check
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { EffectSidebar } from '../sidebar.js';

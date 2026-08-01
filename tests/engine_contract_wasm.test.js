@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // Real-engine contract pin for the WASM surface. segment_worker and
 // segment_controller run against a hand-written FakeEngine; this test loads the

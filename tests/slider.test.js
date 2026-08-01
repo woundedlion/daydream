@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // createSlider's validation branches: NaN/order guards on min/max/step/scale,
 // and the scaled-step rounding guard that rejects a step that collapses to 0.

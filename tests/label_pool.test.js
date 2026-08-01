@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // LabelPool backs driver.js's zero-allocation-per-frame label reuse. It imports
 // three (resolved from node_modules in Node); LabelPool.acquire touches only

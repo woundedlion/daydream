@@ -1,4 +1,3 @@
-// @ts-check
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { URL } from 'node:url';

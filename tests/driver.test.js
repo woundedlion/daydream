@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // driver.js's three.js lifecycle: the DOM-free sizing/LOD helpers, plus the
 // rebuild (setupDots) and teardown (dispose) paths driven over a fake mesh via

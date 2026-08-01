@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // scripts/run-tests.mjs is the `test` script: it runs the suite and gates the
 // total the runner reports. Driven as a subprocess with cwd set to a temp

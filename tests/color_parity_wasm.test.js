@@ -1,4 +1,3 @@
-// @ts-check
 //
 // Executed parity between the browser tools' hand-ported color math and the
 // engine functions they mirror, run against the real shipped WASM module.

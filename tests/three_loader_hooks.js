@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // Module-resolution hooks, registered with module.register(). They redirect
 // three and its OrbitControls addon to the fake for every importer in the

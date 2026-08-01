@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // Shared DOM double for the suites that run without a browser: one element
 // stand-in plus the globalThis.document install/restore helpers. Covers the

@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
 import { test, mock, beforeEach } from 'node:test';

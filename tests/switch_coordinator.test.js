@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // createSwitchCoordinator — the effect/resolution switch transaction daydream.js
 // subscribes to appState. Driven here against a real AppState and fake
