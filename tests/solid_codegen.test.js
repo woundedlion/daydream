@@ -45,9 +45,19 @@ function recordingOp(op) {
   return { spec: { op, params }, seen };
 }
 
-/** A mesh wrapper whose every method returns another such wrapper, so applyOp runs without WASM. */
-function stubMesh() {
-  const mesh = new Proxy({}, { get: () => () => mesh });
+/**
+ * A mesh wrapper whose every method records its call as {op, args} and returns
+ * another such wrapper, so applyOp runs without WASM and the arguments it hands
+ * the engine stay observable.
+ * @param {Array<{op: string, args: Array<*>}>} [calls] - Sink for the recorded calls.
+ */
+function stubMesh(calls = []) {
+  const mesh = new Proxy({}, {
+    get: (target, op) => (...args) => {
+      calls.push({ op, args });
+      return mesh;
+    },
+  });
   return mesh;
 }
 
@@ -72,6 +82,33 @@ test('applyOp and generateFuncAndRecipe consume the OP_DEFS params of every know
     assert.deepEqual([...previewed.seen], expected,
       `applyOp reads different params than OP_DEFS declares for "${op}"`);
   }
+});
+
+/**
+ * Verifies the live preview hands each bound method exactly the argument values
+ * the engine takes, in order — the hankin angle converted from the control's
+ * degrees to the engine's radians, everything else passed through untouched. The
+ * params a path reads say nothing about the values it forwards.
+ */
+test('applyOp forwards each op its engine arguments', () => {
+  const cases = [
+    [{ op: 'truncate', params: { t: 0.33 } }, { op: 'truncate', args: [0.33] }],
+    [{ op: 'chamfer', params: { t: 0.4 } }, { op: 'chamfer', args: [0.4] }],
+    [{ op: 'expand', params: { t: 0.6 } }, { op: 'expand', args: [0.6] }],
+    [{ op: 'bevel', params: { t: 0.25 } }, { op: 'bevel', args: [0.25] }],
+    [{ op: 'snub', params: { t: 0.5, twist: 0.28 } }, { op: 'snub', args: [0.5, 0.28] }],
+    [{ op: 'relax', params: { iter: 100 } }, { op: 'relax', args: [100] }],
+    [{ op: 'hankin', params: { angle: 54 } }, { op: 'hankin', args: [54 * (Math.PI / 180)] }],
+    ['dual', { op: 'dual', args: [] }],
+    ['kis', { op: 'kis', args: [] }],
+  ];
+  for (const [spec, expected] of cases) {
+    const calls = [];
+    applyOp(stubMesh(calls), spec);
+    assert.deepEqual(calls, [expected], `applyOp dispatched ${expected.op} wrongly`);
+  }
+  // The degree->radian conversion is a real change of value, not an identity.
+  assert.notEqual(54 * (Math.PI / 180), 54);
 });
 
 /** Verifies applyOp rejects an op the mesh wrapper binds no method for. */
@@ -314,8 +351,9 @@ test('snapToStep leaves an on-grid value alone', () => {
 
 /**
  * Verifies the hankin angle the tool seeds from the mesh is single-valued: the
- * value in state, the range input, the number box, the generated funcName suffix
- * and the emitted recipe literal all describe the same angle.
+ * value in state, the range input, the number box, the generated funcName suffix,
+ * the emitted recipe literal and the angle the live preview hands the engine all
+ * describe the same angle.
  */
 test('a seeded hankin angle agrees across the control, the funcName and the recipe', () => {
   // A face whose interior angle at its second vertex is arccos(-1/3) = 109.4712
@@ -350,6 +388,13 @@ test('a seeded hankin angle agrees across the control, the funcName and the reci
   const literal = recipe.match(/\.hankin\((-?[\d.]+)f \* D2R\)/);
   assert.ok(literal, `no hankin literal in ${recipe}`);
   assert.equal(Number(literal[1]), angle);
+
+  // The live preview: the same angle reaches the engine, in radians, as the
+  // pasted `<literal>f * D2R` computes.
+  const calls = [];
+  applyOp(stubMesh(calls), { op: 'hankin', params: { angle } });
+  assert.deepEqual(calls, [{ op: 'hankin', args: [angle * (Math.PI / 180)] }]);
+  assert.equal(calls[0].args[0], Number(literal[1]) * (Math.PI / 180));
 });
 
 test('isConvexFace accepts a convex face', () => {
