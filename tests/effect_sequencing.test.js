@@ -361,20 +361,24 @@ test('an unknown preset, or one carrying no list, reports none', () => {
 });
 
 // switchFailureReport turns a runSwitchTransaction outcome into console lines
-// and, only when the rollback also failed, a fatal banner.
+// and a user-visible notice or fatal banner.
 
 test('a successful switch reports nothing', () => {
   assert.deepEqual(
     switchFailureReport('Effect',
       { applied: true, failure: null, recoveryFailure: null }),
-    { logs: [], fatal: null });
+    { logs: [], notice: null, fatal: null });
 });
 
-test('a rejection with no thrown value reports nothing', () => {
+test('a rejection with no thrown value reports the restored value', () => {
   assert.deepEqual(
     switchFailureReport('Effect',
       { applied: false, failure: null, recoveryFailure: null }),
-    { logs: [], fatal: null });
+    {
+      logs: [],
+      notice: 'Effect change was rejected. The previous value was restored.',
+      fatal: null,
+    });
 });
 
 test('a recovered failure is logged but is not fatal', () => {
@@ -382,7 +386,11 @@ test('a recovered failure is logged but is not fatal', () => {
   assert.deepEqual(
     switchFailureReport('Effect',
       { applied: false, failure, recoveryFailure: null }),
-    { logs: [{ message: 'Effect switch failed:', error: failure }], fatal: null });
+    {
+      logs: [{ message: 'Effect switch failed:', error: failure }],
+      notice: 'Effect change was rejected. The previous value was restored.',
+      fatal: null,
+    });
 });
 
 test('a failed rollback logs both errors and is fatal', () => {
@@ -395,6 +403,7 @@ test('a failed rollback logs both errors and is fatal', () => {
         { message: 'Resolution switch failed:', error: failure },
         { message: 'Resolution rollback failed:', error: recoveryFailure },
       ],
+      notice: null,
       fatal: 'Resolution change failed and the previous state could not be '
         + 'restored. Reload the page.',
     });

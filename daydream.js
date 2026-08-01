@@ -159,8 +159,21 @@ function clearEffectParamUrl() {
  */
 function setEngineParam(name, value) {
   const result = host.engine.setParameter(name, value);
-  if (result !== host.module.ParamSetResult.APPLIED)
-    console.warn(`setParameter("${name}") rejected: ${paramSetResultName(result)}.`);
+  if (result !== host.module.ParamSetResult.APPLIED) {
+    const message = `Parameter "${name}" was rejected: ${paramSetResultName(result)}.`;
+    console.warn(message);
+    showApplyNotice(message);
+  } else {
+    showApplyNotice(null);
+  }
+}
+
+/** @param {string|null} message */
+function showApplyNotice(message) {
+  const notice = document.getElementById('apply-notice');
+  if (!notice) return;
+  notice.textContent = message ?? '';
+  notice.hidden = !message;
 }
 
 /**
@@ -365,6 +378,7 @@ const switches = createSwitchCoordinator({
   showResolution: (resolution) => resolutionController.setValue(resolution),
   syncResolutionUrl: () => urlSync.setParam('resolution', appState.get('resolution')),
   logError: (message, error) => console.error(message, error),
+  showNotice: showApplyNotice,
   showFatal: showFatalError,
 });
 

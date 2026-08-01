@@ -235,6 +235,23 @@
   word-break: break-word;
 }
 
+.apply-notice {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 90;
+  max-width: min(90%, 640px);
+  padding: 8px 12px;
+  border: 1px solid #e66;
+  border-radius: 6px;
+  background: #222;
+  color: #eee;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 13px;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
 /* Reload button on the GPU context-lost overlay (reuses .loading-overlay.error). */
 .context-lost-reload {
   margin-top: 4px;
