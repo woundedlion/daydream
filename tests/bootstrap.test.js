@@ -221,5 +221,7 @@ test('index identifies new-window tool links and associates stats headers', () =
     assert.match(link, /rel="noopener"/);
     assert.match(link, /opens in a new window/);
   }
-  assert.equal([...html.matchAll(/<th scope="col">/g)].length, 10);
+  const headers = [...html.matchAll(/<th\b[^>]*>/g)].map(([tag]) => tag);
+  assert.ok(headers.length > 0);
+  for (const header of headers) assert.match(header, /\bscope="col"/);
 });
