@@ -305,63 +305,70 @@ function resolveKeys(brightness, sat, hueValue) {
   };
 }
 
+// Base hues the generative goldens below are pinned at; 0 and 200 cover the
+// bottom of the wheel and a harmony that wraps past 256, 42 is the tool's default.
+const GENERATIVE_SEEDS = [0, 10, 42, 128, 137, 200];
+
+// Saturation keys (s1,s2,s3) the engine's GenerativePalette resolves per seed,
+// captured by running the core/color/color.h constructor.
+const ENGINE_SATS = {
+  PASTEL: { 0: [100, 100, 100], 10: [100, 100, 100], 42: [100, 100, 100], 128: [100, 100, 100], 137: [100, 100, 100], 200: [100, 100, 100] },
+  MID: { 0: [183, 186, 167], 10: [165, 190, 187], 42: [186, 160, 159], 128: [197, 185, 180], 137: [193, 153, 179], 200: [170, 165, 202] },
+  VIBRANT: { 0: [255, 255, 255], 10: [255, 255, 255], 42: [255, 255, 255], 128: [255, 255, 255], 137: [255, 255, 255], 200: [255, 255, 255] },
+};
+
+// Brightness keys (v1,v2,v3) the same constructor resolves per seed.
+const ENGINE_VALUES = {
+  ASCENDING: { 0: [44, 153, 239], 10: [39, 131, 210], 42: [57, 151, 254], 128: [26, 149, 248], 137: [62, 138, 234], 200: [36, 156, 230] },
+  DESCENDING: { 0: [223, 153, 59], 10: [219, 131, 31], 42: [236, 151, 74], 128: [205, 149, 68], 137: [241, 138, 55], 200: [215, 156, 50] },
+  FLAT: { 0: [255, 255, 255], 10: [255, 255, 255], 42: [255, 255, 255], 128: [255, 255, 255], 137: [255, 255, 255], 200: [255, 255, 255] },
+  BELL: { 0: [79, 218, 79], 10: [73, 184, 73], 42: [98, 215, 98], 128: [52, 212, 52], 137: [106, 196, 106], 200: [67, 223, 67] },
+  CUP: { 0: [207, 90, 207], 10: [200, 57, 200], 42: [226, 87, 226], 128: [180, 84, 180], 137: [234, 68, 234], 200: [195, 95, 195] },
+};
+
+// Hue triples (h1,h2,h3) the engine's calc_hues derives per seed, jitter included.
+const ENGINE_HUES = {
+  TRIADIC: { 0: [0, 85, 170], 10: [10, 95, 180], 42: [42, 127, 212], 128: [128, 213, 42], 137: [137, 222, 51], 200: [200, 29, 114] },
+  SPLIT_COMPLEMENTARY: { 0: [0, 107, 149], 10: [10, 117, 159], 42: [42, 149, 191], 128: [128, 235, 21], 137: [137, 244, 30], 200: [200, 51, 93] },
+  COMPLEMENTARY: { 0: [0, 128, 249], 10: [10, 138, 9], 42: [42, 170, 39], 128: [128, 0, 131], 137: [137, 9, 138], 200: [200, 72, 197] },
+  ANALOGOUS: { 0: [0, 21, 42], 10: [10, 22, 43], 42: [42, 60, 74], 128: [128, 145, 162], 137: [137, 149, 160], 200: [200, 213, 226] },
+};
+
 /**
- * Pins palette_math.js's saturation/brightness draws — the fixed profiles by
- * their resolved bakeLut arguments, the seeded ones by the (site, min, max)
- * triple each key is drawn from — against the values transcribed here from
- * core/color/color.h GenerativePalette. This compares two hand-copies of that
- * header: the bridge takes already-resolved h/s/v, so the engine's own
- * derivation never runs and drift on the C++ side is caught only by re-reading
- * it. The site indices are load-bearing: they select the hash stream, so a
- * shifted index reproduces the range but not the engine's value.
+ * Pins the saturation and brightness keys palette_math.js resolves to the keys
+ * the engine's GenerativePalette resolves for the same profiles and base hue.
+ * The goldens are absolute values captured from that constructor, so a shifted
+ * draw site, a moved range bound or a drifted hash all show up here — a
+ * comparison rebuilt from the mirror's own seededRandInt would agree with
+ * itself instead.
  */
-test('GenerativePalette profile draws hold the sites and ranges transcribed from core/color/color.h', () => {
-  const seed = 137;
-  const draw = (site, min, max) => seededRandInt(seed, site, min, max);
-
-  assert.deepEqual(resolveKeys('FLAT', 'PASTEL', seed),
-    { sats: [100, 100, 100], values: [255, 255, 255] });
-  assert.deepEqual(resolveKeys('FLAT', 'VIBRANT', seed).sats, [255, 255, 255]);
-
-  assert.deepEqual(resolveKeys('FLAT', 'MID', seed).sats,
-    [draw(4, 153, 204), draw(5, 153, 204), draw(6, 153, 204)], 'MID saturations');
-  assert.deepEqual(resolveKeys('ASCENDING', 'PASTEL', seed).values,
-    [draw(7, 25, 76), draw(8, 127, 178), draw(9, 204, 256)], 'ASCENDING values');
-  assert.deepEqual(resolveKeys('DESCENDING', 'PASTEL', seed).values,
-    [draw(7, 204, 256), draw(8, 127, 178), draw(9, 25, 76)], 'DESCENDING values');
-  const bell = resolveKeys('BELL', 'PASTEL', seed).values;
-  assert.deepEqual(bell, [draw(7, 51, 127), draw(8, 178, 256), draw(7, 51, 127)], 'BELL values');
-  const cup = resolveKeys('CUP', 'PASTEL', seed).values;
-  assert.deepEqual(cup, [draw(7, 178, 256), draw(8, 51, 127), draw(7, 178, 256)], 'CUP values');
+test('GenerativePalette saturation and brightness keys match the engine', () => {
+  for (const seed of GENERATIVE_SEEDS) {
+    for (const sat of Object.keys(ENGINE_SATS)) {
+      for (const brightness of Object.keys(ENGINE_VALUES)) {
+        const { sats, values } = resolveKeys(brightness, sat, seed);
+        assert.deepEqual(sats, ENGINE_SATS[sat][seed], `${sat} saturations at hue ${seed}`);
+        assert.deepEqual(values, ENGINE_VALUES[brightness][seed], `${brightness} values at hue ${seed}`);
+      }
+    }
+  }
 });
 
 /**
- * Pins palette_math.js's harmony hue offsets — deterministic companions by value
- * (including the 256 wrap), jittered ones by the seeded draw feeding them —
- * against the values transcribed here from core/color/color.h calc_hues. As
- * above, both sides are hand-copies; the engine's calc_hues is never executed.
+ * Pins the harmony hue triples palette_math.js derives to the ones the engine's
+ * calc_hues derives, covering the deterministic offsets, the 256 wrap and the
+ * seeded jitter of COMPLEMENTARY and ANALOGOUS in one set of absolute goldens.
  */
-test('GenerativePalette harmony offsets hold the values transcribed from core/color/color.h', () => {
+test('GenerativePalette harmony hues match the engine', () => {
   const hues = (harmony, hueValue) => {
     new GenerativePalette('STRAIGHT', harmony, 'FLAT', 'VIBRANT', hueValue);
     return [lastBakeArgs[1], lastBakeArgs[4], lastBakeArgs[7]];
   };
-  const wrap = (h) => ((h % 256) + 256) % 256;
-
-  assert.deepEqual(hues('TRIADIC', 10), [10, 95, 180], 'TRIADIC is +85/+170');
-  assert.deepEqual(hues('TRIADIC', 200), [200, 29, 114], 'TRIADIC wraps at 256');
-  assert.deepEqual(hues('SPLIT_COMPLEMENTARY', 10), [10, 117, 159], 'SPLIT_COMPLEMENTARY is +128 -+21');
-  assert.deepEqual(hues('SPLIT_COMPLEMENTARY', 200), [200, 51, 93], 'SPLIT_COMPLEMENTARY wraps at 256');
-  assert.equal(hues('COMPLEMENTARY', 10)[1], 138, 'COMPLEMENTARY is +128');
-
-  for (const hue of [10, 137, 200]) {
-    assert.equal(hues('COMPLEMENTARY', hue)[2], wrap(hue + seededRandInt(hue, 0, -7, 8)),
-      'COMPLEMENTARY jitter');
-
-    const dir = (seededRandInt(hue, 1, 0, 2) === 0) ? 1 : -1;
-    const h2 = wrap(hue + dir * seededRandInt(hue, 2, 11, 22));
-    const h3 = wrap(h2 + dir * seededRandInt(hue, 3, 11, 22));
-    assert.deepEqual(hues('ANALOGOUS', hue), [hue, h2, h3], 'ANALOGOUS direction and steps');
+  for (const harmony of Object.keys(ENGINE_HUES)) {
+    for (const seed of GENERATIVE_SEEDS) {
+      assert.deepEqual(hues(harmony, seed), ENGINE_HUES[harmony][seed],
+        `${harmony} at hue ${seed}`);
+    }
   }
 });
 
