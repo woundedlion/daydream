@@ -275,6 +275,8 @@ export class VideoRecorder {
 
     try {
       sink = this.openSink(recorder, effectName, chunks);
+      const pending = chunks.splice(0);
+      for (const chunk of pending) sink.write(chunk);
     } catch (err) {
       recorder.ondataavailable = null;
       recorder.onstop = null;
