@@ -766,6 +766,43 @@ test('captureFrame advances elapsed when the track lacks requestFrame', () => {
 });
 
 /**
+ * stop() flips the recorder inactive but the async onstop that releases the
+ * track has not run yet, so a render task already in flight can still reach
+ * captureFrame. It must do nothing: no blit into the offscreen, no frame
+ * requested on the still-live track, and no elapsed-time advance past the point
+ * the encoder stopped accepting frames.
+ */
+test('captureFrame is inert between stop and the async onstop', () => {
+  const restore = installRecorderEnv();
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    rec.download = () => {};
+    rec.start('e');
+
+    const draws = [];
+    let requested = 0;
+    rec.offCtx = { clearRect() {}, drawImage(...a) { draws.push(a); } };
+    rec.track.requestFrame = () => { requested++; };
+
+    rec.captureFrame();
+    assert.equal(draws.length, 1, 'a frame captured while recording blits');
+    assert.equal(requested, 1);
+    const elapsedAtStop = rec.elapsedSeconds;
+
+    rec.stop();
+    assert.equal(rec.isRecording, false);
+    assert.ok(rec.track, 'onstop has not released the track yet');
+
+    rec.captureFrame();
+    assert.equal(draws.length, 1, 'no blit after stop');
+    assert.equal(requested, 1, 'no frame requested on the stopped session');
+    assert.equal(rec.elapsedSeconds, elapsedAtStop, 'elapsed does not advance');
+  } finally {
+    restore();
+  }
+});
+
+/**
  * start() never blits: the source is a WebGL canvas whose drawing buffer is
  * cleared once composited, so a blit outside the render task would write
  * transparent black. Only captureFrame(), called from the render task, fills the
