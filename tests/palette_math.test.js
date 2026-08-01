@@ -8,11 +8,7 @@ const {
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams, zoomedProceduralParams,
 } = await import('../tools/palette_math.js');
 
-// Mock bakeLut (smooth in-range sRGB ramp) records its last args so the
-// delegation (shape enum int + nine [0,255] HSV values) can be asserted.
-let lastBakeArgs = null;
-function mockBakeLut(...args) {
-  lastBakeArgs = args;
+function mockBakeLut() {
   const lut = new Uint8Array(256 * 3);
   for (let i = 0; i < 256; i++) {
     lut[3 * i] = i;
@@ -22,6 +18,20 @@ function mockBakeLut(...args) {
   return lut;
 }
 setPaletteOps(mockBakeLut);
+
+function captureBakeArgs(createPalette) {
+  let bakeArgs;
+  setPaletteOps((...args) => {
+    bakeArgs = args;
+    return mockBakeLut();
+  });
+  try {
+    createPalette();
+    return bakeArgs;
+  } finally {
+    setPaletteOps(mockBakeLut);
+  }
+}
 
 const NEAR = 1e-6;
 
@@ -266,18 +276,18 @@ test('generativePaletteCpp rejects an out-of-range or non-integer hue', () => {
 
 /** Verifies GenerativePalette resolves the profiles into a valid bakeLut call: the GradientShape enum int and nine in-range HSV values. */
 test('GenerativePalette delegates resolved (shape, h,s,v x3) to bakeLut', () => {
-  lastBakeArgs = null;
-  new GenerativePalette('VIGNETTE', 'TRIADIC', 'FLAT', 'VIBRANT', 100);
-  assert.ok(Array.isArray(lastBakeArgs) && lastBakeArgs.length === 10, 'bakeLut called with 10 args');
+  const bakeArgs = captureBakeArgs(() =>
+    new GenerativePalette('VIGNETTE', 'TRIADIC', 'FLAT', 'VIBRANT', 100));
+  assert.ok(Array.isArray(bakeArgs) && bakeArgs.length === 10, 'bakeLut called with 10 args');
   // VIGNETTE is index 2 in core/color/color.h GradientShape order.
-  assert.equal(lastBakeArgs[0], 2, 'shape enum int');
+  assert.equal(bakeArgs[0], 2, 'shape enum int');
   for (let i = 1; i < 10; i++) {
-    assert.ok(Number.isInteger(lastBakeArgs[i]), `arg ${i} integer`);
-    assert.ok(lastBakeArgs[i] >= 0 && lastBakeArgs[i] <= 255, `arg ${i} in [0,255]`);
+    assert.ok(Number.isInteger(bakeArgs[i]), `arg ${i} integer`);
+    assert.ok(bakeArgs[i] >= 0 && bakeArgs[i] <= 255, `arg ${i} in [0,255]`);
   }
   // FLAT/VIBRANT are RNG-free: value and saturation pin to 255 on all three keys.
-  assert.deepEqual([lastBakeArgs[3], lastBakeArgs[6], lastBakeArgs[9]], [255, 255, 255], 'FLAT values');
-  assert.deepEqual([lastBakeArgs[2], lastBakeArgs[5], lastBakeArgs[8]], [255, 255, 255], 'VIBRANT saturations');
+  assert.deepEqual([bakeArgs[3], bakeArgs[6], bakeArgs[9]], [255, 255, 255], 'FLAT values');
+  assert.deepEqual([bakeArgs[2], bakeArgs[5], bakeArgs[8]], [255, 255, 255], 'VIBRANT saturations');
 });
 
 /**
@@ -288,10 +298,11 @@ test('GenerativePalette delegates resolved (shape, h,s,v x3) to bakeLut', () => 
  * @returns {{sats:number[], values:number[]}} The resolved saturations and values.
  */
 function resolveKeys(brightness, sat, hueValue) {
-  new GenerativePalette('STRAIGHT', 'TRIADIC', brightness, sat, hueValue);
+  const bakeArgs = captureBakeArgs(() =>
+    new GenerativePalette('STRAIGHT', 'TRIADIC', brightness, sat, hueValue));
   return {
-    sats: [lastBakeArgs[2], lastBakeArgs[5], lastBakeArgs[8]],
-    values: [lastBakeArgs[3], lastBakeArgs[6], lastBakeArgs[9]],
+    sats: [bakeArgs[2], bakeArgs[5], bakeArgs[8]],
+    values: [bakeArgs[3], bakeArgs[6], bakeArgs[9]],
   };
 }
 
@@ -351,8 +362,9 @@ test('GenerativePalette saturation and brightness keys match the engine', () => 
  */
 test('GenerativePalette harmony hues match the engine', () => {
   const hues = (harmony, hueValue) => {
-    new GenerativePalette('STRAIGHT', harmony, 'FLAT', 'VIBRANT', hueValue);
-    return [lastBakeArgs[1], lastBakeArgs[4], lastBakeArgs[7]];
+    const bakeArgs = captureBakeArgs(() =>
+      new GenerativePalette('STRAIGHT', harmony, 'FLAT', 'VIBRANT', hueValue));
+    return [bakeArgs[1], bakeArgs[4], bakeArgs[7]];
   };
   for (const harmony of Object.keys(ENGINE_HUES)) {
     for (const seed of GENERATIVE_SEEDS) {
