@@ -714,7 +714,11 @@ export class SegmentController {
   }
 
   /**
-   * Tell all workers to update resolution.
+   * Tell all workers to update resolution, then re-apply the current effect.
+   * @details The resize tears the worker's effect down and the engine rejects a
+   * clip with no effect, so the trailing setEffect is what restores both. Without
+   * it every worker answers 'render' with a correctly-sized, unclipped black
+   * frame — a state no fence, watchdog or composite check can detect.
    * @param {number} w
    * @param {number} h
    */
@@ -738,6 +742,11 @@ export class SegmentController {
     // replies is bounded by renderParallel's watchdog, so a resize during a hung
     // frame faults and recovers rather than wedging the pipeline.
     this.broadcast({ type: 'setResolution', w, h });
+    this.broadcast({
+      type: 'setEffect',
+      name: this.appState.get('effect'),
+      params: this.snapshotParams(),
+    });
   }
 
   /**
