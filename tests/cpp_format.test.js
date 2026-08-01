@@ -51,3 +51,27 @@ test('formatFloatCpp: negative small value keeps sign and magnitude', () => {
 test('formatFloatCpp: rounds to the default 6 fractional digits', () => {
   assert.equal(formatFloatCpp(0.12345678), '0.123457f');
 });
+
+/**
+ * Non-finite input throws rather than emitting "NaNf" / "Infinityf", which the
+ * C++ compiler would reject far from the GUI value that produced it.
+ */
+test('formatFloatCpp: non-finite input throws', () => {
+  for (const bad of [NaN, Infinity, -Infinity]) {
+    assert.throws(() => formatFloatCpp(bad), /non-finite value/);
+  }
+});
+
+/** toFixed switches to exponential at 1e21, so that magnitude throws instead. */
+test('formatFloatCpp: magnitude at or above 1e21 throws', () => {
+  assert.throws(() => formatFloatCpp(1e21), /exponential notation/);
+  assert.throws(() => formatFloatCpp(-1e21), /exponential notation/);
+  assert.equal(formatFloatCpp(1e20), '100000000000000000000.0f');
+});
+
+/** Below the toFixed(100) floor the small-value rescue cannot recover a digit. */
+test('formatFloatCpp: magnitude below the max-precision floor throws', () => {
+  assert.throws(() => formatFloatCpp(1e-200), /underflows to zero/);
+  assert.throws(() => formatFloatCpp(-Number.MIN_VALUE), /underflows to zero/);
+  assert.equal(formatFloatCpp(1e-100), `0.${'0'.repeat(99)}1f`);
+});
