@@ -311,7 +311,6 @@ function renderCtx(colors, log) {
     frameInterval: 1 / 30,
     needsRender: true,
     labelAxes: false,
-    hadLabels: false,
     recorder: null,
     clock: { getDelta: () => 0 },
     advanceFrameClock: Daydream.prototype.advanceFrameClock,
