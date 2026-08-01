@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // shared.js's own export is initScene; showFatalError et al. are re-exports
 // covered by their source modules' tests (banner.test.js, clipboard.test.js,

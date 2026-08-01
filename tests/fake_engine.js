@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // Single source of truth for the HolosphereEngine method surface the tests
 // stand in for: engine_contract_wasm.test.js pins the real WASM module against

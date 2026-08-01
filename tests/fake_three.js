@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // Stand-in for three + three/addons/controls/OrbitControls.js, covering exactly
 // the surface tools/shared.js constructs. three_loader_hooks.js redirects both

@@ -1,4 +1,3 @@
-// @ts-check
 //
 // Cross-implementation equivalence between the web render-tiling layout
 // (segment_layout.js computeSegmentRange) and the firmware's physical

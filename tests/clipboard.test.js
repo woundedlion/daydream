@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // copyWithFeedback's transient label swap. Key invariant: a second copy within
 // revertMs must not latch the element on "Copied!".

@@ -1,4 +1,3 @@
-// @ts-check
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sortItems, navTargetIndex, scrollArrowState, resolveActiveEffect } from '../sidebar_logic.js';

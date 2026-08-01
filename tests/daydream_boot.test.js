@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // Static checks on daydream.js's WASM-ready block. daydream.js is the app's
 // composition root: it builds a WebGL Daydream and mounts the GUI at module

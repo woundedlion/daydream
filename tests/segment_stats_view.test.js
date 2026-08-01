@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // SegmentStatsView — the segmented-POV overlay: which column each per-segment
 // metric lands in, which source each fault code names, and the text-node-only

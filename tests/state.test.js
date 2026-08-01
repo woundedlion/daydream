@@ -1,4 +1,3 @@
-// @ts-check
 import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { AppState, URLSync, getActiveURLSync, roundUrlNumber, writeUrl } from '../state.js';

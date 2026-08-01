@@ -1,4 +1,3 @@
-// @ts-nocheck
 //
 // scripts/require-tests.mjs is the `pretest` gate. Driven as a subprocess with
 // cwd set to a temp fixture, which is where the script reads package.json and
