@@ -31,6 +31,7 @@ class FakeEngine {
     this.curW = 0;
     this.curH = 0;
     this.resolutionOk = true;
+    this.effectOk = true;
     this.clipOk = true;
     this.clip = null;
     this.effect = null;
@@ -53,8 +54,15 @@ class FakeEngine {
     return true;
   }
   // Clearing params models the engine rebuilding to defaults, so the
-  // "params re-applied AFTER setEffect" ordering is observable.
-  setEffect(name) { this.calls.push(['setEffect', name]); this.effect = name; this.params = []; return true; }
+  // "params re-applied AFTER setEffect" ordering is observable. A rejection
+  // keeps the current effect and its params, like a failed factory build.
+  setEffect(name) {
+    this.calls.push(['setEffect', name]);
+    if (!this.effectOk) return false;
+    this.effect = name;
+    this.params = [];
+    return true;
+  }
   setParameter(name, value) {
     this.params.push([name, value]);
     return ParamSetResult.APPLIED;
@@ -93,6 +101,8 @@ test('FakeEngine mocks only methods the real engine surface pins', () => {
 let engineInstance = null;
 /** Seeds the next-constructed engine's resolutionOk, so init-time rejection is testable. */
 let nextResolutionOk = true;
+/** Seeds the next-constructed engine's effectOk, so init-time rejection is testable. */
+let nextEffectOk = true;
 mock.module('../holosphere_wasm.js', {
   defaultExport: async () => ({
     ParamSetResult,
@@ -100,6 +110,7 @@ mock.module('../holosphere_wasm.js', {
       constructor() {
         engineInstance = new FakeEngine();
         engineInstance.resolutionOk = nextResolutionOk;
+        engineInstance.effectOk = nextEffectOk;
         return engineInstance;
       }
     },
@@ -131,6 +142,7 @@ beforeEach(() => {
   posted.length = 0;
   engineInstance = null;
   nextResolutionOk = true;
+  nextEffectOk = true;
 });
 
 /** The worker posts 'booted' at module load; the controller's boot watchdog depends on this ping. */
@@ -175,6 +187,23 @@ test('init with a rejected resolution posts engineRejected, not ready', async ()
   const failed = posted.find((p) => p.msg.type === 'engineRejected');
   assert.ok(failed, 'engineRejected posted');
   assert.match(failed.msg.reason, /setResolution\(8, 4\) rejected/);
+});
+
+/** An init whose setEffect is rejected posts no ready, no clip, and an explicit engineRejected. */
+test('init with a rejected effect posts engineRejected, not ready', async () => {
+  nextEffectOk = false;
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma',
+                   params: [{ name: 'Speed', value: 0.5 }] });
+
+  assert.ok(engineInstance, 'engine constructed');
+  assert.deepEqual(engineInstance.calls.at(-1), ['setEffect', 'Plasma'], 'setEffect attempted');
+  assert.equal(engineInstance.effect, null, 'no effect adopted');
+  assert.deepEqual(engineInstance.params, [], 'carried params are not applied to a dead engine');
+  assert.equal(engineInstance.clip, null, 'no clip applied');
+  assert.ok(!posted.some((p) => p.msg.type === 'ready'), 'no ready for a rejected effect');
+  const failed = posted.find((p) => p.msg.type === 'engineRejected');
+  assert.ok(failed, 'engineRejected posted');
+  assert.match(failed.msg.reason, /setEffect\(Plasma\) rejected/);
 });
 
 /** render copies exactly this segment's quadrant rows out of the full buffer. */
@@ -430,6 +459,30 @@ test('setEffect with no params just rebuilds, leaving defaults', async () => {
   await dispatch({ type: 'setEffect', name: 'Waves' });
   assert.equal(engineInstance.effect, 'Waves');
   assert.deepEqual(engineInstance.params, [], 'no snapshot to re-apply');
+});
+
+/**
+ * A live setEffect rejection faults immediately rather than letting the
+ * controller wait out its watchdog, and leaves the running effect and its params
+ * in place instead of tuning a rebuild that never happened.
+ */
+test('a rejected setEffect posts engineRejected and re-applies nothing', async () => {
+  await dispatch({
+    type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma',
+    params: [{ name: 'Speed', value: 0.5 }],
+  });
+  const clipBefore = { ...engineInstance.clip };
+  posted.length = 0;
+  engineInstance.effectOk = false;
+
+  await dispatch({ type: 'setEffect', name: 'Waves', params: [{ name: 'Freq', value: 0.25 }] });
+
+  assert.equal(engineInstance.effect, 'Plasma', 'the running effect is kept');
+  assert.deepEqual(engineInstance.params, [['Speed', 0.5]], 'no params re-applied');
+  assert.deepEqual(engineInstance.clip, clipBefore, 'the clip is untouched');
+  const failed = posted.find((p) => p.msg.type === 'engineRejected');
+  assert.ok(failed, 'engineRejected posted');
+  assert.match(failed.msg.reason, /setEffect\(Waves\) rejected/);
 });
 
 test('setParameter handler forwards name/value to the engine', async () => {
