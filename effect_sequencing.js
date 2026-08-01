@@ -89,24 +89,29 @@ export function applyInitialState(apply, onSuccess) {
 
 /**
  * Classify a switch transaction's outcome into what the app should report. A
- * rejected switch whose rollback succeeded is logged only — the previous state
- * is back and the page is usable. A failed rollback leaves state, URL, and
+ * rejected switch whose rollback succeeded is reported to the user while the
+ * previous state remains usable. A failed rollback leaves state, URL, and
  * engine possibly disagreeing, so it additionally earns the fatal banner.
  * @param {string} label - What switched, for the log lines ("Effect"/"Resolution").
  * @param {{applied: boolean, failure: any, recoveryFailure: any}} result - A
  *   runSwitchTransaction() outcome.
- * @returns {{logs: Array<{message: string, error: any}>, fatal: string|null}}
- *   Console lines to emit in order, and the fatal-banner text when there is one.
+ * @returns {{logs: Array<{message: string, error: any}>, notice: string|null,
+ *   fatal: string|null}} Console lines and user-visible messages.
  */
 export function switchFailureReport(label, result) {
   const logs = [];
   if (result.failure) {
     logs.push({ message: `${label} switch failed:`, error: result.failure });
   }
-  if (!result.recoveryFailure) return { logs, fatal: null };
+  if (!result.recoveryFailure) {
+    const notice = result.applied ? null
+      : `${label} change was rejected. The previous value was restored.`;
+    return { logs, notice, fatal: null };
+  }
   logs.push({ message: `${label} rollback failed:`, error: result.recoveryFailure });
   return {
     logs,
+    notice: null,
     fatal: `${label} change failed and the previous state could not be restored. `
       + 'Reload the page.',
   };
@@ -142,6 +147,7 @@ export function switchFailureReport(label, result) {
  * @param {() => void} deps.syncResolutionUrl - Re-asserts the applied resolution
  *   in the URL.
  * @param {(message: string, error: any) => void} deps.logError - Console sink.
+ * @param {(message: string|null) => void} deps.showNotice - Recoverable error sink.
  * @param {(message: string) => void} deps.showFatal - Fatal-banner sink.
  * @returns {{isRestoring: () => boolean, dispose: () => void}} The mute-window
  *   query, and an idempotent unsubscribe.
@@ -156,6 +162,7 @@ export function createSwitchCoordinator({
   showResolution,
   syncResolutionUrl,
   logError,
+  showNotice,
   showFatal,
 }) {
   let restoring = false;
@@ -191,8 +198,9 @@ export function createSwitchCoordinator({
   });
 
   const report = (label, result) => {
-    const { logs, fatal } = switchFailureReport(label, result);
+    const { logs, notice, fatal } = switchFailureReport(label, result);
     for (const { message, error } of logs) logError(message, error);
+    showNotice(notice);
     if (fatal) showFatal(fatal);
   };
 

@@ -48,6 +48,7 @@ function makeApp({
     control: { resolution: 'Lo' },
     calls: [],
     errors: [],
+    notices: [],
     fatals: [],
     urlSyncs: [],
   };
@@ -86,6 +87,7 @@ function makeApp({
     showResolution: (resolution) => { app.control.resolution = resolution; },
     syncResolutionUrl: () => app.urlSyncs.push(appState.get('resolution')),
     logError: (message, error) => app.errors.push({ message, error }),
+    showNotice: (message) => app.notices.push(message),
     showFatal: (message) => app.fatals.push(message),
   });
   return app;
@@ -102,6 +104,7 @@ test('an accepted effect switch applies it and reports nothing', () => {
   assert.equal(app.appState.get('effect'), 'Beta');
   assert.deepEqual(applyCalls(app, 'applyEffect').map((c) => c.preserveParams), [false]);
   assert.deepEqual(app.errors, []);
+  assert.deepEqual(app.notices, [null]);
   assert.deepEqual(app.fatals, []);
 });
 
@@ -117,6 +120,8 @@ test('a rejected effect switch restores state, URL, and control values', () => {
   assert.equal(app.url, urlBefore);
   // The rollback rebuilt the GUI at engine defaults, then replayed the snapshot.
   assert.equal(app.activeEffect.state.Speed, 0.9);
+  assert.deepEqual(app.notices,
+    ['Effect change was rejected. The previous value was restored.']);
   assert.deepEqual(app.fatals, []);
 });
 
@@ -136,7 +141,7 @@ test('a rejected effect switch re-applies with preserveParams and stays muted', 
   assert.equal(app.switches.isRestoring(), false);
 });
 
-test('a rejected switch alone is logged, not fatal', () => {
+test('a rejected switch alone is shown but not fatal', () => {
   const app = makeApp({ rejectEffects: new Set(['Beta']) });
 
   app.appState.set('effect', 'Beta');
@@ -296,6 +301,7 @@ test('dispose() is idempotent and does not drop a second coordinator', () => {
     showResolution: () => {},
     syncResolutionUrl: () => {},
     logError: () => {},
+    showNotice: () => {},
     showFatal: () => {},
   });
 
