@@ -177,11 +177,6 @@ export class AppState {
     }
   }
 
-  /**
-   * Returns a shallow snapshot of the current state.
-   * @returns {Object} A copy of the current key/value pairs.
-   */
-  snapshot() { return { ...this.state }; }
 }
 
 // Single app-wide URL writer; gui.js routes its param writes through this.

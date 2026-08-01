@@ -265,7 +265,9 @@ test('a resolution rollback restores the effect the pre-switch resolution offere
 
     // update() writes both keys before notifying, so the rollback's effect and
     // resolution are never observed apart.
-    assert.deepEqual(app.appState.snapshot(), { effect: 'Beta', resolution: 'Lo' });
+    assert.deepEqual(
+      { effect: app.appState.get('effect'), resolution: app.appState.get('resolution') },
+      { effect: 'Beta', resolution: 'Lo' });
     assert.equal(app.applied.effect, 'Beta');
   });
 

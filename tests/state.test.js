@@ -135,13 +135,6 @@ test('AppState.notify skips a listener added during the same dispatch', () => {
   assert.deepEqual(seen, [3]);
 });
 
-test('AppState.snapshot is a detached copy', () => {
-  const s = new AppState({ a: 1 });
-  const snap = s.snapshot();
-  snap.a = 99;
-  assert.equal(s.get('a'), 1);
-});
-
 // --- URLSync (needs a minimal window stub) ---
 
 /**

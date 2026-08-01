@@ -132,12 +132,6 @@ class DeepLinkGUI {
    */
   get domElement() { return this.gui.domElement; }
   /**
-   * The pixel width of the wrapped lil-gui instance.
-   * @returns {number} The GUI width in pixels.
-   */
-  get width() { return this.gui.width; }
-
-  /**
    * Builds a control's URL param key by joining the root's namespace (when it has
    * one) and its enclosing folder names with the property, e.g.
    * "fx.Effects.Speed", so nested controls and separate GUI roots get distinct keys.
@@ -335,20 +329,6 @@ class DeepLinkGUI {
     return wrapped;
   }
 
-  /**
-   * Clears all deep-link params except the given keys.
-   * @param {Array<string>} [excludedKeys=[]] - Param keys to preserve.
-   * @returns {void}
-   */
-  static reset(excludedKeys = []) {
-    resetGUI(excludedKeys);
-  }
-
-  /**
-   * Opens (expands) the wrapped GUI panel.
-   * @returns {void}
-   */
-  open() { this.gui.open(); }
   /**
    * Closes (collapses) the wrapped GUI panel.
    * @returns {void}

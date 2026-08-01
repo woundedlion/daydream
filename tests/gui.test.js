@@ -551,14 +551,14 @@ test('resetGUI with no exclusions leaves a bare path on a tool page', () => {
 });
 
 /**
- * GUI.reset delegates to the app's URLSync when one is registered, so tracked
+ * resetGUI delegates to the app's URLSync when one is registered, so tracked
  * state is re-asserted rather than cleared with the deep-link params.
  */
-test('GUI.reset routes through the active URLSync', () => {
+test('resetGUI routes through the active URLSync', () => {
   const url = installRecordingWindow('?Speed=0.5&keep=1&effect=Old', '#tool');
   new URLSync(new AppState({ effect: 'Old' }), ['effect']);
 
-  DeepLinkGUI.reset(['keep']);
+  resetGUI(['keep']);
 
   const q = new URL(url.written(), 'http://x').searchParams;
   assert.equal(q.get('Speed'), null);
