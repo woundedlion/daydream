@@ -176,6 +176,8 @@
       // running against the disposed scene.
       onPageTeardown(() => {
         scheduleUpdate.cancel();
+        line?.geometry.dispose();
+        lineMaterial.dispose();
         result.dispose();
       });
 
