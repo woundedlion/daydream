@@ -74,6 +74,19 @@ function fakeGui() {
       return controller;
     },
     /**
+     * The non-deep-linked variant: same control, flagged so a test can tell which
+     * of the two entry points built it.
+     * @param {Object} object - The value object to bind.
+     * @param {string} property - The bound property name.
+     * @param {...*} args - Forwarded to add().
+     * @returns {Object} The controller double.
+     */
+    addSession(object, property, ...args) {
+      const controller = this.add(object, property, ...args);
+      controller.session = true;
+      return controller;
+    },
+    /**
      * @param {string} property - The bound property to look up.
      * @returns {Object|undefined} The controller bound to that property.
      */
@@ -214,6 +227,19 @@ test('a readonly param is disabled and excluded from the writable set', () => {
   assert.deepEqual(h.panel.active().writableParamNames, ['Speed']);
   assert.equal(h.gui().ctrl('Frames').disabled, true);
   assert.equal(h.gui().ctrl('Speed').disabled, false);
+});
+
+/** The engine rejects a write to a readonly param, so its control must be kept
+ * out of the deep-link layer entirely: no URL seeding and no onChange handler to
+ * replay a URL value into setParameter. */
+test('a readonly param is a session control with no engine write-back', () => {
+  const h = makeHarness({ params: [SPEED, TELEMETRY] });
+  h.panel.build();
+
+  assert.equal(h.gui().ctrl('Frames').session, true);
+  assert.equal(h.gui().ctrl('Frames').handler, null);
+  assert.equal(h.gui().ctrl('Speed').session, undefined);
+  assert.equal(typeof h.gui().ctrl('Speed').handler, 'function');
 });
 
 test('an effect with no animated or readonly param has no live values to poll', () => {

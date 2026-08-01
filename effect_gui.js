@@ -33,7 +33,9 @@ export const EXPORT_COPIED = '\u2713 Copied!';
 export const EXPORT_FAILED = '\u2717 Copy failed';
 
 /**
- * Add the lil-gui control one engine parameter definition calls for.
+ * Add the lil-gui control one engine parameter definition calls for. A readonly
+ * (engine-written telemetry) param becomes a session control: the engine refuses
+ * to set it, so seeding it from a URL and writing it back is meaningless.
  * @param {Object} gui - The effect GUI to add to.
  * @param {Object} state - The GUI-bound value object.
  * @param {Object} p - The parameter definition.
@@ -41,14 +43,17 @@ export const EXPORT_FAILED = '\u2717 Copy failed';
  */
 export function addParamControl(gui, state, p) {
   const kind = paramControlKind(p);
+  const add = p.readonly
+    ? (...args) => gui.addSession(...args)
+    : (...args) => gui.add(...args);
   let controller;
   if (kind === 'boolean') {
-    controller = gui.add(state, p.name);
+    controller = add(state, p.name);
   } else if (kind === 'enum') {
     // Dropdown of labels whose values are the option indices the engine expects.
-    controller = gui.add(state, p.name, enumChoices(p.options));
+    controller = add(state, p.name, enumChoices(p.options));
   } else {
-    controller = gui.add(state, p.name, p.min, p.max).decimals(3);
+    controller = add(state, p.name, p.min, p.max).decimals(3);
   }
   controller.isBoolean = (kind === 'boolean');
   return controller;
@@ -327,10 +332,10 @@ export function createEffectGui({
 
       if (p.readonly) {
         if (typeof controller.disable === 'function') controller.disable();
-      } else {
-        fx.writableParamNames.push(p.name);
-        trackDragState(fx, controller);
+        return;
       }
+      fx.writableParamNames.push(p.name);
+      trackDragState(fx, controller);
 
       controller.onChange(v => {
         const value = engineParamValue(v);
