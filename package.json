@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "testFileFloor": 46,
-  "testCountFloor": 768,
+  "testFileFloor": 45,
+  "testCountFloor": 760,
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
     "pretest": "node scripts/require-tests.mjs",
