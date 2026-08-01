@@ -46,17 +46,20 @@ function stubDocument(byId) {
 
 /**
  * Install the DOM and animation globals initScene needs, then build a scene.
- * requestAnimationFrame hands back a fixed id without ever running the callback,
- * so the loop advances exactly one frame.
+ * requestAnimationFrame parks its callback instead of running it, so the loop
+ * advances exactly one frame; nextFrame() runs the parked one on demand.
  * @param {Object} [opts] - Options forwarded to initScene.
- * @returns {Object} initScene's handles plus the canvas, the listener record and
- *          the ids passed to cancelAnimationFrame.
+ * @returns {Object} initScene's handles plus the canvas, the mutable container,
+ *          the listener record, nextFrame() and the ids passed to
+ *          cancelAnimationFrame.
  */
 function mountScene(opts = {}) {
   const canvas = {};
+  const container = { clientWidth: 640, clientHeight: 480 };
   const listeners = { added: [], removed: [] };
   const cancelled = [];
-  stubDocument({ viewport: { clientWidth: 640, clientHeight: 480 }, gl: canvas });
+  let parkedFrame = null;
+  stubDocument({ viewport: container, gl: canvas });
   globalThis.window = {
     devicePixelRatio: 2,
     addEventListener(type, fn) { listeners.added.push([type, fn]); },
@@ -65,12 +68,16 @@ function mountScene(opts = {}) {
       log.push('removeEventListener');
     },
   };
-  globalThis.requestAnimationFrame = () => RAF_ID;
+  globalThis.requestAnimationFrame = (fn) => { parkedFrame = fn; return RAF_ID; };
   globalThis.cancelAnimationFrame = (id) => {
     cancelled.push(id);
     log.push('cancelAnimationFrame');
   };
-  return { canvas, listeners, cancelled, ...initScene('viewport', 'gl', opts) };
+  const nextFrame = () => parkedFrame();
+  return {
+    canvas, container, listeners, cancelled, nextFrame,
+    ...initScene('viewport', 'gl', opts),
+  };
 }
 
 test('capPixelRatio preserves low-density displays and caps high-density displays', () => {
@@ -118,6 +125,69 @@ test('initScene returns the light rig it added when lights are requested', () =>
 
   assert.equal(s.lights.length, 3);
   assert.deepEqual(s.scene.children, s.lights);
+});
+
+test('the default resize retracks the container size and re-caps the pixel ratio', () => {
+  const s = mountScene();
+
+  s.container.clientWidth = 1024;
+  s.container.clientHeight = 256;
+  globalThis.window.devicePixelRatio = 0.5;
+  s.resize();
+  assert.equal(s.camera.aspect, 1024 / 256);
+  assert.equal(s.camera.projectionUpdates, 1, 'a new aspect is inert until the matrix is rebuilt');
+  assert.deepEqual(s.renderer.size, [1024, 256]);
+  assert.equal(s.renderer.pixelRatio, 0.5, 'resize must re-read devicePixelRatio');
+
+  // A display that changes density mid-session, e.g. a window dragged to a
+  // high-DPI monitor.
+  globalThis.window.devicePixelRatio = 3;
+  s.resize();
+  assert.equal(s.renderer.pixelRatio, 1, 'resize must cap the ratio it re-reads');
+
+  // A collapsed container must not drive the aspect to 0, Infinity or NaN.
+  s.container.clientWidth = 0;
+  s.container.clientHeight = 0;
+  s.resize();
+  assert.equal(s.camera.aspect, 1);
+  assert.deepEqual(s.renderer.size, [0, 0]);
+});
+
+test('an onResize handler replaces the default and receives the scene handles', () => {
+  const seen = [];
+  const s = mountScene({ onResize: (handles) => seen.push(handles) });
+  assert.deepEqual(s.listeners.added, [['resize', s.resize]]);
+
+  s.container.clientWidth = 1024;
+  s.container.clientHeight = 256;
+  s.resize();
+
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].scene, s.scene);
+  assert.equal(seen[0].camera, s.camera);
+  assert.equal(seen[0].renderer, s.renderer);
+  assert.equal(seen[0].controls, s.controls);
+  // Replaces, not augments: the default aspect/size update must not also run.
+  assert.equal(s.camera.aspect, 640 / 480);
+  assert.equal(s.camera.projectionUpdates, 0);
+  assert.deepEqual(s.renderer.size, [640, 480]);
+});
+
+test('the frame loop runs onAnimate before the render and onAfterRender after it', () => {
+  const order = [];
+  let s = null;
+  // Frame 1 runs inside initScene, before `s` exists, so it reports no render
+  // count; frame 2 brackets a render whose count the handles expose.
+  const mark = (tag) => () => order.push(`${tag}:${s ? s.renderer.renders : '-'}`);
+  s = mountScene({ onAnimate: mark('animate'), onAfterRender: mark('afterRender') });
+
+  assert.deepEqual(order, ['animate:-', 'afterRender:-']);
+  assert.equal(s.renderer.renders, 1);
+  assert.equal(s.controls.updates, 1);
+
+  s.nextFrame();
+  assert.deepEqual(order.slice(2), ['animate:1', 'afterRender:2']);
+  assert.equal(s.controls.updates, 2, 'the loop must keep driving the controls');
 });
 
 test('dispose stops the frame loop and the resize listener before releasing GPU objects', () => {
