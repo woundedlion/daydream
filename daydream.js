@@ -225,6 +225,10 @@ createHolosphereModule().then(module => {
   host.module = module;
   host.engine = new module.HolosphereEngine();
 
+  // Push the Pole LOD value the GUI settled on during the async WASM-load
+  // window; its onChange no-op'd while host.engine was null.
+  host.engine.setPoleLod(poleLodState.poleLod);
+
   syncResolutionOptions(module);
 
   // Resolution and effect are both applied once via applyResolution(true) below,
