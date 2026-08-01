@@ -25,7 +25,7 @@
  * same-named but reshaped message. Bump on any breaking change to the messages below.
  * @type {number}
  */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 /**
  * One tuned effect parameter, flattened for structured-clone transport. Booleans
@@ -66,7 +66,8 @@ export const PROTOCOL_VERSION = 2;
  * Switch the worker's effect. `params` (when present) carries the main engine's
  * current tuned values, applied AFTER engine.setEffect() — which rebuilds the
  * effect with defaults — so the segment matches instead of reverting to defaults.
- * @typedef {{ type: 'setEffect', name: string, params?: SegParam[] }} SetEffectMsg
+ * @typedef {{ type: 'setEffect', name: string, params?: SegParam[],
+ *   paused?: boolean }} SetEffectMsg
  */
 
 /** Resize the worker's canvas; the worker recomputes its segment rectangle from

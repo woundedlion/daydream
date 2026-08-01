@@ -92,7 +92,8 @@ export function addParamControl(gui, state, p) {
  *   insecure/older context.
  * @param {(message: string, error?: any) => void} [deps.logWarn] - Console sink.
  * @returns {{active: () => Object|null, liveParamValues: () => ArrayLike<number>|null,
- *   build: () => void, mount: () => void, sync: () => void, destroy: () => void}}
+ *   build: () => void, applyAnimationPause: () => void, mount: () => void,
+ *   sync: () => void, destroy: () => void}}
  */
 export function createEffectGui({
   createGui,
@@ -253,25 +254,32 @@ export function createEffectGui({
    * @param {Array<Object>} params - The engine's parameter definitions.
    * @returns {{animationState: {pause: boolean}, controller: Object|null,
    *   setPaused: (v: boolean) => void}} The toggle's state, its controller (null
-   *   when no param animates), and the writer that pauses both engines.
+   *   when no param animates), and its state transition.
    */
   function addPauseToggle(fx, params) {
     const animationState = { pause: false };
     /**
-     * Pause or resume animation-driven params on both the main engine and the
-     * segment-worker pool, keeping the local toggle state in sync.
+     * Adopt a pause transition, applying it immediately after initial hydration
+     * has been committed to the rebuilt renderers.
      * @param {boolean} v - True to freeze animations, false to resume.
      * @returns {void}
      */
-    const setPaused = (v) => {
-      animationState.pause = v;
-      setAnimationsPaused(v);
-    };
-
     let controller = null;
+    const transitionPaused = (v) => {
+      animationState.pause = Boolean(v);
+      if (fx.animationPauseApplied) setAnimationsPaused(animationState.pause);
+    };
+    const setPaused = (v) => {
+      const paused = Boolean(v);
+      if (controller) {
+        controller.setValue(paused);
+      } else {
+        transitionPaused(paused);
+      }
+    };
     if (params.some(p => p.animated)) {
       controller = fx.gui.add(animationState, 'pause').name('Pause Animation');
-      controller.onChange(setPaused);
+      controller.onChange(transitionPaused);
     }
     fx.animationState = animationState;
     fx.pauseController = controller;
@@ -344,7 +352,6 @@ export function createEffectGui({
         // Touching an animated slider takes over from the animation.
         if (p.animated && pause.controller && !pause.animationState.pause) {
           pause.setPaused(true);
-          pause.controller.updateDisplay();
         }
       });
     });
@@ -361,12 +368,27 @@ export function createEffectGui({
     sync,
 
     /**
+     * Commit the hydrated pause state after every renderer has rebuilt its
+     * effect. Subsequent GUI transitions apply immediately.
+     * @returns {void}
+     */
+    applyAnimationPause() {
+      if (!activeEffect?.animationState) return;
+      activeEffect.animationPauseApplied = true;
+      setAnimationsPaused(Boolean(activeEffect.animationState.pause));
+    },
+
+    /**
      * Build the effect GUI for the engine's current effect and install it as the
      * active effect record.
      * @returns {void}
      */
     build() {
-      activeEffect = { gui: createGui(), activeDragEnds: new Set() };
+      activeEffect = {
+        gui: createGui(),
+        activeDragEnds: new Set(),
+        animationPauseApplied: false,
+      };
       // Identity of this GUI's effect record, so async continuations can tell
       // whether a switch has since replaced it.
       const fx = activeEffect;

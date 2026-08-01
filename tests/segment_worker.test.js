@@ -66,7 +66,10 @@ class FakeEngine {
     this.params.push([name, value]);
     return ParamSetResult.APPLIED;
   }
-  setAnimationsPaused(p) { this.paused = p; }
+  setAnimationsPaused(p) {
+    this.calls.push(['setAnimationsPaused', p]);
+    this.paused = p;
+  }
   setClip(x0, x1, y0, y1) {
     if (!this.clipOk || !this.effect) return false;
     this.clip = { y0, y1, x0, x1 };
@@ -450,6 +453,22 @@ test('setEffect handler rebuilds, then re-applies the carried param snapshot', a
   });
   assert.equal(engineInstance.effect, 'Waves', 'switched to the new effect');
   assert.deepEqual(engineInstance.params, [['Freq', 0.25]]);
+});
+
+test('setEffect re-applies pause after rebuilding the worker engine', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  await dispatch({
+    type: 'setEffect', name: 'Waves', paused: true,
+    params: [{ name: 'Freq', value: 0.25 }],
+  });
+
+  assert.equal(engineInstance.effect, 'Waves');
+  assert.deepEqual(engineInstance.params, [['Freq', 0.25]]);
+  assert.equal(engineInstance.paused, true);
+  assert.deepEqual(engineInstance.calls.slice(-2), [
+    ['setEffect', 'Waves'],
+    ['setAnimationsPaused', true],
+  ]);
 });
 
 test('setEffect with no params just rebuilds, leaving defaults', async () => {

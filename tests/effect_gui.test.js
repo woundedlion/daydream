@@ -36,15 +36,24 @@ function fakeController(object, property, args) {
     disabled: false,
     dragging: false,
     displayUpdates: 0,
+    valueSets: [],
+    replayOnChange: false,
     handler: null,
     name(label) { this.label = label; return this; },
     decimals(n) { this.decimalsSet = n; return this; },
     disable() { this.disabled = true; return this; },
-    onChange(fn) { this.handler = fn; return this; },
+    onChange(fn) {
+      this.handler = fn;
+      if (this.replayOnChange) fn(this.getValue());
+      return this;
+    },
     getValue() { return this.object[this.property]; },
     setValue(v) {
+      if (this.getValue() === v) return this;
+      this.valueSets.push(v);
       this.object[this.property] = v;
       if (this.handler) this.handler(v);
+      this.updateDisplay();
       return this;
     },
     updateDisplay() { this.displayUpdates += 1; return this; },
@@ -55,7 +64,7 @@ function fakeController(object, property, args) {
  * lil-gui root double.
  * @returns {Object} The GUI double.
  */
-function fakeGui() {
+function fakeGui(hydrated = {}) {
   return {
     domElement: fakeElement('div'),
     controllers: [],
@@ -68,7 +77,10 @@ function fakeGui() {
       if (this.destroyThrows) throw this.destroyThrows;
     },
     add(object, property, ...args) {
+      const replayOnChange = Object.hasOwn(hydrated, property);
+      if (replayOnChange) object[property] = hydrated[property];
       const controller = fakeController(object, property, args);
+      controller.replayOnChange = replayOnChange;
       this.controllers.push(controller);
       return controller;
     },
@@ -125,6 +137,7 @@ function makeHarness({
   clipboard = fakeClipboard(),
   isMobile = false,
   container = fakeElement('div'),
+  hydrated = {},
 } = {}) {
   const state = {
     generation,
@@ -141,7 +154,7 @@ function makeHarness({
   const dragTarget = fakeElement('window');
 
   const panel = createEffectGui({
-    createGui: () => { const gui = fakeGui(); guis.push(gui); return gui; },
+    createGui: () => { const gui = fakeGui(hydrated); guis.push(gui); return gui; },
     getParameterDefinitions: () => params,
     paramGeneration: () => state.generation,
     segmentsOwnDisplay: () => state.ownsDisplay,
@@ -251,6 +264,8 @@ test('an effect with no animated or readonly param has no live values to poll', 
 test('editing a control writes the engine and the worker pool as floats', () => {
   const h = makeHarness({ params: [SPEED, GLOW] });
   h.panel.build();
+  h.panel.applyAnimationPause();
+  h.writes.length = 0;
 
   h.gui().ctrl('Speed').setValue(0.75);
   h.gui().ctrl('Glow').setValue(true);
@@ -277,6 +292,8 @@ test('the pause toggle is offered only when a param animates', () => {
 test('touching an animated slider takes over from the animation once', () => {
   const h = makeHarness({ params: [SPEED] });
   h.panel.build();
+  h.panel.applyAnimationPause();
+  h.writes.length = 0;
   const pause = h.gui().ctrl('pause');
 
   h.gui().ctrl('Speed').setValue(0.5);
@@ -286,15 +303,40 @@ test('touching an animated slider takes over from the animation once', () => {
   h.gui().ctrl('Speed').setValue(0.6);
   assert.equal(pause.displayUpdates, 1, 'an already-paused effect is not re-paused');
   assert.deepEqual(h.writes.filter((w) => w.startsWith('paused')), ['paused:true']);
+  assert.deepEqual(pause.valueSets, [true]);
 });
 
-test('the pause toggle freezes animations on every engine', () => {
+test('a hydrated pause is committed after the effect renderers rebuild', () => {
+  const h = makeHarness({ params: [SPEED], hydrated: { pause: true } });
+  h.panel.build();
+
+  assert.equal(h.panel.active().animationState.pause, true);
+  assert.deepEqual(h.writes, []);
+
+  h.panel.applyAnimationPause();
+
+  assert.deepEqual(h.writes, ['paused:true']);
+});
+
+test('a fresh effect explicitly commits the unpaused state', () => {
   const h = makeHarness({ params: [SPEED] });
   h.panel.build();
 
-  h.gui().ctrl('pause').setValue(true);
+  h.panel.applyAnimationPause();
 
-  assert.deepEqual(h.writes, ['paused:true']);
+  assert.deepEqual(h.writes, ['paused:false']);
+});
+
+test('the pause toggle freezes and resumes animations on every engine', () => {
+  const h = makeHarness({ params: [SPEED] });
+  h.panel.build();
+  h.panel.applyAnimationPause();
+  h.writes.length = 0;
+
+  h.gui().ctrl('pause').setValue(true);
+  h.gui().ctrl('pause').setValue(false);
+
+  assert.deepEqual(h.writes, ['paused:true', 'paused:false']);
 });
 
 test('the Reset button re-applies the effect', () => {

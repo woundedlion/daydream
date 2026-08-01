@@ -498,6 +498,7 @@ function makeApp({
       destroy: () => log.push('effectGui.destroy'),
       build: () => log.push('effectGui.build'),
       mount: () => log.push('effectGui.mount'),
+      applyAnimationPause: () => log.push('effectGui.applyAnimationPause'),
     },
     clearEffectParamUrl: () => log.push('clearEffectParamUrl'),
     segments,
@@ -532,6 +533,7 @@ test('applying an effect points the engine at it and rebuilds the panel', () => 
     'clearEffectParamUrl',
     'effectGui.build',
     'effectGui.mount',
+    'effectGui.applyAnimationPause',
     'sidebar.setActive Alpha',
   ]);
 });
@@ -558,8 +560,20 @@ test('a segmented pool is told which effect to render', () => {
 
   app.pipeline.applyEffect();
 
-  assert.deepEqual(app.log.slice(-2),
-    ['segments.setEffect Alpha', 'sidebar.setActive Alpha']);
+  assert.deepEqual(app.log.slice(-3), [
+    'segments.setEffect Alpha',
+    'effectGui.applyAnimationPause',
+    'sidebar.setActive Alpha',
+  ]);
+});
+
+test('a preserved pause is committed after the segmented effect rebuild', () => {
+  const app = makeApp({ segmented: true });
+
+  app.pipeline.applyEffect(true);
+
+  assert.ok(app.log.indexOf('effectGui.applyAnimationPause')
+    > app.log.indexOf('segments.setEffect Alpha'));
 });
 
 test('an engine that has not loaded yet still gets a sidebar and a mount point', () => {
@@ -571,6 +585,7 @@ test('an engine that has not loaded yet still gets a sidebar and a mount point',
     'effectGui.destroy',
     'clearEffectParamUrl',
     'effectGui.mount',
+    'effectGui.applyAnimationPause',
     'sidebar.setActive Alpha',
   ]);
 });
@@ -594,6 +609,7 @@ test('a resolution change resizes every renderer before re-applying the effect',
     'effectGui.build',
     'effectGui.mount',
     'segments.setEffect Alpha',
+    'effectGui.applyAnimationPause',
     'sidebar.setActive Alpha',
     'driver.invalidate',
   ]);
