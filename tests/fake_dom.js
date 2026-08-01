@@ -18,10 +18,40 @@ function reparent(nodes, parent) {
 }
 
 /**
+ * Unlinks nodes from the child list they currently sit in, so an insert moves a
+ * node the way the DOM does instead of listing it twice. Re-appending a node to
+ * its own parent therefore moves it to the end.
+ * @param {Array<any>} nodes - Nodes about to be inserted somewhere.
+ * @returns {void}
+ */
+function detach(nodes) {
+  for (const node of nodes) {
+    const parent = node && typeof node === 'object' ? node.parentNode : null;
+    if (!parent || !Array.isArray(parent.children)) continue;
+    const at = parent.children.indexOf(node);
+    if (at >= 0) parent.children.splice(at, 1);
+  }
+}
+
+/**
+ * Matches one node against a selector. Class and tag selectors are supported;
+ * anything else throws rather than silently matching nothing.
+ * @param {Object} node - Candidate element.
+ * @param {string} selector - '.class' or a tag name.
+ * @returns {boolean} True when the node matches.
+ */
+function matches(node, selector) {
+  if (selector.startsWith('.')) return node.classList.contains(selector.slice(1));
+  if (/^[a-z][\w-]*$/i.test(selector)) return node.tagName === selector.toUpperCase();
+  throw new Error(`unsupported selector: ${selector}`);
+}
+
+/**
  * Element stand-in carrying the attribute, class, child, and listener surface
  * the daydream modules read and write. Non-empty innerHTML assignments throw so
  * tests cannot silently accept markup construction that a browser would parse.
- * Listeners are recorded so a test can dispatch(type, event) and assert removal.
+ * Listeners are recorded so a test can dispatch(type, event) and assert removal;
+ * scrollIntoView() records its call count the same way.
  * @param {string} [tag] - Tag name.
  * @returns {Object} Fake element.
  */
@@ -31,12 +61,13 @@ export function fakeElement(tag = 'div') {
     listeners: [],
     tagName: String(tag).toUpperCase(),
     id: '',
-    className: '',
     textContent: '',
     style: {},
+    dataset: {},
     attributes: {},
     children: [],
     parentNode: null,
+    scrollIntoViewCalls: 0,
     get firstElementChild() {
       return this.children.find((node) => node && typeof node === 'object') || null;
     },
@@ -44,16 +75,43 @@ export function fakeElement(tag = 'div') {
       add: (...names) => { for (const name of names) classes.add(name); },
       remove: (...names) => { for (const name of names) classes.delete(name); },
       contains: (name) => classes.has(name),
+      toggle: (name, force) => {
+        const on = force === undefined ? !classes.has(name) : force;
+        if (on) classes.add(name); else classes.delete(name);
+        return on;
+      },
     },
     setAttribute(name, value) { this.attributes[name] = value; },
     getAttribute(name) { return name in this.attributes ? this.attributes[name] : null; },
-    append(...nodes) { reparent(nodes, this); this.children.push(...nodes); },
-    appendChild(node) { reparent([node], this); this.children.push(node); return node; },
+    append(...nodes) { detach(nodes); reparent(nodes, this); this.children.push(...nodes); },
+    appendChild(node) {
+      detach([node]);
+      reparent([node], this);
+      this.children.push(node);
+      return node;
+    },
     removeChild(node) {
       const at = this.children.indexOf(node);
       if (at >= 0) this.children.splice(at, 1);
       reparent([node], null);
       return node;
+    },
+    remove() {
+      detach([this]);
+      this.parentNode = null;
+    },
+    querySelector(selector) { return this.querySelectorAll(selector)[0] || null; },
+    querySelectorAll(selector) {
+      const found = [];
+      const walk = (node) => {
+        for (const child of node.children || []) {
+          if (!child || typeof child !== 'object' || !child.classList) continue;
+          if (matches(child, selector)) found.push(child);
+          walk(child);
+        }
+      };
+      walk(this);
+      return found;
     },
     replaceChildren(...nodes) {
       reparent(this.children, null);
@@ -79,7 +137,18 @@ export function fakeElement(tag = 'div') {
     },
     focus() {},
     select() {},
+    scrollIntoView() { this.scrollIntoViewCalls++; },
   };
+  // className and classList are two views of one class set, as in the DOM: a
+  // module may set the string and later read the list, or the reverse.
+  Object.defineProperty(element, 'className', {
+    enumerable: true,
+    get() { return [...classes].join(' '); },
+    set(value) {
+      classes.clear();
+      for (const name of String(value).split(/\s+/)) if (name) classes.add(name);
+    },
+  });
   Object.defineProperty(element, 'innerHTML', {
     set(value) {
       if (value !== '') throw new Error('innerHTML must not be used');
