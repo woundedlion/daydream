@@ -138,6 +138,30 @@ test('targetHeight capture falls back to a square when the source aspect is dege
   }
 });
 
+test('elapsedFormatted zero-pads seconds and rolls over minutes', () => {
+  const rec = new VideoRecorder(fakeCanvas());
+  rec.elapsedSeconds = 9.9;
+  assert.equal(rec.elapsedFormatted, '0:09');
+  rec.elapsedSeconds = 60;
+  assert.equal(rec.elapsedFormatted, '1:00');
+  rec.elapsedSeconds = 3599.9;
+  assert.equal(rec.elapsedFormatted, '59:59');
+});
+
+test('blitToOffscreen ignores a zero-sized source canvas', () => {
+  const rec = new VideoRecorder(fakeCanvas(0, 32));
+  rec.offscreen = fakeCanvas(64, 32);
+  rec.offCtx = {
+    clearRect() { throw new Error('unexpected clear'); },
+    drawImage() { throw new Error('unexpected draw'); },
+  };
+
+  assert.doesNotThrow(() => rec.blitToOffscreen());
+  rec.canvas.width = 64;
+  rec.canvas.height = 0;
+  assert.doesNotThrow(() => rec.blitToOffscreen());
+});
+
 // ---------------------------------------------------------------------------
 // MediaRecorder session lifecycle, behind a fake MediaRecorder/captureStream.
 // ---------------------------------------------------------------------------
