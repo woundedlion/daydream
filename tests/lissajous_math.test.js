@@ -209,6 +209,19 @@ test('lissajous: at t=0 returns the expected point (0, 1, 0)', () => {
   assert.equal(p.z, 0);
 });
 
+test('lissajous: non-trivial samples match analytic coordinates', () => {
+  const goldens = [
+    [[3, 2, 0, 0.7], [-0.4975, 0.169967, 0.850649]],
+    [[5, 4, 0.5, 1.2], [-0.705952, 0.087499, 0.702834]],
+  ];
+  for (const [[m1, m2, a, t], [x, y, z]] of goldens) {
+    const p = lissajous(m1, m2, a, t);
+    assert.ok(Math.abs(p.x - x) < 1e-6, `x at (${m1},${m2},${a},${t})`);
+    assert.ok(Math.abs(p.y - y) < 1e-6, `y at (${m1},${m2},${a},${t})`);
+    assert.ok(Math.abs(p.z - z) < 1e-6, `z at (${m1},${m2},${a},${t})`);
+  }
+});
+
 /** Verifies every sampled point lies on the unit sphere (|point| ≈ 1). */
 test('lissajous: point lies on the unit sphere (R = 1) for several t', () => {
   const m1 = 12, m2 = 5, a = 0.7;
