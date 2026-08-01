@@ -602,7 +602,10 @@
         if (isLocked && Object.keys(lockedDragStartValues).length > 0) {
           // --- LOCKED RELATIVE MOVEMENT ---
           const startRawValue = lockedDragStartValues[def.param];
-          if (startRawValue === undefined) return; // Should not happen if mousedown fired
+          if (startRawValue === undefined) {
+            handles.setValue(parameters[def.param]);
+            return;
+          }
 
           // Read the group's raw bounds off the live sliders, cap the shared
           // delta so no channel leaves its range (lockedGroupMove), then write
