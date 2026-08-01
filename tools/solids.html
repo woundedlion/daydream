@@ -1646,7 +1646,7 @@
       queueCommit(async () => {
         // Removing an op can invalidate the remainder (e.g. deleting the ambo
         // between two hankins), so removal validates like any other mutation.
-        const candidate = state.ops.filter((_, i) => i !== index);
+        const candidate = state.ops.filter((op, i) => i !== index);
         if (!(await chainIsValid(state.base, candidate))) {
           showGateMsg(GATE_REASON);
           return;
