@@ -9,7 +9,7 @@ node_modules/
 /three.js/
 /vendor/
 
-# Local agent tooling. The canonical prompts/ is tracked in the Holosphere repo.
+# Local agent tooling and machine-local prompts.
 /.claude/
 /prompts/
 
