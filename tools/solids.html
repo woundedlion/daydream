@@ -1296,13 +1296,25 @@
         ? "IslamicStarPatterns"
         : (CATALAN_BASES.has(item.base) ? "Catalan" : "Archimedean");
 
+      // A star-pattern base is not in simple_registry, so the emitted Recipe
+      // has to flatten against the base's own authored chain.
+      let baseRecipe = null;
+      if (baseIsStar) {
+        baseRecipe = MeshOpsWasm ? MeshOpsWasm.getRecipe(item.base) : null;
+        if (!baseRecipe) {
+          showGateMsg(`export failed: no authored chain for "${item.base}" — `
+            + 'its Recipe mirror cannot be generated');
+          return;
+        }
+      }
+
       let code = '';
 
       try {
         if (lang === 'recipe_cpp') {
           code = generateRecipeCpp(item, seedNs);
         } else if (lang === 'registry') {
-          code = generateRegistryCpp(item, seedNs, baseIsStar);
+          code = generateRegistryCpp(item, seedNs, baseRecipe);
         } else {
           console.warn("Unsupported export type.");
           return;
