@@ -621,12 +621,12 @@
     } from './solid_codegen.js';
     import { generateRegistryCpp } from './solid_registry_codegen.js';
     import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
-    import createHolosphereModule from '../holosphere_wasm.js';
 
     let camera, scene, renderer, controls;
     let mainMesh, edgeLines, vertPoints, normalLines;
     let labelsContainer;
     let draggingIndex = -1;
+    let createHolosphereModule = null;
 
     // Render materials are configuration-only and identical across updates, so
     // build them once and reuse. update() rebuilds geometry every call (it
@@ -704,6 +704,7 @@
     async function init() {
       // Load WASM
       try {
+        ({ default: createHolosphereModule } = await import('../holosphere_wasm.js'));
         WasmModule = await createHolosphereModule();
         MeshOpsWasm = WasmModule.MeshOps;
         console.log('WASM Module Loaded');
