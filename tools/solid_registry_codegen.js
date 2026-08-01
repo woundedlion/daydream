@@ -7,8 +7,10 @@
  * The solids tool page's registry-paste generator: the C++ text a saved solid
  * contributes to solids.h (a registry Entry, plus the OpStep table and Recipe
  * mirror a Complex entry must carry). Pure string code with no DOM and no WASM
- * dependency, so it is unit-testable. Output is pasted verbatim into the engine,
- * so the exact text and formatting are byte-for-byte significant.
+ * dependency, so it is unit-testable; the page passes a star-pattern base's
+ * authored chain in, read from MeshOps.getRecipe(). Output is pasted verbatim
+ * into the engine, so the exact text and formatting are byte-for-byte
+ * significant.
  */
 
 import {
@@ -21,6 +23,11 @@ import {
 
 // A namespace is pasted as a C++ qualifier, so guard its shape.
 const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+// Mirrors solids.h `static constexpr float D2R = PI_F / 180.0f` with
+// PI_F = float(PI), so a degree literal's product can be compared in float32
+// against the radian angle the engine reports.
+const D2R_F32 = Math.fround(Math.fround(Math.PI) / 180);
 
 /**
  * solids.h names a recipe's tables after the generator, camelCase segments
@@ -66,6 +73,74 @@ export function opStepCpp(o) {
 }
 
 /**
+ * The shortest C++ float literal that reads back as the same float32.
+ *
+ * A base's authored params cross the WASM boundary as values, not as source
+ * text, so a re-emitted literal must land on the identical float or the pasted
+ * Recipe stops mirroring its generator (solids.h proves the two bitwise equal).
+ * @param {string} where - Param name used in the error message.
+ * @param {number} value - The float32 value the engine reported.
+ * @returns {string} A C++ float literal.
+ * @throws {Error} When the value is non-finite, or no literal up to 17 fractional digits round-trips.
+ */
+function exactFloatLiteral(where, value) {
+  if (!Number.isFinite(value)) {
+    throw new Error(`generateRegistryCpp: ${where} must be a finite number, got ${value}`);
+  }
+  const target = Math.fround(value);
+  for (let digits = 6; digits <= 17; digits++) {
+    const literal = formatFloat(value, digits);
+    if (Math.fround(parseFloat(literal)) === target) return literal;
+  }
+  throw new Error(`generateRegistryCpp: ${where} value ${value} has no exact float literal`);
+}
+
+/**
+ * One solids.h OpStep initializer for a step of a base solid's authored chain,
+ * in the engine-native units MeshOps.getRecipe() reports: radians for hankin,
+ * raw t, relax iteration count.
+ * @param {{op: string, param: number, twist: number}} step - The authored step.
+ * @returns {string} The OpStep initializer.
+ * @throws {Error} When the op is unknown, or the step is a bake-backed relax.
+ */
+function recipeStepCpp(step) {
+  const opName = step.op;
+  if (!KNOWN_OPS.has(opName)) {
+    throw new Error(`generateRegistryCpp: base chain has unknown op "${opName}"`);
+  }
+  if (opName === 'hankin') {
+    // Prefer the house `deg * D2R` product, but only where it reproduces the
+    // engine's float exactly; otherwise emit the radian value itself.
+    const deg = Math.round(step.param * (180 / Math.PI));
+    const angle = Math.fround(deg * D2R_F32) === Math.fround(step.param)
+      ? `${formatFloat(deg)} * IslamicStarPatterns::D2R`
+      : exactFloatLiteral('base chain hankin angle', step.param);
+    return `{Op::HANKIN, ${angle}}`;
+  }
+  if (opName === 'snub') {
+    return `{Op::SNUB, ${exactFloatLiteral('base chain snub t', step.param)}, `
+      + `${exactFloatLiteral('base chain snub twist', step.twist)}}`;
+  }
+  if (opName === 'relax') {
+    // A shipped RELAX step carries a RelaxBake pointer instead of a count and
+    // reports param 0. The bake's symbol does not cross the WASM boundary, so
+    // the step cannot be re-emitted; refuse rather than paste a Recipe that
+    // silently relaxes zero times.
+    if (!(step.param > 0)) {
+      throw new Error('generateRegistryCpp: the base solid\'s chain has a '
+        + 'bake-backed relax step, whose RelaxBakes symbol does not cross the '
+        + 'WASM boundary — author this Recipe by hand');
+    }
+    return `{Op::RELAX, ${exactFloatLiteral('base chain relax iterations', step.param)}}`;
+  }
+  if (OP_DEFS[opName].params.t) {
+    return `{Op::${opName.toUpperCase()}, `
+      + `${exactFloatLiteral(`base chain ${opName} t`, step.param)}}`;
+  }
+  return `{Op::${opName.toUpperCase()}}`;
+}
+
+/**
  * Emits the solids.h registry paste for a saved solid.
  *
  * A Simple result is one Entry line in its seed's namespace. A Complex result —
@@ -73,22 +148,36 @@ export function opStepCpp(o) {
  * islamic_registry, whose entries carry a Recipe mirror; Entry's fourth field
  * defaults to nullptr, which fails the engine's every-Complex-solid-has-a-chain
  * contract.
+ *
+ * Recipe::seed indexes simple_registry, which holds no star pattern, so a star
+ * base is flattened: the seed becomes the base's own seed and the base's
+ * authored chain is prepended to the tool's ops, which is what the generated
+ * function builds.
  * @param {Object} item - The solid spec (see generateFuncAndRecipe).
  * @param {string} seedNamespace - Namespace qualifying the seed (e.g. "Archimedean").
- * @param {boolean} baseIsStar - True when the base is an islamic_registry star pattern.
+ * @param {?{seed: string, ops: Array<{op: string, param: number, twist: number}>}} [baseRecipe] - The base's authored chain from MeshOps.getRecipe(); null when the base is itself a simple_registry seed.
  * @returns {string} The C++ paste.
- * @throws {Error} When the spec or namespace is invalid.
+ * @throws {Error} When the spec, namespace, or base chain is invalid, or a base chain step cannot be re-emitted.
  */
-export function generateRegistryCpp(item, seedNamespace, baseIsStar) {
+export function generateRegistryCpp(item, seedNamespace, baseRecipe = null) {
   if (typeof seedNamespace !== 'string' || !CPP_IDENTIFIER.test(seedNamespace)) {
     throw new Error(`generateRegistryCpp: seed namespace "${seedNamespace}" is not a valid C++ identifier`);
   }
   const { funcName } = generateFuncAndRecipe(item, seedNamespace);
 
+  if (baseRecipe != null) {
+    if (typeof baseRecipe.seed !== 'string' || !CPP_IDENTIFIER.test(baseRecipe.seed)) {
+      throw new Error(`generateRegistryCpp: base chain seed "${baseRecipe.seed}" is not a valid C++ identifier`);
+    }
+    if (!Array.isArray(baseRecipe.ops)) {
+      throw new Error('generateRegistryCpp: base chain ops must be an array');
+    }
+  }
+
   // Complexity is a property of the result, not the base: a hankin step lands
   // the solid in islamic_registry (uniformly Category::Complex), as does
-  // starting from a star pattern.
-  const isComplex = baseIsStar
+  // starting from a star pattern — the only base that carries a chain.
+  const isComplex = baseRecipe != null
     || item.ops.some(o => (typeof o === 'string' ? o : o.op) === 'hankin');
 
   if (!isComplex) {
@@ -98,14 +187,16 @@ export function generateRegistryCpp(item, seedNamespace, baseIsStar) {
 
   const stepsName = `${upperSnake(funcName)}_STEPS`;
   const recipeName = `${upperSnake(funcName)}_RECIPE`;
-  const steps = item.ops.map(opStepCpp).join(',\n    ');
-  // SEED_<base> indexes simple_registry, so a base with no such constant needs
+  const baseSteps = baseRecipe != null ? baseRecipe.ops.map(recipeStepCpp) : [];
+  const steps = baseSteps.concat(item.ops.map(opStepCpp)).join(',\n    ');
+  // SEED_<name> indexes simple_registry, so a seed with no such constant needs
   // one added alongside this paste.
+  const seedName = baseRecipe != null ? baseRecipe.seed : item.base;
   return `/** Step table for ${funcName}. */\n`
     + `inline constexpr OpStep ${stepsName}[] = {\n    ${steps}};\n`
     + `/** Recipe mirror of IslamicStarPatterns::${funcName}. */\n`
     + `inline constexpr Recipe ${recipeName} = {\n`
-    + `    SEED_${upperSnake(item.base)}, ${stepsName},\n`
+    + `    SEED_${upperSnake(seedName)}, ${stepsName},\n`
     + `    static_cast<uint8_t>(std::size(${stepsName}))};\n\n`
     + `    {"${funcName}",\n     IslamicStarPatterns::${funcName}, Category::Complex,\n`
     + `     &${recipeName}},`;
