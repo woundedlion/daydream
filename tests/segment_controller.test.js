@@ -13,7 +13,6 @@ import { unpinnedEngineMethods } from './fake_engine.js';
 // the compositor reads.
 const driver = { W: 0, H: 0, pixels: null };
 
-const { SLOW_FRAME_MS } = await import('../frame_constants.js');
 
 const { SegmentController, MAX_BOOT_RETRIES } = await import('../segment_controller.js');
 const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
