@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import createHolosphereModule from '../holosphere_wasm.js';
 import { KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, applyOp } from '../tools/solid_codegen.js';
 import { ENGINE_METHODS, ParamSetResult } from './fake_engine.js';
+import { isViewLive, refreshPixelView } from '../pixel_view.js';
 
 // The module's stdout, captured rather than dropped: the WASM bridge answers an
 // out-of-domain op argument by clamping it and logging, so this is the only
@@ -255,6 +256,42 @@ test('getParamGeneration and setPoleLod stay exported', () => {
   // daydream.js's slider spans [0, 2].
   for (const v of [0, 1, 2]) engine.setPoleLod(v);
   engine.setPoleLod(0);
+});
+
+// pixel_view.test.js proves refreshPixelView against a synthetic detached
+// buffer; this is the only place the real growth happens with a view
+// outstanding. MeshOps' 16 MB tooling block is allocated lazily on first use and
+// cannot fit the heap the module starts with, so that first call grows it, which
+// detaches every live view. Must run ahead of every other MeshOps test in this
+// file, which would allocate the block first and leave nothing to grow.
+test('heap growth detaches a held pixel view and the re-fetch is live and identical', () => {
+  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), true,
+    'setEffect must succeed for a registered effect');
+  engine.setClip(0, W, 0, H);
+  engine.drawFrame();
+
+  const held = engine.getPixels();
+  assert.equal(isViewLive(held), true, 'a freshly fetched view must be live');
+  const snapshot = Array.from(held);
+
+  const mesh = M.MeshOps.fromSolidName('cube');
+  assert.ok(mesh, 'fromSolidName("cube") must build a mesh');
+  mesh.delete();
+  M.MeshOps.clearToolingMemory();
+
+  assert.equal(isViewLive(held), false,
+    'the 16 MB tooling allocation must grow the heap and detach the held view; ' +
+    'if it no longer does, nothing exercises the detachment contract daydream.js ' +
+    'guards against every frame');
+
+  const { refreshed, view } = refreshPixelView(held, () => engine.getPixels());
+  assert.equal(refreshed, true, 'a detached view must be re-fetched');
+  assert.equal(isViewLive(view), true, 'the re-fetched view must alias live memory');
+  assert.equal(view.length, snapshot.length,
+    're-fetched view length must match the pre-growth view');
+  assert.deepEqual(Array.from(view), snapshot,
+    'growth must preserve the pixels: the re-fetched view must be byte-identical');
 });
 
 // Everything MeshOps binds that is not a Conway/SolidBuilder operator. The
