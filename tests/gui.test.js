@@ -11,7 +11,11 @@ import {
 
 // Restore globalThis.window after each test so the stub never leaks to another suite.
 const savedWindow = globalThis.window;
+// Roots created by a test; destroy() cancels the 200ms URL-write debounce so no
+// timer survives the teardown that drops the window stub.
+const liveRoots = [];
 afterEach(() => {
+  while (liveRoots.length) liveRoots.pop().destroy();
   getActiveURLSync()?.dispose();
   if (savedWindow === undefined) delete globalThis.window;
   else globalThis.window = savedWindow;
@@ -87,7 +91,18 @@ class StubGUI {
 
 mock.module('lil-gui', { namedExports: { GUI: StubGUI } });
 
-const { GUI: DeepLinkGUI, makeUrlParamWriter, resetGUI } = await import('../gui.js');
+const { GUI: BaseGUI, makeUrlParamWriter, resetGUI } = await import('../gui.js');
+
+// GUI root that registers itself for teardown in afterEach.
+class DeepLinkGUI extends BaseGUI {
+  /**
+   * @param {...*} args - Forwarded to the wrapped GUI constructor.
+   */
+  constructor(...args) {
+    super(...args);
+    liveRoots.push(this);
+  }
+}
 
 /**
  * Installs a minimal global window so gui.js can read location.search and call
