@@ -606,8 +606,9 @@ export class Daydream {
 
     // drawFrame() and updateStats() both call into WASM after the view heal, so a
     // heap growth can detach the array instanceColor aliases.
-    if (isViewLive(this.dotMesh.instanceColor.array))
-      this.dotMesh.instanceColor.needsUpdate = true;
+    const instanceColor = this.dotMesh?.instanceColor;
+    if (instanceColor && isViewLive(instanceColor.array))
+      instanceColor.needsUpdate = true;
 
     return true;
   }
