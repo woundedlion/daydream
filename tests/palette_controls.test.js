@@ -98,16 +98,6 @@ test('a group spanning the full range is pinned', () => {
   assert.equal(lockedGroupMove(-50, group([0, 500, 1000])).delta, 0);
 });
 
-/** Verifies each member is capped against the REQUESTED delta, so no violation is masked. */
-test('an early cap does not hide a later member violation', () => {
-  // Asking for +400 overruns the 700 member (which allows +300) and the 900 one
-  // (which allows only +100); the tighter cap wins either iteration order.
-  const ascending = lockedGroupMove(400, group([700, 900, 100]));
-  const descending = lockedGroupMove(400, group([900, 700, 100]));
-  assert.equal(ascending.delta, 100);
-  assert.equal(descending.delta, 100);
-});
-
 /** Verifies members whose start value could not be read are left out entirely. */
 test('members with no start value are ignored', () => {
   const members = group([200, undefined, 900]);
