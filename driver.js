@@ -468,7 +468,8 @@ export class Daydream {
     // (DPR change, sidebar toggle, devtools) preserve their zoom. Rotation
     // leaves the radius unchanged, so it doesn't block re-fitting.
     // setLength rescales only the orbit radius, leaving azimuth/polar intact.
-    const orbitRadius = this.camera.position.length();
+    const orbitOffset = this.camera.position.clone().sub(this.controls.target);
+    const orbitRadius = orbitOffset.length();
     if (
       this.fittedDistance === 0 ||
       Math.abs(orbitRadius - this.fittedDistance) < 1e-3 * this.fittedDistance
@@ -478,7 +479,8 @@ export class Daydream {
         this.controls.minDistance,
         this.controls.maxDistance
       );
-      this.camera.position.setLength(this.fittedDistance);
+      orbitOffset.setLength(this.fittedDistance);
+      this.camera.position.copy(this.controls.target).add(orbitOffset);
     }
 
     // Re-apply on resize so moving to a different-DPR monitor refreshes the ratio.
