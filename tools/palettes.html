@@ -210,10 +210,15 @@
     <h1 class="text-3xl font-bold text-center text-white pt-4">Procedural Color Palette Generator</h1>
 
     <!-- 1. PALETTE PARAMETERS (CONTROLS) -->
-    <div class="flex border-b border-slate-600 mb-0">
-      <button id="tab-btn-procedural" class="tab-btn active" data-tab="procedural">Procedural
+    <div class="flex border-b border-slate-600 mb-0" role="tablist"
+      aria-label="Palette type">
+      <button id="tab-btn-procedural" class="tab-btn active" data-tab="procedural"
+        type="button" role="tab" aria-selected="true"
+        aria-controls="tab-content-procedural">Procedural
         (Cosine)</button>
-      <button id="tab-btn-generative" class="tab-btn" data-tab="generative">Generative</button>
+      <button id="tab-btn-generative" class="tab-btn" data-tab="generative"
+        type="button" role="tab" aria-selected="false" tabindex="-1"
+        aria-controls="tab-content-generative">Generative</button>
     </div>
 
     <!-- Page body: stacked content cards on the left, the Named Palettes card
@@ -221,7 +226,8 @@
     <div class="flex flex-col lg:flex-row gap-6">
       <div class="flex-1 min-w-0 space-y-8">
 
-        <div id="tab-content-procedural" class="tab-content active">
+        <div id="tab-content-procedural" class="tab-content active" role="tabpanel"
+          aria-labelledby="tab-btn-procedural">
           <h2 class="text-2xl font-semibold text-white mb-4">Palette Parameters: C(t) = A + B &middot; cos(2 &pi; (Ct + D))
           </h2>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -280,7 +286,8 @@
           </div>
         </div> <!-- End Procedural Tab -->
 
-    <div id="tab-content-generative" class="tab-content">
+    <div id="tab-content-generative" class="tab-content" role="tabpanel"
+      aria-labelledby="tab-btn-generative" hidden>
       <h2 class="text-2xl font-semibold text-white mb-4">Generative Palette Parameters</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
 
@@ -466,15 +473,18 @@
     function switchTab(tabName) {
       activeTab = tabName;
       // Update buttons
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      const activeBtn = document.getElementById(`tab-btn-${tabName}`);
-      if (activeBtn) activeBtn.classList.add('active');
-
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        const selected = btn.dataset.tab === tabName;
+        btn.classList.toggle('active', selected);
+        btn.setAttribute('aria-selected', selected ? 'true' : 'false');
+        btn.tabIndex = selected ? 0 : -1;
+      });
       // Update content
-      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-      const activeContent = document.getElementById(`tab-content-${tabName}`);
-      if (activeContent) activeContent.classList.add('active');
-
+      document.querySelectorAll('.tab-content').forEach(content => {
+        const selected = content.id === `tab-content-${tabName}`;
+        content.classList.toggle('active', selected);
+        content.hidden = !selected;
+      });
       // Named Palettes loads procedural coefficients, so it only applies here.
       const palettesPanel = document.getElementById('named_palettes_panel');
       if (palettesPanel) palettesPanel.style.display = (tabName === 'procedural') ? '' : 'none';
