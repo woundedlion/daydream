@@ -54,7 +54,7 @@ const evalImportmapJson = ({ vendor = 'cdn', selfSrc = 'https://example.test/app
   const sandbox = {
     URL,
     console,
-    window: extra ? { __DAYDREAM_EXTRA_IMPORTS: extra } : {},
+    window: extra ? { daydreamExtraImports: extra } : {},
     document: {
       currentScript: { src: selfSrc },
       createElement: () => ({ type: '', textContent: '' }),

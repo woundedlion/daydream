@@ -2200,7 +2200,7 @@ loads: Emscripten's embind builds its invokers with `new Function`, which
 `'wasm-unsafe-eval'` does not permit. `font-src` allows `data:` for the woff2
 lil-gui inlines in its stylesheet.
 
-A page-specific local import (e.g. `solids.html` referencing `../solids.js`) is added by setting `window.__DAYDREAM_EXTRA_IMPORTS` before the helper script.
+A page-specific local import (e.g. `solids.html` referencing `../solids.js`) is added by setting `window.daydreamExtraImports` before the helper script.
 
 ### 10.9 Video Recording (`recorder.js`)
 
