@@ -667,9 +667,6 @@ export class SegmentController {
     // segment 0 reports the new effect's first frame; otherwise the synchronously
     // rebuilt GUI would bind the new effect's sliders to stale values by index.
     this.paramValues = null;
-    // A fresh effect starts running; clear a stale pause so workers spawned for
-    // the rebuilt pool don't init paused while the main sphere animates.
-    this.animationsPaused = false;
     // A faulted pool is broken until re-created; rebuild (active) re-reads the
     // effect and params from appState rather than broadcasting to dead workers.
     if (this.faulted) {
@@ -684,7 +681,12 @@ export class SegmentController {
     // flashing the outgoing effect on switch.
     this.results.fill(null);
     this.pendingFrame = false;
-    this.broadcast({ type: 'setEffect', name, params: this.snapshotParams() });
+    this.broadcast({
+      type: 'setEffect',
+      name,
+      params: this.snapshotParams(),
+      paused: this.animationsPaused,
+    });
   }
 
   /**
@@ -744,6 +746,7 @@ export class SegmentController {
       type: 'setEffect',
       name: this.appState.get('effect'),
       params: this.snapshotParams(),
+      paused: this.animationsPaused,
     });
   }
 

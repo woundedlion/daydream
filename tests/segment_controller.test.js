@@ -1558,6 +1558,21 @@ test('setEffect broadcasts the name plus the tuned param snapshot to every worke
       { name: 'Speed', value: 0.5 },
       { name: 'Glow', value: 1.0 },
     ]);
+    assert.equal(msgs[0].paused, false);
+  }
+});
+
+test('setEffect carries the current pause state through the worker rebuild', () => {
+  const c = readyController(2);
+  c.setAnimationsPaused(true);
+  for (const w of c.workers) w.posted.length = 0;
+
+  c.setEffect('NewEffect');
+
+  assert.equal(c.animationsPaused, true);
+  for (const w of c.workers) {
+    const msg = w.posted.find((m) => m.type === 'setEffect');
+    assert.equal(msg.paused, true);
   }
 });
 
@@ -1593,6 +1608,20 @@ test('setResolution re-applies the effect so no worker is left unclipped', () =>
     assert.equal(w.posted[2].name, 'Ribbons', 'the active effect is restored');
     assert.deepEqual(w.posted[2].params, [{ name: 'Speed', value: 0.25 }],
       'tuned values ride along so the rebuild does not land on defaults');
+    assert.equal(w.posted[2].paused, false);
+  }
+});
+
+test('setResolution carries pause state into its trailing effect rebuild', () => {
+  const c = readyController(2, { effect: 'Ribbons' });
+  c.setAnimationsPaused(true);
+  for (const w of c.workers) w.posted.length = 0;
+
+  c.setResolution(8, 8);
+
+  for (const w of c.workers) {
+    const msg = w.posted.find((m) => m.type === 'setEffect');
+    assert.equal(msg.paused, true);
   }
 });
 

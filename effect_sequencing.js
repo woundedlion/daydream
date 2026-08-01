@@ -256,8 +256,8 @@ export function createSwitchCoordinator({
  *   Resolution presets by label.
  * @param {(resolution: string) => Array<string>} deps.availableEffects - The
  *   effect list a resolution offers.
- * @param {{destroy: Function, build: Function, mount: Function}} deps.effectGui -
- *   The effect panel controller.
+ * @param {{destroy: Function, build: Function, mount: Function,
+ *   applyAnimationPause: Function}} deps.effectGui - The effect panel controller.
  * @param {() => void} deps.clearEffectParamUrl - Drops the outgoing effect's
  *   param URL entries.
  * @param {Object} deps.segments - The SegmentController.
@@ -325,6 +325,8 @@ export function createApplyPipeline({
     if (segments.active) {
       segments.setEffect(appState.get('effect'));
     }
+
+    effectGui.applyAnimationPause();
 
     sidebar.setActive(appState.get('effect'));
   }
