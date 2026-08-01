@@ -4,13 +4,12 @@
  */
 
 /**
- * DOM/engine-free sequencing helpers for daydream.js's effect and resolution
- * apply path, extracted so the "apply the effect directly vs let the
- * effect-change subscription fire it" decision, the switch/rollback transaction
- * that drives it, and the param/value skew guard can be unit-tested without a
- * WASM engine, lil-gui, or a browser. applyResolution(), syncGUI()/export() and
- * the appState subscription route through here so those rules live in one tested
- * place, mirroring resolveParamSync().
+ * daydream.js's effect and resolution apply path: the apply pipeline itself, the
+ * switch/rollback transaction that drives it, the "apply the effect directly vs
+ * let the effect-change subscription fire it" decision, and the param/value skew
+ * guard. Every engine, driver, GUI, and sidebar collaborator arrives injected, so
+ * nothing here imports a WASM engine, lil-gui, or a browser and the whole path is
+ * unit-testable, mirroring resolveParamSync().
  */
 
 import { resolveActiveEffect } from "./sidebar_logic.js";
@@ -228,6 +227,164 @@ export function createSwitchCoordinator({
       unsubscribe = null;
     },
   };
+}
+
+/**
+ * Build the effect and resolution apply path — the two functions every switch,
+ * rollback, and initial hydration routes through.
+ *
+ * A rejected apply returns false and leaves the engine, the driver, and the
+ * worker pool as they were, so createSwitchCoordinator() can put the previous
+ * state back; nothing here writes appState except the off-list effect correction
+ * planResolutionApply() asks for.
+ *
+ * @param {Object} deps - Injected app collaborators.
+ * @param {{get: Function, set: Function}} deps.appState - The applied state.
+ * @param {() => Object|null} deps.getEngine - The main WASM engine, null until
+ *   the module finishes loading (the GUI and sidebar are built either way).
+ * @param {() => void} deps.invalidateEngineView - Drops the cached pixel view so
+ *   the next refresh re-fetches it after a resize.
+ * @param {Object<string, {w: number, h: number, dotSize: number}>} deps.presets -
+ *   Resolution presets by label.
+ * @param {(resolution: string) => Array<string>} deps.availableEffects - The
+ *   effect list a resolution offers.
+ * @param {{destroy: Function, build: Function, mount: Function}} deps.effectGui -
+ *   The effect panel controller.
+ * @param {() => void} deps.clearEffectParamUrl - Drops the outgoing effect's
+ *   param URL entries.
+ * @param {Object} deps.segments - The SegmentController.
+ * @param {Object} deps.driver - The Daydream driver.
+ * @param {Object} deps.sidebar - The effect sidebar.
+ * @param {() => boolean} deps.isRestoring - Whether the effect subscription is
+ *   muted (a rollback in progress).
+ * @param {(message: string, error?: any) => void} [deps.logError] - Console sink.
+ * @param {(message: string, error?: any) => void} [deps.logWarn] - Console sink.
+ * @returns {{applyEffect: (preserveParams?: boolean) => boolean|void,
+ *   applyResolution: (preserveParams?: boolean) => boolean|void}}
+ */
+export function createApplyPipeline({
+  appState,
+  getEngine,
+  invalidateEngineView,
+  presets,
+  availableEffects,
+  effectGui,
+  clearEffectParamUrl,
+  segments,
+  driver,
+  sidebar,
+  isRestoring,
+  logError = (...args) => console.error(...args),
+  logWarn = (...args) => console.warn(...args),
+}) {
+  /**
+   * Point the engine at the state's effect and mirror its strobe layout onto the
+   * driver.
+   * @returns {boolean} False when the engine rejected the effect.
+   */
+  function selectEngineEffect() {
+    const engine = getEngine();
+    const effect = appState.get('effect');
+    const applied = engine.setEffect(effect) !== false;
+    driver.setStrobeColumns(engine.strobeColumns());
+    if (!applied) {
+      logError(`setEffect("${effect}") failed; effect unavailable.`);
+    }
+    return applied;
+  }
+
+  /**
+   * Tear down the current effect GUI and build a new one for the active effect.
+   * @param {boolean} [preserveParams=false] - When true, keep the existing
+   *   per-effect param URL entries (used during initial hydration); when false,
+   *   clear them since they don't apply to the newly selected effect.
+   * @returns {boolean|void} false when the engine rejected the effect (the caller
+   *   must revert appState so UI/URL don't advertise an unapplied effect);
+   *   otherwise undefined.
+   */
+  function applyEffect(preserveParams = false) {
+    // A rejected effect leaves the engine unchanged, so return before the worker
+    // broadcast below: sending the rejected name would diverge them from main.
+    if (getEngine() && !selectEngineEffect()) return false;
+
+    effectGui.destroy();
+    if (!preserveParams) clearEffectParamUrl();
+    if (getEngine()) effectGui.build();
+    effectGui.mount();
+
+    // Gated on segmented mode, not on a live pool: a faulted pool can hold no
+    // workers, and setEffect() is the trigger that rebuilds it from appState.
+    if (segments.active) {
+      segments.setEffect(appState.get('effect'));
+    }
+
+    sidebar.setActive(appState.get('effect'));
+  }
+
+  /**
+   * Apply a resolution change: resize geometry, refresh sidebar list, then
+   * re-apply effect.
+   * @param {boolean} [preserveParams=false] - When true, keep the active effect's
+   *   param URL entries through the re-apply (only if the effect is still
+   *   offered; an off-list effect is corrected to the list's first entry,
+   *   dropping its effect-specific URL entries regardless).
+   * @returns {boolean|void} false when the resolution was not applied — an
+   *   unknown preset name, or an engine rejection — so the caller must revert
+   *   appState and UI/URL don't advertise an unapplied value; otherwise
+   *   undefined.
+   */
+  function applyResolution(preserveParams = false) {
+    const resolution = appState.get('resolution');
+    const p = presets[resolution];
+    if (!p) {
+      logError(`Unknown resolution preset "${resolution}"; keeping current.`);
+      return false;
+    }
+
+    const engine = getEngine();
+    if (engine) {
+      if (engine.setResolution(p.w, p.h) === false) {
+        logError(`Unsupported resolution ${p.w}x${p.h}; keeping current.`);
+        return false;
+      }
+      invalidateEngineView();
+    }
+
+    // Gated on segmented mode, not on a live pool: a faulted pool can hold no
+    // workers, and setResolution() is the trigger that rebuilds it from appState.
+    if (segments.active) {
+      segments.setResolution(p.w, p.h);
+    }
+
+    const offered = availableEffects(resolution);
+
+    driver.updateResolution(p.w, p.h, p.dotSize);
+
+    let effectSizes = null;
+    if (engine) {
+      try { effectSizes = engine.getEffectSizes(); }
+      catch (e) { logWarn('getEffectSizes failed (sidebar sizes unavailable):', e); }
+    }
+    sidebar.setEffects(offered, effectSizes);
+
+    // Done after updateResolution()/setEffects() because appState.set('effect',…)
+    // synchronously fires applyEffect(), which would otherwise build against the
+    // pre-resize dot mesh / stale sidebar.
+    const { nextEffect, effectChanged, applyDirectly } =
+      planResolutionApply(offered, appState.get('effect'), isRestoring());
+    if (effectChanged) {
+      appState.set('effect', nextEffect);
+      if (appState.get('effect') !== nextEffect) return false;
+    }
+
+    if (applyDirectly) {
+      if (applyEffect(preserveParams) === false) return false;
+    }
+
+    driver.invalidate();
+  }
+
+  return { applyEffect, applyResolution };
 }
 
 /**

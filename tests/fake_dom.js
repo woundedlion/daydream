@@ -21,12 +21,14 @@ function reparent(nodes, parent) {
  * Element stand-in carrying the attribute, class, child, and listener surface
  * the daydream modules read and write. Non-empty innerHTML assignments throw so
  * tests cannot silently accept markup construction that a browser would parse.
+ * Listeners are recorded so a test can dispatch(type, event) and assert removal.
  * @param {string} [tag] - Tag name.
  * @returns {Object} Fake element.
  */
 export function fakeElement(tag = 'div') {
   const classes = new Set();
   const element = {
+    listeners: [],
     tagName: String(tag).toUpperCase(),
     id: '',
     className: '',
@@ -58,8 +60,23 @@ export function fakeElement(tag = 'div') {
       reparent(nodes, this);
       this.children = nodes;
     },
-    addEventListener() {},
-    removeEventListener() {},
+    contains(node) {
+      if (node === this) return true;
+      return this.children.some(
+        (child) => child && typeof child === 'object'
+          && typeof child.contains === 'function' && child.contains(node));
+    },
+    addEventListener(type, handler) { this.listeners.push({ type, handler }); },
+    removeEventListener(type, handler) {
+      const at = this.listeners.findIndex(
+        (l) => l.type === type && l.handler === handler);
+      if (at >= 0) this.listeners.splice(at, 1);
+    },
+    dispatch(type, event = {}) {
+      for (const l of this.listeners.filter((l) => l.type === type)) {
+        l.handler(event);
+      }
+    },
     focus() {},
     select() {},
   };
