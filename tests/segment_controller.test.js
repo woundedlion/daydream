@@ -372,11 +372,22 @@ test('a doubled segment-0 frame cannot republish over the generation first frame
   c.create(2);
   const done = c.renderParallel();
 
-  deliverFrame(c, 0, { paramValues: [0.25, 1] });
-  deliverFrame(c, 0, { paramValues: [9, 9] });
+  const firstPixels = new Uint16Array([1, 2, 3]);
+  const firstArena = { persistent: 10 };
+  deliverFrame(c, 0, {
+    pixels: firstPixels, elapsed: 2, arenaMetrics: firstArena,
+    paramValues: [0.25, 1],
+  });
+  deliverFrame(c, 0, {
+    pixels: new Uint16Array([9, 9, 9]), elapsed: 9,
+    arenaMetrics: { persistent: 99 }, paramValues: [9, 9],
+  });
 
   assert.deepEqual(c.getParamValues(), [0.25, 1],
     "segment 0's first frame this generation is the only publish");
+  assert.strictEqual(c.scratch[0].pixels, firstPixels, 'the first pixels stay staged');
+  assert.equal(c.timings[0], 2, 'the first timing stays staged');
+  assert.strictEqual(c.arenas[0], firstArena, 'the first arena metrics stay staged');
   assert.equal(c.pending, 1, 'the duplicate settles nothing');
 
   deliverFrame(c, 1);

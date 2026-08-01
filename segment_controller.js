@@ -362,14 +362,15 @@ export class SegmentController {
               + `(expected an integer 0..${numSegments - 1}); dropping`);
             return;
           }
+          // Count and stage only the first message from each segment.
+          if (this.frameSeen[msg.segId]) return;
           // Generation fence: keep only results from the current resolution; still
           // settle the frame either way.
           if (this.inflightGen === this.renderGen) {
             // Mirror segment 0's live params for GUI sync, inside the fence so a
             // stale-generation frame can't publish params against a new descriptor
-            // list, and only on seg 0's first frame this generation so a doubled
-            // 'frame' message can't re-publish.
-            if (msg.segId === 0 && msg.paramValues && !this.frameSeen[0])
+            // list.
+            if (msg.segId === 0 && msg.paramValues)
               this.paramValues = msg.paramValues;
             this.scratch[msg.segId] = {
               pixels: msg.pixels,
@@ -379,9 +380,6 @@ export class SegmentController {
             this.timings[msg.segId] = msg.elapsed;
             this.arenas[msg.segId] = msg.arenaMetrics;
           }
-          // Count distinct segments: a worker emitting two 'frame' messages in
-          // one generation must not drop pending twice and resolve the barrier early.
-          if (this.frameSeen[msg.segId]) return;
           this.frameSeen[msg.segId] = true;
           this.pending--;
           if (this.pending === 0 && this.frameResolve) {
