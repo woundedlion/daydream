@@ -5,13 +5,6 @@ import { test, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 
-// copyToClipboard prefers navigator.clipboard.writeText; stub it to succeed.
-// Node exposes a read-only `navigator`, so override it via defineProperty.
-Object.defineProperty(globalThis, 'navigator', {
-  value: { clipboard: { writeText: async () => {} } },
-  configurable: true,
-});
-
 const {
   copyToClipboard,
   copyWithFeedback,
@@ -35,12 +28,20 @@ function fakeButton(label, initialClasses = []) {
   return el;
 }
 
+let savedNavigator;
+
 beforeEach(() => {
+  savedNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', {
+    value: { clipboard: { writeText: async () => {} } },
+    configurable: true,
+  });
   mock.timers.enable({ apis: ['setTimeout'] });
 });
 
 afterEach(() => {
   mock.timers.reset();
+  Object.defineProperty(globalThis, 'navigator', savedNavigator);
 });
 
 /** Verifies a second copy before the first revert timer still restores the real idle label, not "Copied!". */
