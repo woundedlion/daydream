@@ -2,89 +2,13 @@
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { EffectSidebar } from '../sidebar.js';
+import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 
 // EffectSidebar's DOM-lifecycle methods (constructor, setEffects, applySortOrder,
 // setActive, updateScrollArrows, dispose) touch the DOM only through a narrow set
 // of node methods. There is no jsdom, so this file constructs a real sidebar over
-// minimal fake nodes and asserts the leak-prevention contract: dispose detaches
+// the shared fake nodes and asserts the leak-prevention contract: dispose detaches
 // every listener/observer and clears every ref the constructor created.
-
-// Minimal fake element: tracks children, listeners, classes, and removal so the
-// lifecycle contract is observable. Only the surface sidebar.js actually calls.
-class FakeEl {
-  constructor(tag = 'div') {
-    this.tagName = tag;
-    this.children = [];
-    this.listeners = [];
-    this.classes = new Set();
-    this.attrs = {};
-    this.dataset = {};
-    this.style = {};
-    this.tabIndex = 0;
-    this.onclick = null;
-    this.parentNode = null;
-    this.scrollLeft = 0;
-    this.scrollWidth = 0;
-    this.clientWidth = 0;
-    this.removed = false;
-    this.scrolledIntoView = 0;
-    this.innerHTMLSetCount = 0;
-    this.classList = {
-      add: (c) => this.classes.add(c),
-      remove: (c) => this.classes.delete(c),
-      toggle: (c, on) => { if (on) this.classes.add(c); else this.classes.delete(c); },
-      contains: (c) => this.classes.has(c),
-    };
-  }
-  setAttribute(k, v) { this.attrs[k] = v; }
-  getAttribute(k) { return this.attrs[k]; }
-  appendChild(c) {
-    if (c.parentNode) c.parentNode.removeChild(c);
-    this.children.push(c);
-    c.parentNode = this;
-    return c;
-  }
-  removeChild(c) {
-    const i = this.children.indexOf(c);
-    if (i >= 0) this.children.splice(i, 1);
-    if (c.parentNode === this) c.parentNode = null;
-    return c;
-  }
-  remove() {
-    this.removed = true;
-    if (this.parentNode) this.parentNode.removeChild(this);
-  }
-  addEventListener(type, fn) { this.listeners.push({ type, fn }); }
-  removeEventListener(type, fn) {
-    const i = this.listeners.findIndex((l) => l.type === type && l.fn === fn);
-    if (i >= 0) this.listeners.splice(i, 1);
-  }
-  set innerHTML(v) {
-    this.innerHTMLSetCount++;
-    if (v === '') { for (const c of this.children) c.parentNode = null; this.children = []; }
-  }
-  get innerHTML() { return ''; }
-  querySelector(sel) {
-    const cls = sel.replace(/^\./, '');
-    return this.children.find((c) => c.classes.has(cls)) || null;
-  }
-  querySelectorAll(sel) {
-    const cls = sel.replace(/^\./, '');
-    return this.children.filter((c) => c.classes.has(cls));
-  }
-  scrollIntoView() { this.scrolledIntoView++; }
-}
-
-// className is a plain string in the DOM but sidebar.js also reads classList; keep
-// them separate by mirroring className assignments into the class set so
-// setActive's later classList checks see constructor-time classes.
-Object.defineProperty(FakeEl.prototype, 'className', {
-  get() { return this.classNameStr || ''; },
-  set(v) {
-    this.classNameStr = v;
-    this.classes = new Set(String(v).split(/\s+/).filter(Boolean));
-  },
-});
 
 const observers = [];
 class FakeResizeObserver {
@@ -98,7 +22,6 @@ let rafId = 0;
 const cancelledRaf = [];
 
 const saved = {
-  document: globalThis.document,
   ResizeObserver: globalThis.ResizeObserver,
   requestAnimationFrame: globalThis.requestAnimationFrame,
   cancelAnimationFrame: globalThis.cancelAnimationFrame,
@@ -109,13 +32,15 @@ function installDom() {
   rafCallbacks.clear();
   cancelledRaf.length = 0;
   rafId = 0;
-  globalThis.document = { createElement: (tag) => new FakeEl(tag), activeElement: null };
+  installDocument({ createElement: (tag) => fakeElement(tag), activeElement: null });
   globalThis.ResizeObserver = FakeResizeObserver;
   // Defer, matching the browser: store the callback but do not run it, so
   // setEffects' scroll-arrow measurement does not fire synchronously.
   globalThis.requestAnimationFrame = (cb) => { const id = ++rafId; rafCallbacks.set(id, cb); return id; };
   globalThis.cancelAnimationFrame = (id) => { cancelledRaf.push(id); rafCallbacks.delete(id); };
 }
+
+restoreDocumentAfterEach();
 
 afterEach(() => {
   for (const [k, v] of Object.entries(saved)) {
@@ -126,7 +51,7 @@ afterEach(() => {
 
 function makeSidebar() {
   installDom();
-  const container = new FakeEl('div');
+  const container = fakeElement('div');
   const selected = [];
   const sidebar = new EffectSidebar(container, (name) => selected.push(name));
   return { sidebar, container, selected };
@@ -187,18 +112,18 @@ test('setActive toggles active/aria-selected on only the old and new buttons', (
   sidebar.setActive('A');
   const a = sidebar.buttons.get('A');
   const b = sidebar.buttons.get('B');
-  assert.ok(a.classes.has('active'));
+  assert.ok(a.classList.contains('active'));
   assert.equal(a.getAttribute('aria-selected'), 'true');
   assert.equal(sidebar.tabbableBtn, a);
   assert.equal(a.tabIndex, 0);
 
   sidebar.setActive('B');
-  assert.ok(!a.classes.has('active'));
+  assert.ok(!a.classList.contains('active'));
   assert.equal(a.getAttribute('aria-selected'), 'false');
-  assert.ok(b.classes.has('active'));
+  assert.ok(b.classList.contains('active'));
   assert.equal(b.getAttribute('aria-selected'), 'true');
   assert.equal(sidebar.activeName, 'B');
-  assert.ok(b.scrolledIntoView > 0);
+  assert.ok(b.scrollIntoViewCalls > 0);
   // Exactly one tab stop: the old anchor is demoted as the new one is promoted.
   assert.equal(a.tabIndex, -1);
   assert.equal(b.tabIndex, 0);
@@ -212,7 +137,7 @@ test('setEffects re-marks the active effect on its rebuilt button', () => {
   sidebar.setEffects(['A', 'B', 'C'], {}); // fresh nodes, same active name
   const b = sidebar.buttons.get('B');
 
-  assert.ok(b.classes.has('active'), 'the rebuilt button carries the active class');
+  assert.ok(b.classList.contains('active'), 'the rebuilt button carries the active class');
   assert.equal(b.getAttribute('aria-selected'), 'true');
   // The roving tab stop follows the active effect, not the first option.
   assert.equal(sidebar.tabbableBtn, b);
@@ -229,7 +154,7 @@ test('setActive keeps the current selection when the name is off-list', () => {
   sidebar.setActive('ZZZ'); // no such button
 
   assert.equal(sidebar.activeName, 'A', 'activeName is not stripped by an off-list name');
-  assert.ok(a.classes.has('active'), 'the active button stays selected');
+  assert.ok(a.classList.contains('active'), 'the active button stays selected');
   assert.equal(a.getAttribute('aria-selected'), 'true');
 });
 
@@ -240,18 +165,18 @@ test('updateScrollArrows reflects scroll geometry', () => {
   sidebar.listEl.scrollWidth = 100;
   sidebar.listEl.clientWidth = 100;
   sidebar.updateScrollArrows();
-  assert.ok(!sidebar.arrowLeft.classes.has('visible'));
-  assert.ok(!sidebar.arrowRight.classes.has('visible'));
+  assert.ok(!sidebar.arrowLeft.classList.contains('visible'));
+  assert.ok(!sidebar.arrowRight.classList.contains('visible'));
   // Overflow, scrolled to start: only the right arrow shows.
   sidebar.listEl.scrollWidth = 400;
   sidebar.updateScrollArrows();
-  assert.ok(!sidebar.arrowLeft.classes.has('visible'));
-  assert.ok(sidebar.arrowRight.classes.has('visible'));
+  assert.ok(!sidebar.arrowLeft.classList.contains('visible'));
+  assert.ok(sidebar.arrowRight.classList.contains('visible'));
   // Scrolled to the end: only the left arrow shows.
   sidebar.listEl.scrollLeft = 300;
   sidebar.updateScrollArrows();
-  assert.ok(sidebar.arrowLeft.classes.has('visible'));
-  assert.ok(!sidebar.arrowRight.classes.has('visible'));
+  assert.ok(sidebar.arrowLeft.classList.contains('visible'));
+  assert.ok(!sidebar.arrowRight.classList.contains('visible'));
 });
 
 test('sort controls expose the current order in their accessible name', () => {
@@ -302,5 +227,7 @@ test('dispose detaches every listener/observer and clears refs', () => {
   assert.equal(sidebar.sizeBtn.onclick, null);
   // Every node the constructor appended is detached from the container.
   assert.equal(container.children.length, 0);
-  assert.ok(sidebar.heading.removed && sidebar.listEl.removed && sidebar.arrowRight.removed);
+  assert.equal(sidebar.heading.parentNode, null);
+  assert.equal(sidebar.listEl.parentNode, null);
+  assert.equal(sidebar.arrowRight.parentNode, null);
 });
