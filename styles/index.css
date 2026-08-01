@@ -1,3 +1,13 @@
+:root {
+  --page-bg: #000;
+  --panel-border: #333;
+  --muted-text: #888;
+  --accent: #48f;
+  --focus-ring: #8af;
+  --ui-font: 'Segoe UI', Arial, sans-serif;
+  --nav-font: Arial, sans-serif;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -8,14 +18,14 @@
 .sort-btn:focus-visible,
 .tab:focus-visible,
 .context-lost-reload:focus-visible {
-  outline: 2px solid #8af;
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
 /* Inset: the canvas fills its container, so an outset ring would be clipped.
    Class, not :focus-visible — see Daydream.setupKeyboardOrbit. */
 #canvas.keyboard-focus {
-  outline: 2px solid #8af;
+  outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
 
@@ -39,13 +49,13 @@
   display: flex;
   gap: 5px;
   align-items: center;
-  background: #000;
+  background: var(--page-bg);
   flex-shrink: 0;
 }
 
 .nav-label {
   color: white;
-  font-family: Arial, sans-serif;
+  font-family: var(--nav-font);
   font-size: 14px;
   font-weight: bold;
   margin-right: 5px;
@@ -57,7 +67,7 @@
   background: rgba(255, 255, 255, 0.1);
   color: white;
   text-decoration: none;
-  font-family: Arial, sans-serif;
+  font-family: var(--nav-font);
   font-size: 14px;
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -82,7 +92,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #000;
+  background: var(--page-bg);
 }
 
 /* Main Area Layout (Sidebar + Canvas) */
@@ -134,7 +144,7 @@
   top: 12px;
   left: 32px;
   color: #e22;
-  font-family: 'Segoe UI', Arial, sans-serif;
+  font-family: var(--ui-font);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   line-height: 14px;
@@ -149,7 +159,7 @@
   width: 100%;
   padding: 4px 8px;
   background: rgba(0, 0, 0, 0.6);
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--panel-border);
   text-align: center;
 }
 
@@ -186,19 +196,18 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background: #000;
-  color: #888;
-  font-family: 'Segoe UI', Arial, sans-serif;
+  background: var(--page-bg);
+  color: var(--muted-text);
+  font-family: var(--ui-font);
   font-size: 14px;
   z-index: 100;
-  transition: opacity 0.3s ease;
 }
 
 .spinner {
   width: 32px;
   height: 32px;
   border: 3px solid rgba(255, 255, 255, 0.1);
-  border-top-color: #48f;
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -214,7 +223,7 @@
 
   .spinner {
     animation: none;
-    border-color: #48f;
+    border-color: var(--accent);
   }
 }
 
@@ -229,7 +238,7 @@
 
 .load-error-detail {
   max-width: 80%;
-  color: #888;
+  color: var(--muted-text);
   font-size: 0.85em;
   text-align: center;
   word-break: break-word;
@@ -246,7 +255,7 @@
   border-radius: 6px;
   background: #222;
   color: #eee;
-  font-family: 'Segoe UI', Arial, sans-serif;
+  font-family: var(--ui-font);
   font-size: 13px;
   text-align: center;
   transform: translateX(-50%);
@@ -260,13 +269,13 @@
   color: #eee;
   border: 1px solid #555;
   border-radius: 6px;
-  font-family: 'Segoe UI', Arial, sans-serif;
+  font-family: var(--ui-font);
   font-size: 13px;
   cursor: pointer;
 }
 
 .context-lost-reload:hover {
-  background: #333;
+  background: var(--panel-border);
   border-color: #777;
 }
 
@@ -288,7 +297,7 @@
   min-width: 15rem;
   max-width: 25rem;
   background: rgba(20, 20, 20, 0.95);
-  border-right: 1px solid #333;
+  border-right: 1px solid var(--panel-border);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -300,8 +309,8 @@
 }
 
 .effect-sidebar-heading {
-  color: #888;
-  font-family: 'Segoe UI', Arial, sans-serif;
+  color: var(--muted-text);
+  font-family: var(--ui-font);
   font-size: 11px;
   font-weight: 700;
   text-align: center;
@@ -340,13 +349,14 @@
   /* Selection marker gutter, reserved at full width so activating a button
      recolors it instead of shifting the label. */
   border-left: 3px solid transparent;
-  color: #888;
+  color: var(--muted-text);
   text-align: left;
   cursor: pointer;
-  font-family: 'Segoe UI', Arial, sans-serif;
+  font-family: var(--ui-font);
   font-size: 14px;
   border-radius: 6px;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease,
+    color 0.2s ease;
   white-space: nowrap;
   overflow: hidden;
   user-select: none;
@@ -359,7 +369,7 @@
 }
 
 .effect-size {
-  color: #888;
+  color: var(--muted-text);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   margin-left: 8px;
@@ -367,7 +377,7 @@
 }
 
 .effect-button.active .effect-size {
-  color: #8af;
+  color: var(--focus-ring);
 }
 
 .sort-controls {
@@ -381,14 +391,15 @@
   padding: 3px 6px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #888;
-  font-family: 'Segoe UI', Arial, sans-serif;
+  color: var(--muted-text);
+  font-family: var(--ui-font);
   font-size: 10px;
   border-radius: 4px;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    color 0.15s ease;
   user-select: none;
 }
 
@@ -398,7 +409,7 @@
 }
 
 .sort-btn.active {
-  color: #8af;
+  color: var(--focus-ring);
   border-color: rgba(60, 120, 240, 0.3);
 }
 
@@ -418,7 +429,7 @@
   border-color: rgba(60, 120, 240, 0.4);
   font-weight: 600;
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
-  border-left-color: #48f;
+  border-left-color: var(--accent);
 }
 
 #canvas {
@@ -499,7 +510,7 @@
     min-width: 0;
     height: auto;
     border-right: none;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--panel-border);
     flex-direction: column;
     gap: 0;
     padding: 6px 0;
@@ -539,7 +550,7 @@
     justify-content: center;
     color: rgba(255, 255, 255, 0.7);
     font-size: 18px;
-    font-family: Arial, sans-serif;
+    font-family: var(--nav-font);
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.2s ease;
@@ -691,10 +702,10 @@ div.label {
 
 .segment-stats th {
   font-weight: normal;
-  color: #888;
+  color: var(--muted-text);
   padding: 0 6px;
   text-align: center;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--panel-border);
 }
 
 .segment-stats td {
@@ -706,7 +717,7 @@ div.label {
 
 .segment-stats .seg-label {
   text-align: left;
-  color: #8af;
+  color: var(--focus-ring);
 }
 
 .segment-stats .seg-time {
