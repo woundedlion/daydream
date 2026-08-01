@@ -233,7 +233,6 @@ export class Daydream {
     this.timeAccumulator = 0;
 
     this.labelPool = new LabelPool(this.scene);
-    this.hadLabels = false;
 
     this.setupDots();
 
@@ -550,13 +549,9 @@ export class Daydream {
       this.recorder.captureFrame();
 
     this.refreshLabels();
-    // CSS2DRenderer hides label <div>s only during a render pass, so render one
-    // extra frame when the count falls to zero to let that pass hide them.
-    const hasLabels = this.labelPool.activeCount > 0;
-    if (hasLabels || this.hadLabels) {
+    if (this.labelPool.activeCount > 0) {
       this.labelRenderer.render(this.scene, this.camera);
     }
-    this.hadLabels = hasLabels;
 
     this.renderPip();
     this.renderer.setScissorTest(false);
