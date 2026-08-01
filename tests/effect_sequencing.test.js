@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  createApplyPipeline,
   planResolutionApply,
   paramValueSkew,
   paramExportBlocker,
@@ -407,4 +408,249 @@ test('a rejected switch whose rollback failed still raises the banner', () => {
   assert.deepEqual(report.logs,
     [{ message: 'Effect rollback failed:', error: recoveryFailure }]);
   assert.match(report.fatal, /^Effect change failed/);
+});
+
+// createApplyPipeline is the apply path itself: the effect rebuild every switch
+// runs, and the resolution change that resizes the engine, the pool, and the
+// scene before re-applying the effect.
+
+const APPLY_PRESETS = {
+  Lo: { w: 96, h: 20, dotSize: 2 },
+  Hi: { w: 288, h: 144, dotSize: 0.25 },
+};
+const APPLY_OFFERS = { Lo: ['Alpha', 'Beta'], Hi: ['Alpha', 'Gamma'] };
+
+/**
+ * Build the apply pipeline over doubles that record their order into one log.
+ * @param {Object} [options] - Engine, pool, and state conditions to apply under.
+ * @returns {Object} The pipeline plus its log, sinks, and observable state.
+ */
+function makeApp({
+  effect = 'Alpha',
+  resolution = 'Hi',
+  offers = APPLY_OFFERS,
+  rejectEffects = [],
+  rejectResolutions = [],
+  effectSizes = { Alpha: 12 },
+  sizesFailure = null,
+  noEngine = false,
+  segmented = false,
+  restoring = false,
+  refuseEffectSet = false,
+  subscribeEffect = false,
+} = {}) {
+  const log = [];
+  const errors = [];
+  const warnings = [];
+  const state = { effect, resolution };
+  const rejectedEffects = new Set(rejectEffects);
+  const rejectedResolutions = new Set(rejectResolutions);
+
+  const appState = {
+    get: (key) => state[key],
+    set: (key, value) => {
+      log.push(`state.set ${key}=${value}`);
+      if (refuseEffectSet && key === 'effect') return;
+      state[key] = value;
+      // The app applies an effect change through its appState subscription.
+      if (subscribeEffect && key === 'effect') pipeline.applyEffect();
+    },
+  };
+
+  const engine = {
+    setEffect(name) {
+      log.push(`engine.setEffect ${name}`);
+      return !rejectedEffects.has(name);
+    },
+    strobeColumns: () => 7,
+    setResolution(w, h) {
+      log.push(`engine.setResolution ${w}x${h}`);
+      return !rejectedResolutions.has(`${w}x${h}`);
+    },
+    getEffectSizes() {
+      log.push('engine.getEffectSizes');
+      if (sizesFailure) throw sizesFailure;
+      return effectSizes;
+    },
+  };
+
+  const segments = {
+    active: segmented,
+    setEffect: (name) => log.push(`segments.setEffect ${name}`),
+    setResolution: (w, h) => log.push(`segments.setResolution ${w}x${h}`),
+  };
+
+  const pipeline = createApplyPipeline({
+    appState,
+    getEngine: () => (noEngine ? null : engine),
+    invalidateEngineView: () => log.push('host.invalidateView'),
+    presets: APPLY_PRESETS,
+    availableEffects: (label) => offers[label],
+    effectGui: {
+      destroy: () => log.push('effectGui.destroy'),
+      build: () => log.push('effectGui.build'),
+      mount: () => log.push('effectGui.mount'),
+    },
+    clearEffectParamUrl: () => log.push('clearEffectParamUrl'),
+    segments,
+    driver: {
+      setStrobeColumns: (n) => log.push(`driver.setStrobeColumns ${n}`),
+      updateResolution: (w, h, dot) =>
+        log.push(`driver.updateResolution ${w}x${h}@${dot}`),
+      invalidate: () => log.push('driver.invalidate'),
+    },
+    sidebar: {
+      setActive: (name) => log.push(`sidebar.setActive ${name}`),
+      setEffects: (list, sizes) =>
+        log.push(`sidebar.setEffects ${list.join(',')} sizes=${JSON.stringify(sizes)}`),
+    },
+    isRestoring: () => restoring,
+    logError: (...args) => errors.push(args.join(' ')),
+    logWarn: (...args) => warnings.push(args.join(' ')),
+  });
+
+  return { pipeline, log, errors, warnings, state };
+}
+
+test('applying an effect points the engine at it and rebuilds the panel', () => {
+  const app = makeApp();
+
+  assert.equal(app.pipeline.applyEffect(), undefined);
+
+  assert.deepEqual(app.log, [
+    'engine.setEffect Alpha',
+    'driver.setStrobeColumns 7',
+    'effectGui.destroy',
+    'clearEffectParamUrl',
+    'effectGui.build',
+    'effectGui.mount',
+    'sidebar.setActive Alpha',
+  ]);
+});
+
+test('a preserved apply keeps the effect param deep links', () => {
+  const app = makeApp();
+
+  app.pipeline.applyEffect(true);
+
+  assert.equal(app.log.includes('clearEffectParamUrl'), false);
+});
+
+test('an engine rejection leaves the panel and the workers untouched', () => {
+  const app = makeApp({ rejectEffects: ['Alpha'], segmented: true });
+
+  assert.equal(app.pipeline.applyEffect(), false);
+
+  assert.deepEqual(app.log, ['engine.setEffect Alpha', 'driver.setStrobeColumns 7']);
+  assert.match(app.errors[0], /setEffect\("Alpha"\) failed/);
+});
+
+test('a segmented pool is told which effect to render', () => {
+  const app = makeApp({ segmented: true });
+
+  app.pipeline.applyEffect();
+
+  assert.deepEqual(app.log.slice(-2),
+    ['segments.setEffect Alpha', 'sidebar.setActive Alpha']);
+});
+
+test('an engine that has not loaded yet still gets a sidebar and a mount point', () => {
+  const app = makeApp({ noEngine: true });
+
+  app.pipeline.applyEffect();
+
+  assert.deepEqual(app.log, [
+    'effectGui.destroy',
+    'clearEffectParamUrl',
+    'effectGui.mount',
+    'sidebar.setActive Alpha',
+  ]);
+});
+
+test('a resolution change resizes every renderer before re-applying the effect', () => {
+  const app = makeApp({ segmented: true });
+
+  assert.equal(app.pipeline.applyResolution(), undefined);
+
+  assert.deepEqual(app.log, [
+    'engine.setResolution 288x144',
+    'host.invalidateView',
+    'segments.setResolution 288x144',
+    'driver.updateResolution 288x144@0.25',
+    'engine.getEffectSizes',
+    'sidebar.setEffects Alpha,Gamma sizes={"Alpha":12}',
+    'engine.setEffect Alpha',
+    'driver.setStrobeColumns 7',
+    'effectGui.destroy',
+    'clearEffectParamUrl',
+    'effectGui.build',
+    'effectGui.mount',
+    'segments.setEffect Alpha',
+    'sidebar.setActive Alpha',
+    'driver.invalidate',
+  ]);
+});
+
+test('an unknown preset changes nothing', () => {
+  const app = makeApp({ resolution: 'Mid' });
+
+  assert.equal(app.pipeline.applyResolution(), false);
+
+  assert.deepEqual(app.log, []);
+  assert.match(app.errors[0], /Unknown resolution preset "Mid"/);
+});
+
+test('an engine that cannot build the resolution leaves the scene at its old size', () => {
+  const app = makeApp({ rejectResolutions: ['288x144'] });
+
+  assert.equal(app.pipeline.applyResolution(), false);
+
+  assert.deepEqual(app.log, ['engine.setResolution 288x144']);
+  assert.match(app.errors[0], /Unsupported resolution 288x144/);
+});
+
+test('a failed size query still lists the effects the resolution offers', () => {
+  const app = makeApp({ sizesFailure: new Error('no sizes') });
+
+  app.pipeline.applyResolution();
+
+  assert.equal(app.log.includes('sidebar.setEffects Alpha,Gamma sizes=null'), true);
+  assert.match(app.warnings[0], /getEffectSizes failed/);
+});
+
+test('an off-list effect is corrected and applied once, through the subscription', () => {
+  const app = makeApp({ resolution: 'Lo', effect: 'Gamma', subscribeEffect: true });
+
+  app.pipeline.applyResolution();
+
+  assert.equal(app.state.effect, 'Alpha');
+  assert.deepEqual(app.log.filter((entry) => entry === 'effectGui.build'),
+    ['effectGui.build'], 'the correction applied the effect exactly once');
+  assert.deepEqual(app.log.slice(-2), ['sidebar.setActive Alpha', 'driver.invalidate']);
+});
+
+test('a rollback applies the corrected effect itself, its subscription being muted', () => {
+  const app = makeApp({ resolution: 'Lo', effect: 'Gamma', restoring: true });
+
+  app.pipeline.applyResolution();
+
+  assert.equal(app.state.effect, 'Alpha');
+  assert.deepEqual(app.log.filter((entry) => entry === 'effectGui.build'),
+    ['effectGui.build']);
+});
+
+test('a refused effect correction rejects the resolution change', () => {
+  const app = makeApp({ resolution: 'Lo', effect: 'Gamma', refuseEffectSet: true });
+
+  assert.equal(app.pipeline.applyResolution(), false);
+
+  assert.equal(app.log.includes('driver.invalidate'), false);
+});
+
+test('an effect the resized engine rejects rejects the resolution change', () => {
+  const app = makeApp({ rejectEffects: ['Alpha'] });
+
+  assert.equal(app.pipeline.applyResolution(), false);
+
+  assert.equal(app.log.includes('driver.invalidate'), false);
 });

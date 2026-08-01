@@ -9,37 +9,28 @@ import { Daydream } from "./driver.js";
 import { GUI, resetGUI } from "./gui.js";
 import { EffectSidebar } from "./sidebar.js";
 import {
-  planResolutionApply,
-  paramValueSkew,
-  paramExportBlocker,
-  paramGenerationStale,
   applyInitialState,
+  createApplyPipeline,
   createSwitchCoordinator,
   offeredResolutions,
   resolutionCorrection,
   resolutionEffects,
 } from "./effect_sequencing.js";
+import { createEffectGui } from "./effect_gui.js";
+import {
+  createAppTeardown,
+  createRenderAdapter,
+  repointDisplayAliases,
+} from "./app_lifecycle.js";
 import { AppState, URLSync } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
 import { SegmentController, warmModules } from "./segment_controller.js";
 import { EngineHost } from "./engine_host.js";
-import {
-  resolveParamSync,
-  enumChoices,
-  paramControlKind,
-  engineParamValue,
-} from "./param_sync.js";
-import { formatExportParams } from "./tools/export_params.js";
 import { showFatalError } from "./tools/banner.js";
 import { showBootstrapFailure } from "./bootstrap.js";
 
 // UI layer degrades gracefully (log + keep last good state); lower layers trap.
 
-// How long a transient button label (Export status) stays before reverting.
-const FLASH_MS = 1500;
-// Transient Export button labels.
-const EXPORT_COPIED = '\u2713 Copied!';
-const EXPORT_FAILED = '\u2717 Copy failed';
 // Dwell time per effect while "Test All" cycles the favorites list.
 const TEST_ALL_INTERVAL_MS = 1000;
 
@@ -111,91 +102,12 @@ function favoritesFor(resolution) {
   return favorites;
 }
 
-// Re-point both display aliases (Three.js instanceColor + daydream.pixels) so
-// source, displayed attribute, and daydream.pixels all reference the same WASM
-// view. Shared by EngineHost.refresh(), drawFrame's alias heal, and
-// SegmentController's composite heal.
-function repointDisplayAliases(view) {
-  daydream.dotMesh.instanceColor.array = view;
-  daydream.dotMesh.instanceColor.needsUpdate = true;
-  daydream.pixels = view;
-}
-
-const host = new EngineHost(repointDisplayAliases);
-
-// Throttle the syncGUI param/value length-skew warning to once per skew episode.
-let syncGuiSkewLogged = false;
-
-/**
- * Live per-frame parameter values for the active effect. Once the worker pool
- * owns the display the main engine is no longer stepped, so its values are
- * stale; source from segment 0's worker instead (the pool drops its values on an
- * effect switch and fences the stream on renderGen). May be null or zero-length
- * if the WASM view detached on heap growth — callers must guard.
- * @returns {Float32Array|number[]|null} Null when no stream describes the GUI's
- *   current parameter snapshot.
- */
-function liveParamValues() {
-  if (segments.ownsDisplay) return segments.getParamValues();
-  // The main engine's value stream describes whatever effect it last loaded;
-  // pairing it with a snapshot from an earlier load binds sliders to another
-  // effect's values, which equal parameter counts would hide.
-  if (activeEffect
-      && paramGenerationStale(activeEffect.paramGeneration, host.paramGeneration())) {
-    return null;
-  }
-  return host.engine.getParamValues();
-}
-
-/**
- * Push the engine's per-frame parameter values back into the effect GUI so
- * animation-driven params track live, without clobbering controllers the user
- * is actively editing.
- * @returns {void}
- */
-function syncGUI() {
-  if (!activeEffect || !activeEffect.controllerByName) return;
-  if (!activeEffect.hasLiveParams) return;
-
-  const values = liveParamValues();
-  if (!values || values.length === 0) return;
-
-  const names = activeEffect.paramNames;
-  // A names/values length skew means the cached param list drifted from the
-  // engine's value stream (e.g. a stale list after an async effect change); skip
-  // rather than silently mis-bind sliders by index, mirroring export()'s check.
-  if (paramValueSkew(names.length, values.length)) {
-    if (!syncGuiSkewLogged) {
-      console.warn(`syncGUI: param/value length skew (${names.length} vs ${values.length}); skipping sync`);
-      syncGuiSkewLogged = true;
-    }
-    return;
-  }
-  syncGuiSkewLogged = false;
-  const n = names.length;
-  for (let i = 0; i < n; i++) {
-    const c = activeEffect.controllerByName.get(names[i]);
-    if (!c) continue;
-
-    // lil-gui sliders drag via a non-focusable div, invisible to activeElement,
-    // so dragging covers an in-progress drag.
-    const isEditing =
-      c.dragging || c.domElement.contains(document.activeElement);
-
-    const { update, value } = resolveParamSync(
-      c.getValue(), values[i], c.isBoolean, isEditing);
-    if (!update) continue;
-    c.object[c.property] = value;
-    c.updateDisplay();
-  }
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 // Instances
 ///////////////////////////////////////////////////////////////////////////////
 
 const daydream = new Daydream();
-let activeEffect;
+const host = new EngineHost((view) => repointDisplayAliases(daydream, view));
 
 ///////////////////////////////////////////////////////////////////////////////
 // Centralized State
@@ -221,87 +133,13 @@ const segments = new SegmentController({
   getWasmEngine: () => host.engine,
   refreshPixelView: () => host.refresh(),
   getMemoryView: () => host.view(),
-  repointDisplayAliases,
+  repointDisplayAliases: (view) => repointDisplayAliases(daydream, view),
   statsDoc: document,
 });
 
 ///////////////////////////////////////////////////////////////////////////////
-// Reactive Handlers — subscribe to appState
+// Engine and URL Helpers
 ///////////////////////////////////////////////////////////////////////////////
-
-/**
- * Tear down the active effect GUI and clear activeEffect. The drag's
- * pointerup/pointercancel listeners live on `window`, not the GUI DOM, so
- * destroying the GUI mid-drag would leave them dangling — drain them first.
- * @returns {void}
- */
-function destroyActiveEffectGui() {
-  if (activeEffect && activeEffect.gui) {
-    // A pending Export flash would otherwise fire into a destroyed controller.
-    clearTimeout(activeEffect.exportFlashTimer);
-    activeEffect.exportFlashTimer = null;
-    if (activeEffect.activeDragEnds) {
-      for (const end of activeEffect.activeDragEnds) {
-        window.removeEventListener('pointerup', end);
-        window.removeEventListener('pointercancel', end);
-      }
-      activeEffect.activeDragEnds.clear();
-    }
-    const dom = activeEffect.gui.domElement;
-    if (dom && dom.parentNode) dom.parentNode.removeChild(dom);
-    // Only lil-gui's own teardown is tolerated to throw; a leaked listener set or
-    // a detached DOM node above is a real bug and should surface, not be muffled.
-    try {
-      activeEffect.gui.destroy();
-    } catch (e) {
-      console.warn("GUI destroy warning:", e);
-    }
-  }
-  activeEffect = null;
-}
-
-/**
- * Tear down the current effect GUI and build a new one for the active effect.
- * @param {boolean} [preserveParams=false] - When true, keep the existing per-effect
- *   param URL entries (used during initial hydration); when false, clear them since
- *   they don't apply to the newly selected effect.
- * @returns {boolean|void} false when the engine rejected the effect (the caller
- *   must revert appState so UI/URL don't advertise an unapplied effect); otherwise
- *   undefined.
- */
-function applyEffect(preserveParams = false) {
-  // A rejected effect leaves the engine unchanged, so return before the worker
-  // broadcast below: sending the rejected name would diverge them from main.
-  if (host.engine && !selectEngineEffect()) return false;
-
-  destroyActiveEffectGui();
-  if (!preserveParams) clearEffectParamUrl();
-  if (host.engine) buildActiveEffectGui();
-  mountActiveEffectGui();
-
-  // Gated on segmented mode, not on a live pool: a faulted pool can hold no
-  // workers, and setEffect() is the trigger that rebuilds it from appState.
-  if (segments.active) {
-    segments.setEffect(appState.get('effect'));
-  }
-
-  sidebar.setActive(appState.get('effect'));
-}
-
-/**
- * Point the engine at the state's effect and mirror its strobe layout onto the
- * driver.
- * @returns {boolean} False when the engine rejected the effect.
- */
-function selectEngineEffect() {
-  const effect = appState.get('effect');
-  const applied = host.engine.setEffect(effect) !== false;
-  daydream.setStrobeColumns(host.engine.strobeColumns());
-  if (!applied) {
-    console.error(`setEffect("${effect}") failed; effect unavailable.`);
-  }
-  return applied;
-}
 
 /**
  * Drop the outgoing effect's param URL entries, keeping the global GUI's keys.
@@ -309,193 +147,6 @@ function selectEngineEffect() {
  */
 function clearEffectParamUrl() {
   resetGUI(['resolution', 'effect', ...guiInstance.collectUrlKeys()]);
-}
-
-/**
- * Build the effect GUI for the engine's current effect and install it as the
- * active effect record.
- * @returns {void}
- */
-function buildActiveEffectGui() {
-  activeEffect = { gui: new GUI({ autoPlace: false }, 'fx'), activeDragEnds: new Set() };
-  // Identity of this GUI's effect record, so async continuations can tell whether
-  // a switch has since replaced it.
-  const fx = activeEffect;
-
-  const params = host.engine.getParameterDefinitions();
-  // Stamp the snapshot with the engine's effect-load generation so a later value
-  // read can prove it describes these definitions.
-  fx.paramGeneration = host.paramGeneration();
-
-  addEffectActions(fx, params);
-  const pause = addPauseToggle(fx, params);
-  addParamControllers(fx, params, pause);
-}
-
-/**
- * Add the effect GUI's Reset and Export buttons.
- * @param {Object} fx - The effect record being built.
- * @param {Array<Object>} params - The engine's parameter definitions.
- * @returns {void}
- */
-function addEffectActions(fx, params) {
-  /**
-   * Flash a transient status label on the Export button, restoring the default
-   * label after the flash window. Supersedes any flash still pending for this GUI.
-   * @param {string} label - The transient button label to show.
-   * @returns {void}
-   */
-  const flashExport = (label) => {
-    clearTimeout(fx.exportFlashTimer);
-    exportCtrl.name(label);
-    fx.exportFlashTimer = setTimeout(() => exportCtrl.name('Export'), FLASH_MS);
-  };
-
-  const effectActions = {
-    /**
-     * Rebuild the effect GUI from the engine's current state, discarding edits.
-     * @returns {void}
-     */
-    reset() { applyEffect(); },
-    /**
-     * Copy the current parameter values to the clipboard as a C++ brace-init
-     * list of float literals, then flash the outcome on the Export button.
-     * @returns {void}
-     */
-    export() { exportParams(fx, params, flashExport); }
-  };
-  fx.gui.add(effectActions, 'reset').name('Reset');
-  const exportCtrl = fx.gui.add(effectActions, 'export').name('Export');
-}
-
-/**
- * Write the live parameter values to the clipboard as a C++ brace-init list.
- * @param {Object} fx - The effect record owning the Export button.
- * @param {Array<Object>} params - The engine's parameter definitions.
- * @param {(label: string) => void} flashExport - Shows a transient Export label.
- * @returns {void}
- */
-function exportParams(fx, params, flashExport) {
-  const values = liveParamValues();
-  const blocked = paramExportBlocker(
-    values, fx.paramNames.length, Boolean(navigator.clipboard));
-  if (blocked) {
-    console.warn(blocked);
-    flashExport(EXPORT_FAILED);
-    return;
-  }
-
-  navigator.clipboard.writeText(formatExportParams(params, values)).then(() => {
-    if (activeEffect !== fx) return;
-    flashExport(EXPORT_COPIED);
-  }).catch((err) => {
-    console.warn('Export: clipboard write failed', err);
-    if (activeEffect !== fx) return;
-    flashExport(EXPORT_FAILED);
-  });
-}
-
-/**
- * Add the "Pause Animation" toggle, offered only when the effect has an animated
- * param.
- * @param {Object} fx - The effect record being built.
- * @param {Array<Object>} params - The engine's parameter definitions.
- * @returns {{animationState: {pause: boolean}, controller: Object|null,
- *   setPaused: (v: boolean) => void}} The toggle's state, its controller (null
- *   when no param animates), and the writer that pauses both engines.
- */
-function addPauseToggle(fx, params) {
-  const animationState = { pause: false };
-  /**
-   * Pause or resume animation-driven params on both the main engine and the
-   * segment-worker pool, keeping the local toggle state in sync.
-   * @param {boolean} v - True to freeze animations, false to resume.
-   * @returns {void}
-   */
-  const setPaused = (v) => {
-    animationState.pause = v;
-    host.engine.setAnimationsPaused(v);
-    segments.setAnimationsPaused(v);
-  };
-
-  let controller = null;
-  if (params.some(p => p.animated)) {
-    controller = fx.gui.add(animationState, 'pause').name('Pause Animation');
-    controller.onChange(setPaused);
-  }
-  fx.animationState = animationState;
-  fx.pauseController = controller;
-  return { animationState, controller, setPaused };
-}
-
-/**
- * Build one controller per engine parameter, recording the value-stream order.
- * A ?param=value deep link reaches the engine through the GUI's load-time
- * onChange replay.
- * @param {Object} fx - The effect record being built.
- * @param {Array<Object>} params - The engine's parameter definitions.
- * @param {{animationState: Object, controller: Object|null, setPaused: Function}}
- *   pause - The effect's pause toggle.
- * @returns {void}
- */
-function addParamControllers(fx, params, pause) {
-  // paramNames records the value-stream order; syncGUI() binds by name, not
-  // index, so a C++ param reorder can't mis-bind sliders.
-  const state = {};
-  fx.paramNames = [];
-  fx.writableParamNames = [];
-  fx.controllerByName = new Map();
-  // animated (animation-driven) and readonly (engine telemetry) are the only
-  // params the engine rewrites per frame; a set without them lets syncGUI skip.
-  fx.hasLiveParams = params.some(p => p.animated || p.readonly);
-
-  params.forEach(p => {
-    state[p.name] = p.value;
-
-    const controller = addParamControl(fx.gui, state, p);
-    fx.paramNames.push(p.name);
-    fx.controllerByName.set(p.name, controller);
-
-    if (p.readonly) {
-      if (typeof controller.disable === 'function') controller.disable();
-    } else {
-      fx.writableParamNames.push(p.name);
-      trackDragState(fx, controller);
-    }
-
-    controller.onChange(v => {
-      const value = engineParamValue(v);
-      setEngineParam(p.name, value);
-      segments.setParameter(p.name, value);
-      // Touching an animated slider takes over from the animation.
-      if (p.animated && pause.controller && !pause.animationState.pause) {
-        pause.setPaused(true);
-        pause.controller.updateDisplay();
-      }
-    });
-  });
-}
-
-/**
- * Add the lil-gui control one engine parameter definition calls for.
- * @param {Object} gui - The effect GUI to add to.
- * @param {Object} state - The GUI-bound value object.
- * @param {Object} p - The parameter definition.
- * @returns {Object} The created controller.
- */
-function addParamControl(gui, state, p) {
-  const kind = paramControlKind(p);
-  let controller;
-  if (kind === 'boolean') {
-    controller = gui.add(state, p.name);
-  } else if (kind === 'enum') {
-    // Dropdown of labels whose values are the option indices the engine expects.
-    controller = gui.add(state, p.name, enumChoices(p.options));
-  } else {
-    controller = gui.add(state, p.name, p.min, p.max).decimals(3);
-  }
-  controller.isBoolean = (kind === 'boolean');
-  return controller;
 }
 
 /**
@@ -524,108 +175,6 @@ function paramSetResultName(result) {
 }
 
 /**
- * Flag a controller as dragging until the pointer is released, so syncGUI()'s
- * value stream doesn't fight the drag. The drag-end listeners live on `window`,
- * so they join the effect record's set for a GUI destroyed mid-drag to drain.
- * @param {Object} fx - The effect record owning the controller.
- * @param {Object} controller - The controller to track.
- * @returns {void}
- */
-function trackDragState(fx, controller) {
-  controller.domElement.addEventListener('pointerdown', () => {
-    controller.dragging = true;
-    const end = () => {
-      controller.dragging = false;
-      window.removeEventListener('pointerup', end);
-      window.removeEventListener('pointercancel', end);
-      fx.activeDragEnds.delete(end);
-    };
-    fx.activeDragEnds.add(end);
-    window.addEventListener('pointerup', end);
-    window.addEventListener('pointercancel', end);
-  });
-}
-
-/**
- * Mount the active effect GUI in the page's GUI container.
- * @returns {void}
- */
-function mountActiveEffectGui() {
-  if (!activeEffect || !activeEffect.gui) return;
-
-  // Driver's container-width isMobile, not window.innerWidth (differs for a
-  // narrow container in a wide window).
-  if (daydream.isMobile) activeEffect.gui.close();
-
-  const container = document.getElementById('gui-container');
-  if (!container) return;
-  const dom = activeEffect.gui.domElement;
-  dom.classList.add('effect-gui');
-  dom.classList.remove('global-gui');
-  container.appendChild(dom);
-}
-
-/**
- * Apply a resolution change: resize geometry, refresh sidebar list, then re-apply effect.
- * @param {boolean} [preserveParams=false] - When true, keep the active effect's
- *   param URL entries through the re-apply (only if the effect is still offered;
- *   an off-list effect is corrected to the list's first entry, dropping its
- *   effect-specific URL entries regardless).
- * @returns {boolean|void} false when the resolution was not applied — an unknown
- *   preset name, or an engine rejection — so the caller must revert appState and
- *   UI/URL don't advertise an unapplied value; otherwise undefined.
- */
-function applyResolution(preserveParams = false) {
-  const resolution = appState.get('resolution');
-  const p = resolutionPresets[resolution];
-  if (!p) {
-    console.error(`Unknown resolution preset "${resolution}"; keeping current.`);
-    return false;
-  }
-
-  if (host.engine) {
-    if (host.engine.setResolution(p.w, p.h) === false) {
-      console.error(`Unsupported resolution ${p.w}x${p.h}; keeping current.`);
-      return false;
-    }
-    host.invalidateView(); // force host.refresh() to re-fetch after resize
-  }
-
-  // Gated on segmented mode, not on a live pool: a faulted pool can hold no
-  // workers, and setResolution() is the trigger that rebuilds it from appState.
-  if (segments.active) {
-    segments.setResolution(p.w, p.h);
-  }
-
-  const availableEffects = favoritesFor(resolution);
-
-  daydream.updateResolution(p.w, p.h, p.dotSize);
-
-  let effectSizes = null;
-  if (host.engine) {
-    try { effectSizes = host.engine.getEffectSizes(); }
-    catch (e) { console.warn('getEffectSizes failed (sidebar sizes unavailable):', e); }
-  }
-  sidebar.setEffects(availableEffects, effectSizes);
-
-  // Done after updateResolution()/setEffects() because appState.set('effect',…)
-  // synchronously fires applyEffect(), which would otherwise build against the
-  // pre-resize dot mesh / stale sidebar.
-  const { nextEffect, effectChanged, applyDirectly } =
-    planResolutionApply(availableEffects, appState.get('effect'), switches.isRestoring());
-  if (effectChanged) {
-    appState.set('effect', nextEffect);
-    if (appState.get('effect') !== nextEffect) return false;
-  }
-
-  if (applyDirectly) {
-    if (applyEffect(preserveParams) === false) return false;
-  }
-
-  daydream.invalidate();
-}
-
-/**
  * Narrow the resolution dropdown to the rows the engine reports it can build,
  * correcting the active resolution when the hydrated one is not among them.
  * @param {Object} module - The loaded WASM module.
@@ -651,20 +200,6 @@ function syncResolutionOptions(module) {
   }
 }
 
-const switches = createSwitchCoordinator({
-  appState,
-  getActiveEffect: () => activeEffect,
-  applyEffect,
-  applyResolution,
-  currentUrl: () =>
-    window.location.pathname + window.location.search + window.location.hash,
-  restoreUrl: (url) => window.history.replaceState({}, '', url),
-  showResolution: (resolution) => resolutionController.setValue(resolution),
-  syncResolutionUrl: () => urlSync.setParam('resolution', appState.get('resolution')),
-  logError: (message, error) => console.error(message, error),
-  showFatal: showFatalError,
-});
-
 ///////////////////////////////////////////////////////////////////////////////
 // Initialize WASM
 ///////////////////////////////////////////////////////////////////////////////
@@ -673,8 +208,18 @@ const switches = createSwitchCoordinator({
 // tear the Test-All ticker down.
 let testAllInterval = null;
 let testAllController = null;
-let appDisposed = false;
 let testAllIndex = 0;
+
+/**
+ * Stop the Test All ticker, leaving it ready to be started again.
+ * @returns {void}
+ */
+function stopTestAllTicker() {
+  if (testAllInterval !== null) {
+    clearInterval(testAllInterval);
+    testAllInterval = null;
+  }
+}
 
 createHolosphereModule().then(module => {
   host.module = module;
@@ -686,62 +231,12 @@ createHolosphereModule().then(module => {
   // before first paint: it sets the hydrated resolution and validates the hydrated
   // effect against this resolution's allow-list.
 
-  let aliasDivergenceLogged = false;
-  host.adapter = {
-    /**
-     * Per-frame entry the driver calls: render (segmented or single-engine),
-     * republish the pixel view, then mirror engine params back into the GUI.
-     * @returns {void}
-     */
-    drawFrame() {
-      if (segments.ownsDisplay) {
-        // Composite the previous frame (overwriting driver.render()'s cleared
-        // buffer) and dispatch the next.
-        segments.tick();
-      } else {
-        // A pool that is still spawning paints nothing; keep rendering here so
-        // the sphere stays live, and report the spawn in the segment overlay.
-        if (segments.active) segments.updateStats();
-        host.engine.drawFrame();
-        host.refresh();
-        // All three aliases must point at the one WASM view; log once and
-        // re-point rather than throw (throwing here halts the render loop).
-        const view = host.view();
-        if (daydream.pixels !== view ||
-            daydream.dotMesh.instanceColor.array !== view) {
-          if (!aliasDivergenceLogged) {
-            console.error(
-              "drawFrame: display-buffer alias diverged after host.refresh() — " +
-              "re-pointing daydream.pixels / instanceColor.array at the WASM view");
-            aliasDivergenceLogged = true;
-          }
-          repointDisplayAliases(view);
-        }
-        daydream.dotMesh.instanceColor.needsUpdate = true;
-      }
-      syncGUI();
-    },
-    /**
-     * Report the engine's current arena allocation metrics for the driver's HUD.
-     * @returns {?Object} The main engine's arena metrics, or null once the
-     *   worker pool owns the display and the main engine is idle, where the HUD
-     *   reads per-segment worker stats instead.
-     */
-    getArenaMetrics() {
-      return segments.ownsDisplay ? null : host.engine.getArenaMetrics();
-    },
-    /**
-     * Whether the buffer holds a real frame the recorder may capture this tick.
-     * The single-engine path always renders the full canvas in drawFrame();
-     * a pool that owns the display composites a frame late, so report false until
-     * (and on any tick where) a composite has not landed — otherwise the recorder
-     * captures the cleared (black) buffer left by driver.render()'s fill(0).
-     * @returns {boolean} True when the displayed buffer is a real rendered frame.
-     */
-    captureReady() {
-      return segments.ownsDisplay ? segments.frameComposited : true;
-    }
-  };
+  host.adapter = createRenderAdapter({
+    host,
+    driver: daydream,
+    segments,
+    syncEffectGui: () => effectGui.sync(),
+  });
 
   console.log("Wasm Engine Loaded");
 
@@ -766,16 +261,13 @@ createHolosphereModule().then(module => {
 
   const loadingOverlay = document.getElementById('loading-overlay');
   applyInitialState(
-    () => applyResolution(true),
+    () => apply.applyResolution(true),
     () => loadingOverlay?.remove(),
   );
 }).catch(err => {
   console.error('Failed to initialize the Holosphere renderer:', err);
   // No engine: the Test All ticker would spin uselessly for the page lifetime.
-  if (testAllInterval !== null) {
-    clearInterval(testAllInterval);
-    testAllInterval = null;
-  }
+  stopTestAllTicker();
   if (testAllController) {
     testAllController.setValue(false);
     testAllController.disable();
@@ -818,6 +310,59 @@ const sidebar = new EffectSidebar(
   document.getElementById('effect-sidebar'),
   (name) => appState.set('effect', name)
 );
+
+///////////////////////////////////////////////////////////////////////////////
+// Composition — the effect panel, the apply path, and the switch transaction
+///////////////////////////////////////////////////////////////////////////////
+
+const effectGui = createEffectGui({
+  createGui: () => new GUI({ autoPlace: false }, 'fx'),
+  getParameterDefinitions: () => host.engine.getParameterDefinitions(),
+  paramGeneration: () => host.paramGeneration(),
+  segmentsOwnDisplay: () => segments.ownsDisplay,
+  segmentParamValues: () => segments.getParamValues(),
+  engineParamValues: () => host.engine.getParamValues(),
+  setEngineParam,
+  setWorkerParam: (name, value) => segments.setParameter(name, value),
+  setAnimationsPaused: (paused) => {
+    host.engine.setAnimationsPaused(paused);
+    segments.setAnimationsPaused(paused);
+  },
+  applyEffect: () => apply.applyEffect(),
+  guiContainer: () => document.getElementById('gui-container'),
+  activeElement: () => document.activeElement,
+  isMobile: () => daydream.isMobile,
+  dragTarget: window,
+  clipboard: () => navigator.clipboard ?? null,
+});
+
+const apply = createApplyPipeline({
+  appState,
+  getEngine: () => host.engine,
+  invalidateEngineView: () => host.invalidateView(),
+  presets: resolutionPresets,
+  availableEffects: favoritesFor,
+  effectGui,
+  clearEffectParamUrl,
+  segments,
+  driver: daydream,
+  sidebar,
+  isRestoring: () => switches.isRestoring(),
+});
+
+const switches = createSwitchCoordinator({
+  appState,
+  getActiveEffect: () => effectGui.active(),
+  applyEffect: (preserveParams) => apply.applyEffect(preserveParams),
+  applyResolution: (preserveParams) => apply.applyResolution(preserveParams),
+  currentUrl: () =>
+    window.location.pathname + window.location.search + window.location.hash,
+  restoreUrl: (url) => window.history.replaceState({}, '', url),
+  showResolution: (resolution) => resolutionController.setValue(resolution),
+  syncResolutionUrl: () => urlSync.setParam('resolution', appState.get('resolution')),
+  logError: (message, error) => console.error(message, error),
+  showFatal: showFatalError,
+});
 
 testAllController = guiInstance.addSession({ testAll: false }, 'testAll').name('Test All').onChange((v) => {
   if (v) {
@@ -1036,50 +581,21 @@ daydream.renderer.setAnimationLoop(() => {
 // Teardown
 ///////////////////////////////////////////////////////////////////////////////
 
-/**
- * Release the listeners, timers, and worker pool this module owns so a page
- * discard leaves nothing firing into a dead scene. Symmetric with
- * Daydream.dispose() and EffectSidebar.dispose().
- * @returns {void}
- */
-function disposeApp() {
-  if (appDisposed) return;
-  appDisposed = true;
-  window.removeEventListener("keydown", onKeyDown);
-  window.removeEventListener("unhandledrejection", onUnhandledRejection);
-  window.removeEventListener("pagehide", onPageHide);
-  // Released before the GUI/scene teardown below: a later set() would otherwise
-  // re-enter applyEffect()/applyResolution() against a disposed renderer.
-  switches.dispose();
-  if (testAllInterval !== null) {
-    clearInterval(testAllInterval);
-    testAllInterval = null;
-  }
-  destroyActiveEffectGui();
-  guiInstance.destroy();
-  // Best-effort on a real discard: dispose() ends the MediaRecorder and releases
-  // the stream/offscreen, but its async onstop download cannot be flushed
-  // synchronously here, so an in-progress recording may be lost on teardown.
-  host.recorder?.dispose();
-  urlSync.dispose();
-  sidebar.dispose();
-  daydream.dispose();
-  // Strand any in-flight warmModules() continuation: its post-await guard reads
-  // both, so without this it spawns a worker pool into the discarded page.
-  segments.active = false;
-  segEpoch++;
-  segments.destroy();
-  durationEl.remove();
-  // Null first: the animation-loop guard reads it, so a frame outliving
-  // setAnimationLoop(null) cannot reach the deleted handle.
-  host.adapter = null;
-  host.engine?.delete();
-  host.engine = null;
-}
-
-// pagehide (not unload) so bfcache is respected: e.persisted is false only on a
-// real discard, true when merely frozen for back/forward cache.
-function onPageHide(e) {
-  if (!e.persisted) disposeApp();
-}
-window.addEventListener("pagehide", onPageHide);
+createAppTeardown({
+  pageTarget: window,
+  listeners: [
+    ["keydown", onKeyDown],
+    ["unhandledrejection", onUnhandledRejection],
+  ],
+  switches,
+  stopTimers: stopTestAllTicker,
+  effectGui,
+  globalGui: guiInstance,
+  host,
+  urlSync,
+  sidebar,
+  driver: daydream,
+  segments,
+  strandSegmentWork: () => { segEpoch++; },
+  removeOverlay: () => durationEl.remove(),
+});
