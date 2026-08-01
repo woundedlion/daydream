@@ -203,6 +203,7 @@ const installRecorderEnv = () => {
   FakeMediaRecorder.instances = [];
   FakeMediaRecorder.startError = null;
   FakeMediaRecorder.startData = null;
+  FakeMediaRecorder.isTypeSupported = () => true;
   globalThis.MediaRecorder = FakeMediaRecorder;
   globalThis.HTMLCanvasElement = class { captureStream() {} };
   globalThis.document = { createElement: () => recordableCanvas() };
