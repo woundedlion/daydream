@@ -232,6 +232,52 @@ test('GenerativePalette bakes the golden LUT through the engine bridge', () => {
   }
 });
 
+// Sampled goldens for seeded profile combinations, captured from the engine's
+// own GenerativePalette(shape, harmony, brightness, saturation, base hue)
+// constructor — the draws it makes included. Between them the rows cover every
+// harmony, brightness and saturation profile; the first is the tool's default
+// selection.
+const SEEDED_GOLDEN = [
+  ['STRAIGHT', 'ANALOGOUS', 'FLAT', 'MID', 42,
+    [[210, 126, 30], [204, 131, 26], [196, 136, 27], [189, 140, 32], [181, 144, 39],
+      [176, 147, 40], [170, 149, 42], [164, 152, 46], [158, 154, 51]]],
+  ['CIRCULAR', 'COMPLEMENTARY', 'BELL', 'PASTEL', 137,
+    [[1, 68, 65], [53, 78, 118], [125, 80, 121], [140, 82, 113], [73, 78, 125],
+      [0, 72, 81], [1, 68, 65], [1, 68, 65], [1, 68, 65]]],
+  ['VIGNETTE', 'TRIADIC', 'ASCENDING', 'MID', 10,
+    [[0, 0, 0], [56, 1, 11], [66, 29, 0], [69, 55, 0], [48, 84, 0],
+      [0, 103, 80], [0, 116, 129], [0, 121, 201], [0, 0, 0]]],
+  ['FALLOFF', 'SPLIT_COMPLEMENTARY', 'DESCENDING', 'VIBRANT', 200,
+    [[112, 92, 247], [171, 55, 143], [155, 62, 38], [104, 71, 0], [64, 55, 0],
+      [30, 38, 0], [7, 11, 2], [0, 0, 0], [0, 0, 0]]],
+  ['STRAIGHT', 'ANALOGOUS', 'CUP', 'MID', 128,
+    [[0, 118, 104], [0, 101, 93], [0, 85, 81], [0, 69, 69], [0, 54, 56],
+      [0, 68, 76], [0, 83, 97], [0, 98, 120], [1, 112, 146]]],
+];
+
+/**
+ * Pins the tool's seeded-draw path end to end. palette_math.js resolves the
+ * profiles into h/s/v itself and the bridge bakes only those keys, so the
+ * draw sites, the range bounds and the harmony jitter reach the device solely
+ * through the JS mirror; comparing the baked LUT against the engine's own
+ * profile constructor is what covers them. A one-unit drift in any draw moves a
+ * key and the sampled LUT with it. The test above uses the draw-free
+ * (FLAT, VIBRANT, TRIADIC) combination, which exercises none of this.
+ */
+test('GenerativePalette seeded profiles bake the engine LUT', () => {
+  const ops = new M.PaletteOps();
+  try {
+    P.setPaletteOps((...args) => ops.bakeLut(...args));
+    for (const [shape, harmony, brightness, sat, hue, golden] of SEEDED_GOLDEN) {
+      const pal = new P.GenerativePalette(shape, harmony, brightness, sat, hue);
+      assert.deepEqual(sampleLut(pal.lut), golden,
+        `${shape}/${harmony}/${brightness}/${sat} at hue ${hue} drifted from the engine LUT`);
+    }
+  } finally {
+    ops.delete();
+  }
+});
+
 /** Verifies the lissajous curve matches lissajous_math.js. */
 test('lissajous parity (lissajous)', () => {
   for (const [m1, m2, a, t] of [[3, 2, 0, 0.7], [5, 4, 0.5, 1.2], [1, 1, 0, 0], [2, 3, 1.1, 2.5]]) {
