@@ -28,7 +28,7 @@ export class EffectSidebar {
     this.activeName = null;
     this.sort = { key: 'name', dir: 'asc' };
 
-    this.heading = document.createElement('h3');
+    this.heading = document.createElement('h2');
     this.heading.innerText = 'Effects';
     this.heading.className = 'effect-sidebar-heading';
 
