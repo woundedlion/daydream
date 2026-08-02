@@ -1705,7 +1705,7 @@
     // Candidate chains are proven on a sacrificial module instance before the
     // live module runs them; see createChainValidator in solid_codegen.js.
     const { withValidator, chainIsValid, acquire: acquireValidator, noteDeath: noteValidatorDeath } =
-      createChainValidator(createHolosphereModule);
+      createChainValidator(() => createHolosphereModule());
 
     let gateMsgTimer = null;
     function showGateMsg(text) {
