@@ -1,5 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const SOLIDS_HTML = readFileSync(new URL('../tools/solids.html', import.meta.url), 'utf8');
 
 const {
   OP_DEFS,
@@ -715,6 +718,19 @@ function fakeModule(onOp = () => { }) {
   };
   return { Mod, state };
 }
+
+test('solids validator resolves the module factory after async initialization', async () => {
+  const match = SOLIDS_HTML.match(/\bcreateChainValidator\((.+)\);/);
+  assert.ok(match);
+  const instantiate = Function('createChainValidator', 'Mod', `
+    let createHolosphereModule = null;
+    const validator = createChainValidator(${match[1]});
+    createHolosphereModule = async () => Mod;
+    return validator.acquire();
+  `);
+  const { Mod } = fakeModule();
+  assert.equal(await instantiate(createChainValidator, Mod), Mod);
+});
 
 /** Verifies a chain that replays cleanly is accepted and leaves no live meshes. */
 test('createChainValidator accepts a chain that replays cleanly', async () => {
