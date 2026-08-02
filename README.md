@@ -245,8 +245,14 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   ├── pov_submit_gate.h       Pure LED-submit accept/drop decision for the POVSegmented ISR (host-testable)
 │   ├── pov_segmented.h         Multi-Teensy segmented POV driver (Phantasm)
 │   └── phantasm/               KiCad 10 project for the per-segment carrier board
+│       ├── README.md               Project entry point and validation matrix
 │       ├── phantasm.kicad_sch      Schematic — parts, values, footprints, full connectivity
 │       ├── phantasm.kicad_pcb      Routed PCB (fabrication source of truth)
+│       ├── phantasm.kicad_pro      KiCad project configuration
+│       ├── phantasm.kicad_sym      Project symbol library
+│       ├── phantasm.pretty/        Project footprint library and 3D model
+│       ├── fp-lib-table / sym-lib-table  KiCad library mappings
+│       ├── quilter_incremental/    Independently tracked incremental-router board project
 │       ├── unplaced/               Net-assigned, unrouted board staged for an autoplacer
 │       └── gen/                    Python design/fabrication tools (`just pcb` runs `fab.py` only)
 │
@@ -282,6 +288,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   ├── screenshot_capture_config.test.mjs Node unit test for the capture-offset table
 │   └── check_screenshots.mjs   Asserts docs/screenshots/ matches the effect roster (CI)
 ├── tools/                      Firmware gates, device profiling, and asset bakes
+│   ├── build_pins.py           Shared external-tool version pins for CI and `just`
 │   ├── teensy_gate.py          Size + memory-layout gate parser/classifier (toolchain-free)
 │   ├── teensy_gate_extra.py    PlatformIO post-build glue that runs the gate on every link
 │   ├── teensy_budgets.json     Per-env FLASH/RAM1/RAM2 budgets the gate enforces
@@ -290,9 +297,11 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   ├── teensy_pre.py / teensy_isystem.py / teensy_map.py / teensy_nano.py  PlatformIO build hooks
 │   ├── phantasm.ld             Phantasm linker script (memory-region layout)
 │   ├── profile_one.sh / profile_sweep.sh  On-device HS_PROFILE flash + capture runs
+│   ├── profile_islamic_big.sh  Focused profiling loop for IslamicStars' largest mesh
 │   ├── profile_capture.py      Serial capture of the profiling image's readout
 │   ├── parse_profile.py        Capture-log parser behind the per-window/per-preset reports
 │   ├── device_lock.sh          Host-global per-board lock every device path takes
+│   ├── pov_segment_map_export.cpp  Generator for the committed segment-map golden
 │   ├── relax_bakes.py / relax_bake_harness.cpp  Relaxed-mesh bake generator of record
 │   ├── gen_gamut_lut.py        sRGB gamut-boundary generator of record (emits core/color/gamut_lut.h)
 │   ├── docs_check.py           Markdown fence/link/anchor/path validator (CI)
@@ -343,7 +352,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │                                  Phantasm hardware segment (parallel render)
 ├── segment_layout.js           Pure segment-layout math (Node-unit-testable, no WASM/Worker)
 ├── segment_stats_view.js       Per-segment timing/arena stats overlay + spawn and fault states
-├── worker_protocol.js          JSDoc @typedef contract for main↔worker messages (no runtime code)
+├── worker_protocol.js          JSDoc @typedef contract plus the runtime protocol version
 ├── styles/                     CSS for the main page and tools
 │
 ├── tools/                      Standalone geometry tools (own HTML pages)
@@ -904,7 +913,7 @@ All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<F
 
 The `Timeline` class manages a list of running `IAnimation` objects. Each frame, `timeline.step(canvas)` advances all active animations. Finished animations are removed; repeating animations are rewound. All animation types inherit from `AnimationBase` and support method chaining via `.then()` for sequencing.
 
-`animation.h` defines the contract every animation implements — `IAnimation`, the CRTP `AnimationBase`, and `Animation::Space` — and then includes seven fragment headers grouped by what they animate:
+`animation.h` defines the contract every animation implements — `IAnimation`, the CRTP `AnimationBase`, and `Animation::Space` — and then includes nine fragment headers grouped by what they animate:
 
 | Header | Subject | Contents |
 |---|---|---|
@@ -1711,7 +1720,7 @@ An effect passes construction-time flags to its base as `Effect(W, H, {.strobe =
 
 All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for RingShower, Dynamo and Thrusters.
 
-The simulator, the effect registry, and the tests carry the full roster. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) is a 22-effect subset of it, excluding the two Holosphere-96×20-only effects, Dynamo and Thrusters.
+The effect registry and tests carry the full 24-effect roster. The simulator sidebar exposes the curated subset for its active resolution (§10.5), omitting three effects at 288×144 and six at 96×20. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) is a 22-effect subset of the full roster, excluding the two Holosphere-96×20-only effects, Dynamo and Thrusters.
 
 ### Core Effects (Modern Engine)
 
@@ -2200,7 +2209,7 @@ loads: Emscripten's embind builds its invokers with `new Function`, which
 `'wasm-unsafe-eval'` does not permit. `font-src` allows `data:` for the woff2
 lil-gui inlines in its stylesheet.
 
-A page-specific local import (e.g. `solids.html` referencing `../solids.js`) is added by setting `window.daydreamExtraImports` before the helper script.
+A page-specific local import (e.g. `solids.html` referencing `../solids.js`) is added by setting `window.__DAYDREAM_EXTRA_IMPORTS` before the helper script.
 
 ### 10.9 Video Recording (`recorder.js`)
 
@@ -2255,7 +2264,8 @@ Each hardware target has its own `.ino` entry point in `targets/`:
 
 > **Optional — headless size/layout gate (CI parity).** A PlatformIO build
 > (`just teensy-size`, needs `pip install platformio`) builds the two budgeted
-> shipping images plus the `holosphere_dma` and `phantasm8` compile/link profiles
+> shipping images plus the `holosphere_dma`, `phantasm8`, `profile`, and
+> `profile_o3` compile/link profiles
 > on a stock machine. It checks shipping-image size and memory-region layout
 > against committed budgets while closing the device-only `#ifdef ARDUINO`
 > compile/size blind spot VMicro alone leaves uncovered. It coexists with VMicro
@@ -2333,7 +2343,7 @@ just docs-check   # validate tracked Markdown (the ci.yml docs-markdown job)
 just docs         # docs-check, then build the Doxygen reference into build/docs/html/
 ```
 
-`just docs-check` runs [`tools/docs_check.py`](https://github.com/woundedlion/pov/blob/master/tools/docs_check.py) and its own unit tests: it checks fence balance, link and anchor targets, and backticked repo paths across every tracked Markdown file. `just docs` needs `doxygen` on `PATH`; it clones the pinned doxygen-awesome theme into `.doxygen-awesome/` on first run and synthesizes `Doxyfile.local` from `Doxyfile` plus [`docs/doxygen-theme.cfg`](docs/doxygen-theme.cfg) — the same combination `.github/workflows/docs.yml` publishes to <https://woundedlion.github.io/pov/>.
+`just docs-check` runs [`tools/docs_check.py`](https://github.com/woundedlion/pov/blob/master/tools/docs_check.py) and its own unit tests: it checks fence balance, link and anchor targets, and backticked repo paths across every tracked Markdown file. `just docs` needs `doxygen` on `PATH`; it clones the pinned doxygen-awesome theme into `.doxygen-awesome/` on first run and synthesizes `Doxyfile.local` from `Doxyfile` plus [`docs/doxygen-theme.cfg`](https://github.com/woundedlion/pov/blob/master/docs/doxygen-theme.cfg) — the same combination `.github/workflows/docs.yml` publishes to <https://woundedlion.github.io/pov/>.
 
 ### Running the Simulator — daydream repo
 
