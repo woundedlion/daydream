@@ -19,6 +19,7 @@ import {
 import { createEffectGui } from "./effect_gui.js";
 import {
   createAppTeardown,
+  createModuleLoadHandlers,
   createRenderAdapter,
   repointDisplayAliases,
 } from "./app_lifecycle.js";
@@ -234,69 +235,87 @@ function stopTestAllTicker() {
   }
 }
 
-createHolosphereModule().then(module => {
-  host.module = module;
-  host.engine = new module.HolosphereEngine();
+// Assigned by the teardown wiring at the end of this module, which runs before
+// the module promise can settle.
+let appTeardown = null;
 
-  // Push the Pole LOD value the GUI settled on during the async WASM-load
-  // window; its onChange no-op'd while host.engine was null.
-  host.engine.setPoleLod(poleLodState.poleLod);
+const moduleLoad = createModuleLoadHandlers({
+  teardown: () => appTeardown,
+  start: (module) => {
+    host.module = module;
+    host.engine = new module.HolosphereEngine();
 
-  syncResolutionOptions(module);
+    // Push the Pole LOD value the GUI settled on during the async WASM-load
+    // window; its onChange no-op'd while host.engine was null.
+    host.engine.setPoleLod(poleLodState.poleLod);
 
-  // Resolution and effect are both applied once via applyResolution(true) below,
-  // before first paint: it sets the hydrated resolution and validates the hydrated
-  // effect against this resolution's allow-list.
+    syncResolutionOptions(module);
 
-  host.adapter = createRenderAdapter({
-    host,
-    driver: daydream,
-    segments,
-    syncEffectGui: () => effectGui.sync(),
-  });
+    // Resolution and effect are both applied once via applyResolution(true) below,
+    // before first paint: it sets the hydrated resolution and validates the hydrated
+    // effect against this resolution's allow-list.
 
-  console.log("Wasm Engine Loaded");
+    host.adapter = createRenderAdapter({
+      host,
+      driver: daydream,
+      segments,
+      syncEffectGui: () => effectGui.sync(),
+    });
 
-  // Construct the recorder now that daydream's canvas exists.
-  host.recorder = new VideoRecorder(daydream.canvas);
-  host.recorder.frameInterval = daydream.frameInterval;
-  // Push any Recording settings changed during the async WASM-load window; their
-  // setters no-op'd while host.recorder was null.
-  host.recorder.bitrateMbps = recSettings.quality;
-  host.recorder.targetHeight = REC_RESOLUTIONS[recSettings.resolution];
-  host.recorder.format = REC_FORMATS[recSettings.format];
-  host.recorder.onFormatFallback = (extension) => {
-    const label = Object.keys(REC_FORMATS)
-      .find(key => REC_FORMATS[key] === extension) ?? 'Auto';
-    recFormatCtrl.setValue(label);
-  };
-  // An encoder fault ends the session on its own; drop the recording UI so the
-  // button doesn't keep offering to stop a session that is already gone.
-  host.recorder.onError = () => showRecording(false);
-  daydream.recorder = host.recorder;
-  recordCtrl.enable();
+    console.log("Wasm Engine Loaded");
 
-  const loadingOverlay = document.getElementById('loading-overlay');
-  applyInitialState(
-    () => apply.applyResolution(true),
-    () => loadingOverlay?.remove(),
-  );
-}).catch(err => {
-  console.error('Failed to initialize the Holosphere renderer:', err);
-  // No engine: the Test All ticker would spin uselessly for the page lifetime.
-  stopTestAllTicker();
-  if (testAllController) {
-    testAllController.setValue(false);
-    testAllController.disable();
-  }
-  const loadingOverlay = document.getElementById('loading-overlay');
-  const detailText = (err && err.message) ? err.message : String(err);
-  if (loadingOverlay) {
-    showBootstrapFailure(err, { title: 'Failed to load the rendering engine.' });
-  } else {
-    showFatalError(`Failed to initialize the rendering engine. ${detailText}`);
-  }
+    // Construct the recorder now that daydream's canvas exists.
+    host.recorder = new VideoRecorder(daydream.canvas);
+    host.recorder.frameInterval = daydream.frameInterval;
+    // Push any Recording settings changed during the async WASM-load window; their
+    // setters no-op'd while host.recorder was null.
+    host.recorder.bitrateMbps = recSettings.quality;
+    host.recorder.targetHeight = REC_RESOLUTIONS[recSettings.resolution];
+    host.recorder.format = REC_FORMATS[recSettings.format];
+    host.recorder.onFormatFallback = (extension) => {
+      const label = Object.keys(REC_FORMATS)
+        .find(key => REC_FORMATS[key] === extension) ?? 'Auto';
+      recFormatCtrl.setValue(label);
+    };
+    // An encoder fault ends the session on its own; drop the recording UI so the
+    // button doesn't keep offering to stop a session that is already gone.
+    host.recorder.onError = () => showRecording(false);
+    daydream.recorder = host.recorder;
+    recordCtrl.enable();
+
+    const loadingOverlay = document.getElementById('loading-overlay');
+    applyInitialState(
+      () => apply.applyResolution(true),
+      () => loadingOverlay?.remove(),
+    );
+  },
+  discardStartup: () => {
+    host.adapter = null;
+    host.recorder?.dispose();
+    host.recorder = null;
+    daydream.recorder = null;
+    host.engine?.delete();
+    host.engine = null;
+  },
+  reportFailure: (err) => {
+    console.error('Failed to initialize the Holosphere renderer:', err);
+    // No engine: the Test All ticker would spin uselessly for the page lifetime.
+    stopTestAllTicker();
+    if (testAllController) {
+      testAllController.setValue(false);
+      testAllController.disable();
+    }
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const detailText = (err && err.message) ? err.message : String(err);
+    if (loadingOverlay) {
+      showBootstrapFailure(err, { title: 'Failed to load the rendering engine.' });
+    } else {
+      showFatalError(`Failed to initialize the rendering engine. ${detailText}`);
+    }
+  },
 });
+
+createHolosphereModule().then(moduleLoad.onModuleReady).catch(moduleLoad.onModuleFailed);
 
 ///////////////////////////////////////////////////////////////////////////////
 // GUI + Sidebar Setup
@@ -599,7 +618,7 @@ daydream.renderer.setAnimationLoop(() => {
 // Teardown
 ///////////////////////////////////////////////////////////////////////////////
 
-createAppTeardown({
+appTeardown = createAppTeardown({
   pageTarget: window,
   listeners: [
     ["keydown", onKeyDown],

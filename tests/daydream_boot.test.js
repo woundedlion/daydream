@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 
 const SOURCE = readFileSync(new URL('../daydream.js', import.meta.url), 'utf8');
 
-const WASM_INIT = 'createHolosphereModule().then(';
+const WASM_INIT = 'createModuleLoadHandlers(';
 
 /**
  * Extracts the text between a call's parentheses, skipping parens that sit
@@ -49,12 +49,13 @@ function balanced(src, open) {
 }
 
 /**
- * The body of the createHolosphereModule().then() handler.
- * @returns {string} The handler source.
+ * The dependency block wiring the WASM module promise, including the startup
+ * handler that builds the engine.
+ * @returns {string} The argument source.
  */
 function wasmReadyBlock() {
   const at = SOURCE.indexOf(WASM_INIT);
-  assert.ok(at >= 0, `daydream.js must still initialize the engine via ${WASM_INIT}`);
+  assert.ok(at >= 0, `daydream.js must still wire the engine load through ${WASM_INIT}`);
   return balanced(SOURCE, at + WASM_INIT.length - 1);
 }
 
@@ -68,6 +69,23 @@ test('the WASM-ready block re-applies Pole LOD to the freshly built engine', () 
   assert.equal(call[1], 'poleLodState.poleLod',
     'the replay must read the live Pole LOD state so it carries the URL value '
     + 'when there is one and the default otherwise');
+});
+
+test('the teardown is retained and reachable from the module-load handlers', () => {
+  assert.match(SOURCE, /appTeardown = createAppTeardown\(/,
+    "createAppTeardown()'s result must be kept: the load handlers dispose the "
+    + 'app on a failed load and skip startup once a page discard has won');
+  assert.match(wasmReadyBlock(), /teardown:\s*\(\)\s*=>\s*appTeardown/,
+    'the handlers must read the teardown lazily; it is built after them');
+});
+
+test('the discard path frees an engine built after disposal', () => {
+  const body = wasmReadyBlock();
+  assert.match(body, /discardStartup:/,
+    'a startup that loses the disposal race owns everything it built; dispose() '
+    + 'has already run and will not revisit it');
+  assert.match(body, /host\.engine\?\.delete\(\)/,
+    'a WASM engine handle must be deleted, not merely dropped');
 });
 
 test('the Pole LOD control defaults to 0, leaving the feature off', () => {

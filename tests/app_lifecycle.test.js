@@ -6,6 +6,7 @@ import {
   displayAliasesDiverged,
   createRenderAdapter,
   createAppTeardown,
+  createModuleLoadHandlers,
 } from '../app_lifecycle.js';
 
 // app_lifecycle.js is the composition root's frame and teardown wiring. The
@@ -272,4 +273,89 @@ test('dispose tolerates a page torn down before the engine or recorder existed',
   assert.equal(t.host.engine, null);
   assert.equal(t.host.adapter, null);
   assert.deepEqual(t.log.filter((l) => l.includes('engine.delete')), []);
+});
+
+// Module load: the pagehide teardown is armed during module evaluation, so a
+// page discard can settle before the WASM module does.
+
+/**
+ * Build the module-load handlers over a teardown double and an ordered log.
+ * @param {Object} [options] - Startup behaviour and teardown availability.
+ * @returns {Object} The handlers plus the log and the teardown double.
+ */
+function makeLoadHandlers({ start = () => {}, teardown = 'present' } = {}) {
+  const log = [];
+  let appDisposed = false;
+  const appTeardown = {
+    dispose() {
+      if (appDisposed) return;
+      appDisposed = true;
+      log.push('dispose');
+    },
+    disposed: () => appDisposed,
+  };
+  const handlers = createModuleLoadHandlers({
+    teardown: () => (teardown === 'present' ? appTeardown : null),
+    start: (module) => { log.push(`start ${module.name}`); start(appTeardown); },
+    discardStartup: () => log.push('discardStartup'),
+    reportFailure: (err) => log.push(`reportFailure ${err.message}`),
+  });
+  return { handlers, log, appTeardown };
+}
+
+test('a module that arrives on a live page starts the app', () => {
+  const h = makeLoadHandlers();
+
+  h.handlers.onModuleReady({ name: 'wasm' });
+
+  assert.deepEqual(h.log, ['start wasm']);
+});
+
+test('a module that arrives after a page discard never starts the app', () => {
+  const h = makeLoadHandlers();
+  h.appTeardown.dispose();
+  h.log.length = 0;
+
+  h.handlers.onModuleReady({ name: 'wasm' });
+
+  assert.deepEqual(h.log, [],
+    'startup would re-enter a disposed scene and leak a fresh engine');
+});
+
+test('a discard landing during startup releases what startup built', () => {
+  const h = makeLoadHandlers({ start: (appTeardown) => appTeardown.dispose() });
+
+  h.handlers.onModuleReady({ name: 'wasm' });
+
+  assert.deepEqual(h.log, ['start wasm', 'dispose', 'discardStartup'],
+    'dispose runs once, so the engine built behind it is nobody else\'s to free');
+});
+
+test('a failed module load reports the failure and tears the app down', () => {
+  const h = makeLoadHandlers();
+
+  h.handlers.onModuleFailed(new Error('fetch blocked'));
+
+  assert.deepEqual(h.log, ['reportFailure fetch blocked', 'dispose'],
+    'the animation loop and window listeners must not outlive the failure UI');
+});
+
+test('a failed load on an already discarded page still reports the failure', () => {
+  const h = makeLoadHandlers();
+  h.appTeardown.dispose();
+  h.log.length = 0;
+
+  h.handlers.onModuleFailed(new Error('fetch blocked'));
+
+  assert.deepEqual(h.log, ['reportFailure fetch blocked']);
+});
+
+test('both handlers tolerate a module evaluation that never built the teardown', () => {
+  const ready = makeLoadHandlers({ teardown: 'missing' });
+  ready.handlers.onModuleReady({ name: 'wasm' });
+  assert.deepEqual(ready.log, ['start wasm']);
+
+  const failed = makeLoadHandlers({ teardown: 'missing' });
+  failed.handlers.onModuleFailed(new Error('fetch blocked'));
+  assert.deepEqual(failed.log, ['reportFailure fetch blocked']);
 });
