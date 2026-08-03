@@ -1446,6 +1446,8 @@
       return dropSlotIndex(mouseY, [...list.children]);
     }
 
+    const DRAG_HANDLE_SVG = '<svg viewBox="0 0 24 24"><path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>';
+
     function renderOps() {
       const list = document.getElementById('opsList');
       // Clean up overrides if any
@@ -1539,67 +1541,109 @@
           }
         });
 
-        let controlsHtml = '';
-        if (opDef.params && Object.keys(opDef.params).length > 0) {
-          controlsHtml = '<div class="mt-1 space-y-1">';
-          Object.keys(opDef.params).forEach(key => {
+        // Built node-by-node rather than by innerHTML: o.op and o.params values
+        // survive a localStorage round-trip, and setAttribute/textContent never
+        // parse markup out of them.
+        const header = document.createElement('div');
+        header.className = 'flex justify-between items-center w-full';
+        header.draggable = false;
+
+        const headerLeft = document.createElement('div');
+        headerLeft.className = 'flex items-center';
+
+        const handle = document.createElement('div');
+        handle.className = 'drag-handle';
+        handle.innerHTML = DRAG_HANDLE_SVG;
+
+        const upButton = document.createElement('button');
+        upButton.type = 'button';
+        upButton.className = 'move-op-btn move-op-up';
+        upButton.setAttribute('aria-label', `Move ${o.op} up`);
+        upButton.disabled = i === 0;
+        upButton.textContent = '↑';
+
+        const downButton = document.createElement('button');
+        downButton.type = 'button';
+        downButton.className = 'move-op-btn move-op-down';
+        downButton.setAttribute('aria-label', `Move ${o.op} down`);
+        downButton.disabled = i === state.ops.length - 1;
+        downButton.textContent = '↓';
+
+        const label = document.createElement('span');
+        label.className = 'font-bold';
+        label.textContent = `${i + 1}. ${String(o.op).toUpperCase()}`;
+        headerLeft.append(handle, upButton, downButton, label);
+
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'remove-op-btn text-slate-500 hover:text-white';
+        removeButton.setAttribute('aria-label', `Remove ${o.op} at position ${i + 1}`);
+        removeButton.draggable = false;
+        removeButton.textContent = '×';
+        header.append(headerLeft, removeButton);
+        el.appendChild(header);
+
+        const paramKeys = opDef.params ? Object.keys(opDef.params) : [];
+        if (paramKeys.length > 0) {
+          const controls = document.createElement('div');
+          controls.className = 'mt-1 space-y-1';
+          paramKeys.forEach(key => {
             const def = opDef.params[key];
             const val = o.params[key];
             const controlId = `op-${i}-${key}`;
+
             // data-key tags the row; the inputs are wired via addEventListener
-            // after innerHTML (no inline oninput/onchange/onmousedown attrs).
-            controlsHtml += `
-              <div class="op-param flex items-center text-[0.6rem] space-x-1" data-key="${key}" draggable="false">
-                <label for="${controlId}-range" class="w-12 text-slate-400 capitalize truncate">${key}</label>
-                <input type="range" id="${controlId}-range"
-                  min="${def.min}" max="${def.max}" step="${def.step}" value="${val}"
-                  class="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer min-w-0"
-                />
-                <input type="number" aria-label="${o.op} ${key} value"
-                  min="${def.min}" max="${def.max}" step="${def.step}" value="${Number(val).toFixed(2)}"
-                  class="w-12 bg-transparent text-right font-mono text-slate-500 focus:outline-none focus:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-                <span class="text-[0.5rem] text-slate-600 ml-0.5" aria-hidden="true">${key === 'angle' ? 'deg' : ''}</span>
-              </div>
-                         `;
+            // below (no inline oninput/onchange/onmousedown attrs).
+            const row = document.createElement('div');
+            row.className = 'op-param flex items-center text-[0.6rem] space-x-1';
+            row.dataset.key = key;
+            row.draggable = false;
+
+            const name = document.createElement('label');
+            name.className = 'w-12 text-slate-400 capitalize truncate';
+            name.htmlFor = `${controlId}-range`;
+            name.textContent = key;
+
+            const range = document.createElement('input');
+            range.type = 'range';
+            range.id = `${controlId}-range`;
+            range.className = 'flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer min-w-0';
+            range.min = def.min;
+            range.max = def.max;
+            range.step = def.step;
+            range.value = val;
+
+            const number = document.createElement('input');
+            number.type = 'number';
+            number.setAttribute('aria-label', `${o.op} ${key} value`);
+            number.className = 'w-12 bg-transparent text-right font-mono text-slate-500 focus:outline-none focus:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
+            number.min = def.min;
+            number.max = def.max;
+            number.step = def.step;
+            number.value = Number(val).toFixed(2);
+
+            const unit = document.createElement('span');
+            unit.className = 'text-[0.5rem] text-slate-600 ml-0.5';
+            unit.setAttribute('aria-hidden', 'true');
+            unit.textContent = key === 'angle' ? 'deg' : '';
+
+            row.append(name, range, number, unit);
+            controls.appendChild(row);
+
+            range.addEventListener('input', (e) => updateOpParam(i, key, e.target.value));
+            number.addEventListener('change', (e) => updateOpParam(i, key, e.target.value));
+            // Don't let an input drag start the row reorder.
+            range.addEventListener('mousedown', (e) => e.stopPropagation());
+            number.addEventListener('mousedown', (e) => e.stopPropagation());
           });
-          controlsHtml += '</div>';
+          el.appendChild(controls);
         }
 
-        el.innerHTML = `
-        <div class="flex justify-between items-center w-full" draggable="false">
-          <div class="flex items-center">
-            <div class="drag-handle">
-              <svg viewBox="0 0 24 24"><path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
-            </div>
-            <button type="button" class="move-op-btn move-op-up" aria-label="Move ${o.op} up" ${i === 0 ? 'disabled' : ''}>↑</button>
-            <button type="button" class="move-op-btn move-op-down" aria-label="Move ${o.op} down" ${i === state.ops.length - 1 ? 'disabled' : ''}>↓</button>
-            <span class="font-bold">${i + 1}. ${o.op.toUpperCase()}</span>
-          </div>
-          <button type="button" class="remove-op-btn text-slate-500 hover:text-white"
-            aria-label="Remove ${o.op} at position ${i + 1}" draggable="false">&times;</button>
-        </div>
-        ${controlsHtml}
-      `;
-
-        // Wire the drag handle, remove button, and per-param inputs without
-        // inline attributes — handlers stay module-scoped (no window.*).
-        const handle = el.querySelector('.drag-handle');
         handle.addEventListener('mousedown', enableDrag);
         handle.addEventListener('touchstart', enableDrag);
-        el.querySelector('.move-op-up').addEventListener('click', () => reorderOp(i, i - 1));
-        el.querySelector('.move-op-down').addEventListener('click', () => reorderOp(i, i + 1));
-        el.querySelector('.remove-op-btn').addEventListener('click', () => removeOp(i));
-        el.querySelectorAll('.op-param').forEach((row) => {
-          const key = row.dataset.key;
-          const range = row.querySelector('input[type="range"]');
-          const number = row.querySelector('input[type="number"]');
-          range.addEventListener('input', (e) => updateOpParam(i, key, e.target.value));
-          number.addEventListener('change', (e) => updateOpParam(i, key, e.target.value));
-          // Don't let an input drag start the row reorder (was inline onmousedown).
-          range.addEventListener('mousedown', (e) => e.stopPropagation());
-          number.addEventListener('mousedown', (e) => e.stopPropagation());
-        });
+        upButton.addEventListener('click', () => reorderOp(i, i - 1));
+        downButton.addEventListener('click', () => reorderOp(i, i + 1));
+        removeButton.addEventListener('click', () => removeOp(i));
 
         list.appendChild(el);
       });
