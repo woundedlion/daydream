@@ -209,3 +209,46 @@ export function createAppTeardown({
 
   return { dispose, onPageHide, disposed: () => appDisposed };
 }
+
+/**
+ * Build the handlers for the main WASM module promise, guarded against a page
+ * discard that settles first.
+ *
+ * The teardown's pagehide listener is registered during module evaluation, so a
+ * discard can win the race with the module load. Startup is skipped once the app
+ * is disposed; a disposal that lands while startup is running instead releases
+ * what startup built, since dispose() runs once and will not revisit it. A load
+ * failure disposes the app so no listener or animation loop outlives the
+ * failure UI.
+ *
+ * @param {Object} deps - Injected app collaborators.
+ * @param {() => ?{dispose: Function, disposed: () => boolean}} deps.teardown -
+ *   Reads the app teardown, which the composition root builds after these
+ *   handlers, and reads null when module evaluation never got that far.
+ * @param {(module: Object) => void} deps.start - Brings the app up on the
+ *   loaded module.
+ * @param {() => void} deps.discardStartup - Releases the engine, recorder, and
+ *   adapter start() built when disposal won the race.
+ * @param {(err: *) => void} deps.reportFailure - Renders the load-failure UI.
+ * @returns {{onModuleReady: (module: Object) => void,
+ *   onModuleFailed: (err: *) => void}} The fulfillment and rejection handlers.
+ */
+export function createModuleLoadHandlers({
+  teardown,
+  start,
+  discardStartup,
+  reportFailure,
+}) {
+  const disposed = () => teardown()?.disposed() === true;
+  return {
+    onModuleReady(module) {
+      if (disposed()) return;
+      start(module);
+      if (disposed()) discardStartup();
+    },
+    onModuleFailed(err) {
+      reportFailure(err);
+      teardown()?.dispose();
+    },
+  };
+}
