@@ -335,7 +335,7 @@
     import {
       elliptic, hyperbolic, loxodromic, parabolic,
       inversion, tumble, cayley, snapComplex,
-      glslComplexFunctions, mobiusCodeString,
+      glslComplexFunctions, glslProjectionFunctions, mobiusCodeString,
     } from './mobius_transforms.js';
 
     const config = {
@@ -367,6 +367,7 @@
 
     const fragmentShader = `
         ${glslComplexFunctions}
+        ${glslProjectionFunctions}
         uniform CNum u_a;
         uniform CNum u_b;
         uniform CNum u_c;
@@ -384,29 +385,13 @@
 
         void main() {
           vec3 p = normalize(vPosition);
-          // Mirror of the engine's stereographic projection (core/math/3dmath.h):
-          // pole at +y, real axis x, imaginary axis z.
-          float denom = 1.0 - p.y;
-          CNum w;
-          bool isInfinity = false;
-
-          if (denom < 1e-4) { isInfinity = true; }
-          else { w.re = p.x / denom; w.im = p.z / denom; }
-
-          CNum w_prime;
-          if (isInfinity) {
-            float c_mag_sq = u_c.re*u_c.re + u_c.im*u_c.im;
-            if (c_mag_sq < 1e-6) w_prime = CNum(100.0, 100.0);
-            else w_prime = cdiv(u_a, u_c);
-          } else {
-            CNum aw = cmult(u_a, w);
-            CNum num = cadd(aw, u_b);
-            CNum cw = cmult(u_c, w);
-            CNum den = cadd(cw, u_d);
-            float den_mag = den.re*den.re + den.im*den.im;
-            if (den_mag < 1e-6) w_prime = CNum(100.0, 100.0);
-            else w_prime = cdiv(num, den);
-          }
+          // stereo() and project_div() are the engine's own maps: the pole cap
+          // keeps its azimuth at the sentinel magnitude and the divide guard is
+          // relative, so the preview and the engine agree everywhere.
+          CNum w = stereo(p);
+          CNum num = cadd(cmult(u_a, w), u_b);
+          CNum den = cadd(cmult(u_c, w), u_d);
+          CNum w_prime = project_div(num, den);
 
           float r = length(vec2(w_prime.re, w_prime.im));
           float theta = atan(w_prime.im, w_prime.re);
@@ -452,9 +437,8 @@
 
     // A Möbius transform (az+b)/(cz+d) is invertible only when its complex
     // determinant ad − bc ≠ 0; at det ≈ 0 the map collapses to a constant and
-    // the shader paints a flat (100,100) / (0,0) sentinel with no on-screen cue.
-    // Surface that as a warning so a degenerate parameter set isn't read as a
-    // rendering bug.
+    // the shader paints a flat field with no on-screen cue. Surface that as a
+    // warning so a degenerate parameter set isn't read as a rendering bug.
     const updateDegenerateWarning = () => {
       const el = document.getElementById('degenerateWarning');
       if (!el) return;

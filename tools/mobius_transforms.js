@@ -67,6 +67,93 @@ export const glslComplexFunctions = `
         }
       `;
 
+// --- Projection-domain conventions ----------------------------------------
+// Mirrored from the engine (core/math/3dmath.h). The engine owns these
+// constants and the point-at-infinity behavior built on them; the tool renders
+// what the engine will run, so a divergence here is a lying preview.
+
+/** Conventional magnitude representing the point at infinity. */
+export const STEREO_INF = 1e4;
+
+/** 1 - v.y below which stereo() is inside the north-pole cap. */
+export const STEREO_POLE_EPS = 1e-4;
+
+/** (x,z) radius below which the north-pole azimuth is undefined. */
+export const STEREO_AZIMUTH_EPS = 1e-12;
+
+/**
+ * Stereographic projection sphere -> complex plane: pole at +y, real axis x,
+ * imaginary axis z.
+ * @param {{x:number, y:number, z:number}} v - Point on the unit sphere.
+ * @returns {{re:number, im:number}} The projected complex-plane coordinate.
+ * @details Inside the north-pole cap the result carries the STEREO_INF sentinel
+ * magnitude along the (x,z) azimuth; only the exact pole, where the azimuth is
+ * undefined, lands on the real axis.
+ */
+export function stereo(v) {
+  const denom = 1.0 - v.y;
+  if (denom < STEREO_POLE_EPS) {
+    const r = Math.sqrt(v.x * v.x + v.z * v.z);
+    if (r < STEREO_AZIMUTH_EPS) return { re: STEREO_INF, im: 0.0 };
+    const scale = STEREO_INF / r;
+    return { re: v.x * scale, im: v.z * scale };
+  }
+  return { re: v.x / denom, im: v.z / denom };
+}
+
+/**
+ * Projection-domain complex division for the stereographic/Mobius maps.
+ * @param {{re:number, im:number}} num - Numerator.
+ * @param {{re:number, im:number}} den - Divisor.
+ * @returns {{re:number, im:number}} num/den, except a quotient whose magnitude would reach STEREO_INF collapses to the sentinel along the numerator's direction.
+ * @details Not general complex division (see cdiv): the guard is relative, so a
+ * near-singular divisor still yields a finite point carrying the numerator's
+ * azimuth rather than a fixed constant. Only an exactly zero numerator is the
+ * indeterminate 0/0 form, which returns (0,0).
+ */
+export function projectDiv(num, den) {
+  const denom = den.re * den.re + den.im * den.im;
+  const numMag = num.re * num.re + num.im * num.im;
+  if (numMag >= denom * (STEREO_INF * STEREO_INF)) {
+    if (numMag === 0.0) return { re: 0.0, im: 0.0 };
+    const scale = STEREO_INF / Math.sqrt(numMag);
+    return { re: num.re * scale, im: num.im * scale };
+  }
+  return {
+    re: (num.re * den.re + num.im * den.im) / denom,
+    im: (num.im * den.re - num.re * den.im) / denom,
+  };
+}
+
+// GLSL port of stereo/projectDiv, appended after glslComplexFunctions (which
+// declares CNum). tests/mobius_transforms.test.js pins both the constants and
+// the bodies against the JS above.
+export const glslProjectionFunctions = `
+        const float STEREO_INF = 1e4;
+        const float STEREO_POLE_EPS = 1e-4;
+        const float STEREO_AZIMUTH_EPS = 1e-12;
+        CNum stereo(vec3 v) {
+          float denom = 1.0 - v.y;
+          if (denom < STEREO_POLE_EPS) {
+            float r = sqrt(v.x * v.x + v.z * v.z);
+            if (r < STEREO_AZIMUTH_EPS) return CNum(STEREO_INF, 0.0);
+            float scale = STEREO_INF / r;
+            return CNum(v.x * scale, v.z * scale);
+          }
+          return CNum(v.x / denom, v.z / denom);
+        }
+        CNum project_div(CNum num, CNum den) {
+          float denom = den.re * den.re + den.im * den.im;
+          float num_mag = num.re * num.re + num.im * num.im;
+          if (num_mag >= denom * (STEREO_INF * STEREO_INF)) {
+            if (num_mag == 0.0) return CNum(0.0, 0.0);
+            float scale = STEREO_INF / sqrt(num_mag);
+            return CNum(num.re * scale, num.im * scale);
+          }
+          return CNum((num.re * den.re + num.im * den.im) / denom, (num.im * den.re - num.re * den.im) / denom);
+        }
+      `;
+
 // --- Drag-input snapping --------------------------------------------------
 
 /**
