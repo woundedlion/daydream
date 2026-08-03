@@ -346,6 +346,62 @@ test('render holds the repaint while instanceColor aliases a detached view', () 
   assert.equal(ctx.needsRender, true, 'repaint was dropped instead of deferred');
 });
 
+/** Recorder stand-in counting the frames a session was asked to capture.
+ * @returns {Object} Recorder exposing `frames` and captureFrame().
+ */
+function fakeRecorder() {
+  return { frames: 0, captureFrame() { this.frames++; } };
+}
+
+/** Turns a render context into one whose clock releases a simulation tick.
+ * @param {Object} ctx - Context from renderCtx().
+ * @returns {Object} The same context, running with one interval accrued.
+ */
+function runningCtx(ctx) {
+  ctx.paused = false;
+  ctx.timeAccumulator = 1; // clamped to the backlog cap, then one interval consumed
+  ctx.stepSimulation = () => true;
+  ctx.recorder = fakeRecorder();
+  return ctx;
+}
+
+test('render captures one frame per advanced tick', () => {
+  const log = [];
+  const ctx = runningCtx(renderCtx(new Uint16Array(4), log));
+  Daydream.prototype.render.call(ctx, null);
+
+  assert.ok(log.includes('renderMainView'));
+  assert.equal(ctx.recorder.frames, 1);
+});
+
+test('render still captures a tick whose repaint a heap growth held', () => {
+  const log = [];
+  const ctx = runningCtx(renderCtx(detachedView(), log));
+  Daydream.prototype.render.call(ctx, null);
+
+  assert.ok(!log.includes('renderMainView'), 'rendered from a detached array');
+  assert.equal(ctx.needsRender, true);
+  // The track is locked one frame per tick; dropping this one shortens the video.
+  assert.equal(ctx.recorder.frames, 1, 'an advanced tick produced no video frame');
+});
+
+test('a held repaint that advanced no tick captures nothing', () => {
+  const log = [];
+  const ctx = renderCtx(detachedView(), log);
+  ctx.recorder = fakeRecorder();
+  Daydream.prototype.render.call(ctx, null);
+
+  assert.equal(ctx.recorder.frames, 0);
+});
+
+test('a held tick honours captureReady before capturing', () => {
+  const log = [];
+  const ctx = runningCtx(renderCtx(detachedView(), log));
+  Daydream.prototype.render.call(ctx, { captureReady: () => false });
+
+  assert.equal(ctx.recorder.frames, 0, 'captured the cleared pre-composite buffer');
+});
+
 // ---------------------------------------------------------------------------
 // setupContextLossHandling
 // ---------------------------------------------------------------------------
