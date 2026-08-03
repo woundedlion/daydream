@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 const {
   cmult, cadd, cdiv, snapComplex,
   elliptic, hyperbolic, loxodromic, parabolic, inversion, tumble, cayley,
-  glslComplexFunctions, mobiusCodeString,
+  glslComplexFunctions, glslProjectionFunctions, mobiusCodeString,
+  stereo, projectDiv, STEREO_INF, STEREO_POLE_EPS, STEREO_AZIMUTH_EPS,
 } = await import('../tools/mobius_transforms.js');
 
 const EPS = 1e-12;
@@ -101,13 +102,31 @@ test('cdiv guards against a near-zero denominator', () => {
 // implementations cannot silently diverge.
 
 /**
- * Transpiles the body of one `CNum NAME(CNum p, CNum q) { ... return CNum(RE, IM); }`
- * GLSL function from `src` into a JS function over {re,im} operands.
- * @param {string} src - The GLSL source containing the function.
- * @param {string} name - The function name to extract (cmult/cadd/cdiv).
- * @returns {(p:{re:number,im:number}, q:{re:number,im:number}) => {re:number,im:number}}
+ * Transpiles the `const float NAME = VALUE;` declarations of a GLSL source into
+ * a JS declaration preamble, so a transpiled body reads the constants the shader
+ * itself compiles rather than a hand-copied second set.
+ * @param {string} src - The GLSL source to scan.
+ * @returns {{js: string, values: Object<string, number>}} The preamble and the parsed values.
  */
-function transpileGlslCNum(src, name) {
+function glslConstants(src) {
+  const decls = [...src.matchAll(/const\s+float\s+(\w+)\s*=\s*([^;]+);/g)];
+  const values = {};
+  for (const [, name, value] of decls) values[name] = Number(value);
+  return {
+    js: decls.map(([, name, value]) => `const ${name} = ${value};`).join('\n'),
+    values,
+  };
+}
+
+/**
+ * Transpiles the body of one `CNum NAME(...) { ... return CNum(RE, IM); }`
+ * GLSL function from `src` into a JS function over its arguments.
+ * @param {string} src - The GLSL source containing the function.
+ * @param {string} name - The function name to extract.
+ * @param {string[]} [params] - The JS parameter names, in signature order.
+ * @returns {Function} The transpiled function.
+ */
+function transpileGlslCNum(src, name, params = ['p', 'q']) {
   const body = src.slice(src.indexOf(`CNum ${name}(`));
   const open = body.indexOf('{');
   let depth = 0, end = -1;
@@ -135,15 +154,19 @@ function transpileGlslCNum(src, name) {
     }
     return s;
   };
-  const js = toObj(body.slice(open + 1, end).replace(/\bfloat\b/g, 'const'));
+  const js = toObj(body.slice(open + 1, end)
+    .replace(/\bfloat\b/g, 'const')
+    .replace(/\bsqrt\(/g, 'Math.sqrt('));
   // eslint-disable-next-line no-new-func
-  return new Function('p', 'q', js);
+  return new Function(...params, `${glslConstants(src).js}\n${js}`);
 }
 
 const glsl = {
   cmult: transpileGlslCNum(glslComplexFunctions, 'cmult'),
   cadd: transpileGlslCNum(glslComplexFunctions, 'cadd'),
   cdiv: transpileGlslCNum(glslComplexFunctions, 'cdiv'),
+  stereo: transpileGlslCNum(glslProjectionFunctions, 'stereo', ['v']),
+  projectDiv: transpileGlslCNum(glslProjectionFunctions, 'project_div', ['num', 'den']),
 };
 
 /** The GLSL source defines exactly the three complex ops the JS module exports. */
@@ -181,6 +204,96 @@ test('GLSL and JS cdiv share the 1e-6 near-zero-denominator guard', () => {
   const b = glsl.cdiv({ re: 1, im: 1 }, q);
   assert.deepEqual(b, a);
   assertComplex(a, 0, 0, 'cdiv guarded');
+});
+
+// --- projection-domain conventions ----------------------------------------
+// These mirror core/math/3dmath.h (STEREO_INF, stereo, project_div). The
+// engine owns them; the shader renders what the engine will run, so a
+// divergence would make the preview lie about the pole cap and about a
+// near-singular divisor.
+
+/** The GLSL prelude declares the same projection constants the JS module exports. */
+test('glslProjectionFunctions constants match the JS exports', () => {
+  const { values } = glslConstants(glslProjectionFunctions);
+  assert.equal(values.STEREO_INF, STEREO_INF);
+  assert.equal(values.STEREO_POLE_EPS, STEREO_POLE_EPS);
+  assert.equal(values.STEREO_AZIMUTH_EPS, STEREO_AZIMUTH_EPS);
+  assert.equal(STEREO_INF, 1e4, 'STEREO_INF must match the engine sentinel');
+  assert.equal(STEREO_POLE_EPS, 1e-4, 'STEREO_POLE_EPS must match the engine cap');
+  assert.equal(STEREO_AZIMUTH_EPS, 1e-12, 'STEREO_AZIMUTH_EPS must match the engine');
+});
+
+/**
+ * Outside the pole cap stereo() is the plain quotient; inside it the result
+ * carries the sentinel magnitude along the point's own (x,z) azimuth, so the
+ * cap is not painted a single constant colour.
+ */
+test('stereo keeps the pole cap azimuth at the sentinel magnitude', () => {
+  const equator = stereo({ x: 1, y: 0, z: 0 });
+  assertComplex(equator, 1, 0, 'stereo at (1,0,0)');
+  assertComplex(stereo({ x: 0, y: 0, z: 1 }), 0, 1, 'stereo at (0,0,1)');
+
+  // A point inside the cap (1 - y < STEREO_POLE_EPS) but off the axis.
+  const y = 1 - STEREO_POLE_EPS / 2;
+  const r = Math.sqrt(1 - y * y);
+  for (const [ux, uz] of [[1, 0], [0, 1], [-1, 0], [Math.SQRT1_2, -Math.SQRT1_2]]) {
+    const w = stereo({ x: r * ux, y, z: r * uz });
+    assert.ok(Math.abs(Math.hypot(w.re, w.im) - STEREO_INF) < 1e-6,
+      `cap point (${ux},${uz}) magnitude ${Math.hypot(w.re, w.im)}`);
+    assert.ok(Math.abs(Math.atan2(w.im, w.re) - Math.atan2(uz, ux)) < 1e-9,
+      `cap point (${ux},${uz}) lost its azimuth`);
+  }
+
+  // Only the exact pole, whose azimuth is undefined, falls back to +real.
+  assertComplex(stereo({ x: 0, y: 1, z: 0 }), STEREO_INF, 0, 'stereo at the pole');
+});
+
+/**
+ * project_div's guard is relative (|num| vs |den| * STEREO_INF), not the
+ * absolute |den| test cdiv uses: a large numerator over a moderate divisor
+ * still saturates, and a small numerator over a tiny divisor still divides.
+ */
+test('projectDiv saturates on the relative magnitude, not an absolute divisor', () => {
+  const ordinary = projectDiv({ re: 4, im: 2 }, { re: 2, im: 0 });
+  assertComplex(ordinary, 2, 1, 'projectDiv ordinary');
+
+  // |num| / |den| = 1e5 > STEREO_INF -> clamped along the numerator direction.
+  const big = projectDiv({ re: 1e5, im: 0 }, { re: 1, im: 0 });
+  assertComplex(big, STEREO_INF, 0, 'projectDiv saturated');
+  const bigDiag = projectDiv({ re: 1e5, im: 1e5 }, { re: 1, im: 0 });
+  assert.ok(Math.abs(Math.hypot(bigDiag.re, bigDiag.im) - STEREO_INF) < 1e-6);
+  assert.ok(Math.abs(Math.atan2(bigDiag.im, bigDiag.re) - Math.PI / 4) < 1e-12);
+
+  // A divisor cdiv would zero out (|q|^2 = 1.6e-7 < 1e-6) still divides here.
+  const tiny = { re: 4e-4, im: 0 };
+  assertComplex(cdiv({ re: 1e-6, im: 0 }, tiny), 0, 0, 'cdiv absolute guard');
+  assertComplex(projectDiv({ re: 1e-6, im: 0 }, tiny), 1e-6 / 4e-4, 0,
+    'projectDiv relative guard');
+
+  // Only an exactly zero numerator is the indeterminate form.
+  assertComplex(projectDiv({ re: 0, im: 0 }, { re: 0, im: 0 }), 0, 0, 'projectDiv 0/0');
+});
+
+/** The GLSL stereo/project_div bodies agree with the JS twins the shader mirrors. */
+test('GLSL projection ops match the JS implementations', () => {
+  const points = [
+    { x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, { x: 0, y: -1, z: 0 },
+    { x: 0, y: 1, z: 0 }, { x: 0.48, y: 0.6, z: 0.64 }, { x: 0.6, y: -0.8, z: 0 },
+    { x: 6e-3, y: 1 - 2e-5, z: -8e-3 },
+  ];
+  for (const v of points) {
+    assert.deepEqual(glsl.stereo(v), stereo(v), `stereo at ${JSON.stringify(v)}`);
+  }
+  const complexes = [
+    { re: 1, im: 2 }, { re: 0, im: 0 }, { re: 1e5, im: 0 }, { re: 4e-4, im: 0 },
+    { re: -2, im: 0.5 }, { re: STEREO_INF, im: 0 }, { re: 1e-6, im: 1e-6 },
+  ];
+  for (const num of complexes) {
+    for (const den of complexes) {
+      assert.deepEqual(glsl.projectDiv(num, den), projectDiv(num, den),
+        `project_div(${JSON.stringify(num)}, ${JSON.stringify(den)})`);
+    }
+  }
 });
 
 // --- preset generators ----------------------------------------------------
