@@ -8,14 +8,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; base-uri 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; base-uri 'self'">
   <title>Procedural Color Palette Generator</title>
-  <!-- Vendored Tailwind (Play CDN build) for offline dev. /vendor/ is
-       gitignored, so on the Pages deploy this file 404s; the onerror falls back
-       to the Play CDN — the same in-browser build — instead of serving the tool
-       unstyled. -->
-  <script src="../vendor/tailwindcss.js"
-    onerror="this.remove();document.head.appendChild(Object.assign(document.createElement('script'),{src:'https://cdn.tailwindcss.com'}))"></script>
   <!-- Self-hosted fonts for offline dev; same gitignored /vendor/ story, so on
        the deploy this 404s and the onerror falls back to the canonical CDN copy
        of the same families (Inter + JetBrains Mono). -->
@@ -202,6 +196,8 @@
       display: block;
     }
   </style>
+  <!-- Linked last: utilities must outrank tools.css and the rules above. -->
+  <link rel="stylesheet" href="tailwind.css">
 </head>
 
 <body class="p-4 sm:p-8">
