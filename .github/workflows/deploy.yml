@@ -203,19 +203,26 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
 
-      - name: Stage site (explicit allowlist)
-        # Publish only the runtime app, not the whole repo tree. The former
-        # path: '.' shipped .git/, tests/, scripts/, and dev tooling to Pages
-        # (node_modules/, three.js/, vendor/ are gitignored, so absent from this
-        # fresh checkout — but the tracked dev files were not). Copy the served
-        # set: index.html, README + its screenshot gallery, the root ES modules,
-        # styles/, tools/, and the WASM binary. three.js / lil-gui load from
-        # their CDNs (vendor-importmap.js) and the tools' utility classes ship
-        # as tools/tailwind.css, so no vendored dirs are needed.
+      - name: Stage site from the committed manifest
+        # Publish only the runtime app, not the whole repo tree: path: '.' would
+        # ship .git/, tests/, scripts/ and dev tooling to Pages. site_manifest.txt
+        # is the served set; tests/site_manifest.test.js holds it to what the
+        # pages actually reference, so a new runtime asset in a new directory
+        # goes red in the JS suite instead of 404ing here.
         run: |
           mkdir _site
-          cp index.html README.md *.js holosphere_wasm.wasm _site/
-          cp -r styles tools docs _site/
+          status=0
+          while IFS= read -r path || [ -n "$path" ]; do
+            case "$path" in ''|'#'*) continue ;; esac
+            if [ ! -e "$path" ]; then
+              echo "::error::site_manifest.txt lists $path, which is not in the repo — update the manifest or restore the file."
+              status=1
+              continue
+            fi
+            mkdir -p "_site/$(dirname "$path")"
+            cp -r "$path" "_site/$(dirname "$path")/"
+          done < site_manifest.txt
+          exit $status
 
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3

@@ -39,6 +39,7 @@
   "tests/sidebar.test.js": 71,
   "tests/sidebar_dom.test.js": 20,
   "tests/sidebar_logic.test.js": 35,
+  "tests/site_manifest.test.js": 478,
   "tests/slider.test.js": 45,
   "tests/solid_codegen.test.js": 341,
   "tests/solids_registry_codegen.test.js": 63,
