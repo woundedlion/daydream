@@ -17,6 +17,7 @@
   "tests/frame_constants.test.js": 2,
   "tests/generate_importmap.test.js": 19,
   "tests/geometry.test.js": 34,
+  "tests/global_stats_view.test.js": 28,
   "tests/gui.test.js": 68,
   "tests/label_pool.test.js": 21,
   "tests/lissajous_math.test.js": 136,
