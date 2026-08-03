@@ -10,6 +10,18 @@ const read = (...p) => readFileSync(join(REPO, ...p), 'utf8');
 const pageSrc = (name) => read('tools', `${name}.html`);
 const headOf = (src) => src.slice(src.indexOf('<head>'), src.indexOf('</head>'));
 
+// Every page the app serves, paired with the stylesheets it links: the tool
+// pages share tools/, index.html has its own. The CSP and undefined-class gates
+// run over all of them — index.html is the most-loaded page, so it is the one
+// least able to afford being ungated.
+const SERVED_PAGES = [
+  ...PAGES.map((name) => ({
+    page: `tools/${name}.html`,
+    sheets: [['tools', 'tailwind.css'], ['tools', 'tools.css']],
+  })),
+  { page: 'index.html', sheets: [['styles', 'index.css']] },
+];
+
 /**
  * Class names a stylesheet defines. Tailwind escapes the characters it allows in
  * a class but not in a selector (`.text-\[0\.65rem\]`), so the backslashes come
@@ -52,13 +64,13 @@ test('tool pages load no Tailwind CDN code', () => {
   }
 });
 
-test('tool page CSPs permit no Tailwind CDN origin', () => {
-  for (const name of PAGES) {
-    const csp = pageSrc(name).match(
+test('every served page carries a CSP permitting no Tailwind CDN origin', () => {
+  for (const { page } of SERVED_PAGES) {
+    const csp = read(page).match(
       /<meta http-equiv="Content-Security-Policy" content="([^"]*)"/)?.[1];
-    assert.ok(csp, `${name}.html has no Content-Security-Policy meta`);
+    assert.ok(csp, `${page} has no Content-Security-Policy meta`);
     assert.doesNotMatch(csp, /tailwindcss\.com/,
-      `${name}.html CSP still allows the Tailwind CDN`);
+      `${page} CSP still allows the Tailwind CDN`);
     assert.match(csp, /default-src 'self'/);
     assert.match(csp, /object-src 'none'/);
   }
@@ -83,19 +95,19 @@ const BEHAVIOR_HOOKS = new Set([
   'op-param', 'move-op-up', 'move-op-down', 'remove-op-btn',
 ]);
 
-test('tailwind.css and tools.css define every class the tool pages use', () => {
-  const shared = definedClasses(read('tools', 'tailwind.css'));
-  for (const name of definedClasses(read('tools', 'tools.css'))) shared.add(name);
-  for (const name of BEHAVIOR_HOOKS) shared.add(name);
-  for (const name of PAGES) {
-    const src = pageSrc(name);
-    const defined = new Set(shared);
+test('every served page\'s stylesheets define every class it uses', () => {
+  for (const { page, sheets } of SERVED_PAGES) {
+    const src = read(page);
+    const defined = new Set(BEHAVIOR_HOOKS);
+    for (const sheet of sheets) {
+      for (const name of definedClasses(read(...sheet))) defined.add(name);
+    }
     for (const [, css] of src.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)) {
       for (const cls of definedClasses(css)) defined.add(cls);
     }
     const missing = [...referencedClasses(src)].filter((c) => !defined.has(c));
     assert.deepEqual(missing, [],
-      `${name}.html uses classes no stylesheet defines: ${missing.join(', ')}`);
+      `${page} uses classes no stylesheet defines: ${missing.join(', ')}`);
   }
 });
 
