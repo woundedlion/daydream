@@ -8,7 +8,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import createHolosphereModule from '../holosphere_wasm.js';
-import { KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, applyOp } from '../tools/solid_codegen.js';
+import {
+  KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, applyOp,
+  meshOpFailure, MESH_OP_RESULT_NAMES,
+} from '../tools/solid_codegen.js';
 import { ENGINE_METHODS, ParamSetResult } from './fake_engine.js';
 import { isViewLive, refreshPixelView } from '../pixel_view.js';
 
@@ -307,6 +310,7 @@ test('MeshOps exposes the method surface the solids tool drives', () => {
   assert.equal(typeof M.MeshOps, 'function', 'the module must export MeshOps');
   for (const name of [
     'clearToolingMemory', 'fromSolidName', 'getRegistry', 'getArenaMetrics',
+    'getLastResult',
   ]) {
     assert.equal(typeof M.MeshOps[name], 'function',
       `MeshOps is missing class function ${name} (solids.html calls it)`);
@@ -317,6 +321,32 @@ test('MeshOps exposes the method surface the solids tool drives', () => {
   }
   assert.ok(meshOpNames().length > 0,
     'MeshOps must bind at least one Conway operator');
+});
+
+// A null mesh is the bridge's only recoverable failure channel, and the reason
+// behind it decides the caller's remedy — shrink the chain versus flush the
+// arenas. Pinning the roster and one live reason keeps solid_codegen.js's
+// routing table on the engine's enum rather than a stale copy of it.
+test('meshOpFailure routes a real bridge reject by the reason the module records', () => {
+  assert.ok(M.MeshOpResult, 'the module must export MeshOpResult');
+  const moduleNames = Object.keys(M.MeshOpResult)
+    .filter((k) => M.MeshOpResult[k] instanceof M.MeshOpResult);
+  assert.deepEqual(moduleNames.sort(), [...MESH_OP_RESULT_NAMES].sort(),
+    'solid_codegen.js MESH_OP_RESULT_NAMES must mirror the module enum roster');
+
+  assert.equal(M.MeshOps.fromSolidName('NoSuchSolid'), null,
+    'fromSolidName must return null for an unknown name');
+  const failure = meshOpFailure(M, 'Base solid "NoSuchSolid"');
+  assert.equal(failure.reason, 'UNKNOWN_NAME');
+  assert.equal(failure.flush, false,
+    'an unknown name leaves nothing in the arena to reclaim');
+
+  const mesh = M.MeshOps.fromSolidName('cube');
+  assert.ok(mesh, 'fromSolidName("cube") must build a mesh');
+  assert.ok(mesh.classifyFaces(), 'classifyFaces must return codes for a cube');
+  assert.equal(meshOpFailure(M, 'Face classification').reason, 'OK');
+  mesh.delete();
+  M.MeshOps.clearToolingMemory();
 });
 
 test('solid_codegen KNOWN_OPS matches the operators MeshOps binds', () => {

@@ -26,6 +26,8 @@ const {
   movedOps,
   createCommitQueue,
   createChainValidator,
+  meshOpFailure,
+  MESH_OP_RESULT_NAMES,
 } =
   await import('../tools/solid_codegen.js');
 const { formatFloatCpp } = await import('../tools/cpp_format.js');
@@ -694,16 +696,24 @@ test('createCommitQueue survives a rejected commit', async () => {
 
 /**
  * Builds a fake WASM module whose meshes track their own deletion, with a hook
- * to make a chosen op throw.
+ * to make a chosen op throw and a set of call tokens ('base:<name>',
+ * 'classifyFaces') the bridge answers with a null plus the given reason.
  */
-function fakeModule(onOp = () => { }) {
+function fakeModule(onOp = () => { }, { rejects = new Set(), reason = 'ARENA_EXHAUSTED' } = {}) {
   const state = { live: 0, cleared: 0 };
+  const MeshOpResult = Object.fromEntries(MESH_OP_RESULT_NAMES.map((name) => [name, Symbol(name)]));
+  let lastResult = MeshOpResult.OK;
+  const rejected = (token) => {
+    if (!rejects.has(token)) return false;
+    lastResult = MeshOpResult[reason];
+    return true;
+  };
   const makeMesh = () => {
     state.live++;
     const mesh = {
       deleted: false,
       delete() { this.deleted = true; state.live--; },
-      classifyFaces() { onOp('classifyFaces'); },
+      classifyFaces() { onOp('classifyFaces'); return rejected('classifyFaces') ? null : new Int32Array(1); },
     };
     for (const op of KNOWN_OPS) {
       mesh[op] = () => { onOp(op); return makeMesh(); };
@@ -711,13 +721,61 @@ function fakeModule(onOp = () => { }) {
     return mesh;
   };
   const Mod = {
+    MeshOpResult,
     MeshOps: {
-      fromSolidName(name) { onOp(`base:${name}`); return makeMesh(); },
+      fromSolidName(name) { onOp(`base:${name}`); return rejected(`base:${name}`) ? null : makeMesh(); },
       clearToolingMemory() { state.cleared++; },
+      getLastResult() { return lastResult; },
     },
   };
   return { Mod, state };
 }
+
+/** Verifies the recorded reason is read back by identity and names its remedy. */
+test('meshOpFailure routes each recorded reason', () => {
+  const { Mod } = fakeModule(() => { }, { rejects: new Set(['base:cube']), reason: 'ARENA_EXHAUSTED' });
+  assert.equal(Mod.MeshOps.fromSolidName('cube'), null);
+  const exhausted = meshOpFailure(Mod, 'Base solid "cube"');
+  assert.equal(exhausted.reason, 'ARENA_EXHAUSTED');
+  assert.equal(exhausted.flush, true, 'only ARENA_EXHAUSTED is cleared by flushing the arenas');
+  assert.match(exhausted.message, /^Base solid "cube" failed: /);
+
+  const unknown = fakeModule(() => { }, { rejects: new Set(['base:nope']), reason: 'UNKNOWN_NAME' });
+  assert.equal(unknown.Mod.MeshOps.fromSolidName('nope'), null);
+  const named = meshOpFailure(unknown.Mod, 'Base solid "nope"');
+  assert.equal(named.reason, 'UNKNOWN_NAME');
+  assert.equal(named.flush, false);
+  assert.notEqual(named.message, exhausted.message, 'each reason must carry its own remedy');
+});
+
+/** Verifies a module that binds neither the enum nor getLastResult still yields a message. */
+test('meshOpFailure reports UNKNOWN when the module records no reason', () => {
+  const failure = meshOpFailure({ MeshOps: {} }, 'Face classification');
+  assert.equal(failure.reason, 'UNKNOWN');
+  assert.equal(failure.flush, false);
+  assert.match(failure.message, /^Face classification failed: /);
+});
+
+/** Verifies the null-returning solids.html helper reports and flushes by reason. */
+test('solids requireMesh surfaces the reason and applies its remedy', () => {
+  const match = SOLIDS_HTML.match(/\n {4}function requireMesh\(result, what[\s\S]*?\n {4}}\r?\n/);
+  assert.ok(match, 'solids.html must define requireMesh');
+  const build = Function('meshOpFailure', 'WasmModule', 'MeshOpsWasm', 'showMeshError',
+    `${match[0]}; return requireMesh;`);
+
+  const { Mod, state } = fakeModule(() => { }, { rejects: new Set(['base:cube']) });
+  const shown = [];
+  const requireMesh = build(meshOpFailure, Mod, Mod.MeshOps, (m) => shown.push(m));
+
+  const mesh = Mod.MeshOps.fromSolidName('other');
+  assert.equal(requireMesh(mesh, 'Base solid'), mesh, 'a real mesh passes through');
+  assert.deepEqual(shown, []);
+
+  assert.equal(requireMesh(Mod.MeshOps.fromSolidName('cube'), 'Base solid "cube"'), null);
+  assert.equal(state.cleared, 1, 'ARENA_EXHAUSTED must flush the tooling arenas');
+  assert.equal(shown.length, 1, 'the failure must be surfaced, not only logged');
+  assert.match(shown[0], /^Base solid "cube" failed: /);
+});
 
 test('solids validator resolves the module factory after async initialization', async () => {
   const match = SOLIDS_HTML.match(/\bcreateChainValidator\((.+)\);/);
@@ -748,6 +806,24 @@ test('createChainValidator rejects a chain that throws, freeing its mesh', async
   });
   const validator = createChainValidator(async () => Mod);
   assert.equal(await validator.chainIsValid('cube', ['kis']), false);
+  assert.equal(state.live, 0);
+  assert.equal(state.cleared, 1);
+});
+
+/** Verifies a soft-rejected base solid rejects the chain and reclaims the arena. */
+test('createChainValidator rejects a chain whose base solid comes back null', async () => {
+  const { Mod, state } = fakeModule(() => { }, { rejects: new Set(['base:cube']) });
+  const validator = createChainValidator(async () => Mod);
+  assert.equal(await validator.chainIsValid('cube', ['dual']), false);
+  assert.equal(state.live, 0);
+  assert.equal(state.cleared, 1);
+});
+
+/** Verifies the classify pass the tool always runs is proven, not just called. */
+test('createChainValidator rejects a chain whose classify pass comes back null', async () => {
+  const { Mod, state } = fakeModule(() => { }, { rejects: new Set(['classifyFaces']) });
+  const validator = createChainValidator(async () => Mod);
+  assert.equal(await validator.chainIsValid('cube', ['dual']), false);
   assert.equal(state.live, 0);
   assert.equal(state.cleared, 1);
 });

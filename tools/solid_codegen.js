@@ -136,6 +136,53 @@ function dispatchOp(mesh, o, opName) {
   throw new Error(`unknown op "${opName}" — not bound by the WASM MeshOps module`);
 }
 
+/**
+ * The MeshOpResult keys the WASM bridge binds, in enum order.
+ * @details engine_contract_wasm.test.js pins this list against the module enum.
+ */
+export const MESH_OP_RESULT_NAMES = [
+  'OK',
+  'UNKNOWN_NAME',
+  'CONNECTIVITY_OVERFLOW',
+  'FACE_DEGREE_OVERFLOW',
+  'ARENA_EXHAUSTED',
+  'NON_FINITE_ARG',
+  'ANGLE_OUT_OF_DOMAIN',
+];
+
+// Reason-specific tail of the message a null MeshOps result earns.
+const MESH_FAILURE_REMEDY = {
+  UNKNOWN_NAME: 'the engine registers no solid by that name',
+  CONNECTIVITY_OVERFLOW: 'the result passes the engine 16-bit element ceiling — remove an op',
+  FACE_DEGREE_OVERFLOW: 'the result needs a face with more sides than the engine allows — remove an op',
+  ARENA_EXHAUSTED: 'the tooling arena is full; it has been flushed — try again',
+  NON_FINITE_ARG: 'an op argument was not a finite number',
+  ANGLE_OUT_OF_DOMAIN: 'an angle argument sat outside its op domain',
+};
+
+/**
+ * Reads back why a mesh-producing MeshOps call returned null.
+ * @param {Object} Mod - The WASM module instance that produced the null.
+ * @param {string} what - What the caller was building, used in the message.
+ * @returns {{reason: string, message: string, flush: boolean}} The MeshOpResult key, a message to show, and whether clearToolingMemory() is the remedy that reason calls for.
+ * @details Embind enum values are singletons, so the recorded result is matched
+ * by identity against Module.MeshOpResult, never by truthiness. A module that
+ * binds neither the enum nor getLastResult reports reason 'UNKNOWN'.
+ */
+export function meshOpFailure(Mod, what) {
+  const codes = Mod?.MeshOpResult;
+  const recorded = Mod?.MeshOps?.getLastResult?.();
+  let reason = 'UNKNOWN';
+  if (codes && recorded !== undefined) {
+    reason = MESH_OP_RESULT_NAMES.find((name) => codes[name] === recorded) ?? 'UNKNOWN';
+  }
+  return {
+    reason,
+    message: `${what} failed: ${MESH_FAILURE_REMEDY[reason] ?? 'the engine rejected it'}`,
+    flush: reason === 'ARENA_EXHAUSTED',
+  };
+}
+
 // A base seed-solid name is pasted as a C++ function call (`base(a, b)`), so
 // guard its shape against the valid-identifier pattern.
 const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -663,16 +710,23 @@ export function createChainValidator(createModule) {
       const Ops = Mod.MeshOps;
       let mesh = null;
       try {
+        // A null from either bridge call is a recoverable reject (getLastResult
+        // names it), so the chain is not safe for the live module either.
         mesh = Ops.fromSolidName(base);
+        if (!mesh) {
+          Ops.clearToolingMemory();
+          return false;
+        }
         for (const o of ops) {
           const next = applyOp(mesh, o);
           mesh.delete();
           mesh = next;
         }
-        mesh.classifyFaces();
+        const classes = mesh.classifyFaces();
         mesh.delete();
+        mesh = null;
         Ops.clearToolingMemory();
-        return true;
+        return classes != null;
       } catch (e) {
         noteDeath(e);
         if (!(e instanceof WebAssembly.RuntimeError)) {
