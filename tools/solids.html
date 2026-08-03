@@ -619,7 +619,7 @@
       createCommitQueue,
       createChainValidator,
     } from './solid_codegen.js';
-    import { generateRegistryCpp } from './solid_registry_codegen.js';
+    import { generateRegistryCpp, MAX_RECIPE_STEPS } from './solid_registry_codegen.js';
     import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
 
     let camera, scene, renderer, controls;
@@ -1656,6 +1656,13 @@
     }
 
     function addOp(opName) {
+      // A star base contributes its own authored steps on export, so this only
+      // bounds the tool's share of the flattened chain; generateRegistryCpp
+      // holds the real ceiling.
+      if (state.ops.length >= MAX_RECIPE_STEPS) {
+        showGateMsg(`rejected: a chain carries at most ${MAX_RECIPE_STEPS} ops`);
+        return;
+      }
       const def = OP_DEFS[opName];
       const newOp = { op: opName, params: {} };
       if (def && def.params) {

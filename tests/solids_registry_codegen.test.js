@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { upperSnake, opStepCpp, generateRegistryCpp } =
+const { upperSnake, opStepCpp, generateRegistryCpp, MAX_RECIPE_STEPS } =
   await import('../tools/solid_registry_codegen.js');
 const { OP_DEFS, KNOWN_OPS, PARAMETERIZED_OPS } =
   await import('../tools/solid_codegen.js');
@@ -200,4 +200,33 @@ test('generateRegistryCpp rejects an invalid seed namespace', () => {
 test('generateRegistryCpp rejects an empty op chain', () => {
   assert.throws(() => generateRegistryCpp({ base: 'cube', ops: [] }, 'Archimedean'),
     /op chain is empty/);
+});
+
+/** A Complex chain of `count` steps: one hankin, then parameterless ops. */
+function longOps(count) {
+  return [{ op: 'hankin', params: { angle: 62 } }, ...Array(count - 1).fill('dual')];
+}
+
+test('generateRegistryCpp emits a step table at the uint8_t count ceiling', () => {
+  const code = generateRegistryCpp(
+    { base: 'cube', ops: longOps(MAX_RECIPE_STEPS) }, 'Archimedean');
+  assert.equal(code.split('{Op::').length - 1, MAX_RECIPE_STEPS);
+});
+
+test('generateRegistryCpp rejects a chain one step past the uint8_t count ceiling', () => {
+  assert.throws(() => generateRegistryCpp(
+    { base: 'cube', ops: longOps(MAX_RECIPE_STEPS + 1) }, 'Archimedean'),
+  /has 256 steps; a Recipe carries at most 255/);
+});
+
+test('generateRegistryCpp counts a flattened base chain against the ceiling', () => {
+  const item = { base: 'icosahedron_kis', ops: longOps(5) };
+  const baseOps = Array(MAX_RECIPE_STEPS - 5).fill(chainStep('kis'));
+  const atCeiling = { seed: 'icosahedron', ops: baseOps };
+  const code = generateRegistryCpp(item, 'IslamicStarPatterns', atCeiling);
+  assert.equal(code.split('{Op::').length - 1, MAX_RECIPE_STEPS);
+
+  const overCeiling = { seed: 'icosahedron', ops: [...baseOps, chainStep('kis')] };
+  assert.throws(() => generateRegistryCpp(item, 'IslamicStarPatterns', overCeiling),
+    /has 256 steps; a Recipe carries at most 255/);
 });
