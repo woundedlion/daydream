@@ -81,18 +81,26 @@ function unrefTimer(timer) {
  * the interactive enable path (the primary trigger); a no-op outside a web origin
  * (e.g. under the file://-based unit tests) and swallows all failures — the boot
  * auto-retry is the actual guarantee, this only lowers the odds.
+ * @param {{fetch?: typeof globalThis.fetch, baseUrl?: string|URL}} [dependencies]
  * @returns {Promise<void>}
  */
-export function warmModules() {
-  if (typeof fetch !== 'function') return Promise.resolve();
+export function warmModules({
+  fetch: fetchResource = globalThis.fetch,
+  baseUrl = import.meta.url,
+} = {}) {
+  if (typeof fetchResource !== 'function') return Promise.resolve();
   let probe;
-  try { probe = new URL('./holosphere_wasm.js', import.meta.url); }
+  try { probe = new URL('./holosphere_wasm.js', baseUrl); }
   catch { return Promise.resolve(); }
   if (probe.protocol !== 'http:' && probe.protocol !== 'https:') return Promise.resolve();
-  const urls = ['./segment_worker.js', './holosphere_wasm.js'];
+  const urls = [
+    './segment_worker.js',
+    './holosphere_wasm.js',
+    './holosphere_wasm.wasm',
+  ];
   // fetch resolves at the headers; the body must be drained or nothing is cached.
   return Promise.allSettled(
-    urls.map((u) => fetch(new URL(u, import.meta.url), { cache: 'force-cache' })
+    urls.map((u) => fetchResource(new URL(u, baseUrl), { cache: 'reload' })
       .then((r) => r.arrayBuffer())),
   ).then(() => {});
 }
