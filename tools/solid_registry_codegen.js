@@ -14,6 +14,7 @@
  */
 
 import {
+  CATALAN_BASES,
   OP_DEFS,
   KNOWN_OPS,
   PARAMETERIZED_OPS,
@@ -149,27 +150,25 @@ function recipeStepCpp(step) {
 /**
  * Emits the solids.h registry paste for a saved solid.
  *
- * A Simple result is one Entry line in its seed's namespace. A Complex result —
- * a chain containing a hankin, or one grown from a star pattern — lands in
- * islamic_registry, whose entries carry a Recipe mirror; Entry's fourth field
- * defaults to nullptr, which fails the engine's every-Complex-solid-has-a-chain
- * contract.
+ * A saved solid is always a derived chain, and islamic_registry is the only
+ * registry that takes one: simple_registry is the fixed [Platonic |
+ * Archimedean] roster whose length and slice offsets are pinned by
+ * static_assert, and catalan_registry is the 13 Archimedean duals. So the paste
+ * is uniformly Category::Complex — a generator in namespace IslamicStarPatterns
+ * plus the OpStep table and Recipe mirror every islamic_registry entry must
+ * carry.
  *
  * Recipe::seed indexes simple_registry, which holds no star pattern, so a star
  * base is flattened: the seed becomes the base's own seed and the base's
  * authored chain is prepended to the tool's ops, which is what the generated
  * function builds.
  * @param {Object} item - The solid spec (see generateFuncAndRecipe).
- * @param {string} seedNamespace - Namespace qualifying the seed (e.g. "Archimedean").
  * @param {?{seed: string, ops: Array<{op: string, param: number, twist: number}>}} [baseRecipe] - The base's authored chain from MeshOps.getRecipe(); null when the base is itself a simple_registry seed.
  * @returns {string} The C++ paste.
- * @throws {Error} When the spec, namespace, or base chain is invalid, a base chain step cannot be re-emitted, or the flattened chain exceeds MAX_RECIPE_STEPS.
+ * @throws {Error} When the spec or base chain is invalid, the seed is a Catalan solid, a base chain step cannot be re-emitted, or the flattened chain exceeds MAX_RECIPE_STEPS.
  */
-export function generateRegistryCpp(item, seedNamespace, baseRecipe = null) {
-  if (typeof seedNamespace !== 'string' || !CPP_IDENTIFIER.test(seedNamespace)) {
-    throw new Error(`generateRegistryCpp: seed namespace "${seedNamespace}" is not a valid C++ identifier`);
-  }
-  const { funcName } = generateFuncAndRecipe(item, seedNamespace);
+export function generateRegistryCpp(item, baseRecipe = null) {
+  const { funcName } = generateFuncAndRecipe(item);
 
   if (baseRecipe != null) {
     if (typeof baseRecipe.seed !== 'string' || !CPP_IDENTIFIER.test(baseRecipe.seed)) {
@@ -180,15 +179,13 @@ export function generateRegistryCpp(item, seedNamespace, baseRecipe = null) {
     }
   }
 
-  // Complexity is a property of the result, not the base: a hankin step lands
-  // the solid in islamic_registry (uniformly Category::Complex), as does
-  // starting from a star pattern — the only base that carries a chain.
-  const isComplex = baseRecipe != null
-    || item.ops.some(o => (typeof o === 'string' ? o : o.op) === 'hankin');
-
-  if (!isComplex) {
-    // A Simple result never leaves its seed's namespace.
-    return `    {"${funcName}",\n     ${seedNamespace}::${funcName},\n     Category::Simple},`;
+  // SEED_<name> indexes simple_registry, so a seed with no such constant needs
+  // one added alongside this paste — which a Catalan seed can never get.
+  const seedName = baseRecipe != null ? baseRecipe.seed : item.base;
+  if (CATALAN_BASES.has(seedName)) {
+    throw new Error(`generateRegistryCpp: seed "${seedName}" is a Catalan solid, `
+      + 'which Recipe::seed cannot index — no registry takes this solid; '
+      + 'rebuild the chain from a Platonic or Archimedean seed');
   }
 
   const stepsName = `${upperSnake(funcName)}_STEPS`;
@@ -201,9 +198,6 @@ export function generateRegistryCpp(item, seedNamespace, baseRecipe = null) {
       + 'uint8_t count wraps and the pasted Recipe would replay a different chain');
   }
   const steps = stepList.join(',\n    ');
-  // SEED_<name> indexes simple_registry, so a seed with no such constant needs
-  // one added alongside this paste.
-  const seedName = baseRecipe != null ? baseRecipe.seed : item.base;
   return `/** Step table for ${funcName}. */\n`
     + `inline constexpr OpStep ${stepsName}[] = {\n    ${steps}};\n`
     + `/** Recipe mirror of IslamicStarPatterns::${funcName}. */\n`
