@@ -280,6 +280,7 @@ export class Daydream {
 
     this.labelAxes = false;
     this.cullBackSphere = false;
+    this.showPip = true;
     // Persist column gap-fill overlap (see updateCullUniforms): 1.0 = pills meet
     // exactly; higher closes any hairline seam at the cost of longer terminal caps.
     this.columnFillOverlap = 1.15;
@@ -692,13 +693,16 @@ export class Daydream {
   }
 
   /**
-   * Render the picture-in-picture corner view. Skipped on mobile, under
-   * headless automation (Playwright/Puppeteer/Selenium set navigator.webdriver),
-   * and while recording, so clean screenshots/videos aren't obscured by the
-   * PiP corner.
+   * Render the picture-in-picture corner view. Skipped while the showPip toggle
+   * is off, on mobile, under headless automation (Playwright/Puppeteer/Selenium
+   * set navigator.webdriver), and while recording, so clean screenshots/videos
+   * aren't obscured by the PiP corner.
+   * @details A second full pass over the instanced mesh (no LOD, frustum culling
+   *   off), so on a large grid the toggle roughly halves the per-frame draw cost.
    */
   renderPip() {
-    if (this.isMobile || navigator.webdriver || this.recorder?.isRecording) return;
+    if (!this.showPip || this.isMobile || navigator.webdriver ||
+        this.recorder?.isRecording) return;
 
     this.renderer.setViewport(
       this.pipViewport.x,
