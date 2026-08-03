@@ -876,8 +876,12 @@
       renderBaseSolid();
     }
 
+    // Reads a live wrapper out to plain JS. Null when the readback itself was
+    // rejected — a wrapper the caller held across a clearToolingMemory() aliases
+    // reclaimed arena storage, so the bridge refuses it (STALE_WRAPPER).
     function wasmMeshToJs(wasmMesh) {
-      const vArray = wasmMesh.getVertices(); // Float32Array
+      const vArray = requireMesh(wasmMesh.getVertices(), 'Mesh vertex readback');
+      if (!vArray) return null;
 
       // NaN Check
       for (let i = 0; i < vArray.length; i++) {
@@ -892,7 +896,9 @@
         vertices.push(new THREE.Vector3(vArray[i], vArray[i + 1], vArray[i + 2]));
       }
 
-      const flat = wasmMesh.getFaces(); // { indices: Uint16Array, counts: Uint8Array }
+      // { indices: Uint16Array, counts: Uint8Array }
+      const flat = requireMesh(wasmMesh.getFaces(), 'Mesh face readback');
+      if (!flat) return null;
       const faces = [];
       let k = 0;
       for (let i = 0; i < flat.counts.length; i++) {
@@ -960,6 +966,7 @@
           const meshData = wasmMeshToJs(wasmMesh);
           wasmMesh.delete();
           MeshOpsWasm.clearToolingMemory();
+          if (!meshData) continue;
 
           // Triangulate
           const vertices = [];
@@ -1848,6 +1855,9 @@
       const meshData = wasmMeshToJs(currentWasmMesh);
       currentWasmMesh.delete(); // Cleanup final result
       MeshOpsWasm.clearToolingMemory(); // Flush the 16 MB tooling arenas (8 MB + 4 MB + 4 MB)
+      // A rejected readback leaves no geometry to draw; requireMesh already
+      // reported it, so skip the render rather than clearing the last good mesh.
+      if (!meshData) return;
 
       // Store for stats/helpers
       currentMesh = meshData;
