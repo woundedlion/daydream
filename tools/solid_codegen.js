@@ -99,15 +99,20 @@ export const CATALAN_BASES = new Set([
  * @param {Object} mesh - A live WASM MeshOps mesh wrapper.
  * @param {(string|{op:string, params:Object})} o - The op to apply, as a bare op name or an {op, params} object.
  * @returns {Object} The new mesh wrapper.
- * @throws {Error} When the module binds no method for the op name, or the op soft-rejects.
+ * @throws {Error} When the op name is not a known operator, when the module binds no method for it, or when the op soft-rejects.
  * @details Single source of truth for op dispatch: the live-preview module and
  * the sacrificial validator module must run byte-identical chains or validation
  * proves the wrong thing. The bridge answers a soft reject — an out-of-bounds
  * result, or a non-finite/out-of-domain argument — with null rather than a mesh,
- * which throws before the caller swaps its live wrapper.
+ * which throws before the caller swaps its live wrapper. The KNOWN_OPS gate runs
+ * first: the wrapper also binds lifetime methods (delete, clone), so an op name
+ * off the table would otherwise reach one of them.
  */
 export function applyOp(mesh, o) {
   const opName = typeof o === 'string' ? o : o.op;
+  if (!KNOWN_OPS.has(opName)) {
+    throw new Error(`applyOp: unknown op "${opName}" — not a Conway/SolidBuilder operator`);
+  }
   requireParams('applyOp', opName, o);
   const next = dispatchOp(mesh, o, opName);
   if (!next) {
