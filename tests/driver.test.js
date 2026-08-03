@@ -8,7 +8,7 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { Daydream, dotDetailFor, fitDistance } from '../driver.js';
+import { Daydream, dotDetailFor, fitDistance, MOBILE_BREAKPOINT_PX } from '../driver.js';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 
 restoreDocumentAfterEach();
@@ -63,6 +63,221 @@ test('fitDistance backs off by 1/aspect on a portrait viewport', () => {
 test('fitDistance clamps into the orbit-control range', () => {
   assert.equal(fitDistance(1, 5000, 6000), 5000);
   assert.equal(fitDistance(1, 1, 10), 10);
+});
+
+// ---------------------------------------------------------------------------
+// setCanvasSize
+// ---------------------------------------------------------------------------
+
+/**
+ * Runs `body` with a global window reporting `dpr`, restoring whatever was there
+ * (usually nothing, under node) afterwards.
+ * @param {number} dpr - devicePixelRatio the renderer should read.
+ * @param {Function} body - Code to run under the stubbed window.
+ * @returns {*} Whatever `body` returned.
+ */
+function withDevicePixelRatio(dpr, body) {
+  const had = 'window' in globalThis;
+  const saved = globalThis.window;
+  globalThis.window = { devicePixelRatio: dpr };
+  try { return body(); } finally {
+    if (had) globalThis.window = saved; else delete globalThis.window;
+  }
+}
+
+/**
+ * Minimal `this` for setCanvasSize: real perspective cameras (so aspect and the
+ * projection matrix behave), an orbit stand-in at the class's distance limits,
+ * and viewports seeded to a sentinel so an untouched one is visible.
+ * @param {number} width - Container client width.
+ * @param {number} height - Container client height.
+ * @returns {Object} Context object for prototype.call.
+ */
+function sizeCtx(width, height) {
+  const camera = new THREE.PerspectiveCamera(
+    Daydream.CAMERA_FOV, 1, Daydream.CAMERA_NEAR, Daydream.CAMERA_FAR);
+  camera.position.set(0, 0, Daydream.CAMERA_Z);
+  const sized = [];
+  const sentinel = () => ({ x: -1, y: -1, width: -1, height: -1 });
+  return {
+    sized,
+    canvasParent: { clientWidth: width, clientHeight: height },
+    mainViewport: sentinel(),
+    pipViewport: sentinel(),
+    isMobile: null,
+    fittedDistance: 0,
+    needsRender: false,
+    camera,
+    pipCamera: new THREE.PerspectiveCamera(
+      Daydream.CAMERA_FOV, 3, Daydream.CAMERA_NEAR, Daydream.CAMERA_FAR),
+    controls: {
+      target: new THREE.Vector3(),
+      minDistance: Daydream.CAMERA_NEAR + Daydream.SPHERE_RADIUS,
+      maxDistance: Daydream.CAMERA_FAR - Daydream.SPHERE_RADIUS,
+    },
+    renderer: {
+      pixelRatio: null,
+      setPixelRatio(r) { this.pixelRatio = r; },
+      setSize: (w, h) => sized.push(`renderer:${w}x${h}`),
+    },
+    labelRenderer: { setSize: (w, h) => sized.push(`labels:${w}x${h}`) },
+  };
+}
+
+/** Resizes the container and re-runs the layout.
+ * @param {Object} ctx - Context from sizeCtx().
+ * @param {number} width - New container client width.
+ * @param {number} height - New container client height.
+ * @param {number} [dpr=1] - devicePixelRatio for this pass.
+ * @returns {void}
+ */
+function resize(ctx, width, height, dpr = 1) {
+  ctx.canvasParent.clientWidth = width;
+  ctx.canvasParent.clientHeight = height;
+  withDevicePixelRatio(dpr, () => Daydream.prototype.setCanvasSize.call(ctx));
+}
+
+/** Orbit radius the context's camera currently sits at.
+ * @param {Object} ctx - Context from sizeCtx().
+ * @returns {number} Distance from the orbit target.
+ */
+const orbitRadius = (ctx) => ctx.camera.position.distanceTo(ctx.controls.target);
+
+/** Fraction of the view height the sphere's diameter covers at the current fit.
+ * @param {Object} ctx - Context from sizeCtx().
+ * @returns {number} Vertical coverage, 0..1.
+ */
+function verticalCoverage(ctx) {
+  const visibleHeight = 2 * Math.tan(halfFovRad) * orbitRadius(ctx);
+  return Daydream.SPHERE_RADIUS * 2 / visibleHeight;
+}
+
+test('setCanvasSize leaves everything alone on a 0-sized container', () => {
+  const ctx = sizeCtx(0, 0);
+  resize(ctx, 0, 0);
+
+  // aspect = 0/0 would poison the projection matrix for every later frame.
+  assert.equal(ctx.camera.aspect, 1);
+  assert.deepEqual(ctx.mainViewport, { x: -1, y: -1, width: -1, height: -1 });
+  assert.deepEqual(ctx.sized, []);
+  assert.equal(ctx.needsRender, false);
+
+  resize(ctx, 1200, 0);
+  assert.deepEqual(ctx.sized, [], 'a zero-height container still laid out');
+});
+
+test('setCanvasSize fits the renderer, label layer, and camera to the container', () => {
+  const ctx = sizeCtx(1200, 800);
+  resize(ctx, 1200, 800);
+
+  assert.deepEqual(ctx.mainViewport, { x: 0, y: 0, width: 1200, height: 800 });
+  assert.deepEqual(ctx.sized, ['renderer:1200x800', 'labels:1200x800']);
+  assert.equal(ctx.camera.aspect, 1200 / 800);
+  assert.equal(ctx.needsRender, true);
+});
+
+test('setCanvasSize switches to the compact layout at the breakpoint', () => {
+  const wide = sizeCtx(MOBILE_BREAKPOINT_PX + 1, 600);
+  resize(wide, MOBILE_BREAKPOINT_PX + 1, 600);
+  assert.equal(wide.isMobile, false);
+
+  const narrow = sizeCtx(MOBILE_BREAKPOINT_PX, 600);
+  resize(narrow, MOBILE_BREAKPOINT_PX, 600);
+  assert.equal(narrow.isMobile, true);
+});
+
+test('setCanvasSize anchors a square PiP to the top-right corner', () => {
+  const ctx = sizeCtx(1200, 800);
+  resize(ctx, 1200, 800);
+
+  const { x, y, width, height } = ctx.pipViewport;
+  assert.equal(width, height, 'the PiP viewport is not square');
+  assert.equal(height, Math.floor(800 * 0.3), 'the PiP is not 30% of the smaller dimension');
+  assert.equal(x + width, 1200, 'the PiP is not flush with the right edge');
+  assert.equal(y, 0);
+  assert.equal(ctx.pipCamera.aspect, 1, 'a non-square PiP camera distorts the corner view');
+});
+
+test('setCanvasSize sizes the PiP off the short side on a portrait container', () => {
+  const ctx = sizeCtx(400, 1000);
+  resize(ctx, 400, 1000);
+
+  assert.equal(ctx.pipViewport.width, Math.floor(400 * 0.3));
+});
+
+test('setCanvasSize frames the sphere on the first layout', () => {
+  const ctx = sizeCtx(1200, 800);
+  resize(ctx, 1200, 800);
+
+  assert.ok(Math.abs(verticalCoverage(ctx) - 0.85) < 1e-12);
+  // setLength rescales the radius only, so the starting orbit direction survives.
+  assert.equal(ctx.camera.position.x, 0);
+  assert.equal(ctx.camera.position.y, 0);
+});
+
+test('setCanvasSize backs the camera off when the container turns portrait', () => {
+  const ctx = sizeCtx(1200, 800);
+  resize(ctx, 1200, 800);
+  const landscape = orbitRadius(ctx);
+
+  resize(ctx, 800, 1200);
+  assert.ok(orbitRadius(ctx) > landscape, 'a portrait view clipped the sphere');
+  // Width is the binding dimension below aspect 1, so the sphere covers 85% of it.
+  assert.ok(Math.abs(verticalCoverage(ctx) / ctx.camera.aspect - 0.85) < 1e-9);
+});
+
+test('setCanvasSize preserves a user zoom across a later resize', () => {
+  const ctx = sizeCtx(1200, 800);
+  resize(ctx, 1200, 800);
+  const fitted = ctx.fittedDistance;
+
+  ctx.camera.position.setLength(fitted * 1.8); // the user dollied out
+  resize(ctx, 800, 1200);
+
+  assert.ok(Math.abs(orbitRadius(ctx) - fitted * 1.8) < 1e-9,
+    'the resize stole the user zoom');
+  assert.equal(ctx.fittedDistance, fitted, 'a preserved zoom moved the fit anchor');
+});
+
+test('setCanvasSize re-fits a radius still within a permille of the fit', () => {
+  const ctx = sizeCtx(1200, 800);
+  resize(ctx, 1200, 800);
+  const fitted = ctx.fittedDistance;
+
+  // Float noise from the orbit controls, not a user zoom: snapped back.
+  ctx.camera.position.setLength(fitted * (1 + 5e-4));
+  resize(ctx, 1200, 800, 2);
+  assert.ok(Math.abs(orbitRadius(ctx) - fitted) < 1e-9, 'sub-permille drift was read as a zoom');
+
+  // A tenfold larger offset is a deliberate zoom and survives the same resize.
+  ctx.camera.position.setLength(fitted * (1 + 5e-3));
+  resize(ctx, 1200, 800, 1);
+  assert.ok(Math.abs(orbitRadius(ctx) - fitted * (1 + 5e-3)) < 1e-9,
+    'a real zoom was snapped back to the fit');
+});
+
+test('setCanvasSize re-fits after a rotation, which leaves the radius alone', () => {
+  const ctx = sizeCtx(1200, 800);
+  resize(ctx, 1200, 800);
+  const fitted = ctx.fittedDistance;
+
+  ctx.camera.position.set(fitted, 0, 0); // orbited, same radius
+  resize(ctx, 800, 1200);
+
+  assert.ok(ctx.fittedDistance > fitted, 'rotation blocked the portrait re-fit');
+  assert.ok(Math.abs(ctx.camera.position.x - ctx.fittedDistance) < 1e-9,
+    're-fitting rotated the camera');
+  assert.equal(ctx.camera.position.y, 0);
+});
+
+test('setCanvasSize caps the pixel ratio at the CSS resolution', () => {
+  const ctx = sizeCtx(1200, 800);
+
+  resize(ctx, 1200, 800, 3);
+  assert.equal(ctx.renderer.pixelRatio, 1, 'a 3x display rendered at 3x fill cost');
+
+  resize(ctx, 1200, 800, 0.75);
+  assert.equal(ctx.renderer.pixelRatio, 0.75, 'a sub-1x display was upscaled');
 });
 
 // ---------------------------------------------------------------------------
@@ -673,4 +888,330 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
 
   ctx.handlers.blur();
   assert.equal(ctx.classes.has('keyboard-focus'), false);
+});
+
+// ---------------------------------------------------------------------------
+// precomputeMatrices / updateResolution
+// ---------------------------------------------------------------------------
+
+/** Minimal `this` for precomputeMatrices: a grid and a mesh recording its matrices.
+ * @param {number} w - Grid width in pixels.
+ * @param {number} h - Grid height in pixels.
+ * @returns {Object} Context object for prototype.call, carrying the matrix log.
+ */
+function matricesCtx(w, h) {
+  const matrices = [];
+  return {
+    W: w,
+    H: h,
+    H_OFFSET: Daydream.H_OFFSET,
+    pixels: null,
+    matrices,
+    dotMesh: {
+      count: w * h,
+      instanceColor: null,
+      instanceMatrix: { needsUpdate: false },
+      setMatrixAt: (i, m) => { matrices[i] = m.clone(); },
+    },
+  };
+}
+
+/** Instance position for pixel index `i`.
+ * @param {Object} ctx - Context from matricesCtx() after the call.
+ * @param {number} i - Instance index.
+ * @returns {THREE.Vector3} The dot centre.
+ */
+const dotAt = (ctx, i) =>
+  new THREE.Vector3().setFromMatrixPosition(ctx.matrices[i]);
+
+test('precomputeMatrices places one dot per pixel on the sphere surface', () => {
+  const ctx = matricesCtx(8, 5);
+  Daydream.prototype.precomputeMatrices.call(ctx);
+
+  assert.equal(ctx.matrices.length, 8 * 5);
+  for (let i = 0; i < 8 * 5; i++) {
+    assert.ok(Math.abs(dotAt(ctx, i).length() - Daydream.SPHERE_RADIUS) < 1e-4,
+      `instance ${i} left the sphere surface`);
+  }
+});
+
+test('precomputeMatrices faces every dot outward', () => {
+  const ctx = matricesCtx(8, 5);
+  Daydream.prototype.precomputeMatrices.call(ctx);
+
+  for (let i = 0; i < 8 * 5; i++) {
+    const e = ctx.matrices[i].elements;
+    // The injected shader hides a dot by its outward normal and extends it along
+    // local +x, so local +z must be the surface normal.
+    const forward = new THREE.Vector3(e[8], e[9], e[10]).normalize();
+    assert.ok(forward.dot(dotAt(ctx, i).normalize()) > 1 - 1e-6,
+      `instance ${i} faces into the sphere`);
+  }
+});
+
+test('precomputeMatrices lays rows out north to south and columns apart', () => {
+  const ctx = matricesCtx(8, 5);
+  Daydream.prototype.precomputeMatrices.call(ctx);
+
+  for (let y = 1; y < 5; y++) {
+    assert.ok(dotAt(ctx, y * 8).y < dotAt(ctx, (y - 1) * 8).y,
+      `row ${y} did not descend`);
+  }
+  const seen = new Set();
+  for (let x = 0; x < 8; x++) {
+    const p = dotAt(ctx, 8 + x);
+    seen.add(`${p.x.toFixed(5)},${p.z.toFixed(5)}`);
+  }
+  assert.equal(seen.size, 8, 'columns of one row shared a position');
+});
+
+test('precomputeMatrices allocates a zeroed color buffer the driver aliases', () => {
+  const ctx = matricesCtx(8, 5);
+  Daydream.prototype.precomputeMatrices.call(ctx);
+
+  const attribute = ctx.dotMesh.instanceColor;
+  assert.equal(attribute.itemSize, 3);
+  assert.equal(attribute.array.length, 8 * 5 * 3);
+  assert.ok(attribute.array.every((v) => v === 0));
+  assert.equal(ctx.pixels, attribute.array, 'driver.pixels does not alias the buffer');
+});
+
+test('precomputeMatrices keeps an existing color buffer rather than reallocating', () => {
+  const ctx = matricesCtx(8, 5);
+  const wasmView = new Uint16Array(8 * 5 * 3).fill(7);
+  ctx.dotMesh.instanceColor =
+    new THREE.InstancedBufferAttribute(wasmView, 3, true);
+  Daydream.prototype.precomputeMatrices.call(ctx);
+
+  // Reallocating would strand the engine, which writes through this same view.
+  assert.equal(ctx.dotMesh.instanceColor.array, wasmView);
+  assert.equal(ctx.pixels, wasmView);
+  assert.ok(wasmView.every((v) => v === 0), 'the reused buffer kept a stale frame');
+});
+
+test('precomputeMatrices flags both instance attributes for upload', () => {
+  const ctx = matricesCtx(8, 5);
+  Daydream.prototype.precomputeMatrices.call(ctx);
+
+  assert.equal(ctx.dotMesh.instanceMatrix.needsUpdate, true);
+  assert.equal(ctx.dotMesh.instanceColor.version, 1);
+});
+
+test('precomputeMatrices tolerates a driver with no mesh yet', () => {
+  const ctx = matricesCtx(8, 5);
+  ctx.dotMesh = null;
+  Daydream.prototype.precomputeMatrices.call(ctx);
+
+  assert.equal(ctx.pixels, null);
+});
+
+test('updateResolution rebuilds the mesh and buffer at the new grid', () => {
+  const log = [];
+  const ctx = setupCtx(fakeMesh(log), log);
+  ctx.H_OFFSET = Daydream.H_OFFSET;
+  ctx.setupDots = Daydream.prototype.setupDots;
+  ctx.precomputeMatrices = Daydream.prototype.precomputeMatrices;
+  ctx.invalidate = Daydream.prototype.invalidate;
+
+  Daydream.prototype.updateResolution.call(ctx, 12, 6, 5);
+
+  assert.equal(ctx.W, 12);
+  assert.equal(ctx.H, 6);
+  assert.equal(ctx.DOT_SIZE, 5);
+  assert.equal(ctx.dotMesh.count, 12 * 6);
+  assert.equal(ctx.dotGeometry.parameters.radius, 5);
+  assert.equal(ctx.pixels.length, 12 * 6 * 3);
+  // The rebuilt buffer is black; without a repaint the pre-resize image sticks.
+  assert.equal(ctx.needsRender, true);
+});
+
+// ---------------------------------------------------------------------------
+// updateCullUniforms
+// ---------------------------------------------------------------------------
+
+/** Minimal `this` for updateCullUniforms: a bound material's uniform block.
+ * @returns {Object} Context object for prototype.call.
+ */
+function cullCtx() {
+  return {
+    W: 96,
+    DOT_SIZE: Daydream.DEFAULT_DOT_SIZE,
+    camera: { position: new THREE.Vector3(3, -4, 12) },
+    cullBackSphere: false,
+    strobeColumns: true,
+    columnFillOverlap: 1.15,
+    cullUniforms: {
+      uCameraPos: { value: new THREE.Vector3() },
+      uCullThreshold: { value: NaN },
+      uColumnFillArc: { value: NaN },
+    },
+  };
+}
+
+test('updateCullUniforms publishes the live camera position', () => {
+  const ctx = cullCtx();
+  Daydream.prototype.updateCullUniforms.call(ctx);
+
+  assert.deepEqual(ctx.cullUniforms.uCameraPos.value.toArray(), [3, -4, 12]);
+});
+
+test('updateCullUniforms culls nothing until back-face culling is on', () => {
+  const ctx = cullCtx();
+  Daydream.prototype.updateCullUniforms.call(ctx);
+  // The shader compares a normalized dot product, so nothing reaches below -1.
+  assert.ok(ctx.cullUniforms.uCullThreshold.value < -1,
+    'the far hemisphere was culled with the toggle off');
+
+  ctx.cullBackSphere = true;
+  Daydream.prototype.updateCullUniforms.call(ctx);
+  const threshold = ctx.cullUniforms.uCullThreshold.value;
+  assert.ok(threshold > -1 && threshold < 0,
+    'culling kept the far hemisphere, or ate the visible one');
+});
+
+test('updateCullUniforms gap-fills columns only for a persisting effect', () => {
+  const ctx = cullCtx();
+  Daydream.prototype.updateCullUniforms.call(ctx);
+  assert.equal(ctx.cullUniforms.uColumnFillArc.value, 0, 'strobed dots were smeared');
+
+  ctx.strobeColumns = false;
+  Daydream.prototype.updateCullUniforms.call(ctx);
+  const arc = ctx.cullUniforms.uColumnFillArc.value;
+  assert.ok(arc > 0);
+
+  // The fill is a per-column half-arc: twice the columns, half the arc.
+  ctx.W = 192;
+  Daydream.prototype.updateCullUniforms.call(ctx);
+  assert.ok(Math.abs(ctx.cullUniforms.uColumnFillArc.value - arc / 2) < 1e-9);
+
+  // Overlap scales it linearly.
+  ctx.W = 96;
+  ctx.columnFillOverlap *= 2;
+  Daydream.prototype.updateCullUniforms.call(ctx);
+  assert.ok(Math.abs(ctx.cullUniforms.uColumnFillArc.value - arc * 2) < 1e-9);
+});
+
+test('updateCullUniforms is a no-op before the material has compiled', () => {
+  const ctx = cullCtx();
+  ctx.cullUniforms = null;
+  Daydream.prototype.updateCullUniforms.call(ctx);
+});
+
+// ---------------------------------------------------------------------------
+// refreshLabels
+// ---------------------------------------------------------------------------
+
+/** Minimal `this` for refreshLabels: a label pool recording what it was handed.
+ * @param {THREE.Vector3} cameraPosition - Where the camera sits this frame.
+ * @returns {Object} Context object for prototype.call, carrying `acquired`.
+ */
+function labelCtx(cameraPosition) {
+  const acquired = [];
+  return {
+    acquired,
+    labelAxes: true,
+    camera: { position: cameraPosition },
+    labelPool: {
+      activeCount: 0,
+      cleanups: 0,
+      reset() { acquired.length = 0; },
+      acquire(position, content) { acquired.push({ position, content }); },
+      cleanup() { this.cleanups++; },
+    },
+  };
+}
+
+/** Label texts acquired this frame.
+ * @param {Object} ctx - Context from labelCtx() after the call.
+ * @returns {Array<string>} Acquired label contents.
+ */
+const labelTexts = (ctx) => ctx.acquired.map((a) => a.content);
+
+test('refreshLabels acquires only the camera-facing axis ends', () => {
+  const ctx = labelCtx(new THREE.Vector3(1, 1, 1).setLength(Daydream.CAMERA_Z));
+  Daydream.prototype.refreshLabels.call(ctx);
+
+  assert.deepEqual(labelTexts(ctx), ['X', 'Y', 'Z']);
+  assert.equal(ctx.labelPool.cleanups, 1, 'surplus labels from last frame were left up');
+});
+
+test('refreshLabels keeps the visible set the same at any orbit distance', () => {
+  const direction = new THREE.Vector3(0.25, 1, 0.4).normalize();
+
+  const near = labelCtx(direction.clone().setLength(140));
+  Daydream.prototype.refreshLabels.call(near);
+  const far = labelCtx(direction.clone().setLength(900));
+  Daydream.prototype.refreshLabels.call(far);
+
+  assert.deepEqual(labelTexts(far), labelTexts(near));
+  assert.ok(labelTexts(near).length > 0 && labelTexts(near).length < 6);
+});
+
+test('refreshLabels hands the pool the unscaled axis direction', () => {
+  const ctx = labelCtx(new THREE.Vector3(0, 0, Daydream.CAMERA_Z));
+  Daydream.prototype.refreshLabels.call(ctx);
+
+  assert.deepEqual(labelTexts(ctx), ['Z']);
+  assert.equal(ctx.acquired[0].position, Daydream.Z_AXIS);
+});
+
+test('refreshLabels acquires nothing while the axes are hidden', () => {
+  const ctx = labelCtx(new THREE.Vector3(1, 1, 1).setLength(Daydream.CAMERA_Z));
+  ctx.labelAxes = false;
+  Daydream.prototype.refreshLabels.call(ctx);
+
+  assert.deepEqual(labelTexts(ctx), []);
+  assert.equal(ctx.labelPool.cleanups, 1, 'labels from the previous frame were stranded');
+});
+
+// ---------------------------------------------------------------------------
+// keydown (pause / single-step)
+// ---------------------------------------------------------------------------
+
+/** Keydown event stand-in recording whether the default was prevented.
+ * @param {string} key - The pressed key.
+ * @returns {Object} Event with a `prevented` flag.
+ */
+function keyEvent(key) {
+  return { key, prevented: false, preventDefault() { this.prevented = true; } };
+}
+
+test('space pauses and resumes, dropping any queued step on resume', () => {
+  const ctx = { paused: false, stepFrames: 3 };
+
+  const pause = keyEvent(' ');
+  Daydream.prototype.keydown.call(ctx, pause);
+  assert.equal(ctx.paused, true);
+  // Space also scrolls the page on the mobile layout.
+  assert.equal(pause.prevented, true);
+
+  Daydream.prototype.keydown.call(ctx, keyEvent(' '));
+  assert.equal(ctx.paused, false);
+  assert.equal(ctx.stepFrames, 0, 'a queued step survived the resume');
+});
+
+test('right-arrow queues single frames only while paused', () => {
+  const ctx = { paused: false, stepFrames: 0 };
+
+  const running = keyEvent('ArrowRight');
+  Daydream.prototype.keydown.call(ctx, running);
+  assert.equal(ctx.stepFrames, 0);
+  assert.equal(running.prevented, false, 'the arrow key was stolen from the orbit');
+
+  ctx.paused = true;
+  const stepped = keyEvent('ArrowRight');
+  Daydream.prototype.keydown.call(ctx, stepped);
+  Daydream.prototype.keydown.call(ctx, keyEvent('ArrowRight'));
+  assert.equal(ctx.stepFrames, 2, 'held steps did not queue');
+  assert.equal(stepped.prevented, true);
+});
+
+test('keydown ignores keys it does not own', () => {
+  const ctx = { paused: true, stepFrames: 0 };
+  const other = keyEvent('ArrowLeft');
+  Daydream.prototype.keydown.call(ctx, other);
+
+  assert.equal(ctx.paused, true);
+  assert.equal(ctx.stepFrames, 0);
+  assert.equal(other.prevented, false);
 });
