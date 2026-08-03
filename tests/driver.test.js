@@ -403,6 +403,109 @@ test('a held tick honours captureReady before capturing', () => {
 });
 
 // ---------------------------------------------------------------------------
+// renderPip
+// ---------------------------------------------------------------------------
+
+/** Minimal `this` for renderPip: a desktop view with the toggle on.
+ * @param {Array<string>} log - Ordered event sink.
+ * @returns {Object} Context object for prototype.call.
+ */
+function pipCtx(log) {
+  return {
+    showPip: true,
+    isMobile: false,
+    recorder: null,
+    pipViewport: { x: 70, y: 0, width: 30, height: 30 },
+    camera: {
+      position: new THREE.Vector3(0, 40, 90),
+      quaternion: new THREE.Quaternion(0, 1, 0, 0),
+    },
+    pipCamera: {
+      position: new THREE.Vector3(),
+      quaternion: new THREE.Quaternion(),
+    },
+    renderer: {
+      setViewport: (...a) => log.push(`viewport:${a.join(',')}`),
+      setScissor: (...a) => log.push(`scissor:${a.join(',')}`),
+      render: () => log.push('render'),
+    },
+  };
+}
+
+/**
+ * Runs `body` with navigator.webdriver set, as a headless automation driver
+ * leaves it, restoring the real navigator afterwards.
+ * @param {Function} body - Code to run under the stubbed navigator.
+ * @returns {void}
+ */
+function withWebdriver(body) {
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator',
+    { value: { webdriver: true }, configurable: true });
+  try { body(); } finally { Object.defineProperty(globalThis, 'navigator', saved); }
+}
+
+test('renderPip draws the corner view into its own scissored viewport', () => {
+  const log = [];
+  const ctx = pipCtx(log);
+  Daydream.prototype.renderPip.call(ctx);
+
+  assert.deepEqual(log, ['viewport:70,0,30,30', 'scissor:70,0,30,30', 'render']);
+});
+
+test('renderPip points the PiP camera at the main camera pose', () => {
+  const log = [];
+  const ctx = pipCtx(log);
+  Daydream.prototype.renderPip.call(ctx);
+
+  assert.deepEqual(ctx.pipCamera.position.toArray(), ctx.camera.position.toArray());
+  assert.deepEqual(ctx.pipCamera.quaternion.toArray(), ctx.camera.quaternion.toArray());
+});
+
+test('renderPip skips the second mesh pass while the toggle is off', () => {
+  const log = [];
+  const ctx = pipCtx(log);
+  ctx.showPip = false;
+  Daydream.prototype.renderPip.call(ctx);
+
+  assert.deepEqual(log, [], 'the toggle did not suppress the PiP pass');
+});
+
+test('renderPip stays suppressed on mobile and while recording', () => {
+  for (const suppress of [
+    (ctx) => { ctx.isMobile = true; },
+    (ctx) => { ctx.recorder = { isRecording: true }; },
+  ]) {
+    const log = [];
+    const ctx = pipCtx(log);
+    suppress(ctx);
+    Daydream.prototype.renderPip.call(ctx);
+    assert.deepEqual(log, []);
+  }
+});
+
+test('renderPip stays suppressed under headless automation', () => {
+  const log = [];
+  const ctx = pipCtx(log);
+  withWebdriver(() => Daydream.prototype.renderPip.call(ctx));
+
+  assert.deepEqual(log, []);
+});
+
+test('a live recording suppresses the PiP even with the toggle on', () => {
+  const log = [];
+  const ctx = pipCtx(log);
+  ctx.recorder = { isRecording: false };
+  Daydream.prototype.renderPip.call(ctx);
+  assert.ok(log.includes('render'));
+
+  log.length = 0;
+  ctx.recorder.isRecording = true;
+  Daydream.prototype.renderPip.call(ctx);
+  assert.deepEqual(log, []);
+});
+
+// ---------------------------------------------------------------------------
 // setupContextLossHandling
 // ---------------------------------------------------------------------------
 

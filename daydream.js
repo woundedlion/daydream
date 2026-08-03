@@ -425,6 +425,7 @@ testAllController = guiInstance.addSession({ testAll: false }, 'testAll').name('
 
 guiInstance.add(daydream, 'labelAxes').name('Show Axes').onChange(() => daydream.invalidate());
 guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(() => daydream.invalidate());
+guiInstance.add(daydream, 'showPip').name('Show PiP').onChange(() => daydream.invalidate());
 guiInstance.add(daydream, 'columnFillOverlap', 1.0, 2.0, 0.01).name('Column Fill Overlap').onChange(() => daydream.invalidate());
 
 // Near-pole azimuthal shading decimation. 1.0 is the physically-neutral
