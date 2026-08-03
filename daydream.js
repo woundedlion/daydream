@@ -19,7 +19,9 @@ import {
 import { createEffectGui } from "./effect_gui.js";
 import {
   createAppTeardown,
+  createGlobalKeydownHandler,
   createModuleLoadHandlers,
+  createPoleLodBinding,
   createRenderAdapter,
   createUnhandledRejectionHandler,
   repointDisplayAliases,
@@ -248,7 +250,7 @@ const moduleLoad = createModuleLoadHandlers({
 
     // Push the Pole LOD value the GUI settled on during the async WASM-load
     // window; its onChange no-op'd while host.engine was null.
-    host.engine.setPoleLod(poleLodState.poleLod);
+    poleLod.replay();
 
     syncResolutionOptions(module);
 
@@ -428,14 +430,12 @@ guiInstance.add(daydream, 'cullBackSphere').name('Cull Back Sphere').onChange(()
 guiInstance.add(daydream, 'showPip').name('Show PiP').onChange(() => daydream.invalidate());
 guiInstance.add(daydream, 'columnFillOverlap', 1.0, 2.0, 0.01).name('Column Fill Overlap').onChange(() => daydream.invalidate());
 
-// Near-pole azimuthal shading decimation. 1.0 is the physically-neutral
-// setting: one shade per run of columns sharing an LED footprint. Higher
-// trades fidelity for render time; 0 disables.
-const poleLodState = { poleLod: 0 };
-guiInstance.add(poleLodState, 'poleLod', 0, 2, 0.05).name('Pole LOD').onChange(v => {
-  host.engine?.setPoleLod(v);
-  daydream.invalidate();
+const poleLod = createPoleLodBinding({
+  getEngine: () => host.engine,
+  onChange: () => daydream.invalidate(),
 });
+guiInstance.add(poleLod.state, 'poleLod', 0, 2, 0.05).name('Pole LOD')
+  .onChange((v) => poleLod.apply(v));
 
 // ── Segmented POV controls ──────────────────────────────────────────────────
 const segFolder = guiInstance.addFolder('Segmented POV');
@@ -578,20 +578,7 @@ const recFormatCtrl =
   recFolder.addSession(recSettings, 'recFormat', Object.keys(REC_FORMATS)).name('Rec Format');
 const recordCtrl = recFolder.add(recordState, 'record').name('\u25cf Record');
 recordCtrl.disable();
-const INTERACTIVE_KEY_TARGET =
-  'input, textarea, select, button, [contenteditable], .lil-gui, .effect-sidebar';
-/**
- * Window keydown handler for global playback shortcuts. Ignores keys whose
- * target sits inside an interactive element (gui control, sidebar, input) so
- * activating those controls doesn't also toggle the simulation.
- * @param {KeyboardEvent} e - The keydown event.
- * @returns {void}
- */
-const onKeyDown = (e) => {
-  const t = e.target;
-  if (t instanceof Element && t.closest(INTERACTIVE_KEY_TARGET)) return;
-  daydream.keydown(e);
-};
+const onKeyDown = createGlobalKeydownHandler({ dispatch: (e) => daydream.keydown(e) });
 window.addEventListener("keydown", onKeyDown);
 
 const onUnhandledRejection = createUnhandledRejectionHandler({ report: showFatalError });

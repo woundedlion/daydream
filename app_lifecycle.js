@@ -210,6 +210,65 @@ export function createAppTeardown({
   return { dispose, onPageHide, disposed: () => appDisposed };
 }
 
+// Elements that own their keystrokes: a key landing inside one belongs to that
+// control, not to the global shortcuts.
+export const INTERACTIVE_KEY_TARGET =
+  'input, textarea, select, button, [contenteditable], .lil-gui, .effect-sidebar';
+
+/**
+ * Build the window keydown handler for the global playback shortcuts.
+ *
+ * A key typed into a GUI control, the sidebar, or any text field is that
+ * element's, so it never also drives the simulation. The target is only a node
+ * for a key that landed in the document; anything else falls through to the
+ * shortcuts.
+ *
+ * @param {Object} deps - Injected app collaborators.
+ * @param {(e: KeyboardEvent) => void} deps.dispatch - Runs the shortcut.
+ * @returns {(e: KeyboardEvent) => void} The handler.
+ */
+export function createGlobalKeydownHandler({ dispatch }) {
+  return (e) => {
+    const target = e.target;
+    if (target instanceof Element && target.closest(INTERACTIVE_KEY_TARGET)) return;
+    dispatch(e);
+  };
+}
+
+/**
+ * Bind the Pole LOD control to an engine that does not exist yet.
+ *
+ * DeepLinkGUI replays a URL-hydrated control's onChange at registration, during
+ * module evaluation, while the engine is still null — so the value's only
+ * durable home is this state, and replay() is what carries it (deep-linked or
+ * default) into the engine the module load builds.
+ *
+ * @param {Object} deps - Injected app collaborators.
+ * @param {() => ?{setPoleLod: (v: number) => void}} deps.getEngine - Reads the
+ *   main engine, null until the module load resolves.
+ * @param {() => void} deps.onChange - Invalidates the scene after a change.
+ * @returns {{state: {poleLod: number}, apply: (v: number) => void,
+ *   replay: () => void}} The GUI-bound state object, the control's onChange
+ *   sink, and the post-load replay.
+ */
+export function createPoleLodBinding({ getEngine, onChange }) {
+  // Near-pole azimuthal shading decimation. 1.0 is the physically-neutral
+  // setting: one shade per run of columns sharing an LED footprint. Higher
+  // trades fidelity for render time; 0 disables.
+  const state = { poleLod: 0 };
+  return {
+    state,
+    apply(value) {
+      state.poleLod = value;
+      getEngine()?.setPoleLod(value);
+      onChange();
+    },
+    replay() {
+      getEngine()?.setPoleLod(state.poleLod);
+    },
+  };
+}
+
 /**
  * Build the window `unhandledrejection` handler.
  *

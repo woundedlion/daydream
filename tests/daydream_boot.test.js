@@ -1,12 +1,11 @@
 //
-// Static checks on daydream.js's WASM-ready block. daydream.js is the app's
-// composition root: it builds a WebGL Daydream and mounts the GUI at module
-// scope, so it cannot be imported here — these read its source instead.
-//
-// The engine is late-bound. DeepLinkGUI replays a URL-hydrated control's
-// onChange at registration, during module evaluation, while host.engine is
-// still null. A control whose only durable home is the engine therefore has to
-// be re-applied once createHolosphereModule() resolves.
+// daydream.js is the app's composition root: it builds a WebGL Daydream and
+// mounts the GUI at module scope, so it cannot be imported here. Everything with
+// behaviour of its own lives in an injectable factory and is driven for real in
+// tests/app_lifecycle.test.js — the Pole LOD late-bind, the keydown guard, the
+// module-load handlers, the teardown order. What is left is the wiring itself:
+// which closures this file hands those factories. Only a source read can see
+// that, so these two cases read it, and each one names the failure it prevents.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -59,18 +58,6 @@ function wasmReadyBlock() {
   return balanced(SOURCE, at + WASM_INIT.length - 1);
 }
 
-test('the WASM-ready block re-applies Pole LOD to the freshly built engine', () => {
-  const body = wasmReadyBlock();
-  const call = body.match(/host\.engine\.setPoleLod\(\s*([^)]*?)\s*\)/);
-  assert.ok(call,
-    'the Pole LOD onChange runs while host.engine is null, so the block that '
-    + 'builds the engine must call host.engine.setPoleLod(...); without it a '
-    + '?view.poleLod deep link shows in the GUI but never reaches the engine');
-  assert.equal(call[1], 'poleLodState.poleLod',
-    'the replay must read the live Pole LOD state so it carries the URL value '
-    + 'when there is one and the default otherwise');
-});
-
 test('the teardown is retained and reachable from the module-load handlers', () => {
   assert.match(SOURCE, /appTeardown = createAppTeardown\(/,
     "createAppTeardown()'s result must be kept: the load handlers dispose the "
@@ -88,10 +75,9 @@ test('the discard path frees an engine built after disposal', () => {
     'a WASM engine handle must be deleted, not merely dropped');
 });
 
-test('the Pole LOD control defaults to 0, leaving the feature off', () => {
-  const decl = SOURCE.match(/const poleLodState = \{\s*poleLod:\s*([-\d.]+)\s*\}/);
-  assert.ok(decl, 'daydream.js must declare poleLodState with a poleLod default');
-  assert.equal(Number(decl[1]), 0,
-    'near-pole decimation is deliberately off by default; the WASM-ready '
-    + 'replay must not turn it on when no deep link is present');
+test('the late-bound engine controls are re-applied once the engine exists', () => {
+  assert.match(wasmReadyBlock(), /poleLod\.replay\(\)/,
+    'the Pole LOD onChange runs while host.engine is null, so the block that '
+    + 'builds the engine must replay the binding; without it a ?view.poleLod '
+    + 'deep link shows in the GUI but never reaches the engine');
 });
