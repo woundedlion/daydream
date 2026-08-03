@@ -8,6 +8,7 @@ import {
   paramGenerationStale,
   runSwitchTransaction,
   applyInitialState,
+  ApplyResult,
   snapshotEffectControlState,
   restoreEffectControlState,
   offeredResolutions,
@@ -112,7 +113,7 @@ test('initial state dismisses the loader only after a successful apply', () => {
   const events = [];
 
   applyInitialState(
-    () => { events.push('apply'); },
+    () => { events.push('apply'); return ApplyResult.APPLIED; },
     () => { events.push('dismiss'); },
   );
 
@@ -123,7 +124,7 @@ test('a rejected initial state keeps the loader visible and throws', () => {
   let dismissed = false;
 
   assert.throws(
-    () => applyInitialState(() => false, () => { dismissed = true; }),
+    () => applyInitialState(() => ApplyResult.REJECTED, () => { dismissed = true; }),
     /initialization was rejected/,
   );
   assert.equal(dismissed, false);
@@ -142,7 +143,7 @@ test('a thrown initial state keeps the loader visible and propagates the error',
 
 test('a successful switch leaves the previous applied state untouched', () => {
   let rollbacks = 0;
-  const result = runSwitchTransaction(() => true, () => { rollbacks++; });
+  const result = runSwitchTransaction(() => ApplyResult.APPLIED, () => { rollbacks++; });
 
   assert.deepEqual(result, { applied: true, failure: null, recoveryFailure: null });
   assert.equal(rollbacks, 0);
@@ -150,7 +151,7 @@ test('a successful switch leaves the previous applied state untouched', () => {
 
 test('a rejected switch restores the previous applied state', () => {
   let restored = false;
-  const result = runSwitchTransaction(() => false, () => { restored = true; });
+  const result = runSwitchTransaction(() => ApplyResult.REJECTED, () => { restored = true; });
 
   assert.deepEqual(result, { applied: false, failure: null, recoveryFailure: null });
   assert.equal(restored, true);
@@ -524,7 +525,7 @@ function makeApp({
 test('applying an effect points the engine at it and rebuilds the panel', () => {
   const app = makeApp();
 
-  assert.equal(app.pipeline.applyEffect(), undefined);
+  assert.equal(app.pipeline.applyEffect(), ApplyResult.APPLIED);
 
   assert.deepEqual(app.log, [
     'engine.setEffect Alpha',
@@ -549,7 +550,7 @@ test('a preserved apply keeps the effect param deep links', () => {
 test('an engine rejection leaves the panel and the workers untouched', () => {
   const app = makeApp({ rejectEffects: ['Alpha'], segmented: true });
 
-  assert.equal(app.pipeline.applyEffect(), false);
+  assert.equal(app.pipeline.applyEffect(), ApplyResult.REJECTED);
 
   assert.deepEqual(app.log, ['engine.setEffect Alpha', 'driver.setStrobeColumns 7']);
   assert.match(app.errors[0], /setEffect\("Alpha"\) failed/);
@@ -593,7 +594,7 @@ test('an engine that has not loaded yet still gets a sidebar and a mount point',
 test('a resolution change resizes every renderer before re-applying the effect', () => {
   const app = makeApp({ segmented: true });
 
-  assert.equal(app.pipeline.applyResolution(), undefined);
+  assert.equal(app.pipeline.applyResolution(), ApplyResult.APPLIED);
 
   assert.deepEqual(app.log, [
     'engine.setResolution 288x144',
@@ -618,7 +619,7 @@ test('a resolution change resizes every renderer before re-applying the effect',
 test('an unknown preset changes nothing', () => {
   const app = makeApp({ resolution: 'Mid' });
 
-  assert.equal(app.pipeline.applyResolution(), false);
+  assert.equal(app.pipeline.applyResolution(), ApplyResult.REJECTED);
 
   assert.deepEqual(app.log, []);
   assert.match(app.errors[0], /Unknown resolution preset "Mid"/);
@@ -627,7 +628,7 @@ test('an unknown preset changes nothing', () => {
 test('an engine that cannot build the resolution leaves the scene at its old size', () => {
   const app = makeApp({ rejectResolutions: ['288x144'] });
 
-  assert.equal(app.pipeline.applyResolution(), false);
+  assert.equal(app.pipeline.applyResolution(), ApplyResult.REJECTED);
 
   assert.deepEqual(app.log, ['engine.setResolution 288x144']);
   assert.match(app.errors[0], /Unsupported resolution 288x144/);
@@ -666,7 +667,7 @@ test('a rollback applies the corrected effect itself, its subscription being mut
 test('a refused effect correction rejects the resolution change', () => {
   const app = makeApp({ resolution: 'Lo', effect: 'Gamma', refuseEffectSet: true });
 
-  assert.equal(app.pipeline.applyResolution(), false);
+  assert.equal(app.pipeline.applyResolution(), ApplyResult.REJECTED);
 
   assert.equal(app.log.includes('driver.invalidate'), false);
 });
@@ -674,7 +675,7 @@ test('a refused effect correction rejects the resolution change', () => {
 test('an effect the resized engine rejects rejects the resolution change', () => {
   const app = makeApp({ rejectEffects: ['Alpha'] });
 
-  assert.equal(app.pipeline.applyResolution(), false);
+  assert.equal(app.pipeline.applyResolution(), ApplyResult.REJECTED);
 
   assert.equal(app.log.includes('driver.invalidate'), false);
 });

@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { AppState } from '../state.js';
-import { createSwitchCoordinator } from '../effect_sequencing.js';
+import { ApplyResult, createSwitchCoordinator } from '../effect_sequencing.js';
 
 // An effect GUI record in the shape snapshotEffectControlState() reads: one
 // writable "Speed" control plus the pause toggle.
@@ -59,10 +59,11 @@ function makeApp({
       restoring: app.switches.isRestoring(),
     });
     if (throwOnEffect && !app.switches.isRestoring()) throw throwOnEffect;
-    if (rejectEffects.has(effect)) return false;
+    if (rejectEffects.has(effect)) return ApplyResult.REJECTED;
     app.applied.effect = effect;
     // A successful apply rebuilds the GUI: fresh record, engine-default values.
     app.activeEffect = makeEffectRecord(effect, 0, false);
+    return ApplyResult.APPLIED;
   };
 
   const applyResolution = (preserveParams = false) => {
@@ -71,7 +72,7 @@ function makeApp({
       fn: 'applyResolution', resolution, preserveParams,
       restoring: app.switches.isRestoring(),
     });
-    if (rejectResolutions.has(resolution)) return false;
+    if (rejectResolutions.has(resolution)) return ApplyResult.REJECTED;
     app.applied.resolution = resolution;
     return applyEffect(preserveParams);
   };
@@ -295,8 +296,8 @@ test('dispose() is idempotent and does not drop a second coordinator', () => {
   const other = createSwitchCoordinator({
     appState: app.appState,
     getActiveEffect: () => null,
-    applyEffect: () => { app.calls.push({ fn: 'other' }); },
-    applyResolution: () => {},
+    applyEffect: () => { app.calls.push({ fn: 'other' }); return ApplyResult.APPLIED; },
+    applyResolution: () => ApplyResult.APPLIED,
     currentUrl: () => '',
     restoreUrl: () => {},
     showResolution: () => {},
