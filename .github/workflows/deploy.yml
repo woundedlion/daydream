@@ -30,6 +30,10 @@
 # the segment cross-check in the JS suite cannot measure the web tiling against a
 # firmware table that has drifted from the engine's header.
 #
+# That install also owns README.md and docs/screenshots/, both of which the deploy
+# job publishes. The gate compares them against the same pinned checkout, so the
+# two repos cannot serve divergent documentation.
+#
 # If the engine repo (woundedlion/pov) is PRIVATE, add a repository secret
 # POV_TOKEN = a PAT with read access. For a public engine repo the default
 # workflow token is sufficient.
@@ -126,6 +130,33 @@ jobs:
             echo "::error::pov_segment_map.json is stale relative to the pinned engine ($(cat holosphere_wasm.sha)) — re-run the Holosphere WASM install and commit the refreshed golden."
             exit 1
           fi
+
+      - name: Verify the committed README and screenshot gallery match the pinned engine
+        # The engine's install rules (Holosphere CMakeLists.txt, DAYDREAM_DIR block)
+        # write README.md and mirror docs/screenshots/ here, and the deploy job
+        # publishes both to Pages. Comparing them against the pinned engine keeps a
+        # daydream-only or stale edit from being served as the shared documentation.
+        # The screenshot comparison is recursive and set-wise, so a missing, extra or
+        # differing image all fail.
+        run: |
+          pin="$(cat holosphere_wasm.sha)"
+          status=0
+          if [ ! -f README.md ]; then
+            echo "::error::README.md not found — the deploy job publishes it. The Holosphere WASM install writes it next to the module; commit it with the .wasm."
+            status=1
+          elif ! cmp -s engine/README.md README.md; then
+            echo "::error::README.md is not byte-identical to the pinned engine ($pin) — re-run the Holosphere WASM install and commit the refreshed README."
+            diff -u engine/README.md README.md | head -n 200
+            status=1
+          fi
+          if [ ! -d docs/screenshots ]; then
+            echo "::error::docs/screenshots/ not found — the published README's gallery has no images. The Holosphere WASM install writes it next to the module; commit it with the .wasm."
+            status=1
+          elif ! diff -rq engine/docs/screenshots docs/screenshots; then
+            echo "::error::docs/screenshots/ does not match the pinned engine ($pin) — each line above names a missing, extra or differing image. Re-run the Holosphere WASM install and commit the refreshed gallery."
+            status=1
+          fi
+          exit $status
 
       - name: Install Clang + Ninja
         # Pin the compiler version (clang-18 = Ubuntu 24.04 default) to match CI
