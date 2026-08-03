@@ -125,13 +125,19 @@ test('the header buttons and grip call their handlers with the row index', () =>
   el.querySelector('.drag-handle').dispatch('mousedown', { kind: 'mouse' });
   el.querySelector('.drag-handle').dispatch('touchstart', { kind: 'touch' });
 
-  assert.deepEqual(calls, [
+  const grip = el.querySelector('.drag-handle');
+  assert.deepEqual(calls.slice(0, 3), [
     ['move', 1, 0],
     ['move', 1, 2],
     ['remove', 1],
-    ['startDrag', { kind: 'mouse' }],
-    ['startDrag', { kind: 'touch' }],
   ]);
+  assert.deepEqual(
+    calls.slice(3).map(([name, ev]) => [name, ev.kind, ev.target === grip]),
+    [
+      ['startDrag', 'mouse', true],
+      ['startDrag', 'touch', true],
+    ],
+  );
 });
 
 test('both parameter inputs report edits, and neither starts a row drag', () => {
