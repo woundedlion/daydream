@@ -23,7 +23,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // Re-exported from their dependency-free modules for scene-based pages.
 export { copyToClipboard, copyWithFeedback, COPY_FEEDBACK, wireCopyBlock } from './clipboard.js';
 export { formatFloatCpp } from './cpp_format.js';
-export { showFatalError, bootstrapTool } from './banner.js';
+export { showFatalError, bootstrapTool, reportPageFailures } from './banner.js';
 
 /** @param {number} ratio @returns {number} */
 export function capPixelRatio(ratio) {

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { showFatalError } from '../tools/banner.js';
+import { showFatalError, bootstrapTool, reportPageFailures } from '../tools/banner.js';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 
 restoreDocumentAfterEach();
@@ -94,4 +94,116 @@ test('showFatalError does not throw when neither body nor documentElement exists
   const { created } = fakeDocument({ body: null });
   assert.doesNotThrow(() => showFatalError('too early'));
   assert.equal(messageOf(created[0]), '⚠ too early');
+});
+
+// --- post-boot failure surface --------------------------------------------
+
+/**
+ * A stand-in for `window`: records listeners so a test can fire the failure
+ * events the browser would, and reports what was dispatched to whom.
+ * @returns {{addEventListener: Function, dispatch: Function, types: () => string[]}}
+ */
+function fakeTarget() {
+  const listeners = new Map();
+  const target = {
+    addEventListener(type, fn) {
+      if (!listeners.has(type)) listeners.set(type, []);
+      listeners.get(type).push(fn);
+    },
+    dispatch(type, event = {}) {
+      for (const fn of listeners.get(type) ?? []) fn(event);
+    },
+    types: () => [...listeners.keys()],
+  };
+  return target;
+}
+
+/**
+ * Runs `fn` with console.error captured.
+ * @param {Function} fn - The body to run.
+ * @returns {Array<Array<*>>} The captured console.error argument lists.
+ */
+function withCapturedConsole(fn) {
+  const original = console.error;
+  const logged = [];
+  console.error = (...args) => logged.push(args);
+  try {
+    fn();
+  } finally {
+    console.error = original;
+  }
+  return logged;
+}
+
+test('reportPageFailures listens for both uncaught errors and unhandled rejections', () => {
+  const target = fakeTarget();
+  reportPageFailures('solids tool', target);
+  assert.deepEqual(target.types().sort(), ['error', 'unhandledrejection']);
+});
+
+test('a post-boot uncaught error raises the banner, not just a console line', () => {
+  const { bodyEl } = fakeDocument();
+  const target = fakeTarget();
+  reportPageFailures('solids tool', target);
+
+  const logged = withCapturedConsole(() => {
+    target.dispatch('error', { error: new Error('renderOps blew up') });
+  });
+
+  assert.equal(bodyEl.children.length, 1, 'no banner for a post-boot error');
+  assert.match(messageOf(bodyEl.children[0]),
+    /^⚠ The solids tool hit an error — renderOps blew up —/);
+  assert.equal(logged.length, 1);
+});
+
+test('a post-boot unhandled rejection raises the banner and is not double-reported', () => {
+  const { bodyEl } = fakeDocument();
+  const target = fakeTarget();
+  reportPageFailures('palette tool', target);
+
+  let prevented = 0;
+  const logged = withCapturedConsole(() => {
+    target.dispatch('unhandledrejection', {
+      reason: new Error('bakeLut rejected'),
+      preventDefault: () => { prevented++; },
+    });
+  });
+
+  assert.equal(prevented, 1, 'the browser duplicate report was not suppressed');
+  assert.match(messageOf(bodyEl.children[0]), /bakeLut rejected/);
+  assert.equal(logged.length, 1);
+});
+
+test('a failed subresource does not raise the page-failure banner', () => {
+  const { bodyEl } = fakeDocument();
+  const target = fakeTarget();
+  reportPageFailures('palette tool', target);
+
+  withCapturedConsole(() => {
+    target.dispatch('error', { target: { tagName: 'IMG' }, error: null });
+  });
+  assert.equal(bodyEl.children.length, 0, 'a subresource error opened a banner');
+});
+
+test('bootstrapTool installs the post-boot surface alongside the load handler', () => {
+  const { bodyEl } = fakeDocument();
+  const target = fakeTarget();
+  bootstrapTool(() => { }, 'Möbius tool', target);
+  assert.deepEqual(target.types().sort(), ['error', 'load', 'unhandledrejection']);
+
+  // The boot path still reports through the same banner.
+  withCapturedConsole(() => {
+    target.dispatch('load');
+    assert.equal(bodyEl.children.length, 0, 'a clean init opened a banner');
+    target.dispatch('error', { error: new Error('after boot') });
+  });
+  assert.match(messageOf(bodyEl.children[0]), /Möbius tool hit an error — after boot/);
+});
+
+test('bootstrapTool still banners a synchronous and an async init failure', () => {
+  const target = fakeTarget();
+  const { bodyEl } = fakeDocument();
+  bootstrapTool(() => { throw new Error('sync boom'); }, 'solids tool', target);
+  withCapturedConsole(() => target.dispatch('load'));
+  assert.match(messageOf(bodyEl.children[0]), /failed to initialize/);
 });
