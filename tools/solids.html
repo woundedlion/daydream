@@ -598,6 +598,7 @@
       PLATONIC_SOLIDS,
       CATALAN_BASES,
       applyOp,
+      meshOpFailure,
       formatSolidName,
       pctSuffix,
       generateFuncAndRecipe,
@@ -952,7 +953,9 @@
           offScene.add(light);
           offScene.add(ambient);
 
-          const wasmMesh = MeshOpsWasm.fromSolidName(key);
+          const wasmMesh = requireMesh(MeshOpsWasm.fromSolidName(key),
+            `Thumbnail for "${key}"`);
+          if (!wasmMesh) continue;
           const meshData = wasmMeshToJs(wasmMesh);
           wasmMesh.delete();
           MeshOpsWasm.clearToolingMemory();
@@ -1743,6 +1746,11 @@
         const bad = new Set();
         const build = (M) => {
           let mesh = M.MeshOps.fromSolidName(base);
+          if (!mesh) {
+            const failure = meshOpFailure(M, `Base solid "${base}"`);
+            if (failure.flush) M.MeshOps.clearToolingMemory();
+            throw new Error(failure.message);
+          }
           for (const o of ops) {
             const next = applyOp(mesh, o);
             mesh.delete();
@@ -1765,8 +1773,9 @@
           }
           try {
             const out = applyOp(mesh, candidate);
-            out.classifyFaces(); // committing would classify; probe that too
+            const classes = out.classifyFaces(); // committing would classify; probe that too
             out.delete();
+            if (!classes) bad.add(op);
           } catch (e) {
             bad.add(op);
             noteValidatorDeath(e);
@@ -1804,6 +1813,25 @@
       return true;
     }
 
+    // Reports a mesh failure on the stats line; the next recompute overwrites it.
+    function showMeshError(message) {
+      console.error(message);
+      const statsEl = document.getElementById('meshStats');
+      if (statsEl) statsEl.textContent = message;
+    }
+
+    // MeshOps answers a recoverable failure with null and records the reason
+    // (getLastResult); an unchecked null becomes a TypeError several calls
+    // later. Reports the reason, applies the remedy it calls for, and returns
+    // null so the caller can bail.
+    function requireMesh(result, what) {
+      if (result) return result;
+      const failure = meshOpFailure(WasmModule, what);
+      if (failure.flush) MeshOpsWasm.clearToolingMemory();
+      showMeshError(failure.message);
+      return null;
+    }
+
     function update() {
       if (!WasmModule || !MeshOpsWasm) return;
 
@@ -1825,7 +1853,9 @@
       let currentWasmMesh = null;
       try {
         // Use the string name directly
-        currentWasmMesh = MeshOpsWasm.fromSolidName(state.base);
+        currentWasmMesh = requireMesh(MeshOpsWasm.fromSolidName(state.base),
+          `Base solid "${state.base}"`);
+        if (!currentWasmMesh) return;
       } catch (e) {
         console.error("Error creating base solid:", e);
         engineTrapped(e);
@@ -1846,10 +1876,9 @@
         // error and skip the render rather than displaying a half-applied solid
         // with wrong stats. currentWasmMesh still points at the last valid op
         // result (the failing op threw before the swap), so it is safe to free.
-        currentWasmMesh.delete();
+        if (currentWasmMesh) currentWasmMesh.delete();
         MeshOpsWasm.clearToolingMemory();
-        const statsEl = document.getElementById('meshStats');
-        if (statsEl) statsEl.innerText = `Op error: ${e?.message || e}`;
+        showMeshError(`Op error: ${e?.message || e}`);
         return;
       }
 
@@ -1861,8 +1890,15 @@
       // cached so toggling Colorize redraws from currentMesh without replaying
       // the whole WASM chain.
       currentFaceClasses = null;
+      // Colorize-only data: a null leaves the render intact, and the arena
+      // remedy is the flush already run below, once the mesh is read out. The
+      // reason is reported after renderMesh, which rewrites the line it shares.
+      let classifyFailure = null;
       try {
         currentFaceClasses = currentWasmMesh.classifyFaces();
+        if (!currentFaceClasses) {
+          classifyFailure = meshOpFailure(WasmModule, 'Face classification').message;
+        }
       } catch (e) {
         console.error("WASM classifyFaces error:", e);
         if (engineTrapped(e)) return;
@@ -1876,6 +1912,7 @@
       currentMesh = meshData;
 
       renderMesh();
+      if (classifyFailure) showMeshError(classifyFailure);
 
       // The mesh changed, so which ops would now overflow changed too.
       refreshOpGating();
