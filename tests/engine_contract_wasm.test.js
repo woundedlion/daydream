@@ -12,7 +12,7 @@ import {
   KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, applyOp,
   meshOpFailure, MESH_OP_RESULT_NAMES,
 } from '../tools/solid_codegen.js';
-import { ENGINE_METHODS, ParamSetResult } from './fake_engine.js';
+import { ENGINE_METHODS, ParamSetResult, ClipSetResult } from './fake_engine.js';
 import { isViewLive, refreshPixelView } from '../pixel_view.js';
 
 // The module's stdout, captured rather than dropped: the WASM bridge answers an
@@ -49,6 +49,18 @@ test('the module ParamSetResult enum matches the fake_engine.js mirror', () => {
   for (const name of Object.keys(ParamSetResult)) {
     assert.equal(M.ParamSetResult[name].value, ParamSetResult[name].value,
       `fake_engine.js ParamSetResult.${name}.value must match the module`);
+  }
+});
+
+test('the module ClipSetResult enum matches the fake_engine.js mirror', () => {
+  assert.ok(M.ClipSetResult, 'the module must export ClipSetResult');
+  const moduleNames = Object.keys(M.ClipSetResult)
+    .filter((k) => M.ClipSetResult[k] instanceof M.ClipSetResult);
+  assert.deepEqual(moduleNames.sort(), Object.keys(ClipSetResult).sort(),
+    'fake_engine.js ClipSetResult must mirror the module enum roster');
+  for (const name of Object.keys(ClipSetResult)) {
+    assert.equal(M.ClipSetResult[name].value, ClipSetResult[name].value,
+      `fake_engine.js ClipSetResult.${name}.value must match the module`);
   }
 });
 
@@ -98,7 +110,8 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
     'setParameter must report APPLIED for a known param name');
 
   engine.setAnimationsPaused(false);
-  engine.setClip(0, W, 0, H);
+  assert.equal(engine.setClip(0, W, 0, H), M.ClipSetResult.APPLIED,
+    'setClip must report APPLIED for a full-canvas band');
   engine.drawFrame();
 
   const px = engine.getPixels();
@@ -139,7 +152,7 @@ test('an unknown effect name is rejected and leaves the prior effect renderable'
   assert.deepEqual(paramNames(engine.getParameterDefinitions()), before,
     'a rejected setEffect must keep the prior effect installed');
 
-  assert.equal(engine.setClip(0, W, 0, H), true,
+  assert.equal(engine.setClip(0, W, 0, H), M.ClipSetResult.APPLIED,
     'the prior effect must still accept a full-canvas clip');
   engine.drawFrame();
   assert.equal(engine.getPixels().length, W * H * 3,
@@ -167,11 +180,30 @@ test('malformed clip bounds are rejected', () => {
     [-1, W, 0, H], [0, W + 1, 0, H], [0, W, -1, H], [0, W, 0, H + 1],
     [W, 0, 0, H], [0, W, H, 0],
   ]) {
-    assert.equal(engine.setClip(...bounds), false,
+    assert.equal(engine.setClip(...bounds), M.ClipSetResult.INVALID_BOUNDS,
       `setClip(${bounds.join(', ')}) must be rejected`);
   }
-  assert.equal(engine.setClip(0, W, 0, H), true,
+  assert.equal(engine.setClip(0, W, 0, H), M.ClipSetResult.APPLIED,
     'a full-canvas clip must still be accepted after the rejects');
+});
+
+// segment_worker faults the whole pool on INVALID_BOUNDS, so NO_EFFECT — the
+// ordinary state between a resolution change and the setEffect that follows it —
+// must stay a distinct value rather than collapsing into the same rejection.
+test('an effectless engine reports NO_EFFECT, not a bounds rejection', () => {
+  const other = M.HolosphereEngine.getSupportedResolutions()
+    .find(([w, h]) => w !== W || h !== H);
+  assert.ok(other, 'a second supported resolution is needed to tear the effect down');
+
+  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), true,
+    'setEffect must succeed for a registered effect');
+  const [ow, oh] = other;
+  assert.equal(engine.setResolution(ow, oh), true, `${ow}x${oh} must be buildable`);
+  assert.equal(engine.setClip(0, ow, 0, oh), M.ClipSetResult.NO_EFFECT,
+    'a resolution change tears the effect down, so the clip has no receiver');
+
+  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
 });
 
 test('a rejected parameter write names its reason', () => {

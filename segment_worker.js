@@ -35,6 +35,7 @@ const post = /** @type {(msg: ControllerInboundMsg, transfer?: Transferable[]) =
 // missing/renamed glue file; a failed module fetch never runs this line.
 post({ type: 'booted', version: PROTOCOL_VERSION });
 
+let wasmModule = null;
 let engine = null;
 let segId = 0;
 let totalSegs = 1;
@@ -46,11 +47,17 @@ let arenaMetricsWarned = false;
 /**
  * Apply the stored segment clip rectangle to the engine. Must be called after
  * every setEffect, since rebuilding the effect resets the clip.
- * @returns {boolean} Whether the clip was accepted.
+ * @details setClip answers a Module.ClipSetResult enum value; compare against
+ * the enum, never by truthiness (every enum value is a truthy object). Only
+ * INVALID_BOUNDS faults the pool: NO_EFFECT is the ordinary answer when no
+ * effect is installed to receive the clip, and the controller follows with a
+ * setEffect that re-applies it.
+ * @returns {boolean} Whether the clip was applied.
  */
 function applyClip() {
   if (!engine || !segRange) return false;
-  if (engine.setClip(segRange.x0, segRange.x1, segRange.y0, segRange.y1) === false) {
+  const result = engine.setClip(segRange.x0, segRange.x1, segRange.y0, segRange.y1);
+  if (result === wasmModule.ClipSetResult.INVALID_BOUNDS) {
     post({
       type: 'engineRejected',
       reason: `setClip(${segRange.x0}, ${segRange.x1}, `
@@ -58,7 +65,7 @@ function applyClip() {
     });
     return false;
   }
-  return true;
+  return result === wasmModule.ClipSetResult.APPLIED;
 }
 
 /**
@@ -90,7 +97,7 @@ async function handleMessage(msg) {
 
       // Every segment runs a full engine replica, so engine logs would print
       // once per worker; only segment 0 logs. printErr stays live everywhere.
-      const wasmModule = await createHolosphereModule(segId === 0 ? {} : {
+      wasmModule = await createHolosphereModule(segId === 0 ? {} : {
         print: () => {},
       });
       engine = new wasmModule.HolosphereEngine();
