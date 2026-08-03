@@ -373,6 +373,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   ├── palette_controls.js     DOM-free zoom history and locked-slider delta capping for palettes.html
 │   ├── palette_math.js         ProceduralPalette / GenerativePalette mirror + the PaletteOps bridge
 │   ├── solid_codegen.js        Op dispatch, codegen, and op-chain sequencing for solids.html
+│   ├── tailwind.css            Prebuilt utility classes the four tool pages use, served same-origin
 │   └── tools.css               Shared design tokens and control styling for the tool pages
 │
 ├── scripts/
@@ -384,7 +385,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 ├── tsconfig.json               checkJs settings for the worker-protocol module set
 │
 ├── three.js/                   Optional vendored Three.js checkout
-├── vendor/                     Optional vendored Tailwind build + self-hosted fonts (CDN fallback)
+├── vendor/                     Optional self-hosted fonts (CDN fallback)
 ├── node_modules/lil-gui/       Optional local lil-gui (npm install)
 └── package.json
 ```

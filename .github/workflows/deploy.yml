@@ -209,9 +209,9 @@ jobs:
         # (node_modules/, three.js/, vendor/ are gitignored, so absent from this
         # fresh checkout — but the tracked dev files were not). Copy the served
         # set: index.html, README + its screenshot gallery, the root ES modules,
-        # styles/, tools/, and the WASM binary. three.js / lil-gui / Tailwind
-        # load from their CDNs (vendor-importmap.js + the tools' onerror
-        # fallback), so no vendored dirs are needed.
+        # styles/, tools/, and the WASM binary. three.js / lil-gui load from
+        # their CDNs (vendor-importmap.js) and the tools' utility classes ship
+        # as tools/tailwind.css, so no vendored dirs are needed.
         run: |
           mkdir _site
           cp index.html README.md *.js holosphere_wasm.wasm _site/
