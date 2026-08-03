@@ -12,67 +12,65 @@
 </head>
 
 <body>
-    <div class="page">
-        <h1 class="visually-hidden">Holosphere POV LED sphere simulator</h1>
-        <div id="layout-container" class="layout-container">
-            <nav class="nav-tabs">
-                <span class="nav-label">Tools:</span>
-                <a href="tools/lissajous.html" target="_blank" rel="noopener" class="tab">Lissajous <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
-                <a href="tools/mobius.html" target="_blank" rel="noopener" class="tab">Mobius <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
-                <a href="tools/palettes.html" target="_blank" rel="noopener" class="tab">Palettes <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
-                <a href="tools/solids.html" target="_blank" rel="noopener" class="tab">Solids <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
-                <div id="global-stats-desktop">
-                    <table class="global-stats global-stats--desktop">
-                        <tr class="stats-head">
-                            <th scope="col">Scratch A KB</th>
-                            <th scope="col">Scratch B KB</th>
-                            <th scope="col">Persistent KB</th>
-                            <th scope="col">Stack KB</th>
-                            <th scope="col">Compute</th>
-                        </tr>
-                        <tr>
-                            <td id="stat-scratch-a"></td>
-                            <td id="stat-scratch-b"></td>
-                            <td id="stat-persistent"></td>
-                            <td id="stat-stack"></td>
-                            <td id="perf-stats"></td>
-                        </tr>
-                    </table>
+    <h1 class="visually-hidden">Holosphere POV LED sphere simulator</h1>
+    <div id="layout-container" class="layout-container">
+        <nav class="nav-tabs">
+            <span class="nav-label">Tools:</span>
+            <a href="tools/lissajous.html" target="_blank" rel="noopener" class="tab">Lissajous <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
+            <a href="tools/mobius.html" target="_blank" rel="noopener" class="tab">Mobius <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
+            <a href="tools/palettes.html" target="_blank" rel="noopener" class="tab">Palettes <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
+            <a href="tools/solids.html" target="_blank" rel="noopener" class="tab">Solids <span aria-hidden="true">↗</span><span class="visually-hidden"> (opens in a new window)</span></a>
+            <div id="global-stats-desktop">
+                <table class="global-stats global-stats--desktop">
+                    <tr class="stats-head">
+                        <th scope="col">Scratch A KB</th>
+                        <th scope="col">Scratch B KB</th>
+                        <th scope="col">Persistent KB</th>
+                        <th scope="col">Stack KB</th>
+                        <th scope="col">Compute</th>
+                    </tr>
+                    <tr>
+                        <td id="stat-scratch-a"></td>
+                        <td id="stat-scratch-b"></td>
+                        <td id="stat-persistent"></td>
+                        <td id="stat-stack"></td>
+                        <td id="perf-stats"></td>
+                    </tr>
+                </table>
+            </div>
+        </nav>
+        <main class="main-area">
+            <div id="effect-sidebar" class="effect-sidebar"></div>
+            <div id="stats-bar" class="stats-bar">
+                <table class="global-stats global-stats--mobile">
+                    <tr class="stats-head">
+                        <th scope="col">Scratch A</th>
+                        <th scope="col">Scratch B</th>
+                        <th scope="col">Persistent</th>
+                        <th scope="col">Stack</th>
+                        <th scope="col">Compute</th>
+                    </tr>
+                    <tr>
+                        <td id="stat-scratch-a-m"></td>
+                        <td id="stat-scratch-b-m"></td>
+                        <td id="stat-persistent-m"></td>
+                        <td id="stat-stack-m"></td>
+                        <td id="perf-stats-mobile"></td>
+                    </tr>
+                </table>
+            </div>
+            <div id="canvas-container" class="canvas-container">
+                <div id="loading-overlay" class="loading-overlay" role="status">
+                    <div class="spinner"></div>
+                    <span>Loading engine...</span>
                 </div>
-            </nav>
-            <main class="main-area">
-                <div id="effect-sidebar" class="effect-sidebar"></div>
-                <div id="stats-bar" class="stats-bar">
-                    <table class="global-stats global-stats--mobile">
-                        <tr class="stats-head">
-                            <th scope="col">Scratch A</th>
-                            <th scope="col">Scratch B</th>
-                            <th scope="col">Persistent</th>
-                            <th scope="col">Stack</th>
-                            <th scope="col">Compute</th>
-                        </tr>
-                        <tr>
-                            <td id="stat-scratch-a-m"></td>
-                            <td id="stat-scratch-b-m"></td>
-                            <td id="stat-persistent-m"></td>
-                            <td id="stat-stack-m"></td>
-                            <td id="perf-stats-mobile"></td>
-                        </tr>
-                    </table>
-                </div>
-                <div id="canvas-container" class="canvas-container">
-                    <div id="loading-overlay" class="loading-overlay" role="status">
-                        <div class="spinner"></div>
-                        <span>Loading engine...</span>
-                    </div>
-                    <div id="segment-stats" class="segment-stats" style="display:none;"></div>
-                    <div id="apply-notice" class="apply-notice" role="alert" hidden></div>
-                    <canvas id="canvas" tabindex="0" role="application"
-                        aria-label="Real-time 3D simulation of the LED sphere. Arrow keys orbit the view, plus and minus zoom."></canvas>
-                </div>
-            </main>
-            <div id="gui-container" class="gui-container"></div>
-        </div>
+                <div id="segment-stats" class="segment-stats" style="display:none;"></div>
+                <div id="apply-notice" class="apply-notice" role="alert" hidden></div>
+                <canvas id="canvas" tabindex="0" role="application"
+                    aria-label="Real-time 3D simulation of the LED sphere. Arrow keys orbit the view, plus and minus zoom."></canvas>
+            </div>
+        </main>
+        <div id="gui-container" class="gui-container"></div>
     </div>
     <script type="module" src="bootstrap.js"></script>
 </body>
