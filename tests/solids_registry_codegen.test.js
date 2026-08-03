@@ -64,20 +64,44 @@ function chainStep(op, param = 0, twist = 0) {
   return { op, param, twist };
 }
 
-test('generateRegistryCpp emits a one-line Simple entry in the seed namespace', () => {
+test('generateRegistryCpp emits a Recipe mirror for a hankin-free chain too', () => {
   const item = { base: 'cube', ops: [{ op: 'truncate', params: { t: 0.33 } }] };
-  assert.equal(generateRegistryCpp(item, 'Archimedean'),
-    '    {"cube_truncate33",\n'
-    + '     Archimedean::cube_truncate33,\n'
-    + '     Category::Simple},');
+  assert.equal(generateRegistryCpp(item),
+    '/** Step table for cube_truncate33. */\n'
+    + 'inline constexpr OpStep CUBE_TRUNCATE33_STEPS[] = {\n'
+    + '    {Op::TRUNCATE, 0.33f}};\n'
+    + '/** Recipe mirror of IslamicStarPatterns::cube_truncate33. */\n'
+    + 'inline constexpr Recipe CUBE_TRUNCATE33_RECIPE = {\n'
+    + '    SEED_CUBE, CUBE_TRUNCATE33_STEPS,\n'
+    + '    static_cast<uint8_t>(std::size(CUBE_TRUNCATE33_STEPS))};\n'
+    + '\n'
+    + '    {"cube_truncate33",\n'
+    + '     IslamicStarPatterns::cube_truncate33, Category::Complex,\n'
+    + '     &CUBE_TRUNCATE33_RECIPE},');
 });
 
-test('generateRegistryCpp keeps a Catalan seed in its own namespace', () => {
-  const item = { base: 'rhombicDodecahedron', ops: ['ambo'] };
-  assert.equal(generateRegistryCpp(item, 'Catalan'),
-    '    {"rhombicDodecahedron_ambo",\n'
-    + '     Catalan::rhombicDodecahedron_ambo,\n'
-    + '     Category::Simple},');
+test('generateRegistryCpp never emits a Category::Simple entry', () => {
+  const chains = [
+    [{ base: 'cube', ops: ['ambo'] }],
+    [{ base: 'icosahedron', ops: [{ op: 'hankin', params: { angle: 62 } }] }],
+    [{ base: 'icosahedron_kis', ops: ['dual'] },
+      { seed: 'icosahedron', ops: [chainStep('kis')] }],
+  ];
+  for (const [item, baseRecipe] of chains) {
+    const code = generateRegistryCpp(item, baseRecipe);
+    assert.match(code, /Category::Complex/, `${item.base} must be Complex`);
+    assert.doesNotMatch(code, /Category::Simple/);
+  }
+});
+
+test('generateRegistryCpp refuses a Catalan seed, which no Recipe can index', () => {
+  assert.throws(
+    () => generateRegistryCpp({ base: 'rhombicDodecahedron', ops: ['ambo'] }),
+    /is a Catalan solid/);
+  assert.throws(
+    () => generateRegistryCpp({ base: 'pentagonalHexecontahedron_kis', ops: ['dual'] },
+      { seed: 'disdyakisTriacontahedron', ops: [chainStep('kis')] }),
+    /is a Catalan solid/);
 });
 
 test('generateRegistryCpp emits a step table and Recipe mirror for a hankin chain', () => {
@@ -85,7 +109,7 @@ test('generateRegistryCpp emits a step table and Recipe mirror for a hankin chai
     base: 'dodecahedron',
     ops: [{ op: 'hankin', params: { angle: 62 } }, 'ambo'],
   };
-  assert.equal(generateRegistryCpp(item, 'Archimedean'),
+  assert.equal(generateRegistryCpp(item),
     '/** Step table for dodecahedron_hk62_ambo. */\n'
     + 'inline constexpr OpStep DODECAHEDRON_HK62_AMBO_STEPS[] = {\n'
     + '    {Op::HANKIN, 62.0f * IslamicStarPatterns::D2R},\n'
@@ -103,7 +127,7 @@ test('generateRegistryCpp emits a step table and Recipe mirror for a hankin chai
 test('generateRegistryCpp flattens a star-pattern base onto its own seed', () => {
   const item = { base: 'icosahedron_kis_gyro', ops: [{ op: 'hankin', params: { angle: 54 } }] };
   const baseRecipe = { seed: 'icosahedron', ops: [chainStep('kis'), chainStep('gyro')] };
-  assert.equal(generateRegistryCpp(item, 'IslamicStarPatterns', baseRecipe),
+  assert.equal(generateRegistryCpp(item, baseRecipe),
     '/** Step table for icosahedron_kis_gyro_hk54. */\n'
     + 'inline constexpr OpStep ICOSAHEDRON_KIS_GYRO_HK54_STEPS[] = {\n'
     + '    {Op::KIS},\n'
@@ -129,7 +153,7 @@ test('generateRegistryCpp never names a star pattern as the Recipe seed', () => 
       chainStep('hankin', Math.fround(62 * D2R_F32)),
     ],
   };
-  const code = generateRegistryCpp(item, 'IslamicStarPatterns', baseRecipe);
+  const code = generateRegistryCpp(item, baseRecipe);
   assert.match(code, /\n {4}SEED_DODECAHEDRON, /);
   assert.doesNotMatch(code, /SEED_DODECAHEDRON_HK62/);
   // The base's own chain leads the step table, then the tool's ops.
@@ -143,7 +167,7 @@ test('generateRegistryCpp emits base chain params that read back as the same flo
     seed: 'icosidodecahedron',
     ops: [chainStep('truncate', truncateT), chainStep('ambo'), chainStep('dual')],
   };
-  const code = generateRegistryCpp(item, 'IslamicStarPatterns', baseRecipe);
+  const code = generateRegistryCpp(item, baseRecipe);
   const literal = code.match(/\{Op::TRUNCATE, ([0-9.]+)f\}/);
   assert.ok(literal, 'the base truncate step must emit a float literal');
   assert.equal(Math.fround(parseFloat(literal[1])), truncateT);
@@ -152,7 +176,7 @@ test('generateRegistryCpp emits base chain params that read back as the same flo
 test('generateRegistryCpp carries a base chain snub twist', () => {
   const item = { base: 'icosahedron_snub', ops: [{ op: 'hankin', params: { angle: 62 } }] };
   const baseRecipe = { seed: 'icosahedron', ops: [chainStep('snub', 0.5, 0.25)] };
-  assert.match(generateRegistryCpp(item, 'IslamicStarPatterns', baseRecipe),
+  assert.match(generateRegistryCpp(item, baseRecipe),
     /\{Op::SNUB, 0\.5f, 0\.25f\}/);
 });
 
@@ -168,54 +192,52 @@ test('generateRegistryCpp refuses a base chain whose relax is bake-backed', () =
       chainStep('hankin', Math.fround(66 * D2R_F32)),
     ],
   };
-  assert.throws(() => generateRegistryCpp(item, 'IslamicStarPatterns', baseRecipe),
+  assert.throws(() => generateRegistryCpp(item, baseRecipe),
     /bake-backed relax step/);
 });
 
 test('generateRegistryCpp emits a live base chain relax count', () => {
   const item = { base: 'icosahedron_relax', ops: [{ op: 'hankin', params: { angle: 62 } }] };
   const baseRecipe = { seed: 'icosahedron', ops: [chainStep('relax', 100)] };
-  assert.match(generateRegistryCpp(item, 'IslamicStarPatterns', baseRecipe),
+  assert.match(generateRegistryCpp(item, baseRecipe),
     /\{Op::RELAX, 100\.0f\}/);
 });
 
 test('generateRegistryCpp rejects a malformed base chain', () => {
   const item = { base: 'icosahedron_kis_gyro', ops: ['dual'] };
-  assert.throws(() => generateRegistryCpp(item, 'IslamicStarPatterns',
+  assert.throws(() => generateRegistryCpp(item,
     { seed: 'ico sahedron', ops: [] }), /is not a valid C\+\+ identifier/);
-  assert.throws(() => generateRegistryCpp(item, 'IslamicStarPatterns',
+  assert.throws(() => generateRegistryCpp(item,
     { seed: 'icosahedron', ops: 'kis' }), /ops must be an array/);
-  assert.throws(() => generateRegistryCpp(item, 'IslamicStarPatterns',
+  assert.throws(() => generateRegistryCpp(item,
     { seed: 'icosahedron', ops: [chainStep('notAnOp')] }), /unknown op "notAnOp"/);
 });
 
-test('generateRegistryCpp rejects an invalid seed namespace', () => {
-  const item = { base: 'cube', ops: ['ambo'] };
-  assert.throws(() => generateRegistryCpp(item, 'Arch imedean'),
+test('generateRegistryCpp rejects an invalid base', () => {
+  assert.throws(() => generateRegistryCpp({ base: 'ico sahedron', ops: ['ambo'] }),
     /is not a valid C\+\+ identifier/);
-  assert.throws(() => generateRegistryCpp(item, ''),
+  assert.throws(() => generateRegistryCpp({ base: '', ops: ['ambo'] }),
     /is not a valid C\+\+ identifier/);
 });
 
 test('generateRegistryCpp rejects an empty op chain', () => {
-  assert.throws(() => generateRegistryCpp({ base: 'cube', ops: [] }, 'Archimedean'),
+  assert.throws(() => generateRegistryCpp({ base: 'cube', ops: [] }),
     /op chain is empty/);
 });
 
-/** A Complex chain of `count` steps: one hankin, then parameterless ops. */
+/** A chain of `count` steps: one hankin, then parameterless ops. */
 function longOps(count) {
   return [{ op: 'hankin', params: { angle: 62 } }, ...Array(count - 1).fill('dual')];
 }
 
 test('generateRegistryCpp emits a step table at the uint8_t count ceiling', () => {
-  const code = generateRegistryCpp(
-    { base: 'cube', ops: longOps(MAX_RECIPE_STEPS) }, 'Archimedean');
+  const code = generateRegistryCpp({ base: 'cube', ops: longOps(MAX_RECIPE_STEPS) });
   assert.equal(code.split('{Op::').length - 1, MAX_RECIPE_STEPS);
 });
 
 test('generateRegistryCpp rejects a chain one step past the uint8_t count ceiling', () => {
   assert.throws(() => generateRegistryCpp(
-    { base: 'cube', ops: longOps(MAX_RECIPE_STEPS + 1) }, 'Archimedean'),
+    { base: 'cube', ops: longOps(MAX_RECIPE_STEPS + 1) }),
   /has 256 steps; a Recipe carries at most 255/);
 });
 
@@ -223,10 +245,10 @@ test('generateRegistryCpp counts a flattened base chain against the ceiling', ()
   const item = { base: 'icosahedron_kis', ops: longOps(5) };
   const baseOps = Array(MAX_RECIPE_STEPS - 5).fill(chainStep('kis'));
   const atCeiling = { seed: 'icosahedron', ops: baseOps };
-  const code = generateRegistryCpp(item, 'IslamicStarPatterns', atCeiling);
+  const code = generateRegistryCpp(item, atCeiling);
   assert.equal(code.split('{Op::').length - 1, MAX_RECIPE_STEPS);
 
   const overCeiling = { seed: 'icosahedron', ops: [...baseOps, chainStep('kis')] };
-  assert.throws(() => generateRegistryCpp(item, 'IslamicStarPatterns', overCeiling),
+  assert.throws(() => generateRegistryCpp(item, overCeiling),
     /has 256 steps; a Recipe carries at most 255/);
 });

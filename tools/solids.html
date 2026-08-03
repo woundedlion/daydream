@@ -1335,7 +1335,7 @@
         if (lang === 'recipe_cpp') {
           code = generateRecipeCpp(item, seedNs);
         } else if (lang === 'registry') {
-          code = generateRegistryCpp(item, seedNs, baseRecipe);
+          code = generateRegistryCpp(item, baseRecipe);
         } else {
           console.warn("Unsupported export type.");
           return;
