@@ -24,6 +24,12 @@ import {
 // A namespace is pasted as a C++ qualifier, so guard its shape.
 const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+/**
+ * Longest step table a Recipe can describe: its count field is a uint8_t, so a
+ * 256-step table would emit a count of 0.
+ */
+export const MAX_RECIPE_STEPS = 255;
+
 // Mirrors solids.h `static constexpr float D2R = PI_F / 180.0f` with
 // PI_F = float(PI), so a degree literal's product can be compared in float32
 // against the radian angle the engine reports.
@@ -157,7 +163,7 @@ function recipeStepCpp(step) {
  * @param {string} seedNamespace - Namespace qualifying the seed (e.g. "Archimedean").
  * @param {?{seed: string, ops: Array<{op: string, param: number, twist: number}>}} [baseRecipe] - The base's authored chain from MeshOps.getRecipe(); null when the base is itself a simple_registry seed.
  * @returns {string} The C++ paste.
- * @throws {Error} When the spec, namespace, or base chain is invalid, or a base chain step cannot be re-emitted.
+ * @throws {Error} When the spec, namespace, or base chain is invalid, a base chain step cannot be re-emitted, or the flattened chain exceeds MAX_RECIPE_STEPS.
  */
 export function generateRegistryCpp(item, seedNamespace, baseRecipe = null) {
   if (typeof seedNamespace !== 'string' || !CPP_IDENTIFIER.test(seedNamespace)) {
@@ -188,7 +194,13 @@ export function generateRegistryCpp(item, seedNamespace, baseRecipe = null) {
   const stepsName = `${upperSnake(funcName)}_STEPS`;
   const recipeName = `${upperSnake(funcName)}_RECIPE`;
   const baseSteps = baseRecipe != null ? baseRecipe.ops.map(recipeStepCpp) : [];
-  const steps = baseSteps.concat(item.ops.map(opStepCpp)).join(',\n    ');
+  const stepList = baseSteps.concat(item.ops.map(opStepCpp));
+  if (stepList.length > MAX_RECIPE_STEPS) {
+    throw new Error(`generateRegistryCpp: the flattened chain has ${stepList.length} `
+      + `steps; a Recipe carries at most ${MAX_RECIPE_STEPS}, above which its `
+      + 'uint8_t count wraps and the pasted Recipe would replay a different chain');
+  }
+  const steps = stepList.join(',\n    ');
   // SEED_<name> indexes simple_registry, so a seed with no such constant needs
   // one added alongside this paste.
   const seedName = baseRecipe != null ? baseRecipe.seed : item.base;
