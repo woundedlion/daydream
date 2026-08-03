@@ -3,7 +3,7 @@
 import { test, mock, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { PROTOCOL_VERSION } from '../worker_protocol.js';
-import { unpinnedEngineMethods, ParamSetResult } from './fake_engine.js';
+import { unpinnedEngineMethods, ParamSetResult, ClipSetResult } from './fake_engine.js';
 
 // ---------------------------------------------------------------------------
 // Fakes — installed BEFORE importing the worker, which binds self.postMessage
@@ -71,9 +71,10 @@ class FakeEngine {
     this.paused = p;
   }
   setClip(x0, x1, y0, y1) {
-    if (!this.clipOk || !this.effect) return false;
+    if (!this.effect) return ClipSetResult.NO_EFFECT;
+    if (!this.clipOk) return ClipSetResult.INVALID_BOUNDS;
     this.clip = { y0, y1, x0, x1 };
-    return true;
+    return ClipSetResult.APPLIED;
   }
   drawFrame() { this.calls.push(['drawFrame']); }
   getParamValues() { return this.paramView; }
@@ -108,6 +109,7 @@ let nextEffectOk = true;
 mock.module('../holosphere_wasm.js', {
   defaultExport: async () => ({
     ParamSetResult,
+    ClipSetResult,
     HolosphereEngine: class {
       constructor() {
         engineInstance = new FakeEngine();
@@ -404,6 +406,23 @@ test('worker reports inbound message deserialization failures', () => {
     type: 'engineRejected',
     reason: 'message deserialization failed',
   });
+});
+
+/**
+ * An init carrying no effectName leaves the engine effectless, so its trailing
+ * applyClip can only answer NO_EFFECT. That is the ordinary state the following
+ * setEffect resolves — faulting on it would latch the whole pool with nothing
+ * actually wrong.
+ */
+test('an init without an effect name does not fault the pool', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4 });
+
+  assert.ok(engineInstance, 'engine constructed');
+  assert.equal(engineInstance.effect, null, 'no effect installed');
+  assert.equal(engineInstance.clip, null, 'an effectless engine takes no clip');
+  assert.equal(posted.find((p) => p.msg.type === 'engineRejected'), undefined,
+    'NO_EFFECT must not post engineRejected');
+  assert.ok(posted.some((p) => p.msg.type === 'ready'), 'ready posted');
 });
 
 /** A clip rejection is surfaced immediately instead of rendering full-canvas. */

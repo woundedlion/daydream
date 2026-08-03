@@ -27,6 +27,18 @@ export const ParamSetResult = Object.freeze({
 });
 
 /**
+ * Mirror of the module-level ClipSetResult embind enum (targets/wasm/wasm.cpp)
+ * that setClip returns, under the same identity-comparison contract as
+ * ParamSetResult above. engine_contract_wasm.test.js pins the name roster
+ * against the real module.
+ */
+export const ClipSetResult = Object.freeze({
+  APPLIED: Object.freeze({ value: 0 }),
+  NO_EFFECT: Object.freeze({ value: 1 }),
+  INVALID_BOUNDS: Object.freeze({ value: 2 }),
+});
+
+/**
  * Method names an object exposes that ENGINE_METHODS does not pin — a fake
  * mocking one of these would pass its own tests against a method the real
  * engine never had.
