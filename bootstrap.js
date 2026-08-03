@@ -17,8 +17,13 @@ function errorDetail(error) {
   return String(error);
 }
 
+// Extensions refreshModuleCache re-fetches. The WASM binary is in because the
+// deploy binds it to its glue by content hash, so a cached binary against fresh
+// glue is the canonical skew a Reload has to clear.
+const REFRESHED_EXTENSIONS = ['.js', '.wasm'];
+
 /**
- * Re-fetch every same-origin script the page has already loaded, bypassing the
+ * Re-fetch every same-origin module the page has already loaded, bypassing the
  * HTTP cache and replacing each cache entry with the server's current copy.
  * A plain reload only revalidates the top-level document, so a module held in
  * cache from an earlier deploy stays stale and keeps failing to link against
@@ -33,15 +38,14 @@ export async function refreshModuleCache({
   origin = globalThis.location?.origin,
 } = {}) {
   if (!origin || typeof fetchResource !== 'function') return;
-  const scripts = new Set();
+  const modules = new Set();
   for (const { name } of timeline?.getEntriesByType?.('resource') ?? []) {
-    if (typeof name === 'string' && name.startsWith(`${origin}/`) &&
-        name.split(/[?#]/)[0].endsWith('.js')) {
-      scripts.add(name);
-    }
+    if (typeof name !== 'string' || !name.startsWith(`${origin}/`)) continue;
+    const path = name.split(/[?#]/)[0];
+    if (REFRESHED_EXTENSIONS.some((ext) => path.endsWith(ext))) modules.add(name);
   }
   await Promise.allSettled(
-    Array.from(scripts, (url) => fetchResource(url, { cache: 'reload' })));
+    Array.from(modules, (url) => fetchResource(url, { cache: 'reload' })));
 }
 
 /**

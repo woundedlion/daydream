@@ -130,6 +130,9 @@ test('refreshModuleCache re-fetches same-origin scripts past the cache', async (
       'http://localhost:8000/effect_sequencing.js',
       'http://localhost:8000/effect_sequencing.js',
       'http://localhost:8000/tools/shared.js?v=2',
+      // Glue and binary are bound by content hash, so a cached binary against
+      // fresh glue is exactly the skew Reload exists to clear.
+      'http://localhost:8000/holosphere_wasm.wasm',
     ),
     fetch: (url, options) => { calls.push([url, options]); return Promise.resolve(); },
   });
@@ -138,18 +141,20 @@ test('refreshModuleCache re-fetches same-origin scripts past the cache', async (
     'http://localhost:8000/daydream.js',
     'http://localhost:8000/effect_sequencing.js',
     'http://localhost:8000/tools/shared.js?v=2',
+    'http://localhost:8000/holosphere_wasm.wasm',
   ]);
   for (const [, options] of calls) assert.deepEqual(options, { cache: 'reload' });
 });
 
-test('refreshModuleCache skips cross-origin and non-script resources', async () => {
+test('refreshModuleCache skips cross-origin and non-module resources', async () => {
   const calls = [];
   await refreshModuleCache({
     origin: 'http://localhost:8000',
     performance: fakeTimeline(
       'https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.module.js',
-      'http://localhost:8000/holosphere_wasm.wasm',
+      'https://cdn.jsdelivr.net/npm/some-pkg/dist/some.wasm',
       'http://localhost:8000/styles/index.css',
+      'http://localhost:8000/pov_segment_map.json',
       'http://localhost:8000/bootstrap.js',
     ),
     fetch: (url) => { calls.push(url); return Promise.resolve(); },
