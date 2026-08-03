@@ -190,10 +190,11 @@ export class SegmentController {
     this.frameResolve = null;
     this.ready = false;
 
-    // Generation fence: renderGen bumps on every resolution change; renderParallel
-    // snapshots it into inflightGen at dispatch. A frame whose snapshot no longer
-    // matches renderGen was sized to a stale W/H and must be dropped (its x1/y1
-    // index past the resized buffer).
+    // Generation fence: renderGen bumps wherever an in-flight frame's results stop
+    // being publishable — a resolution change (sized to a stale W/H, its x1/y1
+    // indexing past the resized buffer), an effect switch (outgoing effect), a
+    // fault latch, and destroy(). renderParallel snapshots it into inflightGen at
+    // dispatch; a frame whose snapshot no longer matches renderGen is dropped.
     this.renderGen = 0;
     this.inflightGen = 0;
 
