@@ -175,7 +175,13 @@ async function handleMessage(msg) {
     }
 
     case 'render': {
-      if (!engine || !segRange) break;
+      // Same fail-fast policy as the unknown-type default below: replying to
+      // nothing leaves the controller's frame outstanding until its watchdog.
+      if (!engine || !segRange) {
+        throw new Error('segment_worker: render before a completed init '
+          + `(engine=${engine ? 'set' : 'null'}, `
+          + `segRange=${segRange ? 'set' : 'null'})`);
+      }
 
       // elapsed: JS wall time (ms) incl. embind overhead.
       const t0 = performance.now();
