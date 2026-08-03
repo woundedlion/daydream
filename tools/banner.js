@@ -71,19 +71,53 @@ export function showFatalError(message) {
 }
 
 /**
+ * Route every uncaught error and unhandled rejection on the page to the console
+ * plus the same fatal banner a boot failure raises. Without this a post-boot
+ * throw — an event handler, an animation frame, a stray promise — leaves the
+ * page frozen with nothing on screen to say why.
+ *
+ * preventDefault() on a rejection suppresses the browser's duplicate console
+ * report; the reason is already logged here.
+ *
+ * @param {string} label - Page name used in the messages, e.g. 'Lissajous tool'.
+ * @param {EventTarget} [target=window] - Where to listen for the failures.
+ * @returns {void}
+ */
+export function reportPageFailures(label, target = window) {
+  const surface = (kind, detail) => {
+    console.error(`${label} ${kind}:`, detail);
+    const reason = detail?.message ?? String(detail ?? 'unknown error');
+    showFatalError(`The ${label} hit an error — ${reason} — see the browser console for details.`);
+  };
+  target.addEventListener('error', (e) => {
+    // A failed subresource fires an error event that does not bubble, so only a
+    // script error reaches this listener with the target still the window.
+    if (e.target && e.target !== target) return;
+    surface('error', e.error ?? e.message);
+  });
+  target.addEventListener('unhandledrejection', (e) => {
+    e.preventDefault?.();
+    surface('unhandled rejection', e.reason);
+  });
+}
+
+/**
  * Run a tool page's initializer on window load and route any failure to the
  * console plus a fatal banner. Accepts a synchronous or an async init: a thrown
- * error and a rejected promise take the same path.
+ * error and a rejected promise take the same path. Also installs
+ * reportPageFailures, so failures after init reach the same banner.
  *
  * addEventListener (not `window.onload =`) avoids clobbering any other load
  * handler.
  *
  * @param {Function} init - The page's initializer; may return a promise.
  * @param {string} label - Page name used in both messages, e.g. 'Lissajous tool'.
+ * @param {EventTarget} [target=window] - Where to listen for load and failures.
  * @returns {void}
  */
-export function bootstrapTool(init, label) {
-  window.addEventListener('load', () => {
+export function bootstrapTool(init, label, target = window) {
+  reportPageFailures(label, target);
+  target.addEventListener('load', () => {
     const fail = (e) => {
       console.error(`${label} failed to initialize:`, e);
       showFatalError(`The ${label} failed to initialize — see the browser console for details.`);
