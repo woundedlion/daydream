@@ -20,6 +20,7 @@ effect_sequencing.js
 engine_host.js
 frame_constants.js
 geometry.js
+global_stats_view.js
 gui.js
 param_sync.js
 pixel_view.js

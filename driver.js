@@ -8,7 +8,8 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { pixelToSpherical } from "./geometry.js";
 import { isViewLive } from "./pixel_view.js";
-import { FPS, SLOW_FRAME_MS } from "./frame_constants.js";
+import { FPS } from "./frame_constants.js";
+import { GlobalStatsView } from "./global_stats_view.js";
 
 /**
  * Reuses CSS2DObject label sprites across frames so axis/effect labels can be
@@ -84,15 +85,6 @@ export class LabelPool {
 /** Canvas-container width (px) at and below which rendering uses its compact layout.
  *  CSS rearranges the surrounding page independently based on viewport width. */
 export const MOBILE_BREAKPOINT_PX = 900;
-
-/** Stats-panel cell element IDs per row, ordered [desktop, mobile]. */
-export const STATS_CELL_IDS = {
-  perf: ["perf-stats", "perf-stats-mobile"],
-  scratchA: ["stat-scratch-a", "stat-scratch-a-m"],
-  scratchB: ["stat-scratch-b", "stat-scratch-b-m"],
-  persist: ["stat-persistent", "stat-persistent-m"],
-  stack: ["stat-stack", "stat-stack-m"],
-};
 
 /**
  * Browser-side simulator: drives the three.js scene that renders the LED
@@ -288,8 +280,7 @@ export class Daydream {
     // Round dots until an effect binds and sets its mode (see updateCullUniforms).
     this.strobeColumns = true;
 
-    this.statsGroup = null;
-    this.statsMissLogged = false;
+    this.statsView = new GlobalStatsView();
 
     this.precomputeMatrices();
   }
@@ -869,60 +860,12 @@ export class Daydream {
   }
 
   /**
-   * Write the per-frame stats panels (desktop + mobile): the frame draw
-   * duration (red past SLOW_FRAME_MS) and, if the effect exposes arena metrics,
-   * each arena's usage|high-water|capacity in KiB.
+   * Hand one frame's measurements to the stats overlay.
    * @param {number} duration - Frame draw time in milliseconds.
    * @param {Object} effect - Active effect; its getArenaMetrics() supplies arena usage when present.
    */
   updateStats(duration, effect) {
-    let stats = this.statsGroup;
-    if (!stats) {
-      stats = {};
-      const missing = [];
-      for (const [row, ids] of Object.entries(STATS_CELL_IDS)) {
-        stats[row] = ids.map(id => {
-          const el = document.getElementById(id);
-          if (!el) missing.push(id);
-          return el;
-        });
-      }
-      // Latch only once every row resolved; a row still missing this tick would
-      // otherwise stay dead for the session.
-      if (missing.length === 0) {
-        this.statsGroup = stats;
-      } else if (!this.statsMissLogged) {
-        this.statsMissLogged = true;
-        console.warn(
-          `Stats cells absent from the document (${missing.join(', ')}); ` +
-          `the panel re-queries every frame until they appear.`);
-      }
-    }
-
-    const perfText = `${duration.toFixed(3)} ms`;
-    const perfColor = duration > SLOW_FRAME_MS ? 'red' : 'grey';
-    stats.perf.forEach(el => {
-      if (el) { el.textContent = perfText; el.style.color = perfColor; }
-    });
-
-    if (effect && effect.getArenaMetrics) {
-      const m = effect.getArenaMetrics();
-      if (!m) return;
-      const fmt = (x) => `${(x.usage / 1024).toFixed(1)}|${(x.high_water_mark / 1024).toFixed(1)}|${(x.capacity / 1024).toFixed(0)}`;
-
-      const updateRow = (elements, val) => {
-        const text = fmt(val);
-        elements.forEach(el => { if (el) el.textContent = text; });
-      };
-
-      updateRow(stats.scratchA, m.scratch_arena_a);
-      updateRow(stats.scratchB, m.scratch_arena_b);
-      updateRow(stats.persist, m.persistent_arena);
-      if (m.stack) {
-        const stackText = `${(m.stack.high_water_mark / 1024).toFixed(1)}|${(m.stack.capacity / 1024).toFixed(0)}`;
-        stats.stack.forEach(el => { if (el) el.textContent = stackText; });
-      }
-    }
+    this.statsView.update(duration, effect?.getArenaMetrics?.() ?? null);
   }
 
   /**
