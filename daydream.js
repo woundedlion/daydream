@@ -21,6 +21,7 @@ import {
   createAppTeardown,
   createModuleLoadHandlers,
   createRenderAdapter,
+  createUnhandledRejectionHandler,
   repointDisplayAliases,
 } from "./app_lifecycle.js";
 import { AppState, URLSync } from "./state.js";
@@ -592,17 +593,7 @@ const onKeyDown = (e) => {
 };
 window.addEventListener("keydown", onKeyDown);
 
-/**
- * Surface a rejection nothing awaited. Async failures after boot would
- * otherwise reach only the console, leaving a frozen page with no explanation.
- * @param {PromiseRejectionEvent} e - The rejection event.
- * @returns {void}
- */
-const onUnhandledRejection = (e) => {
-  console.error('Unhandled promise rejection:', e.reason);
-  const detail = e.reason?.message ?? String(e.reason);
-  showFatalError(`Something went wrong. ${detail}`);
-};
+const onUnhandledRejection = createUnhandledRejectionHandler({ report: showFatalError });
 window.addEventListener("unhandledrejection", onUnhandledRejection);
 
 daydream.renderer.setAnimationLoop(() => {

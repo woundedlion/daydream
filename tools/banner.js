@@ -12,31 +12,62 @@
  */
 
 /**
+ * Build the banner shell — a message slot and a dismiss button — and attach it
+ * to the page. The banner is fixed across the top of the viewport, so the
+ * dismiss button is what keeps a survivable failure from permanently occluding
+ * a working page; dismissing removes the element, and the next failure builds a
+ * fresh one.
+ * @returns {Object} The banner element, attached when the page has a parent.
+ */
+function buildBanner() {
+  const el = document.createElement('div');
+  el.id = 'fatal-error-overlay';
+  el.setAttribute('role', 'alert');
+  Object.assign(el.style, {
+    position: 'fixed', top: '0', left: '0', right: '0', zIndex: '9999',
+    display: 'flex', alignItems: 'center', gap: '12px',
+    padding: '12px 16px', background: '#7f1d1d', color: '#fff',
+    font: '14px/1.4 system-ui, sans-serif', textAlign: 'center',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+  });
+
+  const message = document.createElement('span');
+  message.className = 'fatal-error-message';
+  message.style.flex = '1';
+  el.appendChild(message);
+
+  const dismiss = document.createElement('button');
+  dismiss.type = 'button';
+  dismiss.className = 'fatal-error-dismiss';
+  dismiss.textContent = '✕';
+  dismiss.setAttribute('aria-label', 'Dismiss');
+  Object.assign(dismiss.style, {
+    flex: '0 0 auto', padding: '0 4px', border: '0', background: 'transparent',
+    color: 'inherit', font: 'inherit', fontSize: '16px', lineHeight: '1',
+    cursor: 'pointer',
+  });
+  dismiss.addEventListener('click', () => el.remove());
+  el.appendChild(dismiss);
+
+  const parent = document.body || document.documentElement;
+  if (parent) parent.appendChild(el);
+  return el;
+}
+
+/**
  * Render a visible error banner across the top of the page. Tool pages that
  * boot a WASM engine call this from their bootstrap catch so a missing or
  * failed-to-load artifact surfaces to the user, instead of leaving a blank
  * canvas with only a console line (mirrors the segmented view's fault overlay).
- * Idempotent — repeated calls update the single banner.
+ * Idempotent — repeated calls update the single banner. Dismissible.
  *
  * @param {string} message - Human-readable failure description.
  * @returns {void}
  */
 export function showFatalError(message) {
-  const existing = document.getElementById('fatal-error-overlay');
-  const el = existing || document.createElement('div');
-  el.id = 'fatal-error-overlay';
-  el.setAttribute('role', 'alert');
-  el.textContent = `⚠ ${message}`; // textContent, not innerHTML — no injection
-  Object.assign(el.style, {
-    position: 'fixed', top: '0', left: '0', right: '0', zIndex: '9999',
-    padding: '12px 16px', background: '#7f1d1d', color: '#fff',
-    font: '14px/1.4 system-ui, sans-serif', textAlign: 'center',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
-  });
-  if (!existing) {
-    const parent = document.body || document.documentElement;
-    if (parent) parent.appendChild(el);
-  }
+  const el = document.getElementById('fatal-error-overlay') || buildBanner();
+  // textContent, not innerHTML — no injection.
+  el.querySelector('.fatal-error-message').textContent = `⚠ ${message}`;
 }
 
 /**

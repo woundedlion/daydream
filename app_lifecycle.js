@@ -211,6 +211,28 @@ export function createAppTeardown({
 }
 
 /**
+ * Build the window `unhandledrejection` handler.
+ *
+ * A rejection nothing awaited would otherwise reach only the console, leaving a
+ * page that misbehaves with no explanation. It is reported through the banner,
+ * which carries a dismiss control, so a survivable failure does not occlude the
+ * app for the rest of the session. preventDefault() suppresses the browser's
+ * own duplicate console report.
+ *
+ * @param {Object} deps - Injected collaborators.
+ * @param {(message: string) => void} deps.report - Renders the failure banner.
+ * @param {(...args: *) => void} [deps.logError] - Console sink for the reason.
+ * @returns {(e: PromiseRejectionEvent) => void} The handler.
+ */
+export function createUnhandledRejectionHandler({ report, logError = console.error }) {
+  return (e) => {
+    logError('Unhandled promise rejection:', e.reason);
+    e.preventDefault();
+    report(`Something went wrong. ${e.reason?.message ?? String(e.reason)}`);
+  };
+}
+
+/**
  * Build the handlers for the main WASM module promise, guarded against a page
  * discard that settles first.
  *
