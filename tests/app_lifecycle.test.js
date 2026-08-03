@@ -7,6 +7,7 @@ import {
   createRenderAdapter,
   createAppTeardown,
   createModuleLoadHandlers,
+  createUnhandledRejectionHandler,
 } from '../app_lifecycle.js';
 
 // app_lifecycle.js is the composition root's frame and teardown wiring. The
@@ -358,4 +359,38 @@ test('both handlers tolerate a module evaluation that never built the teardown',
   const failed = makeLoadHandlers({ teardown: 'missing' });
   failed.handlers.onModuleFailed(new Error('fetch blocked'));
   assert.deepEqual(failed.log, ['reportFailure fetch blocked']);
+});
+
+/**
+ * Rejection handler under test plus the sinks it writes to.
+ * @returns {Object} The handler, the reported messages, and the console lines.
+ */
+function makeRejectionHandler() {
+  const reported = [];
+  const logged = [];
+  const handler = createUnhandledRejectionHandler({
+    report: (message) => reported.push(message),
+    logError: (...args) => logged.push(args),
+  });
+  return { handler, reported, logged };
+}
+
+test('the rejection handler reports the reason and preventDefaults the event', () => {
+  const { handler, reported, logged } = makeRejectionHandler();
+  let prevented = 0;
+
+  handler({ reason: new Error('boom'), preventDefault: () => { prevented += 1; } });
+
+  assert.equal(prevented, 1, 'without preventDefault the browser double-logs');
+  assert.deepEqual(reported, ['Something went wrong. boom']);
+  assert.equal(logged.length, 1);
+  assert.equal(logged[0][0], 'Unhandled promise rejection:');
+});
+
+test('the rejection handler stringifies a reason carrying no message', () => {
+  const { handler, reported } = makeRejectionHandler();
+
+  handler({ reason: 'aborted', preventDefault: () => {} });
+
+  assert.deepEqual(reported, ['Something went wrong. aborted']);
 });
