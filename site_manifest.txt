@@ -1,0 +1,64 @@
+# The set published to GitHub Pages, one repo-relative path per line. A path may
+# name a file or a directory; a directory ships recursively. deploy.yml stages
+# exactly these, and tests/site_manifest.test.js checks that every asset the
+# served pages reference is listed and tracked.
+#
+# Anything absent from this list is not served: dev tooling, tests/, scripts/,
+# the engine source pin and its hash manifest. three.js and lil-gui load from
+# their CDNs via vendor-importmap.js, so no vendored dirs appear here.
+
+# Simulator page and its module graph.
+index.html
+styles/index.css
+vendor-importmap.js
+bootstrap.js
+app_lifecycle.js
+daydream.js
+driver.js
+effect_gui.js
+effect_sequencing.js
+engine_host.js
+frame_constants.js
+geometry.js
+gui.js
+param_sync.js
+pixel_view.js
+recorder.js
+segment_controller.js
+segment_layout.js
+segment_stats_view.js
+segment_worker.js
+sidebar.js
+sidebar_logic.js
+state.js
+worker_protocol.js
+
+# Engine module: Emscripten glue plus the binary it loads by name.
+holosphere_wasm.js
+holosphere_wasm.wasm
+
+# Tool pages and their shared modules.
+tools/lissajous.html
+tools/mobius.html
+tools/palettes.html
+tools/solids.html
+tools/tools.css
+tools/tailwind.css
+tools/banner.js
+tools/clipboard.js
+tools/color.js
+tools/cpp_format.js
+tools/export_params.js
+tools/lissajous_math.js
+tools/mobius_transforms.js
+tools/page_lifecycle.js
+tools/palette_controls.js
+tools/palette_math.js
+tools/shared.js
+tools/slider.js
+tools/solid_codegen.js
+tools/solid_registry_codegen.js
+
+# Documentation the deploy gate pins to the engine checkout.
+README.md
+docs/screenshots

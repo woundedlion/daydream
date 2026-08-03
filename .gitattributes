@@ -11,5 +11,9 @@ holosphere_wasm.wasm       binary
 # runner, so its bytes must match the engine's LF-pinned file exactly.
 pov_segment_map.json       text eol=lf
 
+# The deploy staging shell reads this line by line; a trailing CR would make
+# every path miss on the runner.
+site_manifest.txt          text eol=lf
+
 # Git hooks are sourced by /bin/sh; CRLF would break the shebang on checkout.
 .githooks/**               text eol=lf
