@@ -165,6 +165,22 @@ test('init faults on a protocol version mismatch', async () => {
   assert.equal(posted.find((p) => p.msg.type === 'ready'), undefined, 'no ready posted');
 });
 
+/** A render before init faults rather than replying with nothing and stalling the fence. */
+test('render before a completed init faults instead of dropping the reply', async () => {
+  const captured = [];
+  const realSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (fn) => { captured.push(fn); return 0; };
+  try {
+    await dispatch({ type: 'render' });
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+  assert.equal(engineInstance, null, 'no engine was ever built for this dispatch');
+  assert.equal(posted.length, 0, 'nothing was posted back');
+  assert.equal(captured.length, 1, 'one rethrow task scheduled');
+  assert.throws(() => captured[0](), /render before a completed init/);
+});
+
 /** init builds the segRange, drives the engine setup in order, and posts ready. */
 test('init applies the segment clip and posts ready', async () => {
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
