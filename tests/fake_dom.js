@@ -33,17 +33,38 @@ function detach(nodes) {
 }
 
 /**
- * Matches one node against a selector. Class and tag selectors are supported;
- * anything else throws rather than silently matching nothing.
+ * Matches one node against a single compound-free selector. Class, attribute-
+ * presence, and tag selectors are supported; anything else throws rather than
+ * silently matching nothing.
  * @param {Object} node - Candidate element.
- * @param {string} selector - '.class' or a tag name.
+ * @param {string} selector - '.class', '[attr]', or a tag name.
  * @returns {boolean} True when the node matches.
  */
-function matches(node, selector) {
+function matchesOne(node, selector) {
   if (selector.startsWith('.')) return node.classList.contains(selector.slice(1));
+  if (selector.startsWith('[') && selector.endsWith(']')) {
+    return node.getAttribute(selector.slice(1, -1)) !== null;
+  }
   if (/^[a-z][\w-]*$/i.test(selector)) return node.tagName === selector.toUpperCase();
   throw new Error(`unsupported selector: ${selector}`);
 }
+
+/**
+ * Matches one node against a selector list.
+ * @param {Object} node - Candidate element.
+ * @param {string} selector - Comma-separated selectors.
+ * @returns {boolean} True when the node matches any of them.
+ */
+function matches(node, selector) {
+  return selector.split(',').some((one) => matchesOne(node, one.trim()));
+}
+
+/**
+ * Prototype every fakeElement() carries, so a module guarding on
+ * `target instanceof Element` can be exercised: install it as globalThis.Element
+ * with installElement().
+ */
+export class FakeElement {}
 
 /**
  * Element stand-in carrying the attribute, class, child, and listener surface
@@ -99,6 +120,13 @@ export function fakeElement(tag = 'div') {
       detach([this]);
       this.parentNode = null;
     },
+    matches(selector) { return matches(this, selector); },
+    closest(selector) {
+      for (let node = this; node; node = node.parentNode) {
+        if (node.classList && matches(node, selector)) return node;
+      }
+      return null;
+    },
     querySelector(selector) { return this.querySelectorAll(selector)[0] || null; },
     querySelectorAll(selector) {
       const found = [];
@@ -130,8 +158,11 @@ export function fakeElement(tag = 'div') {
       if (at >= 0) this.listeners.splice(at, 1);
     },
     dispatch(type, event = {}) {
+      // The dispatching node is the default target, as in the DOM; a test
+      // passing one models a bubbled event from a descendant.
+      const dispatched = { target: this, ...event };
       for (const l of this.listeners.filter((l) => l.type === type)) {
-        l.handler(event);
+        l.handler(dispatched);
       }
     },
     focus() {},
@@ -154,7 +185,31 @@ export function fakeElement(tag = 'div') {
       element.replaceChildren();
     },
   });
+  Object.setPrototypeOf(element, FakeElement.prototype);
   return element;
+}
+
+/**
+ * Installs FakeElement as globalThis.Element, so a bare `instanceof Element`
+ * guard sees the fakes. Pair with restoreElementAfterEach().
+ * @returns {Function} The installed constructor.
+ */
+export function installElement() {
+  globalThis.Element = FakeElement;
+  return FakeElement;
+}
+
+/**
+ * Registers an afterEach that restores globalThis.Element to its pre-suite
+ * value, so an installed stub never leaks into another test or suite.
+ * @returns {void}
+ */
+export function restoreElementAfterEach() {
+  const saved = globalThis.Element;
+  afterEach(() => {
+    if (saved === undefined) delete globalThis.Element;
+    else globalThis.Element = saved;
+  });
 }
 
 /**
