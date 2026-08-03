@@ -45,5 +45,6 @@
   "tests/state.test.js": 1107,
   "tests/switch_coordinator.test.js": 54,
   "tests/tool_pages.test.js": 41,
-  "tests/vendor-importmap.test.js": 34
+  "tests/vendor-importmap.test.js": 34,
+  "tests/wasm_provenance.test.js": 8
 }

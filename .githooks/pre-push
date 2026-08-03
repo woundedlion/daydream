@@ -8,6 +8,15 @@
 # Installed by package.json's `prepare` script (git config core.hooksPath
 # .githooks), so `npm install`/`npm ci` enables it. Skip a single push with
 # `git push --no-verify`.
+# WASM provenance needs no dependencies, so it gates the push even where the
+# suite below cannot run. deploy.yml re-checks it, but only after master is
+# public — an unverifiable artifact must not get that far.
+if command -v node >/dev/null 2>&1; then
+	node --test tests/wasm_provenance.test.js || exit 1
+else
+	echo "pre-push: node not found; WASM provenance was not verified." >&2
+fi
+
 if ! command -v npm >/dev/null 2>&1; then
 	echo "pre-push: npm not found; the JS unit suite did not run." >&2
 	exit 0
