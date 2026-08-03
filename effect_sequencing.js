@@ -15,16 +15,28 @@
 import { resolveActiveEffect } from "./sidebar_logic.js";
 
 /**
+ * Outcome of an effect/resolution apply, mirroring the engine's ParamSetResult
+ * enum. Only APPLIED counts as applied, so a function that falls off its end
+ * reads as a rejection rather than as success.
+ * @enum {string}
+ */
+export const ApplyResult = Object.freeze({
+  APPLIED: 'APPLIED',
+  REJECTED: 'REJECTED',
+});
+
+/**
  * Apply a synchronous state switch and restore the previous applied state when
  * it rejects or throws.
- * @param {Function} apply - Applies the requested state; false means rejected.
+ * @param {() => string} apply - Applies the requested state, returning an
+ *   ApplyResult; anything but APPLIED is a rejection.
  * @param {Function} rollback - Restores the previous applied state.
  * @returns {{applied: boolean, failure: any|null, recoveryFailure: any|null}}
  */
 export function runSwitchTransaction(apply, rollback) {
   let failure = null;
   try {
-    if (apply() !== false) {
+    if (apply() === ApplyResult.APPLIED) {
       return { applied: true, failure: null, recoveryFailure: null };
     }
   } catch (error) {
@@ -76,12 +88,12 @@ export function restoreEffectControlState(effect, snapshot) {
 
 /**
  * Apply the initial resolution/effect state before dismissing the loader.
- * @param {Function} apply - Applies initial state; false means rejected.
+ * @param {() => string} apply - Applies initial state, returning an ApplyResult.
  * @param {Function} onSuccess - Runs only after the initial state applies.
  * @returns {void}
  */
 export function applyInitialState(apply, onSuccess) {
-  if (apply() === false) {
+  if (apply() !== ApplyResult.APPLIED) {
     throw new Error('Initial resolution/effect initialization was rejected.');
   }
   onSuccess();
@@ -136,10 +148,10 @@ export function switchFailureReport(label, result) {
  *   deps.appState - The state to subscribe to and roll back.
  * @param {() => any} deps.getActiveEffect - Reads the live effect control record;
  *   called again after each rollback apply, which rebuilds it.
- * @param {(preserveParams?: boolean) => boolean|void} deps.applyEffect - Applies
- *   the state's effect; false means rejected.
- * @param {(preserveParams?: boolean) => boolean|void} deps.applyResolution -
- *   Applies the state's resolution; false means rejected.
+ * @param {(preserveParams?: boolean) => string} deps.applyEffect - Applies the
+ *   state's effect, returning an ApplyResult.
+ * @param {(preserveParams?: boolean) => string} deps.applyResolution - Applies
+ *   the state's resolution, returning an ApplyResult.
  * @param {() => string} deps.currentUrl - Snapshots the URL to restore.
  * @param {(url: string) => void} deps.restoreUrl - Puts a snapshotted URL back.
  * @param {(resolution: string) => void} deps.showResolution - Points the
@@ -181,7 +193,7 @@ export function createSwitchCoordinator({
   const restoreEffect = (effect, url, effectState) => runMuted(() => {
     appState.set('effect', effect);
     restoreUrl(url);
-    if (applyEffect(true) === false) {
+    if (applyEffect(true) !== ApplyResult.APPLIED) {
       throw new Error(`Effect rollback to "${effect}" was rejected.`);
     }
     restoreEffectControlState(getActiveEffect(), effectState);
@@ -191,7 +203,7 @@ export function createSwitchCoordinator({
     appState.update({ resolution, effect });
     showResolution(resolution);
     restoreUrl(url);
-    if (applyResolution(true) === false) {
+    if (applyResolution(true) !== ApplyResult.APPLIED) {
       throw new Error(`Resolution rollback to "${resolution}" was rejected.`);
     }
     restoreEffectControlState(getActiveEffect(), effectState);
@@ -241,10 +253,10 @@ export function createSwitchCoordinator({
  * Build the effect and resolution apply path — the two functions every switch,
  * rollback, and initial hydration routes through.
  *
- * A rejected apply returns false and leaves the engine, the driver, and the
- * worker pool as they were, so createSwitchCoordinator() can put the previous
- * state back; nothing here writes appState except the off-list effect correction
- * planResolutionApply() asks for.
+ * A rejected apply returns ApplyResult.REJECTED and leaves the engine, the
+ * driver, and the worker pool as they were, so createSwitchCoordinator() can put
+ * the previous state back; nothing here writes appState except the off-list
+ * effect correction planResolutionApply() asks for.
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {{get: Function, set: Function}} deps.appState - The applied state.
@@ -267,8 +279,8 @@ export function createSwitchCoordinator({
  *   muted (a rollback in progress).
  * @param {(message: string, error?: any) => void} [deps.logError] - Console sink.
  * @param {(message: string, error?: any) => void} [deps.logWarn] - Console sink.
- * @returns {{applyEffect: (preserveParams?: boolean) => boolean|void,
- *   applyResolution: (preserveParams?: boolean) => boolean|void}}
+ * @returns {{applyEffect: (preserveParams?: boolean) => string,
+ *   applyResolution: (preserveParams?: boolean) => string}}
  */
 export function createApplyPipeline({
   appState,
@@ -306,14 +318,14 @@ export function createApplyPipeline({
    * @param {boolean} [preserveParams=false] - When true, keep the existing
    *   per-effect param URL entries (used during initial hydration); when false,
    *   clear them since they don't apply to the newly selected effect.
-   * @returns {boolean|void} false when the engine rejected the effect (the caller
-   *   must revert appState so UI/URL don't advertise an unapplied effect);
-   *   otherwise undefined.
+   * @returns {string} ApplyResult.REJECTED when the engine rejected the effect
+   *   (the caller must revert appState so UI/URL don't advertise an unapplied
+   *   effect), else ApplyResult.APPLIED.
    */
   function applyEffect(preserveParams = false) {
     // A rejected effect leaves the engine unchanged, so return before the worker
     // broadcast below: sending the rejected name would diverge them from main.
-    if (getEngine() && !selectEngineEffect()) return false;
+    if (getEngine() && !selectEngineEffect()) return ApplyResult.REJECTED;
 
     effectGui.destroy();
     if (!preserveParams) clearEffectParamUrl();
@@ -329,6 +341,7 @@ export function createApplyPipeline({
     effectGui.applyAnimationPause();
 
     sidebar.setActive(appState.get('effect'));
+    return ApplyResult.APPLIED;
   }
 
   /**
@@ -338,24 +351,24 @@ export function createApplyPipeline({
    *   param URL entries through the re-apply (only if the effect is still
    *   offered; an off-list effect is corrected to the list's first entry,
    *   dropping its effect-specific URL entries regardless).
-   * @returns {boolean|void} false when the resolution was not applied — an
-   *   unknown preset name, or an engine rejection — so the caller must revert
-   *   appState and UI/URL don't advertise an unapplied value; otherwise
-   *   undefined.
+   * @returns {string} ApplyResult.REJECTED when the resolution was not applied —
+   *   an unknown preset name, or an engine rejection — so the caller must revert
+   *   appState and UI/URL don't advertise an unapplied value, else
+   *   ApplyResult.APPLIED.
    */
   function applyResolution(preserveParams = false) {
     const resolution = appState.get('resolution');
     const p = presets[resolution];
     if (!p) {
       logError(`Unknown resolution preset "${resolution}"; keeping current.`);
-      return false;
+      return ApplyResult.REJECTED;
     }
 
     const engine = getEngine();
     if (engine) {
       if (engine.setResolution(p.w, p.h) === false) {
         logError(`Unsupported resolution ${p.w}x${p.h}; keeping current.`);
-        return false;
+        return ApplyResult.REJECTED;
       }
       invalidateEngineView();
     }
@@ -384,14 +397,17 @@ export function createApplyPipeline({
       planResolutionApply(offered, appState.get('effect'), isRestoring());
     if (effectChanged) {
       appState.set('effect', nextEffect);
-      if (appState.get('effect') !== nextEffect) return false;
+      if (appState.get('effect') !== nextEffect) return ApplyResult.REJECTED;
     }
 
     if (applyDirectly) {
-      if (applyEffect(preserveParams) === false) return false;
+      if (applyEffect(preserveParams) !== ApplyResult.APPLIED) {
+        return ApplyResult.REJECTED;
+      }
     }
 
     driver.invalidate();
+    return ApplyResult.APPLIED;
   }
 
   return { applyEffect, applyResolution };
