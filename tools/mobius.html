@@ -669,22 +669,34 @@
         planeElement.style.cursor = 'grabbing';
       };
 
+      // The active touch drag's cleanup, so an interrupted gesture
+      // (touchcancel) or a page discard cannot leave the document listeners
+      // resident.
+      let endTouchDrag = null;
+
       const onTouchStart = (e) => {
         e.preventDefault();
         const touch = e.touches[0];
+        if (!touch) return;
+        if (endTouchDrag) endTouchDrag();
         handleInput(touch.clientX, touch.clientY);
         const onTouchMove = (ev) => {
           ev.preventDefault();
           const moveTouch = ev.touches[0];
+          if (!moveTouch) return;
           handleInput(moveTouch.clientX, moveTouch.clientY);
         };
         const onTouchEnd = () => {
           document.removeEventListener('touchmove', onTouchMove);
           document.removeEventListener('touchend', onTouchEnd);
+          document.removeEventListener('touchcancel', onTouchEnd);
+          endTouchDrag = null;
         };
+        endTouchDrag = onTouchEnd;
         document.addEventListener('touchmove', onTouchMove, { passive: false });
         document.addEventListener('touchend', onTouchEnd);
-      }
+        document.addEventListener('touchcancel', onTouchEnd);
+      };
 
       // Keyboard equivalent of dragging the dot: arrows nudge re/im (Shift for a
       // coarser step), Home recenters to the origin. Mirrors handleInput's
@@ -717,6 +729,9 @@
       planeElement.addEventListener('mousedown', onMouseDown);
       planeElement.addEventListener('touchstart', onTouchStart, { passive: false });
       planeElement.addEventListener('keydown', onKeyDown);
+      onPageTeardown(() => {
+        if (endTouchDrag) endTouchDrag();
+      });
       updateUI();
     };
 
