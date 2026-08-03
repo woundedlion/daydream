@@ -616,10 +616,15 @@ export function createChainValidator(createModule) {
   /**
    * Resolves the current validator instance, spawning one if needed.
    * @returns {Promise<?Object>} The module, or null when it failed to spawn.
+   * @details A failed spawn is not cached: the next acquire retries.
    */
   function acquire() {
-    modulePromise ||= createModule();
-    return modulePromise.catch(() => null);
+    const pending = (modulePromise ||= createModule());
+    return pending.catch(() => {
+      // Only drop our own failed attempt; a later acquire may have replaced it.
+      if (modulePromise === pending) modulePromise = null;
+      return null;
+    });
   }
 
   /**
