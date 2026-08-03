@@ -13,7 +13,8 @@ import { unpinnedEngineMethods } from './fake_engine.js';
 const driver = { W: 0, H: 0, pixels: null };
 
 
-const { SegmentController, MAX_BOOT_RETRIES } = await import('../segment_controller.js');
+const { SegmentController, MAX_BOOT_RETRIES, warmModules } =
+  await import('../segment_controller.js');
 const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
 
 const EXPECTED_CONSOLE_MESSAGES = {
@@ -47,6 +48,26 @@ const consoleMocks = Object.keys(EXPECTED_CONSOLE_MESSAGES)
       .some((pattern) => pattern.test(String(args[0])));
     if (!expected) originalConsole[method](...args);
   }));
+
+test('warmModules refreshes the worker, glue, and binary cache entries', async () => {
+  const calls = [];
+  const response = { arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) };
+  await warmModules({
+    baseUrl: 'http://localhost:8000/segment_controller.js',
+    fetch: (url, options) => {
+      calls.push([url.href, options]);
+      return Promise.resolve(response);
+    },
+  });
+
+  assert.deepEqual(calls.map(([url]) => url), [
+    'http://localhost:8000/segment_worker.js',
+    'http://localhost:8000/holosphere_wasm.js',
+    'http://localhost:8000/holosphere_wasm.wasm',
+  ]);
+  for (const [, options] of calls)
+    assert.deepEqual(options, { cache: 'reload' });
+});
 
 // ---------------------------------------------------------------------------
 // Fakes
