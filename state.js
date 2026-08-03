@@ -304,6 +304,10 @@ export class URLSync {
   /**
    * Records an ad-hoc param write from the GUI layer, merged into the single flush.
    * A no-op once disposed.
+   * @details A tracked key is owned by the AppState, so it is only scheduled, never
+   *   buffered: the buffer outlives the write that filled it, and re-asserting a
+   *   value the state has since moved past would leave the URL advertising the old
+   *   one with nothing left to correct it.
    * @param {string} key - The URL param name to write.
    * @param {*} value - The value to set; null/undefined records a deletion marker.
    *   Numbers are rounded to significant digits to save space and avoid float jitter.
@@ -311,6 +315,10 @@ export class URLSync {
    */
   setParam(key, value) {
     if (this.disposed) return;
+    if (this.trackedKeys.has(key)) {
+      this.schedule();
+      return;
+    }
     if (value === null || value === undefined) {
       // null is a deletion marker (drop the param on flush), not a forget.
       this.adhoc.set(key, null);

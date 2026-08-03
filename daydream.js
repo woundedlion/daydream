@@ -396,7 +396,7 @@ const switches = createSwitchCoordinator({
     window.location.pathname + window.location.search + window.location.hash,
   restoreUrl: (url) => window.history.replaceState({}, '', url),
   showResolution: (resolution) => resolutionController.setValue(resolution),
-  syncResolutionUrl: () => urlSync.setParam('resolution', appState.get('resolution')),
+  syncResolutionUrl: () => urlSync.schedule(),
   logError: (message, error) => console.error(message, error),
   showNotice: showApplyNotice,
   showFatal: showFatalError,

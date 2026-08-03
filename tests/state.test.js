@@ -363,21 +363,56 @@ test('URLSync.flush preserves an existing location.hash', () => {
   assert.equal(new URLSearchParams(calls[0].split('?')[1].split('#')[0]).get('effect'), 'Voronoi');
 });
 
-test('URLSync.flush clears the ad-hoc buffer so a tracked key is not permanently overridden', () => {
+test('URLSync.setParam cannot override a tracked key with a stale value', () => {
   const calls = installWindow('', '/sim');
   const s = new AppState({ resolution: 'low' });
   const sync = new URLSync(s, ['resolution']);
 
-  // The GUI can write a tracked key as an ad-hoc param.
+  // The GUI can address a tracked key as an ad-hoc param; the state still wins.
   sync.setParam('resolution', 'high');
   sync.flush();
   let params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
-  assert.equal(params.get('resolution'), 'high');
+  assert.equal(params.get('resolution'), 'low');
 
   s.set('resolution', 'medium');
   sync.flush();
   params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
   assert.equal(params.get('resolution'), 'medium');
+});
+
+/**
+ * A rejected resolution switch re-asserts the rolled-back value; a valid switch
+ * landing inside the same debounce window must still be what the shareable URL
+ * advertises, since nothing schedules a correction after the flush.
+ */
+test('a re-asserted tracked value does not survive a later switch in the same window', () => {
+  const calls = installWindow('?resolution=low', '/sim');
+  const s = new AppState({ resolution: 'low' });
+  const sync = new URLSync(s, ['resolution']);
+
+  sync.setParam('resolution', s.get('resolution')); // the rejected switch's re-assert
+  s.set('resolution', 'high');                      // accepted, inside the window
+  sync.flush();
+
+  const params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
+  assert.equal(params.get('resolution'), 'high', 'the link carries the applied value');
+
+  sync.flush();
+  const after = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
+  assert.equal(after.get('resolution'), 'high', 'and no buffered write resurrects the old one');
+});
+
+test('URLSync.reset re-asserts tracked state over an ad-hoc write of the same key', () => {
+  const calls = installWindow('?speed=2', '/sim');
+  const s = new AppState({ resolution: 'high' });
+  const sync = new URLSync(s, ['resolution']);
+
+  sync.setParam('resolution', 'low');
+  sync.reset(['resolution']);
+
+  const params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
+  assert.equal(params.get('resolution'), 'high');
+  assert.equal(params.has('speed'), false, 'unexcluded params are cleared');
 });
 
 test('URLSync.setParam(k, null) drops the key from the URL on flush', () => {
