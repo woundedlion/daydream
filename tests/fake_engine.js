@@ -6,7 +6,7 @@
 /** Engine methods the segmented worker and controller drive. */
 export const ENGINE_METHODS = [
   'setResolution', 'setEffect', 'setParameter', 'setAnimationsPaused',
-  'setClip', 'drawFrame', 'getPixels', 'getArenaMetrics',
+  'setPoleLod', 'setClip', 'drawFrame', 'getPixels', 'getArenaMetrics',
   'getParameterDefinitions', 'getParamValues',
 ];
 

@@ -36,6 +36,7 @@ class FakeEngine {
     this.effect = null;
     this.params = [];
     this.paused = false;
+    this.poleLod = null;
     this.metricsThrows = false;
     this.calls = [];
     // Reused view, like the real engine's getParamValues() into WASM memory, so
@@ -69,6 +70,10 @@ class FakeEngine {
   setAnimationsPaused(p) {
     this.calls.push(['setAnimationsPaused', p]);
     this.paused = p;
+  }
+  setPoleLod(v) {
+    this.calls.push(['setPoleLod', v]);
+    this.poleLod = v;
   }
   setClip(x0, x1, y0, y1) {
     if (!this.effect) return ClipSetResult.NO_EFFECT;
@@ -477,6 +482,29 @@ test('init applies the carried params AFTER setEffect rebuilds to defaults', asy
 test('init with paused:true pauses animations on the rebuilt engine', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma', paused: true });
   assert.equal(engineInstance.paused, true);
+});
+
+/**
+ * The decimation aggressiveness is per module instance, so a pool spawned after
+ * the slider moved must inherit it or the composited preview renders at a
+ * different LOD from the value the slider claims.
+ */
+test('init seeds the worker engine with the carried pole LOD', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
+                   effectName: 'Plasma', poleLod: 1.25 });
+  assert.equal(engineInstance.poleLod, 1.25);
+});
+
+test('init without a pole LOD leaves the engine default in place', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  assert.equal(engineInstance.poleLod, null, 'setPoleLod was never called');
+});
+
+test('setPoleLod handler forwards the value to the engine', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  await dispatch({ type: 'setPoleLod', value: 0.75 });
+  assert.equal(engineInstance.poleLod, 0.75);
+  assert.deepEqual(engineInstance.calls.at(-1), ['setPoleLod', 0.75]);
 });
 
 test('setEffect handler rebuilds, then re-applies the carried param snapshot', async () => {

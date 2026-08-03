@@ -25,7 +25,7 @@
  * same-named but reshaped message. Bump on any breaking change to the messages below.
  * @type {number}
  */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 /**
  * One tuned effect parameter, flattened for structured-clone transport. Booleans
@@ -54,11 +54,13 @@ export const PROTOCOL_VERSION = 3;
  * Bootstrap message: assigns the worker its segment index within the pool and the
  * canvas geometry, then optionally selects an effect with tuned values. `paused`
  * carries the host's current pause state so a pool re-created under a paused GUI
- * doesn't start animating.
+ * doesn't start animating; `poleLod` does the same for the Pole LOD slider, whose
+ * value lives per module instance and so must be re-pushed to every fresh engine.
  * @typedef {{
  *   type: 'init', version: number, segId: number, totalSegs: number,
  *   w: number, h: number,
  *   effectName?: string, params?: SegParam[], paused?: boolean,
+ *   poleLod?: number,
  * }} InitMsg
  */
 
@@ -82,6 +84,12 @@ export const PROTOCOL_VERSION = 3;
 /** Toggle whether the worker's effect advances its animation clock.
  * @typedef {{ type: 'setAnimationsPaused', paused: boolean }} SetAnimationsPausedMsg */
 
+/** Set near-pole azimuthal shading decimation on the worker's engine. The
+ * aggressiveness is a per-module-instance global, so each worker carries its own
+ * copy and the slider must reach all of them or the composited preview decimates
+ * differently from the single-engine one.
+ * @typedef {{ type: 'setPoleLod', value: number }} SetPoleLodMsg */
+
 /** Request one frame; the worker replies with a FrameMsg. `recycle` hands back
  * the retired generation's segment buffer (transferred, so the controller gives
  * up ownership) for the worker to refill in place instead of allocating and
@@ -92,7 +100,8 @@ export const PROTOCOL_VERSION = 3;
 /**
  * Every message the controller sends to a worker.
  * @typedef {InitMsg | SetEffectMsg | SetResolutionMsg
- *   | SetParameterMsg | SetAnimationsPausedMsg | RenderMsg} WorkerInboundMsg
+ *   | SetParameterMsg | SetAnimationsPausedMsg | SetPoleLodMsg
+ *   | RenderMsg} WorkerInboundMsg
  */
 
 // --- Worker -> Controller (received by the controller) ---------------------
