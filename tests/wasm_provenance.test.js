@@ -18,6 +18,7 @@ const MANIFEST = 'holosphere_wasm.wasm.sha256';
 const PIN = 'holosphere_wasm.sha';
 const BINARY = 'holosphere_wasm.wasm';
 const GLUE = 'holosphere_wasm.js';
+const TOOLCHAIN = 'holosphere_wasm.toolchain';
 
 /**
  * Runs git in the repo.
@@ -82,6 +83,37 @@ test('the WASM binary and its engine source pin were committed together', () => 
   assert.equal(lastTouch(PIN), wasmCommit,
     `${PIN} was committed apart from ${BINARY}, so the engine source pin can ` +
       'name source the binary was not built from');
+});
+
+test('the toolchain record names a real emsdk and clang', () => {
+  const records = new Map();
+  for (const line of committed(TOOLCHAIN).toString('utf8').split('\n')) {
+    const m = line.match(/^(\S+) +(\S.*?)\s*$/);
+    if (m) records.set(m[1], m[2]);
+  }
+  assert.deepEqual([...records.keys()].sort(), ['clang', 'emsdk'],
+    `${TOOLCHAIN} must record exactly an emsdk and a clang version`);
+  for (const [tool, version] of records) {
+    assert.match(version, /^\d+\.\d+/,
+      `${TOOLCHAIN} records ${tool} as '${version}'; a CMake probe that found ` +
+        'nothing writes a placeholder here and the record then means nothing');
+  }
+});
+
+test('the toolchain record only ever moved with the binary it describes', () => {
+  // The install writes the whole provenance set in one pass and only rewrites
+  // this file when the versions change, so it legitimately trails a rebuild.
+  // Moving on its own is the failure: a hand edit, or a partial install commit.
+  const touched = git(['log', '--format=%H', '--', TOOLCHAIN], 'utf8')
+    .trim().split('\n').filter(Boolean);
+  assert.notEqual(touched.length, 0, `${TOOLCHAIN} is not tracked`);
+  for (const sha of touched) {
+    const files = git(['show', '--name-only', '--format=', sha], 'utf8')
+      .trim().split('\n');
+    assert.ok(files.includes(BINARY),
+      `${sha.slice(0, 8)} changed ${TOOLCHAIN} without rebuilding ${BINARY}, ` +
+        'so the recorded toolchain does not describe the committed module');
+  }
 });
 
 test('the pre-push hook runs this provenance gate', () => {
