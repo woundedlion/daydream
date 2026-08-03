@@ -783,6 +783,21 @@ test('createChainValidator accepts everything when the module cannot spawn', asy
   assert.equal(await validator.withValidator((Mod) => Mod), null);
 });
 
+/** Verifies a transient spawn failure is retried rather than disabling validation for good. */
+test('createChainValidator retries after a failed spawn', async () => {
+  let spawns = 0;
+  const { Mod } = fakeModule((op) => {
+    if (op === 'kis') throw new Error('op refused');
+  });
+  const validator = createChainValidator(async () => {
+    if (spawns++ === 0) throw new Error('no wasm');
+    return Mod;
+  });
+  assert.equal(await validator.chainIsValid('cube', ['kis']), true);
+  assert.equal(await validator.chainIsValid('cube', ['kis']), false);
+  assert.equal(spawns, 2);
+});
+
 /** Verifies validator tasks never interleave, so one task's mesh survives another's cleanup. */
 test('createChainValidator serializes overlapping tasks', async () => {
   const { Mod } = fakeModule();
