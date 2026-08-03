@@ -121,6 +121,21 @@ test('applyOp throws on an op the module does not bind', () => {
     /unknown op "frobnicate"/);
 });
 
+/**
+ * Verifies applyOp gates on KNOWN_OPS before dispatch. The wrapper also binds
+ * lifetime and Object methods, so a name off the op table must be rejected by
+ * name rather than reaching mesh[name]() and surfacing as a soft reject.
+ */
+test('applyOp rejects a bound non-op name without calling it', () => {
+  for (const name of ['delete', 'clone', 'isAliasOf', 'constructor', 'toString']) {
+    const calls = [];
+    assert.throws(() => applyOp(stubMesh(calls), { op: name, params: {} }),
+      new RegExp(`applyOp: unknown op "${name}"`),
+      `applyOp dispatched "${name}" instead of rejecting it by name`);
+    assert.deepEqual(calls, [], `applyOp called mesh.${name}()`);
+  }
+});
+
 /** Verifies applyOp surfaces the bridge's null soft-reject as an error instead of passing null on as a mesh. */
 test('applyOp throws when the module soft-rejects an op', () => {
   assert.throws(() => applyOp({ ambo: () => null }, 'ambo'),
