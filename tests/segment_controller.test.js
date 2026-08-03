@@ -911,6 +911,7 @@ test('setEffect on a faulted active pool rebuilds it and clears the fault', () =
 for (const [label, act] of [
   ['setParameter', (c) => c.setParameter('Speed', 0.5)],
   ['setAnimationsPaused', (c) => c.setAnimationsPaused(true)],
+  ['setPoleLod', (c) => c.setPoleLod(1)],
 ]) {
   test(`${label} on a faulted active pool stays latched`, () => {
     const c = makeController();
@@ -1668,6 +1669,34 @@ test('setAnimationsPaused records the flag and broadcasts it to every worker', (
     const msgs = w.posted.filter((m) => m.type === 'setAnimationsPaused');
     assert.equal(msgs.length, 1);
     assert.equal(msgs[0].paused, true);
+  }
+});
+
+// The aggressiveness is a per-module-instance global in the engine, so a value
+// pushed only to the main thread leaves the composited preview decimating
+// differently from the slider it is calibrated on.
+test('setPoleLod records the value and broadcasts it to every worker', () => {
+  const c = readyController(2);
+  assert.equal(c.poleLod, 0, 'decimation off by default');
+
+  c.setPoleLod(1.5);
+
+  assert.equal(c.poleLod, 1.5, 'controller remembers the slider value');
+  for (const w of c.workers) {
+    const msgs = w.posted.filter((m) => m.type === 'setPoleLod');
+    assert.equal(msgs.length, 1);
+    assert.equal(msgs[0].value, 1.5);
+  }
+});
+
+test('a pool spawned after the slider moved inherits the pole LOD', () => {
+  const c = makeController();
+  c.setPoleLod(0.8);
+  c.create(2);
+
+  for (const w of c.workers) {
+    const init = w.posted.find((m) => m.type === 'init');
+    assert.equal(init.poleLod, 0.8, 'init seeds the fresh worker engine');
   }
 });
 

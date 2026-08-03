@@ -169,6 +169,9 @@ export class SegmentController {
     this.showBoundaries = false;
     // Tracked so create() can carry it into a freshly-spawned pool.
     this.animationsPaused = false;
+    // Near-pole azimuthal decimation. Per-module-instance in the engine, so each
+    // worker holds its own copy and a pool rebuilt mid-session must be re-seeded.
+    this.poleLod = 0;
 
     /** @type {Worker[]} */
     this.workers = [];
@@ -449,6 +452,7 @@ export class SegmentController {
           effectName: this.appState.get('effect'),
           params: initialParams,
           paused: this.animationsPaused,
+          poleLod: this.poleLod,
         });
       } catch (error) {
         this.abortWorkerStartup(i, 'initialization', error);
@@ -720,6 +724,19 @@ export class SegmentController {
     this.animationsPaused = paused;
     if (this.faulted) return;
     this.broadcast({ type: 'setAnimationsPaused', paused });
+  }
+
+  /**
+   * Tell all workers to set the near-pole azimuthal decimation aggressiveness.
+   * @param {number} value
+   */
+  setPoleLod(value) {
+    // Recorded before the fault gate so a later rebuild carries the slider value,
+    // and the latch is held for the same reason setParameter holds it: this fires
+    // continuously during a drag.
+    this.poleLod = value;
+    if (this.faulted) return;
+    this.broadcast({ type: 'setPoleLod', value });
   }
 
   /**

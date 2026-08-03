@@ -126,6 +126,7 @@ async function handleMessage(msg) {
         for (const p of msg.params) engine.setParameter(p.name, p.value);
       }
       if (typeof msg.paused === 'boolean') engine.setAnimationsPaused(msg.paused);
+      if (typeof msg.poleLod === 'number') engine.setPoleLod(msg.poleLod);
       applyClip();
 
       post({ type: 'ready' });
@@ -177,6 +178,13 @@ async function handleMessage(msg) {
     case 'setAnimationsPaused': {
       if (engine) {
         engine.setAnimationsPaused(msg.paused);
+      }
+      break;
+    }
+
+    case 'setPoleLod': {
+      if (engine) {
+        engine.setPoleLod(msg.value);
       }
       break;
     }

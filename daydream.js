@@ -434,8 +434,11 @@ const poleLod = createPoleLodBinding({
   getEngine: () => host.engine,
   onChange: () => daydream.invalidate(),
 });
+// The aggressiveness is per module instance, so segmented mode needs it pushed to
+// every worker's own engine as well as to the main one; the controller keeps the
+// value so a pool spawned later inherits it.
 guiInstance.add(poleLod.state, 'poleLod', 0, 2, 0.05).name('Pole LOD')
-  .onChange((v) => poleLod.apply(v));
+  .onChange((v) => { poleLod.apply(v); segments.setPoleLod(v); });
 
 // ── Segmented POV controls ──────────────────────────────────────────────────
 const segFolder = guiInstance.addFolder('Segmented POV');
