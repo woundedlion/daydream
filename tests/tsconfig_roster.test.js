@@ -1,0 +1,88 @@
+//
+// tsconfig.json's `files` roster is hand-maintained and `noResolve: true` means
+// imports are never followed, so a module the roster misses degrades to `any`
+// with no diagnostic — the typecheck stays green while checking nothing about
+// it. These cases keep the roster closed under the pipeline's own imports.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = new URL('../', import.meta.url);
+
+// Emscripten glue: an install output copied from Holosphere, checked by its
+// build there, and far too large to type-check usefully here.
+const NOT_CHECKED = new Set(['holosphere_wasm.js']);
+
+/**
+ * Reads tsconfig.json, which carries `//` comments JSON.parse rejects. Only
+ * whole-line comments are used, so dropping those lines is enough.
+ * @returns {Object} The parsed config.
+ */
+function readTsconfig() {
+  const text = readFileSync(new URL('tsconfig.json', ROOT), 'utf8');
+  const stripped = text
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('//'))
+    .join('\n');
+  return JSON.parse(stripped);
+}
+
+/**
+ * The relative-module specifiers one file imports.
+ * @param {string} file - Repo-relative module path.
+ * @returns {string[]} Imported sibling module paths.
+ */
+function importsOf(file) {
+  const source = readFileSync(new URL(file, ROOT), 'utf8');
+  const found = [];
+  for (const [, spec] of source.matchAll(/\bfrom\s*["'](\.\/[^"']+)["']/g)) {
+    found.push(spec.slice(2));
+  }
+  for (const [, spec] of source.matchAll(/\bimport\s*["'](\.\/[^"']+)["']/g)) {
+    found.push(spec.slice(2));
+  }
+  return found;
+}
+
+/**
+ * Every module reachable from the roster, the roster included.
+ * @param {string[]} roster - tsconfig.json's `files`.
+ * @returns {Set<string>} The transitive closure, minus what is not checked.
+ */
+function reachableFrom(roster) {
+  const seen = new Set();
+  const queue = [...roster];
+  while (queue.length > 0) {
+    const file = queue.shift();
+    if (seen.has(file) || NOT_CHECKED.has(file)) continue;
+    seen.add(file);
+    queue.push(...importsOf(file));
+  }
+  return seen;
+}
+
+test('every module the typecheck roster reaches is itself on the roster', () => {
+  const roster = readTsconfig().files;
+  const missing = [...reachableFrom(roster)].filter((f) => !roster.includes(f));
+
+  assert.deepEqual(missing, [],
+    'an unlisted module is silently `any` under noResolve — add it to '
+    + 'tsconfig.json "files" or the typecheck stops seeing its types');
+});
+
+test('the typecheck roster lists no module that has gone away', () => {
+  for (const file of readTsconfig().files) {
+    assert.ok(existsSync(fileURLToPath(new URL(file, ROOT))),
+      `tsconfig.json "files" lists ${file}, which no longer exists`);
+  }
+});
+
+test('the typecheck roster stays inside its stated scope', () => {
+  for (const file of readTsconfig().files) {
+    assert.ok(!file.startsWith('tests/'),
+      `tsconfig.json "files" lists ${file}: tests/ is deliberately out of scope`);
+    assert.ok(!NOT_CHECKED.has(file),
+      `tsconfig.json "files" lists ${file}, which is a generated install output`);
+  }
+});
