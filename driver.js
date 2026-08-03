@@ -524,11 +524,20 @@ export class Daydream {
     if (!advanced && !this.needsRender) return;
     this.needsRender = false;
 
+    // Capture only when the sim advanced. In segmented mode the composite lands a
+    // frame late, so captureReady() gates out the leading cleared black frames.
+    const captureDue = Boolean(this.recorder) && advanced &&
+      (typeof effect?.captureReady !== 'function' || effect.captureReady());
+
     // Three throws if an attribute's array byteLength differs from the size it gave
     // the GPU buffer, and a mid-frame heap growth detaches the aliased instanceColor
     // array (byteLength 0). needsUpdate only ever bumps version, so a flagged upload
     // cannot be cancelled — hold the repaint until the next drawFrame re-points it.
     if (this.dotMesh?.instanceColor && !isViewLive(this.dotMesh.instanceColor.array)) {
+      // The tick advanced and cannot be un-run, and the recorded track is locked
+      // one frame per tick, so emit the last painted canvas instead of dropping
+      // the frame and shortening the video.
+      if (captureDue) this.recorder.captureFrame();
       this.needsRender = true;
       return;
     }
@@ -542,11 +551,7 @@ export class Daydream {
     this.renderer.setScissorTest(true);
     this.renderMainView();
 
-    // Capture only when the sim advanced. In segmented mode the composite lands a
-    // frame late, so captureReady() gates out the leading cleared black frames.
-    if (this.recorder && advanced &&
-        (typeof effect?.captureReady !== 'function' || effect.captureReady()))
-      this.recorder.captureFrame();
+    if (captureDue) this.recorder.captureFrame();
 
     this.refreshLabels();
     if (this.labelPool.activeCount > 0) {
