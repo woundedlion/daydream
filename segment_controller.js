@@ -32,12 +32,12 @@ import { PROTOCOL_VERSION } from "./worker_protocol.js";
 // Deadline for all workers to report 'ready'. A non-throwing WASM load failure
 // fires no onerror and never sends 'ready', so this bound latches a fault instead
 // of freezing black.
-const INIT_WATCHDOG_MS = 20000;
+export const INIT_WATCHDOG_MS = 20000;
 
 // Deadline for the per-worker 'booted' ping (fetch+evaluate, not WASM
 // instantiate). Sized for a cold-cache/throttled module+glue fetch; a slow WASM
 // instantiate is separately bounded by INIT_WATCHDOG_MS.
-const BOOT_WATCHDOG_MS = 10000;
+export const BOOT_WATCHDOG_MS = 10000;
 
 // Per-worker liveness deadline for a dispatched parallel render. A worker that
 // accepts 'render' but hangs without throwing fires no onerror and never settles
@@ -51,7 +51,7 @@ const BOOT_WATCHDOG_MS = 10000;
 // (a cold effect build plus a full segment render of at most half of 288x144 on a
 // throttled machine), so it is sized against a hung worker, not a slow one. Peer
 // to the boot/init deadlines above.
-const RENDER_WATCHDOG_MS = 5000;
+export const RENDER_WATCHDOG_MS = 5000;
 
 // Bounded auto-retry for a transient worker module-load failure: a bare, message-
 // less error Event, which the browser fires when a `{type:'module'}` worker's
@@ -61,7 +61,7 @@ const RENDER_WATCHDOG_MS = 5000;
 // backoff (the refetch hits a re-warmed cache/connection) before latching a fault,
 // so the sim self-heals instead of needing a manual segmented-mode toggle.
 export const MAX_BOOT_RETRIES = 3;
-const BOOT_RETRY_DELAY_MS = 250;
+export const BOOT_RETRY_DELAY_MS = 250;
 
 /**
  * Render a thrown value as a fault message detail.

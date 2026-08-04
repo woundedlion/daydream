@@ -13,8 +13,15 @@ import { unpinnedEngineMethods } from './fake_engine.js';
 const driver = { W: 0, H: 0, pixels: null };
 
 
-const { SegmentController, MAX_BOOT_RETRIES, warmModules } =
-  await import('../segment_controller.js');
+const {
+  SegmentController,
+  MAX_BOOT_RETRIES,
+  BOOT_RETRY_DELAY_MS,
+  BOOT_WATCHDOG_MS,
+  INIT_WATCHDOG_MS,
+  RENDER_WATCHDOG_MS,
+  warmModules,
+} = await import('../segment_controller.js');
 const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
 
 const EXPECTED_CONSOLE_MESSAGES = {
@@ -231,17 +238,65 @@ function readyController(n = 2, opts = {}) {
 const flush = () => new Promise((r) => setImmediate(r));
 
 /**
- * Swap in a setTimeout that records callbacks instead of scheduling them, so a
- * test drives the watchdogs and boot backoff by hand.
- * @returns {{timers: Array<Function>, restore: () => void}} The captured
- *   callbacks in arm order, and a restore fn for the real setTimeout.
+ * @typedef {Object} FakeTimer
+ * @property {Function} fn - Callback the production code scheduled.
+ * @property {number} delay - Delay it was scheduled at, which names it: each
+ *   deadline in segment_controller.js has a distinct one.
+ * @property {object} handle - Token setTimeout returned, keyed on by clearTimeout.
+ */
+
+/**
+ * Swap in a setTimeout/clearTimeout pair that records timers instead of
+ * scheduling them, so a test drives the watchdogs and boot backoff by hand and
+ * can see a cancellation. A cleared or fired timer leaves the pending set but
+ * stays in `timers`, which holds every arm in order.
+ * @returns {{timers: Array<FakeTimer>, pendingAt: (delay: number) => Array<FakeTimer>,
+ *   isPending: (timer: FakeTimer) => boolean, fire: (timer: FakeTimer) => void,
+ *   fireOnly: (delay: number, message: string) => void, restore: () => void}}
  */
 const installFakeTimers = () => {
   const realSetTimeout = globalThis.setTimeout;
-  /** @type {Array<Function>} */
+  const realClearTimeout = globalThis.clearTimeout;
+  /** @type {Array<FakeTimer>} */
   const timers = [];
-  globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
-  return { timers, restore: () => { globalThis.setTimeout = realSetTimeout; } };
+  /** @type {Map<object, FakeTimer>} */
+  const pending = new Map();
+  globalThis.setTimeout = (fn, delay) => {
+    const handle = { unref() {} };
+    const timer = { fn, delay, handle };
+    timers.push(timer);
+    pending.set(handle, timer);
+    return handle;
+  };
+  // A handle armed before the swap belongs to the real timer queue, so hand it
+  // back rather than silently dropping the cancellation.
+  globalThis.clearTimeout = (handle) => {
+    if (pending.delete(handle)) return;
+    realClearTimeout(handle);
+  };
+  const isPending = (timer) => pending.has(timer.handle);
+  const fire = (timer) => {
+    pending.delete(timer.handle);
+    timer.fn();
+  };
+  const pendingAt = (delay) =>
+    [...pending.values()].filter((timer) => timer.delay === delay);
+  const fireOnly = (delay, message) => {
+    const matches = pendingAt(delay);
+    assert.equal(matches.length, 1, message);
+    fire(matches[0]);
+  };
+  return {
+    timers,
+    pendingAt,
+    isPending,
+    fire,
+    fireOnly,
+    restore: () => {
+      globalThis.setTimeout = realSetTimeout;
+      globalThis.clearTimeout = realClearTimeout;
+    },
+  };
 };
 
 /**
@@ -697,7 +752,7 @@ test('only the first fault of a session is recorded', () => {
 });
 
 test('a bare-Event boot fault auto-rebuilds the pool instead of latching', () => {
-  const { timers, restore } = installFakeTimers();
+  const clock = installFakeTimers();
   try {
     const c = makeController();
     c.active = true; // the app sets this before create(); the retry path checks it
@@ -710,19 +765,23 @@ test('a bare-Event boot fault auto-rebuilds the pool instead of latching', () =>
     assert.ok(firstPool.every((w) => w.terminated),
       'the failing pool is torn down before the backoff window, not left instantiating WASM');
     assert.deepEqual(c.workers, [], 'no survivor can re-enter the fault path during the backoff');
+    assert.deepEqual(clock.pendingAt(BOOT_WATCHDOG_MS), [],
+      'the torn-down pool leaves no boot watchdog to fault the rebuild');
+    assert.deepEqual(clock.pendingAt(INIT_WATCHDOG_MS), [],
+      'the torn-down pool leaves no init watchdog to fault the rebuild');
 
-    timers[timers.length - 1](); // drive the scheduled rebuild
+    clock.fireOnly(BOOT_RETRY_DELAY_MS, 'exactly one backoff rebuild is scheduled');
     assert.equal(c.bootAttempt, 1, 'retry index advanced');
     assert.equal(c.faulted, false);
     assert.equal(c.workers.length, 2, 'pool respawned at the same segment count');
     assert.notEqual(c.workers[0], firstPool[0], 'rebuilt with fresh workers');
   } finally {
-    restore();
+    clock.restore();
   }
 });
 
 test('a bare-Event boot fault latches once the retry budget is exhausted', () => {
-  const { timers, restore } = installFakeTimers();
+  const clock = installFakeTimers();
   try {
     const c = makeController();
     c.active = true;
@@ -731,15 +790,17 @@ test('a bare-Event boot fault latches once the retry budget is exhausted', () =>
     for (let a = 0; a < MAX_BOOT_RETRIES; a++) {
       c.workers[0].onerror({});
       assert.equal(c.faulted, false, `attempt ${a + 1} retries rather than latching`);
-      timers[timers.length - 1](); // drive the rebuild
+      clock.fireOnly(BOOT_RETRY_DELAY_MS, `attempt ${a + 1} scheduled one rebuild`);
       assert.equal(c.bootAttempt, a + 1);
     }
     // One failure past the budget must latch instead of retrying forever.
     c.workers[0].onerror({});
     assert.equal(c.faulted, true, 'a load fault past the retry budget latches');
     assert.equal(c.faultInfo.segId, 0);
+    assert.deepEqual(clock.pendingAt(BOOT_RETRY_DELAY_MS), [],
+      'the latched pool schedules no further rebuild');
   } finally {
-    restore();
+    clock.restore();
   }
 });
 
@@ -750,61 +811,82 @@ test('a message-less error after the pool is ready still latches fast', () => {
   assert.equal(c.faulted, true);
 });
 
+test('the startup and render deadlines hold their documented durations', () => {
+  assert.deepEqual(
+    {
+      retry: BOOT_RETRY_DELAY_MS,
+      render: RENDER_WATCHDOG_MS,
+      boot: BOOT_WATCHDOG_MS,
+      init: INIT_WATCHDOG_MS,
+    },
+    { retry: 250, render: 5000, boot: 10000, init: 20000 },
+  );
+  // Init covers boot plus the WASM instantiate, so it must outlast boot or a
+  // slow-but-healthy load reports as an init timeout.
+  assert.ok(INIT_WATCHDOG_MS > BOOT_WATCHDOG_MS,
+    'the init deadline outlasts the boot deadline it contains');
+  assert.equal(
+    new Set([BOOT_RETRY_DELAY_MS, RENDER_WATCHDOG_MS, BOOT_WATCHDOG_MS, INIT_WATCHDOG_MS]).size,
+    4,
+    'distinct delays, so a test can name a scheduled timer by the deadline it holds');
+});
+
 test('the boot watchdog faults fast when a worker never sends booted', () => {
-  const { timers, restore } = installFakeTimers();
+  const clock = installFakeTimers();
   try {
     const c = makeController();
     c.create(2);
-    timers[0](); // boot watchdog is armed first
+    clock.fireOnly(BOOT_WATCHDOG_MS, 'one boot watchdog armed at the boot deadline');
     assert.equal(c.faulted, true);
     assert.match(c.faultInfo.message, /module load timed out/);
     assert.match(c.faultInfo.message, /0\/2 booted/);
     assert.match(c.faultInfo.message, /holosphere_wasm\.js/);
   } finally {
-    restore();
+    clock.restore();
   }
 });
 
 test('the boot watchdog names the segments that never booted', () => {
-  const { timers, restore } = installFakeTimers();
+  const clock = installFakeTimers();
   try {
     const c = makeController();
     c.create(4);
     deliverBooted(c, 0); // only seg 0 boots; 1..3 hang
-    timers[0]();
+    clock.fireOnly(BOOT_WATCHDOG_MS, 'one boot watchdog armed at the boot deadline');
     assert.equal(c.faulted, true);
     assert.match(c.faultInfo.message, /1\/4 booted/);
     assert.match(c.faultInfo.message, /never booted: 1, 2, 3/);
     assert.equal(c.faultInfo.segId, -1, 'multiple missing -> pool-wide segId');
   } finally {
-    restore();
+    clock.restore();
   }
 });
 
 test('a single missing segment is named directly in the watchdog fault', () => {
-  const { timers, restore } = installFakeTimers();
+  const clock = installFakeTimers();
   try {
     const c = makeController();
     c.create(2);
     deliverBooted(c, 0);
     deliverReady(c, 0); // seg 0 fully up; seg 1 never readies
-    timers[1](); // init watchdog
+    clock.fireOnly(INIT_WATCHDOG_MS, 'one init watchdog armed at the init deadline');
     assert.equal(c.faulted, true);
     assert.match(c.faultInfo.message, /never ready: 1/);
     assert.equal(c.faultInfo.segId, 1);
   } finally {
-    restore();
+    clock.restore();
   }
 });
 
 test('the render watchdog faults when a worker accepts render but stops progressing', async () => {
   const c = readyController(2);
-  const { timers, restore } = installFakeTimers();
+  const clock = installFakeTimers();
   try {
     const done = c.renderParallel();
     deliverFrame(c, 0); // only seg 0 replies; seg 1 hangs
     assert.equal(c.pending, 1, 'one segment still outstanding');
-    timers[timers.length - 1](); // the re-armed watchdog fires with seg 1 still hung
+    // The re-armed watchdog fires with seg 1 still hung.
+    clock.fireOnly(RENDER_WATCHDOG_MS, 'one render watchdog armed at the render deadline');
     assert.equal(c.faulted, true);
     assert.match(c.faultInfo.message, /render stalled/);
     assert.match(c.faultInfo.message, /1\/2 segments responded/);
@@ -814,44 +896,70 @@ test('the render watchdog faults when a worker accepts render but stops progress
     assert.equal(c.renderWatchdog, null);
     await done; // onWorkerFault resolved the in-flight frame
   } finally {
-    restore();
+    clock.restore();
   }
 });
 
 test('a progress frame re-arms the render watchdog so a slow render does not fault', async () => {
   const c = readyController(2);
-  const { timers, restore } = installFakeTimers();
+  const clock = installFakeTimers();
   try {
     const done = c.renderParallel();
-    assert.equal(timers.length, 1, 'watchdog armed once at dispatch');
+    assert.equal(clock.timers.length, 1, 'watchdog armed once at dispatch');
+    const atDispatch = clock.timers[0];
+    assert.equal(atDispatch.delay, RENDER_WATCHDOG_MS, 'armed at the render deadline');
     deliverFrame(c, 0); // one segment reports; the other is still rendering
     assert.equal(c.pending, 1);
-    assert.equal(timers.length, 2, 'watchdog re-armed on the progress frame');
+    assert.equal(clock.timers.length, 2, 'watchdog re-armed on the progress frame');
+    assert.equal(clock.isPending(atDispatch), false,
+      're-arming cancels the dispatch watchdog rather than leaving two running');
+    assert.equal(clock.pendingAt(RENDER_WATCHDOG_MS).length, 1,
+      'exactly one render watchdog is live across the re-arm');
     assert.notEqual(c.renderWatchdog, null);
     deliverFrame(c, 1); // the slow segment finally reports
     assert.equal(c.pending, 0);
     assert.equal(c.renderWatchdog, null, 'watchdog cleared once the frame settles');
+    assert.deepEqual(clock.pendingAt(RENDER_WATCHDOG_MS), [],
+      'the re-armed watchdog is cancelled too, not just dropped');
     assert.equal(c.faulted, false);
     await done;
   } finally {
-    restore();
+    clock.restore();
   }
 });
 
 test('a completed render clears the render watchdog so it cannot fault later', async () => {
   const c = readyController(2);
-  const { restore } = installFakeTimers();
+  const clock = installFakeTimers();
   try {
     const done = c.renderParallel();
     assert.notEqual(c.renderWatchdog, null, 'watchdog armed at dispatch');
+    assert.equal(clock.pendingAt(RENDER_WATCHDOG_MS).length, 1,
+      'one render watchdog is scheduled at the render deadline');
+    const [armed] = clock.pendingAt(RENDER_WATCHDOG_MS);
     deliverFrame(c, 0);
     deliverFrame(c, 1);
     assert.equal(c.pending, 0);
     assert.equal(c.renderWatchdog, null, 'watchdog cleared once the frame settles');
+    // Dropping the handle is not enough: the callback must be off the timer
+    // queue, or it faults a healthy pool a render deadline later.
+    assert.equal(clock.isPending(armed), false, 'the armed callback was cancelled');
+    assert.deepEqual(clock.pendingAt(RENDER_WATCHDOG_MS), [],
+      'no render watchdog survives the completed frame');
     assert.equal(c.faulted, false);
     await done;
+
+    // What an uncancelled callback costs: it survives into the next render,
+    // where `pending` is nonzero again, and faults a pool that is progressing.
+    const leftovers = clock.pendingAt(RENDER_WATCHDOG_MS);
+    const next = c.renderParallel();
+    for (const timer of leftovers) clock.fire(timer);
+    assert.equal(c.faulted, false, 'no watchdog from the settled frame faults the next one');
+    deliverFrame(c, 0);
+    deliverFrame(c, 1);
+    await next;
   } finally {
-    restore();
+    clock.restore();
   }
 });
 
