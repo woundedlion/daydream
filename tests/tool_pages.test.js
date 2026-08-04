@@ -64,13 +64,17 @@ test('tool pages load no Tailwind CDN code', () => {
   }
 });
 
-test('every served page carries a CSP permitting no Tailwind CDN origin', () => {
+test('every served page carries a CSP permitting no Tailwind CDN origin or blanket eval', () => {
   for (const { page } of SERVED_PAGES) {
     const csp = read(page).match(
       /<meta http-equiv="Content-Security-Policy" content="([^"]*)"/)?.[1];
     assert.ok(csp, `${page} has no Content-Security-Policy meta`);
     assert.doesNotMatch(csp, /tailwindcss\.com/,
       `${page} CSP still allows the Tailwind CDN`);
+    // The quote is what separates the two tokens: 'wasm-unsafe-eval', which
+    // WebAssembly.instantiate needs, does not match.
+    assert.doesNotMatch(csp, /'unsafe-eval'/,
+      `${page} CSP grants blanket 'unsafe-eval'; instantiating WASM needs only 'wasm-unsafe-eval'`);
     assert.match(csp, /default-src 'self'/);
     assert.match(csp, /object-src 'none'/);
   }
