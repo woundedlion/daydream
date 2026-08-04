@@ -89,6 +89,15 @@ test('failure detail is assigned as text without interpreting markup', () => {
   assert.equal(childWithClass(overlay, 'load-error-detail').textContent, markup);
 });
 
+test('the failure overlay moves focus onto its reload button', () => {
+  const { doc, overlay } = fakeDocument();
+
+  showBootstrapFailure(new Error('failed'), { document: doc });
+
+  assert.equal(overlay.getAttribute('role'), 'alert');
+  assert.equal(childWithClass(overlay, 'context-lost-reload').focusCalls, 1);
+});
+
 test('reload button refreshes the module cache before reloading', async () => {
   const { doc, overlay, click } = fakeDocument();
   const order = [];
