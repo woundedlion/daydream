@@ -24,6 +24,7 @@
     "segment_controller.js",
     "segment_layout.js",
     "segment_stats_view.js",
-    "segment_worker.js"
+    "segment_worker.js",
+    "tools/kb_format.js"
   ]
 }

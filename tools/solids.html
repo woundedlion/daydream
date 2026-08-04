@@ -587,7 +587,7 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { initScene, copyWithFeedback, showFatalError, bootstrapTool } from './shared.js';
+    import { initScene, copyWithFeedback, showFatalError, bootstrapTool, formatKB } from './shared.js';
     // The shared op table and dispatch, the pure C++ export-string codegen
     // (formatFloat/pctSuffix/recipe builders), the pure face-geometry helpers and
     // the op-chain queue/validator machinery live in solid_codegen.js, and the
@@ -747,7 +747,7 @@
         // The engine nulls MeshOpsWasm on halt; stop rather than reschedule forever.
         if (!MeshOpsWasm) return;
         const m = MeshOpsWasm.getArenaMetrics();
-        const fmt = (x) => `${(x.high_water_mark / 1024).toFixed(0)} / ${(x.capacity / 1024).toFixed(0)}KB`;
+        const fmt = (x) => `${formatKB(x.high_water_mark, 0)} / ${formatKB(x.capacity, 0)}KB`;
         const statsEl = document.getElementById('arenaStats');
         if (statsEl) {
           statsEl.innerText = `${fmt(m.tooling_arena)}`;
