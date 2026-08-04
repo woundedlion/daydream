@@ -71,7 +71,7 @@ export class FakeElement {}
  * the daydream modules read and write. Non-empty innerHTML assignments throw so
  * tests cannot silently accept markup construction that a browser would parse.
  * Listeners are recorded so a test can dispatch(type, event) and assert removal;
- * scrollIntoView() records its call count the same way.
+ * focus() and scrollIntoView() record their call counts the same way.
  * @param {string} [tag] - Tag name.
  * @returns {Object} Fake element.
  */
@@ -87,6 +87,7 @@ export function fakeElement(tag = 'div') {
     attributes: {},
     children: [],
     parentNode: null,
+    focusCalls: 0,
     scrollIntoViewCalls: 0,
     get firstElementChild() {
       return this.children.find((node) => node && typeof node === 'object') || null;
@@ -165,7 +166,7 @@ export function fakeElement(tag = 'div') {
         l.handler(dispatched);
       }
     },
-    focus() {},
+    focus() { this.focusCalls++; },
     select() {},
     scrollIntoView() { this.scrollIntoViewCalls++; },
   };

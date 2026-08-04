@@ -84,6 +84,9 @@ export function showBootstrapFailure(error, {
   // failure is assertive.
   overlay.setAttribute('role', 'alert');
   overlay.replaceChildren(title, detail, reload);
+  // A role swap on a live node is not reliably announced; focus carries it, and
+  // leaves the keyboard user on the one control the overlay offers.
+  reload.focus({ preventScroll: true });
   return true;
 }
 
