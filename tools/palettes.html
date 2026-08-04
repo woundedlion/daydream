@@ -437,7 +437,7 @@
     // functions (tools/color.js, which mirrors core/color/color.h's).
     import { copyWithFeedback, COPY_FEEDBACK, wireCopyBlock } from './clipboard.js';
     // Labelled range slider + readout, shared with the other tool pages.
-    import { createSlider as buildSlider } from './slider.js';
+    import { createSlider } from './slider.js';
     // Fatal-error banner and load bootstrap from the THREE-free banner module
     // (not shared.js, which pulls in three.js — a dependency this tool
     // otherwise doesn't have).
@@ -580,10 +580,10 @@
     // --- UI and Event Functions ---
 
     /**
-         * Creates the HTML structure for a single parameter slider.
-         */
-    function createSlider(def) {
-      const handles = buildSlider(def.container, {
+     * Creates the HTML structure for a single parameter slider.
+     */
+    function mountSlider(def) {
+      const handles = createSlider(def.container, {
         id: def.param,
         label: def.label,
         min: def.min,
@@ -1303,13 +1303,13 @@
       });
 
       // 1. Initialize all 12 R/G/B sliders
-      sliderDefinitions.forEach(createSlider);
+      sliderDefinitions.forEach(mountSlider);
 
       // 1.5 Build the named-palette swatch gallery
       buildPaletteGallery();
 
       // 2. Initialize Speed slider
-      buildSlider('speed_control', {
+      createSlider('speed_control', {
         id: 'speed',
         label: 'Speed',
         min: 0,
