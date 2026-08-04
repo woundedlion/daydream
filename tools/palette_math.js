@@ -77,11 +77,9 @@ export class ProceduralPalette {
    *   device's interpolated 16-bit-linear LUT by up to ~1 LSB per channel.
    */
   get(t) {
-    const PI2 = TWO_PI;
-
-    const r = Math.max(0, Math.min(1, this.a[0] + this.b[0] * fastCos(PI2 * (this.c[0] * t + this.d[0]))));
-    const g = Math.max(0, Math.min(1, this.a[1] + this.b[1] * fastCos(PI2 * (this.c[1] * t + this.d[1]))));
-    const b = Math.max(0, Math.min(1, this.a[2] + this.b[2] * fastCos(PI2 * (this.c[2] * t + this.d[2]))));
+    const r = Math.max(0, Math.min(1, this.a[0] + this.b[0] * fastCos(TWO_PI * (this.c[0] * t + this.d[0]))));
+    const g = Math.max(0, Math.min(1, this.a[1] + this.b[1] * fastCos(TWO_PI * (this.c[1] * t + this.d[1]))));
+    const b = Math.max(0, Math.min(1, this.a[2] + this.b[2] * fastCos(TWO_PI * (this.c[2] * t + this.d[2]))));
 
     return [srgbToLinearFloat(r), srgbToLinearFloat(g), srgbToLinearFloat(b)];
   }
@@ -93,11 +91,10 @@ export class ProceduralPalette {
    * @returns {number[]} Unclamped sRGB cosine values as [R, G, B].
    */
   getChannelValues(t) {
-    const PI2 = TWO_PI;
     return [
-      this.a[0] + this.b[0] * fastCos(PI2 * (this.c[0] * t + this.d[0])),
-      this.a[1] + this.b[1] * fastCos(PI2 * (this.c[1] * t + this.d[1])),
-      this.a[2] + this.b[2] * fastCos(PI2 * (this.c[2] * t + this.d[2])),
+      this.a[0] + this.b[0] * fastCos(TWO_PI * (this.c[0] * t + this.d[0])),
+      this.a[1] + this.b[1] * fastCos(TWO_PI * (this.c[1] * t + this.d[1])),
+      this.a[2] + this.b[2] * fastCos(TWO_PI * (this.c[2] * t + this.d[2])),
     ];
   }
 
