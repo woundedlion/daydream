@@ -514,12 +514,12 @@ test('destroying a child folder leaves the shared root URL writer armed', () => 
     folder.add({ sides: 3 }, 'sides', 0, 10).setValue(5);
 
     folder.destroy();
-    assert.equal(folder.gui.destroyed, true, 'the folder panel was left in the DOM');
-    assert.equal(root.gui.destroyed, false, 'a child destroy took the root panel down');
+    assert.equal(folder.gui.destroyed, true, 'the folder panel is torn down');
+    assert.equal(root.gui.destroyed, false, 'the root panel survives a child destroy');
 
     mock.timers.tick(200);
     assert.equal(new URL(url.written(), 'http://x').searchParams.get('Shape.sides'), '5',
-      'the child destroy cancelled the root writer');
+      'the root writer still flushes the pending deep link');
   } finally {
     mock.timers.reset();
   }
@@ -537,10 +537,10 @@ test('destroying the root cancels its pending URL write', () => {
     root.add({ speed: 1 }, 'speed', 0, 10).setValue(5);
 
     root.destroy();
-    assert.equal(root.gui.destroyed, true, 'the root panel was left in the DOM');
+    assert.equal(root.gui.destroyed, true, 'the root panel is torn down');
 
     mock.timers.tick(200);
-    assert.equal(url.written(), '/', 'the discarded GUI still wrote to the URL');
+    assert.equal(url.written(), '/', 'the discarded GUI writes nothing');
   } finally {
     mock.timers.reset();
   }
@@ -581,6 +581,6 @@ test('resetGUI routes through the active URLSync', () => {
   const q = new URL(url.written(), 'http://x').searchParams;
   assert.equal(q.get('Speed'), null);
   assert.equal(q.get('keep'), '1');
-  assert.equal(q.get('effect'), 'Old', 'tracked state was not re-asserted');
+  assert.equal(q.get('effect'), 'Old', 'tracked state is re-asserted');
   assert.match(url.written(), /#tool$/);
 });
