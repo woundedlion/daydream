@@ -222,6 +222,10 @@ export class Daydream {
     this.scene.background = new THREE.Color(Daydream.SCENE_BACKGROUND_COLOR);
     this.paused = false;
     this.stepFrames = 0;
+    // Video capture sink, injected by the app while recording is armed and
+    // nulled when it is torn down; null disables capture entirely. Must expose
+    // captureFrame(), abort(message), and an isRecording flag (which also
+    // suppresses the PiP corner).
     this.recorder = null;
 
     this.clock = new THREE.Clock(true);
@@ -498,13 +502,18 @@ export class Daydream {
   }
 
   /**
-   * Animation-loop body, called once per animation frame with the active
-   * effect. Advances the fixed-timestep simulation if an interval has accrued,
+   * Animation-loop body, called once per animation frame with the active render
+   * adapter. Advances the fixed-timestep simulation if an interval has accrued,
    * updates controls, and repaints the main view, labels, and PiP — but only
-   * when the sim stepped, the camera moved, or invalidate() was called.
-   * @param {Object} effect - Active effect; its drawFrame()/getArenaMetrics() drive the painted frame.
+   * when the sim stepped, the camera moved, or invalidate() was called. Hands
+   * this.recorder one frame per advanced tick the adapter reports capture-ready.
+   * @param {{drawFrame: () => void, getArenaMetrics?: () => ?Object,
+   *   captureReady?: () => boolean}} adapter - Per-frame render adapter (see
+   *   createRenderAdapter): drawFrame() paints the pixel buffer,
+   *   getArenaMetrics() feeds the stats overlay, and captureReady() gates the
+   *   recorder. Both optional methods default to permissive when absent.
    */
-  render(effect) {
+  render(adapter) {
     if (this.contextLost) return;
 
     // A pending single-step must fire immediately, even while paused and before
@@ -512,7 +521,7 @@ export class Daydream {
     // advances once per frame either way.
     const clockReady = this.advanceFrameClock();
     const advanced =
-      (clockReady || this.stepFrames !== 0) && this.stepSimulation(effect);
+      (clockReady || this.stepFrames !== 0) && this.stepSimulation(adapter);
 
     // Services live pointer interaction; emits 'change' (→ needsRender).
     this.controls.update();
@@ -523,7 +532,7 @@ export class Daydream {
     // Capture only when the sim advanced. In segmented mode the composite lands a
     // frame late, so captureReady() gates out the leading cleared black frames.
     const captureDue = Boolean(this.recorder) && advanced &&
-      (typeof effect?.captureReady !== 'function' || effect.captureReady());
+      (typeof adapter?.captureReady !== 'function' || adapter.captureReady());
 
     // Three throws if an attribute's array byteLength differs from the size it gave
     // the GPU buffer, and a mid-frame heap growth detaches the aliased instanceColor
@@ -581,10 +590,10 @@ export class Daydream {
   /**
    * Advance the simulation one frame when running or single-stepping: clear the
    * pixel buffer, draw the effect, refresh stats.
-   * @param {Object} effect - Active effect whose drawFrame() paints the pixel buffer.
+   * @param {{drawFrame: () => void}} adapter - Render adapter whose drawFrame() paints the pixel buffer.
    * @returns {boolean} Whether the simulation actually advanced (false while paused), so the caller can gate the recorder on the same decision.
    */
-  stepSimulation(effect) {
+  stepSimulation(adapter) {
     const advanced = !this.paused || this.stepFrames !== 0;
     if (!advanced) return false;
 
@@ -598,12 +607,12 @@ export class Daydream {
       this.pixels.fill(0);
 
     const start = performance.now();
-    if (effect) {
-      effect.drawFrame();
+    if (adapter) {
+      adapter.drawFrame();
     }
     const duration = performance.now() - start;
 
-    this.updateStats(duration, effect);
+    this.updateStats(duration, adapter);
 
     // drawFrame() and updateStats() both call into WASM after the view heal, so a
     // heap growth can detach the array instanceColor aliases.
@@ -866,10 +875,10 @@ export class Daydream {
   /**
    * Hand one frame's measurements to the stats overlay.
    * @param {number} duration - Frame draw time in milliseconds.
-   * @param {Object} effect - Active effect; its getArenaMetrics() supplies arena usage when present.
+   * @param {{getArenaMetrics?: () => ?Object}} adapter - Render adapter; its getArenaMetrics() supplies arena usage when present.
    */
-  updateStats(duration, effect) {
-    this.statsView.update(duration, effect?.getArenaMetrics?.() ?? null);
+  updateStats(duration, adapter) {
+    this.statsView.update(duration, adapter?.getArenaMetrics?.() ?? null);
   }
 
   /**
