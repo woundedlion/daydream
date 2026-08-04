@@ -32,6 +32,35 @@ test('formatExportParams: skips a middle readonly param', () => {
   assert.equal(formatExportParams(params, [0.1, 0.2, 0.3]), '{ 0.1f, 0.3f }');
 });
 
+test('formatExportParams: skips params excluded from presets', () => {
+  const params = [
+    { name: 'Shape', options: ['Star', 'Heart'] },
+    { name: 'Global Alpha', preset: false },
+    { name: 'Scale' },
+  ];
+  assert.equal(formatExportParams(params, [1, 0.75, 2]), '{ 1.0f, 2.0f }');
+});
+
+test('formatExportParams: emits the selected enum symbol exactly', () => {
+  const params = [{
+    name: 'Shape',
+    options: ['Star', 'Heart', 'Polygon'],
+    exportOptions: ['Shape::STAR', 'Shape::HEART', 'Shape::POLYGON'],
+  }];
+  assert.equal(formatExportParams(params, [1]), '{ Shape::HEART }');
+});
+
+test('formatExportParams: rejects an enum index with no export symbol', () => {
+  const params = [{ name: 'Shape', exportOptions: ['Shape::STAR'] }];
+  assert.throws(() => formatExportParams(params, [1]),
+    /No export option for Shape index 1/);
+});
+
+test('formatExportParams: preserves float output without enum export metadata', () => {
+  const params = [{ name: 'Shape', options: ['Star', 'Heart'] }];
+  assert.equal(formatExportParams(params, [1]), '{ 1.0f }');
+});
+
 /** An all-readonly param set yields empty braces rather than a malformed list. */
 test('formatExportParams: all-readonly yields empty braces', () => {
   const params = [{ name: 'X', readonly: true }];
