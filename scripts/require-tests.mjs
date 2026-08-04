@@ -96,3 +96,10 @@ if (strays.length > 0) {
   );
   process.exit(1);
 }
+
+// Without a line on the way out, a run that skipped this gate reads in CI
+// exactly like one that cleared it.
+console.log(
+  `require-tests: ${files.length} files matched ${glob}, at or above the ` +
+    `committed floor of ${floor}.`,
+);
