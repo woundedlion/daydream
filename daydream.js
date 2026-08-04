@@ -441,6 +441,8 @@ guiInstance.add(poleLod.state, 'poleLod', 0, 2, 0.05).name('Pole LOD')
   .onChange((v) => { poleLod.apply(v); segments.setPoleLod(v); });
 
 // ── Segmented POV controls ──────────────────────────────────────────────────
+// The folder name and the segState property names are deep-link key segments
+// (view.Segmented POV.<prop>); renaming either invalidates links already shared.
 const segFolder = guiInstance.addFolder('Segmented POV');
 segFolder.close();
 const segState = { segmented: segments.active, segments: segments.count, boundaries: segments.showBoundaries };
