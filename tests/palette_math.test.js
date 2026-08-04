@@ -139,37 +139,6 @@ test('proceduralPaletteParams flattens a coefficient set into A_R..D_B', () => {
 });
 
 /**
- * Pins seededRandInt to the values GenerativePalette::seeded_rand_int
- * (core/color/color.h) produces for the same arguments. The expected column was
- * evaluated independently from the C++ source — hash01's 32-bit unsigned mix
- * (core/math/3dmath.h), then the single-precision `min + int(u * (max - min))`
- * scale — so a JS mirror that drifts from the header fails here, and the
- * exported palette no longer matches the preview.
- */
-test('seededRandInt reproduces the engine draws for known (seed, site, range)', () => {
-  const cases = [
-    [0, 0, -7, 8, -7],
-    [0, 1, 0, 2, 0],
-    [0, 4, 153, 204, 183],
-    [10, 0, -7, 8, -1],
-    [10, 2, 11, 22, 12],
-    [10, 3, 11, 22, 21],
-    [128, 7, 25, 76, 26],
-    [128, 8, 127, 178, 149],
-    [128, 9, 204, 256, 248],
-    [200, 4, 153, 204, 170],
-    [200, 5, 153, 204, 165],
-    [200, 6, 153, 204, 202],
-    [255, 7, 178, 256, 213],
-    [255, 8, 51, 127, 75],
-  ];
-  for (const [seed, site, min, max, expected] of cases) {
-    assert.equal(seededRandInt(seed, site, min, max), expected,
-      `seededRandInt(${seed}, ${site}, ${min}, ${max})`);
-  }
-});
-
-/**
  * Verifies seededRandInt's range contract over every hue the tool can pass and
  * every site the palette draws from: an integer in [min, max), and min for an
  * empty range (the C++ guard against max <= min).
@@ -305,74 +274,6 @@ function resolveKeys(brightness, sat, hueValue) {
     values: [bakeArgs[3], bakeArgs[6], bakeArgs[9]],
   };
 }
-
-// Base hues the generative goldens below are pinned at; 0 and 200 cover the
-// bottom of the wheel and a harmony that wraps past 256, 42 is the tool's default.
-const GENERATIVE_SEEDS = [0, 10, 42, 128, 137, 200];
-
-// Saturation keys (s1,s2,s3) the engine's GenerativePalette resolves per seed,
-// captured by running the core/color/color.h constructor.
-const ENGINE_SATS = {
-  PASTEL: { 0: [100, 100, 100], 10: [100, 100, 100], 42: [100, 100, 100], 128: [100, 100, 100], 137: [100, 100, 100], 200: [100, 100, 100] },
-  MID: { 0: [183, 186, 167], 10: [165, 190, 187], 42: [186, 160, 159], 128: [197, 185, 180], 137: [193, 153, 179], 200: [170, 165, 202] },
-  VIBRANT: { 0: [255, 255, 255], 10: [255, 255, 255], 42: [255, 255, 255], 128: [255, 255, 255], 137: [255, 255, 255], 200: [255, 255, 255] },
-};
-
-// Brightness keys (v1,v2,v3) the same constructor resolves per seed.
-const ENGINE_VALUES = {
-  ASCENDING: { 0: [44, 153, 239], 10: [39, 131, 210], 42: [57, 151, 254], 128: [26, 149, 248], 137: [62, 138, 234], 200: [36, 156, 230] },
-  DESCENDING: { 0: [223, 153, 59], 10: [219, 131, 31], 42: [236, 151, 74], 128: [205, 149, 68], 137: [241, 138, 55], 200: [215, 156, 50] },
-  FLAT: { 0: [255, 255, 255], 10: [255, 255, 255], 42: [255, 255, 255], 128: [255, 255, 255], 137: [255, 255, 255], 200: [255, 255, 255] },
-  BELL: { 0: [79, 218, 79], 10: [73, 184, 73], 42: [98, 215, 98], 128: [52, 212, 52], 137: [106, 196, 106], 200: [67, 223, 67] },
-  CUP: { 0: [207, 90, 207], 10: [200, 57, 200], 42: [226, 87, 226], 128: [180, 84, 180], 137: [234, 68, 234], 200: [195, 95, 195] },
-};
-
-// Hue triples (h1,h2,h3) the engine's calc_hues derives per seed, jitter included.
-const ENGINE_HUES = {
-  TRIADIC: { 0: [0, 85, 170], 10: [10, 95, 180], 42: [42, 127, 212], 128: [128, 213, 42], 137: [137, 222, 51], 200: [200, 29, 114] },
-  SPLIT_COMPLEMENTARY: { 0: [0, 107, 149], 10: [10, 117, 159], 42: [42, 149, 191], 128: [128, 235, 21], 137: [137, 244, 30], 200: [200, 51, 93] },
-  COMPLEMENTARY: { 0: [0, 128, 249], 10: [10, 138, 9], 42: [42, 170, 39], 128: [128, 0, 131], 137: [137, 9, 138], 200: [200, 72, 197] },
-  ANALOGOUS: { 0: [0, 21, 42], 10: [10, 22, 43], 42: [42, 60, 74], 128: [128, 145, 162], 137: [137, 149, 160], 200: [200, 213, 226] },
-};
-
-/**
- * Pins the saturation and brightness keys palette_math.js resolves to the keys
- * the engine's GenerativePalette resolves for the same profiles and base hue.
- * The goldens are absolute values captured from that constructor, so a shifted
- * draw site, a moved range bound or a drifted hash all show up here — a
- * comparison rebuilt from the mirror's own seededRandInt would agree with
- * itself instead.
- */
-test('GenerativePalette saturation and brightness keys match the engine', () => {
-  for (const seed of GENERATIVE_SEEDS) {
-    for (const sat of Object.keys(ENGINE_SATS)) {
-      for (const brightness of Object.keys(ENGINE_VALUES)) {
-        const { sats, values } = resolveKeys(brightness, sat, seed);
-        assert.deepEqual(sats, ENGINE_SATS[sat][seed], `${sat} saturations at hue ${seed}`);
-        assert.deepEqual(values, ENGINE_VALUES[brightness][seed], `${brightness} values at hue ${seed}`);
-      }
-    }
-  }
-});
-
-/**
- * Pins the harmony hue triples palette_math.js derives to the ones the engine's
- * calc_hues derives, covering the deterministic offsets, the 256 wrap and the
- * seeded jitter of COMPLEMENTARY and ANALOGOUS in one set of absolute goldens.
- */
-test('GenerativePalette harmony hues match the engine', () => {
-  const hues = (harmony, hueValue) => {
-    const bakeArgs = captureBakeArgs(() =>
-      new GenerativePalette('STRAIGHT', harmony, 'FLAT', 'VIBRANT', hueValue));
-    return [bakeArgs[1], bakeArgs[4], bakeArgs[7]];
-  };
-  for (const harmony of Object.keys(ENGINE_HUES)) {
-    for (const seed of GENERATIVE_SEEDS) {
-      assert.deepEqual(hues(harmony, seed), ENGINE_HUES[harmony][seed],
-        `${harmony} at hue ${seed}`);
-    }
-  }
-});
 
 /**
  * Verifies the preview tracks the base hue the export pins: the engine derives

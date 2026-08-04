@@ -22,8 +22,9 @@ test('WASM parity module is present with the exports this suite pins', () => {
   for (const name of [
     'srgb_to_linear_float', 'linear_to_srgb_float', 'srgb_to_linear_interp',
     'linear_rgb_to_oklab', 'oklab_to_linear_rgb', 'hsv_to_rgb',
-    'procedural_palette_linear', 'named_procedural_palettes', 'lissajous',
-    'mobius_transform', 'PaletteOps',
+    'procedural_palette_linear', 'named_procedural_palettes',
+    'generative_palette_hsv_keys', 'lissajous', 'mobius_transform',
+    'PaletteOps',
   ]) {
     assert.equal(typeof M[name], 'function',
       `holosphere_wasm.js is missing export ${name} — parity check would not run`);
@@ -232,49 +233,151 @@ test('GenerativePalette bakes the golden LUT through the engine bridge', () => {
   }
 });
 
-// Sampled goldens for seeded profile combinations, captured from the engine's
-// own GenerativePalette(shape, harmony, brightness, saturation, base hue)
-// constructor — the draws it makes included. Between them the rows cover every
-// harmony, brightness and saturation profile; the first is the tool's default
-// selection.
-const SEEDED_GOLDEN = [
-  ['STRAIGHT', 'ANALOGOUS', 'FLAT', 'MID', 42,
-    [[210, 126, 30], [204, 131, 26], [196, 136, 27], [189, 140, 32], [181, 144, 39],
-      [176, 147, 40], [170, 149, 42], [164, 152, 46], [158, 154, 51]]],
-  ['CIRCULAR', 'COMPLEMENTARY', 'BELL', 'PASTEL', 137,
-    [[1, 68, 65], [53, 78, 118], [125, 80, 121], [140, 82, 113], [73, 78, 125],
-      [0, 72, 81], [1, 68, 65], [1, 68, 65], [1, 68, 65]]],
-  ['VIGNETTE', 'TRIADIC', 'ASCENDING', 'MID', 10,
-    [[0, 0, 0], [56, 1, 11], [66, 29, 0], [69, 55, 0], [48, 84, 0],
-      [0, 103, 80], [0, 116, 129], [0, 121, 201], [0, 0, 0]]],
-  ['FALLOFF', 'SPLIT_COMPLEMENTARY', 'DESCENDING', 'VIBRANT', 200,
-    [[112, 92, 247], [171, 55, 143], [155, 62, 38], [104, 71, 0], [64, 55, 0],
-      [30, 38, 0], [7, 11, 2], [0, 0, 0], [0, 0, 0]]],
-  ['STRAIGHT', 'ANALOGOUS', 'CUP', 'MID', 128,
-    [[0, 118, 104], [0, 101, 93], [0, 85, 81], [0, 69, 69], [0, 54, 56],
-      [0, 68, 76], [0, 83, 97], [0, 98, 120], [1, 112, 146]]],
+// GenerativePalette enum orders, mirrored from core/color/color.h, in the
+// indices generative_palette_hsv_keys takes.
+const GRADIENT_SHAPES = [...P.GRADIENT_SHAPES];
+const HARMONIES = ['TRIADIC', 'SPLIT_COMPLEMENTARY', 'COMPLEMENTARY', 'ANALOGOUS'];
+const BRIGHTNESSES = ['ASCENDING', 'DESCENDING', 'FLAT', 'BELL', 'CUP'];
+const SATURATIONS = ['PASTEL', 'MID', 'VIBRANT'];
+
+/**
+ * The nine HSV keys the engine's GenerativePalette constructor resolves for a
+ * profile triple and base hue — the oracle the tool's mirror is checked against.
+ * @param {string} harmony - HarmonyType token.
+ * @param {string} brightness - BrightnessProfile token.
+ * @param {string} sat - SaturationProfile token.
+ * @param {number} seed - Base hue in 0..255, which is also the draw seed.
+ * @returns {number[]} [h1, s1, v1, h2, s2, v2, h3, s3, v3].
+ */
+function engineKeys(harmony, brightness, sat, seed) {
+  const k = M.generative_palette_hsv_keys(
+    HARMONIES.indexOf(harmony), BRIGHTNESSES.indexOf(brightness),
+    SATURATIONS.indexOf(sat), seed);
+  return [k.h1, k.s1, k.v1, k.h2, k.s2, k.v2, k.h3, k.s3, k.v3];
+}
+
+/**
+ * The nine HSV keys palette_math.js resolves, read off the bakeLut call it makes.
+ * @param {string} harmony - HarmonyType token.
+ * @param {string} brightness - BrightnessProfile token.
+ * @param {string} sat - SaturationProfile token.
+ * @param {number} seed - Base hue in 0..255.
+ * @returns {number[]} The keys in the same order engineKeys returns them.
+ */
+function toolKeys(harmony, brightness, sat, seed) {
+  let keys;
+  P.setPaletteOps((...args) => {
+    keys = args.slice(1);
+    return new Uint8Array(256 * 3);
+  });
+  try {
+    new P.GenerativePalette('STRAIGHT', harmony, brightness, sat, seed);
+  } finally {
+    P.setPaletteOps(null);
+  }
+  return keys;
+}
+
+// Base hues the cross-product sweep runs: the wheel's ends, the tool's default
+// (42), quarter and half turns, and hues whose harmonies wrap past 256.
+const ORACLE_SEEDS = [0, 1, 7, 10, 42, 63, 85, 127, 128, 137, 170, 200, 254, 255];
+
+/**
+ * Pins every key palette_math.js resolves to the engine's own constructor over
+ * the whole harmony x brightness x saturation cross-product. The tool resolves
+ * the profiles into h/s/v itself and the bridge bakes only those keys, so the
+ * draw sites, the range bounds and the harmony jitter reach the device solely
+ * through the JS mirror, and this comparison is what holds them to the engine.
+ */
+test('GenerativePalette keys match the engine oracle (generative_palette_hsv_keys)', () => {
+  for (const harmony of HARMONIES) {
+    for (const brightness of BRIGHTNESSES) {
+      for (const sat of SATURATIONS) {
+        for (const seed of ORACLE_SEEDS) {
+          assert.deepEqual(toolKeys(harmony, brightness, sat, seed),
+            engineKeys(harmony, brightness, sat, seed),
+            `${harmony}/${brightness}/${sat} at hue ${seed}`);
+        }
+      }
+    }
+  }
+});
+
+// Two profile triples that between them reach all ten draw sites: COMPLEMENTARY
+// draws site 0, ANALOGOUS sites 1-3, MID sites 4-6, and ASCENDING sites 7-9.
+const ALL_SITE_PROFILES = [
+  ['COMPLEMENTARY', 'ASCENDING', 'MID'],
+  ['ANALOGOUS', 'FLAT', 'PASTEL'],
 ];
 
 /**
- * Pins the tool's seeded-draw path end to end. palette_math.js resolves the
- * profiles into h/s/v itself and the bridge bakes only those keys, so the
- * draw sites, the range bounds and the harmony jitter reach the device solely
- * through the JS mirror; comparing the baked LUT against the engine's own
- * profile constructor is what covers them. A one-unit drift in any draw moves a
- * key and the sampled LUT with it. The test above uses the draw-free
- * (FLAT, VIBRANT, TRIADIC) combination, which exercises none of this.
+ * Sweeps every base hue the tool can pass through the draw sites the profiles
+ * above reach, so a hash divergence that only shows on some seeds cannot hide
+ * between the sampled hues of the cross-product sweep.
  */
-test('GenerativePalette seeded profiles bake the engine LUT', () => {
+test('GenerativePalette keys match the engine oracle on every base hue', () => {
+  for (const [harmony, brightness, sat] of ALL_SITE_PROFILES) {
+    for (let seed = 0; seed < 256; seed++) {
+      assert.deepEqual(toolKeys(harmony, brightness, sat, seed),
+        engineKeys(harmony, brightness, sat, seed),
+        `${harmony}/${brightness}/${sat} at hue ${seed}`);
+    }
+  }
+});
+
+/**
+ * Pins the engine's own key derivation to the profile definitions, independently
+ * of the JS mirror. The oracle sweeps above are wasm-vs-js, so a drift made on
+ * both sides at once would pass; the draw-free profiles are fully determined
+ * (h1 is the base hue, TRIADIC steps 85, SPLIT_COMPLEMENTARY steps 128+-21,
+ * VIBRANT pins saturation to 255 and PASTEL to 100, FLAT pins value to 255), so
+ * comparing against them catches a shifted offset or a swapped enum order.
+ */
+test('generative_palette_hsv_keys matches the draw-free profile definitions', () => {
+  for (let seed = 0; seed < 256; seed++) {
+    assert.deepEqual(engineKeys('TRIADIC', 'FLAT', 'VIBRANT', seed),
+      [seed, 255, 255, (seed + 85) % 256, 255, 255, (seed + 170) % 256, 255, 255],
+      `TRIADIC/FLAT/VIBRANT at hue ${seed}`);
+    assert.deepEqual(engineKeys('SPLIT_COMPLEMENTARY', 'FLAT', 'PASTEL', seed),
+      [seed, 100, 255, (seed + 107) % 256, 100, 255, (seed + 149) % 256, 100, 255],
+      `SPLIT_COMPLEMENTARY/FLAT/PASTEL at hue ${seed}`);
+  }
+});
+
+// Shape x profile rows the end-to-end bake comparison runs, covering all four
+// gradient shapes and, between them, every harmony, brightness and saturation.
+const ORACLE_BAKES = [
+  ['STRAIGHT', 'ANALOGOUS', 'FLAT', 'MID', 42],
+  ['CIRCULAR', 'COMPLEMENTARY', 'BELL', 'PASTEL', 137],
+  ['VIGNETTE', 'TRIADIC', 'ASCENDING', 'MID', 10],
+  ['FALLOFF', 'SPLIT_COMPLEMENTARY', 'DESCENDING', 'VIBRANT', 200],
+  ['STRAIGHT', 'ANALOGOUS', 'CUP', 'MID', 128],
+];
+
+/**
+ * Closes the loop the preview and the export each walk: the tool's own keys and
+ * the engine's oracle keys must bake the same LUT, byte for byte, through the
+ * same bridge. This is the whole path the browser preview shows and the exported
+ * C++ reproduces on the device, so a drifted key shows up as a different palette
+ * rather than only as a different number.
+ */
+test('GenerativePalette bakes the engine oracle keys byte for byte', () => {
   const ops = new M.PaletteOps();
   try {
-    P.setPaletteOps((...args) => ops.bakeLut(...args));
-    for (const [shape, harmony, brightness, sat, hue, golden] of SEEDED_GOLDEN) {
-      const pal = new P.GenerativePalette(shape, harmony, brightness, sat, hue);
-      assert.deepEqual(sampleLut(pal.lut), golden,
-        `${shape}/${harmony}/${brightness}/${sat} at hue ${hue} drifted from the engine LUT`);
+    for (const [shape, harmony, brightness, sat, seed] of ORACLE_BAKES) {
+      const oracle = Uint8Array.from(ops.bakeLut(
+        GRADIENT_SHAPES.indexOf(shape), ...engineKeys(harmony, brightness, sat, seed)));
+      P.setPaletteOps((...args) => ops.bakeLut(...args));
+      let lut;
+      try {
+        lut = new P.GenerativePalette(shape, harmony, brightness, sat, seed).lut;
+      } finally {
+        P.setPaletteOps(null);
+      }
+      assert.deepEqual(lut, oracle,
+        `${shape}/${harmony}/${brightness}/${sat} at hue ${seed} baked a different LUT`);
     }
   } finally {
-    P.setPaletteOps(null);
     ops.delete();
   }
 });
