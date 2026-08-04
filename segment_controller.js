@@ -72,7 +72,13 @@ function errorDetail(error) {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }
 
-/** @param {ReturnType<typeof setTimeout>} timer */
+/**
+ * Release a pending timer's hold on the Node event loop, so an unfired watchdog
+ * cannot keep the unit-test process alive. No-op in browsers, where `unref` does
+ * not exist and timers do not hold the page open.
+ * @param {ReturnType<typeof setTimeout>} timer - Handle returned by setTimeout.
+ * @returns {void}
+ */
 function unrefTimer(timer) {
   const nodeTimer = /** @type {{unref?: () => void}} */ (
     /** @type {unknown} */ (timer));
@@ -509,6 +515,10 @@ export class SegmentController {
   /**
    * Latch a synchronous startup failure of worker `segId`; onWorkerFault
    * terminates and detaches the partially-created pool.
+   * @param {number} segId - Segment whose startup threw.
+   * @param {string} phase - Startup step named in the fault message, e.g. 'construction'.
+   * @param {unknown} error - The caught value, rendered by errorDetail.
+   * @returns {void}
    */
   abortWorkerStartup(segId, phase, error) {
     this.onWorkerFault(segId, `worker ${phase} failed: ${errorDetail(error)}`);
