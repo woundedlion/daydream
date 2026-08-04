@@ -65,7 +65,7 @@ const runExpectingFailure = () => {
 
 /** Verifies a populated test dir with no stray install passes. */
 test('a populated test dir with no stray install passes', () => {
-  assert.doesNotThrow(run);
+  assert.match(String(run()), /require-tests: 1 files matched/);
 });
 
 /** Verifies an emptied test dir is refused rather than reported as a green run. */
