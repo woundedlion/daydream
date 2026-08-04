@@ -963,9 +963,10 @@ test('composite() blits each quadrant to its display-buffer offset', () => {
   driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
+  c.count = 2;
   c.showBoundaries = false;
   const quad = new Uint16Array(2 * 2 * 3).fill(111);
-  c.results = [{ pixels: quad, x0: 2, x1: 4, y0: 0, y1: 2 }];
+  c.results = [null, { pixels: quad, x0: 2, x1: 4, y0: 0, y1: 2 }];
 
   c.composite();
 
@@ -999,6 +1000,7 @@ test('composite() faults atomically when a non-leading segment overflows', () =>
   driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
+  c.count = 2;
   c.showBoundaries = false;
   const good = new Uint16Array(2 * 2 * 3).fill(111);
   const bad = new Uint16Array(2 * 2 * 3).fill(222);
@@ -1048,6 +1050,43 @@ test('composite() faults on a pixel buffer whose length disagrees with its rect'
   assert.ok(driver.pixels.every((v) => v === 0), 'nothing is blitted on a buffer-length mismatch');
 });
 
+test('composite() faults on a rect that is not that segment\'s band of the layout', () => {
+  // A worker that missed a resolution change answers under the current generation
+  // with a rect that is in bounds and matches its own buffer, so only re-deriving
+  // the band catches it before it blits into another segment's rows.
+  driver.W = 4; driver.H = 4;
+  driver.pixels = new Uint16Array(4 * 4 * 3);
+
+  const c = makeController();
+  c.count = 4;
+  c.showBoundaries = false;
+  // Segment 1's band is [0,2)-[2,4); this is segment 3's, and the same size.
+  const quad = new Uint16Array(2 * 2 * 3).fill(123);
+  c.results = [null, { pixels: quad, x0: 2, x1: 4, y0: 2, y1: 4 }];
+
+  const blitted = c.composite();
+  assert.equal(blitted, 0, 'a misplaced band blits nothing');
+  assert.equal(c.faulted, true, 'a wrong-band rect latches a fault instead of blitting');
+  assert.match(c.faultInfo.message, /segment 1 .* is not its band/);
+  assert.ok(driver.pixels.every((v) => v === 0), 'nothing is blitted on a band mismatch');
+});
+
+test('composite() faults when the layout admits no band for a segment', () => {
+  driver.W = 4; driver.H = 4;
+  driver.pixels = new Uint16Array(4 * 4 * 3);
+
+  const c = makeController();
+  c.count = 3; // no arm split exists for an odd segment count
+  c.showBoundaries = false;
+  const quad = new Uint16Array(2 * 2 * 3).fill(123);
+  c.results = [{ pixels: quad, x0: 0, x1: 2, y0: 0, y1: 2 }];
+
+  const blitted = c.composite();
+  assert.equal(blitted, 0, 'an underivable layout blits nothing');
+  assert.equal(c.faulted, true, 'a throwing layout derivation latches a fault instead of escaping');
+  assert.match(c.faultInfo.message, /no segment-0 band exists/);
+});
+
 test('composite() marks both the internal split and the x=0 wrap seam', () => {
   // On the wrapped cylinder a 2-arm split has two boundaries: the internal split
   // at x=2 and the wrap seam at x=0 where arm 1 meets arm 0.
@@ -1055,6 +1094,7 @@ test('composite() marks both the internal split and the x=0 wrap seam', () => {
   driver.pixels = new Uint16Array(4 * 2 * 3);
 
   const c = makeController();
+  c.count = 2;
   c.showBoundaries = true;
   const quadL = new Uint16Array(2 * 2 * 3).fill(111);
   const quadR = new Uint16Array(2 * 2 * 3).fill(222);
@@ -1076,22 +1116,26 @@ test('composite() marks both the internal split and the x=0 wrap seam', () => {
   assert.equal(driver.pixels[idx(3, 0, 4)], 222, 'arm-1 interior untouched');
 });
 
-test('composite() marks every internal split plus the wrap seam for a 4-arm layout', () => {
-  // A 4-arm split over W=8 has internal boundaries at x=2,4,6 and the wrap seam
-  // at x=0; the >2-arm case exercises production row-seam handling the 2-arm
-  // test cannot.
-  driver.W = 8; driver.H = 2;
-  driver.pixels = new Uint16Array(8 * 2 * 3);
+test('composite() marks every internal split plus the wrap seam for an 8-segment layout', () => {
+  // Eight segments are two arms of four Y-bands each: internal boundaries at
+  // x=4 and y=2,4,6 plus the wrap seam at x=0. The >2-segment case exercises
+  // production row-seam handling the 2-segment test cannot.
+  driver.W = 8; driver.H = 8;
+  driver.pixels = new Uint16Array(8 * 8 * 3);
 
   const c = makeController();
+  c.count = 8;
   c.showBoundaries = true;
-  const arm = (fill) => new Uint16Array(2 * 2 * 3).fill(fill);
-  c.results = [
-    { pixels: arm(111), x0: 0, x1: 2, y0: 0, y1: 2 },
-    { pixels: arm(222), x0: 2, x1: 4, y0: 0, y1: 2 },
-    { pixels: arm(333), x0: 4, x1: 6, y0: 0, y1: 2 },
-    { pixels: arm(444), x0: 6, x1: 8, y0: 0, y1: 2 },
-  ];
+  // Bands run 0, 1, 3, 2 down an arm: its southern half counts back from the pole.
+  const bandYs = [[0, 2], [2, 4], [6, 8], [4, 6]];
+  c.results = Array.from({ length: 8 }, (_, s) => {
+    const [y0, y1] = bandYs[s % 4];
+    const x0 = s < 4 ? 0 : 4;
+    return {
+      pixels: new Uint16Array(4 * 2 * 3).fill(111 * (s + 1)),
+      x0, x1: x0 + 4, y0, y1,
+    };
+  });
 
   c.composite();
 
@@ -1100,56 +1144,74 @@ test('composite() marks every internal split plus the wrap seam for a 4-arm layo
     return driver.pixels[i] === 0 && driver.pixels[i + 1] === 65535 &&
            driver.pixels[i + 2] === 65535;
   };
-  for (const x of [0, 2, 4, 6])
-    assert.ok(isCyan(x, 0) && isCyan(x, 1), `boundary at x=${x} marked`);
-  assert.equal(driver.pixels[idx(1, 0, 8)], 111, 'arm-0 interior untouched');
-  assert.equal(driver.pixels[idx(3, 0, 8)], 222, 'arm-1 interior untouched');
-  assert.equal(driver.pixels[idx(5, 0, 8)], 333, 'arm-2 interior untouched');
-  assert.equal(driver.pixels[idx(7, 0, 8)], 444, 'arm-3 interior untouched');
+  for (const x of [0, 4])
+    assert.ok(isCyan(x, 0) && isCyan(x, 7), `arm boundary at x=${x} marked`);
+  for (const y of [2, 4, 6])
+    assert.ok(isCyan(0, y) && isCyan(7, y), `band seam at y=${y} marked`);
+  assert.equal(driver.pixels[idx(1, 0, 8)], 111, 'arm-0 north band interior untouched');
+  assert.equal(driver.pixels[idx(1, 3, 8)], 222, 'arm-0 second band interior untouched');
+  assert.equal(driver.pixels[idx(5, 7, 8)], 777, 'arm-1 south band interior untouched');
+  assert.equal(driver.pixels[idx(5, 5, 8)], 888, 'arm-1 third band interior untouched');
 });
 
-test('composite() marks a horizontal seam between two stacked Y-band segments', () => {
-  // One arm split in Y (top band y[0,2), bottom band y[2,4)) has a single
-  // horizontal boundary at y=2 and no vertical seam (both bands share x0=0).
-  driver.W = 2; driver.H = 4;
-  driver.pixels = new Uint16Array(2 * 4 * 3);
+test('composite() marks the horizontal seam between stacked Y-band segments', () => {
+  // Four segments split each arm in Y (top band y[0,2), bottom band y[2,4)), so
+  // the horizontal boundary at y=2 runs the full width across both arms.
+  driver.W = 4; driver.H = 4;
+  driver.pixels = new Uint16Array(4 * 4 * 3);
 
   const c = makeController();
+  c.count = 4;
   c.showBoundaries = true;
-  const top = new Uint16Array(2 * 2 * 3).fill(111);
-  const bottom = new Uint16Array(2 * 2 * 3).fill(222);
+  const band = (fill) => new Uint16Array(2 * 2 * 3).fill(fill);
   c.results = [
-    { pixels: top, x0: 0, x1: 2, y0: 0, y1: 2 },
-    { pixels: bottom, x0: 0, x1: 2, y0: 2, y1: 4 },
+    { pixels: band(111), x0: 0, x1: 2, y0: 0, y1: 2 },
+    { pixels: band(222), x0: 0, x1: 2, y0: 2, y1: 4 },
+    { pixels: band(333), x0: 2, x1: 4, y0: 0, y1: 2 },
+    { pixels: band(444), x0: 2, x1: 4, y0: 2, y1: 4 },
   ];
 
   c.composite();
 
   const isCyan = (x, y) => {
-    const i = idx(x, y, 2);
+    const i = idx(x, y, 4);
     return driver.pixels[i] === 0 && driver.pixels[i + 1] === 65535 &&
            driver.pixels[i + 2] === 65535;
   };
-  assert.ok(isCyan(0, 2) && isCyan(1, 2), 'horizontal band seam at y=2 marked across the row');
-  assert.equal(driver.pixels[idx(0, 0, 2)], 111, 'top-band interior untouched');
-  assert.equal(driver.pixels[idx(0, 3, 2)], 222, 'bottom-band interior untouched');
-  assert.ok(!isCyan(0, 0), 'no vertical x=0 seam when the layout is not split in x');
+  assert.ok([0, 1, 2, 3].every((x) => isCyan(x, 2)),
+    'horizontal band seam at y=2 marked across the row');
+  assert.ok(isCyan(2, 0) && isCyan(0, 0), 'arm split at x=2 and wrap seam at x=0 marked');
+  assert.equal(driver.pixels[idx(1, 0, 4)], 111, 'top-band interior untouched');
+  assert.equal(driver.pixels[idx(1, 3, 4)], 222, 'bottom-band interior untouched');
 });
 
-test('composite() draws no x=0 line when the layout is not split in x', () => {
-  // A single full-width segment never splits in x, so x=0 is a same-segment wrap,
-  // not a boundary.
-  driver.W = 4; driver.H = 2;
-  driver.pixels = new Uint16Array(4 * 2 * 3);
+test('composite() draws no x=0 line when only one arm reported', () => {
+  // The x=0 line is arm 1's leading edge seen across the wrap, so a frame whose
+  // only results start at x=0 has no vertical boundary at all.
+  driver.W = 4; driver.H = 4;
+  driver.pixels = new Uint16Array(4 * 4 * 3);
 
   const c = makeController();
+  c.count = 4;
   c.showBoundaries = true;
-  const full = new Uint16Array(4 * 2 * 3).fill(123);
-  c.results = [{ pixels: full, x0: 0, x1: 4, y0: 0, y1: 2 }];
+  const band = (fill) => new Uint16Array(2 * 2 * 3).fill(fill);
+  c.results = [
+    { pixels: band(111), x0: 0, x1: 2, y0: 0, y1: 2 },
+    { pixels: band(222), x0: 0, x1: 2, y0: 2, y1: 4 },
+    null, null,
+  ];
 
   c.composite();
-  assert.ok(driver.pixels.every((v) => v === 123),
-    'full-width segment leaves no boundary overlay');
+
+  const isCyan = (x, y) => {
+    const i = idx(x, y, 4);
+    return driver.pixels[i] === 0 && driver.pixels[i + 1] === 65535 &&
+           driver.pixels[i + 2] === 65535;
+  };
+  assert.ok(!isCyan(0, 0) && !isCyan(2, 0), 'no vertical seam is drawn');
+  assert.ok([0, 1, 2, 3].every((x) => isCyan(x, 2)), 'the band seam is still marked');
+  assert.equal(driver.pixels[idx(0, 0, 4)], 111, 'top-band interior untouched');
+  assert.equal(driver.pixels[idx(2, 0, 4)], 0, 'the unreported arm stays black');
 });
 
 test('composite() self-heals a broken display-buffer alias instead of throwing', () => {

@@ -127,10 +127,14 @@ export const PROTOCOL_VERSION = 4;
 
 /**
  * A rendered quadrant. `pixels` is the segment's RGB16 rectangle ((x1-x0)*(y1-y0)*3),
- * transferred (not copied) across the boundary. `paramValues` carries segment 0's
- * post-frame parameter values (ordered to match the effect's param list) so the
- * GUI can track animation-driven changes the un-stepped main engine cannot supply;
- * null on every other segment.
+ * transferred (not copied) across the boundary. The rectangle is the worker's
+ * `computeSegmentRange(segId, totalSegs, w, h)`; the controller re-derives it and
+ * faults on a mismatch rather than trusting it, so a worker rendering stale
+ * geometry cannot composite into another segment's rows.
+ *
+ * `paramValues` carries segment 0's post-frame parameter values (ordered to match
+ * the effect's param list) so the GUI can track animation-driven changes the
+ * un-stepped main engine cannot supply; null on every other segment.
  * @typedef {{
  *   type: 'frame', segId: number,
  *   x0: number, x1: number, y0: number, y1: number,
