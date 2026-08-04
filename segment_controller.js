@@ -20,7 +20,11 @@
  *   - refreshPixelView(): re-fetch the (possibly detached) WASM pixel view
  *   - getMemoryView():    current Uint16Array view of the display buffer
  */
-import { compositeSegment, stampBoundaries } from "./segment_layout.js";
+import {
+  compositeSegment,
+  isValidSegmentCount,
+  stampBoundaries,
+} from "./segment_layout.js";
 import { FAULT_POOL, FAULT_RENDER, SegmentStatsView } from "./segment_stats_view.js";
 import { PROTOCOL_VERSION } from "./worker_protocol.js";
 
@@ -290,14 +294,25 @@ export class SegmentController {
    * (Re)build the worker pool at the current resolution: destroy any existing
    * pool, then spawn `numSegments` fresh workers, each loading its own WASM
    * module and initialized with this engine's tuned params and paused state.
-   * Latches a pool fault (leaving an empty controller) if the resolution key is
-   * unknown.
-   * @param {number} numSegments
+   * Latches a pool fault (leaving an empty controller) if the segment count is
+   * not layout-legal or the resolution key is unknown.
+   * @param {number} numSegments - Pool size; must satisfy segment_layout's
+   *   isValidSegmentCount (a positive even integer).
    * @param {number} [bootAttempt] - Retry index; 0 for a user-driven spawn, bumped by the transient-module-load auto-retry.
    */
   create(numSegments, bootAttempt = 0) {
     this.destroy();
     this.bootAttempt = bootAttempt;
+
+    // Ahead of the allocations and the spawn loop: a fractional count throws out
+    // of `new Array`, and an illegal one is otherwise only caught by the layout
+    // inside each worker — after N module fetches and N WASM instantiations.
+    if (!isValidSegmentCount(numSegments)) {
+      this.onWorkerFault(FAULT_POOL,
+        `invalid segment count ${numSegments}; must be a positive even integer `
+        + '— no workers were spawned');
+      return;
+    }
 
     this.count = numSegments;
     this.workers = [];

@@ -11,6 +11,19 @@
  * @typedef {{ x0: number, x1: number, y0: number, y1: number, w: number, h: number }} SegRange
  */
 
+const NUM_ARMS = 2;
+
+/**
+ * Whether `total` is a layout-legal segment count: a positive integer multiple
+ * of the arm count, i.e. a positive even number. Exported so a caller can reject
+ * a count before spending work on it; computeSegmentRange enforces the same rule.
+ * @param {number} total - Proposed total segment count.
+ * @returns {boolean}
+ */
+export function isValidSegmentCount(total) {
+  return Number.isInteger(total) && total >= NUM_ARMS && total % NUM_ARMS === 0;
+}
+
 /**
  * Compute the canvas sub-rectangle a segment renders.
  *
@@ -41,8 +54,7 @@
  * @returns {SegRange}
  */
 export function computeSegmentRange(id, total, w, h) {
-  const NUM_ARMS = 2;
-  if (!Number.isInteger(total) || total < NUM_ARMS || total % NUM_ARMS !== 0) {
+  if (!isValidSegmentCount(total)) {
     throw new Error(
       `segment_layout: totalSegs must be a positive even number (got ${total})`);
   }

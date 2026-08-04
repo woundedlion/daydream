@@ -474,7 +474,7 @@ test('a synchronous worker-N construction failure terminates the partial pool', 
   FakeWorker.failConstructionAt = 1;
   const c = makeController();
 
-  assert.doesNotThrow(() => c.create(3));
+  assert.doesNotThrow(() => c.create(4));
 
   assert.equal(FakeWorker.instances.length, 1);
   assert.equal(FakeWorker.instances[0].terminated, true);
@@ -492,7 +492,7 @@ test('a synchronous worker-N init post failure terminates the partial pool', () 
   FakeWorker.failInitialPostAt = 1;
   const c = makeController();
 
-  assert.doesNotThrow(() => c.create(3));
+  assert.doesNotThrow(() => c.create(4));
 
   assert.equal(FakeWorker.instances.length, 2);
   assert.ok(FakeWorker.instances.every((worker) => worker.terminated));
@@ -763,12 +763,12 @@ test('the boot watchdog names the segments that never booted', () => {
   globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
   try {
     const c = makeController();
-    c.create(3);
-    deliverBooted(c, 0); // only seg 0 boots; 1 and 2 hang
+    c.create(4);
+    deliverBooted(c, 0); // only seg 0 boots; 1..3 hang
     timers[0]();
     assert.equal(c.faulted, true);
-    assert.match(c.faultInfo.message, /1\/3 booted/);
-    assert.match(c.faultInfo.message, /never booted: 1, 2/);
+    assert.match(c.faultInfo.message, /1\/4 booted/);
+    assert.match(c.faultInfo.message, /never booted: 1, 2, 3/);
     assert.equal(c.faultInfo.segId, -1, 'multiple missing -> pool-wide segId');
   } finally {
     globalThis.setTimeout = realSetTimeout;
@@ -870,7 +870,7 @@ test('a booted ping is handled and does not by itself make the pool ready', () =
 
 test('destroy() clears the fault latch so a fresh pool can recover', () => {
   const c = makeController();
-  c.create(1);
+  c.create(2);
   c.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
   assert.equal(c.faulted, true);
   c.destroy();
@@ -1703,15 +1703,28 @@ test('a pool spawned after the slider moved inherits the pole LOD', () => {
 test('create with an unknown resolution latches a pool fault', () => {
   const c = makeController({ resolution: 'nope' });
   c.active = true;
-  c.create(3);
+  c.create(4);
 
   assert.equal(c.faulted, true);
   assert.equal(c.faultInfo.segId, -1, 'no single worker to blame');
   assert.match(c.faultInfo.message, /unknown resolution "nope"/);
   assert.equal(c.ownsDisplay, true, 'the fault overlay owns the display');
   assert.deepEqual(c.workers, [], 'no workers were spawned');
-  assert.equal(c.count, 3);
+  assert.equal(c.count, 4);
   for (const arr of [c.results, c.scratch, c.timings, c.arenas, c.frameSeen]) {
     assert.equal(arr.length, c.count, 'count matches the per-segment array lengths');
+  }
+});
+
+test('create with a layout-illegal segment count latches a pool fault', () => {
+  for (const bad of [3, 0, -2, 2.5, NaN]) {
+    const c = makeController();
+    c.active = true;
+    c.create(bad);
+
+    assert.equal(c.faulted, true, `count ${bad} faults`);
+    assert.equal(c.faultInfo.segId, -1, 'no single worker to blame');
+    assert.match(c.faultInfo.message, /invalid segment count/);
+    assert.deepEqual(c.workers, [], 'no workers were spawned');
   }
 });
