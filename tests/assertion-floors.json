@@ -1,54 +1,210 @@
 {
-  "tests/app_lifecycle.test.js": 57,
-  "tests/banner.test.js": 14,
-  "tests/bootstrap.test.js": 55,
-  "tests/clipboard.test.js": 20,
-  "tests/color.test.js": 15,
-  "tests/color_parity_wasm.test.js": 235,
-  "tests/cpp_format.test.js": 22,
-  "tests/daydream_boot.test.js": 8,
-  "tests/driver.test.js": 279,
-  "tests/driver_clock.test.js": 9,
-  "tests/effect_gui.test.js": 91,
-  "tests/effect_sequencing.test.js": 106,
-  "tests/engine_contract_wasm.test.js": 641,
-  "tests/engine_host.test.js": 15,
-  "tests/export_params.test.js": 5,
-  "tests/frame_constants.test.js": 2,
-  "tests/generate_importmap.test.js": 19,
-  "tests/geometry.test.js": 34,
-  "tests/global_stats_view.test.js": 28,
-  "tests/gui.test.js": 68,
-  "tests/label_pool.test.js": 21,
-  "tests/lissajous_math.test.js": 136,
-  "tests/mobius_transforms.test.js": 865,
-  "tests/page_lifecycle.test.js": 19,
-  "tests/palette_controls.test.js": 25,
-  "tests/palette_math.test.js": 5957,
-  "tests/param_sync.test.js": 31,
-  "tests/pixel_view.test.js": 14,
-  "tests/recorder.test.js": 200,
-  "tests/reference_transaction_hook.test.js": 38,
-  "tests/require_tests.test.js": 17,
-  "tests/run_tests.test.js": 23,
-  "tests/segment_controller.test.js": 349,
-  "tests/segment_crosscheck.test.js": 212,
-  "tests/segment_layout.test.js": 180085,
-  "tests/segment_stats_view.test.js": 91,
-  "tests/segment_worker.test.js": 99,
-  "tests/shared.test.js": 50,
-  "tests/sidebar.test.js": 71,
-  "tests/sidebar_dom.test.js": 20,
-  "tests/sidebar_logic.test.js": 35,
-  "tests/site_manifest.test.js": 478,
-  "tests/slider.test.js": 45,
-  "tests/solid_codegen.test.js": 341,
-  "tests/solid_op_rows.test.js": 34,
-  "tests/solids_registry_codegen.test.js": 63,
-  "tests/state.test.js": 1107,
-  "tests/switch_coordinator.test.js": 54,
-  "tests/tool_pages.test.js": 41,
-  "tests/tsconfig_roster.test.js": 19,
-  "tests/vendor-importmap.test.js": 34,
-  "tests/wasm_provenance.test.js": 8
+  "tests/app_lifecycle.test.js": {
+    "cases": 31,
+    "assertions": 57
+  },
+  "tests/banner.test.js": {
+    "cases": 12,
+    "assertions": 14
+  },
+  "tests/bootstrap.test.js": {
+    "cases": 14,
+    "assertions": 55
+  },
+  "tests/clipboard.test.js": {
+    "cases": 5,
+    "assertions": 20
+  },
+  "tests/color.test.js": {
+    "cases": 2,
+    "assertions": 15
+  },
+  "tests/color_parity_wasm.test.js": {
+    "cases": 14,
+    "assertions": 235
+  },
+  "tests/cpp_format.test.js": {
+    "cases": 11,
+    "assertions": 22
+  },
+  "tests/daydream_boot.test.js": {
+    "cases": 3,
+    "assertions": 8
+  },
+  "tests/driver.test.js": {
+    "cases": 64,
+    "assertions": 279
+  },
+  "tests/driver_clock.test.js": {
+    "cases": 4,
+    "assertions": 9
+  },
+  "tests/effect_gui.test.js": {
+    "cases": 41,
+    "assertions": 91
+  },
+  "tests/effect_sequencing.test.js": {
+    "cases": 55,
+    "assertions": 106
+  },
+  "tests/engine_contract_wasm.test.js": {
+    "cases": 21,
+    "assertions": 641
+  },
+  "tests/engine_host.test.js": {
+    "cases": 8,
+    "assertions": 15
+  },
+  "tests/export_params.test.js": {
+    "cases": 9,
+    "assertions": 5
+  },
+  "tests/frame_constants.test.js": {
+    "cases": 1,
+    "assertions": 2
+  },
+  "tests/generate_importmap.test.js": {
+    "cases": 8,
+    "assertions": 19
+  },
+  "tests/geometry.test.js": {
+    "cases": 5,
+    "assertions": 34
+  },
+  "tests/global_stats_view.test.js": {
+    "cases": 10,
+    "assertions": 28
+  },
+  "tests/gui.test.js": {
+    "cases": 17,
+    "assertions": 68
+  },
+  "tests/label_pool.test.js": {
+    "cases": 5,
+    "assertions": 21
+  },
+  "tests/lissajous_math.test.js": {
+    "cases": 21,
+    "assertions": 136
+  },
+  "tests/mobius_transforms.test.js": {
+    "cases": 34,
+    "assertions": 865
+  },
+  "tests/page_lifecycle.test.js": {
+    "cases": 13,
+    "assertions": 19
+  },
+  "tests/palette_controls.test.js": {
+    "cases": 12,
+    "assertions": 25
+  },
+  "tests/palette_math.test.js": {
+    "cases": 27,
+    "assertions": 5957
+  },
+  "tests/param_sync.test.js": {
+    "cases": 18,
+    "assertions": 31
+  },
+  "tests/pixel_view.test.js": {
+    "cases": 6,
+    "assertions": 14
+  },
+  "tests/recorder.test.js": {
+    "cases": 39,
+    "assertions": 200
+  },
+  "tests/reference_transaction_hook.test.js": {
+    "cases": 17,
+    "assertions": 38
+  },
+  "tests/require_tests.test.js": {
+    "cases": 12,
+    "assertions": 17
+  },
+  "tests/run_tests.test.js": {
+    "cases": 17,
+    "assertions": 24
+  },
+  "tests/segment_controller.test.js": {
+    "cases": 80,
+    "assertions": 349
+  },
+  "tests/segment_crosscheck.test.js": {
+    "cases": 4,
+    "assertions": 212
+  },
+  "tests/segment_layout.test.js": {
+    "cases": 11,
+    "assertions": 180085
+  },
+  "tests/segment_stats_view.test.js": {
+    "cases": 10,
+    "assertions": 91
+  },
+  "tests/segment_worker.test.js": {
+    "cases": 31,
+    "assertions": 99
+  },
+  "tests/shared.test.js": {
+    "cases": 10,
+    "assertions": 50
+  },
+  "tests/sidebar.test.js": {
+    "cases": 10,
+    "assertions": 71
+  },
+  "tests/sidebar_dom.test.js": {
+    "cases": 6,
+    "assertions": 20
+  },
+  "tests/sidebar_logic.test.js": {
+    "cases": 16,
+    "assertions": 35
+  },
+  "tests/site_manifest.test.js": {
+    "cases": 3,
+    "assertions": 478
+  },
+  "tests/slider.test.js": {
+    "cases": 15,
+    "assertions": 45
+  },
+  "tests/solid_codegen.test.js": {
+    "cases": 68,
+    "assertions": 341
+  },
+  "tests/solid_op_rows.test.js": {
+    "cases": 9,
+    "assertions": 34
+  },
+  "tests/solids_registry_codegen.test.js": {
+    "cases": 21,
+    "assertions": 63
+  },
+  "tests/state.test.js": {
+    "cases": 47,
+    "assertions": 1107
+  },
+  "tests/switch_coordinator.test.js": {
+    "cases": 15,
+    "assertions": 54
+  },
+  "tests/tool_pages.test.js": {
+    "cases": 5,
+    "assertions": 41
+  },
+  "tests/tsconfig_roster.test.js": {
+    "cases": 3,
+    "assertions": 19
+  },
+  "tests/vendor-importmap.test.js": {
+    "cases": 7,
+    "assertions": 34
+  },
+  "tests/wasm_provenance.test.js": {
+    "cases": 6,
+    "assertions": 8
+  }
 }
