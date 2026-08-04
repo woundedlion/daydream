@@ -232,6 +232,8 @@ export class VideoRecorder {
     this.mediaRecorder = recorder;
     this.stream = stream;
     this.track = track;
+    // Alias of the live session buffer; the recorder never reads it back, it exists
+    // so the active buffer is observable from outside.
     this.chunks = chunks;
 
     recorder.ondataavailable = (e) => {
