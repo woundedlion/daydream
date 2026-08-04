@@ -289,9 +289,9 @@ const moduleLoad = createModuleLoadHandlers({
     host.recorder.frameInterval = daydream.frameInterval;
     // Push any Recording settings changed during the async WASM-load window; their
     // setters no-op'd while host.recorder was null.
-    host.recorder.bitrateMbps = recSettings.quality;
-    host.recorder.targetHeight = REC_RESOLUTIONS[recSettings.resolution];
-    host.recorder.format = REC_FORMATS[recSettings.format];
+    host.recorder.bitrateMbps = recSettings.recQuality;
+    host.recorder.targetHeight = REC_RESOLUTIONS[recSettings.recResolution];
+    host.recorder.format = REC_FORMATS[recSettings.recFormat];
     host.recorder.onFormatFallback = (extension) => {
       const label = Object.keys(REC_FORMATS)
         .find(key => REC_FORMATS[key] === extension) ?? 'Auto';
@@ -436,8 +436,7 @@ testAllController = guiInstance.addSession({ testAll: false }, 'testAll').name('
       appState.set('effect', currentList[testAllIndex]);
     }, TEST_ALL_INTERVAL_MS);
   } else {
-    clearInterval(testAllInterval);
-    testAllInterval = null;
+    stopTestAllTicker();
   }
 });
 
@@ -525,7 +524,6 @@ segFolder.addSession(segState, 'boundaries').name('Show Boundaries').onChange(v 
 // Video recording
 const REC_RESOLUTIONS = { 'Native': null, '720p': 720, '1080p': 1080 };
 const REC_FORMATS = { 'Auto': 'auto', 'MP4': 'mp4', 'WebM': 'webm' };
-const recSettings = { quality: 16, resolution: 'Native', format: 'Auto' };
 // These settings are latched at recorder.start(); warn that a mid-recording
 // change won't take effect until the next start().
 const warnIfRecording = (label) => {
@@ -533,32 +531,35 @@ const warnIfRecording = (label) => {
     console.warn(`Recording: ${label} change applies to the next recording (the current one is already running).`);
   }
 };
-Object.defineProperty(recSettings, 'recQuality', {
-  get() { return this.quality; },
-  set(v) {
-    this.quality = v;
-    if (host.recorder) host.recorder.bitrateMbps = v;
-    warnIfRecording('bitrate');
-  }
-});
-Object.defineProperty(recSettings, 'recResolution', {
-  get() { return this.resolution; },
-  set(v) {
-    this.resolution = v;
-    if (host.recorder) {
-      host.recorder.targetHeight = REC_RESOLUTIONS[v];
-    }
-    warnIfRecording('resolution');
-  }
-});
-Object.defineProperty(recSettings, 'recFormat', {
-  get() { return this.format; },
-  set(v) {
-    this.format = v;
-    if (host.recorder) host.recorder.format = REC_FORMATS[v];
-    warnIfRecording('format');
-  }
-});
+/** GUI-bound recording settings, replayed onto a recorder constructed later. */
+const recSettings = {};
+/**
+ * Defines one recording setting: the value is held privately and pushed to the
+ * live recorder on every write.
+ * @param {string} prop - Property name on recSettings.
+ * @param {*} initial - Value before the GUI or a recorder exists.
+ * @param {string} label - Setting name used in the mid-recording warning.
+ * @param {function(*): void} push - Applies the value to the live host.recorder.
+ * @returns {void}
+ */
+const defineRecSetting = (prop, initial, label, push) => {
+  let value = initial;
+  Object.defineProperty(recSettings, prop, {
+    enumerable: true,
+    get() { return value; },
+    set(v) {
+      value = v;
+      if (host.recorder) push(v);
+      warnIfRecording(label);
+    },
+  });
+};
+defineRecSetting('recQuality', 16, 'bitrate',
+  v => { host.recorder.bitrateMbps = v; });
+defineRecSetting('recResolution', 'Native', 'resolution',
+  v => { host.recorder.targetHeight = REC_RESOLUTIONS[v]; });
+defineRecSetting('recFormat', 'Auto', 'format',
+  v => { host.recorder.format = REC_FORMATS[v]; });
 
 const durationEl = document.createElement('div');
 durationEl.className = 'rec-duration';
