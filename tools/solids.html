@@ -1110,8 +1110,12 @@
       const link = document.createElement('a');
       link.href = url;
       link.download = 'daydream-solids.json';
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+
+      // The click consumes the blob synchronously; the URL only needs to outlive it.
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     function captureSavedThumbnail() {
