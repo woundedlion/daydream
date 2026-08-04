@@ -409,10 +409,13 @@ export class VideoRecorder {
 
   /**
    * Builds the per-session data sink. With the File System Access API present,
-   * streams each chunk straight to a user-chosen file as it arrives so a long
-   * recording never buffers the whole video in RAM; otherwise it accumulates
-   * chunks for a single blob download at stop. The save dialog is raised here
-   * (under start()'s user gesture) so its transient activation is preserved.
+   * streams each chunk straight to a user-chosen file as it arrives, so once the
+   * file is open a long recording never buffers the whole video in RAM; chunks
+   * captured before the user picks a file are held in the write chain, so a save
+   * dialog left open retains everything recorded up to that point. Otherwise it
+   * accumulates chunks for a single blob download at stop. The save dialog is
+   * raised here (under start()'s user gesture) so its transient activation is
+   * preserved.
    * @param {MediaRecorder} recorder - Session recorder, queried for its container type.
    * @param {string} effectName - Base name for the suggested file.
    * @param {Blob[]} chunks - Per-session buffer; the fallback path fills it, the
