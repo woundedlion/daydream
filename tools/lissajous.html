@@ -110,10 +110,12 @@
       domainClosureWarning,
     } from './lissajous_math.js';
 
-    // Utility to get CSS variable color and convert to numeric hex
+    // CSS variable to numeric hex; undefined for a missing or malformed value so
+    // that initScene falls back to its documented default rather than NaN.
     const getCssColor = (name) => {
-      const hex = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-      return parseInt(hex.startsWith('#') ? hex.substring(1) : hex, 16);
+      const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      const match = /^#?([0-9a-f]{6})$/i.exec(value);
+      return match ? parseInt(match[1], 16) : undefined;
     };
 
     const SLATE_900 = getCssColor('--slate-900');
