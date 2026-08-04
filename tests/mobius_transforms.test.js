@@ -106,16 +106,18 @@ test('cdiv guards against a near-zero denominator', () => {
  * a JS declaration preamble, so a transpiled body reads the constants the shader
  * itself compiles rather than a hand-copied second set.
  * @param {string} src - The GLSL source to scan.
- * @returns {{js: string, values: Object<string, number>}} The preamble and the parsed values.
+ * @returns {{js: string, values: Object<string, number>}} The preamble and the values it evaluates to.
+ * @details The values come from evaluating the preamble, so a constant the
+ * shader derives from an earlier one is read as the shader computes it rather
+ * than parsed as a literal.
  */
 function glslConstants(src) {
   const decls = [...src.matchAll(/const\s+float\s+(\w+)\s*=\s*([^;]+);/g)];
-  const values = {};
-  for (const [, name, value] of decls) values[name] = Number(value);
-  return {
-    js: decls.map(([, name, value]) => `const ${name} = ${value};`).join('\n'),
-    values,
-  };
+  const js = decls.map(([, name, value]) => `const ${name} = ${value};`).join('\n');
+  const names = decls.map(([, name]) => name);
+  // eslint-disable-next-line no-new-func
+  const values = new Function(`${js}\nreturn { ${names.join(', ')} };`)();
+  return { js, values };
 }
 
 /**
@@ -219,8 +221,28 @@ test('glslProjectionFunctions constants match the JS exports', () => {
   assert.equal(values.STEREO_POLE_EPS, STEREO_POLE_EPS);
   assert.equal(values.STEREO_AZIMUTH_EPS, STEREO_AZIMUTH_EPS);
   assert.equal(STEREO_INF, 1e4, 'STEREO_INF must match the engine sentinel');
-  assert.equal(STEREO_POLE_EPS, 1e-4, 'STEREO_POLE_EPS must match the engine cap');
+  assert.equal(STEREO_POLE_EPS, 2 / (STEREO_INF * STEREO_INF),
+    'STEREO_POLE_EPS must be the engine cap derived from STEREO_INF');
+  assert.equal(STEREO_POLE_EPS, 2e-8, 'STEREO_POLE_EPS must match the engine cap');
   assert.equal(STEREO_AZIMUTH_EPS, 1e-12, 'STEREO_AZIMUTH_EPS must match the engine');
+});
+
+/**
+ * The pole cap is the crossover where the raw quotient reaches the sentinel, not
+ * a guard band: just outside it stereo() is still the finite quotient, whose
+ * magnitude is STEREO_INF to within the step across the threshold.
+ */
+test('the pole cap begins where the raw quotient reaches STEREO_INF', () => {
+  const outside = 1 - STEREO_POLE_EPS * 1.5;
+  const w = stereo({ x: Math.sqrt(1 - outside * outside), y: outside, z: 0 });
+  assert.ok(w.re < STEREO_INF, `outside the cap got ${w.re}`);
+  assert.ok(w.re > STEREO_INF * 0.8, `outside the cap got ${w.re}`);
+
+  // a cap 5000x wider would flatten this disk onto the sentinel
+  const inner = 1 - 1e-4;
+  const finite = stereo({ x: Math.sqrt(1 - inner * inner), y: inner, z: 0 });
+  assert.ok(Math.abs(finite.re - Math.sqrt(2 / 1e-4 - 1)) < 1e-3,
+    `1 - y = 1e-4 must stay finite, got ${finite.re}`);
 });
 
 /**

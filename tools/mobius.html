@@ -399,9 +399,9 @@
 
         void main() {
           vec3 p = normalize(vPosition);
-          // stereo() and project_div() are the engine's own maps: the pole cap
-          // keeps its azimuth at the sentinel magnitude and the divide guard is
-          // relative, so the preview and the engine agree everywhere.
+          // stereo() and project_div() are the engine's own maps, constants
+          // included: the pole cap keeps its azimuth at the sentinel magnitude
+          // and the divide guard is relative.
           CNum w = stereo(p);
           CNum num = cadd(cmult(u_a, w), u_b);
           CNum den = cadd(cmult(u_c, w), u_d);
