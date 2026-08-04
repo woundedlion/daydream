@@ -17,6 +17,7 @@ const {
   computeInternalAngle,
   snapToStep,
   isConvexFace,
+  fanTriangulateFace,
   uniqueEdges,
   geodesicSegments,
   geodesicTriangleVertices,
@@ -433,6 +434,54 @@ test('isConvexFace rejects a concave star face', () => {
     return { x: radius * Math.cos(angle), y: radius * Math.sin(angle), z: 0 };
   });
   assert.equal(isConvexFace(vertices, vertices.map((_, i) => i)), false);
+});
+
+const SQUARE = [
+  { x: 0, y: 0, z: 0 },
+  { x: 2, y: 0, z: 0 },
+  { x: 2, y: 2, z: 0 },
+  { x: 0, y: 2, z: 0 },
+];
+
+/** Collects fanTriangulateFace's emitted corners as flat x/y/z triples. */
+const fanCorners = (vertices, face, forceCentroid) => {
+  const out = [];
+  fanTriangulateFace(vertices, face, (a, b, c) => {
+    out.push([a.x, a.y, a.z], [b.x, b.y, b.z], [c.x, c.y, c.z]);
+  }, forceCentroid);
+  return out;
+};
+
+test('fanTriangulateFace fans a convex face from its first corner', () => {
+  assert.deepEqual(fanCorners(SQUARE, [0, 1, 2, 3]), [
+    [0, 0, 0], [2, 0, 0], [2, 2, 0],
+    [0, 0, 0], [2, 2, 0], [0, 2, 0],
+  ]);
+});
+
+test('fanTriangulateFace fans a non-convex face from its centroid', () => {
+  const star = Array.from({ length: 10 }, (_, i) => {
+    const angle = i * Math.PI / 5;
+    const radius = i % 2 === 0 ? 2 : 0.8;
+    return { x: radius * Math.cos(angle), y: radius * Math.sin(angle), z: 0 };
+  });
+  const face = star.map((_, i) => i);
+  const corners = fanCorners(star, face);
+  // One triangle per edge, apex first, and no apex is a face vertex.
+  assert.equal(corners.length, face.length * 3);
+  for (let i = 0; i < corners.length; i += 3) {
+    assert.deepEqual(corners[i], corners[0]);
+    assert.deepEqual(corners[i + 1], [star[i / 3].x, star[i / 3].y, star[i / 3].z]);
+    assert.deepEqual(corners[i + 2],
+      [star[(i / 3 + 1) % face.length].x, star[(i / 3 + 1) % face.length].y, 0]);
+  }
+  assert.ok(Math.hypot(corners[0][0], corners[0][1]) < 1e-9);
+});
+
+test('fanTriangulateFace forceCentroid takes the centroid fan on a convex face', () => {
+  const corners = fanCorners(SQUARE, [0, 1, 2, 3], true);
+  assert.equal(corners.length, 12);
+  assert.deepEqual(corners[0], [1, 1, 0]);
 });
 
 /** Verifies generateFuncAndRecipe rejects a base or op that would emit non-compiling C++. */

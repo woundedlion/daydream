@@ -461,6 +461,46 @@ export function isConvexFace(vertices, face) {
 }
 
 /**
+ * Fan-triangulates one polygon face, calling emit() once per triangle with its
+ * three corners in the face's winding order.
+ *
+ * A convex face fans from its first corner (face.length - 2 triangles); anything
+ * else fans from the centroid (face.length triangles), because a corner fan
+ * spills outside a non-convex star face.
+ *
+ * @param {Array<{x:number, y:number, z:number}>} vertices - Mesh vertices.
+ * @param {Array<number>} face - Ordered vertex indices for one face.
+ * @param {(a: {x:number, y:number, z:number}, b: {x:number, y:number, z:number}, c: {x:number, y:number, z:number}) => void} emit - Receives each triangle; the centroid corner is a plain {x, y, z}.
+ * @param {boolean} [forceCentroid=false] - Always take the centroid fan, even on a convex face.
+ * @details forceCentroid exists for the geodesic tessellation, which needs one
+ * fan triangle per face edge so shared edges subdivide identically from both
+ * sides. The centroid scales by the reciprocal count, matching
+ * THREE.Vector3.divideScalar().
+ */
+export function fanTriangulateFace(vertices, face, emit, forceCentroid = false) {
+  if (!forceCentroid && isConvexFace(vertices, face)) {
+    for (let i = 1; i < face.length - 1; i++) {
+      emit(vertices[face[0]], vertices[face[i]], vertices[face[i + 1]]);
+    }
+    return;
+  }
+
+  let cx = 0;
+  let cy = 0;
+  let cz = 0;
+  for (const idx of face) {
+    cx += vertices[idx].x;
+    cy += vertices[idx].y;
+    cz += vertices[idx].z;
+  }
+  const inv = 1 / face.length;
+  const centroid = { x: cx * inv, y: cy * inv, z: cz * inv };
+  for (let i = 0; i < face.length; i++) {
+    emit(centroid, vertices[face[i]], vertices[face[(i + 1) % face.length]]);
+  }
+}
+
+/**
  * Extracts the unique undirected edges of a polygon-face mesh as [lo, hi] vertex
  * index pairs.
  * @param {Array<Array<number>>} faces - Ordered vertex indices per face.
