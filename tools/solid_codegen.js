@@ -190,6 +190,29 @@ export function meshOpFailure(Mod, what) {
   };
 }
 
+/**
+ * Passes a mesh-producing MeshOps result through, or reports and remedies the
+ * failure a null stands for.
+ * @param {Object|null} result - What the bridge returned.
+ * @param {string} what - What the caller was building, used in the message.
+ * @param {Object} ctx - The live wiring, read per call because an engine halt nulls it.
+ * @param {Object} ctx.Mod - The WASM module instance that produced the result.
+ * @param {{clearToolingMemory: Function}} ctx.meshOps - Its MeshOps binding.
+ * @param {Function} ctx.onError - Surfaces the failure message to the user.
+ * @returns {Object|null} The result, or null when it was a failure.
+ * @details MeshOps answers a recoverable failure with null and records the
+ * reason (getLastResult); an unchecked null becomes a TypeError several calls
+ * later. Only ARENA_EXHAUSTED is cleared by flushing the tooling arenas, so the
+ * flush is applied by reason rather than on every failure.
+ */
+export function requireMeshResult(result, what, { Mod, meshOps, onError }) {
+  if (result) return result;
+  const failure = meshOpFailure(Mod, what);
+  if (failure.flush) meshOps.clearToolingMemory();
+  onError(failure.message);
+  return null;
+}
+
 // A base seed-solid name is pasted as a C++ function call (`base(a, b)`), so
 // guard its shape against the valid-identifier pattern.
 const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;

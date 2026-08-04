@@ -442,19 +442,23 @@
     // (not shared.js, which pulls in three.js — a dependency this tool
     // otherwise doesn't have).
     import { showFatalError, bootstrapTool } from './banner.js';
-    import { linearToSrgbFloat, linearRgbToHex } from './color.js';
+    import { linearRgbToHex } from './color.js';
     // Pure palette math (ProceduralPalette/GenerativePalette + helpers and the
     // C++ export-string generators) lives in palette_math.js so it can be unit
     // tested without a DOM. DOM-coupled wiring stays inline below.
     import {
       ProceduralPalette, GenerativePalette,
-      waveGraphBand, proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
+      proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
       NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams, zoomedProceduralParams,
     } from './palette_math.js';
     // The zoom history and the locked-group delta capping are DOM-free state
     // machines, kept in their own module so both are unit tested; the reads and
     // writes against the sliders and the Reset Zoom button stay inline.
     import { createZoomHistory, lockedGroupMove } from './palette_controls.js';
+    // The two canvas painters take their canvas, context and palette as
+    // arguments, so they live in their own module and are unit tested against a
+    // context double; the pointer and keyboard wiring around them stays inline.
+    import { createColorStripPainter, drawWaveGraph } from './palette_canvas.js';
     import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
 
     // --- Palette Class and Data Structure ---
@@ -524,13 +528,10 @@
       colorSwatch, tValueSpan,
       hexValueSpan, copyPromptSpan, resetZoomButton;
 
-    // The color strip is static between palette changes; only the sweeping
-    // marker moves each frame. Cache the rendered gradient to an offscreen
-    // canvas so the per-frame draw is a single blit + a 2px line, instead of a
-    // full getImageData readback and `width` palette.get() OKLCH evaluations.
-    // Invalidated on every palette change (updatePalette) and on a size change.
-    let colorStripCache = null;
-    let colorStripDirty = true;
+    // Owns the strip's offscreen gradient cache; built in init() once the canvas
+    // and its context resolve. Invalidated on every palette change
+    // (updatePalette); a size change is detected by the painter itself.
+    let colorStripPainter = null;
 
     // Spoken names for the coefficient groups and the RGB channels. The visible
     // slider labels are single letters repeated across all four groups, so each
@@ -909,163 +910,12 @@
     // --- Drawing and Animation Functions ---
 
     /**
-         * Draws the color strip, the time marker, and an optional selection overlay.
+         * Draws the color strip against the live palette.
          * @param {number} t The current time parameter (0 to 1) for the marker position.
          * @param {object | null} selectionRange - e.g., { start: 0.2, end: 0.5 }
          */
     function drawColorStrip(t, selectionRange = null) {
-      if (!colorStripCtx) return; // Safety check
-      const width = colorStripCanvas.width;
-      const height = colorStripCanvas.height;
-
-      // 1. Rebuild the cached gradient only when the palette (or size) changed;
-      // otherwise reuse it. The per-frame marker sweep no longer pays for the
-      // full readback and `width` palette evaluations.
-      if (!colorStripCache || colorStripCache.width !== width
-          || colorStripCache.height !== height) {
-        colorStripCache = document.createElement('canvas');
-        colorStripCache.width = width;
-        colorStripCache.height = height;
-        colorStripDirty = true;
-      }
-      if (colorStripDirty) {
-        const cacheCtx = colorStripCache.getContext('2d');
-        const imageData = cacheCtx.createImageData(width, height);
-        const data = imageData.data;
-
-        for (let x = 0; x < width; x++) {
-          const tx = x / (width - 1);
-          const [r, g, b] = palette.get(tx); // Get color in [0, 1] range
-
-          // Plain 8-bit round, no dither: the strip mirrors the device's own
-          // 16->8 truncation (the LED output applies no dithering), so the
-          // preview stays faithful to what the hardware actually shows rather
-          // than a smoother fiction. If output dithering is ever added to the
-          // engine, mirror it here.
-          const rInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, r))) * 255);
-          const gInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, g))) * 255);
-          const bInt = Math.round(linearToSrgbFloat(Math.max(0, Math.min(1, b))) * 255);
-
-          for (let y = 0; y < height; y++) {
-            const index = (y * width + x) * 4;
-            data[index] = rInt;
-            data[index + 1] = gInt;
-            data[index + 2] = bInt;
-            data[index + 3] = 255; // Alpha
-          }
-        }
-        cacheCtx.putImageData(imageData, 0, 0);
-        colorStripDirty = false;
-      }
-
-      // Blit the cached gradient (also clears the previous marker).
-      colorStripCtx.drawImage(colorStripCache, 0, 0);
-
-      // 2. Draw the sweeping line marker
-      const markerX = Math.round(t * (width - 1));
-
-      colorStripCtx.strokeStyle = '#FFFFFF'; // Bright white marker
-      colorStripCtx.lineWidth = 2;
-      colorStripCtx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-      colorStripCtx.shadowBlur = 5;
-
-      colorStripCtx.beginPath();
-      colorStripCtx.moveTo(markerX, 0);
-      colorStripCtx.lineTo(markerX, height);
-      colorStripCtx.stroke();
-
-      colorStripCtx.shadowBlur = 0; // Reset shadow
-
-      // 3. Draw the selection overlay if it exists
-      if (selectionRange) {
-        // Ensure startX is the smaller value
-        const startRaw = selectionRange.start * width;
-        const endRaw = selectionRange.end * width;
-        const startX = Math.min(startRaw, endRaw);
-        const endX = Math.max(startRaw, endRaw);
-
-        colorStripCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        colorStripCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-        colorStripCtx.lineWidth = 1;
-
-        colorStripCtx.fillRect(startX, 0, endX - startX, height);
-        colorStripCtx.strokeRect(startX, 0, endX - startX, height);
-      }
-    }
-
-    /**
-         * Draws the R, G, and B wave functions on the graph canvas.
-         */
-    function drawWaveGraph() {
-      if (!waveGraphCtx) return; // Safety check
-      const width = waveGraphCanvas.width;
-      const height = waveGraphCanvas.height;
-      waveGraphCtx.clearRect(0, 0, width, height);
-
-      // toY() is the single place the value-to-canvas-y mapping lives; every
-      // wave and overlay draw below goes through it or the band edges.
-      const { yTop, yBottom, toY } = waveGraphBand(height);
-
-      // Background grid and center line
-      waveGraphCtx.fillStyle = '#1E293B';
-      waveGraphCtx.fillRect(0, 0, width, height);
-      waveGraphCtx.strokeStyle = '#475569';
-      waveGraphCtx.lineWidth = 1;
-
-      // Draw the range-boundary lines at the top/bottom of the value band (10%
-      // and 90% of the canvas height).
-      waveGraphCtx.beginPath();
-      waveGraphCtx.moveTo(0, yTop);
-      waveGraphCtx.lineTo(width, yTop);
-      waveGraphCtx.moveTo(0, yBottom);
-      waveGraphCtx.lineTo(width, yBottom);
-      waveGraphCtx.stroke();
-
-      // Draw center line (0.5 reference)
-      waveGraphCtx.strokeStyle = '#475569';
-      waveGraphCtx.setLineDash([5, 5]);
-      waveGraphCtx.beginPath();
-      waveGraphCtx.moveTo(0, height / 2);
-      waveGraphCtx.lineTo(width, height / 2);
-      waveGraphCtx.stroke();
-      waveGraphCtx.setLineDash([]); // Reset dashed line
-
-      // Draw R, G, B waves
-      const colors = ['#EF4444', '#22C55E', '#3B82F6']; // Red, Green, Blue
-      const channels = [0, 1, 2];
-
-      // Sample all three channels per column up front: a generative palette
-      // reconstructs its whole LUT entry per sample, so asking one channel at a
-      // time would redo that (and its pows) three times over.
-      const samples = new Array(width);
-      for (let x = 0; x < width; x++) {
-        samples[x] = palette.getChannelValues(x / (width - 1));
-      }
-
-      channels.forEach((channelIndex) => {
-        waveGraphCtx.beginPath();
-        waveGraphCtx.strokeStyle = colors[channelIndex];
-        waveGraphCtx.lineWidth = 3;
-
-        for (let x = 0; x < width; x++) {
-          const mappedY = toY(samples[x][channelIndex]);
-
-          if (x === 0) {
-            waveGraphCtx.moveTo(x, mappedY);
-          } else {
-            waveGraphCtx.lineTo(x, mappedY);
-          }
-        }
-        waveGraphCtx.stroke();
-      });
-
-      // Draw clamped region overlay (optional, but informative)
-      waveGraphCtx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-      const y0 = toY(0), y1 = toY(1); // canvas y of the value-0 and value-1 lines
-      // Area below 0 (between the value-0 line and the band bottom)
-      waveGraphCtx.fillRect(0, y0, width, yBottom - y0);
-      // Area above 1 (between the band top and the value-1 line)
-      waveGraphCtx.fillRect(0, yTop, width, y1 - yTop);
+      colorStripPainter?.draw(palette, t, selectionRange);
     }
 
     /**
@@ -1238,10 +1088,10 @@
       }
 
       // The gradient changed — force the cached color strip to rebuild.
-      colorStripDirty = true;
+      colorStripPainter?.invalidate();
 
       // Redraw static graph elements
-      drawWaveGraph();
+      drawWaveGraph({ canvas: waveGraphCanvas, ctx: waveGraphCtx, palette });
 
       // Update dynamic elements once immediately
       updateSwatch();
@@ -1294,6 +1144,11 @@
         console.error("Fatal Error: Canvas elements not found. Stopping init.");
         return;
       }
+
+      colorStripPainter = createColorStripPainter({
+        canvas: colorStripCanvas,
+        ctx: colorStripCtx,
+      });
 
       // 0. Tab buttons. Wired here via listeners rather than inline onclick
       // attributes, which a `<script type="module">` (module scope, not global)

@@ -28,6 +28,7 @@ const {
   createCommitQueue,
   createChainValidator,
   meshOpFailure,
+  requireMeshResult,
   MESH_OP_RESULT_NAMES,
 } =
   await import('../tools/solid_codegen.js');
@@ -820,25 +821,41 @@ test('meshOpFailure reports UNKNOWN when the module records no reason', () => {
   assert.match(failure.message, /^Face classification failed: /);
 });
 
-/** Verifies the null-returning solids.html helper reports and flushes by reason. */
-test('solids requireMesh surfaces the reason and applies its remedy', () => {
-  const match = SOLIDS_HTML.match(/\n {4}function requireMesh\(result, what[\s\S]*?\n {4}}\r?\n/);
-  assert.ok(match, 'solids.html must define requireMesh');
-  const build = Function('meshOpFailure', 'WasmModule', 'MeshOpsWasm', 'showMeshError',
-    `${match[0]}; return requireMesh;`);
-
+/** Verifies the null-result handler reports and flushes by reason. */
+test('requireMeshResult surfaces the reason and applies its remedy', () => {
   const { Mod, state } = fakeModule(() => { }, { rejects: new Set(['base:cube']) });
   const shown = [];
-  const requireMesh = build(meshOpFailure, Mod, Mod.MeshOps, (m) => shown.push(m));
+  const ctx = { Mod, meshOps: Mod.MeshOps, onError: (m) => shown.push(m) };
 
   const mesh = Mod.MeshOps.fromSolidName('other');
-  assert.equal(requireMesh(mesh, 'Base solid'), mesh, 'a real mesh passes through');
+  assert.equal(requireMeshResult(mesh, 'Base solid', ctx), mesh, 'a real mesh passes through');
   assert.deepEqual(shown, []);
+  assert.equal(state.cleared, 0, 'a success must not flush the arenas');
 
-  assert.equal(requireMesh(Mod.MeshOps.fromSolidName('cube'), 'Base solid "cube"'), null);
+  assert.equal(requireMeshResult(Mod.MeshOps.fromSolidName('cube'), 'Base solid "cube"', ctx), null);
   assert.equal(state.cleared, 1, 'ARENA_EXHAUSTED must flush the tooling arenas');
   assert.equal(shown.length, 1, 'the failure must be surfaced, not only logged');
   assert.match(shown[0], /^Base solid "cube" failed: /);
+});
+
+/** Verifies a reason with no flush remedy leaves the arenas alone. */
+test('requireMeshResult flushes only for the reason that calls for it', () => {
+  const { Mod, state } = fakeModule(
+    () => { }, { rejects: new Set(['base:nope']), reason: 'UNKNOWN_NAME' });
+  const shown = [];
+  assert.equal(requireMeshResult(Mod.MeshOps.fromSolidName('nope'), 'Base solid "nope"',
+    { Mod, meshOps: Mod.MeshOps, onError: (m) => shown.push(m) }), null);
+  assert.equal(state.cleared, 0, 'flushing an intact arena would strand live wrappers');
+  assert.equal(shown.length, 1);
+});
+
+/** Verifies solids.html routes its own failures through the shared handler. */
+test('solids.html binds requireMeshResult to its live module', () => {
+  assert.match(SOLIDS_HTML, /\brequireMeshResult\b[\s\S]*?from '\.\/solid_codegen\.js'/,
+    'solids.html must import the shared handler');
+  assert.match(SOLIDS_HTML,
+    /requireMeshResult\(result, what,\s*\{ Mod: WasmModule, meshOps: MeshOpsWasm, onError: showMeshError \}\)/,
+    'the page must pass its live module, MeshOps binding and error line');
 });
 
 test('solids validator resolves the module factory after async initialization', async () => {

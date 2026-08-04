@@ -99,6 +99,10 @@
     "cases": 13,
     "assertions": 19
   },
+  "tests/palette_canvas.test.js": {
+    "cases": 11,
+    "assertions": 54
+  },
   "tests/palette_controls.test.js": {
     "cases": 12,
     "assertions": 25
@@ -176,12 +180,16 @@
     "assertions": 45
   },
   "tests/solid_codegen.test.js": {
-    "cases": 68,
-    "assertions": 341
+    "cases": 70,
+    "assertions": 350
   },
   "tests/solid_op_rows.test.js": {
     "cases": 9,
     "assertions": 34
+  },
+  "tests/solid_render.test.js": {
+    "cases": 13,
+    "assertions": 54
   },
   "tests/solids_registry_codegen.test.js": {
     "cases": 21,

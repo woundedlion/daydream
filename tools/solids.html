@@ -599,6 +599,7 @@
       CATALAN_BASES,
       applyOp,
       meshOpFailure,
+      requireMeshResult,
       formatSolidName,
       pctSuffix,
       generateFuncAndRecipe,
@@ -607,8 +608,6 @@
       snapToStep,
       fanTriangulateFace,
       uniqueEdges,
-      geodesicSegments,
-      geodesicTriangleVertices,
       dropSlotIndex,
       dropTargetIndex,
       reorderPreviewShift,
@@ -618,10 +617,14 @@
     } from './solid_codegen.js';
     import { generateRegistryCpp, MAX_RECIPE_STEPS } from './solid_registry_codegen.js';
     import { buildOpRow } from './solid_op_rows.js';
+    // Scene construction from the JS-side mesh copy, and the stats line it
+    // reports; the three.js namespace, the scene and the materials below are
+    // passed in, so the renderer is unit tested against a stand-in namespace.
+    import { createMeshRenderer, meshStatsLine } from './solid_render.js';
     import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
 
     let camera, scene, renderer, controls;
-    let mainMesh, edgeLines, vertPoints, normalLines;
+    let meshRenderer = null;
     let labelsContainer;
     let draggingIndex = -1;
     let createHolosphereModule = null;
@@ -788,10 +791,7 @@
       // running against the disposed scene.
       onPageTeardown(() => {
         scheduleUpdate.cancel();
-        mainMesh?.geometry.dispose();
-        edgeLines?.geometry.dispose();
-        vertPoints?.geometry.dispose();
-        normalLines?.geometry.dispose();
+        meshRenderer?.disposeGeometry();
         faceMaterial.dispose();
         faceColorizeMaterial.dispose();
         vertMaterial.dispose();
@@ -852,6 +852,18 @@
       });
 
       labelsContainer = document.getElementById('labels');
+      meshRenderer = createMeshRenderer({
+        THREE,
+        scene,
+        materials: {
+          face: faceMaterial,
+          faceColorize: faceColorizeMaterial,
+          vert: vertMaterial,
+          edge: edgeMaterial,
+          normal: normalMaterial,
+        },
+        labelsContainer,
+      });
 
       document.getElementById('saveBtn').addEventListener('click', saveSolid);
 
@@ -1762,16 +1774,11 @@
       if (statsEl) statsEl.textContent = message;
     }
 
-    // MeshOps answers a recoverable failure with null and records the reason
-    // (getLastResult); an unchecked null becomes a TypeError several calls
-    // later. Reports the reason, applies the remedy it calls for, and returns
-    // null so the caller can bail.
+    // Binds the shared null-result handler to this page's live module and error
+    // line; both are read per call, since an engine halt nulls the module.
     function requireMesh(result, what) {
-      if (result) return result;
-      const failure = meshOpFailure(WasmModule, what);
-      if (failure.flush) MeshOpsWasm.clearToolingMemory();
-      showMeshError(failure.message);
-      return null;
+      return requireMeshResult(result, what,
+        { Mod: WasmModule, meshOps: MeshOpsWasm, onError: showMeshError });
     }
 
     function update() {
@@ -1866,223 +1873,17 @@
     // (relax alone runs up to 500 iterations) when only the view changed.
     function renderMesh() {
       const meshData = currentMesh;
-      if (!meshData) return;
+      if (!meshData || !meshRenderer) return;
 
-      // Colorize is applied only when faces are shown; otherwise the per-vertex
-      // color attribute would be built for hidden geometry.
-      const faceClasses = (state.colorizeFaces && state.showFaces) ? currentFaceClasses : null;
-
-      // Null each handle after disposal: a toggle that leaves its object
-      // unbuilt would otherwise re-dispose the same geometry on every recompute.
-      if (mainMesh) {
-        mainMesh.geometry.dispose();
-        scene.remove(mainMesh);
-        mainMesh = null;
-      }
-      if (edgeLines) {
-        edgeLines.geometry.dispose();
-        scene.remove(edgeLines);
-        edgeLines = null;
-      }
-      if (vertPoints) {
-        vertPoints.geometry.dispose();
-        scene.remove(vertPoints);
-        vertPoints = null;
-      }
-      if (normalLines) {
-        normalLines.geometry.dispose();
-        scene.remove(normalLines);
-        normalLines = null;
-      }
-      if (labelsContainer) labelsContainer.innerHTML = '';
-
-      // Faces
-      const vertices = [];
-      const faceColors = []; // per-vertex RGB, filled only when colorizing
-      const classColor = new THREE.Color();
-
-      const faceCenters = [];
-      const faceNormals = [];
-
-      // Geodesic mode curves the faces onto the sphere (geodesicTriangleVertices
-      // does the per-triangle tessellation); geodesicSegments() picks geoN from
-      // the mesh's widest arc and its triangle count.
-      let geoN = 1;
-      if (state.showFaces && state.showGeodesics) {
-        let triCount = 0;
-        let maxArc = 0;
-        meshData.faces.forEach(f => {
-          triCount += f.length - 2;
-          for (let i = 1; i < f.length - 1; i++) {
-            const a = meshData.vertices[f[0]];
-            const b = meshData.vertices[f[i]];
-            const c = meshData.vertices[f[i + 1]];
-            maxArc = Math.max(maxArc, a.angleTo(b), b.angleTo(c), c.angleTo(a));
-          }
-        });
-        geoN = geodesicSegments(maxArc, triCount);
-      }
-
-      const pushVert = (v) => {
-        vertices.push(v.x, v.y, v.z);
-        if (faceClasses) {
-          faceColors.push(classColor.r, classColor.g, classColor.b);
-        }
-      };
-
-      // Append one fan triangle's geoN² spherical sub-triangles, matching
-      // pushVert's per-vertex color emission.
-      const emitSphericalTri = (a, b, c) => {
-        const xyz = geodesicTriangleVertices(a, b, c, geoN);
-        for (let i = 0; i < xyz.length; i += 3) {
-          vertices.push(xyz[i], xyz[i + 1], xyz[i + 2]);
-          if (faceClasses) {
-            faceColors.push(classColor.r, classColor.g, classColor.b);
-          }
-        }
-      };
-
-      const emitFlatTri = (a, b, c) => {
-        pushVert(a);
-        pushVert(b);
-        pushVert(c);
-      };
-      const emitTri = state.showGeodesics ? emitSphericalTri : emitFlatTri;
-
-      meshData.faces.forEach((f, fi) => {
-        if (state.showFaces) {
-          if (faceClasses) {
-            // Golden-ratio hue stride keeps consecutive class ids far apart on
-            // the color wheel, so adjacent face groups stay distinguishable.
-            classColor.setHSL((faceClasses[fi] * 0.618034) % 1, 0.65, 0.55);
-          }
-          fanTriangulateFace(meshData.vertices, f, emitTri, state.showGeodesics);
-        }
-
-        if (!state.showNormals) return;
-
-        // Center/Normal for other viz
-        const center = new THREE.Vector3();
-        f.forEach(idx => {
-          let v = new THREE.Vector3().copy(meshData.vertices[idx]);
-          if (state.showGeodesics) v.normalize();
-          center.add(v);
-        });
-        center.divideScalar(f.length);
-        faceCenters.push(center);
-
-        // Normal
-        const v0 = meshData.vertices[f[0]];
-        const v1 = meshData.vertices[f[1]];
-        const v2 = meshData.vertices[f[f.length - 1]];
-        const n = new THREE.Vector3().crossVectors(new THREE.Vector3().subVectors(v1, v0), new THREE.Vector3().subVectors(v2, v0)).normalize();
-        faceNormals.push(n);
-      });
-
-      if (state.showFaces) {
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        if (state.showGeodesics) {
-          // Every emitted vertex sits on the unit sphere, so its normal IS its
-          // position; computeVertexNormals on this non-indexed geometry would
-          // yield per-triangle normals and shade the tessellation as facets.
-          geometry.setAttribute('normal', new THREE.Float32BufferAttribute([...vertices], 3));
-        } else {
-          geometry.computeVertexNormals();
-        }
-        if (faceClasses) {
-          geometry.setAttribute('color', new THREE.Float32BufferAttribute(faceColors, 3));
-        }
-
-        // Flat shading reads face normals in-shader (ignoring the normal
-        // attribute), which is right for the polyhedral look but would facet the
-        // sphere; geodesic mode needs the smooth normals set above.
-        const wantFlat = !state.showGeodesics;
-        for (const m of [faceMaterial, faceColorizeMaterial]) {
-          if (m.flatShading !== wantFlat) {
-            m.flatShading = wantFlat;
-            m.needsUpdate = true;
-          }
-        }
-
-        mainMesh = new THREE.Mesh(geometry, faceClasses ? faceColorizeMaterial : faceMaterial);
-        scene.add(mainMesh);
-      }
-
-      // Vertices
-      if (state.showVertices) {
-        const dotGeo = new THREE.BufferGeometry().setFromPoints(meshData.vertices);
-        vertPoints = new THREE.Points(dotGeo, vertMaterial);
-        scene.add(vertPoints);
-      }
-
-      // Edges
-      const edges = uniqueEdges(meshData.faces, meshData.vertices.length);
-
-      // Persist the edge count on the mesh (same object as currentMesh)
-      // so saveSolid reports E instead of falling back to 0 — wasmMeshToJs only
-      // returns {vertices, faces}, so without this every saved card shows 0E.
-      meshData.edgeCount = edges.length;
-
-      const lineGeoPoints = [];
-      for (const [ai, bi] of edges) {
-        const va = meshData.vertices[ai];
-        const vb = meshData.vertices[bi];
-
-        if (state.showGeodesics) {
-          const steps = 12;
-          for (let j = 0; j < steps; j++) {
-            const t1 = j / steps;
-            const t2 = (j + 1) / steps;
-            const p1 = new THREE.Vector3().copy(va).lerp(vb, t1).normalize().multiplyScalar(1.002);
-            const p2 = new THREE.Vector3().copy(va).lerp(vb, t2).normalize().multiplyScalar(1.002);
-            lineGeoPoints.push(p1, p2);
-          }
-        } else {
-          lineGeoPoints.push(va, vb);
-        }
-      }
-
-      const lineGeo = new THREE.BufferGeometry().setFromPoints(lineGeoPoints);
-      edgeLines = new THREE.LineSegments(lineGeo, edgeMaterial);
-      scene.add(edgeLines);
-
-      // Normals
-      if (state.showNormals) {
-        const normalPoints = [];
-        const colors = [];
-        faceCenters.forEach((c, i) => {
-          const n = faceNormals[i];
-          const p2 = c.clone().add(n.multiplyScalar(0.15));
-          normalPoints.push(c, p2);
-          colors.push(0, 1, 0, 0, 1, 0);
-        });
-        const normGeo = new THREE.BufferGeometry().setFromPoints(normalPoints);
-        normGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-        normalLines = new THREE.LineSegments(normGeo, normalMaterial);
-        scene.add(normalLines);
-      }
-
-      // Indices (limit to < 1000). Build into a DocumentFragment and insert in a
-      // single appendChild so up to ~1000 labels cost one DOM mutation instead
-      // of one per vertex. Flag the labels for re-projection so updateLabels
-      // positions the freshly-created set on the next frame.
-      if (state.showIndices && meshData.vertices.length < 1000) {
-        const frag = document.createDocumentFragment();
-        meshData.vertices.forEach((v, i) => {
-          const el = document.createElement('div');
-          el.textContent = i;
-          el.className = 'absolute text-[0.75rem] font-mono text-white bg-black/50 px-1 rounded transform -translate-x-1/2 -translate-y-1/2 pointer-events-none';
-          el.dataset.index = i;
-          frag.appendChild(el);
-        });
-        labelsContainer.appendChild(frag);
-        labelsNeedReproject = true;
-      }
+      const { edgeCount, labelsBuilt } = meshRenderer.render(
+        meshData, state, currentFaceClasses);
+      // Flag the freshly-created labels for re-projection so updateLabels
+      // positions them on the next frame.
+      if (labelsBuilt) labelsNeedReproject = true;
 
       // Update Stats
       renderBaseSolid();
-      document.getElementById('meshStats').innerText = `${meshData.vertices.length}V / ${edges.length}E / ${meshData.faces.length}F / ${meshData.faces.reduce((sum, f) => sum + f.length, 0)}I`;
+      document.getElementById('meshStats').innerText = meshStatsLine(meshData, edgeCount);
     }
 
     // Set true whenever the label set is (re)built, so updateLabels re-projects
