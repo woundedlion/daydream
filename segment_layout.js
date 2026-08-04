@@ -126,3 +126,34 @@ export function extractSegment(canvas, compact, canvasW, rect) {
 export function compositeSegment(canvas, compact, canvasW, rect) {
   blitSegmentRect(canvas, compact, canvasW, rect, false);
 }
+
+/**
+ * Stamp the segment-boundary overlay into a composited canvas: a full-width
+ * cyan row at each y in `ys` and a full-height cyan column at each x in `xs`.
+ * Coordinates at or past the canvas edge are skipped, so a seam list cached
+ * from a larger layout cannot write out of bounds.
+ * @param {Uint16Array} canvas - Full canvas buffer (canvasW*canvasH*3).
+ * @param {number} canvasW - Canvas width in pixels.
+ * @param {number} canvasH - Canvas height in pixels.
+ * @param {number[]} xs - Column indices to stamp.
+ * @param {number[]} ys - Row indices to stamp.
+ * @returns {void}
+ */
+export function stampBoundaries(canvas, canvasW, canvasH, xs, ys) {
+  const plotCyan = (idx) => {
+    canvas[idx]     = 0;
+    canvas[idx + 1] = 65535;
+    canvas[idx + 2] = 65535;
+  };
+
+  for (const y of ys) {
+    if (y >= canvasH) continue;
+    const rowStart = y * canvasW * 3;
+    for (let x = 0; x < canvasW; x++) plotCyan(rowStart + x * 3);
+  }
+
+  for (const x of xs) {
+    if (x >= canvasW) continue;
+    for (let y = 0; y < canvasH; y++) plotCyan((y * canvasW + x) * 3);
+  }
+}

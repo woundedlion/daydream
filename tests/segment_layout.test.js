@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeSegmentRange, extractSegment, compositeSegment } from '../segment_layout.js';
+import { computeSegmentRange, extractSegment, compositeSegment, stampBoundaries } from '../segment_layout.js';
 
 // The exactly-once tiling invariant holds for even widths only: the symmetric
 // floor(w/2) arm split drops an odd width's trailing column (see the odd-width
@@ -137,4 +137,27 @@ test('extract then composite round-trips a non-trivial rect through the shared b
         assert.equal(dst[di], inside ? src[di] : 0, `dst (${x},${y}) ch${c}`);
       }
     }
+});
+
+test('stampBoundaries paints only the listed seams and clips off-canvas ones', () => {
+  const canvasW = 6, canvasH = 4;
+  const canvas = new Uint16Array(canvasW * canvasH * 3);
+  // canvasW/canvasH are past the last valid index: a seam list cached from a
+  // larger layout must be clipped, not wrapped into the next row.
+  stampBoundaries(canvas, canvasW, canvasH, [0, 3, canvasW], [2, canvasH]);
+
+  for (let y = 0; y < canvasH; y++)
+    for (let x = 0; x < canvasW; x++) {
+      const seam = y === 2 || x === 0 || x === 3;
+      const i = (y * canvasW + x) * 3;
+      assert.equal(canvas[i], 0, `R (${x},${y})`);
+      assert.equal(canvas[i + 1], seam ? 65535 : 0, `G (${x},${y})`);
+      assert.equal(canvas[i + 2], seam ? 65535 : 0, `B (${x},${y})`);
+    }
+});
+
+test('stampBoundaries with no seams leaves the canvas untouched', () => {
+  const canvas = new Uint16Array(4 * 2 * 3).fill(7);
+  stampBoundaries(canvas, 4, 2, [], []);
+  assert.ok(canvas.every((v) => v === 7));
 });
