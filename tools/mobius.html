@@ -147,10 +147,24 @@
       touch-action: none;
     }
 
-    /* Visible keyboard-focus ring for the now-focusable (tabindex) pad. */
-    .complex-plane-control:focus-visible {
+    /* Visible keyboard-focus ring for the pad's per-axis slider handles. */
+    .complex-plane-control:focus-within {
       outline: 2px solid var(--blue-500);
       outline-offset: 2px;
+    }
+
+    /* Off-screen but still focusable, so the pad's keyboard handles stay in the
+       tab order and in the accessibility tree. */
+    .complex-plane-axis {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      border: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
 
     .complex-plane-inner {
@@ -555,19 +569,30 @@
       const controlId = `${id}_plane`;
       const dotId = `${id}_dot`;
       const labelId = `${id}_label`;
+      const reId = `${id}_re_axis`;
+      const imId = `${id}_im_axis`;
 
-      // role="application" + tabindex make the otherwise mouse/touch-only pad
-      // keyboard-reachable; the arrow-key handler below adjusts re/im. aria-label
-      // is refreshed with the current value in updateUI so a screen reader
-      // announces it on focus and after each change.
+      // The mouse/touch-only pad is exposed as a group of two per-axis sliders:
+      // each off-screen handle takes the arrow keys for its own part and carries
+      // the announced value in aria-valuenow/aria-valuetext, which a screen
+      // reader re-reads on every change.
       container.innerHTML = `
-          <div id="${controlId}" class="complex-plane-control" tabindex="0" role="application"
-               aria-label="Parameter ${id} complex value. Use the arrow keys to adjust the real and imaginary parts.">
+          <div id="${controlId}" class="complex-plane-control" role="group"
+               aria-label="Parameter ${id} complex value">
             <div class="complex-plane-inner">
               <div class="axis-h"></div>
               <div class="axis-v"></div>
               <div id="${dotId}" class="complex-plane-dot"></div>
             </div>
+            <span id="${reId}" class="complex-plane-axis" tabindex="0" role="slider"
+                  aria-label="Parameter ${id} real part"
+                  aria-valuemin="${-maxExtent}" aria-valuemax="${maxExtent}"
+                  aria-keyshortcuts="ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight Home"></span>
+            <span id="${imId}" class="complex-plane-axis" tabindex="0" role="slider"
+                  aria-orientation="vertical"
+                  aria-label="Parameter ${id} imaginary part"
+                  aria-valuemin="${-maxExtent}" aria-valuemax="${maxExtent}"
+                  aria-keyshortcuts="ArrowUp ArrowDown Shift+ArrowUp Shift+ArrowDown Home"></span>
           </div>
           <div id="${labelId}" class="complex-plane-label"></div>
         `;
@@ -575,6 +600,8 @@
       const planeElement = document.getElementById(controlId);
       const dotElement = document.getElementById(dotId);
       const labelElement = document.getElementById(labelId);
+      const reElement = document.getElementById(reId);
+      const imElement = document.getElementById(imId);
 
       // Cache the last strings written to the DOM so a preset animation (which
       // calls applyConfig -> updateUI every frame) only touches the label/dot
@@ -590,9 +617,12 @@
         const label = `${re.toFixed(2)} ${sign} ${Math.abs(im).toFixed(2)}i`;
         if (label !== lastLabel) {
           labelElement.textContent = label;
-          // Keep the pad's accessible name in sync with its value so a screen
-          // reader announces the new value after each keyboard/drag change.
-          planeElement.setAttribute('aria-label', `Parameter ${id} = ${label}. Use the arrow keys to adjust the real and imaginary parts.`);
+          const reText = re.toFixed(2);
+          const imText = im.toFixed(2);
+          reElement.setAttribute('aria-valuenow', reText);
+          reElement.setAttribute('aria-valuetext', reText);
+          imElement.setAttribute('aria-valuenow', imText);
+          imElement.setAttribute('aria-valuetext', `${imText}i`);
           lastLabel = label;
         }
         const xPercent = ((re / maxExtent) * 0.5 + 0.5) * 100;
@@ -678,24 +708,24 @@
         document.addEventListener('touchcancel', onTouchEnd);
       };
 
-      // Keyboard equivalent of dragging the dot: arrows nudge re/im (Shift for a
-      // coarser step), Home recenters to the origin. Mirrors handleInput's
+      // Keyboard equivalent of dragging the dot: a handle's arrows nudge its own
+      // part, decreasing on Left/Down and increasing on Right/Up (Shift for a
+      // coarser step); Home recenters to the origin. Mirrors handleInput's
       // stop-animation / clamp / snap / notify sequence.
-      const onKeyDown = (e) => {
+      const onAxisKeyDown = (axis) => (e) => {
         const step = e.shiftKey ? 0.2 : 0.05;
-        let dRe = 0, dIm = 0;
+        let delta = 0;
         switch (e.key) {
-          case 'ArrowLeft': dRe = -step; break;
-          case 'ArrowRight': dRe = step; break;
-          case 'ArrowUp': dIm = step; break;
-          case 'ArrowDown': dIm = -step; break;
+          case 'ArrowLeft': case 'ArrowDown': delta = -step; break;
+          case 'ArrowRight': case 'ArrowUp': delta = step; break;
           case 'Home': break; // handled below as recenter
           default: return;
         }
         e.preventDefault();
         if (isAnimating) stopAnimation();
-        let re = e.key === 'Home' ? 0 : paramObj.re + dRe;
-        let im = e.key === 'Home' ? 0 : paramObj.im + dIm;
+        const home = e.key === 'Home';
+        let re = home ? 0 : paramObj.re + (axis === 're' ? delta : 0);
+        let im = home ? 0 : paramObj.im + (axis === 'im' ? delta : 0);
         // Scale the snap band to the key step so a single nudge escapes the
         // zero band (2*threshold) instead of latching back onto 0.
         re = snapComplex(Math.max(-maxExtent, Math.min(maxExtent, re)), step / 4);
@@ -708,7 +738,8 @@
 
       planeElement.addEventListener('mousedown', onMouseDown);
       planeElement.addEventListener('touchstart', onTouchStart, { passive: false });
-      planeElement.addEventListener('keydown', onKeyDown);
+      reElement.addEventListener('keydown', onAxisKeyDown('re'));
+      imElement.addEventListener('keydown', onAxisKeyDown('im'));
       onPageTeardown(() => {
         if (endTouchDrag) endTouchDrag();
       });
