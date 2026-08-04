@@ -20,7 +20,7 @@
  *   - refreshPixelView(): re-fetch the (possibly detached) WASM pixel view
  *   - getMemoryView():    current Uint16Array view of the display buffer
  */
-import { compositeSegment } from "./segment_layout.js";
+import { compositeSegment, stampBoundaries } from "./segment_layout.js";
 import { FAULT_POOL, FAULT_RENDER, SegmentStatsView } from "./segment_stats_view.js";
 import { PROTOCOL_VERSION } from "./worker_protocol.js";
 
@@ -912,23 +912,7 @@ export class SegmentController {
     // and stamping seams would show cyan lines on an otherwise-blank sphere.
     if (this.showBoundaries && blitted > 0) {
       if (this.boundaryGen !== this.renderGen) this.rebuildBoundaries();
-
-      const plotCyan = (idx) => {
-        dst[idx]     = 0;
-        dst[idx + 1] = 65535;
-        dst[idx + 2] = 65535;
-      };
-
-      for (const boundaryY of this.boundaryYs) {
-        if (boundaryY >= h) continue;
-        const rowStart = boundaryY * w * 3;
-        for (let x = 0; x < w; x++) plotCyan(rowStart + x * 3);
-      }
-
-      for (const boundaryX of this.boundaryXs) {
-        if (boundaryX >= w) continue;
-        for (let y = 0; y < h; y++) plotCyan((y * w + boundaryX) * 3);
-      }
+      stampBoundaries(dst, w, h, this.boundaryXs, this.boundaryYs);
     }
 
     return blitted;
