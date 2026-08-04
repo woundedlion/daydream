@@ -20,8 +20,8 @@
     "assertions": 15
   },
   "tests/color_parity_wasm.test.js": {
-    "cases": 14,
-    "assertions": 235
+    "cases": 17,
+    "assertions": 2095
   },
   "tests/cpp_format.test.js": {
     "cases": 11,
@@ -104,8 +104,8 @@
     "assertions": 25
   },
   "tests/palette_math.test.js": {
-    "cases": 27,
-    "assertions": 5957
+    "cases": 24,
+    "assertions": 5739
   },
   "tests/param_sync.test.js": {
     "cases": 18,
