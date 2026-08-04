@@ -228,8 +228,8 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │       ├── FastNoiseLite.h         Single-header noise library
 │       └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
-├── effects/                    24 effects (26 headers: the shared ReactionDiffusionBase.h plus the
-│                                generated mindsplatter_replay_corpus.h):
+├── effects/                    24 effects (25 headers: the 24 plus the shared
+│                                ReactionDiffusionBase.h):
 │                                BZReactionDiffusion.h, HopfFibration.h, IslamicStars.h,
 │                                Raymarch.h, … — see §9 Effects Reference
 │
@@ -278,6 +278,9 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   └── toolchain-native-clang.cmake  Native Clang toolchain behind the tests preset
 ├── platformio.ini              Teensy envs: the two shipping images plus the compile/profiling profiles
 ├── tests/                      Unit tests (CMake subdirectory)
+│   ├── mindsplatter_whitebox.h  White-box MindSplatter accessor shared by its tests and the replay tools
+│   ├── mindsplatter_replay_metrics.h  Difference metrics + clip geometry shared by the replay generator and comparator
+│   └── mindsplatter_replay_corpus.h  Generated golden replay corpus (emitted by tools/mindsplatter_replay_gen.cpp)
 ├── scripts/                    Build + CI tooling
 │   ├── generate_luts.py        sRGB ↔ linear LUT generator of record (emits core/color/color_luts.h)
 │   ├── generate_reaction_graph.py K-NN lattice generator of record (emits core/engine/reaction_graph.cpp)
@@ -311,9 +314,8 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   ├── pov_segment_map_export.cpp  Generator for the committed segment-map golden
 │   ├── relax_bakes.py / relax_bake_harness.cpp  Relaxed-mesh bake generator of record
 │   ├── gen_gamut_lut.py        sRGB gamut-boundary generator of record (emits core/color/gamut_lut.h)
-│   ├── mindsplatter_replay_gen.cpp  Golden-corpus generator of record (emits effects/mindsplatter_replay_corpus.h)
-│   ├── mindsplatter_replay_main.cpp / mindsplatter_replay_metrics.h  Replay comparator over that corpus + its difference metrics
-│   ├── mindsplatter_whitebox.h  White-box MindSplatter accessor shared by its tests and the replay tools
+│   ├── mindsplatter_replay_gen.cpp  Golden-corpus generator of record (emits tests/mindsplatter_replay_corpus.h)
+│   ├── mindsplatter_replay_main.cpp  Replay comparator over that corpus (its fixtures live under tests/)
 │   ├── docs_check.py           Markdown fence/link/anchor/path validator (CI)
 │   ├── docs_images.py          Stages README images into the Doxygen output and resolves every `<img>` (CI)
 │   └── *_tests/                Host unit tests for the gate, hooks, profile parser, bakes, docs checks
