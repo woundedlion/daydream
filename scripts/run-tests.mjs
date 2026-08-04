@@ -5,8 +5,10 @@
 // gutted to a comment still scores one passing test, and a case gutted to an
 // empty body still scores a pass while asserting nothing.
 //
-// Deleting a case drops its file below its floor, by design. Re-measure every
-// assertion floor in one run:
+// Deleting a case drops its file below its floor, by design; a file that ran
+// nothing but a skip is exempt, since a suite gated on a missing prerequisite
+// asserts nothing without having gone away (see scripts/report-skips.mjs).
+// Re-measure every assertion floor in one run:
 //   node scripts/run-tests.mjs --update-floors "tests/*.test.js"
 import { spawnSync } from 'node:child_process';
 import {
@@ -23,6 +25,7 @@ import { join, relative } from 'node:path';
 const FLOORS_PATH = 'tests/assertion-floors.json';
 const UPDATE_FLAG = '--update-floors';
 const COUNTER = new URL('./count-assertions.mjs', import.meta.url).href;
+const SKIP_REPORTER = new URL('./report-skips.mjs', import.meta.url).href;
 
 const argv = process.argv.slice(2);
 const updating = argv.includes(UPDATE_FLAG);
@@ -43,6 +46,14 @@ const suffixes = args
   .filter((a) => !a.startsWith('-'))
   .map((p) => p.slice(p.lastIndexOf('*') + 1));
 
+/**
+ * Repo-relative, forward-slashed form of an absolute path, as the floors file
+ * keys its entries.
+ * @param {string} file - Absolute path.
+ * @returns {string} Floors-file key.
+ */
+const keyOf = (file) => relative(process.cwd(), file).replaceAll('\\', '/');
+
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const floor = pkg.testCountFloor;
 if (!Number.isInteger(floor) || floor < 1) {
@@ -57,10 +68,13 @@ if (!Number.isInteger(floor) || floor < 1) {
 // spec for the operator, TAP into a scratch file for the count.
 const scratch = mkdtempSync(join(tmpdir(), 'daydream-run-tests-'));
 const tapPath = join(scratch, 'summary.tap');
+const skipsPath = join(scratch, 'skipped.json');
 const countsDir = join(scratch, 'assertions');
 let status;
 let report = '';
 const counts = new Map();
+// Files that ran nothing but a skip, keyed as `counts` is.
+const skipped = new Set();
 try {
   mkdirSync(countsDir);
   const run = spawnSync(
@@ -71,6 +85,8 @@ try {
       '--test-reporter-destination=stdout',
       '--test-reporter=tap',
       `--test-reporter-destination=${tapPath}`,
+      `--test-reporter=${SKIP_REPORTER}`,
+      `--test-reporter-destination=${skipsPath}`,
       ...args,
     ],
     {
@@ -96,12 +112,20 @@ try {
     const { file, count } = JSON.parse(
       readFileSync(join(countsDir, entry), 'utf8'),
     );
-    const key = relative(process.cwd(), file).replaceAll('\\', '/');
+    const key = keyOf(file);
     // A test that spawns a script of its own inherits the counter, so keep only
     // the files the run's own patterns describe.
     if (!suffixes.some((s) => key.endsWith(s))) continue;
     counts.set(key, (counts.get(key) ?? 0) + count);
   }
+  let skipReport = '';
+  try {
+    skipReport = readFileSync(skipsPath, 'utf8');
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
+  }
+  if (skipReport.trim() !== '')
+    for (const file of JSON.parse(skipReport)) skipped.add(keyOf(file));
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }
@@ -134,6 +158,17 @@ const measured = Object.fromEntries(
 const assertions = [...counts.values()].reduce((a, b) => a + b, 0);
 
 if (updating) {
+  // A wholly skipped file measured nothing, so re-measuring here would ratchet
+  // its floor to zero and retire it. Keep whatever it has committed.
+  let committed = {};
+  try {
+    committed = JSON.parse(readFileSync(FLOORS_PATH, 'utf8'));
+  } catch {
+    /* no floors yet: there is nothing to keep */
+  }
+  for (const file of skipped)
+    if (file in measured && Number.isInteger(committed[file]))
+      measured[file] = committed[file];
   writeFileSync(FLOORS_PATH, `${JSON.stringify(measured, null, 2)}\n`);
   console.log(
     `run-tests: wrote ${counts.size} floors to ${FLOORS_PATH} ` +
@@ -184,10 +219,12 @@ if (unlisted.length > 0) {
   );
   process.exit(1);
 }
-// A deleted or renamed file reports zero against its committed floor.
+// A deleted or renamed file reports zero against its committed floor. A file
+// whose every result was a skip is exempt instead: it reported results, so it
+// is still there, and a platform-gated suite asserts nothing by design.
 const short = Object.entries(floors)
   .map(([file, min]) => [file, counts.get(file) ?? 0, min])
-  .filter(([, ran, min]) => ran < min);
+  .filter(([file, ran, min]) => ran < min && !skipped.has(file));
 if (short.length > 0) {
   console.error(
     'run-tests: assertions ran below the committed floor:\n' +
@@ -202,5 +239,12 @@ if (short.length > 0) {
 }
 console.log(
   `run-tests: ${total} tests passed (committed floor ${floor}), ` +
-    `${assertions} assertions across ${counts.size} files.`,
+    `${assertions} assertions across ${counts.size} files.` +
+    (skipped.size > 0
+      ? '\nrun-tests: exempted from their assertion floors, wholly skipped:\n' +
+        [...skipped]
+          .sort()
+          .map((f) => `  ${f}`)
+          .join('\n')
+      : ''),
 );
