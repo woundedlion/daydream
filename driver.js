@@ -19,9 +19,13 @@ import { GlobalStatsView } from "./global_stats_view.js";
 export class LabelPool {
   /**
    * @param {THREE.Scene} scene - Scene that pooled label objects are added to and removed from.
+   * @param {number} radius - Sphere radius that unit label directions are scaled to.
+   * @param {Document} [doc] - Document label elements are created in; defaults to the global `document`.
    */
-  constructor(scene) {
+  constructor(scene, radius, doc = globalThis.document) {
     this.scene = scene;
+    this.radius = radius;
+    this.doc = doc;
     this.pool = [];
     this.activeCount = 0;
   }
@@ -45,7 +49,7 @@ export class LabelPool {
     if (this.activeCount < this.pool.length) {
       labelObj = this.pool[this.activeCount];
     } else {
-      const div = document.createElement("div");
+      const div = this.doc.createElement("div");
       div.className = "label";
       labelObj = new CSS2DObject(div);
       labelObj.center.set(0, 0);
@@ -56,7 +60,7 @@ export class LabelPool {
       this.scene.add(labelObj);
     }
 
-    labelObj.position.copy(position).multiplyScalar(Daydream.SPHERE_RADIUS);
+    labelObj.position.copy(position).multiplyScalar(this.radius);
     labelObj.visible = true;
 
     if (labelObj.element.textContent !== content) {
@@ -224,7 +228,7 @@ export class Daydream {
     this.frameInterval = 1 / Daydream.FPS; // seconds per simulation frame
     this.timeAccumulator = 0;
 
-    this.labelPool = new LabelPool(this.scene);
+    this.labelPool = new LabelPool(this.scene, Daydream.SPHERE_RADIUS, document);
 
     this.setupDots();
 

@@ -1,18 +1,13 @@
 //
 // LabelPool backs driver.js's zero-allocation-per-frame label reuse. It imports
 // three (resolved from node_modules in Node); LabelPool.acquire touches only
-// document.createElement and the scene's add/remove, so a create-element stub
-// plus a parent-tracking scene stub exercise the real pooling logic without a DOM.
-import { test, afterEach } from 'node:test';
+// its injected document's createElement and the scene's add/remove, so a
+// create-element stub plus a parent-tracking scene stub exercise the real
+// pooling logic without a DOM.
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { LabelPool } from '../driver.js';
-
-const savedDocument = globalThis.document;
-afterEach(() => {
-  if (savedDocument === undefined) delete globalThis.document;
-  else globalThis.document = savedDocument;
-});
 
 // Stub element carrying only the fields CSS2DObject's constructor and
 // LabelPool.acquire read/write.
@@ -29,9 +24,10 @@ function stubScene() {
   };
 }
 
+const RADIUS = 30;
+
 function makePool() {
-  globalThis.document = { createElement: stubElement };
-  return new LabelPool(stubScene());
+  return new LabelPool(stubScene(), RADIUS, { createElement: stubElement });
 }
 
 const UNIT_X = new THREE.Vector3(1, 0, 0);
@@ -71,8 +67,8 @@ test('LabelPool.acquire scales placement to the sphere and shows the label', () 
   assert.equal(obj.element.className, 'label');
   assert.equal(obj.visible, true);
   assert.equal(obj.parent, pool.scene, 'acquired label is added to the scene');
-  // position = unit direction scaled to the sphere surface (a positive radius).
-  assert.ok(obj.position.x > 1, 'placement is scaled past the unit direction');
+  // position = unit direction scaled to the injected sphere radius.
+  assert.equal(obj.position.x, RADIUS, 'placement is scaled to the sphere radius');
   assert.equal(obj.position.y, 0);
   assert.equal(obj.position.z, 0);
   assert.ok(Math.abs(obj.position.x - obj.position.length()) < 1e-9);
