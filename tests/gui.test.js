@@ -1,3 +1,8 @@
+//
+// gui.js — DeepLinkGUI URL hydration (dropdown, slider, checkbox), per-root key
+// namespacing, and the debounced URL writer, against a stubbed lil-gui.
+//
+// Run: node --test --experimental-test-module-mocks "tests/*.test.js"
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { URL } from 'node:url';
@@ -115,7 +120,7 @@ function installWindow(search) {
   };
 }
 
-const RES = ['Phantasm (144x288)', 'Crystal (192x384)'];
+const RES = ['Holosphere (96x20)', 'Phantasm (288x144)'];
 
 /**
  * Runs `body` with console.warn captured so a rejection path's diagnostic is
@@ -198,14 +203,14 @@ test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
   // under mock timers so the pending write can't fire after afterEach drops window.
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const obj = { resolution: 'Phantasm (144x288)' };
+    const obj = { resolution: 'Phantasm (288x144)' };
     const replayed = [];
     const warnings = captureWarnings(() => {
       const gui = new DeepLinkGUI({ autoPlace: false });
       gui.add(obj, 'resolution', RES).onChange((v) => replayed.push(v));
     });
 
-    assert.equal(obj.resolution, 'Phantasm (144x288)');
+    assert.equal(obj.resolution, 'Phantasm (288x144)');
     assert.deepEqual(replayed, []);
     assert.equal(warnings.length, 1, 'the rejection is reported exactly once');
     assert.match(warnings[0], /ignoring out-of-range URL value "GARBAGE" for "resolution"/);
@@ -219,14 +224,14 @@ test('DeepLinkGUI.add ignores an out-of-list URL value for a dropdown', () => {
  * through onChange.
  */
 test('DeepLinkGUI.add adopts a valid in-list URL value for a dropdown', () => {
-  installWindow('?resolution=' + encodeURIComponent('Crystal (192x384)'));
+  installWindow('?resolution=' + encodeURIComponent('Holosphere (96x20)'));
   const gui = new DeepLinkGUI({ autoPlace: false });
-  const obj = { resolution: 'Phantasm (144x288)' };
+  const obj = { resolution: 'Phantasm (288x144)' };
   const replayed = [];
   gui.add(obj, 'resolution', RES).onChange((v) => replayed.push(v));
 
-  assert.equal(obj.resolution, 'Crystal (192x384)');
-  assert.deepEqual(replayed, ['Crystal (192x384)']);
+  assert.equal(obj.resolution, 'Holosphere (96x20)');
+  assert.deepEqual(replayed, ['Holosphere (96x20)']);
 });
 
 /**
@@ -249,10 +254,10 @@ test('DeepLinkGUI.add leaves a non-enumerated control (no option list) untouched
 test('DeepLinkGUI.add with no matching URL param keeps the default', () => {
   installWindow('?other=x');
   const gui = new DeepLinkGUI({ autoPlace: false });
-  const obj = { resolution: 'Phantasm (144x288)' };
+  const obj = { resolution: 'Phantasm (288x144)' };
   const replayed = [];
   gui.add(obj, 'resolution', RES).onChange((v) => replayed.push(v));
-  assert.equal(obj.resolution, 'Phantasm (144x288)');
+  assert.equal(obj.resolution, 'Phantasm (288x144)');
   assert.deepEqual(replayed, []);
 });
 
