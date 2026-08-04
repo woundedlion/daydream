@@ -22,6 +22,7 @@
  */
 import {
   compositeSegment,
+  computeSegmentRange,
   isValidSegmentCount,
   stampBoundaries,
 } from "./segment_layout.js";
@@ -850,8 +851,9 @@ export class SegmentController {
    * @returns {number} How many segment rectangles were actually blitted this
    *   call. 0 means either every result was null/empty (a fully-fenced frame),
    *   so the display buffer still holds only driver.render()'s fill(0), or the
-   *   pre-pass rejected a segment (out-of-bounds/empty/inverted rect or a
-   *   pixel-length mismatch) and latched a fault. The caller uses this to avoid
+   *   pre-pass rejected a segment (out-of-bounds/empty/inverted rect, a
+   *   pixel-length mismatch, or a rect that is not that segment's band of the
+   *   current layout) and latched a fault. The caller uses this to avoid
    *   marking a black buffer as a real composited frame.
    */
   composite() {
@@ -910,6 +912,29 @@ export class SegmentController {
           `${r.pixels.length} != expected ${expectedLen} for rect ` +
           `[${r.x0},${r.y0})-[${r.x1},${r.y1}) — a rect/buffer mismatch would ` +
           `blit a truncated row (segment-result invariant violated)`);
+        return 0;
+      }
+      // A rect that is self-consistent but not this segment's band blits a
+      // correctly-sized frame into another segment's rows; a worker that missed a
+      // setResolution answers under the current generation, so neither the fence
+      // nor the checks above see anything wrong.
+      let band;
+      try {
+        band = computeSegmentRange(s, n, w, h);
+      } catch (error) {
+        this.onWorkerFault(s,
+          `SegmentController.composite: no segment-${s} band exists for a ` +
+          `${n}-segment ${w}x${h} display buffer — ${errorDetail(error)}`);
+        return 0;
+      }
+      if (r.x0 !== band.x0 || r.x1 !== band.x1
+          || r.y0 !== band.y0 || r.y1 !== band.y1) {
+        this.onWorkerFault(s,
+          `SegmentController.composite: segment ${s} rect ` +
+          `[${r.x0},${r.y0})-[${r.x1},${r.y1}) is not its band ` +
+          `[${band.x0},${band.y0})-[${band.x1},${band.y1}) of the ${n}-segment ` +
+          `${w}x${h} layout — a stale-geometry frame would composite into the ` +
+          `wrong rows (segment-layout invariant violated)`);
         return 0;
       }
     }
