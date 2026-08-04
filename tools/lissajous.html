@@ -100,7 +100,7 @@
   <script type="module">
     import * as THREE from 'three';
     import { initScene, bootstrapTool, wireCopyBlock } from './shared.js';
-    import { createSlider as buildSlider } from './slider.js';
+    import { createSlider } from './slider.js';
     import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
     import {
       MAX_RATIONAL_TERM,
@@ -286,12 +286,12 @@
     // snap) can drive the control it belongs to.
     const sliderHandles = {};
 
-    const createSlider = (id, params) => {
+    const mountSlider = (id, params) => {
       // C1/C2 show 2 decimals; A and Duration show 3; Samples is a whole count.
       const decimals = id === 'Samples' ? 0 : (id === 'A' || id === 'Duration') ? 3 : 2;
       const scale = params.scale || 1;
 
-      sliderHandles[id] = buildSlider(`${id}_container`, {
+      sliderHandles[id] = createSlider(`${id}_container`, {
         id,
         label: params.label,
         min: params.min,
@@ -321,7 +321,7 @@
     const init = () => {
       // Setup sliders first
       Object.keys(config).forEach(id => {
-        createSlider(id, config[id]);
+        mountSlider(id, config[id]);
       });
 
       // Set up the Rational Lock Checkbox
