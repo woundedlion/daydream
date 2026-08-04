@@ -78,6 +78,8 @@ export function snapshotEffectControlState(effect) {
 export function restoreEffectControlState(effect, snapshot) {
   if (!effect?.controllerByName || !snapshot) return;
   const pauseController = effect.pauseController;
+  // Restoring an animated param trips effect_gui's take-over auto-pause. Pausing
+  // first makes that a no-op; resuming after the loop undoes one it did fire.
   if (snapshot.animationsPaused && pauseController) pauseController.setValue(true);
   for (const [name, value] of snapshot.paramValues) {
     const controller = effect.controllerByName.get(name);
