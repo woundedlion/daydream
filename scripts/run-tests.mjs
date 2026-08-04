@@ -1,14 +1,16 @@
 // Run `node --test` over the patterns given on the command line, then gate what
-// it reports against two committed ratchets: package.json's `testCountFloor`
-// (cases) and tests/assertion-floors.json (per-file assertion counts, measured
-// by scripts/count-assertions.mjs). Neither sees what the other does: a file
-// gutted to a comment still scores one passing test, and a case gutted to an
-// empty body still scores a pass while asserting nothing.
+// it reports against tests/assertion-floors.json, which commits two floors per
+// test file: the cases it runs (measured by scripts/report-cases.mjs) and the
+// assertions those cases make (measured by scripts/count-assertions.mjs).
+// Neither floor sees what the other does: a file gutted to a comment still
+// scores the one pass node reports for a file with no cases, and a case gutted
+// to an empty body still scores a pass while asserting nothing.
 //
-// Deleting a case drops its file below its floor, by design; a file that ran
-// nothing but a skip is exempt, since a suite gated on a missing prerequisite
-// asserts nothing without having gone away (see scripts/report-skips.mjs).
-// Re-measure every assertion floor in one run:
+// The floors are per file rather than per run so that one file going quiet is
+// not paid for by another growing. Deleting a case drops its file below its
+// floor, by design; a file that ran nothing but a skip is exempt, since a suite
+// gated on a prerequisite the platform lacks runs nothing without having gone
+// away. Re-measure every floor in one run:
 //   node scripts/run-tests.mjs --update-floors "tests/*.test.js"
 import { spawnSync } from 'node:child_process';
 import {
@@ -25,7 +27,7 @@ import { join, relative } from 'node:path';
 const FLOORS_PATH = 'tests/assertion-floors.json';
 const UPDATE_FLAG = '--update-floors';
 const COUNTER = new URL('./count-assertions.mjs', import.meta.url).href;
-const SKIP_REPORTER = new URL('./report-skips.mjs', import.meta.url).href;
+const CASE_REPORTER = new URL('./report-cases.mjs', import.meta.url).href;
 
 const argv = process.argv.slice(2);
 const updating = argv.includes(UPDATE_FLAG);
@@ -54,26 +56,20 @@ const suffixes = args
  */
 const keyOf = (file) => relative(process.cwd(), file).replaceAll('\\', '/');
 
-const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
-const floor = pkg.testCountFloor;
-if (!Number.isInteger(floor) || floor < 1) {
-  console.error(
-    'run-tests: package.json needs a "testCountFloor" (positive integer) — ' +
-      'the committed total the test runner must report.',
-  );
-  process.exit(1);
-}
-
-// The default reporter depends on whether stdout is a TTY, so pin both ends:
-// spec for the operator, TAP into a scratch file for the count.
+// The default reporter depends on whether stdout is a TTY, so pin both: spec
+// for the operator, the case tallies into a scratch file. A third reporter
+// overruns node's listener budget on the runner's event stream and draws a
+// MaxListenersExceededWarning, so the totals come from the tallies rather than
+// from a TAP report of their own.
 const scratch = mkdtempSync(join(tmpdir(), 'daydream-run-tests-'));
-const tapPath = join(scratch, 'summary.tap');
-const skipsPath = join(scratch, 'skipped.json');
+const casesPath = join(scratch, 'cases.json');
 const countsDir = join(scratch, 'assertions');
 let status;
-let report = '';
+let tallied = false;
 const counts = new Map();
-// Files that ran nothing but a skip, keyed as `counts` is.
+// Cases each file ran, and the files that ran nothing but a skip. Both keyed
+// as `counts` is.
+const cases = new Map();
 const skipped = new Set();
 try {
   mkdirSync(countsDir);
@@ -83,10 +79,8 @@ try {
       '--test',
       '--test-reporter=spec',
       '--test-reporter-destination=stdout',
-      '--test-reporter=tap',
-      `--test-reporter-destination=${tapPath}`,
-      `--test-reporter=${SKIP_REPORTER}`,
-      `--test-reporter-destination=${skipsPath}`,
+      `--test-reporter=${CASE_REPORTER}`,
+      `--test-reporter-destination=${casesPath}`,
       ...args,
     ],
     {
@@ -103,11 +97,6 @@ try {
   if (run.error) throw run.error;
   // A signalled runner reports a null status.
   status = run.status ?? 1;
-  try {
-    report = readFileSync(tapPath, 'utf8');
-  } catch (e) {
-    if (e.code !== 'ENOENT') throw e;
-  }
   for (const entry of readdirSync(countsDir)) {
     const { file, count } = JSON.parse(
       readFileSync(join(countsDir, entry), 'utf8'),
@@ -118,33 +107,27 @@ try {
     if (!suffixes.some((s) => key.endsWith(s))) continue;
     counts.set(key, (counts.get(key) ?? 0) + count);
   }
-  let skipReport = '';
+  let tallies = '';
   try {
-    skipReport = readFileSync(skipsPath, 'utf8');
+    tallies = readFileSync(casesPath, 'utf8');
   } catch (e) {
     if (e.code !== 'ENOENT') throw e;
   }
-  if (skipReport.trim() !== '')
-    for (const file of JSON.parse(skipReport)) skipped.add(keyOf(file));
+  if (tallies.trim() !== '') {
+    tallied = true;
+    for (const [file, tally] of Object.entries(JSON.parse(tallies))) {
+      const key = keyOf(file);
+      cases.set(key, tally.ran);
+      if (tally.skipped > 0 && tally.ran === 0) skipped.add(key);
+    }
+  }
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }
 if (status !== 0) process.exit(status);
 
-// Subtest summaries are indented, so an unindented line is the run total. Take
-// the last in case a future reporter emits more than one.
-const totals = [...report.matchAll(/^# pass (\d+)$/gm)];
-if (totals.length === 0) {
-  console.error(
-    'run-tests: the test runner reported no total — refusing to report a ' +
-      'green run.',
-  );
-  process.exit(1);
-}
-const total = Number(totals[totals.length - 1][1]);
-
-// An empty map means the counter never loaded, which would leave the assertion
-// ratchet silently off.
+// An empty map means the counter never loaded, and no tallies means the
+// reporter never loaded; either would leave a ratchet silently off.
 if (counts.size === 0) {
   console.error(
     'run-tests: no assertion counts were reported — refusing to report a ' +
@@ -152,14 +135,39 @@ if (counts.size === 0) {
   );
   process.exit(1);
 }
-const measured = Object.fromEntries(
-  [...counts].sort(([a], [b]) => (a < b ? -1 : 1)),
-);
+if (!tallied) {
+  console.error(
+    'run-tests: no case counts were reported — refusing to report a green run.',
+  );
+  process.exit(1);
+}
+const total = [...cases.values()].reduce((a, b) => a + b, 0);
 const assertions = [...counts.values()].reduce((a, b) => a + b, 0);
+const measured = Object.fromEntries(
+  [...counts]
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([file, count]) => [
+      file,
+      { cases: cases.get(file) ?? 0, assertions: count },
+    ]),
+);
+
+/**
+ * Whether a committed floor entry is a usable pair.
+ * @param {unknown} min - Entry read from the floors file.
+ * @returns {boolean} True when both counts are non-negative integers.
+ */
+const sound = (min) =>
+  min !== null &&
+  typeof min === 'object' &&
+  Number.isInteger(min.cases) &&
+  min.cases >= 0 &&
+  Number.isInteger(min.assertions) &&
+  min.assertions >= 0;
 
 if (updating) {
   // A wholly skipped file measured nothing, so re-measuring here would ratchet
-  // its floor to zero and retire it. Keep whatever it has committed.
+  // its floors to zero and retire it. Keep whatever it has committed.
   let committed = {};
   try {
     committed = JSON.parse(readFileSync(FLOORS_PATH, 'utf8'));
@@ -167,25 +175,14 @@ if (updating) {
     /* no floors yet: there is nothing to keep */
   }
   for (const file of skipped)
-    if (file in measured && Number.isInteger(committed[file]))
+    if (file in measured && sound(committed[file]))
       measured[file] = committed[file];
   writeFileSync(FLOORS_PATH, `${JSON.stringify(measured, null, 2)}\n`);
   console.log(
     `run-tests: wrote ${counts.size} floors to ${FLOORS_PATH} ` +
-      `(${assertions} assertions). Set "testCountFloor" to ${total} in ` +
-      'package.json to re-measure the case total too.',
+      `(${total} cases, ${assertions} assertions).`,
   );
   process.exit(0);
-}
-
-// Ratchet: raised as tests land, lowered only alongside a deliberate removal.
-if (total < floor) {
-  console.error(
-    `Only ${total} tests passed; the committed floor is ${floor}. Restore ` +
-      'the missing cases, or lower "testCountFloor" in package.json if the ' +
-      'removal was intended.',
-  );
-  process.exit(1);
 }
 
 let floors;
@@ -198,50 +195,68 @@ try {
   );
   process.exit(1);
 }
-const malformed = Object.entries(floors).filter(
-  ([, min]) => !Number.isInteger(min) || min < 0,
-);
+const malformed = Object.entries(floors).filter(([, min]) => !sound(min));
 if (malformed.length > 0) {
   console.error(
-    `run-tests: ${FLOORS_PATH} floors must be non-negative integers:\n` +
-      malformed.map(([file, min]) => `  ${file}: ${min}`).join('\n'),
+    `run-tests: every ${FLOORS_PATH} entry must be a {"cases", "assertions"} ` +
+      'pair of non-negative integers:\n' +
+      malformed
+        .map(([file, min]) => `  ${file}: ${JSON.stringify(min)}`)
+        .join('\n'),
   );
   process.exit(1);
 }
 // A file that ran without a floor is unratcheted, so it is an error rather than
-// a default of zero: a new test file has to commit its measured count.
+// a default of zero: a new test file has to commit its measured counts.
 const unlisted = [...counts.keys()].filter((f) => !(f in floors)).sort();
 if (unlisted.length > 0) {
   console.error(
-    'run-tests: no assertion floor committed for:\n' +
-      unlisted.map((f) => `  ${f}: ${counts.get(f)}`).join('\n') +
+    'run-tests: no floors committed for:\n' +
+      unlisted
+        .map((f) => `  ${f}: ${JSON.stringify(measured[f])}`)
+        .join('\n') +
       `\nAdd them with \`node scripts/run-tests.mjs ${UPDATE_FLAG} <patterns>\`.`,
   );
   process.exit(1);
 }
-// A deleted or renamed file reports zero against its committed floor. A file
-// whose every result was a skip is exempt instead: it reported results, so it
-// is still there, and a platform-gated suite asserts nothing by design.
-const short = Object.entries(floors)
-  .map(([file, min]) => [file, counts.get(file) ?? 0, min])
-  .filter(([file, ran, min]) => ran < min && !skipped.has(file));
-if (short.length > 0) {
+// A deleted or renamed file reports zero against both its floors. A file whose
+// every result was a skip is exempt instead: it reported results, so it is
+// still there, and a platform-gated suite runs nothing by design.
+const gated = Object.entries(floors).filter(([file]) => !skipped.has(file));
+const belowCases = gated
+  .map(([file, min]) => [file, cases.get(file) ?? 0, min.cases])
+  .filter(([, ran, min]) => ran < min);
+const belowAssertions = gated
+  .map(([file, min]) => [file, counts.get(file) ?? 0, min.assertions])
+  .filter(([, ran, min]) => ran < min);
+/**
+ * One reported block of files that came in under a floor.
+ * @param {string} what - What was counted, for the heading.
+ * @param {Array<[string, number, number]>} rows - File, count run, floor.
+ * @returns {string} The block, without a trailing newline.
+ */
+const block = (what, rows) =>
+  `run-tests: ${what} ran below the committed floor:\n` +
+  rows
+    .map(([file, ran, min]) => `  ${file}: ${ran} ran, floor ${min}`)
+    .join('\n');
+if (belowCases.length + belowAssertions.length > 0) {
+  const blocks = [];
+  if (belowCases.length > 0) blocks.push(block('cases', belowCases));
+  if (belowAssertions.length > 0)
+    blocks.push(block('assertions', belowAssertions));
   console.error(
-    'run-tests: assertions ran below the committed floor:\n' +
-      short
-        .map(([file, ran, min]) => `  ${file}: ${ran} ran, floor ${min}`)
-        .join('\n') +
-      '\nRestore the missing assertions, or re-measure with ' +
+    `${blocks.join('\n')}\nRestore what went missing, or re-measure with ` +
       `\`node scripts/run-tests.mjs ${UPDATE_FLAG} <patterns>\` if the removal ` +
       'was intended.',
   );
   process.exit(1);
 }
 console.log(
-  `run-tests: ${total} tests passed (committed floor ${floor}), ` +
-    `${assertions} assertions across ${counts.size} files.` +
+  `run-tests: ${total} tests passed, ${assertions} assertions across ` +
+    `${counts.size} files, each above its committed floor.` +
     (skipped.size > 0
-      ? '\nrun-tests: exempted from their assertion floors, wholly skipped:\n' +
+      ? '\nrun-tests: exempted from their floors, wholly skipped:\n' +
         [...skipped]
           .sort()
           .map((f) => `  ${f}`)

@@ -1,9 +1,9 @@
 //
-// scripts/run-tests.mjs is the `test` script: it runs the suite and gates both
-// the case total the runner reports and the per-file assertion counts
-// scripts/count-assertions.mjs measures. Driven as a subprocess with cwd set to
-// a temp fixture holding its own package.json, floors and test files, so the
-// counts under test are the fixture's and not this suite's.
+// scripts/run-tests.mjs is the `test` script: it runs the suite and gates each
+// file against two committed floors, the cases it runs and the assertions those
+// cases make. Driven as a subprocess with cwd set to a temp fixture holding its
+// own package.json, floors and test files, so the counts under test are the
+// fixture's and not this suite's.
 import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -30,13 +30,12 @@ const FILES = {
 
 let root;
 
-/**
- * Writes the fixture package.json, merging overrides over a floor of one.
- * @param {Object} [overrides] - Fields replacing the defaults.
- */
-const writePkg = (overrides = {}) => {
-  const pkg = { type: 'module', testCountFloor: 1, ...overrides };
-  writeFileSync(join(root, 'package.json'), JSON.stringify(pkg, null, 2));
+/** Writes the fixture package.json, which only has to mark the files ESM. */
+const writePkg = () => {
+  writeFileSync(
+    join(root, 'package.json'),
+    JSON.stringify({ type: 'module' }, null, 2),
+  );
 };
 
 /**
@@ -84,14 +83,14 @@ const skipping = (cases, asserts) =>
     .join('\n');
 
 /**
- * Writes the fixture assertion floors, merging overrides over the counts FILES
- * describes. An override of undefined drops the file's floor.
- * @param {Object} [overrides] - Floors replacing the defaults.
+ * Writes the fixture floors, merging overrides over the counts FILES describes.
+ * An override of undefined drops the file's entry.
+ * @param {Object} [overrides] - Entries replacing the defaults.
  */
 const writeFloors = (overrides = {}) => {
   const floors = {};
   for (const [name, { cases, asserts }] of Object.entries(FILES))
-    floors[`tests/${name}`] = cases * asserts;
+    floors[`tests/${name}`] = { cases, assertions: cases * asserts };
   writeFileSync(
     join(root, FLOORS),
     JSON.stringify({ ...floors, ...overrides }, null, 2),
@@ -150,70 +149,75 @@ const runExpectingFailure = (...args) => {
   assert.fail('the script was expected to exit non-zero');
 };
 
-/**
- * The total the runner reports for the intact fixture. Measured rather than
- * hardcoded: whether a test file itself counts as a case is the runner's
- * convention, not this gate's.
- * @returns {number} Reported passing total.
- */
-const intactTotal = () => {
-  const total = Number(run(PATTERN).match(/run-tests: (\d+) tests passed/)?.[1]);
-  assert.ok(total >= 3, `expected at least the three fixture cases, got ${total}`);
-  return total;
-};
-
 /** Verifies a suite meeting both committed floors passes and reports them. */
 test('a suite that meets the committed floors passes', () => {
-  writePkg({ testCountFloor: intactTotal() });
   assert.match(
     run(PATTERN),
-    /run-tests: \d+ tests passed \(committed floor \d+\), 8 assertions across 2 files/,
+    /run-tests: \d+ tests passed, 8 assertions across 2 files, each above its committed floor/,
   );
 });
 
-/** Verifies gutting a test file fails the total. */
-test('a test file gutted to a comment fails the total', () => {
-  const total = intactTotal();
+/**
+ * Verifies gutting a test file drops it below its case floor. A file with no
+ * cases still scores the one pass node reports for the file itself, so the
+ * count is one rather than zero.
+ */
+test('a test file gutted to a comment fails its case floor', () => {
   writeFileSync(join(root, 'tests', 'a.test.js'), '// TODO: re-enable\n');
-  writePkg({ testCountFloor: total });
   const err = runExpectingFailure(PATTERN);
-  const reported = Number(err.match(/Only (\d+) tests passed/)?.[1]);
-  assert.ok(
-    reported < total,
-    `the gutted run reported ${reported}, not below ${total}`,
+  assert.match(
+    err,
+    /cases ran below the committed floor:\n {2}tests\/a\.test\.js: 1 ran, floor 2/,
   );
-  assert.match(err, new RegExp(`committed floor is ${total}`));
+  assert.match(
+    err,
+    /assertions ran below the committed floor:\n {2}tests\/a\.test\.js: 0 ran, floor 6/,
+  );
+});
+
+/** Verifies dropping one case of a file fails, not just emptying the file. */
+test('a test file that lost a case fails its case floor', () => {
+  writeFileSync(join(root, 'tests', 'a.test.js'), passing(1, 3));
+  assert.match(
+    runExpectingFailure(PATTERN),
+    /cases ran below the committed floor:\n {2}tests\/a\.test\.js: 1 ran, floor 2/,
+  );
 });
 
 /**
  * Verifies emptying every case body while leaving the shells fails — the hole
- * the case total cannot see, since every shell still scores as a passing test.
+ * the case floors cannot see, since every shell still scores as a passing test.
  */
 test('cases gutted to empty bodies fail the assertion floors', () => {
-  writePkg({ testCountFloor: intactTotal() });
   for (const [name, { cases }] of Object.entries(FILES))
     writeFileSync(join(root, 'tests', name), passing(cases, 0));
   const err = runExpectingFailure(PATTERN);
   assert.doesNotMatch(err, /tests passed/);
+  assert.doesNotMatch(err, /cases ran below/);
   assert.match(err, /tests\/a\.test\.js: 0 ran, floor 6/);
   assert.match(err, /tests\/b\.test\.js: 0 ran, floor 2/);
 });
 
-/** Verifies deleting a test file reports zero against its committed floor. */
-test('a deleted test file falls below its assertion floor', () => {
+/** Verifies deleting a test file reports zero against both committed floors. */
+test('a deleted test file falls below its floors', () => {
   rmSync(join(root, 'tests', 'a.test.js'));
+  const err = runExpectingFailure(PATTERN);
   assert.match(
-    runExpectingFailure(PATTERN),
-    /tests\/a\.test\.js: 0 ran, floor 6/,
+    err,
+    /cases ran below the committed floor:\n {2}tests\/a\.test\.js: 0 ran, floor 2/,
+  );
+  assert.match(
+    err,
+    /assertions ran below the committed floor:\n {2}tests\/a\.test\.js: 0 ran, floor 6/,
   );
 });
 
 /**
- * Verifies a suite the platform cannot run is exempt from its floor: it
+ * Verifies a suite the platform cannot run is exempt from both floors: it
  * reported results, so unlike a deleted file it is still there, and a gated
- * suite asserts nothing by design.
+ * suite runs nothing by design.
  */
-test('a wholly skipped suite keeps its assertion floor', () => {
+test('a wholly skipped suite keeps its floors', () => {
   const { cases, asserts } = FILES['a.test.js'];
   writeFileSync(join(root, 'tests', 'a.test.js'), skipping(cases, asserts));
   const out = run(PATTERN);
@@ -222,7 +226,7 @@ test('a wholly skipped suite keeps its assertion floor', () => {
 });
 
 /** Verifies one skipped case does not exempt the cases that did run. */
-test('a partly skipped file still fails its assertion floor', () => {
+test('a partly skipped file still fails its floors', () => {
   writeFileSync(
     join(root, 'tests', 'a.test.js'),
     [
@@ -232,28 +236,30 @@ test('a partly skipped file still fails its assertion floor', () => {
       "test('live', () => {});",
     ].join('\n'),
   );
+  const err = runExpectingFailure(PATTERN);
+  assert.match(err, /cases ran below[^]*tests\/a\.test\.js: 1 ran, floor 2/);
   assert.match(
-    runExpectingFailure(PATTERN),
-    /tests\/a\.test\.js: 0 ran, floor 6/,
+    err,
+    /assertions ran below[^]*tests\/a\.test\.js: 0 ran, floor 6/,
   );
 });
 
-/** Verifies re-measuring does not retire a skipped file's floor to zero. */
+/** Verifies re-measuring does not retire a skipped file's floors to zero. */
 test('--update-floors keeps a wholly skipped floor', () => {
   writeFileSync(join(root, 'tests', 'a.test.js'), skipping(2, 3));
   run('--update-floors', PATTERN);
   assert.deepEqual(readFloors(), {
-    'tests/a.test.js': 6,
-    'tests/b.test.js': 2,
+    'tests/a.test.js': { cases: 2, assertions: 6 },
+    'tests/b.test.js': { cases: 1, assertions: 2 },
   });
 });
 
-/** Verifies a test file with no committed floor is refused, not defaulted. */
+/** Verifies a test file with no committed floors is refused, not defaulted. */
 test('a test file with no committed floor fails', () => {
   writeFileSync(join(root, 'tests', 'c.test.js'), passing(1, 1));
   assert.match(
     runExpectingFailure(PATTERN),
-    /no assertion floor committed for:\n {2}tests\/c\.test\.js: 1/,
+    /no floors committed for:\n {2}tests\/c\.test\.js: \{"cases":1,"assertions":1\}/,
   );
 });
 
@@ -266,19 +272,31 @@ test('a missing floors file fails', () => {
   );
 });
 
+/** Verifies the pre-pair entry shape is refused rather than read as a floor. */
+test('a bare number floor entry fails', () => {
+  writeFloors({ 'tests/a.test.js': 6 });
+  assert.match(runExpectingFailure(PATTERN), /pair of non-negative integers/);
+});
+
+/** Verifies half an entry is refused rather than defaulting the other half. */
+test('a floor entry missing its case count fails', () => {
+  writeFloors({ 'tests/a.test.js': { assertions: 6 } });
+  assert.match(runExpectingFailure(PATTERN), /pair of non-negative integers/);
+});
+
 /** Verifies a non-integer floor is refused rather than compared loosely. */
-test('a non-integer assertion floor fails', () => {
-  writeFloors({ 'tests/a.test.js': '6' });
-  assert.match(runExpectingFailure(PATTERN), /non-negative integers/);
+test('a non-integer floor fails', () => {
+  writeFloors({ 'tests/a.test.js': { cases: 2, assertions: '6' } });
+  assert.match(runExpectingFailure(PATTERN), /pair of non-negative integers/);
 });
 
 /** Verifies re-measuring writes the counts actually run, one file at a time. */
 test('--update-floors writes the measured counts', () => {
-  writeFloors({ 'tests/a.test.js': 999 });
+  writeFloors({ 'tests/a.test.js': { cases: 99, assertions: 999 } });
   assert.match(run('--update-floors', PATTERN), /wrote 2 floors/);
   assert.deepEqual(readFloors(), {
-    'tests/a.test.js': 6,
-    'tests/b.test.js': 2,
+    'tests/a.test.js': { cases: 2, assertions: 6 },
+    'tests/b.test.js': { cases: 1, assertions: 2 },
   });
   run(PATTERN);
 });
@@ -289,21 +307,9 @@ test('an empty test contributes no assertions', () => {
     writeFileSync(join(root, 'tests', name), passing(cases, 0));
   run('--update-floors', PATTERN);
   assert.deepEqual(readFloors(), {
-    'tests/a.test.js': 0,
-    'tests/b.test.js': 0,
+    'tests/a.test.js': { cases: 2, assertions: 0 },
+    'tests/b.test.js': { cases: 1, assertions: 0 },
   });
-});
-
-/** Verifies the floor cannot be dropped to disable the ratchet. */
-test('a missing count floor fails', () => {
-  writePkg({ testCountFloor: undefined });
-  assert.match(runExpectingFailure(PATTERN), /testCountFloor/);
-});
-
-/** Verifies a non-integer floor is refused rather than compared loosely. */
-test('a non-integer count floor fails', () => {
-  writePkg({ testCountFloor: '3' });
-  assert.match(runExpectingFailure(PATTERN), /testCountFloor/);
 });
 
 /** Verifies a pattern-less invocation is refused instead of walking the tree. */
@@ -311,7 +317,7 @@ test('no test pattern fails', () => {
   assert.match(runExpectingFailure(), /test file patterns/);
 });
 
-/** Verifies a failing case still fails the run when the total clears the floor. */
+/** Verifies a failing case still fails the run when every floor is met. */
 test('a failing test fails the run', () => {
   writeFileSync(
     join(root, 'tests', 'c.test.js'),
