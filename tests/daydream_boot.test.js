@@ -5,7 +5,7 @@
 // tests/app_lifecycle.test.js — the Pole LOD late-bind, the keydown guard, the
 // module-load handlers, the teardown order. What is left is the wiring itself:
 // which closures this file hands those factories. Only a source read can see
-// that, so these two cases read it, and each one names the failure it prevents.
+// that, so these cases read it, and each one names the failure it prevents.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -73,6 +73,18 @@ test('the discard path frees an engine built after disposal', () => {
     + 'has already run and will not revisit it');
   assert.match(body, /host\.engine\?\.delete\(\)/,
     'a WASM engine handle must be deleted, not merely dropped');
+});
+
+test('the segmented POV deep-link keys keep the names shared links carry', () => {
+  const consequence = 'a deep link carries view.Segmented POV.<prop>, built from '
+    + "the root namespace, the folder's display name and the bound property: "
+    + 'changing any of the three silently invalidates every link already shared';
+  assert.match(SOURCE, /new GUI\([^)]*,\s*'view'\)/, consequence);
+  assert.match(SOURCE, /addFolder\('Segmented POV'\)/, consequence);
+  for (const prop of ['segmented', 'segments']) {
+    assert.match(SOURCE, new RegExp(`segFolder\\.add\\(segState, '${prop}'`),
+      `${consequence}; '${prop}' must also stay deep-linked (add, not addSession)`);
+  }
 });
 
 test('the late-bound engine controls are re-applied once the engine exists', () => {
