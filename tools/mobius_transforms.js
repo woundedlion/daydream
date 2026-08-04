@@ -75,8 +75,12 @@ export const glslComplexFunctions = `
 /** Conventional magnitude representing the point at infinity. */
 export const STEREO_INF = 1e4;
 
-/** 1 - v.y below which stereo() is inside the north-pole cap. */
-export const STEREO_POLE_EPS = 1e-4;
+/**
+ * 1 - v.y below which stereo() is inside the north-pole cap: the crossover
+ * where |stereo(v)| = sqrt((1 + v.y) / (1 - v.y)) reaches STEREO_INF, so the
+ * cap continues the projection instead of stepping.
+ */
+export const STEREO_POLE_EPS = 2 / (STEREO_INF * STEREO_INF);
 
 /** (x,z) radius below which the north-pole azimuth is undefined. */
 export const STEREO_AZIMUTH_EPS = 1e-12;
@@ -130,7 +134,7 @@ export function projectDiv(num, den) {
 // the bodies against the JS above.
 export const glslProjectionFunctions = `
         const float STEREO_INF = 1e4;
-        const float STEREO_POLE_EPS = 1e-4;
+        const float STEREO_POLE_EPS = 2.0 / (STEREO_INF * STEREO_INF);
         const float STEREO_AZIMUTH_EPS = 1e-12;
         CNum stereo(vec3 v) {
           float denom = 1.0 - v.y;
