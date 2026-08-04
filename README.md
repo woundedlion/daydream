@@ -43,7 +43,7 @@ Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holospher
    - [7.4 Geometry Transformers](#74-geometry-transformers-transformersh)
    - [7.5 Memory Architecture](#75-memory-architecture-memoryh-memorycpp)
    - [7.6 The Color System](#76-the-color-system-colorh)
-   - [7.7 The Mesh System](#77-the-mesh-system-meshh-conwayh-hankinh-spatialh-solidsh)
+   - [7.7 The Mesh System](#77-the-mesh-system-coremesh)
    - [7.8 Generators](#78-generators-generatorsh)
    - [7.9 The Preset System](#79-the-preset-system-presetsh)
    - [7.10 Hardware Drivers](#710-hardware-drivers-dma_ledh-pov_singleh-pov_segmentedh)
@@ -158,6 +158,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 
 ### Holosphere (engine + firmware)
 
+<!-- docs-check: tree -->
 ```
 ├── core/                       Rendering engine
 │   ├── engine/                 Machinery: platform layer, memory, callables, rosters, effect support
@@ -178,7 +179,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   │   ├── transformers.h          Ripple, Noise, Möbius warp geometry transformers
 │   │   ├── styles.h                Feedback::Style named presets + space/color transform functions
 │   │   ├── presets.h               Generic Presets<Params, Size> template
-│   │   └── reaction_graph.h/.cpp   Precomputed Fibonacci-lattice K-NN graph (90 KiB / 92,160-byte table)
+│   │   └── reaction_graph.h / reaction_graph.cpp  Precomputed Fibonacci-lattice K-NN graph (90 KiB / 92,160-byte table)
 │   ├── math/                   Vector/quaternion math and scalar curves
 │   │   ├── 3dmath.h                Vector, Quaternion, Spherical, Complex, Möbius math
 │   │   ├── rotate.h                Quaternion projection helpers
@@ -227,7 +228,8 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │       ├── FastNoiseLite.h         Single-header noise library
 │       └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
-├── effects/                    24 effects (25 headers incl. the shared ReactionDiffusionBase.h):
+├── effects/                    24 effects (26 headers: the shared ReactionDiffusionBase.h plus the
+│                                generated mindsplatter_replay_corpus.h):
 │                                BZReactionDiffusion.h, HopfFibration.h, IslamicStars.h,
 │                                Raymarch.h, … — see §9 Effects Reference
 │
@@ -286,7 +288,11 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   ├── capture_screenshots.mjs Headless gallery capture for docs/screenshots/
 │   ├── screenshot_capture_config.mjs Per-effect capture offsets shared by capture and the CI gate
 │   ├── screenshot_capture_config.test.mjs Node unit test for the capture-offset table
-│   └── check_screenshots.mjs   Asserts docs/screenshots/ matches the effect roster (CI)
+│   ├── screenshot_resolution.mjs Browser-free resolution descent: picks the first resolution the app honors
+│   ├── screenshot_resolution.test.mjs Node unit test for that descent (fallback, empty list, prefix names)
+│   ├── png_probe.mjs           Dependency-free PNG chunk/CRC/inflate validator behind the gallery gate
+│   ├── png_probe.test.mjs      Node unit test for the PNG validator (corrupt/empty fixtures)
+│   └── check_screenshots.mjs   Asserts docs/screenshots/ matches the effect roster and decodes (CI)
 ├── tools/                      Firmware gates, device profiling, and asset bakes
 │   ├── build_pins.py           Shared external-tool version pins for CI and `just`
 │   ├── teensy_gate.py          Size + memory-layout gate parser/classifier (toolchain-free)
@@ -304,17 +310,28 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   ├── pov_segment_map_export.cpp  Generator for the committed segment-map golden
 │   ├── relax_bakes.py / relax_bake_harness.cpp  Relaxed-mesh bake generator of record
 │   ├── gen_gamut_lut.py        sRGB gamut-boundary generator of record (emits core/color/gamut_lut.h)
+│   ├── mindsplatter_replay_gen.cpp  Golden-corpus generator of record (emits effects/mindsplatter_replay_corpus.h)
+│   ├── mindsplatter_replay_main.cpp / mindsplatter_replay_metrics.h  Replay comparator over that corpus + its difference metrics
+│   ├── mindsplatter_whitebox.h  White-box MindSplatter accessor shared by its tests and the replay tools
 │   ├── docs_check.py           Markdown fence/link/anchor/path validator (CI)
-│   └── *_tests/                Host unit tests for the gate, hooks, profile parser, bakes, docs check
+│   ├── docs_images.py          Stages README images into the Doxygen output and resolves every `<img>` (CI)
+│   └── *_tests/                Host unit tests for the gate, hooks, profile parser, bakes, docs checks
 ├── docs/                       Design specs, perf ledgers, and the docs/screenshots/ gallery
 ├── Doxyfile                    Doxygen config for the published API reference
-├── package.json                npm entry points for the scripts/*.mjs tools
+├── package.json                npm entry points for the scripts/*.mjs tools (ESM; Node ≥ 22, CI pinned via tools/build_pins.py)
+├── package-lock.json           Pinned dependency set behind those entry points
+├── .clang-format               LLVM-derived C++ style; CI enforces it with clang-format 18
+├── ruff.toml                   Python lint rules (defect classes only, no formatter) — the ci.yml lint job
+├── eslint.config.mjs           JavaScript lint rules for scripts/*.mjs (recommended set) — the same job
+├── .githooks/                  pre-commit format/test/size gate + a reference-transaction guard keeping master fast-forward-only
 ├── .github/workflows/          ci.yml (native, WASM, format, Teensy, provenance), docs.yml (Doxygen → Pages)
+├── LICENSE                     PolyForm Noncommercial 1.0.0 (engine); effects/ reserved
 └── justfile                    Task runner: `just build` / `test` / `smoke` / `docs` / `install` (`just --list` for the rest)
 ```
 
 ### daydream (web simulator)
 
+<!-- docs-check: tree daydream -->
 ```
 ├── index.html                  Main simulator page
 ├── LICENSE                     PolyForm Noncommercial 1.0.0 (engine); effects reserved
@@ -339,7 +356,6 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 ├── frame_constants.js          Simulation FPS and the slow-frame threshold derived from it
 ├── driver.js                   Three.js scene: sphere mesh, dots, OrbitControls,
 │                                  axes overlay, picture-in-picture camera, resize
-├── label_format.js             DOM-free label number formatting with symbolic snapping
 ├── geometry.js                 Sphere-pixel position math (pixelToSpherical, etc.)
 ├── state.js                    AppState (pub/sub) + URLSync (query-string mirror)
 ├── gui.js                      lil-gui wrapper used by the main page and tools
@@ -373,6 +389,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   ├── palette_controls.js     DOM-free zoom history and locked-slider delta capping for palettes.html
 │   ├── palette_math.js         ProceduralPalette / GenerativePalette mirror + the PaletteOps bridge
 │   ├── solid_codegen.js        Op dispatch, codegen, and op-chain sequencing for solids.html
+│   ├── solid_registry_codegen.js  Registry-paste emitter: the solids.h Entry, OpStep table, and Recipe a saved solid contributes
 │   ├── tailwind.css            Prebuilt utility classes the four tool pages use, served same-origin
 │   └── tools.css               Shared design tokens and control styling for the tool pages
 │
@@ -387,7 +404,8 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 ├── three.js/                   Optional vendored Three.js checkout
 ├── vendor/                     Optional self-hosted fonts (CDN fallback)
 ├── node_modules/lil-gui/       Optional local lil-gui (npm install)
-└── package.json
+├── package.json
+└── package-lock.json           Committed dependency pin (the optional trees above are gitignored)
 ```
 
 When the local `three.js/` and `node_modules/lil-gui/` directories are absent (e.g. on the GitHub Pages deploy, and by default), [`vendor-importmap.js`](https://github.com/woundedlion/daydream/blob/master/vendor-importmap.js) resolves libraries from jsdelivr; `npm run importmap:local` switches it to the vendored copies for offline dev. See [§10.8](#108-vendor-importmap-local-first--cdn-fallback).
@@ -622,6 +640,8 @@ filters.plot(canvas, world_position, color, age, alpha)
 
 The pipeline handles the 3D/2D coordinate mismatch automatically at compile time: if a 3D filter receives a 2D coordinate it lifts it via `pixel_to_vector`; if a 2D filter receives a 3D vector it projects via `vector_to_pixel`.
 
+The tables below are the library surface, deliberately wider than the set of stages the shipping effects instantiate; a stage with no current user is composable inventory, not dead code.
+
 #### World-Space Filters
 
 | Filter | Effect |
@@ -796,7 +816,7 @@ struct DistanceResult {
 | `v2` | Index of the segment's start vertex, interpolated toward the next index across the segment — only the control points land on whole numbers, interior samples are fractional; `Plot::Ring` writes the strided grid index (stride up to W/8), `Plot::Line` has no interior vertices and writes 0 on every sample, and `Plot::Mesh` writes a constant edge index instead |
 | `v3` | Inherited from control-point Fragment (user-defined) |
 
-Plot primitives interpolate registers between control-point Fragments via `Fragment::lerp()`. The vertex shader, if provided, runs once per control point before rasterization. For the always-planar primitives (`Plot::PlanarPolygon`, `Plot::Star`, `Plot::Flower`) the rasterizer re-derives `v0`/`v1` from the rendered azimuthal-equidistant arc — which bows longer than the great-circle chord between vertices — so both stay consistent with the drawn position.
+Plot primitives interpolate registers between control-point Fragments via `Fragment::lerp_registers()`. The vertex shader, if provided, runs once per control point before rasterization. For the always-planar primitives (`Plot::PlanarPolygon`, `Plot::Star`, `Plot::Flower`) the rasterizer re-derives `v0`/`v1` from the rendered azimuthal-equidistant arc — which bows longer than the great-circle chord between vertices — so both stay consistent with the drawn position.
 
 **Full-Screen Shader Path** (`Scan::Shader`):
 
@@ -894,6 +914,17 @@ Plot::Multiline::draw<W, H>(pipeline, canvas, vertices, fragment_shader);
 All `Plot` primitives accept a `Fragments` array (an arena-backed `ArenaVector<Fragment>`) where each fragment carries position, texture registers (v0–v3), age, and color.
 
 - **Edge interpolation** — how consecutive fragments are joined. *Geodesic* (the default) walks the great-circle arc between endpoints; *planar* interpolates along an azimuthal-equidistant straight line in a basis's tangent plane (for effects that live in a 2D local space). This is selected by whether a **planar basis** is supplied to the draw call (`null` ⇒ geodesic).
+
+#### Sampling Policy
+
+`rasterize` takes a `RasterSamplingPolicy` template parameter setting the adaptive sample density. `DEFAULT` targets `SCREEN_STEP_PX` (0.9 px) and compiles the alternative away; `BALANCED` always trades samples for speed; `SELECTABLE` defers the choice to `RasterOptions::balanced_sampling`, so one instantiation serves both and the policy is picked per draw call. Only the single-pass rasterizer reads it — the cached-replay path always samples at the default density.
+
+Balanced sampling stretches each adaptive step by `BALANCED_SCREEN_STEP_PX / SCREEN_STEP_PX` (1.25×), clamped to one base step (2π/W) and left exact below the pole floor (`MIN_POLE_SCALE * BALANCED_POLE_GUARD_SCALE` base steps), where spacing is already at its minimum. Two consequences:
+
+- **Emitted alpha changes.** Sparser samples lay down less coverage per unit arc, so each fragment's alpha is scaled by `balanced_sample_alpha()` — gain `1 + (ratio - 1) * (0.88 - 0.20 * alpha)`, saturating at 1, with `ratio` the balanced step over the default step. The gain is source-over aware, shrinking as alpha rises because opaque samples compound less. A balanced draw is not pixel-identical to a default one.
+- **Step evaluation is reused.** Where the walk is locally straight and clear of the poles (tangent dot > 0.995, step change under 10%, step under 0.9 base steps), the next sample recomputes position only and carries the previous step forward, skipping the tangent and the screen-velocity step.
+
+`ShapeShifter` is the sole caller: `SELECTABLE`, on for `Plot::Star` at 32 or more points and off for every other primitive.
 
 #### Plot Primitives
 
@@ -1014,7 +1045,7 @@ float twist = 0.0f;
 GenerativePalette palette;
 
 // Timeline drives state via animations:
-timeline.add(0, Animation::Rotation<W>(orientation, Y_AXIS, TAU, 600, ease_linear, true));
+timeline.add(0, Animation::Rotation<W>(orientation, Y_AXIS, 2 * PI_F, 600, ease_linear, true));
 timeline.add(0, Animation::Transition(twist, 2.5f, 1000, ease_in_out_cubic));
 timeline.add(0, Animation::ColorWipe(palette, target_palette, 2000, ease_linear));
 
@@ -1033,7 +1064,7 @@ Transformers deform the sphere geometry before rendering. The `Transformer<Param
 
 ```cpp
 template <int CAPACITY>
-using RippleTransformer = Transformer<RippleParams, Animation::Ripple,
+using RippleTransformer = Transformer<Animation::RippleParams, Animation::Ripple,
                                       ripple_transform, CAPACITY>;
 ```
 
@@ -1046,9 +1077,8 @@ Available transformers:
 | `MobiusWarpCircularTransformer` | Loops a Möbius warp continuously |
 | `MobiusWarpGnomonicTransformer` | Möbius via gnomonic projection (preserves straight lines in hemisphere) |
 | `NoiseTransformer` | Distorts surface positions with 3D simplex noise |
-| `OrientTransformer` | Applies an `Orientation` quaternion rotation to all vertices |
 
-Transformers integrate with the `MeshOps::transform()` pipeline and can be chained: `MeshOps::transform(input, output, arena, ripple_transformer, orient_transformer)`.
+Transformers integrate with the `MeshOps::transform()` pipeline and can be chained: `MeshOps::transform(input, output, arena, ripple_transformer, orient_transformer)`. `transform()` takes any callable with a `transform(Vector)`, so a pool specialization and a plain adapter compose in the same call.
 
 #### Displacement Fields
 
@@ -1070,6 +1100,8 @@ Both classes derive from `TransformerPool`, which fixes the call order:
 5. `reclaim_storage(Arena&)` — from the after-reset callback of an arena that is compacted mid-effect (e.g. a mesh carousel). Spawned animations hold `Params` references into the slots, so the caller must replay the same allocation order after the reset as after `init_storage()`; the re-claimed blocks must land at their original addresses (asserted). A reset only rewinds the offset, so the untouched bytes carry live entities through.
 
 #### Standalone Utilities
+
+`OrientTransformer<CAP>` (`transformers.h`) is a plain adapter struct, not a `Transformer<>` specialization: it holds a reference to an `Orientation<CAP>` and applies `orientation.orient()` to each vertex. It has no pool, no params and no lifecycle — effects construct one on the stack at the call site (a deduction guide takes `CAP` from the orientation) and hand it straight to `MeshOps::transform()`.
 
 `stereo_noise_warp()` (`transformers.h`) is a free function, not a `Transformer<>` specialization — it is called directly by effects rather than managed through the transformer pool. It takes an already-projected stereographic coordinate `z` (a `Complex`) plus its precomputed `r_sq` (|z|²) — the caller does the `stereo()` projection — and adds FastNoiseLite-driven displacement attenuated near the projection pole. Returns a `StereoWarpResult` containing the warped coordinate and displacement magnitude (used for hue shift by Liquid2D and Flyby).
 
@@ -1165,7 +1197,7 @@ Twenty-five named `ProceduralPalette` instances are pre-defined in the `Palettes
 Palette interpolation is performed in the OKLCH perceptual color space: both `Gradient` (color-stop interpolation) and `GenerativePalette` (harmony-key interpolation and animated transitions) build their tables in OKLCH. The cosine `ProceduralPalette` is the exception — it evaluates its per-channel waveform directly in sRGB. The pipeline:
 
 ```
-Pixel (sRGB 16-bit) → linear RGB float → OKLab (L, a, b) → OKLCH (L, C, h)
+Pixel (linear 16-bit) → linear RGB float → OKLab (L, a, b) → OKLCH (L, C, h)
                                                                   ↓
                                               shortest-arc hue interpolation
                                                                   ↓
@@ -1181,6 +1213,19 @@ Pixel (sRGB 16-bit) → linear RGB float → OKLab (L, a, b) → OKLCH (L, C, h)
 | `lerp_oklch()` | Interpolate two OKLCH values with shortest-arc hue (avoids the red→green→blue detour) |
 | `gamut_clip_preserve_chroma()` | Maps an out-of-gamut OKLab color back into the sRGB cube by reducing chroma while holding hue and lightness (walk-then-bisect on the chroma scale). The hue-preserving alternative to a per-channel RGB clip. Gated behind an in-gamut test (`oklab_to_linear_rgb_gamut`), so in-gamut colors — the vast majority — pay only the test and skip the search. |
 | `hue_rotate()` | Perceptual hue rotation — rotates the (a,b) chroma plane in OKLab, preserving lightness and chroma. Forward nonlinearity uses `fast_cbrt` (hot per-pixel path); inverse is exact. Out-of-gamut results are chroma-reduced rather than per-channel clipped, which holds hue and stabilizes the feedback loop against saturated-color drift. Used by the feedback `hue_fade` transform and `Flyby`'s displacement-driven hue shift. |
+
+#### The Gamut Boundary Grid
+
+The chroma clip brackets the sRGB boundary from a generated table (`core/color/gamut_lut.h`, emitted by `tools/gen_gamut_lut.py`) indexed by the diamond angle of (b, a) and by L. Each cell stores the minimum and maximum boundary chroma over the region it covers, so the true boundary of every ray in the cell lies inside the stored bracket at any resolution; the per-pixel path walks that bracket in `GAMUT_SCAN_STEPS` and bisects the straddling step `GAMUT_BRACKET_STEPS` times. Grid resolution only sets how wide the bracket starts — the bisection sets how far it is narrowed.
+
+The clip reads the 512 × 256 flash master by default. An effect that clips per pixel can arm a coarser arena copy, which buys read latency alone (RAM rather than QSPI flash):
+
+| Function | Description |
+|---|---|
+| `init_gamut_lut(arena, angle_steps, l_steps)` | Downsamples the flash master into `arena` and points the clip at the copy. Both step counts must divide the master's 512 × 256 (trapped). Costs `gamut_lut_bytes(angle_steps, l_steps)`. Call from the effect's `init()`, after any `configure_arenas()`. |
+| `release_gamut_lut()` | Drops the copy and points the clip back at the flash master. Must run before the storage under the copy is handed out again: `configure_arenas()`, the mesh carousel's compaction, and effects that reset the persistent arena mid-run all call it first. |
+
+`Flyby` and `MeshFeedback` arm a copy; every other effect clips against the flash master.
 
 #### Palette Modifiers
 
@@ -1262,15 +1307,19 @@ StaticPalette<ProceduralPalette, Coords<NoiseWarpModifier>,
 | `PaletteFacade<SP>` | Exposes a compile-time `StaticPalette` composition through the polymorphic `Palette` API, for preset tables and baking |
 | `BakedPalette` | Precomputes any palette source (a `Palette` or a `StaticPalette`) into a fast 16-bit LUT for O(1) lookup. Arena-allocated. |
 
-### 7.7 The Mesh System (`mesh.h`, `conway.h`, `hankin.h`, `spatial.h`, `solids.h`)
+### 7.7 The Mesh System (`core/mesh/`)
 
-The mesh system is split across several files:
+The mesh system is split across nine files:
 
 - **`mesh.h`** — Core data structures (`PolyMesh`, `HalfEdgeMesh`) and fundamental `MeshOps` (compile, clone, classify)
 - **`conway.h`** — Conway mesh operators and vertex transformations
+- **`conway_graph.h`** — Constexpr 23-edge morph graph over the 18 simple-registry solids: per-edge operator/seed/reseed specs, bridge-aware walk weighting, and the closed `ORDERED_TOUR`
+- **`recipe.h`** — Lowers an authored recipe to primitive steps (`expand_to_primitives`), replays either form through `SolidBuilder` (`build_recipe`, `build_steps`), and decides which lowered steps a morph leg can sweep (`is_morphable_step`)
 - **`hankin.h`** — Hankin pattern compilation and dynamic update
+- **`mesh_classes.h`** — Congruence-class clustering plus one canonical distance-LUT bake per class, allocated by descending face count under an 18 KB per-mesh budget
 - **`spatial.h`** — `MeshState` (flat-array renderer format) and `KDTree`
 - **`solids.h`** — Platonic + Archimedean + Catalan + Islamic Star Pattern solid geometry data and registry
+- **`relax_bakes_generated.h`** — Baked relaxed-mesh vertices behind `MeshOps::relax_baked`, generated by `tools/relax_bakes.py`
 
 `PolyMesh` stores vertices and face connectivity via `ArenaVector` arrays. `MeshState` (in `spatial.h`) is the flat compiled format consumed by the renderer. `HalfEdgeMesh` provides a half-edge traversal structure built from either a `PolyMesh` or `MeshState`.
 
@@ -1561,7 +1610,7 @@ A burst terminates when the wire stays quiet past the **gap timeout** (4 columns
 | Half-revolution | — | 144 | 62.5 ms | 37,500,000 | one image / one flip interval |
 | Revolution | — | 288 | 125 ms | 75,000,000 | two flips, two boundary symbols |
 
-All bursts are ≪ the 62.5 ms half-rev, so consecutive symbols never overlap.
+All bursts are ≪ the 62.5 ms half-rev, so consecutive symbols never overlap. The table is nominal: cycle counts are the exact rational rounded, while `Config::cycles_per_column()` truncates its division (~2.6 ppm low). Only pitches and thresholds derive from it — flywheel position divides by the exact `cycles_per_half_rev`.
 
 **One-revolution signal map.** Where each symbol lands across a single 125 ms revolution (beacon only on scheduled revolutions):
 
@@ -1643,6 +1692,8 @@ Any checksum mismatch, wrong digit count, out-of-range digit, or stale partial f
 ```
 
 The dark window is identical (K revolutions) on every board because construction can't begin before B+R — only then is the window's start common knowledge regardless of which copy each board heard.  An effect that can't construct inside K revolutions trips `HS_CHECK` (fail-fast).  All boards reseed `hs::random()` with `hs::epoch_seed(effect index)` per effect build (epoch 0 is the identity seed 1337), so each visit gets a fresh stream and the new instance is bit-identical across boards no matter what each board rendered — or whether it even existed — before the epoch.
+
+**Live-takeover join grid.** The epoch commit only aligns a *swap* between running boards; a board with nothing live yet — at boot, or after a reboot — reaches its first constructed effect whenever its own identity arrives, which is later downstream than on the master. It therefore does not take that effect live on arrival: it waits for a ZERO crossing whose revolution-in-effect is a multiple of `join_grid_revs` (4), marked by `TickActions::join_boundary`. The master sits on the same grid, so at boot every board goes live at the *same* crossing with aligned frame counters instead of the master leading by however long downstream identity took; a mid-show rejoin waits ≤ 4 revolutions, well inside the 16-revolution rejoin budget. The grid must divide 64 so a beacon's mod-64 revolution count lands on the master's grid. Where the epoch commit traps on a missing effect, the join is conditional: `EffectHandoff::joinable` also requires the pending build generation to be unconsumed and to match the one the wire advertises, so a visibility lag just joins one grid step later. No join boundary is marked while a commit is pending — the epoch path owns that swap.
 
 **Concurrency & failure modes.** Two ISRs per board, **single-writer** by construction.  The sync-wire RISING ISR is a pure *publisher* — glitch filter, edge count, first-edge timestamp into a small mailbox, nothing else.  The flywheel ISR (waking ~8× per column) is the sole *consumer/owner* of all sync state: it claims terminated bursts, classifies, gates, snaps, flips, and runs epoch scheduling.  The hot path is ~7-of-8 wakes doing one cycle-counter read and a 64-bit position compute (≈1 % CPU at 600 MHz); only a column change packs pixels and submits DMA.
 
@@ -1891,7 +1942,7 @@ Rings bloom at random orientations and grow their radius from zero, fading in ov
 
 A head traces a fixed 12:5 spherical Lissajous figure whose long trail is continuously warped by a noise transformer, over a slowly cycling gradient palette.
 
-**Parameters**: Alpha, Cycle Dur, Speed, Jitter Amp, Noise Freq, Scale Factor, Cycle Speed
+**Parameters**: Alpha, Cycle Dur, Speed, Jitter Amp, Noise Scale, Scale Factor, Cycle Speed, Duty Cycle
 
 </td></tr></table>
 
@@ -1963,7 +2014,7 @@ A central distorted ring (`Plot::DistortedRing`) warps and spins; periodic rando
 
 A Fibonacci-spiral field of star-polygon SDFs, continuously deformed by an evolving Möbius warp (built on a gnomonic-projection transformer) and slowly tumbled by a Languid random walk.
 
-**Parameters**: Points, Radius, Sides, Debug BB, Warp Speed
+**Parameters**: Points, Radius, Sides, Warp Speed, Debug BB
 
 </td></tr></table>
 
@@ -2009,7 +2060,7 @@ A stack of evenly spaced soft-stroked rings (`Scan::DistortedRing`) sharing one 
 
 #### ShapeShifter
 
-Concentric polygon, star, or flower outlines drawn exclusively through the `Plot` rasterizer. The rings are evenly spaced across the full sphere radius, and a selectable animated waveform offsets each ring's phase to twist the stack back and forth while a global random walk reorients the stack. Six presets continuously blend among spherical polygons, flowers, and stars.
+Concentric polygon, star, or flower outlines drawn exclusively through the `Plot` rasterizer. The rings are evenly spaced across the full sphere radius, and a selectable animated waveform offsets each ring's phase to twist the stack back and forth while a global random walk reorients the stack. A periodic timer steps through the presets, each one snapping the whole parameter set to a fresh arrangement of spherical polygons, flowers, or stars.
 
 **Parameters**: Alpha, Shape, Count, Sides, Function, Amplitude, Speed, Opposite
 
@@ -2066,24 +2117,24 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `getBufferLength()` → `int` | Length of the pixel buffer (`W × H × 3`) for sizing the view |
 | `setParameter(name, value)` → `ParamSetResult` | Update a live effect parameter; returns `Module.ParamSetResult.APPLIED` on success, else the rejection reason (`NO_EFFECT`, `UNKNOWN_PARAM`, `READONLY`, or `NON_FINITE`). Compare against the enum values — never by truthiness. An `APPLIED` float may still have been clamped to the param's `[min, max]`; read the effective value back via `getParamValues()` |
 | `setAnimationsPaused(paused)` | Freeze/resume the current effect's animation drivers (the GUI "Pause Animation" toggle) |
-| `setPoleLod(aggressiveness)` | Set near-pole azimuthal shading decimation (the GUI "Pole LOD" slider, `[0, 2]`); non-finite and negative inputs clamp to 0, and the value saturates at 8 |
+| `setPoleLod(aggressiveness)` | Set near-pole azimuthal shading decimation (the GUI "Pole LOD" slider, `[0, 2]`); non-finite and negative inputs clamp to 0, and the value saturates at 8. The setting is a module-global, so it reaches only the engine instance it was called on — a segmented pool needs it re-sent to every worker (§10.7) |
 | `getPoleLod()` → `float` | Current decimation aggressiveness |
 | `getParameterDefinitions()` | Return the parameter list; each entry is `{name, value, animated, readonly}`, and float params additionally carry `{min, max}` (bool params omit `min`/`max` and return `value` as a JS boolean). Enum params (registered with option labels) also carry `options`, an array of label strings indexed by the param's value, which the GUI renders as a dropdown |
 | `getParamValues()` | Return current parameter values (including animation-driven updates) |
 | `getParamGeneration()` → `int` | Generation identifying which loaded-effect or no-effect state the definition and value streams describe. Pin it beside a `getParameterDefinitions()` snapshot and re-read it with each `getParamValues()` call; a changed value means the snapshot is stale (parameter counts repeat across the roster, so a length check alone cannot detect the switch or teardown) |
-| `getArenaMetrics()` | Memory usage stats for geometry, scratch, and tooling arenas, plus the stack high-water mark (see below) |
+| `getArenaMetrics()` | Memory usage stats for the three engine arenas, plus the stack high-water mark (see below). Read once per frame by the HUD, so it omits the tooling arenas an engine instance never moves; `MeshOps.getArenaMetrics()` reports all six on demand |
 | `getEffectSizes()` | Return `sizeof` for every registered effect at the current resolution |
 | `getSupportedResolutions()` → `[[w, h], …]` | *(static)* List the resolutions the build supports, as `[width, height]` pairs |
-| `setClip(x0, x1, y0, y1)` → `bool` | Restrict rendering to a sub-rectangle (used by segment workers) |
+| `setClip(x0, x1, y0, y1)` → `ClipSetResult` | Restrict rendering to a sub-rectangle (used by segment workers). Returns `Module.ClipSetResult.APPLIED` on success, else the rejection reason (`NO_EFFECT` or `INVALID_BOUNDS`). Compare against the enum values — never by truthiness. The two rejections want opposite responses: `INVALID_BOUNDS` is a caller bug worth faulting on, while `NO_EFFECT` is the ordinary state between a `setResolution()` (or an `init` carrying no effect name) and the `setEffect()` that follows. `APPLIED` does not mean the band is in force: an effect reporting `needs_full_frame()` (§10.7) keeps the full-canvas clip *deliberately* and still reports `APPLIED`. A clip is dropped by any successful `setEffect()` or `setResolution()` and must be re-applied |
 | `strobeColumns()` → `bool` | Whether the current effect renders as discrete strobed columns (dark inter-column gaps) rather than a continuous smeared band; `false` when no effect is set. Daydream reads it to decide whether to fill the inter-column gap |
 
-The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 298 KiB arena) for interactive solid manipulation. `fromSolidName`, `classifyFaces` and the operator methods answer a rejected call with `null`; `MeshOps.getLastResult()` then names the reason as a `Module.MeshOpResult` value (`OK`, `UNKNOWN_NAME`, `CONNECTIVITY_OVERFLOW`, `FACE_DEGREE_OVERFLOW`, `ARENA_EXHAUSTED`, `NON_FINITE_ARG`, or `ANGLE_OUT_OF_DOMAIN`). Compare against the enum values — never by truthiness — and read it before the next such call, which overwrites it. The reasons demand opposite responses: an overflow means shrinking the op chain, `ARENA_EXHAUSTED` means calling `clearToolingMemory()`.
+The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 298 KiB arena) for interactive solid manipulation. `fromSolidName`, `getVertices`, `getFaces`, `classifyFaces` and the operator methods answer a rejected call with `null`; `MeshOps.getLastResult()` then names the reason as a `Module.MeshOpResult` value (`OK`, `UNKNOWN_NAME`, `CONNECTIVITY_OVERFLOW`, `FACE_DEGREE_OVERFLOW`, `ARENA_EXHAUSTED`, `NON_FINITE_ARG`, `ANGLE_OUT_OF_DOMAIN`, or `STALE_WRAPPER`). Compare against the enum values — never by truthiness — and read it before the next such call, which overwrites it. The reasons demand opposite responses: an overflow means shrinking the op chain, `ARENA_EXHAUSTED` means calling `clearToolingMemory()`, and `STALE_WRAPPER` — a wrapper used after a `clearToolingMemory()` reclaimed its storage — means rebuilding the mesh from its base solid. A stale wrapper is rejected rather than trapped, so an interleaved wipe costs the page a null, not the module.
 
 The bridge also exposes a `PaletteOps` class whose `bakeLut` method authors a three-key OKLCH gradient and returns a zero-copy `Uint8Array` view over a 256-entry sRGB LUT (same read-before-next-call memory-view contract as `getPixels`), used by the palette tool. It touches no global RNG, so calling it never perturbs a live engine's render stream.
 
 It likewise exports the engine's color, palette, and geometry math as free functions so the JavaScript tool ports can cross-check against the real implementation rather than a reimplementation: `srgb_to_linear_float`, `linear_to_srgb_float`, `srgb_to_linear_interp` (the interpolated sRGB→16-bit-linear LUT), `linear_rgb_to_oklab`, `oklab_to_linear_rgb`, `hsv_to_rgb` (the device `CHSV` sextant path), `procedural_palette_linear` (the cosine-palette formula), `named_procedural_palettes` (the engine's named cosine-palette coefficient table), `lissajous`, and `mobius_transform` (the stereographic Möbius sphere map).
 
-The WASM bridge includes stack high-water-mark instrumentation: `stack_paint_canary()` fills the stack with a known pattern at init time, and `stack_high_water_mark()` scans for the deepest overwrite. This is reported via `getArenaMetrics()` and logged on every effect switch to catch stack-hungry template instantiations early.
+The WASM bridge includes stack high-water-mark instrumentation: `stack_paint_canary()` fills the stack with a known pattern at init time, and `stack_high_water_mark()` scans for the deepest overwrite. Every effect switch repaints the canary, so the live reading only ever describes the render path; the construction + `init()` depth measured just before that repaint is latched separately and reported as `getArenaMetrics().stack.init_high_water_mark`. `wasm_smoke.mjs` gates both against the same creep budget, so a stack-hungry template instantiation reds CI instead of only printing a number.
 
 Pixel data is 16-bit linear light (`uint16_t` per channel). The zero-copy `Uint16Array` view is bound directly as the instanced dot-mesh's `instanceColor` attribute, declared `normalized` so Three.js scales 0–65535 → 0–1 linear **on the GPU** — there is no per-pixel divide or float copy in JavaScript (Three.js expects linear color when `THREE.ColorManagement.enabled = true`):
 
@@ -2138,7 +2189,7 @@ appState.subscribe((key, value, old) => {
 
 - **`AppState`** — flat key→value store with a `subscribe(callback)` API. Setting a key fires the callback only if the value actually changed. The sidebar and lil-gui both write through `appState.set(...)`, so they stay in sync without explicit coupling. `update(patch)` batches: every key in the patch is written first and only then are subscribers notified, one event per changed key, so a callback that reads a sibling batched key sees its post-batch value instead of a half-applied state.
 - **`URLSync`** — reads tracked keys from `window.location.search` on construction (URL beats default), coercing each raw string to the seeded default's type. The third constructor argument is a per-key validator map applied to that raw string; a key whose predicate rejects keeps the validated default, so a hand-edited link cannot poison state and no consumer has to re-validate afterwards. Writes back to the query string are debounced 200 ms through `history.replaceState`. Shareable links like `?effect=Raymarch&resolution=Phantasm%20(288x144)` work out of the box.
-- **URL write ownership** — `URLSync` is the app-wide single owner of URL writes, reachable as `getActiveURLSync()`; constructing a new one disposes the previous. `gui.js` routes each parameter change through `setParam(key, value)`, which buffers an ad-hoc entry (numbers rounded to 4 decimals, `null` marking a deletion) rather than writing directly. The debounced flush is a read-modify-write at fire time: it re-reads the live query string, overlays the tracked state keys, then overlays the ad-hoc buffer — so concurrent state and GUI updates merge into one `replaceState` instead of clobbering each other. `reset(excludedKeys)` drops every param outside the exclusion set and writes immediately, re-asserting tracked state and surviving ad-hoc entries so a change still inside the debounce window is not lost. Every writer — both `URLSync` paths and the two standalone-page fallbacks in `gui.js` — emits through the exported `writeUrl(params)`, which assembles `pathname + ?query + location.hash` and calls `replaceState`, so no path can drop the fragment.
+- **URL write ownership** — `URLSync` is the app-wide single owner of URL writes, reachable as `getActiveURLSync()`; constructing a new one disposes the previous. `gui.js` routes each parameter change through `setParam(key, value)`, which buffers an ad-hoc entry (numbers rounded to 5 *significant digits* through the shared `roundUrlNumber`, `null` marking a deletion) rather than writing directly. Significant digits, not decimal places: a lil-gui slider's implicit step is a thousandth of its range, so the rule resolves every step at any magnitude, including a param whose whole range is a small fraction of 1. The debounced flush is a read-modify-write at fire time: it re-reads the live query string, overlays the tracked state keys, then overlays the ad-hoc buffer — so concurrent state and GUI updates merge into one `replaceState` instead of clobbering each other. `reset(excludedKeys)` drops every param outside the exclusion set and writes immediately, re-asserting tracked state and surviving ad-hoc entries so a change still inside the debounce window is not lost. Every writer — both `URLSync` paths and the two standalone-page fallbacks in `gui.js` — emits through the exported `writeUrl(params)`, which assembles `pathname + ?query + location.hash` and calls `replaceState`, so no path can drop the fragment.
 
 ### 10.5 The Effect Sidebar (`sidebar.js`)
 
@@ -2178,8 +2229,9 @@ drawFrame() {                postMessage({type:'render'})
 ```
 
 Key properties:
-- **Isolated WASM instances per worker** — each segment has its own arena, its own random seed (`Pcg32(1337)` is deterministic, so all workers produce the same result), and its own effect state.
+- **Isolated WASM instances per worker** — each segment has its own arena, its own RNG stream, and its own effect state. The stream is *per effect load*: every `setEffect()` reseeds the shared `Pcg32` from `hs::epoch_seed(effect_loads++)`, mirroring the device's per-epoch reseed (load 0 keeps the identity `1337` stream). Workers therefore agree only because they process the same message sequence and reach the same load count — an emergent property with no cross-check. A pool rebuilt mid-session starts back at load 0 and does *not* match a main-thread engine that has already switched effects N times.
 - **`setClip(x0, x1, y0, y1)`** — for a non-stateful effect the WASM engine restricts *rendering* to the worker's segment rectangle: the rasterizer's scanline culling skips out-of-clip rows and columns, so out-of-band pixels are never shaded. The pixel readback in `drawFrame()` still copies the full canvas buffer; `segment_worker.js` then extracts that rectangle (the `pixelsCopy` loop in the render handler) before transferring the result back, so only the segment crosses the worker boundary.
+- **Per-instance render settings must be re-sent** — `setPoleLod` writes `pole_lod_aggressiveness`, a module-global of the WASM instance it is called on. A worker's instance carries its own copy, so a value set on the main-thread engine does not reach the pool: the controller must forward the setting to every worker (a protocol message of its own, applied like `setAnimationsPaused`) or the composited preview renders undecimated while the slider reads non-zero.
 - **Cross-segment stateful effects render full-frame** — an effect whose per-frame state reads pixels *outside* the worker's band (`MeshFeedback`'s feedback warp samples the previous frame at unbounded offsets; `Dynamo` reprojects `World::Trails` under rotation) cannot be band-clipped: a clipped worker would have stale/zero history outside its band, so cross-band trails read as black and seams appear. Those effects report `Effect::needs_full_frame()` (derived from a compile-time `any_crosses_segments` filter-pipeline trait), and `setClip` leaves their clip at the full canvas — every worker computes the bit-identical full frame and `segment_worker.js` slices its segment rectangle from the full readback. This mirrors the device exactly, where each board independently renders the whole canvas; only non-stateful effects keep segmented rendering's clipping win. Design: `docs/segmented_stateful_effects_spec.md`.
 - **One-frame pipeline** — frame N's render is dispatched fire-and-forget; frame N-1's results are composited synchronously when they arrive. Wall-clock time is measured against the slowest worker — exactly what the multi-Teensy hardware sees.
 - **Boundary overlay** — a "Show Boundaries" toggle paints cyan markers on the segment edges in the composite buffer to make the partition visible.
@@ -2188,7 +2240,7 @@ Key properties:
 
 ### 10.8 Vendor Importmap (Local-First / CDN Fallback)
 
-`vendor-importmap.js` is loaded as a regular (non-module) `<script>` in every HTML page. At parse time it:
+`vendor-importmap.js` is loaded as a regular (non-module) `<script>` by `index.html` and by the three tool pages that import bare specifiers. `palettes.html` imports none — every module it loads is page-relative — so it carries no importmap script at all. At parse time the helper:
 
 1. Locates itself via `document.currentScript.src`, so it works whether called as `./vendor-importmap.js` (root) or `../vendor-importmap.js` (a tool page).
 2. Reads a build-time-baked `VENDOR` decision (per library, `'cdn'` or `'local'`).
@@ -2210,7 +2262,7 @@ loads: Emscripten's embind builds its invokers with `new Function`, which
 `'wasm-unsafe-eval'` does not permit. `font-src` allows `data:` for the woff2
 lil-gui inlines in its stylesheet.
 
-A page-specific local import (e.g. `solids.html` referencing `../solids.js`) is added by setting `window.__DAYDREAM_EXTRA_IMPORTS` before the helper script.
+A page-specific local import (e.g. `solids.html` referencing `../solids.js`) is added by setting `window.daydreamExtraImports` to a `{ specifier: url }` map before the helper script.
 
 ### 10.9 Video Recording (`recorder.js`)
 
@@ -2238,7 +2290,7 @@ Four standalone HTML pages. Three render with their own Three.js scene; `palette
 | `palettes.html` | Tunes `ProceduralPalette` cosine coefficients and `GenerativePalette` harmony rules and exports the C++ initializer; renders its swatches and graphs on 2D canvas contexts rather than a Three.js scene. `GenerativePalette` LUTs are baked through the WASM `PaletteOps.bakeLut` bridge, so its harmony colors are the engine's own. |
 | `solids.html` | Conway operator playground — chain `truncate`, `kis`, `ambo`, `dual`, etc. on Platonic / Archimedean / Catalan / Islamic-pattern seeds and visualize the result. Backed by the WASM `MeshOps` bridge with dedicated tooling arenas (16 MB, separate from the engine's 298 KiB arena). |
 
-All four reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`.
+The three Three.js pages reuse `vendor-importmap.js`, so they resolve from the CDN by default or from the local `three.js/` after `npm run importmap:local`. `palettes.html` imports only page-relative modules, so it carries no importmap script and its CSP `script-src` is `'self'` with no CDN origin.
 
 ---
 
@@ -2263,14 +2315,20 @@ Each hardware target has its own `.ino` entry point in `targets/`:
 5. Select **Board: Teensy 4.0**, **CPU Speed: 600 MHz**.
 6. Upload.
 
-> **Optional — headless size/layout gate (CI parity).** A PlatformIO build
-> (`just teensy-size`, needs `pip install platformio`) builds the two budgeted
-> shipping images plus the `holosphere_dma`, `phantasm8`, `profile`, and
-> `profile_o3` compile/link profiles
+> **Headless size/layout gate — an active CI job, optional locally.** A
+> PlatformIO build (`just teensy-size`, needs `pip install platformio`) builds
+> the two budgeted shipping images plus the `holosphere_dma`, `phantasm8`,
+> `profile`, and `profile_o3` compile/link profiles
 > on a stock machine. It checks shipping-image size and memory-region layout
 > against committed budgets while closing the device-only `#ifdef ARDUINO`
-> compile/size blind spot VMicro alone leaves uncovered. It coexists with VMicro
-> (it owns `.pio/`, never `__vm/`) and asserts the images *fit*, not byte-identity
+> compile/size blind spot VMicro alone leaves uncovered. CI runs the same build
+> and the same budgets on every master push and pull-request update as the
+> `teensy-size` job, alongside `teensy-warnings` (a cold rebuild enforcing the
+> first-party warning ratchet) and `teensy-gate-tests` (host-Python proofs that
+> each budget and layout invariant fails on a broken fixture) — the firmware is
+> compiled and gated in CI, and only running it on real hardware is manual.
+> Locally it coexists with VMicro (it owns `.pio/`, never `__vm/`) and asserts
+> the images *fit*, not byte-identity
 > with the bench build. See [`docs/teensy_ci_gate_spec.md`](https://github.com/woundedlion/pov/blob/master/docs/teensy_ci_gate_spec.md).
 
 Target-specific constants are defined in each `.ino` file (not a global `constants.h`):
@@ -2304,7 +2362,7 @@ The WASM target (`CMakeLists.txt`, `EMSCRIPTEN` branch) configures:
 - Include paths: project root (for `effects/`, `hardware/`) and `core/` (for engine headers)
 - `-sALLOW_MEMORY_GROWTH=1` — WASM heap can grow for large meshes
 - `-sMODULARIZE=1 -sEXPORT_ES6=1` — ES6 module output
-- `-sSTACK_SIZE=8192` — minimal stack (effects use arena allocation, not deep recursion)
+- `-sSTACK_SIZE` — per build type: 8192 for release (minimal; effects use arena allocation, not deep recursion) and 65536 for debug, where `-O0` disables inlining and stack-slot coalescing and inflates frames past the release budget. Each build-type block sets it exactly once and the shared block never does, so the effective value cannot depend on link-line ordering
 - `-O3 -ffast-math -fno-finite-math-only -flto -msimd128` for release, `-O0 -g -sASSERTIONS=1` for debug (`-fno-finite-math-only` must follow `-ffast-math`, which otherwise folds `std::isfinite()` to true and lets the compiler assume no NaN/Inf — the render sink relies on real finite semantics)
 
 The install step also writes `README.md` and `docs/screenshots/` so the daydream repo always serves the same documentation as Holosphere.
@@ -2321,7 +2379,7 @@ ctest --preset tests          # run the suite (or: just test)
 
 The suite must use Clang — the engine relies on GCC/Clang `__attribute__` extensions MSVC rejects. The native toolchain file ([`cmake/toolchain-native-clang.cmake`](https://github.com/woundedlion/pov/blob/master/cmake/toolchain-native-clang.cmake)) locates Clang via `EMSDK` (or a sibling `../emsdk`) and, on Windows, transparently handles the resource compiler and `lld-link` so no Visual Studio Developer Prompt is required. Tests build with `-DHS_TEST_BUILD`, which widens the host-only budgets: the inline type-erased animation slot (the 64-bit host inflates every embedded pointer past the 32-bit device footprint) and, most significantly, `GLOBAL_ARENA_SIZE` — **8 MiB under the flag against the device's 298 KiB**, so the effect smoke harness can render every effect without OOMing mid-run. The firmware/WASM footprint is unchanged: the real budget stays available as `DEVICE_GLOBAL_ARENA_SIZE`, which the device-budget `static_assert`s check even in the host suite. A high-water mark measured in the native suite is therefore *not* a device figure — it is a 64-bit measurement against an inflated ceiling.
 
-Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-diffusion graph integrity, filters, the plot samplers and the Scan/mesh rasterizer, solids-registry invariants, the Conway/Hankin mesh operators, and animation. Beyond those unit checks the suite also runs: an effect smoke harness that constructs and renders every effect with asserts on, plus a cross-run determinism pass that re-renders each effect under a fixed clock and diffs the frames — at the device 96×20 resolution by default, and additionally at the production 288×144 alongside a white-box correctness block when `HS_EFFECTS_FULL=1` is set, which CI does on every push and pull request; a death harness that spawns subprocesses to confirm each `HS_CHECK` invariant traps; the Phantasm multi-board sync core (`hardware/pov_sync.h`, spec §12); the HD107S SPI wire-format and color-correction tests; the POV driver tiling proofs (each LED write covers the canvas exactly once); and the WASM param-marshaling coverage (the JS definition/value streams stay index-aligned). `tests/run_tests.cpp` is the driver. Extending it with a `tests/test_<module>.h` takes three edits, each pinned by its own CTest case:
+Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-diffusion graph integrity, filters, the plot samplers and the Scan/mesh rasterizer, solids-registry invariants, the Conway/Hankin mesh operators, and animation. Beyond those unit checks the suite also runs: an effect smoke harness that constructs and renders every effect with asserts on, plus a cross-run determinism pass that re-renders each effect under a fixed clock and diffs the frames — at the device 96×20 resolution by default, and additionally at the production 288×144 alongside a white-box correctness block when `HS_EFFECTS_FULL=1` is set, which CI does on every master push and pull-request update; a death harness that spawns subprocesses to confirm each `HS_CHECK` invariant traps; the Phantasm multi-board sync core (`hardware/pov_sync.h`, spec §12); the HD107S SPI wire-format and color-correction tests; the POV driver tiling proofs (each LED write covers the canvas exactly once); and the WASM param-marshaling coverage (the JS definition/value streams stay index-aligned). `tests/run_tests.cpp` is the driver. Extending it with a `tests/test_<module>.h` takes three edits, each pinned by its own CTest case:
 
 1. `#include` the header in `run_tests.cpp`'s include block. The `unit_module_includes` test balances that block's size against the roster row count and requires every header in `tests/` outside a small non-module list to be included by name — so neither an orphaned include nor a test file nothing compiles survives.
 2. Add an `X(name, entry_point, min_assertions)` row to `HS_TEST_MODULE_LIST`, the X-macro that expands into `MODULES[]`. The third column is a **measured** assertion floor — the minimum over the configurations that move a module's count (the `HS_SMOKE_FRAMES` window, Debug `-O0` vs `RelWithDebInfo -O2`, and any `NDEBUG`-gated cases) — enforced by `end_module()`, so a case defined and never called turns the module red instead of compiling clean. `0` leaves a module unfloored.
@@ -2332,7 +2390,7 @@ Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-
 Three layers run the same suite so a regression can't reach the live demo:
 
 - **Local pre-commit hook** ([`.githooks/pre-commit`](https://github.com/woundedlion/pov/blob/master/.githooks/pre-commit)) — with C++/CMake changes staged it runs three gates: a `clang-format` check over the staged first-party sources, a build + run of the native suite, and the Teensy 4 size/layout gate (`pio run -e holosphere -e phantasm -e holosphere_dma`, enforcing the budgets in `tools/teensy_budgets.json`) — several minutes on a cold tree. The format and Teensy gates are skipped when `clang-format` / PlatformIO are absent, so CI re-runs both as its own jobs. The format check also blocks only when `clang-format`'s major matches CI's pinned 18 — any other major reflows differently, so its verdict is reported but never aborts the commit; point `CLANG_FORMAT` at a `clang-format-18` binary to enforce it locally. **On by default (opt-out):** configuring the `tests` preset points `core.hooksPath` at `.githooks` automatically. Skip one gate with `HS_SKIP_FORMAT=1` / `HS_SKIP_TEENSY=1`; `HS_SKIP_TESTS=1 git commit …` stands down the native suite *and* the Teensy gate but not the format check, which runs ahead of it — only `--no-verify` bypasses the whole hook. Disable the auto-enable with `-DHS_INSTALL_GIT_HOOKS=OFF`. Doc-only commits skip all three. The effects module runs its QUICK tier here, so a green hook is not authoritative for the full-resolution passes.
-- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on every push and pull request, runs the native suite on both Linux (clang-18) and Windows (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell), and builds the WASM module. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) — instantiating the module the way the browser does and driving every registered effect at every enumerated resolution, so a SIMD-codegen fault, an embind signature mismatch, a stack overflow, or an `ALLOW_MEMORY_GROWTH` detachment fails here rather than riding a green build to deploy — and **verifies the install provenance set** (`holosphere_wasm.wasm` + `.js` + `.sha` + `.wasm.sha256`, the same artifacts the daydream deploy gate consumes), asserting the recorded `sha256` of both the binary and the Emscripten glue verifies and a clean checkout records no `-dirty` marker. The native suite there runs with `HS_SMOKE_FRAMES=120` to reach effect-lifecycle transitions the default short run skips, and runs a second time at `-O2` (the `tests` preset pins `Debug`, so UB the optimizer acts on and FP results that move under contraction are invisible to the Debug shards; `NDEBUG` is left undefined there so assertions and the arena guards stay live).
+- **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on master pushes and pull-request updates (a push to a branch with no open PR triggers nothing), runs the native suite on both Linux (clang-18) and Windows (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell), and builds the WASM module. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) — instantiating the module the way the browser does and driving every registered effect at every enumerated resolution, so a SIMD-codegen fault, an embind signature mismatch, a stack overflow, or an `ALLOW_MEMORY_GROWTH` detachment fails here rather than riding a green build to deploy — and **verifies the install provenance set** (`holosphere_wasm.wasm` + `.js` + `.sha` + `.wasm.sha256`, the same artifacts the daydream deploy gate consumes), asserting the recorded `sha256` of both the binary and the Emscripten glue verifies and a clean checkout records no `-dirty` marker. The native suite there runs with `HS_SMOKE_FRAMES=120` to reach effect-lifecycle transitions the default short run skips, and runs a second time at `-O2` (the `tests` preset pins `Debug`, so UB the optimizer acts on and FP results that move under contraction are invisible to the Debug shards; `NDEBUG` is left undefined there so assertions and the arena guards stay live). The same shard matrix also runs under **ASan + UBSan** with `-fno-sanitize-recover` — the native build is the only one where the arena guards compile in, so this is the sole automated cover for the arena-lifetime UB the death harness can't reach — and the canvas / segmented-POV modules run once more under **TSan** (its own job: TSan cannot share a binary with ASan), which is the only check on the double-buffer handoff that x86-64's strong memory model masks. A `shard-coverage` job asserts every registered CTest matches exactly one shard regex, so a new module cannot fall out of every sanitized and unsanitized shard at once, and an advisory `code-coverage` job publishes an llvm-cov summary with no threshold gate. A `lint` job runs `ruff` over the Python tooling and `eslint` over `scripts/*.mjs` — both configured to defect rules only ([`ruff.toml`](https://github.com/woundedlion/pov/blob/master/ruff.toml), [`eslint.config.mjs`](https://github.com/woundedlion/pov/blob/master/eslint.config.mjs)), with no formatter and no stylistic rule enabled, so the gate reports breakage rather than reflowing the tree.
 - **Gated deploy** (`.github/workflows/deploy.yml`, **daydream repo**) — daydream's GitHub Pages source is *GitHub Actions*. On a push to daydream's `master` (or manual dispatch), the engine's native unit suite runs as a **gate** (checking out the engine repo) alongside daydream's own JS suite; `deploy` `needs: [gate, js-tests]`, so only if both pass does the workflow publish the simulator to Pages. The engine's WASM is whatever is committed in daydream (built + installed from Holosphere). If the engine repo is private, add a `POV_TOKEN` secret (a read-access PAT) for the gate's checkout.
 
 The simulator's JavaScript lives in the daydream repo and carries its own suite there: `tests/*.test.js`, run by `npm test` (`node --test`), covering the driver and clock, the sidebar and GUI, the segment workers and layout, param marshaling, color/palette math, and the geometry tools' math modules. Two committed ratchets in `package.json` keep a hollowed-out suite from reporting green: a `pretest` guard (`scripts/require-tests.mjs`) fails the run when the test glob matches fewer files than `testFileFloor`, so a rename can't empty the suite silently, and the `test` script itself (`scripts/run-tests.mjs`) fails when the total `node --test` reports falls below `testCountFloor` — a file gutted to a comment still satisfies the file count, and `node --test` scores it as one passing test. Both floors are raised as tests land and lowered only alongside a deliberate removal. The suite runs on every daydream pull request (`.github/workflows/js-tests.yml`, alongside `npm run typecheck` and an import-map freshness check) and again as the `js-tests` job in `deploy.yml`.
@@ -2378,8 +2436,8 @@ After populating them, run `npm run importmap:local` to point [`vendor-importmap
 
 This project is split-licensed: the rendering engine and the visual effects carry different terms.
 
-**Engine — non-commercial.** The core infrastructure (the rendering engine, math, scan/raster, hardware drivers, and test harness — everything outside `effects/`) is licensed under the [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/) (see [`LICENSE`](LICENSE)). You may use, modify, and distribute it for any non-commercial purpose; commercial use is not granted.
+**Engine — non-commercial.** The core infrastructure — the rendering engine, math, scan/raster, hardware drivers, and test harness, which in the Holosphere repository is everything outside `effects/` — is licensed under the [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/) (see [`LICENSE`](LICENSE)). You may use, modify, and distribute it for any non-commercial purpose; commercial use is not granted.
 
-**Effects — proprietary.** The visual effects in `effects/` are Copyright 2025 Gabriel Levy. All rights reserved. They are not covered by the PolyForm license — no rights to use, copy, modify, or distribute them are granted.
+**Effects — proprietary.** The visual effects — the Holosphere repository's `effects/` sources, and their compiled form in any distributed build artifact, including the `holosphere_wasm.wasm` module daydream ships — are Copyright 2025 Gabriel Levy. All rights reserved. They are not covered by the PolyForm license — no rights to use, copy, modify, or distribute them are granted.
 
-**Third-party.** The engine vendors `core/vendor/FastNoiseLite.h` under the MIT License (Auburn / Jordan Peck). The simulator vendors nothing — it loads [three.js](https://github.com/mrdoob/three.js) (MIT, three.js authors) and [lil-gui](https://github.com/georgealways/lil-gui) (MIT, George Michael Brower) from the jsdelivr CDN at the versions pinned in `daydream/package.json` (currently three 0.183.1, lil-gui 0.21.0). The optional self-hosted fonts under `daydream/vendor/fonts/` (Inter and JetBrains Mono, both SIL OFL 1.1) are gitignored and distributed by neither repo.
+**Third-party.** The engine vendors `core/vendor/FastNoiseLite.h` under the MIT License (Auburn / Jordan Peck). The simulator vendors one file: `daydream/tools/tailwind.css`, a prebuilt [Tailwind CSS](https://tailwindcss.com) 3.4.17 utility sheet (MIT, Tailwind Labs) served same-origin to the four tool pages, carrying its upstream MIT banner; its preflight reset derives from [modern-normalize](https://github.com/sindresorhus/modern-normalize) (MIT, Sindre Sorhus), itself derived from normalize.css (MIT, Nicolas Gallagher and Jonathan Neal). Everything else the simulator uses loads at runtime: [three.js](https://github.com/mrdoob/three.js) (MIT, three.js authors) and [lil-gui](https://github.com/georgealways/lil-gui) (MIT, George Michael Brower) come from the jsdelivr CDN at the versions pinned in `daydream/package.json` (currently three 0.183.1, lil-gui 0.21.0). The optional self-hosted fonts under `daydream/vendor/fonts/` (Inter and JetBrains Mono, both SIL OFL 1.1) are gitignored and distributed by neither repo.
