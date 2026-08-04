@@ -231,6 +231,20 @@ function readyController(n = 2, opts = {}) {
 const flush = () => new Promise((r) => setImmediate(r));
 
 /**
+ * Swap in a setTimeout that records callbacks instead of scheduling them, so a
+ * test drives the watchdogs and boot backoff by hand.
+ * @returns {{timers: Array<Function>, restore: () => void}} The captured
+ *   callbacks in arm order, and a restore fn for the real setTimeout.
+ */
+const installFakeTimers = () => {
+  const realSetTimeout = globalThis.setTimeout;
+  /** @type {Array<Function>} */
+  const timers = [];
+  globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
+  return { timers, restore: () => { globalThis.setTimeout = realSetTimeout; } };
+};
+
+/**
  * Deliver a worker->controller 'frame' message to segment `segId`.
  * @param {SegmentController} controller - Controller owning the worker pool.
  * @param {number} segId - Index of the worker delivering the frame.
@@ -683,9 +697,7 @@ test('only the first fault of a session is recorded', () => {
 });
 
 test('a bare-Event boot fault auto-rebuilds the pool instead of latching', () => {
-  const realSetTimeout = globalThis.setTimeout;
-  const timers = [];
-  globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
+  const { timers, restore } = installFakeTimers();
   try {
     const c = makeController();
     c.active = true; // the app sets this before create(); the retry path checks it
@@ -705,14 +717,12 @@ test('a bare-Event boot fault auto-rebuilds the pool instead of latching', () =>
     assert.equal(c.workers.length, 2, 'pool respawned at the same segment count');
     assert.notEqual(c.workers[0], firstPool[0], 'rebuilt with fresh workers');
   } finally {
-    globalThis.setTimeout = realSetTimeout;
+    restore();
   }
 });
 
 test('a bare-Event boot fault latches once the retry budget is exhausted', () => {
-  const realSetTimeout = globalThis.setTimeout;
-  const timers = [];
-  globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
+  const { timers, restore } = installFakeTimers();
   try {
     const c = makeController();
     c.active = true;
@@ -729,7 +739,7 @@ test('a bare-Event boot fault latches once the retry budget is exhausted', () =>
     assert.equal(c.faulted, true, 'a load fault past the retry budget latches');
     assert.equal(c.faultInfo.segId, 0);
   } finally {
-    globalThis.setTimeout = realSetTimeout;
+    restore();
   }
 });
 
@@ -741,9 +751,7 @@ test('a message-less error after the pool is ready still latches fast', () => {
 });
 
 test('the boot watchdog faults fast when a worker never sends booted', () => {
-  const realSetTimeout = globalThis.setTimeout;
-  const timers = [];
-  globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
+  const { timers, restore } = installFakeTimers();
   try {
     const c = makeController();
     c.create(2);
@@ -753,14 +761,12 @@ test('the boot watchdog faults fast when a worker never sends booted', () => {
     assert.match(c.faultInfo.message, /0\/2 booted/);
     assert.match(c.faultInfo.message, /holosphere_wasm\.js/);
   } finally {
-    globalThis.setTimeout = realSetTimeout;
+    restore();
   }
 });
 
 test('the boot watchdog names the segments that never booted', () => {
-  const realSetTimeout = globalThis.setTimeout;
-  const timers = [];
-  globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
+  const { timers, restore } = installFakeTimers();
   try {
     const c = makeController();
     c.create(4);
@@ -771,14 +777,12 @@ test('the boot watchdog names the segments that never booted', () => {
     assert.match(c.faultInfo.message, /never booted: 1, 2, 3/);
     assert.equal(c.faultInfo.segId, -1, 'multiple missing -> pool-wide segId');
   } finally {
-    globalThis.setTimeout = realSetTimeout;
+    restore();
   }
 });
 
 test('a single missing segment is named directly in the watchdog fault', () => {
-  const realSetTimeout = globalThis.setTimeout;
-  const timers = [];
-  globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
+  const { timers, restore } = installFakeTimers();
   try {
     const c = makeController();
     c.create(2);
@@ -789,15 +793,13 @@ test('a single missing segment is named directly in the watchdog fault', () => {
     assert.match(c.faultInfo.message, /never ready: 1/);
     assert.equal(c.faultInfo.segId, 1);
   } finally {
-    globalThis.setTimeout = realSetTimeout;
+    restore();
   }
 });
 
 test('the render watchdog faults when a worker accepts render but stops progressing', async () => {
   const c = readyController(2);
-  const realSetTimeout = globalThis.setTimeout;
-  const timers = [];
-  globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
+  const { timers, restore } = installFakeTimers();
   try {
     const done = c.renderParallel();
     deliverFrame(c, 0); // only seg 0 replies; seg 1 hangs
@@ -812,15 +814,13 @@ test('the render watchdog faults when a worker accepts render but stops progress
     assert.equal(c.renderWatchdog, null);
     await done; // onWorkerFault resolved the in-flight frame
   } finally {
-    globalThis.setTimeout = realSetTimeout;
+    restore();
   }
 });
 
 test('a progress frame re-arms the render watchdog so a slow render does not fault', async () => {
   const c = readyController(2);
-  const realSetTimeout = globalThis.setTimeout;
-  const timers = [];
-  globalThis.setTimeout = (fn) => { timers.push(fn); return { unref() {} }; };
+  const { timers, restore } = installFakeTimers();
   try {
     const done = c.renderParallel();
     assert.equal(timers.length, 1, 'watchdog armed once at dispatch');
@@ -834,14 +834,13 @@ test('a progress frame re-arms the render watchdog so a slow render does not fau
     assert.equal(c.faulted, false);
     await done;
   } finally {
-    globalThis.setTimeout = realSetTimeout;
+    restore();
   }
 });
 
 test('a completed render clears the render watchdog so it cannot fault later', async () => {
   const c = readyController(2);
-  const realSetTimeout = globalThis.setTimeout;
-  globalThis.setTimeout = () => ({ unref() {} });
+  const { restore } = installFakeTimers();
   try {
     const done = c.renderParallel();
     assert.notEqual(c.renderWatchdog, null, 'watchdog armed at dispatch');
@@ -852,7 +851,7 @@ test('a completed render clears the render watchdog so it cannot fault later', a
     assert.equal(c.faulted, false);
     await done;
   } finally {
-    globalThis.setTimeout = realSetTimeout;
+    restore();
   }
 });
 
@@ -1369,8 +1368,7 @@ test('an overrun re-blit shows one whole generation, never a half-updated mix', 
   driver.W = 4; driver.H = 2;
   driver.pixels = new Uint16Array(4 * 2 * 3);
 
-  const realSetTimeout = globalThis.setTimeout;
-  globalThis.setTimeout = () => ({ unref() {} }); // stub the render watchdog
+  const { restore } = installFakeTimers(); // the render watchdog never fires
   try {
     const c = readyController(2);
     c.showBoundaries = false;
@@ -1399,7 +1397,7 @@ test('an overrun re-blit shows one whole generation, never a half-updated mix', 
     assert.equal(driver.pixels[idx(2, 0, 4)], 111, 'quadrant 1 holds generation A');
     assert.equal(c.frameComposited, false, 're-blit is not a new frame');
   } finally {
-    globalThis.setTimeout = realSetTimeout;
+    restore();
   }
 });
 
@@ -1471,8 +1469,7 @@ test('a fault latched by the overrun re-blit paints the overlay on the same tick
   driver.W = 4; driver.H = 2;
   driver.pixels = new Uint16Array(4 * 2 * 3);
 
-  const realSetTimeout = globalThis.setTimeout;
-  globalThis.setTimeout = () => ({ unref() {} }); // stub the render watchdog
+  const { restore } = installFakeTimers(); // the render watchdog never fires
   try {
     const c = readyController(2);
     c.showBoundaries = false;
@@ -1492,7 +1489,7 @@ test('a fault latched by the overrun re-blit paints the overlay on the same tick
     assert.equal(c.faulted, true, 'the re-blit pre-pass latched the fault');
     assert.equal(statsShown, 1, 'the overlay painted on the faulting tick, not the next one');
   } finally {
-    globalThis.setTimeout = realSetTimeout;
+    restore();
   }
 });
 

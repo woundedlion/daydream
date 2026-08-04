@@ -62,13 +62,23 @@ const fakeCanvas = (width = 0, height = 0) =>
   ({ width, height, getContext: () => ({ drawImage() {} }) });
 
 /**
+ * Installs a document whose createElement yields a blank fake canvas, so the
+ * offscreen-sizing paths run in Node without a DOM.
+ * @returns {() => void} A function that restores the saved document.
+ */
+const installFakeDocument = () => {
+  const savedDocument = globalThis.document;
+  globalThis.document = { createElement: () => fakeCanvas() };
+  return () => { globalThis.document = savedDocument; };
+};
+
+/**
  * Verifies native-resolution capture pins the offscreen buffer to the source's
  * start-time size (rounded up to even) and never resizes it when the source
  * canvas changes mid-recording — so the captured track's frame size is fixed.
  */
 test('native-resolution capture pins the offscreen to the source size at start', () => {
-  const prevDoc = globalThis.document;
-  globalThis.document = { createElement: () => fakeCanvas() };
+  const restore = installFakeDocument();
   try {
     const source = fakeCanvas(201, 101);   // odd dims → rounded up to even
     const rec = new VideoRecorder(source);
@@ -85,7 +95,7 @@ test('native-resolution capture pins the offscreen to the source size at start',
     assert.equal(off2.width, 202);
     assert.equal(off2.height, 102);
   } finally {
-    globalThis.document = prevDoc;
+    restore();
   }
 });
 
@@ -95,8 +105,7 @@ test('native-resolution capture pins the offscreen to the source size at start',
  * (codecs require it), and then pins that buffer against a mid-recording resize.
  */
 test('targetHeight capture scales the offscreen to the target height and pins it', () => {
-  const prevDoc = globalThis.document;
-  globalThis.document = { createElement: () => fakeCanvas() };
+  const restore = installFakeDocument();
   try {
     const source = fakeCanvas(800, 600);   // 4:3 source
     const rec = new VideoRecorder(source);
@@ -115,7 +124,7 @@ test('targetHeight capture scales the offscreen to the target height and pins it
     assert.equal(off2.width, 162);
     assert.equal(off2.height, 122);
   } finally {
-    globalThis.document = prevDoc;
+    restore();
   }
 });
 
@@ -125,8 +134,7 @@ test('targetHeight capture scales the offscreen to the target height and pins it
  * the offscreen falls back to a square at the target height instead.
  */
 test('targetHeight capture falls back to a square when the source aspect is degenerate', () => {
-  const prevDoc = globalThis.document;
-  globalThis.document = { createElement: () => fakeCanvas() };
+  const restore = installFakeDocument();
   try {
     const rec = new VideoRecorder(fakeCanvas(0, 0)); // 0/0 → NaN aspect
     rec.targetHeight = 120;
@@ -134,7 +142,7 @@ test('targetHeight capture falls back to a square when the source aspect is dege
     assert.equal(off.height, 120);
     assert.equal(off.width, 120, 'square fallback, not NaN');
   } finally {
-    globalThis.document = prevDoc;
+    restore();
   }
 });
 
