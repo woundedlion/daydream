@@ -13,11 +13,11 @@
   margin: 0;
 }
 
-/* Keyboard focus ring; the UA default is near-invisible over the dark theme. */
-.effect-button:focus-visible,
-.sort-btn:focus-visible,
-.tab:focus-visible,
-.context-lost-reload:focus-visible {
+/* Keyboard focus ring; the UA default is near-invisible over the dark theme.
+   Unscoped so anything focusable added later inherits it. :where() holds the
+   selector at one-class specificity, so lil-gui's own `outline: none` widgets
+   keep their built-in focus styling. #canvas opts out — see the inset rule. */
+:focus-visible:not(:where(#canvas)) {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
@@ -473,10 +473,10 @@
 
 /* --- Mobile Styles --- */
 /* Page layout follows viewport width. The renderer separately measures its
-   canvas container, so its compact layout may switch at a different time. The
-   desktop query below resumes at 900.02px so a fractional width (page zoom,
-   fractional DPR) still lands in exactly one of the two ranges. */
-@media only screen and (max-width: 900px) {
+   canvas container, so its compact layout may switch at a different time.
+   Range syntax, so a fractional width (page zoom, fractional DPR) still lands
+   in exactly one of this query and the desktop complement below. */
+@media only screen and (width <= 900px) {
   /* Hide entire nav-tabs header on mobile */
   .nav-tabs {
     display: none;
@@ -615,7 +615,7 @@
 }
 
 /* --- Desktop Styles --- */
-@media only screen and (min-width: 900.02px) {
+@media only screen and (width > 900px) {
   .gui-container {
     position: absolute;
     display: flex;
