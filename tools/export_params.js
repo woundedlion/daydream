@@ -9,21 +9,30 @@
 import { formatFloatCpp } from './cpp_format.js';
 
 /**
- * Format the live parameter set as a C++ brace-init list of float literals for
- * pasting into a Presets<> array. Readonly params (engine-written, omitted from
- * hand-authored presets) are skipped so their live per-frame values never bake
- * into a preset. Valid only for effects whose Params is a flat all-float
- * aggregate; effects that interleave non-float members (a solid name, a Palette
- * pointer) produce a list that must be edited by hand to match the struct.
- * @param {Array<{readonly?: boolean}>} params - Parameter definitions, parallel to values.
+ * Format the live parameter set as a C++ brace-init list for pasting into a
+ * Presets<> array. Readonly and non-preset params are skipped. An enum carrying
+ * exportOptions emits the symbolic entry matching its live numeric index; all
+ * other values render as float literals. Effects that interleave unrepresented
+ * non-float members still produce a list that must be edited by hand.
+ * @param {Array<{name?: string, readonly?: boolean, preset?: boolean,
+ *   exportOptions?: Array<string>}>} params - Definitions parallel to values.
  * @param {ArrayLike<number>} values - Live float value per param, same order as params.
  * @returns {string} A C++ brace-init list, e.g. "{ 0.85f, 1.0f }".
  */
 export function formatExportParams(params, values) {
   const items = [];
   for (let i = 0; i < params.length; i++) {
-    if (params[i].readonly) continue;
-    items.push(formatFloatCpp(values[i]));
+    const param = params[i];
+    if (param.readonly || param.preset === false) continue;
+    if (param.exportOptions) {
+      const exportValue = param.exportOptions[values[i]];
+      if (exportValue === undefined) {
+        throw new RangeError(`No export option for ${param.name ?? i} index ${values[i]}`);
+      }
+      items.push(exportValue);
+    } else {
+      items.push(formatFloatCpp(values[i]));
+    }
   }
   return '{ ' + items.join(', ') + ' }';
 }
