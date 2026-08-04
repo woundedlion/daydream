@@ -1,5 +1,6 @@
 {
   "source": "hardware/pov_segment_map.h",
+  "generator": "tools/pov_segment_map_export.cpp",
   "configs": [
     {
       "leds": 288,
