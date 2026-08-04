@@ -38,6 +38,7 @@ const LIL_BODY = '// fixture lil-gui.esm.min.js\n';
 const sri = (body) => `sha384-${createHash('sha384').update(body).digest('base64')}`;
 
 let root;
+let env;
 
 /** Recreates the fixture repo: the script under scripts/, plus package.json and vendor-importmap.js at ROOT. */
 const buildRoot = () => {
@@ -46,13 +47,20 @@ const buildRoot = () => {
   copyFileSync(SCRIPT_SRC, join(root, 'scripts', 'generate-importmap.mjs'));
   writeFileSync(join(root, 'package.json'), PKG);
   writeFileSync(join(root, 'vendor-importmap.js'), IMPORTMAP);
-  execFileSync('git', ['init', '-q'], { cwd: root });
+  execFileSync('git', ['init', '-q'], { cwd: root, env });
   execFileSync('git', ['add', 'scripts/generate-importmap.mjs', 'package.json',
-    'vendor-importmap.js'], { cwd: root });
+    'vendor-importmap.js'], { cwd: root, env });
 };
 
 before(() => {
   root = mkdtempSync(join(tmpdir(), 'importmap-'));
+  env = {
+    ...process.env,
+    // Never read the operator's git config: a global core.excludesFile or
+    // core.hooksPath would steer the fixture's add and ls-files.
+    GIT_CONFIG_GLOBAL: join(root, 'absent-config'),
+    GIT_CONFIG_SYSTEM: join(root, 'absent-config'),
+  };
 });
 
 beforeEach(buildRoot);
@@ -64,7 +72,8 @@ after(() => {
 /** Runs the fixture's script with the given args and returns the rewritten vendor-importmap.js. */
 const run = (...args) => {
   writeFileSync(join(root, 'vendor-importmap.js'), IMPORTMAP);
-  execFileSync(process.execPath, [join(root, 'scripts', 'generate-importmap.mjs'), ...args]);
+  execFileSync(process.execPath, [join(root, 'scripts', 'generate-importmap.mjs'), ...args],
+    { env });
   return readFileSync(join(root, 'vendor-importmap.js'), 'utf8');
 };
 
@@ -73,7 +82,7 @@ const runExpectingFailure = (...args) => {
   writeFileSync(join(root, 'vendor-importmap.js'), IMPORTMAP);
   try {
     execFileSync(process.execPath, [join(root, 'scripts', 'generate-importmap.mjs'), ...args],
-      { stdio: ['ignore', 'ignore', 'pipe'] });
+      { stdio: ['ignore', 'ignore', 'pipe'], env });
   } catch (e) {
     return String(e.stderr);
   }
@@ -100,7 +109,7 @@ const installModules = ({ threeVersion = '0.183.1', lilGuiVersion = '0.21.0' } =
 
   writeFileSync(join(root, 'driver.js'),
     "import { OrbitControls } from 'three/addons/controls/OrbitControls.js';\n");
-  execFileSync('git', ['add', 'driver.js'], { cwd: root });
+  execFileSync('git', ['add', 'driver.js'], { cwd: root, env });
 };
 
 /** Places the vendored entry points the --local probes require under ROOT. */
