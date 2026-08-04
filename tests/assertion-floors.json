@@ -30,7 +30,7 @@
   "tests/recorder.test.js": 200,
   "tests/reference_transaction_hook.test.js": 38,
   "tests/require_tests.test.js": 17,
-  "tests/run_tests.test.js": 19,
+  "tests/run_tests.test.js": 23,
   "tests/segment_controller.test.js": 349,
   "tests/segment_crosscheck.test.js": 212,
   "tests/segment_layout.test.js": 180085,

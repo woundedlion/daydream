@@ -60,6 +60,30 @@ const passing = (cases, asserts) =>
     .join('\n');
 
 /**
+ * Fixture test file source whose whole suite skips, as a platform-gated suite
+ * does when its prerequisite is missing: the cases never run and the file
+ * measures no assertions at all.
+ * @param {number} cases - Cases the suite declares.
+ * @param {number} asserts - Assertions each case would have run.
+ * @returns {string} Module source.
+ */
+const skipping = (cases, asserts) =>
+  [
+    "import { describe, test } from 'node:test';",
+    "import assert from 'node:assert/strict';",
+    "describe('gated', { skip: 'no POSIX sh available' }, () => {",
+  ]
+    .concat(
+      Array.from(
+        { length: cases },
+        (_, i) =>
+          `test('case ${i}', () => {${' assert.ok(true);'.repeat(asserts)} });`,
+      ),
+    )
+    .concat(['});'])
+    .join('\n');
+
+/**
  * Writes the fixture assertion floors, merging overrides over the counts FILES
  * describes. An override of undefined drops the file's floor.
  * @param {Object} [overrides] - Floors replacing the defaults.
@@ -182,6 +206,46 @@ test('a deleted test file falls below its assertion floor', () => {
     runExpectingFailure(PATTERN),
     /tests\/a\.test\.js: 0 ran, floor 6/,
   );
+});
+
+/**
+ * Verifies a suite the platform cannot run is exempt from its floor: it
+ * reported results, so unlike a deleted file it is still there, and a gated
+ * suite asserts nothing by design.
+ */
+test('a wholly skipped suite keeps its assertion floor', () => {
+  const { cases, asserts } = FILES['a.test.js'];
+  writeFileSync(join(root, 'tests', 'a.test.js'), skipping(cases, asserts));
+  const out = run(PATTERN);
+  assert.match(out, /2 assertions across 2 files/);
+  assert.match(out, /wholly skipped:\n {2}tests\/a\.test\.js/);
+});
+
+/** Verifies one skipped case does not exempt the cases that did run. */
+test('a partly skipped file still fails its assertion floor', () => {
+  writeFileSync(
+    join(root, 'tests', 'a.test.js'),
+    [
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "test('gated', { skip: 'no POSIX sh' }, () => { assert.ok(true); });",
+      "test('live', () => {});",
+    ].join('\n'),
+  );
+  assert.match(
+    runExpectingFailure(PATTERN),
+    /tests\/a\.test\.js: 0 ran, floor 6/,
+  );
+});
+
+/** Verifies re-measuring does not retire a skipped file's floor to zero. */
+test('--update-floors keeps a wholly skipped floor', () => {
+  writeFileSync(join(root, 'tests', 'a.test.js'), skipping(2, 3));
+  run('--update-floors', PATTERN);
+  assert.deepEqual(readFloors(), {
+    'tests/a.test.js': 6,
+    'tests/b.test.js': 2,
+  });
 });
 
 /** Verifies a test file with no committed floor is refused, not defaulted. */
