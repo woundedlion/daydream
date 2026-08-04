@@ -605,7 +605,7 @@
       generateRecipeCpp,
       computeInternalAngle,
       snapToStep,
-      isConvexFace,
+      fanTriangulateFace,
       uniqueEdges,
       geodesicSegments,
       geodesicTriangleVertices,
@@ -970,24 +970,10 @@
 
           // Triangulate
           const vertices = [];
-          meshData.faces.forEach(f => {
-            if (isConvexFace(meshData.vertices, f)) {
-              for (let i = 1; i < f.length - 1; i++) {
-                vertices.push(...meshData.vertices[f[0]].toArray());
-                vertices.push(...meshData.vertices[f[i]].toArray());
-                vertices.push(...meshData.vertices[f[i + 1]].toArray());
-              }
-            } else {
-              const centroid = new THREE.Vector3();
-              f.forEach(idx => centroid.add(meshData.vertices[idx]));
-              centroid.divideScalar(f.length);
-              for (let i = 0; i < f.length; i++) {
-                vertices.push(...centroid.toArray());
-                vertices.push(...meshData.vertices[f[i]].toArray());
-                vertices.push(...meshData.vertices[f[(i + 1) % f.length]].toArray());
-              }
-            }
-          });
+          const emitTri = (a, b, c) => {
+            vertices.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+          };
+          meshData.faces.forEach(f => fanTriangulateFace(meshData.vertices, f, emitTri));
           const geo = new THREE.BufferGeometry();
           geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
           geo.computeVertexNormals();
@@ -1952,6 +1938,13 @@
         }
       };
 
+      const emitFlatTri = (a, b, c) => {
+        pushVert(a);
+        pushVert(b);
+        pushVert(c);
+      };
+      const emitTri = state.showGeodesics ? emitSphericalTri : emitFlatTri;
+
       meshData.faces.forEach((f, fi) => {
         if (state.showFaces) {
           if (faceClasses) {
@@ -1959,32 +1952,7 @@
             // the color wheel, so adjacent face groups stay distinguishable.
             classColor.setHSL((faceClasses[fi] * 0.618034) % 1, 0.65, 0.55);
           }
-          // Collect vertices for the triangulated face
-          if (!state.showGeodesics && isConvexFace(meshData.vertices, f)) {
-            for (let i = 1; i < f.length - 1; i++) {
-              pushVert(meshData.vertices[f[0]]);
-              pushVert(meshData.vertices[f[i]]);
-              pushVert(meshData.vertices[f[i + 1]]);
-            }
-          } else {
-            const centroid = new THREE.Vector3();
-            f.forEach(idx => centroid.add(meshData.vertices[idx]));
-            centroid.divideScalar(f.length);
-            if (!state.showGeodesics) {
-              for (let i = 0; i < f.length; i++) {
-                pushVert(centroid);
-                pushVert(meshData.vertices[f[i]]);
-                pushVert(meshData.vertices[f[(i + 1) % f.length]]);
-              }
-            } else {
-              // A corner fan spills outside non-convex star faces.
-              for (let i = 0; i < f.length; i++) {
-                emitSphericalTri(centroid,
-                  meshData.vertices[f[i]],
-                  meshData.vertices[f[(i + 1) % f.length]]);
-              }
-            }
-          }
+          fanTriangulateFace(meshData.vertices, f, emitTri, state.showGeodesics);
         }
 
         if (!state.showNormals) return;
