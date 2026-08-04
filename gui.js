@@ -100,20 +100,23 @@ class DeepLinkGUI {
    * @param {string} [rootNamespace] - Prefix segment for every deep-link key in
    *   this root's subtree (e.g. 'fx', 'view'), keeping independent GUI roots out
    *   of one flat key namespace. Omitted for an unnamespaced (tool-page) root.
+   * @param {DeepLinkGUI} [parent] - Enclosing GUI when this is a sub-folder; a
+   *   child shares its root's URL writer instead of owning one.
    */
-  constructor(options, rootNamespace = null) {
+  constructor(options, rootNamespace = null, parent = null) {
     if (options && options.domElement && options.addFolder) {
       this.gui = options;
     } else {
       this.gui = new LilGUI(options);
     }
     this.rootNamespace = rootNamespace;
-    this.parent = null;
+    this.parent = parent;
     this.folderName = null;
     this.folderIndex = 0;
+    this.keySegment = null;
     this.urlKeys = new Set();
     this.children = [];
-    this.urlWriter = makeUrlParamWriter();
+    this.urlWriter = parent ? parent.urlWriter : makeUrlParamWriter();
   }
 
   /**
@@ -139,21 +142,10 @@ class DeepLinkGUI {
    * @returns {string} The dot-joined param key.
    */
   getKey(prop) {
-    let keys = [prop];
+    const keys = [prop];
     let curr = this;
     while (curr.parent) {
-      // A positional fallback for an empty folder name keeps the level from
-      // collapsing, so two deep links can't collide on a dropped segment.
-      let seg = curr.folderName || `#${curr.folderIndex}`;
-      // Named siblings normally get a stable key from the name alone; append the
-      // index only when a genuine same-name sibling would otherwise collide, so
-      // unique-named folders keep their existing (shared-link-stable) keys.
-      if (curr.folderName &&
-          curr.parent.children.filter((c) => c.folderName === curr.folderName)
-            .length > 1) {
-        seg = `${curr.folderName}#${curr.folderIndex}`;
-      }
-      keys.unshift(seg);
+      keys.unshift(curr.keySegment);
       curr = curr.parent;
     }
     if (curr.rootNamespace) keys.unshift(curr.rootNamespace);
@@ -320,11 +312,18 @@ class DeepLinkGUI {
    */
   addFolder(name) {
     const folder = this.gui.addFolder(name);
-    const wrapped = new DeepLinkGUI(folder);
-    wrapped.parent = this;
+    const wrapped = new DeepLinkGUI(folder, null, this);
     wrapped.folderName = name;
     wrapped.folderIndex = this.children.length;
-    wrapped.urlWriter = this.urlWriter;
+    // Fixed here rather than at add() time so a folder's controls can never
+    // split across two naming schemes when a same-name sibling appears later.
+    // A positional segment for an empty name keeps the level from collapsing;
+    // the first claimant of a name keeps the bare segment, so unique-named
+    // folders hold their existing (shared-link-stable) keys.
+    const duplicate = this.children.some((c) => c.folderName === name);
+    wrapped.keySegment = name
+      ? (duplicate ? `${name}#${wrapped.folderIndex}` : name)
+      : `#${wrapped.folderIndex}`;
     this.children.push(wrapped);
     return wrapped;
   }
