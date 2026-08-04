@@ -417,6 +417,25 @@ test('DeepLinkGUI namespaces deep-link keys per root', () => {
 });
 
 /**
+ * A folder's key prefix is fixed when the folder is created, so controls added
+ * before and after a later same-name sibling appears share one scheme instead of
+ * splitting the folder's deep links across two key spellings.
+ */
+test('DeepLinkGUI keeps a folder key prefix stable across a later same-name sibling', () => {
+  installWindow('');
+  const root = new DeepLinkGUI({ autoPlace: false });
+  const first = root.addFolder('Shape');
+  first.add({ sides: 3 }, 'sides', 0, 10);
+
+  const second = root.addFolder('Shape');
+  second.add({ sides: 4 }, 'sides', 0, 10);
+  first.add({ glow: false }, 'glow');
+
+  assert.deepEqual(first.collectUrlKeys(), ['Shape.sides', 'Shape.glow']);
+  assert.deepEqual(second.collectUrlKeys(), ['Shape#1.sides']);
+});
+
+/**
  * Verifies the tool-page fallback writer (no active URLSync) merges, not
  * overwrites, params changed within the debounce window: two keys set before
  * the shared timer fires must both reach the URL so neither is lost from the
