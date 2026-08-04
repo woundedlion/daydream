@@ -172,13 +172,30 @@ function setEngineParam(name, value) {
   }
 }
 
-/** @param {string|null} message */
+const APPLY_NOTICE_MS = 8000;
+let applyNoticeTimer = null;
+
+/**
+ * Show or clear the parameter-rejection notice. The notice self-clears so a
+ * stale rejection cannot outlive the action that raised it.
+ * @param {string|null} message - Text to announce, or null to clear.
+ * @returns {void}
+ */
 function showApplyNotice(message) {
-  const notice = document.getElementById('apply-notice');
-  if (!notice) return;
-  notice.textContent = message ?? '';
-  notice.hidden = !message;
+  const body = document.getElementById('apply-notice-body');
+  const text = document.getElementById('apply-notice-text');
+  if (!body || !text) return;
+  clearTimeout(applyNoticeTimer);
+  applyNoticeTimer = null;
+  text.textContent = message ?? '';
+  body.hidden = !message;
+  if (message) {
+    applyNoticeTimer = setTimeout(() => showApplyNotice(null), APPLY_NOTICE_MS);
+  }
 }
+
+document.getElementById('apply-notice-dismiss')
+  ?.addEventListener('click', () => showApplyNotice(null));
 
 /**
  * Name a ParamSetResult enum value for logging.
@@ -609,7 +626,7 @@ appTeardown = createAppTeardown({
     ["unhandledrejection", onUnhandledRejection],
   ],
   switches,
-  stopTimers: stopTestAllTicker,
+  stopTimers: () => { stopTestAllTicker(); showApplyNotice(null); },
   effectGui,
   globalGui: guiInstance,
   host,

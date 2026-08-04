@@ -244,11 +244,22 @@
   word-break: break-word;
 }
 
+/* Permanently mounted live region: only its body comes and goes, so a message
+   is announced as an insertion into a region already in the accessibility tree. */
 .apply-notice {
   position: absolute;
   top: 12px;
-  left: 50%;
+  left: 0;
+  right: 0;
   z-index: 90;
+  display: flex;
+  justify-content: center;
+}
+
+.apply-notice-body {
+  display: flex;
+  gap: 8px;
+  align-items: center;
   max-width: min(90%, 640px);
   padding: 8px 12px;
   border: 1px solid #e66;
@@ -258,7 +269,21 @@
   font-family: var(--ui-font);
   font-size: 13px;
   text-align: center;
-  transform: translateX(-50%);
+}
+
+.apply-notice-body[hidden] {
+  display: none;
+}
+
+.apply-notice-dismiss {
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: #eee;
+  font-family: var(--ui-font);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 /* Reload button on the GPU context-lost overlay (reuses .loading-overlay.error). */
