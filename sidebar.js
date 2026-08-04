@@ -4,6 +4,7 @@
  */
 
 import { sortItems, navTargetIndex, scrollArrowState } from "./sidebar_logic.js";
+import { formatKB } from "./tools/kb_format.js";
 
 /**
  * Self-contained sidebar managing the effect list, sort controls, and keyboard navigation.
@@ -128,7 +129,7 @@ export class EffectSidebar {
       if (size > 0) {
         const sizeSpan = document.createElement('span');
         sizeSpan.className = 'effect-size';
-        sizeSpan.textContent = `${(size / 1024).toFixed(1)} KB`;
+        sizeSpan.textContent = `${formatKB(size)} KB`;
         btn.appendChild(sizeSpan);
       }
 

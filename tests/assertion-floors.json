@@ -79,6 +79,10 @@
     "cases": 17,
     "assertions": 68
   },
+  "tests/kb_format.test.js": {
+    "cases": 5,
+    "assertions": 10
+  },
   "tests/label_pool.test.js": {
     "cases": 5,
     "assertions": 21

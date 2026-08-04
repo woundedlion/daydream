@@ -10,6 +10,7 @@
  * testable without a Worker and the controller without a DOM.
  */
 import { SLOW_FRAME_MS } from "./frame_constants.js";
+import { formatKB } from "./tools/kb_format.js";
 
 // Sentinel segIds for pool-wide faults with no single worker to blame:
 // FAULT_POOL for a module-load/init timeout, FAULT_RENDER for a render-watchdog
@@ -119,7 +120,6 @@ export class SegmentStatsView {
       return;
     }
 
-    const fmtKB = (x) => (x / 1024).toFixed(1);
     const numSegs = state.count;
 
     // Build the table once; rebuild only on a segment-count change or after the
@@ -144,9 +144,9 @@ export class SegmentStatsView {
       c.compute.className = timing > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
 
       const a = state.arenas[s];
-      c.scrA.textContent = a ? fmtKB(a.scratch_arena_a.high_water_mark) : '-';
-      c.scrB.textContent = a ? fmtKB(a.scratch_arena_b.high_water_mark) : '-';
-      c.persist.textContent = a ? fmtKB(a.persistent_arena.usage) : '-';
+      c.scrA.textContent = a ? formatKB(a.scratch_arena_a.high_water_mark) : '-';
+      c.scrB.textContent = a ? formatKB(a.scratch_arena_b.high_water_mark) : '-';
+      c.persist.textContent = a ? formatKB(a.persistent_arena.usage) : '-';
     }
 
     cells.maxTime.textContent = `${maxTime.toFixed(1)} ms`;
