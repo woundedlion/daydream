@@ -54,6 +54,7 @@ tools/kb_format.js
 tools/lissajous_math.js
 tools/mobius_transforms.js
 tools/page_lifecycle.js
+tools/palette_canvas.js
 tools/palette_controls.js
 tools/palette_math.js
 tools/shared.js
@@ -61,6 +62,7 @@ tools/slider.js
 tools/solid_codegen.js
 tools/solid_op_rows.js
 tools/solid_registry_codegen.js
+tools/solid_render.js
 
 # Documentation the deploy gate pins to the engine checkout.
 README.md
