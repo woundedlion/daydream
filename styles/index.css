@@ -227,7 +227,7 @@
   }
 }
 
-/* Error state when the WASM engine fails to load (see daydream.js init catch). */
+/* Error state when the WASM engine fails to load (see bootstrap.js showBootstrapFailure). */
 .loading-overlay.error {
   color: #e66;
 }
