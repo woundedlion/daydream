@@ -62,6 +62,23 @@ export function parseUrlBoolean(raw) {
 export const URL_FLUSH_DEBOUNCE_MS = 200;
 
 /**
+ * Replace the current history entry with a URL, reporting a refused write
+ * instead of propagating it.
+ * @details Browsers rate-limit replaceState (WebKit: ~100 per 30 s) and throw
+ *   past the limit. Every URL write is cosmetic, so a throw must not escape into
+ *   an apply or rollback path that would read it as a state failure.
+ * @param {string} url - The URL to write.
+ * @returns {void}
+ */
+export function replaceUrl(url) {
+  try {
+    window.history.replaceState({}, '', url);
+  } catch (e) {
+    console.warn('URL update skipped:', e);
+  }
+}
+
+/**
  * The single assembly point for every deep-link URL write: replaceState with
  * pathname + query + the existing location.hash, which rebuilding from pathname
  * alone would drop.
@@ -71,7 +88,7 @@ export const URL_FLUSH_DEBOUNCE_MS = 200;
 export function writeUrl(params) {
   const qs = params.toString();
   const base = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-  window.history.replaceState({}, '', base + window.location.hash);
+  replaceUrl(base + window.location.hash);
 }
 
 /**
@@ -217,6 +234,7 @@ export class URLSync {
     this.timer = null;
     this.disposed = false;
     this.adhoc = new Map(); // GUI-set params (key -> string), merged on flush
+    this.pendingReset = null; // reset()'s excluded keys, applied by the next flush
 
     const params = new URLSearchParams(window.location.search);
     const patch = {};
@@ -334,35 +352,22 @@ export class URLSync {
   }
 
   /**
-   * Clears every URL param except the excluded keys, writing immediately.
-   * Re-asserts current tracked-key state and surviving ad-hoc writes so an
-   * in-flight (cancelled) flush does not lose a fresh value.
+   * Clears every URL param except the excluded keys, on the same debounced flush
+   * every other write takes. Tracked-key state and surviving ad-hoc writes are
+   * re-asserted by that flush, so a value set inside the window is not lost.
+   * @details Debounced rather than immediate because an effect switch calls this
+   *   on every change: writing here would let a burst of switches spend the
+   *   browser's replaceState budget on its own.
    * @param {string[]} excludedKeys - Param names to preserve through the reset.
    * @returns {void}
    */
   reset(excludedKeys = []) {
-    clearTimeout(this.timer);
-    this.timer = null;
     const excl = new Set(excludedKeys);
     for (const k of [...this.adhoc.keys()]) {
       if (!excl.has(k)) this.adhoc.delete(k);
     }
-    const params = new URLSearchParams(window.location.search);
-    for (const k of [...params.keys()]) {
-      if (!excl.has(k)) params.delete(k);
-    }
-    // Re-assert tracked state and surviving ad-hoc writes: clearing this.timer
-    // cancelled any flush for a change made within the debounce window.
-    for (const key of this.trackedKeys) {
-      const val = this.state.get(key);
-      if (val !== null && val !== undefined) this.setTrackedParam(params, key, val);
-    }
-    for (const [key, val] of this.adhoc) {
-      if (val === null) params.delete(key);
-      else params.set(key, val);
-    }
-    writeUrl(params);
-    this.adhoc.clear();
+    this.pendingReset = excl;
+    this.schedule();
   }
 
   /**
@@ -403,6 +408,12 @@ export class URLSync {
    */
   flush() {
     const params = new URLSearchParams(window.location.search);
+    if (this.pendingReset) {
+      for (const k of [...params.keys()]) {
+        if (!this.pendingReset.has(k)) params.delete(k);
+      }
+      this.pendingReset = null;
+    }
     for (const key of this.trackedKeys) {
       const val = this.state.get(key);
       // A cleared tracked key drops its param; leaving it would re-seed the

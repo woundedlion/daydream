@@ -26,7 +26,7 @@ import {
   createUnhandledRejectionHandler,
   repointDisplayAliases,
 } from "./app_lifecycle.js";
-import { AppState, URLSync } from "./state.js";
+import { AppState, URLSync, replaceUrl } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
 import { SegmentController, warmModules } from "./segment_controller.js";
 import { EngineHost } from "./engine_host.js";
@@ -414,7 +414,7 @@ const switches = createSwitchCoordinator({
   applyResolution: (preserveParams) => apply.applyResolution(preserveParams),
   currentUrl: () =>
     window.location.pathname + window.location.search + window.location.hash,
-  restoreUrl: (url) => window.history.replaceState({}, '', url),
+  restoreUrl: replaceUrl,
   showResolution: (resolution) => resolutionController.setValue(resolution),
   syncResolutionUrl: () => urlSync.schedule(),
   logError: (message, error) => console.error(message, error),
