@@ -129,12 +129,26 @@ function blitSegmentRect(canvas, compact, canvasW, rect, gather) {
   }
 }
 
-/** Extract rect from the full canvas into a compact per-segment buffer. */
+/**
+ * Extract rect from the full canvas into a compact per-segment buffer.
+ * @param {Uint16Array} canvas - Full canvas buffer (W*H*3, row stride canvasW*3).
+ * @param {Uint16Array} compact - Packed segment buffer ((x1-x0)*(y1-y0)*3).
+ * @param {number} canvasW - Canvas width in pixels.
+ * @param {{x0:number,x1:number,y0:number,y1:number}} rect - Sub-rectangle to move.
+ * @returns {void}
+ */
 export function extractSegment(canvas, compact, canvasW, rect) {
   blitSegmentRect(canvas, compact, canvasW, rect, true);
 }
 
-/** Composite a compact per-segment buffer back into the full canvas. */
+/**
+ * Composite a compact per-segment buffer back into the full canvas.
+ * @param {Uint16Array} canvas - Full canvas buffer (W*H*3, row stride canvasW*3).
+ * @param {Uint16Array} compact - Packed segment buffer ((x1-x0)*(y1-y0)*3).
+ * @param {number} canvasW - Canvas width in pixels.
+ * @param {{x0:number,x1:number,y0:number,y1:number}} rect - Sub-rectangle to move.
+ * @returns {void}
+ */
 export function compositeSegment(canvas, compact, canvasW, rect) {
   blitSegmentRect(canvas, compact, canvasW, rect, false);
 }
@@ -152,6 +166,7 @@ export function compositeSegment(canvas, compact, canvasW, rect) {
  * @returns {void}
  */
 export function stampBoundaries(canvas, canvasW, canvasH, xs, ys) {
+  /** @param {number} idx - Buffer index of the pixel's red component. */
   const plotCyan = (idx) => {
     canvas[idx]     = 0;
     canvas[idx + 1] = 65535;

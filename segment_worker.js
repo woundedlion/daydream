@@ -17,6 +17,9 @@ import { PROTOCOL_VERSION } from "./worker_protocol.js";
 /** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
 /** @typedef {import('./worker_protocol.js').ControllerInboundMsg} ControllerInboundMsg */
 /** @typedef {import('./worker_protocol.js').SegArenaMetrics} SegArenaMetrics */
+/** @typedef {import('./segment_layout.js').SegRange} SegRange */
+/** @typedef {import('./holosphere_wasm.js').HolosphereModule} HolosphereModule */
+/** @typedef {import('./holosphere_wasm.js').HolosphereEngine} HolosphereEngine */
 
 /**
  * Send a protocol message back to the controller. The dedicated-worker global's
@@ -35,13 +38,16 @@ const post = /** @type {(msg: ControllerInboundMsg, transfer?: Transferable[]) =
 // missing/renamed glue file; a failed module fetch never runs this line.
 post({ type: 'booted', version: PROTOCOL_VERSION });
 
+/** @type {HolosphereModule | null} */
 let wasmModule = null;
+/** @type {HolosphereEngine | null} */
 let engine = null;
 let segId = 0;
 let totalSegs = 1;
 let canvasW = 0;
 let canvasH = 0;
-let segRange = null; // { x0, x1, y0, y1, w, h }
+/** @type {SegRange | null} */
+let segRange = null;
 let arenaMetricsWarned = false;
 
 /**
@@ -57,7 +63,8 @@ let arenaMetricsWarned = false;
  * @returns {boolean} Whether the engine accepted the clip.
  */
 function applyClip() {
-  if (!engine || !segRange) return false;
+  // wasmModule is non-null whenever engine is — the engine is built from it.
+  if (!wasmModule || !engine || !segRange) return false;
   const result = engine.setClip(segRange.x0, segRange.x1, segRange.y0, segRange.y1);
   if (result === wasmModule.ClipSetResult.INVALID_BOUNDS) {
     post({
@@ -100,10 +107,11 @@ async function handleMessage(msg) {
 
       // Every segment runs a full engine replica, so engine logs would print
       // once per worker; only segment 0 logs. printErr stays live everywhere.
-      wasmModule = await createHolosphereModule(segId === 0 ? {} : {
+      const mod = await createHolosphereModule(segId === 0 ? {} : {
         print: () => {},
       });
-      engine = new wasmModule.HolosphereEngine();
+      wasmModule = mod;
+      engine = new mod.HolosphereEngine();
       // A rejected resolution leaves no usable geometry: skip the canvasW/canvasH
       // commit, segRange, and ready (symmetric with the setResolution handler's
       // `=== false` guard), and post engineRejected so the controller faults at once

@@ -35,6 +35,26 @@ export const FAULT_RENDER = -2;
  * }} SegmentStatsState
  */
 
+/**
+ * The cells one segment's row repaint writes.
+ * @typedef {{
+ *   range: HTMLTableCellElement,
+ *   compute: HTMLTableCellElement,
+ *   scrA: HTMLTableCellElement,
+ *   scrB: HTMLTableCellElement,
+ *   persist: HTMLTableCellElement,
+ * }} SegmentRowCells
+ */
+
+/**
+ * Every cell a repaint mutates, cached from the built table.
+ * @typedef {{
+ *   rows: SegmentRowCells[],
+ *   maxTime: HTMLTableCellElement,
+ *   wallTime: HTMLTableCellElement,
+ * }} SegmentStatsCells
+ */
+
 export class SegmentStatsView {
   /**
    * @param {Document} [doc] - Document the overlay renders into; defaults to the global `document`.
@@ -44,7 +64,7 @@ export class SegmentStatsView {
     /** @type {HTMLTableElement | null} */
     this.statsTable = null;
     this.statsSegCount = 0;   // segment count the cached table was built for
-    /** @type {{ rows: any[], maxTime: HTMLElement, wallTime: HTMLElement } | null} */
+    /** @type {SegmentStatsCells | null} */
     this.statsCells = null;
   }
 
@@ -124,12 +144,12 @@ export class SegmentStatsView {
 
     // Build the table once; rebuild only on a segment-count change or after the
     // fault overlay tore it down.
-    if (!this.statsTable || this.statsSegCount !== numSegs
+    let cells = this.statsCells;
+    if (!cells || !this.statsTable || this.statsSegCount !== numSegs
         || this.statsTable.parentNode !== el) {
-      this.buildStatsTable(numSegs, el);
+      cells = this.buildStatsTable(numSegs, el);
     }
 
-    const cells = this.statsCells;
     // Derive maxTime over numSegs, not the whole timings array, so a stale tail
     // entry can't outrank the live segments.
     let maxTime = 0;
@@ -160,17 +180,23 @@ export class SegmentStatsView {
    * than an innerHTML re-parse.
    * @param {number} numSegs - Number of segment rows to build.
    * @param {HTMLElement} el - Container element the table is mounted into.
-   * @returns {void}
+   * @returns {SegmentStatsCells} The cached cell references.
    */
   buildStatsTable(numSegs, el) {
     const table = this.doc.createElement('table');
+    /** @param {string} text - Header label. */
     const th = (text) => { const e = this.doc.createElement('th'); e.textContent = text; return e; };
+    /**
+     * @param {string} [text] - Cell text; left untouched when omitted.
+     * @param {string} [className] - Class to set when non-empty.
+     */
     const td = (text, className) => {
       const e = this.doc.createElement('td');
       if (className) e.className = className;
       if (text !== undefined) e.textContent = text;
       return e;
     };
+    /** @param {HTMLTableCellElement[]} cells - Cells of the new row, in order. */
     const mkRow = (cells) => {
       const tr = this.doc.createElement('tr');
       for (const c of cells) tr.appendChild(c);
@@ -205,5 +231,6 @@ export class SegmentStatsView {
     this.statsTable = table;
     this.statsSegCount = numSegs;
     this.statsCells = { rows, maxTime, wallTime };
+    return this.statsCells;
   }
 }

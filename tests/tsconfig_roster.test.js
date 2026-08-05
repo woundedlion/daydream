@@ -78,6 +78,15 @@ test('the typecheck roster lists no module that has gone away', () => {
   }
 });
 
+test('the typecheck checks nullability and implicit any', () => {
+  const options = readTsconfig().compilerOptions;
+  assert.equal(options.strictNullChecks, true,
+    'the roster exists to catch drift in the postMessage payloads; with '
+    + 'strictNullChecks off a null field reads as its own type and nothing trips');
+  assert.equal(options.noImplicitAny, true,
+    'an unannotated parameter degrades to `any` and stops checking its callers');
+});
+
 test('the typecheck roster stays inside its stated scope', () => {
   for (const file of readTsconfig().files) {
     assert.ok(!file.startsWith('tests/'),
