@@ -6,10 +6,11 @@
 /**
  * The composition root's frame, timer, and teardown wiring: the display-buffer
  * aliases every renderer writes through, the per-frame adapter the driver calls,
- * the Test All walk, the segmented pool's spawn epoch, and the dispose path a
- * page discard runs. Every collaborator is injected, so the alias heal, the
- * segmented/single-engine frame split, the spawn protocol, and the teardown order
- * are unit-testable without Three.js, a WASM engine, or a browser.
+ * the Test All walk, the shared notice element, the segmented pool's spawn epoch,
+ * and the dispose path a page discard runs. Every collaborator is injected, so
+ * the alias heal, the segmented/single-engine frame split, the spawn protocol,
+ * the notice ownership, and the teardown order are unit-testable without
+ * Three.js, a WASM engine, or a browser.
  */
 
 /**
@@ -326,6 +327,61 @@ export function createTestAllTicker({
       handle = null;
     },
     running: () => handle !== null,
+  };
+}
+
+// Dwell time before a notice self-clears, so a stale rejection cannot outlive
+// the action that raised it.
+const APPLY_NOTICE_MS = 8000;
+
+/**
+ * Build the page's notice sink over the shared apply-notice element.
+ *
+ * Several subsystems announce through that one element, so every write names an
+ * owner: raising takes the element over, but a clear lands only when the caller
+ * owns the notice on screen. A parameter write during a slider drag therefore
+ * leaves a switch rejection standing instead of erasing the only explanation the
+ * user was given. The element references are resolved once, at construction.
+ *
+ * @param {Object} deps - Injected app collaborators.
+ * @param {Object} deps.doc - Document holding the notice elements.
+ * @param {number} [deps.timeoutMs] - Dwell time before a notice self-clears.
+ * @param {(fn: Function, ms: number) => *} [deps.schedule] - Timer source.
+ * @param {(handle: *) => void} [deps.cancel] - Timer sink.
+ * @returns {{show: (message: string|null, owner: string) => void,
+ *   clear: () => void, owner: () => string|null}} The sink. clear() drops the
+ *   notice whoever raised it, for the dismiss button and the page teardown;
+ *   owner() reports who holds the element.
+ */
+export function createApplyNotice({
+  doc,
+  timeoutMs = APPLY_NOTICE_MS,
+  schedule = (fn, ms) => setTimeout(fn, ms),
+  cancel = (handle) => clearTimeout(handle),
+}) {
+  const body = doc.getElementById('apply-notice-body');
+  const text = doc.getElementById('apply-notice-text');
+  let handle = null;
+  let held = null;
+
+  const write = (notice, owner) => {
+    if (!body || !text) return;
+    if (handle !== null) cancel(handle);
+    handle = null;
+    held = notice === null ? null : owner;
+    text.textContent = notice ?? '';
+    body.hidden = notice === null;
+    if (notice !== null) handle = schedule(() => write(null, owner), timeoutMs);
+  };
+
+  return {
+    show(message, owner) {
+      const notice = message || null;
+      if (notice === null && held !== null && held !== owner) return;
+      write(notice, owner);
+    },
+    clear: () => write(null, null),
+    owner: () => held,
   };
 }
 

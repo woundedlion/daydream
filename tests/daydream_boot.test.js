@@ -66,6 +66,21 @@ test('the teardown is retained and reachable from the module-load handlers', () 
     'the handlers must read the teardown lazily; it is built after them');
 });
 
+test('the param writer and the switch coordinator own the notice separately', () => {
+  const consequence = 'both announce through the one notice element, so each '
+    + 'must tag its writes with an owner of its own; sharing a tag lets a slider '
+    + 'nudge clear a switch rejection';
+  assert.match(SOURCE, /applyNotice\.show\(message, PARAM_NOTICE\)/, consequence);
+  assert.match(SOURCE, /applyNotice\.show\(null, PARAM_NOTICE\)/, consequence);
+  assert.match(SOURCE, /showNotice:\s*\(message\)\s*=>\s*applyNotice\.show\(message, SWITCH_NOTICE\)/,
+    consequence);
+  assert.notEqual(
+    SOURCE.match(/PARAM_NOTICE = '([^']*)'/)?.[1],
+    SOURCE.match(/SWITCH_NOTICE = '([^']*)'/)?.[1],
+    'the two owner tags must differ',
+  );
+});
+
 test('the discard path frees an engine built after disposal', () => {
   const body = wasmReadyBlock();
   assert.match(body, /discardStartup:/,

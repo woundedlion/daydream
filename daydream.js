@@ -19,6 +19,7 @@ import {
 import { createEffectGui } from "./effect_gui.js";
 import {
   createAppTeardown,
+  createApplyNotice,
   createGlobalKeydownHandler,
   createModuleLoadHandlers,
   createPoleLodBinding,
@@ -157,6 +158,13 @@ function clearEffectParamUrl() {
   resetGUI(['resolution', 'effect', ...guiInstance.collectUrlKeys()]);
 }
 
+const applyNotice = createApplyNotice({ doc: document });
+
+// Owner tags for the shared notice element: a parameter write clears only its
+// own message, leaving a switch rejection standing.
+const PARAM_NOTICE = 'param';
+const SWITCH_NOTICE = 'switch';
+
 /**
  * Write one parameter value to the main engine. setParameter returns a
  * Module.ParamSetResult enum value; compare against the enum, never by
@@ -170,36 +178,14 @@ function setEngineParam(name, value) {
   if (result !== host.module.ParamSetResult.APPLIED) {
     const message = `Parameter "${name}" was rejected: ${paramSetResultName(result)}.`;
     console.warn(message);
-    showApplyNotice(message);
+    applyNotice.show(message, PARAM_NOTICE);
   } else {
-    showApplyNotice(null);
-  }
-}
-
-const APPLY_NOTICE_MS = 8000;
-let applyNoticeTimer = null;
-
-/**
- * Show or clear the parameter-rejection notice. The notice self-clears so a
- * stale rejection cannot outlive the action that raised it.
- * @param {string|null} message - Text to announce, or null to clear.
- * @returns {void}
- */
-function showApplyNotice(message) {
-  const body = document.getElementById('apply-notice-body');
-  const text = document.getElementById('apply-notice-text');
-  if (!body || !text) return;
-  clearTimeout(applyNoticeTimer);
-  applyNoticeTimer = null;
-  text.textContent = message ?? '';
-  body.hidden = !message;
-  if (message) {
-    applyNoticeTimer = setTimeout(() => showApplyNotice(null), APPLY_NOTICE_MS);
+    applyNotice.show(null, PARAM_NOTICE);
   }
 }
 
 document.getElementById('apply-notice-dismiss')
-  ?.addEventListener('click', () => showApplyNotice(null));
+  ?.addEventListener('click', () => applyNotice.clear());
 
 /**
  * Name a ParamSetResult enum value for logging.
@@ -421,7 +407,7 @@ const switches = createSwitchCoordinator({
   showResolution: (resolution) => resolutionController.setValue(resolution),
   syncResolutionUrl: () => urlSync.schedule(),
   logError: (message, error) => console.error(message, error),
-  showNotice: showApplyNotice,
+  showNotice: (message) => applyNotice.show(message, SWITCH_NOTICE),
   showFatal: showFatalError,
 });
 
@@ -620,7 +606,7 @@ appTeardown = createAppTeardown({
     ["unhandledrejection", onUnhandledRejection],
   ],
   switches,
-  stopTimers: () => { testAllTicker.stop(); showApplyNotice(null); },
+  stopTimers: () => { testAllTicker.stop(); applyNotice.clear(); },
   effectGui,
   globalGui: guiInstance,
   host,
