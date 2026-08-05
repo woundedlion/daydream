@@ -63,6 +63,15 @@ export const RENDER_WATCHDOG_MS = 5000;
 export const MAX_BOOT_RETRIES = 3;
 export const BOOT_RETRY_DELAY_MS = 250;
 
+// Minimum spacing between two actual warms. lil-gui fires onChange per drag
+// step, so the segment-count slider calls warmModules() several times a second;
+// each of those revalidates the whole module graph.
+export const WARM_INTERVAL_MS = 10000;
+
+let lastWarmAt = -Infinity;
+/** @type {Promise<void>} */
+let lastWarm = Promise.resolve();
+
 /**
  * Render a thrown value as a fault message detail.
  * @param {unknown} error - The caught value.
@@ -92,28 +101,37 @@ function unrefTimer(timer) {
  * the interactive enable path (the primary trigger); a no-op outside a web origin
  * (e.g. under the file://-based unit tests) and swallows all failures — the boot
  * auto-retry is the actual guarantee, this only lowers the odds.
- * @param {{fetch?: typeof globalThis.fetch, baseUrl?: string|URL}} [dependencies]
+ * @details The artifacts are served unversioned, so freshness rests on
+ * revalidation: `cache: 'no-cache'` re-fetches a rebuilt binary and costs a 304
+ * for an unchanged one, where a reload always re-pulls all 1.8 MB. A call within
+ * `minIntervalMs` of the last warm reuses that warm's promise.
+ * @param {{fetch?: typeof globalThis.fetch, baseUrl?: string|URL, minIntervalMs?: number}} [dependencies]
  * @returns {Promise<void>}
  */
 export function warmModules({
   fetch: fetchResource = globalThis.fetch,
   baseUrl = import.meta.url,
+  minIntervalMs = WARM_INTERVAL_MS,
 } = {}) {
   if (typeof fetchResource !== 'function') return Promise.resolve();
   let probe;
   try { probe = new URL('./holosphere_wasm.js', baseUrl); }
   catch { return Promise.resolve(); }
   if (probe.protocol !== 'http:' && probe.protocol !== 'https:') return Promise.resolve();
+  const now = Date.now();
+  if (now - lastWarmAt < minIntervalMs) return lastWarm;
+  lastWarmAt = now;
   const urls = [
     './segment_worker.js',
     './holosphere_wasm.js',
     './holosphere_wasm.wasm',
   ];
   // fetch resolves at the headers; the body must be drained or nothing is cached.
-  return Promise.allSettled(
-    urls.map((u) => fetchResource(new URL(u, baseUrl), { cache: 'reload' })
+  lastWarm = Promise.allSettled(
+    urls.map((u) => fetchResource(new URL(u, baseUrl), { cache: 'no-cache' })
       .then((r) => r.arrayBuffer())),
   ).then(() => {});
+  return lastWarm;
 }
 
 /** @typedef {import('./worker_protocol.js').WorkerInboundMsg} WorkerInboundMsg */
