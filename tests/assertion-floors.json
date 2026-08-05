@@ -20,8 +20,8 @@
     "assertions": 15
   },
   "tests/color_parity_wasm.test.js": {
-    "cases": 17,
-    "assertions": 2095
+    "cases": 19,
+    "assertions": 2480
   },
   "tests/cpp_format.test.js": {
     "cases": 13,
@@ -57,7 +57,7 @@
   },
   "tests/engine_source_parity.test.js": {
     "cases": 4,
-    "assertions": 134,
+    "assertions": 138,
     "skippable": true
   },
   "tests/export_params.test.js": {
@@ -114,11 +114,12 @@
   },
   "tests/palette_math.test.js": {
     "cases": 24,
-    "assertions": 5739
+    "assertions": 5857
   },
   "tests/param_sync.test.js": {
     "cases": 29,
-    "assertions": 52  },
+    "assertions": 52
+  },
   "tests/pixel_view.test.js": {
     "cases": 10,
     "assertions": 25
@@ -140,12 +141,12 @@
     "assertions": 28
   },
   "tests/segment_controller.test.js": {
-    "cases": 87,
-    "assertions": 427
+    "cases": 88,
+    "assertions": 429
   },
   "tests/segment_crosscheck.test.js": {
     "cases": 4,
-    "assertions": 212
+    "assertions": 290
   },
   "tests/segment_layout.test.js": {
     "cases": 13,
@@ -160,8 +161,8 @@
     "assertions": 118
   },
   "tests/shared.test.js": {
-    "cases": 10,
-    "assertions": 50
+    "cases": 15,
+    "assertions": 60
   },
   "tests/sidebar.test.js": {
     "cases": 10,
@@ -177,15 +178,15 @@
   },
   "tests/site_manifest.test.js": {
     "cases": 3,
-    "assertions": 540
+    "assertions": 546
   },
   "tests/slider.test.js": {
     "cases": 15,
     "assertions": 45
   },
   "tests/solid_codegen.test.js": {
-    "cases": 73,
-    "assertions": 391
+    "cases": 79,
+    "assertions": 435
   },
   "tests/solid_op_rows.test.js": {
     "cases": 9,
