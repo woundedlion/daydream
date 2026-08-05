@@ -126,6 +126,11 @@ function fakeClipboard(failure = null) {
 /**
  * Build the module under test over doubles for every collaborator.
  * @param {Object} [options] - Engine/page state the panel reads.
+ * @param {(p: Object) => boolean} [options.pausesOnWrite] - The engine's implicit
+ *   pause rule, applied by the setEngineParam double: which parameter writes
+ *   leave the engine reporting paused animations.
+ * @param {boolean} [options.pauseAccessor] - False models a module that does not
+ *   export getAnimationsPaused.
  * @returns {Object} The panel plus the doubles and sinks a test asserts on.
  */
 function makeHarness({
@@ -138,6 +143,8 @@ function makeHarness({
   isMobile = false,
   container = fakeElement('div'),
   hydrated = {},
+  pausesOnWrite = (p) => Boolean(p.animated),
+  pauseAccessor = true,
 } = {}) {
   const state = {
     generation,
@@ -152,6 +159,9 @@ function makeHarness({
   const warnings = [];
   const guis = [];
   const dragTarget = fakeElement('window');
+  // Engine double: owns the animation-pause state the panel now reads back,
+  // driven by the same two writes the real engine drives it with.
+  const engine = { paused: false };
 
   const panel = createEffectGui({
     createGui: () => { const gui = fakeGui(hydrated); guis.push(gui); return gui; },
@@ -160,9 +170,17 @@ function makeHarness({
     segmentsOwnDisplay: () => state.ownsDisplay,
     segmentParamValues: () => state.segmentValues,
     engineParamValues: () => state.engineValues,
-    setEngineParam: (name, value) => writes.push(`engine:${name}=${value}`),
+    setEngineParam: (name, value) => {
+      writes.push(`engine:${name}=${value}`);
+      const p = params.find((d) => d.name === name);
+      if (p && pausesOnWrite(p)) engine.paused = true;
+    },
     setWorkerParam: (name, value) => writes.push(`worker:${name}=${value}`),
-    setAnimationsPaused: (paused) => writes.push(`paused:${paused}`),
+    setAnimationsPaused: (paused) => {
+      writes.push(`paused:${paused}`);
+      engine.paused = paused;
+    },
+    engineAnimationsPaused: () => (pauseAccessor ? engine.paused : undefined),
     applyEffect: () => writes.push('applyEffect'),
     guiContainer: () => state.container,
     activeElement: () => state.activeElement,
@@ -172,7 +190,7 @@ function makeHarness({
     logWarn: (...args) => warnings.push(args.join(' ')),
   });
 
-  return { panel, state, writes, warnings, guis, dragTarget, container,
+  return { panel, state, writes, warnings, guis, dragTarget, container, engine,
            gui: () => guis[guis.length - 1] };
 }
 
@@ -304,6 +322,83 @@ test('touching an animated slider takes over from the animation once', () => {
   assert.equal(pause.displayUpdates, 1, 'an already-paused effect is not re-paused');
   assert.deepEqual(h.writes.filter((w) => w.startsWith('paused')), ['paused:true']);
   assert.deepEqual(pause.valueSets, [true]);
+});
+
+// The engine, not the panel, decides which write pauses animations; the toggle
+// reports that decision rather than predicting it.
+
+test('a write the engine did not pause by leaves the toggle running', () => {
+  const h = makeHarness({ params: [SPEED], pausesOnWrite: () => false });
+  h.panel.build();
+  h.panel.applyAnimationPause();
+  h.writes.length = 0;
+
+  h.gui().ctrl('Speed').setValue(0.5);
+
+  assert.equal(h.engine.paused, false);
+  assert.equal(h.panel.active().animationState.pause, false);
+  assert.deepEqual(h.writes.filter((w) => w.startsWith('paused')), []);
+  assert.deepEqual(h.gui().ctrl('pause').valueSets, []);
+});
+
+test('a write the engine paused by flips the toggle even on a static param', () => {
+  const STATIC = { name: 'Width', value: 1, min: 0, max: 2 };
+  const h = makeHarness({
+    params: [SPEED, STATIC],
+    pausesOnWrite: (p) => p.name === 'Width',
+  });
+  h.panel.build();
+  h.panel.applyAnimationPause();
+  h.writes.length = 0;
+
+  h.gui().ctrl('Width').setValue(1.5);
+
+  assert.equal(h.panel.active().animationState.pause, true,
+    'the toggle must report the engine state, not the definition\'s animated flag');
+  assert.deepEqual(h.writes, [
+    'engine:Width=1.5', 'worker:Width=1.5', 'paused:true',
+  ], 'the adopted pause must reach the worker pool too');
+});
+
+test('the toggle resumes when the engine reports animations running again', () => {
+  const h = makeHarness({ params: [SPEED], pausesOnWrite: () => false });
+  h.panel.build();
+  h.panel.applyAnimationPause();
+  h.gui().ctrl('pause').setValue(true);
+  assert.equal(h.engine.paused, true);
+  h.writes.length = 0;
+
+  // An engine-side resume the panel never asked for.
+  h.engine.paused = false;
+  h.gui().ctrl('Speed').setValue(0.6);
+
+  assert.equal(h.panel.active().animationState.pause, false);
+  assert.deepEqual(h.writes.filter((w) => w.startsWith('paused')), ['paused:false']);
+});
+
+test('without the pause accessor the panel falls back to the animated flag', () => {
+  const h = makeHarness({ params: [SPEED], pauseAccessor: false });
+  h.panel.build();
+  h.panel.applyAnimationPause();
+  h.writes.length = 0;
+
+  h.gui().ctrl('Speed').setValue(0.5);
+
+  assert.equal(h.panel.active().animationState.pause, true);
+  assert.deepEqual(h.writes.filter((w) => w.startsWith('paused')), ['paused:true']);
+});
+
+test('an effect with no animated param never touches the pause state', () => {
+  const STATIC = { name: 'Width', value: 1, min: 0, max: 2 };
+  const h = makeHarness({ params: [STATIC], pausesOnWrite: () => true });
+  h.panel.build();
+  h.panel.applyAnimationPause();
+  h.writes.length = 0;
+
+  h.gui().ctrl('Width').setValue(1.5);
+
+  assert.equal(h.panel.active().pauseController, null);
+  assert.deepEqual(h.writes, ['engine:Width=1.5', 'worker:Width=1.5']);
 });
 
 test('a hydrated pause is committed after the effect renderers rebuild', () => {

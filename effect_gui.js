@@ -80,6 +80,8 @@ export function addParamControl(gui, state, p) {
  *   parameter to the worker pool.
  * @param {(paused: boolean) => void} deps.setAnimationsPaused - Freezes/resumes
  *   animation-driven params on every engine.
+ * @param {() => boolean|undefined} deps.engineAnimationsPaused - Reads the main
+ *   engine's animation-pause state, undefined on a module without the accessor.
  * @param {() => void} deps.applyEffect - Rebuilds the panel from engine state
  *   (the Reset button).
  * @param {() => Object|null} deps.guiContainer - The element the panel mounts in.
@@ -105,6 +107,7 @@ export function createEffectGui({
   setEngineParam,
   setWorkerParam,
   setAnimationsPaused,
+  engineAnimationsPaused,
   applyEffect,
   guiContainer,
   activeElement,
@@ -311,6 +314,24 @@ export function createEffectGui({
   }
 
   /**
+   * Re-seat the pause toggle on the engine's own animation state after a
+   * parameter write: the engine pauses animation-driven params implicitly when
+   * one of them is written. The toggle's transition carries the adopted state on
+   * to the worker pool, whose engines each keep their own copy.
+   * @param {{animationState: {pause: boolean}, controller: Object|null,
+   *   setPaused: (v: boolean) => void}} pause - The effect's pause toggle.
+   * @param {Object} written - The definition of the parameter just written.
+   * @returns {void}
+   */
+  function adoptEnginePause(pause, written) {
+    if (!pause.controller) return;
+    // undefined on a module without the accessor
+    const paused = engineAnimationsPaused()
+      ?? (written.animated || pause.animationState.pause);
+    if (paused !== pause.animationState.pause) pause.setPaused(paused);
+  }
+
+  /**
    * Build one controller per engine parameter, recording the value-stream order.
    * A ?param=value deep link reaches the engine through the GUI's load-time
    * onChange replay.
@@ -349,10 +370,7 @@ export function createEffectGui({
         const value = engineParamValue(v);
         setEngineParam(p.name, value);
         setWorkerParam(p.name, value);
-        // Touching an animated slider takes over from the animation.
-        if (p.animated && pause.controller && !pause.animationState.pause) {
-          pause.setPaused(true);
-        }
+        adoptEnginePause(pause, p);
       });
     });
   }
