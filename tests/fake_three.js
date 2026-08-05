@@ -1,6 +1,7 @@
 //
-// Stand-in for three + three/addons/controls/OrbitControls.js, covering exactly
-// the surface tools/shared.js constructs. three_loader_hooks.js redirects both
+// Stand-in for three + three/addons/controls/OrbitControls.js, covering the
+// surface tools/shared.js constructs plus the buffer-attribute double the
+// suites that drive the dot mesh share. three_loader_hooks.js redirects both
 // specifiers here, so shared.js gets these classes and the test importing this
 // module shares their `log`.
 
@@ -72,6 +73,22 @@ export class WebGLRenderer {
   setPixelRatio(ratio) { this.pixelRatio = ratio; }
   render() { this.renders += 1; }
   dispose() { log.push('renderer.dispose'); }
+}
+
+/**
+ * Stand-in for an InstancedBufferAttribute with three.js's real upload
+ * semantics: needsUpdate is write-only and only ever bumps version, so once an
+ * upload is flagged nothing can unflag it. `version` is what WebGLAttributes
+ * compares, so tests assert on it rather than on a readable flag.
+ * @param {?Uint16Array} array - Backing color array.
+ * @returns {Object} Attribute stub exposing array/version/needsUpdate.
+ */
+export function fakeColorAttribute(array) {
+  return {
+    array,
+    version: 0,
+    set needsUpdate(value) { if (value === true) this.version++; },
+  };
 }
 
 export class AmbientLight extends Object3D {}

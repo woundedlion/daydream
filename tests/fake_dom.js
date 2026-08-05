@@ -33,6 +33,18 @@ function detach(nodes) {
 }
 
 /**
+ * Normalizes the third addEventListener/removeEventListener argument to the
+ * capture flag the DOM keys listeners on: a bare boolean, an options bag's
+ * `capture`, or false when omitted.
+ * @param {boolean|Object|undefined} options - Legacy useCapture or options bag.
+ * @returns {boolean} The capture flag.
+ */
+function captureFlag(options) {
+  if (typeof options === 'boolean') return options;
+  return Boolean(options && options.capture);
+}
+
+/**
  * Matches one node against a single compound-free selector. Class, attribute-
  * presence, and tag selectors are supported; anything else throws rather than
  * silently matching nothing.
@@ -70,10 +82,13 @@ export class FakeElement {}
  * Element stand-in carrying the attribute, class, child, and listener surface
  * the daydream modules read and write. Non-empty innerHTML assignments throw so
  * tests cannot silently accept markup construction that a browser would parse.
- * Listeners are recorded so a test can dispatch(type, event) and assert removal;
- * focus() and scrollIntoView() record their call counts the same way. Removing a
- * listener that was never added throws rather than no-opping as the DOM does, so
- * a fixture that omits the add cannot hide a removal that never happens.
+ * Listeners are recorded with their options bag so a test can dispatch(type,
+ * event), read {passive}/{signal}, and assert removal; a {once} listener drops
+ * as it fires and removal pairs on the capture flag, as in the DOM, so a
+ * capture-mismatched removal leaves the listener on the list. focus() and
+ * scrollIntoView() record their call counts the same way. Removing a listener
+ * that was never added throws rather than no-opping as the DOM does, so a
+ * fixture that omits the add cannot hide a removal that never happens.
  * @param {string} [tag] - Tag name.
  * @returns {Object} Fake element.
  */
@@ -154,11 +169,17 @@ export function fakeElement(tag = 'div') {
         (child) => child && typeof child === 'object'
           && typeof child.contains === 'function' && child.contains(node));
     },
-    addEventListener(type, handler) { this.listeners.push({ type, handler }); },
-    removeEventListener(type, handler) {
+    addEventListener(type, handler, options) {
+      this.listeners.push({ type, handler, options, capture: captureFlag(options) });
+    },
+    removeEventListener(type, handler, options) {
+      const capture = captureFlag(options);
       const at = this.listeners.findIndex(
-        (l) => l.type === type && l.handler === handler);
-      if (at < 0) throw new Error(`removeEventListener: no ${type} listener registered`);
+        (l) => l.type === type && l.handler === handler && l.capture === capture);
+      if (at < 0) {
+        throw new Error(
+          `removeEventListener: no ${type} listener registered with capture=${capture}`);
+      }
       this.listeners.splice(at, 1);
     },
     dispatch(type, event = {}) {
@@ -166,6 +187,10 @@ export function fakeElement(tag = 'div') {
       // passing one models a bubbled event from a descendant.
       const dispatched = { target: this, ...event };
       for (const l of this.listeners.filter((l) => l.type === type)) {
+        if (l.options && l.options.once) {
+          const at = this.listeners.indexOf(l);
+          if (at >= 0) this.listeners.splice(at, 1);
+        }
         l.handler(dispatched);
       }
     },
