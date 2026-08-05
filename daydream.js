@@ -384,6 +384,7 @@ const effectGui = createEffectGui({
     host.engine.setAnimationsPaused(paused);
     segments.setAnimationsPaused(paused);
   },
+  engineAnimationsPaused: () => host.engine.getAnimationsPaused?.(),
   applyEffect: () => apply.applyEffect(),
   guiContainer: () => document.getElementById('gui-container'),
   activeElement: () => document.activeElement,
