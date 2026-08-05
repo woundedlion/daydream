@@ -177,14 +177,16 @@ function sampleLut(lut) {
 // Sampled goldens for the four GradientShape values (STRAIGHT, CIRCULAR,
 // VIGNETTE, FALLOFF) baked from TRIADIC_KEYS, plus STRAIGHT from MIXED_KEYS.
 // Captured from the engine bake; the LUT is 8-bit integer output of integer
-// inputs, so these compare exactly.
+// inputs, so these compare exactly. A channel the gradient does not drive can
+// still read a few LSB: the gamut LUT supplies only the bracket the walk
+// refines, so its cell size sets the residue.
 const BAKE_GOLDEN = {
   STRAIGHT: [[241, 83, 136], [242, 94, 64], [213, 125, 0], [178, 146, 0], [131, 164, 24],
     [43, 176, 102], [0, 172, 157], [0, 167, 192], [33, 158, 233]],
   CIRCULAR: [[241, 83, 136], [233, 107, 0], [177, 147, 0], [92, 172, 72], [0, 172, 159],
     [0, 163, 216], [123, 137, 248], [197, 106, 217], [241, 83, 136]],
   VIGNETTE: [[0, 0, 0], [244, 84, 119], [234, 106, 0], [186, 142, 0], [130, 164, 25],
-    [0, 176, 119], [0, 170, 175], [0, 161, 225], [0, 0, 0]],
+    [1, 176, 119], [0, 170, 175], [1, 161, 225], [0, 0, 0]],
   FALLOFF: [[241, 83, 136], [233, 107, 0], [177, 147, 0], [92, 172, 72], [0, 172, 159],
     [0, 163, 216], [0, 80, 117], [1, 1, 1], [0, 0, 0]],
   STRAIGHT_MIXED: [[169, 62, 0], [147, 101, 0], [122, 127, 2], [78, 148, 90], [50, 158, 145],
