@@ -1,5 +1,5 @@
 #!/bin/sh
-# Run the simulator's JS unit suite before every push.
+# Mirror of .github/workflows/js-unit-suite.yml, run before every push.
 #
 # js-tests.yml fires on pull_request only, and daydream lands directly on
 # master, so without this hook the first CI run of the suite is deploy.yml's
@@ -24,9 +24,20 @@ fi
 
 # Linked worktrees deliberately carry no node_modules of their own, so the suite
 # is unrunnable there; warn rather than block a push the main tree can gate.
-if [ ! -d node_modules ]; then
+# npm writes .package-lock.json on install, so it marks a populated tree where an
+# empty-but-present directory would pass a bare -d test.
+if [ ! -f node_modules/.package-lock.json ]; then
 	echo "pre-push: node_modules is missing; the JS unit suite did not run. Run \`npm ci\` to enable it." >&2
 	exit 0
+fi
+
+npm run typecheck || exit 1
+
+# The workflow diffs the whole tree; a developer's is not clean, so scope it.
+npm run importmap || exit 1
+if ! git diff --exit-code -- vendor-importmap.js; then
+	echo "pre-push: vendor-importmap.js was stale; the regenerated file is in your working tree. Commit it and push again." >&2
+	exit 1
 fi
 
 npm test
