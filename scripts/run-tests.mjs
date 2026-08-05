@@ -10,7 +10,10 @@
 // not paid for by another growing. Deleting a case drops its file below its
 // floor, by design; a file that ran nothing but a skip is exempt, since a suite
 // gated on a prerequisite the platform lacks runs nothing without having gone
-// away. Re-measure every floor in one run:
+// away. That exemption is opt-in: the file's floors entry must carry
+// `"skippable": true`, so an unconditional skip retiring a file from gating
+// shows up as a floors diff instead of a silently green run. Re-measure every
+// floor in one run:
 //   node scripts/run-tests.mjs --update-floors "tests/*.test.js"
 import { spawnSync } from 'node:child_process';
 import {
@@ -155,7 +158,8 @@ const measured = Object.fromEntries(
 /**
  * Whether a committed floor entry is a usable pair.
  * @param {unknown} min - Entry read from the floors file.
- * @returns {boolean} True when both counts are non-negative integers.
+ * @returns {boolean} True when both counts are non-negative integers and any
+ *   skippable declaration is a boolean.
  */
 const sound = (min) =>
   min !== null &&
@@ -163,7 +167,8 @@ const sound = (min) =>
   Number.isInteger(min.cases) &&
   min.cases >= 0 &&
   Number.isInteger(min.assertions) &&
-  min.assertions >= 0;
+  min.assertions >= 0 &&
+  (min.skippable === undefined || typeof min.skippable === 'boolean');
 
 if (updating) {
   // A wholly skipped file measured nothing, so re-measuring here would ratchet
@@ -177,6 +182,11 @@ if (updating) {
   for (const file of skipped)
     if (file in measured && sound(committed[file]))
       measured[file] = committed[file];
+  // A skippable file that did run here still needs its declaration carried
+  // over, or re-measuring on a machine holding the prerequisite would strip it.
+  for (const [file, min] of Object.entries(committed))
+    if (file in measured && min?.skippable === true)
+      measured[file] = { ...measured[file], skippable: true };
   writeFileSync(FLOORS_PATH, `${JSON.stringify(measured, null, 2)}\n`);
   console.log(
     `run-tests: wrote ${counts.size} floors to ${FLOORS_PATH} ` +
@@ -221,7 +231,21 @@ if (unlisted.length > 0) {
 }
 // A deleted or renamed file reports zero against both its floors. A file whose
 // every result was a skip is exempt instead: it reported results, so it is
-// still there, and a platform-gated suite runs nothing by design.
+// still there, and a platform-gated suite runs nothing by design. The exemption
+// is opt-in, so an unconditional skip cannot quietly retire a file.
+const undeclaredSkips = [...skipped]
+  .filter((file) => floors[file]?.skippable !== true)
+  .sort();
+if (undeclaredSkips.length > 0) {
+  console.error(
+    'run-tests: every result was a skip, and the floors do not allow it:\n' +
+      undeclaredSkips.map((file) => `  ${file}`).join('\n') +
+      `\nRun the suite, or declare the file skippable in ${FLOORS_PATH} ` +
+      '(add `"skippable": true` to its entry) if its prerequisite is genuinely ' +
+      'optional.',
+  );
+  process.exit(1);
+}
 const gated = Object.entries(floors).filter(([file]) => !skipped.has(file));
 const belowCases = gated
   .map(([file, min]) => [file, cases.get(file) ?? 0, min.cases])
