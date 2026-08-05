@@ -79,7 +79,9 @@ export function enumChoices(options) {
     // Duplicate labels would collapse to one object key, making the earlier
     // index unselectable; disambiguate rather than drop it.
     let key = label;
-    while (key in choices) key = `${key} (${i})`;
+    // `in` would also see Object.prototype, renaming a label like `toString`
+    // that collides with nothing.
+    while (Object.hasOwn(choices, key)) key = `${key} (${i})`;
     choices[key] = i;
   });
   return choices;

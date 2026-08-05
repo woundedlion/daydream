@@ -117,8 +117,8 @@
     "assertions": 5739
   },
   "tests/param_sync.test.js": {
-    "cases": 18,
-    "assertions": 31
+    "cases": 19,
+    "assertions": 33
   },
   "tests/pixel_view.test.js": {
     "cases": 10,
