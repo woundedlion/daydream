@@ -360,7 +360,9 @@ export function createApplyPipeline({
    */
   function applyResolution(preserveParams = false) {
     const resolution = appState.get('resolution');
-    const p = presets[resolution];
+    // Own keys only: an inherited name ("constructor") would otherwise resolve to
+    // a preset with no dimensions and resize the engine to undefined.
+    const p = Object.hasOwn(presets, resolution) ? presets[resolution] : null;
     if (!p) {
       logError(`Unknown resolution preset "${resolution}"; keeping current.`);
       return ApplyResult.REJECTED;

@@ -625,6 +625,20 @@ test('an unknown preset changes nothing', () => {
   assert.match(app.errors[0], /Unknown resolution preset "Mid"/);
 });
 
+/**
+ * The resolution comes from a hand-editable URL param, so a preset lookup must
+ * see own keys only: `Object.prototype` supplies a truthy value for every one of
+ * its names, and the dimensions read off it are undefined.
+ */
+test('an inherited property name is not a preset', () => {
+  for (const name of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+    const app = makeApp({ resolution: name });
+
+    assert.equal(app.pipeline.applyResolution(), ApplyResult.REJECTED, name);
+    assert.deepEqual(app.log, [], `"${name}" reached the engine`);
+  }
+});
+
 test('an engine that cannot build the resolution leaves the scene at its old size', () => {
   const app = makeApp({ rejectResolutions: ['288x144'] });
 
