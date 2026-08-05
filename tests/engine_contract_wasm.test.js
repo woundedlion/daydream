@@ -211,6 +211,8 @@ test('an effectless engine reports NO_EFFECT, not a bounds rejection', () => {
 
 test('a rejected parameter write names its reason', () => {
   assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
+  // Every effect, not just up to the first readonly hit: stopping there made the
+  // flag coverage depend on where one happens to sit in the name order.
   let found = null;
   for (const name of Object.keys(engine.getEffectSizes())) {
     assert.equal(engine.setEffect(name), true, `setEffect must succeed for ${name}`);
@@ -218,15 +220,17 @@ test('a rejected parameter write names its reason', () => {
     for (let i = 0; i < defs.length; i++) {
       assert.equal(typeof defs[i].readonly, 'boolean',
         `${name}.${defs[i].name} must carry a boolean readonly flag`);
-      if (defs[i].readonly && !found) found = { effect: name, def: defs[i] };
+      if (defs[i].readonly && !found)
+        found = { effect: name, name: defs[i].name, value: defs[i].value };
     }
-    if (found) break;
   }
   assert.ok(found,
     'no effect exposes a readonly parameter, so the reject path is unreachable');
-  assert.equal(engine.setParameter(found.def.name, found.def.value),
+  assert.equal(engine.setEffect(found.effect), true,
+    `setEffect must succeed for ${found.effect}`);
+  assert.equal(engine.setParameter(found.name, found.value),
     M.ParamSetResult.READONLY,
-    `setParameter must report READONLY for ${found.effect}.${found.def.name}`);
+    `setParameter must report READONLY for ${found.effect}.${found.name}`);
   assert.equal(engine.setParameter('NoSuchParameter', 0),
     M.ParamSetResult.UNKNOWN_PARAM,
     'setParameter must report UNKNOWN_PARAM for an unknown parameter name');
