@@ -7,8 +7,9 @@ import { refreshPixelView as computePixelView } from "./pixel_view.js";
 
 /**
  * Owns the main-thread WASM engine and its reassignable display state. The pixel
- * view detaches on heap growth, so consumers read it through view()/refresh()
- * rather than caching it; engine, adapter, and recorder are late-bound at WASM load.
+ * view goes stale on heap growth and on a resolution change, so consumers read it
+ * through view()/refresh() rather than caching it; engine, adapter, and recorder
+ * are late-bound at WASM load.
  */
 export class EngineHost {
   /**
@@ -48,14 +49,16 @@ export class EngineHost {
   }
 
   /**
-   * Re-fetch the WASM pixel view when missing or detached (heap growth can detach
-   * the underlying ArrayBuffer, leaving a zero-length view), and notify the caller
-   * so it can re-point its display aliases at the fresh view.
+   * Re-fetch the WASM pixel view when it is missing, detached (heap growth can
+   * detach the underlying ArrayBuffer, leaving a zero-length view), or sized for
+   * a resolution the engine no longer renders, and notify the caller so it can
+   * re-point its display aliases at the fresh view.
    * @returns {void}
    */
   refresh() {
     const { view, refreshed } = computePixelView(
-      this.pixelView, () => this.engine.getPixels());
+      this.pixelView, () => this.engine.getPixels(),
+      this.engine.getBufferLength?.());
     if (refreshed) {
       this.pixelView = view;
       this.onViewRefreshed(view);
