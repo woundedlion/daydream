@@ -22,8 +22,9 @@
 //
 // What the two MUST agree on is the shared convention:
 //   1. Arm partition: segments [0, N/2) are arm A; [N/2, N) are arm B.
-//   2. Arm B is the w/2 half: its web rect starts at x = floor(w/2), and the
-//      firmware's arm-B sampled column at rotation column 0 is floor(w/2).
+//   2. Arm placement: each arm's web rect starts at the canvas column the
+//      firmware samples at rotation column 0 — x = 0 for arm A, x = floor(w/2)
+//      for arm B.
 //   3. Per-segment row coverage: the web rect's row span [y0, y1) equals the SET
 //      of canvas rows the firmware segment's PPS LEDs touch (the bottom strip
 //      runs reversed, so only the covered set is equal, not the traversal order).
@@ -64,15 +65,19 @@ function goldenConfig(S, N) {
 }
 
 /**
- * Canvas column an arm-B segment samples at rotation column 0, per the golden.
+ * Canvas columns each arm samples at rotation column 0, per the golden.
  * @param {number} w - Canvas width.
- * @returns {number}
+ * @returns {{ arm_a: number, arm_b: number }}
  */
-function goldenArmBCol(w) {
+function goldenArmCols(w) {
   const entry = golden.x_cols.find((e) => e.width === w);
   assert.ok(entry, `pov_segment_map.json has no x_cols entry for width ${w} — add `
     + `it to WIDTHS in tools/pov_segment_map_export.cpp, then ${REGENERATE}`);
-  return entry.arm_b;
+  assert.equal(typeof entry.arm_a, 'number',
+    `pov_segment_map.json x_cols entry for width ${w} has no arm_a column — ${REGENERATE}`);
+  assert.equal(typeof entry.arm_b, 'number',
+    `pov_segment_map.json x_cols entry for width ${w} has no arm_b column — ${REGENERATE}`);
+  return entry;
 }
 
 /**
@@ -97,12 +102,15 @@ function crossCheck(S, N, w) {
     const webArmB = rect.x0 === halfW;
     assert.equal(webArmB, m.arm_b, `arm side agrees for id=${id} (S=${S},N=${N})`);
 
-    // (2) Arm B is the w/2 half.
+    // (2) Each arm's web rect starts at the firmware's sampled column.
+    const cols = goldenArmCols(w);
     if (m.arm_b) {
       assert.equal(rect.x0, halfW, `arm-B rect starts at w/2 for id=${id}`);
-      assert.equal(goldenArmBCol(w), halfW, 'firmware arm-B offset is w/2');
+      assert.equal(cols.arm_b, halfW, 'firmware arm-B offset is w/2');
     } else {
-      assert.equal(rect.x0, 0, `arm-A rect starts at 0 for id=${id}`);
+      assert.equal(rect.x0, cols.arm_a,
+        `arm-A rect starts at the firmware arm-A column for id=${id}`);
+      assert.equal(cols.arm_a, 0, 'firmware arm-A offset is 0');
     }
 
     // (3) Row coverage as a SET — the bottom strip is reversed in traversal order.
