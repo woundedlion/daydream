@@ -871,11 +871,25 @@ test('solids validator resolves the module factory after async initialization', 
   assert.equal(await instantiate(createChainValidator, Mod), Mod);
 });
 
+/**
+ * Verifies every page gate binds the verdict and reads its fields. The verdict
+ * is an object and therefore always truthy, so a gate left testing the call's
+ * result directly would pass every chain.
+ */
+test('solids.html binds every chainIsValid verdict instead of testing it', () => {
+  const calls = [...SOLIDS_HTML.matchAll(/\bchainIsValid\(/g)].length;
+  assert.ok(calls >= 7, `expected the page's gates to call chainIsValid, found ${calls}`);
+  assert.equal([...SOLIDS_HTML.matchAll(/const \w+ = await chainIsValid\(/g)].length, calls,
+    'every call must bind its verdict; an unbound one is truthy and gates nothing');
+  assert.doesNotMatch(SOLIDS_HTML, /!\s*\(?await chainIsValid\(/,
+    'a negated call tests the verdict object, not its ok field');
+});
+
 /** Verifies a chain that replays cleanly is accepted and leaves no live meshes. */
 test('createChainValidator accepts a chain that replays cleanly', async () => {
   const { Mod, state } = fakeModule();
   const validator = createChainValidator(async () => Mod);
-  assert.equal(await validator.chainIsValid('cube', ['dual', { op: 'truncate', params: { t: 0.3 } }]), true);
+  assert.equal((await validator.chainIsValid('cube', ['dual', { op: 'truncate', params: { t: 0.3 } }])).ok, true);
   assert.equal(state.live, 0);
   assert.equal(state.cleared, 1);
 });
@@ -886,7 +900,10 @@ test('createChainValidator rejects a chain that throws, freeing its mesh', async
     if (op === 'kis') throw new Error('op refused');
   });
   const validator = createChainValidator(async () => Mod);
-  assert.equal(await validator.chainIsValid('cube', ['kis']), false);
+  const verdict = await validator.chainIsValid('cube', ['kis']);
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.message, 'Op "kis" failed: op refused',
+    'a throw the bridge recorded no reason for must still name the op and what it said');
   assert.equal(state.live, 0);
   assert.equal(state.cleared, 1);
 });
@@ -895,7 +912,7 @@ test('createChainValidator rejects a chain that throws, freeing its mesh', async
 test('createChainValidator rejects a chain whose base solid comes back null', async () => {
   const { Mod, state } = fakeModule(() => { }, { rejects: new Set(['base:cube']) });
   const validator = createChainValidator(async () => Mod);
-  assert.equal(await validator.chainIsValid('cube', ['dual']), false);
+  assert.equal((await validator.chainIsValid('cube', ['dual'])).ok, false);
   assert.equal(state.live, 0);
   assert.equal(state.cleared, 1);
 });
@@ -904,9 +921,37 @@ test('createChainValidator rejects a chain whose base solid comes back null', as
 test('createChainValidator rejects a chain whose classify pass comes back null', async () => {
   const { Mod, state } = fakeModule(() => { }, { rejects: new Set(['classifyFaces']) });
   const validator = createChainValidator(async () => Mod);
-  assert.equal(await validator.chainIsValid('cube', ['dual']), false);
+  assert.equal((await validator.chainIsValid('cube', ['dual'])).ok, false);
   assert.equal(state.live, 0);
   assert.equal(state.cleared, 1);
+});
+
+/**
+ * Verifies the reason the module recorded reaches the caller, so an arena
+ * exhaustion (cleared by the flush the rejection already ran) does not read as
+ * the hard element ceiling.
+ */
+test('createChainValidator carries each rejection reason out to the caller', async () => {
+  const arenaMod = fakeModule(
+    () => { }, { rejects: new Set(['classifyFaces']), reason: 'ARENA_EXHAUSTED' }).Mod;
+  const arena = await createChainValidator(async () => arenaMod).chainIsValid('cube', ['dual']);
+  assert.equal(arena.ok, false);
+  assert.match(arena.message, /^Face classification failed: /);
+  assert.match(arena.message, /flushed — try again/, 'the arena remedy must survive the gate');
+
+  const overflowMod = fakeModule(
+    () => { }, { rejects: new Set(['base:cube']), reason: 'FACE_DEGREE_OVERFLOW' }).Mod;
+  const overflow = await createChainValidator(async () => overflowMod).chainIsValid('cube', ['dual']);
+  assert.equal(overflow.ok, false);
+  assert.match(overflow.message, /^Base solid "cube" failed: /);
+  assert.notEqual(overflow.message, arena.message, 'each reason must arrive with its own remedy');
+});
+
+/** Verifies an accepted chain carries no message to show. */
+test('createChainValidator reports no reason for a chain it accepts', async () => {
+  const { Mod } = fakeModule();
+  const verdict = await createChainValidator(async () => Mod).chainIsValid('cube', ['dual']);
+  assert.deepEqual(verdict, { ok: true, message: '' });
 });
 
 /** Verifies an engine trap wedges the instance, so the next chain runs on a fresh one. */
@@ -917,9 +962,9 @@ test('createChainValidator respawns after a WebAssembly trap', async () => {
     fakeModule().Mod,
   ];
   const validator = createChainValidator(async () => modules[spawns++]);
-  assert.equal(await validator.chainIsValid('cube', ['kis']), false);
+  assert.equal((await validator.chainIsValid('cube', ['kis'])).ok, false);
   assert.equal(spawns, 1);
-  assert.equal(await validator.chainIsValid('cube', ['dual']), true);
+  assert.equal((await validator.chainIsValid('cube', ['dual'])).ok, true);
   assert.equal(spawns, 2);
 });
 
@@ -936,7 +981,7 @@ test('createChainValidator reuses a healthy instance', async () => {
 /** Verifies a module that fails to spawn degrades to permissive rather than blocking the tool. */
 test('createChainValidator accepts everything when the module cannot spawn', async () => {
   const validator = createChainValidator(async () => { throw new Error('no wasm'); });
-  assert.equal(await validator.chainIsValid('cube', ['kis']), true);
+  assert.equal((await validator.chainIsValid('cube', ['kis'])).ok, true);
   assert.equal(await validator.withValidator((Mod) => Mod), null);
 });
 
@@ -950,8 +995,8 @@ test('createChainValidator retries after a failed spawn', async () => {
     if (spawns++ === 0) throw new Error('no wasm');
     return Mod;
   });
-  assert.equal(await validator.chainIsValid('cube', ['kis']), true);
-  assert.equal(await validator.chainIsValid('cube', ['kis']), false);
+  assert.equal((await validator.chainIsValid('cube', ['kis'])).ok, true);
+  assert.equal((await validator.chainIsValid('cube', ['kis'])).ok, false);
   assert.equal(spawns, 2);
 });
 

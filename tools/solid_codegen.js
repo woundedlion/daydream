@@ -721,7 +721,7 @@ export function createCommitQueue(onError = console.error) {
  * respawned, and the mutation is rejected. The engine stays the single authority
  * on its own invariants.
  * @param {function(): Promise<Object>} createModule - Spawns a fresh WASM module instance.
- * @returns {{acquire: function(): Promise<?Object>, noteDeath: function(*): void, withValidator: function(Function): Promise<*>, chainIsValid: function(string, Array<Object>): Promise<boolean>}} The validator handle.
+ * @returns {{acquire: function(): Promise<?Object>, noteDeath: function(*): void, withValidator: function(Function): Promise<*>, chainIsValid: function(string, Array<Object>): Promise<{ok: boolean, message: string}>}} The validator handle.
  */
 export function createChainValidator(createModule) {
   let modulePromise = null;
@@ -770,39 +770,57 @@ export function createChainValidator(createModule) {
    * validator.
    * @param {string} base - Registry name of the seed solid.
    * @param {Array<(string|{op:string, params:Object})>} ops - The candidate op chain.
-   * @returns {Promise<boolean>} True when the whole chain is safe for the live module.
-   * @details A missing validator (module failed to spawn) resolves true:
-   * prevention degrades to the old behavior rather than blocking the tool.
+   * @returns {Promise<{ok: boolean, message: string}>} Whether the whole chain is safe for the live module, and why it is not when it is not.
+   * @details A missing validator (module failed to spawn) resolves ok: true;
+   * prevention degrades to the old behavior rather than blocking the tool. The
+   * result is an object, so callers must test `.ok` — an object is truthy, and
+   * a call site left testing the result itself reads every chain as valid.
    */
   function chainIsValid(base, ops) {
     return withValidator((Mod) => {
-      if (!Mod) return true;
+      if (!Mod) return { ok: true, message: '' };
       const Ops = Mod.MeshOps;
       let mesh = null;
+      // What the replay was building, named in whatever failure it hits.
+      let what = `Base solid "${base}"`;
+      // Reads the reason the module recorded before any further bridge call can
+      // overwrite it, then frees the mesh and the arenas.
+      const rejected = (e = null) => {
+        const failure = meshOpFailure(Mod, what);
+        // A reason of OK means the bridge recorded no rejection and the throw
+        // came from JS (an unbound op name, an Embind marshalling error).
+        const message = failure.reason === 'OK' && e
+          ? `${what} failed: ${e.message || e}`
+          : failure.message;
+        try { if (mesh) mesh.delete(); Ops.clearToolingMemory(); } catch { }
+        return { ok: false, message };
+      };
       try {
-        // A null from either bridge call is a recoverable reject (getLastResult
+        // A null from any bridge call is a recoverable reject (getLastResult
         // names it), so the chain is not safe for the live module either.
         mesh = Ops.fromSolidName(base);
-        if (!mesh) {
-          Ops.clearToolingMemory();
-          return false;
-        }
+        if (!mesh) return rejected();
         for (const o of ops) {
+          what = `Op "${typeof o === 'string' ? o : o.op}"`;
           const next = applyOp(mesh, o);
           mesh.delete();
           mesh = next;
         }
+        what = 'Face classification';
         const classes = mesh.classifyFaces();
+        if (classes == null) return rejected();
         mesh.delete();
         mesh = null;
         Ops.clearToolingMemory();
-        return classes != null;
+        return { ok: true, message: '' };
       } catch (e) {
         noteDeath(e);
-        if (!(e instanceof WebAssembly.RuntimeError)) {
-          try { if (mesh) mesh.delete(); Ops.clearToolingMemory(); } catch { }
+        // A trap tears the instance down: it records no reason and cannot be
+        // called again, so neither the reason nor the cleanup is attempted.
+        if (e instanceof WebAssembly.RuntimeError) {
+          return { ok: false, message: `${what} exceeded an engine mesh limit` };
         }
-        return false;
+        return rejected(e);
       }
     });
   }
