@@ -116,7 +116,7 @@ test('every per-segment metric renders under its own column header', () => {
 
   assert.equal(cell(4, '').textContent, 'max');
   assert.equal(cell(4, 'Compute').textContent, '3.0 ms');
-  assert.equal(cell(5, '').textContent, 'wall');
+  assert.equal(cell(5, '').textContent, 'round-trip');
   assert.equal(cell(5, 'Compute').textContent, '12.5 ms');
 });
 
@@ -154,7 +154,7 @@ test('only times past the slow threshold take the slow class', () => {
   assert.equal(cell(1, 'Compute').className, 'seg-time');
   assert.equal(cell(2, 'Compute').className, 'seg-time slow');
   assert.equal(cell(3, 'Compute').className, 'seg-time');   // max is never reclassed
-  assert.equal(cell(4, 'Compute').className, 'seg-time slow'); // wall is
+  assert.equal(cell(4, 'Compute').className, 'seg-time slow'); // round-trip is
 });
 
 test('the table is mutated in place and rebuilt only on a segment-count change', () => {
@@ -170,7 +170,7 @@ test('the table is mutated in place and rebuilt only on a segment-count change',
   view.update(readyState(3));
   const rebuilt = stats.firstElementChild;
   assert.notEqual(rebuilt, first, 'a segment-count change rebuilds the table');
-  assert.equal(rebuilt.children.length, 3 + 3); // header + 3 segments + max + wall
+  assert.equal(rebuilt.children.length, 3 + 3); // header + 3 segments + max + round-trip
 });
 
 test('an inactive pool hides the overlay and hands the stat bars back', () => {
