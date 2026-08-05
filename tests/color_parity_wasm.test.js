@@ -183,8 +183,8 @@ function sampleLut(lut) {
 const BAKE_GOLDEN = {
   STRAIGHT: [[241, 83, 136], [246, 90, 58], [213, 125, 0], [178, 146, 0], [130, 165, 0],
     [0, 178, 96], [0, 172, 157], [0, 167, 192], [0, 158, 238]],
-  CIRCULAR: [[241, 83, 136], [234, 106, 0], [178, 146, 0], [75, 176, 29], [0, 172, 157],
-    [0, 163, 212], [117, 137, 255], [200, 101, 224], [241, 83, 136]],
+  CIRCULAR: [[241, 83, 136], [174, 112, 247], [0, 158, 238], [0, 173, 154], [131, 164, 0],
+    [0, 172, 158], [1, 158, 238], [179, 110, 244], [241, 83, 136]],
   VIGNETTE: [[0, 0, 0], [245, 83, 119], [234, 106, 1], [186, 142, 0], [130, 165, 0],
     [1, 176, 119], [0, 170, 175], [1, 161, 225], [0, 0, 0]],
   FALLOFF: [[241, 83, 136], [233, 107, 0], [177, 147, 0], [69, 176, 37], [0, 172, 159],
@@ -251,6 +251,23 @@ test('PaletteOps complementary circular LUTs vary continuously across base hues'
       }
     }
     assert.ok(maxChannelStep <= 32, `adjacent base hues jumped by ${maxChannelStep} sRGB levels`);
+  } finally {
+    ops.delete();
+  }
+});
+
+/** Verifies the quantized circular LUT mirrors every RGB entry exactly. */
+test('PaletteOps circular LUT is palindromic', () => {
+  const ops = new M.PaletteOps();
+  try {
+    const lut = Uint8Array.from(ops.bakeLut(
+      1, 17, 180, 230, 93, 180, 70, 181, 180, 230));
+    for (let i = 0; i < 128; i++) {
+      const mirror = 255 - i;
+      for (let channel = 0; channel < 3; channel++) {
+        assert.equal(lut[3 * i + channel], lut[3 * mirror + channel]);
+      }
+    }
   } finally {
     ops.delete();
   }
