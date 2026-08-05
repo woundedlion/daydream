@@ -245,7 +245,7 @@ test('lissajousCodeString emits a C++ LissajousParams initializer', () => {
 
   assert.equal(
     lissajousCodeString(3, 2, 1.5708, 2 * TWO_PI),
-    'LissajousParams{3.0f, 2.0f, 1.571f, 4 * PI_F}');
+    'LissajousParams{3.0f, 2.0f, 1.5708f, 4 * PI_F}');
 
   assert.equal(
     lissajousCodeString(1.06, 1.06, 0, 5.909),

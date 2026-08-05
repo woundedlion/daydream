@@ -7,20 +7,38 @@
 // generators, so the THREE-free generators can import it without pulling
 // Three.js into their unit tests.
 
+// toFixed's maximum fractional precision.
+const MAX_FRACTION_DIGITS = 100;
+
 /**
- * Format a number as a C++ float literal: fixed precision, trailing zeros
- * trimmed but always at least one fractional digit, with an `f` suffix (so a
- * whole value stays a valid float literal: 2 -> "2.0f", never "2f"). Routes
- * through toFixed (not toString) so the output is always plain decimal, never
- * scientific notation (which generated C++ float literals avoid).
+ * Round `n` to `prec` fractional digits as plain decimal with trailing zeros
+ * trimmed and at least one fractional digit kept ("2" -> "2.0").
+ * @param {number} n - The value to round.
+ * @param {number} prec - Fractional digits.
+ * @returns {string} The decimal text, without an `f` suffix.
+ */
+function fixedDecimal(n, prec) {
+  let s = n.toFixed(prec).replace(/(\.\d*?)0+$/, '$1');
+  if (!s.includes('.')) return s + '.0';
+  if (s.endsWith('.')) return s + '0';
+  return s;
+}
+
+/**
+ * Format a number as a C++ float literal: trailing zeros trimmed but always at
+ * least one fractional digit, with an `f` suffix (so a whole value stays a
+ * valid float literal: 2 -> "2.0f", never "2f"). Routes through toFixed (not
+ * toString) so the output is always plain decimal, never scientific notation
+ * (which generated C++ float literals avoid).
  *
- * A nonzero value smaller than the requested precision would otherwise round to
- * "0.0f", silently discarding a meaningful coefficient (e.g. 1e-7 at 6 digits).
- * Such values are re-rounded with enough fractional digits to preserve `digits`
- * significant figures, still in plain decimal notation.
+ * `digits` is a floor, not a cap: toFixed counts fractional digits, not
+ * significant figures, so rounding there costs a small value its significant
+ * figures. Precision widens until the literal reads back as the same float32,
+ * so the emitted C++ and the value that produced it are the same float.
  * @param {number} n - The value to format.
- * @param {number} [digits=6] - Fractional digits to round to before trimming.
+ * @param {number} [digits=6] - Minimum fractional digits before trimming.
  * @returns {string} The C++ float literal (e.g. "1.5f").
+ * @throws {Error} When the value is non-finite, formats in exponential notation, or has no plain-decimal literal that reads back as the same float32.
  */
 export function formatFloatCpp(n, digits = 6) {
   if (!Number.isFinite(n)) {
@@ -29,20 +47,14 @@ export function formatFloatCpp(n, digits = 6) {
   if (Math.abs(n) >= 1e21) {
     throw new Error(`formatFloatCpp: magnitude ${n} formats in exponential notation`);
   }
-  let s = n.toFixed(digits).replace(/(\.\d*?)0+$/, '$1');
-  if (!s.includes('.')) s += '.0';
-  else if (s.endsWith('.')) s += '0';
-  // Nonzero magnitude that collapsed to "0.0": widen precision past the leading
-  // fractional zeros so `digits` significant figures survive (toFixed caps at 100).
-  if (parseFloat(s) === 0 && Number.isFinite(n) && n !== 0) {
-    const leadingZeros = Math.ceil(-Math.log10(Math.abs(n)));
-    const prec = Math.min(100, leadingZeros + digits);
-    s = n.toFixed(prec).replace(/(\.\d*?)0+$/, '$1');
-    if (!s.includes('.')) s += '.0';
-    else if (s.endsWith('.')) s += '0';
-    if (parseFloat(s) === 0) {
-      throw new Error(`formatFloatCpp: magnitude ${n} underflows to zero at max precision`);
-    }
+  const target = Math.fround(n);
+  for (let prec = Math.max(0, digits); prec <= MAX_FRACTION_DIGITS; prec++) {
+    const s = fixedDecimal(n, prec);
+    const parsed = parseFloat(s);
+    // A nonzero coefficient must never be emitted as 0.0f, even where it is
+    // below the float32 subnormal floor and so rounds to a zero target.
+    if (parsed === 0 && n !== 0) continue;
+    if (Math.fround(parsed) === target) return s + 'f';
   }
-  return s + 'f';
+  throw new Error(`formatFloatCpp: magnitude ${n} underflows to zero at max precision`);
 }

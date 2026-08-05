@@ -46,9 +46,35 @@ test('formatFloatCpp: negative small value keeps sign and magnitude', () => {
   assert.equal(formatFloatCpp(-1e-7), '-0.0000001f');
 });
 
-/** A value with more than the default 6 fractional digits rounds at the 6th. */
-test('formatFloatCpp: rounds to the default 6 fractional digits', () => {
-  assert.equal(formatFloatCpp(0.12345678), '0.123457f');
+/** `digits` is a floor: precision widens until the literal reads back as the same float32. */
+test('formatFloatCpp: widens past the requested digits to keep the float32', () => {
+  assert.equal(formatFloatCpp(0.12345678), '0.12345678f');
+  assert.equal(formatFloatCpp(0.5, 0), '0.5f');
+});
+
+/**
+ * A value whose significant figures fall past the 6th fractional digit keeps
+ * them rather than rounding to a fraction of its magnitude.
+ */
+test('formatFloatCpp: small value keeps its significant figures', () => {
+  const literal = formatFloatCpp(2.5714e-6);
+  assert.notEqual(literal, '0.000003f');
+  assert.equal(Math.fround(parseFloat(literal)), Math.fround(2.5714e-6));
+});
+
+/** Every emitted literal reads back as the float32 it was formatted from. */
+test('formatFloatCpp: round-trips float32 across a value sweep', () => {
+  let seed = 12345;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296;
+  const values = [0, 1, -1, 0.1, 1 / 3, Math.PI, 1e-7, 1e20, -2.5714e-6];
+  for (let i = 0; i < 5000; i++) {
+    values.push(rnd(), Math.pow(10, -8 + 11 * rnd()) * (rnd() < 0.5 ? -1 : 1));
+  }
+  for (const v of values) {
+    const literal = formatFloatCpp(v);
+    assert.match(literal, /^-?\d+\.\d+f$/, `plain decimal for ${v}`);
+    assert.equal(Math.fround(parseFloat(literal)), Math.fround(v), `round-trip for ${v}`);
+  }
 });
 
 /**
