@@ -227,6 +227,8 @@ export class Daydream {
     // captureFrame(), abort(message), and an isRecording flag (which also
     // suppresses the PiP corner).
     this.recorder = null;
+    // Captures owed by advanced ticks whose repaint a detached view held.
+    this.heldCaptures = 0;
 
     this.clock = new THREE.Clock(true);
     this.frameInterval = 1 / Daydream.FPS; // seconds per simulation frame
@@ -539,10 +541,10 @@ export class Daydream {
     // array (byteLength 0). needsUpdate only ever bumps version, so a flagged upload
     // cannot be cancelled — hold the repaint until the next drawFrame re-points it.
     if (this.dotMesh?.instanceColor && !isViewLive(this.dotMesh.instanceColor.array)) {
-      // The tick advanced and cannot be un-run, and the recorded track is locked
-      // one frame per tick, so emit the last painted canvas instead of dropping
-      // the frame and shortening the video.
-      if (captureDue) this.recorder.captureFrame();
+      // The tick advanced and cannot be un-run, and the track is locked one frame
+      // per tick. Capturing here would blit a canvas this task never painted (the
+      // compositor already cleared it), so carry the frame to the next repaint.
+      if (captureDue) this.heldCaptures++;
       this.needsRender = true;
       return;
     }
@@ -556,7 +558,9 @@ export class Daydream {
     this.renderer.setScissorTest(true);
     this.renderMainView();
 
-    if (captureDue) this.recorder.captureFrame();
+    const captures = this.recorder ? (captureDue ? 1 : 0) + this.heldCaptures : 0;
+    this.heldCaptures = 0;
+    for (let i = 0; i < captures; i++) this.recorder.captureFrame();
 
     this.refreshLabels();
     if (this.labelPool.activeCount > 0) {

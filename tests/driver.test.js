@@ -526,6 +526,7 @@ function renderCtx(colors, log) {
     needsRender: true,
     labelAxes: false,
     recorder: null,
+    heldCaptures: 0,
     clock: { getDelta: () => 0 },
     advanceFrameClock: Daydream.prototype.advanceFrameClock,
     controls: { update: () => log.push('controls.update') },
@@ -562,59 +563,76 @@ test('render holds the repaint while instanceColor aliases a detached view', () 
 });
 
 /** Recorder stand-in counting the frames a session was asked to capture.
+ * @param {Array<string>} [log] - Ordered event sink shared with renderCtx().
  * @returns {Object} Recorder exposing `frames` and captureFrame().
  */
-function fakeRecorder() {
-  return { frames: 0, captureFrame() { this.frames++; } };
+function fakeRecorder(log) {
+  return { frames: 0, captureFrame() { this.frames++; log?.push('captureFrame'); } };
 }
 
 /** Turns a render context into one whose clock releases a simulation tick.
  * @param {Object} ctx - Context from renderCtx().
+ * @param {Array<string>} [log] - Ordered event sink shared with renderCtx().
  * @returns {Object} The same context, running with one interval accrued.
  */
-function runningCtx(ctx) {
+function runningCtx(ctx, log) {
   ctx.paused = false;
   ctx.timeAccumulator = 1; // clamped to the backlog cap, then one interval consumed
   ctx.stepSimulation = () => true;
-  ctx.recorder = fakeRecorder();
+  ctx.recorder = fakeRecorder(log);
   return ctx;
 }
 
-test('render captures one frame per advanced tick', () => {
+test('render captures one frame per advanced tick, after painting it', () => {
   const log = [];
-  const ctx = runningCtx(renderCtx(new Uint16Array(4), log));
+  const ctx = runningCtx(renderCtx(new Uint16Array(4), log), log);
   Daydream.prototype.render.call(ctx, null);
 
-  assert.ok(log.includes('renderMainView'));
   assert.equal(ctx.recorder.frames, 1);
+  assert.deepEqual(
+    log.filter((e) => e === 'renderMainView' || e === 'captureFrame'),
+    ['renderMainView', 'captureFrame'],
+    'captured a canvas this task had not painted');
 });
 
-test('render still captures a tick whose repaint a heap growth held', () => {
+test('a tick whose repaint a heap growth held captures on the next repaint', () => {
   const log = [];
-  const ctx = runningCtx(renderCtx(detachedView(), log));
+  const ctx = runningCtx(renderCtx(detachedView(), log), log);
   Daydream.prototype.render.call(ctx, null);
 
   assert.ok(!log.includes('renderMainView'), 'rendered from a detached array');
   assert.equal(ctx.needsRender, true);
-  // The track is locked one frame per tick; dropping this one shortens the video.
-  assert.equal(ctx.recorder.frames, 1, 'an advanced tick produced no video frame');
+  assert.equal(ctx.recorder.frames, 0, 'blitted a canvas this task never painted');
+  assert.equal(ctx.heldCaptures, 1);
+
+  // The next drawFrame re-points the alias, so the deferred frame lands with it.
+  ctx.dotMesh.instanceColor.array = new Uint16Array(4);
+  ctx.timeAccumulator = 1;
+  Daydream.prototype.render.call(ctx, null);
+
+  assert.ok(log.includes('renderMainView'));
+  // The track is locked one frame per tick; dropping one shortens the video.
+  assert.equal(ctx.recorder.frames, 2, 'an advanced tick produced no video frame');
+  assert.equal(ctx.heldCaptures, 0);
 });
 
 test('a held repaint that advanced no tick captures nothing', () => {
   const log = [];
   const ctx = renderCtx(detachedView(), log);
-  ctx.recorder = fakeRecorder();
+  ctx.recorder = fakeRecorder(log);
   Daydream.prototype.render.call(ctx, null);
 
   assert.equal(ctx.recorder.frames, 0);
+  assert.equal(ctx.heldCaptures, 0);
 });
 
 test('a held tick honours captureReady before capturing', () => {
   const log = [];
-  const ctx = runningCtx(renderCtx(detachedView(), log));
+  const ctx = runningCtx(renderCtx(detachedView(), log), log);
   Daydream.prototype.render.call(ctx, { captureReady: () => false });
 
   assert.equal(ctx.recorder.frames, 0, 'captured the cleared pre-composite buffer');
+  assert.equal(ctx.heldCaptures, 0, 'deferred a capture captureReady refused');
 });
 
 // ---------------------------------------------------------------------------
