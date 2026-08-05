@@ -111,6 +111,8 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
     'setParameter must report APPLIED for a known param name');
 
   engine.setAnimationsPaused(false);
+  // APPLIED, not FULL_FRAME_KEPT: DisplacementField's filter pipeline does not
+  // cross segment bands, so the clip narrows.
   assert.equal(engine.setClip(0, W, 0, H), M.ClipSetResult.APPLIED,
     'setClip must report APPLIED for a full-canvas band');
   engine.drawFrame();
