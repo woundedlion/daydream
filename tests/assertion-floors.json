@@ -1,15 +1,15 @@
 {
   "tests/app_lifecycle.test.js": {
-    "cases": 31,
-    "assertions": 57
+    "cases": 43,
+    "assertions": 83
   },
   "tests/banner.test.js": {
     "cases": 12,
-    "assertions": 14
+    "assertions": 29
   },
   "tests/bootstrap.test.js": {
-    "cases": 14,
-    "assertions": 55
+    "cases": 15,
+    "assertions": 58
   },
   "tests/clipboard.test.js": {
     "cases": 5,
@@ -24,8 +24,8 @@
     "assertions": 2095
   },
   "tests/cpp_format.test.js": {
-    "cases": 11,
-    "assertions": 22
+    "cases": 13,
+    "assertions": 20043
   },
   "tests/daydream_boot.test.js": {
     "cases": 4,
@@ -33,7 +33,7 @@
   },
   "tests/driver.test.js": {
     "cases": 64,
-    "assertions": 279
+    "assertions": 461
   },
   "tests/driver_clock.test.js": {
     "cases": 4,
@@ -44,12 +44,12 @@
     "assertions": 104
   },
   "tests/effect_sequencing.test.js": {
-    "cases": 55,
-    "assertions": 106
+    "cases": 56,
+    "assertions": 114
   },
   "tests/engine_contract_wasm.test.js": {
     "cases": 22,
-    "assertions": 650
+    "assertions": 665
   },
   "tests/engine_host.test.js": {
     "cases": 11,
@@ -57,15 +57,16 @@
   },
   "tests/engine_source_parity.test.js": {
     "cases": 4,
-    "assertions": 134
+    "assertions": 134,
+    "skippable": true
   },
   "tests/export_params.test.js": {
     "cases": 9,
-    "assertions": 5
+    "assertions": 9
   },
   "tests/frame_constants.test.js": {
     "cases": 1,
-    "assertions": 2
+    "assertions": 3
   },
   "tests/generate_importmap.test.js": {
     "cases": 8,
@@ -80,8 +81,8 @@
     "assertions": 28
   },
   "tests/gui.test.js": {
-    "cases": 17,
-    "assertions": 68
+    "cases": 21,
+    "assertions": 81
   },
   "tests/kb_format.test.js": {
     "cases": 5,
@@ -96,8 +97,8 @@
     "assertions": 136
   },
   "tests/mobius_transforms.test.js": {
-    "cases": 34,
-    "assertions": 865
+    "cases": 36,
+    "assertions": 949
   },
   "tests/page_lifecycle.test.js": {
     "cases": 13,
@@ -136,28 +137,28 @@
     "assertions": 17
   },
   "tests/run_tests.test.js": {
-    "cases": 17,
-    "assertions": 24
+    "cases": 20,
+    "assertions": 28
   },
   "tests/segment_controller.test.js": {
-    "cases": 84,
-    "assertions": 418
+    "cases": 87,
+    "assertions": 427
   },
   "tests/segment_crosscheck.test.js": {
     "cases": 4,
     "assertions": 212
   },
   "tests/segment_layout.test.js": {
-    "cases": 11,
-    "assertions": 180085
+    "cases": 13,
+    "assertions": 180158
   },
   "tests/segment_stats_view.test.js": {
     "cases": 10,
     "assertions": 91
   },
   "tests/segment_worker.test.js": {
-    "cases": 31,
-    "assertions": 99
+    "cases": 32,
+    "assertions": 113
   },
   "tests/shared.test.js": {
     "cases": 10,
@@ -165,7 +166,7 @@
   },
   "tests/sidebar.test.js": {
     "cases": 10,
-    "assertions": 71
+    "assertions": 79
   },
   "tests/sidebar_dom.test.js": {
     "cases": 6,
@@ -177,19 +178,19 @@
   },
   "tests/site_manifest.test.js": {
     "cases": 3,
-    "assertions": 478
+    "assertions": 543
   },
   "tests/slider.test.js": {
     "cases": 15,
     "assertions": 45
   },
   "tests/solid_codegen.test.js": {
-    "cases": 70,
-    "assertions": 350
+    "cases": 73,
+    "assertions": 391
   },
   "tests/solid_op_rows.test.js": {
     "cases": 9,
-    "assertions": 34
+    "assertions": 35
   },
   "tests/solid_render.test.js": {
     "cases": 13,
@@ -197,11 +198,11 @@
   },
   "tests/solids_registry_codegen.test.js": {
     "cases": 21,
-    "assertions": 63
+    "assertions": 70
   },
   "tests/state.test.js": {
-    "cases": 47,
-    "assertions": 1107
+    "cases": 50,
+    "assertions": 1123
   },
   "tests/switch_coordinator.test.js": {
     "cases": 15,
@@ -212,8 +213,8 @@
     "assertions": 51
   },
   "tests/tsconfig_roster.test.js": {
-    "cases": 3,
-    "assertions": 19
+    "cases": 4,
+    "assertions": 27
   },
   "tests/vendor-importmap.test.js": {
     "cases": 7,
@@ -221,6 +222,6 @@
   },
   "tests/wasm_provenance.test.js": {
     "cases": 6,
-    "assertions": 8
+    "assertions": 13
   }
 }

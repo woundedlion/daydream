@@ -217,12 +217,39 @@ test('a deleted test file falls below its floors', () => {
  * reported results, so unlike a deleted file it is still there, and a gated
  * suite runs nothing by design.
  */
-test('a wholly skipped suite keeps its floors', () => {
+test('a declared wholly skipped suite keeps its floors', () => {
   const { cases, asserts } = FILES['a.test.js'];
   writeFileSync(join(root, 'tests', 'a.test.js'), skipping(cases, asserts));
+  writeFloors({
+    'tests/a.test.js': { cases, assertions: cases * asserts, skippable: true },
+  });
   const out = run(PATTERN);
   assert.match(out, /2 assertions across 2 files/);
   assert.match(out, /wholly skipped:\n {2}tests\/a\.test\.js/);
+});
+
+/**
+ * Verifies the exemption is opt-in: an unconditional skip on a file whose
+ * floors do not declare it retires the file from gating, so it fails instead.
+ */
+test('an undeclared wholly skipped suite fails', () => {
+  const { cases, asserts } = FILES['a.test.js'];
+  writeFileSync(join(root, 'tests', 'a.test.js'), skipping(cases, asserts));
+  const err = runExpectingFailure(PATTERN);
+  assert.match(
+    err,
+    /every result was a skip[^]*\n {2}tests\/a\.test\.js/,
+  );
+  assert.match(err, /"skippable": true/);
+});
+
+/** Verifies a declaration of the wrong type is refused as malformed. */
+test('a non-boolean skippable declaration is malformed', () => {
+  writeFloors({
+    'tests/a.test.js': { cases: 2, assertions: 6, skippable: 'yes' },
+  });
+  const err = runExpectingFailure(PATTERN);
+  assert.match(err, /tests\/a\.test\.js/);
 });
 
 /** Verifies one skipped case does not exempt the cases that did run. */
@@ -247,9 +274,27 @@ test('a partly skipped file still fails its floors', () => {
 /** Verifies re-measuring does not retire a skipped file's floors to zero. */
 test('--update-floors keeps a wholly skipped floor', () => {
   writeFileSync(join(root, 'tests', 'a.test.js'), skipping(2, 3));
+  writeFloors({
+    'tests/a.test.js': { cases: 2, assertions: 6, skippable: true },
+  });
   run('--update-floors', PATTERN);
   assert.deepEqual(readFloors(), {
-    'tests/a.test.js': { cases: 2, assertions: 6 },
+    'tests/a.test.js': { cases: 2, assertions: 6, skippable: true },
+    'tests/b.test.js': { cases: 1, assertions: 2 },
+  });
+});
+
+/**
+ * Verifies re-measuring on a machine that holds the prerequisite carries the
+ * declaration over rather than stripping it from the file that ran.
+ */
+test('--update-floors keeps a skippable declaration on a file that ran', () => {
+  writeFloors({
+    'tests/a.test.js': { cases: 1, assertions: 1, skippable: true },
+  });
+  run('--update-floors', PATTERN);
+  assert.deepEqual(readFloors(), {
+    'tests/a.test.js': { cases: 2, assertions: 6, skippable: true },
     'tests/b.test.js': { cases: 1, assertions: 2 },
   });
 });
