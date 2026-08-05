@@ -173,6 +173,10 @@ function makeTeardown({ recorder = true, engine = true } = {}) {
   const pageTarget = fakeElement('window');
   const onKeyDown = () => {};
   const onUnhandledRejection = () => {};
+  const listeners = [['keydown', onKeyDown], ['unhandledrejection', onUnhandledRejection]];
+  // Registered as the app registers them; dispose's removal loop is only
+  // observable against listeners that are actually on the target.
+  for (const [type, handler] of listeners) pageTarget.addEventListener(type, handler);
   const host = {
     adapter: { drawFrame() {} },
     engine: engine
@@ -187,7 +191,7 @@ function makeTeardown({ recorder = true, engine = true } = {}) {
   let epoch = 0;
   const teardown = createAppTeardown({
     pageTarget,
-    listeners: [['keydown', onKeyDown], ['unhandledrejection', onUnhandledRejection]],
+    listeners,
     switches: { dispose() { log.push('switches.dispose'); } },
     stopTimers: () => log.push('stopTimers'),
     effectGui: { destroy() { log.push('effectGui.destroy'); } },
@@ -206,7 +210,8 @@ function makeTeardown({ recorder = true, engine = true } = {}) {
 test('the teardown listens for the page discard', () => {
   const t = makeTeardown();
 
-  assert.deepEqual(t.pageTarget.listeners.map((l) => l.type), ['pagehide']);
+  assert.deepEqual(t.pageTarget.listeners.map((l) => l.type),
+    ['keydown', 'unhandledrejection', 'pagehide']);
 });
 
 test('dispose releases in an order nothing can re-enter', () => {

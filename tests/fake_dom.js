@@ -71,7 +71,9 @@ export class FakeElement {}
  * the daydream modules read and write. Non-empty innerHTML assignments throw so
  * tests cannot silently accept markup construction that a browser would parse.
  * Listeners are recorded so a test can dispatch(type, event) and assert removal;
- * focus() and scrollIntoView() record their call counts the same way.
+ * focus() and scrollIntoView() record their call counts the same way. Removing a
+ * listener that was never added throws rather than no-opping as the DOM does, so
+ * a fixture that omits the add cannot hide a removal that never happens.
  * @param {string} [tag] - Tag name.
  * @returns {Object} Fake element.
  */
@@ -156,7 +158,8 @@ export function fakeElement(tag = 'div') {
     removeEventListener(type, handler) {
       const at = this.listeners.findIndex(
         (l) => l.type === type && l.handler === handler);
-      if (at >= 0) this.listeners.splice(at, 1);
+      if (at < 0) throw new Error(`removeEventListener: no ${type} listener registered`);
+      this.listeners.splice(at, 1);
     },
     dispatch(type, event = {}) {
       // The dispatching node is the default target, as in the DOM; a test
