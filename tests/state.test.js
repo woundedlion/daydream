@@ -1,6 +1,13 @@
 import { test, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { AppState, URLSync, getActiveURLSync, roundUrlNumber, writeUrl } from '../state.js';
+import {
+  AppState,
+  URLSync,
+  getActiveURLSync,
+  replaceUrl,
+  roundUrlNumber,
+  writeUrl,
+} from '../state.js';
 
 // Dispose the active URLSync before restoring window: a debounced flush() would
 // otherwise fire into a deleted window after teardown.
@@ -173,8 +180,35 @@ test('URLSync.reset leaves a bare path when nothing survives', () => {
   const sync = new URLSync(new AppState({ effect: 'Voronoi' }), []);
 
   sync.reset();
+  sync.flush();
 
   assert.deepEqual(calls, ['/sim#frag']);
+});
+
+/**
+ * replaceState is rate-limited (WebKit throws past ~100 writes per 30 s) and the
+ * URL is cosmetic: a refused write must not surface as an app failure, least of
+ * all inside a switch rollback, where it would be read as unrecoverable state.
+ */
+test('a refused history write does not propagate out of the URL layer', () => {
+  const warnings = [];
+  globalThis.window = {
+    location: { search: '', pathname: '/sim', hash: '' },
+    history: { replaceState() { throw new Error('rate limit'); } },
+  };
+  const warn = console.warn;
+  console.warn = (...args) => { warnings.push(args); };
+  try {
+    assert.doesNotThrow(() => replaceUrl('/sim?effect=Voronoi'));
+    assert.doesNotThrow(() => writeUrl(new URLSearchParams('effect=Voronoi')));
+
+    const sync = new URLSync(new AppState({ effect: 'Voronoi' }), ['effect']);
+    assert.doesNotThrow(() => { sync.reset(); sync.flush(); });
+    assert.doesNotThrow(() => sync.flush());
+  } finally {
+    console.warn = warn;
+  }
+  assert.equal(warnings.length, 4, 'every refused write is reported once');
 });
 
 test('URLSync reads initial tracked keys from the URL into state', () => {
@@ -409,6 +443,7 @@ test('URLSync.reset re-asserts tracked state over an ad-hoc write of the same ke
 
   sync.setParam('resolution', 'low');
   sync.reset(['resolution']);
+  sync.flush();
 
   const params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
   assert.equal(params.get('resolution'), 'high');
@@ -423,6 +458,7 @@ test('URLSync.reset carries an excluded ad-hoc write over the value it replaces'
   sync.setParam('speed', 3); // untracked, still buffered inside the debounce window
   sync.setParam('junk', 9);
   sync.reset(['resolution', 'speed']);
+  sync.flush();
 
   const params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
   assert.equal(params.get('speed'), '3', 'the buffered write survives, not the URL value it replaces');
@@ -533,6 +569,7 @@ test('URLSync.reset preserves the excluded keys and clears the rest', () => {
   const sync = new URLSync(s, ['effect']);
 
   sync.reset(['junk']);
+  sync.flush();
 
   assert.equal(calls.length, 1);
   const params = new URLSearchParams(calls[0].split('?')[1]);
@@ -617,21 +654,49 @@ test('URLSync writes nothing when the URL already matches state', () => {
   }
 });
 
-test('URLSync.reset cancels a pending debounced flush', () => {
+test('URLSync.reset collapses into the pending debounced flush', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const calls = installWindow('?effect=Voronoi', '/sim');
+    const calls = installWindow('?effect=Voronoi&speed=2', '/sim');
     const s = new AppState({ effect: 'Voronoi' });
     const sync = new URLSync(s, ['effect']);
 
     s.set('effect', 'Moire'); // arms the 200 ms debounce
-    sync.reset();             // resets immediately and must cancel the pending flush
-    assert.equal(calls.length, 1, 'reset wrote once');
+    sync.reset();
+    assert.equal(calls.length, 0, 'no write outside the debounce');
 
-    mock.timers.tick(200);    // would fire the cancelled flush if still armed
-    assert.equal(calls.length, 1, 'no stale debounced write fired after reset');
+    mock.timers.tick(200);
+    assert.equal(calls.length, 1, 'the reset and the pending change share one write');
     const params = new URLSearchParams(calls[0].split('?')[1]);
     assert.equal(params.get('effect'), 'Moire', 'reset re-asserted current state');
+    assert.equal(params.has('speed'), false, 'unexcluded params are cleared');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+/**
+ * Every effect switch resets the URL, so a burst must cost one write rather than
+ * one per switch: spending the browser's replaceState budget is what makes it
+ * throw.
+ */
+test('a burst of resets costs a single URL write', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const calls = installWindow('?effect=Voronoi&fx.speed=2', '/sim');
+    const s = new AppState({ effect: 'Voronoi' });
+    const sync = new URLSync(s, ['effect']);
+
+    for (const effect of ['Moire', 'Comets', 'Voronoi']) {
+      s.set('effect', effect);
+      sync.reset(['effect']);
+    }
+    mock.timers.tick(200);
+
+    assert.equal(calls.length, 1);
+    const params = new URLSearchParams(calls[0].split('?')[1]);
+    assert.equal(params.get('effect'), 'Voronoi');
+    assert.equal(params.has('fx.speed'), false, "the outgoing effect's params are gone");
   } finally {
     mock.timers.reset();
   }

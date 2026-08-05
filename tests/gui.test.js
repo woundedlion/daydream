@@ -664,6 +664,7 @@ test('resetGUI routes through the active URLSync', () => {
   new URLSync(new AppState({ effect: 'Old' }), ['effect']);
 
   resetGUI(['keep']);
+  getActiveURLSync().flush();
 
   const q = new URL(url.written(), 'http://x').searchParams;
   assert.equal(q.get('Speed'), null);
