@@ -550,6 +550,10 @@ durationEl.className = 'rec-duration';
 durationEl.style.display = 'none';
 document.getElementById('canvas-container')?.appendChild(durationEl);
 
+// Last string written to durationEl, so the animation loop only touches the DOM
+// on a second boundary rather than on every display frame.
+let durationText = null;
+
 /**
  * Reflects the session state in the canvas styling, duration readout, and record
  * button label.
@@ -557,6 +561,7 @@ document.getElementById('canvas-container')?.appendChild(durationEl);
  * @returns {void}
  */
 const showRecording = (recording) => {
+  durationText = null;
   const canvasEl = document.getElementById('canvas-container');
   if (recording) {
     canvasEl?.classList.add('recording');
@@ -596,7 +601,11 @@ daydream.renderer.setAnimationLoop(() => {
     daydream.render(host.adapter);
   }
   if (host.recorder?.isRecording) {
-    durationEl.textContent = host.recorder.elapsedFormatted;
+    const elapsed = host.recorder.elapsedFormatted;
+    if (elapsed !== durationText) {
+      durationText = elapsed;
+      durationEl.textContent = elapsed;
+    }
   }
 });
 
