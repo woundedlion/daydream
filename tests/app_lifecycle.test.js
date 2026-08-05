@@ -6,6 +6,7 @@ import {
   displayAliasesDiverged,
   createRenderAdapter,
   createAppTeardown,
+  createApplyNotice,
   createGlobalKeydownHandler,
   createModuleLoadHandlers,
   createPoleLodBinding,
@@ -19,7 +20,8 @@ import {
 // sphere, a stuck walk, or a leak: all display aliases reference one WASM view,
 // a segmented frame is composited instead of drawn, dispose releases in an order
 // that cannot re-enter the apply path or reach a freed engine, the Test All walk
-// advances its own index, and a segmented toggle burst spawns one worker pool.
+// advances its own index, a segmented toggle burst spawns one worker pool, and
+// one subsystem's notice survives another's clear.
 
 /**
  * Driver double carrying the two display aliases and the dispose sink.
@@ -660,6 +662,116 @@ test('stopping cancels the interval, and starting arms exactly one', () => {
 
   h.ticker.start();
   assert.equal(h.timer.handle, 2, 'a stopped ticker starts again');
+});
+
+// The shared notice element: the parameter writer and the switch coordinator
+// both announce through it, so ownership decides whose message a clear drops.
+
+/**
+ * Build the notice sink over fake notice elements and a timer the test fires by
+ * hand.
+ * @returns {Object} The sink, the two elements, and the pending timeout.
+ */
+function makeApplyNotice() {
+  const body = fakeElement('div');
+  const text = fakeElement('span');
+  body.hidden = true;
+  const timer = { fn: null, ms: null, handle: 0, cancelled: [] };
+  const notice = createApplyNotice({
+    doc: {
+      getElementById: (id) => ({
+        'apply-notice-body': body,
+        'apply-notice-text': text,
+      }[id] ?? null),
+    },
+    timeoutMs: 8000,
+    schedule: (fn, ms) => { timer.fn = fn; timer.ms = ms; return ++timer.handle; },
+    cancel: (handle) => { timer.cancelled.push(handle); timer.fn = null; },
+  });
+  return {
+    notice,
+    body,
+    text,
+    timer,
+    expire: () => timer.fn(),
+  };
+}
+
+test('a param write does not clear a notice the switch coordinator raised', () => {
+  const h = makeApplyNotice();
+
+  h.notice.show('Effect change was rejected.', 'switch');
+  h.notice.show(null, 'param');
+
+  assert.equal(h.text.textContent, 'Effect change was rejected.',
+    'a slider nudge after a rejected switch must not erase the only '
+    + 'explanation the user was given');
+  assert.equal(h.body.hidden, false);
+  assert.equal(h.notice.owner(), 'switch');
+});
+
+test('a raised notice takes the element over from another owner', () => {
+  const h = makeApplyNotice();
+
+  h.notice.show('Effect change was rejected.', 'switch');
+  h.notice.show('Parameter "spin" was rejected.', 'param');
+
+  assert.equal(h.text.textContent, 'Parameter "spin" was rejected.');
+  assert.equal(h.notice.owner(), 'param');
+  assert.deepEqual(h.timer.cancelled, [1],
+    "the displaced owner's self-clear must not fire against the new message");
+});
+
+test('an owner clears the notice it raised', () => {
+  const h = makeApplyNotice();
+
+  h.notice.show('Parameter "spin" was rejected.', 'param');
+  h.notice.show(null, 'param');
+
+  assert.equal(h.text.textContent, '');
+  assert.equal(h.body.hidden, true);
+  assert.equal(h.notice.owner(), null, 'a cleared element is owned by nobody');
+});
+
+test('a clear on an unowned element is a no-op, not a crash', () => {
+  const h = makeApplyNotice();
+
+  h.notice.show(null, 'param');
+
+  assert.equal(h.body.hidden, true);
+  assert.equal(h.notice.owner(), null);
+});
+
+test('the notice self-clears so a stale rejection cannot outlive its action', () => {
+  const h = makeApplyNotice();
+
+  h.notice.show('Effect change was rejected.', 'switch');
+  assert.equal(h.timer.ms, 8000);
+  h.expire();
+
+  assert.equal(h.text.textContent, '');
+  assert.equal(h.body.hidden, true);
+  assert.equal(h.notice.owner(), null);
+});
+
+test('the dismiss button and the teardown clear whoever raised the notice', () => {
+  const h = makeApplyNotice();
+
+  h.notice.show('Effect change was rejected.', 'switch');
+  h.notice.clear();
+
+  assert.equal(h.text.textContent, '');
+  assert.equal(h.body.hidden, true);
+  assert.deepEqual(h.timer.cancelled, [1], 'the pending self-clear is cancelled');
+});
+
+test('the notice tolerates a page missing the element', () => {
+  const notice = createApplyNotice({ doc: { getElementById: () => null } });
+
+  notice.show('Effect change was rejected.', 'switch');
+  notice.clear();
+
+  assert.equal(notice.owner(), null);
 });
 
 // The segmented spawn guard: spawning awaits a module warm-up, so a toggle burst

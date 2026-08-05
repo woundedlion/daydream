@@ -1,7 +1,7 @@
 {
   "tests/app_lifecycle.test.js": {
-    "cases": 43,
-    "assertions": 83
+    "cases": 50,
+    "assertions": 102
   },
   "tests/banner.test.js": {
     "cases": 12,
@@ -28,8 +28,8 @@
     "assertions": 20043
   },
   "tests/daydream_boot.test.js": {
-    "cases": 4,
-    "assertions": 12
+    "cases": 5,
+    "assertions": 16
   },
   "tests/driver.test.js": {
     "cases": 64,
