@@ -55,6 +55,10 @@
     "cases": 11,
     "assertions": 21
   },
+  "tests/engine_source_parity.test.js": {
+    "cases": 4,
+    "assertions": 134
+  },
   "tests/export_params.test.js": {
     "cases": 9,
     "assertions": 5
