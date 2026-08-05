@@ -85,8 +85,10 @@ const LoResFavorites = [
 
 // Display metadata (dot size), geometry, and the effect list offered per
 // resolution. The dropdown offers only the subset the engine reports through
-// getSupportedResolutions().
+// getSupportedResolutions(). Null prototype: a URL string indexes this table, and
+// an inherited key ("constructor", "toString") would answer as a preset.
 const resolutionPresets = {
+  __proto__: null,
   "Holosphere (96x20)": { h: 20, w: 96, dotSize: 2, favorites: LoResFavorites },
   "Phantasm (288x144)": { h: 144, w: 288, dotSize: 0.25, favorites: HiResFavorites },
 };
@@ -126,7 +128,7 @@ const appState = new AppState({
   resolution: "Phantasm (288x144)",
 });
 const urlSync = new URLSync(appState, ['effect', 'resolution'], {
-  resolution: (v) => Boolean(resolutionPresets[v]),
+  resolution: (v) => Object.hasOwn(resolutionPresets, v),
   effect: (v) => knownEffects.has(v),
 });
 
