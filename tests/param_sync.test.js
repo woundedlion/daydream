@@ -80,6 +80,12 @@ test('enum: duplicate labels are disambiguated, never dropped', () => {
   assert.equal(choices['Mode'], 0);
 });
 
+test('enum: a label matching an Object.prototype member keeps its own name', () => {
+  const choices = enumChoices(['toString', 'Warp', 'valueOf']);
+  assert.deepEqual(choices, { toString: 0, Warp: 1, valueOf: 2 });
+  assert.deepEqual(Object.keys(choices), ['toString', 'Warp', 'valueOf']);
+});
+
 // paramControlKind picks the lil-gui control the effect GUI builds for one
 // engine parameter definition.
 
