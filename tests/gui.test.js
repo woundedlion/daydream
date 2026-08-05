@@ -303,6 +303,88 @@ test('DeepLinkGUI.add clamps an out-of-range numeric URL value to the slider min
 });
 
 /**
+ * The URL path bypasses lil-gui's own step snapping, so a numeric add() carrying
+ * a step snaps the deep-linked value onto the step grid and rewrites the stale
+ * off-grid one. A value already on the grid is left alone: the snap multiply's
+ * float noise (0.3 → 0.30000000000000004) is inside the step tolerance, so it
+ * must not read as a correction and re-persist the value.
+ */
+test('DeepLinkGUI.add snaps a numeric URL value to the control step', () => {
+  const offGrid = installRecordingWindow('?speed=2.7');
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const obj = { speed: 1 };
+    const replayed = [];
+    new DeepLinkGUI({ autoPlace: false })
+      .add(obj, 'speed', 0, 10, 0.5)
+      .onChange((v) => replayed.push(v));
+    assert.equal(obj.speed, 2.5, 'the URL value snaps to a step multiple');
+    assert.deepEqual(replayed, [2.5], 'the snapped value replays through onChange');
+    mock.timers.tick(200);
+    assert.equal(new URL(offGrid.written(), 'http://x').searchParams.get('speed'), '2.5',
+      'the snapped value replaces the off-grid one in the URL');
+
+    const onGrid = installRecordingWindow('?speed=0.3');
+    const gridObj = { speed: 1 };
+    new DeepLinkGUI({ autoPlace: false }).add(gridObj, 'speed', 0, 1, 0.1);
+    assert.ok(Math.abs(gridObj.speed - 0.3) < 1e-9, 'an on-grid value survives the snap');
+    mock.timers.tick(200);
+    assert.equal(onGrid.written(), '/', 'an on-grid value triggers no URL rewrite');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+/**
+ * lil-gui keeps a single onChange slot, so DeepLinkGUI fans caller handlers out:
+ * a second registration composes with the first instead of clobbering it, and
+ * the URL writer still runs behind both.
+ */
+test('DeepLinkGUI.add fans a change out to every registered onChange handler', () => {
+  const url = installRecordingWindow('');
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const first = [];
+    const second = [];
+    const controller = new DeepLinkGUI({ autoPlace: false }).add({ speed: 1 }, 'speed', 0, 10);
+    controller.onChange((v) => first.push(v));
+    controller.onChange((v) => second.push(v));
+    controller.setValue(5);
+    mock.timers.tick(200);
+
+    assert.deepEqual(first, [5], 'the first-registered handler still fires');
+    assert.deepEqual(second, [5], 'the second-registered handler fires too');
+    assert.equal(new URL(url.written(), 'http://x').searchParams.get('speed'), '5',
+      'the URL writer survives behind the fan-out');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+/**
+ * addSession is the deep-link opt-out: a session control is neither seeded from
+ * the URL nor written back, so a copied link cannot auto-activate a cycler or a
+ * recording toggle.
+ */
+test('DeepLinkGUI.addSession keeps a session control out of the URL', () => {
+  const url = installRecordingWindow('?Cycle=on');
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const gui = new DeepLinkGUI({ autoPlace: false });
+    const obj = { Cycle: false, Record: false };
+    gui.addSession(obj, 'Cycle');
+    gui.addSession(obj, 'Record').setValue(true);
+    mock.timers.tick(200);
+
+    assert.equal(obj.Cycle, false, 'a session control is not seeded from the URL');
+    assert.deepEqual(gui.collectUrlKeys(), [], 'no session key is deep-linked');
+    assert.equal(url.written(), '/', 'a session change writes no URL param');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+/**
  * Verifies a non-numeric URL value for a numeric control (e.g. ?speed=fast →
  * NaN) is rejected: the bound default is kept and no applyOnLoad replay fires, so
  * a malformed deep link never reaches the engine as NaN.
