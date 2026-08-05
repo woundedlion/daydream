@@ -2,10 +2,12 @@
 // tsconfig.json's `files` roster is hand-maintained and `noResolve: true` means
 // imports are never followed, so a module the roster misses degrades to `any`
 // with no diagnostic — the typecheck stays green while checking nothing about
-// it. These cases keep the roster closed under the pipeline's own imports.
+// it, and a `// @ts-check` pragma on an unrostered file is inert for the same
+// reason. These cases keep the roster closed under the pipeline's own imports
+// and over every file that claims the pragma.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = new URL('../', import.meta.url);
@@ -13,6 +15,10 @@ const ROOT = new URL('../', import.meta.url);
 // Emscripten glue: an install output copied from Holosphere, checked by its
 // build there, and far too large to type-check usefully here.
 const NOT_CHECKED = new Set(['holosphere_wasm.js']);
+
+// Never entered: dependency and git metadata, the vendored third-party drops,
+// and tests/, which tsconfig.json puts out of scope on purpose.
+const SKIP_DIRS = new Set(['node_modules', '.git', 'vendor', 'three.js', 'tests']);
 
 /**
  * Reads tsconfig.json, which carries `//` comments JSON.parse rejects. Only
@@ -62,6 +68,26 @@ function reachableFrom(roster) {
   return seen;
 }
 
+/**
+ * Every in-scope source carrying a `// @ts-check` pragma.
+ * @param {string} dir - Repo-relative directory, '' for the root.
+ * @returns {string[]} Repo-relative module paths.
+ */
+function pragmaFilesUnder(dir) {
+  const found = [];
+  for (const entry of readdirSync(new URL(dir, ROOT), { withFileTypes: true })) {
+    const path = `${dir}${entry.name}`;
+    if (entry.isDirectory()) {
+      if (!SKIP_DIRS.has(entry.name)) found.push(...pragmaFilesUnder(`${path}/`));
+    } else if (/\.m?js$/.test(entry.name) && !NOT_CHECKED.has(path)) {
+      if (/^\s*\/\/\s*@ts-check\s*$/m.test(readFileSync(new URL(path, ROOT), 'utf8'))) {
+        found.push(path);
+      }
+    }
+  }
+  return found;
+}
+
 test('every module the typecheck roster reaches is itself on the roster', () => {
   const roster = readTsconfig().files;
   const missing = [...reachableFrom(roster)].filter((f) => !roster.includes(f));
@@ -69,6 +95,16 @@ test('every module the typecheck roster reaches is itself on the roster', () => 
   assert.deepEqual(missing, [],
     'an unlisted module is silently `any` under noResolve — add it to '
     + 'tsconfig.json "files" or the typecheck stops seeing its types');
+});
+
+test('every `// @ts-check` module is on the typecheck roster', () => {
+  const roster = readTsconfig().files;
+  const inert = pragmaFilesUnder('').filter((f) => !roster.includes(f));
+
+  assert.deepEqual(inert, [],
+    'the pragma only bites on a file tsc actually compiles — add it to '
+    + 'tsconfig.json "files" or drop the pragma, which otherwise reads as '
+    + 'coverage the file does not have');
 });
 
 test('the typecheck roster lists no module that has gone away', () => {
