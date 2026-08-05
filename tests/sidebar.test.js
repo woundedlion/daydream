@@ -94,15 +94,35 @@ test('setEffects rebuilds cleanly without leaking the old roster', () => {
 });
 
 test('applySortOrder reorders the existing button nodes in place', () => {
-  const { sidebar } = makeSidebar();
+  const { sidebar, selected } = makeSidebar();
   sidebar.setEffects(['Charlie', 'alpha', 'Bravo'], {});
   const order = () => sidebar.listEl.children.map((b) => b.dataset.effect);
+  const bravo = sidebar.buttons.get('Bravo');
+  const bravoClick = bravo.onclick;
+  sidebar.setActive('Bravo');
+  document.activeElement = bravo;
+
   sidebar.sortBy('name', 'asc');
   assert.deepEqual(order(), ['alpha', 'Bravo', 'Charlie']);
   sidebar.sortBy('name', 'desc');
   assert.deepEqual(order(), ['Charlie', 'Bravo', 'alpha']);
-  // Same node identities throughout (nodes moved, not recreated).
+
+  // The node was moved, not recreated: the roster entry and the listed node are
+  // still the button captured before the sorts.
+  assert.equal(sidebar.buttons.get('Bravo'), bravo, 'the roster keeps the same node');
+  assert.equal(sidebar.listEl.children[1], bravo, 'the list holds that same node');
   assert.equal(sidebar.buttons.size, 3);
+  // Focus survives because the focused node itself is what moved.
+  assert.equal(document.activeElement, bravo);
+  assert.ok(sidebar.listEl.children.includes(document.activeElement),
+    'the focused node is still in the list');
+  // The roving tab stop is that node, so Tab still lands on the active effect.
+  assert.equal(sidebar.tabbableBtn, bravo);
+  assert.equal(bravo.tabIndex, 0);
+  // The click closure attached at build time is untouched and still selects.
+  assert.equal(bravo.onclick, bravoClick);
+  bravo.onclick();
+  assert.deepEqual(selected, ['Bravo']);
 });
 
 test('setActive toggles active/aria-selected on only the old and new buttons', () => {
