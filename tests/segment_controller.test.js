@@ -20,6 +20,7 @@ const {
   BOOT_WATCHDOG_MS,
   INIT_WATCHDOG_MS,
   RENDER_WATCHDOG_MS,
+  WARM_INTERVAL_MS,
   warmModules,
 } = await import('../segment_controller.js');
 const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
@@ -56,11 +57,12 @@ const consoleMocks = Object.keys(EXPECTED_CONSOLE_MESSAGES)
     if (!expected) originalConsole[method](...args);
   }));
 
-test('warmModules refreshes the worker, glue, and binary cache entries', async () => {
+test('warmModules revalidates the worker, glue, and binary cache entries', async () => {
   const calls = [];
   const response = { arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) };
   await warmModules({
     baseUrl: 'http://localhost:8000/segment_controller.js',
+    minIntervalMs: 0,
     fetch: (url, options) => {
       calls.push([url.href, options]);
       return Promise.resolve(response);
@@ -72,8 +74,27 @@ test('warmModules refreshes the worker, glue, and binary cache entries', async (
     'http://localhost:8000/holosphere_wasm.js',
     'http://localhost:8000/holosphere_wasm.wasm',
   ]);
+  // 'reload' would re-download all 1.8 MB per call; 'no-cache' still refetches a
+  // rebuilt binary because the artifacts are served unversioned.
   for (const [, options] of calls)
-    assert.deepEqual(options, { cache: 'reload' });
+    assert.deepEqual(options, { cache: 'no-cache' });
+});
+
+test('warmModules skips a re-warm inside the dedupe window', async () => {
+  let calls = 0;
+  const response = { arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) };
+  const deps = {
+    baseUrl: 'http://localhost:8000/segment_controller.js',
+    fetch: () => { calls++; return Promise.resolve(response); },
+  };
+  await warmModules({ ...deps, minIntervalMs: 0 });
+  assert.equal(calls, 3, 'a forced warm fetches the whole module graph');
+
+  await warmModules({ ...deps, minIntervalMs: WARM_INTERVAL_MS });
+  assert.equal(calls, 3, 'a slider-drag re-warm reuses the previous warm');
+
+  await warmModules({ ...deps, minIntervalMs: 0 });
+  assert.equal(calls, 6, 'a warm past the window fetches again');
 });
 
 // ---------------------------------------------------------------------------
