@@ -181,16 +181,16 @@ function sampleLut(lut) {
 // still read a few LSB: the gamut LUT supplies only the bracket the walk
 // refines, so its cell size sets the residue.
 const BAKE_GOLDEN = {
-  STRAIGHT: [[241, 83, 136], [242, 94, 64], [213, 125, 0], [178, 146, 0], [131, 164, 24],
-    [43, 176, 102], [0, 172, 157], [0, 167, 192], [33, 158, 233]],
-  CIRCULAR: [[241, 83, 136], [233, 107, 0], [177, 147, 0], [92, 172, 72], [0, 172, 159],
-    [0, 163, 216], [123, 137, 248], [197, 106, 217], [241, 83, 136]],
-  VIGNETTE: [[0, 0, 0], [244, 84, 119], [234, 106, 0], [186, 142, 0], [130, 164, 25],
+  STRAIGHT: [[241, 83, 136], [246, 90, 58], [213, 125, 0], [178, 146, 0], [130, 165, 0],
+    [0, 178, 96], [0, 172, 157], [0, 167, 192], [0, 158, 238]],
+  CIRCULAR: [[241, 83, 136], [234, 106, 0], [178, 146, 0], [75, 176, 29], [0, 172, 157],
+    [0, 163, 212], [117, 137, 255], [200, 101, 224], [241, 83, 136]],
+  VIGNETTE: [[0, 0, 0], [245, 83, 119], [234, 106, 1], [186, 142, 0], [130, 165, 0],
     [1, 176, 119], [0, 170, 175], [1, 161, 225], [0, 0, 0]],
-  FALLOFF: [[241, 83, 136], [233, 107, 0], [177, 147, 0], [92, 172, 72], [0, 172, 159],
-    [0, 163, 216], [0, 80, 117], [1, 1, 1], [0, 0, 0]],
-  STRAIGHT_MIXED: [[169, 62, 0], [147, 101, 0], [122, 127, 2], [78, 148, 90], [50, 158, 145],
-    [0, 130, 146], [0, 99, 143], [23, 56, 160], [57, 4, 127]],
+  FALLOFF: [[241, 83, 136], [233, 107, 0], [177, 147, 0], [69, 176, 37], [0, 172, 159],
+    [0, 163, 216], [0, 80, 117], [0, 1, 1], [0, 0, 0]],
+  STRAIGHT_MIXED: [[169, 62, 0], [147, 101, 0], [122, 127, 0], [74, 149, 88], [49, 158, 145],
+    [0, 130, 146], [0, 99, 143], [18, 52, 169], [57, 0, 128]],
 };
 
 /**
@@ -231,6 +231,27 @@ test('GenerativePalette bakes the golden LUT through the engine bridge', () => {
     assert.deepEqual(sampleLut(pal.lut), BAKE_GOLDEN.VIGNETTE);
   } finally {
     P.setPaletteOps(null);
+    ops.delete();
+  }
+});
+
+/** Verifies exact complementary half-turns keep one hue direction across the base-hue wheel. */
+test('PaletteOps complementary circular LUTs vary continuously across base hues', () => {
+  const ops = new M.PaletteOps();
+  let maxChannelStep = 0;
+  try {
+    for (let hue = 0; hue < 256; hue++) {
+      const nextHue = (hue + 1) & 255;
+      const current = Uint8Array.from(ops.bakeLut(
+        1, hue, 255, 255, (hue + 128) & 255, 255, 255, hue, 255, 255));
+      const next = Uint8Array.from(ops.bakeLut(
+        1, nextHue, 255, 255, (nextHue + 128) & 255, 255, 255, nextHue, 255, 255));
+      for (let i = 0; i < current.length; i++) {
+        maxChannelStep = Math.max(maxChannelStep, Math.abs(current[i] - next[i]));
+      }
+    }
+    assert.ok(maxChannelStep <= 32, `adjacent base hues jumped by ${maxChannelStep} sRGB levels`);
+  } finally {
     ops.delete();
   }
 });
