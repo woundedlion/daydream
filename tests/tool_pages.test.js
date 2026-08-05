@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -9,6 +9,38 @@ const PAGES = ['lissajous', 'mobius', 'palettes', 'solids'];
 const read = (...p) => readFileSync(join(REPO, ...p), 'utf8');
 const pageSrc = (name) => read('tools', `${name}.html`);
 const headOf = (src) => src.slice(src.indexOf('<head>'), src.indexOf('</head>'));
+
+// Relative module specifiers, covering `import`, `export … from` and `import()`.
+const SPECIFIER = /(?:from|import)\s*\(?\s*['"](\.[^'"]+\.js)['"]/g;
+
+/**
+ * The tools/ modules a page ends up loading. The walk follows the app's own
+ * modules too, so a tool module a page reaches only through one (index.html
+ * pulls the banner via bootstrap.js) is found; only tools/ modules are
+ * collected, since the rest carry no shared-stylesheet obligation.
+ * @param {string} page - Repo-relative page path.
+ * @returns {string[][]} Path segments of each tools/ module, sorted.
+ */
+const scriptsOf = (page) => {
+  const found = new Set();
+  const seen = new Set();
+  const walk = (file) => {
+    if (seen.has(file) || !existsSync(join(REPO, file))) return;
+    seen.add(file);
+    if (posix.dirname(file) === 'tools' && file.endsWith('.js')) found.add(file);
+    const src = read(file);
+    // A page's own `src` attributes are page-relative; a module specifier is
+    // relative only when it says so, and a bare one names a vendored package.
+    const specs = file.endsWith('.html')
+      ? [...src.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)]
+        .map(([, s]) => s).filter((s) => !s.includes('://'))
+      : [];
+    for (const [, spec] of src.matchAll(SPECIFIER)) specs.push(spec);
+    for (const spec of specs) walk(posix.join(posix.dirname(file), spec));
+  };
+  walk(page);
+  return [...found].sort().map((f) => f.split('/'));
+};
 
 // Every page the app serves, paired with the stylesheets it links: the tool
 // pages share tools/, index.html has its own. The CSP and undefined-class gates
@@ -20,7 +52,7 @@ const SERVED_PAGES = [
     sheets: [['tools', 'tailwind.css'], ['tools', 'tools.css']],
   })),
   { page: 'index.html', sheets: [['styles', 'index.css']] },
-];
+].map((entry) => ({ ...entry, scripts: scriptsOf(entry.page) }));
 
 /**
  * Class names a stylesheet defines. Tailwind escapes the characters it allows in
@@ -38,18 +70,55 @@ const definedClasses = (css) => {
 };
 
 /**
- * Class tokens a page's static markup references. Inline scripts build markup
- * from template literals, so tokens carrying interpolation or JS punctuation are
+ * Splits a class attribute value into `tokens`. Inline scripts build markup from
+ * template literals, so tokens carrying interpolation or JS punctuation are
  * dropped rather than reported as undefined classes.
+ * @param {Set<string>} tokens - Set the tokens are added to.
+ * @param {string} value - Whitespace-separated class list.
+ * @returns {void}
+ */
+const addTokens = (tokens, value) => {
+  for (const token of value.split(/\s+/)) {
+    if (token && !/[${}<>()'"+=?]/.test(token)) tokens.add(token);
+  }
+};
+
+/**
+ * Class tokens a page's static markup references.
  * @param {string} src - Page source.
  * @returns {Set<string>} Referenced class tokens.
  */
 const referencedClasses = (src) => {
   const tokens = new Set();
-  for (const [, value] of src.matchAll(/class="([^"]*)"/g)) {
-    for (const token of value.split(/\s+/)) {
-      if (token && !/[${}<>()'"+=?]/.test(token)) tokens.add(token);
+  for (const [, value] of src.matchAll(/class="([^"]*)"/g)) addTokens(tokens, value);
+  return tokens;
+};
+
+/**
+ * Class tokens a script puts on the elements it builds. Reads the three forms
+ * the tool modules use — `className =`, `classList.add`/`toggle`, and the
+ * `…Class`/`…Classes` options a caller can override — each of which names its
+ * value as a class list; a class assembled some other way (passed positionally,
+ * built by interpolation) is out of reach and simply goes ungated.
+ * @param {string} src - Script source.
+ * @returns {Set<string>} Referenced class tokens.
+ */
+const scriptClasses = (src) => {
+  const tokens = new Set();
+  const literals = (s) => [...s.matchAll(/(['"`])([^'"`]*)\1/g)].map(([, , v]) => v);
+  for (const [, , value] of src.matchAll(/\.className\s*=\s*(['"`])([^'"`]*)\1/g)) {
+    addTokens(tokens, value);
+  }
+  for (const [, method, args] of src.matchAll(/\.classList\.(add|toggle)\(([^)]*)\)/g)) {
+    // toggle's second argument is a force flag, not a class.
+    const values = literals(args);
+    for (const value of method === 'toggle' ? values.slice(0, 1) : values) {
+      addTokens(tokens, value);
     }
+  }
+  for (const [, binding] of src.matchAll(
+    /\b\w*[Cc]lass(?:es)?\s*[:=]\s*(\[[^\]]*\]|(['"`])[^'"`]*\2)/g)) {
+    for (const value of literals(binding)) addTokens(tokens, value);
   }
   return tokens;
 };
@@ -94,13 +163,16 @@ test('tool pages link tailwind.css last so utilities outrank page rules', () => 
   }
 });
 
-// Classes carried purely as querySelector hooks; nothing styles them.
+// Classes carried purely as querySelector hooks; nothing styles them. The
+// banner's two are inline-styled on purpose — it has to render on a page whose
+// stylesheet is what failed.
 const BEHAVIOR_HOOKS = new Set([
   'op-param', 'move-op-up', 'move-op-down', 'remove-op-btn',
+  'fatal-error-message', 'fatal-error-dismiss',
 ]);
 
 test('every served page\'s stylesheets define every class it uses', () => {
-  for (const { page, sheets } of SERVED_PAGES) {
+  for (const { page, sheets, scripts } of SERVED_PAGES) {
     const src = read(page);
     const defined = new Set(BEHAVIOR_HOOKS);
     for (const sheet of sheets) {
@@ -109,9 +181,26 @@ test('every served page\'s stylesheets define every class it uses', () => {
     for (const [, css] of src.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)) {
       for (const cls of definedClasses(css)) defined.add(cls);
     }
-    const missing = [...referencedClasses(src)].filter((c) => !defined.has(c));
-    assert.deepEqual(missing, [],
-      `${page} uses classes no stylesheet defines: ${missing.join(', ')}`);
+    // tailwind.css is committed prebuilt with no config or build step, so a
+    // utility a script reaches for that no rule defines stays silently unstyled.
+    const sources = [[page, referencedClasses(src)],
+      ...scripts.map((s) => [s.join('/'), scriptClasses(read(...s))])];
+    for (const [source, tokens] of sources) {
+      const missing = [...tokens].filter((c) => !defined.has(c));
+      assert.deepEqual(missing, [],
+        `${source} uses classes no stylesheet ${page} loads defines: ${missing.join(', ')}`);
+    }
+  }
+});
+
+test('every tools/ module that sets a class is reached from a served page', () => {
+  const gated = new Set(
+    SERVED_PAGES.flatMap(({ scripts }) => scripts.map((s) => s.join('/'))));
+  for (const file of readdirSync(join(REPO, 'tools')).filter((f) => f.endsWith('.js'))) {
+    const path = `tools/${file}`;
+    if (scriptClasses(read(path)).size === 0) continue;
+    assert.ok(gated.has(path),
+      `${path} sets classes but no served page's module graph reaches it, so nothing gates them`);
   }
 });
 
