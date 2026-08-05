@@ -53,3 +53,41 @@ test('refreshPixelView: a live view is reused without re-fetching', () => {
   assert.equal(r.view, live);
   assert.equal(calls, 0);
 });
+
+test('refreshPixelView: a live view of the expected length is reused', () => {
+  const live = new Uint16Array(4);
+  let calls = 0;
+  const r = refreshPixelView(live, () => { calls++; return new Uint16Array(4); }, 4);
+  assert.equal(r.refreshed, false);
+  assert.equal(r.view, live);
+  assert.equal(calls, 0);
+});
+
+// A resolution change re-spans the engine's pre-sized pixel buffer without
+// reallocating it, so the stale view is still attached — only its length differs.
+test('refreshPixelView: an attached view of the wrong length is re-fetched', () => {
+  const stale = new Uint16Array(5760);
+  const fresh = new Uint16Array(41472);
+  let calls = 0;
+  const r = refreshPixelView(stale, () => { calls++; return fresh; }, 41472);
+  assert.equal(r.refreshed, true);
+  assert.equal(r.view, fresh);
+  assert.equal(calls, 1);
+});
+
+test('refreshPixelView: a shrunk buffer re-fetches an over-long view', () => {
+  const stale = new Uint16Array(41472);
+  const fresh = new Uint16Array(5760);
+  const r = refreshPixelView(stale, () => fresh, 5760);
+  assert.equal(r.refreshed, true);
+  assert.equal(r.view, fresh);
+});
+
+test('refreshPixelView: an omitted length leaves detachment the only trigger', () => {
+  const live = new Uint16Array(4);
+  let calls = 0;
+  const r = refreshPixelView(live, () => { calls++; return new Uint16Array(8); }, undefined);
+  assert.equal(r.refreshed, false);
+  assert.equal(r.view, live);
+  assert.equal(calls, 0);
+});

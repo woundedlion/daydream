@@ -48,12 +48,12 @@
     "assertions": 106
   },
   "tests/engine_contract_wasm.test.js": {
-    "cases": 21,
-    "assertions": 641
+    "cases": 22,
+    "assertions": 650
   },
   "tests/engine_host.test.js": {
-    "cases": 8,
-    "assertions": 15
+    "cases": 11,
+    "assertions": 21
   },
   "tests/export_params.test.js": {
     "cases": 9,
@@ -116,8 +116,8 @@
     "assertions": 31
   },
   "tests/pixel_view.test.js": {
-    "cases": 6,
-    "assertions": 14
+    "cases": 10,
+    "assertions": 25
   },
   "tests/recorder.test.js": {
     "cases": 39,

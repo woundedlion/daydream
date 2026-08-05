@@ -5,10 +5,10 @@
 
 /**
  * DOM-free logic for the zero-copy WASM pixel view, extracted so the
- * detach/re-fetch contract can be unit-tested without a browser, a WASM module,
- * or Three.js. Both the driver (which clears the buffer) and daydream.js (which
- * re-fetches it) route their "is this view still live?" decision through here so
- * the buffer-alias contract lives in exactly one tested place.
+ * staleness/re-fetch contract can be unit-tested without a browser, a WASM
+ * module, or Three.js. Both the driver (which clears the buffer) and daydream.js
+ * (which re-fetches it) route their "is this view still usable?" decision
+ * through here so the buffer-alias contract lives in exactly one tested place.
  */
 
 /**
@@ -29,15 +29,22 @@ export function isViewLive(view) {
 /**
  * Decide whether the pixel view must be re-fetched, returning the view to use.
  *
- * A non-detached view is never stale (it aliases current memory), so it is
- * returned unchanged; a missing or detached view is re-fetched via getPixels().
- * The caller re-points its display aliases at the returned view only when
- * `refreshed` is true, so a steady-state frame does no work.
+ * A view is stale when it is missing, detached, or no longer the engine's buffer
+ * length: the engine pre-sizes its pixel buffer, so a resolution change re-spans
+ * it without reallocating and a view taken at the old resolution stays attached
+ * while covering the wrong number of instances. A view of the expected length is
+ * returned unchanged; anything else is re-fetched via getPixels(). The caller
+ * re-points its display aliases at the returned view only when `refreshed` is
+ * true, so a steady-state frame does no work.
  * @param {Uint16Array|null} view - The currently held pixel view.
  * @param {() => Uint16Array} getPixels - Fetches a fresh zero-copy view from the engine.
+ * @param {number} [expectedLength] - The engine's current buffer length. Omitted
+ *   on a module without the accessor, which leaves detachment the only trigger.
  * @returns {{view: Uint16Array, refreshed: boolean}} The view to use and whether it was re-fetched.
  */
-export function refreshPixelView(view, getPixels) {
-  if (!isViewLive(view)) return { view: getPixels(), refreshed: true };
+export function refreshPixelView(view, getPixels, expectedLength) {
+  const stale = !isViewLive(view)
+    || (typeof expectedLength === 'number' && view.length !== expectedLength);
+  if (stale) return { view: getPixels(), refreshed: true };
   return { view, refreshed: false };
 }

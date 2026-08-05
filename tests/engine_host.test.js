@@ -57,6 +57,55 @@ test('invalidateView() forces the next refresh() to re-fetch', () => {
   assert.equal(host.view(), second);
 });
 
+test('refresh() re-fetches when the held view no longer spans the engine buffer', () => {
+  const stale = new Uint16Array(5760);
+  const fresh = new Uint16Array(41472);
+  let notified = null;
+  const host = new EngineHost((view) => { notified = view; });
+  host.pixelView = stale;
+  host.engine = { getPixels: () => fresh, getBufferLength: () => 41472 };
+
+  host.refresh();
+
+  assert.equal(host.view(), fresh);
+  assert.equal(notified, fresh);
+});
+
+test('refresh() reuses a view that matches the engine buffer length', () => {
+  const live = new Uint16Array(5760);
+  let getPixelsCalls = 0;
+  const host = new EngineHost();
+  host.pixelView = live;
+  host.engine = {
+    getPixels: () => { getPixelsCalls++; return new Uint16Array(5760); },
+    getBufferLength: () => 5760,
+  };
+
+  host.refresh();
+
+  assert.equal(host.view(), live);
+  assert.equal(getPixelsCalls, 0);
+});
+
+test('refresh() survives a resolution change without invalidateView()', () => {
+  const small = new Uint16Array(5760);
+  const large = new Uint16Array(41472);
+  const host = new EngineHost();
+  let length = 5760;
+  host.engine = {
+    getPixels: () => (length === 5760 ? small : large),
+    getBufferLength: () => length,
+  };
+
+  host.refresh();
+  assert.equal(host.view(), small);
+
+  length = 41472;
+  host.refresh();
+
+  assert.equal(host.view(), large);
+});
+
 test('paramGeneration() reports the engine\'s effect-load counter', () => {
   const host = new EngineHost();
   let loads = 3;

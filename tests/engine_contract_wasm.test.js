@@ -257,7 +257,8 @@ test('strobeColumns and getEffectSizes return the shapes daydream consumes', () 
   }
 });
 
-// getBufferLength has no daydream call site; it is pinned here as intended API.
+// engine_host.js calls getBufferLength through an optional-call guard, so a
+// dropped export is silent at the call site.
 test('getBufferLength reports the active resolution buffer length', () => {
   for (const [w, h] of M.HolosphereEngine.getSupportedResolutions()) {
     assert.equal(engine.setResolution(w, h), true,
@@ -270,6 +271,38 @@ test('getBufferLength reports the active resolution buffer length', () => {
     'setEffect must succeed after a resolution change');
   assert.equal(engine.getBufferLength(), engine.getPixels().length,
     'getBufferLength must equal the getPixels view length');
+});
+
+// The engine pre-sizes its pixel buffer, so a resolution change re-spans it
+// without detaching anything: length, not detachment, is what goes wrong.
+test('a resolution change leaves a held pixel view attached at the wrong length', () => {
+  const sizes = [];
+  for (const [w, h] of M.HolosphereEngine.getSupportedResolutions()) sizes.push([w, h]);
+  const [firstW, firstH] = sizes[0];
+  const other = sizes.find(([w, h]) => w * h !== firstW * firstH);
+  assert.ok(other, 'the engine must offer two differently sized resolutions');
+
+  assert.equal(engine.setResolution(firstW, firstH), true,
+    `${firstW}x${firstH} must stay buildable`);
+  const held = engine.getPixels();
+  assert.equal(held.length, engine.getBufferLength(),
+    'a freshly fetched view must span the whole buffer');
+
+  assert.equal(engine.setResolution(other[0], other[1]), true,
+    `${other[0]}x${other[1]} must stay buildable`);
+  assert.equal(isViewLive(held), true,
+    'a resolution change must not detach the held view; if it starts to, the ' +
+    'length trigger below is no longer the only thing catching a stale view');
+  assert.notEqual(held.length, engine.getBufferLength(),
+    'the held view must still cover the old resolution');
+
+  const { refreshed, view } = refreshPixelView(
+    held, () => engine.getPixels(), engine.getBufferLength());
+  assert.equal(refreshed, true, 'a wrong-length view must be re-fetched');
+  assert.equal(view.length, engine.getBufferLength(),
+    'the re-fetched view must span the new buffer');
+
+  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
 });
 
 // engine_host.js calls getParamGeneration through an optional-call guard and
