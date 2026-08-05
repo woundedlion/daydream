@@ -14,15 +14,13 @@
  */
 
 import {
-  paramExportBlocker,
-  paramGenerationStale,
-  paramValueSkew,
-} from "./effect_sequencing.js";
-import {
   resolveParamSync,
   enumChoices,
   paramControlKind,
   engineParamValue,
+  paramExportBlocker,
+  paramGenerationStale,
+  paramValueSkew,
 } from "./param_sync.js";
 import { formatExportParams } from "./tools/export_params.js";
 

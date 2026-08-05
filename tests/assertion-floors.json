@@ -44,8 +44,8 @@
     "assertions": 104
   },
   "tests/effect_sequencing.test.js": {
-    "cases": 56,
-    "assertions": 114
+    "cases": 46,
+    "assertions": 95
   },
   "tests/engine_contract_wasm.test.js": {
     "cases": 22,
@@ -117,9 +117,8 @@
     "assertions": 5739
   },
   "tests/param_sync.test.js": {
-    "cases": 19,
-    "assertions": 33
-  },
+    "cases": 29,
+    "assertions": 52  },
   "tests/pixel_view.test.js": {
     "cases": 10,
     "assertions": 25
@@ -178,7 +177,7 @@
   },
   "tests/site_manifest.test.js": {
     "cases": 3,
-    "assertions": 543
+    "assertions": 540
   },
   "tests/slider.test.js": {
     "cases": 15,

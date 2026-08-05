@@ -6,10 +6,10 @@
 /**
  * daydream.js's effect and resolution apply path: the apply pipeline itself, the
  * switch/rollback transaction that drives it, the "apply the effect directly vs
- * let the effect-change subscription fire it" decision, and the param/value skew
- * guard. Every engine, driver, GUI, and sidebar collaborator arrives injected, so
- * nothing here imports a WASM engine, lil-gui, or a browser and the whole path is
- * unit-testable, mirroring resolveParamSync().
+ * let the effect-change subscription fire it" decision, and the resolution
+ * preset and effect-list rules. Every engine, driver, GUI, and sidebar
+ * collaborator arrives injected, so nothing here imports a WASM engine, lil-gui,
+ * or a browser and the whole path is unit-testable, mirroring resolveParamSync().
  */
 
 import { resolveActiveEffect } from "./sidebar_logic.js";
@@ -493,55 +493,4 @@ export function resolutionEffects(presets, resolution) {
 export function resolutionCorrection(labels, current) {
   if (labels.length === 0 || labels.includes(current)) return null;
   return labels[0];
-}
-
-/**
- * Whether the cached param-name list has drifted out of length with the engine's
- * per-frame value stream. A skew means the two can no longer be paired by index,
- * so syncGUI() and export() must skip rather than mis-bind sliders.
- * @param {number} namesLength - Length of the effect's cached paramNames list.
- * @param {number} valuesLength - Length of the engine's live value stream.
- * @returns {boolean} True when the lengths differ (do not pair them).
- */
-export function paramValueSkew(namesLength, valuesLength) {
-  return namesLength !== valuesLength;
-}
-
-/**
- * Why the Export action cannot copy the live parameter values, if it cannot. A
- * heap-growth detach leaves the value view zero-length, the segmented source is
- * null before the first frame, as is a read that no longer matches the GUI's
- * snapshot, and the clipboard API is absent on insecure/older contexts. Any of
- * those would copy an all-zero, foreign, or unwritable preset.
- * @param {ArrayLike<number>|null|undefined} values - The live value stream.
- * @param {number} expectedLength - Length of the effect's cached paramNames list.
- * @param {boolean} hasClipboard - Whether the clipboard API is available.
- * @returns {string|null} The warning to log, or null when the copy may proceed.
- */
-export function paramExportBlocker(values, expectedLength, hasClipboard) {
-  if (!values || values.length === 0) {
-    return 'Export: no parameter values matching the current effect; skipping copy';
-  }
-  if (paramValueSkew(expectedLength, values.length)) {
-    return `Export: param/value length skew (${expectedLength} vs ${values.length}); skipping copy`;
-  }
-  if (!hasClipboard) return 'Export: clipboard API unavailable (insecure context?)';
-  return null;
-}
-
-/**
- * Whether the engine's live value stream still describes the effect the GUI's
- * parameter-definition snapshot was taken from. The engine bumps a generation
- * counter on every effect load, so an unequal pair means a load landed between
- * the snapshot and this read and the values must not be bound by index. Length
- * alone cannot decide it: equal parameter counts are common across the roster,
- * so a switch between two same-sized effects passes paramValueSkew() while
- * describing different parameters.
- * @param {number|undefined} snapshotGeneration - Generation recorded when the
- *   parameter definitions were read.
- * @param {number|undefined} streamGeneration - Generation read alongside the values.
- * @returns {boolean} True when the two describe different effect loads.
- */
-export function paramGenerationStale(snapshotGeneration, streamGeneration) {
-  return snapshotGeneration !== streamGeneration;
 }

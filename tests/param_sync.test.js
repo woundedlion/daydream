@@ -5,6 +5,9 @@ import {
   enumChoices,
   paramControlKind,
   engineParamValue,
+  paramValueSkew,
+  paramExportBlocker,
+  paramGenerationStale,
 } from '../param_sync.js';
 
 // resolveParamSync is the DOM-free core of syncGUI()'s per-controller "fight-the-
@@ -126,4 +129,69 @@ test('a number passes through unchanged', () => {
 
 test('an enum index passes through as its own float', () => {
   assert.equal(engineParamValue(2), 2);
+});
+
+// paramValueSkew guards syncGUI()/export() from pairing a drifted param-name
+// list with the engine's value stream by index.
+
+test('equal lengths do not skew', () => {
+  assert.equal(paramValueSkew(3, 3), false);
+  assert.equal(paramValueSkew(0, 0), false);
+});
+
+test('unequal lengths skew (either direction)', () => {
+  assert.equal(paramValueSkew(3, 4), true);
+  assert.equal(paramValueSkew(4, 3), true);
+  assert.equal(paramValueSkew(0, 1), true);
+});
+
+// paramExportBlocker is the Export action's precondition check: it names the one
+// reason a copy cannot proceed, or clears it.
+
+test('a matching value stream on a clipboard-capable context is not blocked', () => {
+  assert.equal(paramExportBlocker([0.25, 1, 0], 3, true), null);
+});
+
+test('a missing or detached value stream blocks the copy', () => {
+  const expected =
+    'Export: no parameter values matching the current effect; skipping copy';
+  assert.equal(paramExportBlocker(null, 3, true), expected);
+  assert.equal(paramExportBlocker(undefined, 3, true), expected);
+  // A heap-growth detach leaves the WASM view zero-length.
+  assert.equal(paramExportBlocker(new Float32Array(0), 3, true), expected);
+});
+
+test('a skewed value stream blocks the copy and reports both lengths', () => {
+  assert.equal(paramExportBlocker([0.5, 0.5], 3, true),
+    'Export: param/value length skew (3 vs 2); skipping copy');
+});
+
+test('a missing clipboard API blocks the copy', () => {
+  assert.equal(paramExportBlocker([0.5], 1, false),
+    'Export: clipboard API unavailable (insecure context?)');
+});
+
+test('a value-stream fault outranks the clipboard report', () => {
+  // The stream is read first, so a null stream on an insecure context reports the
+  // stream — one flash, one warning, whichever came first.
+  assert.match(paramExportBlocker(null, 1, false), /^Export: no parameter values/);
+  assert.match(paramExportBlocker([0.5, 0.5], 1, false), /^Export: param\/value/);
+});
+
+// paramGenerationStale is the identity half of the same guard: it catches an
+// effect switch the length comparison cannot see.
+
+test('a snapshot read at the engine\'s current generation is not stale', () => {
+  assert.equal(paramGenerationStale(0, 0), false);
+  assert.equal(paramGenerationStale(7, 7), false);
+});
+
+test('any generation move makes the snapshot stale', () => {
+  assert.equal(paramGenerationStale(7, 8), true);
+  assert.equal(paramGenerationStale(8, 7), true);
+  assert.equal(paramGenerationStale(0, 1), true);
+});
+
+test('an engine reporting no generation is never stale', () => {
+  assert.equal(paramGenerationStale(undefined, undefined), false);
 });
