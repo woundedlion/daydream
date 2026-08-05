@@ -56,7 +56,8 @@ test('showFatalError writes textContent, never innerHTML — markup is not inter
 
   const el = created[0];
   assert.equal(messageOf(el), '⚠ <img src=x onerror=alert(1)>');
-  assert.equal(el.innerHTML, undefined);
+  assert.deepEqual(el.querySelector('.fatal-error-message').children, [],
+    'the markup landed as text, not as nodes parsed into the message slot');
 });
 
 test('showFatalError is idempotent — repeated calls reuse the single banner', () => {
