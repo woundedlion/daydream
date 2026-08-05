@@ -49,7 +49,7 @@
   },
   "tests/engine_contract_wasm.test.js": {
     "cases": 23,
-    "assertions": 693
+    "assertions": 741
   },
   "tests/engine_host.test.js": {
     "cases": 11,
