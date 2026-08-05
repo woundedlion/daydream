@@ -12,7 +12,6 @@
  * Usage:
  *   import { initScene } from '../tools/shared.js';
  *   const { scene, camera, renderer, controls } = initScene('canvasContainer', 'threeCanvas', {
- *     background: 0x0f172a,
  *     sphereOpacity: 0.2,
  *   });
  */
@@ -32,6 +31,21 @@ export function capPixelRatio(ratio) {
 }
 
 /**
+ * Read a design token off the document root as a numeric color.
+ *
+ * @param {string} name - Custom property name, e.g. '--slate-900'
+ * @returns {number|undefined} The color, or undefined when the property is
+ *          unset, malformed, or there is no styled document to read it from.
+ */
+export function getCssColor(name) {
+  const root = typeof document === 'undefined' ? null : document.documentElement;
+  if (!root || typeof getComputedStyle !== 'function') return undefined;
+  const value = getComputedStyle(root).getPropertyValue(name).trim();
+  const match = /^#?([0-9a-f]{6})$/i.exec(value);
+  return match ? parseInt(match[1], 16) : undefined;
+}
+
+/**
  * Build a ready-to-run Three.js scene (renderer, perspective camera,
  * OrbitControls, optional reference sphere / light rig) wired into the given
  * DOM elements, then start the animation loop. Returns handles plus a dispose()
@@ -40,7 +54,8 @@ export function capPixelRatio(ratio) {
  * @param {string} containerId - ID of the parent container div
  * @param {string} canvasId - ID of the canvas element
  * @param {object} [opts] - Optional configuration
- * @param {number} [opts.background=0x0f172a] - Scene background color
+ * @param {number} [opts.background] - Scene background color; defaults to the
+ *        --slate-900 token, or 0x0f172a where that token is unset
  * @param {number} [opts.sphereOpacity=0.2] - Opacity of reference sphere wireframe
  * @param {boolean} [opts.showSphere=true] - Whether to show a reference sphere
  * @param {number} [opts.cameraDistance=3] - Initial camera distance (ignored if cameraPosition is set)
@@ -60,7 +75,7 @@ export function capPixelRatio(ratio) {
  */
 export function initScene(containerId, canvasId, opts = {}) {
   const {
-    background = 0x0f172a,
+    background = getCssColor('--slate-900') ?? 0x0f172a,
     sphereOpacity = 0.2,
     showSphere = true,
     cameraDistance = 3,

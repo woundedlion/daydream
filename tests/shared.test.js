@@ -20,13 +20,14 @@ register('./three_loader_hooks.js', import.meta.url, {
   data: { fakeThreeUrl: import.meta.resolve('./fake_three.js') },
 });
 
-const { capPixelRatio, initScene } = await import('../tools/shared.js');
+const { capPixelRatio, getCssColor, initScene } = await import('../tools/shared.js');
 
 const RAF_ID = 7;
 
 const saved = {
   document: globalThis.document,
   window: globalThis.window,
+  getComputedStyle: globalThis.getComputedStyle,
   requestAnimationFrame: globalThis.requestAnimationFrame,
   cancelAnimationFrame: globalThis.cancelAnimationFrame,
 };
@@ -40,7 +41,17 @@ afterEach(() => {
 
 /** Stub document.getElementById against a fixed id->element map. */
 function stubDocument(byId) {
-  globalThis.document = { getElementById: (id) => byId[id] || null };
+  globalThis.document = {
+    documentElement: {},
+    getElementById: (id) => byId[id] || null,
+  };
+}
+
+/** Stub getComputedStyle over a fixed custom-property map. */
+function stubComputedStyle(props) {
+  globalThis.getComputedStyle = () => ({
+    getPropertyValue: (name) => props[name] ?? '',
+  });
 }
 
 /**
@@ -83,6 +94,41 @@ test('capPixelRatio preserves low-density displays and caps high-density display
   assert.equal(capPixelRatio(0.75), 0.75);
   assert.equal(capPixelRatio(1), 1);
   assert.equal(capPixelRatio(3), 1);
+});
+
+test('getCssColor reads a six-digit token off the document root', () => {
+  stubDocument({});
+  stubComputedStyle({ '--slate-900': ' #0f172a ', '--bare': 'A1B2C3' });
+  assert.equal(getCssColor('--slate-900'), 0x0f172a);
+  assert.equal(getCssColor('--bare'), 0xa1b2c3);
+});
+
+test('getCssColor returns undefined for an unset or malformed token', () => {
+  stubDocument({});
+  stubComputedStyle({ '--accent': 'rgb(1, 2, 3)', '--short': '#abc' });
+  assert.equal(getCssColor('--accent'), undefined);
+  assert.equal(getCssColor('--short'), undefined);
+  assert.equal(getCssColor('--absent'), undefined);
+});
+
+test('getCssColor returns undefined without a styled document', () => {
+  stubDocument({});
+  assert.equal(getCssColor('--slate-900'), undefined,
+    'a DOM with no getComputedStyle must not throw');
+  delete globalThis.document;
+  stubComputedStyle({ '--slate-900': '#0f172a' });
+  assert.equal(getCssColor('--slate-900'), undefined);
+});
+
+test('initScene takes its default background from the --slate-900 token', () => {
+  stubComputedStyle({ '--slate-900': '#123456' });
+  assert.equal(mountScene().scene.background.hex, 0x123456);
+});
+
+test('initScene falls back to the slate-900 literal when the token is unset', () => {
+  assert.equal(mountScene().scene.background.hex, 0x0f172a);
+  stubComputedStyle({});
+  assert.equal(mountScene().scene.background.hex, 0x0f172a);
 });
 
 test('initScene throws when the container element is absent', () => {
