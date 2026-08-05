@@ -415,6 +415,21 @@ test('URLSync.reset re-asserts tracked state over an ad-hoc write of the same ke
   assert.equal(params.has('speed'), false, 'unexcluded params are cleared');
 });
 
+test('URLSync.reset carries an excluded ad-hoc write over the value it replaces', () => {
+  const calls = installWindow('?speed=2&junk=1', '/sim');
+  const s = new AppState({ resolution: 'high' });
+  const sync = new URLSync(s, ['resolution']);
+
+  sync.setParam('speed', 3); // untracked, still buffered inside the debounce window
+  sync.setParam('junk', 9);
+  sync.reset(['resolution', 'speed']);
+
+  const params = new URLSearchParams(calls[calls.length - 1].split('?')[1]);
+  assert.equal(params.get('speed'), '3', 'the buffered write survives, not the URL value it replaces');
+  assert.equal(params.has('junk'), false, 'an unexcluded ad-hoc write is dropped with its param');
+  assert.equal(params.get('resolution'), 'high', 'tracked state is re-asserted');
+});
+
 test('URLSync.setParam(k, null) drops the key from the URL on flush', () => {
   const calls = installWindow('?keep=1', '/sim');
   const s = new AppState({});
