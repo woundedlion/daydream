@@ -11,6 +11,10 @@
 import { SLOW_FRAME_MS } from "./frame_constants.js";
 import { formatKB } from "./tools/kb_format.js";
 
+/** @typedef {import('./holosphere_wasm.js').ArenaUsage} ArenaUsage */
+/** @typedef {import('./holosphere_wasm.js').ArenaMetrics} ArenaMetrics */
+/** @typedef {Object<string, Array<HTMLElement|null>>} StatsCells */
+
 /** Stats-panel cell element IDs per row, ordered [desktop, mobile]. */
 export const STATS_CELL_IDS = {
   perf: ["perf-stats", "perf-stats-mobile"],
@@ -26,7 +30,7 @@ export class GlobalStatsView {
    */
   constructor(doc = globalThis.document) {
     this.doc = doc;
-    /** @type {Object<string, Array<HTMLElement|null>> | null} */
+    /** @type {StatsCells | null} */
     this.cells = null;
     this.missLogged = false;
   }
@@ -34,7 +38,7 @@ export class GlobalStatsView {
   /**
    * Repaint both stat bars from one frame's measurements.
    * @param {number} duration - Frame draw time in milliseconds.
-   * @param {?Object} metrics - Arena metrics for the frame, or null when the
+   * @param {?ArenaMetrics} metrics - Arena metrics for the frame, or null when the
    *   effect publishes none (a worker pool owning the display, say).
    * @returns {void}
    */
@@ -49,7 +53,12 @@ export class GlobalStatsView {
 
     if (!metrics) return;
 
+    /** @param {ArenaUsage} x */
     const fmt = (x) => `${formatKB(x.usage)}|${formatKB(x.high_water_mark)}|${formatKB(x.capacity, 0)}`;
+    /**
+     * @param {Array<HTMLElement|null>} row
+     * @param {string} text
+     */
     const updateRow = (row, text) => {
       for (const el of row) if (el) el.textContent = text;
     };
@@ -66,12 +75,14 @@ export class GlobalStatsView {
   /**
    * Look the stat cells up, latching them only once every row resolved: a row
    * still absent this tick would otherwise stay dead for the session.
-   * @returns {Object<string, Array<HTMLElement|null>>} Cell elements per row.
+   * @returns {StatsCells} Cell elements per row.
    */
   resolveCells() {
     if (this.cells) return this.cells;
 
+    /** @type {StatsCells} */
     const cells = {};
+    /** @type {string[]} */
     const missing = [];
     for (const [row, ids] of Object.entries(STATS_CELL_IDS)) {
       cells[row] = ids.map(id => {
