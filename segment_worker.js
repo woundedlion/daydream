@@ -93,17 +93,19 @@ function applyClip() {
 async function handleMessage(msg) {
   switch (msg.type) {
     case 'init': {
-      segId = msg.segId;
-      totalSegs = msg.totalSegs;
-
       // A version mismatch means a stale-cached worker or controller: fault before
-      // touching WASM so the controller stops instead of drifting on reshaped fields.
+      // reading any other field, so nothing from a message shape the worker does not
+      // understand is latched, and before touching WASM so the controller stops
+      // instead of drifting on reshaped fields.
       if (msg.version !== PROTOCOL_VERSION) {
         post({ type: 'engineRejected',
                reason: `protocol version ${msg.version} != worker ${PROTOCOL_VERSION}`
                        + ` (stale cached worker or controller)` });
         break;
       }
+
+      segId = msg.segId;
+      totalSegs = msg.totalSegs;
 
       // Every segment runs a full engine replica, so engine logs would print
       // once per worker; only segment 0 logs. printErr stays live everywhere.
