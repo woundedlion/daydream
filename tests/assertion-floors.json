@@ -48,8 +48,8 @@
     "assertions": 95
   },
   "tests/engine_contract_wasm.test.js": {
-    "cases": 22,
-    "assertions": 665
+    "cases": 23,
+    "assertions": 693
   },
   "tests/engine_host.test.js": {
     "cases": 11,
@@ -196,8 +196,8 @@
     "assertions": 54
   },
   "tests/solids_registry_codegen.test.js": {
-    "cases": 21,
-    "assertions": 70
+    "cases": 25,
+    "assertions": 203
   },
   "tests/state.test.js": {
     "cases": 51,

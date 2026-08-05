@@ -101,13 +101,39 @@ export function savedChainShapeError(base, ops) {
 }
 
 /**
- * The Platonic seeds, mirrored from solids.h. The WASM registry reports only
- * Simple/Complex, so the page splits its Simple entries into Platonic and
- * Archimedean against this list.
+ * simple_registry's entry order, mirrored from solids.h. Recipe::seed is an
+ * index into that array, so a seed's position here is its SEED_* value.
+ * engine_contract_wasm.test.js pins the order against the engine's registry.
  */
-export const PLATONIC_SOLIDS = [
+export const SIMPLE_SEEDS = [
+  // Platonic
   'tetrahedron', 'cube', 'octahedron', 'dodecahedron', 'icosahedron',
+  // Archimedean
+  'truncatedTetrahedron', 'cuboctahedron', 'truncatedCube',
+  'truncatedOctahedron', 'rhombicuboctahedron', 'truncatedCuboctahedron',
+  'snubCube', 'icosidodecahedron', 'truncatedDodecahedron',
+  'truncatedIcosahedron', 'rhombicosidodecahedron',
+  'truncatedIcosidodecahedron', 'snubDodecahedron',
 ];
+
+/**
+ * The seeds solids.h already declares a `SEED_*` constant for. The rest of
+ * SIMPLE_SEEDS have none, so a generated Recipe naming one has to carry the
+ * constant's definition alongside it.
+ */
+export const DEFINED_SEED_CONSTANTS = new Set([
+  'octahedron', 'dodecahedron', 'icosahedron', 'truncatedOctahedron',
+  'rhombicuboctahedron', 'icosidodecahedron', 'truncatedIcosahedron',
+  'truncatedIcosidodecahedron', 'snubDodecahedron',
+]);
+
+/**
+ * The Platonic seeds, the leading run of simple_registry (solids.h pins the
+ * count with PLATONIC_COUNT). The WASM registry reports only Simple/Complex, so
+ * the page splits its Simple entries into Platonic and Archimedean against this
+ * list.
+ */
+export const PLATONIC_SOLIDS = SIMPLE_SEEDS.slice(0, 5);
 
 /**
  * The Catalan seeds, mirrored from `namespace Catalan` in solids.h. That
