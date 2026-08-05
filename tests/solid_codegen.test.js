@@ -9,6 +9,7 @@ const {
   KNOWN_OPS,
   PARAMETERIZED_OPS,
   applyOp,
+  savedChainShapeError,
   formatFloat,
   formatSolidName,
   pctSuffix,
@@ -983,6 +984,70 @@ test('createChainValidator accepts everything when the module cannot spawn', asy
   const validator = createChainValidator(async () => { throw new Error('no wasm'); });
   assert.equal((await validator.chainIsValid('cube', ['kis'])).ok, true);
   assert.equal(await validator.withValidator((Mod) => Mod), null);
+});
+
+/**
+ * Verifies every chain the tool can build passes the shape check, so restoring a
+ * legitimately saved solid is never refused. The ops are assembled the way addOp
+ * assembles them — one entry per op, params seeded from the OP_DEFS defaults.
+ */
+test('savedChainShapeError accepts the chains the tool itself saves', () => {
+  const ops = [...KNOWN_OPS].map((op) => {
+    const params = {};
+    for (const [key, def] of Object.entries(OP_DEFS[op].params)) params[key] = def.val;
+    return { op, params };
+  });
+  assert.equal(savedChainShapeError('cube', ops), null);
+  for (const o of ops) {
+    assert.equal(savedChainShapeError('truncatedIcosahedron', [o]), null,
+      `a saved "${o.op}" must stay restorable`);
+  }
+  assert.equal(savedChainShapeError('cube', []), null, 'a bare seed is a valid save');
+});
+
+/**
+ * Verifies each way a stored entry can be unrestorable is named rather than
+ * passed through. The validator resolves true when its module cannot spawn, so
+ * anything this misses reaches renderOps and throws into the commit queue.
+ */
+test('savedChainShapeError rejects every unrestorable stored shape', () => {
+  const cases = [
+    [['cube', [{ op: 'frobnicate', params: {} }]], /unknown operator "frobnicate"/],
+    [['cube', [{ op: 'delete', params: {} }]], /unknown operator "delete"/],
+    [['cube', [{ params: {} }]], /unknown operator "undefined"/],
+    [['cube', ['dual']], /op 1 is not an op entry/],
+    [['cube', [null]], /op 1 is not an op entry/],
+    [['cube', [{ op: 'dual', params: {} }, { op: 'hankin' }]],
+      /op 2 \("hankin"\) carries no numeric "angle"/],
+    [['cube', [{ op: 'snub', params: { t: 0.5 } }]], /carries no numeric "twist"/],
+    [['cube', [{ op: 'truncate', params: { t: 'a lot' } }]], /carries no numeric "t"/],
+    [['cube', [{ op: 'relax', params: { iter: NaN } }]], /carries no numeric "iter"/],
+    [['cube', null], /op chain is not a list/],
+    [['cube', { 0: { op: 'dual' } }], /op chain is not a list/],
+    [[null, []], /names no base solid/],
+    [['', []], /names no base solid/],
+  ];
+  for (const [[base, ops], expected] of cases) {
+    const message = savedChainShapeError(base, ops);
+    assert.ok(typeof message === 'string' && expected.test(message),
+      `expected ${expected} for ${JSON.stringify(ops)}, got ${message}`);
+  }
+});
+
+/**
+ * Verifies the page shape-checks a restore before any state is mutated: the
+ * check has to sit ahead of the commit, since inside it the validator's
+ * spawn-failure path accepts the chain unseen.
+ */
+test('solids.html shape-checks a restore before it commits', () => {
+  const restore = SOLIDS_HTML.match(/function restoreSolid\(item\) \{[\s\S]*?\n {4}\}/)?.[0];
+  assert.ok(restore, 'restoreSolid must stay a named function in solids.html');
+  const checkAt = restore.indexOf('savedChainShapeError(item.base, item.ops)');
+  assert.ok(checkAt > 0, 'restoreSolid must shape-check the stored base and ops');
+  assert.ok(checkAt < restore.indexOf('queueCommit('),
+    'the shape check must run before the commit that mutates state');
+  assert.match(restore, /showGateMsg\(`cannot restore/,
+    'a refused restore must say so rather than fail silently');
 });
 
 /** Verifies a transient spawn failure is retried rather than disabling validation for good. */

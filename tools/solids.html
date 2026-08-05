@@ -595,6 +595,7 @@
     // tested without a DOM or the WASM module. DOM/WASM wiring stays inline.
     import {
       OP_DEFS,
+      savedChainShapeError,
       PLATONIC_SOLIDS,
       CATALAN_BASES,
       applyOp,
@@ -1363,6 +1364,18 @@
     }
 
     function restoreSolid(item) {
+      // localStorage is user-writable and its entries outlive any op-table
+      // change, so the shape is checked against OP_DEFS before anything is
+      // touched. The engine validator cannot stand in for this: it answers true
+      // when its module fails to spawn, and an unrecognized op would then reach
+      // renderOps as an undefined OP_DEFS entry and throw into the commit
+      // queue's error handler, leaving the page showing the previous chain.
+      const shapeError = savedChainShapeError(item.base, item.ops);
+      if (shapeError) {
+        showGateMsg(`cannot restore "${item.title || 'saved solid'}": ${shapeError}`
+          + ' — delete this card and save the solid again');
+        return;
+      }
       queueCommit(async () => {
         // Saved items were valid when saved, but the engine may have been
         // rebuilt with different limits since; validate on the way back in.

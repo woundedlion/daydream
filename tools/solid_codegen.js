@@ -70,6 +70,37 @@ function requireParams(where, opName, o) {
 }
 
 /**
+ * Shape-checks a persisted base+chain against the op table, without the engine.
+ * @param {*} base - The persisted seed-solid name.
+ * @param {*} ops - The persisted op chain.
+ * @returns {?string} A message naming the first defect, or null when the pair is restorable.
+ * @details The chain validator resolves true when its sacrificial module cannot
+ * spawn, so a restore path cannot lean on it to reject a hand-edited or
+ * stale-format localStorage entry. An op name off the table leaves OP_DEFS[op]
+ * undefined and the op-row builder throws reading its params; a declared param
+ * that is missing or non-numeric reaches the WASM bridge as undefined. Both are
+ * caught here, before any state is mutated. The tool's live chain holds {op,
+ * params} objects, so a bare-string op — which applyOp accepts — is not a
+ * restorable entry.
+ */
+export function savedChainShapeError(base, ops) {
+  if (typeof base !== 'string' || !base) return 'it names no base solid';
+  if (!Array.isArray(ops)) return 'its op chain is not a list';
+  for (let i = 0; i < ops.length; i++) {
+    const o = ops[i];
+    const at = `op ${i + 1}`;
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return `${at} is not an op entry`;
+    if (!KNOWN_OPS.has(o.op)) return `${at} names an unknown operator "${o.op}"`;
+    for (const key of Object.keys(OP_DEFS[o.op].params)) {
+      if (!Number.isFinite(o.params?.[key])) {
+        return `${at} ("${o.op}") carries no numeric "${key}"`;
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * The Platonic seeds, mirrored from solids.h. The WASM registry reports only
  * Simple/Complex, so the page splits its Simple entries into Platonic and
  * Archimedean against this list.
