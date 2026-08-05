@@ -224,8 +224,11 @@ export class SegmentStatsView {
     const maxRow = mkRow([td('max', 'seg-label'), td(''), maxTime, spanCell()]);
     maxRow.style.borderTop = '1px solid #333';
 
+    // round-trip spans dispatch to last worker response, so it carries the
+    // structured clone, buffer transfer and event-loop latency that `max` — the
+    // slowest worker's own drawFrame() — excludes.
     const wallTime = td('', 'seg-time');
-    mkRow([td('wall', 'seg-label'), td(''), wallTime, spanCell()]);
+    mkRow([td('round-trip', 'seg-label'), td(''), wallTime, spanCell()]);
 
     el.replaceChildren(table);
     this.statsTable = table;
