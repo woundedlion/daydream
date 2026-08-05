@@ -1066,6 +1066,16 @@ function cullCtx() {
   };
 }
 
+/** Stable serialization of a context: own keys in order, Vector3s flattened.
+ * three.js objects defeat structuredClone, so compare projections instead.
+ * @param {Object} ctx - Context object to project.
+ * @returns {string} String that differs if any reachable field changed.
+ */
+function cullCtxProjection(ctx) {
+  return JSON.stringify(ctx, (key, value) =>
+    value && value.isVector3 ? value.toArray() : value);
+}
+
 test('updateCullUniforms publishes the live camera position', () => {
   const ctx = cullCtx();
   Daydream.prototype.updateCullUniforms.call(ctx);
@@ -1112,7 +1122,10 @@ test('updateCullUniforms gap-fills columns only for a persisting effect', () => 
 test('updateCullUniforms is a no-op before the material has compiled', () => {
   const ctx = cullCtx();
   ctx.cullUniforms = null;
+  const before = cullCtxProjection(ctx);
   Daydream.prototype.updateCullUniforms.call(ctx);
+  assert.equal(cullCtxProjection(ctx), before,
+    'the uncompiled-material path wrote to the context');
 });
 
 // ---------------------------------------------------------------------------
