@@ -4,11 +4,12 @@
  */
 
 /**
- * The composition root's frame and teardown wiring: the display-buffer aliases
- * every renderer writes through, the per-frame adapter the driver calls, and the
- * dispose path a page discard runs. Every collaborator is injected, so the alias
- * heal, the segmented/single-engine frame split, and the teardown order are
- * unit-testable without Three.js, a WASM engine, or a browser.
+ * The composition root's frame, timer, and teardown wiring: the display-buffer
+ * aliases every renderer writes through, the per-frame adapter the driver calls,
+ * the Test All walk, the segmented pool's spawn epoch, and the dispose path a
+ * page discard runs. Every collaborator is injected, so the alias heal, the
+ * segmented/single-engine frame split, the spawn protocol, and the teardown order
+ * are unit-testable without Three.js, a WASM engine, or a browser.
  */
 
 /**
@@ -266,6 +267,97 @@ export function createPoleLodBinding({ getEngine, onChange }) {
     replay() {
       getEngine()?.setPoleLod(state.poleLod);
     },
+  };
+}
+
+/**
+ * Build the "Test All" ticker: the timer that walks the current resolution's
+ * effect list, one entry per interval.
+ *
+ * The index is the ticker's own, not one re-derived from the live effect: a
+ * rejected switch reverts the state to the predecessor, so re-deriving would
+ * recompute the same rejected slot forever. The list is re-read every tick, so a
+ * resolution change mid-walk continues through what the new one offers.
+ *
+ * @param {Object} deps - Injected app collaborators.
+ * @param {number} deps.intervalMs - Dwell time per effect.
+ * @param {() => Array<string>} deps.availableEffects - The effect list the active
+ *   resolution offers.
+ * @param {() => string} deps.getEffect - The live effect name, where the walk starts.
+ * @param {(name: string) => void} deps.setEffect - Requests the next effect.
+ * @param {() => boolean} deps.engineReady - Whether an engine exists to take a
+ *   switch; a tick before the module load lands is skipped, not queued.
+ * @param {(fn: Function, ms: number) => *} [deps.schedule] - Timer source.
+ * @param {(handle: *) => void} [deps.cancel] - Timer sink.
+ * @returns {{start: () => void, stop: () => void, running: () => boolean}} The
+ *   ticker; start() is idempotent, so a re-entered toggle cannot arm two timers.
+ */
+export function createTestAllTicker({
+  intervalMs,
+  availableEffects,
+  getEffect,
+  setEffect,
+  engineReady,
+  schedule = (fn, ms) => setInterval(fn, ms),
+  cancel = (handle) => clearInterval(handle),
+}) {
+  let handle = null;
+  // -1 until the first advance when the live effect is off the list, so the walk
+  // starts at its head.
+  let index = 0;
+
+  const tick = () => {
+    if (!engineReady()) return;
+    const list = availableEffects();
+    if (list.length === 0) return;
+    index = (index + 1) % list.length;
+    setEffect(list[index]);
+  };
+
+  return {
+    start() {
+      if (handle !== null) return;
+      index = availableEffects().indexOf(getEffect());
+      handle = schedule(tick, intervalMs);
+    },
+    stop() {
+      if (handle === null) return;
+      cancel(handle);
+      handle = null;
+    },
+    running: () => handle !== null,
+  };
+}
+
+/**
+ * Build the segmented pool's spawn guard.
+ *
+ * Spawning awaits a module warm-up, so a toggle burst can leave several
+ * continuations in flight at once. Each attempt takes an epoch before the await
+ * and spawns only if no later attempt or strand() superseded it and segmented
+ * mode is still on — an on/off/on burst therefore builds one pool, not two, and
+ * a page discard or a pool failure strands whatever is still awaiting.
+ *
+ * @param {Object} deps - Injected app collaborators.
+ * @param {() => Promise<*>} deps.warmModules - Primes the worker module cache
+ *   before the spawn burst.
+ * @param {() => void} deps.spawn - Builds the pool at the requested size.
+ * @param {() => boolean} deps.isActive - Whether segmented mode is still on.
+ * @returns {{respawn: () => Promise<boolean>, strand: () => void}} The guarded
+ *   spawn, resolving to whether it landed, and the stranding bump. A warm-up
+ *   failure rejects, leaving the caller to run its fallback.
+ */
+export function createSegmentSpawnGuard({ warmModules, spawn, isActive }) {
+  let epoch = 0;
+  return {
+    async respawn() {
+      const mine = ++epoch;
+      await warmModules();
+      if (mine !== epoch || !isActive()) return false;
+      spawn();
+      return true;
+    },
+    strand() { epoch++; },
   };
 }
 

@@ -23,6 +23,8 @@ import {
   createModuleLoadHandlers,
   createPoleLodBinding,
   createRenderAdapter,
+  createSegmentSpawnGuard,
+  createTestAllTicker,
   createUnhandledRejectionHandler,
   repointDisplayAliases,
 } from "./app_lifecycle.js";
@@ -241,21 +243,16 @@ function syncResolutionOptions(module) {
 ///////////////////////////////////////////////////////////////////////////////
 
 // Assigned in the GUI setup below; declared here so the load-failure handler can
-// tear the Test-All ticker down.
-let testAllInterval = null;
+// switch the Test All toggle off and disable it.
 let testAllController = null;
-let testAllIndex = 0;
 
-/**
- * Stop the Test All ticker, leaving it ready to be started again.
- * @returns {void}
- */
-function stopTestAllTicker() {
-  if (testAllInterval !== null) {
-    clearInterval(testAllInterval);
-    testAllInterval = null;
-  }
-}
+const testAllTicker = createTestAllTicker({
+  intervalMs: TEST_ALL_INTERVAL_MS,
+  availableEffects: () => favoritesFor(appState.get('resolution')),
+  getEffect: () => appState.get('effect'),
+  setEffect: (name) => appState.set('effect', name),
+  engineReady: () => Boolean(host.engine),
+});
 
 // Assigned by the teardown wiring at the end of this module, which runs before
 // the module promise can settle.
@@ -322,7 +319,7 @@ const moduleLoad = createModuleLoadHandlers({
   reportFailure: (err) => {
     console.error('Failed to initialize the Holosphere renderer:', err);
     // No engine: the Test All ticker would spin uselessly for the page lifetime.
-    stopTestAllTicker();
+    testAllTicker.stop();
     if (testAllController) {
       testAllController.setValue(false);
       testAllController.disable();
@@ -424,24 +421,11 @@ const switches = createSwitchCoordinator({
   showFatal: showFatalError,
 });
 
-testAllController = guiInstance.addSession({ testAll: false }, 'testAll').name('Test All').onChange((v) => {
-  if (v) {
-    const startList = favoritesFor(appState.get('resolution'));
-    testAllIndex = startList.indexOf(appState.get('effect'));
-    testAllInterval = setInterval(() => {
-      if (!host.engine) return;
-      const currentList = favoritesFor(appState.get('resolution'));
-      if (currentList.length === 0) return;
-      // Advance a persistent index, not one re-derived from the live effect: a
-      // rejected setEffect reverts appState to the predecessor, so re-deriving
-      // would recompute the same rejected slot forever.
-      testAllIndex = (testAllIndex + 1) % currentList.length;
-      appState.set('effect', currentList[testAllIndex]);
-    }, TEST_ALL_INTERVAL_MS);
-  } else {
-    stopTestAllTicker();
-  }
-});
+testAllController = guiInstance.addSession({ testAll: false }, 'testAll').name('Test All')
+  .onChange((v) => {
+    if (v) testAllTicker.start();
+    else testAllTicker.stop();
+  });
 
 
 guiInstance.add(daydream, 'labelAxes').name('Show Axes').onChange(() => daydream.invalidate());
@@ -465,13 +449,14 @@ guiInstance.add(poleLod.state, 'poleLod', 0, 2, 0.05).name('Pole LOD')
 const segFolder = guiInstance.addFolder('Segmented POV');
 segFolder.close();
 const segState = { segmented: segments.active, segments: segments.count, boundaries: segments.showBoundaries };
-// Bumped on every segmented enable/count change and on teardown. An await'd
-// handler captures the epoch before warmModules() and bails if a later toggle
-// superseded it, so an on->off->on burst spawns the worker pool once, not twice.
-let segEpoch = 0;
 // Requested size; segments.count follows the live pool and lags this across
 // the warmModules() await.
 let segCount = segments.count;
+const segSpawn = createSegmentSpawnGuard({
+  warmModules,
+  spawn: () => segments.create(segCount),
+  isActive: () => segments.active,
+});
 /**
  * Fall back to the single-thread engine after a segmented-pool failure, leaving
  * the toggle showing the state the app is actually in.
@@ -482,8 +467,7 @@ let segCount = segments.count;
 function segmentedFailed(label, err) {
   console.error(`Segmented POV: ${label} failed; falling back to the single engine.`, err);
   segments.active = false;
-  // Strand any continuation still awaiting warmModules().
-  segEpoch++;
+  segSpawn.strand();
   segments.destroy();
   segments.updateStats();
   // setValue (not updateDisplay) so the deep-link writer drops segmented=true
@@ -494,13 +478,10 @@ function segmentedFailed(label, err) {
 const segEnabledCtrl = segFolder.add(segState, 'segmented').name('Enabled').onChange(async v => {
   try {
     segments.active = v;
-    const epoch = ++segEpoch;
     if (v) {
-      // Reopen the (idle-dropped) keep-alive connection and prime the module cache
-      // before the worker-spawn burst.
-      await warmModules();
-      if (epoch === segEpoch && segments.active) segments.create(segCount);
+      await segSpawn.respawn();
     } else {
+      segSpawn.strand();
       segments.destroy();
       segments.updateStats();
     }
@@ -511,11 +492,7 @@ const segEnabledCtrl = segFolder.add(segState, 'segmented').name('Enabled').onCh
 segFolder.add(segState, 'segments', 2, 8, 2).name('Segments').onChange(async v => {
   try {
     segCount = v;
-    const epoch = ++segEpoch;
-    if (segments.active) {
-      await warmModules();
-      if (epoch === segEpoch && segments.active) segments.create(segCount);
-    }
+    if (segments.active) await segSpawn.respawn();
   } catch (e) {
     segmentedFailed('resize', e);
   }
@@ -630,7 +607,7 @@ appTeardown = createAppTeardown({
     ["unhandledrejection", onUnhandledRejection],
   ],
   switches,
-  stopTimers: () => { stopTestAllTicker(); showApplyNotice(null); },
+  stopTimers: () => { testAllTicker.stop(); showApplyNotice(null); },
   effectGui,
   globalGui: guiInstance,
   host,
@@ -638,6 +615,6 @@ appTeardown = createAppTeardown({
   sidebar,
   driver: daydream,
   segments,
-  strandSegmentWork: () => { segEpoch++; },
+  strandSegmentWork: () => segSpawn.strand(),
   removeOverlay: () => durationEl.remove(),
 });

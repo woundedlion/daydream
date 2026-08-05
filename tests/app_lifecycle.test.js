@@ -9,14 +9,17 @@ import {
   createGlobalKeydownHandler,
   createModuleLoadHandlers,
   createPoleLodBinding,
+  createSegmentSpawnGuard,
+  createTestAllTicker,
   createUnhandledRejectionHandler,
 } from '../app_lifecycle.js';
 
-// app_lifecycle.js is the composition root's frame and teardown wiring. The
-// contracts under test are the ones a browser would only reveal as a black
-// sphere or a leak: all display aliases reference one WASM view, a segmented
-// frame is composited instead of drawn, and dispose releases in an order that
-// cannot re-enter the apply path or reach a freed engine.
+// app_lifecycle.js is the composition root's frame, timer, and teardown wiring.
+// The contracts under test are the ones a browser would only reveal as a black
+// sphere, a stuck walk, or a leak: all display aliases reference one WASM view,
+// a segmented frame is composited instead of drawn, dispose releases in an order
+// that cannot re-enter the apply path or reach a freed engine, the Test All walk
+// advances its own index, and a segmented toggle burst spawns one worker pool.
 
 /**
  * Driver double carrying the two display aliases and the dispose sink.
@@ -537,4 +540,213 @@ test('a replay before the engine loads is a no-op, not a crash', () => {
   h.binding.replay();
 
   assert.deepEqual(h.pushed, []);
+});
+
+// The Test All ticker walks the resolution's effect list on a timer. Its index
+// is its own: a rejected switch reverts the effect, so an index re-derived from
+// the live one would retry the rejected slot forever.
+
+/**
+ * Build the ticker over a fake interval timer and a recording effect switch.
+ * @param {Object} [options] - Starting effect, the lists offered, engine state.
+ * @returns {Object} The ticker, its doubles, and the requested effect names.
+ */
+function makeTicker({
+  effect = 'Alpha',
+  lists = [['Alpha', 'Beta', 'Gamma']],
+  engineReady = true,
+  acceptSwitch = true,
+} = {}) {
+  const requested = [];
+  const state = { effect, engineReady, listIndex: 0 };
+  const timer = { fn: null, ms: null, handle: 0, cancelled: [] };
+  const ticker = createTestAllTicker({
+    intervalMs: 1000,
+    availableEffects: () => lists[state.listIndex],
+    getEffect: () => state.effect,
+    setEffect: (name) => {
+      requested.push(name);
+      if (acceptSwitch) state.effect = name;
+    },
+    engineReady: () => state.engineReady,
+    schedule: (fn, ms) => { timer.fn = fn; timer.ms = ms; return ++timer.handle; },
+    cancel: (handle) => { timer.cancelled.push(handle); timer.fn = null; },
+  });
+  return {
+    ticker,
+    requested,
+    state,
+    timer,
+    tick: (n = 1) => { for (let i = 0; i < n; i++) timer.fn(); },
+  };
+}
+
+test('the ticker walks the list on from the live effect', () => {
+  const h = makeTicker({ effect: 'Beta' });
+
+  h.ticker.start();
+  assert.equal(h.timer.ms, 1000, 'the dwell time is the one it was built with');
+  h.tick(2);
+
+  assert.deepEqual(h.requested, ['Gamma', 'Alpha'], 'and wraps at the end');
+});
+
+test('the walk continues past an effect the engine refused', () => {
+  const h = makeTicker({ acceptSwitch: false });
+
+  h.ticker.start();
+  h.tick(2);
+
+  assert.deepEqual(h.requested, ['Beta', 'Gamma'],
+    'a reverted effect must not make the ticker retry the same slot');
+});
+
+test('a live effect the list does not offer starts the walk at its head', () => {
+  const h = makeTicker({ effect: 'Zeta' });
+
+  h.ticker.start();
+  h.tick();
+
+  assert.deepEqual(h.requested, ['Alpha']);
+});
+
+test('a tick before the engine loads switches nothing and loses no ground', () => {
+  const h = makeTicker({ engineReady: false });
+
+  h.ticker.start();
+  h.tick(2);
+  assert.deepEqual(h.requested, [], 'there is no engine to take the switch');
+
+  h.state.engineReady = true;
+  h.tick();
+  assert.deepEqual(h.requested, ['Beta'], 'the walk resumes where it started');
+});
+
+test('a resolution change mid-walk continues through the new list', () => {
+  const h = makeTicker({ lists: [['Alpha', 'Beta', 'Gamma'], ['Lo1', 'Lo2']] });
+
+  h.ticker.start();
+  h.tick();
+  h.state.listIndex = 1;
+  h.tick(2);
+
+  assert.deepEqual(h.requested, ['Beta', 'Lo1', 'Lo2'],
+    'the index is taken modulo the list the tick actually reads');
+});
+
+test('a resolution offering nothing ticks without a switch', () => {
+  const h = makeTicker({ lists: [[]] });
+
+  h.ticker.start();
+  h.tick(2);
+
+  assert.deepEqual(h.requested, []);
+});
+
+test('stopping cancels the interval, and starting arms exactly one', () => {
+  const h = makeTicker();
+
+  h.ticker.start();
+  h.ticker.start();
+  assert.equal(h.timer.handle, 1, 'a re-entered toggle must not arm a second timer');
+  assert.equal(h.ticker.running(), true);
+
+  h.ticker.stop();
+  assert.deepEqual(h.timer.cancelled, [1]);
+  assert.equal(h.ticker.running(), false);
+
+  h.ticker.stop();
+  assert.deepEqual(h.timer.cancelled, [1], 'stopping twice cancels once');
+
+  h.ticker.start();
+  assert.equal(h.timer.handle, 2, 'a stopped ticker starts again');
+});
+
+// The segmented spawn guard: spawning awaits a module warm-up, so a toggle burst
+// leaves several continuations in flight against one worker pool.
+
+/**
+ * Build the spawn guard over warm-ups the test resolves by hand.
+ * @returns {Object} The guard, the pending warm-ups, the spawn log, and the
+ *   segmented-mode switch the post-await check reads.
+ */
+function makeSpawnGuard() {
+  const warms = [];
+  const spawns = [];
+  const mode = { active: false };
+  const guard = createSegmentSpawnGuard({
+    warmModules: () => new Promise((resolve, reject) => {
+      warms.push({ resolve, reject });
+    }),
+    spawn: () => spawns.push('create'),
+    isActive: () => mode.active,
+  });
+  return { guard, warms, spawns, mode };
+}
+
+test('an on/off/on burst spawns one worker pool, not two', async () => {
+  const h = makeSpawnGuard();
+
+  h.mode.active = true;
+  const first = h.guard.respawn();
+  h.mode.active = false;
+  h.guard.strand();
+  h.mode.active = true;
+  const second = h.guard.respawn();
+
+  h.warms[0].resolve();
+  h.warms[1].resolve();
+
+  assert.equal(await first, false, 'the superseded attempt is stranded');
+  assert.equal(await second, true);
+  assert.deepEqual(h.spawns, ['create']);
+});
+
+test('the last attempt is the one that spawns, whatever order they resume in', async () => {
+  const h = makeSpawnGuard();
+  h.mode.active = true;
+
+  const first = h.guard.respawn();
+  const second = h.guard.respawn();
+  h.warms[1].resolve();
+  h.warms[0].resolve();
+
+  assert.equal(await second, true);
+  assert.equal(await first, false);
+  assert.deepEqual(h.spawns, ['create'], 'two pools would double the worker count');
+});
+
+test('a strand lands on a continuation still awaiting the warm-up', async () => {
+  const h = makeSpawnGuard();
+  h.mode.active = true;
+
+  const attempt = h.guard.respawn();
+  h.guard.strand(); // the page discard / pool failure path
+  h.warms[0].resolve();
+
+  assert.equal(await attempt, false);
+  assert.deepEqual(h.spawns, [], 'a spawn here builds workers into a dead page');
+});
+
+test('an attempt that resumes with segmented mode off spawns nothing', async () => {
+  const h = makeSpawnGuard();
+  h.mode.active = true;
+
+  const attempt = h.guard.respawn();
+  h.mode.active = false;
+  h.warms[0].resolve();
+
+  assert.equal(await attempt, false);
+  assert.deepEqual(h.spawns, []);
+});
+
+test('a failed warm-up rejects so the caller can fall back', async () => {
+  const h = makeSpawnGuard();
+  h.mode.active = true;
+
+  const attempt = h.guard.respawn();
+  h.warms[0].reject(new Error('offline'));
+
+  await assert.rejects(attempt, /offline/);
+  assert.deepEqual(h.spawns, []);
 });
