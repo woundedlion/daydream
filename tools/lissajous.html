@@ -110,15 +110,6 @@
       domainClosureWarning,
     } from './lissajous_math.js';
 
-    // CSS variable to numeric hex; undefined for a missing or malformed value so
-    // that initScene falls back to its documented default rather than NaN.
-    const getCssColor = (name) => {
-      const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-      const match = /^#?([0-9a-f]{6})$/i.exec(value);
-      return match ? parseInt(match[1], 16) : undefined;
-    };
-
-    const SLATE_900 = getCssColor('--slate-900');
     const TWO_PI = 2 * Math.PI;
 
     // --- Configuration and State ---
@@ -161,7 +152,6 @@
     const initThree = () => {
       // Camera moved closer than the default to make the curve fill the space.
       const result = initScene('canvasContainer', 'threeCanvas', {
-        background: SLATE_900,
         cameraPosition: [1.5, 1.5, 3],
       });
       scene = result.scene;
