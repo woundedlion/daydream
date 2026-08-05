@@ -19,6 +19,7 @@
  *   - getWasmEngine():    current main-thread HolosphereEngine (or null)
  *   - refreshPixelView(): re-fetch the (possibly detached) WASM pixel view
  *   - getMemoryView():    current Uint16Array view of the display buffer
+ *   - repointDisplayAliases(view): re-point both display aliases at a view
  */
 import {
   compositeSegment,
@@ -157,19 +158,23 @@ export class SegmentController {
    * @param {() => ({getParameterDefinitions: () => Array<{name: string, value: number|boolean}>}|null)} deps.getWasmEngine - Returns the current main-thread HolosphereEngine, or null when none is bound.
    * @param {() => unknown} deps.refreshPixelView - Re-fetches the (possibly detached) WASM pixel view.
    * @param {() => (Uint16Array|null)} deps.getMemoryView - Returns the current Uint16Array view of the display buffer.
-   * @param {(view: Uint16Array) => void} [deps.repointDisplayAliases] - Re-points both display aliases (Three.js instanceColor + driver.pixels) at the given view; defaults to re-pointing driver.pixels only.
+   * @param {(view: Uint16Array) => void} deps.repointDisplayAliases - Re-points BOTH display aliases (Three.js instanceColor.array + driver.pixels) at the given view. Required: only the host knows the mesh, and an implementation that moves one alias leaves the composite in a buffer the GPU never reads.
    * @param {Document} [deps.statsDoc] - DOM document the stats overlay renders into; defaults to the global `document`.
+   * @throws {TypeError} When repointDisplayAliases is not a function.
    */
   constructor({ resolutionPresets, appState, driver, getWasmEngine, refreshPixelView,
                 getMemoryView, repointDisplayAliases, statsDoc }) {
+    if (typeof repointDisplayAliases !== 'function') {
+      throw new TypeError('SegmentController: repointDisplayAliases is required '
+        + 'and must be a function that re-points both display aliases');
+    }
     this.resolutionPresets = resolutionPresets;
     this.appState = appState;
     this.driver = driver;
     this.getWasmEngine = getWasmEngine;
     this.refreshPixelView = refreshPixelView;
     this.getMemoryView = getMemoryView;
-    this.repointDisplayAliases =
-      repointDisplayAliases || ((view) => { this.driver.pixels = view; });
+    this.repointDisplayAliases = repointDisplayAliases;
     /** @type {SegmentStatsView} */
     this.statsView = new SegmentStatsView(statsDoc);
 

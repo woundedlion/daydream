@@ -7,10 +7,14 @@
 import { test, mock, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { unpinnedEngineMethods } from './fake_engine.js';
+import { repointDisplayAliases } from '../app_lifecycle.js';
 
-// Stand-in for the injected Daydream renderer: only the grid and display buffer
-// the compositor reads.
-const driver = { W: 0, H: 0, pixels: null };
+// Stand-in for the injected Daydream renderer: the grid and display buffer the
+// compositor reads, plus the dot mesh the second display alias lives on.
+const driver = {
+  W: 0, H: 0, pixels: null,
+  dotMesh: { instanceColor: { array: null, needsUpdate: false } },
+};
 
 
 const {
@@ -176,6 +180,7 @@ function makeController({ resolution = 'lo', effect = 'TestEffect',
     getWasmEngine: () => null,
     refreshPixelView: () => {},
     getMemoryView: () => driver.pixels,
+    repointDisplayAliases: (view) => repointDisplayAliases(driver, view),
   });
 }
 
@@ -183,6 +188,8 @@ beforeEach(() => {
   driver.W = 0;
   driver.H = 0;
   driver.pixels = null;
+  driver.dotMesh.instanceColor.array = null;
+  driver.dotMesh.instanceColor.needsUpdate = false;
   FakeWorker.instances = [];
   FakeWorker.constructionCount = 0;
   FakeWorker.failConstructionAt = -1;
@@ -1354,6 +1361,23 @@ test('composite() self-heals a broken display-buffer alias instead of throwing',
   assert.doesNotThrow(() => c.composite());
   assert.equal(driver.pixels, target,
     'driver.pixels re-pointed at the composite target');
+  assert.equal(driver.dotMesh.instanceColor.array, target,
+    'the mesh alias the GPU reads is re-pointed too');
+});
+
+test('a controller cannot be built without a two-alias display repointer', () => {
+  assert.throws(
+    () => new SegmentController({
+      resolutionPresets: { lo: { w: 4, h: 4 } },
+      appState: { get: () => 'lo' },
+      driver,
+      getWasmEngine: () => null,
+      refreshPixelView: () => {},
+      getMemoryView: () => driver.pixels,
+    }),
+    /repointDisplayAliases is required/,
+    'an omitted repointer would heal only half the alias pair',
+  );
 });
 
 // ---------------------------------------------------------------------------
