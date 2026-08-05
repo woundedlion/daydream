@@ -1587,12 +1587,13 @@
       }
       state.ops[index].params[key] = val;
 
-      // Sync UI elements
+      // Sync UI elements. The row's data-key names the param it drives, so the
+      // state object's key order need not match OP_DEFS'.
       const item = document.getElementById('opsList').children[index];
-      if (item) {
-        const paramIndex = Object.keys(state.ops[index].params).indexOf(key);
-        const slider = item.querySelectorAll('input[type="range"]')[paramIndex];
-        const input = item.querySelectorAll('input[type="number"]')[paramIndex];
+      const row = item && [...item.querySelectorAll('.op-param')].find(r => r.dataset.key === key);
+      if (row) {
+        const slider = row.querySelector('input[type="range"]');
+        const input = row.querySelector('input[type="number"]');
 
         if (slider) slider.value = val;
         if (input) input.value = val.toFixed(2);
