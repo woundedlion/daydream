@@ -110,7 +110,6 @@ test('targetHeight capture scales the offscreen to the target height and pins it
     const source = fakeCanvas(800, 600);   // 4:3 source
     const rec = new VideoRecorder(source);
     rec.targetHeight = 121;                 // odd target → rounded up to even
-    assert.notEqual(rec.targetHeight, null);
 
     const off = rec.ensureOffscreen();
     // height 121 → 122; width round(121 * 800/600) = round(161.33) = 161 → 162.

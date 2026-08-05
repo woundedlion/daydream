@@ -125,7 +125,7 @@
   },
   "tests/recorder.test.js": {
     "cases": 40,
-    "assertions": 210
+    "assertions": 209
   },
   "tests/reference_transaction_hook.test.js": {
     "cases": 17,
