@@ -80,26 +80,23 @@ export function opStepCpp(o) {
 }
 
 /**
- * The shortest C++ float literal that reads back as the same float32.
+ * A C++ float literal for an authored param, naming the param on failure.
  *
  * A base's authored params cross the WASM boundary as values, not as source
  * text, so a re-emitted literal must land on the identical float or the pasted
- * Recipe stops mirroring its generator (solids.h proves the two bitwise equal).
+ * Recipe stops mirroring its generator (solids.h proves the two bitwise equal);
+ * formatFloat guarantees that round-trip.
  * @param {string} where - Param name used in the error message.
  * @param {number} value - The float32 value the engine reported.
  * @returns {string} A C++ float literal.
- * @throws {Error} When the value is non-finite, or no literal up to 17 fractional digits round-trips.
+ * @throws {Error} When the value has no plain-decimal float literal.
  */
 function exactFloatLiteral(where, value) {
-  if (!Number.isFinite(value)) {
-    throw new Error(`generateRegistryCpp: ${where} must be a finite number, got ${value}`);
+  try {
+    return formatFloat(value);
+  } catch (e) {
+    throw new Error(`generateRegistryCpp: ${where} ${e.message.replace(/^formatFloatCpp: /, '')}`);
   }
-  const target = Math.fround(value);
-  for (let digits = 6; digits <= 17; digits++) {
-    const literal = formatFloat(value, digits);
-    if (Math.fround(parseFloat(literal)) === target) return literal;
-  }
-  throw new Error(`generateRegistryCpp: ${where} value ${value} has no exact float literal`);
 }
 
 /**
