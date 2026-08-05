@@ -36,6 +36,7 @@ export const ClipSetResult = Object.freeze({
   APPLIED: Object.freeze({ value: 0 }),
   NO_EFFECT: Object.freeze({ value: 1 }),
   INVALID_BOUNDS: Object.freeze({ value: 2 }),
+  FULL_FRAME_KEPT: Object.freeze({ value: 3 }),
 });
 
 /**

@@ -32,6 +32,7 @@ class FakeEngine {
     this.resolutionOk = true;
     this.effectOk = true;
     this.clipOk = true;
+    this.fullFrame = false;
     this.clip = null;
     this.effect = null;
     this.params = [];
@@ -75,9 +76,12 @@ class FakeEngine {
     this.calls.push(['setPoleLod', v]);
     this.poleLod = v;
   }
+  // `fullFrame` models a needs_full_frame() effect: the bounds are accepted but
+  // the clip stays at the full canvas.
   setClip(x0, x1, y0, y1) {
     if (!this.effect) return ClipSetResult.NO_EFFECT;
     if (!this.clipOk) return ClipSetResult.INVALID_BOUNDS;
+    if (this.fullFrame) return ClipSetResult.FULL_FRAME_KEPT;
     this.clip = { y0, y1, x0, x1 };
     return ClipSetResult.APPLIED;
   }
@@ -441,6 +445,21 @@ test('a rejected clip posts engineRejected', async () => {
   const failed = posted.find((p) => p.msg.type === 'engineRejected');
   assert.ok(failed);
   assert.match(failed.msg.reason, /setClip\(0, 4, 0, 4\) rejected/);
+});
+
+/**
+ * FULL_FRAME_KEPT is a success, not a rejection: a cross-segment stateful effect
+ * renders the whole canvas in every worker and the pool must keep running.
+ */
+test('a full-frame-kept clip does not fault the pool', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  posted.length = 0;
+  engineInstance.fullFrame = true;
+
+  await dispatch({ type: 'setEffect', name: 'MeshFeedback' });
+
+  assert.equal(posted.find((p) => p.msg.type === 'engineRejected'), undefined,
+    'FULL_FRAME_KEPT must not post engineRejected');
 });
 
 /**

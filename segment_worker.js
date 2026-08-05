@@ -48,11 +48,13 @@ let arenaMetricsWarned = false;
  * Apply the stored segment clip rectangle to the engine. Must be called after
  * every setEffect, since rebuilding the effect resets the clip.
  * @details setClip answers a Module.ClipSetResult enum value; compare against
- * the enum, never by truthiness (every enum value is a truthy object). Only
- * INVALID_BOUNDS faults the pool: NO_EFFECT is the ordinary answer when no
- * effect is installed to receive the clip, and the controller follows with a
- * setEffect that re-applies it.
- * @returns {boolean} Whether the clip was applied.
+ * the enum, never by truthiness (every enum value is a truthy object). Two
+ * values are successes: APPLIED installs the band, and FULL_FRAME_KEPT means
+ * the effect reports needs_full_frame() so the clip stays at the full canvas
+ * and this worker renders the whole frame. Only INVALID_BOUNDS faults the pool:
+ * NO_EFFECT is the ordinary answer when no effect is installed to receive the
+ * clip, and the controller follows with a setEffect that re-applies it.
+ * @returns {boolean} Whether the engine accepted the clip.
  */
 function applyClip() {
   if (!engine || !segRange) return false;
@@ -65,7 +67,8 @@ function applyClip() {
     });
     return false;
   }
-  return result === wasmModule.ClipSetResult.APPLIED;
+  return result === wasmModule.ClipSetResult.APPLIED
+    || result === wasmModule.ClipSetResult.FULL_FRAME_KEPT;
 }
 
 /**
