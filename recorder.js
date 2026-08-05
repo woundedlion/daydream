@@ -20,6 +20,11 @@
 // Chunk-delivery interval for MediaRecorder.start(); bounds encoder buffering.
 const RECORDER_TIMESLICE_MS = 1000;
 
+// Seconds of video the streaming sink may hold in RAM while the Save dialog is
+// still unanswered; multiplied by the latched bitrate to get the byte bound. Two
+// minutes is far past any real time-to-pick, so the bound is a runaway guard.
+const PICKER_GRACE_SECONDS = 120;
+
 /**
  * Pick the best-supported MIME type for the requested output format. Codec
  * priority: MP4/H.264 > WebM/VP9 > WebM/VP8. Returns '' if nothing in the
@@ -411,11 +416,12 @@ export class VideoRecorder {
    * Builds the per-session data sink. With the File System Access API present,
    * streams each chunk straight to a user-chosen file as it arrives, so once the
    * file is open a long recording never buffers the whole video in RAM; chunks
-   * captured before the user picks a file are held in the write chain, so a save
-   * dialog left open retains everything recorded up to that point. Otherwise it
-   * accumulates chunks for a single blob download at stop. The save dialog is
-   * raised here (under start()'s user gesture) so its transient activation is
-   * preserved.
+   * captured before the user picks a file are held in the write chain, bounded at
+   * PICKER_GRACE_SECONDS of video at the latched bitrate — past that the session
+   * stops and reports, and what was held still reaches the file if one is picked
+   * later. Otherwise it accumulates chunks for a single blob download at stop.
+   * The save dialog is raised here (under start()'s user gesture) so its
+   * transient activation is preserved.
    * @param {MediaRecorder} recorder - Session recorder, queried for its container type.
    * @param {string} effectName - Base name for the suggested file.
    * @param {Blob[]} chunks - Per-session buffer; the fallback path fills it, the
@@ -439,6 +445,13 @@ export class VideoRecorder {
     let writable = null;
     let failed = false;
     let aborted = false;
+    let picked = false;
+    let backlogBytes = 0;
+    let overflowed = false;
+    // Fall back to the constructor default for a bitrate a host left unset or
+    // non-numeric, so the bound is always a real number of bytes.
+    const bitrateMbps = this.bitrateMbps > 0 ? this.bitrateMbps : 16;
+    const maxBacklogBytes = (bitrateMbps * 1_000_000 / 8) * PICKER_GRACE_SECONDS;
     const opened = globalThis.showSaveFilePicker({
       suggestedName: filename,
       types: [{ description: 'Video', accept: { [this.mimeForExt(ext)]: [`.${ext}`] } }],
@@ -459,7 +472,8 @@ export class VideoRecorder {
         } else {
           console.warn('VideoRecorder: streaming save unavailable, buffering in memory', err);
         }
-      });
+      })
+      .finally(() => { picked = true; });
 
     // One serialized chain; each link awaits the picker, so chunks that arrive
     // before the file opens are written in order once it does. The writable is
@@ -469,6 +483,27 @@ export class VideoRecorder {
     let chain = Promise.resolve();
     return {
       write: (data) => {
+        // Every chunk queued before the picker answers stays reachable from the
+        // chain. Cap that hold and end the session at the cap: a stopped
+        // recording the user is told about beats an unbounded RAM climb behind a
+        // dialog nobody answered. The chunks already queued still reach the file
+        // if it is eventually picked, so the saved video is a clean prefix.
+        if (!picked) {
+          backlogBytes += data.size;
+          if (backlogBytes > maxBacklogBytes) {
+            if (!overflowed) {
+              overflowed = true;
+              if (this.mediaRecorder === recorder) {
+                this.stop();
+                this.reportFailure(
+                  `the Save dialog was left unanswered while ${Math.round(maxBacklogBytes / 1_000_000)} MB `
+                  + `of video (${PICKER_GRACE_SECONDS}s at ${bitrateMbps} Mbps) piled up in memory; recording `
+                  + 'stopped. Choose a file to save what was captured.');
+              }
+            }
+            return;
+          }
+        }
         chain = chain.then(async () => {
           await opened;
           // Save dialog cancelled: finish() discards the buffer, so drop chunks
