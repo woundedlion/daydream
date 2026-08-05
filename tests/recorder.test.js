@@ -707,6 +707,63 @@ test('a mid-stream streaming write failure closes the writable, skips download, 
   }
 });
 
+/**
+ * A Save dialog nobody answers holds every chunk in the write chain. The sink
+ * bounds that hold at 120 s of video at the latched bitrate (15 MB at 1 Mbps
+ * here) and ends the session there, telling the host; the chunks queued under
+ * the bound still reach the file when it is finally picked, so what is saved is
+ * a contiguous prefix rather than a recording missing its middle.
+ */
+test('an unanswered save dialog stops the session at the backlog bound', async () => {
+  const restore = installRecorderEnv();
+  const writes = [];
+  let closed = false;
+  const writable = { write: async (d) => { writes.push(d); }, close: async () => { closed = true; } };
+  let answerPicker = () => {};
+  globalThis.showSaveFilePicker = () => new Promise((resolve) => {
+    answerPicker = () => resolve({ createWritable: async () => writable });
+  });
+  const errs = [];
+  const prevErr = console.error;
+  console.error = (...a) => errs.push(a.join(' '));
+  try {
+    const rec = new VideoRecorder(recordableCanvas());
+    const sinkFinished = trackSinkFinish(rec);
+    rec.bitrateMbps = 1;
+    let downloaded = false;
+    rec.download = () => { downloaded = true; };
+    const notified = [];
+    rec.onError = (err) => notified.push(err);
+
+    rec.start('unanswered');
+    const recorder = rec.mediaRecorder;
+    const sessionChunks = rec.chunks;
+    recorder.ondataavailable({ data: { size: 14_000_000 } });
+    assert.equal(rec.isRecording, true, 'a backlog under the bound keeps recording');
+
+    recorder.ondataavailable({ data: { size: 2_000_000 } });
+    assert.equal(rec.isRecording, false, 'the session stops when the backlog passes the bound');
+    assert.equal(notified.length, 1, 'the host is told the session ended');
+    assert.match(errs.join(' '), /Save dialog/, 'the stop is reported, not silent');
+
+    recorder.ondataavailable({ data: { size: 3_000_000 } });
+    recorder.onstop();
+    assert.equal(notified.length, 1, 'the bound is reported once, not per chunk');
+
+    answerPicker();
+    await sinkFinished();
+
+    assert.deepEqual(writes, [{ size: 14_000_000 }],
+      'the chunks held under the bound still reach the chosen file, in order');
+    assert.equal(closed, true, 'the file is closed once the late pick lands');
+    assert.equal(downloaded, false, 'no in-memory blob download of the dropped tail');
+    assert.deepEqual(sessionChunks, [], 'the dropped chunks are not retained in RAM');
+  } finally {
+    console.error = prevErr;
+    restore();
+  }
+});
+
 test('a streaming session that produces no data never opens the chosen file', async () => {
   const restore = installRecorderEnv();
   let createWritableCalls = 0;
