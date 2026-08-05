@@ -368,6 +368,10 @@ export class SegmentController {
     const readied = new Array(numSegments).fill(false);
     let readyCount = 0;
     let bootedCount = 0;
+    /**
+     * @param {boolean[]} state - Per-index boot or ready flags.
+     * @returns {number[]} Indices still false.
+     */
     const missing = (state) => {
       const out = [];
       for (let i = 0; i < numSegments; i++) if (!state[i]) out.push(i);
