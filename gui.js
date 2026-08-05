@@ -6,9 +6,9 @@
 import { GUI as LilGUI } from "lil-gui";
 import {
   getActiveURLSync,
+  overlayUrlParam,
   parseUrlBoolean,
   parseUrlNumber,
-  roundUrlNumber,
   URL_FLUSH_DEBOUNCE_MS,
   writeUrl,
 } from "./state.js";
@@ -48,17 +48,7 @@ const makeUrlParamWriter = () => {
   const pendingUrlWrites = new Map(); // key -> value (null/undefined => delete)
   const commit = () => {
     const params = getUrlParams();
-    for (const [k, v] of pendingUrlWrites) {
-      if (v === null || v === undefined) {
-        params.delete(k);
-      } else if (typeof v === 'number') {
-        const rounded = roundUrlNumber(v);
-        if (rounded === null) params.delete(k);
-        else params.set(k, String(rounded));
-      } else {
-        params.set(k, v);
-      }
-    }
+    for (const [k, v] of pendingUrlWrites) overlayUrlParam(params, k, v);
     pendingUrlWrites.clear();
     writeUrl(params);
   };

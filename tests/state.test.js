@@ -4,6 +4,7 @@ import {
   AppState,
   URLSync,
   getActiveURLSync,
+  overlayUrlParam,
   replaceUrl,
   roundUrlNumber,
   writeUrl,
@@ -308,15 +309,26 @@ test('URLSync skips an unseeded tracked key rather than seeding the raw string',
   }
 });
 
-test('URLSync serializes a boolean tracked key through String(val)', () => {
-  installWindow('', '/sim');
-  const s = new AppState({ flag: true });
-  const sync = new URLSync(s, ['flag']);
+test('overlayUrlParam serializes a boolean through String(val)', () => {
   const params = new URLSearchParams();
-  sync.setTrackedParam(params, 'flag', s.get('flag'));
+  overlayUrlParam(params, 'flag', true);
   assert.equal(params.get('flag'), 'true', 'true round-trips as the string "true"');
-  sync.setTrackedParam(params, 'flag', false);
+  overlayUrlParam(params, 'flag', false);
   assert.equal(params.get('flag'), 'false', 'false round-trips as the string "false"');
+});
+
+test('overlayUrlParam rounds numbers and deletes values with no URL form', () => {
+  const params = new URLSearchParams('keep=1&speed=9');
+  overlayUrlParam(params, 'speed', 1.234567);
+  assert.equal(params.get('speed'), '1.2346', 'a float is cut to 5 significant digits');
+  overlayUrlParam(params, 'count', 42);
+  assert.equal(params.get('count'), '42', 'an integer keeps no decimal tail');
+  for (const empty of [null, undefined, NaN, Infinity]) {
+    overlayUrlParam(params, 'speed', 1.5);
+    overlayUrlParam(params, 'speed', empty);
+    assert.equal(params.has('speed'), false, `${empty} drops the param`);
+  }
+  assert.equal(params.get('keep'), '1', 'unrelated params survive');
 });
 
 test('URLSync validator admits a valid URL value', () => {
