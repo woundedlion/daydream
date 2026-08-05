@@ -986,6 +986,20 @@ test('a cancelled save picker discards buffered chunks without downloading', asy
 });
 
 /**
+ * Wraps a recorder's host error hook so a test can await an async failure path
+ * directly, rather than guessing how many task turns it takes.
+ * @param {VideoRecorder} rec - Recorder whose installed onError hook is instrumented.
+ * @returns {() => Promise<void>} Resolves once the hook has fired.
+ */
+const trackHostError = (rec) => {
+  const onError = rec.onError;
+  let fire = null;
+  const fired = new Promise((resolve) => { fire = resolve; });
+  rec.onError = (err) => { onError?.(err); fire(); };
+  return async () => { await fired; };
+};
+
+/**
  * Save picker cancelled while the session is still live: the recorder stops, and
  * the host hook must fire or the UI stays latched on a dead session and the next
  * click starts a second recording instead of stopping the first.
@@ -1000,11 +1014,12 @@ test('a cancelled save picker tells the host the session ended', async () => {
     rec.download = () => {};
     const notified = [];
     rec.onError = (err) => notified.push(err);
+    const hostNotified = trackHostError(rec);
 
     rec.start('cancelled');
     const recorder = rec.mediaRecorder;
-    // Let the picker's rejection settle while the session is still installed.
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // The picker's rejection reaches the hook while the session is still installed.
+    await hostNotified();
 
     assert.equal(notified.length, 1, 'the host is told the session ended');
     assert.equal(notified[0], abort, 'the cancellation itself is passed through');
