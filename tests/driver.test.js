@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Daydream, dotDetailFor, fitDistance, MOBILE_BREAKPOINT_PX } from '../driver.js';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
+import { fakeColorAttribute } from './fake_three.js';
 
 restoreDocumentAfterEach();
 
@@ -458,22 +459,6 @@ function detachedView() {
   const view = new Uint16Array(buf);
   buf.transfer();
   return view;
-}
-
-/**
- * Stand-in for an InstancedBufferAttribute with three.js's real upload
- * semantics: needsUpdate is write-only and only ever bumps version, so once an
- * upload is flagged nothing can unflag it. `version` is what WebGLAttributes
- * compares, so tests assert on it rather than on a readable flag.
- * @param {Uint16Array} array - Backing color array.
- * @returns {Object} Attribute stub exposing array/version/needsUpdate.
- */
-function fakeColorAttribute(array) {
-  return {
-    array,
-    version: 0,
-    set needsUpdate(value) { if (value === true) this.version++; },
-  };
 }
 
 /** Minimal `this` for stepSimulation: a running sim over the given color array.

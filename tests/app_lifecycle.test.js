@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement, installElement, restoreElementAfterEach } from './fake_dom.js';
+import { fakeColorAttribute } from './fake_three.js';
 import {
   repointDisplayAliases,
   displayAliasesDiverged,
@@ -31,7 +32,7 @@ import {
 function fakeDriver(log = []) {
   return {
     pixels: null,
-    dotMesh: { instanceColor: { array: null, needsUpdate: false } },
+    dotMesh: { instanceColor: fakeColorAttribute(null) },
     dispose() { log.push('driver.dispose'); },
   };
 }
@@ -47,7 +48,8 @@ test('re-pointing aliases the view everywhere and flags the upload', () => {
 
   assert.equal(driver.pixels, view);
   assert.equal(driver.dotMesh.instanceColor.array, view);
-  assert.equal(driver.dotMesh.instanceColor.needsUpdate, true);
+  assert.equal(driver.dotMesh.instanceColor.version, 1,
+    'a re-pointed attribute uploads, or the sphere shows the previous buffer');
 });
 
 test('aliases agree only when both reference the same view', () => {
@@ -111,7 +113,9 @@ test('a single-engine frame renders, republishes the view, then syncs the panel'
   assert.deepEqual(a.calls,
     ['engine.drawFrame', 'host.refresh', 'effectGui.sync']);
   assert.equal(a.driver.pixels, a.view);
-  assert.equal(a.driver.dotMesh.instanceColor.needsUpdate, true);
+  // A refresh that hands back a fresh view raises the flag, and the frame raises
+  // it again unconditionally; three.js still uploads once per render.
+  assert.equal(a.driver.dotMesh.instanceColor.version, 2);
 });
 
 test('a spawning pool still renders the main engine and reports its progress', () => {
