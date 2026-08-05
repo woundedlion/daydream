@@ -9,8 +9,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import createHolosphereModule from '../holosphere_wasm.js';
 import {
-  KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, applyOp,
-  meshOpFailure, MESH_OP_RESULT_NAMES,
+  KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, SIMPLE_SEEDS,
+  DEFINED_SEED_CONSTANTS, applyOp, meshOpFailure, MESH_OP_RESULT_NAMES,
 } from '../tools/solid_codegen.js';
 import { ENGINE_METHODS, ParamSetResult, ClipSetResult } from './fake_engine.js';
 import { isViewLive, refreshPixelView } from '../pixel_view.js';
@@ -479,6 +479,24 @@ test('the Platonic and Catalan seed lists name registered Simple solids', () => 
   for (const name of PLATONIC_SOLIDS) {
     assert.ok(!CATALAN_BASES.has(name),
       `"${name}" is in both seed lists; the namespace qualifier would be ambiguous`);
+  }
+});
+
+test('SIMPLE_SEEDS mirrors simple_registry, whose index a Recipe seed is', () => {
+  const registry = M.MeshOps.getRegistry();
+  for (let i = 0; i < SIMPLE_SEEDS.length; i++) {
+    assert.equal(registry[i].name, SIMPLE_SEEDS[i],
+      `SIMPLE_SEEDS[${i}] must name registry entry ${i}; a generated SEED_* ` +
+      'constant carries that index and would seed another solid');
+  }
+  // The Catalan registry follows the simple one, so its first entry is where
+  // simple_registry ends: a nineteenth simple solid would land here.
+  assert.ok(CATALAN_BASES.has(registry[SIMPLE_SEEDS.length].name),
+    `SIMPLE_SEEDS stops short of simple_registry, which also holds ` +
+    `"${registry[SIMPLE_SEEDS.length].name}"`);
+  for (const seed of DEFINED_SEED_CONSTANTS) {
+    assert.ok(SIMPLE_SEEDS.includes(seed),
+      `solids.h cannot define SEED_* for "${seed}", which is no simple_registry entry`);
   }
 });
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 const { upperSnake, opStepCpp, generateRegistryCpp, MAX_RECIPE_STEPS } =
   await import('../tools/solid_registry_codegen.js');
-const { OP_DEFS, KNOWN_OPS, PARAMETERIZED_OPS } =
+const { OP_DEFS, KNOWN_OPS, PARAMETERIZED_OPS, SIMPLE_SEEDS, DEFINED_SEED_CONSTANTS } =
   await import('../tools/solid_codegen.js');
 
 test('upperSnake splits camelCase runs and uppercases the rest', () => {
@@ -67,7 +67,12 @@ function chainStep(op, param = 0, twist = 0) {
 test('generateRegistryCpp emits a Recipe mirror for a hankin-free chain too', () => {
   const item = { base: 'cube', ops: [{ op: 'truncate', params: { t: 0.33 } }] };
   assert.equal(generateRegistryCpp(item),
-    '/** Step table for cube_truncate33. */\n'
+    '// solids.h defines no SEED_CUBE. Paste the constant and its\n'
+    + '// static_assert beside the other SEED_* constants.\n'
+    + 'inline constexpr uint8_t SEED_CUBE = 1;\n'
+    + 'static_assert(std::string_view(simple_registry[SEED_CUBE].name) == "cube");\n'
+    + '\n'
+    + '/** Step table for cube_truncate33. */\n'
     + 'inline constexpr OpStep CUBE_TRUNCATE33_STEPS[] = {\n'
     + '    {Op::TRUNCATE, 0.33f}};\n'
     + '/** Recipe mirror of IslamicStarPatterns::cube_truncate33. */\n'
@@ -102,6 +107,69 @@ test('generateRegistryCpp refuses a Catalan seed, which no Recipe can index', ()
     () => generateRegistryCpp({ base: 'pentagonalHexecontahedron_kis', ops: ['dual'] },
       { seed: 'disdyakisTriacontahedron', ops: [chainStep('kis')] }),
     /is a Catalan solid/);
+});
+
+/**
+ * The simple_registry seeds solids.h declares no SEED_* constant for, so a
+ * paste on one has to define it. Pinned here so the roster the generator
+ * encodes cannot drift from solids.h unnoticed.
+ */
+const SEEDS_WITHOUT_CONSTANTS = [
+  'tetrahedron', 'cube', 'truncatedTetrahedron', 'cuboctahedron',
+  'truncatedCube', 'truncatedCuboctahedron', 'snubCube',
+  'truncatedDodecahedron', 'rhombicosidodecahedron',
+];
+
+test('the encoded seed roster splits simple_registry into the two cases', () => {
+  assert.equal(SIMPLE_SEEDS.length, 18);
+  assert.deepEqual(SIMPLE_SEEDS.filter(s => !DEFINED_SEED_CONSTANTS.has(s)),
+    SEEDS_WITHOUT_CONSTANTS);
+  for (const seed of DEFINED_SEED_CONSTANTS) {
+    assert.ok(SIMPLE_SEEDS.includes(seed),
+      `"${seed}" carries a SEED_* constant but is no simple_registry entry`);
+  }
+});
+
+test('generateRegistryCpp names a declared SEED_* constant without redefining it', () => {
+  for (const seed of DEFINED_SEED_CONSTANTS) {
+    const code = generateRegistryCpp({ base: seed, ops: ['ambo'] });
+    assert.match(code, new RegExp(`\\n {4}SEED_${upperSnake(seed)}, `),
+      `the Recipe for "${seed}" must seed on its own constant`);
+    assert.doesNotMatch(code, /inline constexpr uint8_t SEED_/,
+      `solids.h already declares SEED_${upperSnake(seed)}`);
+  }
+});
+
+test('generateRegistryCpp defines the SEED_* constant solids.h lacks', () => {
+  for (const seed of SEEDS_WITHOUT_CONSTANTS) {
+    const code = generateRegistryCpp({ base: seed, ops: ['ambo'] });
+    const constName = `SEED_${upperSnake(seed)}`;
+    const block = code.slice(0, code.indexOf('/** Step table'));
+    assert.ok(block.startsWith(`// solids.h defines no ${constName}.`),
+      `the paste for "${seed}" must open by naming the missing constant`);
+    assert.match(block, new RegExp(
+      `inline constexpr uint8_t ${constName} = ${SIMPLE_SEEDS.indexOf(seed)};`),
+    `${constName} must carry its simple_registry index`);
+    // The house static_assert, which fails to compile if the index moves.
+    assert.match(block, new RegExp('static_assert\\(\\s*std::string_view\\('
+      + `simple_registry\\[${constName}\\]\\.name\\) ==\\s*"${seed}"\\);`));
+    // solids.h is clang-formatted at 80 columns and the block is pasted in.
+    for (const line of block.split('\n')) {
+      assert.ok(line.length <= 80, `"${line}" is ${line.length} columns`);
+    }
+    assert.match(code, new RegExp(`\\n {4}${constName}, `),
+      `the Recipe for "${seed}" must seed on the defined constant`);
+  }
+});
+
+test('generateRegistryCpp refuses a seed that indexes no simple_registry entry', () => {
+  assert.throws(
+    () => generateRegistryCpp({ base: 'dodecahedron_hk62_ambo', ops: ['dual'] }),
+    /names no Platonic or Archimedean solid/);
+  assert.throws(
+    () => generateRegistryCpp({ base: 'icosahedron_kis', ops: ['dual'] },
+      { seed: 'icosahedron_kis', ops: [chainStep('kis')] }),
+    /names no Platonic or Archimedean solid/);
 });
 
 test('generateRegistryCpp emits a step table and Recipe mirror for a hankin chain', () => {
