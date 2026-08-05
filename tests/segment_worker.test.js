@@ -192,6 +192,35 @@ test('render before a completed init faults instead of dropping the reply', asyn
   assert.throws(() => captured[0](), /render before a completed init/);
 });
 
+/**
+ * The version gate is the first statement of the init handler, so a mismatched
+ * init latches nothing: the worker keeps the segment identity it was built with,
+ * for both the frame tag and every later segRange recompute.
+ */
+test('a version-mismatched init latches no segment identity', async () => {
+  await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
+  const built = engineInstance;
+
+  posted.length = 0;
+  await dispatch({ type: 'init', version: PROTOCOL_VERSION + 1,
+                   segId: 0, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });
+  assert.equal(engineInstance, built, 'no second engine constructed');
+  assert.match(posted.find((p) => p.msg.type === 'engineRejected').msg.reason, /protocol version/);
+
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  const frame = posted.find((p) => p.msg.type === 'frame').msg;
+  assert.equal(frame.segId, 3, 'frame still tagged with the original segment');
+  assert.deepEqual([frame.x0, frame.x1, frame.y0, frame.y1], [4, 8, 2, 4]);
+
+  // The recompute reads segId/totalSegs afresh: segId 3 of 4 over 16x8 → [8,16)x[4,8).
+  posted.length = 0;
+  await dispatch({ type: 'setResolution', w: 16, h: 8 });
+  await dispatch({ type: 'render' });
+  const resized = posted.find((p) => p.msg.type === 'frame').msg;
+  assert.deepEqual([resized.x0, resized.x1, resized.y0, resized.y1], [8, 16, 4, 8]);
+});
+
 /** init builds the segRange, drives the engine setup in order, and posts ready. */
 test('init applies the segment clip and posts ready', async () => {
   await dispatch({ type: 'init', segId: 3, totalSegs: 4, w: 8, h: 4, effectName: 'Plasma' });

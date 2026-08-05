@@ -157,8 +157,8 @@
     "assertions": 91
   },
   "tests/segment_worker.test.js": {
-    "cases": 32,
-    "assertions": 113
+    "cases": 33,
+    "assertions": 118
   },
   "tests/shared.test.js": {
     "cases": 10,
