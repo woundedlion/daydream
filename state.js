@@ -10,9 +10,8 @@ const URL_SIGNIFICANT_DIGITS = 5;
 
 /**
  * Round a numeric URL-param value to URL_SIGNIFICANT_DIGITS significant digits,
- * dropping trailing-zero noise. Shared by URLSync.setParam and gui.js's ad-hoc
- * writer so the two URL serializers cannot drift. Number() re-parses the rounded
- * string so 0.50000 collapses back to 0.5.
+ * dropping trailing-zero noise. Number() re-parses the rounded string so 0.50000
+ * collapses back to 0.5.
  * @param {number} value - The numeric value to serialize.
  * @returns {number|null} The rounded value, or null for a non-finite input so
  *   callers drop the key rather than emit a misleading 0. Rounding preserves
@@ -21,6 +20,38 @@ const URL_SIGNIFICANT_DIGITS = 5;
 export function roundUrlNumber(value) {
   if (!Number.isFinite(value)) return null;
   return Number(value.toPrecision(URL_SIGNIFICANT_DIGITS));
+}
+
+/**
+ * Serialize a value the way the URL stores it: numbers through roundUrlNumber,
+ * everything else stringified. The one serialization rule behind every deep-link
+ * write, so no writer can drift from another.
+ * @param {*} value - The value to serialize.
+ * @returns {string|null} The param string, or null when the value has no URL
+ *   representation (null/undefined, or a non-finite number) and the key is
+ *   dropped instead of serializing a 0 the app never held.
+ */
+export function canonicalUrlParam(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') {
+    const rounded = roundUrlNumber(value);
+    return rounded === null ? null : String(rounded);
+  }
+  return String(value);
+}
+
+/**
+ * Overlay one key onto a URLSearchParams under the canonical serialization,
+ * deleting the key when the value has no URL representation.
+ * @param {URLSearchParams} params - The params object to mutate.
+ * @param {string} key - The param name.
+ * @param {*} value - The value to serialize.
+ * @returns {void}
+ */
+export function overlayUrlParam(params, key, value) {
+  const str = canonicalUrlParam(value);
+  if (str === null) params.delete(key);
+  else params.set(key, str);
 }
 
 // A URL number must be wholly numeric: parseFloat would take the leading digits
@@ -274,7 +305,7 @@ export class URLSync {
     // finds no mismatch and schedules nothing.
     for (const key of this.trackedKeys) {
       if (!params.has(key)) continue;
-      if (params.get(key) !== this.canonicalParam(state.get(key))) {
+      if (params.get(key) !== canonicalUrlParam(state.get(key))) {
         this.schedule();
         break;
       }
@@ -337,17 +368,8 @@ export class URLSync {
       this.schedule();
       return;
     }
-    if (value === null || value === undefined) {
-      // null is a deletion marker (drop the param on flush), not a forget.
-      this.adhoc.set(key, null);
-    } else if (typeof value === 'number') {
-      const rounded = roundUrlNumber(value);
-      // A null rounding (non-finite) drops the key rather than serializing a 0
-      // the engine never rendered.
-      this.adhoc.set(key, rounded === null ? null : String(rounded));
-    } else {
-      this.adhoc.set(key, String(value));
-    }
+    // A null entry is a deletion marker (drop the param on flush), not a forget.
+    this.adhoc.set(key, canonicalUrlParam(value));
     this.schedule();
   }
 
@@ -371,36 +393,6 @@ export class URLSync {
   }
 
   /**
-   * Serialize a tracked value the way the URL stores it, rounding numbers via
-   * roundUrlNumber so they match setParam. Strings pass through unchanged.
-   * @param {*} val - The value to serialize.
-   * @returns {string|null} The param string, or null when the value has no URL
-   *   representation and the key is dropped instead.
-   */
-  canonicalParam(val) {
-    if (val === null || val === undefined) return null;
-    if (typeof val === 'number') {
-      const rounded = roundUrlNumber(val);
-      return rounded === null ? null : String(rounded);
-    }
-    return String(val);
-  }
-
-  /**
-   * Write a tracked key into a URLSearchParams using its canonical serialization,
-   * deleting the key when the value has none.
-   * @param {URLSearchParams} params - The params object to mutate.
-   * @param {string} key - The tracked key.
-   * @param {*} val - The value to serialize.
-   * @returns {void}
-   */
-  setTrackedParam(params, key, val) {
-    const str = this.canonicalParam(val);
-    if (str === null) params.delete(key);
-    else params.set(key, str);
-  }
-
-  /**
    * Read-modify-write the URL once: re-read current params, overlay tracked
    * state keys and surviving ad-hoc writes, then replaceState. Running at fire
    * time (not schedule time) is what lets concurrent updates merge.
@@ -414,12 +406,10 @@ export class URLSync {
       }
       this.pendingReset = null;
     }
+    // A cleared tracked key drops its param; leaving it would re-seed the stale
+    // value into state on the next load.
     for (const key of this.trackedKeys) {
-      const val = this.state.get(key);
-      // A cleared tracked key drops its param; leaving it would re-seed the
-      // stale value into state on the next load.
-      if (val === null || val === undefined) params.delete(key);
-      else this.setTrackedParam(params, key, val);
+      overlayUrlParam(params, key, this.state.get(key));
     }
     for (const [key, val] of this.adhoc) {
       if (val === null) params.delete(key);

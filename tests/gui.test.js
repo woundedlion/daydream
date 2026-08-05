@@ -573,6 +573,36 @@ test('makeUrlParamWriter preserves location.hash in the fallback commit', () => 
 });
 
 /**
+ * The fallback commit must serialize exactly as URLSync does, so a tool page and
+ * the app produce the same link for the same value: numbers rounded to
+ * significant digits, and a value with no URL form dropping its param.
+ */
+test('makeUrlParamWriter serializes numbers and deletions like URLSync', () => {
+  let lastUrl = '/';
+  globalThis.window = {
+    location: { search: '?keep=1&stale=9&gone=1', pathname: '/', hash: '' },
+    history: { replaceState(s, t, url) { lastUrl = url; } },
+  };
+  const write = makeUrlParamWriter();
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    write('speed', 1.234567);
+    write('count', 42);
+    write('stale', NaN);  // non-finite has no URL form
+    write('gone', null);  // deletion marker
+    mock.timers.tick(200);
+  } finally {
+    mock.timers.reset();
+  }
+  const q = new URL(lastUrl, 'http://x').searchParams;
+  assert.equal(q.get('speed'), '1.2346', 'a float is cut to 5 significant digits');
+  assert.equal(q.get('count'), '42', 'an integer keeps no decimal tail');
+  assert.equal(q.has('stale'), false, 'a non-finite number drops the param');
+  assert.equal(q.has('gone'), false, 'null removes the param');
+  assert.equal(q.get('keep'), '1', 'unrelated params survive');
+});
+
+/**
  * Installs a window whose replaceState records the written URL.
  * @param {string} search - The raw query string, including the leading '?'.
  * @param {string} [hash] - The location fragment, including the leading '#'.

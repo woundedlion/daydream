@@ -81,8 +81,8 @@
     "assertions": 28
   },
   "tests/gui.test.js": {
-    "cases": 21,
-    "assertions": 81
+    "cases": 22,
+    "assertions": 86
   },
   "tests/kb_format.test.js": {
     "cases": 5,
@@ -201,8 +201,8 @@
     "assertions": 70
   },
   "tests/state.test.js": {
-    "cases": 50,
-    "assertions": 1123
+    "cases": 51,
+    "assertions": 1130
   },
   "tests/switch_coordinator.test.js": {
     "cases": 15,
