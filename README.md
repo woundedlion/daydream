@@ -173,6 +173,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   │   ├── concepts.h              FunctionRef/Fn callable wrappers, PipelineRef type erasure, Tweenable concept
 │   │   ├── inplace_function.h      Fixed-capacity in-place callable storage behind Fn
 │   │   ├── memory.h / memory.cpp   Arena allocator, ScratchScope, Persist<T>
+│   │   ├── static_storage.cpp      Definitions of the framebuffer/timeline statics (DMAMEM placement)
 │   │   ├── static_circular_buffer.h Fixed-capacity non-allocating circular buffer
 │   │   ├── generators.h            Universal generate() wrapper for procedural geometry
 │   │   ├── util.h                  wrap(), fast_wrap(), shortest_distance, apply_if_changed
@@ -211,6 +212,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   │   ├── plot.h                  Line/curve rasterizer with geodesic/planar strategies
 │   │   ├── filter.h                Composable render pipeline + all Filter::World/Screen/Pix
 │   │   ├── sdf.h                   SDF shape primitives, CSG operations, distance queries
+│   │   ├── sdf_volume.h            3D volumetric SDF shapes + domain warps for Scan::Volume
 │   │   ├── shading.h               Fragment + mesh-topology shading helpers, null shaders
 │   │   └── led.h                   LED pin constants + color-correction RAII guards (driver in hardware/pov_single.h)
 │   ├── animation/              Timeline scheduler + the animation type families
@@ -268,7 +270,12 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   ├── Profile/
 │   │   └── Profile.ino         Single-effect HS_PROFILE harness on segment 0 of the segmented rig
 │   └── wasm/
-│       ├── wasm.cpp            Emscripten bindings — HolosphereEngine JS class
+│       ├── wasm.cpp            Emscripten binding TU — includes the binding headers below
+│       ├── engine_bindings.h   Render bridge — HolosphereEngine JS class, resolution/effect dispatch
+│       ├── mesh_ops_bindings.h Mesh editor bridge — MeshOps JS class, tooling arenas, Conway/Goldberg operators
+│       ├── palette_bindings.h  Palette bridge — PaletteOps JS class, generative palette LUT bake
+│       ├── math_exports.h      Free color/palette/geometry exports the JS tool ports cross-check against
+│       ├── arena_metrics.h     Arena metrics report shared by the render and mesh editor bridges
 │       ├── param_marshal.h     Pure parameter definition/value marshaling, single ordering source (host-testable)
 │       └── wasm_predicates.h   Pure embind boundary validation/clamping predicates (host-testable)
 │
@@ -350,7 +357,8 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │
 ├── bootstrap.js                Dynamic-import boot of daydream.js + failure overlay
 ├── daydream.js                 App entry: WASM loader, state wiring, GUI/sidebar
-├── app_lifecycle.js            Composition-root frame adapter, display-alias heal, and teardown
+├── app_lifecycle.js            Composition-root frame adapter, display-alias heal, Test All
+│                                  ticker, segmented spawn epoch, and teardown
 ├── engine_host.js              Owns the main-thread WASM engine + its reassignable display state
 ├── effect_gui.js               Effect panel lifecycle: build, mount, value sync, Export, teardown
 ├── effect_sequencing.js        DOM-free effect/resolution apply-order and skew-guard rules
@@ -855,10 +863,17 @@ The `process_pixel` function applies anti-aliasing based on shape type:
 | `SDF::Flower` | Inverted star (N-petal flower shape from the antipodal perspective) |
 | `SDF::Line` | Geodesic line segment between two sphere-surface points |
 | `SDF::Face` | Planar polygon face (used for mesh rendering) |
-| `SDF::Torus` | 3D volumetric torus SDF with configurable major/minor radii (Cartesian ray-space, not a 2D sphere-surface shape) |
-| `SDF::Warp::Twist` | Domain warp composed with a volumetric SDF via `SDF::WarpedVolume<Shape, Warp>` — e.g. `WarpedVolume<Torus, Warp::Twist>` twists a torus by oscillating Y around the ring azimuth, with an analytic Lipschitz bound for safe sphere-tracing (used by Raymarch) |
 
 The table covers the effect-facing shapes. `sdf.h` also holds internal specializations that only the matching `scan.h` wrapper constructs — `SDF::FlatDistortedRing`, an undisplaced `DistortedRing` with an exact polar centerline distance, is instantiated by `Scan::DistortedRing::draw_flat` and never named by an effect.
+
+#### Volumetric Shapes (`sdf_volume.h`)
+
+The 3D family marched by `Scan::Volume` lives in its own header. It shares the `SDF` namespace but not the scanline contract above: these shapes return a plain `float` distance in Cartesian ray-space, have no vertical bounds or horizontal intervals, and are reached only from the march loop. `sdf.h` does not include `sdf_volume.h`, so an effect that draws only 2D shapes never parses or instantiates it.
+
+| Shape | Description |
+|---|---|
+| `SDF::Torus` | 3D volumetric torus SDF with configurable major/minor radii (Cartesian ray-space, not a 2D sphere-surface shape) |
+| `SDF::Warp::Twist` | Domain warp composed with a volumetric SDF via `SDF::WarpedVolume<Shape, Warp>` — e.g. `WarpedVolume<Torus, Warp::Twist>` twists a torus by oscillating Y around the ring azimuth, with an analytic Lipschitz bound for safe sphere-tracing (used by Raymarch) |
 
 #### CSG Operations (`sdf.h`)
 
@@ -989,7 +1004,7 @@ The fragments compile only inside `animation.h` (a direct include fails with an 
 | `BallDrop` | Animates a `BumpParams` to drop one spherical-cap bump from the north pole to the south along a fixed meridian, ramping the footprint envelope so the bump emerges from and vanishes into the poles |
 | `NoiseProduct` | Integrates the time axis of a `NoiseProductParams` (`time += speed` per frame) to flow a two-octave product-noise field; perpetual |
 | `OpLeg` | Animates one leg of a mesh operator chain: a Conway-operator parameter sweep along a `ConwayGraph` edge or recipe step, a hankin contact-angle sweep on a fixed seed, a relax or medial slerp, or a gated partition swap. Each frame it rebuilds the swept mesh in scratch, compiles it, attaches the leg's hoisted congruence classification, pre-blends the (from, to) palette ramps at the leg's crossfade weight, and hands the mesh to a draw callback — exactly one mesh drawn per frame. Each leg's `.then()` completion handler schedules the next, so a run of legs walks a whole morph path. |
-| `MeshCarousel<SegueT>` | Double-buffered mesh transition system, parameterized on a compile-time segue policy (`namespace Segue`) that owns the transition's animation scheduling via `schedule_segue()` and shapes its rendering through phase-driven hooks (`opacity`/`fill`/`grade`, plus optional `warp`, per-face sweep ordering, and `retarget` for per-transition anchors). Manages a pair of `MeshState` buffers and exposes the front index (`front_index`/`set_front`); the flip itself belongs to the effect, which builds the incoming mesh into the back slot, calls `set_front` on it, and only then calls `schedule_segue` — so the sprite's captured slot index already names the new shape. `schedule_segue` assumes that ordering rather than enforcing it. `Segue::Crossfade` schedules one fading `Animation::Sprite` per transition and returns a next-transition delay that makes consecutive sprites **overlap**: each transition fades only its own incoming shape in (and back out), while the previous transition's sprite — still alive in its fade-out tail — keeps drawing the outgoing shape; no single call ever draws both meshes, but two are rasterized per overlap frame. The overlap length is configurable via the policy's `overlap` member (frames, clamped to the fade window; negative — the default — selects the full window, and `0` makes the schedule sequential so a single mesh renders per frame). `Segue::Dissolve` overlaps the same way but hands the two draws complementary `DissolveMask`s (same threshold and salt, opposite `invert`), so they partition the wireframe's edges and the overlap frame still costs one mesh's scan; it is the only policy that partitions rasterizer work rather than fragments in the shader, so effects pass its masks to `Scan::Mesh::draw` themselves. Every other segue is **sequential** (one mesh per frame): `IrisBloom` (faces contract to glowing center points, then the new tessellation blooms out), `Lace` (fill drains to a glowing edge band and floods back), `TerminatorSweep` (a day/night line pinned to the mesh sweeps across it at constant speed; each face fades over a fixed frame count once the line reaches it), `Shockwave` (an expanding wave erases outward from a point; its echo redraws), `Breakdown` (the pattern breaks down one topology class at a time — every face of a color family fades together, classes in a random order reshuffled per swap, each fully gone before the next starts), `SpinFlip` (rigid spin-up, swap hidden in POV motion blur), and `GoldConvergence` (palettes converge to molten gold around the swap). Used by IslamicStars (fixed to `Segue::TerminatorSweep`); HankinSolids keeps a single mesh and drives `OpLeg` directly instead, and DreamBalls uses `Segue::Crossfade` standalone to overlap its sprite hand-off with no carousel. |
+| `MeshCarousel<SegueT>` | Double-buffered mesh transition system, parameterized on a compile-time segue policy (`namespace Segue`) that owns the transition's animation scheduling via `schedule_segue()` and shapes its rendering through phase-driven hooks (`opacity`/`fill`/`grade`, plus optional `warp`, per-face sweep ordering, and `retarget` for per-transition anchors). Manages a pair of `MeshState` buffers and exposes the front index (`front_index`/`set_front`); the flip itself belongs to the effect, which builds the incoming mesh into the back slot, calls `set_front` on it, and only then calls `schedule_segue` — so the sprite's captured slot index already names the new shape. `schedule_segue` enforces that ordering with an always-on `HS_CHECK` that the passed slot is already the front index, and forwards an optional pause gate to the policy's `schedule()` hook — a signature the `Segue::Schedulable` concept pins so no policy can shadow it with a shorter one and silently drop the gate. `Segue::Crossfade` schedules one fading `Animation::Sprite` per transition and returns a next-transition delay that makes consecutive sprites **overlap**: each transition fades only its own incoming shape in (and back out), while the previous transition's sprite — still alive in its fade-out tail — keeps drawing the outgoing shape; no single call ever draws both meshes, but two are rasterized per overlap frame. The overlap length is configurable via the policy's `overlap` member (frames, clamped to the fade window; negative — the default — selects the full window, and `0` makes the schedule sequential so a single mesh renders per frame). `Segue::Dissolve` overlaps the same way but hands the two draws complementary `DissolveMask`s (same threshold and salt, opposite `invert`), so they partition the wireframe's edges and the overlap frame still costs one mesh's scan; it is the only policy that partitions rasterizer work rather than fragments in the shader, so effects pass its masks to `Scan::Mesh::draw` themselves. Every other segue is **sequential** (one mesh per frame): `IrisBloom` (faces contract to glowing center points, then the new tessellation blooms out), `Lace` (fill drains to a glowing edge band and floods back), `TerminatorSweep` (a day/night line pinned to the mesh sweeps across it at constant speed; each face fades over a fixed frame count once the line reaches it), `Shockwave` (an expanding wave erases outward from a point; its echo redraws), `Breakdown` (the pattern breaks down one topology class at a time — every face of a color family fades together, classes in a random order reshuffled per swap, each fully gone before the next starts), `SpinFlip` (rigid spin-up, swap hidden in POV motion blur), and `GoldConvergence` (palettes converge to molten gold around the swap). Used by IslamicStars (fixed to `Segue::TerminatorSweep`); HankinSolids keeps a single mesh and drives `OpLeg` directly instead, and DreamBalls uses `Segue::Crossfade` standalone to overlap its sprite hand-off with no carousel. |
 
 #### Orientation and Motion Blur
 
@@ -1099,7 +1114,7 @@ Both classes derive from `TransformerPool`, which fixes the call order:
 1. `init_storage(Arena&)` — from the effect's `init()`, after any `configure_arenas()` and before the first spawn.
 2. `spawn(in_frames, args...)` — the returned pointer is transient; use it at the call site, not across frames.
 3. `spawn_pinned(in_frames, args...)` — same, but the pointer may be retained (e.g. registered as a live GUI param). Valid only for an animation that never completes on its own and is added before any finite timeline event, so compaction cannot shift it.
-4. `prepare_frame()` — each frame before `transform()` / `field()`, whenever active params changed through animation or live config. The composition reads that prepared state but cannot verify it is current.
+4. `prepare_frame()` — each frame before `transform()` / `field()`, whenever active params changed through animation or live config. The composition reads that prepared state but cannot verify it is current. Its per-entity hooks (`refresh_from(const ParamsT&)` for live config, `sync()` for derived state) are found by detection, so every `ParamsT` must declare `static constexpr bool NEEDS_PREPARE` — true when it carries either hook, false when it carries neither. A mismatch is a `static_assert`, which is what turns a renamed or signature-drifted hook into a compile error instead of a silently unrefreshed entity.
 5. `reclaim_storage(Arena&)` — from the after-reset callback of an arena that is compacted mid-effect (e.g. a mesh carousel). Spawned animations hold `Params` references into the slots, so the caller must replay the same allocation order after the reset as after `init_storage()`; the re-claimed blocks must land at their original addresses (asserted). A reset only rewinds the offset, so the untouched bytes carry live entities through.
 
 #### Standalone Utilities
@@ -1226,7 +1241,7 @@ The clip reads the 512 × 256 flash master by default. An effect that clips per 
 | Function | Description |
 |---|---|
 | `init_gamut_lut(arena, angle_steps, l_steps)` | Downsamples the flash master into `arena` and points the clip at the copy. Both step counts must divide the master's 512 × 256 (trapped). Costs `gamut_lut_bytes(angle_steps, l_steps)`. Call from the effect's `init()`, after any `configure_arenas()`. |
-| `release_gamut_lut()` | Drops the copy and points the clip back at the flash master. Must run before the storage under the copy is handed out again: `configure_arenas()`, the mesh carousel's compaction, and effects that reset the persistent arena mid-run all call it first. |
+| `release_gamut_lut()` | Drops the copy and points the clip back at the flash master. Must run before the storage under the copy is handed out again: `configure_arenas()` and the mesh carousel's compaction both call it first. |
 
 `Flyby` and `MeshFeedback` arm a copy; every other effect clips against the flash master.
 
@@ -1243,9 +1258,11 @@ range; set it `false` for bounded remaps that must reach the source endpoints.
 Both directions are `static_assert`ed: an unbounded modifier rejects
 `Wrap=false`, and a bounded final modifier rejects `Wrap=true` (wrapping would
 fold its 1.0 output to 0.0 and destroy the top endpoint). Only a modifier that
-re-bounds *arbitrary* input (`FoldModifier`'s triangle wave, `InsetModifier`'s
-clamp) clears an unbounded predecessor; `ReverseModifier` and `MirrorModifier`
-are bounded on `[0,1]` but pass an out-of-range coordinate straight through.
+re-bounds *arbitrary* input (`WrapModifier`'s fold, `FoldModifier`'s triangle
+wave, `InsetModifier`'s clamp) clears an unbounded predecessor; `ReverseModifier`
+and `MirrorModifier` are bounded on `[0,1]` but pass an out-of-range coordinate
+straight through — chaining one after a cycling modifier needs a `WrapModifier`
+between them and `Wrap=false`.
 
 Coordinate modifiers (`modify(float) -> float`):
 
@@ -1255,12 +1272,13 @@ Coordinate modifiers (`modify(float) -> float`):
 | `BreatheModifier` | Oscillates the lookup parameter with a sinusoidal "breathing" envelope |
 | `RippleModifier` | Applies a wavelet distortion to the lookup parameter |
 | `FoldModifier` | Folds the parameter space (mirror at edges) to create ping-pong patterns |
-| `PinchModifier` | Non-linearly warps the lookup parameter toward a focal point |
+| `PinchModifier` | Non-linearly warps the lookup parameter toward a focal point; the per-sample `powf` suits bake-time sampling |
 | `QuantizeModifier` | Posterizes the palette into discrete bands |
 | `ScaleModifier` | Scales and offsets the lookup parameter |
 | `ReverseModifier` | Mirrors the lookup parameter (1.0 - t) |
 | `MirrorModifier` | Maps [0,1] to [0,1,0] for a seamless symmetric loop |
 | `InsetModifier` | Compresses the source domain into an inset window, clamping outside |
+| `WrapModifier` | Folds the lookup parameter into `[0,1)` mid-chain, so a bounded modifier can follow a cycling one |
 | `NoiseWarpModifier` | Displaces the lookup parameter with smooth value noise — the aperiodic counterpart to `RippleModifier` |
 | `DriftModifier` | Meanders the whole palette along a per-frame noise walk (wanders, hesitates, reverses) |
 
@@ -1404,14 +1422,16 @@ SolidBuilder(dodecahedron(a, b), a, b)
 `generators.h` provides a single universal generation wrapper that manages arena lifecycle for all procedural geometry creation:
 
 ```cpp
+namespace hs {
 template <typename GenerateFn, typename... Args>
 auto generate(Arena &target, GenerateFn &&fn, Args &&...args);
+}
 ```
 
 It resets and scopes both scratch arenas, then invokes `fn(target, scratch_a, scratch_b, args...)`. Direct registry lookups and effect geometry creation go through this wrapper for a deterministic arena lifecycle:
 
 ```cpp
-auto mesh = generate(persistent_arena, Solids::get_by_name, std::string_view("icosahedron"));
+auto mesh = hs::generate(persistent_arena, Solids::get_by_name, std::string_view("icosahedron"));
 ```
 
 One deliberate exception: `SolidBuilder`'s fluent Conway chain (`solids.h`) owns its own two-arena ping-pong, swapping the scratch arenas between operators, so it manages arena lifecycle directly rather than through `generate()`.
@@ -1895,7 +1915,7 @@ Polyline rings drift pole-to-pole through an inverse stereographic projection, e
 
 #### DreamBalls
 
-Draws twisting wireframe knotted structures derived from Archimedean solids. Mesh vertices are displaced along per-vertex tangent frames to create orbiting knot patterns, and a Möbius warp is applied to the geometry. Multiple copies orbit simultaneously while the whole structure tumbles under a slow Languid random-walk view orientation punctuated by periodic full-sphere spins. Four presets cycle every 320 frames, each carrying its own solid (rhombicuboctahedron, rhombicosidodecahedron, truncated cuboctahedron, icosidodecahedron), palette, and displacement settings; the outgoing sprite fades out before the incoming one fades in, so exactly one mesh renders per frame.
+Draws twisting wireframe knotted structures derived from Archimedean solids. Mesh vertices are displaced along per-vertex tangent frames to create orbiting knot patterns, and a Möbius warp is applied to the geometry. Multiple copies orbit simultaneously while the whole structure tumbles under a slow Languid random-walk view orientation punctuated by periodic full-sphere spins. Five presets cycle every 320 frames, each carrying its own solid (rhombicuboctahedron, rhombicosidodecahedron, truncated cuboctahedron, icosidodecahedron, snub cube) and displacement settings under a circular analogous generative palette with a cup brightness profile; the outgoing sprite fades out before the incoming one fades in, so exactly one mesh renders per frame.
 
 **Parameters**: Copies (number of knot copies), Radius (displacement), Speed (orbit speed), Warp (Möbius warp scale), Alpha
 
@@ -1993,7 +2013,7 @@ Particles spray from emitters at the eight cube vertices — each sweeping its o
 
 A vertical strand of points — one per latitude row — drifts horizontally around the sphere, each row dragging the next under a gap constraint so the chain wavers like a wind-blown curtain. The strand leaves motion trails, is replicated three times around the sphere, periodically reverses direction, and tumbles under random-axis rotations, while periodic color wipes sweep freshly generated analogous palettes across it.
 
-**Parameters**: Speed, Gap, Trail Len, Wipe Dur
+**Parameters**: Speed, Gap, Trail Len, Trail Cap, Wipe Dur
 
 </td></tr></table>
 
@@ -2116,13 +2136,14 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `setResolution(w, h)` → `bool` | Switch active resolution (96×20 or 288×144); returns `false` on an unsupported size |
 | `setEffect(name)` → `bool` | Instantiate a new effect by string name; resets all arenas to defaults; returns `false` on an unknown name |
 | `drawFrame()` | Advance one frame and copy pixels to the output buffer |
-| `getPixels()` | Return a zero-copy `Uint16Array` view into WASM linear memory |
-| `getBufferLength()` → `int` | Length of the pixel buffer (`W × H × 3`) for sizing the view |
-| `setParameter(name, value)` → `ParamSetResult` | Update a live effect parameter; returns `Module.ParamSetResult.APPLIED` on success, else the rejection reason (`NO_EFFECT`, `UNKNOWN_PARAM`, `READONLY`, or `NON_FINITE`). Compare against the enum values — never by truthiness. An `APPLIED` float may still have been clamped to the param's `[min, max]`; read the effective value back via `getParamValues()` |
+| `getPixels()` | Return a zero-copy `Uint16Array` view into WASM linear memory, spanning the active resolution's prefix of the fixed backing buffer |
+| `getBufferLength()` → `int` | Length of the pixel buffer (`W × H × 3`) for sizing the view, and the staleness test for a cached one: a `setResolution` moves this length without detaching the outstanding view |
+| `setParameter(name, value)` → `ParamSetResult` | Update a live effect parameter; returns `Module.ParamSetResult.APPLIED` on success, else the rejection reason (`NO_EFFECT`, `UNKNOWN_PARAM`, `READONLY`, or `NON_FINITE`). Compare against the enum values — never by truthiness. An `APPLIED` float may still have been clamped to the param's `[min, max]`; read the effective value back via `getParamValues()`. An `APPLIED` write to an *animated* param also engages the animation pause (the animation would otherwise overwrite the value on the next frame), and that pause survives `setEffect` — check `getAnimationsPaused()` afterwards |
 | `setAnimationsPaused(paused)` | Freeze/resume the current effect's animation drivers (the GUI "Pause Animation" toggle) |
+| `getAnimationsPaused()` → `bool` | Whether those drivers are currently frozen. The engine is the owner of this state — an `APPLIED` `setParameter` on an animated param engages the pause by itself — so read it back rather than mirroring the rule in JS |
 | `setPoleLod(aggressiveness)` | Set near-pole azimuthal shading decimation (the GUI "Pole LOD" slider, `[0, 2]`); non-finite and negative inputs clamp to 0, and the value saturates at 8. The setting is a module-global, so it reaches only the engine instance it was called on — a segmented pool needs it re-sent to every worker (§10.7) |
 | `getPoleLod()` → `float` | Current decimation aggressiveness |
-| `getParameterDefinitions()` | Return the parameter list; each entry is `{name, value, animated, readonly}`, and float params additionally carry `{min, max}` (bool params omit `min`/`max` and return `value` as a JS boolean). Enum params (registered with option labels) also carry `options`, an array of label strings indexed by the param's value, which the GUI renders as a dropdown |
+| `getParameterDefinitions()` | Return the parameter list; each entry is `{name, value, animated, readonly, preset}`, and float params additionally carry `{min, max}` (bool params omit `min`/`max` and return `value` as a JS boolean). `preset` is a bool, `false` only for a param the effect excluded from preset exports (`mark_global`), so an export tool skips those alongside the readonly ones. Enum params (registered with option labels) also carry `options`, an array of label strings indexed by the param's value, which the GUI renders as a dropdown; an enum registered with export literals carries `exportOptions` as well — the C++ enum literals indexed the same way, which the export formatter emits in place of a numeric literal. `exportOptions` is absent on an enum registered without them, and on every non-enum param |
 | `getParamValues()` | Return current parameter values (including animation-driven updates) |
 | `getParamGeneration()` → `int` | Generation identifying which loaded-effect or no-effect state the definition and value streams describe. Pin it beside a `getParameterDefinitions()` snapshot and re-read it with each `getParamValues()` call; a changed value means the snapshot is stale (parameter counts repeat across the roster, so a length check alone cannot detect the switch or teardown) |
 | `getArenaMetrics()` | Memory usage stats for the three engine arenas, plus the stack high-water mark (see below). Read once per frame by the HUD, so it omits the tooling arenas an engine instance never moves; `MeshOps.getArenaMetrics()` reports all six on demand |
@@ -2150,14 +2171,29 @@ dotMesh.instanceColor =
 // → instanced dot-mesh per-instance colors → WebGL renderer
 ```
 
-The view aliases WASM linear memory and is **not** bound once: with
-`ALLOW_MEMORY_GROWTH` (e.g. the lazy 16 MB MeshOps allocation) any later heap
-growth detaches the `ArrayBuffer` and leaves the cached view zero-length. Re-fetch
-it after anything that may allocate — a resolution/effect change, and defensively
-each frame — rebinding `instanceColor` to a fresh `getPixels()` view when the old
-one has detached (`wasmPixels.byteLength === 0`), mirroring `daydream.js`'s
-`refreshPixelView`. Copying the snippet without this guard ships a latent
-black-frame-after-growth bug.
+The view aliases WASM linear memory and is **not** bound once. Two independent
+events invalidate it, and a cached view must be tested for both:
+
+- **Heap growth** — with `ALLOW_MEMORY_GROWTH` (e.g. the lazy 16 MB MeshOps
+  allocation) any later growth detaches the `ArrayBuffer` and leaves the cached
+  view zero-length (`wasmPixels.buffer.byteLength === 0`).
+- **A resolution change** — the backing buffer is pre-sized to `MAX_W × MAX_H`
+  and never reallocated (§10.10), so `setResolution` detaches nothing. It moves
+  the *active prefix* instead: the cached view stays live at the previous
+  resolution's length, and a 96×20 view left bound to a 288×144 dot mesh renders
+  the frame wrong rather than throwing. Only a length check catches it.
+
+```js
+if (wasmPixels.buffer.byteLength === 0 ||
+    wasmPixels.length !== wasmEngine.getBufferLength()) {
+  wasmPixels = wasmEngine.getPixels();
+  dotMesh.instanceColor =
+      new THREE.InstancedBufferAttribute(wasmPixels, 3, /*normalized=*/ true);
+}
+```
+
+Run that check defensively each frame. A detachment-only guard ships a latent
+wrong-resolution-view bug the moment a preset is switched.
 
 ### 10.3 The Three.js Renderer (`driver.js`)
 
@@ -2181,7 +2217,7 @@ Daydream uses a tiny pub/sub state container plus a URL-syncing wrapper:
 const appState = new AppState({ effect: 'IslamicStars', resolution: 'Phantasm (288x144)' });
 const urlSync = new URLSync(appState, ['effect', 'resolution'], {
   effect: (v) => knownEffects.has(v),                 // per-key validators gate
-  resolution: (v) => Boolean(resolutionPresets[v]),   // the initial URL read
+  resolution: (v) => Object.hasOwn(resolutionPresets, v),  // the initial URL read
 });
 
 appState.subscribe((key, value, old) => {
@@ -2191,8 +2227,8 @@ appState.subscribe((key, value, old) => {
 ```
 
 - **`AppState`** — flat key→value store with a `subscribe(callback)` API. Setting a key fires the callback only if the value actually changed. The sidebar and lil-gui both write through `appState.set(...)`, so they stay in sync without explicit coupling. `update(patch)` batches: every key in the patch is written first and only then are subscribers notified, one event per changed key, so a callback that reads a sibling batched key sees its post-batch value instead of a half-applied state.
-- **`URLSync`** — reads tracked keys from `window.location.search` on construction (URL beats default), coercing each raw string to the seeded default's type. The third constructor argument is a per-key validator map applied to that raw string; a key whose predicate rejects keeps the validated default, so a hand-edited link cannot poison state and no consumer has to re-validate afterwards. Writes back to the query string are debounced 200 ms through `history.replaceState`. Shareable links like `?effect=Raymarch&resolution=Phantasm%20(288x144)` work out of the box.
-- **URL write ownership** — `URLSync` is the app-wide single owner of URL writes, reachable as `getActiveURLSync()`; constructing a new one disposes the previous. `gui.js` routes each parameter change through `setParam(key, value)`, which buffers an ad-hoc entry (numbers rounded to 5 *significant digits* through the shared `roundUrlNumber`, `null` marking a deletion) rather than writing directly. Significant digits, not decimal places: a lil-gui slider's implicit step is a thousandth of its range, so the rule resolves every step at any magnitude, including a param whose whole range is a small fraction of 1. The debounced flush is a read-modify-write at fire time: it re-reads the live query string, overlays the tracked state keys, then overlays the ad-hoc buffer — so concurrent state and GUI updates merge into one `replaceState` instead of clobbering each other. `reset(excludedKeys)` drops every param outside the exclusion set and writes immediately, re-asserting tracked state and surviving ad-hoc entries so a change still inside the debounce window is not lost. Every writer — both `URLSync` paths and the two standalone-page fallbacks in `gui.js` — emits through the exported `writeUrl(params)`, which assembles `pathname + ?query + location.hash` and calls `replaceState`, so no path can drop the fragment.
+- **`URLSync`** — reads tracked keys from `window.location.search` on construction (URL beats default), coercing each raw string to the seeded default's type. The third constructor argument is a per-key validator map applied to that raw string; a key whose predicate rejects keeps the validated default, so a hand-edited link cannot poison state and no consumer has to re-validate afterwards. A predicate that gates on a lookup table tests own keys (`Object.hasOwn`) and the table carries a `null` prototype, or `?resolution=constructor` passes on the prototype chain. Writes back to the query string are debounced 200 ms through `history.replaceState`. Shareable links like `?effect=Raymarch&resolution=Phantasm%20(288x144)` work out of the box.
+- **URL write ownership** — `URLSync` is the app-wide single owner of URL writes, reachable as `getActiveURLSync()`; constructing a new one disposes the previous. `gui.js` routes each parameter change through `setParam(key, value)`, which buffers an ad-hoc entry (numbers rounded to 5 *significant digits* through the shared `roundUrlNumber`, `null` marking a deletion) rather than writing directly. Significant digits, not decimal places: a lil-gui slider's implicit step is a thousandth of its range, so the rule resolves every step at any magnitude, including a param whose whole range is a small fraction of 1. The debounced flush is a read-modify-write at fire time: it re-reads the live query string, overlays the tracked state keys, then overlays the ad-hoc buffer — so concurrent state and GUI updates merge into one `replaceState` instead of clobbering each other. `reset(excludedKeys)` drops every param outside the exclusion set through that same debounced flush, which re-asserts tracked state and surviving ad-hoc entries so a change still inside the window is not lost — an effect switch resets on every change, so a burst costs one write rather than one per switch. Every writer — both `URLSync` paths and the two standalone-page fallbacks in `gui.js` — emits through the exported `writeUrl(params)`, which assembles `pathname + ?query + location.hash` and calls `replaceState`, so no path can drop the fragment. Both it and the exported `replaceUrl(url)` under it swallow a refused write (browsers rate-limit `replaceState` and throw past the limit): the URL is cosmetic, and a throw escaping into a switch rollback would be reported as unrecoverable state.
 
 ### 10.5 The Effect Sidebar (`sidebar.js`)
 
@@ -2361,10 +2397,10 @@ cmake --build  --preset wasm-release            # build holosphere_wasm.{js,wasm
 cmake --build  --preset wasm-release-install    # build + install into ../daydream/
 ```
 
-Use `wasm-debug` for an unoptimized build with assertions (`-sASSERTIONS=1`). Build outputs go to `build/<preset>/`. The `justfile` provides cross-platform shortcuts that forward to these presets: `just build` (release), `just build-debug`, and `just install` (release + install into `../daydream`). `just smoke` rebuilds and then drives the shipped module through [`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs) under Node — the same runtime gate CI's `wasm` job runs, so a release build is never shipped un-exercised.
+Use `wasm-debug` for an unoptimized build with assertions (`-sASSERTIONS=1`). Build outputs go to `build/<preset>/`. The `justfile` provides cross-platform shortcuts that forward to these presets: `just build` (release), `just build-debug`, and `just install` (smoke + install into `../daydream`). `just smoke` rebuilds and then drives the shipped module through [`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs) under Node — the same runtime gate CI's `wasm` job runs. The recipe graph is `install → smoke → build`, so the module and provenance markers written into daydream are exactly the ones the runtime gate exercised and a release build is never shipped un-exercised.
 
 The WASM target (`CMakeLists.txt`, `EMSCRIPTEN` branch) configures:
-- Source paths: `targets/wasm/wasm.cpp`, `core/engine/memory.cpp`, `core/engine/reaction_graph.cpp`
+- Source paths: `targets/wasm/wasm.cpp`, `core/engine/memory.cpp`, `core/engine/static_storage.cpp`, `core/engine/reaction_graph.cpp`
 - Include paths: project root (for `effects/`, `hardware/`) and `core/` (for engine headers)
 - `-sALLOW_MEMORY_GROWTH=1` — WASM heap can grow for large meshes
 - `-sMODULARIZE=1 -sEXPORT_ES6=1` — ES6 module output
@@ -2388,7 +2424,7 @@ The suite must use Clang — the engine relies on GCC/Clang `__attribute__` exte
 Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-diffusion graph integrity, filters, the plot samplers and the Scan/mesh rasterizer, solids-registry invariants, the Conway/Hankin mesh operators, and animation. Beyond those unit checks the suite also runs: an effect smoke harness that constructs and renders every effect with asserts on, plus a cross-run determinism pass that re-renders each effect under a fixed clock and diffs the frames — at the small-aspect 96×20 simulator/test resolution by default (no firmware image renders 96×20; every PlatformIO env builds 288×144), and additionally at the production 288×144 alongside a white-box correctness block when `HS_EFFECTS_FULL=1` is set, which CI does on every master push and pull-request update; a death harness that spawns subprocesses to confirm each `HS_CHECK` invariant traps; the Phantasm multi-board sync core (`hardware/pov_sync.h`, spec §12); the HD107S SPI wire-format and color-correction tests; the POV driver tiling proofs (each LED write covers the canvas exactly once); and the WASM param-marshaling coverage (the JS definition/value streams stay index-aligned). `tests/run_tests.cpp` is the driver. Extending it with a `tests/test_<module>.h` takes three edits, each pinned by its own CTest case:
 
 1. `#include` the header in `run_tests.cpp`'s include block. The `unit_module_includes` test balances that block's size against the roster row count and requires every header in `tests/` outside a small non-module list to be included by name — so neither an orphaned include nor a test file nothing compiles survives.
-2. Add an `X(name, entry_point, min_assertions)` row to `HS_TEST_MODULE_LIST`, the X-macro that expands into `MODULES[]`. The third column is a **measured** assertion floor — the minimum over the configurations that move a module's count (the `HS_SMOKE_FRAMES` window, Debug `-O0` vs `RelWithDebInfo -O2`, and any `NDEBUG`-gated cases) — enforced by `end_module()`, so a case defined and never called turns the module red instead of compiling clean. `0` leaves a module unfloored. The floor is a count of *assertions*, which in a loop-amplified module (hundreds of assertion sites, millions of assertions) is too coarse to see one lost case whenever a concurrent edit widens a sweep; the `unit_case_calls` test covers that blind spot by counting *sites*, requiring every `void test_*(` / `void check_*(` definition in `tests/` to be referenced elsewhere in its own header.
+2. Add an `X(name, case_sites, entry_point, min_assertions)` row to `HS_TEST_MODULE_LIST`, the X-macro that expands into `MODULES[]`. The fourth column is a **measured** assertion floor — the minimum over the configurations that move a module's count (the `HS_SMOKE_FRAMES` window, Debug `-O0` vs `RelWithDebInfo -O2`, and any `NDEBUG`-gated cases) — enforced by `end_module()`, so a case defined and never called turns the module red instead of compiling clean. `0` leaves a module unfloored. The floor is a count of *assertions*, which in a loop-amplified module (hundreds of assertion sites, millions of assertions) is too coarse to see one lost case whenever a concurrent edit widens a sweep. The `unit_case_calls` test covers that blind spot by counting *sites*: every `void test_*(` / `void check_*(` definition in `tests/` must be referenced elsewhere in its own header, and the second column pins **exactly** how many such definitions the module's header holds — so a case deleted together with its call, which neither the reference check nor the floor can see, turns that module red. That column is a pin, not a floor: adding a case means bumping it, and the gate's error reports the count it found next to the count it expected. `0` there means the module writes no `test_*`/`check_*` cases at all (`death` drives a case table, `effects_smoke` is one sweep).
 3. Add the module name to `_hs_test_modules` in [`tests/CMakeLists.txt`](https://github.com/woundedlion/pov/blob/master/tests/CMakeLists.txt), which generates the one-CTest-test-per-module the CI shards target. `run_tests --check-modules` (the `unit_module_roster` test) fails if the CMake list and the roster diverge either way, so a module added to one but not the other can never run silently.
 
 #### Continuous testing
