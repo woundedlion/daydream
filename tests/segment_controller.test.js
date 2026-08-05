@@ -1835,6 +1835,32 @@ test('setResolution carries pause state into its trailing effect rebuild', () =>
   }
 });
 
+// onWorkerFault terminates the pool but leaves `workers` populated, so an
+// ungated follow-up posts into dead workers and reports nothing.
+test('a faulted setResolution skips its trailing effect rebuild', () => {
+  const c = readyController(2, { effect: 'Ribbons' });
+  for (const w of c.workers) w.posted.length = 0;
+  FakeWorker.failPostAt = 1;
+  FakeWorker.failPostType = 'setResolution';
+
+  c.setResolution(8, 8);
+
+  assert.equal(c.faulted, true);
+  assert.match(c.faultInfo.message, /broadcast of 'setResolution' to seg 1 failed/);
+  for (const w of c.workers)
+    assert.equal(w.posted.some((m) => m.type === 'setEffect'), false,
+      'no setEffect follows the fault');
+});
+
+test('broadcast reports whether every worker accepted the message', () => {
+  const c = readyController(2);
+  assert.equal(c.broadcast({ type: 'setPoleLod', value: 1 }), true);
+
+  FakeWorker.failPostAt = 1;
+  FakeWorker.failPostType = 'setPoleLod';
+  assert.equal(c.broadcast({ type: 'setPoleLod', value: 2 }), false);
+});
+
 test('setParameter broadcasts the name/value to every worker', () => {
   const c = readyController(2);
   c.setParameter('Speed', 0.75);

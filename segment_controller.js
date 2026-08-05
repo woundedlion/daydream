@@ -291,7 +291,11 @@ export class SegmentController {
    * @details A postMessage that throws (an unclonable payload, a worker the agent
    * already tore down) latches a fault instead of escaping to the GUI handler that
    * triggered the broadcast, which would leave the pool half-updated and unreported.
+   * A caller sequencing a second broadcast must gate it on the returned flag: the
+   * fault has already terminated the pool, so the follow-up would post into dead
+   * workers and report nothing.
    * @param {WorkerInboundMsg} msg
+   * @returns {boolean} True when every worker accepted the message.
    */
   broadcast(msg) {
     for (let s = 0; s < this.workers.length; s++) {
@@ -300,9 +304,10 @@ export class SegmentController {
       } catch (error) {
         this.onWorkerFault(s, `broadcast of '${msg.type}' to seg ${s} failed: `
           + errorDetail(error));
-        return;
+        return false;
       }
     }
+    return true;
   }
 
   /**
@@ -811,7 +816,7 @@ export class SegmentController {
     // tick() then dispatches the re-render at the new size. A render that never
     // replies is bounded by renderParallel's watchdog, so a resize during a hung
     // frame faults and recovers rather than wedging the pipeline.
-    this.broadcast({ type: 'setResolution', w, h });
+    if (!this.broadcast({ type: 'setResolution', w, h })) return;
     this.broadcast({
       type: 'setEffect',
       name: this.appState.get('effect'),
