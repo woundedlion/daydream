@@ -297,11 +297,16 @@ test('render refills a recycled buffer and allocates on a size mismatch', async 
 
   posted.length = 0;
   const recycle = new Uint16Array(4 * 2 * 3);
+  // Stale marker no extracted pixel can carry: FakeEngine encodes (i*7)&0xffff
+  // over a 96-element source, so every legitimate value is <= 665. A partial
+  // refill leaves a survivor rather than a plausible-looking zero.
+  const STALE = 0xbeef;
+  recycle.fill(STALE);
   await dispatch({ type: 'render', recycle });
   const reused = posted.find((p) => p.msg.type === 'frame');
   assert.equal(reused.msg.pixels, recycle, 'the returned buffer was refilled, not replaced');
   assert.deepEqual(reused.transfer, [recycle.buffer], 'and transferred straight back');
-  assert.ok(recycle.some((v) => v !== 0), 'every element is overwritten by the extraction');
+  assert.equal(recycle.indexOf(STALE), -1, 'every element is overwritten by the extraction');
 
   posted.length = 0;
   const wrongSize = new Uint16Array(4);
