@@ -255,7 +255,7 @@ const testAllTicker = createTestAllTicker({
 });
 
 // Assigned by the teardown wiring at the end of this module, which runs before
-// the module promise can settle.
+// the WASM load below it is kicked off.
 let appTeardown = null;
 
 const moduleLoad = createModuleLoadHandlers({
@@ -334,8 +334,6 @@ const moduleLoad = createModuleLoadHandlers({
   },
 });
 
-createHolosphereModule().then(moduleLoad.onModuleReady).catch(moduleLoad.onModuleFailed);
-
 ///////////////////////////////////////////////////////////////////////////////
 // GUI + Sidebar Setup
 ///////////////////////////////////////////////////////////////////////////////
@@ -361,8 +359,14 @@ const resolutionController = guiInstance
   .name('Resolution')
   .onChange((v) => appState.set('resolution', v));
 
+const sidebarContainer = document.getElementById('effect-sidebar');
+if (!sidebarContainer) {
+  console.warn('daydream: #effect-sidebar not found; the effect list is not shown.');
+}
+// Off-document fallback: the sidebar is a collaborator of the apply pipeline and
+// of the teardown, so it exists whether or not the page offers it a mount point.
 const sidebar = new EffectSidebar(
-  document.getElementById('effect-sidebar'),
+  sidebarContainer ?? document.createElement('div'),
   (name) => appState.set('effect', name)
 );
 
@@ -618,3 +622,9 @@ appTeardown = createAppTeardown({
   strandSegmentWork: () => segSpawn.strand(),
   removeOverlay: () => durationEl.remove(),
 });
+
+// Last: a throw anywhere above aborts module evaluation, and a load already in
+// flight would then build an engine into a half-built module — no teardown to
+// release it, no pagehide listener. Only synchronous construction sits between
+// this and the import, so the binary's fetch still starts in the same task.
+createHolosphereModule().then(moduleLoad.onModuleReady).catch(moduleLoad.onModuleFailed);
