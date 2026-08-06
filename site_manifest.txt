@@ -50,6 +50,7 @@ tools/clipboard.js
 tools/color.js
 tools/cpp_format.js
 tools/export_params.js
+tools/flyout.js
 tools/kb_format.js
 tools/lissajous_math.js
 tools/mobius_transforms.js
