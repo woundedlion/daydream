@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const {
-  createPaletteViewport, recipeForViewport, lockedGroupMove,
+  createPaletteViewport, recipeForViewport, axisEndpoints, axisFromEndpoints,
+  lockedGroupMove,
   PaletteV2, defaultPaletteRecipe, PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
   paletteRecipeAvailability,
 } =
@@ -45,6 +46,22 @@ test('a palette viewport composes into a detached recipe input window', () => {
   assert.deepEqual(exported.input, { offset: 0.30000000000000004, span: 0.4 });
   assert.deepEqual(recipe.input, { offset: 0.1, span: 0.8 });
   assert.notEqual(exported, recipe);
+});
+
+test('axis endpoints round-trip through center and range', () => {
+  assert.deepEqual(axisFromEndpoints(0.16, 0.88), { center: 0.52, range: 0.72 });
+  assert.deepEqual(axisEndpoints({ center: 0.52, range: 0.72 }), {
+    minimum: 0.16000000000000003,
+    maximum: 0.88,
+  });
+  assert.deepEqual(axisFromEndpoints(0.88, 0.16), { center: 0.52, range: 0.72 });
+});
+
+test('axis endpoints clamp authored extrema to the unit interval', () => {
+  assert.deepEqual(axisEndpoints({ center: 0.1, range: 0.6 }), {
+    minimum: 0,
+    maximum: 0.4,
+  });
 });
 
 /** A locked group of three sliders sharing raw bounds, at the given start values. */
@@ -124,8 +141,8 @@ test('recipe availability exposes only controls that can affect the result', () 
     hueMode: true,
     harmony: true,
     colorPath: true,
-    chromaRange: false,
-    lightnessRange: false,
+    chromaMaximum: false,
+    lightnessMaximum: false,
   });
 
   recipe.hue.mode = PaletteV2.hueMode.SWEEP;
@@ -144,7 +161,10 @@ test('recipe availability exposes only controls that can affect the result', () 
   recipe.chroma.range = 0.2;
   availability = paletteRecipeAvailability(recipe);
   assert.equal(availability.baseHue, true);
-  assert.equal(availability.chromaRange, true);
+  assert.equal(availability.chromaMaximum, true);
+
+  recipe.lightness.curve = PaletteV2.curve.ASCENDING;
+  assert.equal(paletteRecipeAvailability(recipe).lightnessMaximum, true);
 });
 
 test('recipe state rejects stale compiler results', () => {

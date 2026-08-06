@@ -694,13 +694,6 @@
         <section class="param-group recipe-group" aria-labelledby="recipe_color_heading">
           <h3 id="recipe_color_heading" class="font-bold text-yellow-400">Colorfulness</h3>
           <div class="recipe-field">
-            <label for="gen_saturation">Amount</label>
-            <div class="recipe-slider">
-              <input type="range" id="gen_saturation" min="0" max="1" step="0.01" value="0.62">
-              <span id="gen_saturation_value" class="slider-label">0.62</span>
-            </div>
-          </div>
-          <div class="recipe-field">
             <label for="gen_chroma_curve">Shape</label>
             <select id="gen_chroma_curve" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
               <option value="CONSTANT">Even</option>
@@ -710,24 +703,24 @@
               <option value="CUP">Soft Center</option>
             </select>
           </div>
-          <div id="gen_chroma_range_field" class="recipe-field">
-            <label for="gen_chroma_range">Variation</label>
+          <div id="gen_chroma_minimum_field" class="recipe-field">
+            <label id="gen_chroma_minimum_label" for="gen_chroma_minimum">Level</label>
             <div class="recipe-slider">
-              <input type="range" id="gen_chroma_range" min="0" max="1" step="0.01" value="0">
-              <span id="gen_chroma_range_value" class="slider-label">0.00</span>
+              <input type="range" id="gen_chroma_minimum" min="0" max="1" step="0.01" value="0.62">
+              <span id="gen_chroma_minimum_value" class="slider-label">0.62</span>
+            </div>
+          </div>
+          <div id="gen_chroma_maximum_field" class="recipe-field">
+            <label for="gen_chroma_maximum">High</label>
+            <div class="recipe-slider">
+              <input type="range" id="gen_chroma_maximum" min="0" max="1" step="0.01" value="0.62">
+              <span id="gen_chroma_maximum_value" class="slider-label">0.62</span>
             </div>
           </div>
         </section>
 
         <section class="param-group recipe-group" aria-labelledby="recipe_brightness_heading">
           <h3 id="recipe_brightness_heading" class="font-bold text-red-400">Brightness</h3>
-          <div class="recipe-field">
-            <label for="gen_lightness_center">Overall Level</label>
-            <div class="recipe-slider">
-              <input type="range" id="gen_lightness_center" min="0.05" max="0.92" step="0.01" value="0.62">
-              <span id="gen_lightness_center_value" class="slider-label">0.62</span>
-            </div>
-          </div>
           <div class="recipe-field">
             <label for="gen_brightness">Shape</label>
             <select id="gen_brightness" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
@@ -738,11 +731,18 @@
               <option value="CUP">Dark Center</option>
             </select>
           </div>
-          <div id="gen_lightness_range_field" class="recipe-field">
-            <label for="gen_lightness_range">Contrast</label>
+          <div id="gen_lightness_minimum_field" class="recipe-field">
+            <label id="gen_lightness_minimum_label" for="gen_lightness_minimum">Level</label>
             <div class="recipe-slider">
-              <input type="range" id="gen_lightness_range" min="0" max="1" step="0.01" value="0">
-              <span id="gen_lightness_range_value" class="slider-label">0.00</span>
+              <input type="range" id="gen_lightness_minimum" min="0" max="1" step="0.01" value="0.62">
+              <span id="gen_lightness_minimum_value" class="slider-label">0.62</span>
+            </div>
+          </div>
+          <div id="gen_lightness_maximum_field" class="recipe-field">
+            <label for="gen_lightness_maximum">High</label>
+            <div class="recipe-slider">
+              <input type="range" id="gen_lightness_maximum" min="0" max="1" step="0.01" value="0.62">
+              <span id="gen_lightness_maximum_value" class="slider-label">0.62</span>
             </div>
           </div>
         </section>
@@ -838,7 +838,8 @@
     // DOM-free interaction and recipe state live in palette_controls.js; the
     // DOM reads and writes around them stay inline.
     import {
-      createPaletteViewport, recipeForViewport, lockedGroupMove,
+      createPaletteViewport, recipeForViewport, axisEndpoints, axisFromEndpoints,
+      lockedGroupMove,
       defaultPaletteRecipe, PaletteV2,
       PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
     } from './palette_controls.js';
@@ -892,6 +893,76 @@
 
     const enumIndex = (group, value) => PaletteV2[group][value];
 
+    const axisControlDefinitions = {
+      lightness: { prefix: 'gen_lightness', curve: 'gen_brightness' },
+      chroma: { prefix: 'gen_chroma', curve: 'gen_chroma_curve' },
+    };
+
+    function axisControlElements(axisName) {
+      const { prefix, curve } = axisControlDefinitions[axisName];
+      return {
+        curve: document.getElementById(curve),
+        minimum: document.getElementById(`${prefix}_minimum`),
+        maximum: document.getElementById(`${prefix}_maximum`),
+        minimumLabel: document.getElementById(`${prefix}_minimum_label`),
+        minimumValue: document.getElementById(`${prefix}_minimum_value`),
+        maximumValue: document.getElementById(`${prefix}_maximum_value`),
+      };
+    }
+
+    function readAxisEndpoints(axisName) {
+      const { minimum, maximum } = axisControlElements(axisName);
+      return { minimum: Number(minimum.value), maximum: Number(maximum.value) };
+    }
+
+    function syncAxisEndpointControls(axisName) {
+      const elements = axisControlElements(axisName);
+      const { curve, minimum, maximum, minimumLabel, minimumValue, maximumValue } = elements;
+      const constant = curve.value === 'CONSTANT';
+      minimumLabel.textContent = constant ? 'Level' : 'Low';
+
+      minimum.min = '0';
+      minimum.max = constant ? '1' : maximum.value;
+      maximum.min = constant ? '0' : minimum.value;
+      maximum.max = '1';
+      minimumValue.textContent = Number(minimum.value).toFixed(2);
+      maximumValue.textContent = Number(maximum.value).toFixed(2);
+    }
+
+    function setAxisEndpoints(axisName, endpoints) {
+      const { minimum, maximum } = axisControlElements(axisName);
+      minimum.min = maximum.min = '0';
+      minimum.max = maximum.max = '1';
+      minimum.value = endpoints.minimum;
+      maximum.value = endpoints.maximum;
+      syncAxisEndpointControls(axisName);
+    }
+
+    function handleAxisEndpointInput(axisName, event) {
+      const { curve } = axisControlElements(axisName);
+      if (curve.value === 'CONSTANT') {
+        setAxisEndpoints(axisName,
+          { minimum: event.target.value, maximum: event.target.value });
+      } else {
+        syncAxisEndpointControls(axisName);
+      }
+      syncRecipeControlAvailability();
+      scheduleUpdate();
+    }
+
+    function handleAxisCurveChange(axisName) {
+      const { curve } = axisControlElements(axisName);
+      if (curve.value === 'CONSTANT') {
+        const { minimum, maximum } = readAxisEndpoints(axisName);
+        const { center } = axisFromEndpoints(minimum, maximum);
+        setAxisEndpoints(axisName, { minimum: center, maximum: center });
+      } else {
+        syncAxisEndpointControls(axisName);
+      }
+      syncRecipeControlAvailability();
+      scheduleUpdate();
+    }
+
     function readPaletteRecipe() {
       const recipe = defaultPaletteRecipe();
       recipe.domain = enumIndex('domain', document.getElementById('gen_shape').value);
@@ -901,11 +972,14 @@
       recipe.hue.baseTurns = Number(document.getElementById('gen_seed_slider').value) / 256;
       recipe.hue.sweepTurns = 1;
       recipe.lightness.curve = enumIndex('curve', document.getElementById('gen_brightness').value);
-      recipe.lightness.center = Number(document.getElementById('gen_lightness_center').value);
-      recipe.lightness.range = Number(document.getElementById('gen_lightness_range').value);
       recipe.chroma.curve = enumIndex('curve', document.getElementById('gen_chroma_curve').value);
-      recipe.chroma.center = Number(document.getElementById('gen_saturation').value);
-      recipe.chroma.range = Number(document.getElementById('gen_chroma_range').value);
+      for (const [axisName, controls] of [
+        ['lightness', recipe.lightness],
+        ['chroma', recipe.chroma],
+      ]) {
+        const { minimum, maximum } = readAxisEndpoints(axisName);
+        Object.assign(controls, axisFromEndpoints(minimum, maximum));
+      }
       if (recipe.chroma.center === 1) recipe.chroma.headroom = 1;
       return recipe;
     }
@@ -917,8 +991,8 @@
         ['gen_hue_mode_field', 'gen_hue_mode', availability.hueMode],
         ['gen_harmony_field', 'gen_harmony', availability.harmony],
         ['gen_path_field', 'gen_path', availability.colorPath],
-        ['gen_chroma_range_field', 'gen_chroma_range', availability.chromaRange],
-        ['gen_lightness_range_field', 'gen_lightness_range', availability.lightnessRange],
+        ['gen_chroma_maximum_field', 'gen_chroma_maximum', availability.chromaMaximum],
+        ['gen_lightness_maximum_field', 'gen_lightness_maximum', availability.lightnessMaximum],
       ];
 
       for (const [fieldId, controlId, enabled] of controls) {
@@ -945,15 +1019,9 @@
       document.getElementById('gen_chroma_curve').value =
         Object.keys(PaletteV2.curve).find((key) => PaletteV2.curve[key] === recipe.chroma.curve);
       document.getElementById('gen_seed_slider').value = Math.round(recipe.hue.baseTurns * 256) & 255;
-      document.getElementById('gen_lightness_center').value = recipe.lightness.center;
-      document.getElementById('gen_lightness_range').value = recipe.lightness.range;
-      document.getElementById('gen_saturation').value = recipe.chroma.center;
-      document.getElementById('gen_chroma_range').value = recipe.chroma.range;
+      setAxisEndpoints('lightness', axisEndpoints(recipe.lightness));
+      setAxisEndpoints('chroma', axisEndpoints(recipe.chroma));
       document.getElementById('gen_seed_value').textContent = document.getElementById('gen_seed_slider').value;
-      document.getElementById('gen_lightness_center_value').textContent = recipe.lightness.center.toFixed(2);
-      document.getElementById('gen_lightness_range_value').textContent = recipe.lightness.range.toFixed(2);
-      document.getElementById('gen_saturation_value').textContent = recipe.chroma.center.toFixed(2);
-      document.getElementById('gen_chroma_range_value').textContent = recipe.chroma.range.toFixed(2);
       syncRecipeControlAvailability();
       scheduleUpdate();
     }
@@ -1532,8 +1600,7 @@
       }
 
       const dropdowns = [
-        'gen_hue_mode', 'gen_harmony', 'gen_chroma_curve', 'gen_brightness',
-        'gen_shape', 'gen_path',
+        'gen_hue_mode', 'gen_harmony', 'gen_shape', 'gen_path',
       ];
       dropdowns.forEach(id => {
         const el = document.getElementById(id);
@@ -1543,17 +1610,12 @@
         });
       });
 
-      for (const id of [
-        'gen_saturation', 'gen_chroma_range',
-        'gen_lightness_center', 'gen_lightness_range',
-      ]) {
-        const slider = document.getElementById(id);
-        const value = document.getElementById(`${id}_value`);
-        slider?.addEventListener('input', () => {
-          if (value) value.textContent = Number(slider.value).toFixed(2);
-          syncRecipeControlAvailability();
-          scheduleUpdate();
-        });
+      for (const axisName of Object.keys(axisControlDefinitions)) {
+        const { curve, minimum, maximum } = axisControlElements(axisName);
+        curve.addEventListener('change', () => handleAxisCurveChange(axisName));
+        minimum.addEventListener('input', (event) => handleAxisEndpointInput(axisName, event));
+        maximum.addEventListener('input', (event) => handleAxisEndpointInput(axisName, event));
+        syncAxisEndpointControls(axisName);
       }
 
       document.querySelectorAll('[data-recipe-preset]').forEach((button) => {
