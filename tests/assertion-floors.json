@@ -64,6 +64,10 @@
     "cases": 9,
     "assertions": 9
   },
+  "tests/flyout.test.js": {
+    "cases": 3,
+    "assertions": 14
+  },
   "tests/frame_constants.test.js": {
     "cases": 1,
     "assertions": 3
