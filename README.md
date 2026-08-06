@@ -230,7 +230,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │       ├── FastNoiseLite.h         Single-header noise library
 │       └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
-├── effects/                    24 effects (25 headers: the 24 plus the shared
+├── effects/                    23 effects (24 headers: the 23 plus the shared
 │                                ReactionDiffusionBase.h):
 │                                BZReactionDiffusion.h, HopfFibration.h, IslamicStars.h,
 │                                Raymarch.h, … — see §9 Effects Reference
@@ -548,7 +548,7 @@ JS:  wasmEngine.getPixels()
 
 ### End-to-End Flow
 
-A typical effect frame follows a four-stage pipeline. Not every effect uses every stage — some skip generation entirely, others skip transformations, and a few full-screen shader effects (e.g. Liquid2D, Flyby, Raymarch) extend `Effect` directly and bypass the filter pipeline altogether — but the available primitives compose along this flow:
+A typical effect frame follows a four-stage pipeline. Not every effect uses every stage — some skip generation entirely, others skip transformations, and a few full-screen shader effects (e.g. ShaderBall, Raymarch) extend `Effect` directly and bypass the filter pipeline altogether — but the available primitives compose along this flow:
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
@@ -1121,7 +1121,7 @@ Both classes derive from `TransformerPool`, which fixes the call order:
 
 `OrientTransformer<CAP>` (`transformers.h`) is a plain adapter struct, not a `Transformer<>` specialization: it holds a reference to an `Orientation<CAP>` and applies `orientation.orient()` to each vertex. It has no pool, no params and no lifecycle — effects construct one on the stack at the call site (a deduction guide takes `CAP` from the orientation) and hand it straight to `MeshOps::transform()`.
 
-`stereo_noise_warp()` (`transformers.h`) is a free function, not a `Transformer<>` specialization — it is called directly by effects rather than managed through the transformer pool. It takes an already-projected stereographic coordinate `z` (a `Complex`) plus its precomputed `r_sq` (|z|²) — the caller does the `stereo()` projection — and adds FastNoiseLite-driven displacement attenuated near the projection pole. Returns a `StereoWarpResult` containing the warped coordinate and displacement magnitude (used for hue shift by Liquid2D and Flyby).
+`stereo_noise_warp()` (`transformers.h`) is a free function, not a `Transformer<>` specialization — it is called directly by effects rather than managed through the transformer pool. It takes an already-projected stereographic coordinate `z` (a `Complex`) plus its precomputed `r_sq` (|z|²) — the caller does the `stereo()` projection — and adds FastNoiseLite-driven displacement attenuated near the projection pole. Returns a `StereoWarpResult` containing the warped coordinate and displacement magnitude (used for hue shift by ShaderBall).
 
 ### 7.5 Memory Architecture (`memory.h`, `memory.cpp`)
 
@@ -1230,7 +1230,7 @@ Pixel (linear 16-bit) → linear RGB float → OKLab (L, a, b) → OKLCH (L, C, 
 | `oklab_to_oklch()` | Convert OKLab (rectangular) to OKLCH (polar: Lightness, Chroma, Hue) |
 | `lerp_oklch()` | Interpolate two OKLCH values with shortest-arc hue (avoids the red→green→blue detour) |
 | `gamut_clip_preserve_chroma()` | Maps an out-of-gamut OKLab color back into the sRGB cube by reducing chroma while holding hue and lightness (walk-then-bisect on the chroma scale). The hue-preserving alternative to a per-channel RGB clip. Gated behind an in-gamut test (`oklab_to_linear_rgb_gamut`), so in-gamut colors — the vast majority — pay only the test and skip the search. |
-| `hue_rotate()` | Perceptual hue rotation — rotates the (a,b) chroma plane in OKLab, preserving lightness and chroma. Forward nonlinearity uses `fast_cbrt` (hot per-pixel path); inverse is exact. Out-of-gamut results are chroma-reduced rather than per-channel clipped, which holds hue and stabilizes the feedback loop against saturated-color drift. Used by the feedback `hue_fade` transform and `Flyby`'s displacement-driven hue shift. |
+| `hue_rotate()` | Perceptual hue rotation — rotates the (a,b) chroma plane in OKLab, preserving lightness and chroma. Forward nonlinearity uses `fast_cbrt` (hot per-pixel path); inverse is exact. Out-of-gamut results are chroma-reduced rather than per-channel clipped, which holds hue and stabilizes the feedback loop against saturated-color drift. Used by the feedback `hue_fade` transform and `ShaderBall`'s displacement-driven hue shift. |
 
 #### The Gamut Boundary Grid
 
@@ -1243,7 +1243,7 @@ The clip reads the 512 × 256 flash master by default. An effect that clips per 
 | `init_gamut_lut(arena, angle_steps, l_steps)` | Downsamples the flash master into `arena` and points the clip at the copy. Both step counts must divide the master's 512 × 256 (trapped). Costs `gamut_lut_bytes(angle_steps, l_steps)`. Call from the effect's `init()`, after any `configure_arenas()`. |
 | `release_gamut_lut()` | Drops the copy and points the clip back at the flash master. Must run before the storage under the copy is handed out again: `configure_arenas()` and the mesh carousel's compaction both call it first. |
 
-`Flyby` and `MeshFeedback` arm a copy; every other effect clips against the flash master.
+`ShaderBall` and `MeshFeedback` arm a copy; every other effect clips against the flash master.
 
 #### Palette Modifiers
 
@@ -1795,7 +1795,7 @@ An effect passes construction-time flags to its base as `Effect(W, H, {.strobe =
 
 All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for RingShower, Dynamo and Thrusters.
 
-The effect registry and tests carry the full 24-effect roster. The simulator sidebar exposes the curated subset for its active resolution (§10.5), omitting three effects at 288×144 and six at 96×20. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) is a 22-effect subset of the full roster, excluding the two Holosphere-96×20-only effects, Dynamo and Thrusters.
+The effect registry and tests carry the full 23-effect roster. The simulator sidebar exposes the curated subset for its active resolution (§10.5), omitting three effects at 288×144 and five at 96×20. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) is a 21-effect subset of the full roster, excluding the two Holosphere-96×20-only effects, Dynamo and Thrusters.
 
 ### Core Effects (Modern Engine)
 
@@ -1982,18 +1982,6 @@ A fixed icosahedron's wireframe rendered with `Plot::Mesh`, given a noise-distor
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=Liquid2D" target="_blank"><img src="docs/screenshots/Liquid2D.png" alt="Liquid2D" width="280"></a></td>
-<td valign="top">
-
-#### Liquid2D
-
-Stereographic-projection shader (extends `Effect` directly) that samples world-space through a configurable glitch lens (hemisphere mirror + squish/warp). Dual random-walk orientations animate the view and global rotation independently, producing flowing liquid distortion. Uses `Scan::Shader::draw` for full-screen pixel shading and `StaticPalette` with a `BreatheModifier` for animated palette cycling.
-
-**Parameters**: Warp Scale, Warp Strength, Pattern Freq, Time Speed, Complexity, Pole Fade, Cycle Speed
-
-</td></tr></table>
-
-<table border="0"><tr>
 <td width="300"><a href="https://woundedlion.github.io/daydream/?effect=MindSplatter" target="_blank"><img src="docs/screenshots/MindSplatter.png" alt="MindSplatter" width="280"></a></td>
 <td valign="top">
 
@@ -2054,14 +2042,14 @@ Volumetric raymarcher that renders twisted tori at the 26 vertices of a disdyaki
 </td></tr></table>
 
 <table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=Flyby" target="_blank"><img src="docs/screenshots/Flyby.png" alt="Flyby" width="280"></a></td>
+<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=ShaderBall" target="_blank"><img src="docs/screenshots/ShaderBall.png" alt="ShaderBall" width="280"></a></td>
 <td valign="top">
 
-#### Flyby
+#### ShaderBall
 
-Stereographic-projection shader (extends `Effect` directly) with noise-driven warp distortion. A single `Rotation` animation continuously rotates the tangent plane around the Y-axis, producing a fly-through effect on the sphere surface. Uses `Scan::Shader::draw` for full-screen pixel shading with a baked palette. Five camera/warp presets chain forever: `next_preset()` schedules a 480-frame lerp into the next preset and re-arms itself on completion, so every slider except Drift is continuously rewritten.
+Stereographic-projection shader (extends `Effect` directly) spanning liquid domain-warp and grid fly-through looks from one continuous parameter space. Every look axis — Y-spin vs. dual random-walk wander, glitch-lens blend, pattern cross-coupling vs. direct phase feed, palette-bank position, breathe depth, hue shift, value fade — is a preset-lerped float, so the choreography morphs between any two looks (including mixed ones) without a discrete pop. Uses `Scan::Shader::draw` for full-screen pixel shading over a two-slot baked generative palette bank.
 
-**Parameters**: Warp Scale, Warp Strength, Pattern Freq, Speed, Pole Fade, Drift, Hue Shift
+**Parameters**: Warp Scale, Warp Strength, Warp Time, Pattern Freq, Speed, Complexity, Phase Direct, Drift, Pole Fade, Spin Rate, Wander, Lens Mix, Palette, Breathe Depth, Cycle Speed, Hue Shift, Value Fade
 
 </td></tr></table>
 
