@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const {
-  createPaletteViewport, lockedGroupMove,
+  createPaletteViewport, recipeForViewport, lockedGroupMove,
   PaletteV2, defaultPaletteRecipe, PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
   paletteRecipeAvailability,
 } =
@@ -16,7 +16,6 @@ test('the palette viewport maps strip positions onto its visible phase window', 
   viewport.zoom(0.2, 0.6);
   assert.deepEqual(viewport.value, { start: 0.2, end: 0.6 });
   assert.equal(viewport.map(0.25), 0.3);
-  assert.ok(Math.abs(viewport.positionOf(0.4) - 0.5) < 1e-12);
   assert.equal(viewport.zoomed, true);
 });
 
@@ -28,15 +27,6 @@ test('successive palette viewport zooms compose in either drag direction', () =>
   assert.ok(Math.abs(viewport.value.end - 0.65) < 1e-12);
 });
 
-test('the palette viewport clamps and wraps phases within the visible window', () => {
-  const viewport = createPaletteViewport();
-  viewport.zoom(0.2, 0.6);
-  assert.equal(viewport.clamp(0), 0.2);
-  assert.equal(viewport.clamp(1), 0.6);
-  assert.ok(Math.abs(viewport.wrap(0.7) - 0.3) < 1e-12);
-  assert.ok(Math.abs(viewport.wrap(0.1) - 0.5) < 1e-12);
-});
-
 test('reset restores the full palette viewport', () => {
   const viewport = createPaletteViewport();
   viewport.zoom(0.5, 0.5);
@@ -45,6 +35,16 @@ test('reset restores the full palette viewport', () => {
   viewport.reset();
   assert.deepEqual(viewport.value, { start: 0, end: 1 });
   assert.equal(viewport.zoomed, false);
+});
+
+test('a palette viewport composes into a detached recipe input window', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.input = { offset: 0.1, span: 0.8 };
+  const exported = recipeForViewport(recipe, { start: 0.25, end: 0.75 });
+
+  assert.deepEqual(exported.input, { offset: 0.30000000000000004, span: 0.4 });
+  assert.deepEqual(recipe.input, { offset: 0.1, span: 0.8 });
+  assert.notEqual(exported, recipe);
 });
 
 /** A locked group of three sliders sharing raw bounds, at the given start values. */
@@ -102,6 +102,7 @@ test('the default recipe is a detached, complete V2 value', () => {
   first.hue.customTurns[0] = 0.5;
 
   assert.equal(first.schemaVersion, 2);
+  assert.deepEqual(first.input, { offset: 0, span: 1 });
   assert.equal(first.chroma.basis, PaletteV2.chromaBasis.LOCAL_GAMUT);
   assert.equal(second.hue.customTurns[0], 0);
 });

@@ -193,7 +193,7 @@
       gap: 0.75rem;
     }
 
-    .diagnostic-legend {
+    .wave-legend {
       display: flex;
       flex-wrap: wrap;
       justify-content: flex-end;
@@ -203,7 +203,7 @@
       line-height: 0.875rem;
     }
 
-    .diagnostic-legend span::before {
+    .wave-legend span::before {
       display: inline-block;
       width: 0.75rem;
       height: 0.125rem;
@@ -211,10 +211,6 @@
       background: var(--legend-color);
       vertical-align: middle;
       content: '';
-    }
-
-    .diagnostic-legend[hidden] {
-      display: none;
     }
 
     .visualization-card {
@@ -228,40 +224,6 @@
     .visualization-card h2 {
       font-size: 1rem;
       line-height: 1.25rem;
-    }
-
-    .preview-content {
-      display: grid;
-      min-height: 0;
-      flex: 1;
-      grid-template-columns: minmax(6.5rem, 0.8fr) minmax(0, 1fr);
-      gap: 0.75rem;
-    }
-
-    #colorSwatch {
-      width: 100%;
-      height: 5rem;
-    }
-
-    .preview-controls {
-      display: flex;
-      min-width: 0;
-      flex-direction: column;
-      gap: 0.375rem;
-    }
-
-    .preview-controls h3 {
-      font-size: 0.875rem;
-      line-height: 1.25rem;
-    }
-
-    .preview-controls p {
-      font-size: 0.75rem;
-      line-height: 1rem;
-    }
-
-    .preview-controls #copy_prompt {
-      display: none;
     }
 
     .export-flyout {
@@ -349,10 +311,6 @@
       background: var(--blue-500); /* Blue */
     }
 
-    .speed-thumb::-webkit-slider-thumb {
-      background: #8B5CF6; /* Violet */
-    }
-
     /* Canvas Styles */
     #colorStripCanvas {
       border: 1px solid var(--slate-600);
@@ -377,11 +335,39 @@
       height: 150px;
     }
 
-    #colorSwatch {
-      transition: background-color 0.05s linear;
-      /* Smooth visual transition */
-      cursor: pointer;
-      /* Indicate it's clickable for copying */
+    .palette-copy-feedback {
+      position: fixed;
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.625rem;
+      border: 1px solid var(--slate-500);
+      border-radius: 0.5rem;
+      background: var(--slate-900);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, calc(-100% - 0.75rem)) scale(0.96);
+      transition: opacity 0.12s, transform 0.12s;
+    }
+
+    .palette-copy-feedback.is-visible {
+      opacity: 1;
+      transform: translate(-50%, calc(-100% - 0.75rem)) scale(1);
+    }
+
+    .palette-copy-swatch {
+      width: 1.5rem;
+      height: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-radius: 0.25rem;
+    }
+
+    .palette-copy-feedback code {
+      color: white;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
     }
 
     #palette_gallery {
@@ -416,11 +402,11 @@
         min-height: 0;
         flex: 1;
         grid-template-areas:
-          "controls controls"
-          "graph graph"
-          "strip preview";
-        grid-template-columns: minmax(0, 1fr) 17rem;
-        grid-template-rows: auto minmax(8rem, 0.85fr) minmax(8rem, 1.15fr);
+          "controls"
+          "graph"
+          "strip";
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(8rem, 1fr) minmax(6rem, 0.65fr);
       }
 
       .tab-content {
@@ -445,10 +431,6 @@
 
       .strip-panel {
         grid-area: strip;
-      }
-
-      .preview-panel {
-        grid-area: preview;
       }
 
       #waveGraphCanvas {
@@ -562,15 +544,6 @@
       display: block;
     }
 
-    @media (max-width: 480px) {
-      .preview-content {
-        grid-template-columns: 1fr;
-      }
-
-      #colorSwatch {
-        height: 7rem;
-      }
-    }
   </style>
   <!-- Linked last: utilities must outrank tools.css and the rules above. -->
   <link rel="stylesheet" href="tailwind.css">
@@ -802,15 +775,10 @@
     <section class="param-group visualization-card wave-panel">
       <div class="wave-heading">
         <h2 id="wave_graph_title" class="font-semibold text-white">RGB Wave Functions</h2>
-        <div id="diagnostic_legend" class="diagnostic-legend" aria-label="Diagnostic curve legend" hidden>
+        <div class="wave-legend" aria-label="RGB curve legend">
           <span style="--legend-color:#EF4444">Red</span>
           <span style="--legend-color:#22C55E">Green</span>
           <span style="--legend-color:#3B82F6">Blue</span>
-          <span style="--legend-color:#F8FAFC">Brightness</span>
-          <span style="--legend-color:#F59E0B">Gamut Use</span>
-          <span style="--legend-color:#A855F7">Chroma</span>
-          <span style="--legend-color:#EC4899">Gamut Limit</span>
-          <span style="--legend-color:#F43F5E">Gamut Fix</span>
         </div>
       </div>
       <canvas id="waveGraphCanvas" width="1024"
@@ -826,41 +794,17 @@
           class="hidden px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-sm font-medium transition-all shadow-lg">Reset
           Zoom</button>
       </div>
-      <p class="text-sm text-gray-400">Click to set phase, or click and drag to zoom. With the strip focused,
-        ← / → move the phase, Shift+← / → zoom out / in, and Home / End jump to the ends.</p>
+      <p class="text-sm text-gray-400">Click a color to copy its hex value, or click and drag to zoom. With the
+        strip focused, Enter copies the center color and Shift+← / → zooms out / in.</p>
       <canvas id="colorStripCanvas" width="1024" height="100"
-        tabindex="0" role="slider" aria-label="Palette phase"
-        aria-valuemin="0" aria-valuemax="1" aria-valuenow="0"
-        aria-keyshortcuts="ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight Home End"></canvas>
+        tabindex="0" role="button" aria-label="Palette strip; click a color to copy it or drag to zoom"
+        aria-keyshortcuts="Enter Space Shift+ArrowLeft Shift+ArrowRight"></canvas>
+      <div id="palette_copy_feedback" class="palette-copy-feedback" role="status" aria-live="polite">
+        <span id="palette_copy_swatch" class="palette-copy-swatch" aria-hidden="true"></span>
+        <span id="palette_copy_status">Copied</span>
+        <code id="palette_copy_hex">#000000</code>
+      </div>
     </section>
-
-      <!-- 4. ANIMATED PREVIEW (SWATCH & SPEED) -->
-      <section class="param-group visualization-card preview-panel">
-        <h2 class="font-semibold text-white">Animated Preview</h2>
-
-        <div class="preview-content">
-          <!-- Swatch -->
-          <button type="button" id="colorSwatch"
-            class="rounded-lg border-4 border-slate-700 shadow-inner"
-            aria-label="Copy current color as hexadecimal" aria-describedby="hex_value copy_prompt"
-            title="Click to copy Hex code">
-            <!-- Background color is set by JS -->
-          </button>
-
-          <!-- Animation Controls -->
-          <div class="preview-controls">
-            <h3 class="font-bold text-indigo-400">Global Phase Speed (Cycles/s)</h3>
-            <div id="speed_control" class="flex items-center space-x-2"></div>
-            <p class="text-sm text-gray-400">Current Phase (t): <span id="t_value"
-                class="font-mono text-white">0.000</span></p>
-            <p class="text-sm text-gray-400">Current Color:
-              <span id="hex_value" class="font-mono text-white">#000000</span>
-              <span id="copy_prompt" class="ml-2 text-gray-500 transition-colors duration-300" role="status">(Click
-                swatch to copy)</span>
-            </p>
-          </div>
-        </div>
-      </section>
 
       </main>
 
@@ -874,7 +818,7 @@
     // Shared primitives, imported rather than re-implemented inline: the
     // clipboard copy (tools/clipboard.js) and the sRGB/linear-RGB transfer
     // functions (tools/color.js, which mirrors core/color/color.h's).
-    import { copyWithFeedback, COPY_FEEDBACK, wireCopyBlock } from './clipboard.js';
+    import { copyToClipboard, wireCopyBlock } from './clipboard.js';
     // Labelled range slider + readout, shared with the other tool pages.
     import { createSlider } from './slider.js';
     // Fatal-error banner and load bootstrap from the THREE-free banner module
@@ -887,21 +831,21 @@
     // tested without a DOM. DOM-coupled wiring stays inline below.
     import {
       ProceduralPalette, GenerativePalette,
-      proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
+      proceduralPaletteCpp, proceduralParamsForViewport,
+      generativePaletteCpp, setPaletteOps,
       NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
     } from './palette_math.js';
     // DOM-free interaction and recipe state live in palette_controls.js; the
     // DOM reads and writes around them stay inline.
     import {
-      createPaletteViewport, lockedGroupMove, defaultPaletteRecipe, PaletteV2,
+      createPaletteViewport, recipeForViewport, lockedGroupMove,
+      defaultPaletteRecipe, PaletteV2,
       PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
     } from './palette_controls.js';
     // The two canvas painters take their canvas, context and palette as
     // arguments, so they live in their own module and are unit tested against a
     // context double; the pointer and keyboard wiring around them stays inline.
-    import {
-      createColorStripPainter, drawWaveGraph, drawRecipeDiagnostics,
-    } from './palette_canvas.js';
+    import { createColorStripPainter, drawWaveGraph } from './palette_canvas.js';
     import { wireFlyout } from './flyout.js';
     import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
 
@@ -928,15 +872,6 @@
       // Named Palettes loads procedural coefficients, so it only applies here.
       const palettesPanel = document.getElementById('named_palettes_panel');
       if (palettesPanel) palettesPanel.style.display = (tabName === 'procedural') ? '' : 'none';
-
-      const generative = tabName === 'generative';
-      document.getElementById('wave_graph_title').textContent = generative
-        ? 'Color & Gamut Diagnostics'
-        : 'RGB Wave Functions';
-      document.getElementById('diagnostic_legend').hidden = !generative;
-      document.getElementById('waveGraphCanvas').setAttribute('aria-label', generative
-        ? 'Generated color and gamut curves with gamut correction markers'
-        : 'Plot of the red, green and blue channel curves against phase t');
 
       // Update palette based on visible tab
       updatePalette();
@@ -1023,12 +958,6 @@
       scheduleUpdate();
     }
 
-    // Animation state
-    let animationSpeed = 0.3; // Cycles per second (Default: 0.3 cycles/s)
-    let animationTime = 0.0;
-    let lastTime = 0;
-    let animationFrameId = null;
-
     // Drag-to-zoom state
     let isDragging = false;
     let activePointerId = null;
@@ -1036,6 +965,8 @@
     let dragStartPosition = 0.0;
     let dragEndPosition = 0.0;
     const DRAG_THRESHOLD = 0.01; // Minimum drag distance (as %) to be considered a zoom
+    let copyFeedbackTimer = null;
+    let copyRequestId = 0;
     let lockedDragStartValues = {}; // For locked slider relative movement
 
     // Slider handles by param, so a value computed elsewhere (a locked group
@@ -1046,8 +977,8 @@
     // Declared inside init() after the window load handler.
     // to ensure elements exist.
     let colorStripCanvas, colorStripCtx, waveGraphCanvas, waveGraphCtx,
-      colorSwatch, tValueSpan,
-      hexValueSpan, copyPromptSpan, resetZoomButton, paletteRangeHeading;
+      resetZoomButton, paletteRangeHeading, copyFeedback, copyFeedbackSwatch,
+      copyFeedbackStatus, copyFeedbackHex;
 
     // Owns the strip's offscreen gradient cache; built in init() once the canvas
     // and its context resolve. Invalidated on every palette change
@@ -1094,10 +1025,6 @@
     ];
 
     // --- Helper Functions ---
-
-    // COPY_FEEDBACK (the green/gray prompt color classes) is imported from
-    // clipboard.js — see the import above.
-
 
     // --- UI and Event Functions ---
 
@@ -1237,8 +1164,7 @@
       colorStripCanvas.setPointerCapture(event.pointerId);
       event.preventDefault();
 
-      // Draw the initial state (strip + marker)
-      drawColorStrip(animationTime);
+      drawColorStrip();
     }
 
     /**
@@ -1264,7 +1190,9 @@
         }
       }
 
-      // The animate loop redraws the strip with the selection overlay.
+      drawColorStrip(isSelectionActive
+        ? { start: dragStartPosition, end: dragEndPosition }
+        : null);
     }
 
     /**
@@ -1287,7 +1215,7 @@
 
       // If the pointer was released outside Y-bounds, do nothing.
       if (!wasSelectionActive) {
-        drawColorStrip(animationTime); // Redraw to be safe
+        drawColorStrip();
         return;
       }
 
@@ -1296,15 +1224,13 @@
       const range = endPosition - startPosition;
 
       if (range < DRAG_THRESHOLD) {
-        animationTime = paletteViewport.map(startPosition);
-        updateSwatch();
-        drawColorStrip(animationTime);
-        updateStripAria();
+        drawColorStrip();
+        copyPaletteColor(startPosition, event.clientX, event.clientY);
       } else {
         paletteViewport.zoom(startPosition, endPosition);
-        animationTime = paletteViewport.clamp(animationTime);
-        drawColorStrip(animationTime);
-        updateStripAria();
+        drawColorStrip();
+        updateStripView();
+        updatePaletteCodeOutput();
         syncResetZoomButton();
       }
     }
@@ -1315,20 +1241,16 @@
       isDragging = false;
       isSelectionActive = false;
       colorStripCanvas.style.cursor = 'pointer';
-      drawColorStrip(animationTime);
+      drawColorStrip();
     }
 
-    /**
-     * Reflect the current phase on the strip's role="slider" so a screen reader
-     * announces it. Cheap, so called only on discrete phase changes (click /
-     * keyboard), not every animation frame.
-     */
-    function updateStripAria() {
+    function updateStripView() {
       if (!colorStripCanvas) return;
       const { start, end } = paletteViewport.value;
-      colorStripCanvas.setAttribute('aria-valuemin', start.toFixed(3));
-      colorStripCanvas.setAttribute('aria-valuemax', end.toFixed(3));
-      colorStripCanvas.setAttribute('aria-valuenow', animationTime.toFixed(3));
+      colorStripCanvas.setAttribute(
+        'aria-label',
+        `Palette strip, t ${start.toFixed(3)} to ${end.toFixed(3)}. `
+          + 'Press Enter to copy the center color. Drag to zoom.');
       if (paletteRangeHeading) {
         paletteRangeHeading.textContent = paletteViewport.zoomed
           ? `Resulting Palette (t ∈ [${start.toFixed(3)}, ${end.toFixed(3)}])`
@@ -1336,42 +1258,59 @@
       }
     }
 
-    /**
-     * Keyboard control for the focusable strip (mouse/touch parity for a11y):
-     * ← / → nudge the phase, Home / End jump to the ends, and Shift+← / →
-     * zoom out (reset) / in (a window centered on the current phase) — the same
-     * operations the click and click-drag gestures provide.
-     */
-    function setStripPhase(t) {
-      animationTime = paletteViewport.clamp(t);
-      updateSwatch();
-      drawColorStrip(animationTime);
-      updateStripAria();
+    function feedbackPosition(clientX, clientY) {
+      if (Number.isFinite(clientX) && Number.isFinite(clientY)) {
+        return { x: clientX, y: clientY };
+      }
+      const rect = colorStripCanvas.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
     }
 
-    function zoomAroundPhase() {
-      const center = paletteViewport.positionOf(animationTime);
-      const half = 0.1;
-      paletteViewport.zoom(center - half, center + half);
-      animationTime = paletteViewport.clamp(animationTime);
-      drawColorStrip(animationTime);
-      updateStripAria();
+    async function copyPaletteColor(position, clientX, clientY) {
+      if (!palette || !copyFeedback || !copyFeedbackSwatch
+          || !copyFeedbackStatus || !copyFeedbackHex) return;
+
+      const phase = paletteViewport.map(position);
+      const hex = linearRgbToHex(...palette.get(phase));
+      const { x, y } = feedbackPosition(clientX, clientY);
+      copyFeedbackSwatch.style.backgroundColor = hex;
+      copyFeedbackHex.textContent = hex;
+      copyFeedbackStatus.textContent = 'Copying';
+      copyFeedback.style.left = `${x}px`;
+      copyFeedback.style.top = `${y}px`;
+      if (copyFeedbackTimer !== null) {
+        clearTimeout(copyFeedbackTimer);
+        copyFeedbackTimer = null;
+      }
+      copyFeedback.classList.add('is-visible');
+
+      const requestId = ++copyRequestId;
+      const copied = await copyToClipboard(hex);
+      if (requestId !== copyRequestId) return;
+      copyFeedbackStatus.textContent = copied ? 'Copied' : 'Copy failed';
+      copyFeedbackTimer = setTimeout(() => {
+        copyFeedback.classList.remove('is-visible');
+        copyFeedbackTimer = null;
+      }, 1300);
+    }
+
+    function zoomAroundCenter() {
+      paletteViewport.zoom(0.4, 0.6);
+      drawColorStrip();
+      updateStripView();
+      updatePaletteCodeOutput();
       syncResetZoomButton();
     }
 
     function handleStripKeyDown(event) {
-      const { start, end } = paletteViewport.value;
-      const step = (end - start) * 0.02;
-      switch (event.key) {
-        case 'ArrowLeft':
-          if (event.shiftKey) handleResetZoom(); else setStripPhase(animationTime - step);
-          break;
-        case 'ArrowRight':
-          if (event.shiftKey) zoomAroundPhase(); else setStripPhase(animationTime + step);
-          break;
-        case 'Home': setStripPhase(start); break;
-        case 'End': setStripPhase(end); break;
-        default: return;
+      if ((event.key === 'Enter' || event.key === ' ') && !event.shiftKey) {
+        copyPaletteColor(0.5);
+      } else if (event.key === 'ArrowLeft' && event.shiftKey) {
+        handleResetZoom();
+      } else if (event.key === 'ArrowRight' && event.shiftKey) {
+        zoomAroundCenter();
+      } else {
+        return;
       }
       event.preventDefault();
     }
@@ -1380,8 +1319,9 @@
       if (!paletteViewport.zoomed) return;
       paletteViewport.reset();
       syncResetZoomButton();
-      drawColorStrip(animationTime);
-      updateStripAria();
+      drawColorStrip();
+      updateStripView();
+      updatePaletteCodeOutput();
     }
 
     function syncResetZoomButton() {
@@ -1390,72 +1330,8 @@
       }
     }
 
-    // --- Drawing and Animation Functions ---
-
-    /**
-         * Draws the color strip against the live palette.
-         * @param {number} t The current time parameter (0 to 1) for the marker position.
-         * @param {object | null} selectionRange - e.g., { start: 0.2, end: 0.5 }
-         */
-    function drawColorStrip(t, selectionRange = null) {
-      colorStripPainter?.draw(palette, t, selectionRange, paletteViewport.value);
-    }
-
-    /**
-         * Updates the color swatch based on the current animation time.
-         */
-    function updateSwatch() {
-      if (!palette || !colorSwatch) return; // Safety check
-
-      const [r, g, b] = palette.get(animationTime);
-      const hex = linearRgbToHex(r, g, b); // Get the hex code
-
-      colorSwatch.style.backgroundColor = hex;
-
-      if (tValueSpan) {
-        tValueSpan.textContent = animationTime.toFixed(3);
-      }
-      if (hexValueSpan) {
-        hexValueSpan.textContent = hex; // Update the new span
-      }
-    }
-
-    /**
-         * Main animation loop using requestAnimationFrame.
-         */
-    function animate(currentTime) {
-      animationFrameId = requestAnimationFrame(animate);
-
-      if (!lastTime) {
-        lastTime = currentTime;
-        return;
-      }
-
-      const deltaTime = (currentTime - lastTime) / 1000; // Time passed in seconds
-      lastTime = currentTime;
-
-      // When the marker is parked (speed 0) and the user isn't dragging a
-      // selection, nothing changes frame-to-frame — skip the swatch/strip
-      // redraw instead of repainting an identical frame. On-demand changes
-      // (param edits, clicks, drag start) redraw directly, and the loop resumes
-      // drawing as soon as speed becomes nonzero or a drag begins. Discrete
-      // interactions (click-to-set-phase, drag start) call drawColorStrip
-      // themselves, so the marker still updates while parked.
-      if (animationSpeed === 0 && !isDragging) return;
-
-      // Update global time based on speed
-      animationTime = paletteViewport.wrap(animationTime + animationSpeed * deltaTime);
-
-      updateSwatch();
-
-      // Always draw the color strip.
-      // If dragging AND selection is active, draw with the selection overlay.
-      // Otherwise, just draw with the time marker.
-      if (isDragging && isSelectionActive) {
-        drawColorStrip(animationTime, { start: dragStartPosition, end: dragEndPosition });
-      } else {
-        drawColorStrip(animationTime);
-      }
+    function drawColorStrip(selectionRange = null) {
+      colorStripPainter?.draw(palette, selectionRange, paletteViewport.value);
     }
 
 
@@ -1470,10 +1346,13 @@
         // The C++ export string is generated by the pure proceduralPaletteCpp
         // (palette_math.js) so its exact format is regression-tested; this
         // function only reads the current parameters and writes the result.
-        codeOutput.textContent = proceduralPaletteCpp(parameters);
+        codeOutput.textContent = proceduralPaletteCpp(
+          proceduralParamsForViewport(parameters, paletteViewport.value));
       } else {
         codeOutput.textContent = generativePaletteCpp(
-          palette?.canonicalRecipe ?? readPaletteRecipe());
+          recipeForViewport(
+            palette?.canonicalRecipe ?? readPaletteRecipe(),
+            paletteViewport.value));
       }
     }
 
@@ -1509,7 +1388,7 @@
       parameters = { ...proceduralPaletteParams(entry) };
       paletteViewport.reset();
       syncResetZoomButton();
-      updateStripAria();
+      updateStripView();
       updateAllSliders();
       updatePalette();
     }
@@ -1573,15 +1452,8 @@
       // The gradient changed — force the cached color strip to rebuild.
       colorStripPainter?.invalidate();
 
-      // Redraw static graph elements
-      if (activeTab === 'procedural')
-        drawWaveGraph({ canvas: waveGraphCanvas, ctx: waveGraphCtx, palette });
-      else
-        drawRecipeDiagnostics({ canvas: waveGraphCanvas, ctx: waveGraphCtx, palette });
-
-      // Update dynamic elements once immediately
-      updateSwatch();
-      drawColorStrip(animationTime);
+      drawWaveGraph({ canvas: waveGraphCanvas, ctx: waveGraphCtx, palette });
+      drawColorStrip();
 
       // Update the code output
       updatePaletteCodeOutput();
@@ -1618,12 +1490,12 @@
       colorStripCtx = colorStripCanvas ? colorStripCanvas.getContext('2d') : null;
       waveGraphCanvas = document.getElementById('waveGraphCanvas');
       waveGraphCtx = waveGraphCanvas ? waveGraphCanvas.getContext('2d') : null;
-      colorSwatch = document.getElementById('colorSwatch');
-      tValueSpan = document.getElementById('t_value');
-      hexValueSpan = document.getElementById('hex_value');
-      copyPromptSpan = document.getElementById('copy_prompt');
       resetZoomButton = document.getElementById('resetZoomButton');
       paletteRangeHeading = document.getElementById('palette_range_heading');
+      copyFeedback = document.getElementById('palette_copy_feedback');
+      copyFeedbackSwatch = document.getElementById('palette_copy_swatch');
+      copyFeedbackStatus = document.getElementById('palette_copy_status');
+      copyFeedbackHex = document.getElementById('palette_copy_hex');
 
       // Safety check for critical elements
       if (!colorStripCanvas || !waveGraphCanvas || !colorStripCtx || !waveGraphCtx) {
@@ -1649,24 +1521,7 @@
       // 1.5 Build the named-palette swatch gallery
       buildPaletteGallery();
 
-      // 2. Initialize Speed slider
-      createSlider('speed_control', {
-        id: 'speed',
-        label: 'Speed',
-        min: 0,
-        max: 2,
-        step: 0.001,
-        value: animationSpeed,
-        scale: 1000,
-        decimals: 3,
-        labelClass: 'w-12 text-gray-400',
-        sliderClass: 'w-full speed-thumb',
-        valueClass: 'slider-label w-16 text-right',
-      }, (rawValue) => {
-        animationSpeed = rawValue / 1000;
-      });
-
-      // 2.5 Initialize Generative Palette UI Controls
+      // 2. Initialize Generative Palette UI Controls
       const genSeedSlider = document.getElementById('gen_seed_slider');
       const genSeedValue = document.getElementById('gen_seed_value');
       if (genSeedSlider && genSeedValue) {
@@ -1715,18 +1570,7 @@
       colorStripCanvas.addEventListener('pointerup', handleDragEnd);
       colorStripCanvas.addEventListener('pointercancel', handleDragCancel);
       colorStripCanvas.addEventListener('keydown', handleStripKeyDown); // keyboard parity (a11y)
-      updateStripAria(); // seed aria-valuenow
-
-      // 4. Add click-to-copy to the swatch
-      if (colorSwatch) {
-        colorSwatch.addEventListener('click', () => {
-          if (hexValueSpan) {
-            const hex = hexValueSpan.textContent;
-            copyWithFeedback(hex,
-              { element: copyPromptSpan, revertText: "(Click swatch to copy)", ...COPY_FEEDBACK });
-          }
-        });
-      }
+      updateStripView();
 
       // 5. Add listener for the reset zoom button
       if (resetZoomButton) {
@@ -1744,22 +1588,14 @@
         trigger: document.getElementById('export_toggle'),
       });
 
-      // 7. Set up the initial state and start the animation
-      updatePalette(); // This will now also call updatePaletteCodeOutput()
-      if (animationFrameId === null) {
-        animate(0); // Start the animation loop
-      }
+      updatePalette();
 
-      // Stop the RAF loop, drop any queued recompute, and detach the strip
-      // listeners on teardown.
       onPageTeardown(() => {
         teardownExportFlyout();
         scheduleUpdate.cancel();
         window.removeEventListener('resize', scheduleUpdate);
-        if (animationFrameId !== null) {
-          cancelAnimationFrame(animationFrameId);
-          animationFrameId = null;
-        }
+        copyRequestId += 1;
+        if (copyFeedbackTimer !== null) clearTimeout(copyFeedbackTimer);
         colorStripCanvas.removeEventListener('pointerdown', handleDragStart);
         colorStripCanvas.removeEventListener('pointermove', handleDragMove);
         colorStripCanvas.removeEventListener('pointerup', handleDragEnd);

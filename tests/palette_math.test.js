@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 const {
   ProceduralPalette, GenerativePalette, compilePaletteRecipe,
   mapValue, waveGraphBand, WAVE_GRAPH_VALUE_RANGE,
-  proceduralPaletteCpp, generativePaletteCpp, paletteRecipeJson, setPaletteOps,
+  proceduralPaletteCpp, proceduralParamsForViewport,
+  generativePaletteCpp, paletteRecipeJson, setPaletteOps,
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
 } = await import('../tools/palette_math.js');
 const { defaultPaletteRecipe } = await import('../tools/palette_controls.js');
@@ -141,6 +142,26 @@ test('proceduralPaletteParams flattens a coefficient set into A_R..D_B', () => {
   });
 });
 
+test('proceduralParamsForViewport reparameterizes the exported phase window', () => {
+  const parameters = {
+    A_R: 0.5, A_G: 0.5, A_B: 0.5,
+    B_R: 0.5, B_G: 0.5, B_B: 0.5,
+    C_R: 1, C_G: 2, C_B: -1,
+    D_R: 0, D_G: 0.25, D_B: 0.75,
+  };
+  const result = proceduralParamsForViewport(parameters, { start: 0.2, end: 0.6 });
+  assert.deepEqual(result, {
+    ...parameters,
+    C_R: 0.39999999999999997,
+    C_G: 0.7999999999999999,
+    C_B: -0.39999999999999997,
+    D_R: 0.2,
+    D_G: 0.65,
+    D_B: 0.55,
+  });
+  assert.equal(parameters.C_R, 1);
+});
+
 /** Verifies mapValue linearly remaps a value from one numeric range to another. */
 test('mapValue computes the expected interpolations', () => {
   assert.equal(mapValue(0.5, 0, 1, 0, 100), 50);
@@ -227,6 +248,8 @@ test('generativePaletteCpp serializes the complete V2 recipe', () => {
   const source = generativePaletteCpp(recipe);
 
   assert.match(source, /recipe\.schema_version = 2;/);
+  assert.match(source, /recipe\.input\.offset = 0\.0f;/);
+  assert.match(source, /recipe\.input\.span = 1\.0f;/);
   assert.match(source, /PaletteDomain::LOOP/);
   assert.match(source, /PaletteHarmony::TRIADIC/);
   assert.match(source, /AxisCurve::ASCENDING/);

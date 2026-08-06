@@ -147,6 +147,19 @@ export function proceduralPaletteParams({ a, b, c, d }) {
   };
 }
 
+export function proceduralParamsForViewport(parameters, viewport) {
+  const span = viewport.end - viewport.start;
+  return {
+    ...parameters,
+    C_R: parameters.C_R * span,
+    D_R: (parameters.D_R + parameters.C_R * viewport.start) % 1.0,
+    C_G: parameters.C_G * span,
+    D_G: (parameters.D_G + parameters.C_G * viewport.start) % 1.0,
+    C_B: parameters.C_B * span,
+    D_B: (parameters.D_B + parameters.C_B * viewport.start) % 1.0,
+  };
+}
+
 // --- Generative Palette V2 --------------------------------------------------
 
 /**
@@ -320,6 +333,8 @@ export function generativePaletteCpp(recipe) {
   const f = (value) => formatFloatCpp(value, 6);
   return `PaletteRecipe recipe;
 recipe.schema_version = ${recipe.schemaVersion};
+recipe.input.offset = ${f(recipe.input.offset)};
+recipe.input.span = ${f(recipe.input.span)};
 recipe.domain = PaletteDomain::${enumName('domain', recipe.domain)};
 recipe.easing = SegmentEase::${enumName('easing', recipe.easing)};
 recipe.color_path = ColorPath::${enumName('colorPath', recipe.colorPath)};

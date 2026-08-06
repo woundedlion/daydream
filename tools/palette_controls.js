@@ -10,7 +10,7 @@ const clampUnit = (value) => Math.max(0, Math.min(1, value));
  *
  * Pointer positions stay local to the visible strip while palette phases stay
  * in the original 0..1 domain. Keeping that mapping here gives Procedural and
- * Generative palettes identical click, animation, and nested-zoom behavior.
+ * Generative palettes identical copy and nested-zoom behavior.
  */
 export function createPaletteViewport() {
   let start = 0;
@@ -29,19 +29,6 @@ export function createPaletteViewport() {
 
     map,
 
-    positionOf(phase) {
-      return clampUnit((phase - start) / (end - start));
-    },
-
-    clamp(phase) {
-      return Math.max(start, Math.min(end, phase));
-    },
-
-    wrap(phase) {
-      const span = end - start;
-      return start + (((phase - start) % span) + span) % span;
-    },
-
     zoom(firstPosition, secondPosition) {
       const low = Math.min(clampUnit(firstPosition), clampUnit(secondPosition));
       const high = Math.max(clampUnit(firstPosition), clampUnit(secondPosition));
@@ -58,6 +45,13 @@ export function createPaletteViewport() {
       end = 1;
     },
   };
+}
+
+export function recipeForViewport(recipe, viewport) {
+  const result = structuredClone(recipe);
+  result.input.offset = recipe.input.offset + viewport.start * recipe.input.span;
+  result.input.span = (viewport.end - viewport.start) * recipe.input.span;
+  return result;
 }
 
 /**
@@ -116,6 +110,7 @@ export const PaletteV2 = Object.freeze({
 export function defaultPaletteRecipe() {
   return {
     schemaVersion: 2,
+    input: { offset: 0, span: 1 },
     domain: PaletteV2.domain.STRAIGHT,
     easing: PaletteV2.easing.COSINE,
     colorPath: PaletteV2.colorPath.OKLCH_ARC,

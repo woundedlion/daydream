@@ -5,7 +5,7 @@
 
 /**
  * The two canvas painters of the palette tool page (tools/palettes.html): the
- * gradient strip with its sweep marker and drag-selection overlay, and the RGB
+ * gradient strip with its drag-selection overlay, and the RGB
  * wave graph. Both take their canvas and 2D context as arguments and read the
  * palette only through get()/getChannelValues(), so a recording context double
  * exercises them without a browser. The page keeps the pointer/keyboard wiring.
@@ -17,11 +17,9 @@ import { waveGraphBand } from './palette_math.js';
 /**
  * Builds the color-strip painter, which owns the offscreen gradient cache.
  *
- * The strip is static between palette changes; only the sweeping marker moves
- * each frame. Caching the rendered gradient makes the per-frame draw a single
- * blit plus a 2px line instead of a full ImageData build and `width` palette
- * evaluations. Call invalidate() whenever the palette changes; a canvas size
- * change is detected here.
+ * Caching the rendered gradient avoids rebuilding ImageData while a drag only
+ * changes the selection overlay. Call invalidate() whenever the palette
+ * changes; a canvas size change is detected here.
  * @param {Object} opts - Painter context.
  * @param {{width: number, height: number}} opts.canvas - The visible strip canvas.
  * @param {Object} opts.ctx - Its 2D context.
@@ -94,37 +92,21 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
     },
 
     /**
-     * Draws the color strip, the time marker, and an optional selection overlay.
+     * Draws the color strip and an optional selection overlay.
      * @param {{get: Function}} palette - The palette to render.
-     * @param {number} t - The current time parameter (0 to 1) for the marker position.
      * @param {{start: number, end: number}|null} [selectionRange] - Drag selection as strip positions.
      * @param {{start: number, end: number}} [view] - Phase window shown by the strip.
      * @returns {void}
      */
-    draw(palette, t, selectionRange = null, view = { start: 0, end: 1 }) {
+    draw(palette, selectionRange = null, view = { start: 0, end: 1 }) {
       if (!ctx) return;
       const width = canvas.width;
       const height = canvas.height;
 
       refreshCache(palette, width, height, view);
 
-      // Blit the cached gradient (also clears the previous marker).
+      // Blit the cached gradient, clearing the previous selection overlay.
       ctx.drawImage(cache, 0, 0);
-
-      const markerPosition = (t - view.start) / (view.end - view.start);
-      const markerX = Math.round(Math.max(0, Math.min(1, markerPosition)) * (width - 1));
-
-      ctx.strokeStyle = '#FFFFFF'; // Bright white marker
-      ctx.lineWidth = 2;
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-      ctx.shadowBlur = 5;
-
-      ctx.beginPath();
-      ctx.moveTo(markerX, 0);
-      ctx.lineTo(markerX, height);
-      ctx.stroke();
-
-      ctx.shadowBlur = 0; // Reset shadow
 
       if (selectionRange) {
         // Ensure startX is the smaller value
@@ -143,7 +125,6 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
     },
   };
 }
-
 // Red, Green, Blue.
 const WAVE_COLORS = ['#EF4444', '#22C55E', '#3B82F6'];
 
@@ -235,75 +216,4 @@ export function drawWaveGraph({ canvas, ctx, palette }) {
   ctx.fillRect(0, y0, width, yBottom - y0);
   // Area above 1 (between the band top and the value-1 line)
   ctx.fillRect(0, yTop, width, y1 - yTop);
-}
-
-const DIAGNOSTIC_CURVES = [
-  { key: 'L', color: '#F8FAFC', axis: 'left' },
-  { key: 'q', color: '#F59E0B', axis: 'left' },
-  { key: 'C', color: '#A855F7', axis: 'right' },
-  { key: 'Cmax', color: '#EC4899', axis: 'right' },
-];
-
-/**
- * Draws engine-returned V2 diagnostics without reproducing palette math.
- * @param {Object} opts
- * @param {{width:number,height:number}} opts.canvas
- * @param {Object} opts.ctx
- * @param {{diagnosticAt:Function,getChannelValues:Function}} opts.palette
- */
-export function drawRecipeDiagnostics({ canvas, ctx, palette }) {
-  if (!ctx) return;
-  const { width, height } = fitCanvasToDisplay(canvas, ctx);
-  const top = 24;
-  const bottom = height - 24;
-  const samples = Array.from({ length: width }, (_, x) => {
-    const t = width > 1 ? x / (width - 1) : 0;
-    return {
-      ...palette.diagnosticAt(t),
-      rgbFloat: palette.getChannelValues(t),
-    };
-  });
-  const chromaMax = Math.max(1e-6, ...samples.map((sample) => sample.Cmax));
-  const leftY = (value) => bottom - Math.max(0, Math.min(1, value)) * (bottom - top);
-  const rightY = (value) => bottom - (value / chromaMax) * (bottom - top);
-
-  ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = '#1E293B';
-  ctx.fillRect(0, 0, width, height);
-
-  WAVE_COLORS.forEach((color, channel) => {
-    ctx.beginPath();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    for (let x = 0; x < width; x += 1) {
-      const y = leftY(samples[x].rgbFloat[channel]);
-      if (x === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-  });
-
-  for (const curve of DIAGNOSTIC_CURVES) {
-    ctx.beginPath();
-    ctx.strokeStyle = curve.color;
-    ctx.lineWidth = 1.5;
-    for (let x = 0; x < width; x += 1) {
-      const value = samples[x][curve.key];
-      const y = curve.axis === 'left' ? leftY(value) : rightY(value);
-      if (x === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-  }
-
-  ctx.strokeStyle = '#F43F5E';
-  ctx.lineWidth = 1;
-  for (let x = 0; x < width; x += 1) {
-    if (!samples[x].fallbackMapped) continue;
-    ctx.beginPath();
-    ctx.moveTo(x, top);
-    ctx.lineTo(x, bottom);
-    ctx.stroke();
-  }
-
 }
