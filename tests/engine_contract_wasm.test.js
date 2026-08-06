@@ -545,7 +545,8 @@ test('PaletteOps exposes the method surface the palette tool drives', () => {
     assert.equal(typeof ops.inspectV2, 'function');
     assert.equal(ops.bakeLut, undefined);
     const recipe = {
-      schemaVersion: 2, domain: 0, easing: 1, colorPath: 0,
+      schemaVersion: 2, input: { offset: 0, span: 1 },
+      domain: 0, easing: 1, colorPath: 0,
       hue: {
         mode: 0, harmony: 1, direction: 0, baseTurns: 0,
         spreadTurns: 0.07, sweepTurns: 1, customTurns: [0, 0, 0],

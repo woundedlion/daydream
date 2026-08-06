@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  createColorStripPainter, drawWaveGraph, drawRecipeDiagnostics,
+  createColorStripPainter, drawWaveGraph,
 } from '../tools/palette_canvas.js';
 import { waveGraphBand } from '../tools/palette_math.js';
 import { linearToSrgbFloat } from '../tools/color.js';
@@ -83,30 +83,29 @@ const opNames = (ctx) => ctx.ops.map(([name]) => name);
 
 test('the strip bakes its gradient once and reuses it for later frames', () => {
   const { painter, palette, created } = stripSetup(8, 4);
-  painter.draw(palette, 0);
+  painter.draw(palette);
   assert.equal(created.length, 1, 'one offscreen cache canvas');
   assert.equal(palette.getCalls, 8, 'the gradient samples one color per column');
 
-  painter.draw(palette, 0.5);
-  painter.draw(palette, 0.75);
-  assert.equal(palette.getCalls, 8, 'a marker sweep must not re-evaluate the palette');
+  painter.draw(palette);
+  painter.draw(palette);
+  assert.equal(palette.getCalls, 8, 'redrawing must not re-evaluate the palette');
   assert.equal(created.length, 1, 'the cache canvas is reused');
 });
-
 test('invalidate forces the next draw to re-evaluate the palette', () => {
   const { painter, palette, created } = stripSetup(8, 4);
-  painter.draw(palette, 0);
+  painter.draw(palette);
   painter.invalidate();
-  painter.draw(palette, 0);
+  painter.draw(palette);
   assert.equal(palette.getCalls, 16, 'the palette changed, so the gradient must be rebuilt');
   assert.equal(created.length, 1, 'an unchanged size reuses the cache canvas');
 });
 
 test('a canvas resize rebuilds the cache without an explicit invalidate', () => {
   const { painter, canvas, palette, created } = stripSetup(8, 4);
-  painter.draw(palette, 0);
+  painter.draw(palette);
   canvas.width = 16;
-  painter.draw(palette, 0);
+  painter.draw(palette);
   assert.equal(created.length, 2, 'a stale-size cache would blit at the wrong scale');
   assert.deepEqual([created[1].width, created[1].height], [16, 4]);
   assert.equal(palette.getCalls, 8 + 16);
@@ -114,7 +113,7 @@ test('a canvas resize rebuilds the cache without an explicit invalidate', () => 
 
 test('the baked gradient carries the sRGB-encoded palette, opaque, on every row', () => {
   const { painter, palette, created } = stripSetup(4, 2);
-  painter.draw(palette, 0);
+  painter.draw(palette);
   const { data } = created[0].ctx.painted;
 
   const width = 4;
@@ -131,53 +130,35 @@ test('the baked gradient carries the sRGB-encoded palette, opaque, on every row'
   }
 });
 
-test('the marker lands on the column the phase names and leaves no shadow behind', () => {
-  const { painter, ctx, palette, created } = stripSetup(9, 4);
-  painter.draw(palette, 0.5);
-
-  assert.deepEqual(ctx.ops[0], ['drawImage', created[0], 0, 0],
-    'the cached gradient must be blitted first — it also clears the last marker');
-  assert.ok(ctx.ops.some(([n, x]) => n === 'moveTo' && x === 4),
-    'the marker must sit at round(t * (width - 1))');
-  assert.ok(ctx.ops.some(([n, x, y]) => n === 'lineTo' && x === 4 && y === 4));
-  assert.equal(ctx.shadowBlur, 0, 'a left-on shadow would blur the next overlay');
-
-  ctx.ops.length = 0;
-  painter.draw(palette, 1);
-  assert.ok(ctx.ops.some(([n, x]) => n === 'moveTo' && x === 8), 'phase 1 marks the last column');
-});
-
-test('the strip samples and locates its marker within the visible phase window', () => {
-  const { painter, ctx, palette, created } = stripSetup(5, 2);
-  painter.draw(palette, 0.4, null, { start: 0.2, end: 0.6 });
+test('the strip samples the visible phase window', () => {
+  const { painter, palette, created } = stripSetup(5, 2);
+  painter.draw(palette, null, { start: 0.2, end: 0.6 });
 
   const { data } = created[0].ctx.painted;
   const red = (column) => data[column * 4];
   assert.equal(red(0), Math.round(linearToSrgbFloat(0.2) * 255));
   assert.equal(red(4), Math.round(linearToSrgbFloat(0.6) * 255));
-  assert.ok(ctx.ops.some(([name, x]) => name === 'moveTo' && x === 2),
-    'phase 0.4 is centered in the 0.2..0.6 viewport');
 });
 
 test('changing the visible phase window rebuilds the strip cache', () => {
   const { painter, palette } = stripSetup(8, 4);
-  painter.draw(palette, 0.5);
-  painter.draw(palette, 0.5, null, { start: 0.25, end: 0.75 });
+  painter.draw(palette);
+  painter.draw(palette, null, { start: 0.25, end: 0.75 });
   assert.equal(palette.getCalls, 16);
 });
 
 test('a selection overlay is drawn only when one is passed, in either drag direction', () => {
   const { painter, ctx, palette } = stripSetup(10, 4);
-  painter.draw(palette, 0.2);
+  painter.draw(palette);
   assert.ok(!opNames(ctx).includes('fillRect'), 'no selection means no overlay');
 
   ctx.ops.length = 0;
-  painter.draw(palette, 0.2, { start: 0.2, end: 0.7 });
+  painter.draw(palette, { start: 0.2, end: 0.7 });
   const forward = ctx.ops.filter(([n]) => n === 'fillRect' || n === 'strokeRect');
   assert.deepEqual(forward, [['fillRect', 2, 0, 5, 4], ['strokeRect', 2, 0, 5, 4]]);
 
   ctx.ops.length = 0;
-  painter.draw(palette, 0.2, { start: 0.7, end: 0.2 });
+  painter.draw(palette, { start: 0.7, end: 0.2 });
   const backward = ctx.ops.filter(([n]) => n === 'fillRect' || n === 'strokeRect');
   assert.deepEqual(backward, forward, 'a backwards drag must select the same span');
 });
@@ -268,29 +249,9 @@ test('the dashed reference line is reset so the channel curves stay solid', () =
 test('neither painter touches a canvas it has no context for', () => {
   const painter = createColorStripPainter({ canvas: { width: 8, height: 4 }, ctx: null, doc: fakeDoc().doc });
   const palette = fakePalette();
-  painter.draw(palette, 0.5);
+  painter.draw(palette);
   assert.equal(palette.getCalls, 0);
 
   drawWaveGraph({ canvas: { width: 8, height: 4 }, ctx: null, palette });
   assert.equal(palette.channelCalls, 0);
-});
-
-test('recipe diagnostics plot color, perceptual axes, and fallback samples', () => {
-  const canvas = { width: 4, height: 100 };
-  const ctx = fakeContext();
-  const palette = {
-    diagnosticAt(t) {
-      return {
-        L: t, C: t * 0.2, q: 1 - t, Cmax: 0.25,
-        fallbackMapped: t > 0.5,
-      };
-    },
-    getChannelValues(t) { return [t, 0.5, 1 - t]; },
-  };
-
-  drawRecipeDiagnostics({ canvas, ctx, palette });
-
-  assert.deepEqual(ctx.ops[0], ['clearRect', 0, 0, 4, 100]);
-  assert.equal(ctx.ops.filter(([name]) => name === 'stroke').length, 9);
-  assert.ok(!ctx.ops.some(([name]) => name === 'fillText'));
 });
