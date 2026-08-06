@@ -155,6 +155,22 @@ export function defaultPaletteRecipe() {
   };
 }
 
+export function paletteRecipeAvailability(recipe) {
+  const variedChroma = recipe.chroma.curve !== PaletteV2.curve.CONSTANT;
+  const hasColor = recipe.chroma.center > 0 || (variedChroma && recipe.chroma.range > 0);
+  const monochromatic = recipe.hue.mode === PaletteV2.hueMode.HARMONY &&
+    recipe.hue.harmony === PaletteV2.harmony.MONOCHROMATIC;
+
+  return {
+    baseHue: hasColor,
+    hueMode: hasColor,
+    harmony: hasColor && recipe.hue.mode === PaletteV2.hueMode.HARMONY,
+    colorPath: hasColor && !monochromatic,
+    chromaRange: variedChroma,
+    lightnessRange: recipe.lightness.curve !== PaletteV2.curve.CONSTANT,
+  };
+}
+
 function cloneRecipe(recipe) {
   return structuredClone(recipe);
 }

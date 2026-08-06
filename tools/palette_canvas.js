@@ -138,6 +138,21 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
 // Red, Green, Blue.
 const WAVE_COLORS = ['#EF4444', '#22C55E', '#3B82F6'];
 
+function fitCanvasToDisplay(canvas, ctx) {
+  const width = Math.max(1, Math.round(canvas.clientWidth || canvas.width));
+  const height = Math.max(1, Math.round(canvas.clientHeight || canvas.height));
+  const pixelRatio = Math.max(1, globalThis.devicePixelRatio || 1);
+  const renderWidth = Math.round(width * pixelRatio);
+  const renderHeight = Math.round(height * pixelRatio);
+
+  if (canvas.width !== renderWidth || canvas.height !== renderHeight) {
+    canvas.width = renderWidth;
+    canvas.height = renderHeight;
+  }
+  ctx.setTransform?.(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  return { width, height };
+}
+
 /**
  * Draws the R, G, and B wave functions on the graph canvas.
  * @param {Object} opts - Draw context.
@@ -148,8 +163,7 @@ const WAVE_COLORS = ['#EF4444', '#22C55E', '#3B82F6'];
  */
 export function drawWaveGraph({ canvas, ctx, palette }) {
   if (!ctx) return;
-  const width = canvas.width;
-  const height = canvas.height;
+  const { width, height } = fitCanvasToDisplay(canvas, ctx);
   ctx.clearRect(0, 0, width, height);
 
   // toY() is the single place the value-to-canvas-y mapping lives; every
@@ -230,7 +244,7 @@ const DIAGNOSTIC_CURVES = [
  */
 export function drawRecipeDiagnostics({ canvas, ctx, palette }) {
   if (!ctx) return;
-  const { width, height } = canvas;
+  const { width, height } = fitCanvasToDisplay(canvas, ctx);
   const top = 24;
   const bottom = height - 24;
   const samples = Array.from({ length: width }, (_, x) => {
@@ -251,6 +265,7 @@ export function drawRecipeDiagnostics({ canvas, ctx, palette }) {
   WAVE_COLORS.forEach((color, channel) => {
     ctx.beginPath();
     ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
     for (let x = 0; x < width; x += 1) {
       const y = leftY(samples[x].rgbFloat[channel]);
       if (x === 0) ctx.moveTo(x, y);
@@ -262,6 +277,7 @@ export function drawRecipeDiagnostics({ canvas, ctx, palette }) {
   for (const curve of DIAGNOSTIC_CURVES) {
     ctx.beginPath();
     ctx.strokeStyle = curve.color;
+    ctx.lineWidth = 1.5;
     for (let x = 0; x < width; x += 1) {
       const value = samples[x][curve.key];
       const y = curve.axis === 'left' ? leftY(value) : rightY(value);
@@ -272,6 +288,7 @@ export function drawRecipeDiagnostics({ canvas, ctx, palette }) {
   }
 
   ctx.strokeStyle = '#F43F5E';
+  ctx.lineWidth = 1;
   for (let x = 0; x < width; x += 1) {
     if (!samples[x].fallbackMapped) continue;
     ctx.beginPath();
@@ -280,9 +297,4 @@ export function drawRecipeDiagnostics({ canvas, ctx, palette }) {
     ctx.stroke();
   }
 
-  if (ctx.fillText) {
-    ctx.fillStyle = '#CBD5E1';
-    ctx.fillText('sRGB / L / q [0,1]', 6, 14);
-    ctx.fillText(`C [0,${chromaMax.toFixed(3)}]`, Math.max(6, width - 110), 14);
-  }
 }

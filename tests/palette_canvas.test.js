@@ -173,6 +173,27 @@ test('the wave graph samples every column once for all three channels', () => {
   assert.equal(palette.getCalls, 0, 'the graph plots channel values, not colors');
 });
 
+test('the wave graph fits its backing buffer to the displayed size and pixel density', () => {
+  const canvas = { width: 1024, height: 300, clientWidth: 400, clientHeight: 120 };
+  const ctx = fakeContext();
+  ctx.setTransform = (...args) => ctx.ops.push(['setTransform', ...args]);
+  const palette = fakePalette();
+  const originalPixelRatio = globalThis.devicePixelRatio;
+  globalThis.devicePixelRatio = 2;
+
+  try {
+    drawWaveGraph({ canvas, ctx, palette });
+  } finally {
+    if (originalPixelRatio === undefined) delete globalThis.devicePixelRatio;
+    else globalThis.devicePixelRatio = originalPixelRatio;
+  }
+
+  assert.deepEqual([canvas.width, canvas.height], [800, 240]);
+  assert.deepEqual(ctx.ops[0], ['setTransform', 2, 0, 0, 2, 0, 0]);
+  assert.deepEqual(ctx.ops[1], ['clearRect', 0, 0, 400, 120]);
+  assert.equal(palette.channelCalls, 400);
+});
+
 test('the wave graph draws the band edges, the three channels and the clamp overlays', () => {
   const canvas = { width: 16, height: 100 };
   const ctx = fakeContext();
@@ -252,6 +273,5 @@ test('recipe diagnostics plot color, perceptual axes, and fallback samples', () 
 
   assert.deepEqual(ctx.ops[0], ['clearRect', 0, 0, 4, 100]);
   assert.equal(ctx.ops.filter(([name]) => name === 'stroke').length, 9);
-  assert.ok(ctx.ops.some(([name, text]) => name === 'fillText' && /sRGB/.test(text)));
-  assert.ok(ctx.ops.some(([name, text]) => name === 'fillText' && /C \[0,0\.250\]/.test(text)));
+  assert.ok(!ctx.ops.some(([name]) => name === 'fillText'));
 });
