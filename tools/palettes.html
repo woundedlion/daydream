@@ -31,6 +31,12 @@
       margin: auto;
     }
 
+    .recipe-presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
     /* Each .param-group is a grid cell in the palette tabs, so drop the shared
        vertical card margin — the grid gap already spaces the cells. */
     .param-group {
@@ -214,7 +220,7 @@
         (Cosine)</button>
       <button id="tab-btn-generative" class="tab-btn" data-tab="generative"
         type="button" role="tab" aria-selected="false" tabindex="-1"
-        aria-controls="tab-content-generative">Generative</button>
+        aria-controls="tab-content-generative">V2 Recipe</button>
     </div>
 
     <!-- Page body: stacked content cards on the left, the Named Palettes card
@@ -284,13 +290,18 @@
 
     <div id="tab-content-generative" class="tab-content" role="tabpanel"
       aria-labelledby="tab-btn-generative" hidden>
-      <h2 class="text-2xl font-semibold text-white mb-4">Generative Palette Parameters</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <h2 class="text-2xl font-semibold text-white mb-4">Generative Palette V2 Recipe</h2>
+      <div class="recipe-presets mb-4" aria-label="Reference recipe presets">
+        <button type="button" class="tab-btn" data-recipe-preset="balancedAnalogous">Balanced Analogous</button>
+        <button type="button" class="tab-btn" data-recipe-preset="isolightSpectralLoop">Isolight Spectral Loop</button>
+        <button type="button" class="tab-btn" data-recipe-preset="tonalMonochrome">Tonal Monochrome</button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 
         <!-- Base Hue -->
         <div class="param-group space-y-4 col-span-1">
           <label for="gen_seed_slider" class="block text-lg font-bold text-blue-400">Base Hue</label>
-          <p class="text-xs text-gray-400">Base color (0-255).</p>
+          <p class="text-xs text-gray-400">Hue only; it never reshuffles other controls.</p>
           <div class="flex items-center space-x-2">
             <span class="w-4 h-4 text-center font-bold text-blue-500" aria-hidden="true">H</span>
             <input type="range" id="gen_seed_slider" min="0" max="255" step="1" value="42" class="b-thumb">
@@ -298,35 +309,57 @@
           </div>
         </div>
 
-        <!-- Harmony Type -->
+        <div class="param-group space-y-4 col-span-1">
+          <label for="gen_hue_mode" class="block text-lg font-bold text-blue-400">Hue Mode</label>
+          <select id="gen_hue_mode" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+            <option value="HARMONY">Harmony</option>
+            <option value="SWEEP">Full Sweep</option>
+          </select>
+        </div>
+
         <div class="param-group space-y-4 col-span-1">
           <label for="gen_harmony" class="block text-lg font-bold text-green-400">Harmony Type</label>
           <p class="text-xs text-gray-400">Color relationship.</p>
           <select id="gen_harmony" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
             <option value="ANALOGOUS">Analogous</option>
+            <option value="MONOCHROMATIC">Monochromatic</option>
+            <option value="ACCENTED_ANALOGOUS">Accented Analogous</option>
             <option value="COMPLEMENTARY">Complementary</option>
             <option value="SPLIT_COMPLEMENTARY">Split Complementary</option>
             <option value="TRIADIC">Triadic</option>
           </select>
         </div>
 
-        <!-- Saturation Profile -->
         <div class="param-group space-y-4 col-span-1">
-          <label for="gen_saturation" class="block text-lg font-bold text-yellow-400">Saturation</label>
-          <p class="text-xs text-gray-400">Color intensity.</p>
-          <select id="gen_saturation" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-            <option value="MID">Mid</option>
-            <option value="PASTEL">Pastel</option>
-            <option value="VIBRANT">Vibrant</option>
+          <label for="gen_saturation" class="block text-lg font-bold text-yellow-400">Gamut-relative Chroma</label>
+          <p class="text-xs text-gray-400">Fraction of available sRGB chroma.</p>
+          <input type="range" id="gen_saturation" min="0" max="1" step="0.01" value="0.62">
+          <span id="gen_saturation_value" class="slider-label">0.62</span>
+        </div>
+
+        <div class="param-group space-y-4 col-span-1">
+          <label for="gen_chroma_curve" class="block text-lg font-bold text-yellow-400">Chroma Curve</label>
+          <select id="gen_chroma_curve" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+            <option value="CONSTANT">Constant</option>
+            <option value="BELL">Bell</option>
+            <option value="ASCENDING">Ascending</option>
+            <option value="DESCENDING">Descending</option>
+            <option value="CUP">Cup</option>
           </select>
+        </div>
+
+        <div class="param-group space-y-4 col-span-1">
+          <label for="gen_chroma_range" class="block text-lg font-bold text-yellow-400">Chroma Range</label>
+          <input type="range" id="gen_chroma_range" min="0" max="1" step="0.01" value="0">
+          <span id="gen_chroma_range_value" class="slider-label">0.00</span>
         </div>
 
         <!-- Brightness Profile -->
         <div class="param-group space-y-4 col-span-1">
-          <label for="gen_brightness" class="block text-lg font-bold text-red-400">Brightness</label>
-          <p class="text-xs text-gray-400">Luminance distribution.</p>
+          <label for="gen_brightness" class="block text-lg font-bold text-red-400">Lightness Curve</label>
+          <p class="text-xs text-gray-400">OKLab L distribution.</p>
           <select id="gen_brightness" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-            <option value="FLAT">Flat</option>
+            <option value="CONSTANT">Constant</option>
             <option value="ASCENDING">Ascending</option>
             <option value="DESCENDING">Descending</option>
             <option value="BELL">Bell</option>
@@ -336,17 +369,38 @@
 
         <!-- Gradient Shape -->
         <div class="param-group space-y-4 col-span-1">
-          <label for="gen_shape" class="block text-lg font-bold text-purple-400">Gradient Shape</label>
+          <label for="gen_shape" class="block text-lg font-bold text-purple-400">Domain</label>
           <p class="text-xs text-gray-400">Spatial distribution.</p>
           <select id="gen_shape" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
             <option value="STRAIGHT">Straight</option>
-            <option value="CIRCULAR">Circular</option>
+            <option value="MIRROR">Mirror</option>
             <option value="VIGNETTE">Vignette</option>
             <option value="FALLOFF">Falloff</option>
+            <option value="LOOP">Loop</option>
           </select>
         </div>
 
+        <div class="param-group space-y-4 col-span-1">
+          <label for="gen_path" class="block text-lg font-bold text-purple-400">Color Path</label>
+          <select id="gen_path" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+            <option value="OKLCH_ARC">Colorful arc</option>
+            <option value="OKLAB_CARTESIAN">Neutral bridge</option>
+          </select>
+        </div>
+
+        <div class="param-group space-y-4 col-span-1">
+          <label for="gen_lightness_center" class="block text-lg font-bold text-gray-300">Lightness Center</label>
+          <input type="range" id="gen_lightness_center" min="0.05" max="0.92" step="0.01" value="0.62">
+          <span id="gen_lightness_center_value" class="slider-label">0.62</span>
+        </div>
+
+        <div class="param-group space-y-4 col-span-1">
+          <label for="gen_lightness_range" class="block text-lg font-bold text-gray-300">Lightness Range</label>
+          <input type="range" id="gen_lightness_range" min="0" max="1" step="0.01" value="0">
+          <span id="gen_lightness_range_value" class="slider-label">0.00</span>
+        </div>
       </div>
+      <p id="gen_status" class="mt-4 text-sm text-slate-300" role="status"></p>
     </div> <!-- End Generative Tab -->
 
     <!-- 2. RGB WAVE FUNCTIONS (GRAPH) -->
@@ -454,11 +508,16 @@
     // The zoom history and the locked-group delta capping are DOM-free state
     // machines, kept in their own module so both are unit tested; the reads and
     // writes against the sliders and the Reset Zoom button stay inline.
-    import { createZoomHistory, lockedGroupMove } from './palette_controls.js';
+    import {
+      createZoomHistory, lockedGroupMove, defaultPaletteRecipe, PaletteV2,
+      PALETTE_RECIPE_PRESETS,
+    } from './palette_controls.js';
     // The two canvas painters take their canvas, context and palette as
     // arguments, so they live in their own module and are unit tested against a
     // context double; the pointer and keyboard wiring around them stays inline.
-    import { createColorStripPainter, drawWaveGraph } from './palette_canvas.js';
+    import {
+      createColorStripPainter, drawWaveGraph, drawRecipeDiagnostics,
+    } from './palette_canvas.js';
     import { createFrameScheduler, onPageTeardown } from './page_lifecycle.js';
 
     // --- Palette Class and Data Structure ---
@@ -501,6 +560,53 @@
     let parameters = { ...defaultParams };
     let palette;
     const zoomHistory = createZoomHistory();
+
+    const enumIndex = (group, value) => PaletteV2[group][value];
+
+    function readPaletteRecipe() {
+      const recipe = defaultPaletteRecipe();
+      recipe.domain = enumIndex('domain', document.getElementById('gen_shape').value);
+      recipe.colorPath = enumIndex('colorPath', document.getElementById('gen_path').value);
+      recipe.hue.mode = enumIndex('hueMode', document.getElementById('gen_hue_mode').value);
+      recipe.hue.harmony = enumIndex('harmony', document.getElementById('gen_harmony').value);
+      recipe.hue.baseTurns = Number(document.getElementById('gen_seed_slider').value) / 256;
+      recipe.hue.sweepTurns = 1;
+      recipe.lightness.curve = enumIndex('curve', document.getElementById('gen_brightness').value);
+      recipe.lightness.center = Number(document.getElementById('gen_lightness_center').value);
+      recipe.lightness.range = Number(document.getElementById('gen_lightness_range').value);
+      recipe.chroma.curve = enumIndex('curve', document.getElementById('gen_chroma_curve').value);
+      recipe.chroma.center = Number(document.getElementById('gen_saturation').value);
+      recipe.chroma.range = Number(document.getElementById('gen_chroma_range').value);
+      if (recipe.chroma.center === 1) recipe.chroma.headroom = 1;
+      return recipe;
+    }
+
+    function loadRecipePreset(name) {
+      const recipe = PALETTE_RECIPE_PRESETS[name]();
+      document.getElementById('gen_shape').value =
+        Object.keys(PaletteV2.domain).find((key) => PaletteV2.domain[key] === recipe.domain);
+      document.getElementById('gen_hue_mode').value =
+        Object.keys(PaletteV2.hueMode).find((key) => PaletteV2.hueMode[key] === recipe.hue.mode);
+      document.getElementById('gen_harmony').value =
+        Object.keys(PaletteV2.harmony).find((key) => PaletteV2.harmony[key] === recipe.hue.harmony);
+      document.getElementById('gen_path').value =
+        Object.keys(PaletteV2.colorPath).find((key) => PaletteV2.colorPath[key] === recipe.colorPath);
+      document.getElementById('gen_brightness').value =
+        Object.keys(PaletteV2.curve).find((key) => PaletteV2.curve[key] === recipe.lightness.curve);
+      document.getElementById('gen_chroma_curve').value =
+        Object.keys(PaletteV2.curve).find((key) => PaletteV2.curve[key] === recipe.chroma.curve);
+      document.getElementById('gen_seed_slider').value = Math.round(recipe.hue.baseTurns * 256) & 255;
+      document.getElementById('gen_lightness_center').value = recipe.lightness.center;
+      document.getElementById('gen_lightness_range').value = recipe.lightness.range;
+      document.getElementById('gen_saturation').value = recipe.chroma.center;
+      document.getElementById('gen_chroma_range').value = recipe.chroma.range;
+      document.getElementById('gen_seed_value').textContent = document.getElementById('gen_seed_slider').value;
+      document.getElementById('gen_lightness_center_value').textContent = recipe.lightness.center.toFixed(2);
+      document.getElementById('gen_lightness_range_value').textContent = recipe.lightness.range.toFixed(2);
+      document.getElementById('gen_saturation_value').textContent = recipe.chroma.center.toFixed(2);
+      document.getElementById('gen_chroma_range_value').textContent = recipe.chroma.range.toFixed(2);
+      scheduleUpdate();
+    }
 
     // Animation state
     let animationSpeed = 0.3; // Cycles per second (Default: 0.3 cycles/s)
@@ -990,15 +1096,8 @@
         // function only reads the current parameters and writes the result.
         codeOutput.textContent = proceduralPaletteCpp(parameters);
       } else {
-        const shape = document.getElementById('gen_shape').value;
-        const harmony = document.getElementById('gen_harmony').value;
-        const brightness = document.getElementById('gen_brightness').value;
-        const sat = document.getElementById('gen_saturation').value;
-        const hueValue = parseInt(document.getElementById('gen_seed_slider').value);
-
-        // Pure generativePaletteCpp (palette_math.js) emits the block; this
-        // function just supplies the DOM inputs.
-        codeOutput.textContent = generativePaletteCpp({ shape, harmony, brightness, sat, hueValue });
+        codeOutput.textContent = generativePaletteCpp(
+          palette?.canonicalRecipe ?? readPaletteRecipe());
       }
     }
 
@@ -1079,19 +1178,29 @@
         const D = [parameters.D_R, parameters.D_G, parameters.D_B];
         palette = new ProceduralPalette(A, B, C, D);
       } else {
-        const shape = document.getElementById('gen_shape').value;
-        const harmony = document.getElementById('gen_harmony').value;
-        const brightness = document.getElementById('gen_brightness').value;
-        const sat = document.getElementById('gen_saturation').value;
-        const hueValue = parseInt(document.getElementById('gen_seed_slider').value);
-        palette = new GenerativePalette(shape, harmony, brightness, sat, hueValue);
+        try {
+          palette = new GenerativePalette(readPaletteRecipe());
+          const status = document.getElementById('gen_status');
+          status.textContent = palette.canonicalRecipe.domain === PaletteV2.domain.LOOP &&
+              palette.lut[0] === palette.lut[765] &&
+              palette.lut[1] === palette.lut[766] &&
+              palette.lut[2] === palette.lut[767]
+            ? 'Compiled · Bit-exact seam'
+            : 'Compiled';
+        } catch (error) {
+          document.getElementById('gen_status').textContent = error.message;
+          return;
+        }
       }
 
       // The gradient changed — force the cached color strip to rebuild.
       colorStripPainter?.invalidate();
 
       // Redraw static graph elements
-      drawWaveGraph({ canvas: waveGraphCanvas, ctx: waveGraphCtx, palette });
+      if (activeTab === 'procedural')
+        drawWaveGraph({ canvas: waveGraphCanvas, ctx: waveGraphCtx, palette });
+      else
+        drawRecipeDiagnostics({ canvas: waveGraphCanvas, ctx: waveGraphCtx, palette });
 
       // Update dynamic elements once immediately
       updateSwatch();
@@ -1118,8 +1227,7 @@
         const { default: createHolosphereModule } = await import('../holosphere_wasm.js');
         const wasm = await createHolosphereModule();
         const paletteOps = new wasm.PaletteOps();
-        setPaletteOps((shape, h1, s1, v1, h2, s2, v2, h3, s3, v3) =>
-          paletteOps.bakeLut(shape, h1, s1, v1, h2, s2, v2, h3, s3, v3));
+        setPaletteOps(paletteOps);
       } catch (e) {
         console.error('Failed to load WASM:', e);
         showFatalError('Failed to load the Holosphere WASM engine — the palette '
@@ -1190,10 +1298,29 @@
         });
       }
 
-      const dropdowns = ['gen_harmony', 'gen_saturation', 'gen_brightness', 'gen_shape'];
+      const dropdowns = [
+        'gen_hue_mode', 'gen_harmony', 'gen_chroma_curve', 'gen_brightness',
+        'gen_shape', 'gen_path',
+      ];
       dropdowns.forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.addEventListener('change', updatePalette);
+        if (el) el.addEventListener('change', scheduleUpdate);
+      });
+
+      for (const id of [
+        'gen_saturation', 'gen_chroma_range',
+        'gen_lightness_center', 'gen_lightness_range',
+      ]) {
+        const slider = document.getElementById(id);
+        const value = document.getElementById(`${id}_value`);
+        slider?.addEventListener('input', () => {
+          if (value) value.textContent = Number(slider.value).toFixed(2);
+          scheduleUpdate();
+        });
+      }
+
+      document.querySelectorAll('[data-recipe-preset]').forEach((button) => {
+        button.addEventListener('click', () => loadRecipePreset(button.dataset.recipePreset));
       });
 
       // 3. Add drag-and-drop listeners

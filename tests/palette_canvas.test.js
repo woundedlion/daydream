@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createColorStripPainter, drawWaveGraph } from '../tools/palette_canvas.js';
+import {
+  createColorStripPainter, drawWaveGraph, drawRecipeDiagnostics,
+} from '../tools/palette_canvas.js';
 import { waveGraphBand } from '../tools/palette_math.js';
 import { linearToSrgbFloat } from '../tools/color.js';
 
@@ -26,6 +28,7 @@ function fakeContext() {
     drawImage: (image, x, y) => ops.push(['drawImage', image, x, y]),
     createImageData: (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }),
     putImageData: function putImageData(image) { this.painted = image; },
+    fillText: (...a) => ops.push(['fillText', ...a]),
   };
 }
 
@@ -230,4 +233,25 @@ test('neither painter touches a canvas it has no context for', () => {
 
   drawWaveGraph({ canvas: { width: 8, height: 4 }, ctx: null, palette });
   assert.equal(palette.channelCalls, 0);
+});
+
+test('recipe diagnostics plot color, perceptual axes, and fallback samples', () => {
+  const canvas = { width: 4, height: 100 };
+  const ctx = fakeContext();
+  const palette = {
+    diagnosticAt(t) {
+      return {
+        L: t, C: t * 0.2, q: 1 - t, Cmax: 0.25,
+        fallbackMapped: t > 0.5,
+      };
+    },
+    getChannelValues(t) { return [t, 0.5, 1 - t]; },
+  };
+
+  drawRecipeDiagnostics({ canvas, ctx, palette });
+
+  assert.deepEqual(ctx.ops[0], ['clearRect', 0, 0, 4, 100]);
+  assert.equal(ctx.ops.filter(([name]) => name === 'stroke').length, 9);
+  assert.ok(ctx.ops.some(([name, text]) => name === 'fillText' && /sRGB/.test(text)));
+  assert.ok(ctx.ops.some(([name, text]) => name === 'fillText' && /C \[0,0\.250\]/.test(text)));
 });

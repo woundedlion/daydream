@@ -2,11 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const {
-  ProceduralPalette, seededRandInt, GenerativePalette,
+  ProceduralPalette, GenerativePalette, compilePaletteRecipe,
   mapValue, waveGraphBand, WAVE_GRAPH_VALUE_RANGE,
-  proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
+  proceduralPaletteCpp, generativePaletteCpp, paletteRecipeJson, setPaletteOps,
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams, zoomedProceduralParams,
 } = await import('../tools/palette_math.js');
+const { defaultPaletteRecipe } = await import('../tools/palette_controls.js');
 
 function mockBakeLut() {
   const lut = new Uint8Array(256 * 3);
@@ -17,21 +18,22 @@ function mockBakeLut() {
   }
   return lut;
 }
-setPaletteOps(mockBakeLut);
 
-function captureBakeArgs(createPalette) {
-  let bakeArgs;
-  setPaletteOps((...args) => {
-    bakeArgs = args;
-    return mockBakeLut();
+function mockPaletteOps(overrides = {}) {
+  const compile = (recipe) => ({
+    status: { code: 0, field: 0, wrappedFields: 0, clampedFields: 0, canonicalizedFields: 0 },
+    canonicalRecipe: structuredClone(recipe),
+    lut: mockBakeLut(),
+    diagnostics: new Float32Array(256 * 6),
+    fallback: new Uint8Array(256),
   });
-  try {
-    createPalette();
-    return bakeArgs;
-  } finally {
-    setPaletteOps(mockBakeLut);
-  }
+  return {
+    compileAndBakeV2: compile,
+    inspectV2: compile,
+    ...overrides,
+  };
 }
+setPaletteOps(mockPaletteOps());
 
 const NEAR = 1e-6;
 
@@ -139,22 +141,6 @@ test('proceduralPaletteParams flattens a coefficient set into A_R..D_B', () => {
   });
 });
 
-/**
- * Verifies seededRandInt's range contract over every hue the tool can pass and
- * every site the palette draws from: an integer in [min, max), and min for an
- * empty range (the C++ guard against max <= min).
- */
-test('seededRandInt stays in [min, max) for every seed and site', () => {
-  for (let seed = 0; seed < 256; seed++) {
-    for (let site = 0; site < 10; site++) {
-      const v = seededRandInt(seed, site, 153, 204);
-      assert.ok(Number.isInteger(v) && v >= 153 && v < 204, `seed ${seed} site ${site}`);
-    }
-  }
-  assert.equal(seededRandInt(7, 0, 42, 42), 42);
-  assert.equal(seededRandInt(7, 0, 42, 10), 42);
-});
-
 /** Verifies mapValue linearly remaps a value from one numeric range to another. */
 test('mapValue computes the expected interpolations', () => {
   assert.equal(mapValue(0.5, 0, 1, 0, 100), 50);
@@ -206,96 +192,6 @@ test('proceduralPaletteCpp emits a valid C++ initializer', () => {
   assert.ok(s.includes('{0.5f, 0.5f, 0.5f}'));
 });
 
-/** Verifies generativePaletteCpp emits the GenerativePalette block with the chosen enum tokens and base hue. */
-test('generativePaletteCpp emits the block with the chosen enum tokens', () => {
-  const s = generativePaletteCpp({
-    shape: 'VIGNETTE',
-    harmony: 'TRIADIC',
-    brightness: 'ASCENDING',
-    sat: 'VIBRANT',
-    hueValue: 42,
-  });
-  assert.ok(s.includes('GenerativePalette palette{'));
-  assert.ok(s.includes('GradientShape::VIGNETTE'));
-  assert.ok(s.includes('HarmonyType::TRIADIC'));
-  assert.ok(s.includes('BrightnessProfile::ASCENDING'));
-  assert.ok(s.includes('SaturationProfile::VIBRANT'));
-  assert.ok(s.includes('42}'));
-  assert.ok(!s.includes('//'), 'no caveat comment: the pinned hue reproduces the preview');
-});
-
-/** Verifies generativePaletteCpp rejects an enum token that would emit a nonexistent C++ enumerator. */
-test('generativePaletteCpp rejects an unknown enum token', () => {
-  const ok = { shape: 'STRAIGHT', harmony: 'TRIADIC', brightness: 'FLAT', sat: 'MID', hueValue: 0 };
-  assert.throws(() => generativePaletteCpp({ ...ok, shape: 'SPIRAL' }), /unknown GradientShape "SPIRAL"/);
-  assert.throws(() => generativePaletteCpp({ ...ok, harmony: 'TETRADIC' }), /unknown HarmonyType "TETRADIC"/);
-  assert.throws(() => generativePaletteCpp({ ...ok, brightness: 'DOME' }), /unknown BrightnessProfile "DOME"/);
-  assert.throws(() => generativePaletteCpp({ ...ok, sat: 'NEON' }), /unknown SaturationProfile "NEON"/);
-  assert.doesNotThrow(() => generativePaletteCpp(ok));
-});
-
-/** Verifies generativePaletteCpp rejects a hueValue that would paste invalid C++. */
-test('generativePaletteCpp rejects an out-of-range or non-integer hue', () => {
-  const ok = { shape: 'STRAIGHT', harmony: 'TRIADIC', brightness: 'FLAT', sat: 'MID', hueValue: 0 };
-  assert.throws(() => generativePaletteCpp({ ...ok, hueValue: NaN }), /hueValue/);
-  assert.throws(() => generativePaletteCpp({ ...ok, hueValue: 256 }), /hueValue/);
-  assert.throws(() => generativePaletteCpp({ ...ok, hueValue: -1 }), /hueValue/);
-  assert.throws(() => generativePaletteCpp({ ...ok, hueValue: 1.5 }), /hueValue/);
-  assert.doesNotThrow(() => generativePaletteCpp({ ...ok, hueValue: 255 }));
-});
-
-/** Verifies GenerativePalette resolves the profiles into a valid bakeLut call: the GradientShape enum int and nine in-range HSV values. */
-test('GenerativePalette delegates resolved (shape, h,s,v x3) to bakeLut', () => {
-  const bakeArgs = captureBakeArgs(() =>
-    new GenerativePalette('VIGNETTE', 'TRIADIC', 'FLAT', 'VIBRANT', 100));
-  assert.ok(Array.isArray(bakeArgs) && bakeArgs.length === 10, 'bakeLut called with 10 args');
-  // VIGNETTE is index 2 in core/color/color.h GradientShape order.
-  assert.equal(bakeArgs[0], 2, 'shape enum int');
-  for (let i = 1; i < 10; i++) {
-    assert.ok(Number.isInteger(bakeArgs[i]), `arg ${i} integer`);
-    assert.ok(bakeArgs[i] >= 0 && bakeArgs[i] <= 255, `arg ${i} in [0,255]`);
-  }
-  // FLAT/VIBRANT are RNG-free: value and saturation pin to 255 on all three keys.
-  assert.deepEqual([bakeArgs[3], bakeArgs[6], bakeArgs[9]], [255, 255, 255], 'FLAT values');
-  assert.deepEqual([bakeArgs[2], bakeArgs[5], bakeArgs[8]], [255, 255, 255], 'VIBRANT saturations');
-});
-
-/**
- * Resolves a palette and returns the (s1,s2,s3) and (v1,v2,v3) bakeLut carries.
- * @param {string} brightness - Brightness profile under test.
- * @param {string} sat - Saturation profile under test.
- * @param {number} hueValue - Base hue, which is also the draw seed.
- * @returns {{sats:number[], values:number[]}} The resolved saturations and values.
- */
-function resolveKeys(brightness, sat, hueValue) {
-  const bakeArgs = captureBakeArgs(() =>
-    new GenerativePalette('STRAIGHT', 'TRIADIC', brightness, sat, hueValue));
-  return {
-    sats: [bakeArgs[2], bakeArgs[5], bakeArgs[8]],
-    values: [bakeArgs[3], bakeArgs[6], bakeArgs[9]],
-  };
-}
-
-/**
- * Verifies the preview tracks the base hue the export pins: the engine derives
- * every draw from that hue, so two hues must resolve different key triples
- * rather than sharing one profile-string-seeded structure.
- */
-test('GenerativePalette key draws move with the base hue', () => {
-  const keys = (hueValue) => {
-    const { sats, values } = resolveKeys('ASCENDING', 'MID', hueValue);
-    return [...sats, ...values];
-  };
-  assert.notDeepEqual(keys(10), keys(11));
-  assert.deepEqual(keys(10), keys(10));
-});
-
-/** Verifies GenerativePalette rejects an unknown gradient shape before reaching bakeLut. */
-test('GenerativePalette throws on an unknown gradient shape', () => {
-  assert.throws(() => new GenerativePalette('SPIRAL', 'TRIADIC', 'FLAT', 'VIBRANT', 0),
-    /unknown GradientShape "SPIRAL"/);
-});
-
 /**
  * Verifies GenerativePalette.get's upper boundary. get clamps t to [0,1] and
  * maps it onto the 256-entry LUT: t === 1.0 lands exactly on the final entry
@@ -303,8 +199,8 @@ test('GenerativePalette throws on an unknown gradient shape', () => {
  * final color, not NaN or a wrapped value, and be continuous with the interior
  * limit approaching it.
  */
-test('GenerativePalette.get: t === 1.0 and t > 1.0 clamp to the final stop color', () => {
-  const pal = new GenerativePalette('STRAIGHT', 'ANALOGOUS', 'ASCENDING', 'VIBRANT', 128);
+test('GenerativePalette.get clamps to the final LUT entry', () => {
+  const pal = new GenerativePalette(defaultPaletteRecipe());
 
   const atOne = pal.get(1.0);
   const beyond = pal.get(1.5);
@@ -323,51 +219,134 @@ test('GenerativePalette.get: t === 1.0 and t > 1.0 clamp to the final stop color
   }
 });
 
-/** Verifies GenerativePalette.get yields finite linear RGB triples within [0, 1] across several t values and shapes. */
-test('GenerativePalette.get returns finite linear RGB in range', () => {
-  const pal = new GenerativePalette('STRAIGHT', 'ANALOGOUS', 'ASCENDING', 'VIBRANT', 128);
-  for (const t of [0, 0.25, 0.5, 0.75, 0.999]) {
-    const rgb = pal.get(t);
-    assert.equal(rgb.length, 3);
-    for (const ch of rgb) {
-      assert.ok(Number.isFinite(ch), `channel finite at t=${t}`);
-      assert.ok(ch >= -1e-6 && ch <= 1 + 1e-6, `channel ${ch} in [0,1] at t=${t}`);
-    }
-  }
-  const vig = new GenerativePalette('VIGNETTE', 'COMPLEMENTARY', 'BELL', 'MID', 200);
-  const mid = vig.get(0.5);
-  for (const ch of mid) assert.ok(Number.isFinite(ch));
+test('generativePaletteCpp serializes the complete V2 recipe', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.domain = 4;
+  recipe.hue.harmony = 5;
+  recipe.lightness.curve = 1;
+  const source = generativePaletteCpp(recipe);
+
+  assert.match(source, /recipe\.schema_version = 2;/);
+  assert.match(source, /PaletteDomain::LOOP/);
+  assert.match(source, /PaletteHarmony::TRIADIC/);
+  assert.match(source, /AxisCurve::ASCENDING/);
+  assert.match(source, /ChromaBasis::LOCAL_GAMUT/);
+  assert.match(source, /GenerativePalette::try_compile\(recipe, palette, canonical, status\)/);
 });
 
-/**
- * Pins GenerativePalette.get's interpolation DOMAIN, which is the whole point of
- * the reconstruction: BakedPalette::get (core/color/composition.h) lerps
- * linear-light entries, so a sample between two LUT stops must be the linear-light
- * blend of them, not the sRGB blend.
- */
-test('GenerativePalette.get blends adjacent LUT entries in linear light', () => {
-  // Entry 0 black, every later entry mid grey: the 0->1 step is a wide gap, where
-  // the linear and sRGB domains disagree by ~0.14 rather than by rounding.
-  setPaletteOps(() => {
-    const lut = new Uint8Array(256 * 3);
-    lut.fill(128, 3);
-    return lut;
-  });
-  try {
-    const pal = new GenerativePalette('STRAIGHT', 'TRIADIC', 'FLAT', 'VIBRANT', 0);
-    const grey = 0.21586050011389926;
+test('generativePaletteCpp rejects unknown enum values', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.domain = 99;
+  assert.throws(() => generativePaletteCpp(recipe), /unknown domain enum value 99/);
+});
 
-    for (const [t, frac] of [[0.5 / 255, 0.5], [0.25 / 255, 0.25], [0.75 / 255, 0.75]]) {
-      for (const ch of pal.get(t)) {
-        assert.ok(Math.abs(ch - grey * frac) < NEAR, `linear blend at frac ${frac}: ${ch}`);
-        assert.ok(Math.abs(ch - (128 / 255) * frac) > 0.05, `not the sRGB blend: ${ch}`);
+test('paletteRecipeJson preserves the complete recipe', () => {
+  const recipe = defaultPaletteRecipe();
+  assert.deepEqual(JSON.parse(paletteRecipeJson(recipe)), recipe);
+});
+
+test('compilePaletteRecipe selects the requested bridge operation and owns its buffers', () => {
+  const recipe = defaultPaletteRecipe();
+  const lut = mockBakeLut();
+  const diagnostics = new Float32Array(256 * 6).fill(0.25);
+  const fallback = new Uint8Array(256).fill(1);
+  const calls = [];
+  const compile = (kind) => (input) => {
+    calls.push([kind, input]);
+    return {
+      status: { code: 0, field: 0 },
+      canonicalRecipe: input,
+      lut,
+      diagnostics,
+      fallback,
+    };
+  };
+  setPaletteOps({ compileAndBakeV2: compile('compile'), inspectV2: compile('inspect') });
+  try {
+    const inspected = compilePaletteRecipe(recipe);
+    const compiled = compilePaletteRecipe(recipe, false);
+    assert.deepEqual(calls.map(([kind]) => kind), ['inspect', 'compile']);
+    assert.notEqual(inspected.lut, lut);
+    assert.notEqual(inspected.diagnostics, diagnostics);
+    assert.notEqual(inspected.fallback, fallback);
+    assert.notEqual(inspected.canonicalRecipe, recipe);
+    assert.deepEqual(compiled.lut, lut);
+  } finally {
+    setPaletteOps(mockPaletteOps());
+  }
+});
+
+test('GenerativePalette reports compiler failures', () => {
+  setPaletteOps(mockPaletteOps({
+    inspectV2: () => ({ status: { code: 2, field: 7 } }),
+  }));
+  try {
+    assert.throws(() => new GenerativePalette(defaultPaletteRecipe()),
+      /Palette recipe error 2 at field 7/);
+  } finally {
+    setPaletteOps(mockPaletteOps());
+  }
+});
+
+test('GenerativePalette uses the canonical recipe and exposes diagnostics', () => {
+  const recipe = defaultPaletteRecipe();
+  const diagnostics = new Float32Array(256 * 6);
+  diagnostics.set([0.6, 0.2, 0.75, 0.25, 0.1, 0.12], 6 * 128);
+  const fallback = new Uint8Array(256);
+  fallback[128] = 1;
+  setPaletteOps(mockPaletteOps({
+    inspectV2: (input) => ({
+      status: { code: 0, field: 0 },
+      canonicalRecipe: { ...structuredClone(input), falloffStart: 0.8 },
+      lut: mockBakeLut(),
+      diagnostics,
+      fallback,
+    }),
+  }));
+  try {
+    const palette = new GenerativePalette(recipe);
+    assert.equal(palette.canonicalRecipe.falloffStart, 0.8);
+    assert.deepEqual(palette.diagnosticAt(128 / 255), {
+      t: 128 / 255,
+      rgb: [128, 127, 128],
+      L: diagnostics[768],
+      C: diagnostics[769],
+      q: diagnostics[770],
+      Cmax: diagnostics[771],
+      hPath: diagnostics[772],
+      hFinal: diagnostics[773],
+      fallbackMapped: true,
+    });
+  } finally {
+    setPaletteOps(mockPaletteOps());
+  }
+});
+
+test('GenerativePalette.get blends adjacent entries in linear light', () => {
+  const lut = new Uint8Array(256 * 3);
+  lut.fill(128, 3);
+  setPaletteOps(mockPaletteOps({
+    inspectV2: (recipe) => ({
+      status: { code: 0, field: 0 },
+      canonicalRecipe: recipe,
+      lut,
+      diagnostics: new Float32Array(256 * 6),
+      fallback: new Uint8Array(256),
+    }),
+  }));
+  try {
+    const palette = new GenerativePalette(defaultPaletteRecipe());
+    const grey = 0.21586050011389926;
+    for (const [t, fraction] of [[0.5 / 255, 0.5], [0.25 / 255, 0.25]]) {
+      for (const channel of palette.get(t)) {
+        assert.ok(Math.abs(channel - grey * fraction) < NEAR);
       }
     }
-
-    for (const ch of pal.get(0)) assert.ok(Math.abs(ch) < NEAR, 'entry 0 is black');
-    for (const ch of pal.get(1)) assert.ok(Math.abs(ch - grey) < NEAR, 'entry 255 is linearized grey');
+    assert.deepEqual(palette.get(2), palette.get(1));
+    assert.deepEqual(palette.get(-1), palette.get(0));
+    assert.deepEqual(palette.get(Number.NaN), palette.get(1));
   } finally {
-    setPaletteOps(mockBakeLut);
+    setPaletteOps(mockPaletteOps());
   }
 });
 

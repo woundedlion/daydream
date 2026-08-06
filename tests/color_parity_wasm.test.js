@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import createHolosphereModule from '../holosphere_wasm.js';
 import * as C from '../tools/color.js';
 import * as P from '../tools/palette_math.js';
+import { defaultPaletteRecipe, PaletteV2 } from '../tools/palette_controls.js';
 import * as L from '../tools/lissajous_math.js';
 import * as MB from '../tools/mobius_transforms.js';
 
@@ -23,7 +24,7 @@ test('WASM parity module is present with the exports this suite pins', () => {
     'srgb_to_linear_float', 'linear_to_srgb_float', 'srgb_to_linear_interp',
     'linear_rgb_to_oklab', 'oklab_to_linear_rgb', 'hsv_to_rgb',
     'procedural_palette_linear', 'named_procedural_palettes',
-    'generative_palette_hsv_keys', 'lissajous', 'mobius_transform',
+    'lissajous', 'mobius_transform',
     'PaletteOps',
   ]) {
     assert.equal(typeof M[name], 'function',
@@ -153,270 +154,88 @@ test('NAMED_PROCEDURAL_PALETTES matches the engine table (named_procedural_palet
   assert.deepEqual(M.named_procedural_palettes(), mirror);
 });
 
-// Entries of the 256-stop LUT the bakeLut goldens below pin.
 const LUT_SAMPLES = [0, 32, 64, 96, 128, 160, 192, 224, 255];
 
-// Three fully saturated keys on the TRIADIC hues, i.e. what
-// GenerativePalette(shape, 'TRIADIC', 'FLAT', 'VIBRANT', 0) resolves to.
-const TRIADIC_KEYS = [0, 255, 255, 85, 255, 255, 170, 255, 255];
-
-// Off-primary hues with partial saturation and value, exercising the s/v path
-// the saturated keys above hold constant.
-const MIXED_KEYS = [30, 200, 180, 128, 120, 240, 210, 255, 90];
-
-/**
- * Reads the sampled entries of a baked LUT as [r, g, b] triples.
- * @param {Uint8Array|number[]} lut - A 256*3 sRGB LUT from PaletteOps.bakeLut.
- * @returns {number[][]} One triple per LUT_SAMPLES index, in order.
- */
 function sampleLut(lut) {
-  assert.equal(lut.length, 256 * 3, `bakeLut returned ${lut.length} bytes, want 768`);
-  return LUT_SAMPLES.map((i) => [lut[3 * i], lut[3 * i + 1], lut[3 * i + 2]]);
+  assert.equal(lut.length, 256 * 3);
+  return LUT_SAMPLES.map((index) =>
+    [lut[3 * index], lut[3 * index + 1], lut[3 * index + 2]]);
 }
 
-// Sampled goldens for the four GradientShape values (STRAIGHT, CIRCULAR,
-// VIGNETTE, FALLOFF) baked from TRIADIC_KEYS, plus STRAIGHT from MIXED_KEYS.
-// Captured from the engine bake; the LUT is 8-bit integer output of integer
-// inputs, so these compare exactly. A channel the gradient does not drive can
-// still read a few LSB: the gamut LUT supplies only the bracket the walk
-// refines, so its cell size sets the residue.
-const BAKE_GOLDEN = {
-  STRAIGHT: [[241, 83, 136], [246, 90, 58], [213, 125, 0], [178, 146, 0], [130, 165, 0],
-    [0, 178, 96], [0, 172, 157], [0, 167, 192], [0, 158, 238]],
-  CIRCULAR: [[241, 83, 136], [174, 112, 247], [0, 158, 238], [0, 173, 154], [131, 164, 0],
-    [0, 172, 158], [1, 158, 238], [179, 110, 244], [241, 83, 136]],
-  VIGNETTE: [[0, 0, 0], [245, 83, 119], [234, 106, 1], [186, 142, 0], [130, 165, 0],
-    [1, 176, 119], [0, 170, 175], [1, 161, 225], [0, 0, 0]],
-  FALLOFF: [[241, 83, 136], [233, 107, 0], [177, 147, 0], [69, 176, 37], [0, 172, 159],
-    [0, 163, 216], [0, 80, 117], [0, 1, 1], [0, 0, 0]],
-  STRAIGHT_MIXED: [[169, 62, 0], [147, 101, 0], [122, 127, 0], [74, 149, 88], [49, 158, 145],
-    [0, 130, 146], [0, 99, 143], [18, 52, 169], [57, 0, 128]],
-};
-
-/**
- * Pins the engine's generative-palette bake to fixed golden bytes. palette_math.js
- * hands bakeLut already-resolved h/s/v keys, so the gradient interpolation itself
- * lives entirely in the engine and this is the only place its output values are
- * checked — the module contract test pins
- * bakeLut's type and length, and palette_math.test.js substitutes a synthetic ramp.
- * Baking all four shapes from one key set also pins the GradientShape enum order
- * palette_math.js mirrors: a shifted mapping lands on another shape's golden.
- */
-test('PaletteOps.bakeLut golden LUT entries (absolute pin)', () => {
+test('PaletteOps exposes only the V2 recipe compiler operations', () => {
   const ops = new M.PaletteOps();
   try {
-    const shapes = ['STRAIGHT', 'CIRCULAR', 'VIGNETTE', 'FALLOFF'];
-    shapes.forEach((name, shape) => {
-      assert.deepEqual(sampleLut(ops.bakeLut(shape, ...TRIADIC_KEYS)), BAKE_GOLDEN[name],
-        `bakeLut(${name}) drifted from the golden LUT`);
-    });
-    assert.deepEqual(sampleLut(ops.bakeLut(0, ...MIXED_KEYS)), BAKE_GOLDEN.STRAIGHT_MIXED,
-      'bakeLut(STRAIGHT) on partial saturation/value drifted from the golden LUT');
+    assert.equal(typeof ops.compileAndBakeV2, 'function');
+    assert.equal(typeof ops.inspectV2, 'function');
+    assert.equal(ops.bakeLut, undefined);
   } finally {
     ops.delete();
   }
 });
 
-/**
- * Verifies GenerativePalette drives the real bridge to the same bytes: the
- * profiles it resolves (TRIADIC hues off base 0, VIBRANT saturation, FLAT value)
- * are the draw-free combination, so the whole tool path is pinned to the goldens
- * above without a seeded draw in the loop.
- */
-test('GenerativePalette bakes the golden LUT through the engine bridge', () => {
+test('PaletteOps compiles deterministic V2 recipe LUTs', () => {
+  const ops = new M.PaletteOps();
+  const recipe = defaultPaletteRecipe();
+  try {
+    const first = ops.compileAndBakeV2(recipe);
+    const second = ops.compileAndBakeV2(recipe);
+    assert.equal(first.status.code, 0);
+    assert.equal(first.canonicalRecipe.schemaVersion, 2);
+    assert.deepEqual(sampleLut(Uint8Array.from(first.lut)),
+      sampleLut(Uint8Array.from(second.lut)));
+  } finally {
+    ops.delete();
+  }
+});
+
+test('PaletteOps enforces exact mirror and loop seams', () => {
   const ops = new M.PaletteOps();
   try {
-    P.setPaletteOps((...args) => ops.bakeLut(...args));
-    const pal = new P.GenerativePalette('VIGNETTE', 'TRIADIC', 'FLAT', 'VIBRANT', 0);
-    assert.deepEqual(sampleLut(pal.lut), BAKE_GOLDEN.VIGNETTE);
+    const mirror = defaultPaletteRecipe();
+    mirror.domain = PaletteV2.domain.MIRROR;
+    const mirrored = Uint8Array.from(ops.compileAndBakeV2(mirror).lut);
+    for (let index = 0; index < 128; index += 1) {
+      assert.deepEqual(
+        Array.from(mirrored.slice(index * 3, index * 3 + 3)),
+        Array.from(mirrored.slice((255 - index) * 3, (256 - index) * 3)));
+    }
+
+    const loop = defaultPaletteRecipe();
+    loop.domain = PaletteV2.domain.LOOP;
+    loop.hue.mode = PaletteV2.hueMode.SWEEP;
+    const looped = Uint8Array.from(ops.compileAndBakeV2(loop).lut);
+    assert.deepEqual(Array.from(looped.slice(765)), Array.from(looped.slice(0, 3)));
+  } finally {
+    ops.delete();
+  }
+});
+
+test('browser GenerativePalette owns the real bridge result', () => {
+  const ops = new M.PaletteOps();
+  P.setPaletteOps(ops);
+  try {
+    const recipe = defaultPaletteRecipe();
+    recipe.hue.baseTurns = 0.37;
+    const direct = ops.inspectV2(recipe);
+    const palette = new P.GenerativePalette(recipe);
+    assert.deepEqual(palette.lut, Uint8Array.from(direct.lut));
+    assert.deepEqual(palette.canonicalRecipe, direct.canonicalRecipe);
+    assert.equal(palette.diagnostics.length, 256 * 6);
+    assert.equal(palette.fallback.length, 256);
   } finally {
     P.setPaletteOps(null);
     ops.delete();
   }
 });
 
-/** Verifies exact complementary half-turns keep one hue direction across the base-hue wheel. */
-test('PaletteOps complementary circular LUTs vary continuously across base hues', () => {
+test('PATH_MINIMUM is rejected until its certified solver is available', () => {
   const ops = new M.PaletteOps();
-  let maxChannelStep = 0;
+  const recipe = defaultPaletteRecipe();
+  recipe.chroma.basis = PaletteV2.chromaBasis.PATH_MINIMUM;
   try {
-    for (let hue = 0; hue < 256; hue++) {
-      const nextHue = (hue + 1) & 255;
-      const current = Uint8Array.from(ops.bakeLut(
-        1, hue, 255, 255, (hue + 128) & 255, 255, 255, hue, 255, 255));
-      const next = Uint8Array.from(ops.bakeLut(
-        1, nextHue, 255, 255, (nextHue + 128) & 255, 255, 255, nextHue, 255, 255));
-      for (let i = 0; i < current.length; i++) {
-        maxChannelStep = Math.max(maxChannelStep, Math.abs(current[i] - next[i]));
-      }
-    }
-    assert.ok(maxChannelStep <= 32, `adjacent base hues jumped by ${maxChannelStep} sRGB levels`);
-  } finally {
-    ops.delete();
-  }
-});
-
-/** Verifies the quantized circular LUT mirrors every RGB entry exactly. */
-test('PaletteOps circular LUT is palindromic', () => {
-  const ops = new M.PaletteOps();
-  try {
-    const lut = Uint8Array.from(ops.bakeLut(
-      1, 17, 180, 230, 93, 180, 70, 181, 180, 230));
-    for (let i = 0; i < 128; i++) {
-      const mirror = 255 - i;
-      for (let channel = 0; channel < 3; channel++) {
-        assert.equal(lut[3 * i + channel], lut[3 * mirror + channel]);
-      }
-    }
-  } finally {
-    ops.delete();
-  }
-});
-
-// GenerativePalette enum orders, mirrored from core/color/color.h, in the
-// indices generative_palette_hsv_keys takes.
-const GRADIENT_SHAPES = [...P.GRADIENT_SHAPES];
-const HARMONIES = ['TRIADIC', 'SPLIT_COMPLEMENTARY', 'COMPLEMENTARY', 'ANALOGOUS'];
-const BRIGHTNESSES = ['ASCENDING', 'DESCENDING', 'FLAT', 'BELL', 'CUP'];
-const SATURATIONS = ['PASTEL', 'MID', 'VIBRANT'];
-
-/**
- * The nine HSV keys the engine's GenerativePalette constructor resolves for a
- * profile triple and base hue — the oracle the tool's mirror is checked against.
- * @param {string} harmony - HarmonyType token.
- * @param {string} brightness - BrightnessProfile token.
- * @param {string} sat - SaturationProfile token.
- * @param {number} seed - Base hue in 0..255, which is also the draw seed.
- * @returns {number[]} [h1, s1, v1, h2, s2, v2, h3, s3, v3].
- */
-function engineKeys(harmony, brightness, sat, seed) {
-  const k = M.generative_palette_hsv_keys(
-    HARMONIES.indexOf(harmony), BRIGHTNESSES.indexOf(brightness),
-    SATURATIONS.indexOf(sat), seed);
-  return [k.h1, k.s1, k.v1, k.h2, k.s2, k.v2, k.h3, k.s3, k.v3];
-}
-
-/**
- * The nine HSV keys palette_math.js resolves, read off the bakeLut call it makes.
- * @param {string} harmony - HarmonyType token.
- * @param {string} brightness - BrightnessProfile token.
- * @param {string} sat - SaturationProfile token.
- * @param {number} seed - Base hue in 0..255.
- * @returns {number[]} The keys in the same order engineKeys returns them.
- */
-function toolKeys(harmony, brightness, sat, seed) {
-  let keys;
-  P.setPaletteOps((...args) => {
-    keys = args.slice(1);
-    return new Uint8Array(256 * 3);
-  });
-  try {
-    new P.GenerativePalette('STRAIGHT', harmony, brightness, sat, seed);
-  } finally {
-    P.setPaletteOps(null);
-  }
-  return keys;
-}
-
-// Base hues the cross-product sweep runs: the wheel's ends, the tool's default
-// (42), quarter and half turns, and hues whose harmonies wrap past 256.
-const ORACLE_SEEDS = [0, 1, 7, 10, 42, 63, 85, 127, 128, 137, 170, 200, 254, 255];
-
-/**
- * Pins every key palette_math.js resolves to the engine's own constructor over
- * the whole harmony x brightness x saturation cross-product. The tool resolves
- * the profiles into h/s/v itself and the bridge bakes only those keys, so the
- * draw sites, the range bounds and the harmony jitter reach the device solely
- * through the JS mirror, and this comparison is what holds them to the engine.
- */
-test('GenerativePalette keys match the engine oracle (generative_palette_hsv_keys)', () => {
-  for (const harmony of HARMONIES) {
-    for (const brightness of BRIGHTNESSES) {
-      for (const sat of SATURATIONS) {
-        for (const seed of ORACLE_SEEDS) {
-          assert.deepEqual(toolKeys(harmony, brightness, sat, seed),
-            engineKeys(harmony, brightness, sat, seed),
-            `${harmony}/${brightness}/${sat} at hue ${seed}`);
-        }
-      }
-    }
-  }
-});
-
-// Two profile triples that between them reach all ten draw sites: COMPLEMENTARY
-// draws site 0, ANALOGOUS sites 1-3, MID sites 4-6, and ASCENDING sites 7-9.
-const ALL_SITE_PROFILES = [
-  ['COMPLEMENTARY', 'ASCENDING', 'MID'],
-  ['ANALOGOUS', 'FLAT', 'PASTEL'],
-];
-
-/**
- * Sweeps every base hue the tool can pass through the draw sites the profiles
- * above reach, so a hash divergence that only shows on some seeds cannot hide
- * between the sampled hues of the cross-product sweep.
- */
-test('GenerativePalette keys match the engine oracle on every base hue', () => {
-  for (const [harmony, brightness, sat] of ALL_SITE_PROFILES) {
-    for (let seed = 0; seed < 256; seed++) {
-      assert.deepEqual(toolKeys(harmony, brightness, sat, seed),
-        engineKeys(harmony, brightness, sat, seed),
-        `${harmony}/${brightness}/${sat} at hue ${seed}`);
-    }
-  }
-});
-
-/**
- * Pins the engine's own key derivation to the profile definitions, independently
- * of the JS mirror. The oracle sweeps above are wasm-vs-js, so a drift made on
- * both sides at once would pass; the draw-free profiles are fully determined
- * (h1 is the base hue, TRIADIC steps 85, SPLIT_COMPLEMENTARY steps 128+-21,
- * VIBRANT pins saturation to 255 and PASTEL to 100, FLAT pins value to 255), so
- * comparing against them catches a shifted offset or a swapped enum order.
- */
-test('generative_palette_hsv_keys matches the draw-free profile definitions', () => {
-  for (let seed = 0; seed < 256; seed++) {
-    assert.deepEqual(engineKeys('TRIADIC', 'FLAT', 'VIBRANT', seed),
-      [seed, 255, 255, (seed + 85) % 256, 255, 255, (seed + 170) % 256, 255, 255],
-      `TRIADIC/FLAT/VIBRANT at hue ${seed}`);
-    assert.deepEqual(engineKeys('SPLIT_COMPLEMENTARY', 'FLAT', 'PASTEL', seed),
-      [seed, 100, 255, (seed + 107) % 256, 100, 255, (seed + 149) % 256, 100, 255],
-      `SPLIT_COMPLEMENTARY/FLAT/PASTEL at hue ${seed}`);
-  }
-});
-
-// Shape x profile rows the end-to-end bake comparison runs, covering all four
-// gradient shapes and, between them, every harmony, brightness and saturation.
-const ORACLE_BAKES = [
-  ['STRAIGHT', 'ANALOGOUS', 'FLAT', 'MID', 42],
-  ['CIRCULAR', 'COMPLEMENTARY', 'BELL', 'PASTEL', 137],
-  ['VIGNETTE', 'TRIADIC', 'ASCENDING', 'MID', 10],
-  ['FALLOFF', 'SPLIT_COMPLEMENTARY', 'DESCENDING', 'VIBRANT', 200],
-  ['STRAIGHT', 'ANALOGOUS', 'CUP', 'MID', 128],
-];
-
-/**
- * Closes the loop the preview and the export each walk: the tool's own keys and
- * the engine's oracle keys must bake the same LUT, byte for byte, through the
- * same bridge. This is the whole path the browser preview shows and the exported
- * C++ reproduces on the device, so a drifted key shows up as a different palette
- * rather than only as a different number.
- */
-test('GenerativePalette bakes the engine oracle keys byte for byte', () => {
-  const ops = new M.PaletteOps();
-  try {
-    for (const [shape, harmony, brightness, sat, seed] of ORACLE_BAKES) {
-      const oracle = Uint8Array.from(ops.bakeLut(
-        GRADIENT_SHAPES.indexOf(shape), ...engineKeys(harmony, brightness, sat, seed)));
-      P.setPaletteOps((...args) => ops.bakeLut(...args));
-      let lut;
-      try {
-        lut = new P.GenerativePalette(shape, harmony, brightness, sat, seed).lut;
-      } finally {
-        P.setPaletteOps(null);
-      }
-      assert.deepEqual(lut, oracle,
-        `${shape}/${harmony}/${brightness}/${sat} at hue ${seed} baked a different LUT`);
-    }
+    const result = ops.compileAndBakeV2(recipe);
+    assert.notEqual(result.status.code, 0);
+    assert.equal(result.lut, undefined);
   } finally {
     ops.delete();
   }
