@@ -5,7 +5,7 @@ const {
   ProceduralPalette, GenerativePalette, compilePaletteRecipe,
   mapValue, waveGraphBand, WAVE_GRAPH_VALUE_RANGE,
   proceduralPaletteCpp, generativePaletteCpp, paletteRecipeJson, setPaletteOps,
-  NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams, zoomedProceduralParams,
+  NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
 } = await import('../tools/palette_math.js');
 const { defaultPaletteRecipe } = await import('../tools/palette_controls.js');
 
@@ -348,56 +348,4 @@ test('GenerativePalette.get blends adjacent entries in linear light', () => {
   } finally {
     setPaletteOps(mockPaletteOps());
   }
-});
-
-/**
- * Verifies the zoom window maps onto the whole strip: the color at phase p of
- * the zoomed palette equals the color at t_start + p*(t_end - t_start) of the
- * original, for every channel.
- */
-test('zoomedProceduralParams reparameterizes the window onto the full strip', () => {
-  const base = {
-    A_R: 0.5, A_G: 0.5, A_B: 0.5,
-    B_R: 0.5, B_G: 0.5, B_B: 0.5,
-    C_R: 1.0, C_G: 1.0, C_B: 1.0,
-    D_R: 0.0, D_G: 0.33, D_B: 0.67,
-  };
-  const tStart = 0.2;
-  const tEnd = 0.6;
-  const zoomed = { ...base, ...zoomedProceduralParams(base, tStart, tEnd) };
-
-  const before = new ProceduralPalette(
-    [base.A_R, base.A_G, base.A_B], [base.B_R, base.B_G, base.B_B],
-    [base.C_R, base.C_G, base.C_B], [base.D_R, base.D_G, base.D_B]);
-  const after = new ProceduralPalette(
-    [zoomed.A_R, zoomed.A_G, zoomed.A_B], [zoomed.B_R, zoomed.B_G, zoomed.B_B],
-    [zoomed.C_R, zoomed.C_G, zoomed.C_B], [zoomed.D_R, zoomed.D_G, zoomed.D_B]);
-
-  for (const p of [0, 0.25, 0.5, 0.75, 1]) {
-    const want = before.get(tStart + p * (tEnd - tStart));
-    const got = after.get(p);
-    for (let i = 0; i < 3; i++) {
-      assert.ok(Math.abs(want[i] - got[i]) < 1e-9,
-        `channel ${i} at p=${p}: ${got[i]} != ${want[i]}`);
-    }
-  }
-});
-
-/** Verifies frequency scales by the window width and phase wraps into [0, 1). */
-test('zoomedProceduralParams scales frequency and wraps phase', () => {
-  const out = zoomedProceduralParams(
-    { C_R: 2, C_G: 4, C_B: 0, D_R: 0.9, D_G: 0.1, D_B: 0.4 }, 0.25, 0.75);
-  assert.equal(out.C_R, 1);
-  assert.equal(out.C_G, 2);
-  assert.equal(out.C_B, 0);
-  // (0.9 + 2*0.25) % 1 = 0.4
-  assert.ok(Math.abs(out.D_R - 0.4) < 1e-12);
-  assert.ok(Math.abs(out.D_G - 0.1) < 1e-12);
-  assert.equal(out.D_B, 0.4);
-});
-
-/** Verifies the A/B (bias/amplitude) triples are left untouched by a zoom. */
-test('zoomedProceduralParams touches only the C and D triples', () => {
-  const out = zoomedProceduralParams({ C_R: 1, C_G: 1, C_B: 1, D_R: 0, D_G: 0, D_B: 0 }, 0, 0.5);
-  assert.deepEqual(Object.keys(out).sort(), ['C_B', 'C_G', 'C_R', 'D_B', 'D_G', 'D_R']);
 });

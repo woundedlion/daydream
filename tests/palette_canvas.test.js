@@ -147,6 +147,25 @@ test('the marker lands on the column the phase names and leaves no shadow behind
   assert.ok(ctx.ops.some(([n, x]) => n === 'moveTo' && x === 8), 'phase 1 marks the last column');
 });
 
+test('the strip samples and locates its marker within the visible phase window', () => {
+  const { painter, ctx, palette, created } = stripSetup(5, 2);
+  painter.draw(palette, 0.4, null, { start: 0.2, end: 0.6 });
+
+  const { data } = created[0].ctx.painted;
+  const red = (column) => data[column * 4];
+  assert.equal(red(0), Math.round(linearToSrgbFloat(0.2) * 255));
+  assert.equal(red(4), Math.round(linearToSrgbFloat(0.6) * 255));
+  assert.ok(ctx.ops.some(([name, x]) => name === 'moveTo' && x === 2),
+    'phase 0.4 is centered in the 0.2..0.6 viewport');
+});
+
+test('changing the visible phase window rebuilds the strip cache', () => {
+  const { painter, palette } = stripSetup(8, 4);
+  painter.draw(palette, 0.5);
+  painter.draw(palette, 0.5, null, { start: 0.25, end: 0.75 });
+  assert.equal(palette.getCalls, 16);
+});
+
 test('a selection overlay is drawn only when one is passed, in either drag direction', () => {
   const { painter, ctx, palette } = stripSetup(10, 4);
   painter.draw(palette, 0.2);
