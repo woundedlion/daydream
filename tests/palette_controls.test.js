@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 const {
   createZoomHistory, lockedGroupMove, ZOOMED_PARAMS,
   PaletteV2, defaultPaletteRecipe, PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
+  paletteRecipeAvailability,
 } =
   await import('../tools/palette_controls.js');
 
@@ -137,6 +138,36 @@ test('recipe presets express distinct high-level intents', () => {
   assert.equal(loop.hue.mode, PaletteV2.hueMode.SWEEP);
   assert.equal(tonal.hue.harmony, PaletteV2.harmony.MONOCHROMATIC);
   assert.equal(tonal.lightness.curve, PaletteV2.curve.ASCENDING);
+});
+
+test('recipe availability exposes only controls that can affect the result', () => {
+  const recipe = defaultPaletteRecipe();
+  assert.deepEqual(paletteRecipeAvailability(recipe), {
+    baseHue: true,
+    hueMode: true,
+    harmony: true,
+    colorPath: true,
+    chromaRange: false,
+    lightnessRange: false,
+  });
+
+  recipe.hue.mode = PaletteV2.hueMode.SWEEP;
+  assert.equal(paletteRecipeAvailability(recipe).harmony, false);
+
+  recipe.hue.mode = PaletteV2.hueMode.HARMONY;
+  recipe.hue.harmony = PaletteV2.harmony.MONOCHROMATIC;
+  assert.equal(paletteRecipeAvailability(recipe).colorPath, false);
+
+  recipe.chroma.center = 0;
+  let availability = paletteRecipeAvailability(recipe);
+  assert.equal(availability.baseHue, false);
+  assert.equal(availability.hueMode, false);
+
+  recipe.chroma.curve = PaletteV2.curve.BELL;
+  recipe.chroma.range = 0.2;
+  availability = paletteRecipeAvailability(recipe);
+  assert.equal(availability.baseHue, true);
+  assert.equal(availability.chromaRange, true);
 });
 
 test('recipe state rejects stale compiler results', () => {

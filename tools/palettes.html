@@ -62,7 +62,36 @@
     .recipe-presets {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.5rem;
+      gap: 0.375rem;
+    }
+
+    .recipe-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.625rem;
+    }
+
+    .recipe-header h2 {
+      font-size: 1.125rem;
+      line-height: 1.5rem;
+    }
+
+    .recipe-preset {
+      padding: 0.3rem 0.5rem;
+      border: 1px solid var(--slate-600);
+      border-radius: 0.375rem;
+      background: var(--slate-700);
+      color: #CBD5E1;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    .recipe-preset:hover,
+    .recipe-preset:focus-visible {
+      border-color: var(--blue-500);
+      outline: none;
     }
 
     /* Each .param-group is a grid cell in the palette tabs, so drop the shared
@@ -93,8 +122,99 @@
 
     .recipe-controls {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
       gap: 0.625rem;
+    }
+
+    .recipe-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+    }
+
+    .recipe-group > h3 {
+      font-size: 0.9375rem;
+      line-height: 1.25rem;
+    }
+
+    .recipe-field {
+      display: grid;
+      grid-template-columns: minmax(4.75rem, 0.7fr) minmax(0, 1.3fr);
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 0;
+      transition: opacity 0.15s;
+    }
+
+    .recipe-field > label {
+      color: #CBD5E1;
+      font-size: 0.75rem;
+      font-weight: 600;
+      line-height: 1rem;
+    }
+
+    .recipe-field > select {
+      min-width: 0;
+      height: 1.75rem;
+      font-size: 0.8125rem;
+    }
+
+    .recipe-field.is-disabled {
+      opacity: 0.35;
+    }
+
+    .recipe-field :disabled {
+      cursor: not-allowed;
+    }
+
+    .recipe-slider {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+
+    .recipe-slider .slider-label {
+      width: 2.75rem;
+      flex-shrink: 0;
+      text-align: right;
+    }
+
+    #gen_status {
+      margin-top: 0.375rem;
+      min-height: 1rem;
+      font-size: 0.75rem;
+      line-height: 1rem;
+    }
+
+    .wave-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .diagnostic-legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.25rem 0.625rem;
+      color: #CBD5E1;
+      font-size: 0.6875rem;
+      line-height: 0.875rem;
+    }
+
+    .diagnostic-legend span::before {
+      display: inline-block;
+      width: 0.75rem;
+      height: 0.125rem;
+      margin-right: 0.25rem;
+      background: var(--legend-color);
+      vertical-align: middle;
+      content: '';
+    }
+
+    .diagnostic-legend[hidden] {
+      display: none;
     }
 
     .visualization-card {
@@ -310,6 +430,15 @@
         padding: 0.75rem;
       }
 
+      #tab-content-generative {
+        max-height: none;
+        overflow: visible;
+      }
+
+      #tab-content-generative .recipe-controls {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
       .wave-panel {
         grid-area: graph;
       }
@@ -483,7 +612,7 @@
         (Cosine)</button>
       <button id="tab-btn-generative" class="tab-btn" data-tab="generative"
         type="button" role="tab" aria-selected="false" tabindex="-1"
-        aria-controls="tab-content-generative">V2 Recipe</button>
+        aria-controls="tab-content-generative">Generative</button>
     </div>
 
     <div class="palette-body">
@@ -551,122 +680,140 @@
 
     <div id="tab-content-generative" class="tab-content" role="tabpanel"
       aria-labelledby="tab-btn-generative" hidden>
-      <h2 class="text-2xl font-semibold text-white mb-4">Generative Palette V2 Recipe</h2>
-      <div class="recipe-presets mb-4" aria-label="Reference recipe presets">
-        <button type="button" class="tab-btn" data-recipe-preset="balancedAnalogous">Balanced Analogous</button>
-        <button type="button" class="tab-btn" data-recipe-preset="isolightSpectralLoop">Isolight Spectral Loop</button>
-        <button type="button" class="tab-btn" data-recipe-preset="tonalMonochrome">Tonal Monochrome</button>
+      <div class="recipe-header">
+        <h2 class="font-semibold text-white">Generative Palette</h2>
+        <div class="recipe-presets" aria-label="Palette presets">
+          <button type="button" class="recipe-preset" data-recipe-preset="balancedAnalogous">Balanced</button>
+          <button type="button" class="recipe-preset" data-recipe-preset="isolightSpectralLoop">Rainbow Loop</button>
+          <button type="button" class="recipe-preset" data-recipe-preset="tonalMonochrome">Tonal</button>
+        </div>
       </div>
       <div class="recipe-controls">
-
-        <!-- Base Hue -->
-        <div class="param-group space-y-4 col-span-1">
-          <label for="gen_seed_slider" class="block text-lg font-bold text-blue-400">Base Hue</label>
-          <p class="text-xs text-gray-400">Hue only; it never reshuffles other controls.</p>
-          <div class="flex items-center space-x-2">
-            <span class="w-4 h-4 text-center font-bold text-blue-500" aria-hidden="true">H</span>
-            <input type="range" id="gen_seed_slider" min="0" max="255" step="1" value="42" class="b-thumb">
-            <span id="gen_seed_value" class="slider-label w-12 text-right">42</span>
+        <section class="param-group recipe-group" aria-labelledby="recipe_hue_heading">
+          <h3 id="recipe_hue_heading" class="font-bold text-blue-400">Hue</h3>
+          <div id="gen_seed_field" class="recipe-field">
+            <label for="gen_seed_slider">Starting Color</label>
+            <div class="recipe-slider">
+              <input type="range" id="gen_seed_slider" min="0" max="255" step="1" value="42" class="b-thumb">
+              <span id="gen_seed_value" class="slider-label">42</span>
+            </div>
           </div>
-        </div>
+          <div id="gen_hue_mode_field" class="recipe-field">
+            <label for="gen_hue_mode">Color Pattern</label>
+            <select id="gen_hue_mode" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+              <option value="HARMONY">Related Colors</option>
+              <option value="SWEEP">Rainbow Sweep</option>
+            </select>
+          </div>
+          <div id="gen_harmony_field" class="recipe-field">
+            <label for="gen_harmony">Color Relationship</label>
+            <select id="gen_harmony" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+              <option value="ANALOGOUS">Neighbors</option>
+              <option value="MONOCHROMATIC">One Hue</option>
+              <option value="ACCENTED_ANALOGOUS">Neighbors + Accent</option>
+              <option value="COMPLEMENTARY">Opposites</option>
+              <option value="SPLIT_COMPLEMENTARY">Split Opposites</option>
+              <option value="TRIADIC">Three-Way</option>
+            </select>
+          </div>
+        </section>
 
-        <div class="param-group space-y-4 col-span-1">
-          <label for="gen_hue_mode" class="block text-lg font-bold text-blue-400">Hue Mode</label>
-          <select id="gen_hue_mode" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-            <option value="HARMONY">Harmony</option>
-            <option value="SWEEP">Full Sweep</option>
-          </select>
-        </div>
+        <section class="param-group recipe-group" aria-labelledby="recipe_color_heading">
+          <h3 id="recipe_color_heading" class="font-bold text-yellow-400">Colorfulness</h3>
+          <div class="recipe-field">
+            <label for="gen_saturation">Amount</label>
+            <div class="recipe-slider">
+              <input type="range" id="gen_saturation" min="0" max="1" step="0.01" value="0.62">
+              <span id="gen_saturation_value" class="slider-label">0.62</span>
+            </div>
+          </div>
+          <div class="recipe-field">
+            <label for="gen_chroma_curve">Shape</label>
+            <select id="gen_chroma_curve" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+              <option value="CONSTANT">Even</option>
+              <option value="BELL">Strong Center</option>
+              <option value="ASCENDING">Increase</option>
+              <option value="DESCENDING">Decrease</option>
+              <option value="CUP">Soft Center</option>
+            </select>
+          </div>
+          <div id="gen_chroma_range_field" class="recipe-field">
+            <label for="gen_chroma_range">Variation</label>
+            <div class="recipe-slider">
+              <input type="range" id="gen_chroma_range" min="0" max="1" step="0.01" value="0">
+              <span id="gen_chroma_range_value" class="slider-label">0.00</span>
+            </div>
+          </div>
+        </section>
 
-        <div class="param-group space-y-4 col-span-1">
-          <label for="gen_harmony" class="block text-lg font-bold text-green-400">Harmony Type</label>
-          <p class="text-xs text-gray-400">Color relationship.</p>
-          <select id="gen_harmony" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-            <option value="ANALOGOUS">Analogous</option>
-            <option value="MONOCHROMATIC">Monochromatic</option>
-            <option value="ACCENTED_ANALOGOUS">Accented Analogous</option>
-            <option value="COMPLEMENTARY">Complementary</option>
-            <option value="SPLIT_COMPLEMENTARY">Split Complementary</option>
-            <option value="TRIADIC">Triadic</option>
-          </select>
-        </div>
+        <section class="param-group recipe-group" aria-labelledby="recipe_brightness_heading">
+          <h3 id="recipe_brightness_heading" class="font-bold text-red-400">Brightness</h3>
+          <div class="recipe-field">
+            <label for="gen_lightness_center">Overall Level</label>
+            <div class="recipe-slider">
+              <input type="range" id="gen_lightness_center" min="0.05" max="0.92" step="0.01" value="0.62">
+              <span id="gen_lightness_center_value" class="slider-label">0.62</span>
+            </div>
+          </div>
+          <div class="recipe-field">
+            <label for="gen_brightness">Shape</label>
+            <select id="gen_brightness" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+              <option value="CONSTANT">Even</option>
+              <option value="ASCENDING">Dark to Light</option>
+              <option value="DESCENDING">Light to Dark</option>
+              <option value="BELL">Bright Center</option>
+              <option value="CUP">Dark Center</option>
+            </select>
+          </div>
+          <div id="gen_lightness_range_field" class="recipe-field">
+            <label for="gen_lightness_range">Contrast</label>
+            <div class="recipe-slider">
+              <input type="range" id="gen_lightness_range" min="0" max="1" step="0.01" value="0">
+              <span id="gen_lightness_range_value" class="slider-label">0.00</span>
+            </div>
+          </div>
+        </section>
 
-        <div class="param-group space-y-4 col-span-1">
-          <label for="gen_saturation" class="block text-lg font-bold text-yellow-400">Gamut-relative Chroma</label>
-          <p class="text-xs text-gray-400">Fraction of available sRGB chroma.</p>
-          <input type="range" id="gen_saturation" min="0" max="1" step="0.01" value="0.62">
-          <span id="gen_saturation_value" class="slider-label">0.62</span>
-        </div>
-
-        <div class="param-group space-y-4 col-span-1">
-          <label for="gen_chroma_curve" class="block text-lg font-bold text-yellow-400">Chroma Curve</label>
-          <select id="gen_chroma_curve" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-            <option value="CONSTANT">Constant</option>
-            <option value="BELL">Bell</option>
-            <option value="ASCENDING">Ascending</option>
-            <option value="DESCENDING">Descending</option>
-            <option value="CUP">Cup</option>
-          </select>
-        </div>
-
-        <div class="param-group space-y-4 col-span-1">
-          <label for="gen_chroma_range" class="block text-lg font-bold text-yellow-400">Chroma Range</label>
-          <input type="range" id="gen_chroma_range" min="0" max="1" step="0.01" value="0">
-          <span id="gen_chroma_range_value" class="slider-label">0.00</span>
-        </div>
-
-        <!-- Brightness Profile -->
-        <div class="param-group space-y-4 col-span-1">
-          <label for="gen_brightness" class="block text-lg font-bold text-red-400">Lightness Curve</label>
-          <p class="text-xs text-gray-400">OKLab L distribution.</p>
-          <select id="gen_brightness" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-            <option value="CONSTANT">Constant</option>
-            <option value="ASCENDING">Ascending</option>
-            <option value="DESCENDING">Descending</option>
-            <option value="BELL">Bell</option>
-            <option value="CUP">Cup</option>
-          </select>
-        </div>
-
-        <!-- Gradient Shape -->
-        <div class="param-group space-y-4 col-span-1">
-          <label for="gen_shape" class="block text-lg font-bold text-purple-400">Domain</label>
-          <p class="text-xs text-gray-400">Spatial distribution.</p>
-          <select id="gen_shape" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-            <option value="STRAIGHT">Straight</option>
-            <option value="MIRROR">Mirror</option>
-            <option value="VIGNETTE">Vignette</option>
-            <option value="FALLOFF">Falloff</option>
-            <option value="LOOP">Loop</option>
-          </select>
-        </div>
-
-        <div class="param-group space-y-4 col-span-1">
-          <label for="gen_path" class="block text-lg font-bold text-purple-400">Color Path</label>
-          <select id="gen_path" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-            <option value="OKLCH_ARC">Colorful arc</option>
-            <option value="OKLAB_CARTESIAN">Neutral bridge</option>
-          </select>
-        </div>
-
-        <div class="param-group space-y-4 col-span-1">
-          <label for="gen_lightness_center" class="block text-lg font-bold text-gray-300">Lightness Center</label>
-          <input type="range" id="gen_lightness_center" min="0.05" max="0.92" step="0.01" value="0.62">
-          <span id="gen_lightness_center_value" class="slider-label">0.62</span>
-        </div>
-
-        <div class="param-group space-y-4 col-span-1">
-          <label for="gen_lightness_range" class="block text-lg font-bold text-gray-300">Lightness Range</label>
-          <input type="range" id="gen_lightness_range" min="0" max="1" step="0.01" value="0">
-          <span id="gen_lightness_range_value" class="slider-label">0.00</span>
-        </div>
+        <section class="param-group recipe-group" aria-labelledby="recipe_gradient_heading">
+          <h3 id="recipe_gradient_heading" class="font-bold text-purple-400">Gradient</h3>
+          <div class="recipe-field">
+            <label for="gen_shape">Layout</label>
+            <select id="gen_shape" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+              <option value="STRAIGHT">One Way</option>
+              <option value="MIRROR">Mirrored</option>
+              <option value="VIGNETTE">Dark Edges</option>
+              <option value="FALLOFF">Fade to Dark</option>
+              <option value="LOOP">Seamless Loop</option>
+            </select>
+          </div>
+          <div id="gen_path_field" class="recipe-field">
+            <label for="gen_path">Blend Style</label>
+            <select id="gen_path" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+              <option value="OKLCH_ARC">Follow Hue Wheel</option>
+              <option value="OKLAB_CARTESIAN">Blend Through Neutral</option>
+            </select>
+          </div>
+        </section>
       </div>
-      <p id="gen_status" class="mt-4 text-sm text-slate-300" role="status"></p>
+      <p id="gen_status" class="text-slate-300" role="status"></p>
     </div> <!-- End Generative Tab -->
 
     <!-- 2. RGB WAVE FUNCTIONS (GRAPH) -->
     <section class="param-group visualization-card wave-panel">
-      <h2 class="text-xl font-semibold text-white">RGB Wave Functions</h2> <canvas id="waveGraphCanvas" width="1024"
+      <div class="wave-heading">
+        <h2 id="wave_graph_title" class="font-semibold text-white">RGB Wave Functions</h2>
+        <div id="diagnostic_legend" class="diagnostic-legend" aria-label="Diagnostic curve legend" hidden>
+          <span style="--legend-color:#EF4444">Red</span>
+          <span style="--legend-color:#22C55E">Green</span>
+          <span style="--legend-color:#3B82F6">Blue</span>
+          <span style="--legend-color:#F8FAFC">Brightness</span>
+          <span style="--legend-color:#F59E0B">Gamut Use</span>
+          <span style="--legend-color:#A855F7">Chroma</span>
+          <span style="--legend-color:#EC4899">Gamut Limit</span>
+          <span style="--legend-color:#F43F5E">Gamut Fix</span>
+        </div>
+      </div>
+      <canvas id="waveGraphCanvas" width="1024"
         height="300" role="img"
         aria-label="Plot of the red, green and blue channel curves against phase t"></canvas>
     </section>
@@ -748,7 +895,7 @@
     // writes against the sliders and the Reset Zoom button stay inline.
     import {
       createZoomHistory, lockedGroupMove, defaultPaletteRecipe, PaletteV2,
-      PALETTE_RECIPE_PRESETS,
+      PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
     } from './palette_controls.js';
     // The two canvas painters take their canvas, context and palette as
     // arguments, so they live in their own module and are unit tested against a
@@ -782,6 +929,15 @@
       // Named Palettes loads procedural coefficients, so it only applies here.
       const palettesPanel = document.getElementById('named_palettes_panel');
       if (palettesPanel) palettesPanel.style.display = (tabName === 'procedural') ? '' : 'none';
+
+      const generative = tabName === 'generative';
+      document.getElementById('wave_graph_title').textContent = generative
+        ? 'Color & Gamut Diagnostics'
+        : 'RGB Wave Functions';
+      document.getElementById('diagnostic_legend').hidden = !generative;
+      document.getElementById('waveGraphCanvas').setAttribute('aria-label', generative
+        ? 'Generated color and gamut curves with gamut correction markers'
+        : 'Plot of the red, green and blue channel curves against phase t');
 
       // Update palette based on visible tab
       updatePalette();
@@ -820,6 +976,26 @@
       return recipe;
     }
 
+    function syncRecipeControlAvailability() {
+      const availability = paletteRecipeAvailability(readPaletteRecipe());
+      const controls = [
+        ['gen_seed_field', 'gen_seed_slider', availability.baseHue],
+        ['gen_hue_mode_field', 'gen_hue_mode', availability.hueMode],
+        ['gen_harmony_field', 'gen_harmony', availability.harmony],
+        ['gen_path_field', 'gen_path', availability.colorPath],
+        ['gen_chroma_range_field', 'gen_chroma_range', availability.chromaRange],
+        ['gen_lightness_range_field', 'gen_lightness_range', availability.lightnessRange],
+      ];
+
+      for (const [fieldId, controlId, enabled] of controls) {
+        const field = document.getElementById(fieldId);
+        const control = document.getElementById(controlId);
+        field.classList.toggle('is-disabled', !enabled);
+        field.setAttribute('aria-disabled', String(!enabled));
+        control.disabled = !enabled;
+      }
+    }
+
     function loadRecipePreset(name) {
       const recipe = PALETTE_RECIPE_PRESETS[name]();
       document.getElementById('gen_shape').value =
@@ -844,6 +1020,7 @@
       document.getElementById('gen_lightness_range_value').textContent = recipe.lightness.range.toFixed(2);
       document.getElementById('gen_saturation_value').textContent = recipe.chroma.center.toFixed(2);
       document.getElementById('gen_chroma_range_value').textContent = recipe.chroma.range.toFixed(2);
+      syncRecipeControlAvailability();
       scheduleUpdate();
     }
 
@@ -1543,7 +1720,10 @@
       ];
       dropdowns.forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.addEventListener('change', scheduleUpdate);
+        el?.addEventListener('change', () => {
+          syncRecipeControlAvailability();
+          scheduleUpdate();
+        });
       });
 
       for (const id of [
@@ -1554,6 +1734,7 @@
         const value = document.getElementById(`${id}_value`);
         slider?.addEventListener('input', () => {
           if (value) value.textContent = Number(slider.value).toFixed(2);
+          syncRecipeControlAvailability();
           scheduleUpdate();
         });
       }
@@ -1561,6 +1742,10 @@
       document.querySelectorAll('[data-recipe-preset]').forEach((button) => {
         button.addEventListener('click', () => loadRecipePreset(button.dataset.recipePreset));
       });
+
+      syncRecipeControlAvailability();
+
+      window.addEventListener('resize', scheduleUpdate);
 
       // 3. Add drag-and-drop listeners
       colorStripCanvas.addEventListener('pointerdown', handleDragStart);
@@ -1608,6 +1793,7 @@
       onPageTeardown(() => {
         teardownExportFlyout();
         scheduleUpdate.cancel();
+        window.removeEventListener('resize', scheduleUpdate);
         if (animationFrameId !== null) {
           cancelAnimationFrame(animationFrameId);
           animationFrameId = null;
