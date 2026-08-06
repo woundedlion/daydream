@@ -54,6 +54,22 @@ export function recipeForViewport(recipe, viewport) {
   return result;
 }
 
+export function axisEndpoints({ center, range }) {
+  return {
+    minimum: clampUnit(center - range * 0.5),
+    maximum: clampUnit(center + range * 0.5),
+  };
+}
+
+export function axisFromEndpoints(minimum, maximum) {
+  const low = Math.min(minimum, maximum);
+  const high = Math.max(minimum, maximum);
+  return {
+    center: (low + high) * 0.5,
+    range: high - low,
+  };
+}
+
 /**
  * Caps the shared delta a locked R/G/B group moves by so no member leaves its
  * own range, and reports each member's resulting value.
@@ -153,8 +169,8 @@ export function paletteRecipeAvailability(recipe) {
     hueMode: hasColor,
     harmony: hasColor && recipe.hue.mode === PaletteV2.hueMode.HARMONY,
     colorPath: hasColor && !monochromatic,
-    chromaRange: variedChroma,
-    lightnessRange: recipe.lightness.curve !== PaletteV2.curve.CONSTANT,
+    chromaMaximum: variedChroma,
+    lightnessMaximum: recipe.lightness.curve !== PaletteV2.curve.CONSTANT,
   };
 }
 
