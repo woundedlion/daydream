@@ -213,3 +213,76 @@ export function drawWaveGraph({ canvas, ctx, palette }) {
   // Area above 1 (between the band top and the value-1 line)
   ctx.fillRect(0, yTop, width, y1 - yTop);
 }
+
+const DIAGNOSTIC_CURVES = [
+  { key: 'L', color: '#F8FAFC', axis: 'left' },
+  { key: 'q', color: '#F59E0B', axis: 'left' },
+  { key: 'C', color: '#A855F7', axis: 'right' },
+  { key: 'Cmax', color: '#EC4899', axis: 'right' },
+];
+
+/**
+ * Draws engine-returned V2 diagnostics without reproducing palette math.
+ * @param {Object} opts
+ * @param {{width:number,height:number}} opts.canvas
+ * @param {Object} opts.ctx
+ * @param {{diagnosticAt:Function,getChannelValues:Function}} opts.palette
+ */
+export function drawRecipeDiagnostics({ canvas, ctx, palette }) {
+  if (!ctx) return;
+  const { width, height } = canvas;
+  const top = 24;
+  const bottom = height - 24;
+  const samples = Array.from({ length: width }, (_, x) => {
+    const t = width > 1 ? x / (width - 1) : 0;
+    return {
+      ...palette.diagnosticAt(t),
+      rgbFloat: palette.getChannelValues(t),
+    };
+  });
+  const chromaMax = Math.max(1e-6, ...samples.map((sample) => sample.Cmax));
+  const leftY = (value) => bottom - Math.max(0, Math.min(1, value)) * (bottom - top);
+  const rightY = (value) => bottom - (value / chromaMax) * (bottom - top);
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = '#1E293B';
+  ctx.fillRect(0, 0, width, height);
+
+  WAVE_COLORS.forEach((color, channel) => {
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    for (let x = 0; x < width; x += 1) {
+      const y = leftY(samples[x].rgbFloat[channel]);
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  });
+
+  for (const curve of DIAGNOSTIC_CURVES) {
+    ctx.beginPath();
+    ctx.strokeStyle = curve.color;
+    for (let x = 0; x < width; x += 1) {
+      const value = samples[x][curve.key];
+      const y = curve.axis === 'left' ? leftY(value) : rightY(value);
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = '#F43F5E';
+  for (let x = 0; x < width; x += 1) {
+    if (!samples[x].fallbackMapped) continue;
+    ctx.beginPath();
+    ctx.moveTo(x, top);
+    ctx.lineTo(x, bottom);
+    ctx.stroke();
+  }
+
+  if (ctx.fillText) {
+    ctx.fillStyle = '#CBD5E1';
+    ctx.fillText('sRGB / L / q [0,1]', 6, 14);
+    ctx.fillText(`C [0,${chromaMax.toFixed(3)}]`, Math.max(6, width - 110), 14);
+  }
+}

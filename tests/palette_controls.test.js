@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { createZoomHistory, lockedGroupMove, ZOOMED_PARAMS } =
+const {
+  createZoomHistory, lockedGroupMove, ZOOMED_PARAMS,
+  PaletteV2, defaultPaletteRecipe, PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
+} =
   await import('../tools/palette_controls.js');
 
 /** The 12-coefficient shape the palette page holds, with recognizable C/D values. */
@@ -114,4 +117,49 @@ test('negative raw bounds cap correctly', () => {
   }));
   assert.equal(lockedGroupMove(-2000, members).delta, -1000);
   assert.equal(lockedGroupMove(2000, members).delta, 1000);
+});
+
+test('the default recipe is a detached, complete V2 value', () => {
+  const first = defaultPaletteRecipe();
+  const second = defaultPaletteRecipe();
+  first.hue.customTurns[0] = 0.5;
+
+  assert.equal(first.schemaVersion, 2);
+  assert.equal(first.chroma.basis, PaletteV2.chromaBasis.LOCAL_GAMUT);
+  assert.equal(second.hue.customTurns[0], 0);
+});
+
+test('recipe presets express distinct high-level intents', () => {
+  const loop = PALETTE_RECIPE_PRESETS.isolightSpectralLoop();
+  const tonal = PALETTE_RECIPE_PRESETS.tonalMonochrome();
+
+  assert.equal(loop.domain, PaletteV2.domain.LOOP);
+  assert.equal(loop.hue.mode, PaletteV2.hueMode.SWEEP);
+  assert.equal(tonal.hue.harmony, PaletteV2.harmony.MONOCHROMATIC);
+  assert.equal(tonal.lightness.curve, PaletteV2.curve.ASCENDING);
+});
+
+test('recipe state rejects stale compiler results', () => {
+  const state = createPaletteRecipeState();
+  const oldRevision = state.value.revision;
+  const revision = state.edit(recipe => { recipe.hue.baseTurns = 0.25; });
+
+  assert.equal(state.applyCompileResult(oldRevision, {
+    status: { code: 0 }, canonicalRecipe: defaultPaletteRecipe(),
+  }), false);
+  assert.equal(state.applyCompileResult(revision, {
+    status: { code: 0 }, canonicalRecipe: state.value.draft,
+  }), true);
+  assert.equal(state.value.canonical.hue.baseTurns, 0.25);
+});
+
+test('recipe state never exposes mutable internal values', () => {
+  const state = createPaletteRecipeState();
+  const view = state.value;
+  view.draft.hue.baseTurns = 0.75;
+  assert.equal(state.value.draft.hue.baseTurns, 0);
+
+  state.replace(PALETTE_RECIPE_PRESETS.tonalMonochrome());
+  assert.equal(state.value.canonical, null);
+  assert.equal(state.value.status, null);
 });

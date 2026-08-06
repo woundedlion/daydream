@@ -3,17 +3,10 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-// Pure palette math mirroring the engine's ProceduralPalette and
-// GenerativePalette so the browser tool can predict device colors. Parity is
-// close, not exact, on either path:
-//   - ProceduralPalette evaluates the cosine with the engine's fast_cosf
-//     approximation (so the curve matches the device) and linearizes with an
-//     exact pow; only the linearization differs from the device's interpolated
-//     16-bit-linear LUT, by up to ~1 LSB per channel.
-//   - GenerativePalette previews via a sampler reconstructing each entry from
-//     the WASM bridge's 8-bit sRGB LUT, not the engine's native 16-bit-linear
-//     BakedPalette. The interpolation domain matches (linear), but the 8-bit
-//     source quantization can diverge by MORE than ~1 LSB, most in dark tones.
+// ProceduralPalette mirrors the engine's cosine approximation. GenerativePalette
+// samples engine-compiled 8-bit sRGB LUTs and interpolates them in linear light.
+// The device evaluates its native palette at 16-bit precision, so the browser
+// preview can differ most in dark tones.
 
 import { srgbToLinearFloat, linearToSrgbFloat } from './color.js';
 import { formatFloatCpp } from './cpp_format.js';
@@ -34,21 +27,15 @@ function fastSin(x) {
 function fastCos(x) { return fastSin(x + Math.PI * 0.5); }
 
 // --- WASM color-math bridge -------------------------------------------------
-// The engine's PaletteOps.bakeLut is injected via setPaletteOps; this module
-// calls it for the exact colors and mirrors the engine's seeded profile draws.
-let bakeLut = null;
+let paletteOps = null;
 
 /**
- * Injects the WASM PaletteOps bridge GenerativePalette uses to bake its LUT.
- * @param {((shape:number, h1:number, s1:number, v1:number, h2:number, s2:number, v2:number, h3:number, s3:number, v3:number) => (Uint8Array|number[])) | null} fn
- *   Returns a 256*3 sRGB LUT; entry i is the palette sampled at t = i/255.
+ * Installs the module-lifetime PaletteOps instance.
+ * @param {{compileAndBakeV2:Function, inspectV2:Function}|null} ops
  */
-export function setPaletteOps(fn) {
-  bakeLut = fn;
+export function setPaletteOps(ops) {
+  paletteOps = ops;
 }
-
-// GradientShape enum order, mirrored from core/color/color.h (STRAIGHT=0 .. FALLOFF=3).
-const GRADIENT_SHAPE_INDEX = { STRAIGHT: 0, CIRCULAR: 1, VIGNETTE: 2, FALLOFF: 3 };
 
 /**
  * The core procedural palette, defined by C(t) = A + B * cos(TWO_PI * (C * t + D)).
@@ -160,217 +147,85 @@ export function proceduralPaletteParams({ a, b, c, d }) {
   };
 }
 
-// --- Generative Palette Implementation ---
-
-// Mirror of the engine's hash01 (core/math/3dmath.h): the PCG RXS-M-XS output
-// hash, in 32-bit unsigned arithmetic.
-function hash01(i, seed) {
-  seed >>>= 0;
-  let h = (Math.imul((i ^ seed) >>> 0, 747796405) + 2891336453) >>> 0;
-  h = Math.imul(((h >>> ((h >>> 28) + 4)) ^ h ^ seed) >>> 0, 277803737) >>> 0;
-  h = ((h >>> 22) ^ h) >>> 0;
-  return (h >>> 8) / 16777216;
-}
+// --- Generative Palette V2 --------------------------------------------------
 
 /**
- * Mirror of GenerativePalette::seeded_rand_int (core/color/color.h): the
- * seed-hashed setup draw the engine makes when the palette pins its base hue,
- * so a preview reproduces the exported palette rather than merely its ranges.
- * @param {number} seed - Palette seed, i.e. the base hue in 0..255.
- * @param {number} site - Draw-site index, distinct per engine call site.
- * @param {number} min - Inclusive lower bound.
- * @param {number} max - Exclusive upper bound.
- * @returns {number} The drawn integer in [min, max).
+ * Compiles a recipe with the engine and copies its aliased module buffers.
+ * @param {Object} recipe
+ * @param {boolean} inspect
+ * @returns {Object}
  */
-export function seededRandInt(seed, site, min, max) {
-  if (max <= min) return min;
-  const u = hash01(seed, Math.imul(site, 0x9E3779B9) >>> 0);
-  // fround: the engine scales the draw in single precision before truncating.
-  return min + Math.trunc(Math.fround(u * (max - min)));
+export function compilePaletteRecipe(recipe, inspect = true) {
+  if (!paletteOps) {
+    throw new Error('PaletteOps bridge is not initialized');
+  }
+  const result = inspect
+    ? paletteOps.inspectV2(recipe)
+    : paletteOps.compileAndBakeV2(recipe);
+  const copied = {
+    status: { ...result.status },
+    canonicalRecipe: result.canonicalRecipe
+      ? structuredClone(result.canonicalRecipe)
+      : undefined,
+  };
+  if (result.lut) copied.lut = Uint8Array.from(result.lut);
+  if (result.diagnostics) copied.diagnostics = Float32Array.from(result.diagnostics);
+  if (result.fallback) copied.fallback = Uint8Array.from(result.fallback);
+  return copied;
 }
 
-/**
- * Builds a 3-color gradient palette from high-level profile strings (gradient
- * shape, color harmony, brightness/saturation profiles) plus a base hue,
- * mirroring the engine's GenerativePalette so the tool previews device output.
- */
 export class GenerativePalette {
   /**
-   * Resolves the profile strings into three anchor colors and gradient stops.
-   * satProfile/brightnessProfile values pick fixed or seed-hashed HSV ranges
-   * (h, s, v in 0..255) for the three anchor colors a/b/c.
-   * @param {string} gradientShape - Gradient-shape profile (e.g. "VIGNETTE", "STRAIGHT").
-   * @param {string} harmonyType - Color-harmony rule (e.g. "TRIADIC", "ANALOGOUS").
-   * @param {string} brightnessProfile - Brightness profile (e.g. "ASCENDING", "BELL").
-   * @param {string} satProfile - Saturation profile ("PASTEL", "MID", "VIBRANT").
-   * @param {number} hueValue - Base hue in 0..255.
+   * @param {Object} recipe
    */
-  constructor(gradientShape, harmonyType, brightnessProfile, satProfile, hueValue) {
-    this.gradientShape = gradientShape;
-    this.harmonyType = harmonyType;
-
-    assertMember('GradientShape', gradientShape, GRADIENT_SHAPES);
-    assertMember('HarmonyType', harmonyType, HARMONY_TYPES);
-    assertMember('BrightnessProfile', brightnessProfile, BRIGHTNESS_PROFILES);
-    assertMember('SaturationProfile', satProfile, SATURATION_PROFILES);
-
-    const h1 = hueValue;
-    const { h2, h3 } = this.calcHues(h1, harmonyType, hueValue);
-
-    let s1 = 0, s2 = 0, s3 = 0;
-    switch (satProfile) {
-      case "PASTEL":
-        s1 = s2 = s3 = 100;
-        break;
-      case "MID":
-        s1 = seededRandInt(hueValue, 4, 153, 204);
-        s2 = seededRandInt(hueValue, 5, 153, 204);
-        s3 = seededRandInt(hueValue, 6, 153, 204);
-        break;
-      case "VIBRANT":
-        s1 = s2 = s3 = 255;
-        break;
-    }
-
-    let v1 = 0, v2 = 0, v3 = 0;
-    switch (brightnessProfile) {
-      case "ASCENDING":
-        v1 = seededRandInt(hueValue, 7, 25, 76);
-        v2 = seededRandInt(hueValue, 8, 127, 178);
-        v3 = seededRandInt(hueValue, 9, 204, 256);
-        break;
-      case "DESCENDING":
-        v1 = seededRandInt(hueValue, 7, 204, 256);
-        v2 = seededRandInt(hueValue, 8, 127, 178);
-        v3 = seededRandInt(hueValue, 9, 25, 76);
-        break;
-      case "FLAT":
-        v1 = v2 = v3 = 255;
-        break;
-      case "BELL":
-        v1 = seededRandInt(hueValue, 7, 51, 127);
-        v2 = seededRandInt(hueValue, 8, 178, 256);
-        v3 = v1;
-        break;
-      case "CUP":
-        v1 = seededRandInt(hueValue, 7, 178, 256);
-        v2 = seededRandInt(hueValue, 8, 51, 127);
-        v3 = v1;
-        break;
-    }
-
-    const shapeIndex = GRADIENT_SHAPE_INDEX[this.gradientShape];
-    if (!bakeLut) {
+  constructor(recipe) {
+    const result = compilePaletteRecipe(recipe, true);
+    if (result.status.code !== 0) {
       throw new Error(
-        'PaletteOps bridge not initialized: call setPaletteOps() with the WASM ' +
-        'PaletteOps.bakeLut before constructing a GenerativePalette.');
+        `Palette recipe error ${result.status.code} at field ${result.status.field}`);
     }
-    // Copy out of the WASM memory view: it aliases the module buffer and the
-    // next bake invalidates it.
-    this.lut = Uint8Array.from(
-      bakeLut(shapeIndex, h1, s1, v1, h2, s2, v2, h3, s3, v3));
+    this.canonicalRecipe = result.canonicalRecipe;
+    this.lut = result.lut;
+    this.diagnostics = result.diagnostics;
+    this.fallback = result.fallback;
   }
 
-  /**
-   * Wraps a hue into 0..255, handling negative values (JS % can go negative).
-   * @param {number} hue - Hue value, possibly out of range or negative.
-   * @returns {number} Equivalent hue in 0..255.
-   */
-  wrapHue(hue) {
-    return ((hue % 256) + 256) % 256;
-  }
-
-  /**
-   * Derives the two companion hues (h2, h3) from base hue h1 per the color-harmony
-   * rule. Offsets are in the 0..255 hue space (85 ≈ 120°, 128 ≈ 180°).
-   * @param {number} h1 - Base hue in 0..255.
-   * @param {string} harmonyType - Color-harmony rule (e.g. "TRIADIC", "ANALOGOUS").
-   * @param {number} seed - Palette seed for the jittered harmonies' draws.
-   * @returns {{h2:number, h3:number}} The two companion hues in 0..255.
-   */
-  calcHues(h1, harmonyType, seed) {
-    let h2, h3;
-    switch (harmonyType) {
-      case "TRIADIC":
-        h2 = this.wrapHue(h1 + 85);
-        h3 = this.wrapHue(h1 + 170);
-        break;
-      case "SPLIT_COMPLEMENTARY": {
-        const complement = this.wrapHue(h1 + 128);
-        h2 = this.wrapHue(complement - 21);
-        h3 = this.wrapHue(complement + 21);
-        break;
-      }
-      case "COMPLEMENTARY":
-        h2 = this.wrapHue(h1 + 128);
-        h3 = this.wrapHue(h1 + seededRandInt(seed, 0, -7, 8));
-        break;
-      case "ANALOGOUS": {
-        const dir = (seededRandInt(seed, 1, 0, 2) === 0) ? 1 : -1;
-        h2 = this.wrapHue(h1 + dir * seededRandInt(seed, 2, 11, 22));
-        h3 = this.wrapHue(h2 + dir * seededRandInt(seed, 3, 11, 22));
-        break;
-      }
-      default:
-        throw new Error(`PaletteMath.calcHues: unknown harmonyType "${harmonyType}" ` +
-          `(expected one of ${[...HARMONY_TYPES].join(', ')})`);
-    }
-    return { h2, h3 };
-  }
-
-  /**
-   * Samples the engine-baked gradient LUT at t, interpolating between adjacent
-   * entries in linear light. Domain-verified against the engine: BakedPalette::get
-   * (core/color/composition.h) lerps between two linear-light Color4 LUT entries (lerp16), so
-   * converting each sRGB-8bit entry here to linear first and lerping in linear
-   * matches the engine's interpolation DOMAIN (linear, not sRGB). Note the
-   * SOURCE precision does not match: `this.lut` is the bridge's 8-bit sRGB LUT,
-   * while the engine's BakedPalette holds 16-bit linear entries — so this
-   * reconstruction can diverge by more than ~1 LSB (see the module header),
-   * most in dark tones. Close, not exact.
-   * @param {number} t - Time parameter in [0, 1] (clamped).
-   * @returns {number[]} Linear [R, G, B] float values.
-   */
   get(t) {
-    const sample = (i) => [
-      srgbToLinearFloat(this.lut[3 * i] / 255),
-      srgbToLinearFloat(this.lut[3 * i + 1] / 255),
-      srgbToLinearFloat(this.lut[3 * i + 2] / 255),
-    ];
-    const idx = Math.max(0, Math.min(1, t)) * 255;
-    const lo = Math.floor(idx);
-    if (lo >= 255) return sample(255);
-    const frac = idx - lo;
-    const a = sample(lo);
-    const b = sample(lo + 1);
-    return [
-      a[0] + (b[0] - a[0]) * frac,
-      a[1] + (b[1] - a[1]) * frac,
-      a[2] + (b[2] - a[2]) * frac,
-    ];
+    const index = Math.max(0, Math.min(255, Number.isNaN(t) ? 255 : t * 255));
+    const left = Math.floor(index);
+    const right = Math.min(255, left + 1);
+    const weight = index - left;
+    const color = [];
+    for (let channel = 0; channel < 3; channel += 1) {
+      const a = srgbToLinearFloat(this.lut[left * 3 + channel] / 255);
+      const b = srgbToLinearFloat(this.lut[right * 3 + channel] / 255);
+      color.push(a + (b - a) * weight);
+    }
+    return color;
   }
 
-  /**
-   * The sRGB sample at t, for curve plotting. Takes the linear triple from
-   * get(t) back to sRGB so the wave graph plots the same domain as
-   * ProceduralPalette (raw sRGB) and the 8-bit sRGB form the device bakes and
-   * exports.
-   * @param {number} t - Time parameter in [0, 1].
-   * @returns {number[]} sRGB values as [R, G, B].
-   */
   getChannelValues(t) {
-    const [r, g, b] = this.get(t);
-    return [linearToSrgbFloat(r), linearToSrgbFloat(g), linearToSrgbFloat(b)];
+    return this.get(t).map(linearToSrgbFloat);
   }
 
-  /**
-   * One channel of the sRGB sample at t.
-   * @param {number} t - Time parameter in [0, 1].
-   * @param {number} channelIndex - Channel to sample (0=R, 1=G, 2=B).
-   * @returns {number} sRGB value for the channel.
-   */
   getChannelValue(t, channelIndex) {
     return this.getChannelValues(t)[channelIndex];
+  }
+
+  diagnosticAt(t) {
+    const index = Math.max(0, Math.min(255, Math.round(t * 255)));
+    const offset = index * 6;
+    return {
+      t: index / 255,
+      rgb: Array.from(this.lut.slice(index * 3, index * 3 + 3)),
+      L: this.diagnostics[offset],
+      C: this.diagnostics[offset + 1],
+      q: this.diagnostics[offset + 2],
+      Cmax: this.diagnostics[offset + 3],
+      hPath: this.diagnostics[offset + 4],
+      hFinal: this.diagnostics[offset + 5],
+      fallbackMapped: this.fallback[index] !== 0,
+    };
   }
 }
 
@@ -449,44 +304,73 @@ export function proceduralPaletteCpp(parameters) {
                           ${v(parameters.D_R, parameters.D_G, parameters.D_B)}); // D`;
 }
 
-// The four GenerativePalette enum sets, mirrored from core/color/color.h. A token
-// outside these sets would paste a nonexistent enumerator into the emitted C++,
-// so generativePaletteCpp rejects it at the source.
-export const GRADIENT_SHAPES = new Set(Object.keys(GRADIENT_SHAPE_INDEX));
-export const HARMONY_TYPES = new Set(['TRIADIC', 'SPLIT_COMPLEMENTARY', 'COMPLEMENTARY', 'ANALOGOUS']);
-export const BRIGHTNESS_PROFILES = new Set(['ASCENDING', 'DESCENDING', 'FLAT', 'BELL', 'CUP']);
-export const SATURATION_PROFILES = new Set(['PASTEL', 'MID', 'VIBRANT']);
+const ENUM_NAMES = Object.freeze({
+  domain: ['STRAIGHT', 'MIRROR', 'VIGNETTE', 'FALLOFF', 'LOOP'],
+  easing: ['LINEAR', 'COSINE', 'SMOOTHSTEP'],
+  colorPath: ['OKLCH_ARC', 'OKLAB_CARTESIAN'],
+  hueMode: ['HARMONY', 'SWEEP', 'CUSTOM'],
+  harmony: [
+    'MONOCHROMATIC',
+    'ANALOGOUS',
+    'ACCENTED_ANALOGOUS',
+    'COMPLEMENTARY',
+    'SPLIT_COMPLEMENTARY',
+    'TRIADIC',
+  ],
+  direction: ['SHORTEST', 'CLOCKWISE', 'COUNTERCLOCKWISE'],
+  curve: ['CONSTANT', 'ASCENDING', 'DESCENDING', 'BELL', 'CUP', 'CUSTOM'],
+  chromaBasis: ['LOCAL_GAMUT', 'PATH_MINIMUM', 'ABSOLUTE'],
+});
 
-/**
- * Throws if `token` is not in `allowed`, naming the value and the permitted set.
- * Shared by GenerativePalette and generativePaletteCpp so the preview and the
- * C++ export reject the same vocabulary with one error format.
- * @param {string} label - Enum name shown in the error (e.g. "GradientShape").
- * @param {string} token - The candidate value to validate.
- * @param {Set<string>} allowed - The permitted values.
- */
-function assertMember(label, token, allowed) {
-  if (!allowed.has(token)) {
-    throw new Error(`unknown ${label} "${token}" ` +
-      `(expected one of ${[...allowed].join(', ')})`);
-  }
+function enumName(group, value) {
+  const name = ENUM_NAMES[group]?.[value];
+  if (!name) throw new Error(`unknown ${group} enum value ${value}`);
+  return name;
+}
+
+function cppFloat3(values) {
+  return `{${values.map((value) => formatFloatCpp(value, 6)).join(', ')}}`;
 }
 
 /**
- * Emit the generative-tab C++ initializer. Passing the base hue pins the
- * engine's setup draws to the seed-hashed path, so the emitted palette
- * reproduces the preview rather than only its profiles.
- * @param {{shape:string,harmony:string,brightness:string,sat:string,hueValue:number}} opts - Gradient shape, harmony, brightness/saturation profiles and base hue.
- * @returns {string} The C++ GenerativePalette initializer source.
+ * Serializes a complete canonical V2 recipe.
+ * @param {Object} recipe
+ * @returns {string}
  */
-export function generativePaletteCpp({ shape, harmony, brightness, sat, hueValue }) {
-  assertMember('GradientShape', shape, GRADIENT_SHAPES);
-  assertMember('HarmonyType', harmony, HARMONY_TYPES);
-  assertMember('BrightnessProfile', brightness, BRIGHTNESS_PROFILES);
-  assertMember('SaturationProfile', sat, SATURATION_PROFILES);
-  if (!Number.isInteger(hueValue) || hueValue < 0 || hueValue > 255) {
-    throw new Error(`generativePaletteCpp: hueValue ${hueValue} must be an ` +
-      `integer in 0..255`);
-  }
-  return `GenerativePalette palette{\n    GradientShape::${shape}, HarmonyType::${harmony},\n    BrightnessProfile::${brightness}, SaturationProfile::${sat}, ${hueValue}};`;
+export function generativePaletteCpp(recipe) {
+  const f = (value) => formatFloatCpp(value, 6);
+  return `PaletteRecipe recipe;
+recipe.schema_version = ${recipe.schemaVersion};
+recipe.domain = PaletteDomain::${enumName('domain', recipe.domain)};
+recipe.easing = SegmentEase::${enumName('easing', recipe.easing)};
+recipe.color_path = ColorPath::${enumName('colorPath', recipe.colorPath)};
+recipe.hue.mode = HueMode::${enumName('hueMode', recipe.hue.mode)};
+recipe.hue.harmony = PaletteHarmony::${enumName('harmony', recipe.hue.harmony)};
+recipe.hue.direction = HueDirection::${enumName('direction', recipe.hue.direction)};
+recipe.hue.base_turns = ${f(recipe.hue.baseTurns)};
+recipe.hue.spread_turns = ${f(recipe.hue.spreadTurns)};
+recipe.hue.sweep_turns = ${f(recipe.hue.sweepTurns)};
+recipe.hue.custom_turns = ${cppFloat3(recipe.hue.customTurns)};
+recipe.lightness.curve = AxisCurve::${enumName('curve', recipe.lightness.curve)};
+recipe.lightness.center = ${f(recipe.lightness.center)};
+recipe.lightness.range = ${f(recipe.lightness.range)};
+recipe.lightness.custom = ${cppFloat3(recipe.lightness.custom)};
+recipe.chroma.curve = AxisCurve::${enumName('curve', recipe.chroma.curve)};
+recipe.chroma.basis = ChromaBasis::${enumName('chromaBasis', recipe.chroma.basis)};
+recipe.chroma.center = ${f(recipe.chroma.center)};
+recipe.chroma.range = ${f(recipe.chroma.range)};
+recipe.chroma.headroom = ${f(recipe.chroma.headroom)};
+recipe.chroma.custom = ${cppFloat3(recipe.chroma.custom)};
+recipe.hue_torsion = ${f(recipe.hueTorsion)};
+recipe.falloff_start = ${f(recipe.falloffStart)};
+GenerativePalette palette;
+PaletteRecipe canonical;
+PaletteCompileStatus status;
+HS_CHECK(GenerativePalette::try_compile(recipe, palette, canonical, status),
+         "Palette recipe error %d at field %d", static_cast<int>(status.code),
+         static_cast<int>(status.field));`;
+}
+
+export function paletteRecipeJson(recipe) {
+  return JSON.stringify(recipe, null, 2);
 }

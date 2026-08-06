@@ -541,12 +541,29 @@ test('PaletteOps exposes the method surface the palette tool drives', () => {
     'the module must export PaletteOps');
   const ops = new M.PaletteOps();
   try {
-    assert.equal(typeof ops.bakeLut, 'function',
-      'PaletteOps is missing bakeLut (palettes.html calls it)');
-    // STRAIGHT gradient over three in-range HSV keys.
-    const lut = ops.bakeLut(0, 0, 255, 255, 85, 255, 255, 170, 255, 255);
-    assert.ok(lut instanceof Uint8Array, 'bakeLut must return a Uint8Array');
-    assert.equal(lut.length, 256 * 3, 'bakeLut length must be 256*3');
+    assert.equal(typeof ops.compileAndBakeV2, 'function');
+    assert.equal(typeof ops.inspectV2, 'function');
+    assert.equal(ops.bakeLut, undefined);
+    const recipe = {
+      schemaVersion: 2, domain: 0, easing: 1, colorPath: 0,
+      hue: {
+        mode: 0, harmony: 1, direction: 0, baseTurns: 0,
+        spreadTurns: 0.07, sweepTurns: 1, customTurns: [0, 0, 0],
+      },
+      lightness: { curve: 0, center: 0.62, range: 0, custom: [0, 0, 0] },
+      chroma: {
+        curve: 0, basis: 0, center: 0.62, range: 0,
+        headroom: 0.94, custom: [0, 0, 0],
+      },
+      hueTorsion: 0, falloffStart: 0.9,
+    };
+    const compiled = ops.compileAndBakeV2(recipe);
+    assert.equal(compiled.status.code, 0);
+    assert.ok(compiled.lut instanceof Uint8Array);
+    assert.equal(compiled.lut.length, 256 * 3);
+    const inspected = ops.inspectV2(recipe);
+    assert.equal(inspected.diagnostics.length, 256 * 6);
+    assert.equal(inspected.fallback.length, 256);
   } finally {
     ops.delete();
   }
