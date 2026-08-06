@@ -31,21 +31,25 @@ import { waveGraphBand } from './palette_math.js';
 export function createColorStripPainter({ canvas, ctx, doc = document }) {
   let cache = null;
   let dirty = true;
+  let cachedViewStart = null;
+  let cachedViewEnd = null;
 
   /**
    * Repaints the offscreen gradient when the palette or the canvas size changed.
    * @param {{get: Function}} palette - Palette sampled per column.
    * @param {number} width - Canvas width.
    * @param {number} height - Canvas height.
+   * @param {{start: number, end: number}} view - Phase window shown by the strip.
    * @returns {void}
    */
-  function refreshCache(palette, width, height) {
+  function refreshCache(palette, width, height, view) {
     if (!cache || cache.width !== width || cache.height !== height) {
       cache = doc.createElement('canvas');
       cache.width = width;
       cache.height = height;
       dirty = true;
     }
+    if (view.start !== cachedViewStart || view.end !== cachedViewEnd) dirty = true;
     if (!dirty) return;
 
     const cacheCtx = cache.getContext('2d');
@@ -53,8 +57,9 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
     const data = imageData.data;
 
     for (let x = 0; x < width; x++) {
-      const tx = x / (width - 1);
-      const [r, g, b] = palette.get(tx); // Get color in [0, 1] range
+      const position = width === 1 ? 0 : x / (width - 1);
+      const phase = view.start + position * (view.end - view.start);
+      const [r, g, b] = palette.get(phase);
 
       // Plain 8-bit round, no dither: the strip mirrors the device's own
       // 16->8 truncation (the LED output applies no dithering), so the
@@ -74,6 +79,8 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
       }
     }
     cacheCtx.putImageData(imageData, 0, 0);
+    cachedViewStart = view.start;
+    cachedViewEnd = view.end;
     dirty = false;
   }
 
@@ -90,20 +97,22 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
      * Draws the color strip, the time marker, and an optional selection overlay.
      * @param {{get: Function}} palette - The palette to render.
      * @param {number} t - The current time parameter (0 to 1) for the marker position.
-     * @param {{start: number, end: number}|null} [selectionRange] - Drag selection, in the same 0..1 domain.
+     * @param {{start: number, end: number}|null} [selectionRange] - Drag selection as strip positions.
+     * @param {{start: number, end: number}} [view] - Phase window shown by the strip.
      * @returns {void}
      */
-    draw(palette, t, selectionRange = null) {
+    draw(palette, t, selectionRange = null, view = { start: 0, end: 1 }) {
       if (!ctx) return;
       const width = canvas.width;
       const height = canvas.height;
 
-      refreshCache(palette, width, height);
+      refreshCache(palette, width, height, view);
 
       // Blit the cached gradient (also clears the previous marker).
       ctx.drawImage(cache, 0, 0);
 
-      const markerX = Math.round(t * (width - 1));
+      const markerPosition = (t - view.start) / (view.end - view.start);
+      const markerX = Math.round(Math.max(0, Math.min(1, markerPosition)) * (width - 1));
 
       ctx.strokeStyle = '#FFFFFF'; // Bright white marker
       ctx.lineWidth = 2;

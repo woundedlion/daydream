@@ -2,73 +2,49 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const {
-  createZoomHistory, lockedGroupMove, ZOOMED_PARAMS,
+  createPaletteViewport, lockedGroupMove,
   PaletteV2, defaultPaletteRecipe, PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
   paletteRecipeAvailability,
 } =
   await import('../tools/palette_controls.js');
 
-/** The 12-coefficient shape the palette page holds, with recognizable C/D values. */
-const params = () => ({
-  A_R: 0.5, A_G: 0.5, A_B: 0.5,
-  B_R: 0.5, B_G: 0.5, B_B: 0.5,
-  C_R: 1, C_G: 2, C_B: 3,
-  D_R: 0.1, D_G: 0.2, D_B: 0.3,
+test('the palette viewport maps strip positions onto its visible phase window', () => {
+  const viewport = createPaletteViewport();
+  assert.equal(viewport.map(0.25), 0.25);
+  assert.equal(viewport.zoomed, false);
+
+  viewport.zoom(0.2, 0.6);
+  assert.deepEqual(viewport.value, { start: 0.2, end: 0.6 });
+  assert.equal(viewport.map(0.25), 0.3);
+  assert.ok(Math.abs(viewport.positionOf(0.4) - 0.5) < 1e-12);
+  assert.equal(viewport.zoomed, true);
 });
 
-/** Verifies a fresh history holds nothing and has nothing to restore. */
-test('a fresh zoom history is empty', () => {
-  const history = createZoomHistory();
-  assert.equal(history.zoomed, false);
-  assert.equal(history.restore(), null);
+test('successive palette viewport zooms compose in either drag direction', () => {
+  const viewport = createPaletteViewport();
+  viewport.zoom(0.2, 0.8);
+  viewport.zoom(0.75, 0.25);
+  assert.ok(Math.abs(viewport.value.start - 0.35) < 1e-12);
+  assert.ok(Math.abs(viewport.value.end - 0.65) < 1e-12);
 });
 
-/** Verifies a capture snapshots exactly the frequency/phase coefficients a zoom rewrites. */
-test('capture snapshots only the frequency and phase coefficients', () => {
-  const history = createZoomHistory();
-  history.capture(params());
-  assert.equal(history.zoomed, true);
-
-  const restored = history.restore();
-  assert.deepEqual(Object.keys(restored).sort(), [...ZOOMED_PARAMS].sort());
-  assert.deepEqual(restored, { C_R: 1, C_G: 2, C_B: 3, D_R: 0.1, D_G: 0.2, D_B: 0.3 });
+test('the palette viewport clamps and wraps phases within the visible window', () => {
+  const viewport = createPaletteViewport();
+  viewport.zoom(0.2, 0.6);
+  assert.equal(viewport.clamp(0), 0.2);
+  assert.equal(viewport.clamp(1), 0.6);
+  assert.ok(Math.abs(viewport.wrap(0.7) - 0.3) < 1e-12);
+  assert.ok(Math.abs(viewport.wrap(0.1) - 0.5) < 1e-12);
 });
 
-/** Verifies the snapshot is a copy, so later parameter edits cannot mutate the history. */
-test('the snapshot is detached from the live parameter object', () => {
-  const history = createZoomHistory();
-  const live = params();
-  history.capture(live);
-  live.C_R = 99;
-  assert.equal(history.restore().C_R, 1);
-});
-
-/** Verifies successive zooms keep the FIRST pre-zoom state, so reset returns to the start. */
-test('a second capture does not overwrite the first pre-zoom state', () => {
-  const history = createZoomHistory();
-  history.capture(params());
-  history.capture({ ...params(), C_R: 0.25, D_R: 0.9 });
-  const restored = history.restore();
-  assert.equal(restored.C_R, 1);
-  assert.equal(restored.D_R, 0.1);
-});
-
-/** Verifies restore is one-shot: the history empties, so a second reset is a no-op. */
-test('restore consumes the snapshot', () => {
-  const history = createZoomHistory();
-  history.capture(params());
-  assert.notEqual(history.restore(), null);
-  assert.equal(history.zoomed, false);
-  assert.equal(history.restore(), null);
-});
-
-/** Verifies clear() abandons the snapshot, as a manual C/D edit must. */
-test('clear discards the snapshot without restoring it', () => {
-  const history = createZoomHistory();
-  history.capture(params());
-  history.clear();
-  assert.equal(history.zoomed, false);
-  assert.equal(history.restore(), null);
+test('reset restores the full palette viewport', () => {
+  const viewport = createPaletteViewport();
+  viewport.zoom(0.5, 0.5);
+  assert.deepEqual(viewport.value, { start: 0, end: 1 });
+  viewport.zoom(0.2, 0.6);
+  viewport.reset();
+  assert.deepEqual(viewport.value, { start: 0, end: 1 });
+  assert.equal(viewport.zoomed, false);
 });
 
 /** A locked group of three sliders sharing raw bounds, at the given start values. */

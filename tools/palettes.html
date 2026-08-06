@@ -821,7 +821,7 @@
     <!-- 3. RESULTING PALETTE (STATIC STRIP) -->
     <section class="param-group visualization-card strip-panel">
       <div class="flex justify-between items-center">
-        <h2 class="text-xl font-semibold text-white">Resulting Palette (t &isin; [0, 1])</h2> <button
+        <h2 id="palette_range_heading" class="text-xl font-semibold text-white">Resulting Palette (t &isin; [0, 1])</h2> <button
           id="resetZoomButton"
           class="hidden px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-sm font-medium transition-all shadow-lg">Reset
           Zoom</button>
@@ -888,13 +888,12 @@
     import {
       ProceduralPalette, GenerativePalette,
       proceduralPaletteCpp, generativePaletteCpp, setPaletteOps,
-      NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams, zoomedProceduralParams,
+      NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
     } from './palette_math.js';
-    // The zoom history and the locked-group delta capping are DOM-free state
-    // machines, kept in their own module so both are unit tested; the reads and
-    // writes against the sliders and the Reset Zoom button stay inline.
+    // DOM-free interaction and recipe state live in palette_controls.js; the
+    // DOM reads and writes around them stay inline.
     import {
-      createZoomHistory, lockedGroupMove, defaultPaletteRecipe, PaletteV2,
+      createPaletteViewport, lockedGroupMove, defaultPaletteRecipe, PaletteV2,
       PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
     } from './palette_controls.js';
     // The two canvas painters take their canvas, context and palette as
@@ -954,7 +953,7 @@
 
     let parameters = { ...defaultParams };
     let palette;
-    const zoomHistory = createZoomHistory();
+    const paletteViewport = createPaletteViewport();
 
     const enumIndex = (group, value) => PaletteV2[group][value];
 
@@ -1034,8 +1033,8 @@
     let isDragging = false;
     let activePointerId = null;
     let isSelectionActive = false; // Tracks if drag is active AND within Y-bounds
-    let dragStartTime = 0.0;
-    let dragEndTime = 0.0;
+    let dragStartPosition = 0.0;
+    let dragEndPosition = 0.0;
     const DRAG_THRESHOLD = 0.01; // Minimum drag distance (as %) to be considered a zoom
     let lockedDragStartValues = {}; // For locked slider relative movement
 
@@ -1048,7 +1047,7 @@
     // to ensure elements exist.
     let colorStripCanvas, colorStripCtx, waveGraphCanvas, waveGraphCtx,
       colorSwatch, tValueSpan,
-      hexValueSpan, copyPromptSpan, resetZoomButton;
+      hexValueSpan, copyPromptSpan, resetZoomButton, paletteRangeHeading;
 
     // Owns the strip's offscreen gradient cache; built in init() once the canvas
     // and its context resolve. Invalidated on every palette change
@@ -1163,11 +1162,6 @@
           parameters[def.param] = rawValue / def.scale;
         }
 
-        // Any manual slider change invalidates the zoom history
-        if (def.group === 'C' || def.group === 'D') {
-          clearZoomHistory();
-        }
-
         scheduleUpdate();
       });
 
@@ -1237,8 +1231,8 @@
       activePointerId = event.pointerId;
       isDragging = true;
       isSelectionActive = true; // Selection is active on start
-      dragStartTime = getNormalizedX(event);
-      dragEndTime = dragStartTime;
+      dragStartPosition = getNormalizedX(event);
+      dragEndPosition = dragStartPosition;
       colorStripCanvas.style.cursor = 'crosshair';
       colorStripCanvas.setPointerCapture(event.pointerId);
       event.preventDefault();
@@ -1254,8 +1248,7 @@
     function handleDragMove(event) {
       if (!isDragging || event.pointerId !== activePointerId) return;
 
-      // Always update the end time, even if off-canvas (for left/right)
-      dragEndTime = getNormalizedX(event);
+      dragEndPosition = getNormalizedX(event);
 
       // Check if the pointer is outside the canvas's Y-bounds to deactivate selection
       if (colorStripCanvas) { // Safety check
@@ -1298,29 +1291,20 @@
         return;
       }
 
-      const t_start = Math.min(dragStartTime, dragEndTime);
-      const t_end = Math.max(dragStartTime, dragEndTime);
-      const range = t_end - t_start;
+      const startPosition = Math.min(dragStartPosition, dragEndPosition);
+      const endPosition = Math.max(dragStartPosition, dragEndPosition);
+      const range = endPosition - startPosition;
 
       if (range < DRAG_THRESHOLD) {
-        // --- This was a CLICK ---
-        animationTime = t_start; // Use t_start (which equals dragStartTime)
-
-
-        // Force update of visual elements
+        animationTime = paletteViewport.map(startPosition);
         updateSwatch();
-        drawColorStrip(animationTime); // Redraw without selection
+        drawColorStrip(animationTime);
         updateStripAria();
-
       } else {
-        // --- This was a ZOOM (drag) ---
-        // zoomPalette() rewrites the Procedural C_R..D_B params; on other tabs
-        // the strip has no visible zoom, so skip it to avoid corrupting them.
-        if (activeTab !== 'procedural') {
-          drawColorStrip(animationTime); // clear the abandoned selection overlay
-          return;
-        }
-        zoomPalette(t_start, t_end);
+        paletteViewport.zoom(startPosition, endPosition);
+        animationTime = paletteViewport.clamp(animationTime);
+        drawColorStrip(animationTime);
+        updateStripAria();
         syncResetZoomButton();
       }
     }
@@ -1341,7 +1325,15 @@
      */
     function updateStripAria() {
       if (!colorStripCanvas) return;
+      const { start, end } = paletteViewport.value;
+      colorStripCanvas.setAttribute('aria-valuemin', start.toFixed(3));
+      colorStripCanvas.setAttribute('aria-valuemax', end.toFixed(3));
       colorStripCanvas.setAttribute('aria-valuenow', animationTime.toFixed(3));
+      if (paletteRangeHeading) {
+        paletteRangeHeading.textContent = paletteViewport.zoomed
+          ? `Resulting Palette (t ∈ [${start.toFixed(3)}, ${end.toFixed(3)}])`
+          : 'Resulting Palette (t ∈ [0, 1])';
+      }
     }
 
     /**
@@ -1351,26 +1343,25 @@
      * operations the click and click-drag gestures provide.
      */
     function setStripPhase(t) {
-      animationTime = Math.max(0, Math.min(1, t));
+      animationTime = paletteViewport.clamp(t);
       updateSwatch();
       drawColorStrip(animationTime);
       updateStripAria();
     }
 
     function zoomAroundPhase() {
-      // zoomPalette() rewrites the Procedural C_R..D_B params; on other tabs
-      // those are hidden, so leave them untouched.
-      if (activeTab !== 'procedural') return;
+      const center = paletteViewport.positionOf(animationTime);
       const half = 0.1;
-      const t0 = Math.max(0, animationTime - half);
-      const t1 = Math.min(1, animationTime + half);
-      if (t1 - t0 < DRAG_THRESHOLD) return;
-      zoomPalette(t0, t1);
+      paletteViewport.zoom(center - half, center + half);
+      animationTime = paletteViewport.clamp(animationTime);
+      drawColorStrip(animationTime);
+      updateStripAria();
       syncResetZoomButton();
     }
 
     function handleStripKeyDown(event) {
-      const step = 0.02;
+      const { start, end } = paletteViewport.value;
+      const step = (end - start) * 0.02;
       switch (event.key) {
         case 'ArrowLeft':
           if (event.shiftKey) handleResetZoom(); else setStripPhase(animationTime - step);
@@ -1378,54 +1369,24 @@
         case 'ArrowRight':
           if (event.shiftKey) zoomAroundPhase(); else setStripPhase(animationTime + step);
           break;
-        case 'Home': setStripPhase(0); break;
-        case 'End': setStripPhase(1); break;
+        case 'Home': setStripPhase(start); break;
+        case 'End': setStripPhase(end); break;
         default: return;
       }
       event.preventDefault();
     }
 
-    /**
-         * Calculates and applies new C (frequency) and D (phase) parameters
-         * to zoom the palette from t_start to t_end.
-         */
-    function zoomPalette(t_start, t_end) {
-      zoomHistory.capture(parameters);
-      Object.assign(parameters, zoomedProceduralParams(parameters, t_start, t_end));
-
-      updateAllSliders();
-      updatePalette();
-    }
-
-    /**
-         * Restores the parameters from before the zoom.
-         */
     function handleResetZoom() {
-      const restored = zoomHistory.restore();
-      if (!restored) return;
-
-      Object.assign(parameters, restored);
+      if (!paletteViewport.zoomed) return;
+      paletteViewport.reset();
       syncResetZoomButton();
-
-      updateAllSliders();
-      updatePalette();
+      drawColorStrip(animationTime);
+      updateStripAria();
     }
 
-    /**
-         * Drops the zoom history, so the palette's current C/D become the new
-         * baseline and there is nothing to reset to.
-         */
-    function clearZoomHistory() {
-      zoomHistory.clear();
-      syncResetZoomButton();
-    }
-
-    /**
-         * Shows the reset button exactly while a pre-zoom state is held.
-         */
     function syncResetZoomButton() {
       if (resetZoomButton) {
-        resetZoomButton.classList.toggle('hidden', !zoomHistory.zoomed);
+        resetZoomButton.classList.toggle('hidden', !paletteViewport.zoomed);
       }
     }
 
@@ -1437,7 +1398,7 @@
          * @param {object | null} selectionRange - e.g., { start: 0.2, end: 0.5 }
          */
     function drawColorStrip(t, selectionRange = null) {
-      colorStripPainter?.draw(palette, t, selectionRange);
+      colorStripPainter?.draw(palette, t, selectionRange, paletteViewport.value);
     }
 
     /**
@@ -1483,8 +1444,7 @@
       if (animationSpeed === 0 && !isDragging) return;
 
       // Update global time based on speed
-      animationTime += animationSpeed * deltaTime;
-      animationTime %= 1.0; // Keep t between 0 and 1 (wrap around)
+      animationTime = paletteViewport.wrap(animationTime + animationSpeed * deltaTime);
 
       updateSwatch();
 
@@ -1492,7 +1452,7 @@
       // If dragging AND selection is active, draw with the selection overlay.
       // Otherwise, just draw with the time marker.
       if (isDragging && isSelectionActive) {
-        drawColorStrip(animationTime, { start: dragStartTime, end: dragEndTime });
+        drawColorStrip(animationTime, { start: dragStartPosition, end: dragEndPosition });
       } else {
         drawColorStrip(animationTime);
       }
@@ -1542,13 +1502,14 @@
 
     /**
      * Loads a named palette's coefficients into the procedural controls and
-     * redraws. Clears the zoom history since the loaded C/D become the new
-     * baseline.
+     * redraws in the full palette viewport.
      * @param {{name:string, a:number[], b:number[], c:number[], d:number[]}} entry - The palette to load.
      */
     function loadNamedPalette(entry) {
       parameters = { ...proceduralPaletteParams(entry) };
-      clearZoomHistory();
+      paletteViewport.reset();
+      syncResetZoomButton();
+      updateStripAria();
       updateAllSliders();
       updatePalette();
     }
@@ -1662,6 +1623,7 @@
       hexValueSpan = document.getElementById('hex_value');
       copyPromptSpan = document.getElementById('copy_prompt');
       resetZoomButton = document.getElementById('resetZoomButton');
+      paletteRangeHeading = document.getElementById('palette_range_heading');
 
       // Safety check for critical elements
       if (!colorStripCanvas || !waveGraphCanvas || !colorStripCtx || !waveGraphCtx) {

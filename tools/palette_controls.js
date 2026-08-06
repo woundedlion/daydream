@@ -3,67 +3,59 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
-/**
- * DOM-free control state for the palette tool page (tools/palettes.html): the
- * drag-to-zoom history the Reset Zoom button reflects, and the delta capping a
- * locked R/G/B slider group moves under. The page keeps the DOM reads and
- * writes around these.
- */
+const clampUnit = (value) => Math.max(0, Math.min(1, value));
 
 /**
- * The procedural coefficients a zoom rewrites, and therefore the ones the
- * history snapshots. The A (base) and B (amplitude) triples are untouched by a
- * zoom, so restoring them would discard unrelated edits.
+ * Owns the phase window shown by the palette strip.
+ *
+ * Pointer positions stay local to the visible strip while palette phases stay
+ * in the original 0..1 domain. Keeping that mapping here gives Procedural and
+ * Generative palettes identical click, animation, and nested-zoom behavior.
  */
-export const ZOOMED_PARAMS = ['C_R', 'C_G', 'C_B', 'D_R', 'D_G', 'D_B'];
+export function createPaletteViewport() {
+  let start = 0;
+  let end = 1;
 
-/**
- * Builds the zoom history: at most one pre-zoom snapshot of the frequency/phase
- * coefficients, held from the first zoom until it is restored or invalidated.
- *
- * Successive zooms compose, so only the FIRST pre-zoom state is kept — a reset
- * always returns to where the user started rather than one zoom back. Any edit
- * that redefines the frequency/phase baseline (a manual C/D slider move, loading
- * a named palette) invalidates the snapshot instead.
- *
- * @returns {{zoomed: boolean, capture: function(Object): void, restore: function(): ?Object, clear: function(): void}} The history handle; `zoomed` reports whether a snapshot is held.
- */
-export function createZoomHistory() {
-  /** @type {?Object} */
-  let saved = null;
+  const map = (position) => start + clampUnit(position) * (end - start);
 
   return {
+    get value() {
+      return { start, end };
+    },
+
     get zoomed() {
-      return saved !== null;
+      return start !== 0 || end !== 1;
     },
 
-    /**
-     * Snapshots the frequency/phase coefficients, unless one is already held.
-     * @param {Object} parameters - The current 12-coefficient parameter set.
-     * @returns {void}
-     */
-    capture(parameters) {
-      if (saved !== null) return;
-      saved = {};
-      for (const key of ZOOMED_PARAMS) saved[key] = parameters[key];
+    map,
+
+    positionOf(phase) {
+      return clampUnit((phase - start) / (end - start));
     },
 
-    /**
-     * Takes the snapshot back and drops it.
-     * @returns {?Object} The pre-zoom frequency/phase coefficients, or null when none is held.
-     */
-    restore() {
-      const snapshot = saved;
-      saved = null;
-      return snapshot;
+    clamp(phase) {
+      return Math.max(start, Math.min(end, phase));
     },
 
-    /**
-     * Drops the snapshot without restoring it.
-     * @returns {void}
-     */
-    clear() {
-      saved = null;
+    wrap(phase) {
+      const span = end - start;
+      return start + (((phase - start) % span) + span) % span;
+    },
+
+    zoom(firstPosition, secondPosition) {
+      const low = Math.min(clampUnit(firstPosition), clampUnit(secondPosition));
+      const high = Math.max(clampUnit(firstPosition), clampUnit(secondPosition));
+      if (low === high) return { start, end };
+      const nextStart = map(low);
+      const nextEnd = map(high);
+      start = nextStart;
+      end = nextEnd;
+      return { start, end };
+    },
+
+    reset() {
+      start = 0;
+      end = 1;
     },
   };
 }
