@@ -523,7 +523,7 @@
       }
 
       #tab-content-generative .recipe-controls {
-        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+        grid-template-columns: repeat(5, minmax(0, 1fr));
       }
 
       .wave-panel {
@@ -566,6 +566,37 @@
         min-height: 0;
         max-height: none;
         overflow-y: auto;
+      }
+    }
+
+    @media (min-width: 1024px) and (max-width: 1199px) {
+      .key-wheel-card {
+        gap: 0.25rem;
+      }
+
+      .key-wheel-intro {
+        font-size: 0.625rem;
+        line-height: 0.75rem;
+      }
+
+      #hueKeyWheelCanvas {
+        width: min(100%, 8.5rem);
+      }
+
+      .custom-key-fields {
+        gap: 0.125rem;
+      }
+
+      .custom-key-field {
+        grid-template-columns: auto minmax(0, 1fr) 4.25rem;
+        gap: 0.25rem;
+        font-size: 0.6875rem;
+      }
+
+      .custom-key-number,
+      .custom-key-anchor {
+        height: 1.5rem;
+        font-size: 0.6875rem;
       }
     }
 
