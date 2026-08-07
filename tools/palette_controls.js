@@ -5,6 +5,20 @@
 
 const clampUnit = (value) => Math.max(0, Math.min(1, value));
 
+const PALETTE_TABS = new Set(['procedural', 'generative']);
+
+export function paletteTabFromSearch(search) {
+  const tab = new URLSearchParams(search).get('tab');
+  return PALETTE_TABS.has(tab) ? tab : 'procedural';
+}
+
+export function paletteTabUrl(href, tab) {
+  if (!PALETTE_TABS.has(tab)) throw new RangeError(`Unknown palette tab: ${tab}`);
+  const url = new URL(href);
+  url.searchParams.set('tab', tab);
+  return url.href;
+}
+
 /**
  * Owns the phase window shown by the palette strip.
  *
@@ -163,17 +177,23 @@ export function defaultPaletteRecipe() {
 export function paletteRecipeAvailability(recipe) {
   const variedChroma = recipe.chroma.curve !== PaletteV4.curve.CONSTANT;
   const hasColor = recipe.chroma.center > 0 || (variedChroma && recipe.chroma.range > 0);
+  const customHue = recipe.hue.mode === PaletteV4.hueMode.CUSTOM;
   const monochromatic = recipe.hue.mode === PaletteV4.hueMode.HARMONY &&
     recipe.hue.harmony === PaletteV4.harmony.MONOCHROMATIC;
+  const customLightness = recipe.lightness.curve === PaletteV4.curve.CUSTOM;
+  const customChroma = recipe.chroma.curve === PaletteV4.curve.CUSTOM;
 
   return {
-    baseHue: hasColor,
+    baseHue: hasColor && !customHue,
     hueMode: hasColor,
     harmony: hasColor && recipe.hue.mode === PaletteV4.hueMode.HARMONY,
     colorPath: hasColor && !monochromatic,
-    hueDirection: hasColor && !monochromatic,
-    chromaMaximum: variedChroma,
-    lightnessMaximum: recipe.lightness.curve !== PaletteV4.curve.CONSTANT,
+    hueDirection: hasColor && !monochromatic && !customHue,
+    chromaEndpoints: !customChroma,
+    chromaMaximum: variedChroma && !customChroma,
+    lightnessEndpoints: !customLightness,
+    lightnessMaximum: recipe.lightness.curve !== PaletteV4.curve.CONSTANT &&
+      !customLightness,
   };
 }
 

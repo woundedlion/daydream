@@ -167,7 +167,41 @@ test('PaletteOps exposes only the V4 recipe compiler operations', () => {
   try {
     assert.equal(typeof ops.compileAndBakeV4, 'function');
     assert.equal(typeof ops.inspectV4, 'function');
+    assert.equal(typeof ops.effectPresetsV4, 'function');
     assert.equal(ops.bakeLut, undefined);
+  } finally {
+    ops.delete();
+  }
+});
+
+test('PaletteOps publishes every effect-owned GenerativePalette recipe', () => {
+  const ops = new M.PaletteOps();
+  try {
+    const presets = Array.from(ops.effectPresetsV4());
+    assert.deepEqual(presets.map((preset) => preset.name), [
+      'BZReactionDiffusion',
+      'Comets',
+      'DisplacementField / RingShower',
+      'Dynamo',
+      'GSReactionDiffusion',
+      'MobiusGrid',
+      'Raymarch',
+      'ShaderBall Liquid',
+      'ShaderBall Flyby',
+    ]);
+    assert.deepEqual(presets.filter((preset) => preset.randomHue)
+      .map((preset) => preset.name), [
+      'Comets',
+      'DisplacementField / RingShower',
+      'Dynamo',
+      'MobiusGrid',
+    ]);
+    for (const preset of presets) {
+      assert.equal(preset.recipe.schemaVersion, 4);
+      assert.equal(ops.inspectV4(preset.recipe).status.code, 0, preset.name);
+    }
+    assert.equal(presets[0].recipe.hue.mode, PaletteV4.hueMode.CUSTOM);
+    assert.equal(presets[7].recipe.lightness.curve, PaletteV4.curve.CUSTOM);
   } finally {
     ops.delete();
   }

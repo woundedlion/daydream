@@ -94,6 +94,16 @@
       outline: none;
     }
 
+    .recipe-preset-select {
+      max-width: 15rem;
+      padding: 0.3rem 1.8rem 0.3rem 0.5rem;
+      border: 1px solid var(--slate-600);
+      border-radius: 0.375rem;
+      background: var(--slate-700);
+      color: #CBD5E1;
+      font-size: 0.75rem;
+    }
+
     /* Each .param-group is a grid cell in the palette tabs, so drop the shared
        vertical card margin — the grid gap already spaces the cells. */
     .param-group {
@@ -670,6 +680,10 @@
           <button type="button" class="recipe-preset" data-recipe-preset="balancedAnalogous">Analogous</button>
           <button type="button" class="recipe-preset" data-recipe-preset="isolightSpectralLoop">OKLCH Hue Loop</button>
           <button type="button" class="recipe-preset" data-recipe-preset="tonalMonochrome">Monochromatic Ramp</button>
+          <select id="effect_recipe_preset" class="recipe-preset-select"
+            aria-label="Effect palette recipe">
+            <option value="">Effect recipes...</option>
+          </select>
         </div>
       </div>
       <div class="recipe-controls">
@@ -678,7 +692,7 @@
           <div id="gen_seed_field" class="recipe-field">
             <label for="gen_seed_slider">Base Hue (degrees)</label>
             <div class="recipe-slider">
-              <input type="range" id="gen_seed_slider" min="0" max="359" step="1" value="59" class="b-thumb">
+              <input type="range" id="gen_seed_slider" min="0" max="359.9999" step="0.0001" value="59" class="b-thumb">
               <span id="gen_seed_value" class="slider-label">59&deg;</span>
             </div>
           </div>
@@ -687,6 +701,7 @@
             <select id="gen_hue_mode" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
               <option value="HARMONY">Color Harmony</option>
               <option value="SWEEP">Hue Sweep</option>
+              <option value="CUSTOM" disabled>Custom Keys (preset)</option>
             </select>
           </div>
           <div id="gen_harmony_field" class="recipe-field">
@@ -714,6 +729,7 @@
               <option value="ASCENDING">Linear Ascending</option>
               <option value="DESCENDING">Linear Descending</option>
               <option value="CUP">V-shaped Trough</option>
+              <option value="CUSTOM" disabled>Custom Keys (preset)</option>
             </select>
           </div>
           <div id="gen_chroma_minimum_field" class="recipe-field">
@@ -742,6 +758,7 @@
               <option value="DESCENDING">Linear Descending</option>
               <option value="BELL">Triangular Peak</option>
               <option value="CUP">V-shaped Trough</option>
+              <option value="CUSTOM" disabled>Custom Keys (preset)</option>
             </select>
           </div>
           <div id="gen_lightness_minimum_field" class="recipe-field">
@@ -877,6 +894,7 @@
     import {
       createPaletteViewport, axisEndpoints, axisFromEndpoints,
       lockedGroupMove,
+      paletteTabFromSearch, paletteTabUrl,
       defaultPaletteRecipe, PaletteV4,
       PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
     } from './palette_controls.js';
@@ -892,7 +910,7 @@
     // --- Tab Switcher Logic ---
     let activeTab = 'procedural';
 
-    function switchTab(tabName) {
+    function switchTab(tabName, updateUrl = true) {
       activeTab = tabName;
       // Update buttons
       document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -911,6 +929,10 @@
       const palettesPanel = document.getElementById('named_palettes_panel');
       if (palettesPanel) palettesPanel.style.display = (tabName === 'procedural') ? '' : 'none';
 
+      if (updateUrl)
+        history.replaceState(history.state, '',
+          paletteTabUrl(window.location.href, tabName));
+
       // Update palette based on visible tab
       updatePalette();
     }
@@ -926,6 +948,8 @@
 
     let parameters = { ...defaultParams };
     let palette;
+    let recipeTemplate = defaultPaletteRecipe();
+    let effectPalettePresets = [];
     const paletteViewport = createPaletteViewport();
 
     const enumIndex = (group, value) => PaletteV4[group][value];
@@ -1051,23 +1075,27 @@
     }
 
     function readPaletteRecipe() {
-      const recipe = defaultPaletteRecipe();
+      const recipe = structuredClone(recipeTemplate);
       recipe.input = recipeWindow();
       recipe.domain = enumIndex('domain', document.getElementById('gen_shape').value);
       recipe.colorPath = enumIndex('colorPath', document.getElementById('gen_path').value);
       recipe.hue.mode = enumIndex('hueMode', document.getElementById('gen_hue_mode').value);
       recipe.hue.harmony = enumIndex('harmony', document.getElementById('gen_harmony').value);
       recipe.hue.direction = enumIndex('direction', document.getElementById('gen_direction').value);
-      recipe.hue.baseTurns = Number(document.getElementById('gen_seed_slider').value) / 360;
-      recipe.hue.sweepTurns = 1;
+      if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM) {
+        recipe.hue.baseTurns = Number(document.getElementById('gen_seed_slider').value) / 360;
+        recipe.hue.sweepTurns = 1;
+      }
       recipe.lightness.curve = enumIndex('curve', document.getElementById('gen_brightness').value);
       recipe.chroma.curve = enumIndex('curve', document.getElementById('gen_chroma_curve').value);
       for (const [axisName, controls] of [
         ['lightness', recipe.lightness],
         ['chroma', recipe.chroma],
       ]) {
-        const { minimum, maximum } = readAxisEndpoints(axisName);
-        Object.assign(controls, axisFromEndpoints(minimum, maximum));
+        if (controls.curve !== PaletteV4.curve.CUSTOM) {
+          const { minimum, maximum } = readAxisEndpoints(axisName);
+          Object.assign(controls, axisFromEndpoints(minimum, maximum));
+        }
       }
       if (recipe.chroma.center === 1) recipe.chroma.headroom = 1;
       return recipe;
@@ -1082,7 +1110,9 @@
         ['gen_harmony_field', 'gen_harmony', availability.harmony],
         ['gen_path_field', 'gen_path', availability.colorPath],
         ['gen_direction_field', 'gen_direction', availability.hueDirection],
+        ['gen_chroma_minimum_field', 'gen_chroma_minimum', availability.chromaEndpoints],
         ['gen_chroma_maximum_field', 'gen_chroma_maximum', availability.chromaMaximum],
+        ['gen_lightness_minimum_field', 'gen_lightness_minimum', availability.lightnessEndpoints],
         ['gen_lightness_maximum_field', 'gen_lightness_maximum', availability.lightnessMaximum],
       ];
 
@@ -1095,8 +1125,8 @@
       }
     }
 
-    function loadRecipePreset(name) {
-      const recipe = PALETTE_RECIPE_PRESETS[name]();
+    function loadRecipe(recipe) {
+      recipeTemplate = structuredClone(recipe);
       document.getElementById('gen_shape').value =
         Object.keys(PaletteV4.domain).find((key) => PaletteV4.domain[key] === recipe.domain);
       document.getElementById('gen_hue_mode').value =
@@ -1111,15 +1141,36 @@
         Object.keys(PaletteV4.curve).find((key) => PaletteV4.curve[key] === recipe.lightness.curve);
       document.getElementById('gen_chroma_curve').value =
         Object.keys(PaletteV4.curve).find((key) => PaletteV4.curve[key] === recipe.chroma.curve);
-      document.getElementById('gen_seed_slider').value =
-        Math.round(recipe.hue.baseTurns * 360) % 360;
+      const hueDegrees = ((recipe.hue.baseTurns * 360) % 360 + 360) % 360;
+      document.getElementById('gen_seed_slider').value = hueDegrees;
       setRecipeWindow(recipe.input.offset, recipe.input.span);
       setAxisEndpoints('lightness', axisEndpoints(recipe.lightness));
       setAxisEndpoints('chroma', axisEndpoints(recipe.chroma));
       document.getElementById('gen_seed_value').textContent =
-        `${document.getElementById('gen_seed_slider').value}°`;
+        `${Number(hueDegrees.toFixed(4))}°`;
       syncRecipeControlAvailability();
       scheduleUpdate();
+    }
+
+    function loadRecipePreset(name) {
+      loadRecipe(PALETTE_RECIPE_PRESETS[name]());
+    }
+
+    function buildEffectRecipePresets() {
+      const select = document.getElementById('effect_recipe_preset');
+      for (const [index, preset] of effectPalettePresets.entries()) {
+        const option = document.createElement('option');
+        option.value = String(index);
+        option.textContent = preset.randomHue
+          ? `${preset.name} (random hue)`
+          : preset.name;
+        select.appendChild(option);
+      }
+      select.addEventListener('change', () => {
+        if (select.value === '') return;
+        loadRecipe(effectPalettePresets[Number(select.value)].recipe);
+        select.value = '';
+      });
     }
 
     // Drag-to-zoom state
@@ -1666,6 +1717,7 @@
         const wasm = await createHolosphereModule();
         const paletteOps = new wasm.PaletteOps();
         setPaletteOps(paletteOps);
+        effectPalettePresets = Array.from(paletteOps.effectPresetsV4());
       } catch (e) {
         console.error('Failed to load WASM:', e);
         showFatalError('Failed to load the Holosphere WASM engine — the palette '
@@ -1709,6 +1761,7 @@
 
       // 1.5 Build the named-palette swatch gallery
       buildPaletteGallery();
+      buildEffectRecipePresets();
 
       // 2. Initialize Generative Palette UI Controls
       const genSeedSlider = document.getElementById('gen_seed_slider');
@@ -1781,7 +1834,7 @@
         trigger: document.getElementById('export_toggle'),
       });
 
-      updatePalette();
+      switchTab(paletteTabFromSearch(window.location.search), false);
 
       onPageTeardown(() => {
         teardownExportFlyout();
