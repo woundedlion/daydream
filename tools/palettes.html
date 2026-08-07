@@ -604,15 +604,15 @@
 
         <div id="tab-content-procedural" class="tab-content active" role="tabpanel"
           aria-labelledby="tab-btn-procedural">
-          <h2 class="text-2xl font-semibold text-white mb-4">Palette Parameters: C(t) = A + B &middot; cos(2 &pi; (Ct + D))
+          <h2 class="text-2xl font-semibold text-white mb-4">Cosine Palette Parameters: C(t) = A + B &middot; cos(2 &pi; (Ct + D))
           </h2>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
-            <!-- PARAMETER A: BASE / OFFSET -->
+            <!-- PARAMETER A: OFFSET -->
             <div class="param-group space-y-2" role="group" aria-labelledby="group_A_heading">
-              <h3 id="group_A_heading" class="text-lg font-bold text-blue-400">Base</h3>
+              <h3 id="group_A_heading" class="text-lg font-bold text-blue-400">Offset (A)</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
-                <input type="checkbox" id="lock_A" aria-label="Lock R, G, B (Base)"
+                <input type="checkbox" id="lock_A" aria-label="Lock R, G, B (Offset)"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
                 <label for="lock_A">Lock R, G, B</label>
               </div>
@@ -623,7 +623,7 @@
 
             <!-- PARAMETER B: AMPLITUDE -->
             <div class="param-group space-y-2" role="group" aria-labelledby="group_B_heading">
-              <h3 id="group_B_heading" class="text-lg font-bold text-green-400">Amp</h3>
+              <h3 id="group_B_heading" class="text-lg font-bold text-green-400">Amplitude (B)</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
                 <input type="checkbox" id="lock_B" aria-label="Lock R, G, B (Amplitude)"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
@@ -636,7 +636,7 @@
 
             <!-- PARAMETER C: FREQUENCY -->
             <div class="param-group space-y-2" role="group" aria-labelledby="group_C_heading">
-              <h3 id="group_C_heading" class="text-lg font-bold text-red-400">Freq</h3>
+              <h3 id="group_C_heading" class="text-lg font-bold text-red-400">Frequency (C)</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
                 <input type="checkbox" id="lock_C" aria-label="Lock R, G, B (Frequency)"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
@@ -649,7 +649,7 @@
 
             <!-- PARAMETER D: PHASE -->
             <div class="param-group space-y-2" role="group" aria-labelledby="group_D_heading">
-              <h3 id="group_D_heading" class="text-lg font-bold text-yellow-400">Phase</h3>
+              <h3 id="group_D_heading" class="text-lg font-bold text-yellow-400">Phase (D)</h3>
               <div class="flex items-center space-x-2 text-sm text-gray-300">
                 <input type="checkbox" id="lock_D" aria-label="Lock R, G, B (Phase)"
                   class="w-4 h-4 rounded text-blue-500 focus:ring-blue-600 border-gray-600">
@@ -665,32 +665,32 @@
     <div id="tab-content-generative" class="tab-content" role="tabpanel"
       aria-labelledby="tab-btn-generative" hidden>
       <div class="recipe-header">
-        <h2 class="font-semibold text-white">Generative Palette</h2>
-        <div class="recipe-presets" aria-label="Palette presets">
-          <button type="button" class="recipe-preset" data-recipe-preset="balancedAnalogous">Balanced</button>
-          <button type="button" class="recipe-preset" data-recipe-preset="isolightSpectralLoop">Rainbow Loop</button>
-          <button type="button" class="recipe-preset" data-recipe-preset="tonalMonochrome">Tonal</button>
+        <h2 class="font-semibold text-white">Generative OKLCH Palette</h2>
+        <div class="recipe-presets" aria-label="Generative recipe presets">
+          <button type="button" class="recipe-preset" data-recipe-preset="balancedAnalogous">Analogous</button>
+          <button type="button" class="recipe-preset" data-recipe-preset="isolightSpectralLoop">OKLCH Hue Loop</button>
+          <button type="button" class="recipe-preset" data-recipe-preset="tonalMonochrome">Monochromatic Ramp</button>
         </div>
       </div>
       <div class="recipe-controls">
         <section class="param-group recipe-group" aria-labelledby="recipe_hue_heading">
           <h3 id="recipe_hue_heading" class="font-bold text-blue-400">Hue</h3>
           <div id="gen_seed_field" class="recipe-field">
-            <label for="gen_seed_slider">Starting Color</label>
+            <label for="gen_seed_slider">Base Hue (degrees)</label>
             <div class="recipe-slider">
-              <input type="range" id="gen_seed_slider" min="0" max="255" step="1" value="42" class="b-thumb">
-              <span id="gen_seed_value" class="slider-label">42</span>
+              <input type="range" id="gen_seed_slider" min="0" max="359" step="1" value="59" class="b-thumb">
+              <span id="gen_seed_value" class="slider-label">59&deg;</span>
             </div>
           </div>
           <div id="gen_hue_mode_field" class="recipe-field">
-            <label for="gen_hue_mode">Hue Structure</label>
+            <label for="gen_hue_mode">Hue Distribution</label>
             <select id="gen_hue_mode" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
               <option value="HARMONY">Color Harmony</option>
-              <option value="SWEEP">Full Spectrum</option>
+              <option value="SWEEP">Hue Sweep</option>
             </select>
           </div>
           <div id="gen_harmony_field" class="recipe-field">
-            <label for="gen_harmony">Color Relationship</label>
+            <label for="gen_harmony">Color Harmony</label>
             <select id="gen_harmony" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
               <option value="ANALOGOUS">Analogous</option>
               <option value="MONOCHROMATIC">Monochromatic</option>
@@ -698,33 +698,33 @@
               <option value="COMPLEMENTARY">Complementary</option>
               <option value="SPLIT_COMPLEMENTARY">Split Complementary</option>
               <option value="TRIADIC">Triadic</option>
-              <option value="TETRADIC">Tetradic (Rectangle)</option>
+              <option value="TETRADIC">Rectangular Tetradic</option>
               <option value="SQUARE">Square</option>
             </select>
           </div>
         </section>
 
         <section class="param-group recipe-group" aria-labelledby="recipe_color_heading">
-          <h3 id="recipe_color_heading" class="font-bold text-yellow-400">Colorfulness</h3>
+          <h3 id="recipe_color_heading" class="font-bold text-yellow-400">Gamut-relative Chroma</h3>
           <div class="recipe-field">
-            <label for="gen_chroma_curve">Shape</label>
+            <label for="gen_chroma_curve">Relative Chroma Curve</label>
             <select id="gen_chroma_curve" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="CONSTANT">Even</option>
-              <option value="BELL">Strong Center</option>
-              <option value="ASCENDING">Increase</option>
-              <option value="DESCENDING">Decrease</option>
-              <option value="CUP">Soft Center</option>
+              <option value="CONSTANT">Constant</option>
+              <option value="BELL">Triangular Peak</option>
+              <option value="ASCENDING">Linear Ascending</option>
+              <option value="DESCENDING">Linear Descending</option>
+              <option value="CUP">V-shaped Trough</option>
             </select>
           </div>
           <div id="gen_chroma_minimum_field" class="recipe-field">
-            <label id="gen_chroma_minimum_label" for="gen_chroma_minimum">Level</label>
+            <label id="gen_chroma_minimum_label" for="gen_chroma_minimum">Relative Chroma</label>
             <div class="recipe-slider">
               <input type="range" id="gen_chroma_minimum" min="0" max="1" step="0.01" value="0.62">
               <span id="gen_chroma_minimum_value" class="slider-label">0.62</span>
             </div>
           </div>
           <div id="gen_chroma_maximum_field" class="recipe-field">
-            <label for="gen_chroma_maximum">High</label>
+            <label id="gen_chroma_maximum_label" for="gen_chroma_maximum">Maximum Relative Chroma</label>
             <div class="recipe-slider">
               <input type="range" id="gen_chroma_maximum" min="0" max="1" step="0.01" value="0.62">
               <span id="gen_chroma_maximum_value" class="slider-label">0.62</span>
@@ -733,26 +733,26 @@
         </section>
 
         <section class="param-group recipe-group" aria-labelledby="recipe_brightness_heading">
-          <h3 id="recipe_brightness_heading" class="font-bold text-red-400">Brightness</h3>
+          <h3 id="recipe_brightness_heading" class="font-bold text-red-400">OKLab Lightness</h3>
           <div class="recipe-field">
-            <label for="gen_brightness">Shape</label>
+            <label for="gen_brightness">Lightness Curve</label>
             <select id="gen_brightness" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="CONSTANT">Even</option>
-              <option value="ASCENDING">Dark to Light</option>
-              <option value="DESCENDING">Light to Dark</option>
-              <option value="BELL">Bright Center</option>
-              <option value="CUP">Dark Center</option>
+              <option value="CONSTANT">Constant</option>
+              <option value="ASCENDING">Linear Ascending</option>
+              <option value="DESCENDING">Linear Descending</option>
+              <option value="BELL">Triangular Peak</option>
+              <option value="CUP">V-shaped Trough</option>
             </select>
           </div>
           <div id="gen_lightness_minimum_field" class="recipe-field">
-            <label id="gen_lightness_minimum_label" for="gen_lightness_minimum">Level</label>
+            <label id="gen_lightness_minimum_label" for="gen_lightness_minimum">Lightness</label>
             <div class="recipe-slider">
               <input type="range" id="gen_lightness_minimum" min="0" max="1" step="0.01" value="0.62">
               <span id="gen_lightness_minimum_value" class="slider-label">0.62</span>
             </div>
           </div>
           <div id="gen_lightness_maximum_field" class="recipe-field">
-            <label for="gen_lightness_maximum">High</label>
+            <label id="gen_lightness_maximum_label" for="gen_lightness_maximum">Maximum Lightness</label>
             <div class="recipe-slider">
               <input type="range" id="gen_lightness_maximum" min="0" max="1" step="0.01" value="0.62">
               <span id="gen_lightness_maximum_value" class="slider-label">0.62</span>
@@ -761,54 +761,44 @@
         </section>
 
         <section class="param-group recipe-group" aria-labelledby="recipe_gradient_heading">
-          <h3 id="recipe_gradient_heading" class="font-bold text-purple-400">Gradient</h3>
+          <h3 id="recipe_gradient_heading" class="font-bold text-purple-400">Domain &amp; Interpolation</h3>
           <div class="recipe-field">
-            <label for="gen_shape">Layout</label>
+            <label for="gen_shape">Domain Mapping</label>
             <select id="gen_shape" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="STRAIGHT">One Way</option>
-              <option value="MIRROR">Mirrored</option>
-              <option value="VIGNETTE">Dark Edges</option>
-              <option value="FALLOFF">Fade to Dark</option>
-              <option value="LOOP">Seamless Loop</option>
+              <option value="STRAIGHT">Straight</option>
+              <option value="MIRROR">Mirror</option>
+              <option value="VIGNETTE">Vignette</option>
+              <option value="FALLOFF">Falloff</option>
+              <option value="LOOP">Loop</option>
             </select>
           </div>
           <div id="gen_path_field" class="recipe-field">
-            <label for="gen_path">Blend Style</label>
+            <label for="gen_path">Color-space Path</label>
             <select id="gen_path" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="OKLCH_ARC">Follow Hue Wheel</option>
-              <option value="OKLAB_CARTESIAN">Blend Through Neutral</option>
+              <option value="OKLCH_ARC">OKLCH Hue Arc</option>
+              <option value="OKLAB_CARTESIAN">OKLab Cartesian</option>
             </select>
           </div>
           <div id="gen_direction_field" class="recipe-field">
             <label for="gen_direction">Hue Direction</label>
             <select id="gen_direction" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="SHORTEST">Shortest Arc</option>
-              <option value="CLOCKWISE">Clockwise</option>
-              <option value="COUNTERCLOCKWISE">Counterclockwise</option>
+              <option value="SHORTEST">Shortest Hue Arc</option>
+              <option value="CLOCKWISE">Clockwise Hue Arc</option>
+              <option value="COUNTERCLOCKWISE">Counterclockwise Hue Arc</option>
             </select>
           </div>
         </section>
       </div>
-      <div class="recipe-window-controls" aria-label="Recipe structure and window">
+      <div class="recipe-window-controls" aria-label="Input domain window">
         <div class="recipe-field">
-          <label for="gen_key_count">Key Colors</label>
-          <select id="gen_key_count" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5</option>
-            <option value="6" selected>6</option>
-          </select>
-        </div>
-        <div class="recipe-field">
-          <label for="gen_phase">Phase</label>
+          <label for="gen_phase">Input Offset</label>
           <div class="recipe-slider">
             <input type="range" id="gen_phase" min="0" max="0" step="0.001" value="0">
             <span id="gen_phase_value" class="slider-label">0.000</span>
           </div>
         </div>
         <div class="recipe-field">
-          <label for="gen_width">Width</label>
+          <label for="gen_width">Input Span</label>
           <div class="recipe-slider">
             <input type="range" id="gen_width" min="0.01" max="1" step="0.001" value="1">
             <span id="gen_width_value" class="slider-label">1.000</span>
@@ -821,8 +811,8 @@
     <!-- 2. RGB WAVE FUNCTIONS (GRAPH) -->
     <section class="param-group visualization-card wave-panel">
       <div class="wave-heading">
-        <h2 id="wave_graph_title" class="font-semibold text-white">RGB Wave Functions</h2>
-        <div class="wave-legend" aria-label="RGB curve legend">
+        <h2 id="wave_graph_title" class="font-semibold text-white">sRGB Channel Curves</h2>
+        <div class="wave-legend" aria-label="sRGB channel curve legend">
           <span style="--legend-color:#EF4444">Red</span>
           <span style="--legend-color:#22C55E">Green</span>
           <span style="--legend-color:#3B82F6">Blue</span>
@@ -830,13 +820,13 @@
       </div>
       <canvas id="waveGraphCanvas" width="1024"
         height="300" role="img"
-        aria-label="Plot of the red, green and blue channel curves against phase t"></canvas>
+        aria-label="Plot of the sRGB red, green and blue channel curves against normalized palette coordinate t"></canvas>
     </section>
 
     <!-- 3. RESULTING PALETTE (STATIC STRIP) -->
     <section class="param-group visualization-card strip-panel">
       <div class="flex justify-between items-center">
-        <h2 id="palette_range_heading" class="text-xl font-semibold text-white">Resulting Palette (t &isin; [0, 1])</h2> <button
+        <h2 id="palette_range_heading" class="text-xl font-semibold text-white">sRGB Palette (t &isin; [0, 1])</h2> <button
           id="resetZoomButton"
           class="hidden px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-sm font-medium transition-all shadow-lg">Reset
           Zoom</button>
@@ -856,7 +846,7 @@
       </main>
 
       <aside id="named_palettes_panel" class="param-group palette-panel space-y-3">
-        <h3 class="text-lg font-bold text-white">Named Palettes</h3>
+        <h3 class="text-lg font-bold text-white">Cosine Palette Presets</h3>
         <div id="palette_gallery" class="flex flex-col gap-2"></div>
       </aside>
     </div>
@@ -887,9 +877,8 @@
     import {
       createPaletteViewport, axisEndpoints, axisFromEndpoints,
       lockedGroupMove,
-      defaultPaletteRecipe, PaletteV3,
+      defaultPaletteRecipe, PaletteV4,
       PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
-      minimumPaletteKeyCount,
     } from './palette_controls.js';
     // The two canvas painters take their canvas, context and palette as
     // arguments, so they live in their own module and are unit tested against a
@@ -939,7 +928,7 @@
     let palette;
     const paletteViewport = createPaletteViewport();
 
-    const enumIndex = (group, value) => PaletteV3[group][value];
+    const enumIndex = (group, value) => PaletteV4[group][value];
     const fullViewport = Object.freeze({ start: 0, end: 1 });
 
     function recipeWindow() {
@@ -982,17 +971,23 @@
     }
 
     const axisControlDefinitions = {
-      lightness: { prefix: 'gen_lightness', curve: 'gen_brightness' },
-      chroma: { prefix: 'gen_chroma', curve: 'gen_chroma_curve' },
+      lightness: {
+        prefix: 'gen_lightness', curve: 'gen_brightness', label: 'Lightness',
+      },
+      chroma: {
+        prefix: 'gen_chroma', curve: 'gen_chroma_curve', label: 'Relative Chroma',
+      },
     };
 
     function axisControlElements(axisName) {
-      const { prefix, curve } = axisControlDefinitions[axisName];
+      const { prefix, curve, label } = axisControlDefinitions[axisName];
       return {
+        label,
         curve: document.getElementById(curve),
         minimum: document.getElementById(`${prefix}_minimum`),
         maximum: document.getElementById(`${prefix}_maximum`),
         minimumLabel: document.getElementById(`${prefix}_minimum_label`),
+        maximumLabel: document.getElementById(`${prefix}_maximum_label`),
         minimumValue: document.getElementById(`${prefix}_minimum_value`),
         maximumValue: document.getElementById(`${prefix}_maximum_value`),
       };
@@ -1005,9 +1000,13 @@
 
     function syncAxisEndpointControls(axisName) {
       const elements = axisControlElements(axisName);
-      const { curve, minimum, maximum, minimumLabel, minimumValue, maximumValue } = elements;
+      const {
+        label, curve, minimum, maximum, minimumLabel, maximumLabel,
+        minimumValue, maximumValue,
+      } = elements;
       const constant = curve.value === 'CONSTANT';
-      minimumLabel.textContent = constant ? 'Level' : 'Low';
+      minimumLabel.textContent = constant ? label : `Minimum ${label}`;
+      maximumLabel.textContent = `Maximum ${label}`;
 
       minimum.min = '0';
       minimum.max = constant ? '1' : maximum.value;
@@ -1053,14 +1052,13 @@
 
     function readPaletteRecipe() {
       const recipe = defaultPaletteRecipe();
-      recipe.keyCount = Number(document.getElementById('gen_key_count').value);
       recipe.input = recipeWindow();
       recipe.domain = enumIndex('domain', document.getElementById('gen_shape').value);
       recipe.colorPath = enumIndex('colorPath', document.getElementById('gen_path').value);
       recipe.hue.mode = enumIndex('hueMode', document.getElementById('gen_hue_mode').value);
       recipe.hue.harmony = enumIndex('harmony', document.getElementById('gen_harmony').value);
       recipe.hue.direction = enumIndex('direction', document.getElementById('gen_direction').value);
-      recipe.hue.baseTurns = Number(document.getElementById('gen_seed_slider').value) / 256;
+      recipe.hue.baseTurns = Number(document.getElementById('gen_seed_slider').value) / 360;
       recipe.hue.sweepTurns = 1;
       recipe.lightness.curve = enumIndex('curve', document.getElementById('gen_brightness').value);
       recipe.chroma.curve = enumIndex('curve', document.getElementById('gen_chroma_curve').value);
@@ -1076,16 +1074,7 @@
     }
 
     function syncRecipeControlAvailability() {
-      let recipe = readPaletteRecipe();
-      const keyCount = document.getElementById('gen_key_count');
-      const minimumKeyCount = minimumPaletteKeyCount(recipe);
-      for (const option of keyCount.options)
-        option.disabled = Number(option.value) < minimumKeyCount;
-      if (recipe.keyCount < minimumKeyCount) {
-        keyCount.value = minimumKeyCount;
-        recipe = readPaletteRecipe();
-      }
-
+      const recipe = readPaletteRecipe();
       const availability = paletteRecipeAvailability(recipe);
       const controls = [
         ['gen_seed_field', 'gen_seed_slider', availability.baseHue],
@@ -1109,25 +1098,26 @@
     function loadRecipePreset(name) {
       const recipe = PALETTE_RECIPE_PRESETS[name]();
       document.getElementById('gen_shape').value =
-        Object.keys(PaletteV3.domain).find((key) => PaletteV3.domain[key] === recipe.domain);
+        Object.keys(PaletteV4.domain).find((key) => PaletteV4.domain[key] === recipe.domain);
       document.getElementById('gen_hue_mode').value =
-        Object.keys(PaletteV3.hueMode).find((key) => PaletteV3.hueMode[key] === recipe.hue.mode);
+        Object.keys(PaletteV4.hueMode).find((key) => PaletteV4.hueMode[key] === recipe.hue.mode);
       document.getElementById('gen_harmony').value =
-        Object.keys(PaletteV3.harmony).find((key) => PaletteV3.harmony[key] === recipe.hue.harmony);
+        Object.keys(PaletteV4.harmony).find((key) => PaletteV4.harmony[key] === recipe.hue.harmony);
       document.getElementById('gen_direction').value =
-        Object.keys(PaletteV3.direction).find((key) => PaletteV3.direction[key] === recipe.hue.direction);
+        Object.keys(PaletteV4.direction).find((key) => PaletteV4.direction[key] === recipe.hue.direction);
       document.getElementById('gen_path').value =
-        Object.keys(PaletteV3.colorPath).find((key) => PaletteV3.colorPath[key] === recipe.colorPath);
+        Object.keys(PaletteV4.colorPath).find((key) => PaletteV4.colorPath[key] === recipe.colorPath);
       document.getElementById('gen_brightness').value =
-        Object.keys(PaletteV3.curve).find((key) => PaletteV3.curve[key] === recipe.lightness.curve);
+        Object.keys(PaletteV4.curve).find((key) => PaletteV4.curve[key] === recipe.lightness.curve);
       document.getElementById('gen_chroma_curve').value =
-        Object.keys(PaletteV3.curve).find((key) => PaletteV3.curve[key] === recipe.chroma.curve);
-      document.getElementById('gen_seed_slider').value = Math.round(recipe.hue.baseTurns * 256) & 255;
-      document.getElementById('gen_key_count').value = recipe.keyCount;
+        Object.keys(PaletteV4.curve).find((key) => PaletteV4.curve[key] === recipe.chroma.curve);
+      document.getElementById('gen_seed_slider').value =
+        Math.round(recipe.hue.baseTurns * 360) % 360;
       setRecipeWindow(recipe.input.offset, recipe.input.span);
       setAxisEndpoints('lightness', axisEndpoints(recipe.lightness));
       setAxisEndpoints('chroma', axisEndpoints(recipe.chroma));
-      document.getElementById('gen_seed_value').textContent = document.getElementById('gen_seed_slider').value;
+      document.getElementById('gen_seed_value').textContent =
+        `${document.getElementById('gen_seed_slider').value}°`;
       syncRecipeControlAvailability();
       scheduleUpdate();
     }
@@ -1162,9 +1152,11 @@
     // Spoken names for the coefficient groups and the RGB channels. The visible
     // slider labels are single letters repeated across all four groups, so each
     // control's accessible name is built from its group and channel instead —
-    // "Base red" rather than a fourth control called "R". The group names match
+    // "Offset red" rather than a fourth control called "R". The group names match
     // the <h3> each group's role="group" is labelled by.
-    const GROUP_NAMES = { A: 'Base', B: 'Amplitude', C: 'Frequency', D: 'Phase' };
+    const GROUP_NAMES = {
+      A: 'Offset', B: 'Amplitude', C: 'Frequency', D: 'Phase',
+    };
     const CHANNEL_NAMES = { R: 'red', G: 'green', B: 'blue' };
 
     /**
@@ -1435,8 +1427,8 @@
           + 'Press Enter to copy the center color. Drag to zoom.');
       if (paletteRangeHeading) {
         paletteRangeHeading.textContent = zoomed()
-          ? `Resulting Palette (t ∈ [${start.toFixed(3)}, ${end.toFixed(3)}])`
-          : 'Resulting Palette (t ∈ [0, 1])';
+          ? `sRGB Palette (t ∈ [${start.toFixed(3)}, ${end.toFixed(3)}])`
+          : 'sRGB Palette (t ∈ [0, 1])';
       }
     }
 
@@ -1632,12 +1624,12 @@
         try {
           palette = new GenerativePalette(readPaletteRecipe());
           const status = document.getElementById('gen_status');
-          status.textContent = palette.canonicalRecipe.domain === PaletteV3.domain.LOOP &&
+          status.textContent = palette.canonicalRecipe.domain === PaletteV4.domain.LOOP &&
               palette.lut[0] === palette.lut[765] &&
               palette.lut[1] === palette.lut[766] &&
               palette.lut[2] === palette.lut[767]
-            ? 'Compiled · Bit-exact seam'
-            : 'Compiled';
+            ? 'Recipe valid · Bit-exact loop closure'
+            : 'Recipe valid';
         } catch (error) {
           document.getElementById('gen_status').textContent = error.message;
           return;
@@ -1723,14 +1715,13 @@
       const genSeedValue = document.getElementById('gen_seed_value');
       if (genSeedSlider && genSeedValue) {
         genSeedSlider.addEventListener('input', () => {
-          genSeedValue.textContent = genSeedSlider.value;
+          genSeedValue.textContent = `${genSeedSlider.value}°`;
           scheduleUpdate();
         });
       }
 
       const dropdowns = [
         'gen_hue_mode', 'gen_harmony', 'gen_shape', 'gen_path', 'gen_direction',
-        'gen_key_count',
       ];
       dropdowns.forEach(id => {
         const el = document.getElementById(id);

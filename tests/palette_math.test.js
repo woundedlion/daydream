@@ -8,7 +8,7 @@ const {
   generativePaletteCpp, paletteRecipeJson, setPaletteOps,
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
 } = await import('../tools/palette_math.js');
-const { defaultPaletteRecipe, PaletteV3 } = await import('../tools/palette_controls.js');
+const { defaultPaletteRecipe, PaletteV4 } = await import('../tools/palette_controls.js');
 
 function mockBakeLut() {
   const lut = new Uint8Array(256 * 3);
@@ -29,8 +29,8 @@ function mockPaletteOps(overrides = {}) {
     fallback: new Uint8Array(256),
   });
   return {
-    compileAndBakeV3: compile,
-    inspectV3: compile,
+    compileAndBakeV4: compile,
+    inspectV4: compile,
     ...overrides,
   };
 }
@@ -240,15 +240,15 @@ test('GenerativePalette.get clamps to the final LUT entry', () => {
   }
 });
 
-test('generativePaletteCpp serializes the complete V3 recipe', () => {
+test('generativePaletteCpp serializes the complete V4 recipe', () => {
   const recipe = defaultPaletteRecipe();
   recipe.domain = 4;
   recipe.hue.harmony = 5;
   recipe.lightness.curve = 1;
   const source = generativePaletteCpp(recipe);
 
-  assert.match(source, /recipe\.schema_version = 3;/);
-  assert.match(source, /recipe\.key_count = 6;/);
+  assert.match(source, /recipe\.schema_version = 4;/);
+  assert.doesNotMatch(source, /key_count/);
   assert.match(source, /recipe\.input\.offset = 0\.0f;/);
   assert.match(source, /recipe\.input\.span = 1\.0f;/);
   assert.match(source, /PaletteDomain::LOOP/);
@@ -260,7 +260,7 @@ test('generativePaletteCpp serializes the complete V3 recipe', () => {
 
 test('generativePaletteCpp names every supported color harmony', () => {
   const recipe = defaultPaletteRecipe();
-  for (const [name, value] of Object.entries(PaletteV3.harmony)) {
+  for (const [name, value] of Object.entries(PaletteV4.harmony)) {
     recipe.hue.harmony = value;
     const source = generativePaletteCpp(recipe);
     assert.match(source, new RegExp(`PaletteHarmony::${name}`));
@@ -268,15 +268,14 @@ test('generativePaletteCpp names every supported color harmony', () => {
   }
 });
 
-test('paletteRecipeJson preserves a two-key Complementary recipe', () => {
+test('paletteRecipeJson preserves a Complementary recipe without derived state', () => {
   const recipe = defaultPaletteRecipe();
-  recipe.keyCount = 2;
-  recipe.hue.harmony = PaletteV3.harmony.COMPLEMENTARY;
+  recipe.hue.harmony = PaletteV4.harmony.COMPLEMENTARY;
   const exported = JSON.parse(paletteRecipeJson(recipe));
 
-  assert.equal(exported.schemaVersion, 3);
-  assert.equal(exported.keyCount, 2);
-  assert.equal(exported.hue.harmony, PaletteV3.harmony.COMPLEMENTARY);
+  assert.equal(exported.schemaVersion, 4);
+  assert.equal('keyCount' in exported, false);
+  assert.equal(exported.hue.harmony, PaletteV4.harmony.COMPLEMENTARY);
 });
 
 test('generativePaletteCpp rejects unknown enum values', () => {
@@ -306,7 +305,7 @@ test('compilePaletteRecipe selects the requested bridge operation and owns its b
       fallback,
     };
   };
-  setPaletteOps({ compileAndBakeV3: compile('compile'), inspectV3: compile('inspect') });
+  setPaletteOps({ compileAndBakeV4: compile('compile'), inspectV4: compile('inspect') });
   try {
     const inspected = compilePaletteRecipe(recipe);
     const compiled = compilePaletteRecipe(recipe, false);
@@ -323,7 +322,7 @@ test('compilePaletteRecipe selects the requested bridge operation and owns its b
 
 test('GenerativePalette reports compiler failures', () => {
   setPaletteOps(mockPaletteOps({
-    inspectV3: () => ({ status: { code: 2, field: 7 } }),
+    inspectV4: () => ({ status: { code: 2, field: 7 } }),
   }));
   try {
     assert.throws(() => new GenerativePalette(defaultPaletteRecipe()),
@@ -340,7 +339,7 @@ test('GenerativePalette uses the canonical recipe and exposes diagnostics', () =
   const fallback = new Uint8Array(256);
   fallback[128] = 1;
   setPaletteOps(mockPaletteOps({
-    inspectV3: (input) => ({
+    inspectV4: (input) => ({
       status: { code: 0, field: 0 },
       canonicalRecipe: { ...structuredClone(input), falloffStart: 0.8 },
       lut: mockBakeLut(),
@@ -371,7 +370,7 @@ test('GenerativePalette.get blends adjacent entries in linear light', () => {
   const lut = new Uint8Array(256 * 3);
   lut.fill(128, 3);
   setPaletteOps(mockPaletteOps({
-    inspectV3: (recipe) => ({
+    inspectV4: (recipe) => ({
       status: { code: 0, field: 0 },
       canonicalRecipe: recipe,
       lut,

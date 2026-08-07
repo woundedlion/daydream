@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import createHolosphereModule from '../holosphere_wasm.js';
 import * as C from '../tools/color.js';
 import * as P from '../tools/palette_math.js';
-import { defaultPaletteRecipe, PaletteV3 } from '../tools/palette_controls.js';
+import { defaultPaletteRecipe, PaletteV4 } from '../tools/palette_controls.js';
 import * as L from '../tools/lissajous_math.js';
 import * as MB from '../tools/mobius_transforms.js';
 
@@ -162,26 +162,26 @@ function sampleLut(lut) {
     [lut[3 * index], lut[3 * index + 1], lut[3 * index + 2]]);
 }
 
-test('PaletteOps exposes only the V3 recipe compiler operations', () => {
+test('PaletteOps exposes only the V4 recipe compiler operations', () => {
   const ops = new M.PaletteOps();
   try {
-    assert.equal(typeof ops.compileAndBakeV3, 'function');
-    assert.equal(typeof ops.inspectV3, 'function');
+    assert.equal(typeof ops.compileAndBakeV4, 'function');
+    assert.equal(typeof ops.inspectV4, 'function');
     assert.equal(ops.bakeLut, undefined);
   } finally {
     ops.delete();
   }
 });
 
-test('PaletteOps compiles deterministic V3 recipe LUTs', () => {
+test('PaletteOps compiles deterministic V4 recipe LUTs', () => {
   const ops = new M.PaletteOps();
   const recipe = defaultPaletteRecipe();
   try {
-    const first = ops.compileAndBakeV3(recipe);
-    const second = ops.compileAndBakeV3(recipe);
+    const first = ops.compileAndBakeV4(recipe);
+    const second = ops.compileAndBakeV4(recipe);
     assert.equal(first.status.code, 0);
-    assert.equal(first.canonicalRecipe.schemaVersion, 3);
-    assert.equal(first.canonicalRecipe.keyCount, 6);
+    assert.equal(first.canonicalRecipe.schemaVersion, 4);
+    assert.equal('keyCount' in first.canonicalRecipe, false);
     assert.deepEqual(sampleLut(Uint8Array.from(first.lut)),
       sampleLut(Uint8Array.from(second.lut)));
   } finally {
@@ -193,8 +193,8 @@ test('PaletteOps enforces exact mirror and loop seams', () => {
   const ops = new M.PaletteOps();
   try {
     const mirror = defaultPaletteRecipe();
-    mirror.domain = PaletteV3.domain.MIRROR;
-    const mirrored = Uint8Array.from(ops.compileAndBakeV3(mirror).lut);
+    mirror.domain = PaletteV4.domain.MIRROR;
+    const mirrored = Uint8Array.from(ops.compileAndBakeV4(mirror).lut);
     for (let index = 0; index < 128; index += 1) {
       assert.deepEqual(
         Array.from(mirrored.slice(index * 3, index * 3 + 3)),
@@ -202,9 +202,9 @@ test('PaletteOps enforces exact mirror and loop seams', () => {
     }
 
     const loop = defaultPaletteRecipe();
-    loop.domain = PaletteV3.domain.LOOP;
-    loop.hue.mode = PaletteV3.hueMode.SWEEP;
-    const looped = Uint8Array.from(ops.compileAndBakeV3(loop).lut);
+    loop.domain = PaletteV4.domain.LOOP;
+    loop.hue.mode = PaletteV4.hueMode.SWEEP;
+    const looped = Uint8Array.from(ops.compileAndBakeV4(loop).lut);
     assert.deepEqual(Array.from(looped.slice(765)), Array.from(looped.slice(0, 3)));
   } finally {
     ops.delete();
@@ -214,16 +214,16 @@ test('PaletteOps enforces exact mirror and loop seams', () => {
 test('GenerativePalette removes the saturated-blue gamut seam', () => {
   const ops = new M.PaletteOps();
   const recipe = defaultPaletteRecipe();
-  recipe.hue.mode = PaletteV3.hueMode.SWEEP;
+  recipe.hue.mode = PaletteV4.hueMode.SWEEP;
   recipe.hue.baseTurns = 98 / 256;
   recipe.chroma.center = 1;
   recipe.chroma.headroom = 1;
-  recipe.lightness.curve = PaletteV3.curve.ASCENDING;
+  recipe.lightness.curve = PaletteV4.curve.ASCENDING;
   recipe.lightness.center = 0.495;
   recipe.lightness.range = 0.41;
 
   try {
-    const result = ops.inspectV3(recipe);
+    const result = ops.inspectV4(recipe);
     const lut = Uint8Array.from(result.lut);
     let largestChannelStep = 0;
     for (let index = 75; index <= 95; index += 1) {
@@ -243,11 +243,11 @@ test('GenerativePalette removes the saturated-blue gamut seam', () => {
 test('Complementary harmony progresses once from the seed to its opposite', () => {
   const ops = new M.PaletteOps();
   const recipe = defaultPaletteRecipe();
-  recipe.hue.harmony = PaletteV3.harmony.COMPLEMENTARY;
+  recipe.hue.harmony = PaletteV4.harmony.COMPLEMENTARY;
   recipe.hue.baseTurns = 200 / 256;
 
   try {
-    const result = ops.inspectV3(recipe);
+    const result = ops.inspectV4(recipe);
     const diagnostics = result.diagnostics;
     const firstHue = diagnostics[4];
     const quarterHue = diagnostics[64 * 6 + 4];
@@ -271,40 +271,25 @@ test('Complementary harmony progresses once from the seed to its opposite', () =
 test('recipe window crops hue while axis envelopes span the visible result', () => {
   const ops = new M.PaletteOps();
   const recipe = defaultPaletteRecipe();
-  recipe.hue.harmony = PaletteV3.harmony.TRIADIC;
+  recipe.hue.harmony = PaletteV4.harmony.TRIADIC;
   recipe.input = { offset: 0.2, span: 0.4 };
-  recipe.lightness.curve = PaletteV3.curve.ASCENDING;
+  recipe.lightness.curve = PaletteV4.curve.ASCENDING;
   recipe.lightness.center = 0.5;
   recipe.lightness.range = 0.6;
 
   try {
-    const result = ops.inspectV3(recipe);
+    const result = ops.inspectV4(recipe);
     const diagnostics = Array.from(result.diagnostics);
     assert.ok(Math.abs(diagnostics[0] - 0.2) < 1e-5);
     assert.ok(Math.abs(diagnostics[255 * 6] - 0.8) < 1e-5);
 
     const full = structuredClone(recipe);
     full.input = { offset: 0, span: 1 };
-    full.lightness.curve = PaletteV3.curve.CONSTANT;
-    const fullDiagnostics = Array.from(ops.inspectV3(full).diagnostics);
+    full.lightness.curve = PaletteV4.curve.CONSTANT;
+    const fullDiagnostics = Array.from(ops.inspectV4(full).diagnostics);
     assert.ok(Math.abs(diagnostics[4] - fullDiagnostics[51 * 6 + 4]) < 0.03);
     assert.ok(Math.abs(diagnostics[255 * 6 + 4] -
       fullDiagnostics[153 * 6 + 4]) < 0.03);
-  } finally {
-    ops.delete();
-  }
-});
-
-test('two-key relationships compile only when the harmony supports them', () => {
-  const ops = new M.PaletteOps();
-  const recipe = defaultPaletteRecipe();
-  recipe.keyCount = 2;
-  recipe.hue.harmony = PaletteV3.harmony.COMPLEMENTARY;
-
-  try {
-    assert.equal(ops.compileAndBakeV3(recipe).status.code, 0);
-    recipe.hue.harmony = PaletteV3.harmony.TRIADIC;
-    assert.notEqual(ops.compileAndBakeV3(recipe).status.code, 0);
   } finally {
     ops.delete();
   }
@@ -316,7 +301,7 @@ test('browser GenerativePalette owns the real bridge result', () => {
   try {
     const recipe = defaultPaletteRecipe();
     recipe.hue.baseTurns = 0.37;
-    const direct = ops.inspectV3(recipe);
+    const direct = ops.inspectV4(recipe);
     const palette = new P.GenerativePalette(recipe);
     assert.deepEqual(palette.lut, Uint8Array.from(direct.lut));
     assert.deepEqual(palette.canonicalRecipe, direct.canonicalRecipe);
@@ -331,9 +316,9 @@ test('browser GenerativePalette owns the real bridge result', () => {
 test('PATH_MINIMUM is rejected until its certified solver is available', () => {
   const ops = new M.PaletteOps();
   const recipe = defaultPaletteRecipe();
-  recipe.chroma.basis = PaletteV3.chromaBasis.PATH_MINIMUM;
+  recipe.chroma.basis = PaletteV4.chromaBasis.PATH_MINIMUM;
   try {
-    const result = ops.compileAndBakeV3(recipe);
+    const result = ops.compileAndBakeV4(recipe);
     assert.notEqual(result.status.code, 0);
     assert.equal(result.lut, undefined);
   } finally {
