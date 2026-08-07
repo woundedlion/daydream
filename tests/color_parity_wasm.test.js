@@ -268,7 +268,7 @@ test('Complementary harmony progresses once from the seed to its opposite', () =
   }
 });
 
-test('recipe window crops hue while axis envelopes span the visible result', () => {
+test('recipe window crops every axis before the domain is applied', () => {
   const ops = new M.PaletteOps();
   const recipe = defaultPaletteRecipe();
   recipe.hue.harmony = PaletteV4.harmony.TRIADIC;
@@ -280,8 +280,8 @@ test('recipe window crops hue while axis envelopes span the visible result', () 
   try {
     const result = ops.inspectV4(recipe);
     const diagnostics = Array.from(result.diagnostics);
-    assert.ok(Math.abs(diagnostics[0] - 0.2) < 1e-5);
-    assert.ok(Math.abs(diagnostics[255 * 6] - 0.8) < 1e-5);
+    assert.ok(Math.abs(diagnostics[0] - 0.32) < 1e-5);
+    assert.ok(Math.abs(diagnostics[255 * 6] - 0.56) < 1e-5);
 
     const full = structuredClone(recipe);
     full.input = { offset: 0, span: 1 };
