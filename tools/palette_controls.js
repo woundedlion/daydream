@@ -283,6 +283,14 @@ export function customHueTurns(baseTurns, offsets, template = [0, 0, 0, 0]) {
   return turns;
 }
 
+export function moveCustomHueKey(baseTurns, offsets, keyIndex, wrappedTurn) {
+  const nextOffsets = [...offsets];
+  const currentTurn = baseTurns + nextOffsets[keyIndex];
+  const nextTurn = equivalentTurnNear(wrappedTurn, currentTurn);
+  nextOffsets[keyIndex] = Math.max(-2, Math.min(2, nextTurn - baseTurns));
+  return nextOffsets;
+}
+
 export function defaultPaletteRecipe() {
   return {
     schemaVersion: 4,

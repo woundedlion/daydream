@@ -147,8 +147,25 @@
       line-height: 1.25rem;
     }
 
-    .key-wheel-card {
-      align-items: stretch;
+    .hue-card-content {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .hue-card-controls,
+    .hue-key-visualizer {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 0.375rem;
+    }
+
+    .key-wheel-heading {
+      color: #C7D2FE;
+      font-size: 0.75rem;
+      font-weight: 700;
+      line-height: 1rem;
+      text-align: center;
     }
 
     .key-wheel-intro {
@@ -163,7 +180,7 @@
     }
 
     #hueKeyWheelCanvas {
-      width: min(100%, 10.5rem);
+      width: min(100%, 8.5rem);
       height: auto;
       border: 1px solid var(--slate-600);
       border-radius: 50%;
@@ -482,6 +499,19 @@
         grid-template-columns: repeat(5, minmax(0, 1fr));
       }
 
+      #tab-content-generative .hue-recipe-card {
+        grid-column: span 2;
+      }
+
+      .hue-card-content {
+        grid-template-columns: minmax(0, 1fr) 8.5rem;
+        align-items: center;
+      }
+
+      .hue-key-visualizer {
+        width: 8.5rem;
+      }
+
       .wave-panel {
         grid-area: graph;
       }
@@ -556,17 +586,25 @@
         flex: none;
       }
 
-      .key-wheel-card {
-        gap: 0.25rem;
-      }
-
       .key-wheel-intro {
         font-size: 0.625rem;
         line-height: 0.75rem;
       }
 
       #hueKeyWheelCanvas {
-        width: min(100%, 7.25rem);
+        width: min(100%, 6.5rem);
+      }
+
+      .hue-card-content {
+        grid-template-columns: minmax(0, 1fr) 6.5rem;
+      }
+
+      .hue-key-visualizer {
+        width: 6.5rem;
+      }
+
+      .hue-card-controls .recipe-field {
+        grid-template-columns: minmax(4rem, 0.7fr) minmax(0, 1.3fr);
       }
 
       .recipe-slider {
@@ -777,43 +815,62 @@
         </div>
       </div>
       <div class="recipe-controls">
-        <section class="param-group recipe-group" aria-labelledby="recipe_hue_heading">
+        <section class="param-group recipe-group hue-recipe-card" aria-labelledby="recipe_hue_heading">
           <h3 id="recipe_hue_heading" class="font-bold text-blue-400">Hue</h3>
-          <div id="gen_seed_field" class="recipe-field">
-            <label for="gen_seed_slider">Base Hue (degrees)</label>
-            <div class="recipe-slider">
-              <input type="range" id="gen_seed_slider" min="0" max="359.9999" step="0.0001" value="59" class="b-thumb">
-              <span id="gen_seed_value" class="slider-label">59&deg;</span>
+          <div class="hue-card-content">
+            <div class="hue-card-controls">
+              <div id="gen_seed_field" class="recipe-field">
+                <label for="gen_seed_slider">Hue</label>
+                <div class="recipe-slider">
+                  <input type="range" id="gen_seed_slider" min="0" max="359.9999" step="0.0001" value="59"
+                    class="b-thumb" aria-label="Base Hue (degrees)" title="Base Hue (degrees)">
+                  <span id="gen_seed_value" class="slider-label">59&deg;</span>
+                </div>
+              </div>
+              <div id="gen_hue_mode_field" class="recipe-field">
+                <label for="gen_hue_mode">Distribution</label>
+                <select id="gen_hue_mode" aria-label="Hue Distribution" title="Hue Distribution"
+                  class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+                  <option value="HARMONY">Color Harmony</option>
+                  <option value="SWEEP">Hue Sweep</option>
+                  <option value="CUSTOM">Custom Keys</option>
+                </select>
+              </div>
+              <div id="gen_harmony_field" class="recipe-field">
+                <label for="gen_harmony">Harmony</label>
+                <select id="gen_harmony" aria-label="Color Harmony" title="Color Harmony"
+                  class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+                  <option value="ANALOGOUS">Analogous</option>
+                  <option value="MONOCHROMATIC">Monochromatic</option>
+                  <option value="ACCENTED_ANALOGOUS">Accented Analogous</option>
+                  <option value="COMPLEMENTARY">Complementary</option>
+                  <option value="SPLIT_COMPLEMENTARY">Split Complementary</option>
+                  <option value="TRIADIC">Triadic</option>
+                  <option value="TETRADIC">Rectangular Tetradic</option>
+                  <option value="SQUARE">Square</option>
+                </select>
+              </div>
             </div>
-          </div>
-          <div id="gen_hue_mode_field" class="recipe-field">
-            <label for="gen_hue_mode">Hue Distribution</label>
-            <select id="gen_hue_mode" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="HARMONY">Color Harmony</option>
-              <option value="SWEEP">Hue Sweep</option>
-              <option value="CUSTOM">Custom Keys</option>
-            </select>
-          </div>
-          <div id="gen_harmony_field" class="recipe-field">
-            <label for="gen_harmony">Color Harmony</label>
-            <select id="gen_harmony" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="ANALOGOUS">Analogous</option>
-              <option value="MONOCHROMATIC">Monochromatic</option>
-              <option value="ACCENTED_ANALOGOUS">Accented Analogous</option>
-              <option value="COMPLEMENTARY">Complementary</option>
-              <option value="SPLIT_COMPLEMENTARY">Split Complementary</option>
-              <option value="TRIADIC">Triadic</option>
-              <option value="TETRADIC">Rectangular Tetradic</option>
-              <option value="SQUARE">Square</option>
-            </select>
+            <div class="hue-key-visualizer" aria-labelledby="key_wheel_heading">
+              <h4 id="key_wheel_heading" class="key-wheel-heading">OKLCH Hue Keys</h4>
+              <div class="key-wheel-canvas-wrap">
+                <canvas id="hueKeyWheelCanvas" width="256" height="256" tabindex="0"
+                  role="group" aria-roledescription="interactive gamut wheel"
+                  aria-keyshortcuts="A B C ArrowLeft ArrowRight"
+                  aria-describedby="key_wheel_help"
+                  aria-label="OKLCH gamut wheel with three hue key positions"></canvas>
+              </div>
+              <p id="key_wheel_help" class="key-wheel-intro">Drag keys independently.</p>
+            </div>
           </div>
         </section>
 
         <section class="param-group recipe-group" aria-labelledby="recipe_color_heading">
           <h3 id="recipe_color_heading" class="font-bold text-yellow-400">Gamut-relative Chroma</h3>
           <div class="recipe-field">
-            <label for="gen_chroma_curve">Relative Chroma Curve</label>
-            <select id="gen_chroma_curve" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+            <label for="gen_chroma_curve">Curve</label>
+            <select id="gen_chroma_curve" aria-label="Relative Chroma Curve" title="Relative Chroma Curve"
+              class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
               <option value="CONSTANT">Constant</option>
               <option value="BELL">Triangular Peak</option>
               <option value="ASCENDING">Linear Ascending</option>
@@ -823,14 +880,14 @@
             </select>
           </div>
           <div id="gen_chroma_minimum_field" class="recipe-field">
-            <label id="gen_chroma_minimum_label" for="gen_chroma_minimum">Relative Chroma</label>
+            <label id="gen_chroma_minimum_label" for="gen_chroma_minimum">Chroma</label>
             <div class="recipe-slider">
               <input type="range" id="gen_chroma_minimum" min="0" max="1" step="0.01" value="0.62">
               <span id="gen_chroma_minimum_value" class="slider-label">0.62</span>
             </div>
           </div>
           <div id="gen_chroma_maximum_field" class="recipe-field">
-            <label id="gen_chroma_maximum_label" for="gen_chroma_maximum">Maximum Relative Chroma</label>
+            <label id="gen_chroma_maximum_label" for="gen_chroma_maximum">Maximum</label>
             <div class="recipe-slider">
               <input type="range" id="gen_chroma_maximum" min="0" max="1" step="0.01" value="0.62">
               <span id="gen_chroma_maximum_value" class="slider-label">0.62</span>
@@ -841,8 +898,9 @@
         <section class="param-group recipe-group" aria-labelledby="recipe_brightness_heading">
           <h3 id="recipe_brightness_heading" class="font-bold text-red-400">OKLab Lightness</h3>
           <div class="recipe-field">
-            <label for="gen_brightness">Lightness Curve</label>
-            <select id="gen_brightness" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+            <label for="gen_brightness">Curve</label>
+            <select id="gen_brightness" aria-label="Lightness Curve" title="Lightness Curve"
+              class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
               <option value="CONSTANT">Constant</option>
               <option value="ASCENDING">Linear Ascending</option>
               <option value="DESCENDING">Linear Descending</option>
@@ -859,7 +917,7 @@
             </div>
           </div>
           <div id="gen_lightness_maximum_field" class="recipe-field">
-            <label id="gen_lightness_maximum_label" for="gen_lightness_maximum">Maximum Lightness</label>
+            <label id="gen_lightness_maximum_label" for="gen_lightness_maximum">Maximum</label>
             <div class="recipe-slider">
               <input type="range" id="gen_lightness_maximum" min="0" max="1" step="0.01" value="0.62">
               <span id="gen_lightness_maximum_value" class="slider-label">0.62</span>
@@ -870,8 +928,9 @@
         <section class="param-group recipe-group" aria-labelledby="recipe_gradient_heading">
           <h3 id="recipe_gradient_heading" class="font-bold text-purple-400">Domain &amp; Interpolation</h3>
           <div class="recipe-field">
-            <label for="gen_shape">Domain Mapping</label>
-            <select id="gen_shape" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+            <label for="gen_shape">Domain</label>
+            <select id="gen_shape" aria-label="Domain Mapping" title="Domain Mapping"
+              class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
               <option value="STRAIGHT">Straight</option>
               <option value="MIRROR">Mirror</option>
               <option value="VIGNETTE">Vignette</option>
@@ -880,15 +939,17 @@
             </select>
           </div>
           <div id="gen_path_field" class="recipe-field">
-            <label for="gen_path">Color-space Path</label>
-            <select id="gen_path" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+            <label for="gen_path">Path</label>
+            <select id="gen_path" aria-label="Color-space Path" title="Color-space Path"
+              class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
               <option value="OKLCH_ARC">OKLCH Hue Arc</option>
               <option value="OKLAB_CARTESIAN">OKLab Cartesian</option>
             </select>
           </div>
           <div id="gen_direction_field" class="recipe-field">
-            <label for="gen_direction">Hue Direction</label>
-            <select id="gen_direction" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+            <label for="gen_direction">Direction</label>
+            <select id="gen_direction" aria-label="Hue Direction" title="Hue Direction"
+              class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
               <option value="SHORTEST">Shortest Hue Arc</option>
               <option value="CLOCKWISE">Clockwise Hue Arc</option>
               <option value="COUNTERCLOCKWISE">Counterclockwise Hue Arc</option>
@@ -896,30 +957,21 @@
           </div>
         </section>
 
-        <section class="param-group recipe-group key-wheel-card" aria-labelledby="key_wheel_heading">
-          <h3 id="key_wheel_heading" class="font-bold text-indigo-300">OKLCH Hue Keys</h3>
-          <p id="key_wheel_help" class="key-wheel-intro">Drag a marker. Keyboard: A/B/C, then left/right arrows; Shift adjusts 10&deg;.</p>
-          <div class="key-wheel-canvas-wrap">
-            <canvas id="hueKeyWheelCanvas" width="256" height="256" tabindex="0"
-              role="group" aria-roledescription="interactive gamut wheel"
-              aria-keyshortcuts="A B C ArrowLeft ArrowRight"
-              aria-describedby="key_wheel_help"
-              aria-label="OKLCH gamut wheel with three hue key positions"></canvas>
-          </div>
-        </section>
       </div>
       <div class="recipe-window-controls" aria-label="Input domain window">
         <div class="recipe-field">
-          <label for="gen_phase">Input Offset</label>
+          <label for="gen_phase">Offset</label>
           <div class="recipe-slider">
-            <input type="range" id="gen_phase" min="0" max="0" step="0.001" value="0">
+            <input type="range" id="gen_phase" min="0" max="0" step="0.001" value="0"
+              aria-label="Input Offset" title="Input Offset">
             <span id="gen_phase_value" class="slider-label">0.000</span>
           </div>
         </div>
         <div class="recipe-field">
-          <label for="gen_width">Input Span</label>
+          <label for="gen_width">Span</label>
           <div class="recipe-slider">
-            <input type="range" id="gen_width" min="0.01" max="1" step="0.001" value="1">
+            <input type="range" id="gen_width" min="0.01" max="1" step="0.001" value="1"
+              aria-label="Input Span" title="Input Span">
             <span id="gen_width_value" class="slider-label">1.000</span>
           </div>
         </div>
@@ -999,9 +1051,9 @@
       paletteTabFromSearch, paletteTabUrl,
       defaultPaletteRecipe, PaletteV4,
       PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
-      wrapTurns, equivalentTurnNear,
+      wrapTurns,
       hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
-      customHueKeyState, customHueTurns,
+      customHueKeyState, customHueTurns, moveCustomHueKey,
     } from './palette_controls.js';
     // The two canvas painters take their canvas, context and palette as
     // arguments, so they live in their own module and are unit tested against a
@@ -1250,14 +1302,8 @@
     function updateHueKeyFromPointer(event) {
       if (activeHueKey === null) return;
       const pointerTurn = wheelPointerTurn(event);
-      if (activeHueKey === 0) {
-        setCustomBaseTurns(pointerTurn);
-      } else {
-        const base = customBaseTurns();
-        const current = base + customHueOffsets[activeHueKey];
-        const next = equivalentTurnNear(pointerTurn, current);
-        customHueOffsets[activeHueKey] = Math.max(-2, Math.min(2, next - base));
-      }
+      customHueOffsets = moveCustomHueKey(
+        customBaseTurns(), customHueOffsets, activeHueKey, pointerTurn);
       scheduleUpdate();
     }
 
@@ -1316,12 +1362,10 @@
       const recipe = readPaletteRecipe();
       if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM) activateCustomHue(recipe);
       const delta = direction * (event.shiftKey ? 10 : 1) / 360;
-      if (selectedHueKey === 0) {
-        setCustomBaseTurns(customBaseTurns() + delta);
-      } else {
-        customHueOffsets[selectedHueKey] = Math.max(-2, Math.min(2,
-          customHueOffsets[selectedHueKey] + delta));
-      }
+      const base = customBaseTurns();
+      const current = base + customHueOffsets[selectedHueKey];
+      customHueOffsets = moveCustomHueKey(
+        base, customHueOffsets, selectedHueKey, wrapTurns(current + delta));
       scheduleUpdate();
       event.preventDefault();
     }
@@ -1368,16 +1412,18 @@
     const axisControlDefinitions = {
       lightness: {
         prefix: 'gen_lightness', curve: 'gen_brightness', label: 'Lightness',
+        shortLabel: 'Lightness',
       },
       chroma: {
         prefix: 'gen_chroma', curve: 'gen_chroma_curve', label: 'Relative Chroma',
+        shortLabel: 'Chroma',
       },
     };
 
     function axisControlElements(axisName) {
-      const { prefix, curve, label } = axisControlDefinitions[axisName];
+      const { prefix, curve, label, shortLabel } = axisControlDefinitions[axisName];
       return {
-        label,
+        label, shortLabel,
         curve: document.getElementById(curve),
         minimum: document.getElementById(`${prefix}_minimum`),
         maximum: document.getElementById(`${prefix}_maximum`),
@@ -1396,12 +1442,16 @@
     function syncAxisEndpointControls(axisName) {
       const elements = axisControlElements(axisName);
       const {
-        label, curve, minimum, maximum, minimumLabel, maximumLabel,
+        label, shortLabel, curve, minimum, maximum, minimumLabel, maximumLabel,
         minimumValue, maximumValue,
       } = elements;
       const constant = curve.value === 'CONSTANT';
-      minimumLabel.textContent = constant ? label : `Minimum ${label}`;
-      maximumLabel.textContent = `Maximum ${label}`;
+      minimumLabel.textContent = shortLabel;
+      maximumLabel.textContent = 'Maximum';
+      minimum.setAttribute('aria-label', constant ? label : `Minimum ${label}`);
+      minimum.title = constant ? label : `Minimum ${label}`;
+      maximum.setAttribute('aria-label', `Maximum ${label}`);
+      maximum.title = `Maximum ${label}`;
 
       minimum.min = '0';
       minimum.max = constant ? '1' : maximum.value;
