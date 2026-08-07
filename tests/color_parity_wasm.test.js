@@ -210,6 +210,50 @@ test('PaletteOps enforces exact mirror and loop seams', () => {
   }
 });
 
+test('GenerativePalette removes the saturated-blue gamut seam', () => {
+  const ops = new M.PaletteOps();
+  const recipe = defaultPaletteRecipe();
+  recipe.domain = PaletteV2.domain.VIGNETTE;
+  recipe.hue.baseTurns = 200 / 256;
+  recipe.chroma.center = 1;
+  recipe.chroma.headroom = 1;
+  recipe.lightness.center = 0.43;
+
+  try {
+    const result = ops.inspectV2(recipe);
+    const lut = Uint8Array.from(result.lut);
+    let largestChannelStep = 0;
+    for (let index = 52; index <= 78; index += 1) {
+      for (let channel = 0; channel < 3; channel += 1) {
+        largestChannelStep = Math.max(largestChannelStep,
+          Math.abs(lut[index * 3 + channel] - lut[(index - 1) * 3 + channel]));
+      }
+    }
+    assert.ok(largestChannelStep < 16,
+      `saturated-blue region contains a ${largestChannelStep}-level channel seam`);
+    assert.ok(Array.from(result.fallback).every((mapped) => mapped === 0));
+  } finally {
+    ops.delete();
+  }
+});
+
+test('Complementary harmony progresses once from the seed to its opposite', () => {
+  const ops = new M.PaletteOps();
+  const recipe = defaultPaletteRecipe();
+  recipe.hue.harmony = PaletteV2.harmony.COMPLEMENTARY;
+
+  try {
+    const diagnostics = ops.inspectV2(recipe).diagnostics;
+    const firstHue = diagnostics[4];
+    const middleHue = diagnostics[127 * 6 + 4];
+    const lastHue = diagnostics[255 * 6 + 4];
+    assert.ok(Math.abs(middleHue - firstHue - Math.PI / 2) < 0.02);
+    assert.ok(Math.abs(lastHue - firstHue - Math.PI) < 0.02);
+  } finally {
+    ops.delete();
+  }
+});
+
 test('browser GenerativePalette owns the real bridge result', () => {
   const ops = new M.PaletteOps();
   P.setPaletteOps(ops);
