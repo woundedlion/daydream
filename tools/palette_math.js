@@ -31,7 +31,7 @@ let paletteOps = null;
 
 /**
  * Installs the module-lifetime PaletteOps instance.
- * @param {{compileAndBakeV2:Function, inspectV2:Function}|null} ops
+ * @param {{compileAndBakeV3:Function, inspectV3:Function}|null} ops
  */
 export function setPaletteOps(ops) {
   paletteOps = ops;
@@ -160,7 +160,7 @@ export function proceduralParamsForViewport(parameters, viewport) {
   };
 }
 
-// --- Generative Palette V2 --------------------------------------------------
+// --- Generative Palette V3 --------------------------------------------------
 
 /**
  * Compiles a recipe with the engine and copies its aliased module buffers.
@@ -173,8 +173,8 @@ export function compilePaletteRecipe(recipe, inspect = true) {
     throw new Error('PaletteOps bridge is not initialized');
   }
   const result = inspect
-    ? paletteOps.inspectV2(recipe)
-    : paletteOps.compileAndBakeV2(recipe);
+    ? paletteOps.inspectV3(recipe)
+    : paletteOps.compileAndBakeV3(recipe);
   const copied = {
     status: { ...result.status },
     canonicalRecipe: result.canonicalRecipe
@@ -320,12 +320,12 @@ function enumName(group, value) {
   return name;
 }
 
-function cppFloat3(values) {
+function cppFloatArray(values) {
   return `{${values.map((value) => formatFloatCpp(value, 6)).join(', ')}}`;
 }
 
 /**
- * Serializes a complete canonical V2 recipe.
+ * Serializes a complete canonical V3 recipe.
  * @param {Object} recipe
  * @returns {string}
  */
@@ -333,6 +333,7 @@ export function generativePaletteCpp(recipe) {
   const f = (value) => formatFloatCpp(value, 6);
   return `PaletteRecipe recipe;
 recipe.schema_version = ${recipe.schemaVersion};
+recipe.key_count = ${recipe.keyCount};
 recipe.input.offset = ${f(recipe.input.offset)};
 recipe.input.span = ${f(recipe.input.span)};
 recipe.domain = PaletteDomain::${enumName('domain', recipe.domain)};
@@ -344,17 +345,17 @@ recipe.hue.direction = HueDirection::${enumName('direction', recipe.hue.directio
 recipe.hue.base_turns = ${f(recipe.hue.baseTurns)};
 recipe.hue.spread_turns = ${f(recipe.hue.spreadTurns)};
 recipe.hue.sweep_turns = ${f(recipe.hue.sweepTurns)};
-recipe.hue.custom_turns = ${cppFloat3(recipe.hue.customTurns)};
+recipe.hue.custom_turns = ${cppFloatArray(recipe.hue.customTurns)};
 recipe.lightness.curve = AxisCurve::${enumName('curve', recipe.lightness.curve)};
 recipe.lightness.center = ${f(recipe.lightness.center)};
 recipe.lightness.range = ${f(recipe.lightness.range)};
-recipe.lightness.custom = ${cppFloat3(recipe.lightness.custom)};
+recipe.lightness.custom = ${cppFloatArray(recipe.lightness.custom)};
 recipe.chroma.curve = AxisCurve::${enumName('curve', recipe.chroma.curve)};
 recipe.chroma.basis = ChromaBasis::${enumName('chromaBasis', recipe.chroma.basis)};
 recipe.chroma.center = ${f(recipe.chroma.center)};
 recipe.chroma.range = ${f(recipe.chroma.range)};
 recipe.chroma.headroom = ${f(recipe.chroma.headroom)};
-recipe.chroma.custom = ${cppFloat3(recipe.chroma.custom)};
+recipe.chroma.custom = ${cppFloatArray(recipe.chroma.custom)};
 recipe.hue_torsion = ${f(recipe.hueTorsion)};
 recipe.falloff_start = ${f(recipe.falloffStart)};
 GenerativePalette palette;

@@ -98,7 +98,7 @@ export function lockedGroupMove(rawDelta, members) {
   return { delta, values };
 }
 
-export const PaletteV2 = Object.freeze({
+export const PaletteV3 = Object.freeze({
   hueMode: Object.freeze({ HARMONY: 0, SWEEP: 1, CUSTOM: 2 }),
   harmony: Object.freeze({
     MONOCHROMATIC: 0,
@@ -125,33 +125,34 @@ export const PaletteV2 = Object.freeze({
 
 export function defaultPaletteRecipe() {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
+    keyCount: 6,
     input: { offset: 0, span: 1 },
-    domain: PaletteV2.domain.STRAIGHT,
-    easing: PaletteV2.easing.COSINE,
-    colorPath: PaletteV2.colorPath.OKLCH_ARC,
+    domain: PaletteV3.domain.STRAIGHT,
+    easing: PaletteV3.easing.COSINE,
+    colorPath: PaletteV3.colorPath.OKLCH_ARC,
     hue: {
-      mode: PaletteV2.hueMode.HARMONY,
-      harmony: PaletteV2.harmony.ANALOGOUS,
-      direction: PaletteV2.direction.SHORTEST,
+      mode: PaletteV3.hueMode.HARMONY,
+      harmony: PaletteV3.harmony.ANALOGOUS,
+      direction: PaletteV3.direction.SHORTEST,
       baseTurns: 0,
       spreadTurns: 0.07,
       sweepTurns: 1,
-      customTurns: [0, 0, 0],
+      customTurns: [0, 0, 0, 0, 0, 0],
     },
     lightness: {
-      curve: PaletteV2.curve.CONSTANT,
+      curve: PaletteV3.curve.CONSTANT,
       center: 0.62,
       range: 0,
-      custom: [0, 0, 0],
+      custom: [0, 0, 0, 0, 0, 0],
     },
     chroma: {
-      curve: PaletteV2.curve.CONSTANT,
-      basis: PaletteV2.chromaBasis.LOCAL_GAMUT,
+      curve: PaletteV3.curve.CONSTANT,
+      basis: PaletteV3.chromaBasis.LOCAL_GAMUT,
       center: 0.62,
       range: 0,
       headroom: 0.94,
-      custom: [0, 0, 0],
+      custom: [0, 0, 0, 0, 0, 0],
     },
     hueTorsion: 0,
     falloffStart: 0.9,
@@ -159,19 +160,19 @@ export function defaultPaletteRecipe() {
 }
 
 export function paletteRecipeAvailability(recipe) {
-  const variedChroma = recipe.chroma.curve !== PaletteV2.curve.CONSTANT;
+  const variedChroma = recipe.chroma.curve !== PaletteV3.curve.CONSTANT;
   const hasColor = recipe.chroma.center > 0 || (variedChroma && recipe.chroma.range > 0);
-  const monochromatic = recipe.hue.mode === PaletteV2.hueMode.HARMONY &&
-    recipe.hue.harmony === PaletteV2.harmony.MONOCHROMATIC;
+  const monochromatic = recipe.hue.mode === PaletteV3.hueMode.HARMONY &&
+    recipe.hue.harmony === PaletteV3.harmony.MONOCHROMATIC;
 
   return {
     baseHue: hasColor,
     hueMode: hasColor,
-    harmony: hasColor && recipe.hue.mode === PaletteV2.hueMode.HARMONY,
+    harmony: hasColor && recipe.hue.mode === PaletteV3.hueMode.HARMONY,
     colorPath: hasColor && !monochromatic,
     hueDirection: hasColor && !monochromatic,
     chromaMaximum: variedChroma,
-    lightnessMaximum: recipe.lightness.curve !== PaletteV2.curve.CONSTANT,
+    lightnessMaximum: recipe.lightness.curve !== PaletteV3.curve.CONSTANT,
   };
 }
 
@@ -185,19 +186,19 @@ export const PALETTE_RECIPE_PRESETS = Object.freeze({
   },
   isolightSpectralLoop() {
     const recipe = defaultPaletteRecipe();
-    recipe.domain = PaletteV2.domain.LOOP;
-    recipe.hue.mode = PaletteV2.hueMode.SWEEP;
+    recipe.domain = PaletteV3.domain.LOOP;
+    recipe.hue.mode = PaletteV3.hueMode.SWEEP;
     recipe.hue.sweepTurns = 1;
     recipe.chroma.center = 0.72;
     return recipe;
   },
   tonalMonochrome() {
     const recipe = defaultPaletteRecipe();
-    recipe.hue.harmony = PaletteV2.harmony.MONOCHROMATIC;
-    recipe.lightness.curve = PaletteV2.curve.ASCENDING;
+    recipe.hue.harmony = PaletteV3.harmony.MONOCHROMATIC;
+    recipe.lightness.curve = PaletteV3.curve.ASCENDING;
     recipe.lightness.center = 0.52;
     recipe.lightness.range = 0.72;
-    recipe.chroma.curve = PaletteV2.curve.BELL;
+    recipe.chroma.curve = PaletteV3.curve.BELL;
     recipe.chroma.center = 0.52;
     recipe.chroma.range = 0.42;
     return recipe;
