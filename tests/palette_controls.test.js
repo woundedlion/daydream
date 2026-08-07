@@ -6,6 +6,7 @@ const {
   lockedGroupMove,
   PaletteV3, defaultPaletteRecipe, PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
   paletteRecipeAvailability,
+  minimumPaletteKeyCount,
 } =
   await import('../tools/palette_controls.js');
 
@@ -143,6 +144,7 @@ test('recipe availability exposes only controls that can affect the result', () 
     harmony: true,
     colorPath: true,
     hueDirection: true,
+    minimumKeyCount: 2,
     chromaMaximum: false,
     lightnessMaximum: false,
   });
@@ -168,6 +170,24 @@ test('recipe availability exposes only controls that can affect the result', () 
 
   recipe.lightness.curve = PaletteV3.curve.ASCENDING;
   assert.equal(paletteRecipeAvailability(recipe).lightnessMaximum, true);
+});
+
+test('key count minimum follows the selected color relationship', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.hue.harmony = PaletteV3.harmony.COMPLEMENTARY;
+  assert.equal(minimumPaletteKeyCount(recipe), 2);
+
+  recipe.hue.harmony = PaletteV3.harmony.TRIADIC;
+  assert.equal(minimumPaletteKeyCount(recipe), 3);
+
+  recipe.hue.harmony = PaletteV3.harmony.TETRADIC;
+  assert.equal(minimumPaletteKeyCount(recipe), 4);
+
+  recipe.hue.harmony = PaletteV3.harmony.SQUARE;
+  assert.equal(minimumPaletteKeyCount(recipe), 4);
+
+  recipe.hue.mode = PaletteV3.hueMode.SWEEP;
+  assert.equal(minimumPaletteKeyCount(recipe), 2);
 });
 
 test('recipe state rejects stale compiler results', () => {
