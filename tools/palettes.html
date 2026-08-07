@@ -570,6 +570,36 @@
     }
 
     @media (min-width: 1024px) and (max-width: 1199px) {
+      html,
+      body {
+        height: auto;
+        overflow-x: hidden;
+        overflow-y: auto;
+      }
+
+      .palette-shell {
+        height: auto;
+        min-height: calc(100dvh - 1.5rem);
+      }
+
+      .palette-body,
+      .palette-main {
+        min-height: auto;
+      }
+
+      .palette-main {
+        grid-template-rows: auto auto auto;
+      }
+
+      #waveGraphCanvas {
+        height: 7rem;
+      }
+
+      .strip-panel #colorStripCanvas {
+        height: 8rem;
+        flex: none;
+      }
+
       .key-wheel-card {
         gap: 0.25rem;
       }
