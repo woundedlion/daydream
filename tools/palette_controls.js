@@ -169,6 +169,7 @@ export function paletteRecipeAvailability(recipe) {
     hueMode: hasColor,
     harmony: hasColor && recipe.hue.mode === PaletteV2.hueMode.HARMONY,
     colorPath: hasColor && !monochromatic,
+    hueDirection: hasColor && !monochromatic,
     chromaMaximum: variedChroma,
     lightnessMaximum: recipe.lightness.curve !== PaletteV2.curve.CONSTANT,
   };

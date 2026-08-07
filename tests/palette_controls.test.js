@@ -141,6 +141,7 @@ test('recipe availability exposes only controls that can affect the result', () 
     hueMode: true,
     harmony: true,
     colorPath: true,
+    hueDirection: true,
     chromaMaximum: false,
     lightnessMaximum: false,
   });
@@ -151,6 +152,7 @@ test('recipe availability exposes only controls that can affect the result', () 
   recipe.hue.mode = PaletteV2.hueMode.HARMONY;
   recipe.hue.harmony = PaletteV2.harmony.MONOCHROMATIC;
   assert.equal(paletteRecipeAvailability(recipe).colorPath, false);
+  assert.equal(paletteRecipeAvailability(recipe).hueDirection, false);
 
   recipe.chroma.center = 0;
   let availability = paletteRecipeAvailability(recipe);

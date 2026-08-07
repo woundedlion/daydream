@@ -672,21 +672,21 @@
             </div>
           </div>
           <div id="gen_hue_mode_field" class="recipe-field">
-            <label for="gen_hue_mode">Color Pattern</label>
+            <label for="gen_hue_mode">Hue Structure</label>
             <select id="gen_hue_mode" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="HARMONY">Related Colors</option>
-              <option value="SWEEP">Rainbow Sweep</option>
+              <option value="HARMONY">Color Harmony</option>
+              <option value="SWEEP">Full Spectrum</option>
             </select>
           </div>
           <div id="gen_harmony_field" class="recipe-field">
             <label for="gen_harmony">Color Relationship</label>
             <select id="gen_harmony" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="ANALOGOUS">Neighbors</option>
-              <option value="MONOCHROMATIC">One Hue</option>
-              <option value="ACCENTED_ANALOGOUS">Neighbors + Accent</option>
-              <option value="COMPLEMENTARY">Opposites</option>
-              <option value="SPLIT_COMPLEMENTARY">Split Opposites</option>
-              <option value="TRIADIC">Three-Way</option>
+              <option value="ANALOGOUS">Analogous</option>
+              <option value="MONOCHROMATIC">Monochromatic</option>
+              <option value="ACCENTED_ANALOGOUS">Accented Analogous</option>
+              <option value="COMPLEMENTARY">Complementary</option>
+              <option value="SPLIT_COMPLEMENTARY">Split Complementary</option>
+              <option value="TRIADIC">Triadic</option>
             </select>
           </div>
         </section>
@@ -764,6 +764,14 @@
             <select id="gen_path" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
               <option value="OKLCH_ARC">Follow Hue Wheel</option>
               <option value="OKLAB_CARTESIAN">Blend Through Neutral</option>
+            </select>
+          </div>
+          <div id="gen_direction_field" class="recipe-field">
+            <label for="gen_direction">Hue Direction</label>
+            <select id="gen_direction" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+              <option value="SHORTEST">Shortest Arc</option>
+              <option value="CLOCKWISE">Clockwise</option>
+              <option value="COUNTERCLOCKWISE">Counterclockwise</option>
             </select>
           </div>
         </section>
@@ -969,6 +977,7 @@
       recipe.colorPath = enumIndex('colorPath', document.getElementById('gen_path').value);
       recipe.hue.mode = enumIndex('hueMode', document.getElementById('gen_hue_mode').value);
       recipe.hue.harmony = enumIndex('harmony', document.getElementById('gen_harmony').value);
+      recipe.hue.direction = enumIndex('direction', document.getElementById('gen_direction').value);
       recipe.hue.baseTurns = Number(document.getElementById('gen_seed_slider').value) / 256;
       recipe.hue.sweepTurns = 1;
       recipe.lightness.curve = enumIndex('curve', document.getElementById('gen_brightness').value);
@@ -991,6 +1000,7 @@
         ['gen_hue_mode_field', 'gen_hue_mode', availability.hueMode],
         ['gen_harmony_field', 'gen_harmony', availability.harmony],
         ['gen_path_field', 'gen_path', availability.colorPath],
+        ['gen_direction_field', 'gen_direction', availability.hueDirection],
         ['gen_chroma_maximum_field', 'gen_chroma_maximum', availability.chromaMaximum],
         ['gen_lightness_maximum_field', 'gen_lightness_maximum', availability.lightnessMaximum],
       ];
@@ -1012,6 +1022,8 @@
         Object.keys(PaletteV2.hueMode).find((key) => PaletteV2.hueMode[key] === recipe.hue.mode);
       document.getElementById('gen_harmony').value =
         Object.keys(PaletteV2.harmony).find((key) => PaletteV2.harmony[key] === recipe.hue.harmony);
+      document.getElementById('gen_direction').value =
+        Object.keys(PaletteV2.direction).find((key) => PaletteV2.direction[key] === recipe.hue.direction);
       document.getElementById('gen_path').value =
         Object.keys(PaletteV2.colorPath).find((key) => PaletteV2.colorPath[key] === recipe.colorPath);
       document.getElementById('gen_brightness').value =
@@ -1600,7 +1612,7 @@
       }
 
       const dropdowns = [
-        'gen_hue_mode', 'gen_harmony', 'gen_shape', 'gen_path',
+        'gen_hue_mode', 'gen_harmony', 'gen_shape', 'gen_path', 'gen_direction',
       ];
       dropdowns.forEach(id => {
         const el = document.getElementById(id);
