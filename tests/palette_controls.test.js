@@ -6,7 +6,8 @@ const {
   createPaletteViewport, recipeForViewport, axisEndpoints, axisFromEndpoints,
   lockedGroupMove,
   PaletteV4, defaultPaletteRecipe, PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
-  paletteRecipeAvailability,
+  paletteRecipeAvailability, wrapTurns, signedTurnDelta, equivalentTurnNear,
+  customHueKeyState, customHueTurns,
 } =
   await import('../tools/palette_controls.js');
 
@@ -142,6 +143,60 @@ test('the default recipe is a detached, complete V4 value', () => {
   assert.equal(second.hue.customTurns[0], 0);
 });
 
+test('custom hue offsets stay signed and continuous across the wrap seam', () => {
+  assert.equal(wrapTurns(-0.02), 0.98);
+  assert.ok(Math.abs(signedTurnDelta(0.02 - 0.98) - 0.04) < 1e-12);
+  assert.ok(Math.abs(equivalentTurnNear(0.02, 0.98) - 1.02) < 1e-12);
+  assert.ok(Math.abs(equivalentTurnNear(0.98, 0.02) + 0.02) < 1e-12);
+});
+
+test('custom hue state derives three sensible keys from authored harmonies', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.hue.baseTurns = 0.98;
+  recipe.hue.harmony = PaletteV4.harmony.TRIADIC;
+  const state = customHueKeyState(recipe);
+
+  assert.equal(state.baseTurns, 0.98);
+  assert.ok(Math.abs(state.offsets[1] - 1 / 3) < 1e-12);
+  assert.ok(Math.abs(state.offsets[2] - 2 / 3) < 1e-12);
+});
+
+test('custom hue state samples a sweep into three editable keys', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.hue.mode = PaletteV4.hueMode.SWEEP;
+  recipe.hue.baseTurns = 0.9;
+  recipe.hue.sweepTurns = 1;
+  recipe.hue.direction = PaletteV4.direction.CLOCKWISE;
+
+  assert.deepEqual(customHueKeyState(recipe), {
+    baseTurns: 0.9,
+    offsets: [0, -0.5, -1],
+  });
+});
+
+test('custom hue state preserves unwrapped offsets from existing custom recipes', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.hue.mode = PaletteV4.hueMode.CUSTOM;
+  recipe.hue.customTurns = [0.98, 1.02, 0.73, 0];
+
+  assert.deepEqual(customHueKeyState(recipe), {
+    baseTurns: 0.98,
+    offsets: [0, 0.040000000000000036, -0.25],
+  });
+});
+
+test('moving the custom base hue rotates every key without changing offsets', () => {
+  const offsets = [0, 0.04, -0.25];
+  const before = customHueTurns(0.98, offsets);
+  const after = customHueTurns(0.03, offsets);
+
+  assert.deepEqual(before.slice(0, 3), [0.98, 1.02, 0.73]);
+  assert.deepEqual(after.slice(0, 2), [0.03, 0.07]);
+  assert.ok(Math.abs(after[2] + 0.22) < 1e-12);
+  for (let i = 0; i < 3; i++)
+    assert.ok(Math.abs((after[i] - before[i]) + 0.95) < 1e-12);
+});
+
 test('recipe presets express distinct high-level intents', () => {
   const loop = PALETTE_RECIPE_PRESETS.isolightSpectralLoop();
   const tonal = PALETTE_RECIPE_PRESETS.tonalMonochrome();
@@ -192,7 +247,7 @@ test('recipe availability exposes only controls that can affect the result', () 
   recipe.lightness.curve = PaletteV4.curve.CUSTOM;
   recipe.chroma.curve = PaletteV4.curve.CUSTOM;
   availability = paletteRecipeAvailability(recipe);
-  assert.equal(availability.baseHue, false);
+  assert.equal(availability.baseHue, true);
   assert.equal(availability.hueDirection, false);
   assert.equal(availability.lightnessEndpoints, false);
   assert.equal(availability.chromaEndpoints, false);

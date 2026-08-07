@@ -147,6 +147,86 @@
       line-height: 1.25rem;
     }
 
+    .key-wheel-card {
+      align-items: stretch;
+    }
+
+    .key-wheel-intro {
+      color: #94A3B8;
+      font-size: 0.6875rem;
+      line-height: 0.875rem;
+    }
+
+    .key-wheel-canvas-wrap {
+      display: grid;
+      place-items: center;
+    }
+
+    #hueKeyWheelCanvas {
+      width: min(100%, 13rem);
+      height: auto;
+      border: 1px solid var(--slate-600);
+      border-radius: 50%;
+      background: var(--slate-900);
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    #hueKeyWheelCanvas:focus-visible {
+      outline: 2px solid var(--blue-500);
+      outline-offset: 2px;
+    }
+
+    .custom-key-fields {
+      display: grid;
+      gap: 0.25rem;
+    }
+
+    .custom-key-field {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) 5.25rem;
+      align-items: center;
+      gap: 0.375rem;
+      color: #CBD5E1;
+      font-size: 0.75rem;
+    }
+
+    .custom-key-badge {
+      display: inline-grid;
+      width: 1.25rem;
+      height: 1.25rem;
+      place-items: center;
+      border: 1px solid #FFFFFF;
+      border-radius: 50%;
+      background: var(--slate-900);
+      color: #FFFFFF;
+      font-size: 0.6875rem;
+      font-weight: 700;
+    }
+
+    .custom-key-number,
+    .custom-key-anchor {
+      box-sizing: border-box;
+      width: 100%;
+      min-width: 0;
+      height: 1.75rem;
+      padding: 0.25rem 0.375rem;
+      border: 1px solid var(--slate-600);
+      border-radius: 0.375rem;
+      background: var(--slate-700);
+      color: #FFFFFF;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      text-align: right;
+    }
+
+    .custom-key-anchor {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      color: #94A3B8;
+    }
+
     .recipe-field {
       display: grid;
       grid-template-columns: minmax(4.75rem, 0.7fr) minmax(0, 1.3fr);
@@ -443,7 +523,7 @@
       }
 
       #tab-content-generative .recipe-controls {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
       }
 
       .wave-panel {
@@ -701,7 +781,7 @@
             <select id="gen_hue_mode" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
               <option value="HARMONY">Color Harmony</option>
               <option value="SWEEP">Hue Sweep</option>
-              <option value="CUSTOM" disabled>Custom Keys (preset)</option>
+              <option value="CUSTOM">Custom Keys</option>
             </select>
           </div>
           <div id="gen_harmony_field" class="recipe-field">
@@ -805,6 +885,35 @@
             </select>
           </div>
         </section>
+
+        <section class="param-group recipe-group key-wheel-card" aria-labelledby="key_wheel_heading">
+          <h3 id="key_wheel_heading" class="font-bold text-indigo-300">OKLCH Hue Keys</h3>
+          <p id="key_wheel_help" class="key-wheel-intro">Drag a numbered key to switch to custom keys. Drag A or move Base Hue to rotate the set.</p>
+          <div class="key-wheel-canvas-wrap">
+            <canvas id="hueKeyWheelCanvas" width="256" height="256" tabindex="0"
+              role="img" aria-describedby="key_wheel_help"
+              aria-label="OKLCH gamut wheel with three hue key positions"></canvas>
+          </div>
+          <div class="custom-key-fields" aria-label="Custom key offsets from base hue">
+            <div class="custom-key-field">
+              <span class="custom-key-badge" aria-hidden="true">A</span>
+              <span>Base anchor</span>
+              <span class="custom-key-anchor">0&deg;</span>
+            </div>
+            <label class="custom-key-field" for="gen_custom_key_b">
+              <span class="custom-key-badge" aria-hidden="true">B</span>
+              <span>Offset from A (&deg;)</span>
+              <input id="gen_custom_key_b" class="custom-key-number" type="number"
+                min="-720" max="720" step="0.1" value="25.2">
+            </label>
+            <label class="custom-key-field" for="gen_custom_key_c">
+              <span class="custom-key-badge" aria-hidden="true">C</span>
+              <span>Offset from A (&deg;)</span>
+              <input id="gen_custom_key_c" class="custom-key-number" type="number"
+                min="-720" max="720" step="0.1" value="50.4">
+            </label>
+          </div>
+        </section>
       </div>
       <div class="recipe-window-controls" aria-label="Input domain window">
         <div class="recipe-field">
@@ -879,7 +988,7 @@
     // (not shared.js, which pulls in three.js — a dependency this tool
     // otherwise doesn't have).
     import { showFatalError, bootstrapTool } from './banner.js';
-    import { linearRgbToHex } from './color.js';
+    import { linearRgbToHex, linearToSrgbFloat } from './color.js';
     // Pure palette math (ProceduralPalette/GenerativePalette + helpers and the
     // C++ export-string generators) lives in palette_math.js so it can be unit
     // tested without a DOM. DOM-coupled wiring stays inline below.
@@ -897,6 +1006,8 @@
       paletteTabFromSearch, paletteTabUrl,
       defaultPaletteRecipe, PaletteV4,
       PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
+      wrapTurns, signedTurnDelta, equivalentTurnNear,
+      customHueKeyState, customHueTurns,
     } from './palette_controls.js';
     // The two canvas painters take their canvas, context and palette as
     // arguments, so they live in their own module and are unit tested against a
@@ -949,11 +1060,209 @@
     let parameters = { ...defaultParams };
     let palette;
     let recipeTemplate = defaultPaletteRecipe();
+    let customHueOffsets = [0, 0.07, 0.14];
+    let previousHueMode = PaletteV4.hueMode.HARMONY;
     let effectPalettePresets = [];
     const paletteViewport = createPaletteViewport();
 
+    let hueKeyWheelCanvas, hueKeyWheelCtx;
+    let hueKeyWheelRaster = null;
+    let hueKeyWheelLightness = null;
+    let activeHueKey = null;
+    let activeHuePointerId = null;
+
     const enumIndex = (group, value) => PaletteV4[group][value];
     const fullViewport = Object.freeze({ start: 0, end: 1 });
+
+    function customBaseTurns() {
+      return Number(document.getElementById('gen_seed_slider').value) / 360;
+    }
+
+    function setCustomBaseTurns(turns) {
+      const degrees = wrapTurns(turns) * 360;
+      document.getElementById('gen_seed_slider').value = degrees;
+      document.getElementById('gen_seed_value').textContent =
+        `${Number(degrees.toFixed(4))}°`;
+    }
+
+    function syncCustomKeyControls(offsets = customHueOffsets) {
+      for (const [index, id] of [[1, 'gen_custom_key_b'], [2, 'gen_custom_key_c']]) {
+        document.getElementById(id).value =
+          String(Number((offsets[index] * 360).toFixed(4)));
+      }
+    }
+
+    function activateCustomHue(sourceRecipe) {
+      const state = customHueKeyState(sourceRecipe);
+      customHueOffsets = state.offsets;
+      setCustomBaseTurns(state.baseTurns);
+      document.getElementById('gen_hue_mode').value = 'CUSTOM';
+      previousHueMode = PaletteV4.hueMode.CUSTOM;
+      syncCustomKeyControls();
+      syncRecipeControlAvailability();
+    }
+
+    function currentHueKeyState(recipe) {
+      if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
+        return { baseTurns: customBaseTurns(), offsets: [...customHueOffsets] };
+      }
+      return customHueKeyState(recipe);
+    }
+
+    function oklchLinearRgb(lightness, chroma, turns) {
+      const angle = turns * Math.PI * 2;
+      const a = chroma * Math.cos(angle);
+      const b = chroma * Math.sin(angle);
+      const lRoot = lightness + 0.3963377774 * a + 0.2158037573 * b;
+      const mRoot = lightness - 0.1055613458 * a - 0.0638541728 * b;
+      const sRoot = lightness - 0.0894841775 * a - 1.291485548 * b;
+      const l = lRoot * lRoot * lRoot;
+      const m = mRoot * mRoot * mRoot;
+      const s = sRoot * sRoot * sRoot;
+      return [
+        4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+      ];
+    }
+
+    function wheelRaster(lightness) {
+      const { width, height } = hueKeyWheelCanvas;
+      const image = hueKeyWheelCtx.createImageData(width, height);
+      const radius = Math.min(width, height) * 0.47;
+      const centerX = width * 0.5;
+      const centerY = height * 0.5;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const dx = x + 0.5 - centerX;
+          const dy = y + 0.5 - centerY;
+          const distance = Math.hypot(dx, dy);
+          const offset = (y * width + x) * 4;
+          const chroma = distance / radius * 0.4;
+          const rgb = oklchLinearRgb(lightness, chroma,
+            wrapTurns(Math.atan2(dy, dx) / (Math.PI * 2)));
+          const inGamut = distance <= radius && rgb.every((channel) =>
+            channel >= -0.0001 && channel <= 1.0001);
+          if (inGamut) {
+            for (let channel = 0; channel < 3; channel++) {
+              image.data[offset + channel] = Math.round(
+                Math.max(0, Math.min(1, linearToSrgbFloat(rgb[channel]))) * 255);
+            }
+          } else {
+            image.data[offset] = 15;
+            image.data[offset + 1] = 23;
+            image.data[offset + 2] = 42;
+          }
+          image.data[offset + 3] = 255;
+        }
+      }
+      return image;
+    }
+
+    function drawHueKeyWheel(recipe) {
+      if (!hueKeyWheelCanvas || !hueKeyWheelCtx) return;
+      const lightness = recipe.lightness.center;
+      if (!hueKeyWheelRaster || hueKeyWheelLightness !== lightness) {
+        hueKeyWheelRaster = wheelRaster(lightness);
+        hueKeyWheelLightness = lightness;
+      }
+      hueKeyWheelCtx.putImageData(hueKeyWheelRaster, 0, 0);
+
+      const { width, height } = hueKeyWheelCanvas;
+      const centerX = width * 0.5;
+      const centerY = height * 0.5;
+      const radius = Math.min(width, height) * 0.405;
+      const state = currentHueKeyState(recipe);
+      if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM)
+        syncCustomKeyControls(state.offsets);
+      const points = state.offsets.map((offset) => {
+        const angle = (state.baseTurns + offset) * Math.PI * 2;
+        return {
+          x: centerX + Math.cos(angle) * radius,
+          y: centerY + Math.sin(angle) * radius,
+        };
+      });
+
+      hueKeyWheelCtx.beginPath();
+      hueKeyWheelCtx.moveTo(points[0].x, points[0].y);
+      for (const point of points.slice(1)) hueKeyWheelCtx.lineTo(point.x, point.y);
+      hueKeyWheelCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+      hueKeyWheelCtx.lineWidth = 2;
+      hueKeyWheelCtx.stroke();
+
+      points.forEach((point, index) => {
+        hueKeyWheelCtx.beginPath();
+        hueKeyWheelCtx.arc(point.x, point.y, 11, 0, Math.PI * 2);
+        hueKeyWheelCtx.fillStyle = '#0F172A';
+        hueKeyWheelCtx.fill();
+        hueKeyWheelCtx.strokeStyle = index === activeHueKey ? '#60A5FA' : '#FFFFFF';
+        hueKeyWheelCtx.lineWidth = index === activeHueKey ? 4 : 2;
+        hueKeyWheelCtx.stroke();
+        hueKeyWheelCtx.fillStyle = '#FFFFFF';
+        hueKeyWheelCtx.font = '700 12px Inter, sans-serif';
+        hueKeyWheelCtx.textAlign = 'center';
+        hueKeyWheelCtx.textBaseline = 'middle';
+        hueKeyWheelCtx.fillText(['A', 'B', 'C'][index], point.x, point.y);
+      });
+
+      const degrees = state.offsets.map((offset) =>
+        Number((wrapTurns(state.baseTurns + offset) * 360).toFixed(1)));
+      hueKeyWheelCanvas.setAttribute('aria-label',
+        `OKLCH gamut wheel. Key A ${degrees[0]} degrees, Key B ${degrees[1]} degrees, Key C ${degrees[2]} degrees.`);
+    }
+
+    function wheelPointerTurn(event) {
+      const rect = hueKeyWheelCanvas.getBoundingClientRect();
+      const x = event.clientX - rect.left - rect.width * 0.5;
+      const y = event.clientY - rect.top - rect.height * 0.5;
+      return wrapTurns(Math.atan2(y, x) / (Math.PI * 2));
+    }
+
+    function updateHueKeyFromPointer(event) {
+      if (activeHueKey === null) return;
+      const pointerTurn = wheelPointerTurn(event);
+      if (activeHueKey === 0) {
+        setCustomBaseTurns(pointerTurn);
+      } else {
+        const base = customBaseTurns();
+        const current = base + customHueOffsets[activeHueKey];
+        const next = equivalentTurnNear(pointerTurn, current);
+        customHueOffsets[activeHueKey] = Math.max(-2, Math.min(2, next - base));
+        syncCustomKeyControls();
+      }
+      scheduleUpdate();
+    }
+
+    function handleHueWheelPointerDown(event) {
+      if (!event.isPrimary || event.button !== 0 || activeHuePointerId !== null) return;
+      const sourceRecipe = readPaletteRecipe();
+      const sourceState = currentHueKeyState(sourceRecipe);
+      if (sourceRecipe.hue.mode !== PaletteV4.hueMode.CUSTOM)
+        activateCustomHue(sourceRecipe);
+      const turn = wheelPointerTurn(event);
+      activeHueKey = sourceState.offsets.reduce((nearest, offset, index) =>
+        Math.abs(signedTurnDelta(turn - sourceState.baseTurns - offset)) <
+          Math.abs(signedTurnDelta(turn - sourceState.baseTurns - sourceState.offsets[nearest]))
+          ? index : nearest, 0);
+      activeHuePointerId = event.pointerId;
+      hueKeyWheelCanvas.setPointerCapture(event.pointerId);
+      updateHueKeyFromPointer(event);
+      event.preventDefault();
+    }
+
+    function handleHueWheelPointerMove(event) {
+      if (event.pointerId !== activeHuePointerId) return;
+      updateHueKeyFromPointer(event);
+    }
+
+    function handleHueWheelPointerEnd(event) {
+      if (event.pointerId !== activeHuePointerId) return;
+      if (hueKeyWheelCanvas.hasPointerCapture(event.pointerId))
+        hueKeyWheelCanvas.releasePointerCapture(event.pointerId);
+      activeHueKey = null;
+      activeHuePointerId = null;
+      scheduleUpdate();
+    }
 
     function recipeWindow() {
       return {
@@ -1082,8 +1391,11 @@
       recipe.hue.mode = enumIndex('hueMode', document.getElementById('gen_hue_mode').value);
       recipe.hue.harmony = enumIndex('harmony', document.getElementById('gen_harmony').value);
       recipe.hue.direction = enumIndex('direction', document.getElementById('gen_direction').value);
-      if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM) {
-        recipe.hue.baseTurns = Number(document.getElementById('gen_seed_slider').value) / 360;
+      recipe.hue.baseTurns = customBaseTurns();
+      if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
+        recipe.hue.customTurns = customHueTurns(
+          recipe.hue.baseTurns, customHueOffsets, recipe.hue.customTurns);
+      } else {
         recipe.hue.sweepTurns = 1;
       }
       recipe.lightness.curve = enumIndex('curve', document.getElementById('gen_brightness').value);
@@ -1141,13 +1453,15 @@
         Object.keys(PaletteV4.curve).find((key) => PaletteV4.curve[key] === recipe.lightness.curve);
       document.getElementById('gen_chroma_curve').value =
         Object.keys(PaletteV4.curve).find((key) => PaletteV4.curve[key] === recipe.chroma.curve);
-      const hueDegrees = ((recipe.hue.baseTurns * 360) % 360 + 360) % 360;
-      document.getElementById('gen_seed_slider').value = hueDegrees;
+      const hueState = customHueKeyState(recipe);
+      customHueOffsets = hueState.offsets;
+      previousHueMode = recipe.hue.mode;
+      setCustomBaseTurns(recipe.hue.mode === PaletteV4.hueMode.CUSTOM
+        ? hueState.baseTurns : recipe.hue.baseTurns);
+      syncCustomKeyControls();
       setRecipeWindow(recipe.input.offset, recipe.input.span);
       setAxisEndpoints('lightness', axisEndpoints(recipe.lightness));
       setAxisEndpoints('chroma', axisEndpoints(recipe.chroma));
-      document.getElementById('gen_seed_value').textContent =
-        `${Number(hueDegrees.toFixed(4))}°`;
       syncRecipeControlAvailability();
       scheduleUpdate();
     }
@@ -1691,6 +2005,8 @@
       colorStripPainter?.invalidate();
 
       drawWaveGraph({ canvas: waveGraphCanvas, ctx: waveGraphCtx, palette });
+      if (activeTab === 'generative')
+        drawHueKeyWheel(palette.canonicalRecipe);
       drawColorStrip();
       updateStripView();
       syncResetZoomButton();
@@ -1731,6 +2047,8 @@
       colorStripCtx = colorStripCanvas ? colorStripCanvas.getContext('2d') : null;
       waveGraphCanvas = document.getElementById('waveGraphCanvas');
       waveGraphCtx = waveGraphCanvas ? waveGraphCanvas.getContext('2d') : null;
+      hueKeyWheelCanvas = document.getElementById('hueKeyWheelCanvas');
+      hueKeyWheelCtx = hueKeyWheelCanvas ? hueKeyWheelCanvas.getContext('2d') : null;
       resetZoomButton = document.getElementById('resetZoomButton');
       paletteRangeHeading = document.getElementById('palette_range_heading');
       copyFeedback = document.getElementById('palette_copy_feedback');
@@ -1739,7 +2057,8 @@
       copyFeedbackHex = document.getElementById('palette_copy_hex');
 
       // Safety check for critical elements
-      if (!colorStripCanvas || !waveGraphCanvas || !colorStripCtx || !waveGraphCtx) {
+      if (!colorStripCanvas || !waveGraphCanvas || !hueKeyWheelCanvas ||
+          !colorStripCtx || !waveGraphCtx || !hueKeyWheelCtx) {
         console.error("Fatal Error: Canvas elements not found. Stopping init.");
         return;
       }
@@ -1773,12 +2092,38 @@
         });
       }
 
+      for (const [index, id] of [[1, 'gen_custom_key_b'], [2, 'gen_custom_key_c']]) {
+        document.getElementById(id).addEventListener('input', (event) => {
+          const degrees = event.target.valueAsNumber;
+          if (!Number.isFinite(degrees)) return;
+          if (enumIndex('hueMode', document.getElementById('gen_hue_mode').value) !==
+              PaletteV4.hueMode.CUSTOM)
+            activateCustomHue(readPaletteRecipe());
+          customHueOffsets[index] = Math.max(-2, Math.min(2, degrees / 360));
+          syncCustomKeyControls();
+          scheduleUpdate();
+        });
+      }
+
       const dropdowns = [
         'gen_hue_mode', 'gen_harmony', 'gen_shape', 'gen_path', 'gen_direction',
       ];
       dropdowns.forEach(id => {
         const el = document.getElementById(id);
         el?.addEventListener('change', () => {
+          if (id === 'gen_hue_mode') {
+            const nextMode = enumIndex('hueMode', el.value);
+            if (nextMode === PaletteV4.hueMode.CUSTOM &&
+                previousHueMode !== PaletteV4.hueMode.CUSTOM) {
+              const sourceRecipe = readPaletteRecipe();
+              sourceRecipe.hue.mode = previousHueMode;
+              sourceRecipe.hue.baseTurns = customBaseTurns();
+              sourceRecipe.hue.sweepTurns = 1;
+              activateCustomHue(sourceRecipe);
+            } else {
+              previousHueMode = nextMode;
+            }
+          }
           if (id === 'gen_harmony' && el.value === 'COMPLEMENTARY')
             document.getElementById('gen_path').value = 'OKLAB_CARTESIAN';
           syncRecipeControlAvailability();
@@ -1809,6 +2154,11 @@
       syncRecipeControlAvailability();
 
       window.addEventListener('resize', scheduleUpdate);
+
+      hueKeyWheelCanvas.addEventListener('pointerdown', handleHueWheelPointerDown);
+      hueKeyWheelCanvas.addEventListener('pointermove', handleHueWheelPointerMove);
+      hueKeyWheelCanvas.addEventListener('pointerup', handleHueWheelPointerEnd);
+      hueKeyWheelCanvas.addEventListener('pointercancel', handleHueWheelPointerEnd);
 
       // 3. Add drag-and-drop listeners
       colorStripCanvas.addEventListener('pointerdown', handleDragStart);
@@ -1846,6 +2196,10 @@
         colorStripCanvas.removeEventListener('pointermove', handleDragMove);
         colorStripCanvas.removeEventListener('pointerup', handleDragEnd);
         colorStripCanvas.removeEventListener('pointercancel', handleDragCancel);
+        hueKeyWheelCanvas.removeEventListener('pointerdown', handleHueWheelPointerDown);
+        hueKeyWheelCanvas.removeEventListener('pointermove', handleHueWheelPointerMove);
+        hueKeyWheelCanvas.removeEventListener('pointerup', handleHueWheelPointerEnd);
+        hueKeyWheelCanvas.removeEventListener('pointercancel', handleHueWheelPointerEnd);
       });
     }
 

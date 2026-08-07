@@ -5,6 +5,19 @@
 
 const clampUnit = (value) => Math.max(0, Math.min(1, value));
 
+export const wrapTurns = (turns) => turns - Math.floor(turns);
+
+export function signedTurnDelta(delta) {
+  const wrapped = wrapTurns(delta);
+  if (wrapped < 0.5) return wrapped;
+  if (wrapped > 0.5) return wrapped - 1;
+  return delta < 0 ? -0.5 : 0.5;
+}
+
+export function equivalentTurnNear(wrappedTurn, referenceTurn) {
+  return referenceTurn + signedTurnDelta(wrappedTurn - referenceTurn);
+}
+
 const PALETTE_TABS = new Set(['procedural', 'generative']);
 
 export function paletteTabFromSearch(search) {
@@ -139,6 +152,87 @@ export const PaletteV4 = Object.freeze({
   easing: Object.freeze({ LINEAR: 0, COSINE: 1, SMOOTHSTEP: 2 }),
 });
 
+function directedTurnDelta(delta, direction) {
+  if (direction === PaletteV4.direction.SHORTEST) return signedTurnDelta(delta);
+  const wrapped = wrapTurns(delta);
+  if (direction === PaletteV4.direction.CLOCKWISE)
+    return wrapped === 0 ? 0 : wrapped - 1;
+  return wrapped;
+}
+
+function harmonyRelationships(recipe) {
+  const { baseTurns: base, spreadTurns: spread, harmony, direction } = recipe.hue;
+  const orientation = direction === PaletteV4.direction.CLOCKWISE ? -1 : 1;
+  switch (harmony) {
+    case PaletteV4.harmony.MONOCHROMATIC:
+      return [base];
+    case PaletteV4.harmony.ANALOGOUS:
+      return [base - orientation * spread, base, base + orientation * spread];
+    case PaletteV4.harmony.ACCENTED_ANALOGOUS:
+      return [base - orientation * spread, base, base + orientation * spread,
+        base + orientation * 0.5];
+    case PaletteV4.harmony.COMPLEMENTARY:
+      return [base, base + orientation * 0.5];
+    case PaletteV4.harmony.SPLIT_COMPLEMENTARY:
+      return [base, base + orientation * (0.5 - spread),
+        base + orientation * (0.5 + spread)];
+    case PaletteV4.harmony.TRIADIC:
+      return [base, base + orientation / 3, base + orientation * 2 / 3];
+    case PaletteV4.harmony.TETRADIC:
+      return [base, base + orientation * spread, base + orientation * 0.5,
+        base + orientation * (0.5 + spread)];
+    case PaletteV4.harmony.SQUARE:
+      return [base, base + orientation * 0.25, base + orientation * 0.5,
+        base + orientation * 0.75];
+    default:
+      throw new RangeError(`Unknown palette harmony: ${harmony}`);
+  }
+}
+
+function resampleThreeTurns(turns) {
+  if (turns.length === 1) return [turns[0], turns[0], turns[0]];
+  return [0, 0.5, 1].map((position) => {
+    const scaled = position * (turns.length - 1);
+    const left = Math.floor(scaled);
+    const right = Math.min(left + 1, turns.length - 1);
+    return turns[left] + (turns[right] - turns[left]) * (scaled - left);
+  });
+}
+
+export function customHueKeyState(recipe) {
+  let turns;
+  if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
+    turns = recipe.hue.customTurns.slice(0, 3);
+  } else if (recipe.hue.mode === PaletteV4.hueMode.SWEEP) {
+    const sweep = recipe.hue.direction === PaletteV4.direction.CLOCKWISE
+      ? -Math.abs(recipe.hue.sweepTurns)
+      : recipe.hue.direction === PaletteV4.direction.COUNTERCLOCKWISE
+        ? Math.abs(recipe.hue.sweepTurns)
+        : recipe.hue.sweepTurns;
+    turns = [recipe.hue.baseTurns, recipe.hue.baseTurns + sweep * 0.5,
+      recipe.hue.baseTurns + sweep];
+  } else {
+    const relationships = harmonyRelationships(recipe);
+    for (let i = 1; i < relationships.length; i++) {
+      relationships[i] = relationships[i - 1] + directedTurnDelta(
+        relationships[i] - relationships[i - 1], recipe.hue.direction);
+    }
+    turns = resampleThreeTurns(relationships);
+  }
+
+  const anchor = turns[0];
+  return {
+    baseTurns: wrapTurns(anchor),
+    offsets: turns.map((turn) => turn - anchor),
+  };
+}
+
+export function customHueTurns(baseTurns, offsets, template = [0, 0, 0, 0]) {
+  const turns = [...template];
+  for (let i = 0; i < 3; i++) turns[i] = wrapTurns(baseTurns) + offsets[i];
+  return turns;
+}
+
 export function defaultPaletteRecipe() {
   return {
     schemaVersion: 4,
@@ -184,7 +278,7 @@ export function paletteRecipeAvailability(recipe) {
   const customChroma = recipe.chroma.curve === PaletteV4.curve.CUSTOM;
 
   return {
-    baseHue: hasColor && !customHue,
+    baseHue: hasColor,
     hueMode: hasColor,
     harmony: hasColor && recipe.hue.mode === PaletteV4.hueMode.HARMONY,
     colorPath: hasColor && !monochromatic,
