@@ -29,8 +29,8 @@ function mockPaletteOps(overrides = {}) {
     fallback: new Uint8Array(256),
   });
   return {
-    compileAndBakeV2: compile,
-    inspectV2: compile,
+    compileAndBakeV3: compile,
+    inspectV3: compile,
     ...overrides,
   };
 }
@@ -240,14 +240,15 @@ test('GenerativePalette.get clamps to the final LUT entry', () => {
   }
 });
 
-test('generativePaletteCpp serializes the complete V2 recipe', () => {
+test('generativePaletteCpp serializes the complete V3 recipe', () => {
   const recipe = defaultPaletteRecipe();
   recipe.domain = 4;
   recipe.hue.harmony = 5;
   recipe.lightness.curve = 1;
   const source = generativePaletteCpp(recipe);
 
-  assert.match(source, /recipe\.schema_version = 2;/);
+  assert.match(source, /recipe\.schema_version = 3;/);
+  assert.match(source, /recipe\.key_count = 6;/);
   assert.match(source, /recipe\.input\.offset = 0\.0f;/);
   assert.match(source, /recipe\.input\.span = 1\.0f;/);
   assert.match(source, /PaletteDomain::LOOP/);
@@ -284,7 +285,7 @@ test('compilePaletteRecipe selects the requested bridge operation and owns its b
       fallback,
     };
   };
-  setPaletteOps({ compileAndBakeV2: compile('compile'), inspectV2: compile('inspect') });
+  setPaletteOps({ compileAndBakeV3: compile('compile'), inspectV3: compile('inspect') });
   try {
     const inspected = compilePaletteRecipe(recipe);
     const compiled = compilePaletteRecipe(recipe, false);
@@ -301,7 +302,7 @@ test('compilePaletteRecipe selects the requested bridge operation and owns its b
 
 test('GenerativePalette reports compiler failures', () => {
   setPaletteOps(mockPaletteOps({
-    inspectV2: () => ({ status: { code: 2, field: 7 } }),
+    inspectV3: () => ({ status: { code: 2, field: 7 } }),
   }));
   try {
     assert.throws(() => new GenerativePalette(defaultPaletteRecipe()),
@@ -318,7 +319,7 @@ test('GenerativePalette uses the canonical recipe and exposes diagnostics', () =
   const fallback = new Uint8Array(256);
   fallback[128] = 1;
   setPaletteOps(mockPaletteOps({
-    inspectV2: (input) => ({
+    inspectV3: (input) => ({
       status: { code: 0, field: 0 },
       canonicalRecipe: { ...structuredClone(input), falloffStart: 0.8 },
       lut: mockBakeLut(),
@@ -349,7 +350,7 @@ test('GenerativePalette.get blends adjacent entries in linear light', () => {
   const lut = new Uint8Array(256 * 3);
   lut.fill(128, 3);
   setPaletteOps(mockPaletteOps({
-    inspectV2: (recipe) => ({
+    inspectV3: (recipe) => ({
       status: { code: 0, field: 0 },
       canonicalRecipe: recipe,
       lut,

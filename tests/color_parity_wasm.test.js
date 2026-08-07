@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import createHolosphereModule from '../holosphere_wasm.js';
 import * as C from '../tools/color.js';
 import * as P from '../tools/palette_math.js';
-import { defaultPaletteRecipe, PaletteV2 } from '../tools/palette_controls.js';
+import { defaultPaletteRecipe, PaletteV3 } from '../tools/palette_controls.js';
 import * as L from '../tools/lissajous_math.js';
 import * as MB from '../tools/mobius_transforms.js';
 
@@ -162,25 +162,26 @@ function sampleLut(lut) {
     [lut[3 * index], lut[3 * index + 1], lut[3 * index + 2]]);
 }
 
-test('PaletteOps exposes only the V2 recipe compiler operations', () => {
+test('PaletteOps exposes only the V3 recipe compiler operations', () => {
   const ops = new M.PaletteOps();
   try {
-    assert.equal(typeof ops.compileAndBakeV2, 'function');
-    assert.equal(typeof ops.inspectV2, 'function');
+    assert.equal(typeof ops.compileAndBakeV3, 'function');
+    assert.equal(typeof ops.inspectV3, 'function');
     assert.equal(ops.bakeLut, undefined);
   } finally {
     ops.delete();
   }
 });
 
-test('PaletteOps compiles deterministic V2 recipe LUTs', () => {
+test('PaletteOps compiles deterministic V3 recipe LUTs', () => {
   const ops = new M.PaletteOps();
   const recipe = defaultPaletteRecipe();
   try {
-    const first = ops.compileAndBakeV2(recipe);
-    const second = ops.compileAndBakeV2(recipe);
+    const first = ops.compileAndBakeV3(recipe);
+    const second = ops.compileAndBakeV3(recipe);
     assert.equal(first.status.code, 0);
-    assert.equal(first.canonicalRecipe.schemaVersion, 2);
+    assert.equal(first.canonicalRecipe.schemaVersion, 3);
+    assert.equal(first.canonicalRecipe.keyCount, 6);
     assert.deepEqual(sampleLut(Uint8Array.from(first.lut)),
       sampleLut(Uint8Array.from(second.lut)));
   } finally {
@@ -192,8 +193,8 @@ test('PaletteOps enforces exact mirror and loop seams', () => {
   const ops = new M.PaletteOps();
   try {
     const mirror = defaultPaletteRecipe();
-    mirror.domain = PaletteV2.domain.MIRROR;
-    const mirrored = Uint8Array.from(ops.compileAndBakeV2(mirror).lut);
+    mirror.domain = PaletteV3.domain.MIRROR;
+    const mirrored = Uint8Array.from(ops.compileAndBakeV3(mirror).lut);
     for (let index = 0; index < 128; index += 1) {
       assert.deepEqual(
         Array.from(mirrored.slice(index * 3, index * 3 + 3)),
@@ -201,9 +202,9 @@ test('PaletteOps enforces exact mirror and loop seams', () => {
     }
 
     const loop = defaultPaletteRecipe();
-    loop.domain = PaletteV2.domain.LOOP;
-    loop.hue.mode = PaletteV2.hueMode.SWEEP;
-    const looped = Uint8Array.from(ops.compileAndBakeV2(loop).lut);
+    loop.domain = PaletteV3.domain.LOOP;
+    loop.hue.mode = PaletteV3.hueMode.SWEEP;
+    const looped = Uint8Array.from(ops.compileAndBakeV3(loop).lut);
     assert.deepEqual(Array.from(looped.slice(765)), Array.from(looped.slice(0, 3)));
   } finally {
     ops.delete();
@@ -213,14 +214,14 @@ test('PaletteOps enforces exact mirror and loop seams', () => {
 test('GenerativePalette removes the saturated-blue gamut seam', () => {
   const ops = new M.PaletteOps();
   const recipe = defaultPaletteRecipe();
-  recipe.domain = PaletteV2.domain.VIGNETTE;
+  recipe.domain = PaletteV3.domain.VIGNETTE;
   recipe.hue.baseTurns = 200 / 256;
   recipe.chroma.center = 1;
   recipe.chroma.headroom = 1;
   recipe.lightness.center = 0.43;
 
   try {
-    const result = ops.inspectV2(recipe);
+    const result = ops.inspectV3(recipe);
     const lut = Uint8Array.from(result.lut);
     let largestChannelStep = 0;
     for (let index = 52; index <= 78; index += 1) {
@@ -240,15 +241,25 @@ test('GenerativePalette removes the saturated-blue gamut seam', () => {
 test('Complementary harmony progresses once from the seed to its opposite', () => {
   const ops = new M.PaletteOps();
   const recipe = defaultPaletteRecipe();
-  recipe.hue.harmony = PaletteV2.harmony.COMPLEMENTARY;
+  recipe.hue.harmony = PaletteV3.harmony.COMPLEMENTARY;
+  recipe.hue.baseTurns = 200 / 256;
 
   try {
-    const diagnostics = ops.inspectV2(recipe).diagnostics;
+    const result = ops.inspectV3(recipe);
+    const diagnostics = result.diagnostics;
     const firstHue = diagnostics[4];
-    const middleHue = diagnostics[127 * 6 + 4];
+    const seedRegionHue = diagnostics[76 * 6 + 4];
+    const middleHue = 0.5 * (diagnostics[127 * 6 + 4] +
+      diagnostics[128 * 6 + 4]);
+    const oppositeRegionHue = diagnostics[179 * 6 + 4];
     const lastHue = diagnostics[255 * 6 + 4];
-    assert.ok(Math.abs(middleHue - firstHue - Math.PI / 2) < 0.02);
+    assert.ok(Math.abs(seedRegionHue - firstHue) < 0.02);
+    assert.ok(Math.abs(middleHue - firstHue - Math.PI / 2) < 0.03);
+    assert.ok(Math.abs(oppositeRegionHue - firstHue - Math.PI) < 0.02);
     assert.ok(Math.abs(lastHue - firstHue - Math.PI) < 0.02);
+    assert.ok(result.lut[2] > result.lut[0] && result.lut[2] > result.lut[1]);
+    assert.ok(result.lut[765] > result.lut[767]);
+    assert.ok(result.lut[766] > result.lut[767]);
   } finally {
     ops.delete();
   }
@@ -260,7 +271,7 @@ test('browser GenerativePalette owns the real bridge result', () => {
   try {
     const recipe = defaultPaletteRecipe();
     recipe.hue.baseTurns = 0.37;
-    const direct = ops.inspectV2(recipe);
+    const direct = ops.inspectV3(recipe);
     const palette = new P.GenerativePalette(recipe);
     assert.deepEqual(palette.lut, Uint8Array.from(direct.lut));
     assert.deepEqual(palette.canonicalRecipe, direct.canonicalRecipe);
@@ -275,9 +286,9 @@ test('browser GenerativePalette owns the real bridge result', () => {
 test('PATH_MINIMUM is rejected until its certified solver is available', () => {
   const ops = new M.PaletteOps();
   const recipe = defaultPaletteRecipe();
-  recipe.chroma.basis = PaletteV2.chromaBasis.PATH_MINIMUM;
+  recipe.chroma.basis = PaletteV3.chromaBasis.PATH_MINIMUM;
   try {
-    const result = ops.compileAndBakeV2(recipe);
+    const result = ops.compileAndBakeV3(recipe);
     assert.notEqual(result.status.code, 0);
     assert.equal(result.lut, undefined);
   } finally {

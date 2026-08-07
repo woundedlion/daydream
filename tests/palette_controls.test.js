@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 const {
   createPaletteViewport, recipeForViewport, axisEndpoints, axisFromEndpoints,
   lockedGroupMove,
-  PaletteV2, defaultPaletteRecipe, PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
+  PaletteV3, defaultPaletteRecipe, PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
   paletteRecipeAvailability,
 } =
   await import('../tools/palette_controls.js');
@@ -113,14 +113,15 @@ test('negative raw bounds cap correctly', () => {
   assert.equal(lockedGroupMove(2000, members).delta, 1000);
 });
 
-test('the default recipe is a detached, complete V2 value', () => {
+test('the default recipe is a detached, complete V3 value', () => {
   const first = defaultPaletteRecipe();
   const second = defaultPaletteRecipe();
   first.hue.customTurns[0] = 0.5;
 
-  assert.equal(first.schemaVersion, 2);
+  assert.equal(first.schemaVersion, 3);
+  assert.equal(first.keyCount, 6);
   assert.deepEqual(first.input, { offset: 0, span: 1 });
-  assert.equal(first.chroma.basis, PaletteV2.chromaBasis.LOCAL_GAMUT);
+  assert.equal(first.chroma.basis, PaletteV3.chromaBasis.LOCAL_GAMUT);
   assert.equal(second.hue.customTurns[0], 0);
 });
 
@@ -128,10 +129,10 @@ test('recipe presets express distinct high-level intents', () => {
   const loop = PALETTE_RECIPE_PRESETS.isolightSpectralLoop();
   const tonal = PALETTE_RECIPE_PRESETS.tonalMonochrome();
 
-  assert.equal(loop.domain, PaletteV2.domain.LOOP);
-  assert.equal(loop.hue.mode, PaletteV2.hueMode.SWEEP);
-  assert.equal(tonal.hue.harmony, PaletteV2.harmony.MONOCHROMATIC);
-  assert.equal(tonal.lightness.curve, PaletteV2.curve.ASCENDING);
+  assert.equal(loop.domain, PaletteV3.domain.LOOP);
+  assert.equal(loop.hue.mode, PaletteV3.hueMode.SWEEP);
+  assert.equal(tonal.hue.harmony, PaletteV3.harmony.MONOCHROMATIC);
+  assert.equal(tonal.lightness.curve, PaletteV3.curve.ASCENDING);
 });
 
 test('recipe availability exposes only controls that can affect the result', () => {
@@ -146,11 +147,11 @@ test('recipe availability exposes only controls that can affect the result', () 
     lightnessMaximum: false,
   });
 
-  recipe.hue.mode = PaletteV2.hueMode.SWEEP;
+  recipe.hue.mode = PaletteV3.hueMode.SWEEP;
   assert.equal(paletteRecipeAvailability(recipe).harmony, false);
 
-  recipe.hue.mode = PaletteV2.hueMode.HARMONY;
-  recipe.hue.harmony = PaletteV2.harmony.MONOCHROMATIC;
+  recipe.hue.mode = PaletteV3.hueMode.HARMONY;
+  recipe.hue.harmony = PaletteV3.harmony.MONOCHROMATIC;
   assert.equal(paletteRecipeAvailability(recipe).colorPath, false);
   assert.equal(paletteRecipeAvailability(recipe).hueDirection, false);
 
@@ -159,13 +160,13 @@ test('recipe availability exposes only controls that can affect the result', () 
   assert.equal(availability.baseHue, false);
   assert.equal(availability.hueMode, false);
 
-  recipe.chroma.curve = PaletteV2.curve.BELL;
+  recipe.chroma.curve = PaletteV3.curve.BELL;
   recipe.chroma.range = 0.2;
   availability = paletteRecipeAvailability(recipe);
   assert.equal(availability.baseHue, true);
   assert.equal(availability.chromaMaximum, true);
 
-  recipe.lightness.curve = PaletteV2.curve.ASCENDING;
+  recipe.lightness.curve = PaletteV3.curve.ASCENDING;
   assert.equal(paletteRecipeAvailability(recipe).lightnessMaximum, true);
 });
 
