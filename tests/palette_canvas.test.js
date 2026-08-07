@@ -194,7 +194,7 @@ test('the wave graph fits its backing buffer to the displayed size and pixel den
   assert.equal(palette.channelCalls, 400);
 });
 
-test('the wave graph draws the band edges, the three channels and the clamp overlays', () => {
+test('the wave graph draws the band edges and the three channels without clamp overlays', () => {
   const canvas = { width: 16, height: 100 };
   const ctx = fakeContext();
   drawWaveGraph({ canvas, ctx, palette: fakePalette() });
@@ -213,11 +213,9 @@ test('the wave graph draws the band edges, the three channels and the clamp over
     'the three channel curves must be stroked in R, G, B order');
 
   const fills = ctx.ops.filter(([n]) => n === 'fillRect');
-  assert.deepEqual(fills[0], ['fillRect', 0, 0, 16, 100], 'the graph background');
-  assert.deepEqual(fills.slice(1), [
-    ['fillRect', 0, toY(0), 16, yBottom - toY(0)],
-    ['fillRect', 0, yTop, 16, toY(1) - yTop],
-  ], 'the below-0 and above-1 clamp bands');
+  assert.deepEqual(fills, [
+    ['fillRect', 0, 0, 16, 100],
+  ], 'the graph should have only its uniform background');
 });
 
 test('the wave graph plots each channel through the shared value-to-y map', () => {

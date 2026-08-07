@@ -209,11 +209,4 @@ export function drawWaveGraph({ canvas, ctx, palette }) {
     ctx.stroke();
   });
 
-  // Draw clamped region overlay (optional, but informative)
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-  const y0 = toY(0), y1 = toY(1); // canvas y of the value-0 and value-1 lines
-  // Area below 0 (between the value-0 line and the band bottom)
-  ctx.fillRect(0, y0, width, yBottom - y0);
-  // Area above 1 (between the band top and the value-1 line)
-  ctx.fillRect(0, yTop, width, y1 - yTop);
 }
