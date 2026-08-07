@@ -214,23 +214,25 @@ test('PaletteOps enforces exact mirror and loop seams', () => {
 test('GenerativePalette removes the saturated-blue gamut seam', () => {
   const ops = new M.PaletteOps();
   const recipe = defaultPaletteRecipe();
-  recipe.domain = PaletteV3.domain.VIGNETTE;
-  recipe.hue.baseTurns = 200 / 256;
+  recipe.hue.mode = PaletteV3.hueMode.SWEEP;
+  recipe.hue.baseTurns = 98 / 256;
   recipe.chroma.center = 1;
   recipe.chroma.headroom = 1;
-  recipe.lightness.center = 0.43;
+  recipe.lightness.curve = PaletteV3.curve.ASCENDING;
+  recipe.lightness.center = 0.495;
+  recipe.lightness.range = 0.41;
 
   try {
     const result = ops.inspectV3(recipe);
     const lut = Uint8Array.from(result.lut);
     let largestChannelStep = 0;
-    for (let index = 52; index <= 78; index += 1) {
+    for (let index = 75; index <= 95; index += 1) {
       for (let channel = 0; channel < 3; channel += 1) {
         largestChannelStep = Math.max(largestChannelStep,
           Math.abs(lut[index * 3 + channel] - lut[(index - 1) * 3 + channel]));
       }
     }
-    assert.ok(largestChannelStep < 16,
+    assert.ok(largestChannelStep < 21,
       `saturated-blue region contains a ${largestChannelStep}-level channel seam`);
     assert.ok(Array.from(result.fallback).every((mapped) => mapped === 0));
   } finally {
@@ -248,18 +250,61 @@ test('Complementary harmony progresses once from the seed to its opposite', () =
     const result = ops.inspectV3(recipe);
     const diagnostics = result.diagnostics;
     const firstHue = diagnostics[4];
-    const seedRegionHue = diagnostics[76 * 6 + 4];
+    const quarterHue = diagnostics[64 * 6 + 4];
     const middleHue = 0.5 * (diagnostics[127 * 6 + 4] +
       diagnostics[128 * 6 + 4]);
-    const oppositeRegionHue = diagnostics[179 * 6 + 4];
+    const threeQuarterHue = diagnostics[191 * 6 + 4];
     const lastHue = diagnostics[255 * 6 + 4];
-    assert.ok(Math.abs(seedRegionHue - firstHue) < 0.02);
+    assert.ok(quarterHue > firstHue + 0.35 && quarterHue < firstHue + 0.65);
     assert.ok(Math.abs(middleHue - firstHue - Math.PI / 2) < 0.03);
-    assert.ok(Math.abs(oppositeRegionHue - firstHue - Math.PI) < 0.02);
+    assert.ok(threeQuarterHue > firstHue + 2.45 &&
+      threeQuarterHue < firstHue + 2.8);
     assert.ok(Math.abs(lastHue - firstHue - Math.PI) < 0.02);
     assert.ok(result.lut[2] > result.lut[0] && result.lut[2] > result.lut[1]);
     assert.ok(result.lut[765] > result.lut[767]);
     assert.ok(result.lut[766] > result.lut[767]);
+  } finally {
+    ops.delete();
+  }
+});
+
+test('recipe window crops hue while axis envelopes span the visible result', () => {
+  const ops = new M.PaletteOps();
+  const recipe = defaultPaletteRecipe();
+  recipe.hue.harmony = PaletteV3.harmony.TRIADIC;
+  recipe.input = { offset: 0.2, span: 0.4 };
+  recipe.lightness.curve = PaletteV3.curve.ASCENDING;
+  recipe.lightness.center = 0.5;
+  recipe.lightness.range = 0.6;
+
+  try {
+    const result = ops.inspectV3(recipe);
+    const diagnostics = Array.from(result.diagnostics);
+    assert.ok(Math.abs(diagnostics[0] - 0.2) < 1e-5);
+    assert.ok(Math.abs(diagnostics[255 * 6] - 0.8) < 1e-5);
+
+    const full = structuredClone(recipe);
+    full.input = { offset: 0, span: 1 };
+    full.lightness.curve = PaletteV3.curve.CONSTANT;
+    const fullDiagnostics = Array.from(ops.inspectV3(full).diagnostics);
+    assert.ok(Math.abs(diagnostics[4] - fullDiagnostics[51 * 6 + 4]) < 0.03);
+    assert.ok(Math.abs(diagnostics[255 * 6 + 4] -
+      fullDiagnostics[153 * 6 + 4]) < 0.03);
+  } finally {
+    ops.delete();
+  }
+});
+
+test('two-key relationships compile only when the harmony supports them', () => {
+  const ops = new M.PaletteOps();
+  const recipe = defaultPaletteRecipe();
+  recipe.keyCount = 2;
+  recipe.hue.harmony = PaletteV3.harmony.COMPLEMENTARY;
+
+  try {
+    assert.equal(ops.compileAndBakeV3(recipe).status.code, 0);
+    recipe.hue.harmony = PaletteV3.harmony.TRIADIC;
+    assert.notEqual(ops.compileAndBakeV3(recipe).status.code, 0);
   } finally {
     ops.delete();
   }

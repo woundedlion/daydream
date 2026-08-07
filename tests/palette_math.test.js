@@ -8,7 +8,7 @@ const {
   generativePaletteCpp, paletteRecipeJson, setPaletteOps,
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
 } = await import('../tools/palette_math.js');
-const { defaultPaletteRecipe } = await import('../tools/palette_controls.js');
+const { defaultPaletteRecipe, PaletteV3 } = await import('../tools/palette_controls.js');
 
 function mockBakeLut() {
   const lut = new Uint8Array(256 * 3);
@@ -256,6 +256,27 @@ test('generativePaletteCpp serializes the complete V3 recipe', () => {
   assert.match(source, /AxisCurve::ASCENDING/);
   assert.match(source, /ChromaBasis::LOCAL_GAMUT/);
   assert.match(source, /GenerativePalette::try_compile\(recipe, palette, canonical, status\)/);
+});
+
+test('generativePaletteCpp names every supported color harmony', () => {
+  const recipe = defaultPaletteRecipe();
+  for (const [name, value] of Object.entries(PaletteV3.harmony)) {
+    recipe.hue.harmony = value;
+    const source = generativePaletteCpp(recipe);
+    assert.match(source, new RegExp(`PaletteHarmony::${name}`));
+    assert.doesNotMatch(source, /undefined/);
+  }
+});
+
+test('paletteRecipeJson preserves a two-key Complementary recipe', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.keyCount = 2;
+  recipe.hue.harmony = PaletteV3.harmony.COMPLEMENTARY;
+  const exported = JSON.parse(paletteRecipeJson(recipe));
+
+  assert.equal(exported.schemaVersion, 3);
+  assert.equal(exported.keyCount, 2);
+  assert.equal(exported.hue.harmony, PaletteV3.harmony.COMPLEMENTARY);
 });
 
 test('generativePaletteCpp rejects unknown enum values', () => {

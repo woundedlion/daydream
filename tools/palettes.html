@@ -698,6 +698,8 @@
               <option value="COMPLEMENTARY">Complementary</option>
               <option value="SPLIT_COMPLEMENTARY">Split Complementary</option>
               <option value="TRIADIC">Triadic</option>
+              <option value="TETRADIC">Tetradic (Rectangle)</option>
+              <option value="SQUARE">Square</option>
             </select>
           </div>
         </section>
@@ -791,6 +793,7 @@
         <div class="recipe-field">
           <label for="gen_key_count">Key Colors</label>
           <select id="gen_key_count" class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
+            <option value="2">2</option>
             <option value="3">3</option>
             <option value="4">4</option>
             <option value="5">5</option>
@@ -886,6 +889,7 @@
       lockedGroupMove,
       defaultPaletteRecipe, PaletteV3,
       PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
+      minimumPaletteKeyCount,
     } from './palette_controls.js';
     // The two canvas painters take their canvas, context and palette as
     // arguments, so they live in their own module and are unit tested against a
@@ -1072,7 +1076,17 @@
     }
 
     function syncRecipeControlAvailability() {
-      const availability = paletteRecipeAvailability(readPaletteRecipe());
+      let recipe = readPaletteRecipe();
+      const keyCount = document.getElementById('gen_key_count');
+      const minimumKeyCount = minimumPaletteKeyCount(recipe);
+      for (const option of keyCount.options)
+        option.disabled = Number(option.value) < minimumKeyCount;
+      if (recipe.keyCount < minimumKeyCount) {
+        keyCount.value = minimumKeyCount;
+        recipe = readPaletteRecipe();
+      }
+
+      const availability = paletteRecipeAvailability(recipe);
       const controls = [
         ['gen_seed_field', 'gen_seed_slider', availability.baseHue],
         ['gen_hue_mode_field', 'gen_hue_mode', availability.hueMode],
@@ -1721,6 +1735,8 @@
       dropdowns.forEach(id => {
         const el = document.getElementById(id);
         el?.addEventListener('change', () => {
+          if (id === 'gen_harmony' && el.value === 'COMPLEMENTARY')
+            document.getElementById('gen_path').value = 'OKLAB_CARTESIAN';
           syncRecipeControlAvailability();
           scheduleUpdate();
         });

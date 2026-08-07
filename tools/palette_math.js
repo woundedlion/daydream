@@ -308,6 +308,8 @@ const ENUM_NAMES = Object.freeze({
     'COMPLEMENTARY',
     'SPLIT_COMPLEMENTARY',
     'TRIADIC',
+    'TETRADIC',
+    'SQUARE',
   ],
   direction: ['SHORTEST', 'CLOCKWISE', 'COUNTERCLOCKWISE'],
   curve: ['CONSTANT', 'ASCENDING', 'DESCENDING', 'BELL', 'CUP', 'CUSTOM'],

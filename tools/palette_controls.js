@@ -107,6 +107,8 @@ export const PaletteV3 = Object.freeze({
     COMPLEMENTARY: 3,
     SPLIT_COMPLEMENTARY: 4,
     TRIADIC: 5,
+    TETRADIC: 6,
+    SQUARE: 7,
   }),
   direction: Object.freeze({ SHORTEST: 0, CLOCKWISE: 1, COUNTERCLOCKWISE: 2 }),
   curve: Object.freeze({
@@ -171,9 +173,25 @@ export function paletteRecipeAvailability(recipe) {
     harmony: hasColor && recipe.hue.mode === PaletteV3.hueMode.HARMONY,
     colorPath: hasColor && !monochromatic,
     hueDirection: hasColor && !monochromatic,
+    minimumKeyCount: minimumPaletteKeyCount(recipe),
     chromaMaximum: variedChroma,
     lightnessMaximum: recipe.lightness.curve !== PaletteV3.curve.CONSTANT,
   };
+}
+
+export function minimumPaletteKeyCount(recipe) {
+  if (recipe.hue.mode !== PaletteV3.hueMode.HARMONY) return 2;
+  switch (recipe.hue.harmony) {
+    case PaletteV3.harmony.ACCENTED_ANALOGOUS:
+    case PaletteV3.harmony.SPLIT_COMPLEMENTARY:
+    case PaletteV3.harmony.TRIADIC:
+      return 3;
+    case PaletteV3.harmony.TETRADIC:
+    case PaletteV3.harmony.SQUARE:
+      return 4;
+    default:
+      return 2;
+  }
 }
 
 function cloneRecipe(recipe) {
