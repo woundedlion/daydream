@@ -31,7 +31,7 @@ let paletteOps = null;
 
 /**
  * Installs the module-lifetime PaletteOps instance.
- * @param {{compileAndBakeV3:Function, inspectV3:Function}|null} ops
+ * @param {{compileAndBakeV4:Function, inspectV4:Function}|null} ops
  */
 export function setPaletteOps(ops) {
   paletteOps = ops;
@@ -160,7 +160,7 @@ export function proceduralParamsForViewport(parameters, viewport) {
   };
 }
 
-// --- Generative Palette V3 --------------------------------------------------
+// --- Generative Palette V4 --------------------------------------------------
 
 /**
  * Compiles a recipe with the engine and copies its aliased module buffers.
@@ -173,8 +173,8 @@ export function compilePaletteRecipe(recipe, inspect = true) {
     throw new Error('PaletteOps bridge is not initialized');
   }
   const result = inspect
-    ? paletteOps.inspectV3(recipe)
-    : paletteOps.compileAndBakeV3(recipe);
+    ? paletteOps.inspectV4(recipe)
+    : paletteOps.compileAndBakeV4(recipe);
   const copied = {
     status: { ...result.status },
     canonicalRecipe: result.canonicalRecipe
@@ -327,7 +327,7 @@ function cppFloatArray(values) {
 }
 
 /**
- * Serializes a complete canonical V3 recipe.
+ * Serializes a complete canonical V4 recipe.
  * @param {Object} recipe
  * @returns {string}
  */
@@ -335,7 +335,6 @@ export function generativePaletteCpp(recipe) {
   const f = (value) => formatFloatCpp(value, 6);
   return `PaletteRecipe recipe;
 recipe.schema_version = ${recipe.schemaVersion};
-recipe.key_count = ${recipe.keyCount};
 recipe.input.offset = ${f(recipe.input.offset)};
 recipe.input.span = ${f(recipe.input.span)};
 recipe.domain = PaletteDomain::${enumName('domain', recipe.domain)};
