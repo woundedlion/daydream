@@ -8,7 +8,7 @@ const {
   PaletteV4, defaultPaletteRecipe, PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
   paletteRecipeAvailability, wrapTurns, signedTurnDelta, equivalentTurnNear,
   hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
-  customHueKeyState, customHueTurns,
+  customHueKeyState, customHueTurns, moveCustomHueKey,
 } =
   await import('../tools/palette_controls.js');
 
@@ -224,6 +224,39 @@ test('moving the custom base hue rotates every key without changing offsets', ()
   assert.ok(Math.abs(after[2] + 0.22) < 1e-12);
   for (let i = 0; i < 3; i++)
     assert.ok(Math.abs((after[i] - before[i]) + 0.95) < 1e-12);
+});
+
+test('moving custom key A leaves the base and other authored keys unchanged', () => {
+  const offsets = [0, 0.25, -0.125];
+  const moved = moveCustomHueKey(0.2, offsets, 0, 0.3);
+
+  assert.deepEqual(offsets, [0, 0.25, -0.125]);
+  assert.ok(Math.abs(moved[0] - 0.1) < 1e-12);
+  assert.deepEqual(moved.slice(1), offsets.slice(1));
+  const turns = customHueTurns(0.2, moved);
+  assert.equal(turns[1], 0.45);
+  assert.ok(Math.abs(turns[2] - 0.075) < 1e-12);
+});
+
+test('moving custom key A across the seam follows the nearby turn', () => {
+  const offsets = [0, 0.14, -0.1];
+  const moved = moveCustomHueKey(0.98, offsets, 0, 0.02);
+  const turns = customHueTurns(0.98, moved);
+
+  assert.ok(Math.abs(turns[0] - 1.02) < 1e-12);
+  assert.ok(Math.abs(turns[1] - 1.12) < 1e-12);
+  assert.equal(turns[2], 0.88);
+  assert.ok(Math.abs(turns[1] - turns[0] - 0.1) < 1e-12);
+  assert.deepEqual(moved.slice(1), offsets.slice(1));
+});
+
+test('moving custom key B retains its seam-safe independent behavior', () => {
+  const offsets = [0, -0.96, -0.25];
+  const moved = moveCustomHueKey(0.98, offsets, 1, 0.03);
+
+  assert.equal(moved[0], offsets[0]);
+  assert.ok(Math.abs(moved[1] + 0.95) < 1e-12);
+  assert.equal(moved[2], offsets[2]);
 });
 
 test('recipe presets express distinct high-level intents', () => {
