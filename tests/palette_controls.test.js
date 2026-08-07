@@ -7,6 +7,7 @@ const {
   lockedGroupMove,
   PaletteV4, defaultPaletteRecipe, PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
   paletteRecipeAvailability, wrapTurns, signedTurnDelta, equivalentTurnNear,
+  hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
   customHueKeyState, customHueTurns,
 } =
   await import('../tools/palette_controls.js');
@@ -148,6 +149,34 @@ test('custom hue offsets stay signed and continuous across the wrap seam', () =>
   assert.ok(Math.abs(signedTurnDelta(0.02 - 0.98) - 0.04) < 1e-12);
   assert.ok(Math.abs(equivalentTurnNear(0.02, 0.98) - 1.02) < 1e-12);
   assert.ok(Math.abs(equivalentTurnNear(0.98, 0.02) + 0.02) < 1e-12);
+});
+
+test('hue key hit testing ignores blank wheel space', () => {
+  const points = [{ x: 20, y: 20 }, { x: 80, y: 20 }, { x: 50, y: 80 }];
+
+  assert.equal(hitTestHueKeyMarker(22, 21, points, 12), 0);
+  assert.equal(hitTestHueKeyMarker(68, 20, points, 12), 1);
+  assert.equal(hitTestHueKeyMarker(50, 50, points, 12), null);
+});
+
+test('gamut chroma scale finds the widest OKLCH hue boundary', () => {
+  const maximum = maxSrgbGamutChroma(0.5);
+  const hueSamples = 360;
+  let widestSample = 0;
+  let beyondBoundarySample = 0;
+
+  for (let hue = 0; hue < hueSamples; hue++) {
+    const rgb = oklchLinearRgb(0.5, maximum, hue / hueSamples);
+    if (rgb.every((channel) => channel >= -0.0002 && channel <= 1.0002))
+      widestSample++;
+    const beyondRgb = oklchLinearRgb(0.5, maximum + 0.002, hue / hueSamples);
+    if (beyondRgb.every((channel) => channel >= 0 && channel <= 1))
+      beyondBoundarySample++;
+  }
+
+  assert.ok(maximum > 0.28 && maximum < 0.31);
+  assert.ok(widestSample > 0);
+  assert.equal(beyondBoundarySample, 0);
 });
 
 test('custom hue state derives three sensible keys from authored harmonies', () => {

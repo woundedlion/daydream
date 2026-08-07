@@ -163,68 +163,18 @@
     }
 
     #hueKeyWheelCanvas {
-      width: min(100%, 13rem);
+      width: min(100%, 10.5rem);
       height: auto;
       border: 1px solid var(--slate-600);
       border-radius: 50%;
       background: var(--slate-900);
-      cursor: crosshair;
+      cursor: default;
       touch-action: none;
     }
 
     #hueKeyWheelCanvas:focus-visible {
       outline: 2px solid var(--blue-500);
       outline-offset: 2px;
-    }
-
-    .custom-key-fields {
-      display: grid;
-      gap: 0.25rem;
-    }
-
-    .custom-key-field {
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr) 5.25rem;
-      align-items: center;
-      gap: 0.375rem;
-      color: #CBD5E1;
-      font-size: 0.75rem;
-    }
-
-    .custom-key-badge {
-      display: inline-grid;
-      width: 1.25rem;
-      height: 1.25rem;
-      place-items: center;
-      border: 1px solid #FFFFFF;
-      border-radius: 50%;
-      background: var(--slate-900);
-      color: #FFFFFF;
-      font-size: 0.6875rem;
-      font-weight: 700;
-    }
-
-    .custom-key-number,
-    .custom-key-anchor {
-      box-sizing: border-box;
-      width: 100%;
-      min-width: 0;
-      height: 1.75rem;
-      padding: 0.25rem 0.375rem;
-      border: 1px solid var(--slate-600);
-      border-radius: 0.375rem;
-      background: var(--slate-700);
-      color: #FFFFFF;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      text-align: right;
-    }
-
-    .custom-key-anchor {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      color: #94A3B8;
     }
 
     .recipe-field {
@@ -259,8 +209,14 @@
 
     .recipe-slider {
       display: flex;
+      min-width: 0;
       align-items: center;
       gap: 0.375rem;
+    }
+
+    .recipe-slider input[type="range"] {
+      width: 100%;
+      min-width: 0;
     }
 
     .recipe-slider .slider-label {
@@ -610,23 +566,16 @@
       }
 
       #hueKeyWheelCanvas {
-        width: min(100%, 8.5rem);
+        width: min(100%, 7.25rem);
       }
 
-      .custom-key-fields {
-        gap: 0.125rem;
-      }
-
-      .custom-key-field {
-        grid-template-columns: auto minmax(0, 1fr) 4.25rem;
+      .recipe-slider {
         gap: 0.25rem;
-        font-size: 0.6875rem;
       }
 
-      .custom-key-number,
-      .custom-key-anchor {
-        height: 1.5rem;
-        font-size: 0.6875rem;
+      .recipe-slider .slider-label {
+        width: 2.375rem;
+        font-size: 0.625rem;
       }
     }
 
@@ -949,30 +898,13 @@
 
         <section class="param-group recipe-group key-wheel-card" aria-labelledby="key_wheel_heading">
           <h3 id="key_wheel_heading" class="font-bold text-indigo-300">OKLCH Hue Keys</h3>
-          <p id="key_wheel_help" class="key-wheel-intro">Drag a numbered key to switch to custom keys. Drag A or move Base Hue to rotate the set.</p>
+          <p id="key_wheel_help" class="key-wheel-intro">Drag a marker. Keyboard: A/B/C, then left/right arrows; Shift adjusts 10&deg;.</p>
           <div class="key-wheel-canvas-wrap">
             <canvas id="hueKeyWheelCanvas" width="256" height="256" tabindex="0"
-              role="img" aria-describedby="key_wheel_help"
+              role="group" aria-roledescription="interactive gamut wheel"
+              aria-keyshortcuts="A B C ArrowLeft ArrowRight"
+              aria-describedby="key_wheel_help"
               aria-label="OKLCH gamut wheel with three hue key positions"></canvas>
-          </div>
-          <div class="custom-key-fields" aria-label="Custom key offsets from base hue">
-            <div class="custom-key-field">
-              <span class="custom-key-badge" aria-hidden="true">A</span>
-              <span>Base anchor</span>
-              <span class="custom-key-anchor">0&deg;</span>
-            </div>
-            <label class="custom-key-field" for="gen_custom_key_b">
-              <span class="custom-key-badge" aria-hidden="true">B</span>
-              <span>Offset from A (&deg;)</span>
-              <input id="gen_custom_key_b" class="custom-key-number" type="number"
-                min="-720" max="720" step="0.1" value="25.2">
-            </label>
-            <label class="custom-key-field" for="gen_custom_key_c">
-              <span class="custom-key-badge" aria-hidden="true">C</span>
-              <span>Offset from A (&deg;)</span>
-              <input id="gen_custom_key_c" class="custom-key-number" type="number"
-                min="-720" max="720" step="0.1" value="50.4">
-            </label>
           </div>
         </section>
       </div>
@@ -1067,7 +999,8 @@
       paletteTabFromSearch, paletteTabUrl,
       defaultPaletteRecipe, PaletteV4,
       PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
-      wrapTurns, signedTurnDelta, equivalentTurnNear,
+      wrapTurns, equivalentTurnNear,
+      hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
       customHueKeyState, customHueTurns,
     } from './palette_controls.js';
     // The two canvas painters take their canvas, context and palette as
@@ -1131,6 +1064,7 @@
     let hueKeyWheelLightness = null;
     let activeHueKey = null;
     let activeHuePointerId = null;
+    let selectedHueKey = 0;
 
     const enumIndex = (group, value) => PaletteV4[group][value];
     const fullViewport = Object.freeze({ start: 0, end: 1 });
@@ -1143,14 +1077,7 @@
       const degrees = wrapTurns(turns) * 360;
       document.getElementById('gen_seed_slider').value = degrees;
       document.getElementById('gen_seed_value').textContent =
-        `${Number(degrees.toFixed(4))}°`;
-    }
-
-    function syncCustomKeyControls(offsets = customHueOffsets) {
-      for (const [index, id] of [[1, 'gen_custom_key_b'], [2, 'gen_custom_key_c']]) {
-        document.getElementById(id).value =
-          String(Number((offsets[index] * 360).toFixed(4)));
-      }
+        `${Number(degrees.toFixed(1))}°`;
     }
 
     function activateCustomHue(sourceRecipe) {
@@ -1159,7 +1086,6 @@
       setCustomBaseTurns(state.baseTurns);
       document.getElementById('gen_hue_mode').value = 'CUSTOM';
       previousHueMode = PaletteV4.hueMode.CUSTOM;
-      syncCustomKeyControls();
       syncRecipeControlAvailability();
     }
 
@@ -1170,36 +1096,20 @@
       return customHueKeyState(recipe);
     }
 
-    function oklchLinearRgb(lightness, chroma, turns) {
-      const angle = turns * Math.PI * 2;
-      const a = chroma * Math.cos(angle);
-      const b = chroma * Math.sin(angle);
-      const lRoot = lightness + 0.3963377774 * a + 0.2158037573 * b;
-      const mRoot = lightness - 0.1055613458 * a - 0.0638541728 * b;
-      const sRoot = lightness - 0.0894841775 * a - 1.291485548 * b;
-      const l = lRoot * lRoot * lRoot;
-      const m = mRoot * mRoot * mRoot;
-      const s = sRoot * sRoot * sRoot;
-      return [
-        4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-        -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
-      ];
-    }
-
     function wheelRaster(lightness) {
       const { width, height } = hueKeyWheelCanvas;
       const image = hueKeyWheelCtx.createImageData(width, height);
       const radius = Math.min(width, height) * 0.47;
       const centerX = width * 0.5;
       const centerY = height * 0.5;
+      const maximumChroma = Math.max(0.001, maxSrgbGamutChroma(lightness));
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
           const dx = x + 0.5 - centerX;
           const dy = y + 0.5 - centerY;
           const distance = Math.hypot(dx, dy);
           const offset = (y * width + x) * 4;
-          const chroma = distance / radius * 0.4;
+          const chroma = distance / radius * maximumChroma;
           const rgb = oklchLinearRgb(lightness, chroma,
             wrapTurns(Math.atan2(dy, dx) / (Math.PI * 2)));
           const inGamut = distance <= radius && rgb.every((channel) =>
@@ -1220,6 +1130,67 @@
       return image;
     }
 
+    function hueKeyPoints(state) {
+      const { width, height } = hueKeyWheelCanvas;
+      const centerX = width * 0.5;
+      const centerY = height * 0.5;
+      const radius = Math.min(width, height) * 0.405;
+      return state.offsets.map((offset) => {
+        const angle = (state.baseTurns + offset) * Math.PI * 2;
+        return {
+          x: centerX + Math.cos(angle) * radius,
+          y: centerY + Math.sin(angle) * radius,
+        };
+      });
+    }
+
+    function hueKeyLabelLayout(points, degrees, centerX) {
+      hueKeyWheelCtx.font = '700 20px Inter, sans-serif';
+      const paddingX = 7;
+      const height = 28;
+      const safeInset = 18;
+      const labels = points.map((point, index) => {
+        const text = `${['A', 'B', 'C'][index]} ${degrees[index]}°`;
+        const width = hueKeyWheelCtx.measureText(text).width + paddingX * 2;
+        const preferredX = point.x < centerX ? point.x + 13 : point.x - width - 13;
+        return {
+          text, width, height, paddingX,
+          x: Math.max(safeInset, Math.min(
+            hueKeyWheelCanvas.width - width - safeInset, preferredX)),
+          y: Math.max(safeInset, Math.min(
+            hueKeyWheelCanvas.height - height - safeInset,
+            point.y - height * 0.5)),
+        };
+      });
+      const sorted = [...labels].sort((left, right) => left.y - right.y);
+      for (let index = 1; index < sorted.length; index++) {
+        for (let prior = 0; prior < index; prior++) {
+          const horizontalOverlap = sorted[index].x < sorted[prior].x + sorted[prior].width &&
+            sorted[index].x + sorted[index].width > sorted[prior].x;
+          if (horizontalOverlap)
+            sorted[index].y = Math.max(sorted[index].y,
+              sorted[prior].y + sorted[prior].height + 2);
+        }
+      }
+      const bottom = Math.max(...labels.map((label) => label.y + label.height));
+      const shift = Math.max(0, bottom - hueKeyWheelCanvas.height + safeInset);
+      for (const label of labels) label.y = Math.max(safeInset, label.y - shift);
+      return labels;
+    }
+
+    function drawHueKeyLabel(label) {
+      const { text, width, height, paddingX, x, y } = label;
+      hueKeyWheelCtx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+      hueKeyWheelCtx.fillRect(x, y, width, height);
+      hueKeyWheelCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      hueKeyWheelCtx.lineWidth = 1;
+      hueKeyWheelCtx.strokeRect(x, y, width, height);
+      hueKeyWheelCtx.fillStyle = '#FFFFFF';
+      hueKeyWheelCtx.textAlign = 'left';
+      hueKeyWheelCtx.textBaseline = 'middle';
+      hueKeyWheelCtx.fillText(text, x + paddingX, y + height * 0.5);
+    }
+
     function drawHueKeyWheel(recipe) {
       if (!hueKeyWheelCanvas || !hueKeyWheelCtx) return;
       const lightness = recipe.lightness.center;
@@ -1231,18 +1202,11 @@
 
       const { width, height } = hueKeyWheelCanvas;
       const centerX = width * 0.5;
-      const centerY = height * 0.5;
-      const radius = Math.min(width, height) * 0.405;
       const state = currentHueKeyState(recipe);
-      if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM)
-        syncCustomKeyControls(state.offsets);
-      const points = state.offsets.map((offset) => {
-        const angle = (state.baseTurns + offset) * Math.PI * 2;
-        return {
-          x: centerX + Math.cos(angle) * radius,
-          y: centerY + Math.sin(angle) * radius,
-        };
-      });
+      const points = hueKeyPoints(state);
+      const degrees = state.offsets.map((offset) =>
+        Math.round(wrapTurns(state.baseTurns + offset) * 360) % 360);
+      const labels = hueKeyLabelLayout(points, degrees, centerX);
 
       hueKeyWheelCtx.beginPath();
       hueKeyWheelCtx.moveTo(points[0].x, points[0].y);
@@ -1253,29 +1217,33 @@
 
       points.forEach((point, index) => {
         hueKeyWheelCtx.beginPath();
-        hueKeyWheelCtx.arc(point.x, point.y, 11, 0, Math.PI * 2);
+        hueKeyWheelCtx.arc(point.x, point.y, 8, 0, Math.PI * 2);
         hueKeyWheelCtx.fillStyle = '#0F172A';
         hueKeyWheelCtx.fill();
-        hueKeyWheelCtx.strokeStyle = index === activeHueKey ? '#60A5FA' : '#FFFFFF';
-        hueKeyWheelCtx.lineWidth = index === activeHueKey ? 4 : 2;
+        const highlighted = index === activeHueKey || index === selectedHueKey;
+        hueKeyWheelCtx.strokeStyle = highlighted ? '#60A5FA' : '#FFFFFF';
+        hueKeyWheelCtx.lineWidth = highlighted ? 4 : 2;
         hueKeyWheelCtx.stroke();
-        hueKeyWheelCtx.fillStyle = '#FFFFFF';
-        hueKeyWheelCtx.font = '700 12px Inter, sans-serif';
-        hueKeyWheelCtx.textAlign = 'center';
-        hueKeyWheelCtx.textBaseline = 'middle';
-        hueKeyWheelCtx.fillText(['A', 'B', 'C'][index], point.x, point.y);
       });
+      labels.forEach(drawHueKeyLabel);
 
-      const degrees = state.offsets.map((offset) =>
-        Number((wrapTurns(state.baseTurns + offset) * 360).toFixed(1)));
       hueKeyWheelCanvas.setAttribute('aria-label',
-        `OKLCH gamut wheel. Key A ${degrees[0]} degrees, Key B ${degrees[1]} degrees, Key C ${degrees[2]} degrees.`);
+        `OKLCH gamut wheel. Key A ${degrees[0]} degrees, Key B ${degrees[1]} degrees, ` +
+        `Key C ${degrees[2]} degrees. Key ${['A', 'B', 'C'][selectedHueKey]} selected.`);
+    }
+
+    function wheelPointerPosition(event) {
+      const rect = hueKeyWheelCanvas.getBoundingClientRect();
+      return {
+        x: (event.clientX - rect.left) * hueKeyWheelCanvas.width / rect.width,
+        y: (event.clientY - rect.top) * hueKeyWheelCanvas.height / rect.height,
+      };
     }
 
     function wheelPointerTurn(event) {
-      const rect = hueKeyWheelCanvas.getBoundingClientRect();
-      const x = event.clientX - rect.left - rect.width * 0.5;
-      const y = event.clientY - rect.top - rect.height * 0.5;
+      const position = wheelPointerPosition(event);
+      const x = position.x - hueKeyWheelCanvas.width * 0.5;
+      const y = position.y - hueKeyWheelCanvas.height * 0.5;
       return wrapTurns(Math.atan2(y, x) / (Math.PI * 2));
     }
 
@@ -1289,7 +1257,6 @@
         const current = base + customHueOffsets[activeHueKey];
         const next = equivalentTurnNear(pointerTurn, current);
         customHueOffsets[activeHueKey] = Math.max(-2, Math.min(2, next - base));
-        syncCustomKeyControls();
       }
       scheduleUpdate();
     }
@@ -1298,21 +1265,29 @@
       if (!event.isPrimary || event.button !== 0 || activeHuePointerId !== null) return;
       const sourceRecipe = readPaletteRecipe();
       const sourceState = currentHueKeyState(sourceRecipe);
-      if (sourceRecipe.hue.mode !== PaletteV4.hueMode.CUSTOM)
-        activateCustomHue(sourceRecipe);
-      const turn = wheelPointerTurn(event);
-      activeHueKey = sourceState.offsets.reduce((nearest, offset, index) =>
-        Math.abs(signedTurnDelta(turn - sourceState.baseTurns - offset)) <
-          Math.abs(signedTurnDelta(turn - sourceState.baseTurns - sourceState.offsets[nearest]))
-          ? index : nearest, 0);
+      const position = wheelPointerPosition(event);
+      activeHueKey = hitTestHueKeyMarker(position.x, position.y,
+        hueKeyPoints(sourceState), 16);
+      if (activeHueKey === null) return;
+      selectedHueKey = activeHueKey;
       activeHuePointerId = event.pointerId;
       hueKeyWheelCanvas.setPointerCapture(event.pointerId);
-      updateHueKeyFromPointer(event);
+      hueKeyWheelCanvas.style.cursor = 'grabbing';
+      scheduleUpdate();
       event.preventDefault();
     }
 
     function handleHueWheelPointerMove(event) {
-      if (event.pointerId !== activeHuePointerId) return;
+      if (event.pointerId !== activeHuePointerId) {
+        const recipe = readPaletteRecipe();
+        const position = wheelPointerPosition(event);
+        const marker = hitTestHueKeyMarker(position.x, position.y,
+          hueKeyPoints(currentHueKeyState(recipe)), 16);
+        hueKeyWheelCanvas.style.cursor = marker === null ? 'default' : 'grab';
+        return;
+      }
+      const recipe = readPaletteRecipe();
+      if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM) activateCustomHue(recipe);
       updateHueKeyFromPointer(event);
     }
 
@@ -1322,7 +1297,33 @@
         hueKeyWheelCanvas.releasePointerCapture(event.pointerId);
       activeHueKey = null;
       activeHuePointerId = null;
+      hueKeyWheelCanvas.style.cursor = 'default';
       scheduleUpdate();
+    }
+
+    function handleHueWheelKeyDown(event) {
+      const keyIndex = { a: 0, b: 1, c: 2 }[event.key.toLowerCase()];
+      if (keyIndex !== undefined) {
+        selectedHueKey = keyIndex;
+        scheduleUpdate();
+        event.preventDefault();
+        return;
+      }
+      const direction = event.key === 'ArrowLeft' || event.key === 'ArrowDown' ? -1
+        : event.key === 'ArrowRight' || event.key === 'ArrowUp' ? 1 : 0;
+      if (direction === 0) return;
+
+      const recipe = readPaletteRecipe();
+      if (recipe.hue.mode !== PaletteV4.hueMode.CUSTOM) activateCustomHue(recipe);
+      const delta = direction * (event.shiftKey ? 10 : 1) / 360;
+      if (selectedHueKey === 0) {
+        setCustomBaseTurns(customBaseTurns() + delta);
+      } else {
+        customHueOffsets[selectedHueKey] = Math.max(-2, Math.min(2,
+          customHueOffsets[selectedHueKey] + delta));
+      }
+      scheduleUpdate();
+      event.preventDefault();
     }
 
     function recipeWindow() {
@@ -1519,7 +1520,6 @@
       previousHueMode = recipe.hue.mode;
       setCustomBaseTurns(recipe.hue.mode === PaletteV4.hueMode.CUSTOM
         ? hueState.baseTurns : recipe.hue.baseTurns);
-      syncCustomKeyControls();
       setRecipeWindow(recipe.input.offset, recipe.input.span);
       setAxisEndpoints('lightness', axisEndpoints(recipe.lightness));
       setAxisEndpoints('chroma', axisEndpoints(recipe.chroma));
@@ -2148,20 +2148,7 @@
       const genSeedValue = document.getElementById('gen_seed_value');
       if (genSeedSlider && genSeedValue) {
         genSeedSlider.addEventListener('input', () => {
-          genSeedValue.textContent = `${genSeedSlider.value}°`;
-          scheduleUpdate();
-        });
-      }
-
-      for (const [index, id] of [[1, 'gen_custom_key_b'], [2, 'gen_custom_key_c']]) {
-        document.getElementById(id).addEventListener('input', (event) => {
-          const degrees = event.target.valueAsNumber;
-          if (!Number.isFinite(degrees)) return;
-          if (enumIndex('hueMode', document.getElementById('gen_hue_mode').value) !==
-              PaletteV4.hueMode.CUSTOM)
-            activateCustomHue(readPaletteRecipe());
-          customHueOffsets[index] = Math.max(-2, Math.min(2, degrees / 360));
-          syncCustomKeyControls();
+          genSeedValue.textContent = `${Number(Number(genSeedSlider.value).toFixed(1))}°`;
           scheduleUpdate();
         });
       }
@@ -2220,6 +2207,7 @@
       hueKeyWheelCanvas.addEventListener('pointermove', handleHueWheelPointerMove);
       hueKeyWheelCanvas.addEventListener('pointerup', handleHueWheelPointerEnd);
       hueKeyWheelCanvas.addEventListener('pointercancel', handleHueWheelPointerEnd);
+      hueKeyWheelCanvas.addEventListener('keydown', handleHueWheelKeyDown);
 
       // 3. Add drag-and-drop listeners
       colorStripCanvas.addEventListener('pointerdown', handleDragStart);
@@ -2261,6 +2249,7 @@
         hueKeyWheelCanvas.removeEventListener('pointermove', handleHueWheelPointerMove);
         hueKeyWheelCanvas.removeEventListener('pointerup', handleHueWheelPointerEnd);
         hueKeyWheelCanvas.removeEventListener('pointercancel', handleHueWheelPointerEnd);
+        hueKeyWheelCanvas.removeEventListener('keydown', handleHueWheelKeyDown);
       });
     }
 

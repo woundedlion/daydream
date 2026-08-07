@@ -18,6 +18,56 @@ export function equivalentTurnNear(wrappedTurn, referenceTurn) {
   return referenceTurn + signedTurnDelta(wrappedTurn - referenceTurn);
 }
 
+export function hitTestHueKeyMarker(x, y, points, radius) {
+  let nearest = null;
+  let nearestDistance = radius;
+  for (let index = 0; index < points.length; index++) {
+    const distance = Math.hypot(x - points[index].x, y - points[index].y);
+    if (distance <= nearestDistance) {
+      nearest = index;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
+}
+
+export function oklchLinearRgb(lightness, chroma, turns) {
+  const angle = turns * Math.PI * 2;
+  const a = chroma * Math.cos(angle);
+  const b = chroma * Math.sin(angle);
+  const lRoot = lightness + 0.3963377774 * a + 0.2158037573 * b;
+  const mRoot = lightness - 0.1055613458 * a - 0.0638541728 * b;
+  const sRoot = lightness - 0.0894841775 * a - 1.291485548 * b;
+  const l = lRoot * lRoot * lRoot;
+  const m = mRoot * mRoot * mRoot;
+  const s = sRoot * sRoot * sRoot;
+  return [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ];
+}
+
+export function maxSrgbGamutChroma(lightness) {
+  const hueSamples = 360;
+  const searchIterations = 12;
+  const chromaLimit = 0.5;
+  let maximum = 0;
+
+  for (let hue = 0; hue < hueSamples; hue++) {
+    let low = 0;
+    let high = chromaLimit;
+    for (let iteration = 0; iteration < searchIterations; iteration++) {
+      const chroma = (low + high) * 0.5;
+      const rgb = oklchLinearRgb(lightness, chroma, hue / hueSamples);
+      if (rgb.every((channel) => channel >= 0 && channel <= 1)) low = chroma;
+      else high = chroma;
+    }
+    maximum = Math.max(maximum, low);
+  }
+  return maximum;
+}
+
 const PALETTE_TABS = new Set(['procedural', 'generative']);
 
 export function paletteTabFromSearch(search) {
