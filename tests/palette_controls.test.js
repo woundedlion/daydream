@@ -2,12 +2,29 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const {
+  paletteTabFromSearch, paletteTabUrl,
   createPaletteViewport, recipeForViewport, axisEndpoints, axisFromEndpoints,
   lockedGroupMove,
   PaletteV4, defaultPaletteRecipe, PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
   paletteRecipeAvailability,
 } =
   await import('../tools/palette_controls.js');
+
+test('palette tab deep links select only known tabs', () => {
+  assert.equal(paletteTabFromSearch('?tab=generative'), 'generative');
+  assert.equal(paletteTabFromSearch('?tab=procedural'), 'procedural');
+  assert.equal(paletteTabFromSearch('?tab=unknown'), 'procedural');
+  assert.equal(paletteTabFromSearch(''), 'procedural');
+});
+
+test('palette tab URLs preserve other query state and the hash', () => {
+  const href = paletteTabUrl(
+    'https://example.test/tools/palettes.html?foo=1#export', 'generative');
+  assert.equal(href,
+    'https://example.test/tools/palettes.html?foo=1&tab=generative#export');
+  assert.throws(() => paletteTabUrl('https://example.test/', 'unknown'),
+    /Unknown palette tab/);
+});
 
 test('the palette viewport maps strip positions onto its visible phase window', () => {
   const viewport = createPaletteViewport();
@@ -143,7 +160,9 @@ test('recipe availability exposes only controls that can affect the result', () 
     harmony: true,
     colorPath: true,
     hueDirection: true,
+    chromaEndpoints: true,
     chromaMaximum: false,
+    lightnessEndpoints: true,
     lightnessMaximum: false,
   });
 
@@ -168,6 +187,15 @@ test('recipe availability exposes only controls that can affect the result', () 
 
   recipe.lightness.curve = PaletteV4.curve.ASCENDING;
   assert.equal(paletteRecipeAvailability(recipe).lightnessMaximum, true);
+
+  recipe.hue.mode = PaletteV4.hueMode.CUSTOM;
+  recipe.lightness.curve = PaletteV4.curve.CUSTOM;
+  recipe.chroma.curve = PaletteV4.curve.CUSTOM;
+  availability = paletteRecipeAvailability(recipe);
+  assert.equal(availability.baseHue, false);
+  assert.equal(availability.hueDirection, false);
+  assert.equal(availability.lightnessEndpoints, false);
+  assert.equal(availability.chromaEndpoints, false);
 });
 
 test('recipe state rejects stale compiler results', () => {
