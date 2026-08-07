@@ -27,7 +27,7 @@
       padding: 1rem;
     }
 
-    .container {
+    .container.palette-shell {
       max-width: 1500px;
       margin: auto;
     }
@@ -73,9 +73,27 @@
       margin-bottom: 0.625rem;
     }
 
+    .recipe-title-status {
+      display: flex;
+      min-width: 0;
+      flex-shrink: 0;
+      align-items: baseline;
+      gap: 0.625rem;
+    }
+
     .recipe-header h2 {
       font-size: 1.125rem;
       line-height: 1.5rem;
+    }
+
+    #gen_status {
+      max-width: 13rem;
+      overflow: hidden;
+      color: #94A3B8;
+      font-size: 0.6875rem;
+      line-height: 1rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .recipe-preset {
@@ -160,18 +178,16 @@
       gap: 0.375rem;
     }
 
-    .key-wheel-heading {
-      color: #C7D2FE;
-      font-size: 0.75rem;
-      font-weight: 700;
-      line-height: 1rem;
-      text-align: center;
-    }
-
-    .key-wheel-intro {
-      color: #94A3B8;
-      font-size: 0.6875rem;
-      line-height: 0.875rem;
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
 
     .key-wheel-canvas-wrap {
@@ -240,24 +256,6 @@
       width: 2.75rem;
       flex-shrink: 0;
       text-align: right;
-    }
-
-    .recipe-window-controls {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 0.625rem;
-      margin-top: 0.5rem;
-      padding: 0.5rem 0.625rem;
-      border: 1px solid #475569;
-      border-radius: 0.5rem;
-      background: #334155;
-    }
-
-    #gen_status {
-      margin-top: 0.375rem;
-      min-height: 1rem;
-      font-size: 0.75rem;
-      line-height: 1rem;
     }
 
     .wave-heading {
@@ -503,6 +501,34 @@
         grid-column: span 2;
       }
 
+      .palette-shell[data-active-tab="generative"] .palette-main {
+        grid-template-areas:
+          "controls controls"
+          "graph strip";
+        grid-template-columns: minmax(17rem, 0.75fr) minmax(0, 1.35fr);
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .palette-shell[data-active-tab="generative"] .visualization-card {
+        overflow: hidden;
+      }
+
+      .palette-shell[data-active-tab="generative"] .wave-panel #waveGraphCanvas,
+      .palette-shell[data-active-tab="generative"] .strip-panel #colorStripCanvas {
+        min-height: 7rem;
+        height: 0;
+        flex: 1;
+      }
+
+      .domain-recipe-card .recipe-field {
+        grid-template-columns: 3.5rem minmax(0, 1fr);
+      }
+
+      .domain-recipe-card .recipe-slider .slider-label {
+        width: 2.375rem;
+        font-size: 0.6875rem;
+      }
+
       .hue-card-content {
         grid-template-columns: minmax(0, 1fr) 8.5rem;
         align-items: center;
@@ -552,68 +578,6 @@
         min-height: 0;
         max-height: none;
         overflow-y: auto;
-      }
-    }
-
-    @media (min-width: 1024px) and (max-width: 1199px) {
-      html,
-      body {
-        height: auto;
-        overflow-x: hidden;
-        overflow-y: auto;
-      }
-
-      .palette-shell {
-        height: auto;
-        min-height: calc(100dvh - 1.5rem);
-      }
-
-      .palette-body,
-      .palette-main {
-        min-height: auto;
-      }
-
-      .palette-main {
-        grid-template-rows: auto auto auto;
-      }
-
-      #waveGraphCanvas {
-        height: 7rem;
-      }
-
-      .strip-panel #colorStripCanvas {
-        height: 8rem;
-        flex: none;
-      }
-
-      .key-wheel-intro {
-        font-size: 0.625rem;
-        line-height: 0.75rem;
-      }
-
-      #hueKeyWheelCanvas {
-        width: min(100%, 6.5rem);
-      }
-
-      .hue-card-content {
-        grid-template-columns: minmax(0, 1fr) 6.5rem;
-      }
-
-      .hue-key-visualizer {
-        width: 6.5rem;
-      }
-
-      .hue-card-controls .recipe-field {
-        grid-template-columns: minmax(4rem, 0.7fr) minmax(0, 1.3fr);
-      }
-
-      .recipe-slider {
-        gap: 0.25rem;
-      }
-
-      .recipe-slider .slider-label {
-        width: 2.375rem;
-        font-size: 0.625rem;
       }
     }
 
@@ -700,7 +664,7 @@
 
 <body>
 
-  <div class="container palette-shell">
+  <div class="container palette-shell" data-active-tab="procedural">
     <header class="palette-header">
       <h1 class="font-bold text-white">Procedural Color Palette Generator</h1>
       <div id="export_flyout" class="export-flyout">
@@ -803,11 +767,14 @@
     <div id="tab-content-generative" class="tab-content" role="tabpanel"
       aria-labelledby="tab-btn-generative" hidden>
       <div class="recipe-header">
-        <h2 class="font-semibold text-white">Generative OKLCH Palette</h2>
+        <div class="recipe-title-status">
+          <h2 class="font-semibold text-white">OKLCH Recipe</h2>
+          <p id="gen_status" role="status"></p>
+        </div>
         <div class="recipe-presets" aria-label="Generative recipe presets">
           <button type="button" class="recipe-preset" data-recipe-preset="balancedAnalogous">Analogous</button>
-          <button type="button" class="recipe-preset" data-recipe-preset="isolightSpectralLoop">OKLCH Hue Loop</button>
-          <button type="button" class="recipe-preset" data-recipe-preset="tonalMonochrome">Monochromatic Ramp</button>
+          <button type="button" class="recipe-preset" data-recipe-preset="isolightSpectralLoop">Loop</button>
+          <button type="button" class="recipe-preset" data-recipe-preset="tonalMonochrome">Monochrome</button>
           <select id="effect_recipe_preset" class="recipe-preset-select"
             aria-label="Effect palette recipe">
             <option value="">Effect recipes...</option>
@@ -831,9 +798,9 @@
                 <label for="gen_hue_mode">Distribution</label>
                 <select id="gen_hue_mode" aria-label="Hue Distribution" title="Hue Distribution"
                   class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-                  <option value="HARMONY">Color Harmony</option>
-                  <option value="SWEEP">Hue Sweep</option>
-                  <option value="CUSTOM">Custom Keys</option>
+                  <option value="HARMONY">Harmony</option>
+                  <option value="SWEEP">Sweep</option>
+                  <option value="CUSTOM">Custom</option>
                 </select>
               </div>
               <div id="gen_harmony_field" class="recipe-field">
@@ -841,18 +808,18 @@
                 <select id="gen_harmony" aria-label="Color Harmony" title="Color Harmony"
                   class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
                   <option value="ANALOGOUS">Analogous</option>
-                  <option value="MONOCHROMATIC">Monochromatic</option>
-                  <option value="ACCENTED_ANALOGOUS">Accented Analogous</option>
-                  <option value="COMPLEMENTARY">Complementary</option>
-                  <option value="SPLIT_COMPLEMENTARY">Split Complementary</option>
+                  <option value="MONOCHROMATIC">Mono</option>
+                  <option value="ACCENTED_ANALOGOUS">Accented</option>
+                  <option value="COMPLEMENTARY">Complement</option>
+                  <option value="SPLIT_COMPLEMENTARY">Split</option>
                   <option value="TRIADIC">Triadic</option>
-                  <option value="TETRADIC">Rectangular Tetradic</option>
+                  <option value="TETRADIC">Tetradic</option>
                   <option value="SQUARE">Square</option>
                 </select>
               </div>
             </div>
             <div class="hue-key-visualizer" aria-labelledby="key_wheel_heading">
-              <h4 id="key_wheel_heading" class="key-wheel-heading">OKLCH Hue Keys</h4>
+              <h4 id="key_wheel_heading" class="visually-hidden">OKLCH Hue Keys</h4>
               <div class="key-wheel-canvas-wrap">
                 <canvas id="hueKeyWheelCanvas" width="256" height="256" tabindex="0"
                   role="group" aria-roledescription="interactive gamut wheel"
@@ -860,23 +827,23 @@
                   aria-describedby="key_wheel_help"
                   aria-label="OKLCH gamut wheel with three hue key positions"></canvas>
               </div>
-              <p id="key_wheel_help" class="key-wheel-intro">Drag keys independently.</p>
+              <p id="key_wheel_help" class="visually-hidden">Drag keys independently.</p>
             </div>
           </div>
         </section>
 
         <section class="param-group recipe-group" aria-labelledby="recipe_color_heading">
-          <h3 id="recipe_color_heading" class="font-bold text-yellow-400">Gamut-relative Chroma</h3>
+          <h3 id="recipe_color_heading" class="font-bold text-yellow-400">Chroma</h3>
           <div class="recipe-field">
             <label for="gen_chroma_curve">Curve</label>
             <select id="gen_chroma_curve" aria-label="Relative Chroma Curve" title="Relative Chroma Curve"
               class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
               <option value="CONSTANT">Constant</option>
-              <option value="BELL">Triangular Peak</option>
-              <option value="ASCENDING">Linear Ascending</option>
-              <option value="DESCENDING">Linear Descending</option>
-              <option value="CUP">V-shaped Trough</option>
-              <option value="CUSTOM" disabled>Custom Keys (preset)</option>
+              <option value="BELL">Peak</option>
+              <option value="ASCENDING">Ascending</option>
+              <option value="DESCENDING">Descending</option>
+              <option value="CUP">Trough</option>
+              <option value="CUSTOM" disabled>Custom</option>
             </select>
           </div>
           <div id="gen_chroma_minimum_field" class="recipe-field">
@@ -896,17 +863,17 @@
         </section>
 
         <section class="param-group recipe-group" aria-labelledby="recipe_brightness_heading">
-          <h3 id="recipe_brightness_heading" class="font-bold text-red-400">OKLab Lightness</h3>
+          <h3 id="recipe_brightness_heading" class="font-bold text-red-400">Lightness</h3>
           <div class="recipe-field">
             <label for="gen_brightness">Curve</label>
             <select id="gen_brightness" aria-label="Lightness Curve" title="Lightness Curve"
               class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
               <option value="CONSTANT">Constant</option>
-              <option value="ASCENDING">Linear Ascending</option>
-              <option value="DESCENDING">Linear Descending</option>
-              <option value="BELL">Triangular Peak</option>
-              <option value="CUP">V-shaped Trough</option>
-              <option value="CUSTOM" disabled>Custom Keys (preset)</option>
+              <option value="ASCENDING">Ascending</option>
+              <option value="DESCENDING">Descending</option>
+              <option value="BELL">Peak</option>
+              <option value="CUP">Trough</option>
+              <option value="CUSTOM" disabled>Custom</option>
             </select>
           </div>
           <div id="gen_lightness_minimum_field" class="recipe-field">
@@ -925,8 +892,8 @@
           </div>
         </section>
 
-        <section class="param-group recipe-group" aria-labelledby="recipe_gradient_heading">
-          <h3 id="recipe_gradient_heading" class="font-bold text-purple-400">Domain &amp; Interpolation</h3>
+        <section class="param-group recipe-group domain-recipe-card" aria-labelledby="recipe_gradient_heading">
+          <h3 id="recipe_gradient_heading" class="font-bold text-purple-400">Domain</h3>
           <div class="recipe-field">
             <label for="gen_shape">Domain</label>
             <select id="gen_shape" aria-label="Domain Mapping" title="Domain Mapping"
@@ -942,41 +909,38 @@
             <label for="gen_path">Path</label>
             <select id="gen_path" aria-label="Color-space Path" title="Color-space Path"
               class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="OKLCH_ARC">OKLCH Hue Arc</option>
-              <option value="OKLAB_CARTESIAN">OKLab Cartesian</option>
+              <option value="OKLCH_ARC">OKLCH</option>
+              <option value="OKLAB_CARTESIAN">OKLab</option>
             </select>
           </div>
           <div id="gen_direction_field" class="recipe-field">
             <label for="gen_direction">Direction</label>
             <select id="gen_direction" aria-label="Hue Direction" title="Hue Direction"
               class="w-full bg-slate-700 text-white rounded p-1 border border-slate-600">
-              <option value="SHORTEST">Shortest Hue Arc</option>
-              <option value="CLOCKWISE">Clockwise Hue Arc</option>
-              <option value="COUNTERCLOCKWISE">Counterclockwise Hue Arc</option>
+              <option value="SHORTEST">Shortest</option>
+              <option value="CLOCKWISE">CW</option>
+              <option value="COUNTERCLOCKWISE">CCW</option>
             </select>
+          </div>
+          <div class="recipe-field">
+            <label for="gen_phase">Offset</label>
+            <div class="recipe-slider">
+              <input type="range" id="gen_phase" min="0" max="0" step="0.001" value="0"
+                aria-label="Input Offset" title="Input Offset">
+              <span id="gen_phase_value" class="slider-label">0.000</span>
+            </div>
+          </div>
+          <div class="recipe-field">
+            <label for="gen_width">Span</label>
+            <div class="recipe-slider">
+              <input type="range" id="gen_width" min="0.01" max="1" step="0.001" value="1"
+                aria-label="Input Span" title="Input Span">
+              <span id="gen_width_value" class="slider-label">1.000</span>
+            </div>
           </div>
         </section>
 
       </div>
-      <div class="recipe-window-controls" aria-label="Input domain window">
-        <div class="recipe-field">
-          <label for="gen_phase">Offset</label>
-          <div class="recipe-slider">
-            <input type="range" id="gen_phase" min="0" max="0" step="0.001" value="0"
-              aria-label="Input Offset" title="Input Offset">
-            <span id="gen_phase_value" class="slider-label">0.000</span>
-          </div>
-        </div>
-        <div class="recipe-field">
-          <label for="gen_width">Span</label>
-          <div class="recipe-slider">
-            <input type="range" id="gen_width" min="0.01" max="1" step="0.001" value="1"
-              aria-label="Input Span" title="Input Span">
-            <span id="gen_width_value" class="slider-label">1.000</span>
-          </div>
-        </div>
-      </div>
-      <p id="gen_status" class="text-slate-300" role="status"></p>
     </div> <!-- End Generative Tab -->
 
     <!-- 2. RGB WAVE FUNCTIONS (GRAPH) -->
@@ -1069,6 +1033,7 @@
 
     function switchTab(tabName, updateUrl = true) {
       activeTab = tabName;
+      document.querySelector('.palette-shell').dataset.activeTab = tabName;
       // Update buttons
       document.querySelectorAll('.tab-btn').forEach(btn => {
         const selected = btn.dataset.tab === tabName;
