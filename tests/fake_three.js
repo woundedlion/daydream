@@ -76,17 +76,52 @@ export class WebGLRenderer {
 }
 
 /**
+ * Length an array binds the GPU buffer to, or null for one that binds nothing:
+ * the dispose path's null detach, and a view whose ArrayBuffer heap growth
+ * detached — that one reads length 0 without anyone having re-pointed it, and
+ * the driver's own liveness guard is what keeps it off the GPU.
+ * @param {?Uint16Array} array - Candidate backing array.
+ * @returns {?number} The bound length, or null.
+ */
+function uploadLengthOf(array) {
+  if (array == null || array.buffer?.byteLength === 0) return null;
+  return array.length;
+}
+
+/**
  * Stand-in for an InstancedBufferAttribute with three.js's real upload
- * semantics: needsUpdate is write-only and only ever bumps version, so once an
- * upload is flagged nothing can unflag it. `version` is what WebGLAttributes
- * compares, so tests assert on it rather than on a readable flag.
+ * semantics:
+ *
+ * - needsUpdate is write-only and only ever bumps version, so once an upload is
+ *   flagged nothing can unflag it. `version` is what WebGLAttributes compares,
+ *   so tests assert on it rather than on a readable flag.
+ * - the GPU buffer is sized from the array at first upload and every later
+ *   upload is a bufferSubData into it, so the array length is fixed for the
+ *   attribute's lifetime. Re-pointing at a live view of another length renders
+ *   the wrong frame in a browser rather than throwing (README §10.2); here it
+ *   throws.
+ *
  * @param {?Uint16Array} array - Backing color array.
  * @returns {Object} Attribute stub exposing array/version/needsUpdate.
  */
 export function fakeColorAttribute(array) {
+  let backing = array;
+  let uploadLength = uploadLengthOf(array);
   return {
-    array,
     version: 0,
+    get array() { return backing; },
+    set array(value) {
+      const length = uploadLengthOf(value);
+      if (length !== null) {
+        if (uploadLength === null) uploadLength = length;
+        else if (length !== uploadLength) {
+          throw new Error(
+            `instanceColor.array re-pointed at length ${length}, `
+            + `but the GPU buffer is sized ${uploadLength}`);
+        }
+      }
+      backing = value;
+    },
     set needsUpdate(value) { if (value === true) this.version++; },
   };
 }
