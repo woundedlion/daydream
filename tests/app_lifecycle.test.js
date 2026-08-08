@@ -747,7 +747,7 @@ test('stopping cancels the interval, and starting arms exactly one', () => {
 function makeApplyNotice() {
   const body = fakeElement('div');
   const text = fakeElement('span');
-  body.hidden = true;
+  body.hidden = true; // index.html renders apply-notice-body hidden
   const timer = { fn: null, ms: null, handle: 0, cancelled: [] };
   const notice = createApplyNotice({
     doc: {
@@ -805,12 +805,17 @@ test('an owner clears the notice it raised', () => {
   assert.equal(h.notice.owner(), null, 'a cleared element is owned by nobody');
 });
 
-test('a clear on an unowned element is a no-op, not a crash', () => {
+test('a clear on an unowned element hides it rather than crashing', () => {
   const h = makeApplyNotice();
+  // A notice on screen that no owner is recorded for, as a reload of a page
+  // whose markup already carried one leaves it.
+  h.body.hidden = false;
+  h.text.textContent = 'Effect change was rejected.';
 
   h.notice.show(null, 'param');
 
-  assert.equal(h.body.hidden, true);
+  assert.equal(h.body.hidden, true, 'an unowned clear left the notice on screen');
+  assert.equal(h.text.textContent, '');
   assert.equal(h.notice.owner(), null);
 });
 
