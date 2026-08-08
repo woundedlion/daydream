@@ -141,8 +141,8 @@
     "assertions": 17
   },
   "tests/run_tests.test.js": {
-    "cases": 20,
-    "assertions": 28
+    "cases": 21,
+    "assertions": 31
   },
   "tests/segment_controller.test.js": {
     "cases": 88,
