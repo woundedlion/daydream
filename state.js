@@ -92,6 +92,11 @@ export function parseUrlBoolean(raw) {
 // enough to swallow a slider drag, short enough that a copied link is current.
 export const URL_FLUSH_DEBOUNCE_MS = 200;
 
+// Re-arm delay after a refused replaceState. Longer than the debounce so a retry
+// run does not spend the browser's write budget faster than the rate limit it is
+// waiting out.
+export const URL_FLUSH_RETRY_MS = 2000;
+
 /**
  * Replace the current history entry with a URL, reporting a refused write
  * instead of propagating it.
@@ -99,13 +104,15 @@ export const URL_FLUSH_DEBOUNCE_MS = 200;
  *   past the limit. Every URL write is cosmetic, so a throw must not escape into
  *   an apply or rollback path that would read it as a state failure.
  * @param {string} url - The URL to write.
- * @returns {void}
+ * @returns {boolean} Whether the URL was written; false when the browser refused it.
  */
 export function replaceUrl(url) {
   try {
     window.history.replaceState({}, '', url);
+    return true;
   } catch (e) {
     console.warn('URL update skipped:', e);
+    return false;
   }
 }
 
@@ -114,12 +121,12 @@ export function replaceUrl(url) {
  * pathname + query + the existing location.hash, which rebuilding from pathname
  * alone would drop.
  * @param {URLSearchParams} params - The query params to write; empty writes a bare path.
- * @returns {void}
+ * @returns {boolean} Whether the URL was written; false when the browser refused it.
  */
 export function writeUrl(params) {
   const qs = params.toString();
   const base = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-  replaceUrl(base + window.location.hash);
+  return replaceUrl(base + window.location.hash);
 }
 
 /**
@@ -350,12 +357,13 @@ export class URLSync {
   /**
    * Debounces a URL write, collapsing bursts into one flush after
    * URL_FLUSH_DEBOUNCE_MS. A no-op once disposed.
+   * @param {number} [delayMs] - Delay before the flush fires.
    * @returns {void}
    */
-  schedule() {
+  schedule(delayMs = URL_FLUSH_DEBOUNCE_MS) {
     if (this.disposed) return;
     clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.flush(), URL_FLUSH_DEBOUNCE_MS);
+    this.timer = setTimeout(() => this.flush(), delayMs);
   }
 
   /**
@@ -418,12 +426,16 @@ export class URLSync {
    * Read-modify-write the URL once: re-read current params, overlay tracked
    * state keys and surviving ad-hoc writes, then replaceState. Running at fire
    * time (not schedule time) is what lets concurrent updates merge.
+   * @details A refused write (replaceState rate limit) leaves the URL as it was,
+   *   so the buffered ad-hoc writes and any pending reset are kept and a retry is
+   *   armed. Tracked keys are re-read from state on every flush and need no such
+   *   hold. Dropping the buffer here would lose a GUI param permanently, since
+   *   nothing but the next write on that same key would re-assert it.
    * @returns {void}
    */
   flush() {
     const params = new URLSearchParams(window.location.search);
     this.applyPendingReset(params);
-    this.pendingReset = null;
     // A cleared tracked key drops its param; leaving it would re-seed the stale
     // value into state on the next load.
     for (const key of this.trackedKeys) {
@@ -433,9 +445,13 @@ export class URLSync {
       if (val === null) params.delete(key);
       else params.set(key, val);
     }
-    writeUrl(params);
+    if (!writeUrl(params)) {
+      this.schedule(URL_FLUSH_RETRY_MS);
+      return;
+    }
     // The URL is now the store of record; clear the buffer so a stale ad-hoc entry
     // can't re-apply on every flush.
+    this.pendingReset = null;
     this.adhoc.clear();
   }
 }
