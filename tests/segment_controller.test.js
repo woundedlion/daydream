@@ -771,6 +771,25 @@ test('a frame with a non-integer segId is dropped without settling the barrier',
   await done;
 });
 
+test('a frame tagged with another segment id is dropped', async () => {
+  const c = makeController();
+  c.create(2);
+  const done = c.renderParallel();
+
+  // In range and an integer, but not this worker's index: staging it would fill
+  // segment 1's slot from segment 0's pixels and leave 1 outstanding.
+  deliverFrameWithSegId(c, 0, 1);
+  assert.equal(c.pending, 2, 'a mis-tagged frame must not settle the barrier');
+  assert.deepEqual(c.scratch, [null, null], 'no staging slot is written');
+  assert.deepEqual(c.frameSeen, [false, false], 'no segment is marked seen');
+  assert.equal(c.faulted, false, 'a mis-tagged frame is a loud drop, not a pool fault');
+
+  deliverFrame(c, 0);
+  deliverFrame(c, 1);
+  assert.equal(c.pending, 0);
+  await done;
+});
+
 test('a surviving worker responding after a fault does not drive pending negative', async () => {
   const c = makeController();
   c.create(2);
