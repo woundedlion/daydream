@@ -75,9 +75,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
     },
 
     /**
-     * Rebuilds the scene from a mesh already read out of WASM. Records the edge
-     * count on the mesh (the readback carries only vertices and faces, so a
-     * saved card would otherwise report 0E).
+     * Rebuilds the scene from a mesh already read out of WASM.
      * @param {{vertices: Array<Object>, faces: Array<Array<number>>}} meshData - The mesh to draw.
      * @param {Object} view - The page's presentation flags: showGeodesics, showFaces, colorizeFaces, showVertices, showNormals, showIndices.
      * @param {Int32Array|null} faceClassIds - Per-face topology class ids, or null when none were computed.
@@ -218,7 +216,6 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
 
       // Edges
       const edges = uniqueEdges(meshData.faces, meshData.vertices.length);
-      meshData.edgeCount = edges.length;
 
       const lineGeoPoints = [];
       for (const [ai, bi] of edges) {
