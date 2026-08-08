@@ -81,6 +81,19 @@ test('the param writer and the switch coordinator own the notice separately', ()
   );
 });
 
+test('a segmented-POV spawn failure is announced, not only logged', () => {
+  const at = SOURCE.indexOf('function segmentedFailed(');
+  assert.ok(at >= 0, 'the segmented fallback must stay a named function');
+  const body = SOURCE.slice(at, SOURCE.indexOf('\n}', at));
+  assert.match(body, /applyNotice\.show\(/,
+    'a console-only failure is invisible: the user sees the toggle flip back '
+    + 'and cannot tell it from a mis-click, and the fault banner covers only '
+    + 'latched runtime faults');
+  assert.match(body, /SWITCH_NOTICE/,
+    'the notice must carry the switch owner tag, so a parameter write does not '
+    + 'clear it');
+});
+
 test('the discard path frees an engine built after disposal', () => {
   const body = wasmReadyBlock();
   assert.match(body, /discardStartup:/,
