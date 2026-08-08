@@ -249,6 +249,42 @@ function resampleThreeTurns(turns) {
   });
 }
 
+function directedHarmonyTurns(recipe) {
+  const turns = harmonyRelationships(recipe);
+  for (let i = 1; i < turns.length; i++) {
+    turns[i] = turns[i - 1] + directedTurnDelta(
+      turns[i] - turns[i - 1], recipe.hue.direction);
+  }
+  return turns;
+}
+
+function hueKeyStateFromTurns(turns) {
+  const anchor = turns[0];
+  return {
+    baseTurns: wrapTurns(anchor),
+    offsets: turns.map((turn) => turn - anchor),
+  };
+}
+
+export function hueKeyState(recipe) {
+  if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM)
+    return hueKeyStateFromTurns(recipe.hue.customTurns.slice(0, 3));
+  if (recipe.hue.mode === PaletteV4.hueMode.SWEEP) {
+    let sweep = recipe.hue.sweepTurns;
+    if (recipe.hue.direction === PaletteV4.direction.CLOCKWISE)
+      sweep = -Math.abs(sweep);
+    else if (recipe.hue.direction === PaletteV4.direction.COUNTERCLOCKWISE)
+      sweep = Math.abs(sweep);
+    const end = recipe.domain === PaletteV4.domain.LOOP ? sweep * 0.5 : sweep;
+    return hueKeyStateFromTurns([recipe.hue.baseTurns, recipe.hue.baseTurns + end]);
+  }
+
+  const turns = directedHarmonyTurns(recipe);
+  if (recipe.hue.harmony === PaletteV4.harmony.MONOCHROMATIC)
+    turns.push(turns[0]);
+  return hueKeyStateFromTurns(turns);
+}
+
 export function customHueKeyState(recipe) {
   let turns;
   if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
@@ -262,19 +298,10 @@ export function customHueKeyState(recipe) {
     turns = [recipe.hue.baseTurns, recipe.hue.baseTurns + sweep * 0.5,
       recipe.hue.baseTurns + sweep];
   } else {
-    const relationships = harmonyRelationships(recipe);
-    for (let i = 1; i < relationships.length; i++) {
-      relationships[i] = relationships[i - 1] + directedTurnDelta(
-        relationships[i] - relationships[i - 1], recipe.hue.direction);
-    }
-    turns = resampleThreeTurns(relationships);
+    turns = resampleThreeTurns(directedHarmonyTurns(recipe));
   }
 
-  const anchor = turns[0];
-  return {
-    baseTurns: wrapTurns(anchor),
-    offsets: turns.map((turn) => turn - anchor),
-  };
+  return hueKeyStateFromTurns(turns);
 }
 
 export function customHueTurns(baseTurns, offsets, template = [0, 0, 0, 0]) {

@@ -8,7 +8,7 @@ const {
   PaletteV4, defaultPaletteRecipe, PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
   paletteRecipeAvailability, wrapTurns, signedTurnDelta, equivalentTurnNear,
   hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
-  customHueKeyState, customHueTurns, moveCustomHueKey,
+  hueKeyState, customHueKeyState, customHueTurns, moveCustomHueKey,
 } =
   await import('../tools/palette_controls.js');
 
@@ -188,6 +188,26 @@ test('custom hue state derives three sensible keys from authored harmonies', () 
   assert.equal(state.baseTurns, 0.98);
   assert.ok(Math.abs(state.offsets[1] - 1 / 3) < 1e-12);
   assert.ok(Math.abs(state.offsets[2] - 2 / 3) < 1e-12);
+});
+
+test('hue key state exposes all four tetradic and square anchors', () => {
+  const recipe = defaultPaletteRecipe();
+  recipe.hue.baseTurns = 0.1;
+  recipe.hue.spreadTurns = 0.08;
+  recipe.hue.harmony = PaletteV4.harmony.TETRADIC;
+
+  const tetradic = hueKeyState(recipe).offsets;
+  const expectedTetradic = [0, 0.08, 0.5, 0.58];
+  assert.equal(tetradic.length, 4);
+  for (let index = 0; index < tetradic.length; index++)
+    assert.ok(Math.abs(tetradic[index] - expectedTetradic[index]) < 1e-12);
+
+  recipe.hue.harmony = PaletteV4.harmony.SQUARE;
+  const square = hueKeyState(recipe).offsets;
+  const expectedSquare = [0, 0.25, 0.5, 0.75];
+  assert.equal(square.length, 4);
+  for (let index = 0; index < square.length; index++)
+    assert.ok(Math.abs(square[index] - expectedSquare[index]) < 1e-12);
 });
 
 test('custom hue state samples a sweep into three editable keys', () => {
