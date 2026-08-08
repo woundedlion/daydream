@@ -115,6 +115,8 @@ let engineInstance = null;
 let nextResolutionOk = true;
 /** Seeds the next-constructed engine's effectOk, so init-time rejection is testable. */
 let nextEffectOk = true;
+/** Seeds the next-constructed engine's clipOk, so init-time rejection is testable. */
+let nextClipOk = true;
 mock.module('../holosphere_wasm.js', {
   defaultExport: async () => ({
     ParamSetResult,
@@ -124,6 +126,7 @@ mock.module('../holosphere_wasm.js', {
         engineInstance = new FakeEngine();
         engineInstance.resolutionOk = nextResolutionOk;
         engineInstance.effectOk = nextEffectOk;
+        engineInstance.clipOk = nextClipOk;
         return engineInstance;
       }
     },
@@ -156,6 +159,7 @@ beforeEach(() => {
   engineInstance = null;
   nextResolutionOk = true;
   nextEffectOk = true;
+  nextClipOk = true;
 });
 
 /** The worker posts 'booted' at module load; the controller's boot watchdog depends on this ping. */
@@ -262,6 +266,18 @@ test('init with a rejected effect posts engineRejected, not ready', async () => 
   const failed = posted.find((p) => p.msg.type === 'engineRejected');
   assert.ok(failed, 'engineRejected posted');
   assert.match(failed.msg.reason, /setEffect\(Plasma\) rejected/);
+});
+
+/** An init whose clip is rejected has no render geometry, so it posts no ready. */
+test('init with a rejected clip posts engineRejected, not ready', async () => {
+  nextClipOk = false;
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+
+  const failed = posted.find((p) => p.msg.type === 'engineRejected');
+  assert.ok(failed, 'engineRejected posted');
+  assert.match(failed.msg.reason, /setClip\(0, 4, 0, 4\) rejected/);
+  assert.equal(posted.find((p) => p.msg.type === 'ready'), undefined,
+    'a worker rendering no geometry must not report itself ready');
 });
 
 /** render copies exactly this segment's quadrant rows out of the full buffer. */
