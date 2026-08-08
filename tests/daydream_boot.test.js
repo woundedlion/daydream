@@ -115,6 +115,14 @@ test('the segmented POV deep-link keys keep the names shared links carry', () =>
   }
 });
 
+test('the segment-count control marks the count no hardware produces', () => {
+  const at = SOURCE.indexOf("segFolder.add(segState, 'segments'");
+  assert.ok(at >= 0, 'the segment-count control must stay in the segmented folder');
+  assert.match(SOURCE.slice(at, SOURCE.indexOf('\n', at)), /\.name\('Segments \(6[^']*'\)/,
+    'the slider offers 6 segments, which the power-of-two firmware layout never '
+    + 'runs; without the marker the per-segment overlay names boards that cannot exist');
+});
+
 test('the late-bound engine controls are re-applied once the engine exists', () => {
   assert.match(wasmReadyBlock(), /poleLod\.replay\(\)/,
     'the Pole LOD onChange runs while host.engine is null, so the block that '

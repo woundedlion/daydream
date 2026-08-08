@@ -484,7 +484,10 @@ const segEnabledCtrl = segFolder.add(segState, 'segmented').name('Enabled').onCh
     segmentedFailed(v ? 'enable' : 'teardown', e);
   }
 });
-segFolder.add(segState, 'segments', 2, 8, 2).name('Segments').onChange(async v => {
+// The firmware takes a power-of-two segment count <= 8, so 6 is extra worker
+// parallelism no hardware produces; the label says so, since the per-segment
+// overlay otherwise names boards that cannot exist.
+segFolder.add(segState, 'segments', 2, 8, 2).name('Segments (6 = sim only)').onChange(async v => {
   try {
     segCount = v;
     if (segments.active) await segSpawn.respawn();
