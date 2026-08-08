@@ -1395,12 +1395,15 @@
     function applyRestore(item) {
       state.base = item.base;
       state.ops = structuredClone(item.ops); // Deep copy (ops are plain data)
-      state.showGeodesics = item.geodesics;
-      state.showFaces = item.faces !== undefined ? item.faces : true;
-      state.colorizeFaces = !!item.colorize;
-      state.showVertices = item.vertices;
-      state.showNormals = !!item.normals;
-      state.showIndices = !!item.indices;
+      // A card saved before a flag existed carries none, and lands on the page's
+      // own default for it rather than off.
+      const flag = (value, fallback) => !!(value ?? fallback);
+      state.showGeodesics = flag(item.geodesics, true);
+      state.showFaces = flag(item.faces, true);
+      state.colorizeFaces = flag(item.colorize, false);
+      state.showVertices = flag(item.vertices, false);
+      state.showNormals = flag(item.normals, false);
+      state.showIndices = flag(item.indices, false);
 
       // Update UI
       updateToggles();
