@@ -2,6 +2,7 @@
   --page-bg: #000;
   --panel-border: #333;
   --muted-text: #888;
+  --error-text: #e66;
   --accent: #48f;
   --focus-ring: #8af;
   --ui-font: 'Segoe UI', Arial, sans-serif;
@@ -229,7 +230,7 @@
 
 /* Error state when the WASM engine fails to load (see bootstrap.js showBootstrapFailure). */
 .loading-overlay.error {
-  color: #e66;
+  color: var(--error-text);
 }
 
 .load-error-title {
@@ -262,7 +263,7 @@
   align-items: center;
   max-width: min(90%, 640px);
   padding: 8px 12px;
-  border: 1px solid #e66;
+  border: 1px solid var(--error-text);
   border-radius: 6px;
   background: #222;
   color: #eee;
@@ -750,5 +751,5 @@ div.label {
 }
 
 .segment-stats .seg-time.slow {
-  color: #f66;
+  color: var(--error-text);
 }
