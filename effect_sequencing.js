@@ -163,8 +163,9 @@ export function switchFailureReport(label, result) {
  * @param {(message: string, error: any) => void} deps.logError - Console sink.
  * @param {(message: string|null) => void} deps.showNotice - Recoverable error sink.
  * @param {(message: string) => void} deps.showFatal - Fatal-banner sink.
- * @returns {{isRestoring: () => boolean, dispose: () => void}} The mute-window
- *   query, and an idempotent unsubscribe.
+ * @returns {{isRestoring: () => boolean, mute: (write: () => void) => void,
+ *   dispose: () => void}} The mute-window query, a muted-write helper for state
+ *   the caller applies itself, and an idempotent unsubscribe.
  */
 export function createSwitchCoordinator({
   appState,
@@ -243,6 +244,7 @@ export function createSwitchCoordinator({
   let unsubscribe = appState.subscribe(onChange);
   return {
     isRestoring: () => restoring,
+    mute: runMuted,
     dispose() {
       if (!unsubscribe) return;
       unsubscribe();

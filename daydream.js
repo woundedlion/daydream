@@ -219,8 +219,9 @@ function syncResolutionOptions(module) {
   const corrected = resolutionCorrection(labels, current);
   if (corrected !== null) {
     console.warn(`Resolution "${current}" is not supported by the engine; using "${corrected}".`);
-    // Fires the controller's onChange, so appState and the URL both follow.
-    resolutionController.setValue(corrected);
+    // Muted: the onChange still carries the correction into appState and the URL,
+    // but the apply is applyInitialState's single preserving one below.
+    switches.mute(() => resolutionController.setValue(corrected));
   }
 }
 
