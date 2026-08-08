@@ -464,14 +464,6 @@
   height: 100%;
 }
 
-/* GUI Container Defaults (Desktop) */
-.gui-container {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 1000;
-}
-
 /* --- Mobile Styles --- */
 /* Page layout follows viewport width. The renderer separately measures its
    canvas container, so its compact layout may switch at a different time.
