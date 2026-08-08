@@ -7,13 +7,14 @@
 import { test, mock, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { unpinnedEngineMethods } from './fake_engine.js';
+import { fakeColorAttribute } from './fake_three.js';
 import { repointDisplayAliases } from '../app_lifecycle.js';
 
 // Stand-in for the injected Daydream renderer: the grid and display buffer the
 // compositor reads, plus the dot mesh the second display alias lives on.
 const driver = {
   W: 0, H: 0, pixels: null,
-  dotMesh: { instanceColor: { array: null, needsUpdate: false } },
+  dotMesh: { instanceColor: fakeColorAttribute(null) },
 };
 
 
@@ -190,8 +191,9 @@ beforeEach(() => {
   driver.W = 0;
   driver.H = 0;
   driver.pixels = null;
-  driver.dotMesh.instanceColor.array = null;
-  driver.dotMesh.instanceColor.needsUpdate = false;
+  // A fresh attribute per test: the length invariant binds at first upload and
+  // the cases below composite at different grid sizes.
+  driver.dotMesh.instanceColor = fakeColorAttribute(null);
   FakeWorker.instances = [];
   FakeWorker.constructionCount = 0;
   FakeWorker.failConstructionAt = -1;
