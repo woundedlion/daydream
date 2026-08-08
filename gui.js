@@ -14,10 +14,17 @@ import {
 } from "./state.js";
 
 /**
- * Reads the current URL query string into a parsed params object.
+ * Reads the current URL query string into a parsed params object, minus the
+ * keys a reset scheduled but not yet flushed will drop. An effect switch resets
+ * and rebuilds the panel inside that one debounce window, so a raw read would
+ * hydrate the incoming effect's controls from the outgoing effect's params.
  * @returns {URLSearchParams} The query parameters of the current location.
  */
-const getUrlParams = () => new URLSearchParams(window.location.search);
+const getUrlParams = () => {
+  const params = new URLSearchParams(window.location.search);
+  getActiveURLSync()?.applyPendingReset(params);
+  return params;
+};
 
 /**
  * Extracts the set of values lil-gui will accept for an enumerated control

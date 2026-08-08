@@ -702,3 +702,24 @@ test('resetGUI routes through the active URLSync', () => {
   assert.equal(q.get('effect'), 'Old', 'tracked state is re-asserted');
   assert.match(url.written(), /#tool$/);
 });
+
+/**
+ * An effect switch resets the param URL and rebuilds the panel inside one
+ * debounce window, so a control added there seeds from the engine, not from the
+ * URL entry on its way out — effects share param names, and the outgoing
+ * effect's value would otherwise hydrate the incoming one's slider.
+ */
+test('a control added inside a scheduled reset ignores the params it drops', () => {
+  installRecordingWindow('?fx.Alpha=0.75&view.poleLod=1.5&effect=Old');
+  new URLSync(new AppState({ effect: 'Old' }), ['effect']);
+
+  resetGUI(['effect', 'view.poleLod']);
+
+  const incoming = { Alpha: 0.2 };
+  new DeepLinkGUI({ autoPlace: false }, 'fx').add(incoming, 'Alpha', 0, 1);
+  assert.equal(incoming.Alpha, 0.2, 'the outgoing effect\'s value must not hydrate');
+
+  const global = { poleLod: 0 };
+  new DeepLinkGUI({ autoPlace: false }, 'view').add(global, 'poleLod', 0, 2);
+  assert.equal(global.poleLod, 1.5, 'an excluded key still hydrates');
+});

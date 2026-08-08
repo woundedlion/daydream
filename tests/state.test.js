@@ -478,6 +478,31 @@ test('URLSync.reset carries an excluded ad-hoc write over the value it replaces'
   assert.equal(params.get('resolution'), 'high', 'tracked state is re-asserted');
 });
 
+/**
+ * reset() only schedules the clear, so a reader inside the debounce window still
+ * sees the params on their way out — the deep-link GUI rebuilds an effect panel
+ * there, and would hydrate it from the outgoing effect's values.
+ */
+test('URLSync.applyPendingReset hides the params a scheduled reset will clear', () => {
+  installWindow('?speed=2&keep=1', '/sim');
+  const sync = new URLSync(new AppState({ resolution: 'high' }), ['resolution']);
+
+  const before = new URLSearchParams('speed=2&keep=1');
+  sync.applyPendingReset(before);
+  assert.equal(before.get('speed'), '2', 'nothing is hidden with no reset pending');
+
+  sync.reset(['keep']);
+  const during = new URLSearchParams('speed=2&keep=1');
+  sync.applyPendingReset(during);
+  assert.equal(during.has('speed'), false);
+  assert.equal(during.get('keep'), '1', 'an excluded key is still readable');
+
+  sync.flush();
+  const after = new URLSearchParams('speed=2&keep=1');
+  sync.applyPendingReset(after);
+  assert.equal(after.get('speed'), '2', 'the flush ends the window');
+});
+
 test('URLSync.setParam(k, null) drops the key from the URL on flush', () => {
   const calls = installWindow('?keep=1', '/sim');
   const s = new AppState({});
