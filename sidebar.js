@@ -30,7 +30,7 @@ export class EffectSidebar {
     this.sort = { key: 'name', dir: 'asc' };
 
     this.heading = document.createElement('h2');
-    this.heading.innerText = 'Effects';
+    this.heading.textContent = 'Effects';
     this.heading.className = 'effect-sidebar-heading';
 
     this.sortRow = document.createElement('div');
