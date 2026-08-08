@@ -9,6 +9,9 @@ node_modules/
 /three.js/
 /vendor/
 
+# The Holosphere checkout CI drops here for the engine-parity cases.
+/engine/
+
 # Local agent tooling and machine-local prompts.
 /.claude/
 /prompts/

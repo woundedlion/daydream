@@ -9,8 +9,9 @@
 // touches them, so no export can — and sees an edit at engine HEAD before a
 // rebuild.
 //
-// The engine is a separate repository and is absent from the JS unit suite job,
-// so every case here skips when no checkout is found.
+// The engine is a separate repository. The JS unit suite checks it out and sets
+// HOLOSPHERE_ENGINE_REQUIRED, under which a missing tree fails instead of
+// skipping; only a local run without a checkout skips.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
@@ -22,8 +23,9 @@ import * as P from '../tools/palette_math.js';
 
 const REPO = new URL('../', import.meta.url);
 const ENGINE_ENV = 'HOLOSPHERE_ENGINE_DIR';
-// deploy.yml's gate checks the pinned engine out to engine/; a working checkout
-// sits beside this repo under either its directory name.
+const REQUIRED_ENV = 'HOLOSPHERE_ENGINE_REQUIRED';
+// js-unit-suite.yml and deploy.yml's gate both check the engine out to engine/;
+// a working checkout sits beside this repo under either its directory name.
 const CANDIDATES = ['engine', '../Holosphere', '../pov'];
 const MARKER = 'core/math/3dmath.h';
 
@@ -41,17 +43,22 @@ function findEngine() {
 }
 
 const { root: ENGINE, tried: TRIED } = findEngine();
-const SKIP = ENGINE
-  ? false
-  : `no Holosphere checkout holds ${MARKER} (looked in ${TRIED.join(', ')}) — ` +
-    `set ${ENGINE_ENV} to an engine tree to run the source-parity checks`;
+const MISSING =
+  `no Holosphere checkout holds ${MARKER} (looked in ${TRIED.join(', ')}) — ` +
+  `set ${ENGINE_ENV} to an engine tree to run the source-parity checks`;
+// Every case runs where the engine is declared required, so a job that lost its
+// engine checkout reports a failure rather than a green run of nothing.
+const SKIP = ENGINE || process.env[REQUIRED_ENV] ? false : MISSING;
 
 /**
  * Reads an engine header.
  * @param {string} path - Path below the engine root, e.g. 'core/color/color.h'.
  * @returns {string} The file's text.
  */
-const header = (path) => readFileSync(join(ENGINE, path), 'utf8');
+const header = (path) => {
+  assert.ok(ENGINE, MISSING);
+  return readFileSync(join(ENGINE, path), 'utf8');
+};
 
 /**
  * Every numeric literal in a fragment of C++ or JS, in source order, with the

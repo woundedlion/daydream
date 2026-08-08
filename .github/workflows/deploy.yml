@@ -185,6 +185,8 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/js-unit-suite.yml
+    secrets:
+      POV_TOKEN: ${{ secrets.POV_TOKEN }}
 
   deploy:
     name: Deploy to Pages

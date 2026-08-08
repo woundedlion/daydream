@@ -17,8 +17,9 @@ const ROOT = new URL('../', import.meta.url);
 const NOT_CHECKED = new Set(['holosphere_wasm.js']);
 
 // Never entered: dependency and git metadata, the vendored third-party drops,
-// and tests/, which tsconfig.json puts out of scope on purpose.
-const SKIP_DIRS = new Set(['node_modules', '.git', 'vendor', 'three.js', 'tests']);
+// the engine checkout the parity cases read, and tests/, which tsconfig.json
+// puts out of scope on purpose.
+const SKIP_DIRS = new Set(['node_modules', '.git', 'vendor', 'three.js', 'tests', 'engine']);
 
 /**
  * Reads tsconfig.json, which carries `//` comments JSON.parse rejects. Only
