@@ -303,8 +303,6 @@ export function createTestAllTicker({
   cancel = (handle) => clearInterval(handle),
 }) {
   let handle = null;
-  // -1 until the first advance when the live effect is off the list, so the walk
-  // starts at its head.
   let index = 0;
 
   const tick = () => {
@@ -318,6 +316,7 @@ export function createTestAllTicker({
   return {
     start() {
       if (handle !== null) return;
+      // -1 for an effect off the list, so the first advance starts at its head.
       index = availableEffects().indexOf(getEffect());
       handle = schedule(tick, intervalMs);
     },
