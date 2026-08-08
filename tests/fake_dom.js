@@ -84,8 +84,9 @@ export class FakeElement {}
  * tests cannot silently accept markup construction that a browser would parse.
  * Listeners are recorded with their options bag so a test can dispatch(type,
  * event), read {passive}/{signal}, and assert removal; a {once} listener drops
- * as it fires and removal pairs on the capture flag, as in the DOM, so a
- * capture-mismatched removal leaves the listener on the list. focus() and
+ * as it fires, a listener an earlier handler removed does not fire, and removal
+ * pairs on the capture flag, as in the DOM, so a capture-mismatched removal
+ * leaves the listener on the list. focus() and
  * scrollIntoView() record their call counts the same way. Removing a listener
  * that was never added throws rather than no-opping as the DOM does, so a
  * fixture that omits the add cannot hide a removal that never happens.
@@ -187,10 +188,11 @@ export function fakeElement(tag = 'div') {
       // passing one models a bubbled event from a descendant.
       const dispatched = { target: this, ...event };
       for (const l of this.listeners.filter((l) => l.type === type)) {
-        if (l.options && l.options.once) {
-          const at = this.listeners.indexOf(l);
-          if (at >= 0) this.listeners.splice(at, 1);
-        }
+        // Re-check membership: an earlier handler may have removed this one,
+        // and the DOM skips a listener removed after the dispatch began.
+        const at = this.listeners.indexOf(l);
+        if (at < 0) continue;
+        if (l.options && l.options.once) this.listeners.splice(at, 1);
         l.handler(dispatched);
       }
     },
