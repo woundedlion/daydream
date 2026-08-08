@@ -213,8 +213,8 @@
     "assertions": 54
   },
   "tests/tool_pages.test.js": {
-    "cases": 6,
-    "assertions": 94
+    "cases": 7,
+    "assertions": 111
   },
   "tests/tsconfig_roster.test.js": {
     "cases": 5,
