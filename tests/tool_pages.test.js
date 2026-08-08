@@ -54,6 +54,41 @@ const SERVED_PAGES = [
   { page: 'index.html', sheets: [['styles', 'index.css']] },
 ].map((entry) => ({ ...entry, scripts: scriptsOf(entry.page) }));
 
+// Each served page's whole script-src, token by token. 'unsafe-inline' covers
+// the import map vendor-importmap.js injects and the inline module block each
+// tool page carries, so the directive bounds where scripts are fetched from
+// rather than what may run inline, and the origin list is the whole of it.
+const SCRIPT_SRC = {
+  'tools/lissajous.html': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+  'tools/mobius.html': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+  'tools/palettes.html': ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'"],
+  'tools/solids.html':
+    ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
+  'index.html':
+    ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
+};
+
+/**
+ * A page's Content-Security-Policy.
+ * @param {string} page - Repo-relative page path.
+ * @returns {?string} The meta tag's policy, or null where the page carries none.
+ */
+const cspOf = (page) =>
+  read(page).match(
+    /<meta http-equiv="Content-Security-Policy" content="([^"]*)"/)?.[1] ?? null;
+
+/**
+ * One directive's source list.
+ * @param {string} csp - Policy text.
+ * @param {string} name - Directive name, e.g. 'script-src'.
+ * @returns {?string[]} Its tokens in source order, or null where the policy does
+ *   not name the directive.
+ */
+const directive = (csp, name) =>
+  csp.split(';')
+    .map((d) => d.trim().split(/\s+/))
+    .find(([d]) => d === name)?.slice(1) ?? null;
+
 /**
  * Class names a stylesheet defines. Tailwind escapes the characters it allows in
  * a class but not in a selector (`.text-\[0\.65rem\]`), so the backslashes come
@@ -135,8 +170,7 @@ test('tool pages load no Tailwind CDN code', () => {
 
 test('every served page carries a CSP permitting no Tailwind CDN origin or blanket eval', () => {
   for (const { page } of SERVED_PAGES) {
-    const csp = read(page).match(
-      /<meta http-equiv="Content-Security-Policy" content="([^"]*)"/)?.[1];
+    const csp = cspOf(page);
     assert.ok(csp, `${page} has no Content-Security-Policy meta`);
     assert.doesNotMatch(csp, /tailwindcss\.com/,
       `${page} CSP still allows the Tailwind CDN`);
@@ -146,6 +180,23 @@ test('every served page carries a CSP permitting no Tailwind CDN origin or blank
       `${page} CSP grants blanket 'unsafe-eval'; instantiating WASM needs only 'wasm-unsafe-eval'`);
     assert.match(csp, /default-src 'self'/);
     assert.match(csp, /object-src 'none'/);
+  }
+});
+
+/**
+ * Pins each served page's script-src to its exact token list. `default-src`
+ * alone leaves the directive that actually decides where scripts load from
+ * ungated, so an origin added to any page passes CI on the strength of a
+ * default it overrides.
+ */
+test('every served page\'s script-src is exactly its committed token list', () => {
+  for (const { page } of SERVED_PAGES) {
+    const want = SCRIPT_SRC[page];
+    assert.ok(want, `${page} has no committed script-src token list`);
+    const tokens = directive(cspOf(page), 'script-src');
+    assert.ok(tokens, `${page} CSP declares no script-src of its own`);
+    assert.deepEqual([...tokens].sort(), [...want].sort(),
+      `${page} script-src drifted from its committed token list`);
   }
 });
 
