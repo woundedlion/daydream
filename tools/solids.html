@@ -1438,13 +1438,14 @@
       if (to < 0 || to >= state.ops.length || from === to) return;
       const opName = state.ops[from].op;
       queueCommit(async () => {
-        const candidate = movedOps(state.ops, from, to);
-        const check = await chainIsValid(state.base, candidate);
+        const check = await chainIsValid(state.base, movedOps(state.ops, from, to));
         if (!check.ok) {
           showGateMsg(`rejected: ${check.message}`);
           return;
         }
-        state.ops = candidate;
+        // Re-derived from the live ops: a param edit lands outside the commit
+        // queue, so a clone taken before the await would drop it.
+        state.ops = movedOps(state.ops, from, to);
         renderOps();
         update();
         showGateMsg(`moved ${opName} to position ${to + 1}`);
@@ -1542,13 +1543,15 @@
         }
         renderOps(); // snap the drag preview back now; the commit re-renders
         queueCommit(async () => {
-          const candidate = movedOps(state.ops, fromIndex, toIndex);
-          const check = await chainIsValid(state.base, candidate);
+          const check = await chainIsValid(
+            state.base, movedOps(state.ops, fromIndex, toIndex));
           if (!check.ok) {
             showGateMsg(`rejected: ${check.message}`);
             return;
           }
-          state.ops = candidate;
+          // Re-derived from the live ops: a param edit lands outside the commit
+          // queue, so a clone taken before the await would drop it.
+          state.ops = movedOps(state.ops, fromIndex, toIndex);
           renderOps();
           update();
         });
