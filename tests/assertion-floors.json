@@ -185,8 +185,8 @@
     "assertions": 546
   },
   "tests/slider.test.js": {
-    "cases": 15,
-    "assertions": 45
+    "cases": 17,
+    "assertions": 59
   },
   "tests/solid_codegen.test.js": {
     "cases": 80,
