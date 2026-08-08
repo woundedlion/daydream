@@ -81,8 +81,8 @@
     "assertions": 34
   },
   "tests/global_stats_view.test.js": {
-    "cases": 10,
-    "assertions": 28
+    "cases": 11,
+    "assertions": 31
   },
   "tests/gui.test.js": {
     "cases": 22,

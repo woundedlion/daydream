@@ -39,7 +39,8 @@ export class GlobalStatsView {
    * Repaint both stat bars from one frame's measurements.
    * @param {number} duration - Frame draw time in milliseconds.
    * @param {?ArenaMetrics} metrics - Arena metrics for the frame, or null when the
-   *   effect publishes none (a worker pool owning the display, say).
+   *   effect publishes none (a worker pool owning the display, say). A row whose
+   *   arena is absent keeps its last text rather than throwing on the frame path.
    * @returns {void}
    */
   update(duration, metrics) {
@@ -62,10 +63,17 @@ export class GlobalStatsView {
     const updateRow = (row, text) => {
       for (const el of row) if (el) el.textContent = text;
     };
+    /**
+     * @param {Array<HTMLElement|null>} row
+     * @param {?ArenaUsage} usage
+     */
+    const updateArena = (row, usage) => {
+      if (usage) updateRow(row, fmt(usage));
+    };
 
-    updateRow(cells.scratchA, fmt(metrics.scratch_arena_a));
-    updateRow(cells.scratchB, fmt(metrics.scratch_arena_b));
-    updateRow(cells.persist, fmt(metrics.persistent_arena));
+    updateArena(cells.scratchA, metrics.scratch_arena_a);
+    updateArena(cells.scratchB, metrics.scratch_arena_b);
+    updateArena(cells.persist, metrics.persistent_arena);
     if (metrics.stack) {
       updateRow(cells.stack,
         `${formatKB(metrics.stack.high_water_mark)}|${formatKB(metrics.stack.capacity, 0)}`);
