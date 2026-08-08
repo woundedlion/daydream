@@ -129,16 +129,29 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
 const WAVE_COLORS = ['#EF4444', '#22C55E', '#3B82F6'];
 
 function fitCanvasToDisplay(canvas, ctx) {
-  const width = Math.max(1, Math.round(canvas.clientWidth || canvas.width));
-  const height = Math.max(1, Math.round(canvas.clientHeight || canvas.height));
   const pixelRatio = Math.max(1, globalThis.devicePixelRatio || 1);
-  const renderWidth = Math.round(width * pixelRatio);
-  const renderHeight = Math.round(height * pixelRatio);
+  let width;
+  let height;
 
-  if (canvas.width !== renderWidth || canvas.height !== renderHeight) {
-    canvas.width = renderWidth;
-    canvas.height = renderHeight;
+  if (canvas.clientWidth && canvas.clientHeight) {
+    width = Math.max(1, Math.round(canvas.clientWidth));
+    height = Math.max(1, Math.round(canvas.clientHeight));
+    const renderWidth = Math.round(width * pixelRatio);
+    const renderHeight = Math.round(height * pixelRatio);
+    if (canvas.width !== renderWidth || canvas.height !== renderHeight) {
+      canvas.width = renderWidth;
+      canvas.height = renderHeight;
+    }
+  } else {
+    // An unlaid-out canvas has no display size to fit to. Its backing store is
+    // already in device pixels, so sizing it from itself would multiply by the
+    // ratio again on every call.
+    width = Math.max(1, Math.round(canvas.width / pixelRatio));
+    height = Math.max(1, Math.round(canvas.height / pixelRatio));
   }
+
+  // Setting canvas.width resets the context state, so the transform is applied
+  // after any resize.
   ctx.setTransform?.(pixelRatio, 0, 0, pixelRatio, 0, 0);
   return { width, height };
 }
