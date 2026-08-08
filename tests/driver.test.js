@@ -8,7 +8,9 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { Daydream, dotDetailFor, fitDistance, MOBILE_BREAKPOINT_PX } from '../driver.js';
+import {
+  Daydream, dotDetailFor, fitDistance, initialAspect, MOBILE_BREAKPOINT_PX,
+} from '../driver.js';
 import { fakeElement, installDocument, restoreDocumentAfterEach } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 
@@ -64,6 +66,22 @@ test('fitDistance backs off by 1/aspect on a portrait viewport', () => {
 test('fitDistance clamps into the orbit-control range', () => {
   assert.equal(fitDistance(1, 5000, 6000), 5000);
   assert.equal(fitDistance(1, 1, 10), 10);
+});
+
+// ---------------------------------------------------------------------------
+// initialAspect
+// ---------------------------------------------------------------------------
+
+test('initialAspect reports the canvas ratio once it has a size', () => {
+  assert.equal(initialAspect({ width: 1200, height: 800 }), 1.5);
+});
+
+test('initialAspect falls back to square while a dimension is still 0', () => {
+  // width/0 is Infinity, which is truthy: a `|| 1` guard passes it straight
+  // into the projection matrix.
+  assert.equal(initialAspect({ width: 1200, height: 0 }), 1);
+  assert.equal(initialAspect({ width: 0, height: 800 }), 1);
+  assert.equal(initialAspect({ width: 0, height: 0 }), 1);
 });
 
 // ---------------------------------------------------------------------------
