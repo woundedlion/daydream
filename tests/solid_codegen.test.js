@@ -278,6 +278,33 @@ test('generateRecipeCpp defaults missing V/F/I counts to 0', () => {
 });
 
 /**
+ * The counts ride in from localStorage, which a user can hand-edit, and the
+ * output is pasted into solids.h; a count carrying a newline must not be able
+ * to splice C++ above the generated function.
+ */
+test('generateRecipeCpp emits counts no non-negative integer can escape', () => {
+  const spliced = generateRecipeCpp({
+    base: 'cube',
+    ops: ['dual'],
+    vCount: '8\nvoid evil() { launch(); }\n// V=8',
+    fCount: 12,
+    iCount: 4,
+  }, 'Archimedean');
+  assert.equal(spliced.split('\n').length, 4);
+  assert.ok(!spliced.includes('evil'));
+  assert.equal(spliced.split('\n')[0], '// V=0, F=12, I=4');
+
+  for (const [count, shown] of [
+    [-3, 0], [1.9, 1], ['24', 24], [NaN, 0], [Infinity, 0], [null, 0], [{}, 0],
+    ['*/ evil() /*', 0],
+  ]) {
+    const cpp = generateRecipeCpp({ base: 'cube', ops: ['dual'], vCount: count }, 'Archimedean');
+    assert.equal(cpp.split('\n')[0], `// V=${shown}, F=0, I=0`,
+      `count ${String(count)} rendered wrong`);
+  }
+});
+
+/**
  * The generated function is pasted into `namespace IslamicStarPatterns`, which
  * carries no using-directive, so an unqualified seed call would not compile.
  */

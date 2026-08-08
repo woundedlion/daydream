@@ -189,8 +189,8 @@
     "assertions": 45
   },
   "tests/solid_codegen.test.js": {
-    "cases": 79,
-    "assertions": 435
+    "cases": 80,
+    "assertions": 446
   },
   "tests/solid_op_rows.test.js": {
     "cases": 9,
