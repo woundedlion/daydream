@@ -66,7 +66,8 @@ let arenaMetricsWarned = false;
  * clip, and the controller follows with a setEffect that re-applies it. The
  * APPLIED/FULL_FRAME_KEPT split is latched into clipFullFrame and reported on
  * every frame, so the two successes stay distinguishable to the pool.
- * @returns {boolean} Whether the engine accepted the clip.
+ * @returns {boolean} False only when this worker is left without usable render
+ * geometry, which applyClip has already reported; NO_EFFECT counts as accepted.
  */
 function applyClip() {
   // wasmModule is non-null whenever engine is — the engine is built from it.
@@ -81,8 +82,7 @@ function applyClip() {
     });
     return false;
   }
-  return result === wasmModule.ClipSetResult.APPLIED
-    || result === wasmModule.ClipSetResult.FULL_FRAME_KEPT;
+  return true;
 }
 
 /**
@@ -147,7 +147,8 @@ async function handleMessage(msg) {
       }
       if (typeof msg.paused === 'boolean') engine.setAnimationsPaused(msg.paused);
       if (typeof msg.poleLod === 'number') engine.setPoleLod(msg.poleLod);
-      applyClip();
+      // A rejected clip leaves no usable render geometry: report nothing ready.
+      if (!applyClip()) break;
 
       post({ type: 'ready' });
       break;
