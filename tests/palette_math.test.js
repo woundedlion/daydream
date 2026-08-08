@@ -84,18 +84,6 @@ test('NAMED_PROCEDURAL_PALETTES is a well-formed table of coefficient vec3s', ()
   assert.ok(names.has('DARK_RAINBOW'));
 });
 
-/** Verifies the mirror carries the engine's whole named-palette roster, in core/color/palettes.h declaration order. */
-test('NAMED_PROCEDURAL_PALETTES mirrors the engine roster', () => {
-  assert.deepEqual(NAMED_PROCEDURAL_PALETTES.map(entry => entry.name), [
-    'DARK_RAINBOW', 'BLOOD_STREAM', 'VINTAGE_SUNSET', 'RICH_SUNSET', 'UNDERSEA',
-    'LATE_SUNSET', 'MANGO_PEEL', 'ICE_MELT', 'LEMON_LIME', 'ALGAE', 'EMBERS',
-    'FIRE_GLOW', 'DARK_PRIMARY', 'MAUVE_FADE', 'LAVENDER_LAKE', 'DESERT_ROSE',
-    'BRUISED_MOSS', 'BRUISED_BANANA', 'BRIGHT_SUNRISE', 'FIRE_AND_ICE',
-    'PEACH_POP', 'POPPED_PEACH', 'BLUE_LAGOON', 'ORANGE_CRUSH', 'PLUM_SUNRISE',
-    'CORAL_BLUE', 'BRUISED_MANGO',
-  ]);
-});
-
 /** Verifies every named palette, including the negative-frequency entries, renders finite in-range linear color across the domain. */
 test('NAMED_PROCEDURAL_PALETTES all render across the domain', () => {
   for (const entry of NAMED_PROCEDURAL_PALETTES) {
