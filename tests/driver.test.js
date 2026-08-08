@@ -7,6 +7,7 @@
 // context-loss handlers run against the shared fake DOM.
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import {
   Daydream, dotDetailFor, fitDistance, initialAspect, MOBILE_BREAKPOINT_PX,
@@ -1269,4 +1270,63 @@ test('keydown ignores keys it does not own', () => {
   assert.equal(ctx.paused, true);
   assert.equal(ctx.stepFrames, 0);
   assert.equal(other.prevented, false);
+});
+
+// ---------------------------------------------------------------------------
+// context-factory parity
+// ---------------------------------------------------------------------------
+
+// The constructor needs a WebGL context, so every case above drives a prototype
+// method over a hand-built `this`. Read the class's field roster out of the
+// source so a context cannot keep standing in for state the driver dropped or
+// renamed — the mirror of the method-surface check fake_engine.js runs.
+const DRIVER_SOURCE = readFileSync(new URL('../driver.js', import.meta.url), 'utf8');
+
+/** Fields the Daydream class assigns, read from its class body.
+ * @returns {Set<string>} Field names.
+ */
+function driverFields() {
+  const body = DRIVER_SOURCE
+    .split(/^export class Daydream \{$/m)[1]?.split(/^\}$/m)[0];
+  assert.ok(body, 'the Daydream class body no longer parses');
+  return new Set([...body.matchAll(/this\.([A-Za-z_]\w*) =[^=]/g)].map((m) => m[1]));
+}
+
+// Keys a context carries that are not driver state: the sinks a test reads its
+// assertions out of.
+const CONTEXT_SINKS = new Set(['sized', 'handlers', 'classes', 'acquired', 'matrices']);
+
+/** Context keys that are neither driver state, a stand-in for a prototype
+ *  method, nor a declared test sink.
+ * @param {Object} ctx - Context object from one of the factories above.
+ * @returns {Array<string>} Unpinned key names, sorted.
+ */
+function unpinnedContextFields(ctx) {
+  const fields = driverFields();
+  return Object.keys(ctx)
+    .filter((key) => !fields.has(key)
+      && !CONTEXT_SINKS.has(key)
+      && typeof Daydream.prototype[key] !== 'function')
+    .sort();
+}
+
+test('every hand-built context stands in only for state the driver has', () => {
+  const contexts = {
+    sizeCtx: sizeCtx(1200, 800),
+    setupCtx: setupCtx(fakeMesh([]), []),
+    disposeCtx: disposeCtx(fakeMesh([]), []),
+    stepCtx: stepCtx(new Uint16Array(4)),
+    renderCtx: renderCtx(new Uint16Array(4), []),
+    pipCtx: pipCtx([]),
+    contextLossCtx: contextLossCtx(),
+    orbitCtx: orbitCtx({ focusVisible: false }),
+    matricesCtx: matricesCtx(4, 2),
+    cullCtx: cullCtx(),
+    labelCtx: labelCtx(new THREE.Vector3(0, 0, 1)),
+  };
+
+  for (const [name, ctx] of Object.entries(contexts)) {
+    assert.deepEqual(unpinnedContextFields(ctx), [],
+      `${name} carries fields the Daydream class never assigns`);
+  }
 });
