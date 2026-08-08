@@ -164,6 +164,7 @@ const applyNotice = createApplyNotice({ doc: document });
 // own message, leaving a switch rejection standing.
 const PARAM_NOTICE = 'param';
 const SWITCH_NOTICE = 'switch';
+const RECORD_NOTICE = 'record';
 
 /**
  * Write one parameter value to the main engine. setParameter returns a
@@ -571,7 +572,13 @@ const recordState = { record: () => {
     console.warn('Recording is unavailable until the rendering engine finishes loading.');
     return;
   }
-  showRecording(host.recorder.toggle(appState.get('effect')));
+  const recording = host.recorder.toggle(appState.get('effect'));
+  if (recording && daydream.labelAxes) {
+    applyNotice.show(
+      'Axis labels are page overlays, not canvas pixels; the recording will not carry them.',
+      RECORD_NOTICE);
+  }
+  showRecording(recording);
 }};
 
 const recFolder = guiInstance.addFolder('Recording');

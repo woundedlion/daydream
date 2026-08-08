@@ -15,6 +15,9 @@
  * offscreen scales to it; at native resolution the offscreen is pinned to the
  * source's start-time size. Either way the source renderer is never resized, and
  * a mid-recording resolution change cannot change the encoded track dimensions.
+ *
+ * Only canvas pixels reach the file: the CSS2D axis labels are DOM nodes over the
+ * canvas, so a recording made with "Label Axes" on carries no labels.
  */
 
 // Chunk-delivery interval for MediaRecorder.start(); bounds encoder buffering.
