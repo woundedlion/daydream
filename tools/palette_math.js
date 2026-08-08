@@ -98,9 +98,9 @@ export class ProceduralPalette {
 
 /**
  * The named procedural palettes shipped by the engine, mirrored from
- * core/color/palettes.h (namespace Palettes). Each entry's a/b/c/d are the
- * cosine-formula coefficient vec3s in the order the C++ initializer lists them,
- * so a gallery preview and its exported code match the on-device palette.
+ * HS_PROCEDURAL_PALETTE_LIST in core/color/palettes.h. Each entry's a/b/c/d are
+ * the cosine-formula coefficient vec3s in that macro's order, so a gallery
+ * preview and its exported code match the on-device palette.
  * @type {{name:string, a:number[], b:number[], c:number[], d:number[]}[]}
  */
 export const NAMED_PROCEDURAL_PALETTES = [
@@ -121,7 +121,7 @@ export const NAMED_PROCEDURAL_PALETTES = [
   { name: 'LAVENDER_LAKE', a: [0.473, 0.473, 0.473], b: [0.500, 0.500, 0.500], c: [0.364, 0.124, 0.528], d: [0.142, 0.378, 0.876] },
   { name: 'DESERT_ROSE', a: [0.500, 0.500, 0.500], b: [0.500, 0.270, 0.442], c: [0.303, 1.012, 0.585], d: [0.985, 0.720, 0.212] },
   { name: 'BRUISED_MOSS', a: [0.500, 0.500, 0.500], b: [0.500, 0.500, 0.500], c: [0.142, 0.252, 0.000], d: [0.492, 0.200, 0.670] },
-  { name: 'BRUISED_BANANA', a: [0.620, 0.620, 0.620], b: [0.742, 0.742, 0.742], c: [0.162, 0.286, 0.012], d: [0.235, 0.205, 0.688] },
+  { name: 'BRUISED_BANANA', a: [0.175, 0.470, 0.171], b: [1.000, 0.622, 0.000], c: [0.191, 0.191, 0.191], d: [0.629, -0.417, 0.444] },
   { name: 'BRIGHT_SUNRISE', a: [0.620, 0.620, 0.620], b: [0.742, 0.742, 0.742], c: [0.162, 0.286, 0.012], d: [0.090, 0.205, 0.688] },
   { name: 'FIRE_AND_ICE', a: [0.500, 0.500, 0.500], b: [0.500, 0.500, 0.500], c: [0.955, 1.004, 0.910], d: [0.167, 0.018, 0.930] },
   { name: 'PEACH_POP', a: [1.000, 0.144, 0.175], b: [0.543, 0.543, 0.543], c: [0.507, 0.409, 0.507], d: [0.001, 0.002, 0.620] },
@@ -130,6 +130,7 @@ export const NAMED_PROCEDURAL_PALETTES = [
   { name: 'ORANGE_CRUSH', a: [0.575, 0.168, 0.464], b: [0.406, 0.697, 0.357], c: [0.000, -0.10051, -0.042778], d: [0.141, 0.25551, 0.579778] },
   { name: 'PLUM_SUNRISE', a: [0.407, 0.000, 0.296], b: [0.332, 0.592, 0.029], c: [0.358961, 0.331145, 0.274519], d: [0.500342, 0.505109, 0.278634] },
   { name: 'CORAL_BLUE', a: [0.4, 0.347, 0.801], b: [0.5, 0.303, 0.5], c: [0.75363518, -0.20031623, 0.0110030736], d: [0.9144297, -0.16868377, 0.40006184] },
+  { name: 'BRUISED_MANGO', a: [0.385, 0.470, 0.171], b: [1.000, 0.518, 0.000], c: [0.191, 0.191, 5.000], d: [0.619, -0.427, 0.887] },
 ];
 
 /**

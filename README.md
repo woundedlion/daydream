@@ -158,7 +158,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 
 ### Holosphere (engine + firmware)
 
-<!-- docs-check: tree -->
+<!-- docs-check: tree exhaustive -->
 ```
 ├── core/                       Rendering engine
 │   ├── engine/                 Machinery: platform layer, memory, callables, rosters, effect support
@@ -205,6 +205,9 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   │   ├── srgb_decode.h           Branchless linear16 → sRGB8 encode from DTCM split tables
 │   │   ├── srgb_decode_lut.h       Generated split-decode tables behind srgb_decode.h
 │   │   ├── gamut_lut.h             Generated sRGB gamut-boundary chroma table for OKLab clipping
+│   │   ├── generative_palette.h    GenerativePalette + PaletteRecipe harmony/profile compilation
+│   │   ├── palette_cycler.h        PaletteCycler: dwell-and-fade display LUT over a palette sequence
+│   │   ├── effect_palette_recipes.h Per-effect authored PaletteRecipe constructors
 │   │   └── palettes.h              Named ProceduralPalette instances + shared MeshPaletteBank
 │   ├── render/                 Canvas, rasterizers, and the filter pipeline
 │   │   ├── canvas.h                Effect base class + Canvas RAII write-buffer guard
@@ -273,6 +276,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │       ├── wasm.cpp            Emscripten binding TU — includes the binding headers below
 │       ├── engine_bindings.h   Render bridge — HolosphereEngine JS class, resolution/effect dispatch
 │       ├── mesh_ops_bindings.h Mesh editor bridge — MeshOps JS class, tooling arenas, Conway/Goldberg operators
+│       ├── mesh_op_bounds.h    Pure mesh-operator roster + growth factors behind the MeshOps guards (host-testable)
 │       ├── palette_bindings.h  Palette bridge — PaletteOps JS class, generative palette LUT bake
 │       ├── math_exports.h      Free color/palette/geometry exports the JS tool ports cross-check against
 │       ├── arena_metrics.h     Arena metrics report shared by the render and mesh editor bridges
@@ -310,7 +314,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   ├── teensy_budgets.json     Per-env FLASH/RAM1/RAM2 budgets the gate enforces
 │   ├── teensy_size_table.py    `just teensy-size` wrapper: builds every env + prints the region table
 │   ├── teensy_size_trail.py    Per-commit firmware size trail: ELF section parser, recorder, regression report
-│   ├── teensy_warnings.py      Warning-hygiene ratchet against teensy_warning_baseline.txt
+│   ├── teensy_warnings.py / teensy_warning_baseline.txt  Warning-hygiene ratchet + its baseline
 │   ├── teensy_pre.py / teensy_isystem.py / teensy_map.py / teensy_nano.py  PlatformIO build hooks
 │   ├── phantasm.ld             Phantasm linker script (memory-region layout)
 │   ├── profile_one.sh / profile_sweep.sh  On-device HS_PROFILE flash + capture runs
@@ -321,6 +325,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   ├── pov_segment_map_export.cpp  Generator for the committed segment-map golden
 │   ├── relax_bakes.py / relax_bake_harness.cpp  Relaxed-mesh bake generator of record
 │   ├── gen_gamut_lut.py        sRGB gamut-boundary generator of record (emits core/color/gamut_lut.h)
+│   ├── mindsplatter_palette_gen.cpp  MindSplatter palette-LUT bank generator of record
 │   ├── mindsplatter_replay_gen.cpp  Golden-corpus generator of record (emits tests/mindsplatter_replay_corpus.h)
 │   ├── mindsplatter_replay_main.cpp  Replay comparator over that corpus (its fixtures live under tests/)
 │   ├── docs_check.py           Markdown fence/link/anchor/path validator (CI)
@@ -437,7 +442,7 @@ Three build targets share a common engine:
 │  │ Holosphere/  │   │  Effects → Canvas → Filter Pipeline          │    │
 │  │  .ino        │   │      → SDF/Plot → Pixel Buffer               │    │
 │  │              │   │                                              │    │
-│  │ Phantasm/    │   │  effects/  (24 visual algorithms)            │    │
+│  │ Phantasm/    │   │  effects/  (23 visual algorithms)            │    │
 │  │  .ino        │   │                                              │    │
 │  │              │   ├──────────────────────────────────────────────┤    │
 │  │ wasm/        │   │          hardware/  (Drivers)                │    │
@@ -1208,7 +1213,7 @@ FastLED output ← CRGB(gamma encode) ← linear→sRGB ← Pixel
 | `GenerativePalette` | Procedurally generated palette from harmony rules (triadic, analogous, etc.) combined with brightness/saturation profiles. Supports snapshot/lerp for animated transitions. |
 | `SolidColorPalette` | Constant color, adapts to the `Palette` interface. |
 
-Twenty-six named `ProceduralPalette` instances are pre-defined in the `Palettes` namespace: `DARK_RAINBOW`, `BLOOD_STREAM`, `VINTAGE_SUNSET`, `RICH_SUNSET`, `UNDERSEA`, `LATE_SUNSET`, `MANGO_PEEL`, `ICE_MELT`, `LEMON_LIME`, `ALGAE`, `EMBERS`, `FIRE_GLOW`, `DARK_PRIMARY`, `MAUVE_FADE`, `LAVENDER_LAKE`, `DESERT_ROSE`, `BRUISED_MOSS`, `BRUISED_BANANA`, `BRIGHT_SUNRISE`, `FIRE_AND_ICE`, `PEACH_POP`, `POPPED_PEACH`, `BLUE_LAGOON`, `ORANGE_CRUSH`, `PLUM_SUNRISE`, and `CORAL_BLUE`. Six of them — `EMBERS`, `RICH_SUNSET`, `BRIGHT_SUNRISE`, `BRUISED_MOSS`, `LAVENDER_LAKE`, `POPPED_PEACH` — are the slots of `MeshPaletteBank`, the shared baked bank the mesh effects draw from.
+Twenty-seven named `ProceduralPalette` instances are pre-defined in the `Palettes` namespace: `DARK_RAINBOW`, `BLOOD_STREAM`, `VINTAGE_SUNSET`, `RICH_SUNSET`, `UNDERSEA`, `LATE_SUNSET`, `MANGO_PEEL`, `ICE_MELT`, `LEMON_LIME`, `ALGAE`, `EMBERS`, `FIRE_GLOW`, `DARK_PRIMARY`, `MAUVE_FADE`, `LAVENDER_LAKE`, `DESERT_ROSE`, `BRUISED_MOSS`, `BRUISED_BANANA`, `BRIGHT_SUNRISE`, `FIRE_AND_ICE`, `PEACH_POP`, `POPPED_PEACH`, `BLUE_LAGOON`, `ORANGE_CRUSH`, `PLUM_SUNRISE`, `CORAL_BLUE`, and `BRUISED_MANGO`. Six of them — `EMBERS`, `RICH_SUNSET`, `BRIGHT_SUNRISE`, `BRUISED_MOSS`, `LAVENDER_LAKE`, `POPPED_PEACH` — are the slots of `MeshPaletteBank`, the shared baked bank the mesh effects draw from.
 
 #### OKLCH Perceptual Color
 
@@ -1795,7 +1800,7 @@ An effect passes construction-time flags to its base as `Effect(W, H, {.strobe =
 
 All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for RingShower, Dynamo and Thrusters.
 
-The effect registry and tests carry the full 23-effect roster. The simulator sidebar exposes the curated subset for its active resolution (§10.5), omitting three effects at 288×144 and five at 96×20. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) is a 21-effect subset of the full roster, excluding the two Holosphere-96×20-only effects, Dynamo and Thrusters.
+The effect registry and tests carry the full 23-effect roster. The simulator sidebar exposes the curated subset for its active resolution (§10.5), omitting three effects at 288×144 and five at 96×20. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) is a 21-effect subset of the full roster, excluding the two Holosphere-96×20-only effects, Dynamo and Thrusters. Full-cycle Teensy measurements for the firmware playlist are indexed in the [on-device effect profiles](docs/profiles/README.md).
 
 ### Core Effects (Modern Engine)
 
@@ -1987,7 +1992,9 @@ A fixed icosahedron's wireframe rendered with `Plot::Mesh`, given a noise-distor
 
 #### MindSplatter
 
-Particles spray from emitters at the eight cube vertices — each sweeping its own tangent-plane emission angle — and fall toward attractor wells at the six octahedron vertices, where an event-horizon kernel around each signed axis punches them out as holes. A random walk tumbles the view, periodic Möbius warp bursts distort the whole field, and a preset timer lerps friction, well strength and speeds between four presets.
+Particles spray from emitters at the eight cube vertices — each sweeping its own tangent-plane emission angle — and fall toward attractor wells at the six octahedron vertices, where an event-horizon kernel around each signed axis punches them out as holes. A random walk tumbles the view, periodic Möbius warp bursts distort the whole field, and a preset timer lerps friction, well strength and speeds between eight presets.
+
+**Teensy full-cycle profile**: all eight presets hold 16 fps; shipping peaks at 38.95 ms with 0/1728 spills, and global O3 peaks at 38.78 ms with 0/1728 spills ([shipping](docs/profiles/shipping/profile_mindsplatter_teensy_2026-08-07.md), [global O3](docs/profiles/O3/profile_mindsplatter_teensy_2026-08-07.md)).
 
 **Parameters**: Friction, Well Str, Init Spd, Ang Spd, Particles
 
@@ -2047,7 +2054,9 @@ Volumetric raymarcher that renders twisted tori at the 26 vertices of a disdyaki
 
 #### ShaderBall
 
-Stereographic-projection shader (extends `Effect` directly) spanning liquid domain-warp and grid fly-through looks from one continuous parameter space. Every look axis — Y-spin vs. dual random-walk wander, glitch-lens blend, pattern cross-coupling vs. direct phase feed, palette-bank position, breathe depth, hue shift, value fade — is a preset-lerped float, so the choreography morphs between any two looks (including mixed ones) without a discrete pop. Uses `Scan::Shader::draw` for full-screen pixel shading over a two-slot baked generative palette bank.
+Stereographic-projection shader (extends `Effect` directly) spanning 12 liquid domain-warp and grid fly-through presets from one continuous parameter space. Every look axis — Y-spin vs. dual random-walk wander, glitch-lens blend, pattern cross-coupling vs. direct phase feed, palette-bank position, breathe depth, hue shift, value fade — is a preset-lerped float, so the choreography morphs between any two looks (including mixed ones) without a discrete pop. Uses `Scan::Shader::draw` for full-screen pixel shading over a two-slot baked generative palette bank.
+
+**Teensy full-cycle profile**: shipping peaks at 97.93 ms with five of 12 presets spilling; global O3 lowers the peak to 89.21 ms with three presets spilling ([shipping](docs/profiles/shipping/profile_shaderball_teensy_2026-08-07.md), [global O3](docs/profiles/O3/profile_shaderball_teensy_2026-08-07.md)).
 
 **Parameters**: Warp Scale, Warp Strength, Warp Time, Pattern Freq, Speed, Complexity, Phase Direct, Drift, Pole Fade, Spin Rate, Wander, Lens Mix, Palette, Breathe Depth, Cycle Speed, Hue Shift, Value Fade
 
@@ -2142,7 +2151,7 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 
 The bridge also exposes a `MeshOps` class — used by the `solids.html` geometry tool — with dedicated tooling arenas (an 8 MB persistent arena plus two 4 MB scratch arenas — 16 MB total, separate from the engine's 298 KiB arena) for interactive solid manipulation. `fromSolidName`, `getVertices`, `getFaces`, `classifyFaces` and the operator methods answer a rejected call with `null`; `MeshOps.getLastResult()` then names the reason as a `Module.MeshOpResult` value (`OK`, `UNKNOWN_NAME`, `CONNECTIVITY_OVERFLOW`, `FACE_DEGREE_OVERFLOW`, `ARENA_EXHAUSTED`, `NON_FINITE_ARG`, `ANGLE_OUT_OF_DOMAIN`, or `STALE_WRAPPER`). Compare against the enum values — never by truthiness — and read it before the next such call, which overwrites it. The reasons demand opposite responses: an overflow means shrinking the op chain, `ARENA_EXHAUSTED` means calling `clearToolingMemory()`, and `STALE_WRAPPER` — a wrapper used after a `clearToolingMemory()` reclaimed its storage — means rebuilding the mesh from its base solid. A stale wrapper is rejected rather than trapped, so an interleaved wipe costs the page a null, not the module.
 
-The bridge also exposes a `PaletteOps` class with versioned `compileAndBakeV3(recipe)` and `inspectV3(recipe)` methods. Both compile a V3 perceptual recipe and return a zero-copy view over a 256-entry sRGB LUT; inspection also returns the engine's `L`, `C`, `q`, gamut-boundary, hue-path, and fallback diagnostics. These views share the same read-before-next-call lifetime contract as `getPixels`. Recipe compilation is deterministic and does not touch global RNG.
+The bridge also exposes a `PaletteOps` class with versioned `compileAndBakeV4(recipe)` and `inspectV4(recipe)` methods. Both compile a V4 perceptual recipe and return a zero-copy view over a 256-entry sRGB LUT; inspection also returns the engine's `L`, `C`, `q`, gamut-boundary, hue-path, and fallback diagnostics. These views share the same read-before-next-call lifetime contract as `getPixels`. Recipe compilation is deterministic and does not touch global RNG.
 
 It likewise exports the engine's color, procedural-palette, and geometry math as free functions so JavaScript tools can cross-check the real implementation: `srgb_to_linear_float`, `linear_to_srgb_float`, `srgb_to_linear_interp`, `linear_rgb_to_oklab`, `oklab_to_linear_rgb`, `hsv_to_rgb`, `procedural_palette_linear`, `named_procedural_palettes`, `lissajous`, and `mobius_transform`.
 
