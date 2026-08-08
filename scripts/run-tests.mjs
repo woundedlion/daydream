@@ -171,6 +171,27 @@ const sound = (min) =>
   (min.skippable === undefined || typeof min.skippable === 'boolean');
 
 if (updating) {
+  // A file that ran cases and counted nothing is either gutted or asserting
+  // where the counter cannot see: `assert(x)` calls the callable each assert
+  // module exports as its default, a binding rather than a property, so
+  // scripts/count-assertions.mjs never wraps it. Either way a floor of zero
+  // assertions gates nothing while reading as a committed floor, so it is
+  // refused rather than written.
+  const silent = Object.entries(measured)
+    .filter(([, min]) => min.cases > 0 && min.assertions === 0)
+    .map(([file]) => file)
+    .sort();
+  if (silent.length > 0) {
+    console.error(
+      'run-tests: these ran cases and counted no assertions, which is not a ' +
+        'floor worth committing:\n' +
+        silent.map((file) => `  ${file}`).join('\n') +
+        '\nGive each case an assertion, and call node:assert through a ' +
+        'property — `assert.ok(x)` rather than `assert(x)`, which is not ' +
+        'counted.',
+    );
+    process.exit(1);
+  }
   // A wholly skipped file measured nothing, so re-measuring here would ratchet
   // its floors to zero and retire it. Keep whatever it has committed.
   let committed = {};

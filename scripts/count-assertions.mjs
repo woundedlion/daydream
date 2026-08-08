@@ -18,6 +18,11 @@ if (dir && file && process.env.NODE_TEST_CONTEXT) {
   // function property is an assertion. Each wrapper calls the function it
   // captured, not the property, so an alias held by two properties
   // (strict.equal is assert.strictEqual) still scores one per call.
+  //
+  // Only properties are reachable: each module's default export is a callable
+  // bound inside the builtin, so a bare `assert(x)` runs the original and
+  // scores nothing. scripts/run-tests.mjs refuses to commit a floor of zero
+  // assertions for a file that ran cases, so that style cannot ratchet there.
   for (const target of [assert, assert.strict]) {
     for (const key of Object.keys(target)) {
       const fn = target[key];

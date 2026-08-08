@@ -346,15 +346,37 @@ test('--update-floors writes the measured counts', () => {
   run(PATTERN);
 });
 
-/** Verifies an empty test body is measured as no assertions at all. */
-test('an empty test contributes no assertions', () => {
-  for (const [name, { cases }] of Object.entries(FILES))
-    writeFileSync(join(root, 'tests', name), passing(cases, 0));
-  run('--update-floors', PATTERN);
+/**
+ * Verifies a file that ran cases and measured no assertions is refused rather
+ * than ratcheted: a floor of zero assertions gates nothing, and it is also what
+ * a file asserting through the counter's blind spot measures.
+ */
+test('--update-floors refuses a file that counted no assertions', () => {
+  writeFileSync(join(root, 'tests', 'a.test.js'), passing(2, 0));
+  const err = runExpectingFailure('--update-floors', PATTERN);
+  assert.match(err, /counted no assertions[^]*\n {2}tests\/a\.test\.js/);
+  assert.doesNotMatch(err, /tests\/b\.test\.js/);
   assert.deepEqual(readFloors(), {
-    'tests/a.test.js': { cases: 2, assertions: 0 },
-    'tests/b.test.js': { cases: 1, assertions: 0 },
+    'tests/a.test.js': { cases: 2, assertions: 6 },
+    'tests/b.test.js': { cases: 1, assertions: 2 },
   });
+});
+
+/** Verifies the uncounted `assert(x)` call style is refused, not floored at zero. */
+test('--update-floors refuses a file calling assert as a function', () => {
+  writeFileSync(
+    join(root, 'tests', 'a.test.js'),
+    [
+      "import { test } from 'node:test';",
+      "import check from 'node:assert/strict';",
+      "test('case 0', () => { check(true); check(1, 1); });",
+      "test('case 1', () => { check(true); });",
+    ].join('\n'),
+  );
+  assert.match(
+    runExpectingFailure('--update-floors', PATTERN),
+    /counted no assertions[^]*\n {2}tests\/a\.test\.js/,
+  );
 });
 
 /** Verifies a pattern-less invocation is refused instead of walking the tree. */
