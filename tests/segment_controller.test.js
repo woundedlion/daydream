@@ -1462,6 +1462,8 @@ test('composite() self-heals a broken display-buffer alias instead of throwing',
     'driver.pixels re-pointed at the composite target');
   assert.equal(driver.dotMesh.instanceColor.array, target,
     'the mesh alias the GPU reads is re-pointed too');
+  assert.equal(driver.dotMesh.instanceColor.version, 1,
+    'a re-pointed attribute nobody flagged uploads the old buffer forever');
 });
 
 test('a controller cannot be built without a two-alias display repointer', () => {
