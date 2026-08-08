@@ -572,36 +572,47 @@
       const reId = `${id}_re_axis`;
       const imId = `${id}_im_axis`;
 
+      const makeDiv = (className, elementId) => {
+        const el = document.createElement('div');
+        el.className = className;
+        if (elementId) el.id = elementId;
+        return el;
+      };
+
       // The mouse/touch-only pad is exposed as a group of two per-axis sliders:
       // each off-screen handle takes the arrow keys for its own part and carries
       // the announced value in aria-valuenow/aria-valuetext, which a screen
       // reader re-reads on every change.
-      container.innerHTML = `
-          <div id="${controlId}" class="complex-plane-control" role="group"
-               aria-label="Parameter ${id} complex value">
-            <div class="complex-plane-inner">
-              <div class="axis-h"></div>
-              <div class="axis-v"></div>
-              <div id="${dotId}" class="complex-plane-dot"></div>
-            </div>
-            <span id="${reId}" class="complex-plane-axis" tabindex="0" role="slider"
-                  aria-label="Parameter ${id} real part"
-                  aria-valuemin="${-maxExtent}" aria-valuemax="${maxExtent}"
-                  aria-keyshortcuts="ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight Home"></span>
-            <span id="${imId}" class="complex-plane-axis" tabindex="0" role="slider"
-                  aria-orientation="vertical"
-                  aria-label="Parameter ${id} imaginary part"
-                  aria-valuemin="${-maxExtent}" aria-valuemax="${maxExtent}"
-                  aria-keyshortcuts="ArrowUp ArrowDown Shift+ArrowUp Shift+ArrowDown Home"></span>
-          </div>
-          <div id="${labelId}" class="complex-plane-label"></div>
-        `;
+      const makeAxis = (axisId, axisLabel, keyshortcuts, vertical) => {
+        const el = document.createElement('span');
+        el.id = axisId;
+        el.className = 'complex-plane-axis';
+        el.tabIndex = 0;
+        el.setAttribute('role', 'slider');
+        if (vertical) el.setAttribute('aria-orientation', 'vertical');
+        el.setAttribute('aria-label', axisLabel);
+        el.setAttribute('aria-valuemin', String(-maxExtent));
+        el.setAttribute('aria-valuemax', String(maxExtent));
+        el.setAttribute('aria-keyshortcuts', keyshortcuts);
+        return el;
+      };
 
-      const planeElement = document.getElementById(controlId);
-      const dotElement = document.getElementById(dotId);
-      const labelElement = document.getElementById(labelId);
-      const reElement = document.getElementById(reId);
-      const imElement = document.getElementById(imId);
+      const planeElement = makeDiv('complex-plane-control', controlId);
+      planeElement.setAttribute('role', 'group');
+      planeElement.setAttribute('aria-label', `Parameter ${id} complex value`);
+
+      const inner = makeDiv('complex-plane-inner');
+      const dotElement = makeDiv('complex-plane-dot', dotId);
+      inner.append(makeDiv('axis-h'), makeDiv('axis-v'), dotElement);
+
+      const reElement = makeAxis(reId, `Parameter ${id} real part`,
+        'ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight Home', false);
+      const imElement = makeAxis(imId, `Parameter ${id} imaginary part`,
+        'ArrowUp ArrowDown Shift+ArrowUp Shift+ArrowDown Home', true);
+      planeElement.append(inner, reElement, imElement);
+
+      const labelElement = makeDiv('complex-plane-label', labelId);
+      container.replaceChildren(planeElement, labelElement);
 
       // Cache the last strings written to the DOM so a preset animation (which
       // calls applyConfig -> updateUI every frame) only touches the label/dot
@@ -823,11 +834,14 @@
         const btn = document.createElement('button');
         btn.className = 'preset-btn';
         btn.dataset.id = preset.id;
-        btn.innerHTML = `
-            <div class="font-semibold">${preset.name}</div>
-            <div class="preset-desc">${preset.desc}</div>
-          `;
-        btn.onclick = () => startPreset(preset);
+        const name = document.createElement('div');
+        name.className = 'font-semibold';
+        name.textContent = preset.name;
+        const desc = document.createElement('div');
+        desc.className = 'preset-desc';
+        desc.textContent = preset.desc;
+        btn.append(name, desc);
+        btn.addEventListener('click', () => startPreset(preset));
         presetList.appendChild(btn);
 
         const opt = document.createElement('option');
