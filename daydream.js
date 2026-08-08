@@ -20,6 +20,7 @@ import { createEffectGui } from "./effect_gui.js";
 import {
   createAppTeardown,
   createApplyNotice,
+  createFrameLoopGuard,
   createGlobalKeydownHandler,
   createModuleLoadHandlers,
   createPoleLodBinding,
@@ -581,18 +582,21 @@ window.addEventListener("keydown", onKeyDown);
 const onUnhandledRejection = createUnhandledRejectionHandler({ report: showFatalError });
 window.addEventListener("unhandledrejection", onUnhandledRejection);
 
-daydream.renderer.setAnimationLoop(() => {
-  if (host.adapter) {
-    daydream.render(host.adapter);
-  }
-  if (host.recorder?.isRecording) {
-    const elapsed = host.recorder.elapsedFormatted;
-    if (elapsed !== durationText) {
-      durationText = elapsed;
-      durationEl.textContent = elapsed;
+daydream.renderer.setAnimationLoop(createFrameLoopGuard({
+  frame: () => {
+    if (host.adapter) {
+      daydream.render(host.adapter);
     }
-  }
-});
+    if (host.recorder?.isRecording) {
+      const elapsed = host.recorder.elapsedFormatted;
+      if (elapsed !== durationText) {
+        durationText = elapsed;
+        durationEl.textContent = elapsed;
+      }
+    }
+  },
+  report: showFatalError,
+}));
 
 ///////////////////////////////////////////////////////////////////////////////
 // Teardown

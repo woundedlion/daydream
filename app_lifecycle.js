@@ -440,6 +440,39 @@ export function createUnhandledRejectionHandler({ report, logError = console.err
 }
 
 /**
+ * Wrap the render loop's per-frame body so a throw cannot freeze the page.
+ *
+ * Three.js re-arms requestAnimationFrame only after the callback returns, so an
+ * escaping throw stops the loop for the page's lifetime, silently and with the
+ * last frame still on screen. Catching keeps the loop armed and keeps calling
+ * the body: a failure is often per-frame state the next frame clears, and an
+ * effect or resolution switch runs from an event handler, outside the loop, so
+ * the user can still drive the app back to something that renders. Only the
+ * first failure is logged and banner-reported — a body that throws every frame
+ * would otherwise report 60 times a second.
+ *
+ * @param {Object} deps - Injected collaborators.
+ * @param {() => void} deps.frame - The per-frame body.
+ * @param {(message: string) => void} deps.report - Renders the failure banner.
+ * @param {(...args: *) => void} [deps.logError] - Console sink for the throw.
+ * @returns {() => void} The guarded callback for setAnimationLoop.
+ */
+export function createFrameLoopGuard({ frame, report, logError = console.error }) {
+  let reported = false;
+  return () => {
+    try {
+      frame();
+    } catch (e) {
+      if (reported) return;
+      reported = true;
+      logError('Render loop frame failed:', e);
+      report(`The render loop hit an error. ${e?.message ?? String(e)}`
+        + ' See the browser console for details.');
+    }
+  };
+}
+
+/**
  * Build the handlers for the main WASM module promise, guarded against a page
  * discard that settles first.
  *
