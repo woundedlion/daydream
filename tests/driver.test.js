@@ -896,11 +896,16 @@ test('a keyboard-focused canvas rings and orbits until it loses focus', () => {
   ctx.handlers.focus();
   assert.equal(ctx.classes.has('keyboard-focus'), true);
 
+  let propagationStopped = false;
   ctx.handlers.keydown({
-    key: 'ArrowLeft', preventDefault: () => {}, stopPropagation: () => {},
+    key: 'ArrowLeft',
+    preventDefault: () => {},
+    stopPropagation: () => { propagationStopped = true; },
   });
   assert.ok(Math.abs(ctx.camera.position.x) > 1e-6, 'arrow key did not orbit');
   assert.equal(ctx.needsRender, true);
+  assert.equal(propagationStopped, true,
+    'the window handler reads the same arrow key as a paused frame step');
 
   ctx.handlers.blur();
   assert.equal(ctx.classes.has('keyboard-focus'), false);
