@@ -123,6 +123,17 @@ test('update omits the stack row when the metrics carry no stack', () => {
   assert.equal(byId['stat-persistent'].textContent, '6.0|7.0|16');
 });
 
+test('update omits an arena row the metrics do not carry', () => {
+  const { doc, byId } = makeDoc();
+  const view = new GlobalStatsView(doc);
+  view.update(1, metrics());
+
+  assert.doesNotThrow(() => view.update(2, metrics({ scratch_arena_b: undefined })));
+  assert.equal(byId['stat-scratch-b'].textContent, '3.0|5.0|8',
+    'a partial metrics object blanked the last known arena usage');
+  assert.equal(byId['stat-persistent'].textContent, '6.0|7.0|16');
+});
+
 test('a fully resolved panel is looked up once, not every frame', () => {
   const { doc, lookups } = makeDoc();
   const view = new GlobalStatsView(doc);
