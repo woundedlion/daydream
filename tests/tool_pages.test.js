@@ -200,6 +200,22 @@ test('every served page\'s script-src is exactly its committed token list', () =
   }
 });
 
+/**
+ * tools.css names Inter and JetBrains Mono for every page it styles, so a page
+ * that links no font stylesheet renders in the system fallback instead.
+ */
+test('every tool page links the font families tools.css styles for', () => {
+  for (const name of PAGES) {
+    const csp = cspOf(`tools/${name}.html`);
+    assert.match(headOf(pageSrc(name)), /<link\b[^>]*href="\.\.\/vendor\/fonts\/fonts\.css"/,
+      `${name}.html links no font stylesheet`);
+    assert.ok(directive(csp, 'style-src').includes('https://fonts.googleapis.com'),
+      `${name}.html CSP blocks the font stylesheet's CDN fallback`);
+    assert.ok(directive(csp, 'font-src').includes('https://fonts.gstatic.com'),
+      `${name}.html CSP blocks the fallback font files`);
+  }
+});
+
 test('tool pages link tailwind.css last so utilities outrank page rules', () => {
   for (const name of PAGES) {
     const head = headOf(pageSrc(name));
