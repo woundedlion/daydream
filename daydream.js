@@ -322,8 +322,8 @@ const moduleLoad = createModuleLoadHandlers({
 // GUI + Sidebar Setup
 ///////////////////////////////////////////////////////////////////////////////
 
-// Namespaced roots: 'fx' keys come from C++ register_param() names, 'view' keys
-// from the app's own controls, so the two can never collide in the URL.
+// Namespaced roots keep the URL keys apart: 'fx' holds the C++ register_param()
+// names plus the panel's own 'pause' toggle, 'view' the app's own controls.
 const guiInstance = new GUI({ autoPlace: false }, 'view');
 guiInstance.domElement.classList.add('global-gui');
 if (daydream.isMobile) {
