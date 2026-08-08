@@ -47,6 +47,8 @@ export function formatFloatCpp(n, digits = 6) {
   if (Math.abs(n) >= 1e21) {
     throw new Error(`formatFloatCpp: magnitude ${n} formats in exponential notation`);
   }
+  // toFixed drops the sign of -0, whose C++ literal is a different float32.
+  if (n === 0) return Object.is(n, -0) ? '-0.0f' : '0.0f';
   const target = Math.fround(n);
   for (let prec = Math.max(0, digits); prec <= MAX_FRACTION_DIGITS; prec++) {
     const s = fixedDecimal(n, prec);
