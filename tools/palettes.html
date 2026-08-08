@@ -823,9 +823,9 @@
               <div class="key-wheel-canvas-wrap">
                 <canvas id="hueKeyWheelCanvas" width="256" height="256" tabindex="0"
                   role="group" aria-roledescription="interactive gamut wheel"
-                  aria-keyshortcuts="A B C ArrowLeft ArrowRight"
+                  aria-keyshortcuts="A B C D ArrowLeft ArrowRight"
                   aria-describedby="key_wheel_help"
-                  aria-label="OKLCH gamut wheel with three hue key positions"></canvas>
+                  aria-label="OKLCH gamut wheel with hue key positions"></canvas>
               </div>
               <p id="key_wheel_help" class="visually-hidden">Drag keys independently.</p>
             </div>
@@ -1017,7 +1017,7 @@
       PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
       wrapTurns,
       hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
-      customHueKeyState, customHueTurns, moveCustomHueKey,
+      hueKeyState, customHueKeyState, customHueTurns, moveCustomHueKey,
     } from './palette_controls.js';
     // The two canvas painters take their canvas, context and palette as
     // arguments, so they live in their own module and are unit tested against a
@@ -1082,6 +1082,7 @@
     let activeHueKey = null;
     let activeHuePointerId = null;
     let selectedHueKey = 0;
+    const hueKeyNames = ['A', 'B', 'C', 'D'];
 
     const enumIndex = (group, value) => PaletteV4[group][value];
     const fullViewport = Object.freeze({ start: 0, end: 1 });
@@ -1100,6 +1101,9 @@
     function activateCustomHue(sourceRecipe) {
       const state = customHueKeyState(sourceRecipe);
       customHueOffsets = state.offsets;
+      selectedHueKey = Math.min(selectedHueKey, customHueOffsets.length - 1);
+      if (activeHueKey !== null)
+        activeHueKey = Math.min(activeHueKey, customHueOffsets.length - 1);
       setCustomBaseTurns(state.baseTurns);
       document.getElementById('gen_hue_mode').value = 'CUSTOM';
       previousHueMode = PaletteV4.hueMode.CUSTOM;
@@ -1110,7 +1114,7 @@
       if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
         return { baseTurns: customBaseTurns(), offsets: [...customHueOffsets] };
       }
-      return customHueKeyState(recipe);
+      return hueKeyState(recipe);
     }
 
     function wheelRaster(lightness) {
@@ -1167,7 +1171,7 @@
       const height = 28;
       const safeInset = 18;
       const labels = points.map((point, index) => {
-        const text = `${['A', 'B', 'C'][index]} ${degrees[index]}°`;
+        const text = `${hueKeyNames[index]} ${degrees[index]}°`;
         const width = hueKeyWheelCtx.measureText(text).width + paddingX * 2;
         const preferredX = point.x < centerX ? point.x + 13 : point.x - width - 13;
         return {
@@ -1221,6 +1225,7 @@
       const centerX = width * 0.5;
       const state = currentHueKeyState(recipe);
       const points = hueKeyPoints(state);
+      selectedHueKey = Math.min(selectedHueKey, points.length - 1);
       const degrees = state.offsets.map((offset) =>
         Math.round(wrapTurns(state.baseTurns + offset) * 360) % 360);
       const labels = hueKeyLabelLayout(points, degrees, centerX);
@@ -1244,9 +1249,11 @@
       });
       labels.forEach(drawHueKeyLabel);
 
+      const keyDescriptions = degrees.map((degreesValue, index) =>
+        `Key ${hueKeyNames[index]} ${degreesValue} degrees`).join(', ');
       hueKeyWheelCanvas.setAttribute('aria-label',
-        `OKLCH gamut wheel. Key A ${degrees[0]} degrees, Key B ${degrees[1]} degrees, ` +
-        `Key C ${degrees[2]} degrees. Key ${['A', 'B', 'C'][selectedHueKey]} selected.`);
+        `OKLCH gamut wheel. ${keyDescriptions}. ` +
+        `Key ${hueKeyNames[selectedHueKey]} selected.`);
     }
 
     function wheelPointerPosition(event) {
@@ -1313,8 +1320,9 @@
     }
 
     function handleHueWheelKeyDown(event) {
-      const keyIndex = { a: 0, b: 1, c: 2 }[event.key.toLowerCase()];
+      const keyIndex = { a: 0, b: 1, c: 2, d: 3 }[event.key.toLowerCase()];
       if (keyIndex !== undefined) {
+        if (keyIndex >= currentHueKeyState(readPaletteRecipe()).offsets.length) return;
         selectedHueKey = keyIndex;
         scheduleUpdate();
         event.preventDefault();
