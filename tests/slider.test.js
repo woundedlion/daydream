@@ -137,13 +137,52 @@ test('input updates the readout and aria-valuetext before onInput', () => {
 test('setValue drives thumb, readout and aria-valuetext without firing onInput', () => {
   let calls = 0;
   const { slider, valueSpan, setValue } = createSlider(
-    'c', { ...base, scale: 10, decimals: 1 }, () => { calls += 1; });
+    'c', { ...base, step: 0.1, scale: 10, decimals: 1 }, () => { calls += 1; });
 
   assert.equal(setValue(7.26), 7.3);
   assert.equal(slider.value, '73');
   assert.equal(valueSpan.textContent, '7.3');
   assert.equal(slider.getAttribute('aria-valuetext'), '7.3');
   assert.equal(calls, 0);
+});
+
+/**
+ * `<input type=range>` accepts only `min + k*step`, so a value merely rounded
+ * into scaled units is re-snapped by the browser and the thumb leaves the
+ * readout naming a position it is not at. Live on lissajous.html's Domain
+ * slider, whose scaled step is 2.
+ */
+test('setValue lands on the step grid the input accepts', () => {
+  const { slider, valueSpan, setValue } = createSlider(
+    'c', { ...base, step: 0.2, value: 0, scale: 10, decimals: 1 }, null);
+
+  assert.equal(slider.step, '2');
+  assert.equal(setValue(7.26), 7.2);
+  assert.equal(slider.value, '72');
+  assert.equal(valueSpan.textContent, '7.2');
+  assert.equal(slider.getAttribute('aria-valuetext'), '7.2');
+});
+
+/**
+ * The grid starts at `min`, and `max` need not land on it: the highest value
+ * the control holds is then the last step below `max`, which is where the
+ * browser parks a larger request.
+ */
+test('the step grid is anchored at min and never overshoots max', () => {
+  const anchored = createSlider(
+    'c', { ...base, min: 1, max: 10, step: 3, value: 1, decimals: 0 }, null);
+  assert.equal(anchored.slider.min, '1');
+  assert.equal(anchored.slider.step, '3');
+  assert.equal(anchored.setValue(5), 4);
+  assert.equal(anchored.setValue(6), 7);
+  assert.equal(anchored.setValue(10), 10);
+
+  const ragged = createSlider(
+    'c', { ...base, min: 0, max: 10, step: 3, value: 5, decimals: 0 }, null);
+  assert.equal(ragged.slider.value, '6', 'the initial value snaps to the grid too');
+  assert.equal(ragged.setValue(10), 9);
+  assert.equal(ragged.slider.value, '9');
+  assert.equal(ragged.setValue(-4), 0);
 });
 
 /** Verifies setValue clamps to the configured range instead of moving the thumb off it. */

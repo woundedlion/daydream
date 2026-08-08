@@ -76,7 +76,27 @@ export function createSlider(containerId, cfg, onInput) {
 
   const sliderId = `${id}_slider`;
   const valueSpanId = `${id}_value`;
-  const clampedValue = Math.min(max, Math.max(min, value));
+  const scaledMin = Math.round(min * scale);
+  const scaledMax = Math.round(max * scale);
+
+  /**
+   * Puts a display value onto the scaled grid the input actually accepts:
+   * `min + k*step`, clamped to the range. `<input type=range>` re-snaps
+   * anything off that grid, so a value merely rounded to scaled units would
+   * leave the thumb somewhere the readout does not name whenever
+   * `step * scale > 1`.
+   * @param {number} display - The value in display space.
+   * @returns {number} The value in scaled units, on the grid and in range.
+   */
+  const toScaled = (display) => {
+    const clamped = Math.min(max, Math.max(min, display));
+    const steps = Math.round((clamped * scale - scaledMin) / sliderStep);
+    const snapped = scaledMin + steps * sliderStep;
+    // The top of the range need not land on the grid; the last step below it is
+    // then the highest value the control holds.
+    const inRange = snapped > scaledMax ? snapped - sliderStep : snapped;
+    return Math.max(scaledMin, inRange);
+  };
 
   container.replaceChildren();
 
@@ -85,13 +105,13 @@ export function createSlider(containerId, cfg, onInput) {
   labelElement.className = labelClass;
   labelElement.textContent = `${label}${labelSuffix}`;
 
-  const roundedValue = Math.round(clampedValue * scale);
+  const roundedValue = toScaled(value);
 
   const slider = document.createElement('input');
   slider.type = 'range';
   slider.id = sliderId;
-  slider.min = String(Math.round(min * scale));
-  slider.max = String(Math.round(max * scale));
+  slider.min = String(scaledMin);
+  slider.max = String(scaledMax);
   slider.step = String(sliderStep);
   slider.value = String(roundedValue);
   slider.className = sliderClass;
@@ -123,10 +143,10 @@ export function createSlider(containerId, cfg, onInput) {
    * together, so a page that computes a value elsewhere cannot leave one of the
    * three behind. Fires no `input` event — the caller owns its own state.
    * @param {number} display - The value in display space; clamped to [min, max].
-   * @returns {number} The value now shown, clamped and rounded to the scaled grid.
+   * @returns {number} The value now shown, clamped and snapped to the step grid.
    */
   const setValue = (display) => {
-    const scaled = Math.round(Math.min(max, Math.max(min, display)) * scale);
+    const scaled = toScaled(display);
     const shown = scaled / scale;
     const text = shown.toFixed(decimals);
     slider.value = String(scaled);
