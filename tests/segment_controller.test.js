@@ -344,6 +344,7 @@ const installFakeTimers = () => {
  * @param {number} [overrides.elapsed] - Simulated elapsed time for the frame.
  * @param {Object} [overrides.arenaMetrics] - Optional arena-metrics payload.
  * @param {number[]} [overrides.paramValues] - Post-frame param values the worker reports.
+ * @param {boolean} [overrides.fullFrame] - Whether the worker shaded the whole canvas.
  * @returns {void}
  */
 function deliverFrame(controller, segId, overrides = {}) {
@@ -361,6 +362,7 @@ function deliverFrame(controller, segId, overrides = {}) {
       elapsed: overrides.elapsed ?? 1,
       arenaMetrics: overrides.arenaMetrics ?? null,
       paramValues: overrides.paramValues ?? null,
+      fullFrame: overrides.fullFrame ?? false,
     },
   });
 }
@@ -402,6 +404,27 @@ test('frames delivered out of order within a generation land in their own slots'
   assert.equal(c.scratch[0].x1, 2);
   assert.equal(c.pending, 0);
   await done;
+});
+
+/**
+ * A needs_full_frame() effect makes every worker shade the whole canvas, so the
+ * pool is not N-way parallel even though each 'frame' still names a band. The
+ * per-segment flag is the only thing that separates the two.
+ */
+test('the clip disposition each worker reports is published per segment', async () => {
+  const c = makeController();
+  c.create(2);
+  const done = c.renderParallel();
+  assert.deepEqual(c.fullFrames, [false, false], 'a dispatch starts every segment clipped');
+
+  deliverFrame(c, 0, { x0: 0, x1: 2, y0: 0, y1: 2, fullFrame: true });
+  deliverFrame(c, 1, { x0: 2, x1: 4, y0: 0, y1: 2 });
+  assert.deepEqual(c.fullFrames, [true, false]);
+  await done;
+
+  c.renderParallel();
+  assert.deepEqual(c.fullFrames, [false, false],
+    'a segment that goes silent must not keep a prior generation flag');
 });
 
 test('a frame dispatched before a resolution change is dropped but still settles', async () => {

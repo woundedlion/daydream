@@ -25,7 +25,7 @@
  * same-named but reshaped message. Bump on any breaking change to the messages below.
  * @type {number}
  */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 /**
  * One tuned effect parameter, flattened for structured-clone transport. Booleans
@@ -135,12 +135,20 @@ export const PROTOCOL_VERSION = 4;
  * `paramValues` carries segment 0's post-frame parameter values (ordered to match
  * the effect's param list) so the GUI can track animation-driven changes the
  * un-stepped main engine cannot supply; null on every other segment.
+ *
+ * `fullFrame` is the disposition of the worker's last setClip: false when the
+ * band was installed (`APPLIED`) and the engine shaded only the rectangle, true
+ * when the effect reports `needs_full_frame()` (`FULL_FRAME_KEPT`) and the
+ * engine shaded the whole canvas for the rectangle to be sliced out of. Carrying
+ * it is what lets the pool tell an N-way parallel speedup from N workers each
+ * computing the same full frame; `elapsed` alone cannot.
  * @typedef {{
  *   type: 'frame', segId: number,
  *   x0: number, x1: number, y0: number, y1: number,
  *   pixels: Uint16Array, elapsed: number,
  *   arenaMetrics: SegArenaMetrics | null,
  *   paramValues: number[] | null,
+ *   fullFrame: boolean,
  * }} FrameMsg
  */
 

@@ -230,6 +230,13 @@ export class SegmentController {
     this.timings = [];        // ms per segment (worker-measured)
     /** @type {Array<SegArenaMetrics | null>} */
     this.arenas = [];
+    /**
+     * Per-segment clip disposition of the last reported frame: true when that
+     * worker's effect reports needs_full_frame() and it shaded the whole canvas
+     * instead of its band. The pool is only N-way parallel where this is false.
+     * @type {boolean[]}
+     */
+    this.fullFrames = [];
 
     /** @type {number[] | null} */
     this.paramValues = null;  // segment 0's latest param values, for GUI sync
@@ -367,6 +374,7 @@ export class SegmentController {
     this.scratch = new Array(numSegments).fill(null);
     this.timings = new Array(numSegments).fill(0);
     this.arenas = new Array(numSegments).fill(null);
+    this.fullFrames = new Array(numSegments).fill(false);
     this.frameSeen = new Array(numSegments).fill(false);
     this.paramValues = null;
     this.ready = false;
@@ -460,6 +468,7 @@ export class SegmentController {
             };
             this.timings[msg.segId] = msg.elapsed;
             this.arenas[msg.segId] = msg.arenaMetrics;
+            this.fullFrames[msg.segId] = msg.fullFrame === true;
           }
           this.frameSeen[msg.segId] = true;
           this.pending--;
@@ -652,6 +661,7 @@ export class SegmentController {
     this.scratch = [];
     this.timings = [];
     this.arenas = [];
+    this.fullFrames = [];
     this.frameSeen = [];
     this.ready = false;
     this.pending = 0;
@@ -875,6 +885,7 @@ export class SegmentController {
       // reports fresh 0/'-' rather than a prior generation's values.
       this.timings.fill(0);
       this.arenas.fill(null);
+      this.fullFrames.fill(false);
       this.frameStart = performance.now();
       this.frameResolve = () => {
         this.clearRenderWatchdog();

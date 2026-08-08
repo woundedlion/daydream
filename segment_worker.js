@@ -48,6 +48,10 @@ let canvasW = 0;
 let canvasH = 0;
 /** @type {SegRange | null} */
 let segRange = null;
+// Disposition of the last applyClip: true once the engine kept the full-canvas
+// clip for a needs_full_frame() effect, so every 'frame' reports what this
+// worker actually shaded rather than the rectangle it sliced out.
+let clipFullFrame = false;
 let arenaMetricsWarned = false;
 
 /**
@@ -59,13 +63,16 @@ let arenaMetricsWarned = false;
  * the effect reports needs_full_frame() so the clip stays at the full canvas
  * and this worker renders the whole frame. Only INVALID_BOUNDS faults the pool:
  * NO_EFFECT is the ordinary answer when no effect is installed to receive the
- * clip, and the controller follows with a setEffect that re-applies it.
+ * clip, and the controller follows with a setEffect that re-applies it. The
+ * APPLIED/FULL_FRAME_KEPT split is latched into clipFullFrame and reported on
+ * every frame, so the two successes stay distinguishable to the pool.
  * @returns {boolean} Whether the engine accepted the clip.
  */
 function applyClip() {
   // wasmModule is non-null whenever engine is — the engine is built from it.
   if (!wasmModule || !engine || !segRange) return false;
   const result = engine.setClip(segRange.x0, segRange.x1, segRange.y0, segRange.y1);
+  clipFullFrame = result === wasmModule.ClipSetResult.FULL_FRAME_KEPT;
   if (result === wasmModule.ClipSetResult.INVALID_BOUNDS) {
     post({
       type: 'engineRejected',
@@ -286,6 +293,7 @@ async function handleMessage(msg) {
         elapsed,
         arenaMetrics,
         paramValues,
+        fullFrame: clipFullFrame,
       }, [pixelsCopy.buffer]);
       break;
     }
