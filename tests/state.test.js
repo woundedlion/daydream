@@ -81,6 +81,23 @@ test('AppState.update does not re-announce a key a re-entrant write restored', (
   assert.deepEqual(events, [['a', 1, 0], ['b', 9, 2], ['b', 2, 9]]);
 });
 
+test('AppState.update notifies a nested update of an already-dispatched key', () => {
+  const s = new AppState({ a: 0, b: 0 });
+  const events = [];
+  let reentered = false;
+  s.subscribe((key, value, old) => {
+    events.push([key, value, old]);
+    // Re-enter update() on 'a', which this batch has already dispatched.
+    if (key === 'b' && !reentered) { reentered = true; s.update({ a: 7 }); }
+  });
+
+  s.update({ a: 1, b: 2 });
+
+  // The nested write is a transition of its own, so it is announced like the
+  // same write through set() would be, and neither batch fires a key twice.
+  assert.deepEqual(events, [['a', 1, 0], ['b', 2, 0], ['a', 7, 1]]);
+});
+
 test('AppState.subscribe returns an unsubscribe function', () => {
   const s = new AppState({ a: 1 });
   let count = 0;

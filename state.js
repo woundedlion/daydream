@@ -136,7 +136,11 @@ export class AppState {
     this.state = { ...defaults };
     this.listeners = [];
     this.batchDepth = 0;
-    this.dispatchedKeys = new Set();
+    // key -> notifications dispatched since the outermost batch began. A queued
+    // tuple is compared against the count taken when its batch was captured, so
+    // a nested batch is measured from its own starting point rather than
+    // inheriting an enclosing batch's dispatches.
+    this.dispatchCounts = new Map();
   }
 
   /**
@@ -177,16 +181,18 @@ export class AppState {
       }
     }
     // A subscriber may re-enter set()/update() while this batch drains and notify
-    // a key still queued below. Skip a queued tuple whose key already went out:
-    // its `old` no longer describes a transition that happened.
+    // a key still queued below. Skip a queued tuple whose key went out after this
+    // batch captured it: its `old` no longer describes a transition that happened.
+    const captured = new Map();
+    for (const [key] of changes) captured.set(key, this.dispatchCounts.get(key) ?? 0);
     this.batchDepth++;
     try {
       for (const [key, value, old] of changes) {
-        if (this.dispatchedKeys.has(key)) continue;
+        if ((this.dispatchCounts.get(key) ?? 0) !== captured.get(key)) continue;
         this.notify(key, value, old);
       }
     } finally {
-      if (--this.batchDepth === 0) this.dispatchedKeys.clear();
+      if (--this.batchDepth === 0) this.dispatchCounts.clear();
     }
   }
 
@@ -216,7 +222,9 @@ export class AppState {
    * @returns {void}
    */
   notify(key, value, old) {
-    if (this.batchDepth > 0) this.dispatchedKeys.add(key);
+    if (this.batchDepth > 0) {
+      this.dispatchCounts.set(key, (this.dispatchCounts.get(key) ?? 0) + 1);
+    }
     // Dispatch over a snapshot so a subscriber added during dispatch is not
     // invoked for the current event; membership is re-checked per call so one
     // removed during dispatch is not invoked either.
