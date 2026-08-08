@@ -99,7 +99,7 @@ export class SegmentStatsView {
       const box = this.doc.createElement('div');
       box.setAttribute('role', 'alert');
       box.tabIndex = -1;
-      box.style.cssText = 'color:#ff5252;padding:6px;font-size:0.85em';
+      box.style.cssText = 'color:var(--error-text);padding:6px;font-size:0.85em';
       // segId < 0 is a pool-wide fault, not one worker; FAULT_RENDER is a render
       // timeout, other negatives are pool init/module load.
       const who = !f ? 'worker ?'
@@ -109,12 +109,12 @@ export class SegmentStatsView {
       box.append(`⚠ Segment ${who} faulted — segmented render halted.`);
       box.appendChild(this.doc.createElement('br'));
       const msg = this.doc.createElement('span');
-      msg.style.color = '#999';
+      msg.style.color = 'var(--muted-text)';
       msg.textContent = (f && f.message) || 'see console';
       box.appendChild(msg);
       box.appendChild(this.doc.createElement('br'));
       const hint = this.doc.createElement('span');
-      hint.style.color = '#999';
+      hint.style.color = 'var(--muted-text)';
       hint.textContent = 'Change resolution or toggle segmented mode to restart.';
       box.appendChild(hint);
       el.replaceChildren(box);
@@ -133,7 +133,7 @@ export class SegmentStatsView {
       }
       const box = this.doc.createElement('div');
       box.setAttribute('role', 'status');
-      box.style.cssText = 'color:#999;padding:6px;font-size:0.85em';
+      box.style.cssText = 'color:var(--muted-text);padding:6px;font-size:0.85em';
       box.append(message);
       el.replaceChildren(box);
       this.statsTable = null; // force a rebuild once the pool reports ready
@@ -211,7 +211,7 @@ export class SegmentStatsView {
     const rows = [];
     for (let s = 0; s < numSegs; s++) {
       const range = td('');
-      range.style.cssText = 'color:#555;font-size:0.8em';
+      range.style.cssText = 'color:var(--muted-text);font-size:0.8em';
       const compute = td('', 'seg-time');
       const scrA = td('-');
       const scrB = td('-');
@@ -222,7 +222,7 @@ export class SegmentStatsView {
 
     const maxTime = td('', 'seg-time');
     const maxRow = mkRow([td('max', 'seg-label'), td(''), maxTime, spanCell()]);
-    maxRow.style.borderTop = '1px solid #333';
+    maxRow.style.borderTop = '1px solid var(--panel-border)';
 
     // round-trip spans dispatch to last worker response, so it carries the
     // structured clone, buffer transfer and event-loop latency that `max` — the
