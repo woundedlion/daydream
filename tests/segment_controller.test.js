@@ -20,6 +20,7 @@ const driver = {
 const {
   SegmentController,
   MAX_BOOT_RETRIES,
+  MAX_FAULTED_REBUILDS,
   BOOT_RETRY_DELAY_MS,
   BOOT_WATCHDOG_MS,
   INIT_WATCHDOG_MS,
@@ -37,6 +38,7 @@ const EXPECTED_CONSOLE_MESSAGES = {
   warn: [
     /^\[Segmented\] seg \d+ module failed to load \(attempt \d+\/\d+\); rebuilding pool$/,
     /^\[Segmented\] additional worker fault \(seg -?\d+\): /,
+    /^\[Segmented\] pool faulted on \d+ consecutive effect-switch rebuilds; /,
   ],
   error: [
     /^\[Segmented\] Worker seg \d+ error:/,
@@ -1039,6 +1041,59 @@ test('setEffect on a faulted active pool rebuilds it and clears the fault', () =
   assert.equal(c.faulted, false, 'recreating the pool cleared the fault latch');
   assert.equal(c.workers.length, 2, 'a fresh pool of workers was built');
   assert.equal(FakeWorker.instances.length, beforeCount + 2, 'new workers were spawned');
+});
+
+/**
+ * Latch a worker throw on segment 0 of the live pool.
+ * @param {SegmentController} controller - Controller owning the worker pool.
+ * @returns {void}
+ */
+function faultSegZero(controller) {
+  controller.workers[0].onerror({ message: 'x', filename: '', lineno: 0, colno: 0 });
+}
+
+// The Test All ticker switches effects on a 1 s interval, so a fault that
+// reproduces on every rebuild would respawn the pool once per tick.
+test('repeated effect switches on a refaulting pool spawn a bounded worker count', () => {
+  const c = makeController();
+  c.active = true;
+  c.create(2);
+  faultSegZero(c);
+  const spawnedBefore = FakeWorker.constructionCount;
+
+  for (let i = 0; i < 10; i++) {
+    c.setEffect(`Effect${i}`);
+    if (!c.faulted) faultSegZero(c);
+  }
+
+  assert.equal(FakeWorker.constructionCount - spawnedBefore, MAX_FAULTED_REBUILDS * 2,
+    'rebuild spawns are bounded, not one pool per switch');
+  assert.equal(c.faulted, true, 'the pool stays latched once the budget is spent');
+});
+
+test('a pool that reaches ready restores the faulted effect-switch budget', () => {
+  const c = makeController();
+  c.active = true;
+  c.create(2);
+  faultSegZero(c);
+  for (let i = 0; i <= MAX_FAULTED_REBUILDS; i++) {
+    c.setEffect(`Effect${i}`);
+    if (!c.faulted) faultSegZero(c);
+  }
+  assert.equal(c.faulted, true, 'the budget is spent');
+
+  // A resolution change is user-driven and stays unbounded, as the fault banner says.
+  c.setResolution(8, 8);
+  assert.equal(c.faulted, false, 'the resolution change rebuilt the latched pool');
+  deliverReady(c, 0);
+  deliverReady(c, 1);
+  assert.equal(c.faultedRebuilds, 0, 'a live pool ends the faulted-rebuild run');
+
+  faultSegZero(c);
+  const spawnedBefore = FakeWorker.constructionCount;
+  c.setEffect('AfterRecovery');
+  assert.equal(c.faulted, false, 'a later switch rebuilds again');
+  assert.equal(FakeWorker.constructionCount - spawnedBefore, 2, 'a fresh pool was spawned');
 });
 
 // A slider drag fires setParameter per pointer move; a rebuild there would

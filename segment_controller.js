@@ -64,6 +64,14 @@ export const RENDER_WATCHDOG_MS = 5000;
 export const MAX_BOOT_RETRIES = 3;
 export const BOOT_RETRY_DELAY_MS = 250;
 
+// Bound on consecutive effect-switch rebuilds of a faulted pool. Effect switches
+// can be timer-driven (the Test All ticker walks the list on an interval), so a
+// deterministic fault would otherwise respawn the whole pool — one WASM module
+// per segment — on every tick. Reset when a pool reaches ready; once spent, the
+// restart paths are the user-driven ones the fault banner names: a resolution
+// change or a segmented-mode toggle.
+export const MAX_FAULTED_REBUILDS = 2;
+
 // Minimum spacing between two actual warms. lil-gui fires onChange per drag
 // step, so the segment-count slider calls warmModules() several times a second;
 // each of those revalidates the whole module graph.
@@ -253,6 +261,10 @@ export class SegmentController {
     this.faulted = false;
     /** @type {{ segId: number, message: string } | null} */
     this.faultInfo = null;     // first fault this session
+    // Effect-switch rebuilds of a faulted pool since the last pool reached ready.
+    // Not cleared by destroy(): the faulted rebuild runs through create(), which
+    // destroys first, so clearing it there would unbound the count.
+    this.faultedRebuilds = 0;
 
     /** @type {ReturnType<typeof setTimeout> | null} */
     this.initWatchdog = null;
@@ -401,6 +413,9 @@ export class SegmentController {
           if (!readied[i]) { readied[i] = true; readyCount++; }
           if (readyCount === numSegments) {
             this.ready = true;
+            // A live pool ends the faulted-rebuild run, so the next fault gets a
+            // fresh budget.
+            this.faultedRebuilds = 0;
             this.clearBootWatchdog();
             this.clearInitWatchdog();
             console.log(`[Segmented] All ${numSegments} workers ready`);
@@ -671,8 +686,9 @@ export class SegmentController {
    * is left populated rather than cleared, so a fault message still reports
    * against the pool that was dispatched to; destroy() clears it on the rebuild.
    * Recovery is by re-creating the pool (effect switch / resolution change /
-   * mode toggle), which clears the latch via destroy(). Only the first fault per
-   * session is recorded for the UI.
+   * mode toggle), which clears the latch via destroy(); the effect-switch path is
+   * bounded by MAX_FAULTED_REBUILDS. Only the first fault per session is recorded
+   * for the UI.
    * @param {number} segId - Index of the worker segment that faulted.
    * @param {string} message - Human-readable fault message for the UI/console.
    */
@@ -740,8 +756,19 @@ export class SegmentController {
     this.paramValues = null;
     // A faulted pool is broken until re-created; rebuild (active) re-reads the
     // effect and params from appState rather than broadcasting to dead workers.
+    // Bounded by MAX_FAULTED_REBUILDS: effect switches can arrive on a timer, and
+    // a fault that reproduces on every rebuild would respawn the pool per switch.
     if (this.faulted) {
-      if (this.active) this.create(this.count);
+      if (!this.active) return;
+      this.faultedRebuilds++;
+      if (this.faultedRebuilds > MAX_FAULTED_REBUILDS) {
+        if (this.faultedRebuilds === MAX_FAULTED_REBUILDS + 1) {
+          console.warn(`[Segmented] pool faulted on ${MAX_FAULTED_REBUILDS} consecutive `
+            + 'effect-switch rebuilds; change resolution or toggle segmented mode to restart');
+        }
+        return;
+      }
+      this.create(this.count);
       return;
     }
     // Bump the fence so an in-flight old-effect frame fails inflightGen ===
