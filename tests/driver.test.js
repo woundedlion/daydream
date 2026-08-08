@@ -369,6 +369,7 @@ function disposeCtx(mesh, log) {
     renderer: {
       setAnimationLoop: () => log.push('renderer.stopLoop'),
       dispose: () => log.push('renderer.dispose'),
+      forceContextLoss: () => log.push('renderer.loseContext'),
     },
   };
 }
@@ -429,12 +430,14 @@ test('dispose releases the observer, listeners, and GPU resources', () => {
   for (const step of ['observer.disconnect',
                       'overlay.remove', 'material.dispose', 'axisMaterial.dispose',
                       'controls.dispose', 'labelLayer.remove',
-                      'renderer.dispose']) {
+                      'renderer.dispose', 'renderer.loseContext']) {
     assert.ok(log.includes(step), `dispose skipped ${step}`);
   }
   assert.deepEqual(ctx.canvas.listeners, [],
     'a listener outlived the canvas it was bound to');
   assert.ok(log.indexOf('renderer.stopLoop') < log.indexOf('renderer.dispose'));
+  assert.ok(log.indexOf('renderer.dispose') < log.indexOf('renderer.loseContext'),
+    'the drawing context was released before the renderer freed its objects');
 });
 
 test('dispose removes each axis from the scene and frees its geometry', () => {

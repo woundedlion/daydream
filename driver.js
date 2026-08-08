@@ -956,6 +956,9 @@ export class Daydream {
     // dotMesh / disposed renderer on a real page discard.
     this.renderer?.setAnimationLoop(null);
     this.renderer?.dispose();
+    // dispose() frees the GPU objects but keeps the drawing context, which the
+    // browser caps at ~16 per page; only a context loss hands it back.
+    this.renderer?.forceContextLoss();
   }
 }
 
