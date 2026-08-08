@@ -212,13 +212,14 @@ test('a faces-only render builds exactly the mesh and its edge lines', () => {
   assert.equal(find(scene, 'Mesh').geometry.attributes.color, undefined);
 });
 
-test('the edge count is recorded on the mesh the caller keeps', () => {
+test('the render leaves the caller\'s mesh untouched', () => {
   const { renderer } = setup();
   const mesh = tetrahedron();
-  assert.equal(mesh.edgeCount, undefined);
-  renderer.render(mesh, view(), null);
-  assert.equal(mesh.edgeCount, uniqueEdges(mesh.faces, mesh.vertices.length).length,
-    'a saved solid reads its E count off the mesh, not off the render');
+  const keysBefore = Object.keys(mesh).sort();
+  const result = renderer.render(mesh, view(), null);
+  assert.equal(result.edgeCount, uniqueEdges(mesh.faces, mesh.vertices.length).length,
+    'the edge count is reported back, not written onto the mesh');
+  assert.deepEqual(Object.keys(mesh).sort(), keysBefore);
 });
 
 test('the stats line reports vertices, edges, faces and indices', () => {
