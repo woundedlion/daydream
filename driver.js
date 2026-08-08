@@ -189,11 +189,7 @@ export class Daydream {
 
     this.camera = new THREE.PerspectiveCamera(
       Daydream.CAMERA_FOV,
-      // Square fallback until the canvas has a real size: width/0 yields a
-      // truthy Infinity that slips past `|| 1`, so require both dimensions > 0.
-      this.canvas.width > 0 && this.canvas.height > 0
-        ? this.canvas.width / this.canvas.height
-        : 1,
+      initialAspect(this.canvas),
       Daydream.CAMERA_NEAR,
       Daydream.CAMERA_FAR
     );
@@ -961,6 +957,17 @@ export class Daydream {
     this.renderer?.forceContextLoss();
   }
 }
+
+/**
+ * Camera aspect for a canvas the page has not laid out yet.
+ *
+ * Both dimensions must be positive: width/0 yields a truthy Infinity that slips
+ * past a `|| 1` guard and poisons the projection matrix.
+ * @param {{width: number, height: number}} canvas - The render canvas.
+ * @returns {number} width/height, or 1 while either dimension is still 0.
+ */
+export const initialAspect = (canvas) =>
+  canvas.width > 0 && canvas.height > 0 ? canvas.width / canvas.height : 1;
 
 /** Per-dot sphere LOD: segment count decays exponentially as pixel count rises
  *  so the triangle budget stays bounded.
