@@ -101,11 +101,19 @@ export class EffectSidebar {
 
   /**
    * Create the option buttons once for the given effect names and sizes, then
-   * apply the current sort order, active highlight, and roving tabindex anchor.
+   * apply the current sort order, active highlight, and roving tabindex anchor,
+   * restoring keyboard focus when it was inside the list.
    * @param {Array<string>} names - Effect names, one button per name.
    * @param {Object} [effectSizes] - Map of effect name to size in bytes; missing or absent entries are treated as 0.
    */
   setEffects(names, effectSizes) {
+    // Discarding the focused option drops focus to <body>, where the list's
+    // keydown handler no longer sees it and Space reaches the global one
+    // instead. Name it now; the rebuilt button carrying that name takes it back.
+    const focused = document.activeElement;
+    const refocusName = focused && this.listEl.contains(focused)
+      ? (focused.dataset?.effect ?? '') : null;
+
     this.buttons.clear();
     this.listEl.innerHTML = '';
     this.items = [];
@@ -143,6 +151,12 @@ export class EffectSidebar {
     this.setRovingTabbable(
       this.buttons.get(this.activeName) || this.listEl.querySelector('.effect-button')
     );
+    // Only when focus was already in the list: a rebuild driven from elsewhere
+    // must not pull it out of whatever the user is on. An option that left the
+    // roster hands focus to the tab stop rather than off the list.
+    if (refocusName !== null) {
+      (this.buttons.get(refocusName) || this.tabbableBtn)?.focus();
+    }
     // Defer until the grid has laid out before measuring scroll extents.
     this.scheduleScrollArrows();
   }

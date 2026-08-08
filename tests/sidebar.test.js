@@ -164,6 +164,46 @@ test('setEffects re-marks the active effect on its rebuilt button', () => {
   assert.equal(sidebar.buttons.get('A').tabIndex, -1);
 });
 
+// A resolution change rebuilds the roster mid-keyboard-navigation. Focus left on
+// <body> stops matching the list's keydown handler, and the next Space reaches
+// the global one — pausing the simulation instead of selecting an effect.
+test('setEffects returns focus to the rebuilt button of the focused option', () => {
+  const { sidebar } = makeSidebar();
+  sidebar.setEffects(['A', 'B'], {});
+  document.activeElement = sidebar.buttons.get('B');
+
+  sidebar.setEffects(['A', 'B', 'C'], {}); // fresh nodes, same names
+
+  assert.equal(sidebar.buttons.get('B').focusCalls, 1);
+  assert.equal(sidebar.buttons.get('A').focusCalls, 0, 'focus lands on one option');
+});
+
+test('setEffects falls back to the tab stop when the focused option is gone', () => {
+  const { sidebar } = makeSidebar();
+  sidebar.setEffects(['A', 'B'], {});
+  sidebar.setActive('A');
+  document.activeElement = sidebar.buttons.get('B');
+
+  sidebar.setEffects(['A', 'C'], {}); // B left the roster
+
+  assert.equal(sidebar.tabbableBtn, sidebar.buttons.get('A'));
+  assert.equal(sidebar.tabbableBtn.focusCalls, 1, 'focus stays inside the list');
+});
+
+test('setEffects leaves focus alone when it was outside the list', () => {
+  const { sidebar } = makeSidebar();
+  sidebar.setEffects(['A', 'B'], {});
+  const elsewhere = fakeElement('input');
+  document.activeElement = elsewhere;
+
+  sidebar.setEffects(['A', 'B'], {});
+
+  assert.equal(elsewhere.focusCalls, 0);
+  for (const btn of sidebar.buttons.values()) {
+    assert.equal(btn.focusCalls, 0, 'a rebuild must not pull focus into the list');
+  }
+});
+
 test('setActive keeps the current selection when the name is off-list', () => {
   const { sidebar } = makeSidebar();
   sidebar.setEffects(['A', 'B'], {});
