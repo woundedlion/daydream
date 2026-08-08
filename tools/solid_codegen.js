@@ -429,6 +429,20 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
 }
 
 /**
+ * Renders one stored mesh count for the leading comment. The counts come from
+ * user-writable localStorage and land in text a human pastes into a C++ header,
+ * so anything that is not a non-negative integer becomes 0 rather than reaching
+ * the output; a count carrying a newline would otherwise splice arbitrary code
+ * above the generated function.
+ * @param {*} value - The persisted count.
+ * @returns {number} The count as a non-negative integer, or 0.
+ */
+function commentCount(value) {
+  const n = Math.trunc(Number(value));
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+/**
  * Emits the full FLASHMEM C++ function for a solid, prefixed with a comment
  * recording its vertex/face/index counts. Output is pasted verbatim into the
  * engine, so the exact text and formatting are byte-for-byte significant.
@@ -440,7 +454,8 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
 export function generateRecipeCpp(item, baseNamespace) {
   requireNamespace('generateRecipeCpp', baseNamespace);
   const { funcName, recipe } = generateFuncAndRecipe(item, baseNamespace);
-  const comment = `// V=${item.vCount || 0}, F=${item.fCount || 0}, I=${item.iCount || 0}`;
+  const comment = `// V=${commentCount(item.vCount)}, F=${commentCount(item.fCount)}, `
+    + `I=${commentCount(item.iCount)}`;
   return `${comment}\nFLASHMEM static PolyMesh ${funcName}(Arena &a, Arena &b) {\n  return ${recipe};\n}`;
 }
 
