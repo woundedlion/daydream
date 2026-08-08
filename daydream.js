@@ -450,12 +450,17 @@ const segSpawn = createSegmentSpawnGuard({
 /**
  * Fall back to the single-thread engine after a segmented-pool failure, leaving
  * the toggle showing the state the app is actually in.
- * @param {string} label - What failed, for the log line.
+ * @param {string} label - What failed, named in the log line and the notice.
  * @param {*} err - The thrown value.
  * @returns {void}
  */
 function segmentedFailed(label, err) {
   console.error(`Segmented POV: ${label} failed; falling back to the single engine.`, err);
+  const detail = (err && err.message) ? err.message : String(err);
+  // Otherwise the only symptom is the toggle flipping back, which reads as a
+  // mis-click; the fault banner covers latched runtime faults, not this path.
+  applyNotice.show(`Segmented POV ${label} failed: ${detail}. `
+    + 'Falling back to the single engine.', SWITCH_NOTICE);
   segments.active = false;
   segSpawn.strand();
   segments.destroy();
