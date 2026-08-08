@@ -279,6 +279,31 @@ test('keys other than effect and resolution are ignored', () => {
   assert.deepEqual(app.calls, []);
 });
 
+test('mute() lands a state write without applying it, and reopens after', () => {
+  const app = makeApp();
+
+  app.switches.mute(() => app.appState.set('resolution', 'Hi'));
+
+  assert.deepEqual(app.calls, []);
+  assert.equal(app.appState.get('resolution'), 'Hi');
+  assert.equal(app.applied.resolution, 'Lo');
+  assert.equal(app.switches.isRestoring(), false);
+
+  app.appState.set('effect', 'Beta');
+  assert.equal(app.applied.effect, 'Beta');
+});
+
+test('mute() reopens the subscription after a throwing write', () => {
+  const app = makeApp();
+  const failure = new Error('write failed');
+
+  assert.throws(() => app.switches.mute(() => { throw failure; }), failure);
+
+  assert.equal(app.switches.isRestoring(), false);
+  app.appState.set('effect', 'Beta');
+  assert.equal(app.applied.effect, 'Beta');
+});
+
 test('dispose() stops applying later state changes', () => {
   const app = makeApp();
 
