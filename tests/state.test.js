@@ -7,6 +7,7 @@ import {
   overlayUrlParam,
   replaceUrl,
   roundUrlNumber,
+  URL_FLUSH_RETRY_MS,
   writeUrl,
 } from '../state.js';
 
@@ -227,6 +228,50 @@ test('a refused history write does not propagate out of the URL layer', () => {
     console.warn = warn;
   }
   assert.equal(warnings.length, 4, 'every refused write is reported once');
+});
+
+/**
+ * A tracked key is re-read from state on every flush, so a refused write costs
+ * it nothing. An ad-hoc GUI param lives only in the buffer: dropping it there
+ * would lose the value with nothing left to re-assert it.
+ */
+test('URLSync holds its ad-hoc buffer through a refused history write', () => {
+  const written = [];
+  let refuse = true;
+  const delays = [];
+  const realSetTimeout = globalThis.setTimeout;
+  const warn = console.warn;
+  console.warn = () => {};
+  globalThis.setTimeout = (fn, ms) => { delays.push(ms); return 0; };
+  globalThis.window = {
+    location: { search: '', pathname: '/sim', hash: '' },
+    history: {
+      replaceState: (state, title, url) => {
+        if (refuse) throw new Error('rate limit');
+        written.push(url);
+      },
+    },
+  };
+  try {
+    const sync = new URLSync(new AppState({ effect: 'Voronoi' }), ['effect']);
+    sync.setParam('scale', 3);
+
+    sync.flush();
+    assert.deepEqual(written, [], 'the refused write left the URL as it was');
+    assert.equal(delays.at(-1), URL_FLUSH_RETRY_MS, 'a retry is armed');
+
+    refuse = false;
+    sync.flush();
+    assert.deepEqual(written, ['/sim?effect=Voronoi&scale=3'],
+      'the retry re-asserts the buffered ad-hoc param');
+
+    sync.flush();
+    assert.deepEqual(written.at(-1), '/sim?effect=Voronoi',
+      'a landed ad-hoc write is not replayed from the buffer');
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+    console.warn = warn;
+  }
 });
 
 test('URLSync reads initial tracked keys from the URL into state', () => {
