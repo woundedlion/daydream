@@ -343,8 +343,14 @@ export function pctSuffix(val) {
  * Derives the C++ funcName and SolidBuilder recipe expression for a solid spec.
  * The funcName is the base plus one suffix per op (encoding parameters where two
  * solids could otherwise collide); the recipe is the chained
- * SolidBuilder(...).build() call. Both naming and chaining follow solids.h
- * conventions.
+ * SolidBuilder(...).build() call, which is solids.h's own chaining form.
+ *
+ * Naming picks one of the several suffix dialects solids.h carries: hundredths
+ * plus the short `_hk` for hankin (`_bevel20` for 0.2, `_hk58`). The tenths
+ * (`_bevel2` for the same 0.2), thousandths (`_truncate033`), `d`-suffixed
+ * (`_truncate50d`) and spelled-out (`_hankin62`) names also there are not
+ * generated, so a generated name need not match a hand-written one for the
+ * same chain.
  * @param {Object} item - The solid spec.
  * @param {string} item.base - The base solid name.
  * @param {Array<(string|{op:string, params:Object})>} item.ops - Ops to apply, each a bare op name or an {op, params} object; must be non-empty.
