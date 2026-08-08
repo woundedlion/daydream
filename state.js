@@ -393,6 +393,20 @@ export class URLSync {
   }
 
   /**
+   * Drop from a params object the keys a scheduled reset() will clear, so a
+   * reader running inside the debounce window does not see params the app has
+   * already discarded — the reset is scheduled, but the decision is made.
+   * @param {URLSearchParams} params - Params to filter in place.
+   * @returns {void}
+   */
+  applyPendingReset(params) {
+    if (!this.pendingReset) return;
+    for (const k of [...params.keys()]) {
+      if (!this.pendingReset.has(k)) params.delete(k);
+    }
+  }
+
+  /**
    * Read-modify-write the URL once: re-read current params, overlay tracked
    * state keys and surviving ad-hoc writes, then replaceState. Running at fire
    * time (not schedule time) is what lets concurrent updates merge.
@@ -400,12 +414,8 @@ export class URLSync {
    */
   flush() {
     const params = new URLSearchParams(window.location.search);
-    if (this.pendingReset) {
-      for (const k of [...params.keys()]) {
-        if (!this.pendingReset.has(k)) params.delete(k);
-      }
-      this.pendingReset = null;
-    }
+    this.applyPendingReset(params);
+    this.pendingReset = null;
     // A cleared tracked key drops its param; leaving it would re-seed the stale
     // value into state on the next load.
     for (const key of this.trackedKeys) {
