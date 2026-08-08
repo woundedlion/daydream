@@ -41,6 +41,12 @@ test('formatFloatCpp: zero renders as "0.0f"', () => {
   assert.equal(formatFloatCpp(0), '0.0f');
 });
 
+/** Negative zero keeps its sign: -0.0f and 0.0f are different float32 values. */
+test('formatFloatCpp: negative zero renders as "-0.0f"', () => {
+  assert.equal(formatFloatCpp(-0), '-0.0f');
+  assert.ok(Object.is(Math.fround(parseFloat(formatFloatCpp(-0))), -0));
+});
+
 /** Negative small values keep their sign and magnitude. */
 test('formatFloatCpp: negative small value keeps sign and magnitude', () => {
   assert.equal(formatFloatCpp(-1e-7), '-0.0000001f');

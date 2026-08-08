@@ -24,8 +24,8 @@
     "assertions": 356
   },
   "tests/cpp_format.test.js": {
-    "cases": 13,
-    "assertions": 20043
+    "cases": 14,
+    "assertions": 20045
   },
   "tests/daydream_boot.test.js": {
     "cases": 5,
