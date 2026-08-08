@@ -8,6 +8,7 @@ import {
   createRenderAdapter,
   createAppTeardown,
   createApplyNotice,
+  createFrameLoopGuard,
   createGlobalKeydownHandler,
   createModuleLoadHandlers,
   createPoleLodBinding,
@@ -21,8 +22,9 @@ import {
 // sphere, a stuck walk, or a leak: all display aliases reference one WASM view,
 // a segmented frame is composited instead of drawn, dispose releases in an order
 // that cannot re-enter the apply path or reach a freed engine, the Test All walk
-// advances its own index, a segmented toggle burst spawns one worker pool, and
-// one subsystem's notice survives another's clear.
+// advances its own index, a segmented toggle burst spawns one worker pool, one
+// subsystem's notice survives another's clear, and a throwing frame does not
+// take the render loop down with it.
 
 /**
  * Driver double carrying the two display aliases and the dispose sink.
@@ -409,6 +411,60 @@ test('the rejection handler stringifies a reason carrying no message', () => {
   handler({ reason: 'aborted', preventDefault: () => {} });
 
   assert.deepEqual(reported, ['Something went wrong. aborted']);
+});
+
+// The render loop guard: Three.js re-arms the frame request only after the
+// callback returns, so a throw that escapes it freezes the page for good.
+
+/**
+ * Guard under test over a frame body the test drives, plus the sinks it writes to.
+ * @param {() => void} frame - The per-frame body.
+ * @returns {Object} The guarded callback, the reported messages, and the console lines.
+ */
+function makeFrameGuard(frame) {
+  const reported = [];
+  const logged = [];
+  const guarded = createFrameLoopGuard({
+    frame,
+    report: (message) => reported.push(message),
+    logError: (...args) => logged.push(args),
+  });
+  return { guarded, reported, logged };
+}
+
+test('a throwing frame is contained and the loop keeps calling the body', () => {
+  let calls = 0;
+  const { guarded, reported } = makeFrameGuard(() => {
+    calls += 1;
+    if (calls === 1) throw new Error('view detached');
+  });
+
+  guarded();
+  guarded();
+
+  assert.equal(calls, 2, 'a contained throw must not stop the frames that follow');
+  assert.equal(reported.length, 1);
+  assert.match(reported[0], /view detached/);
+});
+
+test('a frame that throws every tick reports once', () => {
+  const { guarded, reported, logged } = makeFrameGuard(() => {
+    throw new Error('boom');
+  });
+
+  for (let i = 0; i < 5; i++) guarded();
+
+  assert.equal(reported.length, 1, 'the banner must not be rewritten 60 times a second');
+  assert.equal(logged.length, 1);
+  assert.equal(logged[0][0], 'Render loop frame failed:');
+});
+
+test('a frame guard stringifies a thrown value carrying no message', () => {
+  const { guarded, reported } = makeFrameGuard(() => { throw 'aborted'; });
+
+  guarded();
+
+  assert.match(reported[0], /aborted/);
 });
 
 // The global keydown guard: the shortcuts are the canvas's, so a key typed into
