@@ -441,14 +441,14 @@ export class SegmentController {
         } else if (msg.type === 'frame') {
           // A halted pool zeroed `pending`; ignore late frames so it can't go negative.
           if (this.faulted) return;
-          // Integer-checked, not just range-checked: NaN/undefined fail both range
-          // comparisons, so a bare range guard would let them through to index
-          // `scratch`/`frameSeen` by string key and settle the barrier with a
-          // segment absent — publishing a torn frame the recorder counts as real.
-          if (!Number.isInteger(msg.segId)
-              || msg.segId < 0 || msg.segId >= numSegments) {
+          // This handler belongs to worker `i`, so its frame must carry segId i.
+          // The identity check subsumes a range check and rejects NaN/undefined,
+          // which would otherwise index `scratch`/`frameSeen` by string key and
+          // settle the barrier with a segment absent — publishing a torn frame
+          // the recorder counts as real.
+          if (msg.segId !== i) {
             console.error(`[Segmented] frame from invalid segId ${msg.segId} `
-              + `(expected an integer 0..${numSegments - 1}); dropping`);
+              + `(worker seg ${i}); dropping`);
             return;
           }
           // Count and stage only the first message from each segment.
