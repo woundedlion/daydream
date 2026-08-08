@@ -26,12 +26,24 @@ export interface ArenaUsage {
   capacity: number;
 }
 
+/**
+ * Usage snapshot of the WASM stack, in bytes. No running usage: the depth at
+ * the read is outside any render. `high_water_mark` is the canary's live
+ * reading, which a repaint resets; `init_high_water_mark` is the latched
+ * effect-construction peak, which no repaint erases.
+ */
+export interface StackUsage {
+  high_water_mark: number;
+  init_high_water_mark: number;
+  capacity: number;
+}
+
 /** The engine's arena usage snapshot. */
 export interface ArenaMetrics {
   scratch_arena_a: ArenaUsage;
   scratch_arena_b: ArenaUsage;
   persistent_arena: ArenaUsage;
-  stack: ArenaUsage;
+  stack: StackUsage;
 }
 
 export interface HolosphereEngine {
