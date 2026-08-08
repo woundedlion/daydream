@@ -134,6 +134,17 @@ test('a segment with no frame yet shows ? for its range and - for its arenas', (
   assert.equal(cell(2, 'Persist').textContent, '-');
 });
 
+test('a worker that shaded the whole canvas is not reported as a band render', () => {
+  const { doc, stats } = makeDoc();
+  const state = readyState(2);
+  state.fullFrames = [true, false];
+  new SegmentStatsView(doc).update(state);
+
+  const { cell } = grid(stats);
+  assert.equal(cell(1, 'Range').textContent, 'full frame');
+  assert.equal(cell(2, 'Range').textContent, 'x[10–19] y[101–201]');
+});
+
 test('max time covers the live segments only, ignoring a stale tail entry', () => {
   const { doc, stats } = makeDoc();
   const state = readyState(2);

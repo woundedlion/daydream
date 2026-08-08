@@ -497,6 +497,27 @@ test('a full-frame-kept clip does not fault the pool', async () => {
 });
 
 /**
+ * The two clip successes describe different work: APPLIED shades the band,
+ * FULL_FRAME_KEPT shades the whole canvas in every worker. Nothing else in a
+ * 'frame' separates them, so the pool would otherwise read N full-canvas
+ * renders as an N-way speedup.
+ */
+test('a frame reports whether the whole canvas was shaded', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.fullFrame, false,
+    'an installed band is a clipped render');
+
+  engineInstance.fullFrame = true;
+  await dispatch({ type: 'setEffect', name: 'MeshFeedback' });
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.fullFrame, true,
+    'a kept full-canvas clip is reported as one');
+});
+
+/**
  * The serialized queue must isolate a failure (later messages still run) and
  * rethrow it on a fresh task so it reaches the worker's global error handler
  * rather than vanishing as an unhandled rejection.

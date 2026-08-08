@@ -30,6 +30,7 @@ export const FAULT_RENDER = -2;
  *   results: Array<{x0: number, x1: number, y0: number, y1: number} | null>,
  *   timings: number[],
  *   arenas: Array<import('./worker_protocol.js').SegArenaMetrics | null>,
+ *   fullFrames?: boolean[],
  *   frameSeen: boolean[],
  *   wallTime: number,
  * }} SegmentStatsState
@@ -159,7 +160,12 @@ export class SegmentStatsView {
       if (timing > maxTime) maxTime = timing;
       const c = cells.rows[s];
 
-      c.range.textContent = state.frameSeen[s] && r ? `x[${r.x0}–${r.x1}] y[${r.y0}–${r.y1}]` : '?';
+      // A needs_full_frame() effect shades the whole canvas in every worker and
+      // the rectangle is only what was sliced out of it, so naming the rect
+      // there would claim a segmented render the pool never did.
+      c.range.textContent = !(state.frameSeen[s] && r) ? '?'
+        : state.fullFrames?.[s] ? 'full frame'
+        : `x[${r.x0}–${r.x1}] y[${r.y0}–${r.y1}]`;
       c.compute.textContent = `${timing.toFixed(1)} ms`;
       c.compute.className = timing > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
 
