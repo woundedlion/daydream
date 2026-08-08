@@ -334,14 +334,27 @@ function disposeCtx(mesh, log) {
     name,
     geometry: { dispose: () => log.push(`${name}.geometry.dispose`) },
   });
-  return {
-    resizeObserver: { disconnect: () => log.push('observer.disconnect') },
-    canvas: { removeEventListener: (type) => log.push(`canvas.off:${type}`) },
+  const handlers = {
     onContextLost: () => {},
     onContextRestored: () => {},
     onCanvasKeyDown: () => {},
     onCanvasFocus: () => {},
     onCanvasBlur: () => {},
+  };
+  // Pre-registered exactly as setupContextLossHandling() and
+  // setupKeyboardOrbit() register them, so a removal that drifts on handler
+  // identity or capture flag throws in fakeElement instead of leaving the
+  // listener on a canvas the page is done with.
+  const canvas = fakeElement('canvas');
+  canvas.addEventListener('webglcontextlost', handlers.onContextLost, false);
+  canvas.addEventListener('webglcontextrestored', handlers.onContextRestored, false);
+  canvas.addEventListener('keydown', handlers.onCanvasKeyDown);
+  canvas.addEventListener('focus', handlers.onCanvasFocus);
+  canvas.addEventListener('blur', handlers.onCanvasBlur);
+  return {
+    resizeObserver: { disconnect: () => log.push('observer.disconnect') },
+    canvas,
+    ...handlers,
     contextLostOverlay: { remove: () => log.push('overlay.remove') },
     scene: { remove: (obj) => log.push(`scene.remove:${obj?.name ?? 'dotMesh'}`) },
     dotMesh: mesh,
@@ -413,14 +426,14 @@ test('dispose releases the observer, listeners, and GPU resources', () => {
   const ctx = disposeCtx(fakeMesh(log), log);
   Daydream.prototype.dispose.call(ctx);
 
-  for (const step of ['observer.disconnect', 'canvas.off:webglcontextlost',
-                      'canvas.off:webglcontextrestored', 'canvas.off:keydown',
-                      'canvas.off:focus', 'canvas.off:blur',
+  for (const step of ['observer.disconnect',
                       'overlay.remove', 'material.dispose', 'axisMaterial.dispose',
                       'controls.dispose', 'labelLayer.remove',
                       'renderer.dispose']) {
     assert.ok(log.includes(step), `dispose skipped ${step}`);
   }
+  assert.deepEqual(ctx.canvas.listeners, [],
+    'a listener outlived the canvas it was bound to');
   assert.ok(log.indexOf('renderer.stopLoop') < log.indexOf('renderer.dispose'));
 });
 
