@@ -311,11 +311,8 @@ const moduleLoad = createModuleLoadHandlers({
       testAllController.setValue(false);
       testAllController.disable();
     }
-    const loadingOverlay = document.getElementById('loading-overlay');
-    const detailText = (err && err.message) ? err.message : String(err);
-    if (loadingOverlay) {
-      showBootstrapFailure(err, { title: 'Failed to load the rendering engine.' });
-    } else {
+    if (!showBootstrapFailure(err, { title: 'Failed to load the rendering engine.' })) {
+      const detailText = (err && err.message) ? err.message : String(err);
       showFatalError(`Failed to initialize the rendering engine. ${detailText}`);
     }
   },
