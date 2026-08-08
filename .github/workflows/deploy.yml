@@ -214,7 +214,10 @@ jobs:
         run: |
           mkdir _site
           status=0
-          while IFS= read -r path || [ -n "$path" ]; do
+          # Default IFS trims leading and trailing whitespace, so an indented
+          # comment or a padded path classifies here exactly as it does in
+          # tests/site_manifest.test.js, which trims before dropping comments.
+          while read -r path || [ -n "$path" ]; do
             case "$path" in ''|'#'*) continue ;; esac
             if [ ! -e "$path" ]; then
               echo "::error::site_manifest.txt lists $path, which is not in the repo — update the manifest or restore the file."
