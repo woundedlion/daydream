@@ -187,7 +187,7 @@ test('setCanvasSize switches to the compact layout at the breakpoint', () => {
   assert.equal(narrow.isMobile, true);
 });
 
-test('setCanvasSize anchors a square PiP to the top-right corner', () => {
+test('setCanvasSize anchors a square PiP to the bottom-right corner', () => {
   const ctx = sizeCtx(1200, 800);
   resize(ctx, 1200, 800);
 
@@ -195,7 +195,7 @@ test('setCanvasSize anchors a square PiP to the top-right corner', () => {
   assert.equal(width, height, 'the PiP viewport is not square');
   assert.equal(height, Math.floor(800 * 0.3), 'the PiP is not 30% of the smaller dimension');
   assert.equal(x + width, 1200, 'the PiP is not flush with the right edge');
-  assert.equal(y, 0);
+  assert.equal(y, 0, 'setViewport measures from the lower left, so y 0 is the bottom edge');
   assert.equal(ctx.pipCamera.aspect, 1, 'a non-square PiP camera distorts the corner view');
 });
 
