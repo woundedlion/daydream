@@ -187,8 +187,9 @@ function setEngineParam(name, value) {
   }
 }
 
-document.getElementById('apply-notice-dismiss')
-  ?.addEventListener('click', () => applyNotice.clear());
+const applyNoticeDismiss = document.getElementById('apply-notice-dismiss');
+const onApplyNoticeDismiss = () => applyNotice.clear();
+applyNoticeDismiss?.addEventListener('click', onApplyNoticeDismiss);
 
 /**
  * Name a ParamSetResult enum value for logging.
@@ -625,6 +626,9 @@ appTeardown = createAppTeardown({
   listeners: [
     ["keydown", onKeyDown],
     ["unhandledrejection", onUnhandledRejection],
+    ...(applyNoticeDismiss
+      ? [["click", onApplyNoticeDismiss, applyNoticeDismiss]]
+      : []),
   ],
   switches,
   stopTimers: () => { testAllTicker.stop(); applyNotice.clear(); },

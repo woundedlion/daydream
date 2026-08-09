@@ -128,8 +128,8 @@ export function createRenderAdapter({
  * @param {Object} deps - Injected app collaborators.
  * @param {{addEventListener: Function, removeEventListener: Function}}
  *   deps.pageTarget - Where the page listeners live (the window).
- * @param {Array<[string, Function]>} deps.listeners - Window listeners the app
- *   installed, removed on dispose.
+ * @param {Array<[string, Function, Object?]>} deps.listeners - Listeners the app
+ *   installed, removed from their optional owner target or pageTarget on dispose.
  * @param {{dispose: Function}} deps.switches - The switch coordinator.
  * @param {() => void} deps.stopTimers - Stops the app's interval timers.
  * @param {{destroy: Function}} deps.effectGui - The effect panel controller.
@@ -172,8 +172,8 @@ export function createAppTeardown({
   function dispose() {
     if (appDisposed) return;
     appDisposed = true;
-    for (const [type, handler] of listeners) {
-      pageTarget.removeEventListener(type, handler);
+    for (const [type, handler, target = pageTarget] of listeners) {
+      target.removeEventListener(type, handler);
     }
     pageTarget.removeEventListener("pagehide", onPageHide);
     switches.dispose();
