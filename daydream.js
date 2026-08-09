@@ -295,12 +295,8 @@ const moduleLoad = createModuleLoadHandlers({
     );
   },
   discardStartup: () => {
-    host.adapter = null;
-    host.recorder?.dispose();
-    host.recorder = null;
+    host.dispose();
     daydream.recorder = null;
-    host.engine?.delete();
-    host.engine = null;
   },
   reportFailure: (err) => {
     console.error('Failed to initialize the Holosphere renderer:', err);

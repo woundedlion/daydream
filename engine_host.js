@@ -64,4 +64,23 @@ export class EngineHost {
       this.onViewRefreshed(view);
     }
   }
+
+  /**
+   * Release the recorder, render adapter, engine handle, and cached view,
+   * leaving the host inert. Idempotent, and the one release path for both a page
+   * discard and a startup the discard raced. A recording in progress is ended
+   * but not flushed: its onstop download is async and cannot complete under a
+   * synchronous page discard.
+   * @returns {void}
+   */
+  dispose() {
+    this.recorder?.dispose();
+    this.recorder = null;
+    // Before the delete: the frame loop reaches the engine only through the
+    // adapter, so a frame that outlives the teardown must find nothing to call.
+    this.adapter = null;
+    this.engine?.delete();
+    this.engine = null;
+    this.pixelView = null;
+  }
 }
