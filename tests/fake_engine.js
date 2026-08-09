@@ -40,6 +40,30 @@ export const ClipSetResult = Object.freeze({
 });
 
 /**
+ * Mirror of the module-level ResolutionSetResult embind enum that setResolution
+ * returns, under the same identity-comparison contract as ParamSetResult above.
+ * RESIZED and ALREADY_ACTIVE are both successes; only RESIZED tears the effect
+ * down. engine_contract_wasm.test.js pins the name roster against the real
+ * module.
+ */
+export const ResolutionSetResult = Object.freeze({
+  RESIZED: Object.freeze({ value: 0 }),
+  ALREADY_ACTIVE: Object.freeze({ value: 1 }),
+  UNSUPPORTED: Object.freeze({ value: 2 }),
+});
+
+/**
+ * Mirror of the module-level EffectSetResult embind enum that setEffect
+ * returns, under the same identity-comparison contract as ParamSetResult above.
+ * engine_contract_wasm.test.js pins the name roster against the real module.
+ */
+export const EffectSetResult = Object.freeze({
+  INSTALLED: Object.freeze({ value: 0 }),
+  UNKNOWN_EFFECT: Object.freeze({ value: 1 }),
+  UNSUPPORTED_RESOLUTION: Object.freeze({ value: 2 }),
+});
+
+/**
  * Method names an object exposes that ENGINE_METHODS does not pin — a fake
  * mocking one of these would pass its own tests against a method the real
  * engine never had.

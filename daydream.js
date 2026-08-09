@@ -386,6 +386,7 @@ const effectGui = createEffectGui({
 const apply = createApplyPipeline({
   appState,
   getEngine: () => host.engine,
+  getModule: () => host.module,
   invalidateEngineView: () => host.invalidateView(),
   presets: resolutionPresets,
   availableEffects: favoritesFor,

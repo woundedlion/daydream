@@ -3,7 +3,10 @@
 import { test, mock, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { PROTOCOL_VERSION } from '../worker_protocol.js';
-import { unpinnedEngineMethods, ParamSetResult, ClipSetResult } from './fake_engine.js';
+import {
+  unpinnedEngineMethods, ParamSetResult, ClipSetResult,
+  ResolutionSetResult, EffectSetResult,
+} from './fake_engine.js';
 
 // ---------------------------------------------------------------------------
 // Fakes — installed BEFORE importing the worker, which binds self.postMessage
@@ -47,22 +50,22 @@ class FakeEngine {
   }
   setResolution(w, h) {
     this.calls.push(['setResolution', w, h]);
-    if (!this.resolutionOk) return false;
+    if (!this.resolutionOk) return ResolutionSetResult.UNSUPPORTED;
     this.curW = w;
     this.curH = h;
     this.effect = null;
     this.clip = null;
-    return true;
+    return ResolutionSetResult.RESIZED;
   }
   // Clearing params models the engine rebuilding to defaults, so the
   // "params re-applied AFTER setEffect" ordering is observable. A rejection
   // keeps the current effect and its params, like a failed factory build.
   setEffect(name) {
     this.calls.push(['setEffect', name]);
-    if (!this.effectOk) return false;
+    if (!this.effectOk) return EffectSetResult.UNKNOWN_EFFECT;
     this.effect = name;
     this.params = [];
-    return true;
+    return EffectSetResult.INSTALLED;
   }
   setParameter(name, value) {
     this.params.push([name, value]);
@@ -121,6 +124,8 @@ mock.module('../holosphere_wasm.js', {
   defaultExport: async () => ({
     ParamSetResult,
     ClipSetResult,
+    ResolutionSetResult,
+    EffectSetResult,
     HolosphereEngine: class {
       constructor() {
         engineInstance = new FakeEngine();
@@ -416,7 +421,7 @@ test('render streams param values from segment 0 only', async () => {
 });
 
 /**
- * Regression: setResolution returning false must leave the worker's geometry and
+ * Regression: an UNSUPPORTED setResolution must leave the worker's geometry and
  * clip untouched, so it keeps extracting the old-size quadrant.
  */
 test('a rejected setResolution leaves segRange and clip untouched', async () => {

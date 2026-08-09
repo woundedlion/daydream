@@ -13,6 +13,7 @@ import {
   resolutionEffects,
   switchFailureReport,
 } from '../effect_sequencing.js';
+import { EffectSetResult, ResolutionSetResult } from './fake_engine.js';
 
 function makeEffectControls(values, paused = false, sinks = null) {
   const state = { ...values };
@@ -401,12 +402,14 @@ function makeApp({
   const engine = {
     setEffect(name) {
       log.push(`engine.setEffect ${name}`);
-      return !rejectedEffects.has(name);
+      return rejectedEffects.has(name)
+        ? EffectSetResult.UNKNOWN_EFFECT : EffectSetResult.INSTALLED;
     },
     strobeColumns: () => 7,
     setResolution(w, h) {
       log.push(`engine.setResolution ${w}x${h}`);
-      return !rejectedResolutions.has(`${w}x${h}`);
+      return rejectedResolutions.has(`${w}x${h}`)
+        ? ResolutionSetResult.UNSUPPORTED : ResolutionSetResult.RESIZED;
     },
     getEffectSizes() {
       log.push('engine.getEffectSizes');
@@ -424,6 +427,7 @@ function makeApp({
   const pipeline = createApplyPipeline({
     appState,
     getEngine: () => (noEngine ? null : engine),
+    getModule: () => (noEngine ? null : { EffectSetResult, ResolutionSetResult }),
     invalidateEngineView: () => log.push('host.invalidateView'),
     presets: APPLY_PRESETS,
     availableEffects: (label) => offers[label],
