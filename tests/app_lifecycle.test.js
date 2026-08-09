@@ -195,12 +195,20 @@ test('a segmented frame is capturable only once a composite has landed', () => {
 function makeTeardown({ recorder = true, engine = true } = {}) {
   const log = [];
   const pageTarget = fakeElement('window');
+  const noticeTarget = fakeElement('button');
   const onKeyDown = () => {};
   const onUnhandledRejection = () => {};
-  const listeners = [['keydown', onKeyDown], ['unhandledrejection', onUnhandledRejection]];
+  const onNoticeDismiss = () => {};
+  const listeners = [
+    ['keydown', onKeyDown],
+    ['unhandledrejection', onUnhandledRejection],
+    ['click', onNoticeDismiss, noticeTarget],
+  ];
   // Registered as the app registers them; dispose's removal loop is only
   // observable against listeners that are actually on the target.
-  for (const [type, handler] of listeners) pageTarget.addEventListener(type, handler);
+  for (const [type, handler, target = pageTarget] of listeners) {
+    target.addEventListener(type, handler);
+  }
   // The real host, so the teardown's release order is the one its dispose() runs.
   const host = new EngineHost();
   host.adapter = { drawFrame() {} };
@@ -228,7 +236,15 @@ function makeTeardown({ recorder = true, engine = true } = {}) {
     strandSegmentWork: () => { epoch += 1; log.push('strandSegmentWork'); },
     removeOverlay: () => log.push('removeOverlay'),
   });
-  return { teardown, log, pageTarget, host, segments, handlers: { onKeyDown, onUnhandledRejection } };
+  return {
+    teardown,
+    log,
+    pageTarget,
+    noticeTarget,
+    host,
+    segments,
+    handlers: { onKeyDown, onUnhandledRejection },
+  };
 }
 
 test('the teardown listens for the page discard', () => {
@@ -275,6 +291,7 @@ test('dispose removes every listener the app installed', () => {
   t.teardown.dispose();
 
   assert.deepEqual(t.pageTarget.listeners, []);
+  assert.deepEqual(t.noticeTarget.listeners, []);
 });
 
 test('dispose runs once however often it is called', () => {
