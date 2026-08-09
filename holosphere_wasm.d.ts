@@ -46,6 +46,24 @@ export interface ArenaMetrics {
   stack: StackUsage;
 }
 
+/**
+ * One entry of getParameterDefinitions(). `value` is a boolean for a toggle,
+ * which carries no range; every other parameter carries `min`/`max`. `options`
+ * labels an enum by value index, and `exportOptions` carries the matching
+ * symbolic names when the effect declares them.
+ */
+export interface ParameterDefinition {
+  name: string;
+  value: number | boolean;
+  min?: number;
+  max?: number;
+  options?: string[];
+  exportOptions?: string[];
+  animated: boolean;
+  readonly: boolean;
+  preset: boolean;
+}
+
 export interface HolosphereEngine {
   /** RESIZED tears the effect down; ALREADY_ACTIVE is a pure no-op; UNSUPPORTED keeps the old geometry. */
   setResolution(w: number, h: number): EnumValue;
@@ -59,7 +77,15 @@ export interface HolosphereEngine {
   drawFrame(): void;
   /** RGB16 canvas buffer, W*H*3, as a view over the module's memory. */
   getPixels(): Uint16Array;
+  /**
+   * Element count of the active getPixels() view (w*h*3). A resolution change
+   * moves this without detaching a held view, so a held view of a different
+   * length spans a prior resolution.
+   */
+  getBufferLength(): number;
   getArenaMetrics(): ArenaMetrics;
+  /** The bound effect's parameter descriptors, in declaration order; empty with no effect set. */
+  getParameterDefinitions(): ParameterDefinition[];
   /** Current values of the bound effect's parameters, in definition order. */
   getParamValues(): ArrayLike<number> & Iterable<number>;
 }
