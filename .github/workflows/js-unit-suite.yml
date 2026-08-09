@@ -1,5 +1,5 @@
-# The simulator's JS unit suite: install, typecheck, import-map freshness, unit
-# tests. Called by js-tests.yml (pull requests) and by deploy.yml's gate
+# The simulator's JS unit suite: install, lint, typecheck, import-map freshness,
+# unit tests. Called by js-tests.yml (pull requests) and by deploy.yml's gate
 # (push to master), so both paths run one definition rather than two copies
 # that drift apart.
 #
@@ -38,6 +38,22 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # Config in eslint.config.mjs. An over-broad `ignores` list would empty the
+      # target set while `eslint .` still exits 0, so count the files the run
+      # actually reported on. The second invocation is the one whose output a
+      # failure is read from.
+      - name: Lint JavaScript
+        run: |
+          npx eslint . --format json > /tmp/eslint-report.json || true
+          count=$(node -p "JSON.parse(require('fs').readFileSync('/tmp/eslint-report.json','utf8')).length")
+          if [ "$count" -eq 0 ]; then
+            echo "::error::no files selected — the eslint.config.mjs ignores list is broken"
+            exit 1
+          fi
+          npx eslint .
+          echo "eslint clean: $count files linted."
+
       - run: npm run typecheck
       - name: Verify committed import map
         run: |

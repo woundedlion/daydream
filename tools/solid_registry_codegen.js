@@ -103,7 +103,8 @@ function exactFloatLiteral(where, value) {
   try {
     return formatFloat(value);
   } catch (e) {
-    throw new Error(`generateRegistryCpp: ${where} ${e.message.replace(/^formatFloatCpp: /, '')}`);
+    throw new Error(`generateRegistryCpp: ${where} ${e.message.replace(/^formatFloatCpp: /, '')}`,
+      { cause: e });
   }
 }
 

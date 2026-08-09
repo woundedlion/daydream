@@ -871,7 +871,7 @@ export function createChainValidator(createModule) {
         const message = failure.reason === 'OK' && e
           ? `${what} failed: ${e.message || e}`
           : failure.message;
-        try { if (mesh) mesh.delete(); Ops.clearToolingMemory(); } catch { }
+        try { if (mesh) mesh.delete(); Ops.clearToolingMemory(); } catch { /* best effort */ }
         return { ok: false, message };
       };
       try {

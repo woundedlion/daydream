@@ -115,7 +115,6 @@ function glslConstants(src) {
   const decls = [...src.matchAll(/const\s+float\s+(\w+)\s*=\s*([^;]+);/g)];
   const js = decls.map(([, name, value]) => `const ${name} = ${value};`).join('\n');
   const names = decls.map(([, name]) => name);
-  // eslint-disable-next-line no-new-func
   const values = new Function(`${js}\nreturn { ${names.join(', ')} };`)();
   return { js, values };
 }
@@ -140,7 +139,7 @@ function transpileGlslCNum(src, name, params = ['p', 'q']) {
   // `{ re, im }` objects. Constructors can nest parens, so split args by the
   // top-level comma rather than with a regex.
   const toObj = (s) => {
-    let out = '', i = 0;
+    let i = 0;
     while ((i = s.indexOf('CNum(', i)) !== -1) {
       let depth = 0, j = i + 4, start = j + 1, comma = -1, end2 = -1;
       for (; j < s.length; j++) {
@@ -148,10 +147,9 @@ function transpileGlslCNum(src, name, params = ['p', 'q']) {
         else if (s[j] === ')') { if (--depth === 0) { end2 = j; break; } }
         else if (s[j] === ',' && depth === 1) comma = j;
       }
-      out = s.slice(0, i)
+      s = s.slice(0, i)
         + `({ re: (${s.slice(start, comma)}), im: (${s.slice(comma + 1, end2)}) })`
         + s.slice(end2 + 1);
-      s = out;
       i = 0;
     }
     return s;
@@ -159,7 +157,6 @@ function transpileGlslCNum(src, name, params = ['p', 'q']) {
   const js = toObj(body.slice(open + 1, end)
     .replace(/\bfloat\b/g, 'const')
     .replace(/\bsqrt\(/g, 'Math.sqrt('));
-  // eslint-disable-next-line no-new-func
   return new Function(...params, `${glslConstants(src).js}\n${js}`);
 }
 
