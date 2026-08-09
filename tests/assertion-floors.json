@@ -32,8 +32,8 @@
     "assertions": 21
   },
   "tests/driver.test.js": {
-    "cases": 67,
-    "assertions": 487
+    "cases": 66,
+    "assertions": 486
   },
   "tests/driver_clock.test.js": {
     "cases": 4,

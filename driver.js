@@ -849,27 +849,23 @@ export class Daydream {
       dummy.position.copy(vector);
       dummy.updateMatrix();
 
-      if (this.dotMesh) {
-        this.dotMesh.setMatrixAt(i, dummy.matrix);
-      }
+      this.dotMesh.setMatrixAt(i, dummy.matrix);
     }
 
-    if (this.dotMesh) {
-      const needed = this.dotMesh.count * 3;
-      if (!this.dotMesh.instanceColor) {
-        this.dotMesh.instanceColor = new THREE.InstancedBufferAttribute(
-          new Uint16Array(needed), 3, true
-        );
-        this.dotMesh.instanceColor.setUsage(THREE.StreamDrawUsage);
-      }
-      // A fresh JS-owned buffer, not WASM memory; the next refreshPixelView()
-      // re-fetches the WASM view and re-points all three aliases.
-      this.pixels = this.dotMesh.instanceColor.array;
-      this.pixels.fill(0);
-
-      this.dotMesh.instanceMatrix.needsUpdate = true;
-      this.dotMesh.instanceColor.needsUpdate = true;
+    const needed = this.dotMesh.count * 3;
+    if (!this.dotMesh.instanceColor) {
+      this.dotMesh.instanceColor = new THREE.InstancedBufferAttribute(
+        new Uint16Array(needed), 3, true
+      );
+      this.dotMesh.instanceColor.setUsage(THREE.StreamDrawUsage);
     }
+    // A fresh JS-owned buffer, not WASM memory; the next refreshPixelView()
+    // re-fetches the WASM view and re-points all three aliases.
+    this.pixels = this.dotMesh.instanceColor.array;
+    this.pixels.fill(0);
+
+    this.dotMesh.instanceMatrix.needsUpdate = true;
+    this.dotMesh.instanceColor.needsUpdate = true;
   }
 
   /**
