@@ -7,6 +7,7 @@
 import { test, mock, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { unpinnedEngineMethods } from './fake_engine.js';
+import { fakeElement } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 import { repointDisplayAliases } from '../app_lifecycle.js';
 
@@ -1782,26 +1783,11 @@ test('an init-phase fault still reaches the fault overlay (faulted checked befor
   assert.equal(c.renderInFlight, false, 'no doomed render dispatched');
 });
 
-/**
- * Minimal DOM element stand-in covering the overlay surface updateStats() uses.
- * @returns {Object} A fake element recording attributes, children, and focus calls.
- */
-const makeElement = () => {
-  const attributes = new Map();
-  return {
-    style: {},
-    children: [],
-    focusCount: 0,
-    setAttribute(name, value) { attributes.set(name, String(value)); },
-    getAttribute(name) { return attributes.get(name) || null; },
-    append(...children) { this.children.push(...children); },
-    appendChild(child) { this.children.push(child); return child; },
-    replaceChildren(...children) { this.children = children; },
-    focus() { this.focusCount++; },
-    get firstElementChild() {
-      return this.children.find((child) => typeof child === 'object') || null;
-    },
-  };
+const makeElement = (tag) => {
+  const element = fakeElement(tag);
+  element.focusCount = 0;
+  element.focus = () => { element.focusCount++; };
+  return element;
 };
 
 test('the fault overlay is an alert focused once for recovery', () => {
