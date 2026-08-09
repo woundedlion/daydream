@@ -6,9 +6,10 @@
 /**
  * DOM-free logic for the zero-copy WASM pixel view, extracted so the
  * staleness/re-fetch contract can be unit-tested without a browser, a WASM
- * module, or Three.js. Both the driver (which clears the buffer) and daydream.js
- * (which re-fetches it) route their "is this view still usable?" decision
- * through here so the buffer-alias contract lives in exactly one tested place.
+ * module, or Three.js. Both the driver (which clears the buffer) and
+ * engine_host.js (which re-fetches it) route their "is this view still
+ * usable?" decision through here so the buffer-alias contract lives in exactly
+ * one tested place.
  */
 
 /**
