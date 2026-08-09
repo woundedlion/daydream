@@ -193,3 +193,22 @@ test('--local falls back to cdn when an entry point is absent', () => {
   assert.ok(out.includes(`three: '${sri(THREE_BODY)}'`), 'the cdn-resolved library is still hashed');
   assert.match(out, /lilGui: '',/, 'the locally vendored one is not');
 });
+
+/** Verifies --out writes the rewritten file elsewhere and leaves vendor-importmap.js untouched. */
+test('--out redirects the output without touching vendor-importmap.js', () => {
+  installModules();
+  const outPath = join(root, 'importmap.out');
+  run('--out', outPath);
+  const out = readFileSync(outPath, 'utf8');
+  assert.match(out, /const VENDOR = \{ three: 'cdn', lilGui: 'cdn' \};/);
+  assert.match(out, /const THREE_VERSION = '0\.183\.1';/);
+  assert.equal(readFileSync(join(root, 'vendor-importmap.js'), 'utf8'), IMPORTMAP,
+    'the tracked file keeps its stale block');
+});
+
+/** Verifies --out without a path fails instead of writing somewhere surprising. */
+test('--out without a path fails', () => {
+  installModules();
+  assert.match(runExpectingFailure('--out'), /--out requires a path/);
+  assert.match(runExpectingFailure('--out', '--local'), /--out requires a path/);
+});
