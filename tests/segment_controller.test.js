@@ -1466,6 +1466,23 @@ test('composite() self-heals a broken display-buffer alias instead of throwing',
     'a re-pointed attribute nobody flagged uploads the old buffer forever');
 });
 
+test('composite() heals a diverged mesh alias even while driver.pixels is aligned', () => {
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
+  // Split the alias pair: the GPU-side attribute reads a stale buffer while
+  // driver.pixels still matches the composite target.
+  driver.dotMesh.instanceColor = fakeColorAttribute(new Uint16Array(4 * 2 * 3));
+
+  const c = makeController();
+  c.results = [];
+
+  c.composite();
+  assert.equal(driver.dotMesh.instanceColor.array, driver.pixels,
+    'the mesh alias the GPU reads is re-pointed at the composite target');
+  assert.equal(driver.dotMesh.instanceColor.version, 1,
+    'the heal flags the attribute for re-upload');
+});
+
 test('a controller cannot be built without a two-alias display repointer', () => {
   assert.throws(
     () => new SegmentController({
