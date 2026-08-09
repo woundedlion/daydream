@@ -15,7 +15,8 @@ const ROOT = new URL('../', import.meta.url);
 // Emscripten glue: an install output copied from Holosphere, checked by its
 // build there, and far too large to type-check usefully here. app_lifecycle:
 // outside the pipeline's typed scope (collaborators typed as bare Object);
-// segment_controller imports only its display-alias predicate.
+// segment_controller imports only its display-alias predicate. Each has a
+// hand-written `.d.ts` sibling on the roster, which is what resolves the import.
 const NOT_CHECKED = new Set(['holosphere_wasm.js', 'app_lifecycle.js']);
 
 // Never entered: dependency and git metadata, the vendored third-party drops,
@@ -126,6 +127,19 @@ test('the typecheck checks nullability and implicit any', () => {
     + 'strictNullChecks off a null field reads as its own type and nothing trips');
   assert.equal(options.noImplicitAny, true,
     'an unannotated parameter degrades to `any` and stops checking its callers');
+});
+
+test('every not-checked module has a declaration file on the roster', () => {
+  const roster = readTsconfig().files;
+  for (const file of NOT_CHECKED) {
+    const declaration = file.replace(/\.m?js$/, '.d.ts');
+    assert.ok(roster.includes(declaration),
+      `${file} is exempt from the typecheck but a rostered module imports it; `
+      + `without ${declaration} on tsconfig.json "files" the import is an `
+      + 'unresolved-module error under noResolve, not a silent `any`');
+    assert.ok(existsSync(fileURLToPath(new URL(declaration, ROOT))),
+      `tsconfig.json "files" lists ${declaration}, which does not exist`);
+  }
 });
 
 test('the typecheck roster stays inside its stated scope', () => {

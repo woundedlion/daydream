@@ -20,10 +20,12 @@
   // `noResolve` also means imports are not followed even for the files below, so
   // an unlisted one degrades to `any` with no diagnostic — tests/tsconfig_roster
   // .test.js keeps this list closed under the pipeline's own imports.
-  // holosphere_wasm.d.ts stands in for the generated glue, which is never
-  // checked; listing it is what makes the glue import resolve under noResolve.
+  // holosphere_wasm.d.ts and app_lifecycle.d.ts stand in for modules that are
+  // never checked; listing them is what makes those imports resolve under
+  // noResolve.
   "files": [
     "holosphere_wasm.d.ts",
+    "app_lifecycle.d.ts",
     "frame_constants.js",
     "global_stats_view.js",
     "worker_protocol.js",
