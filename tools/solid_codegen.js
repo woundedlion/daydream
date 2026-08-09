@@ -78,8 +78,9 @@ function requireParams(where, opName, o) {
  * spawn, so a restore path cannot lean on it to reject a hand-edited or
  * stale-format localStorage entry. An op name off the table leaves OP_DEFS[op]
  * undefined and the op-row builder throws reading its params; a declared param
- * that is missing or non-numeric reaches the WASM bridge as undefined. Both are
- * caught here, before any state is mutated. The tool's live chain holds {op,
+ * that is missing, non-numeric, or outside its current range reaches the WASM
+ * bridge as invalid state. Both are caught here, before any state is mutated.
+ * The tool's live chain holds {op,
  * params} objects, so a bare-string op — which applyOp accepts — is not a
  * restorable entry.
  */
@@ -91,9 +92,13 @@ export function savedChainShapeError(base, ops) {
     const at = `op ${i + 1}`;
     if (!o || typeof o !== 'object' || Array.isArray(o)) return `${at} is not an op entry`;
     if (!KNOWN_OPS.has(o.op)) return `${at} names an unknown operator "${o.op}"`;
-    for (const key of Object.keys(OP_DEFS[o.op].params)) {
-      if (!Number.isFinite(o.params?.[key])) {
+    for (const [key, def] of Object.entries(OP_DEFS[o.op].params)) {
+      const value = o.params?.[key];
+      if (!Number.isFinite(value)) {
         return `${at} ("${o.op}") carries no numeric "${key}"`;
+      }
+      if (value < def.min || value > def.max) {
+        return `${at} ("${o.op}") carries out-of-range "${key}"`;
       }
     }
   }
