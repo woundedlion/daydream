@@ -56,17 +56,21 @@ const ignored = (path) =>
 // addons) are bare; only these forms name a file in this repo.
 const JS_REF = [
   /(?:import|export)\s[^;'"]*?from\s*['"](\.{1,2}\/[^'"]+)['"]/g,
+  /\bimport\s*['"](\.{1,2}\/[^'"]+)['"]/g,
   /\bimport\s*\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)/g,
   /\bnew\s+(?:URL|Worker)\s*\(\s*['"](\.{1,2}\/[^'"]+)['"]/g,
 ];
 // The Emscripten glue locates its binary by plain file name, not by specifier.
 const WASM_REF = /['"]([\w.-]+\.wasm)['"]/g;
 const HTML_REF = /\b(?:src|href)\s*=\s*"([^"]*)"/g;
+const CSS_REF = /\burl\(\s*['"]?([^'")]+?)['"]?\s*\)/g;
 const SCRIPT_BODY = /<script\b[^>]*>([\s\S]*?)<\/script>/g;
+const STYLE_BODY = /<style\b[^>]*>([\s\S]*?)<\/style>/g;
 
 /**
  * Repo-relative targets a file references. HTML attributes are document-relative
- * URLs; script bodies and modules use ES specifiers.
+ * URLs; script bodies and modules use ES specifiers; style bodies and
+ * stylesheets use url().
  * @param {string} path - Repo-relative path of the referencing file.
  * @returns {string[]} Referenced paths, normalized against the file's directory.
  */
@@ -79,6 +83,9 @@ const referencesOf = (path) => {
   if (path.endsWith('.html')) {
     scan(src, [HTML_REF]);
     for (const [, body] of src.matchAll(SCRIPT_BODY)) scan(body, JS_REF);
+    for (const [, body] of src.matchAll(STYLE_BODY)) scan(body, [CSS_REF]);
+  } else if (path.endsWith('.css')) {
+    scan(src, [CSS_REF]);
   } else {
     scan(src, JS_REF);
   }
@@ -140,7 +147,7 @@ test('the site manifest covers every asset the served pages reference', () => {
       assert.ok(covered(target),
         `${path} references ${target}, which ${MANIFEST} does not publish — ` +
           'it would 404 on Pages');
-      if (/\.(js|html)$/.test(target)) queue.push(target);
+      if (/\.(js|html|css)$/.test(target)) queue.push(target);
     }
   }
   // A walk that stops at the entry pages proves nothing about the graph.
