@@ -269,6 +269,21 @@ test('geodesic mode tessellates the faces and supplies its own smooth normals', 
     'computeVertexNormals would facet the tessellation');
 });
 
+test('the geodesic budget counts the centroid-fan triangles the mesh emits', () => {
+  const { renderer, scene } = setup();
+  // Four vertices and 4000 repeated faces: the fan count grows, the edge and
+  // vertex work does not.
+  const dense = tetrahedron();
+  dense.faces = Array.from({ length: 1000 }, () => TETRA_FACES.map((f) => [...f])).flat();
+
+  renderer.render(dense, view({ showGeodesics: true }), null);
+  const triangles = find(scene, 'Mesh').geometry.attributes.position.array.length / 9;
+
+  // 4000 faces * 3 centroid-fan triangles, subdivided 5 x 5.
+  assert.equal(triangles, 4000 * 3 * 25);
+  assert.ok(triangles <= 400000, 'the tessellation must stay inside its triangle budget');
+});
+
 test('flat shading is switched with the geodesic toggle, and only when it changes', () => {
   const { renderer, materials } = setup();
   renderer.render(tetrahedron(), view(), null);

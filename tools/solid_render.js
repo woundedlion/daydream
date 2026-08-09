@@ -104,13 +104,14 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
 
       // Geodesic mode curves the faces onto the sphere (geodesicTriangleVertices
       // does the per-triangle tessellation); geodesicSegments() picks geoN from
-      // the mesh's widest arc and its triangle count.
+      // the mesh's widest arc and its triangle count. Geodesic mode forces the
+      // centroid fan, so a face emits f.length triangles, not f.length - 2.
       let geoN = 1;
       if (view.showFaces && view.showGeodesics) {
         let triCount = 0;
         let maxArc = 0;
         meshData.faces.forEach(f => {
-          triCount += f.length - 2;
+          triCount += f.length;
           for (let i = 1; i < f.length - 1; i++) {
             const a = meshData.vertices[f[0]];
             const b = meshData.vertices[f[i]];
