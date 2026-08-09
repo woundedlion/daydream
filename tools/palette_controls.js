@@ -210,30 +210,32 @@ function directedTurnDelta(delta, direction) {
   return wrapped;
 }
 
+// Offsets, not absolute hues: differencing base-shifted hues rounds a
+// half-turn step to either side of the SHORTEST tie.
 function harmonyRelationships(recipe) {
-  const { baseTurns: base, spreadTurns: spread, harmony, direction } = recipe.hue;
+  const { spreadTurns: spread, harmony, direction } = recipe.hue;
   const orientation = direction === PaletteV4.direction.CLOCKWISE ? -1 : 1;
   switch (harmony) {
     case PaletteV4.harmony.MONOCHROMATIC:
-      return [base];
+      return [0];
     case PaletteV4.harmony.ANALOGOUS:
-      return [base - orientation * spread, base, base + orientation * spread];
+      return [-orientation * spread, 0, orientation * spread];
     case PaletteV4.harmony.ACCENTED_ANALOGOUS:
-      return [base - orientation * spread, base, base + orientation * spread,
-        base + orientation * 0.5];
+      return [-orientation * spread, 0, orientation * spread,
+        orientation * 0.5];
     case PaletteV4.harmony.COMPLEMENTARY:
-      return [base, base + orientation * 0.5];
+      return [0, orientation * 0.5];
     case PaletteV4.harmony.SPLIT_COMPLEMENTARY:
-      return [base, base + orientation * (0.5 - spread),
-        base + orientation * (0.5 + spread)];
+      return [0, orientation * (0.5 - spread),
+        orientation * (0.5 + spread)];
     case PaletteV4.harmony.TRIADIC:
-      return [base, base + orientation / 3, base + orientation * 2 / 3];
+      return [0, orientation / 3, orientation * 2 / 3];
     case PaletteV4.harmony.TETRADIC:
-      return [base, base + orientation * spread, base + orientation * 0.5,
-        base + orientation * (0.5 + spread)];
+      return [0, orientation * spread, orientation * 0.5,
+        orientation * (0.5 + spread)];
     case PaletteV4.harmony.SQUARE:
-      return [base, base + orientation * 0.25, base + orientation * 0.5,
-        base + orientation * 0.75];
+      return [0, orientation * 0.25, orientation * 0.5,
+        orientation * 0.75];
     default:
       throw new RangeError(`Unknown palette harmony: ${harmony}`);
   }
@@ -255,7 +257,7 @@ function directedHarmonyTurns(recipe) {
     turns[i] = turns[i - 1] + directedTurnDelta(
       turns[i] - turns[i - 1], recipe.hue.direction);
   }
-  return turns;
+  return turns.map((turn) => turn + recipe.hue.baseTurns);
 }
 
 function hueKeyStateFromTurns(turns) {
