@@ -74,7 +74,13 @@ export function opStepCpp(o) {
   if (opName === 'snub') {
     return `{Op::SNUB, ${formatFloat(params.t)}, ${formatFloat(params.twist)}}`;
   }
-  if (opName === 'relax') return `{Op::RELAX, ${formatFloat(params.iter)}}`;
+  if (opName === 'relax') {
+    // The engine's apply_step refuses a bake-less RELAX below one iteration.
+    if (!(params.iter >= 1)) {
+      throw new Error(`opStepCpp: relax param "iter" must be at least 1, got ${params.iter}`);
+    }
+    return `{Op::RELAX, ${formatFloat(params.iter)}}`;
+  }
   if (OP_DEFS[opName].params.t) {
     return `{Op::${opName.toUpperCase()}, ${formatFloat(params.t)}}`;
   }

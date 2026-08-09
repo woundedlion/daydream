@@ -190,7 +190,7 @@
   },
   "tests/solid_codegen.test.js": {
     "cases": 80,
-    "assertions": 446
+    "assertions": 445
   },
   "tests/solid_op_rows.test.js": {
     "cases": 9,
@@ -201,8 +201,8 @@
     "assertions": 54
   },
   "tests/solids_registry_codegen.test.js": {
-    "cases": 25,
-    "assertions": 203
+    "cases": 26,
+    "assertions": 204
   },
   "tests/state.test.js": {
     "cases": 51,

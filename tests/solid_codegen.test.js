@@ -205,12 +205,11 @@ test('generateFuncAndRecipe handles hankin (angle * D2R) and relax (iter)', () =
   assert.equal(recipe, 'SolidBuilder(cube(a, b), a, b).hankin(30.0f * D2R).relax(200).build()');
 });
 
-/** Verifies an explicit relax iter:0 is preserved (not coerced to the default 8). */
-test('generateFuncAndRecipe preserves an explicit relax iter:0', () => {
+/** Verifies a relax with zero iterations is rejected: the engine's apply_step refuses a bake-less RELAX below one iteration. */
+test('generateFuncAndRecipe rejects a relax with zero iterations', () => {
   const item = { base: 'cube', ops: [{ op: 'relax', params: { iter: 0 } }] };
-  const { funcName, recipe } = generateFuncAndRecipe(item);
-  assert.equal(funcName, 'cube_relax0');
-  assert.equal(recipe, 'SolidBuilder(cube(a, b), a, b).relax(0).build()');
+  assert.throws(() => generateFuncAndRecipe(item),
+    /relax param "iter" must be a positive integer/);
 });
 
 /** Verifies snub emits both t and twist params (matching the live preview) and encodes each in the funcName. */
@@ -250,7 +249,7 @@ test('a parameterized op with empty params is rejected, not defaulted', () => {
   assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'snub', params: {} }] }),
     /snub param "t" must be a finite number/);
   assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'relax', params: {} }] }),
-    /relax param "iter" must be a non-negative integer/);
+    /relax param "iter" must be a positive integer/);
 });
 
 /** Verifies generateRecipeCpp emits the full FLASHMEM function source, prefixed by the V/F/I count comment, byte-for-byte. */
@@ -533,16 +532,16 @@ test('generateFuncAndRecipe rejects an empty op chain', () => {
   assert.throws(() => generateRecipeCpp({ base: 'cube', ops: [] }, 'Archimedean'), /op chain is empty/);
 });
 
-/** Verifies generateFuncAndRecipe rejects non-finite fractional params and non-integer/negative relax counts. */
+/** Verifies generateFuncAndRecipe rejects non-finite fractional params and non-integer or non-positive relax counts. */
 test('generateFuncAndRecipe rejects non-finite or out-of-range op params', () => {
   assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'truncate', params: { t: NaN } }] }),
     /must be a finite number/);
   assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'hankin', params: { angle: Infinity } }] }),
     /must be a finite number/);
   assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'relax', params: { iter: 1.5 } }] }),
-    /must be a non-negative integer/);
+    /must be a positive integer/);
   assert.throws(() => generateFuncAndRecipe({ base: 'cube', ops: [{ op: 'relax', params: { iter: -1 } }] }),
-    /must be a non-negative integer/);
+    /must be a positive integer/);
 });
 
 /** Verifies a negative fractional param is rejected rather than emitting a `-`-tainted, non-identifier funcName. */

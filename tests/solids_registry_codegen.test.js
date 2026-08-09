@@ -41,6 +41,11 @@ test('opStepCpp names an Op enumerator for every op the tool offers', () => {
   }
 });
 
+test('opStepCpp rejects a relax with zero iterations', () => {
+  assert.throws(() => opStepCpp({ op: 'relax', params: { iter: 0 } }),
+    /relax param "iter" must be at least 1/);
+});
+
 test('opStepCpp rejects an unknown op instead of dereferencing a missing entry', () => {
   assert.throws(() => opStepCpp({ op: 'notAnOp', params: {} }), /unknown op "notAnOp"/);
   assert.throws(() => opStepCpp('notAnOp'), /unknown op "notAnOp"/);
