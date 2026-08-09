@@ -47,10 +47,10 @@ function importsOf(file) {
   const importer = new URL(file, ROOT);
   const source = readFileSync(importer, 'utf8');
   const found = [];
-  for (const [, spec] of source.matchAll(/\bfrom\s*["'](\.\/[^"']+)["']/g)) {
+  for (const [, spec] of source.matchAll(/\bfrom\s*["'](\.{1,2}\/[^"']+)["']/g)) {
     found.push(new URL(spec, importer).href.slice(ROOT.href.length));
   }
-  for (const [, spec] of source.matchAll(/\bimport\s*["'](\.\/[^"']+)["']/g)) {
+  for (const [, spec] of source.matchAll(/\bimport\s*["'](\.{1,2}\/[^"']+)["']/g)) {
     found.push(new URL(spec, importer).href.slice(ROOT.href.length));
   }
   return found;
