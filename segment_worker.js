@@ -123,9 +123,10 @@ async function handleMessage(msg) {
       engine = new mod.HolosphereEngine();
       // A rejected resolution leaves no usable geometry: skip the canvasW/canvasH
       // commit, segRange, and ready (symmetric with the setResolution handler's
-      // `=== false` guard), and post engineRejected so the controller faults at once
-      // instead of waiting out the full init watchdog.
-      if (engine.setResolution(msg.w, msg.h) === false) {
+      // UNSUPPORTED guard), and post engineRejected so the controller faults at
+      // once instead of waiting out the full init watchdog.
+      if (engine.setResolution(msg.w, msg.h)
+          === wasmModule.ResolutionSetResult.UNSUPPORTED) {
         post({ type: 'engineRejected',
                reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
         break;
@@ -135,7 +136,8 @@ async function handleMessage(msg) {
       segRange = computeSegmentRange(segId, totalSegs, canvasW, canvasH);
 
       if (msg.effectName) {
-        if (engine.setEffect(msg.effectName) === false) {
+        if (engine.setEffect(msg.effectName)
+            !== wasmModule.EffectSetResult.INSTALLED) {
           post({ type: 'engineRejected',
                  reason: `setEffect(${msg.effectName}) rejected` });
           break;
@@ -156,7 +158,9 @@ async function handleMessage(msg) {
 
     case 'setEffect': {
       if (engine) {
-        if (engine.setEffect(msg.name) === false) {
+        // INSTALLED is the sole success; either rejection keeps the old effect.
+        if (engine.setEffect(msg.name)
+            !== wasmModule.EffectSetResult.INSTALLED) {
           post({ type: 'engineRejected',
                  reason: `setEffect(${msg.name}) rejected` });
           break;
@@ -175,9 +179,10 @@ async function handleMessage(msg) {
 
     case 'setResolution': {
       if (engine) {
-        // `=== false` (not `!`) is load-bearing: only an explicit false rejection
-        // keeps the current geometry; a non-boolean return must not count as one.
-        if (engine.setResolution(msg.w, msg.h) === false) {
+        // Only an explicit UNSUPPORTED keeps the current geometry: RESIZED and
+        // ALREADY_ACTIVE both leave the requested size active, so both commit.
+        if (engine.setResolution(msg.w, msg.h)
+            === wasmModule.ResolutionSetResult.UNSUPPORTED) {
           post({ type: 'engineRejected',
                  reason: `setResolution(${msg.w}, ${msg.h}) rejected` });
           break;

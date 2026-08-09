@@ -266,6 +266,9 @@ export function createSwitchCoordinator({
  * @param {{get: Function, set: Function}} deps.appState - The applied state.
  * @param {() => Object|null} deps.getEngine - The main WASM engine, null until
  *   the module finishes loading (the GUI and sidebar are built either way).
+ * @param {() => Object|null} deps.getModule - The loaded WASM module, for its
+ *   EffectSetResult/ResolutionSetResult enums; non-null whenever getEngine()
+ *   answers an engine.
  * @param {() => void} deps.invalidateEngineView - Drops the cached pixel view so
  *   the next refresh re-fetches it after a resize.
  * @param {Object<string, {w: number, h: number, dotSize: number}>} deps.presets -
@@ -289,6 +292,7 @@ export function createSwitchCoordinator({
 export function createApplyPipeline({
   appState,
   getEngine,
+  getModule,
   invalidateEngineView,
   presets,
   availableEffects,
@@ -309,7 +313,10 @@ export function createApplyPipeline({
   function selectEngineEffect() {
     const engine = getEngine();
     const effect = appState.get('effect');
-    const applied = engine.setEffect(effect) !== false;
+    // Compare against the enum value, never by truthiness (every
+    // Module.EffectSetResult value is a truthy object).
+    const applied =
+      engine.setEffect(effect) === getModule().EffectSetResult.INSTALLED;
     driver.setStrobeColumns(engine.strobeColumns());
     if (!applied) {
       logError(`setEffect("${effect}") failed; effect unavailable.`);
@@ -372,7 +379,10 @@ export function createApplyPipeline({
 
     const engine = getEngine();
     if (engine) {
-      if (engine.setResolution(p.w, p.h) === false) {
+      // Only UNSUPPORTED rejects; RESIZED and ALREADY_ACTIVE both leave the
+      // requested size active.
+      if (engine.setResolution(p.w, p.h)
+          === getModule().ResolutionSetResult.UNSUPPORTED) {
         logError(`Unsupported resolution ${p.w}x${p.h}; keeping current.`);
         return ApplyResult.REJECTED;
       }

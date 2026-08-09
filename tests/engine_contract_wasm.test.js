@@ -12,7 +12,10 @@ import {
   KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, SIMPLE_SEEDS,
   DEFINED_SEED_CONSTANTS, applyOp, meshOpFailure, MESH_OP_RESULT_NAMES,
 } from '../tools/solid_codegen.js';
-import { ENGINE_METHODS, ParamSetResult, ClipSetResult } from './fake_engine.js';
+import {
+  ENGINE_METHODS, ParamSetResult, ClipSetResult,
+  ResolutionSetResult, EffectSetResult,
+} from './fake_engine.js';
 import { isViewLive, refreshPixelView } from '../pixel_view.js';
 
 // The module's stdout, captured rather than dropped: the WASM bridge answers an
@@ -29,6 +32,11 @@ const W = 96, H = 20;
 // One shared engine: the engine owns a single global arena, so a second
 // instantiation traps (the app itself only ever makes one).
 const engine = new M.HolosphereEngine();
+
+// Both non-rejections leave the requested size active; only RESIZED tears the
+// effect down. The shared engine makes either possible at most call sites.
+const resolutionOk = (r) => r === M.ResolutionSetResult.RESIZED
+  || r === M.ResolutionSetResult.ALREADY_ACTIVE;
 
 test('HolosphereEngine exposes the method surface the FakeEngines mock', () => {
   for (const name of ENGINE_METHODS) {
@@ -64,6 +72,30 @@ test('the module ClipSetResult enum matches the fake_engine.js mirror', () => {
   }
 });
 
+test('the module ResolutionSetResult enum matches the fake_engine.js mirror', () => {
+  assert.ok(M.ResolutionSetResult, 'the module must export ResolutionSetResult');
+  const moduleNames = Object.keys(M.ResolutionSetResult)
+    .filter((k) => M.ResolutionSetResult[k] instanceof M.ResolutionSetResult);
+  assert.deepEqual(moduleNames.sort(), Object.keys(ResolutionSetResult).sort(),
+    'fake_engine.js ResolutionSetResult must mirror the module enum roster');
+  for (const name of Object.keys(ResolutionSetResult)) {
+    assert.equal(M.ResolutionSetResult[name].value, ResolutionSetResult[name].value,
+      `fake_engine.js ResolutionSetResult.${name}.value must match the module`);
+  }
+});
+
+test('the module EffectSetResult enum matches the fake_engine.js mirror', () => {
+  assert.ok(M.EffectSetResult, 'the module must export EffectSetResult');
+  const moduleNames = Object.keys(M.EffectSetResult)
+    .filter((k) => M.EffectSetResult[k] instanceof M.EffectSetResult);
+  assert.deepEqual(moduleNames.sort(), Object.keys(EffectSetResult).sort(),
+    'fake_engine.js EffectSetResult must mirror the module enum roster');
+  for (const name of Object.keys(EffectSetResult)) {
+    assert.equal(M.EffectSetResult[name].value, EffectSetResult[name].value,
+      `fake_engine.js EffectSetResult.${name}.value must match the module`);
+  }
+});
+
 test('getSupportedResolutions reports buildable [w, h] rows', () => {
   const rows = M.HolosphereEngine.getSupportedResolutions();
   assert.ok(Array.isArray(rows), 'getSupportedResolutions must return an array');
@@ -74,7 +106,7 @@ test('getSupportedResolutions reports buildable [w, h] rows', () => {
     const [w, h] = row;
     assert.equal(typeof w, 'number', 'reported width must be a number');
     assert.equal(typeof h, 'number', 'reported height must be a number');
-    assert.equal(engine.setResolution(w, h), true,
+    assert.ok(resolutionOk(engine.setResolution(w, h)),
       `the engine must build the ${w}x${h} row it reports`);
   }
   // daydream.js narrows its preset table to these rows; a preset it offers must
@@ -84,16 +116,20 @@ test('getSupportedResolutions reports buildable [w, h] rows', () => {
 });
 
 test('HolosphereEngine return shapes match what the segmented path consumes', () => {
-  // Strict boolean: segment_worker gates on `=== false`.
+  // Enum results: segment_worker compares against Module.ResolutionSetResult /
+  // Module.EffectSetResult values, never by truthiness.
   const ok = engine.setResolution(W, H);
-  assert.equal(typeof ok, 'boolean', 'setResolution must return a boolean');
-  assert.equal(ok, true, `the ${W}x${H} preset must be a buildable resolution`);
+  assert.ok(ok instanceof M.ResolutionSetResult,
+    'setResolution must return a ResolutionSetResult value');
+  assert.ok(resolutionOk(ok), `the ${W}x${H} preset must be a buildable resolution`);
 
   // DisplacementField is on HS_EFFECT_LIST, so the factory registers it at every
   // supported resolution.
   const effectOk = engine.setEffect('DisplacementField');
-  assert.equal(typeof effectOk, 'boolean', 'setEffect must return a boolean');
-  assert.equal(effectOk, true, 'setEffect must succeed for a registered effect');
+  assert.ok(effectOk instanceof M.EffectSetResult,
+    'setEffect must return an EffectSetResult value');
+  assert.equal(effectOk, M.EffectSetResult.INSTALLED,
+    'setEffect must report INSTALLED for a registered effect');
 
   const defs = engine.getParameterDefinitions();
   assert.equal(typeof defs.length, 'number',
@@ -145,13 +181,13 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
 const paramNames = (defs) => Array.from(defs, (d) => d.name);
 
 test('an unknown effect name is rejected and leaves the prior effect renderable', () => {
-  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), true,
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
     'setEffect must succeed for a registered effect');
   const before = paramNames(engine.getParameterDefinitions());
 
-  assert.equal(engine.setEffect('NoSuchEffect'), false,
-    'setEffect must return false for an unregistered effect name');
+  assert.equal(engine.setEffect('NoSuchEffect'), M.EffectSetResult.UNKNOWN_EFFECT,
+    'setEffect must report UNKNOWN_EFFECT for an unregistered effect name');
   assert.deepEqual(paramNames(engine.getParameterDefinitions()), before,
     'a rejected setEffect must keep the prior effect installed');
 
@@ -168,16 +204,16 @@ test('an unsupported resolution is rejected and keeps the prior one active', () 
   assert.ok(!supported.includes('97x21'),
     '97x21 must stay unsupported for this test to exercise the reject path');
 
-  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
-  assert.equal(engine.setResolution(97, 21), false,
-    'setResolution must return false for an unsupported size');
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setResolution(97, 21), M.ResolutionSetResult.UNSUPPORTED,
+    'setResolution must report UNSUPPORTED for an unsupported size');
   assert.equal(engine.getBufferLength(), W * H * 3,
     'a rejected resolution must leave the prior one active');
 });
 
 test('malformed clip bounds are rejected', () => {
-  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), true,
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
     'setEffect must succeed after a resolution change');
   for (const bounds of [
     [-1, W, 0, H], [0, W + 1, 0, H], [0, W, -1, H], [0, W, 0, H + 1],
@@ -198,24 +234,39 @@ test('an effectless engine reports NO_EFFECT, not a bounds rejection', () => {
     .find(([w, h]) => w !== W || h !== H);
   assert.ok(other, 'a second supported resolution is needed to tear the effect down');
 
-  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), true,
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
     'setEffect must succeed for a registered effect');
   const [ow, oh] = other;
-  assert.equal(engine.setResolution(ow, oh), true, `${ow}x${oh} must be buildable`);
+  assert.equal(engine.setResolution(ow, oh), M.ResolutionSetResult.RESIZED,
+    `switching to ${ow}x${oh} must report RESIZED`);
   assert.equal(engine.setClip(0, ow, 0, oh), M.ClipSetResult.NO_EFFECT,
     'a resolution change tears the effect down, so the clip has no receiver');
 
-  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+});
+
+// The two non-rejections must stay distinct: only RESIZED obliges the caller to
+// re-apply setEffect/setClip, and treating ALREADY_ACTIVE as a resize would
+// needlessly tear the app's GUI and worker pool down on every same-size apply.
+test('a request matching the active resolution reports ALREADY_ACTIVE and keeps the effect', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+    'setEffect must succeed for a registered effect');
+  assert.equal(engine.setResolution(W, H), M.ResolutionSetResult.ALREADY_ACTIVE,
+    'a same-size request must report ALREADY_ACTIVE');
+  assert.ok(engine.getParameterDefinitions().length > 0,
+    'an ALREADY_ACTIVE setResolution must leave the current effect installed');
 });
 
 test('a rejected parameter write names its reason', () => {
-  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   // Every effect, not just up to the first readonly hit: stopping there made the
   // flag coverage depend on where one happens to sit in the name order.
   let found = null;
   for (const name of Object.keys(engine.getEffectSizes())) {
-    assert.equal(engine.setEffect(name), true, `setEffect must succeed for ${name}`);
+    assert.equal(engine.setEffect(name), M.EffectSetResult.INSTALLED,
+      `setEffect must succeed for ${name}`);
     const defs = engine.getParameterDefinitions();
     for (let i = 0; i < defs.length; i++) {
       assert.equal(typeof defs[i].readonly, 'boolean',
@@ -226,7 +277,7 @@ test('a rejected parameter write names its reason', () => {
   }
   assert.ok(found,
     'no effect exposes a readonly parameter, so the reject path is unreachable');
-  assert.equal(engine.setEffect(found.effect), true,
+  assert.equal(engine.setEffect(found.effect), M.EffectSetResult.INSTALLED,
     `setEffect must succeed for ${found.effect}`);
   assert.equal(engine.setParameter(found.name, found.value),
     M.ParamSetResult.READONLY,
@@ -243,8 +294,8 @@ test('a rejected parameter write names its reason', () => {
 });
 
 test('strobeColumns and getEffectSizes return the shapes daydream consumes', () => {
-  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), true,
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
     'setEffect must succeed after the readonly scan');
   // driver.js gates the column-fill arc on `=== false`.
   assert.equal(typeof engine.strobeColumns(), 'boolean',
@@ -265,13 +316,13 @@ test('strobeColumns and getEffectSizes return the shapes daydream consumes', () 
 // dropped export is silent at the call site.
 test('getBufferLength reports the active resolution buffer length', () => {
   for (const [w, h] of M.HolosphereEngine.getSupportedResolutions()) {
-    assert.equal(engine.setResolution(w, h), true,
+    assert.ok(resolutionOk(engine.setResolution(w, h)),
       `the engine must build the ${w}x${h} row it reports`);
     assert.equal(engine.getBufferLength(), w * h * 3,
       `getBufferLength must report w*h*3 at ${w}x${h}`);
   }
-  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), true,
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
     'setEffect must succeed after a resolution change');
   assert.equal(engine.getBufferLength(), engine.getPixels().length,
     'getBufferLength must equal the getPixels view length');
@@ -286,14 +337,14 @@ test('a resolution change leaves a held pixel view attached at the wrong length'
   const other = sizes.find(([w, h]) => w * h !== firstW * firstH);
   assert.ok(other, 'the engine must offer two differently sized resolutions');
 
-  assert.equal(engine.setResolution(firstW, firstH), true,
+  assert.ok(resolutionOk(engine.setResolution(firstW, firstH)),
     `${firstW}x${firstH} must stay buildable`);
   const held = engine.getPixels();
   assert.equal(held.length, engine.getBufferLength(),
     'a freshly fetched view must span the whole buffer');
 
-  assert.equal(engine.setResolution(other[0], other[1]), true,
-    `${other[0]}x${other[1]} must stay buildable`);
+  assert.equal(engine.setResolution(other[0], other[1]), M.ResolutionSetResult.RESIZED,
+    `switching to ${other[0]}x${other[1]} must report RESIZED`);
   assert.equal(isViewLive(held), true,
     'a resolution change must not detach the held view; if it starts to, the ' +
     'length trigger below is no longer the only thing catching a stale view');
@@ -306,20 +357,20 @@ test('a resolution change leaves a held pixel view attached at the wrong length'
   assert.equal(view.length, engine.getBufferLength(),
     'the re-fetched view must span the new buffer');
 
-  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 });
 
 // engine_host.js calls getParamGeneration through an optional-call guard and
 // daydream.js's Pole LOD slider calls setPoleLod on an optional chain, so a
 // dropped export is silent on both call sites.
 test('getParamGeneration and setPoleLod stay exported', () => {
-  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), true,
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
     'setEffect must succeed for a registered effect');
 
   const generation = engine.getParamGeneration();
   assert.equal(typeof generation, 'number', 'getParamGeneration must return a number');
-  assert.equal(engine.setEffect('DisplacementField'), true,
+  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
     'setEffect must succeed on a reload');
   assert.notEqual(engine.getParamGeneration(), generation,
     'getParamGeneration must change across a setEffect, or a stale param snapshot ' +
@@ -339,8 +390,8 @@ test('getParamGeneration and setPoleLod stay exported', () => {
 // detaches every live view. Must run ahead of every other MeshOps test in this
 // file, which would allocate the block first and leave nothing to grow.
 test('heap growth detaches a held pixel view and the re-fetch is live and identical', () => {
-  assert.equal(engine.setResolution(W, H), true, `${W}x${H} must stay buildable`);
-  assert.equal(engine.setEffect('DisplacementField'), true,
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
     'setEffect must succeed for a registered effect');
   engine.setClip(0, W, 0, H);
   engine.drawFrame();

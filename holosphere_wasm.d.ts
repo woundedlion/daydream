@@ -47,10 +47,10 @@ export interface ArenaMetrics {
 }
 
 export interface HolosphereEngine {
-  /** @returns false when the resolution is rejected, leaving the old geometry. */
-  setResolution(w: number, h: number): boolean;
-  /** @returns false when no effect of that name exists. */
-  setEffect(name: string): boolean;
+  /** RESIZED tears the effect down; ALREADY_ACTIVE is a pure no-op; UNSUPPORTED keeps the old geometry. */
+  setResolution(w: number, h: number): EnumValue;
+  /** INSTALLED on success; UNKNOWN_EFFECT / UNSUPPORTED_RESOLUTION keep the prior effect. */
+  setEffect(name: string): EnumValue;
   setParameter(name: string, value: number): EnumValue;
   setAnimationsPaused(paused: boolean): void;
   setPoleLod(value: number): void;
@@ -78,6 +78,16 @@ export interface HolosphereModule {
     UNKNOWN_PARAM: EnumValue;
     READONLY: EnumValue;
     NON_FINITE: EnumValue;
+  };
+  ResolutionSetResult: {
+    RESIZED: EnumValue;
+    ALREADY_ACTIVE: EnumValue;
+    UNSUPPORTED: EnumValue;
+  };
+  EffectSetResult: {
+    INSTALLED: EnumValue;
+    UNKNOWN_EFFECT: EnumValue;
+    UNSUPPORTED_RESOLUTION: EnumValue;
   };
 }
 
