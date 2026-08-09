@@ -29,6 +29,7 @@ export const FLASH_MS = 1500;
 // Transient Export button labels.
 export const EXPORT_COPIED = '\u2713 Copied!';
 export const EXPORT_FAILED = '\u2717 Copy failed';
+const RESERVED_CONTROL_NAMES = new Set(['reset', 'export', 'pause']);
 
 /**
  * Add the lil-gui control one engine parameter definition calls for. A readonly
@@ -410,6 +411,12 @@ export function createEffectGui({
       const fx = activeEffect;
 
       const params = getParameterDefinitions();
+      const reservedParams = params
+        .filter((p) => RESERVED_CONTROL_NAMES.has(p.name))
+        .map((p) => p.name);
+      if (reservedParams.length > 0) {
+        logWarn(`Engine parameter names conflict with effect controls: ${reservedParams.join(', ')}`);
+      }
       // Stamp the snapshot with the engine's effect-load generation so a later
       // value read can prove it describes these definitions.
       fx.paramGeneration = paramGeneration();
