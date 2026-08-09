@@ -2092,9 +2092,9 @@ Stereographic-projection shader (extends `Effect` directly) spanning 13 liquid d
 
 #### ShadierBall
 
-Slot-based stereographic shader (extends `Effect` directly): each preset names a pattern **Function** and a sphere **Lens** — discrete slot tags dispatched per pixel on frame-constant copies — plus the continuous params those slots consume. The first slots pair a twin-wave interference function (two traveling plane waves, the second rotating continuously relative to the first) with the trig-free glitch lens ahead of the stereographic projection. Color walks the 256 prebaked triadic profiles through a `PaletteCycler` on a golden-ratio hue step, fade after fade with no dwell.
+Slot-based sphere shader (extends `Effect` directly): each preset names a pattern **Function** (twin-wave interference, rings, spiral, or grid), a sphere-to-plane **Projection** (equirectangular, stereographic, or gnomonic), and a sphere **Lens** (glitch fold, latitude twist, or six-fold kaleidoscope) — discrete slot tags dispatched per pixel on frame-constant copies — plus the continuous params those slots consume. The shipped preset pairs the twin-wave function (two traveling plane waves, the second rotating continuously relative to the first) with the glitch lens ahead of a stereographic projection; every other combination is one dropdown away. Color walks the 256 prebaked triadic profiles through a `PaletteCycler` on a golden-ratio hue step, fade after fade with no dwell.
 
-**Parameters**: Function, Lens, Speed, Pattern Freq, Wave Spin, Pole Fade, Lens Mix
+**Parameters**: Function, Projection, Lens, Speed, Pattern Freq, Wave Spin, Pole Fade, Lens Mix
 
 </td></tr></table>
 
