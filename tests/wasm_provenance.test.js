@@ -40,6 +40,15 @@ const git = (args, encoding) =>
 const committed = (path) => git(['show', `HEAD:${path}`], 'buffer');
 
 /**
+ * Fails on a shallow clone, where every path's last touch resolves to the
+ * graft commit and the last-touch tests below pass vacuously.
+ */
+const assertFullHistory = () => {
+  assert.equal(git(['rev-parse', '--is-shallow-repository'], 'utf8').trim(), 'false',
+    'shallow clone: last-touch history is truncated — fetch full history (fetch-depth: 0)');
+};
+
+/**
  * Parses `sha256sum` output: `<hex><two spaces or space-star><name>`.
  * @param {string} text - Manifest content.
  * @returns {Map<string, string>} File name to recorded hash.
@@ -77,6 +86,7 @@ test('the engine source pin is a bare, clean engine SHA', () => {
 });
 
 test('the WASM binary and its engine source pin were committed together', () => {
+  assertFullHistory();
   const lastTouch = (path) => git(['log', '-1', '--format=%H', '--', path], 'utf8').trim();
   const wasmCommit = lastTouch(BINARY);
   assert.notEqual(wasmCommit, '', `${BINARY} is not tracked`);
@@ -104,6 +114,7 @@ test('the toolchain record only ever moved with the binary it describes', () => 
   // The install writes the whole provenance set in one pass and only rewrites
   // this file when the versions change, so it legitimately trails a rebuild.
   // Moving on its own is the failure: a hand edit, or a partial install commit.
+  assertFullHistory();
   const touched = git(['log', '--format=%H', '--', TOOLCHAIN], 'utf8')
     .trim().split('\n').filter(Boolean);
   assert.notEqual(touched.length, 0, `${TOOLCHAIN} is not tracked`);
