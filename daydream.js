@@ -276,11 +276,7 @@ const moduleLoad = createModuleLoadHandlers({
     // Construct the recorder now that daydream's canvas exists.
     host.recorder = new VideoRecorder(daydream.canvas);
     host.recorder.frameInterval = daydream.frameInterval;
-    // Push any Recording settings changed during the async WASM-load window; their
-    // setters no-op'd while host.recorder was null.
-    host.recorder.bitrateMbps = recSettings.recQuality;
-    host.recorder.targetHeight = REC_RESOLUTIONS[recSettings.recResolution];
-    host.recorder.format = REC_FORMATS[recSettings.recFormat];
+    replayRecSettings();
     host.recorder.onFormatFallback = (extension) => {
       const label = Object.keys(REC_FORMATS)
         .find(key => REC_FORMATS[key] === extension) ?? 'Auto';
@@ -513,9 +509,10 @@ const warnIfRecording = (label) => {
 };
 /** GUI-bound recording settings, replayed onto a recorder constructed later. */
 const recSettings = {};
+const recSettingReplays = [];
 /**
- * Defines one recording setting: the value is held privately and pushed to the
- * live recorder on every write.
+ * Defines one recording setting: the value is held privately, pushed to the
+ * live recorder on every write, and registered for replayRecSettings().
  * @param {string} prop - Property name on recSettings.
  * @param {*} initial - Value before the GUI or a recorder exists.
  * @param {string} label - Setting name used in the mid-recording warning.
@@ -533,6 +530,15 @@ const defineRecSetting = (prop, initial, label, push) => {
       warnIfRecording(label);
     },
   });
+  recSettingReplays.push(() => push(value));
+};
+/**
+ * Pushes every recording setting onto the freshly constructed recorder; writes
+ * during the async WASM-load window no-op'd while host.recorder was null.
+ * @returns {void}
+ */
+const replayRecSettings = () => {
+  for (const replay of recSettingReplays) replay();
 };
 defineRecSetting('recQuality', 16, 'bitrate',
   v => { host.recorder.bitrateMbps = v; });
