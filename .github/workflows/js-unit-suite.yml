@@ -34,7 +34,7 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '22'      # package.json engines: node >=22.3.0
+          node-version: '22.23.2' # tests/assertion-floors.json measurement runtime
           cache: npm
 
       - run: npm ci
