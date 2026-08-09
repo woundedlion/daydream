@@ -34,10 +34,11 @@ const strays = [];
 // never run. The sweep starts at the repo root, so a sibling directory hides
 // one no better than a subdirectory of the test dir does.
 const unreachable = [];
-// Never entered: git metadata, the vendored third-party drops the page serves,
-// and the engine checkout the parity cases read — each carries test files of its
-// own, none of which this glob owns.
-const skipDirs = new Set(['.git', 'three.js', 'vendor', 'engine']);
+// Never entered: git metadata, the workflow's checkouts under .worktrees/, the
+// vendored third-party drops the page serves, and the engine checkout the
+// parity cases read — each carries test files of its own, none of which this
+// glob owns.
+const skipDirs = new Set(['.git', '.worktrees', 'three.js', 'vendor', 'engine']);
 // `depth` is the distance below the glob's base dir, or null outside it. The
 // root is scanned as `null` so paths read as they do in the repo.
 const scan = (d, depth) => {
