@@ -99,8 +99,10 @@ test('the discard path frees an engine built after disposal', () => {
   assert.match(body, /discardStartup:/,
     'a startup that loses the disposal race owns everything it built; dispose() '
     + 'has already run and will not revisit it');
-  assert.match(body, /host\.engine\?\.delete\(\)/,
-    'a WASM engine handle must be deleted, not merely dropped');
+  assert.match(body, /host\.dispose\(\)/,
+    'a WASM engine handle must be deleted, not merely dropped, and the release '
+    + 'that deletes it is EngineHost.dispose() — the same one the page teardown '
+    + 'runs, so the two paths cannot drift');
 });
 
 test('the segmented POV deep-link keys keep the names shared links carry', () => {

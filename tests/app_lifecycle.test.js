@@ -16,6 +16,7 @@ import {
   createTestAllTicker,
   createUnhandledRejectionHandler,
 } from '../app_lifecycle.js';
+import { EngineHost } from '../engine_host.js';
 
 // app_lifecycle.js is the composition root's frame, timer, and teardown wiring.
 // The contracts under test are the ones a browser would only reveal as a black
@@ -200,13 +201,13 @@ function makeTeardown({ recorder = true, engine = true } = {}) {
   // Registered as the app registers them; dispose's removal loop is only
   // observable against listeners that are actually on the target.
   for (const [type, handler] of listeners) pageTarget.addEventListener(type, handler);
-  const host = {
-    adapter: { drawFrame() {} },
-    engine: engine
-      ? { delete() { log.push(`engine.delete adapter=${host.adapter}`); } }
-      : null,
-    recorder: recorder ? { dispose() { log.push('recorder.dispose'); } } : null,
-  };
+  // The real host, so the teardown's release order is the one its dispose() runs.
+  const host = new EngineHost();
+  host.adapter = { drawFrame() {} };
+  host.engine = engine
+    ? { delete() { log.push(`engine.delete adapter=${host.adapter}`); } }
+    : null;
+  host.recorder = recorder ? { dispose() { log.push('recorder.dispose'); } } : null;
   const segments = {
     active: true,
     destroy() { log.push(`segments.destroy active=${segments.active} epoch=${epoch}`); },
@@ -248,14 +249,24 @@ test('dispose releases in an order nothing can re-enter', () => {
     'effectGui.destroy',
     'globalGui.destroy',
     'recorder.dispose',
+    'engine.delete adapter=null',
     'urlSync.dispose',
     'sidebar.dispose',
     'driver.dispose',
     'strandSegmentWork',
     'segments.destroy active=false epoch=1',
     'removeOverlay',
-    'engine.delete adapter=null',
   ]);
+});
+
+test('dispose leaves the host holding nothing', () => {
+  const t = makeTeardown();
+
+  t.teardown.dispose();
+
+  assert.equal(t.host.recorder, null, 'a disposed recorder must not stay bound');
+  assert.equal(t.host.adapter, null);
+  assert.equal(t.host.engine, null);
 });
 
 test('dispose removes every listener the app installed', () => {

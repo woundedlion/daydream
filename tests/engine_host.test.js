@@ -123,6 +123,36 @@ test('paramGeneration() is undefined on a module without the accessor', () => {
   assert.equal(host.paramGeneration(), undefined);
 });
 
+test('dispose() releases the recorder before the engine and leaves the host inert', () => {
+  const order = [];
+  const host = new EngineHost();
+  host.adapter = { drawFrame() {} };
+  host.recorder = { dispose() { order.push('recorder'); } };
+  host.engine = {
+    getPixels: () => new Uint16Array(4),
+    delete() { order.push(`engine adapter=${host.adapter}`); },
+  };
+  host.refresh();
+
+  host.dispose();
+
+  assert.deepEqual(order, ['recorder', 'engine adapter=null']);
+  assert.equal(host.recorder, null);
+  assert.equal(host.adapter, null);
+  assert.equal(host.engine, null);
+  assert.equal(host.view(), null);
+});
+
+test('dispose() runs on a host that never reached a module load', () => {
+  const host = new EngineHost();
+
+  host.dispose();
+  host.dispose();
+
+  assert.equal(host.engine, null);
+  assert.equal(host.recorder, null);
+});
+
 test('refresh() re-fetches and re-notifies when the held view has detached', () => {
   const stale = new Uint16Array(4);
   stale.buffer.transfer(); // Emscripten heap growth detaches the backing buffer in place

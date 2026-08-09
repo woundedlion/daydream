@@ -121,9 +121,9 @@ export function createRenderAdapter({
  *
  * Order is the contract: the state subscription is released before the GUI and
  * scene teardown (a later set() would otherwise re-enter the apply path against
- * a disposed renderer), the pool is stranded before it is destroyed, and the
- * render adapter is nulled before the engine handle is deleted so a frame
- * outliving setAnimationLoop(null) cannot reach a freed engine.
+ * a disposed renderer), the engine host is released before driver.dispose()
+ * drops the WebGL context the recorder captures its stream from, and the pool is
+ * stranded before it is destroyed.
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {{addEventListener: Function, removeEventListener: Function}}
@@ -134,7 +134,8 @@ export function createRenderAdapter({
  * @param {() => void} deps.stopTimers - Stops the app's interval timers.
  * @param {{destroy: Function}} deps.effectGui - The effect panel controller.
  * @param {{destroy: Function}} deps.globalGui - The global GUI root.
- * @param {Object} deps.host - The EngineHost owning engine, adapter, recorder.
+ * @param {{dispose: Function}} deps.host - The EngineHost owning engine,
+ *   adapter, and recorder.
  * @param {{dispose: Function}} deps.urlSync - The URL writer.
  * @param {{dispose: Function}} deps.sidebar - The effect sidebar.
  * @param {{dispose: Function}} deps.driver - The Daydream driver.
@@ -179,10 +180,7 @@ export function createAppTeardown({
     stopTimers();
     effectGui.destroy();
     globalGui.destroy();
-    // Best-effort on a real discard: dispose() ends the MediaRecorder and
-    // releases the stream/offscreen, but its async onstop download cannot be
-    // flushed synchronously here, so an in-progress recording may be lost.
-    host.recorder?.dispose();
+    host.dispose();
     urlSync.dispose();
     sidebar.dispose();
     driver.dispose();
@@ -192,9 +190,6 @@ export function createAppTeardown({
     strandSegmentWork();
     segments.destroy();
     removeOverlay();
-    host.adapter = null;
-    host.engine?.delete();
-    host.engine = null;
   }
 
   /**
