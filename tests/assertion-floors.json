@@ -181,8 +181,8 @@
     "assertions": 35
   },
   "tests/site_manifest.test.js": {
-    "cases": 3,
-    "assertions": 565
+    "cases": 4,
+    "assertions": 571
   },
   "tests/slider.test.js": {
     "cases": 17,
@@ -214,7 +214,7 @@
   },
   "tests/tool_pages.test.js": {
     "cases": 8,
-    "assertions": 127
+    "assertions": 133
   },
   "tests/tsconfig_roster.test.js": {
     "cases": 5,
