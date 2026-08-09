@@ -1,8 +1,9 @@
 // Counts the node:assert calls a test file runs. scripts/run-tests.mjs loads
 // this through NODE_OPTIONS, so every process `node --test` spawns wraps its
 // own copy of node:assert and drops its count in $DAYDREAM_ASSERTION_COUNTS for
-// the runner to aggregate. NODE_TEST_CONTEXT gates it, so a process that only
-// inherits the environment — the runner, a script a test spawns — writes none.
+// the runner to aggregate. NODE_TEST_CONTEXT keeps the outer runner from
+// writing, but a script spawned by a test inherits it and writes too;
+// run-tests discards those records by path.
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
