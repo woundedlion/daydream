@@ -34,10 +34,18 @@ fi
 npm run typecheck || exit 1
 
 # The workflow diffs the whole tree; a developer's is not clean, so scope it.
-npm run importmap || exit 1
-if ! git diff --exit-code -- vendor-importmap.js; then
-	echo "pre-push: vendor-importmap.js was stale; the regenerated file is in your working tree. Commit it and push again." >&2
+# Generate to a temp file: regenerating in place would clobber a deliberate
+# local-vendoring block in the working tree.
+tmp=$(mktemp ./vendor-importmap.XXXXXX) || exit 1
+if ! npm run importmap -- --out "$tmp"; then
+	rm -f "$tmp"
 	exit 1
 fi
+if ! git show :vendor-importmap.js | git -c core.autocrlf=false diff --no-index --ignore-cr-at-eol --exit-code -- - "$tmp"; then
+	rm -f "$tmp"
+	echo "pre-push: vendor-importmap.js was stale; regenerate it with \`npm run importmap\`, then commit it and push again." >&2
+	exit 1
+fi
+rm -f "$tmp"
 
 npm test
