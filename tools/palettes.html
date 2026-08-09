@@ -1480,8 +1480,6 @@
       if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
         recipe.hue.customTurns = customHueTurns(
           recipe.hue.baseTurns, customHueOffsets, recipe.hue.customTurns);
-      } else {
-        recipe.hue.sweepTurns = 1;
       }
       recipe.lightness.curve = enumIndex('curve', document.getElementById('gen_brightness').value);
       recipe.chroma.curve = enumIndex('curve', document.getElementById('gen_chroma_curve').value);
