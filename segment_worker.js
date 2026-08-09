@@ -157,7 +157,7 @@ async function handleMessage(msg) {
     }
 
     case 'setEffect': {
-      if (engine) {
+      if (engine && wasmModule) {
         // INSTALLED is the sole success; either rejection keeps the old effect.
         if (engine.setEffect(msg.name)
             !== wasmModule.EffectSetResult.INSTALLED) {
@@ -178,7 +178,7 @@ async function handleMessage(msg) {
     }
 
     case 'setResolution': {
-      if (engine) {
+      if (engine && wasmModule) {
         // Only an explicit UNSUPPORTED keeps the current geometry: RESIZED and
         // ALREADY_ACTIVE both leave the requested size active, so both commit.
         if (engine.setResolution(msg.w, msg.h)
