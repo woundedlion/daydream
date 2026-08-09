@@ -1,7 +1,7 @@
 {
   "tests/app_lifecycle.test.js": {
-    "cases": 54,
-    "assertions": 111
+    "cases": 55,
+    "assertions": 114
   },
   "tests/banner.test.js": {
     "cases": 12,
@@ -52,8 +52,8 @@
     "assertions": 757
   },
   "tests/engine_host.test.js": {
-    "cases": 11,
-    "assertions": 21
+    "cases": 13,
+    "assertions": 28
   },
   "tests/engine_source_parity.test.js": {
     "cases": 4,
@@ -117,8 +117,8 @@
     "assertions": 107
   },
   "tests/palette_math.test.js": {
-    "cases": 21,
-    "assertions": 3336
+    "cases": 22,
+    "assertions": 4065
   },
   "tests/param_sync.test.js": {
     "cases": 29,
@@ -182,7 +182,7 @@
   },
   "tests/site_manifest.test.js": {
     "cases": 4,
-    "assertions": 571
+    "assertions": 574
   },
   "tests/slider.test.js": {
     "cases": 17,
@@ -197,8 +197,8 @@
     "assertions": 35
   },
   "tests/solid_render.test.js": {
-    "cases": 13,
-    "assertions": 54
+    "cases": 14,
+    "assertions": 56
   },
   "tests/solids_registry_codegen.test.js": {
     "cases": 26,
@@ -217,8 +217,8 @@
     "assertions": 133
   },
   "tests/tsconfig_roster.test.js": {
-    "cases": 5,
-    "assertions": 31
+    "cases": 6,
+    "assertions": 38
   },
   "tests/vendor-importmap.test.js": {
     "cases": 7,
