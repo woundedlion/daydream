@@ -1844,10 +1844,7 @@
       } else {
         if (activeTab === 'procedural') {
           paletteViewport.zoom(startPosition, endPosition);
-          drawColorStrip();
-          updateStripView();
-          updatePaletteCodeOutput();
-          syncResetZoomButton();
+          redrawForViewport();
         } else {
           const current = recipeWindow();
           setRecipeWindow(
@@ -1922,10 +1919,7 @@
     function zoomAroundCenter() {
       if (activeTab === 'procedural') {
         paletteViewport.zoom(0.4, 0.6);
-        drawColorStrip();
-        updateStripView();
-        updatePaletteCodeOutput();
-        syncResetZoomButton();
+        redrawForViewport();
       } else {
         const current = recipeWindow();
         setRecipeWindow(current.offset + current.span * 0.4,
@@ -1951,10 +1945,7 @@
       if (!zoomed()) return;
       if (activeTab === 'procedural') {
         paletteViewport.reset();
-        syncResetZoomButton();
-        drawColorStrip();
-        updateStripView();
-        updatePaletteCodeOutput();
+        redrawForViewport();
       } else {
         setRecipeWindow(0, 1);
         scheduleUpdate();
@@ -1970,6 +1961,34 @@
     function drawColorStrip(selectionRange = null) {
       const viewport = activeTab === 'procedural' ? paletteViewport.value : fullViewport;
       colorStripPainter?.draw(palette, selectionRange, viewport);
+    }
+
+    /**
+     * Plots the wave graph over the phase window the strip and the C++ export
+     * show, by re-parameterizing the coefficients through the procedural
+     * viewport exactly as the export does. The generative palette carries its
+     * window in its own recipe, so it plots as baked.
+     */
+    function drawPaletteWaveGraph() {
+      let plotted = palette;
+      if (activeTab === 'procedural') {
+        const view = proceduralParamsForViewport(parameters, paletteViewport.value);
+        plotted = new ProceduralPalette(
+          [view.A_R, view.A_G, view.A_B],
+          [view.B_R, view.B_G, view.B_B],
+          [view.C_R, view.C_G, view.C_B],
+          [view.D_R, view.D_G, view.D_B]);
+      }
+      drawWaveGraph({ canvas: waveGraphCanvas, ctx: waveGraphCtx, palette: plotted });
+    }
+
+    /** Redraws every view of the palette after its viewport moved. */
+    function redrawForViewport() {
+      drawColorStrip();
+      drawPaletteWaveGraph();
+      updateStripView();
+      updatePaletteCodeOutput();
+      syncResetZoomButton();
     }
 
 
@@ -2088,7 +2107,7 @@
       // The gradient changed — force the cached color strip to rebuild.
       colorStripPainter?.invalidate();
 
-      drawWaveGraph({ canvas: waveGraphCanvas, ctx: waveGraphCtx, palette });
+      drawPaletteWaveGraph();
       if (activeTab === 'generative')
         drawHueKeyWheel(palette.canonicalRecipe);
       drawColorStrip();
