@@ -36,18 +36,20 @@ function readTsconfig() {
 }
 
 /**
- * The relative-module specifiers one file imports.
+ * The relative-module specifiers one file imports, resolved against the
+ * importing file's directory.
  * @param {string} file - Repo-relative module path.
- * @returns {string[]} Imported sibling module paths.
+ * @returns {string[]} Imported module paths, repo-relative.
  */
 function importsOf(file) {
-  const source = readFileSync(new URL(file, ROOT), 'utf8');
+  const importer = new URL(file, ROOT);
+  const source = readFileSync(importer, 'utf8');
   const found = [];
   for (const [, spec] of source.matchAll(/\bfrom\s*["'](\.\/[^"']+)["']/g)) {
-    found.push(spec.slice(2));
+    found.push(new URL(spec, importer).href.slice(ROOT.href.length));
   }
   for (const [, spec] of source.matchAll(/\bimport\s*["'](\.\/[^"']+)["']/g)) {
-    found.push(spec.slice(2));
+    found.push(new URL(spec, importer).href.slice(ROOT.href.length));
   }
   return found;
 }
