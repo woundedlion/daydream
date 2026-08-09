@@ -276,7 +276,8 @@ const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 // Op params become C++ literals, so reject anything that would emit NaN/Inf or a
 // malformed token. requireFinite covers fractional params; requireCount also
-// enforces a non-negative integer (e.g. a relax iteration count).
+// enforces a positive integer (e.g. a relax iteration count — the engine's
+// apply_step refuses a bake-less RELAX below one iteration).
 function requireFinite(opName, param, val) {
   if (!Number.isFinite(val)) {
     throw new Error(`generateFuncAndRecipe: ${opName} param "${param}" must be a finite number, got ${val}`);
@@ -284,8 +285,8 @@ function requireFinite(opName, param, val) {
 }
 
 function requireCount(opName, param, val) {
-  if (!Number.isInteger(val) || val < 0) {
-    throw new Error(`generateFuncAndRecipe: ${opName} param "${param}" must be a non-negative integer, got ${val}`);
+  if (!Number.isInteger(val) || val < 1) {
+    throw new Error(`generateFuncAndRecipe: ${opName} param "${param}" must be a positive integer, got ${val}`);
   }
 }
 
