@@ -28,6 +28,7 @@ export async function copyToClipboard(text) {
       return true;
     }
   } catch {
+    // fall through to the execCommand path
   }
 
   const textarea = document.createElement('textarea');
@@ -41,8 +42,8 @@ export async function copyToClipboard(text) {
   let ok = false;
   try {
     ok = document.execCommand('copy');
-  } catch (err) {
-    ok = false;
+  } catch {
+    // execCommand throws in sandboxed frames
   }
   document.body.removeChild(textarea);
   return ok;

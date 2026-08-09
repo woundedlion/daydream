@@ -219,7 +219,7 @@ test('the wave graph draws the band edges and the three channels without clamp o
   const ctx = fakeContext();
   drawWaveGraph({ canvas, ctx, palette: fakePalette() });
 
-  const { yTop, yBottom, toY } = waveGraphBand(100);
+  const { yTop, yBottom } = waveGraphBand(100);
   assert.deepEqual(ctx.ops[0], ['clearRect', 0, 0, 16, 100]);
 
   const moves = ctx.ops.filter(([n]) => n === 'moveTo').map(([, x, y]) => [x, y]);

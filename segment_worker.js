@@ -259,7 +259,7 @@ async function handleMessage(msg) {
       extractSegment(allPixels, pixelsCopy, canvasW, segRange);
 
       /** @type {SegArenaMetrics | null} */
-      let arenaMetrics = null;
+      let arenaMetrics;
       try {
         arenaMetrics = engine.getArenaMetrics();
         // Convert to a plain object (embind vals can't be transferred). The

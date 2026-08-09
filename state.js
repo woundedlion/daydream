@@ -326,7 +326,7 @@ export class URLSync {
       }
     }
 
-    this.unsubscribe = state.subscribe((key, value) => {
+    this.unsubscribe = state.subscribe((key) => {
       if (!this.trackedKeys.has(key)) return;
       this.schedule();
     });

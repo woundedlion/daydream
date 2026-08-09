@@ -10,6 +10,7 @@
     "pretest": "node scripts/require-tests.mjs",
     "test": "node scripts/run-tests.mjs --experimental-test-module-mocks \"tests/*.test.js\"",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "importmap": "node scripts/generate-importmap.mjs",
     "importmap:local": "node scripts/generate-importmap.mjs --local"
   },
@@ -21,6 +22,9 @@
     "node": ">=22.3.0"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.8.0",
+    "globals": "17.9.0",
     "typescript": "7.0.2"
   }
 }
