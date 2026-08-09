@@ -27,6 +27,7 @@ import {
   isValidSegmentCount,
   stampBoundaries,
 } from "./segment_layout.js";
+import { displayAliasesDiverged } from "./app_lifecycle.js";
 import { FAULT_POOL, FAULT_RENDER, SegmentStatsView } from "./segment_stats_view.js";
 import { PROTOCOL_VERSION } from "./worker_protocol.js";
 
@@ -946,12 +947,12 @@ export class SegmentController {
     // divergence, self-heal rather than fault the render loop (mirrors the
     // single-engine path): re-point both display aliases at the composite target.
     // driver.render() re-clears driver.pixels next frame, restoring the elision.
-    if (dst !== this.driver.pixels) {
+    if (displayAliasesDiverged(this.driver, dst)) {
       if (!this.aliasDivergenceLogged) {
         console.error(
           "SegmentController.composite: display-buffer alias diverged " +
-          "(getMemoryView() !== driver.pixels) — re-pointing the display " +
-          "aliases at the composite target");
+          "from getMemoryView() — re-pointing the display aliases at the " +
+          "composite target");
         this.aliasDivergenceLogged = true;
       }
       this.repointDisplayAliases(dst);
