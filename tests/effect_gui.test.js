@@ -250,6 +250,22 @@ test('build records the value-stream order and stamps the effect generation', ()
   assert.equal(fx.hasLiveParams, true);
 });
 
+test('build warns when engine params collide with effect controls', () => {
+  const h = makeHarness({
+    params: [
+      { name: 'reset', value: 0, min: 0, max: 1 },
+      { name: 'export', value: 0, min: 0, max: 1 },
+      { name: 'pause', value: false, animated: true },
+    ],
+  });
+
+  h.panel.build();
+
+  assert.deepEqual(h.warnings, [
+    'Engine parameter names conflict with effect controls: reset, export, pause',
+  ]);
+});
+
 test('a readonly param is disabled and excluded from the writable set', () => {
   const h = makeHarness({ params: [SPEED, TELEMETRY] });
   h.panel.build();
