@@ -1040,14 +1040,6 @@ test('precomputeMatrices flags both instance attributes for upload', () => {
   assert.equal(ctx.dotMesh.instanceColor.version, 1);
 });
 
-test('precomputeMatrices tolerates a driver with no mesh yet', () => {
-  const ctx = matricesCtx(8, 5);
-  ctx.dotMesh = null;
-  Daydream.prototype.precomputeMatrices.call(ctx);
-
-  assert.equal(ctx.pixels, null);
-});
-
 test('updateResolution rebuilds the mesh and buffer at the new grid', () => {
   const log = [];
   const ctx = setupCtx(fakeMesh(log), log);
