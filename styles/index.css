@@ -255,6 +255,7 @@
   z-index: 90;
   display: flex;
   justify-content: center;
+  pointer-events: none;
 }
 
 .apply-notice-body {
@@ -269,6 +270,7 @@
   color: #eee;
   font-family: var(--ui-font);
   font-size: 13px;
+  pointer-events: auto;
   text-align: center;
 }
 
