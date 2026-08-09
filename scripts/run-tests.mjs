@@ -107,7 +107,7 @@ try {
     const key = keyOf(file);
     // A test that spawns a script of its own inherits the counter, so keep only
     // the files the run's own patterns describe.
-    if (!suffixes.some((s) => key.endsWith(s))) continue;
+    if (key.startsWith('..') || !suffixes.some((s) => key.endsWith(s))) continue;
     counts.set(key, (counts.get(key) ?? 0) + count);
   }
   let tallies = '';
