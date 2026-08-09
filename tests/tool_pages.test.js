@@ -3,9 +3,12 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { servedPages } from './site_pages.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const PAGES = ['lissajous', 'mobius', 'palettes', 'solids'];
+const PAGES = servedPages()
+  .filter((page) => page.startsWith('tools/'))
+  .map((page) => posix.basename(page, '.html'));
 const read = (...p) => readFileSync(join(REPO, ...p), 'utf8');
 const pageSrc = (name) => read('tools', `${name}.html`);
 const headOf = (src) => src.slice(src.indexOf('<head>'), src.indexOf('</head>'));
@@ -42,17 +45,33 @@ const scriptsOf = (page) => {
   return [...found].sort().map((f) => f.split('/'));
 };
 
-// Every page the app serves, paired with the stylesheets it links: the tool
-// pages share tools/, index.html has its own. The CSP and undefined-class gates
-// run over all of them — index.html is the most-loaded page, so it is the one
-// least able to afford being ungated.
-const SERVED_PAGES = [
-  ...PAGES.map((name) => ({
-    page: `tools/${name}.html`,
-    sheets: [['tools', 'tailwind.css'], ['tools', 'tools.css']],
-  })),
-  { page: 'index.html', sheets: [['styles', 'index.css']] },
-].map((entry) => ({ ...entry, scripts: scriptsOf(entry.page) }));
+/**
+ * The repo stylesheets a page links. The vendored font sheet lives in the
+ * gitignored /vendor/ and is absent from a checkout, so only what exists is
+ * collected.
+ * @param {string} page - Repo-relative page path.
+ * @returns {string[][]} Path segments of each stylesheet.
+ */
+const sheetsOf = (page) => {
+  const found = [];
+  for (const [tag] of headOf(read(page)).matchAll(/<link\b[^>]*>/g)) {
+    if (!/\brel="stylesheet"/.test(tag)) continue;
+    const href = tag.match(/\bhref="([^"]+)"/)?.[1];
+    if (!href || href.includes('://')) continue;
+    const path = posix.normalize(posix.join(posix.dirname(page), href));
+    if (existsSync(join(REPO, path))) found.push(path.split('/'));
+  }
+  return found;
+};
+
+// Every page the app serves, paired with the stylesheets it links. The CSP and
+// undefined-class gates run over all of them — index.html is the most-loaded
+// page, so it is the one least able to afford being ungated.
+const SERVED_PAGES = servedPages().map((page) => ({
+  page,
+  sheets: sheetsOf(page),
+  scripts: scriptsOf(page),
+}));
 
 // Each served page's whole script-src, token by token. 'unsafe-inline' covers
 // the import map vendor-importmap.js injects and the inline module block each
@@ -190,6 +209,8 @@ test('every served page carries a CSP permitting no Tailwind CDN origin or blank
  * default it overrides.
  */
 test('every served page\'s script-src is exactly its committed token list', () => {
+  assert.deepEqual(Object.keys(SCRIPT_SRC).sort(), SERVED_PAGES.map(({ page }) => page).sort(),
+    'the committed script-src lists and the served set have drifted apart');
   for (const { page } of SERVED_PAGES) {
     const want = SCRIPT_SRC[page];
     assert.ok(want, `${page} has no committed script-src token list`);
@@ -247,6 +268,7 @@ const BEHAVIOR_HOOKS = new Set([
 test('every served page\'s stylesheets define every class it uses', () => {
   for (const { page, sheets, scripts } of SERVED_PAGES) {
     const src = read(page);
+    assert.ok(sheets.length > 0, `${page} links no stylesheet in the repo`);
     const defined = new Set(BEHAVIOR_HOOKS);
     for (const sheet of sheets) {
       for (const name of definedClasses(read(...sheet))) defined.add(name);

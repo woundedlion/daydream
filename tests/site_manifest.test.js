@@ -9,27 +9,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { manifestEntries, servedPages } from './site_pages.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = 'site_manifest.txt';
-// Entry points a visitor can load directly; everything else is reached from one
-// of them.
-const PAGES = [
-  'index.html',
-  'tools/lissajous.html',
-  'tools/mobius.html',
-  'tools/palettes.html',
-  'tools/solids.html',
-];
+const PAGES = servedPages();
 
 const read = (path) => readFileSync(resolve(REPO, path), 'utf8');
-
-/** @returns {string[]} Manifest entries, comments and blanks dropped. */
-const manifestEntries = () =>
-  read(MANIFEST)
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '' && !line.startsWith('#'));
 
 /** @returns {Set<string>} Every path git tracks, repo-relative. */
 const trackedFiles = () =>
@@ -117,6 +103,23 @@ test('every site manifest entry is tracked and present', () => {
     const covers = [...tracked].some((f) => f === entry || f.startsWith(`${entry}/`));
     assert.ok(covers,
       `${MANIFEST} lists '${entry}', which git does not track — it would 404 on Pages`);
+  }
+});
+
+test('the derived page roster names every served page', () => {
+  const entries = manifestEntries();
+  const covered = (path) =>
+    entries.some((entry) => entry === path || path.startsWith(`${entry}/`));
+
+  const pages = new Set(PAGES);
+  assert.ok(pages.size > 0, `${MANIFEST} publishes no page`);
+  // A manifest entry may name a directory, which ships recursively; a page under
+  // one is served without appearing as an entry of its own.
+  for (const file of trackedFiles()) {
+    if (!file.endsWith('.html') || !covered(file)) continue;
+    assert.ok(pages.has(file),
+      `${file} is served but no ${MANIFEST} entry names it, so the CSP and ` +
+        'stylesheet cases never see it');
   }
 });
 
