@@ -202,13 +202,19 @@ test('every served page\'s script-src is exactly its committed token list', () =
 
 /**
  * tools.css names Inter and JetBrains Mono for every page it styles, so a page
- * that links no font stylesheet renders in the system fallback instead.
+ * that links no font stylesheet renders in the system fallback instead. The
+ * vendored stylesheet lives in the gitignored /vendor/, so on the deploy the
+ * link 404s and only its onerror swap to the CDN copy loads any fonts at all.
  */
 test('every tool page links the font families tools.css styles for', () => {
   for (const name of PAGES) {
     const csp = cspOf(`tools/${name}.html`);
-    assert.match(headOf(pageSrc(name)), /<link\b[^>]*href="\.\.\/vendor\/fonts\/fonts\.css"/,
-      `${name}.html links no font stylesheet`);
+    const fontLink = headOf(pageSrc(name))
+      .match(/<link\b[^>]*href="\.\.\/vendor\/fonts\/fonts\.css"[^>]*>/)?.[0];
+    assert.ok(fontLink, `${name}.html links no font stylesheet`);
+    assert.match(fontLink,
+      /onerror="this\.onerror=null;this\.href='https:\/\/fonts\.googleapis\.com\/css2\?family=Inter[^']*family=JetBrains\+Mono[^']*'"/,
+      `${name}.html font link carries no CDN onerror fallback, so the deploy renders in the system font`);
     assert.ok(directive(csp, 'style-src').includes('https://fonts.googleapis.com'),
       `${name}.html CSP blocks the font stylesheet's CDN fallback`);
     assert.ok(directive(csp, 'font-src').includes('https://fonts.gstatic.com'),
