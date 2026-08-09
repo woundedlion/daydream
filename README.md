@@ -1824,7 +1824,7 @@ An effect passes construction-time flags to its base as `Effect(W, H, {.strobe =
 
 All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for RingShower, Dynamo and Thrusters.
 
-The effect registry and tests carry the full 23-effect roster. The simulator sidebar exposes the curated subset for its active resolution (§10.5), omitting three effects at 288×144 and five at 96×20. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) is a 21-effect subset of the full roster, excluding the two Holosphere-96×20-only effects, Dynamo and Thrusters. Full-cycle Teensy measurements for the firmware playlist are indexed in the [on-device effect profiles](docs/profiles/README.md).
+The effect registry and tests carry the full 24-effect roster. The simulator sidebar exposes the curated subset for its active resolution (§10.5), omitting three effects at 288×144 and five at 96×20. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) is a 21-effect subset of the full roster, excluding the two Holosphere-96×20-only effects, Dynamo and Thrusters, and the sim-only ShadierBall. Full-cycle Teensy measurements for the firmware playlist are indexed in the [on-device effect profiles](docs/profiles/README.md).
 
 ### Core Effects (Modern Engine)
 
@@ -2080,7 +2080,7 @@ Volumetric raymarcher that renders twisted tori at the 26 vertices of a disdyaki
 
 Stereographic-projection shader (extends `Effect` directly) spanning 13 liquid domain-warp, mixed-pattern, and grid fly-through presets from one continuous parameter space. Every look axis — Y-spin vs. dual random-walk wander, glitch-lens strength, pattern cross-coupling vs. direct phase feed, breathe depth, hue shift, and value fade — is a preset-lerped float, so the choreography morphs between any two looks without a discrete pop. Lens transitions interpolate direct and fully lensed stereographic coordinates before one warp/pattern sample. `Scan::Shader::draw` shades through one continuously cycling liquid palette.
 
-**Teensy full-cycle profile**: shipping holds all 13 presets at 16 fps with a 53.99 ms peak and 0/6,368 frames spilling; global O3 peaks at 50.20 ms ([shipping](docs/profiles/shipping/profile_shaderball_teensy_2026-08-08.md), [global O3](docs/profiles/O3/profile_shaderball_teensy_2026-08-08.md)).
+**Teensy full-cycle profile**: shipping holds all 13 presets of the 2026-08-08 capture at 16 fps with a 53.99 ms peak and 0/6,368 frames spilling; global O3 peaks at 50.20 ms ([shipping](docs/profiles/shipping/profile_shaderball_teensy_2026-08-08.md), [global O3](docs/profiles/O3/profile_shaderball_teensy_2026-08-08.md)).
 
 **Parameters**: Warp Scale, Warp Strength, Warp Time, Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Pole Fade, Spin Rate, Wander, Lens Mix, Breathe Depth, Cycle Speed, Hue Shift, Value Fade
 
@@ -2092,9 +2092,9 @@ Stereographic-projection shader (extends `Effect` directly) spanning 13 liquid d
 
 #### ShadierBall
 
-Slot-based sphere shader (extends `Effect` directly): each preset names a pattern **Function** (twin-wave interference, rings, spiral, or grid), a sphere-to-plane **Projection** (equirectangular, stereographic, or gnomonic), and a sphere **Lens** (glitch fold, latitude twist, or six-fold kaleidoscope) — discrete slot tags dispatched per pixel on frame-constant copies — plus the continuous params those slots consume. The shipped preset pairs the twin-wave function (two traveling plane waves, the second rotating continuously relative to the first) with the glitch lens ahead of a stereographic projection; every other combination is one dropdown away. Color walks the 256 prebaked triadic profiles through a `PaletteCycler` on a golden-ratio hue step, fade after fade with no dwell.
+Slot-based sphere shader (extends `Effect` directly): each preset names a pattern **Function** (twin-wave interference, rings, spiral, or grid), a sphere-to-plane **Projection** (seam-free equirectangular — azimuth folded and pole-tapered — stereographic, or gnomonic), and a sphere **Lens** (glitch fold, latitude twist, or six-fold kaleidoscope) — discrete slot tags dispatched per pixel on frame-constant copies — plus the continuous params those slots consume. A random-walk camera drifts the whole view at a languid preset-set gain. The shipped preset pairs the twin-wave function (two traveling plane waves, the second rotating continuously relative to the first) with the glitch lens ahead of a stereographic projection; every other combination is one dropdown away. Color walks the 256 prebaked triadic profiles through a `PaletteCycler` on a golden-ratio hue step, fade after fade with no dwell — pausing animation never stills it.
 
-**Parameters**: Function, Projection, Lens, Speed, Pattern Freq, Wave Spin, Pole Fade, Lens Mix
+**Parameters**: Function, Projection, Lens, Speed, Pattern Freq, Wave Spin, Pole Fade, Lens Mix, Wander
 
 </td></tr></table>
 
@@ -2104,7 +2104,7 @@ Slot-based sphere shader (extends `Effect` directly): each preset names a patter
 
 #### DisplacementField
 
-A stack of evenly spaced soft-stroked rings (`Scan::DistortedRing`) sharing one axis, each vertex displaced along the stack axis by a stack of displacement fields that alternate between two phases. In the ball phase, cap-shaped bumps spawn at the pole on random meridians and fall to the opposite pole at varying speeds, bowing the rings away from each falling ball; once the last ball lands, a two-octave world-space OpenSimplex noise field (octave 1 envelopes octave 2, so perturbations turn sparse wherever the envelope runs near zero) fades in from zero, dwells at full strength, then fades back out into the next ball phase. Ring colors sweep a circular analogous palette across the stack, with each fragment's hue rotated by the local displacement magnitude, and the palette slowly wipes to a freshly generated one every ~3 seconds.
+A stack of evenly spaced soft-stroked rings (`Scan::DistortedRing`) sharing one axis, each vertex displaced along the stack axis by a stack of displacement fields that alternate between two phases. In the ball phase, cap-shaped bumps spawn at the pole on random meridians and fall to the opposite pole at varying speeds, bowing the rings away from each falling ball; once the last ball lands, a two-octave world-space OpenSimplex noise field (octave 1 envelopes octave 2, so perturbations turn sparse wherever the envelope runs near zero) fades in from zero, dwells at full strength, then fades back out into the next ball phase. Ring colors sweep a circular analogous palette across the stack, with each fragment's hue rotated by the local displacement magnitude, and the palette slowly wipes to a freshly generated one every ~11 seconds.
 
 **Parameters**: Alpha, Rings, Thickness, Ball Amp, Noise Amp, Scale 1, Scale 2, Hue Rotate, Flow Speed, Ball Min, Ball Max, Ball Rate, Speed Min, Speed Max
 
