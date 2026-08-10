@@ -32,7 +32,7 @@ import {
 } from "./app_lifecycle.js";
 import { AppState, URLSync, replaceUrl } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
-import { SegmentController, warmModules } from "./segment_controller.js";
+import { SegmentController, maxSegmentCount, warmModules } from "./segment_controller.js";
 import { EngineHost } from "./engine_host.js";
 import { showFatalError } from "./tools/banner.js";
 import { showBootstrapFailure } from "./bootstrap.js";
@@ -433,10 +433,18 @@ guiInstance.add(poleLod.state, 'poleLod', 0, 2, 0.05).name('Pole LOD')
 // (view.Segmented POV.<prop>); renaming either invalidates links already shared.
 const segFolder = guiInstance.addFolder('Segmented POV');
 segFolder.close();
-const segState = { segmented: segments.active, segments: segments.count, boundaries: segments.showBoundaries };
+// Every pool member holds a WASM heap of its own, so the ceiling is what the
+// device can carry. The slider is built against it, which is also what bounds a
+// deep link — addWithHydration clamps an over-cap URL value and rewrites the URL.
+const segMax = maxSegmentCount(navigator, daydream.isMobile);
+const segState = {
+  segmented: segments.active,
+  segments: Math.min(segments.count, segMax),
+  boundaries: segments.showBoundaries,
+};
 // Requested size; segments.count follows the live pool and lags this across
 // the warmModules() await.
-let segCount = segments.count;
+let segCount = segState.segments;
 const segSpawn = createSegmentSpawnGuard({
   warmModules,
   spawn: () => segments.create(segCount),
@@ -481,8 +489,10 @@ const segEnabledCtrl = segFolder.add(segState, 'segmented').name('Enabled').onCh
 });
 // The firmware takes a power-of-two segment count <= 8, so 6 is extra worker
 // parallelism no hardware produces; the label says so, since the per-segment
-// overlay otherwise names boards that cannot exist.
-segFolder.add(segState, 'segments', 2, 8, 2).name('Segments (6 = sim only)').onChange(async v => {
+// overlay otherwise names boards that cannot exist. A device cap that drops 6
+// from the range takes the marker with it and names the cap instead.
+const segLabel = segMax >= 6 ? 'Segments (6 = sim only)' : `Segments (max ${segMax} here)`;
+segFolder.add(segState, 'segments', 2, segMax, 2).name(segLabel).onChange(async v => {
   try {
     segCount = v;
     if (segments.active) await segSpawn.respawn();
