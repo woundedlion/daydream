@@ -117,8 +117,18 @@ export interface HolosphereModule {
   };
 }
 
-/** Emscripten module factory; `print`/`printErr` override the log sinks. */
+/**
+ * Emscripten module factory; `print`/`printErr` override the log sinks.
+ * `instantiateWasm` replaces the glue's own fetch+compile of the binary: it is
+ * handed the import object and calls back with an instance, so a caller holding
+ * an already-compiled module supplies one without a second compilation. Async is
+ * allowed — the glue awaits the callback — and the returned object is ignored.
+ */
 export default function createHolosphereModule(options?: {
   print?: (text: string) => void;
   printErr?: (text: string) => void;
+  instantiateWasm?: (
+    imports: WebAssembly.Imports,
+    onInstance: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void,
+  ) => object;
 }): Promise<HolosphereModule>;

@@ -56,11 +56,16 @@ export const PROTOCOL_VERSION = 6;
  * carries the host's current pause state so a pool re-created under a paused GUI
  * doesn't start animating; `poleLod` does the same for the Pole LOD slider, whose
  * value lives per module instance and so must be re-pushed to every fresh engine.
+ *
+ * `wasmModule` is the binary the controller already compiled, for the worker to
+ * instantiate instead of fetching and compiling its own copy. Optional in both
+ * directions — absent it, the worker takes the glue's own load path — so it is
+ * not a version-breaking field.
  * @typedef {{
  *   type: 'init', version: number, segId: number, totalSegs: number,
  *   w: number, h: number,
  *   effectName?: string, params?: SegParam[], paused?: boolean,
- *   poleLod?: number, paramRevision: number,
+ *   poleLod?: number, paramRevision: number, wasmModule?: WebAssembly.Module,
  * }} InitMsg
  */
 

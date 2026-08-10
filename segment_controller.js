@@ -5,11 +5,11 @@
  *
  * SegmentController — owns the segmented-POV worker pipeline.
  *
- * N Web Workers each load their own isolated WASM module instance and render a
- * segment rectangle of the canvas in parallel; results are composited into the display
- * buffer. The pipeline is one-frame deep: frame N-1's results are displayed
- * while frame N renders on the workers (frame time = max(segment times), not
- * sum).
+ * N Web Workers each instantiate their own isolated WASM engine — from one
+ * compilation shared with the pool — and render a segment rectangle of the
+ * canvas in parallel; results are composited into the display buffer. The
+ * pipeline is one-frame deep: frame N-1's results are displayed while frame N
+ * renders on the workers (frame time = max(segment times), not sum).
  *
  * The host (daydream.js) owns the main-thread WASM engine and pixel view (both
  * reassignable), so those are injected as lazy getters:
@@ -83,6 +83,17 @@ let lastWarmAt = -Infinity;
 let lastWarm = Promise.resolve();
 
 /**
+ * The binary compiled once by warmModules, handed to every worker in its `init`
+ * so the pool instantiates one compilation instead of N. A WebAssembly.Module is
+ * structured-cloneable and carries no state: the binary declares its own memory
+ * rather than importing one, so each instance still gets an isolated heap and a
+ * private global arena. Null until a warm lands (and outside a web origin), and
+ * the worker then falls back to fetching and compiling the binary itself.
+ * @type {WebAssembly.Module | null}
+ */
+let sharedWasmModule = null;
+
+/**
  * Render a thrown value as a fault message detail.
  * @param {unknown} error - The caught value.
  * @returns {string} `Name: message` for an Error, else its string form.
@@ -115,6 +126,11 @@ function unrefTimer(timer) {
  * revalidation: `cache: 'no-cache'` re-fetches a rebuilt binary and costs a 304
  * for an unchanged one, where a reload always re-pulls all 1.8 MB. A call within
  * `minIntervalMs` of the last warm reuses that warm's promise.
+ *
+ * The drained binary is also compiled here into `sharedWasmModule`, so the pool
+ * spawn that follows spends one compilation of the 2 MB module rather than one
+ * per worker. A compile failure leaves the previous module in place and the
+ * workers compile their own, like every other failure on this path.
  * @param {{fetch?: typeof globalThis.fetch, baseUrl?: string|URL, minIntervalMs?: number}} [dependencies]
  * @returns {Promise<void>}
  */
@@ -131,16 +147,19 @@ export function warmModules({
   const now = Date.now();
   if (now - lastWarmAt < minIntervalMs) return lastWarm;
   lastWarmAt = now;
-  const urls = [
-    './segment_worker.js',
-    './holosphere_wasm.js',
-    './holosphere_wasm.wasm',
-  ];
   // fetch resolves at the headers; the body must be drained or nothing is cached.
-  lastWarm = Promise.allSettled(
-    urls.map((u) => fetchResource(new URL(u, baseUrl), { cache: 'no-cache' })
-      .then((r) => r.arrayBuffer())),
-  ).then(() => {});
+  const drain = (/** @type {string} */ u) =>
+    fetchResource(new URL(u, baseUrl), { cache: 'no-cache' }).then((r) => r.arrayBuffer());
+  const workerJs = drain('./segment_worker.js');
+  const glueJs = drain('./holosphere_wasm.js');
+  const binary = drain('./holosphere_wasm.wasm');
+  lastWarm = Promise.allSettled([
+    workerJs,
+    glueJs,
+    binary,
+    binary.then((bytes) => WebAssembly.compile(bytes))
+      .then((compiled) => { sharedWasmModule = compiled; }),
+  ]).then(() => {});
   return lastWarm;
 }
 
@@ -549,6 +568,7 @@ export class SegmentController {
           paused: this.animationsPaused,
           poleLod: this.poleLod,
           paramRevision: this.paramRevision,
+          wasmModule: sharedWasmModule ?? undefined,
         });
       } catch (error) {
         this.abortWorkerStartup(i, 'initialization', error);

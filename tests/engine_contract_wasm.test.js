@@ -7,6 +7,7 @@
 // standalone tools (solids.html, palettes.html) run on.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import createHolosphereModule from '../holosphere_wasm.js';
 import {
   KNOWN_OPS, OP_DEFS, PLATONIC_SOLIDS, CATALAN_BASES, SIMPLE_SEEDS,
@@ -618,5 +619,62 @@ test('PaletteOps exposes the method surface the palette tool drives', () => {
     assert.equal(inspected.fallback.length, 256);
   } finally {
     ops.delete();
+  }
+});
+
+/**
+ * The segmented pool compiles the binary once and hands every worker the
+ * WebAssembly.Module, which each instantiates through the glue's instantiateWasm
+ * hook. Two things must hold for that to be safe, and neither is visible from
+ * the mocked worker tests: the glue must honour the hook (or the pool silently
+ * pays N compilations again), and instances of one compilation must not share
+ * state (the binary declares its own memory rather than importing one, so each
+ * gets a private heap, global arena and engine singleton).
+ */
+test('the glue honours instantiateWasm, and shared-module instances stay isolated', async () => {
+  const binary = readFileSync(new URL('../holosphere_wasm.wasm', import.meta.url));
+  const compiled = await WebAssembly.compile(binary);
+  let hookCalls = 0;
+  const fromShared = () => createHolosphereModule({
+    print: () => {},
+    instantiateWasm: (imports, onInstance) => {
+      hookCalls++;
+      WebAssembly.instantiate(compiled, imports)
+        .then((instance) => onInstance(instance, compiled));
+      return {};
+    },
+  });
+
+  const [a, b] = [await fromShared(), await fromShared()];
+  assert.equal(hookCalls, 2,
+    'the glue must take the supplied compilation, not fetch and compile its own');
+
+  const engines = [new a.HolosphereEngine(), new b.HolosphereEngine()];
+  try {
+    // Each instance carries its own enum objects, so a result is only ever
+    // compared against the module it came from.
+    const frames = [a, b].map((mod, i) => {
+      const e = engines[i];
+      const resized = e.setResolution(W, H);
+      assert.ok(resized === mod.ResolutionSetResult.RESIZED
+        || resized === mod.ResolutionSetResult.ALREADY_ACTIVE);
+      assert.equal(e.setEffect('DisplacementField'), mod.EffectSetResult.INSTALLED);
+      e.drawFrame();
+      return e.getPixels();
+    });
+    assert.notEqual(frames[0].buffer, frames[1].buffer,
+      'each instance must render into a linear memory of its own');
+    assert.ok(frames[0].some((v) => v !== 0), 'the shared module renders a real frame');
+    assert.deepEqual(Array.from(frames[0]), Array.from(frames[1]),
+      'one compilation, two instances, the same frame');
+
+    // Divergent state in one instance must leave the other's frame alone.
+    const before = Uint16Array.from(engines[0].getPixels());
+    engines[1].setClip(0, W / 2, 0, H);
+    engines[1].drawFrame();
+    assert.deepEqual(Array.from(engines[0].getPixels()), Array.from(before),
+      "a second instance's clip and redraw must not reach the first's heap");
+  } finally {
+    for (const e of engines) e.delete();
   }
 });
