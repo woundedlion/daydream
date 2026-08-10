@@ -113,6 +113,21 @@ export interface HolosphereEngine {
   getParameterDefinitions(): ParameterDefinition[];
   /** Current values of the bound effect's parameters, in definition order. */
   getParamValues(): ArrayLike<number> & Iterable<number>;
+  /**
+   * Identity token joining a getParameterDefinitions() snapshot to a later
+   * getParamValues() read: it changes on every effect replacement and schema
+   * rebind. Parameter counts repeat even when names and order do not, so pin
+   * this beside a snapshot and rebuild the definitions when it moves.
+   */
+  getParamGeneration(): number;
+  /**
+   * True when the effect strobes each POV column to black after it is shown
+   * (discrete columns with dark gaps), false when columns persist and smear
+   * into the next. False with no effect set.
+   */
+  strobeColumns(): boolean;
+  /** Effect name to hint size at the active resolution; empty at an unsupported one. */
+  getEffectSizes(): Record<string, number>;
 }
 
 export interface HolosphereModule {

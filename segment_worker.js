@@ -254,9 +254,8 @@ async function handleMessage(msg) {
       // animation-driven params; the main engine is never stepped in this mode.
       const paramValues =
         segId === 0 ? Array.from(engine.getParamValues()) : null;
-      const generationSource = /** @type {{getParamGeneration?: () => number}} */ (engine);
       const paramGeneration = segId === 0
-        ? generationSource.getParamGeneration?.() ?? null
+        ? engine.getParamGeneration?.() ?? null
         : null;
 
       const allPixels = engine.getPixels();
