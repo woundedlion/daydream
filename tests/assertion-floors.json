@@ -12,8 +12,8 @@
     "assertions": 58
   },
   "tests/clipboard.test.js": {
-    "cases": 5,
-    "assertions": 20
+    "cases": 6,
+    "assertions": 22
   },
   "tests/color.test.js": {
     "cases": 2,
@@ -28,8 +28,8 @@
     "assertions": 20045
   },
   "tests/daydream_boot.test.js": {
-    "cases": 7,
-    "assertions": 21
+    "cases": 8,
+    "assertions": 25
   },
   "tests/driver.test.js": {
     "cases": 66,
@@ -40,16 +40,16 @@
     "assertions": 9
   },
   "tests/effect_gui.test.js": {
-    "cases": 46,
-    "assertions": 104
+    "cases": 52,
+    "assertions": 131
   },
   "tests/effect_sequencing.test.js": {
     "cases": 46,
     "assertions": 95
   },
   "tests/engine_contract_wasm.test.js": {
-    "cases": 27,
-    "assertions": 780
+    "cases": 28,
+    "assertions": 789
   },
   "tests/engine_host.test.js": {
     "cases": 13,
@@ -85,8 +85,8 @@
     "assertions": 31
   },
   "tests/gui.test.js": {
-    "cases": 23,
-    "assertions": 88
+    "cases": 24,
+    "assertions": 90
   },
   "tests/kb_format.test.js": {
     "cases": 5,
@@ -113,8 +113,8 @@
     "assertions": 58
   },
   "tests/palette_controls.test.js": {
-    "cases": 30,
-    "assertions": 107
+    "cases": 32,
+    "assertions": 116
   },
   "tests/palette_math.test.js": {
     "cases": 22,
@@ -145,8 +145,8 @@
     "assertions": 31
   },
   "tests/segment_controller.test.js": {
-    "cases": 96,
-    "assertions": 478
+    "cases": 98,
+    "assertions": 523
   },
   "tests/segment_crosscheck.test.js": {
     "cases": 4,
@@ -161,8 +161,8 @@
     "assertions": 93
   },
   "tests/segment_worker.test.js": {
-    "cases": 35,
-    "assertions": 123
+    "cases": 38,
+    "assertions": 134
   },
   "tests/shared.test.js": {
     "cases": 15,
@@ -182,7 +182,7 @@
   },
   "tests/site_manifest.test.js": {
     "cases": 4,
-    "assertions": 574
+    "assertions": 584
   },
   "tests/slider.test.js": {
     "cases": 17,
@@ -190,7 +190,7 @@
   },
   "tests/solid_codegen.test.js": {
     "cases": 80,
-    "assertions": 445
+    "assertions": 447
   },
   "tests/solid_op_rows.test.js": {
     "cases": 9,
@@ -214,7 +214,7 @@
   },
   "tests/tool_pages.test.js": {
     "cases": 8,
-    "assertions": 133
+    "assertions": 138
   },
   "tests/tsconfig_roster.test.js": {
     "cases": 6,
