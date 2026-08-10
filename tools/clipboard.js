@@ -11,43 +11,9 @@
  * their module graph. shared.js re-exports these for its scene-based callers.
  */
 
-/**
- * Copy text to the clipboard using the async Clipboard API, falling back to
- * the legacy execCommand path for non-secure contexts / older browsers.
- *
- * Feedback (button labels, "Copied!" spans, etc.) is left to the caller so
- * each tool keeps its own UI; this only performs the copy.
- *
- * @param {string} text - Text to copy
- * @returns {Promise<boolean>} Whether the copy succeeded
- */
-export async function copyToClipboard(text) {
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    // fall through to the execCommand path
-  }
+import { copyToClipboard } from './copy_text.js';
 
-  const textarea = document.createElement('textarea');
-  textarea.value = text;
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.focus();
-  textarea.select();
-
-  let ok = false;
-  try {
-    ok = document.execCommand('copy');
-  } catch {
-    // execCommand throws in sandboxed frames
-  }
-  document.body.removeChild(textarea);
-  return ok;
-}
+export { copyToClipboard };
 
 /**
  * Copy `text`, then briefly swap an element's label to a "copied" message

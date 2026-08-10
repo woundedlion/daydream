@@ -148,7 +148,7 @@ test('unequal lengths skew (either direction)', () => {
 // paramExportBlocker is the Export action's precondition check: it names the one
 // reason a copy cannot proceed, or clears it.
 
-test('a matching value stream on a clipboard-capable context is not blocked', () => {
+test('a matching value stream with a copy operation is not blocked', () => {
   assert.equal(paramExportBlocker([0.25, 1, 0], 3, true), null);
 });
 
@@ -166,14 +166,14 @@ test('a skewed value stream blocks the copy and reports both lengths', () => {
     'Export: param/value length skew (3 vs 2); skipping copy');
 });
 
-test('a missing clipboard API blocks the copy', () => {
+test('a missing copy operation blocks the copy', () => {
   assert.equal(paramExportBlocker([0.5], 1, false),
-    'Export: clipboard API unavailable (insecure context?)');
+    'Export: clipboard copy unavailable');
 });
 
-test('a value-stream fault outranks the clipboard report', () => {
-  // The stream is read first, so a null stream on an insecure context reports the
-  // stream — one flash, one warning, whichever came first.
+test('a value-stream fault outranks copy availability', () => {
+  // The stream is read first, so a null stream without a copy operation reports
+  // the stream — one flash, one warning, whichever came first.
   assert.match(paramExportBlocker(null, 1, false), /^Export: no parameter values/);
   assert.match(paramExportBlocker([0.5, 0.5], 1, false), /^Export: param\/value/);
 });

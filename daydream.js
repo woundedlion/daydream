@@ -36,6 +36,7 @@ import { SegmentController, warmModules } from "./segment_controller.js";
 import { EngineHost } from "./engine_host.js";
 import { showFatalError } from "./tools/banner.js";
 import { showBootstrapFailure } from "./bootstrap.js";
+import { copyToClipboard } from "./tools/copy_text.js";
 
 // UI layer degrades gracefully (log + keep last good state); lower layers trap.
 
@@ -374,7 +375,7 @@ const effectGui = createEffectGui({
   activeElement: () => document.activeElement,
   isMobile: () => daydream.isMobile,
   dragTarget: window,
-  clipboard: () => navigator.clipboard ?? null,
+  copyText: copyToClipboard,
 });
 
 const apply = createApplyPipeline({

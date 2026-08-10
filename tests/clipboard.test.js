@@ -145,6 +145,37 @@ test('copyToClipboard falls back to execCommand', async () => {
   }
 });
 
+test('copyToClipboard falls back after an async clipboard rejection', async () => {
+  const restore = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', {
+    value: {
+      clipboard: { writeText: async () => { throw new Error('denied'); } },
+    },
+    configurable: true,
+  });
+  let command;
+  installDocument({
+    body: fakeElement('body'),
+    createElement: (tag) => {
+      const element = fakeElement(tag);
+      element.focus = () => {};
+      element.select = () => {};
+      return element;
+    },
+    execCommand: (name) => {
+      command = name;
+      return true;
+    },
+  });
+
+  try {
+    assert.equal(await copyToClipboard('fallback text'), true);
+    assert.equal(command, 'copy');
+  } finally {
+    Object.defineProperty(globalThis, 'navigator', restore);
+  }
+});
+
 /** Verifies both wireCopyBlock triggers copy the source and flash the prompt. */
 test('wireCopyBlock wires the button and block triggers', async () => {
   const writes = [];
