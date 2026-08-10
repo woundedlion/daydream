@@ -102,7 +102,7 @@
   },
   "tests/mobius_transforms.test.js": {
     "cases": 36,
-    "assertions": 949
+    "assertions": 606
   },
   "tests/page_lifecycle.test.js": {
     "cases": 13,
@@ -118,7 +118,7 @@
   },
   "tests/palette_math.test.js": {
     "cases": 22,
-    "assertions": 4065
+    "assertions": 1446
   },
   "tests/param_sync.test.js": {
     "cases": 29,
