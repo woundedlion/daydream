@@ -304,12 +304,15 @@ export class Daydream {
     overlay.setAttribute("role", "alert");
     overlay.tabIndex = -1;
     overlay.style.display = "none";
-    const title = document.createElement("div");
+    // Same element vocabulary as the bootstrap load-failure overlay, which
+    // shares these classes.
+    const title = document.createElement("span");
     title.className = "load-error-title";
     title.textContent = "GPU context lost";
-    this.contextLostDetail = document.createElement("div");
+    this.contextLostDetail = document.createElement("span");
     this.contextLostDetail.className = "load-error-detail";
     const reload = document.createElement("button");
+    reload.type = "button";
     reload.className = "context-lost-reload";
     reload.textContent = "Reload";
     reload.addEventListener("click", () => location.reload());
