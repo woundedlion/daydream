@@ -56,8 +56,8 @@
     "assertions": 28
   },
   "tests/engine_source_parity.test.js": {
-    "cases": 5,
-    "assertions": 167,
+    "cases": 6,
+    "assertions": 175,
     "skippable": true
   },
   "tests/export_params.test.js": {
