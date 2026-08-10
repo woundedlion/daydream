@@ -224,6 +224,16 @@ test('a numeric param becomes a slider bounded by the definition', () => {
   assert.equal(controller.isBoolean, false);
 });
 
+test('an integer param becomes a slider stepped to whole values', () => {
+  const gui = fakeGui();
+  const controller = addParamControl(gui, { Burst: 4 },
+    { name: 'Burst', value: 4, min: 1, max: 32, step: 1 });
+
+  assert.deepEqual(controller.args, [1, 32, 1]);
+  assert.equal(controller.decimalsSet, 0);
+  assert.equal(controller.isBoolean, false);
+});
+
 test('a boolean param becomes a toggle with no range arguments', () => {
   const gui = fakeGui();
   const controller = addParamControl(gui, { Glow: false }, GLOW);

@@ -44,14 +44,17 @@ export function resolveParamSync(current, incoming, isBoolean, isEditing) {
 
 /**
  * Which lil-gui control an engine parameter definition maps to. A boolean value
- * outranks an options list, so a flag that also carries labels stays a toggle.
+ * outranks an options list, so a flag that also carries labels stays a toggle,
+ * and labels outrank a step, so an enum stays a dropdown, not a stepped slider.
  *
- * @param {{value: any, options?: any}} param - An engine parameter definition.
- * @returns {'boolean'|'enum'|'number'} The control kind to build.
+ * @param {{value: any, options?: any, step?: number}} param - An engine
+ *   parameter definition.
+ * @returns {'boolean'|'enum'|'integer'|'number'} The control kind to build.
  */
 export function paramControlKind(param) {
   if (typeof param.value === 'boolean') return 'boolean';
   if (Array.isArray(param.options) && param.options.length > 0) return 'enum';
+  if (param.step === 1) return 'integer';
   return 'number';
 }
 

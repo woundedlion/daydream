@@ -54,6 +54,9 @@ export function addParamControl(gui, state, p, hydrate = true) {
   } else if (kind === 'enum') {
     // Dropdown of labels whose values are the option indices the engine expects.
     controller = add(state, p.name, enumChoices(p.options));
+  } else if (kind === 'integer') {
+    // The engine truncates a fractional write, so offer only what it can hold.
+    controller = add(state, p.name, p.min, p.max, 1).decimals(0);
   } else {
     controller = add(state, p.name, p.min, p.max).decimals(3);
   }

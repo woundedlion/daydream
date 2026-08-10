@@ -108,6 +108,16 @@ test('anything else is a slider', () => {
   assert.equal(paramControlKind({ value: 0, options: null }), 'number');
 });
 
+test('a unit step with no labels is an integer control', () => {
+  assert.equal(paramControlKind({ value: 4, min: 1, max: 32, step: 1 }), 'integer');
+});
+
+test('labels outrank a step, so a stepped enum stays a dropdown', () => {
+  // The engine emits step 1 for every whole-number target, enums included.
+  assert.equal(
+    paramControlKind({ value: 0, options: ['A', 'B'], step: 1 }), 'enum');
+});
+
 test('a boolean carrying labels stays a toggle', () => {
   // A dropdown would write the option index, not the 0/1 the flag expects.
   assert.equal(paramControlKind({ value: true, options: ['Off', 'On'] }), 'boolean');
