@@ -622,7 +622,9 @@ export class SegmentController {
         }
         const detail = e?.message
           || `module load failed after ${MAX_BOOT_RETRIES} attempts`
-             + ` (commonly a missing or renamed holosphere_wasm.js)`;
+             + ` (commonly a missing or renamed holosphere_wasm.js, or a bare`
+             + ` import specifier — a worker resolves its graph without the`
+             + ` page's import map)`;
         console.error(`[Segmented] Worker seg ${i} error: ${detail}`
           + ` (${e?.filename}:${e?.lineno}:${e?.colno})`, e);
         this.onWorkerFault(i, detail);

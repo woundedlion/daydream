@@ -2,6 +2,9 @@
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
 import { test, mock, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join, posix } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { PROTOCOL_VERSION } from '../worker_protocol.js';
 import {
   unpinnedEngineMethods, ParamSetResult, ClipSetResult,
@@ -749,4 +752,62 @@ test('setAnimationsPaused handler forwards the flag (both directions) to the eng
   assert.equal(engineInstance.paused, true);
   await dispatch({ type: 'setAnimationsPaused', paused: false });
   assert.equal(engineInstance.paused, false);
+});
+
+// ---------------------------------------------------------------------------
+// Module graph
+// ---------------------------------------------------------------------------
+
+const REPO = fileURLToPath(new URL('..', import.meta.url));
+
+/**
+ * Static import/export-from specifiers of one module source. Dynamic `import()`
+ * is out of scope: it resolves when it runs, and the generated WASM glue guards
+ * a node-only one behind an environment check the worker never takes.
+ * @param {string} source - Module source text.
+ * @returns {string[]} Specifiers, in source order.
+ */
+function staticSpecifiers(source) {
+  const specs = [];
+  // Statement-anchored so a specifier-shaped string inside minified code is not
+  // read as an import; the bounded gap spans a multi-line import clause.
+  for (const m of source.matchAll(
+    /^[ \t]*(?:import|export)[ \t][\s\S]{0,400}?from[ \t]*['"]([^'"]+)['"]/gm)) {
+    specs.push(m[1]);
+  }
+  for (const m of source.matchAll(/^[ \t]*import[ \t]*['"]([^'"]+)['"]/gm)) {
+    specs.push(m[1]);
+  }
+  return specs;
+}
+
+// A worker resolves its own import graph, and the page's import map does not
+// reach it, so a bare specifier anywhere in that graph fails the module load —
+// as a message-less error Event, which the controller can only read as the
+// transient fetch race it usually is, burning every boot retry on a failure
+// that will never resolve.
+test('the worker module graph carries no specifier an import map would resolve', () => {
+  const reached = new Set();
+  /** @param {string} file - Repo-relative, forward-slashed module path. */
+  const walk = (file) => {
+    if (reached.has(file)) return;
+    reached.add(file);
+    const source = readFileSync(join(REPO, file), 'utf8');
+    for (const spec of staticSpecifiers(source)) {
+      assert.ok(spec.startsWith('./') || spec.startsWith('../'),
+        `${file} statically imports "${spec}"; import maps do not apply to `
+        + 'workers, so only a relative specifier resolves inside the pool');
+      walk(posix.normalize(posix.join(posix.dirname(file), spec)));
+    }
+  };
+  walk('segment_worker.js');
+
+  // Pinned, not just counted: a module joining the graph is a module the worker
+  // now fetches on every spawn, and one leaving it takes its own gate with it.
+  assert.deepEqual([...reached].sort(), [
+    'holosphere_wasm.js',
+    'segment_layout.js',
+    'segment_worker.js',
+    'worker_protocol.js',
+  ]);
 });
