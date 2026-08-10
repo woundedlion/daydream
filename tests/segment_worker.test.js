@@ -110,7 +110,7 @@ class FakeEngine {
 }
 
 test('FakeEngine mocks only methods the real engine surface pins', () => {
-  assert.deepEqual(unpinnedEngineMethods(FakeEngine.prototype), [],
+  assert.deepEqual(unpinnedEngineMethods(new FakeEngine()), [],
     'engine_contract_wasm.test.js never checks these against the real module');
 });
 
