@@ -69,14 +69,17 @@ export interface BooleanParameterDefinition extends ParameterDefinitionBase {
 
 /**
  * Every non-toggle parameter: sliders and enums alike carry `min`/`max`, so
- * neither is optional here. `options` labels an enum by value index — the value
- * is the selected index — and `exportOptions` carries the matching C++ enum
- * literals, present only when the effect declares them.
+ * neither is optional here. `step` is 1 on a whole-number target — an enum or
+ * an integer count — and absent on a float one. `options` labels an enum by
+ * value index — the value is the selected index — and `exportOptions` carries
+ * the matching C++ enum literals, present only when the effect declares them;
+ * an integer count carries its range instead and exports as a numeric literal.
  */
 export interface NumericParameterDefinition extends ParameterDefinitionBase {
   value: number;
   min: number;
   max: number;
+  step?: number;
   options?: string[];
   exportOptions?: string[];
 }
