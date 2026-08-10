@@ -806,6 +806,13 @@ test('setupContextLossHandling starts unlost behind a hidden overlay', () => {
   assert.equal(ctx.contextLostOverlay.getAttribute('role'), 'alert');
   assert.equal(ctx.contextLostOverlay.tabIndex, -1);
   assert.equal(ctx.contextLostOverlay.style.display, 'none');
+  // The bootstrap load-failure overlay shares these classes, so both build the
+  // same elements; an untyped button defaults to submit inside a form.
+  assert.equal(ctx.contextLostOverlay.querySelector('.load-error-title').tagName, 'SPAN');
+  assert.equal(ctx.contextLostDetail.tagName, 'SPAN');
+  const reload = ctx.contextLostOverlay.querySelector('.context-lost-reload');
+  assert.equal(reload.tagName, 'BUTTON');
+  assert.equal(reload.type, 'button');
 });
 
 test('a lost context claims the restore, shows the reason, and aborts the recording', () => {
