@@ -681,15 +681,22 @@
         onChange();
       };
 
+      // The active mouse drag's cleanup, so a page discard mid-drag cannot
+      // leave the document listeners resident.
+      let endMouseDrag = null;
+
       const onMouseDown = (e) => {
         e.preventDefault();
+        if (endMouseDrag) endMouseDrag();
         handleInput(e.clientX, e.clientY);
         const onMouseMove = (ev) => handleInput(ev.clientX, ev.clientY);
         const onMouseUp = () => {
           document.removeEventListener('mousemove', onMouseMove);
           document.removeEventListener('mouseup', onMouseUp);
+          endMouseDrag = null;
           planeElement.style.cursor = 'grab';
         };
+        endMouseDrag = onMouseUp;
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
         planeElement.style.cursor = 'grabbing';
@@ -757,6 +764,7 @@
       reElement.addEventListener('keydown', onAxisKeyDown('re'));
       imElement.addEventListener('keydown', onAxisKeyDown('im'));
       onPageTeardown(() => {
+        if (endMouseDrag) endMouseDrag();
         if (endTouchDrag) endTouchDrag();
       });
       updateUI();
