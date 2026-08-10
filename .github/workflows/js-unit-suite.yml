@@ -27,6 +27,10 @@ jobs:
   js-tests:
     name: npm test
     runs-on: ubuntu-24.04
+    # A job calling a reusable workflow may not set timeout-minutes, so the bound
+    # lives here and covers both callers; without it a wedged test run holds a
+    # runner for GitHub's 6-hour default.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
