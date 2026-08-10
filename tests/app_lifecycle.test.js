@@ -902,6 +902,25 @@ test('a document without the notice elements is reported once, not swallowed', (
   assert.equal(warnings.length, 1);
 });
 
+test('the live region is unhidden before its text is written', () => {
+  const h = makeApplyNotice();
+  const writes = [];
+  let stored = '';
+  Object.defineProperty(h.text, 'textContent', {
+    get: () => stored,
+    set(value) { stored = value; writes.push({ value, hidden: h.body.hidden }); },
+  });
+
+  h.notice.show('Effect change was rejected.', 'switch');
+  // Hidden content is outside the accessibility tree: a write followed by the
+  // unhide leaves the unhide as the only mutation assistive tech sees.
+  assert.deepEqual(writes, [{ value: 'Effect change was rejected.', hidden: false }]);
+
+  h.notice.show(null, 'switch');
+  assert.deepEqual(writes[1], { value: '', hidden: true },
+    'a clear hides the region before emptying it, so nothing is re-announced');
+});
+
 test('a param write does not clear a notice the switch coordinator raised', () => {
   const h = makeApplyNotice();
 
