@@ -20,6 +20,8 @@ import { fileURLToPath } from 'node:url';
 import * as MB from '../tools/mobius_transforms.js';
 import * as C from '../tools/color.js';
 import * as P from '../tools/palette_math.js';
+import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS } from '../tools/solid_codegen.js';
+import { upperSnake } from '../tools/solid_registry_codegen.js';
 
 const REPO = new URL('../', import.meta.url);
 const ENGINE_ENV = 'HOLOSPHERE_ENGINE_DIR';
@@ -206,4 +208,42 @@ test('NAMED_PROCEDURAL_PALETTES matches core/color/palettes.h', { skip: SKIP }, 
   }
   assert.deepEqual(P.NAMED_PROCEDURAL_PALETTES.map(({ name, a, b, c, d }) => ({ name, a, b, c, d })),
     want, 'the palette roster drifted from the engine table');
+});
+
+/**
+ * The `SEED_*` constants core/mesh/solids.h declares.
+ * @param {string} source - core/mesh/solids.h text.
+ * @returns {Map<string, number>} Constant name -> the simple_registry index it holds.
+ */
+function engineSeedConstants(source) {
+  return new Map([...source.matchAll(/inline constexpr uint8_t (SEED_\w+)\s*=\s*(\d+);/g)]
+    .map(([, name, index]) => [name, Number(index)]));
+}
+
+/**
+ * Pins solid_codegen.js's DEFINED_SEED_CONSTANTS to the constants solids.h
+ * actually declares. The registry generator leads a paste with a seed
+ * constant's definition exactly when the set says the engine has none, so drift
+ * either way emits C++ that does not compile: a redefinition, or a Recipe
+ * naming an undeclared identifier. Each constant's value is checked against
+ * SIMPLE_SEEDS too, since the definition a paste carries is generated from that
+ * index.
+ */
+test('DEFINED_SEED_CONSTANTS matches core/mesh/solids.h', { skip: SKIP }, () => {
+  const declared = engineSeedConstants(header('core/mesh/solids.h'));
+  assert.ok(declared.size > 0,
+    'no SEED_* constant found in core/mesh/solids.h — the reader is out of date');
+  const seedOf = new Map(SIMPLE_SEEDS.map((name) => [`SEED_${upperSnake(name)}`, name]));
+  const want = [];
+  for (const [constant, index] of declared) {
+    const seed = seedOf.get(constant);
+    assert.ok(seed, `${constant} names no SIMPLE_SEEDS entry, so no paste can ever cite it`);
+    assert.equal(SIMPLE_SEEDS.indexOf(seed), index,
+      `${constant} is ${index} in the engine but ${SIMPLE_SEEDS.indexOf(seed)} in SIMPLE_SEEDS`);
+    want.push(seed);
+  }
+  assert.deepEqual([...DEFINED_SEED_CONSTANTS].sort(), want.sort(),
+    'DEFINED_SEED_CONSTANTS drifted from the engine: a seed it names but solids.h '
+    + 'does not leaves a Recipe citing an undeclared SEED_*, and one it omits makes '
+    + 'the paste redefine a constant the header already has');
 });
