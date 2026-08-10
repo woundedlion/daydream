@@ -332,11 +332,13 @@ export function fakeElement(tag = 'div') {
   let text = '';
   Object.defineProperty(element, 'textContent', {
     enumerable: true,
+    configurable: true,
     get() { return text; },
     set(value) { text = value === null || value === undefined ? '' : String(value); },
   });
   Object.defineProperty(element, 'dataset', {
     enumerable: true,
+    configurable: true,
     value: fakeDataset(element),
   });
   Object.setPrototypeOf(element, FakeElement.prototype);
