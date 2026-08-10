@@ -216,6 +216,7 @@ export const MESH_OP_RESULT_NAMES = [
   'NON_FINITE_ARG',
   'ANGLE_OUT_OF_DOMAIN',
   'STALE_WRAPPER',
+  'ARENA_UNAVAILABLE',
 ];
 
 // Reason-specific tail of the message a null MeshOps result earns.
@@ -227,6 +228,7 @@ const MESH_FAILURE_REMEDY = {
   NON_FINITE_ARG: 'an op argument was not a finite number',
   ANGLE_OUT_OF_DOMAIN: 'an angle argument sat outside its op domain',
   STALE_WRAPPER: 'a tooling-memory flush reclaimed this mesh — rebuild it from the base solid',
+  ARENA_UNAVAILABLE: 'the engine could not reserve its tooling memory, so no mesh op can run — reload the page',
 };
 
 /**
