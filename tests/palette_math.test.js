@@ -10,6 +10,7 @@ const {
 } = await import('../tools/palette_math.js');
 const { defaultPaletteRecipe, PaletteV4 } = await import('../tools/palette_controls.js');
 
+/** A ramp standing in for a compiled LUT: it exercises indexing, not the compiler. */
 function mockBakeLut() {
   const lut = new Uint8Array(256 * 3);
   for (let i = 0; i < 256; i++) {
@@ -34,9 +35,35 @@ function mockPaletteOps(overrides = {}) {
     ...overrides,
   };
 }
-setPaletteOps(mockPaletteOps());
+
+/**
+ * Runs `body` with `ops` installed as the compiler bridge and uninstalls it
+ * afterwards. The bridge is module-global, so an install that outlives its case
+ * measures every later GenerativePalette assertion against a stand-in LUT
+ * instead of a compiled one. The real compiler is exercised against the shipped
+ * module in color_parity_wasm.test.js.
+ * @param {Object} ops - Bridge stand-in, from mockPaletteOps().
+ * @param {Function} body - Case body.
+ * @returns {void}
+ */
+function withPaletteOps(ops, body) {
+  setPaletteOps(ops);
+  try {
+    body();
+  } finally {
+    setPaletteOps(null);
+  }
+}
 
 const NEAR = 1e-6;
+
+/** Pins the uninstalled default, so a case reading a stand-in LUT has to say so. */
+test('a palette compiles only against an explicitly installed bridge', () => {
+  assert.throws(() => new GenerativePalette(defaultPaletteRecipe()),
+    /PaletteOps bridge is not initialized/);
+  assert.throws(() => compilePaletteRecipe(defaultPaletteRecipe()),
+    /PaletteOps bridge is not initialized/);
+});
 
 /**
  * Verifies ProceduralPalette.get clamps and linearizes the cosine output, and
@@ -238,23 +265,25 @@ test('proceduralPaletteCpp emits a valid C++ initializer', () => {
  * limit approaching it.
  */
 test('GenerativePalette.get clamps to the final LUT entry', () => {
-  const pal = new GenerativePalette(defaultPaletteRecipe());
+  withPaletteOps(mockPaletteOps(), () => {
+    const pal = new GenerativePalette(defaultPaletteRecipe());
 
-  const atOne = pal.get(1.0);
-  const beyond = pal.get(1.5);
-  const justBelow = pal.get(0.99999);
+    const atOne = pal.get(1.0);
+    const beyond = pal.get(1.5);
+    const justBelow = pal.get(0.99999);
 
-  assert.equal(atOne.length, 3);
-  for (const ch of atOne) {
-    assert.ok(Number.isFinite(ch), `channel finite at t=1.0`);
-    assert.ok(ch >= -1e-6 && ch <= 1 + 1e-6, `channel ${ch} in [0,1] at t=1.0`);
-  }
+    assert.equal(atOne.length, 3);
+    for (const ch of atOne) {
+      assert.ok(Number.isFinite(ch), `channel finite at t=1.0`);
+      assert.ok(ch >= -1e-6 && ch <= 1 + 1e-6, `channel ${ch} in [0,1] at t=1.0`);
+    }
 
-  assert.deepEqual(beyond, atOne);
+    assert.deepEqual(beyond, atOne);
 
-  for (let i = 0; i < 3; i++) {
-    assert.ok(Math.abs(atOne[i] - justBelow[i]) < 1e-4, `continuous at t→1 on channel ${i}`);
-  }
+    for (let i = 0; i < 3; i++) {
+      assert.ok(Math.abs(atOne[i] - justBelow[i]) < 1e-4, `continuous at t→1 on channel ${i}`);
+    }
+  });
 });
 
 test('generativePaletteCpp serializes the complete V4 recipe', () => {
@@ -322,8 +351,8 @@ test('compilePaletteRecipe selects the requested bridge operation and owns its b
       fallback,
     };
   };
-  setPaletteOps({ compileAndBakeV4: compile('compile'), inspectV4: compile('inspect') });
-  try {
+  const ops = { compileAndBakeV4: compile('compile'), inspectV4: compile('inspect') };
+  withPaletteOps(ops, () => {
     const inspected = compilePaletteRecipe(recipe);
     const compiled = compilePaletteRecipe(recipe, false);
     assert.deepEqual(calls.map(([kind]) => kind), ['inspect', 'compile']);
@@ -332,21 +361,15 @@ test('compilePaletteRecipe selects the requested bridge operation and owns its b
     assert.notEqual(inspected.fallback, fallback);
     assert.notEqual(inspected.canonicalRecipe, recipe);
     assert.deepEqual(compiled.lut, lut);
-  } finally {
-    setPaletteOps(mockPaletteOps());
-  }
+  });
 });
 
 test('GenerativePalette reports compiler failures', () => {
-  setPaletteOps(mockPaletteOps({
-    inspectV4: () => ({ status: { code: 2, field: 7 } }),
-  }));
-  try {
+  const ops = mockPaletteOps({ inspectV4: () => ({ status: { code: 2, field: 7 } }) });
+  withPaletteOps(ops, () => {
     assert.throws(() => new GenerativePalette(defaultPaletteRecipe()),
       /Palette recipe error 2 at field 7/);
-  } finally {
-    setPaletteOps(mockPaletteOps());
-  }
+  });
 });
 
 test('GenerativePalette uses the canonical recipe and exposes diagnostics', () => {
@@ -355,7 +378,7 @@ test('GenerativePalette uses the canonical recipe and exposes diagnostics', () =
   diagnostics.set([0.6, 0.2, 0.75, 0.25, 0.1, 0.12], 6 * 128);
   const fallback = new Uint8Array(256);
   fallback[128] = 1;
-  setPaletteOps(mockPaletteOps({
+  const ops = mockPaletteOps({
     inspectV4: (input) => ({
       status: { code: 0, field: 0 },
       canonicalRecipe: { ...structuredClone(input), falloffStart: 0.8 },
@@ -363,8 +386,8 @@ test('GenerativePalette uses the canonical recipe and exposes diagnostics', () =
       diagnostics,
       fallback,
     }),
-  }));
-  try {
+  });
+  withPaletteOps(ops, () => {
     const palette = new GenerativePalette(recipe);
     assert.equal(palette.canonicalRecipe.falloffStart, 0.8);
     assert.deepEqual(palette.diagnosticAt(128 / 255), {
@@ -378,15 +401,13 @@ test('GenerativePalette uses the canonical recipe and exposes diagnostics', () =
       hFinal: diagnostics[773],
       fallbackMapped: true,
     });
-  } finally {
-    setPaletteOps(mockPaletteOps());
-  }
+  });
 });
 
 test('GenerativePalette.get blends adjacent entries in linear light', () => {
   const lut = new Uint8Array(256 * 3);
   lut.fill(128, 3);
-  setPaletteOps(mockPaletteOps({
+  const ops = mockPaletteOps({
     inspectV4: (recipe) => ({
       status: { code: 0, field: 0 },
       canonicalRecipe: recipe,
@@ -394,8 +415,8 @@ test('GenerativePalette.get blends adjacent entries in linear light', () => {
       diagnostics: new Float32Array(256 * 6),
       fallback: new Uint8Array(256),
     }),
-  }));
-  try {
+  });
+  withPaletteOps(ops, () => {
     const palette = new GenerativePalette(defaultPaletteRecipe());
     const grey = 0.21586050011389926;
     for (const [t, fraction] of [[0.5 / 255, 0.5], [0.25 / 255, 0.25]]) {
@@ -406,7 +427,5 @@ test('GenerativePalette.get blends adjacent entries in linear light', () => {
     assert.deepEqual(palette.get(2), palette.get(1));
     assert.deepEqual(palette.get(-1), palette.get(0));
     assert.deepEqual(palette.get(Number.NaN), palette.get(1));
-  } finally {
-    setPaletteOps(mockPaletteOps());
-  }
+  });
 });
