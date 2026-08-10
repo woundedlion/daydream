@@ -24,8 +24,10 @@ import {
   createGlobalKeydownHandler,
   createModuleLoadHandlers,
   createPoleLodBinding,
+  createRecordingSettings,
   createRenderAdapter,
   createSegmentSpawnGuard,
+  createSegmentedFallback,
   createTestAllTicker,
   createUnhandledRejectionHandler,
   repointDisplayAliases,
@@ -276,7 +278,7 @@ const moduleLoad = createModuleLoadHandlers({
     // Construct the recorder now that daydream's canvas exists.
     host.recorder = new VideoRecorder(daydream.canvas);
     host.recorder.frameInterval = daydream.frameInterval;
-    replayRecSettings();
+    recording.replay();
     host.recorder.onFormatFallback = (extension) => {
       const label = Object.keys(REC_FORMATS)
         .find(key => REC_FORMATS[key] === extension) ?? 'Auto';
@@ -450,29 +452,13 @@ const segSpawn = createSegmentSpawnGuard({
   spawn: () => segments.create(segCount),
   isActive: () => segments.active,
 });
-/**
- * Fall back to the single-thread engine after a segmented-pool failure, leaving
- * the toggle showing the state the app is actually in.
- * @param {string} label - What failed, named in the log line and the notice.
- * @param {*} err - The thrown value.
- * @returns {void}
- */
-function segmentedFailed(label, err) {
-  console.error(`Segmented POV: ${label} failed; falling back to the single engine.`, err);
-  const detail = (err && err.message) ? err.message : String(err);
-  // Otherwise the only symptom is the toggle flipping back, which reads as a
-  // mis-click; the fault banner covers latched runtime faults, not this path.
-  applyNotice.show(`Segmented POV ${label} failed: ${detail}. `
-    + 'Falling back to the single engine.', SWITCH_NOTICE);
-  segments.active = false;
-  segSpawn.strand();
-  segments.destroy();
-  segments.updateStats();
-  // setValue (not updateDisplay) so the deep-link writer drops segmented=true
-  // from the URL; it no-ops when the toggle is already false. Its onChange
-  // re-runs the teardown, which is idempotent.
-  segEnabledCtrl.setValue(false);
-}
+const segmentedFailed = createSegmentedFallback({
+  segments,
+  strand: () => segSpawn.strand(),
+  showNotice: (message) => applyNotice.show(message, SWITCH_NOTICE),
+  // No-ops when the toggle is already false.
+  showToggle: (on) => segEnabledCtrl.setValue(on),
+});
 const segEnabledCtrl = segFolder.add(segState, 'segmented').name('Enabled').onChange(async v => {
   try {
     segments.active = v;
@@ -507,52 +493,14 @@ segFolder.addSession(segState, 'boundaries').name('Show Boundaries').onChange(v 
 // Video recording
 const REC_RESOLUTIONS = { 'Native': null, '720p': 720, '1080p': 1080 };
 const REC_FORMATS = { 'Auto': 'auto', 'MP4': 'mp4', 'WebM': 'webm' };
-// These settings are latched at recorder.start(); warn that a mid-recording
-// change won't take effect until the next start().
-const warnIfRecording = (label) => {
-  if (host.recorder?.isRecording) {
-    console.warn(`Recording: ${label} change applies to the next recording (the current one is already running).`);
-  }
-};
-/** GUI-bound recording settings, replayed onto a recorder constructed later. */
-const recSettings = {};
-const recSettingReplays = [];
-/**
- * Defines one recording setting: the value is held privately, pushed to the
- * live recorder on every write, and registered for replayRecSettings().
- * @param {string} prop - Property name on recSettings.
- * @param {*} initial - Value before the GUI or a recorder exists.
- * @param {string} label - Setting name used in the mid-recording warning.
- * @param {function(*): void} push - Applies the value to the live host.recorder.
- * @returns {void}
- */
-const defineRecSetting = (prop, initial, label, push) => {
-  let value = initial;
-  Object.defineProperty(recSettings, prop, {
-    enumerable: true,
-    get() { return value; },
-    set(v) {
-      value = v;
-      if (host.recorder) push(v);
-      warnIfRecording(label);
-    },
-  });
-  recSettingReplays.push(() => push(value));
-};
-/**
- * Pushes every recording setting onto the freshly constructed recorder; writes
- * during the async WASM-load window no-op'd while host.recorder was null.
- * @returns {void}
- */
-const replayRecSettings = () => {
-  for (const replay of recSettingReplays) replay();
-};
-defineRecSetting('recQuality', 16, 'bitrate',
-  v => { host.recorder.bitrateMbps = v; });
-defineRecSetting('recResolution', 'Native', 'resolution',
-  v => { host.recorder.targetHeight = REC_RESOLUTIONS[v]; });
-defineRecSetting('recFormat', 'Auto', 'format',
-  v => { host.recorder.format = REC_FORMATS[v]; });
+const recording = createRecordingSettings({ getRecorder: () => host.recorder });
+const recSettings = recording.settings;
+recording.define('recQuality', 16, 'bitrate',
+  (recorder, v) => { recorder.bitrateMbps = v; });
+recording.define('recResolution', 'Native', 'resolution',
+  (recorder, v) => { recorder.targetHeight = REC_RESOLUTIONS[v]; });
+recording.define('recFormat', 'Auto', 'format',
+  (recorder, v) => { recorder.format = REC_FORMATS[v]; });
 
 const durationEl = document.createElement('div');
 durationEl.className = 'rec-duration';
