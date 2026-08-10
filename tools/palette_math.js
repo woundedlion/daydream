@@ -30,8 +30,11 @@ function fastCos(x) { return fastSin(x + Math.PI * 0.5); }
 let paletteOps = null;
 
 /**
- * Installs the module-lifetime PaletteOps instance.
- * @param {{compileAndBakeV4:Function, inspectV4:Function}|null} ops
+ * Installs the module-lifetime PaletteOps instance every generative-palette
+ * call compiles through. The page installs it once the WASM module is up, and
+ * passes null to drop it.
+ * @param {{compileAndBakeV4:Function, inspectV4:Function}|null} ops - The engine bridge, or null to clear it.
+ * @returns {void}
  */
 export function setPaletteOps(ops) {
   paletteOps = ops;
@@ -148,6 +151,15 @@ export function proceduralPaletteParams({ a, b, c, d }) {
   };
 }
 
+/**
+ * Re-parameterizes a procedural palette so t in [0, 1] covers only the
+ * viewport's window of the original: each channel's frequency scales by the
+ * window's span and its phase absorbs the window's start. A zoomed strip then
+ * plots the same colors at full width without the caller remapping t.
+ * @param {{A_R:number,A_G:number,A_B:number,B_R:number,B_G:number,B_B:number,C_R:number,C_G:number,C_B:number,D_R:number,D_G:number,D_B:number}} parameters - The 12 cosine coefficients.
+ * @param {{start:number, end:number}} viewport - The visible window, in the palette's own 0..1 phase.
+ * @returns {Object} The same 12 keys, with C and D rewritten for the window.
+ */
 export function proceduralParamsForViewport(parameters, viewport) {
   const span = viewport.end - viewport.start;
   return {
@@ -164,10 +176,13 @@ export function proceduralParamsForViewport(parameters, viewport) {
 // --- Generative Palette V4 --------------------------------------------------
 
 /**
- * Compiles a recipe with the engine and copies its aliased module buffers.
- * @param {Object} recipe
- * @param {boolean} inspect
- * @returns {Object}
+ * Compiles a recipe with the engine and copies its aliased module buffers. The
+ * bridge returns views onto WASM memory, which the next call reuses, so the
+ * results are copied out before they can be overwritten.
+ * @param {Object} recipe - A V4 palette recipe.
+ * @param {boolean} [inspect=true] - Whether to also bake the per-sample diagnostics the tool plots; false bakes the LUT alone.
+ * @returns {{status:Object, canonicalRecipe:(Object|undefined), lut:(Uint8Array|undefined), diagnostics:(Float32Array|undefined), fallback:(Uint8Array|undefined)}} The detached compile result; `status.code` is 0 on success.
+ * @throws {Error} When no PaletteOps bridge has been installed.
  */
 export function compilePaletteRecipe(recipe, inspect = true) {
   if (!paletteOps) {
@@ -188,9 +203,16 @@ export function compilePaletteRecipe(recipe, inspect = true) {
   return copied;
 }
 
+/**
+ * A compiled V4 palette: the engine's own 256-entry sRGB LUT, sampled the way
+ * the device samples it. Interchangeable with ProceduralPalette at the
+ * get/getChannelValue(s) surface the previews draw through.
+ */
 export class GenerativePalette {
   /**
-   * @param {Object} recipe
+   * Compiles the recipe and keeps the baked LUT and diagnostics.
+   * @param {Object} recipe - A V4 palette recipe.
+   * @throws {Error} When the recipe does not compile, carrying the status code and field.
    */
   constructor(recipe) {
     const result = compilePaletteRecipe(recipe, true);
@@ -204,6 +226,11 @@ export class GenerativePalette {
     this.fallback = result.fallback;
   }
 
+  /**
+   * The linearized color at a phase, interpolated between LUT entries.
+   * @param {number} t - Phase in [0, 1]; outside it the ends hold, and NaN reads the last entry.
+   * @returns {number[]} Linear [R, G, B] in [0, 1].
+   */
   get(t) {
     const index = Math.max(0, Math.min(255, Number.isNaN(t) ? 255 : t * 255));
     const left = Math.floor(index);
@@ -218,14 +245,37 @@ export class GenerativePalette {
     return color;
   }
 
+  /**
+   * All three channels at a phase, in sRGB, as the wave graph plots them.
+   * @param {number} t - Phase in [0, 1].
+   * @returns {number[]} sRGB [R, G, B].
+   */
   getChannelValues(t) {
     return this.get(t).map(linearToSrgbFloat);
   }
 
+  /**
+   * One channel of the sRGB sample at a phase.
+   * @param {number} t - Phase in [0, 1].
+   * @param {number} channelIndex - Channel to read (0=R, 1=G, 2=B).
+   * @returns {number} The channel's sRGB value.
+   */
   getChannelValue(t, channelIndex) {
     return this.getChannelValues(t)[channelIndex];
   }
 
+  /**
+   * The compiler's own account of the nearest LUT entry to a phase, for the
+   * inspector: where the color sat in OKLCH, how much chroma the gamut allowed
+   * there, and whether it had to be mapped back into gamut.
+   * @param {number} t - Phase in [0, 1]; the nearest of the 256 entries answers.
+   * @returns {{t:number, rgb:number[], L:number, C:number, q:number, Cmax:number, hPath:number, hFinal:number, fallbackMapped:boolean}}
+   *   The entry's phase and 8-bit sRGB triple, the OKLCH lightness and chroma it
+   *   resolved to, the chroma control `q` as a fraction of the boundary, the
+   *   gamut's chroma ceiling `Cmax` at that lightness and hue, the hue the color
+   *   path asked for and the hue torsion left it at, and whether the color fell
+   *   out of gamut and was mapped back in.
+   */
   diagnosticAt(t) {
     const index = Math.max(0, Math.min(255, Math.round(t * 255)));
     const offset = index * 6;
@@ -328,9 +378,12 @@ function cppFloatArray(values) {
 }
 
 /**
- * Serializes a complete canonical V4 recipe.
- * @param {Object} recipe
- * @returns {string}
+ * Serializes a complete canonical V4 recipe as the C++ that rebuilds it: every
+ * field assigned, then the try_compile call and the assert the engine's callers
+ * carry.
+ * @param {Object} recipe - A canonical V4 recipe, as the compiler returned it.
+ * @returns {string} The C++ source, ready to paste.
+ * @throws {Error} When a field holds an enum ordinal the engine has no name for.
  */
 export function generativePaletteCpp(recipe) {
   const f = (value) => formatFloatCpp(value, 6);
@@ -368,6 +421,11 @@ HS_CHECK(GenerativePalette::try_compile(recipe, palette, canonical, status),
          static_cast<int>(status.field));`;
 }
 
+/**
+ * Serializes a recipe as the JSON the tool exports and re-imports.
+ * @param {Object} recipe - A V4 palette recipe.
+ * @returns {string} Indented JSON.
+ */
 export function paletteRecipeJson(recipe) {
   return JSON.stringify(recipe, null, 2);
 }

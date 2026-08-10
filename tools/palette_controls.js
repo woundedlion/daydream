@@ -3,10 +3,28 @@
  * Licensed under the Polyform Noncommercial License 1.0.0
  */
 
+/*
+ * Pure state and geometry behind the palette tool's controls (palettes.html):
+ * hue-wheel math, the strip's zoom window, and the V4 recipe values the engine's
+ * palette compiler consumes. No DOM, so every export is testable headless.
+ */
+
 const clampUnit = (value) => Math.max(0, Math.min(1, value));
 
+/**
+ * Wraps a hue onto the [0, 1) fundamental domain.
+ * @param {number} turns - A hue in turns (one turn is 360°).
+ * @returns {number} The equivalent hue in [0, 1).
+ */
 export const wrapTurns = (turns) => turns - Math.floor(turns);
 
+/**
+ * The shortest signed rotation a hue difference stands for.
+ * @param {number} delta - Difference between two hues, in turns.
+ * @returns {number} The equivalent difference in [-0.5, 0.5]. Exactly half a
+ *   turn is equally far either way, so it keeps the sign of `delta` — a key
+ *   dragged the long way round travels on instead of snapping back.
+ */
 export function signedTurnDelta(delta) {
   const wrapped = wrapTurns(delta);
   if (wrapped < 0.5) return wrapped;
@@ -14,10 +32,26 @@ export function signedTurnDelta(delta) {
   return delta < 0 ? -0.5 : 0.5;
 }
 
+/**
+ * Lifts a wrapped hue to the representative nearest a reference hue, so a hue
+ * that crossed the 0/1 seam stays continuous with where it came from.
+ * @param {number} wrappedTurn - A hue in turns, typically in [0, 1).
+ * @param {number} referenceTurn - The unwrapped hue the result should sit beside.
+ * @returns {number} The representative of `wrappedTurn` within half a turn of `referenceTurn`.
+ */
 export function equivalentTurnNear(wrappedTurn, referenceTurn) {
   return referenceTurn + signedTurnDelta(wrappedTurn - referenceTurn);
 }
 
+/**
+ * Finds the hue-wheel key marker a pointer is over.
+ * @param {number} x - Pointer x, in the space the marker points are given in.
+ * @param {number} y - Pointer y, in the same space.
+ * @param {Array<{x:number, y:number}>} points - Marker centers, in key order.
+ * @param {number} radius - Grab radius around a marker.
+ * @returns {?number} Index of the closest marker within `radius`, the later of
+ *   two equally close ones, or null over blank wheel space.
+ */
 export function hitTestHueKeyMarker(x, y, points, radius) {
   let nearest = null;
   let nearestDistance = radius;
@@ -31,6 +65,14 @@ export function hitTestHueKeyMarker(x, y, points, radius) {
   return nearest;
 }
 
+/**
+ * Converts an OKLCH color to linear sRGB, unclamped so the caller can see which
+ * side of the gamut a channel fell off.
+ * @param {number} lightness - OKLCH L, nominally in [0, 1].
+ * @param {number} chroma - OKLCH C.
+ * @param {number} turns - OKLCH hue, in turns.
+ * @returns {number[]} Linear [R, G, B]; a channel outside [0, 1] is out of gamut.
+ */
 export function oklchLinearRgb(lightness, chroma, turns) {
   const angle = turns * Math.PI * 2;
   const a = chroma * Math.cos(angle);
@@ -48,6 +90,13 @@ export function oklchLinearRgb(lightness, chroma, turns) {
   ];
 }
 
+/**
+ * The widest chroma any hue reaches inside the sRGB gamut at one lightness,
+ * bisected per hue over a 360-step sweep. Scales the hue wheel's chroma axis so
+ * its outer edge is the gamut's widest slice at that lightness.
+ * @param {number} lightness - OKLCH L to search at.
+ * @returns {number} The maximum in-gamut chroma over all hues.
+ */
 export function maxSrgbGamutChroma(lightness) {
   const hueSamples = 360;
   const searchIterations = 12;
@@ -70,11 +119,24 @@ export function maxSrgbGamutChroma(lightness) {
 
 const PALETTE_TABS = new Set(['procedural', 'generative']);
 
+/**
+ * Reads the tool's selected tab out of a deep link.
+ * @param {string} search - A location's query string, e.g. '?tab=generative'.
+ * @returns {string} The named tab, or 'procedural' when the query names none of them.
+ */
 export function paletteTabFromSearch(search) {
   const tab = new URLSearchParams(search).get('tab');
   return PALETTE_TABS.has(tab) ? tab : 'procedural';
 }
 
+/**
+ * The tool's URL with its tab selected, leaving the rest of the query and the
+ * hash as they were.
+ * @param {string} href - Absolute URL to rewrite.
+ * @param {string} tab - Tab to select.
+ * @returns {string} The rewritten absolute URL.
+ * @throws {RangeError} When `tab` is not one of the tool's tabs.
+ */
 export function paletteTabUrl(href, tab) {
   if (!PALETTE_TABS.has(tab)) throw new RangeError(`Unknown palette tab: ${tab}`);
   const url = new URL(href);
@@ -105,6 +167,13 @@ export function tablistKeyTarget(key, current, count) {
  * Pointer positions stay local to the visible strip while palette phases stay
  * in the original 0..1 domain. Keeping that mapping here gives Procedural and
  * Generative palettes identical copy and nested-zoom behavior.
+ *
+ * @returns {{value: {start:number, end:number}, zoomed: boolean, map: function(number): number, zoom: function(number, number): {start:number, end:number}, reset: function(): void}}
+ *   The viewport. `value` is the visible phase window and `zoomed` reports
+ *   whether it is narrower than the whole palette; `map` takes a 0..1 strip
+ *   position to its palette phase; `zoom` narrows the window to the span
+ *   between two strip positions, in either drag direction, and returns it (an
+ *   empty drag leaves the window alone); `reset` restores the full 0..1 range.
  */
 export function createPaletteViewport() {
   let start = 0;
@@ -141,6 +210,13 @@ export function createPaletteViewport() {
   };
 }
 
+/**
+ * A copy of a recipe whose input window is narrowed onto the viewport, so a
+ * zoomed strip compiles the phases it shows at full LUT resolution.
+ * @param {Object} recipe - A V4 palette recipe.
+ * @param {{start:number, end:number}} viewport - The visible window, in fractions of the recipe's own span.
+ * @returns {Object} A detached recipe with the window composed onto input.offset/input.span.
+ */
 export function recipeForViewport(recipe, viewport) {
   const result = structuredClone(recipe);
   result.input.offset = recipe.input.offset + viewport.start * recipe.input.span;
@@ -148,6 +224,12 @@ export function recipeForViewport(recipe, viewport) {
   return result;
 }
 
+/**
+ * The endpoints a lightness or chroma axis spans, for controls that edit its
+ * ends rather than its center and width.
+ * @param {{center:number, range:number}} axis - The recipe's axis values.
+ * @returns {{minimum:number, maximum:number}} The endpoints, each clamped to [0, 1].
+ */
 export function axisEndpoints({ center, range }) {
   return {
     minimum: clampUnit(center - range * 0.5),
@@ -155,6 +237,12 @@ export function axisEndpoints({ center, range }) {
   };
 }
 
+/**
+ * The center-and-range form of an axis the user edited by its endpoints.
+ * @param {number} minimum - One endpoint.
+ * @param {number} maximum - The other; the two may arrive in either order.
+ * @returns {{center:number, range:number}} The axis values, with a non-negative range.
+ */
 export function axisFromEndpoints(minimum, maximum) {
   const low = Math.min(minimum, maximum);
   const high = Math.max(minimum, maximum);
@@ -192,6 +280,12 @@ export function lockedGroupMove(rawDelta, members) {
   return { delta, values };
 }
 
+/**
+ * The V4 recipe enumerants. The ordinals are what a recipe carries across the
+ * WASM boundary, so they mirror the engine's palette enums in declaration
+ * order.
+ * @type {Object<string, Object<string, number>>}
+ */
 export const PaletteV4 = Object.freeze({
   hueMode: Object.freeze({ HARMONY: 0, SWEEP: 1, CUSTOM: 2 }),
   harmony: Object.freeze({
@@ -285,6 +379,16 @@ function hueKeyStateFromTurns(turns) {
   };
 }
 
+/**
+ * The hue keys the wheel draws for a recipe, read in its own hue mode: the
+ * authored keys for CUSTOM, the two ends for SWEEP (halved under a LOOP domain,
+ * which travels out and back), and the harmony's anchors otherwise —
+ * MONOCHROMATIC repeats its single anchor so the wheel still draws a pair.
+ * @param {Object} recipe - A V4 palette recipe.
+ * @returns {{baseTurns:number, offsets:number[]}} The first key's wrapped turn
+ *   and every key's signed offset from it, so keys that walked past the seam
+ *   keep the continuous positions the harmony gave them.
+ */
 export function hueKeyState(recipe) {
   if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM)
     return hueKeyStateFromTurns(recipe.hue.customTurns.slice(0, 3));
@@ -304,6 +408,13 @@ export function hueKeyState(recipe) {
   return hueKeyStateFromTurns(turns);
 }
 
+/**
+ * The three keys a switch into CUSTOM hue mode should author, so the handoff
+ * starts on the shape the wheel already showed: a harmony's anchors resampled
+ * to three, a sweep's start/middle/end, or the existing custom keys untouched.
+ * @param {Object} recipe - A V4 palette recipe.
+ * @returns {{baseTurns:number, offsets:number[]}} The base turn and the three keys' offsets from it.
+ */
 export function customHueKeyState(recipe) {
   let turns;
   if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
@@ -323,12 +434,30 @@ export function customHueKeyState(recipe) {
   return hueKeyStateFromTurns(turns);
 }
 
+/**
+ * Rebuilds a recipe's customTurns array from the wheel's base-plus-offsets form.
+ * @param {number} baseTurns - The base hue, wrapped into [0, 1) before the offsets are added.
+ * @param {number[]} offsets - The three keys' offsets from the base.
+ * @param {number[]} [template] - Array the untouched fourth slot is carried over from.
+ * @returns {number[]} The four turns a recipe's hue.customTurns holds.
+ */
 export function customHueTurns(baseTurns, offsets, template = [0, 0, 0, 0]) {
   const turns = [...template];
   for (let i = 0; i < 3; i++) turns[i] = wrapTurns(baseTurns) + offsets[i];
   return turns;
 }
 
+/**
+ * Moves one custom hue key onto the turn a drag landed on.
+ * @param {number} baseTurns - The keys' base hue.
+ * @param {number[]} offsets - The keys' current offsets from the base.
+ * @param {number} keyIndex - Which key moved.
+ * @param {number} wrappedTurn - The pointed-at hue, as read off the wheel.
+ * @returns {number[]} A new offsets array; the other keys are unchanged. The
+ *   moved key takes the representative of `wrappedTurn` nearest where it
+ *   already was, so a drag across the seam does not spin it the long way round,
+ *   and its offset is clamped to ±2 turns so it cannot wind up unboundedly.
+ */
 export function moveCustomHueKey(baseTurns, offsets, keyIndex, wrappedTurn) {
   const nextOffsets = [...offsets];
   const currentTurn = baseTurns + nextOffsets[keyIndex];
@@ -337,6 +466,10 @@ export function moveCustomHueKey(baseTurns, offsets, keyIndex, wrappedTurn) {
   return nextOffsets;
 }
 
+/**
+ * The complete V4 recipe the tool opens on: a balanced analogous palette.
+ * @returns {Object} A fresh, detached recipe, safe to mutate.
+ */
 export function defaultPaletteRecipe() {
   return {
     schemaVersion: 4,
@@ -372,6 +505,14 @@ export function defaultPaletteRecipe() {
   };
 }
 
+/**
+ * Which control groups can still change the palette a recipe describes, so the
+ * page disables the rest instead of offering sliders with no effect: a palette
+ * with no chroma has no hue to steer, a monochromatic harmony has no direction
+ * or color path, and a custom curve authors its own endpoints.
+ * @param {Object} recipe - A V4 palette recipe.
+ * @returns {Object<string, boolean>} One enabled flag per control group.
+ */
 export function paletteRecipeAvailability(recipe) {
   const variedChroma = recipe.chroma.curve !== PaletteV4.curve.CONSTANT;
   const hasColor = recipe.chroma.center > 0 || (variedChroma && recipe.chroma.range > 0);
@@ -399,6 +540,11 @@ function cloneRecipe(recipe) {
   return structuredClone(recipe);
 }
 
+/**
+ * The tool's starting points, each a factory so a preset hands out a fresh
+ * recipe rather than a shared one the page would edit in place.
+ * @type {Object<string, function(): Object>}
+ */
 export const PALETTE_RECIPE_PRESETS = Object.freeze({
   balancedAnalogous() {
     return defaultPaletteRecipe();
@@ -424,6 +570,22 @@ export const PALETTE_RECIPE_PRESETS = Object.freeze({
   },
 });
 
+/**
+ * Owns the recipe being edited and the compiler's last word on it.
+ *
+ * Compilation is asynchronous, so each edit bumps a revision and a result
+ * carrying a stale one is dropped: a slow compile cannot overwrite the state a
+ * later edit produced. Every value in and out is cloned, so nothing the page
+ * holds aliases the store.
+ *
+ * @param {Object} [initial] - Recipe to start from; copied, not adopted.
+ * @returns {{value: Object, edit: function(function(Object): void): number, applyCompileResult: function(number, Object): boolean, replace: function(Object): number}}
+ *   The store. `value` is a detached {revision, draft, canonical, status}
+ *   snapshot; `edit` runs the mutator against a copy of the draft and returns
+ *   the new revision; `applyCompileResult` records a result against the
+ *   revision it compiled and reports whether that revision was still current;
+ *   `replace` swaps the whole draft and returns the new revision.
+ */
 export function createPaletteRecipeState(initial = defaultPaletteRecipe()) {
   let state = {
     revision: 0,
