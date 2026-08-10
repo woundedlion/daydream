@@ -35,12 +35,13 @@ export class EngineHost {
    * Identity of the effect the engine currently has loaded, bumped on every
    * setEffect. A parameter-definition snapshot and a value-stream read reporting
    * the same generation describe the same effect.
-   * @returns {number|undefined} The engine's generation counter; undefined when
-   *   the loaded WASM module does not expose one, which pins every read to the
-   *   same value and leaves the length guard as the only pairing check.
+   * @returns {number|undefined} The engine's generation counter; undefined
+   *   before the WASM load, after dispose(), or when the loaded module does not
+   *   expose one, which pins every read to the same value and leaves the length
+   *   guard as the only pairing check.
    */
   paramGeneration() {
-    return this.engine.getParamGeneration?.();
+    return this.engine?.getParamGeneration?.();
   }
 
   /** Drop the cached view so the next refresh() re-fetches it (used after a resize). */
@@ -52,10 +53,12 @@ export class EngineHost {
    * Re-fetch the WASM pixel view when it is missing, detached (heap growth can
    * detach the underlying ArrayBuffer, leaving a zero-length view), or sized for
    * a resolution the engine no longer renders, and notify the caller so it can
-   * re-point its display aliases at the fresh view.
+   * re-point its display aliases at the fresh view. A no-op before the WASM load
+   * and after dispose(), when there is no engine to fetch from.
    * @returns {void}
    */
   refresh() {
+    if (!this.engine) return;
     const { view, refreshed } = computePixelView(
       this.pixelView, () => this.engine.getPixels(),
       this.engine.getBufferLength?.());

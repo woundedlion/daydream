@@ -123,6 +123,40 @@ test('paramGeneration() is undefined on a module without the accessor', () => {
   assert.equal(host.paramGeneration(), undefined);
 });
 
+// Both accessors sit behind the object daydream.js hands SegmentController, and
+// the frame loop reaches them on either side of the WASM load.
+test('paramGeneration() is undefined before the load and after dispose()', () => {
+  const host = new EngineHost();
+
+  assert.equal(host.paramGeneration(), undefined);
+
+  host.engine = { getParamGeneration: () => 5, delete() {} };
+  assert.equal(host.paramGeneration(), 5);
+
+  host.dispose();
+  assert.equal(host.paramGeneration(), undefined);
+});
+
+test('refresh() is a no-op before the load and after dispose()', () => {
+  let notifyCalls = 0;
+  const host = new EngineHost(() => { notifyCalls++; });
+
+  host.refresh();
+  assert.equal(host.view(), null);
+  assert.equal(notifyCalls, 0);
+
+  const fresh = new Uint16Array(4);
+  host.engine = { getPixels: () => fresh, delete() {} };
+  host.refresh();
+  assert.equal(host.view(), fresh);
+  assert.equal(notifyCalls, 1);
+
+  host.dispose();
+  host.refresh();
+  assert.equal(host.view(), null);
+  assert.equal(notifyCalls, 1);
+});
+
 test('dispose() releases the recorder before the engine and leaves the host inert', () => {
   const order = [];
   const host = new EngineHost();
