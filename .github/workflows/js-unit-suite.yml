@@ -36,9 +36,17 @@ jobs:
         with:
           fetch-depth: 0   # full history: tests/wasm_provenance.test.js reads git log per file
 
+      # This exact runtime is the measurement basis of the committed per-file
+      # floors in tests/assertion-floors.json, so it is the only spelling of the
+      # Node version in this repository and a bump is not a routine one: node:test
+      # can retally cases across majors, so re-measure the floors
+      # (node scripts/run-tests.mjs --update-floors "tests/*.test.js") in the same
+      # commit. It deliberately trails the engine repository's Node pin
+      # (Holosphere tools/build_pins.py), which gates C++ tooling the floors do
+      # not depend on; the two need not move together.
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '22.23.2' # tests/assertion-floors.json measurement runtime
+          node-version: '22.23.2'
           cache: npm
 
       - run: npm ci
