@@ -389,13 +389,15 @@ const APPLY_NOTICE_MS = 8000;
  * owner: raising takes the element over, but a clear lands only when the caller
  * owns the notice on screen. A parameter write during a slider drag therefore
  * leaves a switch rejection standing instead of erasing the only explanation the
- * user was given. The element references are resolved once, at construction.
+ * user was given.
  *
  * @param {Object} deps - Injected app collaborators.
  * @param {Object} deps.doc - Document holding the notice elements.
  * @param {number} [deps.timeoutMs] - Dwell time before a notice self-clears.
  * @param {(fn: Function, ms: number) => *} [deps.schedule] - Timer source.
  * @param {(handle: *) => void} [deps.cancel] - Timer sink.
+ * @param {(message: string) => void} [deps.logWarning] - Sink for the
+ *   one-shot report that the notice elements are absent.
  * @returns {{show: (message: string|null, owner: string) => void,
  *   clear: () => void, owner: () => string|null}} The sink. clear() drops the
  *   notice whoever raised it, for the dismiss button and the page teardown;
@@ -406,14 +408,41 @@ export function createApplyNotice({
   timeoutMs = APPLY_NOTICE_MS,
   schedule = (fn, ms) => setTimeout(fn, ms),
   cancel = (handle) => clearTimeout(handle),
+  logWarning = (message) => console.warn(message),
 }) {
-  const body = doc.getElementById('apply-notice-body');
-  const text = doc.getElementById('apply-notice-text');
+  let elements = null;
+  let missLogged = false;
   let handle = null;
   let held = null;
 
+  // Latched only once both elements are present, so markup that arrives after
+  // construction still gets its notices; the absence is reported once rather
+  // than dropping every rejection message unremarked.
+  const resolve = () => {
+    if (elements) return elements;
+    const found = {
+      body: doc.getElementById('apply-notice-body'),
+      text: doc.getElementById('apply-notice-text'),
+    };
+    if (found.body && found.text) {
+      elements = found;
+      return elements;
+    }
+    if (!missLogged) {
+      missLogged = true;
+      const missing = Object.entries(found)
+        .filter(([, el]) => !el).map(([part]) => `apply-notice-${part}`);
+      logWarning(
+        `Apply-notice elements absent from the document (${missing.join(', ')}); `
+        + 'rejection and fallback messages are not shown until they appear.');
+    }
+    return null;
+  };
+
   const write = (notice, owner) => {
-    if (!body || !text) return;
+    const el = resolve();
+    if (!el) return;
+    const { body, text } = el;
     if (handle !== null) cancel(handle);
     handle = null;
     held = notice === null ? null : owner;
