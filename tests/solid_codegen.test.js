@@ -28,6 +28,7 @@ const {
   movedOps,
   createCommitQueue,
   createChainValidator,
+  createOpGate,
   meshOpFailure,
   requireMeshResult,
   MESH_OP_RESULT_NAMES,
@@ -1107,4 +1108,117 @@ test('createChainValidator serializes overlapping tasks', async () => {
   const b = validator.withValidator(task('b'));
   await Promise.all([a, b]);
   assert.deepEqual(log, ['a:in', 'a:out', 'b:in', 'b:out']);
+});
+
+// The add-op buttons the solids page offers, as refreshOpGating reads them.
+const CANDIDATES = ['kis', 'ambo', 'dual'];
+
+/** Verifies a clean sweep blocks nothing and reports itself complete. */
+test('createOpGate clears every candidate that replays', async () => {
+  const { Mod, state } = fakeModule();
+  const gate = createOpGate(createChainValidator(async () => Mod));
+
+  const probe = await gate.refresh('cube', [{ op: 'kis', params: {} }], CANDIDATES);
+  assert.deepEqual([...probe.blocked], []);
+  assert.equal(probe.complete, true);
+  assert.equal(probe.abandoned, false);
+  assert.equal(state.live, 0, 'the sweep must free every mesh it built');
+});
+
+/** Verifies a candidate whose classify pass comes back null is blocked. */
+test('createOpGate blocks a candidate the bridge rejects', async () => {
+  const { Mod } = fakeModule(() => { }, { rejects: new Set(['classifyFaces']) });
+  const gate = createOpGate(createChainValidator(async () => Mod));
+
+  const probe = await gate.refresh('cube', [], CANDIDATES);
+  assert.deepEqual([...probe.blocked].sort(), [...CANDIDATES].sort());
+  assert.equal(probe.complete, true);
+});
+
+/** Verifies a trapping candidate is blocked and the sweep resumes on a fresh instance. */
+test('createOpGate respawns mid-sweep after a candidate traps', async () => {
+  let spawns = 0;
+  const modules = [
+    fakeModule((op) => { if (op === 'ambo') throw new WebAssembly.RuntimeError('trap'); }).Mod,
+    fakeModule().Mod,
+  ];
+  const gate = createOpGate(createChainValidator(async () => modules[spawns++]));
+
+  const probe = await gate.refresh('cube', [], CANDIDATES);
+  assert.deepEqual([...probe.blocked], ['ambo']);
+  assert.equal(probe.complete, true);
+  assert.equal(spawns, 2);
+});
+
+/** Verifies a chain whose topology is unchanged is not re-swept. */
+test('createOpGate skips a pass whose base and op names repeat', async () => {
+  const probes = [];
+  const { Mod } = fakeModule((op) => probes.push(op));
+  const gate = createOpGate(createChainValidator(async () => Mod));
+  const ops = [{ op: 'truncate', params: { t: 0.33 } }];
+
+  assert.notEqual(await gate.refresh('cube', ops, CANDIDATES), null);
+  const swept = probes.length;
+  // Only a param moved: the topology, and so the gating, cannot have changed.
+  assert.equal(await gate.refresh('cube', [{ op: 'truncate', params: { t: 0.4 } }],
+    CANDIDATES), null);
+  assert.equal(probes.length, swept);
+  assert.notEqual(await gate.refresh('cube', [{ op: 'kis', params: {} }], CANDIDATES), null);
+  assert.ok(probes.length > swept);
+});
+
+/** Verifies a pass the chain outran reports nothing rather than gating on stale probes. */
+test('createOpGate discards a pass the chain changed under', async () => {
+  const { Mod } = fakeModule();
+  const gate = createOpGate(createChainValidator(async () => Mod));
+
+  const first = gate.refresh('cube', [], CANDIDATES);
+  const second = gate.refresh('octahedron', [], CANDIDATES);
+  assert.equal(await first, null);
+  assert.notEqual(await second, null);
+});
+
+/**
+ * Verifies probing gives up after the retry budget rather than re-spawning a
+ * module that will never start on every recompute, and says so exactly once.
+ */
+test('createOpGate abandons probing after its retry budget', async () => {
+  let spawns = 0;
+  const gate = createOpGate(
+    createChainValidator(async () => { spawns++; throw new Error('no wasm'); }), 3);
+
+  for (let i = 0; i < 2; i++) {
+    const probe = await gate.refresh('cube', [], CANDIDATES);
+    assert.equal(probe.complete, false);
+    assert.equal(probe.abandoned, false, 'the budget must not be spent early');
+  }
+  assert.equal((await gate.refresh('cube', [], CANDIDATES)).abandoned, true);
+  const after = spawns;
+  assert.equal(await gate.refresh('cube', [], CANDIDATES), null);
+  assert.equal(spawns, after, 'an abandoned gate must stop spawning');
+});
+
+/** Verifies an incomplete pass does not bank its signature, so the next one re-sweeps. */
+test('createOpGate re-sweeps a chain whose last pass was incomplete', async () => {
+  let spawns = 0;
+  const { Mod } = fakeModule();
+  const gate = createOpGate(createChainValidator(async () => {
+    spawns++;
+    if (spawns === 1) throw new Error('no wasm');
+    return Mod;
+  }));
+
+  assert.equal((await gate.refresh('cube', [], CANDIDATES)).complete, false);
+  assert.equal((await gate.refresh('cube', [], CANDIDATES)).complete, true);
+});
+
+/** Verifies a base the registry does not hold leaves the sweep incomplete, not blocking. */
+test('createOpGate reports an unbuildable base as an incomplete pass', async () => {
+  const { Mod } = fakeModule(() => { },
+    { rejects: new Set(['base:nope']), reason: 'UNKNOWN_NAME' });
+  const gate = createOpGate(createChainValidator(async () => Mod));
+
+  const probe = await gate.refresh('nope', [], CANDIDATES);
+  assert.deepEqual([...probe.blocked], []);
+  assert.equal(probe.complete, false);
 });

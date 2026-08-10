@@ -117,8 +117,8 @@
     "assertions": 58
   },
   "tests/palette_controls.test.js": {
-    "cases": 32,
-    "assertions": 116
+    "cases": 38,
+    "assertions": 137
   },
   "tests/palette_math.test.js": {
     "cases": 23,
@@ -197,8 +197,8 @@
     "assertions": 59
   },
   "tests/solid_codegen.test.js": {
-    "cases": 80,
-    "assertions": 447
+    "cases": 88,
+    "assertions": 474
   },
   "tests/solid_op_rows.test.js": {
     "cases": 10,
