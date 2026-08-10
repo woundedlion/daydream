@@ -184,6 +184,39 @@ test('the table is mutated in place and rebuilt only on a segment-count change',
   assert.equal(rebuilt.children.length, 3 + 3); // header + 3 segments + max + round-trip
 });
 
+// The overlay repaints on every composited frame, so the steady-state path has
+// to touch the document only where something changed.
+test('a steady-state repaint re-queries nothing and rewrites no class', () => {
+  const { doc, stats } = makeDoc();
+  const lookup = doc.getElementById;
+  let lookups = 0;
+  doc.getElementById = (id) => { lookups++; return lookup(id); };
+  const view = new SegmentStatsView(doc);
+
+  view.update(readyState(2));
+  assert.equal(lookups, 3, 'the first repaint resolves the three overlay elements');
+
+  // Counting wrapper over the fake element's className accessor, so an
+  // unconditional write is visible even when the value is unchanged.
+  const compute = grid(stats).cell(1, 'Compute');
+  const accessor = Object.getOwnPropertyDescriptor(compute, 'className');
+  let classWrites = 0;
+  Object.defineProperty(compute, 'className', {
+    enumerable: true,
+    get: accessor.get,
+    set(value) { classWrites++; accessor.set.call(compute, value); },
+  });
+
+  view.update(readyState(2, { timings: [5, 6] }));
+  view.update(readyState(2, { timings: [7, 8] }));
+  assert.equal(lookups, 3, 'later repaints reuse the resolved elements');
+  assert.equal(classWrites, 0, 'an unchanged compute class is not rewritten');
+
+  view.update(readyState(2, { timings: [SLOW_FRAME_MS + 1, 1] }));
+  assert.equal(classWrites, 1, 'crossing the slow threshold writes it once');
+  assert.equal(compute.className, 'seg-time slow');
+});
+
 test('an inactive pool hides the overlay and hands the stat bars back', () => {
   const { doc, stats, desktop, mobile } = makeDoc();
   const view = new SegmentStatsView(doc);

@@ -204,6 +204,8 @@ export function fakeElement(tag = 'div') {
   // module may set the string and later read the list, or the reverse.
   Object.defineProperty(element, 'className', {
     enumerable: true,
+    // Configurable so a test can wrap the accessor to count writes.
+    configurable: true,
     get() { return [...classes].join(' '); },
     set(value) {
       classes.clear();
