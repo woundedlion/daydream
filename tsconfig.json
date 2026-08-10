@@ -13,13 +13,14 @@
     "skipLibCheck": true,
     "types": []
   },
-  // Deliberately narrow: only the segment/worker pipeline, whose message shapes
-  // must agree across the postMessage boundary with no runtime to catch a
-  // mismatch, plus whatever else opts in with a `// @ts-check` pragma. The rest
-  // of the app and every tests/ file are out of scope.
+  // The segment/worker pipeline, whose message shapes must agree across the
+  // postMessage boundary with no runtime to catch a mismatch, plus every other
+  // module that checks clean under the options above and whatever opts in with a
+  // `// @ts-check` pragma. A module is absent because it does not yet check
+  // clean, not because checking it would be unwelcome; tests/ is out of scope.
   // `noResolve` also means imports are not followed even for the files below, so
   // an unlisted one degrades to `any` with no diagnostic — tests/tsconfig_roster
-  // .test.js keeps this list closed under the pipeline's own imports.
+  // .test.js keeps this list closed under the rostered modules' own imports.
   // holosphere_wasm.d.ts and app_lifecycle.d.ts stand in for modules that are
   // never checked; listing them is what makes those imports resolve under
   // noResolve.
@@ -28,6 +29,9 @@
     "app_lifecycle.d.ts",
     "frame_constants.js",
     "global_stats_view.js",
+    "param_sync.js",
+    "pixel_view.js",
+    "sidebar_logic.js",
     "worker_protocol.js",
     "segment_controller.js",
     "segment_layout.js",
