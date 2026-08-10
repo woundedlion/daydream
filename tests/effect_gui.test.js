@@ -327,7 +327,7 @@ test('editing a control writes the engine and the worker pool as floats', () => 
 test('the pause toggle is offered only when a param animates', () => {
   const animated = makeHarness({ params: [SPEED] });
   animated.panel.build();
-  assert.equal(animated.gui().ctrl('pause').label, 'Pause Animation');
+  assert.equal(animated.gui().ctrl('pause').label, 'Pause Presets');
   assert.notEqual(animated.panel.active().pauseController, null);
 
   const static_ = makeHarness({ params: [{ name: 'Speed', value: 0.1, min: 0, max: 1 }] });

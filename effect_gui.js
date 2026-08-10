@@ -273,7 +273,7 @@ export function createEffectGui({
   }
 
   /**
-   * Add the "Pause Animation" toggle, offered only when the effect has an
+   * Add the "Pause Presets" toggle, offered only when the effect has an
    * animated param.
    * @param {Object} fx - The effect record being built.
    * @param {Array<Object>} params - The engine's parameter definitions.
@@ -306,7 +306,7 @@ export function createEffectGui({
       const add = !hydrate && typeof fx.gui.addUnhydrated === 'function'
         ? (...args) => fx.gui.addUnhydrated(...args)
         : (...args) => fx.gui.add(...args);
-      controller = add(animationState, 'pause').name('Pause Animation');
+      controller = add(animationState, 'pause').name('Pause Presets');
       controller.onChange(transitionPaused);
     }
     fx.animationState = animationState;

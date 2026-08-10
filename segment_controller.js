@@ -243,6 +243,7 @@ export class SegmentController {
     this.paramValues = null;  // segment 0's latest param values, for GUI sync
     /** @type {number | null} */
     this.paramGeneration = null; // schema identity paired with paramValues
+    this.paramRevision = 0;
 
     this.pending = 0;         // count of outstanding render responses
     /** @type {boolean[]} */
@@ -472,7 +473,8 @@ export class SegmentController {
             // Mirror segment 0's live params for GUI sync, inside the fence so a
             // stale-generation frame can't publish params against a new descriptor
             // list.
-            if (msg.segId === 0 && msg.paramValues) {
+            if (msg.segId === 0 && msg.paramValues
+                && msg.paramRevision === this.paramRevision) {
               this.paramValues = msg.paramValues;
               this.paramGeneration = msg.paramGeneration ?? null;
             }
@@ -546,6 +548,7 @@ export class SegmentController {
           params: initialParams,
           paused: this.animationsPaused,
           poleLod: this.poleLod,
+          paramRevision: this.paramRevision,
         });
       } catch (error) {
         this.abortWorkerStartup(i, 'initialization', error);
@@ -780,6 +783,7 @@ export class SegmentController {
     // rebuilt GUI would bind the new effect's sliders to stale values by index.
     this.paramValues = null;
     this.paramGeneration = null;
+    this.paramRevision++;
     // A faulted pool is broken until re-created; rebuild (active) re-reads the
     // effect and params from appState rather than broadcasting to dead workers.
     // Bounded by MAX_FAULTED_REBUILDS: effect switches can arrive on a timer, and
@@ -810,6 +814,7 @@ export class SegmentController {
       name,
       params: this.snapshotParams(),
       paused: this.animationsPaused,
+      paramRevision: this.paramRevision,
     });
   }
 
@@ -819,11 +824,17 @@ export class SegmentController {
    * @param {number} value
    */
   setParameter(name, value) {
+    this.paramValues = null;
+    this.paramGeneration = null;
+    this.paramRevision++;
     // A faulted pool stays latched: this fires continuously during a slider drag,
     // so rebuilding here would respawn the pool per drag event. Recovery is a
     // resolution/effect change or a mode toggle.
     if (this.faulted) return;
-    this.broadcast({ type: 'setParameter', name, value });
+    this.broadcast({
+      type: 'setParameter', name, value,
+      paramRevision: this.paramRevision,
+    });
   }
 
   /**
@@ -870,6 +881,9 @@ export class SegmentController {
     }
     // Open a new generation: in-flight and settled results were sized to the old
     // W/H. Drop settled results here; onmessage's fence drops in-flight ones.
+    this.paramValues = null;
+    this.paramGeneration = null;
+    this.paramRevision++;
     this.renderGen++;
     this.results.fill(null);
     this.pendingFrame = false;
@@ -884,6 +898,7 @@ export class SegmentController {
       name: this.appState.get('effect'),
       params: this.snapshotParams(),
       paused: this.animationsPaused,
+      paramRevision: this.paramRevision,
     });
   }
 

@@ -46,6 +46,7 @@ let segId = 0;
 let totalSegs = 1;
 let canvasW = 0;
 let canvasH = 0;
+let paramRevision = 0;
 /** @type {SegRange | null} */
 let segRange = null;
 // Disposition of the last applyClip: true once the engine kept the full-canvas
@@ -113,6 +114,7 @@ async function handleMessage(msg) {
 
       segId = msg.segId;
       totalSegs = msg.totalSegs;
+      paramRevision = msg.paramRevision;
 
       // Every segment runs a full engine replica, so engine logs would print
       // once per worker; only segment 0 logs. printErr stays live everywhere.
@@ -172,6 +174,7 @@ async function handleMessage(msg) {
         if (typeof msg.paused === 'boolean') {
           engine.setAnimationsPaused(msg.paused);
         }
+        paramRevision = msg.paramRevision;
         applyClip();
       }
       break;
@@ -197,6 +200,7 @@ async function handleMessage(msg) {
     case 'setParameter': {
       if (engine) {
         engine.setParameter(msg.name, msg.value);
+        paramRevision = msg.paramRevision;
       }
       break;
     }
@@ -304,6 +308,7 @@ async function handleMessage(msg) {
         arenaMetrics,
         paramValues,
         paramGeneration,
+        paramRevision,
         fullFrame: clipFullFrame,
       }, [pixelsCopy.buffer]);
       break;
