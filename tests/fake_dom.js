@@ -90,6 +90,15 @@ export class FakeElement {}
  * scrollIntoView() record their call counts the same way. Removing a listener
  * that was never added throws rather than no-opping as the DOM does, so a
  * fixture that omits the add cannot hide a removal that never happens.
+ *
+ * dispatch() propagates over the parentNode chain the way the DOM does, so a
+ * listener's attachment point is observable: capture listeners run root-first,
+ * then every listener on the dispatching node in registration order, then the
+ * non-capture listeners back up to the root. The event carries `target` (the
+ * dispatching node unless the caller names one), `currentTarget`,
+ * stopPropagation() and stopImmediatePropagation(); the two stop methods are
+ * the event's own and overwrite any the caller passed. Events bubble unless the
+ * caller passes {bubbles: false}.
  * @param {string} [tag] - Tag name.
  * @returns {Object} Fake element.
  */
@@ -184,16 +193,57 @@ export function fakeElement(tag = 'div') {
       this.listeners.splice(at, 1);
     },
     dispatch(type, event = {}) {
-      // The dispatching node is the default target, as in the DOM; a test
-      // passing one models a bubbled event from a descendant.
-      const dispatched = { target: this, ...event };
-      for (const l of this.listeners.filter((l) => l.type === type)) {
-        // Re-check membership: an earlier handler may have removed this one,
-        // and the DOM skips a listener removed after the dispatch began.
-        const at = this.listeners.indexOf(l);
-        if (at < 0) continue;
-        if (l.options && l.options.once) this.listeners.splice(at, 1);
-        l.handler(dispatched);
+      // Propagation path: the dispatching node, then each ancestor.
+      const path = [];
+      for (let node = this; node; node = node.parentNode) path.push(node);
+      const ancestors = path.slice(1);
+
+      let stopped = false;
+      let stoppedHere = false;
+      // stopPropagation/stopImmediatePropagation belong to the event, so they
+      // overwrite anything the caller supplied rather than the reverse.
+      const dispatched = {
+        target: this,
+        bubbles: true,
+        ...event,
+        currentTarget: null,
+        stopPropagation() { stopped = true; },
+        stopImmediatePropagation() { stopped = true; stoppedHere = true; },
+      };
+
+      /**
+       * Runs one node's listeners for this event.
+       * @param {Object} node - Node the event has reached.
+       * @param {boolean|null} capture - Capture flag to run, or null for the
+       *   at-target phase, which runs both flags in registration order.
+       * @returns {void}
+       */
+      const fire = (node, capture) => {
+        dispatched.currentTarget = node;
+        stoppedHere = false;
+        for (const l of [...node.listeners]) {
+          if (stoppedHere) break;
+          if (l.type !== type) continue;
+          if (capture !== null && l.capture !== capture) continue;
+          // Re-check membership: an earlier handler may have removed this one,
+          // and the DOM skips a listener removed after the dispatch began.
+          const at = node.listeners.indexOf(l);
+          if (at < 0) continue;
+          if (l.options && l.options.once) node.listeners.splice(at, 1);
+          l.handler(dispatched);
+        }
+      };
+
+      for (const node of [...ancestors].reverse()) {
+        if (stopped) return;
+        fire(node, true);
+      }
+      if (stopped) return;
+      fire(this, null);
+      if (!dispatched.bubbles) return;
+      for (const node of ancestors) {
+        if (stopped) return;
+        fire(node, false);
       }
     },
     focus() { this.focusCalls++; },

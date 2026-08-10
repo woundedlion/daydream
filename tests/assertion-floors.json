@@ -64,6 +64,10 @@
     "cases": 9,
     "assertions": 9
   },
+  "tests/fake_dom.test.js": {
+    "cases": 12,
+    "assertions": 14
+  },
   "tests/flyout.test.js": {
     "cases": 3,
     "assertions": 14
@@ -194,7 +198,7 @@
   },
   "tests/solid_op_rows.test.js": {
     "cases": 9,
-    "assertions": 35
+    "assertions": 36
   },
   "tests/solid_render.test.js": {
     "cases": 14,
