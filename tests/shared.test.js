@@ -15,7 +15,9 @@ import {
 } from './fake_three.js';
 
 // Same URL this file's static import above resolved, so shared.js and the
-// assertions below share one module instance — and one `log`.
+// assertions below share one module instance — and one `log`. The hook is
+// process-wide and never deregistered, which is only safe because `node --test`
+// gives each test file its own process.
 register('./three_loader_hooks.js', import.meta.url, {
   data: { fakeThreeUrl: import.meta.resolve('./fake_three.js') },
 });
