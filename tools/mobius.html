@@ -298,9 +298,7 @@
       <div class="flex flex-col">
         <h1 class="text-lg font-bold text-white leading-tight">Mobius Visualizer</h1>
         <p class="text-xs text-indigo-300 font-mono">f(z) = (az + b) / (cz + d)</p>
-        <p id="degenerateWarning" class="hidden text-xs text-amber-400 font-medium" role="status">
-          ⚠ Degenerate transform (ad − bc ≈ 0): the map collapses to a constant.
-        </p>
+        <p id="degenerateWarning" class="hidden text-xs text-amber-400 font-medium" role="status"></p>
       </div>
       <select id="presetSelect" aria-label="Preset"
         class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium rounded border border-slate-500 px-2 py-1 mx-2 truncate">
@@ -458,6 +456,9 @@
     // determinant ad − bc ≠ 0; at det ≈ 0 the map collapses to a constant and
     // the shader paints a flat field with no on-screen cue. Surface that as a
     // warning so a degenerate parameter set isn't read as a rendering bug.
+    const DEGENERATE_WARNING =
+      '⚠ Degenerate transform (ad − bc ≈ 0): the map collapses to a constant.';
+
     const updateDegenerateWarning = () => {
       const el = document.getElementById('degenerateWarning');
       if (!el) return;
@@ -466,6 +467,10 @@
       const detRe = (A.re * D.re - A.im * D.im) - (B.re * C.re - B.im * C.im);
       const detIm = (A.re * D.im + A.im * D.re) - (B.re * C.im + B.im * C.re);
       const degenerate = Math.hypot(detRe, detIm) < 1e-4;
+      // A live region announces a content change, so the text has to arrive
+      // with the warning; markup that only loses its `hidden` class is silent.
+      const text = degenerate ? DEGENERATE_WARNING : '';
+      if (el.textContent !== text) el.textContent = text;
       el.classList.toggle('hidden', !degenerate);
     };
 
