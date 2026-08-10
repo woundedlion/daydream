@@ -133,9 +133,10 @@ function transpileGlslCNum(src, name, params = ['p', 'q']) {
     if (body[i] === '{') depth++;
     else if (body[i] === '}' && --depth === 0) { end = i; break; }
   }
-  // GLSL -> JS: `float` decls become `const`, `CNum(re, im)` constructors become
-  // `{ re, im }` objects. Constructors can nest parens, so split args by the
-  // top-level comma rather than with a regex.
+  // GLSL -> JS: `float` decls become `const`, the built-in math functions gain
+  // their `Math.` prefix, and `CNum(re, im)` constructors become `{ re, im }`
+  // objects. Constructors can nest parens, so split args by the top-level comma
+  // rather than with a regex.
   const toObj = (s) => {
     let i = 0;
     while ((i = s.indexOf('CNum(', i)) !== -1) {
@@ -154,7 +155,7 @@ function transpileGlslCNum(src, name, params = ['p', 'q']) {
   };
   const js = toObj(body.slice(open + 1, end)
     .replace(/\bfloat\b/g, 'const')
-    .replace(/\bsqrt\(/g, 'Math.sqrt('));
+    .replace(/\b(sqrt|abs|max|min)\(/g, 'Math.$1('));
   return new Function(...params, `${glslConstants(src).js}\n${js}`);
 }
 
@@ -299,6 +300,27 @@ test('projectDiv saturates on the relative magnitude, not an absolute divisor', 
   assertComplex(projectDiv({ re: 0, im: 0 }, { re: 0, im: 0 }), 0, 0, 'projectDiv 0/0');
 });
 
+/**
+ * The saturating branch normalizes by the peak component before squaring, so a
+ * numerator whose squared magnitude overflows to infinity (or underflows to
+ * zero) keeps its direction instead of collapsing onto the origin. Doubles
+ * overflow at ~1e154 where the shader's floats overflow at ~2e19, so these
+ * exponents stand in for the fp32 case the engine guards.
+ */
+test('projectDiv keeps the direction when the squared magnitude is out of range', () => {
+  const huge = projectDiv({ re: 3e200, im: 0 }, { re: 1, im: 0 });
+  assertComplex(huge, STEREO_INF, 0, 'projectDiv overflowing numerator');
+
+  const tiny = projectDiv({ re: 0, im: -3e-200 }, { re: 0, im: 0 });
+  assertComplex(tiny, 0, -STEREO_INF, 'projectDiv underflowing numerator');
+
+  const diagonal = projectDiv({ re: -3e200, im: 3e200 }, { re: 1, im: 0 });
+  assert.ok(Math.abs(Math.hypot(diagonal.re, diagonal.im) - STEREO_INF) < 1e-6,
+    `magnitude ${Math.hypot(diagonal.re, diagonal.im)}`);
+  assert.ok(Math.abs(Math.atan2(diagonal.im, diagonal.re) - 3 * Math.PI / 4) < 1e-12,
+    'diagonal azimuth');
+});
+
 /** The GLSL stereo/project_div bodies agree with the JS twins the shader mirrors. */
 test('GLSL projection ops match the JS implementations', () => {
   const points = [
@@ -312,6 +334,7 @@ test('GLSL projection ops match the JS implementations', () => {
   const complexes = [
     { re: 1, im: 2 }, { re: 0, im: 0 }, { re: 1e5, im: 0 }, { re: 4e-4, im: 0 },
     { re: -2, im: 0.5 }, { re: STEREO_INF, im: 0 }, { re: 1e-6, im: 1e-6 },
+    { re: 3e200, im: -3e200 }, { re: 0, im: 3e-200 },
   ];
   for (const num of complexes) {
     for (const den of complexes) {
