@@ -241,6 +241,8 @@ export class SegmentController {
 
     /** @type {number[] | null} */
     this.paramValues = null;  // segment 0's latest param values, for GUI sync
+    /** @type {number | null} */
+    this.paramGeneration = null; // schema identity paired with paramValues
 
     this.pending = 0;         // count of outstanding render responses
     /** @type {boolean[]} */
@@ -346,6 +348,15 @@ export class SegmentController {
   }
 
   /**
+   * Schema generation paired with getParamValues(), or null before segment 0
+   * publishes a value snapshot.
+   * @returns {number | null}
+   */
+  getParamGeneration() {
+    return this.paramGeneration;
+  }
+
+  /**
    * (Re)build the worker pool at the current resolution: destroy any existing
    * pool, then spawn `numSegments` fresh workers, each loading its own WASM
    * module and initialized with this engine's tuned params and paused state.
@@ -378,6 +389,7 @@ export class SegmentController {
     this.fullFrames = new Array(numSegments).fill(false);
     this.frameSeen = new Array(numSegments).fill(false);
     this.paramValues = null;
+    this.paramGeneration = null;
     this.ready = false;
 
     const res = this.resolutionPresets[this.appState.get('resolution')];
@@ -460,8 +472,10 @@ export class SegmentController {
             // Mirror segment 0's live params for GUI sync, inside the fence so a
             // stale-generation frame can't publish params against a new descriptor
             // list.
-            if (msg.segId === 0 && msg.paramValues)
+            if (msg.segId === 0 && msg.paramValues) {
               this.paramValues = msg.paramValues;
+              this.paramGeneration = msg.paramGeneration ?? null;
+            }
             this.scratch[msg.segId] = {
               pixels: msg.pixels,
               x0: msg.x0, x1: msg.x1,
@@ -765,6 +779,7 @@ export class SegmentController {
     // segment 0 reports the new effect's first frame; otherwise the synchronously
     // rebuilt GUI would bind the new effect's sliders to stale values by index.
     this.paramValues = null;
+    this.paramGeneration = null;
     // A faulted pool is broken until re-created; rebuild (active) re-reads the
     // effect and params from appState rather than broadcasting to dead workers.
     // Bounded by MAX_FAULTED_REBUILDS: effect switches can arrive on a timer, and

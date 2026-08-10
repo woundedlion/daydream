@@ -360,6 +360,7 @@ const effectGui = createEffectGui({
   paramGeneration: () => host.paramGeneration(),
   segmentsOwnDisplay: () => segments.ownsDisplay,
   segmentParamValues: () => segments.getParamValues(),
+  segmentParamGeneration: () => segments.getParamGeneration(),
   engineParamValues: () => host.engine.getParamValues(),
   setEngineParam,
   setWorkerParam: (name, value) => segments.setParameter(name, value),

@@ -38,12 +38,15 @@ const RESERVED_CONTROL_NAMES = new Set(['reset', 'export', 'pause']);
  * @param {Object} gui - The effect GUI to add to.
  * @param {Object} state - The GUI-bound value object.
  * @param {Object} p - The parameter definition.
+ * @param {boolean} [hydrate=true] - Whether a matching deep link may seed it.
  * @returns {Object} The created controller.
  */
-export function addParamControl(gui, state, p) {
+export function addParamControl(gui, state, p, hydrate = true) {
   const kind = paramControlKind(p);
   const add = p.readonly
     ? (...args) => gui.addSession(...args)
+    : !hydrate && typeof gui.addUnhydrated === 'function'
+      ? (...args) => gui.addUnhydrated(...args)
     : (...args) => gui.add(...args);
   let controller;
   if (kind === 'boolean') {
@@ -71,6 +74,8 @@ export function addParamControl(gui, state, p) {
  *   the display, making its values (not the idle main engine's) the live ones.
  * @param {() => ArrayLike<number>|null} deps.segmentParamValues - The pool's
  *   per-frame value stream.
+ * @param {() => number|null|undefined} [deps.segmentParamGeneration] - Schema
+ *   generation paired with segment 0's value stream.
  * @param {() => ArrayLike<number>|null} deps.engineParamValues - The main
  *   engine's per-frame value stream.
  * @param {(name: string, value: number) => void} deps.setEngineParam - Writes one
@@ -102,6 +107,7 @@ export function createEffectGui({
   paramGeneration,
   segmentsOwnDisplay,
   segmentParamValues,
+  segmentParamGeneration = () => undefined,
   engineParamValues,
   setEngineParam,
   setWorkerParam,
@@ -118,6 +124,7 @@ export function createEffectGui({
   let activeEffect = null;
   // Throttle the param/value length-skew warning to once per skew episode.
   let skewLogged = false;
+  let rebuildFailureGeneration;
 
   /**
    * Live per-frame parameter values for the active effect. Once the worker pool
@@ -129,13 +136,22 @@ export function createEffectGui({
    *   current parameter snapshot.
    */
   function liveParamValues() {
-    if (segmentsOwnDisplay()) return segmentParamValues();
     // The main engine's value stream describes whatever effect it last loaded;
     // pairing it with a snapshot from an earlier load binds sliders to another
-    // effect's values, which equal parameter counts would hide.
+    // effect's values, which equal parameter counts would hide. The main engine
+    // also owns the parameter definitions in segmented mode, even though segment
+    // 0 owns the live values, so this identity check precedes the source choice.
     if (activeEffect
         && paramGenerationStale(activeEffect.paramGeneration, paramGeneration())) {
       return null;
+    }
+    if (segmentsOwnDisplay()) {
+      const valuesGeneration = segmentParamGeneration();
+      if (valuesGeneration != null
+          && paramGenerationStale(activeEffect?.paramGeneration, valuesGeneration)) {
+        return null;
+      }
+      return segmentParamValues();
     }
     return engineParamValues();
   }
@@ -148,6 +164,13 @@ export function createEffectGui({
    */
   function sync() {
     if (!activeEffect || !activeEffect.controllerByName) return;
+    if (paramGenerationStale(activeEffect.paramGeneration, paramGeneration())) {
+      rebuildSchema();
+      // A segmented value snapshot may be from a frame already in flight when
+      // the topology changed. The next render supplies values for the rebuilt
+      // schema; never bind the pre-rebuild snapshot during this call.
+      return;
+    }
     if (!activeEffect.hasLiveParams) return;
 
     const values = liveParamValues();
@@ -258,8 +281,8 @@ export function createEffectGui({
    *   setPaused: (v: boolean) => void}} The toggle's state, its controller (null
    *   when no param animates), and its state transition.
    */
-  function addPauseToggle(fx, params) {
-    const animationState = { pause: false };
+  function addPauseToggle(fx, params, initialPause = false, hydrate = true) {
+    const animationState = { pause: Boolean(initialPause) };
     /**
      * Adopt a pause transition, applying it immediately after initial hydration
      * has been committed to the rebuilt renderers.
@@ -280,7 +303,10 @@ export function createEffectGui({
       }
     };
     if (params.some(p => p.animated)) {
-      controller = fx.gui.add(animationState, 'pause').name('Pause Animation');
+      const add = !hydrate && typeof fx.gui.addUnhydrated === 'function'
+        ? (...args) => fx.gui.addUnhydrated(...args)
+        : (...args) => fx.gui.add(...args);
+      controller = add(animationState, 'pause').name('Pause Animation');
       controller.onChange(transitionPaused);
     }
     fx.animationState = animationState;
@@ -340,7 +366,7 @@ export function createEffectGui({
    *   pause - The effect's pause toggle.
    * @returns {void}
    */
-  function addParamControllers(fx, params, pause) {
+  function addParamControllers(fx, params, pause, previousParamNames = null) {
     // paramNames records the value-stream order; sync() binds by name, not
     // index, so a C++ param reorder can't mis-bind sliders.
     const state = {};
@@ -354,7 +380,8 @@ export function createEffectGui({
     params.forEach(p => {
       state[p.name] = p.value;
 
-      const controller = addParamControl(fx.gui, state, p);
+      const controller = addParamControl(
+        fx.gui, state, p, !previousParamNames?.has(p.name));
       fx.paramNames.push(p.name);
       fx.controllerByName.set(p.name, controller);
 
@@ -372,6 +399,132 @@ export function createEffectGui({
         adoptEnginePause(pause, p);
       });
     });
+  }
+
+  /**
+   * Construct one effect record without publishing or mounting it. Keeping the
+   * old record live until this succeeds makes a schema rebuild atomic from the
+   * panel's point of view.
+   * @param {{initialPause?: boolean, hydratePause?: boolean,
+   *   previousParamNames?: Set<string>|null}} [options] - Rebuild state.
+   * @returns {Object} A complete, unmounted effect record.
+   */
+  function createEffectRecord({
+    initialPause = false,
+    hydratePause = true,
+    previousParamNames = null,
+  } = {}) {
+    const fx = {
+      gui: createGui(),
+      activeDragEnds: new Set(),
+      animationPauseApplied: false,
+    };
+
+    try {
+      const params = getParameterDefinitions();
+      const reservedParams = params
+        .filter((p) => RESERVED_CONTROL_NAMES.has(p.name))
+        .map((p) => p.name);
+      if (reservedParams.length > 0) {
+        logWarn(`Engine parameter names conflict with effect controls: ${reservedParams.join(', ')}`);
+      }
+      // Stamp before controls are attached: URL replay can synchronously write
+      // engine params and make this snapshot stale, which the next sync must see.
+      fx.paramGeneration = paramGeneration();
+
+      addEffectActions(fx, params);
+      const pause = addPauseToggle(fx, params, initialPause, hydratePause);
+      addParamControllers(fx, params, pause, previousParamNames);
+      fx.pause = pause;
+      return fx;
+    } catch (error) {
+      disposeEffect(fx);
+      throw error;
+    }
+  }
+
+  /**
+   * Release one effect record without changing which record is published.
+   * @param {Object|null} fx - Record to release.
+   * @returns {void}
+   */
+  function disposeEffect(fx) {
+    if (!fx?.gui) return;
+    clearTimeout(fx.exportFlashTimer);
+    fx.exportFlashTimer = null;
+    if (fx.activeDragEnds) {
+      for (const end of fx.activeDragEnds) {
+        dragTarget.removeEventListener('pointerup', end);
+        dragTarget.removeEventListener('pointercancel', end);
+      }
+      fx.activeDragEnds.clear();
+    }
+    const dom = fx.gui.domElement;
+    if (dom?.parentNode) dom.parentNode.removeChild(dom);
+    try {
+      fx.gui.destroy();
+    } catch (e) {
+      logWarn("GUI destroy warning:", e);
+    }
+  }
+
+  /**
+   * Replace a stale parameter schema without reloading the effect. Definitions
+   * always come from the main engine; segmented workers only supply live values.
+   * @returns {boolean} True when a replacement record was installed.
+   */
+  function rebuildSchema() {
+    const previous = activeEffect;
+    if (!previous) return false;
+
+    const generation = paramGeneration();
+    const wasMounted = Boolean(previous.gui?.domElement?.parentNode);
+    const preservedPause = engineAnimationsPaused()
+      ?? Boolean(previous.animationState?.pause);
+    let next;
+    try {
+      next = createEffectRecord({
+        initialPause: preservedPause,
+        hydratePause: false,
+        previousParamNames: new Set(previous.paramNames),
+      });
+    } catch (error) {
+      if (rebuildFailureGeneration !== generation) {
+        logWarn('Effect GUI: parameter-schema rebuild failed', error);
+        rebuildFailureGeneration = generation;
+      }
+      return false;
+    }
+
+    // URL replay for newly revealed controls may itself pause the engine. Read
+    // the actual state after all parameter callbacks, and update only the new
+    // toggle model while it is still detached so preservation emits no write.
+    const actualPause = engineAnimationsPaused() ?? preservedPause;
+    next.pause.setPaused(actualPause);
+    next.animationPauseApplied = previous.animationPauseApplied;
+
+    disposeEffect(previous);
+    activeEffect = next;
+    rebuildFailureGeneration = undefined;
+    skewLogged = false;
+    if (wasMounted) mountEffect(next);
+    return true;
+  }
+
+  /**
+   * Mount one effect record in the current GUI container.
+   * @param {Object} fx - Record to mount.
+   * @returns {void}
+   */
+  function mountEffect(fx) {
+    if (!fx?.gui) return;
+    if (isMobile()) fx.gui.close();
+    const container = guiContainer();
+    if (!container) return;
+    const dom = fx.gui.domElement;
+    dom.classList.add('effect-gui');
+    dom.classList.remove('global-gui');
+    container.appendChild(dom);
   }
 
   return {
@@ -401,29 +554,7 @@ export function createEffectGui({
      * @returns {void}
      */
     build() {
-      activeEffect = {
-        gui: createGui(),
-        activeDragEnds: new Set(),
-        animationPauseApplied: false,
-      };
-      // Identity of this GUI's effect record, so async continuations can tell
-      // whether a switch has since replaced it.
-      const fx = activeEffect;
-
-      const params = getParameterDefinitions();
-      const reservedParams = params
-        .filter((p) => RESERVED_CONTROL_NAMES.has(p.name))
-        .map((p) => p.name);
-      if (reservedParams.length > 0) {
-        logWarn(`Engine parameter names conflict with effect controls: ${reservedParams.join(', ')}`);
-      }
-      // Stamp the snapshot with the engine's effect-load generation so a later
-      // value read can prove it describes these definitions.
-      fx.paramGeneration = paramGeneration();
-
-      addEffectActions(fx, params);
-      const pause = addPauseToggle(fx, params);
-      addParamControllers(fx, params, pause);
+      activeEffect = createEffectRecord();
     },
 
     /**
@@ -431,18 +562,7 @@ export function createEffectGui({
      * @returns {void}
      */
     mount() {
-      if (!activeEffect || !activeEffect.gui) return;
-
-      // Driver's container-width isMobile, not window.innerWidth (differs for a
-      // narrow container in a wide window).
-      if (isMobile()) activeEffect.gui.close();
-
-      const container = guiContainer();
-      if (!container) return;
-      const dom = activeEffect.gui.domElement;
-      dom.classList.add('effect-gui');
-      dom.classList.remove('global-gui');
-      container.appendChild(dom);
+      mountEffect(activeEffect);
     },
 
     /**
@@ -452,28 +572,7 @@ export function createEffectGui({
      * @returns {void}
      */
     destroy() {
-      if (activeEffect && activeEffect.gui) {
-        // A pending Export flash would otherwise fire into a destroyed controller.
-        clearTimeout(activeEffect.exportFlashTimer);
-        activeEffect.exportFlashTimer = null;
-        if (activeEffect.activeDragEnds) {
-          for (const end of activeEffect.activeDragEnds) {
-            dragTarget.removeEventListener('pointerup', end);
-            dragTarget.removeEventListener('pointercancel', end);
-          }
-          activeEffect.activeDragEnds.clear();
-        }
-        const dom = activeEffect.gui.domElement;
-        if (dom && dom.parentNode) dom.parentNode.removeChild(dom);
-        // Only lil-gui's own teardown is tolerated to throw; a leaked listener set
-        // or a detached DOM node above is a real bug and should surface, not be
-        // muffled.
-        try {
-          activeEffect.gui.destroy();
-        } catch (e) {
-          logWarn("GUI destroy warning:", e);
-        }
-      }
+      disposeEffect(activeEffect);
       activeEffect = null;
     },
   };

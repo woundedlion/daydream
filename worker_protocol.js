@@ -148,6 +148,7 @@ export const PROTOCOL_VERSION = 5;
  *   pixels: Uint16Array, elapsed: number,
  *   arenaMetrics: SegArenaMetrics | null,
  *   paramValues: number[] | null,
+ *   paramGeneration: number | null,
  *   fullFrame: boolean,
  * }} FrameMsg
  */

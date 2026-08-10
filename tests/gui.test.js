@@ -6,7 +6,12 @@
 import { test, mock, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { URL } from 'node:url';
-import { AppState, URLSync, getActiveURLSync } from '../state.js';
+import {
+  AppState,
+  URLSync,
+  URL_FLUSH_DEBOUNCE_MS,
+  getActiveURLSync,
+} from '../state.js';
 import { engineParamValue } from '../param_sync.js';
 import {
   snapshotEffectControlState,
@@ -501,6 +506,23 @@ test('DeepLinkGUI namespaces deep-link keys per root', () => {
   const folder = fx.addFolder('Shape');
   folder.add({ sides: 3 }, 'sides', 0, 10);
   assert.deepEqual(folder.collectUrlKeys(), ['fx.Shape.sides']);
+});
+
+test('addUnhydrated keeps the current value but still deep-links later edits', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  const url = installRecordingWindow('?fx.Speed=9');
+  try {
+    const state = { Speed: 2 };
+    const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
+    const controller = gui.addUnhydrated(state, 'Speed', 0, 10);
+
+    assert.equal(state.Speed, 2);
+    controller.setValue(4);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+    assert.equal(new URL(url.written(), 'http://x').searchParams.get('fx.Speed'), '4');
+  } finally {
+    mock.timers.reset();
+  }
 });
 
 /**

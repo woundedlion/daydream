@@ -363,6 +363,7 @@ function deliverFrame(controller, segId, overrides = {}) {
       elapsed: overrides.elapsed ?? 1,
       arenaMetrics: overrides.arenaMetrics ?? null,
       paramValues: overrides.paramValues ?? null,
+      paramGeneration: overrides.paramGeneration ?? null,
       fullFrame: overrides.fullFrame ?? false,
     },
   });
@@ -466,15 +467,17 @@ test('destroy() bumps the generation so a stale in-flight .then cannot arm a new
 // mode, since the main-thread engine is never stepped.
 // ---------------------------------------------------------------------------
 
-test('a segment-0 frame publishes its param values for the GUI to read', async () => {
+test('a segment-0 frame publishes paired param values and generation for the GUI', async () => {
   const c = makeController();
   c.create(2);
   const done = c.renderParallel();
   assert.equal(c.getParamValues(), null, 'nothing published before the first frame');
+  assert.equal(c.getParamGeneration(), null);
 
-  deliverFrame(c, 0, { paramValues: [0.25, 1] });
+  deliverFrame(c, 0, { paramValues: [0.25, 1], paramGeneration: 7 });
   assert.deepEqual(c.getParamValues(), [0.25, 1],
     'segment 0 mirrors its post-frame params into the controller');
+  assert.equal(c.getParamGeneration(), 7);
 
   deliverFrame(c, 1);
   await done;
