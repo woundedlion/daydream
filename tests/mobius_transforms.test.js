@@ -25,16 +25,14 @@ function assertComplex(actual, re, im, msg) {
 }
 
 /**
- * Asserts that every coefficient of a Mobius coefficient set is finite.
- * @param {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} coeffs - The {A,B,C,D} coefficient set to check.
- * @param {string} label - Context label prefixed to any failure message.
- * @returns {void}
+ * The determinant AD - BC of a Mobius coefficient set.
+ * @param {{A:{re:number,im:number}, B:{re:number,im:number}, C:{re:number,im:number}, D:{re:number,im:number}}} coeffs - The {A,B,C,D} coefficient set.
+ * @returns {{re:number, im:number}} The determinant.
  */
-function assertFiniteCoeffs(coeffs, label) {
-  for (const k of ['A', 'B', 'C', 'D']) {
-    assert.ok(Number.isFinite(coeffs[k].re), `${label}: ${k}.re not finite`);
-    assert.ok(Number.isFinite(coeffs[k].im), `${label}: ${k}.im not finite`);
-  }
+function determinant({ A, B, C, D }) {
+  const ad = cmult(A, D);
+  const bc = cmult(B, C);
+  return { re: ad.re - bc.re, im: ad.im - bc.im };
 }
 
 // --- snapComplex ----------------------------------------------------------
@@ -490,12 +488,20 @@ test('mobiusCodeString formats fractional preset coefficients', () => {
     'MobiusParams{1.0f, 0.0f, 0.0f, -0.5f, 0.5f, 0.0f, 0.5f, 0.5f}');
 });
 
-/** Every preset generator returns finite A,B,C,D coefficients across a spread of t values. */
-test('all preset generators produce finite coefficients across a range of t', () => {
-  const gens = { elliptic, hyperbolic, loxodromic, parabolic, inversion, tumble, cayley };
+/**
+ * Six of the presets are unimodular: AD - BC stays at 1 for every t, so a
+ * negated term, a swapped coefficient or a lost reciprocal fails here. cayley
+ * blends toward a non-unimodular map, so it only has to stay non-degenerate;
+ * its determinant runs from 1 at p=0 to 2i at p=1.
+ */
+test('preset generators hold their determinant across a range of t', () => {
+  const unimodular = { elliptic, hyperbolic, loxodromic, parabolic, inversion, tumble };
   for (const t of [0, 0.1, 1, 2.5, 5, 10, 42]) {
-    for (const [name, gen] of Object.entries(gens)) {
-      assertFiniteCoeffs(gen(t), `${name}@${t}`);
+    for (const [name, gen] of Object.entries(unimodular)) {
+      assertComplex(determinant(gen(t)), 1, 0, `${name}@${t} determinant`);
     }
+    const d = determinant(cayley(t));
+    assert.ok(Math.hypot(d.re, d.im) > 0.5,
+      `cayley@${t} determinant (${d.re}, ${d.im}) is degenerate`);
   }
 });

@@ -84,15 +84,20 @@ test('NAMED_PROCEDURAL_PALETTES is a well-formed table of coefficient vec3s', ()
   assert.ok(names.has('DARK_RAINBOW'));
 });
 
-/** Verifies every named palette, including the negative-frequency entries, renders finite in-range linear color across the domain. */
+/**
+ * Verifies every named palette, including the negative-frequency entries,
+ * renders finite in-range linear color across the domain, and that the ramp
+ * carries a gradient rather than one flat color; the tightest shipped palette
+ * spans 0.15.
+ */
 test('NAMED_PROCEDURAL_PALETTES all render across the domain', () => {
   for (const entry of NAMED_PROCEDURAL_PALETTES) {
     const pal = new ProceduralPalette(entry.a, entry.b, entry.c, entry.d);
-    for (let i = 0; i <= 32; i++) {
-      for (const ch of pal.get(i / 32)) {
-        assert.ok(Number.isFinite(ch) && ch >= 0 && ch <= 1, `${entry.name} at t=${i / 32}: ${ch}`);
-      }
-    }
+    const ramp = [];
+    for (let i = 0; i <= 32; i++) ramp.push(...pal.get(i / 32));
+    const bad = ramp.find((ch) => !(Number.isFinite(ch) && ch >= 0 && ch <= 1));
+    assert.equal(bad, undefined, `${entry.name} renders ${bad} outside [0, 1]`);
+    assert.ok(Math.max(...ramp) - Math.min(...ramp) > 0.05, `${entry.name} renders a flat ramp`);
   }
 });
 
