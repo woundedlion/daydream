@@ -873,6 +873,35 @@ function makeApplyNotice() {
   };
 }
 
+test('a document without the notice elements is reported once, not swallowed', () => {
+  const warnings = [];
+  const present = {};
+  const notice = createApplyNotice({
+    doc: { getElementById: (id) => present[id] ?? null },
+    schedule: () => 1,
+    cancel: () => {},
+    logWarning: (message) => warnings.push(message),
+  });
+
+  notice.show('Effect change was rejected.', 'switch');
+  notice.show('Parameter "spin" was rejected.', 'param');
+
+  assert.equal(warnings.length, 1, 'the absence is named once, not once per write');
+  assert.match(warnings[0], /apply-notice-body/);
+  assert.match(warnings[0], /apply-notice-text/);
+  assert.equal(notice.owner(), null);
+
+  // The sink re-queries, so markup that arrives later still gets its notices.
+  present['apply-notice-body'] = fakeElement('div');
+  present['apply-notice-text'] = fakeElement('span');
+  notice.show('Effect change was rejected.', 'switch');
+
+  assert.equal(present['apply-notice-text'].textContent, 'Effect change was rejected.');
+  assert.equal(present['apply-notice-body'].hidden, false);
+  assert.equal(notice.owner(), 'switch');
+  assert.equal(warnings.length, 1);
+});
+
 test('a param write does not clear a notice the switch coordinator raised', () => {
   const h = makeApplyNotice();
 
@@ -947,7 +976,10 @@ test('the dismiss button and the teardown clear whoever raised the notice', () =
 });
 
 test('the notice tolerates a page missing the element', () => {
-  const notice = createApplyNotice({ doc: { getElementById: () => null } });
+  const notice = createApplyNotice({
+    doc: { getElementById: () => null },
+    logWarning: () => {},
+  });
 
   notice.show('Effect change was rejected.', 'switch');
   notice.clear();
