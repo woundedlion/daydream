@@ -417,6 +417,45 @@ function deliverFrame(controller, segId, overrides = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// The `active` flag
+// ---------------------------------------------------------------------------
+
+// The flag is read as a condition by the host's spawn guard and by ownsDisplay,
+// so a truthy non-boolean reads as enabled everywhere it is consumed.
+test('active rejects a non-boolean write and keeps its prior value', () => {
+  const c = makeController();
+  assert.equal(c.active, false, 'a fresh controller is inactive');
+
+  for (const bad of ['true', 1, {}, null, undefined]) {
+    assert.throws(() => { c.active = bad; }, TypeError,
+      `active must reject ${JSON.stringify(bad) ?? String(bad)}`);
+    assert.equal(c.active, false, 'a rejected write must not land');
+  }
+
+  c.active = true;
+  assert.equal(c.active, true, 'a boolean write lands');
+  assert.throws(() => { c.active = 0; }, TypeError,
+    'active must reject a falsy non-boolean too');
+  assert.equal(c.active, true, 'a rejected write must not clear the flag');
+  c.active = false;
+  assert.equal(c.active, false, 'a boolean write clears the flag');
+});
+
+// The pool stays latched across a fault so a user-driven setEffect/setResolution
+// can rebuild it; only the host clears the flag.
+test('destroy() and a fault leave active alone', () => {
+  const c = makeController();
+  c.active = true;
+  c.create(2);
+  c.onWorkerFault(0, 'boom');
+  assert.equal(c.faulted, true, 'the fault latched');
+  assert.equal(c.active, true, 'a fault must not clear active');
+  c.destroy();
+  assert.equal(c.active, true, 'destroy() must not clear active');
+  assert.equal(c.ownsDisplay, false, 'a destroyed pool owns no display');
+});
+
+// ---------------------------------------------------------------------------
 // Generation fence
 // ---------------------------------------------------------------------------
 

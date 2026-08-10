@@ -208,6 +208,9 @@ export function maxSegmentCount(nav = globalThis.navigator, isMobile = false) {
  */
 
 export class SegmentController {
+  /** Backing store for the `active` accessor pair. */
+  #active = false;
+
   /**
    * Wire the controller to the host's reassignable engine/view via lazy getters.
    * @param {Object} deps - Host-injected dependencies.
@@ -237,25 +240,6 @@ export class SegmentController {
     /** @type {SegmentStatsView} */
     this.statsView = new SegmentStatsView(statsDoc);
 
-    /**
-     * Whether segmented mode is on. Host-owned: only the host (daydream.js)
-     * writes it; the controller reads it to decide whether a pool should exist
-     * (the transient boot retry, the faulted setEffect/setResolution rebuilds,
-     * and ownsDisplay). It stays true across a fault so a user-driven
-     * setEffect/setResolution can rebuild the latched pool.
-     *
-     * Host write ordering:
-     * - Enable: set true and bump the host's epoch counter before awaiting
-     *   warmModules(); call create() only if the epoch and this flag still hold.
-     *   A pool created while false never owns the display, and a transient
-     *   worker boot failure is never retried (the retry timer re-creates only
-     *   while active).
-     * - Disable/teardown: set false and bump the epoch before destroy(), so an
-     *   in-flight warmModules() continuation (its post-await guard reads both)
-     *   cannot spawn a pool into a torn-down host.
-     * @type {boolean}
-     */
-    this.active = false;
     // Live pool size, set only by create() so it always matches the length of the
     // per-segment arrays composite() and updateStats() index.
     this.count = 4;
@@ -350,6 +334,45 @@ export class SegmentController {
     /** @type {number[]} */
     this.boundaryXs = [];
     this.boundaryGen = -1;
+  }
+
+  /**
+   * Whether segmented mode is on. Host-owned: only the host (daydream.js)
+   * writes it; the controller reads it to decide whether a pool should exist
+   * (the transient boot retry, the faulted setEffect/setResolution rebuilds,
+   * and ownsDisplay). It stays true across a fault so a user-driven
+   * setEffect/setResolution can rebuild the latched pool.
+   * @returns {boolean} True while segmented mode is on.
+   */
+  get active() {
+    return this.#active;
+  }
+
+  /**
+   * Turn segmented mode on or off.
+   *
+   * The write must land BEFORE the host awaits or tears anything down, in both
+   * directions:
+   * - Enable: set true, then await warmModules(); the spawn guard's post-await
+   *   check reads this flag and its own epoch, and calls create() only if both
+   *   still hold. A pool created while false never owns the display, and a
+   *   transient worker boot failure is never retried (the retry timer re-creates
+   *   only while active).
+   * - Disable/teardown: set false, then destroy(). A warmModules() continuation
+   *   already in flight reads the flag after its await, so it cannot spawn a pool
+   *   into a torn-down host.
+   *
+   * @param {boolean} on - Whether segmented mode is on.
+   * @throws {TypeError} When `on` is not a boolean. The flag reaches the spawn
+   *   guard and ownsDisplay as a condition, where a truthy non-boolean would read
+   *   as enabled and a pool would spawn behind a display the host still paints.
+   */
+  set active(on) {
+    if (typeof on !== 'boolean') {
+      throw new TypeError('SegmentController.active must be a boolean, got '
+        + `${typeof on}`);
+    }
+    this.#active = on;
   }
 
   /**
