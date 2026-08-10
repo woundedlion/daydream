@@ -19,6 +19,7 @@
   --blue-500: #3b82f6;
   --blue-400: #60a5fa;
   --indigo-400: #818cf8;
+  --indigo-300: #a5b4fc;
 }
 
 body {
@@ -67,10 +68,12 @@ input[type=range]:disabled::-webkit-slider-thumb {
   cursor: default;
 }
 
+/* Every slider's numeric readout, on the --slate-700 of .param-group. The lighter
+ * indigo is what carries that pairing over the 4.5:1 WCAG AA floor at 14px. */
 .slider-label {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.875rem;
-  color: var(--indigo-400);
+  color: var(--indigo-300);
 }
 
 /* Compact button base + primary/secondary fills. A page may still define its
