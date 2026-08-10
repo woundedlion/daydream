@@ -1013,11 +1013,11 @@
       createPaletteViewport, axisEndpoints, axisFromEndpoints,
       lockedGroupMove,
       paletteTabFromSearch, paletteTabUrl, tablistKeyTarget,
-      defaultPaletteRecipe, PaletteV4,
+      defaultPaletteRecipe, paletteRecipeFromControls, PaletteV4,
       PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
       wrapTurns,
       hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
-      hueKeyState, customHueKeyState, customHueTurns, moveCustomHueKey,
+      hueKeyState, customHueKeyState, moveCustomHueKey,
     } from './palette_controls.js';
     // The two canvas painters take their canvas, context and palette as
     // arguments, so they live in their own module and are unit tested against a
@@ -1469,31 +1469,21 @@
     }
 
     function readPaletteRecipe() {
-      const recipe = structuredClone(recipeTemplate);
-      recipe.input = recipeWindow();
-      recipe.domain = enumIndex('domain', document.getElementById('gen_shape').value);
-      recipe.colorPath = enumIndex('colorPath', document.getElementById('gen_path').value);
-      recipe.hue.mode = enumIndex('hueMode', document.getElementById('gen_hue_mode').value);
-      recipe.hue.harmony = enumIndex('harmony', document.getElementById('gen_harmony').value);
-      recipe.hue.direction = enumIndex('direction', document.getElementById('gen_direction').value);
-      recipe.hue.baseTurns = customBaseTurns();
-      if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
-        recipe.hue.customTurns = customHueTurns(
-          recipe.hue.baseTurns, customHueOffsets, recipe.hue.customTurns);
-      }
-      recipe.lightness.curve = enumIndex('curve', document.getElementById('gen_brightness').value);
-      recipe.chroma.curve = enumIndex('curve', document.getElementById('gen_chroma_curve').value);
-      for (const [axisName, controls] of [
-        ['lightness', recipe.lightness],
-        ['chroma', recipe.chroma],
-      ]) {
-        if (controls.curve !== PaletteV4.curve.CUSTOM) {
-          const { minimum, maximum } = readAxisEndpoints(axisName);
-          Object.assign(controls, axisFromEndpoints(minimum, maximum));
-        }
-      }
-      if (recipe.chroma.center === 1) recipe.chroma.headroom = 1;
-      return recipe;
+      const selected = (id) => document.getElementById(id).value;
+      return paletteRecipeFromControls(recipeTemplate, {
+        window: recipeWindow(),
+        domain: selected('gen_shape'),
+        colorPath: selected('gen_path'),
+        hueMode: selected('gen_hue_mode'),
+        harmony: selected('gen_harmony'),
+        direction: selected('gen_direction'),
+        baseTurns: customBaseTurns(),
+        customHueOffsets,
+        lightnessCurve: selected('gen_brightness'),
+        chromaCurve: selected('gen_chroma_curve'),
+        lightness: readAxisEndpoints('lightness'),
+        chroma: readAxisEndpoints('chroma'),
+      });
     }
 
     function syncRecipeControlAvailability() {

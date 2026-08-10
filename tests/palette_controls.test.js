@@ -5,7 +5,8 @@ const {
   paletteTabFromSearch, paletteTabUrl, tablistKeyTarget,
   createPaletteViewport, recipeForViewport, axisEndpoints, axisFromEndpoints,
   lockedGroupMove,
-  PaletteV4, defaultPaletteRecipe, PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
+  PaletteV4, defaultPaletteRecipe, paletteRecipeFromControls,
+  PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
   paletteRecipeAvailability, wrapTurns, signedTurnDelta, equivalentTurnNear,
   hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
   hueKeyState, customHueKeyState, customHueTurns, moveCustomHueKey,
@@ -373,4 +374,84 @@ test('recipe state never exposes mutable internal values', () => {
   state.replace(PALETTE_RECIPE_PRESETS.tonalMonochrome());
   assert.equal(state.value.canonical, null);
   assert.equal(state.value.status, null);
+});
+
+// A full set of control readings, as the generative tab reads them.
+const CONTROL_READINGS = {
+  window: { offset: 0.1, span: 0.8 },
+  domain: 'MIRROR',
+  colorPath: 'OKLAB_CARTESIAN',
+  hueMode: 'HARMONY',
+  harmony: 'TRIADIC',
+  direction: 'CLOCKWISE',
+  baseTurns: 0.25,
+  customHueOffsets: [0, 0.07, 0.14],
+  lightnessCurve: 'ASCENDING',
+  chromaCurve: 'BELL',
+  lightness: { minimum: 0.2, maximum: 0.8 },
+  chroma: { minimum: 0.3, maximum: 0.5 },
+};
+
+test('control readings marshal into a recipe by enum name', () => {
+  const recipe = paletteRecipeFromControls(defaultPaletteRecipe(), CONTROL_READINGS);
+
+  assert.deepEqual(recipe.input, { offset: 0.1, span: 0.8 });
+  assert.equal(recipe.domain, PaletteV4.domain.MIRROR);
+  assert.equal(recipe.colorPath, PaletteV4.colorPath.OKLAB_CARTESIAN);
+  assert.equal(recipe.hue.mode, PaletteV4.hueMode.HARMONY);
+  assert.equal(recipe.hue.harmony, PaletteV4.harmony.TRIADIC);
+  assert.equal(recipe.hue.direction, PaletteV4.direction.CLOCKWISE);
+  assert.equal(recipe.hue.baseTurns, 0.25);
+  assert.equal(recipe.lightness.curve, PaletteV4.curve.ASCENDING);
+  assert.equal(recipe.chroma.curve, PaletteV4.curve.BELL);
+});
+
+test('an axis endpoint pair becomes its center and range', () => {
+  const recipe = paletteRecipeFromControls(defaultPaletteRecipe(), CONTROL_READINGS);
+
+  assert.deepEqual(recipe.lightness, { ...defaultPaletteRecipe().lightness,
+    curve: PaletteV4.curve.ASCENDING, ...axisFromEndpoints(0.2, 0.8) });
+  assert.equal(recipe.chroma.center, 0.4);
+  assert.equal(recipe.chroma.range, 0.2);
+});
+
+test('a CUSTOM axis keeps the template points its endpoints cannot describe', () => {
+  const template = defaultPaletteRecipe();
+  template.lightness.custom = [0.1, 0.2, 0.3, 0.4];
+  template.lightness.center = 0.55;
+  template.lightness.range = 0.3;
+  const recipe = paletteRecipeFromControls(template,
+    { ...CONTROL_READINGS, lightnessCurve: 'CUSTOM' });
+
+  assert.deepEqual(recipe.lightness.custom, [0.1, 0.2, 0.3, 0.4]);
+  assert.equal(recipe.lightness.center, 0.55);
+  assert.equal(recipe.lightness.range, 0.3);
+});
+
+test('custom hue turns are derived only in CUSTOM hue mode', () => {
+  const offsets = [0, 0.07, 0.14];
+  const harmony = paletteRecipeFromControls(defaultPaletteRecipe(), CONTROL_READINGS);
+  const custom = paletteRecipeFromControls(defaultPaletteRecipe(),
+    { ...CONTROL_READINGS, hueMode: 'CUSTOM' });
+
+  assert.deepEqual(harmony.hue.customTurns, defaultPaletteRecipe().hue.customTurns);
+  assert.deepEqual(custom.hue.customTurns,
+    customHueTurns(0.25, offsets, defaultPaletteRecipe().hue.customTurns));
+});
+
+test('a fully saturated chroma center takes the full headroom', () => {
+  const recipe = paletteRecipeFromControls(defaultPaletteRecipe(),
+    { ...CONTROL_READINGS, chroma: { minimum: 1, maximum: 1 } });
+
+  assert.equal(recipe.chroma.center, 1);
+  assert.equal(recipe.chroma.headroom, 1);
+});
+
+test('marshalling never writes through to the template', () => {
+  const template = defaultPaletteRecipe();
+  const recipe = paletteRecipeFromControls(template, CONTROL_READINGS);
+  recipe.hue.customTurns[0] = 0.5;
+
+  assert.deepEqual(template, defaultPaletteRecipe());
+  assert.equal(recipe.schemaVersion, template.schemaVersion);
 });

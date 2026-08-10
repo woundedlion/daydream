@@ -507,6 +507,58 @@ export function defaultPaletteRecipe() {
 }
 
 /**
+ * Marshals the generative tab's control readings into a V4 recipe.
+ *
+ * Every C++ recipe export and every preview repaint goes through this, and the
+ * enum members it reads are the string values the page's <select> options carry
+ * — so the mapping is where a renamed option turns into an `undefined` enum the
+ * engine bridge rejects. It stays free of the DOM: the page reads the controls
+ * and hands the values over.
+ *
+ * A CUSTOM-curve axis keeps the template's own custom points, so its endpoint
+ * readings are ignored rather than overwriting them.
+ * @param {Object} template - Recipe the reading is applied over; deep-cloned, never mutated.
+ * @param {Object} controls - The control readings.
+ * @param {{offset: number, span: number}} controls.window - Input window (offset, span).
+ * @param {string} controls.domain - PaletteV4.domain member name.
+ * @param {string} controls.colorPath - PaletteV4.colorPath member name.
+ * @param {string} controls.hueMode - PaletteV4.hueMode member name.
+ * @param {string} controls.harmony - PaletteV4.harmony member name.
+ * @param {string} controls.direction - PaletteV4.direction member name.
+ * @param {number} controls.baseTurns - Base hue, in turns.
+ * @param {number[]} controls.customHueOffsets - Per-key hue offsets, used only in CUSTOM hue mode.
+ * @param {string} controls.lightnessCurve - PaletteV4.curve member name.
+ * @param {string} controls.chromaCurve - PaletteV4.curve member name.
+ * @param {{minimum: number, maximum: number}} controls.lightness - Lightness endpoints.
+ * @param {{minimum: number, maximum: number}} controls.chroma - Chroma endpoints.
+ * @returns {Object} The recipe.
+ */
+export function paletteRecipeFromControls(template, controls) {
+  const recipe = structuredClone(template);
+  recipe.input = { ...controls.window };
+  recipe.domain = PaletteV4.domain[controls.domain];
+  recipe.colorPath = PaletteV4.colorPath[controls.colorPath];
+  recipe.hue.mode = PaletteV4.hueMode[controls.hueMode];
+  recipe.hue.harmony = PaletteV4.harmony[controls.harmony];
+  recipe.hue.direction = PaletteV4.direction[controls.direction];
+  recipe.hue.baseTurns = controls.baseTurns;
+  if (recipe.hue.mode === PaletteV4.hueMode.CUSTOM) {
+    recipe.hue.customTurns = customHueTurns(
+      recipe.hue.baseTurns, controls.customHueOffsets, recipe.hue.customTurns);
+  }
+  recipe.lightness.curve = PaletteV4.curve[controls.lightnessCurve];
+  recipe.chroma.curve = PaletteV4.curve[controls.chromaCurve];
+  for (const axis of ['lightness', 'chroma']) {
+    if (recipe[axis].curve === PaletteV4.curve.CUSTOM) continue;
+    const { minimum, maximum } = controls[axis];
+    Object.assign(recipe[axis], axisFromEndpoints(minimum, maximum));
+  }
+  // A fully saturated center leaves no room to pull back into gamut.
+  if (recipe.chroma.center === 1) recipe.chroma.headroom = 1;
+  return recipe;
+}
+
+/**
  * Which control groups can still change the palette a recipe describes, so the
  * page disables the rest instead of offering sliders with no effect: a palette
  * with no chroma has no hue to steer, a monochromatic harmony has no direction

@@ -620,6 +620,7 @@
       movedOps,
       createCommitQueue,
       createChainValidator,
+      createOpGate,
     } from './solid_codegen.js';
     import { generateRegistryCpp, MAX_RECIPE_STEPS } from './solid_registry_codegen.js';
     import { buildOpRow, formatParamValue } from './solid_op_rows.js';
@@ -1715,8 +1716,9 @@
     // --- CHAIN VALIDATION ---
     // Candidate chains are proven on a sacrificial module instance before the
     // live module runs them; see createChainValidator in solid_codegen.js.
-    const { withValidator, chainIsValid, acquire: acquireValidator, noteDeath: noteValidatorDeath } =
-      createChainValidator(() => createHolosphereModule());
+    const validator = createChainValidator(() => createHolosphereModule());
+    const { chainIsValid } = validator;
+    const opGate = createOpGate(validator);
 
     let gateMsgTimer = null;
     function showGateMsg(text) {
@@ -1727,97 +1729,25 @@
       gateMsgTimer = setTimeout(() => { el.innerText = ''; }, 3000);
     }
 
-    // Gray out add-op buttons whose op would trap on the CURRENT mesh. One
-    // chain build serves all 14 probes (ops never mutate their input); a probe
-    // trap kills the validator, so the chain is rebuilt on a fresh instance and
-    // probing continues with the next op.
-    let gateGen = 0;
-    let lastGateSig = null;
-    let gateProbeFailures = 0;
-    let gateProbesAbandoned = false;
-    // A validator that never spawns would otherwise be retried on every
-    // recompute; past this many incomplete passes the gate is left wherever the
-    // probes that did land put it, and probing stops.
-    const GATE_PROBE_RETRIES = 3;
+    // Gray out add-op buttons whose op would trap on the CURRENT mesh; the
+    // sweep itself is createOpGate in solid_codegen.js.
     async function refreshOpGating() {
-      // Gating depends only on the mesh's topology, which op params never
-      // change — skip the probe pass when only a param slider moved.
-      const sig = state.base + '|' + state.ops.map(o => o.op).join(',');
-      if (gateProbesAbandoned || sig === lastGateSig) return;
-
-      const gen = ++gateGen;
-      const base = state.base;
-      const ops = structuredClone(state.ops);
       const buttons = [...document.querySelectorAll('#addOpGrid [data-op]')];
+      const probe = await opGate.refresh(state.base, state.ops,
+        buttons.map((btn) => btn.dataset.op));
+      if (!probe) return;
 
-      // `complete` is false when the pass never got a full sweep against a live
-      // module: `bad` is then only a lower bound on what would trap, so the ops
-      // it does not name stay at whatever the last complete pass decided.
-      const probe = await withValidator(async (Mod) => {
-        const bad = new Set();
-        if (!Mod) return { bad, complete: false };
-        const build = (M) => {
-          let mesh = M.MeshOps.fromSolidName(base);
-          if (!mesh) {
-            const failure = meshOpFailure(M, `Base solid "${base}"`);
-            if (failure.flush) M.MeshOps.clearToolingMemory();
-            throw new Error(failure.message);
-          }
-          for (const o of ops) {
-            const next = applyOp(mesh, o);
-            mesh.delete();
-            mesh = next;
-          }
-          return mesh;
-        };
-        let mesh;
-        try {
-          mesh = build(Mod); // current chain: valid by construction
-        } catch (e) {
-          noteValidatorDeath(e);
-          return { bad, complete: false };
-        }
-        for (const btn of buttons) {
-          const op = btn.dataset.op;
-          const candidate = { op, params: {} };
-          for (const [k, def] of Object.entries(OP_DEFS[op]?.params ?? {})) {
-            candidate.params[k] = def.val;
-          }
-          try {
-            const out = applyOp(mesh, candidate);
-            const classes = out.classifyFaces(); // committing would classify; probe that too
-            out.delete();
-            if (!classes) bad.add(op);
-          } catch (e) {
-            bad.add(op);
-            noteValidatorDeath(e);
-            if (e instanceof WebAssembly.RuntimeError) {
-              // Instance is wedged; respawn and rebuild for remaining probes.
-              Mod = await acquireValidator();
-              if (!Mod) return { bad, complete: false };
-              try { mesh = build(Mod); }
-              catch (e2) { noteValidatorDeath(e2); return { bad, complete: false }; }
-            }
-          }
-        }
-        try { mesh.delete(); Mod.MeshOps.clearToolingMemory(); } catch (e) { noteValidatorDeath(e); }
-        return { bad, complete: true };
-      });
-
-      if (gen !== gateGen) return; // state changed while probing
       for (const btn of buttons) {
-        const blocked = probe.bad.has(btn.dataset.op);
+        const blocked = probe.blocked.has(btn.dataset.op);
+        // An incomplete pass names only a lower bound on what would trap, so an
+        // op it does not name stays where the last complete pass left it.
         if (!blocked && !probe.complete) continue;
         btn.disabled = blocked;
         if (blocked) btn.title = 'Would exceed an engine mesh limit on the current solid';
         else btn.removeAttribute('title');
       }
 
-      if (probe.complete) {
-        lastGateSig = sig;
-        gateProbeFailures = 0;
-      } else if (++gateProbeFailures >= GATE_PROBE_RETRIES) {
-        gateProbesAbandoned = true;
+      if (probe.abandoned) {
         showGateMsg('op availability is no longer checked: the validator module will not start');
       }
     }

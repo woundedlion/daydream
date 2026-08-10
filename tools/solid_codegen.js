@@ -911,3 +911,115 @@ export function createChainValidator(createModule) {
 
   return { acquire, noteDeath, withValidator, chainIsValid };
 }
+
+/**
+ * Builds the add-op availability gate: which of the offered ops would trap if
+ * appended to the current chain.
+ *
+ * Every candidate is applied (and classified, which committing would do too) on
+ * the sacrificial validator, so the answer comes from the engine rather than
+ * from a JS mirror of its ceilings. A trap kills only the validator, which is
+ * respawned mid-sweep and the chain rebuilt on it.
+ *
+ * Gating depends only on the mesh's topology, which op params never change, so
+ * a pass whose base and op names repeat the last complete one is skipped.
+ * @param {{acquire: function(): Promise<?Object>, noteDeath: function(*): void, withValidator: function(Function): Promise<*>}} validator - A createChainValidator handle.
+ * @param {number} [retries=3] - Incomplete passes tolerated before probing stops. A validator that never spawns would otherwise be retried on every recompute.
+ * @returns {{refresh: function(string, Array<Object>, string[]): Promise<?{blocked: Set<string>, complete: boolean, abandoned: boolean}>}} The gate.
+ */
+export function createOpGate(validator, retries = 3) {
+  let generation = 0;
+  let lastSignature = null;
+  let failures = 0;
+  let abandoned = false;
+
+  /**
+   * Sweeps the candidates against a live validator instance.
+   * @param {string} base - Registry name of the seed solid.
+   * @param {Array<Object>} ops - The current chain.
+   * @param {string[]} candidates - Op names to probe.
+   * @returns {Promise<{bad: Set<string>, complete: boolean}>} The ops that would
+   *   trap, and whether the sweep ever got a full pass against a live module.
+   *   Where it did not, `bad` is only a lower bound on what would trap.
+   */
+  function probe(base, ops, candidates) {
+    return validator.withValidator(async (Mod) => {
+      const bad = new Set();
+      if (!Mod) return { bad, complete: false };
+      const build = (M) => {
+        let mesh = M.MeshOps.fromSolidName(base);
+        if (!mesh) {
+          const failure = meshOpFailure(M, `Base solid "${base}"`);
+          if (failure.flush) M.MeshOps.clearToolingMemory();
+          throw new Error(failure.message);
+        }
+        for (const o of ops) {
+          const next = applyOp(mesh, o);
+          mesh.delete();
+          mesh = next;
+        }
+        return mesh;
+      };
+      let mesh;
+      try {
+        mesh = build(Mod); // current chain: valid by construction
+      } catch (e) {
+        validator.noteDeath(e);
+        return { bad, complete: false };
+      }
+      for (const op of candidates) {
+        const candidate = { op, params: {} };
+        for (const [key, def] of Object.entries(OP_DEFS[op]?.params ?? {})) {
+          candidate.params[key] = def.val;
+        }
+        try {
+          const out = applyOp(mesh, candidate);
+          const classes = out.classifyFaces();
+          out.delete();
+          if (!classes) bad.add(op);
+        } catch (e) {
+          bad.add(op);
+          validator.noteDeath(e);
+          if (e instanceof WebAssembly.RuntimeError) {
+            // Instance is wedged; respawn and rebuild for the remaining probes.
+            Mod = await validator.acquire();
+            if (!Mod) return { bad, complete: false };
+            try { mesh = build(Mod); }
+            catch (e2) { validator.noteDeath(e2); return { bad, complete: false }; }
+          }
+        }
+      }
+      try { mesh.delete(); Mod.MeshOps.clearToolingMemory(); }
+      catch (e) { validator.noteDeath(e); }
+      return { bad, complete: true };
+    });
+  }
+
+  /**
+   * Re-derives which candidates are blocked on the current chain.
+   * @param {string} base - Registry name of the seed solid.
+   * @param {Array<{op: string}>} ops - The current chain.
+   * @param {string[]} candidates - Op names to probe.
+   * @returns {Promise<?{blocked: Set<string>, complete: boolean, abandoned: boolean}>}
+   *   The verdict, or null when the pass was skipped or the chain changed under
+   *   it. `abandoned` is true on the pass that gives up, and only that one.
+   */
+  async function refresh(base, ops, candidates) {
+    const signature = `${base}|${ops.map((o) => o.op).join(',')}`;
+    if (abandoned || signature === lastSignature) return null;
+
+    const started = ++generation;
+    const { bad, complete } = await probe(base, structuredClone(ops), candidates);
+    if (started !== generation) return null;
+
+    if (complete) {
+      lastSignature = signature;
+      failures = 0;
+    } else if (++failures >= retries) {
+      abandoned = true;
+    }
+    return { blocked: bad, complete, abandoned };
+  }
+
+  return { refresh };
+}
