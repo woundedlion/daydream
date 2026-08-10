@@ -340,7 +340,8 @@
       transform: translateY(-2px);
     }
 
-    /* Saved solid whose generated funcName is shared with another card. */
+    /* Saved solid whose generated funcName is shared with another card or with
+       an engine-registry entry. */
     .saved-item.name-clash {
       border-color: #f59e0b;
     }
@@ -705,6 +706,10 @@
     let PlatonicSolids = [];
     let ArchimedeanSolids = [];
     let IslamicStarPatterns = [];
+    // Every name the engine registry already defines. A generated funcName equal
+    // to one of these is a redefinition once the C++ is pasted into solids.h.
+    // Empty until the registry loads, which leaves the saved-set check alone.
+    let RegistrySolidNames = new Set();
 
     // Initialize
     async function init() {
@@ -722,12 +727,14 @@
         PlatonicSolids = [];
         ArchimedeanSolids = [];
         IslamicStarPatterns = [];
+        RegistrySolidNames = new Set();
 
         for (let i = 0; i < registry.length; i++) {
           const item = registry[i];
           const name = item.name;
           const cat = item.category; // "Simple" or "Complex"
 
+          RegistrySolidNames.add(name);
           if (cat === "Complex") {
             IslamicStarPatterns.push(name);
           } else {
@@ -1206,8 +1213,13 @@
       // generateFuncAndRecipe encodes op params at coarse granularity (pctSuffix
       // to 0.01, hankin to 1 deg), so two near-identical solids can share a
       // funcName and the later C++ paste would clobber the earlier definition.
+      // The engine registry is the other half: a chain whose name matches an
+      // entry solids.h already carries redefines it at paste time.
       const funcName = savedFuncName(item);
-      if (funcName && savedSolids.some(s => savedFuncName(s) === funcName)) {
+      if (funcName && RegistrySolidNames.has(funcName)) {
+        showGateMsg(`saved: "${funcName}" is already in the engine registry — `
+          + `the exported C++ would redefine it; vary an op parameter`);
+      } else if (funcName && savedSolids.some(s => savedFuncName(s) === funcName)) {
         showGateMsg(`saved: "${funcName}" collides with another saved solid — `
           + `vary an op parameter to keep the exported C++ names unique`);
       }
@@ -1233,7 +1245,8 @@
       list.innerHTML = '';
 
       // Two cards with the same funcName export definitions that overwrite each
-      // other, so flag every member of a colliding set, not just the newest.
+      // other, so flag every member of a colliding set, not just the newest. A
+      // name the engine registry already holds is flagged the same way.
       const nameCounts = new Map();
       savedSolids.forEach(item => {
         const name = savedFuncName(item);
@@ -1244,9 +1257,12 @@
         const el = document.createElement('div');
         el.className = 'saved-item relative pr-6';
         const funcName = savedFuncName(item);
-        if (funcName && nameCounts.get(funcName) > 1) {
+        const inRegistry = funcName !== null && RegistrySolidNames.has(funcName);
+        if (funcName && (inRegistry || nameCounts.get(funcName) > 1)) {
           el.classList.add('name-clash');
-          el.title = `Exports as ${funcName}, which another saved solid also exports`;
+          el.title = inRegistry
+            ? `Exports as ${funcName}, which the engine registry already defines`
+            : `Exports as ${funcName}, which another saved solid also exports`;
         }
 
         const deleteButton = document.createElement('button');
