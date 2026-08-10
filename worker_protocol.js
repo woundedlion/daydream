@@ -25,7 +25,7 @@
  * same-named but reshaped message. Bump on any breaking change to the messages below.
  * @type {number}
  */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 /**
  * One tuned effect parameter, flattened for structured-clone transport. Booleans
@@ -60,7 +60,7 @@ export const PROTOCOL_VERSION = 5;
  *   type: 'init', version: number, segId: number, totalSegs: number,
  *   w: number, h: number,
  *   effectName?: string, params?: SegParam[], paused?: boolean,
- *   poleLod?: number,
+ *   poleLod?: number, paramRevision: number,
  * }} InitMsg
  */
 
@@ -69,7 +69,7 @@ export const PROTOCOL_VERSION = 5;
  * current tuned values, applied AFTER engine.setEffect() — which rebuilds the
  * effect with defaults — so the segment matches instead of reverting to defaults.
  * @typedef {{ type: 'setEffect', name: string, params?: SegParam[],
- *   paused?: boolean }} SetEffectMsg
+ *   paused?: boolean, paramRevision: number }} SetEffectMsg
  */
 
 /** Resize the worker's canvas; the worker recomputes its segment rectangle from
@@ -79,7 +79,8 @@ export const PROTOCOL_VERSION = 5;
  * @typedef {{ type: 'setResolution', w: number, h: number }} SetResolutionMsg */
 
 /** Push one live tuned-parameter value to the worker's bound effect.
- * @typedef {{ type: 'setParameter', name: string, value: number }} SetParameterMsg */
+ * @typedef {{ type: 'setParameter', name: string, value: number,
+ *   paramRevision: number }} SetParameterMsg */
 
 /** Toggle whether the worker's effect advances its animation clock.
  * @typedef {{ type: 'setAnimationsPaused', paused: boolean }} SetAnimationsPausedMsg */
@@ -149,6 +150,7 @@ export const PROTOCOL_VERSION = 5;
  *   arenaMetrics: SegArenaMetrics | null,
  *   paramValues: number[] | null,
  *   paramGeneration: number | null,
+ *   paramRevision: number,
  *   fullFrame: boolean,
  * }} FrameMsg
  */

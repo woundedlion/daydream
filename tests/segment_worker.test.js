@@ -155,7 +155,11 @@ const bootedAtLoad = posted.filter((p) => p.msg.type === 'booted');
 async function dispatch(msg) {
   // Stamp the current protocol version on init so per-test messages needn't
   // repeat it; a test probing the mismatch path passes an explicit version.
-  if (msg.type === 'init') msg = { version: PROTOCOL_VERSION, ...msg };
+  if (msg.type === 'init') {
+    msg = { version: PROTOCOL_VERSION, paramRevision: 0, ...msg };
+  } else if (msg.type === 'setEffect' || msg.type === 'setParameter') {
+    msg = { paramRevision: 0, ...msg };
+  }
   await fakeSelf.onmessage({ data: msg });
 }
 
@@ -402,7 +406,10 @@ test('an unknown message type faults instead of being silently dropped', async (
 
 /** Segment 0 mirrors its post-frame param values; other segments send null. */
 test('render streams param values from segment 0 only', async () => {
-  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  await dispatch({
+    type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
+    effectName: 'Plasma', paramRevision: 11,
+  });
   engineInstance.getParamGeneration = () => 17;
   posted.length = 0;
   await dispatch({ type: 'render' });
@@ -410,6 +417,7 @@ test('render streams param values from segment 0 only', async () => {
   assert.ok(Array.isArray(frame0.paramValues), 'paramValues is a detached plain array');
   assert.deepEqual(frame0.paramValues, [5, 15, 25], 'segment 0 carries params');
   assert.equal(frame0.paramGeneration, 17, 'segment 0 pairs params with their schema');
+  assert.equal(frame0.paramRevision, 11, 'the frame carries its applied write revision');
   // Mutating the engine's reused view after the frame is posted must not disturb
   // the sent values, proving the worker copied them out rather than forwarding.
   engineInstance.paramView[0] = 999;
@@ -611,9 +619,14 @@ test('setEffect handler rebuilds, then re-applies the carried param snapshot', a
   await dispatch({
     type: 'setEffect', name: 'Waves',
     params: [{ name: 'Freq', value: 0.25 }],
+    paramRevision: 9,
   });
   assert.equal(engineInstance.effect, 'Waves', 'switched to the new effect');
   assert.deepEqual(engineInstance.params, [['Freq', 0.25]]);
+
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.paramRevision, 9);
 });
 
 test('setEffect re-applies pause after rebuilding the worker engine', async () => {
@@ -664,10 +677,16 @@ test('a rejected setEffect posts engineRejected and re-applies nothing', async (
   assert.match(failed.msg.reason, /setEffect\(Waves\) rejected/);
 });
 
-test('setParameter handler forwards name/value to the engine', async () => {
+test('setParameter handler forwards name/value and advances the frame revision', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
-  await dispatch({ type: 'setParameter', name: 'Speed', value: 0.9 });
+  await dispatch({
+    type: 'setParameter', name: 'Speed', value: 0.9, paramRevision: 12,
+  });
   assert.deepEqual(engineInstance.params.at(-1), ['Speed', 0.9]);
+
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  assert.equal(posted.find((p) => p.msg.type === 'frame').msg.paramRevision, 12);
 });
 
 test('setAnimationsPaused handler forwards the flag (both directions) to the engine', async () => {

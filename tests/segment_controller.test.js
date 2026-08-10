@@ -345,6 +345,7 @@ const installFakeTimers = () => {
  * @param {number} [overrides.elapsed] - Simulated elapsed time for the frame.
  * @param {Object} [overrides.arenaMetrics] - Optional arena-metrics payload.
  * @param {number[]} [overrides.paramValues] - Post-frame param values the worker reports.
+ * @param {number} [overrides.paramRevision] - Parameter write revision paired with the frame.
  * @param {boolean} [overrides.fullFrame] - Whether the worker shaded the whole canvas.
  * @returns {void}
  */
@@ -364,6 +365,7 @@ function deliverFrame(controller, segId, overrides = {}) {
       arenaMetrics: overrides.arenaMetrics ?? null,
       paramValues: overrides.paramValues ?? null,
       paramGeneration: overrides.paramGeneration ?? null,
+      paramRevision: overrides.paramRevision ?? controller.paramRevision,
       fullFrame: overrides.fullFrame ?? false,
     },
   });
@@ -514,6 +516,38 @@ test('a frame carrying no param values leaves the published set intact', async (
   await done;
 });
 
+test('an in-flight frame cannot republish parameter values from before a GUI write', async () => {
+  const c = makeController();
+  c.create(2);
+
+  let done = c.renderParallel();
+  deliverFrame(c, 0, { paramValues: [0.25], paramGeneration: 7 });
+  deliverFrame(c, 1);
+  await done;
+  assert.deepEqual(c.getParamValues(), [0.25]);
+
+  done = c.renderParallel();
+  const staleRevision = c.paramRevision;
+  c.setParameter('Speed', 0.75);
+  assert.equal(c.getParamValues(), null,
+    'the previous snapshot is withheld until a worker acknowledges the write');
+
+  deliverFrame(c, 0, {
+    paramValues: [0.25], paramGeneration: 7, paramRevision: staleRevision,
+  });
+  assert.equal(c.getParamValues(), null,
+    'a frame rendered before the write cannot move the slider back');
+  deliverFrame(c, 1, { paramRevision: staleRevision });
+  await done;
+
+  done = c.renderParallel();
+  deliverFrame(c, 0, { paramValues: [0.75], paramGeneration: 7 });
+  assert.deepEqual(c.getParamValues(), [0.75],
+    'the first frame at the current revision resumes GUI synchronization');
+  deliverFrame(c, 1);
+  await done;
+});
+
 test('a doubled segment-0 frame cannot republish over the generation first frame', async () => {
   const c = makeController();
   c.create(2);
@@ -584,6 +618,7 @@ test('create posts init stamped with the protocol version', () => {
     const init = w.posted.find((m) => m.type === 'init');
     assert.ok(init, 'init posted');
     assert.equal(init.version, PROTOCOL_VERSION);
+    assert.equal(init.paramRevision, c.paramRevision);
   }
 });
 
@@ -1900,6 +1935,7 @@ test('setEffect broadcasts the name plus the tuned param snapshot to every worke
       { name: 'Glow', value: 1.0 },
     ]);
     assert.equal(msgs[0].paused, false);
+    assert.equal(msgs[0].paramRevision, c.paramRevision);
   }
 });
 
@@ -2000,6 +2036,7 @@ test('setParameter broadcasts the name/value to every worker', () => {
     assert.equal(msgs.length, 1);
     assert.equal(msgs[0].name, 'Speed');
     assert.equal(msgs[0].value, 0.75);
+    assert.equal(msgs[0].paramRevision, c.paramRevision);
   }
 });
 
