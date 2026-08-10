@@ -119,9 +119,15 @@ export function projectDiv(num, den) {
   const denom = den.re * den.re + den.im * den.im;
   const numMag = num.re * num.re + num.im * num.im;
   if (numMag >= denom * (STEREO_INF * STEREO_INF)) {
-    if (numMag === 0.0) return { re: 0.0, im: 0.0 };
-    const scale = STEREO_INF / Math.sqrt(numMag);
-    return { re: num.re * scale, im: num.im * scale };
+    // Normalize by the peak component first: a numerator squared far above the
+    // sentinel overflows to infinity and one far below it underflows to zero,
+    // and either collapses the direction onto the origin.
+    const peak = Math.max(Math.abs(num.re), Math.abs(num.im));
+    if (peak === 0.0) return { re: 0.0, im: 0.0 };
+    const re = num.re / peak;
+    const im = num.im / peak;
+    const scale = STEREO_INF / Math.sqrt(re * re + im * im);
+    return { re: re * scale, im: im * scale };
   }
   return {
     re: (num.re * den.re + num.im * den.im) / denom,
@@ -150,9 +156,12 @@ export const glslProjectionFunctions = `
           float denom = den.re * den.re + den.im * den.im;
           float num_mag = num.re * num.re + num.im * num.im;
           if (num_mag >= denom * (STEREO_INF * STEREO_INF)) {
-            if (num_mag == 0.0) return CNum(0.0, 0.0);
-            float scale = STEREO_INF / sqrt(num_mag);
-            return CNum(num.re * scale, num.im * scale);
+            float peak = max(abs(num.re), abs(num.im));
+            if (peak == 0.0) return CNum(0.0, 0.0);
+            float re = num.re / peak;
+            float im = num.im / peak;
+            float scale = STEREO_INF / sqrt(re * re + im * im);
+            return CNum(re * scale, im * scale);
           }
           return CNum((num.re * den.re + num.im * den.im) / denom, (num.im * den.re - num.re * den.im) / denom);
         }
