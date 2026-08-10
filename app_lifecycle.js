@@ -446,8 +446,12 @@ export function createApplyNotice({
     if (handle !== null) cancel(handle);
     handle = null;
     held = notice === null ? null : owner;
-    text.textContent = notice ?? '';
+    // Hidden content sits outside the accessibility tree, so the text has to
+    // land in an already-exposed body: unhide before writing, hide before
+    // clearing. Writing first leaves the unhide as the only mutation assistive
+    // tech sees, which is not reliably announced.
     body.hidden = notice === null;
+    text.textContent = notice ?? '';
     if (notice !== null) handle = schedule(() => write(null, owner), timeoutMs);
   };
 

@@ -95,6 +95,18 @@ test('a segmented-POV spawn failure is announced, not only logged', () => {
     + 'segmented=true from the URL');
 });
 
+test('a recording start or stop is announced, not only styled', () => {
+  const at = SOURCE.indexOf('const recordState = {');
+  assert.ok(at >= 0, 'the record toggle must stay a named binding');
+  const body = SOURCE.slice(at, SOURCE.indexOf('\n}};', at));
+  assert.match(body, /RECORD_NOTICE/,
+    'the canvas tint, the duration readout, and the button label are all '
+    + 'visual: without a notice a screen-reader user gets no report that the '
+    + 'session started or ended');
+  assert.match(body, /Recording started\./);
+  assert.match(body, /Recording stopped\./);
+});
+
 test('the discard path frees an engine built after disposal', () => {
   const body = wasmReadyBlock();
   assert.match(body, /discardStartup:/,

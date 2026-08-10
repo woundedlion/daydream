@@ -537,11 +537,14 @@ const recordState = { record: () => {
     return;
   }
   const recording = host.recorder.toggle(appState.get('effect'));
-  if (recording && daydream.labelAxes) {
-    applyNotice.show(
-      'Axis labels are page overlays, not canvas pixels; the recording will not carry them.',
-      RECORD_NOTICE);
-  }
+  // The canvas tint, the duration readout, and the button label are all visual;
+  // the notice region is what carries the state change to assistive tech.
+  const axisWarning = recording && daydream.labelAxes
+    ? ' Axis labels are page overlays, not canvas pixels; the recording will not carry them.'
+    : '';
+  applyNotice.show(
+    `${recording ? 'Recording started.' : 'Recording stopped.'}${axisWarning}`,
+    RECORD_NOTICE);
   showRecording(recording);
 }};
 
