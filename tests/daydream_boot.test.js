@@ -120,9 +120,23 @@ test('the segmented POV deep-link keys keep the names shared links carry', () =>
 test('the segment-count control marks the count no hardware produces', () => {
   const at = SOURCE.indexOf("segFolder.add(segState, 'segments'");
   assert.ok(at >= 0, 'the segment-count control must stay in the segmented folder');
-  assert.match(SOURCE.slice(at, SOURCE.indexOf('\n', at)), /\.name\('Segments \(6[^']*'\)/,
+  assert.match(SOURCE.slice(at, SOURCE.indexOf('\n', at)), /\.name\(segLabel\)/,
+    'the label must stay bound to segLabel, which carries the marker');
+  assert.match(SOURCE, /segMax >= 6 \? 'Segments \(6[^']*'/,
     'the slider offers 6 segments, which the power-of-two firmware layout never '
     + 'runs; without the marker the per-segment overlay names boards that cannot exist');
+});
+
+test('the segment-count slider carries the device cap as its own maximum', () => {
+  const at = SOURCE.indexOf("segFolder.add(segState, 'segments'");
+  assert.match(SOURCE.slice(at, SOURCE.indexOf('\n', at)), /'segments', 2, segMax, 2\)/,
+    'the cap must bound the control itself: the deep-link hydrator clamps against '
+    + "the max passed to add(), and the pool's memory cost is what it bounds");
+  assert.match(SOURCE, /const segMax = maxSegmentCount\(navigator, daydream\.isMobile\)/,
+    'the cap must read the device hints, not a constant');
+  assert.match(SOURCE, /segments: Math\.min\(segments\.count, segMax\)/,
+    'the initial value must sit inside the range, or a capped device opens the '
+    + 'GUI showing a count the slider cannot represent');
 });
 
 test('the late-bound engine controls are re-applied once the engine exists', () => {

@@ -56,7 +56,7 @@ export function isValidSegmentCount(total) {
  *
  * @param {number} id - segment index in [0, total)
  * @param {number} total - total segment count (positive even number; the GUI
- *   exposes 2..8 in steps of 2)
+ *   exposes 2..8 in steps of 2, capped further on a low-memory device)
  * @param {number} w - canvas width in pixels
  * @param {number} h - canvas height in pixels
  * @returns {SegRange}
