@@ -2183,11 +2183,16 @@ test('create with a layout-illegal segment count latches a pool fault', () => {
   for (const bad of [3, 0, -2, 2.5, NaN]) {
     const c = makeController();
     c.active = true;
+    c.create(6);
     c.create(bad);
 
     assert.equal(c.faulted, true, `count ${bad} faults`);
     assert.equal(c.faultInfo.segId, -1, 'no single worker to blame');
     assert.match(c.faultInfo.message, /invalid segment count/);
     assert.deepEqual(c.workers, [], 'no workers were spawned');
+    // The recovery rebuilds re-create() at `count`, so the banner has to name
+    // the size they will actually spawn.
+    assert.equal(c.count, 6, 'the rejected count does not become the pool size');
+    assert.match(c.faultInfo.message, /a rebuild will use 6/);
   }
 });
