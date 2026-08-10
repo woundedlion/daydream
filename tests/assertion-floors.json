@@ -65,8 +65,8 @@
     "assertions": 9
   },
   "tests/fake_dom.test.js": {
-    "cases": 12,
-    "assertions": 14
+    "cases": 15,
+    "assertions": 29
   },
   "tests/flyout.test.js": {
     "cases": 3,
@@ -202,7 +202,7 @@
   },
   "tests/solid_render.test.js": {
     "cases": 14,
-    "assertions": 56
+    "assertions": 57
   },
   "tests/solids_registry_codegen.test.js": {
     "cases": 26,

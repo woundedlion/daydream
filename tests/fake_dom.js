@@ -72,6 +72,63 @@ function matches(node, selector) {
 }
 
 /**
+ * The attribute a dataset key reads and writes, under the DOM's camelCase to
+ * `data-*` mapping.
+ * @param {string} key - Dataset key.
+ * @returns {string} Attribute name.
+ */
+function datasetAttribute(key) {
+  return `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+}
+
+/**
+ * The dataset key a `data-*` attribute is exposed under.
+ * @param {string} name - Attribute name, `data-` prefix included.
+ * @returns {string} Dataset key.
+ */
+function datasetKey(name) {
+  return name.slice('data-'.length).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+}
+
+/**
+ * DOMStringMap stand-in: a live view over the element's `data-*` attributes
+ * that stringifies every write, as the platform does. Backing the map with the
+ * attributes is what the DOM does too, so a dataset write is visible to
+ * getAttribute and to an `[attr]` selector.
+ * @param {Object} element - Element the map belongs to.
+ * @returns {Object} The dataset view.
+ */
+function fakeDataset(element) {
+  const attributeFor = (key) => (typeof key === 'string' ? datasetAttribute(key) : null);
+  const present = (key) => {
+    const name = attributeFor(key);
+    return name !== null && name in element.attributes;
+  };
+  return new Proxy({}, {
+    get: (_, key) => (present(key) ? element.attributes[attributeFor(key)] : undefined),
+    set: (_, key, value) => {
+      element.attributes[datasetAttribute(String(key))] = String(value);
+      return true;
+    },
+    has: (_, key) => present(key),
+    deleteProperty: (_, key) => {
+      if (present(key)) delete element.attributes[attributeFor(key)];
+      return true;
+    },
+    ownKeys: () => Object.keys(element.attributes)
+      .filter((name) => name.startsWith('data-')).map(datasetKey),
+    getOwnPropertyDescriptor: (_, key) => (present(key)
+      ? {
+        value: element.attributes[attributeFor(key)],
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      }
+      : undefined),
+  });
+}
+
+/**
  * Prototype every fakeElement() carries, so a module guarding on
  * `target instanceof Element` can be exercised: install it as globalThis.Element
  * with installElement().
@@ -82,6 +139,10 @@ export class FakeElement {}
  * Element stand-in carrying the attribute, class, child, and listener surface
  * the daydream modules read and write. Non-empty innerHTML assignments throw so
  * tests cannot silently accept markup construction that a browser would parse.
+ * setAttribute, textContent and dataset stringify what they are given, as the
+ * platform does, so a test cannot assert a type back that a browser never
+ * yields; dataset is a view over the element's `data-*` attributes, so a write
+ * through it is visible to getAttribute and to an `[attr]` selector.
  * Listeners are recorded with their options bag so a test can dispatch(type,
  * event), read {passive}/{signal}, and assert removal; a {once} listener drops
  * as it fires, a listener an earlier handler removed does not fire, and removal
@@ -108,9 +169,7 @@ export function fakeElement(tag = 'div') {
     listeners: [],
     tagName: String(tag).toUpperCase(),
     id: '',
-    textContent: '',
     style: {},
-    dataset: {},
     attributes: {},
     children: [],
     parentNode: null,
@@ -129,7 +188,7 @@ export function fakeElement(tag = 'div') {
         return on;
       },
     },
-    setAttribute(name, value) { this.attributes[name] = value; },
+    setAttribute(name, value) { this.attributes[name] = String(value); },
     getAttribute(name) { return name in this.attributes ? this.attributes[name] : null; },
     append(...nodes) { detach(nodes); reparent(nodes, this); this.children.push(...nodes); },
     appendChild(node) {
@@ -267,6 +326,18 @@ export function fakeElement(tag = 'div') {
       if (value !== '') throw new Error('innerHTML must not be used');
       element.replaceChildren();
     },
+  });
+  // textContent is a DOMString: a write of anything else comes back stringified,
+  // and null (or a missing argument) reads back as the empty string.
+  let text = '';
+  Object.defineProperty(element, 'textContent', {
+    enumerable: true,
+    get() { return text; },
+    set(value) { text = value === null || value === undefined ? '' : String(value); },
+  });
+  Object.defineProperty(element, 'dataset', {
+    enumerable: true,
+    value: fakeDataset(element),
   });
   Object.setPrototypeOf(element, FakeElement.prototype);
   return element;

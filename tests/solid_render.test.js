@@ -349,8 +349,14 @@ test('index labels are built under the limit, carry their index, and are cleared
 
   assert.equal(result.labelsBuilt, true, 'the caller re-projects only labels it is told about');
   assert.equal(labelsContainer.children.length, 4);
-  assert.deepEqual(labelsContainer.children.map((el) => el.textContent), [0, 1, 2, 3]);
-  assert.deepEqual(labelsContainer.children.map((el) => el.dataset.index), [0, 1, 2, 3]);
+  // The page re-projects the labels by parseInt-ing data-index, so the index has
+  // to arrive as the string a browser stores, on an attribute a selector finds.
+  assert.deepEqual(labelsContainer.children.map((el) => el.textContent),
+    ['0', '1', '2', '3']);
+  assert.deepEqual(labelsContainer.children.map((el) => el.dataset.index),
+    ['0', '1', '2', '3']);
+  assert.deepEqual(labelsContainer.querySelectorAll('[data-index]'),
+    labelsContainer.children);
 
   const again = renderer.render(tetrahedron(), view(), null);
   assert.equal(again.labelsBuilt, false);

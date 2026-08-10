@@ -1,8 +1,9 @@
 //
-// fake_dom.js's event propagation, pinned on its own. Fifteen suites dispatch
-// through this fake, and a listener that runs at the wrong attachment point —
-// or a stopPropagation that stops nothing — would read there as an assertion
-// about the module under test rather than about the harness.
+// fake_dom.js's event propagation and value coercion, pinned on their own.
+// Fifteen suites dispatch and assert through this fake, so a listener that runs
+// at the wrong attachment point, a stopPropagation that stops nothing, or a
+// property handing back a type no browser produces would all read there as
+// assertions about the module under test rather than about the harness.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeElement } from './fake_dom.js';
@@ -178,4 +179,52 @@ test('a listener an earlier handler removed does not run', () => {
   leaf.dispatch('click');
 
   assert.deepEqual(log, ['leaf']);
+});
+
+test('textContent and setAttribute hand back the strings a browser stores', () => {
+  const el = fakeElement('div');
+
+  el.textContent = 7;
+  assert.equal(el.textContent, '7');
+  el.textContent = null;
+  assert.equal(el.textContent, '', 'null reads back as the empty string');
+  el.textContent = undefined;
+  assert.equal(el.textContent, '');
+
+  el.setAttribute('tabindex', -1);
+  assert.equal(el.getAttribute('tabindex'), '-1');
+});
+
+test('dataset is a stringifying view over the element data- attributes', () => {
+  const el = fakeElement('div');
+
+  el.dataset.index = 3;
+  el.dataset.sortLabel = 'name';
+
+  assert.equal(el.dataset.index, '3');
+  assert.equal(el.getAttribute('data-index'), '3',
+    'a dataset write is a data- attribute write');
+  assert.equal(el.getAttribute('data-sort-label'), 'name',
+    'camelCase keys map to hyphenated attributes');
+  assert.deepEqual(Object.keys(el.dataset), ['index', 'sortLabel']);
+
+  el.setAttribute('data-index', '4');
+  assert.equal(el.dataset.index, '4', 'the attribute is the backing store');
+
+  delete el.dataset.index;
+  assert.equal(el.getAttribute('data-index'), null);
+  assert.equal(el.dataset.index, undefined);
+  assert.equal('missing' in el.dataset, false);
+});
+
+test('a dataset write is reachable by an [attr] selector', () => {
+  const parent = fakeElement('div');
+  const tagged = fakeElement('span');
+  const bare = fakeElement('span');
+  parent.append(tagged, bare);
+  tagged.dataset.index = 0;
+
+  assert.deepEqual(parent.querySelectorAll('[data-index]'), [tagged]);
+  assert.equal(tagged.matches('[data-index]'), true);
+  assert.equal(bare.matches('[data-index]'), false);
 });
