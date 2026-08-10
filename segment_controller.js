@@ -79,6 +79,10 @@ export const MAX_FAULTED_REBUILDS = 2;
 export const WARM_INTERVAL_MS = 10000;
 
 let lastWarmAt = -Infinity;
+// Resolved probe URL the stored warm covers. A warm of another module graph
+// must not be served this one's promise, so the dedupe window is keyed on it.
+/** @type {string | null} */
+let lastWarmKey = null;
 /** @type {Promise<void>} */
 let lastWarm = Promise.resolve();
 
@@ -125,7 +129,8 @@ function unrefTimer(timer) {
  * @details The artifacts are served unversioned, so freshness rests on
  * revalidation: `cache: 'no-cache'` re-fetches a rebuilt binary and costs a 304
  * for an unchanged one, where a reload always re-pulls all 1.8 MB. A call within
- * `minIntervalMs` of the last warm reuses that warm's promise.
+ * `minIntervalMs` of the last warm of the SAME base URL reuses that warm's
+ * promise; another base URL describes another module graph and warms its own.
  *
  * The drained binary is also compiled here into `sharedWasmModule`, so the pool
  * spawn that follows spends one compilation of the 2 MB module rather than one
@@ -145,21 +150,33 @@ export function warmModules({
   catch { return Promise.resolve(); }
   if (probe.protocol !== 'http:' && probe.protocol !== 'https:') return Promise.resolve();
   const now = Date.now();
-  if (now - lastWarmAt < minIntervalMs) return lastWarm;
-  lastWarmAt = now;
+  if (probe.href === lastWarmKey && now - lastWarmAt < minIntervalMs) return lastWarm;
   // fetch resolves at the headers; the body must be drained or nothing is cached.
   const drain = (/** @type {string} */ u) =>
     fetchResource(new URL(u, baseUrl), { cache: 'no-cache' }).then((r) => r.arrayBuffer());
-  const workerJs = drain('./segment_worker.js');
-  const glueJs = drain('./holosphere_wasm.js');
-  const binary = drain('./holosphere_wasm.wasm');
-  lastWarm = Promise.allSettled([
-    workerJs,
-    glueJs,
-    binary,
-    binary.then((bytes) => WebAssembly.compile(bytes))
-      .then((compiled) => { sharedWasmModule = compiled; }),
-  ]).then(() => {});
+  /** @type {Promise<void>} */
+  let warm;
+  try {
+    const workerJs = drain('./segment_worker.js');
+    const glueJs = drain('./holosphere_wasm.js');
+    const binary = drain('./holosphere_wasm.wasm');
+    warm = Promise.allSettled([
+      workerJs,
+      glueJs,
+      binary,
+      binary.then((bytes) => WebAssembly.compile(bytes))
+        .then((compiled) => { sharedWasmModule = compiled; }),
+    ]).then(() => {});
+  } catch {
+    // A fetch that throws synchronously warmed nothing, so the window stays
+    // with the last warm that did: advancing it here would hand every caller
+    // inside the window a promise already settled by an earlier module graph.
+    return Promise.resolve();
+  }
+  // Stamped only once the promise it describes exists, for the same reason.
+  lastWarmAt = now;
+  lastWarmKey = probe.href;
+  lastWarm = warm;
   return lastWarm;
 }
 

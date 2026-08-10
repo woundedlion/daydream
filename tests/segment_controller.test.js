@@ -105,6 +105,57 @@ test('warmModules skips a re-warm inside the dedupe window', async () => {
   assert.equal(calls, 6, 'a warm past the window fetches again');
 });
 
+test('the dedupe window covers one base URL, not every caller in it', async () => {
+  const seen = [];
+  const response = { arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) };
+  const deps = {
+    fetch: (url) => { seen.push(url.href); return Promise.resolve(response); },
+  };
+  await warmModules({
+    ...deps, minIntervalMs: 0,
+    baseUrl: 'http://localhost:8000/first/segment_controller.js',
+  });
+  seen.length = 0;
+
+  // Another base URL is another module graph: serving it the first warm's
+  // promise would report a warm of files it never fetched.
+  await warmModules({
+    ...deps, minIntervalMs: WARM_INTERVAL_MS,
+    baseUrl: 'http://localhost:8000/second/segment_controller.js',
+  });
+  assert.deepEqual(seen, [
+    'http://localhost:8000/second/segment_worker.js',
+    'http://localhost:8000/second/holosphere_wasm.js',
+    'http://localhost:8000/second/holosphere_wasm.wasm',
+  ], 'a second base URL inside the window warms its own module graph');
+
+  seen.length = 0;
+  await warmModules({
+    ...deps, minIntervalMs: WARM_INTERVAL_MS,
+    baseUrl: 'http://localhost:8000/second/segment_controller.js',
+  });
+  assert.deepEqual(seen, [], 'a repeat of that base URL still dedupes');
+});
+
+test('a warm whose fetch throws synchronously does not claim the window', async () => {
+  const baseUrl = 'http://localhost:8000/offline/segment_controller.js';
+  await warmModules({
+    baseUrl, minIntervalMs: 0,
+    fetch: () => { throw new TypeError('network down'); },
+  });
+
+  let calls = 0;
+  await warmModules({
+    baseUrl, minIntervalMs: WARM_INTERVAL_MS,
+    fetch: () => {
+      calls++;
+      return Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) });
+    },
+  });
+  assert.equal(calls, 3,
+    'the throw warmed nothing, so the next call must not be handed a settled promise');
+});
+
 // The smallest valid module — the header alone. Compiling a real one is what
 // shows the init message can carry a WebAssembly.Module across the boundary.
 const EMPTY_WASM = Uint8Array.of(0, 0x61, 0x73, 0x6d, 1, 0, 0, 0);
