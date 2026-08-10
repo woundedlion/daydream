@@ -50,6 +50,7 @@ Building the WASM target in Holosphere installs `holosphere_wasm.js`, `holospher
      - [Frame Sync Protocol: 1-Wire Signal Datasheet](#frame-sync-protocol-1-wire-signal-datasheet)
 8. [The Effect System](#8-the-effect-system)
 9. [Effects Reference](#9-effects-reference)
+   - [ShaderBall Shader Vocabulary](#shaderball-shader-vocabulary)
 10. [The Web Simulator (Daydream)](#10-the-web-simulator-daydream)
     - [10.1 Process and Threading Model](#101-process-and-threading-model)
     - [10.2 The WASM Bridge](#102-the-wasm-bridge)
@@ -184,7 +185,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   ├── math/                   Vector/quaternion math and scalar curves
 │   │   ├── 3dmath.h                Vector, Quaternion, Spherical, Complex, Möbius math
 │   │   ├── rotate.h                Quaternion projection helpers
-│   │   ├── geometry.h              Dots/Points, PhiLUT/TrigLUT, coord conversions
+│   │   ├── geometry.h              PhiLUT/TrigLUT, pixel ↔ vector mapping, pole_wrap, Orientation, Basis
 │   │   ├── spherical_field.h       Latitude-ring field layout + bilinear sphere sampling
 │   │   ├── easing.h                Easing functions (cubic, sine, elastic, expo, etc.)
 │   │   └── waves.h                 sin_wave / tri_wave / square_wave generators
@@ -639,7 +640,7 @@ The clear covers only the current display clip unless a filter declares
 contents outside the band are separate properties: `World::Trails` needs the
 former, while `Pixel::Feedback` needs both. The margin-expanded render band is
 otherwise write-only scratch; its width comes from the pipeline's
-`max_segment_margin` fold over each filter's `segment_margin` (how far the
+`total_segment_margin` sum of each filter's `segment_margin` (how far the
 stage's output lands from the plotted position), floored at 1. Filtered effects
 derive all three from their pipelines.
 
@@ -1824,7 +1825,7 @@ An effect passes construction-time flags to its base as `Effect(W, H, {.strobe =
 
 All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for RingShower, Dynamo and Thrusters.
 
-The effect registry and tests carry the full 24-effect roster. The simulator sidebar exposes the curated subset for its active resolution (§10.5), omitting three effects at 288×144 and five at 96×20. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) is a 21-effect subset of the full roster, excluding the two Holosphere-96×20-only effects, Dynamo and Thrusters, and the sim-only ShadierBall. Full-cycle Teensy measurements for the firmware playlist are indexed in the [on-device effect profiles](docs/profiles/README.md).
+The effect registry and tests carry the full 23-effect roster. The simulator sidebar exposes the curated subset for its active resolution (§10.5), omitting three effects at 288×144 and five at 96×20. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) is a 20-effect subset of the full roster, excluding the two Holosphere-96×20-only effects, Dynamo and Thrusters, plus ShaderBall while its 288×144 instantiation exceeds the remaining ITCM budget. Full-cycle Teensy measurements for the firmware playlist are indexed in the [on-device effect profiles](docs/profiles/README.md).
 
 ### Core Effects (Modern Engine)
 
@@ -1944,7 +1945,7 @@ Polyline rings drift pole-to-pole through an inverse stereographic projection, e
 
 #### DreamBalls
 
-Draws twisting wireframe knotted structures derived from Archimedean solids. Mesh vertices are displaced along per-vertex tangent frames to create orbiting knot patterns, and a Möbius warp is applied to the geometry. Multiple copies orbit simultaneously while the whole structure tumbles under a slow Languid random-walk view orientation punctuated by periodic full-sphere spins. Five presets cycle every 320 frames, each carrying its own solid (rhombicuboctahedron, rhombicosidodecahedron, truncated cuboctahedron, icosidodecahedron, snub cube) and displacement settings. Four fixed procedural palettes cover the five: the first two presets share a blood-stream palette composed with an alpha falloff that ramps alpha linearly from full at the palette's near end to zero at its far end, and the last three take rich sunset, lavender lake, and coral blue. The outgoing sprite fades out before the incoming one fades in, so exactly one mesh renders per frame.
+Draws twisting wireframe knotted structures over a selectable Platonic, Archimedean, or Catalan base mesh. The `Base Mesh` dropdown exposes all 31 simple solids, and its selection is stored with the other preset parameters. Mesh vertices are displaced along per-vertex tangent frames to create orbiting knot patterns, and a Möbius warp is applied to the geometry. Multiple copies orbit simultaneously while the whole structure tumbles under a slow Languid random-walk view orientation punctuated by periodic full-sphere spins. Five presets cycle every 320 frames, each carrying its own solid (rhombicuboctahedron, rhombicosidodecahedron, truncated cuboctahedron, icosidodecahedron, snub cube) and displacement settings. Four fixed procedural palettes cover the five: the first two presets share a blood-stream palette composed with an alpha falloff that ramps alpha linearly from full at the palette's near end to zero at its far end, and the last three take rich sunset, lavender lake, and coral blue. The outgoing sprite fades out before the incoming one fades in, so exactly one mesh renders per frame.
 
 **Parameters**: Copies (number of knot copies), Radius (displacement), Speed (orbit speed), Warp (Möbius warp scale), Alpha
 
@@ -2004,9 +2005,9 @@ A head traces a fixed 12:5 spherical Lissajous figure whose long trail is contin
 
 #### MeshFeedback
 
-A fixed icosahedron's wireframe rendered with `Plot::Mesh`, given a noise-distorted, feedback-loop appearance via `Filter::Pixel::Feedback`. An orientation random-walk tumbles the solid while a `Presets` cycle hard-cuts the feedback/distortion style parameters.
+A selectable Platonic, Archimedean, or Catalan wireframe rendered with `Plot::Mesh`, given a noise-distorted, feedback-loop appearance via `Filter::Pixel::Feedback`. An orientation random-walk tumbles the solid while a `Presets` cycle hard-cuts both the base mesh and feedback/distortion style parameters.
 
-**Parameters**: Fade, Distort Amp, Distort Freq, Distort Speed, Noise Scale, Hue Shift, Feedback
+**Parameters**: Base Mesh, Fade, Distort Amp, Distort Freq, Distort Speed, Noise Scale, Hue Shift, Feedback
 
 </td></tr></table>
 
@@ -2016,11 +2017,11 @@ A fixed icosahedron's wireframe rendered with `Plot::Mesh`, given a noise-distor
 
 #### MindSplatter
 
-Particles spray from emitters at the eight cube vertices — each sweeping its own tangent-plane emission angle — and fall toward attractor wells at the six octahedron vertices, where an event-horizon kernel around each signed axis punches them out as holes. A random walk tumbles the view, periodic Möbius warp bursts distort the whole field, and a preset timer lerps friction, well strength and speeds between eight presets.
+Particles spray from emitters at the vertices of a selectable Platonic solid — each sweeping its own tangent-plane emission angle — and fall toward attractor wells at the vertices of its dual. The tetrahedron is self-dual; cube/octahedron and dodecahedron/icosahedron form the other pairs. Event-horizon kernels punch the particles out around each attractor. A random walk tumbles the view, periodic Möbius warp bursts distort the whole field, and a preset timer transitions the base mesh, friction, well strength, and speeds between eight presets.
 
-**Teensy full-cycle profile**: all eight presets hold 16 fps; shipping peaks at 38.95 ms with 0/1728 spills, and global O3 peaks at 38.78 ms with 0/1728 spills ([shipping](docs/profiles/shipping/profile_mindsplatter_teensy_2026-08-07.md), [global O3](docs/profiles/O3/profile_mindsplatter_teensy_2026-08-07.md)).
+**Teensy full-cycle profile (legacy cube/octahedron geometry)**: all eight presets hold 16 fps; shipping peaks at 38.95 ms with 0/1728 spills, and global O3 peaks at 38.78 ms with 0/1728 spills ([shipping](docs/profiles/shipping/profile_mindsplatter_teensy_2026-08-07.md), [global O3](docs/profiles/O3/profile_mindsplatter_teensy_2026-08-07.md)).
 
-**Parameters**: Friction, Well Str, Init Spd, Ang Spd, Warp, Particles
+**Parameters**: Base Mesh, Friction, Well Str, Init Spd, Ang Spd, Warp, Particles
 
 </td></tr></table>
 
@@ -2078,25 +2079,81 @@ Volumetric raymarcher that renders twisted tori at the 26 vertices of a disdyaki
 
 #### ShaderBall
 
-Stereographic-projection shader (extends `Effect` directly) spanning 15 liquid domain-warp, mixed-pattern, and grid fly-through presets from one continuous parameter space. Every look axis — Y-spin vs. dual random-walk wander, glitch-lens strength, pattern cross-coupling vs. direct phase feed, breathe depth, hue shift, and value fade — is a preset-lerped float, so the choreography morphs between any two looks without a discrete pop. Lens transitions interpolate direct and fully lensed stereographic coordinates before one warp/pattern sample. `Scan::Shader::draw` shades through one continuously cycling liquid palette.
+Typed pullback sphere shader (extends `Effect` directly) whose presets compose a source function, sphere projection, surface lens, two planar warp stages, material shaping, coverage, and colorization. It includes the original liquid/flyby vocabulary plus Bonne, Peirce quincuncial, and Airocean (Dymaxion) projections; topology-aware seam metadata; generated triadic and deformation palettes; and continuous preset choreography. GUI edits publish directly to the live authored state, while preset changes use continuous parameter morphs or output-space crossfades when topology changes.
 
-**Teensy full-cycle profile**: shipping holds all 13 presets of the 2026-08-08 capture at 16 fps with a 53.99 ms peak and 0/6,368 frames spilling; global O3 peaks at 50.20 ms ([shipping](docs/profiles/shipping/profile_shaderball_teensy_2026-08-08.md), [global O3](docs/profiles/O3/profile_shaderball_teensy_2026-08-08.md)).
-
-**Parameters**: Warp Scale, Warp Strength, Warp Time, Pattern Freq, Speed, Complexity, Pattern Mix, Drift, Pole Fade, Spin Rate, Wander, Lens Mix, Breathe Depth, Cycle Speed, Hue Shift, Value Fade
+**Parameters**: the active controls are schema-driven by the selected slots. See the vocabulary and dependency map below.
 
 </td></tr></table>
 
-<table border="0"><tr>
-<td width="300"><a href="https://woundedlion.github.io/daydream/?effect=ShadierBall" target="_blank"><img src="docs/screenshots/ShadierBall.png" alt="ShadierBall" width="280"></a></td>
-<td valign="top">
+### ShaderBall Shader Vocabulary
 
-#### ShadierBall
+ShaderBall is a fixed typed pipeline, not a free-form node graph. Each dropdown chooses one implementation for a named stage; the sliders below it edit only that stage's parameters. A frame snapshots the selected slots, live parameters, clocks, transforms, and palette resources before the per-pixel shader starts, so the hot loop reads immutable state.
 
-Slot-based sphere shader (extends `Effect` directly): each preset names a pattern **Function** (twin-wave interference, rings, spiral, or grid), a sphere-to-plane **Projection** (seam-free equirectangular — azimuth folded and pole-tapered — stereographic, or gnomonic), and a sphere **Lens** (glitch fold, latitude twist, or six-fold kaleidoscope) — discrete slot tags dispatched per pixel on frame-constant copies — plus the continuous params those slots consume. A random-walk camera drifts the whole view at a languid preset-set gain. The shipped preset pairs the twin-wave function (two traveling plane waves, the second rotating continuously relative to the first) with the glitch lens ahead of a stereographic projection; every other combination is one dropdown away. Color walks the 256 prebaked triadic profiles through a `PaletteCycler` on a golden-ratio hue step, fade after fade with no dwell — pausing animation never stills it.
+The shader is a *pullback*: it starts at a visible point on the sphere and walks backward through camera, lens, projection, and warps to discover the source coordinate to sample. Material stages then turn that signed source value and the projection/warp metadata into RGBA.
 
-**Parameters**: Function, Projection, Lens, Speed, Pattern Freq, Wave Spin, Pole Fade, Lens Mix, Wander
+```mermaid
+flowchart LR
+  V[Sphere sample] --> OC[Outer camera]
+  OC --> L[Surface lens]
+  L --> PF[Projection frame]
+  PF --> P[Projection]
+  P --> PL[Projected lookup<br/>coords + weight + seam topology]
+  PL --> OW[Outer planar warp]
+  OW --> IW[Inner planar warp]
+  IW --> F[Source function]
+  F --> SW[Signal weight]
+  SW --> VT[Value transfer]
+  VT --> C[Colorizer]
+  C --> RGBA[RGBA]
 
-</td></tr></table>
+  PL -. projection weight .-> SW
+  PL -. projection weight / edge distance .-> OW
+  PL -. projection weight / edge distance .-> IW
+  PL -. projection weight / edge distance .-> CV[Coverage]
+  VT -. shaped value .-> CV
+  CV -. alpha .-> C
+  OW -. displacement + path metadata .-> C
+  IW -. displacement + path metadata .-> C
+```
+
+The authored stage order is `source → inner warp → outer warp → projection`; pullback evaluation reverses it. **Outer Warp** is therefore nearest the projection and **Inner Warp** nearest the source. This positional vocabulary is stable even when either stage is `None`.
+
+| Stage | Options | Produces or controls |
+|---|---|---|
+| **Function** | Twin Wave, Rings, Spiral, Grid, Coupled / Direct, Noise Contour, Primitive Lattice | A signed scalar field sampled in the final planar coordinates. Function-specific controls replace irrelevant generic sliders. |
+| **Projection** | Equirectangular, Stereographic, Gnomonic, Bonne, Peirce Quincuncial, Airocean / Dymaxion | Planar coordinates plus region/component identity, projection weight, boundary traits, stable edge identity, and fade distance. |
+| **Projection Frame** | Identity, Spin + Wander | Rotates the sphere before projection. Spin Rate and Projection Wander exist only for Spin + Wander. |
+| **Lens** | None, Glitch, Twist, Kaleidoscope, Möbius, Tangent Noise | Distorts a unit-sphere direction before projection. Lens Mix and lens-specific controls exist only for an active lens. |
+| **Outer / Inner Warp** | None, Legacy Stereo Noise, Affine Frame, Wave Shear, Vortex, Vector Noise, Curl Flow, Mirror Tile, Polar Chart | Pulls planar coordinates backward and accumulates displacement, deformation, and path length for downstream colorizers. |
+| **Signal Weight** | None, Projection | Optionally multiplies the signed source signal by the projection's weight before remapping it to `[0, 1]`. It changes value, not alpha. |
+| **Value Transfer** | Linear, Ridge, Iso Contour, Smooth Bands | Shapes the normalized value. Iso controls appear only for Iso Contour; Band Count and Band Phase only for Smooth Bands. |
+| **Coverage** | Opaque, Projection Weight, Projection Weight Squared, Value Cutout, Edge Fade | Computes alpha independently from color value. Linear projection weight is softer and broader than the squared form. |
+| **Colorizer** | Generated Triadic, ShaderBall Liquid, Deformation Ink | Converts shaped value, coverage, and optional warp metadata into straight-alpha color. |
+
+Selector dependencies are explicit and deterministic:
+
+```mermaid
+flowchart TD
+  Projection -->|Bonne| Bonne[Hemisphere + standard parallel]
+  Projection -->|Peirce| Peirce[Layout; scroll for strip layouts]
+  Projection -->|Airocean / Dymaxion| Air[Net layout]
+  Projection -->|Gnomonic| Gnomonic[Hemisphere policy]
+  Projection --> CommonP[Meridian / scale / pole controls<br/>when meaningful]
+
+  Function --> Source[Function-specific source controls]
+  Lens --> LensParams[Lens Mix + selected lens controls]
+  OuterWarp[Outer Warp] --> OuterParams[Selected stage controls]
+  InnerWarp[Inner Warp] --> InnerParams[Selected stage controls]
+  ValueTransfer --> TransferParams[Iso or band controls]
+  Coverage --> CoverageParams[Cutout threshold or edge width]
+  Colorizer --> ColorParams[Palette / breathe / hue / fade controls]
+```
+
+Some combinations are intentionally inadmissible. Legacy stereographic noise selects Stereographic projection; seam-sensitive noise stages do not cross the cut topology of Bonne, Peirce, or Airocean; Polar Chart constrains the compatible source; and the device cost model may clear a sibling stage to stay within the 62.5 ms frame budget. These are canonicalization rules between typed stages, not preset-specific patches.
+
+Projection seams use topology supplied by the projection kernel rather than guessing from planar coordinates. **Edge Fade** treats paired cuts as subduction boundaries: one stable side receives the authored fade width, while its partner gets only a one-pixel feather. Glued and periodic edges remain continuous and do not fade. **Pole Fade** is projection weight; selecting either projection-weight coverage policy carries that attenuation into alpha as well as any separately selected signal weighting.
+
+GUI sliders and dropdowns apply immediately. Automatic preset choreography remains continuous: compatible configurations morph one live state, while incompatible discrete topologies blend complete endpoint colors. Source, warp, projection, breathe, global-walk, and palette clocks keep advancing according to their named rates; **Pause Presets** stops automatic preset selection, not those clocks.
 
 <table border="0"><tr>
 <td width="300"><a href="https://woundedlion.github.io/daydream/?effect=DisplacementField" target="_blank"><img src="docs/screenshots/DisplacementField.png" alt="DisplacementField" width="280"></a></td>
@@ -2242,6 +2299,9 @@ The `Daydream` class owns the entire render side. Features:
 | **Instanced dot mesh** | One `InstancedMesh` of `W × H` small **hemi**spheres — `THREE.SphereGeometry` with `phiLength = π`, covering only the outward-facing half. `setupDots()` builds that geometry, the material, and the mesh; `precomputeMatrices()` fills each instance matrix from `pixelToSpherical(x, y)` (a `THREE.Spherical`, applied via `setFromSpherical`) and turns the dot radially outward with a `lookAt`, so the missing half never faces the camera and `THREE.FrontSide` suffices. `precomputeMatrices()` also allocates the shared `instanceColor` buffer that per-frame colors are written into. All `W × H` dots cost one draw call per render pass — two passes per frame while the PiP view below is up. |
 | **Linear color pipeline** | `THREE.ColorManagement.enabled = true` and `setPixelRatio(min(devicePixelRatio, 1))`. Colors arriving from WASM are already linear, so no extra conversion. |
 | **OrbitControls camera** | A normal `PerspectiveCamera` at `(0, 0, 220)` with FOV 20°, plus `OrbitControls` for mouse/touch navigation. |
+| **Keyboard orbit** | A keyboard-focused canvas uses the arrow keys to orbit and `+`/`-` to dolly. Pointer focus does not claim those keys, preserving the paused-frame shortcut on the global handler. |
+| **On-demand repaint** | The animation loop repaints only after a simulation step, camera movement, or `invalidate()`. Any caller that changes visible scene state without either of the first two must call `invalidate()`, especially for changes that must appear while paused. |
+| **Context-loss recovery** | `webglcontextlost` stops GL work, aborts recording, and presents an accessible reload prompt; `webglcontextrestored` clears the lost state and schedules a repaint. |
 | **Picture-in-picture** | A clone of the main camera, tracking its position and orientation each frame, renders the same view into a square 30%-sized bottom-right viewport. Suppressed when `isMobile`, under `navigator.webdriver` (§ headless capture), and while recording. |
 | **Axes overlay** | Three `THREE.Line`s for X/Y/Z visible on toggle, plus a `CSS2DRenderer`-backed `LabelPool` for the six axis-direction labels ("X / Y / Z" and "-X / -Y / -Z") with zero allocation per frame. |
 | **Resize observer** | `ResizeObserver` on the canvas container recomputes camera aspect, viewport, and `isMobile` (width ≤ 900). |
@@ -2348,7 +2408,7 @@ A page-specific local import (e.g. `solids.html` referencing `../solids.js`) is 
 
 ### 10.9 Video Recording (`recorder.js`)
 
-A `VideoRecorder` wraps `MediaRecorder` over an offscreen capture canvas's `captureStream(0)` — the manual-frame-request mode where frames are taken on demand instead of on wall-clock. After every simulation tick, `recorder.captureFrame()` blits the source canvas into the offscreen and requests a frame from the stream; this means recorded video is locked to the effect's simulation rate (16 FPS by default) regardless of how fast the browser actually renders. The result is byte-perfect repeatability between recordings. This holds only where the captured track exposes `requestFrame`; on browsers lacking it the recorder falls back to a wall-clock timer, so the rate-lock and repeatability guarantees do not apply.
+A `VideoRecorder` wraps `MediaRecorder` over an offscreen capture canvas's `captureStream(0)` — the manual-frame-request mode where frames are taken on demand instead of on wall-clock. On the single-engine path, every simulation tick calls `recorder.captureFrame()`, which blits the source canvas into the offscreen and requests a frame from the stream; recorded video is therefore locked to the effect's simulation rate (16 FPS by default) regardless of how fast the browser actually renders, with byte-perfect repeatability between recordings. The segmented path captures only ticks where `captureReady()` reports that a composite landed, so a pool overrun can drop a recorded frame and void both guarantees. The guarantees also require the captured track to expose `requestFrame`; on browsers lacking it the recorder falls back to a wall-clock timer.
 
 Codec priority is MP4/H.264 → WebM/VP9 → WebM/VP8. Capture always goes through the offscreen canvas: it is either scaled to a target height for size-controlled exports, or pinned to the source's start-time size at native resolution. Either way the recorded track's frame size is fixed for the whole session, so a mid-recording resolution change cannot alter the encoded dimensions.
 
@@ -2485,7 +2545,7 @@ Three layers run the same suite so a regression can't reach the live demo:
 - **Presubmit CI** (`.github/workflows/ci.yml`, Holosphere repo) — on master pushes and pull-request updates (a push to a branch with no open PR triggers nothing), runs the native suite on both Linux (clang-18) and Windows (emsdk Clang, which exercises the `lld-link` / rc.exe toolchain branch from a plain shell), and builds the WASM module. It then **smoke-tests the WASM at runtime** ([`scripts/wasm_smoke.mjs`](https://github.com/woundedlion/pov/blob/master/scripts/wasm_smoke.mjs)) — instantiating the module the way the browser does and driving every registered effect at every enumerated resolution, so a SIMD-codegen fault, an embind signature mismatch, a stack overflow, or an `ALLOW_MEMORY_GROWTH` detachment fails here rather than riding a green build to deploy — and **verifies the install provenance set** (`holosphere_wasm.wasm` + `.js` + `.sha` + `.wasm.sha256`, the same artifacts the daydream deploy gate consumes), asserting the recorded `sha256` of both the binary and the Emscripten glue verifies and a clean checkout records no `-dirty` marker. The native suite there runs with `HS_SMOKE_FRAMES=120` to reach effect-lifecycle transitions the default short run skips, and runs a second time at `-O2` (the `tests` preset pins `Debug`, so UB the optimizer acts on and FP results that move under contraction are invisible to the Debug shards; `NDEBUG` is left undefined there so assertions and the arena guards stay live). The same shard matrix also runs under **ASan + UBSan** with `-fno-sanitize-recover` — the native build is the only one where the arena guards compile in, so this is the sole automated cover for the arena-lifetime UB the death harness can't reach — and the canvas / segmented-POV modules run once more under **TSan** (its own job: TSan cannot share a binary with ASan), which is the only check on the double-buffer handoff that x86-64's strong memory model masks. A `shard-coverage` job asserts every registered CTest matches exactly one shard regex, so a new module cannot fall out of every sanitized and unsanitized shard at once, and an advisory `code-coverage` job publishes an llvm-cov summary with no threshold gate. A `lint` job runs `ruff` over the Python tooling and `eslint` over `scripts/*.mjs` — both configured to defect rules only ([`ruff.toml`](https://github.com/woundedlion/pov/blob/master/ruff.toml), [`eslint.config.mjs`](https://github.com/woundedlion/pov/blob/master/eslint.config.mjs)), with no formatter and no stylistic rule enabled, so the gate reports breakage rather than reflowing the tree.
 - **Gated deploy** (`.github/workflows/deploy.yml`, **daydream repo**) — daydream's GitHub Pages source is *GitHub Actions*. On a push to daydream's `master` (or manual dispatch), the engine's native unit suite runs as a **gate** (checking out the engine repo) alongside daydream's own JS suite; `deploy` `needs: [gate, js-tests]`, so only if both pass does the workflow publish the simulator to Pages. The engine's WASM is whatever is committed in daydream (built + installed from Holosphere). If the engine repo is private, add a `POV_TOKEN` secret (a read-access PAT) for the gate's checkout.
 
-The simulator's JavaScript lives in the daydream repo and carries its own suite there: `tests/*.test.js`, run by `npm test` (`node --test`), covering the driver and clock, the sidebar and GUI, the segment workers and layout, param marshaling, color/palette math, and the geometry tools' math modules. Two committed ratchets in `package.json` keep a hollowed-out suite from reporting green: a `pretest` guard (`scripts/require-tests.mjs`) fails the run when the test glob matches fewer files than `testFileFloor`, so a rename can't empty the suite silently, and the `test` script itself (`scripts/run-tests.mjs`) fails when the total `node --test` reports falls below `testCountFloor` — a file gutted to a comment still satisfies the file count, and `node --test` scores it as one passing test. Both floors are raised as tests land and lowered only alongside a deliberate removal. The suite runs on every daydream pull request (`.github/workflows/js-tests.yml`, alongside `npm run typecheck` and an import-map freshness check) and again as the `js-tests` job in `deploy.yml`.
+The simulator's JavaScript lives in the daydream repo and carries its own suite there: `tests/*.test.js`, run by `npm test` (`node --test`), covering the driver and clock, the sidebar and GUI, the segment workers and layout, param marshaling, color/palette math, and the geometry tools' math modules. Two committed ratchets keep a hollowed-out suite from reporting green: a `pretest` guard (`scripts/require-tests.mjs`) fails the run when the test glob matches fewer files than `package.json`'s `testFileFloor`, so a rename can't empty the suite silently, while `scripts/run-tests.mjs` checks every file against the `{cases, assertions}` minimums in `tests/assertion-floors.json`. Re-measure those per-file floors deliberately with `node scripts/run-tests.mjs --update-floors "tests/*.test.js"`; reductions belong only alongside the corresponding test removal. The suite runs on every daydream pull request (`.github/workflows/js-tests.yml`, alongside `npm run typecheck` and an import-map freshness check) and again as the `js-tests` job in `deploy.yml`.
 
 ### Documentation — Holosphere repo
 
