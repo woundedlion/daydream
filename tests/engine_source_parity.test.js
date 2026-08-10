@@ -139,7 +139,9 @@ test('glslProjectionFunctions constants match core/math/3dmath.h', { skip: SKIP 
 
 // The two sRGB transfer functions, as color.js names them and as core/color/color.h
 // does. Both ports are a single guarded expression whose coefficients appear in
-// the same order, so the ordered literals are the comparison.
+// the same order, so the ordered literals are the comparison — an operator or
+// grouping change that keeps them is invisible here, and is caught instead by
+// tests/color_parity_wasm.test.js's output sweep.
 const SRGB_FUNCTIONS = [
   ['srgbToLinearFloat', 'srgb_to_linear_float'],
   ['linearToSrgbFloat', 'linear_to_srgb_float'],
