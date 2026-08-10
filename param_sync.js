@@ -104,21 +104,21 @@ export function paramValueSkew(namesLength, valuesLength) {
  * Why the Export action cannot copy the live parameter values, if it cannot. A
  * heap-growth detach leaves the value view zero-length, the segmented source is
  * null before the first frame, as is a read that no longer matches the GUI's
- * snapshot, and the clipboard API is absent on insecure/older contexts. Any of
+ * snapshot, and the copy operation can be absent in a non-browser host. Any of
  * those would copy an all-zero, foreign, or unwritable preset.
  * @param {ArrayLike<number>|null|undefined} values - The live value stream.
  * @param {number} expectedLength - Length of the effect's cached paramNames list.
- * @param {boolean} hasClipboard - Whether the clipboard API is available.
+ * @param {boolean} canCopy - Whether a clipboard copy operation is available.
  * @returns {string|null} The warning to log, or null when the copy may proceed.
  */
-export function paramExportBlocker(values, expectedLength, hasClipboard) {
+export function paramExportBlocker(values, expectedLength, canCopy) {
   if (!values || values.length === 0) {
     return 'Export: no parameter values matching the current effect; skipping copy';
   }
   if (paramValueSkew(expectedLength, values.length)) {
     return `Export: param/value length skew (${expectedLength} vs ${values.length}); skipping copy`;
   }
-  if (!hasClipboard) return 'Export: clipboard API unavailable (insecure context?)';
+  if (!canCopy) return 'Export: clipboard copy unavailable';
   return null;
 }
 

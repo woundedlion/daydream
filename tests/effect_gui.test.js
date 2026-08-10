@@ -13,7 +13,7 @@ import {
 // to, which value stream feeds the sliders each frame, what an Export may copy,
 // and what a destroyed panel must release. Every collaborator is injected, so
 // this suite drives the real module over doubles for lil-gui, the engine, the
-// worker pool, the clipboard, and the window.
+// worker pool, the clipboard copy operation, and the window.
 
 afterEach(() => { mock.timers.reset(); });
 
@@ -114,19 +114,20 @@ function fakeGui(hydrated = {}) {
 }
 
 /**
- * Clipboard double whose writeText resolves (or rejects) on demand.
- * @param {Error|null} [failure] - Rejection value, or null to resolve.
- * @returns {Object} The clipboard double, carrying the copied texts.
+ * Clipboard copy double that resolves, fails, or rejects on demand.
+ * @param {boolean|Error} [outcome] - Resolution value or rejection value.
+ * @returns {Function} The copy operation, carrying the copied texts.
  */
-function fakeClipboard(failure = null) {
+function fakeCopyText(outcome = true) {
   const copied = [];
-  return {
-    copied,
-    writeText(text) {
-      copied.push(text);
-      return failure ? Promise.reject(failure) : Promise.resolve();
-    },
+  const copyText = (text) => {
+    copied.push(text);
+    return outcome instanceof Error
+      ? Promise.reject(outcome)
+      : Promise.resolve(outcome);
   };
+  copyText.copied = copied;
+  return copyText;
 }
 
 /**
@@ -147,7 +148,7 @@ function makeHarness({
   segmentValues = null,
   ownsDisplay = false,
   generation = 1,
-  clipboard = fakeClipboard(),
+  copyText = fakeCopyText(),
   isMobile = false,
   container = fakeElement('div'),
   hydrated = {},
@@ -163,7 +164,7 @@ function makeHarness({
     segmentGeneration: null,
     ownsDisplay,
     activeElement: null,
-    clipboard,
+    copyText,
     container,
   };
   const writes = [];
@@ -199,7 +200,7 @@ function makeHarness({
     activeElement: () => state.activeElement,
     isMobile: () => isMobile,
     dragTarget,
-    clipboard: () => state.clipboard,
+    copyText: state.copyText,
     logWarn: (...args) => warnings.push(args.join(' ')),
   });
 
@@ -705,7 +706,7 @@ test('Export copies the live values as a C++ brace-init list', async () => {
   h.gui().ctrl('export').object.export();
   await Promise.resolve();
 
-  assert.deepEqual(h.state.clipboard.copied, ['{ 0.25f, 0.5f }']);
+  assert.deepEqual(h.state.copyText.copied, ['{ 0.25f, 0.5f }']);
   assert.equal(h.gui().ctrl('export').label, EXPORT_COPIED);
 });
 
@@ -719,17 +720,17 @@ test('Export omits engine-written readonly params from the preset', async () => 
   h.gui().ctrl('export').object.export();
   await Promise.resolve();
 
-  assert.deepEqual(h.state.clipboard.copied, ['{ 0.25f }']);
+  assert.deepEqual(h.state.copyText.copied, ['{ 0.25f }']);
 });
 
-test('Export on a context with no clipboard reports the failure and copies nothing', () => {
-  const h = makeHarness({ params: [SPEED], engineValues: [0.25], clipboard: null });
+test('Export without a copy operation reports the failure', () => {
+  const h = makeHarness({ params: [SPEED], engineValues: [0.25], copyText: null });
   h.panel.build();
 
   h.gui().ctrl('export').object.export();
 
   assert.equal(h.gui().ctrl('export').label, EXPORT_FAILED);
-  assert.deepEqual(h.warnings, ['Export: clipboard API unavailable (insecure context?)']);
+  assert.deepEqual(h.warnings, ['Export: clipboard copy unavailable']);
 });
 
 test('Export refuses a value stream that has skewed from the panel', () => {
@@ -738,16 +739,16 @@ test('Export refuses a value stream that has skewed from the panel', () => {
 
   h.gui().ctrl('export').object.export();
 
-  assert.deepEqual(h.state.clipboard.copied, []);
+  assert.deepEqual(h.state.copyText.copied, []);
   assert.equal(h.gui().ctrl('export').label, EXPORT_FAILED);
   assert.match(h.warnings[0], /param\/value length skew \(2 vs 1\)/);
 });
 
-test('a rejected clipboard write reports the failure', async () => {
+test('a rejected clipboard copy reports the failure', async () => {
   const h = makeHarness({
     params: [SPEED],
     engineValues: [0.25],
-    clipboard: fakeClipboard(new Error('denied')),
+    copyText: fakeCopyText(new Error('denied')),
   });
   h.panel.build();
 
@@ -756,7 +757,22 @@ test('a rejected clipboard write reports the failure', async () => {
   await Promise.resolve();
 
   assert.equal(h.gui().ctrl('export').label, EXPORT_FAILED);
-  assert.match(h.warnings[0], /clipboard write failed/);
+  assert.match(h.warnings[0], /clipboard copy failed/);
+});
+
+test('a copy operation that exhausts its fallbacks reports the failure', async () => {
+  const h = makeHarness({
+    params: [SPEED],
+    engineValues: [0.25],
+    copyText: fakeCopyText(false),
+  });
+  h.panel.build();
+
+  h.gui().ctrl('export').object.export();
+  await Promise.resolve();
+
+  assert.equal(h.gui().ctrl('export').label, EXPORT_FAILED);
+  assert.match(h.warnings[0], /clipboard copy failed/);
 });
 
 test('an Export that lands after an effect switch does not flash the old panel', async () => {
@@ -768,13 +784,13 @@ test('an Export that lands after an effect switch does not flash the old panel',
   h.panel.build();
   await Promise.resolve();
 
-  assert.deepEqual(h.state.clipboard.copied, ['{ 0.25f }']);
+  assert.deepEqual(h.state.copyText.copied, ['{ 0.25f }']);
   assert.equal(stale.ctrl('export').label, 'Export', 'the replaced panel is left alone');
 });
 
 test('the Export flash reverts to the default label', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
-  const h = makeHarness({ params: [SPEED], engineValues: [0.25], clipboard: null });
+  const h = makeHarness({ params: [SPEED], engineValues: [0.25], copyText: null });
   h.panel.build();
 
   h.gui().ctrl('export').object.export();
@@ -786,7 +802,7 @@ test('the Export flash reverts to the default label', () => {
 
 test('destroy cancels a pending Export flash', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
-  const h = makeHarness({ params: [SPEED], engineValues: [0.25], clipboard: null });
+  const h = makeHarness({ params: [SPEED], engineValues: [0.25], copyText: null });
   h.panel.build();
   const stale = h.gui();
 

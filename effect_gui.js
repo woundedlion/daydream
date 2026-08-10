@@ -6,8 +6,8 @@
 /**
  * The effect panel's whole lifecycle — build, mount, per-frame value sync,
  * Export, and teardown — with lil-gui, the engine, the worker pool, the
- * clipboard, and the document injected. daydream.js owns only the wiring that
- * names those collaborators, so the panel's rules (which control an engine
+ * copy operation, and the document injected. daydream.js owns only the wiring
+ * that names those collaborators, so the panel's rules (which control an engine
  * parameter maps to, which value stream feeds the sliders, what blocks an
  * Export, what a destroyed GUI must release) are unit-testable without a
  * browser or a WASM engine.
@@ -94,8 +94,8 @@ export function addParamControl(gui, state, p, hydrate = true) {
  * @param {{addEventListener: Function, removeEventListener: Function}}
  *   deps.dragTarget - Where the drag-end listeners live (the window): a lil-gui
  *   drag continues outside the control's own DOM.
- * @param {() => Object|null} deps.clipboard - The clipboard API, or null on an
- *   insecure/older context.
+ * @param {(text: string) => Promise<boolean>} deps.copyText - Copies text using
+ *   the browser's available clipboard path.
  * @param {(message: string, error?: any) => void} [deps.logWarn] - Console sink.
  * @returns {{active: () => Object|null, liveParamValues: () => ArrayLike<number>|null,
  *   build: () => void, applyAnimationPause: () => void, mount: () => void,
@@ -118,7 +118,7 @@ export function createEffectGui({
   activeElement,
   isMobile,
   dragTarget,
-  clipboard,
+  copyText,
   logWarn = (...args) => console.warn(...args),
 }) {
   let activeEffect = null;
@@ -216,20 +216,33 @@ export function createEffectGui({
    */
   function exportParams(fx, params, flashExport) {
     const values = liveParamValues();
-    const board = clipboard();
     const blocked = paramExportBlocker(
-      values, fx.paramNames.length, Boolean(board));
+      values, fx.paramNames.length, typeof copyText === 'function');
     if (blocked) {
       logWarn(blocked);
       flashExport(EXPORT_FAILED);
       return;
     }
 
-    board.writeText(formatExportParams(params, values)).then(() => {
+    let text;
+    try {
+      text = formatExportParams(params, values);
+    } catch (err) {
+      logWarn('Export: parameter formatting failed', err);
+      flashExport(EXPORT_FAILED);
+      return;
+    }
+
+    copyText(text).then((copied) => {
       if (activeEffect !== fx) return;
-      flashExport(EXPORT_COPIED);
+      if (copied) {
+        flashExport(EXPORT_COPIED);
+      } else {
+        logWarn('Export: clipboard copy failed');
+        flashExport(EXPORT_FAILED);
+      }
     }).catch((err) => {
-      logWarn('Export: clipboard write failed', err);
+      logWarn('Export: clipboard copy failed', err);
       if (activeEffect !== fx) return;
       flashExport(EXPORT_FAILED);
     });

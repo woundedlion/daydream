@@ -47,6 +47,7 @@ tools/tools.css
 tools/tailwind.css
 tools/banner.js
 tools/clipboard.js
+tools/copy_text.js
 tools/color.js
 tools/cpp_format.js
 tools/export_params.js
