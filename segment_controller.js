@@ -448,9 +448,13 @@ export class SegmentController {
     // of `new Array`, and an illegal one is otherwise only caught by the layout
     // inside each worker — after N module fetches and N WASM instantiations.
     if (!isValidSegmentCount(numSegments)) {
+      // `count` is left at the last legal size — it is the only one a rebuild
+      // can spawn — and named here, since every recovery path (the faulted
+      // setEffect/setResolution rebuilds and the boot retry) passes it back to
+      // create() rather than the size that was asked for.
       this.onWorkerFault(FAULT_POOL,
         `invalid segment count ${numSegments}; must be a positive even integer `
-        + '— no workers were spawned');
+        + `— no workers were spawned, and a rebuild will use ${this.count}`);
       return;
     }
 
