@@ -75,6 +75,7 @@ export function engineParamValue(value) {
  * @returns {Object<string, number>} Choices object for lil-gui's add().
  */
 export function enumChoices(options) {
+  /** @type {Object<string, number>} */
   const choices = {};
   options.forEach((label, i) => {
     // Duplicate labels would collapse to one object key, making the earlier

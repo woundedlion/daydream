@@ -21,7 +21,8 @@
  * fill()/read on it throws or reads nothing — so the backing buffer must also be
  * non-detached.
  * @param {ArrayBufferView|null|undefined} view - The pixel view to test.
- * @returns {boolean} True when view is a typed array whose buffer is not detached.
+ * @returns {view is ArrayBufferView} True when view is a typed array whose
+ *   buffer is not detached.
  */
 export function isViewLive(view) {
   return ArrayBuffer.isView(view) && view.buffer.byteLength !== 0;
