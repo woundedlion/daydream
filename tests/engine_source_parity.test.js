@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import * as MB from '../tools/mobius_transforms.js';
 import * as C from '../tools/color.js';
 import * as P from '../tools/palette_math.js';
+import * as PC from '../tools/palette_controls.js';
 import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS } from '../tools/solid_codegen.js';
 import { upperSnake } from '../tools/solid_registry_codegen.js';
 
@@ -166,6 +167,32 @@ test('sRGB transfer coefficients match core/color/color.h', { skip: SKIP }, () =
     assert.deepEqual(numbersIn(functionBody(js, jsName)), want,
       `${jsName} coefficients drifted from ${cppName}`);
   }
+});
+
+/**
+ * Pins palette_controls.js's OKLab matrix to core/color/color.h. The engine
+ * splits the same arithmetic across two functions — the inverse OKLab matrix
+ * then the cube-and-RGB matrix — whose coefficients appear in the order
+ * oklchLinearRgb restates them. Everything the palettes page draws in OKLCh
+ * rides on these: the hue wheel's raster, and the gamut boundary
+ * maxSrgbGamutChroma bisects for.
+ */
+test('the OKLab matrix matches core/color/color.h', { skip: SKIP }, () => {
+  const cpp = header('core/color/color.h');
+  const js = readFileSync(fileURLToPath(new URL('tools/palette_controls.js', REPO)), 'utf8');
+  assert.equal(typeof PC.oklchLinearRgb, 'function', 'palette_controls.js must export oklchLinearRgb');
+  const want = [
+    ...numbersIn(functionBody(cpp, 'oklab_to_lms_cbrt')),
+    ...numbersIn(functionBody(cpp, 'lms_cbrt_to_linear_rgb')),
+  ];
+  assert.equal(want.length, 15, 'read the wrong coefficient count — the reader is out of date');
+  // The turns -> (a, b) polar prelude has no engine counterpart, so the
+  // comparison starts where the JS port picks the matrix up.
+  const body = functionBody(js, 'oklchLinearRgb');
+  const matrix = body.indexOf('const lRoot');
+  assert.notEqual(matrix, -1, 'oklchLinearRgb no longer opens its matrix with lRoot');
+  assert.deepEqual(numbersIn(body.slice(matrix)), want,
+    'the OKLab matrix drifted from the engine');
 });
 
 /**
