@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const {
-  paletteTabFromSearch, paletteTabUrl,
+  paletteTabFromSearch, paletteTabUrl, tablistKeyTarget,
   createPaletteViewport, recipeForViewport, axisEndpoints, axisFromEndpoints,
   lockedGroupMove,
   PaletteV4, defaultPaletteRecipe, PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
@@ -26,6 +26,21 @@ test('palette tab URLs preserve other query state and the hash', () => {
     'https://example.test/tools/palettes.html?foo=1&tab=generative#export');
   assert.throws(() => paletteTabUrl('https://example.test/', 'unknown'),
     /Unknown palette tab/);
+});
+
+test('tablist arrow keys wrap and Home/End reach the ends', () => {
+  assert.equal(tablistKeyTarget('ArrowRight', 0, 2), 1);
+  assert.equal(tablistKeyTarget('ArrowRight', 1, 2), 0);
+  assert.equal(tablistKeyTarget('ArrowLeft', 0, 2), 1);
+  assert.equal(tablistKeyTarget('ArrowLeft', 1, 2), 0);
+  assert.equal(tablistKeyTarget('Home', 2, 3), 0);
+  assert.equal(tablistKeyTarget('End', 0, 3), 2);
+});
+
+test('tablist keys other than the navigation contract are left alone', () => {
+  assert.equal(tablistKeyTarget('Enter', 0, 2), null);
+  assert.equal(tablistKeyTarget('Tab', 0, 2), null);
+  assert.equal(tablistKeyTarget('ArrowRight', 0, 0), null);
 });
 
 test('the palette viewport maps strip positions onto its visible phase window', () => {

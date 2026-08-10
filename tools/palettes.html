@@ -1012,7 +1012,7 @@
     import {
       createPaletteViewport, axisEndpoints, axisFromEndpoints,
       lockedGroupMove,
-      paletteTabFromSearch, paletteTabUrl,
+      paletteTabFromSearch, paletteTabUrl, tablistKeyTarget,
       defaultPaletteRecipe, PaletteV4,
       PALETTE_RECIPE_PRESETS, paletteRecipeAvailability,
       wrapTurns,
@@ -2171,9 +2171,18 @@
 
       // 0. Tab buttons. Wired here via listeners rather than inline onclick
       // attributes, which a `<script type="module">` (module scope, not global)
-      // cannot reach.
-      document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
+      // cannot reach. The roving tabindex switchTab maintains leaves arrow keys
+      // as the only way into the unselected tab, so activation follows focus.
+      const tabButtons = Array.from(document.querySelectorAll('.tab-btn[data-tab]'));
+      tabButtons.forEach((btn, index) => {
         btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+        btn.addEventListener('keydown', (event) => {
+          const target = tablistKeyTarget(event.key, index, tabButtons.length);
+          if (target === null) return;
+          event.preventDefault();
+          switchTab(tabButtons[target].dataset.tab);
+          tabButtons[target].focus();
+        });
       });
 
       // 1. Initialize all 12 R/G/B sliders
