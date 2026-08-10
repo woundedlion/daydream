@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMeshRenderer, meshStatsLine } from '../tools/solid_render.js';
-import { uniqueEdges } from '../tools/solid_codegen.js';
 import { fakeElement } from './fake_dom.js';
 
 // Stand-in for the three.js surface the renderer constructs. The vector math is
@@ -217,7 +216,7 @@ test('the render leaves the caller\'s mesh untouched', () => {
   const mesh = tetrahedron();
   const keysBefore = Object.keys(mesh).sort();
   const result = renderer.render(mesh, view(), null);
-  assert.equal(result.edgeCount, uniqueEdges(mesh.faces, mesh.vertices.length).length,
+  assert.equal(result.edgeCount, 6,
     'the edge count is reported back, not written onto the mesh');
   assert.deepEqual(Object.keys(mesh).sort(), keysBefore);
 });
