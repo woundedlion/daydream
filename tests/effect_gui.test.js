@@ -84,6 +84,12 @@ function fakeGui(hydrated = {}) {
       this.controllers.push(controller);
       return controller;
     },
+    addUnhydrated(object, property, ...args) {
+      const controller = fakeController(object, property, args);
+      controller.unhydrated = true;
+      this.controllers.push(controller);
+      return controller;
+    },
     /**
      * The non-deep-linked variant: same control, flagged so a test can tell which
      * of the two entry points built it.
@@ -131,6 +137,8 @@ function fakeClipboard(failure = null) {
  *   leave the engine reporting paused animations.
  * @param {boolean} [options.pauseAccessor] - False models a module that does not
  *   export getAnimationsPaused.
+ * @param {Function} [options.onEngineParam] - Optional engine-side reaction to
+ *   a parameter write, used to model a dynamic descriptor rebind.
  * @returns {Object} The panel plus the doubles and sinks a test asserts on.
  */
 function makeHarness({
@@ -145,11 +153,14 @@ function makeHarness({
   hydrated = {},
   pausesOnWrite = (p) => Boolean(p.animated),
   pauseAccessor = true,
+  onEngineParam = () => {},
 } = {}) {
   const state = {
+    params,
     generation,
     engineValues,
     segmentValues,
+    segmentGeneration: null,
     ownsDisplay,
     activeElement: null,
     clipboard,
@@ -165,15 +176,17 @@ function makeHarness({
 
   const panel = createEffectGui({
     createGui: () => { const gui = fakeGui(hydrated); guis.push(gui); return gui; },
-    getParameterDefinitions: () => params,
+    getParameterDefinitions: () => state.params,
     paramGeneration: () => state.generation,
     segmentsOwnDisplay: () => state.ownsDisplay,
     segmentParamValues: () => state.segmentValues,
+    segmentParamGeneration: () => state.segmentGeneration,
     engineParamValues: () => state.engineValues,
     setEngineParam: (name, value) => {
       writes.push(`engine:${name}=${value}`);
-      const p = params.find((d) => d.name === name);
+      const p = state.params.find((d) => d.name === name);
       if (p && pausesOnWrite(p)) engine.paused = true;
+      onEngineParam(name, value, state);
     },
     setWorkerParam: (name, value) => writes.push(`worker:${name}=${value}`),
     setAnimationsPaused: (paused) => {
@@ -527,8 +540,129 @@ test('sync skips a value stream that no longer describes the built panel', () =>
 
   h.panel.sync();
 
+  assert.equal(h.guis.length, 2);
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.1);
-  assert.equal(h.panel.liveParamValues(), null);
+  assert.equal(h.panel.active().paramGeneration, 4);
+});
+
+test('a schema generation change atomically rebuilds and remounts the panel', () => {
+  const projection = {
+    name: 'Projection', value: 0, options: ['Stereographic', 'Bonne'], animated: true,
+  };
+  const bonne = { name: 'Bonne Parallel', value: 0.4, min: 0.01, max: 1.5, animated: true };
+  const h = makeHarness({ params: [projection], engineValues: [0], generation: 7 });
+  h.panel.build();
+  h.panel.mount();
+  const oldGui = h.gui();
+  const oldProjection = oldGui.ctrl('Projection');
+
+  h.state.params = [{ ...projection, value: 1 }, bonne];
+  h.state.engineValues = [1, 0.6];
+  h.state.generation = 8;
+  h.panel.sync();
+
+  assert.equal(oldGui.destroyed, 1);
+  assert.deepEqual(h.container.children, [h.gui().domElement]);
+  assert.deepEqual(h.panel.active().paramNames, ['Projection', 'Bonne Parallel']);
+  assert.equal(h.gui().ctrl('Projection').getValue(), 1);
+  assert.equal(h.gui().ctrl('Bonne Parallel').getValue(), 0.4,
+    'the stale value stream is not consumed during the rebuild');
+  assert.equal(oldProjection.getValue(), 0, 'the retired binding is never updated');
+
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Bonne Parallel').getValue(), 0.6);
+});
+
+test('initial topology hydration reveals and replays its dependent controls', () => {
+  const projection = {
+    name: 'Projection', value: 0, options: ['Stereographic', 'Bonne'], animated: true,
+  };
+  const bonne = { name: 'Bonne Parallel', value: 0.4, min: 0.01, max: 1.5, animated: true };
+  const h = makeHarness({
+    params: [projection],
+    generation: 20,
+    hydrated: { Projection: 1, 'Bonne Parallel': 0.9 },
+    onEngineParam(name, value, state) {
+      if (name !== 'Projection' || value !== 1) return;
+      state.params = [{ ...projection, value: 1 }, bonne];
+      state.generation = 21;
+    },
+  });
+
+  h.panel.build();
+  h.panel.mount();
+  assert.deepEqual(h.panel.active().paramNames, ['Projection']);
+
+  h.panel.sync();
+
+  assert.deepEqual(h.panel.active().paramNames, ['Projection', 'Bonne Parallel']);
+  assert.equal(h.gui().ctrl('Projection').getValue(), 1);
+  assert.equal(h.gui().ctrl('Projection').unhydrated, true);
+  assert.equal(h.gui().ctrl('Bonne Parallel').getValue(), 0.9);
+  assert.deepEqual(h.writes.filter((w) => w.includes('Bonne Parallel')), [
+    'engine:Bonne Parallel=0.9',
+    'worker:Bonne Parallel=0.9',
+  ]);
+});
+
+test('a schema rebuild preserves the engine pause and hydrates only new controls', () => {
+  const detail = { name: 'Detail', value: 0.2, min: 0, max: 1, animated: true };
+  const h = makeHarness({
+    params: [SPEED],
+    engineValues: [0.1],
+    generation: 2,
+    hydrated: { Speed: 0.8, Detail: 0.7, pause: false },
+  });
+  h.panel.build();
+  h.panel.mount();
+  h.panel.applyAnimationPause();
+  h.engine.paused = true;
+  h.writes.length = 0;
+
+  h.state.params = [{ ...SPEED, value: 0.55 }, detail];
+  h.state.engineValues = [0.55, 0.7];
+  h.state.generation = 3;
+  h.panel.sync();
+
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.55,
+    'an existing control takes the authoritative engine value');
+  assert.equal(h.gui().ctrl('Speed').unhydrated, true);
+  assert.equal(h.gui().ctrl('Detail').getValue(), 0.7,
+    'a newly relevant deep-link value is replayed');
+  assert.equal(h.gui().ctrl('pause').getValue(), true);
+  assert.equal(h.gui().ctrl('pause').unhydrated, true);
+  assert.deepEqual(h.writes, ['engine:Detail=0.7', 'worker:Detail=0.7'],
+    'rebuilding does not write a guessed pause state');
+});
+
+test('segmented mode rebuilds from main-engine definitions before reading worker values', () => {
+  const h = makeHarness({
+    params: [SPEED],
+    segmentValues: [0.95],
+    ownsDisplay: true,
+    generation: 11,
+  });
+  h.panel.build();
+  h.panel.mount();
+  const depth = { name: 'Depth', value: 0.25, min: 0, max: 1, animated: true };
+  h.state.params = [depth];
+  h.state.generation = 12;
+  h.state.segmentGeneration = 11;
+
+  h.panel.sync();
+
+  assert.deepEqual(h.panel.active().paramNames, ['Depth']);
+  assert.equal(h.gui().ctrl('Depth').getValue(), 0.25,
+    'the old same-length worker stream cannot bind to the new definition');
+
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Depth').getValue(), 0.25,
+    'a repeatedly polled old worker snapshot remains fenced');
+
+  h.state.segmentGeneration = 12;
+  h.state.segmentValues = [0.6];
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Depth').getValue(), 0.6);
 });
 
 test('sync skips a detached (zero-length) value stream', () => {

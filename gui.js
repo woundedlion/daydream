@@ -191,13 +191,39 @@ class DeepLinkGUI {
    * @returns {Object} The created lil-gui controller.
    */
   add(object, prop, ...args) {
+    return this.addWithHydration(true, object, prop, ...args);
+  }
+
+  /**
+   * Adds a deep-linked control without seeding it from the current URL. Dynamic
+   * effect-schema rebuilds use this for controls that already existed in the
+   * previous schema: their engine values are newer than a debounced URL write,
+   * but subsequent edits must keep updating the same deep-link key.
+   * @param {Object} object - The object holding the bound property.
+   * @param {string} prop - The property name to control.
+   * @param {...*} args - Forwarded to lil-gui's add().
+   * @returns {Object} The created lil-gui controller.
+   */
+  addUnhydrated(object, prop, ...args) {
+    return this.addWithHydration(false, object, prop, ...args);
+  }
+
+  /**
+   * Common deep-linked control construction.
+   * @param {boolean} hydrate - Whether a matching URL value may seed the control.
+   * @param {Object} object - The object holding the bound property.
+   * @param {string} prop - The property name to control.
+   * @param {...*} args - Forwarded to lil-gui's add().
+   * @returns {Object} The created lil-gui controller.
+   */
+  addWithHydration(hydrate, object, prop, ...args) {
     const key = this.getKey(prop);
     const isFunction = typeof object[prop] === 'function';
 
     const params = getUrlParams();
     let urlApplied = false;
     let valClamped = false;
-    if (!isFunction && params.has(key)) {
+    if (hydrate && !isFunction && params.has(key)) {
       let val = params.get(key);
       const currentVal = object[prop];
       urlApplied = true;

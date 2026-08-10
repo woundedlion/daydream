@@ -233,6 +233,10 @@ async function handleMessage(msg) {
       // animation-driven params; the main engine is never stepped in this mode.
       const paramValues =
         segId === 0 ? Array.from(engine.getParamValues()) : null;
+      const generationSource = /** @type {{getParamGeneration?: () => number}} */ (engine);
+      const paramGeneration = segId === 0
+        ? generationSource.getParamGeneration?.() ?? null
+        : null;
 
       const allPixels = engine.getPixels();
       const { x0, x1, y0, y1, w: qw, h: qh } = segRange;
@@ -299,6 +303,7 @@ async function handleMessage(msg) {
         elapsed,
         arenaMetrics,
         paramValues,
+        paramGeneration,
         fullFrame: clipFullFrame,
       }, [pixelsCopy.buffer]);
       break;

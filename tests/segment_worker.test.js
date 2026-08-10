@@ -403,11 +403,13 @@ test('an unknown message type faults instead of being silently dropped', async (
 /** Segment 0 mirrors its post-frame param values; other segments send null. */
 test('render streams param values from segment 0 only', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  engineInstance.getParamGeneration = () => 17;
   posted.length = 0;
   await dispatch({ type: 'render' });
   const frame0 = posted.find((p) => p.msg.type === 'frame').msg;
   assert.ok(Array.isArray(frame0.paramValues), 'paramValues is a detached plain array');
   assert.deepEqual(frame0.paramValues, [5, 15, 25], 'segment 0 carries params');
+  assert.equal(frame0.paramGeneration, 17, 'segment 0 pairs params with their schema');
   // Mutating the engine's reused view after the frame is posted must not disturb
   // the sent values, proving the worker copied them out rather than forwarding.
   engineInstance.paramView[0] = 999;
@@ -418,6 +420,7 @@ test('render streams param values from segment 0 only', async () => {
   await dispatch({ type: 'render' });
   const frame1 = posted.find((p) => p.msg.type === 'frame').msg;
   assert.equal(frame1.paramValues, null, 'non-zero segments omit params');
+  assert.equal(frame1.paramGeneration, null, 'non-zero segments omit the schema token');
 });
 
 /**
