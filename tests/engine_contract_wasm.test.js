@@ -384,6 +384,59 @@ test('getParamGeneration and setPoleLod stay exported', () => {
   engine.setPoleLod(0);
 });
 
+// daydream.js reads the pause indicator through an optional-call guard
+// (engineAnimationsPaused: () => host.engine.getAnimationsPaused?.()), so a
+// dropped export is silent at the call site and only desyncs the GUI toggle.
+test('getAnimationsPaused reports the pause both of its writers engage', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+    'setEffect must succeed for a registered effect');
+
+  assert.equal(typeof engine.getAnimationsPaused(), 'boolean',
+    'getAnimationsPaused must return a boolean');
+  engine.setAnimationsPaused(true);
+  assert.equal(engine.getAnimationsPaused(), true,
+    'getAnimationsPaused must report the state setAnimationsPaused wrote');
+  engine.setAnimationsPaused(false);
+  assert.equal(engine.getAnimationsPaused(), false,
+    'getAnimationsPaused must report a resume');
+
+  // effect_gui.js re-reads the pause after an apply rather than tracking it.
+  engine.setAnimationsPaused(true);
+  assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
+    'setEffect must succeed on a reload');
+  assert.equal(engine.getAnimationsPaused(), true,
+    'the pause must be retained across a setEffect rebuild');
+  engine.setAnimationsPaused(false);
+
+  // An APPLIED write to an animated param engages the same pause, so
+  // setAnimationsPaused is not the only writer the indicator has to follow.
+  let animated = null;
+  for (const name of Object.keys(engine.getEffectSizes())) {
+    assert.equal(engine.setEffect(name), M.EffectSetResult.INSTALLED,
+      `setEffect must succeed for ${name}`);
+    const def = engine.getParameterDefinitions()
+      .find((d) => d.animated && !d.readonly && typeof d.value === 'number');
+    if (def) {
+      animated = { effect: name, name: def.name, value: def.value };
+      break;
+    }
+  }
+  assert.ok(animated,
+    'no effect exposes a writable animated parameter, so the implicit pause is ' +
+    'unreachable');
+  assert.equal(engine.getAnimationsPaused(), false,
+    'the scan must leave animations running');
+  assert.equal(engine.setParameter(animated.name, animated.value),
+    M.ParamSetResult.APPLIED,
+    `setParameter must apply ${animated.effect}.${animated.name}`);
+  assert.equal(engine.getAnimationsPaused(), true,
+    'an applied write to an animated param must engage the pause');
+
+  engine.setAnimationsPaused(false);
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+});
+
 // pixel_view.test.js proves refreshPixelView against a synthetic detached
 // buffer; this is the only place the real growth happens with a view
 // outstanding. MeshOps' 16 MB tooling block is allocated lazily on first use and
