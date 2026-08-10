@@ -161,11 +161,19 @@ test('both parameter inputs report edits, and neither starts a row drag', () => 
   number.dispatch('change', { target: { value: '0.45' } });
   assert.deepEqual(calls, [['setParam', 2, 't', '0.4'], ['setParam', 2, 't', '0.45']]);
 
-  let stopped = 0;
-  const mousedown = { stopPropagation: () => { stopped++; } };
-  range.dispatch('mousedown', mousedown);
-  number.dispatch('mousedown', mousedown);
-  assert.equal(stopped, 2, 'an input drag would start the row reorder');
+  // The chain's reorder listener sits above the row, so a mousedown that
+  // bubbles out of an input would start a drag while the user is scrubbing it.
+  const chain = fakeElement('div');
+  chain.appendChild(el);
+  const reordered = [];
+  chain.addEventListener('mousedown', (e) => reordered.push(e.target));
+
+  range.dispatch('mousedown');
+  number.dispatch('mousedown');
+  assert.deepEqual(reordered, [], 'an input drag would start the row reorder');
+
+  el.dispatch('mousedown');
+  assert.deepEqual(reordered, [el], 'the row body itself still reaches the chain');
 });
 
 test('the drag grip is built as namespaced SVG nodes, not markup', () => {
