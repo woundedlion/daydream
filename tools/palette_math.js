@@ -347,7 +347,12 @@ export function proceduralPaletteCpp(parameters) {
                           ${v(parameters.D_R, parameters.D_G, parameters.D_B)}); // D`;
 }
 
-const ENUM_NAMES = Object.freeze({
+/**
+ * The C++ enumerator each V4 recipe enum value serializes as, indexed by value.
+ * The inverse of palette_controls.js's PaletteV4; engine_source_parity.test.js
+ * pins both to the `enum class` rosters in core/color/color.h.
+ */
+export const ENUM_NAMES = Object.freeze({
   domain: ['STRAIGHT', 'MIRROR', 'VIGNETTE', 'FALLOFF', 'LOOP'],
   easing: ['LINEAR', 'COSINE', 'SMOOTHSTEP'],
   colorPath: ['OKLCH_ARC', 'OKLAB_CARTESIAN'],

@@ -195,6 +195,60 @@ test('the OKLab matrix matches core/color/color.h', { skip: SKIP }, () => {
     'the OKLab matrix drifted from the engine');
 });
 
+// Each V4 recipe enum, as the tool modules group it and as core/color/color.h
+// declares it. Both mirrors are keyed by these group names, so a group added on
+// one side and not the other fails before any roster is read.
+const V4_ENUMS = [
+  ['hueMode', 'HueMode'],
+  ['harmony', 'PaletteHarmony'],
+  ['direction', 'HueDirection'],
+  ['curve', 'AxisCurve'],
+  ['chromaBasis', 'ChromaBasis'],
+  ['colorPath', 'ColorPath'],
+  ['domain', 'PaletteDomain'],
+  ['easing', 'SegmentEase'],
+];
+
+/**
+ * The enumerators of a plain `enum class`, in declaration order.
+ * @param {string} source - core/color/color.h text.
+ * @param {string} name - The enum's C++ name.
+ * @returns {string[]} The enumerator names; their positions are their values.
+ */
+function engineEnumerators(source, name) {
+  const m = source.match(new RegExp(`enum class ${name}\\s*:\\s*uint8_t\\s*\\{([^}]*)\\}`));
+  assert.ok(m, `enum class ${name} not found in core/color/color.h — the reader is out of date`);
+  const members = m[1].split(',').map((s) => s.trim()).filter(Boolean);
+  for (const member of members) {
+    assert.match(member, /^[A-Z][A-Z0-9_]*$/,
+      `${name}::${member} is not a bare enumerator, so position no longer gives its value`);
+  }
+  return members;
+}
+
+/**
+ * Pins both V4 enum mirrors to the engine rosters they encode: PaletteV4
+ * (name -> value) in palette_controls.js and ENUM_NAMES (value -> name) in
+ * palette_math.js. The two are written out independently — one drives the
+ * page's harmony and hue-path branches, the other names the enumerators in the
+ * exported C++ — so a reordered or inserted engine enumerator can leave the
+ * page computing one harmony and the paste naming another.
+ */
+test('the V4 enum rosters match core/color/color.h', { skip: SKIP }, () => {
+  const cpp = header('core/color/color.h');
+  const groups = V4_ENUMS.map(([group]) => group).sort();
+  assert.deepEqual(Object.keys(PC.PaletteV4).sort(), groups,
+    'PaletteV4 no longer covers exactly the engine enums this case reads');
+  assert.deepEqual(Object.keys(P.ENUM_NAMES).sort(), groups,
+    'ENUM_NAMES no longer covers exactly the engine enums this case reads');
+  for (const [group, cppName] of V4_ENUMS) {
+    const want = engineEnumerators(cpp, cppName);
+    assert.deepEqual(P.ENUM_NAMES[group], want, `ENUM_NAMES.${group} drifted from ${cppName}`);
+    assert.deepEqual(PC.PaletteV4[group], Object.fromEntries(want.map((n, i) => [n, i])),
+      `PaletteV4.${group} drifted from ${cppName}`);
+  }
+});
+
 /**
  * The engine's named-palette roster, read from its X-macro list.
  * @param {string} source - core/color/palettes.h text.
