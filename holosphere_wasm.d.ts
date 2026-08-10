@@ -6,8 +6,9 @@
  * Holosphere WASM install writes here. The glue itself is a generated install
  * output and is never type-checked (tests/tsconfig_roster.test.js), so this
  * file is what the typecheck sees for the module. It covers the surface the
- * segment pipeline drives; tests/fake_engine.js pins that method roster and
- * both enums against the real module.
+ * segment pipeline drives; tests/fake_engine.js pins that method roster and all
+ * four result enums — ParamSetResult, ClipSetResult, ResolutionSetResult,
+ * EffectSetResult — against the real module.
  */
 
 /**
@@ -46,23 +47,47 @@ export interface ArenaMetrics {
   stack: StackUsage;
 }
 
-/**
- * One entry of getParameterDefinitions(). `value` is a boolean for a toggle,
- * which carries no range; every other parameter carries `min`/`max`. `options`
- * labels an enum by value index, and `exportOptions` carries the matching
- * symbolic names when the effect declares them.
- */
-export interface ParameterDefinition {
+/** The fields every getParameterDefinitions() entry carries, toggle or not. */
+export interface ParameterDefinitionBase {
+  /** Parameter name, as setParameter() takes it. */
   name: string;
-  value: number | boolean;
-  min?: number;
-  max?: number;
-  options?: string[];
-  exportOptions?: string[];
+  /**
+   * True while the engine animates the value. An accepted setParameter() write
+   * to an animated param engages the engine's animation pause.
+   */
   animated: boolean;
+  /** True for engine-written telemetry; setParameter() answers it READONLY. */
   readonly: boolean;
+  /** True when a preset export carries this parameter. */
   preset: boolean;
 }
+
+/** A toggle. Its value is a JS boolean and it carries no range or options. */
+export interface BooleanParameterDefinition extends ParameterDefinitionBase {
+  value: boolean;
+}
+
+/**
+ * Every non-toggle parameter: sliders and enums alike carry `min`/`max`, so
+ * neither is optional here. `options` labels an enum by value index — the value
+ * is the selected index — and `exportOptions` carries the matching C++ enum
+ * literals, present only when the effect declares them.
+ */
+export interface NumericParameterDefinition extends ParameterDefinitionBase {
+  value: number;
+  min: number;
+  max: number;
+  options?: string[];
+  exportOptions?: string[];
+}
+
+/**
+ * One entry of getParameterDefinitions(). Narrow on `typeof value === 'boolean'`
+ * to tell a toggle, which carries no range, from a ranged parameter.
+ */
+export type ParameterDefinition =
+  | BooleanParameterDefinition
+  | NumericParameterDefinition;
 
 export interface HolosphereEngine {
   /** RESIZED tears the effect down; ALREADY_ACTIVE is a pure no-op; UNSUPPORTED keeps the old geometry. */
