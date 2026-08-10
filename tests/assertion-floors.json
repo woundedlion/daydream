@@ -49,7 +49,7 @@
   },
   "tests/engine_contract_wasm.test.js": {
     "cases": 28,
-    "assertions": 206
+    "assertions": 210
   },
   "tests/engine_host.test.js": {
     "cases": 13,
@@ -117,8 +117,8 @@
     "assertions": 116
   },
   "tests/palette_math.test.js": {
-    "cases": 22,
-    "assertions": 1446
+    "cases": 23,
+    "assertions": 1448
   },
   "tests/param_sync.test.js": {
     "cases": 29,
