@@ -174,10 +174,14 @@ jobs:
         # The defaults are the QUICK tier: an 8-frame smoke at device resolution
         # only, which never reaches the effect-lifecycle transitions nor the
         # 288x144 production-resolution roster passes.
+        #
+        # --no-tests=error: an empty test list must fail this gate rather than
+        # exit 0. Redundant with the tests preset's noTestsAction, and spelled
+        # out at every ci.yml ctest call for the same reason.
         env:
           HS_SMOKE_FRAMES: 120
           HS_EFFECTS_FULL: 1
-        run: ctest --preset tests --output-on-failure
+        run: ctest --preset tests --output-on-failure --no-tests=error
         working-directory: engine
 
   js-tests:
