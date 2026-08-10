@@ -532,10 +532,14 @@ export class SegmentController {
           // The identity check subsumes a range check and rejects NaN/undefined,
           // which would otherwise index `scratch`/`frameSeen` by string key and
           // settle the barrier with a segment absent — publishing a torn frame
-          // the recorder counts as real.
+          // the recorder counts as real. Staging it is unsafe and dropping it
+          // leaves `pending` short until the render watchdog reports a stall
+          // that names neither this worker nor the id it sent, so the protocol
+          // violation faults here with both.
           if (msg.segId !== i) {
-            console.error(`[Segmented] frame from invalid segId ${msg.segId} `
-              + `(worker seg ${i}); dropping`);
+            this.onWorkerFault(i, `worker seg ${i} reported a frame tagged segId `
+              + `${String(msg.segId)}; a frame the pool cannot attribute is a `
+              + 'protocol violation (stale cached worker or glue)');
             return;
           }
           // Count and stage only the first message from each segment.

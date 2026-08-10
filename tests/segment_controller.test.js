@@ -46,7 +46,6 @@ const EXPECTED_CONSOLE_MESSAGES = {
   error: [
     /^\[Segmented\] Worker seg \d+ error:/,
     /^\[Segmented\] Worker seg \d+ message deserialization failed$/,
-    /^\[Segmented\] frame from invalid segId /,
     /^SegmentController\.composite: display-buffer alias diverged /,
   ],
 };
@@ -870,31 +869,30 @@ function deliverFrameWithSegId(controller, worker, segId) {
   });
 }
 
-test('a frame with a non-integer segId is dropped without settling the barrier', async () => {
-  const c = makeController();
-  c.create(2);
-  const done = c.renderParallel();
-
+test('a frame with a non-integer segId faults instead of stalling the barrier', async () => {
   // Each of these fails both range comparisons, so a range-only guard would let
   // it index by string key and decrement `pending` for an absent segment.
   for (const segId of [undefined, NaN, null, '1', 1.5]) {
+    const c = makeController();
+    c.create(2);
+    const done = c.renderParallel();
+
     deliverFrameWithSegId(c, 0, segId);
-    assert.equal(c.pending, 2, `segId ${String(segId)} must not settle the barrier`);
+    assert.equal(c.faulted, true, `segId ${String(segId)} faults the pool`);
+    assert.equal(c.faultInfo.segId, 0, 'the fault names the worker that sent it');
+    assert.ok(c.faultInfo.message.includes(`tagged segId ${String(segId)}`),
+      `the fault names the offending id, not just a stall: ${c.faultInfo.message}`);
     assert.deepEqual(c.scratch, [null, null],
       `segId ${String(segId)} must not write a staging slot`);
     assert.deepEqual(c.frameSeen, [false, false],
       `segId ${String(segId)} must not mark a segment seen`);
+    assert.equal(c.pending, 0,
+      'the fault settles the frame rather than leaving it to the render watchdog');
+    await done;
   }
-  assert.equal(c.faulted, false, 'a malformed segId is a loud drop, not a pool fault');
-
-  // The real segments still complete the generation.
-  deliverFrame(c, 0);
-  deliverFrame(c, 1);
-  assert.equal(c.pending, 0);
-  await done;
 });
 
-test('a frame tagged with another segment id is dropped', async () => {
+test('a frame tagged with another segment id faults the pool', async () => {
   const c = makeController();
   c.create(2);
   const done = c.renderParallel();
@@ -902,13 +900,12 @@ test('a frame tagged with another segment id is dropped', async () => {
   // In range and an integer, but not this worker's index: staging it would fill
   // segment 1's slot from segment 0's pixels and leave 1 outstanding.
   deliverFrameWithSegId(c, 0, 1);
-  assert.equal(c.pending, 2, 'a mis-tagged frame must not settle the barrier');
+  assert.equal(c.faulted, true, 'a mis-tagged frame faults rather than freezing the preview');
+  assert.equal(c.faultInfo.segId, 0, 'the fault names the worker that sent it');
+  assert.ok(c.faultInfo.message.includes('tagged segId 1'),
+    `the fault names the offending id: ${c.faultInfo.message}`);
   assert.deepEqual(c.scratch, [null, null], 'no staging slot is written');
   assert.deepEqual(c.frameSeen, [false, false], 'no segment is marked seen');
-  assert.equal(c.faulted, false, 'a mis-tagged frame is a loud drop, not a pool fault');
-
-  deliverFrame(c, 0);
-  deliverFrame(c, 1);
   assert.equal(c.pending, 0);
   await done;
 });
