@@ -1,7 +1,7 @@
 //
 // SegmentController — unit coverage for the generation-fence drop, the
 // worker-fault deadlock-break latch, and the quadrant compositor. Driven by a
-// fake Worker, a fake driver, and a mocked ./driver.js.
+// fake Worker and a fake driver injected as a constructor dependency.
 //
 // Run: node --test --experimental-test-module-mocks "tests/*.test.js"
 import { test, mock, beforeEach, after } from 'node:test';
