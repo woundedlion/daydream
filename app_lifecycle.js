@@ -267,6 +267,60 @@ export function createPoleLodBinding({ getEngine, onChange }) {
 }
 
 /**
+ * Build the recording settings the GUI binds to, over a recorder that does not
+ * exist yet.
+ *
+ * The recorder is constructed only once the module load resolves and the canvas
+ * exists, but the GUI mounts at module scope — so each setting holds its own
+ * value behind an accessor, pushes it at every write, and replay() carries
+ * whatever accumulated (deep-linked or default) into the recorder the load
+ * builds. The recorder latches these at start(), so a write during a session is
+ * reported rather than silently deferred to the next one.
+ *
+ * @param {Object} deps - Injected app collaborators.
+ * @param {() => ?Object} deps.getRecorder - Reads the live recorder, null until
+ *   the module load resolves.
+ * @param {(message: string) => void} [deps.warn] - Sink for the mid-recording
+ *   notice.
+ * @returns {{settings: Object, define: (prop: string, initial: *, label: string,
+ *   push: (recorder: Object, value: *) => void) => void, replay: () => void}}
+ *   The GUI-bound settings object, the per-setting definer, and the post-load
+ *   replay.
+ */
+export function createRecordingSettings({
+  getRecorder,
+  warn = (message) => console.warn(message),
+}) {
+  const settings = {};
+  const replays = [];
+  return {
+    settings,
+    define(prop, initial, label, push) {
+      let value = initial;
+      Object.defineProperty(settings, prop, {
+        enumerable: true,
+        get: () => value,
+        set(v) {
+          value = v;
+          const recorder = getRecorder();
+          if (recorder) push(recorder, v);
+          if (recorder?.isRecording) {
+            warn(`Recording: ${label} change applies to the next recording `
+              + '(the current one is already running).');
+          }
+        },
+      });
+      // Unguarded: replay() runs immediately after the recorder is constructed,
+      // and a null-tolerant replay would drop every setting in silence.
+      replays.push(() => push(getRecorder(), value));
+    },
+    replay() {
+      for (const push of replays) push();
+    },
+  };
+}
+
+/**
  * Build the "Test All" ticker: the timer that walks the current resolution's
  * effect list, one entry per interval.
  *
@@ -408,6 +462,50 @@ export function createSegmentSpawnGuard({ warmModules, spawn, isActive }) {
       return true;
     },
     strand() { epoch++; },
+  };
+}
+
+/**
+ * Build the segmented pool's fallback to the single-thread engine.
+ *
+ * Ordered: the flag goes false before the strand and the teardown, so a
+ * warmModules() continuation still in flight reads an inactive host after its
+ * await and cannot spawn a pool behind the engine the app has fallen back to.
+ * The toggle is corrected last, since its own onChange re-runs the (idempotent)
+ * teardown.
+ *
+ * @param {Object} deps - Injected app collaborators.
+ * @param {{active: boolean, destroy: () => void, updateStats: () => void}} deps.segments -
+ *   The segment controller.
+ * @param {() => void} deps.strand - Bumps the spawn epoch.
+ * @param {(message: string) => void} deps.showNotice - Reports the fallback;
+ *   without it the only symptom is the toggle flipping back, which reads as a
+ *   mis-click, and the fault banner covers latched runtime faults, not this path.
+ * @param {(on: boolean) => void} deps.showToggle - Writes the Enabled control
+ *   through setValue (not updateDisplay), so the deep-link writer drops
+ *   segmented=true from the URL.
+ * @param {(message: string, err: *) => void} [deps.logError] - Console sink.
+ * @returns {(label: string, err: *) => void} The fallback, taking what failed
+ *   (named in the log line and the notice) and the thrown value.
+ */
+export function createSegmentedFallback({
+  segments,
+  strand,
+  showNotice,
+  showToggle,
+  logError = (message, err) => console.error(message, err),
+}) {
+  return (label, err) => {
+    logError(`Segmented POV: ${label} failed; falling back to the single engine.`,
+      err);
+    const detail = (err && err.message) ? err.message : String(err);
+    showNotice(`Segmented POV ${label} failed: ${detail}. `
+      + 'Falling back to the single engine.');
+    segments.active = false;
+    strand();
+    segments.destroy();
+    segments.updateStats();
+    showToggle(false);
   };
 }
 

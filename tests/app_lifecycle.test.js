@@ -12,7 +12,9 @@ import {
   createGlobalKeydownHandler,
   createModuleLoadHandlers,
   createPoleLodBinding,
+  createRecordingSettings,
   createSegmentSpawnGuard,
+  createSegmentedFallback,
   createTestAllTicker,
   createUnhandledRejectionHandler,
 } from '../app_lifecycle.js';
@@ -644,6 +646,80 @@ test('a replay before the engine loads is a no-op, not a crash', () => {
   assert.deepEqual(h.pushed, []);
 });
 
+// The recording settings share the Pole LOD binding's problem: the GUI mounts at
+// module scope, the recorder is built only when the module load resolves, and
+// the recorder latches every one of these at start().
+
+/**
+ * Build the recording settings over a recorder that appears only when made to.
+ * @returns {Object} The block, the recorder double, the warnings, and the load.
+ */
+function makeRecordingSettings() {
+  const warnings = [];
+  let recorder = null;
+  const block = createRecordingSettings({
+    getRecorder: () => recorder,
+    warn: (message) => warnings.push(message),
+  });
+  block.define('recQuality', 16, 'bitrate',
+    (rec, v) => { rec.bitrateMbps = v; });
+  block.define('recFormat', 'Auto', 'format',
+    (rec, v) => { rec.format = v; });
+  return {
+    block,
+    warnings,
+    getRecorder: () => recorder,
+    loadRecorder: () => { recorder = { isRecording: false }; return recorder; },
+  };
+}
+
+test('a setting written before the recorder exists is held, not lost', () => {
+  const h = makeRecordingSettings();
+
+  h.block.settings.recQuality = 8;
+  assert.equal(h.block.settings.recQuality, 8, 'the setting is its own durable home');
+  assert.deepEqual(h.warnings, [], 'there is no session to warn about yet');
+
+  const recorder = h.loadRecorder();
+  h.block.replay();
+
+  assert.equal(recorder.bitrateMbps, 8, 'the load carries the held value in');
+  assert.equal(recorder.format, 'Auto', 'an untouched setting replays its default');
+});
+
+test('a setting written once the recorder exists reaches it immediately', () => {
+  const h = makeRecordingSettings();
+  const recorder = h.loadRecorder();
+
+  h.block.settings.recFormat = 'mp4';
+
+  assert.equal(recorder.format, 'mp4');
+  assert.equal(h.block.settings.recFormat, 'mp4', 'and the setting still reads back');
+  assert.deepEqual(h.warnings, [], 'no session is running, so nothing is deferred');
+});
+
+test('a write during a session is reported as deferred to the next one', () => {
+  const h = makeRecordingSettings();
+  const recorder = h.loadRecorder();
+  recorder.isRecording = true;
+
+  h.block.settings.recQuality = 20;
+
+  assert.equal(recorder.bitrateMbps, 20, 'the write still lands on the recorder');
+  assert.equal(h.warnings.length, 1, 'and is reported exactly once');
+  assert.match(h.warnings[0], /bitrate/, 'the notice names the setting');
+  assert.match(h.warnings[0], /next recording/, 'and says when it takes effect');
+});
+
+// GUI-bound: lil-gui enumerates the object it is handed, so a non-enumerable
+// setting would never get a control.
+test('every setting is enumerable on the GUI-bound object', () => {
+  const h = makeRecordingSettings();
+
+  assert.deepEqual(Object.keys(h.block.settings), ['recQuality', 'recFormat'],
+    'the settings enumerate in definition order');
+});
+
 // The Test All ticker walks the resolution's effect list on a timer. Its index
 // is its own: a rejected switch reverts the effect, so an index re-derived from
 // the live one would retry the rejected slot forever.
@@ -966,4 +1042,71 @@ test('a failed warm-up rejects so the caller can fall back', async () => {
 
   await assert.rejects(attempt, /offline/);
   assert.deepEqual(h.spawns, []);
+});
+
+// What the caller falls back with. Its order is the contract: the flag goes
+// false before the strand and the teardown, or a continuation resuming mid-way
+// spawns a pool behind the single engine the app just fell back to.
+
+/**
+ * Build the fallback over a recording segment-controller double.
+ * @returns {Object} The fallback, the ordered log, and the controller double.
+ */
+function makeSegmentedFallback() {
+  const order = [];
+  const notices = [];
+  const logs = [];
+  let active = true;
+  const segments = {
+    destroy: () => order.push('destroy'),
+    updateStats: () => order.push('updateStats'),
+  };
+  // An accessor, as the real controller has, so the write's position is visible.
+  Object.defineProperty(segments, 'active', {
+    enumerable: true,
+    get: () => active,
+    set: (v) => { active = v; order.push(`active=${v}`); },
+  });
+  const fallback = createSegmentedFallback({
+    segments,
+    strand: () => order.push('strand'),
+    showNotice: (message) => { order.push('notice'); notices.push(message); },
+    showToggle: (on) => order.push(`toggle=${on}`),
+    logError: (message, err) => logs.push([message, err]),
+  });
+  return { fallback, order, notices, logs, segments };
+}
+
+test('the segmented fallback clears the flag before it strands or tears down', () => {
+  const h = makeSegmentedFallback();
+
+  h.fallback('enable', new Error('no workers'));
+
+  assert.deepEqual(h.order,
+    ['notice', 'active=false', 'strand', 'destroy', 'updateStats', 'toggle=false'],
+    'a strand or a destroy ahead of the flag leaves a window a resuming '
+    + 'continuation can spawn into');
+  assert.equal(h.segments.active, false, 'the host is left inactive');
+});
+
+test('the segmented fallback names what failed in both the notice and the log', () => {
+  const h = makeSegmentedFallback();
+  const err = new Error('no workers');
+
+  h.fallback('resize', err);
+
+  assert.match(h.notices[0], /resize/, 'the notice names the operation');
+  assert.match(h.notices[0], /no workers/, 'and the reason');
+  assert.match(h.notices[0], /single engine/, 'and what the app fell back to');
+  assert.equal(h.logs.length, 1, 'the console gets the thrown value too');
+  assert.equal(h.logs[0][1], err, 'unwrapped, so its stack survives');
+});
+
+test('the segmented fallback reports a thrown non-Error', () => {
+  const h = makeSegmentedFallback();
+
+  h.fallback('teardown', 'worker exploded');
+
+  assert.match(h.notices[0], /worker exploded/,
+    'a rejection carrying a bare string must not read as "[object Object]"');
 });

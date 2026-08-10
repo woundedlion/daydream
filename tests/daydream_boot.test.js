@@ -82,16 +82,17 @@ test('the param writer and the switch coordinator own the notice separately', ()
 });
 
 test('a segmented-POV spawn failure is announced, not only logged', () => {
-  const at = SOURCE.indexOf('function segmentedFailed(');
-  assert.ok(at >= 0, 'the segmented fallback must stay a named function');
-  const body = SOURCE.slice(at, SOURCE.indexOf('\n}', at));
-  assert.match(body, /applyNotice\.show\(/,
+  const at = SOURCE.indexOf('createSegmentedFallback(');
+  assert.ok(at >= 0, 'the segmented fallback must stay wired to its factory');
+  const args = balanced(SOURCE, SOURCE.indexOf('(', at));
+  assert.match(args, /showNotice:\s*\(message\)\s*=>\s*applyNotice\.show\(message, SWITCH_NOTICE\)/,
     'a console-only failure is invisible: the user sees the toggle flip back '
-    + 'and cannot tell it from a mis-click, and the fault banner covers only '
-    + 'latched runtime faults');
-  assert.match(body, /SWITCH_NOTICE/,
-    'the notice must carry the switch owner tag, so a parameter write does not '
-    + 'clear it');
+    + 'and cannot tell it from a mis-click, the fault banner covers only latched '
+    + 'runtime faults, and the switch owner tag is what keeps a parameter write '
+    + 'from clearing the notice');
+  assert.match(args, /showToggle:\s*\(on\)\s*=>\s*segEnabledCtrl\.setValue\(on\)/,
+    'setValue (not updateDisplay) is what makes the deep-link writer drop '
+    + 'segmented=true from the URL');
 });
 
 test('the discard path frees an engine built after disposal', () => {
