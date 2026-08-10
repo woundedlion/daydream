@@ -58,7 +58,8 @@ const STYLE_BODY = /<style\b[^>]*>([\s\S]*?)<\/style>/g;
  * URLs; script bodies and modules use ES specifiers; style bodies and
  * stylesheets use url().
  * @param {string} path - Repo-relative path of the referencing file.
- * @returns {string[]} Referenced paths, normalized against the file's directory.
+ * @returns {{targets: string[], escaping: string[]}} Referenced paths normalized
+ *   against the file's directory, and those that normalize outside the repo.
  */
 const referencesOf = (path) => {
   const src = read(path);
@@ -78,17 +79,18 @@ const referencesOf = (path) => {
   scan(src, [WASM_REF]);
 
   const base = posix.dirname(path);
-  const out = [];
+  const targets = [];
+  const escaping = [];
   for (const value of raw) {
     const spec = value.split(/[?#]/)[0];
     // Absolute URLs, protocol-relative hosts, data:/blob: payloads and empty
     // attributes name nothing in the repo.
     if (spec === '' || /^[a-z][a-z0-9+.-]*:/i.test(spec) || spec.startsWith('//')) continue;
     const target = posix.normalize(posix.join(base, spec));
-    assert.ok(!target.startsWith('..'), `${path} references ${spec}, outside the repo`);
-    out.push(target);
+    if (target.startsWith('..')) escaping.push(`${path} -> ${spec}`);
+    else targets.push(target);
   }
-  return out;
+  return { targets, escaping };
 };
 
 test('every site manifest entry is tracked and present', () => {
@@ -96,14 +98,23 @@ test('every site manifest entry is tracked and present', () => {
   assert.ok(entries.length > 0, `${MANIFEST} lists nothing`);
   assert.deepEqual([...new Set(entries)], entries, `${MANIFEST} repeats an entry`);
   const tracked = trackedFiles();
+  // Accumulated rather than asserted per entry, so the assertion count does not
+  // track the manifest's length.
+  const malformed = [];
+  const absent = [];
+  const untracked = [];
   for (const entry of entries) {
-    assert.doesNotMatch(entry, /^[./]|\\|\/$/,
-      `${MANIFEST} entry '${entry}' must be a repo-relative path with forward slashes`);
-    assert.ok(existsSync(resolve(REPO, entry)), `${MANIFEST} lists '${entry}', which does not exist`);
-    const covers = [...tracked].some((f) => f === entry || f.startsWith(`${entry}/`));
-    assert.ok(covers,
-      `${MANIFEST} lists '${entry}', which git does not track — it would 404 on Pages`);
+    if (/^[./]|\\|\/$/.test(entry)) malformed.push(entry);
+    if (!existsSync(resolve(REPO, entry))) absent.push(entry);
+    if (![...tracked].some((f) => f === entry || f.startsWith(`${entry}/`)))
+      untracked.push(entry);
   }
+  assert.deepEqual(malformed.slice(0, 5), [],
+    `${malformed.length} ${MANIFEST} entries are not repo-relative forward-slashed paths`);
+  assert.deepEqual(absent.slice(0, 5), [],
+    `${absent.length} ${MANIFEST} entries do not exist`);
+  assert.deepEqual(untracked.slice(0, 5), [],
+    `${untracked.length} ${MANIFEST} entries git does not track — they would 404 on Pages`);
 });
 
 test('the derived page roster names every served page', () => {
@@ -115,12 +126,11 @@ test('the derived page roster names every served page', () => {
   assert.ok(pages.size > 0, `${MANIFEST} publishes no page`);
   // A manifest entry may name a directory, which ships recursively; a page under
   // one is served without appearing as an entry of its own.
-  for (const file of trackedFiles()) {
-    if (!file.endsWith('.html') || !covered(file)) continue;
-    assert.ok(pages.has(file),
-      `${file} is served but no ${MANIFEST} entry names it, so the CSP and ` +
-        'stylesheet cases never see it');
-  }
+  const unlisted = [...trackedFiles()].filter(
+    (file) => file.endsWith('.html') && covered(file) && !pages.has(file));
+  assert.deepEqual(unlisted.slice(0, 5), [],
+    `${unlisted.length} served pages are named by no ${MANIFEST} entry, so the ` +
+      'CSP and stylesheet cases never see them');
 });
 
 test('the site manifest covers every asset the served pages reference', () => {
@@ -131,28 +141,41 @@ test('the site manifest covers every asset the served pages reference', () => {
   const tracked = trackedFiles();
   const seen = new Set();
   const queue = [...PAGES];
+  // The walk visits every reachable file, so it accumulates its findings and
+  // asserts once per class rather than once per node.
+  const unpublished = [];
+  const dangling = [];
+  const absent = [];
+  const escaping = [];
   while (queue.length > 0) {
     const path = queue.pop();
     if (seen.has(path)) continue;
     seen.add(path);
-    assert.ok(covered(path), `${path} is served but missing from ${MANIFEST}`);
-    for (const target of referencesOf(path)) {
+    if (!covered(path)) unpublished.push(path);
+    const refs = referencesOf(path);
+    escaping.push(...refs.escaping);
+    for (const target of refs.targets) {
       if (!tracked.has(target)) {
         // Only a deliberately gitignored drop may be absent from the deploy
         // checkout; anything else is a reference that 404s on Pages.
-        assert.ok(ignored(target),
-          `${path} references ${target}, which git neither tracks nor ignores — ` +
-            'it would 404 on Pages');
+        if (!ignored(target)) dangling.push(`${path} -> ${target}`);
         continue;
       }
-      assert.ok(existsSync(resolve(REPO, target)),
-        `${path} references ${target}, which does not exist`);
-      assert.ok(covered(target),
-        `${path} references ${target}, which ${MANIFEST} does not publish — ` +
-          'it would 404 on Pages');
+      if (!existsSync(resolve(REPO, target))) absent.push(`${path} -> ${target}`);
+      else if (!covered(target)) unpublished.push(`${path} -> ${target}`);
       if (/\.(js|html|css)$/.test(target)) queue.push(target);
     }
   }
+  assert.deepEqual(escaping.slice(0, 5), [],
+    `${escaping.length} references normalize outside the repo`);
+  assert.deepEqual(absent.slice(0, 5), [],
+    `${absent.length} references name a tracked path that does not exist`);
+  assert.deepEqual(dangling.slice(0, 5), [],
+    `${dangling.length} references git neither tracks nor ignores — they would ` +
+      '404 on Pages');
+  assert.deepEqual(unpublished.slice(0, 5), [],
+    `${unpublished.length} served paths ${MANIFEST} does not publish — they ` +
+      'would 404 on Pages');
   // A walk that stops at the entry pages proves nothing about the graph.
   assert.ok(seen.size > PAGES.length, 'the reference walk reached no modules');
 });
