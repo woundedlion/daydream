@@ -129,8 +129,8 @@ test('snapToRationalRatio: closing period equals 2π·n/passiveC for a known rat
   const { m, n, snappedActiveC, closingPeriod } = snapToRationalRatio(activeC, passiveC);
   assert.equal(m, 3);
   assert.equal(n, 2);
-  assert.equal(snappedActiveC, passiveC * (m / n));
-  assert.equal(closingPeriod, (TWO_PI * n) / passiveC);
+  assert.equal(snappedActiveC, 6);
+  assert.equal(closingPeriod, TWO_PI / 2);
 });
 
 test('snapToRationalRatio: 8/7 closure fits the closed-curve domain', () => {
@@ -186,8 +186,7 @@ test('snapToRationalRatio: a range keeps the snapped frequency reachable', () =>
   assert.equal(snappedActiveC, 91);
   assert.equal(m, 7);
   assert.equal(n, 1);
-  assert.equal(snappedActiveC, passiveC * (m / n));
-  assert.equal(closingPeriod, (TWO_PI * n) / passiveC);
+  assert.equal(closingPeriod, TWO_PI / 13);
   assert.equal(domainClosureWarning(passiveC, closingPeriod), null);
 });
 

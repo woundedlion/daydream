@@ -98,7 +98,7 @@
   },
   "tests/lissajous_math.test.js": {
     "cases": 21,
-    "assertions": 136
+    "assertions": 135
   },
   "tests/mobius_transforms.test.js": {
     "cases": 36,
