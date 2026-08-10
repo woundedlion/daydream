@@ -37,6 +37,11 @@
     "segment_layout.js",
     "segment_stats_view.js",
     "segment_worker.js",
-    "tools/kb_format.js"
+    "tools/color.js",
+    "tools/copy_text.js",
+    "tools/cpp_format.js",
+    "tools/export_params.js",
+    "tools/kb_format.js",
+    "tools/mobius_transforms.js"
   ]
 }
