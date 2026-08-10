@@ -16,6 +16,10 @@ export async function copyToClipboard(text) {
     }
   } catch {}
 
+  // The textarea has to take focus for execCommand('copy') to see a selection,
+  // so hold the element that had it and hand focus back.
+  const previouslyFocused = document.activeElement;
+
   const textarea = document.createElement('textarea');
   textarea.value = text;
   textarea.style.position = 'fixed';
@@ -29,5 +33,6 @@ export async function copyToClipboard(text) {
     copied = document.execCommand('copy');
   } catch {}
   document.body.removeChild(textarea);
+  if (typeof previouslyFocused?.focus === 'function') previouslyFocused.focus();
   return copied;
 }

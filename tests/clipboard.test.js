@@ -145,6 +145,36 @@ test('copyToClipboard falls back to execCommand', async () => {
   }
 });
 
+/** The fallback's temporary textarea must hand focus back to the trigger. */
+test('copyToClipboard restores focus after the execCommand fallback', async () => {
+  const restore = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true });
+  const trigger = fakeElement('button');
+  let refocused = false;
+  trigger.focus = () => { refocused = true; };
+  installDocument({
+    activeElement: trigger,
+    body: fakeElement('body'),
+    createElement: (tag) => {
+      const element = fakeElement(tag);
+      element.focus = () => {};
+      element.select = () => {};
+      return element;
+    },
+    execCommand: () => {
+      assert.equal(refocused, false, 'focus returns only after the copy');
+      return true;
+    },
+  });
+
+  try {
+    assert.equal(await copyToClipboard('legacy text'), true);
+    assert.equal(refocused, true, 'the trigger regained focus');
+  } finally {
+    Object.defineProperty(globalThis, 'navigator', restore);
+  }
+});
+
 test('copyToClipboard falls back after an async clipboard rejection', async () => {
   const restore = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   Object.defineProperty(globalThis, 'navigator', {
