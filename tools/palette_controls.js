@@ -83,6 +83,23 @@ export function paletteTabUrl(href, tab) {
 }
 
 /**
+ * Resolves the WAI-ARIA tablist keyboard contract for a horizontal tablist:
+ * arrows step and wrap, Home and End jump to the ends.
+ * @param {string} key - KeyboardEvent key.
+ * @param {number} current - Index of the focused tab.
+ * @param {number} count - Number of tabs in the tablist.
+ * @returns {?number} Index to focus and activate, or null for unhandled keys.
+ */
+export function tablistKeyTarget(key, current, count) {
+  if (count < 1) return null;
+  if (key === 'ArrowRight') return (current + 1) % count;
+  if (key === 'ArrowLeft') return (current - 1 + count) % count;
+  if (key === 'Home') return 0;
+  if (key === 'End') return count - 1;
+  return null;
+}
+
+/**
  * Owns the phase window shown by the palette strip.
  *
  * Pointer positions stay local to the visible strip while palette phases stay
