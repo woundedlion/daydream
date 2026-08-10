@@ -621,7 +621,7 @@
       createChainValidator,
     } from './solid_codegen.js';
     import { generateRegistryCpp, MAX_RECIPE_STEPS } from './solid_registry_codegen.js';
-    import { buildOpRow } from './solid_op_rows.js';
+    import { buildOpRow, formatParamValue } from './solid_op_rows.js';
     // Scene construction from the JS-side mesh copy, and the stats line it
     // reports; the three.js namespace, the scene and the materials below are
     // passed in, so the renderer is unit tested against a stand-in namespace.
@@ -1619,7 +1619,7 @@
         const input = row.querySelector('input[type="number"]');
 
         if (slider) slider.value = val;
-        if (input) input.value = val.toFixed(2);
+        if (input) input.value = formatParamValue(val, def);
       }
       scheduleUpdate();
     }

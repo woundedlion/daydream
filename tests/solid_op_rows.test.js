@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildOpRow } from '../tools/solid_op_rows.js';
+import { buildOpRow, formatParamValue } from '../tools/solid_op_rows.js';
 import { OP_DEFS } from '../tools/solid_codegen.js';
 import { fakeElement } from './fake_dom.js';
 
@@ -94,6 +94,17 @@ test('parameter rows carry the OP_DEFS range and the current value', () => {
   assert.equal(number(twistRow).value, '0.28');
   assert.equal(number(twistRow).getAttribute('aria-label'), 'snub twist value');
   assert.equal(tRow.children[0].htmlFor, range(tRow).id);
+});
+
+test('an integer-stepped parameter renders whole, a fractional one to two decimals', () => {
+  assert.equal(formatParamValue(54, OP_DEFS.hankin.params.angle), '54');
+  assert.equal(formatParamValue(100, OP_DEFS.relax.params.iter), '100');
+  assert.equal(formatParamValue(0.5, OP_DEFS.snub.params.t), '0.50');
+  assert.equal(formatParamValue(0.33, undefined), '0.33');
+
+  const { el } = build({ op: 'relax', params: { iter: 100 } });
+  const [row] = el.querySelectorAll('.op-param');
+  assert.equal(row.children.find((c) => c.type === 'number').value, '100');
 });
 
 test('the angle parameter is the one that carries a degree suffix', () => {

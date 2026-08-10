@@ -57,6 +57,18 @@ function buildButton(doc, className, text, ariaLabel) {
 }
 
 /**
+ * Formats a parameter value for its number box, at the precision its step grid
+ * can reach: whole for an integer-stepped parameter (whose C++ argument is a
+ * count or a whole degree), two decimals otherwise.
+ * @param {number|string} value - The value to display.
+ * @param {{step: number}} [def] - The parameter's OP_DEFS range.
+ * @returns {string} The formatted value, or 'NaN' for a non-numeric one.
+ */
+export function formatParamValue(value, def) {
+  return Number(value).toFixed(Number.isInteger(def?.step) ? 0 : 2);
+}
+
+/**
  * Builds one parameter row: name, slider, number box and unit suffix.
  * @param {Document} doc - Document the nodes are created in.
  * @param {string} key - Parameter name, as declared in OP_DEFS.
@@ -93,7 +105,7 @@ function buildParamRow(doc, key, def, value, controlId, opName) {
   number.min = def.min;
   number.max = def.max;
   number.step = def.step;
-  number.value = Number(value).toFixed(2);
+  number.value = formatParamValue(value, def);
 
   const unit = doc.createElement('span');
   unit.className = 'text-[0.5rem] text-slate-600 ml-0.5';
