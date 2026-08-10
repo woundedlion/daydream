@@ -105,6 +105,32 @@ test('warmModules skips a re-warm inside the dedupe window', async () => {
   assert.equal(calls, 6, 'a warm past the window fetches again');
 });
 
+// The smallest valid module — the header alone. Compiling a real one is what
+// shows the init message can carry a WebAssembly.Module across the boundary.
+const EMPTY_WASM = Uint8Array.of(0, 0x61, 0x73, 0x6d, 1, 0, 0, 0);
+
+test('a warmed binary is compiled once and handed to every worker', async () => {
+  await warmModules({
+    baseUrl: 'http://localhost:8000/segment_controller.js',
+    minIntervalMs: 0,
+    fetch: (url) => Promise.resolve({
+      arrayBuffer: () => Promise.resolve(
+        url.href.endsWith('.wasm') ? EMPTY_WASM.buffer : new ArrayBuffer(0)),
+    }),
+  });
+
+  const c = makeController();
+  c.create(2);
+  const modules = FakeWorker.instances
+    .map((w) => w.posted.find((m) => m.type === 'init').wasmModule);
+  for (const compiled of modules) {
+    assert.ok(compiled instanceof WebAssembly.Module,
+      'each worker gets the compilation instead of fetching and compiling its own');
+  }
+  assert.equal(new Set(modules).size, 1, 'one compilation, shared');
+  c.destroy();
+});
+
 // ---------------------------------------------------------------------------
 // Fakes
 // ---------------------------------------------------------------------------

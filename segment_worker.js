@@ -6,8 +6,9 @@
  * Segment Worker — runs in a Web Worker to render one rectangular quadrant of
  * the canvas (an arm column subdivided into a Y-band; both axes are clipped —
  * see computeSegmentRange in segment_layout.js and the pov_segmented.h layout).
- * Each worker loads its own WASM module instance (isolated memory space),
- * ensuring separate global arenas and effect state.
+ * Each worker instantiates its own WASM engine (isolated memory space), ensuring
+ * separate global arenas and effect state; the compiled binary those instances
+ * share arrives with `init` when the controller has one.
  */
 
 import createHolosphereModule from "./holosphere_wasm.js";
@@ -116,11 +117,27 @@ async function handleMessage(msg) {
       totalSegs = msg.totalSegs;
       paramRevision = msg.paramRevision;
 
+      /** @type {Parameters<typeof createHolosphereModule>[0]} */
+      const options = {};
       // Every segment runs a full engine replica, so engine logs would print
       // once per worker; only segment 0 logs. printErr stays live everywhere.
-      const mod = await createHolosphereModule(segId === 0 ? {} : {
-        print: () => {},
-      });
+      if (segId !== 0) options.print = () => {};
+      const compiled = msg.wasmModule;
+      if (compiled) {
+        // Instantiate the controller's single compilation instead of fetching and
+        // compiling the 2 MB binary again here. The binary declares its own memory
+        // rather than importing one, so this instance still gets a private heap.
+        options.instantiateWasm = (imports, onInstance) => {
+          WebAssembly.instantiate(compiled, imports).then(
+            (instance) => onInstance(instance, compiled),
+            // The glue's instantiate has no rejection path, so without this the
+            // await below never settles and the pool waits out its init watchdog.
+            (error) => post({ type: 'engineRejected',
+                              reason: `shared module instantiate failed: ${error}` }));
+          return {};
+        };
+      }
+      const mod = await createHolosphereModule(options);
       wasmModule = mod;
       engine = new mod.HolosphereEngine();
       // A rejected resolution leaves no usable geometry: skip the canvasW/canvasH

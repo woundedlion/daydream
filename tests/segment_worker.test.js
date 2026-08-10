@@ -120,22 +120,27 @@ let nextResolutionOk = true;
 let nextEffectOk = true;
 /** Seeds the next-constructed engine's clipOk, so init-time rejection is testable. */
 let nextClipOk = true;
+/** Options the worker handed the module factory, where the instantiate hook lands. */
+let moduleOptions = null;
 mock.module('../holosphere_wasm.js', {
-  defaultExport: async () => ({
-    ParamSetResult,
-    ClipSetResult,
-    ResolutionSetResult,
-    EffectSetResult,
-    HolosphereEngine: class {
-      constructor() {
-        engineInstance = new FakeEngine();
-        engineInstance.resolutionOk = nextResolutionOk;
-        engineInstance.effectOk = nextEffectOk;
-        engineInstance.clipOk = nextClipOk;
-        return engineInstance;
-      }
-    },
-  }),
+  defaultExport: async (options) => {
+    moduleOptions = options;
+    return {
+      ParamSetResult,
+      ClipSetResult,
+      ResolutionSetResult,
+      EffectSetResult,
+      HolosphereEngine: class {
+        constructor() {
+          engineInstance = new FakeEngine();
+          engineInstance.resolutionOk = nextResolutionOk;
+          engineInstance.effectOk = nextEffectOk;
+          engineInstance.clipOk = nextClipOk;
+          return engineInstance;
+        }
+      },
+    };
+  },
 });
 
 await import('../segment_worker.js');
@@ -166,6 +171,7 @@ async function dispatch(msg) {
 beforeEach(() => {
   posted.length = 0;
   engineInstance = null;
+  moduleOptions = null;
   nextResolutionOk = true;
   nextEffectOk = true;
   nextClipOk = true;
@@ -203,6 +209,52 @@ test('render before a completed init faults instead of dropping the reply', asyn
   assert.equal(posted.length, 0, 'nothing was posted back');
   assert.equal(captured.length, 1, 'one rethrow task scheduled');
   assert.throws(() => captured[0](), /render before a completed init/);
+});
+
+/** Header-only module: valid, imports nothing, so it instantiates against `{}`. */
+const EMPTY_WASM = Uint8Array.of(0, 0x61, 0x73, 0x6d, 1, 0, 0, 0);
+
+test('init instantiates a controller-supplied module through the glue hook', async () => {
+  const compiled = await WebAssembly.compile(EMPTY_WASM);
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
+                   effectName: 'Plasma', wasmModule: compiled });
+
+  const instantiate = moduleOptions.instantiateWasm;
+  assert.ok(instantiate, 'the glue is handed an instantiate hook');
+  const handed = await new Promise((resolve) => {
+    instantiate({}, (instance, module) => resolve({ instance, module }));
+  });
+  assert.ok(handed.instance instanceof WebAssembly.Instance,
+    'the hook answers with an instance of its own, so this heap stays private');
+  assert.equal(handed.module, compiled, 'built from the shared compilation');
+});
+
+test('init without a supplied module leaves the glue its own load path', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma' });
+  assert.equal(moduleOptions.instantiateWasm, undefined,
+    'no hook installed, so the glue fetches and compiles the binary itself');
+});
+
+/**
+ * The glue's instantiate promise has no rejection path, so a failure inside the
+ * hook must be reported here or the worker never answers and the controller
+ * waits out its whole init watchdog.
+ */
+test('a failed instantiate of a supplied module reports instead of hanging', async () => {
+  // One unsatisfied function import ("a"."b"), so instantiating against {} fails.
+  const needsImport = await WebAssembly.compile(Uint8Array.of(
+    0, 0x61, 0x73, 0x6d, 1, 0, 0, 0,
+    1, 4, 1, 0x60, 0, 0,
+    2, 7, 1, 1, 0x61, 1, 0x62, 0, 0));
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
+                   effectName: 'Plasma', wasmModule: needsImport });
+
+  posted.length = 0;
+  moduleOptions.instantiateWasm({}, () => assert.fail('instantiation cannot succeed'));
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
+  const failed = posted.find((p) => p.msg.type === 'engineRejected');
+  assert.ok(failed, 'engineRejected posted');
+  assert.match(failed.msg.reason, /shared module instantiate failed/);
 });
 
 /**
