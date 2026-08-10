@@ -76,11 +76,18 @@ test('formatFloatCpp: round-trips float32 across a value sweep', () => {
   for (let i = 0; i < 5000; i++) {
     values.push(rnd(), Math.pow(10, -8 + 11 * rnd()) * (rnd() < 0.5 ? -1 : 1));
   }
+  const notPlain = [];
+  const notRoundTripped = [];
   for (const v of values) {
     const literal = formatFloatCpp(v);
-    assert.match(literal, /^-?\d+\.\d+f$/, `plain decimal for ${v}`);
-    assert.equal(Math.fround(parseFloat(literal)), Math.fround(v), `round-trip for ${v}`);
+    if (!/^-?\d+\.\d+f$/.test(literal)) notPlain.push(`${v} -> ${literal}`);
+    if (!Object.is(Math.fround(parseFloat(literal)), Math.fround(v)))
+      notRoundTripped.push(`${v} -> ${literal}`);
   }
+  assert.deepEqual(notPlain.slice(0, 5), [],
+    `${notPlain.length} of ${values.length} were not plain decimal`);
+  assert.deepEqual(notRoundTripped.slice(0, 5), [],
+    `${notRoundTripped.length} of ${values.length} did not round-trip`);
 });
 
 /**

@@ -25,7 +25,7 @@
   },
   "tests/cpp_format.test.js": {
     "cases": 14,
-    "assertions": 20045
+    "assertions": 29
   },
   "tests/daydream_boot.test.js": {
     "cases": 8,
@@ -154,7 +154,7 @@
   },
   "tests/segment_layout.test.js": {
     "cases": 13,
-    "assertions": 180158
+    "assertions": 147
   },
   "tests/segment_stats_view.test.js": {
     "cases": 11,

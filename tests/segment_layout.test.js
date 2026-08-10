@@ -16,6 +16,7 @@ test('a full segment set tiles the canvas exactly once', () => {
 
   for (const { w, h, total } of cases) {
     const cover = new Uint8Array(w * h);
+    const twice = [];
     for (let id = 0; id < total; id++) {
       const r = computeSegmentRange(id, total, w, h);
       assert.ok(r.x0 >= 0 && r.x1 <= w, `x in range for id=${id} ${w}x${h}/${total}`);
@@ -24,15 +25,17 @@ test('a full segment set tiles the canvas exactly once', () => {
       assert.equal(r.h, r.y1 - r.y0, 'reported h matches y span');
       for (let y = r.y0; y < r.y1; y++) {
         for (let x = r.x0; x < r.x1; x++) {
-          assert.equal(cover[y * w + x], 0,
-            `pixel (${x},${y}) painted twice for ${w}x${h}/${total}`);
+          if (cover[y * w + x] !== 0) twice.push(`(${x},${y})`);
           cover[y * w + x] = 1;
         }
       }
     }
-    for (let i = 0; i < cover.length; i++) {
-      assert.equal(cover[i], 1, `pixel ${i} uncovered for ${w}x${h}/${total}`);
-    }
+    const uncovered = [];
+    for (let i = 0; i < cover.length; i++) if (cover[i] !== 1) uncovered.push(i);
+    assert.deepEqual(twice.slice(0, 5), [],
+      `${twice.length} pixels painted twice for ${w}x${h}/${total}`);
+    assert.deepEqual(uncovered.slice(0, 5), [],
+      `${uncovered.length} pixels uncovered for ${w}x${h}/${total}`);
   }
 });
 
@@ -117,26 +120,33 @@ test('extract then composite round-trips a non-trivial rect through the shared b
 
   const compact = new Uint16Array(qw * qh * 3);
   extractSegment(src, compact, canvasW, rect);
+  const gathered = [];
   for (let y = 0; y < qh; y++)
     for (let x = 0; x < qw; x++)
       for (let c = 0; c < 3; c++) {
         const ci = (y * qw + x) * 3 + c;
         const si = ((y + rect.y0) * canvasW + (x + rect.x0)) * 3 + c;
-        assert.equal(compact[ci], src[si], `compact (${x},${y}) ch${c}`);
+        if (compact[ci] !== src[si])
+          gathered.push(`(${x},${y}) ch${c}: ${compact[ci]} != ${src[si]}`);
       }
+  assert.deepEqual(gathered.slice(0, 5), [], `${gathered.length} compact samples wrong`);
 
   // gather=false path: composite the compact buffer back into a fresh canvas;
   // the rect must land at its source offset and nothing outside it is touched.
   const dst = new Uint16Array(canvasW * canvasH * 3);
   compositeSegment(dst, compact, canvasW, rect);
+  const scattered = [];
   for (let y = 0; y < canvasH; y++)
     for (let x = 0; x < canvasW; x++) {
       const inside = x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1;
       for (let c = 0; c < 3; c++) {
         const di = (y * canvasW + x) * 3 + c;
-        assert.equal(dst[di], inside ? src[di] : 0, `dst (${x},${y}) ch${c}`);
+        const want = inside ? src[di] : 0;
+        if (dst[di] !== want)
+          scattered.push(`(${x},${y}) ch${c}: ${dst[di]} != ${want}`);
       }
     }
+  assert.deepEqual(scattered.slice(0, 5), [], `${scattered.length} canvas samples wrong`);
 });
 
 test('stampBoundaries paints only the listed seams and clips off-canvas ones', () => {
@@ -146,14 +156,17 @@ test('stampBoundaries paints only the listed seams and clips off-canvas ones', (
   // larger layout must be clipped, not wrapped into the next row.
   stampBoundaries(canvas, canvasW, canvasH, [0, 3, canvasW], [2, canvasH]);
 
+  const wrong = [];
   for (let y = 0; y < canvasH; y++)
     for (let x = 0; x < canvasW; x++) {
       const seam = y === 2 || x === 0 || x === 3;
       const i = (y * canvasW + x) * 3;
-      assert.equal(canvas[i], 0, `R (${x},${y})`);
-      assert.equal(canvas[i + 1], seam ? 65535 : 0, `G (${x},${y})`);
-      assert.equal(canvas[i + 2], seam ? 65535 : 0, `B (${x},${y})`);
+      const want = [0, seam ? 65535 : 0, seam ? 65535 : 0];
+      for (let c = 0; c < 3; c++)
+        if (canvas[i + c] !== want[c])
+          wrong.push(`(${x},${y}) ch${c}: ${canvas[i + c]} != ${want[c]}`);
     }
+  assert.deepEqual(wrong.slice(0, 5), [], `${wrong.length} pixels wrong`);
 });
 
 test('stampBoundaries with no seams leaves the canvas untouched', () => {
