@@ -194,6 +194,7 @@ test('PaletteOps publishes every effect-owned GenerativePalette recipe', () => {
       'Comets',
       'DisplacementField / RingShower',
       'Dynamo',
+      'GSReactionDiffusion',
       'MobiusGrid',
     ]);
     for (const preset of presets) {
