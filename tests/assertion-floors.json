@@ -148,6 +148,10 @@
     "cases": 21,
     "assertions": 31
   },
+  "tests/segment_composite_wasm.test.js": {
+    "cases": 5,
+    "assertions": 126
+  },
   "tests/segment_controller.test.js": {
     "cases": 98,
     "assertions": 523
