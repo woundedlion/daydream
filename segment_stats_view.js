@@ -67,6 +67,23 @@ export class SegmentStatsView {
     this.statsSegCount = 0;   // segment count the cached table was built for
     /** @type {SegmentStatsCells | null} */
     this.statsCells = null;
+    // Overlay containers, resolved once. An id the document does not carry yet
+    // is left uncached, so a repaint before the page is built re-queries.
+    /** @type {Object<string, HTMLElement>} */
+    this.byId = {};
+  }
+
+  /**
+   * The overlay element of the given id, cached across repaints.
+   * @param {string} id - Element id to resolve.
+   * @returns {HTMLElement | null} The element, or null while it is absent.
+   */
+  element(id) {
+    const cached = this.byId[id];
+    if (cached) return cached;
+    const found = this.doc.getElementById(id);
+    if (found) this.byId[id] = found;
+    return found;
   }
 
   /**
@@ -75,11 +92,11 @@ export class SegmentStatsView {
    * @returns {void}
    */
   update(state) {
-    const el = this.doc.getElementById('segment-stats');
+    const el = this.element('segment-stats');
     if (!el) return;
 
-    const globalStatsDesktop = this.doc.getElementById('global-stats-desktop');
-    const globalStatsMobile = this.doc.getElementById('stats-bar');
+    const globalStatsDesktop = this.element('global-stats-desktop');
+    const globalStatsMobile = this.element('stats-bar');
 
     if (!state.active) {
       el.style.display = 'none';
@@ -167,7 +184,10 @@ export class SegmentStatsView {
         : state.fullFrames?.[s] ? 'full frame'
         : `x[${r.x0}–${r.x1}] y[${r.y0}–${r.y1}]`;
       c.compute.textContent = `${timing.toFixed(1)} ms`;
-      c.compute.className = timing > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
+      // Written only on a crossing: an unchanged class attribute still costs a
+      // style invalidation per row per composited frame.
+      const computeClass = timing > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
+      if (c.compute.className !== computeClass) c.compute.className = computeClass;
 
       const a = state.arenas[s];
       c.scrA.textContent = a ? formatKB(a.scratch_arena_a.high_water_mark) : '-';
@@ -177,7 +197,8 @@ export class SegmentStatsView {
 
     cells.maxTime.textContent = `${maxTime.toFixed(1)} ms`;
     cells.wallTime.textContent = `${state.wallTime.toFixed(1)} ms`;
-    cells.wallTime.className = state.wallTime > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
+    const wallClass = state.wallTime > SLOW_FRAME_MS ? 'seg-time slow' : 'seg-time';
+    if (cells.wallTime.className !== wallClass) cells.wallTime.className = wallClass;
   }
 
   /**
