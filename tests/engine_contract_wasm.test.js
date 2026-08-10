@@ -101,15 +101,21 @@ test('getSupportedResolutions reports buildable [w, h] rows', () => {
   const rows = M.HolosphereEngine.getSupportedResolutions();
   assert.ok(Array.isArray(rows), 'getSupportedResolutions must return an array');
   assert.ok(rows.length > 0, 'the engine must report at least one resolution');
+  const malformed = [];
+  const unbuildable = [];
   for (const row of rows) {
-    assert.ok(Array.isArray(row) && row.length === 2,
-      'each reported resolution must be a [w, h] pair');
+    if (!Array.isArray(row) || row.length !== 2
+      || typeof row[0] !== 'number' || typeof row[1] !== 'number') {
+      malformed.push(JSON.stringify(row));
+      continue;
+    }
     const [w, h] = row;
-    assert.equal(typeof w, 'number', 'reported width must be a number');
-    assert.equal(typeof h, 'number', 'reported height must be a number');
-    assert.ok(resolutionOk(engine.setResolution(w, h)),
-      `the engine must build the ${w}x${h} row it reports`);
+    if (!resolutionOk(engine.setResolution(w, h))) unbuildable.push(`${w}x${h}`);
   }
+  assert.deepEqual(malformed.slice(0, 5), [],
+    `${malformed.length} reported resolutions are not numeric [w, h] pairs`);
+  assert.deepEqual(unbuildable.slice(0, 5), [],
+    `${unbuildable.length} reported resolutions the engine cannot build`);
   // daydream.js narrows its preset table to these rows; a preset it offers must
   // stay reachable.
   assert.ok(rows.some(([w, h]) => w === W && h === H),
@@ -162,9 +168,9 @@ test('HolosphereEngine return shapes match what the segmented path consumes', ()
   const paramValues = engine.getParamValues();
   assert.equal(typeof paramValues.length, 'number',
     'getParamValues must return an array-like value');
-  for (const v of paramValues) {
-    assert.equal(typeof v, 'number', 'getParamValues elements must be numbers');
-  }
+  assert.deepEqual(
+    Array.from(paramValues).filter((v) => typeof v !== 'number'), [],
+    'getParamValues elements must be numbers');
 
   const m = engine.getArenaMetrics();
   for (const arena of ['scratch_arena_a', 'scratch_arena_b', 'persistent_arena']) {
@@ -263,19 +269,28 @@ test('a request matching the active resolution reports ALREADY_ACTIVE and keeps 
 test('a rejected parameter write names its reason', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   // Every effect, not just up to the first readonly hit: stopping there made the
-  // flag coverage depend on where one happens to sit in the name order.
+  // flag coverage depend on where one happens to sit in the name order. The scan
+  // accumulates so its assertion count does not track the roster's size.
   let found = null;
+  const uninstallable = [];
+  const nonBoolean = [];
   for (const name of Object.keys(engine.getEffectSizes())) {
-    assert.equal(engine.setEffect(name), M.EffectSetResult.INSTALLED,
-      `setEffect must succeed for ${name}`);
+    if (engine.setEffect(name) !== M.EffectSetResult.INSTALLED) {
+      uninstallable.push(name);
+      continue;
+    }
     const defs = engine.getParameterDefinitions();
     for (let i = 0; i < defs.length; i++) {
-      assert.equal(typeof defs[i].readonly, 'boolean',
-        `${name}.${defs[i].name} must carry a boolean readonly flag`);
+      if (typeof defs[i].readonly !== 'boolean')
+        nonBoolean.push(`${name}.${defs[i].name}`);
       if (defs[i].readonly && !found)
         found = { effect: name, name: defs[i].name, value: defs[i].value };
     }
   }
+  assert.deepEqual(uninstallable.slice(0, 5), [],
+    `setEffect failed for ${uninstallable.length} registered effects`);
+  assert.deepEqual(nonBoolean.slice(0, 5), [],
+    `${nonBoolean.length} params carry no boolean readonly flag`);
   assert.ok(found,
     'no effect exposes a readonly parameter, so the reject path is unreachable');
   assert.equal(engine.setEffect(found.effect), M.EffectSetResult.INSTALLED,
@@ -307,21 +322,22 @@ test('strobeColumns and getEffectSizes return the shapes daydream consumes', () 
   const names = Object.keys(sizes);
   assert.ok(names.includes('DisplacementField'),
     'getEffectSizes must name the effects the factory builds');
-  for (const name of names) {
-    assert.equal(typeof sizes[name], 'number',
-      `getEffectSizes().${name} must be a number`);
-  }
+  const nonNumeric = names.filter((name) => typeof sizes[name] !== 'number');
+  assert.deepEqual(nonNumeric.slice(0, 5), [],
+    `${nonNumeric.length} getEffectSizes entries are not numbers`);
 });
 
 // engine_host.js calls getBufferLength through an optional-call guard, so a
 // dropped export is silent at the call site.
 test('getBufferLength reports the active resolution buffer length', () => {
+  const wrong = [];
   for (const [w, h] of M.HolosphereEngine.getSupportedResolutions()) {
-    assert.ok(resolutionOk(engine.setResolution(w, h)),
-      `the engine must build the ${w}x${h} row it reports`);
-    assert.equal(engine.getBufferLength(), w * h * 3,
-      `getBufferLength must report w*h*3 at ${w}x${h}`);
+    if (!resolutionOk(engine.setResolution(w, h))) wrong.push(`${w}x${h} unbuildable`);
+    else if (engine.getBufferLength() !== w * h * 3)
+      wrong.push(`${w}x${h}: ${engine.getBufferLength()} != ${w * h * 3}`);
   }
+  assert.deepEqual(wrong.slice(0, 5), [],
+    `getBufferLength is wrong at ${wrong.length} reported resolutions`);
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,
     'setEffect must succeed after a resolution change');
@@ -552,6 +568,7 @@ function opBoundCases(def) {
 // engine, not a JS mirror of it, the authority on those bounds.
 test('every OP_DEFS bound sits inside the engine domain the WASM bridge enforces', () => {
   const seed = 'cube';
+  const clamped = [];
   for (const [op, def] of Object.entries(OP_DEFS)) {
     for (const { label, params } of opBoundCases(def)) {
       moduleLogs.length = 0;
@@ -565,13 +582,14 @@ test('every OP_DEFS bound sits inside the engine domain the WASM bridge enforces
         mesh.delete();
         M.MeshOps.clearToolingMemory();
       }
-      assert.deepEqual(moduleLogs, [],
-        `${op} ${label} on a ${seed} made the WASM bridge log; the OP_DEFS ` +
-        'range reaches outside the engine domain for that operator, so the ' +
-        'preview silently clamps while the generated C++ carries the authored ' +
-        'value into an engine assert. Narrow the range in tools/solid_codegen.js');
+      if (moduleLogs.length > 0) clamped.push(`${op} ${label}: ${moduleLogs.join(' ')}`);
     }
   }
+  assert.deepEqual(clamped.slice(0, 5), [],
+    `${clamped.length} OP_DEFS endpoints made the WASM bridge log on a ${seed}; ` +
+    'the range reaches outside the engine domain for that operator, so the ' +
+    'preview silently clamps while the generated C++ carries the authored value ' +
+    'into an engine assert. Narrow the range in tools/solid_codegen.js');
 });
 
 test('the Platonic and Catalan seed lists name registered Simple solids', () => {
@@ -580,33 +598,36 @@ test('the Platonic and Catalan seed lists name registered Simple solids', () => 
   for (let i = 0; i < registry.length; i++) {
     if (registry[i].category === 'Simple') simple.add(registry[i].name);
   }
-  for (const name of [...PLATONIC_SOLIDS, ...CATALAN_BASES]) {
-    assert.ok(simple.has(name),
-      `solid_codegen.js lists "${name}" but the engine registers no Simple solid ` +
-      'by that name; update tools/solid_codegen.js to match solids.h');
-  }
-  for (const name of PLATONIC_SOLIDS) {
-    assert.ok(!CATALAN_BASES.has(name),
-      `"${name}" is in both seed lists; the namespace qualifier would be ambiguous`);
-  }
+  const unregistered = [...PLATONIC_SOLIDS, ...CATALAN_BASES]
+    .filter((name) => !simple.has(name));
+  assert.deepEqual(unregistered.slice(0, 5), [],
+    `solid_codegen.js lists ${unregistered.length} names the engine registers no ` +
+    'Simple solid for; update tools/solid_codegen.js to match solids.h');
+  const inBoth = [...PLATONIC_SOLIDS].filter((name) => CATALAN_BASES.has(name));
+  assert.deepEqual(inBoth.slice(0, 5), [],
+    `${inBoth.length} names are in both seed lists; the namespace qualifier ` +
+    'would be ambiguous');
 });
 
 test('SIMPLE_SEEDS mirrors simple_registry, whose index a Recipe seed is', () => {
   const registry = M.MeshOps.getRegistry();
-  for (let i = 0; i < SIMPLE_SEEDS.length; i++) {
-    assert.equal(registry[i].name, SIMPLE_SEEDS[i],
-      `SIMPLE_SEEDS[${i}] must name registry entry ${i}; a generated SEED_* ` +
-      'constant carries that index and would seed another solid');
-  }
+  const misindexed = [];
+  for (let i = 0; i < SIMPLE_SEEDS.length; i++)
+    if (registry[i].name !== SIMPLE_SEEDS[i])
+      misindexed.push(`[${i}] ${SIMPLE_SEEDS[i]} != ${registry[i].name}`);
+  assert.deepEqual(misindexed.slice(0, 5), [],
+    `${misindexed.length} SIMPLE_SEEDS entries do not name their registry index; ` +
+    'a generated SEED_* constant carries that index and would seed another solid');
   // The Catalan registry follows the simple one, so its first entry is where
   // simple_registry ends: a nineteenth simple solid would land here.
   assert.ok(CATALAN_BASES.has(registry[SIMPLE_SEEDS.length].name),
     `SIMPLE_SEEDS stops short of simple_registry, which also holds ` +
     `"${registry[SIMPLE_SEEDS.length].name}"`);
-  for (const seed of DEFINED_SEED_CONSTANTS) {
-    assert.ok(SIMPLE_SEEDS.includes(seed),
-      `solids.h cannot define SEED_* for "${seed}", which is no simple_registry entry`);
-  }
+  const unseeded = [...DEFINED_SEED_CONSTANTS]
+    .filter((seed) => !SIMPLE_SEEDS.includes(seed));
+  assert.deepEqual(unseeded.slice(0, 5), [],
+    `solids.h defines SEED_* for ${unseeded.length} names that are no ` +
+    'simple_registry entry');
 });
 
 // MeshOps.getRecipe has no daydream call site; it is pinned here as intended API.
@@ -621,22 +642,30 @@ test('MeshOps.getRecipe returns an authored chain for every Complex solid', () =
     else if (registry[i].category === 'Complex') complex.push(registry[i].name);
   }
   assert.ok(complex.length > 0, 'the registry must expose at least one Complex solid');
+  const faults = [];
   for (const name of complex) {
     const recipe = M.MeshOps.getRecipe(name);
-    assert.ok(recipe, `Complex solid "${name}" must carry an authored recipe`);
-    assert.ok(simple.has(recipe.seed),
-      `recipe seed "${recipe.seed}" of "${name}" must name a registered Simple solid`);
-    assert.ok(Array.isArray(recipe.ops) && recipe.ops.length > 0,
-      `recipe of "${name}" must carry a non-empty ops array`);
+    if (!recipe) {
+      faults.push(`"${name}" carries no authored recipe`);
+      continue;
+    }
+    if (!simple.has(recipe.seed))
+      faults.push(`seed "${recipe.seed}" of "${name}" names no registered Simple solid`);
+    if (!Array.isArray(recipe.ops) || recipe.ops.length === 0) {
+      faults.push(`recipe of "${name}" carries no ops array`);
+      continue;
+    }
     for (const step of recipe.ops) {
-      assert.ok(KNOWN_OPS.has(step.op),
-        `recipe of "${name}" uses op "${step.op}", which MeshOps does not bind`);
-      assert.equal(typeof step.param, 'number',
-        `recipe step "${step.op}" of "${name}" must carry a numeric param`);
-      assert.equal(typeof step.twist, 'number',
-        `recipe step "${step.op}" of "${name}" must carry a numeric twist`);
+      if (!KNOWN_OPS.has(step.op))
+        faults.push(`recipe of "${name}" uses op "${step.op}", which MeshOps does not bind`);
+      if (typeof step.param !== 'number')
+        faults.push(`step "${step.op}" of "${name}" carries a non-numeric param`);
+      if (typeof step.twist !== 'number')
+        faults.push(`step "${step.op}" of "${name}" carries a non-numeric twist`);
     }
   }
+  assert.deepEqual(faults.slice(0, 5), [],
+    `${faults.length} Complex-solid recipes are malformed`);
   assert.equal(M.MeshOps.getRecipe('NoSuchSolid'), null,
     'getRecipe must return null for an unknown name');
 });
