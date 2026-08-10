@@ -22,6 +22,11 @@ function errorDetail(error) {
 // glue is the canonical skew a Reload has to clear.
 const REFRESHED_EXTENSIONS = ['.js', '.wasm'];
 
+// Resource-timing entries kept, over the 250-entry default. The buffer drops
+// every load past its size, and the dropped ones are the earliest — the modules
+// a Reload most needs to re-fetch.
+const RESOURCE_TIMING_ENTRIES = 1000;
+
 /**
  * Re-fetch every same-origin module the page has already loaded, bypassing the
  * HTTP cache and replacing each cache entry with the server's current copy.
@@ -76,8 +81,15 @@ export function showBootstrapFailure(error, {
   reload.type = 'button';
   reload.className = 'context-lost-reload';
   reload.textContent = 'Reload';
-  reload.addEventListener('click', () =>
-    refresh().catch(() => {}).then(() => pageLocation?.reload()));
+  reload.addEventListener('click', () => {
+    // The sweep re-fetches the whole module graph, the multi-megabyte binary
+    // included, so it needs a progress report and exactly one run per click.
+    // Relabel before disabling: the name change on the focused control is what
+    // carries the state, and a disabled button drops focus.
+    reload.textContent = 'Reloading…';
+    reload.disabled = true;
+    return refresh().catch(() => {}).then(() => pageLocation?.reload());
+  });
 
   overlay.classList.add('error');
   // The markup ships role="status" for the polite loading message; a boot
@@ -93,7 +105,7 @@ export function showBootstrapFailure(error, {
 /**
  * @param {{loader?: () => Promise<unknown>|unknown, document?: Document,
  *   location?: Location, logger?: Pick<Console, 'error'>,
- *   fatal?: (message: string) => void}} [dependencies]
+ *   fatal?: (message: string) => void, performance?: Performance}} [dependencies]
  * @returns {Promise<boolean>} True when the application module loaded.
  */
 export async function bootstrap({
@@ -102,7 +114,11 @@ export async function bootstrap({
   location: pageLocation = globalThis.location,
   logger = globalThis.console,
   fatal = showFatalError,
+  performance: timeline = globalThis.performance,
 } = {}) {
+  // Widened before the application module pulls its graph in, so every module
+  // refreshModuleCache has to re-fetch is still in the buffer to be found.
+  timeline?.setResourceTimingBufferSize?.(RESOURCE_TIMING_ENTRIES);
   try {
     await loader();
     return true;

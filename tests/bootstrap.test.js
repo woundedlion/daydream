@@ -113,6 +113,54 @@ test('reload button refreshes the module cache before reloading', async () => {
   assert.deepEqual(order, ['refresh', 'reload']);
 });
 
+test('the reload button reports the sweep and cannot be re-fired', async () => {
+  const { doc, overlay, click } = fakeDocument();
+  let refreshes = 0;
+  showBootstrapFailure(new Error('failed'), {
+    document: doc,
+    location: { reload() {} },
+    refresh: async () => { refreshes += 1; },
+  });
+
+  const reload = childWithClass(overlay, 'context-lost-reload');
+  await click(reload);
+
+  // Every run re-fetches the whole module graph including the WASM binary, so a
+  // second click would start a second sweep over the first with nothing on
+  // screen to say the first was running.
+  assert.equal(reload.textContent, 'Reloading…');
+  assert.equal(reload.disabled, true);
+  assert.equal(refreshes, 1);
+});
+
+test('bootstrap widens the resource-timing buffer before the module graph loads', async () => {
+  const { doc } = fakeDocument();
+  const order = [];
+  const loaded = await bootstrap({
+    loader: async () => { order.push('load'); },
+    document: doc,
+    logger: quietLogger,
+    performance: { setResourceTimingBufferSize: (size) => order.push(size) },
+  });
+
+  assert.equal(loaded, true);
+  assert.equal(order.length, 2);
+  assert.ok(order[0] > 250,
+    'the 250-entry default drops the earliest modules — the ones a Reload is '
+    + 'most likely to be clearing');
+  assert.equal(order[1], 'load', 'a module loaded before the widening is unlisted');
+});
+
+test('bootstrap loads on a page whose performance object lacks the control', async () => {
+  const { doc } = fakeDocument();
+  assert.equal(await bootstrap({
+    loader: async () => {},
+    document: doc,
+    logger: quietLogger,
+    performance: {},
+  }), true);
+});
+
 test('reload button still reloads when the cache refresh fails', async () => {
   const { doc, overlay, click } = fakeDocument();
   let reloads = 0;
