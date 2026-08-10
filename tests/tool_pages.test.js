@@ -303,3 +303,76 @@ test('tailwind.css keeps its upstream license banner', () => {
   assert.match(read('tools', 'tailwind.css'),
     /! tailwindcss v\d+\.\d+\.\d+ \| MIT License/);
 });
+
+// WCAG 2.1 SC 1.4.3, normal-size text: anything under 18.66px, or under 24px
+// and not bold. Every pair below is well inside that.
+const AA_CONTRAST = 4.5;
+
+// Text rule -> the tools.css rule that paints the surface it sits on. The
+// stylesheet pairs these itself, so nothing about a page can talk either side
+// out of the other.
+const CONTRAST_PAIRS = [['.slider-label', '.param-group']];
+
+/**
+ * One rule's declaration block.
+ * @param {string} css - Stylesheet text.
+ * @param {string} selector - The rule's selector, exactly as written.
+ * @returns {string} Everything between its braces.
+ */
+function ruleBody(css, selector) {
+  for (const chunk of css.split('}')) {
+    const brace = chunk.indexOf('{');
+    if (brace !== -1 && chunk.slice(0, brace).replace(/\/\*[\s\S]*?\*\//g, '').trim() === selector) {
+      return chunk.slice(brace + 1);
+    }
+  }
+  return assert.fail(`tools.css declares no ${selector} rule`);
+}
+
+/**
+ * A property's value, with a single `var()` reference resolved against :root.
+ * @param {string} css - Stylesheet text.
+ * @param {string} selector - Rule to read.
+ * @param {string} property - Property to read.
+ * @returns {string} The value, as a `#rrggbb` literal.
+ */
+function color(css, selector, property) {
+  const declared = ruleBody(css, selector)
+    .match(new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`));
+  assert.ok(declared, `${selector} declares no ${property}`);
+  const value = declared[1].trim();
+  const token = value.match(/^var\(\s*(--[\w-]+)\s*\)$/);
+  const resolved = token ? color(css, ':root', token[1]) : value;
+  assert.match(resolved, /^#[0-9a-f]{6}$/i,
+    `${selector} ${property} resolves to ${resolved}, which this reader cannot measure`);
+  return resolved;
+}
+
+/**
+ * WCAG relative luminance of a `#rrggbb` color.
+ * @param {string} hex - The color.
+ * @returns {number} Its luminance in [0, 1].
+ */
+function luminance(hex) {
+  const channels = [1, 3, 5].map((at) => {
+    const c = parseInt(hex.slice(at, at + 2), 16) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+/**
+ * Pins the shared control styling to the WCAG AA contrast floor. These rules
+ * style the readout of every slider on two tool pages, so a token retuned for
+ * looks takes the whole set of them below the floor at once.
+ */
+test('tools.css control text clears the WCAG AA contrast floor', () => {
+  const css = read('tools', 'tools.css');
+  for (const [text, surface] of CONTRAST_PAIRS) {
+    const [light, dark] = [color(css, text, 'color'), color(css, surface, 'background-color')]
+      .map(luminance).sort((a, b) => b - a);
+    const ratio = (light + 0.05) / (dark + 0.05);
+    assert.ok(ratio >= AA_CONTRAST,
+      `${text} on ${surface} measures ${ratio.toFixed(2)}:1, under the ${AA_CONTRAST}:1 AA floor`);
+  }
+});
