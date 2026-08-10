@@ -10,7 +10,9 @@ import {
 
 // ---------------------------------------------------------------------------
 // Fakes — installed BEFORE importing the worker, which binds self.postMessage
-// and assigns self.onmessage at module-evaluation time.
+// and assigns self.onmessage at module-evaluation time. `globalThis.self` is
+// never restored, which is only safe because `node --test` gives each test file
+// its own process.
 // ---------------------------------------------------------------------------
 
 const posted = [];
