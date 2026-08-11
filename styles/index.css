@@ -612,9 +612,7 @@
   .canvas-container {
     min-height: 50vh;
   }
-}
 
-@media only screen and (width <= 900px) {
   .gui-container .effect-gui .preset-nav-previous,
   .gui-container .effect-gui .preset-nav-next {
     display: inline-flex;
