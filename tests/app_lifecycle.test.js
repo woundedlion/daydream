@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeElement, installElement, restoreElementAfterEach } from './fake_dom.js';
+import { fakeElement } from './fake_dom.js';
 import { fakeColorAttribute } from './fake_three.js';
 import {
   repointDisplayAliases,
@@ -510,16 +510,13 @@ test('a frame guard stringifies a thrown value carrying no message', () => {
 });
 
 // The global keydown guard: the shortcuts are the canvas's, so a key typed into
-// a control belongs to that control. `Element` is a browser global the handler
-// tests against, so the suite installs the fake one for the duration.
-restoreElementAfterEach();
+// a control belongs to that control.
 
 /**
  * Build the handler over a fake DOM tree and a recording dispatch sink.
  * @returns {Object} The handler, the tree's nodes, and the delivered keys.
  */
 function makeKeydownHandler() {
-  installElement();
   const keys = [];
   const handler = createGlobalKeydownHandler({ dispatch: (e) => keys.push(e.key) });
 

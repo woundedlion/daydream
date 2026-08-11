@@ -129,13 +129,6 @@ function fakeDataset(element) {
 }
 
 /**
- * Prototype every fakeElement() carries, so a module guarding on
- * `target instanceof Element` can be exercised: install it as globalThis.Element
- * with installElement().
- */
-export class FakeElement {}
-
-/**
  * Element stand-in carrying the attribute, class, child, and listener surface
  * the daydream modules read and write. Non-empty innerHTML assignments throw so
  * tests cannot silently accept markup construction that a browser would parse.
@@ -341,31 +334,7 @@ export function fakeElement(tag = 'div') {
     configurable: true,
     value: fakeDataset(element),
   });
-  Object.setPrototypeOf(element, FakeElement.prototype);
   return element;
-}
-
-/**
- * Installs FakeElement as globalThis.Element, so a bare `instanceof Element`
- * guard sees the fakes. Pair with restoreElementAfterEach().
- * @returns {Function} The installed constructor.
- */
-export function installElement() {
-  globalThis.Element = FakeElement;
-  return FakeElement;
-}
-
-/**
- * Registers an afterEach that restores globalThis.Element to its pre-suite
- * value, so an installed stub never leaks into another test or suite.
- * @returns {void}
- */
-export function restoreElementAfterEach() {
-  const saved = globalThis.Element;
-  afterEach(() => {
-    if (saved === undefined) delete globalThis.Element;
-    else globalThis.Element = saved;
-  });
 }
 
 /**
