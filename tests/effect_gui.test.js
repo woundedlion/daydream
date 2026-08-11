@@ -720,6 +720,40 @@ test('Export copies the live values as a C++ brace-init list', async () => {
   assert.equal(h.gui().ctrl('export').label, EXPORT_COPIED);
 });
 
+test('Export copies displayed values while a segmented snapshot is pending', async () => {
+  const h = makeHarness({
+    params: [SPEED, GLOW],
+    segmentValues: null,
+    ownsDisplay: true,
+  });
+  h.panel.build();
+  h.gui().ctrl('Speed').setValue(0.75);
+  h.gui().ctrl('Glow').setValue(true);
+
+  h.gui().ctrl('export').object.export();
+  await Promise.resolve();
+
+  assert.deepEqual(h.state.copyText.copied, ['{ 0.75f, 1.0f }']);
+  assert.equal(h.gui().ctrl('export').label, EXPORT_COPIED);
+});
+
+test('Export does not fall back to controls from a stale schema', () => {
+  const h = makeHarness({
+    params: [SPEED],
+    segmentValues: null,
+    ownsDisplay: true,
+    generation: 4,
+  });
+  h.panel.build();
+  h.state.generation = 5;
+
+  h.gui().ctrl('export').object.export();
+
+  assert.deepEqual(h.state.copyText.copied, []);
+  assert.equal(h.gui().ctrl('export').label, EXPORT_FAILED);
+  assert.match(h.warnings[0], /no parameter values matching/);
+});
+
 test('Export omits engine-written readonly params from the preset', async () => {
   const h = makeHarness({
     params: [SPEED, TELEMETRY],

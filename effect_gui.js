@@ -218,7 +218,12 @@ export function createEffectGui({
    * @returns {void}
    */
   function exportParams(fx, params, flashExport) {
-    const values = liveParamValues();
+    let values = liveParamValues();
+    if ((!values || values.length === 0)
+        && !paramGenerationStale(fx.paramGeneration, paramGeneration())) {
+      values = fx.paramNames.map((name) =>
+        engineParamValue(fx.controllerByName.get(name).getValue()));
+    }
     const blocked = paramExportBlocker(
       values, fx.paramNames.length, typeof copyText === 'function');
     if (blocked) {
