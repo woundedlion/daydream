@@ -6,7 +6,7 @@
   "type": "module",
   "testFileFloor": 59,
   "scripts": {
-    "prepare": "git config core.hooksPath .githooks || true",
+    "prepare": "git config core.hooksPath .githooks",
     "pretest": "node scripts/require-tests.mjs",
     "test": "node scripts/run-tests.mjs --experimental-test-module-mocks \"tests/*.test.js\"",
     "typecheck": "tsc --noEmit",
