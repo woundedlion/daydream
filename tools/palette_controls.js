@@ -9,6 +9,56 @@
  * palette compiler consumes. No DOM, so every export is testable headless.
  */
 
+/**
+ * One axis of a V4 recipe: a curve over [0, 1] given by its center and width,
+ * or the four authored points a CUSTOM curve reads instead.
+ * @typedef {object} PaletteAxis
+ * @property {number} curve - A PaletteV4.curve ordinal.
+ * @property {number} center - Midpoint of the axis' range.
+ * @property {number} range - Full width the curve spans about the center.
+ * @property {number[]} custom - The CUSTOM curve's authored points.
+ */
+
+/**
+ * @typedef {PaletteAxis & {basis: number, headroom: number}} PaletteChromaAxis
+ *   The chroma axis, which also names the gamut its values are measured against
+ *   (a PaletteV4.chromaBasis ordinal) and how much of that gamut it keeps back.
+ */
+
+/**
+ * The hue block of a V4 recipe. Which fields matter depends on `mode`: a
+ * harmony reads `harmony`/`spreadTurns`, a sweep reads `sweepTurns`, and CUSTOM
+ * reads `customTurns`.
+ * @typedef {object} PaletteHue
+ * @property {number} mode - A PaletteV4.hueMode ordinal.
+ * @property {number} harmony - A PaletteV4.harmony ordinal.
+ * @property {number} direction - A PaletteV4.direction ordinal.
+ * @property {number} baseTurns - The anchor hue, in turns.
+ * @property {number} spreadTurns - Angular spread between a harmony's anchors.
+ * @property {number} sweepTurns - Total travel of a SWEEP, in turns.
+ * @property {number[]} customTurns - The four authored key hues, in turns.
+ */
+
+/**
+ * A V4 palette recipe, as the engine's palette compiler consumes it. The enum
+ * fields carry PaletteV4 ordinals.
+ * @typedef {object} PaletteRecipe
+ * @property {number} schemaVersion - Recipe schema the fields follow.
+ * @property {{offset: number, span: number}} input - The phase window sampled.
+ * @property {number} domain - A PaletteV4.domain ordinal.
+ * @property {number} easing - A PaletteV4.easing ordinal.
+ * @property {number} colorPath - A PaletteV4.colorPath ordinal.
+ * @property {PaletteHue} hue - The hue keys and how they are derived.
+ * @property {PaletteAxis} lightness - The OKLCH lightness axis.
+ * @property {PaletteChromaAxis} chroma - The OKLCH chroma axis.
+ * @property {number} hueTorsion - Hue drift applied along the palette.
+ * @property {number} falloffStart - Where a FALLOFF domain begins to fade.
+ */
+
+/**
+ * @param {number} value - Value to clamp.
+ * @returns {number} `value` clamped to [0, 1].
+ */
 const clampUnit = (value) => Math.max(0, Math.min(1, value));
 
 /**
@@ -125,7 +175,7 @@ const PALETTE_TABS = new Set(['procedural', 'generative']);
  * @returns {string} The named tab, or 'procedural' when the query names none of them.
  */
 export function paletteTabFromSearch(search) {
-  const tab = new URLSearchParams(search).get('tab');
+  const tab = new URLSearchParams(search).get('tab') ?? '';
   return PALETTE_TABS.has(tab) ? tab : 'procedural';
 }
 
@@ -162,23 +212,33 @@ export function tablistKeyTarget(key, current, count) {
 }
 
 /**
+ * @typedef {object} PaletteViewport
+ * @property {{start: number, end: number}} value - The visible phase window.
+ * @property {boolean} zoomed - Whether the window is narrower than the whole palette.
+ * @property {(position: number) => number} map - Takes a 0..1 strip position to its palette phase.
+ * @property {(firstPosition: number, secondPosition: number) => {start: number, end: number}} zoom
+ *   Narrows the window to the span between two strip positions, in either drag
+ *   direction, and returns it; an empty drag leaves the window alone.
+ * @property {() => void} reset - Restores the full 0..1 range.
+ */
+
+/**
  * Owns the phase window shown by the palette strip.
  *
  * Pointer positions stay local to the visible strip while palette phases stay
  * in the original 0..1 domain. Keeping that mapping here gives Procedural and
  * Generative palettes identical copy and nested-zoom behavior.
  *
- * @returns {{value: {start:number, end:number}, zoomed: boolean, map: function(number): number, zoom: function(number, number): {start:number, end:number}, reset: function(): void}}
- *   The viewport. `value` is the visible phase window and `zoomed` reports
- *   whether it is narrower than the whole palette; `map` takes a 0..1 strip
- *   position to its palette phase; `zoom` narrows the window to the span
- *   between two strip positions, in either drag direction, and returns it (an
- *   empty drag leaves the window alone); `reset` restores the full 0..1 range.
+ * @returns {PaletteViewport} The viewport.
  */
 export function createPaletteViewport() {
   let start = 0;
   let end = 1;
 
+  /**
+   * @param {number} position - A 0..1 position along the visible strip.
+   * @returns {number} The palette phase it names.
+   */
   const map = (position) => start + clampUnit(position) * (end - start);
 
   return {
@@ -192,6 +252,11 @@ export function createPaletteViewport() {
 
     map,
 
+    /**
+     * @param {number} firstPosition - One end of the drag, as a 0..1 strip position.
+     * @param {number} secondPosition - The other end.
+     * @returns {{start: number, end: number}} The window now shown.
+     */
     zoom(firstPosition, secondPosition) {
       const low = Math.min(clampUnit(firstPosition), clampUnit(secondPosition));
       const high = Math.max(clampUnit(firstPosition), clampUnit(secondPosition));
@@ -261,6 +326,7 @@ export function lockedGroupMove(rawDelta, members) {
     if (m.start + rawDelta > m.max) delta = Math.min(delta, m.max - m.start);
   }
 
+  /** @type {Object<string, number>} */
   const values = {};
   for (const m of moving) values[m.param] = m.start + delta;
   return { delta, values };
@@ -300,6 +366,11 @@ export const PaletteV4 = Object.freeze({
   easing: Object.freeze({ LINEAR: 0, COSINE: 1, SMOOTHSTEP: 2 }),
 });
 
+/**
+ * @param {number} delta - Difference between two hues, in turns.
+ * @param {number} direction - A PaletteV4.direction ordinal.
+ * @returns {number} The signed travel that direction asks for.
+ */
 function directedTurnDelta(delta, direction) {
   if (direction === PaletteV4.direction.SHORTEST) return signedTurnDelta(delta);
   const wrapped = wrapTurns(delta);
@@ -308,6 +379,10 @@ function directedTurnDelta(delta, direction) {
   return wrapped;
 }
 
+/**
+ * @param {PaletteRecipe} recipe - A V4 palette recipe.
+ * @returns {number[]} The harmony's anchor offsets, in turns.
+ */
 // Offsets, not absolute hues: differencing base-shifted hues rounds a
 // half-turn step to either side of the SHORTEST tie.
 function harmonyRelationships(recipe) {
@@ -339,6 +414,10 @@ function harmonyRelationships(recipe) {
   }
 }
 
+/**
+ * @param {number[]} turns - Hue keys, in turns.
+ * @returns {number[]} The same shape resampled to exactly three keys.
+ */
 function resampleThreeTurns(turns) {
   if (turns.length === 1) return [turns[0], turns[0], turns[0]];
   return [0, 0.5, 1].map((position) => {
@@ -349,6 +428,11 @@ function resampleThreeTurns(turns) {
   });
 }
 
+/**
+ * @param {PaletteRecipe} recipe - A V4 palette recipe.
+ * @returns {number[]} The harmony's anchors as absolute hues, in turns, walked
+ *   in the recipe's direction so they stay continuous across the 0/1 seam.
+ */
 function directedHarmonyTurns(recipe) {
   const turns = harmonyRelationships(recipe);
   for (let i = 1; i < turns.length; i++) {
@@ -358,6 +442,11 @@ function directedHarmonyTurns(recipe) {
   return turns.map((turn) => turn + recipe.hue.baseTurns);
 }
 
+/**
+ * @param {number[]} turns - Hue keys, in turns.
+ * @returns {{baseTurns: number, offsets: number[]}} The first key wrapped, and
+ *   every key's signed offset from it.
+ */
 function hueKeyStateFromTurns(turns) {
   const anchor = turns[0];
   return {
@@ -371,7 +460,7 @@ function hueKeyStateFromTurns(turns) {
  * authored keys for CUSTOM, the two ends for SWEEP (halved under a LOOP domain,
  * which travels out and back), and the harmony's anchors otherwise —
  * MONOCHROMATIC repeats its single anchor so the wheel still draws a pair.
- * @param {Object} recipe - A V4 palette recipe.
+ * @param {PaletteRecipe} recipe - A V4 palette recipe.
  * @returns {{baseTurns:number, offsets:number[]}} The first key's wrapped turn
  *   and every key's signed offset from it, so keys that walked past the seam
  *   keep the continuous positions the harmony gave them.
@@ -399,7 +488,7 @@ export function hueKeyState(recipe) {
  * The three keys a switch into CUSTOM hue mode should author, so the handoff
  * starts on the shape the wheel already showed: a harmony's anchors resampled
  * to three, a sweep's start/middle/end, or the existing custom keys untouched.
- * @param {Object} recipe - A V4 palette recipe.
+ * @param {PaletteRecipe} recipe - A V4 palette recipe.
  * @returns {{baseTurns:number, offsets:number[]}} The base turn and the three keys' offsets from it.
  */
 export function customHueKeyState(recipe) {
@@ -455,7 +544,7 @@ export function moveCustomHueKey(baseTurns, offsets, keyIndex, wrappedTurn) {
 
 /**
  * The complete V4 recipe the tool opens on: a balanced analogous palette.
- * @returns {Object} A fresh, detached recipe, safe to mutate.
+ * @returns {PaletteRecipe} A fresh, detached recipe, safe to mutate.
  */
 export function defaultPaletteRecipe() {
   return {
@@ -503,7 +592,7 @@ export function defaultPaletteRecipe() {
  *
  * A CUSTOM-curve axis keeps the template's own custom points, so its endpoint
  * readings are ignored rather than overwriting them.
- * @param {Object} template - Recipe the reading is applied over; deep-cloned, never mutated.
+ * @param {PaletteRecipe} template - Recipe the reading is applied over; deep-cloned, never mutated.
  * @param {Object} controls - The control readings.
  * @param {{offset: number, span: number}} controls.window - Input window (offset, span).
  * @param {string} controls.domain - PaletteV4.domain member name.
@@ -517,7 +606,7 @@ export function defaultPaletteRecipe() {
  * @param {string} controls.chromaCurve - PaletteV4.curve member name.
  * @param {{minimum: number, maximum: number}} controls.lightness - Lightness endpoints.
  * @param {{minimum: number, maximum: number}} controls.chroma - Chroma endpoints.
- * @returns {Object} The recipe.
+ * @returns {PaletteRecipe} The recipe.
  */
 export function paletteRecipeFromControls(template, controls) {
   const recipe = structuredClone(template);
@@ -534,7 +623,7 @@ export function paletteRecipeFromControls(template, controls) {
   }
   recipe.lightness.curve = PaletteV4.curve[controls.lightnessCurve];
   recipe.chroma.curve = PaletteV4.curve[controls.chromaCurve];
-  for (const axis of ['lightness', 'chroma']) {
+  for (const axis of /** @type {Array<'lightness'|'chroma'>} */ (['lightness', 'chroma'])) {
     if (recipe[axis].curve === PaletteV4.curve.CUSTOM) continue;
     const { minimum, maximum } = controls[axis];
     Object.assign(recipe[axis], axisFromEndpoints(minimum, maximum));
@@ -549,7 +638,7 @@ export function paletteRecipeFromControls(template, controls) {
  * page disables the rest instead of offering sliders with no effect: a palette
  * with no chroma has no hue to steer, a monochromatic harmony has no direction
  * or color path, and a custom curve authors its own endpoints.
- * @param {Object} recipe - A V4 palette recipe.
+ * @param {PaletteRecipe} recipe - A V4 palette recipe.
  * @returns {Object<string, boolean>} One enabled flag per control group.
  */
 export function paletteRecipeAvailability(recipe) {
@@ -578,7 +667,7 @@ export function paletteRecipeAvailability(recipe) {
 /**
  * The tool's starting points, each a factory so a preset hands out a fresh
  * recipe rather than a shared one the page would edit in place.
- * @type {Object<string, function(): Object>}
+ * @type {Object<string, () => PaletteRecipe>}
  */
 export const PALETTE_RECIPE_PRESETS = Object.freeze({
   balancedAnalogous() {

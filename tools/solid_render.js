@@ -21,9 +21,37 @@ import {
   geodesicTriangleVertices,
 } from './solid_codegen.js';
 
+/** @typedef {{x: number, y: number, z: number}} Point */
+
+/**
+ * A mesh vertex: as much of THREE.Vector3's shape as the render reads.
+ * @typedef {Point & {angleTo: (other: any) => number}} Vertex
+ */
+
+/**
+ * @typedef {{vertices: Vertex[], faces: Array<Array<number>>}} SolidMeshData
+ */
+
+/**
+ * The three.js namespace, injected so a stand-in can serve in a test. Its
+ * constructors are reached by name rather than declared here.
+ * @typedef {Object<string, any>} ThreeNamespace
+ */
+
+/**
+ * The page's presentation toggles.
+ * @typedef {object} SolidViewFlags
+ * @property {boolean} showGeodesics - Curve the faces and edges onto the sphere.
+ * @property {boolean} showFaces - Draw the face geometry.
+ * @property {boolean} colorizeFaces - Tint faces by topology class, faces permitting.
+ * @property {boolean} showVertices - Draw the vertex dots.
+ * @property {boolean} showNormals - Draw the per-face normals.
+ * @property {boolean} showIndices - Overlay the vertex-index labels.
+ */
+
 /**
  * The stats line under the viewport: vertex, edge, face and index counts.
- * @param {{vertices: Array<Object>, faces: Array<Array<number>>}} meshData - The rendered mesh.
+ * @param {SolidMeshData} meshData - The rendered mesh.
  * @param {number} edgeCount - Unique undirected edges, as counted by the render.
  * @returns {string} The formatted line.
  */
@@ -36,22 +64,26 @@ export function meshStatsLine(meshData, edgeCount) {
 /**
  * Builds the mesh renderer, which owns the four scene objects it swaps.
  * @param {Object} opts - Renderer context.
- * @param {Object} opts.THREE - The three.js namespace.
- * @param {{add: Function, remove: Function}} opts.scene - Scene the objects are added to.
- * @param {Object} opts.materials - Shared materials: {face, faceColorize, vert, edge, normal}.
+ * @param {ThreeNamespace} opts.THREE - The three.js namespace.
+ * @param {{add: (object: any) => void, remove: (object: any) => void}} opts.scene - Scene the objects are added to.
+ * @param {Object<string, any>} opts.materials - Shared materials: {face, faceColorize, vert, edge, normal}.
  * @param {Element} [opts.labelsContainer] - Overlay the vertex-index labels are appended to; without one the render builds no labels.
  * @param {Document} [opts.doc] - Document the label nodes are created in.
- * @returns {{render: Function, disposeGeometry: Function}} The renderer.
+ * @returns {{render: (meshData: SolidMeshData, view: SolidViewFlags, faceClassIds: Int32Array?) => {edgeCount: number, labelsBuilt: boolean}, disposeGeometry: () => void}} The renderer.
  */
 export function createMeshRenderer({ THREE, scene, materials, labelsContainer, doc = document }) {
+  /** @type {any} */
   let mainMesh = null;
+  /** @type {any} */
   let edgeLines = null;
+  /** @type {any} */
   let vertPoints = null;
+  /** @type {any} */
   let normalLines = null;
 
   /**
    * Drops one scene object and its geometry.
-   * @param {Object|null} object - The object, or null when the toggle left it unbuilt.
+   * @param {any} object - The object, or null when the toggle left it unbuilt.
    * @returns {null} Always null, so the caller's handle is cleared.
    */
   function discard(object) {
@@ -76,9 +108,9 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
 
     /**
      * Rebuilds the scene from a mesh already read out of WASM.
-     * @param {{vertices: Array<Object>, faces: Array<Array<number>>}} meshData - The mesh to draw.
-     * @param {Object} view - The page's presentation flags: showGeodesics, showFaces, colorizeFaces, showVertices, showNormals, showIndices.
-     * @param {Int32Array|null} faceClassIds - Per-face topology class ids, or null when none were computed.
+     * @param {SolidMeshData} meshData - The mesh to draw.
+     * @param {SolidViewFlags} view - The page's presentation flags.
+     * @param {Int32Array?} faceClassIds - Per-face topology class ids, or null when none were computed.
      * @returns {{edgeCount: number, labelsBuilt: boolean}} What the render produced.
      */
     render(meshData, view, faceClassIds) {
@@ -95,11 +127,15 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
       if (labelsContainer) labelsContainer.innerHTML = '';
 
       // Faces
+      /** @type {number[]} */
       const vertices = [];
+      /** @type {number[]} */
       const faceColors = []; // per-vertex RGB, filled only when colorizing
       const classColor = new THREE.Color();
 
+      /** @type {any[]} */
       const faceCenters = [];
+      /** @type {any[]} */
       const faceNormals = [];
 
       // Geodesic mode curves the faces onto the sphere (geodesicTriangleVertices
@@ -122,7 +158,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
         geoN = geodesicSegments(maxArc, triCount);
       }
 
-      const pushVert = (v) => {
+      const pushVert = (/** @type {Point} */ v) => {
         vertices.push(v.x, v.y, v.z);
         if (faceClasses) {
           faceColors.push(classColor.r, classColor.g, classColor.b);
@@ -131,7 +167,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
 
       // Append one fan triangle's geoN² spherical sub-triangles, matching
       // pushVert's per-vertex color emission.
-      const emitSphericalTri = (a, b, c) => {
+      const emitSphericalTri = (/** @type {Point} */ a, /** @type {Point} */ b, /** @type {Point} */ c) => {
         const xyz = geodesicTriangleVertices(a, b, c, geoN);
         for (let i = 0; i < xyz.length; i += 3) {
           vertices.push(xyz[i], xyz[i + 1], xyz[i + 2]);
@@ -141,7 +177,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
         }
       };
 
-      const emitFlatTri = (a, b, c) => {
+      const emitFlatTri = (/** @type {Point} */ a, /** @type {Point} */ b, /** @type {Point} */ c) => {
         pushVert(a);
         pushVert(b);
         pushVert(c);
@@ -218,6 +254,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
       // Edges
       const edges = uniqueEdges(meshData.faces, meshData.vertices.length);
 
+      /** @type {any[]} */
       const lineGeoPoints = [];
       for (const [ai, bi] of edges) {
         const va = meshData.vertices[ai];
@@ -243,7 +280,9 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
 
       // Normals
       if (view.showNormals) {
+        /** @type {any[]} */
         const normalPoints = [];
+        /** @type {number[]} */
         const colors = [];
         faceCenters.forEach((c, i) => {
           const n = faceNormals[i];
@@ -265,9 +304,9 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
         const frag = doc.createDocumentFragment();
         meshData.vertices.forEach((v, i) => {
           const el = doc.createElement('div');
-          el.textContent = i;
+          el.textContent = String(i);
           el.className = 'absolute text-[0.75rem] font-mono text-white bg-black/50 px-1 rounded transform -translate-x-1/2 -translate-y-1/2 pointer-events-none';
-          el.dataset.index = i;
+          el.dataset.index = String(i);
           frag.appendChild(el);
         });
         labelsContainer.appendChild(frag);

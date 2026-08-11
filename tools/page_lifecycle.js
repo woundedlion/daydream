@@ -10,6 +10,10 @@
  */
 
 /**
+ * @typedef {{ (): void, cancel: () => void }} FrameScheduler
+ */
+
+/**
  * Builds a scheduler that runs `run` at most once per animation frame.
  *
  * A slider's `input` event fires on every pointer tick during a drag, and each
@@ -18,7 +22,7 @@
  * recompute pending, so a drag costs one per frame instead of one per tick.
  *
  * @param {Function} run - The recompute to coalesce. Called with no arguments.
- * @returns {{(): void, cancel: function(): void}} Call it to request a run; call `.cancel()` to drop a pending frame.
+ * @returns {FrameScheduler} Call it to request a run; call `.cancel()` to drop a pending frame.
  */
 export function createFrameScheduler(run) {
   let pending = 0;

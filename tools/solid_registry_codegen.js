@@ -54,7 +54,7 @@ export function upperSnake(name) {
  * degrees, emitted as the house `deg * D2R` product), SNUB a (t, twist) pair,
  * RELAX a live iteration count (the engine's shipped chains swap that for a
  * `.bake =` designator once a bake exists).
- * @param {(string|{op:string, params:Object})} o - The op, as a bare name or an {op, params} object.
+ * @param {import('./solid_codegen.js').ChainOp} o - The op, as a bare name or an {op, params} object.
  * @returns {string} The OpStep initializer.
  * @throws {Error} When the op is unknown or a parameterized op arrives without params.
  */
@@ -67,7 +67,7 @@ export function opStepCpp(o) {
   if (PARAMETERIZED_OPS.has(opName) && (typeof o === 'string' || !o.params)) {
     throw new Error(`opStepCpp: op "${opName}" requires a params object`);
   }
-  const params = o.params || {};
+  const params = (typeof o === 'string' ? undefined : o.params) ?? {};
   if (opName === 'hankin') {
     return `{Op::HANKIN, ${formatFloat(params.angle)} * IslamicStarPatterns::D2R}`;
   }
@@ -103,7 +103,8 @@ function exactFloatLiteral(where, value) {
   try {
     return formatFloat(value);
   } catch (e) {
-    throw new Error(`generateRegistryCpp: ${where} ${e.message.replace(/^formatFloatCpp: /, '')}`,
+    const detail = e instanceof Error ? e.message : String(e);
+    throw new Error(`generateRegistryCpp: ${where} ${detail.replace(/^formatFloatCpp: /, '')}`,
       { cause: e });
   }
 }
@@ -208,7 +209,7 @@ function seedConstantCpp(seedName, seedIndex) {
  * solids.h declares a SEED_* constant for only some of the simple_registry
  * entries, so a paste on any other seed leads with that constant's definition
  * rather than an identifier the engine does not have.
- * @param {Object} item - The solid spec (see generateFuncAndRecipe).
+ * @param {import('./solid_codegen.js').SolidSpec} item - The solid spec (see generateFuncAndRecipe).
  * @param {?{seed: string, ops: Array<{op: string, param: number, twist: number}>}} [baseRecipe] - The base's authored chain from MeshOps.getRecipe(); null when the base is itself a simple_registry seed.
  * @returns {string} The C++ paste.
  * @throws {Error} When the spec or base chain is invalid, the seed is not a simple_registry solid, a base chain step cannot be re-emitted, or the flattened chain exceeds MAX_RECIPE_STEPS.

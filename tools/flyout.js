@@ -13,6 +13,10 @@
  * @returns {() => void} Removes listeners and closes the flyout.
  */
 export function wireFlyout({ root, trigger, documentTarget = document }) {
+  /**
+   * @param {boolean} open - Whether the panel is exposed.
+   * @returns {void}
+   */
   const setOpen = (open) => {
     root.classList.toggle('is-open', open);
     trigger.setAttribute('aria-expanded', String(open));
@@ -22,10 +26,18 @@ export function wireFlyout({ root, trigger, documentTarget = document }) {
     setOpen(trigger.getAttribute('aria-expanded') !== 'true');
   };
 
+  /**
+   * @param {Event} event - The pointerdown that may fall outside the flyout.
+   * @returns {void}
+   */
   const dismissOutside = (event) => {
-    if (!root.contains(event.target)) setOpen(false);
+    if (!root.contains(/** @type {Node} */ (event.target))) setOpen(false);
   };
 
+  /**
+   * @param {KeyboardEvent} event - The keydown that may be Escape.
+   * @returns {void}
+   */
   const dismissWithEscape = (event) => {
     if (event.key !== 'Escape') return;
     setOpen(false);

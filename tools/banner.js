@@ -17,7 +17,7 @@
  * dismiss button is what keeps a survivable failure from permanently occluding
  * a working page; dismissing removes the element, and the next failure builds a
  * fresh one.
- * @returns {Object} The banner element, attached when the page has a parent.
+ * @returns {HTMLElement} The banner element, attached when the page has a parent.
  */
 function buildBanner() {
   const el = document.createElement('div');
@@ -66,8 +66,9 @@ function buildBanner() {
  */
 export function showFatalError(message) {
   const el = document.getElementById('fatal-error-overlay') || buildBanner();
+  const slot = /** @type {HTMLElement} */ (el.querySelector('.fatal-error-message'));
   // textContent, not innerHTML — no injection.
-  el.querySelector('.fatal-error-message').textContent = `⚠ ${message}`;
+  slot.textContent = `⚠ ${message}`;
 }
 
 /**
@@ -84,18 +85,25 @@ export function showFatalError(message) {
  * @returns {void}
  */
 export function reportPageFailures(label, target = window) {
+  /**
+   * @param {string} kind - Failure category named in the message.
+   * @param {any} detail - The thrown value, or a message string.
+   * @returns {void}
+   */
   const surface = (kind, detail) => {
     console.error(`${label} ${kind}:`, detail);
     const reason = detail?.message ?? String(detail ?? 'unknown error');
     showFatalError(`The ${label} hit an error — ${reason} — see the browser console for details.`);
   };
-  target.addEventListener('error', (e) => {
+  target.addEventListener('error', (event) => {
+    const e = /** @type {ErrorEvent} */ (event);
     // A failed subresource fires an error event that does not bubble, so only a
     // script error reaches this listener with the target still the window.
     if (e.target && e.target !== target) return;
     surface('error', e.error ?? e.message);
   });
-  target.addEventListener('unhandledrejection', (e) => {
+  target.addEventListener('unhandledrejection', (event) => {
+    const e = /** @type {PromiseRejectionEvent} */ (event);
     e.preventDefault?.();
     surface('unhandled rejection', e.reason);
   });
@@ -118,6 +126,10 @@ export function reportPageFailures(label, target = window) {
 export function bootstrapTool(init, label, target = window) {
   reportPageFailures(label, target);
   target.addEventListener('load', () => {
+    /**
+     * @param {any} e - The thrown value or rejection reason.
+     * @returns {void}
+     */
     const fail = (e) => {
       console.error(`${label} failed to initialize:`, e);
       showFatalError(`The ${label} failed to initialize — see the browser console for details.`);
