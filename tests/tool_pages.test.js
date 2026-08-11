@@ -313,6 +313,10 @@ const AA_CONTRAST = 4.5;
 // out of the other.
 const CONTRAST_PAIRS = [['.slider-label', '.param-group']];
 
+// palettes.html styles its tabs in a <style> of its own. Both label colours sit
+// on a fill the same rule declares, so each pair is one selector read twice.
+const TAB_CONTRAST_PAIRS = [['.tab-btn', '.tab-btn'], ['.tab-btn.active', '.tab-btn.active']];
+
 /**
  * One rule's declaration block.
  * @param {string} css - Stylesheet text.
@@ -362,6 +366,19 @@ function luminance(hex) {
 }
 
 /**
+ * Contrast ratio between one rule's text colour and another's fill.
+ * @param {string} css - Stylesheet text.
+ * @param {string} text - Rule declaring `color`.
+ * @param {string} surface - Rule declaring `background-color`.
+ * @returns {number} The WCAG contrast ratio.
+ */
+function contrast(css, text, surface) {
+  const [light, dark] = [color(css, text, 'color'), color(css, surface, 'background-color')]
+    .map(luminance).sort((a, b) => b - a);
+  return (light + 0.05) / (dark + 0.05);
+}
+
+/**
  * Pins the shared control styling to the WCAG AA contrast floor. These rules
  * style the readout of every slider on two tool pages, so a token retuned for
  * looks takes the whole set of them below the floor at once.
@@ -369,10 +386,23 @@ function luminance(hex) {
 test('tools.css control text clears the WCAG AA contrast floor', () => {
   const css = read('tools', 'tools.css');
   for (const [text, surface] of CONTRAST_PAIRS) {
-    const [light, dark] = [color(css, text, 'color'), color(css, surface, 'background-color')]
-      .map(luminance).sort((a, b) => b - a);
-    const ratio = (light + 0.05) / (dark + 0.05);
+    const ratio = contrast(css, text, surface);
     assert.ok(ratio >= AA_CONTRAST,
       `${text} on ${surface} measures ${ratio.toFixed(2)}:1, under the ${AA_CONTRAST}:1 AA floor`);
+  }
+});
+
+test('the palettes.html tab controls clear the WCAG AA contrast floor', () => {
+  const src = read('tools', 'palettes.html');
+  const open = src.indexOf('<style>');
+  assert.ok(open >= 0, 'palettes.html must still carry its page styles inline');
+  // Read behind tools.css so the page rules' var() references resolve against
+  // the token block that defines them.
+  const css = read('tools', 'tools.css')
+    + src.slice(open + '<style>'.length, src.indexOf('</style>', open));
+  for (const [text, surface] of TAB_CONTRAST_PAIRS) {
+    const ratio = contrast(css, text, surface);
+    assert.ok(ratio >= AA_CONTRAST,
+      `${text} measures ${ratio.toFixed(2)}:1, under the ${AA_CONTRAST}:1 AA floor`);
   }
 });
