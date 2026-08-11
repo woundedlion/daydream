@@ -115,6 +115,20 @@ test('a recording start or stop is announced, not only styled', () => {
   assert.match(body, /Recording stopped\./);
 });
 
+test('a recorder fault reports its reason, not just an un-tinted canvas', () => {
+  const at = SOURCE.indexOf('host.recorder.onError =');
+  assert.ok(at >= 0, 'the recorder fault hook must stay wired');
+  const body = SOURCE.slice(at, SOURCE.indexOf('\n    };', at));
+  assert.match(body, /\(err\)/,
+    'the hook is handed the reason; dropping the parameter throws it away');
+  assert.match(body, /applyNotice\.show\([^;]*RECORD_NOTICE\)/,
+    'an encoder fault, a failed start, and a cancelled Save dialog all reach '
+    + 'the user as the Record button flicking back, which reads as a mis-click '
+    + 'unless the reason is announced');
+  assert.match(body, /showRecording\(false\)/,
+    'the session is already gone: the button must stop offering to stop it');
+});
+
 test('the discard path frees an engine built after disposal', () => {
   const body = wasmReadyBlock();
   assert.match(body, /discardStartup:/,

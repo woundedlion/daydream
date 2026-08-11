@@ -297,8 +297,13 @@ const moduleLoad = createModuleLoadHandlers({
       recFormatCtrl.setValue(label);
     };
     // An encoder fault ends the session on its own; drop the recording UI so the
-    // button doesn't keep offering to stop a session that is already gone.
-    host.recorder.onError = () => showRecording(false);
+    // button doesn't keep offering to stop a session that is already gone, and
+    // report the reason through the same notice the record toggle writes.
+    host.recorder.onError = (err) => {
+      const detail = (err && err.message) ? err.message : String(err);
+      applyNotice.show(`Recording stopped: ${detail}`, RECORD_NOTICE);
+      showRecording(false);
+    };
     daydream.recorder = host.recorder;
     recordCtrl.enable();
 
