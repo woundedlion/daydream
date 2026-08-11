@@ -1397,6 +1397,18 @@ test('a pause toggled on a faulted pool is carried into the rebuilt one', () => 
  */
 const idx = (x, y, w) => (y * w + x) * 3;
 
+/**
+ * Whether the boundary colour was drawn at (x,y) of the driver's display buffer.
+ * @param {number} x - Pixel column.
+ * @param {number} y - Pixel row.
+ * @returns {boolean} True when the pixel is cyan.
+ */
+const isCyan = (x, y) => {
+  const i = idx(x, y, driver.W);
+  return driver.pixels[i] === 0 && driver.pixels[i + 1] === 65535 &&
+         driver.pixels[i + 2] === 65535;
+};
+
 test('composite() blits each quadrant to its display-buffer offset', () => {
   driver.W = 4; driver.H = 2;
   driver.pixels = new Uint16Array(4 * 2 * 3);
@@ -1544,11 +1556,6 @@ test('composite() marks both the internal split and the x=0 wrap seam', () => {
 
   c.composite();
 
-  const isCyan = (x, y) => {
-    const i = idx(x, y, 4);
-    return driver.pixels[i] === 0 && driver.pixels[i + 1] === 65535 &&
-           driver.pixels[i + 2] === 65535;
-  };
   assert.ok(isCyan(2, 0) && isCyan(2, 1), 'internal arm split at x=2 marked');
   assert.ok(isCyan(0, 0) && isCyan(0, 1), 'wrap-seam boundary at x=0 marked');
   assert.equal(driver.pixels[idx(1, 0, 4)], 111, 'arm-0 interior untouched');
@@ -1578,11 +1585,6 @@ test('composite() marks every internal split plus the wrap seam for an 8-segment
 
   c.composite();
 
-  const isCyan = (x, y) => {
-    const i = idx(x, y, 8);
-    return driver.pixels[i] === 0 && driver.pixels[i + 1] === 65535 &&
-           driver.pixels[i + 2] === 65535;
-  };
   for (const x of [0, 4])
     assert.ok(isCyan(x, 0) && isCyan(x, 7), `arm boundary at x=${x} marked`);
   for (const y of [2, 4, 6])
@@ -1612,11 +1614,6 @@ test('composite() marks the horizontal seam between stacked Y-band segments', ()
 
   c.composite();
 
-  const isCyan = (x, y) => {
-    const i = idx(x, y, 4);
-    return driver.pixels[i] === 0 && driver.pixels[i + 1] === 65535 &&
-           driver.pixels[i + 2] === 65535;
-  };
   assert.ok([0, 1, 2, 3].every((x) => isCyan(x, 2)),
     'horizontal band seam at y=2 marked across the row');
   assert.ok(isCyan(2, 0) && isCyan(0, 0), 'arm split at x=2 and wrap seam at x=0 marked');
@@ -1642,11 +1639,6 @@ test('composite() draws no x=0 line when only one arm reported', () => {
 
   c.composite();
 
-  const isCyan = (x, y) => {
-    const i = idx(x, y, 4);
-    return driver.pixels[i] === 0 && driver.pixels[i + 1] === 65535 &&
-           driver.pixels[i + 2] === 65535;
-  };
   assert.ok(!isCyan(0, 0) && !isCyan(2, 0), 'no vertical seam is drawn');
   assert.ok([0, 1, 2, 3].every((x) => isCyan(x, 2)), 'the band seam is still marked');
   assert.equal(driver.pixels[idx(0, 0, 4)], 111, 'top-band interior untouched');

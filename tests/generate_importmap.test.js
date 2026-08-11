@@ -3,14 +3,14 @@
 // vendor-importmap.js. Driven as a subprocess against a temp fixture so the
 // real repo files are never touched: the script resolves ROOT as <scriptdir>/..
 // and reads package.json + vendor-importmap.js from there.
-import { test, before, after, beforeEach } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, copyFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, rmSync, copyFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fixtureRepo, expectFailure } from './fixture_repo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT_SRC = resolve(HERE, '../scripts/generate-importmap.mjs');
@@ -37,9 +37,6 @@ const ORBIT_BODY = '// fixture OrbitControls.js\n';
 const LIL_BODY = '// fixture lil-gui.esm.min.js\n';
 const sri = (body) => `sha384-${createHash('sha384').update(body).digest('base64')}`;
 
-let root;
-let env;
-
 /** Recreates the fixture repo: the script under scripts/, plus package.json and vendor-importmap.js at ROOT. */
 const buildRoot = () => {
   rmSync(root, { recursive: true, force: true });
@@ -52,22 +49,15 @@ const buildRoot = () => {
     'vendor-importmap.js'], { cwd: root, env });
 };
 
-before(() => {
-  root = mkdtempSync(join(tmpdir(), 'importmap-'));
-  env = {
-    ...process.env,
-    // Never read the operator's git config: a global core.excludesFile or
-    // core.hooksPath would steer the fixture's add and ls-files.
-    GIT_CONFIG_GLOBAL: join(root, 'absent-config'),
-    GIT_CONFIG_SYSTEM: join(root, 'absent-config'),
-  };
-});
+const root = fixtureRepo('importmap-', buildRoot);
 
-beforeEach(buildRoot);
-
-after(() => {
-  rmSync(root, { recursive: true, force: true });
-});
+const env = {
+  ...process.env,
+  // Never read the operator's git config: a global core.excludesFile or
+  // core.hooksPath would steer the fixture's add and ls-files.
+  GIT_CONFIG_GLOBAL: join(root, 'absent-config'),
+  GIT_CONFIG_SYSTEM: join(root, 'absent-config'),
+};
 
 /** Runs the fixture's script with the given args and returns the rewritten vendor-importmap.js. */
 const run = (...args) => {
@@ -80,13 +70,8 @@ const run = (...args) => {
 /** Runs the fixture's script expecting failure and returns its stderr. */
 const runExpectingFailure = (...args) => {
   writeFileSync(join(root, 'vendor-importmap.js'), IMPORTMAP);
-  try {
-    execFileSync(process.execPath, [join(root, 'scripts', 'generate-importmap.mjs'), ...args],
-      { stdio: ['ignore', 'ignore', 'pipe'], env });
-  } catch (e) {
-    return String(e.stderr);
-  }
-  assert.fail('the script was expected to exit non-zero');
+  return expectFailure(process.execPath,
+    [join(root, 'scripts', 'generate-importmap.mjs'), ...args], { env });
 };
 
 /**
