@@ -631,6 +631,7 @@ export function createEffectGui({
      */
     build() {
       activeEffect = createEffectRecord();
+      skewLogged = false;
     },
 
     /**

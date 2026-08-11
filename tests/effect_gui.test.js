@@ -761,6 +761,20 @@ test('a param/value length skew is warned once per episode, never bound by index
   assert.equal(h.warnings.length, 2, 'a new skew episode warns again');
 });
 
+test('an effect switch clears the skew latch', () => {
+  const h = makeHarness({ params: [SPEED, GLOW], engineValues: [0.9] });
+  h.panel.build();
+  h.panel.sync();
+  assert.equal(h.warnings.length, 1);
+
+  h.panel.destroy();
+  h.panel.build();
+  h.panel.sync();
+
+  assert.equal(h.warnings.length, 2,
+    'the next effect gets its own skew episode');
+});
+
 // The Export action copies the live values, and reports the outcome on its own
 // button.
 
