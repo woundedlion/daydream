@@ -2155,9 +2155,9 @@ flowchart TD
   Colorizer --> ColorParams[Palette / breathe / hue / fade controls]
 ```
 
-Some combinations are intentionally inadmissible. Legacy stereographic noise selects Stereographic projection; seam-sensitive noise stages do not cross the cut topology of Bonne, Peirce, or Airocean; Polar Chart constrains the compatible source; and the device cost model may clear a sibling stage to stay within the 62.5 ms frame budget. These are canonicalization rules between typed stages, not preset-specific patches.
+Some combinations are intentionally inadmissible. Legacy stereographic noise selects Stereographic projection; seam-sensitive noise stages do not cross the cut topology of Bonne, Peirce, or Airocean; and Polar Chart constrains the compatible source. These are correctness rules between typed stages, not performance estimates or preset-specific patches.
 
-Projection seams use topology supplied by the projection kernel rather than guessing from planar coordinates. **Edge Fade** treats paired cuts as subduction boundaries: one stable side receives the authored fade width, while its partner gets only a one-pixel feather. Glued and periodic edges remain continuous and do not fade. **Pole Fade** is projection weight; selecting either projection-weight coverage policy carries that attenuation into alpha as well as any separately selected signal weighting.
+Projection seams use topology supplied by the projection kernel rather than guessing from planar coordinates. **Edge Fade** gives both sides of a paired cut the same authored fade, so the seam closes flush without a subducted edge. Glued and periodic edges remain continuous and do not fade. **Pole Fade** is projection weight; selecting either projection-weight coverage policy carries that attenuation into alpha as well as any separately selected signal weighting.
 
 GUI sliders and dropdowns apply immediately. Automatic preset choreography remains continuous: compatible configurations morph one live state, while incompatible discrete topologies blend complete endpoint colors. Source, warp, projection, breathe, global-walk, and palette clocks keep advancing according to their named rates. **Pause Animation** stops automatic preset selection; an in-flight preset transition still finishes.
 
