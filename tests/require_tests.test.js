@@ -2,18 +2,16 @@
 // scripts/require-tests.mjs is the `pretest` gate. Driven as a subprocess with
 // cwd set to a temp fixture, which is where the script reads package.json and
 // resolves the test glob from.
-import { test, before, after, beforeEach } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fixtureRepo, expectFailure } from './fixture_repo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(HERE, '../scripts/require-tests.mjs');
-
-let root;
 
 /**
  * Writes the fixture package.json, merging overrides over a non-recursive glob
@@ -37,31 +35,14 @@ const buildRoot = () => {
   writeFileSync(join(root, 'tests', 'sample.test.js'), '');
 };
 
-before(() => {
-  root = mkdtempSync(join(tmpdir(), 'require-tests-'));
-});
-
-beforeEach(buildRoot);
-
-after(() => {
-  rmSync(root, { recursive: true, force: true });
-});
+const root = fixtureRepo('require-tests-', buildRoot);
 
 /** Runs the script against the fixture, asserting it exits zero. */
 const run = () => execFileSync(process.execPath, [SCRIPT], { cwd: root });
 
 /** Runs the script against the fixture expecting failure and returns its stderr. */
-const runExpectingFailure = () => {
-  try {
-    execFileSync(process.execPath, [SCRIPT], {
-      cwd: root,
-      stdio: ['ignore', 'ignore', 'pipe'],
-    });
-  } catch (e) {
-    return String(e.stderr);
-  }
-  assert.fail('the script was expected to exit non-zero');
-};
+const runExpectingFailure = () =>
+  expectFailure(process.execPath, [SCRIPT], { cwd: root });
 
 /** Verifies a populated test dir with no stray install passes. */
 test('a populated test dir with no stray install passes', () => {

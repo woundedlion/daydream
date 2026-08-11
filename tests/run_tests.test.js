@@ -4,19 +4,13 @@
 // cases make. Driven as a subprocess with cwd set to a temp fixture holding its
 // own package.json, floors and test files, so the counts under test are the
 // fixture's and not this suite's.
-import { test, before, after, beforeEach } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import {
-  mkdtempSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-  rmSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fixtureRepo, expectFailure } from './fixture_repo.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(HERE, '../scripts/run-tests.mjs');
@@ -27,8 +21,6 @@ const FILES = {
   'a.test.js': { cases: 2, asserts: 3 },
   'b.test.js': { cases: 1, asserts: 2 },
 };
-
-let root;
 
 /** Writes the fixture package.json, which only has to mark the files ESM. */
 const writePkg = () => {
@@ -110,15 +102,7 @@ const buildRoot = () => {
     writeFileSync(join(root, 'tests', name), passing(cases, asserts));
 };
 
-before(() => {
-  root = mkdtempSync(join(tmpdir(), 'run-tests-'));
-});
-
-beforeEach(buildRoot);
-
-after(() => {
-  rmSync(root, { recursive: true, force: true });
-});
+const root = fixtureRepo('run-tests-', buildRoot);
 
 // This suite runs inside `node --test`, which marks its children with
 // NODE_TEST_CONTEXT; a runner that inherits it refuses to run files at all.
@@ -136,18 +120,8 @@ const run = (...args) =>
   );
 
 /** Runs the script against the fixture expecting failure and returns its stderr. */
-const runExpectingFailure = (...args) => {
-  try {
-    execFileSync(process.execPath, [SCRIPT, ...args], {
-      cwd: root,
-      env,
-      stdio: ['ignore', 'ignore', 'pipe'],
-    });
-  } catch (e) {
-    return String(e.stderr);
-  }
-  assert.fail('the script was expected to exit non-zero');
-};
+const runExpectingFailure = (...args) =>
+  expectFailure(process.execPath, [SCRIPT, ...args], { cwd: root, env });
 
 /** Verifies a suite meeting both committed floors passes and reports them. */
 test('a suite that meets the committed floors passes', () => {
