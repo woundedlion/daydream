@@ -568,7 +568,7 @@ test('sync reads the worker pool once it owns the display', () => {
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.25);
 });
 
-test('sync skips a value stream that no longer describes the built panel', () => {
+test('sync rebuilds before reading the main engine value stream', () => {
   const h = makeHarness({ params: [SPEED], engineValues: [0.9], generation: 3 });
   h.panel.build();
   h.state.generation = 4;
@@ -576,7 +576,7 @@ test('sync skips a value stream that no longer describes the built panel', () =>
   h.panel.sync();
 
   assert.equal(h.guis.length, 2);
-  assert.equal(h.gui().ctrl('Speed').getValue(), 0.1);
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.9);
   assert.equal(h.panel.active().paramGeneration, 4);
 });
 
@@ -600,8 +600,7 @@ test('a schema generation change atomically rebuilds and remounts the panel', ()
   assert.deepEqual(h.container.children, [h.gui().domElement]);
   assert.deepEqual(h.panel.active().paramNames, ['Projection', 'Bonne Parallel']);
   assert.equal(h.gui().ctrl('Projection').getValue(), 1);
-  assert.equal(h.gui().ctrl('Bonne Parallel').getValue(), 0.4,
-    'the stale value stream is not consumed during the rebuild');
+  assert.equal(h.gui().ctrl('Bonne Parallel').getValue(), 0.6);
   assert.equal(oldProjection.getValue(), 0, 'the retired binding is never updated');
 
   h.panel.sync();
@@ -756,14 +755,26 @@ test('preset effects put Previous and Next side by side below Export', () => {
   assert.equal(h.gui().ctrl('pause'), undefined);
 });
 
-test('natural worker preset advancement rebuilds from the synchronized schema', () => {
-  const DEPTH = { name: 'Depth', value: 0.7, min: 0, max: 1, animated: true };
+test('natural worker preset advancement keeps live transition values', () => {
+  const FUNCTION = {
+    name: 'Function', value: 4,
+    options: ['Twin Wave', 'Rings', 'Spiral', 'Grid', 'Coupled / Direct',
+      'Noise Contour', 'Primitive Lattice'],
+    animated: true,
+  };
+  const TARGET_FUNCTION = { ...FUNCTION, value: 6 };
+  const TARGET_SPEED = { ...SPEED, value: 0.9 };
   const h = makeHarness({
-    params: [SPEED], presetCount: 3, presetIndex: 0,
+    params: [FUNCTION, SPEED],
+    segmentValues: [4, 0.1],
+    ownsDisplay: true,
+    presetCount: 3,
+    presetIndex: 0,
     onSynchronizePreset: (_index, state) => {
-      state.params = [DEPTH];
-      state.engineValues = [0.7];
+      state.params = [TARGET_FUNCTION, TARGET_SPEED];
+      state.engineValues = [6, 0.9];
       state.generation = 2;
+      state.segmentGeneration = 2;
     },
   });
   h.panel.build();
@@ -775,10 +786,20 @@ test('natural worker preset advancement rebuilds from the synchronized schema', 
   h.panel.sync();
 
   assert.equal(oldGui.destroyed, 1);
-  assert.equal(h.gui().ctrl('Depth').getValue(), 0.7);
+  assert.equal(h.gui().ctrl('Function').getValue(), 4);
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.1);
   assert.equal(h.gui().ctrl('presetPosition').getValue(), '3 / 3');
   assert.equal(h.gui().ctrl('pause').getValue(), false);
   assert.deepEqual(h.writes, ['syncPreset:2']);
+
+  h.state.segmentValues = [4, 0.45];
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.45);
+
+  h.state.segmentValues = [6, 0.9];
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Function').getValue(), 6);
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.9);
 });
 
 test('a rejected preset selection does not change the pause state', () => {
