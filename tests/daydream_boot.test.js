@@ -166,3 +166,16 @@ test('the late-bound engine controls are re-applied once the engine exists', () 
     + 'builds the engine must replay the binding; without it a ?view.poleLod '
     + 'deep link shows in the GUI but never reaches the engine');
 });
+
+test('narrowing the resolution options rebinds the controller and its handler', () => {
+  const consequence = "lil-gui's options() destroys the receiver and returns a "
+    + 'replacement that carries the name but no onChange; syncResolutionOptions '
+    + 'runs on every boot, so a discarded return value leaves the live dropdown '
+    + 'writing to nothing and setValue() updating a detached <select>';
+  assert.match(SOURCE, /let resolutionController/, consequence);
+  assert.match(SOURCE, /resolutionController = resolutionController\.options\([^)]*\)\s*\.onChange\(setResolution\)/,
+    consequence);
+  assert.match(SOURCE, /const setResolution = \(v\) => appState\.set\('resolution', v\)/,
+    'the replacement must re-attach the same handler the original carried, or '
+    + 'the dropdown and the muted engine correction diverge');
+});

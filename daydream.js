@@ -228,7 +228,9 @@ function syncResolutionOptions(module) {
   if (unlabeled.length > 0) {
     console.warn(`Engine resolutions with no preset (not offered): ${unlabeled.join(', ')}`);
   }
-  resolutionController.options(labels);
+  // options() destroys the receiver and returns a replacement carrying only the
+  // copied name, so the binding and its handler have to be re-established.
+  resolutionController = resolutionController.options(labels).onChange(setResolution);
 
   const current = appState.get('resolution');
   const corrected = resolutionCorrection(labels, current);
@@ -345,10 +347,12 @@ if (guiContainer) {
 
 // Not deep-linked here: urlSync owns the `resolution` param, so a second writer
 // under the 'view' namespace would give the URL two authorities for one setting.
-const resolutionController = guiInstance
+const setResolution = (v) => appState.set('resolution', v);
+// Reassigned by syncResolutionOptions: lil-gui's options() replaces the controller.
+let resolutionController = guiInstance
   .addSession({ resolution: appState.get('resolution') }, 'resolution', Object.keys(resolutionPresets))
   .name('Resolution')
-  .onChange((v) => appState.set('resolution', v));
+  .onChange(setResolution);
 
 const sidebarContainer = document.getElementById('effect-sidebar');
 if (!sidebarContainer) {
