@@ -66,6 +66,14 @@ test('the teardown is retained and reachable from the module-load handlers', () 
     'the handlers must read the teardown lazily; it is built after them');
 });
 
+test('the composition root rejects a stale segmented-controller module', () => {
+  assert.match(SOURCE, /SEGMENT_CONTROLLER_API_VERSION/,
+    'a fresh daydream.js must require a named export absent from stale cached controllers');
+  assert.match(SOURCE,
+    /SEGMENT_CONTROLLER_API_VERSION !== EXPECTED_SEGMENT_CONTROLLER_API_VERSION/,
+    'a controller from a different API generation must fail inside bootstrap');
+});
+
 test('the param writer and the switch coordinator own the notice separately', () => {
   const consequence = 'both announce through the one notice element, so each '
     + 'must tag its writes with an owner of its own; sharing a tag lets a slider '

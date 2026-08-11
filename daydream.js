@@ -34,7 +34,12 @@ import {
 } from "./app_lifecycle.js";
 import { AppState, URLSync, replaceUrl } from "./state.js";
 import { VideoRecorder } from "./recorder.js";
-import { SegmentController, maxSegmentCount, warmModules } from "./segment_controller.js";
+import {
+  SEGMENT_CONTROLLER_API_VERSION,
+  SegmentController,
+  maxSegmentCount,
+  warmModules,
+} from "./segment_controller.js";
 import { EngineHost } from "./engine_host.js";
 import { showFatalError } from "./tools/banner.js";
 import { showBootstrapFailure } from "./bootstrap.js";
@@ -44,6 +49,11 @@ import { copyToClipboard } from "./tools/copy_text.js";
 
 // Dwell time per effect while "Test All" cycles the favorites list.
 const TEST_ALL_INTERVAL_MS = 1000;
+const EXPECTED_SEGMENT_CONTROLLER_API_VERSION = 1;
+
+if (SEGMENT_CONTROLLER_API_VERSION !== EXPECTED_SEGMENT_CONTROLLER_API_VERSION) {
+  throw new Error('Cached segment_controller.js is incompatible; reload the simulator.');
+}
 
 const HiResFavorites = [
   "BZReactionDiffusion",

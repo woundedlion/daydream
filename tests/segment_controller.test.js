@@ -21,6 +21,7 @@ const driver = {
 
 const {
   SegmentController,
+  SEGMENT_CONTROLLER_API_VERSION,
   MAX_BOOT_RETRIES,
   MAX_FAULTED_REBUILDS,
   BOOT_RETRY_DELAY_MS,
@@ -32,6 +33,10 @@ const {
   warmModules,
 } = await import('../segment_controller.js');
 const { PROTOCOL_VERSION } = await import('../worker_protocol.js');
+
+test('segment controller publishes its composition-root API version', () => {
+  assert.equal(SEGMENT_CONTROLLER_API_VERSION, 1);
+});
 
 const EXPECTED_CONSOLE_MESSAGES = {
   log: [
