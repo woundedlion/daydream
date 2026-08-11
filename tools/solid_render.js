@@ -39,7 +39,7 @@ export function meshStatsLine(meshData, edgeCount) {
  * @param {Object} opts.THREE - The three.js namespace.
  * @param {{add: Function, remove: Function}} opts.scene - Scene the objects are added to.
  * @param {Object} opts.materials - Shared materials: {face, faceColorize, vert, edge, normal}.
- * @param {Element} opts.labelsContainer - Overlay the vertex-index labels are appended to.
+ * @param {Element} [opts.labelsContainer] - Overlay the vertex-index labels are appended to; without one the render builds no labels.
  * @param {Document} [opts.doc] - Document the label nodes are created in.
  * @returns {{render: Function, disposeGeometry: Function}} The renderer.
  */
@@ -261,7 +261,7 @@ export function createMeshRenderer({ THREE, scene, materials, labelsContainer, d
       // single appendChild so up to ~1000 labels cost one DOM mutation instead
       // of one per vertex.
       let labelsBuilt = false;
-      if (view.showIndices && meshData.vertices.length < 1000) {
+      if (view.showIndices && labelsContainer && meshData.vertices.length < 1000) {
         const frag = doc.createDocumentFragment();
         meshData.vertices.forEach((v, i) => {
           const el = doc.createElement('div');
