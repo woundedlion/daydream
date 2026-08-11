@@ -157,6 +157,7 @@ function makeHarness({
   onEngineParam = () => {},
   presetCount = 0,
   presetIndex = 0,
+  presetSelectionAccepted = true,
 } = {}) {
   const state = {
     params,
@@ -202,7 +203,10 @@ function makeHarness({
     getPresetIndex: () => state.presetIndex,
     selectPreset: (index) => {
       writes.push(`preset:${index}`);
+      if (!presetSelectionAccepted) return false;
       state.presetIndex = index;
+      engine.paused = true;
+      return true;
     },
     engineAnimationsPaused: () => (pauseAccessor ? engine.paused : undefined),
     applyEffect: () => writes.push('applyEffect'),
@@ -723,8 +727,10 @@ test('preset effects put Previous and Next side by side below Export', () => {
   const h = makeHarness({ presetCount: 3, presetIndex: 0 });
   h.panel.build();
 
-  assert.deepEqual(h.gui().controllers.slice(0, 4).map((c) => c.property),
-    ['reset', 'export', 'previousPreset', 'nextPreset']);
+  assert.deepEqual(h.gui().controllers.slice(0, 5).map((c) => c.property),
+    ['reset', 'export', 'presetPosition', 'previousPreset', 'nextPreset']);
+  assert.equal(h.gui().ctrl('presetPosition').getValue(), '1 / 3');
+  assert.equal(h.gui().ctrl('presetPosition').disabled, true);
   assert.equal(h.gui().ctrl('previousPreset').label, 'Previous Preset');
   assert.equal(h.gui().ctrl('nextPreset').label, 'Next Preset');
   assert.ok(h.gui().ctrl('previousPreset').domElement.classList
@@ -733,9 +739,42 @@ test('preset effects put Previous and Next side by side below Export', () => {
     .contains('preset-nav-next'));
 
   h.gui().ctrl('previousPreset').object.previousPreset();
+  assert.equal(h.gui().ctrl('presetPosition').getValue(), '3 / 3');
   h.gui().ctrl('nextPreset').object.nextPreset();
-  assert.deepEqual(h.writes,
-    ['paused:true', 'preset:2', 'paused:true', 'preset:0']);
+  assert.deepEqual(h.writes, ['preset:2', 'preset:0']);
+  assert.equal(h.gui().ctrl('presetPosition').getValue(), '1 / 3');
+  assert.equal(h.gui().ctrl('pause'), undefined);
+});
+
+test('sync adopts automatic preset and pause state without echoing writes', () => {
+  const h = makeHarness({ params: [SPEED], presetCount: 3, presetIndex: 0 });
+  h.panel.build();
+  h.panel.applyAnimationPause();
+  h.writes.length = 0;
+
+  h.state.presetIndex = 2;
+  h.engine.paused = true;
+  h.panel.sync();
+
+  assert.equal(h.gui().ctrl('presetPosition').getValue(), '3 / 3');
+  assert.equal(h.gui().ctrl('pause').getValue(), true);
+  assert.deepEqual(h.writes, []);
+});
+
+test('a rejected preset selection does not change the pause state', () => {
+  const h = makeHarness({
+    params: [SPEED], presetCount: 3, presetIndex: 1,
+    presetSelectionAccepted: false,
+  });
+  h.panel.build();
+  h.panel.applyAnimationPause();
+  h.writes.length = 0;
+
+  h.gui().ctrl('nextPreset').object.nextPreset();
+
+  assert.equal(h.panel.active().animationState.pause, false);
+  assert.equal(h.engine.paused, false);
+  assert.deepEqual(h.writes, ['preset:2']);
 });
 
 test('effects without presets do not show preset navigation', () => {
@@ -743,6 +782,7 @@ test('effects without presets do not show preset navigation', () => {
   h.panel.build();
   assert.equal(h.gui().ctrl('previousPreset'), undefined);
   assert.equal(h.gui().ctrl('nextPreset'), undefined);
+  assert.equal(h.gui().ctrl('presetPosition'), undefined);
 });
 
 test('Export copies the live values as a C++ brace-init list', async () => {

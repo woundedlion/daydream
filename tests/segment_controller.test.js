@@ -2202,17 +2202,32 @@ test('setAnimationsPaused records the flag and broadcasts it to every worker', (
 
 test('selectPreset broadcasts one exact index and invalidates parameter state', () => {
   const c = readyController(2);
+  c.presetCount = 6;
   c.paramValues = [1, 2];
   c.paramGeneration = 7;
-  c.selectPreset(4);
+  assert.equal(c.selectPreset(4), true);
 
   assert.equal(c.getPresetIndex(), 4);
+  assert.equal(c.animationsPaused, true);
   assert.equal(c.getParamValues(), null);
   assert.equal(c.getParamGeneration(), null);
   for (const w of c.workers) {
     const msg = w.posted.find((m) => m.type === 'selectPreset');
     assert.equal(msg.index, 4);
     assert.equal(msg.paramRevision, c.paramRevision);
+  }
+});
+
+test('selectPreset rejects an unavailable index without pausing', () => {
+  const c = readyController(2);
+  c.presetCount = 3;
+
+  assert.equal(c.selectPreset(3), false);
+
+  assert.equal(c.getPresetIndex(), null);
+  assert.equal(c.animationsPaused, false);
+  for (const w of c.workers) {
+    assert.equal(w.posted.some((m) => m.type === 'selectPreset'), false);
   }
 });
 

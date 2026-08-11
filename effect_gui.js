@@ -30,7 +30,7 @@ export const FLASH_MS = 1500;
 export const EXPORT_COPIED = '\u2713 Copied!';
 export const EXPORT_FAILED = '\u2717 Copy failed';
 const RESERVED_CONTROL_NAMES = new Set([
-  'reset', 'export', 'previousPreset', 'nextPreset', 'pause'
+  'reset', 'export', 'presetPosition', 'previousPreset', 'nextPreset', 'pause'
 ]);
 
 /**
@@ -91,7 +91,7 @@ export function addParamControl(gui, state, p, hydrate = true) {
  *   animation-driven params on every engine.
  * @param {() => number} deps.getPresetCount - Number of presets on the live effect.
  * @param {() => number} deps.getPresetIndex - Selected preset on the live effect.
- * @param {(index: number) => void} deps.selectPreset - Selects one preset on every engine.
+ * @param {(index: number) => boolean} deps.selectPreset - Selects one preset on every engine.
  * @param {() => boolean|undefined} deps.engineAnimationsPaused - Reads the main
  *   engine's animation-pause state, undefined on a module without the accessor.
  * @param {() => void} deps.applyEffect - Rebuilds the panel from engine state
@@ -167,6 +167,20 @@ export function createEffectGui({
     return engineParamValues();
   }
 
+  function adoptPauseDisplay(fx, paused) {
+    if (paused === undefined || paused === fx.pause.animationState.pause) return;
+    fx.pause.animationState.pause = paused;
+    fx.pause.controller?.updateDisplay();
+  }
+
+  function adoptPresetDisplay(fx, count, index) {
+    if (!fx.preset || count <= 0) return;
+    const position = `${index + 1} / ${count}`;
+    if (fx.preset.state.presetPosition === position) return;
+    fx.preset.state.presetPosition = position;
+    fx.preset.controller.updateDisplay();
+  }
+
   /**
    * Push the engine's per-frame parameter values back into the effect GUI so
    * animation-driven params track live, without clobbering controllers the user
@@ -182,6 +196,8 @@ export function createEffectGui({
       // schema; never bind the pre-rebuild snapshot during this call.
       return;
     }
+    adoptPauseDisplay(activeEffect, engineAnimationsPaused());
+    adoptPresetDisplay(activeEffect, getPresetCount(), getPresetIndex());
     if (!activeEffect.hasLiveParams) return;
 
     const values = liveParamValues();
@@ -301,12 +317,20 @@ export function createEffectGui({
     const exportCtrl = fx.gui.add(effectActions, 'export').name('Export');
     const presetCount = getPresetCount();
     if (presetCount > 0) {
+      effectActions.presetPosition = `${getPresetIndex() + 1} / ${presetCount}`;
+      const addPosition = typeof fx.gui.addSession === 'function'
+        ? (...args) => fx.gui.addSession(...args)
+        : (...args) => fx.gui.add(...args);
+      const position = addPosition(effectActions, 'presetPosition')
+        .name('Preset').disable();
+      fx.preset = { state: effectActions, controller: position };
       const move = (delta) => {
-        if (fx.pause?.controller) fx.pause.setPaused(true);
-        else setAnimationsPaused(true);
         const count = getPresetCount();
         if (count <= 0) return;
-        selectPreset((getPresetIndex() + delta + count) % count);
+        const index = (getPresetIndex() + delta + count) % count;
+        if (!selectPreset(index)) return;
+        adoptPresetDisplay(fx, count, index);
+        adoptPauseDisplay(fx, engineAnimationsPaused() ?? true);
       };
       effectActions.previousPreset = () => move(-1);
       effectActions.nextPreset = () => move(1);
