@@ -75,7 +75,7 @@ export function formatParamValue(value, def) {
  * @param {{min: number, max: number, step: number}} def - The parameter's range.
  * @param {number} value - Current value.
  * @param {string} controlId - Unique id prefix for the row's controls.
- * @param {string} opName - Op the parameter belongs to, used in the number box's accessible name.
+ * @param {string} opName - Op the parameter belongs to, used in both inputs' accessible names.
  * @returns {{row: Element, range: Element, number: Element}} The row and its two inputs.
  */
 function buildParamRow(doc, key, def, value, controlId, opName) {
@@ -92,6 +92,9 @@ function buildParamRow(doc, key, def, value, controlId, opName) {
   const range = doc.createElement('input');
   range.type = 'range';
   range.id = `${controlId}-range`;
+  // The visible label is the bare key, which repeats across the chain; the
+  // aria-label overrides it so each op's slider is named by its own op.
+  range.setAttribute('aria-label', `${opName} ${key}`);
   range.className = 'flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer min-w-0';
   range.min = def.min;
   range.max = def.max;
