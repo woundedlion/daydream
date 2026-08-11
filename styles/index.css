@@ -204,6 +204,11 @@
   z-index: 100;
 }
 
+/* Above every canvas-scoped overlay (recording indicator, segment stats). */
+.context-lost-overlay {
+  z-index: 300;
+}
+
 .spinner {
   width: 32px;
   height: 32px;
@@ -737,6 +742,13 @@ div.label {
   color: #aaa;
   line-height: 1.4;
   backdrop-filter: blur(4px);
+}
+
+/* The fault message is the string a bug report needs, so it takes hits (and so
+   selection) while the rest of the overlay stays click-through. */
+.segment-stats [role="alert"] {
+  pointer-events: auto;
+  user-select: text;
 }
 
 .segment-stats table {
