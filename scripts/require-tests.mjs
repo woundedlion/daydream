@@ -80,6 +80,16 @@ if (files.length < floor) {
   );
   process.exit(1);
 }
+// A floor left behind covers none of the files that landed since, so those
+// files can be deleted again without tripping it.
+if (files.length > floor) {
+  console.error(
+    `${files.length} files matched ${glob} but the committed floor is only ` +
+      `${floor}. Raise "testFileFloor" in package.json to ${files.length} so ` +
+      'the files that landed since are covered too.',
+  );
+  process.exit(1);
+}
 
 if (unreachable.length > 0) {
   console.error(
@@ -102,6 +112,6 @@ if (strays.length > 0) {
 // Without a line on the way out, a run that skipped this gate reads in CI
 // exactly like one that cleared it.
 console.log(
-  `require-tests: ${files.length} files matched ${glob}, at or above the ` +
-    `committed floor of ${floor}.`,
+  `require-tests: ${files.length} files matched ${glob}, the committed ` +
+    `floor of ${floor}.`,
 );
