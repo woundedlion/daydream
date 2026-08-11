@@ -20,6 +20,8 @@
  * canvas, so a recording made with "Label Axes" on carries no labels.
  */
 
+import { FPS } from "./frame_constants.js";
+
 // Chunk-delivery interval for MediaRecorder.start(); bounds encoder buffering.
 const RECORDER_TIMESLICE_MS = 1000;
 
@@ -59,9 +61,9 @@ export class VideoRecorder {
    * Constructs a recorder bound to a source canvas.
    * @param {HTMLCanvasElement} canvas - Source canvas to record.
    * @param {number} frameInterval - Seconds of video added per captured frame;
-   *   drives the elapsed-time counter (default 1/16 s = 16 fps).
+   *   drives the elapsed-time counter (defaults to the simulation rate, 1/FPS).
    */
-  constructor(canvas, frameInterval = 1 / 16) {
+  constructor(canvas, frameInterval = 1 / FPS) {
     this.canvas = canvas;
     this.mediaRecorder = null;
     this.chunks = [];
