@@ -155,6 +155,7 @@ function makeHarness({
   pausesOnWrite = (p) => Boolean(p.animated),
   pauseAccessor = true,
   onEngineParam = () => {},
+  onSynchronizePreset = () => {},
   presetCount = 0,
   presetIndex = 0,
   presetSelectionAccepted = true,
@@ -171,6 +172,7 @@ function makeHarness({
     container,
     presetCount,
     presetIndex,
+    hostPresetIndex: presetIndex,
   };
   const writes = [];
   const warnings = [];
@@ -201,10 +203,18 @@ function makeHarness({
     },
     getPresetCount: () => state.presetCount,
     getPresetIndex: () => state.presetIndex,
+    synchronizePreset: (index) => {
+      if (state.hostPresetIndex === index) return true;
+      writes.push(`syncPreset:${index}`);
+      state.hostPresetIndex = index;
+      onSynchronizePreset(index, state);
+      return true;
+    },
     selectPreset: (index) => {
       writes.push(`preset:${index}`);
       if (!presetSelectionAccepted) return false;
       state.presetIndex = index;
+      state.hostPresetIndex = index;
       engine.paused = true;
       return true;
     },
@@ -746,19 +756,29 @@ test('preset effects put Previous and Next side by side below Export', () => {
   assert.equal(h.gui().ctrl('pause'), undefined);
 });
 
-test('sync adopts automatic preset and pause state without echoing writes', () => {
-  const h = makeHarness({ params: [SPEED], presetCount: 3, presetIndex: 0 });
+test('natural worker preset advancement rebuilds from the synchronized schema', () => {
+  const DEPTH = { name: 'Depth', value: 0.7, min: 0, max: 1, animated: true };
+  const h = makeHarness({
+    params: [SPEED], presetCount: 3, presetIndex: 0,
+    onSynchronizePreset: (_index, state) => {
+      state.params = [DEPTH];
+      state.engineValues = [0.7];
+      state.generation = 2;
+    },
+  });
   h.panel.build();
   h.panel.applyAnimationPause();
+  const oldGui = h.gui();
   h.writes.length = 0;
 
   h.state.presetIndex = 2;
-  h.engine.paused = true;
   h.panel.sync();
 
+  assert.equal(oldGui.destroyed, 1);
+  assert.equal(h.gui().ctrl('Depth').getValue(), 0.7);
   assert.equal(h.gui().ctrl('presetPosition').getValue(), '3 / 3');
-  assert.equal(h.gui().ctrl('pause').getValue(), true);
-  assert.deepEqual(h.writes, []);
+  assert.equal(h.gui().ctrl('pause').getValue(), false);
+  assert.deepEqual(h.writes, ['syncPreset:2']);
 });
 
 test('a rejected preset selection does not change the pause state', () => {

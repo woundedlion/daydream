@@ -91,6 +91,7 @@ class FakeEngine {
     this.presetIndex = index;
     return true;
   }
+  synchronizePreset(index) { return this.selectPreset(index); }
   nextPreset() {
     return this.selectPreset((this.presetIndex + 1) % this.presetCount);
   }

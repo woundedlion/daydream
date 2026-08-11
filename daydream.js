@@ -385,6 +385,8 @@ const effectGui = createEffectGui({
   getPresetIndex: () => segments.ownsDisplay
     ? (segments.getPresetIndex() ?? host.engine.getPresetIndex())
     : host.engine.getPresetIndex(),
+  synchronizePreset: (index) => host.engine.getPresetIndex() === index
+    || host.engine.synchronizePreset(index),
   selectPreset: (index) => {
     if (!host.engine.selectPreset(index)) return false;
     segments.selectPreset(index);

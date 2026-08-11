@@ -91,6 +91,8 @@ export function addParamControl(gui, state, p, hydrate = true) {
  *   animation-driven params on every engine.
  * @param {() => number} deps.getPresetCount - Number of presets on the live effect.
  * @param {() => number} deps.getPresetIndex - Selected preset on the live effect.
+ * @param {(index: number) => boolean} deps.synchronizePreset - Mirrors a live
+ *   worker preset into the engine that owns GUI parameter definitions.
  * @param {(index: number) => boolean} deps.selectPreset - Selects one preset on every engine.
  * @param {() => boolean|undefined} deps.engineAnimationsPaused - Reads the main
  *   engine's animation-pause state, undefined on a module without the accessor.
@@ -122,6 +124,7 @@ export function createEffectGui({
   setAnimationsPaused,
   getPresetCount,
   getPresetIndex,
+  synchronizePreset,
   selectPreset,
   engineAnimationsPaused,
   applyEffect,
@@ -189,6 +192,9 @@ export function createEffectGui({
    */
   function sync() {
     if (!activeEffect || !activeEffect.controllerByName) return;
+    const presetCount = getPresetCount();
+    const presetIndex = getPresetIndex();
+    if (!synchronizePreset(presetIndex)) return;
     if (paramGenerationStale(activeEffect.paramGeneration, paramGeneration())) {
       rebuildSchema();
       // A segmented value snapshot may be from a frame already in flight when
@@ -197,7 +203,7 @@ export function createEffectGui({
       return;
     }
     adoptPauseDisplay(activeEffect, engineAnimationsPaused());
-    adoptPresetDisplay(activeEffect, getPresetCount(), getPresetIndex());
+    adoptPresetDisplay(activeEffect, presetCount, presetIndex);
     if (!activeEffect.hasLiveParams) return;
 
     const values = liveParamValues();

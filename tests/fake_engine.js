@@ -6,8 +6,8 @@
 /** Instance methods the tests' engine fakes stand in for. */
 export const ENGINE_METHODS = [
   'setResolution', 'setEffect', 'setParameter', 'setAnimationsPaused',
-  'getPresetCount', 'getPresetIndex', 'selectPreset', 'nextPreset',
-  'previousPreset',
+  'getPresetCount', 'getPresetIndex', 'selectPreset', 'synchronizePreset',
+  'nextPreset', 'previousPreset',
   'setPoleLod', 'setClip', 'drawFrame', 'getPixels', 'getArenaMetrics',
   'getParameterDefinitions', 'getParamValues', 'getBufferLength',
   'getParamGeneration', 'getEffectSizes', 'strobeColumns',
