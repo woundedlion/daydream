@@ -79,8 +79,6 @@ export function addParamControl(gui, state, p, hydrate = true) {
  *   the display, making its values (not the idle main engine's) the live ones.
  * @param {() => ArrayLike<number>|null} deps.segmentParamValues - The pool's
  *   per-frame value stream.
- * @param {() => number|null|undefined} [deps.segmentParamGeneration] - Schema
- *   generation paired with segment 0's value stream.
  * @param {() => ArrayLike<number>|null} deps.engineParamValues - The main
  *   engine's per-frame value stream.
  * @param {(name: string, value: number) => void} deps.setEngineParam - Writes one
@@ -99,7 +97,6 @@ export function addParamControl(gui, state, p, hydrate = true) {
  * @param {() => void} deps.applyEffect - Rebuilds the panel from engine state
  *   (the Reset button).
  * @param {() => Object|null} deps.guiContainer - The element the panel mounts in.
- * @param {() => Object|null} deps.activeElement - The document's focused element.
  * @param {() => boolean} deps.isMobile - Whether to mount the panel collapsed.
  * @param {{addEventListener: Function, removeEventListener: Function}}
  *   deps.dragTarget - Where the drag-end listeners live (the window): a lil-gui
@@ -117,7 +114,6 @@ export function createEffectGui({
   paramGeneration,
   segmentsOwnDisplay,
   segmentParamValues,
-  segmentParamGeneration = () => undefined,
   engineParamValues,
   setEngineParam,
   setWorkerParam,
@@ -129,7 +125,6 @@ export function createEffectGui({
   engineAnimationsPaused,
   applyEffect,
   guiContainer,
-  activeElement,
   isMobile,
   dragTarget,
   copyText,
@@ -160,11 +155,8 @@ export function createEffectGui({
       return null;
     }
     if (segmentsOwnDisplay()) {
-      const valuesGeneration = segmentParamGeneration();
-      if (valuesGeneration != null
-          && paramGenerationStale(activeEffect?.paramGeneration, valuesGeneration)) {
-        return null;
-      }
+      // Worker and main-engine generations are instance-local; paramRevision
+      // fences worker snapshots.
       return segmentParamValues();
     }
     return engineParamValues();
@@ -186,8 +178,7 @@ export function createEffectGui({
 
   /**
    * Push the engine's per-frame parameter values back into the effect GUI so
-   * animation-driven params track live, without clobbering controllers the user
-   * is actively editing.
+   * all rendered params track live without clobbering an active drag.
    * @returns {void}
    */
   function sync() {
@@ -204,7 +195,7 @@ export function createEffectGui({
     if (!presetSynced) return;
     adoptPauseDisplay(activeEffect, engineAnimationsPaused());
     adoptPresetDisplay(activeEffect, presetCount, presetIndex);
-    if (!activeEffect.hasLiveParams) return;
+    if (!activeEffect.hasParams) return;
 
     const values = liveParamValues();
     if (!values || values.length === 0) return;
@@ -227,10 +218,7 @@ export function createEffectGui({
       const c = activeEffect.controllerByName.get(names[i]);
       if (!c) continue;
 
-      // lil-gui sliders drag via a non-focusable div, invisible to activeElement,
-      // so dragging covers an in-progress drag.
-      const isEditing =
-        c.dragging || c.domElement.contains(activeElement());
+      const isEditing = c.dragging;
 
       const { update, value } = resolveParamSync(
         c.getValue(), values[i], c.isBoolean, isEditing);
@@ -449,9 +437,7 @@ export function createEffectGui({
     fx.paramNames = [];
     fx.writableParamNames = [];
     fx.controllerByName = new Map();
-    // animated (animation-driven) and readonly (engine telemetry) are the only
-    // params the engine rewrites per frame; a set without them lets sync skip.
-    fx.hasLiveParams = params.some(p => p.animated || p.readonly);
+    fx.hasParams = params.length > 0;
 
     params.forEach(p => {
       state[p.name] = p.value;

@@ -166,9 +166,7 @@ function makeHarness({
     generation,
     engineValues,
     segmentValues,
-    segmentGeneration: null,
     ownsDisplay,
-    activeElement: null,
     copyText,
     container,
     presetCount,
@@ -189,7 +187,6 @@ function makeHarness({
     paramGeneration: () => state.generation,
     segmentsOwnDisplay: () => state.ownsDisplay,
     segmentParamValues: () => state.segmentValues,
-    segmentParamGeneration: () => state.segmentGeneration,
     engineParamValues: () => state.engineValues,
     setEngineParam: (name, value) => {
       writes.push(`engine:${name}=${value}`);
@@ -223,7 +220,6 @@ function makeHarness({
     engineAnimationsPaused: () => (pauseAccessor ? engine.paused : undefined),
     applyEffect: () => writes.push('applyEffect'),
     guiContainer: () => state.container,
-    activeElement: () => state.activeElement,
     isMobile: () => isMobile,
     dragTarget,
     copyText: state.copyText,
@@ -297,7 +293,7 @@ test('build records the value-stream order and stamps the effect generation', ()
   assert.deepEqual(fx.paramNames, ['Speed', 'Glow', 'Frames']);
   assert.deepEqual([...fx.controllerByName.keys()], ['Speed', 'Glow', 'Frames']);
   assert.equal(fx.paramGeneration, 7);
-  assert.equal(fx.hasLiveParams, true);
+  assert.equal(fx.hasParams, true);
 });
 
 test('build warns when engine params collide with effect controls', () => {
@@ -338,11 +334,11 @@ test('a readonly param is a session control with no engine write-back', () => {
   assert.equal(typeof h.gui().ctrl('Speed').handler, 'function');
 });
 
-test('an effect with no animated or readonly param has no live values to poll', () => {
+test('every parameter participates in rendered-value synchronization', () => {
   const h = makeHarness({ params: [{ name: 'Speed', value: 0.1, min: 0, max: 1 }] });
   h.panel.build();
 
-  assert.equal(h.panel.active().hasLiveParams, false);
+  assert.equal(h.panel.active().hasParams, true);
 });
 
 test('editing a control writes the engine and the worker pool as floats', () => {
@@ -534,17 +530,7 @@ test('sync leaves a dragged control alone', () => {
   assert.equal(h.gui().ctrl('Glow').getValue(), true, 'other controls still track');
 });
 
-test('sync leaves the focused control alone', () => {
-  const h = makeHarness({ params: [SPEED], engineValues: [0.9] });
-  h.panel.build();
-  h.state.activeElement = h.gui().ctrl('Speed').domElement;
-
-  h.panel.sync();
-
-  assert.equal(h.gui().ctrl('Speed').getValue(), 0.1);
-});
-
-test('sync polls nothing for an effect with no live params', () => {
+test('sync adopts programmatic changes to an ordinary parameter', () => {
   const h = makeHarness({
     params: [{ name: 'Speed', value: 0.1, min: 0, max: 1 }],
     engineValues: [0.9],
@@ -553,7 +539,7 @@ test('sync polls nothing for an effect with no live params', () => {
 
   h.panel.sync();
 
-  assert.equal(h.gui().ctrl('Speed').getValue(), 0.1);
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.9);
 });
 
 test('sync reads the worker pool once it owns the display', () => {
@@ -607,6 +593,100 @@ test('a schema generation change atomically rebuilds and remounts the panel', ()
 
   h.panel.sync();
   assert.equal(h.gui().ctrl('Bonne Parallel').getValue(), 0.6);
+});
+
+test('a selector rebuild adopts the renderer snapshot when it arrives', () => {
+  const projection = {
+    name: 'Projection', value: 6,
+    options: ['Folded Sinusoidal', 'Stereographic', 'Gnomonic', 'Bonne',
+      'Peirce Quincuncial', 'Dymaxion / Airocean', 'Equirectangular'],
+    animated: true,
+  };
+  const h = makeHarness({
+    params: [projection],
+    segmentValues: [6],
+    ownsDisplay: true,
+    onEngineParam(name, value, state) {
+      if (name !== 'Projection' || value !== 0) return;
+      state.params = [{ ...projection }];
+      state.generation = 2;
+    },
+  });
+  h.panel.build();
+
+  h.gui().ctrl('Projection').setValue(0);
+  h.state.segmentValues = null;
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Projection').getValue(), 6);
+
+  h.state.segmentValues = [0];
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Projection').getValue(), 0);
+});
+
+test('rendered state stays authoritative across edits, drags, presets, and lerps', () => {
+  const functionDef = {
+    name: 'Function', value: 4,
+    options: ['Twin Wave', 'Rings', 'Spiral', 'Grid', 'Coupled / Direct',
+      'Noise Contour', 'Primitive Lattice'],
+    animated: true,
+  };
+  const projectionDef = {
+    name: 'Projection', value: 6,
+    options: ['Folded Sinusoidal', 'Stereographic', 'Gnomonic', 'Bonne',
+      'Peirce Quincuncial', 'Dymaxion / Airocean', 'Equirectangular'],
+    animated: true,
+  };
+  const h = makeHarness({
+    params: [functionDef, projectionDef, SPEED],
+    segmentValues: [4, 6, 0.1],
+    ownsDisplay: true,
+    presetCount: 3,
+    presetIndex: 0,
+    onEngineParam(name, value, state) {
+      if (name !== 'Projection' || value !== 0) return;
+      state.params = [functionDef, projectionDef, SPEED];
+      state.generation = 2;
+    },
+    onSynchronizePreset(_index, state) {
+      state.params = [
+        { ...functionDef, value: 6 },
+        { ...projectionDef, value: 0 },
+        { ...SPEED, value: 0.9 },
+      ];
+      state.generation = 3;
+    },
+  });
+  h.panel.build();
+
+  h.gui().ctrl('Projection').setValue(0);
+  h.state.segmentValues = null;
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Projection').getValue(), 6);
+
+  h.state.segmentValues = [4, 0, 0.2];
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Projection').getValue(), 0);
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.2);
+
+  h.gui().ctrl('Speed').dragging = true;
+  h.state.segmentValues = [4, 0, 0.4];
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.2);
+  h.gui().ctrl('Speed').dragging = false;
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.4);
+
+  h.state.presetIndex = 2;
+  h.state.segmentValues = [4, 0, 0.55];
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Function').getValue(), 4);
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.55);
+
+  h.state.segmentValues = [6, 0, 0.9];
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Function').getValue(), 6);
+  assert.equal(h.gui().ctrl('Speed').getValue(), 0.9);
 });
 
 test('initial topology hydration reveals and replays its dependent controls', () => {
@@ -683,7 +763,7 @@ test('segmented mode rebuilds from main-engine definitions before reading worker
   const depth = { name: 'Depth', value: 0.25, min: 0, max: 1, animated: true };
   h.state.params = [depth];
   h.state.generation = 12;
-  h.state.segmentGeneration = 11;
+  h.state.segmentValues = null;
 
   h.panel.sync();
 
@@ -691,11 +771,6 @@ test('segmented mode rebuilds from main-engine definitions before reading worker
   assert.equal(h.gui().ctrl('Depth').getValue(), 0.25,
     'the old same-length worker stream cannot bind to the new definition');
 
-  h.panel.sync();
-  assert.equal(h.gui().ctrl('Depth').getValue(), 0.25,
-    'a repeatedly polled old worker snapshot remains fenced');
-
-  h.state.segmentGeneration = 12;
   h.state.segmentValues = [0.6];
   h.panel.sync();
   assert.equal(h.gui().ctrl('Depth').getValue(), 0.6);
@@ -820,7 +895,6 @@ test('natural worker preset advancement keeps live transition values', () => {
       state.params = [TARGET_FUNCTION, TARGET_SPEED];
       state.engineValues = [6, 0.9];
       state.generation = 2;
-      state.segmentGeneration = 2;
     },
   });
   h.panel.build();

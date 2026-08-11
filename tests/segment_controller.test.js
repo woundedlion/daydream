@@ -488,7 +488,6 @@ function deliverFrame(controller, segId, overrides = {}) {
       elapsed: overrides.elapsed ?? 1,
       arenaMetrics: overrides.arenaMetrics ?? null,
       paramValues: overrides.paramValues ?? null,
-      paramGeneration: overrides.paramGeneration ?? null,
       paramRevision: overrides.paramRevision ?? controller.paramRevision,
       presetCount: overrides.presetCount ?? null,
       presetIndex: overrides.presetIndex ?? null,
@@ -634,18 +633,16 @@ test('destroy() bumps the generation so a stale in-flight .then cannot arm a new
 // mode, since the main-thread engine is never stepped.
 // ---------------------------------------------------------------------------
 
-test('a segment-0 frame publishes paired param values and generation for the GUI', async () => {
+test('a segment-0 frame publishes rendered param values for the GUI', async () => {
   const c = makeController();
   c.create(2);
   const done = c.renderParallel();
   assert.equal(c.getParamValues(), null, 'nothing published before the first frame');
-  assert.equal(c.getParamGeneration(), null);
 
-  deliverFrame(c, 0, { paramValues: [0.25, 1], paramGeneration: 7,
+  deliverFrame(c, 0, { paramValues: [0.25, 1],
     presetCount: 6, presetIndex: 4 });
   assert.deepEqual(c.getParamValues(), [0.25, 1],
     'segment 0 mirrors its post-frame params into the controller');
-  assert.equal(c.getParamGeneration(), 7);
   assert.equal(c.getPresetCount(), 6);
   assert.equal(c.getPresetIndex(), 4);
 
@@ -689,7 +686,7 @@ test('an in-flight frame cannot republish parameter values from before a GUI wri
   c.create(2);
 
   let done = c.renderParallel();
-  deliverFrame(c, 0, { paramValues: [0.25], paramGeneration: 7 });
+  deliverFrame(c, 0, { paramValues: [0.25] });
   deliverFrame(c, 1);
   await done;
   assert.deepEqual(c.getParamValues(), [0.25]);
@@ -701,7 +698,7 @@ test('an in-flight frame cannot republish parameter values from before a GUI wri
     'the previous snapshot is withheld until a worker acknowledges the write');
 
   deliverFrame(c, 0, {
-    paramValues: [0.25], paramGeneration: 7, paramRevision: staleRevision,
+    paramValues: [0.25], paramRevision: staleRevision,
   });
   assert.equal(c.getParamValues(), null,
     'a frame rendered before the write cannot move the slider back');
@@ -709,7 +706,7 @@ test('an in-flight frame cannot republish parameter values from before a GUI wri
   await done;
 
   done = c.renderParallel();
-  deliverFrame(c, 0, { paramValues: [0.75], paramGeneration: 7 });
+  deliverFrame(c, 0, { paramValues: [0.75] });
   assert.deepEqual(c.getParamValues(), [0.75],
     'the first frame at the current revision resumes GUI synchronization');
   deliverFrame(c, 1);
@@ -2270,13 +2267,11 @@ test('selectPreset broadcasts one exact index and invalidates parameter state', 
   const c = readyController(2);
   c.presetCount = 6;
   c.paramValues = [1, 2];
-  c.paramGeneration = 7;
   assert.equal(c.selectPreset(4), true);
 
   assert.equal(c.getPresetIndex(), 4);
   assert.equal(c.animationsPaused, true);
   assert.equal(c.getParamValues(), null);
-  assert.equal(c.getParamGeneration(), null);
   for (const w of c.workers) {
     const msg = w.posted.find((m) => m.type === 'selectPreset');
     assert.equal(msg.index, 4);

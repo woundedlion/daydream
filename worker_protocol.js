@@ -144,7 +144,7 @@ export const PROTOCOL_VERSION = 7;
  * geometry cannot composite into another segment's rows.
  *
  * `paramValues` carries segment 0's post-frame parameter values (ordered to match
- * the effect's param list) so the GUI can track animation-driven changes the
+ * the effect's param list) so the GUI can track rendered changes the
  * un-stepped main engine cannot supply; null on every other segment.
  *
  * `fullFrame` is the disposition of the worker's last setClip: false when the
@@ -159,7 +159,6 @@ export const PROTOCOL_VERSION = 7;
  *   pixels: Uint16Array, elapsed: number,
  *   arenaMetrics: SegArenaMetrics | null,
  *   paramValues: number[] | null,
- *   paramGeneration: number | null,
  *   paramRevision: number, presetCount: number | null,
  *   presetIndex: number | null,
  *   fullFrame: boolean,
