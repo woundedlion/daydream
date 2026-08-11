@@ -96,6 +96,16 @@ test('parameter rows carry the OP_DEFS range and the current value', () => {
   assert.equal(tRow.children[0].htmlFor, range(tRow).id);
 });
 
+test('every op parameter control is named by its op, not by the bare key', () => {
+  const { el } = build({ op: 'snub', params: { t: 0.5, twist: 0.28 } });
+  for (const row of el.querySelectorAll('.op-param')) {
+    const range = row.children.find((c) => c.type === 'range');
+    assert.equal(range.getAttribute('aria-label'), `snub ${row.dataset.key}`,
+      'a chain of truncate + chamfer + bevel otherwise announces three sliders '
+      + 'all called "t"');
+  }
+});
+
 test('an integer-stepped parameter renders whole, a fractional one to two decimals', () => {
   assert.equal(formatParamValue(54, OP_DEFS.hankin.params.angle), '54');
   assert.equal(formatParamValue(100, OP_DEFS.relax.params.iter), '100');

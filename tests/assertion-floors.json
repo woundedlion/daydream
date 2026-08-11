@@ -201,8 +201,8 @@
     "assertions": 474
   },
   "tests/solid_op_rows.test.js": {
-    "cases": 10,
-    "assertions": 42
+    "cases": 11,
+    "assertions": 45
   },
   "tests/solid_render.test.js": {
     "cases": 14,
