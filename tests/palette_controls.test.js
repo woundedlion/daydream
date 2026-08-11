@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 
 const {
   paletteTabFromSearch, paletteTabUrl, tablistKeyTarget,
-  createPaletteViewport, recipeForViewport, axisEndpoints, axisFromEndpoints,
+  createPaletteViewport, axisEndpoints, axisFromEndpoints,
   lockedGroupMove,
   PaletteV4, defaultPaletteRecipe, paletteRecipeFromControls,
-  PALETTE_RECIPE_PRESETS, createPaletteRecipeState,
+  PALETTE_RECIPE_PRESETS,
   paletteRecipeAvailability, wrapTurns, signedTurnDelta, equivalentTurnNear,
   hitTestHueKeyMarker, oklchLinearRgb, maxSrgbGamutChroma,
   hueKeyState, customHueKeyState, customHueTurns, moveCustomHueKey,
@@ -71,16 +71,6 @@ test('reset restores the full palette viewport', () => {
   viewport.reset();
   assert.deepEqual(viewport.value, { start: 0, end: 1 });
   assert.equal(viewport.zoomed, false);
-});
-
-test('a palette viewport composes into a detached recipe input window', () => {
-  const recipe = defaultPaletteRecipe();
-  recipe.input = { offset: 0.1, span: 0.8 };
-  const exported = recipeForViewport(recipe, { start: 0.25, end: 0.75 });
-
-  assert.deepEqual(exported.input, { offset: 0.30000000000000004, span: 0.4 });
-  assert.deepEqual(recipe.input, { offset: 0.1, span: 0.8 });
-  assert.notEqual(exported, recipe);
 });
 
 test('axis endpoints round-trip through center and range', () => {
@@ -349,31 +339,6 @@ test('recipe availability exposes only controls that can affect the result', () 
   assert.equal(availability.hueDirection, false);
   assert.equal(availability.lightnessEndpoints, false);
   assert.equal(availability.chromaEndpoints, false);
-});
-
-test('recipe state rejects stale compiler results', () => {
-  const state = createPaletteRecipeState();
-  const oldRevision = state.value.revision;
-  const revision = state.edit(recipe => { recipe.hue.baseTurns = 0.25; });
-
-  assert.equal(state.applyCompileResult(oldRevision, {
-    status: { code: 0 }, canonicalRecipe: defaultPaletteRecipe(),
-  }), false);
-  assert.equal(state.applyCompileResult(revision, {
-    status: { code: 0 }, canonicalRecipe: state.value.draft,
-  }), true);
-  assert.equal(state.value.canonical.hue.baseTurns, 0.25);
-});
-
-test('recipe state never exposes mutable internal values', () => {
-  const state = createPaletteRecipeState();
-  const view = state.value;
-  view.draft.hue.baseTurns = 0.75;
-  assert.equal(state.value.draft.hue.baseTurns, 0);
-
-  state.replace(PALETTE_RECIPE_PRESETS.tonalMonochrome());
-  assert.equal(state.value.canonical, null);
-  assert.equal(state.value.status, null);
 });
 
 // A full set of control readings, as the generative tab reads them.

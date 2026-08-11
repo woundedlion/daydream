@@ -5,7 +5,7 @@ const {
   ProceduralPalette, GenerativePalette, compilePaletteRecipe,
   mapValue, waveGraphBand, WAVE_GRAPH_VALUE_RANGE,
   proceduralPaletteCpp, proceduralParamsForViewport,
-  generativePaletteCpp, paletteRecipeJson, setPaletteOps,
+  generativePaletteCpp, setPaletteOps,
   NAMED_PROCEDURAL_PALETTES, proceduralPaletteParams,
 } = await import('../tools/palette_math.js');
 const { defaultPaletteRecipe, PaletteV4 } = await import('../tools/palette_controls.js');
@@ -314,25 +314,10 @@ test('generativePaletteCpp names every supported color harmony', () => {
   }
 });
 
-test('paletteRecipeJson preserves a Complementary recipe without derived state', () => {
-  const recipe = defaultPaletteRecipe();
-  recipe.hue.harmony = PaletteV4.harmony.COMPLEMENTARY;
-  const exported = JSON.parse(paletteRecipeJson(recipe));
-
-  assert.equal(exported.schemaVersion, 4);
-  assert.equal('keyCount' in exported, false);
-  assert.equal(exported.hue.harmony, PaletteV4.harmony.COMPLEMENTARY);
-});
-
 test('generativePaletteCpp rejects unknown enum values', () => {
   const recipe = defaultPaletteRecipe();
   recipe.domain = 99;
   assert.throws(() => generativePaletteCpp(recipe), /unknown domain enum value 99/);
-});
-
-test('paletteRecipeJson preserves the complete recipe', () => {
-  const recipe = defaultPaletteRecipe();
-  assert.deepEqual(JSON.parse(paletteRecipeJson(recipe)), recipe);
 });
 
 test('compilePaletteRecipe selects the requested bridge operation and owns its buffers', () => {

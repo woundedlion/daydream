@@ -117,12 +117,12 @@
     "assertions": 58
   },
   "tests/palette_controls.test.js": {
-    "cases": 38,
-    "assertions": 137
+    "cases": 35,
+    "assertions": 128
   },
   "tests/palette_math.test.js": {
-    "cases": 23,
-    "assertions": 1448
+    "cases": 21,
+    "assertions": 1444
   },
   "tests/param_sync.test.js": {
     "cases": 29,

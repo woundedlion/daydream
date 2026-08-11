@@ -211,20 +211,6 @@ export function createPaletteViewport() {
 }
 
 /**
- * A copy of a recipe whose input window is narrowed onto the viewport, so a
- * zoomed strip compiles the phases it shows at full LUT resolution.
- * @param {Object} recipe - A V4 palette recipe.
- * @param {{start:number, end:number}} viewport - The visible window, in fractions of the recipe's own span.
- * @returns {Object} A detached recipe with the window composed onto input.offset/input.span.
- */
-export function recipeForViewport(recipe, viewport) {
-  const result = structuredClone(recipe);
-  result.input.offset = recipe.input.offset + viewport.start * recipe.input.span;
-  result.input.span = (viewport.end - viewport.start) * recipe.input.span;
-  return result;
-}
-
-/**
  * The endpoints a lightness or chroma axis spans, for controls that edit its
  * ends rather than its center and width.
  * @param {{center:number, range:number}} axis - The recipe's axis values.
@@ -589,10 +575,6 @@ export function paletteRecipeAvailability(recipe) {
   };
 }
 
-function cloneRecipe(recipe) {
-  return structuredClone(recipe);
-}
-
 /**
  * The tool's starting points, each a factory so a preset hands out a fresh
  * recipe rather than a shared one the page would edit in place.
@@ -622,57 +604,3 @@ export const PALETTE_RECIPE_PRESETS = Object.freeze({
     return recipe;
   },
 });
-
-/**
- * Owns the recipe being edited and the compiler's last word on it.
- *
- * Compilation is asynchronous, so each edit bumps a revision and a result
- * carrying a stale one is dropped: a slow compile cannot overwrite the state a
- * later edit produced. Every value in and out is cloned, so nothing the page
- * holds aliases the store.
- *
- * @param {Object} [initial] - Recipe to start from; copied, not adopted.
- * @returns {{value: Object, edit: function(function(Object): void): number, applyCompileResult: function(number, Object): boolean, replace: function(Object): number}}
- *   The store. `value` is a detached {revision, draft, canonical, status}
- *   snapshot; `edit` runs the mutator against a copy of the draft and returns
- *   the new revision; `applyCompileResult` records a result against the
- *   revision it compiled and reports whether that revision was still current;
- *   `replace` swaps the whole draft and returns the new revision.
- */
-export function createPaletteRecipeState(initial = defaultPaletteRecipe()) {
-  let state = {
-    revision: 0,
-    draft: cloneRecipe(initial),
-    canonical: null,
-    status: null,
-  };
-  return {
-    get value() {
-      return cloneRecipe(state);
-    },
-    edit(mutator) {
-      const draft = cloneRecipe(state.draft);
-      mutator(draft);
-      state = { ...state, revision: state.revision + 1, draft, status: null };
-      return state.revision;
-    },
-    applyCompileResult(revision, result) {
-      if (revision !== state.revision) return false;
-      state = {
-        ...state,
-        canonical: result.canonicalRecipe ? cloneRecipe(result.canonicalRecipe) : null,
-        status: { ...result.status },
-      };
-      return true;
-    },
-    replace(recipe) {
-      state = {
-        revision: state.revision + 1,
-        draft: cloneRecipe(recipe),
-        canonical: null,
-        status: null,
-      };
-      return state.revision;
-    },
-  };
-}
