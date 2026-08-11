@@ -227,7 +227,8 @@ export const INTERACTIVE_KEY_TARGET =
 export function createGlobalKeydownHandler({ dispatch }) {
   return (e) => {
     const target = e.target;
-    if (target instanceof Element && target.closest(INTERACTIVE_KEY_TARGET)) return;
+    if (typeof target?.closest === 'function'
+        && target.closest(INTERACTIVE_KEY_TARGET)) return;
     dispatch(e);
   };
 }
