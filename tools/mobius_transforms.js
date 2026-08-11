@@ -38,8 +38,7 @@ export function cadd(p, q) {
 
 /**
  * Computes the complex quotient p/q. Returns 0 when |q|^2 < 1e-6 (i.e. |q| <
- * 1e-3) to avoid divide-by-near-zero blow-up, matching the shader's guarded
- * division.
+ * 1e-3) to avoid divide-by-near-zero blow-up.
  * @param {{re:number, im:number}} p - Complex dividend.
  * @param {{re:number, im:number}} q - Complex divisor.
  * @returns {{re:number, im:number}} The complex quotient p/q, or {re:0, im:0} when |q|^2 < 1e-6 (|q| < 1e-3).
@@ -53,18 +52,13 @@ export function cdiv(p, q) {
   };
 }
 
-// GLSL port of cmult/cadd/cdiv consumed by the mobius.html fragment shader.
-// Single source of truth for the shader; tests/mobius_transforms.test.js pins
-// this against the JS functions above so the two cannot silently diverge.
+// GLSL port of cmult/cadd consumed by the mobius.html fragment shader. Single
+// source of truth for the shader; tests/mobius_transforms.test.js pins this
+// against the JS functions above so the two cannot silently diverge.
 export const glslComplexFunctions = `
         struct CNum { float re; float im; };
         CNum cmult(CNum p, CNum q) { return CNum(p.re * q.re - p.im * q.im, p.re * q.im + p.im * q.re); }
         CNum cadd(CNum p, CNum q) { return CNum(p.re + q.re, p.im + q.im); }
-        CNum cdiv(CNum p, CNum q) {
-          float denom = q.re * q.re + q.im * q.im;
-          if (denom < 1e-6) return CNum(0.0, 0.0);
-          return CNum((p.re * q.re + p.im * q.im) / denom, (p.im * q.re - p.re * q.im) / denom);
-        }
       `;
 
 // --- Projection-domain conventions ----------------------------------------

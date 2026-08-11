@@ -94,7 +94,7 @@ test('cdiv guards against a near-zero denominator', () => {
 });
 
 // --- GLSL/JS parity -------------------------------------------------------
-// The shader can't import the JS module, so the GLSL source for cmult/cadd/cdiv
+// The shader can't import the JS module, so the GLSL source for cmult/cadd
 // lives in mobius_transforms.js (glslComplexFunctions). These tests transpile
 // that GLSL body to JS and assert it agrees with the JS functions, so the two
 // implementations cannot silently diverge.
@@ -162,20 +162,19 @@ function transpileGlslCNum(src, name, params = ['p', 'q']) {
 const glsl = {
   cmult: transpileGlslCNum(glslComplexFunctions, 'cmult'),
   cadd: transpileGlslCNum(glslComplexFunctions, 'cadd'),
-  cdiv: transpileGlslCNum(glslComplexFunctions, 'cdiv'),
   stereo: transpileGlslCNum(glslProjectionFunctions, 'stereo', ['v']),
   projectDiv: transpileGlslCNum(glslProjectionFunctions, 'project_div', ['num', 'den']),
 };
 
-/** The GLSL source defines exactly the three complex ops the JS module exports. */
-test('glslComplexFunctions defines cmult, cadd and cdiv with the 1e-6 guard', () => {
+/** The GLSL source defines exactly the complex ops the shader calls. */
+test('glslComplexFunctions defines cmult and cadd', () => {
   assert.match(glslComplexFunctions, /CNum cmult\(/);
   assert.match(glslComplexFunctions, /CNum cadd\(/);
-  assert.match(glslComplexFunctions, /CNum cdiv\(/);
-  assert.match(glslComplexFunctions, /denom < 1e-6/);
+  assert.doesNotMatch(glslComplexFunctions, /CNum cdiv\(/,
+    'the shader divides through project_div; a GLSL cdiv would be dead source');
 });
 
-/** GLSL cmult/cadd/cdiv agree bit-for-bit with the JS versions across representative inputs. */
+/** GLSL cmult/cadd agree bit-for-bit with the JS versions across representative inputs. */
 test('GLSL complex ops match the JS implementations', () => {
   const cases = [
     { re: 1, im: 2 }, { re: 3, im: 4 }, { re: 0, im: 1 }, { re: -2, im: 0.5 },
@@ -183,7 +182,7 @@ test('GLSL complex ops match the JS implementations', () => {
   ];
   for (const p of cases) {
     for (const q of cases) {
-      for (const [name, jsFn] of [['cmult', cmult], ['cadd', cadd], ['cdiv', cdiv]]) {
+      for (const [name, jsFn] of [['cmult', cmult], ['cadd', cadd]]) {
         const a = jsFn(p, q);
         const b = glsl[name](p, q);
         assert.equal(b.re, a.re, `${name}.re for p=${JSON.stringify(p)} q=${JSON.stringify(q)}`);
@@ -191,17 +190,6 @@ test('GLSL complex ops match the JS implementations', () => {
       }
     }
   }
-});
-
-/** The 1e-6 guard fires identically in both: |q|^2 just below the threshold yields 0. */
-test('GLSL and JS cdiv share the 1e-6 near-zero-denominator guard', () => {
-  // |q|^2 = 1.6e-7 < 1e-6 -> guarded to 0 in both.
-  const q = { re: 4e-4, im: 0 };
-  assert.ok(q.re * q.re < 1e-6);
-  const a = cdiv({ re: 1, im: 1 }, q);
-  const b = glsl.cdiv({ re: 1, im: 1 }, q);
-  assert.deepEqual(b, a);
-  assertComplex(a, 0, 0, 'cdiv guarded');
 });
 
 // --- projection-domain conventions ----------------------------------------
