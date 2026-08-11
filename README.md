@@ -2159,7 +2159,7 @@ Some combinations are intentionally inadmissible. Legacy stereographic noise sel
 
 Projection seams use topology supplied by the projection kernel rather than guessing from planar coordinates. **Edge Fade** treats paired cuts as subduction boundaries: one stable side receives the authored fade width, while its partner gets only a one-pixel feather. Glued and periodic edges remain continuous and do not fade. **Pole Fade** is projection weight; selecting either projection-weight coverage policy carries that attenuation into alpha as well as any separately selected signal weighting.
 
-GUI sliders and dropdowns apply immediately. Automatic preset choreography remains continuous: compatible configurations morph one live state, while incompatible discrete topologies blend complete endpoint colors. Source, warp, projection, breathe, global-walk, and palette clocks keep advancing according to their named rates; **Pause Presets** stops automatic preset selection, not those clocks.
+GUI sliders and dropdowns apply immediately. Automatic preset choreography remains continuous: compatible configurations morph one live state, while incompatible discrete topologies blend complete endpoint colors. Source, warp, projection, breathe, global-walk, and palette clocks keep advancing according to their named rates. **Pause Animation** stops automatic preset selection; an in-flight preset transition still finishes.
 
 <table border="0"><tr>
 <td width="300"><a href="https://woundedlion.github.io/daydream/?effect=DisplacementField" target="_blank"><img src="docs/screenshots/DisplacementField.png" alt="DisplacementField" width="280"></a></td>
