@@ -64,6 +64,14 @@ test('a match count below the committed floor fails', () => {
   assert.match(err, /floor is 2/);
 });
 
+/** Verifies a floor left behind by the files that landed since is refused. */
+test('a match count above the committed floor fails', () => {
+  writeFileSync(join(root, 'tests', 'later.test.js'), '');
+  const err = runExpectingFailure();
+  assert.match(err, /2 files matched/);
+  assert.match(err, /Raise "testFileFloor" in package.json to 2/);
+});
+
 /** Verifies the floor cannot be dropped to disable the ratchet. */
 test('a missing floor fails', () => {
   writePkg({ testFileFloor: undefined });

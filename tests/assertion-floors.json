@@ -142,8 +142,8 @@
     "skippable": true
   },
   "tests/require_tests.test.js": {
-    "cases": 12,
-    "assertions": 17
+    "cases": 13,
+    "assertions": 19
   },
   "tests/run_tests.test.js": {
     "cases": 21,
