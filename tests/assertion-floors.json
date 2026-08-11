@@ -226,8 +226,8 @@
     "assertions": 166
   },
   "tests/tsconfig_roster.test.js": {
-    "cases": 6,
-    "assertions": 62
+    "cases": 7,
+    "assertions": 63
   },
   "tests/vendor-importmap.test.js": {
     "cases": 7,

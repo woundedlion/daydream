@@ -16,6 +16,57 @@
 import { formatFloatCpp } from './cpp_format.js';
 
 /**
+ * One op parameter's slider default and range.
+ * @typedef {{val: number, min: number, max: number, step: number}} OpParamDef
+ */
+
+/**
+ * @typedef {{op: string, params?: Object<string, number>}} ChainOpObject
+ */
+
+/**
+ * An op as a chain holds it: a bare op name, or an {op, params} object.
+ * @typedef {string|ChainOpObject} ChainOp
+ */
+
+/**
+ * A live WASM MeshOps mesh wrapper. Its op methods are bound by the module, so
+ * the surface is reached by name rather than declared here.
+ * @typedef {Object<string, any>} MeshWrapper
+ */
+
+/**
+ * A spawned WASM module instance, reached by binding name.
+ * @typedef {Object<string, any>} WasmModule
+ */
+
+/**
+ * A createChainValidator handle.
+ * @typedef {object} ChainValidator
+ * @property {() => Promise<?WasmModule>} acquire - The current validator instance, spawning one if needed.
+ * @property {(e: any) => void} noteDeath - Drops a wedged instance.
+ * @property {(task: (mod: ?WasmModule) => any) => Promise<any>} withValidator - Runs a task against the instance, serialized.
+ * @property {(base: string, ops: ChainOp[]) => Promise<{ok: boolean, message: string}>} chainIsValid - Replays a chain on the validator.
+ */
+
+/**
+ * What a gate pass concluded. `abandoned` is true on the pass that gives up,
+ * and only that one.
+ * @typedef {{blocked: Set<string>, complete: boolean, abandoned: boolean}} OpGateVerdict
+ */
+
+/**
+ * A solid as the tool holds it: a seed name, the chain applied to it, and the
+ * element counts the last preview reported.
+ * @typedef {object} SolidSpec
+ * @property {string} base - The base solid name.
+ * @property {ChainOp[]} ops - Ops to apply, in order.
+ * @property {number} [vCount] - Vertices the preview reported.
+ * @property {number} [fCount] - Faces the preview reported.
+ * @property {number} [iCount] - Indices the preview reported.
+ */
+
+/**
  * Per-op parameter table for the Conway/SolidBuilder operators, shared by the
  * live preview (applyOp) and the C++ generator (generateFuncAndRecipe) so the
  * two cannot drift. Each params entry names a parameter both paths consume, in
@@ -26,6 +77,7 @@ import { formatFloatCpp } from './cpp_format.js';
  * argument and only logs, so the preview would hide a bound the generated C++
  * carries into an always-on engine assert. engine_contract_wasm.test.js pins
  * both.
+ * @type {Object<string, {params: Object<string, OpParamDef>}>}
  */
 export const OP_DEFS = {
   kis: { params: {} },
@@ -53,6 +105,7 @@ export const OP_DEFS = {
  * covers. The composite ops (bevel, gyro, meta, needle, zip) are absent because
  * they lower to primitives before the check, and over the ranges this tool
  * offers every primitive they lower to sweeps.
+ * @type {Object<string, ?Object<string, {min: number, max: number}>>}
  */
 export const MORPH_SWEEP = {
   kis: {},
@@ -71,7 +124,7 @@ export const MORPH_SWEEP = {
  * the whole entry to IslamicStars' whole-generate fallback, so the shape appears
  * finished instead of being built op by op — a property of the authored chain
  * that no engine-domain check reports.
- * @param {(string|{op: string, params: Object<string, number>})} o - The op as the chain holds it.
+ * @param {ChainOp} o - The op as the chain holds it.
  * @returns {?string} A sentence naming the reason, or null when the step sweeps.
  */
 export function unsweepableReason(o) {
@@ -106,7 +159,7 @@ export const PARAMETERIZED_OPS = new Set(
  * Rejects an op whose params object is missing on either dispatch path.
  * @param {string} where - Caller name used in the error message.
  * @param {string} opName - The op being dispatched.
- * @param {(string|{op:string, params:Object})} o - The op as supplied.
+ * @param {ChainOp} o - The op as supplied.
  * @returns {void}
  * @throws {Error} When a parameterized op arrives without a params object.
  */
@@ -114,6 +167,15 @@ function requireParams(where, opName, o) {
   if (PARAMETERIZED_OPS.has(opName) && (typeof o === 'string' || !o.params)) {
     throw new Error(`${where}: op "${opName}" requires a params object`);
   }
+}
+
+/**
+ * The params of an op that requireParams has already accepted.
+ * @param {ChainOp} o - The op as supplied.
+ * @returns {Object<string, number>} Its params; empty for a parameterless op.
+ */
+function opParams(o) {
+  return (typeof o === 'string' ? undefined : o.params) ?? {};
 }
 
 /**
@@ -205,9 +267,9 @@ export const CATALAN_BASES = new Set([
 /**
  * Applies one op of the {op, params} encoding to a WASM mesh wrapper, returning
  * the resulting mesh.
- * @param {Object} mesh - A live WASM MeshOps mesh wrapper.
- * @param {(string|{op:string, params:Object})} o - The op to apply, as a bare op name or an {op, params} object.
- * @returns {Object} The new mesh wrapper.
+ * @param {MeshWrapper} mesh - A live WASM MeshOps mesh wrapper.
+ * @param {ChainOp} o - The op to apply, as a bare op name or an {op, params} object.
+ * @returns {MeshWrapper} The new mesh wrapper.
  * @throws {Error} When the op name is not a known operator, when the module binds no method for it, or when the op soft-rejects.
  * @details Single source of truth for op dispatch: the live-preview module and
  * the sacrificial validator module must run byte-identical chains or validation
@@ -232,20 +294,21 @@ export function applyOp(mesh, o) {
 
 /**
  * Calls the bound method for one op.
- * @param {Object} mesh - A live WASM MeshOps mesh wrapper.
- * @param {(string|{op:string, params:Object})} o - The op to apply.
+ * @param {MeshWrapper} mesh - A live WASM MeshOps mesh wrapper.
+ * @param {ChainOp} o - The op to apply.
  * @param {string} opName - The op's name.
- * @returns {?Object} The new mesh wrapper, or null when the module soft-rejects the op.
+ * @returns {?MeshWrapper} The new mesh wrapper, or null when the module soft-rejects the op.
  * @throws {Error} When the module binds no method for the op name.
  */
 function dispatchOp(mesh, o, opName) {
-  if (opName === 'truncate') return mesh.truncate(o.params.t);
-  if (opName === 'chamfer') return mesh.chamfer(o.params.t);
-  if (opName === 'expand') return mesh.expand(o.params.t);
-  if (opName === 'bevel') return mesh.bevel(o.params.t);
-  if (opName === 'snub') return mesh.snub(o.params.t, o.params.twist);
-  if (opName === 'hankin') return mesh.hankin(o.params.angle * (Math.PI / 180));
-  if (opName === 'relax') return mesh.relax(o.params.iter);
+  const params = opParams(o);
+  if (opName === 'truncate') return mesh.truncate(params.t);
+  if (opName === 'chamfer') return mesh.chamfer(params.t);
+  if (opName === 'expand') return mesh.expand(params.t);
+  if (opName === 'bevel') return mesh.bevel(params.t);
+  if (opName === 'snub') return mesh.snub(params.t, params.twist);
+  if (opName === 'hankin') return mesh.hankin(params.angle * (Math.PI / 180));
+  if (opName === 'relax') return mesh.relax(params.iter);
   if (mesh[opName]) return mesh[opName]();
   throw new Error(`unknown op "${opName}" — not bound by the WASM MeshOps module`);
 }
@@ -267,6 +330,7 @@ export const MESH_OP_RESULT_NAMES = [
 ];
 
 // Reason-specific tail of the message a null MeshOps result earns.
+/** @type {Object<string, string>} */
 const MESH_FAILURE_REMEDY = {
   UNKNOWN_NAME: 'the engine registers no solid by that name',
   CONNECTIVITY_OVERFLOW: 'the result passes the engine 16-bit element ceiling — remove an op',
@@ -280,7 +344,7 @@ const MESH_FAILURE_REMEDY = {
 
 /**
  * Reads back why a mesh-producing MeshOps call returned null.
- * @param {Object} Mod - The WASM module instance that produced the null.
+ * @param {WasmModule} Mod - The WASM module instance that produced the null.
  * @param {string} what - What the caller was building, used in the message.
  * @returns {{reason: string, message: string, flush: boolean}} The MeshOpResult key, a message to show, and whether clearToolingMemory() is the remedy that reason calls for.
  * @details Embind enum values are singletons, so the recorded result is matched
@@ -304,13 +368,13 @@ export function meshOpFailure(Mod, what) {
 /**
  * Passes a mesh-producing MeshOps result through, or reports and remedies the
  * failure a null stands for.
- * @param {Object|null} result - What the bridge returned.
+ * @param {MeshWrapper?} result - What the bridge returned.
  * @param {string} what - What the caller was building, used in the message.
  * @param {Object} ctx - The live wiring, read per call because an engine halt nulls it.
- * @param {Object} ctx.Mod - The WASM module instance that produced the result.
- * @param {{clearToolingMemory: Function}} ctx.meshOps - Its MeshOps binding.
- * @param {Function} ctx.onError - Surfaces the failure message to the user.
- * @returns {Object|null} The result, or null when it was a failure.
+ * @param {WasmModule} ctx.Mod - The WASM module instance that produced the result.
+ * @param {{clearToolingMemory: () => void}} ctx.meshOps - Its MeshOps binding.
+ * @param {(message: string) => void} ctx.onError - Surfaces the failure message to the user.
+ * @returns {MeshWrapper?} The result, or null when it was a failure.
  * @details MeshOps answers a recoverable failure with null and records the
  * reason (getLastResult); an unchecked null becomes a TypeError several calls
  * later. Only ARENA_EXHAUSTED is cleared by flushing the tooling arenas, so the
@@ -332,12 +396,26 @@ const CPP_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // malformed token. requireFinite covers fractional params; requireCount also
 // enforces a positive integer (e.g. a relax iteration count — the engine's
 // apply_step refuses a bake-less RELAX below one iteration).
+/**
+ * @param {string} opName - The op the param belongs to.
+ * @param {string} param - The param's name.
+ * @param {number} val - The value to check.
+ * @returns {void}
+ * @throws {Error} When the value is not finite.
+ */
 function requireFinite(opName, param, val) {
   if (!Number.isFinite(val)) {
     throw new Error(`generateFuncAndRecipe: ${opName} param "${param}" must be a finite number, got ${val}`);
   }
 }
 
+/**
+ * @param {string} opName - The op the param belongs to.
+ * @param {string} param - The param's name.
+ * @param {number} val - The value to check.
+ * @returns {void}
+ * @throws {Error} When the value is not a positive integer.
+ */
 function requireCount(opName, param, val) {
   if (!Number.isInteger(val) || val < 1) {
     throw new Error(`generateFuncAndRecipe: ${opName} param "${param}" must be a positive integer, got ${val}`);
@@ -346,6 +424,12 @@ function requireCount(opName, param, val) {
 
 // Generated functions are pasted into `namespace IslamicStarPatterns`, which
 // carries no using-directive, so the seed call must name its own namespace.
+/**
+ * @param {string} where - Caller name used in the error message.
+ * @param {string} ns - The namespace to check.
+ * @returns {void}
+ * @throws {Error} When the namespace is not a valid C++ identifier.
+ */
 function requireNamespace(where, ns) {
   if (typeof ns !== 'string' || !CPP_IDENTIFIER.test(ns)) {
     throw new Error(`${where}: base namespace "${ns}" is not a valid C++ identifier`);
@@ -406,9 +490,7 @@ export function pctSuffix(val) {
  * (`_truncate50d`) and spelled-out (`_hankin62`) names also there are not
  * generated, so a generated name need not match a hand-written one for the
  * same chain.
- * @param {Object} item - The solid spec.
- * @param {string} item.base - The base solid name.
- * @param {Array<(string|{op:string, params:Object})>} item.ops - Ops to apply, each a bare op name or an {op, params} object; must be non-empty.
+ * @param {SolidSpec} item - The solid spec; its op chain must be non-empty.
  * @param {string} [baseNamespace] - Namespace qualifying the seed call (e.g. "Archimedean"). Omit only when the caller wants the funcName alone; a recipe pasted into the engine must carry it.
  * @returns {{funcName: string, recipe: string}} The generated C++ function name and SolidBuilder recipe expression.
  * @throws {Error} When the base or namespace is not a valid C++ identifier, the op chain is empty, or an op or its params are invalid.
@@ -440,41 +522,42 @@ export function generateFuncAndRecipe(item, baseNamespace = '') {
         `(expected one of ${[...KNOWN_OPS].join(', ')})`);
     }
     requireParams('generateFuncAndRecipe', opName, o);
+    const params = opParams(o);
 
     if (opName === 'truncate') {
-      requireFinite(opName, 't', o.params.t);
-      chain += `.truncate(${formatFloat(o.params.t)})`;
-      nameParts.push(`_truncate${pctSuffix(o.params.t)}`);
+      requireFinite(opName, 't', params.t);
+      chain += `.truncate(${formatFloat(params.t)})`;
+      nameParts.push(`_truncate${pctSuffix(params.t)}`);
     } else if (opName === 'expand') {
-      requireFinite(opName, 't', o.params.t);
-      chain += `.expand(${formatFloat(o.params.t)})`;
-      nameParts.push(`_expand${pctSuffix(o.params.t)}`);
+      requireFinite(opName, 't', params.t);
+      chain += `.expand(${formatFloat(params.t)})`;
+      nameParts.push(`_expand${pctSuffix(params.t)}`);
     } else if (opName === 'chamfer') {
-      requireFinite(opName, 't', o.params.t);
-      chain += `.chamfer(${formatFloat(o.params.t)})`;
-      nameParts.push(`_chamfer${pctSuffix(o.params.t)}`);
+      requireFinite(opName, 't', params.t);
+      chain += `.chamfer(${formatFloat(params.t)})`;
+      nameParts.push(`_chamfer${pctSuffix(params.t)}`);
     } else if (opName === 'hankin') {
-      requireFinite(opName, 'angle', o.params.angle);
-      if (o.params.angle < 0) {
-        throw new Error(`generateFuncAndRecipe: hankin angle ${o.params.angle} is negative; suffix must stay a valid C++ identifier`);
+      requireFinite(opName, 'angle', params.angle);
+      if (params.angle < 0) {
+        throw new Error(`generateFuncAndRecipe: hankin angle ${params.angle} is negative; suffix must stay a valid C++ identifier`);
       }
-      chain += `.hankin(${formatFloat(o.params.angle)} * D2R)`;
-      nameParts.push(`_hk${Math.round(o.params.angle)}`);
+      chain += `.hankin(${formatFloat(params.angle)} * D2R)`;
+      nameParts.push(`_hk${Math.round(params.angle)}`);
     } else if (opName === 'snub') {
       // The twist suffix keeps two snubs that share a `t` but differ in twist
       // from colliding on one funcName.
-      requireFinite(opName, 't', o.params.t);
-      requireFinite(opName, 'twist', o.params.twist);
-      chain += `.snub(${formatFloat(o.params.t)}, ${formatFloat(o.params.twist)})`;
-      nameParts.push(`_snub${pctSuffix(o.params.t)}_tw${pctSuffix(o.params.twist)}`);
+      requireFinite(opName, 't', params.t);
+      requireFinite(opName, 'twist', params.twist);
+      chain += `.snub(${formatFloat(params.t)}, ${formatFloat(params.twist)})`;
+      nameParts.push(`_snub${pctSuffix(params.t)}_tw${pctSuffix(params.twist)}`);
     } else if (opName === 'relax') {
-      requireCount(opName, 'iter', o.params.iter);
-      chain += `.relax(${o.params.iter})`;
-      nameParts.push(`_relax${o.params.iter}`);
+      requireCount(opName, 'iter', params.iter);
+      chain += `.relax(${params.iter})`;
+      nameParts.push(`_relax${params.iter}`);
     } else if (opName === 'bevel') {
-      requireFinite(opName, 't', o.params.t);
-      chain += `.bevel(${formatFloat(o.params.t)})`;
-      nameParts.push(`_bevel${pctSuffix(o.params.t)}`);
+      requireFinite(opName, 't', params.t);
+      chain += `.bevel(${formatFloat(params.t)})`;
+      nameParts.push(`_bevel${pctSuffix(params.t)}`);
     } else {
       // Parameterless ops: dual, kis, ambo, gyro, meta, needle, zip.
       chain += `.${opName}()`;
@@ -507,7 +590,7 @@ function commentCount(value) {
  * Emits the full FLASHMEM C++ function for a solid, prefixed with a comment
  * recording its vertex/face/index counts. Output is pasted verbatim into the
  * engine, so the exact text and formatting are byte-for-byte significant.
- * @param {Object} item - The solid spec (see generateFuncAndRecipe), optionally with vCount, fCount, and iCount counts.
+ * @param {SolidSpec} item - The solid spec (see generateFuncAndRecipe), optionally with vCount, fCount, and iCount counts.
  * @param {string} baseNamespace - Namespace qualifying the seed call (e.g. "Archimedean"); required, since the emitted function is pasted where the seed is not visible unqualified.
  * @returns {string} The complete C++ function source including its leading count comment.
  * @throws {Error} When the namespace is not a valid C++ identifier, or generateFuncAndRecipe rejects the spec.
@@ -667,6 +750,7 @@ export function fanTriangulateFace(vertices, face, emit, forceCentroid = false) 
  */
 export function uniqueEdges(faces, vertexCount) {
   const seen = new Set();
+  /** @type {Array<[number, number]>} */
   const edges = [];
   for (const f of faces) {
     for (let i = 0; i < f.length; i++) {
@@ -752,8 +836,9 @@ export function geodesicTriangleVertices(a, b, c, n) {
     grid.push(row);
   }
 
+  /** @type {number[]} */
   const out = [];
-  const emit = (p) => out.push(p[0], p[1], p[2]);
+  const emit = (/** @type {number[]} */ p) => out.push(p[0], p[1], p[2]);
   for (let gi = 0; gi < n; gi++) {
     for (let gj = 0; gj < n - gi; gj++) {
       emit(grid[gi][gj]);
@@ -831,12 +916,12 @@ export function movedOps(ops, from, to) {
  * Builds a serializer for validated state mutations: each commit sees the state
  * its predecessors left, so two rapid clicks can't validate against the same
  * snapshot and then both land.
- * @param {Function} [onError] - Handler for a rejected commit; defaults to console.error.
- * @returns {function(Function): Promise<void>} Enqueues a commit and resolves once it (or its error handler) has run.
+ * @param {(reason: any) => void} [onError] - Handler for a rejected commit; defaults to console.error.
+ * @returns {(commit: () => any) => Promise<void>} Enqueues a commit and resolves once it (or its error handler) has run.
  */
 export function createCommitQueue(onError = console.error) {
   let tail = Promise.resolve();
-  return function queueCommit(fn) {
+  return function queueCommit(/** @type {() => any} */ fn) {
     tail = tail.then(fn).catch(onError);
     return tail;
   };
@@ -853,10 +938,11 @@ export function createCommitQueue(onError = console.error) {
  * the live module ever sees it: a trap kills only the validator, which is
  * respawned, and the mutation is rejected. The engine stays the single authority
  * on its own invariants.
- * @param {function(): Promise<Object>} createModule - Spawns a fresh WASM module instance.
- * @returns {{acquire: function(): Promise<?Object>, noteDeath: function(*): void, withValidator: function(Function): Promise<*>, chainIsValid: function(string, Array<Object>): Promise<{ok: boolean, message: string}>}} The validator handle.
+ * @param {() => Promise<WasmModule>} createModule - Spawns a fresh WASM module instance.
+ * @returns {ChainValidator} The validator handle.
  */
 export function createChainValidator(createModule) {
+  /** @type {?Promise<WasmModule>} */
   let modulePromise = null;
   // Serializes all validator use: tasks hold the single instance (and sometimes
   // a live mesh wrapper) across awaits, and an interleaved clearToolingMemory
@@ -865,7 +951,7 @@ export function createChainValidator(createModule) {
 
   /**
    * Resolves the current validator instance, spawning one if needed.
-   * @returns {Promise<?Object>} The module, or null when it failed to spawn.
+   * @returns {Promise<?WasmModule>} The module, or null when it failed to spawn.
    * @details A failed spawn is not cached: the next acquire retries.
    */
   function acquire() {
@@ -888,8 +974,8 @@ export function createChainValidator(createModule) {
 
   /**
    * Runs a task against the validator instance, serialized behind prior tasks.
-   * @param {function(?Object): *} task - Receives the module, or null when it failed to spawn.
-   * @returns {Promise<*>} The task's result.
+   * @param {(mod: ?WasmModule) => any} task - Receives the module, or null when it failed to spawn.
+   * @returns {Promise<any>} The task's result.
    */
   function withValidator(task) {
     const run = queue.then(async () => task(await acquire()));
@@ -902,7 +988,7 @@ export function createChainValidator(createModule) {
    * Replays base+ops (plus the classifyFaces pass the tool always runs) on the
    * validator.
    * @param {string} base - Registry name of the seed solid.
-   * @param {Array<(string|{op:string, params:Object})>} ops - The candidate op chain.
+   * @param {ChainOp[]} ops - The candidate op chain.
    * @returns {Promise<{ok: boolean, message: string}>} Whether the whole chain is safe for the live module, and why it is not when it is not.
    * @details A missing validator (module failed to spawn) resolves ok: true;
    * prevention degrades to the old behavior rather than blocking the tool. The
@@ -913,12 +999,13 @@ export function createChainValidator(createModule) {
     return withValidator((Mod) => {
       if (!Mod) return { ok: true, message: '' };
       const Ops = Mod.MeshOps;
+      /** @type {?MeshWrapper} */
       let mesh = null;
       // What the replay was building, named in whatever failure it hits.
       let what = `Base solid "${base}"`;
       // Reads the reason the module recorded before any further bridge call can
       // overwrite it, then frees the mesh and the arenas.
-      const rejected = (e = null) => {
+      const rejected = (/** @type {any} */ e = null) => {
         const failure = meshOpFailure(Mod, what);
         // A reason of OK means the bridge recorded no rejection and the throw
         // came from JS (an unbound op name, an Embind marshalling error).
@@ -972,12 +1059,13 @@ export function createChainValidator(createModule) {
  *
  * Gating depends only on the mesh's topology, which op params never change, so
  * a pass whose base and op names repeat the last complete one is skipped.
- * @param {{acquire: function(): Promise<?Object>, noteDeath: function(*): void, withValidator: function(Function): Promise<*>}} validator - A createChainValidator handle.
+ * @param {ChainValidator} validator - A createChainValidator handle.
  * @param {number} [retries=3] - Incomplete passes tolerated before probing stops. A validator that never spawns would otherwise be retried on every recompute.
- * @returns {{refresh: function(string, Array<Object>, string[]): Promise<?{blocked: Set<string>, complete: boolean, abandoned: boolean}>}} The gate.
+ * @returns {{refresh: (base: string, ops: Array<{op: string}>, candidates: string[]) => Promise<?OpGateVerdict>}} The gate.
  */
 export function createOpGate(validator, retries = 3) {
   let generation = 0;
+  /** @type {?string} */
   let lastSignature = null;
   let failures = 0;
   let abandoned = false;
@@ -985,7 +1073,7 @@ export function createOpGate(validator, retries = 3) {
   /**
    * Sweeps the candidates against a live validator instance.
    * @param {string} base - Registry name of the seed solid.
-   * @param {Array<Object>} ops - The current chain.
+   * @param {ChainOp[]} ops - The current chain.
    * @param {string[]} candidates - Op names to probe.
    * @returns {Promise<{bad: Set<string>, complete: boolean}>} The ops that would
    *   trap, and whether the sweep ever got a full pass against a live module.
@@ -993,9 +1081,10 @@ export function createOpGate(validator, retries = 3) {
    */
   function probe(base, ops, candidates) {
     return validator.withValidator(async (Mod) => {
+      /** @type {Set<string>} */
       const bad = new Set();
       if (!Mod) return { bad, complete: false };
-      const build = (M) => {
+      const build = (/** @type {WasmModule} */ M) => {
         let mesh = M.MeshOps.fromSolidName(base);
         if (!mesh) {
           const failure = meshOpFailure(M, `Base solid "${base}"`);
@@ -1009,6 +1098,7 @@ export function createOpGate(validator, retries = 3) {
         }
         return mesh;
       };
+      /** @type {MeshWrapper} */
       let mesh;
       try {
         mesh = build(Mod); // current chain: valid by construction
@@ -1017,6 +1107,7 @@ export function createOpGate(validator, retries = 3) {
         return { bad, complete: false };
       }
       for (const op of candidates) {
+        /** @type {{op: string, params: Object<string, number>}} */
         const candidate = { op, params: {} };
         for (const [key, def] of Object.entries(OP_DEFS[op]?.params ?? {})) {
           candidate.params[key] = def.val;
@@ -1049,9 +1140,8 @@ export function createOpGate(validator, retries = 3) {
    * @param {string} base - Registry name of the seed solid.
    * @param {Array<{op: string}>} ops - The current chain.
    * @param {string[]} candidates - Op names to probe.
-   * @returns {Promise<?{blocked: Set<string>, complete: boolean, abandoned: boolean}>}
-   *   The verdict, or null when the pass was skipped or the chain changed under
-   *   it. `abandoned` is true on the pass that gives up, and only that one.
+   * @returns {Promise<?OpGateVerdict>} The verdict, or null when the pass was
+   *   skipped or the chain changed under it.
    */
   async function refresh(base, ops, candidates) {
     const signature = `${base}|${ops.map((o) => o.op).join(',')}`;

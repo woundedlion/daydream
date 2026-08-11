@@ -30,7 +30,7 @@
  * @param {string} [cfg.sliderClass] - Classes for the input
  * @param {string} [cfg.valueClass] - Classes for the readout span
  * @param {Function} onInput - Called with the raw slider value on each input
- * @returns {{ slider: HTMLInputElement, valueSpan: HTMLElement, setValue: function(number): number }}
+ * @returns {{ slider: HTMLInputElement, valueSpan: HTMLElement, setValue: (display: number) => number }}
  */
 export function createSlider(containerId, cfg, onInput) {
   const container = document.getElementById(containerId);

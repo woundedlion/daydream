@@ -3,8 +3,9 @@
 // imports are never followed, so a module the roster misses degrades to `any`
 // with no diagnostic — the typecheck stays green while checking nothing about
 // it, and a `// @ts-check` pragma on an unrostered file is inert for the same
-// reason. These cases keep the roster closed under the pipeline's own imports
-// and over every file that claims the pragma.
+// reason. These cases keep the roster closed under the pipeline's own imports,
+// over every file that claims the pragma, and over tools/, which is rostered
+// whole apart from the modules a bare third-party import puts out of reach.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -143,6 +144,24 @@ test('every not-checked module has a declaration file on the roster', () => {
     assert.ok(existsSync(fileURLToPath(new URL(declaration, ROOT))),
       `tsconfig.json "files" lists ${declaration}, which does not exist`);
   }
+});
+
+test('every tools/ module is rostered unless a bare import puts it out of reach', () => {
+  const roster = readTsconfig().files;
+  const unreachable = [];
+  for (const entry of readdirSync(new URL('tools/', ROOT), { withFileTypes: true })) {
+    if (!entry.isFile() || !/\.m?js$/.test(entry.name)) continue;
+    const path = `tools/${entry.name}`;
+    if (roster.includes(path)) continue;
+    const source = readFileSync(new URL(path, ROOT), 'utf8');
+    // A bare specifier resolves to a package this program does not contain, and
+    // noResolve cannot pull its typings in, so the module cannot check clean.
+    if (!/\bfrom\s*["'][^.'"]/.test(source)) unreachable.push(path);
+  }
+
+  assert.deepEqual(unreachable, [],
+    'a tools/ module with no third-party import has nothing stopping it from '
+    + 'being checked — add it to tsconfig.json "files"');
 });
 
 test('the typecheck roster stays inside its stated scope', () => {

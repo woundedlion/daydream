@@ -11,12 +11,48 @@
 import { srgbToLinearFloat, linearToSrgbFloat } from './color.js';
 import { formatFloatCpp } from './cpp_format.js';
 
+/** @typedef {import('./palette_controls.js').PaletteRecipe} PaletteRecipe */
+
+/**
+ * The 12 flattened cosine coefficients the procedural sliders and the C++
+ * export read: A/B/C/D per R/G/B channel.
+ * @typedef {{A_R:number,A_G:number,A_B:number,B_R:number,B_G:number,B_B:number,C_R:number,C_G:number,C_B:number,D_R:number,D_G:number,D_B:number}} ProceduralParams
+ */
+
+/**
+ * @typedef {object} PaletteCompileStatus
+ * @property {number} code - 0 on success, otherwise the compiler's error code.
+ * @property {number} field - Which recipe field the error names.
+ */
+
+/**
+ * A compile result detached from WASM memory. The buffers are absent when the
+ * recipe did not compile, and `diagnostics` also when the bake skipped them.
+ * @typedef {object} PaletteCompileResult
+ * @property {PaletteCompileStatus} status - How the compile went.
+ * @property {PaletteRecipe} [canonicalRecipe] - The recipe as the compiler normalized it.
+ * @property {Uint8Array} [lut] - 256 sRGB triples.
+ * @property {Float32Array} [diagnostics] - Six per-entry values, in diagnosticAt's order.
+ * @property {Uint8Array} [fallback] - Per entry, non-zero where the color was mapped back into gamut.
+ */
+
+/**
+ * The engine bridge every generative-palette call compiles through.
+ * @typedef {object} PaletteOps
+ * @property {(recipe: PaletteRecipe) => PaletteCompileResult} compileAndBakeV4
+ * @property {(recipe: PaletteRecipe) => PaletteCompileResult} inspectV4
+ */
+
 const TWO_PI = 2 * Math.PI;
 
-// Mirror of the engine's fast_cosf (core/math/3dmath.h): a Bhaskara I sine
-// approximation, range-reduced to [0, 2π). ProceduralPalette::get evaluates its
-// cosine this way on the per-sample path, so the browser preview must use the
-// same approximation (not Math.cos) to predict device colors.
+/**
+ * Mirror of the engine's fast_cosf (core/math/3dmath.h): a Bhaskara I sine
+ * approximation, range-reduced to [0, 2π). ProceduralPalette::get evaluates its
+ * cosine this way on the per-sample path, so the browser preview must use the
+ * same approximation (not Math.cos) to predict device colors.
+ * @param {number} x - Angle in radians.
+ * @returns {number} The approximated sine.
+ */
 function fastSin(x) {
   x -= Math.floor(x / TWO_PI) * TWO_PI;
   let sign = 1;
@@ -24,16 +60,21 @@ function fastSin(x) {
   const xpi = x * (Math.PI - x);
   return (sign * 16 * xpi) / (5 * Math.PI * Math.PI - 4 * xpi);
 }
+/**
+ * @param {number} x - Angle in radians.
+ * @returns {number} The approximated cosine.
+ */
 function fastCos(x) { return fastSin(x + Math.PI * 0.5); }
 
 // --- WASM color-math bridge -------------------------------------------------
+/** @type {PaletteOps?} */
 let paletteOps = null;
 
 /**
  * Installs the module-lifetime PaletteOps instance every generative-palette
  * call compiles through. The page installs it once the WASM module is up, and
  * passes null to drop it.
- * @param {{compileAndBakeV4:Function, inspectV4:Function}|null} ops - The engine bridge, or null to clear it.
+ * @param {PaletteOps?} ops - The engine bridge, or null to clear it.
  * @returns {void}
  */
 export function setPaletteOps(ops) {
@@ -140,7 +181,7 @@ export const NAMED_PROCEDURAL_PALETTES = [
  * Flattens a palette's a/b/c/d coefficient vec3s into the tool's 12-key
  * `parameters` object (A_R..D_B) the sliders and the C++ export read.
  * @param {{a:number[], b:number[], c:number[], d:number[]}} palette - A {a,b,c,d} coefficient set (e.g. a NAMED_PROCEDURAL_PALETTES entry).
- * @returns {{A_R:number,A_G:number,A_B:number,B_R:number,B_G:number,B_B:number,C_R:number,C_G:number,C_B:number,D_R:number,D_G:number,D_B:number}} The flattened coefficients.
+ * @returns {ProceduralParams} The flattened coefficients.
  */
 export function proceduralPaletteParams({ a, b, c, d }) {
   return {
@@ -156,9 +197,9 @@ export function proceduralPaletteParams({ a, b, c, d }) {
  * viewport's window of the original: each channel's frequency scales by the
  * window's span and its phase absorbs the window's start. A zoomed strip then
  * plots the same colors at full width without the caller remapping t.
- * @param {{A_R:number,A_G:number,A_B:number,B_R:number,B_G:number,B_B:number,C_R:number,C_G:number,C_B:number,D_R:number,D_G:number,D_B:number}} parameters - The 12 cosine coefficients.
+ * @param {ProceduralParams} parameters - The 12 cosine coefficients.
  * @param {{start:number, end:number}} viewport - The visible window, in the palette's own 0..1 phase.
- * @returns {Object} The same 12 keys, with C and D rewritten for the window.
+ * @returns {ProceduralParams} The same 12 keys, with C and D rewritten for the window.
  */
 export function proceduralParamsForViewport(parameters, viewport) {
   const span = viewport.end - viewport.start;
@@ -179,9 +220,9 @@ export function proceduralParamsForViewport(parameters, viewport) {
  * Compiles a recipe with the engine and copies its aliased module buffers. The
  * bridge returns views onto WASM memory, which the next call reuses, so the
  * results are copied out before they can be overwritten.
- * @param {Object} recipe - A V4 palette recipe.
+ * @param {PaletteRecipe} recipe - A V4 palette recipe.
  * @param {boolean} [inspect=true] - Whether to also bake the per-sample diagnostics the tool plots; false bakes the LUT alone.
- * @returns {{status:Object, canonicalRecipe:(Object|undefined), lut:(Uint8Array|undefined), diagnostics:(Float32Array|undefined), fallback:(Uint8Array|undefined)}} The detached compile result; `status.code` is 0 on success.
+ * @returns {PaletteCompileResult} The detached compile result; `status.code` is 0 on success.
  * @throws {Error} When no PaletteOps bridge has been installed.
  */
 export function compilePaletteRecipe(recipe, inspect = true) {
@@ -191,6 +232,7 @@ export function compilePaletteRecipe(recipe, inspect = true) {
   const result = inspect
     ? paletteOps.inspectV4(recipe)
     : paletteOps.compileAndBakeV4(recipe);
+  /** @type {PaletteCompileResult} */
   const copied = {
     status: { ...result.status },
     canonicalRecipe: result.canonicalRecipe
@@ -211,7 +253,7 @@ export function compilePaletteRecipe(recipe, inspect = true) {
 export class GenerativePalette {
   /**
    * Compiles the recipe and keeps the baked LUT and diagnostics.
-   * @param {Object} recipe - A V4 palette recipe.
+   * @param {PaletteRecipe} recipe - A V4 palette recipe.
    * @throws {Error} When the recipe does not compile, carrying the status code and field.
    */
   constructor(recipe) {
@@ -221,9 +263,10 @@ export class GenerativePalette {
         `Palette recipe error ${result.status.code} at field ${result.status.field}`);
     }
     this.canonicalRecipe = result.canonicalRecipe;
-    this.lut = result.lut;
-    this.diagnostics = result.diagnostics;
-    this.fallback = result.fallback;
+    // A successful inspect bake always carries all three buffers.
+    this.lut = /** @type {Uint8Array} */ (result.lut);
+    this.diagnostics = /** @type {Float32Array} */ (result.diagnostics);
+    this.fallback = /** @type {Uint8Array} */ (result.fallback);
   }
 
   /**
@@ -321,13 +364,17 @@ export const WAVE_GRAPH_VALUE_RANGE = { min: -0.5, max: 1.5 };
  * band between 10% and 90% of the height, value increasing upward. The 10%
  * margins leave the range-boundary lines drawable inside the canvas.
  * @param {number} height - Canvas height in pixels.
- * @returns {{yTop: number, yBottom: number, toY: function(number): number}} The band's canvas-y edges (yTop is the max-value edge) and the value-to-canvas-y map.
+ * @returns {{yTop: number, yBottom: number, toY: (value: number) => number}} The band's canvas-y edges (yTop is the max-value edge) and the value-to-canvas-y map.
  */
 export function waveGraphBand(height) {
   const yTop = height * 0.1;
   const yBottom = height * 0.9;
   const { min, max } = WAVE_GRAPH_VALUE_RANGE;
-  return { yTop, yBottom, toY: (value) => mapValue(value, min, max, yBottom, yTop) };
+  return {
+    yTop,
+    yBottom,
+    toY: (/** @type {number} */ value) => mapValue(value, min, max, yBottom, yTop),
+  };
 }
 
 /**
@@ -335,12 +382,13 @@ export function waveGraphBand(height) {
  * `ProceduralPalette name({r,g,b}f, ...)` — not bare JS arrays. Brace-init
  * each vec3 with `f`-suffixed floats so the output pastes straight into
  * palettes.h beside the named instances, matching the generative tab.
- * @param {{A_R:number,A_G:number,A_B:number,B_R:number,B_G:number,B_B:number,C_R:number,C_G:number,C_B:number,D_R:number,D_G:number,D_B:number}} parameters - The 12 cosine-formula coefficients (A/B/C/D per R/G/B channel).
+ * @param {ProceduralParams} parameters - The 12 cosine-formula coefficients (A/B/C/D per R/G/B channel).
  * @returns {string} The C++ ProceduralPalette initializer source.
  */
 export function proceduralPaletteCpp(parameters) {
-  const f = (n) => formatFloatCpp(n, 6);
-  const v = (r, g, b) => `{${f(r)}, ${f(g)}, ${f(b)}}`;
+  const f = (/** @type {number} */ n) => formatFloatCpp(n, 6);
+  const v = (/** @type {number} */ r, /** @type {number} */ g, /** @type {number} */ b) =>
+    `{${f(r)}, ${f(g)}, ${f(b)}}`;
   return `ProceduralPalette palette(${v(parameters.A_R, parameters.A_G, parameters.A_B)},  // A
                           ${v(parameters.B_R, parameters.B_G, parameters.B_B)},  // B
                           ${v(parameters.C_R, parameters.C_G, parameters.C_B)},  // C
@@ -372,12 +420,22 @@ export const ENUM_NAMES = Object.freeze({
   chromaBasis: ['LOCAL_GAMUT', 'PATH_MINIMUM', 'ABSOLUTE'],
 });
 
+/**
+ * @param {keyof typeof ENUM_NAMES} group - Which enum the value belongs to.
+ * @param {number} value - The ordinal a recipe carries.
+ * @returns {string} The C++ enumerator's name.
+ * @throws {Error} When the group has no name for that ordinal.
+ */
 function enumName(group, value) {
   const name = ENUM_NAMES[group]?.[value];
   if (!name) throw new Error(`unknown ${group} enum value ${value}`);
   return name;
 }
 
+/**
+ * @param {number[]} values - The array's elements.
+ * @returns {string} A C++ brace-initializer of `f`-suffixed floats.
+ */
 function cppFloatArray(values) {
   return `{${values.map((value) => formatFloatCpp(value, 6)).join(', ')}}`;
 }
@@ -386,12 +444,12 @@ function cppFloatArray(values) {
  * Serializes a complete canonical V4 recipe as the C++ that rebuilds it: every
  * field assigned, then the try_compile call and the assert the engine's callers
  * carry.
- * @param {Object} recipe - A canonical V4 recipe, as the compiler returned it.
+ * @param {PaletteRecipe} recipe - A canonical V4 recipe, as the compiler returned it.
  * @returns {string} The C++ source, ready to paste.
  * @throws {Error} When a field holds an enum ordinal the engine has no name for.
  */
 export function generativePaletteCpp(recipe) {
-  const f = (value) => formatFloatCpp(value, 6);
+  const f = (/** @type {number} */ value) => formatFloatCpp(value, 6);
   return `PaletteRecipe recipe;
 recipe.schema_version = ${recipe.schemaVersion};
 recipe.input.offset = ${f(recipe.input.offset)};

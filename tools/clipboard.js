@@ -16,6 +16,12 @@ import { copyToClipboard } from './copy_text.js';
 export { copyToClipboard };
 
 /**
+ * An element carrying the in-flight revert of a flashed label, so a re-entry
+ * restores the label the element had before the first flash.
+ * @typedef {HTMLElement & {copyFeedback?: {timer: number, original: string?}}} FeedbackElement
+ */
+
+/**
  * Copy `text`, then briefly swap an element's label to a "copied" message
  * (optionally toggling CSS classes) and restore it after `revertMs`. Shared
  * transient-feedback wrapper around copyToClipboard so tools don't each
@@ -23,7 +29,7 @@ export { copyToClipboard };
  *
  * @param {string} text - Text to copy.
  * @param {Object} [opts] - Feedback options.
- * @param {HTMLElement} [opts.element] - Element whose label flips on copy.
+ * @param {FeedbackElement} [opts.element] - Element whose label flips on copy.
  * @param {string} [opts.copiedText='Copied!'] - Label shown on success.
  * @param {string} [opts.failedText='Copy failed'] - Label shown on failure.
  * @param {string} [opts.revertText] - Label to restore (default: current text).
@@ -90,14 +96,14 @@ export const COPY_FEEDBACK = {
  * @param {Object} opts
  * @param {HTMLElement} opts.source - Element whose textContent is copied.
  * @param {HTMLElement} [opts.button] - Button that triggers the copy.
- * @param {HTMLElement} [opts.prompt] - Element whose label flashes on copy.
+ * @param {FeedbackElement} [opts.prompt] - Element whose label flashes on copy.
  * @param {HTMLElement} [opts.block] - Element (e.g. the <pre>) that also copies on click.
  * @returns {void}
  */
 export function wireCopyBlock({ source, button, prompt, block }) {
   if (!source) return;
   const handleCopy = () => {
-    copyWithFeedback(source.textContent,
+    copyWithFeedback(source.textContent ?? '',
       { element: prompt, revertText: '', ...COPY_FEEDBACK });
   };
   button?.addEventListener('click', handleCopy);

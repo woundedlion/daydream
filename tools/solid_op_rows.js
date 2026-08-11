@@ -15,6 +15,21 @@
 
 import { unsweepableReason } from './solid_codegen.js';
 
+/** @typedef {import('./solid_codegen.js').OpParamDef} OpParamDef */
+
+/**
+ * @typedef {{op: string, params: Object<string, number>}} ChainOpRow
+ */
+
+/**
+ * The row's handlers.
+ * @typedef {object} OpRowHandlers
+ * @property {(event: Event) => void} startDrag - Begins a reorder drag.
+ * @property {(from: number, to: number) => void} move - Moves the op one slot.
+ * @property {(index: number) => void} remove - Drops the op.
+ * @property {(index: number, key: string, value: string) => void} setParam - Writes one parameter.
+ */
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // Six-dot drag grip.
@@ -27,7 +42,7 @@ const DRAG_HANDLE_PATH =
 /**
  * Builds the drag grip.
  * @param {Document} doc - Document the nodes are created in.
- * @returns {Element} The grip element.
+ * @returns {HTMLElement} The grip element.
  */
 function buildDragHandle(doc) {
   const handle = doc.createElement('div');
@@ -47,7 +62,7 @@ function buildDragHandle(doc) {
  * @param {string} className - Class attribute value.
  * @param {string} text - Visible label.
  * @param {string} ariaLabel - Accessible name.
- * @returns {Element} The button element.
+ * @returns {HTMLButtonElement} The button element.
  */
 function buildButton(doc, className, text, ariaLabel) {
   const button = doc.createElement('button');
@@ -74,11 +89,11 @@ export function formatParamValue(value, def) {
  * Builds one parameter row: name, slider, number box and unit suffix.
  * @param {Document} doc - Document the nodes are created in.
  * @param {string} key - Parameter name, as declared in OP_DEFS.
- * @param {{min: number, max: number, step: number}} def - The parameter's range.
+ * @param {OpParamDef} def - The parameter's range.
  * @param {number} value - Current value.
  * @param {string} controlId - Unique id prefix for the row's controls.
  * @param {string} opName - Op the parameter belongs to, used in both inputs' accessible names.
- * @returns {{row: Element, range: Element, number: Element}} The row and its two inputs.
+ * @returns {{row: HTMLElement, range: HTMLInputElement, number: HTMLInputElement}} The row and its two inputs.
  */
 function buildParamRow(doc, key, def, value, controlId, opName) {
   const row = doc.createElement('div');
@@ -98,10 +113,10 @@ function buildParamRow(doc, key, def, value, controlId, opName) {
   // aria-label overrides it so each op's slider is named by its own op.
   range.setAttribute('aria-label', `${opName} ${key}`);
   range.className = 'flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer min-w-0';
-  range.min = def.min;
-  range.max = def.max;
-  range.step = def.step;
-  range.value = value;
+  range.min = String(def.min);
+  range.max = String(def.max);
+  range.step = String(def.step);
+  range.value = String(value);
 
   const number = doc.createElement('input');
   number.type = 'number';
@@ -109,9 +124,9 @@ function buildParamRow(doc, key, def, value, controlId, opName) {
   // At 0.6rem on the row's --slate-800, slate-300/400 are the lightest pair that
   // keeps the value ahead of its unit and both over the 4.5:1 WCAG AA floor.
   number.className = 'w-12 bg-transparent text-right font-mono text-slate-300 focus:outline-none focus:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
-  number.min = def.min;
-  number.max = def.max;
-  number.step = def.step;
+  number.min = String(def.min);
+  number.max = String(def.max);
+  number.step = String(def.step);
   number.value = formatParamValue(value, def);
 
   const unit = doc.createElement('span');
@@ -127,12 +142,12 @@ function buildParamRow(doc, key, def, value, controlId, opName) {
  * Writes a row's morph-sweep marker for the op's current parameters. A slider
  * can cross the band without the row being rebuilt, so the caller re-runs this
  * after a parameter write.
- * @param {Element} el - The row buildOpRow returned.
- * @param {{op: string, params: Object<string, number>}} op - The op's current state.
+ * @param {HTMLElement} el - The row buildOpRow returned.
+ * @param {ChainOpRow} op - The op's current state.
  * @returns {void}
  */
 export function syncSweepWarning(el, op) {
-  const flag = el.querySelector('.op-unsweepable');
+  const flag = /** @type {HTMLElement?} */ (el.querySelector('.op-unsweepable'));
   if (!flag) return;
   const reason = unsweepableReason(op);
   flag.textContent = reason ? '⚠' : '';
@@ -143,14 +158,14 @@ export function syncSweepWarning(el, op) {
 
 /**
  * Builds one op-chain row, wired to the caller's handlers.
- * @param {{op: string, params: Object<string, number>}} op - The op this row shows.
+ * @param {ChainOpRow} op - The op this row shows.
  * @param {number} index - The op's position in the chain.
  * @param {Object} opts - Row context.
- * @param {{params: Object}} opts.opDef - The op's OP_DEFS entry.
+ * @param {{params: Object<string, OpParamDef>}} opts.opDef - The op's OP_DEFS entry.
  * @param {number} opts.count - Length of the chain, which disables the last row's down button.
- * @param {Object} opts.on - Handlers: startDrag(event), move(from, to), remove(index), setParam(index, key, value).
+ * @param {OpRowHandlers} opts.on - The row's handlers.
  * @param {Document} [opts.doc] - Document the nodes are created in.
- * @returns {Element} The row element, unattached.
+ * @returns {HTMLElement} The row element, unattached.
  */
 export function buildOpRow(op, index, { opDef, count, on, doc = document }) {
   const el = doc.createElement('div');
@@ -194,8 +209,10 @@ export function buildOpRow(op, index, { opDef, count, on, doc = document }) {
         doc, key, opDef.params[key], op.params[key], `op-${index}-${key}`, op.op);
       controls.appendChild(row);
 
-      range.addEventListener('input', (e) => on.setParam(index, key, e.target.value));
-      number.addEventListener('change', (e) => on.setParam(index, key, e.target.value));
+      const readValue = (/** @type {Event} */ e) =>
+        /** @type {HTMLInputElement} */ (e.target).value;
+      range.addEventListener('input', (e) => on.setParam(index, key, readValue(e)));
+      number.addEventListener('change', (e) => on.setParam(index, key, readValue(e)));
       // Don't let an input drag start the row reorder.
       range.addEventListener('mousedown', (e) => e.stopPropagation());
       number.addEventListener('mousedown', (e) => e.stopPropagation());

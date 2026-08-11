@@ -15,30 +15,43 @@ import { linearToSrgbFloat } from './color.js';
 import { waveGraphBand } from './palette_math.js';
 
 /**
+ * @typedef {{get: (t: number) => number[]}} StripPalette
+ *   Sampled per strip column for linear [R, G, B].
+ */
+
+/**
+ * @typedef {{getChannelValues: (t: number) => number[]}} WavePalette
+ *   Sampled per graph column for sRGB [R, G, B].
+ */
+
+/**
  * Builds the color-strip painter, which owns the offscreen gradient cache.
  *
  * Caching the rendered gradient avoids rebuilding ImageData while a drag only
  * changes the selection overlay. Call invalidate() whenever the palette
  * changes; a canvas size change is detected here.
  * @param {Object} opts - Painter context.
- * @param {{width: number, height: number}} opts.canvas - The visible strip canvas.
- * @param {Object} opts.ctx - Its 2D context.
+ * @param {HTMLCanvasElement} opts.canvas - The visible strip canvas.
+ * @param {CanvasRenderingContext2D} opts.ctx - Its 2D context.
  * @param {Document} [opts.doc] - Document the offscreen cache canvas is created in.
- * @returns {{invalidate: Function, draw: Function}} The painter.
+ * @returns {{invalidate: () => void, draw: (palette: StripPalette, selectionRange?: {start: number, end: number}?, view?: {start: number, end: number}) => void}} The painter.
  */
 export function createColorStripPainter({ canvas, ctx, doc = document }) {
+  /** @type {HTMLCanvasElement?} */
   let cache = null;
   let dirty = true;
+  /** @type {number?} */
   let cachedViewStart = null;
+  /** @type {number?} */
   let cachedViewEnd = null;
 
   /**
    * Repaints the offscreen gradient when the palette or the canvas size changed.
-   * @param {{get: Function}} palette - Palette sampled per column.
+   * @param {StripPalette} palette - Palette sampled per column.
    * @param {number} width - Canvas width.
    * @param {number} height - Canvas height.
    * @param {{start: number, end: number}} view - Phase window shown by the strip.
-   * @returns {void}
+   * @returns {HTMLCanvasElement} The cache canvas, current as of this call.
    */
   function refreshCache(palette, width, height, view) {
     if (!cache || cache.width !== width || cache.height !== height) {
@@ -48,9 +61,9 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
       dirty = true;
     }
     if (view.start !== cachedViewStart || view.end !== cachedViewEnd) dirty = true;
-    if (!dirty) return;
+    if (!dirty) return cache;
 
-    const cacheCtx = cache.getContext('2d');
+    const cacheCtx = /** @type {CanvasRenderingContext2D} */ (cache.getContext('2d'));
     const imageData = cacheCtx.createImageData(width, height);
     const data = imageData.data;
 
@@ -80,6 +93,7 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
     cachedViewStart = view.start;
     cachedViewEnd = view.end;
     dirty = false;
+    return cache;
   }
 
   return {
@@ -93,7 +107,7 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
 
     /**
      * Draws the color strip and an optional selection overlay.
-     * @param {{get: Function}} palette - The palette to render.
+     * @param {StripPalette} palette - The palette to render.
      * @param {{start: number, end: number}|null} [selectionRange] - Drag selection as strip positions.
      * @param {{start: number, end: number}} [view] - Phase window shown by the strip.
      * @returns {void}
@@ -103,10 +117,10 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
       const width = canvas.width;
       const height = canvas.height;
 
-      refreshCache(palette, width, height, view);
+      const gradient = refreshCache(palette, width, height, view);
 
       // Blit the cached gradient, clearing the previous selection overlay.
-      ctx.drawImage(cache, 0, 0);
+      ctx.drawImage(gradient, 0, 0);
 
       if (selectionRange) {
         // Ensure startX is the smaller value
@@ -128,6 +142,11 @@ export function createColorStripPainter({ canvas, ctx, doc = document }) {
 // Red, Green, Blue.
 const WAVE_COLORS = ['#EF4444', '#22C55E', '#3B82F6'];
 
+/**
+ * @param {HTMLCanvasElement} canvas - Canvas to size to its display box.
+ * @param {CanvasRenderingContext2D} ctx - Its 2D context.
+ * @returns {{width: number, height: number}} The canvas' size in CSS pixels.
+ */
 function fitCanvasToDisplay(canvas, ctx) {
   const pixelRatio = Math.max(1, globalThis.devicePixelRatio || 1);
   let width;
@@ -159,9 +178,9 @@ function fitCanvasToDisplay(canvas, ctx) {
 /**
  * Draws the R, G, and B wave functions on the graph canvas.
  * @param {Object} opts - Draw context.
- * @param {{width: number, height: number}} opts.canvas - The graph canvas.
- * @param {Object} opts.ctx - Its 2D context.
- * @param {{getChannelValues: Function}} opts.palette - The palette to plot.
+ * @param {HTMLCanvasElement} opts.canvas - The graph canvas.
+ * @param {CanvasRenderingContext2D} opts.ctx - Its 2D context.
+ * @param {WavePalette} opts.palette - The palette to plot.
  * @returns {void}
  */
 export function drawWaveGraph({ canvas, ctx, palette }) {

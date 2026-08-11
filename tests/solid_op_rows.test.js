@@ -87,10 +87,11 @@ test('parameter rows carry the OP_DEFS range and the current value', () => {
   const [tRow, twistRow] = rows;
   const range = (row) => row.children.find((c) => c.type === 'range');
   const number = (row) => row.children.find((c) => c.type === 'number');
-  assert.equal(range(tRow).min, 0.01);
-  assert.equal(range(tRow).max, 0.99);
-  assert.equal(range(tRow).step, 0.01);
-  assert.equal(range(tRow).value, 0.5);
+  // An input's range and value are string properties in the DOM.
+  assert.equal(range(tRow).min, '0.01');
+  assert.equal(range(tRow).max, '0.99');
+  assert.equal(range(tRow).step, '0.01');
+  assert.equal(range(tRow).value, '0.5');
   assert.equal(number(twistRow).value, '0.28');
   assert.equal(number(twistRow).getAttribute('aria-label'), 'snub twist value');
   assert.equal(tRow.children[0].htmlFor, range(tRow).id);

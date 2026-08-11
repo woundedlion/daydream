@@ -24,6 +24,10 @@
   // holosphere_wasm.d.ts and app_lifecycle.d.ts stand in for modules that are
   // never checked; listing them is what makes those imports resolve under
   // noResolve.
+  // tools/ is rostered whole except for the modules that import three, which
+  // ships no typings: under noResolve a bare specifier resolves to nothing this
+  // program contains, so `@types/three` could not be reached even if installed.
+  // tsconfig_roster.test.js holds tools/ to that one exemption.
   "files": [
     "holosphere_wasm.d.ts",
     "app_lifecycle.d.ts",
@@ -37,11 +41,23 @@
     "segment_layout.js",
     "segment_stats_view.js",
     "segment_worker.js",
+    "tools/banner.js",
+    "tools/clipboard.js",
     "tools/color.js",
     "tools/copy_text.js",
     "tools/cpp_format.js",
     "tools/export_params.js",
+    "tools/flyout.js",
     "tools/kb_format.js",
-    "tools/mobius_transforms.js"
+    "tools/mobius_transforms.js",
+    "tools/page_lifecycle.js",
+    "tools/palette_canvas.js",
+    "tools/palette_controls.js",
+    "tools/palette_math.js",
+    "tools/slider.js",
+    "tools/solid_codegen.js",
+    "tools/solid_op_rows.js",
+    "tools/solid_registry_codegen.js",
+    "tools/solid_render.js"
   ]
 }
