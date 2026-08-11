@@ -202,7 +202,7 @@ export function drawWaveGraph({ canvas, ctx, palette }) {
   // time would redo that (and its pows) three times over.
   const samples = new Array(width);
   for (let x = 0; x < width; x++) {
-    samples[x] = palette.getChannelValues(x / (width - 1));
+    samples[x] = palette.getChannelValues(width === 1 ? 0 : x / (width - 1));
   }
 
   WAVE_COLORS.forEach((color, channelIndex) => {

@@ -257,6 +257,17 @@ test('the wave graph plots each channel through the shared value-to-y map', () =
   ]);
 });
 
+test('a one-column wave graph samples phase 0 instead of dividing by zero', () => {
+  const canvas = { width: 1, height: 100 };
+  const ctx = fakeContext();
+  drawWaveGraph({ canvas, ctx, palette: fakePalette() });
+
+  const { toY } = waveGraphBand(100);
+  const curveMoves = ctx.ops.filter(([n, x]) => n === 'moveTo' && x === 0)
+    .map(([, , y]) => y);
+  assert.ok(curveMoves.includes(toY(0)), 'the lone column must plot the phase-0 sample');
+});
+
 test('the dashed reference line is reset so the channel curves stay solid', () => {
   const ctx = fakeContext();
   drawWaveGraph({ canvas: { width: 8, height: 100 }, ctx, palette: fakePalette() });
