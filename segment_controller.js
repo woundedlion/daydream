@@ -295,6 +295,10 @@ export class SegmentController {
     /** @type {number | null} */
     this.paramGeneration = null; // schema identity paired with paramValues
     this.paramRevision = 0;
+    /** @type {number | null} */
+    this.presetCount = null;
+    /** @type {number | null} */
+    this.presetIndex = null;
 
     this.pending = 0;         // count of outstanding render responses
     /** @type {boolean[]} */
@@ -447,6 +451,14 @@ export class SegmentController {
     return this.paramGeneration;
   }
 
+  getPresetCount() {
+    return this.presetCount;
+  }
+
+  getPresetIndex() {
+    return this.presetIndex;
+  }
+
   /**
    * (Re)build the worker pool at the current resolution: destroy any existing
    * pool, then spawn `numSegments` fresh workers, each loading its own WASM
@@ -485,6 +497,9 @@ export class SegmentController {
     this.frameSeen = new Array(numSegments).fill(false);
     this.paramValues = null;
     this.paramGeneration = null;
+    const mainEngine = this.getWasmEngine();
+    this.presetCount = mainEngine?.getPresetCount?.() ?? null;
+    this.presetIndex = mainEngine?.getPresetIndex?.() ?? null;
     this.ready = false;
 
     const res = this.resolutionPresets[this.appState.get('resolution')];
@@ -575,6 +590,8 @@ export class SegmentController {
                 && msg.paramRevision === this.paramRevision) {
               this.paramValues = msg.paramValues;
               this.paramGeneration = msg.paramGeneration ?? null;
+              this.presetCount = msg.presetCount ?? null;
+              this.presetIndex = msg.presetIndex ?? null;
             }
             this.scratch[msg.segId] = {
               pixels: msg.pixels,
@@ -647,6 +664,7 @@ export class SegmentController {
           effectName: this.appState.get('effect'),
           params: initialParams,
           paused: this.animationsPaused,
+          presetIndex: this.presetIndex ?? undefined,
           poleLod: this.poleLod,
           paramRevision: this.paramRevision,
           wasmModule: sharedWasmModule ?? undefined,
@@ -885,6 +903,9 @@ export class SegmentController {
     this.paramValues = null;
     this.paramGeneration = null;
     this.paramRevision++;
+    const mainEngine = this.getWasmEngine();
+    this.presetCount = mainEngine?.getPresetCount?.() ?? null;
+    this.presetIndex = mainEngine?.getPresetIndex?.() ?? null;
     // A faulted pool is broken until re-created; rebuild (active) re-reads the
     // effect and params from appState rather than broadcasting to dead workers.
     // Bounded by MAX_FAULTED_REBUILDS: effect switches can arrive on a timer, and
@@ -915,6 +936,7 @@ export class SegmentController {
       name,
       params: this.snapshotParams(),
       paused: this.animationsPaused,
+      presetIndex: this.presetIndex ?? undefined,
       paramRevision: this.paramRevision,
     });
   }
@@ -947,6 +969,17 @@ export class SegmentController {
     this.animationsPaused = paused;
     if (this.faulted) return;
     this.broadcast({ type: 'setAnimationsPaused', paused });
+  }
+
+  /** @param {number} index */
+  selectPreset(index) {
+    this.paramValues = null;
+    this.paramGeneration = null;
+    this.paramRevision++;
+    this.presetIndex = index;
+    if (this.faulted) return;
+    this.broadcast({ type: 'selectPreset', index,
+      paramRevision: this.paramRevision });
   }
 
   /**
@@ -999,6 +1032,7 @@ export class SegmentController {
       name: this.appState.get('effect'),
       params: this.snapshotParams(),
       paused: this.animationsPaused,
+      presetIndex: this.presetIndex ?? undefined,
       paramRevision: this.paramRevision,
     });
   }

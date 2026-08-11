@@ -46,6 +46,8 @@ class FakeEngine {
     this.params = [];
     this.paused = false;
     this.poleLod = null;
+    this.presetCount = 3;
+    this.presetIndex = 0;
     this.metricsThrows = false;
     this.calls = [];
     // Reused view, like the real engine's getParamValues() into WASM memory, so
@@ -70,6 +72,7 @@ class FakeEngine {
     if (!this.effectOk) return EffectSetResult.UNKNOWN_EFFECT;
     this.effect = name;
     this.params = [];
+    this.presetIndex = 0;
     return EffectSetResult.INSTALLED;
   }
   setParameter(name, value) {
@@ -79,6 +82,21 @@ class FakeEngine {
   setAnimationsPaused(p) {
     this.calls.push(['setAnimationsPaused', p]);
     this.paused = p;
+  }
+  getPresetCount() { return this.presetCount; }
+  getPresetIndex() { return this.presetIndex; }
+  selectPreset(index) {
+    this.calls.push(['selectPreset', index]);
+    if (index < 0 || index >= this.presetCount) return false;
+    this.presetIndex = index;
+    return true;
+  }
+  nextPreset() {
+    return this.selectPreset((this.presetIndex + 1) % this.presetCount);
+  }
+  previousPreset() {
+    return this.selectPreset(
+      (this.presetIndex + this.presetCount - 1) % this.presetCount);
   }
   setPoleLod(v) {
     this.calls.push(['setPoleLod', v]);
@@ -642,6 +660,17 @@ test('init applies the carried params AFTER setEffect rebuilds to defaults', asy
   assert.deepEqual(engineInstance.params, [['Speed', 0.5], ['Glow', 1.0]]);
 });
 
+test('init selects the carried preset before applying tuned params', async () => {
+  await dispatch({
+    type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma',
+    presetIndex: 2, params: [{ name: 'Speed', value: 0.5 }],
+  });
+  assert.equal(engineInstance.presetIndex, 2);
+  assert.deepEqual(engineInstance.calls.slice(1, 3),
+    [['setEffect', 'Plasma'], ['selectPreset', 2]]);
+  assert.deepEqual(engineInstance.params, [['Speed', 0.5]]);
+});
+
 test('init with paused:true pauses animations on the rebuilt engine', async () => {
   await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma', paused: true });
   assert.equal(engineInstance.paused, true);
@@ -752,6 +781,20 @@ test('setAnimationsPaused handler forwards the flag (both directions) to the eng
   assert.equal(engineInstance.paused, true);
   await dispatch({ type: 'setAnimationsPaused', paused: false });
   assert.equal(engineInstance.paused, false);
+});
+
+test('selectPreset forwards the index and publishes preset state', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
+    effectName: 'Plasma' });
+  await dispatch({ type: 'selectPreset', index: 2, paramRevision: 13 });
+  assert.equal(engineInstance.presetIndex, 2);
+
+  posted.length = 0;
+  await dispatch({ type: 'render' });
+  const frame = posted.find((p) => p.msg.type === 'frame').msg;
+  assert.equal(frame.presetCount, 3);
+  assert.equal(frame.presetIndex, 2);
+  assert.equal(frame.paramRevision, 13);
 });
 
 // ---------------------------------------------------------------------------

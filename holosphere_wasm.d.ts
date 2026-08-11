@@ -99,6 +99,11 @@ export interface HolosphereEngine {
   setEffect(name: string): EnumValue;
   setParameter(name: string, value: number): EnumValue;
   setAnimationsPaused(paused: boolean): void;
+  getPresetCount(): number;
+  getPresetIndex(): number;
+  selectPreset(index: number): boolean;
+  nextPreset(): boolean;
+  previousPreset(): boolean;
   setPoleLod(value: number): void;
   /** Restrict rendering to [x0,x1) x [y0,y1); reset by a setEffect rebuild. */
   setClip(x0: number, x1: number, y0: number, y1: number): EnumValue;

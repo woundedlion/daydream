@@ -369,6 +369,16 @@ const effectGui = createEffectGui({
     host.engine.setAnimationsPaused(paused);
     segments.setAnimationsPaused(paused);
   },
+  getPresetCount: () => segments.ownsDisplay
+    ? (segments.getPresetCount() ?? host.engine.getPresetCount())
+    : host.engine.getPresetCount(),
+  getPresetIndex: () => segments.ownsDisplay
+    ? (segments.getPresetIndex() ?? host.engine.getPresetIndex())
+    : host.engine.getPresetIndex(),
+  selectPreset: (index) => {
+    host.engine.selectPreset(index);
+    segments.selectPreset(index);
+  },
   engineAnimationsPaused: () => host.engine.getAnimationsPaused?.(),
   applyEffect: () => apply.applyEffect(),
   guiContainer: () => document.getElementById('gui-container'),
