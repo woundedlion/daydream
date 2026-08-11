@@ -1877,6 +1877,30 @@ test('an overrun re-blit shows one whole generation, never a half-updated mix', 
   }
 });
 
+test('a composite short one segment is not handed to the recorder as a frame', async () => {
+  driver.W = 4; driver.H = 2;
+  driver.pixels = new Uint16Array(4 * 2 * 3);
+
+  const c = readyController(2);
+  c.showBoundaries = false;
+  c.tick();
+
+  const quad = () => new Uint16Array(2 * 2 * 3).fill(111);
+  deliverFrame(c, 0, { pixels: quad(), x0: 0, x1: 2, y0: 0, y1: 2 });
+  deliverFrame(c, 1, { pixels: quad(), x0: 2, x1: 4, y0: 0, y1: 2 });
+  await flush();
+
+  // The whole-array swap publishes only generations that filled every slot, so
+  // an empty one stands in for that invariant breaking.
+  c.results[1] = null;
+  c.tick();
+
+  assert.ok(driver.pixels.some((v) => v === 111), 'the arrived segment still blits');
+  assert.equal(driver.pixels[idx(2, 0, 4)], 0, 'the missing segment leaves its band black');
+  assert.equal(c.frameComposited, false,
+    'a frame with a black band would be recorded as complete');
+});
+
 test('destroy() clears frameComposited so a respawning pool cannot capture black frames', async () => {
   driver.W = 4; driver.H = 2;
   driver.pixels = new Uint16Array(4 * 2 * 3);
