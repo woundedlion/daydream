@@ -626,11 +626,12 @@
       text-overflow: ellipsis;
     }
 
-    /* Tab Styles */
+    /* Tab Styles. Both label colours are the ramp step that clears the 4.5:1
+     * WCAG AA floor at 16px against the fill declared beside them. */
     .tab-btn {
       padding: 0.5rem 1.5rem;
       background-color: var(--slate-700);
-      color: #94A3B8;
+      color: var(--slate-300);
       border-radius: 0.5rem 0.5rem 0 0;
       font-weight: 600;
       cursor: pointer;
@@ -641,7 +642,7 @@
 
     .tab-btn.active {
       background-color: var(--slate-800);
-      color: var(--blue-500);
+      color: var(--blue-400);
       border-color: var(--slate-600);
     }
 
