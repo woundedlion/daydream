@@ -47,6 +47,7 @@ const EXPECTED_CONSOLE_MESSAGES = {
     /^\[Segmented\] seg \d+ module failed to load \(attempt \d+\/\d+\); rebuilding pool$/,
     /^\[Segmented\] additional worker fault \(seg -?\d+\): /,
     /^\[Segmented\] pool faulted on \d+ consecutive effect-switch rebuilds; /,
+    /^\[Segmented\] shared WASM compile failed; each worker will compile its own$/,
   ],
   error: [
     /^\[Segmented\] Worker seg \d+ error:/,
@@ -185,6 +186,29 @@ test('a warmed binary is compiled once and handed to every worker', async () => 
   }
   assert.equal(new Set(modules).size, 1, 'one compilation, shared');
   c.destroy();
+});
+
+test('a binary the engine refuses is reported, not left to the spawn to discover', async () => {
+  const warned = [];
+  const stub = mock.method(console, 'warn', (...args) => { warned.push(args); });
+  try {
+    await warmModules({
+      baseUrl: 'http://localhost:8000/corrupt/segment_controller.js',
+      minIntervalMs: 0,
+      fetch: (url) => Promise.resolve({
+        arrayBuffer: () => Promise.resolve(url.href.endsWith('.wasm')
+          ? Uint8Array.of(0, 0x61, 0x73, 0x6d, 9, 9, 9, 9).buffer
+          : new ArrayBuffer(0)),
+      }),
+    });
+  } finally {
+    stub.mock.restore();
+  }
+
+  assert.equal(warned.length, 1, 'the compile rejection reached no diagnostic');
+  assert.match(String(warned[0][0]), /shared WASM compile failed/);
+  assert.ok(warned[0][1] instanceof Error,
+    'the rejection is carried, so the operator sees why it failed');
 });
 
 test('a device cap moves with the memory hint and the mobile layout', () => {

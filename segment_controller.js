@@ -126,7 +126,7 @@ function unrefTimer(timer) {
  * connection before a pool spawn, so the burst of cold concurrent worker fetches
  * after an idle period can't lose the race and abort one worker's load. Awaited on
  * the interactive enable path (the primary trigger); a no-op outside a web origin
- * (e.g. under the file://-based unit tests) and swallows all failures — the boot
+ * (e.g. under the file://-based unit tests) and swallows fetch failures — the boot
  * auto-retry is the actual guarantee, this only lowers the odds.
  * @details The artifacts are served unversioned, so freshness rests on
  * revalidation: `cache: 'no-cache'` re-fetches a rebuilt binary and costs a 304
@@ -136,8 +136,8 @@ function unrefTimer(timer) {
  *
  * The drained binary is also compiled here into `sharedWasmModule`, so the pool
  * spawn that follows spends one compilation of the 2 MB module rather than one
- * per worker. A compile failure leaves the previous module in place and the
- * workers compile their own, like every other failure on this path.
+ * per worker. A compile failure is reported and leaves the previous module in
+ * place; the workers then compile their own.
  * @param {{fetch?: typeof globalThis.fetch, baseUrl?: string|URL, minIntervalMs?: number}} [dependencies]
  * @returns {Promise<void>}
  */
@@ -166,8 +166,16 @@ export function warmModules({
       workerJs,
       glueJs,
       binary,
-      binary.then((bytes) => WebAssembly.compile(bytes))
-        .then((compiled) => { sharedWasmModule = compiled; }),
+      binary
+        .then((bytes) => WebAssembly.compile(bytes).catch((err) => {
+          // Reported here alone: the fetch rejections allSettled swallows are
+          // a cold cache, but a binary the engine refuses is a broken artifact,
+          // and its only other symptom is a slower spawn.
+          console.warn('[Segmented] shared WASM compile failed; each worker '
+            + 'will compile its own', err);
+          return null;
+        }))
+        .then((compiled) => { if (compiled) sharedWasmModule = compiled; }),
     ]).then(() => {});
   } catch {
     // A fetch that throws synchronously warmed nothing, so the window stays
