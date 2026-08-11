@@ -557,9 +557,13 @@ export class Daydream {
     this.renderer.setScissorTest(true);
     this.renderMainView();
 
-    const captures = this.recorder ? (captureDue ? 1 : 0) + this.heldCaptures : 0;
-    this.heldCaptures = 0;
-    for (let i = 0; i < captures; i++) this.recorder.captureFrame();
+    // One requestFrame per repaint: several in a single task carry one timestamp,
+    // so the stream cannot emit them as separate video frames while the elapsed
+    // counter charges for each. A backlog drains one per repaint instead.
+    const owed = this.recorder ? (captureDue ? 1 : 0) + this.heldCaptures : 0;
+    this.heldCaptures = owed > 0 ? owed - 1 : 0;
+    if (owed > 0) this.recorder.captureFrame();
+    if (this.heldCaptures > 0) this.needsRender = true;
 
     this.refreshLabels();
     if (this.labelPool.activeCount > 0) {
