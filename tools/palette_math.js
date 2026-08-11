@@ -425,12 +425,3 @@ HS_CHECK(GenerativePalette::try_compile(recipe, palette, canonical, status),
          "Palette recipe error %d at field %d", static_cast<int>(status.code),
          static_cast<int>(status.field));`;
 }
-
-/**
- * Serializes a recipe as the JSON the tool exports and re-imports.
- * @param {Object} recipe - A V4 palette recipe.
- * @returns {string} Indented JSON.
- */
-export function paletteRecipeJson(recipe) {
-  return JSON.stringify(recipe, null, 2);
-}
