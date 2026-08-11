@@ -246,6 +246,7 @@ test('dispose stops the frame loop and the resize listener before releasing GPU 
     'removeEventListener',
     'controls.dispose',
     'renderer.dispose',
+    'renderer.forceContextLoss',
     'geometry.dispose',
     'material.dispose',
     'scene.clear',
@@ -266,6 +267,7 @@ test('dispose skips the sphere teardown when no reference sphere was built', () 
     'removeEventListener',
     'controls.dispose',
     'renderer.dispose',
+    'renderer.forceContextLoss',
     'scene.clear',
   ]);
 });
