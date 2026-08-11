@@ -391,7 +391,8 @@ export class SegmentController {
    *   only while active).
    * - Disable/teardown: set false, then destroy(). A warmModules() continuation
    *   already in flight reads the flag after its await, so it cannot spawn a pool
-   *   into a torn-down host.
+   *   into a torn-down host. The write also repaints the overlay, which is what
+   *   hands the global stat bars back, so no caller has to remember to.
    *
    * @param {boolean} on - Whether segmented mode is on.
    * @throws {TypeError} When `on` is not a boolean. The flag reaches the spawn
@@ -404,6 +405,7 @@ export class SegmentController {
         + `${typeof on}`);
     }
     this.#active = on;
+    if (!on) this.updateStats();
   }
 
   /**

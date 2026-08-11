@@ -2068,6 +2068,32 @@ test('a spawning pool reports the spawn and does not own the display', () => {
   assert.equal(c.ownsDisplay, true, 'a faulted pool keeps the display for its overlay');
 });
 
+test('turning segmented mode off hands the global stat bars back', () => {
+  // The overlay hides page-owned elements while it stands in for them, so the
+  // hand-back rides on the flag rather than on a host remembering to repaint.
+  const byId = {
+    'segment-stats': makeElement(),
+    'global-stats-desktop': makeElement(),
+    'stats-bar': makeElement(),
+  };
+  const c = makeController();
+  c.statsView.doc = {
+    getElementById: (id) => byId[id] ?? null,
+    createElement: makeElement,
+  };
+
+  c.active = true;
+  c.updateStats();
+  assert.equal(byId['global-stats-desktop'].style.display, 'none');
+  assert.equal(byId['stats-bar'].style.display, 'none');
+
+  c.active = false;
+
+  assert.equal(byId['segment-stats'].style.display, 'none', 'the overlay stayed up');
+  assert.equal(byId['global-stats-desktop'].style.display, '');
+  assert.equal(byId['stats-bar'].style.display, '');
+});
+
 // ---------------------------------------------------------------------------
 // Broadcast paths — setEffect / setParameter / setAnimationsPaused / snapshotParams
 // ---------------------------------------------------------------------------
