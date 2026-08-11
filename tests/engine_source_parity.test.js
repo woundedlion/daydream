@@ -21,7 +21,9 @@ import * as MB from '../tools/mobius_transforms.js';
 import * as C from '../tools/color.js';
 import * as P from '../tools/palette_math.js';
 import * as PC from '../tools/palette_controls.js';
-import { DEFINED_SEED_CONSTANTS, SIMPLE_SEEDS } from '../tools/solid_codegen.js';
+import {
+  DEFINED_SEED_CONSTANTS, MORPH_SWEEP, OP_DEFS, SIMPLE_SEEDS,
+} from '../tools/solid_codegen.js';
 import { upperSnake } from '../tools/solid_registry_codegen.js';
 
 const REPO = new URL('../', import.meta.url);
@@ -327,4 +329,112 @@ test('DEFINED_SEED_CONSTANTS matches core/mesh/solids.h', { skip: SKIP }, () => 
     'DEFINED_SEED_CONSTANTS drifted from the engine: a seed it names but solids.h '
     + 'does not leaves a Recipe citing an undeclared SEED_*, and one it omits makes '
     + 'the paste redefine a constant the header already has');
+});
+
+const RECIPE_H = 'core/mesh/recipe.h';
+const CONWAY_GRAPH_H = 'core/mesh/conway_graph.h';
+const CLAMP_EXPR = /^step\.param >= ([\w:]+) && step\.param <= ([\w:]+)$/;
+
+/**
+ * The expression each `case Op::X` label of a switch returns, following
+ * fall-through so a shared return covers every label above it.
+ * @param {string} body - Function body holding one switch over Op.
+ * @returns {Map<string, string>} Op enumerator -> the returned expression.
+ */
+function switchReturns(body) {
+  const verdicts = new Map();
+  let labels = [];
+  for (const chunk of body.split(/case Op::/).slice(1)) {
+    const label = chunk.match(/^(\w+):/);
+    assert.ok(label, 'unreadable case label — the parity reader is out of date');
+    labels.push(label[1]);
+    const ret = chunk.match(/return\s+([\s\S]*?);/);
+    if (!ret) continue;
+    for (const op of labels) verdicts.set(op, ret[1].replace(/\s+/g, ' ').trim());
+    labels = [];
+  }
+  return verdicts;
+}
+
+/**
+ * The primitive steps each composite case of expand_to_primitives emits.
+ * @param {string} body - The function body.
+ * @returns {Map<string, string[]>} Op enumerator -> each emit()'s brace-init text.
+ */
+function loweredSteps(body) {
+  const lowered = new Map();
+  let labels = [];
+  for (const chunk of body.split(/case Op::/).slice(1)) {
+    const label = chunk.match(/^(\w+):/);
+    assert.ok(label, 'unreadable case label — the parity reader is out of date');
+    labels.push(label[1]);
+    const emits = [...chunk.matchAll(/emit\(\{([^}]*)\}\)/g)].map(([, args]) => args.trim());
+    if (emits.length === 0) continue;
+    for (const op of labels) lowered.set(op, emits);
+    labels = [];
+  }
+  return lowered;
+}
+
+/**
+ * Pins solid_codegen.js's MORPH_SWEEP to Solids::is_morphable_step and the
+ * clamps it reads. The tool authors registry entries the engine's morph path
+ * then either sweeps on screen or declines, dropping the whole shape to the
+ * whole-generate fallback; nothing in the engine's domain checks reports that
+ * bound, so a drift here silently costs an authored shape its build-up.
+ * The composite ops carry no entry because they lower to primitives first,
+ * which holds only while the primitives they lower to sweep across the ranges
+ * OP_DEFS offers — checked here against expand_to_primitives.
+ */
+test('MORPH_SWEEP matches core/mesh/recipe.h', { skip: SKIP }, () => {
+  const graph = header(CONWAY_GRAPH_H);
+  const recipe = header(RECIPE_H);
+  const clamp = {
+    'ConwayGraph::T_EPS': engineConstant(graph, 'T_EPS'),
+    'ConwayGraph::T_EPS_TRUNCATE_MIN': engineConstant(graph, 'T_EPS_TRUNCATE_MIN'),
+    'ConwayGraph::T_EPS_TRUNCATE_FAR_MAX': engineConstant(graph, 'T_EPS_TRUNCATE_FAR_MAX',
+      { T_EPS_AMBO: engineConstant(graph, 'T_EPS_AMBO') }),
+    CHAMFER_T_MAX: engineConstant(recipe, 'CHAMFER_T_MAX'),
+  };
+  const verdicts = switchReturns(functionBody(recipe, 'is_morphable_step'));
+  assert.ok(verdicts.size > 0,
+    `no Op case found in ${RECIPE_H} — the parity reader is out of date`);
+
+  const want = {};
+  for (const [op, expr] of verdicts) {
+    const name = op.toLowerCase();
+    if (!(name in MORPH_SWEEP)) continue;
+    if (expr === 'true' || expr === 'false') {
+      want[name] = expr === 'true' ? {} : null;
+      continue;
+    }
+    const band = expr.match(CLAMP_EXPR);
+    assert.ok(band, `${op} sweeps on "${expr}", which this reader cannot measure`);
+    want[name] = { t: { min: clamp[band[1]], max: clamp[band[2]] } };
+  }
+  assert.deepEqual(MORPH_SWEEP, want,
+    'MORPH_SWEEP drifted from is_morphable_step: the tool would either warn about '
+    + 'a chain the engine sweeps or stay silent about one it declines');
+
+  const lowered = loweredSteps(functionBody(recipe, 'expand_to_primitives'));
+  for (const op of Object.keys(OP_DEFS)) {
+    if (op in MORPH_SWEEP) continue;
+    const emits = lowered.get(op.toUpperCase());
+    assert.ok(emits, `${op} is neither in MORPH_SWEEP nor lowered by expand_to_primitives`);
+    for (const args of emits) {
+      const [, prim, param] = args.match(/Op::(\w+)\s*(?:,\s*([^,]+))?/);
+      const expr = verdicts.get(prim);
+      if (expr === 'true') continue;
+      const band = expr?.match(CLAMP_EXPR);
+      assert.ok(band, `${op} lowers to ${prim}, whose verdict "${expr}" leaves the `
+        + 'tool no ground to stay silent about it');
+      const range = param?.includes('step.param')
+        ? OP_DEFS[op].params?.t
+        : { min: Number(param), max: Number(param) };
+      assert.ok(range, `${op} lowers ${prim} from a parameter this reader cannot locate`);
+      assert.ok(range.min >= clamp[band[1]] && range.max <= clamp[band[2]],
+        `${op} offers ${prim} over ${range.min}-${range.max}, outside the swept `
+        + `${clamp[band[1]]}-${clamp[band[2]]}: the tool can no longer stay silent about it`);
+    }
+  }
 });

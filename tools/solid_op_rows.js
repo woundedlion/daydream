@@ -13,6 +13,8 @@
  * handlers are wired with addEventListener here.
  */
 
+import { unsweepableReason } from './solid_codegen.js';
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // Six-dot drag grip.
@@ -122,6 +124,24 @@ function buildParamRow(doc, key, def, value, controlId, opName) {
 }
 
 /**
+ * Writes a row's morph-sweep marker for the op's current parameters. A slider
+ * can cross the band without the row being rebuilt, so the caller re-runs this
+ * after a parameter write.
+ * @param {Element} el - The row buildOpRow returned.
+ * @param {{op: string, params: Object<string, number>}} op - The op's current state.
+ * @returns {void}
+ */
+export function syncSweepWarning(el, op) {
+  const flag = el.querySelector('.op-unsweepable');
+  if (!flag) return;
+  const reason = unsweepableReason(op);
+  flag.textContent = reason ? '⚠' : '';
+  flag.setAttribute('aria-label', reason ?? '');
+  flag.setAttribute('title', reason ?? '');
+  flag.hidden = !reason;
+}
+
+/**
  * Builds one op-chain row, wired to the caller's handlers.
  * @param {{op: string, params: Object<string, number>}} op - The op this row shows.
  * @param {number} index - The op's position in the chain.
@@ -153,7 +173,11 @@ export function buildOpRow(op, index, { opDef, count, on, doc = document }) {
   const label = doc.createElement('span');
   label.className = 'font-bold';
   label.textContent = `${index + 1}. ${String(op.op).toUpperCase()}`;
-  headerLeft.append(handle, upButton, downButton, label);
+
+  const sweep = doc.createElement('span');
+  sweep.className = 'op-unsweepable text-amber-400';
+  sweep.setAttribute('role', 'img');
+  headerLeft.append(handle, upButton, downButton, label, sweep);
 
   const removeButton = buildButton(doc, 'remove-op-btn text-slate-500 hover:text-white',
     '×', `Remove ${op.op} at position ${index + 1}`);
@@ -185,5 +209,6 @@ export function buildOpRow(op, index, { opDef, count, on, doc = document }) {
   downButton.addEventListener('click', () => on.move(index, index + 1));
   removeButton.addEventListener('click', () => on.remove(index));
 
+  syncSweepWarning(el, op);
   return el;
 }

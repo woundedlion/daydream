@@ -32,6 +32,8 @@ const {
   meshOpFailure,
   requireMeshResult,
   MESH_OP_RESULT_NAMES,
+  MORPH_SWEEP,
+  unsweepableReason,
 } =
   await import('../tools/solid_codegen.js');
 const { formatFloatCpp } = await import('../tools/cpp_format.js');
@@ -1221,4 +1223,54 @@ test('createOpGate reports an unbuildable base as an incomplete pass', async () 
   const probe = await gate.refresh('nope', [], CANDIDATES);
   assert.deepEqual([...probe.blocked], []);
   assert.equal(probe.complete, false);
+});
+
+test('MORPH_SWEEP covers the primitive ops and no composite', () => {
+  for (const op of Object.keys(MORPH_SWEEP)) {
+    assert.ok(op in OP_DEFS, `MORPH_SWEEP names ${op}, which the tool cannot author`);
+  }
+  for (const op of ['bevel', 'gyro', 'meta', 'needle', 'zip']) {
+    assert.equal(op in MORPH_SWEEP, false,
+      `${op} lowers to primitives before the engine's morph check reads it`);
+  }
+});
+
+test('unsweepableReason names the ops the engine morph path declines', () => {
+  assert.equal(unsweepableReason({ op: 'kis', params: {} }), null);
+  assert.equal(unsweepableReason('ambo'), null);
+  assert.equal(unsweepableReason({ op: 'bevel', params: { t: 0.5 } }), null,
+    'a composite lowers to primitives the engine sweeps');
+  assert.equal(unsweepableReason({ op: 'notanop', params: {} }), null,
+    'an op off the table is a different defect, reported by savedChainShapeError');
+
+  assert.match(unsweepableReason({ op: 'expand', params: { t: 0.5 } }), /^expand has no morph leg/,
+    'expand has a leg kind but no sweep coverage, so a shape using it is generated whole');
+
+  const { min, max } = MORPH_SWEEP.chamfer.t;
+  assert.equal(unsweepableReason({ op: 'chamfer', params: { t: max } }), null,
+    'the band is inclusive at both ends');
+  assert.equal(unsweepableReason({ op: 'chamfer', params: { t: min } }), null);
+  assert.match(unsweepableReason({ op: 'chamfer', params: { t: max + 0.01 } }),
+    /^chamfer sweeps t only over/,
+    'the OP_DEFS slider reaches past the band, which is the drift this reports');
+  assert.match(unsweepableReason({ op: 'chamfer', params: { t: OP_DEFS.chamfer.params.t.min } }),
+    /^chamfer sweeps t only over/,
+    'the slider also reaches below it');
+});
+
+test('a slider reaching past its swept band is reported rather than silent', () => {
+  for (const [op, band] of Object.entries(MORPH_SWEEP)) {
+    if (!band) continue;
+    for (const [key, { min, max }] of Object.entries(band)) {
+      const def = OP_DEFS[op].params[key];
+      assert.ok(def, `MORPH_SWEEP bounds ${op}.${key}, which OP_DEFS does not declare`);
+      if (def.min >= min && def.max <= max) continue;
+      // A slider reaching outside its band is legal; the row marker is what
+      // keeps it from being silent.
+      assert.match(unsweepableReason({ op, params: { [key]: def.max } })
+        ?? unsweepableReason({ op, params: { [key]: def.min } }) ?? '',
+      new RegExp(`^${op} sweeps ${key}`),
+      `${op} offers ${key} outside its band with nothing reporting it`);
+    }
+  }
 });

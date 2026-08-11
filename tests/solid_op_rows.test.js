@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildOpRow, formatParamValue } from '../tools/solid_op_rows.js';
+import { buildOpRow, formatParamValue, syncSweepWarning } from '../tools/solid_op_rows.js';
 import { OP_DEFS } from '../tools/solid_codegen.js';
 import { fakeElement } from './fake_dom.js';
 
@@ -195,4 +195,37 @@ test('the drag grip is built as namespaced SVG nodes, not markup', () => {
   const path = svg.children[0];
   assert.equal(path.namespaceURI, 'http://www.w3.org/2000/svg');
   assert.match(path.getAttribute('d'), /^M11 18c0 1\.1/);
+});
+
+test('a row marks an op the engine morph path declines', () => {
+  const swept = build({ op: 'chamfer', params: { t: 0.5 } }).el.querySelector('.op-unsweepable');
+  assert.equal(swept.textContent, '', 'a swept op carries no marker');
+  assert.equal(swept.hidden, true);
+
+  const { el } = build({ op: 'expand', params: { t: 0.5 } });
+  const flag = el.querySelector('.op-unsweepable');
+  assert.equal(flag.hidden, false);
+  assert.match(flag.getAttribute('aria-label'), /^expand has no morph leg/,
+    'the marker is a glyph, so the reason has to reach assistive tech by name');
+  assert.equal(flag.getAttribute('title'), flag.getAttribute('aria-label'),
+    'the pointer tooltip and the accessible name must carry the same reason');
+});
+
+test('the sweep marker follows a slider across its band', () => {
+  const op = { op: 'chamfer', params: { t: 0.5 } };
+  const { el } = build(op);
+  const flag = el.querySelector('.op-unsweepable');
+  assert.equal(flag.hidden, true);
+
+  // A parameter write patches the inputs in place rather than rebuilding the
+  // row, so the marker only tracks the value if the caller re-syncs it.
+  op.params.t = 0.99;
+  syncSweepWarning(el, op);
+  assert.equal(flag.hidden, false);
+  assert.match(flag.getAttribute('aria-label'), /^chamfer sweeps t only over/);
+
+  op.params.t = 0.5;
+  syncSweepWarning(el, op);
+  assert.equal(flag.hidden, true);
+  assert.equal(flag.getAttribute('aria-label'), '');
 });

@@ -56,8 +56,8 @@
     "assertions": 37
   },
   "tests/engine_source_parity.test.js": {
-    "cases": 7,
-    "assertions": 235,
+    "cases": 8,
+    "assertions": 289,
     "skippable": true
   },
   "tests/export_params.test.js": {
@@ -197,12 +197,12 @@
     "assertions": 59
   },
   "tests/solid_codegen.test.js": {
-    "cases": 88,
-    "assertions": 474
+    "cases": 91,
+    "assertions": 500
   },
   "tests/solid_op_rows.test.js": {
-    "cases": 11,
-    "assertions": 45
+    "cases": 13,
+    "assertions": 55
   },
   "tests/solid_render.test.js": {
     "cases": 14,
