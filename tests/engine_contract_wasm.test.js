@@ -453,6 +453,99 @@ test('getAnimationsPaused reports the pause both of its writers engage', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
 });
 
+// The method-surface pin above sees only that the six preset methods exist,
+// while segment_worker's FakeEngine models their semantics and
+// segment_controller.selectPreset mirrors a pause the engine engages on its own.
+// Return type, rejection and the pause are what the fakes stand in for.
+test('the preset methods answer the way the segmented path assumes', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+
+  // Accumulated over the whole roster so the assertion count does not track it.
+  const malformed = [];
+  let paged = null;
+  let presetless = null;
+  for (const name of Object.keys(engine.getEffectSizes())) {
+    if (engine.setEffect(name) !== M.EffectSetResult.INSTALLED) {
+      malformed.push(`${name}: setEffect failed`);
+      continue;
+    }
+    const count = engine.getPresetCount();
+    const index = engine.getPresetIndex();
+    if (!Number.isInteger(count) || count < 0) malformed.push(`${name}: count ${count}`);
+    else if (index !== 0) malformed.push(`${name}: a fresh effect reports index ${index}`);
+    if (count > 1 && !paged) paged = { effect: name, count };
+    if (count === 0 && !presetless) presetless = name;
+  }
+  assert.deepEqual(malformed.slice(0, 5), [],
+    `${malformed.length} effects report a malformed preset roster`);
+  assert.ok(paged, 'no effect carries two presets, so the paging contract is unreachable');
+  assert.ok(presetless,
+    'every effect carries presets, so the empty-roster rejection is unreachable');
+
+  assert.equal(engine.setEffect(paged.effect), M.EffectSetResult.INSTALLED,
+    `setEffect must succeed for ${paged.effect}`);
+  engine.setAnimationsPaused(false);
+
+  // daydream.js gates on the return by truthiness, so a void method would read
+  // as a rejection at every call site.
+  assert.equal(engine.selectPreset(1), true,
+    'selectPreset must report boolean success for an in-range index');
+  assert.equal(engine.getPresetIndex(), 1, 'selectPreset must move the reported index');
+  // segment_controller.selectPreset writes its own animationsPaused to true on
+  // the strength of this, so a preset that stopped pausing would desync the GUI.
+  assert.equal(engine.getAnimationsPaused(), true,
+    'selectPreset must engage the animation pause');
+
+  engine.setAnimationsPaused(false);
+  for (const index of [-1, paged.count, paged.count + 1]) {
+    assert.equal(engine.selectPreset(index), false,
+      `selectPreset(${index}) must be rejected on a ${paged.count}-preset effect`);
+  }
+  assert.equal(engine.getPresetIndex(), 1,
+    'a rejected selectPreset must leave the active preset alone');
+  assert.equal(engine.getAnimationsPaused(), false,
+    'a rejected selectPreset must not engage the pause');
+
+  assert.equal(engine.selectPreset(paged.count - 1), true,
+    'the last preset must be selectable');
+  assert.equal(engine.nextPreset(), true, 'nextPreset must report boolean success');
+  assert.equal(engine.getPresetIndex(), 0, 'nextPreset must wrap past the last preset');
+  assert.equal(engine.previousPreset(), true, 'previousPreset must report boolean success');
+  assert.equal(engine.getPresetIndex(), paged.count - 1,
+    'previousPreset must wrap below the first preset');
+
+  // effect_gui's per-frame sync calls this, so a pause here would freeze every
+  // animated param the moment the GUI caught up with an external advance.
+  engine.setAnimationsPaused(false);
+  assert.equal(engine.synchronizePreset(0), true,
+    'synchronizePreset must report boolean success for an in-range index');
+  assert.equal(engine.getPresetIndex(), 0, 'synchronizePreset must move the reported index');
+  assert.equal(engine.getAnimationsPaused(), false,
+    'synchronizePreset must not engage the pause selectPreset does');
+  assert.equal(engine.synchronizePreset(paged.count), false,
+    'synchronizePreset must reject an out-of-range index');
+
+  assert.equal(engine.selectPreset(1), true, 'the second preset must be selectable');
+  assert.equal(engine.setEffect(paged.effect), M.EffectSetResult.INSTALLED,
+    'setEffect must succeed on a reload');
+  assert.equal(engine.getPresetIndex(), 0,
+    'a setEffect rebuild must reset the preset index');
+
+  // segment_worker calls selectPreset unguarded on the index it is broadcast.
+  assert.equal(engine.setEffect(presetless), M.EffectSetResult.INSTALLED,
+    `setEffect must succeed for ${presetless}`);
+  assert.equal(engine.getPresetCount(), 0, `${presetless} must carry no presets`);
+  assert.equal(engine.selectPreset(0), false,
+    'selectPreset must be rejected on an effect with no presets');
+  assert.equal(engine.nextPreset(), false,
+    'nextPreset must be rejected on an effect with no presets');
+  assert.equal(engine.previousPreset(), false,
+    'previousPreset must be rejected on an effect with no presets');
+
+  engine.setAnimationsPaused(false);
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+});
+
 // pixel_view.test.js proves refreshPixelView against a synthetic detached
 // buffer; this is the only place the real growth happens with a view
 // outstanding. MeshOps' 16 MB tooling block is allocated lazily on first use and
