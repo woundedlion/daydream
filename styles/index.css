@@ -609,6 +609,20 @@
   }
 }
 
+@media only screen and (width <= 900px) {
+  .gui-container .effect-gui .preset-nav-previous,
+  .gui-container .effect-gui .preset-nav-next {
+    display: inline-flex;
+    vertical-align: top;
+    width: 50%;
+  }
+
+  .gui-container .effect-gui .preset-nav-previous > .lil-widget,
+  .gui-container .effect-gui .preset-nav-next > .lil-widget {
+    width: 100%;
+  }
+}
+
 /* --- Desktop Styles --- */
 @media only screen and (width > 900px) {
   .gui-container {
@@ -676,6 +690,14 @@
 
   .gui-container .lil-gui .lil-controller.lil-function > .lil-widget {
     grid-column: 1 / -1;
+  }
+
+  .gui-container .lil-gui .preset-nav-previous > .lil-widget {
+    grid-column: 1;
+  }
+
+  .gui-container .lil-gui .preset-nav-next > .lil-widget {
+    grid-column: 2;
   }
 
   /* 1px gap between adjacent panels */

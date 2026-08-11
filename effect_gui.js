@@ -29,7 +29,9 @@ export const FLASH_MS = 1500;
 // Transient Export button labels.
 export const EXPORT_COPIED = '\u2713 Copied!';
 export const EXPORT_FAILED = '\u2717 Copy failed';
-const RESERVED_CONTROL_NAMES = new Set(['reset', 'export', 'pause']);
+const RESERVED_CONTROL_NAMES = new Set([
+  'reset', 'export', 'previousPreset', 'nextPreset', 'pause'
+]);
 
 /**
  * Add the lil-gui control one engine parameter definition calls for. A readonly
@@ -87,6 +89,9 @@ export function addParamControl(gui, state, p, hydrate = true) {
  *   parameter to the worker pool.
  * @param {(paused: boolean) => void} deps.setAnimationsPaused - Freezes/resumes
  *   animation-driven params on every engine.
+ * @param {() => number} deps.getPresetCount - Number of presets on the live effect.
+ * @param {() => number} deps.getPresetIndex - Selected preset on the live effect.
+ * @param {(index: number) => void} deps.selectPreset - Selects one preset on every engine.
  * @param {() => boolean|undefined} deps.engineAnimationsPaused - Reads the main
  *   engine's animation-pause state, undefined on a module without the accessor.
  * @param {() => void} deps.applyEffect - Rebuilds the panel from engine state
@@ -115,6 +120,9 @@ export function createEffectGui({
   setEngineParam,
   setWorkerParam,
   setAnimationsPaused,
+  getPresetCount,
+  getPresetIndex,
+  selectPreset,
   engineAnimationsPaused,
   applyEffect,
   guiContainer,
@@ -257,7 +265,7 @@ export function createEffectGui({
   }
 
   /**
-   * Add the effect GUI's Reset and Export buttons.
+   * Add the effect GUI's Reset, Export, and preset navigation buttons.
    * @param {Object} fx - The effect record being built.
    * @param {Array<Object>} params - The engine's parameter definitions.
    * @returns {void}
@@ -291,6 +299,23 @@ export function createEffectGui({
     };
     fx.gui.add(effectActions, 'reset').name('Reset');
     const exportCtrl = fx.gui.add(effectActions, 'export').name('Export');
+    const presetCount = getPresetCount();
+    if (presetCount > 0) {
+      const move = (delta) => {
+        if (fx.pause?.controller) fx.pause.setPaused(true);
+        else setAnimationsPaused(true);
+        const count = getPresetCount();
+        if (count <= 0) return;
+        selectPreset((getPresetIndex() + delta + count) % count);
+      };
+      effectActions.previousPreset = () => move(-1);
+      effectActions.nextPreset = () => move(1);
+      const previous = fx.gui.add(effectActions, 'previousPreset')
+        .name('Previous Preset');
+      const next = fx.gui.add(effectActions, 'nextPreset').name('Next Preset');
+      previous.domElement.classList.add('preset-nav-previous');
+      next.domElement.classList.add('preset-nav-next');
+    }
   }
 
   /**

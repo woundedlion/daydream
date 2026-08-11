@@ -162,6 +162,9 @@ async function handleMessage(msg) {
           break;
         }
       }
+      if (typeof msg.presetIndex === 'number') {
+        engine.selectPreset(msg.presetIndex);
+      }
       // Tuned params must follow setEffect, which rebuilds with defaults.
       if (msg.params) {
         for (const p of msg.params) engine.setParameter(p.name, p.value);
@@ -183,6 +186,9 @@ async function handleMessage(msg) {
           post({ type: 'engineRejected',
                  reason: `setEffect(${msg.name}) rejected` });
           break;
+        }
+        if (typeof msg.presetIndex === 'number') {
+          engine.selectPreset(msg.presetIndex);
         }
         // Tuned params must follow setEffect, which rebuilds with defaults.
         if (msg.params) {
@@ -229,6 +235,14 @@ async function handleMessage(msg) {
       break;
     }
 
+    case 'selectPreset': {
+      if (engine) {
+        engine.selectPreset(msg.index);
+        paramRevision = msg.paramRevision;
+      }
+      break;
+    }
+
     case 'setPoleLod': {
       if (engine) {
         engine.setPoleLod(msg.value);
@@ -257,6 +271,8 @@ async function handleMessage(msg) {
       const paramGeneration = segId === 0
         ? engine.getParamGeneration?.() ?? null
         : null;
+      const presetCount = segId === 0 ? engine.getPresetCount?.() ?? null : null;
+      const presetIndex = segId === 0 ? engine.getPresetIndex?.() ?? null : null;
 
       const allPixels = engine.getPixels();
       const { x0, x1, y0, y1, w: qw, h: qh } = segRange;
@@ -325,6 +341,8 @@ async function handleMessage(msg) {
         paramValues,
         paramGeneration,
         paramRevision,
+        presetCount,
+        presetIndex,
         fullFrame: clipFullFrame,
       }, [pixelsCopy.buffer]);
       break;

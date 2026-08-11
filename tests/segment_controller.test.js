@@ -461,6 +461,8 @@ function deliverFrame(controller, segId, overrides = {}) {
       paramValues: overrides.paramValues ?? null,
       paramGeneration: overrides.paramGeneration ?? null,
       paramRevision: overrides.paramRevision ?? controller.paramRevision,
+      presetCount: overrides.presetCount ?? null,
+      presetIndex: overrides.presetIndex ?? null,
       fullFrame: overrides.fullFrame ?? false,
     },
   });
@@ -610,10 +612,13 @@ test('a segment-0 frame publishes paired param values and generation for the GUI
   assert.equal(c.getParamValues(), null, 'nothing published before the first frame');
   assert.equal(c.getParamGeneration(), null);
 
-  deliverFrame(c, 0, { paramValues: [0.25, 1], paramGeneration: 7 });
+  deliverFrame(c, 0, { paramValues: [0.25, 1], paramGeneration: 7,
+    presetCount: 6, presetIndex: 4 });
   assert.deepEqual(c.getParamValues(), [0.25, 1],
     'segment 0 mirrors its post-frame params into the controller');
   assert.equal(c.getParamGeneration(), 7);
+  assert.equal(c.getPresetCount(), 6);
+  assert.equal(c.getPresetIndex(), 4);
 
   deliverFrame(c, 1);
   await done;
@@ -2019,8 +2024,12 @@ test('a spawning pool reports the spawn and does not own the display', () => {
  * @param {Array<{name: string, value: number|boolean}>} defs - Param defs.
  * @returns {{ getParameterDefinitions: () => Array }} Fake engine.
  */
-function fakeEngine(defs) {
-  return { getParameterDefinitions: () => defs };
+function fakeEngine(defs, presetCount = 0, presetIndex = 0) {
+  return {
+    getParameterDefinitions: () => defs,
+    getPresetCount: () => presetCount,
+    getPresetIndex: () => presetIndex,
+  };
 }
 
 test('fakeEngine mocks only methods the real engine surface pins', () => {
@@ -2183,6 +2192,22 @@ test('setAnimationsPaused records the flag and broadcasts it to every worker', (
     const msgs = w.posted.filter((m) => m.type === 'setAnimationsPaused');
     assert.equal(msgs.length, 1);
     assert.equal(msgs[0].paused, true);
+  }
+});
+
+test('selectPreset broadcasts one exact index and invalidates parameter state', () => {
+  const c = readyController(2);
+  c.paramValues = [1, 2];
+  c.paramGeneration = 7;
+  c.selectPreset(4);
+
+  assert.equal(c.getPresetIndex(), 4);
+  assert.equal(c.getParamValues(), null);
+  assert.equal(c.getParamGeneration(), null);
+  for (const w of c.workers) {
+    const msg = w.posted.find((m) => m.type === 'selectPreset');
+    assert.equal(msg.index, 4);
+    assert.equal(msg.paramRevision, c.paramRevision);
   }
 });
 

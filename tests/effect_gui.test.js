@@ -155,6 +155,8 @@ function makeHarness({
   pausesOnWrite = (p) => Boolean(p.animated),
   pauseAccessor = true,
   onEngineParam = () => {},
+  presetCount = 0,
+  presetIndex = 0,
 } = {}) {
   const state = {
     params,
@@ -166,6 +168,8 @@ function makeHarness({
     activeElement: null,
     copyText,
     container,
+    presetCount,
+    presetIndex,
   };
   const writes = [];
   const warnings = [];
@@ -193,6 +197,12 @@ function makeHarness({
     setAnimationsPaused: (paused) => {
       writes.push(`paused:${paused}`);
       engine.paused = paused;
+    },
+    getPresetCount: () => state.presetCount,
+    getPresetIndex: () => state.presetIndex,
+    selectPreset: (index) => {
+      writes.push(`preset:${index}`);
+      state.presetIndex = index;
     },
     engineAnimationsPaused: () => (pauseAccessor ? engine.paused : undefined),
     applyEffect: () => writes.push('applyEffect'),
@@ -708,6 +718,32 @@ test('a param/value length skew is warned once per episode, never bound by index
 
 // The Export action copies the live values, and reports the outcome on its own
 // button.
+
+test('preset effects put Previous and Next side by side below Export', () => {
+  const h = makeHarness({ presetCount: 3, presetIndex: 0 });
+  h.panel.build();
+
+  assert.deepEqual(h.gui().controllers.slice(0, 4).map((c) => c.property),
+    ['reset', 'export', 'previousPreset', 'nextPreset']);
+  assert.equal(h.gui().ctrl('previousPreset').label, 'Previous Preset');
+  assert.equal(h.gui().ctrl('nextPreset').label, 'Next Preset');
+  assert.ok(h.gui().ctrl('previousPreset').domElement.classList
+    .contains('preset-nav-previous'));
+  assert.ok(h.gui().ctrl('nextPreset').domElement.classList
+    .contains('preset-nav-next'));
+
+  h.gui().ctrl('previousPreset').object.previousPreset();
+  h.gui().ctrl('nextPreset').object.nextPreset();
+  assert.deepEqual(h.writes,
+    ['paused:true', 'preset:2', 'paused:true', 'preset:0']);
+});
+
+test('effects without presets do not show preset navigation', () => {
+  const h = makeHarness();
+  h.panel.build();
+  assert.equal(h.gui().ctrl('previousPreset'), undefined);
+  assert.equal(h.gui().ctrl('nextPreset'), undefined);
+});
 
 test('Export copies the live values as a C++ brace-init list', async () => {
   const h = makeHarness({ params: [SPEED, GLOW], engineValues: [0.25, 0.5] });

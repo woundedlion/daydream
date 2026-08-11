@@ -25,7 +25,7 @@
  * same-named but reshaped message. Bump on any breaking change to the messages below.
  * @type {number}
  */
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 /**
  * One tuned effect parameter, flattened for structured-clone transport. Booleans
@@ -65,6 +65,7 @@ export const PROTOCOL_VERSION = 6;
  *   type: 'init', version: number, segId: number, totalSegs: number,
  *   w: number, h: number,
  *   effectName?: string, params?: SegParam[], paused?: boolean,
+ *   presetIndex?: number,
  *   poleLod?: number, paramRevision: number, wasmModule?: WebAssembly.Module,
  * }} InitMsg
  */
@@ -74,7 +75,7 @@ export const PROTOCOL_VERSION = 6;
  * current tuned values, applied AFTER engine.setEffect() — which rebuilds the
  * effect with defaults — so the segment matches instead of reverting to defaults.
  * @typedef {{ type: 'setEffect', name: string, params?: SegParam[],
- *   paused?: boolean, paramRevision: number }} SetEffectMsg
+ *   paused?: boolean, presetIndex?: number, paramRevision: number }} SetEffectMsg
  */
 
 /** Resize the worker's canvas; the worker recomputes its segment rectangle from
@@ -89,6 +90,10 @@ export const PROTOCOL_VERSION = 6;
 
 /** Toggle whether the worker's effect advances its animation clock.
  * @typedef {{ type: 'setAnimationsPaused', paused: boolean }} SetAnimationsPausedMsg */
+
+/** Select one effect preset by index.
+ * @typedef {{ type: 'selectPreset', index: number,
+ *   paramRevision: number }} SelectPresetMsg */
 
 /** Set near-pole azimuthal shading decimation on the worker's engine. The
  * aggressiveness is a per-module-instance global, so each worker carries its own
@@ -106,7 +111,7 @@ export const PROTOCOL_VERSION = 6;
 /**
  * Every message the controller sends to a worker.
  * @typedef {InitMsg | SetEffectMsg | SetResolutionMsg
- *   | SetParameterMsg | SetAnimationsPausedMsg | SetPoleLodMsg
+ *   | SetParameterMsg | SetAnimationsPausedMsg | SelectPresetMsg | SetPoleLodMsg
  *   | RenderMsg} WorkerInboundMsg
  */
 
@@ -155,7 +160,8 @@ export const PROTOCOL_VERSION = 6;
  *   arenaMetrics: SegArenaMetrics | null,
  *   paramValues: number[] | null,
  *   paramGeneration: number | null,
- *   paramRevision: number,
+ *   paramRevision: number, presetCount: number | null,
+ *   presetIndex: number | null,
  *   fullFrame: boolean,
  * }} FrameMsg
  */
