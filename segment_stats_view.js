@@ -18,6 +18,10 @@ import { formatKB } from "./tools/kb_format.js";
 export const FAULT_POOL = -1;
 export const FAULT_RENDER = -2;
 
+// The global stat bars this overlay stands in for while segmented mode is on.
+// They belong to the page, so what is hidden here is handed back as it was.
+const STAT_BAR_IDS = ['global-stats-desktop', 'stats-bar'];
+
 /**
  * The controller state one overlay repaint reads. Every array is indexed by
  * segment and at least `count` long.
@@ -71,6 +75,10 @@ export class SegmentStatsView {
     // is left uncached, so a repaint before the page is built re-queries.
     /** @type {Object<string, HTMLElement>} */
     this.byId = {};
+    // Inline display each hidden stat bar carried, keyed by id; an entry exists
+    // only while this overlay is the one hiding that bar.
+    /** @type {Object<string, string>} */
+    this.hiddenStatBars = {};
   }
 
   /**
@@ -87,6 +95,33 @@ export class SegmentStatsView {
   }
 
   /**
+   * Hide the global stat bars this overlay stands in for, remembering the inline
+   * display each carried. Repeat calls keep the first remembered value.
+   * @returns {void}
+   */
+  hideStatBars() {
+    for (const id of STAT_BAR_IDS) {
+      const bar = this.element(id);
+      if (!bar) continue;
+      if (!(id in this.hiddenStatBars))
+        this.hiddenStatBars[id] = bar.style.display ?? '';
+      bar.style.display = 'none';
+    }
+  }
+
+  /**
+   * Hand back every stat bar this overlay hid, at the inline display it had.
+   * @returns {void}
+   */
+  showStatBars() {
+    for (const [id, display] of Object.entries(this.hiddenStatBars)) {
+      const bar = this.element(id);
+      if (bar) bar.style.display = display;
+    }
+    this.hiddenStatBars = {};
+  }
+
+  /**
    * Repaint the overlay from one snapshot of the controller's published state.
    * @param {SegmentStatsState} state - Current pool and per-segment state.
    * @returns {void}
@@ -95,18 +130,13 @@ export class SegmentStatsView {
     const el = this.element('segment-stats');
     if (!el) return;
 
-    const globalStatsDesktop = this.element('global-stats-desktop');
-    const globalStatsMobile = this.element('stats-bar');
-
     if (!state.active) {
       el.style.display = 'none';
-      if (globalStatsDesktop) globalStatsDesktop.style.display = '';
-      if (globalStatsMobile) globalStatsMobile.style.display = '';
+      this.showStatBars();
       return;
     }
 
-    if (globalStatsDesktop) globalStatsDesktop.style.display = 'none';
-    if (globalStatsMobile) globalStatsMobile.style.display = 'none';
+    this.hideStatBars();
     el.style.display = '';
 
     if (state.faulted) {

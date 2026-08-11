@@ -232,6 +232,40 @@ test('an inactive pool hides the overlay and hands the stat bars back', () => {
   assert.equal(mobile.style.display, '');
 });
 
+// The bars belong to the page, so an inline display the page set on one is a
+// value the overlay is borrowing, not the stylesheet's to overwrite.
+test('a stat bar is handed back at the inline display it was hidden with', () => {
+  const { doc, desktop, mobile } = makeDoc();
+  const view = new SegmentStatsView(doc);
+  desktop.style.display = 'flex';
+
+  view.update(readyState(2));
+  assert.equal(desktop.style.display, 'none');
+  assert.equal(mobile.style.display, 'none');
+
+  view.update(readyState(2, { active: false }));
+  assert.equal(desktop.style.display, 'flex', 'the borrowed value was overwritten');
+  assert.equal(mobile.style.display, '', 'a bar with no inline display keeps none');
+});
+
+test('repeated repaints do not overwrite the remembered stat-bar display', () => {
+  const { doc, desktop } = makeDoc();
+  const view = new SegmentStatsView(doc);
+  desktop.style.display = 'grid';
+
+  view.update(readyState(2));
+  view.update(readyState(2));
+  view.update(readyState(2, { active: false }));
+
+  assert.equal(desktop.style.display, 'grid',
+    'a second hide remembered the hidden value as the one to restore');
+
+  // Nothing is held after the hand-back, so a later restore invents no value.
+  desktop.style.display = 'block';
+  view.update(readyState(2, { active: false }));
+  assert.equal(desktop.style.display, 'block');
+});
+
 test('a spawning pool reports the worker count instead of a table', () => {
   const { doc, stats } = makeDoc();
   const view = new SegmentStatsView(doc);
