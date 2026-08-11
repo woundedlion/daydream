@@ -73,6 +73,7 @@ export class WebGLRenderer {
   setPixelRatio(ratio) { this.pixelRatio = ratio; }
   render() { this.renders += 1; }
   dispose() { log.push('renderer.dispose'); }
+  forceContextLoss() { log.push('renderer.forceContextLoss'); }
 }
 
 /**

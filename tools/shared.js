@@ -187,6 +187,9 @@ export function initScene(containerId, canvasId, opts = {}) {
     window.removeEventListener('resize', resize);
     controls.dispose();
     renderer.dispose();
+    // dispose() frees Three's own objects but leaves the WebGL context live,
+    // and a browser allows only a handful at a time.
+    renderer.forceContextLoss();
     sphere?.geometry.dispose();
     sphere?.material.dispose();
     scene.clear();
