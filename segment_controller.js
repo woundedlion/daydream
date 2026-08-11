@@ -1102,7 +1102,6 @@ export class SegmentController {
           return;
         }
       }
-      this.scratch.fill(null);
 
       this.armRenderWatchdog();
     });
