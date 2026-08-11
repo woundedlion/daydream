@@ -159,6 +159,7 @@ function makeHarness({
   presetCount = 0,
   presetIndex = 0,
   presetSelectionAccepted = true,
+  presetSyncAccepted = true,
 } = {}) {
   const state = {
     params,
@@ -205,6 +206,7 @@ function makeHarness({
     getPresetIndex: () => state.presetIndex,
     synchronizePreset: (index) => {
       if (state.hostPresetIndex === index) return true;
+      if (!presetSyncAccepted) return false;
       writes.push(`syncPreset:${index}`);
       state.hostPresetIndex = index;
       onSynchronizePreset(index, state);
@@ -695,6 +697,36 @@ test('segmented mode rebuilds from main-engine definitions before reading worker
 
   h.state.segmentGeneration = 12;
   h.state.segmentValues = [0.6];
+  h.panel.sync();
+  assert.equal(h.gui().ctrl('Depth').getValue(), 0.6);
+});
+
+test('a refused preset sync still rebuilds a stale schema', () => {
+  const h = makeHarness({
+    params: [SPEED],
+    engineValues: [0.9],
+    generation: 11,
+    presetCount: 3,
+    presetIndex: 0,
+    presetSyncAccepted: false,
+  });
+  h.panel.build();
+  const depth = { name: 'Depth', value: 0.25, min: 0, max: 1, animated: true };
+  h.state.params = [depth];
+  h.state.engineValues = [0.6];
+  h.state.generation = 12;
+  // The live preset the main engine's older effect cannot hold: the refusal
+  // that follows is exactly what the rebuild resolves.
+  h.state.presetIndex = 2;
+
+  h.panel.sync();
+
+  assert.deepEqual(h.panel.active().paramNames, ['Depth']);
+  assert.equal(h.panel.active().paramGeneration, 12);
+  assert.equal(h.gui().ctrl('Depth').getValue(), 0.25,
+    'the refusal still gates the value poll');
+
+  h.state.hostPresetIndex = 2;
   h.panel.sync();
   assert.equal(h.gui().ctrl('Depth').getValue(), 0.6);
 });

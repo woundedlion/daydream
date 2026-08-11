@@ -194,10 +194,14 @@ export function createEffectGui({
     if (!activeEffect || !activeEffect.controllerByName) return;
     const presetCount = getPresetCount();
     const presetIndex = getPresetIndex();
-    if (!synchronizePreset(presetIndex)) return;
+    // Mirroring the preset can itself load a new schema, so the rebuild follows
+    // it — but a refusal must not gate the rebuild, which is what clears the
+    // stale schema a refusal comes from.
+    const presetSynced = synchronizePreset(presetIndex);
     if (paramGenerationStale(activeEffect.paramGeneration, paramGeneration())) {
       if (!rebuildSchema()) return;
     }
+    if (!presetSynced) return;
     adoptPauseDisplay(activeEffect, engineAnimationsPaused());
     adoptPresetDisplay(activeEffect, presetCount, presetIndex);
     if (!activeEffect.hasLiveParams) return;
