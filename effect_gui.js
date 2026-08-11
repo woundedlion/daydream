@@ -196,11 +196,7 @@ export function createEffectGui({
     const presetIndex = getPresetIndex();
     if (!synchronizePreset(presetIndex)) return;
     if (paramGenerationStale(activeEffect.paramGeneration, paramGeneration())) {
-      rebuildSchema();
-      // A segmented value snapshot may be from a frame already in flight when
-      // the topology changed. The next render supplies values for the rebuilt
-      // schema; never bind the pre-rebuild snapshot during this call.
-      return;
+      if (!rebuildSchema()) return;
     }
     adoptPauseDisplay(activeEffect, engineAnimationsPaused());
     adoptPresetDisplay(activeEffect, presetCount, presetIndex);
