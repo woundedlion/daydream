@@ -356,6 +356,23 @@ test('a rejected parameter write names its reason', () => {
     'setParameter must report NON_FINITE for a NaN value');
 });
 
+test('parameter definitions separate rendered and requested state', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
+  const before = engine.getParameterDefinitions().find((d) => d.name === 'Lens');
+  assert.ok(before, 'ShaderBall must expose the Lens selector');
+  assert.equal(typeof before.requestedValue, 'number');
+
+  const requested = before.value === 4 ? 5 : 4;
+  assert.equal(engine.setParameter('Lens', requested), M.ParamSetResult.APPLIED);
+  const after = engine.getParameterDefinitions().find((d) => d.name === 'Lens');
+
+  assert.equal(after.value, before.value,
+    'the GUI value remains the renderer-owned state until a frame advances');
+  assert.equal(after.requestedValue, requested,
+    'reload/worker initialization can copy the accepted write immediately');
+});
+
 test('strobeColumns and getEffectSizes return the shapes daydream consumes', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,

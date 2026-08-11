@@ -65,7 +65,10 @@ export interface ParameterDefinitionBase {
 
 /** A toggle. Its value is a JS boolean and it carries no range or options. */
 export interface BooleanParameterDefinition extends ParameterDefinitionBase {
+  /** Current rendered value shown by the GUI. */
   value: boolean;
+  /** Writable target copied when another renderer is initialized. */
+  requestedValue: boolean;
 }
 
 /**
@@ -77,7 +80,10 @@ export interface BooleanParameterDefinition extends ParameterDefinitionBase {
  * an integer count carries its range instead and exports as a numeric literal.
  */
 export interface NumericParameterDefinition extends ParameterDefinitionBase {
+  /** Current rendered value shown by the GUI. */
   value: number;
+  /** Writable target copied when another renderer is initialized. */
+  requestedValue: number;
   min: number;
   max: number;
   step?: number;
