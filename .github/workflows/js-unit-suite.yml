@@ -7,14 +7,23 @@
 # hand-transcribe, so the job checks the engine out to engine/ and declares it
 # required, which turns a missing checkout from a skipped case into a failure.
 #
-# That checkout tracks the engine's default branch, not the holosphere_wasm.sha
-# pin deploy.yml's gate uses. The transcriptions have to agree with engine HEAD
-# before the next WASM rebuild advances the pin; at the pin they agree by
+# On the pull-request path that checkout tracks the engine's default branch: the
+# transcriptions have to agree with engine HEAD before the next WASM rebuild
+# advances holosphere_wasm.sha. The deploy path passes pin-engine, which resolves
+# the checkout to that pin instead, so an unrelated engine commit cannot red the
+# deploy of a daydream tree that did not change; at the pin the two agree by
 # construction, which is what tests/color_parity_wasm.test.js already covers.
 name: JS unit suite
 
 on:
   workflow_call:
+    inputs:
+      pin-engine:
+        description: >-
+          Check the engine out at holosphere_wasm.sha instead of its default
+          branch. Set by the deploy path.
+        type: boolean
+        default: false
     secrets:
       POV_TOKEN:
         description: Read access to woundedlion/pov; needed only while it is private.
@@ -72,10 +81,36 @@ jobs:
           npm run importmap
           git diff --exit-code
 
+      - name: Resolve the engine ref
+        id: engine
+        env:
+          PIN: ${{ inputs.pin-engine }}
+        # An empty ref is what actions/checkout reads as "the default branch".
+        run: |
+          if [ "$PIN" != "true" ]; then
+            echo "ref=" >> "$GITHUB_OUTPUT"
+            echo "Tracking the engine default branch."
+            exit 0
+          fi
+          if [ ! -f holosphere_wasm.sha ]; then
+            echo "::error::holosphere_wasm.sha not found — the pinned engine checkout has no source pin to resolve. The Holosphere WASM install writes it next to the module; commit it with the .wasm."
+            exit 1
+          fi
+          sha="$(tr -d '[:space:]' < holosphere_wasm.sha)"
+          # A ref actions/checkout can't resolve surfaces only as an opaque
+          # "ref not found" a step later.
+          if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::holosphere_wasm.sha does not hold a bare 40-hex engine SHA (got '$sha') — rebuild from a clean Holosphere checkout and re-commit all four installed WASM files."
+            exit 1
+          fi
+          echo "ref=$sha" >> "$GITHUB_OUTPUT"
+          echo "Pinning engine checkout to $sha (from holosphere_wasm.sha)"
+
       - name: Checkout engine (woundedlion/pov)
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: woundedlion/pov
+          ref: ${{ steps.engine.outputs.ref }}
           token: ${{ secrets.POV_TOKEN || github.token }}
           path: engine
 
