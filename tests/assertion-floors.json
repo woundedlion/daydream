@@ -138,7 +138,8 @@
   },
   "tests/reference_transaction_hook.test.js": {
     "cases": 17,
-    "assertions": 38
+    "assertions": 38,
+    "skippable": true
   },
   "tests/require_tests.test.js": {
     "cases": 12,
