@@ -14,7 +14,9 @@ export async function copyToClipboard(text) {
       await navigator.clipboard.writeText(text);
       return true;
     }
-  } catch {}
+  } catch {
+    // permission denied or no secure context; fall through to the textarea path
+  }
 
   // The textarea has to take focus for execCommand('copy') to see a selection,
   // so hold the element that had it and hand focus back.
@@ -31,7 +33,9 @@ export async function copyToClipboard(text) {
   let copied = false;
   try {
     copied = document.execCommand('copy');
-  } catch {}
+  } catch {
+    // execCommand is unavailable or refused; copied stays false
+  }
   document.body.removeChild(textarea);
   if (typeof previouslyFocused?.focus === 'function') previouslyFocused.focus();
   return copied;
