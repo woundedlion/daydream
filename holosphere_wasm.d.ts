@@ -8,7 +8,8 @@
  * file is what the typecheck sees for the module. It covers the surface the
  * segment pipeline drives; tests/fake_engine.js pins that method roster and all
  * four result enums — ParamSetResult, ClipSetResult, ResolutionSetResult,
- * EffectSetResult — against the real module.
+ * EffectSetResult — against the real module, and
+ * tests/engine_contract_wasm.test.js pins the declarations below against both.
  */
 
 /**
@@ -99,9 +100,13 @@ export interface HolosphereEngine {
   setEffect(name: string): EnumValue;
   setParameter(name: string, value: number): EnumValue;
   setAnimationsPaused(paused: boolean): void;
+  /** The pause state both the panel toggle and an animated-parameter write engage. */
+  getAnimationsPaused(): boolean;
   getPresetCount(): number;
   getPresetIndex(): number;
   selectPreset(index: number): boolean;
+  /** Adopts an index a segment worker already advanced to, without engaging the animation pause. */
+  synchronizePreset(index: number): boolean;
   nextPreset(): boolean;
   previousPreset(): boolean;
   setPoleLod(value: number): void;
@@ -139,7 +144,11 @@ export interface HolosphereEngine {
 }
 
 export interface HolosphereModule {
-  HolosphereEngine: new () => HolosphereEngine;
+  HolosphereEngine: {
+    new (): HolosphereEngine;
+    /** Buildable [w, h] rows; the app narrows its resolution presets to these. */
+    getSupportedResolutions(): Array<[number, number]>;
+  };
   ClipSetResult: {
     APPLIED: EnumValue;
     NO_EFFECT: EnumValue;

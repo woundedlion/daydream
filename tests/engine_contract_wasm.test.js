@@ -46,6 +46,53 @@ test('HolosphereEngine exposes the method surface the FakeEngines mock', () => {
   }
 });
 
+// holosphere_wasm.d.ts is hand-written and stands in for glue the typecheck
+// never reads, so nothing but this pin keeps it from drifting off the module.
+const DTS = readFileSync(new URL('../holosphere_wasm.d.ts', import.meta.url), 'utf8');
+
+/**
+ * Body of a named `export interface` declaration, comments stripped.
+ * @param {string} name - Interface name.
+ * @returns {string} The declaration body.
+ */
+function interfaceBody(name) {
+  const at = DTS.indexOf(`export interface ${name} {`);
+  assert.ok(at >= 0, `holosphere_wasm.d.ts must declare interface ${name}`);
+  const end = DTS.indexOf('\n}', at);
+  assert.ok(end > at, `interface ${name} must be closed at column 0`);
+  return DTS.slice(at, end).replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+test('holosphere_wasm.d.ts declares the pinned engine method roster', () => {
+  const body = interfaceBody('HolosphereEngine');
+  const declared = new Set(
+    [...body.matchAll(/^\s*([A-Za-z_]\w*)\s*\(/gm)].map((m) => m[1]));
+  // getAnimationsPaused is read through an optional call, so it is absent from
+  // ENGINE_METHODS while still being part of the surface the app drives.
+  for (const name of [...ENGINE_METHODS, 'getAnimationsPaused']) {
+    assert.ok(declared.has(name),
+      `holosphere_wasm.d.ts is missing ${name}, which the app calls`);
+  }
+  for (const name of declared) {
+    assert.equal(typeof engine[name], 'function',
+      `holosphere_wasm.d.ts declares ${name}, which the module does not export`);
+  }
+});
+
+test('holosphere_wasm.d.ts declares the engine statics the app calls', () => {
+  const body = interfaceBody('HolosphereModule');
+  const at = body.indexOf('HolosphereEngine:');
+  assert.ok(at >= 0, 'HolosphereModule must carry the engine constructor');
+  const decl = body.slice(at, body.indexOf('\n  };', at));
+  assert.match(decl, /new\s*\(\s*\)\s*:\s*HolosphereEngine/,
+    'the constructor signature must survive the statics being declared beside it');
+  assert.match(decl, /getSupportedResolutions\s*\(/,
+    'daydream.js narrows its resolution presets through this static; a bare '
+    + '`new () => HolosphereEngine` declares it out of existence');
+  assert.equal(typeof M.HolosphereEngine.getSupportedResolutions, 'function',
+    'the module must expose getSupportedResolutions on the constructor');
+});
+
 test('the module ParamSetResult enum matches the fake_engine.js mirror', () => {
   assert.ok(M.ParamSetResult, 'the module must export ParamSetResult');
   // Embind exposes the enum as a constructor whose value names sit beside
