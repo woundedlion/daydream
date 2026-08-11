@@ -290,7 +290,7 @@ const moduleLoad = createModuleLoadHandlers({
     // Construct the recorder now that daydream's canvas exists.
     host.recorder = new VideoRecorder(daydream.canvas);
     host.recorder.frameInterval = daydream.frameInterval;
-    recording.replay();
+    recordingSettings.replay();
     host.recorder.onFormatFallback = (extension) => {
       const label = Object.keys(REC_FORMATS)
         .find(key => REC_FORMATS[key] === extension) ?? 'Auto';
@@ -525,13 +525,13 @@ segFolder.addSession(segState, 'boundaries').name('Show Boundaries').onChange(v 
 // Video recording
 const REC_RESOLUTIONS = { 'Native': null, '720p': 720, '1080p': 1080 };
 const REC_FORMATS = { 'Auto': 'auto', 'MP4': 'mp4', 'WebM': 'webm' };
-const recording = createRecordingSettings({ getRecorder: () => host.recorder });
-const recSettings = recording.settings;
-recording.define('recQuality', 16, 'bitrate',
+const recordingSettings = createRecordingSettings({ getRecorder: () => host.recorder });
+const recSettings = recordingSettings.settings;
+recordingSettings.define('recQuality', 16, 'bitrate',
   (recorder, v) => { recorder.bitrateMbps = v; });
-recording.define('recResolution', 'Native', 'resolution',
+recordingSettings.define('recResolution', 'Native', 'resolution',
   (recorder, v) => { recorder.targetHeight = REC_RESOLUTIONS[v]; });
-recording.define('recFormat', 'Auto', 'format',
+recordingSettings.define('recFormat', 'Auto', 'format',
   (recorder, v) => { recorder.format = REC_FORMATS[v]; });
 
 const durationEl = document.createElement('div');
@@ -546,13 +546,13 @@ let durationText = null;
 /**
  * Reflects the session state in the canvas styling, duration readout, and record
  * button label.
- * @param {boolean} recording - Whether a recording session is now active.
+ * @param {boolean} isRecording - Whether a recording session is now active.
  * @returns {void}
  */
-const showRecording = (recording) => {
+const showRecording = (isRecording) => {
   durationText = null;
   const canvasEl = document.getElementById('canvas-container');
-  if (recording) {
+  if (isRecording) {
     canvasEl?.classList.add('recording');
     durationEl.style.display = '';
     recordCtrl.name('\u25a0 Stop');
@@ -568,16 +568,16 @@ const recordState = { record: () => {
     console.warn('Recording is unavailable until the rendering engine finishes loading.');
     return;
   }
-  const recording = host.recorder.toggle(appState.get('effect'));
+  const isRecording = host.recorder.toggle(appState.get('effect'));
   // The canvas tint, the duration readout, and the button label are all visual;
   // the notice region is what carries the state change to assistive tech.
-  const axisWarning = recording && daydream.labelAxes
+  const axisWarning = isRecording && daydream.labelAxes
     ? ' Axis labels are page overlays, not canvas pixels; the recording will not carry them.'
     : '';
   applyNotice.show(
-    `${recording ? 'Recording started.' : 'Recording stopped.'}${axisWarning}`,
+    `${isRecording ? 'Recording started.' : 'Recording stopped.'}${axisWarning}`,
     RECORD_NOTICE);
-  showRecording(recording);
+  showRecording(isRecording);
 }};
 
 const recFolder = guiInstance.addFolder('Recording');
