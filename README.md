@@ -157,6 +157,8 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 
 ## 3. Repository Map
 
+Both trees are gated against their repository's tracked file list: every row must name a path that exists, and a directory that names any of its children must name them all. A directory drawn as a single summary row names no children and so is exempt — nothing forces `effects/`, `tests/`, `docs/`, `.githooks/`, or `.github/workflows/` to enumerate their contents here.
+
 ### Holosphere (engine + firmware)
 
 <!-- docs-check: tree exhaustive -->
@@ -187,6 +189,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   │   ├── rotate.h                Quaternion projection helpers
 │   │   ├── geometry.h              PhiLUT/TrigLUT, pixel ↔ vector mapping, pole_wrap, Orientation, Basis
 │   │   ├── spherical_field.h       Latitude-ring field layout + bilinear sphere sampling
+│   │   ├── projections.h           Bonne / Peirce quincuncial / Airocean sphere → plane kernels
 │   │   ├── easing.h                Easing functions (cubic, sine, elastic, expo, etc.)
 │   │   └── waves.h                 sin_wave / tri_wave / square_wave generators
 │   ├── mesh/                   Polyhedral meshes and their operators
@@ -209,12 +212,13 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │   │   ├── generative_palette.h    GenerativePalette + PaletteRecipe compilation (via color.h)
 │   │   ├── palette_cycler.h        PaletteCycler: dwell-and-fade display LUT over a palette sequence
 │   │   ├── effect_palette_recipes.h Per-effect authored PaletteRecipe constructors
+│   │   ├── mindsplatter_palettes.h Generated MindSplatter palette-LUT bank (from tools/mindsplatter_palette_gen.cpp)
 │   │   └── palettes.h              Named ProceduralPalette instances + shared MeshPaletteBank
 │   ├── render/                 Canvas, rasterizers, and the filter pipeline
 │   │   ├── canvas.h                Effect base class + Canvas RAII write-buffer guard
 │   │   ├── scan.h                  Rasterization primitives (Ring, Circle, Star, Mesh, etc.)
 │   │   ├── plot.h                  Line/curve rasterizer with geodesic/planar strategies
-│   │   ├── filter.h                Composable render pipeline + all Filter::World/Screen/Pix
+│   │   ├── filter.h                Composable render pipeline + all Filter::World/Screen/Pixel
 │   │   ├── sdf.h                   SDF shape primitives, CSG operations, distance queries
 │   │   ├── sdf_volume.h            3D volumetric SDF shapes + domain warps for Scan::Volume
 │   │   ├── shading.h               Fragment + mesh-topology shading helpers, null shaders
@@ -234,9 +238,8 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 │       ├── FastNoiseLite.h         Single-header noise library
 │       └── FastNoiseLite_config.h  FastNoiseLite build configuration
 │
-├── effects/                    26 headers: one per effect (23) plus the shared
-│                                ReactionDiffusionBase.h, mindsplatter_palettes.h and
-│                                shaderball_projections.h:
+├── effects/                    24 headers: one per effect (23) plus the shared
+│                                ReactionDiffusionBase.h:
 │                                BZReactionDiffusion.h, HopfFibration.h, IslamicStars.h,
 │                                Raymarch.h, … — see §9 Effects Reference
 │
@@ -338,7 +341,7 @@ The rule is deliberate about *where* it goes: `HS_CHECK` guards seams where a vi
 ├── Doxyfile                    Doxygen config for the published API reference
 ├── package.json                npm entry points for the scripts/*.mjs tools (ESM; Node ≥ 22, CI pinned via tools/build_pins.py)
 ├── package-lock.json           Pinned dependency set behind those entry points
-├── .clang-format               LLVM-derived C++ style; CI enforces it with clang-format 18
+├── .clang-format               LLVM-derived C++ style; CI enforces it with clang-format 22
 ├── ruff.toml                   Python lint rules (defect classes only, no formatter) — the ci.yml lint job
 ├── eslint.config.mjs           JavaScript lint rules for scripts/*.mjs (recommended set) — the same job
 ├── .githooks/                  pre-commit format/test/size gate, post-commit size-trail recorder, and a reference-transaction guard keeping master fast-forward-only
@@ -1160,7 +1163,7 @@ A single contiguous memory block (`GLOBAL_ARENA_SIZE = 298 KiB`) is partitioned 
 | `scratch_arena_a` | 16 KB | Short-lived intermediate geometry (RAII scoped) |
 | `scratch_arena_b` | 16 KB | Secondary scratch for ping-pong subdivision passes |
 
-The native unit-test build (`-DHS_TEST_BUILD`, §11) is the one exception: it raises `GLOBAL_ARENA_SIZE` to 8 MiB — and with it the persistent default, which is whatever the two 16 KB scratch arenas leave — so the smoke harness can render every effect without OOMing. The device budget stays reachable as `DEVICE_GLOBAL_ARENA_SIZE` / `DEVICE_PERSISTENT_BUDGET`, which the per-effect footprint `static_assert`s check against instead, so an effect that outgrows the device still fails in the host suite.
+The native effect harnesses use `HS_GLOBAL_ARENA_BYTES=8388608` — and with it the persistent default, which is whatever the two 16 KB scratch arenas leave — so they can render every effect without OOMing. The device budget stays reachable as `DEVICE_GLOBAL_ARENA_SIZE` / `DEVICE_PERSISTENT_BUDGET`, which the per-effect footprint `static_assert`s check against instead, so an effect that outgrows the device still fails in the host suite.
 
 Effects that need more scratch memory can repartition at init time:
 
@@ -1622,7 +1625,7 @@ x = ( x_boundary + (now − epoch) · (W/2) / cycles_per_half_rev )  mod W
 
 The ID straps select the board: the build reads `ID_STRAPS = log2(N)` active-low bits and decodes `(~raw) & (N-1)`. N=4 reads ID0/pin 21 and ID1/pin 22; N=8 also reads ID2/pin 23. All-floating selects segment 0/master. `SYNC` is one shared pin 3 — the master drives it and downstream boards receive on its rising edge; `MASTER_EN` (pin 5) gates an external level shifter so only the master drives the shared bus. The former column-clock wire is **deleted** and pin 4 is freed — `SYNC` is the only inter-board connection. It is assumed physically reliable (a hard, soldered line); a severed wire is out of scope (boards free-run and precess apart at crystal rate, a slow smear, never an instant break).
 
-**Signal levels & symbol waveforms.** The wire idles LOW.  A **symbol** is a burst of short active-high pulses at a fixed pitch; **the meaning is the count of rising edges — pulse width carries no information.**  Each pulse is HIGH for one ISR body (pin set HIGH at ISR entry, LOW at exit; tens of µs) and the rising edge is the only timed event.  Pulses are drawn narrow, to scale against the ~868 µs pitch:
+**Signal levels & symbol waveforms.** The wire idles LOW.  A **symbol** is a burst of short active-high pulses at a fixed pitch; **the meaning is the count of rising edges — pulse width carries no information.**  Each pulse is HIGH for one ISR body (pin set HIGH at ISR entry, LOW at exit; ~8–13 µs on the rendering wake every scheduled pulse lands on, ~54 µs when a non-rendering wake defers the drop) and the rising edge is the only timed event.  Pulses are drawn narrow, to scale against the ~868 µs pitch:
 
 ```
  HALF — 1 pulse — marks boundary x = W/2 (144)
@@ -1728,7 +1731,7 @@ Any checksum mismatch, wrong digit count, out-of-range digit, or stale partial f
            beacon digit train can't capture a just-rebooted board mid-frame.
            The train's FIRST digit is preceded by silence exactly as a
            boundary symbol is, so it can still be mistaken once; the
-           R-rejection fallback bounds the recovery (§9.1 mis-snap row).
+           R-rejection fallback bounds the recovery (spec §9.1 mis-snap row).
            Renders black until it has BOTH phase (a snap) AND identity
            (epoch/beacon).
  LOCKED  : accept a valid symbol only if implied correction ≤ G (4 col) AND
@@ -1819,9 +1822,9 @@ register_animated_param("Speed", &params.speed, 0.0f, 2.0f);  // animation-drive
 register_readonly_param("Particles", &params.active_count, 0.0f, 1024.0f);  // engine-written telemetry
 ```
 
-The enum overload takes an array of option labels that must outlive the effect (string literals). `register_animated_param` marks the param as written by the animation system, so the GUI renders it as an auto-pausing slider that engages "Pause Animation" when touched; `register_readonly_param` marks it engine-written, so the GUI shows the live value but disables editing. The readonly flag can also be applied to an already-registered param via `mark_readonly(name)`.
+The enum overload takes an array of option labels that must outlive the effect (string literals). `register_animated_param` marks the param as written by the animation system, so the GUI renders it as an auto-pausing slider that engages "Pause Animation" when touched; `register_readonly_param` marks it engine-written, so the GUI shows the live value but disables editing. The readonly flag can also be applied to an already-registered param via `mark_readonly(name)`, and `mark_global(name)` marks an already-registered param a global control rather than part of the effect's look, clearing the `preset` flag so preset exports skip it.
 
-The parameter list (`ParamList` — a fixed `std::array<ParamDef, 32>`) is accessible via `getParameters()`, and `updateParameter(name, float)` sets values at runtime. Parameters support both `float*` and `bool*` targets via `std::variant`, with automatic bool threshold at 0.5. The animation system can also write to these parameters, allowing effects to animate their own exposed controls.
+The parameter list (`ParamList`) is accessible via `getParameters()`, and `updateParameter(name, float)` sets values at runtime. Its default storage is a fixed `std::array<ParamDef, 32>`; an effect needing more calls `use_parameter_storage()` to swap in an arena-allocated array, as ShaderBall does at 64 (both are fixed-capacity — the no-realloc memory-view invariant the WASM bridge depends on). Each `ParamDef` holds a plain `void *` target tagged by a `TargetType`: `FLOAT`, `BOOL`, or one of six integer widths (`INT_I8`/`INT_U8`/`INT_I16`/`INT_U16`/`INT_I32`/`INT_U32`). Every write arrives as a float and is converted on store, with automatic bool threshold at 0.5. The animation system can also write to these parameters, allowing effects to animate their own exposed controls.
 
 ### The `EffectConfig` Flags
 
@@ -1833,7 +1836,7 @@ An effect passes construction-time flags to its base as `Effect(W, H, {.strobe =
 
 All screenshots below were captured from the [live WebAssembly simulator](https://woundedlion.github.io/daydream/) — the Phantasm 288×144 preset for most, and the Holosphere 96×20 preset for RingShower, Dynamo and Thrusters.
 
-The effect registry and tests carry the full 23-effect roster. The simulator sidebar exposes the curated subset for its active resolution (§10.5), omitting three effects at 288×144 and five at 96×20. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) is a 20-effect subset of the full roster, excluding the two Holosphere-96×20-only effects, Dynamo and Thrusters, plus ShaderBall while its 288×144 instantiation exceeds the remaining ITCM budget. Full-cycle Teensy measurements for the firmware playlist are indexed in the [on-device effect profiles](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md).
+The effect registry and tests carry the full 23-effect roster. The simulator sidebar exposes the curated subset for its active resolution (§10.5), omitting three effects at 288×144 and five at 96×20. The Phantasm firmware playlist (`HS_PHANTASM_EFFECT_LIST` in `core/engine/effects.h`) is a 21-effect subset of the full roster, excluding the two Holosphere-96×20-only effects, Dynamo and Thrusters. Full-cycle Teensy measurements for the firmware playlist are indexed in the [on-device effect profiles](https://github.com/woundedlion/pov/blob/master/docs/profiles/README.md).
 
 ### Core Effects (Modern Engine)
 
@@ -1953,7 +1956,7 @@ Polyline rings drift pole-to-pole through an inverse stereographic projection, e
 
 #### DreamBalls
 
-Draws twisting wireframe knotted structures over a selectable Platonic, Archimedean, or Catalan base mesh. The `Base Mesh` dropdown exposes all 31 of them (`Solids::BaseMesh`), and its selection is stored with the other preset parameters. Edges render as an over/under weave whose crossing graph `Weave Topology` selects: `Automatic` (the default every preset carries) parallel-transports each crossing's outgoing frame to the hidden end of the incoming edge when the solid is four-regular and falls back to the medial graph when it is not, `Medial` forces that medial graph, and `Original with defects` keeps the source mesh's shared-vertex framing. `Weave Gap` is the fraction of each strand that fades out where it tucks under its crossing partner. Mesh vertices are displaced along per-vertex tangent frames to create orbiting knot patterns, and a Möbius warp is applied to the geometry. Multiple copies orbit simultaneously while the whole structure tumbles under a slow Languid random-walk view orientation punctuated by periodic full-sphere spins. Five presets cycle every 320 frames, each carrying its own solid (rhombicuboctahedron, rhombicosidodecahedron, truncated cuboctahedron, icosidodecahedron, snub cube) and displacement settings. Four fixed procedural palettes cover the five: the first two presets share a blood-stream palette composed with an alpha falloff that ramps alpha linearly from full at the palette's near end to zero at its far end, and the last three take rich sunset, lavender lake, and coral blue. The outgoing sprite fades out before the incoming one fades in, so exactly one mesh renders per frame.
+Draws twisting wireframe knotted structures over a selectable Platonic, Archimedean, or Catalan base mesh. The `Base Mesh` dropdown exposes all 31 of them (`Solids::BaseMesh`), and its selection is stored with the other preset parameters. Edges render as an over/under weave whose crossing graph `Weave Topology` selects: `Automatic` (the default every preset carries) parallel-transports each crossing's outgoing frame to the hidden end of the incoming edge when the solid is four-regular and falls back to the medial graph when it is not, `Medial` forces that medial graph, and `Original with defects` keeps the source mesh's shared-vertex framing. `Weave Gap` is the fraction of each strand that fades out where it tucks under its crossing partner. Mesh vertices are displaced along per-vertex tangent frames to create orbiting knot patterns, and a Möbius warp is applied to the geometry. Multiple copies orbit simultaneously while the whole structure tumbles under a slow Languid random-walk view orientation punctuated by periodic full-sphere spins. Ten presets cycle every 320 frames, each carrying a solid and displacement settings — rhombicuboctahedron, rhombicosidodecahedron, truncated cuboctahedron, icosidodecahedron, snub cube, truncated dodecahedron, triakis icosahedron and disdyakis triacontahedron, the triakis icosahedron taking three of the ten slots at different displacements. Four fixed procedural palettes cover the ten: the first two presets share a blood-stream palette composed with an alpha falloff that ramps alpha linearly from full at the palette's near end to zero at its far end, the next two take rich sunset and lavender lake, and the last six take coral blue. The outgoing sprite fades out before the incoming one fades in, so exactly one mesh renders per frame.
 
 **Parameters**: Base Mesh (source solid), Weave Topology (crossing graph), Weave Gap (under-strand fade), Copies (number of knot copies), Radius (displacement), Speed (orbit speed), Warp (Möbius warp scale), Alpha
 
@@ -2127,14 +2130,16 @@ The authored stage order is `source → inner warp → outer warp → projection
 | Stage | Options | Produces or controls |
 |---|---|---|
 | **Function** | Twin Wave, Rings, Spiral, Grid, Coupled / Direct, Noise Contour, Primitive Lattice | A signed scalar field sampled in the final planar coordinates. Function-specific controls replace irrelevant generic sliders. |
-| **Projection** | Equirectangular, Stereographic, Gnomonic, Bonne, Peirce Quincuncial, Airocean / Dymaxion | Planar coordinates plus region/component identity, projection weight, boundary traits, stable edge identity, and fade distance. |
+| **Projection** | Folded Sinusoidal, Stereographic, Gnomonic, Bonne, Peirce Quincuncial, Dymaxion / Airocean, Equirectangular | Planar coordinates plus region/component identity, projection weight, boundary traits, stable edge identity, and fade distance. |
 | **Projection Frame** | Identity, Spin + Wander | Rotates the sphere before projection. Spin Rate and Projection Wander exist only for Spin + Wander. |
-| **Lens** | None, Glitch, Twist, Kaleidoscope, Möbius, Tangent Noise | Distorts a unit-sphere direction before projection. Lens Mix and lens-specific controls exist only for an active lens. |
-| **Outer / Inner Warp** | None, Legacy Stereo Noise, Affine Frame, Wave Shear, Vortex, Vector Noise, Curl Flow, Mirror Tile, Polar Chart | Pulls planar coordinates backward and accumulates displacement, deformation, and path length for downstream colorizers. |
+| **Lens** | None, Glitch, Twist, Kaleidoscope, Mobius, Tangent Noise | Distorts a unit-sphere direction before projection. Lens Mix and lens-specific controls exist only for an active lens. |
+| **Outer / Inner Warp** | None, Stereo Noise, Affine Frame, Wave Shear, Vortex, Vector Noise, Curl Flow, Mirror Tile, Polar Chart | Pulls planar coordinates backward and accumulates displacement, deformation, and path length for downstream colorizers. |
 | **Signal Weight** | None, Projection | Optionally multiplies the signed source signal by the projection's weight before remapping it to `[0, 1]`. It changes value, not alpha. |
 | **Value Transfer** | Linear, Ridge, Iso Contour, Smooth Bands | Shapes the normalized value. Iso controls appear only for Iso Contour; Band Count and Band Phase only for Smooth Bands. |
-| **Coverage** | Opaque, Projection Weight, Projection Weight Squared, Value Cutout, Edge Fade | Computes alpha independently from color value. Linear projection weight is softer and broader than the squared form. |
+| **Coverage** | Opaque, Projection Weight Squared, Value Cutout, Edge Fade, Projection Weight | Computes alpha independently from color value. Linear projection weight is softer and broader than the squared form. |
 | **Colorizer** | Generated Triadic, ShaderBall Liquid, Deformation Ink | Converts shaped value, coverage, and optional warp metadata into straight-alpha color. |
+
+**Outer Wander** sits outside that table: it is always registered, and scales how much of a continuous random walk rotates the viewing direction before any stage runs, drifting the whole look. The Spin + Wander frame's own **Projection Wander** is a separate slider that drifts only the sphere's pre-projection orientation.
 
 Selector dependencies are explicit and deterministic:
 
@@ -2142,7 +2147,7 @@ Selector dependencies are explicit and deterministic:
 flowchart TD
   Projection -->|Bonne| Bonne[Hemisphere + standard parallel]
   Projection -->|Peirce| Peirce[Layout; scroll for strip layouts]
-  Projection -->|Airocean / Dymaxion| Air[Net layout]
+  Projection -->|Dymaxion / Airocean| Air[Net layout]
   Projection -->|Gnomonic| Gnomonic[Hemisphere policy]
   Projection --> CommonP[Meridian / scale / pole controls<br/>when meaningful]
 
@@ -2167,7 +2172,7 @@ GUI sliders and dropdowns apply immediately. Automatic preset choreography remai
 
 #### DisplacementField
 
-A stack of evenly spaced soft-stroked rings (`Scan::DistortedRing`) sharing one axis, each vertex displaced along the stack axis by a stack of displacement fields that alternate between two phases. In the ball phase, cap-shaped bumps spawn at the pole on random meridians and fall to the opposite pole at varying speeds, bowing the rings away from each falling ball; once the last ball lands, a two-octave world-space OpenSimplex noise field (octave 1 envelopes octave 2, so perturbations turn sparse wherever the envelope runs near zero) fades in from zero, dwells at full strength, then fades back out into the next ball phase. Ring colors sweep a circular analogous palette across the stack, with each fragment's hue rotated by the local displacement magnitude, and the palette slowly wipes to a freshly generated one every ~11 seconds.
+A stack of evenly spaced soft-stroked rings (`Scan::DistortedRingStack`) sharing one axis, each vertex displaced along the stack axis by a stack of displacement fields that alternate between two phases. In the ball phase, cap-shaped bumps spawn at the pole on random meridians and fall to the opposite pole at varying speeds, bowing the rings away from each falling ball; once the last ball lands, a two-octave world-space OpenSimplex noise field (octave 1 envelopes octave 2, so perturbations turn sparse wherever the envelope runs near zero) fades in from zero, dwells at full strength, then fades back out into the next ball phase. Ring colors sweep a circular analogous palette across the stack, with each fragment's hue rotated by the local displacement magnitude, and the palette slowly wipes to a freshly generated one every ~11 seconds.
 
 **Parameters**: Alpha, Rings, Thickness, Ball Amp, Noise Amp, Scale 1, Scale 2, Hue Rotate, Flow Speed, Ball Min, Ball Max, Ball Rate, Speed Min, Speed Max
 
@@ -2242,9 +2247,14 @@ A normal page load creates one WASM instance on the main thread. The dot mesh ha
 | `setParameter(name, value)` → `ParamSetResult` | Update a live effect parameter; returns `Module.ParamSetResult.APPLIED` on success, else the rejection reason (`NO_EFFECT`, `UNKNOWN_PARAM`, `READONLY`, or `NON_FINITE`). Compare against the enum values — never by truthiness. An `APPLIED` float may still have been clamped to the param's `[min, max]`; read the effective value back via `getParamValues()`. An `APPLIED` write to an *animated* param also engages the animation pause (the animation would otherwise overwrite the value on the next frame), and that pause survives `setEffect` — check `getAnimationsPaused()` afterwards |
 | `setAnimationsPaused(paused)` | Freeze/resume the current effect's animation drivers (the GUI "Pause Animation" toggle) |
 | `getAnimationsPaused()` → `bool` | Whether those drivers are currently frozen. The engine is the owner of this state — an `APPLIED` `setParameter` on an animated param engages the pause by itself — so read it back rather than mirroring the rule in JS |
+| `getPresetCount()` → `uint32` | Number of presets the current effect exposes for manual navigation; `0` when no effect is set or the effect authored none, which is how a GUI decides whether to offer preset controls at all |
+| `getPresetIndex()` → `uint32` | Index of the selected preset; `0` when no effect is set, so tell that apart with `getPresetCount() != 0`. An effect whose choreography advances its own presets moves this with no JS call, so poll it rather than tracking the index last written |
+| `selectPreset(index)` → `bool` | Select a preset for manual navigation: applies it **and engages the animation pause**, exactly as `setAnimationsPaused(true)` would, so the preset's values are not overwritten by the animation on the next frame. `false` when no effect is set, the index is out of range, or the effect refused the preset. The pause survives `setEffect`, so read it back via `getAnimationsPaused()`; parameter values move with the preset, so re-read `getParamValues()` |
+| `synchronizePreset(index)` → `bool` | Select a preset **without touching the pause state** — the call for following engine-driven advancement, which `selectPreset` would freeze. A request for the already-active index is a success no-op; `false` when no effect is set, the index is out of range, or the effect refused the preset |
+| `nextPreset()` / `previousPreset()` → `bool` | Step one preset forward/back with wraparound, pausing animations like `selectPreset`; `false` when no effect is set, the effect has no presets, or it refused the preset |
 | `setPoleLod(aggressiveness)` | Set near-pole azimuthal shading decimation (the GUI "Pole LOD" slider, `[0, 2]`); non-finite and negative inputs clamp to 0, and the value saturates at 8. The setting is a module-global, so it reaches only the engine instance it was called on — a segmented pool needs it re-sent to every worker (§10.7) |
 | `getPoleLod()` → `float` | Current decimation aggressiveness |
-| `getParameterDefinitions()` | Return the parameter list; each entry is `{name, value, animated, readonly, preset}`, and float params additionally carry `{min, max}` (bool params omit `min`/`max` and return `value` as a JS boolean). `preset` is a bool, `false` only for a param the effect excluded from preset exports (`mark_global`), so an export tool skips those alongside the readonly ones. Enum params (registered with option labels) also carry `options`, an array of label strings indexed by the param's value, which the GUI renders as a dropdown; an enum registered with export literals carries `exportOptions` as well — the C++ enum literals indexed the same way, which the export formatter emits in place of a numeric literal. `exportOptions` is absent on an enum registered without them, and on every non-enum param |
+| `getParameterDefinitions()` | Return the parameter list; each entry is `{name, value, animated, readonly, preset}`, and float params additionally carry `{min, max}` (bool params omit `min`/`max` and return `value` as a JS boolean). Whole-number targets — enum and integer params — additionally carry `step: 1`, absent on a float one, so the GUI knows which controls admit only whole values. `preset` is a bool, `false` only for a param the effect excluded from preset exports (`mark_global`), so an export tool skips those alongside the readonly ones. Enum params (registered with option labels) also carry `options`, an array of label strings indexed by the param's value, which the GUI renders as a dropdown; an enum registered with export literals carries `exportOptions` as well — the C++ enum literals indexed the same way, which the export formatter emits in place of a numeric literal. `exportOptions` is absent on an enum registered without them, and on every non-enum param |
 | `getParamValues()` | Return current parameter values (including animation-driven updates), as raw floats in definition order. A bool param streams as `0.0`/`1.0` here even though `getParameterDefinitions()` reports its `value` as a JS boolean, so a consumer reads the type off the definition and thresholds this stream at 0.5 rather than testing `typeof` on it |
 | `getParamGeneration()` → `int` | Generation identifying which loaded-effect or no-effect state the definition and value streams describe. Pin it beside a `getParameterDefinitions()` snapshot and re-read it with each `getParamValues()` call; a changed value means the snapshot is stale (parameter counts repeat across the roster, so a length check alone cannot detect the switch or teardown) |
 | `getArenaMetrics()` | Memory usage stats for the three engine arenas, plus the stack high-water mark (see below). Read once per frame by the HUD, so it omits the tooling arenas an engine instance never moves; `MeshOps.getArenaMetrics()` reports all six on demand |
@@ -2345,7 +2355,7 @@ The left-edge effect list is a small custom widget:
 
 ### 10.6 GUI Auto-Generation
 
-The effect parameter panel is entirely driven by what C++ registers via `register_param()`. When an effect is loaded, the simulator calls `getParameterDefinitions()` and builds `lil-gui` controls:
+The parameter controls in the effect panel are entirely driven by what C++ registers via `register_param()`; a fixed set of panel actions sits above them. When an effect is loaded, the simulator calls `getParameterDefinitions()` and builds `lil-gui` controls:
 
 ```js
 params.forEach(p => {
@@ -2354,7 +2364,7 @@ params.forEach(p => {
 });
 ```
 
-`getParamValues()` is polled each frame to sync the GUI with parameter values that the animation system has changed autonomously. The sync skips any control the user is currently interacting with to avoid fighting the slider. A per-effect **Reset** rebuilds the GUI from defaults, and **Export** copies the current `{ name, value }` set as a C++-formatted initializer suitable for `Presets<…>` arrays. If a segmented-render parameter snapshot is temporarily unavailable after an edit, Export uses the values displayed by the current parameter schema.
+`getParamValues()` is polled each frame to sync the GUI with parameter values that the animation system has changed autonomously. The sync skips any control the user is currently interacting with to avoid fighting the slider. A per-effect **Reset** rebuilds the GUI from defaults, and **Export** copies the current `{ name, value }` set as a C++-formatted initializer suitable for `Presets<…>` arrays. If a segmented-render parameter snapshot is temporarily unavailable after an edit, Export uses the values displayed by the current parameter schema. An effect that reports presets also gets a disabled **Preset** readout of the live index plus **Previous Preset** / **Next Preset** buttons that step it, and each per-frame sync first mirrors the live preset into the engine that owns the definitions, skipping the rest of the update when that mirror fails.
 
 ### 10.7 Segmented POV Workers (`segment_worker.js`)
 
@@ -2410,7 +2420,7 @@ built with `new Function` at module-creation time, and the shipped glue
 generates no code at runtime (asserted by `wasm_smoke.mjs`). `font-src` allows
 `data:` for the woff2 lil-gui inlines in its stylesheet.
 
-A page-specific local import (e.g. `solids.html` referencing `../solids.js`) is added by setting `window.daydreamExtraImports` to a `{ specifier: url }` map before the helper script.
+A page can add its own local imports by setting `window.daydreamExtraImports` to a `{ specifier: url }` map before the helper script; no page currently does.
 
 ### 10.9 Video Recording (`recorder.js`)
 
@@ -2488,9 +2498,9 @@ static constexpr unsigned int RPM = 480;
 
 Pin assignments are in `core/render/led.h` (also included by `hardware/pov_single.h`):
 ```cpp
-static constexpr int PIN_DATA   = 11;
-static constexpr int PIN_CLOCK  = 13;
-static constexpr int PIN_RANDOM = 15;
+inline constexpr int PIN_DATA   = 11;
+inline constexpr int PIN_CLOCK  = 13;
+inline constexpr int PIN_RANDOM = 15;
 ```
 
 ### WASM Build — Holosphere repo (installs into daydream)
@@ -2525,7 +2535,7 @@ cmake --build --preset tests  # build the run_tests executable
 ctest --preset tests          # run the suite (or: just test)
 ```
 
-The suite must use Clang — the engine relies on GCC/Clang `__attribute__` extensions MSVC rejects. The native toolchain file ([`cmake/toolchain-native-clang.cmake`](https://github.com/woundedlion/pov/blob/master/cmake/toolchain-native-clang.cmake)) locates Clang via `EMSDK` (or a sibling `../emsdk`) and, on Windows, transparently handles the resource compiler and `lld-link` so no Visual Studio Developer Prompt is required. Tests build with `-DHS_TEST_BUILD`, which widens the host-only budgets: the inline type-erased animation slot (the 64-bit host inflates every embedded pointer past the 32-bit device footprint) and, most significantly, `GLOBAL_ARENA_SIZE` — **8 MiB under the flag against the device's 298 KiB**, so the effect smoke harness can render every effect without OOMing mid-run. The firmware/WASM footprint is unchanged: the real budget stays available as `DEVICE_GLOBAL_ARENA_SIZE`, which the device-budget `static_assert`s check even in the host suite. A high-water mark measured in the native suite is therefore *not* a device figure — it is a 64-bit measurement against an inflated ceiling.
+The suite must use Clang — the engine relies on GCC/Clang `__attribute__` extensions MSVC rejects. The native toolchain file ([`cmake/toolchain-native-clang.cmake`](https://github.com/woundedlion/pov/blob/master/cmake/toolchain-native-clang.cmake)) locates Clang via `EMSDK` (or a sibling `../emsdk`) and, on Windows, transparently handles the resource compiler and `lld-link` so no Visual Studio Developer Prompt is required. Reusable CMake interface targets select test capabilities and widen the host-only budgets: the inline type-erased animation slot (the 64-bit host inflates every embedded pointer past the 32-bit device footprint) and, most significantly, `GLOBAL_ARENA_SIZE` — **8 MiB for host effect harnesses against the device's 298 KiB**, so the effect smoke harness can render every effect without OOMing mid-run. The firmware/WASM footprint is unchanged: the real budget stays available as `DEVICE_GLOBAL_ARENA_SIZE`, which the device-budget `static_assert`s check even in the host suite. A high-water mark measured in the native suite is therefore *not* a device figure — it is a 64-bit measurement against an inflated ceiling.
 
 Coverage spans the math/geometry/memory core, color, easing/waves, the reaction-diffusion graph integrity, filters, the plot samplers and the Scan/mesh rasterizer, solids-registry invariants, the Conway/Hankin mesh operators, and animation. Beyond those unit checks the suite also runs: an effect smoke harness that constructs and renders every effect with asserts on, plus a cross-run determinism pass that re-renders each effect under a fixed clock and diffs the frames — at the small-aspect 96×20 simulator/test resolution by default (the only firmware image that renders 96×20 is Holosphere — the `holosphere`/`holosphere_dma` PlatformIO envs build `-DCANVAS_W=96 -DCANVAS_H=20` and the sketch shows a single effect; the Phantasm image and every other env are 288×144), and additionally at the production 288×144 alongside a white-box correctness block when `HS_EFFECTS_FULL=1` is set, which CI does on every master push and pull-request update; a death harness that spawns subprocesses to confirm each `HS_CHECK` invariant traps; the Phantasm multi-board sync core (`hardware/pov_sync.h`, spec §12); the HD107S SPI wire-format and color-correction tests; the POV driver tiling proofs (each LED write covers the canvas exactly once); and the WASM param-marshaling coverage (the JS definition/value streams stay index-aligned). `tests/run_tests.cpp` is the driver. Extending it with a `tests/test_<module>.h` takes three edits, each pinned by its own CTest case:
 
