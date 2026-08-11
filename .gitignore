@@ -12,6 +12,10 @@ node_modules/
 # The Holosphere checkout CI drops here for the engine-parity cases.
 /engine/
 
+# Linked git worktrees. A checkout of this same tree, so `git add -A` from the
+# root would otherwise commit a second copy of the repository.
+/.worktrees/
+
 # Local agent tooling and machine-local prompts.
 /.claude/
 /prompts/
