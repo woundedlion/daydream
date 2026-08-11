@@ -631,9 +631,20 @@ test('a tick whose repaint a heap growth held captures on the next repaint', () 
   Daydream.prototype.render.call(ctx, null);
 
   assert.ok(log.includes('renderMainView'));
+  // Two requestFrame calls in one task share a timestamp and reach the stream as
+  // one frame, so this repaint takes its own tick's capture and holds the other.
+  assert.equal(ctx.recorder.frames, 1, 'spent two captures on one painted canvas');
+  assert.equal(ctx.heldCaptures, 1);
+  assert.equal(ctx.needsRender, true, 'nothing was scheduled to drain the backlog');
+
+  // A repaint the frame clock releases no tick for: the backlog is all it owes.
+  ctx.timeAccumulator = 0;
+  Daydream.prototype.render.call(ctx, null);
+
   // The track is locked one frame per tick; dropping one shortens the video.
   assert.equal(ctx.recorder.frames, 2, 'an advanced tick produced no video frame');
   assert.equal(ctx.heldCaptures, 0);
+  assert.equal(ctx.needsRender, false, 'kept repainting past an empty backlog');
 });
 
 test('a held repaint that advanced no tick captures nothing', () => {
