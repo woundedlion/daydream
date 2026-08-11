@@ -113,8 +113,8 @@
     "assertions": 19
   },
   "tests/palette_canvas.test.js": {
-    "cases": 14,
-    "assertions": 58
+    "cases": 15,
+    "assertions": 59
   },
   "tests/palette_controls.test.js": {
     "cases": 35,
