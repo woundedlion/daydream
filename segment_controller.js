@@ -1280,7 +1280,9 @@ export class SegmentController {
       const blitted = this.composite();
       this.updateStats();
       this.pendingFrame = false;
-      this.frameComposited = blitted > 0;
+      // Only a whole generation is a frame: a band left black by a missing slot
+      // would otherwise be recorded as one.
+      this.frameComposited = blitted === this.count;
     } else if (this.results.some(r => r && r.pixels)) {
       // Render overran this tick: re-blit the last published frame over driver's
       // clear so the preview holds it instead of flashing black. `results` is only
