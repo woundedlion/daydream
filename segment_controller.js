@@ -975,13 +975,17 @@ export class SegmentController {
 
   /** @param {number} index */
   selectPreset(index) {
+    if (!Number.isInteger(index) || this.presetCount == null
+        || index < 0 || index >= this.presetCount) return false;
     this.paramValues = null;
     this.paramGeneration = null;
     this.paramRevision++;
     this.presetIndex = index;
-    if (this.faulted) return;
+    this.animationsPaused = true;
+    if (this.faulted) return true;
     this.broadcast({ type: 'selectPreset', index,
       paramRevision: this.paramRevision });
+    return true;
   }
 
   /**
