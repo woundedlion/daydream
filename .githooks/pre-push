@@ -31,6 +31,7 @@ if [ ! -f node_modules/.package-lock.json ]; then
 	exit 0
 fi
 
+npm run lint || exit 1
 npm run typecheck || exit 1
 
 # The workflow diffs the whole tree; a developer's is not clean, so scope it.
