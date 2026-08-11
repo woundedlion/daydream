@@ -463,10 +463,22 @@ export class SegmentController {
     return this.paramGeneration;
   }
 
+  /**
+   * Number of presets the current effect exposes, mirrored from segment 0's
+   * frames (seeded from the main engine at pool creation), or null when no
+   * engine has reported one.
+   * @returns {number | null}
+   */
   getPresetCount() {
     return this.presetCount;
   }
 
+  /**
+   * The preset the pool is currently on, mirrored from segment 0's frames
+   * (seeded from the main engine at pool creation), or null when no engine has
+   * reported one.
+   * @returns {number | null}
+   */
   getPresetIndex() {
     return this.presetIndex;
   }
@@ -983,7 +995,13 @@ export class SegmentController {
     this.broadcast({ type: 'setAnimationsPaused', paused });
   }
 
-  /** @param {number} index */
+  /**
+   * Select a preset on every worker, latching it so a rebuild lands on it too.
+   * @param {number} index
+   * @returns {boolean} False when `index` is not an integer in range for the
+   *   known preset count (nothing is latched or broadcast); true once accepted,
+   *   including on a faulted pool, where it is latched but not broadcast.
+   */
   selectPreset(index) {
     if (!Number.isInteger(index) || this.presetCount == null
         || index < 0 || index >= this.presetCount) return false;
