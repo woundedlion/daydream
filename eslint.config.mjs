@@ -11,8 +11,14 @@ import globals from 'globals';
 export default [
   // eslint reads no .gitignore. holosphere_wasm.js is Emscripten glue built in
   // the engine repo; vendor/ and three.js/ are third-party drops the tool pages
-  // load offline.
-  { ignores: ['holosphere_wasm.js', 'vendor/**', 'three.js/**', 'engine/**'] },
+  // load offline; .worktrees/ holds linked checkouts of this same tree, each
+  // already linted where it is pushed from.
+  {
+    ignores: [
+      'holosphere_wasm.js', 'vendor/**', 'three.js/**', 'engine/**',
+      '.worktrees/**',
+    ],
+  },
   js.configs.recommended,
   {
     files: ['**/*.js', '**/*.mjs'],

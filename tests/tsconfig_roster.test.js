@@ -19,10 +19,13 @@ const ROOT = new URL('../', import.meta.url);
 // hand-written `.d.ts` sibling on the roster, which is what resolves the import.
 const NOT_CHECKED = new Set(['holosphere_wasm.js', 'app_lifecycle.js']);
 
-// Never entered: dependency and git metadata, the vendored third-party drops,
-// the engine checkout the parity cases read, and tests/, which tsconfig.json
-// puts out of scope on purpose.
-const SKIP_DIRS = new Set(['node_modules', '.git', 'vendor', 'three.js', 'tests', 'engine']);
+// Never entered: dependency and git metadata, the linked worktrees, the vendored
+// third-party drops, the engine checkout the parity cases read, and tests/,
+// which tsconfig.json puts out of scope on purpose. A worktree carries pragma
+// files of its own, which this roster does not own.
+const SKIP_DIRS = new Set([
+  'node_modules', '.git', '.worktrees', 'vendor', 'three.js', 'tests', 'engine',
+]);
 
 /**
  * Reads tsconfig.json, which carries `//` comments JSON.parse rejects. Only
