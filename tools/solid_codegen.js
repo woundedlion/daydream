@@ -44,6 +44,53 @@ export const OP_DEFS = {
   bevel: { params: { t: { val: 0.25, min: 0.01, max: 0.5, step: 0.01 } } },
 };
 
+/**
+ * Which authored ops the engine's morph path can build on screen, mirrored from
+ * Solids::is_morphable_step (core/mesh/recipe.h) and the sweep clamps it reads
+ * (core/mesh/conway_graph.h); tests/engine_source_parity.test.js pins every
+ * entry against those headers. An empty object is an op that always sweeps,
+ * `null` an op with no leg kind at all, and a parameter entry the band the leg
+ * covers. The composite ops (bevel, gyro, meta, needle, zip) are absent because
+ * they lower to primitives before the check, and over the ranges this tool
+ * offers every primitive they lower to sweeps.
+ */
+export const MORPH_SWEEP = {
+  kis: {},
+  ambo: {},
+  snub: {},
+  dual: {},
+  truncate: { t: { min: 0.002, max: 0.995 } },
+  chamfer: { t: { min: 0.02, max: 0.63 } },
+  expand: null,
+  hankin: {},
+  relax: {},
+};
+
+/**
+ * Why the engine's morph path would decline a chain step. A declined step drops
+ * the whole entry to IslamicStars' whole-generate fallback, so the shape appears
+ * finished instead of being built op by op — a property of the authored chain
+ * that no engine-domain check reports.
+ * @param {(string|{op: string, params: Object<string, number>})} o - The op as the chain holds it.
+ * @returns {?string} A sentence naming the reason, or null when the step sweeps.
+ */
+export function unsweepableReason(o) {
+  const opName = typeof o === 'string' ? o : o?.op;
+  if (!(opName in MORPH_SWEEP)) return null;
+  const band = MORPH_SWEEP[opName];
+  if (!band) {
+    return `${opName} has no morph leg: a shape using it is generated whole `
+      + 'rather than built on screen.';
+  }
+  for (const [key, { min, max }] of Object.entries(band)) {
+    const value = typeof o === 'string' ? NaN : Number(o?.params?.[key]);
+    if (!Number.isFinite(value) || (value >= min && value <= max)) continue;
+    return `${opName} sweeps ${key} only over ${min} to ${max}: at ${value} the `
+      + 'shape is generated whole rather than built on screen.';
+  }
+  return null;
+}
+
 /** The operators this generator can emit, derived from the shared op table. */
 export const KNOWN_OPS = new Set(Object.keys(OP_DEFS));
 

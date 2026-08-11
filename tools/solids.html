@@ -213,6 +213,13 @@
       z-index: 10;
     }
 
+    /* Marks a step the engine's morph path declines to sweep; empty and hidden
+       while the step sweeps. */
+    .op-unsweepable {
+      margin-left: 0.25rem;
+      cursor: help;
+    }
+
     .drag-handle {
       cursor: grab;
       display: flex;
@@ -623,7 +630,7 @@
       createOpGate,
     } from './solid_codegen.js';
     import { generateRegistryCpp, MAX_RECIPE_STEPS } from './solid_registry_codegen.js';
-    import { buildOpRow, formatParamValue } from './solid_op_rows.js';
+    import { buildOpRow, formatParamValue, syncSweepWarning } from './solid_op_rows.js';
     // Scene construction from the JS-side mesh copy, and the stats line it
     // reports; the three.js namespace, the scene and the materials below are
     // passed in, so the renderer is unit tested against a stand-in namespace.
@@ -1638,6 +1645,7 @@
         if (slider) slider.value = val;
         if (input) input.value = formatParamValue(val, def);
       }
+      if (item) syncSweepWarning(item, state.ops[index]);
       scheduleUpdate();
     }
 
