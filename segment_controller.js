@@ -302,8 +302,6 @@ export class SegmentController {
 
     /** @type {number[] | null} */
     this.paramValues = null;  // segment 0's latest param values, for GUI sync
-    /** @type {number | null} */
-    this.paramGeneration = null; // schema identity paired with paramValues
     this.paramRevision = 0;
     /** @type {number | null} */
     this.presetCount = null;
@@ -455,15 +453,6 @@ export class SegmentController {
   }
 
   /**
-   * Schema generation paired with getParamValues(), or null before segment 0
-   * publishes a value snapshot.
-   * @returns {number | null}
-   */
-  getParamGeneration() {
-    return this.paramGeneration;
-  }
-
-  /**
    * Number of presets the current effect exposes, mirrored from segment 0's
    * frames (seeded from the main engine at pool creation), or null when no
    * engine has reported one.
@@ -520,7 +509,6 @@ export class SegmentController {
     this.fullFrames = new Array(numSegments).fill(false);
     this.frameSeen = new Array(numSegments).fill(false);
     this.paramValues = null;
-    this.paramGeneration = null;
     const mainEngine = this.getWasmEngine();
     this.presetCount = mainEngine?.getPresetCount?.() ?? null;
     this.presetIndex = mainEngine?.getPresetIndex?.() ?? null;
@@ -613,7 +601,6 @@ export class SegmentController {
             if (msg.segId === 0 && msg.paramValues
                 && msg.paramRevision === this.paramRevision) {
               this.paramValues = msg.paramValues;
-              this.paramGeneration = msg.paramGeneration ?? null;
               this.presetCount = msg.presetCount ?? null;
               this.presetIndex = msg.presetIndex ?? null;
             }
@@ -925,7 +912,6 @@ export class SegmentController {
     // segment 0 reports the new effect's first frame; otherwise the synchronously
     // rebuilt GUI would bind the new effect's sliders to stale values by index.
     this.paramValues = null;
-    this.paramGeneration = null;
     this.paramRevision++;
     const mainEngine = this.getWasmEngine();
     this.presetCount = mainEngine?.getPresetCount?.() ?? null;
@@ -972,7 +958,6 @@ export class SegmentController {
    */
   setParameter(name, value) {
     this.paramValues = null;
-    this.paramGeneration = null;
     this.paramRevision++;
     // A faulted pool stays latched: this fires continuously during a slider drag,
     // so rebuilding here would respawn the pool per drag event. Recovery is a
@@ -1006,7 +991,6 @@ export class SegmentController {
     if (!Number.isInteger(index) || this.presetCount == null
         || index < 0 || index >= this.presetCount) return false;
     this.paramValues = null;
-    this.paramGeneration = null;
     this.paramRevision++;
     this.presetIndex = index;
     this.animationsPaused = true;
@@ -1050,7 +1034,6 @@ export class SegmentController {
     // Open a new generation: in-flight and settled results were sized to the old
     // W/H. Drop settled results here; onmessage's fence drops in-flight ones.
     this.paramValues = null;
-    this.paramGeneration = null;
     this.paramRevision++;
     this.renderGen++;
     this.results.fill(null);

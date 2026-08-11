@@ -264,13 +264,10 @@ async function handleMessage(msg) {
       engine.drawFrame();
       const elapsed = performance.now() - t0;
 
-      // Segment 0 mirrors its post-frame param values back so the GUI can track
-      // animation-driven params; the main engine is never stepped in this mode.
+      // Segment 0 mirrors its post-frame param values back; the main engine is
+      // never stepped in this mode.
       const paramValues =
         segId === 0 ? Array.from(engine.getParamValues()) : null;
-      const paramGeneration = segId === 0
-        ? engine.getParamGeneration?.() ?? null
-        : null;
       const presetCount = segId === 0 ? engine.getPresetCount?.() ?? null : null;
       const presetIndex = segId === 0 ? engine.getPresetIndex?.() ?? null : null;
 
@@ -339,7 +336,6 @@ async function handleMessage(msg) {
         elapsed,
         arenaMetrics,
         paramValues,
-        paramGeneration,
         paramRevision,
         presetCount,
         presetIndex,
