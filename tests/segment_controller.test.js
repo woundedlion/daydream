@@ -2089,7 +2089,8 @@ test('turning segmented mode off hands the global stat bars back', () => {
 
 /**
  * Minimal stand-in for the WASM engine exposing just getParameterDefinitions().
- * @param {Array<{name: string, value: number|boolean}>} defs - Param defs.
+ * @param {Array<{name: string, value: number|boolean,
+ *   requestedValue?: number|boolean}>} defs - Param defs.
  * @returns {{ getParameterDefinitions: () => Array }} Fake engine.
  */
 function fakeEngine(defs, presetCount = 0, presetIndex = 0) {
@@ -2105,16 +2106,16 @@ test('fakeEngine mocks only methods the real engine surface pins', () => {
     'engine_contract_wasm.test.js never checks these against the real module');
 });
 
-test('snapshotParams() flattens param defs (bool -> 1/0, number passthrough)', () => {
+test('snapshotParams() copies requested state, not an in-flight rendered value', () => {
   const c = makeController();
   c.getWasmEngine = () => fakeEngine([
-    { name: 'Speed', value: 0.5 },
-    { name: 'Glow', value: true },
+    { name: 'Speed', value: 0.5, requestedValue: 0.9 },
+    { name: 'Glow', value: false, requestedValue: true },
     { name: 'Invert', value: false },
     { name: 'Count', value: 7 },
   ]);
   assert.deepEqual(c.snapshotParams(), [
-    { name: 'Speed', value: 0.5 },
+    { name: 'Speed', value: 0.9 },
     { name: 'Glow', value: 1.0 },
     { name: 'Invert', value: 0.0 },
     { name: 'Count', value: 7 },

@@ -271,6 +271,7 @@ test('an enumerated param becomes a dropdown of labels to engine indices', () =>
 
   assert.deepEqual(controller.args, [{ Off: 0, On: 1, Auto: 2 }]);
   assert.equal(controller.isBoolean, false);
+  assert.equal(controller.isContinuous, false);
 });
 
 test('a boolean carrying option labels stays a toggle', () => {
@@ -540,6 +541,25 @@ test('sync adopts programmatic changes to an ordinary parameter', () => {
   h.panel.sync();
 
   assert.equal(h.gui().ctrl('Speed').getValue(), 0.9);
+});
+
+test('a Lens dropdown always adopts the rendered value', () => {
+  const lens = {
+    name: 'Lens', value: 3,
+    options: ['None', 'Glitch', 'Twist', 'Kaleidoscope', 'Mobius', 'Tangent Noise'],
+    animated: true,
+  };
+  const h = makeHarness({ params: [lens], segmentValues: [4], ownsDisplay: true });
+  h.panel.build();
+  const controller = h.gui().ctrl('Lens');
+
+  controller.domElement.dispatch('pointerdown');
+  assert.equal(controller.dragging, false, 'a dropdown never claims continuous-drag ownership');
+  assert.deepEqual(h.dragTarget.listeners, []);
+
+  h.panel.sync();
+
+  assert.equal(controller.getValue(), 4, 'the dropdown displays the renderer-owned Lens');
 });
 
 test('sync reads the worker pool once it owns the display', () => {
@@ -1171,6 +1191,17 @@ test('a readonly control is never drag-tracked', () => {
   h.panel.build();
 
   h.gui().ctrl('Frames').domElement.dispatch('pointerdown');
+
+  assert.deepEqual(h.dragTarget.listeners, []);
+});
+
+test('toggles and dropdowns are never drag-tracked', () => {
+  const mode = { name: 'Mode', value: 0, options: ['Off', 'On'] };
+  const h = makeHarness({ params: [GLOW, mode] });
+  h.panel.build();
+
+  h.gui().ctrl('Glow').domElement.dispatch('pointerdown');
+  h.gui().ctrl('Mode').domElement.dispatch('pointerdown');
 
   assert.deepEqual(h.dragTarget.listeners, []);
 });

@@ -63,6 +63,7 @@ export function addParamControl(gui, state, p, hydrate = true) {
     controller = add(state, p.name, p.min, p.max).decimals(3);
   }
   controller.isBoolean = (kind === 'boolean');
+  controller.isContinuous = (kind === 'number' || kind === 'integer');
   return controller;
 }
 
@@ -452,7 +453,7 @@ export function createEffectGui({
         return;
       }
       fx.writableParamNames.push(p.name);
-      trackDragState(fx, controller);
+      if (controller.isContinuous) trackDragState(fx, controller);
 
       controller.onChange(v => {
         const value = engineParamValue(v);

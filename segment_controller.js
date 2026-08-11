@@ -879,10 +879,12 @@ export class SegmentController {
   }
 
   /**
-   * Snapshot the main engine's current tuned parameter values, flattened for
-   * structured-clone transport (bools encoded as 1/0). Empty when no engine is
-   * bound. Shared by the init message (create) and the effect switch (setEffect),
-   * which both need the worker to land on the user's values rather than defaults.
+   * Snapshot the main engine's requested parameter values, flattened for
+   * structured-clone transport (bools encoded as 1/0). The displayed value may
+   * still be interpolating, so it cannot seed a new renderer. Empty when no
+   * engine is bound. Shared by the init message (create) and the effect switch
+   * (setEffect), which both need the worker to land on the user's values rather
+   * than defaults.
    * @returns {import('./worker_protocol.js').SegParam[]}
    */
   snapshotParams() {
@@ -893,7 +895,9 @@ export class SegmentController {
     const params = [];
     for (let i = 0; i < defs.length; i++) {
       const p = defs[i];
-      const v = (typeof p.value === 'boolean') ? (p.value ? 1.0 : 0.0) : p.value;
+      const requestedValue = /** @type {number|boolean|undefined} */ (p.requestedValue);
+      const requested = requestedValue ?? p.value;
+      const v = (typeof requested === 'boolean') ? (requested ? 1.0 : 0.0) : requested;
       params.push({ name: p.name, value: v });
     }
     return params;
