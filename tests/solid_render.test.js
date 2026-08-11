@@ -374,6 +374,14 @@ test('a mesh at the label ceiling gets no labels at all', () => {
   assert.equal(labelsContainer.children.length, 0, '1000 labels is past the projection budget');
 });
 
+test('a renderer built without a labels overlay still renders with indices on', () => {
+  const renderer = createMeshRenderer({
+    THREE, scene: fakeScene(), materials: fakeMaterials(), doc: fakeDoc(),
+  });
+  const result = renderer.render(tetrahedron(), view({ showIndices: true }), null);
+  assert.equal(result.labelsBuilt, false);
+});
+
 test('teardown disposes whatever is currently built', () => {
   const { renderer, scene } = setup();
   renderer.render(tetrahedron(), view({ showVertices: true }), null);
