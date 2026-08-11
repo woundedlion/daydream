@@ -1202,7 +1202,6 @@
       }).join(', ');
 
       const item = {
-        id: Date.now(),
         base: state.base,
         ops: structuredClone(state.ops), // Deep copy (ops are plain data)
         geodesics: state.showGeodesics,
