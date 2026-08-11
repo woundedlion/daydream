@@ -31,6 +31,8 @@ import { displayAliasesDiverged } from "./app_lifecycle.js";
 import { FAULT_POOL, FAULT_RENDER, SegmentStatsView } from "./segment_stats_view.js";
 import { PROTOCOL_VERSION } from "./worker_protocol.js";
 
+export const SEGMENT_CONTROLLER_API_VERSION = 1;
+
 // Deadline for all workers to report 'ready'. A non-throwing WASM load failure
 // fires no onerror and never sends 'ready', so this bound latches a fault instead
 // of freezing black.
