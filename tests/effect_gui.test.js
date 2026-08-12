@@ -7,6 +7,9 @@ import {
   EXPORT_COPIED,
   EXPORT_FAILED,
   FLASH_MS,
+  SHADERBALL_STAGE_ORDER,
+  legacyShaderBallParamNames,
+  shaderBallStageAssignments,
 } from '../effect_gui.js';
 
 // createEffectGui owns the effect panel: which control an engine parameter maps
@@ -16,6 +19,29 @@ import {
 // worker pool, the clipboard copy operation, and the window.
 
 afterEach(() => { mock.timers.reset(); });
+
+const ENUM = { value: 0, requestedValue: 0, options: ['None'], animated: true };
+
+function shaderBallParams() {
+  return [
+    { name: 'Function', ...ENUM },
+    { name: 'Pattern Freq', value: 1, min: 0, max: 10, animated: true },
+    { name: 'Projection', ...ENUM },
+    { name: 'Pole Fade', value: 1, min: 0, max: 2, animated: true },
+    { name: 'Projection Frame', ...ENUM },
+    { name: 'Projection Wander', value: 0, min: 0, max: 1, animated: true },
+    { name: 'Camera Wander', value: 1, min: 0, max: 1, animated: true },
+    { name: 'Lens', ...ENUM },
+    { name: 'Planar Warp 1', ...ENUM },
+    { name: 'Planar Warp 1 Strength', value: 1, min: 0, max: 4, animated: true },
+    { name: 'Planar Warp 2', ...ENUM },
+    { name: 'Signal Weight', ...ENUM },
+    { name: 'Value Transfer', ...ENUM },
+    { name: 'Coverage', ...ENUM },
+    { name: 'Colorizer', ...ENUM },
+    { name: 'Hue Shift', value: 0, min: 0, max: 1, animated: true },
+  ];
+}
 
 /**
  * lil-gui controller double: records the add() arguments, the label, the
@@ -65,15 +91,23 @@ function fakeController(object, property, args) {
  * @returns {Object} The GUI double.
  */
 function fakeGui(hydrated = {}, stored = {}) {
-  return {
+  const gui = {
     domElement: fakeElement('div'),
     controllers: [],
+    folders: [],
     closed: false,
     destroyed: 0,
     destroyThrows: null,
     stored,
     storedWrites: [],
-    readStoredNumber(property) { return this.stored[property]; },
+    readStoredNumber(property, legacyProperties = []) {
+      if (this.stored[property] !== undefined) return this.stored[property];
+      const legacy = legacyProperties.find((name) => this.stored[name] !== undefined);
+      if (!legacy) return undefined;
+      this.stored[property] = this.stored[legacy];
+      delete this.stored[legacy];
+      return this.stored[property];
+    },
     writeStoredValue(property, value) {
       this.stored[property] = value;
       this.storedWrites.push([property, value]);
@@ -89,6 +123,16 @@ function fakeGui(hydrated = {}, stored = {}) {
       const controller = fakeController(object, property, args);
       controller.replayOnChange = replayOnChange;
       this.controllers.push(controller);
+      return controller;
+    },
+    addMigrated(object, property, legacyNames, ...args) {
+      const legacyName = legacyNames.find((name) => Object.hasOwn(hydrated, name));
+      if (legacyName && !Object.hasOwn(hydrated, property)) {
+        object[property] = hydrated[legacyName];
+      }
+      const controller = this.add(object, property, ...args);
+      controller.legacyNames = legacyNames;
+      if (legacyName) controller.replayOnChange = true;
       return controller;
     },
     addUnhydrated(object, property, ...args) {
@@ -118,6 +162,36 @@ function fakeGui(hydrated = {}, stored = {}) {
       return this.controllers.find((c) => c.property === property);
     },
   };
+  gui.addDisplayFolder = (name) => {
+    const folder = {
+      name,
+      add: (object, property, ...args) => {
+        const controller = gui.add(object, property, ...args);
+        controller.folder = name;
+        return controller;
+      },
+      addMigrated: (object, property, legacyNames, ...args) => {
+        const controller = gui.addMigrated(
+          object, property, legacyNames, ...args);
+        controller.folder = name;
+        return controller;
+      },
+      addUnhydrated: (object, property, ...args) => {
+        const controller = gui.addUnhydrated(object, property, ...args);
+        controller.folder = name;
+        return controller;
+      },
+      addSession: (object, property, ...args) => {
+        const controller = gui.addSession(object, property, ...args);
+        controller.folder = name;
+        return controller;
+      },
+    };
+    gui.folders.push(folder);
+    return folder;
+  };
+  gui.addFolder = gui.addDisplayFolder;
+  return gui;
 }
 
 /**
@@ -290,6 +364,49 @@ test('an enumerated param becomes a dropdown of labels to engine indices', () =>
   assert.equal(controller.isContinuous, false);
 });
 
+test('ShaderBall parameters map to banks in evaluation order', () => {
+  const assignments = shaderBallStageAssignments(shaderBallParams());
+
+  assert.deepEqual(SHADERBALL_STAGE_ORDER, [
+    'Camera', 'Lens', 'Projection Frame', 'Projection', 'Planar Warp 1',
+    'Planar Warp 2', 'Function', 'Signal Weight', 'Value Transfer',
+    'Coverage', 'Color',
+  ]);
+  assert.equal(assignments.get('Projection Wander'), 'Projection Frame');
+  assert.equal(assignments.get('Planar Warp 1 Strength'), 'Planar Warp 1');
+  assert.equal(assignments.get('Hue Shift'), 'Color');
+});
+
+test('ShaderBall builds one URL-transparent bank for every pipeline stage', () => {
+  const params = shaderBallParams();
+  const h = makeHarness({
+    params,
+    engineValues: params.map((parameter) => parameter.value),
+  });
+
+  h.panel.build();
+
+  assert.deepEqual(h.gui().folders.map((folder) => folder.name),
+    SHADERBALL_STAGE_ORDER);
+  assert.equal(h.gui().ctrl('Camera Wander').folder, 'Camera');
+  assert.equal(h.gui().ctrl('Camera Wander').label, 'Wander');
+  assert.equal(h.gui().ctrl('Planar Warp 1').folder, 'Planar Warp 1');
+  assert.equal(h.gui().ctrl('Planar Warp 1').label, 'Mode');
+  assert.equal(h.gui().ctrl('Planar Warp 1 Strength').label, 'Strength');
+  assert.equal(h.gui().ctrl('Function').folder, 'Function');
+});
+
+test('renamed ShaderBall controls accept every legacy deep-link name', () => {
+  assert.deepEqual(legacyShaderBallParamNames('Camera Wander'), ['Outer Wander']);
+  assert.deepEqual(legacyShaderBallParamNames('Planar Warp 1'), ['Outer Warp']);
+  assert.deepEqual(legacyShaderBallParamNames('Planar Warp 1 Strength'),
+    ['Outer Warp Strength']);
+  assert.deepEqual(legacyShaderBallParamNames('Planar Warp 1 Vector Angle'),
+    ['Outer Vector Angle']);
+  assert.deepEqual(legacyShaderBallParamNames('Planar Warp 2 Noise Basis'),
+    ['Inner Noise Basis']);
+});
+
 test('an invalid param carries an actionable warning indicator and tooltip', () => {
   const gui = fakeGui();
   const warning = 'Legacy Stereo Noise requires Projection = Stereographic.';
@@ -330,7 +447,7 @@ test('build records the value-stream order and stamps the effect generation', ()
 
 test('build restores the last accepted value before replaying an invalid request', () => {
   const outer = {
-    name: 'Outer Warp', value: 1, requestedValue: 1, acceptedValue: 1,
+    name: 'Planar Warp 1', value: 1, requestedValue: 1, acceptedValue: 1,
     options: ['None', 'Stereo Noise', 'Vector Noise', 'Curl Flow'],
   };
   const h = makeHarness({
@@ -349,14 +466,15 @@ test('build restores the last accepted value before replaying an invalid request
   h.panel.build();
 
   assert.deepEqual(h.writes, [
-    'engine:Outer Warp=0',
-    'engine:Outer Warp=3',
-    'worker:Outer Warp=3',
+    'engine:Planar Warp 1=0',
+    'engine:Planar Warp 1=3',
+    'worker:Planar Warp 1=3',
   ]);
-  assert.equal(h.gui().ctrl('Outer Warp').getValue(), 3);
-  assert.equal(h.gui().stored['__accepted.Outer Warp'], 0);
+  assert.equal(h.gui().ctrl('Planar Warp 1').getValue(), 3);
+  assert.equal(h.gui().stored['__accepted.Planar Warp 1'], 0);
+  assert.equal(h.gui().stored['__accepted.Outer Warp'], undefined);
   assert.deepEqual(h.acceptedSnapshots.at(-1), [
-    { name: 'Outer Warp', value: 0 },
+    { name: 'Planar Warp 1', value: 0 },
   ]);
 });
 

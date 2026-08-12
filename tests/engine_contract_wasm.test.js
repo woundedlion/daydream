@@ -392,12 +392,14 @@ test('ShaderBall reports an invalid selector without changing its neighbors', ()
   assert.equal(projection?.acceptedValue, rootValue('Projection'),
     'the renderer seed remains on the last accepted projection');
   assert.match(projection?.warning ?? '', /requires Projection = Stereographic/);
-  for (const name of ['Function', 'Lens', 'Outer Warp', 'Inner Warp', 'Coverage']) {
+  for (const name of [
+    'Function', 'Lens', 'Planar Warp 1', 'Planar Warp 2', 'Coverage',
+  ]) {
     assert.equal(after.find((d) => d.name === name)?.requestedValue, rootValue(name),
       `${name} must not move as a byproduct of the Projection edit`);
   }
 
-  assert.equal(engine.setParameter('Outer Warp', 0), M.ParamSetResult.APPLIED);
+  assert.equal(engine.setParameter('Planar Warp 1', 0), M.ParamSetResult.APPLIED);
   const repaired = engine.getParameterDefinitions().find((d) => d.name === 'Projection');
   assert.equal(repaired?.warning, undefined,
     'making the existing tuple compatible admits the pending Projection');
@@ -406,17 +408,17 @@ test('ShaderBall reports an invalid selector without changing its neighbors', ()
 test('ShaderBall exposes rejected Curl Flow separately from the accepted warp', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
-  assert.equal(engine.setParameter('Outer Warp', 0), M.ParamSetResult.APPLIED);
-  const outer = engine.getParameterDefinitions().find((d) => d.name === 'Outer Warp');
+  assert.equal(engine.setParameter('Planar Warp 1', 0), M.ParamSetResult.APPLIED);
+  const outer = engine.getParameterDefinitions().find((d) => d.name === 'Planar Warp 1');
   const curlFlow = outer?.options?.indexOf('Curl Flow');
   assert.notEqual(curlFlow, undefined);
 
-  assert.equal(engine.setParameter('Outer Warp', curlFlow), M.ParamSetResult.APPLIED);
-  const rejected = engine.getParameterDefinitions().find((d) => d.name === 'Outer Warp');
+  assert.equal(engine.setParameter('Planar Warp 1', curlFlow), M.ParamSetResult.APPLIED);
+  const rejected = engine.getParameterDefinitions().find((d) => d.name === 'Planar Warp 1');
   assert.equal(rejected?.requestedValue, curlFlow);
   assert.equal(rejected?.acceptedValue, 0,
     'reload must seed the renderer with None, not the preset Stereo Noise');
-  assert.match(rejected?.warning ?? '', /Outer Curl Flow rejected/);
+  assert.match(rejected?.warning ?? '', /Planar Warp 1 Curl Flow rejected/);
 });
 
 test('ShaderBall keeps Mirror Tile when dodecahedral Grid becomes Primitive Lattice', () => {
@@ -426,8 +428,8 @@ test('ShaderBall keeps Mirror Tile when dodecahedral Grid becomes Primitive Latt
 
   const before = engine.getParameterDefinitions();
   const functionDef = before.find((d) => d.name === 'Function');
-  const outerDef = before.find((d) => d.name === 'Outer Warp');
-  const innerDef = before.find((d) => d.name === 'Inner Warp');
+  const outerDef = before.find((d) => d.name === 'Planar Warp 1');
+  const innerDef = before.find((d) => d.name === 'Planar Warp 2');
   const primitiveLattice = functionDef?.options?.indexOf('Primitive Lattice');
   const mirrorTile = outerDef?.options?.indexOf('Mirror Tile');
   const stereoNoise = innerDef?.options?.indexOf('Stereo Noise');
@@ -436,19 +438,19 @@ test('ShaderBall keeps Mirror Tile when dodecahedral Grid becomes Primitive Latt
 
   assert.equal(engine.setParameter('Function', primitiveLattice), M.ParamSetResult.APPLIED);
   const requested = engine.getParameterDefinitions();
-  assert.equal(requested.find((d) => d.name === 'Outer Warp')?.requestedValue, mirrorTile,
-    'the Function edit must not rewrite the requested Outer Warp');
-  assert.equal(requested.find((d) => d.name === 'Inner Warp')?.requestedValue, stereoNoise,
-    'the Function edit must not rewrite the requested Inner Warp');
+  assert.equal(requested.find((d) => d.name === 'Planar Warp 1')?.requestedValue, mirrorTile,
+    'the Function edit must not rewrite requested Planar Warp 1');
+  assert.equal(requested.find((d) => d.name === 'Planar Warp 2')?.requestedValue, stereoNoise,
+    'the Function edit must not rewrite requested Planar Warp 2');
   assert.equal(requested.find((d) => d.name === 'Function')?.warning, undefined);
 
   engine.drawFrame();
   const rendered = engine.getParameterDefinitions();
   assert.equal(rendered.find((d) => d.name === 'Function')?.value, primitiveLattice);
-  assert.equal(rendered.find((d) => d.name === 'Outer Warp')?.value, mirrorTile,
-    'the rendered Outer Warp must remain Mirror Tile');
-  assert.equal(rendered.find((d) => d.name === 'Inner Warp')?.value, stereoNoise,
-    'the rendered Inner Warp must remain Stereo Noise');
+  assert.equal(rendered.find((d) => d.name === 'Planar Warp 1')?.value, mirrorTile,
+    'rendered Planar Warp 1 must remain Mirror Tile');
+  assert.equal(rendered.find((d) => d.name === 'Planar Warp 2')?.value, stereoNoise,
+    'rendered Planar Warp 2 must remain Stereo Noise');
 });
 
 test('strobeColumns and getEffectSizes return the shapes daydream consumes', () => {

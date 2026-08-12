@@ -2102,30 +2102,33 @@ The shader is a *pullback*: it starts at a visible point on the sphere and walks
 
 ```mermaid
 flowchart LR
-  V[Sphere sample] --> OC[Outer camera]
+  V[Sphere sample] --> OC[Camera]
   OC --> L[Surface lens]
   L --> PF[Projection frame]
   PF --> P[Projection]
   P --> PL[Projected lookup<br/>coords + weight + seam topology]
-  PL --> OW[Outer planar warp]
-  OW --> IW[Inner planar warp]
-  IW --> F[Source function]
+  PL --> W1[Planar Warp 1]
+  W1 --> W2[Planar Warp 2]
+  W2 --> F[Source function]
   F --> SW[Signal weight]
   SW --> VT[Value transfer]
   VT --> C[Colorizer]
   C --> RGBA[RGBA]
 
   PL -. projection weight .-> SW
-  PL -. projection weight / edge distance .-> OW
-  PL -. projection weight / edge distance .-> IW
+  PL -. projection weight / edge distance .-> W1
+  PL -. projection weight / edge distance .-> W2
   PL -. projection weight / edge distance .-> CV[Coverage]
   VT -. shaped value .-> CV
   CV -. alpha .-> C
-  OW -. displacement + path metadata .-> C
-  IW -. displacement + path metadata .-> C
+  W1 -. displacement + path metadata .-> C
+  W2 -. displacement + path metadata .-> C
 ```
 
-The authored stage order is `source → inner warp → outer warp → projection`; pullback evaluation reverses it. **Outer Warp** is therefore nearest the projection and **Inner Warp** nearest the source. This positional vocabulary is stable even when either stage is `None`.
+The two planar warps run in their displayed pullback order: **Planar Warp 1**
+then **Planar Warp 2**, followed by the source function. The numbered names
+describe execution directly without requiring the reader to reverse an
+authored image-formation pipeline.
 
 | Stage | Options | Produces or controls |
 |---|---|---|
@@ -2133,13 +2136,17 @@ The authored stage order is `source → inner warp → outer warp → projection
 | **Projection** | Folded Sinusoidal, Stereographic, Gnomonic, Bonne, Peirce Quincuncial, Dymaxion / Airocean, Equirectangular | Planar coordinates plus region/component identity, projection weight, boundary traits, stable edge identity, and fade distance. |
 | **Projection Frame** | Identity, Spin + Wander | Rotates the sphere before projection. Spin Rate and Projection Wander exist only for Spin + Wander. |
 | **Lens** | None, Glitch, Twist, Kaleidoscope, Mobius, Tangent Noise | Distorts a unit-sphere direction before projection. Lens Mix and lens-specific controls exist only for an active lens. |
-| **Outer / Inner Warp** | None, Stereo Noise, Affine Frame, Wave Shear, Vortex, Vector Noise, Curl Flow, Mirror Tile, Polar Chart | Pulls planar coordinates backward and accumulates displacement, deformation, and path length for downstream colorizers. |
+| **Planar Warp 1 / 2** | None, Stereo Noise, Affine Frame, Wave Shear, Vortex, Vector Noise, Curl Flow, Mirror Tile, Polar Chart | Sequentially pulls planar coordinates backward and accumulates displacement, deformation, and path length for downstream colorizers. |
 | **Signal Weight** | None, Projection | Optionally multiplies the signed source signal by the projection's weight before remapping it to `[0, 1]`. It changes value, not alpha. |
 | **Value Transfer** | Linear, Ridge, Iso Contour, Smooth Bands | Shapes the normalized value. Iso controls appear only for Iso Contour; Band Count and Band Phase only for Smooth Bands. |
 | **Coverage** | Opaque, Projection Weight Squared, Value Cutout, Edge Fade, Projection Weight | Computes alpha independently from color value. Linear projection weight is softer and broader than the squared form. |
 | **Colorizer** | Generated Triadic, ShaderBall Liquid, Deformation Ink | Converts shaped value, coverage, and optional warp metadata into straight-alpha color. |
 
-**Outer Wander** sits outside that table: it is always registered, and scales how much of a continuous random walk rotates the viewing direction before any stage runs, drifting the whole look. The Spin + Wander frame's own **Projection Wander** is a separate slider that drifts only the sphere's pre-projection orientation.
+**Camera Wander** sits outside that table: it is always registered, and scales
+how much of a continuous random walk rotates the viewing direction before any
+stage runs, drifting the whole look. The Spin + Wander frame's own
+**Projection Wander** is a separate slider that drifts only the sphere's
+pre-projection orientation.
 
 Selector dependencies are explicit and deterministic:
 
@@ -2153,8 +2160,8 @@ flowchart TD
 
   Function --> Source[Function-specific source controls]
   Lens --> LensParams[Lens Mix + selected lens controls]
-  OuterWarp[Outer Warp] --> OuterParams[Selected stage controls]
-  InnerWarp[Inner Warp] --> InnerParams[Selected stage controls]
+  Warp1[Planar Warp 1] --> Warp1Params[Selected stage controls]
+  Warp2[Planar Warp 2] --> Warp2Params[Selected stage controls]
   ValueTransfer --> TransferParams[Iso or band controls]
   Coverage --> CoverageParams[Cutout threshold or edge width]
   Colorizer --> ColorParams[Palette / breathe / hue / fade controls]
