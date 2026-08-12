@@ -432,7 +432,8 @@ test('ShaderBall exposes rejected Curl Flow separately from the accepted warp', 
   assert.equal(rejected?.requestedValue, curlFlow);
   assert.equal(rejected?.acceptedValue, 0,
     'reload must seed the renderer with None, not the preset Stereo Noise');
-  assert.match(rejected?.warning ?? '', /Planar Warp 1 Curl Flow rejected/);
+  assert.match(rejected?.warning ?? '',
+    /Planar Warp 1 Projected Curl Flow rejected/);
 });
 
 test('ShaderBall keeps planar warps when dodecahedral Grid becomes Primitive Lattice', () => {
