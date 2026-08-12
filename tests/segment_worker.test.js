@@ -662,13 +662,13 @@ test('init restores accepted params before replaying rejected requests', async (
   await dispatch({
     type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'ShaderBall',
     params: [
-      { name: 'Outer Warp', acceptedValue: 0, value: 6 },
-      { name: 'Outer Warp Scale', acceptedValue: 1, value: 100 },
+      { name: 'Planar Warp 1', acceptedValue: 0, value: 6 },
+      { name: 'Planar Warp 1 Scale', acceptedValue: 1, value: 100 },
     ],
   });
   assert.deepEqual(engineInstance.params, [
-    ['Outer Warp', 0], ['Outer Warp Scale', 1],
-    ['Outer Warp', 6], ['Outer Warp Scale', 100],
+    ['Planar Warp 1', 0], ['Planar Warp 1 Scale', 1],
+    ['Planar Warp 1', 6], ['Planar Warp 1 Scale', 100],
   ]);
 });
 

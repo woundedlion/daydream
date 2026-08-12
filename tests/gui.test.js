@@ -508,6 +508,58 @@ test('DeepLinkGUI namespaces deep-link keys per root', () => {
   assert.deepEqual(folder.collectUrlKeys(), ['fx.Shape.sides']);
 });
 
+test('display folders do not change descendant deep-link keys', () => {
+  installWindow('?fx.Speed=4');
+  const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
+  const folder = gui.addDisplayFolder('Function');
+  const state = { Speed: 1 };
+
+  folder.add(state, 'Speed', 0, 10);
+
+  assert.equal(state.Speed, 4);
+  assert.deepEqual(folder.collectUrlKeys(), ['fx.Speed']);
+});
+
+test('addMigrated rewrites a legacy deep-link key without changing its value', () => {
+  const url = installRecordingWindow('?fx.Outer+Warp=2&keep=1');
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
+    const folder = gui.addDisplayFolder('Planar Warp 1');
+    const state = { 'Planar Warp 1': 0 };
+
+    folder.addMigrated(state, 'Planar Warp 1', ['Outer Warp'],
+      { None: 0, Mirror: 1, Curl: 2 });
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+
+    const params = new URL(url.written(), 'http://x').searchParams;
+    assert.equal(state['Planar Warp 1'], 2);
+    assert.equal(params.get('fx.Planar Warp 1'), '2');
+    assert.equal(params.has('fx.Outer Warp'), false);
+    assert.equal(params.get('keep'), '1');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test('readStoredNumber migrates a legacy companion key', () => {
+  const url = installRecordingWindow('?fx.__accepted.Outer+Warp=6');
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
+    const value = gui.readStoredNumber('__accepted.Planar Warp 1',
+      ['__accepted.Outer Warp']);
+    mock.timers.tick(URL_FLUSH_DEBOUNCE_MS);
+
+    const params = new URL(url.written(), 'http://x').searchParams;
+    assert.equal(value, 6);
+    assert.equal(params.get('fx.__accepted.Planar Warp 1'), '6');
+    assert.equal(params.has('fx.__accepted.Outer Warp'), false);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
 test('addUnhydrated keeps the current value but still deep-links later edits', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const url = installRecordingWindow('?fx.Speed=9');

@@ -33,6 +33,87 @@ export const EXPORT_FAILED = '\u2717 Copy failed';
 const RESERVED_CONTROL_NAMES = new Set([
   'reset', 'export', 'presetIndex', 'previousPreset', 'nextPreset', 'pause'
 ]);
+export const SHADERBALL_STAGE_ORDER = [
+  'Camera',
+  'Lens',
+  'Projection Frame',
+  'Projection',
+  'Planar Warp 1',
+  'Planar Warp 2',
+  'Function',
+  'Signal Weight',
+  'Value Transfer',
+  'Coverage',
+  'Color',
+];
+const SHADERBALL_STAGE_BOUNDARIES = new Map([
+  ['Function', 'Function'],
+  ['Projection', 'Projection'],
+  ['Projection Frame', 'Projection Frame'],
+  ['Camera Wander', 'Camera'],
+  ['Lens', 'Lens'],
+  ['Planar Warp 1', 'Planar Warp 1'],
+  ['Planar Warp 2', 'Planar Warp 2'],
+  ['Signal Weight', 'Signal Weight'],
+  ['Value Transfer', 'Value Transfer'],
+  ['Coverage', 'Coverage'],
+  ['Colorizer', 'Color'],
+]);
+const SHADERBALL_SIGNATURE = [
+  'Function', 'Projection', 'Lens', 'Planar Warp 1', 'Planar Warp 2',
+  'Signal Weight', 'Value Transfer', 'Coverage', 'Colorizer',
+];
+
+/**
+ * @param {string} name - Canonical engine parameter name.
+ * @returns {Array<string>} Former names accepted from saved deep links.
+ */
+export function legacyShaderBallParamNames(name) {
+  if (name === 'Camera Wander') return ['Outer Wander'];
+  for (const [prefix, legacy] of [
+    ['Planar Warp 1', 'Outer'],
+    ['Planar Warp 2', 'Inner'],
+  ]) {
+    if (name === prefix) return [`${legacy} Warp`];
+    if (!name.startsWith(`${prefix} `)) continue;
+    const suffix = name.slice(prefix.length + 1);
+    if (['Strength', 'Scale', 'Time', 'Envelope'].includes(suffix)) {
+      return [`${legacy} Warp ${suffix}`];
+    }
+    return [`${legacy} ${suffix}`];
+  }
+  return [];
+}
+
+/**
+ * @param {Array<Object>} params - Engine parameter definitions in stream order.
+ * @returns {Map<string, string>|null} Parameter name to pipeline-stage title.
+ */
+export function shaderBallStageAssignments(params) {
+  const names = new Set(params.map((parameter) => parameter.name));
+  if (!SHADERBALL_SIGNATURE.every((name) => names.has(name))) return null;
+  const assignments = new Map();
+  let stage = 'Function';
+  for (const parameter of params) {
+    stage = SHADERBALL_STAGE_BOUNDARIES.get(parameter.name) ?? stage;
+    assignments.set(parameter.name, stage);
+  }
+  return assignments;
+}
+
+function shaderBallControlLabel(stage, name) {
+  if (SHADERBALL_STAGE_BOUNDARIES.has(name)) {
+    return stage === 'Camera' ? 'Wander' : 'Mode';
+  }
+  if (name.startsWith(`${stage} `)) return name.slice(stage.length + 1);
+  if (stage === 'Projection Frame' && name.startsWith('Projection ')) {
+    return name.slice('Projection '.length);
+  }
+  if (stage === 'Color' && name.startsWith('Colorizer ')) {
+    return name.slice('Colorizer '.length);
+  }
+  return name;
+}
 
 /**
  * Add the lil-gui control one engine parameter definition calls for. A readonly
@@ -44,10 +125,14 @@ const RESERVED_CONTROL_NAMES = new Set([
  * @param {boolean} [hydrate=true] - Whether a matching deep link may seed it.
  * @returns {Object} The created controller.
  */
-export function addParamControl(gui, state, p, hydrate = true) {
+export function addParamControl(gui, state, p, hydrate = true, legacyNames = []) {
   const kind = paramControlKind(p);
   const add = p.readonly
     ? (...args) => gui.addSession(...args)
+    : hydrate && legacyNames.length > 0
+        && typeof gui.addMigrated === 'function'
+      ? (object, property, ...args) =>
+          gui.addMigrated(object, property, legacyNames, ...args)
     : !hydrate && typeof gui.addUnhydrated === 'function'
       ? (...args) => gui.addUnhydrated(...args)
     : (...args) => gui.add(...args);
@@ -171,7 +256,9 @@ export function createEffectGui({
       let value;
       for (const candidate of getParameterDefinitions()) {
         if (candidate.readonly || restored.has(candidate.name)) continue;
-        const stored = gui.readStoredNumber(acceptedStorageKey(candidate.name));
+        const stored = gui.readStoredNumber(
+          acceptedStorageKey(candidate.name),
+          legacyShaderBallParamNames(candidate.name).map(acceptedStorageKey));
         if (stored === undefined) continue;
         parameter = candidate;
         value = stored;
@@ -508,14 +595,28 @@ export function createEffectGui({
     fx.writableParamNames = [];
     fx.controllerByName = new Map();
     fx.hasParams = params.length > 0;
+    const stageAssignments = shaderBallStageAssignments(params);
+    const stageFolders = new Map();
+    if (stageAssignments) {
+      for (const stage of SHADERBALL_STAGE_ORDER) {
+        const addFolder = typeof fx.gui.addDisplayFolder === 'function'
+          ? fx.gui.addDisplayFolder.bind(fx.gui)
+          : fx.gui.addFolder.bind(fx.gui);
+        stageFolders.set(stage, addFolder(stage));
+      }
+    }
 
     params.forEach(p => {
       state[p.name] = paramControlKind(p) === 'enum'
         ? selectorControlValue(p)
         : p.value;
 
+      const stage = stageAssignments?.get(p.name);
+      const controlGui = stage ? stageFolders.get(stage) : fx.gui;
       const controller = addParamControl(
-        fx.gui, state, p, !previousParamNames?.has(p.name));
+        controlGui, state, p, !previousParamNames?.has(p.name),
+        legacyShaderBallParamNames(p.name));
+      if (stage) controller.name(shaderBallControlLabel(stage, p.name));
       fx.paramNames.push(p.name);
       fx.controllerByName.set(p.name, controller);
 

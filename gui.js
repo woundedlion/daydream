@@ -142,7 +142,7 @@ class DeepLinkGUI {
     const keys = [prop];
     let curr = this;
     while (curr.parent) {
-      keys.unshift(curr.keySegment);
+      if (curr.keySegment) keys.unshift(curr.keySegment);
       curr = curr.parent;
     }
     if (curr.rootNamespace) keys.unshift(curr.rootNamespace);
@@ -152,17 +152,27 @@ class DeepLinkGUI {
   /**
    * Read a numeric companion value without creating a visible control.
    * @param {string} prop - Companion property name within this GUI namespace.
+   * @param {Array<string>} [legacyProps=[]] - Former companion property names.
    * @returns {number|undefined} Parsed value, or undefined when absent/invalid.
    */
-  readStoredNumber(prop) {
+  readStoredNumber(prop, legacyProps = []) {
     const key = this.getKey(prop);
     this.urlKeys.add(key);
     const params = getUrlParams();
-    if (!params.has(key)) return undefined;
-    const value = parseUrlNumber(params.get(key));
+    const legacyKey = legacyProps
+      .map((legacyProp) => this.getKey(legacyProp))
+      .find((candidate) => params.has(candidate));
+    const sourceKey = params.has(key) ? key : legacyKey;
+    if (!sourceKey) return undefined;
+    const value = parseUrlNumber(params.get(sourceKey));
     if (value === null) {
-      console.warn(`DeepLinkGUI: ignoring non-numeric stored value for "${key}"`);
+      console.warn(`DeepLinkGUI: ignoring non-numeric stored value for "${sourceKey}"`);
       return undefined;
+    }
+    if (sourceKey !== key) {
+      this.urlKeys.add(sourceKey);
+      this.urlWriter(key, value);
+      this.urlWriter(sourceKey, null);
     }
     return value;
   }
@@ -221,7 +231,20 @@ class DeepLinkGUI {
    * @returns {Object} The created lil-gui controller.
    */
   add(object, prop, ...args) {
-    return this.addWithHydration(true, object, prop, ...args);
+    return this.addWithHydration(true, object, prop, [], ...args);
+  }
+
+  /**
+   * Adds a control that accepts old property names and rewrites them to the
+   * canonical deep-link key.
+   * @param {Object} object - The object holding the bound property.
+   * @param {string} prop - The canonical property name.
+   * @param {Array<string>} legacyProps - Former property names.
+   * @param {...*} args - Forwarded to lil-gui's add().
+   * @returns {Object} The created controller.
+   */
+  addMigrated(object, prop, legacyProps, ...args) {
+    return this.addWithHydration(true, object, prop, legacyProps, ...args);
   }
 
   /**
@@ -235,7 +258,7 @@ class DeepLinkGUI {
    * @returns {Object} The created lil-gui controller.
    */
   addUnhydrated(object, prop, ...args) {
-    return this.addWithHydration(false, object, prop, ...args);
+    return this.addWithHydration(false, object, prop, [], ...args);
   }
 
   /**
@@ -243,24 +266,29 @@ class DeepLinkGUI {
    * @param {boolean} hydrate - Whether a matching URL value may seed the control.
    * @param {Object} object - The object holding the bound property.
    * @param {string} prop - The property name to control.
+   * @param {Array<string>} legacyProps - Former property names.
    * @param {...*} args - Forwarded to lil-gui's add().
    * @returns {Object} The created lil-gui controller.
    */
-  addWithHydration(hydrate, object, prop, ...args) {
+  addWithHydration(hydrate, object, prop, legacyProps, ...args) {
     const key = this.getKey(prop);
     const isFunction = typeof object[prop] === 'function';
 
     const params = getUrlParams();
     let urlApplied = false;
     let valClamped = false;
-    if (hydrate && !isFunction && params.has(key)) {
-      let val = params.get(key);
+    const legacyKey = legacyProps
+      .map((legacyProp) => this.getKey(legacyProp))
+      .find((candidate) => params.has(candidate));
+    const sourceKey = params.has(key) ? key : legacyKey;
+    if (hydrate && !isFunction && sourceKey) {
+      let val = params.get(sourceKey);
       const currentVal = object[prop];
       urlApplied = true;
       if (typeof currentVal === 'number') {
         const num = parseUrlNumber(val);
         if (num === null) {
-          console.warn(`DeepLinkGUI: ignoring non-numeric URL value "${params.get(key)}" for "${key}"`);
+          console.warn(`DeepLinkGUI: ignoring non-numeric URL value "${params.get(sourceKey)}" for "${sourceKey}"`);
           val = currentVal;
           urlApplied = false;
           valClamped = true;
@@ -287,7 +315,7 @@ class DeepLinkGUI {
       } else if (typeof currentVal === 'boolean') {
         const flag = parseUrlBoolean(val);
         if (flag === null) {
-          console.warn(`DeepLinkGUI: ignoring unrecognized boolean URL value "${params.get(key)}" for "${key}"`);
+          console.warn(`DeepLinkGUI: ignoring unrecognized boolean URL value "${params.get(sourceKey)}" for "${sourceKey}"`);
           val = currentVal;
           urlApplied = false;
           valClamped = true;
@@ -309,7 +337,7 @@ class DeepLinkGUI {
         let idx = allowed.indexOf(val);
         if (idx < 0) idx = allowed.findIndex((opt) => String(opt) === String(val));
         if (idx < 0) {
-          console.warn(`DeepLinkGUI: ignoring out-of-range URL value "${params.get(key)}" for "${key}"`);
+          console.warn(`DeepLinkGUI: ignoring out-of-range URL value "${params.get(sourceKey)}" for "${sourceKey}"`);
           urlApplied = false;
           valClamped = true;
         } else {
@@ -325,6 +353,12 @@ class DeepLinkGUI {
     if (!isFunction) {
       this.urlKeys.add(key);
       this.attachUrlWriter(controller, (v) => this.urlWriter(key, v), urlApplied);
+    }
+
+    if (!isFunction && sourceKey && sourceKey !== key) {
+      this.urlKeys.add(sourceKey);
+      this.urlWriter(key, controller.getValue());
+      this.urlWriter(sourceKey, null);
     }
 
     if (!isFunction && valClamped) {
@@ -377,6 +411,21 @@ class DeepLinkGUI {
     wrapped.keySegment = name
       ? (duplicate ? `${name}#${wrapped.folderIndex}` : name)
       : `#${wrapped.folderIndex}`;
+    this.children.push(wrapped);
+    return wrapped;
+  }
+
+  /**
+   * Creates a visual folder without changing any descendant deep-link key.
+   * @param {string} name - Folder title shown in the GUI.
+   * @returns {DeepLinkGUI} The wrapped child folder.
+   */
+  addDisplayFolder(name) {
+    const folder = this.gui.addFolder(name);
+    const wrapped = new DeepLinkGUI(folder, null, this);
+    wrapped.folderName = name;
+    wrapped.folderIndex = this.children.length;
+    wrapped.keySegment = null;
     this.children.push(wrapped);
     return wrapped;
   }
