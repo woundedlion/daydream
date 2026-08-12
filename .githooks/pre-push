@@ -11,8 +11,12 @@
 # WASM provenance needs no dependencies, so it gates the push even where the
 # suite below cannot run. deploy.yml re-checks it, but only after master is
 # public — an unverifiable artifact must not get that far.
+# DAYDREAM_WASM_CLEAN_REQUIRED additionally demands that the installed artifacts
+# equal their committed blobs. That is false for most of an engine-integration
+# session — build, install here, test, then commit — so it is declared at the
+# push, where the tested module and the pushed one must finally be the same.
 if command -v node >/dev/null 2>&1; then
-	node --test tests/wasm_provenance.test.js || exit 1
+	DAYDREAM_WASM_CLEAN_REQUIRED=1 node --test tests/wasm_provenance.test.js || exit 1
 else
 	echo "pre-push: node not found; WASM provenance was not verified." >&2
 fi
