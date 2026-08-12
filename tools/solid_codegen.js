@@ -1112,27 +1112,53 @@ export function createOpGate(validator, retries = 3) {
         validator.noteDeath(e);
         return { bad, complete: false };
       }
+      /**
+       * Applies one candidate to the standing chain and classifies the result.
+       * @param {{op: string, params: Object<string, number>}} candidate - The op to probe.
+       * @returns {string} 'ok', 'bad', 'exhausted' when the tooling arena filled, or 'trapped' when the instance died.
+       * @details The recorded reason is read back before any further bridge
+       * call can overwrite it, so the mesh is freed after the verdict.
+       */
+      const attempt = (candidate) => {
+        try {
+          const out = applyOp(mesh, candidate);
+          const classes = out.classifyFaces();
+          const verdict = classes ? 'ok'
+            : (meshOpFailure(Mod, 'Face classification').flush ? 'exhausted' : 'bad');
+          out.delete();
+          return verdict;
+        } catch (e) {
+          validator.noteDeath(e);
+          if (e instanceof WebAssembly.RuntimeError) return 'trapped';
+          // applyOp raises a soft reject as a throw; of the reasons behind one,
+          // only a full arena is cleared by flushing it.
+          return meshOpFailure(Mod, `Op "${candidate.op}"`).flush ? 'exhausted' : 'bad';
+        }
+      };
+
       for (const op of candidates) {
         /** @type {{op: string, params: Object<string, number>}} */
         const candidate = { op, params: {} };
         for (const [key, def] of Object.entries(OP_DEFS[op]?.params ?? {})) {
           candidate.params[key] = def.val;
         }
-        try {
-          const out = applyOp(mesh, candidate);
-          const classes = out.classifyFaces();
-          out.delete();
-          if (!classes) bad.add(op);
-        } catch (e) {
+        let verdict = attempt(candidate);
+        if (verdict === 'exhausted') {
+          // A full arena rejects every later candidate too, so reclaim it and
+          // judge this one on an arena it does not share with its predecessors.
+          try { mesh.delete(); Mod.MeshOps.clearToolingMemory(); mesh = build(Mod); }
+          catch (e) { validator.noteDeath(e); return { bad, complete: false }; }
+          verdict = attempt(candidate);
+        }
+        if (verdict === 'trapped') {
           bad.add(op);
-          validator.noteDeath(e);
-          if (e instanceof WebAssembly.RuntimeError) {
-            // Instance is wedged; respawn and rebuild for the remaining probes.
-            Mod = await validator.acquire();
-            if (!Mod) return { bad, complete: false };
-            try { mesh = build(Mod); }
-            catch (e2) { validator.noteDeath(e2); return { bad, complete: false }; }
-          }
+          // Instance is wedged; respawn and rebuild for the remaining probes.
+          Mod = await validator.acquire();
+          if (!Mod) return { bad, complete: false };
+          try { mesh = build(Mod); }
+          catch (e) { validator.noteDeath(e); return { bad, complete: false }; }
+        } else if (verdict !== 'ok') {
+          bad.add(op);
         }
       }
       try { mesh.delete(); Mod.MeshOps.clearToolingMemory(); }

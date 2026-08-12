@@ -811,7 +811,7 @@ function fakeModule(onOp = () => { }, { rejects = new Set(), reason = 'ARENA_EXH
       classifyFaces() { onOp('classifyFaces'); return rejected('classifyFaces') ? null : new Int32Array(1); },
     };
     for (const op of KNOWN_OPS) {
-      mesh[op] = () => { onOp(op); return makeMesh(); };
+      mesh[op] = () => { onOp(op); return rejected(op) ? null : makeMesh(); };
     }
     return mesh;
   };
@@ -1155,6 +1155,37 @@ test('createOpGate respawns mid-sweep after a candidate traps', async () => {
   assert.deepEqual([...probe.blocked], ['ambo']);
   assert.equal(probe.complete, true);
   assert.equal(spawns, 2);
+});
+
+/**
+ * Verifies a candidate that fills the tooling arena does not condemn the
+ * candidates behind it: the arena is reclaimed, the chain rebuilt, and the
+ * candidate judged on an arena its predecessors did not fill.
+ */
+test('createOpGate reclaims the arena and re-judges the candidate that filled it', async () => {
+  const rejects = new Set(['kis']);
+  let seen = 0;
+  // The arena is full for the first kis and reclaimed for the retry.
+  const { Mod, state } = fakeModule((op) => {
+    if (op === 'kis' && seen++ >= 1) rejects.delete('kis');
+  }, { rejects });
+  const gate = createOpGate(createChainValidator(async () => Mod));
+
+  const probe = await gate.refresh('cube', [], CANDIDATES);
+  assert.deepEqual([...probe.blocked], [], 'an exhausted arena is not an illegal op');
+  assert.equal(probe.complete, true);
+  assert.ok(state.cleared > 0, 'the sweep must flush the arena it filled');
+  assert.equal(state.live, 0, 'the rebuild must free the chain it replaced');
+});
+
+/** Verifies a candidate that exhausts a reclaimed arena too is blocked, and only it. */
+test('createOpGate blocks a candidate that refills a reclaimed arena', async () => {
+  const { Mod } = fakeModule(() => { }, { rejects: new Set(['kis']) });
+  const gate = createOpGate(createChainValidator(async () => Mod));
+
+  const probe = await gate.refresh('cube', [], CANDIDATES);
+  assert.deepEqual([...probe.blocked], ['kis']);
+  assert.equal(probe.complete, true);
 });
 
 /** Verifies a chain whose topology is unchanged is not re-swept. */
