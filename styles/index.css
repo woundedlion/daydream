@@ -709,6 +709,13 @@
   }
 }
 
+.gui-container .effect-gui .lil-controller.param-warning > .lil-name::after {
+  content: "\26a0";
+  color: #facc15;
+  margin-left: 0.4em;
+  text-shadow: 0 0 2px #000;
+}
+
 div.labelLayer {
   pointer-events: none;
   position: absolute;

@@ -373,6 +373,60 @@ test('parameter definitions separate rendered and requested state', () => {
     'reload/worker initialization can copy the accepted write immediately');
 });
 
+test('ShaderBall reports an invalid selector without changing its neighbors', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
+  const before = engine.getParameterDefinitions();
+  const rootValue = (name) => before.find((d) => d.name === name)?.requestedValue;
+
+  assert.equal(engine.setParameter('Projection', 3), M.ParamSetResult.APPLIED);
+  const after = engine.getParameterDefinitions();
+  const projection = after.find((d) => d.name === 'Projection');
+  assert.equal(projection?.requestedValue, 3);
+  assert.match(projection?.warning ?? '', /requires Projection = Stereographic/);
+  for (const name of ['Function', 'Lens', 'Outer Warp', 'Inner Warp', 'Coverage']) {
+    assert.equal(after.find((d) => d.name === name)?.requestedValue, rootValue(name),
+      `${name} must not move as a byproduct of the Projection edit`);
+  }
+
+  assert.equal(engine.setParameter('Outer Warp', 0), M.ParamSetResult.APPLIED);
+  const repaired = engine.getParameterDefinitions().find((d) => d.name === 'Projection');
+  assert.equal(repaired?.warning, undefined,
+    'making the existing tuple compatible admits the pending Projection');
+});
+
+test('ShaderBall keeps Mirror Tile when dodecahedral Grid becomes Primitive Lattice', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
+  assert.equal(engine.selectPreset(28), true);
+
+  const before = engine.getParameterDefinitions();
+  const functionDef = before.find((d) => d.name === 'Function');
+  const outerDef = before.find((d) => d.name === 'Outer Warp');
+  const innerDef = before.find((d) => d.name === 'Inner Warp');
+  const primitiveLattice = functionDef?.options?.indexOf('Primitive Lattice');
+  const mirrorTile = outerDef?.options?.indexOf('Mirror Tile');
+  const stereoNoise = innerDef?.options?.indexOf('Stereo Noise');
+  assert.equal(outerDef?.requestedValue, mirrorTile);
+  assert.equal(innerDef?.requestedValue, stereoNoise);
+
+  assert.equal(engine.setParameter('Function', primitiveLattice), M.ParamSetResult.APPLIED);
+  const requested = engine.getParameterDefinitions();
+  assert.equal(requested.find((d) => d.name === 'Outer Warp')?.requestedValue, mirrorTile,
+    'the Function edit must not rewrite the requested Outer Warp');
+  assert.equal(requested.find((d) => d.name === 'Inner Warp')?.requestedValue, stereoNoise,
+    'the Function edit must not rewrite the requested Inner Warp');
+  assert.equal(requested.find((d) => d.name === 'Function')?.warning, undefined);
+
+  engine.drawFrame();
+  const rendered = engine.getParameterDefinitions();
+  assert.equal(rendered.find((d) => d.name === 'Function')?.value, primitiveLattice);
+  assert.equal(rendered.find((d) => d.name === 'Outer Warp')?.value, mirrorTile,
+    'the rendered Outer Warp must remain Mirror Tile');
+  assert.equal(rendered.find((d) => d.name === 'Inner Warp')?.value, stereoNoise,
+    'the rendered Inner Warp must remain Stereo Noise');
+});
+
 test('strobeColumns and getEffectSizes return the shapes daydream consumes', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('DisplacementField'), M.EffectSetResult.INSTALLED,

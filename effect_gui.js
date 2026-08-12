@@ -64,6 +64,11 @@ export function addParamControl(gui, state, p, hydrate = true) {
   }
   controller.isBoolean = (kind === 'boolean');
   controller.isContinuous = (kind === 'number' || kind === 'integer');
+  if (p.warning) {
+    controller.domElement.classList.add('param-warning');
+    controller.domElement.setAttribute('title', p.warning);
+    controller.domElement.setAttribute('aria-invalid', 'true');
+  }
   return controller;
 }
 
