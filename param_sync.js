@@ -70,6 +70,14 @@ export function engineParamValue(value) {
 }
 
 /**
+ * @param {{value: *, requestedValue?: *}} parameter - Engine parameter definition.
+ * @returns {*} The state an interactive selector must display.
+ */
+export function selectorControlValue(parameter) {
+  return parameter.requestedValue ?? parameter.value;
+}
+
+/**
  * Build the lil-gui choices object for an enumerated engine parameter: option
  * label -> option index, the float value the engine expects from setParameter.
  *

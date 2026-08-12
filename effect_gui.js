@@ -21,6 +21,7 @@ import {
   paramExportBlocker,
   paramGenerationStale,
   paramValueSkew,
+  selectorControlValue,
 } from "./param_sync.js";
 import { formatExportParams } from "./tools/export_params.js";
 
@@ -63,6 +64,7 @@ export function addParamControl(gui, state, p, hydrate = true) {
     controller = add(state, p.name, p.min, p.max).decimals(3);
   }
   controller.isBoolean = (kind === 'boolean');
+  controller.isEnum = (kind === 'enum');
   controller.isContinuous = (kind === 'number' || kind === 'integer');
   if (p.warning) {
     controller.domElement.classList.add('param-warning');
@@ -221,6 +223,17 @@ export function createEffectGui({
     fx.preset.controller.updateDisplay();
   }
 
+  function adoptRequestedEnums(fx) {
+    for (const parameter of getParameterDefinitions()) {
+      const controller = fx.controllerByName.get(parameter.name);
+      if (!controller?.isEnum) continue;
+      const value = selectorControlValue(parameter);
+      if (controller.getValue() === value) continue;
+      controller.object[controller.property] = value;
+      controller.updateDisplay();
+    }
+  }
+
   /**
    * Push the engine's per-frame parameter values back into the effect GUI so
    * all rendered params track live without clobbering an active drag.
@@ -241,6 +254,7 @@ export function createEffectGui({
     adoptPauseDisplay(activeEffect, engineAnimationsPaused());
     adoptPresetDisplay(activeEffect, presetCount, presetIndex);
     if (!activeEffect.hasParams) return;
+    adoptRequestedEnums(activeEffect);
 
     const values = liveParamValues();
     if (!values || values.length === 0) return;
@@ -262,6 +276,7 @@ export function createEffectGui({
     for (let i = 0; i < n; i++) {
       const c = activeEffect.controllerByName.get(names[i]);
       if (!c) continue;
+      if (c.isEnum) continue;
 
       const isEditing = c.dragging;
 
@@ -495,7 +510,9 @@ export function createEffectGui({
     fx.hasParams = params.length > 0;
 
     params.forEach(p => {
-      state[p.name] = p.value;
+      state[p.name] = paramControlKind(p) === 'enum'
+        ? selectorControlValue(p)
+        : p.value;
 
       const controller = addParamControl(
         fx.gui, state, p, !previousParamNames?.has(p.name));

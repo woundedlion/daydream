@@ -18,6 +18,7 @@ import {
   ResolutionSetResult, EffectSetResult,
 } from './fake_engine.js';
 import { isViewLive, refreshPixelView } from '../pixel_view.js';
+import { selectorControlValue } from '../param_sync.js';
 
 // The module's stdout, captured rather than dropped: the WASM bridge answers an
 // out-of-domain op argument by clamping it and logging, so this is the only
@@ -374,6 +375,8 @@ test('parameter definitions separate rendered and requested state', () => {
     'reload/worker initialization can copy the accepted write immediately');
   assert.equal(after.acceptedValue, requested,
     'a valid request is immediately available as the renderer seed');
+  assert.equal(selectorControlValue(after), requested,
+    'the GUI selector must retain the accepted request while rendering catches up');
 });
 
 test('ShaderBall reports an invalid selector without changing its neighbors', () => {
