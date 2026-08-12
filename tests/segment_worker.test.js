@@ -658,6 +658,20 @@ test('init applies the carried params AFTER setEffect rebuilds to defaults', asy
   assert.deepEqual(engineInstance.params, [['Speed', 0.5], ['Glow', 1.0]]);
 });
 
+test('init restores accepted params before replaying rejected requests', async () => {
+  await dispatch({
+    type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'ShaderBall',
+    params: [
+      { name: 'Outer Warp', acceptedValue: 0, value: 6 },
+      { name: 'Outer Warp Scale', acceptedValue: 1, value: 100 },
+    ],
+  });
+  assert.deepEqual(engineInstance.params, [
+    ['Outer Warp', 0], ['Outer Warp Scale', 1],
+    ['Outer Warp', 6], ['Outer Warp Scale', 100],
+  ]);
+});
+
 test('init selects the carried preset before applying tuned params', async () => {
   await dispatch({
     type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma',

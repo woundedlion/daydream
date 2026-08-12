@@ -303,6 +303,8 @@ export class SegmentController {
     /** @type {number[] | null} */
     this.paramValues = null;  // segment 0's latest param values, for GUI sync
     this.paramRevision = 0;
+    /** @type {Map<string, number>} */
+    this.acceptedParams = new Map();
     /** @type {number | null} */
     this.presetCount = null;
     /** @type {number | null} */
@@ -879,28 +881,45 @@ export class SegmentController {
   }
 
   /**
-   * Snapshot the main engine's requested parameter values, flattened for
-   * structured-clone transport (bools encoded as 1/0). The displayed value may
-   * still be interpolating, so it cannot seed a new renderer. Empty when no
-   * engine is bound. Shared by the init message (create) and the effect switch
-   * (setEffect), which both need the worker to land on the user's values rather
-   * than defaults.
+   * Snapshot the main engine's accepted and requested parameter values,
+   * flattened for structured-clone transport (bools encoded as 1/0). Workers
+   * restore the accepted render state first, then replay pending requests.
    * @returns {import('./worker_protocol.js').SegParam[]}
    */
   snapshotParams() {
     const engine = this.getWasmEngine();
     if (!engine) return [];
     const defs = engine.getParameterDefinitions();
-    /** @type {import('./worker_protocol.js').SegParam[]} */
-    const params = [];
+    /** @type {Map<string, import('./worker_protocol.js').SegParam>} */
+    const params = new Map();
+    for (const [name, acceptedValue] of this.acceptedParams) {
+      params.set(name, { name, acceptedValue });
+    }
     for (let i = 0; i < defs.length; i++) {
       const p = defs[i];
       const requestedValue = /** @type {number|boolean|undefined} */ (p.requestedValue);
       const requested = requestedValue ?? p.value;
       const v = (typeof requested === 'boolean') ? (requested ? 1.0 : 0.0) : requested;
-      params.push({ name: p.name, value: v });
+      const acceptedValue = /** @type {number|boolean|undefined} */ (p.acceptedValue);
+      const accepted = acceptedValue ?? requested;
+      const acceptedV = (typeof accepted === 'boolean')
+        ? (accepted ? 1.0 : 0.0) : accepted;
+      const entry = params.get(p.name) ?? { name: p.name };
+      entry.value = v;
+      entry.acceptedValue = acceptedV;
+      params.set(p.name, entry);
     }
-    return params;
+    return [...params.values()];
+  }
+
+  /** @param {{name: string, value: number}[]} params */
+  rememberAcceptedParams(params) {
+    for (const parameter of params)
+      this.acceptedParams.set(parameter.name, parameter.value);
+  }
+
+  resetAcceptedParams() {
+    this.acceptedParams.clear();
   }
 
   /**

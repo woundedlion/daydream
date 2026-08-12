@@ -25,12 +25,12 @@
  * same-named but reshaped message. Bump on any breaking change to the messages below.
  * @type {number}
  */
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
 
 /**
  * One tuned effect parameter, flattened for structured-clone transport. Booleans
  * are encoded as 1/0 so the value is always a plain number.
- * @typedef {{ name: string, value: number }} SegParam
+ * @typedef {{ name: string, value?: number, acceptedValue?: number }} SegParam
  */
 
 /**

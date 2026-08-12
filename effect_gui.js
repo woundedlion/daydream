@@ -91,6 +91,11 @@ export function addParamControl(gui, state, p, hydrate = true) {
  *   parameter to the main engine.
  * @param {(name: string, value: number) => void} deps.setWorkerParam - Writes one
  *   parameter to the worker pool.
+ * @param {(params: Array<{name: string, value: number}>) => void}
+ *   [deps.rememberWorkerAcceptedParams] - Retains accepted values needed when a
+ *   worker rebuilds while the GUI holds a rejected request.
+ * @param {() => void} [deps.resetWorkerAcceptedParams] - Clears accepted values
+ *   belonging to the previous effect.
  * @param {(paused: boolean) => void} deps.setAnimationsPaused - Freezes/resumes
  *   animation-driven params on every engine.
  * @param {() => number} deps.getPresetCount - Number of presets on the live effect.
@@ -123,6 +128,8 @@ export function createEffectGui({
   engineParamValues,
   setEngineParam,
   setWorkerParam,
+  rememberWorkerAcceptedParams = () => {},
+  resetWorkerAcceptedParams = () => {},
   setAnimationsPaused,
   getPresetCount,
   getPresetIndex,
@@ -140,6 +147,39 @@ export function createEffectGui({
   // Throttle the param/value length-skew warning to once per skew episode.
   let skewLogged = false;
   let rebuildFailureGeneration;
+  const acceptedStorageKey = (name) => `__accepted.${name}`;
+
+  function persistAcceptedParams(gui) {
+    const acceptedParams = [];
+    for (const parameter of getParameterDefinitions()) {
+      if (parameter.readonly) continue;
+      const accepted = parameter.acceptedValue
+        ?? parameter.requestedValue ?? parameter.value;
+      acceptedParams.push({ name: parameter.name, value: engineParamValue(accepted) });
+      gui?.writeStoredValue?.(acceptedStorageKey(parameter.name), accepted);
+    }
+    rememberWorkerAcceptedParams(acceptedParams);
+  }
+
+  function restoreAcceptedParams(gui) {
+    if (typeof gui?.readStoredNumber !== 'function') return;
+    const restored = new Set();
+    for (;;) {
+      let parameter;
+      let value;
+      for (const candidate of getParameterDefinitions()) {
+        if (candidate.readonly || restored.has(candidate.name)) continue;
+        const stored = gui.readStoredNumber(acceptedStorageKey(candidate.name));
+        if (stored === undefined) continue;
+        parameter = candidate;
+        value = stored;
+        break;
+      }
+      if (!parameter) return;
+      restored.add(parameter.name);
+      setEngineParam(parameter.name, value);
+    }
+  }
 
   /**
    * Live per-frame parameter values for the active effect. Once the worker pool
@@ -329,6 +369,7 @@ export function createEffectGui({
         if (count <= 0) return;
         const index = (getPresetIndex() + delta + count) % count;
         if (!selectPreset(index)) return;
+        persistAcceptedParams(fx.gui);
         adoptPresetDisplay(fx, count, index);
         adoptPauseDisplay(fx, engineAnimationsPaused() ?? true);
       };
@@ -462,7 +503,9 @@ export function createEffectGui({
 
       controller.onChange(v => {
         const value = engineParamValue(v);
+        persistAcceptedParams(fx.gui);
         setEngineParam(p.name, value);
+        persistAcceptedParams(fx.gui);
         setWorkerParam(p.name, value);
         adoptEnginePause(pause, p);
       });
@@ -474,12 +517,14 @@ export function createEffectGui({
    * old record live until this succeeds makes a schema rebuild atomic from the
    * panel's point of view.
    * @param {{initialPause?: boolean, hydratePause?: boolean,
+   *   restoreAccepted?: boolean,
    *   previousParamNames?: Set<string>|null}} [options] - Rebuild state.
    * @returns {Object} A complete, unmounted effect record.
    */
   function createEffectRecord({
     initialPause = false,
     hydratePause = true,
+    restoreAccepted = false,
     previousParamNames = null,
   } = {}) {
     const fx = {
@@ -489,6 +534,7 @@ export function createEffectGui({
     };
 
     try {
+      if (restoreAccepted) restoreAcceptedParams(fx.gui);
       const params = getParameterDefinitions();
       const reservedParams = params
         .filter((p) => RESERVED_CONTROL_NAMES.has(p.name))
@@ -622,7 +668,9 @@ export function createEffectGui({
      * @returns {void}
      */
     build() {
-      activeEffect = createEffectRecord();
+      resetWorkerAcceptedParams();
+      activeEffect = createEffectRecord({ restoreAccepted: true });
+      persistAcceptedParams(activeEffect.gui);
       skewLogged = false;
     },
 

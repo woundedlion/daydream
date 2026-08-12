@@ -150,6 +150,36 @@ class DeepLinkGUI {
   }
 
   /**
+   * Read a numeric companion value without creating a visible control.
+   * @param {string} prop - Companion property name within this GUI namespace.
+   * @returns {number|undefined} Parsed value, or undefined when absent/invalid.
+   */
+  readStoredNumber(prop) {
+    const key = this.getKey(prop);
+    this.urlKeys.add(key);
+    const params = getUrlParams();
+    if (!params.has(key)) return undefined;
+    const value = parseUrlNumber(params.get(key));
+    if (value === null) {
+      console.warn(`DeepLinkGUI: ignoring non-numeric stored value for "${key}"`);
+      return undefined;
+    }
+    return value;
+  }
+
+  /**
+   * Write or clear a companion value without creating a visible control.
+   * @param {string} prop - Companion property name within this GUI namespace.
+   * @param {string|number|boolean|null|undefined} value - Value, or null to clear.
+   * @returns {void}
+   */
+  writeStoredValue(prop, value) {
+    const key = this.getKey(prop);
+    this.urlKeys.add(key);
+    this.urlWriter(key, value);
+  }
+
+  /**
    * Installs the deep-link URL writer as the controller's onChange and redirects
    * any later caller onChange(fn) to user handlers that run ahead of the writer.
    * lil-gui keeps a single onChange slot, so without this a caller doing

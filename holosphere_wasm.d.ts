@@ -71,6 +71,8 @@ export interface BooleanParameterDefinition extends ParameterDefinitionBase {
   value: boolean;
   /** Writable target copied when another renderer is initialized. */
   requestedValue: boolean;
+  /** Last value admitted for rendering. */
+  acceptedValue: boolean;
 }
 
 /**
@@ -86,6 +88,8 @@ export interface NumericParameterDefinition extends ParameterDefinitionBase {
   value: number;
   /** Writable target copied when another renderer is initialized. */
   requestedValue: number;
+  /** Last value admitted for rendering. */
+  acceptedValue: number;
   min: number;
   max: number;
   step?: number;
