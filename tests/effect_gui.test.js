@@ -64,13 +64,20 @@ function fakeController(object, property, args) {
  * lil-gui root double.
  * @returns {Object} The GUI double.
  */
-function fakeGui(hydrated = {}) {
+function fakeGui(hydrated = {}, stored = {}) {
   return {
     domElement: fakeElement('div'),
     controllers: [],
     closed: false,
     destroyed: 0,
     destroyThrows: null,
+    stored,
+    storedWrites: [],
+    readStoredNumber(property) { return this.stored[property]; },
+    writeStoredValue(property, value) {
+      this.stored[property] = value;
+      this.storedWrites.push([property, value]);
+    },
     close() { this.closed = true; },
     destroy() {
       this.destroyed += 1;
@@ -152,6 +159,7 @@ function makeHarness({
   isMobile = false,
   container = fakeElement('div'),
   hydrated = {},
+  acceptedStored = {},
   pausesOnWrite = (p) => Boolean(p.animated),
   pauseAccessor = true,
   onEngineParam = () => {},
@@ -175,6 +183,7 @@ function makeHarness({
   };
   const writes = [];
   const warnings = [];
+  const acceptedSnapshots = [];
   const guis = [];
   const dragTarget = fakeElement('window');
   // Engine double: owns the animation-pause state the panel now reads back,
@@ -182,7 +191,11 @@ function makeHarness({
   const engine = { paused: false };
 
   const panel = createEffectGui({
-    createGui: () => { const gui = fakeGui(hydrated); guis.push(gui); return gui; },
+    createGui: () => {
+      const gui = fakeGui(hydrated, acceptedStored);
+      guis.push(gui);
+      return gui;
+    },
     getParameterDefinitions: () => state.params,
     paramGeneration: () => state.generation,
     segmentsOwnDisplay: () => state.ownsDisplay,
@@ -195,6 +208,8 @@ function makeHarness({
       onEngineParam(name, value, state);
     },
     setWorkerParam: (name, value) => writes.push(`worker:${name}=${value}`),
+    rememberWorkerAcceptedParams: (params) => acceptedSnapshots.push(params),
+    resetWorkerAcceptedParams: () => acceptedSnapshots.push('reset'),
     setAnimationsPaused: (paused) => {
       writes.push(`paused:${paused}`);
       engine.paused = paused;
@@ -227,6 +242,7 @@ function makeHarness({
   });
 
   return { panel, state, writes, warnings, guis, dragTarget, container, engine,
+           acceptedSnapshots,
            gui: () => guis[guis.length - 1] };
 }
 
@@ -310,6 +326,38 @@ test('build records the value-stream order and stamps the effect generation', ()
   assert.deepEqual([...fx.controllerByName.keys()], ['Speed', 'Glow', 'Frames']);
   assert.equal(fx.paramGeneration, 7);
   assert.equal(fx.hasParams, true);
+});
+
+test('build restores the last accepted value before replaying an invalid request', () => {
+  const outer = {
+    name: 'Outer Warp', value: 1, requestedValue: 1, acceptedValue: 1,
+    options: ['None', 'Stereo Noise', 'Vector Noise', 'Curl Flow'],
+  };
+  const h = makeHarness({
+    params: [outer],
+    hydrated: { 'Outer Warp': 3 },
+    acceptedStored: { '__accepted.Outer Warp': 0 },
+    onEngineParam: (_name, value) => {
+      outer.requestedValue = value;
+      if (value !== 3) {
+        outer.value = value;
+        outer.acceptedValue = value;
+      }
+    },
+  });
+
+  h.panel.build();
+
+  assert.deepEqual(h.writes, [
+    'engine:Outer Warp=0',
+    'engine:Outer Warp=3',
+    'worker:Outer Warp=3',
+  ]);
+  assert.equal(h.gui().ctrl('Outer Warp').getValue(), 3);
+  assert.equal(h.gui().stored['__accepted.Outer Warp'], 0);
+  assert.deepEqual(h.acceptedSnapshots.at(-1), [
+    { name: 'Outer Warp', value: 0 },
+  ]);
 });
 
 test('build warns when engine params collide with effect controls', () => {

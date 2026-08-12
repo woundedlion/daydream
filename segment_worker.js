@@ -167,7 +167,13 @@ async function handleMessage(msg) {
       }
       // Tuned params must follow setEffect, which rebuilds with defaults.
       if (msg.params) {
-        for (const p of msg.params) engine.setParameter(p.name, p.value);
+        for (const p of msg.params) {
+          if (typeof p.acceptedValue === 'number')
+            engine.setParameter(p.name, p.acceptedValue);
+        }
+        for (const p of msg.params) {
+          if (typeof p.value === 'number') engine.setParameter(p.name, p.value);
+        }
       }
       if (typeof msg.paused === 'boolean') engine.setAnimationsPaused(msg.paused);
       if (typeof msg.poleLod === 'number') engine.setPoleLod(msg.poleLod);
@@ -192,7 +198,13 @@ async function handleMessage(msg) {
         }
         // Tuned params must follow setEffect, which rebuilds with defaults.
         if (msg.params) {
-          for (const p of msg.params) engine.setParameter(p.name, p.value);
+          for (const p of msg.params) {
+            if (typeof p.acceptedValue === 'number')
+              engine.setParameter(p.name, p.acceptedValue);
+          }
+          for (const p of msg.params) {
+            if (typeof p.value === 'number') engine.setParameter(p.name, p.value);
+          }
         }
         if (typeof msg.paused === 'boolean') {
           engine.setAnimationsPaused(msg.paused);

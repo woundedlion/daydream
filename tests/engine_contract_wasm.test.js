@@ -362,6 +362,7 @@ test('parameter definitions separate rendered and requested state', () => {
   const before = engine.getParameterDefinitions().find((d) => d.name === 'Lens');
   assert.ok(before, 'ShaderBall must expose the Lens selector');
   assert.equal(typeof before.requestedValue, 'number');
+  assert.equal(typeof before.acceptedValue, 'number');
 
   const requested = before.value === 4 ? 5 : 4;
   assert.equal(engine.setParameter('Lens', requested), M.ParamSetResult.APPLIED);
@@ -371,6 +372,8 @@ test('parameter definitions separate rendered and requested state', () => {
     'the GUI value remains the renderer-owned state until a frame advances');
   assert.equal(after.requestedValue, requested,
     'reload/worker initialization can copy the accepted write immediately');
+  assert.equal(after.acceptedValue, requested,
+    'a valid request is immediately available as the renderer seed');
 });
 
 test('ShaderBall reports an invalid selector without changing its neighbors', () => {
@@ -383,6 +386,8 @@ test('ShaderBall reports an invalid selector without changing its neighbors', ()
   const after = engine.getParameterDefinitions();
   const projection = after.find((d) => d.name === 'Projection');
   assert.equal(projection?.requestedValue, 3);
+  assert.equal(projection?.acceptedValue, rootValue('Projection'),
+    'the renderer seed remains on the last accepted projection');
   assert.match(projection?.warning ?? '', /requires Projection = Stereographic/);
   for (const name of ['Function', 'Lens', 'Outer Warp', 'Inner Warp', 'Coverage']) {
     assert.equal(after.find((d) => d.name === name)?.requestedValue, rootValue(name),
@@ -395,10 +400,26 @@ test('ShaderBall reports an invalid selector without changing its neighbors', ()
     'making the existing tuple compatible admits the pending Projection');
 });
 
+test('ShaderBall exposes rejected Curl Flow separately from the accepted warp', () => {
+  assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
+  assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
+  assert.equal(engine.setParameter('Outer Warp', 0), M.ParamSetResult.APPLIED);
+  const outer = engine.getParameterDefinitions().find((d) => d.name === 'Outer Warp');
+  const curlFlow = outer?.options?.indexOf('Curl Flow');
+  assert.notEqual(curlFlow, undefined);
+
+  assert.equal(engine.setParameter('Outer Warp', curlFlow), M.ParamSetResult.APPLIED);
+  const rejected = engine.getParameterDefinitions().find((d) => d.name === 'Outer Warp');
+  assert.equal(rejected?.requestedValue, curlFlow);
+  assert.equal(rejected?.acceptedValue, 0,
+    'reload must seed the renderer with None, not the preset Stereo Noise');
+  assert.match(rejected?.warning ?? '', /Outer Curl Flow rejected/);
+});
+
 test('ShaderBall keeps Mirror Tile when dodecahedral Grid becomes Primitive Lattice', () => {
   assert.ok(resolutionOk(engine.setResolution(W, H)), `${W}x${H} must stay buildable`);
   assert.equal(engine.setEffect('ShaderBall'), M.EffectSetResult.INSTALLED);
-  assert.equal(engine.selectPreset(28), true);
+  assert.equal(engine.selectPreset(18), true);
 
   const before = engine.getParameterDefinitions();
   const functionDef = before.find((d) => d.name === 'Function');

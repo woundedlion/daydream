@@ -2090,7 +2090,8 @@ test('turning segmented mode off hands the global stat bars back', () => {
 /**
  * Minimal stand-in for the WASM engine exposing just getParameterDefinitions().
  * @param {Array<{name: string, value: number|boolean,
- *   requestedValue?: number|boolean}>} defs - Param defs.
+ *   requestedValue?: number|boolean,
+ *   acceptedValue?: number|boolean}>} defs - Param defs.
  * @returns {{ getParameterDefinitions: () => Array }} Fake engine.
  */
 function fakeEngine(defs, presetCount = 0, presetIndex = 0) {
@@ -2106,19 +2107,19 @@ test('fakeEngine mocks only methods the real engine surface pins', () => {
     'engine_contract_wasm.test.js never checks these against the real module');
 });
 
-test('snapshotParams() copies requested state, not an in-flight rendered value', () => {
+test('snapshotParams() carries accepted and requested state independently', () => {
   const c = makeController();
   c.getWasmEngine = () => fakeEngine([
-    { name: 'Speed', value: 0.5, requestedValue: 0.9 },
-    { name: 'Glow', value: false, requestedValue: true },
+    { name: 'Speed', value: 0.5, requestedValue: 0.9, acceptedValue: 0.4 },
+    { name: 'Glow', value: false, requestedValue: true, acceptedValue: false },
     { name: 'Invert', value: false },
     { name: 'Count', value: 7 },
   ]);
   assert.deepEqual(c.snapshotParams(), [
-    { name: 'Speed', value: 0.9 },
-    { name: 'Glow', value: 1.0 },
-    { name: 'Invert', value: 0.0 },
-    { name: 'Count', value: 7 },
+    { name: 'Speed', value: 0.9, acceptedValue: 0.4 },
+    { name: 'Glow', value: 1.0, acceptedValue: 0.0 },
+    { name: 'Invert', value: 0.0, acceptedValue: 0.0 },
+    { name: 'Count', value: 7, acceptedValue: 7 },
   ]);
 });
 
@@ -2141,8 +2142,8 @@ test('setEffect broadcasts the name plus the tuned param snapshot to every worke
     assert.equal(msgs.length, 1, 'each worker received exactly one setEffect');
     assert.equal(msgs[0].name, 'NewEffect');
     assert.deepEqual(msgs[0].params, [
-      { name: 'Speed', value: 0.5 },
-      { name: 'Glow', value: 1.0 },
+      { name: 'Speed', value: 0.5, acceptedValue: 0.5 },
+      { name: 'Glow', value: 1.0, acceptedValue: 1.0 },
     ]);
     assert.equal(msgs[0].paused, false);
     assert.equal(msgs[0].paramRevision, c.paramRevision);
@@ -2193,7 +2194,8 @@ test('setResolution re-applies the effect so no worker is left unclipped', () =>
       ['init', 'setResolution', 'setEffect'],
       'the resize is followed by the effect rebuild that restores the clip');
     assert.equal(w.posted[2].name, 'Ribbons', 'the active effect is restored');
-    assert.deepEqual(w.posted[2].params, [{ name: 'Speed', value: 0.25 }],
+    assert.deepEqual(w.posted[2].params,
+      [{ name: 'Speed', value: 0.25, acceptedValue: 0.25 }],
       'tuned values ride along so the rebuild does not land on defaults');
     assert.equal(w.posted[2].paused, false);
   }
