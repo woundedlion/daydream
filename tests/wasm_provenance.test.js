@@ -2,9 +2,10 @@
 // them. deploy.yml runs the same checks, but only after a push has already made
 // master public, so a dirty or partial engine install turns a public deploy red.
 //
-// Every artifact is read from HEAD rather than the working tree: a checkout
-// mid-`cmake --install` carries rebuilt binaries that were never committed, and
-// only committed content is what gets pushed and deployed.
+// The provenance itself is read from HEAD rather than the working tree: a
+// checkout mid-`cmake --install` carries rebuilt binaries that were never
+// committed, and only committed content is what gets pushed and deployed. The
+// last case closes the gap that opens between the two.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -19,6 +20,8 @@ const PIN = 'holosphere_wasm.sha';
 const BINARY = 'holosphere_wasm.wasm';
 const GLUE = 'holosphere_wasm.js';
 const TOOLCHAIN = 'holosphere_wasm.toolchain';
+const INSTALLED = [BINARY, GLUE, MANIFEST, PIN, TOOLCHAIN];
+const CLEAN_ENV = 'DAYDREAM_WASM_CLEAN_REQUIRED';
 
 /**
  * Runs git in the repo.
@@ -127,8 +130,34 @@ test('the toolchain record only ever moved with the binary it describes', () => 
   }
 });
 
+// The checks above all read HEAD, but engine_contract_wasm, color_parity_wasm
+// and segment_composite_wasm load the module from the working tree. Where the
+// two disagree, a green suite exercised bytes other than the ones being pushed
+// and deployed.
+//
+// A rebuilt-but-uncommitted install is the normal state while an engine change
+// is being tested here, so this runs only where the distinction is real:
+// .githooks/pre-push and js-unit-suite.yml declare it.
+test('the working-tree WASM artifacts are the committed ones', {
+  skip: process.env[CLEAN_ENV]
+    ? false
+    : `set ${CLEAN_ENV} to require the installed artifacts to match HEAD`,
+}, () => {
+  // .gitattributes pins all five to LF or binary, so a blob's bytes are its
+  // checkout bytes even under core.autocrlf, and a raw compare is exact.
+  for (const name of INSTALLED) {
+    assert.ok(readFileSync(resolve(REPO, name)).equals(committed(name)),
+      `the working tree's ${name} differs from HEAD, so the WASM suites loaded ` +
+        'a module that is not the committed one and their result says nothing ' +
+        'about what gets deployed — commit the installed artifacts together, or ' +
+        'restore them with `git checkout -- holosphere_wasm.*`');
+  }
+});
+
 test('the pre-push hook runs this provenance gate', () => {
   const hook = readFileSync(resolve(REPO, '.githooks/pre-push'), 'utf8');
   assert.match(hook, /tests\/wasm_provenance\.test\.js/,
     'the provenance gate must run from .githooks/pre-push, not only from npm test');
+  assert.match(hook, new RegExp(`${CLEAN_ENV}=`),
+    `the hook must set ${CLEAN_ENV}, or the working-tree check never runs before a push`);
 });
