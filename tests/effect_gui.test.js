@@ -274,6 +274,21 @@ test('an enumerated param becomes a dropdown of labels to engine indices', () =>
   assert.equal(controller.isContinuous, false);
 });
 
+test('an invalid param carries an actionable warning indicator and tooltip', () => {
+  const gui = fakeGui();
+  const warning = 'Legacy Stereo Noise requires Projection = Stereographic.';
+  const controller = addParamControl(gui, { Projection: 3 }, {
+    name: 'Projection',
+    value: 3,
+    options: ['Sinusoidal', 'Stereographic', 'Gnomonic', 'Bonne'],
+    warning,
+  });
+
+  assert.equal(controller.domElement.classList.contains('param-warning'), true);
+  assert.equal(controller.domElement.getAttribute('title'), warning);
+  assert.equal(controller.domElement.getAttribute('aria-invalid'), 'true');
+});
+
 test('a boolean carrying option labels stays a toggle', () => {
   const gui = fakeGui();
   const controller = addParamControl(gui, { Glow: true },

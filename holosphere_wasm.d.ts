@@ -61,6 +61,8 @@ export interface ParameterDefinitionBase {
   readonly: boolean;
   /** True when a preset export carries this parameter. */
   preset: boolean;
+  /** Actionable reason the requested value cannot currently be rendered. */
+  warning?: string;
 }
 
 /** A toggle. Its value is a JS boolean and it carries no range or options. */
