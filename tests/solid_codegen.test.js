@@ -1086,6 +1086,16 @@ test('solids.html shape-checks a restore before it commits', () => {
     'a refused restore must say so rather than fail silently');
 });
 
+/** Verifies a NaN vertex readback is refused outright rather than passed on as an empty mesh. */
+test('wasmMeshToJs refuses a NaN vertex readback', () => {
+  const fn = SOLIDS_HTML.match(/function wasmMeshToJs\(wasmMesh\) \{[\s\S]*?\n {4}\}/)?.[0];
+  assert.ok(fn, 'wasmMeshToJs must stay a named function in solids.html');
+  const guard = fn.match(/if \(Number\.isNaN\([\s\S]*?\n {8}\}/)?.[0];
+  assert.ok(guard, 'the readback must still reject NaN vertices');
+  assert.match(guard, /showMeshError\(/, 'a NaN readback must reach the error line, not only the console');
+  assert.match(guard, /return null;/, 'a NaN readback must not yield a mesh that save and export accept');
+});
+
 /** Verifies a transient spawn failure is retried rather than disabling validation for good. */
 test('createChainValidator retries after a failed spawn', async () => {
   let spawns = 0;
