@@ -560,6 +560,15 @@ test('readStoredNumber migrates a legacy companion key', () => {
   }
 });
 
+test('readStoredString returns an opaque namespaced companion value', () => {
+  const snapshot = '{"schemaVersion":2,"accepted":[4294967295]}';
+  installWindow(`?fx.__fullConfig=${encodeURIComponent(snapshot)}`);
+  const gui = new DeepLinkGUI({ autoPlace: false }, 'fx');
+
+  assert.equal(gui.readStoredString('__fullConfig'), snapshot);
+  assert.deepEqual(gui.collectUrlKeys(), ['fx.__fullConfig']);
+});
+
 test('addUnhydrated keeps the current value but still deep-links later edits', () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   const url = installRecordingWindow('?fx.Speed=9');

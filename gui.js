@@ -178,6 +178,18 @@ class DeepLinkGUI {
   }
 
   /**
+   * Read an opaque companion value without creating a visible control.
+   * @param {string} prop - Companion property name within this GUI namespace.
+   * @returns {string|undefined} Stored text, or undefined when absent.
+   */
+  readStoredString(prop) {
+    const key = this.getKey(prop);
+    this.urlKeys.add(key);
+    const params = getUrlParams();
+    return params.has(key) ? params.get(key) ?? undefined : undefined;
+  }
+
+  /**
    * Write or clear a companion value without creating a visible control.
    * @param {string} prop - Companion property name within this GUI namespace.
    * @param {string|number|boolean|null|undefined} value - Value, or null to clear.

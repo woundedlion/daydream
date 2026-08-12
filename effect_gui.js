@@ -30,6 +30,7 @@ export const FLASH_MS = 1500;
 // Transient Export button labels.
 export const EXPORT_COPIED = '\u2713 Copied!';
 export const EXPORT_FAILED = '\u2717 Copy failed';
+export const FULL_CONFIG_STORAGE_KEY = '__fullConfig';
 const RESERVED_CONTROL_NAMES = new Set([
   'reset', 'export', 'presetIndex', 'previousPreset', 'nextPreset', 'pause'
 ]);
@@ -123,11 +124,14 @@ function shaderBallControlLabel(stage, name) {
  * @param {Object} state - The GUI-bound value object.
  * @param {Object} p - The parameter definition.
  * @param {boolean} [hydrate=true] - Whether a matching deep link may seed it.
+ * @param {Array<string>} [legacyNames=[]] - Former deep-link property names.
+ * @param {boolean} [persist=true] - Whether the control owns a deep-link key.
  * @returns {Object} The created controller.
  */
-export function addParamControl(gui, state, p, hydrate = true, legacyNames = []) {
+export function addParamControl(
+  gui, state, p, hydrate = true, legacyNames = [], persist = true) {
   const kind = paramControlKind(p);
-  const add = p.readonly
+  const add = p.readonly || !persist
     ? (...args) => gui.addSession(...args)
     : hydrate && legacyNames.length > 0
         && typeof gui.addMigrated === 'function'
@@ -201,6 +205,15 @@ export function addParamControl(gui, state, p, hydrate = true, legacyNames = [])
  *   drag continues outside the control's own DOM.
  * @param {(text: string) => Promise<boolean>} deps.copyText - Copies text using
  *   the browser's available clipboard path.
+ * @param {() => boolean} [deps.usesFullConfigSnapshot] - Whether the active
+ *   effect persists through the exhaustive versioned snapshot API.
+ * @param {() => Object|null} [deps.getFullConfigSnapshot] - Captures that state.
+ * @param {(snapshot: Object) => boolean} [deps.restoreFullConfigSnapshot] -
+ *   Atomically restores a captured state.
+ * @param {() => string} [deps.getConfigImportNotice] - Reads a migration notice.
+ * @param {() => void} [deps.clearConfigImportNotice] - Consumes that notice.
+ * @param {(message: string|null) => void} [deps.showConfigImportNotice] - Shows
+ *   or clears the migration notice.
  * @param {(message: string, error?: any) => void} [deps.logWarn] - Console sink.
  * @returns {{active: () => Object|null, liveParamValues: () => ArrayLike<number>|null,
  *   build: () => void, applyAnimationPause: () => void, mount: () => void,
@@ -228,6 +241,12 @@ export function createEffectGui({
   isMobile,
   dragTarget,
   copyText,
+  usesFullConfigSnapshot = () => false,
+  getFullConfigSnapshot = () => null,
+  restoreFullConfigSnapshot = () => false,
+  getConfigImportNotice = () => '',
+  clearConfigImportNotice = () => {},
+  showConfigImportNotice = () => {},
   logWarn = (...args) => console.warn(...args),
 }) {
   let activeEffect = null;
@@ -235,6 +254,43 @@ export function createEffectGui({
   let skewLogged = false;
   let rebuildFailureGeneration;
   const acceptedStorageKey = (name) => `__accepted.${name}`;
+
+  function persistEffectState(gui) {
+    if (!usesFullConfigSnapshot()) {
+      persistAcceptedParams(gui);
+      return;
+    }
+    const snapshot = getFullConfigSnapshot();
+    if (!snapshot) return;
+    gui?.writeStoredValue?.(FULL_CONFIG_STORAGE_KEY, JSON.stringify(snapshot));
+  }
+
+  function restoreEffectState(gui) {
+    if (!usesFullConfigSnapshot()) {
+      restoreAcceptedParams(gui);
+      return;
+    }
+    const text = gui?.readStoredString?.(FULL_CONFIG_STORAGE_KEY);
+    if (text === undefined) return;
+    let snapshot;
+    try {
+      snapshot = JSON.parse(text);
+      if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+        throw new TypeError('snapshot must be an object');
+      }
+      if (!Object.hasOwn(snapshot, 'schemaVersion')) snapshot.schemaVersion = 1;
+    } catch (error) {
+      logWarn('ShaderBall: ignoring invalid full-config snapshot', error);
+      return;
+    }
+    if (!restoreFullConfigSnapshot(snapshot)) {
+      logWarn('ShaderBall: full-config snapshot was rejected');
+      return;
+    }
+    const notice = getConfigImportNotice();
+    clearConfigImportNotice();
+    showConfigImportNotice(notice || null);
+  }
 
   function persistAcceptedParams(gui) {
     const acceptedParams = [];
@@ -383,6 +439,26 @@ export function createEffectGui({
    * @returns {void}
    */
   function exportParams(fx, params, flashExport) {
+    if (usesFullConfigSnapshot()) {
+      const snapshot = getFullConfigSnapshot();
+      if (!snapshot || typeof copyText !== 'function') {
+        logWarn('Export: ShaderBall full-config snapshot is unavailable');
+        flashExport(EXPORT_FAILED);
+        return;
+      }
+      copyText(JSON.stringify(snapshot, null, 2)).then((copied) => {
+        if (activeEffect !== fx) return;
+        if (copied) flashExport(EXPORT_COPIED);
+        else {
+          logWarn('Export: clipboard copy failed');
+          flashExport(EXPORT_FAILED);
+        }
+      }).catch((err) => {
+        logWarn('Export: clipboard copy failed', err);
+        if (activeEffect === fx) flashExport(EXPORT_FAILED);
+      });
+      return;
+    }
     let values = liveParamValues();
     if ((!values || values.length === 0)
         && !paramGenerationStale(fx.paramGeneration, paramGeneration())) {
@@ -473,7 +549,7 @@ export function createEffectGui({
           adoptPresetDisplay(fx, count, getPresetIndex());
           return;
         }
-        persistAcceptedParams(fx.gui);
+        persistEffectState(fx.gui);
         adoptPresetDisplay(fx, count, index);
         adoptPauseDisplay(fx, engineAnimationsPaused() ?? true);
       };
@@ -615,7 +691,7 @@ export function createEffectGui({
       const controlGui = stage ? stageFolders.get(stage) : fx.gui;
       const controller = addParamControl(
         controlGui, state, p, !previousParamNames?.has(p.name),
-        legacyShaderBallParamNames(p.name));
+        legacyShaderBallParamNames(p.name), !usesFullConfigSnapshot());
       if (stage) controller.name(shaderBallControlLabel(stage, p.name));
       fx.paramNames.push(p.name);
       fx.controllerByName.set(p.name, controller);
@@ -629,9 +705,8 @@ export function createEffectGui({
 
       controller.onChange(v => {
         const value = engineParamValue(v);
-        persistAcceptedParams(fx.gui);
         setEngineParam(p.name, value);
-        persistAcceptedParams(fx.gui);
+        persistEffectState(fx.gui);
         setWorkerParam(p.name, value);
         adoptEnginePause(pause, p);
       });
@@ -660,7 +735,7 @@ export function createEffectGui({
     };
 
     try {
-      if (restoreAccepted) restoreAcceptedParams(fx.gui);
+      if (restoreAccepted) restoreEffectState(fx.gui);
       const params = getParameterDefinitions();
       const reservedParams = params
         .filter((p) => RESERVED_CONTROL_NAMES.has(p.name))
@@ -796,7 +871,7 @@ export function createEffectGui({
     build() {
       resetWorkerAcceptedParams();
       activeEffect = createEffectRecord({ restoreAccepted: true });
-      persistAcceptedParams(activeEffect.gui);
+      persistEffectState(activeEffect.gui);
       skewLogged = false;
     },
 
