@@ -915,11 +915,10 @@
       const vArray = requireMesh(wasmMesh.getVertices(), 'Mesh vertex readback');
       if (!vArray) return null;
 
-      // NaN Check
       for (let i = 0; i < vArray.length; i++) {
         if (Number.isNaN(vArray[i])) {
-          console.error("WASM returned NaN vertex at index", i);
-          return { vertices: [], faces: [] }; // Fail gracefully
+          showMeshError(`Mesh vertex readback failed: component ${i} is NaN`);
+          return null;
         }
       }
 
