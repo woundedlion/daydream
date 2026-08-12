@@ -14,8 +14,8 @@ import {
   DEFINED_SEED_CONSTANTS, applyOp, meshOpFailure, MESH_OP_RESULT_NAMES,
 } from '../tools/solid_codegen.js';
 import {
-  ENGINE_METHODS, ParamSetResult, ClipSetResult,
-  ResolutionSetResult, EffectSetResult,
+  ENGINE_METHODS, ENGINE_OPTIONAL_METHODS, ParamSetResult, ClipSetResult,
+  ResolutionSetResult, EffectSetResult, FullConfigRestoreResult,
 } from './fake_engine.js';
 import { isViewLive, refreshPixelView } from '../pixel_view.js';
 import { selectorControlValue } from '../param_sync.js';
@@ -66,11 +66,15 @@ function interfaceBody(name) {
 
 test('holosphere_wasm.d.ts declares the pinned engine method roster', () => {
   const body = interfaceBody('HolosphereEngine');
+  // The `\??` accepts the optional members the full-config surface is declared
+  // as; without it they parse as nothing and are pinned by neither loop below.
   const declared = new Set(
-    [...body.matchAll(/^\s*([A-Za-z_]\w*)\s*\(/gm)].map((m) => m[1]));
+    [...body.matchAll(/^\s*([A-Za-z_]\w*)\??\s*\(/gm)].map((m) => m[1]));
   // getAnimationsPaused is read through an optional call, so it is absent from
   // ENGINE_METHODS while still being part of the surface the app drives.
-  for (const name of [...ENGINE_METHODS, 'getAnimationsPaused']) {
+  for (const name of [
+    ...ENGINE_METHODS, ...ENGINE_OPTIONAL_METHODS, 'getAnimationsPaused',
+  ]) {
     assert.ok(declared.has(name),
       `holosphere_wasm.d.ts is missing ${name}, which the app calls`);
   }
@@ -142,6 +146,23 @@ test('the module EffectSetResult enum matches the fake_engine.js mirror', () => 
   for (const name of Object.keys(EffectSetResult)) {
     assert.equal(M.EffectSetResult[name].value, EffectSetResult[name].value,
       `fake_engine.js EffectSetResult.${name}.value must match the module`);
+  }
+});
+
+// daydream.js compares restoreFullConfigSnapshot's return against
+// module.FullConfigRestoreResult?.APPLIED and segment_worker.js reads the whole
+// roster off the module, both through optional chains: a renumbered or dropped
+// value reads as a silent restore failure at those call sites.
+test('the module FullConfigRestoreResult enum matches the fake_engine.js mirror', () => {
+  assert.ok(M.FullConfigRestoreResult, 'the module must export FullConfigRestoreResult');
+  const moduleNames = Object.keys(M.FullConfigRestoreResult)
+    .filter((k) => M.FullConfigRestoreResult[k] instanceof M.FullConfigRestoreResult);
+  assert.deepEqual(moduleNames.sort(), Object.keys(FullConfigRestoreResult).sort(),
+    'fake_engine.js FullConfigRestoreResult must mirror the module enum roster');
+  for (const name of Object.keys(FullConfigRestoreResult)) {
+    assert.equal(M.FullConfigRestoreResult[name].value,
+      FullConfigRestoreResult[name].value,
+      `fake_engine.js FullConfigRestoreResult.${name}.value must match the module`);
   }
 });
 
