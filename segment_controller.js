@@ -540,7 +540,7 @@ export class SegmentController {
       return out;
     };
 
-    const initialParams = this.snapshotParams();
+    const initialState = this.snapshotEffectState();
 
     for (let i = 0; i < numSegments; i++) {
       let worker;
@@ -675,7 +675,7 @@ export class SegmentController {
           w: res.w,
           h: res.h,
           effectName: this.appState.get('effect'),
-          params: initialParams,
+          ...initialState,
           paused: this.animationsPaused,
           presetIndex: this.presetIndex ?? undefined,
           poleLod: this.poleLod,
@@ -912,6 +912,22 @@ export class SegmentController {
     return [...params.values()];
   }
 
+  /**
+   * Capture the rebuild state for the active effect. ShaderBall owns a complete
+   * versioned snapshot; all other effects retain the parameter-list protocol.
+   * @returns {{params?: import('./worker_protocol.js').SegParam[],
+   *   fullConfigSnapshot?: import('./worker_protocol.js').FullConfigSnapshot}}
+   */
+  snapshotEffectState() {
+    const engine = this.getWasmEngine();
+    if (this.appState.get('effect') === 'ShaderBall'
+        && typeof engine?.getFullConfigSnapshot === 'function') {
+      const snapshot = engine.getFullConfigSnapshot();
+      if (snapshot) return { fullConfigSnapshot: snapshot };
+    }
+    return { params: this.snapshotParams() };
+  }
+
   /** @param {{name: string, value: number}[]} params */
   rememberAcceptedParams(params) {
     for (const parameter of params)
@@ -967,7 +983,7 @@ export class SegmentController {
     this.broadcast({
       type: 'setEffect',
       name,
-      params: this.snapshotParams(),
+      ...this.snapshotEffectState(),
       paused: this.animationsPaused,
       presetIndex: this.presetIndex ?? undefined,
       paramRevision: this.paramRevision,
@@ -1070,7 +1086,7 @@ export class SegmentController {
     this.broadcast({
       type: 'setEffect',
       name: this.appState.get('effect'),
-      params: this.snapshotParams(),
+      ...this.snapshotEffectState(),
       paused: this.animationsPaused,
       presetIndex: this.presetIndex ?? undefined,
       paramRevision: this.paramRevision,

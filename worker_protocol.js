@@ -25,12 +25,27 @@
  * same-named but reshaped message. Bump on any breaking change to the messages below.
  * @type {number}
  */
-export const PROTOCOL_VERSION = 8;
+export const PROTOCOL_VERSION = 9;
 
 /**
  * One tuned effect parameter, flattened for structured-clone transport. Booleans
  * are encoded as 1/0 so the value is always a plain number.
  * @typedef {{ name: string, value?: number, acceptedValue?: number }} SegParam
+ */
+
+/**
+ * Versioned ShaderBall state. Field-array indices are defined by the engine's
+ * exhaustive stable field-ID table, never by the current presentation schema.
+ * Accepted/requested entries are uint32 payload words and must not pass through
+ * floating-point reinterpretation during persistence or transport.
+ * @typedef {{
+ *   schemaVersion: number,
+ *   accepted: number[],
+ *   requested: number[],
+ *   pendingFieldIds: number[],
+ *   hasRuntime: boolean,
+ *   runtime: number[],
+ * }} FullConfigSnapshot
  */
 
 /**
@@ -64,7 +79,8 @@ export const PROTOCOL_VERSION = 8;
  * @typedef {{
  *   type: 'init', version: number, segId: number, totalSegs: number,
  *   w: number, h: number,
- *   effectName?: string, params?: SegParam[], paused?: boolean,
+ *   effectName?: string, params?: SegParam[],
+ *   fullConfigSnapshot?: FullConfigSnapshot, paused?: boolean,
  *   presetIndex?: number,
  *   poleLod?: number, paramRevision: number, wasmModule?: WebAssembly.Module,
  * }} InitMsg
@@ -75,6 +91,7 @@ export const PROTOCOL_VERSION = 8;
  * current tuned values, applied AFTER engine.setEffect() — which rebuilds the
  * effect with defaults — so the segment matches instead of reverting to defaults.
  * @typedef {{ type: 'setEffect', name: string, params?: SegParam[],
+ *   fullConfigSnapshot?: FullConfigSnapshot,
  *   paused?: boolean, presetIndex?: number, paramRevision: number }} SetEffectMsg
  */
 

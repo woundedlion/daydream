@@ -2128,6 +2128,30 @@ test('snapshotParams() is empty when no engine is bound', () => {
   assert.deepEqual(c.snapshotParams(), []);
 });
 
+test('ShaderBall rebuild state uses the exhaustive full-config snapshot', () => {
+  const snapshot = {
+    schemaVersion: 2,
+    accepted: [1, 2, 3], requested: [1, 9, 3], pendingFieldIds: [1],
+    hasRuntime: true, runtime: [0.25],
+  };
+  const c = makeController({ effect: 'ShaderBall' });
+  c.getWasmEngine = () => ({
+    getFullConfigSnapshot: () => snapshot,
+    getParameterDefinitions: () => {
+      throw new Error('dynamic definitions are not persistence');
+    },
+  });
+  assert.deepEqual(c.snapshotEffectState(), { fullConfigSnapshot: snapshot });
+});
+
+test('ShaderBall falls back to params until the snapshot API is installed', () => {
+  const c = makeController({ effect: 'ShaderBall' });
+  c.getWasmEngine = () => fakeEngine([{ name: 'Speed', value: 0.5 }]);
+  assert.deepEqual(c.snapshotEffectState(), {
+    params: [{ name: 'Speed', value: 0.5, acceptedValue: 0.5 }],
+  });
+});
+
 test('setEffect broadcasts the name plus the tuned param snapshot to every worker', () => {
   const c = readyController(2);
   c.getWasmEngine = () => fakeEngine([

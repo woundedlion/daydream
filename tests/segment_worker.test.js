@@ -9,6 +9,7 @@ import { PROTOCOL_VERSION } from '../worker_protocol.js';
 import {
   unpinnedEngineMethods, ParamSetResult, ClipSetResult,
   ResolutionSetResult, EffectSetResult,
+  FullConfigRestoreResult,
 } from './fake_engine.js';
 
 // ---------------------------------------------------------------------------
@@ -79,6 +80,14 @@ class FakeEngine {
     this.params.push([name, value]);
     return ParamSetResult.APPLIED;
   }
+  getFullConfigSnapshot() { return null; }
+  restoreFullConfigSnapshot(snapshot) {
+    this.calls.push(['restoreFullConfigSnapshot', snapshot]);
+    return FullConfigRestoreResult.APPLIED;
+  }
+  getFullConfigFieldDefinitions() { return []; }
+  getConfigImportNotice() { return ''; }
+  clearConfigImportNotice() {}
   setAnimationsPaused(p) {
     this.calls.push(['setAnimationsPaused', p]);
     this.paused = p;
@@ -154,6 +163,7 @@ mock.module('../holosphere_wasm.js', {
       ClipSetResult,
       ResolutionSetResult,
       EffectSetResult,
+      FullConfigRestoreResult,
       HolosphereEngine: class {
         constructor() {
           engineInstance = new FakeEngine();
@@ -672,6 +682,22 @@ test('init restores accepted params before replaying rejected requests', async (
   ]);
 });
 
+test('init restores ShaderBall full config atomically instead of replaying params', async () => {
+  const snapshot = {
+    schemaVersion: 2,
+    accepted: [1, 2], requested: [1, 7], pendingFieldIds: [1],
+    hasRuntime: false, runtime: [],
+  };
+  await dispatch({
+    type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
+    effectName: 'ShaderBall', fullConfigSnapshot: snapshot,
+  });
+  assert.deepEqual(engineInstance.calls.find((call) =>
+    call[0] === 'restoreFullConfigSnapshot'),
+  ['restoreFullConfigSnapshot', snapshot]);
+  assert.deepEqual(engineInstance.params, []);
+});
+
 test('init selects the carried preset before applying tuned params', async () => {
   await dispatch({
     type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4, effectName: 'Plasma',
@@ -725,6 +751,24 @@ test('setEffect handler rebuilds, then re-applies the carried param snapshot', a
   posted.length = 0;
   await dispatch({ type: 'render' });
   assert.equal(posted.find((p) => p.msg.type === 'frame').msg.paramRevision, 9);
+});
+
+test('setEffect restores ShaderBall snapshot after rebuilding', async () => {
+  await dispatch({ type: 'init', segId: 0, totalSegs: 2, w: 8, h: 4,
+    effectName: 'Plasma' });
+  const snapshot = {
+    schemaVersion: 2,
+    accepted: [3], requested: [4], pendingFieldIds: [0],
+    hasRuntime: false, runtime: [],
+  };
+  await dispatch({
+    type: 'setEffect', name: 'ShaderBall', fullConfigSnapshot: snapshot,
+    paramRevision: 14,
+  });
+  assert.deepEqual(engineInstance.calls.slice(-2), [
+    ['setEffect', 'ShaderBall'],
+    ['restoreFullConfigSnapshot', snapshot],
+  ]);
 });
 
 test('setEffect re-applies pause after rebuilding the worker engine', async () => {

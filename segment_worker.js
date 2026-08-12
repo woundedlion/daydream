@@ -57,6 +57,31 @@ let clipFullFrame = false;
 let arenaMetricsWarned = false;
 
 /**
+ * Restore a complete ShaderBall snapshot after the effect has been rebuilt.
+ * @param {import('./worker_protocol.js').FullConfigSnapshot|undefined} snapshot
+ * @returns {boolean} True when no snapshot was supplied or it was accepted.
+ */
+function restoreFullConfig(snapshot) {
+  if (!snapshot) return true;
+  if (!engine || !wasmModule
+      || typeof engine.restoreFullConfigSnapshot !== 'function'
+      || !wasmModule.FullConfigRestoreResult) {
+    post({ type: 'engineRejected',
+           reason: 'ShaderBall full-config restore API is unavailable' });
+    return false;
+  }
+  const result = engine.restoreFullConfigSnapshot(snapshot);
+  const restoreResults = wasmModule.FullConfigRestoreResult;
+  if (result === restoreResults.APPLIED) return true;
+  const name = Object.entries(restoreResults)
+    .find(([, value]) => value === result)?.[0]
+    ?? `value ${String(result?.value ?? result)}`;
+  post({ type: 'engineRejected',
+         reason: `ShaderBall full-config restore rejected: ${name}` });
+  return false;
+}
+
+/**
  * Apply the stored segment clip rectangle to the engine. Must be called after
  * every setEffect, since rebuilding the effect resets the clip.
  * @details setClip answers a Module.ClipSetResult enum value; compare against
@@ -165,6 +190,7 @@ async function handleMessage(msg) {
       if (typeof msg.presetIndex === 'number') {
         engine.selectPreset(msg.presetIndex);
       }
+      if (!restoreFullConfig(msg.fullConfigSnapshot)) break;
       // Tuned params must follow setEffect, which rebuilds with defaults.
       if (msg.params) {
         for (const p of msg.params) {
@@ -196,6 +222,7 @@ async function handleMessage(msg) {
         if (typeof msg.presetIndex === 'number') {
           engine.selectPreset(msg.presetIndex);
         }
+        if (!restoreFullConfig(msg.fullConfigSnapshot)) break;
         // Tuned params must follow setEffect, which rebuilds with defaults.
         if (msg.params) {
           for (const p of msg.params) {
